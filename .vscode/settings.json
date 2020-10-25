@@ -4,6 +4,9 @@
         "xstring": "cpp",
         "*.tcc": "cpp",
         "cstdio": "cpp",
-        "xlocnum": "cpp"
+        "xlocnum": "cpp",
+        "string": "cpp",
+        "xlocale": "cpp",
+        "xutility": "cpp"
     }
 }
