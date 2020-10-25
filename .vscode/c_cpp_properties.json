@@ -3,8 +3,12 @@
         {
             "name": "Win32",
             "includePath": [
+                "C:\\Users\\Robert\\AppData\\Local\\Arduino15\\packages\\esp32\\tools\\**",
+                "C:\\Users\\Robert\\AppData\\Local\\Arduino15\\packages\\esp32\\hardware\\esp32\\1.0.4\\**",
                 "C:\\Users\\Robert\\AppData\\Local\\Arduino15\\packages\\esp8266\\tools\\**",
-                "C:\\Users\\Robert\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.7.4\\**"
+                "C:\\Users\\Robert\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.7.4\\**",
+                "D:\\Users\\Robert\\Documents\\Arduino\\libraries\\**",
+                "${workspaceFolder}\\**"
             ],
             "forcedInclude": [],
             "intelliSenseMode": "msvc-x64",

@@ -1,6 +1,6 @@
 /* 
 ***************************************************************************  
-**  Program  : OTGWStuff, part of OTGWloggerAPI
+**  Program  : OTGWStuff
 **  Version  : v0.0.1
 **
 **  Copyright (c) 2020 Robert van den Breemen
@@ -301,6 +301,7 @@ void print_f88(float _OTdata, const char *_label, const char*_unit)
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
+  sendMQTTData(sJson.c_str());
 }
 
 void print_s16(int16_t _OTdata, const char *_label, const char*_unit)
@@ -338,6 +339,7 @@ void print_s8s8(uint16_t _OTdata, const char *_label, const char*_unit)
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
+  sendMQTTData(sJson.c_str());
 }
 
 
@@ -357,6 +359,7 @@ void print_u16(uint16_t _OTdata, const char *_label, const char*_unit)
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());  
   //SendMQTT
+  sendMQTTData(sJson.c_str());
 }
 
 void print_status(uint16_t _OTdata, const char *_label, const char*_unit)
@@ -423,6 +426,7 @@ void print_status(uint16_t _OTdata, const char *_label, const char*_unit)
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
+  sendMQTTData(sJson.c_str());
 }
 
 void print_ASFflags(uint16_t _OTdata, const char *_label, const char*_unit)
@@ -463,6 +467,7 @@ void print_ASFflags(uint16_t _OTdata, const char *_label, const char*_unit)
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
+  sendMQTTData(sJson.c_str());
 }
 
 void print_flag8u8(uint16_t _OTdata, const char *_label, const char*_unit)
@@ -494,6 +499,7 @@ void print_flag8u8(uint16_t _OTdata, const char *_label, const char*_unit)
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
+  sendMQTTData(sJson.c_str());
 }
 
 void print_flag8(uint16_t _OTdata, const char *_label, const char*_unit)
@@ -525,6 +531,7 @@ void print_flag8(uint16_t _OTdata, const char *_label, const char*_unit)
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
+  sendMQTTData(sJson.c_str());
 }
 
 void print_flag8flag8(uint16_t _OTdata, const char *_label, const char*_unit)
@@ -565,6 +572,7 @@ void print_flag8flag8(uint16_t _OTdata, const char *_label, const char*_unit)
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
+  sendMQTTData(sJson.c_str());
 }
 
 void print_u8u8(uint16_t _OTdata, const char *_label, const char*_unit)
@@ -584,6 +592,7 @@ void print_u8u8(uint16_t _OTdata, const char *_label, const char*_unit)
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
+  sendMQTTData(sJson.c_str());
 }
 
 void print_daytime(uint16_t _OTdata, const char *_label, const char*_unit)
@@ -604,6 +613,7 @@ void print_daytime(uint16_t _OTdata, const char *_label, const char*_unit)
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
+  sendMQTTData(sJson.c_str());
 }
 
 

@@ -95,6 +95,9 @@ void setup()
   httpServer.begin();
   DebugTln("\nServer started\r");
   
+  // Start MQTT connection
+  startMQTT();
+
   // Set up first message as the IP address
   sprintf(cMsg, "%03d.%03d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
   DebugTf("\nAssigned IP[%s]\r\n", cMsg);
@@ -161,7 +164,7 @@ void doBackgroundTasks()
   httpServer.handleClient();
   MDNS.update();
   events();                     // trigger ezTime update etc.
-  //  handleMQTT();                 // MQTT transmissions
+  handleMQTT();                 // MQTT transmissions
   // handleKeyInput();             // Debug Menu
   blinkLEDms(1000);               // 'blink' the status led every x ms
   yield();
