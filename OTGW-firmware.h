@@ -1,3 +1,15 @@
+/* 
+***************************************************************************  
+**  Program  : OTGW-firmware.h
+**  Version  : v0.0.1
+**
+**  Copyright (c) 2020 Robert van den Breemen
+**  Borrowed from OpenTherm library from: 
+**      https://github.com/jpraus/arduino-opentherm
+**
+**  TERMS OF USE: MIT License. See bottom of file.                                                            
+***************************************************************************      
+*/
 
 //#include <ESP8266WiFi.h>
 
