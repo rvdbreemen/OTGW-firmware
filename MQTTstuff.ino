@@ -176,7 +176,7 @@ String trimVal(char *in)
 } // trimVal()
 
 //===========================================================================================
-void sendMQTTData(const char *message) 
+void sendMQTTData(const char* item, const char *json) 
 {
 /*  
 * The maximum message size, including header, is 128 bytes by default. 
@@ -190,8 +190,13 @@ void sendMQTTData(const char *message)
 
   if (!MQTTclient.connected() || !isValidIP(MQTTbrokerIP)) return;
   DebugTf("Sending data to MQTT server [%s]:[%d]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort);
-  DebugTf("Topic [%d] Message [%s]\r\n", settingMQTTtopTopic.c_str(), message);
-  MQTTclient.publish(settingMQTTtopTopic.c_str(), message); 
+  
+  //build topic
+  char topic[100];
+  snprintf(topic, sizeof(topic), "%s/", settingMQTTtopTopic.c_str());
+  strlcat(topic, item, sizeof(topic));
+  DebugTf("TopicId [%d] Message [%s]\r\n", settingMQTTtopTopic.c_str(), json);
+  MQTTclient.publish(topic, json); 
 
 } // sendMQTTData()
  
