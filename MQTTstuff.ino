@@ -195,7 +195,7 @@ void sendMQTTData(const char* item, const char *json)
   char topic[100];
   snprintf(topic, sizeof(topic), "%s/", settingMQTTtopTopic.c_str());
   strlcat(topic, item, sizeof(topic));
-  DebugTf("TopicId [%d] Message [%s]\r\n", settingMQTTtopTopic.c_str(), json);
+  DebugTf("TopicId [%s] Message [%s]\r\n", settingMQTTtopTopic.c_str(), json);
   MQTTclient.publish(topic, json); 
 
 } // sendMQTTData()

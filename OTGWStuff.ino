@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGWStuff
-**  Version  : v0.1.0
+**  Version  : v0.0.1
 **
 **  Copyright (c) 2020 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -149,25 +149,25 @@ const char *statusToString(OpenThermResponseStatus status)
 {
 	switch (status) {
 		case OT_NONE:    return "NONE";
-		case OT_SUCCESS: return "SUCCESS";
-		case OT_INVALID: return "INVALID";
-		case OT_TIMEOUT: return "TIMEOUT";
-		default:      return "UNKNOWN";
+		case OT_SUCCESS:  return "SUCCESS";
+		case OT_INVALID:  return "INVALID";
+		case OT_TIMEOUT:  return "TIMEOUT";
+		default:          return "UNKNOWN";
 	}
 }
 
 const char *messageTypeToString(OpenThermMessageType message_type)
 {
 	switch (message_type) {
-		case OT_READ_DATA:       return "READ_DATA";
-		case OT_WRITE_DATA:      return "WRITE_DATA";
-		case OT_INVALID_DATA:    return "INVALID_DATA";
-		case OT_RESERVED:        return "RESERVED";
-		case OT_READ_ACK:        return "READ_ACK";
-		case OT_WRITE_ACK:       return "WRITE_ACK";
-		case OT_DATA_INVALID:    return "DATA_INVALID";
-		case OT_UNKNOWN_DATA_ID: return "UNKNOWN_DATA_ID";
-		default:              return "UNKNOWN";
+		case OT_READ_DATA:        return "READ_DATA";
+		case OT_WRITE_DATA:       return "WRITE_DATA";
+		case OT_INVALID_DATA:     return "INVALID_DATA";
+		case OT_RESERVED:         return "RESERVED";
+		case OT_READ_ACK:         return "READ_ACK";
+		case OT_WRITE_ACK:        return "WRITE_ACK";
+		case OT_DATA_INVALID:     return "DATA_INVALID";
+		case OT_UNKNOWN_DATA_ID:  return "UNKNOWN_DATA_ID";
+		default:                  return "UNKNOWN";
 	}
 }
 
@@ -197,7 +197,7 @@ const char *messageIDToString(OpenThermMessageID message_id){
 	    case Date:                      return "Date"; // u8 / u8  Calendar date 
 	    case Year:                      return "Year"; // u16  Calendar year 
 	    case TrSetCH2:                  return "TrSetCH2"; // f8.8  Room Setpoint for 2nd CH circuit (°C)
-	    case Tr:                        return "Tr"; // f8.8  Room temperature (°C)
+	    case Tr:                        return "Troom"; // f8.8  Room temperature (°C)
 	    case Tboiler:                   return "Tboiler"; // f8.8  Boiler flow water temperature (°C)
 	    case Tdhw:                      return "Tdhw"; // f8.8  DHW temperature (°C)
 	    case Toutside:                  return "Toutside"; // f8.8  Outside temperature (°C)
@@ -227,7 +227,7 @@ const char *messageIDToString(OpenThermMessageID message_id){
 	    case OpenThermVersionSlave:     return "OpenThermVersionSlave"; // f8.8  The implemented version of the OpenTherm Protocol Specification in the slave. 
 	    case MasterVersion:             return "MasterVersion"; // u8 / u8  Master product version number and type 
 	    case SlaveVersion:              return "SlaveVersion"; // u8 / u8  Slave product version number and type
-        default:                        return "Unknown";
+      default:                        return "Unknown";
     }
 }
 
@@ -300,7 +300,7 @@ void print_f88(float _OTdata, const char *_label, const char*_unit)
   msgid_0["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
-  Debugf("\r\n%s\r\n", sJson.c_str());
+  DebugTf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -320,7 +320,7 @@ void print_s16(int16_t _OTdata, const char *_label, const char*_unit)
   msgid_0["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
-  Debugf("\r\n%s\r\n", sJson.c_str());
+  DebugTf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -341,7 +341,7 @@ void print_s8s8(uint16_t _OTdata, const char *_label, const char*_unit)
   msgid_0["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
-  Debugf("\r\n%s\r\n", sJson.c_str());
+  DebugTf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -362,7 +362,7 @@ void print_u16(uint16_t _OTdata, const char *_label, const char*_unit)
   msgid_0["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
-  Debugf("\r\n%s\r\n", sJson.c_str());  
+  DebugTf("\r\n%s\r\n", sJson.c_str());  
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -430,7 +430,7 @@ void print_status(uint16_t _OTdata, const char *_label, const char*_unit)
   msgid_0["diagnostic_indicator"] = (((data.valueLB) & 0x40) ? "On" : "Off");
   String sJson;
   serializeJson(doc, sJson);
-  Debugf("\r\n%s\r\n", sJson.c_str());
+  DebugTf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -472,7 +472,7 @@ void print_ASFflags(uint16_t _OTdata, const char *_label, const char*_unit)
   msgid_0["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
-  Debugf("\r\n%s\r\n", sJson.c_str());
+  DebugTf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -505,7 +505,7 @@ void print_flag8u8(uint16_t _OTdata, const char *_label, const char*_unit)
   msgid_0["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
-  Debugf("\r\n%s\r\n", sJson.c_str());
+  DebugTf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -538,7 +538,7 @@ void print_flag8(uint16_t _OTdata, const char *_label, const char*_unit)
   msgid_0["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
-  Debugf("\r\n%s\r\n", sJson.c_str());
+  DebugTf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -580,7 +580,7 @@ void print_flag8flag8(uint16_t _OTdata, const char *_label, const char*_unit)
   msgid_0["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
-  Debugf("\r\n%s\r\n", sJson.c_str());
+  DebugTf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -601,7 +601,7 @@ void print_u8u8(uint16_t _OTdata, const char *_label, const char*_unit)
   msgid_0["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
-  Debugf("\r\n%s\r\n", sJson.c_str());
+  DebugTf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -623,7 +623,7 @@ void print_daytime(uint16_t _OTdata, const char *_label, const char*_unit)
   msgid_0["minutes"] = data.valueLB;
   String sJson;
   serializeJson(doc, sJson);
-  Debugf("\r\n%s\r\n", sJson.c_str());
+  DebugTf("\r\n%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }

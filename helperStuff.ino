@@ -425,11 +425,11 @@ boolean isValidIP(IPAddress ip)
   _isValidIP &= !(ip[0]==127 && ip[1]==0 && ip[2]==0 && ip[3]==1);                 // if not 127.0.0.0 then it might be valid
   _isValidIP &= !(ip[0]>=224);                                                     // if ip[0] >=224 then reserved space  
   
-  DebugTf( "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-  if (_isValidIP) 
-    Debugln(F(" = Valid IP")); 
-  else 
-    Debugln(F(" = Invalid IP!"));
+  // DebugTf( "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+  // if (_isValidIP) 
+  //   Debugln(F(" = Valid IP")); 
+  // else 
+  //   Debugln(F(" = Invalid IP!"));
     
   return _isValidIP;
   
