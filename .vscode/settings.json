@@ -1,0 +1,9 @@
+{
+    "files.associations": {
+        "vector": "cpp",
+        "xstring": "cpp",
+        "*.tcc": "cpp",
+        "cstdio": "cpp",
+        "xlocnum": "cpp"
+    }
+}

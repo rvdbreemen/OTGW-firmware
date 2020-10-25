@@ -1,0 +1,76 @@
+/*
+***************************************************************************  
+**  Program  : FSexplorer.html, part of ESP_ticker
+**  Version  : v1.3.1
+**  For more information visit: https://fipsok.de
+***************************************************************************  
+*/
+body {
+	font-family: sans-serif;
+	//background-color: #a9a9a9;
+	background-color: lightblue;
+	display: flex;
+	flex-flow: column;
+	align-items: left;
+}
+h1,h2 {
+	color: #e1e1e1;
+	text-shadow: 2px 2px 2px black;
+}
+a:link {
+  text-decoration: none;
+}
+input {
+	height: 35px;
+	font-size: 13px;
+}
+h1+main {
+	display: flex;
+}
+section {
+	display: flex;
+	flex-direction: column;
+	padding: 0.2em;
+}
+hr {
+  border: 0;
+  clear:both;
+  display:block;
+  width: 99%;                
+  background-color:darkblue;
+  height: 5px;
+}
+
+#left {
+	align-items: flex-end;
+	text-shadow: 1px 1px 2px #757474;
+}
+.note {
+	background-color: salmon;
+	padding: 0.5em;
+	margin-top: 1em;
+	text-align: center;
+	max-width: 320px;
+	border-radius: 0.5em;
+}
+.button {
+	width: 150px;
+	height: 40px;
+	font-size: 14px;
+	margin-top: 1em;
+	cursor: pointer;
+	background-color: lightgray;
+	box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.7);
+}
+[type=submit] {
+	height: 40px;
+	min-width: 70px;
+}
+[value^=Format] {
+	background-color: #ddd;
+}
+[title] {
+	background-color: silver;
+	font-size: 16px;
+	width: 125px;
+}

@@ -1,0 +1,273 @@
+/*
+***************************************************************************  
+**  Program  : index.css, part of ESP_ticker
+**  Version  : v1.3.1
+**
+**  Copyright (c) 2020 Willem Aandewiel
+**
+**  TERMS OF USE: MIT License. See bottom of file.                                                            
+***************************************************************************      
+*/
+* {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: 'Dosis', sans-serif;
+  line-height: 1.6;
+  color: black;
+  background: #e6ffff;
+}
+
+table {
+  color: black;
+  border-collapse: collapse;
+  width: 90%;
+  background: lightblue;
+}
+
+th {
+  padding-left: 15px;
+  padding-right: 15px;
+  white-space: nowrap;
+  border-right: 1px solid #ddd;
+  border-left: 1px solid #ddd;
+  vertical-align: bottom;
+}
+
+td {
+  padding-left: 15px;
+  padding-right: 15px;
+  white-space: nowrap;
+  border-bottom: 1px solid #ddd;
+  border-right: 1px solid #ddd;
+  border-left: 1px solid #ddd;
+  vertical-align: bottom;
+}
+
+tfoot {
+  font-size: 12px;
+  color: darkblue;
+}
+
+input {
+   padding-top: 3px;
+   padding-bottom: 2px;
+   font-size: 12pt;
+}
+
+.settingDiv {
+  background: lightblue;  
+  white-space: nowrap;  
+}
+
+.outer-div {
+  /*width: 90%; */
+  text-align: center;
+  background-color: #e6ffff 
+}
+.inner-div {
+  display: inline-block; 
+  /*
+  margin: 0 auto;
+  padding: 3px;
+  background-color: lightblue
+  */
+}
+
+.container-card {
+  padding: 50;
+  margin: 50;
+  list-style: none;
+  flex-direction: row; /*row | row-reverse | column | column-reverse*/
+  
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+  
+  -webkit-flex-flow: row wrap;
+  justify-content: space-around; /* flex-start | flex-end | center | space-between | space-around | space-evenly */
+
+}
+
+.container-box {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  flex-direction: column; /*row | row-reverse | column | column-reverse*/
+  
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+  
+  -webkit-flex-flow: column wrap;
+  justify-content: flex-start;
+  margin-top: 10px;
+
+}
+
+/*--------------------- N A V - B A R -----------------*/
+.nav-container {
+  list-style: none;
+  margin: 0; 
+  
+  background: #00bffe;
+  
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex-start;
+  -webkit-flex-flow: row wrap;
+  min-height: 24px; 
+
+}
+
+.nav-img {
+  top: 1px;
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+}
+
+.nav-item {
+  display: inline-block;
+  font-size: 16px;
+  padding: 10px 0;
+  height: 20px;
+  width: 110px;
+  border: none;
+  color: white;
+
+}
+
+.nav-left {
+  flex: 2 1 0;
+  text-align: center; 
+}
+
+.nav-right {
+  flex: 1 1 0;
+  text-align: right;
+  width: 200px; 
+}
+
+.nav-container a:hover {
+  color: black;
+  background: skyblue; /* only for FSexplorer - Rest does not work */
+}
+
+.nav-clock {
+  //top: 1px;
+  color: black;
+  float: right;
+  font-size: small;
+  font-weight:bold;
+  text-align: right;
+  background: white; 
+  width: 200px; 
+  padding-right: 10px;
+  background: #e6ffff;
+}
+
+/*-------------------------*/
+/***
+@media all and (max-width: 600px) {
+  .nav-container {
+    justify-content: space-around;
+  }
+}
+
+@media all and (max-width: 400px) {
+  .nav-container {
+    -webkit-flex-flow: column wrap;
+    flex-flow: column wrap;
+    padding: 0;
+  }
+}
+***/
+
+.tabButton {
+  background-color: white;
+}
+
+.tabButton a:hover {
+  background-color: gray;
+}
+
+
+.header h1 span {
+  position: relative;
+  top: 1px;
+  left: 10px;
+}
+
+.bottom { 
+  position: fixed;
+  font-size: small;
+  color: gray;
+  bottom:0;
+} 
+.right-0  {right: 0; padding-right: 10px; }
+.left-0   {left:  0; padding-left:  10px; }
+            
+//--- next 4 are for the API doc page --------
+.div1 { 
+  float: left;  
+  margin-left: 20px; 
+  margin-top: 10px;
+}
+.div1 a:link, a:visited { 
+  background-color: deepSkyBlue; 
+  color: white; 
+  padding: 5px 15px; 
+  width: 210px; 
+  text-align: right; 
+  text-decoration: none; 
+  display: inline-block;
+}
+.div1 a:hover, a:active { 
+  background-color: deepSkyBlue;
+  color: black;
+}
+
+.div2 { 
+  margin-left: 280px; 
+  margin-top: -52px;
+}
+
+
+/* define tag selectors () -------------------------------------------------- */
+
+button { width: 100px; }
+
+/*
+***************************************************************************
+*
+* Permission is hereby granted, free of charge, to any person obtaining a
+* copy of this software and associated documentation files (the
+* "Software"), to deal in the Software without restriction, including
+* without limitation the rights to use, copy, modify, merge, publish,
+* distribute, sublicense, and/or sell copies of the Software, and to permit
+* persons to whom the Software is furnished to do so, subject to the
+* following conditions:
+*
+* The above copyright notice and this permission notice shall be included
+* in all copies or substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+* OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT
+* OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+* THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+* 
+***************************************************************************
+*/

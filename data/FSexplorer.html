@@ -1,0 +1,134 @@
+<!--
+***************************************************************************  
+**  Program  : FSexplorer.html, part of ESP_ticker
+**  Version  : v1.3.1
+**
+**  Copyright (c) 2020 Willem Aandewiel
+**
+**  TERMS OF USE: MIT License. See bottom of file.                                                            
+***************************************************************************      
+-->
+<!DOCTYPE HTML>
+<html lang="en">
+   <head>
+      <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+      <link rel="stylesheet" href="FSexplorer.css">
+      <title>FSexplorer ESP</title>
+      <script>
+         document.addEventListener('DOMContentLoaded', () => {
+             let span = document.querySelector('span');
+             let main = document.querySelector('main');
+             let fileSize = document.querySelector('fileSize');
+             let elem = document.querySelectorAll('input');
+             //fetch('json').then(function (response) {
+             fetch('api/listfiles').then(function (response) {
+                 return response.json();
+             }).then(function (json) {
+               let dir = '<table width=90%>';
+               for (var i = 0; i < json.length - 1; i++) {
+                 dir += "<tr>";
+                 if (json[i].name.indexOf("More files not") > -1)
+                 {
+                   dir += `<td width=20% nowrap>${json[i].name}</td>`;
+                   dir += `<td width=10% nowrap></td>`;
+                   dir += `<td width=10% nowrap></td>`;
+                 } 
+                 else
+                 {
+                   dir += `<td width=20% nowrap><a href ="${json[i].name}" target="_blank">${json[i].name}</a></td>`;
+                   dir += `<td width=10% nowrap><small>${json[i].size}</small></td>`;
+                   dir += `<td width=10% nowrap><a href ="${json[i].name}"download="${json[i].name}"> Download </a></td>`;
+                   if (   json[i].name != 'FSexplorer.html' && json[i].name != 'FSexplorer.css' && json[i].name != 'FSexplorer.png'
+                       && json[i].name != 'index.html'      && json[i].name != 'index.js'       && json[i].name != 'index.css'
+                   	  && json[i].name != 'settings.png'
+                 	 ) 
+                   {
+                     dir += `<td width=10% nowrap><a href ="${json[i].name}?delete=/${json[i].name}"> Delete </a></td>`;
+                     if (json[i].name == '!format') 
+                     {
+                 	    document.getElementById('FormatSPIFFS').disabled = false;
+                     }
+                   }
+                   else 
+                   {
+                     dir += `<td width=10% nowrap> </td>`;
+                   }
+                 }                 	 
+                 dir += "<td width=50%> </td></tr>";
+               }	// for ..
+               main.insertAdjacentHTML('beforeend', dir);
+               document.querySelectorAll('[href*=delete]').forEach((node) => {
+               		 node.addEventListener('click', () => {
+               		 		 if (!confirm('Weet je zeker dat je dit bestand wilt verwijderen?!')) event.preventDefault();  
+               		 });
+               });
+               main.insertAdjacentHTML('beforeend', '</table>');
+               main.insertAdjacentHTML('beforeend', `<p><b>SPIFFS</b> gebruikt ${json[i].usedBytes} van ${json[i].totalBytes}`);
+               free = json[i].freeBytes;
+               fileSize.innerHTML = "<b> &nbsp; </b><p>";    // spacer                
+
+             });	// function(json)
+             elem[0].addEventListener('change', () => {
+                 let nBytes = elem[0].files[0].size, output = `${nBytes} Byte`;
+                 for (var aMultiples = [
+                     ' KB',
+                     ' MB'
+                    ], i = 0, nApprox = nBytes / 1024; nApprox > 1; nApprox /= 1024, i++) {
+                      output = nApprox.toFixed(2) + aMultiples[i];
+                    }
+                    if (nBytes > free) {
+                      fileSize.innerHTML = `<p><small> Bestand Grootte: ${output}</small><strong style="color: red;"> niet genoeg ruimte! </strong><p>`;
+                      elem[1].setAttribute('disabled', 'disabled');
+                    } 
+                    else {
+                      fileSize.innerHTML = `<b>Bestand grootte:</b> ${output}<p>`;
+                      elem[1].removeAttribute('disabled');
+                    }
+             });
+             //elem[6].addEventListener('click', () => {
+             document.getElementById('FormatSPIFFS').addEventListener('click', () => {
+                 if (!confirm(`Weet je zeker dat je deze functie wilt uitvoeren?\nAls je doorgaat moet je zelf FSexplorer.html en álle andere systeem bestanden weer uploaden!!.`)) event.preventDefault();
+             }); 
+          });
+      </script>
+   </head>
+   <body>
+      <h2>FSexplorer ESP</h2>
+      <div>
+         <main></main>
+      </div>
+      <form action="/upload" method="POST" enctype="multipart/form-data"><input type="file" name="upload">
+         <input type="submit" value="Upload" disabled>
+      </form>
+      <span></span>
+      <fileSize></fileSize>
+      <hr>
+      <div style='width: 40%'>
+        <span>
+        <form style='float: left;' action='/update' method='GET'>
+          <input type='submit' class='button' name='SUBMIT' value='Update Firmware' ENABLED/>
+        </form>
+        <form style='float: right;' action='/'>
+          <input type='submit' class='button' name='SUBMIT' value='Exit FSexplorer'>
+        </form>
+        </span>
+    
+      </div>
+      <div style='width: 40%'>
+        <span>
+        <form style='float: left;' action='/ReBoot'>
+          <input type='submit' class='button' name='SUBMIT' value='ReBoot'>
+        </form>
+
+      </div>
+      <div style='width: 40%'>
+        <span>
+        <form style='float right;' action="/SPIFFSformat" method="POST">
+          <input id='FormatSPIFFS' type='submit' class='button' name='SUBMIT' value='Format SPIFFS' DISABLED/>
+        </form>
+        </span>
+      </div>
+   </body>
+</html>
