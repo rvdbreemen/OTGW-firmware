@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v2.0.1
+**  Version  : v0.0.1
 **
 **  Copyright (c) 2020 Willem Aandewiel
 **
