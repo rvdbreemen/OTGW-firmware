@@ -28,13 +28,12 @@
 #define JSON_BUFF_MAX   1024
 
 WiFiClient  wifiClient;
-bool      Verbose = false;
-char      cMsg[CMSG_SIZE];
-char      fChar[10];
-String    lastReset   = "";
-uint32_t  blinkyTimer;
-char      settingHostname[41];
-uint32_t   upTimeSeconds=0;
+bool        Verbose = false;
+char        cMsg[CMSG_SIZE];
+char        fChar[10];
+String      lastReset   = "";
+char        settingHostname[41];
+uint32_t    upTimeSeconds=0;
 Timezone    CET; 
 
 const char *weekDayName[]  {  "Unknown", "Zondag", "Maandag", "Dinsdag", "Woensdag"
@@ -42,7 +41,7 @@ const char *weekDayName[]  {  "Unknown", "Zondag", "Maandag", "Dinsdag", "Woensd
 const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
 
 //MQTT settings
-String    settingMQTTbroker="192.168.88.254";
+String    settingMQTTbroker= "192.168.88.254";
 int32_t   settingMQTTbrokerPort = 1883;
 String    settingMQTTuser = "";
 String    settingMQTTpasswd = "";
