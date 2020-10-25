@@ -8,5 +8,10 @@ More information on this gateway can be read here: http://otgw.tclcode.com/
 The goal of this OTGW firmware is:
 - parsing the protocol on the NodeMCU (8266)
 - send MQTT messages for every change
+- send to InfluxDB directly 
 - poll a simple REST API
 - enable telnet listening (interpreted data and debugging)
+
+
+version 0.1.0 - MQTT sending added (JSON message)
+version 0.0.1 - parsing of OT protocol (to telnet)
