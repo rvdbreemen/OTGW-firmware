@@ -291,12 +291,13 @@ void print_f88(float _OTdata, const char *_label, const char*_unit)
   _OTdata = round(data.f88()*100.0) / 100.0; // round float 2 digits, like this: x.xx     
   Debugf("%-37s = %3.2f %s", _label, _OTdata , _unit);
   //BuildJOSN for MQTT
-  const size_t capacity = JSON_OBJECT_SIZE(4);
+  const size_t capacity = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(3);
   DynamicJsonDocument doc(capacity);
-  doc["id"]=messageIDToString(static_cast<OpenThermMessageID>(data.id));
-  doc["label"] = _label;
-  doc["value"] = _OTdata;
-  doc["unit"] = _unit;
+  JsonArray msgid = doc.createNestedArray(messageIDToString(static_cast<OpenThermMessageID>(data.id)));
+  JsonObject msgid_0 = msgid.createNestedObject();
+  msgid_0["label"] = _label;
+  msgid_0["value"] = _OTdata;
+  msgid_0["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());
@@ -310,12 +311,13 @@ void print_s16(int16_t _OTdata, const char *_label, const char*_unit)
   _OTdata = data.s16();     
   Debugf("%-37s = %5d %s", _label, _OTdata, _unit);
   //BuildJOSN for MQTT
-  const size_t capacity = JSON_OBJECT_SIZE(4);
+  const size_t capacity = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(3);
   DynamicJsonDocument doc(capacity);
-  doc["id"]=messageIDToString(static_cast<OpenThermMessageID>(data.id));
-  doc["label"] = _label;
-  doc["value"] = _OTdata;
-  doc["unit"] = _unit;
+  JsonArray msgid = doc.createNestedArray(messageIDToString(static_cast<OpenThermMessageID>(data.id)));
+  JsonObject msgid_0 = msgid.createNestedObject();
+  msgid_0["label"] = _label;
+  msgid_0["value"] = _OTdata;
+  msgid_0["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());
@@ -328,13 +330,14 @@ void print_s8s8(uint16_t _OTdata, const char *_label, const char*_unit)
   _OTdata = data.u16();     
   Debugf("%-37s = %3d / %3d %s", _label, (int8_t)data.valueHB, (int8_t)data.valueLB, _unit);
   //BuildJOSN for MQTT
-  const size_t capacity = JSON_OBJECT_SIZE(5);
+  const size_t capacity = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(4);
   DynamicJsonDocument doc(capacity);
-  doc["id"]=messageIDToString(static_cast<OpenThermMessageID>(data.id));
-  doc["label"] = _label;
-  doc["valueHB"] = (int8_t)data.valueHB;
-  doc["valueLB"] = (int8_t)data.valueLB;
-  doc["unit"] = _unit;
+  JsonArray msgid = doc.createNestedArray(messageIDToString(static_cast<OpenThermMessageID>(data.id)));
+  JsonObject msgid_0 = msgid.createNestedObject();
+  msgid_0["label"] = _label;
+  msgid_0["valueHB"] = (int8_t)data.valueHB;
+  msgid_0["valueLB"] = (int8_t)data.valueLB;
+  msgid_0["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());
@@ -349,12 +352,13 @@ void print_u16(uint16_t _OTdata, const char *_label, const char*_unit)
   _OTdata = data.u16();     
   Debugf("%-37s = %5d %s", _label, _OTdata, _unit);
   //BuildJOSN for MQTT
-  const size_t capacity = JSON_OBJECT_SIZE(4);
+  const size_t capacity = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(3);
   DynamicJsonDocument doc(capacity);
-  doc["id"]=messageIDToString(static_cast<OpenThermMessageID>(data.id));
-  doc["label"] = _label;
-  doc["value"] = _OTdata;
-  doc["unit"] = _unit;
+  JsonArray msgid = doc.createNestedArray(messageIDToString(static_cast<OpenThermMessageID>(data.id)));
+  JsonObject msgid_0 = msgid.createNestedObject();
+  msgid_0["label"] = _label;
+  msgid_0["valueHB"] = _OTdata;
+  msgid_0["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());  
@@ -408,20 +412,21 @@ void print_status(uint16_t _OTdata, const char *_label, const char*_unit)
   Debugf("%-37s = M[%s] S[%s]", _label, _flag8_master.c_str(), _flag8_slave.c_str());
 
   //BuildJOSN for MQTT
-  const size_t capacity = JSON_OBJECT_SIZE(12);
+  const size_t capacity = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(11);
   DynamicJsonDocument doc(capacity);
-  doc["id"]=messageIDToString(static_cast<OpenThermMessageID>(data.id));
-  doc["label"] = _label;
-  doc["master-flag8"] = _flag8_master.c_str();
-  doc["slave-flag8"] = _flag8_slave.c_str();
-  doc["unit"] = _unit;
-  doc["fault"] = (((data.valueLB) & 0x01) ? "On": "Off");
-  doc["centralheating"] = (((data.valueLB) & 0x02) ? "On": "Off");
-  doc["domestichotwater"] = (((data.valueLB) & 0x04) ? "On": "Off"); 
-  doc["flame"] = (((data.valueLB) & 0x08) ? "On" : "Off"); 
-  doc["cooling"] = (((data.valueLB) & 0x10) ? "On" : "Off");
-  doc["centralheating2"] =(((data.valueLB) & 0x20) ? "On" : "Off");
-  doc["diagnostic_indicator"] = (((data.valueLB) & 0x40) ? "On" : "Off");
+  JsonArray msgid = doc.createNestedArray(messageIDToString(static_cast<OpenThermMessageID>(data.id)));
+  JsonObject msgid_0 = msgid.createNestedObject();
+  msgid_0["label"] = _label;
+  msgid_0["master-flag8"] = _flag8_master.c_str();
+  msgid_0["slave-flag8"] = _flag8_slave.c_str();
+  msgid_0["unit"] = _unit;
+  msgid_0["fault"] = (((data.valueLB) & 0x01) ? "On": "Off");
+  msgid_0["centralheating"] = (((data.valueLB) & 0x02) ? "On": "Off");
+  msgid_0["domestichotwater"] = (((data.valueLB) & 0x04) ? "On": "Off"); 
+  msgid_0["flame"] = (((data.valueLB) & 0x08) ? "On" : "Off"); 
+  msgid_0["cooling"] = (((data.valueLB) & 0x10) ? "On" : "Off");
+  msgid_0["centralheating2"] =(((data.valueLB) & 0x20) ? "On" : "Off");
+  msgid_0["diagnostic_indicator"] = (((data.valueLB) & 0x40) ? "On" : "Off");
   String sJson;
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());
@@ -456,13 +461,14 @@ void print_ASFflags(uint16_t _OTdata, const char *_label, const char*_unit)
   Debugf("%-37s = M[%s] OEM fault code [%3d]", _label, _flag8.c_str(), data.valueLB);
 
   //BuildJOSN for MQTT
-  const size_t capacity = JSON_OBJECT_SIZE(5);
+  const size_t capacity = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(4);
   DynamicJsonDocument doc(capacity);
-  doc["id"]=messageIDToString(static_cast<OpenThermMessageID>(data.id));
-  doc["label"] = _label;
-  doc["oem_fault"] = data.valueLB;
-  doc["flag8"] = _flag8.c_str();
-  doc["unit"] = _unit;
+  JsonArray msgid = doc.createNestedArray(messageIDToString(static_cast<OpenThermMessageID>(data.id)));
+  JsonObject msgid_0 = msgid.createNestedObject();
+  msgid_0["label"] = _label;
+  msgid_0["oem_fault"] = data.valueLB;
+  msgid_0["flag8"] = _flag8.c_str();
+  msgid_0["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());
@@ -488,13 +494,14 @@ void print_flag8u8(uint16_t _OTdata, const char *_label, const char*_unit)
   Debugf("%-37s = %s / %3d", _label, _flag8.c_str(), data.valueLB);
 
   //BuildJOSN for MQTT
-  const size_t capacity = JSON_OBJECT_SIZE(5);
+  const size_t capacity = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(4);
   DynamicJsonDocument doc(capacity);
-  doc["id"]=messageIDToString(static_cast<OpenThermMessageID>(data.id));
-  doc["label"] = _label;
-  doc["flag8"] = _flag8.c_str();
-  doc["value"] = data.valueLB;
-  doc["unit"] = _unit;
+  JsonArray msgid = doc.createNestedArray(messageIDToString(static_cast<OpenThermMessageID>(data.id)));
+  JsonObject msgid_0 = msgid.createNestedObject();
+  msgid_0["label"] = _label;
+  msgid_0["flag8"] = _flag8.c_str();
+  msgid_0["value"] = data.valueLB;
+  msgid_0["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());
@@ -520,13 +527,14 @@ void print_flag8(uint16_t _OTdata, const char *_label, const char*_unit)
   Debugf("%-37s = %s / %3d", _label, _flag8.c_str(), data.valueHB);
 
   //BuildJOSN for MQTT
-  const size_t capacity = JSON_OBJECT_SIZE(5);
+  const size_t capacity = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(4);
   DynamicJsonDocument doc(capacity);
-  doc["id"]=messageIDToString(static_cast<OpenThermMessageID>(data.id));
-  doc["label"] = _label;
-  doc["flag8"] = _flag8.c_str();
-  doc["value"] = data.valueHB;
-  doc["unit"] = _unit;
+  JsonArray msgid = doc.createNestedArray(messageIDToString(static_cast<OpenThermMessageID>(data.id)));
+  JsonObject msgid_0 = msgid.createNestedObject();
+  msgid_0["label"] = _label;
+  msgid_0["flag8"] = _flag8.c_str();
+  msgid_0["value"] = data.valueHB;
+  msgid_0["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());
@@ -560,14 +568,15 @@ void print_flag8flag8(uint16_t _OTdata, const char *_label, const char*_unit)
   _flag8_LB+=(((data.valueLB) & 0x01) ? '1' : '0');
 
   Debugf("%-37s = %s / %s - %3d / %3d", _label, _flag8_HB.c_str(), _flag8_LB.c_str(), data.valueHB, data.valueLB);
-  //BuildJOSN for MQTT
-  const size_t capacity = JSON_OBJECT_SIZE(5);
+  //BuildJOSN for MQTT  
+  const size_t capacity = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(4);
   DynamicJsonDocument doc(capacity);
-  doc["id"]=messageIDToString(static_cast<OpenThermMessageID>(data.id));
-  doc["label"] = _label;
-  doc["flag8HB"] = _flag8_HB.c_str();
-  doc["flag8LB"] = _flag8_LB.c_str();
-  doc["unit"] = _unit;
+  JsonArray msgid = doc.createNestedArray(messageIDToString(static_cast<OpenThermMessageID>(data.id)));
+  JsonObject msgid_0 = msgid.createNestedObject();
+  msgid_0["label"] = _label;
+  msgid_0["flag8HB"] = _flag8_HB.c_str();
+  msgid_0["flag8LB"] = _flag8_LB.c_str();
+  msgid_0["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());
@@ -581,13 +590,14 @@ void print_u8u8(uint16_t _OTdata, const char *_label, const char*_unit)
   _OTdata = data.u16();     
   Debugf("%-37s = %3d / %3d %s", _label, (uint8_t)data.valueHB, (uint8_t)data.valueLB, _unit);
   //BuildJOSN for MQTT
-  const size_t capacity = JSON_OBJECT_SIZE(5);
+  const size_t capacity = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(4);
   DynamicJsonDocument doc(capacity);
-  doc["id"]=messageIDToString(static_cast<OpenThermMessageID>(data.id));
-  doc["label"] = _label;
-  doc["valueHB"] = (int8_t)data.valueHB;
-  doc["valueLB"] = (int8_t)data.valueLB;
-  doc["unit"] = _unit;
+  JsonArray msgid = doc.createNestedArray(messageIDToString(static_cast<OpenThermMessageID>(data.id)));
+  JsonObject msgid_0 = msgid.createNestedObject();
+  msgid_0["label"] = _label;
+  msgid_0["valueHB"] = (int8_t)data.valueHB;
+  msgid_0["valueLB"] = (int8_t)data.valueLB;
+  msgid_0["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());
@@ -602,13 +612,14 @@ void print_daytime(uint16_t _OTdata, const char *_label, const char*_unit)
   _OTdata = data.u16();     
   Debugf("%-37s = %s - %2d:%2d", _label, dayOfWeekName[(data.valueHB >> 5) & 0x7], (data.valueHB & 0x1F), data.valueLB); 
   //BuildJOSN for MQTT
-  const size_t capacity = JSON_OBJECT_SIZE(5);
+  const size_t capacity = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(4);
   DynamicJsonDocument doc(capacity);
-  doc["id"]=messageIDToString(static_cast<OpenThermMessageID>(data.id));
-  doc["label"] = _label;
-  doc["dayofweek"] = dayOfWeekName[(data.valueHB >> 5) & 0x7];
-  doc["hour"] = (data.valueHB & 0x1F);
-  doc["minutes"] = data.valueLB;
+  JsonArray msgid = doc.createNestedArray(messageIDToString(static_cast<OpenThermMessageID>(data.id)));
+  JsonObject msgid_0 = msgid.createNestedObject();
+  msgid_0["label"] = _label;
+  msgid_0["dayofweek"] = dayOfWeekName[(data.valueHB >> 5) & 0x7];
+  msgid_0["hour"] = (data.valueHB & 0x1F);
+  msgid_0["minutes"] = data.valueLB;
   String sJson;
   serializeJson(doc, sJson);
   Debugf("\r\n%s\r\n", sJson.c_str());

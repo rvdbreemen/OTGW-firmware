@@ -160,13 +160,12 @@ void doTaskEvery60s(){
 //===[ Do the background tasks ]===
 void doBackgroundTasks()
 {
+  blinkLEDms(1000);              // 'blink' the status led every x ms
   handleOTGW();                 // OTGW handling
+  handleMQTT();                 // MQTT transmissions
   httpServer.handleClient();
   MDNS.update();
   events();                     // trigger ezTime update etc.
-  handleMQTT();                 // MQTT transmissions
-  // handleKeyInput();             // Debug Menu
-  blinkLEDms(1000);               // 'blink' the status led every x ms
   yield();
 }
 
