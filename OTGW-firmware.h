@@ -27,6 +27,7 @@
 #define CMSG_SIZE        512
 #define JSON_BUFF_MAX   1024
 
+WiFiClient  wifiClient;
 bool      Verbose = false;
 char      cMsg[CMSG_SIZE];
 char      fChar[10];
@@ -39,5 +40,13 @@ Timezone    CET;
 const char *weekDayName[]  {  "Unknown", "Zondag", "Maandag", "Dinsdag", "Woensdag"
                             , "Donderdag", "Vrijdag", "Zaterdag", "Unknown" };
 const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
+
+//MQTT settings
+String    settingMQTTbroker="192.168.88.254";
+int32_t   settingMQTTbrokerPort = 1883;
+String    settingMQTTuser = "";
+String    settingMQTTpasswd = "";
+String    settingMQTTtopTopic = "OTGW";
+int32_t   settingMQTTinterval = 10;
 
 // eof
