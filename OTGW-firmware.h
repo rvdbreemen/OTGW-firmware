@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v0.0.1
+**  Version  : v0.1.0
 **
 **  Copyright (c) 2020 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
