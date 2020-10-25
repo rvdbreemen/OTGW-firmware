@@ -1,9 +1,21 @@
+/* 
+***************************************************************************  
+**  Program  : OTGW-firmware.ino
+**  Version  : v0.0.1
+**
+**  Copyright (c) 2020 Robert van den Breemen
+**  Borrowed from OpenTherm library from: 
+**      https://github.com/jpraus/arduino-opentherm
+**
+**  TERMS OF USE: MIT License. See bottom of file.                                                            
+***************************************************************************      
+*/
 
-#define _FW_VERSION "v0.0.1 (25-10-2020)"
-
+#include "version.h"
+#define _FW_VERSION _VERSION
 
 #define _HOSTNAME   "OTGWfirmware"
-#include "OTGWfirmware.h"
+#include "OTGW-firmware.h"
 
 // WiFi Server object and parameters
 WiFiServer server(80);
