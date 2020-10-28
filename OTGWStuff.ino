@@ -289,7 +289,7 @@ void print_f88(float _OTdata, const char *_label, const char*_unit)
 {
   //function to print data
   _OTdata = round(data.f88()*100.0) / 100.0; // round float 2 digits, like this: x.xx     
-  DebugTf("%-37s = %3.2f %s", _label, _OTdata , _unit);
+  Debugf("%-37s = %3.2f %s", _label, _OTdata , _unit);
   //BuildJOSN for MQTT
   const size_t capacity =  JSON_OBJECT_SIZE(3);
   DynamicJsonDocument doc(capacity);
@@ -298,7 +298,7 @@ void print_f88(float _OTdata, const char *_label, const char*_unit)
   doc["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
-  DebugTf("\r\n%s\r\n", sJson.c_str());
+  //DebugTf("%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -307,7 +307,7 @@ void print_s16(int16_t _OTdata, const char *_label, const char*_unit)
 {
   //function to print data
   _OTdata = data.s16();     
-  DebugTf("%-37s = %5d %s", _label, _OTdata, _unit);
+  Debugf("%-37s = %5d %s", _label, _OTdata, _unit);
   //BuildJOSN for MQTT
   const size_t capacity =  JSON_OBJECT_SIZE(3);
   DynamicJsonDocument doc(capacity);
@@ -316,7 +316,7 @@ void print_s16(int16_t _OTdata, const char *_label, const char*_unit)
   doc["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
-  DebugTf("\r\n%s\r\n", sJson.c_str());
+  //DebugTf("%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -325,7 +325,7 @@ void print_s8s8(uint16_t _OTdata, const char *_label, const char*_unit)
 {
   //function to print data
   _OTdata = data.u16();     
-  DebugTf("%-37s = %3d / %3d %s", _label, (int8_t)data.valueHB, (int8_t)data.valueLB, _unit);
+  Debugf("%-37s = %3d / %3d %s", _label, (int8_t)data.valueHB, (int8_t)data.valueLB, _unit);
   //BuildJOSN for MQTT
   const size_t capacity =JSON_OBJECT_SIZE(4);
   DynamicJsonDocument doc(capacity);
@@ -335,7 +335,7 @@ void print_s8s8(uint16_t _OTdata, const char *_label, const char*_unit)
   doc["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
-  DebugTf("\r\n%s\r\n", sJson.c_str());
+  //DebugTf("%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -345,7 +345,7 @@ void print_u16(uint16_t _OTdata, const char *_label, const char*_unit)
 {
   //function to print data
   _OTdata = data.u16();     
-  DebugTf("%-37s = %5d %s", _label, _OTdata, _unit);
+  Debugf("%-37s = %5d %s", _label, _OTdata, _unit);
   //BuildJOSN for MQTT
   const size_t capacity =JSON_OBJECT_SIZE(3);
   DynamicJsonDocument doc(capacity);
@@ -354,7 +354,7 @@ void print_u16(uint16_t _OTdata, const char *_label, const char*_unit)
   doc["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
-  DebugTf("\r\n%s\r\n", sJson.c_str());  
+  //DebugTf("%s\r\n", sJson.c_str());  
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -402,7 +402,7 @@ void print_status(uint16_t _OTdata, const char *_label, const char*_unit)
   _flag8_slave += (((data.valueLB) & 0x40) ? 'D' : '-'); 
   _flag8_slave += (((data.valueLB) & 0x80) ? '.' : '-');
 
-  DebugTf("%-37s = M[%s] S[%s]", _label, _flag8_master.c_str(), _flag8_slave.c_str());
+  Debugf("%-37s = M[%s] S[%s]", _label, _flag8_master.c_str(), _flag8_slave.c_str());
 
   //BuildJOSN for MQTT
   const size_t capacity = JSON_OBJECT_SIZE(11);
@@ -420,7 +420,7 @@ void print_status(uint16_t _OTdata, const char *_label, const char*_unit)
   doc["diagnostic_indicator"] = (((data.valueLB) & 0x40) ? "On" : "Off");
   String sJson;
   serializeJson(doc, sJson);
-  DebugTf("\r\n%s\r\n", sJson.c_str());
+  //DebugTf("%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -449,7 +449,7 @@ void print_ASFflags(uint16_t _OTdata, const char *_label, const char*_unit)
   _flag8 +=(((data.valueHB) & 0x02) ? '1' : '0'); 
   _flag8 +=(((data.valueHB) & 0x01) ? '1' : '0');
 
-  DebugTf("%-37s = M[%s] OEM fault code [%3d]", _label, _flag8.c_str(), data.valueLB);
+  Debugf("%-37s = M[%s] OEM fault code [%3d]", _label, _flag8.c_str(), data.valueLB);
 
   //BuildJOSN for MQTT
   const size_t capacity = JSON_OBJECT_SIZE(4);
@@ -460,7 +460,7 @@ void print_ASFflags(uint16_t _OTdata, const char *_label, const char*_unit)
   doc["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
-  DebugTf("\r\n%s\r\n", sJson.c_str());
+  //DebugTf("%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -480,7 +480,7 @@ void print_flag8u8(uint16_t _OTdata, const char *_label, const char*_unit)
   _flag8 +=(((data.valueHB) & 0x02) ? '1' : '0'); 
   _flag8 +=(((data.valueHB) & 0x01) ? '1' : '0');
    
-  DebugTf("%-37s = %s / %3d", _label, _flag8.c_str(), data.valueLB);
+  Debugf("%-37s = %s / %3d", _label, _flag8.c_str(), data.valueLB);
 
   //BuildJOSN for MQTT
   const size_t capacity = JSON_OBJECT_SIZE(4);
@@ -491,7 +491,7 @@ void print_flag8u8(uint16_t _OTdata, const char *_label, const char*_unit)
   doc["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
-  DebugTf("\r\n%s\r\n", sJson.c_str());
+  //DebugTf("%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -511,7 +511,7 @@ void print_flag8(uint16_t _OTdata, const char *_label, const char*_unit)
   _flag8 +=(((data.valueHB) & 0x02) ? '1' : '0'); 
   _flag8 +=(((data.valueHB) & 0x01) ? '1' : '0');
 
-  DebugTf("%-37s = %s / %3d", _label, _flag8.c_str(), data.valueHB);
+  Debugf("%-37s = %s / %3d", _label, _flag8.c_str(), data.valueHB);
 
   //BuildJOSN for MQTT
   const size_t capacity = JSON_OBJECT_SIZE(4);
@@ -522,7 +522,7 @@ void print_flag8(uint16_t _OTdata, const char *_label, const char*_unit)
   doc["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
-  DebugTf("\r\n%s\r\n", sJson.c_str());
+  //DebugTf("%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -552,7 +552,7 @@ void print_flag8flag8(uint16_t _OTdata, const char *_label, const char*_unit)
   _flag8_LB+=(((data.valueLB) & 0x02) ? '1' : '0'); 
   _flag8_LB+=(((data.valueLB) & 0x01) ? '1' : '0');
 
-  DebugTf("%-37s = %s / %s - %3d / %3d", _label, _flag8_HB.c_str(), _flag8_LB.c_str(), data.valueHB, data.valueLB);
+  Debugf("%-37s = %s / %s - %3d / %3d", _label, _flag8_HB.c_str(), _flag8_LB.c_str(), data.valueHB, data.valueLB);
   //BuildJOSN for MQTT  
   const size_t capacity = JSON_OBJECT_SIZE(4);
   DynamicJsonDocument doc(capacity);
@@ -562,7 +562,7 @@ void print_flag8flag8(uint16_t _OTdata, const char *_label, const char*_unit)
   doc["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
-  DebugTf("\r\n%s\r\n", sJson.c_str());
+  //DebugTf("%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -571,7 +571,7 @@ void print_u8u8(uint16_t _OTdata, const char *_label, const char*_unit)
 {
   //function to print data
   _OTdata = data.u16();     
-  DebugTf("%-37s = %3d / %3d %s", _label, (uint8_t)data.valueHB, (uint8_t)data.valueLB, _unit);
+  Debugf("%-37s = %3d / %3d %s", _label, (uint8_t)data.valueHB, (uint8_t)data.valueLB, _unit);
   //BuildJOSN for MQTT
   const size_t capacity = JSON_OBJECT_SIZE(4);
   DynamicJsonDocument doc(capacity);
@@ -581,7 +581,7 @@ void print_u8u8(uint16_t _OTdata, const char *_label, const char*_unit)
   doc["unit"] = _unit;
   String sJson;
   serializeJson(doc, sJson);
-  DebugTf("\r\n%s\r\n", sJson.c_str());
+  //DebugTf("%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -591,7 +591,7 @@ void print_daytime(uint16_t _OTdata, const char *_label, const char*_unit)
   //function to print data
   const char *dayOfWeekName[]  { "Unknown", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag", "Zondag", "Unknown" };
   _OTdata = data.u16();     
-  DebugTf("%-37s = %s - %2d:%2d", _label, dayOfWeekName[(data.valueHB >> 5) & 0x7], (data.valueHB & 0x1F), data.valueLB); 
+  Debugf("%-37s = %s - %2d:%2d", _label, dayOfWeekName[(data.valueHB >> 5) & 0x7], (data.valueHB & 0x1F), data.valueLB); 
   //BuildJOSN for MQTT
   const size_t capacity = JSON_OBJECT_SIZE(4);
   DynamicJsonDocument doc(capacity);
@@ -601,7 +601,7 @@ void print_daytime(uint16_t _OTdata, const char *_label, const char*_unit)
   doc["minutes"] = data.valueLB;
   String sJson;
   serializeJson(doc, sJson);
-  DebugTf("\r\n%s\r\n", sJson.c_str());
+  //DebugTf("%s\r\n", sJson.c_str());
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(data.id)), sJson.c_str());
 }
@@ -617,36 +617,37 @@ void handleOTGW(){
     strBuffer.trim(); //remove LF and CR (and whitespaces)
 
     // DebugTf("[%s] [%d]\r\n", strBuffer.c_str(), strBuffer.length());
-
+    
     if (strBuffer.length()>=9) {
+      DebugTf("%s ", strBuffer.c_str());
       //parse value
       uint32_t value = strtoul(strBuffer.substring(1).c_str(), NULL, 16);
       // DebugTf("Value=[%08x]\r\n", (uint32_t)value);
       //processing message
-      if (strBuffer.charAt(0)=='B')
-      {
-        DebugT("Boiler           ");
-      } else 
-      if (strBuffer.charAt(0)=='T')
-      {
-        DebugT("Thermostat       ");
-      } else
-      if (strBuffer.charAt(0)=='R')
-      {
-        DebugT("Request Boiler   ");
-      } else      
-      if (strBuffer.charAt(0)=='A')
-      {
-        DebugT("Answer Themostat ");
-      } else      
-      if (strBuffer.charAt(0)=='E')
-      {
-        DebugT("Parity error     ");
-      } else
-      {
-        DebugTf("Unexpected=[%c] ", strBuffer.charAt(0));
-      }
-      DebugTf("msg=[%s] value=[%08x]", strBuffer.c_str(), value);
+      // if (strBuffer.charAt(0)=='B')
+      // {
+      //   DebugT("Boiler           ");
+      // } else 
+      // if (strBuffer.charAt(0)=='T')
+      // {
+      //   DebugT("Thermostat       ");
+      // } else
+      // if (strBuffer.charAt(0)=='R')
+      // {
+      //   DebugT("Request Boiler   ");
+      // } else      
+      // if (strBuffer.charAt(0)=='A')
+      // {
+      //   DebugT("Answer Themostat ");
+      // } else      
+      // if (strBuffer.charAt(0)=='E')
+      // {
+      //   DebugT("Parity error     ");
+      // } else
+      // {
+      //   DebugTf("Unexpected=[%c] ", strBuffer.charAt(0));
+      // }
+      //Debugf("msg=[%s] value=[%08x]", strBuffer.c_str(), value);
 
       //split 32bit value into the relevant OT protocol parts
       data.type = (value >> 28) & 0x7;         // byte 1 = take 3 bits that define msg msgType
@@ -655,12 +656,12 @@ void handleOTGW(){
       data.valueLB = value & 0xFF;             // byte 4 = low byte
 
       //print message frame
-      Debugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]", data.type, data.id, data.valueHB, data.valueLB);
+      //Debugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", data.type, data.id, data.valueHB, data.valueLB);
 
       //print message Type and ID
-      Debugf("\t[%-16s]", messageTypeToString(static_cast<OpenThermMessageType>(data.type)));
-      Debugf("\t[%-30s]\t", messageIDToString(static_cast<OpenThermMessageID>(data.id)));
-      Debugln(); DebugFlush();
+      Debugf("[%-16s]\t", messageTypeToString(static_cast<OpenThermMessageType>(data.type)));
+      Debugf("[%-30s]\t", messageIDToString(static_cast<OpenThermMessageID>(data.id)));
+      DebugFlush();
 
       //next step interpret the OT protocol
       if (static_cast<OpenThermMessageType>(data.type) == OT_READ_ACK || static_cast<OpenThermMessageType>(data.type) == OT_WRITE_DATA) {

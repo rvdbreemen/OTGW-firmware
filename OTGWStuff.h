@@ -8,8 +8,7 @@
 **      https://github.com/jpraus/arduino-opentherm
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
-***************************************************************************    
-* This   
+***************************************************************************       
 */  
 
 typedef struct {
