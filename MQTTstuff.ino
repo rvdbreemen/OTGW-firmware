@@ -34,7 +34,9 @@
 void startMQTT() 
 {
   stateMQTT = MQTT_STATE_INIT;
-  handleMQTT();
+  handleMQTT(); //initialize the MQTT statemachine
+  handleMQTT(); //then try to connect to MQTT
+  handleMQTT(); //now you should be connected to MQTT ready to send 
 }
 //===========================================================================================
 void handleMQTT() 
@@ -167,6 +169,11 @@ void handleMQTT()
   }
 } // handleMQTT()
 
+
+bool MQTT_connected()
+{
+  return MQTTclient.connected();
+}
 //===========================================================================================
 String trimVal(char *in) 
 {
@@ -197,7 +204,18 @@ void sendMQTTData(const char* item, const char *json)
   strlcat(topic, item, sizeof(topic));
   DebugTf("TopicId [%s] Message [%s]\r\n", topic, json);
   MQTTclient.publish(topic, json, true); //retain message at broker
+  feedWatchDog();
+} // sendMQTTData()
 
+//===========================================================================================
+void sendMQTT(const char* topic, const char *json, const int8_t len) 
+{
+  if (!MQTTclient.connected() || !isValidIP(MQTTbrokerIP)) return;
+  DebugTf("Sending data to MQTT server [%s]:[%d] ", settingMQTTbroker.c_str(), settingMQTTbrokerPort);  
+  Debugf("TopicId [%s] Message [%s]\r\n", topic, json);
+  if (MQTTclient.getBufferSize() < len) MQTTclient.setBufferSize(len); //resize buffer when needed
+  MQTTclient.publish(topic, json, true); //retain message at broker
+  feedWatchDog();
 } // sendMQTTData()
  
 /***************************************************************************
