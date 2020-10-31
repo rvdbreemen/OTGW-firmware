@@ -43,7 +43,6 @@ void writeSettings(bool show)
 void readSettings(bool show) 
 {
   String sTmp;
-  String words[10];
   char cTmp[CMSG_SIZE], cVal[101], cKey[101];
   
   File file;

@@ -11,6 +11,8 @@
 ***************************************************************************      
 */
 
+
+
 #define EXT_WD_I2C_ADDRESS 0x26
 #define PIN_I2C_SDA 4
 #define PIN_I2C_SCL 5
@@ -678,7 +680,6 @@ void handleOTGW(){
           case RelModLevel:               print_f88(OTdata.RelModLevel,                           "Relative Modulation Level","%");  break;
           case CHPressure:                print_f88(OTdata.CHPressure,                            "Water pressure in CH circuit","bar"); break;
           case DHWFlowRate:               print_f88(OTdata.DHWFlowRate,                           "Water flow rate in DHW circuit","l/min");  break;
-          case TrSetCH2:                  print_f88(OTdata.TrSetCH2,                              "Room Setpoint for 2nd CH circuit","°C");  break;  
           case Tr:                        print_f88(OTdata.Tr,                                    "Room temperature","°C");  break;  
           case Tboiler:                   print_f88(OTdata.Tboiler,                               "Boiler flow water temperature","°C");  break;
           case Tdhw:                      print_f88(OTdata.Tdhw,                                  "DHW temperature","°C");  break;
@@ -691,7 +692,7 @@ void handleOTGW(){
           case Texhaust:                  print_s16(OTdata.Texhaust,                              "Boiler exhaust temperature","°C");  break; // s16  Boiler exhaust temperature (°C)
           case TdhwSet:                   print_f88(OTdata.TdhwSet,                               "DHW setpoint","°C");  break;
           case MaxTSet:                   print_f88(OTdata.MaxTSet,                               "Max CH water setpoint","°C");  break;
-          case Hcratio:                   print_f88(OTdata.Hcratio,                               "OTC heat curve ratio","°C");  break;
+          case Hcratio:                   print_f88(OTdata.Hcratio,                               "OTC heat curve ratio","");  break;
           case OpenThermVersionMaster:    print_f88(OTdata.OpenThermVersionMaster,                "Master OT protocol version","");  break;
           case OpenThermVersionSlave:     print_f88(OTdata.OpenThermVersionSlave,                 "Slave OT protocol version","");  break;
           case Status:                    print_status(OTdata.Status,                             "Status",""); break;
@@ -728,6 +729,65 @@ void handleOTGW(){
       Debugln(); 
     }
   }   // while Serial.available()
+}
+
+bool splitString(String sIn, char del, String& cKey, String& cVal)
+{
+  sIn.trim();                                 //trim spaces
+  cKey=""; cVal="";
+  if (sIn.indexOf("//")==0) return false;     //comment, skip split
+  if (sIn.length()<=3) return false;          //not enough buffer, skip split
+  int pos = sIn.indexOf(del);                 //determine split point
+  if ((pos==0) || (pos==(sIn.length()-1))) return false; // no key or no value
+  cKey = sIn.substring(0,pos-1); cKey.trim(); //before, and trim spaces
+  cVal = sIn.substring(pos+1); cVal.trim();   //after,and trim spaces
+  return true;
+}
+
+void OTGWconfigureHomeassistantUsingMQTT()
+{
+  const char* cfgFilename = "/mqttha.cfg";
+  String sTopic="";
+  String sMsg="";
+  File fh; //filehandle
+  //Let's open the MQTT autoconfig file
+  SPIFFS.begin();
+  if (SPIFFS.exists(cfgFilename))
+  {
+    fh = SPIFFS.open(cfgFilename, "r");
+    if (fh) {
+      //Lets go read the config and send it out to MQTT line by line
+      while(fh.available()) 
+      {  //read file line by line, split and send to MQTT (topic, msg)
+          String sLine = fh.readStringUntil('\n');
+          // DebugTf("sline[%s]\r\n", sLine.c_str());
+          if (splitString( sLine, ',', sTopic, sMsg))
+          {
+            DebugTf("sTopic[%s], sMsg[%s]\r\n", sTopic.c_str(), sMsg.c_str());
+            sendMQTT(sTopic.c_str(), sMsg.c_str(), sTopic.length() + sMsg.length());
+          } else DebugTf("Either comment or invalid config line: [%s]\r\n", sLine.c_str());
+      } // while available()
+      fh.close();  
+    } 
+  } 
+}
+
+void setupHomeassitantIntegration()
+{ 
+  static bool flagMQTTconfig = false;
+  if  (!MQTT_connected()) //f MQTT not connected then 
+  {
+    handleMQTT();
+    flagMQTTconfig = false;
+  }
+  else 
+  {  //if MQTT connected then
+    if (!flagMQTTconfig) //if not configured then
+    { 
+      flagMQTTconfig = true;
+      OTGWconfigureHomeassistantUsingMQTT();
+    }
+  }  
 }
 
 /***************************************************************************

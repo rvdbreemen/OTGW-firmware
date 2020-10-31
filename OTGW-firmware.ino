@@ -64,7 +64,10 @@ void setup()
 
   startMDNS(settingHostname);
   
-  //--- ezTime initialisation
+  // Start MQTT connection
+  startMQTT(); 
+
+  // Initialisation ezTime
   setDebug(INFO);  
   waitForSync(); 
   CET.setLocation(F("Europe/Amsterdam"));
@@ -95,13 +98,10 @@ void setup()
   httpServer.begin();
   DebugTln("\nServer started\r");
   
-  // Start MQTT connection
-  startMQTT();
-
   // Set up first message as the IP address
   sprintf(cMsg, "%03d.%03d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
   DebugTf("\nAssigned IP[%s]\r\n", cMsg);
-  
+
   initWatchDog();  // setup the WatchDog
 } // setup()
 
@@ -143,18 +143,19 @@ void doTaskEvery1s(){
 //===[ Do task every 5s ]===
 void doTaskEvery5s(){
   //== do tasks ==
-
 }
 
 //===[ Do task every 30s ]===
 void doTaskEvery30s(){
   //== do tasks ==
   DebugTf("Alive, Serial Available=[%d]\r\n", Serial.available());
+
 }
 
 //===[ Do task every 60s ]===
 void doTaskEvery60s(){
-  //getOTGW_PS_1();
+  //(re)configure homeassistant integration
+  setupHomeassitantIntegration();
 }
 
 //===[ Do the background tasks ]===
