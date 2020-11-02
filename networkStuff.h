@@ -38,7 +38,7 @@
 
 #include <WiFiUdp.h>            // part of ESP8266 Core https://github.com/esp8266/Arduino
 //#include "ESP8266HTTPUpdateServer.h"
-#include "ModUpdateServerOTGW.h"  // https://github.com/mrWheel/ModUpdateServer
+#include "ModUpdateServer.h"   // https://github.com/mrWheel/ModUpdateServer
 #include "updateServerHtml.h"
 #include <WiFiManager.h>        // version 0.15.0 - https://github.com/tzapu/WiFiManager
 // included in main program: #include <TelnetStream.h>       // Version 0.0.1 - https://github.com/jandrassy/TelnetStream

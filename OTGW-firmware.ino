@@ -136,8 +136,6 @@ void delayms(unsigned long delay_ms)
 void doTaskEvery1s(){
   //== do tasks ==
   upTimeSeconds++;
-  feedWatchDog();       // Feed the dog before it bites!
-  //DebugTln("Feed the dog before he bites!");
 }
 
 //===[ Do task every 5s ]===
@@ -154,20 +152,20 @@ void doTaskEvery30s(){
 
 //===[ Do task every 60s ]===
 void doTaskEvery60s(){
-  //(re)configure homeassistant integration
-  setupHomeassitantIntegration();
+
 }
 
 //===[ Do the background tasks ]===
 void doBackgroundTasks()
 {
-  blinkLEDms(1000);              // 'blink' the status led every x ms
+  delay(0);
+  feedWatchDog();               // Feed the dog before it bites!
+  blinkLEDms(1000);             // 'blink' the status led every x ms
   handleOTGW();                 // OTGW handling
   handleMQTT();                 // MQTT transmissions
   httpServer.handleClient();
   MDNS.update();
   events();                     // trigger ezTime update etc.
-  yield();
 }
 
 void loop()
