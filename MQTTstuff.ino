@@ -35,8 +35,8 @@ void startMQTT()
 {
   stateMQTT = MQTT_STATE_INIT;
   handleMQTT(); //initialize the MQTT statemachine
-  handleMQTT(); //then try to connect to MQTT
-  handleMQTT(); //now you should be connected to MQTT ready to send 
+  // handleMQTT(); //then try to connect to MQTT
+  // handleMQTT(); //now you should be connected to MQTT ready to send
 }
 //===========================================================================================
 void handleMQTT() 
@@ -94,6 +94,8 @@ void handleMQTT()
         Debugln(F(" .. connected\r"));
         stateMQTT = MQTT_STATE_IS_CONNECTED;
         //DebugTln(F("Next State: MQTT_STATE_IS_CONNECTED"));
+        //First do AutoConfiguration for Homeassistant
+        doAutoConfigure();
       }
       else
       { // no connection, try again, do a non-blocking wait for 3 seconds.
@@ -174,6 +176,7 @@ bool MQTT_connected()
 {
   return MQTTclient.connected();
 }
+
 //===========================================================================================
 String trimVal(char *in) 
 {
@@ -196,28 +199,70 @@ void sendMQTTData(const char* item, const char *json)
 //===========================================================================================
 
   if (!MQTTclient.connected() || !isValidIP(MQTTbrokerIP)) return;
-  DebugTf("Sending data to MQTT server [%s]:[%d]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort);
-  
-  //build topic
+  // DebugTf("Sending data to MQTT server [%s]:[%d]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort);
   char topic[100];
   snprintf(topic, sizeof(topic), "%s/", settingMQTTtopTopic.c_str());
   strlcat(topic, item, sizeof(topic));
-  DebugTf("TopicId [%s] Message [%s]\r\n", topic, json);
-  MQTTclient.publish(topic, json, true); //retain message at broker
-  feedWatchDog();
+  DebugTf("Sending MQTT: TopicId [%s] Message [%s]\r\n", topic, json);
+  if (!MQTTclient.publish(topic, json, true)) DebugTln("MQTT publish failed.");
+  feedWatchDog();//feed the dog
 } // sendMQTTData()
 
 //===========================================================================================
 void sendMQTT(const char* topic, const char *json, const int8_t len) 
 {
   if (!MQTTclient.connected() || !isValidIP(MQTTbrokerIP)) return;
-  DebugTf("Sending data to MQTT server [%s]:[%d] ", settingMQTTbroker.c_str(), settingMQTTbrokerPort);  
-  Debugf("TopicId [%s] Message [%s]\r\n", topic, json);
+  // DebugTf("Sending data to MQTT server [%s]:[%d] ", settingMQTTbroker.c_str(), settingMQTTbrokerPort);  
+  DebugTf("Sending MQTT: TopicId [%s] Message [%s]\r\n", topic, json);
   if (MQTTclient.getBufferSize() < len) MQTTclient.setBufferSize(len); //resize buffer when needed
-  MQTTclient.publish(topic, json, true); //retain message at broker
+  if (!MQTTclient.publish(topic, json, true)) DebugTln("MQTT publish failed.");
   feedWatchDog();
 } // sendMQTTData()
- 
+
+
+bool splitString(String sIn, char del, String& cKey, String& cVal)
+{
+  sIn.trim();                                 //trim spaces
+  cKey=""; cVal="";
+  if (sIn.indexOf("//")==0) return false;     //comment, skip split
+  if (sIn.length()<=3) return false;          //not enough buffer, skip split
+  int pos = sIn.indexOf(del);                 //determine split point
+  if ((pos==0) || (pos==(sIn.length()-1))) return false; // no key or no value
+  cKey = sIn.substring(0,pos-1); cKey.trim(); //before, and trim spaces
+  cVal = sIn.substring(pos+1); cVal.trim();   //after,and trim spaces
+  return true;
+}
+
+void doAutoConfigure()
+{
+  const char* cfgFilename = "/mqttha.cfg";
+  String sTopic="";
+  String sMsg="";
+  File fh; //filehandle
+  //Let's open the MQTT autoconfig file
+  SPIFFS.begin();
+  if (SPIFFS.exists(cfgFilename))
+  {
+    fh = SPIFFS.open(cfgFilename, "r");
+    if (fh) {
+      //Lets go read the config and send it out to MQTT line by line
+      while(fh.available()) 
+      {  //read file line by line, split and send to MQTT (topic, msg)
+          feedWatchDog(); //start with feeding the dog
+          String sLine = fh.readStringUntil('\n');
+          // DebugTf("sline[%s]\r\n", sLine.c_str());
+          if (splitString( sLine, ',', sTopic, sMsg))
+          {
+            DebugTf("sTopic[%s], sMsg[%s]\r\n", sTopic.c_str(), sMsg.c_str());
+            sendMQTT(sTopic.c_str(), sMsg.c_str(), sTopic.length() + sMsg.length());
+          } else DebugTf("Either comment or invalid config line: [%s]\r\n", sLine.c_str());
+      } // while available()
+      fh.close();  
+    } 
+  } 
+}
+
+
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a

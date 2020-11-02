@@ -22,7 +22,6 @@
 #include "OTGWStuff.h"
 #include "Wire.h"
 
-
 #define SETTINGS_FILE   "/settings.ini"
 #define CMSG_SIZE        512
 #define JSON_BUFF_MAX   1024

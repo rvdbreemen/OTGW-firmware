@@ -11,6 +11,7 @@
 ***************************************************************************       
 */  
 
+
 typedef struct {
 	uint16_t 	Status = 0; 				// flag8 / flag8  Master and Slave Status flags. 
 	float 		Tset = 0.0; 					// f8.8  Control setpoint  ie CH  water temperature setpoint (°C)
@@ -69,7 +70,7 @@ typedef struct {
 
 } OTdataStruct;
 
-static OTdataStruct OTdata;   
+static OTdataStruct OTdataObject;   
 
 
 enum OpenThermResponseStatus {
