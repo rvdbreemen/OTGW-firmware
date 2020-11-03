@@ -186,6 +186,11 @@ String trimVal(char *in)
 } // trimVal()
 
 //===========================================================================================
+void sendMQTTData(const String item, const String json)
+{
+  sendMQTTData(item.c_str(), json.c_str());
+} 
+
 void sendMQTTData(const char* item, const char *json) 
 {
 /*  
@@ -219,7 +224,7 @@ void sendMQTT(const char* topic, const char *json, const int8_t len)
   feedWatchDog();
 } // sendMQTTData()
 
-
+//===========================================================================================
 bool splitString(String sIn, char del, String& cKey, String& cVal)
 {
   sIn.trim();                                 //trim spaces
@@ -233,6 +238,7 @@ bool splitString(String sIn, char del, String& cKey, String& cVal)
   return true;
 }
 
+//===========================================================================================
 void doAutoConfigure()
 {
   const char* cfgFilename = "/mqttha.cfg";
@@ -254,7 +260,7 @@ void doAutoConfigure()
           if (splitString( sLine, ',', sTopic, sMsg))
           {
             DebugTf("sTopic[%s], sMsg[%s]\r\n", sTopic.c_str(), sMsg.c_str());
-            sendMQTT(sTopic.c_str(), sMsg.c_str(), sTopic.length() + sMsg.length());
+            sendMQTT(sTopic.c_str(), sMsg.c_str(), (sTopic.length() + sMsg.length()+2));
           } else DebugTf("Either comment or invalid config line: [%s]\r\n", sLine.c_str());
       } // while available()
       fh.close();  

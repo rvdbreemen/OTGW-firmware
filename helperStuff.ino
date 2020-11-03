@@ -37,6 +37,52 @@ bool isNumericp(const char *timeStamp, int8_t len)
   
 } // isNumericp()
 
+//===========================================================================================
+// Note: This function returns a pointer to a substring of the original string.
+// If the given string was allocated dynamically, the caller must not overwrite
+// that pointer with the returned value, since the original pointer must be
+// deallocated using the same allocator with which it was allocated.  The return
+// value must NOT be deallocated using free() etc.
+char *trimwhitespace(char *str)
+{
+  char *end;
+
+  // Trim leading space
+  while(isspace((unsigned char)*str)) str++;
+
+  if(*str == 0)  // All spaces?
+    return str;
+
+  // Trim trailing space
+  end = str + strlen(str) - 1;
+  while(end > str && isspace((unsigned char)*end)) end--;
+
+  // Write new null terminator character
+  end[1] = '\0';
+
+  return str;
+}
+int8_t splitCString(char *sIn, const char *del, char wOut[][10], const int maxWords)
+{
+    //printf("sIn=[%s]\r\n", sIn);
+    int wc=0;    
+    for(int i = 0; i<maxWords; i++){
+        memset(wOut[i], '\0', sizeof(wOut[0]));  //make sure the c-strings are blank
+    }
+    char * token = strtok(sIn, del);
+    // loop through the string to extract all other tokens
+    while( token != NULL  && wc < maxWords) {
+        //now trim spaces from token and copy it to wOut
+        strlcpy(wOut[wc++], trimwhitespace(token), sizeof(wOut[0]));
+        token = strtok(NULL, del);
+    }
+        
+    // for (int i = 0; i<maxWords; i++){
+    //     printf("wOut[%d]=[%s]\r\n", i, wOut[i]);
+    // }
+
+    return wc;
+}
 
 //===========================================================================================
 int8_t splitString(String inStrng, char delimiter, String wOut[], uint8_t maxWords) 
