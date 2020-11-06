@@ -14,7 +14,7 @@
 #include "version.h"
 #define _FW_VERSION _VERSION
 
-#define _HOSTNAME   "OTGWfirmware"
+#define _HOSTNAME   "OTGW"
 #include "OTGW-firmware.h"
 
 // WiFi Server object and parameters
