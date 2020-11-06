@@ -375,7 +375,7 @@ void print_status(uint16_t _value, const char *_label, const char*_unit)
   _flag8_master[7] = (((OTdata.valueHB) & 0x80) ? '.' : '-');
   _flag8_master[8] = '\0';
 
-  Debugf("%-37s = M[%s] ", _label, _flag8_master);
+  Debugf("%-37s = M[%s] \r\n", _label, _flag8_master);
   //Master Status
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "/master", sizeof(_topic));
@@ -407,7 +407,8 @@ void print_status(uint16_t _value, const char *_label, const char*_unit)
   _flag8_slave[7] = (((OTdata.valueLB) & 0x80) ? '.' : '-');
   _flag8_slave[8] = '\0';
 
-  Debugf("S[%s]\r\n",  _flag8_slave);
+  Debugf("%-37s = S[%s] \r\n", _label, _flag8_slave);
+  
   //Slave Status
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "/slave", sizeof(_topic));
