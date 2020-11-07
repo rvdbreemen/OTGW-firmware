@@ -11,7 +11,7 @@ The goal of this OTGW firmware is:
 - send to InfluxDB directly 
 - poll a simple REST API
 - enable telnet listening (interpreted data and debugging)
-
-version 0.0.1 - parsing of OT protocol (to telnet)
-version 0.1.0 - MQTT sending added
+ 
+version 0.0.1 - parsing of OT protocol (to telnet)  
+version 0.1.0 - MQTT sending added  
 Version 0.2.0 - auto-discovery for home assistant integration (and Domiticz)
