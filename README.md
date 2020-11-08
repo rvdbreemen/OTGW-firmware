@@ -7,15 +7,15 @@ More information on this gateway can be read here: http://otgw.tclcode.com/
 
 The goal of this OTGW firmware is:
 - parsing the protocol on the NodeMCU (8266)
-- send MQTT messages for every change
-- send to InfluxDB directly 
-- poll a simple REST API
 - enable telnet listening (interpreted data and debugging)
- 
-version 0.0.1 - parsing of OT protocol (to telnet)  
-version 0.1.0 - MQTT sending added  
-Version 0.2.0 - auto-discovery for home assistant integration (and Domiticz)
+- send MQTT messages for every change  (parsed OT message)
+- Integrate with Home Assistant (and Domoticz)
 
+To do:
+- implement a REST API
+- InfluxDB client to do direct logging 
+- OT command sending interface
+  
 | Version | Release notes |
 |-|-|
 | 0.2.0 | Auto-discovery throug MQTT implemented for integration with home assistant (and domoticz)     |
