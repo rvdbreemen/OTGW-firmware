@@ -38,6 +38,27 @@ void startMQTT()
   // handleMQTT(); //then try to connect to MQTT
   // handleMQTT(); //now you should be connected to MQTT ready to send
 }
+
+void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
+
+
+  // DebugT("Message arrived [");
+  // Debug(topic);
+  // Debug("] ");
+  // for (int i = 0; i < length; i++) {
+  //   Debug((char)payload[i]);
+  // }
+  // Debugln();
+  Debugf("Message arrived on topic [%s] = [%s]", topic, (char *)payload);
+
+  //what is the incoming message?  
+  if (stricmp(topic, "command") == 0) 
+  {
+    //incoming command to be forwarded to OTGW
+    sendOTGW((char *)payload, length);
+  }
+}
+
 //===========================================================================================
 void handleMQTT() 
 {
@@ -55,6 +76,7 @@ void handleMQTT()
         DebugTf("[%s] => setServer(%s, %d)\r\n", settingMQTTbroker.c_str(), MQTTbrokerIPchar, settingMQTTbrokerPort);
         MQTTclient.disconnect();
         MQTTclient.setServer(MQTTbrokerIPchar, settingMQTTbrokerPort);
+        MQTTclient.setCallback(handleMQTTcallback);
         MQTTclientId  = String(_HOSTNAME) + WiFi.macAddress();
         //skip try to connect
         stateMQTT = MQTT_STATE_TRY_TO_CONNECT;

@@ -93,24 +93,7 @@ void feedWatchDog() {
   //==== feed the WD over I2C ==== 
 }
 
-//===================[ Watchdog OTGW ]===============================
-
-//===================[ OTGW PS=1 Command ]===============================
-void getOTGW_PS_1(){
-  DebugTln("PS=1");
-  Serial.write("PS=1\r\n");
-  delay(100);
-  while(Serial.available() > 0) 
-  { 
-    String strBuffer = Serial.readStringUntil('\n');
-    strBuffer.trim(); //remove LF and CR (and whitespaces)
-    DebugTln(strBuffer);
-  }
-  DebugTln("PS=0");
-  Serial.write("PS=0\r\n");
-}
-
-//===================[ OTGW PS=1 Command ]===============================
+//===================[ END Watchdog OTGW ]===============================
 
 //=======================================================================
 float OpenthermData::f88() {
@@ -598,9 +581,40 @@ void print_daytime(uint16_t _value, const char *_label, const char*_unit)
   strlcat(_topic, "_minutes", sizeof(_topic));
   sendMQTTData(_topic, itoa(OTdata.valueLB, _msg, 10)); 
 }
+//===================[ OTGW PS=1 Command ]===============================
+void getOTGW_PS_1(){
+  DebugTln("PS=1");
+  Serial.write("PS=1\r\n");
+  delay(100);
+  while(Serial.available() > 0) 
+  { 
+    String strBuffer = Serial.readStringUntil('\n');
+    strBuffer.trim(); //remove LF and CR (and whitespaces)
+    DebugTln(strBuffer);
+  }
+  DebugTln("PS=0");
+  Serial.write("PS=0\r\n");
+}
+//===================[ OTGW PS=1 Command ]===============================
 
+//===================[ Send buffer to OTGW ]=============================
 
-//=====================================[ Handle OTGW ]=====================================================
+int sendOTGW(const char* buf, int len)
+{
+  //Just send the buffer to OTGW when the Serial interface is available
+  if (Serial) {
+    //check the write buffer
+    if (Serial.availableForWrite()>= (len+2)) {
+      //write buffer to serial
+      // Debugf("Sending command OTGW to [%s]", buf);
+      Serial.write(buf, len);
+      // Serial.write("PS=0\r\n");
+      Serial.write("\r\n");
+    } else Debugln("Error: Write buffer not big enough!");
+  } else Debugln("Error: Serial device not found!");
+}
+
+//===================[ Handle OTGW ]=====================================
 void handleOTGW(){
   //let's try this, read all data from the serial device, and dump it to the telnet stream.
   while(Serial.available() > 0) 
