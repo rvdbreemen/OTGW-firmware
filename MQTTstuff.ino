@@ -52,7 +52,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   Debugf("Message arrived on topic [%s] = [%s]", topic, (char *)payload);
 
   //what is the incoming message?  
-  if (stricmp(topic, "command") == 0) 
+  if (stricmp(topic, OTGW_COMMAND_TOPIC) == 0) 
   {
     //incoming command to be forwarded to OTGW
     sendOTGW((char *)payload, length);
@@ -118,6 +118,8 @@ void handleMQTT()
         //DebugTln(F("Next State: MQTT_STATE_IS_CONNECTED"));
         //First do AutoConfiguration for Homeassistant
         doAutoConfigure();
+        //Subscribe to topics
+        MQTTclient.subscribe(OTGW_COMMAND_TOPIC); 
       }
       else
       { // no connection, try again, do a non-blocking wait for 3 seconds.
