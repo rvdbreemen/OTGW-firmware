@@ -167,7 +167,7 @@ const char *messageIDToString(OpenThermMessageID message_id){
 	    case TSet:                      return "TSet";  // f8.8  Control setpoint  ie CH  water temperature setpoint (°C)
       case MConfigMMemberIDcode:      return "MConfigMMemberIDcode"; // flag8 / u8  Master Configuration Flags /  Master MemberID Code 
       case SConfigSMemberIDcode:      return "SConfigSMemberIDcode"; // flag8 / u8  Slave Configuration Flags /  Slave MemberID Code 
-	    case Command:                   return "Command"; // u8 / u8  Remote Command 
+	    case Command:                   return "Remote Command"; // u8 / u8  Remote Command 
 	    case ASFflags:                  return "ASFflags"; // / OEM-fault-code  flag8 / u8  Application-specific fault flags and OEM fault code 
 	    case RBPflags:                  return "RBPflags"; // flag8 / flag8  Remote boiler parameter transfer-enable & read/write flags 
 	    case CoolingControl:            return "CoolingControl"; // f8.8  Cooling control signal (%) 
