@@ -35,8 +35,8 @@ void startMQTT()
 {
   stateMQTT = MQTT_STATE_INIT;
   handleMQTT(); //initialize the MQTT statemachine
-  // handleMQTT(); //then try to connect to MQTT
-  // handleMQTT(); //now you should be connected to MQTT ready to send
+  //handleMQTT(); //then try to connect to MQTT
+  //handleMQTT(); //now you should be connected to MQTT ready to send
 }
 
 void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {

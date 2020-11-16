@@ -736,6 +736,11 @@ void handleOTGW(){
   }   // while Serial.available()
 }
 
+void startOTGWstream()
+{
+  OTGWstream.begin();
+}
+
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a
