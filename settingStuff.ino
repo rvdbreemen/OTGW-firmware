@@ -82,7 +82,7 @@ void readSettings(bool show)
     DebugTf("cKey[%s], cVal[%s]\r\n", cKey, cVal);
 
     //strToLower(cKey);
-    if (stricmp(cKey, "hostname") == 0)         strCopy(settingHostname,         sizeof(settingHostname), cVal);
+    if (stricmp(cKey, "hostname") == 0) strlcpy(settingHostname, cVal, sizeof(settingHostname));
 
   } // while available()
   
@@ -109,9 +109,10 @@ void updateSetting(const char *field, const char *newValue)
 {
   DebugTf("-> field[%s], newValue[%s]\r\n", field, newValue);
 
-  if (!stricmp(field, "Hostname")) {
-    strCopy(settingHostname, sizeof(settingHostname), newValue); 
-    if (strlen(settingHostname) < 1) strCopy(settingHostname, sizeof(settingHostname), _HOSTNAME); 
+  if (!stricmp(field, "Hostname")) 
+  {
+    strlcpy(settingHostname, newValue, sizeof(settingHostname)); 
+    if (strlen(settingHostname) < 1) strlcpy(settingHostname,  _HOSTNAME, sizeof(settingHostname)); 
     char *dotPntr = strchr(settingHostname, '.') ;
     if (dotPntr != NULL)
     {
