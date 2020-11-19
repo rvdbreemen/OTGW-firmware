@@ -87,7 +87,7 @@ void sendDeviceInfo()
 {
   sendStartJsonObj("devinfo");
 
-  sendNestedJsonObj("author", "Willem Aandewiel (www.aandewiel.nl)");
+  sendNestedJsonObj("author", "Robert van den Breemen");
   sendNestedJsonObj("fwversion", _FW_VERSION);
 
   snprintf(cMsg, sizeof(cMsg), "%s %s", __DATE__, __TIME__);
