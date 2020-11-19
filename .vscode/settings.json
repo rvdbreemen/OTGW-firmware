@@ -1,24 +1,5 @@
 {
     "files.associations": {
-        "vector": "cpp",
-        "xstring": "cpp",
-        "*.tcc": "cpp",
-        "cstdio": "cpp",
-        "xlocnum": "cpp",
-        "string": "cpp",
-        "xlocale": "cpp",
-        "xutility": "cpp",
-        "array": "cpp",
-        "deque": "cpp",
-        "list": "cpp",
-        "unordered_map": "cpp",
-        "unordered_set": "cpp",
-        "initializer_list": "cpp",
-        "xhash": "cpp",
-        "xtree": "cpp",
-        "system_error": "cpp",
-        "atomic": "cpp",
-        "ios": "cpp",
-        "xiosbase": "cpp"
+        "*.yaml": "home-assistant"
     }
 }

@@ -25,9 +25,10 @@ WiFiServer server(80);
 //=====================================================================
 void setup()
 {
+  rebootCount = updateRebootCount();
 
   Serial.begin(9600, SERIAL_8N1);
-  //while(!Serial) { /* wait a bit */ }
+  while (!Serial) {} //Wait for OK 
 
   //setup randomseed the right way
   randomSeed(RANDOM_REG32); //This is 8266 HWRNG used to seed the Random PRNG: Read more: https://config9.com/arduino/getting-a-truly-random-number-in-arduino/

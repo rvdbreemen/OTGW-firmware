@@ -93,24 +93,7 @@ void feedWatchDog() {
   //==== feed the WD over I2C ==== 
 }
 
-//===================[ Watchdog OTGW ]===============================
-
-//===================[ OTGW PS=1 Command ]===============================
-void getOTGW_PS_1(){
-  DebugTln("PS=1");
-  Serial.write("PS=1\r\n");
-  delay(100);
-  while(Serial.available() > 0) 
-  { 
-    String strBuffer = Serial.readStringUntil('\n');
-    strBuffer.trim(); //remove LF and CR (and whitespaces)
-    DebugTln(strBuffer);
-  }
-  DebugTln("PS=0");
-  Serial.write("PS=0\r\n");
-}
-
-//===================[ OTGW PS=1 Command ]===============================
+//===================[ END Watchdog OTGW ]===============================
 
 //=======================================================================
 float OpenthermData::f88() {
@@ -184,7 +167,7 @@ const char *messageIDToString(OpenThermMessageID message_id){
 	    case TSet:                      return "TSet";  // f8.8  Control setpoint  ie CH  water temperature setpoint (°C)
       case MConfigMMemberIDcode:      return "MConfigMMemberIDcode"; // flag8 / u8  Master Configuration Flags /  Master MemberID Code 
       case SConfigSMemberIDcode:      return "SConfigSMemberIDcode"; // flag8 / u8  Slave Configuration Flags /  Slave MemberID Code 
-	    case Command:                   return "Command"; // u8 / u8  Remote Command 
+	    case Command:                   return "Remote Command"; // u8 / u8  Remote Command 
 	    case ASFflags:                  return "ASFflags"; // / OEM-fault-code  flag8 / u8  Application-specific fault flags and OEM fault code 
 	    case RBPflags:                  return "RBPflags"; // flag8 / flag8  Remote boiler parameter transfer-enable & read/write flags 
 	    case CoolingControl:            return "CoolingControl"; // f8.8  Cooling control signal (%) 
@@ -598,9 +581,40 @@ void print_daytime(uint16_t _value, const char *_label, const char*_unit)
   strlcat(_topic, "_minutes", sizeof(_topic));
   sendMQTTData(_topic, itoa(OTdata.valueLB, _msg, 10)); 
 }
+//===================[ OTGW PS=1 Command ]===============================
+void getOTGW_PS_1(){
+  DebugTln("PS=1");
+  Serial.write("PS=1\r\n");
+  delay(100);
+  while(Serial.available() > 0) 
+  { 
+    String strBuffer = Serial.readStringUntil('\n');
+    strBuffer.trim(); //remove LF and CR (and whitespaces)
+    DebugTln(strBuffer);
+  }
+  DebugTln("PS=0");
+  Serial.write("PS=0\r\n");
+}
+//===================[ OTGW PS=1 Command ]===============================
 
+//===================[ Send buffer to OTGW ]=============================
 
-//=====================================[ Handle OTGW ]=====================================================
+int sendOTGW(const char* buf, int len)
+{
+  //Just send the buffer to OTGW when the Serial interface is available
+  if (Serial) {
+    //check the write buffer
+    if (Serial.availableForWrite()>= (len+2)) {
+      //write buffer to serial
+      // Debugf("Sending command OTGW to [%s]", buf);
+      Serial.write(buf, len);
+      // Serial.write("PS=0\r\n");
+      Serial.write("\r\n");
+    } else Debugln("Error: Write buffer not big enough!");
+  } else Debugln("Error: Serial device not found!");
+}
+
+//===================[ Handle OTGW ]=====================================
 void handleOTGW_1(){
 //let's try this, read all data from the serial device, and dump it to the telnet stream.
   while(Serial.available() > 0) 
@@ -743,6 +757,11 @@ void handleOTGW(){
       Debugln(); 
     }
   }   // while Serial.available()
+}
+
+void startOTGWstream()
+{
+  OTGWstream.begin();
 }
 
 /***************************************************************************

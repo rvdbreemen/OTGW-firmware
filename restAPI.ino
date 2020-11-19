@@ -17,7 +17,7 @@ void processAPI()
   char URI[50]   = "";
   String words[10];
 
-  strncpy( URI, httpServer.uri().c_str(), sizeof(URI) );
+  strlcpy( URI, httpServer.uri().c_str(), sizeof(URI) );
 
   if (httpServer.method() == HTTP_GET)
         DebugTf("from[%s] URI[%s] method[GET] \r\n"
@@ -213,19 +213,19 @@ void sendApiNotFound(const char *URI)
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send ( 404, "text/html", "<!DOCTYPE HTML><html><head>");
 
-  strCopy(cMsg,   sizeof(cMsg), "<style>body { background-color: lightgray; font-size: 15pt;}");
-  strConcat(cMsg, sizeof(cMsg), "</style></head><body>");
+  strlcpy(cMsg, "<style>body { background-color: lightgray; font-size: 15pt;}", sizeof(cMsg));
+  strlcat(cMsg,  "</style></head><body>", sizeof(cMsg));
   httpServer.sendContent(cMsg);
 
-  strCopy(cMsg,   sizeof(cMsg), "<h1>OTGW firmware</h1><b1>");
+  strlcpy(cMsg, "<h1>OTGW firmware</h1><b1>", sizeof(cMsg));
   httpServer.sendContent(cMsg);
 
-  strCopy(cMsg,   sizeof(cMsg), "<br>[<b>");
-  strConcat(cMsg, sizeof(cMsg), URI);
-  strConcat(cMsg, sizeof(cMsg), "</b>] is not a valid ");
+  strlcpy(cMsg, "<br>[<b>", sizeof(cMsg));
+  strlcat(cMsg, URI, sizeof(cMsg));
+  strlcat(cMsg, "</b>] is not a valid ", sizeof(cMsg));
   httpServer.sendContent(cMsg);
   
-  strCopy(cMsg, sizeof(cMsg), "</body></html>\r\n");
+  strlcpy(cMsg, "</body></html>\r\n", sizeof(cMsg));
   httpServer.sendContent(cMsg);
 
 } // sendApiNotFound()

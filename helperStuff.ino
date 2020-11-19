@@ -62,6 +62,25 @@ char *trimwhitespace(char *str)
 
   return str;
 }
+
+
+bool splitCString(char *sIn, const char *del, char *cKey, char *cValue)
+{
+  //printf("sIn=[%s]\r\n", sIn);
+  static char _key[128];
+  static char _value[256];
+
+  char * token = strtok(sIn, del);
+  // loop through the string to extract all other tokens
+  while( token != NULL ) {
+      //now trim spaces from token and copy it to wOut
+      //strlcpy(wOut[wc++], trimwhitespace(token), sizeof(wOut[0]));
+      token = strtok(NULL, del);
+  }
+    
+  return true;
+}
+
 int8_t splitCString(char *sIn, const char *del, char wOut[][10], const int maxWords)
 {
     //printf("sIn=[%s]\r\n", sIn);
@@ -481,6 +500,36 @@ boolean isValidIP(IPAddress ip)
   
 } //  isValidIP()
 
+
+uint32_t updateRebootCount()
+{
+  //simple function to keep track of the number of reboots 
+  //return: number of reboots (if it goes as planned)
+  uint32_t _reboot = 0;
+  #define REBOOTCNT_FILE "/reboot_count.txt"
+  if (SPIFFS.begin()) {
+    //start with opening the file
+    File fh = SPIFFS.open(REBOOTCNT_FILE, "r");
+    if (fh) {
+      //read from file
+      if (fh.available()){
+        //read the first line 
+        _reboot  = fh.readStringUntil('\n').toInt();
+      }
+    }
+    fh.close();
+    //increment reboot counter
+    _reboot++;
+    //write back the reboot counter
+    fh = SPIFFS.open(REBOOTCNT_FILE, "w");
+    if (fh) {
+      //write to _reboot to file
+      fh.println(_reboot);
+    }
+    fh.close();
+  } 
+  return _reboot;
+}
 
 
 /***************************************************************************
