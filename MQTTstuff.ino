@@ -35,9 +35,30 @@ void startMQTT()
 {
   stateMQTT = MQTT_STATE_INIT;
   handleMQTT(); //initialize the MQTT statemachine
-  // handleMQTT(); //then try to connect to MQTT
-  // handleMQTT(); //now you should be connected to MQTT ready to send
+  //handleMQTT(); //then try to connect to MQTT
+  //handleMQTT(); //now you should be connected to MQTT ready to send
 }
+
+void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
+
+
+  // DebugT("Message arrived [");
+  // Debug(topic);
+  // Debug("] ");
+  // for (int i = 0; i < length; i++) {
+  //   Debug((char)payload[i]);
+  // }
+  // Debugln();
+  Debugf("Message arrived on topic [%s] = [%s]", topic, (char *)payload);
+
+  //what is the incoming message?  
+  if (stricmp(topic, OTGW_COMMAND_TOPIC) == 0) 
+  {
+    //incoming command to be forwarded to OTGW
+    sendOTGW((char *)payload, length);
+  }
+}
+
 //===========================================================================================
 void handleMQTT() 
 {
@@ -55,6 +76,7 @@ void handleMQTT()
         DebugTf("[%s] => setServer(%s, %d)\r\n", settingMQTTbroker.c_str(), MQTTbrokerIPchar, settingMQTTbrokerPort);
         MQTTclient.disconnect();
         MQTTclient.setServer(MQTTbrokerIPchar, settingMQTTbrokerPort);
+        MQTTclient.setCallback(handleMQTTcallback);
         MQTTclientId  = String(_HOSTNAME) + WiFi.macAddress();
         //skip try to connect
         stateMQTT = MQTT_STATE_TRY_TO_CONNECT;
@@ -96,6 +118,8 @@ void handleMQTT()
         //DebugTln(F("Next State: MQTT_STATE_IS_CONNECTED"));
         //First do AutoConfiguration for Homeassistant
         doAutoConfigure();
+        //Subscribe to topics
+        MQTTclient.subscribe(OTGW_COMMAND_TOPIC); 
       }
       else
       { // no connection, try again, do a non-blocking wait for 3 seconds.

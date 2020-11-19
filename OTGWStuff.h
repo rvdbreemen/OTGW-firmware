@@ -11,6 +11,7 @@
 ***************************************************************************       
 */  
 
+#define OTGW_COMMAND_TOPIC "command"
 
 typedef struct {
 	uint16_t 	Status = 0; 				// flag8 / flag8  Master and Slave Status flags. 

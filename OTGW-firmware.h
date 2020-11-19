@@ -33,6 +33,7 @@ char        fChar[10];
 String      lastReset   = "";
 char        settingHostname[41];
 uint32_t    upTimeSeconds=0;
+uint32_t    rebootCount=0;
 Timezone    CET; 
 
 const char *weekDayName[]  {  "Unknown", "Zondag", "Maandag", "Dinsdag", "Woensdag"
@@ -47,4 +48,7 @@ String    settingMQTTpasswd = "";
 String    settingMQTTtopTopic = "OTGW";
 int32_t   settingMQTTinterval = 10;
 
+// OTGW Serial 2 Telnet 
+#define OTGW_SERIAL_PORT 1023
+TelnetStreamClass OTGWstream(OTGW_SERIAL_PORT); 
 // eof

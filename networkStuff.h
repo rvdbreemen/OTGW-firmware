@@ -120,7 +120,6 @@ void startTelnet()
   TelnetStream.begin();
   DebugTln(F("\nTelnet server started .."));
   TelnetStream.flush();
-
 } // startTelnet()
 
 
