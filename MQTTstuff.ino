@@ -35,8 +35,8 @@ void startMQTT()
 {
   stateMQTT = MQTT_STATE_INIT;
   handleMQTT(); //initialize the MQTT statemachine
-  //handleMQTT(); //then try to connect to MQTT
-  //handleMQTT(); //now you should be connected to MQTT ready to send
+  // handleMQTT(); //then try to connect to MQTT
+  // handleMQTT(); //now you should be connected to MQTT ready to send
 }
 
 void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
@@ -119,7 +119,12 @@ void handleMQTT()
         //First do AutoConfiguration for Homeassistant
         doAutoConfigure();
         //Subscribe to topics
-        MQTTclient.subscribe(OTGW_COMMAND_TOPIC); 
+        char topic[100];
+        strcpy(topic, settingMQTTtopTopic.c_str());
+        strlcat(topic, "/", sizeof(topic));
+        strlcat(topic, OTGW_COMMAND_TOPIC, sizeof(topic));
+        DebugTf("Subscribe to MQTT: TopicId [%s]\r\n", topic);
+        MQTTclient.subscribe(topic); 
       }
       else
       { // no connection, try again, do a non-blocking wait for 3 seconds.
@@ -232,7 +237,7 @@ void sendMQTTData(const char* item, const char *json)
   char topic[100];
   snprintf(topic, sizeof(topic), "%s/", settingMQTTtopTopic.c_str());
   strlcat(topic, item, sizeof(topic));
-  DebugTf("Sending MQTT: TopicId [%s] Message [%s]\r\n", topic, json);
+  //DebugTf("Sending MQTT: TopicId [%s] Message [%s]\r\n", topic, json);
   if (!MQTTclient.publish(topic, json, true)) DebugTln("MQTT publish failed.");
   feedWatchDog();//feed the dog
 } // sendMQTTData()
@@ -242,7 +247,7 @@ void sendMQTT(const char* topic, const char *json, const int8_t len)
 {
   if (!MQTTclient.connected() || !isValidIP(MQTTbrokerIP)) return;
   // DebugTf("Sending data to MQTT server [%s]:[%d] ", settingMQTTbroker.c_str(), settingMQTTbrokerPort);  
-  DebugTf("Sending MQTT: TopicId [%s] Message [%s]\r\n", topic, json);
+  //DebugTf("Sending MQTT: TopicId [%s] Message [%s]\r\n", topic, json);
   if (MQTTclient.getBufferSize() < len) MQTTclient.setBufferSize(len); //resize buffer when needed
   if (!MQTTclient.publish(topic, json, true)) DebugTln("MQTT publish failed.");
   feedWatchDog();

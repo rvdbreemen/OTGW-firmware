@@ -89,7 +89,6 @@ void feedWatchDog() {
     Wire.endTransmission();                       //That's all there is...
   }
   yield();
-
   //==== feed the WD over I2C ==== 
 }
 
@@ -276,7 +275,7 @@ void print_f88(float _value, const char *_label, const char*_unit)
 {
   //function to print data
   _value = round(OTdata.f88()*100.0) / 100.0; // round float 2 digits, like this: x.xx 
-  Debugf("%-37s = %3.2f %s\r\n", _label, _value , _unit);
+  // Debugf("%-37s = %3.2f %s\r\n", _label, _value , _unit);
   char _msg[15] {0};
   dtostrf(_value, 3, 2, _msg);
   Debugf("%-37s = %s %s\r\n", _label, _msg , _unit);
@@ -288,7 +287,7 @@ void print_s16(int16_t _value, const char *_label, const char*_unit)
 {
   //function to print data
   _value = OTdata.s16();     
-  Debugf("%-37s = %5d %s\r\n", _label, _value, _unit);
+  // Debugf("%-37s = %5d %s\r\n", _label, _value, _unit);
   //Build string for MQTT
   char _msg[15] {0};
   itoa(_value, _msg, 10);
@@ -619,9 +618,8 @@ void handleOTGW_1(){
 //let's try this, read all data from the serial device, and dump it to the telnet stream.
   while(Serial.available() > 0) 
   { 
-    feedWatchDog(); //let's make sure we don't get bit
     char rIn = Serial.read();       
-    TelnetStream.write((char)rIn);
+    OTGWstream.write((char)rIn);
     //DebugTf("[%s] [%d]\r\n", strBuffer.c_str(), strBuffer.length());
   }
 }
@@ -630,10 +628,9 @@ void handleOTGW_2(){
 //let's try this, read all data from the serial device, and dump it to the telnet stream.
   while(Serial.available() > 0) 
   { 
-    feedWatchDog(); //let's make sure we don't get bit
     String strBuffer = Serial.readStringUntil('\n');      
-    TelnetStream.write((char *)strBuffer.c_str(), strBuffer.length());
-    TelnetStream.write('\n');
+    //OTGWstream.write((char *)strBuffer.c_str(), strBuffer.length());
+    //OTGWstream.write('\n');
     //DebugTf("[%s] [%d]\r\n", strBuffer.c_str(), strBuffer.length());
   }
 }
@@ -642,17 +639,21 @@ void handleOTGW(){
   //let's try this, read all data from the serial device, and dump it to the telnet stream.
   while(Serial.available() > 0) 
   { 
-    feedWatchDog(); //let's make sure we don't get bit
     String strBuffer = Serial.readStringUntil('\n');
-    strBuffer.trim(); //remove LF and CR (and whitespaces)
+    //OTGWstream.write((char *)strBuffer.c_str(), strBuffer.length());
+    //OTGWstream.write('\n');
+    //strBuffer.trim(); //remove LF and CR (and whitespaces)
 
-    DebugTf("[%s] [%d]\r\n", strBuffer.c_str(), strBuffer.length());
+    //DebugTf("[%s] [%d]\r\n", strBuffer.c_str(), strBuffer.length());
     
     if (strBuffer.length()>=9) {
-      DebugTf("%s ", strBuffer.c_str());
+      strBuffer.trim(); //remove LF and CR (and whitespaces)
+      OTGWstream.write((char *)strBuffer.c_str(), strBuffer.length());
+      OTGWstream.write('\r');OTGWstream.write('\n');//add the CR & LF
+      // DebugTf("[%s] ", strBuffer.c_str());
       //parse value
       uint32_t value = strtoul(strBuffer.substring(1).c_str(), NULL, 16);
-      // DebugTf("Value=[%08x]\r\n", (uint32_t)value);
+      // Debugf("Value=[%08x]\r\n", (uint32_t)value);
       //processing message
       // if (strBuffer.charAt(0)=='B')
       // {
@@ -677,7 +678,7 @@ void handleOTGW(){
       // {
       //   DebugTf("Unexpected=[%c] ", strBuffer.charAt(0));
       // }
-      //Debugf("msg=[%s] value=[%08x]", strBuffer.c_str(), value);
+      DebugTf("msg=[%s] value=[%08x]", strBuffer.c_str(), value);
 
       //split 32bit value into the relevant OT protocol parts
       OTdata.type = (value >> 28) & 0x7;         // byte 1 = take 3 bits that define msg msgType
@@ -686,7 +687,7 @@ void handleOTGW(){
       OTdata.valueLB = value & 0xFF;             // byte 4 = low byte
 
       //print message frame
-      //Debugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
+      Debugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
 
       //print message Type and ID
       Debugf("[%-16s]\t", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
