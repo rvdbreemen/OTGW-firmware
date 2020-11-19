@@ -20,7 +20,7 @@ Looking for the documentation, go here (work in progress): https://github.com/rv
   
 | Version | Release notes |
 |-|-|
-| 0.3.0 | OTmon stream implementend on 1023   
+| 0.3.0 | OTmon stream implementend on port 1023 (debug port stil on telnet port 23 |   
 | 0.2.0 | Auto-discovery throug MQTT implemented for integration with home assistant (and domoticz)     |
 | 0.1.0 | MQTT messaging implemented |
 | 0.0.1 | parsing of OT protocol implemented (use telnet to see)   Watchdog implemented |
