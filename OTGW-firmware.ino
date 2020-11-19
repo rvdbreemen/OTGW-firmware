@@ -146,26 +146,24 @@ void doTaskEvery5s(){
 //===[ Do task every 30s ]===
 void doTaskEvery30s(){
   //== do tasks ==
-  DebugTf("Alive, Serial Available=[%d]\r\n", Serial.available());
-
 }
 
 //===[ Do task every 60s ]===
 void doTaskEvery60s(){
-
+  //== do tasks ==
 }
 
 //===[ Do the background tasks ]===
 void doBackgroundTasks()
 {
-  delay(0);
+  delay(1);
   feedWatchDog();               // Feed the dog before it bites!
-  blinkLEDms(1000);             // 'blink' the status led every x ms
-  handleOTGW();                 // OTGW handling
+  handleOTGW_2();                 // OTGW handling
   handleMQTT();                 // MQTT transmissions
   httpServer.handleClient();
   MDNS.update();
   events();                     // trigger ezTime update etc.
+  blinkLEDms(1000);             // 'blink' the status led every x ms
 }
 
 void loop()

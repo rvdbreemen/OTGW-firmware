@@ -601,15 +601,38 @@ void print_daytime(uint16_t _value, const char *_label, const char*_unit)
 
 
 //=====================================[ Handle OTGW ]=====================================================
+void handleOTGW_1(){
+//let's try this, read all data from the serial device, and dump it to the telnet stream.
+  while(Serial.available() > 0) 
+  { 
+    feedWatchDog(); //let's make sure we don't get bit
+    char rIn = Serial.read();       
+    TelnetStream.write((char)rIn);
+    //DebugTf("[%s] [%d]\r\n", strBuffer.c_str(), strBuffer.length());
+  }
+}
+
+void handleOTGW_2(){
+//let's try this, read all data from the serial device, and dump it to the telnet stream.
+  while(Serial.available() > 0) 
+  { 
+    feedWatchDog(); //let's make sure we don't get bit
+    String strBuffer = Serial.readStringUntil('\n');      
+    TelnetStream.write((char *)strBuffer.c_str(), strBuffer.length());
+    TelnetStream.write('\n');
+    //DebugTf("[%s] [%d]\r\n", strBuffer.c_str(), strBuffer.length());
+  }
+}
+
 void handleOTGW(){
   //let's try this, read all data from the serial device, and dump it to the telnet stream.
   while(Serial.available() > 0) 
   { 
-
+    feedWatchDog(); //let's make sure we don't get bit
     String strBuffer = Serial.readStringUntil('\n');
     strBuffer.trim(); //remove LF and CR (and whitespaces)
 
-    // DebugTf("[%s] [%d]\r\n", strBuffer.c_str(), strBuffer.length());
+    DebugTf("[%s] [%d]\r\n", strBuffer.c_str(), strBuffer.length());
     
     if (strBuffer.length()>=9) {
       DebugTf("%s ", strBuffer.c_str());
