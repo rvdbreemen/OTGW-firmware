@@ -81,8 +81,8 @@ void setup()
   DebugTln(cMsg);
 
   Serial.print("\nGebruik 'telnet ");
-  Serial.print (WiFi.localIP());
-  Serial.println("' voor verdere debugging\r\n");
+  Serial.print(WiFi.localIP());
+  Serial.print("' voor verdere debugging\r\n");
 
 //================ Start HTTP Server ================================
   setupFSexplorer();
@@ -103,9 +103,12 @@ void setup()
   sprintf(cMsg, "%03d.%03d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
   DebugTf("\nAssigned IP[%s]\r\n", cMsg);
 
-  initWatchDog();  // setup the WatchDog
-} // setup()
+  initWatchDog();       // setup the WatchDog
+  startOTGWstream();    // 
 
+  DebugTf("Reboot count = [%d]\r\n", rebootCount);
+  Debugln("Setup finished!");
+}
 
 //=====================================================================
 
@@ -157,14 +160,14 @@ void doTaskEvery60s(){
 //===[ Do the background tasks ]===
 void doBackgroundTasks()
 {
-  delay(1);
   feedWatchDog();               // Feed the dog before it bites!
-  handleOTGW_2();                 // OTGW handling
   handleMQTT();                 // MQTT transmissions
+  handleOTGW();                 // OTGW handling
   httpServer.handleClient();
   MDNS.update();
   events();                     // trigger ezTime update etc.
   blinkLEDms(1000);             // 'blink' the status led every x ms
+  delay(1);
 }
 
 void loop()
