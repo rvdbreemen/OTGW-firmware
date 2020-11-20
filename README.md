@@ -17,7 +17,7 @@ To do:
 - InfluxDB client to do direct logging 
 - OT command sending interface
 
-Looking for the documentation, go here (work in progress): https://github.com/rvdbreemen/OTGW-firmware/wiki/Documentation-of-OTGW-firmware
+Looking for the documentation, go here (work in progress):   https://github.com/rvdbreemen/OTGW-firmware/wiki/Documentation-of-OTGW-firmware
   
 | Version | Release notes |
 |-|-|
