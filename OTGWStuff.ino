@@ -754,8 +754,7 @@ void handleOTGW(){
           case MasterVersion:             print_u8u8(OTdataObject.MasterVersion,                      "MasterVersion (version/type)","" ); break;// u8 / u8  Master product version number and type 
           case SlaveVersion:              print_u8u8(OTdataObject.SlaveVersion,                       "SlaveVersion  (version/type)", ""); break;// u8 / u8  Slave product version number and type
         }
-      } 
-      Debugln(); 
+      } else Debugln(); //next line 
     }
   }   // while Serial.available()
 }
