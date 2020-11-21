@@ -262,11 +262,10 @@ bool splitString(String sIn, char del, String& cKey, String& cVal)
   if (sIn.length()<=3) return false;          //not enough buffer, skip split
   int pos = sIn.indexOf(del);                 //determine split point
   if ((pos==0) || (pos==(sIn.length()-1))) return false; // no key or no value
-  cKey = sIn.substring(0,pos-1); cKey.trim(); //before, and trim spaces
+  cKey = sIn.substring(0,pos); cKey.trim();   //before, and trim spaces
   cVal = sIn.substring(pos+1); cVal.trim();   //after,and trim spaces
   return true;
 }
-
 //===========================================================================================
 void doAutoConfigure()
 {
@@ -286,7 +285,7 @@ void doAutoConfigure()
           feedWatchDog(); //start with feeding the dog
           String sLine = fh.readStringUntil('\n');
           // DebugTf("sline[%s]\r\n", sLine.c_str());
-          if (splitString( sLine, ',', sTopic, sMsg))
+          if (splitString(sLine, ',', sTopic, sMsg))
           {
             DebugTf("sTopic[%s], sMsg[%s]\r\n", sTopic.c_str(), sMsg.c_str());
             sendMQTT(sTopic.c_str(), sMsg.c_str(), (sTopic.length() + sMsg.length()+2));
