@@ -73,9 +73,11 @@ void startWiFi(const char* hostname, int timeOut)
   String thisAP = String(hostname) + "-" + WiFi.macAddress();
 
   DebugT("start ...");
-  
   manageWiFi.setDebugOutput(true);
-  
+
+  //--- next line in release needs to be commented out!
+  manageWiFi.resetSettings();
+
   //--- set callback that gets called when connecting to previous WiFi fails, and enters Access Point mode
   manageWiFi.setAPCallback(configModeCallback);
 
@@ -88,16 +90,13 @@ void startWiFi(const char* hostname, int timeOut)
   //--- if it does not connect it starts an access point with the specified name
   //--- here  "<HOSTNAME>-<MAC>"
   //--- and goes into a blocking loop awaiting configuration
-  if (!manageWiFi.autoConnect(thisAP.c_str())) 
+  if (!manageWiFi.autoConnect(thisAP.c_str()))
   {
+    //-- fail to connect? Have you tried turning it off and on again? 
     DebugTln(F("failed to connect and hit timeout"));
-
-    //reset and try again, or maybe put it to deep sleep
-    //delay(3000);
-    //ESP.reset();
-    //delay(2000);
-    DebugTf(" took [%d] seconds ==> ERROR!\r\n", (millis() - lTime) / 1000);
-    return;
+    delay(2000);  // Enough time for messages to be sent.
+    ESP.restart();
+    delay(5000);  // Enough time to ensure we don't return.
   }
   
   Debugln();
