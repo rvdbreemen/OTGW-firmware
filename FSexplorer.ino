@@ -320,11 +320,6 @@ void doRedirect(String msg, int wait, const char* URL, bool reboot)
   
   DebugTln(msg);
   httpServer.send(200, "text/html", redirectHTML);
-  if (reboot) 
-  {
-    delay(5000);
-    ESP.restart();
-    delay(5000);
-  }
+  if (reboot) doRestart("Reboot after OTA flash");
   
 } // doRedirect()
