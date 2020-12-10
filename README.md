@@ -1,4 +1,7 @@
 # OTGW-firmware
+
+[![Join the chat at https://gitter.im/OTGW-firmware/community](https://badges.gitter.im/OTGW-firmware/community.svg)](https://gitter.im/OTGW-firmware/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 Opentherm firmware - Nodoshop version
 
 This is a new firmware for the Nodoshop version of the OpenTherm Gateway.  
@@ -21,7 +24,9 @@ Looking for the documentation, go here (work in progress):   https://github.com/
   
 | Version | Release notes |
 |-|-|
-| 0.3.0 | OTmon stream implementend on port 1023 (debug port remains on port 23 (telnet) |   
+
+| 0.3.1 | Bug: Open AP after configuration, change ESP to STA mode on StartWifi  No more default Debug to Serial, only to port 23 telnet |   
+| 0.3.0 | OTmon stream implementend on port 1023 (debug port remains on port 23 - telnet) |   
 | 0.2.0 | Auto-discovery throug MQTT implemented for integration with home assistant (and domoticz)     |
 | 0.1.0 | MQTT messaging implemented |
 | 0.0.1 | parsing of OT protocol implemented (use telnet to see)   Watchdog implemented |
