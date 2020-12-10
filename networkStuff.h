@@ -40,7 +40,7 @@
 //#include "ESP8266HTTPUpdateServer.h"
 #include "ModUpdateServer.h"   // https://github.com/mrWheel/ModUpdateServer
 #include "updateServerHtml.h"
-#include <WiFiManager.h>        // version 0.15.0 - https://github.com/tzapu/WiFiManager
+#include <WiFiManager.h>        // version 2.0.4-beta - use latest development branch  - https://github.com/tzapu/WiFiManager
 // included in main program: #include <TelnetStream.h>       // Version 0.0.1 - https://github.com/jandrassy/TelnetStream
 #include <FS.h>                 // part of ESP8266 Core https://github.com/esp8266/Arduino
 
@@ -67,15 +67,19 @@ void configModeCallback (WiFiManager *myWiFiManager)
 
 //===========================================================================================
 void startWiFi(const char* hostname, int timeOut) 
-{
+{    
+  WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+
   WiFiManager manageWiFi;
   uint32_t lTime = millis();
   String thisAP = String(hostname) + "-" + WiFi.macAddress();
 
-  DebugT("start ...");
-  
+  Serial.println("Start Wifi ...");
   manageWiFi.setDebugOutput(true);
-  
+
+  //--- next line in release needs to be commented out!
+  // manageWiFi.resetSettings();
+
   //--- set callback that gets called when connecting to previous WiFi fails, and enters Access Point mode
   manageWiFi.setAPCallback(configModeCallback);
 
@@ -88,18 +92,18 @@ void startWiFi(const char* hostname, int timeOut)
   //--- if it does not connect it starts an access point with the specified name
   //--- here  "<HOSTNAME>-<MAC>"
   //--- and goes into a blocking loop awaiting configuration
-  if (!manageWiFi.autoConnect(thisAP.c_str())) 
+  Serial.printf("AutoConnect to: %s", thisAP.c_str());
+  if (!manageWiFi.autoConnect(thisAP.c_str()))
   {
+    //-- fail to connect? Have you tried turning it off and on again? 
     DebugTln(F("failed to connect and hit timeout"));
-
-    //reset and try again, or maybe put it to deep sleep
-    //delay(3000);
-    //ESP.reset();
-    //delay(2000);
-    DebugTf(" took [%d] seconds ==> ERROR!\r\n", (millis() - lTime) / 1000);
-    return;
+    delay(2000);  // Enough time for messages to be sent.
+    ESP.restart();
+    delay(5000);  // Enough time to ensure we don't return.
   }
-  
+
+  //WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+
   Debugln();
   DebugT(F("Connected to " )); Debugln (WiFi.SSID());
   DebugT(F("IP address: " ));  Debugln (WiFi.localIP());
