@@ -1,4 +1,7 @@
 # OTGW-firmware
+
+[![Join the chat at https://gitter.im/OTGW-firmware/community](https://badges.gitter.im/OTGW-firmware/community.svg)](https://gitter.im/OTGW-firmware/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 Opentherm firmware - Nodoshop version
 
 This is a new firmware for the Nodoshop version of the OpenTherm Gateway.  
