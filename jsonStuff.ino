@@ -20,7 +20,7 @@ void sendStartJsonObj(const char *objName)
   httpServer.sendHeader("Access-Control-Allow-Origin", "*");
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send(200, "application/json", sBuff);
-  
+
 } // sendStartJsonObj()
 
 

@@ -151,6 +151,7 @@ enum OpenThermMessageID {
 	SlaveVersion, // u8 / u8  Slave product version number and type
 };
 
+
 enum OpenThermStatus {
 	OT_NOT_INITIALIZED,
 	OT_READY,

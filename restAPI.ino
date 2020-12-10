@@ -58,7 +58,17 @@ void processAPI()
     return;
   }
 
-  if (words[3] == "devinfo")
+  if (words[3] == "otgw")
+  {
+     //what the heck should I do?
+     // /api/v0/otgw/{id}/value = return the value of the messageid
+     // /api/v0/otgw/{id}/msg = return the text for the message
+     // /api/v0/otgw/{id}/friendly = return the nice name
+     // /api/v0/otgw/{id}/unit = return the unit of the msgid
+     sendOTGWvalue(word[4].toInt()); 
+
+  } 
+  else if (words[3] == "devinfo")
   {
     sendDeviceInfo();
   }
@@ -81,6 +91,13 @@ void processAPI()
   
 } // processAPI()
 
+
+//====[ implementing REST API ]====
+void sendOTGWvalue(byte MsgId){
+  // So reply with the value of the MsgID
+  sendStartJsonObj("otgw_value"); 
+  sendEndJsonObj();
+}
 
 //=======================================================================
 void sendDeviceInfo() 
