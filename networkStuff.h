@@ -40,7 +40,7 @@
 //#include "ESP8266HTTPUpdateServer.h"
 #include "ModUpdateServer.h"   // https://github.com/mrWheel/ModUpdateServer
 #include "updateServerHtml.h"
-#include <WiFiManager.h>        // version 0.15.0 - https://github.com/tzapu/WiFiManager
+#include <WiFiManager.h>        // version 0.16.0 - https://github.com/tzapu/WiFiManager
 // included in main program: #include <TelnetStream.h>       // Version 0.0.1 - https://github.com/jandrassy/TelnetStream
 #include <FS.h>                 // part of ESP8266 Core https://github.com/esp8266/Arduino
 
@@ -72,11 +72,11 @@ void startWiFi(const char* hostname, int timeOut)
   uint32_t lTime = millis();
   String thisAP = String(hostname) + "-" + WiFi.macAddress();
 
-  DebugT("start ...");
+  Serial.println("Start Wifi ...");
   manageWiFi.setDebugOutput(true);
 
   //--- next line in release needs to be commented out!
-  manageWiFi.resetSettings();
+  // manageWiFi.resetSettings();
 
   //--- set callback that gets called when connecting to previous WiFi fails, and enters Access Point mode
   manageWiFi.setAPCallback(configModeCallback);
