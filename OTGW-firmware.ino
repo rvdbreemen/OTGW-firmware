@@ -11,6 +11,28 @@
 ***************************************************************************      
 */
 
+/*
+ *  How to install the OTGW on your nodeMCU
+ *  
+ *  Make sure you have all required library's installed:
+ *  - ezTime - https://github.com/ropg/ezTime
+ *  - TelnetStream - https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
+ *  - ArduinoJson - https://arduinojson.org/
+ *  All the library's can be installed using the library manager.
+ *  
+ *  How to upload to your SPIFF?
+ *  Just install the SPIFF upload plugin (https://github.com/esp8266/arduino-esp8266fs-plugin) 
+ *  and upload it to your SPIFF after first flashing the device.
+ *  
+ *  How to compile this firmware?
+ *  - NodeMCU v1.0
+ *  - Flashsize (4MB - FS:2MB - OTA ~1019KB)
+ *  - CPU frequentcy: 160MHz 
+ *  - Normal defaults should work fine. 
+ *  First time: Make sure to flash sketch + wifi or flash ALL contents.
+ *  
+ */
+
 #include "version.h"
 #define _FW_VERSION _VERSION
 
@@ -19,8 +41,6 @@
 
 // WiFi Server object and parameters
 WiFiServer server(80);
-
-
 
 //=====================================================================
 void setup()
@@ -42,23 +62,23 @@ void setup()
   //start the debug port 23
   startTelnet();
 
-  Debug("\r\n[OTGW firmware - Nodoshop version]\r\n");
-  DebugTf("Booting....[%s]\r\n\r\n", String(_FW_VERSION).c_str());
+  Serial.println(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
+  Serial.printf("Booting....[%s]\r\n\r\n", String(_FW_VERSION).c_str());
   
 //================ SPIFFS ===========================================
   if (SPIFFS.begin()) 
   {
-    DebugTln(F("SPIFFS Mount succesfull\r"));
+    Serial.println(F("SPIFFS Mount succesfull\r"));
     SPIFFSmounted = true;
   } else { 
-    DebugTln(F("SPIFFS Mount failed\r"));   // Serious problem with SPIFFS 
+    Serial.println(F("SPIFFS Mount failed\r"));   // Serious problem with SPIFFS 
     SPIFFSmounted = false;
   }
 
   readSettings(true);
 
   // Connect to and initialise WiFi network
-  DebugTln("Attempting to connect to WiFi network\r");
+  Serial.println(F("Attempting to connect to WiFi network\r"));
   digitalWrite(LED_BUILTIN, HIGH);
   startWiFi(_HOSTNAME, 240);  // timeout 4 minuten
   digitalWrite(LED_BUILTIN, LOW);
@@ -74,15 +94,14 @@ void setup()
   CET.setLocation(F("Europe/Amsterdam"));
   CET.setDefault(); 
   
-  Debugln("UTC time: "+ UTC.dateTime());
-  Debugln("CET time: "+ CET.dateTime());
+  Serial.println("UTC time: "+ UTC.dateTime());
+  Serial.println("CET time: "+ CET.dateTime());
 
-  snprintf(cMsg, sizeof(cMsg), "Last reset reason: [%s]\r", ESP.getResetReason().c_str());
-  DebugTln(cMsg);
-
-  Serial.print("\nGebruik 'telnet ");
+  Serial.printf("Last reset reason: [%s]\r\n", ESP.getResetReason().c_str());
+  Serial.print("Gebruik 'telnet ");
   Serial.print(WiFi.localIP());
-  Serial.print("' voor verdere debugging\r\n");
+  Serial.println("' voor verdere debugging");
+
 
 //================ Start HTTP Server ================================
   setupFSexplorer();
@@ -97,17 +116,17 @@ void setup()
 
 
   httpServer.begin();
-  DebugTln("\nServer started\r");
+  Serial.println("\nHTTP Server started\r");
   
   // Set up first message as the IP address
   sprintf(cMsg, "%03d.%03d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
-  DebugTf("\nAssigned IP[%s]\r\n", cMsg);
+  Serial.printf("\nAssigned IP[%s]\r\n", cMsg);
 
   initWatchDog();       // setup the WatchDog
   startOTGWstream();    // 
 
-  DebugTf("Reboot count = [%d]\r\n", rebootCount);
-  Debugln("Setup finished!");
+  Serial.printf("Reboot count = [%d]\r\n", rebootCount);
+  Serial.println(F("Setup finished!"));
 }
 
 //=====================================================================

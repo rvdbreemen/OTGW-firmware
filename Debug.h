@@ -2,28 +2,21 @@
 ***************************************************************************  
 **  Program  : Debug.h
 **
-**  Copyright (c) 2020 Willem Aandewiel
-**  Met dank aan Erik
+**  Copyright (c) 2020 Robert van den Breemen
+**  Met dank aan Willem Aandewiel en Erik
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
+** Modified: as OTGW actually uses the Serial interface, so no more debug to serial please.
 */
 
 /*---- start macro's ------------------------------------------------------------------*/
 
-#define Debug(...)      ({ Serial.print(__VA_ARGS__);         \
-                           TelnetStream.print(__VA_ARGS__);   \
-                        })
-#define Debugln(...)    ({ Serial.println(__VA_ARGS__);       \
-                           TelnetStream.println(__VA_ARGS__); \
-                        })
-#define Debugf(...)     ({ Serial.printf(__VA_ARGS__);        \
-                           TelnetStream.printf(__VA_ARGS__);  \
-                        })
+#define Debug(...)      ({ TelnetStream.print(__VA_ARGS__);   })
+#define Debugln(...)    ({ TelnetStream.println(__VA_ARGS__); })
+#define Debugf(...)     ({ TelnetStream.printf(__VA_ARGS__);  })
 
-#define DebugFlush()    ({ Serial.flush(); \
-                           TelnetStream.flush(); \
-                        })
+#define DebugFlush()    ({ TelnetStream.flush(); })
 
 
 #define DebugT(...)     ({ _debugBOL(__FUNCTION__, __LINE__);  \
@@ -49,6 +42,5 @@ void _debugBOL(const char *fn, int line)
                 ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(),\
                 fn, line);
                  
-  Serial.print (_bol);
   TelnetStream.print (_bol);
 }

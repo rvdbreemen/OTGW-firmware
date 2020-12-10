@@ -605,7 +605,7 @@ int sendOTGW(const char* buf, int len)
     //check the write buffer
     if (Serial.availableForWrite()>= (len+2)) {
       //write buffer to serial
-      // Debugf("Sending command OTGW to [%s]", buf);
+      Debugf("Sending command OTGW to [%s]\r\n", buf);
       Serial.write(buf, len);
       // Serial.write("PS=0\r\n");
       Serial.write("\r\n");
