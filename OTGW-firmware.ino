@@ -11,6 +11,28 @@
 ***************************************************************************      
 */
 
+/*
+ *  How to install the OTGW on your nodeMCU
+ *  
+ *  Make sure you have all required library's installed:
+ *  - ezTime - https://github.com/ropg/ezTime
+ *  - TelnetStream - https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
+ *  - ArduinoJson - https://arduinojson.org/
+ *  All the library's can be installed using the library manager.
+ *  
+ *  How to upload to your SPIFF?
+ *  Just install the SPIFF upload plugin (https://github.com/esp8266/arduino-esp8266fs-plugin) 
+ *  and upload it to your SPIFF after first flashing the device.
+ *  
+ *  How to compile this firmware?
+ *  - NodeMCU v1.0
+ *  - Flashsize (4MB - FS:2MB - OTA ~1019KB)
+ *  - CPU frequentcy: 160MHz 
+ *  - Normal defaults should work fine. 
+ *  First time: Make sure to flash sketch + wifi or flash ALL contents.
+ *  
+ */
+
 #include "version.h"
 #define _FW_VERSION _VERSION
 
@@ -19,8 +41,6 @@
 
 // WiFi Server object and parameters
 WiFiServer server(80);
-
-
 
 //=====================================================================
 void setup()
@@ -81,6 +101,7 @@ void setup()
   Serial.print("Gebruik 'telnet ");
   Serial.print(WiFi.localIP());
   Serial.println("' voor verdere debugging");
+
 
 //================ Start HTTP Server ================================
   setupFSexplorer();
