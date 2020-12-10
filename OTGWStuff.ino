@@ -759,6 +759,9 @@ void handleOTGW(){
   }   // while Serial.available()
 }
 
+//functions for REST API
+void 
+
 void startOTGWstream()
 {
   OTGWstream.begin();
