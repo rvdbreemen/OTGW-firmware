@@ -65,7 +65,7 @@ void processAPI()
      // /api/v0/otgw/{id}/msg = return the text for the message
      // /api/v0/otgw/{id}/friendly = return the nice name
      // /api/v0/otgw/{id}/unit = return the unit of the msgid
-     sendOTGWvalue(word[4].toInt()); 
+     sendOTGWvalue(words[4].toInt()); 
 
   } 
   else if (words[3] == "devinfo")
@@ -96,6 +96,7 @@ void processAPI()
 void sendOTGWvalue(byte MsgId){
   // So reply with the value of the MsgID
   sendStartJsonObj("otgw_value"); 
+  getOTGWValue(MsgId);
   sendEndJsonObj();
 }
 

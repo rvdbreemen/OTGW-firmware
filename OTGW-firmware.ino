@@ -123,7 +123,7 @@ void setup()
   Serial.printf("\nAssigned IP[%s]\r\n", cMsg);
 
   initWatchDog();       // setup the WatchDog
-  startOTGWstream();    // 
+  startOTGWstream();    
 
   Serial.printf("Reboot count = [%d]\r\n", rebootCount);
   Serial.println(F("Setup finished!"));

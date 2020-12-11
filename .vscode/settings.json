@@ -2,6 +2,8 @@
     "files.associations": {
         "*.yaml": "home-assistant",
         "xlocale": "cpp",
-        "xstring": "cpp"
+        "xstring": "cpp",
+        "*.tcc": "cpp",
+        "ostream": "cpp"
     }
 }

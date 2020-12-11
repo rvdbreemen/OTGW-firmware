@@ -42,14 +42,11 @@ void startMQTT()
 void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 
 
-  // DebugT("Message arrived [");
-  // Debug(topic);
-  // Debug("] ");
-  // for (int i = 0; i < length; i++) {
-  //   Debug((char)payload[i]);
-  // }
-  // Debugln();
-  Debugf("Message arrived on topic [%s] = [%s]", topic, (char *)payload);
+  DebugT("Message arrived on topic ["); Debug(topic); Debug("] = [");
+  for (int i = 0; i < length; i++) {
+    Debug((char)payload[i]);
+  }
+  Debug("] ("); Debug(length); Debug(")"); Debugln();
 
   //what is the incoming message?  
   if (stricmp(topic, OTGW_COMMAND_TOPIC) == 0) 
