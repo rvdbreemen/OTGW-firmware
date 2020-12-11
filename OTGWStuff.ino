@@ -161,64 +161,9 @@ const char *messageTypeToString(OpenThermMessageType message_type)
 }
 
 const char *messageIDToString(OpenThermMessageID message_id){
-    switch (message_id) {
-      case Status:                    return "Status"; // flag8 / flag8  Master and Slave Status flags. 
-	    case TSet:                      return "TSet";  // f8.8  Control setpoint  ie CH  water temperature setpoint (°C)
-      case MConfigMMemberIDcode:      return "MConfigMMemberIDcode"; // flag8 / u8  Master Configuration Flags /  Master MemberID Code 
-      case SConfigSMemberIDcode:      return "SConfigSMemberIDcode"; // flag8 / u8  Slave Configuration Flags /  Slave MemberID Code 
-	    case Command:                   return "Remote Command"; // u8 / u8  Remote Command 
-	    case ASFflags:                  return "ASFflags"; // / OEM-fault-code  flag8 / u8  Application-specific fault flags and OEM fault code 
-	    case RBPflags:                  return "RBPflags"; // flag8 / flag8  Remote boiler parameter transfer-enable & read/write flags 
-	    case CoolingControl:            return "CoolingControl"; // f8.8  Cooling control signal (%) 
-	    case TsetCH2:                   return "TsetCH2"; // f8.8  Control setpoint for 2e CH circuit (°C)
-	    case TrOverride:                return "TrOverride"; // f8.8  Remote override room setpoint 
-	    case TSP:                       return "TSP";  // u8 / u8  Number of Transparent-Slave-Parameters supported by slave 
-	    case TSPindexTSPvalue:          return "TSPindexTSPvalue"; // u8 / u8  Index number / Value of referred-to transparent slave parameter. 
-	    case FHBsize:                   return "FHBsize"; // u8 / u8  Size of Fault-History-Buffer supported by slave 
-	    case FHBindexFHBvalue:          return "FHBindexFHBvalue"; // u8 / u8  Index number / Value of referred-to fault-history buffer entry. 
-	    case MaxRelModLevelSetting:     return "MaxRelModLevelSetting"; // f8.8  Maximum relative modulation level setting (%) 
-	    case MaxCapacityMinModLevel:    return "MaxCapacityMinModLevel"; // u8 / u8  Maximum boiler capacity (kW) / Minimum boiler modulation level(%) 
-	    case TrSet:                     return "TrSet"; // f8.8  Room Setpoint (°C)
-	    case RelModLevel:               return "RelModLevel"; // f8.8  Relative Modulation Level (%) 
-	    case CHPressure:                return "CHPressure"; // f8.8  Water pressure in CH circuit  (bar) 
-	    case DHWFlowRate:               return "DHWFlowRate"; // f8.8  Water flow rate in DHW circuit. (litres/minute) 
-	    case DayTime:                   return "DayTime"; // special / u8  Day of Week and Time of Day 
-	    case Date:                      return "Date"; // u8 / u8  Calendar date 
-	    case Year:                      return "Year"; // u16  Calendar year 
-	    case TrSetCH2:                  return "TrSetCH2"; // f8.8  Room Setpoint for 2nd CH circuit (°C)
-	    case Tr:                        return "Troom"; // f8.8  Room temperature (°C)
-	    case Tboiler:                   return "Tboiler"; // f8.8  Boiler flow water temperature (°C)
-	    case Tdhw:                      return "Tdhw"; // f8.8  DHW temperature (°C)
-	    case Toutside:                  return "Toutside"; // f8.8  Outside temperature (°C)
-	    case Tret:                      return "Tret"; // f8.8  Return water temperature (°C)
-	    case Tstorage:                  return "Tstorage"; // f8.8  Solar storage temperature (°C)
-	    case Tcollector:                return "Tcollector"; // f8.8  Solar collector temperature (°C)
-	    case TflowCH2:                  return "TflowCH2"; // f8.8  Flow water temperature CH2 circuit (°C)
-	    case Tdhw2:                     return "Tdhw2"; // f8.8  Domestic hot water temperature 2 (°C)
-	    case Texhaust:                  return "Texhaust"; // s16  Boiler exhaust temperature (°C)
-	    case TdhwSetUBTdhwSetLB:        return "TdhwSetUBTdhwSetLB"; // s8 / s8  DHW setpoint upper & lower bounds for adjustment  (°C)
-	    case MaxTSetUBMaxTSetLB:        return "MaxTSetUBMaxTSetLB"; // s8 / s8  Max CH water setpoint upper & lower bounds for adjustment  (°C)
-	    case HcratioUBHcratioLB:        return "HcratioUBHcratioLB"; // s8 / s8  OTC heat curve ratio upper & lower bounds for adjustment  
-	    case TdhwSet:                   return "TdhwSet"; // f8.8  DHW setpoint (°C)    (Remote parameter 1)
-	    case MaxTSet:                   return "MaxTSet"; // f8.8  Max CH water setpoint (°C)  (Remote parameters 2)
-	    case Hcratio:                   return "Hcratio"; // f8.8  OTC heat curve ratio (°C)  (Remote parameter 3)
-	    case RemoteOverrideFunction:    return "RemoteOverrideFunction"; // flag8 / -  Function of manual and program changes in master and remote room setpoint. 
-	    case OEMDiagnosticCode:         return "OEMDiagnosticCode"; // u16  OEM-specific diagnostic/service code 
-	    case BurnerStarts:              return "BurnerStarts"; // u16  Number of starts burner 
-	    case CHPumpStarts:              return "CHPumpStarts"; // u16  Number of starts CH pump 
-	    case DHWPumpValveStarts:        return "DHWPumpValveStarts"; // u16  Number of starts DHW pump/valve 
-	    case DHWBurnerStarts:           return "DHWBurnerStarts";  // u16  Number of starts burner during DHW mode 
-	    case BurnerOperationHours:      return "BurnerOperationHours"; // u16  Number of hours that burner is in operation (i.e. flame on) 
-	    case CHPumpOperationHours:      return "CHPumpOperationHours"; // u16  Number of hours that CH pump has been running 
-	    case DHWPumpValveOperationHours: return "DHWPumpValveOperationHours"; // u16  Number of hours that DHW pump has been running or DHW valve has been opened 
-	    case DHWBurnerOperationHours:   return "DHWBurnerOperationHours"; // u16  Number of hours that burner is in operation during DHW mode 
-	    case OpenThermVersionMaster:    return "OpenThermVersionMaster"; // f8.8  The implemented version of the OpenTherm Protocol Specification in the master. 
-	    case OpenThermVersionSlave:     return "OpenThermVersionSlave"; // f8.8  The implemented version of the OpenTherm Protocol Specification in the slave. 
-	    case MasterVersion:             return "MasterVersion"; // u8 / u8  Master product version number and type 
-	    case SlaveVersion:              return "SlaveVersion"; // u8 / u8  Slave product version number and type
-      default:                        return "Unknown";
-    }
-}
+  if (message_id<=127) {
+    return OTmap[message_id].label;
+  } else return "Undefined";}
 
 OpenThermMessageType getMessageType(unsigned long message)
 {
@@ -271,70 +216,67 @@ const char *byte_to_binary(int x)
 }
 
 
-void print_f88(float *_value, const char *_label, const char*_unit)
+float print_f88()
 {
   //function to print data
-  *_value = round(OTdata.f88()*100.0) / 100.0; // round float 2 digits, like this: x.xx 
-  // Debugf("%-37s = %3.2f %s\r\n", _label, *_value , _unit);
+  float _value = round(OTdata.f88()*100.0) / 100.0; // round float 2 digits, like this: x.xx 
+  // Debugf("%-37s = %3.2f %s\r\n", OTmap[OTdata.id].label, _value , OTmap[OTdata.id].unit);
   char _msg[15] {0};
-  dtostrf(*_value, 3, 2, _msg);
-  Debugf("%-37s = %s %s\r\n", _label, _msg , _unit);
+  dtostrf(_value, 3, 2, _msg);
+  Debugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg , OTmap[OTdata.id].unit);
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
+  return _value;
 }
 
-void print_s16(int16_t *_value, const char *_label, const char*_unit)
-{
-  //function to print data
-  *_value = OTdata.s16();     
-  // Debugf("%-37s = %5d %s\r\n", _label, *_value, _unit);
+int16_t print_s16()
+{    
+  int16_t _value = OTdata.s16(); 
+  // Debugf("%-37s = %5d %s\r\n", OTmap[OTdata.id].label, _value, OTmap[OTdata.id].unit);
   //Build string for MQTT
   char _msg[15] {0};
-  itoa(*_value, _msg, 10);
-  Debugf("%-37s = %s %s\r\n", _label, _msg, _unit);
+  itoa(_value, _msg, 10);
+  Debugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg, OTmap[OTdata.id].unit);
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
+  return _value;
 }
 
-void print_s8s8(uint16_t *_value, const char *_label, const char*_unit)
+uint16_t print_s8s8()
 {
-  //function to print data
-  *_value = OTdata.u16();     
-  Debugf("%-37s = %3d / %3d %s\r\n", _label, (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB, _unit);
+  Debugf("%-37s = %3d / %3d %s\r\n", OTmap[OTdata.id].label, (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB, OTmap[OTdata.id].unit);
   //Build string for MQTT
   char _msg[15] {0};
   char _topic[50] {0};
   itoa((int8_t)OTdata.valueHB, _msg, 10);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_value_hb", sizeof(_topic));
-  Debugf("%-37s = %s %s\r\n", _label, _msg, _unit);
+  Debugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg, OTmap[OTdata.id].unit);
   sendMQTTData(_topic, _msg);
   //Build string for MQTT
   itoa((int8_t)OTdata.valueLB, _msg, 10);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_value_lb", sizeof(_topic));
-  Debugf("%-37s = %s %s\r\n", _label, _msg, _unit);
+  Debugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg, OTmap[OTdata.id].unit);
   sendMQTTData(_topic, _msg);
+  return  OTdata.u16();
 }
 
 
-void print_u16(uint16_t *_value, const char *_label, const char*_unit)
-{
-  //function to print data
-  *_value = OTdata.u16();     
+uint16_t print_u16()
+{ 
+  uint16_t _value = OTdata.u16(); 
   //Build string for MQTT
   char _msg[15] {0};
-  utoa(*_value, _msg, 10);
-  Debugf("%-37s = %s %s\r\n", _label, _msg, _unit);
+  utoa(_value, _msg, 10);
+  Debugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg, OTmap[OTdata.id].unit);
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
+  return _value;
 }
 
-void print_status(uint16_t *_value, const char *_label, const char*_unit)
+uint16_t print_status()
 {
-  //function to print data
-  *_value = OTdata.u16();     
-  
   char _flag8_master[8] {0};
   char _flag8_slave[8] {0};
     //bit: [clear/0, set/1]
@@ -356,7 +298,7 @@ void print_status(uint16_t *_value, const char *_label, const char*_unit)
   _flag8_master[7] = (((OTdata.valueHB) & 0x80) ? '.' : '-');
   _flag8_master[8] = '\0';
 
-  Debugf("%-37s = M[%s] \r\n", _label, _flag8_master);
+  Debugf("%-37s = M[%s] \r\n", OTmap[OTdata.id].label, _flag8_master);
   //Master Status
   sendMQTTData("status_master", _flag8_master);
   sendMQTTData("ch_enable",             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
@@ -384,7 +326,7 @@ void print_status(uint16_t *_value, const char *_label, const char*_unit)
   _flag8_slave[7] = (((OTdata.valueLB) & 0x80) ? '.' : '-');
   _flag8_slave[8] = '\0';
 
-  DebugTf("%-37s = S[%s] \r\n", _label, _flag8_slave);
+  DebugTf("%-37s = S[%s] \r\n", OTmap[OTdata.id].label, _flag8_slave);
 
   //Slave Status
   sendMQTTData("status_slave", _flag8_slave);
@@ -395,15 +337,12 @@ void print_status(uint16_t *_value, const char *_label, const char*_unit)
   sendMQTTData("cooling",               (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  
   sendMQTTData("centralheating2",       (((OTdata.valueLB) & 0x20) ? "ON" : "OFF"));
   sendMQTTData("diagnostic_indicator",  (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));
+  return OTdata.u16(); 
 }
 
-void print_ASFflags(uint16_t *_value, const char *_label, const char*_unit)
+uint16_t print_ASFflags()
 {
-  //function to print data
-  *_value = OTdata.u16();     
- 
-  Debugf("%-37s = M[%s] OEM fault code [%3d]\r\n", _label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-
+  Debugf("%-37s = M[%s] OEM fault code [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   //Build string for MQTT
   char _msg[15] {0};
   //Application Specific Fault
@@ -427,16 +366,13 @@ void print_ASFflags(uint16_t *_value, const char *_label, const char*_unit)
   sendMQTTData("gas_flame_fault",       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));
   sendMQTTData("air_pressure_fault",    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  
   sendMQTTData("water_over-temperature",(((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));
+  return  OTdata.u16();
 }
 
 
-void print_slavememberid(uint16_t *_value, const char *_label, const char*_unit)
+uint16_t print_slavememberid()
 {
-  //function to print data
-  *_value = OTdata.u16();     
- 
-  Debugf("%-37s = Slave Config[%s] MemberID code [%3d]\r\n", _label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-
+  Debugf("%-37s = Slave Config[%s] MemberID code [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   //Build string for SendMQTT
   sendMQTTData("slave_configuration", byte_to_binary(OTdata.valueHB));
   char _msg[15] {0};
@@ -462,30 +398,23 @@ void print_slavememberid(uint16_t *_value, const char *_label, const char*_unit)
   sendMQTTData("dhw_config",                              (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));
   sendMQTTData("master_low_off_pomp_control_function",    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  
   sendMQTTData("ch2_present",                             (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));
+  return OTdata.u16(); 
 }
 
-void print_mastermemberid(uint16_t *_value, const char *_label, const char*_unit)
+uint16_t print_mastermemberid()
 {
-  //function to print data
-  *_value = OTdata.u16();     
- 
-  Debugf("%-37s = Master Config[%s] MemberID code [%3d]\r\n", _label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-
+  Debugf("%-37s = Master Config[%s] MemberID code [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   //Build string for MQTT
   char _msg[15] {0};
   sendMQTTData("master_configuration", byte_to_binary(OTdata.valueHB));
   utoa(OTdata.valueLB, _msg, 10);
   sendMQTTData("master_memberid_code", _msg);
-
-
+  return OTdata.u16();
 }
 
-void print_flag8u8(uint16_t *_value, const char *_label, const char*_unit)
+uint16_t print_flag8u8()
 {
-  *_value = OTdata.u16();  
-
-  Debugf("%-37s = M[%s] - [%3d]\r\n", _label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-
+  Debugf("%-37s = M[%s] - [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   //Build string for MQTT
   char _topic[50] {0};
   //flag8 value
@@ -498,16 +427,14 @@ void print_flag8u8(uint16_t *_value, const char *_label, const char*_unit)
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_code", sizeof(_topic));
   sendMQTTData(_topic, _msg);
+  return OTdata.u16(); 
 }
 
 
 
-void print_flag8(uint16_t *_value, const char *_label, const char*_unit)
+uint16_t print_flag8()
 {
-  //function to print data
-  *_value = OTdata.u16();     
-  
-  Debugf("%-37s = flag8 = [%s] - decimal = [%3d]\r\n", _label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
+  Debugf("%-37s = flag8 = [%s] - decimal = [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
 
   //Build string for MQTT
   char _topic[50] {0};
@@ -515,55 +442,53 @@ void print_flag8(uint16_t *_value, const char *_label, const char*_unit)
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_flag8", sizeof(_topic));
   sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
+  return OTdata.u16();
 }
 
-void print_flag8flag8(uint16_t *_value, const char *_label, const char*_unit)
-{
-  //function to print data
-  *_value = OTdata.u16();     
-  
+uint16_t print_flag8flag8()
+{  
   //Build string for MQTT
   char _topic[50] {0};
   //flag8 valueHB
-  Debugf("%-37s = HB flag8[%s] -[%3d]\r\n", _label, byte_to_binary(OTdata.valueHB), OTdata.valueHB);
+  Debugf("%-37s = HB flag8[%s] -[%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueHB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_hb_flag8", sizeof(_topic));
   sendMQTTData(_topic, byte_to_binary(OTdata.valueHB));
   //flag8 valueLB
-  Debugf("%-37s = LB flag8[%s] - [%3d]\r\n", _label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
+  Debugf("%-37s = LB flag8[%s] - [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_lb_flag8", sizeof(_topic));
   sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
+  return OTdata.u16();
 }
 
-void print_u8u8(uint16_t *_value, const char *_label, const char*_unit)
-{
-  //function to print data
-  *_value = OTdata.u16();     
-  Debugf("%-37s = %3d / %3d %s\r\n", _label, (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, _unit);
+uint16_t print_u8u8()
+{  
+  Debugf("%-37s = %3d / %3d %s\r\n", OTmap[OTdata.id].label, (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, OTmap[OTdata.id].unit);
   //Build string for MQTT
   char _topic[50] {0};
   char _msg[10] {0};
   //flag8 valueHB
   utoa((OTdata.valueHB), _msg, 10);
-  Debugf("%-37s = HB u8[%s] [%3d]\r\n", _label, _msg, OTdata.valueHB);
+  Debugf("%-37s = HB u8[%s] [%3d]\r\n", OTmap[OTdata.id].label, _msg, OTdata.valueHB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_hb_u8", sizeof(_topic));
   sendMQTTData(_topic, _msg);
   //flag8 valueLB
   utoa((OTdata.valueLB), _msg, 10);
-  Debugf("%-37s = LB u8[%s] [%3d]\r\n", _label, _msg, OTdata.valueLB);
+  Debugf("%-37s = LB u8[%s] [%3d]\r\n", OTmap[OTdata.id].label, _msg, OTdata.valueLB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_lb_u8", sizeof(_topic));
   sendMQTTData(_topic, _msg);
+  return OTdata.u16();
 }
 
-void print_daytime(uint16_t *_value, const char *_label, const char*_unit)
+uint16_t print_daytime()
 {
   //function to print data
   const char *dayOfWeekName[]  { "Unknown", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag", "Zondag", "Unknown" };
-  *_value = OTdata.u16();     
-  Debugf("%-37s = %s - %2d:%2d\r\n", _label, dayOfWeekName[(OTdata.valueHB >> 5) & 0x7], (OTdata.valueHB & 0x1F), OTdata.valueLB); 
+  uint16_t _value = OTdata.u16();     
+  Debugf("%-37s = %s - %2d:%2d\r\n", OTmap[OTdata.id].label, dayOfWeekName[(OTdata.valueHB >> 5) & 0x7], (OTdata.valueHB & 0x1F), OTdata.valueLB); 
   //Build string for MQTT
   char _topic[50] {0};
   char _msg[10] {0};
@@ -579,6 +504,7 @@ void print_daytime(uint16_t *_value, const char *_label, const char*_unit)
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_minutes", sizeof(_topic));
   sendMQTTData(_topic, itoa(OTdata.valueLB, _msg, 10)); 
+  return _value;
 }
 //===================[ OTGW PS=1 Command ]===============================
 void getOTGW_PS_1(){
@@ -640,16 +566,16 @@ void handleOTGW(){
   while(Serial.available() > 0) 
   { 
     String strBuffer = Serial.readStringUntil('\n');
-    //OTGWstream.write((char *)strBuffer.c_str(), strBuffer.length());
-    //OTGWstream.write('\n');
-    //strBuffer.trim(); //remove LF and CR (and whitespaces)
+    OTGWstream.write((char *)strBuffer.c_str(), strBuffer.length());
+    OTGWstream.write('\n');
+    strBuffer.trim(); //remove LF and CR (and whitespaces)
 
     //DebugTf("[%s] [%d]\r\n", strBuffer.c_str(), strBuffer.length());
     
     if (strBuffer.length()>=9) {
-      strBuffer.trim(); //remove LF and CR (and whitespaces)
-      OTGWstream.write((char *)strBuffer.c_str(), strBuffer.length());
-      OTGWstream.write('\r');OTGWstream.write('\n');//add the CR & LF
+      // strBuffer.trim(); //remove LF and CR (and whitespaces)
+      // OTGWstream.write((char *)strBuffer.c_str(), strBuffer.length());
+      // OTGWstream.write('\r');OTGWstream.write('\n');//add the CR & LF
       // DebugTf("[%s] ", strBuffer.c_str());
       //parse value
       uint32_t value = strtoul(strBuffer.substring(1).c_str(), NULL, 16);
@@ -700,59 +626,59 @@ void handleOTGW(){
         //#define OTprint(data, value, text, format) ({ data= value; Debugf("[%37s]", text); Debugf("= [format]", data)})
         //interpret values f8.8
         switch (static_cast<OpenThermMessageID>(OTdata.id)) { 
-          case TSet:                      print_f88(&OTdataObject.Tset,                                "Control setpoint", "°C"); break;         
-          case CoolingControl:            print_f88(&OTdataObject.CoolingControl,                      "Cooling control signal","%");   break;
-          case TsetCH2:                   print_f88(&OTdataObject.TsetCH2,                             "Control setpoint for 2e circuit","°C");  break;
-          case TrOverride:                print_f88(&OTdataObject.TrOverride,                          "Remote override room setpoint","°C");  break;        
-          case MaxRelModLevelSetting:     print_f88(&OTdataObject.MaxRelModLevelSetting,               "Max Rel Modulation level setting","%");  break;
-          case TrSet:                     print_f88(&OTdataObject.TrSet,                               "Room setpoint","°C");  break;
-          case RelModLevel:               print_f88(&OTdataObject.RelModLevel,                         "Relative Modulation Level","%");  break;
-          case CHPressure:                print_f88(&OTdataObject.CHPressure,                          "Water pressure in CH circuit","bar"); break;
-          case DHWFlowRate:               print_f88(&OTdataObject.DHWFlowRate,                         "Water flow rate in DHW circuit","l/min");  break;
-          case Tr:                        print_f88(&OTdataObject.Tr,                                  "Room temperature","°C");  Debugf("Troom=%d\r\n", OTdataObject.Tr);break;  
-          case Tboiler:                   print_f88(&OTdataObject.Tboiler,                             "Boiler flow water temperature","°C");  break;
-          case Tdhw:                      print_f88(&OTdataObject.Tdhw,                                "DHW temperature","°C");  break;
-          case Toutside:                  print_f88(&OTdataObject.Toutside,                            "Outside temperature","°C");  break;
-          case Tret:                      print_f88(&OTdataObject.Tret,                                "Return water temperature","°C");  break;
-          case Tstorage:                  print_f88(&OTdataObject.Tstorage,                            "Solar storage temperature","°C");  break;
-          case Tcollector:                print_f88(&OTdataObject.Tcollector,                          "Solar collector temperature","°C");  break;
-          case TflowCH2:                  print_f88(&OTdataObject.TflowCH2,                            "Flow water temperature CH2 cir.","°C");  break;          
-          case Tdhw2:                     print_f88(&OTdataObject.Tdhw2,                               "Domestic hot water temperature 2","°C");  break;
-          case Texhaust:                  print_s16(&OTdataObject.Texhaust,                            "Boiler exhaust temperature","°C");  break; // s16  Boiler exhaust temperature (°C)
-          case TdhwSet:                   print_f88(&OTdataObject.TdhwSet,                             "DHW setpoint","°C");  break;
-          case MaxTSet:                   print_f88(&OTdataObject.MaxTSet,                             "Max CH water setpoint","°C");  break;
-          case Hcratio:                   print_f88(&OTdataObject.Hcratio,                             "OTC heat curve ratio","");  break;
-          case OpenThermVersionMaster:    print_f88(&OTdataObject.OpenThermVersionMaster,              "Master OT protocol version","");  break;
-          case OpenThermVersionSlave:     print_f88(&OTdataObject.OpenThermVersionSlave,               "Slave OT protocol version","");  break;
-          case Status:                    print_status(&OTdataObject.Status,                           "Status",""); break;
-          case ASFflags:                  print_ASFflags(&OTdataObject.ASFflags,                       "Application Specific Fault",""); break;
-          case MConfigMMemberIDcode:      print_mastermemberid(&OTdataObject.MConfigMMemberIDcode,     "Master Config / Member ID", ""); break; // flag8 / u8  Master Configuration Flags /  Master MemberID Code 
-          case SConfigSMemberIDcode:      print_slavememberid(&OTdataObject.SConfigSMemberIDcode,      "Slave  Config / Member ID", ""); break; // flag8 / u8  Slave Configuration Flags /  Slave MemberID Code  
-          case Command:                   print_u8u8(&OTdataObject.Command,                            "Command","");  break; // u8 / u8  Remote Command 
-          case RBPflags:                  print_flag8flag8(&OTdataObject.RBPflags,                     "RBPflags", ""); break; // flag8 / flag8  Remote boiler parameter transfer-enable & read/write flags 
-          case TSP:                       print_u8u8(&OTdataObject.TSP,                                "Nr of Transp. Slave Parameters", ""); break; // u8 / u8  Number of Transparent-Slave-Parameters supported by slave 
-          case TSPindexTSPvalue:          print_u8u8(&OTdataObject.TSPindexTSPvalue,                   "TSPindexTSPvalue", "");  break; // u8 / u8  Index number / Value of referred-to transparent slave parameter. 
-          case FHBsize:                   print_u8u8(&OTdataObject.FHBsize,                            "FHBsize", "");  break;  // u8 / u8  Size of Fault-History-Buffer supported by slave 
-          case FHBindexFHBvalue:          print_u8u8(&OTdataObject.FHBindexFHBvalue,                   "FHBindexFHBvalue", "");  break;  // u8 / u8  Index number / Value of referred-to fault-history buffer entry. 
-          case MaxCapacityMinModLevel:    print_u8u8(&OTdataObject.MaxCapacityMinModLevel,             "MaxCapacityMinModLevel", "");  break;  // u8 / u8  Maximum boiler capacity (kW) / Minimum boiler modulation level(%) 
-          case DayTime:                   print_daytime(&OTdataObject.DayTime,                         "Day of Week - Daytime (hour/min)", "");  break; // special / u8  Day of Week and Time of Day 
-          case Date:                      print_u8u8(&OTdataObject.Date,                               "Date (Month/Day)", "");  break; // u8 / u8  Calendar date 
-          case Year:                      print_u16(&OTdataObject.Year,                                "Year","");  break; // u16  Calendar year 
-          case TdhwSetUBTdhwSetLB:        print_s8s8(&OTdataObject.TdhwSetUBTdhwSetLB,                 "TdhwSetUBTdhwSetLB", "°C"); break;  // s8 / s8  DHW setpoint upper & lower bounds for adjustment  (°C)
-          case MaxTSetUBMaxTSetLB:        print_s8s8(&OTdataObject.MaxTSetUBMaxTSetLB,                 "MaxTSetUBMaxTSetLB", "°C"); break;  // s8 / s8  Max CH water setpoint upper & lower bounds for adjustment  (°C)
-          case HcratioUBHcratioLB:        print_s8s8(&OTdataObject.HcratioUBHcratioLB,                 "HcratioUBHcratioLB", ""); break;  // s8 / s8  OTC heat curve ratio upper & lower bounds for adjustment  
-          case RemoteOverrideFunction:    print_flag8(&OTdataObject.RemoteOverrideFunction,            "RemoteOverrideFunction", ""); break; // u8 / flag8 -  Function of manual and program changes in master and remote room setpoint. 
-          case OEMDiagnosticCode:         print_u16(&OTdataObject.OEMDiagnosticCode,                   "OEM diagnostic/service code","");  break; // u16  OEM-specific diagnostic/service code 
-          case BurnerStarts:              print_u16(&OTdataObject.BurnerStarts,                        "Nr of starts burner","");  break; // u16  Number of starts burner 
-          case CHPumpStarts:              print_u16(&OTdataObject.CHPumpStarts,                        "Nr of starts CH pump","");  break; // u16  Number of starts CH pump 
-          case DHWPumpValveStarts:        print_u16(&OTdataObject.DHWPumpValveStarts,                  "Nr of starts DHW pump/valve","");  break; // u16  Number of starts DHW pump/valve
-          case DHWBurnerStarts:           print_u16(&OTdataObject.DHWBurnerStarts,                     "Nr of starts burner during DHW","");  break; // u16  Number of starts burner during DHW mode 
-          case BurnerOperationHours:      print_u16(&OTdataObject.BurnerOperationHours,                "Nr of hours burner operation","");  break; // u16  Number of hours that burner is in operation (i.e. flame on) 
-          case CHPumpOperationHours:      print_u16(&OTdataObject.CHPumpOperationHours,                "Nr of hours CH pump running","");  break; // u16  Number of hours that CH pump has been running 
-          case DHWPumpValveOperationHours:print_u16(&OTdataObject.DHWPumpValveOperationHours,          "Nr of hours DHW valve open","");  break; // u16  Number of hours that DHW pump has been running or DHW valve has been opened 
-          case DHWBurnerOperationHours:   print_u16(&OTdataObject.DHWBurnerOperationHours,             "Nr of hours burner operation DHW","");  break; // u16  Number of hours that burner is in operation during DHW mode 
-          case MasterVersion:             print_u8u8(&OTdataObject.MasterVersion,                      "MasterVersion (version/type)","" ); break;// u8 / u8  Master product version number and type 
-          case SlaveVersion:              print_u8u8(&OTdataObject.SlaveVersion,                       "SlaveVersion  (version/type)", ""); break;// u8 / u8  Slave product version number and type
+          case TSet:                      OTdataObject.Tset = print_f88(); break;         
+          case CoolingControl:            OTdataObject.CoolingControl = print_f88(); break;
+          case TsetCH2:                   OTdataObject.TsetCH2 = print_f88();  break;
+          case TrOverride:                OTdataObject.TrOverride = print_f88();  break;        
+          case MaxRelModLevelSetting:     OTdataObject.MaxRelModLevelSetting = print_f88();  break;
+          case TrSet:                     OTdataObject.TrSet = print_f88();  break;
+          case RelModLevel:               OTdataObject.RelModLevel = print_f88();  break;
+          case CHPressure:                OTdataObject.CHPressure = print_f88(); break;
+          case DHWFlowRate:               OTdataObject.DHWFlowRate = print_f88();  break;
+          case Tr:                        OTdataObject.Tr = print_f88();  Debugf("Troom=%f\r\n", OTdataObject.Tr);break;  
+          case Tboiler:                   OTdataObject.Tboiler = print_f88();  break;
+          case Tdhw:                      OTdataObject.Tdhw = print_f88();  break;
+          case Toutside:                  OTdataObject.Toutside = print_f88();  break;
+          case Tret:                      OTdataObject.Tret = print_f88();  break;
+          case Tstorage:                  OTdataObject.Tstorage = print_f88();  break;
+          case Tcollector:                OTdataObject.Tcollector = print_f88(); break;
+          case TflowCH2:                  OTdataObject.TflowCH2 = print_f88(); break;          
+          case Tdhw2:                     OTdataObject.Tdhw2 = print_f88(); break;
+          case Texhaust:                  OTdataObject.Texhaust = print_s16();  break; 
+          case TdhwSet:                   OTdataObject.TdhwSet = print_f88(); break;
+          case MaxTSet:                   OTdataObject.MaxTSet = print_f88(); break;
+          case Hcratio:                   OTdataObject.Hcratio = print_f88(); break;
+          case OpenThermVersionMaster:    OTdataObject.OpenThermVersionMaster = print_f88(); break;
+          case OpenThermVersionSlave:     OTdataObject.OpenThermVersionSlave = print_f88(); break;
+          case Status:                    OTdataObject.Status = print_status(); break;
+          case ASFflags:                  OTdataObject.ASFflags = print_ASFflags(); break;
+          case MConfigMMemberIDcode:      OTdataObject.MConfigMMemberIDcode = print_mastermemberid(); break; 
+          case SConfigSMemberIDcode:      OTdataObject.SConfigSMemberIDcode = print_slavememberid(); break;   
+          case Command:                   OTdataObject.Command = print_u8u8();  break; 
+          case RBPflags:                  OTdataObject.RBPflags = print_flag8flag8(); break; 
+          case TSP:                       OTdataObject.TSP = print_u8u8(); break; 
+          case TSPindexTSPvalue:          OTdataObject.TSPindexTSPvalue = print_u8u8();  break; 
+          case FHBsize:                   OTdataObject.FHBsize = print_u8u8();  break;  
+          case FHBindexFHBvalue:          OTdataObject.FHBindexFHBvalue = print_u8u8();  break; 
+          case MaxCapacityMinModLevel:    OTdataObject.MaxCapacityMinModLevel = print_u8u8();  break; 
+          case DayTime:                   OTdataObject.DayTime = print_daytime();  break; 
+          case Date:                      OTdataObject.Date = print_u8u8();  break; 
+          case Year:                      OTdataObject.Year = print_u16();  break; 
+          case TdhwSetUBTdhwSetLB:        OTdataObject.TdhwSetUBTdhwSetLB = print_s8s8(); break;  
+          case MaxTSetUBMaxTSetLB:        OTdataObject.MaxTSetUBMaxTSetLB = print_s8s8(); break;  
+          case HcratioUBHcratioLB:        OTdataObject.HcratioUBHcratioLB = print_s8s8(); break;  
+          case RemoteOverrideFunction:    OTdataObject.RemoteOverrideFunction = print_flag8(); break;
+          case OEMDiagnosticCode:         OTdataObject.OEMDiagnosticCode = print_u16();  break;
+          case BurnerStarts:              OTdataObject.BurnerStarts = print_u16();  break; 
+          case CHPumpStarts:              OTdataObject.CHPumpStarts = print_u16();  break; 
+          case DHWPumpValveStarts:        OTdataObject.DHWPumpValveStarts = print_u16();  break; 
+          case DHWBurnerStarts:           OTdataObject.DHWBurnerStarts = print_u16();  break;
+          case BurnerOperationHours:      OTdataObject.BurnerOperationHours = print_u16();  break;
+          case CHPumpOperationHours:      OTdataObject.CHPumpOperationHours = print_u16();  break; 
+          case DHWPumpValveOperationHours:OTdataObject.DHWPumpValveOperationHours = print_u16();  break;  
+          case DHWBurnerOperationHours:   OTdataObject.DHWBurnerOperationHours = print_u16();  break; 
+          case MasterVersion:             OTdataObject.MasterVersion = print_u8u8(); break; 
+          case SlaveVersion:              OTdataObject.SlaveVersion = print_u8u8(); break;
         }
       } else Debugln(); //next line 
     }
@@ -760,11 +686,64 @@ void handleOTGW(){
 }
 
 //functions for REST API
-String getOTGWValue(uint8_t MsgId)
+String getOTGWValue(int msgid)
 {
-  switch (static_cast<OpenThermMessageID>(OTdata.id)) { 
-    case Tr: return String(OTdataObject.Tr); break;  
-  }
+  switch (static_cast<OpenThermMessageID>(msgid)) { 
+    case TSet:                      return String(OTdataObject.Tset); break;         
+    case CoolingControl:            return String(OTdataObject.CoolingControl); break;
+    case TsetCH2:                   return String(OTdataObject.TsetCH2);  break;
+    case TrOverride:                return String(OTdataObject.TrOverride);  break;        
+    case MaxRelModLevelSetting:     return String(OTdataObject.MaxRelModLevelSetting);  break;
+    case TrSet:                     return String(OTdataObject.TrSet);  break;
+    case RelModLevel:               return String(OTdataObject.RelModLevel);  break;
+    case CHPressure:                return String(OTdataObject.CHPressure); break;
+    case DHWFlowRate:               return String(OTdataObject.DHWFlowRate);  break;
+    case Tr:                        return String(OTdataObject.Tr);  break;  
+    case Tboiler:                   return String(OTdataObject.Tboiler);  break;
+    case Tdhw:                      return String(OTdataObject.Tdhw);  break;
+    case Toutside:                  return String(OTdataObject.Toutside);  break;
+    case Tret:                      return String(OTdataObject.Tret);  break;
+    case Tstorage:                  return String(OTdataObject.Tstorage);  break;
+    case Tcollector:                return String(OTdataObject.Tcollector); break;
+    case TflowCH2:                  return String(OTdataObject.TflowCH2); break;          
+    case Tdhw2:                     return String(OTdataObject.Tdhw2); break;
+    case Texhaust:                  return String(OTdataObject.Texhaust); break; 
+    case TdhwSet:                   return String(OTdataObject.TdhwSet); break;
+    case MaxTSet:                   return String(OTdataObject.MaxTSet); break;
+    case Hcratio:                   return String(OTdataObject.Hcratio); break;
+    case OpenThermVersionMaster:    return String(OTdataObject.OpenThermVersionMaster); break;
+    case OpenThermVersionSlave:     return String(OTdataObject.OpenThermVersionSlave); break;
+    case Status:                    return String(OTdataObject.Status); break;
+    case ASFflags:                  return String(OTdataObject.ASFflags); break;
+    case MConfigMMemberIDcode:      return String(OTdataObject.MConfigMMemberIDcode); break; 
+    case SConfigSMemberIDcode:      return String(OTdataObject.SConfigSMemberIDcode); break;   
+    case Command:                   return String(OTdataObject.Command);  break; 
+    case RBPflags:                  return String(OTdataObject.RBPflags); break; 
+    case TSP:                       return String(OTdataObject.TSP); break; 
+    case TSPindexTSPvalue:          return String(OTdataObject.TSPindexTSPvalue);  break; 
+    case FHBsize:                   return String(OTdataObject.FHBsize);  break;  
+    case FHBindexFHBvalue:          return String(OTdataObject.FHBindexFHBvalue);  break; 
+    case MaxCapacityMinModLevel:    return String(OTdataObject.MaxCapacityMinModLevel);  break; 
+    case DayTime:                   return String(OTdataObject.DayTime);  break; 
+    case Date:                      return String(OTdataObject.Date);  break; 
+    case Year:                      return String(OTdataObject.Year);  break; 
+    case TdhwSetUBTdhwSetLB:        return String(OTdataObject.TdhwSetUBTdhwSetLB); break;  
+    case MaxTSetUBMaxTSetLB:        return String(OTdataObject.MaxTSetUBMaxTSetLB); break;  
+    case HcratioUBHcratioLB:        return String(OTdataObject.HcratioUBHcratioLB); break;  
+    case RemoteOverrideFunction:    return String(OTdataObject.RemoteOverrideFunction); break;
+    case OEMDiagnosticCode:         return String(OTdataObject.OEMDiagnosticCode);  break;
+    case BurnerStarts:              return String(OTdataObject.BurnerStarts);  break; 
+    case CHPumpStarts:              return String(OTdataObject.CHPumpStarts);  break; 
+    case DHWPumpValveStarts:        return String(OTdataObject.DHWPumpValveStarts);  break; 
+    case DHWBurnerStarts:           return String(OTdataObject.DHWBurnerStarts);  break;
+    case BurnerOperationHours:      return String(OTdataObject.BurnerOperationHours);  break;
+    case CHPumpOperationHours:      return String(OTdataObject.CHPumpOperationHours);  break; 
+    case DHWPumpValveOperationHours:return String(OTdataObject.DHWPumpValveOperationHours);  break;  
+    case DHWBurnerOperationHours:   return String(OTdataObject.DHWBurnerOperationHours);  break; 
+    case MasterVersion:             return String(OTdataObject.MasterVersion); break; 
+    case SlaveVersion:              return String(OTdataObject.SlaveVersion); break;
+    default: return "not implemented yet!";
+  } 
 }
 
 void startOTGWstream()
