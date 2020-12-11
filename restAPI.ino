@@ -65,7 +65,10 @@ void processAPI()
      // /api/v0/otgw/{id}/msg = return the text for the message
      // /api/v0/otgw/{id}/friendly = return the nice name
      // /api/v0/otgw/{id}/unit = return the unit of the msgid
-     sendOTGWvalue(words[4].toInt()); 
+     int msgid = words[4].toInt();
+     DebugTf("otwg msgid = %d\r\n", msgid);
+     DebugFlush();
+     sendOTGWvalue(msgid); 
 
   } 
   else if (words[3] == "devinfo")
@@ -93,11 +96,11 @@ void processAPI()
 
 
 //====[ implementing REST API ]====
-void sendOTGWvalue(byte MsgId){
+void sendOTGWvalue(int msgid){
   // So reply with the value of the MsgID
-  sendStartJsonObj("otgw_value"); 
-  getOTGWValue(MsgId);
-  sendEndJsonObj();
+  // sendStartJsonObj("otgw_value"); 
+  DebugTf("%s = %s %s\r\n", OTmap[msgid].label, getOTGWValue(msgid).c_str(), OTmap[msgid].unit);
+  // sendEndJsonObj();
 }
 
 //=======================================================================
