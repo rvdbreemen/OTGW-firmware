@@ -104,7 +104,11 @@ void sendOTGWvalue(int msgid){
     DebugTf("%s = %s %s\r\n", OTmap[msgid].label, getOTGWValue(msgid).c_str(), OTmap[msgid].unit);
     //build the json
     root["label"] = OTmap[msgid].label;
-    root["value"] = getOTGWValue(msgid);
+    if (OTmap[msgid].type == ot_f88) {
+      root["value"] = getOTGWValue(msgid).toFloat(); 
+    } else {// all other message types convert to integer
+      root["value"] = getOTGWValue(msgid).toInt();
+    }
     root["unit"] = OTmap[msgid].unit;    
   } else {
     root["error"] = "message id > 127: reserved for future use";
