@@ -1,7 +1,7 @@
 //The version number conforms to semver.org format
 #define _VERSION_MAJOR 0
-#define _VERSION_MINOR 3  
-#define _VERSION_PATCH 1
+#define _VERSION_MINOR 4  
+#define _VERSION_PATCH 0
 #define _VERSION_BUILD 253
 //#define _VERSION_PRERELEASE beta  //uncomment to define prerelease labels: alpha - beta - rc
 #define _VERSION_DATE "12-12-2020"
