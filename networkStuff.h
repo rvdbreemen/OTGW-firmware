@@ -1,9 +1,10 @@
 /*
 ***************************************************************************  
 **  Program : networkStuff.h
-**  Version : 2.0  10-05-2020
+**  Version : 2.0
 **
-**  Copyright (c) 2020 Willem Aandewiel
+**  Copyright (c) 2020 Robert van den Breemen
+**     based on Framework ESP8266 from Willem Aandewiel
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      

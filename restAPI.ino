@@ -3,7 +3,8 @@
 **  Program  : restAPI
 **  Version  : v0.3.0
 **
-**  Copyright (c) 2020 Willem Aandewiel
+**  Copyright (c) 2020 Robert van den Breemen
+**     based on Framework ESP8266 from Willem Aandewiel
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
@@ -61,15 +62,14 @@ void processAPI()
   if (words[3] == "otgw")
   {
      //what the heck should I do?
-     // /api/v0/otgw/{id}/value = return the value of the messageid
-     // /api/v0/otgw/{id}/msg = return the text for the message
-     // /api/v0/otgw/{id}/friendly = return the nice name
-     // /api/v0/otgw/{id}/unit = return the unit of the msgid
-     int msgid = words[4].toInt();
-     DebugTf("otwg msgid = %d\r\n", msgid);
-     DebugFlush();
-     sendOTGWvalue(msgid); 
-
+     // /api/v0/otgw/{msgid}   msgid = OpenTherm Message Id
+     // Response: label, value, unit
+     // {
+     //   "label": "Tr",
+     //   "value": "0.00",
+     //   "unit": "°C"
+     // }
+     sendOTGWvalue(words[4].toInt()); 
   } 
   else if (words[3] == "devinfo")
   {
@@ -97,10 +97,25 @@ void processAPI()
 
 //====[ implementing REST API ]====
 void sendOTGWvalue(int msgid){
-  // So reply with the value of the MsgID
-  // sendStartJsonObj("otgw_value"); 
-  DebugTf("%s = %s %s\r\n", OTmap[msgid].label, getOTGWValue(msgid).c_str(), OTmap[msgid].unit);
-  // sendEndJsonObj();
+  StaticJsonDocument<256> doc;
+  JsonObject root  = doc.to<JsonObject>();
+  if (msgid<=127) {
+    //Debug print the values first
+    DebugTf("%s = %s %s\r\n", OTmap[msgid].label, getOTGWValue(msgid).c_str(), OTmap[msgid].unit);
+    //build the json
+    root["label"] = OTmap[msgid].label;
+    root["value"] = getOTGWValue(msgid);
+    root["unit"] = OTmap[msgid].unit;    
+  } else {
+    root["error"] = "message id > 127: reserved for future use";
+  }
+  String sBuff;
+  serializeJsonPretty(root, sBuff);
+  //DebugTf("Json = %s\r\n", sBuff.c_str());
+  //reply with json
+  httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  httpServer.send(200, "application/json", sBuff);
 }
 
 //=======================================================================

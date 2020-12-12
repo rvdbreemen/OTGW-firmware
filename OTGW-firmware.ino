@@ -4,8 +4,6 @@
 **  Version  : v0.3.0
 **
 **  Copyright (c) 2020 Robert van den Breemen
-**  Borrowed from OpenTherm library from: 
-**      https://github.com/jpraus/arduino-opentherm
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      

@@ -1,6 +1,7 @@
 /* 
 ***************************************************************************  
 **  Filename  : safeTimers.h
+**  Version : 0.3.0
 **
 **  Copyright (c) 2020 Willem Aandewiel
 **
