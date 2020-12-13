@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v0.4.0
+**  Version  : v0.4.1
 **
 **  Copyright (c) 2020 Robert van den Breemen
 **
@@ -78,10 +78,12 @@ void setup()
   // Connect to and initialise WiFi network
   Serial.println(F("Attempting to connect to WiFi network\r"));
   digitalWrite(LED_BUILTIN, HIGH);
-  startWiFi(_HOSTNAME, 240);  // timeout 4 minuten
+  startWiFi(_HOSTNAME, 240);  // timeout 240 seconds
   digitalWrite(LED_BUILTIN, LOW);
-
+  
   startMDNS(settingHostname);
+  
+  delay(1000);
   
   // Start MQTT connection
   startMQTT(); 
@@ -172,6 +174,15 @@ void doTaskEvery30s(){
 //===[ Do task every 60s ]===
 void doTaskEvery60s(){
   //== do tasks ==
+  //if no wifi, try reconnecting (once a minute)
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    //disconnected, try to reconnect then...
+     startWiFi(_HOSTNAME, 240);
+    //check OTGW and telnet
+    startTelnet();
+    startOTGWstream(); 
+  }
 }
 
 //===[ Do the background tasks ]===

@@ -13,8 +13,9 @@ The features of this OTGW firmware are:
 - enable telnet listening (interpreted data and debugging)
 - send MQTT messages for every change  (parsed OT message)
 - integrate with Home Assistant (and Domoticz)
-- implement interface for original OTmon application 
-- implement a REST API
+- serial interface on port 1023 for original OTmon application 
+- a REST API (http://<ip>/api/v0/otgw/{id})
+- sending a MQTT command to OTGW (topic: OTGW/command) 
 
 To do:
 - InfluxDB client to do direct logging 
@@ -24,6 +25,7 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
   
 | Version | Release notes |
 |-|-|
+| 0.4.1 | MQTT command sending now works, topic: OTGW/command and |   
 | 0.4.0 | RestAPI implemented - as simple as <ip>/api/v0/otgw/{id} to get the latest values |   
 | 0.3.1 | Bug: Open AP after configuration, change ESP to STA mode on StartWifi <br> No more default Debug to Serial, only to port 23 telnet |   
 | 0.3.0 | OTmon stream implementend on port 1023 (debug port remains on port 23 - telnet) |   

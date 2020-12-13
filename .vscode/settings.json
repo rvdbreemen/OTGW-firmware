@@ -4,6 +4,11 @@
         "xlocale": "cpp",
         "xstring": "cpp",
         "*.tcc": "cpp",
-        "ostream": "cpp"
+        "ostream": "cpp",
+        "algorithm": "cpp",
+        "xhash": "cpp",
+        "xtree": "cpp",
+        "xutility": "cpp",
+        "istream": "cpp"
     }
 }

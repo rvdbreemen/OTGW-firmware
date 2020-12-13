@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v0.4.0
+**  Version  : v0.4.1
 **
 **  Copyright (c) 2020 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -41,15 +41,17 @@ void startMQTT()
 
 void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 
-
   DebugT("Message arrived on topic ["); Debug(topic); Debug("] = [");
   for (int i = 0; i < length; i++) {
     Debug((char)payload[i]);
   }
   Debug("] ("); Debug(length); Debug(")"); Debugln();
-
+  
+  char subscribeTopic[100];
+  snprintf(subscribeTopic, sizeof(subscribeTopic), "%s/", settingMQTTtopTopic.c_str());
+  strlcat(subscribeTopic, OTGW_COMMAND_TOPIC, sizeof(subscribeTopic));
   //what is the incoming message?  
-  if (stricmp(topic, OTGW_COMMAND_TOPIC) == 0) 
+  if (stricmp(topic, subscribeTopic) == 0) 
   {
     //incoming command to be forwarded to OTGW
     sendOTGW((char *)payload, length);
@@ -280,12 +282,14 @@ void doAutoConfigure()
       while(fh.available()) 
       {  //read file line by line, split and send to MQTT (topic, msg)
           feedWatchDog(); //start with feeding the dog
+          
           String sLine = fh.readStringUntil('\n');
           // DebugTf("sline[%s]\r\n", sLine.c_str());
           if (splitString(sLine, ',', sTopic, sMsg))
           {
             DebugTf("sTopic[%s], sMsg[%s]\r\n", sTopic.c_str(), sMsg.c_str());
             sendMQTT(sTopic.c_str(), sMsg.c_str(), (sTopic.length() + sMsg.length()+2));
+            delay(10);
           } else DebugTf("Either comment or invalid config line: [%s]\r\n", sLine.c_str());
       } // while available()
       fh.close();  
