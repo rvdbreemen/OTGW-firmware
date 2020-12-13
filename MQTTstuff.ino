@@ -41,15 +41,17 @@ void startMQTT()
 
 void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 
-
   DebugT("Message arrived on topic ["); Debug(topic); Debug("] = [");
   for (int i = 0; i < length; i++) {
     Debug((char)payload[i]);
   }
   Debug("] ("); Debug(length); Debug(")"); Debugln();
-
+  
+  char subscribeTopic[100];
+  snprintf(subscribeTopic, sizeof(subscribeTopic), "%s/", settingMQTTtopTopic.c_str());
+  strlcat(subscribeTopic, OTGW_COMMAND_TOPIC, sizeof(subscribeTopic));
   //what is the incoming message?  
-  if (stricmp(topic, OTGW_COMMAND_TOPIC) == 0) 
+  if (stricmp(topic, subscribeTopic) == 0) 
   {
     //incoming command to be forwarded to OTGW
     sendOTGW((char *)payload, length);

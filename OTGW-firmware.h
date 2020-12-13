@@ -48,6 +48,5 @@ int32_t   settingMQTTinterval = 10;
 
 // OTGW Serial 2 Telnet 
 #define OTGW_SERIAL_PORT 1023
-WiFiServer OTGWstream(OTGW_SERIAL_PORT); 
-WiFiClient OTGWclient;
+TelnetStreamClass OTGWstream(OTGW_SERIAL_PORT); 
 // eof
