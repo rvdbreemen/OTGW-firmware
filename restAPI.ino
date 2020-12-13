@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v0.4.0
+**  Version  : v0.4.1
 **
 **  Copyright (c) 2020 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
