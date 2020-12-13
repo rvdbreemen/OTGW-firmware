@@ -674,8 +674,8 @@ void handleOTGW()
   //handle incoming data from network sent to OTGW
   while (OTGWstream.available()){
     //Serial.write(OTGWstream.read()); //just forward it directly to Serial
-    outByte = OTGWstream.read();
-    OTGWstream.write(outByte);
+    outByte = OTGWstream.read();  // read from port 1023
+    Serial.write(outByte);        // write to serial port
     if (outByte == '\n')
     {
       sWrite[bytes_write] = 0;
@@ -695,8 +695,8 @@ void handleOTGW()
   //read a single line and continue
   while(Serial.available()) 
   {
-    inByte = Serial.read();
-    OTGWstream.write(inByte);
+    inByte = Serial.read();   // read from serial port
+    OTGWstream.write(inByte); // write to port 1023
     if (inByte== '\n')
     { //line terminator, continue to process incoming message
       sRead[bytes_read] = 0;

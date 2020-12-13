@@ -25,10 +25,11 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
   
 | Version | Release notes |
 |-|-|
+| 0.4.2 | Bi-directional OTmon on port 1023 (aka ser2net) |   
 | 0.4.1 | MQTT command sending now works, topic: OTGW/command and |   
 | 0.4.0 | RestAPI implemented - as simple as <ip>/api/v0/otgw/{id} to get the latest values |   
 | 0.3.1 | Bug: Open AP after configuration, change ESP to STA mode on StartWifi <br> No more default Debug to Serial, only to port 23 telnet |   
-| 0.3.0 | OTmon stream implementend on port 1023 (debug port remains on port 23 - telnet) |   
+| 0.3.0 | Read only OTmon stream implementend on port 1023 (debug port remains on port 23 - telnet) |   
 | 0.2.0 | Auto-discovery throug MQTT implemented for integration with home assistant (and domoticz)     |
 | 0.1.0 | MQTT messaging implemented |
 | 0.0.1 | parsing of OT protocol implemented (use telnet to see)   Watchdog implemented |

@@ -99,7 +99,7 @@ void processAPI()
 void sendOTGWvalue(int msgid){
   StaticJsonDocument<256> doc;
   JsonObject root  = doc.to<JsonObject>();
-  if (msgid<=127) {
+  if (msgid>= 0 && msgid<=127) { //message id's need to be between 0 and 127
     //Debug print the values first
     DebugTf("%s = %s %s\r\n", OTmap[msgid].label, getOTGWValue(msgid).c_str(), OTmap[msgid].unit);
     //build the json
