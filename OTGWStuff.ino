@@ -696,11 +696,9 @@ void handleOTGW()
   while(Serial.available()) 
   {
     inByte = Serial.read();
+    OTGWstream.write(inByte);
     if (inByte== '\n')
     { //line terminator, continue to process incoming message
-      OTGWstream.write('\r');
-      OTGWstream.write('\n');
-      OTGWstream.flush();
       sRead[bytes_read] = 0;
       processOTGW(sRead, bytes_read);
       bytes_read = 0;
@@ -711,7 +709,6 @@ void handleOTGW()
     } 
     else
     {
-      OTGWstream.write(inByte);
       if (bytes_read < (MAX_BUFFER-1))
         sRead[bytes_read++] = inByte;
     }
