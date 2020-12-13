@@ -529,12 +529,19 @@ int sendOTGW(const char* buf, int len)
   //Just send the buffer to OTGW when the Serial interface is available
   if (Serial) {
     //check the write buffer
+    Debugf("Serial Write Buffer space = [%d] - needed [%d]\r\n",Serial.availableForWrite(), (len+2));
+    DebugT("Sending to Serial [");
+    for (int i = 0; i < len; i++) {
+      Debug((char)buf[i]);
+    }
+    Debug("] ("); Debug(len); Debug(")"); Debugln();
+    
     if (Serial.availableForWrite()>= (len+2)) {
       //write buffer to serial
-      Debugf("Sending command OTGW to [%s]\r\n", buf);
       Serial.write(buf, len);
       // Serial.write("PS=0\r\n");
-      Serial.write("\n");
+      Serial.write('\r');
+      Serial.write('\n');
     } else Debugln("Error: Write buffer not big enough!");
   } else Debugln("Error: Serial device not found!");
 }
@@ -655,42 +662,47 @@ void processOTGW(const char * buf, int len)
 
 void handleOTGW()
 {
-  //connect the OTmonitor port 1023
-  if (OTGWstream.hasClient())
-  { //incoming telnet connection
-    if (!OTGWclient || !OTGWclient.connected()){
-      if (OTGWclient) OTGWclient.stop();
-      OTGWclient =  OTGWstream.available();
-      OTGWclient.flush();
-    }
-  }
-
   //handle serial communication and line processing
   #define MAX_BUFFER 128
-  static char sBuf[MAX_BUFFER];
+  static char sRead[MAX_BUFFER];
+  static char sWrite[MAX_BUFFER];
   static size_t bytes_read = 0;
+  static size_t bytes_write = 0;
   static uint8_t inByte;
-  
+  static uint8_t outByte;
+
   //handle incoming data from network sent to OTGW
-  if (OTGWclient.connected()){
-    while (OTGWclient.available()){
-      Serial.write(OTGWclient.read()); //just forward it directly to Serial
+  while (OTGWstream.available()){
+    //Serial.write(OTGWstream.read()); //just forward it directly to Serial
+    outByte = OTGWstream.read();
+    OTGWstream.write(outByte);
+    if (outByte == '\n')
+    {
+      sWrite[bytes_write] = 0;
+      DebugTf("Net2Ser: Sending to OTGW: [%s] (%d)\r\n", sWrite, bytes_write);
+      bytes_write = 0; //start next line
+    } else if  (outByte == '\r')
+    {
+      // skip LF
+    } 
+    else 
+    {
+      if (bytes_write < (MAX_BUFFER-1))
+        sWrite[bytes_write++] = outByte;
     }
   }
-
+  
   //read a single line and continue
   while(Serial.available()) 
   {
     inByte = Serial.read();
     if (inByte== '\n')
     { //line terminator, continue to process incoming message
-      if (OTGWclient.connected()){
-        OTGWclient.write('\r');
-        OTGWclient.write('\n');
-        OTGWclient.flush();
-      }
-      sBuf[bytes_read] = 0;
-      processOTGW(sBuf, bytes_read);
+      OTGWstream.write('\r');
+      OTGWstream.write('\n');
+      OTGWstream.flush();
+      sRead[bytes_read] = 0;
+      processOTGW(sRead, bytes_read);
       bytes_read = 0;
       break; // to continue processing incoming message
     } 
@@ -699,9 +711,9 @@ void handleOTGW()
     } 
     else
     {
-      if (OTGWclient.connected()) OTGWclient.write(inByte);
+      OTGWstream.write(inByte);
       if (bytes_read < (MAX_BUFFER-1))
-        sBuf[bytes_read++] = inByte;
+        sRead[bytes_read++] = inByte;
     }
   }
   
