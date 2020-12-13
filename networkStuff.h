@@ -118,7 +118,6 @@ void startWiFi(const char* hostname, int timeOut)
   
 } // startWiFi()
 
-
 //===========================================================================================
 void startTelnet() 
 {
@@ -126,7 +125,6 @@ void startTelnet()
   DebugTln(F("\nTelnet server started .."));
   TelnetStream.flush();
 } // startTelnet()
-
 
 //=======================================================================
 void startMDNS(const char *Hostname) 
