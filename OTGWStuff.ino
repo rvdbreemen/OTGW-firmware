@@ -534,156 +534,178 @@ int sendOTGW(const char* buf, int len)
       Debugf("Sending command OTGW to [%s]\r\n", buf);
       Serial.write(buf, len);
       // Serial.write("PS=0\r\n");
-      Serial.write("\r\n");
+      Serial.write("\n");
     } else Debugln("Error: Write buffer not big enough!");
   } else Debugln("Error: Serial device not found!");
 }
 
-//===================[ Handle OTGW ]=====================================
-void handleOTGW_1(){
-//let's try this, read all data from the serial device, and dump it to the telnet stream.
-  while(Serial.available() > 0) 
+void processOTGW(const char * buf, int len)
+{
+  if (len >= 9) 
   { 
-    char rIn = Serial.read();       
-    OTGWstream.write((char)rIn);
-    //DebugTf("[%s] [%d]\r\n", strBuffer.c_str(), strBuffer.length());
-  }
+    //OT protocol messages are 9 chars long
+    //parse value
+    const char *bufval = buf + 1;
+    uint32_t value = strtoul(bufval, NULL, 16);
+    // Debugf("Value=[%08x]\r\n", (uint32_t)value);
+    //processing message
+    // if (strBuffer.charAt(0)=='B')
+    // {
+    //   DebugT("Boiler           ");
+    // } else 
+    // if (strBuffer.charAt(0)=='T')
+    // {
+    //   DebugT("Thermostat       ");
+    // } else
+    // if (strBuffer.charAt(0)=='R')
+    // {
+    //   DebugT("Request Boiler   ");
+    // } else      
+    // if (strBuffer.charAt(0)=='A')
+    // {
+    //   DebugT("Answer Themostat ");
+    // } else      
+    // if (strBuffer.charAt(0)=='E')
+    // {
+    //   DebugT("Parity error     ");
+    // } else
+    // {
+    //   DebugTf("Unexpected=[%c] ", strBuffer.charAt(0));
+    // }
+    DebugTf("msg=[%s] value=[%08x]", bufval, value);
+
+    //split 32bit value into the relevant OT protocol parts
+    OTdata.type = (value >> 28) & 0x7;         // byte 1 = take 3 bits that define msg msgType
+    OTdata.id = (value >> 16) & 0xFF;          // byte 2 = message id 8 bits 
+    OTdata.valueHB = (value >> 8) & 0xFF;      // byte 3 = high byte
+    OTdata.valueLB = value & 0xFF;             // byte 4 = low byte
+
+    //print message frame
+    Debugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
+
+    //print message Type and ID
+    Debugf("[%-16s]\t", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
+    Debugf("[%-30s]\t", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
+    DebugFlush();
+
+    //next step interpret the OT protocol
+    if (static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_ACK || static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_DATA) {
+
+      //#define OTprint(data, value, text, format) ({ data= value; Debugf("[%37s]", text); Debugf("= [format]", data)})
+      //interpret values f8.8
+      switch (static_cast<OpenThermMessageID>(OTdata.id)) { 
+        case TSet:                      OTdataObject.Tset = print_f88(); break;         
+        case CoolingControl:            OTdataObject.CoolingControl = print_f88(); break;
+        case TsetCH2:                   OTdataObject.TsetCH2 = print_f88();  break;
+        case TrOverride:                OTdataObject.TrOverride = print_f88();  break;        
+        case MaxRelModLevelSetting:     OTdataObject.MaxRelModLevelSetting = print_f88();  break;
+        case TrSet:                     OTdataObject.TrSet = print_f88();  break;
+        case TrSetCH2:                  OTdataObject.TrSetCH2 = print_f88();  break;
+        case RelModLevel:               OTdataObject.RelModLevel = print_f88();  break;
+        case CHPressure:                OTdataObject.CHPressure = print_f88(); break;
+        case DHWFlowRate:               OTdataObject.DHWFlowRate = print_f88();  break;
+        case Tr:                        OTdataObject.Tr = print_f88();  Debugf("Troom=%f\r\n", OTdataObject.Tr);break;  
+        case Tboiler:                   OTdataObject.Tboiler = print_f88();  break;
+        case Tdhw:                      OTdataObject.Tdhw = print_f88();  break;
+        case Toutside:                  OTdataObject.Toutside = print_f88();  break;
+        case Tret:                      OTdataObject.Tret = print_f88();  break;
+        case Tstorage:                  OTdataObject.Tstorage = print_f88();  break;
+        case Tcollector:                OTdataObject.Tcollector = print_f88(); break;
+        case TflowCH2:                  OTdataObject.TflowCH2 = print_f88(); break;          
+        case Tdhw2:                     OTdataObject.Tdhw2 = print_f88(); break;
+        case Texhaust:                  OTdataObject.Texhaust = print_s16();  break; 
+        case TdhwSet:                   OTdataObject.TdhwSet = print_f88(); break;
+        case MaxTSet:                   OTdataObject.MaxTSet = print_f88(); break;
+        case Hcratio:                   OTdataObject.Hcratio = print_f88(); break;
+        case OpenThermVersionMaster:    OTdataObject.OpenThermVersionMaster = print_f88(); break;
+        case OpenThermVersionSlave:     OTdataObject.OpenThermVersionSlave = print_f88(); break;
+        case Status:                    OTdataObject.Status = print_status(); break;
+        case ASFflags:                  OTdataObject.ASFflags = print_ASFflags(); break;
+        case MConfigMMemberIDcode:      OTdataObject.MConfigMMemberIDcode = print_mastermemberid(); break; 
+        case SConfigSMemberIDcode:      OTdataObject.SConfigSMemberIDcode = print_slavememberid(); break;   
+        case Command:                   OTdataObject.Command = print_u8u8();  break; 
+        case RBPflags:                  OTdataObject.RBPflags = print_flag8flag8(); break; 
+        case TSP:                       OTdataObject.TSP = print_u8u8(); break; 
+        case TSPindexTSPvalue:          OTdataObject.TSPindexTSPvalue = print_u8u8();  break; 
+        case FHBsize:                   OTdataObject.FHBsize = print_u8u8();  break;  
+        case FHBindexFHBvalue:          OTdataObject.FHBindexFHBvalue = print_u8u8();  break; 
+        case MaxCapacityMinModLevel:    OTdataObject.MaxCapacityMinModLevel = print_u8u8();  break; 
+        case DayTime:                   OTdataObject.DayTime = print_daytime();  break; 
+        case Date:                      OTdataObject.Date = print_u8u8();  break; 
+        case Year:                      OTdataObject.Year = print_u16();  break; 
+        case TdhwSetUBTdhwSetLB:        OTdataObject.TdhwSetUBTdhwSetLB = print_s8s8(); break;  
+        case MaxTSetUBMaxTSetLB:        OTdataObject.MaxTSetUBMaxTSetLB = print_s8s8(); break;  
+        case HcratioUBHcratioLB:        OTdataObject.HcratioUBHcratioLB = print_s8s8(); break;  
+        case RemoteOverrideFunction:    OTdataObject.RemoteOverrideFunction = print_flag8(); break;
+        case OEMDiagnosticCode:         OTdataObject.OEMDiagnosticCode = print_u16();  break;
+        case BurnerStarts:              OTdataObject.BurnerStarts = print_u16();  break; 
+        case CHPumpStarts:              OTdataObject.CHPumpStarts = print_u16();  break; 
+        case DHWPumpValveStarts:        OTdataObject.DHWPumpValveStarts = print_u16();  break; 
+        case DHWBurnerStarts:           OTdataObject.DHWBurnerStarts = print_u16();  break;
+        case BurnerOperationHours:      OTdataObject.BurnerOperationHours = print_u16();  break;
+        case CHPumpOperationHours:      OTdataObject.CHPumpOperationHours = print_u16();  break; 
+        case DHWPumpValveOperationHours:OTdataObject.DHWPumpValveOperationHours = print_u16();  break;  
+        case DHWBurnerOperationHours:   OTdataObject.DHWBurnerOperationHours = print_u16();  break; 
+        case MasterVersion:             OTdataObject.MasterVersion = print_u8u8(); break; 
+        case SlaveVersion:              OTdataObject.SlaveVersion = print_u8u8(); break;
+      }
+    } else Debugln(); //next line 
+  } else DebugTf("[%s] [%d]\r\n", buf, len);
 }
 
-void handleOTGW_2(){
-//let's try this, read all data from the serial device, and dump it to the telnet stream.
-  while(Serial.available() > 0) 
-  { 
-    String strBuffer = Serial.readStringUntil('\n');      
-    //OTGWstream.write((char *)strBuffer.c_str(), strBuffer.length());
-    //OTGWstream.write('\n');
-    //DebugTf("[%s] [%d]\r\n", strBuffer.c_str(), strBuffer.length());
-  }
-}
-
-void handleOTGW(){
-  //let's try this, read all data from the serial device, and dump it to the telnet stream.
-  while(Serial.available() > 0) 
-  { 
-    String strBuffer = Serial.readStringUntil('\n');
-    OTGWstream.write((char *)strBuffer.c_str(), strBuffer.length());
-    OTGWstream.write('\n');
-    strBuffer.trim(); //remove LF and CR (and whitespaces)
-
-    //DebugTf("[%s] [%d]\r\n", strBuffer.c_str(), strBuffer.length());
-    
-    if (strBuffer.length()>=9) {
-      // strBuffer.trim(); //remove LF and CR (and whitespaces)
-      // OTGWstream.write((char *)strBuffer.c_str(), strBuffer.length());
-      // OTGWstream.write('\r');OTGWstream.write('\n');//add the CR & LF
-      // DebugTf("[%s] ", strBuffer.c_str());
-      //parse value
-      uint32_t value = strtoul(strBuffer.substring(1).c_str(), NULL, 16);
-      // Debugf("Value=[%08x]\r\n", (uint32_t)value);
-      //processing message
-      // if (strBuffer.charAt(0)=='B')
-      // {
-      //   DebugT("Boiler           ");
-      // } else 
-      // if (strBuffer.charAt(0)=='T')
-      // {
-      //   DebugT("Thermostat       ");
-      // } else
-      // if (strBuffer.charAt(0)=='R')
-      // {
-      //   DebugT("Request Boiler   ");
-      // } else      
-      // if (strBuffer.charAt(0)=='A')
-      // {
-      //   DebugT("Answer Themostat ");
-      // } else      
-      // if (strBuffer.charAt(0)=='E')
-      // {
-      //   DebugT("Parity error     ");
-      // } else
-      // {
-      //   DebugTf("Unexpected=[%c] ", strBuffer.charAt(0));
-      // }
-      DebugTf("msg=[%s] value=[%08x]", strBuffer.c_str(), value);
-
-      //split 32bit value into the relevant OT protocol parts
-      OTdata.type = (value >> 28) & 0x7;         // byte 1 = take 3 bits that define msg msgType
-      OTdata.id = (value >> 16) & 0xFF;          // byte 2 = message id 8 bits 
-      OTdata.valueHB = (value >> 8) & 0xFF;      // byte 3 = high byte
-      OTdata.valueLB = value & 0xFF;             // byte 4 = low byte
-
-      //print message frame
-      Debugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
-
-      //print message Type and ID
-      Debugf("[%-16s]\t", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
-      Debugf("[%-30s]\t", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
-      DebugFlush();
-
-      //next step interpret the OT protocol
-      if (static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_ACK || static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_DATA) {
-
-        //#define OTprint(data, value, text, format) ({ data= value; Debugf("[%37s]", text); Debugf("= [format]", data)})
-        //interpret values f8.8
-        switch (static_cast<OpenThermMessageID>(OTdata.id)) { 
-          case TSet:                      OTdataObject.Tset = print_f88(); break;         
-          case CoolingControl:            OTdataObject.CoolingControl = print_f88(); break;
-          case TsetCH2:                   OTdataObject.TsetCH2 = print_f88();  break;
-          case TrOverride:                OTdataObject.TrOverride = print_f88();  break;        
-          case MaxRelModLevelSetting:     OTdataObject.MaxRelModLevelSetting = print_f88();  break;
-          case TrSet:                     OTdataObject.TrSet = print_f88();  break;
-          case RelModLevel:               OTdataObject.RelModLevel = print_f88();  break;
-          case CHPressure:                OTdataObject.CHPressure = print_f88(); break;
-          case DHWFlowRate:               OTdataObject.DHWFlowRate = print_f88();  break;
-          case Tr:                        OTdataObject.Tr = print_f88();  Debugf("Troom=%f\r\n", OTdataObject.Tr);break;  
-          case Tboiler:                   OTdataObject.Tboiler = print_f88();  break;
-          case Tdhw:                      OTdataObject.Tdhw = print_f88();  break;
-          case Toutside:                  OTdataObject.Toutside = print_f88();  break;
-          case Tret:                      OTdataObject.Tret = print_f88();  break;
-          case Tstorage:                  OTdataObject.Tstorage = print_f88();  break;
-          case Tcollector:                OTdataObject.Tcollector = print_f88(); break;
-          case TflowCH2:                  OTdataObject.TflowCH2 = print_f88(); break;          
-          case Tdhw2:                     OTdataObject.Tdhw2 = print_f88(); break;
-          case Texhaust:                  OTdataObject.Texhaust = print_s16();  break; 
-          case TdhwSet:                   OTdataObject.TdhwSet = print_f88(); break;
-          case MaxTSet:                   OTdataObject.MaxTSet = print_f88(); break;
-          case Hcratio:                   OTdataObject.Hcratio = print_f88(); break;
-          case OpenThermVersionMaster:    OTdataObject.OpenThermVersionMaster = print_f88(); break;
-          case OpenThermVersionSlave:     OTdataObject.OpenThermVersionSlave = print_f88(); break;
-          case Status:                    OTdataObject.Status = print_status(); break;
-          case ASFflags:                  OTdataObject.ASFflags = print_ASFflags(); break;
-          case MConfigMMemberIDcode:      OTdataObject.MConfigMMemberIDcode = print_mastermemberid(); break; 
-          case SConfigSMemberIDcode:      OTdataObject.SConfigSMemberIDcode = print_slavememberid(); break;   
-          case Command:                   OTdataObject.Command = print_u8u8();  break; 
-          case RBPflags:                  OTdataObject.RBPflags = print_flag8flag8(); break; 
-          case TSP:                       OTdataObject.TSP = print_u8u8(); break; 
-          case TSPindexTSPvalue:          OTdataObject.TSPindexTSPvalue = print_u8u8();  break; 
-          case FHBsize:                   OTdataObject.FHBsize = print_u8u8();  break;  
-          case FHBindexFHBvalue:          OTdataObject.FHBindexFHBvalue = print_u8u8();  break; 
-          case MaxCapacityMinModLevel:    OTdataObject.MaxCapacityMinModLevel = print_u8u8();  break; 
-          case DayTime:                   OTdataObject.DayTime = print_daytime();  break; 
-          case Date:                      OTdataObject.Date = print_u8u8();  break; 
-          case Year:                      OTdataObject.Year = print_u16();  break; 
-          case TdhwSetUBTdhwSetLB:        OTdataObject.TdhwSetUBTdhwSetLB = print_s8s8(); break;  
-          case MaxTSetUBMaxTSetLB:        OTdataObject.MaxTSetUBMaxTSetLB = print_s8s8(); break;  
-          case HcratioUBHcratioLB:        OTdataObject.HcratioUBHcratioLB = print_s8s8(); break;  
-          case RemoteOverrideFunction:    OTdataObject.RemoteOverrideFunction = print_flag8(); break;
-          case OEMDiagnosticCode:         OTdataObject.OEMDiagnosticCode = print_u16();  break;
-          case BurnerStarts:              OTdataObject.BurnerStarts = print_u16();  break; 
-          case CHPumpStarts:              OTdataObject.CHPumpStarts = print_u16();  break; 
-          case DHWPumpValveStarts:        OTdataObject.DHWPumpValveStarts = print_u16();  break; 
-          case DHWBurnerStarts:           OTdataObject.DHWBurnerStarts = print_u16();  break;
-          case BurnerOperationHours:      OTdataObject.BurnerOperationHours = print_u16();  break;
-          case CHPumpOperationHours:      OTdataObject.CHPumpOperationHours = print_u16();  break; 
-          case DHWPumpValveOperationHours:OTdataObject.DHWPumpValveOperationHours = print_u16();  break;  
-          case DHWBurnerOperationHours:   OTdataObject.DHWBurnerOperationHours = print_u16();  break; 
-          case MasterVersion:             OTdataObject.MasterVersion = print_u8u8(); break; 
-          case SlaveVersion:              OTdataObject.SlaveVersion = print_u8u8(); break;
-        }
-      } else Debugln(); //next line 
+void handleOTGW()
+{
+  //connect the OTmonitor port 1023
+  if (OTGWstream.hasClient())
+  { //incoming telnet connection
+    if (!OTGWclient || !OTGWclient.connected()){
+      if (OTGWclient) OTGWclient.stop();
+      OTGWclient =  OTGWstream.available();
+      OTGWclient.flush();
     }
-  }   // while Serial.available()
-}
+  }
+
+  //handle serial communication and line processing
+  #define MAX_BUFFER 128
+  static char sBuf[MAX_BUFFER];
+  static size_t bytes_read = 0;
+  static uint8_t inByte;
+  
+  //handle incoming data from network sent to OTGW
+  if (OTGWclient.connected()){
+    while (OTGWclient.available()){
+      Serial.write(OTGWclient.read()); //just forward it directly to Serial
+    }
+  }
+
+  //read a single line and continue
+  while(Serial.available()) 
+  {
+    inByte = Serial.read();
+    if (inByte== '\n')
+    { //line terminator, continue to process incoming message
+      if (OTGWclient.connected()){
+        OTGWclient.write('\r');
+        OTGWclient.write('\n');
+        OTGWclient.flush();
+      }
+      sBuf[bytes_read] = 0;
+      processOTGW(sBuf, bytes_read);
+      bytes_read = 0;
+      break; // to continue processing incoming message
+    } 
+    else if (inByte == '\r')
+    { // just ignore LF... 
+    } 
+    else
+    {
+      if (OTGWclient.connected()) OTGWclient.write(inByte);
+      if (bytes_read < (MAX_BUFFER-1))
+        sBuf[bytes_read++] = inByte;
+    }
+  }
+  
+}// END of handleOTGW
 
 //functions for REST API
 String getOTGWValue(int msgid)
@@ -695,6 +717,7 @@ String getOTGWValue(int msgid)
     case TrOverride:                return String(OTdataObject.TrOverride);  break;        
     case MaxRelModLevelSetting:     return String(OTdataObject.MaxRelModLevelSetting);  break;
     case TrSet:                     return String(OTdataObject.TrSet);  break;
+    case TrSetCH2:                  return String(OTdataObject.TrSetCH2);  break;
     case RelModLevel:               return String(OTdataObject.RelModLevel);  break;
     case CHPressure:                return String(OTdataObject.CHPressure); break;
     case DHWFlowRate:               return String(OTdataObject.DHWFlowRate);  break;
