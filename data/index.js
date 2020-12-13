@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of ESP_ticker
-**  Version  : v0.4.1
+**  Version  : v0.4.2
 **
 **  Copyright (c) 2020 Willem Aandewiel
 **
