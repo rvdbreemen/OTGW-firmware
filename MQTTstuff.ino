@@ -280,12 +280,14 @@ void doAutoConfigure()
       while(fh.available()) 
       {  //read file line by line, split and send to MQTT (topic, msg)
           feedWatchDog(); //start with feeding the dog
+          
           String sLine = fh.readStringUntil('\n');
           // DebugTf("sline[%s]\r\n", sLine.c_str());
           if (splitString(sLine, ',', sTopic, sMsg))
           {
             DebugTf("sTopic[%s], sMsg[%s]\r\n", sTopic.c_str(), sMsg.c_str());
             sendMQTT(sTopic.c_str(), sMsg.c_str(), (sTopic.length() + sMsg.length()+2));
+            delay(10);
           } else DebugTf("Either comment or invalid config line: [%s]\r\n", sLine.c_str());
       } // while available()
       fh.close();  
