@@ -83,7 +83,7 @@ void setup()
   
   startMDNS(settingHostname);
   
-  delay(10000);
+  delay(1000);
   
   // Start MQTT connection
   startMQTT(); 
