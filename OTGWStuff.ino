@@ -660,18 +660,40 @@ void processOTGW(const char * buf, int len)
   } else DebugTf("[%s] [%d]\r\n", buf, len);
 }
 
+
+//====================[ HandleOTGW ]====================
+/*  
+** This is the core of the OTGW firmware. 
+** This code basically reads from serial, connected to the OTGW hardware, and
+** processes each OT message coming. It can also be used to send data into the
+** OpenTherm Gateway. 
+**
+** The main purpose is to read each OT Msg (9 bytes), or anything that comes 
+** from the OTGW hardware firmware. Default it assumes raw OT messages, however
+** it can handle the other messages to, like PS=1/PS=0 etc.
+** 
+** Also, this code bit implements the serial 2 network (port 1023). The serial port 
+** is forwarded to port 1023, and visavera. So you can use it with OTmonitor (the 
+** original OpenTherm program that comes with the hardware). The serial port and 
+** ser2net port 1023 are both "line read" into the read buffer (coming from OTGW 
+** thru serial) and write buffer  (coming from 1023 going to serial).
+**
+** The write buffer (incoming from port 1023) is also line printed to the Debug (port 23).
+** The read line buffer is per line parsed by the proces OT parser code (processOTGW (buf, len)).
+*/
 void handleOTGW()
 {
   //handle serial communication and line processing
-  #define MAX_BUFFER 128
-  static char sRead[MAX_BUFFER];
-  static char sWrite[MAX_BUFFER];
+  #define MAX_BUFFER_READ 256
+  #define MAX_BUFFER_WRITE 64
+  static char sRead[MAX_BUFFER_READ];
+  static char sWrite[MAX_BUFFER_WRITE];
   static size_t bytes_read = 0;
   static size_t bytes_write = 0;
   static uint8_t inByte;
   static uint8_t outByte;
 
-  //handle incoming data from network sent to OTGW
+  //handle incoming data from network (port 1023) sent to serial port OTGW (WRITE BUFFER)
   while (OTGWstream.available()){
     //Serial.write(OTGWstream.read()); //just forward it directly to Serial
     outByte = OTGWstream.read();  // read from port 1023
@@ -687,12 +709,12 @@ void handleOTGW()
     } 
     else 
     {
-      if (bytes_write < (MAX_BUFFER-1))
+      if (bytes_write < (MAX_BUFFER_WRITE-1))
         sWrite[bytes_write++] = outByte;
     }
   }
   
-  //read a single line and continue
+  //Handle incoming data from OTGW through serial port (READ BUFFER)
   while(Serial.available()) 
   {
     inByte = Serial.read();   // read from serial port
@@ -709,14 +731,14 @@ void handleOTGW()
     } 
     else
     {
-      if (bytes_read < (MAX_BUFFER-1))
+      if (bytes_read < (MAX_BUFFER_READ-1))
         sRead[bytes_read++] = inByte;
     }
   }
   
 }// END of handleOTGW
 
-//functions for REST API
+//====================[ functions for REST API ]====================
 String getOTGWValue(int msgid)
 {
   switch (static_cast<OpenThermMessageID>(msgid)) { 

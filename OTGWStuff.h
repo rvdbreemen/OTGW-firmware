@@ -350,7 +350,6 @@ struct OpenthermData {
   void s16(int16_t value);
 };
 
-static volatile unsigned long _data;
 
 
 
