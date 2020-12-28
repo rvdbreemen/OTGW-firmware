@@ -37,9 +37,6 @@
 #define _HOSTNAME   "OTGW"
 #include "OTGW-firmware.h"
 
-// WiFi Server object and parameters
-WiFiServer server(80);
-
 //=====================================================================
 void setup()
 {

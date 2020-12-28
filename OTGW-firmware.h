@@ -46,7 +46,4 @@ String    settingMQTTpasswd = "";
 String    settingMQTTtopTopic = "OTGW";
 int32_t   settingMQTTinterval = 10;
 
-// OTGW Serial 2 Telnet 
-#define OTGW_SERIAL_PORT 1023
-TelnetStreamClass OTGWstream(OTGW_SERIAL_PORT); 
 // eof
