@@ -13,6 +13,8 @@
 //=======================================================================
 void writeSettings(bool show) 
 {
+
+  //let's use JSON to write the setting file
   DebugTf("Writing to [%s] ..\r\n", SETTINGS_FILE);
   File file = SPIFFS.open(SETTINGS_FILE, "w"); // open for reading and writing
   if (!file) 
@@ -24,81 +26,71 @@ void writeSettings(bool show)
 
   DebugT(F("Start writing setting data "));
 
-  file.print("Hostname = ");  file.println(settingHostname);  Debug(F("."));
-
+  const size_t capacity = JSON_OBJECT_SIZE(5);  // save more setting, grow # of objects accordingly
+  DynamicJsonDocument doc(capacity);
+  JsonObject root  = doc.to<JsonObject>();
+  root["hostname"] = settingHostname;
+  root["MQTTbroker"] = settingMQTTbroker;
+  root["MQTTport"] = settingMQTTbrokerPort;
+  root["MQTTuser"] = settingMQTTuser;
+  root["MQTTpasswd"] = settingMQTTpasswd;
+  serializeJsonPretty(root, file);
+  Debugln(F("... done!"));
+  if (show)  serializeJsonPretty(root, TelnetStream); //Debug stream ;-)
   file.close();  
-  
-  Debugln(F(" done"));
 
-  if (show) 
-  {
-    DebugTln(F("Wrote this:"));
-    DebugT(F("        Hostname = ")); Debugln(settingHostname);
-
-  } // show
-  
 } // writeSettings()
 
 
 //=======================================================================
 void readSettings(bool show) 
 {
-  String sTmp;
-  char cTmp[CMSG_SIZE], cVal[101], cKey[101];
-  
-  File file;
-  
+
+  // Open file for reading
+  File file =  SPIFFS.open(SETTINGS_FILE, "r");
+
   DebugTf(" %s ..\r\n", SETTINGS_FILE);
-
-  snprintf(settingHostname,    sizeof(settingHostname), "%s", _HOSTNAME);
-
   if (!SPIFFS.exists(SETTINGS_FILE)) 
-  {
+  {  //create settings file if it does not exist yet.
     DebugTln(F(" .. file not found! --> created file!"));
     writeSettings(show);
+    readSettings(false); //now it should work...
+    return;
   }
 
-  for (int T = 0; T < 2; T++) 
+  // Deserialize the JSON document
+  StaticJsonDocument<512> doc;
+  DeserializationError error = deserializeJson(doc, file);
+  if (error)
   {
-    file = SPIFFS.open(SETTINGS_FILE, "r");
-    if (!file) 
-    {
-      if (T == 0) DebugTf(" .. something went wrong opening [%s]\r\n", SETTINGS_FILE);
-      else        DebugT(T);
-      delay(100);
-    }
-  } // try T times ..
+    DebugTln(F("Failed to read file, use existing defaults."));
+    return;
+  }
 
-  DebugTln(F("Reading settings:\r"));
-  while(file.available()) 
-  {
-    sTmp = file.readStringUntil('\n');
-    snprintf(cTmp, sizeof(cTmp), "%s", sTmp.c_str());
-    strTrimCntr(cTmp, sizeof(cTmp));
-    int sEq = strIndex(cTmp, "=");
-    strCopy(cKey, 100, cTmp, 0, sEq -1);
-    strCopy(cVal, 100, cTmp, sEq +1, strlen(cTmp));
-    strTrim(cKey, sizeof(cKey), ' ');
-    strTrim(cVal, sizeof(cVal), ' ');
-    DebugTf("cKey[%s], cVal[%s]\r\n", cKey, cVal);
+  // Copy values from the JsonDocument to the Config 
+  strlcpy(settingHostname,  doc["hostname"]|_HOSTNAME, sizeof(settingHostname));
+  settingMQTTbroker       = doc["MQTTbroker"].as<String>();
+  settingMQTTbrokerPort   = doc["MQTTport"]; //default port
+  settingMQTTuser         = doc["MQTTuser"].as<String>();
+  settingMQTTpasswd       = doc["MQTTpasswd"].as<String>();
 
-    //strToLower(cKey);
-    if (stricmp(cKey, "hostname") == 0) strlcpy(settingHostname, cVal, sizeof(settingHostname));
+  // Close the file (Curiously, File's destructor doesn't close the file)
+  file.close();
 
-  } // while available()
-  
-  file.close();  
-
-  //--- this will take some time to settle in
-  //--- probably need a reboot before that to happen :-(
+  //Update some settings right now 
   MDNS.setHostname(settingHostname);    // start advertising with new(?) settingHostname
 
   DebugTln(F(" .. done\r"));
 
-  if (!show) return;
-  
-  Debugln(F("\r\n==== read Settings ===================================================\r"));
-  Debugf("                 Hostname : %s\r\n",  settingHostname);
+  if (show) {
+    Debugln(F("\r\n==== read Settings ===================================================\r"));
+    Debugf("                 Hostname      : %s\r\n",  settingHostname);
+    Debugf("                 MQTT broker   : %s\r\n",  CSTR(settingMQTTbroker));
+    Debugf("                 MQTT port     : %d\r\n",  settingMQTTbrokerPort);
+    Debugf("                 MQTT username : %s\r\n",  CSTR(settingMQTTuser));
+    Debugf("                 MQTT password : %s\r\n",  CSTR(settingMQTTpasswd));
+  }
+
   
   Debugln(F("-\r"));
 
@@ -107,13 +99,15 @@ void readSettings(bool show)
 
 //=======================================================================
 void updateSetting(const char *field, const char *newValue)
-{
+{ //do not just trust the caller to do the right thing, server side validation is here!
   DebugTf("-> field[%s], newValue[%s]\r\n", field, newValue);
 
-  if (!stricmp(field, "Hostname")) 
-  {
-    strlcpy(settingHostname, newValue, sizeof(settingHostname)); 
-    if (strlen(settingHostname) < 1) strlcpy(settingHostname,  _HOSTNAME, sizeof(settingHostname)); 
+  if (stricmp(field, "hostname")==0) 
+  { //make sure we have a valid hostname here...
+    if (strlen(newValue)==0){ //value empty, then...
+      strlcpy(settingHostname,  _HOSTNAME, sizeof(settingHostname)); 
+    }
+    else strlcpy(settingHostname, newValue, sizeof(settingHostname)); 
     char *dotPntr = strchr(settingHostname, '.') ;
     if (dotPntr != NULL)
     {
@@ -123,7 +117,11 @@ void updateSetting(const char *field, const char *newValue)
     Debugln();
     DebugTf("Need reboot before new %s.local will be available!\r\n\n", settingHostname);
   }
-
+  if (stricmp(field, "MQTTbroker")==0)  settingMQTTbroker = String(newValue);
+  if (stricmp(field, "MQTTport")==0)    settingMQTTbrokerPort = atoi(newValue);
+  if (stricmp(field, "MQTTuser")==0)    settingMQTTuser = String(newValue);
+  if (stricmp(field, "MQTTpasswd")==0)  settingMQTTpasswd = String(newValue);
+  //finally update write settings
   writeSettings(false);
   
 } // updateSetting()

@@ -9,6 +9,8 @@
         "xhash": "cpp",
         "xtree": "cpp",
         "xutility": "cpp",
-        "istream": "cpp"
+        "istream": "cpp",
+        "vector": "cpp",
+        "string": "cpp"
     }
 }
