@@ -26,7 +26,7 @@ void writeSettings(bool show)
 
   DebugT(F("Start writing setting data "));
 
-  const size_t capacity = JSON_OBJECT_SIZE(5);  // save more setting, grow # of objects accordingly
+  const size_t capacity = JSON_OBJECT_SIZE(6);  // save more setting, grow # of objects accordingly
   DynamicJsonDocument doc(capacity);
   JsonObject root  = doc.to<JsonObject>();
   root["hostname"] = settingHostname;
@@ -34,6 +34,8 @@ void writeSettings(bool show)
   root["MQTTport"] = settingMQTTbrokerPort;
   root["MQTTuser"] = settingMQTTuser;
   root["MQTTpasswd"] = settingMQTTpasswd;
+  root["MQTTtoptopic"] = settingMQTTtopTopic;
+
   serializeJsonPretty(root, file);
   Debugln(F("... done!"));
   if (show)  serializeJsonPretty(root, TelnetStream); //Debug stream ;-)
@@ -70,9 +72,10 @@ void readSettings(bool show)
   // Copy values from the JsonDocument to the Config 
   strlcpy(settingHostname,  doc["hostname"]|_HOSTNAME, sizeof(settingHostname));
   settingMQTTbroker       = doc["MQTTbroker"].as<String>();
-  settingMQTTbrokerPort   = doc["MQTTport"]; //default port
+  settingMQTTbrokerPort   = doc["MQTTbrokerPort"]; //default port
   settingMQTTuser         = doc["MQTTuser"].as<String>();
   settingMQTTpasswd       = doc["MQTTpasswd"].as<String>();
+  settingMQTTtopTopic     = doc["MQTTtoptopic"].as<String>();
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
@@ -89,8 +92,8 @@ void readSettings(bool show)
     Debugf("                 MQTT port     : %d\r\n",  settingMQTTbrokerPort);
     Debugf("                 MQTT username : %s\r\n",  CSTR(settingMQTTuser));
     Debugf("                 MQTT password : %s\r\n",  CSTR(settingMQTTpasswd));
+    Debugf("                 MQTT toptopic : %s\r\n",  CSTR(settingMQTTtopTopic));
   }
-
   
   Debugln(F("-\r"));
 
@@ -117,10 +120,12 @@ void updateSetting(const char *field, const char *newValue)
     Debugln();
     DebugTf("Need reboot before new %s.local will be available!\r\n\n", settingHostname);
   }
-  if (stricmp(field, "MQTTbroker")==0)  settingMQTTbroker = String(newValue);
-  if (stricmp(field, "MQTTport")==0)    settingMQTTbrokerPort = atoi(newValue);
-  if (stricmp(field, "MQTTuser")==0)    settingMQTTuser = String(newValue);
-  if (stricmp(field, "MQTTpasswd")==0)  settingMQTTpasswd = String(newValue);
+  if (stricmp(field, "MQTTbroker")==0)      settingMQTTbroker = String(newValue);
+  if (stricmp(field, "MQTTbrokerPort")==0)  settingMQTTbrokerPort = atoi(newValue);
+  if (stricmp(field, "MQTTuser")==0)        settingMQTTuser = String(newValue);
+  if (stricmp(field, "MQTTpasswd")==0)      settingMQTTpasswd = String(newValue);
+  if (stricmp(field, "MQTTtoptopic")==0)    settingMQTTtopTopic = String(newValue);
+  
   //finally update write settings
   writeSettings(false);
   

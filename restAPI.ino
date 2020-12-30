@@ -199,7 +199,6 @@ void sendDeviceTime()
 
 } // sendDeviceTime()
 
-
 //=======================================================================
 void sendDeviceSettings() 
 {
@@ -207,9 +206,16 @@ void sendDeviceSettings()
 
   sendStartJsonObj("settings");
   
+  //sendJsonSettingObj("string",   settingString,   "s", sizeof(settingString)-1);
+  //sendJsonSettingObj("float",    settingFloat,    "f", 0, 10,  5);
+  //sendJsonSettingObj("intager",  settingInteger , "i", 2, 60);
+
   sendJsonSettingObj("hostname", settingHostname, "s", sizeof(settingHostname) -1);
-//sendJsonSettingObj("float",    settingFloat,    "f", 0, 10,  5);
-//sendJsonSettingObj("intager",  settingInteger , "i", 2, 60);
+  sendJsonSettingObj("mqttbroker", CSTR(settingMQTTbroker), "s", 64);
+  sendJsonSettingObj("mqttbrokerport", settingMQTTbrokerPort, "i", 0, 65535);
+  sendJsonSettingObj("mqttuser", CSTR(settingMQTTuser), "s", 32);
+  sendJsonSettingObj("mqttpasswd", CSTR(settingMQTTpasswd), "s", 32);
+  sendJsonSettingObj("mqtttoptopic", CSTR(settingMQTTtopTopic), "s", 15);
 
   sendEndJsonObj();
 

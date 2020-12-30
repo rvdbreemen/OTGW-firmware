@@ -47,6 +47,5 @@ int32_t   settingMQTTbrokerPort = 1883;
 String    settingMQTTuser = "";
 String    settingMQTTpasswd = "";
 String    settingMQTTtopTopic = "OTGW";
-int32_t   settingMQTTinterval = 10;
 
 // eof

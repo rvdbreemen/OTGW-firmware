@@ -16,15 +16,17 @@ The features of this OTGW firmware are:
 - serial interface on port 1023 for original OTmon application 
 - a REST API (http://<ip>/api/v0/otgw/{id})
 - sending a MQTT command to OTGW (topic: OTGW/command) 
+- OT command sending interface
 
 To do:
 - InfluxDB client to do direct logging 
-- OT command sending interface
+- OTmonitor Web UI (standalone interface)
 
 Looking for the documentation, go here (work in progress):  <br> https://github.com/rvdbreemen/OTGW-firmware/wiki/Documentation-of-OTGW-firmware
   
 | Version | Release notes |
 |-|-|
+| 0.5.0 | Load/Save Settings & WebUI for settings |
 | 0.4.2 | Bi-directional OTmon on port 1023 (aka ser2net) |   
 | 0.4.1 | MQTT command sending now works, topic: OTGW/command and |   
 | 0.4.0 | RestAPI implemented - as simple as <ip>/api/v0/otgw/{id} to get the latest values |   
