@@ -487,7 +487,19 @@
   } // printAllVals()
   
   
+  var translateFields = [
 
+    [ "hostname",                  "HostName" ]
+   ,[ "mqttbroker",                "MQTT Broker IP/URL" ]
+   ,[ "mqttbrokerport",            "MQTT Broker Poort" ]
+   ,[ "mqttuser",                  "MQTT Gebruiker" ]
+   ,[ "mqttpasswd",                "Password MQTT Gebruiker" ]
+   ,[ "mqtttoptopic",              "MQTT Top Topic" ]
+   ,[ "influxdbhostname",          "InfluxDB hostname"]
+   ,[ "influxdbport",              "InfluxDB port (default: 8086)"]
+   ,[ "influxdbdatabasename",      "InfluxDB database name"]
+   
+                 ];
   
 /*
 ***************************************************************************

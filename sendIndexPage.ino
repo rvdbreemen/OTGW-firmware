@@ -33,7 +33,7 @@ R"(
       </div>
       <br/>
       <div id="mainPage">
-        <div id="waiting">Wait! retrieving local messages .....</div>
+        <div id="waiting">Not implemented yet. <br><br>Wait! Retrieving local messages...</div>
       </div>
     </div>
 
