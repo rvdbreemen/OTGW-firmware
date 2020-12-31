@@ -26,7 +26,7 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
   
 | Version | Release notes |
 |-|-|
-| 0.5.0 | Load/Save Settings & WebUI for settings |
+| 0.5.0 | Implemented the UI for settings (restapi, read/write file in json) |
 | 0.4.2 | Bi-directional OTmon on port 1023 (aka ser2net) |   
 | 0.4.1 | MQTT command sending now works, topic: OTGW/command and |   
 | 0.4.0 | RestAPI implemented - as simple as <ip>/api/v0/otgw/{id} to get the latest values |   
