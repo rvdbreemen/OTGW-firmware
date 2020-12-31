@@ -221,7 +221,7 @@
             rowDiv.setAttribute("style", "text-align: right;");
             rowDiv.style.marginLeft = "10px";
             rowDiv.style.marginRight = "10px";
-            rowDiv.style.width = "800px";
+            rowDiv.style.width = "850px";
             rowDiv.style.border = "thick solid lightblue";
             rowDiv.style.background = "lightblue";
             //--- field Name ---
