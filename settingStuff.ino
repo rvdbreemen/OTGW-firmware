@@ -26,16 +26,17 @@ void writeSettings(bool show)
 
   DebugT(F("Start writing setting data "));
 
-  const size_t capacity = JSON_OBJECT_SIZE(6);  // save more setting, grow # of objects accordingly
-  DynamicJsonDocument doc(capacity);
+  //const size_t capacity = JSON_OBJECT_SIZE(6);  // save more setting, grow # of objects accordingly
+  DynamicJsonDocument doc(512);
   JsonObject root  = doc.to<JsonObject>();
   root["hostname"] = settingHostname;
   root["MQTTbroker"] = settingMQTTbroker;
-  root["MQTTport"] = settingMQTTbrokerPort;
+  root["MQTTbrokerPort"] = settingMQTTbrokerPort;
   root["MQTTuser"] = settingMQTTuser;
   root["MQTTpasswd"] = settingMQTTpasswd;
   root["MQTTtoptopic"] = settingMQTTtopTopic;
 
+  serializeJsonPretty(root, TelnetStream);
   serializeJsonPretty(root, file);
   Debugln(F("... done!"));
   if (show)  serializeJsonPretty(root, TelnetStream); //Debug stream ;-)
@@ -70,24 +71,26 @@ void readSettings(bool show)
   }
 
   // Copy values from the JsonDocument to the Config 
-  strlcpy(settingHostname,  doc["hostname"]|_HOSTNAME, sizeof(settingHostname));
+  settingHostname         = doc["hostname"].as<String>();
+  if (settingHostname.length()==0) settingHostname = _HOSTNAME;
   settingMQTTbroker       = doc["MQTTbroker"].as<String>();
   settingMQTTbrokerPort   = doc["MQTTbrokerPort"]; //default port
   settingMQTTuser         = doc["MQTTuser"].as<String>();
   settingMQTTpasswd       = doc["MQTTpasswd"].as<String>();
   settingMQTTtopTopic     = doc["MQTTtoptopic"].as<String>();
+  if (settingMQTTtopTopic.length()==0) settingMQTTtopTopic = _HOSTNAME;
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
 
   //Update some settings right now 
-  MDNS.setHostname(settingHostname);    // start advertising with new(?) settingHostname
+  MDNS.setHostname(CSTR(settingHostname));    // start advertising with new(?) settingHostname
 
   DebugTln(F(" .. done\r"));
 
   if (show) {
     Debugln(F("\r\n==== read Settings ===================================================\r"));
-    Debugf("                 Hostname      : %s\r\n",  settingHostname);
+    Debugf("                 Hostname      : %s\r\n",  CSTR(settingHostname));
     Debugf("                 MQTT broker   : %s\r\n",  CSTR(settingMQTTbroker));
     Debugf("                 MQTT port     : %d\r\n",  settingMQTTbrokerPort);
     Debugf("                 MQTT username : %s\r\n",  CSTR(settingMQTTuser));
@@ -107,24 +110,24 @@ void updateSetting(const char *field, const char *newValue)
 
   if (stricmp(field, "hostname")==0) 
   { //make sure we have a valid hostname here...
-    if (strlen(newValue)==0){ //value empty, then...
-      strlcpy(settingHostname,  _HOSTNAME, sizeof(settingHostname)); 
+    settingHostname = String(newValue);
+    if (settingHostname.length()==0) settingHostname=_HOSTNAME; 
+    int pos = settingMQTTtopTopic.indexOf("."); //strip away anything beyond the dot
+    if (pos){
+      settingMQTTtopTopic = settingMQTTtopTopic.substring(0, pos-1);
     }
-    else strlcpy(settingHostname, newValue, sizeof(settingHostname)); 
-    char *dotPntr = strchr(settingHostname, '.') ;
-    if (dotPntr != NULL)
-    {
-      byte dotPos = (dotPntr-settingHostname);
-      if (dotPos > 0)  settingHostname[dotPos] = '\0';
-    }
+    
     Debugln();
-    DebugTf("Need reboot before new %s.local will be available!\r\n\n", settingHostname);
+    DebugTf("Need reboot before new %s.local will be available!\r\n\n", CSTR(settingHostname));
   }
   if (stricmp(field, "MQTTbroker")==0)      settingMQTTbroker = String(newValue);
   if (stricmp(field, "MQTTbrokerPort")==0)  settingMQTTbrokerPort = atoi(newValue);
   if (stricmp(field, "MQTTuser")==0)        settingMQTTuser = String(newValue);
   if (stricmp(field, "MQTTpasswd")==0)      settingMQTTpasswd = String(newValue);
-  if (stricmp(field, "MQTTtoptopic")==0)    settingMQTTtopTopic = String(newValue);
+  if (stricmp(field, "MQTTtoptopic")==0)    {
+    settingMQTTtopTopic = String(newValue);
+    if (settingMQTTtopTopic.length()==0) settingMQTTtopTopic = "OTGW";
+  }
   
   //finally update write settings
   writeSettings(false);

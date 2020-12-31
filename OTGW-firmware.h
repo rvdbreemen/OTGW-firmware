@@ -40,10 +40,10 @@ const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
 
 
 //All things that are settings 
-char      settingHostname[64];
+String    settingHostname = _HOSTNAME;
 //MQTT settings
 String    settingMQTTbroker= "192.168.88.254";
-int32_t   settingMQTTbrokerPort = 1883;
+int16_t   settingMQTTbrokerPort = 1883; 
 String    settingMQTTuser = "";
 String    settingMQTTpasswd = "";
 String    settingMQTTtopTopic = "OTGW";
