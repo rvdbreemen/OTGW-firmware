@@ -135,7 +135,7 @@ void sendDeviceInfo()
 
   snprintf(cMsg, sizeof(cMsg), "%s %s", __DATE__, __TIME__);
   sendNestedJsonObj("compiled", cMsg);
-  sendNestedJsonObj("hostname", settingHostname);
+  sendNestedJsonObj("hostname", CSTR(settingHostname));
   sendNestedJsonObj("ipaddress", WiFi.localIP().toString().c_str());
   sendNestedJsonObj("macaddress", WiFi.macAddress().c_str());
   sendNestedJsonObj("freeheap", ESP.getFreeHeap());
@@ -210,7 +210,7 @@ void sendDeviceSettings()
   //sendJsonSettingObj("float",    settingFloat,    "f", 0, 10,  5);
   //sendJsonSettingObj("intager",  settingInteger , "i", 2, 60);
 
-  sendJsonSettingObj("hostname", settingHostname, "s", sizeof(settingHostname) -1);
+  sendJsonSettingObj("hostname", CSTR(settingHostname), "s", 64);
   sendJsonSettingObj("mqttbroker", CSTR(settingMQTTbroker), "s", 64);
   sendJsonSettingObj("mqttbrokerport", settingMQTTbrokerPort, "i", 0, 65535);
   sendJsonSettingObj("mqttuser", CSTR(settingMQTTuser), "s", 32);

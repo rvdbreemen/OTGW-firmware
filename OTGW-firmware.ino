@@ -77,7 +77,7 @@ void setup()
   startWiFi(_HOSTNAME, 240);  // timeout 240 seconds
   digitalWrite(LED_BUILTIN, LOW);
   
-  startMDNS(settingHostname);
+  startMDNS(CSTR(settingHostname));
   
   delay(1000);
   
