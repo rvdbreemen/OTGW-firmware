@@ -17,6 +17,7 @@ The features of this OTGW firmware are:
 - a REST API (http://<ip>/api/v0/otgw/{id})
 - sending a MQTT command to OTGW (topic: OTGW/command) 
 - OT command sending interface
+- settings for Hostname and MQTT in the webUI (just compile and edit in webUI)
 
 To do:
 - InfluxDB client to do direct logging 
