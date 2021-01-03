@@ -13,10 +13,9 @@ The features of this OTGW firmware are:
 - enable telnet listening (interpreted data and debugging)
 - send MQTT messages for every change  (parsed OT message)
 - integrate with Home Assistant (and Domoticz)
-- serial interface on port 1023 for original OTmon application 
+- serial interface on port 1023 for original OTmonitor application (bi-directional)
 - a REST API (http://<ip>/api/v0/otgw/{id})
 - sending a MQTT command to OTGW (topic: OTGW/command) 
-- OT command sending interface
 - settings for Hostname and MQTT in the webUI (just compile and edit in webUI)
 
 To do:
