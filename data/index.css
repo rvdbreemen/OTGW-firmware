@@ -95,8 +95,8 @@ input {
 }
 
 .container-box {
-  padding: 0;
-  margin: 0;
+  padding: 10px;
+  margin: 10px;
   list-style: none;
   flex-direction: column; /*row | row-reverse | column | column-reverse*/
   

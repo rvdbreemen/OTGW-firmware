@@ -800,6 +800,69 @@ String getOTGWValue(int msgid)
   } 
 }
 
+
+
+
+//Get all data JSON
+String getOTGWresponse(){
+
+  uint16_t 	Status = 0; 				// flag8 / flag8  Master and Slave Status flags. 
+	float 		Tset = 0.0; 					// f8.8  Control setpoint  ie CH  water temperature setpoint (°C)
+	uint16_t	MConfigMMemberIDcode = 0; 	// flag8 / u8  Master Configuration Flags /  Master MemberID Code 
+	uint16_t	SConfigSMemberIDcode = 0; // flag8 / u8  Slave Configuration Flags /  Slave MemberID Code 
+	uint16_t 	Command = 0; // u8 / u8  Remote Command 
+	uint16_t 	ASFflags = 0; // / OEM-fault-code  flag8 / u8  Application-specific fault flags and OEM fault code 
+	uint16_t 	RBPflags = 0; // flag8 / flag8  Remote boiler parameter transfer-enable & read/write flags 
+	float 		CoolingControl = 0.0 ; // f8.8  Cooling control signal (%) 
+	float 		TsetCH2 = 0.0 ; // f8.8  Control setpoint for 2e CH circuit (°C)
+	float 		TrOverride = 0.0 ; // f8.8  Remote override room setpoint 
+	uint16_t 	TSP = 0; // u8 / u8  Number of Transparent-Slave-Parameters supported by slave 
+	uint16_t 	TSPindexTSPvalue = 0; // u8 / u8  Index number / Value of referred-to transparent slave parameter. 
+	uint16_t 	FHBsize = 0; // u8 / u8  Size of Fault-History-Buffer supported by slave 
+	uint16_t 	FHBindexFHBvalue = 0; // u8 / u8  Index number / Value of referred-to fault-history buffer entry. 
+	float 		MaxRelModLevelSetting = 0.0 ; // f8.8  Maximum relative modulation level setting (%) 
+	uint16_t 	MaxCapacityMinModLevel = 0; // u8 / u8  Maximum boiler capacity (kW) / Minimum boiler modulation level(%) 
+	float 		TrSet = 0.0 ; // f8.8  Room Setpoint (°C)
+	float 		RelModLevel = 0.0 ; // f8.8  Relative Modulation Level (%) 
+	float 		CHPressure = 0.0 ; // f8.8  Water pressure in CH circuit  (bar) 
+	float 		DHWFlowRate = 0.0 ; // f8.8  Water flow rate in DHW circuit. (litres/minute) 
+	uint16_t 	DayTime = 0; // special / u8  Day of Week and Time of Day 
+	uint16_t 	Date = 0; // u8 / u8  Calendar date 
+	uint16_t 	Year = 0; // u16  Calendar year 
+	float 		TrSetCH2 = 0.0 ; // f8.8  Room Setpoint for 2nd CH circuit (°C)
+	float 		Tr = 0.0 ; // f8.8  Room temperature (°C)
+	float 		Tboiler = 0.0 ; // f8.8  Boiler flow water temperature (°C)
+	float 		Tdhw = 0.0 ; // f8.8  DHW temperature (°C)
+	float 		Toutside = 0.0 ; // f8.8  Outside temperature (°C)
+	float 		Tret = 0.0 ; // f8.8  Return water temperature (°C)
+	float 		Tstorage = 0.0 ; // f8.8  Solar storage temperature (°C)
+	float 		Tcollector = 0.0 ; // f8.8  Solar collector temperature (°C)
+	float 		TflowCH2 = 0.0 ; // f8.8  Flow water temperature CH2 circuit (°C)
+	float 		Tdhw2 = 0.0 ; // f8.8  Domestic hot water temperature 2 (°C)
+	int16_t 	Texhaust = 0; // s16  Boiler exhaust temperature (°C)
+	uint16_t 	TdhwSetUBTdhwSetLB = 0 ; // s8 / s8  DHW setpoint upper & lower bounds for adjustment  (°C)
+	uint16_t 	MaxTSetUBMaxTSetLB = 0; // s8 / s8  Max CH water setpoint upper & lower bounds for adjustment  (°C)
+	uint16_t	HcratioUBHcratioLB = 0; // s8 / s8  OTC heat curve ratio upper & lower bounds for adjustment  
+	float 		TdhwSet = 0.0 ; // f8.8  DHW setpoint (°C)    (Remote parameter 1)
+	float 		MaxTSet = 0.0 ; // f8.8  Max CH water setpoint (°C)  (Remote parameters 2)
+	float 		Hcratio = 0.0 ; // f8.8  OTC heat curve ratio (°C)  (Remote parameter 3)
+	uint16_t 	RemoteOverrideFunction = 0; // flag8 / -  Function of manual and program changes in master and remote room setpoint. 
+	uint16_t 	OEMDiagnosticCode = 0; // u16  OEM-specific diagnostic/service code 
+	uint16_t 	BurnerStarts = 0; // u16  Number of starts burner 
+	uint16_t 	CHPumpStarts = 0; // u16  Number of starts CH pump 
+	uint16_t 	DHWPumpValveStarts = 0; // u16  Number of starts DHW pump/valve 
+	uint16_t 	DHWBurnerStarts = 0; // u16  Number of starts burner during DHW mode 
+	uint16_t 	BurnerOperationHours = 0; // u16  Number of hours that burner is in operation (i.e. flame on) 
+	uint16_t 	CHPumpOperationHours = 0; // u16  Number of hours that CH pump has been running 
+	uint16_t 	DHWPumpValveOperationHours = 0; // u16  Number of hours that DHW pump has been running or DHW valve has been opened 
+	uint16_t 	DHWBurnerOperationHours = 0; // u16  Number of hours that burner is in operation during DHW mode 
+	float 		OpenThermVersionMaster = 0.0 ; // f8.8  The implemented version of the OpenTherm Protocol Specification in the master. 
+	float 		OpenThermVersionSlave = 0.0 ; // f8.8  The implemented version of the OpenTherm Protocol Specification in the slave. 
+	uint16_t 	MasterVersion = 0; // u8 / u8  Master product version number and type 
+	uint16_t 	SlaveVersion = 0; // u8 / u8  Slave product version number and type
+
+}
+
 void startOTGWstream()
 {
   OTGWstream.begin();
