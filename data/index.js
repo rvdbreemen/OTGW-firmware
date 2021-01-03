@@ -123,6 +123,12 @@
   } // refreshDevInfo()
     
   //============================================================================  
+  function refreshOTmonitor()
+  {
+    console.log("refreshOTmonitor() ..");
+ 
+  }
+
   function refreshMessages()
   {
     console.log("refreshMessages() ..");

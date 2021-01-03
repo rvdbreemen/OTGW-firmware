@@ -56,7 +56,11 @@ void processAPI()
   if (words[2] == "v1") 
   { //v1 API calls
     if (words[3] == "otgw"){
-      if (words[4] == "id"){
+      if (words[4] == "otmonitor") {
+        // GET /api/v1/otgw/otmonitor
+        // Response: see json response
+        sendOTmonitor();
+      } else if (words[4] == "id"){
         //what the heck should I do?
         // /api/v1/otgw/id/{msgid}   msgid = OpenTherm Message Id (0-127)
         // Response: label, value, unit
@@ -192,6 +196,46 @@ void sendOTGWlabel(const char *msglabel){
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send(200, "application/json", sBuff);
 }
+
+//=======================================================================
+void sendOTmonitor() 
+{
+  DebugTln("sending OT monitor values ...\r");
+
+  sendStartJsonObj("otmonitor");
+  
+  sendNestedJsonObj("flamestatus", CONOFF(isFlameStatus()));
+  sendNestedJsonObj("chmodus", CONOFF(isCentralHeatingActive()));
+  sendNestedJsonObj("chenable", CONOFF(isCentralHeatingEnabled()));
+  sendNestedJsonObj("dhwmode", CONOFF(isDomesticHotWaterActive()));
+  sendNestedJsonObj("dhwenable", CONOFF(isDomesticHotWaterEnabled()));
+  sendNestedJsonObj("diagnosticindicator", CONOFF(isDiagnosticIndicator()));
+  sendNestedJsonObj("faultindicator", CONOFF(isFaultIndicator()));
+
+  sendNestedJsonObj("outsidetemperature", OTdataObject.Toutside);
+  sendNestedJsonObj("roomtemperatature", OTdataObject.Tr);
+  sendNestedJsonObj("roomsetpoint", OTdataObject.TrSet);
+  sendNestedJsonObj("remoteroomsetpoint", OTdataObject.TrOverride);
+  sendNestedJsonObj("relmodlvl", OTdataObject.RelModLevel);
+  sendNestedJsonObj("maxrelmodlvl", OTdataObject.MaxRelModLevelSetting);
+  sendNestedJsonObj("CHwaterpressure", OTdataObject.CHPressure);
+
+  sendNestedJsonObj("boilertemperature", OTdataObject.Tboiler);
+  sendNestedJsonObj("returnwatertemperature", OTdataObject.Tret);
+  sendNestedJsonObj("controlsetpoint", OTdataObject.Tset);
+  sendNestedJsonObj("maxchwatersetpoint", OTdataObject.MaxTSet);
+  sendNestedJsonObj("dhwtemperature", OTdataObject.Tdhw);
+  sendNestedJsonObj("dhwsetpoint", OTdataObject.TdhwSet);
+  sendNestedJsonObj("oemfaultcode", OTdataObject.OEMDiagnosticCode);
+
+  
+  //sendJsonSettingObj("string",   settingString,   "s", sizeof(settingString)-1);
+  //sendJsonSettingObj("float",    settingFloat,    "f", 0, 10,  5);
+  //sendJsonSettingObj("intager",  settingInteger , "i", 2, 60);
+
+  sendEndJsonObj();
+
+} // sendDeviceSettings()
 
 //=======================================================================
 void sendDeviceInfo() 

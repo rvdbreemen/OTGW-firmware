@@ -14,8 +14,10 @@ The features of this OTGW firmware are:
 - send MQTT messages for every change  (parsed OT message)
 - integrate with Home Assistant (and Domoticz)
 - serial interface on port 1023 for original OTmonitor application (bi-directional)
-- a REST API (http://<ip>/api/v0/otgw/{id})
-- sending a MQTT command to OTGW (topic: OTGW/command) 
+- simple REST API (http://<ip>/api/v0/otgw/{id})
+- simple REST API (http://<ip>/api/v1/otgw/id/{id} or http://<ip>/api/v1/otgw/label/{textlabel eg. Tr or Toutside} 
+- sending commands thru MQTT (topic: OTGW/command) 
+- sending commands thru REST API (/api/v1/otgw/command/{any command})
 - settings for Hostname and MQTT in the webUI (just compile and edit in webUI)
 
 To do:
@@ -26,6 +28,7 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
   
 | Version | Release notes |
 |-|-|
+| 0.5.1 | REST APIs, v1, for OTmonitor values, GetByLabel, GetByID, POST otgw/command/{command}
 | 0.5.0 | Implemented the UI for settings (restapi, read/write file in json) |
 | 0.4.2 | Bi-directional serial communication on port 1023 (aka ser2net) for use with OTmonitor application|   
 | 0.4.1 | MQTT command sending now works, topic: OTGW/command and |   

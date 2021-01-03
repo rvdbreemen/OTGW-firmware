@@ -25,6 +25,8 @@
 #define CMSG_SIZE 512
 #define JSON_BUFF_MAX   1024
 #define CSTR(x) x.c_str()
+#define CBOOLEAN(x) (x?"True":"False")
+#define CONOFF(x) (x?"On":"Off")
 
 WiFiClient  wifiClient;
 bool        Verbose = false;
