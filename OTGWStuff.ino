@@ -589,6 +589,7 @@ void processOTGW(const char * buf, int len)
   if (len >= 9) 
   { 
     //OT protocol messages are 9 chars long
+    sendMQTTData("message", buf);
     //parse value
     const char *bufval = buf + 1;
     uint32_t value = strtoul(bufval, NULL, 16);
