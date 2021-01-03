@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGWStuff
-**  Version  : v0.5.0
+**  Version  : v0.5.1
 **
 **  Copyright (c) 2020 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
