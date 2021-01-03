@@ -52,45 +52,80 @@ void processAPI()
     sendApiNotFound(URI);
     return;
   }
+  
+  if (words[2] == "v1") 
+  { //v1 API calls
+    if (words[3] == "otgw"){
+      if (words[4] == "id"){
+        //what the heck should I do?
+        // /api/v1/otgw/id/{msgid}   msgid = OpenTherm Message Id (0-127)
+        // Response: label, value, unit
+        // {
+        //   "label": "Tr",
+        //   "value": "0.00",
+        //   "unit": "°C"
+        // }
+        sendOTGWvalue(words[5].toInt());  
+      } else if (words[4] == "label"){
+        //what the heck should I do?
+        // /api/v1/otgw/label/{msglabel} = OpenTherm Label (matching string)
+        // Response: label, value, unit
+        // {
+        //   "label": "Tr",
+        //   "value": "0.00",
+        //   "unit": "°C"
+        // }   
+        sendOTGWlabel(CSTR(words[5]));
+      } else if (words[4] == "command"){
+        if (httpServer.method() == HTTP_PUT || httpServer.method() == HTTP_POST)
+        {
+          /* how to post a command to OTGW
+          ** POST or PUT = /api/v1/otgw/command/{command} = Any command you want
+          ** Response: 200 OK
+          ** @@Todo: Check if command was executed correctly.
+          */
+          //Send a command to OTGW
+          sendOTGW(CSTR(words[5]), words[5].length());
+          httpServer.send(200, "text/plain", "OK");
+        }
+      }
 
-  if (words[2] != "v0")
-  {
-    sendApiNotFound(URI);
-    return;
-  }
-
-  if (words[3] == "otgw")
-  {
-     //what the heck should I do?
-     // /api/v0/otgw/{msgid}   msgid = OpenTherm Message Id
-     // Response: label, value, unit
-     // {
-     //   "label": "Tr",
-     //   "value": "0.00",
-     //   "unit": "°C"
-     // }
-     sendOTGWvalue(words[4].toInt()); 
+    }
   } 
-  else if (words[3] == "devinfo")
-  {
-    sendDeviceInfo();
-  }
-  else if (words[3] == "devtime")
-  {
-    sendDeviceTime();
-  }
-  else if (words[3] == "settings")
-  {
-    if (httpServer.method() == HTTP_PUT || httpServer.method() == HTTP_POST)
+  else if (words[2] == "v0")
+  { //v0 API calls
+    if (words[3] == "otgw"){
+      //what the heck should I do?
+      // /api/v0/otgw/{msgid}   msgid = OpenTherm Message Id
+      // Response: label, value, unit
+      // {
+      //   "label": "Tr",
+      //   "value": "0.00",
+      //   "unit": "°C"
+      // }
+      sendOTGWvalue(words[4].toInt()); 
+    } 
+    else if (words[3] == "devinfo")
     {
-      postSettings();
+      sendDeviceInfo();
     }
-    else
+    else if (words[3] == "devtime")
     {
-      sendDeviceSettings();
+      sendDeviceTime();
     }
-  }
-  else sendApiNotFound(URI);
+    else if (words[3] == "settings")
+    {
+      if (httpServer.method() == HTTP_PUT || httpServer.method() == HTTP_POST)
+      {
+        postSettings();
+      }
+      else
+      {
+        sendDeviceSettings();
+      }
+    }
+    else sendApiNotFound(URI);
+  } else sendApiNotFound(URI);
   
 } // processAPI()
 
@@ -116,6 +151,39 @@ void sendOTGWvalue(int msgid){
   } else {
     root["error"] = "message id > 127: reserved for future use";
   }
+  String sBuff;
+  serializeJsonPretty(root, sBuff);
+  //DebugTf("Json = %s\r\n", sBuff.c_str());
+  //reply with json
+  httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  httpServer.send(200, "application/json", sBuff);
+}
+
+void sendOTGWlabel(const char *msglabel){
+  StaticJsonDocument<256> doc;
+  JsonObject root  = doc.to<JsonObject>();
+  int msgid;
+  for (msgid = 0; msgid<=127; msgid++){
+    if (stricmp(OTmap[msgid].label, msglabel)==0) break;
+  }
+  if (msgid > 127){
+    root["error"] = "message id > 127: reserved for future use";
+  } else if (OTmap[msgid].type==ot_undef) {  //message is undefined, return error
+    root["error"] = "message undefined: reserved for future use";
+  } else 
+  { //message id's need to be between 0 and 127
+    //Debug print the values first
+    DebugTf("%s = %s %s\r\n", OTmap[msgid].label, getOTGWValue(msgid).c_str(), OTmap[msgid].unit);
+    //build the json
+    root["label"] = OTmap[msgid].label;
+    if (OTmap[msgid].type == ot_f88) {
+      root["value"] = getOTGWValue(msgid).toFloat(); 
+    } else {// all other message types convert to integer
+      root["value"] = getOTGWValue(msgid).toInt();
+    }
+    root["unit"] = OTmap[msgid].unit;    
+  } 
   String sBuff;
   serializeJsonPretty(root, sBuff);
   //DebugTf("Json = %s\r\n", sBuff.c_str());
@@ -233,7 +301,7 @@ void postSettings()
   // I say: try it yourself ;-) It won't be easy
       String wOut[5];
       String wPair[5];
-      String jsonIn  = httpServer.arg(0).c_str();
+      String jsonIn  = CSTR(httpServer.arg(0));
       char field[25] = "";
       char newValue[101]="";
       jsonIn.replace("{", "");

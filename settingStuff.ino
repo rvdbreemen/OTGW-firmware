@@ -36,7 +36,6 @@ void writeSettings(bool show)
   root["MQTTpasswd"] = settingMQTTpasswd;
   root["MQTTtoptopic"] = settingMQTTtopTopic;
 
-  serializeJsonPretty(root, TelnetStream);
   serializeJsonPretty(root, file);
   Debugln(F("... done!"));
   if (show)  serializeJsonPretty(root, TelnetStream); //Debug stream ;-)
