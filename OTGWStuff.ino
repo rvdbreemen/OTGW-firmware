@@ -176,30 +176,68 @@ OpenThermMessageID getDataID(unsigned long frame)
     return (OpenThermMessageID)((frame >> 16) & 0xFF);
 }
 
-//parsing responses
+//parsing responses - helper functions
+//  0: CH enable [ CH is disabled, CH is enabled]
+//  1: DHW enable [ DHW is disabled, DHW is enabled]
+//  2: Cooling enable [ Cooling is disabled, Cooling is enabled]]
+//  3: OTC active [OTC not active, OTC is active]
+//  4: CH2 enable [CH2 is disabled, CH2 is enabled]
+//  5: reserved
+//  6: reserved
+//  7: reserved
 
-bool isFault(unsigned long response) {
-	return response & 0x1;
+bool isCentralHeatingEnabled() {
+	return OTdataObject.Status & 0x0100;
 }
 
-bool isCentralHeatingActive(unsigned long response) {
-	return response & 0x2;
+bool isDomesticHotWaterEnabled() {
+	return OTdataObject.Status & 0x0200;
 }
 
-bool isHotWaterActive(unsigned long response) {
-	return response & 0x4;
+bool isCoolingEnabled() {
+	return OTdataObject.Status & 0x0400;
 }
 
-bool isFlameOn(unsigned long response) {
-	return response & 0x8;
+bool isOutsideTemperatureCompensationActive() {
+	return OTdataObject.Status & 0x0800;
 }
 
-bool isCoolingActive(unsigned long response) {
-	return response & 0x10;
+bool isCentralHeating2enabled() {
+	return OTdataObject.Status & 0x1000;
 }
 
-bool isDiagnostic(unsigned long response) {
-	return response & 0x40;
+//Slave
+//  0: fault indication [ no fault, fault ]
+//  1: CH mode [CH not active, CH active]
+//  2: DHW mode [ DHW not active, DHW active]
+//  3: Flame status [ flame off, flame on ]
+//  4: Cooling status [ cooling mode not active, cooling mode active ]
+//  5: CH2 mode [CH2 not active, CH2 active]
+//  6: diagnostic indication [no diagnostics, diagnostic event]
+//  7: reserved
+
+bool isFaultIndicator() {
+	return OTdataObject.Status & 0x001;
+}
+
+bool isCentralHeatingActive() {
+	return OTdataObject.Status & 0x002;
+}
+
+bool isDomesticHotWaterActive() {
+	return OTdataObject.Status & 0x004;
+}
+
+bool isFlameStatus() {
+	return OTdataObject.Status & 0x008;
+}
+
+bool isCoolingActive() {
+	return OTdataObject.Status & 0x0010;
+}
+
+bool isDiagnosticIndicator() {
+	return OTdataObject.Status & 0x0040;
 }
 
 const char *byte_to_binary(int x)
