@@ -45,7 +45,7 @@
     needReload = false;
     refreshDevTime();
     refreshDevInfo();
-    refreshMessages();
+    refreshOTmonitor();
 
     document.getElementById("displayMainPage").style.display       = "block";
     document.getElementById("displaySettingsPage").style.display   = "none";
@@ -133,7 +133,7 @@
   {
     console.log("refreshMessages() ..");
     data = {};
-    fetch(APIGW+"v0/messages")
+    fetch(APIGW+"v1/otgw/otmonitor")
       .then(response => response.json())
       .then(json => {
         console.log("then(json => ..)");
@@ -141,9 +141,9 @@
         for( let i in msg )
         {
           console.log("["+msg[i].name+"]=>["+msg[i].value+"]");
-          var messages = document.getElementById('mainPage');
-          if( ( document.getElementById("msgR_"+msg[i].name)) == null )
-          {
+          var otmonitor = document.getElementById('mainPage');
+          if( ( document.getElementById("otmon_"+msg[i].name)) == null )
+          { // if element does not exists yet, then build page
             var rowDiv = document.createElement("div");
             rowDiv.setAttribute("class", "msgDiv");
             rowDiv.setAttribute("id", "msgR_"+msg[i].name);
@@ -159,40 +159,24 @@
                   fldDiv.style.width = "30px";
                   fldDiv.style.float = 'left';
                   fldDiv.textContent = msg[i].name;
+                  fldDiv.setAttribute("id", "otmon_"+msg[i].name);
                   rowDiv.appendChild(fldDiv);
             //--- input ---
-              var inputDiv = document.createElement("div");
-                  inputDiv.setAttribute("style", "text-align: left;");
-
-                    var sInput = document.createElement("INPUT");
-                    sInput.setAttribute("id", "M_"+msg[i].name);
-                    sInput.setAttribute("style", "background: white");
-
-                    if (msg[i].type == "s")
-                    {
-                      sInput.setAttribute("type", "text");
-                      sInput.setAttribute("maxlength", msg[i].maxlen);
-                      sInput.setAttribute("size", 100);
-                    
-                      sInput.setAttribute("value", msg[i].value);
-                      //console.log("addEventListener(M_"+msg[i].name+")");
-                      sInput.addEventListener('change',
-                                function() { setBackGround("M_"+msg[i].name, "lightgray"); },
-                                            false
-                                );
-                    }
-                    inputDiv.appendChild(sInput);
-                  
-            rowDiv.appendChild(inputDiv);
-            messages.appendChild(rowDiv);
+              var valDiv = document.createElement("div");
+                  valDiv.setAttribute("style", "text-align: left;");
+                  fldDiv.style.width = "30px";
+                  fldDiv.style.float = 'left';
+                  valDiv.textContent = msg[i].value; 
+                  valDiv.setAttribute("style", "background: white");
+                  rowDiv.appendChild(valDiv);
+            otmonitor.appendChild(rowDiv);
           }
           else
-          {
-            document.getElementById("M_"+msg[i].name).style.background = "white";
-            document.getElementById("M_"+msg[i].name).value = data[i].value;
+          { //if the element exists, then update the value
+            document.getElementById("otmon_"+msg[i].name).value = data[i].value;  
           }
         }
-        document.getElementById("waiting").innerHTML = "";
+        // document.getElementById("waiting").innerHTML = "";
       })
       .catch(function(error) {
         var p = document.createElement('p');
