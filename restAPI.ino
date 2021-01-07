@@ -218,7 +218,7 @@ void sendOTmonitor()
   sendNestedJsonObj("remoteroomsetpoint", OTdataObject.TrOverride);
   sendNestedJsonObj("relmodlvl", OTdataObject.RelModLevel);
   sendNestedJsonObj("maxrelmodlvl", OTdataObject.MaxRelModLevelSetting);
-  sendNestedJsonObj("CHwaterpressure", OTdataObject.CHPressure);
+  sendNestedJsonObj("chwaterpressure", OTdataObject.CHPressure);
 
   sendNestedJsonObj("boilertemperature", OTdataObject.Tboiler);
   sendNestedJsonObj("returnwatertemperature", OTdataObject.Tret);
