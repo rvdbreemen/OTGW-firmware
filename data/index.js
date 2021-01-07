@@ -504,6 +504,28 @@
    ,[ "influxdbhostname",          "InfluxDB hostname"]
    ,[ "influxdbport",              "InfluxDB port (default: 8086)"]
    ,[ "influxdbdatabasename",      "InfluxDB database name"]
+   ,[ "flamestatus",               "Flame status"]
+   ,[ "chmodus",                   "Central Heating Status"]
+   ,[ "chenable",                  "Central Heating Enabled"]
+   ,[ "dhwmode",                   "Domestic Hot Water Status"]
+   ,[ "dhwenable",                 "Domestic Hot Water Enabled"]
+   ,[ "diagnosticindicator",       "Diagnostic Indicator"]
+   ,[ "faultindicator",            "Fault Indicator"]
+   ,[ "outsidetemperature",        "Outside Temperature"]
+   ,[ "roomtemperatature",         "Room Temperature"]
+   ,[ "roomsetpoint",              "Room Temperature Setpoint"]
+   ,[ "relmodlvl",                 "Relative Modulation Level"]
+   ,[ "maxrelmodlvl",              "Max. Rel. Modulation Level"]
+   ,[ "chwaterpressure",           "Central Heating Water Pressure"]
+   ,[ "boilertemperature",         "Boiler Temperature"]   
+   ,[ "returnwatertemperature",    "Return Water Temperature"]
+   ,[ "controlsetpoint",           "Control Setpoint"]
+   ,[ "maxchwatersetpoint",        "Max. CH Water Setpoint"]
+   ,[ "dhwtemperature",            "Domestic Hotwater Temperature"]
+   ,[ "dhwsetpoint",               "Domestic Hotwater Setpoint"]
+   ,[ "oemfaultcode",              "OEM Fault Code"]
+
+  
    
                  ];
   
