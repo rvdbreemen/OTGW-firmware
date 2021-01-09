@@ -24,7 +24,7 @@ R"(
     <div id="displayMainPage"      style="display:none">
       <div class="nav-container">
         <div class='nav-left'>
-          <a id='saveMsg' class='nav-item tabButton' style="background: lightblue;">opslaan</a>
+          <a id='saveMsg' class='nav-item tabButton' style="background: lightblue;">save</a>
           <a id='M_FSexplorer'    class='nav-img'>
                       <img src='/FSexplorer.png' alt='FSexplorer'></a>
           <a id='Settings'      class='nav-img'>
@@ -41,7 +41,7 @@ R"(
       <div class="nav-container">
         <div class='nav-left'>
           <a id='back' class='nav-item tabButton' style="background: lightblue;">Terug</a>
-          <a id='saveSettings' class='nav-item tabButton' style="background: lightblue;">opslaan</a>
+          <a id='saveSettings' class='nav-item tabButton' style="background: lightblue;">save</a>
           <a id='S_FSexplorer' class='nav-img'>
                       <img src='/FSexplorer.png' alt='FSexplorer'></a>
         </div>
