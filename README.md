@@ -19,15 +19,16 @@ The features of this OTGW firmware are:
 - sending commands thru MQTT (topic: OTGW/command) 
 - sending commands thru REST API (/api/v1/otgw/command/{any command})
 - settings for Hostname and MQTT in the webUI (just compile and edit in webUI)
+- OTmonitor Web UI (standalone interface)
 
 To do:
 - InfluxDB client to do direct logging 
-- OTmonitor Web UI (standalone interface)
 
 Looking for the documentation, go here (work in progress):  <br> https://github.com/rvdbreemen/OTGW-firmware/wiki/Documentation-of-OTGW-firmware
   
 | Version | Release notes |
 |-|-|
+| 0.6.0 | Standalone UI for simple OT monitor purposes and deviceinformation, moved index.html to SPIFF
 | 0.5.1 | REST APIs, v1, for OTmonitor values, GetByLabel, GetByID, POST otgw/command/{command}
 | 0.5.0 | Implemented the UI for settings (restapi, read/write file in json) |
 | 0.4.2 | Bi-directional serial communication on port 1023 (aka ser2net) for use with OTmonitor application|   
@@ -38,4 +39,3 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
 | 0.2.0 | Auto-discovery throug MQTT implemented for integration with home assistant (and domoticz)     |
 | 0.1.0 | MQTT messaging implemented |
 | 0.0.1 | parsing of OT protocol implemented (use telnet to see)   Watchdog implemented |
-
