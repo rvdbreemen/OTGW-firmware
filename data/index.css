@@ -241,9 +241,13 @@ input {
 }
 
 /* OTmonitor */
+.otmonrow: {
+  background: lightblue;
+}
 .otmoncolumn1 {
   float: left;
   width: 270px;
+ 
 }
 .otmoncolumn2 {
   float: left;
@@ -261,6 +265,7 @@ input {
   content: "";
   display: table;
   clear: both;
+  background: lightblue;
 }
 
 /* define tag selectors () -------------------------------------------------- */

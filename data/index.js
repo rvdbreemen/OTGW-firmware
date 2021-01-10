@@ -56,7 +56,7 @@
     needReload = false;
     refreshDevInfo();
     refreshOTmonitor();
-    tid = setInterval(function(){refreshOTmonitor(); }, 2000); //delay is in milliseconds 
+    tid = setInterval(function(){refreshOTmonitor(); }, 1000); //delay is in milliseconds 
 
     document.getElementById("displayMainPage").style.display       = "block";
     document.getElementById("displaySettingsPage").style.display   = "none";
@@ -168,17 +168,17 @@
           { // if element does not exists yet, then build page
             var rowDiv = document.createElement("div");
             rowDiv.setAttribute("class", "otmonrow");
-            rowDiv.setAttribute("id", "otmon_"+data[i].name);
+            //rowDiv.setAttribute("id", "otmon_"+data[i].name);
             rowDiv.style.background = "lightblue";
             //--- field Name ---
             var fldDiv = document.createElement("div");
             fldDiv.setAttribute("class", "otmoncolumn1")
             fldDiv.textContent = translateToHuman(data[i].name);
-            fldDiv.setAttribute("id", "otmon_"+data[i].name);
             rowDiv.appendChild(fldDiv);
             //--- Value ---
             var valDiv = document.createElement("div");
             valDiv.setAttribute("class", "otmoncolumn2")
+            valDiv.setAttribute("id", "otmon_"+data[i].name);
             valDiv.textContent = data[i].value; 
             rowDiv.appendChild(valDiv);      
             //--- Unit  ---
@@ -190,7 +190,7 @@
           }
           else
           { //if the element exists, then update the value
-            document.getElementById("otmon_"+data[i].name).value = data[i].value;  
+            document.getElementById("otmon_"+data[i].name).textContent = data[i].value;  
           }
         }
         
