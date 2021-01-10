@@ -13,6 +13,7 @@
 "use strict";
 
   let needReload  = true;
+  refreshDevTime();
   
   window.onload=bootsTrapMain;
   window.onfocus = function() {
@@ -23,6 +24,7 @@
 
   
   var tid = 0;
+  var timeupdate = setInterval(function(){refreshDevTime(); }, 1000); //delay is in milliseconds
     
   //============================================================================  
   function bootsTrapMain() {
@@ -53,7 +55,7 @@
     document.getElementById('tabSettings').addEventListener('click',function(){settingsPage();});
     needReload = false;
     refreshDevInfo();
-    tid = setInterval(function(){refreshOTmonitor();refreshDevTime(); }, 1000); //delay is in milliseconds 
+    tid = setInterval(function(){refreshOTmonitor(); }, 2000); //delay is in milliseconds 
 
     document.getElementById("displayMainPage").style.display       = "block";
     document.getElementById("displaySettingsPage").style.display   = "none";
@@ -64,6 +66,7 @@
   function deviceinfoPage()
   {
     clearInterval(tid);
+    refreshDevTime();
     document.getElementById("displayMainPage").style.display       = "none";
     document.getElementById("displaySettingsPage").style.display   = "none";
     var deviceinfoPage = document.getElementById("deviceinfoPage");
@@ -75,6 +78,7 @@
   function settingsPage()
   {
     clearInterval(tid);
+    refreshDevTime();
     document.getElementById("displayMainPage").style.display       = "none";
     document.getElementById("displayDeviceInfo").style.display     = "none";
     var settingsPage = document.getElementById("settingsPage");
@@ -90,7 +94,7 @@
     fetch(APIGW+"v0/devtime")
       .then(response => response.json())
       .then(json => {
-        console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
+        //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
         for( let i in json.devtime ){
             if (json.devtime[i].name == "dateTime")
             {
@@ -582,7 +586,30 @@
    ,[ "dhwsetpoint",               "Domestic Hotwater Setpoint"]
    ,[ "oemfaultcode",              "OEM Fault Code"]
 
-  
+   ,[ "author",                     "Developer"]
+   ,[ "fwversion",                  "Firmware Version"]
+   ,[ "compiled",                   "Compiled on (date/time)"]
+   ,[ "HostName",                   "Hostname (add .local)"]
+   ,[ "ipaddress",                  "IP address"]
+   ,[ "macaddress",                 "MAC address"]
+   ,[ "freeheap",                   "Free Heap Memory (bytes)"]
+   ,[ "maxfreeblock",               "Maximum Free Block Memory (bytes)"]
+   ,[ "chipid",                     "Unique Chip ID"]
+   ,[ "coreversion",                "Arduino Core Version"]
+   ,[ "sdkversion",                 "Espressif SDK Version"]
+   ,[ "cpufreq",                    "CPU speed (MHz)"]
+   ,[ "sketchsize",                 "Sketch Size (bytes)"]
+   ,[ "freesketchspace",            "Free Sketch Space (bytes)"]
+   ,[ "flashchipid",                "Flash ID"]   
+   ,[ "flashchipsize",              "Flash Chip Size (MB)"]
+   ,[ "flashchiprealsize",          "Real Flash Chip Size (MB)"]
+   ,[ "spiffssize",                 "SPIFF size (MB)"]
+   ,[ "flashchipspeed",             "Flash Chip Speed (MHz)"]
+   ,[ "flashchipmode",              "Flash Mode"]
+   ,[ "boardtype",                  "Board Type"]
+   ,[ "ssid",                       "Wifi Network (SSID)"]
+   ,[ "wifirssi",                   "Wifi Receive Power (dB)"]
+   ,[ "lastreset",                  "Last Reset Reason"]
    
                  ];
   
