@@ -24,30 +24,36 @@ R"(
     <div id="displayMainPage"      style="display:none">
       <div class="nav-container">
         <div class='nav-left'>
-          <a id='saveMsg' class='nav-item tabButton' style="background: lightblue;">save</a>
-          <a id='M_FSexplorer'    class='nav-img'>
-                      <img src='/FSexplorer.png' alt='FSexplorer'></a>
-          <a id='Settings'      class='nav-img'>
-                      <img src='/settings.png' alt='Settings'></a>
+          <a id='tabDeviceInfo' class='nav-item tabButton' style="background: lightblue;">Device Info</a>
+          <a id='M_FSexplorer'  class='nav-img'> <img src='/FSexplorer.png' alt='FSexplorer'></a>
+          <a id='tabSettings'   class='nav-img'> <img src='/settings.png' alt='Settings'></a>
         </div>
       </div>
       <br/>
       <div id="mainPage">
-        <div id="waiting">Not implemented yet. <br><br>Wait! Retrieving local messages...</div>
+        <div id="waiting">Wait for it...</div>
       </div>
     </div>
-
-    <div id="displaySettingsPage"  style="display:none">
+    <div id="displayDeviceInfo"  style="display:none">
       <div class="nav-container">
         <div class='nav-left'>
-          <a id='back' class='nav-item tabButton' style="background: lightblue;">Terug</a>
-          <a id='saveSettings' class='nav-item tabButton' style="background: lightblue;">save</a>
-          <a id='S_FSexplorer' class='nav-img'>
-                      <img src='/FSexplorer.png' alt='FSexplorer'></a>
+          <a id='D_back' class='nav-item tabButton' style="background: lightblue;">Back</a>
+          <a id='D_FSexplorer' class='nav-img'> <img src='/FSexplorer.png' alt='FSexplorer'></a>
         </div>
       </div>
       <br/>
-      <div id="settingsPage"></div>
+      <div id="deviceinfoPage"></div>
+    </div>
+    <div id="displaySettingsPage"  style="display:none">
+      <div class="nav-container">
+        <div class='nav-left'>
+          <a id='S_back' class='nav-item tabButton' style="background: lightblue;">Back</a>
+          <a id='S_saveSettings' class='nav-item tabButton' style="background: lightblue;">Save</a>
+          <a id='S_FSexplorer' class='nav-img'> <img src='/FSexplorer.png' alt='FSexplorer'></a>
+        </div>
+      </div>
+      <br/>
+      <div id="settingsPage">Loading...</div>
     </div>
   
     <!-- KEEP THIS --->

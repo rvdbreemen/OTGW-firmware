@@ -47,90 +47,93 @@ void processAPI()
     Debugln(" ");
   }
 
-  if (words[1] != "api")
-  {
-    sendApiNotFound(URI);
-    return;
-  }
-  
-  if (words[2] == "v1") 
-  { //v1 API calls
-    if (words[3] == "otgw"){
-      if (words[4] == "otmonitor") {
-        // GET /api/v1/otgw/otmonitor
-        // Response: see json response
-        sendOTmonitor();
-      } else if (words[4] == "id"){
+  if (words[1] == "api"){
+
+    if (words[2] == "v1") 
+    { //v1 API calls
+      if (words[3] == "otgw"){
+        if (words[4] == "otmonitor") {
+          // GET /api/v1/otgw/otmonitor
+          // Response: see json response
+          sendOTmonitor();
+        } else if (words[4] == "id"){
+          //what the heck should I do?
+          // /api/v1/otgw/id/{msgid}   msgid = OpenTherm Message Id (0-127)
+          // Response: label, value, unit
+          // {
+          //   "label": "Tr",
+          //   "value": "0.00",
+          //   "unit": "°C"
+          // }
+          sendOTGWvalue(words[5].toInt());  
+        } else if (words[4] == "label"){
+          //what the heck should I do?
+          // /api/v1/otgw/label/{msglabel} = OpenTherm Label (matching string)
+          // Response: label, value, unit
+          // {
+          //   "label": "Tr",
+          //   "value": "0.00",
+          //   "unit": "°C"
+          // }   
+          sendOTGWlabel(CSTR(words[5]));
+        } else if (words[4] == "command"){
+          if (httpServer.method() == HTTP_PUT || httpServer.method() == HTTP_POST)
+          {
+            /* how to post a command to OTGW
+            ** POST or PUT = /api/v1/otgw/command/{command} = Any command you want
+            ** Response: 200 OK
+            ** @@Todo: Check if command was executed correctly.
+            */
+            //Send a command to OTGW
+            sendOTGW(CSTR(words[5]), words[5].length());
+            httpServer.send(200, "text/plain", "OK");
+          }
+        }
+        else sendApiNotFound(URI);
+      }
+      else sendApiNotFound(URI);
+    } 
+    else if (words[2] == "v0")
+    { //v0 API calls
+      if (words[3] == "otgw"){
         //what the heck should I do?
-        // /api/v1/otgw/id/{msgid}   msgid = OpenTherm Message Id (0-127)
+        // /api/v0/otgw/{msgid}   msgid = OpenTherm Message Id
         // Response: label, value, unit
         // {
         //   "label": "Tr",
         //   "value": "0.00",
         //   "unit": "°C"
         // }
-        sendOTGWvalue(words[5].toInt());  
-      } else if (words[4] == "label"){
-        //what the heck should I do?
-        // /api/v1/otgw/label/{msglabel} = OpenTherm Label (matching string)
-        // Response: label, value, unit
-        // {
-        //   "label": "Tr",
-        //   "value": "0.00",
-        //   "unit": "°C"
-        // }   
-        sendOTGWlabel(CSTR(words[5]));
-      } else if (words[4] == "command"){
+        sendOTGWvalue(words[4].toInt()); 
+      } 
+      else if (words[3] == "devinfo")
+      {
+        sendDeviceInfo();
+      }
+      else if (words[3] == "devtime")
+      {
+        sendDeviceTime();
+      }
+      else if (words[3] == "settings")
+      {
         if (httpServer.method() == HTTP_PUT || httpServer.method() == HTTP_POST)
         {
-          /* how to post a command to OTGW
-          ** POST or PUT = /api/v1/otgw/command/{command} = Any command you want
-          ** Response: 200 OK
-          ** @@Todo: Check if command was executed correctly.
-          */
-          //Send a command to OTGW
-          sendOTGW(CSTR(words[5]), words[5].length());
-          httpServer.send(200, "text/plain", "OK");
+          postSettings();
+        }
+        else
+        {
+          sendDeviceSettings();
         }
       }
-
-    }
-  } 
-  else if (words[2] == "v0")
-  { //v0 API calls
-    if (words[3] == "otgw"){
-      //what the heck should I do?
-      // /api/v0/otgw/{msgid}   msgid = OpenTherm Message Id
-      // Response: label, value, unit
-      // {
-      //   "label": "Tr",
-      //   "value": "0.00",
-      //   "unit": "°C"
-      // }
-      sendOTGWvalue(words[4].toInt()); 
-    } 
-    else if (words[3] == "devinfo")
-    {
-      sendDeviceInfo();
-    }
-    else if (words[3] == "devtime")
-    {
-      sendDeviceTime();
-    }
-    else if (words[3] == "settings")
-    {
-      if (httpServer.method() == HTTP_PUT || httpServer.method() == HTTP_POST)
-      {
-        postSettings();
-      }
-      else
-      {
-        sendDeviceSettings();
-      }
-    }
-    else sendApiNotFound(URI);
-  } else sendApiNotFound(URI);
+      else sendApiNotFound(URI);
+    } else sendApiNotFound(URI);
+  }
+  else 
+  {
+    sendApiNotFound(URI);
+  }
   
+    
 } // processAPI()
 
 

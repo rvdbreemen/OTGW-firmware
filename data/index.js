@@ -1,9 +1,9 @@
 /*
 ***************************************************************************  
-**  Program  : index.js, part of ESP_ticker
+**  Program  : index.js, part of OTGW-firmware project
 **  Version  : v0.5.1
 **
-**  Copyright (c) 2020 Willem Aandewiel
+**  Copyright (c) 2021 Robert van den Breemen
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
@@ -20,13 +20,19 @@
       window.location.reload(true);
     }
   };
+
+  
+  var tid = 0;
     
   //============================================================================  
   function bootsTrapMain() {
     console.log("bootsTrapMain()");
-    document.getElementById('saveMsg').addEventListener('click',function() 
-                                                {saveMessages();});
+  
     document.getElementById('M_FSexplorer').addEventListener('click',function() 
+                                                { console.log("newTab: goFSexplorer");
+                                                  location.href = "/FSexplorer";
+                                                });
+    document.getElementById('D_FSexplorer').addEventListener('click',function() 
                                                 { console.log("newTab: goFSexplorer");
                                                   location.href = "/FSexplorer";
                                                 });
@@ -34,34 +40,48 @@
                                                 { console.log("newTab: goFSexplorer");
                                                   location.href = "/FSexplorer";
                                                 });
-    document.getElementById('back').addEventListener('click',function() 
+    document.getElementById('D_back').addEventListener('click',function()
                                                 { console.log("newTab: goBack");
-                                                  location.href = "/";
+                                                location.href = "/";
                                                 });
-    document.getElementById('Settings').addEventListener('click',function() 
-                                                {settingsPage();});
-    document.getElementById('saveSettings').addEventListener('click',function() 
-                                                {saveSettings();});
+    document.getElementById('S_back').addEventListener('click',function()
+                                                { console.log("newTab: goBack");
+                                                location.href = "/";
+                                                });
+    document.getElementById('S_saveSettings').addEventListener('click',function(){saveSettings();});
+    document.getElementById('tabDeviceInfo').addEventListener('click',function(){deviceinfoPage();});
+    document.getElementById('tabSettings').addEventListener('click',function(){settingsPage();});
     needReload = false;
-    refreshDevTime();
     refreshDevInfo();
-    refreshOTmonitor();
+    tid = setInterval(function(){refreshOTmonitor();refreshDevTime(); }, 1000); //delay is in milliseconds 
 
     document.getElementById("displayMainPage").style.display       = "block";
     document.getElementById("displaySettingsPage").style.display   = "none";
+    document.getElementById("displayDeviceInfo").style.display     = "none";
   
   } // bootsTrapMain()
 
+  function deviceinfoPage()
+  {
+    clearInterval(tid);
+    document.getElementById("displayMainPage").style.display       = "none";
+    document.getElementById("displaySettingsPage").style.display   = "none";
+    var deviceinfoPage = document.getElementById("deviceinfoPage");
+    refreshDeviceInfo();
+    document.getElementById("displayDeviceInfo").style.display     = "block";
+    
+  } // settingsPage()
+
   function settingsPage()
   {
+    clearInterval(tid);
     document.getElementById("displayMainPage").style.display       = "none";
-
+    document.getElementById("displayDeviceInfo").style.display     = "none";
     var settingsPage = document.getElementById("settingsPage");
     refreshSettings();
     document.getElementById("displaySettingsPage").style.display   = "block";
     
   } // settingsPage()
-
   
   //============================================================================  
   function refreshDevTime()
@@ -96,7 +116,7 @@
     fetch(APIGW+"v0/devinfo")
       .then(response => response.json())
       .then(json => {
-        //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
+        console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
         data = json.devinfo;
         for( let i in data )
         {
@@ -127,26 +147,23 @@
   {
     console.log("refreshOTmonitor() ..");
  
-  }
-
-  function refreshMessages()
-  {
-    console.log("refreshMessages() ..");
     data = {};
-    fetch(APIGW+"v1/otgw/otmonitor")
+    fetch(APIGW+"v1/otgw/otmonitor")  //api/v1/otgw/otmonitor
       .then(response => response.json())
       .then(json => {
         console.log("then(json => ..)");
-        msg = json.messages;
-        for( let i in msg )
+        //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
+        data = json.otmonitor;
+        for( let i in data )
         {
-          console.log("["+msg[i].name+"]=>["+msg[i].value+"]");
-          var otmonitor = document.getElementById('mainPage');
-          if( ( document.getElementById("otmon_"+msg[i].name)) == null )
+          document.getElementById("waiting").innerHTML = "";
+          //console.log("["+data[i].name+"]=>["+data[i].value+"]");
+          var mainPage = document.getElementById('mainPage');
+          if( ( document.getElementById("otmon_"+data[i].name)) == null )
           { // if element does not exists yet, then build page
             var rowDiv = document.createElement("div");
-            rowDiv.setAttribute("class", "msgDiv");
-            rowDiv.setAttribute("id", "msgR_"+msg[i].name);
+            rowDiv.setAttribute("class", "settingDiv");
+            rowDiv.setAttribute("id", "otmon_"+data[i].name);
             rowDiv.setAttribute("style", "text-align: right;");
             rowDiv.style.marginLeft = "10px";
             rowDiv.style.marginRight = "10px";
@@ -158,25 +175,25 @@
                   fldDiv.setAttribute("style", "margin-right: 10px;");
                   fldDiv.style.width = "30px";
                   fldDiv.style.float = 'left';
-                  fldDiv.textContent = msg[i].name;
-                  fldDiv.setAttribute("id", "otmon_"+msg[i].name);
+                  fldDiv.textContent = translateToHuman(data[i].name);
+                  fldDiv.setAttribute("id", "otmon_"+data[i].name);
                   rowDiv.appendChild(fldDiv);
             //--- input ---
               var valDiv = document.createElement("div");
                   valDiv.setAttribute("style", "text-align: left;");
                   fldDiv.style.width = "30px";
                   fldDiv.style.float = 'left';
-                  valDiv.textContent = msg[i].value; 
-                  valDiv.setAttribute("style", "background: white");
+                  valDiv.textContent = data[i].value; 
+                  valDiv.setAttribute("style", "background: lightblue");
                   rowDiv.appendChild(valDiv);
-            otmonitor.appendChild(rowDiv);
+            mainPage.appendChild(rowDiv);
           }
           else
           { //if the element exists, then update the value
-            document.getElementById("otmon_"+msg[i].name).value = data[i].value;  
+            document.getElementById("otmon_"+data[i].name).value = data[i].value;  
           }
         }
-        // document.getElementById("waiting").innerHTML = "";
+        
       })
       .catch(function(error) {
         var p = document.createElement('p');
@@ -185,9 +202,66 @@
         );
       });     
 
-  } // refreshMessages()
+  } // refreshOTmonitor()
   
-    
+  function refreshDeviceInfo()
+  {
+    console.log("refreshDeviceInfo() ..");
+ 
+    data = {};
+    fetch(APIGW+"v0/devinfo")
+      .then(response => response.json())
+      .then(json => {
+        console.log("then(json => ..)");
+        console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
+        data = json.devinfo;
+        for( let i in data )
+        {
+          console.log("["+data[i].name+"]=>["+data[i].value+"]");
+          var deviceinfoPage = document.getElementById('deviceinfoPage');
+          if( ( document.getElementById("devinfo_"+data[i].name)) == null )
+          { // if element does not exists yet, then build page
+            var rowDiv = document.createElement("div");
+            rowDiv.setAttribute("class", "settingDiv");
+            rowDiv.setAttribute("id", "devinfo_"+data[i].name);
+            rowDiv.setAttribute("style", "text-align: right;");
+            rowDiv.style.marginLeft = "10px";
+            rowDiv.style.marginRight = "10px";
+            rowDiv.style.width = "850px";
+            rowDiv.style.border = "thick solid lightblue";
+            rowDiv.style.background = "lightblue";
+            //--- field Name ---
+              var fldDiv = document.createElement("div");
+                  fldDiv.setAttribute("style", "margin-right: 10px;");
+                  fldDiv.style.width = "30px";
+                  fldDiv.style.float = 'left';
+                  fldDiv.textContent = translateToHuman(data[i].name);
+                  rowDiv.appendChild(fldDiv);
+            //--- input ---
+              var valDiv = document.createElement("div");
+                  valDiv.setAttribute("style", "text-align: left;");
+                  fldDiv.style.width = "30px";
+                  fldDiv.style.float = 'left';
+                  valDiv.textContent = data[i].value; 
+                  valDiv.setAttribute("style", "background: lightblue");
+                  rowDiv.appendChild(valDiv);
+            deviceinfoPage.appendChild(rowDiv);
+          }
+          else
+          { //if the element exists, then update the value
+            document.getElementById("devinfo_"+data[i].name).value = data[i].value;  
+          }
+        }
+      })
+      .catch(function(error) {
+        var p = document.createElement('p');
+        p.appendChild(
+          document.createTextNode('Error: ' + error.message)
+        );
+      });     
+
+  } // refreshDeviceInfo()
+
   //============================================================================  
   function refreshSettings()
   {
@@ -197,6 +271,7 @@
       .then(response => response.json())
       .then(json => {
         console.log("then(json => ..)");
+        console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
         data = json.settings;
         for( let i in data )
         {
@@ -332,12 +407,10 @@
       //do something to each div like
       var msgId = mRow[i].getAttribute("id");
       var field = msgId;
-      //console.log("msgId["+msgId+", msgNr["+field+"]");
+      console.log("msgId["+msgId+", msgNr["+field+"]");
       value = document.getElementById(msgId).value;
-      //console.log("==> name["+field+"], value["+value+"]");
-
+      console.log("==> name["+field+"], value["+value+"]");
       changes = false;
-
       if   (getBackGround(field) == "lightgray")
       {
         setBackGround(field, "white");
@@ -349,7 +422,6 @@
         sendPostSetting(field, value);
       }
     } 
-    
   } // saveSettings()
 
   
@@ -498,6 +570,7 @@
    ,[ "outsidetemperature",        "Outside Temperature"]
    ,[ "roomtemperatature",         "Room Temperature"]
    ,[ "roomsetpoint",              "Room Temperature Setpoint"]
+   ,[ "remoteroomsetpoint",        "Remote Room Temperature Setpoint"]
    ,[ "relmodlvl",                 "Relative Modulation Level"]
    ,[ "maxrelmodlvl",              "Max. Rel. Modulation Level"]
    ,[ "chwaterpressure",           "Central Heating Water Pressure"]
