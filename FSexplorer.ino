@@ -85,11 +85,11 @@ void setupFSexplorer()    // Funktionsaufruf "spiffs();" muss im Setup eingebund
       if (Verbose) DebugTf("next: processAPI(%s)\r\n", String(httpServer.uri()).c_str());
       processAPI();
     }
-    else if (httpServer.uri() == "/")
-    {
-      DebugTln("index requested..");
-      sendIndexPage();
-    }
+    // else if (httpServer.uri() == "/")
+    // {
+    //   DebugTln("index requested..");
+    //   sendIndexPage();
+    // }
     else
     {
       DebugTf("next: handleFile(%s)\r\n"

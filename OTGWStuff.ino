@@ -3,7 +3,7 @@
 **  Program  : OTGWStuff
 **  Version  : v0.6.0
 **
-**  Copyright (c) 2020 Robert van den Breemen
+**  Copyright (c) 2021 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
 **      https://github.com/jpraus/arduino-opentherm
 **
