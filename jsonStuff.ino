@@ -110,6 +110,59 @@ void sendNestedJsonObj(const char *cName, float fValue)
 } // sendNestedJsonObj(*char, float)
 
 
+//============= build OTmonitor string ========================
+void sendJsonOTmonObj(const char *cName, const char *cValue, const char *cUnit)
+{
+  char jsonBuff[JSON_BUFF_MAX] = "";
+  
+  snprintf(jsonBuff, sizeof(jsonBuff), "%s{\"name\": \"%s\", \"value\": \"%s\", \"unit\": \"%s\"}"
+                                      , objSprtr, cName, cValue, cUnit);
+
+  httpServer.sendContent(jsonBuff);
+  sprintf(objSprtr, ",\r\n");
+
+} // sendJsonOTmonObj(*char, *char, *char)
+
+//=======================================================================
+void sendJsonOTmonObj(const char *cName, int32_t iValue, const char *cUnit)
+{
+  char jsonBuff[200] = "";
+  
+  snprintf(jsonBuff, sizeof(jsonBuff), "%s{\"name\": \"%s\", \"value\": %d, \"unit\": \"%s\"}"
+                                      , objSprtr, cName, iValue, cUnit);
+
+  httpServer.sendContent(jsonBuff);
+  sprintf(objSprtr, ",\r\n");
+
+} // sendJsonOTmonObj(*char, int, *char)
+
+//=======================================================================
+void sendJsonOTmonObj(const char *cName, uint32_t uValue, const char *cUnit)
+{
+  char jsonBuff[200] = "";
+  
+  snprintf(jsonBuff, sizeof(jsonBuff), "%s{\"name\": \"%s\", \"value\": %u, \"unit\": \"%s\"}"
+                                      , objSprtr, cName, uValue, cUnit);
+
+  httpServer.sendContent(jsonBuff);
+  sprintf(objSprtr, ",\r\n");
+
+} // sendNestedJsonObj(*char, uint, *char)
+
+
+//=======================================================================
+void sendJsonOTmonObj(const char *cName, float fValue, const char *cUnit)
+{
+  char jsonBuff[200] = "";
+  
+  snprintf(jsonBuff, sizeof(jsonBuff), "%s{\"name\": \"%s\", \"value\": %.3f, \"unit\": \"%s\"}"
+                                      , objSprtr, cName, fValue, cUnit);
+
+  httpServer.sendContent(jsonBuff);
+  sprintf(objSprtr, ",\r\n");
+
+} // sendJsonOTmonObj(*char, float, *char)
+
 //=======================================================================
 // ************ function to build Json Settings string ******************
 //=======================================================================

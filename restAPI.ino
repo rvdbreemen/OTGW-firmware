@@ -124,16 +124,9 @@ void processAPI()
         {
           sendDeviceSettings();
         }
-      }
-      else sendApiNotFound(URI);
+      } else sendApiNotFound(URI);
     } else sendApiNotFound(URI);
-  }
-  else 
-  {
-    sendApiNotFound(URI);
-  }
-  
-    
+  } else sendApiNotFound(URI);
 } // processAPI()
 
 
@@ -207,29 +200,29 @@ void sendOTmonitor()
 
   sendStartJsonObj("otmonitor");
   
-  sendNestedJsonObj("flamestatus", CONOFF(isFlameStatus()));
-  sendNestedJsonObj("chmodus", CONOFF(isCentralHeatingActive()));
-  sendNestedJsonObj("chenable", CONOFF(isCentralHeatingEnabled()));
-  sendNestedJsonObj("dhwmode", CONOFF(isDomesticHotWaterActive()));
-  sendNestedJsonObj("dhwenable", CONOFF(isDomesticHotWaterEnabled()));
-  sendNestedJsonObj("diagnosticindicator", CONOFF(isDiagnosticIndicator()));
-  sendNestedJsonObj("faultindicator", CONOFF(isFaultIndicator()));
+  sendJsonOTmonObj("flamestatus", CONOFF(isFlameStatus()),"");
+  sendJsonOTmonObj("chmodus", CONOFF(isCentralHeatingActive()),"");
+  sendJsonOTmonObj("chenable", CONOFF(isCentralHeatingEnabled()),"");
+  sendJsonOTmonObj("dhwmode", CONOFF(isDomesticHotWaterActive()),"");
+  sendJsonOTmonObj("dhwenable", CONOFF(isDomesticHotWaterEnabled()),"");
+  sendJsonOTmonObj("diagnosticindicator", CONOFF(isDiagnosticIndicator()),"");
+  sendJsonOTmonObj("faultindicator", CONOFF(isFaultIndicator()),"");
 
-  sendNestedJsonObj("outsidetemperature", OTdataObject.Toutside);
-  sendNestedJsonObj("roomtemperatature", OTdataObject.Tr);
-  sendNestedJsonObj("roomsetpoint", OTdataObject.TrSet);
-  sendNestedJsonObj("remoteroomsetpoint", OTdataObject.TrOverride);
-  sendNestedJsonObj("relmodlvl", OTdataObject.RelModLevel);
-  sendNestedJsonObj("maxrelmodlvl", OTdataObject.MaxRelModLevelSetting);
-  sendNestedJsonObj("chwaterpressure", OTdataObject.CHPressure);
+  sendJsonOTmonObj("outsidetemperature", OTdataObject.Toutside, "°C");
+  sendJsonOTmonObj("roomtemperatature", OTdataObject.Tr, "°C");
+  sendJsonOTmonObj("roomsetpoint", OTdataObject.TrSet, "°C");
+  sendJsonOTmonObj("remoteroomsetpoint", OTdataObject.TrOverride, "°C");
+  sendJsonOTmonObj("relmodlvl", OTdataObject.RelModLevel,"%");
+  sendJsonOTmonObj("maxrelmodlvl", OTdataObject.MaxRelModLevelSetting, "%");
+  sendJsonOTmonObj("chwaterpressure", OTdataObject.CHPressure, "bar");
 
-  sendNestedJsonObj("boilertemperature", OTdataObject.Tboiler);
-  sendNestedJsonObj("returnwatertemperature", OTdataObject.Tret);
-  sendNestedJsonObj("controlsetpoint", OTdataObject.Tset);
-  sendNestedJsonObj("maxchwatersetpoint", OTdataObject.MaxTSet);
-  sendNestedJsonObj("dhwtemperature", OTdataObject.Tdhw);
-  sendNestedJsonObj("dhwsetpoint", OTdataObject.TdhwSet);
-  sendNestedJsonObj("oemfaultcode", OTdataObject.OEMDiagnosticCode);
+  sendJsonOTmonObj("boilertemperature", OTdataObject.Tboiler, "°C");
+  sendJsonOTmonObj("returnwatertemperature", OTdataObject.Tret,"°C");
+  sendJsonOTmonObj("controlsetpoint", OTdataObject.Tset,"°C");
+  sendJsonOTmonObj("maxchwatersetpoint", OTdataObject.MaxTSet,"°C");
+  sendJsonOTmonObj("dhwtemperature", OTdataObject.Tdhw,"°C");
+  sendJsonOTmonObj("dhwsetpoint", OTdataObject.TdhwSet,"°C");
+  sendJsonOTmonObj("oemfaultcode", OTdataObject.OEMDiagnosticCode, "");
 
   
   //sendJsonSettingObj("string",   settingString,   "s", sizeof(settingString)-1);
