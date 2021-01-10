@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v0.5.1
+**  Version  : v0.6.0
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **
