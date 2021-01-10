@@ -14,7 +14,7 @@
 
   let needReload  = true;
   refreshDevTime();
-  
+
   window.onload=bootsTrapMain;
   window.onfocus = function() {
     if (needReload) {
@@ -55,6 +55,7 @@
     document.getElementById('tabSettings').addEventListener('click',function(){settingsPage();});
     needReload = false;
     refreshDevInfo();
+    refreshOTmonitor();
     tid = setInterval(function(){refreshOTmonitor(); }, 2000); //delay is in milliseconds 
 
     document.getElementById("displayMainPage").style.display       = "block";
@@ -166,30 +167,25 @@
           if( ( document.getElementById("otmon_"+data[i].name)) == null )
           { // if element does not exists yet, then build page
             var rowDiv = document.createElement("div");
-            rowDiv.setAttribute("class", "settingDiv");
+            rowDiv.setAttribute("class", "otmonrow");
             rowDiv.setAttribute("id", "otmon_"+data[i].name);
-            rowDiv.setAttribute("style", "text-align: right;");
-            rowDiv.style.marginLeft = "10px";
-            rowDiv.style.marginRight = "10px";
-            rowDiv.style.width = "850px";
-            rowDiv.style.border = "thick solid lightblue";
             rowDiv.style.background = "lightblue";
             //--- field Name ---
-              var fldDiv = document.createElement("div");
-                  fldDiv.setAttribute("style", "margin-right: 10px;");
-                  fldDiv.style.width = "30px";
-                  fldDiv.style.float = 'left';
-                  fldDiv.textContent = translateToHuman(data[i].name);
-                  fldDiv.setAttribute("id", "otmon_"+data[i].name);
-                  rowDiv.appendChild(fldDiv);
-            //--- input ---
-              var valDiv = document.createElement("div");
-                  valDiv.setAttribute("style", "text-align: left;");
-                  fldDiv.style.width = "30px";
-                  fldDiv.style.float = 'left';
-                  valDiv.textContent = data[i].value; 
-                  valDiv.setAttribute("style", "background: lightblue");
-                  rowDiv.appendChild(valDiv);
+            var fldDiv = document.createElement("div");
+            fldDiv.setAttribute("class", "otmoncolumn1")
+            fldDiv.textContent = translateToHuman(data[i].name);
+            fldDiv.setAttribute("id", "otmon_"+data[i].name);
+            rowDiv.appendChild(fldDiv);
+            //--- Value ---
+            var valDiv = document.createElement("div");
+            valDiv.setAttribute("class", "otmoncolumn2")
+            valDiv.textContent = data[i].value; 
+            rowDiv.appendChild(valDiv);      
+            //--- Unit  ---
+            var unitDiv = document.createElement("div");
+            unitDiv.setAttribute("class", "otmoncolumn3")
+            unitDiv.textContent = data[i].unit; 
+            rowDiv.appendChild(unitDiv);
             mainPage.appendChild(rowDiv);
           }
           else
@@ -231,24 +227,24 @@
             rowDiv.setAttribute("style", "text-align: right;");
             rowDiv.style.marginLeft = "10px";
             rowDiv.style.marginRight = "10px";
-            rowDiv.style.width = "850px";
-            rowDiv.style.border = "thick solid lightblue";
+            rowDiv.style.width = "500px";
+            //rowDiv.style.border = "thick solid lightblue";
             rowDiv.style.background = "lightblue";
             //--- field Name ---
               var fldDiv = document.createElement("div");
                   fldDiv.setAttribute("style", "margin-right: 10px;");
-                  fldDiv.style.width = "30px";
+                  fldDiv.style.width = "285px";
                   fldDiv.style.float = 'left';
                   fldDiv.textContent = translateToHuman(data[i].name);
-                  rowDiv.appendChild(fldDiv);
+            rowDiv.appendChild(fldDiv);
             //--- input ---
               var valDiv = document.createElement("div");
                   valDiv.setAttribute("style", "text-align: left;");
-                  fldDiv.style.width = "30px";
-                  fldDiv.style.float = 'left';
+                  valDiv.style.width = "200px";
+                  valDiv.style.float = 'left';
                   valDiv.textContent = data[i].value; 
                   valDiv.setAttribute("style", "background: lightblue");
-                  rowDiv.appendChild(valDiv);
+            rowDiv.appendChild(valDiv);
             deviceinfoPage.appendChild(rowDiv);
           }
           else

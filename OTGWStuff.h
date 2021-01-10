@@ -159,6 +159,7 @@ enum OpenThermMessageID {
 };
 	enum OTtype_t { ot_f88, ot_s16, ot_s8s8, ot_u16, ot_u8u8, ot_flag8, ot_flag8flag8, ot_special, ot_flag8u8, ot_undef}; 
  	enum OTmsgcmd_t { OT_READ, OT_WRITE, OT_RW, OT_UNDEF };
+	
 	struct OTlookup_t
     {
         int id;

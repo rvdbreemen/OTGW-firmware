@@ -242,6 +242,29 @@ input {
   margin-top: -52px;
 }
 
+/* OTmonitor */
+.otmoncolumn1 {
+  float: left;
+  width: 285px;
+  padding: 10px;
+}
+.otmoncolumn2 {
+  float: left;
+  width: 50px;
+  padding: 10px;
+}
+.otmoncolumn3 {
+  float: left;
+  width: 30px;
+  padding: 10px;
+}
+
+/* Clear floats after the columns */
+.otmonrow:after {
+  content: "";
+  display: table;
+  clear: both;
+}
 
 /* define tag selectors () -------------------------------------------------- */
 
