@@ -243,11 +243,11 @@ input {
 /* OTmonitor */
 .otmoncolumn1 {
   float: left;
-  width: 285px;
+  width: 270px;
 }
 .otmoncolumn2 {
   float: left;
-  width: 50px;
+  width: 40px;
   text-align: right;
 }
 .otmoncolumn3 {
