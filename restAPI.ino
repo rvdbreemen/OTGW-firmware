@@ -87,7 +87,7 @@ void processAPI()
             //Send a command to OTGW
             sendOTGW(CSTR(words[5]), words[5].length());
             httpServer.send(200, "text/plain", "OK");
-          }
+          } else sendApiNotFound(URI);
         }
         else sendApiNotFound(URI);
       }

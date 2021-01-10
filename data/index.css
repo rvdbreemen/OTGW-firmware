@@ -162,7 +162,7 @@ input {
 }
 
 .nav-clock {
-  //top: 1px;
+  top: 1px;
   color: black;
   float: right;
   font-size: small;
@@ -215,7 +215,7 @@ input {
 .right-0  {right: 0; padding-right: 10px; }
 .left-0   {left:  0; padding-left:  10px; }
             
-//--- next 4 are for the API doc page --------
+/*-- next 4 are for the API doc page --------*/
 .div1 { 
   float: left;  
   margin-left: 20px; 
@@ -241,27 +241,51 @@ input {
 }
 
 /* OTmonitor */
-.otmonrow: {
+.otmonrow {
   background: lightblue;
+  display: table-row;
 }
 .otmoncolumn1 {
+  display: table-cell;
   float: left;
   width: 270px;
  
 }
 .otmoncolumn2 {
+  display: table-cell;
   float: left;
   width: 40px;
   text-align: right;
 }
 .otmoncolumn3 {
+  display: table-cell;
   float: left;
   width: 30px;
   margin-left: 2px;
 }
 
+/* DevInfo */
+.devinfonrow {
+  background: lightblue;
+  display: table-row;
+  font-size: 14px;
+}
+.devinfocolumn1 {
+  display: table-cell;
+  float: left;
+  width: 160px;
+  font-size: 12px;
+}
+.devinfocolumn2 {
+  display: table-cell;
+  float: left;
+  width: 160px;
+  text-align: left;
+  font-size: 12px;
+}
+
 /* Clear floats after the columns */
-.otmonrow:after {
+.devinforow:after {
   content: "";
   display: table;
   clear: both;

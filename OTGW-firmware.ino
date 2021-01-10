@@ -101,15 +101,23 @@ void setup()
 
 //================ Start HTTP Server ================================
   setupFSexplorer();
+  if (!SPIFFS.exists("/index.html")) {
+    httpServer.serveStatic("/",           SPIFFS, "/FSexplorer.html");
+    httpServer.serveStatic("/index",      SPIFFS, "/FSexplorer.html");
+    httpServer.serveStatic("/index.html", SPIFFS, "/FSexplorer.html");
+  } else{
+    httpServer.serveStatic("/",           SPIFFS, "/index.html");
+    httpServer.serveStatic("/index",      SPIFFS, "/index.html");
+    httpServer.serveStatic("/index.html", SPIFFS, "/index.html");
+  } 
+  // httpServer.on("/",          sendIndexPage);
+  // httpServer.on("/index",     sendIndexPage);
+  // httpServer.on("/index.html",sendIndexPage);
   httpServer.serveStatic("/FSexplorer.png",   SPIFFS, "/FSexplorer.png");
-  httpServer.on("/",          sendIndexPage);
-  httpServer.on("/index",     sendIndexPage);
-  httpServer.on("/index.html",sendIndexPage);
   httpServer.serveStatic("/index.css", SPIFFS, "/index.css");
   httpServer.serveStatic("/index.js",  SPIFFS, "/index.js");
   // all other api calls are catched in FSexplorer onNotFounD!
-  httpServer.on("/api", HTTP_GET, processAPI);
-
+  httpServer.on("/api", HTTP_ANY, processAPI);  //was only HTTP_GET (20210110)
 
   httpServer.begin();
   Serial.println("\nHTTP Server started\r");

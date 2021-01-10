@@ -172,18 +172,18 @@
             rowDiv.style.background = "lightblue";
             //--- field Name ---
             var fldDiv = document.createElement("div");
-            fldDiv.setAttribute("class", "otmoncolumn1")
+            fldDiv.setAttribute("class", "otmoncolumn1");
             fldDiv.textContent = translateToHuman(data[i].name);
             rowDiv.appendChild(fldDiv);
             //--- Value ---
             var valDiv = document.createElement("div");
-            valDiv.setAttribute("class", "otmoncolumn2")
+            valDiv.setAttribute("class", "otmoncolumn2");
             valDiv.setAttribute("id", "otmon_"+data[i].name);
             valDiv.textContent = data[i].value; 
             rowDiv.appendChild(valDiv);      
             //--- Unit  ---
             var unitDiv = document.createElement("div");
-            unitDiv.setAttribute("class", "otmoncolumn3")
+            unitDiv.setAttribute("class", "otmoncolumn3");
             unitDiv.textContent = data[i].unit; 
             rowDiv.appendChild(unitDiv);
             mainPage.appendChild(rowDiv);
@@ -213,7 +213,7 @@
       .then(response => response.json())
       .then(json => {
         console.log("then(json => ..)");
-        console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
+        //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
         data = json.devinfo;
         for( let i in data )
         {
@@ -222,34 +222,20 @@
           if( ( document.getElementById("devinfo_"+data[i].name)) == null )
           { // if element does not exists yet, then build page
             var rowDiv = document.createElement("div");
-            rowDiv.setAttribute("class", "settingDiv");
+            rowDiv.setAttribute("class", "devinforow");
             rowDiv.setAttribute("id", "devinfo_"+data[i].name);
-            rowDiv.setAttribute("style", "text-align: right;");
-            rowDiv.style.marginLeft = "10px";
-            rowDiv.style.marginRight = "10px";
-            rowDiv.style.width = "500px";
-            //rowDiv.style.border = "thick solid lightblue";
             rowDiv.style.background = "lightblue";
             //--- field Name ---
-              var fldDiv = document.createElement("div");
-                  fldDiv.setAttribute("style", "margin-right: 10px;");
-                  fldDiv.style.width = "285px";
-                  fldDiv.style.float = 'left';
-                  fldDiv.textContent = translateToHuman(data[i].name);
+            var fldDiv = document.createElement("div");
+            fldDiv.setAttribute("class", "devinfocolumn1");
+            fldDiv.textContent = translateToHuman(data[i].name);
             rowDiv.appendChild(fldDiv);
             //--- input ---
-              var valDiv = document.createElement("div");
-                  valDiv.setAttribute("style", "text-align: left;");
-                  valDiv.style.width = "200px";
-                  valDiv.style.float = 'left';
-                  valDiv.textContent = data[i].value; 
-                  valDiv.setAttribute("style", "background: lightblue");
+            var valDiv = document.createElement("div");
+            valDiv.setAttribute("class", "devinfocolumn2");                  
+            valDiv.textContent = data[i].value; 
             rowDiv.appendChild(valDiv);
             deviceinfoPage.appendChild(rowDiv);
-          }
-          else
-          { //if the element exists, then update the value
-            document.getElementById("devinfo_"+data[i].name).value = data[i].value;  
           }
         }
       })
@@ -589,7 +575,7 @@
    ,[ "ipaddress",                  "IP address"]
    ,[ "macaddress",                 "MAC address"]
    ,[ "freeheap",                   "Free Heap Memory (bytes)"]
-   ,[ "maxfreeblock",               "Maximum Free Block Memory (bytes)"]
+   ,[ "maxfreeblock",               "Max. Free Memory (bytes)"]
    ,[ "chipid",                     "Unique Chip ID"]
    ,[ "coreversion",                "Arduino Core Version"]
    ,[ "sdkversion",                 "Espressif SDK Version"]
