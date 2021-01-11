@@ -1,6 +1,7 @@
 /*
 ***************************************************************************  
-**  Program  : MonUpdateServer.h
+**  Program  : OTGW-MonUpdateServer.h
+**  Modified to work with OTGW Nodoshop Hardware Watchdog
 ** 
 **  This is the ESP8266HTTPUpdateServer.h file 
 **  Created and modified by Ivan Grokhotkov, Miguel Angel Ajo, Earle Philhower and many others 
@@ -72,7 +73,7 @@ class ESP8266HTTPUpdateServerTemplate
 
 };
 
-#include "ModUpdateServer-impl.h"
+#include "OTGW-ModUpdateServer-impl.h"
 
 
 using ESP8266HTTPUpdateServer = esp8266httpupdateserver::ESP8266HTTPUpdateServerTemplate<WiFiServer>;

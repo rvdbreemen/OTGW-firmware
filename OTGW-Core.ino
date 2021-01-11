@@ -14,6 +14,7 @@
 #define EXT_WD_I2C_ADDRESS 0x26
 #define PIN_I2C_SDA 4
 #define PIN_I2C_SCL 5
+#define FEEDWATCHDOGNOW   Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   Wire.write(0xA5);   Wire.endTransmission();
 
 /* --- PRINTF_BYTE_TO_BINARY macro's --- */
 #define PRINTF_BINARY_PATTERN_INT8 "%c%c%c%c%c%c%c%c"
@@ -74,6 +75,8 @@ String initWatchDog() {
   return ReasonReset;
   //===========================================
 }
+
+
 
 //===[ Feed the WatchDog before it bites! (1x per second) ]===
 void feedWatchDog() {
