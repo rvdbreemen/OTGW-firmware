@@ -7,17 +7,17 @@ static const char UpdateServerIndex[] PROGMEM =
      <body>
      <h1>OTGW firmware Flash utility</h1>
      <form method='POST' action='?cmd=0' enctype='multipart/form-data'>
-          Selecteer een "<b>.ino.bin</b>" bestand<br/>
+          Select a "<b>.ino.bin</b>" file to flash<br/>
           <input type='file' accept='ino.bin' name='firmware'>
           <input type='submit' value='Flash Firmware'>
       </form>
       <form method='POST' action='?cmd=100' enctype='multipart/form-data'> 
-          Selecteer een "<b>.spiffs.bin</b>" bestand<br/>
+          Select a "<b>.spiffs.bin</b>" file to flash<br/>
           <input type='file' accept='spiffs.bin' name='filesystem'>
           <input type='submit' value='Flash Spiffs'>
       </form>
       <hr>
-      <br/><font color='red'>Let op!!!</font>
+      <br/><font color='red'>Warning!!!</font>
       <br/>You will lose all your files when flassing SPIFF. 
       <br/>Basckup your files first to your local filesystem (using FSexplorer) 
       and upload them after the flassing of your SPIFF.
