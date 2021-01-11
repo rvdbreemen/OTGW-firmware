@@ -240,6 +240,40 @@ input {
   margin-top: -52px;
 }
 
+/* header */
+.headerrow {
+  vertical-align:bottom;
+}
+
+.headercolumnbig{
+  font-size: xx-large;
+  font-weight: bold;
+  float: left;
+  width: 350px;
+}
+
+.headercolumn{
+  font-size: smaller;
+  float: left;
+  width: 175px;
+  
+}
+
+/* Clear floats after the columns */
+.headerrow:after {
+  content: "";
+  display: table;
+  clear: both;
+}
+
+/* Responsive layout - makes the three columns stack on top of each other instead of next to each other */
+@media screen and (max-width: 600px) {
+  .column {
+    width: 100%;
+  }
+}
+
+
 /* OTmonitor */
 .otmonrow {
   background: lightblue;

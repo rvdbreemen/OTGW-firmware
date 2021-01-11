@@ -18,14 +18,14 @@ static const char UpdateServerIndex[] PROGMEM =
       </form>
       <hr>
       <br/><font color='red'>Warning!!!</font>
-      <br/>You will lose all your files when flassing SPIFF. 
-      <br/>Basckup your files first to your local filesystem (using FSexplorer) 
-      and upload them after the flassing of your SPIFF.
+      <br/>You will lose all your files when flashing SPIFF. 
+      <br/>Backup your files first to your local filesystem (using FSexplorer) 
+      and upload them after the flashing of your SPIFF.
       <hr>
       <br/>
       <br/>Wait <span style='font-size: 1.3em;' id="waitSeconds">60</span> seconds ..
-      <br>If nothing happend, then wait for count down to zero and then refresh with this linkspan style='font-size:1.3em;'><b><a href="/">hier</a></b></span>!
-     </body>
+      <br>If nothing happend, then wait for count down to zero and then refresh with <span style='font-size:1.3em;'><b><a href="/">this link here</a></b></span>!
+      </body>
      <script>
          var seconds = document.getElementById("waitSeconds").textContent;
          var countdown = setInterval(function() {
@@ -53,7 +53,7 @@ static const char UpdateServerSuccess[] PROGMEM =
       <br/>
       <br>
       <br/>Wait <span style='font-size: 1.3em;' id="waitSeconds">60</span> seconds ..
-      <br>If nothing happend, then wait for count down to zero and then refresh with this linkspan style='font-size:1.3em;'><b><a href="/">hier</a></b></span>!
+      <br>If nothing happend, then wait for count down to zero and then refresh with <span style='font-size:1.3em;'><b><a href="/">this link here</a></b></span>!
       </body>
       <script>
          var seconds = document.getElementById("waitSeconds").textContent;
