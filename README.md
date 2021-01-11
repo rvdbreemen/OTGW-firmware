@@ -28,8 +28,8 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
   
 | Version | Release notes |
 |-|-|
-| 0.6.0 | Standalone UI for simple OT monitor purposes and deviceinformation, moved index.html to SPIFF
-| 0.5.1 | REST APIs, v1, for OTmonitor values, GetByLabel, GetByID, POST otgw/command/{command}
+| 0.6.0 | Standalone UI for simple OT monitor purposes and deviceinformation, moved index.html to SPIFF <br>OTA is possible after flashing 0.6.0 (Hardware watchdog is fed during flashuploads now) |
+| 0.5.1 | REST APIs, v1, for OTmonitor values, GetByLabel, GetByID, POST otgw/command/{command} |
 | 0.5.0 | Implemented the UI for settings (restapi, read/write file in json) |
 | 0.4.2 | Bi-directional serial communication on port 1023 (aka ser2net) for use with OTmonitor application|   
 | 0.4.1 | MQTT command sending now works, topic: OTGW/command and |   
