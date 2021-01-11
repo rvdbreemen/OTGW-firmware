@@ -1,6 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : MonUpdateServer-impl.h
+**  Modified to work with OTGW Nodoshop Hardware Watchdog
 ** 
 **  This is the ESP8266HTTPUpdateServer.h file 
 **  Created and modified by Ivan Grokhotkov, Miguel Angel Ajo, Earle Philhower and many others 
@@ -24,7 +25,8 @@
 #include <flash_hal.h>
 #include <FS.h>
 #include "StreamString.h"
-#include "ModUpdateServer.h"
+#include "Wire.h"
+#include "OTGW-ModUpdateServer.h"
 
 #ifndef Debug
   //#warning Debug() was not defined!
@@ -130,6 +132,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
         if (_serial_output) Debug(".");
+        // Feed the dog before it bites!
+        Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
+        // End of feeding hack
         if(Update.write(upload.buf, upload.currentSize) != upload.currentSize){
           _setUpdaterError();
         }
