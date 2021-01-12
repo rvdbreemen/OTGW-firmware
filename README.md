@@ -29,6 +29,7 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
   
 | Version | Release notes |
 |-|-|
+| 0.6.1 | Bugfix: setting page did not always work correctly, now it does. |
 | 0.6.0 | Standalone UI for simple OT monitor purposes and deviceinformation, moved index.html to SPIFF <br>OTA is possible after flashing 0.6.0 (Hardware watchdog is fed, during flash uploads now) |
 | 0.5.1 | REST APIs, v1, for OTmonitor values, GetByLabel, GetByID, POST otgw/command/{command} |
 | 0.5.0 | Implemented the UI for settings (restapi, read/write file in json) |
