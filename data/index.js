@@ -230,7 +230,7 @@
             fldDiv.setAttribute("class", "devinfocolumn1");
             fldDiv.textContent = translateToHuman(data[i].name);
             rowDiv.appendChild(fldDiv);
-            //--- input ---
+            //--- value on screen ---
             var valDiv = document.createElement("div");
             valDiv.setAttribute("class", "devinfocolumn2");                  
             valDiv.textContent = data[i].value; 
@@ -259,6 +259,7 @@
         console.log("then(json => ..)");
         console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
         data = json.settings;
+        document.getElementById("settingMessage").innerHTML = "";
         for( let i in data )
         {
           console.log("["+data[i].name+"]=>["+data[i].value+"]");
@@ -317,6 +318,10 @@
                                 function() { setBackGround(data[i].name, "lightgray"); },
                                             false
                                 );
+                    sInput.addEventListener('keydown',
+                                function() { setBackGround(data[i].name, "lightgray"); },
+                                            false
+                                );
                   inputDiv.appendChild(sInput);
                   
             rowDiv.appendChild(inputDiv);
@@ -341,43 +346,7 @@
 
   } // refreshSettings()
     
-  
-  //============================================================================  
-  function saveMessages() 
-  {
-    console.log("Saving messages ..");
-    let changes = false;
-    
-    //--- has anything changed?
-    var page = document.getElementById("mainPage"); 
-    var mRow = page.getElementsByTagName("input");
-    //var mRow = document.getElementById("mainPage").getElementsByTagName('div');
-    for(var i = 0; i < mRow.length; i++)
-    {
-      //do something to each div like
-      var msgId = mRow[i].getAttribute("id");
-      var field = msgId.substr(2);
-      //console.log("msgId["+msgId+", msgNr["+field+"]");
-      value = document.getElementById(msgId).value;
-      //console.log("==> name["+field+"], value["+value+"]");
 
-      changes = false;
-
-      if   (getBackGround("M_"+field) == "lightgray")
-      {
-        setBackGround("M_"+field, "white");
-        changes = true;
-      }
-      if (changes) {
-        console.log("Changes where made in ["+field+"]["+value+"]");
-        //processWithTimeout([(data.length -1), 0], 2, data, sendPostReading);
-        sendPostMessages(field, value);
-      }
-    } 
-
-  } // saveMessages()
-
-  
   //============================================================================  
   function saveSettings() 
   {
@@ -405,6 +374,8 @@
       if (changes) {
         console.log("Changes where made in ["+field+"]["+value+"]");
         //processWithTimeout([(data.length -1), 0], 2, data, sendPostReading);
+        document.getElementById("settingMessage").innerHTML = "Saving changes...";
+        setTimeout(function(){ document.getElementById("settingMessage").innerHTML = ""; }, 1000); //and clear the message
         sendPostSetting(field, value);
       }
     } 
@@ -435,25 +406,7 @@
   } // saveSettings()
 ****/
     
-  //============================================================================  
-  function sendPostMessages(field, value) 
-  {
-    const jsonString = {"name" : field, "value" : value};
-    console.log("sending: "+JSON.stringify(jsonString));
-    const other_params = {
-        headers : { "content-type" : "application/json; charset=UTF-8"},
-        body : JSON.stringify(jsonString),
-        method : "POST",
-        mode : "cors"
-    };
-
-    fetch(APIGW+"v0/messages", other_params)
-      .then(function(response) {
-      }, function(error) {
-        console.log("Error["+error.message+"]"); //=> String
-      });
-      
-  } // sendPostMessages()
+ 
 
     
   //============================================================================  
