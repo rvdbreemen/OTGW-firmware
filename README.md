@@ -21,6 +21,7 @@ The features of this OTGW firmware are:
 - settings for Hostname and MQTT in the webUI (just compile and edit in webUI)
 - OTmonitor Web UI (standalone interface)
 - reliable OTA upgrades (v0.6.0+)
+- upgrade PIC firmware using OTmonitor software (through port 1023)
 
 To do:
 - InfluxDB client to do direct logging 
