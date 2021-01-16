@@ -492,9 +492,9 @@
 
     [ "hostname",                  "HostName" ]
    ,[ "mqttbroker",                "MQTT Broker IP/URL" ]
-   ,[ "mqttbrokerport",            "MQTT Broker Poort" ]
-   ,[ "mqttuser",                  "MQTT Gebruiker" ]
-   ,[ "mqttpasswd",                "Password MQTT Gebruiker" ]
+   ,[ "mqttbrokerport",            "MQTT Broker Port" ]
+   ,[ "mqttuser",                  "MQTT User" ]
+   ,[ "mqttpasswd",                "Password MQTT User" ]
    ,[ "mqtttoptopic",              "MQTT Top Topic" ]
    ,[ "influxdbhostname",          "InfluxDB hostname"]
    ,[ "influxdbport",              "InfluxDB port (default: 8086)"]
