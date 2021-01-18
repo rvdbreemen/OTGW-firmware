@@ -126,8 +126,9 @@ void setup()
   sprintf(cMsg, "%03d.%03d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
   Serial.printf("\nAssigned IP[%s]\r\n", cMsg);
 
+  resetOTGW();          // reset the OTGW pic
   initWatchDog();       // setup the WatchDog
-  startOTGWstream();    
+  startOTGWstream();    // start port 1023 
 
   Serial.printf("Reboot count = [%d]\r\n", rebootCount);
   Serial.println(F("Setup finished!"));
