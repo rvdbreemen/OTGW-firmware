@@ -46,6 +46,16 @@
 OpenthermData OTdata;
 DECLARE_TIMER_MS(timerWD, 1000, CATCH_UP_MISSED_TICKS);
 
+//===================[ Reset OTGW ]===============================
+void resetOTGW() {
+  //lower the right pin for just 500ms and the OTGW is reset
+  pinMode(14, OUTPUT);
+  digitalWrite(14, LOW);
+  delay(500);
+  digitalWrite(14, HIGH);
+  pinMode(14, INPUT_PULLUP);
+}
+
 //===================[ Watchdog OTGW ]===============================
 String initWatchDog() {
   // configure hardware pins according to eeprom settings.
