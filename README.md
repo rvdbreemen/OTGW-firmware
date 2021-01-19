@@ -1,14 +1,17 @@
-# OTGW-firmware
+# OTGW-firmware for NodeMCU - ESP 8266 
 
 [![Join the chat at https://gitter.im/OTGW-firmware/community](https://badges.gitter.im/OTGW-firmware/community.svg)](https://gitter.im/OTGW-firmware/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 Opentherm firmware - Nodoshop version
 
-This is a new firmware for the Nodoshop version of the OpenTherm Gateway.  
-It can be found here: https://www.nodo-shop.nl/nl/opentherm-gateway/188-opentherm-gateway.html  
-More information on this gateway can be read here: http://otgw.tclcode.com/  
+This is a custom firmware for the Nodoshop NodeMCU/ESP8266 version of the OpenTherm Gateway. 
 
-The features of this OTGW firmware are:
+It can be found here: https://www.nodo-shop.nl/nl/opentherm-gateway/188-opentherm-gateway.html  
+More information on this gateway can be read here: http://otgw.tclcode.com/  (PIC firmware is found on Schelte Bron!)
+
+
+
+The features of this Custom OTGW NodeMCU (ESP8266) firmware are:
 - parsing the protocol on the NodeMCU (8266)
 - enable telnet listening (interpreted data and debugging)
 - send MQTT messages for every change  (parsed OT message)
