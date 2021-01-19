@@ -7,7 +7,7 @@ Opentherm firmware - Nodoshop version
 This is a custom firmware for the Nodoshop NodeMCU/ESP8266 version of the OpenTherm Gateway. 
 
 It can be found here: https://www.nodo-shop.nl/nl/opentherm-gateway/188-opentherm-gateway.html  
-More information on this gateway can be read here: http://otgw.tclcode.com/  (PIC firmware is found on Schelte Bron!)
+More information on this gateway can be read here: http://otgw.tclcode.com/  (also location of the OTGW PIC firmware) 
 
 
 
