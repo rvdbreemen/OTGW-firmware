@@ -1,0 +1,163 @@
+https://www.opentherm.eu/request-details/?post_ids=1833
+
+Informatoin from a Monitor OpenTherm for Mbus
+ch: info
+ch: service/diagnostics
+cooling: info
+cooling: service/diagnostics
+dhw: info
+dhw: service/diagnostics
+general: info
+general: service/diagnostics
+solar: info
+solar: service/diagnostics
+ventilation: info
+ventilation: service/diagnostics
+
+OT messages supported
+ID0:HB0: Master status: CH enable
+ID0:HB1: Master status: DHW enable
+ID0:HB2: Master status: Cooling enable
+ID0:HB3: Master status: OTC active
+ID0:HB4: Master status: CH2 enable
+ID0:HB5: Master status: Summer/winter mode
+ID0:HB6: Master status: DHW blocking
+ID0:LB0: Slave Status: Fault indication
+ID0:LB1: Slave Status: CH mode
+ID0:LB2: Slave Status: DHW mode
+ID0:LB3: Slave Status: Flame status
+ID0:LB4: Slave Status: Cooling status
+ID0:LB5: Slave Status: CH2 mode
+ID0:LB6: Slave Status: Diagnostic/service indication
+ID0:LB7: Slave Status: Electricity production
+ID1: Control Setpoint i.e. CH water temperature Setpoint (°C)
+ID10: Number of Transparent-Slave-Parameters supported by slave
+ID100: Function of manual and program changes in master and remote room Setpoint
+ID101:HB012: Master Solar Storage: Solar mode
+ID101:LB0: Slave Solar Storage: Fault indication
+ID101:LB123: Slave Solar Storage: Solar mode status
+ID101:LB45: Slave Solar Storage: Solar status
+ID102: Application-specific fault flags and OEM fault code Solar Storage
+ID103:HB0: Slave Configuration Solar Storage: System type
+ID103:LB: Slave MemberID Code Solar Storage
+ID104: Solar Storage product version number and type
+ID105: Number of Transparent-Slave-Parameters supported by TSP’s Solar Storage
+ID106: Index number / Value of referred-to transparent TSP’s Solar Storage parameter
+ID107: Size of Fault-History-Buffer supported by Solar Storage
+ID108: Index number / Value of referred-to fault-history buffer entry Solar Stor
+ID109: Electricity producer starts
+ID11: Index number / Value of referred-to transparent slave parameter
+ID110: Electricity producer hours
+ID111: Electricity production
+ID112: Cumulativ Electricity production
+ID113: Number of un-successful burner starts
+ID114: Number of times flame signal was too low
+ID115: OEM-specific diagnostic/service code
+ID116: Number of succesful starts burner
+ID117: Number of starts CH pump
+ID118: Number of starts DHW pump/valve
+ID119: Number of starts burner during DHW mode
+ID12: Size of Fault-History-Buffer supported by slave
+ID120: Number of hours that burner is in operation (i.e. flame on)
+ID121: Number of hours that CH pump has been running
+ID122: Number of hours that DHW pump has been running or DHW valve has been opened
+ID123: Number of hours that burner is in operation during DHW mode
+ID124: The implemented version of the OpenTherm Protocol Specification in the master
+ID125: The implemented version of the OpenTherm Protocol Specification in the slave
+ID126: Master product version number and type
+ID127: Slave product version number and type
+ID13: Index number / Value of referred-to fault-history buffer entry
+ID14: Maximum relative modulation level setting (%)
+ID15: Maximum boiler capacity (kW) / Minimum boiler modulation level(%)
+ID16: Room Setpoint (°C)
+ID17: Relative Modulation Level (%)
+ID18: Water pressure in CH circuit (bar)
+ID19: Water flow rate in DHW circuit. (litres/minute)
+ID2:HB0: Master configuration: Smart power
+ID2:LB: Master MemberID Code
+ID20: Day of Week and Time of Day
+ID21: Calendar date
+ID22: Calendar year
+ID23: Room Setpoint for 2nd CH circuit (°C)
+ID24: Room temperature (°C)
+ID25: Boiler flow water temperature (°C)
+ID26: DHW temperature (°C)
+ID27: Outside temperature (°C)
+ID28: Return water temperature (°C)
+ID29: Solar storage temperature (°C)
+ID3:HB0: Slave configuration: DHW present
+ID3:HB1: Slave configuration: Control type
+ID3:HB2: Slave configuration: Cooling configuration
+ID3:HB3: Slave configuration: DHW configuration
+ID3:HB4: Slave configuration: Master low-off&pump control
+ID3:HB5: Slave configuration: CH2 present
+ID3:HB6: Slave configuration: Remote water filling function
+ID3:HB7: Heat/cool mode control
+ID3:LB: Slave MemberID Code
+ID30: Solar collector temperature (°C)
+ID31: Flow water temperature CH2 circuit (°C)
+ID32: Domestic hot water temperature 2 (°C)
+ID33: Boiler exhaust temperature (°C)
+ID34: Boiler heat exchanger temperature (°C)
+ID35: Boiler fan speed Setpoint and actual value
+ID36: Electrical current through burner flame [µA]
+ID37: Room temperature for 2nd CH circuit (°C)
+ID38: Relative Humidity
+ID4 (HB=1): Remote Request Boiler Lockout-reset
+ID4 (HB=10): Remote Request Service request reset
+ID4 (HB=2): Remote Request Water filling
+ID48: DHW Setpoint upper & lower bounds for adjustment (°C)
+ID49: Max CH water Setpoint upper & lower bounds for adjustment (°C)
+ID5:HB0: Service request
+ID5:HB1: Lockout-reset
+ID5:HB2: Low water pressure
+ID5:HB3: Gas/flame fault
+ID5:HB4: Air pressure fault
+ID5:HB5: Water over-temperature
+ID5:LB: OEM fault code
+ID56: DHW Setpoint (°C) (Remote parameter 1)
+ID57: Max CH water Setpoint (°C) (Remote parameters 2)
+ID6:HB0: Remote boiler parameter transfer-enable: DHW setpoint
+ID6:HB1: Remote boiler parameter transfer-enable: max. CH setpoint
+ID6:LB0: Remote boiler parameter read/write: DHW setpoint
+ID6:LB1: Remote boiler parameter read/write: max. CH setpoint
+ID7: Cooling control signal (%)
+ID70:HB0: Master status ventilation / heat-recovery: Ventilation enable
+ID70:HB1: Master status ventilation / heat-recovery: Bypass postion
+ID70:HB2: Master status ventilation / heat-recovery: Bypass mode
+ID70:HB3: Master status ventilation / heat-recovery: Free ventilation mode
+ID70:LB0: Slave status ventilation / heat-recovery: Fault indication
+ID70:LB1: Slave status ventilation / heat-recovery: Ventilation mode
+ID70:LB2: Slave status ventilation / heat-recovery: Bypass status
+ID70:LB3: Slave status ventilation / heat-recovery: Bypass automatic status
+ID70:LB4: Slave status ventilation / heat-recovery: Free ventilation status
+ID70:LB6: Slave status ventilation / heat-recovery: Diagnostic indication
+ID71: Relative ventilation position (0-100%). 0% is the minimum set ventilation and 100% is the maximum set ventilation
+ID72: Application-specific fault flags and OEM fault code ventilation / heat-recovery
+ID73: An OEM-specific diagnostic/service code for ventilation / heat-recovery system
+ID74:HB0: Slave Configuration ventilation / heat-recovery: System type
+ID74:HB1: Slave Configuration ventilation / heat-recovery: Bypass
+ID74:HB2: Slave Configuration ventilation / heat-recovery: Speed control
+ID74:LB: Slave MemberID Code ventilation / heat-recovery
+ID75: The implemented version of the OpenTherm Protocol Specification in the ventilation / heat-recovery system
+ID76: Ventilation / heat-recovery product version number and type
+ID77: Relative ventilation (0-100%)
+ID78: Relative humidity exhaust air (0-100%)
+ID79: CO2 level exhaust air (0-2000 ppm)
+ID8: Control Setpoint for 2e CH circuit (°C)
+ID80: Supply inlet temperature (°C)
+ID81: Supply outlet temperature (°C)
+ID82: mExhaust inlet temperature (°C)
+ID83: Exhaust outlet temperature (°C)
+ID84: Exhaust fan speed in rpm
+ID85: Supply fan speed in rpm
+ID86:HB0: Remote ventilation / heat-recovery parameter transfer-enable: Nominal ventilation value
+ID86:LB0: Remote ventilation / heat-recovery parameter read/write : Nominal ventilation value
+ID87: Nominal relative value for ventilation (0-100 %)
+ID88: Number of Transparent-Slave-Parameters supported by TSP’s ventilation / heat-recovery
+ID89: Index number / Value of referred-to transparent TSP’s ventilation / heat-recovery parameter
+ID9: Remote override room Setpoint
+ID90"Size of Fault-History-Buffer supported by ventilation / heat-recovery
+ID91: Index number / Value of referred-to fault-history buffer entry ventilation / heat-recovery
+ID98: For a specific RF sensor the RF strength and battery level is written
+ID99: perating Mode HC1, HC2/ Operating Mode DHW

@@ -707,6 +707,28 @@ void processOTGW(const char * buf, int len)
         case DHWBurnerOperationHours:   OTdataObject.DHWBurnerOperationHours = print_u16();  break; 
         case MasterVersion:             OTdataObject.MasterVersion = print_u8u8(); break; 
         case SlaveVersion:              OTdataObject.SlaveVersion = print_u8u8(); break;
+        case StatusVH:                  OTdataObject.StatusVH = print_flag8flag8(); break;
+		    case ControlSetpointVH:         OTdataObject.ControlSetpointVH = print_u8u8(); break;
+        case FaultFlagsCodeVH:          OTdataObject.FaultFlagsCodeVH = print_flag8u8(); break;
+		    case DiagnosticCodeVH:          OTdataObject.DiagnosticCodeVH = print_u16(); break;
+        case ConfigMemberIDVH:          OTdataObject.ConfigMemberIDVH = print_flag8u8(); break;
+		    case OpenthermVersionVH:        OTdataObject.OpenthermVersionVH = print_f88(); break;
+		    case VersionTypeVH:             OTdataObject.VersionTypeVH = print_u8u8(); break;
+		    case RelativeVentilation:       OTdataObject.RelativeVentilation = print_u8u8(); break;
+	      case RelativeHumidity:          OTdataObject.RelativeHumidity = print_u8u8(); break;
+		    case CO2Level:                  OTdataObject.CO2Level = print_u16(); break;
+ 		    case SupplyInletTemperature:    OTdataObject.SupplyInletTemperature = print_f88(); break;
+ 		    case SupplyOutletTemperature:   OTdataObject.SupplyOutletTemperature = print_f88(); break;
+ 		    case ExhaustInletTemperature:   OTdataObject.ExhaustInletTemperature = print_f88(); break;
+ 		    case ExhaustOutletTemperature:  OTdataObject.ExhaustOutletTemperature = print_f88(); break;
+        case ActualExhaustFanSpeed:     OTdataObject.ActualExhaustFanSpeed = print_u16(); break;
+		    case ActualInletFanSpeed:       OTdataObject.ActualInletFanSpeed = print_u16(); break;
+		    case RemoteParameterSettingVH:  OTdataObject.RemoteParameterSettingVH = print_flag8flag8(); break;
+		    case NominalVentilationValue:   OTdataObject.NominalVentilationValue = print_u8u8(); break;
+        case TSPNumberVH:               OTdataObject.TSPNumberVH = print_u8u8(); break;
+		    case TSPEntryVH:                OTdataObject.TSPEntryVH = print_u8u8(); break;
+		    case FaultBufferSizeVH:         OTdataObject.FaultBufferSizeVH = print_u8u8(); break;
+		    case FaultBufferEntryVH:        OTdataObject.FaultBufferEntryVH = print_u8u8(); break;
       }
     } else Debugln(); //next line 
   } else DebugTf("[%s] [%d]\r\n", buf, len);
@@ -848,6 +870,28 @@ String getOTGWValue(int msgid)
     case DHWBurnerOperationHours:   return String(OTdataObject.DHWBurnerOperationHours);  break; 
     case MasterVersion:             return String(OTdataObject.MasterVersion); break; 
     case SlaveVersion:              return String(OTdataObject.SlaveVersion); break;
+    case StatusVH:                  return String(OTdataObject.StatusVH); break;
+    case ControlSetpointVH:         return String(OTdataObject.ControlSetpointVH); break;
+    case FaultFlagsCodeVH:          return String(OTdataObject.FaultFlagsCodeVH); break;
+    case DiagnosticCodeVH:          return String(OTdataObject.DiagnosticCodeVH); break;
+    case ConfigMemberIDVH:          return String(OTdataObject.ConfigMemberIDVH); break;
+    case OpenthermVersionVH:        return String(OTdataObject.OpenthermVersionVH); break;
+    case VersionTypeVH:             return String(OTdataObject.VersionTypeVH); break;
+    case RelativeVentilation:       return String(OTdataObject.RelativeVentilation); break;
+    case RelativeHumidity:          return String(OTdataObject.RelativeHumidity); break;
+    case CO2Level:                  return String(OTdataObject.CO2Level); break;
+    case SupplyInletTemperature:    return String(OTdataObject.SupplyInletTemperature); break;
+    case SupplyOutletTemperature:   return String(OTdataObject.SupplyOutletTemperature); break;
+    case ExhaustInletTemperature:   return String(OTdataObject.ExhaustInletTemperature); break;
+    case ExhaustOutletTemperature:  return String(OTdataObject.ExhaustOutletTemperature); break;
+    case ActualExhaustFanSpeed:     return String(OTdataObject.ActualExhaustFanSpeed); break;
+    case ActualInletFanSpeed:       return String(OTdataObject.ActualInletFanSpeed); break;
+    case RemoteParameterSettingVH:  return String(OTdataObject.RemoteParameterSettingVH); break;
+    case NominalVentilationValue:   return String(OTdataObject.NominalVentilationValue); break;
+    case TSPNumberVH:               return String(OTdataObject.TSPNumberVH); break;
+    case TSPEntryVH:                return String(OTdataObject.TSPEntryVH); break;
+    case FaultBufferSizeVH:         return String(OTdataObject.FaultBufferSizeVH); break;
+    case FaultBufferEntryVH:        return String(OTdataObject.FaultBufferEntryVH); break;
     default: return "not implemented yet!";
   } 
 }
