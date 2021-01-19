@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGWStuff.h 
-**  Version  : v0.6.1
+**  Version  : v0.7.0
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
