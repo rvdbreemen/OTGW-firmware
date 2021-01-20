@@ -384,7 +384,7 @@ enum OpenThermMessageID {
 		{ 128, OT_UNDEF , ot_undef, "", "", "" },
 		{ 129, OT_UNDEF , ot_undef, "", "", "" },
 		{ 130, OT_UNDEF , ot_undef, "", "", "" },
-		{ 131, OR_RW 	, ot_u8u8, 		"RemehadFdUcodes", "Remeha dF-/dU-codes", "" },
+		{ 131, OT_RW 	, ot_u8u8, 		"RemehadFdUcodes", "Remeha dF-/dU-codes", "" },
 		{ 132, OT_READ 	, ot_u8u8, 		"RemehaServicemessage", "Remeha Servicemessage", "" },
 		{ 133, OT_READ 	, ot_u8u8, 		"RemehaDetectionConnectedSCU", "Remeha detection connected SCU’s", "" },
 		// all data ids are not defined above are resevered for future use
