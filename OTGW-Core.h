@@ -86,8 +86,8 @@ typedef struct {
 	float		OpenthermVersionVH = 0.0;
 	uint16_t	VersionTypeVH = 0;
 	uint16_t	RelativeVentilation = 0;
-	uint16_t	RelativeHumidity = 0;
-	uint16_t	CO2Level = 0;
+	uint16_t	RelativeHumidityVH = 0;
+	uint16_t	CO2LevelVH = 0;
 	float		SupplyInletTemperature = 0.0;
 	float		SupplyOutletTemperature = 0.0;
 	float		ExhaustInletTemperature = 0.0;
@@ -201,8 +201,8 @@ enum OpenThermMessageID {
 	OpenthermVersionVH, // f8.8 OpenTherm Version V/H
 	VersionTypeVH,	// u8 / u8 Version & Type V/H
 	RelativeVentilation, // u8 Relative Ventilation (%)
-	RelativeHumidity, // u8 / u8 Relative Humidity (%)
-	CO2Level, // u16 CO2 Level (ppm)
+	RelativeHumidityVH, // u8 / u8 Relative Humidity (%)
+	CO2LevelVH, // u16 CO2 Level (ppm)
  	SupplyInletTemperature,	// f8.8 Supply Inlet Temperature (°C)
  	SupplyOutletTemperature, // f8.8 Supply Outlet Temperature(°C)
  	ExhaustInletTemperature, // f8.8 Exhaust Inlet Temperature (°C)
@@ -331,8 +331,8 @@ enum OpenThermMessageID {
 		{  75, OT_READ  , ot_f88, 				"OpenthermVersionVH", "OpenTherm Version V/H", "" },
 		{  76, OT_READ  , ot_u8u8, 				"VersionTypeVH", "Version & Type V/H", "" },
 		{  77, OT_READ  , ot_u8, 				"RelativeVentilation", "Relative Ventilation", "%" },
-		{  78, OT_RW    , ot_u8u8, 				"RelativeHumidity", "Relative Humidity", "%" },
-		{  79, OT_RW    , ot_u16, 				"CO2Level", "CO2 Level", "ppm" },
+		{  78, OT_RW    , ot_u8u8, 				"RelativeHumidityVH", "Relative Humidity V/H", "%" },
+		{  79, OT_RW    , ot_u16, 				"CO2LevelVH", "CO2 Level V/H", "ppm" },
  		{  80, OT_READ  , ot_f88, 				"SupplyInletTemperature", "Supply Inlet Temperature", "°C" },
  		{  81, OT_READ  , ot_f88, 				"SupplyOutletTemperature", "Supply Outlet Temperature", "°C" },
  		{  82, OT_READ  , ot_f88, 				"ExhaustInletTemperature", "Exhaust Inlet Temperature", "°C" },
