@@ -174,7 +174,7 @@ const char *messageTypeToString(OpenThermMessageType message_type)
 }
 
 const char *messageIDToString(OpenThermMessageID message_id){
-  if (message_id<=127) {
+  if (message_id <= OT_MSGID_MAX) {
     return OTmap[message_id].label;
   } else return "Undefined";}
 
