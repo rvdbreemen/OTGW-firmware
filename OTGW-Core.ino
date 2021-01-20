@@ -715,8 +715,8 @@ void processOTGW(const char * buf, int len)
 		    case OpenthermVersionVH:        OTdataObject.OpenthermVersionVH = print_f88(); break;
 		    case VersionTypeVH:             OTdataObject.VersionTypeVH = print_u8u8(); break;
 		    case RelativeVentilation:       OTdataObject.RelativeVentilation = print_u8u8(); break;
-	      case RelativeHumidity:          OTdataObject.RelativeHumidity = print_u8u8(); break;
-		    case CO2Level:                  OTdataObject.CO2Level = print_u16(); break;
+	      case RelativeHumidityVH:        OTdataObject.RelativeHumidityVH = print_u8u8(); break;
+		    case CO2LevelVH:                OTdataObject.CO2LevelVH = print_u16(); break;
  		    case SupplyInletTemperature:    OTdataObject.SupplyInletTemperature = print_f88(); break;
  		    case SupplyOutletTemperature:   OTdataObject.SupplyOutletTemperature = print_f88(); break;
  		    case ExhaustInletTemperature:   OTdataObject.ExhaustInletTemperature = print_f88(); break;
@@ -878,8 +878,8 @@ String getOTGWValue(int msgid)
     case OpenthermVersionVH:        return String(OTdataObject.OpenthermVersionVH); break;
     case VersionTypeVH:             return String(OTdataObject.VersionTypeVH); break;
     case RelativeVentilation:       return String(OTdataObject.RelativeVentilation); break;
-    case RelativeHumidity:          return String(OTdataObject.RelativeHumidity); break;
-    case CO2Level:                  return String(OTdataObject.CO2Level); break;
+    case RelativeHumidityVH:        return String(OTdataObject.RelativeHumidityVH); break;
+    case CO2LevelVH:                return String(OTdataObject.CO2LevelVH); break;
     case SupplyInletTemperature:    return String(OTdataObject.SupplyInletTemperature); break;
     case SupplyOutletTemperature:   return String(OTdataObject.SupplyOutletTemperature); break;
     case ExhaustInletTemperature:   return String(OTdataObject.ExhaustInletTemperature); break;
