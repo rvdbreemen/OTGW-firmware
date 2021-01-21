@@ -283,6 +283,7 @@ void sendDeviceInfo()
   );
   sendNestedJsonObj("ssid", WiFi.SSID().c_str());
   sendNestedJsonObj("wifirssi", WiFi.RSSI());
+  sendNestedJosnObj("mqttconnected", CBOOLEAN(MQTTclient.connected()));
 //sendNestedJsonObj("uptime", upTime());
 
   sendNestedJsonObj("lastreset", lastReset);
