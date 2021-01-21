@@ -545,6 +545,7 @@
    ,[ "ssid",                       "Wifi Network (SSID)"]
    ,[ "wifirssi",                   "Wifi Receive Power (dB)"]
    ,[ "lastreset",                  "Last Reset Reason"]
+   ,[ "mqttconnected",              "MQTT Connected"]
    
                  ];
   
