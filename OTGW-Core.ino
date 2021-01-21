@@ -561,6 +561,7 @@ uint16_t print_daytime()
 void getOTGW_PS_1(){
   DebugTln("PS=1");
   Serial.write("PS=1\r\n");
+  Serial.flush();
   delay(100);
   while(Serial.available() > 0) 
   { 
@@ -570,6 +571,7 @@ void getOTGW_PS_1(){
   }
   DebugTln("PS=0");
   Serial.write("PS=0\r\n");
+  Serial.flush();
 }
 //===================[ OTGW PS=1 Command ]===============================
 
@@ -577,7 +579,7 @@ void getOTGW_PS_1(){
 
 int sendOTGW(const char* buf, int len)
 {
-  //Just send the buffer to OTGW when the Serial interface is available
+  //Send the buffer to OTGW when the Serial interface is available
   if (Serial) {
     //check the write buffer
     Debugf("Serial Write Buffer space = [%d] - needed [%d]\r\n",Serial.availableForWrite(), (len+2));
@@ -587,12 +589,18 @@ int sendOTGW(const char* buf, int len)
     }
     Debug("] ("); Debug(len); Debug(")"); Debugln();
     
+    while (Serial.availableForWrite()==(len+2)) {
+      //cannot write, buffer full, wait for some space in serial out buffer
+      feedWatchDog();     //this yields for other processes
+    }
+
     if (Serial.availableForWrite()>= (len+2)) {
       //write buffer to serial
       Serial.write(buf, len);
       // Serial.write("PS=0\r\n");
       Serial.write('\r');
       Serial.write('\n');
+      Serial.flush(); 
     } else Debugln("Error: Write buffer not big enough!");
   } else Debugln("Error: Serial device not found!");
 }
@@ -784,7 +792,12 @@ void handleOTGW()
   while (OTGWstream.available()){
     //Serial.write(OTGWstream.read()); //just forward it directly to Serial
     outByte = OTGWstream.read();  // read from port 1023
+    while (Serial.availableForWrite()==0) {
+      //cannot write, buffer full, wait for some space in serial out buffer
+      feedWatchDog();     //this yields for other processes
+    }
     Serial.write(outByte);        // write to serial port
+    Serial.flush();               // wait for write to serial
     if (outByte == '\n')
     {
       sWrite[bytes_write] = 0;
