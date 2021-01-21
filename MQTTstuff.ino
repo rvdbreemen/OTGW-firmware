@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v0.6.1
+**  Version  : v0.7.0
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -295,6 +295,10 @@ void doAutoConfigure()
       fh.close();  
     } 
   } 
+}
+
+bool getMQTTconnectstatus(){
+  return MQTTclient.connected();
 }
 
 

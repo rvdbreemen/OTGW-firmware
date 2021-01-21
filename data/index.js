@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v0.6.1
+**  Version  : v0.7.0
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **
@@ -492,9 +492,9 @@
 
     [ "hostname",                  "HostName" ]
    ,[ "mqttbroker",                "MQTT Broker IP/URL" ]
-   ,[ "mqttbrokerport",            "MQTT Broker Poort" ]
-   ,[ "mqttuser",                  "MQTT Gebruiker" ]
-   ,[ "mqttpasswd",                "Password MQTT Gebruiker" ]
+   ,[ "mqttbrokerport",            "MQTT Broker Port" ]
+   ,[ "mqttuser",                  "MQTT User" ]
+   ,[ "mqttpasswd",                "Password MQTT User" ]
    ,[ "mqtttoptopic",              "MQTT Top Topic" ]
    ,[ "influxdbhostname",          "InfluxDB hostname"]
    ,[ "influxdbport",              "InfluxDB port (default: 8086)"]
@@ -545,6 +545,7 @@
    ,[ "ssid",                       "Wifi Network (SSID)"]
    ,[ "wifirssi",                   "Wifi Receive Power (dB)"]
    ,[ "lastreset",                  "Last Reset Reason"]
+   ,[ "mqttconnected",              "MQTT Connected"]
    
                  ];
   

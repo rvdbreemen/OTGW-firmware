@@ -1,7 +1,7 @@
 <!--
 ***************************************************************************  
 **  Program  : FSexplorer.html, part of ESP_ticker
-**  Version  : v0.6.1
+**  Version  : v0.7.0
 **
 **  Copyright (c) 2020 Willem Aandewiel
 **
@@ -61,11 +61,11 @@
                main.insertAdjacentHTML('beforeend', dir);
                document.querySelectorAll('[href*=delete]').forEach((node) => {
                		 node.addEventListener('click', () => {
-               		 		 if (!confirm('Weet je zeker dat je dit bestand wilt verwijderen?!')) event.preventDefault();  
+               		 		 if (!confirm('Are you sure you want to delete this file?')) event.preventDefault();  
                		 });
                });
                main.insertAdjacentHTML('beforeend', '</table>');
-               main.insertAdjacentHTML('beforeend', `<p><b>SPIFFS</b> gebruikt ${json[i].usedBytes} van ${json[i].totalBytes}`);
+               main.insertAdjacentHTML('beforeend', `<p><b>SPIFFS</b> used ${json[i].usedBytes} by ${json[i].totalBytes}`);
                free = json[i].freeBytes;
                fileSize.innerHTML = "<b> &nbsp; </b><p>";    // spacer                
 
@@ -79,17 +79,17 @@
                       output = nApprox.toFixed(2) + aMultiples[i];
                     }
                     if (nBytes > free) {
-                      fileSize.innerHTML = `<p><small> Bestand Grootte: ${output}</small><strong style="color: red;"> niet genoeg ruimte! </strong><p>`;
+                      fileSize.innerHTML = `<p><small> Filesize : ${output}</small><strong style="color: red;"> not enough space! </strong><p>`;
                       elem[1].setAttribute('disabled', 'disabled');
                     } 
                     else {
-                      fileSize.innerHTML = `<b>Bestand grootte:</b> ${output}<p>`;
+                      fileSize.innerHTML = `<b>Filesize:</b> ${output}<p>`;
                       elem[1].removeAttribute('disabled');
                     }
              });
              //elem[6].addEventListener('click', () => {
              document.getElementById('FormatSPIFFS').addEventListener('click', () => {
-                 if (!confirm(`Weet je zeker dat je deze functie wilt uitvoeren?\nAls je doorgaat moet je zelf FSexplorer.html en álle andere systeem bestanden weer uploaden!!.`)) event.preventDefault();
+                 if (!confirm(`Are you sure you want to execute this function?\nWhen you continue you have to upload FSexplorer.html and all other system files again!!.`)) event.preventDefault();
              }); 
           });
       </script>

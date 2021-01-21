@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v0.6.1
+**  Version  : v0.7.0
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -136,7 +136,7 @@ void sendOTGWvalue(int msgid){
   JsonObject root  = doc.to<JsonObject>();
   if (OTmap[msgid].type==ot_undef) {  //message is undefined, return error
     root["error"] = "message undefined: reserved for future use";
-  } else if (msgid>= 0 && msgid<=127) 
+  } else if (msgid>= 0 && msgid<= OT_MSGID_MAX) 
   { //message id's need to be between 0 and 127
     //Debug print the values first
     DebugTf("%s = %s %s\r\n", OTmap[msgid].label, getOTGWValue(msgid).c_str(), OTmap[msgid].unit);
@@ -149,7 +149,7 @@ void sendOTGWvalue(int msgid){
     }
     root["unit"] = OTmap[msgid].unit;    
   } else {
-    root["error"] = "message id > 127: reserved for future use";
+    root["error"] = "message id: reserved for future use";
   }
   String sBuff;
   serializeJsonPretty(root, sBuff);
@@ -164,15 +164,15 @@ void sendOTGWlabel(const char *msglabel){
   StaticJsonDocument<256> doc;
   JsonObject root  = doc.to<JsonObject>();
   int msgid;
-  for (msgid = 0; msgid<=127; msgid++){
+  for (msgid = 0; msgid<= OT_MSGID_MAX; msgid++){
     if (stricmp(OTmap[msgid].label, msglabel)==0) break;
   }
-  if (msgid > 127){
-    root["error"] = "message id > 127: reserved for future use";
+  if (msgid > OT_MSGID_MAX){
+    root["error"] = "message id: reserved for future use";
   } else if (OTmap[msgid].type==ot_undef) {  //message is undefined, return error
     root["error"] = "message undefined: reserved for future use";
   } else 
-  { //message id's need to be between 0 and 127
+  { //message id's need to be between 0 and OT_MSGID_MAX
     //Debug print the values first
     DebugTf("%s = %s %s\r\n", OTmap[msgid].label, getOTGWValue(msgid).c_str(), OTmap[msgid].unit);
     //build the json
@@ -283,6 +283,7 @@ void sendDeviceInfo()
   );
   sendNestedJsonObj("ssid", WiFi.SSID().c_str());
   sendNestedJsonObj("wifirssi", WiFi.RSSI());
+  // sendNestedJosnObj("mqttconnected", CBOOLEAN(getMQTTconnectstatus()));
 //sendNestedJsonObj("uptime", upTime());
 
   sendNestedJsonObj("lastreset", lastReset);
