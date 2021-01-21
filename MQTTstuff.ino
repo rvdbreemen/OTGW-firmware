@@ -297,6 +297,10 @@ void doAutoConfigure()
   } 
 }
 
+bool getMQTTconnectstatus(){
+  return MQTTclient.connected();
+}
+
 
 /***************************************************************************
 *
