@@ -24,7 +24,8 @@ The features of this Custom OTGW NodeMCU (ESP8266) firmware are:
 - settings for Hostname and MQTT in the webUI (just compile and edit in webUI)
 - OTmonitor Web UI (standalone interface)
 - reliable OTA upgrades (v0.6.0+)
-- upgrade PIC firmware using OTmonitor software (through port 1023)
+
+**WARNING: Do not upgrade your PIC thru port 1023! Connect Your OTGW to your serialport instead for upgrade.**
 
 To do:
 - InfluxDB client to do direct logging 
