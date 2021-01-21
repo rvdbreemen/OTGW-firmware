@@ -1,0 +1,38 @@
+https://www.domoticaforum.eu/viewtopic.php?f=70&t=10893
+
+http://www.opentherm.eu/product/view/18/feeling-d201-ot
+ID 98: For a specific RF sensor the RF strength and battery level is written
+ID 99: Operating Mode HC1, HC2/ Operating Mode DHW
+
+https://www.opentherm.eu/request-details/?post_ids=1833
+ID 109: Electricity producer starts
+ID 110: Electricity producer hours
+ID 111: Electricity production
+ID 112: Cumulativ Electricity production
+
+https://www.opentherm.eu/request-details/?post_ids=1833
+New OT (Remeha) Data-ID's
+
+ID 36:   {f8.8}   "Electrical current through burner flame" (µA)
+ID 37:   {f8.8}   "Room temperature for 2nd CH circuit"
+ID 38:   {u8 u8}   "Relative Humidity"
+
+OT Remeha qSense <-> Remeha Tzerra communication
+ID 131:   {u8 u8}   "Remeha dF-/dU-codes"
+ID 132:   {u8 u8}   "Remeha Servicemessage"
+ID 133:   {u8 u8}   "Remeha detection connected SCU’s"
+
+"Remeha dF-/dU-codes": Should match the dF-/dU-codes written on boiler nameplate. Read-Data Request (0 0) returns the data. Also accepts Write-Data Requests (dF dU), this returns the boiler to its factory defaults.
+"Remeha Servicemessage" Read-Data Request (0 0), boiler returns (0 2) in case of no boiler service. Write-Data Request (1 255) clears the boiler service message.
+boiler returns (1 1) = next service type is "A"
+boiler returns (1 2) = next service type is "B"
+boiler returns (1 3) = next service type is "C"
+"Remeha detection connected SCU’s": Write-Data Request (255 1) enables detection of connected SCU prints, correct response is (Write-Ack 255 1).
+
+
+Other Remeha info:
+Data-ID 5: correponds with the Remeha E:xx fault codes.
+Data-ID 11: correponds with the Remeha Pxx parameter codes.
+Data-ID 35: reported value is fan speed in rpm/60 .
+Data-ID 115: correponds with the Remeha Status and Sub-status numbers using {u8 u8} data-type.
+

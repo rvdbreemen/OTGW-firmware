@@ -1,0 +1,18 @@
+According to this document from 2016 the OpenTherm Association is testing OT version 5.
+
+https://www.opentherm.eu/wp-content/uploads/2016/03/OpenTherm-workshop-at-the-Mostra-Convegno-20161.pdf
+
+Version history
+20 years of protocol development:
+–first official release : 1996-1997
+–Version 2.0 : 2000
+–Version 2.2 : 2003 (february 7)
+–Version 3.0: 2006 (Smart power)
+–Version 4.0: 2011 (may 12)
+
+Version 5.0: Currently being tested
+• Larger datapackages
+• Addressing
+• Slave-master communication
+
+According to the document there are (or will be) 7 mandatory ID's.
