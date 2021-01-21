@@ -23,7 +23,7 @@ The features of this Custom OTGW NodeMCU (ESP8266) firmware are:
 - sending commands thru REST API (/api/v1/otgw/command/{any command})
 - settings for Hostname and MQTT in the webUI (just compile and edit in webUI)
 - OTmonitor Web UI (standalone interface)
-- reliable OTA upgrades (v0.6.0+)
+- reliable OTA upgrades ofr NodeMCU (v0.6.0+)
 
 **WARNING: Do not upgrade your PIC thru port 1023! Connect Your OTGW to your serialport instead for upgrade.**
 
@@ -34,7 +34,7 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
   
 | Version | Release notes |
 |-|-|
-| 0.7.0 | Added all 2.3b msgids Ventilation/Heat Recovery. And Remeha msgids. Thanks @STemplar <br>Added OTGW pic reset on bootup.<br> Translate dutch to english.  |
+| 0.7.0 | Bugfix: Serial flushing & writebuffer checking to prevent overflow during flashing. <br> Added all 2.3b msgids Ventilation/Heat Recovery. And Remeha msgids. Thanks @STemplar <br>Added OTGW pic reset on bootup.<br> Translate dutch to english.  |
 | 0.6.1 | Bugfix: setting page did not always work correctly, now it does. |
 | 0.6.0 | Standalone UI for simple OT monitor purposes and deviceinformation, moved index.html to SPIFF <br>OTA is possible after flashing 0.6.0 (Hardware watchdog is fed, during flash uploads now) |
 | 0.5.1 | REST APIs, v1, for OTmonitor values, GetByLabel, GetByID, POST otgw/command/{command} |
