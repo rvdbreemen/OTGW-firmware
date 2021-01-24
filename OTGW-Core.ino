@@ -607,12 +607,7 @@ int sendOTGW(const char* buf, int len)
 
 void processOTGW(const char * buf, int len)
 {
-  if (stricmp(buf, "GW=R")==0){
-    //detect [GW=R], then reset the gateway the gpio way
-    resetOTGW();
-    delay(100); //delay 100ms
-    return;
-  }
+
   if (len >= 9) 
   { 
     //OT protocol messages are 9 chars long
@@ -808,6 +803,12 @@ void handleOTGW()
     {
       sWrite[bytes_write] = 0;
       DebugTf("Net2Ser: Sending to OTGW: [%s] (%d)\r\n", sWrite, bytes_write);
+      if (stricmp(sWrite, "GW=R")==0){
+        //detect [GW=R], then reset the gateway the gpio way
+        DebugTln("Detected: GW=R. Reset gateway command executed.");
+        resetOTGW();
+        delay(100); //delay 100ms
+      }
       bytes_write = 0; //start next line
     } else if  (outByte == '\r')
     {
