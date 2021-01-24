@@ -781,7 +781,7 @@ void handleOTGW()
 {
   //handle serial communication and line processing
   #define MAX_BUFFER_READ 256
-  #define MAX_BUFFER_WRITE 64
+  #define MAX_BUFFER_WRITE 128
   static char sRead[MAX_BUFFER_READ];
   static char sWrite[MAX_BUFFER_WRITE];
   static size_t bytes_read = 0;

@@ -2,13 +2,13 @@
 #define _VERSION_MAJOR 0
 #define _VERSION_MINOR 7  
 #define _VERSION_PATCH 1
-#define _VERSION_BUILD 429
+#define _VERSION_BUILD 430
 //#define _VERSION_PRERELEASE beta  //uncomment to define prerelease labels: alpha - beta - rc
 #define _VERSION_DATE "24-01-2021"
-#define _VERSION_TIME "22:09:02"
+#define _VERSION_TIME "22:10:35"
 #define _SEMVER_CORE "0.7.1"
-#define _SEMVER_BUILD "0.7.1+429"
-#define _SEMVER_FULL "0.7.1+429"
+#define _SEMVER_BUILD "0.7.1+430"
+#define _SEMVER_FULL "0.7.1+430"
 #define _SEMVER_NOBUILD "0.7.1 (24-01-2021)"
-#define _VERSION "0.7.1+429 (24-01-2021)"
+#define _VERSION "0.7.1+430 (24-01-2021)"
 //The version information is created automatically, more information here: https://github.com/rvdbreemen/autoinc-semver
