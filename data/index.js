@@ -287,7 +287,7 @@
               var inputDiv = document.createElement("div");
                   inputDiv.setAttribute("style", "text-align: left;");
 
-                    var sInput = document.createElement("INPUT");
+                    var sInput = document.createElement("input");
               //----sInput.setAttribute("id", "setFld_"+data[i].name);
                     sInput.setAttribute("id", data[i].name);
 
@@ -355,23 +355,18 @@
     
     //--- has anything changed?
     var page = document.getElementById("settingsPage"); 
-    var mRow = page.getElementsByTagName("input");
+    var inputs = page.getElementsByTagName("input");
     //var mRow = document.getElementById("mainPage").getElementsByTagName('div');
-    for(var i = 0; i < mRow.length; i++)
+    for(var i = 0; i < inputs.length; i++)
     {
       //do something to each div like
-      var msgId = mRow[i].getAttribute("id");
-      var field = msgId;
-      console.log("msgId["+msgId+", msgNr["+field+"]");
-      value = document.getElementById(msgId).value;
+      var field = inputs[i].getAttribute("id");
+      console.log("InputNr["+i+"], InputId["+field+"]");
+      value = document.getElementById(field).value;
       console.log("==> name["+field+"], value["+value+"]");
-      changes = false;
-      if   (getBackGround(field) == "lightgray")
-      {
+      if (getBackGround(field).includes("lightgray"))
+      { //then it was changes, and needs to be saved
         setBackGround(field, "white");
-        changes = true;
-      }
-      if (changes) {
         console.log("Changes where made in ["+field+"]["+value+"]");
         //processWithTimeout([(data.length -1), 0], 2, data, sendPostReading);
         document.getElementById("settingMessage").innerHTML = "Saving changes...";
