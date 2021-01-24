@@ -48,3 +48,11 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
 | 0.2.0 | Auto-discovery throug MQTT implemented for integration with home assistant (and domoticz)     |
 | 0.1.0 | MQTT messaging implemented |
 | 0.0.1 | parsing of OT protocol implemented (use telnet to see)   Watchdog implemented |
+
+Shoutout to early adopters helping me out testing and discussing the firmware in development. For pushing features, testing and living on the edge. 
+
+So a big thanks goes to the following people: 
+* @vampywiz17 
+* @Stemplar 
+* @tjfsteele 
+* @proditaki
