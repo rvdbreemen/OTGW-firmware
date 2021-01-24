@@ -800,7 +800,7 @@ void handleOTGW()
     Serial.write(outByte);        // write to serial port
     Serial.flush();               // wait for write to serial
     if (outByte == '\n')
-    {
+    { //on newline, do something...
       sWrite[bytes_write] = 0;
       DebugTf("Net2Ser: Sending to OTGW: [%s] (%d)\r\n", sWrite, bytes_write);
       if (stricmp(sWrite, "GW=R")==0){
