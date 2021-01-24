@@ -607,6 +607,11 @@ int sendOTGW(const char* buf, int len)
 
 void processOTGW(const char * buf, int len)
 {
+  if (stricmp(buf, "GW=R")==0){
+    //detect [GW=R], then reset the gateway the gpio way
+    resetOTGW();
+    delay(100); //delay 100ms
+  }
   if (len >= 9) 
   { 
     //OT protocol messages are 9 chars long
