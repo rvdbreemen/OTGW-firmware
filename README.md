@@ -34,6 +34,7 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
   
 | Version | Release notes |
 |-|-|
+| 0.7.1 | Bugfix: Settings UI works even with "browserplugins". Thanks @STemplar   |
 | 0.7.0 | Bugfix: Serial flushing & writebuffer checking to prevent overflow during flashing. <br> Added all 2.3b msgids Ventilation/Heat Recovery. And Remeha msgids. Thanks @STemplar <br>Added OTGW pic reset on bootup.<br> Translate dutch to english.  |
 | 0.6.1 | Bugfix: setting page did not always work correctly, now it does. |
 | 0.6.0 | Standalone UI for simple OT monitor purposes and deviceinformation, moved index.html to SPIFF <br>OTA is possible after flashing 0.6.0 (Hardware watchdog is fed, during flash uploads now) |
