@@ -611,6 +611,7 @@ void processOTGW(const char * buf, int len)
     //detect [GW=R], then reset the gateway the gpio way
     resetOTGW();
     delay(100); //delay 100ms
+    return;
   }
   if (len >= 9) 
   { 
