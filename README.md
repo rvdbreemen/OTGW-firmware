@@ -2,13 +2,14 @@
 
 [![Join the chat at https://gitter.im/OTGW-firmware/community](https://badges.gitter.im/OTGW-firmware/community.svg)](https://gitter.im/OTGW-firmware/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-Opentherm firmware - Nodoshop version
+Opentherm Nodoshop firmware
 
 This is a custom firmware for the Nodoshop NodeMCU/ESP8266 version of the OpenTherm Gateway. 
 
 It can be found here: https://www.nodo-shop.nl/nl/opentherm-gateway/188-opentherm-gateway.html  
 More information on this gateway can be read here: http://otgw.tclcode.com/  (also location of the OTGW PIC firmware) 
 
+The goal of this project is to become a fully functioning ESP8266 firmware that operates the OTGW as a standalone application. With a WebUI, MQTT and REST API, integration with Home Assistant (using MQTT discovery) and a TCP connection for serial connection (on port 25238).
 
 
 The features of this Custom OTGW NodeMCU (ESP8266) firmware are:
@@ -25,7 +26,7 @@ The features of this Custom OTGW NodeMCU (ESP8266) firmware are:
 - OTmonitor Web UI (standalone interface)
 - reliable OTA upgrades ofr NodeMCU (v0.6.0+)
 
-**WARNING: Do not upgrade your PIC thru port 1023! Connect Your OTGW to your serialport instead for upgrade.**
+**WARNING: Do not upgrade your PIC thru WiFi using port 1023! Connect Your OTGW to your serialport instead for upgrade.**
 
 To do:
 - InfluxDB client to do direct logging 
@@ -34,17 +35,17 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
   
 | Version | Release notes |
 |-|-|
-| 0.7.1 | Bugfix: Settings UI works even with "browserplugins". Thanks @STemplar   |
-| 0.7.0 | Bugfix: Serial flushing & writebuffer checking to prevent overflow during flashing. <br> Added all 2.3b msgids Ventilation/Heat Recovery. And Remeha msgids. Thanks @STemplar <br>Added OTGW pic reset on bootup.<br> Translate dutch to english.  |
+| 0.7.1 | Adding reset gateway to enter self-programming mode more reliable. <br> Changed to port 25238 for serial TCP connections (default of OTmonitor application by Schelte Bron)<br>Bugfix: Settings UI works even with "browserplugins". Thanks @STemplar   |
+| 0.7.0 | Added all Ventilation/Heat Recovery msgids (2.3b OT spec). Plus Remeha msgids. Thanks @STemplar <br>Added OTGW pic reset on bootup.<br> Translate dutch to english. <br>Bugfix: Serial flushing & writebuffer checking to prevent overflow during flashing.  |
 | 0.6.1 | Bugfix: setting page did not always work correctly, now it does. |
 | 0.6.0 | Standalone UI for simple OT monitor purposes and deviceinformation, moved index.html to SPIFF <br>OTA is possible after flashing 0.6.0 (Hardware watchdog is fed, during flash uploads now) |
 | 0.5.1 | REST APIs, v1, for OTmonitor values, GetByLabel, GetByID, POST otgw/command/{command} |
 | 0.5.0 | Implemented the UI for settings (restapi, read/write file in json) |
-| 0.4.2 | Bi-directional serial communication on port 1023 (aka ser2net) for use with OTmonitor application|   
+| 0.4.2 | Bi-directional serial communication on port 25238 (aka ser2net) for use with OTmonitor application|   
 | 0.4.1 | MQTT command sending now works, topic: OTGW/command and |   
 | 0.4.0 | RestAPI implemented - as simple as <ip>/api/v0/otgw/{id} to get the latest values |   
 | 0.3.1 | Bug: Open AP after configuration, change ESP to STA mode on StartWifi <br> No more default Debug to Serial, only to port 23 telnet |   
-| 0.3.0 | Read only Serial stream implementend on port 1023 (debug port remains on port 23 - telnet) |   
+| 0.3.0 | Read only Serial stream implementend on port 25238 (debug port remains on port 23 - telnet) |   
 | 0.2.0 | Auto-discovery throug MQTT implemented for integration with home assistant (and domoticz)     |
 | 0.1.0 | MQTT messaging implemented |
 | 0.0.1 | parsing of OT protocol implemented (use telnet to see)   Watchdog implemented |
