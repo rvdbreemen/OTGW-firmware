@@ -93,7 +93,7 @@ void feedWatchDog() {
   //==== feed the WD over I2C ==== 
   // Address: 0x26
   // I2C Watchdog feed
-  DECLARE_TIMER_MS(timerWD, 1000, CATCH_UP_MISSED_TICKS);
+  DECLARE_TIMER_MS(timerWD, 3000, CATCH_UP_MISSED_TICKS);
   if DUE(timerWD)
   {
     Wire.beginTransmission(OTGW_EXT_WD_I2C_ADDRESS);    //Nodoshop design uses the hardware WD on I2C, address 0x26
