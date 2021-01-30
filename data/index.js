@@ -502,7 +502,7 @@
    ,[ "diagnosticindicator",       "Diagnostic Indicator"]
    ,[ "faultindicator",            "Fault Indicator"]
    ,[ "outsidetemperature",        "Outside Temperature"]
-   ,[ "roomtemperatature",         "Room Temperature"]
+   ,[ "roomtemperature",           "Room Temperature"]
    ,[ "roomsetpoint",              "Room Temperature Setpoint"]
    ,[ "remoteroomsetpoint",        "Remote Room Temperature Setpoint"]
    ,[ "relmodlvl",                 "Relative Modulation Level"]
