@@ -1,6 +1,6 @@
 /*
 ***************************************************************************  
-**  Program  : Header file: OTGWStuff.h 
+**  Program  : Header file: OTGW-Core.h 
 **  Version  : v0.7.1
 **
 **  Copyright (c) 2021 Robert van den Breemen
@@ -10,6 +10,9 @@
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************       
 */  
+
+#ifndef OTGWCore_h
+#define OTGWCore_h
 
 // OTGW Serial 2 network port  
 // #include <TelnetStream.h>       // https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
@@ -449,7 +452,7 @@ struct OpenthermData {
   void s16(int16_t value);
 };
 
-
+#endif
 
 
 /***************************************************************************

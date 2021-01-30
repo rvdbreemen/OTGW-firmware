@@ -209,7 +209,7 @@ void sendOTmonitor()
   sendJsonOTmonObj("faultindicator", CONOFF(isFaultIndicator()),"");
 
   sendJsonOTmonObj("outsidetemperature", OTdataObject.Toutside, "°C");
-  sendJsonOTmonObj("roomtemperatature", OTdataObject.Tr, "°C");
+  sendJsonOTmonObj("roomtemperature", OTdataObject.Tr, "°C");
   sendJsonOTmonObj("roomsetpoint", OTdataObject.TrSet, "°C");
   sendJsonOTmonObj("remoteroomsetpoint", OTdataObject.TrOverride, "°C");
   sendJsonOTmonObj("relmodlvl", OTdataObject.RelModLevel,"%");
