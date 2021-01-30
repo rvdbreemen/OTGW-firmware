@@ -19,7 +19,7 @@
 #include "OTGW-Core.h"
 
 //Defaults and macro definitions
-#define _HOSTNAME   "OTGW"
+#define _HOSTNAME       "OTGW"
 #define SETTINGS_FILE   "/settings.ini"
 #define CMSG_SIZE 512
 #define JSON_BUFF_MAX   1024

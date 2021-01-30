@@ -16,7 +16,7 @@ void writeSettings(bool show)
 
   //let's use JSON to write the setting file
   DebugTf("Writing to [%s] ..\r\n", SETTINGS_FILE);
-  File file = SPIFFS.open(SETTINGS_FILE, "w"); // open for reading and writing
+  File file = LittleFS.open(SETTINGS_FILE, "w"); // open for reading and writing
   if (!file) 
   {
     DebugTf("open(%s, 'w') FAILED!!! --> Bailout\r\n", SETTINGS_FILE);
@@ -49,10 +49,10 @@ void readSettings(bool show)
 {
 
   // Open file for reading
-  File file =  SPIFFS.open(SETTINGS_FILE, "r");
+  File file =  LittleFS.open(SETTINGS_FILE, "r");
 
   DebugTf(" %s ..\r\n", SETTINGS_FILE);
-  if (!SPIFFS.exists(SETTINGS_FILE)) 
+  if (!LittleFS.exists(SETTINGS_FILE)) 
   {  //create settings file if it does not exist yet.
     DebugTln(F(" .. file not found! --> created file!"));
     writeSettings(show);

@@ -59,14 +59,14 @@ void setup()
   Serial.println(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   Serial.printf("Booting....[%s]\r\n\r\n", String(_FW_VERSION).c_str());
   
-//================ SPIFFS ===========================================
-  if (SPIFFS.begin()) 
+//================ LittleFS ===========================================
+  if (LittleFS.begin()) 
   {
-    Serial.println(F("SPIFFS Mount succesfull\r"));
-    SPIFFSmounted = true;
+    Serial.println(F("LittleFS Mount succesfull\r"));
+    LittleFSmounted = true;
   } else { 
-    Serial.println(F("SPIFFS Mount failed\r"));   // Serious problem with SPIFFS 
-    SPIFFSmounted = false;
+    Serial.println(F("LittleFS Mount failed\r"));   // Serious problem with LittleFS 
+    LittleFSmounted = false;
   }
 
   readSettings(true);
@@ -101,21 +101,21 @@ void setup()
 
 //================ Start HTTP Server ================================
   setupFSexplorer();
-  if (!SPIFFS.exists("/index.html")) {
-    httpServer.serveStatic("/",           SPIFFS, "/FSexplorer.html");
-    httpServer.serveStatic("/index",      SPIFFS, "/FSexplorer.html");
-    httpServer.serveStatic("/index.html", SPIFFS, "/FSexplorer.html");
+  if (!LittleFS.exists("/index.html")) {
+    httpServer.serveStatic("/",           LittleFS, "/FSexplorer.html");
+    httpServer.serveStatic("/index",      LittleFS, "/FSexplorer.html");
+    httpServer.serveStatic("/index.html", LittleFS, "/FSexplorer.html");
   } else{
-    httpServer.serveStatic("/",           SPIFFS, "/index.html");
-    httpServer.serveStatic("/index",      SPIFFS, "/index.html");
-    httpServer.serveStatic("/index.html", SPIFFS, "/index.html");
+    httpServer.serveStatic("/",           LittleFS, "/index.html");
+    httpServer.serveStatic("/index",      LittleFS, "/index.html");
+    httpServer.serveStatic("/index.html", LittleFS, "/index.html");
   } 
   // httpServer.on("/",          sendIndexPage);
   // httpServer.on("/index",     sendIndexPage);
   // httpServer.on("/index.html",sendIndexPage);
-  httpServer.serveStatic("/FSexplorer.png",   SPIFFS, "/FSexplorer.png");
-  httpServer.serveStatic("/index.css", SPIFFS, "/index.css");
-  httpServer.serveStatic("/index.js",  SPIFFS, "/index.js");
+  httpServer.serveStatic("/FSexplorer.png",   LittleFS, "/FSexplorer.png");
+  httpServer.serveStatic("/index.css", LittleFS, "/index.css");
+  httpServer.serveStatic("/index.js",  LittleFS, "/index.js");
   // all other api calls are catched in FSexplorer onNotFounD!
   httpServer.on("/api", HTTP_ANY, processAPI);  //was only HTTP_GET (20210110)
 

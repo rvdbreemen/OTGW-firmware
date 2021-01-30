@@ -43,15 +43,16 @@
 #include "updateServerHtml.h"
 #include <WiFiManager.h>        // version 2.0.4-beta - use latest development branch  - https://github.com/tzapu/WiFiManager
 // included in main program: #include <TelnetStream.h>       // Version 0.0.1 - https://github.com/jandrassy/TelnetStream
-#include <FS.h>                 // part of ESP8266 Core https://github.com/esp8266/Arduino
 
+//#include <FS.h>                 // part of ESP8266 Core https://github.com/esp8266/Arduino
+#include <LittleFS.h>
 
 ESP8266WebServer        httpServer (80);
 ESP8266HTTPUpdateServer httpUpdater(true);
 
 
-static      FSInfo SPIFFSinfo;
-bool        SPIFFSmounted; 
+static      FSInfo LittleFSinfo;
+bool        LittleFSmounted; 
 bool        isConnected = false;
 
 //gets called when WiFiManager enters configuration mode

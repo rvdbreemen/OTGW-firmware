@@ -51,8 +51,8 @@ static const char serverIndex2[] PROGMEM =
       </form>
       <form method='POST' action='?cmd=100' enctype='multipart/form-data'> 
         <input type='hidden' name='cmd' value='100'>
-                  <input type='file' accept='spiffs.bin' name='update'>
-                  <input type='submit' value='Flash Spiffs'>
+                  <input type='file' accept='LittleFS.bin' name='update'>
+                  <input type='submit' value='Flash LittleFS'>
       </form>
      </html>)";
 
