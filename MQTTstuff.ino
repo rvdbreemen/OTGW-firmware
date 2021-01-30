@@ -273,10 +273,10 @@ void doAutoConfigure()
   String sMsg="";
   File fh; //filehandle
   //Let's open the MQTT autoconfig file
-  SPIFFS.begin();
-  if (SPIFFS.exists(cfgFilename))
+  LittleFS.begin();
+  if (LittleFS.exists(cfgFilename))
   {
-    fh = SPIFFS.open(cfgFilename, "r");
+    fh = LittleFS.open(cfgFilename, "r");
     if (fh) {
       //Lets go read the config and send it out to MQTT line by line
       while(fh.available()) 

@@ -533,7 +533,7 @@
    ,[ "flashchipid",                "Flash ID"]   
    ,[ "flashchipsize",              "Flash Chip Size (MB)"]
    ,[ "flashchiprealsize",          "Real Flash Chip Size (MB)"]
-   ,[ "spiffssize",                 "SPIFF size (MB)"]
+   ,[ "littlefssize",               "LittleFS size (MB)"]
    ,[ "flashchipspeed",             "Flash Chip Speed (MHz)"]
    ,[ "flashchipmode",              "Flash Mode"]
    ,[ "boardtype",                  "Board Type"]

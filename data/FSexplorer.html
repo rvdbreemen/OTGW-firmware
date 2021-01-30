@@ -48,7 +48,7 @@
                      dir += `<td width=10% nowrap><a href ="${json[i].name}?delete=/${json[i].name}"> Delete </a></td>`;
                      if (json[i].name == '!format') 
                      {
-                 	    document.getElementById('FormatSPIFFS').disabled = false;
+                 	    document.getElementById('FormatLittleFS').disabled = false;
                      }
                    }
                    else 
@@ -65,7 +65,7 @@
                		 });
                });
                main.insertAdjacentHTML('beforeend', '</table>');
-               main.insertAdjacentHTML('beforeend', `<p><b>SPIFFS</b> used ${json[i].usedBytes} by ${json[i].totalBytes}`);
+               main.insertAdjacentHTML('beforeend', `<p><b>LittleFS</b> used ${json[i].usedBytes} by ${json[i].totalBytes}`);
                free = json[i].freeBytes;
                fileSize.innerHTML = "<b> &nbsp; </b><p>";    // spacer                
 
@@ -88,7 +88,7 @@
                     }
              });
              //elem[6].addEventListener('click', () => {
-             document.getElementById('FormatSPIFFS').addEventListener('click', () => {
+             document.getElementById('FormatLittleFS').addEventListener('click', () => {
                  if (!confirm(`Are you sure you want to execute this function?\nWhen you continue you have to upload FSexplorer.html and all other system files again!!.`)) event.preventDefault();
              }); 
           });
@@ -125,8 +125,8 @@
       </div>
       <div style='width: 40%'>
         <span>
-        <form style='float right;' action="/SPIFFSformat" method="POST">
-          <input id='FormatSPIFFS' type='submit' class='button' name='SUBMIT' value='Format SPIFFS' DISABLED/>
+        <form style='float right;' action="/LittleFSformat" method="POST">
+          <input id='FormatLittleFS' type='submit' class='button' name='SUBMIT' value='Format SPIFFS' DISABLED/>
         </form>
         </span>
       </div>

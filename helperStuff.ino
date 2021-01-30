@@ -508,9 +508,9 @@ uint32_t updateRebootCount()
   //return: number of reboots (if it goes as planned)
   uint32_t _reboot = 0;
   #define REBOOTCNT_FILE "/reboot_count.txt"
-  if (SPIFFS.begin()) {
+  if (LittleFS.begin()) {
     //start with opening the file
-    File fh = SPIFFS.open(REBOOTCNT_FILE, "r");
+    File fh = LittleFS.open(REBOOTCNT_FILE, "r");
     if (fh) {
       //read from file
       if (fh.available()){
@@ -522,7 +522,7 @@ uint32_t updateRebootCount()
     //increment reboot counter
     _reboot++;
     //write back the reboot counter
-    fh = SPIFFS.open(REBOOTCNT_FILE, "w");
+    fh = LittleFS.open(REBOOTCNT_FILE, "w");
     if (fh) {
       //write to _reboot to file
       fh.println(_reboot);
