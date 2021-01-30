@@ -11,7 +11,6 @@
 ***************************************************************************      
 */
 
-//#include "OTGW-Core.h"
 
 //define Nodoshop OTGW hardware
 #define OTGW_BUTTON D3
