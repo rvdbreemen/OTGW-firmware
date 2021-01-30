@@ -12,6 +12,7 @@
         "istream": "cpp",
         "vector": "cpp",
         "string": "cpp",
-        "fstream": "cpp"
+        "fstream": "cpp",
+        "cstring": "cpp"
     }
 }

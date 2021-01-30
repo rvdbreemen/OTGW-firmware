@@ -109,8 +109,9 @@ void APIlistFiles()             // Senden aller Daten an den Client
 {   
   FSInfo LittleFSinfo;
 
+  #define LEN_FILENAME 32
   typedef struct _fileMeta {
-    char    Name[30];     
+    char    Name[LEN_FILENAME];     
     int32_t Size;
   } fileMeta;
 
@@ -121,7 +122,7 @@ void APIlistFiles()             // Senden aller Daten an den Client
   while (dir.next() && (fileNr < MAX_FILES_IN_LIST))  
   {
     dirMap[fileNr].Name[0] = '\0';
-    strncat(dirMap[fileNr].Name, dir.fileName().substring(1).c_str(), 29); // remove leading '/'
+    strlcat(dirMap[fileNr].Name, dir.fileName().c_str(), LEN_FILENAME); 
     dirMap[fileNr].Size = dir.fileSize();
     fileNr++;
   }
@@ -132,7 +133,7 @@ void APIlistFiles()             // Senden aller Daten an den Client
     yield();
     for (int8_t x = y + 1; x < fileNr; x++)  {
       //DebugTf("y[%d], x[%d] => seq[y][%s] / seq[x][%s] ", y, x, dirMap[y].Name, dirMap[x].Name);
-      if (compare(String(dirMap[x].Name), String(dirMap[y].Name)))  
+      if (strcasecmp(dirMap[x].Name, dirMap[y].Name) <= 0)
       {
         //Debug(" !switch!");
         fileMeta temp = dirMap[y];

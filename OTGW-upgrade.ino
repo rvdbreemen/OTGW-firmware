@@ -645,6 +645,46 @@ void upgradeevent() {
   }
 }
 
+void upgradenow() {
+  static bool dle = false;
+  static uint8_t len, sum;
+  int ch;
+  // So kickoff the upgrade
+  if (fwstate == FWSTATE_IDLE) {
+    blink(0);
+    digitalWrite(LED1, LOW);
+    fwupgradestart();
+  }
+
+  // So a PIC reset just happend, so we should get a STX next, if all goes well that is.
+  while (fwstate != FWSTATE_IDLE) {
+    // keep feeding the dog from time to time... 
+    feedWatchDog();
+    // Let's check what the PIC sends
+    if (Serial.available() > 0) {
+      ch = Serial.read();
+      if (!dle && ch == STX) {
+        digitalWrite(LED2, LOW);
+        len = 0;
+        sum = 0;
+      } else if (!dle && ch == DLE) {
+        dle = true;
+      } else if (!dle && ch == ETX) {
+        digitalWrite(LED2, HIGH);
+        if (sum == 0) {
+          fwupgradestep(fwupd->buffer, len);
+        } else {
+          fwupgradestep();
+        }
+        len = 0;
+      } else if (fwstate != FWSTATE_RSET) {
+        fwupd->buffer[len++] = ch;
+        sum -= ch;
+        dle = false;
+      }
+    }
+  }
+}
 
 
 /***************************************************************************
