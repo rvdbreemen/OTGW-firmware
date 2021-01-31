@@ -62,7 +62,7 @@ void resetOTGW() {
 String getpicfwversion(){
   String _ret="";
   #define BANNER "OpenTherm Gateway"
-  String line = getCommand("PR=A");
+  String line = executeCommand("PR=A");
   int p = line.indexOf(BANNER);
   if (p >= 0) {
     p += sizeof(BANNER);

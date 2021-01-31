@@ -136,7 +136,7 @@ void setup()
   resetOTGW();          // reset the OTGW pic
   initWatchDog();       // setup the WatchDog
   startOTGWstream();    // start port 1023 
-  sPICfwversion = getCommand("PR=A"); // fetch the firmware version
+  sPICfwversion = executeCommand("PR=A"); // fetch the firmware version
   DebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
 
   DebugTf("Reboot count = [%d]\r\n", rebootCount);
