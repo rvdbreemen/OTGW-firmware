@@ -290,8 +290,17 @@
                     var sInput = document.createElement("input");
               //----sInput.setAttribute("id", "setFld_"+data[i].name);
                     sInput.setAttribute("id", data[i].name);
-
-                    if (data[i].type == "s")
+                    if (data[i].type == "b")
+                    {
+                      sInput.setAttribute("type", "checkbox");
+                      sInput.checked = data[i].value;
+                      //if (data[i].value == "true"){
+                      //  sInput.checked = true; 
+                      //} else {
+                      //  sInput.checked = false;
+                      //}
+                    }
+                    else if (data[i].type == "s")
                     {
                       sInput.setAttribute("type", "text");
                       sInput.setAttribute("maxlength", data[i].maxlen);
@@ -362,7 +371,11 @@
       //do something to each div like
       var field = inputs[i].getAttribute("id");
       console.log("InputNr["+i+"], InputId["+field+"]");
-      value = document.getElementById(field).value;
+      if (inputs[i].type == "checkbox") {
+        value = document.getElementById(field).checked;
+      } else {
+        value = document.getElementById(field).value;
+      }
       console.log("==> name["+field+"], value["+value+"]");
       if (getBackGround(field).includes("lightgray"))
       { //then it was changes, and needs to be saved
@@ -373,35 +386,8 @@
         setTimeout(function(){ document.getElementById("settingMessage").innerHTML = ""; }, 1000); //and clear the message
         sendPostSetting(field, value);
       }
-    } 
+    }
   } // saveSettings()
-
-  
-/****  
-  //============================================================================  
-  function saveSettings() 
-  {
-    console.log("saveSettings() ...");
-    var settings = document.getElementById("settingsPage").getElementsByTagName('div');;
-    for(var i = 0; i < settings.length; i++){
-      //do something to each div like
-      //console.log(settings[i].innerHTML);
-      Dname = settings[i].getAttribute("id");
-      if (Dname != null)
-      {
-        //console.log("Dname["+Dname+"]");
-        field = Dname.substr(2);
-        value = document.getElementById(field).value;
-        console.log("==> name["+field+"], value["+value+"]");
-        sendPostSetting(field, value) 
-        //console.log("value["+value+"]");
-      }
-    }    
-    
-  } // saveSettings()
-****/
-    
- 
 
     
   //============================================================================  
@@ -515,7 +501,6 @@
    ,[ "dhwtemperature",            "Domestic Hotwater Temperature"]
    ,[ "dhwsetpoint",               "Domestic Hotwater Setpoint"]
    ,[ "oemfaultcode",              "OEM Fault Code"]
-
    ,[ "author",                     "Developer"]
    ,[ "fwversion",                  "Firmware Version"]
    ,[ "compiled",                   "Compiled on (date/time)"]
@@ -541,6 +526,8 @@
    ,[ "wifirssi",                   "Wifi Receive Power (dB)"]
    ,[ "lastreset",                  "Last Reset Reason"]
    ,[ "mqttconnected",              "MQTT Connected"]
+   ,[ "mqttenable",                 "MQTT Enable"]
+   ,[ "timezone",                   "Timezone"]
    
                  ];
   

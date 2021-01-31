@@ -50,13 +50,97 @@ OpenthermData OTdata;
 
 //===================[ Reset OTGW ]===============================
 void resetOTGW() {
-  //lower the right pin for just 500ms and the OTGW is reset
+  //lower the right pin for just 100ms and the OTGW is reset
+  DebugTln("OTGW PIC reset");
   pinMode(OTGW_RESET, OUTPUT);
   digitalWrite(OTGW_RESET, LOW);
-  delay(200);
+  delay(100);
   digitalWrite(OTGW_RESET, HIGH);
   pinMode(OTGW_RESET, INPUT_PULLUP);
 }
+//===================[ getpicfwversion ]===========================
+String getpicfwversion(){
+  String _ret="";
+  #define BANNER "OpenTherm Gateway"
+  String line = getCommand("PR=A");
+  int p = line.indexOf(BANNER);
+  if (p >= 0) {
+    p += sizeof(BANNER);
+    _ret = line.substring(p);
+  } else _ret ="not found";
+  DebugTf("Current firmware version: %s\n", CSTR(_ret));
+  _ret.trim();
+  return _ret;
+}
+//===================[ OTGW Command & Response ]===================
+String getCommand(const String sCmd){
+  return getCommand(CSTR(sCmd), sCmd.length());
+}
+
+String getCommand(const char* sCmd, int len){
+// Example:
+// 
+  DebugTf("OTGW Send Cmd [%s]=[%s]\r\n", sCmd);
+  while(Serial.availableForWrite() < len+2){
+    feedWatchDog();
+  }
+  Serial.write(sCmd, len);
+  Serial.write("\r\n");
+  Serial.flush();
+  //wait for response
+  while(!Serial.available()) {
+    feedWatchDog();
+  }
+  //fetch a line
+  char line[80];
+  char _cmd[2];
+  char *_ret;
+  memcpy(_cmd, sCmd, 2);
+  DebugTf("Command: [%s]\r\n", _cmd);
+  size_t l = Serial.readBytesUntil('\n', line, sizeof(line)-1);
+  line[l]='\0';
+  DebugTf("Line returned: [%s]\r\n", line);
+  // Responses: When a serial command is accepted by the gateway, it responds with the two letters of the command code, a colon, and the interpreted data value.
+  if (prefix(_cmd, line)){
+    //Command:    "TT=19.125"
+    // Response:  "TT: 19.13"
+    //            [XX:response string]
+    memcpy(line, line+3, sizeof(line)-3);    
+  } else if (prefix("NG", line)){
+    strlcpy(line, "NG - No Good. The command code is unknown.", sizeof(line));
+  } else if (prefix("SE", line)){
+    strlcpy(line, "SE - Syntax Error. The command contained an unexpected character or was incomplete.", sizeof(line));
+  } else if (prefix("BV", line)){
+    strlcpy(line, "BV - Bad Value. The command contained a data value that is not allowed.", sizeof(line));
+  } else if (prefix("OR", line)){
+    strlcpy(line, "OR - Out of Range. A number was specified outside of the allowed range.", sizeof(line));
+  } else if (prefix("NS", line)){
+    strlcpy(line, "NS - No Space. The alternative Data-ID could not be added because the table is full.", sizeof(line));
+  } else if (prefix("NF", line)){
+    strlcpy(line, "NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table.", sizeof(line));
+  } else if (prefix("OE", line)){
+    strlcpy(line, "OE - Overrun Error. The processor was busy and failed to process all received characters.", sizeof(line));
+  }
+  return line;
+}
+
+//===================[ OTGW PS=1 Command ]===============================
+void getOTGW_PS_1(){
+  DebugTln("PS=1");
+  Serial.write("PS=1\r\n");
+  Serial.flush();
+
+  while(!Serial.available()) {
+    feedWatchDog();
+  }
+  String line = Serial.readStringUntil('\n');
+  line.trim(); //remove LF and CR (and whitespaces)
+  DebugTln(line);
+  DebugTln("PS=0");
+  Serial.write("PS=0\r\n");
+  Serial.flush();
+}
+//===================[ OTGW PS=1 Command ]===============================
 
 //===================[ Watchdog OTGW ]===============================
 String initWatchDog() {
@@ -556,23 +640,7 @@ uint16_t print_daytime()
   sendMQTTData(_topic, itoa(OTdata.valueLB, _msg, 10)); 
   return _value;
 }
-//===================[ OTGW PS=1 Command ]===============================
-void getOTGW_PS_1(){
-  DebugTln("PS=1");
-  Serial.write("PS=1\r\n");
-  Serial.flush();
-  delay(100);
-  while(Serial.available() > 0) 
-  { 
-    String strBuffer = Serial.readStringUntil('\n');
-    strBuffer.trim(); //remove LF and CR (and whitespaces)
-    DebugTln(strBuffer);
-  }
-  DebugTln("PS=0");
-  Serial.write("PS=0\r\n");
-  Serial.flush();
-}
-//===================[ OTGW PS=1 Command ]===============================
+
 
 //===================[ Send buffer to OTGW ]=============================
 
@@ -802,11 +870,11 @@ void handleOTGW()
     { //on newline, do something...
       sWrite[bytes_write] = 0;
       DebugTf("Net2Ser: Sending to OTGW: [%s] (%d)\r\n", sWrite, bytes_write);
+      //check for reset command
       if (stricmp(sWrite, "GW=R")==0){
         //detect [GW=R], then reset the gateway the gpio way
         DebugTln("Detected: GW=R. Reset gateway command executed.");
         resetOTGW();
-        delay(100); //delay 100ms
       }
       bytes_write = 0; //start next line
     } else if  (outByte == '\r')

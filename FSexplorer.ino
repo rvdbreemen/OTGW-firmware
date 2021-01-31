@@ -77,6 +77,7 @@ void setupFSexplorer()    // Funktionsaufruf "LittleFS();" muss im Setup eingebu
   httpServer.on("/upload", HTTP_POST, []() {}, handleFileUpload);
   httpServer.on("/ReBoot", reBootESP);
   httpServer.on("/update", updateFirmware);
+  httpServer.on("/upgradepic", upgradePIC);
   httpServer.onNotFound([]() 
   {
     if (Verbose) DebugTf("in 'onNotFound()'!! [%s] => \r\n", String(httpServer.uri()).c_str());
@@ -268,21 +269,28 @@ bool freeSpace(uint16_t const& printsize)
   
 } // freeSpace()
 
+//=====================================================================================
+void upgradePIC()
+{
+  DebugTln(F("Redirect to upgrade PIC .."));
+  upgradenow();
+  doRedirect("Upgrade OTGW PIC ", 120, "/FSexplorer", false);
+} // upgradePIC()
+
 
 //=====================================================================================
 void updateFirmware()
 {
   DebugTln(F("Redirect to updateIndex .."));
   doRedirect("wait ... ", 1, "/updateIndex", false);
-      
 } // updateFirmware()
+
 
 //=====================================================================================
 void reBootESP()
 {
   DebugTln(F("Redirect and ReBoot .."));
-  doRedirect("Reboot OTGW firmware ..", 60, "/", true);
-      
+  doRedirect("Reboot OTGW firmware ..", 60, "/", true);   
 } // reBootESP()
 
 //=====================================================================================
@@ -295,18 +303,18 @@ void doRedirect(String msg, int wait, const char* URL, bool reboot)
   "<style type='text/css'>"
   "body {background-color: lightblue;}"
   "</style>"
-  "<title>Redirect to Main Program</title>"
+  "<title>Redirect to ...</title>"
   "</head>"
   "<body><h1>FSexplorer</h1>"
   "<h3>"+msg+"</h3>"
   "<br><div style='width: 500px; position: relative; font-size: 25px;'>"
-  "  <div style='float: left;'>Redirect over &nbsp;</div>"
+  "  <div style='float: left;'>Redirect in &nbsp;</div>"
   "  <div style='float: left;' id='counter'>"+String(wait)+"</div>"
-  "  <div style='float: left;'>&nbsp; seconden ...</div>"
+  "  <div style='float: left;'>&nbsp; seconds ...</div>"
   "  <div style='float: right;'>&nbsp;</div>"
   "</div>"
   "<!-- Note: don't tell people to `click` the link, just tell them that it is a link. -->"
-  "<br><br><hr>If you are not redirected automatically, click this <a href='/'>Main Program</a>."
+  "<br><br><hr>Wait for the redirect. In case you are not redirected automatically, then click this <a href='/'>link to continue</a>."
   "  <script>"
   "      setInterval(function() {"
   "          var div = document.querySelector('#counter');"
@@ -321,6 +329,6 @@ void doRedirect(String msg, int wait, const char* URL, bool reboot)
   
   DebugTln(msg);
   httpServer.send(200, "text/html", redirectHTML);
-  if (reboot) doRestart("Reboot after OTA flash");
+  if (reboot) doRestart("Reboot after upgrade");
   
 } // doRedirect()

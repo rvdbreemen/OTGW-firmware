@@ -13,6 +13,7 @@
         "vector": "cpp",
         "string": "cpp",
         "fstream": "cpp",
-        "cstring": "cpp"
+        "cstring": "cpp",
+        "regex": "cpp"
     }
 }

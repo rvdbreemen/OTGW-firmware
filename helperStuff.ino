@@ -539,6 +539,24 @@ void doRestart(const char* str) {
   delay(5000);  // Enough time to ensure we don't return.
 }
 
+String upTime() 
+{
+  char    calcUptime[20];
+
+  snprintf(calcUptime, sizeof(calcUptime), "%d(d)-%02d:%02d(H:m)"
+                                          , int((upTimeSeconds / (60 * 60 * 24)) % 365)
+                                          , int((upTimeSeconds / (60 * 60)) % 24)
+                                          , int((upTimeSeconds / (60)) % 60));
+
+  return calcUptime;
+
+} // upTime()
+
+bool prefix(const char *pre, const char *str)
+{
+    return strncmp(pre, str, strlen(pre)) == 0;
+}
+
 
 /***************************************************************************
 *
