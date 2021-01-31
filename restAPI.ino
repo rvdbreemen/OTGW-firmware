@@ -99,7 +99,7 @@ void processAPI()
             ** Response: 200 [response is value after {xx:value}]|[errorcode: {NG|SE|BV|OR|NS|NF|OE}]
             */
             //Send a command to OTGW and get the response too...
-            httpServer.send(200, "text/plain", getCommand(words[5]));
+            httpServer.send(200, "text/plain", executeCommand(words[5]));
           } else sendApiNotFound(URI);
         }
         else sendApiNotFound(URI);

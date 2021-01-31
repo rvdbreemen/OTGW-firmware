@@ -73,13 +73,15 @@ String getpicfwversion(){
   return _ret;
 }
 //===================[ OTGW Command & Response ]===================
-String getCommand(const String sCmd){
-  return getCommand(CSTR(sCmd), sCmd.length());
+String executeCommand(const String sCmd){
+  return executeCommand(CSTR(sCmd), sCmd.length());
 }
 
-String getCommand(const char* sCmd, int len){
-// Example:
-// 
+String executeCommand(const char* sCmd, int len){
+  char _cmd[2];
+  char line[80];
+  char *_ret;
+  //send command to OTGW
   DebugTf("OTGW Send Cmd [%s]=[%s]\r\n", sCmd);
   while(Serial.availableForWrite() < len+2){
     feedWatchDog();
@@ -91,15 +93,13 @@ String getCommand(const char* sCmd, int len){
   while(!Serial.available()) {
     feedWatchDog();
   }
-  //fetch a line
-  char line[80];
-  char _cmd[2];
-  char *_ret;
+  //remember command send
   memcpy(_cmd, sCmd, 2);
-  DebugTf("Command: [%s]\r\n", _cmd);
+  // DebugTf("Send command: [%s]\r\n", _cmd);
+  //fetch a line
   size_t l = Serial.readBytesUntil('\n', line, sizeof(line)-1);
   line[l]='\0';
-  DebugTf("Line returned: [%s]\r\n", line);
+  DebugTf("Command send - Response returned: [%s] - [%s]\r\n", _cmd, line);
   // Responses: When a serial command is accepted by the gateway, it responds with the two letters of the command code, a colon, and the interpreted data value.
   if (prefix(_cmd, line)){
     //Command:    "TT=19.125"
