@@ -236,9 +236,18 @@ void sendJsonSettingObj(const char *cName, const char *cValue, const char *sType
 
 } // sendJsonSettingObj(*char, *char, *char, int, int)
 
+//=======================================================================
+void sendJsonSettingObj(const char *cName, bool bValue, const char *sType)
+{
+  char jsonBuff[200] = "";
 
+  snprintf(jsonBuff, sizeof(jsonBuff), "%s{\"name\": \"%s\", \"value\":\"%s\", \"type\": \"%s\"}"
+                                      , objSprtr, cName,  CBOOLEAN(bValue), sType);
 
+  httpServer.sendContent(jsonBuff);
+  sprintf(objSprtr, ",\r\n");
 
+} // sendJsonSettingObj(*char, bool, *char)    
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a

@@ -30,11 +30,13 @@ void writeSettings(bool show)
   DynamicJsonDocument doc(512);
   JsonObject root  = doc.to<JsonObject>();
   root["hostname"] = settingHostname;
+  root["MQTTenable"] = settingMQTTenable;
   root["MQTTbroker"] = settingMQTTbroker;
   root["MQTTbrokerPort"] = settingMQTTbrokerPort;
   root["MQTTuser"] = settingMQTTuser;
   root["MQTTpasswd"] = settingMQTTpasswd;
   root["MQTTtoptopic"] = settingMQTTtopTopic;
+  root["Timezone"] = settingTimezone;
 
   serializeJsonPretty(root, file);
   Debugln(F("... done!"));
@@ -72,12 +74,14 @@ void readSettings(bool show)
   // Copy values from the JsonDocument to the Config 
   settingHostname         = doc["hostname"].as<String>();
   if (settingHostname.length()==0) settingHostname = _HOSTNAME;
+  settingMQTTenable       = doc["MQTTenable"]; 
   settingMQTTbroker       = doc["MQTTbroker"].as<String>();
   settingMQTTbrokerPort   = doc["MQTTbrokerPort"]; //default port
   settingMQTTuser         = doc["MQTTuser"].as<String>();
   settingMQTTpasswd       = doc["MQTTpasswd"].as<String>();
   settingMQTTtopTopic     = doc["MQTTtoptopic"].as<String>();
   if (settingMQTTtopTopic.length()==0) settingMQTTtopTopic = _HOSTNAME;
+  settingTimezone         = doc["Timezone"].as<String>();
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
@@ -90,11 +94,13 @@ void readSettings(bool show)
   if (show) {
     Debugln(F("\r\n==== read Settings ===================================================\r"));
     Debugf("                 Hostname      : %s\r\n",  CSTR(settingHostname));
+    Debugf("                 MQTT enabled  : %s\r\n",  CBOOLEAN(settingMQTTenable));
     Debugf("                 MQTT broker   : %s\r\n",  CSTR(settingMQTTbroker));
     Debugf("                 MQTT port     : %d\r\n",  settingMQTTbrokerPort);
     Debugf("                 MQTT username : %s\r\n",  CSTR(settingMQTTuser));
     Debugf("                 MQTT password : %s\r\n",  CSTR(settingMQTTpasswd));
     Debugf("                 MQTT toptopic : %s\r\n",  CSTR(settingMQTTtopTopic));
+    Debugf("                 Timezone      : %s\r\n",  CSTR(settingTimezone));
   }
   
   Debugln(F("-\r"));
@@ -119,6 +125,7 @@ void updateSetting(const char *field, const char *newValue)
     Debugln();
     DebugTf("Need reboot before new %s.local will be available!\r\n\n", CSTR(settingHostname));
   }
+  if (stricmp(field, "MQTTenable")==0)      settingMQTTenable = EVALBOOLEAN(newValue);
   if (stricmp(field, "MQTTbroker")==0)      settingMQTTbroker = String(newValue);
   if (stricmp(field, "MQTTbrokerPort")==0)  settingMQTTbrokerPort = atoi(newValue);
   if (stricmp(field, "MQTTuser")==0)        settingMQTTuser = String(newValue);
@@ -127,6 +134,7 @@ void updateSetting(const char *field, const char *newValue)
     settingMQTTtopTopic = String(newValue);
     if (settingMQTTtopTopic.length()==0) settingMQTTtopTopic = "OTGW";
   }
+  if (stricmp(field, "Timezone")==0)        settingTimezone = String(newValue);
   
   //finally update write settings
   writeSettings(false);

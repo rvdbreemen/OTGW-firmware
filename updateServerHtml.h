@@ -18,9 +18,9 @@ static const char UpdateServerIndex[] PROGMEM =
       </form>
       <hr>
       <br/><font color='red'>Warning!!!</font>
-      <br/>You will lose all your files when flashing SPIFF. 
+      <br/>You will lose all your files when flashing LittleFS. 
       <br/>Backup your files first to your local filesystem (using FSexplorer) 
-      and upload them after the flashing of your SPIFF.
+      and upload them after the flashing of your LittleFS.
       <hr>
       <br/>
       <br/>Wait <span style='font-size: 1.3em;' id="waitSeconds">60</span> seconds ..

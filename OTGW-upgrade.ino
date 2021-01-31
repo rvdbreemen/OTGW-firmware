@@ -26,7 +26,7 @@
 
 #define BANNER "OpenTherm Gateway"
 
-extern char fwversion[];
+char fwversion[16];
 
 #define STX 0x0F
 #define ETX 0x04
@@ -67,7 +67,7 @@ enum {
   ERROR_MISMATCHES
 };
 
-static uint8_t fwstate = FWSTATE_IDLE;
+static byte fwstate = FWSTATE_IDLE;
 
 struct fwupdatedata {
   unsigned char buffer[80];
@@ -82,7 +82,7 @@ struct fwupdatedata {
 
 struct xferdata {
   unsigned short addr;
-  uint8_t size, mask;
+  byte size, mask;
 };
 
 Ticker timeout;
@@ -165,7 +165,7 @@ int eeprom(const char *version, struct xferdata *xfer) {
 int transfer(const char *ver1, const char *ver2) {
   struct xferdata xfer1[XFER_MAX_ID] = {}, xfer2[XFER_MAX_ID] = {};
   int last, i, j, mask;
-  uint8_t value;
+  byte value;
 
   last = min(eeprom(ver1, xfer1), eeprom(ver2, xfer2));
   for (i = 0; i <= last; i++) {
@@ -280,7 +280,7 @@ bool readhex(unsigned short *codemem, unsigned char *datamem, unsigned short *co
 void fwupgradefail();
 
 void fwupgradecmd(const unsigned char *cmd, int len) {
-  uint8_t i, ch, sum = 0;
+  byte i, ch, sum = 0;
 
   Serial.write(STX);
   for (i = 0; i <= len; i++) {
@@ -295,7 +295,7 @@ void fwupgradecmd(const unsigned char *cmd, int len) {
 }
 
 bool erasecode(short addr) {
-  uint8_t fwcommand[] = {CMD_ERASEPROG, 1, 0, 0};
+  byte fwcommand[] = {CMD_ERASEPROG, 1, 0, 0};
   bool rc = false;
   short i;
   for (i = 0; i < 32; i++) {
@@ -313,7 +313,7 @@ bool erasecode(short addr) {
 }
 
 void loadcode(short addr, const unsigned short *code, short len = 32) {
-  uint8_t i, fwcommand[4 + 2 * len];
+  byte i, fwcommand[4 + 2 * len];
   unsigned short *data = (unsigned short *)fwcommand + 2;
   fwcommand[0] = CMD_WRITEPROG;
   fwcommand[1] = len >> 2;
@@ -326,7 +326,7 @@ void loadcode(short addr, const unsigned short *code, short len = 32) {
 }
 
 void readcode(short addr, short len = 32) {
-  uint8_t fwcommand[] = {CMD_READPROG, 32, 0, 0};
+  byte fwcommand[] = {CMD_READPROG, 32, 0, 0};
   fwcommand[1] = len;
   fwcommand[2] = addr & 0xff;
   fwcommand[3] = addr >> 8;
@@ -347,8 +347,8 @@ bool verifycode(const unsigned short *code, const unsigned short *data, short le
 }
 
 void loaddata(short addr) {
-  uint8_t i;
-  uint8_t fwcommand[68] = {CMD_WRITEDATA, 64};
+  byte i;
+  byte fwcommand[68] = {CMD_WRITEDATA, 64};
   fwcommand[2] = addr & 0xff;
   fwcommand[3] = addr >> 8;
   for (i = 0; i < 64; i++) {
@@ -358,12 +358,12 @@ void loaddata(short addr) {
 }
 
 void readdata(short addr) {
-  uint8_t fwcommand[] = {CMD_READDATA, 64, 0, 0};
+  byte fwcommand[] = {CMD_READDATA, 64, 0, 0};
   fwcommand[2] = addr & 0xff;
   fwupgradecmd(fwcommand, sizeof(fwcommand));
 }
 
-bool verifydata(short pc, const uint8_t *data, short len = 64) {
+bool verifydata(short pc, const byte *data, short len = 64) {
   short i;
   bool rc = true;
 
@@ -394,11 +394,11 @@ void fwupgradestop(int result) {
   }
 }
 
-void fwupgradestep(const uint8_t *packet = nullptr, int len = 0) {
+void fwupgradestep(const byte *packet = nullptr, int len = 0) {
   const unsigned short *data = (const unsigned short *)packet;
   static short pc;
-  static uint8_t lastcmd = 0;
-  uint8_t cmd = 0;
+  static byte lastcmd = 0;
+  byte cmd = 0;
 
   if (packet == nullptr || len == 0) {
     cmd = lastcmd;
@@ -416,7 +416,7 @@ void fwupgradestep(const uint8_t *packet = nullptr, int len = 0) {
       break;
     case FWSTATE_RSET:
       if (packet != nullptr) {
-        uint8_t fwcommand[] = {CMD_VERSION, 3};
+        byte fwcommand[] = {CMD_VERSION, 3};
         fwupgradecmd(fwcommand, sizeof(fwcommand));
         fwstate = FWSTATE_VERSION;
       } else if (++fwupd->retries > 5) {
@@ -450,7 +450,7 @@ void fwupgradestep(const uint8_t *packet = nullptr, int len = 0) {
       } else if (++fwupd->retries > 10) {
         fwupgradestop(ERROR_RETRIES);
       } else {
-        uint8_t fwcommand[] = {CMD_VERSION, 3};
+        byte fwcommand[] = {CMD_VERSION, 3};
         fwupgradecmd(fwcommand, sizeof(fwcommand));
         fwstate = FWSTATE_VERSION;
       }
@@ -535,7 +535,7 @@ void fwupgradestep(const uint8_t *packet = nullptr, int len = 0) {
             // digitalWrite(LED2, LOW);
             loaddata(pc);
           } else {
-            uint8_t fwcommand[] = {CMD_RESET, 0};
+            byte fwcommand[] = {CMD_RESET, 0};
             fwupgradecmd(fwcommand, sizeof(fwcommand));
             fwupgradestop(ERROR_NONE);
           }
@@ -594,7 +594,7 @@ void fwupgradestart() {
 }
 
 void fwupgradefail() {
-  // Send a non-DLE uint8_t in case the PIC is waiting for a uint8_t following DLE
+  // Send a non-DLE byte in case the PIC is waiting for a byte following DLE
   Serial.write(STX);
   fwupgradestep();
 }
@@ -602,7 +602,7 @@ void fwupgradefail() {
 void upgradeevent() {
   static unsigned int pressed = 0;
   static bool dle = false;
-  static uint8_t len, sum;
+  static byte len, sum;
   int ch;
 
   if (fwstate == FWSTATE_IDLE) {
@@ -645,18 +645,22 @@ void upgradeevent() {
   }
 }
 
+
 void upgradenow() {
   static bool dle = false;
   static uint8_t len, sum;
   int ch;
-  // So kickoff the upgrade
-  if (fwstate == FWSTATE_IDLE) {
-    blink(0);
-    digitalWrite(LED1, LOW);
-    fwupgradestart();
-  }
-
-  // So a PIC reset just happend, so we should get a STX next, if all goes well that is.
+  // Only start, when not already programming the flash.
+  if (fwstate != FWSTATE_IDLE) {
+    DebugTln("Error: PIC already in programming in progress.");
+    return;
+  } 
+  // Start the upgrade now...
+  blink(0);
+  digitalWrite(LED1, LOW);
+  fwupgradestart();
+  
+  // Ready to program, the PIC reset just happend, so we should get a STX next, if all goes well that is.
   while (fwstate != FWSTATE_IDLE) {
     // keep feeding the dog from time to time... 
     feedWatchDog();
@@ -684,6 +688,8 @@ void upgradenow() {
       }
     }
   }
+  // When you are done, then reset the PIC one more time, to capture the actual fwversion of the OTGW
+  resetOTGW();
 }
 
 

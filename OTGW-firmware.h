@@ -27,6 +27,8 @@
 #define CSTR(x) x.c_str()
 #define CBOOLEAN(x) (x?"True":"False")
 #define CONOFF(x) (x?"On":"Off")
+#define CBINARY(x) (x?"1":"0")
+#define EVALBOOLEAN(x) (stricmp(x,"true")==0||stricmp(x,"on")==0||stricmp(x,"1")==0)
 
 //Global variables
 WiFiClient  wifiClient;
@@ -34,22 +36,27 @@ bool        Verbose = false;
 char        cMsg[CMSG_SIZE];
 char        fChar[10];
 String      lastReset   = "";
-uint32_t    upTimeSeconds=0;
-uint32_t    rebootCount=0;
-Timezone    CET; 
+uint64_t    upTimeSeconds = 0;
+uint32_t    rebootCount = 0;
+Timezone    myTZ; 
 
 const char *weekDayName[]  {  "Unknown", "Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag", "Unknown" };
 const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
 
+//Information on OTGW 
+String    sPICfwversion = ""; 
 
 //All things that are settings 
 String    settingHostname = _HOSTNAME;
 //MQTT settings
+bool      settingMQTTenable = true;
+bool      settingMQTTsecure = false; 
 String    settingMQTTbroker= "192.168.88.254";
 int16_t   settingMQTTbrokerPort = 1883; 
 String    settingMQTTuser = "";
 String    settingMQTTpasswd = "";
 String    settingMQTTtopTopic = "OTGW";
+String    settingTimezone = "NL"; //Default
 
 // That's all folks...
 

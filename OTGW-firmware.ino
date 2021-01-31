@@ -10,18 +10,12 @@
 */
 
 /*
- *  How to install the OTGW on your nodeMCU
+ *  How to install the OTGW on your nodeMCU:
+ *  Read this: https://github.com/rvdbreemen/OTGW-firmware/wiki/How-to-compile-OTGW-firmware-yourself
  *  
- *  Make sure you have all required library's installed:
- *  - ezTime - https://github.com/ropg/ezTime
- *  - TelnetStream - https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
- *  - ArduinoJson - https://arduinojson.org/
- *  All the library's can be installed using the library manager.
- *  
- *  How to upload to your SPIFF?
- *  Just install the SPIFF upload plugin (https://github.com/esp8266/arduino-esp8266fs-plugin) 
- *  and upload it to your SPIFF after first flashing the device.
- *  
+ *  How to upload to your LittleFS?
+ *  Read this: https://github.com/rvdbreemen/OTGW-firmware/wiki/Upload-files-to-LittleFS-(filesystem)
+ * 
  *  How to compile this firmware?
  *  - NodeMCU v1.0
  *  - Flashsize (4MB - FS:2MB - OTA ~1019KB)
@@ -41,6 +35,9 @@ void setup()
 {
   rebootCount = updateRebootCount();
 
+  Serial.println(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
+  Serial.printf("Booting....[%s]\r\n\r\n", String(_FW_VERSION).c_str());
+
   Serial.begin(9600, SERIAL_8N1);
   while (!Serial) {} //Wait for OK 
 
@@ -48,6 +45,7 @@ void setup()
   randomSeed(RANDOM_REG32); //This is 8266 HWRNG used to seed the Random PRNG: Read more: https://config9.com/arduino/getting-a-truly-random-number-in-arduino/
 
   lastReset     = ESP.getResetReason();
+  Serial.printf("Last reset reason: [%s]\r\n", ESP.getResetReason().c_str());
 
   //setup the status LED
   pinMode(LED_BUILTIN, OUTPUT);
@@ -55,9 +53,9 @@ void setup()
 
   //start the debug port 23
   startTelnet();
-
-  Serial.println(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
-  Serial.printf("Booting....[%s]\r\n\r\n", String(_FW_VERSION).c_str());
+  Serial.print("Use  'telnet ");
+  Serial.print(WiFi.localIP());
+  Serial.println("' for debugging");
   
 //================ LittleFS ===========================================
   if (LittleFS.begin()) 
@@ -85,19 +83,27 @@ void setup()
   startMQTT(); 
 
   // Initialisation ezTime
-  setDebug(INFO);  
-  waitForSync(); 
-  CET.setLocation(F("Europe/Amsterdam"));
-  CET.setDefault(); 
+  setDebug(INFO); 
+  updateNTP();        //force NTP sync
+  waitForSync(60);    //wait until valid time
+  setInterval(1800);  //every 30minutes NTP sync
+  //no TZ cached, then try to GeoIP locate your TZ, otherwise fallback to default
+  if (!myTZ.setCache(0)) { 
+    //ezTime will try to determine your location based on your IP using GeoIP
+    if (myTZ.setLocation()) {
+      settingTimezone = myTZ.getTimezoneName();
+      DebugTf("GeoIP located your timezone to be: %s\n", CSTR(settingTimezone));
+    } else {
+      if (myTZ.setLocation(settingTimezone)){
+        DebugTf("Timezone set to (using default): %s\n", CSTR(settingTimezone));
+        settingTimezone = myTZ.getTimezoneName();
+      } else DebugTln(errorString());
+    }
+  }
+  myTZ.setDefault();
   
-  Serial.println("UTC time: "+ UTC.dateTime());
-  Serial.println("CET time: "+ CET.dateTime());
-
-  Serial.printf("Last reset reason: [%s]\r\n", ESP.getResetReason().c_str());
-  Serial.print("Gebruik 'telnet ");
-  Serial.print(WiFi.localIP());
-  Serial.println("' voor verdere debugging");
-
+  DebugTln("UTC time  : "+ UTC.dateTime());
+  DebugTln("local time: "+ myTZ.dateTime());
 
 //================ Start HTTP Server ================================
   setupFSexplorer();
@@ -126,11 +132,14 @@ void setup()
   sprintf(cMsg, "%03d.%03d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
   Serial.printf("\nAssigned IP[%s]\r\n", cMsg);
 
+  // Setup the OTGW PIC
   resetOTGW();          // reset the OTGW pic
   initWatchDog();       // setup the WatchDog
   startOTGWstream();    // start port 1023 
+  sPICfwversion = getCommand("PR=A"); // fetch the firmware version
+  DebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
 
-  Serial.printf("Reboot count = [%d]\r\n", rebootCount);
+  DebugTf("Reboot count = [%d]\r\n", rebootCount);
   Serial.println(F("Setup finished!"));
 }
 

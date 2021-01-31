@@ -33,6 +33,7 @@
 //===========================================================================================
 void startMQTT() 
 {
+  if (!settingMQTTenable) return;
   stateMQTT = MQTT_STATE_INIT;
   handleMQTT(); //initialize the MQTT statemachine
   // handleMQTT(); //then try to connect to MQTT
@@ -60,7 +61,8 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 
 //===========================================================================================
 void handleMQTT() 
-{
+{  
+  if (!settingMQTTenable) return;
   DECLARE_TIMER_MIN(timerMQTTwaitforconnect, 10, CATCH_UP_MISSED_TICKS);  // 10 minutes
   DECLARE_TIMER_SEC(timerMQTTwaitforretry, 3, CATCH_UP_MISSED_TICKS);     // 3 seconden backoff
 
@@ -202,6 +204,7 @@ void handleMQTT()
 
 bool MQTT_connected()
 {
+  if (!settingMQTTenable) return false;
   return MQTTclient.connected();
 }
 
@@ -221,6 +224,7 @@ void sendMQTTData(const String item, const String json)
 
 void sendMQTTData(const char* item, const char *json) 
 {
+
 /*  
 * The maximum message size, including header, is 128 bytes by default. 
 * This is configurable via MQTT_MAX_PACKET_SIZE in PubSubClient.h.
@@ -230,7 +234,7 @@ void sendMQTTData(const char* item, const char *json)
 * MQTT_MAX_PACKET_SIZE dus aanpassen!!!
 */
 //===========================================================================================
-
+  if (!settingMQTTenable) return;
   if (!MQTTclient.connected() || !isValidIP(MQTTbrokerIP)) return;
   // DebugTf("Sending data to MQTT server [%s]:[%d]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort);
   char topic[100];
@@ -244,6 +248,7 @@ void sendMQTTData(const char* item, const char *json)
 //===========================================================================================
 void sendMQTT(const char* topic, const char *json, const int8_t len) 
 {
+  if (!settingMQTTenable) return;
   if (!MQTTclient.connected() || !isValidIP(MQTTbrokerIP)) return;
   // DebugTf("Sending data to MQTT server [%s]:[%d] ", settingMQTTbroker.c_str(), settingMQTTbrokerPort);  
   //DebugTf("Sending MQTT: TopicId [%s] Message [%s]\r\n", topic, json);
@@ -268,6 +273,7 @@ bool splitString(String sIn, char del, String& cKey, String& cVal)
 //===========================================================================================
 void doAutoConfigure()
 {
+  if (!settingMQTTenable) return;
   const char* cfgFilename = "/mqttha.cfg";
   String sTopic="";
   String sMsg="";
@@ -298,6 +304,7 @@ void doAutoConfigure()
 }
 
 bool getMQTTconnectstatus(){
+  if (!settingMQTTenable) return false;
   return MQTTclient.connected();
 }
 

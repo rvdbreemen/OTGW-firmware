@@ -14,6 +14,7 @@
 //=======================================================================
 void processAPI() 
 {
+  static char response[80] = "";
   char fName[40] = "";
   char URI[50]   = "";
   String words[10];
@@ -87,6 +88,18 @@ void processAPI()
             //Send a command to OTGW
             sendOTGW(CSTR(words[5]), words[5].length());
             httpServer.send(200, "text/plain", "OK");
+          } else sendApiNotFound(URI);
+        } else if (words[4] == "cmdrsp"){
+          if (httpServer.method() == HTTP_PUT || httpServer.method() == HTTP_POST)
+          {
+            /* how to post a command to OTGW
+            ** POST or PUT = /api/v1/otgw/cmdrsp/{command} = Any command you want
+            ** This fetches the response, if OTGW accepted the command, then the value of the response will be return.
+            ** OR and Error code is returned (read this section serial commands: https://otgw.tclcode.com/firmware.html) 
+            ** Response: 200 [response is value after {xx:value}]|[errorcode: {NG|SE|BV|OR|NS|NF|OE}]
+            */
+            //Send a command to OTGW and get the response too...
+            httpServer.send(200, "text/plain", getCommand(words[5]));
           } else sendApiNotFound(URI);
         }
         else sendApiNotFound(URI);
@@ -284,9 +297,10 @@ void sendDeviceInfo()
   sendNestedJsonObj("ssid", WiFi.SSID().c_str());
   sendNestedJsonObj("wifirssi", WiFi.RSSI());
   // sendNestedJosnObj("mqttconnected", CBOOLEAN(getMQTTconnectstatus()));
-//sendNestedJsonObj("uptime", upTime());
-
+  sendNestedJsonObj("uptime", upTime());
   sendNestedJsonObj("lastreset", lastReset);
+  sendNestedJsonObj("bootcount", rebootCount);
+  
 
   httpServer.sendContent("\r\n]}\r\n");
 
@@ -320,10 +334,11 @@ void sendDeviceSettings()
   //sendJsonSettingObj("intager",  settingInteger , "i", 2, 60);
 
   sendJsonSettingObj("hostname", CSTR(settingHostname), "s", 32);
+  sendJsonSettingObj("mqttenable", settingMQTTenable, "b");
   sendJsonSettingObj("mqttbroker", CSTR(settingMQTTbroker), "s", 32);
   sendJsonSettingObj("mqttbrokerport", settingMQTTbrokerPort, "i", 0, 65535);
   sendJsonSettingObj("mqttuser", CSTR(settingMQTTuser), "s", 32);
-  sendJsonSettingObj("mqttpasswd", CSTR(settingMQTTpasswd), "s", 32);
+  sendJsonSettingObj("mqttpasswd", CSTR(settingMQTTpasswd), "s", 100);
   sendJsonSettingObj("mqtttoptopic", CSTR(settingMQTTtopTopic), "s", 15);
 
   sendEndJsonObj();
