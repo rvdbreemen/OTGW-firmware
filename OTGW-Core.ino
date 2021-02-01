@@ -74,10 +74,56 @@ String getpicfwversion(){
 }
 //===================[ OTGW Command & Response ]===================
 String executeCommand(const String sCmd){
-  return executeCommand(CSTR(sCmd), sCmd.length());
+  //send command to OTGW
+  DebugTf("OTGW Send Cmd [%s]=[%s]\r\n", CSTR(sCmd));
+  while(Serial.availableForWrite() < sCmd.length()+2){
+    feedWatchDog();
+  }
+  Serial.write(CSTR(sCmd));
+  Serial.write("\r\n");
+  Serial.flush();
+  //wait for response
+  Serial.setTimeout(3000);
+  while(!Serial.available()) {
+    feedWatchDog();
+  }
+  String _cmd = sCmd.substring(0,1);
+  DebugTf("Send command: [%s]\r\n", CSTR(_cmd));
+  //fetch a line
+  String line = Serial.readStringUntil('\n');
+  String _ret ="";
+  if (line.startsWith(_cmd)){
+    // Responses: When a serial command is accepted by the gateway, it responds with the two letters of the command code, a colon, and the interpreted data value.
+    // Command:   "TT=19.125"
+    // Response:  "TT: 19.13"
+    //            [XX:response string]   
+    _ret = line.substring(3);
+  } else if (line.startsWith("NG")){
+    _ret = "NG - No Good. The command code is unknown.";
+  } else if (line.startsWith("SE")){
+    _ret = "SE - Syntax Error. The command contained an unexpected character or was incomplete.";
+  } else if (line.startsWith("BV")){
+    _ret = "BV - Bad Value. The command contained a data value that is not allowed.";
+  } else if (line.startsWith("OR")){
+    _ret = "OR - Out of Range. A number was specified outside of the allowed range.";
+  } else if (line.startsWith("NS")){
+    _ret = "NS - No Space. The alternative Data-ID could not be added because the table is full.";
+  } else if (line.startsWith("NF")){
+    _ret = "NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table.";
+  } else if (line.startsWith("OE")){
+    _ret = "OE - Overrun Error. The processor was busy and failed to process all received characters.";
+  } else {
+    _ret = "Error: Different command response ["+line+"] Cmd send ["+_cmd+"]";
+  } 
+  DebugTf("Command send - Response returned: [%s]:[%s] - line: [%s]\r\n", CSTR(_cmd), CSTR(_ret), CSTR(line));
+  return _ret;
 }
 
-String executeCommand(const char* sCmd, size_t len){
+String executeCommandCstyle(const String sCmd){
+  return executeCommandCstyle(CSTR(sCmd), sCmd.length());
+}
+
+String executeCommandCstyle(const char* sCmd, size_t len){
   char _cmd[2];
   char line[80];
   char _ret[80];
