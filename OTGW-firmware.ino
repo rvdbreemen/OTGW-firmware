@@ -132,6 +132,11 @@ void setup()
   sprintf(cMsg, "%03d.%03d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
   Serial.printf("\nAssigned IP[%s]\r\n", cMsg);
 
+  for (int i=0; i<50; i++){
+    blinkLEDnow();
+    delay(200);
+  }// 50* 200 = 10.0000 msec = 10 seconds of blinking
+
   // Setup the OTGW PIC
   resetOTGW();          // reset the OTGW pic
   initWatchDog();       // setup the WatchDog
