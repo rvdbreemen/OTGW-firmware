@@ -33,19 +33,19 @@
 //=====================================================================
 void setup()
 {
-  rebootCount = updateRebootCount();
+  Serial.begin(9600, SERIAL_8N1);
+  while (!Serial) {} //Wait for OK
 
   Serial.println(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   Serial.printf("Booting....[%s]\r\n\r\n", String(_FW_VERSION).c_str());
 
-  Serial.begin(9600, SERIAL_8N1);
-  while (!Serial) {} //Wait for OK 
+  rebootCount = updateRebootCount();
 
   //setup randomseed the right way
   randomSeed(RANDOM_REG32); //This is 8266 HWRNG used to seed the Random PRNG: Read more: https://config9.com/arduino/getting-a-truly-random-number-in-arduino/
 
   lastReset     = ESP.getResetReason();
-  Serial.printf("Last reset reason: [%s]\r\n", ESP.getResetReason().c_str());
+  Serial.printf("Last reset reason: [%s]\r\n", CSTR(ESP.getResetReason()));
 
   //setup the status LED
   pinMode(LED_BUILTIN, OUTPUT);
@@ -142,8 +142,8 @@ void setup()
   resetOTGW();          // reset the OTGW pic
   DebugTln("Setup Watchdog");
   initWatchDog();       // setup the WatchDog
-  DebugTln("Start OTGW Stream");
-  startOTGWstream();    // start port 25238 
+  //DebugTln("Start OTGW Stream");
+  //startOTGWstream();    // start port 25238 
   DebugTln("Fetch PIC firmware");
   sPICfwversion = executeCommand("PR=A"); // fetch the firmware version
   DebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
