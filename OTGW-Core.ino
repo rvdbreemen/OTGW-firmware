@@ -77,10 +77,10 @@ String executeCommand(const String sCmd){
   return executeCommand(CSTR(sCmd), sCmd.length());
 }
 
-String executeCommand(const char* sCmd, int len){
+String executeCommand(const char* sCmd, size_t len){
   char _cmd[2];
   char line[80];
-  char *_ret;
+  char _ret[80];
   //send command to OTGW
   DebugTf("OTGW Send Cmd [%s]=[%s]\r\n", sCmd);
   while(Serial.availableForWrite() < len+2){
@@ -90,38 +90,47 @@ String executeCommand(const char* sCmd, int len){
   Serial.write("\r\n");
   Serial.flush();
   //wait for response
+  Serial.setTimeout(3000);
   while(!Serial.available()) {
     feedWatchDog();
   }
-  //remember command send
-  memcpy(_cmd, sCmd, 2);
   // DebugTf("Send command: [%s]\r\n", _cmd);
   //fetch a line
   size_t l = Serial.readBytesUntil('\n', line, sizeof(line)-1);
   line[l]='\0';
-  DebugTf("Command send - Response returned: [%s] - [%s]\r\n", _cmd, line);
-  // Responses: When a serial command is accepted by the gateway, it responds with the two letters of the command code, a colon, and the interpreted data value.
-  if (prefix(_cmd, line)){
-    //Command:    "TT=19.125"
+  _cmd[0]='\0';
+  if (l  > 0) {
+    strcpy(_cmd,strtok(line,":"));                   
+  } 
+  if (prefix(_cmd, sCmd)){
+    // Responses: When a serial command is accepted by the gateway, it responds with the two letters of the command code, a colon, and the interpreted data value.
+    // Command:   "TT=19.125"
     // Response:  "TT: 19.13"
-    //            [XX:response string]
-    memcpy(line, line+3, sizeof(line)-3);    
-  } else if (prefix("NG", line)){
-    strlcpy(line, "NG - No Good. The command code is unknown.", sizeof(line));
-  } else if (prefix("SE", line)){
-    strlcpy(line, "SE - Syntax Error. The command contained an unexpected character or was incomplete.", sizeof(line));
-  } else if (prefix("BV", line)){
-    strlcpy(line, "BV - Bad Value. The command contained a data value that is not allowed.", sizeof(line));
-  } else if (prefix("OR", line)){
-    strlcpy(line, "OR - Out of Range. A number was specified outside of the allowed range.", sizeof(line));
-  } else if (prefix("NS", line)){
-    strlcpy(line, "NS - No Space. The alternative Data-ID could not be added because the table is full.", sizeof(line));
-  } else if (prefix("NF", line)){
-    strlcpy(line, "NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table.", sizeof(line));
-  } else if (prefix("OE", line)){
-    strlcpy(line, "OE - Overrun Error. The processor was busy and failed to process all received characters.", sizeof(line));
-  }
-  return line;
+    //            [XX:response string]   
+    strcpy(_resp,strtok(NULL,":"));  
+  } else if (prefix("NG", _cmd)){
+    strlcpy(_resp, "NG - No Good. The command code is unknown.", sizeof(_resp));
+  } else if (prefix("SE", _cmd)){
+    strlcpy(_resp, "SE - Syntax Error. The command contained an unexpected character or was incomplete.", sizeof(_resp));
+  } else if (prefix("BV", _cmd)){
+    strlcpy(_resp, "BV - Bad Value. The command contained a data value that is not allowed.", sizeof(_resp));
+  } else if (prefix("OR", _cmd)){
+    strlcpy(_resp, "OR - Out of Range. A number was specified outside of the allowed range.", sizeof(_resp));
+  } else if (prefix("NS", _cmd)){
+    strlcpy(_resp, "NS - No Space. The alternative Data-ID could not be added because the table is full.", sizeof(_resp));
+  } else if (prefix("NF", _cmd)){
+    strlcpy(_resp, "NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table.", sizeof(_resp));
+  } else if (prefix("OE", _cmd)){
+    strlcpy(_resp, "OE - Overrun Error. The processor was busy and failed to process all received characters.", sizeof(_resp));
+  } else {
+    strlcpy(_resp, "Error: Different command response [", sizeof(_resp));
+    strlcat(_resp, _cmd, sizeof(_resp));
+    strlcat(_resp, "] Cmd send [", sizeof(_resp));
+    strlcat(_resp, sCmd, sizeof(_resp));
+    strlcat(_resp, "]", sizeof(_resp));
+  } 
+  DebugTf("Command send - Response returned: [%s]:[%s] - line: [%s]\r\n", _cmd, _resp, line);
+  return _resp;
 }
 
 //===================[ OTGW PS=1 Command ]===============================
