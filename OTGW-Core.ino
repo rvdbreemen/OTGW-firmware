@@ -19,12 +19,15 @@
 // #define OTGW_LED2   D0
 
 //external watchdog 
-#define OTGW_I2C_SCL 5
-#define OTGW_I2C_SDA 4
-#define OTGW_EXT_WD_I2C_ADDRESS 0x26
+// #define OTGW_I2C_SCL 5
+// #define OTGW_I2C_SDA 4
+// #define OTGW_EXT_WD_I2C_ADDRESS 0x26
+#define EXT_WD_I2C_ADDRESS 0x26
+#define PIN_I2C_SDA 4
+#define PIN_I2C_SCL 5
 
 //Macro to Feed the Watchdog
-#define FEEDWATCHDOGNOW   Wire.beginTransmission(OTGW_EXT_WD_I2C_ADDRESS);   Wire.write(0xA5);   Wire.endTransmission();
+#define FEEDWATCHDOGNOW   Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   Wire.write(0xA5);   Wire.endTransmission();
 
 /* --- PRINTF_BYTE_TO_BINARY macro's --- */
 #define PRINTF_BINARY_PATTERN_INT8 "%c%c%c%c%c%c%c%c"
@@ -197,23 +200,26 @@ void getOTGW_PS_1(){
   Serial.flush();
 }
 //===================[ OTGW PS=1 Command ]===============================
-
 //===================[ Watchdog OTGW ]===============================
 String initWatchDog() {
   // Hardware WatchDog is based on: 
   // https://github.com/rvdbreemen/ESPEasySlaves/tree/master/TinyI2CWatchdog
   // Code here is based on ESPEasy code, modified to work in the project.
-  String ReasonReset = "";
-  DebugTln(F("INIT : I2C"));
+
   // configure hardware pins according to eeprom settings.
-  Wire.begin(OTGW_I2C_SDA, OTGW_I2C_SCL);  //configure the I2C bus
+  DebugTln(F("INIT : I2C"));
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);  //configure the I2C bus
+  //=============================================
+  // I2C Watchdog boot status check
+  String ReasonReset = "";
+  
   delay(500);
-  Wire.beginTransmission(OTGW_EXT_WD_I2C_ADDRESS);   // OTGW WD address
+  Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   // OTGW WD address
   Wire.write(0x83);             // command to set pointer
   Wire.write(17);               // pointer value to status byte
   Wire.endTransmission();
   
-  Wire.requestFrom((uint8_t)OTGW_EXT_WD_I2C_ADDRESS, (uint8_t)1);
+  Wire.requestFrom((uint8_t)EXT_WD_I2C_ADDRESS, (uint8_t)1);
   if (Wire.available())
   {
     byte status = Wire.read();
@@ -225,7 +231,10 @@ String initWatchDog() {
     }
   }
   return ReasonReset;
+  //===========================================
 }
+
+
 
 //===[ Feed the WatchDog before it bites! (1x per second) ]===
 void feedWatchDog() {
@@ -233,12 +242,12 @@ void feedWatchDog() {
   //==== feed the WD over I2C ==== 
   // Address: 0x26
   // I2C Watchdog feed
-  DECLARE_TIMER_MS(timerWD, 3000, CATCH_UP_MISSED_TICKS);
+  DECLARE_TIMER_MS(timerWD, 1000, CATCH_UP_MISSED_TICKS);
   if DUE(timerWD)
   {
-    Wire.beginTransmission(OTGW_EXT_WD_I2C_ADDRESS);    //Nodoshop design uses the hardware WD on I2C, address 0x26
-    Wire.write(0xA5);                                   //Feed the dog, before it bites.
-    Wire.endTransmission();                             //That's all there is...
+    Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   //Nodoshop design uses the hardware WD on I2C, address 0x26
+    Wire.write(0xA5);                             //Feed the dog, before it bites.
+    Wire.endTransmission();                       //That's all there is...
   }
   yield();
   //==== feed the WD over I2C ==== 
