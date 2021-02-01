@@ -13,13 +13,14 @@
 
 
 //define Nodoshop OTGW hardware
-#define OTGW_BUTTON D3
-#define OTGW_RESET  D5
-#define OTGW_LED1   D4
-#define OTGW_LED2   D0
+// #define OTGW_BUTTON D3
+#define OTGW_RESET  14
+// #define OTGW_LED1   D4
+// #define OTGW_LED2   D0
+
 //external watchdog 
-#define OTGW_I2C_SCL D1
-#define OTGW_I2C_SDA D2
+#define OTGW_I2C_SCL 5
+#define OTGW_I2C_SDA 4
 #define OTGW_EXT_WD_I2C_ADDRESS 0x26
 
 //Macro to Feed the Watchdog
@@ -890,13 +891,13 @@ void processOTGW(const char * buf, int len)
 ** from the OTGW hardware firmware. Default it assumes raw OT messages, however
 ** it can handle the other messages to, like PS=1/PS=0 etc.
 ** 
-** Also, this code bit implements the serial 2 network (port 1023). The serial port 
-** is forwarded to port 1023, and visavera. So you can use it with OTmonitor (the 
+** Also, this code bit implements the serial 2 network (port 25238). The serial port 
+** is forwarded to port 25238, and visavera. So you can use it with OTmonitor (the 
 ** original OpenTherm program that comes with the hardware). The serial port and 
-** ser2net port 1023 are both "line read" into the read buffer (coming from OTGW 
-** thru serial) and write buffer  (coming from 1023 going to serial).
+** ser2net port 25238 are both "line read" into the read buffer (coming from OTGW 
+** thru serial) and write buffer  (coming from 25238 going to serial).
 **
-** The write buffer (incoming from port 1023) is also line printed to the Debug (port 23).
+** The write buffer (incoming from port 25238) is also line printed to the Debug (port 23).
 ** The read line buffer is per line parsed by the proces OT parser code (processOTGW (buf, len)).
 */
 void handleOTGW()
@@ -911,10 +912,10 @@ void handleOTGW()
   static uint8_t inByte;
   static uint8_t outByte;
 
-  //handle incoming data from network (port 1023) sent to serial port OTGW (WRITE BUFFER)
+  //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
   while (OTGWstream.available()){
     //Serial.write(OTGWstream.read()); //just forward it directly to Serial
-    outByte = OTGWstream.read();  // read from port 1023
+    outByte = OTGWstream.read();  // read from port 25238
     while (Serial.availableForWrite()==0) {
       //cannot write, buffer full, wait for some space in serial out buffer
       feedWatchDog();     //this yields for other processes
@@ -947,7 +948,7 @@ void handleOTGW()
   while(Serial.available()) 
   {
     inByte = Serial.read();   // read from serial port
-    OTGWstream.write(inByte); // write to port 1023
+    OTGWstream.write(inByte); // write to port 25238
     if (inByte== '\n')
     { //line terminator, continue to process incoming message
       sRead[bytes_read] = 0;
