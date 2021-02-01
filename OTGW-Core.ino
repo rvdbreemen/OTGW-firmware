@@ -79,7 +79,7 @@ String getpicfwversion(){
 //===================[ OTGW Command & Response ]===================
 String executeCommand(const String sCmd){
   //send command to OTGW
-  DebugTf("OTGW Send Cmd [%s]=[%s]\r\n", CSTR(sCmd));
+  DebugTf("OTGW Send Cmd [%s]\r\n", CSTR(sCmd));
   while(Serial.availableForWrite() < sCmd.length()+2){
     feedWatchDog();
   }
