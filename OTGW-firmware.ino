@@ -135,7 +135,7 @@ void setup()
   // Setup the OTGW PIC
   resetOTGW();          // reset the OTGW pic
   initWatchDog();       // setup the WatchDog
-  startOTGWstream();    // start port 1023 
+  startOTGWstream();    // start port 25238 
   sPICfwversion = executeCommand("PR=A"); // fetch the firmware version
   DebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
 
