@@ -138,9 +138,13 @@ void setup()
   }// 50* 200 = 10.0000 msec = 10 seconds of blinking
 
   // Setup the OTGW PIC
+  DebugTln("Reset OTGW PIC");
   resetOTGW();          // reset the OTGW pic
+  DebugTln("Setup Watchdog");
   initWatchDog();       // setup the WatchDog
+  DebugTln("Start OTGW Stream");
   startOTGWstream();    // start port 25238 
+  DebugTln("Fetch PIC firmware");
   sPICfwversion = executeCommand("PR=A"); // fetch the firmware version
   DebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
 
