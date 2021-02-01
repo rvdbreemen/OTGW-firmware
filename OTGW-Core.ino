@@ -107,30 +107,30 @@ String executeCommand(const char* sCmd, size_t len){
     // Command:   "TT=19.125"
     // Response:  "TT: 19.13"
     //            [XX:response string]   
-    strcpy(_resp,strtok(NULL,":"));  
+    strcpy(_ret,strtok(NULL,":"));  
   } else if (prefix("NG", _cmd)){
-    strlcpy(_resp, "NG - No Good. The command code is unknown.", sizeof(_resp));
+    strlcpy(_ret, "NG - No Good. The command code is unknown.", sizeof(_ret));
   } else if (prefix("SE", _cmd)){
-    strlcpy(_resp, "SE - Syntax Error. The command contained an unexpected character or was incomplete.", sizeof(_resp));
+    strlcpy(_ret, "SE - Syntax Error. The command contained an unexpected character or was incomplete.", sizeof(_ret));
   } else if (prefix("BV", _cmd)){
-    strlcpy(_resp, "BV - Bad Value. The command contained a data value that is not allowed.", sizeof(_resp));
+    strlcpy(_ret, "BV - Bad Value. The command contained a data value that is not allowed.", sizeof(_ret));
   } else if (prefix("OR", _cmd)){
-    strlcpy(_resp, "OR - Out of Range. A number was specified outside of the allowed range.", sizeof(_resp));
+    strlcpy(_ret, "OR - Out of Range. A number was specified outside of the allowed range.", sizeof(_ret));
   } else if (prefix("NS", _cmd)){
-    strlcpy(_resp, "NS - No Space. The alternative Data-ID could not be added because the table is full.", sizeof(_resp));
+    strlcpy(_ret, "NS - No Space. The alternative Data-ID could not be added because the table is full.", sizeof(_ret));
   } else if (prefix("NF", _cmd)){
-    strlcpy(_resp, "NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table.", sizeof(_resp));
+    strlcpy(_ret, "NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table.", sizeof(_ret));
   } else if (prefix("OE", _cmd)){
-    strlcpy(_resp, "OE - Overrun Error. The processor was busy and failed to process all received characters.", sizeof(_resp));
+    strlcpy(_ret, "OE - Overrun Error. The processor was busy and failed to process all received characters.", sizeof(_ret));
   } else {
-    strlcpy(_resp, "Error: Different command response [", sizeof(_resp));
-    strlcat(_resp, _cmd, sizeof(_resp));
-    strlcat(_resp, "] Cmd send [", sizeof(_resp));
-    strlcat(_resp, sCmd, sizeof(_resp));
-    strlcat(_resp, "]", sizeof(_resp));
+    strlcpy(_ret, "Error: Different command response [", sizeof(_ret));
+    strlcat(_ret, _cmd, sizeof(_ret));
+    strlcat(_ret, "] Cmd send [", sizeof(_ret));
+    strlcat(_ret, sCmd, sizeof(_ret));
+    strlcat(_ret, "]", sizeof(_ret));
   } 
-  DebugTf("Command send - Response returned: [%s]:[%s] - line: [%s]\r\n", _cmd, _resp, line);
-  return _resp;
+  DebugTf("Command send - Response returned: [%s]:[%s] - line: [%s]\r\n", _cmd, _ret, line);
+  return _ret;
 }
 
 //===================[ OTGW PS=1 Command ]===============================
