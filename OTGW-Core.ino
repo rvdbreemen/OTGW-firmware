@@ -123,7 +123,7 @@ String executeCommand(const String sCmd){
     //just an empty line... most likely it's a timeout situation
     _ret = "TO - Timeout. No response.";
   } else {
-    _ret = "Error: Different command response ["+line+"] Cmd send ["+_cmd+"]";
+    _ret = line; //some commands return a string, just return that.
   } 
   DebugTf("Command send [%s]-[%s] - Response line: [%s] - Returned value: [%s]\r\n", CSTR(sCmd), CSTR(_cmd), CSTR(line), CSTR(_ret));
   return _ret;
