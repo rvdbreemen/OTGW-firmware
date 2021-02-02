@@ -273,8 +273,8 @@ bool freeSpace(uint16_t const& printsize)
 void upgradePIC()
 {
   DebugTln(F("Redirect to upgrade PIC .."));
-  upgradenow();
   doRedirect("Upgrade OTGW PIC ", 120, "/FSexplorer", false);
+  upgradenow();
 } // upgradePIC()
 
 

@@ -84,9 +84,9 @@ void setup()
 
   // Initialisation ezTime
   setDebug(INFO); 
+  setServer("time.google.com");
   updateNTP();        //force NTP sync
   waitForSync(60);    //wait until valid time
-  setInterval(1800);  //every 30minutes NTP sync
   //no TZ cached, then try to GeoIP locate your TZ, otherwise fallback to default
   if (!myTZ.setCache(0)) { 
     //ezTime will try to determine your location based on your IP using GeoIP
@@ -138,14 +138,14 @@ void setup()
     delay(200);
   }// 50* 200 = 10.0000 msec = 10 seconds of blinking
 
-  Serial.println(F("Setup finished!"));
+  DebugTln("Setup Watchdog");
+  initWatchDog();       // setup the WatchDog
+  Serial.println(F("Setup finished!\r\n"));
   // After resetting the OTGW PIC never send anything to Serial for debug
   // and switch to telnet port 23 for debug purposed. 
   // Setup the OTGW PIC
   DebugTln("Reset OTGW PIC");
   resetOTGW();          // reset the OTGW pic
-  DebugTln("Setup Watchdog");
-  initWatchDog();       // setup the WatchDog
   DebugTln("Start OTGW Stream");
   startOTGWstream();    // start port 25238 
   DebugTln("Fetch PIC firmware");
