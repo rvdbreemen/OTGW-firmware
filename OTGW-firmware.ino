@@ -101,6 +101,7 @@ void setup()
     }
   }
   myTZ.setDefault();
+  setDebug(NNONE); 
   
   DebugTln("UTC time  : "+ UTC.dateTime());
   DebugTln("local time: "+ myTZ.dateTime());
