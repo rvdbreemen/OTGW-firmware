@@ -71,7 +71,7 @@ String getpicfwversion(){
   if (p >= 0) {
     p += sizeof(BANNER);
     _ret = line.substring(p);
-  } else _ret ="not found";
+  } else _ret ="No version found";
   DebugTf("Current firmware version: %s\n", CSTR(_ret));
   _ret.trim();
   return _ret;
@@ -93,7 +93,7 @@ String executeCommand(const String sCmd){
   while(!Serial.available() && !DUE(tmrWaitForIt)) {
     feedWatchDog();
   }
-  String _cmd = sCmd.substring(0,1);
+  String _cmd = sCmd.substring(0,2);
   DebugTf("Send command: [%s]\r\n", CSTR(_cmd));
   //fetch a line
   String line = Serial.readStringUntil('\n');
@@ -119,10 +119,13 @@ String executeCommand(const String sCmd){
     _ret = "NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table.";
   } else if (line.startsWith("OE")){
     _ret = "OE - Overrun Error. The processor was busy and failed to process all received characters.";
+  } else if (line.length()==0) {
+    //just an empty line... most likely it's a timeout situation
+    _ret = "TO - Timeout. No response.";
   } else {
     _ret = "Error: Different command response ["+line+"] Cmd send ["+_cmd+"]";
   } 
-  DebugTf("Command send - Response returned: [%s]:[%s] - line: [%s]\r\n", CSTR(_cmd), CSTR(_ret), CSTR(line));
+  DebugTf("Command send [%s]-[%s] - Response line: [%s] - Returned value: [%s]\r\n", CSTR(sCmd), CSTR(_cmd), CSTR(line), CSTR(_ret));
   return _ret;
 }
 
