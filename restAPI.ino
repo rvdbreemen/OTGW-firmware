@@ -253,15 +253,16 @@ void sendDeviceInfo()
 
   sendNestedJsonObj("author", "Robert van den Breemen");
   sendNestedJsonObj("fwversion", _FW_VERSION);
+  sendNestedJsonObj("picfwversion", CSTR(sPICfwversion));
 
   snprintf(cMsg, sizeof(cMsg), "%s %s", __DATE__, __TIME__);
   sendNestedJsonObj("compiled", cMsg);
   sendNestedJsonObj("hostname", CSTR(settingHostname));
-  sendNestedJsonObj("ipaddress", WiFi.localIP().toString().c_str());
-  sendNestedJsonObj("macaddress", WiFi.macAddress().c_str());
+  sendNestedJsonObj("ipaddress", CSTR(WiFi.localIP().toString()));
+  sendNestedJsonObj("macaddress", CSTR(WiFi.macAddress()));
   sendNestedJsonObj("freeheap", ESP.getFreeHeap());
   sendNestedJsonObj("maxfreeblock", ESP.getMaxFreeBlockSize());
-  sendNestedJsonObj("chipid", String( ESP.getChipId(), HEX ).c_str());
+  sendNestedJsonObj("chipid", CSTR(String( ESP.getChipId(), HEX )));
   sendNestedJsonObj("coreversion", String( ESP.getCoreVersion() ).c_str() );
   sendNestedJsonObj("sdkversion", String( ESP.getSdkVersion() ).c_str());
   sendNestedJsonObj("cpufreq", ESP.getCpuFreqMHz());

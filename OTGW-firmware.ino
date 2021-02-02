@@ -149,7 +149,7 @@ void setup()
   DebugTln("Start OTGW Stream");
   startOTGWstream();    // start port 25238 
   DebugTln("Fetch PIC firmware");
-  sPICfwversion = executeCommand("PR=A"); // fetch the firmware version
+  sPICfwversion = getpicfwversion(); // fetch the firmware version
   DebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
 
   DebugTf("Reboot count = [%d]\r\n", rebootCount);
