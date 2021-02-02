@@ -50,6 +50,8 @@ void setup()
   //setup the status LED
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH); //OFF
+  pinMode(16,OUTPUT);
+  digitalWrite(16,LOW);
 
   //start the debug port 23
   startTelnet();
@@ -153,6 +155,8 @@ void setup()
   DebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
 
   DebugTf("Reboot count = [%d]\r\n", rebootCount);
+  pinMode(16,OUTPUT);
+  digitalWrite(16,HIGH);
 }
 
 //=====================================================================
