@@ -80,21 +80,24 @@ String getpicfwversion(){
 String executeCommand(const String sCmd){
   //send command to OTGW
   DebugTf("OTGW Send Cmd [%s]\r\n", CSTR(sCmd));
-  while(Serial.availableForWrite() < sCmd.length()+2){
+  Serial.setTimeout(1000);
+  DECLARE_TIMER_MS(tmrWaitForIt, 1000);
+  while((Serial.availableForWrite() < sCmd.length()+2) && !DUE(tmrWaitForIt)){
     feedWatchDog();
   }
   Serial.write(CSTR(sCmd));
   Serial.write("\r\n");
   Serial.flush();
   //wait for response
-  Serial.setTimeout(3000);
-  while(!Serial.available()) {
+  RESTART_TIMER(tmrWaitForit);
+  while(!Serial.available() && !DUE(tmrWaitforIt)) {
     feedWatchDog();
   }
   String _cmd = sCmd.substring(0,1);
   DebugTf("Send command: [%s]\r\n", CSTR(_cmd));
   //fetch a line
   String line = Serial.readStringUntil('\n');
+  line.trim();
   String _ret ="";
   if (line.startsWith(_cmd)){
     // Responses: When a serial command is accepted by the gateway, it responds with the two letters of the command code, a colon, and the interpreted data value.
