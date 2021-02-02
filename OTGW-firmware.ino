@@ -101,6 +101,7 @@ void setup()
     }
   }
   myTZ.setDefault();
+  setDebug(NONE); //turn off any other debug information
   
   DebugTln("UTC time  : "+ UTC.dateTime());
   DebugTln("local time: "+ myTZ.dateTime());
@@ -137,6 +138,9 @@ void setup()
     delay(200);
   }// 50* 200 = 10.0000 msec = 10 seconds of blinking
 
+  Serial.println(F("Setup finished!"));
+  // After resetting the OTGW PIC never send anything to Serial for debug
+  // and switch to telnet port 23 for debug purposed. 
   // Setup the OTGW PIC
   DebugTln("Reset OTGW PIC");
   resetOTGW();          // reset the OTGW pic
@@ -149,7 +153,6 @@ void setup()
   DebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
 
   DebugTf("Reboot count = [%d]\r\n", rebootCount);
-  Serial.println(F("Setup finished!"));
 }
 
 //=====================================================================
