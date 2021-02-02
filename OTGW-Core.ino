@@ -89,8 +89,8 @@ String executeCommand(const String sCmd){
   Serial.write("\r\n");
   Serial.flush();
   //wait for response
-  RESTART_TIMER(tmrWaitForit);
-  while(!Serial.available() && !DUE(tmrWaitforIt)) {
+  RESTART_TIMER(tmrWaitForIt);
+  while(!Serial.available() && !DUE(tmrWaitForIt)) {
     feedWatchDog();
   }
   String _cmd = sCmd.substring(0,1);
