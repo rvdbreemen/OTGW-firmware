@@ -4,7 +4,7 @@
 **  Version  : v0.7.3
 **
 **  Copyright (c) 2021 Copyright (c) 2021 - Schelte Bron
-**  Based on version 0.3: https://github.com/hvxl/otgwmcu
+**  Based on version 0.4: https://github.com/hvxl/otgwmcu
 **  Modified version of : upgrade.h 
 **
 **  TERMS OF USE: MIT License. See bottom of file.                            
@@ -13,6 +13,7 @@
 
 void picreset();
 void upgradeevent();
+void fwupgradestart(const char * = "/gateway.hex");
 
 /***************************************************************************
 *
