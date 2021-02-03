@@ -4,17 +4,12 @@
 **  Version  : v0.7.3
 **
 **  Copyright (c) 2021 Copyright (c) 2021 - Schelte Bron
-**  Based on version 0.3: https://github.com/hvxl/otgwmcu
+**  Based on version 0.4: https://github.com/hvxl/otgwmcu
 **  Modified version of : upgrade.cpp
 **
 **  TERMS OF USE: MIT License. See bottom of file.                            
 **************************************************************************
 */  
-
-#include <Ticker.h>
-// #include "otgwmcu.h"
-// #include "proxy.h"
-// #include "debug.h"
 
 #define I2CSCL D1
 #define I2CSDA D2
@@ -27,6 +22,13 @@
 #define BANNER "OpenTherm Gateway"
 
 char fwversion[16];
+
+
+#include <Ticker.h>
+// #include "upgrade.h"
+// #include "otgwmcu.h"
+// #include "proxy.h"
+// #include "debug.h"
 
 #define STX 0x0F
 #define ETX 0x04
@@ -104,10 +106,10 @@ void blink(short delayms = 200) {
 void picreset() {
   pinMode(PICRST,OUTPUT);
   digitalWrite(PICRST,LOW);
+  Serial.print("GW=R\r");
   delay(100);
   digitalWrite(PICRST,HIGH);
   pinMode(PICRST,INPUT);
-  // Serial.print("GW=R\r");
 }
 
 int vcompare(const char *version1, const char* version2) {
@@ -201,13 +203,13 @@ unsigned char hexcheck(char *hex, int len) {
   return sum;
 }
 
-bool readhex(unsigned short *codemem, unsigned char *datamem, unsigned short *config = nullptr) {
+bool readhex(const char *hexfile, unsigned short *codemem, unsigned char *datamem, unsigned short *config = nullptr) {
   char hexbuf[48];
   int len, addr, tag, data, offs, linecnt = 0;
   bool rc = false;
   File f;
 
-  f = LittleFS.open("/gateway.hex", "r");
+  f = LittleFS.open(hexfile, "r");
   if (!f) return false;
   memset(codemem, -1, 4096 * sizeof(short));
   memset(datamem, -1, 256 * sizeof(char));
@@ -294,9 +296,8 @@ void fwupgradecmd(const unsigned char *cmd, int len) {
   Serial.write(ETX);
 }
 
-bool erasecode(short addr) {
+bool erasecode(short addr, bool rc = false) {
   byte fwcommand[] = {CMD_ERASEPROG, 1, 0, 0};
-  bool rc = false;
   short i;
   for (i = 0; i < 32; i++) {
     if (fwupd->codemem[addr + i] != 0xffff) {
@@ -407,6 +408,8 @@ void fwupgradestep(const byte *packet = nullptr, int len = 0) {
     lastcmd = cmd;
   }
 
+  // DebugTf("fwupgradestep: state = %d, cmd = %d, packet = %d\n", fwstate, cmd, packet != nullptr);
+
   switch (fwstate) {
     case FWSTATE_IDLE:
       fwupd->errcnt = 0;
@@ -444,7 +447,7 @@ void fwupgradestep(const byte *packet = nullptr, int len = 0) {
           fwstate = FWSTATE_DUMP;
         } else {
           pc = 0x20;
-          erasecode(pc);
+          erasecode(pc, true);
           fwstate = FWSTATE_PREP;
         }
       } else if (++fwupd->retries > 10) {
@@ -474,6 +477,8 @@ void fwupgradestep(const byte *packet = nullptr, int len = 0) {
       }
       break;
     case FWSTATE_PREP:
+      // Programming has started; invalidate the firmware version
+      *fwversion = '\0';
       if (cmd == CMD_ERASEPROG) {
         loadcode(pc, fwupd->failsafe, 4);
       } else if (cmd == CMD_WRITEPROG) {
@@ -488,7 +493,7 @@ void fwupgradestep(const byte *packet = nullptr, int len = 0) {
           if (++fwupd->retries > 5) {
             fwupgradestop(ERROR_RETRIES);
           } else {
-            erasecode(pc);
+            erasecode(pc, true);
           }
         }
       }
@@ -555,7 +560,7 @@ void fwupgradestep(const byte *packet = nullptr, int len = 0) {
   }
 }
 
-void fwupgradestart() {
+void fwupgradestart(const char *hexfile) {
   unsigned short ptr;
   char *s;
 
@@ -564,8 +569,11 @@ void fwupgradestart() {
     return;
   }
 
+  blink(0);
+  digitalWrite(LED1, LOW);
+
   fwupd = (struct fwupdatedata *)malloc(sizeof(struct fwupdatedata));
-  if (!readhex(fwupd->codemem, fwupd->datamem)) {
+  if (!readhex(hexfile, fwupd->codemem, fwupd->datamem)) {
     fwupgradestop(ERROR_READFILE);
     return;
   }
@@ -577,6 +585,7 @@ void fwupgradestart() {
   }
 
   // Look for the new firmware version
+  fwupd->version = nullptr;
   ptr = 0;
   while (ptr < 256) {
     s = strstr((char *)fwupd->datamem + ptr, BANNER);
@@ -612,8 +621,6 @@ void upgradeevent() {
         // user will have to press the button for one millisecond longer.
         pressed = millis();
       } else if (millis() - pressed > 2000) {
-        blink(0);
-        digitalWrite(LED1, LOW);
         fwupgradestart();
         pressed = 0;
       }
@@ -646,6 +653,7 @@ void upgradeevent() {
 }
 
 
+
 void upgradenow() {
   static bool dle = false;
   static uint8_t len, sum;
@@ -658,9 +666,11 @@ void upgradenow() {
   // Start the upgrade now...
   blink(0);
   digitalWrite(LED1, LOW);
+  DebugTln("Start PIC upgrade now.");
   fwupgradestart();
   
   // Ready to program, the PIC reset just happend, so we should get a STX next, if all goes well that is.
+  uint32_t tmrTimeout = millis();
   while (fwstate != FWSTATE_IDLE) {
     // keep feeding the dog from time to time... 
     feedWatchDog();
