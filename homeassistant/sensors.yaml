@@ -1,132 +1,88 @@
-### OTGW ###
-- platform: mqtt
-  state_topic: "OTGW/TrSet"
-  name: "Room setpoint"
-  unit_of_measurement: "°C"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/Troom"
-  name: "Room Temperature"
-  unit_of_measurement: "°C"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/Toutside"
-  name: "Outside Temperature"
-  unit_of_measurement: "°C"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/Tboiler"
-  name: "Boiler flow water temperature"
-  unit_of_measurement: "°C"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/Tdhw"
-  name: "DHW temperature"
-  unit_of_measurement: "°C"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/TdhwSet"
-  name: "DHW setpoint"
-  unit_of_measurement: "°C"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/Tret"
-  name: "Return water temperature"
-  unit_of_measurement: "°C"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/Tstorage"
-  name: "Solar storage temperature"
-  unit_of_measurement: "°C"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/Tcollector"
-  name: "Solar collector temperature"
-  unit_of_measurement: "°C"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/TflowCH2"
-  name: "Flow water temperature CH2 cir."
-  unit_of_measurement: "°C"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/Tdhw2"
-  name: "Domestic hot water temperature 2"
-  unit_of_measurement: "°C"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/Texhaust"
-  name: "Boiler exhaust temperature"
-  unit_of_measurement: "°C"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/MaxTSet"
-  name: "Max CH water setpoint"
-  unit_of_measurement: "°C"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/Hcratio"
-  name: "OTC heat curve ratio"
-  unit_of_measurement: ""
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/TSet"
-  name: "Control setpoint"
-  unit_of_measurement: "°C"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/CoolingControl"
-  name: "Cooling control signal"
-  unit_of_measurement: "%"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/TsetCH2"
-  name: "Control setpoint for 2e circuit"
-  unit_of_measurement: "°C"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/TrOverride"
-  name: "Remote override room setpoint"
-  unit_of_measurement: "°C"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/MaxRelModLevelSetting"
-  name: "Max Rel Modulation level setting"
-  unit_of_measurement: "%"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/RelModLevel"
-  name: "Relative Modulation Level"
-  unit_of_measurement: "%"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/CHPressure"
-  name: "Water pressure in CH circuit"
-  unit_of_measurement: "bar"
-  value_template: "{{ value_json.value }}"
-
-- platform: mqtt
-  state_topic: "OTGW/DHWFlowRate"
-  name: "Water flow rate in DHW circuit"
-  unit_of_measurement: "l/min"
-  value_template: "{{ value_json.value }}"
+  - platform: mqtt
+    state_topic: "OTGW/TrSet"
+    name: "Room setpoint"
+    unit_of_measurement: "°C"
+  - platform: mqtt
+    state_topic: "OTGW/Troom"
+    name: "Room Temperature"
+    unit_of_measurement: "°C"
+  - platform: mqtt
+    state_topic: "OTGW/Toutside"
+    name: "Outside Temperature"
+    unit_of_measurement: "°C"
+  - platform: mqtt
+    state_topic: "OTGW/Tboiler"
+    name: "Boiler flow water temperature"
+    unit_of_measurement: "°C"
+  - platform: mqtt
+    state_topic: "OTGW/Tdhw"
+    name: "DHW temperature"
+    unit_of_measurement: "°C"
+  - platform: mqtt
+    state_topic: "OTGW/TdhwSet"
+    name: "DHW setpoint"
+    unit_of_measurement: "°C"
+  - platform: mqtt
+    state_topic: "OTGW/Tret"
+    name: "Return water temperature"
+    unit_of_measurement: "°C"
+  - platform: mqtt
+    state_topic: "OTGW/Tstorage"
+    name: "Solar storage temperature"
+    unit_of_measurement: "°C"
+  - platform: mqtt
+    state_topic: "OTGW/Tcollector"
+    name: "Solar collector temperature"
+    unit_of_measurement: "°C"
+  - platform: mqtt
+    state_topic: "OTGW/TflowCH2"
+    name: "Flow water temperature CH2 cir."
+    unit_of_measurement: "°C"
+  - platform: mqtt
+    state_topic: "OTGW/Tdhw2"
+    name: "Domestic hot water temperature 2"
+    unit_of_measurement: "°C"
+  - platform: mqtt
+    state_topic: "OTGW/Texhaust"
+    name: "Boiler exhaust temperature"
+    unit_of_measurement: "°C"
+  - platform: mqtt
+    state_topic: "OTGW/MaxTSet"
+    name: "Max CH water setpoint"
+    unit_of_measurement: "°C"
+  - platform: mqtt
+    state_topic: "OTGW/Hcratio"
+    name: "OTC heat curve ratio"
+    unit_of_measurement: ""
+  - platform: mqtt
+    state_topic: "OTGW/TSet"
+    name: "Control setpoint"
+    unit_of_measurement: "°C"
+  - platform: mqtt
+    state_topic: "OTGW/CoolingControl"
+    name: "Cooling control signal"
+    unit_of_measurement: "%"
+  - platform: mqtt
+    state_topic: "OTGW/TsetCH2"
+    name: "Control setpoint for 2e circuit"
+    unit_of_measurement: "°C"
+  - platform: mqtt
+    state_topic: "OTGW/TrOverride"
+    name: "Remote override room setpoint"
+    unit_of_measurement: "°C"
+  - platform: mqtt
+    state_topic: "OTGW/MaxRelModLevelSetting"
+    name: "Max Rel Modulation level setting"
+    unit_of_measurement: "%"
+  - platform: mqtt
+    state_topic: "OTGW/RelModLevel"
+    name: "Relative Modulation Level"
+    unit_of_measurement: "%"
+  - platform: mqtt
+    state_topic: "OTGW/CHPressure"
+    name: "Water pressure in CH circuit"
+    unit_of_measurement: "bar"
+  - platform: mqtt
+    state_topic: "OTGW/DHWFlowRate"
+    name: "Water flow rate in DHW circuit"
+    unit_of_measurement: "l/min"
