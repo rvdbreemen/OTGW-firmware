@@ -30,9 +30,9 @@
 
 #ifndef Debug
   //#warning Debug() was not defined!
-	#define Debug(...)		({ Serial.print(__VA_ARGS__); })  
-	#define Debugln(...)	({ Serial.println(__VA_ARGS__); })  
-	#define Debugf(...)		({ Serial.printf(__VA_ARGS__); })  
+	#define Debug(...)		({ OTGWSerial.print(__VA_ARGS__); })  
+	#define Debugln(...)	({ OTGWSerial.println(__VA_ARGS__); })  
+	#define Debugf(...)		({ OTGWSerial.printf(__VA_ARGS__); })  
 //#else
 //  #warning Seems Debug() is already defined!
 #endif
@@ -105,8 +105,8 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
 
       if(upload.status == UPLOAD_FILE_START){
         _updaterError.clear();
-        if (_serial_output)
-          Serial.setDebugOutput(true);
+        // if (_serial_output)
+        //   OTGWSerial.setDebugOutput(true);
 
         _authenticated = (_username == emptyString || _password == emptyString || _server->authenticate(_username.c_str(), _password.c_str()));
         if(!_authenticated){
@@ -144,7 +144,8 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         } else {
           _setUpdaterError();
         }
-        if (_serial_output) Serial.setDebugOutput(false);
+        // if (_serial_output) 
+        //   OTGWSerial.setDebugOutput(false);
       } else if(_authenticated && upload.status == UPLOAD_FILE_ABORTED){
         Update.end();
         if (_serial_output) Debugln("Update was aborted");

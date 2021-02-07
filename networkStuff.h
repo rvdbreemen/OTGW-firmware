@@ -50,7 +50,6 @@
 ESP8266WebServer        httpServer (80);
 ESP8266HTTPUpdateServer httpUpdater(true);
 
-
 static      FSInfo LittleFSinfo;
 bool        LittleFSmounted; 
 bool        isConnected = false;
@@ -76,7 +75,7 @@ void startWiFi(const char* hostname, int timeOut)
   uint32_t lTime = millis();
   String thisAP = String(hostname) + "-" + WiFi.macAddress();
 
-  Serial.println("Start Wifi ...");
+  OTGWSerial.println("Start Wifi ...");
   manageWiFi.setDebugOutput(true);
 
   //--- next line in release needs to be commented out!
@@ -94,7 +93,7 @@ void startWiFi(const char* hostname, int timeOut)
   //--- if it does not connect it starts an access point with the specified name
   //--- here  "<HOSTNAME>-<MAC>"
   //--- and goes into a blocking loop awaiting configuration
-  Serial.printf("AutoConnect to: %s", thisAP.c_str());
+  OTGWSerial.printf("AutoConnect to: %s", thisAP.c_str());
   if (!manageWiFi.autoConnect(thisAP.c_str()))
   {
     //-- fail to connect? Have you tried turning it off and on again? 

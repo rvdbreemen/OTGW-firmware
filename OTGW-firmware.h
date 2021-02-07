@@ -9,15 +9,36 @@
 ***************************************************************************      
 */
 
+#include <Arduino.h>
 #include <ezTime.h>             // https://github.com/ropg/ezTime
 #include <TelnetStream.h>       // https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
 #include <ArduinoJson.h>        // https://arduinojson.org/
 #include "Wire.h"
 #include "Debug.h"
 #include "safeTimers.h"
-#include "networkStuff.h"
+#include "OTGWSerial.h"         // Bron Schelte's Serial class - it upgrades and more
 #include "OTGW-Core.h"          // Core code for this firmware 
-#include "OTGW-upgrade.h"       // Schelte Bron's upgrade PIC code
+
+//OTGW Nodoshop hardware definitions
+#define I2CSCL D1
+#define I2CSDA D2
+#define BUTTON D3
+#define PICRST D5
+
+#define LED1 D4
+#define LED2 D0
+
+#define FIRMWARE "/gateway.hex"
+
+extern OTGWSerial OTGWSerial(PICRST, LED2);
+void fwupgradestart(const char *hexfile);
+
+void blinkLEDnow();
+void blinkLEDnow(uint8_t);
+void setLed(int8_t, uint8_t);
+
+//Now load network suff
+#include "networkStuff.h"
 
 //Defaults and macro definitions
 #define _HOSTNAME       "OTGW"
@@ -45,6 +66,7 @@ const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
 
 //Information on OTGW 
 String    sPICfwversion = ""; 
+bool      bOTGWonline = true;
 
 //All things that are settings 
 String    settingHostname = _HOSTNAME;

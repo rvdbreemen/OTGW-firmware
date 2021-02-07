@@ -12,9 +12,9 @@
 
 /*---- start macro's ------------------------------------------------------------------*/
 
-#define Debug(...)      ({ TelnetStream.print(__VA_ARGS__);   })
-#define Debugln(...)    ({ TelnetStream.println(__VA_ARGS__); })
-#define Debugf(...)     ({ TelnetStream.printf(__VA_ARGS__);  })
+#define Debug(...)      ({ TelnetStream.print(__VA_ARGS__);    })
+#define Debugln(...)    ({ TelnetStream.println(__VA_ARGS__);  })
+#define Debugf(...)     ({ TelnetStream.printf(__VA_ARGS__);   })
 
 #define DebugFlush()    ({ TelnetStream.flush(); })
 
