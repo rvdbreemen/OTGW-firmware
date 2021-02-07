@@ -30,14 +30,18 @@
 
 #include "OTGW-firmware.h"
 
+#define ON LOW
+#define OFF HIGH
+
 //=====================================================================
 void setup()
 {
-  Serial.begin(9600, SERIAL_8N1);
-  while (!Serial) {} //Wait for OK
-
-  Serial.println(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
-  Serial.printf("Booting....[%s]\r\n\r\n", String(_FW_VERSION).c_str());
+  // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
+  // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
+  // while (!Serial) {} //Wait for OK
+  
+  OTGWSerial.println(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
+  OTGWSerial.printf("Booting....[%s]\r\n\r\n", String(_FW_VERSION).c_str());
 
   rebootCount = updateRebootCount();
 
@@ -45,41 +49,45 @@ void setup()
   randomSeed(RANDOM_REG32); //This is 8266 HWRNG used to seed the Random PRNG: Read more: https://config9.com/arduino/getting-a-truly-random-number-in-arduino/
 
   lastReset     = ESP.getResetReason();
-  Serial.printf("Last reset reason: [%s]\r\n", CSTR(ESP.getResetReason()));
+  OTGWSerial.printf("Last reset reason: [%s]\r\n", CSTR(ESP.getResetReason()));
 
   //setup the status LED
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, HIGH); //OFF
-  pinMode(16,OUTPUT);
-  digitalWrite(16,LOW);
+  setLed(LED1, ON);
+  setLed(LED2, ON);
 
   //start the debug port 23
   startTelnet();
-  Serial.print("Use  'telnet ");
-  Serial.print(WiFi.localIP());
-  Serial.println("' for debugging");
-  
+  OTGWSerial.print("Use  'telnet ");
+  OTGWSerial.print(WiFi.localIP());
+  OTGWSerial.println("' for debugging");
+
+  DebugT("Waiting");
+  Debugln();
 //================ LittleFS ===========================================
   if (LittleFS.begin()) 
   {
-    Serial.println(F("LittleFS Mount succesfull\r"));
+    OTGWSerial.println(F("LittleFS Mount succesfull\r"));
     LittleFSmounted = true;
   } else { 
-    Serial.println(F("LittleFS Mount failed\r"));   // Serious problem with LittleFS 
+    OTGWSerial.println(F("LittleFS Mount failed\r"));   // Serious problem with LittleFS 
     LittleFSmounted = false;
   }
 
   readSettings(true);
 
   // Connect to and initialise WiFi network
-  Serial.println(F("Attempting to connect to WiFi network\r"));
-  digitalWrite(LED_BUILTIN, HIGH);
+  OTGWSerial.println(F("Attempting to connect to WiFi network\r"));
+  setLed(LED1, ON);
   startWiFi(_HOSTNAME, 240);  // timeout 240 seconds
-  digitalWrite(LED_BUILTIN, LOW);
-  
+  for (int i=0; i<=3;i++) {
+    blinkLEDnow(LED1);
+    delay(250);
+    blinkLEDnow(LED1);
+    delay(250);
+  }
+  setLed(LED1, OFF);
+
   startMDNS(CSTR(settingHostname));
-  
-  delay(1000);
   
   // Start MQTT connection
   startMQTT(); 
@@ -129,20 +137,15 @@ void setup()
   httpServer.on("/api", HTTP_ANY, processAPI);  //was only HTTP_GET (20210110)
 
   httpServer.begin();
-  Serial.println("\nHTTP Server started\r");
+  OTGWSerial.println("\nHTTP Server started\r");
   
   // Set up first message as the IP address
   sprintf(cMsg, "%03d.%03d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
-  Serial.printf("\nAssigned IP[%s]\r\n", cMsg);
-
-  for (int i=0; i<50; i++){
-    blinkLEDnow();
-    delay(200);
-  }// 50* 200 = 10.0000 msec = 10 seconds of blinking
+  OTGWSerial.printf("\nAssigned IP=%s\r\n", cMsg);
 
   DebugTln("Setup Watchdog");
   initWatchDog();       // setup the WatchDog
-  Serial.println(F("Setup finished!\r\n"));
+  OTGWSerial.println(F("Setup finished!\r\n"));
   // After resetting the OTGW PIC never send anything to Serial for debug
   // and switch to telnet port 23 for debug purposed. 
   // Setup the OTGW PIC
@@ -150,29 +153,44 @@ void setup()
   resetOTGW();          // reset the OTGW pic
   DebugTln("Start OTGW Stream");
   startOTGWstream();    // start port 25238 
-  DebugTln("Fetch PIC firmware");
-  sPICfwversion = getpicfwversion(); // fetch the firmware version
   DebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
 
   DebugTf("Reboot count = [%d]\r\n", rebootCount);
-  pinMode(16,OUTPUT);
-  digitalWrite(16,HIGH);
+  setLed(LED1, OFF);
+  //Blink LED2 to signal setup done
+  for (int i=0; i<=3;i++) {
+    blinkLEDnow(LED2);
+    delay(250);
+    blinkLEDnow(LED2);
+    delay(250);
+  }
+  setLed(LED2, OFF);
 }
 
 //=====================================================================
 
 //===[ blink status led ]===
-void blinkLEDms(uint32_t iDelay){
+
+void setLed(uint8_t led, uint8_t status){
+  pinMode(led, OUTPUT);
+  digitalWrite(led, status); 
+}
+
+void blinkLEDms(uint32_t delay){
   //blink the statusled, when time passed
-  DECLARE_TIMER_MS(timerBlink, iDelay);
+  DECLARE_TIMER_MS(timerBlink, delay);
   if (DUE(timerBlink)) {
     blinkLEDnow();
   }
 }
 
 void blinkLEDnow(){
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+  blinkLEDnow(LED1);
+}
+
+void blinkLEDnow(uint8_t led = LED1){
+  pinMode(led, OUTPUT);
+  digitalWrite(led, !digitalRead(led));
 }
 
 //===[ no-blocking delay with running background tasks in ms ]===

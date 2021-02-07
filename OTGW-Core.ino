@@ -11,20 +11,16 @@
 ***************************************************************************      
 */
 
-
 //define Nodoshop OTGW hardware
-// #define OTGW_BUTTON D3
-#define OTGW_RESET  14
-// #define OTGW_LED1   D4
-// #define OTGW_LED2   D0
+#define OTGW_BUTTON 0   //D3
+#define OTGW_RESET  14  //D5
+#define OTGW_LED1   2   //D4
+#define OTGW_LED2   16  //D0
 
 //external watchdog 
-// #define OTGW_I2C_SCL 5
-// #define OTGW_I2C_SDA 4
-// #define OTGW_EXT_WD_I2C_ADDRESS 0x26
 #define EXT_WD_I2C_ADDRESS 0x26
-#define PIN_I2C_SDA 4
-#define PIN_I2C_SCL 5
+#define PIN_I2C_SDA 4   //D2
+#define PIN_I2C_SCL 5   //D1
 
 //Macro to Feed the Watchdog
 #define FEEDWATCHDOGNOW   Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   Wire.write(0xA5);   Wire.endTransmission();
@@ -52,27 +48,47 @@
 //some variable's
 OpenthermData OTdata;
 
+#define OTGW_BANNER "OpenTherm Gateway "
+
 //===================[ Reset OTGW ]===============================
 void resetOTGW() {
   //lower the right pin for just 100ms and the OTGW is reset
   DebugTln("OTGW PIC reset");
   pinMode(OTGW_RESET, OUTPUT);
   digitalWrite(OTGW_RESET, LOW);
+  OTGWSerial.print("GW=R\r\n");
   delay(100);
   digitalWrite(OTGW_RESET, HIGH);
   pinMode(OTGW_RESET, INPUT_PULLUP);
+
+  //wait for response
+  OTGWSerial.setTimeout(250);
+  String line = OTGWSerial.readStringUntil('\n');
+  line.trim();
+  DebugTf("Received after reset: %s (%d)\r\n", CSTR(line), line.length());
+  bOTGWonline = (line.length()>0);
+  if (bOTGWonline){
+    //find version
+    int p = line.indexOf(OTGW_BANNER);
+    if (p >= 0) {
+      p += sizeof(OTGW_BANNER);
+      sPICfwversion = line.substring(p);
+    } else sPICfwversion ="No version found";
+  } else sPICfwversion = "No OTWG connected!";
+  DebugTf("Current firmware version: %s\r\n", CSTR(sPICfwversion));
+  OTGWSerial.setTimeout(1000);
 }
 //===================[ getpicfwversion ]===========================
 String getpicfwversion(){
   String _ret="";
-  #define BANNER "OpenTherm Gateway"
+
   String line = executeCommand("PR=A");
-  int p = line.indexOf(BANNER);
+  int p = line.indexOf(OTGW_BANNER);
   if (p >= 0) {
-    p += sizeof(BANNER);
+    p += sizeof(OTGW_BANNER);
     _ret = line.substring(p);
   } else _ret ="No version found";
-  DebugTf("Current firmware version: %s\n", CSTR(_ret));
+  DebugTf("Current firmware version: %s\r\n", CSTR(_ret));
   _ret.trim();
   return _ret;
 }
@@ -80,23 +96,23 @@ String getpicfwversion(){
 String executeCommand(const String sCmd){
   //send command to OTGW
   DebugTf("OTGW Send Cmd [%s]\r\n", CSTR(sCmd));
-  Serial.setTimeout(1000);
+  OTGWSerial.setTimeout(1000);
   DECLARE_TIMER_MS(tmrWaitForIt, 1000);
-  while((Serial.availableForWrite() < sCmd.length()+2) && !DUE(tmrWaitForIt)){
+  while((OTGWSerial.availableForWrite() < sCmd.length()+2) && !DUE(tmrWaitForIt)){
     feedWatchDog();
   }
-  Serial.write(CSTR(sCmd));
-  Serial.write("\r\n");
-  Serial.flush();
+  OTGWSerial.write(CSTR(sCmd));
+  OTGWSerial.write("\r\n");
+  OTGWSerial.flush();
   //wait for response
   RESTART_TIMER(tmrWaitForIt);
-  while(!Serial.available() && !DUE(tmrWaitForIt)) {
+  while(!OTGWSerial.available() && !DUE(tmrWaitForIt)) {
     feedWatchDog();
   }
   String _cmd = sCmd.substring(0,2);
   DebugTf("Send command: [%s]\r\n", CSTR(_cmd));
   //fetch a line
-  String line = Serial.readStringUntil('\n');
+  String line = OTGWSerial.readStringUntil('\n');
   line.trim();
   String _ret ="";
   if (line.startsWith(_cmd)){
@@ -129,81 +145,81 @@ String executeCommand(const String sCmd){
   return _ret;
 }
 
-String executeCommandCstyle(const String sCmd){
-  return executeCommandCstyle(CSTR(sCmd), sCmd.length());
-}
+// String executeCommandCstyle(const String sCmd){
+//   return executeCommandCstyle(CSTR(sCmd), sCmd.length());
+// }
 
-String executeCommandCstyle(const char* sCmd, size_t len){
-  char _cmd[2];
-  char line[80];
-  char _ret[80];
-  //send command to OTGW
-  DebugTf("OTGW Send Cmd [%s]=[%s]\r\n", sCmd);
-  while(Serial.availableForWrite() < len+2){
-    feedWatchDog();
-  }
-  Serial.write(sCmd, len);
-  Serial.write("\r\n");
-  Serial.flush();
-  //wait for response
-  Serial.setTimeout(3000);
-  while(!Serial.available()) {
-    feedWatchDog();
-  }
-  // DebugTf("Send command: [%s]\r\n", _cmd);
-  //fetch a line
-  size_t l = Serial.readBytesUntil('\n', line, sizeof(line)-1);
-  line[l]='\0';
-  _cmd[0]='\0';
-  if (l  > 0) {
-    strcpy(_cmd,strtok(line,":"));                   
-  } 
-  if (prefix(_cmd, sCmd)){
-    // Responses: When a serial command is accepted by the gateway, it responds with the two letters of the command code, a colon, and the interpreted data value.
-    // Command:   "TT=19.125"
-    // Response:  "TT: 19.13"
-    //            [XX:response string]   
-    strcpy(_ret,strtok(NULL,":"));  
-  } else if (prefix("NG", _cmd)){
-    strlcpy(_ret, "NG - No Good. The command code is unknown.", sizeof(_ret));
-  } else if (prefix("SE", _cmd)){
-    strlcpy(_ret, "SE - Syntax Error. The command contained an unexpected character or was incomplete.", sizeof(_ret));
-  } else if (prefix("BV", _cmd)){
-    strlcpy(_ret, "BV - Bad Value. The command contained a data value that is not allowed.", sizeof(_ret));
-  } else if (prefix("OR", _cmd)){
-    strlcpy(_ret, "OR - Out of Range. A number was specified outside of the allowed range.", sizeof(_ret));
-  } else if (prefix("NS", _cmd)){
-    strlcpy(_ret, "NS - No Space. The alternative Data-ID could not be added because the table is full.", sizeof(_ret));
-  } else if (prefix("NF", _cmd)){
-    strlcpy(_ret, "NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table.", sizeof(_ret));
-  } else if (prefix("OE", _cmd)){
-    strlcpy(_ret, "OE - Overrun Error. The processor was busy and failed to process all received characters.", sizeof(_ret));
-  } else {
-    strlcpy(_ret, "Error: Different command response [", sizeof(_ret));
-    strlcat(_ret, _cmd, sizeof(_ret));
-    strlcat(_ret, "] Cmd send [", sizeof(_ret));
-    strlcat(_ret, sCmd, sizeof(_ret));
-    strlcat(_ret, "]", sizeof(_ret));
-  } 
-  DebugTf("Command send - Response returned: [%s]:[%s] - line: [%s]\r\n", _cmd, _ret, line);
-  return _ret;
-}
+// String executeCommandCstyle(const char* sCmd, size_t len){
+//   char _cmd[2];
+//   char line[80];
+//   char _ret[80];
+//   //send command to OTGW
+//   DebugTf("OTGW Send Cmd [%s]=[%s]\r\n", sCmd);
+//   while(OTGWSerial.availableForWrite() < len+2){
+//     feedWatchDog();
+//   }
+//   OTGWSerial.write(sCmd, len);
+//   OTGWSerial.write("\r\n");
+//   OTGWSerial.flush();
+//   //wait for response
+//   OTGWSerial.setTimeout(3000);
+//   while(!OTGWSerial.available()) {
+//     feedWatchDog();
+//   }
+//   // DebugTf("Send command: [%s]\r\n", _cmd);
+//   //fetch a line
+//   size_t l = OTGWSerial.readBytesUntil('\n', line, sizeof(line)-1);
+//   line[l]='\0';
+//   _cmd[0]='\0';
+//   if (l  > 0) {
+//     strcpy(_cmd,strtok(line,":"));                   
+//   } 
+//   if (prefix(_cmd, sCmd)){
+//     // Responses: When a serial command is accepted by the gateway, it responds with the two letters of the command code, a colon, and the interpreted data value.
+//     // Command:   "TT=19.125"
+//     // Response:  "TT: 19.13"
+//     //            [XX:response string]   
+//     strcpy(_ret,strtok(NULL,":"));  
+//   } else if (prefix("NG", _cmd)){
+//     strlcpy(_ret, "NG - No Good. The command code is unknown.", sizeof(_ret));
+//   } else if (prefix("SE", _cmd)){
+//     strlcpy(_ret, "SE - Syntax Error. The command contained an unexpected character or was incomplete.", sizeof(_ret));
+//   } else if (prefix("BV", _cmd)){
+//     strlcpy(_ret, "BV - Bad Value. The command contained a data value that is not allowed.", sizeof(_ret));
+//   } else if (prefix("OR", _cmd)){
+//     strlcpy(_ret, "OR - Out of Range. A number was specified outside of the allowed range.", sizeof(_ret));
+//   } else if (prefix("NS", _cmd)){
+//     strlcpy(_ret, "NS - No Space. The alternative Data-ID could not be added because the table is full.", sizeof(_ret));
+//   } else if (prefix("NF", _cmd)){
+//     strlcpy(_ret, "NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table.", sizeof(_ret));
+//   } else if (prefix("OE", _cmd)){
+//     strlcpy(_ret, "OE - Overrun Error. The processor was busy and failed to process all received characters.", sizeof(_ret));
+//   } else {
+//     strlcpy(_ret, "Error: Different command response [", sizeof(_ret));
+//     strlcat(_ret, _cmd, sizeof(_ret));
+//     strlcat(_ret, "] Cmd send [", sizeof(_ret));
+//     strlcat(_ret, sCmd, sizeof(_ret));
+//     strlcat(_ret, "]", sizeof(_ret));
+//   } 
+//   DebugTf("Command send - Response returned: [%s]:[%s] - line: [%s]\r\n", _cmd, _ret, line);
+//   return _ret;
+// }
 
 //===================[ OTGW PS=1 Command ]===============================
 void getOTGW_PS_1(){
   DebugTln("PS=1");
-  Serial.write("PS=1\r\n");
-  Serial.flush();
+  OTGWSerial.write("PS=1\r\n");
+  OTGWSerial.flush();
 
-  while(!Serial.available()) {
+  while(!OTGWSerial.available()) {
     feedWatchDog();
   }
-  String line = Serial.readStringUntil('\n');
+  String line = OTGWSerial.readStringUntil('\n');
   line.trim(); //remove LF and CR (and whitespaces)
   DebugTln(line);
   DebugTln("PS=0");
-  Serial.write("PS=0\r\n");
-  Serial.flush();
+  OTGWSerial.write("PS=0\r\n");
+  OTGWSerial.flush();
 }
 //===================[ OTGW PS=1 Command ]===============================
 //===================[ Watchdog OTGW ]===============================
@@ -720,25 +736,25 @@ int sendOTGW(const char* buf, int len)
   //Send the buffer to OTGW when the Serial interface is available
   if (Serial) {
     //check the write buffer
-    Debugf("Serial Write Buffer space = [%d] - needed [%d]\r\n",Serial.availableForWrite(), (len+2));
+    Debugf("Serial Write Buffer space = [%d] - needed [%d]\r\n",OTGWSerial.availableForWrite(), (len+2));
     DebugT("Sending to Serial [");
     for (int i = 0; i < len; i++) {
       Debug((char)buf[i]);
     }
     Debug("] ("); Debug(len); Debug(")"); Debugln();
     
-    while (Serial.availableForWrite()==(len+2)) {
+    while (OTGWSerial.availableForWrite()==(len+2)) {
       //cannot write, buffer full, wait for some space in serial out buffer
       feedWatchDog();     //this yields for other processes
     }
 
-    if (Serial.availableForWrite()>= (len+2)) {
+    if (OTGWSerial.availableForWrite()>= (len+2)) {
       //write buffer to serial
-      Serial.write(buf, len);
-      // Serial.write("PS=0\r\n");
-      Serial.write('\r');
-      Serial.write('\n');
-      Serial.flush(); 
+      OTGWSerial.write(buf, len);
+      // OTGWSerial.write("PS=0\r\n");
+      OTGWSerial.write('\r');
+      OTGWSerial.write('\n');
+      OTGWSerial.flush(); 
     } else Debugln("Error: Write buffer not big enough!");
   } else Debugln("Error: Serial device not found!");
 }
@@ -929,14 +945,14 @@ void handleOTGW()
 
   //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
   while (OTGWstream.available()){
-    //Serial.write(OTGWstream.read()); //just forward it directly to Serial
+    //OTGWSerial.write(OTGWstream.read()); //just forward it directly to Serial
     outByte = OTGWstream.read();  // read from port 25238
-    while (Serial.availableForWrite()==0) {
+    while (OTGWSerial.availableForWrite()==0) {
       //cannot write, buffer full, wait for some space in serial out buffer
       feedWatchDog();     //this yields for other processes
     }
-    Serial.write(outByte);        // write to serial port
-    Serial.flush();               // wait for write to serial
+    OTGWSerial.write(outByte);        // write to serial port
+    OTGWSerial.flush();               // wait for write to serial
     if (outByte == '\n')
     { //on newline, do something...
       sWrite[bytes_write] = 0;
@@ -960,9 +976,9 @@ void handleOTGW()
   }
   
   //Handle incoming data from OTGW through serial port (READ BUFFER)
-  while(Serial.available()) 
+  while(OTGWSerial.available()) 
   {
-    inByte = Serial.read();   // read from serial port
+    inByte = OTGWSerial.read();   // read from serial port
     OTGWstream.write(inByte); // write to port 25238
     if (inByte== '\n')
     { //line terminator, continue to process incoming message
@@ -1083,6 +1099,17 @@ String getOTGWValue(int msgid)
 void startOTGWstream()
 {
   OTGWstream.begin();
+}
+
+void upgradenow() {
+  if (OTGWSerial.busy()) return; // if already in programming mode, never call it twice
+  DebugTln("Start PIC upgrade now.");
+  fwupgradestart(FIRMWARE);  
+  while (OTGWSerial.busy()){
+    feedWatchDog();
+  }
+  // When you are done, then reset the PIC one more time, to capture the actual fwversion of the OTGW
+  resetOTGW();
 }
 
 /***************************************************************************
