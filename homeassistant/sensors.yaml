@@ -3,7 +3,7 @@
     name: "Room setpoint"
     unit_of_measurement: "°C"
   - platform: mqtt
-    state_topic: "OTGW/Troom"
+    state_topic: "OTGW/Tr"
     name: "Room Temperature"
     unit_of_measurement: "°C"
   - platform: mqtt
