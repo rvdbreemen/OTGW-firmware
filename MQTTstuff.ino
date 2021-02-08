@@ -70,11 +70,11 @@ void handleMQTT()
   {
     case MQTT_STATE_INIT:  
       DebugTln(F("MQTT State: MQTT Initializing")); 
-      WiFi.hostByName(settingMQTTbroker.c_str(), MQTTbrokerIP);  // lookup the MQTTbroker convert to IP
+      WiFi.hostByName(CSTR(settingMQTTbroker), MQTTbrokerIP);  // lookup the MQTTbroker convert to IP
       sprintf(MQTTbrokerIPchar, "%d.%d.%d.%d", MQTTbrokerIP[0], MQTTbrokerIP[1], MQTTbrokerIP[2], MQTTbrokerIP[3]);
       if (isValidIP(MQTTbrokerIP))  
       {
-        DebugTf("[%s] => setServer(%s, %d)\r\n", settingMQTTbroker.c_str(), MQTTbrokerIPchar, settingMQTTbrokerPort);
+        DebugTf("[%s] => setServer(%s, %d)\r\n", CSTR(settingMQTTbroker), MQTTbrokerIPchar, settingMQTTbrokerPort);
         MQTTclient.disconnect();
         MQTTclient.setServer(MQTTbrokerIPchar, settingMQTTbrokerPort);
         MQTTclient.setCallback(handleMQTTcallback);
@@ -84,7 +84,7 @@ void handleMQTT()
       }
       else
       { // invalid IP, then goto error state
-        DebugTf("ERROR: [%s] => is not a valid URL\r\n", settingMQTTbroker.c_str());
+        DebugTf("ERROR: [%s] => is not a valid URL\r\n", CSTR(settingMQTTbroker));
         stateMQTT = MQTT_STATE_ERROR;
         //DebugTln(F("Next State: MQTT_STATE_ERROR"));
       }    
@@ -102,16 +102,16 @@ void handleMQTT()
       if (settingMQTTuser.length() == 0) 
       {
         Debug(F("without a Username/Password "));
-        MQTTclient.connect(MQTTclientId.c_str());
+        MQTTclient.connect(CSTR(MQTTclientId));
       } 
       else 
       {
-        Debugf("Username [%s] ", settingMQTTuser.c_str());
-        MQTTclient.connect(MQTTclientId.c_str(), settingMQTTuser.c_str(), settingMQTTpasswd.c_str());
+        Debugf("Username [%s] ", CSTR(settingMQTTuser));
+        MQTTclient.connect(CSTR(MQTTclientId), CSTR(settingMQTTuser), CSTR(settingMQTTpasswd));
       }
 
       //If connection was made succesful, move on to next state...
-      if  (MQTTclient.connected())
+      if (MQTTclient.connected())
       {
         reconnectAttempts = 0;  
         Debugln(F(" .. connected\r"));
@@ -121,7 +121,7 @@ void handleMQTT()
         doAutoConfigure();
         //Subscribe to topics
         char topic[100];
-        strcpy(topic, settingMQTTtopTopic.c_str());
+        strcpy(topic, CSTR(settingMQTTtopTopic));
         strlcat(topic, "/", sizeof(topic));
         strlcat(topic, OTGW_COMMAND_TOPIC, sizeof(topic));
         DebugTf("Subscribe to MQTT: TopicId [%s]\r\n", topic);
@@ -199,14 +199,21 @@ void handleMQTT()
       //DebugTln(F("Next State: MQTT_STATE_INIT"));
     break;
   }
+  statusMQTTconnection = MQTTclient.connected();
 } // handleMQTT()
 
 
-bool MQTT_connected()
-{
-  if (!settingMQTTenable) return false;
-  return MQTTclient.connected();
-}
+// bool MQTT_connected()
+// {
+//   if (!settingMQTTenable) return false;
+//   return MQTTclient.connected();
+// }
+
+// bool getMQTTconnectstatus(){
+//   if (!settingMQTTenable) return false;
+//   return MQTTclient.connected();
+// }
+
 
 //===========================================================================================
 String trimVal(char *in) 
@@ -219,12 +226,12 @@ String trimVal(char *in)
 //===========================================================================================
 void sendMQTTData(const String item, const String json)
 {
-  sendMQTTData(item.c_str(), json.c_str());
+  if (!settingMQTTenable) return;
+  sendMQTTData(CSTR(item), CSTR(json));
 } 
 
 void sendMQTTData(const char* item, const char *json) 
 {
-
 /*  
 * The maximum message size, including header, is 128 bytes by default. 
 * This is configurable via MQTT_MAX_PACKET_SIZE in PubSubClient.h.
@@ -238,7 +245,7 @@ void sendMQTTData(const char* item, const char *json)
   if (!MQTTclient.connected() || !isValidIP(MQTTbrokerIP)) return;
   // DebugTf("Sending data to MQTT server [%s]:[%d]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort);
   char topic[100];
-  snprintf(topic, sizeof(topic), "%s/", settingMQTTtopTopic.c_str());
+  snprintf(topic, sizeof(topic), "%s/", CSTR(settingMQTTtopTopic));
   strlcat(topic, item, sizeof(topic));
   //DebugTf("Sending MQTT: TopicId [%s] Message [%s]\r\n", topic, json);
   if (!MQTTclient.publish(topic, json, true)) DebugTln("MQTT publish failed.");
@@ -290,23 +297,19 @@ void doAutoConfigure()
           feedWatchDog(); //start with feeding the dog
           
           String sLine = fh.readStringUntil('\n');
-          // DebugTf("sline[%s]\r\n", sLine.c_str());
+          // DebugTf("sline[%s]\r\n", CSTR(sLine));
           if (splitString(sLine, ',', sTopic, sMsg))
           {
-            DebugTf("sTopic[%s], sMsg[%s]\r\n", sTopic.c_str(), sMsg.c_str());
-            sendMQTT(sTopic.c_str(), sMsg.c_str(), (sTopic.length() + sMsg.length()+2));
+            DebugTf("sTopic[%s], sMsg[%s]\r\n", CSTR(sTopic), CSTR(sMsg));
+            sendMQTT(CSTR(sTopic), CSTR(sMsg), (sTopic.length() + sMsg.length()+2));
             delay(10);
-          } else DebugTf("Either comment or invalid config line: [%s]\r\n", sLine.c_str());
+          } else DebugTf("Either comment or invalid config line: [%s]\r\n", CSTR(sLine));
       } // while available()
       fh.close();  
     } 
   } 
 }
 
-bool getMQTTconnectstatus(){
-  if (!settingMQTTenable) return false;
-  return MQTTclient.connected();
-}
 
 
 /***************************************************************************

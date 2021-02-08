@@ -21,6 +21,8 @@
         "unordered_map": "cpp",
         "unordered_set": "cpp",
         "initializer_list": "cpp",
-        "sstream": "cpp"
+        "sstream": "cpp",
+        "iosfwd": "cpp",
+        "xlocbuf": "cpp"
     }
 }

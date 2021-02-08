@@ -71,6 +71,7 @@ bool      bOTGWonline = true;
 //All things that are settings 
 String    settingHostname = _HOSTNAME;
 //MQTT settings
+bool      statusMQTTconnection = false; 
 bool      settingMQTTenable = true;
 bool      settingMQTTsecure = false; 
 String    settingMQTTbroker= "192.168.88.254";
