@@ -78,27 +78,25 @@ OTGWSerial::OTGWSerial(int resetPin, int progressLed)
 }
 
 int OTGWSerial::available() {
-  if (upgradeEvent()) return 0;
-  return HardwareSerial::available();
+  if (upgradeEvent()) {
+    return 0;
+  } else {
+    return HardwareSerial::available();
+  }
 }
 
+// Reimplement the read function. Other read functions call this to implement their functionality.
 int OTGWSerial::read() {
+  int retval;
+  char ch;
   if (upgradeEvent()) return -1;
-  return HardwareSerial::read();
+  retval = HardwareSerial::read();
+  if (retval >= 0) {
+    ch = retval;
+    matchBanner(&ch);
+  }
+  return retval;
 }
-
-// // Reimplement the read function. Other read functions call this to implement their functionality.
-// int OTGWSerial::read() {
-//   int retval;
-//   char ch;
-//   if (upgradeEvent()) return -1;
-//   retval = HardwareSerial::read();
-//   if (retval >= 0) {
-//     ch = retval;
-//     matchBanner(&ch);
-//   }
-//   return retval;
-// }
 
 int OTGWSerial::availableForWrite() {
   if (upgradeEvent()) return 0;
