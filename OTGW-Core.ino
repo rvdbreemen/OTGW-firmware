@@ -761,40 +761,34 @@ int sendOTGW(const char* buf, int len)
 
 void processOTGW(const char * buf, int len)
 {
-
-  if (len >= 9) 
+  if (len == 9) 
   { 
     //OT protocol messages are 9 chars long
     sendMQTTData("otmessage", buf);
-    //parse value
+    // source of otmsg
+    if (buf[0]=='B')
+    {
+      DebugT("Boiler           ");
+    } else if (buf[0]=='T')
+    {
+      DebugT("Thermostat       ");
+    } else     if (buf[0]=='R')
+    {
+      DebugT("Request Boiler   ");
+    } else if (buf[0]=='A')
+    {
+      DebugT("Answer Themostat ");
+    } else if (buf[0]=='E')
+    {
+      DebugT("Parity error     ");
+    } else
+    {
+      DebugTf("Unexpected=[%c] ", buf[0]);
+    }
+
     const char *bufval = buf + 1;
     uint32_t value = strtoul(bufval, NULL, 16);
-    // Debugf("Value=[%08x]\r\n", (uint32_t)value);
-    //processing message
-    // if (strBuffer.charAt(0)=='B')
-    // {
-    //   DebugT("Boiler           ");
-    // } else 
-    // if (strBuffer.charAt(0)=='T')
-    // {
-    //   DebugT("Thermostat       ");
-    // } else
-    // if (strBuffer.charAt(0)=='R')
-    // {
-    //   DebugT("Request Boiler   ");
-    // } else      
-    // if (strBuffer.charAt(0)=='A')
-    // {
-    //   DebugT("Answer Themostat ");
-    // } else      
-    // if (strBuffer.charAt(0)=='E')
-    // {
-    //   DebugT("Parity error     ");
-    // } else
-    // {
-    //   DebugTf("Unexpected=[%c] ", strBuffer.charAt(0));
-    // }
-    DebugTf("msg=[%s] value=[%08x]", bufval, value);
+    Debugf("msg=[%s] value=[%08x]", bufval, value);
 
     //split 32bit value into the relevant OT protocol parts
     OTdata.type = (value >> 28) & 0x7;         // byte 1 = take 3 bits that define msg msgType
@@ -907,7 +901,7 @@ void processOTGW(const char * buf, int len)
         case RemehaDetectionConnectedSCU:   OTdataObject.RemehaDetectionConnectedSCU = print_u8u8(); break;
       }
     } else Debugln(); //next line 
-  } else DebugTf("[%s] [%d]\r\n", buf, len);
+  } else DebugTf("received from OTGW => [%s] [%d]\r\n", buf, len);
 }
 
 
