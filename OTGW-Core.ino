@@ -1107,9 +1107,44 @@ void upgradenow() {
   fwupgradestart(FIRMWARE);  
   while (OTGWSerial.busy()){
     feedWatchDog();
+    //blink the led during flash...
+    DECLARE_TIMER_MS(timerUpgrade, 500);
+    if (DUE(timerUpgrade)) {
+        blinkLEDnow(LED2);
+    }
   }
   // When you are done, then reset the PIC one more time, to capture the actual fwversion of the OTGW
   resetOTGW();
+}
+
+void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
+  DebugTf("Upgrade finished: Errorcode = %d - %d retries, %d errors\n", result, retries, errors);
+  switch (result) {
+    case OTGW_ERROR_NONE:          errorupgrade = "PIC upgrade was succesful."; break;
+    case OTGW_ERROR_MEMORY:        errorupgrade = "Not enough memory available."; break;
+    case OTGW_ERROR_INPROG:        errorupgrade = "Firmware upgrade in progress."; break;
+    case OTGW_ERROR_HEX_ACCESS:    errorupgrade = "Could not open hex file."; break;
+    case OTGW_ERROR_HEX_FORMAT:    errorupgrade = "Invalid format of hex file."; break;
+    case OTGW_ERROR_HEX_DATASIZE:  errorupgrade = "Wrong data size in hex file."; break;
+    case OTGW_ERROR_HEX_CHECKSUM:  errorupgrade = "Bad checksum in hex file."; break;
+    case OTGW_ERROR_MAGIC:         errorupgrade = "Hex file does not contain expected data."; break;
+    case OTGW_ERROR_RESET:         errorupgrade = "PIC reset failed."; break;
+    case OTGW_ERROR_RETRIES:       errorupgrade = "Too many retries."; break;
+    case OTGW_ERROR_MISMATCHES:   errorupgrade = "Too many mismatches."; break;
+    default:                       errorupgrade = "Unknown state."; break;
+  }
+}
+
+void fwupgradestart(const char *hexfile) {
+  OTGWError result;
+  
+  digitalWrite(LED1, LOW);
+  result = OTGWSerial.startUpgrade(hexfile);
+  if (result!= OTGW_ERROR_NONE) {
+    fwupgradedone(result);
+  } else {
+    OTGWSerial.registerFinishedCallback(fwupgradedone);
+  }
 }
 
 /***************************************************************************
