@@ -52,31 +52,16 @@ OpenthermData OTdata;
 
 //===================[ Reset OTGW ]===============================
 void resetOTGW() {
-  //lower the right pin for just 100ms and the OTGW is reset
-  DebugTln("OTGW PIC reset");
-  pinMode(OTGW_RESET, OUTPUT);
-  digitalWrite(OTGW_RESET, LOW);
-  OTGWSerial.print("GW=R\r\n");
-  delay(100);
-  digitalWrite(OTGW_RESET, HIGH);
-  pinMode(OTGW_RESET, INPUT_PULLUP);
-
-  //wait for response
-  OTGWSerial.setTimeout(250);
-  String line = OTGWSerial.readStringUntil('\n');
-  line.trim();
-  DebugTf("Received after reset: %s (%d)\r\n", CSTR(line), line.length());
-  bOTGWonline = (line.length()>0);
+  OTGWSerial.resetPic();
+  String resp = OTGWSerial.readStringUntil('\n');
+  DebugTf("Received firmware version: [%s] [%s] (%d)\r\n", CSTR(resp), OTGWSerial.firmwareVersion(), strlen(OTGWSerial.firmwareVersion()));
+  bOTGWonline = (strlen(OTGWSerial.firmwareVersion())>0);
   if (bOTGWonline){
-    //find version
-    int p = line.indexOf(OTGW_BANNER);
-    if (p >= 0) {
-      p += sizeof(OTGW_BANNER);
-      sPICfwversion = line.substring(p);
-    } else sPICfwversion ="No version found";
+      if (resp.length()>0) {
+        sPICfwversion = String(OTGWSerial.firmwareVersion());
+      } else sPICfwversion ="No version found";
   } else sPICfwversion = "No OTWG connected!";
   DebugTf("Current firmware version: %s\r\n", CSTR(sPICfwversion));
-  OTGWSerial.setTimeout(1000);
 }
 //===================[ getpicfwversion ]===========================
 String getpicfwversion(){
