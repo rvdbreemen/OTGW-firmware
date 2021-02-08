@@ -274,7 +274,7 @@ void upgradePIC()
 {
   DebugTln(F("Redirect to upgrade PIC .."));
   doRedirect("Upgrade OTGW PIC ", 120, "/FSexplorer", false);
-  // upgradenow();
+  upgradenow();
 } // upgradePIC()
 
 
