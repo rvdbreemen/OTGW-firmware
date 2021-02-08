@@ -302,7 +302,6 @@ void sendDeviceInfo()
   sendNestedJsonObj("lastreset", lastReset);
   sendNestedJsonObj("bootcount", rebootCount);
   
-
   httpServer.sendContent("\r\n]}\r\n");
 
 } // sendDeviceInfo()
