@@ -67,6 +67,7 @@ const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
 //Information on OTGW 
 String    sPICfwversion = ""; 
 bool      bOTGWonline = true;
+String    errorupgrade = ""; 
 
 //All things that are settings 
 String    settingHostname = _HOSTNAME;
