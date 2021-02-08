@@ -48,7 +48,7 @@
 //some variable's
 OpenthermData OTdata;
 
-#define OTGW_BANNER "OpenTherm Gateway "
+#define OTGW_BANNER "OpenTherm Gateway"
 
 //===================[ Reset OTGW ]===============================
 void resetOTGW() {
