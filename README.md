@@ -44,7 +44,8 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
   
 | Version | Release notes |
 |-|-|
-| 0.7.3 | Integration of the otgw-pic firmware upgrade (by Schelte Bron)<br>Adding MQTT disable/enable option<br>Adding MQTT long password (max. 100 chars)<br>Adding executeCommand API (verify and return response for commands)<br>Adding RESTAPI /api/v1/otgw/cmdrsp/{command} that returns {response from command}<br>Added uptime and otgw fwversion in devinfo UI |
+| 0.7.4 | Integration of the otgw-pic firmware upgrade (by Schelte Bron) |
+| 0.7.3 | Adding MQTT disable/enable option<br>Adding MQTT long password (max. 100 chars)<br>Adding executeCommand API (verify and return response for commands)<br>Adding RESTAPI /api/v1/otgw/cmdrsp/{command} that returns {response from command}<br>Added uptime and otgw fwversion in devinfo UI |
 | 0.7.2 | Breaking change: Moving over to LittleFS. This means you need to reflash your device using a USB cable.   |
 | 0.7.1 | Adding reset gateway to enter self-programming mode more reliable. <br> Changed to port 25238 for serial TCP connections (default of OTmonitor application by Schelte Bron)<br>Bugfix: Settings UI works even with "browserplugins". Thanks @STemplar   |
 | 0.7.0 | Added all Ventilation/Heat Recovery msgids (2.3b OT spec). Plus Remeha msgids. Thanks @STemplar <br>Added OTGW pic reset on bootup.<br> Translate dutch to english. <br>Bugfix: Serial flushing & writebuffer checking to prevent overflow during flashing.  |
