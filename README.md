@@ -44,6 +44,7 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
   
 | Version | Release notes |
 |-|-|
+| 0.7.5 | Complete set of status bits in UI and Central Heating 2 information |
 | 0.7.4 | Integration of the otgw-pic firmware upgrade (by Schelte Bron) |
 | 0.7.3 | Adding MQTT disable/enable option<br>Adding MQTT long password (max. 100 chars)<br>Adding executeCommand API (verify and return response for commands)<br>Adding RESTAPI /api/v1/otgw/cmdrsp/{command} that returns {response from command}<br>Added uptime and otgw fwversion in devinfo UI |
 | 0.7.2 | Breaking change: Moving over to LittleFS. This means you need to reflash your device using a USB cable.   |
