@@ -216,25 +216,39 @@ void sendOTmonitor()
   sendJsonOTmonObj("flamestatus", CONOFF(isFlameStatus()),"");
   sendJsonOTmonObj("chmodus", CONOFF(isCentralHeatingActive()),"");
   sendJsonOTmonObj("chenable", CONOFF(isCentralHeatingEnabled()),"");
+  sendJsonOTmonObj("ch2modus", CONOFF(isCentralHeating2Active()),"");
+  sendJsonOTmonObj("ch2enable", CONOFF(isCentralHeating2enabled()),"");
   sendJsonOTmonObj("dhwmode", CONOFF(isDomesticHotWaterActive()),"");
   sendJsonOTmonObj("dhwenable", CONOFF(isDomesticHotWaterEnabled()),"");
   sendJsonOTmonObj("diagnosticindicator", CONOFF(isDiagnosticIndicator()),"");
   sendJsonOTmonObj("faultindicator", CONOFF(isFaultIndicator()),"");
+  
+  sendJsonOTmonObj("coolingmodus", CONOFF(isCoolingEnabled()),"");
+  sendJsonOTmonObj("coolingactive", CONOFF(isCoolingActive()),"");  
+  sendJsonOTmonObj("otcactive", CONOFF(isOutsideTemperatureCompensationActive()),"");
+
+  sendJsonOTmonObj("servicerequest", CONOFF(isServiceRequest()),"");
+  sendJsonOTmonObj("lockoutreset", CONOFF(isLockoutReset()),"");
+  sendJsonOTmonObj("lowwaterpressure", CONOFF(isLowWaterPressure()),"");
+  sendJsonOTmonObj("gasflamefault", CONOFF(isGasFlameFault()),"");
+  sendJsonOTmonObj("airtemp", CONOFF(isAirTemperature()),"");
+  sendJsonOTmonObj("waterovertemperature", CONOFF(isWaterOverTemperature()),"");
+  
 
   sendJsonOTmonObj("outsidetemperature", OTdataObject.Toutside, "°C");
   sendJsonOTmonObj("roomtemperature", OTdataObject.Tr, "°C");
   sendJsonOTmonObj("roomsetpoint", OTdataObject.TrSet, "°C");
   sendJsonOTmonObj("remoteroomsetpoint", OTdataObject.TrOverride, "°C");
+  sendJsonOTmonObj("controlsetpoint", OTdataObject.Tset,"°C");
   sendJsonOTmonObj("relmodlvl", OTdataObject.RelModLevel,"%");
   sendJsonOTmonObj("maxrelmodlvl", OTdataObject.MaxRelModLevelSetting, "%");
-  sendJsonOTmonObj("chwaterpressure", OTdataObject.CHPressure, "bar");
-
+ 
   sendJsonOTmonObj("boilertemperature", OTdataObject.Tboiler, "°C");
   sendJsonOTmonObj("returnwatertemperature", OTdataObject.Tret,"°C");
-  sendJsonOTmonObj("controlsetpoint", OTdataObject.Tset,"°C");
-  sendJsonOTmonObj("maxchwatersetpoint", OTdataObject.MaxTSet,"°C");
   sendJsonOTmonObj("dhwtemperature", OTdataObject.Tdhw,"°C");
   sendJsonOTmonObj("dhwsetpoint", OTdataObject.TdhwSet,"°C");
+  sendJsonOTmonObj("maxchwatersetpoint", OTdataObject.MaxTSet,"°C");
+  sendJsonOTmonObj("chwaterpressure", OTdataObject.CHPressure, "bar");
   sendJsonOTmonObj("oemfaultcode", OTdataObject.OEMDiagnosticCode, "");
 
   

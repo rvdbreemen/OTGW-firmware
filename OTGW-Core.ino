@@ -405,9 +405,50 @@ bool isCoolingActive() {
 	return OTdataObject.Status & 0x0010;
 }
 
+bool isCentralHeating2Active() {
+	return OTdataObject.Status & 0x0020;
+}
+
+
 bool isDiagnosticIndicator() {
 	return OTdataObject.Status & 0x0040;
 }
+
+  //bit: [clear/0, set/1]
+  //0: Service request [service not req’d, service required]
+  //1: Lockout-reset [ remote reset disabled, rr enabled]
+  //2: Low water press [ no WP fault, water pressure fault]
+  //3: Gas/flame fault [ no G/F fault, gas/flame fault ]
+  //4: Air press fault [ no AP fault, air pressure fault ]
+  //5: Water over-temp[ no OvT fault, over-temperat. Fault]
+  //6: reserved
+  //7: reserved
+
+bool isServiceRequest() {
+	return OTdataObject.ASFflags & 0x0001;
+}
+
+bool isLockoutReset() {
+	return OTdataObject.ASFflags & 0x0002;
+}
+
+bool isLowWaterPressure() {
+	return OTdataObject.ASFflags & 0x0004;
+}
+
+bool isGasFlameFault() {
+	return OTdataObject.ASFflags & 0x0008;
+}
+
+bool isAirTemperature() {
+	return OTdataObject.ASFflags & 0x0010;
+}
+
+bool isWaterOverTemperature() {
+	return OTdataObject.ASFflags & 0x0020;
+}
+
+
 
 const char *byte_to_binary(int x)
 {
