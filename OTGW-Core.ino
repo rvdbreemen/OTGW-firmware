@@ -61,7 +61,7 @@ void resetOTGW() {
       if (resp.length()>0) {
         sPICfwversion = String(OTGWSerial.firmwareVersion());
       } else sPICfwversion ="No version found";
-  } else sPICfwversion = "No OTWG connected!";
+  } else sPICfwversion = "No OTGW connected!";
   DebugTf("Current firmware version: %s\r\n", CSTR(sPICfwversion));
 }
 //===================[ getpicfwversion ]===========================
