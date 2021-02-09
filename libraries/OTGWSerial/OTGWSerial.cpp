@@ -78,22 +78,17 @@ OTGWSerial::OTGWSerial(int resetPin, int progressLed)
 }
 
 int OTGWSerial::available() {
-  if (upgradeEvent()) {
-    return 0;
-  } else {
-    return HardwareSerial::available();
-  }
+  if (upgradeEvent()) return 0;
+  return HardwareSerial::available();
 }
 
 // Reimplement the read function. Other read functions call this to implement their functionality.
 int OTGWSerial::read() {
   int retval;
-  char ch;
   if (upgradeEvent()) return -1;
   retval = HardwareSerial::read();
   if (retval >= 0) {
-    ch = retval;
-    matchBanner(&ch);
+    matchBanner(retval);
   }
   return retval;
 }
@@ -107,7 +102,6 @@ size_t OTGWSerial::write(uint8_t c) {
   if (upgradeEvent()) return 0;
   return HardwareSerial::write(c);
 }
-
 
 size_t OTGWSerial::write(const uint8_t *buffer, size_t len) {
   if (upgradeEvent()) return 0;
@@ -158,18 +152,19 @@ void OTGWSerial::progress(int weight) {
 }
 
 // Look for the banner in the incoming data and extract the version number
-void OTGWSerial::matchBanner(const char *str, int len) {
-  for (int i = 0; i < len; i++) {
-    if (banner[_banner_matched] == '\0') {
-      if (isspace(str[i])) {
-        _version[_version_pos] = '\0';
-        _banner_matched = 0;
-        _version_pos = 0;
-      } else {
-        _version[_version_pos++] = str[i];
-      }
-    } else if (str[i] != banner[_banner_matched++]) {
+void OTGWSerial::matchBanner(char ch) {
+  if (banner[_banner_matched] == '\0') {
+    if (isspace(ch)) {
+      _version[_version_pos] = '\0';
       _banner_matched = 0;
+      _version_pos = 0;
+    } else {
+      _version[_version_pos++] = ch;
+    }
+  } else if (ch != banner[_banner_matched++]) {
+    _banner_matched = 0;
+    if (ch == banner[_banner_matched]) {
+      _banner_matched++;
     }
   }
 }
