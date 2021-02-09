@@ -294,17 +294,12 @@
                     {
                       sInput.setAttribute("type", "checkbox");
                       sInput.checked = strToBool(data[i].value);
-                      //if (data[i].value == "true"){
-                      //  sInput.checked = true; 
-                      //} else {
-                      //  sInput.checked = false;
-                      //}
                     }
                     else if (data[i].type == "s")
                     {
                       sInput.setAttribute("type", "text");
                       sInput.setAttribute("maxlength", data[i].maxlen);
-                      sInput.setAttribute("size", data[i].maxlen);
+                      sInput.setAttribute("size", (data[i].maxlen > 20 ? 20 : data[i].maxlen));
                     }
                     else if (data[i].type == "f")
                     {
