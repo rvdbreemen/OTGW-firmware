@@ -73,7 +73,7 @@ String    errorupgrade = "";
 String    settingHostname = _HOSTNAME;
 //MQTT settings
 bool      statusMQTTconnection = false; 
-bool      settingMQTTenable = true;
+bool      settingMQTTenable = false;
 bool      settingMQTTsecure = false; 
 String    settingMQTTbroker= "192.168.88.254";
 int16_t   settingMQTTbrokerPort = 1883; 
