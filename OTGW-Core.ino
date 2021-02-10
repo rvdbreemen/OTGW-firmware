@@ -967,6 +967,7 @@ void handleOTGW()
   //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
   while (OTGWstream.available()){
     //OTGWSerial.write(OTGWstream.read()); //just forward it directly to Serial
+    blinkLEDnow(LED2);
     outByte = OTGWstream.read();  // read from port 25238
     while (OTGWSerial.availableForWrite()==0) {
       //cannot write, buffer full, wait for some space in serial out buffer
