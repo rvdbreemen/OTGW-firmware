@@ -349,14 +349,14 @@ void sendDeviceSettings()
 
   sendJsonSettingObj("hostname", CSTR(settingHostname), "s", 32);
   sendJsonSettingObj("mqttenable", settingMQTTenable, "b");
-  sendJsonSettingObj("mqttfieldset","on", "f");
-  sendJsonSettingObj("mqttlegend","MQTT settings", "l");
+  // sendJsonSettingObj("mqttfieldset","on", "f");
+  // sendJsonSettingObj("mqttlegend","MQTT settings", "l");
   sendJsonSettingObj("mqttbroker", CSTR(settingMQTTbroker), "s", 32);
   sendJsonSettingObj("mqttbrokerport", settingMQTTbrokerPort, "i", 0, 65535);
   sendJsonSettingObj("mqttuser", CSTR(settingMQTTuser), "s", 32);
   sendJsonSettingObj("mqttpasswd", CSTR(settingMQTTpasswd), "s", 100);
   sendJsonSettingObj("mqtttoptopic", CSTR(settingMQTTtopTopic), "s", 15);
-  sendJsonSettingObj("mqttfieldset","off", "f");
+  // sendJsonSettingObj("mqttfieldset","off", "f");
 
   sendEndJsonObj();
 
