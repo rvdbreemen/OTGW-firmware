@@ -1,6 +1,4 @@
-
-
-API call: http://192.168.88.10/api/v0/settings
+API call: GET: http://192.168.88.10/api/v0/settings
 
 {"settings":[
 {"name": "hostname", "value":"OTGW", "type": "s", "maxlen": 32},
@@ -15,14 +13,14 @@ API call: http://192.168.88.10/api/v0/settings
 {"name": "mqttfieldset", "value":"True", "type": "f"}
 ]}
 
-API call: http://192.168.88.10/api/v0/devtime
+API call: GET: http://192.168.88.10/api/v0/devtime
 
 {"devtime":[
 {"name": "dateTime", "value": "2021-02-10 21:21:16"},
 {"name": "epoch", "value": 1612992076}
 ]}
 
-API call: http://192.168.88.10/api/v0/devinfo
+API call: GET: http://192.168.88.10/api/v0/devinfo
 
 {"devinfo":[
 {"name": "author", "value": "Robert van den Breemen"},
@@ -55,8 +53,7 @@ API call: http://192.168.88.10/api/v0/devinfo
 {"name": "bootcount", "value": 139 }
 ]}
 
-API call: 
-http://192.168.88.10/api/v1/otgw/otmonitor
+API call: GET: http://192.168.88.10/api/v1/otgw/otmonitor
 
 {"otmonitor":[
 {"name": "flamestatus", "value": "On", "unit": ""},
