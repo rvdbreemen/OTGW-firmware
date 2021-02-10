@@ -1,7 +1,7 @@
 /*
 *************************************************************************  
 **  Program  : Header file: OTGW-upgrade.ino
-**  Version  : v0.7.3
+**  Version  : v0.7.5
 **
 **  Copyright (c) 2021 Copyright (c) 2021 - Schelte Bron
 **  Based on version 0.4: https://github.com/hvxl/otgwmcu
