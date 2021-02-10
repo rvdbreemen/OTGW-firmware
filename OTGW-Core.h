@@ -126,6 +126,12 @@ typedef struct {
 	uint16_t 	RemehaServicemessage = 0; // u16 Remeha Servicemessage
 	uint16_t    RemehaDetectionConnectedSCU =0; // u16 Remeha detection connected SCU’s
 
+	//errors
+	uint16_t	error01 = 0;
+	uint16_t	error02 = 0;
+	uint16_t	error03 = 0;
+	uint16_t	error04 = 0;
+
 } OTdataStruct;
 
 static OTdataStruct OTdataObject;   

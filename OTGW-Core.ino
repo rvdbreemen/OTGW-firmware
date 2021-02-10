@@ -788,6 +788,10 @@ int sendOTGW(const char* buf, int len)
 
 void processOTGW(const char * buf, int len)
 {
+  if (strstr(buf, "Error 01")!= NULL) OTdataObject.error01++;
+  if (strstr(buf, "Error 02")!= NULL) OTdataObject.error02++;
+  if (strstr(buf, "Error 03")!= NULL) OTdataObject.error03++;
+  if (strstr(buf, "Error 04")!= NULL) OTdataObject.error04++;
   if (len == 9) 
   { 
     //OT protocol messages are 9 chars long
