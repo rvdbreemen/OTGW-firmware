@@ -72,7 +72,8 @@ void setupFSexplorer()    // Funktionsaufruf "LittleFS();" muss im Setup eingebu
   {
     httpServer.send(200, "text/html", Helper); //Upload the FSexplorer.html
   }
-  httpServer.on("/api/listfiles", APIlistFiles);
+  httpServer.on("/api/listfiles", apilistfiles);
+  httpServer.on("/api/firmwarefilelist", apifirmwarefilelist);
   httpServer.on("/LittleFSformat", formatLittleFS);
   httpServer.on("/upload", HTTP_POST, []() {}, handleFileUpload);
   httpServer.on("/ReBoot", reBootESP);
@@ -106,7 +107,38 @@ void setupFSexplorer()    // Funktionsaufruf "LittleFS();" muss im Setup eingebu
 
 
 //=====================================================================================
-void APIlistFiles()             // Senden aller Daten an den Client
+void apifirmwarefilelist() {
+  char *s, buffer[400];
+  String version;
+  Dir dir;
+  File f;
+  
+  s = buffer;
+  s += sprintf(buffer, "[");
+  dir = LittleFS.openDir("/");
+  while (dir.next()) {
+    if (dir.fileName().endsWith(".hex")) {
+      String verfile = "/" + dir.fileName();
+      verfile.replace(".hex", ".ver");
+      f = LittleFS.open(verfile, "r");
+      if (f) {
+        version = f.readStringUntil('\n');
+        version.trim();
+        f.close();
+      } else {
+        version = "0.0";
+      }
+      s += snprintf( s, sizeof(buffer), "{name:\"%s\",version:\"%s\",size:%d},", CSTR(dir.fileName()), CSTR(version), dir.fileSize());
+    }
+  }
+  s += sprintf(s, "]\n");
+  DebugTf("filelist response: [%s]\n", buffer);
+  httpServer.send(200, "text/json", buffer);
+}
+
+
+//=====================================================================================
+void apilistfiles()             // Senden aller Daten an den Client
 {   
   FSInfo LittleFSinfo;
 
@@ -160,18 +192,17 @@ void APIlistFiles()             // Senden aller Daten an den Client
   for (int f=0; f < fileNr; f++)  
   {
     DebugTf("[%3d] >> [%s]\r\n", f, dirMap[f].Name);
-    if (temp != "[") temp += ",";
-    temp += R"({"name":")" + String(dirMap[f].Name) + R"(","size":")" + formatBytes(dirMap[f].Size) + R"("})";
+    temp += R"({"name":")" + String(dirMap[f].Name) + R"(","size":")" + formatBytes(dirMap[f].Size) + R"("},)";
   }
 
   LittleFS.info(LittleFSinfo);
-  temp += R"(,{"usedBytes":")" + formatBytes(LittleFSinfo.usedBytes * 1.05) + R"(",)" +       // Berechnet den verwendeten Speicherplatz + 5% Sicherheitsaufschlag
+  temp += R"({"usedBytes":")" + formatBytes(LittleFSinfo.usedBytes * 1.05) + R"(",)" +       // Berechnet den verwendeten Speicherplatz + 5% Sicherheitsaufschlag
           R"("totalBytes":")" + formatBytes(LittleFSinfo.totalBytes) + R"(","freeBytes":")" + // Zeigt die Größe des Speichers
           (LittleFSinfo.totalBytes - (LittleFSinfo.usedBytes * 1.05)) + R"("}])";               // Berechnet den freien Speicherplatz + 5% Sicherheitsaufschlag
 
   httpServer.send(200, "application/json", temp);
   
-} // APIlistFiles()
+} // apilistfiles()
 
 
 //=====================================================================================
@@ -290,7 +321,7 @@ void updateFirmware()
 void reBootESP()
 {
   DebugTln(F("Redirect and ReBoot .."));
-  doRedirect("Reboot OTGW firmware ..", 60, "/", true);   
+  doRedirect("Reboot OTGW firmware ..", 120, "/", true);   
 } // reBootESP()
 
 //=====================================================================================

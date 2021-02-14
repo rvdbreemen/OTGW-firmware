@@ -22,6 +22,12 @@
 #define PIN_I2C_SDA 4   //D2
 #define PIN_I2C_SCL 5   //D1
 
+//used by update firmware functions
+const char *hexheaders[] = {
+  "Last-Modified",
+  "X-Version"
+};
+
 //Macro to Feed the Watchdog
 #define FEEDWATCHDOGNOW   Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   Wire.write(0xA5);   Wire.endTransmission();
 
@@ -1161,6 +1167,8 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   }
 }
 
+
+// Schelte's firmware integration
 void fwupgradestart(const char *hexfile) {
   OTGWError result;
   
@@ -1171,6 +1179,66 @@ void fwupgradestart(const char *hexfile) {
   } else {
     OTGWSerial.registerFinishedCallback(fwupgradedone);
   }
+}
+
+
+
+void firmwarerefresh(String filename, String version) {
+  WiFiClient client;
+  HTTPClient http;
+  String latest;
+  int code;
+  
+  http.begin(client, "http://otgw.tclcode.com/download/" + filename);
+  http.collectHeaders(hexheaders, 2);
+  code = http.sendRequest("HEAD");
+  if (code == HTTP_CODE_OK) {
+    for (int i = 0; i< http.headers(); i++) {
+      DebugTf("%s: %s\n", hexheaders[i], http.header(i).c_str());
+    }
+    latest = http.header(1);
+    if (latest != version) {
+      DebugTf("Update %s: %s -> %s\n", filename.c_str(), version.c_str(), latest.c_str());
+      http.end();
+      http.begin(client, "http://otgw.tclcode.com/download/" + filename);
+      code = http.GET();
+      if (code == HTTP_CODE_OK) {
+        File f = LittleFS.open("/" + filename, "w");
+        if (f) {
+          http.writeToStream(&f);
+          f.close();
+          String verfile = "/" + filename;
+          verfile.replace(".hex", ".ver");
+          f = LittleFS.open(verfile, "w");
+          if (f) {
+            f.print(latest + "\n");
+            f.close();
+            DebugTf("Update successful\n");
+          }
+        }
+      }
+    }
+  }
+  http.end();
+}
+
+void firmwareapi() {
+  String action = httpServer.arg("action");
+  String filename = httpServer.arg("name");
+  String version = httpServer.arg("version");
+  DebugTf("Action: %s %s\n", action.c_str(), filename.c_str());
+  if (action == "download") {
+    fwupgradestart(String("/" + filename).c_str());
+  } else if (action == "update") {
+    firmwarerefresh(filename, version);
+  } else if (action == "delete") {
+    String path = "/" + filename;
+    LittleFS.remove(path);
+    path.replace(".hex", ".ver");
+    LittleFS.remove(path);
+  }
+  httpServer.sendHeader("Location", "firmware.html", true);
+  httpServer.send(303, "text/html", "<a href='firmware.html'>Return</a>");
 }
 
 /***************************************************************************

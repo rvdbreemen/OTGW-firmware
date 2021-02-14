@@ -23,6 +23,7 @@
         "initializer_list": "cpp",
         "sstream": "cpp",
         "iosfwd": "cpp",
-        "xlocbuf": "cpp"
+        "xlocbuf": "cpp",
+        "random": "cpp"
     }
 }
