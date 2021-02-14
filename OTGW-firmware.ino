@@ -93,28 +93,31 @@ void setup()
   startMQTT(); 
 
   // Initialisation ezTime
-  setDebug(INFO); 
-  setServer("time.google.com");
-  updateNTP();        //force NTP sync
-  waitForSync(60);    //wait until valid time
-  //no TZ cached, then try to GeoIP locate your TZ, otherwise fallback to default
-  if (!myTZ.setCache(0)) { 
-    //ezTime will try to determine your location based on your IP using GeoIP
-    if (myTZ.setLocation()) {
-      settingTimezone = myTZ.getTimezoneName();
-      DebugTf("GeoIP located your timezone to be: %s\n", CSTR(settingTimezone));
-    } else {
-      if (myTZ.setLocation(settingTimezone)){
-        DebugTf("Timezone set to (using default): %s\n", CSTR(settingTimezone));
-        settingTimezone = myTZ.getTimezoneName();
-      } else DebugTln(errorString());
-    }
+  if (settingNTPenable){
+    
+    setDebug(INFO); 
+    setServer("time.google.com");
+    //no TZ cached, then try to GeoIP locate your TZ, otherwise fallback to default
+    // myTZ.clearCache();
+    // if (!myTZ.setCache(0)) { 
+      //ezTime will try to determine your location based on your IP using GeoIP
+      if (myTZ.setLocation()) {
+        settingNTPtimezone = myTZ.getTimezoneName();
+        DebugTf("GeoIP located your timezone to be: %s\n", CSTR(settingNTPtimezone));
+      } else {
+        if (myTZ.setLocation(settingNTPtimezone)){
+          DebugTf("Timezone set to (using default): %s\n", CSTR(settingNTPtimezone));
+          settingNTPtimezone = myTZ.getTimezoneName();
+        } else DebugTln(errorString());
+      }
+    // }
+    updateNTP();        //force NTP sync
+    waitForSync(60);    //wait until valid time myTZ.setDefault();
+    setDebug(NONE);     //turn off any other debug information
+    
+    DebugTln("UTC time  : "+ UTC.dateTime());
+    DebugTln("local time: "+ myTZ.dateTime());
   }
-  myTZ.setDefault();
-  setDebug(NONE); //turn off any other debug information
-  
-  DebugTln("UTC time  : "+ UTC.dateTime());
-  DebugTln("local time: "+ myTZ.dateTime());
 
 //================ Start HTTP Server ================================
   setupFSexplorer();
