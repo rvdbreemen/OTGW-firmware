@@ -15,7 +15,7 @@
   let needReload  = true;
   refreshDevTime();
 
-  window.onload=bootsTrapMain;
+  window.onload=initMainPage;
   window.onfocus = function() {
     if (needReload) {
       window.location.reload(true);
@@ -27,8 +27,8 @@
   var timeupdate = setInterval(function(){refreshDevTime(); }, 1000); //delay is in milliseconds
     
   //============================================================================  
-  function bootsTrapMain() {
-    console.log("bootsTrapMain()");
+  function initMainPage() {
+    console.log("initMainPage()");
   
     document.getElementById('M_FSexplorer').addEventListener('click',function() 
                                                 { console.log("newTab: goFSexplorer");
@@ -42,6 +42,10 @@
                                                 { console.log("newTab: goFSexplorer");
                                                   location.href = "/FSexplorer";
                                                 });
+    document.getElementById('F_FSexplorer').addEventListener('click',function() 
+                                                { console.log("newTab: goFSexplorer");
+                                                  location.href = "/FSexplorer";
+                                                });                                                
     document.getElementById('D_back').addEventListener('click',function()
                                                 { console.log("newTab: goBack");
                                                 location.href = "/";
@@ -50,8 +54,13 @@
                                                 { console.log("newTab: goBack");
                                                 location.href = "/";
                                                 });
+    document.getElementById('F_back').addEventListener('click',function()
+                                                { console.log("newTab: goBack");
+                                                location.href = "/";
+                                                });
     document.getElementById('S_saveSettings').addEventListener('click',function(){saveSettings();});
     document.getElementById('tabDeviceInfo').addEventListener('click',function(){deviceinfoPage();});
+    document.getElementById('tabPICflash').addEventListener('click',function(){firmwarePage();});
     document.getElementById('tabSettings').addEventListener('click',function(){settingsPage();});
     needReload = false;
     refreshDevInfo();
@@ -61,8 +70,21 @@
     document.getElementById("displayMainPage").style.display       = "block";
     document.getElementById("displaySettingsPage").style.display   = "none";
     document.getElementById("displayDeviceInfo").style.display     = "none";
+    document.getElementById("displayPICflash").style.display     = "none";
   
-  } // bootsTrapMain()
+  } // initMainPage()
+
+  function firmwarePage()
+  {
+    clearInterval(tid);
+    refreshDevTime();
+    document.getElementById("displayMainPage").style.display       = "none";
+    document.getElementById("displaySettingsPage").style.display   = "none";
+    document.getElementById("displayDeviceInfo").style.display     = "none";
+    var firmwarePage = document.getElementById("displayPICflash");
+    refreshFirmware();
+    document.getElementById("displayPICflash").style.display     = "block";    
+  } // deviceinfoPage()
 
   function deviceinfoPage()
   {
@@ -70,18 +92,20 @@
     refreshDevTime();
     document.getElementById("displayMainPage").style.display       = "none";
     document.getElementById("displaySettingsPage").style.display   = "none";
+    document.getElementById("displayPICflash").style.display     = "none";
     var deviceinfoPage = document.getElementById("deviceinfoPage");
     refreshDeviceInfo();
     document.getElementById("displayDeviceInfo").style.display     = "block";
     
-  } // settingsPage()
+  } // deviceinfoPage()
 
   function settingsPage()
   {
     clearInterval(tid);
     refreshDevTime();
     document.getElementById("displayMainPage").style.display       = "none";
-    document.getElementById("displayDeviceInfo").style.display     = "none";
+    document.getElementById("displayDeviceInfo").style.display     = "none";    
+    document.getElementById("displayPICflash").style.display     = "none";
     var settingsPage = document.getElementById("settingsPage");
     refreshSettings();
     document.getElementById("displaySettingsPage").style.display   = "block";
@@ -113,7 +137,21 @@
       
   } // refreshDevTime()
     
-  
+  function refreshFirmware(){
+    console.log("refreshFirmware() .. "+APIGW+"firmwarefilelist");
+    fetch(APIGW+"firmwarefilelist")
+      .then(response => response.json())
+      .then(data => {
+        console.log(data);
+        console.log("parsed .., data is ["+ JSON.stringify(data)+"]");
+      })
+      .catch(function(error) {
+        var p = document.createElement('p');
+        p.appendChild(
+          document.createTextNode('Error: ' + error.message)
+        );
+      });     
+  }
   //============================================================================  
   function refreshDevInfo()
   {
@@ -542,11 +580,11 @@
    ,[ "wifirssi",                   "Wifi Receive Power (dB)"]
    ,[ "lastreset",                  "Last Reset Reason"]
    ,[ "mqttconnected",              "MQTT Connected"]
-   ,[ "mqttenable",                 "MQTT Enable"]
+   ,[ "mqttenabled",                 "MQTT Enable"]
    ,[ "ntpenable",                  "NTP Enable"]
    ,[ "ntptimezone",                "NTP Timezone"]
-   
-   
+   ,[ "uptime",                     "Uptime since boot"]
+   ,[ "bootcount",                  "Nr. Reboots"] 
                  ];
   
 /*

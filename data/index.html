@@ -20,6 +20,7 @@
     <div id="displayMainPage"      style="display:none">
       <div class="nav-container">
         <div class='nav-left'>
+          <a id='tabPICflash' class='nav-item tabButton' style="background: lightblue;">PIC firmware</a>
           <a id='tabDeviceInfo' class='nav-item tabButton' style="background: lightblue;">Device Info</a>
           <a id='M_FSexplorer'  class='nav-img'> <img src='/FSexplorer.png' alt='FSexplorer'></a>
           <a id='tabSettings'   class='nav-img'> <img src='/settings.png' alt='Settings'></a>
@@ -29,6 +30,16 @@
       <div id="mainPage">
         <div id="waiting">Wait for it...</div>
       </div>
+    </div>
+    <div id="displayPICflash"  style="display:none">
+      <div class="nav-container">
+        <div class='nav-left'>
+          <a id='F_back' class='nav-item tabButton' style="background: lightblue;">Back</a>
+          <a id='F_FSexplorer' class='nav-img'> <img src='/FSexplorer.png' alt='FSexplorer'></a>
+        </div>
+      </div>
+      <br/>
+      <div id="displayPICpage"></div>
     </div>
     <div id="displayDeviceInfo"  style="display:none">
       <div class="nav-container">
@@ -62,7 +73,7 @@
     <div id="message" class="bottom left-0">-</div>
   
     <script>
-       window.onload=bootsTrapMain;
+       window.onload=initMainPage;
     </script>
 
   </body>
