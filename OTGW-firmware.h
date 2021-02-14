@@ -28,7 +28,7 @@
 #define LED1 D4
 #define LED2 D0
 
-#define FIRMWARE "/gateway.hex"
+#define PICFIRMWARE "/gateway.hex"
 
 extern OTGWSerial OTGWSerial(PICRST, LED2);
 void fwupgradestart(const char *hexfile);
@@ -36,9 +36,6 @@ void fwupgradestart(const char *hexfile);
 void blinkLEDnow();
 void blinkLEDnow(uint8_t);
 void setLed(int8_t, uint8_t);
-
-//Now load network suff
-#include "networkStuff.h"
 
 //Defaults and macro definitions
 #define _HOSTNAME       "OTGW"
@@ -83,8 +80,10 @@ String    settingMQTTtopTopic = "OTGW";
 bool      settingNTPenable = false;
 String    settingNTPtimezone = "NL"; //Default
 
-// That's all folks...
+//Now load network suff
+#include "networkStuff.h"
 
+// That's all folks...
 
 /***************************************************************************
 *
