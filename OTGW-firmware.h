@@ -80,7 +80,8 @@ int16_t   settingMQTTbrokerPort = 1883;
 String    settingMQTTuser = "";
 String    settingMQTTpasswd = "";
 String    settingMQTTtopTopic = "OTGW";
-String    settingTimezone = "NL"; //Default
+bool      settingNTPenable = false;
+String    settingNTPtimezone = "NL"; //Default
 
 // That's all folks...
 

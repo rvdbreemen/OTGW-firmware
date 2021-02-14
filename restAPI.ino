@@ -357,7 +357,8 @@ void sendDeviceSettings()
   sendJsonSettingObj("mqttpasswd", CSTR(settingMQTTpasswd), "s", 100);
   sendJsonSettingObj("mqtttoptopic", CSTR(settingMQTTtopTopic), "s", 15);
   // sendJsonSettingObj("mqttfieldset","off", "f");
-
+  sendJsonSettingObj("ntpenable", settingNTPenable, "b");
+  sendJsonSettingObj("ntptimezone", CSTR(settingNTPtimezone), "s", 15);
   sendEndJsonObj();
 
 } // sendDeviceSettings()

@@ -36,7 +36,8 @@ void writeSettings(bool show)
   root["MQTTuser"] = settingMQTTuser;
   root["MQTTpasswd"] = settingMQTTpasswd;
   root["MQTTtoptopic"] = settingMQTTtopTopic;
-  root["Timezone"] = settingTimezone;
+  root["NTPenable"] = settingNTPenable;
+  root["NTPtimezone"] = settingNTPtimezone;
 
   serializeJsonPretty(root, file);
   Debugln(F("... done!"));
@@ -81,7 +82,8 @@ void readSettings(bool show)
   settingMQTTpasswd       = doc["MQTTpasswd"].as<String>();
   settingMQTTtopTopic     = doc["MQTTtoptopic"].as<String>();
   if (settingMQTTtopTopic.length()==0) settingMQTTtopTopic = _HOSTNAME;
-  settingTimezone         = doc["Timezone"].as<String>();
+  settingNTPenable       = doc["NTPenable"]; 
+  settingNTPtimezone         = doc["NTPtimezone"].as<String>();
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
@@ -100,7 +102,8 @@ void readSettings(bool show)
     Debugf("                 MQTT username : %s\r\n",  CSTR(settingMQTTuser));
     Debugf("                 MQTT password : %s\r\n",  CSTR(settingMQTTpasswd));
     Debugf("                 MQTT toptopic : %s\r\n",  CSTR(settingMQTTtopTopic));
-    Debugf("                 Timezone      : %s\r\n",  CSTR(settingTimezone));
+    Debugf("                 NTP enabled   : %s\r\n",  CBOOLEAN(settingNTPenable));
+    Debugf("                 NPT timezone  : %s\r\n",  CSTR(settingNTPtimezone));
   }
   
   Debugln(F("-\r"));
@@ -134,7 +137,8 @@ void updateSetting(const char *field, const char *newValue)
     settingMQTTtopTopic = String(newValue);
     if (settingMQTTtopTopic.length()==0) settingMQTTtopTopic = "OTGW";
   }
-  if (stricmp(field, "Timezone")==0)        settingTimezone = String(newValue);
+  if (stricmp(field, "NTPenable")==0)      settingNTPenable = EVALBOOLEAN(newValue);
+  if (stricmp(field, "NTPtimezone")==0)    settingNTPtimezone = String(newValue);
   
   //finally update write settings
   writeSettings(false);

@@ -543,7 +543,9 @@
    ,[ "lastreset",                  "Last Reset Reason"]
    ,[ "mqttconnected",              "MQTT Connected"]
    ,[ "mqttenable",                 "MQTT Enable"]
-   ,[ "timezone",                   "Timezone"]
+   ,[ "ntpenable",                  "NTP Enable"]
+   ,[ "ntptimezone",                "NTP Timezone"]
+   
    
                  ];
   
