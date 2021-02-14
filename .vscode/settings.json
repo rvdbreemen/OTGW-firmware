@@ -24,6 +24,7 @@
         "sstream": "cpp",
         "iosfwd": "cpp",
         "xlocbuf": "cpp",
-        "random": "cpp"
+        "random": "cpp",
+        "chrono": "cpp"
     }
 }

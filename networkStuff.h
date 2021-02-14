@@ -143,6 +143,46 @@ void startMDNS(const char *Hostname)
   
 } // startMDNS()
 
+void startNTP(){
+  // Initialisation ezTime
+  if (!settingNTPenable) return;
+
+  setDebug(INFO); 
+  setServer("time.google.com");
+  //no TZ cached, then try to GeoIP locate your TZ, otherwise fallback to default
+  myTZ.setCache(0);
+  myTZ.clearCache();
+
+  if (settingNTPtimezone.length()==0){
+    //ezTime will try to determine your location based on your IP using GeoIP
+    DebugTln("Trying to locate the timezone using GeoIP lookup");
+    if (myTZ.setLocation()) {
+      settingNTPtimezone = myTZ.getTimezoneName();
+      DebugTf("GeoIP located your timezone to be: %s\r\n", CSTR(settingNTPtimezone));
+    } else { 
+      DebugTln(errorString());
+      settingNTPtimezone = "NL";
+    }
+  } else {
+    if (myTZ.setLocation(settingNTPtimezone)){
+      DebugTf("Timezone set to (using default): %s\r\n", CSTR(settingNTPtimezone));
+      settingNTPtimezone = myTZ.getTimezoneName();
+    } else { 
+      DebugTln(errorString());
+      settingNTPtimezone = "NL";
+    }
+  }
+  // }
+  myTZ.setDefault();
+  updateNTP();        //force NTP sync
+  waitForSync(60);    //wait until valid time myTZ.setDefault();
+  setDebug(NONE);     //turn off any other debug information
+  
+  DebugTln("UTC time  : "+ UTC.dateTime());
+  DebugTln("local time: "+ myTZ.dateTime());
+}
+
+
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a

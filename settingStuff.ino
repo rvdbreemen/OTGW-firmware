@@ -82,8 +82,8 @@ void readSettings(bool show)
   settingMQTTpasswd       = doc["MQTTpasswd"].as<String>();
   settingMQTTtopTopic     = doc["MQTTtoptopic"].as<String>();
   if (settingMQTTtopTopic.length()==0) settingMQTTtopTopic = _HOSTNAME;
-  settingNTPenable       = doc["NTPenable"]; 
-  settingNTPtimezone         = doc["NTPtimezone"].as<String>();
+  settingNTPenable        = doc["NTPenable"]; 
+  settingNTPtimezone      = doc["NTPtimezone"].as<String>();
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
@@ -138,8 +138,10 @@ void updateSetting(const char *field, const char *newValue)
     if (settingMQTTtopTopic.length()==0) settingMQTTtopTopic = "OTGW";
   }
   if (stricmp(field, "NTPenable")==0)      settingNTPenable = EVALBOOLEAN(newValue);
-  if (stricmp(field, "NTPtimezone")==0)    settingNTPtimezone = String(newValue);
-  
+  if (stricmp(field, "NTPtimezone")==0)    {
+    settingNTPtimezone = String(newValue);
+    startNTP();  // update timezone if changed
+  }
   //finally update write settings
   writeSettings(false);
   

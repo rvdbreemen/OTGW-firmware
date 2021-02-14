@@ -1136,7 +1136,7 @@ void startOTGWstream()
 void upgradenow() {
   if (OTGWSerial.busy()) return; // if already in programming mode, never call it twice
   DebugTln("Start PIC upgrade now.");
-  fwupgradestart(FIRMWARE);  
+  fwupgradestart(PICFIRMWARE);  
   while (OTGWSerial.busy()){
     feedWatchDog();
     //blink the led during flash...

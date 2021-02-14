@@ -34,8 +34,7 @@
 #define OFF HIGH
 
 //=====================================================================
-void setup()
-{
+void setup() {
   // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
   // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
   // while (!Serial) {} //Wait for OK
@@ -60,19 +59,8 @@ void setup()
   OTGWSerial.print("Use  'telnet ");
   OTGWSerial.print(WiFi.localIP());
   OTGWSerial.println("' for debugging");
-
-  DebugT("Waiting");
-  Debugln();
-//================ LittleFS ===========================================
-  if (LittleFS.begin()) 
-  {
-    OTGWSerial.println(F("LittleFS Mount succesfull\r"));
-    LittleFSmounted = true;
-  } else { 
-    OTGWSerial.println(F("LittleFS Mount failed\r"));   // Serious problem with LittleFS 
-    LittleFSmounted = false;
-  }
-
+  
+  LittleFS.begin();
   readSettings(true);
 
   // Connect to and initialise WiFi network
@@ -88,36 +76,8 @@ void setup()
   setLed(LED1, OFF);
 
   startMDNS(CSTR(settingHostname));
-  
-  // Start MQTT connection
   startMQTT(); 
-
-  // Initialisation ezTime
-  if (settingNTPenable){
-    
-    setDebug(INFO); 
-    setServer("time.google.com");
-    //no TZ cached, then try to GeoIP locate your TZ, otherwise fallback to default
-    // myTZ.clearCache();
-    // if (!myTZ.setCache(0)) { 
-      //ezTime will try to determine your location based on your IP using GeoIP
-      if (myTZ.setLocation()) {
-        settingNTPtimezone = myTZ.getTimezoneName();
-        DebugTf("GeoIP located your timezone to be: %s\n", CSTR(settingNTPtimezone));
-      } else {
-        if (myTZ.setLocation(settingNTPtimezone)){
-          DebugTf("Timezone set to (using default): %s\n", CSTR(settingNTPtimezone));
-          settingNTPtimezone = myTZ.getTimezoneName();
-        } else DebugTln(errorString());
-      }
-    // }
-    updateNTP();        //force NTP sync
-    waitForSync(60);    //wait until valid time myTZ.setDefault();
-    setDebug(NONE);     //turn off any other debug information
-    
-    DebugTln("UTC time  : "+ UTC.dateTime());
-    DebugTln("local time: "+ myTZ.dateTime());
-  }
+  startNTP();
 
 //================ Start HTTP Server ================================
   setupFSexplorer();
