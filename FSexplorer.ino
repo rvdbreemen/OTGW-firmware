@@ -132,7 +132,7 @@ void apifirmwarefilelist() {
     }
   }
   s += sprintf(s, "]\n");
-  DebugTf("filelist response: [%s]\n", buffer);
+  DebugTf("filelist response: [%s]\r\n", buffer);
   httpServer.send(200, "text/json", buffer);
 }
 

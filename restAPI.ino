@@ -267,8 +267,7 @@ void sendDeviceInfo()
 
   sendNestedJsonObj("author", "Robert van den Breemen");
   sendNestedJsonObj("fwversion", _FW_VERSION);
-  sendNestedJsonObj("picfwversion", OTGWSerial.firmwareVersion());
-
+  sendNestedJsonObj("picfwversion", CSTR(sPICfwversion));
   snprintf(cMsg, sizeof(cMsg), "%s %s", __DATE__, __TIME__);
   sendNestedJsonObj("compiled", cMsg);
   sendNestedJsonObj("hostname", CSTR(settingHostname));
@@ -277,8 +276,8 @@ void sendDeviceInfo()
   sendNestedJsonObj("freeheap", ESP.getFreeHeap());
   sendNestedJsonObj("maxfreeblock", ESP.getMaxFreeBlockSize());
   sendNestedJsonObj("chipid", CSTR(String( ESP.getChipId(), HEX )));
-  sendNestedJsonObj("coreversion", String( ESP.getCoreVersion() ).c_str() );
-  sendNestedJsonObj("sdkversion", String( ESP.getSdkVersion() ).c_str());
+  sendNestedJsonObj("coreversion", CSTR(ESP.getCoreVersion()) );
+  sendNestedJsonObj("sdkversion",  ESP.getSdkVersion());
   sendNestedJsonObj("cpufreq", ESP.getCpuFreqMHz());
   sendNestedJsonObj("sketchsize", formatFloat( (ESP.getSketchSize() / 1024.0), 3));
   sendNestedJsonObj("freesketchspace", formatFloat( (ESP.getFreeSketchSpace() / 1024.0), 3));
@@ -309,12 +308,15 @@ void sendDeviceInfo()
      "ESP8266_ESP12"
 #endif
   );
-  sendNestedJsonObj("ssid", WiFi.SSID().c_str());
+  sendNestedJsonObj("ssid", CSTR(WiFi.SSID()));
   sendNestedJsonObj("wifirssi", WiFi.RSSI());
   sendNestedJsonObj("mqttconnected", String(CBOOLEAN(statusMQTTconnection)));
+  sendNestedJsonObj("ntpenabled", String(CBOOLEAN(settingNTPenable)));
+  sendNestedJsonObj("ntptimezone", CSTR(settingNTPtimezone));
   sendNestedJsonObj("uptime", upTime());
   sendNestedJsonObj("lastreset", lastReset);
   sendNestedJsonObj("bootcount", rebootCount);
+  
   
   httpServer.sendContent("\r\n]}\r\n");
 

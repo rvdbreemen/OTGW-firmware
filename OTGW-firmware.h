@@ -77,8 +77,8 @@ int16_t   settingMQTTbrokerPort = 1883;
 String    settingMQTTuser = "";
 String    settingMQTTpasswd = "";
 String    settingMQTTtopTopic = "OTGW";
-bool      settingNTPenable = false;
-String    settingNTPtimezone = "NL"; //Default
+bool      settingNTPenable = true;
+String    settingNTPtimezone = "Europe/Amsterdam"; //Default
 
 //Now load network suff
 #include "networkStuff.h"

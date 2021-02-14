@@ -161,7 +161,7 @@ void startNTP(){
       DebugTf("GeoIP located your timezone to be: %s\r\n", CSTR(settingNTPtimezone));
     } else { 
       DebugTln(errorString());
-      settingNTPtimezone = "NL";
+      settingNTPtimezone = "PICFIRMWARE";
     }
   } else {
     if (myTZ.setLocation(settingNTPtimezone)){
@@ -169,7 +169,7 @@ void startNTP(){
       settingNTPtimezone = myTZ.getTimezoneName();
     } else { 
       DebugTln(errorString());
-      settingNTPtimezone = "NL";
+      settingNTPtimezone = "Europe/Amsterdam";
     }
   }
   // }
