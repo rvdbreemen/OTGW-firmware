@@ -1,9 +1,9 @@
 /*
 ***************************************************************************  
-**  Program  : index.css, part of ESP_ticker
+**  Program  : index.css, part of OTGW-firmware
 **  Version  : v0.7.5
 **
-**  Copyright (c) 2020 Willem Aandewiel
+**  Copyright (c) 2020 Robert van den Breemen
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
@@ -271,6 +271,41 @@ input {
   .column {
     width: 100%;
   }
+}
+
+/* PIC firmware page */
+#table {
+  display: table;
+  padding: 5px;
+}
+.picrow {
+  display: table-row;
+  padding: 5px;
+}
+.piccolumn1 {
+  display: table-cell;
+  width: 150px;
+  margin: 5px;
+}
+.piccolumn2 {
+  display: table-cell;
+  width: 75px;
+  margin: 5px;
+}
+.piccolumn3 {
+  display: table-cell;
+  width: 100px;
+  margin: 5px;
+}
+.piccolumn4 {
+  display: table-cell;
+  width: 34px;
+  margin: 5px;
+}
+.piccolumn5 {
+  display: table-cell;
+  width: 34px;
+  margin: 5px;
 }
 
 

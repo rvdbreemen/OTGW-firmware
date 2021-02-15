@@ -8,6 +8,7 @@
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
 */
+  const localURL='http://'+window.location.host; 
   const APIGW='http://'+window.location.host+'/api/';
 
 "use strict";
@@ -136,22 +137,73 @@
       });     
       
   } // refreshDevTime()
-    
+  //============================================================================      
   function refreshFirmware(){
     console.log("refreshFirmware() .. "+APIGW+"firmwarefilelist");
     fetch(APIGW+"firmwarefilelist")
       .then(response => response.json())
-      .then(data => {
-        console.log(data);
-        console.log("parsed .., data is ["+ JSON.stringify(data)+"]");
+      .then(files => {
+        console.log("parsed ... data is ["+ JSON.stringify(files)+"]");
+        for( let i in files )
+        {
+          console.log("["+files[i].name+"]=>["+files[i].version+"]=>["+files[i].size+"]");
+
+          var displayPICpage = document.getElementById('displayPICflash');          
+          var rowDiv = document.createElement("div");
+          rowDiv.setAttribute("class", "picrow");
+          rowDiv.setAttribute("id", "firmware_"+files[i].name);
+          rowDiv.style.background = "lightblue";
+          //--- field Name ---
+          var fldDiv = document.createElement("div");
+          fldDiv.setAttribute("class", "piccolumn1");
+          fldDiv.textContent = files[i].name;
+          rowDiv.appendChild(fldDiv);
+          //--- version on screen ---
+          var valDiv = document.createElement("div");
+          valDiv.setAttribute("class", "piccolumn2");                  
+          valDiv.textContent = files[i].version; 
+          rowDiv.appendChild(valDiv);
+          //--- size on screen ---
+          var sizDiv = document.createElement("div");
+          sizDiv.setAttribute("class", "piccolumn3");                  
+          sizDiv.textContent = files[i].size; 
+          rowDiv.appendChild(sizDiv);
+          //--- refresh icon ---
+          var btn = document.createElement("div");
+          btn.setAttribute("class", "piccolumn4");
+            // var a = document.createElement('a');
+            // a.href = localURL+'test.html?name='+file[i].name;
+            // btn.appendChild(a);
+            var img = document.createElement('img'); 
+            img.src = localURL+'/refresh-page-option.png';
+            //img.href =localURL+'test.html?name='+file[i].name;
+            btn.appendChild(img); 
+          rowDiv.appendChild(btn); 
+          //--- flash to pic icon---
+          var btn = document.createElement("div");
+          btn.setAttribute("class", "piccolumn5");
+            var img = document.createElement('img'); 
+            img.src = localURL+'/download-to-storage-drive.png'
+            //img.href =localURL+'test.html?name='+file[i].name;
+          btn.appendChild(img); 
+          rowDiv.appendChild(btn); 
+          displayPICpage.appendChild(rowDiv);
+
+          
+        }
+ 
       })
       .catch(function(error) {
         var p = document.createElement('p');
         p.appendChild(
           document.createTextNode('Error: ' + error.message)
         );
-      });     
+      });   
+
+   
   }
+
+  
   //============================================================================  
   function refreshDevInfo()
   {
