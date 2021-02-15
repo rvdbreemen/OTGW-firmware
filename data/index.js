@@ -198,6 +198,7 @@
           var sizDiv = document.createElement("div");
           sizDiv.setAttribute("class", "piccolumn3");                  
           sizDiv.textContent = files[i].size; 
+          sizDiv.style.textAlign = "right";
           rowDiv.appendChild(sizDiv);
           //--- refresh icon ---
           var btn = document.createElement("div");
