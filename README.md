@@ -73,6 +73,8 @@ So shoutout to the following people, for testing, discussing, and feedback on de
 
 A big thank should goto **Schelte Bron** @hvlx for amazing work on the OpenTherm Gateway and for providing access to the upgrade routines of the PIC. Enabling this custom firmware a reliable way to upgrade you PIC firmware.
 
-You want to thank me? Then...
+If you want to thank Schelte Bron for his work on the OpenTherm Gateway project, just head over to his homepage and donate to him: https://otgw.tclcode.com/
+
+In case you want to buy me a coffee, head over here:
 
 <a href="https://www.buymeacoffee.com/rvdbreemen"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=rvdbreemen&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00"></a>
