@@ -144,6 +144,37 @@
       .then(response => response.json())
       .then(files => {
         console.log("parsed ... data is ["+ JSON.stringify(files)+"]");
+        
+        var displayPICpage = document.getElementById('displayPICflash');          
+        var rowDiv = document.createElement("div");
+        rowDiv.setAttribute("class", "picrow");
+        rowDiv.setAttribute("id", "firmwarename");
+        rowDiv.style.background = "lightblue";
+        rowDiv.style.fontWeight = "bold";
+        //--- field Name ---
+        var fldDiv = document.createElement("div");
+        fldDiv.setAttribute("class", "piccolumn1");
+        fldDiv.textContent = "Firmware name"
+        rowDiv.appendChild(fldDiv);
+        //--- version on screen ---
+        var valDiv = document.createElement("div");
+        valDiv.setAttribute("class", "piccolumn2");                  
+        valDiv.textContent = "Version" 
+        rowDiv.appendChild(valDiv);
+        //--- size on screen ---
+        var sizDiv = document.createElement("div");
+        sizDiv.setAttribute("class", "piccolumn3");                  
+        sizDiv.textContent = "Size" 
+        rowDiv.appendChild(sizDiv);
+        //--- refresh icon ---
+        var btn = document.createElement("div");
+        btn.setAttribute("class", "piccolumn4");
+        rowDiv.appendChild(btn); 
+        //--- flash to pic icon---
+        var btn = document.createElement("div");
+        rowDiv.appendChild(btn); 
+        displayPICpage.appendChild(rowDiv);
+
         for( let i in files )
         {
           console.log("["+files[i].name+"]=>["+files[i].version+"]=>["+files[i].size+"]");
