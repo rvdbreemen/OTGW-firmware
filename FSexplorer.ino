@@ -128,12 +128,12 @@ void apifirmwarefilelist() {
       } else {
         version = "0.0";
       }
-      s += snprintf( s, sizeof(buffer), "{name:\"%s\",version:\"%s\",size:%d},", CSTR(dir.fileName()), CSTR(version), dir.fileSize());
+      s += snprintf( s, sizeof(buffer), "{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d},", CSTR(dir.fileName()), CSTR(version), dir.fileSize());
     }
   }
-  s += sprintf(s, "]\n");
+  s += sprintf(--s, "]\n");
   DebugTf("filelist response: [%s]\r\n", buffer);
-  httpServer.send(200, "text/json", buffer);
+  httpServer.send(200, "application/json", buffer);
 }
 
 
