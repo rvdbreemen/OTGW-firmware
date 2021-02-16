@@ -126,7 +126,12 @@ void apifirmwarefilelist() {
         version.trim();
         f.close();
       } else {
-        version = "0.0";
+        version = GetVersion(dir.fileName()); // .ver file is missing, try to recreate it from .hex
+        if (!version.length()) version = "0.0"; 
+        if (f = LittleFS.open(verfile, "w")) {
+          f.print(version + "\n");
+          f.close();
+        }
       }
       s += snprintf( s, sizeof(buffer), "{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d},", CSTR(dir.fileName()), CSTR(version), dir.fileSize());
     }
