@@ -112,12 +112,13 @@ void apifirmwarefilelist() {
   String version;
   Dir dir;
   File f;
-  
+      
   s = buffer;
   s += sprintf(buffer, "[");
   dir = LittleFS.openDir("/");
   while (dir.next()) {
     if (dir.fileName().endsWith(".hex")) {
+      version="";
       String verfile = "/" + dir.fileName();
       verfile.replace(".hex", ".ver");
       f = LittleFS.open(verfile, "r");
@@ -125,13 +126,15 @@ void apifirmwarefilelist() {
         version = f.readStringUntil('\n');
         version.trim();
         f.close();
-      } else {
-        version = GetVersion(dir.fileName()); // .ver file is missing, try to recreate it from .hex
-        if (!version.length()) version = "0.0"; 
-        if (f = LittleFS.open(verfile, "w")) {
-          f.print(version + "\n");
-          f.close();
-        }
+      } else { // .ver file is missing, try to retrieve it from .hex
+        version = GetVersion("/"+dir.fileName());
+        DebugTf("GetVersion(/%s) returned %s\n", dir.fileName().c_str(), version.c_str());  
+        if (version.length()) // .ver not found and something to write
+          if (f = LittleFS.open(verfile, "w")) {
+            DebugTf("creating %s containing \"%s\"\n",verfile.c_str(),version.c_str());
+            f.print(version + "\n");
+            f.close();
+          } else version="0.0";
       }
       s += snprintf( s, sizeof(buffer), "{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d},", CSTR(dir.fileName()), CSTR(version), dir.fileSize());
     }
@@ -155,7 +158,7 @@ void apilistfiles()             // Senden aller Daten an den Client
 
   _fileMeta dirMap[MAX_FILES_IN_LIST+1];
   int fileNr = 0;
-  
+    
   Dir dir = LittleFS.openDir("/");         // List files on LittleFS
   while (dir.next() && (fileNr < MAX_FILES_IN_LIST))  
   {
