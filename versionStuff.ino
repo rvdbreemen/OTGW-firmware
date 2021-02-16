@@ -29,7 +29,7 @@ char *GetVersion(String hexfile)
         DebugTf("Parse error on line %d\n",linecnt);// Parse error
         break;
       }
-      DebugTf("Read in %2x %4x %2x\n",len,addr,tag);
+      //DebugTf("Read in %2x %4x %2x\n",len,addr,tag);
       if (len & 1)
       {
         DebugTf("Invalid data size on line %d\n",linecnt);// Invalid data size
@@ -61,7 +61,7 @@ char *GetVersion(String hexfile)
         //break;
         //}
       } else if (tag == 1) {
-        DebugTf("tag==1\n");
+        //DebugTf("tag==1\n");
         break;
       }
     }
