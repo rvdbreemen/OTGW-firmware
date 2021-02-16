@@ -17,13 +17,13 @@ char *GetVersion(String hexfile)
   unsigned short ptr;
   char *s="";
   File f;
-  DebugTf("GetVersion opening %s\n",hexfile.c_str());
+  //DebugTf("GetVersion opening %s\n",hexfile.c_str());
   f = LittleFS.open(hexfile, "r");
   if (f)  // only proceed if file exists
   {
     while (f.readBytesUntil('\n', hexbuf, sizeof(hexbuf)) != 0) {
       linecnt++;
-      DebugTf("reading line %d %s\n",linecnt,hexbuf);
+      //DebugTf("reading line %d %s\n",linecnt,hexbuf);
       if (sscanf(hexbuf, ":%2x%4x%2x", &len, &addr, &tag) != 3)
       {
         DebugTf("Parse error on line %d\n",linecnt);// Parse error
@@ -39,7 +39,7 @@ char *GetVersion(String hexfile)
       len >>= 1;
       if (tag == 0)
       {
-        DebugTf("Checking address %4x on line %d\n",addr,linecnt);// Invalid data size
+        //DebugTf("Checking address %4x on line %d\n",addr,linecnt);// Invalid data size
         if (addr >= 0x4200 && addr <= 0x4400)
         {
           // Data memory
@@ -50,7 +50,7 @@ char *GetVersion(String hexfile)
               break;
             // if (!bitRead(datamap, addr / 64)) weight += WEIGHT_DATAPROG;
             // bitSet(datamap, addr / 64);
-            DebugTf("storing %x in %x\n",data,addr);
+            //DebugTf("storing %x in %x\n",data,addr);
             datamem[addr++] = byteswap(data);
             offs += 4;
             len--;
@@ -66,18 +66,18 @@ char *GetVersion(String hexfile)
       }
     }
     f.close();
-    DebugTf("closing file and hunting for banner\n");
+    //DebugTf("closing file and hunting for banner\n");
     ptr = 0; 
     while (ptr < 256)
     {
-      DebugTf("checking for %s at char pos %d\n",banner,ptr);
+      //DebugTf("checking for %s at char pos %d\n",banner,ptr);
       s = strstr((char *)datamem + ptr, banner);
       if (!s)
       {
-        DebugTf("did not find the banner\n");
+        //DebugTf("did not find the banner\n");
         ptr += strnlen((char *)datamem + ptr, 256 - ptr) + 1;
       } else {
-        DebugTf("hit the banner! returning version string %s\n",s);
+        //DebugTf("hit the banner! returning version string %s\n",s);
         s += sizeof(banner) - 1; return (s);
       }
     }
