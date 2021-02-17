@@ -313,8 +313,12 @@ bool freeSpace(uint16_t const& printsize)
 void upgradePIC()
 {
   DebugTln(F("Redirect to upgrade PIC .."));
-  doRedirect("Upgrade OTGW PIC ", 120, "/FSexplorer", false);
-  upgradenow();
+  if (!strcmp(GetVersion("/gateway.hex"), CSTR(sPICfwversion))) {
+    doRedirect("OTGW PIC already up to date", 10, "/FSexplorer", false);
+  } else {
+    doRedirect("Upgrade OTGW PIC ", 120, "/FSexplorer", false);
+    upgradenow();
+  }
 } // upgradePIC()
 
 
