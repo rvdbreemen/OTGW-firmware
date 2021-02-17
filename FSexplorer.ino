@@ -109,7 +109,7 @@ void setupFSexplorer()    // Funktionsaufruf "LittleFS();" muss im Setup eingebu
 //=====================================================================================
 void apifirmwarefilelist() {
   char *s, buffer[400];
-  String version;
+  String version, fwversion;
   Dir dir;
   File f;
       
@@ -118,7 +118,7 @@ void apifirmwarefilelist() {
   dir = LittleFS.openDir("/");
   while (dir.next()) {
     if (dir.fileName().endsWith(".hex")) {
-      version="";
+      version="";fwversion="";
       String verfile = "/" + dir.fileName();
       verfile.replace(".hex", ".ver");
       f = LittleFS.open(verfile, "r");
@@ -126,15 +126,16 @@ void apifirmwarefilelist() {
         version = f.readStringUntil('\n');
         version.trim();
         f.close();
-      } else { // .ver file is missing, try to retrieve it from .hex
-        version = GetVersion("/"+dir.fileName());
-        DebugTf("GetVersion(/%s) returned %s\n", dir.fileName().c_str(), version.c_str());  
-        if (version.length()) // .ver not found and something to write
-          if (f = LittleFS.open(verfile, "w")) {
-            DebugTf("creating %s containing \"%s\"\n",verfile.c_str(),version.c_str());
-            f.print(version + "\n");
-            f.close();
-          } else version="0.0";
+      } 
+      fwversion = GetVersion("/"+dir.fileName()); // only check if gateway firmware
+      DebugTf("GetVersion(%s) returned %s\n", dir.fileName().c_str(), fwversion.c_str());  
+      if (fwversion.length() && strcmp(fwversion.c_str(),version.c_str())) { // versions do not match
+        version=fwversion; // assign hex file version to version
+        if (f = LittleFS.open(verfile, "w")) { // write to .ver file
+          DebugTf("writing %s to %s\n",version.c_str(),verfile.c_str());
+          f.print(version + "\n");
+          f.close();
+        } 
       }
       s += snprintf( s, sizeof(buffer), "{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d},", CSTR(dir.fileName()), CSTR(version), dir.fileSize());
     }
