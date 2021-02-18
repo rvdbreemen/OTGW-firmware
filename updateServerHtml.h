@@ -23,6 +23,7 @@ static const char UpdateServerIndex[] PROGMEM =
       and upload them after the flashing of your LittleFS.
       <hr>
       <br/>
+      <!--
       <br/>Wait <span style='font-size: 1.3em;' id="waitSeconds">120</span> seconds ..
       <br>If nothing happend, then wait for count down to zero and then refresh with <span style='font-size:1.3em;'><b><a href="/">this link here</a></b></span>!
       </body>
@@ -36,7 +37,7 @@ static const char UpdateServerIndex[] PROGMEM =
               window.location.assign("/")
            }
          }, 1000);
-     </script>
+     </script>-->
      </html>)";
 
 static const char UpdateServerSuccess[] PROGMEM = 
