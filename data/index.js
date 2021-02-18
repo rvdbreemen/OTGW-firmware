@@ -203,21 +203,26 @@
           //--- refresh icon ---
           var btn = document.createElement("div");
           btn.setAttribute("class", "piccolumn4");
-            // var a = document.createElement('a');
-            // a.href = localURL+'test.html?name='+file[i].name;
-            // btn.appendChild(a);
+            var a = document.createElement('a');
+            a.href = localURL+'/pic?action=refresh&name='+files[i].name+'&version='+files[i].version;
             var img = document.createElement('img'); 
             img.src = localURL+'/refresh-page-option.png';
-            //img.href =localURL+'test.html?name='+file[i].name;
-            btn.appendChild(img); 
+            img.style.width = '16px';
+            img.style.height = 'auto';
+            a.appendChild(img);
+            btn.appendChild(a); 
           rowDiv.appendChild(btn); 
           //--- flash to pic icon---
           var btn = document.createElement("div");
           btn.setAttribute("class", "piccolumn5");
+          var a = document.createElement('a');
+            a.href = localURL+'/pic?action=upgrade&name='+files[i].name+'&version='+files[i].version;
             var img = document.createElement('img'); 
             img.src = localURL+'/download-to-storage-drive.png'
-            //img.href =localURL+'test.html?name='+file[i].name;
-          btn.appendChild(img); 
+            img.style.width = '16px';
+            img.style.height = 'auto';
+            a.appendChild(img);
+            btn.appendChild(a); 
           rowDiv.appendChild(btn); 
           displayPICpage.appendChild(rowDiv);
 

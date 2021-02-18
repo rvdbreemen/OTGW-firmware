@@ -54,12 +54,6 @@ void setup() {
   setLed(LED1, ON);
   setLed(LED2, ON);
 
-  //start the debug port 23
-  startTelnet();
-  OTGWSerial.print("Use  'telnet ");
-  OTGWSerial.print(WiFi.localIP());
-  OTGWSerial.println("' for debugging");
-  
   LittleFS.begin();
   readSettings(true);
 
@@ -69,9 +63,9 @@ void setup() {
   startWiFi(_HOSTNAME, 240);  // timeout 240 seconds
   for (int i=0; i<=3;i++) {
     blinkLEDnow(LED1);
-    delay(250);
+    delay(100);
     blinkLEDnow(LED1);
-    delay(250);
+    delay(100);
   }
   setLed(LED1, OFF);
 
@@ -79,6 +73,12 @@ void setup() {
   startMQTT(); 
   startNTP();
 
+  //start the debug port 23
+  startTelnet();
+  OTGWSerial.print("Use  'telnet ");
+  OTGWSerial.print(WiFi.localIP());
+  OTGWSerial.println("' for debugging");
+  
 //================ Start HTTP Server ================================
   setupFSexplorer();
   if (!LittleFS.exists("/index.html")) {
@@ -90,9 +90,6 @@ void setup() {
     httpServer.serveStatic("/index",      LittleFS, "/index.html");
     httpServer.serveStatic("/index.html", LittleFS, "/index.html");
   } 
-  // httpServer.on("/",          sendIndexPage);
-  // httpServer.on("/index",     sendIndexPage);
-  // httpServer.on("/index.html",sendIndexPage);
   httpServer.serveStatic("/FSexplorer.png",   LittleFS, "/FSexplorer.png");
   httpServer.serveStatic("/index.css", LittleFS, "/index.css");
   httpServer.serveStatic("/index.js",  LittleFS, "/index.js");
@@ -100,9 +97,8 @@ void setup() {
   httpServer.on("/api", HTTP_ANY, processAPI);  //was only HTTP_GET (20210110)
 
   httpServer.begin();
-  OTGWSerial.println("\nHTTP Server started\r");
-  
   // Set up first message as the IP address
+  OTGWSerial.println("\nHTTP Server started\r");  
   sprintf(cMsg, "%03d.%03d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
   OTGWSerial.printf("\nAssigned IP=%s\r\n", cMsg);
 
@@ -123,9 +119,9 @@ void setup() {
   //Blink LED2 to signal setup done
   for (int i=0; i<=3;i++) {
     blinkLEDnow(LED2);
-    delay(250);
+    delay(100);
     blinkLEDnow(LED2);
-    delay(250);
+    delay(100);
   }
   setLed(LED2, OFF);
 }

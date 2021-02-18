@@ -73,12 +73,13 @@ void setupFSexplorer()    // Funktionsaufruf "LittleFS();" muss im Setup eingebu
     httpServer.send(200, "text/html", Helper); //Upload the FSexplorer.html
   }
   httpServer.on("/api/listfiles", apilistfiles);
-  httpServer.on("/api/firmwarefilelist", apifirmwarefilelist);
   httpServer.on("/LittleFSformat", formatLittleFS);
   httpServer.on("/upload", HTTP_POST, []() {}, handleFileUpload);
   httpServer.on("/ReBoot", reBootESP);
-  httpServer.on("/update", updateFirmware);
-  httpServer.on("/upgradepic", upgradePIC);
+  //otgw pic functions
+  //httpServer.on("/upgradepic", upgradePIC);
+  httpServer.on("/pic", upgradepic);
+  httpServer.on("/api/firmwarefilelist", apifirmwarefilelist);  
   httpServer.onNotFound([]() 
   {
     if (Verbose) DebugTf("in 'onNotFound()'!! [%s] => \r\n", String(httpServer.uri()).c_str());
@@ -104,7 +105,6 @@ void setupFSexplorer()    // Funktionsaufruf "LittleFS();" muss im Setup eingebu
   });
   
 } // setupFSexplorer()
-
 
 //=====================================================================================
 void apifirmwarefilelist() {
@@ -310,24 +310,16 @@ bool freeSpace(uint16_t const& printsize)
 } // freeSpace()
 
 //=====================================================================================
-void upgradePIC()
-{
-  DebugTln(F("Redirect to upgrade PIC .."));
-  if (!strcmp(GetVersion("/gateway.hex"), CSTR(sPICfwversion))) {
-    doRedirect("OTGW PIC already up to date", 10, "/FSexplorer", false);
-  } else {
-    doRedirect("Upgrade OTGW PIC ", 120, "/FSexplorer", false);
-    upgradenow();
-  }
-} // upgradePIC()
-
-
-//=====================================================================================
-void updateFirmware()
-{
-  DebugTln(F("Redirect to updateIndex .."));
-  doRedirect("wait ... ", 1, "/updateIndex", false);
-} // updateFirmware()
+// void upgradePIC()
+// {
+//   DebugTln(F("Redirect to upgrade PIC .."));
+//   if (!strcmp(GetVersion("/gateway.hex"), CSTR(sPICfwversion))) {
+//     doRedirect("OTGW PIC already up to date", 10, "/FSexplorer", false);
+//   } else {
+//     doRedirect("Upgrade OTGW PIC ", 120, "/FSexplorer", false);
+//     upgradepicnow();
+//   }
+// } // upgradePIC()
 
 
 //=====================================================================================
