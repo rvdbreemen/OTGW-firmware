@@ -11,12 +11,15 @@
   const localURL='http://'+window.location.host; 
   const APIGW='http://'+window.location.host+'/api/';
 
-"use strict";
+  "use strict";
 
   let needReload  = true;
   refreshDevTime();
 
+  console.log("Hash="+window.location.hash);
   window.onload=initMainPage;
+ 
+
   window.onfocus = function() {
     if (needReload) {
       window.location.reload(true);
@@ -72,7 +75,12 @@
     document.getElementById("displaySettingsPage").style.display   = "none";
     document.getElementById("displayDeviceInfo").style.display     = "none";
     document.getElementById("displayPICflash").style.display     = "none";
-  
+    
+    if (window.location.hash == "#tabPICflash"){
+      setTimeout(function () {
+        firmwarePage();
+      }, 150);
+    };
   } // initMainPage()
 
   function firmwarePage()

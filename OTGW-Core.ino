@@ -1237,8 +1237,8 @@ void upgradepic() {
     path.replace(".hex", ".ver");
     LittleFS.remove(path);
   }
-  httpServer.sendHeader("Location", "index.html", true);
-  httpServer.send(303, "text/html", "<a href='index.html'>Return</a>");
+  httpServer.sendHeader("Location", "index.html#tabPICflash", true);
+  httpServer.send(303, "text/html", "<a href='index.html#tabPICflash'>Return</a>");
 }
 
 /***************************************************************************

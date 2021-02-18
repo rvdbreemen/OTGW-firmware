@@ -84,7 +84,7 @@ void readSettings(bool show)
   if (settingMQTTtopTopic.length()==0) settingMQTTtopTopic = _HOSTNAME;
   settingNTPenable        = doc["NTPenable"]; 
   settingNTPtimezone      = doc["NTPtimezone"].as<String>();
-  if (settingNTPtimezone=="null")  settingNTPtimezone = "Europe/Amsterdam"; //default to amsterdam timezone
+  if (settingNTPtimezone=="null")  settingNTPtimezone = "CET"; //default to amsterdam timezone
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();

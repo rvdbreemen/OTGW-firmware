@@ -149,9 +149,6 @@ void startNTP(){
 
   setDebug(INFO); 
   setServer("time.google.com");
-  //no TZ cached, then try to GeoIP locate your TZ, otherwise fallback to default
-  myTZ.setCache(0);
-  myTZ.clearCache();
 
   if (settingNTPtimezone.length()==0){
     //ezTime will try to determine your location based on your IP using GeoIP
@@ -161,7 +158,7 @@ void startNTP(){
       DebugTf("GeoIP located your timezone to be: %s\r\n", CSTR(settingNTPtimezone));
     } else { 
       DebugTln(errorString());
-      settingNTPtimezone = "PICFIRMWARE";
+      settingNTPtimezone = "CET";
     }
   } else {
     if (myTZ.setLocation(settingNTPtimezone)){
@@ -169,7 +166,7 @@ void startNTP(){
       settingNTPtimezone = myTZ.getTimezoneName();
     } else { 
       DebugTln(errorString());
-      settingNTPtimezone = "Europe/Amsterdam";
+      settingNTPtimezone = "CET";
     }
   }
   // }
