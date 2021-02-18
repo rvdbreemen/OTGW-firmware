@@ -78,7 +78,7 @@ String    settingMQTTuser = "";
 String    settingMQTTpasswd = "";
 String    settingMQTTtopTopic = "OTGW";
 bool      settingNTPenable = true;
-String    settingNTPtimezone = "Europe/Amsterdam"; //Default
+String    settingNTPtimezone = "CET"; //Default
 
 //Now load network suff
 #include "networkStuff.h"
