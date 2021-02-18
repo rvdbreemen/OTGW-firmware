@@ -299,12 +299,15 @@ input {
 }
 .piccolumn4 {
   display: table-cell;
-  width: 34px;
+  padding-left: 5px;
+  width: 16px;
   margin: 5px;
 }
 .piccolumn5 {
   display: table-cell;
-  width: 34px;
+  width: 16px;
+  padding-left: 5px;
+  padding-right: 5px;
   margin: 5px;
 }
 

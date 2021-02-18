@@ -1133,10 +1133,10 @@ void startOTGWstream()
   OTGWstream.begin();
 }
 
-void upgradenow() {
+void upgradepicnow(const char *filename) {
   if (OTGWSerial.busy()) return; // if already in programming mode, never call it twice
   DebugTln("Start PIC upgrade now.");
-  fwupgradestart(PICFIRMWARE);  
+  fwupgradestart(filename);  
   while (OTGWSerial.busy()){
     feedWatchDog();
     //blink the led during flash...
@@ -1183,7 +1183,7 @@ void fwupgradestart(const char *hexfile) {
 
 
 
-void firmwarerefresh(String filename, String version) {
+void refreshpic(String filename, String version) {
   WiFiClient client;
   HTTPClient http;
   String latest;
@@ -1222,23 +1222,23 @@ void firmwarerefresh(String filename, String version) {
   http.end();
 }
 
-void firmwareapi() {
+void upgradepic() {
   String action = httpServer.arg("action");
   String filename = httpServer.arg("name");
   String version = httpServer.arg("version");
-  DebugTf("Action: %s %s\n", action.c_str(), filename.c_str());
-  if (action == "download") {
-    fwupgradestart(String("/" + filename).c_str());
-  } else if (action == "update") {
-    firmwarerefresh(filename, version);
+  DebugTf("Action: %s %s %s\r\n", action.c_str(), filename.c_str(), version.c_str());
+  if (action == "upgrade") {
+    upgradepicnow(String("/" + filename).c_str());
+  } else if (action == "refresh") {
+    refreshpic(filename, version);
   } else if (action == "delete") {
     String path = "/" + filename;
     LittleFS.remove(path);
     path.replace(".hex", ".ver");
     LittleFS.remove(path);
   }
-  httpServer.sendHeader("Location", "firmware.html", true);
-  httpServer.send(303, "text/html", "<a href='firmware.html'>Return</a>");
+  //httpServer.sendHeader("Location", "firmware.html", true);
+  //httpServer.send(303, "text/html", "<a href='firmware.html'>Return</a>");
 }
 
 /***************************************************************************
