@@ -1182,8 +1182,8 @@ void fwupgradestart(const char *hexfile) {
   }
 }
 
-bool checkforupdatepic(String filename, String version){
-   WiFiClient client;
+String checkforupdatepic(String filename, String version){
+  WiFiClient client;
   HTTPClient http;
   String latest;
   int code;
@@ -1198,7 +1198,7 @@ bool checkforupdatepic(String filename, String version){
     latest = http.header(1);
     DebugTf("Update %s: %s -> %s\n", filename.c_str(), version.c_str(), latest.c_str());
     http.end();
-    return (latest != version);
+    return(latest); 
   }
 }
 
@@ -1207,18 +1207,10 @@ void refreshpic(String filename, String version) {
   HTTPClient http;
   String latest;
   int code;
-  
-  http.begin(client, "http://otgw.tclcode.com/download/" + filename);
-  http.collectHeaders(hexheaders, 2);
-  code = http.sendRequest("HEAD");
-  if (code == HTTP_CODE_OK) {
-    for (int i = 0; i< http.headers(); i++) {
-      DebugTf("%s: %s\n", hexheaders[i], http.header(i).c_str());
-    }
-    latest = http.header(1);
+
+  if (latest=checkforupdatepic(filename, version) != "") {
     if (latest != version) {
       DebugTf("Update %s: %s -> %s\n", filename.c_str(), version.c_str(), latest.c_str());
-      http.end();
       http.begin(client, "http://otgw.tclcode.com/download/" + filename);
       code = http.GET();
       if (code == HTTP_CODE_OK) {
