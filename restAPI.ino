@@ -333,6 +333,7 @@ void sendDeviceTime()
                                                        , hour(), minute(), second());
   sendNestedJsonObj("dateTime", actTime); 
   sendNestedJsonObj("epoch", (int)now());
+  sendNestedJsonObj("message", sMessage);
 
   sendEndJsonObj();
 

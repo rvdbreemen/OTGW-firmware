@@ -25,6 +25,7 @@
         "iosfwd": "cpp",
         "xlocbuf": "cpp",
         "random": "cpp",
-        "chrono": "cpp"
+        "chrono": "cpp",
+        "system_error": "cpp"
     }
 }
