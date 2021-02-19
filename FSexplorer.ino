@@ -74,6 +74,8 @@ void startWebserver(){
   httpServer.serveStatic("/FSexplorer.png",   LittleFS, "/FSexplorer.png");
   httpServer.serveStatic("/index.css", LittleFS, "/index.css");
   httpServer.serveStatic("/index.js",  LittleFS, "/index.js");
+  //otgw pic functions
+  httpServer.on("/pic", upgradepic);
   // all other api calls are catched in FSexplorer onNotFounD!
   httpServer.on("/api", HTTP_ANY, processAPI);  //was only HTTP_GET (20210110)
 
@@ -84,10 +86,8 @@ void startWebserver(){
   OTGWSerial.printf("\nAssigned IP=%s\r\n", cMsg);
 }
 //=====================================================================================
-void setupFSexplorer()    // Funktionsaufruf "LittleFS();" muss im Setup eingebunden werden
-{    
+void setupFSexplorer(){    
   LittleFS.begin();
-  
   if (LittleFS.exists("/FSexplorer.html")) 
   {
     httpServer.serveStatic("/FSexplorer.html", LittleFS, "/FSexplorer.html");
@@ -97,14 +97,12 @@ void setupFSexplorer()    // Funktionsaufruf "LittleFS();" muss im Setup eingebu
   {
     httpServer.send(200, "text/html", Helper); //Upload the FSexplorer.html
   }
+  httpServer.on("/api/firmwarefilelist", apifirmwarefilelist); 
   httpServer.on("/api/listfiles", apilistfiles);
   httpServer.on("/LittleFSformat", formatLittleFS);
   httpServer.on("/upload", HTTP_POST, []() {}, handleFileUpload);
   httpServer.on("/ReBoot", reBootESP);
-  //otgw pic functions
-  //httpServer.on("/upgradepic", upgradePIC);
-  httpServer.on("/pic", upgradepic);
-  httpServer.on("/api/firmwarefilelist", apifirmwarefilelist);  
+ 
   httpServer.onNotFound([]() 
   {
     if (Verbose) DebugTf("in 'onNotFound()'!! [%s] => \r\n", String(httpServer.uri()).c_str());
@@ -333,19 +331,6 @@ bool freeSpace(uint16_t const& printsize)
   return (LittleFSinfo.totalBytes - (LittleFSinfo.usedBytes * 1.05) > printsize) ? true : false;
   
 } // freeSpace()
-
-//=====================================================================================
-// void upgradePIC()
-// {
-//   DebugTln(F("Redirect to upgrade PIC .."));
-//   if (!strcmp(GetVersion("/gateway.hex"), CSTR(sPICfwversion))) {
-//     doRedirect("OTGW PIC already up to date", 10, "/FSexplorer", false);
-//   } else {
-//     doRedirect("Upgrade OTGW PIC ", 120, "/FSexplorer", false);
-//     upgradepicnow();
-//   }
-// } // upgradePIC()
-
 
 //=====================================================================================
 void reBootESP()
