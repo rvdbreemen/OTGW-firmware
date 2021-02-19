@@ -85,7 +85,7 @@ void setup() {
   startOTGWstream();    // start port 25238 
   DebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
   if (checkforupdatepic("gateway.hex", OTGWSerial.firmwareVersion())) {
-     sMessage = "New PIC version available: " + String(OTGWSerial.firmwareVersion());
+     sMessage = "New PIC version available!";
   }
   DebugTf("Reboot count = [%d]\r\n", rebootCount);
   setLed(LED1, OFF);
