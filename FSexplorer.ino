@@ -58,6 +58,31 @@ const char Helper[] = R"(
 )";
 const char Header[] = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCache-Control: no-cache\r\n";
 
+
+
+//=====================================================================================
+void startWebserver(){
+  if (!LittleFS.exists("/index.html")) {
+    httpServer.serveStatic("/",           LittleFS, "/FSexplorer.html");
+    httpServer.serveStatic("/index",      LittleFS, "/FSexplorer.html");
+    httpServer.serveStatic("/index.html", LittleFS, "/FSexplorer.html");
+  } else{
+    httpServer.serveStatic("/",           LittleFS, "/index.html");
+    httpServer.serveStatic("/index",      LittleFS, "/index.html");
+    httpServer.serveStatic("/index.html", LittleFS, "/index.html");
+  } 
+  httpServer.serveStatic("/FSexplorer.png",   LittleFS, "/FSexplorer.png");
+  httpServer.serveStatic("/index.css", LittleFS, "/index.css");
+  httpServer.serveStatic("/index.js",  LittleFS, "/index.js");
+  // all other api calls are catched in FSexplorer onNotFounD!
+  httpServer.on("/api", HTTP_ANY, processAPI);  //was only HTTP_GET (20210110)
+
+  httpServer.begin();
+  // Set up first message as the IP address
+  OTGWSerial.println("\nHTTP Server started\r");  
+  sprintf(cMsg, "%03d.%03d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
+  OTGWSerial.printf("\nAssigned IP=%s\r\n", cMsg);
+}
 //=====================================================================================
 void setupFSexplorer()    // Funktionsaufruf "LittleFS();" muss im Setup eingebunden werden
 {    

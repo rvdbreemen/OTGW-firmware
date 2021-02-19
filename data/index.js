@@ -135,6 +135,7 @@
               //console.log("Got new time ["+json.devtime[i].value+"]");
               document.getElementById('theTime').innerHTML = json.devtime[i].value;
             }
+            if (json.devtime[i].name == "message") document.getElementById('message').innerHTML = json.devtime[i].value;
           }
       })
       .catch(function(error) {

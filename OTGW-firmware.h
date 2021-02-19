@@ -53,10 +53,11 @@ WiFiClient  wifiClient;
 bool        Verbose = false;
 char        cMsg[CMSG_SIZE];
 char        fChar[10];
-String      lastReset   = "";
+String      lastReset = "";
 uint64_t    upTimeSeconds = 0;
 uint32_t    rebootCount = 0;
 Timezone    myTZ; 
+String      sMessage = "";    
 
 const char *weekDayName[]  {  "Unknown", "Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag", "Unknown" };
 const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
@@ -66,8 +67,10 @@ String    sPICfwversion = "";
 bool      bOTGWonline = true;
 String    errorupgrade = ""; 
 
+
 //All things that are settings 
 String    settingHostname = _HOSTNAME;
+
 //MQTT settings
 bool      statusMQTTconnection = false; 
 bool      settingMQTTenable = false;
@@ -79,6 +82,7 @@ String    settingMQTTpasswd = "";
 String    settingMQTTtopTopic = "OTGW";
 bool      settingNTPenable = true;
 String    settingNTPtimezone = "CET"; //Default
+
 
 //Now load network suff
 #include "networkStuff.h"

@@ -72,48 +72,21 @@ void setup() {
   startMDNS(CSTR(settingHostname));
   startMQTT(); 
   startNTP();
-
-  //start the debug port 23
-  startTelnet();
-  OTGWSerial.print("Use  'telnet ");
-  OTGWSerial.print(WiFi.localIP());
-  OTGWSerial.println("' for debugging");
-  
-//================ Start HTTP Server ================================
+  startTelnet();  //start the debug port 23
   setupFSexplorer();
-  if (!LittleFS.exists("/index.html")) {
-    httpServer.serveStatic("/",           LittleFS, "/FSexplorer.html");
-    httpServer.serveStatic("/index",      LittleFS, "/FSexplorer.html");
-    httpServer.serveStatic("/index.html", LittleFS, "/FSexplorer.html");
-  } else{
-    httpServer.serveStatic("/",           LittleFS, "/index.html");
-    httpServer.serveStatic("/index",      LittleFS, "/index.html");
-    httpServer.serveStatic("/index.html", LittleFS, "/index.html");
-  } 
-  httpServer.serveStatic("/FSexplorer.png",   LittleFS, "/FSexplorer.png");
-  httpServer.serveStatic("/index.css", LittleFS, "/index.css");
-  httpServer.serveStatic("/index.js",  LittleFS, "/index.js");
-  // all other api calls are catched in FSexplorer onNotFounD!
-  httpServer.on("/api", HTTP_ANY, processAPI);  //was only HTTP_GET (20210110)
+  startWebserver();
 
-  httpServer.begin();
-  // Set up first message as the IP address
-  OTGWSerial.println("\nHTTP Server started\r");  
-  sprintf(cMsg, "%03d.%03d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
-  OTGWSerial.printf("\nAssigned IP=%s\r\n", cMsg);
-
-  DebugTln("Setup Watchdog");
   initWatchDog();       // setup the WatchDog
   OTGWSerial.println(F("Setup finished!\r\n"));
   // After resetting the OTGW PIC never send anything to Serial for debug
   // and switch to telnet port 23 for debug purposed. 
   // Setup the OTGW PIC
-  DebugTln("Reset OTGW PIC");
   resetOTGW();          // reset the OTGW pic
-  DebugTln("Start OTGW Stream");
   startOTGWstream();    // start port 25238 
   DebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
-
+  if (!checkforupdatepic("gateway.hex", OTGWSerial.firmwareVersion())) {
+     sMessage = "New PIC version available!"; 
+  }
   DebugTf("Reboot count = [%d]\r\n", rebootCount);
   setLed(LED1, OFF);
   //Blink LED2 to signal setup done

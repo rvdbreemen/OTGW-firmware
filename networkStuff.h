@@ -119,9 +119,14 @@ void startWiFi(const char* hostname, int timeOut)
   
 } // startWiFi()
 
+
+
 //===========================================================================================
 void startTelnet() 
 {
+  OTGWSerial.print("Use  'telnet ");
+  OTGWSerial.print(WiFi.localIP());
+  OTGWSerial.println("' for debugging");
   TelnetStream.begin();
   DebugTln(F("\nTelnet server started .."));
   TelnetStream.flush();
