@@ -84,7 +84,7 @@ void setup() {
   resetOTGW();          // reset the OTGW pic
   startOTGWstream();    // start port 25238 
   DebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
-  String latest = checkforupdatepic("gateway.hex", sPICfwversion);
+  String latest = checkforupdatepic("gateway.hex");
   if (!bOTGWonline) {
     sMessage = sPICfwversion; 
   } else if (latest != sPICfwversion) {
