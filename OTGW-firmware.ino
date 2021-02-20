@@ -84,9 +84,11 @@ void setup() {
   resetOTGW();          // reset the OTGW pic
   startOTGWstream();    // start port 25238 
   DebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
-  String latest=checkforupdatepic("gateway.hex", sPICfwversion);
-  if (latest != sPICfwversion) {
-     sMessage = "New PIC version " + latest + " available!";
+  String latest = checkforupdatepic("gateway.hex", sPICfwversion);
+  if (!bOTGWonline) {
+    sMessage = sPICfwversion; 
+  } else if (latest != sPICfwversion) {
+    sMessage = "New PIC version " + latest + " available!";
   }
   DebugTf("Reboot count = [%d]\r\n", rebootCount);
   setLed(LED1, OFF);
@@ -166,6 +168,16 @@ void doTaskEvery60s(){
   }
 }
 
+//===[ check for new pic version  ]===
+void docheckforpic(){
+  String latest = checkforupdatepic("gateway.hex");
+  if (!bOTGWonline) {
+    sMessage = sPICfwversion; 
+  } else if (latest != sPICfwversion) {
+    sMessage = "New PIC version " + latest + " available!";
+  }
+}
+
 //===[ Do the background tasks ]===
 void doBackgroundTasks()
 {
@@ -186,13 +198,13 @@ void loop()
   DECLARE_TIMER_SEC(timer5s, 5, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer30s, 30, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
-
+  DECLARE_TIMER_MIN(tmrcheckpic, 1440, CATCH_UP_MISSED_TICKS);
 
   if (DUE(timer1s))       doTaskEvery1s();
   if (DUE(timer5s))       doTaskEvery5s();
   if (DUE(timer30s))      doTaskEvery30s();
   if (DUE(timer60s))      doTaskEvery60s();
-
+  if (DUE(tmrcheckpic))   docheckforpic();
   doBackgroundTasks();
 }
 
