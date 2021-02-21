@@ -300,7 +300,7 @@
           document.getElementById("waiting").innerHTML = "";
           //console.log("["+data[i].name+"]=>["+data[i].value+"]");
           var mainPage = document.getElementById('mainPage');
-          if( ( document.getElementById("otmon_"+data[i].name)) == null )
+          if((document.getElementById("otmon_"+data[i].name))==null)
           { // if element does not exists yet, then build page
             var rowDiv = document.createElement("div");
             rowDiv.setAttribute("class", "otmonrow");
@@ -322,11 +322,15 @@
             unitDiv.setAttribute("class", "otmoncolumn3");
             unitDiv.textContent = data[i].unit; 
             rowDiv.appendChild(unitDiv);
+            rowDiv.style.display = ((data[i].epoch==0)?"none":"block");
             mainPage.appendChild(rowDiv);
+            
           }
           else
           { //if the element exists, then update the value
-            document.getElementById("otmon_"+data[i].name).textContent = data[i].value;  
+            var update = document.getElementById("otmon_"+data[i].name);
+            update.style.display = ((data[i].epoch==0)?"none":"block");
+            update.textContent = data[i].value;  
           }
         }
         

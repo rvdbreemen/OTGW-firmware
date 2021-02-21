@@ -842,13 +842,16 @@ void processOTGW(const char * buf, int len)
     Debugf("[%-30s]\t", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
     DebugFlush();
 
+    //keep track of update
+    msglastupdated[OTdata.id] = now();
+
     //next step interpret the OT protocol
     if (static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_ACK || static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_DATA) {
 
       //#define OTprint(data, value, text, format) ({ data= value; Debugf("[%37s]", text); Debugf("= [format]", data)})
       //interpret values f8.8
       switch (static_cast<OpenThermMessageID>(OTdata.id)) {   
-        case TSet:                          OTdataObject.Tset = print_f88(); break;         
+        case TSet:                          OTdataObject.TSet = print_f88(); break;         
         case CoolingControl:                OTdataObject.CoolingControl = print_f88(); break;
         case TsetCH2:                       OTdataObject.TsetCH2 = print_f88();  break;
         case TrOverride:                    OTdataObject.TrOverride = print_f88();  break;        
@@ -1036,7 +1039,7 @@ void handleOTGW()
 String getOTGWValue(int msgid)
 {
   switch (static_cast<OpenThermMessageID>(msgid)) { 
-    case TSet:                              return String(OTdataObject.Tset); break;         
+    case TSet:                              return String(OTdataObject.TSet); break;         
     case CoolingControl:                    return String(OTdataObject.CoolingControl); break;
     case TsetCH2:                           return String(OTdataObject.TsetCH2);  break;
     case TrOverride:                        return String(OTdataObject.TrOverride);  break;        

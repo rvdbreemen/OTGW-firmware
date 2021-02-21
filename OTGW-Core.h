@@ -25,7 +25,7 @@ TelnetStreamClass OTGWstream(OTGW_SERIAL_PORT);
 
 typedef struct {
 	uint16_t 	Status = 0; 				// flag8 / flag8  Master and Slave Status flags. 
-	float 		Tset = 0.0; 					// f8.8  Control setpoint  ie CH  water temperature setpoint (°C)
+	float 		TSet = 0.0; 					// f8.8  Control setpoint  ie CH  water temperature setpoint (°C)
 	uint16_t	MConfigMMemberIDcode = 0; 	// flag8 / u8  Master Configuration Flags /  Master MemberID Code 
 	uint16_t	SConfigSMemberIDcode = 0; // flag8 / u8  Slave Configuration Flags /  Slave MemberID Code 
 	uint16_t 	Command = 0; // u8 / u8  Remote Command 
@@ -400,6 +400,8 @@ enum OpenThermMessageID {
 	};
 
 #define OT_MSGID_MAX 133
+
+time_t msglastupdated[255] = {0}; //all msg, even if they are unknown
 
 enum OpenThermStatus {
 	OT_NOT_INITIALIZED,
