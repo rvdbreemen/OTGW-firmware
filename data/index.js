@@ -686,6 +686,7 @@
    ,[ "ntptimezone",                "NTP Timezone"]
    ,[ "uptime",                     "Uptime since boot"]
    ,[ "bootcount",                  "Nr. Reboots"] 
+   ,[ "ledblink",                   "Heartbeat LED (on/off)"]
                  ];
   
 /*

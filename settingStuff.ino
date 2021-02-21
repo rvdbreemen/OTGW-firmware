@@ -38,6 +38,7 @@ void writeSettings(bool show)
   root["MQTTtoptopic"] = settingMQTTtopTopic;
   root["NTPenable"] = settingNTPenable;
   root["NTPtimezone"] = settingNTPtimezone;
+  root["LEDblink"] = settingLEDblink;
 
   serializeJsonPretty(root, file);
   Debugln(F("... done!"));
@@ -75,7 +76,7 @@ void readSettings(bool show)
   // Copy values from the JsonDocument to the Config 
   settingHostname         = doc["hostname"].as<String>();
   if (settingHostname.length()==0) settingHostname = _HOSTNAME;
-  settingMQTTenable       = doc["MQTTenable"]; 
+  settingMQTTenable       = doc["MQTTenable"]|settingMQTTenable; 
   settingMQTTbroker       = doc["MQTTbroker"].as<String>();
   settingMQTTbrokerPort   = doc["MQTTbrokerPort"]; //default port
   settingMQTTuser         = doc["MQTTuser"].as<String>();
@@ -85,6 +86,7 @@ void readSettings(bool show)
   settingNTPenable        = doc["NTPenable"]; 
   settingNTPtimezone      = doc["NTPtimezone"].as<String>();
   if (settingNTPtimezone=="null")  settingNTPtimezone = "CET"; //default to amsterdam timezone
+  settingLEDblink         = doc["LEDblink"]|settingLEDblink;
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
@@ -143,6 +145,7 @@ void updateSetting(const char *field, const char *newValue)
     settingNTPtimezone = String(newValue);
     startNTP();  // update timezone if changed
   }
+  if (stricmp(field, "LEDblink")==0)      settingLEDblink = EVALBOOLEAN(newValue);
   //finally update write settings
   writeSettings(false);
   

@@ -82,6 +82,7 @@ String    settingMQTTpasswd = "";
 String    settingMQTTtopTopic = "OTGW";
 bool      settingNTPenable = true;
 String    settingNTPtimezone = "CET"; //Default
+bool      settingLEDblink = true;
 
 
 //Now load network suff
