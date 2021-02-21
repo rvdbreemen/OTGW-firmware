@@ -44,7 +44,7 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
   
 | Version | Release notes |
 |-|-|
-| 0.7.6 | PIC firmware integration done. <br> NTP configurable <br> Web UI only values that have been updated |
+| 0.7.6 | PIC firmware integration done. <br> NTP configurable <br> Web UI only values that have been updated <br> Update to REST API to include epoch of last update to message |
 | 0.7.5 | Complete set of status bits in UI and Central Heating 2 information |
 | 0.7.4 | Integration of the otgw-pic firmware upgrade code - upgrade to pic firmware version 5.0 (by Schelte Bron) |
 | 0.7.3 | Adding MQTT disable/enable option<br>Adding MQTT long password (max. 100 chars)<br>Adding executeCommand API (verify and return response for commands)<br>Adding RESTAPI /api/v1/otgw/cmdrsp/{command} that returns {response from command}<br>Added uptime and otgw fwversion in devinfo UI |
