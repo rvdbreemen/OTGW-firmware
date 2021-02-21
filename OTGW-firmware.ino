@@ -161,7 +161,7 @@ void doTaskEvery60s(){
   if (WiFi.status() != WL_CONNECTED)
   {
     //disconnected, try to reconnect then...
-     startWiFi(_HOSTNAME, 240);
+    startWiFi(_HOSTNAME, 240);
     //check OTGW and telnet
     startTelnet();
     startOTGWstream(); 
@@ -187,7 +187,8 @@ void doBackgroundTasks()
   httpServer.handleClient();
   MDNS.update();
   events();                     // trigger ezTime update etc.
-  blinkLEDms(1000);             // 'blink' the status led every x ms
+  // 'blink' the status led every x ms
+  if (settingLEDblink) blinkLEDms(1000);             
   delay(1);
 }
 
