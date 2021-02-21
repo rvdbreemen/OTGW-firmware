@@ -292,7 +292,8 @@
     fetch(APIGW+"v1/otgw/otmonitor")  //api/v1/otgw/otmonitor
       .then(response => response.json())
       .then(json => {
-        console.log("then(json => ..)");
+        //console.log("then(json => ..)");
+        needReload = false;
         //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
         data = json.otmonitor;
         for( let i in data )
@@ -322,18 +323,32 @@
             unitDiv.setAttribute("class", "otmoncolumn3");
             unitDiv.textContent = data[i].unit; 
             rowDiv.appendChild(unitDiv);
+            //--- Unit  ---
+            var epochDiv = document.createElement("div");
+            epochDiv.style.display = "none";
+            epochDiv.setAttribute("id", "otmon_epoch_"+data[i].name);
+            epochDiv.textContent = data[i].epoch; 
+            rowDiv.appendChild(epochDiv); 
             rowDiv.style.display = ((data[i].epoch==0)?"none":"block");
             mainPage.appendChild(rowDiv);
-            
           }
           else
           { //if the element exists, then update the value
             var update = document.getElementById("otmon_"+data[i].name);
-            update.style.display = ((data[i].epoch==0)?"none":"block");
-            update.textContent = data[i].value;  
+            update.textContent = data[i].value;
+
+            var epoch = document.getElementById("otmon_epoch_"+data[i].name);
+            // if ( Number(epoch.textContent) != Number(data[i].epoch)) console.log("epoch [text, new] (" + Number(epoch.textContent) + " , " + Number(data[i].epoch)+")");
+            if ((Number(epoch.textContent)==0) && (Number(data[i].epoch)>0)) {
+              //console.log ("unhide based on epoch");
+              setTimeout(function () { update.style.display = 'block';}, 0);
+              needReload = true;
+            } 
+            epoch.textContent = data[i].epoch;
           }
         }
-      })
+        if (needReload) window.location.reload(true);
+    })
       .catch(function(error) {
         var p = document.createElement('p');
         p.appendChild(
