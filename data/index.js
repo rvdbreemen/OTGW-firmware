@@ -333,7 +333,6 @@
             update.textContent = data[i].value;  
           }
         }
-        
       })
       .catch(function(error) {
         var p = document.createElement('p');
