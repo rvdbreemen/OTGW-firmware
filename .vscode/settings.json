@@ -26,6 +26,7 @@
         "xlocbuf": "cpp",
         "random": "cpp",
         "chrono": "cpp",
-        "system_error": "cpp"
+        "system_error": "cpp",
+        "cstddef": "cpp"
     }
 }
