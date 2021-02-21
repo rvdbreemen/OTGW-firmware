@@ -1,9 +1,6 @@
 # OTGW-firmware for NodeMCU - ESP 8266 
 
-Join the discord chat at: https://img.shields.io/discord/812969634638725140.svg?style=flat-square
-[![Join the chat at https://gitter.im/OTGW-firmware/community](https://badges.gitter.im/OTGW-firmware/community.svg)](https://gitter.im/OTGW-firmware/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-
-
+[![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
 
 Opentherm Nodoshop firmware
 
