@@ -292,6 +292,63 @@
     fetch(APIGW+"v1/otgw/otmonitor")  //api/v1/otgw/otmonitor
       .then(response => response.json())
       .then(json => {
+        console.log("then(json => ..)");
+        //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
+        data = json.otmonitor;
+        for( let i in data )
+        {
+          document.getElementById("waiting").innerHTML = "";
+          //console.log("["+data[i].name+"]=>["+data[i].value+"]");
+          var mainPage = document.getElementById('mainPage');
+          if( ( document.getElementById("otmon_"+data[i].name)) == null )
+          { // if element does not exists yet, then build page
+            var rowDiv = document.createElement("div");
+            rowDiv.setAttribute("class", "otmonrow");
+            //rowDiv.setAttribute("id", "otmon_"+data[i].name);
+            rowDiv.style.background = "lightblue";
+            //--- field Name ---
+            var fldDiv = document.createElement("div");
+            fldDiv.setAttribute("class", "otmoncolumn1");
+            fldDiv.textContent = translateToHuman(data[i].name);
+            rowDiv.appendChild(fldDiv);
+            //--- Value ---
+            var valDiv = document.createElement("div");
+            valDiv.setAttribute("class", "otmoncolumn2");
+            valDiv.setAttribute("id", "otmon_"+data[i].name);
+            valDiv.textContent = data[i].value; 
+            rowDiv.appendChild(valDiv);      
+            //--- Unit  ---
+            var unitDiv = document.createElement("div");
+            unitDiv.setAttribute("class", "otmoncolumn3");
+            unitDiv.textContent = data[i].unit; 
+            rowDiv.appendChild(unitDiv);
+            mainPage.appendChild(rowDiv);
+          }
+          else
+          { //if the element exists, then update the value
+            document.getElementById("otmon_"+data[i].name).textContent = data[i].value;  
+          }
+        }
+        
+      })
+      .catch(function(error) {
+        var p = document.createElement('p');
+        p.appendChild(
+          document.createTextNode('Error: ' + error.message)
+        );
+      });     
+
+  } // refreshOTmonitor()
+  
+  
+  function refreshOTmonitor2()
+  {
+    console.log("refreshOTmonitor() ..");
+ 
+    data = {};
+    fetch(APIGW+"v1/otgw/otmonitor")  //api/v1/otgw/otmonitor
+      .then(response => response.json())
+      .then(json => {
         //console.log("then(json => ..)");
         needReload = false;
         //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
@@ -324,11 +381,12 @@
             unitDiv.textContent = data[i].unit; 
             rowDiv.appendChild(unitDiv);
             //--- Unit  ---
-            var epochDiv = document.createElement("div");
-            epochDiv.style.display = "none";
-            epochDiv.setAttribute("id", "otmon_epoch_"+data[i].name);
-            epochDiv.textContent = data[i].epoch; 
-            rowDiv.appendChild(epochDiv); 
+            var epoch = document.createElement("INPUT");
+            epoch.setAttribute("type", "hidden");
+            epoch.setAttribute("id", "otmon_epoch_"+data[i].name);
+            epoch.name = data[i].name;
+            epoch.value = data[i].epoch; 
+            rowDiv.appendChild(epoch); 
             rowDiv.style.display = ((data[i].epoch==0)?"none":"block");
             mainPage.appendChild(rowDiv);
           }
@@ -339,12 +397,12 @@
 
             var epoch = document.getElementById("otmon_epoch_"+data[i].name);
             // if ( Number(epoch.textContent) != Number(data[i].epoch)) console.log("epoch [text, new] (" + Number(epoch.textContent) + " , " + Number(data[i].epoch)+")");
-            if ((Number(epoch.textContent)==0) && (Number(data[i].epoch)>0)) {
+            if ((Number(epoch.value)==0) && (Number(data[i].epoch)>0)) {
               //console.log ("unhide based on epoch");
               setTimeout(function () { update.style.display = 'block';}, 0);
               needReload = true;
             } 
-            epoch.textContent = data[i].epoch;
+            epoch.value = data[i].epoch;
           }
         }
         if (needReload) window.location.reload(true);
