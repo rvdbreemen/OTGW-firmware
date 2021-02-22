@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v0.7.5
+**  Version  : v0.7.6
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **
@@ -34,8 +34,7 @@
 #define OFF HIGH
 
 //=====================================================================
-void setup()
-{
+void setup() {
   // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
   // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
   // while (!Serial) {} //Wait for OK
@@ -55,24 +54,7 @@ void setup()
   setLed(LED1, ON);
   setLed(LED2, ON);
 
-  //start the debug port 23
-  startTelnet();
-  OTGWSerial.print("Use  'telnet ");
-  OTGWSerial.print(WiFi.localIP());
-  OTGWSerial.println("' for debugging");
-
-  DebugT("Waiting");
-  Debugln();
-//================ LittleFS ===========================================
-  if (LittleFS.begin()) 
-  {
-    OTGWSerial.println(F("LittleFS Mount succesfull\r"));
-    LittleFSmounted = true;
-  } else { 
-    OTGWSerial.println(F("LittleFS Mount failed\r"));   // Serious problem with LittleFS 
-    LittleFSmounted = false;
-  }
-
+  LittleFS.begin();
   readSettings(true);
 
   // Connect to and initialise WiFi network
@@ -81,88 +63,41 @@ void setup()
   startWiFi(_HOSTNAME, 240);  // timeout 240 seconds
   for (int i=0; i<=3;i++) {
     blinkLEDnow(LED1);
-    delay(250);
+    delay(100);
     blinkLEDnow(LED1);
-    delay(250);
+    delay(100);
   }
   setLed(LED1, OFF);
 
   startMDNS(CSTR(settingHostname));
-  
-  // Start MQTT connection
   startMQTT(); 
-
-  // Initialisation ezTime
-  setDebug(INFO); 
-  setServer("time.google.com");
-  updateNTP();        //force NTP sync
-  waitForSync(60);    //wait until valid time
-  //no TZ cached, then try to GeoIP locate your TZ, otherwise fallback to default
-  if (!myTZ.setCache(0)) { 
-    //ezTime will try to determine your location based on your IP using GeoIP
-    if (myTZ.setLocation()) {
-      settingTimezone = myTZ.getTimezoneName();
-      DebugTf("GeoIP located your timezone to be: %s\n", CSTR(settingTimezone));
-    } else {
-      if (myTZ.setLocation(settingTimezone)){
-        DebugTf("Timezone set to (using default): %s\n", CSTR(settingTimezone));
-        settingTimezone = myTZ.getTimezoneName();
-      } else DebugTln(errorString());
-    }
-  }
-  myTZ.setDefault();
-  setDebug(NONE); //turn off any other debug information
-  
-  DebugTln("UTC time  : "+ UTC.dateTime());
-  DebugTln("local time: "+ myTZ.dateTime());
-
-//================ Start HTTP Server ================================
+  startNTP();
+  startTelnet();  //start the debug port 23
   setupFSexplorer();
-  if (!LittleFS.exists("/index.html")) {
-    httpServer.serveStatic("/",           LittleFS, "/FSexplorer.html");
-    httpServer.serveStatic("/index",      LittleFS, "/FSexplorer.html");
-    httpServer.serveStatic("/index.html", LittleFS, "/FSexplorer.html");
-  } else{
-    httpServer.serveStatic("/",           LittleFS, "/index.html");
-    httpServer.serveStatic("/index",      LittleFS, "/index.html");
-    httpServer.serveStatic("/index.html", LittleFS, "/index.html");
-  } 
-  // httpServer.on("/",          sendIndexPage);
-  // httpServer.on("/index",     sendIndexPage);
-  // httpServer.on("/index.html",sendIndexPage);
-  httpServer.serveStatic("/FSexplorer.png",   LittleFS, "/FSexplorer.png");
-  httpServer.serveStatic("/index.css", LittleFS, "/index.css");
-  httpServer.serveStatic("/index.js",  LittleFS, "/index.js");
-  // all other api calls are catched in FSexplorer onNotFounD!
-  httpServer.on("/api", HTTP_ANY, processAPI);  //was only HTTP_GET (20210110)
+  startWebserver();
 
-  httpServer.begin();
-  OTGWSerial.println("\nHTTP Server started\r");
-  
-  // Set up first message as the IP address
-  sprintf(cMsg, "%03d.%03d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
-  OTGWSerial.printf("\nAssigned IP=%s\r\n", cMsg);
-
-  DebugTln("Setup Watchdog");
   initWatchDog();       // setup the WatchDog
   OTGWSerial.println(F("Setup finished!\r\n"));
   // After resetting the OTGW PIC never send anything to Serial for debug
   // and switch to telnet port 23 for debug purposed. 
   // Setup the OTGW PIC
-  DebugTln("Reset OTGW PIC");
   resetOTGW();          // reset the OTGW pic
-  DebugTln("Start OTGW Stream");
   startOTGWstream();    // start port 25238 
   DebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
-
+  String latest = checkforupdatepic("gateway.hex");
+  if (!bOTGWonline) {
+    sMessage = sPICfwversion; 
+  } else if (latest != sPICfwversion) {
+    sMessage = "New PIC version " + latest + " available!";
+  }
   DebugTf("Reboot count = [%d]\r\n", rebootCount);
   setLed(LED1, OFF);
   //Blink LED2 to signal setup done
   for (int i=0; i<=3;i++) {
     blinkLEDnow(LED2);
-    delay(250);
+    delay(100);
     blinkLEDnow(LED2);
-    delay(250);
+    delay(100);
   }
   setLed(LED2, OFF);
 }
@@ -226,10 +161,20 @@ void doTaskEvery60s(){
   if (WiFi.status() != WL_CONNECTED)
   {
     //disconnected, try to reconnect then...
-     startWiFi(_HOSTNAME, 240);
+    startWiFi(_HOSTNAME, 240);
     //check OTGW and telnet
     startTelnet();
     startOTGWstream(); 
+  }
+}
+
+//===[ check for new pic version  ]===
+void docheckforpic(){
+  String latest = checkforupdatepic("gateway.hex");
+  if (!bOTGWonline) {
+    sMessage = sPICfwversion; 
+  } else if (latest != sPICfwversion) {
+    sMessage = "New PIC version " + latest + " available!";
   }
 }
 
@@ -242,7 +187,8 @@ void doBackgroundTasks()
   httpServer.handleClient();
   MDNS.update();
   events();                     // trigger ezTime update etc.
-  blinkLEDms(1000);             // 'blink' the status led every x ms
+  // 'blink' the status led every x ms
+  if (settingLEDblink) blinkLEDms(1000);             
   delay(1);
 }
 
@@ -253,13 +199,13 @@ void loop()
   DECLARE_TIMER_SEC(timer5s, 5, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer30s, 30, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
-
+  DECLARE_TIMER_MIN(tmrcheckpic, 1440, CATCH_UP_MISSED_TICKS);
 
   if (DUE(timer1s))       doTaskEvery1s();
   if (DUE(timer5s))       doTaskEvery5s();
   if (DUE(timer30s))      doTaskEvery30s();
   if (DUE(timer60s))      doTaskEvery60s();
-
+  if (DUE(tmrcheckpic))   docheckforpic();
   doBackgroundTasks();
 }
 

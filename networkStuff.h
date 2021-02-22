@@ -33,9 +33,10 @@
 */
 
 
-#include <ESP8266WiFi.h>        //ESP8266 Core WiFi Library         
+#include <ESP8266WiFi.h>        // ESP8266 Core WiFi Library         
 #include <ESP8266WebServer.h>   // Version 1.0.0 - part of ESP8266 Core https://github.com/esp8266/Arduino
 #include <ESP8266mDNS.h>        // part of ESP8266 Core https://github.com/esp8266/Arduino
+#include <ESP8266HTTPClient.h>
 
 #include <WiFiUdp.h>            // part of ESP8266 Core https://github.com/esp8266/Arduino
 //#include "ESP8266HTTPUpdateServer.h"
@@ -118,9 +119,14 @@ void startWiFi(const char* hostname, int timeOut)
   
 } // startWiFi()
 
+
+
 //===========================================================================================
 void startTelnet() 
 {
+  OTGWSerial.print("Use  'telnet ");
+  OTGWSerial.print(WiFi.localIP());
+  OTGWSerial.println("' for debugging");
   TelnetStream.begin();
   DebugTln(F("\nTelnet server started .."));
   TelnetStream.flush();
@@ -141,6 +147,43 @@ void startMDNS(const char *Hostname)
   MDNS.addService("http", "tcp", 80);
   
 } // startMDNS()
+
+void startNTP(){
+  // Initialisation ezTime
+  if (!settingNTPenable) return;
+
+  setDebug(INFO); 
+  setServer("time.google.com");
+
+  if (settingNTPtimezone.length()==0){
+    //ezTime will try to determine your location based on your IP using GeoIP
+    DebugTln("Trying to locate the timezone using GeoIP lookup");
+    if (myTZ.setLocation()) {
+      settingNTPtimezone = myTZ.getTimezoneName();
+      DebugTf("GeoIP located your timezone to be: %s\r\n", CSTR(settingNTPtimezone));
+    } else { 
+      DebugTln(errorString());
+      settingNTPtimezone = "CET";
+    }
+  } else {
+    if (myTZ.setLocation(settingNTPtimezone)){
+      DebugTf("Timezone set to (using default): %s\r\n", CSTR(settingNTPtimezone));
+      settingNTPtimezone = myTZ.getTimezoneName();
+    } else { 
+      DebugTln(errorString());
+      settingNTPtimezone = "CET";
+    }
+  }
+  // }
+  myTZ.setDefault();
+  updateNTP();        //force NTP sync
+  waitForSync(60);    //wait until valid time myTZ.setDefault();
+  setDebug(NONE);     //turn off any other debug information
+  
+  DebugTln("UTC time  : "+ UTC.dateTime());
+  DebugTln("local time: "+ myTZ.dateTime());
+}
+
 
 /***************************************************************************
 *

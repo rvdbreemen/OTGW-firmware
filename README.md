@@ -1,6 +1,6 @@
 # OTGW-firmware for NodeMCU - ESP 8266 
 
-[![Join the chat at https://gitter.im/OTGW-firmware/community](https://badges.gitter.im/OTGW-firmware/community.svg)](https://gitter.im/OTGW-firmware/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
 
 Opentherm Nodoshop firmware
 
@@ -39,11 +39,14 @@ The features of this Nodosop OpenTherm NodeMCU firmware are:
 
 To do:
 - InfluxDB client to do direct logging 
+- Instant update of webUI using websockets
+- Showing log of OT messages using websockets
 
 Looking for the documentation, go here (work in progress):  <br> https://github.com/rvdbreemen/OTGW-firmware/wiki/Documentation-of-OTGW-firmware
   
 | Version | Release notes |
 |-|-|
+| 0.7.6 | PIC firmware integration done. <br> NTP configurable <br> Web UI only values that have been updated <br> Update to REST API to include epoch of last update to message|
 | 0.7.5 | Complete set of status bits in UI and Central Heating 2 information |
 | 0.7.4 | Integration of the otgw-pic firmware upgrade code - upgrade to pic firmware version 5.0 (by Schelte Bron) |
 | 0.7.3 | Adding MQTT disable/enable option<br>Adding MQTT long password (max. 100 chars)<br>Adding executeCommand API (verify and return response for commands)<br>Adding RESTAPI /api/v1/otgw/cmdrsp/{command} that returns {response from command}<br>Added uptime and otgw fwversion in devinfo UI |

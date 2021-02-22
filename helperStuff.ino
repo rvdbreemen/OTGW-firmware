@@ -557,7 +557,17 @@ bool prefix(const char *pre, const char *str)
     return strncmp(pre, str, strlen(pre)) == 0;
 }
 
+bool dayChanged(){
+  static int8_t lastday = 0;
+  if (lastday==0) lastday = day();
+  return (lastday != day());
+}
 
+bool hourChanged(){
+  static int8_t lasthour = 0;
+  if (lasthour==0) lasthour = hour();
+  return (lasthour != hour());
+}
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a
