@@ -1,9 +1,9 @@
 /*
 ***************************************************************************  
-**  Program  : index.css, part of ESP_ticker
-**  Version  : v0.7.5
+**  Program  : index.css, part of OTGW-firmware
+**  Version  : v0.7.6
 **
-**  Copyright (c) 2020 Willem Aandewiel
+**  Copyright (c) 2020 Robert van den Breemen
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
@@ -273,8 +273,57 @@ input {
   }
 }
 
+/* PIC firmware page */
+#table {
+  display: table;
+  padding: 5px;
+}
+.picrow {
+  display: table-row;
+  padding: 5px;
+}
+.piccolumn1 {
+  display: table-cell;
+  width: 150px;
+  margin: 5px;
+}
+.piccolumn2 {
+  display: table-cell;
+  width: 75px;
+  margin: 5px;
+}
+.piccolumn3 {
+  display: table-cell;
+  width: 100px;
+  margin: 5px;
+}
+.piccolumn4 {
+  display: table-cell;
+  padding-left: 5px;
+  width: 16px;
+  margin: 5px;
+}
+.piccolumn5 {
+  display: table-cell;
+  width: 16px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 5px;
+}
+
+/* Responsive layout - makes the three columns stack on top of each other instead of next to each other */
+@media screen and (max-width: 600px) {
+  .column {
+    width: 100%;
+  }
+}
+
 
 /* OTmonitor */
+#table {
+  display: table;
+  padding: 5px;
+}
 .otmonrow {
   background: lightblue;
   display: table-row;
@@ -296,9 +345,26 @@ input {
   float: left;
   width: 30px;
   margin-left: 2px;
+  padding-right: 5px;
+}
+.otmoncolumn4 {
+  display: table-cell;
+  float: left;
+  width: 30px;
+  margin-left: 2px;
+}
+.devinforow:after {
+  content: "";
+  display: table;
+  clear: both;
+  background: lightblue;
 }
 
 /* DevInfo */
+#table {
+  display: table;
+  padding: 5px;
+}
 .devinfonrow {
   background: lightblue;
   display: table-row;
