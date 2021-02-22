@@ -81,7 +81,7 @@ String    settingMQTTuser = "";
 String    settingMQTTpasswd = "";
 String    settingMQTTtopTopic = "OTGW";
 bool      settingNTPenable = true;
-String    settingNTPtimezone = "CET"; //Default
+String    settingNTPtimezone = "Europe/Amsterdam"; //Default
 bool      settingLEDblink = true;
 
 
