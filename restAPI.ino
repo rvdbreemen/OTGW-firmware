@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v0.7.5
+**  Version  : v0.7.6
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -212,44 +212,46 @@ void sendOTmonitor()
   DebugTln("sending OT monitor values ...\r");
 
   sendStartJsonObj("otmonitor");
-  
-  sendJsonOTmonObj("flamestatus", CONOFF(isFlameStatus()),"");
-  sendJsonOTmonObj("chmodus", CONOFF(isCentralHeatingActive()),"");
-  sendJsonOTmonObj("chenable", CONOFF(isCentralHeatingEnabled()),"");
-  sendJsonOTmonObj("ch2modus", CONOFF(isCentralHeating2Active()),"");
-  sendJsonOTmonObj("ch2enable", CONOFF(isCentralHeating2enabled()),"");
-  sendJsonOTmonObj("dhwmode", CONOFF(isDomesticHotWaterActive()),"");
-  sendJsonOTmonObj("dhwenable", CONOFF(isDomesticHotWaterEnabled()),"");
-  sendJsonOTmonObj("diagnosticindicator", CONOFF(isDiagnosticIndicator()),"");
-  sendJsonOTmonObj("faultindicator", CONOFF(isFaultIndicator()),"");
-  
-  sendJsonOTmonObj("coolingmodus", CONOFF(isCoolingEnabled()),"");
-  sendJsonOTmonObj("coolingactive", CONOFF(isCoolingActive()),"");  
-  sendJsonOTmonObj("otcactive", CONOFF(isOutsideTemperatureCompensationActive()),"");
 
-  sendJsonOTmonObj("servicerequest", CONOFF(isServiceRequest()),"");
-  sendJsonOTmonObj("lockoutreset", CONOFF(isLockoutReset()),"");
-  sendJsonOTmonObj("lowwaterpressure", CONOFF(isLowWaterPressure()),"");
-  sendJsonOTmonObj("gasflamefault", CONOFF(isGasFlameFault()),"");
-  sendJsonOTmonObj("airtemp", CONOFF(isAirTemperature()),"");
-  sendJsonOTmonObj("waterovertemperature", CONOFF(isWaterOverTemperature()),"");
+  
+  
+  sendJsonOTmonObj("flamestatus", CONOFF(isFlameStatus()),"", msglastupdated[Status]);
+  sendJsonOTmonObj("chmodus", CONOFF(isCentralHeatingActive()),"", msglastupdated[Status]);
+  sendJsonOTmonObj("chenable", CONOFF(isCentralHeatingEnabled()),"", msglastupdated[Status]);
+  sendJsonOTmonObj("ch2modus", CONOFF(isCentralHeating2Active()),"", msglastupdated[Status]);
+  sendJsonOTmonObj("ch2enable", CONOFF(isCentralHeating2enabled()),"", msglastupdated[Status]);
+  sendJsonOTmonObj("dhwmode", CONOFF(isDomesticHotWaterActive()),"", msglastupdated[Status]);
+  sendJsonOTmonObj("dhwenable", CONOFF(isDomesticHotWaterEnabled()),"", msglastupdated[Status]);
+  sendJsonOTmonObj("diagnosticindicator", CONOFF(isDiagnosticIndicator()),"", msglastupdated[Status]);
+  sendJsonOTmonObj("faultindicator", CONOFF(isFaultIndicator()),"", msglastupdated[Status]);
+  
+  sendJsonOTmonObj("coolingmodus", CONOFF(isCoolingEnabled()),"", msglastupdated[Status]);
+  sendJsonOTmonObj("coolingactive", CONOFF(isCoolingActive()),"", msglastupdated[Status]);  
+  sendJsonOTmonObj("otcactive", CONOFF(isOutsideTemperatureCompensationActive()),"", msglastupdated[Status]);
+
+  sendJsonOTmonObj("servicerequest", CONOFF(isServiceRequest()),"", msglastupdated[ASFflags]);
+  sendJsonOTmonObj("lockoutreset", CONOFF(isLockoutReset()),"", msglastupdated[ASFflags]);
+  sendJsonOTmonObj("lowwaterpressure", CONOFF(isLowWaterPressure()),"", msglastupdated[ASFflags]);
+  sendJsonOTmonObj("gasflamefault", CONOFF(isGasFlameFault()),"", msglastupdated[ASFflags]);
+  sendJsonOTmonObj("airtemp", CONOFF(isAirTemperature()),"", msglastupdated[ASFflags]);
+  sendJsonOTmonObj("waterovertemperature", CONOFF(isWaterOverTemperature()),"", msglastupdated[ASFflags]);
   
 
-  sendJsonOTmonObj("outsidetemperature", OTdataObject.Toutside, "°C");
-  sendJsonOTmonObj("roomtemperature", OTdataObject.Tr, "°C");
-  sendJsonOTmonObj("roomsetpoint", OTdataObject.TrSet, "°C");
-  sendJsonOTmonObj("remoteroomsetpoint", OTdataObject.TrOverride, "°C");
-  sendJsonOTmonObj("controlsetpoint", OTdataObject.Tset,"°C");
-  sendJsonOTmonObj("relmodlvl", OTdataObject.RelModLevel,"%");
-  sendJsonOTmonObj("maxrelmodlvl", OTdataObject.MaxRelModLevelSetting, "%");
+  sendJsonOTmonObj("outsidetemperature", OTdataObject.Toutside, "°C", msglastupdated[Toutside]);
+  sendJsonOTmonObj("roomtemperature", OTdataObject.Tr, "°C", msglastupdated[Tr]);
+  sendJsonOTmonObj("roomsetpoint", OTdataObject.TrSet, "°C", msglastupdated[TrSet]);
+  sendJsonOTmonObj("remoteroomsetpoint", OTdataObject.TrOverride, "°C", msglastupdated[TrOverride]);
+  sendJsonOTmonObj("controlsetpoint", OTdataObject.TSet,"°C", msglastupdated[TSet]);
+  sendJsonOTmonObj("relmodlvl", OTdataObject.RelModLevel,"%", msglastupdated[RelModLevel]);
+  sendJsonOTmonObj("maxrelmodlvl", OTdataObject.MaxRelModLevelSetting, "%", msglastupdated[MaxRelModLevelSetting]);
  
-  sendJsonOTmonObj("boilertemperature", OTdataObject.Tboiler, "°C");
-  sendJsonOTmonObj("returnwatertemperature", OTdataObject.Tret,"°C");
-  sendJsonOTmonObj("dhwtemperature", OTdataObject.Tdhw,"°C");
-  sendJsonOTmonObj("dhwsetpoint", OTdataObject.TdhwSet,"°C");
-  sendJsonOTmonObj("maxchwatersetpoint", OTdataObject.MaxTSet,"°C");
-  sendJsonOTmonObj("chwaterpressure", OTdataObject.CHPressure, "bar");
-  sendJsonOTmonObj("oemfaultcode", OTdataObject.OEMDiagnosticCode, "");
+  sendJsonOTmonObj("boilertemperature", OTdataObject.Tboiler, "°C", msglastupdated[Tboiler]);
+  sendJsonOTmonObj("returnwatertemperature", OTdataObject.Tret,"°C", msglastupdated[Tret]);
+  sendJsonOTmonObj("dhwtemperature", OTdataObject.Tdhw,"°C", msglastupdated[Tdhw]);
+  sendJsonOTmonObj("dhwsetpoint", OTdataObject.TdhwSet,"°C", msglastupdated[TdhwSet]);
+  sendJsonOTmonObj("maxchwatersetpoint", OTdataObject.MaxTSet,"°C", msglastupdated[MaxTSet]);
+  sendJsonOTmonObj("chwaterpressure", OTdataObject.CHPressure, "bar", msglastupdated[CHPressure]);
+  sendJsonOTmonObj("oemfaultcode", OTdataObject.OEMDiagnosticCode, "", msglastupdated[OEMDiagnosticCode]);
 
   
   //sendJsonSettingObj("string",   settingString,   "s", sizeof(settingString)-1);
@@ -267,8 +269,7 @@ void sendDeviceInfo()
 
   sendNestedJsonObj("author", "Robert van den Breemen");
   sendNestedJsonObj("fwversion", _FW_VERSION);
-  sendNestedJsonObj("picfwversion", OTGWSerial.firmwareVersion());
-
+  sendNestedJsonObj("picfwversion", CSTR(sPICfwversion));
   snprintf(cMsg, sizeof(cMsg), "%s %s", __DATE__, __TIME__);
   sendNestedJsonObj("compiled", cMsg);
   sendNestedJsonObj("hostname", CSTR(settingHostname));
@@ -277,8 +278,8 @@ void sendDeviceInfo()
   sendNestedJsonObj("freeheap", ESP.getFreeHeap());
   sendNestedJsonObj("maxfreeblock", ESP.getMaxFreeBlockSize());
   sendNestedJsonObj("chipid", CSTR(String( ESP.getChipId(), HEX )));
-  sendNestedJsonObj("coreversion", String( ESP.getCoreVersion() ).c_str() );
-  sendNestedJsonObj("sdkversion", String( ESP.getSdkVersion() ).c_str());
+  sendNestedJsonObj("coreversion", CSTR(ESP.getCoreVersion()) );
+  sendNestedJsonObj("sdkversion",  ESP.getSdkVersion());
   sendNestedJsonObj("cpufreq", ESP.getCpuFreqMHz());
   sendNestedJsonObj("sketchsize", formatFloat( (ESP.getSketchSize() / 1024.0), 3));
   sendNestedJsonObj("freesketchspace", formatFloat( (ESP.getFreeSketchSpace() / 1024.0), 3));
@@ -309,12 +310,15 @@ void sendDeviceInfo()
      "ESP8266_ESP12"
 #endif
   );
-  sendNestedJsonObj("ssid", WiFi.SSID().c_str());
+  sendNestedJsonObj("ssid", CSTR(WiFi.SSID()));
   sendNestedJsonObj("wifirssi", WiFi.RSSI());
   sendNestedJsonObj("mqttconnected", String(CBOOLEAN(statusMQTTconnection)));
+  sendNestedJsonObj("ntpenabled", String(CBOOLEAN(settingNTPenable)));
+  sendNestedJsonObj("ntptimezone", CSTR(settingNTPtimezone));
   sendNestedJsonObj("uptime", upTime());
   sendNestedJsonObj("lastreset", lastReset);
   sendNestedJsonObj("bootcount", rebootCount);
+  
   
   httpServer.sendContent("\r\n]}\r\n");
 
@@ -331,6 +335,7 @@ void sendDeviceTime()
                                                        , hour(), minute(), second());
   sendNestedJsonObj("dateTime", actTime); 
   sendNestedJsonObj("epoch", (int)now());
+  sendNestedJsonObj("message", sMessage);
 
   sendEndJsonObj();
 
@@ -357,7 +362,9 @@ void sendDeviceSettings()
   sendJsonSettingObj("mqttpasswd", CSTR(settingMQTTpasswd), "s", 100);
   sendJsonSettingObj("mqtttoptopic", CSTR(settingMQTTtopTopic), "s", 15);
   // sendJsonSettingObj("mqttfieldset","off", "f");
-
+  sendJsonSettingObj("ntpenable", settingNTPenable, "b");
+  sendJsonSettingObj("ntptimezone", CSTR(settingNTPtimezone), "s", 50);
+  sendJsonSettingObj("ledblink", settingLEDblink, "b");
   sendEndJsonObj();
 
 } // sendDeviceSettings()

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v0.7.5
+**  Version  : v0.7.6
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -111,12 +111,12 @@ void sendNestedJsonObj(const char *cName, float fValue)
 
 
 //============= build OTmonitor string ========================
-void sendJsonOTmonObj(const char *cName, const char *cValue, const char *cUnit)
+void sendJsonOTmonObj(const char *cName, const char *cValue, const char *cUnit, time_t epoch)
 {
   char jsonBuff[JSON_BUFF_MAX] = "";
   
-  snprintf(jsonBuff, sizeof(jsonBuff), "%s{\"name\": \"%s\", \"value\": \"%s\", \"unit\": \"%s\"}"
-                                      , objSprtr, cName, cValue, cUnit);
+  snprintf(jsonBuff, sizeof(jsonBuff), "%s{\"name\": \"%s\", \"value\": \"%s\", \"unit\": \"%s\", \"epoch\": \"%d\"}"
+                                      , objSprtr, cName, cValue, cUnit, (uint32_t)epoch);
 
   httpServer.sendContent(jsonBuff);
   sprintf(objSprtr, ",\r\n");
@@ -124,12 +124,12 @@ void sendJsonOTmonObj(const char *cName, const char *cValue, const char *cUnit)
 } // sendJsonOTmonObj(*char, *char, *char)
 
 //=======================================================================
-void sendJsonOTmonObj(const char *cName, int32_t iValue, const char *cUnit)
+void sendJsonOTmonObj(const char *cName, int32_t iValue, const char *cUnit, time_t epoch)
 {
   char jsonBuff[200] = "";
   
-  snprintf(jsonBuff, sizeof(jsonBuff), "%s{\"name\": \"%s\", \"value\": %d, \"unit\": \"%s\"}"
-                                      , objSprtr, cName, iValue, cUnit);
+  snprintf(jsonBuff, sizeof(jsonBuff), "%s{\"name\": \"%s\", \"value\": %d, \"unit\": \"%s\", \"epoch\": \"%d\"}"
+                                      , objSprtr, cName, iValue, cUnit, (uint32_t)epoch);
 
   httpServer.sendContent(jsonBuff);
   sprintf(objSprtr, ",\r\n");
@@ -137,12 +137,12 @@ void sendJsonOTmonObj(const char *cName, int32_t iValue, const char *cUnit)
 } // sendJsonOTmonObj(*char, int, *char)
 
 //=======================================================================
-void sendJsonOTmonObj(const char *cName, uint32_t uValue, const char *cUnit)
+void sendJsonOTmonObj(const char *cName, uint32_t uValue, const char *cUnit, time_t epoch)
 {
   char jsonBuff[200] = "";
   
-  snprintf(jsonBuff, sizeof(jsonBuff), "%s{\"name\": \"%s\", \"value\": %u, \"unit\": \"%s\"}"
-                                      , objSprtr, cName, uValue, cUnit);
+  snprintf(jsonBuff, sizeof(jsonBuff), "%s{\"name\": \"%s\", \"value\": %u, \"unit\": \"%s\", \"epoch\": \"%d\"}"
+                                      , objSprtr, cName, uValue, cUnit, (uint32_t)epoch);
 
   httpServer.sendContent(jsonBuff);
   sprintf(objSprtr, ",\r\n");
@@ -151,12 +151,12 @@ void sendJsonOTmonObj(const char *cName, uint32_t uValue, const char *cUnit)
 
 
 //=======================================================================
-void sendJsonOTmonObj(const char *cName, float fValue, const char *cUnit)
+void sendJsonOTmonObj(const char *cName, float fValue, const char *cUnit, time_t epoch)
 {
   char jsonBuff[200] = "";
   
-  snprintf(jsonBuff, sizeof(jsonBuff), "%s{\"name\": \"%s\", \"value\": %.3f, \"unit\": \"%s\"}"
-                                      , objSprtr, cName, fValue, cUnit);
+  snprintf(jsonBuff, sizeof(jsonBuff), "%s{\"name\": \"%s\", \"value\": %.3f, \"unit\": \"%s\", \"epoch\": \"%d\"}"
+                                      , objSprtr, cName, fValue, cUnit, (uint32_t)epoch);
 
   httpServer.sendContent(jsonBuff);
   sprintf(objSprtr, ",\r\n");

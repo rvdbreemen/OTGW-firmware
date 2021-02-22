@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v0.7.5
+**  Version  : v0.7.6
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **
@@ -28,7 +28,7 @@
 #define LED1 D4
 #define LED2 D0
 
-#define FIRMWARE "/gateway.hex"
+#define PICFIRMWARE "/gateway.hex"
 
 extern OTGWSerial OTGWSerial(PICRST, LED2);
 void fwupgradestart(const char *hexfile);
@@ -36,9 +36,6 @@ void fwupgradestart(const char *hexfile);
 void blinkLEDnow();
 void blinkLEDnow(uint8_t);
 void setLed(int8_t, uint8_t);
-
-//Now load network suff
-#include "networkStuff.h"
 
 //Defaults and macro definitions
 #define _HOSTNAME       "OTGW"
@@ -56,10 +53,11 @@ WiFiClient  wifiClient;
 bool        Verbose = false;
 char        cMsg[CMSG_SIZE];
 char        fChar[10];
-String      lastReset   = "";
+String      lastReset = "";
 uint64_t    upTimeSeconds = 0;
 uint32_t    rebootCount = 0;
 Timezone    myTZ; 
+String      sMessage = "";    
 
 const char *weekDayName[]  {  "Unknown", "Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag", "Unknown" };
 const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
@@ -69,8 +67,10 @@ String    sPICfwversion = "";
 bool      bOTGWonline = true;
 String    errorupgrade = ""; 
 
+
 //All things that are settings 
 String    settingHostname = _HOSTNAME;
+
 //MQTT settings
 bool      statusMQTTconnection = false; 
 bool      settingMQTTenable = false;
@@ -80,10 +80,15 @@ int16_t   settingMQTTbrokerPort = 1883;
 String    settingMQTTuser = "";
 String    settingMQTTpasswd = "";
 String    settingMQTTtopTopic = "OTGW";
-String    settingTimezone = "NL"; //Default
+bool      settingNTPenable = true;
+String    settingNTPtimezone = "CET"; //Default
+bool      settingLEDblink = true;
+
+
+//Now load network suff
+#include "networkStuff.h"
 
 // That's all folks...
-
 
 /***************************************************************************
 *

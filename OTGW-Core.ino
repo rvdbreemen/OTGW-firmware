@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v0.7.5
+**  Version  : v0.7.6
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -21,6 +21,12 @@
 #define EXT_WD_I2C_ADDRESS 0x26
 #define PIN_I2C_SDA 4   //D2
 #define PIN_I2C_SCL 5   //D1
+
+//used by update firmware functions
+const char *hexheaders[] = {
+  "Last-Modified",
+  "X-Version"
+};
 
 //Macro to Feed the Watchdog
 #define FEEDWATCHDOGNOW   Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   Wire.write(0xA5);   Wire.endTransmission();
@@ -215,6 +221,7 @@ String initWatchDog() {
   // Code here is based on ESPEasy code, modified to work in the project.
 
   // configure hardware pins according to eeprom settings.
+  DebugTln("Setup Watchdog");
   DebugTln(F("INIT : I2C"));
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);  //configure the I2C bus
   //=============================================
@@ -835,13 +842,16 @@ void processOTGW(const char * buf, int len)
     Debugf("[%-30s]\t", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
     DebugFlush();
 
+    //keep track of update
+    msglastupdated[OTdata.id] = now();
+
     //next step interpret the OT protocol
     if (static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_ACK || static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_DATA) {
 
       //#define OTprint(data, value, text, format) ({ data= value; Debugf("[%37s]", text); Debugf("= [format]", data)})
       //interpret values f8.8
       switch (static_cast<OpenThermMessageID>(OTdata.id)) {   
-        case TSet:                          OTdataObject.Tset = print_f88(); break;         
+        case TSet:                          OTdataObject.TSet = print_f88(); break;         
         case CoolingControl:                OTdataObject.CoolingControl = print_f88(); break;
         case TsetCH2:                       OTdataObject.TsetCH2 = print_f88();  break;
         case TrOverride:                    OTdataObject.TrOverride = print_f88();  break;        
@@ -1029,7 +1039,7 @@ void handleOTGW()
 String getOTGWValue(int msgid)
 {
   switch (static_cast<OpenThermMessageID>(msgid)) { 
-    case TSet:                              return String(OTdataObject.Tset); break;         
+    case TSet:                              return String(OTdataObject.TSet); break;         
     case CoolingControl:                    return String(OTdataObject.CoolingControl); break;
     case TsetCH2:                           return String(OTdataObject.TsetCH2);  break;
     case TrOverride:                        return String(OTdataObject.TrOverride);  break;        
@@ -1127,10 +1137,10 @@ void startOTGWstream()
   OTGWstream.begin();
 }
 
-void upgradenow() {
+void upgradepicnow(const char *filename) {
   if (OTGWSerial.busy()) return; // if already in programming mode, never call it twice
   DebugTln("Start PIC upgrade now.");
-  fwupgradestart(FIRMWARE);  
+  fwupgradestart(filename);  
   while (OTGWSerial.busy()){
     feedWatchDog();
     //blink the led during flash...
@@ -1161,6 +1171,8 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   }
 }
 
+
+// Schelte's firmware integration
 void fwupgradestart(const char *hexfile) {
   OTGWError result;
   
@@ -1171,6 +1183,76 @@ void fwupgradestart(const char *hexfile) {
   } else {
     OTGWSerial.registerFinishedCallback(fwupgradedone);
   }
+}
+
+String checkforupdatepic(String filename){
+  WiFiClient client;
+  HTTPClient http;
+  String latest = "";
+  int code;
+
+  http.begin(client, "http://otgw.tclcode.com/download/" + filename);
+  http.collectHeaders(hexheaders, 2);
+  code = http.sendRequest("HEAD");
+  if (code == HTTP_CODE_OK) {
+    for (int i = 0; i< http.headers(); i++) {
+      DebugTf("%s: %s\n", hexheaders[i], http.header(i).c_str());
+    }
+    latest = http.header(1);
+    DebugTf("Update %s -> %s\n", filename.c_str(), latest.c_str());
+    http.end();
+  }
+  return latest; 
+}
+
+void refreshpic(String filename, String version) {
+  WiFiClient client;
+  HTTPClient http;
+  String latest;
+  int code;
+
+  if (latest=checkforupdatepic(filename) != "") {
+    if (latest != version) {
+      DebugTf("Update %s: %s -> %s\n", filename.c_str(), version.c_str(), latest.c_str());
+      http.begin(client, "http://otgw.tclcode.com/download/" + filename);
+      code = http.GET();
+      if (code == HTTP_CODE_OK) {
+        File f = LittleFS.open("/" + filename, "w");
+        if (f) {
+          http.writeToStream(&f);
+          f.close();
+          String verfile = "/" + filename;
+          verfile.replace(".hex", ".ver");
+          f = LittleFS.open(verfile, "w");
+          if (f) {
+            f.print(latest + "\n");
+            f.close();
+            DebugTf("Update successful\n");
+          }
+        }
+      }
+    }
+  }
+  http.end();
+}
+
+void upgradepic() {
+  String action = httpServer.arg("action");
+  String filename = httpServer.arg("name");
+  String version = httpServer.arg("version");
+  DebugTf("Action: %s %s %s\r\n", action.c_str(), filename.c_str(), version.c_str());
+  if (action == "upgrade") {
+    upgradepicnow(String("/" + filename).c_str());
+  } else if (action == "refresh") {
+    refreshpic(filename, version);
+  } else if (action == "delete") {
+    String path = "/" + filename;
+    LittleFS.remove(path);
+    path.replace(".hex", ".ver");
+    LittleFS.remove(path);
+  }
+  httpServer.sendHeader("Location", "index.html#tabPICflash", true);
+  httpServer.send(303, "text/html", "<a href='index.html#tabPICflash'>Return</a>");
 }
 
 /***************************************************************************

@@ -58,11 +58,36 @@ const char Helper[] = R"(
 )";
 const char Header[] = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCache-Control: no-cache\r\n";
 
+
+
 //=====================================================================================
-void setupFSexplorer()    // Funktionsaufruf "LittleFS();" muss im Setup eingebunden werden
-{    
+void startWebserver(){
+  if (!LittleFS.exists("/index.html")) {
+    httpServer.serveStatic("/",           LittleFS, "/FSexplorer.html");
+    httpServer.serveStatic("/index",      LittleFS, "/FSexplorer.html");
+    httpServer.serveStatic("/index.html", LittleFS, "/FSexplorer.html");
+  } else{
+    httpServer.serveStatic("/",           LittleFS, "/index.html");
+    httpServer.serveStatic("/index",      LittleFS, "/index.html");
+    httpServer.serveStatic("/index.html", LittleFS, "/index.html");
+  } 
+  httpServer.serveStatic("/FSexplorer.png",   LittleFS, "/FSexplorer.png");
+  httpServer.serveStatic("/index.css", LittleFS, "/index.css");
+  httpServer.serveStatic("/index.js",  LittleFS, "/index.js");
+  //otgw pic functions
+  httpServer.on("/pic", upgradepic);
+  // all other api calls are catched in FSexplorer onNotFounD!
+  httpServer.on("/api", HTTP_ANY, processAPI);  //was only HTTP_GET (20210110)
+
+  httpServer.begin();
+  // Set up first message as the IP address
+  OTGWSerial.println("\nHTTP Server started\r");  
+  sprintf(cMsg, "%03d.%03d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
+  OTGWSerial.printf("\nAssigned IP=%s\r\n", cMsg);
+}
+//=====================================================================================
+void setupFSexplorer(){    
   LittleFS.begin();
-  
   if (LittleFS.exists("/FSexplorer.html")) 
   {
     httpServer.serveStatic("/FSexplorer.html", LittleFS, "/FSexplorer.html");
@@ -72,12 +97,12 @@ void setupFSexplorer()    // Funktionsaufruf "LittleFS();" muss im Setup eingebu
   {
     httpServer.send(200, "text/html", Helper); //Upload the FSexplorer.html
   }
-  httpServer.on("/api/listfiles", APIlistFiles);
+  httpServer.on("/api/firmwarefilelist", apifirmwarefilelist); 
+  httpServer.on("/api/listfiles", apilistfiles);
   httpServer.on("/LittleFSformat", formatLittleFS);
   httpServer.on("/upload", HTTP_POST, []() {}, handleFileUpload);
   httpServer.on("/ReBoot", reBootESP);
-  httpServer.on("/update", updateFirmware);
-  httpServer.on("/upgradepic", upgradePIC);
+ 
   httpServer.onNotFound([]() 
   {
     if (Verbose) DebugTf("in 'onNotFound()'!! [%s] => \r\n", String(httpServer.uri()).c_str());
@@ -104,9 +129,48 @@ void setupFSexplorer()    // Funktionsaufruf "LittleFS();" muss im Setup eingebu
   
 } // setupFSexplorer()
 
+//=====================================================================================
+void apifirmwarefilelist() {
+  char *s, buffer[400];
+  String version, fwversion;
+  Dir dir;
+  File f;
+      
+  s = buffer;
+  s += sprintf(buffer, "[");
+  dir = LittleFS.openDir("/");
+  while (dir.next()) {
+    if (dir.fileName().endsWith(".hex")) {
+      version="";fwversion="";
+      String verfile = "/" + dir.fileName();
+      verfile.replace(".hex", ".ver");
+      f = LittleFS.open(verfile, "r");
+      if (f) {
+        version = f.readStringUntil('\n');
+        version.trim();
+        f.close();
+      } 
+      fwversion = GetVersion("/"+dir.fileName()); // only check if gateway firmware
+      DebugTf("GetVersion(%s) returned %s\n", dir.fileName().c_str(), fwversion.c_str());  
+      if (fwversion.length() && strcmp(fwversion.c_str(),version.c_str())) { // versions do not match
+        version=fwversion; // assign hex file version to version
+        if (f = LittleFS.open(verfile, "w")) { // write to .ver file
+          DebugTf("writing %s to %s\n",version.c_str(),verfile.c_str());
+          f.print(version + "\n");
+          f.close();
+        } 
+      }
+      s += snprintf( s, sizeof(buffer), "{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d},", CSTR(dir.fileName()), CSTR(version), dir.fileSize());
+    }
+  }
+  s += sprintf(--s, "]\n");
+  DebugTf("filelist response: [%s]\r\n", buffer);
+  httpServer.send(200, "application/json", buffer);
+}
+
 
 //=====================================================================================
-void APIlistFiles()             // Senden aller Daten an den Client
+void apilistfiles()             // Senden aller Daten an den Client
 {   
   FSInfo LittleFSinfo;
 
@@ -118,7 +182,7 @@ void APIlistFiles()             // Senden aller Daten an den Client
 
   _fileMeta dirMap[MAX_FILES_IN_LIST+1];
   int fileNr = 0;
-  
+    
   Dir dir = LittleFS.openDir("/");         // List files on LittleFS
   while (dir.next() && (fileNr < MAX_FILES_IN_LIST))  
   {
@@ -160,18 +224,17 @@ void APIlistFiles()             // Senden aller Daten an den Client
   for (int f=0; f < fileNr; f++)  
   {
     DebugTf("[%3d] >> [%s]\r\n", f, dirMap[f].Name);
-    if (temp != "[") temp += ",";
-    temp += R"({"name":")" + String(dirMap[f].Name) + R"(","size":")" + formatBytes(dirMap[f].Size) + R"("})";
+    temp += R"({"name":")" + String(dirMap[f].Name) + R"(","size":")" + formatBytes(dirMap[f].Size) + R"("},)";
   }
 
   LittleFS.info(LittleFSinfo);
-  temp += R"(,{"usedBytes":")" + formatBytes(LittleFSinfo.usedBytes * 1.05) + R"(",)" +       // Berechnet den verwendeten Speicherplatz + 5% Sicherheitsaufschlag
+  temp += R"({"usedBytes":")" + formatBytes(LittleFSinfo.usedBytes * 1.05) + R"(",)" +       // Berechnet den verwendeten Speicherplatz + 5% Sicherheitsaufschlag
           R"("totalBytes":")" + formatBytes(LittleFSinfo.totalBytes) + R"(","freeBytes":")" + // Zeigt die Größe des Speichers
           (LittleFSinfo.totalBytes - (LittleFSinfo.usedBytes * 1.05)) + R"("}])";               // Berechnet den freien Speicherplatz + 5% Sicherheitsaufschlag
 
   httpServer.send(200, "application/json", temp);
   
-} // APIlistFiles()
+} // apilistfiles()
 
 
 //=====================================================================================
@@ -270,27 +333,10 @@ bool freeSpace(uint16_t const& printsize)
 } // freeSpace()
 
 //=====================================================================================
-void upgradePIC()
-{
-  DebugTln(F("Redirect to upgrade PIC .."));
-  doRedirect("Upgrade OTGW PIC ", 120, "/FSexplorer", false);
-  upgradenow();
-} // upgradePIC()
-
-
-//=====================================================================================
-void updateFirmware()
-{
-  DebugTln(F("Redirect to updateIndex .."));
-  doRedirect("wait ... ", 1, "/updateIndex", false);
-} // updateFirmware()
-
-
-//=====================================================================================
 void reBootESP()
 {
   DebugTln(F("Redirect and ReBoot .."));
-  doRedirect("Reboot OTGW firmware ..", 60, "/", true);   
+  doRedirect("Reboot OTGW firmware ..", 120, "/", true);   
 } // reBootESP()
 
 //=====================================================================================

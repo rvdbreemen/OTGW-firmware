@@ -1,21 +1,25 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v0.7.5
+**  Version  : v0.7.6
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
 */
+  const localURL='http://'+window.location.host; 
   const APIGW='http://'+window.location.host+'/api/';
 
-"use strict";
+  "use strict";
 
   let needReload  = true;
   refreshDevTime();
 
-  window.onload=bootsTrapMain;
+  console.log("Hash="+window.location.hash);
+  window.onload=initMainPage;
+ 
+
   window.onfocus = function() {
     if (needReload) {
       window.location.reload(true);
@@ -27,8 +31,8 @@
   var timeupdate = setInterval(function(){refreshDevTime(); }, 1000); //delay is in milliseconds
     
   //============================================================================  
-  function bootsTrapMain() {
-    console.log("bootsTrapMain()");
+  function initMainPage() {
+    console.log("initMainPage()");
   
     document.getElementById('M_FSexplorer').addEventListener('click',function() 
                                                 { console.log("newTab: goFSexplorer");
@@ -42,6 +46,10 @@
                                                 { console.log("newTab: goFSexplorer");
                                                   location.href = "/FSexplorer";
                                                 });
+    document.getElementById('F_FSexplorer').addEventListener('click',function() 
+                                                { console.log("newTab: goFSexplorer");
+                                                  location.href = "/FSexplorer";
+                                                });                                                
     document.getElementById('D_back').addEventListener('click',function()
                                                 { console.log("newTab: goBack");
                                                 location.href = "/";
@@ -50,8 +58,13 @@
                                                 { console.log("newTab: goBack");
                                                 location.href = "/";
                                                 });
+    document.getElementById('F_back').addEventListener('click',function()
+                                                { console.log("newTab: goBack");
+                                                location.href = "/";
+                                                });
     document.getElementById('S_saveSettings').addEventListener('click',function(){saveSettings();});
     document.getElementById('tabDeviceInfo').addEventListener('click',function(){deviceinfoPage();});
+    document.getElementById('tabPICflash').addEventListener('click',function(){firmwarePage();});
     document.getElementById('tabSettings').addEventListener('click',function(){settingsPage();});
     needReload = false;
     refreshDevInfo();
@@ -61,8 +74,26 @@
     document.getElementById("displayMainPage").style.display       = "block";
     document.getElementById("displaySettingsPage").style.display   = "none";
     document.getElementById("displayDeviceInfo").style.display     = "none";
-  
-  } // bootsTrapMain()
+    document.getElementById("displayPICflash").style.display     = "none";
+    
+    if (window.location.hash == "#tabPICflash"){
+      setTimeout(function () {
+        firmwarePage();
+      }, 150);
+    };
+  } // initMainPage()
+
+  function firmwarePage()
+  {
+    clearInterval(tid);
+    refreshDevTime();
+    document.getElementById("displayMainPage").style.display       = "none";
+    document.getElementById("displaySettingsPage").style.display   = "none";
+    document.getElementById("displayDeviceInfo").style.display     = "none";
+    var firmwarePage = document.getElementById("displayPICflash");
+    refreshFirmware();
+    document.getElementById("displayPICflash").style.display     = "block";    
+  } // deviceinfoPage()
 
   function deviceinfoPage()
   {
@@ -70,18 +101,20 @@
     refreshDevTime();
     document.getElementById("displayMainPage").style.display       = "none";
     document.getElementById("displaySettingsPage").style.display   = "none";
+    document.getElementById("displayPICflash").style.display     = "none";
     var deviceinfoPage = document.getElementById("deviceinfoPage");
     refreshDeviceInfo();
     document.getElementById("displayDeviceInfo").style.display     = "block";
     
-  } // settingsPage()
+  } // deviceinfoPage()
 
   function settingsPage()
   {
     clearInterval(tid);
     refreshDevTime();
     document.getElementById("displayMainPage").style.display       = "none";
-    document.getElementById("displayDeviceInfo").style.display     = "none";
+    document.getElementById("displayDeviceInfo").style.display     = "none";    
+    document.getElementById("displayPICflash").style.display     = "none";
     var settingsPage = document.getElementById("settingsPage");
     refreshSettings();
     document.getElementById("displaySettingsPage").style.display   = "block";
@@ -102,6 +135,7 @@
               //console.log("Got new time ["+json.devtime[i].value+"]");
               document.getElementById('theTime').innerHTML = json.devtime[i].value;
             }
+            if (json.devtime[i].name == "message") document.getElementById('message').innerHTML = json.devtime[i].value;
           }
       })
       .catch(function(error) {
@@ -112,7 +146,109 @@
       });     
       
   } // refreshDevTime()
-    
+  //============================================================================      
+  function refreshFirmware(){
+    console.log("refreshFirmware() .. "+APIGW+"firmwarefilelist");
+    fetch(APIGW+"firmwarefilelist")
+      .then(response => response.json())
+      .then(files => {
+        console.log("parsed ... data is ["+ JSON.stringify(files)+"]");
+        
+        var displayPICpage = document.getElementById('displayPICflash');          
+        var rowDiv = document.createElement("div");
+        rowDiv.setAttribute("class", "picrow");
+        rowDiv.setAttribute("id", "firmwarename");
+        rowDiv.style.background = "lightblue";
+        rowDiv.style.fontWeight = "bold";
+        //--- field Name ---
+        var fldDiv = document.createElement("div");
+        fldDiv.setAttribute("class", "piccolumn1");
+        fldDiv.textContent = "Firmware name"
+        rowDiv.appendChild(fldDiv);
+        //--- version on screen ---
+        var valDiv = document.createElement("div");
+        valDiv.setAttribute("class", "piccolumn2");                  
+        valDiv.textContent = "Version" 
+        rowDiv.appendChild(valDiv);
+        //--- size on screen ---
+        var sizDiv = document.createElement("div");
+        sizDiv.setAttribute("class", "piccolumn3");                  
+        sizDiv.textContent = "Size" 
+        rowDiv.appendChild(sizDiv);
+        //--- refresh icon ---
+        var btn = document.createElement("div");
+        btn.setAttribute("class", "piccolumn4");
+        rowDiv.appendChild(btn); 
+        //--- flash to pic icon---
+        var btn = document.createElement("div");
+        rowDiv.appendChild(btn); 
+        displayPICpage.appendChild(rowDiv);
+
+        for( let i in files )
+        {
+          console.log("["+files[i].name+"]=>["+files[i].version+"]=>["+files[i].size+"]");
+
+          var displayPICpage = document.getElementById('displayPICflash');          
+          var rowDiv = document.createElement("div");
+          rowDiv.setAttribute("class", "picrow");
+          rowDiv.setAttribute("id", "firmware_"+files[i].name);
+          rowDiv.style.background = "lightblue";
+          //--- field Name ---
+          var fldDiv = document.createElement("div");
+          fldDiv.setAttribute("class", "piccolumn1");
+          fldDiv.textContent = files[i].name;
+          rowDiv.appendChild(fldDiv);
+          //--- version on screen ---
+          var valDiv = document.createElement("div");
+          valDiv.setAttribute("class", "piccolumn2");                  
+          valDiv.textContent = files[i].version; 
+          rowDiv.appendChild(valDiv);
+          //--- size on screen ---
+          var sizDiv = document.createElement("div");
+          sizDiv.setAttribute("class", "piccolumn3");                  
+          sizDiv.textContent = files[i].size; 
+          sizDiv.style.textAlign = "right";
+          rowDiv.appendChild(sizDiv);
+          //--- refresh icon ---
+          var btn = document.createElement("div");
+          btn.setAttribute("class", "piccolumn4");
+            var a = document.createElement('a');
+            a.href = localURL+'/pic?action=refresh&name='+files[i].name+'&version='+files[i].version;
+            var img = document.createElement('img'); 
+            img.src = localURL+'/refresh-page-option.png';
+            img.style.width = '16px';
+            img.style.height = 'auto';
+            a.appendChild(img);
+            btn.appendChild(a); 
+          rowDiv.appendChild(btn); 
+          //--- flash to pic icon---
+          var btn = document.createElement("div");
+          btn.setAttribute("class", "piccolumn5");
+          var a = document.createElement('a');
+            a.href = localURL+'/pic?action=upgrade&name='+files[i].name+'&version='+files[i].version;
+            var img = document.createElement('img'); 
+            img.src = localURL+'/download-to-storage-drive.png'
+            img.style.width = '16px';
+            img.style.height = 'auto';
+            a.appendChild(img);
+            btn.appendChild(a); 
+          rowDiv.appendChild(btn); 
+          displayPICpage.appendChild(rowDiv);
+
+          
+        }
+ 
+      })
+      .catch(function(error) {
+        var p = document.createElement('p');
+        p.appendChild(
+          document.createTextNode('Error: ' + error.message)
+        );
+      });   
+
+   
+  }
+
   
   //============================================================================  
   function refreshDevInfo()
@@ -195,6 +331,82 @@
         }
         
       })
+      .catch(function(error) {
+        var p = document.createElement('p');
+        p.appendChild(
+          document.createTextNode('Error: ' + error.message)
+        );
+      });     
+
+  } // refreshOTmonitor()
+  
+  
+  function refreshOTmonitor2()
+  {
+    console.log("refreshOTmonitor() ..");
+ 
+    data = {};
+    fetch(APIGW+"v1/otgw/otmonitor")  //api/v1/otgw/otmonitor
+      .then(response => response.json())
+      .then(json => {
+        //console.log("then(json => ..)");
+        needReload = false;
+        //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
+        data = json.otmonitor;
+        for( let i in data )
+        {
+          document.getElementById("waiting").innerHTML = "";
+          //console.log("["+data[i].name+"]=>["+data[i].value+"]");
+          var mainPage = document.getElementById('mainPage');
+          if((document.getElementById("otmon_"+data[i].name))==null)
+          { // if element does not exists yet, then build page
+            var rowDiv = document.createElement("div");
+            rowDiv.setAttribute("class", "otmonrow");
+            //rowDiv.setAttribute("id", "otmon_"+data[i].name);
+            rowDiv.style.background = "lightblue";
+            //--- field Name ---
+            var fldDiv = document.createElement("div");
+            fldDiv.setAttribute("class", "otmoncolumn1");
+            fldDiv.textContent = translateToHuman(data[i].name);
+            rowDiv.appendChild(fldDiv);
+            //--- Value ---
+            var valDiv = document.createElement("div");
+            valDiv.setAttribute("class", "otmoncolumn2");
+            valDiv.setAttribute("id", "otmon_"+data[i].name);
+            valDiv.textContent = data[i].value; 
+            rowDiv.appendChild(valDiv);      
+            //--- Unit  ---
+            var unitDiv = document.createElement("div");
+            unitDiv.setAttribute("class", "otmoncolumn3");
+            unitDiv.textContent = data[i].unit; 
+            rowDiv.appendChild(unitDiv);
+            //--- Unit  ---
+            var epoch = document.createElement("INPUT");
+            epoch.setAttribute("type", "hidden");
+            epoch.setAttribute("id", "otmon_epoch_"+data[i].name);
+            epoch.name = data[i].name;
+            epoch.value = data[i].epoch; 
+            rowDiv.appendChild(epoch); 
+            rowDiv.style.display = ((data[i].epoch==0)?"none":"block");
+            mainPage.appendChild(rowDiv);
+          }
+          else
+          { //if the element exists, then update the value
+            var update = document.getElementById("otmon_"+data[i].name);
+            update.textContent = data[i].value;
+
+            var epoch = document.getElementById("otmon_epoch_"+data[i].name);
+            // if ( Number(epoch.textContent) != Number(data[i].epoch)) console.log("epoch [text, new] (" + Number(epoch.textContent) + " , " + Number(data[i].epoch)+")");
+            if ((Number(epoch.value)==0) && (Number(data[i].epoch)>0)) {
+              //console.log ("unhide based on epoch");
+              setTimeout(function () { update.style.display = 'block';}, 0);
+              needReload = true;
+            } 
+            epoch.value = data[i].epoch;
+          }
+        }
+        if (needReload) window.location.reload(true);
+    })
       .catch(function(error) {
         var p = document.createElement('p');
         p.appendChild(
@@ -542,9 +754,12 @@
    ,[ "wifirssi",                   "Wifi Receive Power (dB)"]
    ,[ "lastreset",                  "Last Reset Reason"]
    ,[ "mqttconnected",              "MQTT Connected"]
-   ,[ "mqttenable",                 "MQTT Enable"]
-   ,[ "timezone",                   "Timezone"]
-   
+   ,[ "mqttenabled",                 "MQTT Enable"]
+   ,[ "ntpenable",                  "NTP Enable"]
+   ,[ "ntptimezone",                "NTP Timezone"]
+   ,[ "uptime",                     "Uptime since boot"]
+   ,[ "bootcount",                  "Nr. Reboots"] 
+   ,[ "ledblink",                   "Heartbeat LED (on/off)"]
                  ];
   
 /*
