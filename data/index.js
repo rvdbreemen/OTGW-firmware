@@ -294,6 +294,7 @@
       .then(json => {
         console.log("then(json => ..)");
         //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
+        needReload = false;
         data = json.otmonitor;
         for( let i in data )
         {
@@ -306,6 +307,14 @@
             rowDiv.setAttribute("class", "otmonrow");
             //rowDiv.setAttribute("id", "otmon_"+data[i].name);
             rowDiv.style.background = "lightblue";
+            rowDiv.style.visibility = ((data[i].epoch==0)?"collapse":"visible");
+            // rowDiv.style.display = ((data[i].epoch==0)?"none":"table-row");
+            var epoch = document.createElement("INPUT");
+            epoch.setAttribute("type", "hidden");
+            epoch.setAttribute("id", "otmon_epoch_"+data[i].name);
+            epoch.name = data[i].name;
+            epoch.value = data[i].epoch; 
+            rowDiv.appendChild(epoch); 
             //--- field Name ---
             var fldDiv = document.createElement("div");
             fldDiv.setAttribute("class", "otmoncolumn1");
@@ -326,10 +335,19 @@
           }
           else
           { //if the element exists, then update the value
-            document.getElementById("otmon_"+data[i].name).textContent = data[i].value;  
+            var update = document.getElementById("otmon_"+data[i].name);
+            var epoch = document.getElementById("otmon_epoch_"+data[i].name);
+            if ((Number(epoch.value)==0) && (Number(data[i].epoch)>0)) {
+              //console.log ("unhide based on epoch");
+              //setTimeout(function () { update.style.visibility = 'visible';}, 0);
+              needReload = true;
+            } 
+            epoch.value = data[i].epoch;
+            //if (update.style.visibility == 'visible') update.textContent = data[i].value;
+
           }
         }
-        
+        if (needReload) window.location.reload(true);
       })
       .catch(function(error) {
         var p = document.createElement('p');
