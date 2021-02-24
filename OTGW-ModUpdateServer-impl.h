@@ -122,7 +122,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           size_t fsSize = ((size_t) &_FS_end - (size_t) &_FS_start);
           close_all_fs();
           if (!Update.begin(fsSize, U_FS)){//start with max available size
-            if (_serial_output) Update.printError(Serial);
+            if (_serial_output) Update.printError(OTGWSerial);
           }
         } else {
           uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
@@ -169,7 +169,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setSuccessPage(const char *suc
 template <typename ServerType>
 void ESP8266HTTPUpdateServerTemplate<ServerType>::_setUpdaterError()
 {
-  if (_serial_output) Update.printError(Serial);
+  if (_serial_output) Update.printError(OTGWSerial);
   StreamString str;
   Update.printError(str);
   _updaterError = str.c_str();

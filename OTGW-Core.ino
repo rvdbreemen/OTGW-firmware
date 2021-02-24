@@ -768,9 +768,9 @@ uint16_t print_daytime()
 int sendOTGW(const char* buf, int len)
 {
   //Send the buffer to OTGW when the Serial interface is available
-  if (Serial) {
+  if (OTGWSerial.availableForWrite()>=len+2) {
     //check the write buffer
-    Debugf("Serial Write Buffer space = [%d] - needed [%d]\r\n",OTGWSerial.availableForWrite(), (len+2));
+    //Debugf("Serial Write Buffer space = [%d] - needed [%d]\r\n",OTGWSerial.availableForWrite(), (len+2));
     DebugT("Sending to Serial [");
     for (int i = 0; i < len; i++) {
       Debug((char)buf[i]);
