@@ -155,26 +155,20 @@ void startNTP(){
   setDebug(INFO); 
   setServer("time.google.com");
 
-  if (settingNTPtimezone.length()==0){
-    //ezTime will try to determine your location based on your IP using GeoIP
-    DebugTln("Trying to locate the timezone using GeoIP lookup");
-    if (myTZ.setLocation()) {
-      settingNTPtimezone = myTZ.getTimezoneName();
-      DebugTf("GeoIP located your timezone to be: %s\r\n", CSTR(settingNTPtimezone));
-    } else { 
-      DebugTln(errorString());
-      settingNTPtimezone = "Europe/Amsterdam";
-    }
-  } else {
-    if (myTZ.setLocation(settingNTPtimezone)){
-      DebugTf("Timezone set to (using default): %s\r\n", CSTR(settingNTPtimezone));
-      settingNTPtimezone = myTZ.getTimezoneName();
-    } else { 
-      DebugTln(errorString());
-      settingNTPtimezone = "Europe/Amsterdam";
-    }
+  if (settingNTPtimezone.length()==0) settingNTPtimezone = DEFAULT_TIMEZONE; //set back to default timezone
+
+  if (myTZ.setLocation(settingNTPtimezone)){
+    DebugTf("Timezone set to: %s\r\n", CSTR(settingNTPtimezone));
+    DebugTf("Olson TZ : %s\r\n", CSTR(myTZ.getOlson()));
+    DebugTf("Posix TZ : %s\r\n", CSTR(myTZ.getPosix()));
+    DebugTf("TZ Name  : %s\r\n", CSTR(myTZ.getTimezoneName()));
+    DebugTf("TX Offset: %d\r\n", myTZ.getOffset());
+    DebugTf("DST      : %d\r\n", myTZ.isDST());
+  } else { 
+    DebugTf("Error setting Timezone: %s\r\n", CSTR(errorString()));
+    settingNTPtimezone = DEFAULT_TIMEZONE;
   }
-  // }
+
   myTZ.setDefault();
   updateNTP();        //force NTP sync
   waitForSync(60);    //wait until valid time myTZ.setDefault();
@@ -182,6 +176,26 @@ void startNTP(){
   
   DebugTln("UTC time  : "+ UTC.dateTime());
   DebugTln("local time: "+ myTZ.dateTime());
+}
+
+String getMacAddress() {
+  uint8_t baseMac[6];
+  char baseMacChr[13] = {0};
+#  if defined(ESP8266)
+  WiFi.macAddress(baseMac);
+  sprintf(baseMacChr, "%02X%02X%02X%02X%02X%02X", baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
+#  elif defined(ESP32)
+  esp_read_mac(baseMac, ESP_MAC_WIFI_STA);
+  sprintf(baseMacChr, "%02X%02X%02X%02X%02X%02X", baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
+#  else
+  sprintf(baseMacChr, "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+#  endif
+  return String(baseMacChr);
+}
+
+String getUniqueId(String name, String sufix) {
+  String uniqueId = (String)getMacAddress() + name + sufix;
+  return String(uniqueId);
 }
 
 

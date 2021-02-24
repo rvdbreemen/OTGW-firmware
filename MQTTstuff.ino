@@ -300,7 +300,13 @@ void doAutoConfigure()
           // DebugTf("sline[%s]\r\n", CSTR(sLine));
           if (splitString(sLine, ',', sTopic, sMsg))
           {
-            DebugTf("sTopic[%s], sMsg[%s]\r\n", CSTR(sTopic), CSTR(sMsg));
+            DebugTf("sTopic[%s]==>", CSTR(sTopic)); DebugFlush();
+            sTopic.replace("%homeassistant%", CSTR(settingMQTThaprefix));  
+            Debugf("[%s]\r\n", CSTR(sTopic));DebugFlush();
+            
+            DebugTf("sMsg[%s]==>", CSTR(sMsg)); DebugFlush();
+            sMsg.replace("%OTGW%", CSTR(settingMQTTtopTopic));
+            Debugf("[%s]\r\n", CSTR(sMsg)); DebugFlush();
             sendMQTT(CSTR(sTopic), CSTR(sMsg), (sTopic.length() + sMsg.length()+2));
             delay(10);
           } else DebugTf("Either comment or invalid config line: [%s]\r\n", CSTR(sLine));
