@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v0.7.6
+**  Version  : v0.7.7
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
