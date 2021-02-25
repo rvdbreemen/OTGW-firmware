@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v0.7.7
+**  Version  : v0.7.8
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -36,6 +36,7 @@ void writeSettings(bool show)
   root["MQTTuser"] = settingMQTTuser;
   root["MQTTpasswd"] = settingMQTTpasswd;
   root["MQTTtoptopic"] = settingMQTTtopTopic;
+  root["MQTThaprefix"] = settingMQTThaprefix;
   root["NTPenable"] = settingNTPenable;
   root["NTPtimezone"] = settingNTPtimezone;
   root["LEDblink"] = settingLEDblink;
@@ -82,7 +83,9 @@ void readSettings(bool show)
   settingMQTTuser         = doc["MQTTuser"].as<String>();
   settingMQTTpasswd       = doc["MQTTpasswd"].as<String>();
   settingMQTTtopTopic     = doc["MQTTtoptopic"].as<String>();
-  if (settingMQTTtopTopic.length()==0) settingMQTTtopTopic = _HOSTNAME;
+  if (settingMQTTtopTopic=="null") settingMQTTtopTopic = _HOSTNAME;
+  settingMQTThaprefix     = doc["MQTThaprefix"].as<String>();
+  if (settingMQTThaprefix=="null") settingMQTThaprefix = HOMEASSISTANT_PREFIX;
   settingNTPenable        = doc["NTPenable"]; 
   settingNTPtimezone      = doc["NTPtimezone"].as<String>();
   if (settingNTPtimezone=="null")  settingNTPtimezone = "Europe/Amsterdam"; //default to amsterdam timezone
@@ -105,6 +108,7 @@ void readSettings(bool show)
     Debugf("                 MQTT username : %s\r\n",  CSTR(settingMQTTuser));
     Debugf("                 MQTT password : %s\r\n",  CSTR(settingMQTTpasswd));
     Debugf("                 MQTT toptopic : %s\r\n",  CSTR(settingMQTTtopTopic));
+    Debugf("                 HA prefix     : %s\r\n",  CSTR(settingMQTThaprefix));
     Debugf("                 NTP enabled   : %s\r\n",  CBOOLEAN(settingNTPenable));
     Debugf("                 NPT timezone  : %s\r\n",  CSTR(settingNTPtimezone));
   }
@@ -140,6 +144,11 @@ void updateSetting(const char *field, const char *newValue)
     settingMQTTtopTopic = String(newValue);
     if (settingMQTTtopTopic.length()==0) settingMQTTtopTopic = "OTGW";
   }
+  if (stricmp(field, "MQTThaprefix")==0)    {
+    settingMQTThaprefix = String(newValue);
+    if (settingMQTThaprefix.length()==0) settingMQTThaprefix = HOMEASSISTANT_PREFIX;
+  }
+  
   if (stricmp(field, "NTPenable")==0)      settingNTPenable = EVALBOOLEAN(newValue);
   if (stricmp(field, "NTPtimezone")==0)    {
     settingNTPtimezone = String(newValue);

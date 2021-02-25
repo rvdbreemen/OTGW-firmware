@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v0.7.7
+**  Version  : v0.7.8
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **
@@ -40,6 +40,8 @@ void setLed(int8_t, uint8_t);
 //Defaults and macro definitions
 #define _HOSTNAME       "OTGW"
 #define SETTINGS_FILE   "/settings.ini"
+#define DEFAULT_TIMEZONE "Europe/Amsterdam"
+#define HOMEASSISTANT_PREFIX "homeassistant"
 #define CMSG_SIZE 512
 #define JSON_BUFF_MAX   1024
 #define CSTR(x) x.c_str()
@@ -47,6 +49,7 @@ void setLed(int8_t, uint8_t);
 #define CONOFF(x) (x?"On":"Off")
 #define CBINARY(x) (x?"1":"0")
 #define EVALBOOLEAN(x) (stricmp(x,"true")==0||stricmp(x,"on")==0||stricmp(x,"1")==0)
+
 
 //Global variables
 WiFiClient  wifiClient;
@@ -79,9 +82,10 @@ String    settingMQTTbroker= "192.168.88.254";
 int16_t   settingMQTTbrokerPort = 1883; 
 String    settingMQTTuser = "";
 String    settingMQTTpasswd = "";
+String    settingMQTThaprefix = HOMEASSISTANT_PREFIX;
 String    settingMQTTtopTopic = "OTGW";
 bool      settingNTPenable = true;
-String    settingNTPtimezone = "Europe/Amsterdam"; //Default
+String    settingNTPtimezone = DEFAULT_TIMEZONE;
 bool      settingLEDblink = true;
 
 
