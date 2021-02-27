@@ -8,9 +8,6 @@
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
-*  RB  changed MQTT stuff to FSM 
-*  RB  added safeTimers 
-*  RB  sendMQTT generalized
 */
 
 // Declare some variables within global scope

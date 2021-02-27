@@ -1,6 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
+**  Version  : v0.7.8
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
