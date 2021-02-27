@@ -296,7 +296,7 @@ void sendJsonSettingObj(const char *cName, bool bValue, const char *sType)
 {
   char jsonBuff[200] = "";
 
-  snprintf(jsonBuff, sizeof(jsonBuff), ",{\"name\": \"%s\", \"value\":\"%s\", \"type\": \"%s\"}"
+  snprintf(jsonBuff, sizeof(jsonBuff), "{\"name\": \"%s\", \"value\":\"%s\", \"type\": \"%s\"}"
                                       , cName,  CBOOLEAN(bValue), sType);
 
   sendBeforenext();
