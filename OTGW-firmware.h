@@ -45,7 +45,7 @@ void setLed(int8_t, uint8_t);
 #define CMSG_SIZE 512
 #define JSON_BUFF_MAX   1024
 #define CSTR(x) x.c_str()
-#define CBOOLEAN(x) (x?"True":"False")
+#define CBOOLEAN(x) (x?"true":"false")
 #define CONOFF(x) (x?"On":"Off")
 #define CBINARY(x) (x?"1":"0")
 #define EVALBOOLEAN(x) (stricmp(x,"true")==0||stricmp(x,"on")==0||stricmp(x,"1")==0)
