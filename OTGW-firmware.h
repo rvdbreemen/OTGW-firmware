@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v0.7.8
+**  Version  : v0.8.0
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **
@@ -73,6 +73,7 @@ String    errorupgrade = "";
 
 //All things that are settings 
 String    settingHostname = _HOSTNAME;
+String    settingNodeId = _HOSTNAME;
 
 //MQTT settings
 bool      statusMQTTconnection = false; 
@@ -84,7 +85,11 @@ String    settingMQTTuser = "";
 String    settingMQTTpasswd = "";
 String    settingMQTThaprefix = HOMEASSISTANT_PREFIX;
 String    settingMQTTtopTopic = "OTGW";
-bool      settingNTPenable = true;
+String    settingMQTTPubNamespace = "";
+String    settingMQTTSubNamespace = "";
+
+//
+bool settingNTPenable = true;
 String    settingNTPtimezone = DEFAULT_TIMEZONE;
 bool      settingLEDblink = true;
 

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v0.7.8
+**  Version  : v0.8.0
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **
@@ -68,6 +68,10 @@ void setup() {
     delay(100);
   }
   setLed(LED1, OFF);
+
+  settingNodeId = getUniqueId();
+  settingMQTTPubNamespace = settingMQTTtopTopic + "/value/" + settingNodeId;
+  settingMQTTSubNamespace = settingMQTTtopTopic + "/set/" + settingNodeId;
 
   startMDNS(CSTR(settingHostname));
   startMQTT(); 
@@ -190,6 +194,7 @@ void doBackgroundTasks()
   // 'blink' the status led every x ms
   if (settingLEDblink) blinkLEDms(1000);             
   delay(1);
+  handleDebug();
 }
 
 void loop()

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v0.7.8
+**  Version  : v0.8.0
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1196,10 +1196,10 @@ String checkforupdatepic(String filename){
   code = http.sendRequest("HEAD");
   if (code == HTTP_CODE_OK) {
     for (int i = 0; i< http.headers(); i++) {
-      DebugTf("%s: %s\n", hexheaders[i], http.header(i).c_str());
+      DebugTf("%s: %s\r\n", hexheaders[i], http.header(i).c_str());
     }
     latest = http.header(1);
-    DebugTf("Update %s -> %s\n", filename.c_str(), latest.c_str());
+    DebugTf("Update %s -> %s\r\n", filename.c_str(), latest.c_str());
     http.end();
   }
   return latest; 
@@ -1213,7 +1213,7 @@ void refreshpic(String filename, String version) {
 
   if (latest=checkforupdatepic(filename) != "") {
     if (latest != version) {
-      DebugTf("Update %s: %s -> %s\n", filename.c_str(), version.c_str(), latest.c_str());
+      DebugTf("Update %s: %s -> %s\r\n", filename.c_str(), version.c_str(), latest.c_str());
       http.begin(client, "http://otgw.tclcode.com/download/" + filename);
       code = http.GET();
       if (code == HTTP_CODE_OK) {
