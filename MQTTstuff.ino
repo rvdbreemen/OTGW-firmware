@@ -297,13 +297,32 @@ void doAutoConfigure()
           // DebugTf("sline[%s]\r\n", CSTR(sLine));
           if (splitString(sLine, ',', sTopic, sMsg))
           {
+            // discovery topic prefix
             DebugTf("sTopic[%s]==>", CSTR(sTopic)); DebugFlush();
             sTopic.replace("%homeassistant%", CSTR(settingMQTThaprefix));  
             Debugf("[%s]\r\n", CSTR(sTopic));DebugFlush();
-            
+
+            /// node
+            DebugTf("sTopic[%s]==>", CSTR(sTopic)); DebugFlush();
+            sTopic.replace("%node_id%", CSTR(getUniqueId()));
+            Debugf("[%s]\r\n", CSTR(sTopic)); DebugFlush();
+
+            /// ----------------------
+            /// node
+            DebugTf("sMsg[%s]==>", CSTR(sMsg)); DebugFlush();
+            sMsg.replace("%node_id%", CSTR(getUniqueId()));
+            Debugf("[%s]\r\n", CSTR(sMsg)); DebugFlush();
+
+            /// version
+            DebugTf("sMsg[%s]==>", CSTR(sMsg)); DebugFlush();
+            sMsg.replace("%version%", CSTR(String(_VERSION)));
+            Debugf("[%s]\r\n", CSTR(sMsg)); DebugFlush();
+
+            // payload topic prefix
             DebugTf("sMsg[%s]==>", CSTR(sMsg)); DebugFlush();
             sMsg.replace("%OTGW%", CSTR(settingMQTTtopTopic));
             Debugf("[%s]\r\n", CSTR(sMsg)); DebugFlush();
+
             sendMQTT(CSTR(sTopic), CSTR(sMsg), (sTopic.length() + sMsg.length()+2));
             delay(10);
           } else DebugTf("Either comment or invalid config line: [%s]\r\n", CSTR(sLine));
