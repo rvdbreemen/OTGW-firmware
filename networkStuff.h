@@ -196,8 +196,8 @@ String getMacAddress() {
   return String(baseMacChr);
 }
 
-String getUniqueId(String name, String sufix) {
-  String uniqueId = (String)getMacAddress() + name + sufix;
+String getUniqueId() {
+  String uniqueId = "otgw-"(String)getMacAddress();
   return String(uniqueId);
 }
 
