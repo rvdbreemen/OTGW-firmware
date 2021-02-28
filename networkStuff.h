@@ -2,7 +2,7 @@
 ***************************************************************************  
 **  Program : networkStuff.h
 **
-**  Version  : v0.7.8
+**  Version  : v0.8.0
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **
@@ -196,8 +196,8 @@ String getMacAddress() {
   return String(baseMacChr);
 }
 
-String getUniqueId(String name, String sufix) {
-  String uniqueId = (String)getMacAddress() + name + sufix;
+String getUniqueId() {
+  String uniqueId = "otgw-"+(String)getMacAddress();
   return String(uniqueId);
 }
 
