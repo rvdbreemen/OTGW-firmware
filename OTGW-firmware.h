@@ -41,7 +41,11 @@ void setLed(int8_t, uint8_t);
 #define _HOSTNAME       "OTGW"
 #define SETTINGS_FILE   "/settings.ini"
 #define DEFAULT_TIMEZONE "Europe/Amsterdam"
-#define HOMEASSISTANT_PREFIX "homeassistant"
+
+#define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"  // Home Assistant discovery prefix
+#define HOME_ASSISTANT_LWT_TOPIC   "homeassistant/status"  // home Assistant Birth and Last Will Topic (default = homeassistant/status)
+#define HOME_ASSISTANT_LWT_SUBSCRIBE    true               // Subscribe to Home Assistant Birth and Last Will Topic (default = true)
+
 #define CMSG_SIZE 512
 #define JSON_BUFF_MAX   1024
 #define CSTR(x) x.c_str()
@@ -82,7 +86,7 @@ String    settingMQTTbroker= "192.168.88.254";
 int16_t   settingMQTTbrokerPort = 1883; 
 String    settingMQTTuser = "";
 String    settingMQTTpasswd = "";
-String    settingMQTThaprefix = HOMEASSISTANT_PREFIX;
+String    settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
 String    settingMQTTtopTopic = "OTGW";
 bool      settingNTPenable = true;
 String    settingNTPtimezone = DEFAULT_TIMEZONE;
