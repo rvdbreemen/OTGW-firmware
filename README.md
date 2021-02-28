@@ -68,18 +68,20 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
 | 0.1.0 | MQTT messaging implemented |
 | 0.0.1 | parsing of OT protocol implemented (use telnet to see)   Watchdog implemented |
 
+
+## Credits
 Shoutout to early adopters helping me out testing and discussing the firmware in development. For pushing features, testing and living on the edge. 
 
 So shoutout to the following people, for testing, discussing, and feedback on development: 
-* @vampywiz17 
-* @Stemplar 
-* @tjfsteele 
-* @proditaki
+* @vampywiz17     early adopter and tester 
+* @Stemplar       reporting issues realy on
+* @proditaki      for creating Domiticz plugin for OTGW-firmware
+* @tjfsteele      for endless hours of testing
 
 A big thank should goto **Schelte Bron** @hvlx for amazing work on the OpenTherm Gateway and for providing access to the upgrade routines of the PIC. Enabling this custom firmware a reliable way to upgrade you PIC firmware.
 
 If you want to thank Schelte Bron for his work on the OpenTherm Gateway project, just head over to his homepage and donate to him: https://otgw.tclcode.com/
 
+## Buy me a coffee
 In case you want to buy me a coffee, head over here:
-
 <a href="https://www.buymeacoffee.com/rvdbreemen"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=rvdbreemen&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00"></a>
