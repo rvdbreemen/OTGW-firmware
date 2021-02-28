@@ -84,4 +84,5 @@ If you want to thank Schelte Bron for his work on the OpenTherm Gateway project,
 
 ## Buy me a coffee
 In case you want to buy me a coffee, head over here:
+
 <a href="https://www.buymeacoffee.com/rvdbreemen"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=rvdbreemen&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00"></a>
