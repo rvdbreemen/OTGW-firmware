@@ -432,27 +432,27 @@ bool isDiagnosticIndicator() {
   //7: reserved
 
 bool isServiceRequest() {
-	return OTdataObject.ASFflags & 0x0001;
+	return OTdataObject.ASFflags & 0x0100;
 }
 
 bool isLockoutReset() {
-	return OTdataObject.ASFflags & 0x0002;
+	return OTdataObject.ASFflags & 0x0200;
 }
 
 bool isLowWaterPressure() {
-	return OTdataObject.ASFflags & 0x0004;
+	return OTdataObject.ASFflags & 0x0400;
 }
 
 bool isGasFlameFault() {
-	return OTdataObject.ASFflags & 0x0008;
+	return OTdataObject.ASFflags & 0x0800;
 }
 
 bool isAirTemperature() {
-	return OTdataObject.ASFflags & 0x0010;
+	return OTdataObject.ASFflags & 0x1000;
 }
 
 bool isWaterOverTemperature() {
-	return OTdataObject.ASFflags & 0x0020;
+	return OTdataObject.ASFflags & 0x2000;
 }
 
 
