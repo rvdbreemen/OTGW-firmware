@@ -52,6 +52,7 @@ void setup() {
 
   //setup the status LED
   setLed(LED1, ON);
+  delay(10000);
   setLed(LED2, ON);
 
   LittleFS.begin();
