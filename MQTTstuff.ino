@@ -352,9 +352,14 @@ void resetMQTTBufferSize()
             sTopic.replace("%node_id%", CSTR(settingNodeId));
             Debugf("[%s]\r\n", CSTR(sTopic)); 
             /// ----------------------
-            /// node
+
             DebugTf("sMsg[%s]==>", CSTR(sMsg)); 
+
+            /// node
             sMsg.replace("%node_id%", CSTR(settingNodeId));
+
+            /// hostname
+            sMsg.replace("%hostname%", CSTR(settingHostname));
 
             /// version
             sMsg.replace("%version%", CSTR(String(_VERSION)));
@@ -364,6 +369,7 @@ void resetMQTTBufferSize()
 
             // sub topics
             sMsg.replace("%mqtt_sub_topic%", CSTR(settingMQTTSubNamespace));
+
             Debugf("[%s]\r\n", CSTR(sMsg)); DebugFlush();
 
             //sendMQTT(CSTR(sTopic), CSTR(sMsg), (sTopic.length() + sMsg.length()+2));
