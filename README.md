@@ -13,7 +13,7 @@ The goal of this project is to become a fully functioning ESP8266 firmware that 
 - a WebUI
 - bidirection MQTT support
 - a REST API
-- automatic integration with Home Assistant
+- automatic integration with Home Assistant (Home Assistant Core v2021.2.0+)
 - and a TCP socket for serial connection
 
 **Breaking change: With version 0.8.0: MQTT Discovery topic naming convention has changed significantly, this will break MQTT based applications.**
@@ -32,7 +32,7 @@ The features of this Nodosop OpenTherm NodeMCU firmware are:
   - simple REST API (http://<ip>/api/v1/otgw/id/{id} or http://<ip>/api/v1/otgw/label/{textlabel eg. Tr or Toutside}, commands on /api/v1/otgw/command/{any command})
   - serial interface on port 25238 for original OTmonitor application (bi-directional)
   - OTmonitor Web UI (standalone interface)
-- automatic integration with Home Assistant using _Home Assistant Discovery_
+- automatic integration with Home Assistant using _Home Assistant Discovery_ (Home Assistant Core v2021.2.0+)
 - integration with any MQTT based Home Automation solution, like Domoticz (plugin available) & OpenHAB
 - reliable OTA upgrades of `OTGW-firmare` (the nodeMCU) itself (v0.6.0+)
 - reliable OTGW PIC upgrades, to the latest firmware available at http://otgw.tclcode.com/download.html
@@ -49,7 +49,7 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
   
 | Version | Release notes |
 |-|-|
-| 0.8.0 | **Breaking Change: MQTT topic naming convention has changed from `<mqqt top prefix>/<sensor>` to `<mqtt top prefix>/value/<node id>/<sensor>` for data publshed and `<mqtt top prefix>/set/<node id>/<command>` for subscriptions** <br> Update Homeasssistant Discovery: add OTGW as a device and group all exposed entities as childs <br> Update Homeasssistant Discovery: add climate (thermostat) enity, uses temporary temperature override (OTGW `TT` command) <br> Bugfix #14: reduce MQTT connect timeout < the watchdog timeout to prevent reboot on a timout |
+| 0.8.0 | **Breaking Change: MQTT topic naming convention has changed from `<mqqt top prefix>/<sensor>` to `<mqtt top prefix>/value/<node id>/<sensor>` for data publshed and `<mqtt top prefix>/set/<node id>/<command>` for subscriptions** <br> Update Homeasssistant Discovery: add OTGW as a device and group all exposed entities as childs <br> Update Homeasssistant Discovery: add climate (thermostat) enity, uses temporary temperature override (OTGW `TT` command) (Home Assistant Core v2021.2.0+)<br> Bugfix #14: reduce MQTT connect timeout < the watchdog timeout to prevent reboot on a timout |
 | 0.7.8 | Update Home Assistant Discovery <br> Flexible Home Assistant prefix <br> Bugfix: Removed hardcoded OTGW topic <br> Bugfix: NTP timezone discovery removed |
 | 0.7.7 | UI improved: Only show updates values in web UI <br> Bugifx: Serial not found error when sending commands thru MQTT fixed |
 | 0.7.6 | PIC firmware integration done. <br> New setting: NTP configurable <br> New setting: heartbeat led on/off <br> Update to REST API to include epoch of last update to message|
