@@ -98,14 +98,16 @@ void handleMQTT()
       reconnectAttempts++;
 
       //If no username, then anonymous connection to broker, otherwise assume username/password.
-      if (settingMQTTuser.length() == 0) 
+       if (settingMQTTuser.length() == 0) 
       {
         Debug(F("without a Username/Password "));
-        MQTTclient.connect(CSTR(MQTTclientId), CSTR(settingMQTTPubNamespace), 0, true, "offline");
+        // MQTTclient.connect(CSTR(MQTTclientId));
+         MQTTclient.connect(CSTR(MQTTclientId), CSTR(settingMQTTPubNamespace), 0, true, "offline");
       } 
       else 
       {
         Debugf("Username [%s] ", CSTR(settingMQTTuser));
+        // MQTTclient.connect(CSTR(MQTTclientId), CSTR(settingMQTTuser), CSTR(settingMQTTpasswd));
         MQTTclient.connect(CSTR(MQTTclientId), CSTR(settingMQTTuser), CSTR(settingMQTTpasswd), CSTR(settingMQTTPubNamespace), 0, true, "offline");
       }
 
@@ -113,7 +115,7 @@ void handleMQTT()
       if (MQTTclient.connected())
       {
         reconnectAttempts = 0;  
-        Debugln(F(" .. connected\r"));
+        Debugln(F(" .. connected\r"));DebugFlush();
         stateMQTT = MQTT_STATE_IS_CONNECTED;
         //DebugTln(F("Next State: MQTT_STATE_IS_CONNECTED"));
         // birth message, sendMQTT retains  by default

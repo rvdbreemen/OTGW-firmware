@@ -263,6 +263,7 @@ void feedWatchDog() {
     Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   //Nodoshop design uses the hardware WD on I2C, address 0x26
     Wire.write(0xA5);                             //Feed the dog, before it bites.
     Wire.endTransmission();                       //That's all there is...
+    if (settingLEDblink) blinkLEDnow(LED1);
   }
   yield();
   //==== feed the WD over I2C ==== 
@@ -981,7 +982,6 @@ void handleOTGW()
   //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
   while (OTGWstream.available()){
     //OTGWSerial.write(OTGWstream.read()); //just forward it directly to Serial
-    blinkLEDnow(LED2);
     outByte = OTGWstream.read();  // read from port 25238
     while (OTGWSerial.availableForWrite()==0) {
       //cannot write, buffer full, wait for some space in serial out buffer
@@ -1019,6 +1019,7 @@ void handleOTGW()
     if (inByte== '\n')
     { //line terminator, continue to process incoming message
       sRead[bytes_read] = 0;
+      blinkLEDnow(LED2);
       processOTGW(sRead, bytes_read);
       bytes_read = 0;
       break; // to continue processing incoming message
