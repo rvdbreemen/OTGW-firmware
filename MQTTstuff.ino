@@ -374,7 +374,7 @@ void resetMQTTBufferSize()
 
             //sendMQTT(CSTR(sTopic), CSTR(sMsg), (sTopic.length() + sMsg.length()+2));
             sendMQTT(sTopic, sMsg);
-            
+            resetMQTTBufferSize();
             delay(10);
           } else DebugTf("Either comment or invalid config line: [%s]\r\n", CSTR(sLine));
       } // while available()
