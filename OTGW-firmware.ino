@@ -192,8 +192,8 @@ void doBackgroundTasks()
   httpServer.handleClient();
   MDNS.update();
   events();                     // trigger ezTime update etc.
-  // 'blink' the status led every x ms
-  if (settingLEDblink) blinkLEDms(1000);             
+  // // 'blink' the status led every x ms
+  // if (settingLEDblink) blinkLEDms(1000);             
   delay(1);
   handleDebug();
 }
