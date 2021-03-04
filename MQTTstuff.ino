@@ -249,7 +249,7 @@ void sendMQTTData(const String topic, const String json, const bool retain = fal
 * json:   <string> , payload to send
 * retain: <bool> , retain mqtt message  
 */
-void sendMQTTData(const char* topic, const char *json, const bool *retain) 
+void sendMQTTData(const char* topic, const char *json, const bool retain = false) 
 {
 /*  
 * The maximum message size, including header, is 128 bytes by default. 
