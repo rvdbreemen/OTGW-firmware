@@ -98,16 +98,14 @@ void handleMQTT()
       reconnectAttempts++;
 
       //If no username, then anonymous connection to broker, otherwise assume username/password.
-       if (settingMQTTuser.length() == 0) 
+      if (settingMQTTuser.length() == 0) 
       {
         Debug(F("without a Username/Password "));
-        // MQTTclient.connect(CSTR(MQTTclientId));
-         MQTTclient.connect(CSTR(MQTTclientId), CSTR(settingMQTTPubNamespace), 0, true, "offline");
+        MQTTclient.connect(CSTR(MQTTclientId), CSTR(settingMQTTPubNamespace), 0, true, "offline");
       } 
       else 
       {
         Debugf("Username [%s] ", CSTR(settingMQTTuser));
-        // MQTTclient.connect(CSTR(MQTTclientId), CSTR(settingMQTTuser), CSTR(settingMQTTpasswd));
         MQTTclient.connect(CSTR(MQTTclientId), CSTR(settingMQTTuser), CSTR(settingMQTTpasswd), CSTR(settingMQTTPubNamespace), 0, true, "offline");
       }
 
