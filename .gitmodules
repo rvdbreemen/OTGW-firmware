@@ -1,3 +1,6 @@
 [submodule "Arduino/libraries/pubsubclient"]
 	path = Arduino/libraries/pubsubclient
 	url = https://github.com/knolleary/pubsubclient
+[submodule "Arduino/libraries/WiFiManager"]
+	path = Arduino/libraries/WiFiManager
+	url = https://github.com/tzapu/WiFiManager
