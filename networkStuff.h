@@ -40,6 +40,7 @@
 #include <ESP8266WebServer.h>   // Version 1.0.0 - part of ESP8266 Core https://github.com/esp8266/Arduino
 #include <ESP8266mDNS.h>        // part of ESP8266 Core https://github.com/esp8266/Arduino
 #include <ESP8266HTTPClient.h>
+#include <ESP8266LLMNR.h>
 
 #include <WiFiUdp.h>            // part of ESP8266 Core https://github.com/esp8266/Arduino
 //#include "ESP8266HTTPUpdateServer.h"
@@ -136,20 +137,33 @@ void startTelnet()
 } // startTelnet()
 
 //=======================================================================
-void startMDNS(const char *Hostname) 
+void startMDNS(const char *hostname) 
 {
-  DebugTf("[1] mDNS setup as [%s.local]\r\n", Hostname);
-  if (MDNS.begin(Hostname))               // Start the mDNS responder for Hostname.local
+  DebugTf("mDNS setup as [%s.local]\r\n", hostname);
+  if (MDNS.begin(hostname))               // Start the mDNS responder for Hostname.local
   {
-    DebugTf("[2] mDNS responder started as [%s.local]\r\n", Hostname);
+    DebugTf("mDNS responder started as [%s.local]\r\n", hostname);
   } 
   else 
   {
-    DebugTln(F("[3] Error setting up MDNS responder!\r\n"));
+    DebugTln(F("Error setting up MDNS responder!\r\n"));
   }
   MDNS.addService("http", "tcp", 80);
-  
 } // startMDNS()
+
+void startLLMNR(const char *hostname) 
+{
+  DebugTf("LLMNR setup as [%s]\r\n", hostname);
+  if (LLMNR.begin(hostname))               // Start the LLMNR responder for hostname
+  {
+    DebugTf("LLMNR responder started as [%s]\r\n", hostname);
+  } 
+  else 
+  {
+    DebugTln(F("Error setting up LLMNR responder!\r\n"));
+  }
+} // startLLMNR()
+
 
 void startNTP(){
   // Initialisation ezTime

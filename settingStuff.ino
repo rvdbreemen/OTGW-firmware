@@ -83,7 +83,10 @@ void readSettings(bool show)
   settingMQTTuser         = doc["MQTTuser"].as<String>();
   settingMQTTpasswd       = doc["MQTTpasswd"].as<String>();
   settingMQTTtopTopic     = doc["MQTTtoptopic"].as<String>();
-  if (settingMQTTtopTopic=="null") { settingMQTTtopTopic = _HOSTNAME; settingMQTTtopTopic.toLowerCase();}
+  if (settingMQTTtopTopic=="null") {
+    settingMQTTtopTopic = _HOSTNAME;
+    settingMQTTtopTopic.toLowerCase();
+  }
   settingMQTThaprefix     = doc["MQTThaprefix"].as<String>();
   if (settingMQTThaprefix=="null") settingMQTThaprefix = HOMEASSISTANT_PREFIX;
   settingNTPenable        = doc["NTPenable"]; 
@@ -97,23 +100,24 @@ void readSettings(bool show)
   //Update some settings right now 
   MDNS.setHostname(CSTR(settingHostname));    // start advertising with new(?) settingHostname
 
-  DebugTln(F(" .. done\r"));
+  DebugTln(F(" .. done\r\n"));
 
   if (show) {
     Debugln(F("\r\n==== read Settings ===================================================\r"));
-    Debugf("                 Hostname      : %s\r\n",  CSTR(settingHostname));
-    Debugf("                 MQTT enabled  : %s\r\n",  CBOOLEAN(settingMQTTenable));
-    Debugf("                 MQTT broker   : %s\r\n",  CSTR(settingMQTTbroker));
-    Debugf("                 MQTT port     : %d\r\n",  settingMQTTbrokerPort);
-    Debugf("                 MQTT username : %s\r\n",  CSTR(settingMQTTuser));
-    Debugf("                 MQTT password : %s\r\n",  CSTR(settingMQTTpasswd));
-    Debugf("                 MQTT toptopic : %s\r\n",  CSTR(settingMQTTtopTopic));
-    Debugf("                 HA prefix     : %s\r\n",  CSTR(settingMQTThaprefix));
-    Debugf("                 NTP enabled   : %s\r\n",  CBOOLEAN(settingNTPenable));
-    Debugf("                 NPT timezone  : %s\r\n",  CSTR(settingNTPtimezone));
+    Debugf("Hostname      : %s\r\n",  CSTR(settingHostname));
+    Debugf("MQTT enabled  : %s\r\n",  CBOOLEAN(settingMQTTenable));
+    Debugf("MQTT broker   : %s\r\n",  CSTR(settingMQTTbroker));
+    Debugf("MQTT port     : %d\r\n",  settingMQTTbrokerPort);
+    Debugf("MQTT username : %s\r\n",  CSTR(settingMQTTuser));
+    Debugf("MQTT password : %s\r\n",  CSTR(settingMQTTpasswd));
+    Debugf("MQTT toptopic : %s\r\n",  CSTR(settingMQTTtopTopic));
+    Debugf("HA prefix     : %s\r\n",  CSTR(settingMQTThaprefix));
+    Debugf("NTP enabled   : %s\r\n",  CBOOLEAN(settingNTPenable));
+    Debugf("NPT timezone  : %s\r\n",  CSTR(settingNTPtimezone));
+    Debugf("Led Blink     : %s\r\n",  CBOOLEAN(settingLEDblink));
   }
   
-  Debugln(F("-\r"));
+  Debugln(F("-\r\n"));
 
 } // readSettings()
 
@@ -142,7 +146,10 @@ void updateSetting(const char *field, const char *newValue)
   if (stricmp(field, "MQTTpasswd")==0)      settingMQTTpasswd = String(newValue);
   if (stricmp(field, "MQTTtoptopic")==0)    {
     settingMQTTtopTopic = String(newValue);
-    if (settingMQTTtopTopic.length()==0) { settingMQTTtopTopic = _HOSTNAME; settingMQTTtopTopic.toLowerCase();}
+    if (settingMQTTtopTopic.length()==0)    {
+      settingMQTTtopTopic = _HOSTNAME;
+      settingMQTTtopTopic.toLowerCase();
+    }
   }
   if (stricmp(field, "MQTThaprefix")==0)    {
     settingMQTThaprefix = String(newValue);
