@@ -69,10 +69,6 @@ void setup() {
   }
   setLed(LED1, OFF);
 
-  settingNodeId = getUniqueId();
-  settingMQTTPubNamespace = settingMQTTtopTopic + "/value/" + settingNodeId;
-  settingMQTTSubNamespace = settingMQTTtopTopic + "/set/" + settingNodeId;
-
   startMDNS(CSTR(settingHostname));
   startMQTT(); 
   startNTP();

@@ -84,12 +84,10 @@ int16_t   settingMQTTbrokerPort = 1883;
 String    settingMQTTuser = "";
 String    settingMQTTpasswd = "";
 String    settingMQTThaprefix = HOMEASSISTANT_PREFIX;
-String    settingMQTTtopTopic = "OTGW";
+String    settingMQTTtopTopic = "otgw";
 String    settingMQTTPubNamespace = "";
 String    settingMQTTSubNamespace = "";
-
-//
-bool settingNTPenable = true;
+bool      settingNTPenable = true;
 String    settingNTPtimezone = DEFAULT_TIMEZONE;
 bool      settingLEDblink = true;
 
