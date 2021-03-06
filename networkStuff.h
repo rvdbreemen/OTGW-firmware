@@ -151,11 +151,8 @@ void startMDNS(const char *hostname)
   MDNS.addService("http", "tcp", 80);
 } // startMDNS()
 
-void startLLMNR(const char *_hostname) 
+void startLLMNR(const char *hostname) 
 {
-  char hostname[80]={0};
-  strlcpy(hostname, _hostname, sizeof(hostname));
-  strlcat(hostname, ".local", sizeof(hostname));
   DebugTf("LLMNR setup as [%s]\r\n", hostname);
   if (LLMNR.begin(hostname))               // Start the LLMNR responder for hostname
   {
