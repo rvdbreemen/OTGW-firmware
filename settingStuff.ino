@@ -88,7 +88,7 @@ void readSettings(bool show)
     settingMQTTtopTopic.toLowerCase();
   }
   settingMQTThaprefix     = doc["MQTThaprefix"].as<String>();
-  if (settingMQTThaprefix=="null") settingMQTThaprefix = HOMEASSISTANT_PREFIX;
+  if (settingMQTThaprefix=="null") settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
   settingNTPenable        = doc["NTPenable"]; 
   settingNTPtimezone      = doc["NTPtimezone"].as<String>();
   if (settingNTPtimezone=="null")  settingNTPtimezone = "Europe/Amsterdam"; //default to amsterdam timezone
@@ -153,7 +153,7 @@ void updateSetting(const char *field, const char *newValue)
   }
   if (stricmp(field, "MQTThaprefix")==0)    {
     settingMQTThaprefix = String(newValue);
-    if (settingMQTThaprefix.length()==0) settingMQTThaprefix = HOMEASSISTANT_PREFIX;
+    if (settingMQTThaprefix.length()==0) settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
   }
   
   if (stricmp(field, "NTPenable")==0)      settingNTPenable = EVALBOOLEAN(newValue);
