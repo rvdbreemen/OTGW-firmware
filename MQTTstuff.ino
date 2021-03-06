@@ -326,8 +326,9 @@ void resetMQTTBufferSize()
   //===========================================================================================
   void doAutoConfigure()
   {
-    if (!settingMQTTenable)
-      return;
+    if (!settingMQTTenable) return;
+    if (!MQTTclient.connected()) {DebugTln("ERROR: MQTT broker not connected."); return;} 
+    if (!isValidIP(MQTTbrokerIP)) {DebugTln("ERROR: MQTT broker IP not valid."); return;} 
     const char *cfgFilename = "/mqttha.cfg";
     String sTopic = "";
     String sMsg = "";
