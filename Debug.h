@@ -10,10 +10,11 @@
 ** Modified: as OTGW actually uses the Serial interface, so no more debug to serial please.
 */
 
-/*---- start macro's ------------------------------------------------------------------*/
+/*---- sto wait
+art macro's ------------------------------------------------------------------*/
 
 #define Debug(...)      ({ TelnetStream.print(__VA_ARGS__);    })
-#define Debugln(...)    ({ TelnetStream.println(__VA_ARGS__);  })
+#define Debugln(...)    ({ TelnetStream.println(__VA_ARGS__);   )
 #define Debugf(...)     ({ TelnetStream.printf(__VA_ARGS__);   })
 
 #define DebugFlush()    ({ TelnetStream.flush(); })

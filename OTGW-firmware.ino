@@ -52,7 +52,6 @@ void setup() {
 
   //setup the status LED
   setLed(LED1, ON);
-  delay(10000);
   setLed(LED2, ON);
 
   LittleFS.begin();
@@ -81,7 +80,6 @@ void setup() {
   setupFSexplorer();
   startWebserver();
 
-  initWatchDog();       // setup the WatchDog
   OTGWSerial.println(F("Setup finished!\r\n"));
   // After resetting the OTGW PIC never send anything to Serial for debug
   // and switch to telnet port 23 for debug purposed. 
@@ -96,8 +94,10 @@ void setup() {
     sMessage = "New PIC version " + latest + " available!";
   }
   DebugTf("Reboot count = [%d]\r\n", rebootCount);
-  setLed(LED1, OFF);
+  initWatchDog();       // setup the WatchDog
+
   //Blink LED2 to signal setup done
+  setLed(LED1, OFF);
   for (int i=0; i<=3;i++) {
     blinkLEDnow(LED2);
     delay(100);
@@ -105,7 +105,7 @@ void setup() {
     delay(100);
   }
   setLed(LED2, OFF);
-}
+  }
 
 //=====================================================================
 
