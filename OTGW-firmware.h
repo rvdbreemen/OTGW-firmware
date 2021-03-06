@@ -43,8 +43,6 @@ void setLed(int8_t, uint8_t);
 #define DEFAULT_TIMEZONE "Europe/Amsterdam"
 
 #define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"  // Home Assistant discovery prefix
-#define HOME_ASSISTANT_LWT_TOPIC   "homeassistant/status"  // home Assistant Birth and Last Will Topic (default = homeassistant/status)
-#define HOME_ASSISTANT_LWT_SUBSCRIBE    true               // Subscribe to Home Assistant Birth and Last Will Topic (default = true)
 
 #define CMSG_SIZE 512
 #define JSON_BUFF_MAX   1024
