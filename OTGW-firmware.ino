@@ -102,7 +102,7 @@ void blinkLEDms(uint32_t delay){
   }
 }
 
-void blinkLED(uint8_t led, int nr, uint32_t waittime_ms, ){
+void blinkLED(uint8_t led, int nr, uint32_t waittime_ms){
     for (int i = nr; i>0; i--){
       blinkLEDnow(led);
       delayms(waittime_ms);
