@@ -4,3 +4,6 @@
 [submodule "Arduino/libraries/WiFiManager"]
 	path = Arduino/libraries/WiFiManager
 	url = https://github.com/tzapu/WiFiManager
+[submodule "Arduino/libraries/TelnetStream"]
+	path = Arduino/libraries/TelnetStream
+	url = https://github.com/jandrassy/TelnetStream
