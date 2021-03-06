@@ -84,6 +84,16 @@ String getpicfwversion(){
   _ret.trim();
   return _ret;
 }
+//===================[ checkOTWGpicforupdate ]=====================
+void checkOTWGpicforupdate(){
+  DebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
+  String latest = checkforupdatepic("gateway.hex");
+  if (!bOTGWonline) {
+    sMessage = sPICfwversion; 
+  } else if (latest != sPICfwversion) {
+    sMessage = "New PIC version " + latest + " available!";
+  }
+}
 //===================[ OTGW Command & Response ]===================
 String executeCommand(const String sCmd){
   //send command to OTGW

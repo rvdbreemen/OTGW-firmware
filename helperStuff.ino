@@ -529,7 +529,8 @@ uint32_t updateRebootCount()
       fh.println(_reboot);
     }
     fh.close();
-  } 
+  }
+  DebugTf("Reboot count = [%d]\r\n", rebootCount);
   return _reboot;
 }
 
