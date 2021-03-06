@@ -36,11 +36,11 @@ The features of this Nodosop OpenTherm NodeMCU firmware are:
 - integration with any MQTT based Home Automation solution, like Domoticz (plugin available) & OpenHAB
 - reliable OTA upgrades of `OTGW-firmare` (the nodeMCU) itself (v0.6.0+)
 - reliable OTGW PIC upgrades, to the latest firmware available at http://otgw.tclcode.com/download.html
+- Cleaner RestAPI's for Telegraf OTmonitor integration
 
-**Warning: Do not flash your OTGW PIC firmware through wifi. Instead use the _NEW_ reliable PIC firmware upgrade, just goto the File Explorer tab and click the PIC upgrade button**
+**Warning: Never flash your OTGW PIC firmware through wifi using OTmonitor application, you can brick your OTGW PIC. Instead use the buildin PIC firmware upgrade feature (based on code by Bron Schelte)**
 
 To do:
-- Cleaner RestAPI's for Telegraf OTmonitor integration
 - InfluxDB client to do direct logging 
 - Instant update of webUI using websockets
 - Showing log of OT messages using websockets
@@ -49,7 +49,7 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
   
 | Version | Release notes |
 |-|-|
-| 0.8.0 | **Breaking Change: MQTT topic naming convention has changed from `<mqqt top prefix>/<sensor>` to `<mqtt top prefix>/value/<node id>/<sensor>` for data publshed and `<mqtt top prefix>/set/<node id>/<command>` for subscriptions** <br> Update Homeasssistant Discovery: add OTGW as a device and group all exposed entities as childs <br> Update Homeasssistant Discovery: add climate (thermostat) enity, uses temporary temperature override (OTGW `TT` command) (Home Assistant Core v2021.2.0+)<br> Bugfix #14: reduce MQTT connect timeout < the watchdog timeout to prevent reboot on a timout<br> Adding LLMNR responder (http://otgw/ will work now too)<br>New restapi: Telegraf endpoint (/api/v1/otgw/telegraf)|
+| 0.8.0 | **Breaking Change: MQTT topic naming convention has changed from `<mqqt top prefix>/<sensor>` to `<mqtt top prefix>/value/<node id>/<sensor>` for data publshed and `<mqtt top prefix>/set/<node id>/<command>` for subscriptions** <br> Update Homeasssistant Discovery: add OTGW as a device and group all exposed entities as childs <br> Update Homeasssistant Discovery: add climate (thermostat) enity, uses temporary temperature override (OTGW `TT` command) (Home Assistant Core v2021.2.0+)<br> Bugfix #14: reduce MQTT connect timeout < the watchdog timeout to prevent reboot on a timout<br> Adding LLMNR responder (http://otgw/ will work now too)<br>New restapi: Telegraf endpoint (/api/v1/otgw/telegraf)<br> Fixing bugs in core OTGW msg processor for ASF flas|
 | 0.7.8 | Update Home Assistant Discovery <br> Flexible Home Assistant prefix <br> Bugfix: Removed hardcoded OTGW topic <br> Bugfix: NTP timezone discovery removed |
 | 0.7.7 | UI improved: Only show updates values in web UI <br> Bugifx: Serial not found error when sending commands thru MQTT fixed |
 | 0.7.6 | PIC firmware integration done. <br> New setting: NTP configurable <br> New setting: heartbeat led on/off <br> Update to REST API to include epoch of last update to message|
@@ -77,7 +77,7 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
 Shoutout to early adopters helping me out testing and discussing the firmware in development. For pushing features, testing and living on the edge. 
 
 So shoutout to the following people for the collaboration on development: 
-* @sjorsjuhmaniac for improving the MQTT naming convention and HA integration
+* @sjorsjuhmaniac for improving the MQTT naming convention and HA integration, adding climate entity and otgw device 
 * @vampywiz17     early adopter and tester 
 * @Stemplar       reporting issues realy on
 * @proditaki      for creating Domiticz plugin for OTGW-firmware
