@@ -63,6 +63,7 @@ void setup() {
   setLed(LED1, OFF);
 
   startMDNS(CSTR(settingHostname));
+  startLLMNR(CSTR(settingHostname));
   startMQTT(); 
   startNTP();
   startTelnet();  //start the debug port 23
