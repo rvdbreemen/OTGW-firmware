@@ -32,6 +32,10 @@ void startMQTT()
 {
   if (!settingMQTTenable) return;
   stateMQTT = MQTT_STATE_INIT;
+  //setup for mqtt discovery
+  settingNodeId = getUniqueId();
+  settingMQTTPubNamespace = settingMQTTtopTopic + "/value/" + settingNodeId;
+  settingMQTTSubNamespace = settingMQTTtopTopic + "/set/" + settingNodeId;
   handleMQTT(); //initialize the MQTT statemachine
   // handleMQTT(); //then try to connect to MQTT
   // handleMQTT(); //now you should be connected to MQTT ready to send
