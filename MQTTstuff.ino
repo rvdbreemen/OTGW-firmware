@@ -306,13 +306,10 @@ void resetMQTTBufferSize()
     sIn.trim(); //trim spaces
     cKey = "";
     cVal = "";
-    if (sIn.indexOf("//") == 0)
-      return false; //comment, skip split
-    if (sIn.length() <= 3)
-      return false;             //not enough buffer, skip split
+    if (sIn.indexOf("//") == 0) return false; //comment, skip split
+    if (sIn.length() <= 3) return false; //not enough buffer, skip split
     int pos = sIn.indexOf(del); //determine split point
-    if ((pos == 0) || (pos == (sIn.length() - 1)))
-      return false; // no key or no value
+    if ((pos == 0) || (pos == (sIn.length() - 1))) return false; // no key or no value
     cKey = sIn.substring(0, pos);
     cKey.trim(); //before, and trim spaces
     cVal = sIn.substring(pos + 1);
