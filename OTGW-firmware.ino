@@ -111,10 +111,6 @@ void blinkLED(uint8_t led, int nr, uint32_t waittime_ms){
     }
 }
 
-// void blinkLEDnow(){
-//   blinkLEDnow(LED1);
-// }
-
 void blinkLEDnow(uint8_t led = LED1){
   pinMode(led, OUTPUT);
   digitalWrite(led, !digitalRead(led));
