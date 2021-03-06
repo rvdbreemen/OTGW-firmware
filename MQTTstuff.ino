@@ -26,16 +26,18 @@
   enum states_of_MQTT stateMQTT = MQTT_STATE_INIT;
 
   String            MQTTclientId;
-
+  String            MQTTPubNamespace = "";
+  String            MQTTSubNamespace = "";
+  String            NodeId = "";
 //===========================================================================================
 void startMQTT() 
 {
   if (!settingMQTTenable) return;
   stateMQTT = MQTT_STATE_INIT;
   //setup for mqtt discovery
-  settingNodeId = getUniqueId();
-  settingMQTTPubNamespace = settingMQTTtopTopic + "/value/" + settingNodeId;
-  settingMQTTSubNamespace = settingMQTTtopTopic + "/set/" + settingNodeId;
+  NodeId = getUniqueId();
+  MQTTPubNamespace = settingMQTTtopTopic + "/value/" + NodeId;
+  MQTTSubNamespace = settingMQTTtopTopic + "/set/" + NodeId;
   handleMQTT(); //initialize the MQTT statemachine
   // handleMQTT(); //then try to connect to MQTT
   // handleMQTT(); //now you should be connected to MQTT ready to send
@@ -52,7 +54,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   
   char subscribeTopic[100];
   // naming convention <mqtt top>/set/<node id>/<command>
-  snprintf(subscribeTopic, sizeof(subscribeTopic), "%s/", settingMQTTSubNamespace.c_str());
+  snprintf(subscribeTopic, sizeof(subscribeTopic), "%s/", MQTTSubNamespace.c_str());
   strlcat(subscribeTopic, OTGW_COMMAND_TOPIC, sizeof(subscribeTopic));
   //what is the incoming message?  
   if (stricmp(topic, subscribeTopic) == 0) 
@@ -105,12 +107,12 @@ void handleMQTT()
       if (settingMQTTuser.length() == 0) 
       {
         Debug(F("without a Username/Password "));
-        MQTTclient.connect(CSTR(MQTTclientId), CSTR(settingMQTTPubNamespace), 0, true, "offline");
+        MQTTclient.connect(CSTR(MQTTclientId), CSTR(MQTTPubNamespace), 0, true, "offline");
       } 
       else 
       {
         Debugf("Username [%s] ", CSTR(settingMQTTuser));
-        MQTTclient.connect(CSTR(MQTTclientId), CSTR(settingMQTTuser), CSTR(settingMQTTpasswd), CSTR(settingMQTTPubNamespace), 0, true, "offline");
+        MQTTclient.connect(CSTR(MQTTclientId), CSTR(settingMQTTuser), CSTR(settingMQTTpasswd), CSTR(MQTTPubNamespace), 0, true, "offline");
       }
 
       //If connection was made succesful, move on to next state...
@@ -121,12 +123,12 @@ void handleMQTT()
         stateMQTT = MQTT_STATE_IS_CONNECTED;
         //DebugTln(F("Next State: MQTT_STATE_IS_CONNECTED"));
         // birth message, sendMQTT retains  by default
-        sendMQTT(CSTR(settingMQTTPubNamespace), "online");
+        sendMQTT(CSTR(MQTTPubNamespace), "online");
         //First do AutoConfiguration for Homeassistant
         doAutoConfigure();
         //Subscribe to topics
         char topic[100];
-        strcpy(topic, CSTR(settingMQTTSubNamespace));
+        strcpy(topic, CSTR(MQTTSubNamespace));
         strlcat(topic, "/#", sizeof(topic));
         DebugTf("Subscribe to MQTT: TopicId [%s]\r\n", topic);
         if (MQTTclient.subscribe(topic)){
@@ -266,7 +268,7 @@ void sendMQTTData(const char* topic, const char *json, const bool retain = false
   if (!MQTTclient.connected() || !isValidIP(MQTTbrokerIP)) return;
   // DebugTf("Sending data to MQTT server [%s]:[%d]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort);
   char full_topic[100];
-  snprintf(full_topic, sizeof(full_topic), "%s/", CSTR(settingMQTTPubNamespace));
+  snprintf(full_topic, sizeof(full_topic), "%s/", CSTR(MQTTPubNamespace));
   strlcat(full_topic, topic, sizeof(full_topic));
   //DebugTf("Sending MQTT: TopicId [%s] Message [%s]\r\n", full_topic, json);
   if (!MQTTclient.publish(full_topic, json, retain)) DebugTln("MQTT publish failed.");
@@ -350,14 +352,14 @@ void resetMQTTBufferSize()
             sTopic.replace("%homeassistant%", CSTR(settingMQTThaprefix));  
 
             /// node
-            sTopic.replace("%node_id%", CSTR(settingNodeId));
+            sTopic.replace("%node_id%", CSTR(NodeId));
             Debugf("[%s]\r\n", CSTR(sTopic)); 
             /// ----------------------
 
             DebugTf("sMsg[%s]==>", CSTR(sMsg)); 
 
             /// node
-            sMsg.replace("%node_id%", CSTR(settingNodeId));
+            sMsg.replace("%node_id%", CSTR(NodeId));
 
             /// hostname
             sMsg.replace("%hostname%", CSTR(settingHostname));
@@ -366,10 +368,10 @@ void resetMQTTBufferSize()
             sMsg.replace("%version%", CSTR(String(_VERSION)));
 
             // pub topics prefix
-            sMsg.replace("%mqtt_pub_topic%", CSTR(settingMQTTPubNamespace));
+            sMsg.replace("%mqtt_pub_topic%", CSTR(MQTTPubNamespace));
 
             // sub topics
-            sMsg.replace("%mqtt_sub_topic%", CSTR(settingMQTTSubNamespace));
+            sMsg.replace("%mqtt_sub_topic%", CSTR(MQTTSubNamespace));
 
             Debugf("[%s]\r\n", CSTR(sMsg)); DebugFlush();
 

@@ -77,7 +77,6 @@ String    errorupgrade = "";
 
 //All things that are settings 
 String    settingHostname = _HOSTNAME;
-String    settingNodeId = _HOSTNAME;
 
 //MQTT settings
 bool      statusMQTTconnection = false; 
@@ -87,10 +86,8 @@ String    settingMQTTbroker= "192.168.88.254";
 int16_t   settingMQTTbrokerPort = 1883; 
 String    settingMQTTuser = "";
 String    settingMQTTpasswd = "";
-String    settingMQTThaprefix = HOMEASSISTANT_PREFIX;
+String    settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
 String    settingMQTTtopTopic = "otgw";
-String    settingMQTTPubNamespace = "";
-String    settingMQTTSubNamespace = "";
 bool      settingNTPenable = true;
 String    settingNTPtimezone = DEFAULT_TIMEZONE;
 bool      settingLEDblink = true;
