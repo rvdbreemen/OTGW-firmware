@@ -10,3 +10,6 @@
 [submodule "Arduino/libraries/ezTime"]
 	path = Arduino/libraries/ezTime
 	url = https://github.com/ropg/ezTime.git
+[submodule "Arduino/libraries/ArduinoJson"]
+	path = Arduino/libraries/ArduinoJson
+	url = https://github.com/bblanchon/ArduinoJson
