@@ -83,6 +83,7 @@ void handleMQTT()
         MQTTclient.disconnect();
         MQTTclient.setServer(MQTTbrokerIPchar, settingMQTTbrokerPort);
         MQTTclient.setCallback(handleMQTTcallback);
+        MQTTclient.setSocketTimeout(4); 
         MQTTclientId  = String(_HOSTNAME) + WiFi.macAddress();
         //skip try to connect
         stateMQTT = MQTT_STATE_TRY_TO_CONNECT;
