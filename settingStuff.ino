@@ -83,7 +83,7 @@ void readSettings(bool show)
   settingMQTTuser         = doc["MQTTuser"].as<String>();
   settingMQTTpasswd       = doc["MQTTpasswd"].as<String>();
   settingMQTTtopTopic     = doc["MQTTtoptopic"].as<String>();
-  if (settingMQTTtopTopic=="null") settingMQTTtopTopic = _HOSTNAME;
+  if (settingMQTTtopTopic=="null") { settingMQTTtopTopic = _HOSTNAME; settingMQTTtopTopic.toLowerCase();}
   settingMQTThaprefix     = doc["MQTThaprefix"].as<String>();
   if (settingMQTThaprefix=="null") settingMQTThaprefix = HOMEASSISTANT_PREFIX;
   settingNTPenable        = doc["NTPenable"]; 
@@ -142,7 +142,7 @@ void updateSetting(const char *field, const char *newValue)
   if (stricmp(field, "MQTTpasswd")==0)      settingMQTTpasswd = String(newValue);
   if (stricmp(field, "MQTTtoptopic")==0)    {
     settingMQTTtopTopic = String(newValue);
-    if (settingMQTTtopTopic.length()==0) settingMQTTtopTopic = "OTGW";
+    if (settingMQTTtopTopic.length()==0) { settingMQTTtopTopic = _HOSTNAME; settingMQTTtopTopic.toLowerCase();}
   }
   if (stricmp(field, "MQTThaprefix")==0)    {
     settingMQTThaprefix = String(newValue);
