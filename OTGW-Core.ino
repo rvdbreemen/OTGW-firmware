@@ -614,6 +614,7 @@ uint16_t print_ASFflags()
   //Application Specific Fault
   sendMQTTData("ASF_flags", byte_to_binary(OTdata.valueHB));
   //OEM fault code
+  utoa(OTdata.valueLB, _msg, 10);
   sendMQTTData("ASF_oemfaultcode", _msg);
 
   //bit: [clear/0, set/1]
@@ -695,8 +696,6 @@ uint16_t print_flag8u8()
   sendMQTTData(_topic, _msg);
   return OTdata.u16(); 
 }
-
-
 
 uint16_t print_flag8()
 {
