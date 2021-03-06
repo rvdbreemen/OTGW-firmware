@@ -699,7 +699,7 @@
    ,[ "mqttconnected",              "MQTT Connected"]
    ,[ "mqttenable",                 "MQTT Enable"]
    ,[ "mqtthaprefix",               "MQTT Home Assistant prefix"]
-   ,[ "ntpenable",                  "NTP Enable"]
+   ,[ "ntpenabled",                 "NTP Enable"]
    ,[ "ntptimezone",                "NTP Timezone"]
    ,[ "uptime",                     "Uptime since boot"]
    ,[ "bootcount",                  "Nr. Reboots"] 
