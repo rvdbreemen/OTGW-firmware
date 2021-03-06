@@ -61,6 +61,7 @@ void resetOTGW() {
   OTGWSerial.resetPic();
   //then read the first response of the firmware to make sure it reads it
   String resp = OTGWSerial.readStringUntil('\n');
+  resp.trim();
   DebugTf("Received firmware version: [%s] [%s] (%d)\r\n", CSTR(resp), OTGWSerial.firmwareVersion(), strlen(OTGWSerial.firmwareVersion()));
   bOTGWonline = (strlen(OTGWSerial.firmwareVersion())>0);
   if (bOTGWonline){
