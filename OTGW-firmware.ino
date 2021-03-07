@@ -71,7 +71,6 @@ void setup() {
   setupFSexplorer();
   startWebserver();
 
-
   OTGWSerial.println(F("Setup finished!\r\n"));
   // After resetting the OTGW PIC never send anything to Serial for debug
   // and switch to telnet port 23 for debug purposed. 
