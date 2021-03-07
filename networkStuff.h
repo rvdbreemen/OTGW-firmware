@@ -169,7 +169,7 @@ void startNTP(){
   // Initialisation ezTime
   if (!settingNTPenable) return;
 
-  setDebug(INFO); 
+  setDebug(NONE); 
   setServer("time.google.com");
 
   if (settingNTPtimezone.length()==0) settingNTPtimezone = DEFAULT_TIMEZONE; //set back to default timezone
