@@ -62,11 +62,12 @@ void setup() {
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
 
+  startTelnet();              // start the debug port 23
   startMDNS(CSTR(settingHostname));
   startLLMNR(CSTR(settingHostname));
   startMQTT(); 
   startNTP();
-  startTelnet();  //start the debug port 23
+
   setupFSexplorer();
   startWebserver();
 
