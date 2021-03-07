@@ -37,7 +37,7 @@ The features of this Nodosop OpenTherm NodeMCU firmware are:
 - reliable OTA upgrades of `OTGW-firmare` (the nodeMCU) itself (v0.6.0+)
 - reliable OTGW PIC upgrades, to the latest firmware available at http://otgw.tclcode.com/download.html
 - Cleaner RestAPI's for Telegraf OTmonitor integration
-
+ 
 **Warning: Never flash your OTGW PIC firmware through wifi using OTmonitor application, you can brick your OTGW PIC. Instead use the buildin PIC firmware upgrade feature (based on code by Bron Schelte)**
 
 To do:
