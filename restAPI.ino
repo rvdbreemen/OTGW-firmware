@@ -358,7 +358,7 @@ void sendDeviceInfo()
   sendNestedJsonObj("ssid", CSTR(WiFi.SSID()));
   sendNestedJsonObj("wifirssi", WiFi.RSSI());
   sendNestedJsonObj("mqttconnected", String(CBOOLEAN(statusMQTTconnection)));
-  sendNestedJsonObj("ntpenabled", String(CBOOLEAN(settingNTPenable)));
+  sendNestedJsonObj("ntpenable", String(CBOOLEAN(settingNTPenable)));
   sendNestedJsonObj("ntptimezone", CSTR(settingNTPtimezone));
   sendNestedJsonObj("uptime", upTime());
   sendNestedJsonObj("lastreset", lastReset);
