@@ -82,7 +82,7 @@ typedef struct {
 	
 	//Ventilation/HeatRecovery Msgids
 	uint16_t	StatusVH = 0;
-	uint8_t		ControlSetpointVH = 0;
+	uint16_t	ControlSetpointVH = 0;  //should be uint8_t
 	uint16_t	FaultFlagsCodeVH = 0;
 	uint16_t	DiagnosticCodeVH = 0;
 	uint16_t	ConfigMemberIDVH = 0;
