@@ -89,10 +89,10 @@ String    settingMQTTuser = "";
 String    settingMQTTpasswd = "";
 String    settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
 String    settingMQTTtopTopic = "otgw";
+bool      settingMQTTOTmessage = false;
 bool      settingNTPenable = true;
 String    settingNTPtimezone = DEFAULT_TIMEZONE;
 bool      settingLEDblink = true;
-
 
 //Now load network suff
 #include "networkStuff.h"

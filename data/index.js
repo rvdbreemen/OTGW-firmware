@@ -704,6 +704,8 @@
    ,[ "uptime",                     "Uptime since boot"]
    ,[ "bootcount",                  "Nr. Reboots"] 
    ,[ "ledblink",                   "Heartbeat LED (on/off)"]
+   ,[ "mqttotmessage",              "MQTT OT msg Enable"]
+   
                  ];
   
 /*
