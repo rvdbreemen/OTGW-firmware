@@ -148,66 +148,6 @@ String executeCommand(const String sCmd){
   return _ret;
 }
 
-// String executeCommandCstyle(const String sCmd){
-//   return executeCommandCstyle(CSTR(sCmd), sCmd.length());
-// }
-
-// String executeCommandCstyle(const char* sCmd, size_t len){
-//   char _cmd[2];
-//   char line[80];
-//   char _ret[80];
-//   //send command to OTGW
-//   DebugTf("OTGW Send Cmd [%s]=[%s]\r\n", sCmd);
-//   while(OTGWSerial.availableForWrite() < len+2){
-//     feedWatchDog();
-//   }
-//   OTGWSerial.write(sCmd, len);
-//   OTGWSerial.write("\r\n");
-//   OTGWSerial.flush();
-//   //wait for response
-//   OTGWSerial.setTimeout(3000);
-//   while(!OTGWSerial.available()) {
-//     feedWatchDog();
-//   }
-//   // DebugTf("Send command: [%s]\r\n", _cmd);
-//   //fetch a line
-//   size_t l = OTGWSerial.readBytesUntil('\n', line, sizeof(line)-1);
-//   line[l]='\0';
-//   _cmd[0]='\0';
-//   if (l  > 0) {
-//     strcpy(_cmd,strtok(line,":"));                   
-//   } 
-//   if (prefix(_cmd, sCmd)){
-//     // Responses: When a serial command is accepted by the gateway, it responds with the two letters of the command code, a colon, and the interpreted data value.
-//     // Command:   "TT=19.125"
-//     // Response:  "TT: 19.13"
-//     //            [XX:response string]   
-//     strcpy(_ret,strtok(NULL,":"));  
-//   } else if (prefix("NG", _cmd)){
-//     strlcpy(_ret, "NG - No Good. The command code is unknown.", sizeof(_ret));
-//   } else if (prefix("SE", _cmd)){
-//     strlcpy(_ret, "SE - Syntax Error. The command contained an unexpected character or was incomplete.", sizeof(_ret));
-//   } else if (prefix("BV", _cmd)){
-//     strlcpy(_ret, "BV - Bad Value. The command contained a data value that is not allowed.", sizeof(_ret));
-//   } else if (prefix("OR", _cmd)){
-//     strlcpy(_ret, "OR - Out of Range. A number was specified outside of the allowed range.", sizeof(_ret));
-//   } else if (prefix("NS", _cmd)){
-//     strlcpy(_ret, "NS - No Space. The alternative Data-ID could not be added because the table is full.", sizeof(_ret));
-//   } else if (prefix("NF", _cmd)){
-//     strlcpy(_ret, "NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table.", sizeof(_ret));
-//   } else if (prefix("OE", _cmd)){
-//     strlcpy(_ret, "OE - Overrun Error. The processor was busy and failed to process all received characters.", sizeof(_ret));
-//   } else {
-//     strlcpy(_ret, "Error: Different command response [", sizeof(_ret));
-//     strlcat(_ret, _cmd, sizeof(_ret));
-//     strlcat(_ret, "] Cmd send [", sizeof(_ret));
-//     strlcat(_ret, sCmd, sizeof(_ret));
-//     strlcat(_ret, "]", sizeof(_ret));
-//   } 
-//   DebugTf("Command send - Response returned: [%s]:[%s] - line: [%s]\r\n", _cmd, _ret, line);
-//   return _ret;
-// }
-
 //===================[ OTGW PS=1 Command ]===============================
 void getOTGW_PS_1(){
   DebugTln("PS=1");
@@ -804,14 +744,26 @@ int sendOTGW(const char* buf, int len)
   } else Debugln("Error: Serial device not found!");
 }
 
-void processOTGW(const char * buf, int len)
-{
-  if (strstr(buf, "Error 01")!= NULL) OTdataObject.error01++;
-  if (strstr(buf, "Error 02")!= NULL) OTdataObject.error02++;
-  if (strstr(buf, "Error 03")!= NULL) OTdataObject.error03++;
-  if (strstr(buf, "Error 04")!= NULL) OTdataObject.error04++;
-  if (len == 9) 
-  { 
+/*
+  This function checks if the string received is a valid "raw OT message".
+  Raw OTmessages are 9 chars long and start with TBARE when talking to OTGW PIC.
+*/
+bool isvalidotmsg(const char *buf, int len){
+  char *chk = "TBARE";
+  bool _ret =  (len==9);
+  _ret &= (strchr(chk, buf[0])!=NULL);
+  return _ret;
+}
+
+/*
+  Process OTGW messages coming from the PIC.
+  It knows about:
+  - raw OTmsg format
+  - error format
+  - ...
+*/
+void processOTGW(const char * buf, int len){ 
+  if (isvalidotmsg(buf, len)) { 
     //OT protocol messages are 9 chars long
     sendMQTTData("otmessage", buf);
     // source of otmsg
@@ -821,7 +773,7 @@ void processOTGW(const char * buf, int len)
     } else if (buf[0]=='T')
     {
       DebugT("Thermostat       ");
-    } else     if (buf[0]=='R')
+    } else if (buf[0]=='R')
     {
       DebugT("Request Boiler   ");
     } else if (buf[0]=='A')
@@ -830,10 +782,7 @@ void processOTGW(const char * buf, int len)
     } else if (buf[0]=='E')
     {
       DebugT("Parity error     ");
-    } else
-    {
-      DebugTf("Unexpected=[%c] ", buf[0]);
-    }
+    } 
 
     const char *bufval = buf + 1;
     uint32_t value = strtoul(bufval, NULL, 16);
@@ -953,7 +902,26 @@ void processOTGW(const char * buf, int len)
         case RemehaDetectionConnectedSCU:   OTdataObject.RemehaDetectionConnectedSCU = print_u8u8(); break;
       }
     } else Debugln(); //next line 
-  } else DebugTf("received from OTGW => [%s] [%d]\r\n", buf, len);
+  } else DebugTf("Unexpected rreceived from OTGW => [%s] [%d]\r\n", buf, len);
+
+  
+  if (strstr(buf, "Error 01")!= NULL) {
+    OTdataObject.error01++;
+    DebugTf("Error 01 = %d\r\n",OTdataObject.error01);
+  }
+  if (strstr(buf, "Error 02")!= NULL) {
+    OTdataObject.error02++;
+    DebugTf("Error 02 = %d\r\n",OTdataObject.error02);
+  }  
+  if (strstr(buf, "Error 03")!= NULL) {
+    OTdataObject.error03++;
+    DebugTf("Error 03 = %d\r\n",OTdataObject.error03);
+  }
+  if (strstr(buf, "Error 04")!= NULL){
+    OTdataObject.error04++;
+    DebugTf("Error 04 = %d\r\n",OTdataObject.error04);
+  }
+ 
 }
 
 

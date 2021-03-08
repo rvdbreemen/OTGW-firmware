@@ -140,6 +140,7 @@ void handleMQTT()
           DebugTf("MQTT: Subscribe TopicId [%s] FAILED! \r\n", topic);
         }
         DebugFlush();
+        sendMQTTversioninfo();
       }
       else
       { // no connection, try again, do a non-blocking wait for 3 seconds.
@@ -216,19 +217,6 @@ void handleMQTT()
   statusMQTTconnection = MQTTclient.connected();
 } // handleMQTT()
 
-
-// bool MQTT_connected()
-// {
-//   if (!settingMQTTenable) return false;
-//   return MQTTclient.connected();
-// }
-
-// bool getMQTTconnectstatus(){
-//   if (!settingMQTTenable) return false;
-//   return MQTTclient.connected();
-// }
-
-
 //===========================================================================================
 String trimVal(char *in) 
 {
@@ -238,11 +226,10 @@ String trimVal(char *in)
 } // trimVal()
 
 /* 
-* topic:  <string> , sensor topic, will be automatically prefixed with <mqtt topic>/value/<node_id>
-* json:   <string> , payload to send
-* retain: <bool> , retain mqtt message  
+  topic:  <string> , sensor topic, will be automatically prefixed with <mqtt topic>/value/<node_id>
+  json:   <string> , payload to send
+  retain: <bool> , retain mqtt message  
 */
-//===========================================================================================
 void sendMQTTData(const String topic, const String json, const bool retain = false)
 {
   if (!settingMQTTenable) return;
@@ -250,21 +237,12 @@ void sendMQTTData(const String topic, const String json, const bool retain = fal
 }
 
 /* 
-* topic:  <string> , sensor topic, will be automatically prefixed with <mqtt topic>/value/<node_id>
-* json:   <string> , payload to send
-* retain: <bool> , retain mqtt message  
+  topic:  <string> , sensor topic, will be automatically prefixed with <mqtt topic>/value/<node_id>
+  json:   <string> , payload to send
+  retain: <bool> , retain mqtt message  
 */
 void sendMQTTData(const char* topic, const char *json, const bool retain = false) 
 {
-/*  
-* The maximum message size, including header, is 128 bytes by default. 
-* This is configurable via MQTT_MAX_PACKET_SIZE in PubSubClient.h.
-* Als de json string te lang wordt zal de string niet naar de MQTT server
-* worden gestuurd. Vandaar de korte namen als ED en PDl1.
-* Mocht je langere, meer zinvolle namen willen gebruiken dan moet je de
-* MQTT_MAX_PACKET_SIZE dus aanpassen!!!
-*/
-//===========================================================================================
   if (!settingMQTTenable) return;
   if (!MQTTclient.connected() || !isValidIP(MQTTbrokerIP)) return;
   // DebugTf("Sending data to MQTT server [%s]:[%d]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort);
@@ -302,93 +280,102 @@ void sendMQTT(const char* topic, const char *json, const size_t len)
   feedWatchDog();
 } // sendMQTTData()
 
+//===========================================================================================
+/*
+Publish usefull firmware version information to MQTT broker.
+*/
+void sendMQTTversioninfo(){
+  sendMQTTData("otgw-firmware/version", _VERSION);
+  sendMQTTData("otgw-firmware/reboot_count", String(rebootCount));
+  sendMQTTData("otgw-pic/version", sPICfwversion);
+}
+//===========================================================================================
 void resetMQTTBufferSize()
 {
   if (!settingMQTTenable) return;
   MQTTclient.setBufferSize(256);
 }
-  //===========================================================================================
-  bool splitString(String sIn, char del, String &cKey, String &cVal)
+//===========================================================================================
+bool splitString(String sIn, char del, String &cKey, String &cVal)
+{
+  sIn.trim(); //trim spaces
+  cKey = "";
+  cVal = "";
+  if (sIn.indexOf("//") == 0) return false; //comment, skip split
+  if (sIn.length() <= 3) return false; //not enough buffer, skip split
+  int pos = sIn.indexOf(del); //determine split point
+  if ((pos == 0) || (pos == (sIn.length() - 1))) return false; // no key or no value
+  cKey = sIn.substring(0, pos);
+  cKey.trim(); //before, and trim spaces
+  cVal = sIn.substring(pos + 1);
+  cVal.trim(); //after,and trim spaces
+  return true;
+}
+//===========================================================================================
+void doAutoConfigure(){
+  if (!settingMQTTenable) return;
+  if (!MQTTclient.connected()) {DebugTln("ERROR: MQTT broker not connected."); return;} 
+  if (!isValidIP(MQTTbrokerIP)) {DebugTln("ERROR: MQTT broker IP not valid."); return;} 
+  const char *cfgFilename = "/mqttha.cfg";
+  String sTopic = "";
+  String sMsg = "";
+  File fh; //filehandle
+  //Let's open the MQTT autoconfig file
+  LittleFS.begin();
+  if (LittleFS.exists(cfgFilename))
   {
-    sIn.trim(); //trim spaces
-    cKey = "";
-    cVal = "";
-    if (sIn.indexOf("//") == 0) return false; //comment, skip split
-    if (sIn.length() <= 3) return false; //not enough buffer, skip split
-    int pos = sIn.indexOf(del); //determine split point
-    if ((pos == 0) || (pos == (sIn.length() - 1))) return false; // no key or no value
-    cKey = sIn.substring(0, pos);
-    cKey.trim(); //before, and trim spaces
-    cVal = sIn.substring(pos + 1);
-    cVal.trim(); //after,and trim spaces
-    return true;
-  }
-  //===========================================================================================
-  void doAutoConfigure()
-  {
-    if (!settingMQTTenable) return;
-    if (!MQTTclient.connected()) {DebugTln("ERROR: MQTT broker not connected."); return;} 
-    if (!isValidIP(MQTTbrokerIP)) {DebugTln("ERROR: MQTT broker IP not valid."); return;} 
-    const char *cfgFilename = "/mqttha.cfg";
-    String sTopic = "";
-    String sMsg = "";
-    File fh; //filehandle
-    //Let's open the MQTT autoconfig file
-    LittleFS.begin();
-    if (LittleFS.exists(cfgFilename))
+    fh = LittleFS.open(cfgFilename, "r");
+    if (fh)
     {
-      fh = LittleFS.open(cfgFilename, "r");
-      if (fh)
-      {
-        //Lets go read the config and send it out to MQTT line by line
-        while (fh.available())
-        {                 //read file line by line, split and send to MQTT (topic, msg)
-          feedWatchDog(); //start with feeding the dog
-          
-          String sLine = fh.readStringUntil('\n');
-          // DebugTf("sline[%s]\r\n", CSTR(sLine));
-          if (splitString(sLine, ',', sTopic, sMsg))
-          {
-            // discovery topic prefix
-            DebugTf("sTopic[%s]==>", CSTR(sTopic)); 
-            sTopic.replace("%homeassistant%", CSTR(settingMQTThaprefix));  
+      //Lets go read the config and send it out to MQTT line by line
+      while (fh.available())
+      {                 //read file line by line, split and send to MQTT (topic, msg)
+        feedWatchDog(); //start with feeding the dog
+        
+        String sLine = fh.readStringUntil('\n');
+        // DebugTf("sline[%s]\r\n", CSTR(sLine));
+        if (splitString(sLine, ',', sTopic, sMsg))
+        {
+          // discovery topic prefix
+          DebugTf("sTopic[%s]==>", CSTR(sTopic)); 
+          sTopic.replace("%homeassistant%", CSTR(settingMQTThaprefix));  
 
-            /// node
-            sTopic.replace("%node_id%", CSTR(NodeId));
-            Debugf("[%s]\r\n", CSTR(sTopic)); 
-            /// ----------------------
+          /// node
+          sTopic.replace("%node_id%", CSTR(NodeId));
+          Debugf("[%s]\r\n", CSTR(sTopic)); 
+          /// ----------------------
 
-            DebugTf("sMsg[%s]==>", CSTR(sMsg)); 
+          DebugTf("sMsg[%s]==>", CSTR(sMsg)); 
 
-            /// node
-            sMsg.replace("%node_id%", CSTR(NodeId));
+          /// node
+          sMsg.replace("%node_id%", CSTR(NodeId));
 
-            /// hostname
-            sMsg.replace("%hostname%", CSTR(settingHostname));
+          /// hostname
+          sMsg.replace("%hostname%", CSTR(settingHostname));
 
-            /// version
-            sMsg.replace("%version%", CSTR(String(_VERSION)));
+          /// version
+          sMsg.replace("%version%", CSTR(String(_VERSION)));
 
-            // pub topics prefix
-            sMsg.replace("%mqtt_pub_topic%", CSTR(MQTTPubNamespace));
+          // pub topics prefix
+          sMsg.replace("%mqtt_pub_topic%", CSTR(MQTTPubNamespace));
 
-            // sub topics
-            sMsg.replace("%mqtt_sub_topic%", CSTR(MQTTSubNamespace));
+          // sub topics
+          sMsg.replace("%mqtt_sub_topic%", CSTR(MQTTSubNamespace));
 
-            Debugf("[%s]\r\n", CSTR(sMsg)); DebugFlush();
+          Debugf("[%s]\r\n", CSTR(sMsg)); DebugFlush();
 
-            //sendMQTT(CSTR(sTopic), CSTR(sMsg), (sTopic.length() + sMsg.length()+2));
-            sendMQTT(sTopic, sMsg);
-            resetMQTTBufferSize();
-            delay(10);
-          } else DebugTf("Either comment or invalid config line: [%s]\r\n", CSTR(sLine));
+          //sendMQTT(CSTR(sTopic), CSTR(sMsg), (sTopic.length() + sMsg.length()+2));
+          sendMQTT(sTopic, sMsg);
+          resetMQTTBufferSize();
+          delay(10);
+        } else DebugTf("Either comment or invalid config line: [%s]\r\n", CSTR(sLine));
       } // while available()
-      fh.close();
+    fh.close();
 
-      // HA discovery msg's are rather large, reset the buffer size to release some memory
-      resetMQTTBufferSize();
+    // HA discovery msg's are rather large, reset the buffer size to release some memory
+    resetMQTTBufferSize();
     } 
-  } 
+  }  
 }
 
 

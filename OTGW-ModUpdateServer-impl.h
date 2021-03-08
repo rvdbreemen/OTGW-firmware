@@ -131,7 +131,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           }
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
-        if (_serial_output) Debug(".");
+        if (_serial_output) {Debug("."); blinkLEDnow(LED1);}
         // Feed the dog before it bites!
         Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
         // End of feeding hack

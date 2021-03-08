@@ -157,6 +157,12 @@ void doTaskEvery60s(){
   }
 }
 
+//===[ Do task every 5min ]===
+void do5minevent(){
+  DebugTf("Uptime seconds: %d", upTimeSeconds);
+  sendMQTTData("otgw-firmware/uptime", String(upTimeSeconds));
+}
+
 //===[ check for new pic version  ]===
 void docheckforpic(){
   String latest = checkforupdatepic("gateway.hex");
@@ -184,18 +190,20 @@ void doBackgroundTasks()
 
 void loop()
 {
-
   DECLARE_TIMER_SEC(timer1s, 1, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer5s, 5, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer30s, 30, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(tmrcheckpic, 1440, CATCH_UP_MISSED_TICKS);
+  DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS);
 
   if (DUE(timer1s))       doTaskEvery1s();
   if (DUE(timer5s))       doTaskEvery5s();
   if (DUE(timer30s))      doTaskEvery30s();
   if (DUE(timer60s))      doTaskEvery60s();
   if (DUE(tmrcheckpic))   docheckforpic();
+  if (DUE(timer5min))     do5minevent();
+
   doBackgroundTasks();
 }
 
