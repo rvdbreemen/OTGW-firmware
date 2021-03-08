@@ -902,25 +902,23 @@ void processOTGW(const char * buf, int len){
         case RemehaDetectionConnectedSCU:   OTdataObject.RemehaDetectionConnectedSCU = print_u8u8(); break;
       }
     } else Debugln(); //next line 
-  } else DebugTf("Unexpected rreceived from OTGW => [%s] [%d]\r\n", buf, len);
-
-  
-  if (strstr(buf, "Error 01")!= NULL) {
+  } else if (strstr(buf, "Error 01")!= NULL) {
     OTdataObject.error01++;
     DebugTf("Error 01 = %d\r\n",OTdataObject.error01);
-  }
-  if (strstr(buf, "Error 02")!= NULL) {
+    sendMQTTData("Error 01", String(OTdataObject.error01));
+  } else if (strstr(buf, "Error 02")!= NULL) {
     OTdataObject.error02++;
     DebugTf("Error 02 = %d\r\n",OTdataObject.error02);
-  }  
-  if (strstr(buf, "Error 03")!= NULL) {
+    sendMQTTData("Error 02", String(OTdataObject.error02));
+  } else if (strstr(buf, "Error 03")!= NULL) {
     OTdataObject.error03++;
     DebugTf("Error 03 = %d\r\n",OTdataObject.error03);
-  }
-  if (strstr(buf, "Error 04")!= NULL){
+    sendMQTTData("Error 03", String(OTdataObject.error03));
+  } else if (strstr(buf, "Error 04")!= NULL){
     OTdataObject.error04++;
     DebugTf("Error 04 = %d\r\n",OTdataObject.error04);
-  }
+    sendMQTTData("Error 04", String(OTdataObject.error04));
+  } else DebugTf("Unexpected received from OTGW => [%s] [%d]\r\n", buf, len);
  
 }
 
