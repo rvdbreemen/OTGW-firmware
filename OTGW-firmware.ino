@@ -160,7 +160,8 @@ void doTaskEvery60s(){
 //===[ Do task every 5min ]===
 void do5minevent(){
   DebugTf("Uptime seconds: %d", upTimeSeconds);
-  sendMQTTData("otgw-firmware/uptime", String(upTimeSeconds));
+  String sUptime = String(upTimeSeconds);
+  sendMQTTData("otgw-firmware/uptime", sUptime, false);
 }
 
 //===[ check for new pic version  ]===
