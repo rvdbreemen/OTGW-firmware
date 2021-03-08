@@ -59,7 +59,7 @@ bool        Verbose = false;
 char        cMsg[CMSG_SIZE];
 char        fChar[10];
 String      lastReset = "";
-uint64_t    upTimeSeconds = 0;
+uint32_t    upTimeSeconds = 0;
 uint32_t    rebootCount = 0;
 Timezone    myTZ; 
 String      sMessage = "";    

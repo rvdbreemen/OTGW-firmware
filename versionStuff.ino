@@ -7,8 +7,7 @@
 
 static const char banner[] = "OpenTherm Gateway ";
 
-char *GetVersion(String hexfile)
-{
+char *GetVersion(String hexfile){
   char hexbuf[48];
   int len, addr, tag, data, offs, linecnt = 0, weight;
   uint32_t codemap[4] = {};
