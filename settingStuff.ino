@@ -37,6 +37,7 @@ void writeSettings(bool show)
   root["MQTTpasswd"] = settingMQTTpasswd;
   root["MQTTtoptopic"] = settingMQTTtopTopic;
   root["MQTThaprefix"] = settingMQTThaprefix;
+  root["MQTTOTmessage"] = settingMQTTOTmessage;
   root["NTPenable"] = settingNTPenable;
   root["NTPtimezone"] = settingNTPtimezone;
   root["LEDblink"] = settingLEDblink;
@@ -89,6 +90,7 @@ void readSettings(bool show)
   }
   settingMQTThaprefix     = doc["MQTThaprefix"].as<String>();
   if (settingMQTThaprefix=="null") settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
+  settingMQTTOTmessage    = doc["MQTTOTmessage"]|settingMQTTOTmessage;
   settingNTPenable        = doc["NTPenable"]; 
   settingNTPtimezone      = doc["NTPtimezone"].as<String>();
   if (settingNTPtimezone=="null")  settingNTPtimezone = "Europe/Amsterdam"; //default to amsterdam timezone
@@ -155,6 +157,7 @@ void updateSetting(const char *field, const char *newValue)
     settingMQTThaprefix = String(newValue);
     if (settingMQTThaprefix.length()==0) settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
   }
+  if (stricmp(field, "MQTTOTmessage")==0)  settingMQTTOTmessage = EVALBOOLEAN(newValue);
   
   if (stricmp(field, "NTPenable")==0)      settingNTPenable = EVALBOOLEAN(newValue);
   if (stricmp(field, "NTPtimezone")==0)    {

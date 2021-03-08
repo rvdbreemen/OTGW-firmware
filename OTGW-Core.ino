@@ -774,7 +774,7 @@ bool isvalidotmsg(const char *buf, int len){
 void processOTGW(const char * buf, int len){ 
   if (isvalidotmsg(buf, len)) { 
     //OT protocol messages are 9 chars long
-    sendMQTTData("otmessage", buf);
+    if (settingMQTTOTmessage) sendMQTTData("otmessage", buf);
     // source of otmsg
     if (buf[0]=='B')
     {
