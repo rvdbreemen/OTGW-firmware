@@ -49,6 +49,7 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
   
 | Version | Release notes |
 |-|-|
+| 0.8.1 | Improving ot msg processing<br>Adding: mqtt firmware information, uptime seconds<br>Bugfix: mqtt topic "master_low_off_pump_control_function" |
 | 0.8.0 | **Breaking Change: MQTT topic naming convention has changed from `<mqqt top prefix>/<sensor>` to `<mqtt top prefix>/value/<node id>/<sensor>` for data publshed and `<mqtt top prefix>/set/<node id>/<command>` for subscriptions** <br> Update Homeasssistant Discovery: add OTGW as a device and group all exposed entities as childs <br> Update Homeasssistant Discovery: add climate (thermostat) enity, uses temporary temperature override (OTGW `TT` command) (Home Assistant Core v2021.2.0+)<br> Bugfix #14: reduce MQTT connect timeout < the watchdog timeout to prevent reboot on a timout<br> Adding LLMNR responder (http://otgw/ will work now too)<br>New restapi: Telegraf endpoint (/api/v1/otgw/telegraf)<br> Fixing bugs in core OTGW msg processor for ASF flas|
 | 0.7.8 | Update Home Assistant Discovery <br> Flexible Home Assistant prefix <br> Bugfix: Removed hardcoded OTGW topic <br> Bugfix: NTP timezone discovery removed |
 | 0.7.7 | UI improved: Only show updates values in web UI <br> Bugifx: Serial not found error when sending commands thru MQTT fixed |
