@@ -432,7 +432,7 @@ void print_f88(float *value)
   dtostrf(_value, 3, 2, _msg);
   Debugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg , OTmap[OTdata.id].unit);
   //SendMQTT
-  if ((*value)!=_value) sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
+  sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
   (*value) = _value;
 }
 
@@ -445,7 +445,7 @@ void print_s16(int16_t *value)
   itoa(_value, _msg, 10);
   Debugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg, OTmap[OTdata.id].unit);
   //SendMQTT
-  if ((*value)!=_value) sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
+  sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
   (*value) = _value;
 }
 
@@ -460,13 +460,13 @@ void print_s8s8(uint16_t *value)
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_value_hb", sizeof(_topic));
   Debugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg, OTmap[OTdata.id].unit);
-  if (((*value)>>8 & 0xF0)!=OTdata.valueLB) sendMQTTData(_topic, _msg);
+  sendMQTTData(_topic, _msg);
   //Build string for MQTT
   itoa((int8_t)OTdata.valueLB, _msg, 10);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_value_lb", sizeof(_topic));
   Debugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg, OTmap[OTdata.id].unit);
-  if (((*value) & 0x0F)!=OTdata.valueLB) sendMQTTData(_topic, _msg);
+  sendMQTTData(_topic, _msg);
   (*value)=_value;
 }
 
@@ -479,7 +479,7 @@ void print_u16(uint16_t *value)
   utoa(_value, _msg, 10);
   Debugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg, OTmap[OTdata.id].unit);
   //SendMQTT
-  if ((*value)!= _value) sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
+  sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
   (*value) = _value;
 }
 
@@ -509,7 +509,7 @@ void print_status(uint16_t *value)
 
   Debugf("%-37s = M[%s] \r\n", OTmap[OTdata.id].label, _flag8_master);
   //Master Status
-  if (((*value)>>8)!=OTdata.valueHB)     sendMQTTData("status_master", _flag8_master);
+  sendMQTTData("status_master", _flag8_master);
   sendMQTTData("ch_enable",             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
   sendMQTTData("dhw_enable",            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));
   sendMQTTData("cooling_enable",        (((OTdata.valueHB) & 0x04) ? "ON" : "OFF")); 
@@ -538,7 +538,7 @@ void print_status(uint16_t *value)
   DebugTf("%-37s = S[%s] \r\n", OTmap[OTdata.id].label, _flag8_slave);
 
   //Slave Status
-  if (((*value) & 0x0F)!=OTdata.valueLB) sendMQTTData("status_slave", _flag8_slave);
+  sendMQTTData("status_slave", _flag8_slave);
   sendMQTTData("fault",                 (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  
   sendMQTTData("centralheating",        (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  
   sendMQTTData("domestichotwater",      (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));  
@@ -586,10 +586,10 @@ void print_slavememberid(uint16_t *value)
   uint16_t _value=OTdata.u16();
   Debugf("%-37s = Slave Config[%s] MemberID code [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   //Build string for SendMQTT
-  if (((*value) >> 8)!=OTdata.valueHB) sendMQTTData("slave_configuration", byte_to_binary(OTdata.valueHB));
+  sendMQTTData("slave_configuration", byte_to_binary(OTdata.valueHB));
   char _msg[15] {0};
   utoa(OTdata.valueLB, _msg, 10);
-  if ((*value & 0x0F)!=OTdata.valueLB) sendMQTTData("slave_memberid_code", _msg);
+  sendMQTTData("slave_memberid_code", _msg);
 
   
   // bit: description  [ clear/0, set/1] 
@@ -619,9 +619,9 @@ void print_mastermemberid(uint16_t *value)
   Debugf("%-37s = Master Config[%s] MemberID code [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   //Build string for MQTT
   char _msg[15] {0};
-  if (((*value) >> 8)!=OTdata.valueHB) sendMQTTData("master_configuration", byte_to_binary(OTdata.valueHB));
+  sendMQTTData("master_configuration", byte_to_binary(OTdata.valueHB));
   utoa(OTdata.valueLB, _msg, 10);
-  if ((*value & 0x0F)!=OTdata.valueLB) sendMQTTData("master_memberid_code", _msg);
+  sendMQTTData("master_memberid_code", _msg);
   (*value)=_value;
 }
 
@@ -634,13 +634,13 @@ void print_flag8u8(uint16_t *value)
   //flag8 value
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_flag8", sizeof(_topic));
-  if (((*value) >> 8)!=OTdata.valueHB) sendMQTTData(_topic, byte_to_binary(OTdata.valueHB));
+  sendMQTTData(_topic, byte_to_binary(OTdata.valueHB));
   //u8 value
   char _msg[15] {0};
   utoa(OTdata.valueLB, _msg, 10);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_code", sizeof(_topic));
-  if ((*value & 0x0F)!=OTdata.valueLB) sendMQTTData(_topic, _msg);
+  sendMQTTData(_topic, _msg);
   (*value)=_value;
 }
 
@@ -654,7 +654,7 @@ void print_flag8(uint16_t *value)
   //flag8 value
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_flag8", sizeof(_topic));
-  if ((*value & 0x0F)!=OTdata.valueLB) sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
+  sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
   (*value)=_value;
 }
 
@@ -667,12 +667,12 @@ void print_flag8flag8(uint16_t *value)
   Debugf("%-37s = HB flag8[%s] -[%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueHB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_hb_flag8", sizeof(_topic));
-  if (((*value) >> 8)!=OTdata.valueHB) sendMQTTData(_topic, byte_to_binary(OTdata.valueHB));
+  sendMQTTData(_topic, byte_to_binary(OTdata.valueHB));
   //flag8 valueLB
   Debugf("%-37s = LB flag8[%s] - [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_lb_flag8", sizeof(_topic));
-  if ((*value & 0x0F)!=OTdata.valueLB) sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
+  sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
   (*value)=_value;
 }
 
@@ -688,13 +688,13 @@ void print_u8u8(uint16_t *value)
   Debugf("%-37s = HB u8[%s] [%3d]\r\n", OTmap[OTdata.id].label, _msg, OTdata.valueHB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_hb_u8", sizeof(_topic));
-  if (((*value)>>8)!=OTdata.valueHB) sendMQTTData(_topic, _msg);
+  sendMQTTData(_topic, _msg);
   //flag8 valueLB
   utoa((OTdata.valueLB), _msg, 10);
   Debugf("%-37s = LB u8[%s] [%3d]\r\n", OTmap[OTdata.id].label, _msg, OTdata.valueLB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_lb_u8", sizeof(_topic));
-  if (((*value)&0x0F)!=OTdata.valueLB) sendMQTTData(_topic, _msg);
+  sendMQTTData(_topic, _msg);
   (*value)=_value;
 }
 
@@ -710,13 +710,13 @@ void print_date(uint16_t *value)
   Debugf("%-37s = HB u8[%s] [%3d]\r\n", OTmap[OTdata.id].label, _msg, OTdata.valueHB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_month", sizeof(_topic));
-  if (((*value)>>8)!=OTdata.valueHB) sendMQTTData(_topic, _msg);
+  sendMQTTData(_topic, _msg);
   //flag8 valueLB
   utoa((OTdata.valueLB), _msg, 10);
   Debugf("%-37s = LB u8[%s] [%3d]\r\n", OTmap[OTdata.id].label, _msg, OTdata.valueLB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_day_of_month", sizeof(_topic));
-  if (((*value)&0x0F)!=OTdata.valueLB) sendMQTTData(_topic, _msg);
+  sendMQTTData(_topic, _msg);
   (*value)=_value;
 }
 
@@ -732,15 +732,15 @@ void print_daytime(uint16_t *value)
   //dayofweek
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_dayofweek", sizeof(_topic));
-  if ((((*value) & 0xE0)>>8)!=(OTdata.valueHB >> 5) & 0x7) sendMQTTData(_topic, dayOfWeekName[(OTdata.valueHB >> 5) & 0x7]);
+  sendMQTTData(_topic, dayOfWeekName[(OTdata.valueHB >> 5) & 0x7]);
   //hour
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_hour", sizeof(_topic));
-  if (((*value)&0x0F)!=(OTdata.valueHB & 0x0F)) sendMQTTData(_topic, itoa((OTdata.valueHB & 0x0F), _msg, 10)); 
+  sendMQTTData(_topic, itoa((OTdata.valueHB & 0x0F), _msg, 10)); 
   //min
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_minutes", sizeof(_topic));
-  if (((*value)&0x0F)!=OTdata.valueLB) sendMQTTData(_topic, itoa((OTdata.valueLB), _msg, 10)); 
+  sendMQTTData(_topic, itoa((OTdata.valueLB), _msg, 10)); 
   (*value) = _value;
 }
 
