@@ -698,6 +698,28 @@ void print_u8u8(uint16_t *value)
   (*value)=_value;
 }
 
+void print_date(uint16_t *value)
+{ 
+  uint16_t _value=OTdata.u16();
+  Debugf("%-37s = %3d / %3d %s\r\n", OTmap[OTdata.id].label, (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, OTmap[OTdata.id].unit);
+  //Build string for MQTT
+  char _topic[50] {0};
+  char _msg[10] {0};
+  //flag8 valueHB
+  utoa((OTdata.valueHB), _msg, 10);
+  Debugf("%-37s = HB u8[%s] [%3d]\r\n", OTmap[OTdata.id].label, _msg, OTdata.valueHB);
+  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+  strlcat(_topic, "_month", sizeof(_topic));
+  if (((*value)>>8)!=OTdata.valueHB) sendMQTTData(_topic, _msg);
+  //flag8 valueLB
+  utoa((OTdata.valueLB), _msg, 10);
+  Debugf("%-37s = LB u8[%s] [%3d]\r\n", OTmap[OTdata.id].label, _msg, OTdata.valueLB);
+  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+  strlcat(_topic, "_day_of_month", sizeof(_topic));
+  if (((*value)&0x0F)!=OTdata.valueLB) sendMQTTData(_topic, _msg);
+  (*value)=_value;
+}
+
 void print_daytime(uint16_t *value)
 {
   uint16_t _value = OTdata.u16();    
@@ -857,7 +879,7 @@ void processOTGW(const char * buf, int len){
         case FHBindexFHBvalue:              print_u8u8(&OTdataObject.FHBindexFHBvalue);  break; 
         case MaxCapacityMinModLevel:        print_u8u8(&OTdataObject.MaxCapacityMinModLevel);  break; 
         case DayTime:                       print_daytime(&OTdataObject.DayTime);  break; 
-        case Date:                          print_u8u8(&OTdataObject.Date);  break; 
+        case Date:                          print_date(&OTdataObject.Date);  break; 
         case Year:                          print_u16(&OTdataObject.Year);  break; 
         case TdhwSetUBTdhwSetLB:            print_s8s8(&OTdataObject.TdhwSetUBTdhwSetLB); break;  
         case MaxTSetUBMaxTSetLB:            print_s8s8(&OTdataObject.MaxTSetUBMaxTSetLB); break;  
