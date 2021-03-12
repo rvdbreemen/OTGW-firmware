@@ -41,6 +41,8 @@ void writeSettings(bool show)
   root["NTPenable"] = settingNTPenable;
   root["NTPtimezone"] = settingNTPtimezone;
   root["LEDblink"] = settingLEDblink;
+  root["GPIOSENSORSenabled"] = settingGPIOSENSORSenabled;
+  root["GPIOSENSORSpin"] = settingGPIOSENSORSpin;
 
   serializeJsonPretty(root, file);
   Debugln(F("... done!"));
@@ -95,6 +97,8 @@ void readSettings(bool show)
   settingNTPtimezone      = doc["NTPtimezone"].as<String>();
   if (settingNTPtimezone=="null")  settingNTPtimezone = "Europe/Amsterdam"; //default to amsterdam timezone
   settingLEDblink         = doc["LEDblink"]|settingLEDblink;
+  settingGPIOSENSORSenabled = doc["GPIOSENSORSenabled"] | settingGPIOSENSORSenabled;
+  settingGPIOSENSORSpin = doc["GPIOSENSORSpin"] | settingGPIOSENSORSpin;
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
@@ -117,7 +121,9 @@ void readSettings(bool show)
     Debugf("NTP enabled   : %s\r\n",  CBOOLEAN(settingNTPenable));
     Debugf("NPT timezone  : %s\r\n",  CSTR(settingNTPtimezone));
     Debugf("Led Blink     : %s\r\n",  CBOOLEAN(settingLEDblink));
-  }
+    Debugf("GPIO Sensors  : %s\r\n",  CBOOLEAN(settingGPIOSENSORSenabled));
+    Debugf("GPIO Sen. Pin : %d\r\n",  settingGPIOSENSORSpin);
+    }
   
   Debugln(F("-\r\n"));
 
@@ -165,9 +171,22 @@ void updateSetting(const char *field, const char *newValue)
     startNTP();  // update timezone if changed
   }
   if (stricmp(field, "LEDblink")==0)      settingLEDblink = EVALBOOLEAN(newValue);
+  if (stricmp(field, "GPIOSENSORSenabled") == 0)
+  {
+    settingGPIOSENSORSenabled = EVALBOOLEAN(newValue);
+    Debugln();
+    DebugTf("Need reboot before GPIO SENSORS will search for sensors on pin GPIO%d!\r\n\n", settingGPIOSENSORSpin);
+  }
+  if (stricmp(field, "GPIOSENSORSpin") == 0)    
+  {
+    settingGPIOSENSORSpin = atoi(newValue);
+    Debugln();
+    DebugTf("Need reboot before GPIO SENSORS will use new pin GPIO%d!\r\n\n", settingGPIOSENSORSpin);
+  }
+
   //finally update write settings
   writeSettings(false);
-  
+
 } // updateSetting()
 
 

@@ -94,6 +94,10 @@ bool      settingNTPenable = true;
 String    settingNTPtimezone = DEFAULT_TIMEZONE;
 bool      settingLEDblink = true;
 
+// GPIO Sensor Settings
+bool      settingGPIOSENSORSenabled = false;
+int8_t    settingGPIOSENSORSpin = 10;
+
 //Now load network suff
 #include "networkStuff.h"
 
