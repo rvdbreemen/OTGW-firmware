@@ -704,6 +704,8 @@
    ,[ "uptime",                     "Uptime since boot"]
    ,[ "bootcount",                  "Nr. Reboots"] 
    ,[ "ledblink",                   "Heartbeat LED (on/off)"]
+   ,[ "gpiosensorsenabled",         "GPIO Sensors Enabled"]
+   ,[ "gpiosensorspin",             "GPIO pin # (SD3 = GPIO10 => 10)"]
    ,[ "mqttotmessage",              "MQTT OT msg Enable"]
    
                  ];

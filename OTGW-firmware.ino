@@ -78,6 +78,7 @@ void setup() {
   resetOTGW();          // reset the OTGW pic
   startOTGWstream();    // start port 25238 
   checkOTWGpicforupdate();
+  initSensors();        // init DS18B20
 
   initWatchDog();       // setup the WatchDog
   //Blink LED2 to signal setup done
@@ -136,6 +137,7 @@ void doTaskEvery1s(){
 //===[ Do task every 5s ]===
 void doTaskEvery5s(){
   //== do tasks ==
+  pollSensors();
 }
 
 //===[ Do task every 30s ]===
