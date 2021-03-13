@@ -413,10 +413,13 @@ void sendDeviceSettings()
   sendJsonSettingObj("ntptimezone", CSTR(settingNTPtimezone), "s", 50);
   sendJsonSettingObj("ledblink", settingLEDblink, "b");
   sendJsonSettingObj("gpiosensorsenabled", settingGPIOSENSORSenabled, "b");
-  sendJsonSettingObj("gpiosensorspin", settingGPIOSENSORSpin, "i", 1, 16);
+  sendJsonSettingObj("gpiosensorspin", settingGPIOSENSORSpin, "i", 0, 16);
   sendJsonSettingObj("gpiosensorsinterval", settingGPIOSENSORSinterval, "i", 5, 65535);
   sendJsonSettingObj("otgwcommandenable", settingOTGWcommandenable, "b");
   sendJsonSettingObj("otgwcommands", CSTR(settingOTGWcommands), "s", 32);
+  sendJsonSettingObj("gpiooutputsenabled", settingGPIOOUTPUTSenabled, "b");
+  sendJsonSettingObj("gpiooutputspin", settingGPIOOUTPUTSpin, "i", 0, 16);
+  sendJsonSettingObj("gpiooutputstriggerbit", settingGPIOOUTPUTStriggerBit, "i", 0,16);
   sendEndJsonObj("settings");
 
 } // sendDeviceSettings()

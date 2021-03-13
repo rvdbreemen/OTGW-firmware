@@ -31,6 +31,48 @@ void handleDebug(){
             case '1':   bDebugOTmsg = !bDebugOTmsg; DebugTf("\r\nDebug OTmsg: %s\r\n", CBOOLEAN(bDebugOTmsg)); break;
             case '2':   bDebugRestAPI = !bDebugRestAPI; DebugTf("\r\nDebug RestAPI: %s\r\n", CBOOLEAN(bDebugRestAPI)); break;
             case '3':   bDebugMQTT = !bDebugMQTT; DebugTf("\r\nDebug MQTT: %s\r\n", CBOOLEAN(bDebugMQTT)); break;
+            case 'b':
+                DebugTln("Blink led 1");
+                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
+                blinkLED(LED1, 5, 500);
+            break;
+            case 'i':
+                DebugTln("relay init");
+                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
+                initOutputs();
+            break;
+            case 'u':
+                DebugTln("gpio output on ");
+                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
+                digitalWrite(settingGPIOOUTPUTSpin, ON);
+                break;
+            case 'j':
+                DebugTf("read gpio output state (0== led ON): %d \r\n", digitalRead(settingGPIOOUTPUTSpin));
+            break;
+            case 'k':
+                DebugTln("read settings");
+                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
+                readSettings(true);
+            break;
+            case 'o':
+                DebugTln("gpio output off");
+                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
+                digitalWrite(settingGPIOOUTPUTSpin, OFF);
+                break;
+            case 'l':
+                DebugTln("MyDEBUG =true");
+                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
+                settingMyDEBUG = true;
+                break;
+            case 'f':
+                if(settingMyDEBUG)
+                {
+                    DebugTln("MyDEBUG = true");
+                }else{
+                    DebugTln("MyDEBUG = false");
+                }
+                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
+                break;
             default:
             break;
         }
