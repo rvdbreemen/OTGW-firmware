@@ -45,6 +45,8 @@ void writeSettings(bool show)
   root["GPIOSENSORSpin"] = settingGPIOSENSORSpin;
   root["OTGWcommandenable"] = settingOTGWcommandenable;
   root["OTGWcommands"] = settingOTGWcommands;
+  root["GPIOOUTPUTSenabled"] = settingGPIOOUTPUTSenabled;
+  root["GPIOOUTPUTSpin"] = settingGPIOOUTPUTSpin;
 
   serializeJsonPretty(root, file);
   Debugln(F("... done!"));
@@ -105,6 +107,8 @@ void readSettings(bool show)
   settingOTGWcommandenable = doc["OTGWcommandenable"] | settingOTGWcommandenable;
   settingOTGWcommands     = doc["OTGWcommands"].as<String>();
   if (settingOTGWcommands=="null") settingOTGWcommands = "";
+  settingGPIOOUTPUTSenabled = doc["GPIOOUTPUTSenabled"] | settingGPIOOUTPUTSenabled;
+  settingGPIOOUTPUTSpin = doc["GPIOOUTPUTSpin"] | settingGPIOOUTPUTSpin;
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
@@ -129,7 +133,9 @@ void readSettings(bool show)
     Debugf("GPIO Interval : %s\r\n",  CBOOLEAN(settingGPIOSENSORSinterval));
     Debugf("OTGW boot cmd enabled : %s\r\n",  CBOOLEAN(settingOTGWcommandenable));
     Debugf("OTGW boot cmd         : %s\r\n",  CSTR(settingOTGWcommands));
- }
+    Debugf("GPIO Outputs  : %s\r\n",  CBOOLEAN(settingGPIOOUTPUTSenabled));
+    Debugf("GPIO Out. Pin : %d\r\n",  settingGPIOOUTPUTSpin);
+    }
   
   Debugln(F("-\r\n"));
 
@@ -203,6 +209,18 @@ void updateSetting(const char *field, const char *newValue)
   }
   if (stricmp(field, "OTGWcommandenable")==0)    settingOTGWcommandenable = EVALBOOLEAN(newValue);
   if (stricmp(field, "OTGWcommands")==0)         settingOTGWcommands = String(newValue);
+  if (stricmp(field, "GPIOOUTPUTSenabled") == 0)
+  {
+    settingGPIOOUTPUTSenabled = EVALBOOLEAN(newValue);
+    Debugln();
+    DebugTf("Need reboot before GPIO OUTPUTS will be enabled on pin GPIO%d!\r\n\n", settingGPIOOUTPUTSenabled);
+  }
+  if (stricmp(field, "GPIOOUTPUTSpin") == 0)
+  {
+    settingGPIOOUTPUTSpin = atoi(newValue);
+    Debugln();
+    DebugTf("Need reboot before GPIO OUTPUTS will use new pin GPIO%d!\r\n\n", settingGPIOOUTPUTSpin);
+  }
 
   //finally update write settings
   writeSettings(false);

@@ -107,6 +107,10 @@ bool      bDebugOTmsg = true;
 bool      bDebugRestAPI = false;
 bool      bDebugMQTT = true;
 
+// GPIO Output Settings
+bool      settingGPIOOUTPUTSenabled = false;
+int8_t    settingGPIOOUTPUTSpin = 10;
+
 //Now load network suff
 #include "networkStuff.h"
 

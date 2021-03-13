@@ -417,6 +417,8 @@ void sendDeviceSettings()
   sendJsonSettingObj("gpiosensorsinterval", settingGPIOSENSORSinterval, "i", 5, 65535);
   sendJsonSettingObj("otgwcommandenable", settingOTGWcommandenable, "b");
   sendJsonSettingObj("otgwcommands", CSTR(settingOTGWcommands), "s", 32);
+  sendJsonSettingObj("gpiooutputsenabled", settingGPIOOUTPUTSenabled, "b");
+  sendJsonSettingObj("gpiooutputspin", settingGPIOOUTPUTSpin, "i", 1, 16);
   sendEndJsonObj("settings");
 
 } // sendDeviceSettings()
