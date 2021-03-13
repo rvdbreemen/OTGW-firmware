@@ -711,8 +711,9 @@
    ,[ "mqttotmessage",              "MQTT OT msg Enable"]
    ,[ "otgwcommandenable",          "OTGW Boot Command Enabled"]
    ,[ "otgwcommands",               "OTGW Boot Command"]
-   
-   
+   ,[ "gpiooutputsenabled",         "GPIO Output Enabled"]
+   ,[ "gpiooutputspin",             "GPIO pin # to switch on/off"]
+   ,[ "gpiooutputstriggerbit",      "Bit # of the master/slave bits to trigger on (0-15)"]
    
                  ];
   
