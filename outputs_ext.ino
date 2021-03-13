@@ -21,3 +21,10 @@ void initOutputs() {
   // set the LED with the ledState of the variable:
   // digitalWrite(ledPin, ledState);
 }
+
+// still need to hook into processOTGW
+void setOutput(bool set_HIGH = true)
+{
+  if(!settingGPIOOUTPUTSenabled) return;
+  digitalWrite(settingGPIOOUTPUTSpin,set_HIGH)
+}
