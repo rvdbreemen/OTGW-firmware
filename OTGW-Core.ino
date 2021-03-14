@@ -95,6 +95,15 @@ void checkOTWGpicforupdate(){
     sMessage = "New PIC version " + latest + " available!";
   }
 }
+
+//===================[ checkOTWGpicforupdate ]=====================
+void sendOTGWbootcmd(){
+  if (!settingOTGWcommandenable) return;
+  DebugTf("OTGW boot message = [%s]\r\n", CSTR(settingOTGWcommands));
+  OTGWSerial.write(CSTR(settingOTGWcommands));
+  OTGWSerial.flush();
+}
+
 //===================[ OTGW Command & Response ]===================
 String executeCommand(const String sCmd){
   //send command to OTGW
