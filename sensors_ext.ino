@@ -5,7 +5,9 @@
 
 #include <OneWire.h>
 #include <DallasTemperature.h>
-char * getDallasAddress(DeviceAddress deviceAddress);
+
+//prototype
+char* getDallasAddress(DeviceAddress deviceAddress);
 
 // GPIO where the DS18B20 is connected to
 // Data wire is plugged TO GPIO 10
@@ -120,7 +122,7 @@ int pollSensors()
 }
 
 // function to print a device address
-char * getDallasAddress(DeviceAddress deviceAddress)
+char* getDallasAddress(DeviceAddress deviceAddress)
 {
   // DebugTf("\r\n");
   static char dest[10];

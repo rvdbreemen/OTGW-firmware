@@ -97,6 +97,7 @@ bool      settingLEDblink = true;
 // GPIO Sensor Settings
 bool      settingGPIOSENSORSenabled = false;
 int8_t    settingGPIOSENSORSpin = 10;
+int16_t   settingGPIOSENSORSinterval = 5;
 
 //Now load network suff
 #include "networkStuff.h"

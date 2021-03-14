@@ -705,6 +705,7 @@
    ,[ "bootcount",                  "Nr. Reboots"] 
    ,[ "ledblink",                   "Heartbeat LED (on/off)"]
    ,[ "gpiosensorsenabled",         "GPIO Sensors Enabled"]
+   ,[ "gpiosensorinterval",         "GPIO Publish Interval (sec)"]
    ,[ "gpiosensorspin",             "GPIO pin # (SD3 = GPIO10 => 10)"]
    ,[ "mqttotmessage",              "MQTT OT msg Enable"]
    
