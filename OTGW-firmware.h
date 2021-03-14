@@ -99,6 +99,10 @@ bool      settingGPIOSENSORSenabled = false;
 int8_t    settingGPIOSENSORSpin = 10;
 int16_t   settingGPIOSENSORSinterval = 5;
 
+// Boot commands
+bool      settingOTGWcommandenable = false;
+String    settingOTGWcommands = "GW=1\r\nAA=28\r\n";
+
 //Now load network suff
 #include "networkStuff.h"
 

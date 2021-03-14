@@ -64,35 +64,23 @@ void setup() {
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
 
-  OTGWSerial.println(F("Init Telenet"));
   startTelnet();              // start the debug port 23
-  OTGWSerial.println(F("Init MDNS"));
   startMDNS(CSTR(settingHostname));
-  OTGWSerial.println(F("Init LLMNR"));
   startLLMNR(CSTR(settingHostname));
-  OTGWSerial.println(F("Init MQTT"));
   startMQTT(); 
-  OTGWSerial.println(F("Init NTP"));
   startNTP();
-  OTGWSerial.println(F("Init FSexplorer"));
   setupFSexplorer();
-  OTGWSerial.println(F("Init WebServer"));
   startWebserver();
   OTGWSerial.println(F("Setup finished!\r\n"));
   // After resetting the OTGW PIC never send anything to Serial for debug
   // and switch to telnet port 23 for debug purposed. 
   // Setup the OTGW PIC
-  OTGWSerial.println(F("Reset OTGW"));
   resetOTGW();          // reset the OTGW pic
-  OTGWSerial.println(F("Start OTGW Stream"));
   startOTGWstream();    // start port 25238 
-  OTGWSerial.println(F("Start for Pic")); 
   checkOTWGpicforupdate();
-  OTGWSerial.println(F("Start Init Sensor"));
   initSensors();        // init DS18B20
-  OTGWSerial.println(F("Start init Watschdog"));
   initWatchDog();       // setup the WatchDog
-  OTGWSerial.println(F("Finally done!"));
+  sendOTGWbootcmd();   
   //Blink LED2 to signal setup done
   setLed(LED1, OFF);
   blinkLED(LED2, 3, 100);
