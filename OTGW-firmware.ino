@@ -33,6 +33,8 @@
 #define ON LOW
 #define OFF HIGH
 
+DECLARE_TIMER_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS);
+  
 //=====================================================================
 void setup() {
   // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
@@ -62,25 +64,35 @@ void setup() {
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
 
+  OTGWSerial.println(F("Init Telenet"));
   startTelnet();              // start the debug port 23
+  OTGWSerial.println(F("Init MDNS"));
   startMDNS(CSTR(settingHostname));
+  OTGWSerial.println(F("Init LLMNR"));
   startLLMNR(CSTR(settingHostname));
+  OTGWSerial.println(F("Init MQTT"));
   startMQTT(); 
+  OTGWSerial.println(F("Init NTP"));
   startNTP();
-
+  OTGWSerial.println(F("Init FSexplorer"));
   setupFSexplorer();
+  OTGWSerial.println(F("Init WebServer"));
   startWebserver();
-
   OTGWSerial.println(F("Setup finished!\r\n"));
   // After resetting the OTGW PIC never send anything to Serial for debug
   // and switch to telnet port 23 for debug purposed. 
   // Setup the OTGW PIC
+  OTGWSerial.println(F("Reset OTGW"));
   resetOTGW();          // reset the OTGW pic
+  OTGWSerial.println(F("Start OTGW Stream"));
   startOTGWstream();    // start port 25238 
+  OTGWSerial.println(F("Start for Pic")); 
   checkOTWGpicforupdate();
+  OTGWSerial.println(F("Start Init Sensor"));
   initSensors();        // init DS18B20
-
+  OTGWSerial.println(F("Start init Watschdog"));
   initWatchDog();       // setup the WatchDog
+  OTGWSerial.println(F("Finally done!"));
   //Blink LED2 to signal setup done
   setLed(LED1, OFF);
   blinkLED(LED2, 3, 100);
@@ -137,7 +149,7 @@ void doTaskEvery1s(){
 //===[ Do task every 5s ]===
 void doTaskEvery5s(){
   //== do tasks ==
-  pollSensors();
+  
 }
 
 //===[ Do task every 30s ]===
@@ -184,9 +196,7 @@ void doBackgroundTasks()
   handleOTGW();                 // OTGW handling
   httpServer.handleClient();
   MDNS.update();
-  events();                     // trigger ezTime update etc.
-  // // 'blink' the status led every x ms
-  // if (settingLEDblink) blinkLEDms(1000);             
+  events();                     // trigger ezTime update etc       
   delay(1);
   handleDebug();
 }
@@ -199,14 +209,14 @@ void loop()
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(tmrcheckpic, 1440, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS);
-
-  if (DUE(timer1s))       doTaskEvery1s();
-  if (DUE(timer5s))       doTaskEvery5s();
-  if (DUE(timer30s))      doTaskEvery30s();
-  if (DUE(timer60s))      doTaskEvery60s();
-  if (DUE(tmrcheckpic))   docheckforpic();
-  if (DUE(timer5min))     do5minevent();
-
+  
+  if (DUE(timer1s))         doTaskEvery1s();
+  if (DUE(timer5s))         doTaskEvery5s();
+  if (DUE(timer30s))        doTaskEvery30s();
+  if (DUE(timer60s))        doTaskEvery60s();
+  if (DUE(tmrcheckpic))     docheckforpic();
+  if (DUE(timer5min))       do5minevent();
+  if (DUE(timerpollsensor)) pollSensors();
   doBackgroundTasks();
 }
 

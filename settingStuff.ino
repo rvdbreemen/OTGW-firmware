@@ -99,6 +99,7 @@ void readSettings(bool show)
   settingLEDblink         = doc["LEDblink"]|settingLEDblink;
   settingGPIOSENSORSenabled = doc["GPIOSENSORSenabled"] | settingGPIOSENSORSenabled;
   settingGPIOSENSORSpin = doc["GPIOSENSORSpin"] | settingGPIOSENSORSpin;
+  settingGPIOSENSORSinterval = doc["GPIOSENSORSinterval"] | settingGPIOSENSORSinterval;
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
@@ -123,7 +124,8 @@ void readSettings(bool show)
     Debugf("Led Blink     : %s\r\n",  CBOOLEAN(settingLEDblink));
     Debugf("GPIO Sensors  : %s\r\n",  CBOOLEAN(settingGPIOSENSORSenabled));
     Debugf("GPIO Sen. Pin : %d\r\n",  settingGPIOSENSORSpin);
-    }
+    Debugf("GPIO Interval : %s\r\n",  CBOOLEAN(settingGPIOSENSORSinterval));
+  }
   
   Debugln(F("-\r\n"));
 
@@ -183,7 +185,10 @@ void updateSetting(const char *field, const char *newValue)
     Debugln();
     DebugTf("Need reboot before GPIO SENSORS will use new pin GPIO%d!\r\n\n", settingGPIOSENSORSpin);
   }
-
+  if (stricmp(field, "GPIOSENSORSinterval") == 0) {
+    settingGPIOSENSORSinterval = atoi(newValue);
+    CHANGE_INTERVAL_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS); 
+  }
   //finally update write settings
   writeSettings(false);
 

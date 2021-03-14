@@ -59,6 +59,8 @@ static      FSInfo LittleFSinfo;
 bool        LittleFSmounted; 
 bool        isConnected = false;
 
+#define WM_DEBUG_PORT OTGWSerial
+
 //gets called when WiFiManager enters configuration mode
 //===========================================================================================
 void configModeCallback (WiFiManager *myWiFiManager) 
@@ -98,7 +100,7 @@ void startWiFi(const char* hostname, int timeOut)
   //--- if it does not connect it starts an access point with the specified name
   //--- here  "<HOSTNAME>-<MAC>"
   //--- and goes into a blocking loop awaiting configuration
-  OTGWSerial.printf("AutoConnect to: %s", thisAP.c_str());
+  OTGWSerial.printf("AutoConnect to: %s\r\n", thisAP.c_str());
   if (!manageWiFi.autoConnect(thisAP.c_str()))
   {
     //-- fail to connect? Have you tried turning it off and on again? 
@@ -108,12 +110,12 @@ void startWiFi(const char* hostname, int timeOut)
     delay(5000);  // Enough time to ensure we don't return.
   }
 
-  //WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-
+  WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+  
   Debugln();
-  DebugT(F("Connected to " )); Debugln (WiFi.SSID());
-  DebugT(F("IP address: " ));  Debugln (WiFi.localIP());
-  DebugT(F("IP gateway: " ));  Debugln (WiFi.gatewayIP());
+  DebugT(F("Connected to " )); Debugln(WiFi.SSID());
+  DebugT(F("IP address: " ));  Debugln(WiFi.localIP());
+  DebugT(F("IP gateway: " ));  Debugln(WiFi.gatewayIP());
   Debugln();
 
   httpUpdater.setup(&httpServer);
@@ -128,7 +130,7 @@ void startWiFi(const char* hostname, int timeOut)
 //===========================================================================================
 void startTelnet() 
 {
-  OTGWSerial.print("Use  'telnet ");
+  OTGWSerial.print("\r\nUse  'telnet ");
   OTGWSerial.print(WiFi.localIP());
   OTGWSerial.println("' for debugging");
   TelnetStream.begin();

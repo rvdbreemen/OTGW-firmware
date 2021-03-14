@@ -414,6 +414,8 @@ void sendDeviceSettings()
   sendJsonSettingObj("ledblink", settingLEDblink, "b");
   sendJsonSettingObj("gpiosensorsenabled", settingGPIOSENSORSenabled, "b");
   sendJsonSettingObj("gpiosensorspin", settingGPIOSENSORSpin, "i", 1, 16);
+  sendJsonSettingObj("gpiosensorsinterval", settingGPIOSENSORSinterval, "i", 1, 65535);
+  
   sendEndJsonObj("settings");
 
 } // sendDeviceSettings()
