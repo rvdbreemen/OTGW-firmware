@@ -110,13 +110,14 @@ bool      bDebugMQTT = true;
 // GPIO Output Settings
 bool      settingGPIOOUTPUTSenabled = false;
 int8_t    settingGPIOOUTPUTSpin = 10;
+int8_t    settingGPIOOUTPUTStriggerBit = 0;
 
 //Now load network suff
 #include "networkStuff.h"
 
-// That's all folks...
+    // That's all folks...
 
-/***************************************************************************
+    /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a
 * copy of this software and associated documentation files (the

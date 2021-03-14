@@ -47,6 +47,7 @@ void writeSettings(bool show)
   root["OTGWcommands"] = settingOTGWcommands;
   root["GPIOOUTPUTSenabled"] = settingGPIOOUTPUTSenabled;
   root["GPIOOUTPUTSpin"] = settingGPIOOUTPUTSpin;
+  root["GPIOOUTPUTStriggerBit"] = settingGPIOOUTPUTStriggerBit;
 
   serializeJsonPretty(root, file);
   Debugln(F("... done!"));
@@ -109,6 +110,7 @@ void readSettings(bool show)
   if (settingOTGWcommands=="null") settingOTGWcommands = "";
   settingGPIOOUTPUTSenabled = doc["GPIOOUTPUTSenabled"] | settingGPIOOUTPUTSenabled;
   settingGPIOOUTPUTSpin = doc["GPIOOUTPUTSpin"] | settingGPIOOUTPUTSpin;
+  settingGPIOOUTPUTStriggerBit = doc["GPIOOUTPUTStriggerBit"] | settingGPIOOUTPUTStriggerBit;
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
@@ -117,24 +119,25 @@ void readSettings(bool show)
 
   if (show) {
     Debugln(F("\r\n==== read Settings ===================================================\r"));
-    Debugf("Hostname      : %s\r\n",  CSTR(settingHostname));
-    Debugf("MQTT enabled  : %s\r\n",  CBOOLEAN(settingMQTTenable));
-    Debugf("MQTT broker   : %s\r\n",  CSTR(settingMQTTbroker));
-    Debugf("MQTT port     : %d\r\n",  settingMQTTbrokerPort);
-    Debugf("MQTT username : %s\r\n",  CSTR(settingMQTTuser));
-    Debugf("MQTT password : %s\r\n",  CSTR(settingMQTTpasswd));
-    Debugf("MQTT toptopic : %s\r\n",  CSTR(settingMQTTtopTopic));
-    Debugf("HA prefix     : %s\r\n",  CSTR(settingMQTThaprefix));
-    Debugf("NTP enabled   : %s\r\n",  CBOOLEAN(settingNTPenable));
-    Debugf("NPT timezone  : %s\r\n",  CSTR(settingNTPtimezone));
-    Debugf("Led Blink     : %s\r\n",  CBOOLEAN(settingLEDblink));
-    Debugf("GPIO Sensors  : %s\r\n",  CBOOLEAN(settingGPIOSENSORSenabled));
-    Debugf("GPIO Sen. Pin : %d\r\n",  settingGPIOSENSORSpin);
-    Debugf("GPIO Interval : %s\r\n",  CBOOLEAN(settingGPIOSENSORSinterval));
+    Debugf("Hostname              : %s\r\n", CSTR(settingHostname));
+    Debugf("MQTT enabled          : %s\r\n", CBOOLEAN(settingMQTTenable));
+    Debugf("MQTT broker           : %s\r\n", CSTR(settingMQTTbroker));
+    Debugf("MQTT port             : %d\r\n", settingMQTTbrokerPort);
+    Debugf("MQTT username         : %s\r\n", CSTR(settingMQTTuser));
+    Debugf("MQTT password         : %s\r\n", CSTR(settingMQTTpasswd));
+    Debugf("MQTT toptopic         : %s\r\n", CSTR(settingMQTTtopTopic));
+    Debugf("HA prefix             : %s\r\n", CSTR(settingMQTThaprefix));
+    Debugf("NTP enabled           : %s\r\n", CBOOLEAN(settingNTPenable));
+    Debugf("NPT timezone          : %s\r\n", CSTR(settingNTPtimezone));
+    Debugf("Led Blink             : %s\r\n", CBOOLEAN(settingLEDblink));
+    Debugf("GPIO Sensors          : %s\r\n",  CBOOLEAN(settingGPIOSENSORSenabled));
+    Debugf("GPIO Sen. Pin         : %d\r\n",  settingGPIOSENSORSpin);
+    Debugf("GPIO Interval         : %s\r\n",  CBOOLEAN(settingGPIOSENSORSinterval));
     Debugf("OTGW boot cmd enabled : %s\r\n",  CBOOLEAN(settingOTGWcommandenable));
     Debugf("OTGW boot cmd         : %s\r\n",  CSTR(settingOTGWcommands));
-    Debugf("GPIO Outputs  : %s\r\n",  CBOOLEAN(settingGPIOOUTPUTSenabled));
-    Debugf("GPIO Out. Pin : %d\r\n",  settingGPIOOUTPUTSpin);
+    Debugf("GPIO Outputs          : %s\r\n",  CBOOLEAN(settingGPIOOUTPUTSenabled));
+    Debugf("GPIO Out. Pin         : %d\r\n",  settingGPIOOUTPUTSpin);
+    Debugf("GPIO Out. Trg. Bit    : %d\r\n",  settingGPIOOUTPUTStriggerBit);
     }
   
   Debugln(F("-\r\n"));
@@ -220,6 +223,12 @@ void updateSetting(const char *field, const char *newValue)
     settingGPIOOUTPUTSpin = atoi(newValue);
     Debugln();
     DebugTf("Need reboot before GPIO OUTPUTS will use new pin GPIO%d!\r\n\n", settingGPIOOUTPUTSpin);
+  }
+  if (stricmp(field, "GPIOOUTPUTStriggerBit") == 0)
+  {
+    settingGPIOOUTPUTStriggerBit = atoi(newValue);
+    Debugln();
+    DebugTf("Need reboot before GPIO OUTPUTS will use new trigger bit %d!\r\n\n", settingGPIOOUTPUTStriggerBit);
   }
 
   //finally update write settings
