@@ -20,12 +20,11 @@
 TelnetStreamClass OTGWstream(OTGW_SERIAL_PORT); 
 
 //Depends on the library 
-
 #define OTGW_COMMAND_TOPIC "command"
 
 typedef struct {
-	uint16_t 	Status = 0; 				// flag8 / flag8  Master and Slave Status flags. 
-	float 		TSet = 0.0; 					// f8.8  Control setpoint  ie CH  water temperature setpoint (°C)
+	uint16_t 	Status = 0; // flag8 / flag8  Master and Slave Status flags. 
+	float 		TSet = 0.0; // f8.8  Control setpoint  ie CH  water temperature setpoint (°C)
 	uint16_t	MConfigMMemberIDcode = 0; 	// flag8 / u8  Master Configuration Flags /  Master MemberID Code 
 	uint16_t	SConfigSMemberIDcode = 0; // flag8 / u8  Slave Configuration Flags /  Slave MemberID Code 
 	uint16_t 	Command = 0; // u8 / u8  Remote Command 
@@ -59,7 +58,7 @@ typedef struct {
 	float 		Tdhw2 = 0.0 ; // f8.8  Domestic hot water temperature 2 (°C)
 	int16_t 	Texhaust = 0; // s16  Boiler exhaust temperature (°C)
 	uint16_t	FanSpeed = 0; // u16  Fan Speed (rpm)
-	float 		ElectricalCurrentBurnerFlame =0.0; // f88 Electrical current through burner flame (µA)
+	float 		ElectricalCurrentBurnerFlame = 0.0; // f88 Electrical current through burner flame (µA)
 	float 		TRoomCH2= 0.0; // f88  Room Temperature for 2nd CH circuit ("°C)
 	uint16_t	RelativeHumidity = 0; // u8 / u8 Relative Humidity (%)
 	uint16_t 	TdhwSetUBTdhwSetLB = 0 ; // s8 / s8  DHW setpoint upper & lower bounds for adjustment  (°C)
