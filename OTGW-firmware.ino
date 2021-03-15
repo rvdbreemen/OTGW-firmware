@@ -85,7 +85,7 @@ void setup() {
   setLed(LED1, OFF);
   blinkLED(LED2, 3, 100);
   setLed(LED2, OFF);
-  }
+}
 
 //=====================================================================
 
@@ -174,6 +174,7 @@ void docheckforpic(){
   } else if (latest != sPICfwversion) {
     sMessage = "New PIC version " + latest + " available!";
   }
+  if (!checklittlefshash()) sMessage = "Flash your littleFS with matching version!";
 }
 
 //===[ Do the background tasks ]===

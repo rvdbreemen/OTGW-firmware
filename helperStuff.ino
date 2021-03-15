@@ -570,6 +570,30 @@ bool hourChanged(){
   if (lasthour==0) lasthour = hour();
   return (lasthour != hour());
 }
+
+/*
+  check if the version githash is in the littlefs as version.hash
+
+*/
+bool checklittlefshash()
+{
+  #define GITHASH_FILE "/version.hash"
+  String _githash="";
+  if (LittleFS.begin()) {
+    //start with opening the file
+    File fh = LittleFS.open(GITHASH_FILE, "r");
+    if (fh) {
+      //read from file
+      if (fh.available()){
+        //read the first line 
+         _githash = fh.readStringUntil('\n');
+      }
+    }
+    DebugTf("Check githash = [%s]\r\n", CSTR(_githash));
+    return (stricmp(CSTR(_githash), _VERSION_GITHASH)==0);
+  }
+  return false;
+}
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a
