@@ -94,6 +94,7 @@ void checkOTWGpicforupdate(){
   } else if (latest != sPICfwversion) {
     sMessage = "New PIC version " + latest + " available!";
   }
+  if (!checklittlefshash()) sMessage = "Flash your littleFS with matching version!";
 }
 
 //===================[ checkOTWGpicforupdate ]=====================

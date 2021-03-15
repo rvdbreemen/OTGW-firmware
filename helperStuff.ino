@@ -575,8 +575,7 @@ bool hourChanged(){
   check if the version githash is in the littlefs as version.hash
 
 */
-bool checklittlefshash()
-{
+bool checklittlefshash(){
   #define GITHASH_FILE "/version.hash"
   String _githash="";
   if (LittleFS.begin()) {
@@ -589,7 +588,7 @@ bool checklittlefshash()
          _githash = fh.readStringUntil('\n');
       }
     }
-    DebugTf("Check githash = [%s]\r\n", CSTR(_githash));
+    OTGWSerial.printf("Check githash = [%s]\r\n", CSTR(_githash));
     return (stricmp(CSTR(_githash), _VERSION_GITHASH)==0);
   }
   return false;
