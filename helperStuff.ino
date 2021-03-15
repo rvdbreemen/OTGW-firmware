@@ -588,7 +588,7 @@ bool checklittlefshash(){
          _githash = fh.readStringUntil('\n');
       }
     }
-    OTGWSerial.printf("Check githash = [%s]\r\n", CSTR(_githash));
+    DebugTf("Check githash = [%s]\r\n", CSTR(_githash));
     return (stricmp(CSTR(_githash), _VERSION_GITHASH)==0);
   }
   return false;
