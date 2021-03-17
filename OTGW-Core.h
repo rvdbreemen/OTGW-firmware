@@ -402,6 +402,17 @@ enum OpenThermMessageID {
 
 time_t msglastupdated[255] = {0}; //all msg, even if they are unknown
 
+struct OT_cmd_t { // see all possible commands for PIC here: https://otgw.tclcode.com/firmware.html
+	char cmd[15];
+	int cmdlen;
+	int retrycnt; 
+	time_t due;
+};
+
+#define CMDQUEUE_MAX 20
+struct OT_cmd_t cmdqueue[CMDQUEUE_MAX];
+static int cmdptr = 0;
+
 enum OpenThermStatus {
 	OT_NOT_INITIALIZED,
 	OT_READY,

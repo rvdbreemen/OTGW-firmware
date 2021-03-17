@@ -131,6 +131,7 @@ void delayms(unsigned long delay_ms)
 //===[ Do task every 1s ]===
 void doTaskEvery1s(){
   //== do tasks ==
+  handleOTGWqueue(); //just check if there are commands to retry
   upTimeSeconds++;
 }
 
