@@ -157,24 +157,6 @@ String executeCommand(const String sCmd){
   DebugTf("Command send [%s]-[%s] - Response line: [%s] - Returned value: [%s]\r\n", CSTR(sCmd), CSTR(_cmd), CSTR(line), CSTR(_ret));
   return _ret;
 }
-
-//===================[ OTGW PS=1 Command ]===============================
-void getOTGW_PS_1(){
-  DebugTln("PS=1");
-  OTGWSerial.write("PS=1\r\n");
-  OTGWSerial.flush();
-
-  while(!OTGWSerial.available()) {
-    feedWatchDog();
-  }
-  String line = OTGWSerial.readStringUntil('\n');
-  line.trim(); //remove LF and CR (and whitespaces)
-  DebugTln(line);
-  DebugTln("PS=0");
-  OTGWSerial.write("PS=0\r\n");
-  OTGWSerial.flush();
-}
-//===================[ OTGW PS=1 Command ]===============================
 //===================[ Watchdog OTGW ]===============================
 String initWatchDog() {
   // Hardware WatchDog is based on: 
@@ -209,9 +191,6 @@ String initWatchDog() {
   return ReasonReset;
   //===========================================
 }
-
-
-
 //===[ Feed the WatchDog before it bites! (1x per second) ]===
 void feedWatchDog() {
   //make sure to do this at least once a second
@@ -226,8 +205,7 @@ void feedWatchDog() {
     Wire.endTransmission();                       //That's all there is...
     if (settingLEDblink) blinkLEDnow(LED1);
   }
-  yield();
-  //==== feed the WD over I2C ==== 
+  yield(); 
 }
 
 //===================[ END Watchdog OTGW ]===============================
@@ -417,8 +395,6 @@ bool isWaterOverTemperature() {
 	return OTdataObject.ASFflags & 0x2000;
 }
 
-
-
 const char *byte_to_binary(int x)
 {
     static char b[9];
@@ -430,8 +406,7 @@ const char *byte_to_binary(int x)
     }
 
     return b;
-}
-
+}  //byte_to_binary
 
 void print_f88(float *value)
 {
@@ -757,6 +732,75 @@ void print_daytime(uint16_t *value)
 
 //===================[ Send buffer to OTGW ]=============================
 
+#define OTGW_CMD_RETRY 5
+#define OTGW_CMD_INTERVAL 5
+
+void sendOTGWcmd(const char* buf, int len){
+// - zorg dat er maar 1 call is waar er data NAAR de otgw wordt gestuurd. In die call, store die commando's in een queue
+// - zorg dat er maar 1 call is waar inkomende data van de otgw word verwerkt. Filter die data op command response (3rd char == ':') en compare met queue.
+// - met een timer of ander loopje, check if een command in de queue te oud is. (now() - received > 5 sec ofzo) en dan stuur nogmaals
+// - voeg een counter toe hoe vaak een command verstuurd is, stop na 5x en gooi een error op de bus/mqtt etc.
+  //sscanf(buf, "%2s=%s", cmdqueue[cmdptr].cmd, cmdqueue[cmdptr].value);
+  if (len<2) return; //no valid command of less then 2 bytes
+  cmdqueue[cmdptr].cmdlen = strlcpy(cmdqueue[cmdptr].cmd, buf, sizeof(cmdqueue[cmdptr].cmd));
+  cmdqueue[cmdptr].retrycnt = 0;
+  cmdqueue[cmdptr].due = now();
+  DebugTf("command=[%d]\r\n", cmdqueue[cmdptr].cmd);
+  if (cmdptr < CMDQUEUE_MAX) cmdptr++;
+  handleOTGWqueue();
+}
+
+void handleOTGWqueue(){
+  for (int i=0; i<cmdptr; i++){
+    if ((cmdqueue[i].retrycnt == 0) || (cmdqueue[i].due > now())) {
+      sendOTGW(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
+      cmdqueue[i].due = now() + OTGW_CMD_INTERVAL;
+      if (cmdqueue[i].retrycnt >= OTGW_CMD_RETRY){
+        //max retry reached, so delete command from queue
+        for (int j=i; j<=cmdptr; j++){
+          DebugTf("Moving [%d] => [%d]\r\n", j+1, j);
+          strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[i].cmd));
+          cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
+          cmdqueue[j].retrycnt = cmdqueue[j+1].retrycnt;
+          cmdqueue[j].due = cmdqueue[j+1].due;
+        }
+        cmdptr--;
+      }
+      cmdqueue[cmdptr].retrycnt++;
+    }
+  }
+}
+
+void verifyOTGWcmdqueue(char *buf, int len){
+  char cmd[2]={0};
+  char value[10]={0};
+  DebugTf("Verify command in queue [%s] [%d]", buf, len);
+  if (len<3) return; //shorter than 2letters and colon, then reject input
+  if (buf[2]!=':') return; //not a valid command response
+  memcpy(cmd, buf, 2);
+  memcpy(value, buf+3, len-3);
+  for (int i=0; i<cmdptr; i++){
+      DebugTf("Checking [%s]==>[%d]:[%s] from queue\r\n", cmd, i, cmdqueue[i].cmd); 
+    if (strstr(cmdqueue[i].cmd, cmd)){
+      //command found, check value
+      DebugTf("Found cmd [%s]==>[%d]:[%s]\r\n", cmd, i, cmdqueue[i].cmd); 
+      if(strstr(cmdqueue[i].cmd, value)){
+        //value found, thus remove command from queue
+        DebugTf("Found value [%s]==>[%d]:[%s]\r\n", value, i, cmdqueue[i].cmd); 
+        DebugTf("Remove from queue [%d]:[%s] from queue\r\n", i, cmdqueue[i].cmd);
+        for (int j=i; j<=cmdptr; j++){
+          DebugTf("Moving [%d] => [%d]\r\n", j+1, j);
+          strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[i].cmd));
+          cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
+          cmdqueue[j].retrycnt = cmdqueue[j+1].retrycnt;
+          cmdqueue[j].due = cmdqueue[j+1].due;
+        }
+        cmdptr--;
+      }
+    }
+  }
+}
+
 int sendOTGW(const char* buf, int len)
 {
   //Send the buffer to OTGW when the Serial interface is available
@@ -803,7 +847,7 @@ bool isvalidotmsg(const char *buf, int len){
   - error format
   - ...
 */
-void processOTGW(const char * buf, int len){ 
+void processOTGW(const char *buf, int len){
   if (isvalidotmsg(buf, len)) { 
     //OT protocol messages are 9 chars long
     if (settingMQTTOTmessage) sendMQTTData("otmessage", buf);
@@ -943,6 +987,8 @@ void processOTGW(const char * buf, int len){
         case RemehaDetectionConnectedSCU:   print_u8u8(&OTdataObject.RemehaDetectionConnectedSCU); break;
       }
     } else Debugln(); //next line 
+  } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
+    verifyOTGWcmdqueue(buf, len);
   } else if (strstr(buf, "Error 01")!= NULL) {
     OTdataObject.error01++;
     DebugTf("Error 01 = %d\r\n",OTdataObject.error01);
@@ -959,7 +1005,7 @@ void processOTGW(const char * buf, int len){
     OTdataObject.error04++;
     DebugTf("Error 04 = %d\r\n",OTdataObject.error04);
     sendMQTTData("Error 04", String(OTdataObject.error04));
-  } else DebugTf("Unexpected received from OTGW => [%s] [%d]\r\n", buf, len);
+  } else DebugTf("Not processed, received from OTGW => [%s] [%d]\r\n", buf, len);
  
 }
 
@@ -1050,7 +1096,6 @@ void handleOTGW()
         sRead[bytes_read++] = inByte;
     }
   }
-  
 }// END of handleOTGW
 
 //====================[ functions for REST API ]====================
