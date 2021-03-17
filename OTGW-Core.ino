@@ -771,7 +771,7 @@ void handleOTGWqueue(){
   }
 }
 
-void verifyOTGWcmdqueue(char *buf, int len){
+void verifyOTGWcmdqueue(const char *buf, int len){
   char cmd[2]={0};
   char value[10]={0};
   DebugTf("Verify command in queue [%s] [%d]", buf, len);
