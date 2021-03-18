@@ -16,3 +16,6 @@
 [submodule "Arduino/packages/esp8266"]
 	path = Arduino/packages/esp8266
 	url = https://github.com/esp8266/Arduino.git
+[submodule "Arduino/libraries/DallasTemperature"]
+	path = Arduino/libraries/DallasTemperature
+	url = https://github.com/milesburton/Arduino-Temperature-Control-Library
