@@ -1,0 +1,24 @@
+[submodule "Arduino/libraries/pubsubclient"]
+	path = Arduino/libraries/pubsubclient
+	url = https://github.com/knolleary/pubsubclient
+[submodule "Arduino/libraries/WiFiManager"]
+	path = Arduino/libraries/WiFiManager
+	url = https://github.com/tzapu/WiFiManager
+[submodule "Arduino/libraries/TelnetStream"]
+	path = Arduino/libraries/TelnetStream
+	url = https://github.com/jandrassy/TelnetStream
+[submodule "Arduino/libraries/ezTime"]
+	path = Arduino/libraries/ezTime
+	url = https://github.com/ropg/ezTime.git
+[submodule "Arduino/libraries/ArduinoJson"]
+	path = Arduino/libraries/ArduinoJson
+	url = https://github.com/bblanchon/ArduinoJson
+[submodule "Arduino/packages/esp8266"]
+	path = Arduino/packages/esp8266
+	url = https://github.com/esp8266/Arduino.git
+[submodule "Arduino/libraries/DallasTemperature"]
+	path = Arduino/libraries/DallasTemperature
+	url = https://github.com/milesburton/Arduino-Temperature-Control-Library
+[submodule "Arduino/libraries/OneWire"]
+	path = Arduino/libraries/OneWire
+	url = https://github.com/PaulStoffregen/OneWire.git
