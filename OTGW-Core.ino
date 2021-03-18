@@ -741,9 +741,13 @@ void sendOTGWcmd(const char* buf, int len){
 // - met een timer of ander loopje, check if een command in de queue te oud is. (now() - received > 5 sec ofzo) en dan stuur nogmaals
 // - voeg een counter toe hoe vaak een command verstuurd is, stop na 5x en gooi een error op de bus/mqtt etc.
   //sscanf(buf, "%2s=%s", cmdqueue[cmdptr].cmd, cmdqueue[cmdptr].value);
-  if (len<2) return; //no valid command of less then 2 bytes
+  if (len < 3 or buf[2] != '=')
+  {
+    DebugTf("Not a valid command=[%d]\r\n", buf);
+  }
 
-  //store incoming command in queue
+  //add to queue. 
+  // we should check if there is an existing cmd queue:  if so, overwrite value
   cmdqueue[cmdptr].cmdlen = strlcpy(cmdqueue[cmdptr].cmd, buf, sizeof(cmdqueue[cmdptr].cmd));
   cmdqueue[cmdptr].retrycnt = 0;
   cmdqueue[cmdptr].due = now();
@@ -751,7 +755,6 @@ void sendOTGWcmd(const char* buf, int len){
   if (cmdptr < CMDQUEUE_MAX) cmdptr++;
 
   handleOTGWqueue();
-
 }
 
 void handleOTGWqueue(){
@@ -786,7 +789,7 @@ void handleOTGWqueue(){
 }
 
 // processes incoming data from the otgw
-void verifyOTGWcmdqueue(const char *buf, int len){
+void processOTGWdata(const char *buf, int len){
   char cmd[2]={0};
   char value[10]={0};
 
@@ -796,30 +799,39 @@ void verifyOTGWcmdqueue(const char *buf, int len){
     //not a valid command response
     //shorter than 2letters and colon, then reject input
     DebugTf("Data is not a command response [%s] [%d]", buf, len);
-    return;
+
+    /* 
+     * do normal data handling stuff
+     */
   }
+  else
+  {
+    // it's a command response, do our thing 
 
-  memcpy(cmd, buf, 2);
-  memcpy(value, buf+3, len-3);
+    memcpy(cmd, buf, 2);
+    memcpy(value, buf+3, len-3);
 
-  //loop queue
-  for (int i=0; i<cmdptr; i++){
-      DebugTf("Checking incoming [%s]==>[%d]:[%s] in queue\r\n", cmd, i, cmdqueue[i].cmd); 
-    if (strstr(cmdqueue[i].cmd, cmd)){
-      //command found, check value
-      DebugTf("Found cmd [%s]==>[%d]:[%s]\r\n", cmd, i, cmdqueue[i].cmd); 
-      if(strstr(cmdqueue[i].cmd, value)){
-        //value found, thus remove command from queue
-        DebugTf("Found value [%s]==>[%d]:[%s]\r\n", value, i, cmdqueue[i].cmd); 
-        DebugTf("Remove from queue [%d]:[%s] from queue\r\n", i, cmdqueue[i].cmd);
-        for (int j=i; j<=cmdptr; j++){
-          DebugTf("Moving [%d] => [%d]\r\n", j+1, j);
-          strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[i].cmd));
-          cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
-          cmdqueue[j].retrycnt = cmdqueue[j+1].retrycnt;
-          cmdqueue[j].due = cmdqueue[j+1].due;
+    //loop queue
+    for (int i=0; i<cmdptr; i++){
+        DebugTf("Checking incoming [%s]==>[%d]:[%s] in queue\r\n", cmd, i, cmdqueue[i].cmd); 
+      if (strstr(cmdqueue[i].cmd, cmd)){
+        //command found in queue,
+        DebugTf("Found cmd [%s]==>[%d]:[%s]\r\n", cmd, i, cmdqueue[i].cmd); 
+
+        // check if value matches reques
+        if(strstr(cmdqueue[i].cmd, value)){
+          //value found, thus remove command from queue
+          DebugTf("Found value [%s]==>[%d]:[%s]\r\n", value, i, cmdqueue[i].cmd); 
+          DebugTf("Remove from queue [%d]:[%s] from queue\r\n", i, cmdqueue[i].cmd);
+          for (int j=i; j<=cmdptr; j++){
+            DebugTf("Moving [%d] => [%d]\r\n", j+1, j);
+            strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[i].cmd));
+            cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
+            cmdqueue[j].retrycnt = cmdqueue[j+1].retrycnt;
+            cmdqueue[j].due = cmdqueue[j+1].due;
+          }
+          cmdptr--;
         }
-        cmdptr--;
       }
     }
   }
