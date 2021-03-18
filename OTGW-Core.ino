@@ -742,21 +742,35 @@ void sendOTGWcmd(const char* buf, int len){
 // - voeg een counter toe hoe vaak een command verstuurd is, stop na 5x en gooi een error op de bus/mqtt etc.
   //sscanf(buf, "%2s=%s", cmdqueue[cmdptr].cmd, cmdqueue[cmdptr].value);
   if (len<2) return; //no valid command of less then 2 bytes
+
+  //store incoming command in queue
   cmdqueue[cmdptr].cmdlen = strlcpy(cmdqueue[cmdptr].cmd, buf, sizeof(cmdqueue[cmdptr].cmd));
   cmdqueue[cmdptr].retrycnt = 0;
   cmdqueue[cmdptr].due = now();
   DebugTf("command=[%d]\r\n", cmdqueue[cmdptr].cmd);
   if (cmdptr < CMDQUEUE_MAX) cmdptr++;
+
   handleOTGWqueue();
+
 }
 
 void handleOTGWqueue(){
+
+  // loop queue
   for (int i=0; i<cmdptr; i++){
+    // if we haven't sent it yet or it's due
     if ((cmdqueue[i].retrycnt == 0) || (cmdqueue[i].due > now())) {
-      sendOTGW(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
+
+      // send it to the otgw
       cmdqueue[i].due = now() + OTGW_CMD_INTERVAL;
+      sendOTGW(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
+
+
       if (cmdqueue[i].retrycnt >= OTGW_CMD_RETRY){
         //max retry reached, so delete command from queue
+        // need to throw errors if we exceed max retry, the problem to is we can't do 
+        // that here as we need to wait and see if we get a response on the final call above.
+        // i suggest to move this final retry block to the verifyOTGWcmdqueque loops
         for (int j=i; j<=cmdptr; j++){
           DebugTf("Moving [%d] => [%d]\r\n", j+1, j);
           strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[i].cmd));
@@ -771,16 +785,26 @@ void handleOTGWqueue(){
   }
 }
 
+// processes incoming data from the otgw
 void verifyOTGWcmdqueue(const char *buf, int len){
   char cmd[2]={0};
   char value[10]={0};
+
   DebugTf("Verify command in queue [%s] [%d]", buf, len);
-  if (len<3) return; //shorter than 2letters and colon, then reject input
-  if (buf[2]!=':') return; //not a valid command response
+  if (len<3 or buf[2]!=':') 
+  {
+    //not a valid command response
+    //shorter than 2letters and colon, then reject input
+    DebugTf("Data is not a command response [%s] [%d]", buf, len);
+    return;
+  }
+
   memcpy(cmd, buf, 2);
   memcpy(value, buf+3, len-3);
+
+  //loop queue
   for (int i=0; i<cmdptr; i++){
-      DebugTf("Checking [%s]==>[%d]:[%s] from queue\r\n", cmd, i, cmdqueue[i].cmd); 
+      DebugTf("Checking incoming [%s]==>[%d]:[%s] in queue\r\n", cmd, i, cmdqueue[i].cmd); 
     if (strstr(cmdqueue[i].cmd, cmd)){
       //command found, check value
       DebugTf("Found cmd [%s]==>[%d]:[%s]\r\n", cmd, i, cmdqueue[i].cmd); 
@@ -799,6 +823,23 @@ void verifyOTGWcmdqueue(const char *buf, int len){
       }
     }
   }
+}
+
+// check if we have any commands waiting in queue
+// should be triggererd by a backbround task every x seconds
+void checkDueCommands()
+{
+
+  // loop queue
+    //  if now() - cmd received  < x seconds
+      // if counter < max_retry
+        // send command again
+      
+      // else
+        // throw error, command exceede max retries
+        // remove from queue
+  
+
 }
 
 int sendOTGW(const char* buf, int len)
