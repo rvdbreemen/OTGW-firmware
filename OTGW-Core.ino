@@ -731,30 +731,61 @@ void print_daytime(uint16_t *value)
 
 
 //===================[ Send buffer to OTGW ]=============================
-
-#define OTGW_CMD_RETRY 5
-#define OTGW_CMD_INTERVAL 5
-
-void sendOTGWcmd(const char* buf, int len){
 // - zorg dat er maar 1 call is waar er data NAAR de otgw wordt gestuurd. In die call, store die commando's in een queue
 // - zorg dat er maar 1 call is waar inkomende data van de otgw word verwerkt. Filter die data op command response (3rd char == ':') en compare met queue.
 // - met een timer of ander loopje, check if een command in de queue te oud is. (now() - received > 5 sec ofzo) en dan stuur nogmaals
 // - voeg een counter toe hoe vaak een command verstuurd is, stop na 5x en gooi een error op de bus/mqtt etc.
-  //sscanf(buf, "%2s=%s", cmdqueue[cmdptr].cmd, cmdqueue[cmdptr].value);
-  if (len<2) return; //no valid command of less then 2 bytes
-  cmdqueue[cmdptr].cmdlen = strlcpy(cmdqueue[cmdptr].cmd, buf, sizeof(cmdqueue[cmdptr].cmd));
-  cmdqueue[cmdptr].retrycnt = 0;
-  cmdqueue[cmdptr].due = now();
-  DebugTf("command=[%d]\r\n", cmdqueue[cmdptr].cmd);
-  if (cmdptr < CMDQUEUE_MAX) cmdptr++;
+
+#define OTGW_CMD_RETRY 5
+#define OTGW_CMD_INTERVAL 5
+
+void addOTWGcmdtoqueue(const char* buf, int len){
+  if ((len < 3) || (buf[2] != '=')){ 
+    //no valid command of less then 2 bytes
+    DebugTf("Not a valid command=[%d]\r\n", buf);
+  }
+
+  //check to see if the cmd is in queue
+  bool foundcmd = false;
+  int8_t insertptr = cmdptr; //set insertprt to next empty slot
+  char cmd[2]={0};
+  memcpy(cmd, buf, 2);
+  for (int i=0; i<cmdptr; i++){
+    if (strstr(cmdqueue[i].cmd, cmd)) {
+      //found cmd exists, set the inertptr to found slot
+      DebugTf("Found cmd exists in slot [%d]", i);
+      foundcmd = true;
+      insertptr = i;
+      break;
+    }
+  } 
+  //insert to the queue
+  cmdqueue[insertptr].cmdlen = strlcpy(cmdqueue[insertptr].cmd, buf, sizeof(cmdqueue[insertptr].cmd));
+  cmdqueue[insertptr].retrycnt = 0;
+  cmdqueue[insertptr].due = now()-1; //due right away
+  DebugTf("Insert queue in slot[%d]:[%d]\r\n", insertptr, cmdqueue[insertptr].cmd);
+  //if not found
+  if (!foundcmd) {
+    //if not reached max of queue
+    if (cmdptr < CMDQUEUE_MAX) {
+      cmdptr++; //next free slot
+    } else DebugTln("Error: Reached max queue");
+  }
+  //trigger sending command right away
   handleOTGWqueue();
 }
 
+/*
+  handleOTGWqueue should be called every second from main loop. 
+  This checks the queue for message are due to be resent.
+  If retry max is reached the cmd is delete from the queue
+*/
 void handleOTGWqueue(){
-  for (int i=0; i<cmdptr; i++){
-    if ((cmdqueue[i].retrycnt == 0) || (cmdqueue[i].due > now())) {
+  for (int i=0; i<cmdptr; i++) {
+    if (cmdqueue[i].due > now()) {
       sendOTGW(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
-      cmdqueue[i].due = now() + OTGW_CMD_INTERVAL;
+      cmdqueue[i].retrycnt++;
+      cmdqueue[i].due = now() + OTGW_CMD_INTERVAL * 1000; //seconds
       if (cmdqueue[i].retrycnt >= OTGW_CMD_RETRY){
         //max retry reached, so delete command from queue
         for (int j=i; j<=cmdptr; j++){
@@ -766,17 +797,25 @@ void handleOTGWqueue(){
         }
         cmdptr--;
       }
-      cmdqueue[cmdptr].retrycnt++;
     }
   }
 }
 
-void verifyOTGWcmdqueue(const char *buf, int len){
+/*
+  checkOTGWcmdqueue (buf, len)
+  This takes response from otgw and checks to see if the command was accepted.
+  Checks the response, and finds the command (if it's there).
+  Then checks if incoming response matches what was to be set.
+  Only then it's deleted from the queue.
+*/
+void checkOTGWcmdqueue(const char *buf, int len){
+  if ((len<3) || (buf[2]!=':')) {
+    DebugTf("Error: Not a command response [%s] [%d]", buf, len);
+    return; //not a valid command response
+  }
+  DebugTf("Verify command in queue [%s] [%d]", buf, len);
   char cmd[2]={0};
   char value[10]={0};
-  DebugTf("Verify command in queue [%s] [%d]", buf, len);
-  if (len<3) return; //shorter than 2letters and colon, then reject input
-  if (buf[2]!=':') return; //not a valid command response
   memcpy(cmd, buf, 2);
   memcpy(value, buf+3, len-3);
   for (int i=0; i<cmdptr; i++){
@@ -988,7 +1027,7 @@ void processOTGW(const char *buf, int len){
       }
     } else Debugln(); //next line 
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
-    verifyOTGWcmdqueue(buf, len);
+    checkOTGWcmdqueue(buf, len);
   } else if (strstr(buf, "Error 01")!= NULL) {
     OTdataObject.error01++;
     DebugTf("Error 01 = %d\r\n",OTdataObject.error01);
