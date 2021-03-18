@@ -19,3 +19,6 @@
 [submodule "Arduino/libraries/DallasTemperature"]
 	path = Arduino/libraries/DallasTemperature
 	url = https://github.com/milesburton/Arduino-Temperature-Control-Library
+[submodule "Arduino/libraries/OneWire"]
+	path = Arduino/libraries/OneWire
+	url = https://github.com/PaulStoffregen/OneWire.git
