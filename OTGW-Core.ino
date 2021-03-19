@@ -753,16 +753,19 @@ void addOTWGcmdtoqueue(const char* buf, int len){
   for (int i=0; i<cmdptr; i++){
     if (strstr(cmdqueue[i].cmd, cmd)) {
       //found cmd exists, set the inertptr to found slot
-      DebugTf("Found cmd exists in slot [%d]", i);
       foundcmd = true;
       insertptr = i;
       break;
     }
   } 
+
+  if (foundcmd) DebugTf("Found cmd exists in slot [%d]\r\n", insertptr);
+  else DebugTf("Adding cmd end of queue, slot [%d]\r\n", insertptr );
+
   //insert to the queue
   cmdqueue[insertptr].cmdlen = strlcpy(cmdqueue[insertptr].cmd, buf, sizeof(cmdqueue[insertptr].cmd));
   cmdqueue[insertptr].retrycnt = 0;
-  cmdqueue[insertptr].due = now()-1; //due right away
+  cmdqueue[insertptr].due = now(); //due right away
   DebugTf("Insert queue in slot[%d]:[%d]\r\n", insertptr, cmdqueue[insertptr].cmd);
   //if not found
   if (!foundcmd) {
@@ -771,8 +774,6 @@ void addOTWGcmdtoqueue(const char* buf, int len){
       cmdptr++; //next free slot
     } else DebugTln("Error: Reached max queue");
   }
-  //trigger sending command right away
-  handleOTGWqueue();
 }
 
 /*
@@ -797,6 +798,8 @@ void handleOTGWqueue(){
         }
         cmdptr--;
       }
+      // //exit queue handling, after 1 command
+      // return;
     }
   }
 }
@@ -835,7 +838,7 @@ void checkOTGWcmdqueue(const char *buf, int len){
           cmdqueue[j].due = cmdqueue[j+1].due;
         }
         cmdptr--;
-      }
+      } else DebugTf("Error: Did not find value [%s]==>[%d]:[%s]\r\n", value, i, cmdqueue[i].cmd); 
     }
   }
 }
