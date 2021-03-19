@@ -60,7 +60,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   if (stricmp(topic, subscribeTopic) == 0) 
   {
     //incoming command to be forwarded to OTGW
-    sendOTGW((char *)payload, length);
+    addOTWGcmdtoqueue((char *)payload, length);
   }
 }
 
