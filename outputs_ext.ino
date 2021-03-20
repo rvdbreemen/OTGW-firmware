@@ -6,7 +6,7 @@
 
 // adds support to activiate a digital output
 // 
-void setOutput(bool set_HIGH);
+void setOutputState(bool set_HIGH);
 
 
 void initOutputs() {
@@ -17,24 +17,24 @@ void initOutputs() {
   DebugTf("init GPIO Output on GPIO%d...\r\n", settingGPIOOUTPUTSpin);
 
   pinMode(settingGPIOOUTPUTSpin, OUTPUT);
-  setOutput(true);
+  setOutputState(true);
 
   // set the LED with the ledState of the variable:
   // digitalWrite(ledPin, ledState);
 }
 
 // still need to hook into processOTGW
-void setOutput(uint8_t status = ON)
+void setOutputState(uint8_t status = ON)
 {
-  (status == ON) ? setOutput(true) : setOutput(false);
+  (status == ON) ? setOutputState(true) : setOutputState(false);
 }
-void setOutput(bool set_HIGH = true)
+void setOutputState(bool set_HIGH = true)
 {
   if(!settingGPIOOUTPUTSenabled) return;
   digitalWrite(settingGPIOOUTPUTSpin,ON);
 }
 
-void outputHook(const char * master, const char * slave)
+void outputsHook(const char * master, const char * slave)
 {
   // master
   // bit: [clear/0, set/1]
@@ -92,11 +92,11 @@ void outputHook(const char * master, const char * slave)
   {
     if (stricmp((const char*)master[settingGPIOOUTPUTStriggerBit], "-")!=0) 
     {
-      setOutput(true);
+      setOutputState(true);
     } 
     else
     {
-      setOutput(false);
+      setOutputState(false);
       /* code */
     }
   }
@@ -105,11 +105,11 @@ void outputHook(const char * master, const char * slave)
   {
     if (stricmp((const char*)master[settingGPIOOUTPUTStriggerBit - 10], "-")!=0)
     {
-      setOutput(true);
+      setOutputState(true);
     }
     else
     {
-    setOutput(false);
+    setOutputState(false);
     }
   }
   else
