@@ -88,8 +88,9 @@ void outputHook(const char * master, const char * slave)
   {
     if (stricmp((const char*)master[settingGPIOOUTPUTStriggerBit], "-")!=0) 
     {
-       setOutput(true);
-    } else
+      setOutput(true);
+    } 
+    else
     {
       setOutput(false);
       /* code */

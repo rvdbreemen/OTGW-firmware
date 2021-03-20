@@ -42,9 +42,12 @@ void handleDebug(){
                 initOutputs();
             break;
             case 'q':
-                DebugTln("led 1 on ");
+                DebugTln("gpio output on ");
                 // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
-                digitalWrite(16,ON);
+                digitalWrite(settingGPIOSENSORSpin, ON);
+                break;
+            case 'a':
+                DebugTf("read gpio output state: %d", digitalRead(settingGPIOSENSORSpin));
             break;
             case 's':
                 DebugTln("read settings");
@@ -52,10 +55,10 @@ void handleDebug(){
                 readSettings(true);
             break;
             case 'w':
-                DebugTln("led 1 off ");
+                DebugTln("gpio output on");
                 // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
-                digitalWrite(16,OFF);
-            break;
+                digitalWrite(settingGPIOSENSORSpin, OFF);
+                break;
             default:
             break;
         }
