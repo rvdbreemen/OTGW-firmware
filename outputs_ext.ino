@@ -92,6 +92,8 @@ void outputsHook(const char * master, const char * slave)
   // master bits
   if (settingGPIOOUTPUTStriggerBit >= 0 && settingGPIOOUTPUTStriggerBit < 7)
   {
+    if (stricmp((const char*)master[settingGPIOOUTPUTStriggerBit], ".")!=0) 
+    {
     if (stricmp((const char*)master[settingGPIOOUTPUTStriggerBit], "-")!=0) 
     {
       setOutputState(true);
@@ -101,6 +103,7 @@ void outputsHook(const char * master, const char * slave)
       setOutputState(false);
       /* code */
     }
+  }
   }
   // slave bits
   else if (settingGPIOOUTPUTStriggerBit >= 10 && settingGPIOOUTPUTStriggerBit < 17)
