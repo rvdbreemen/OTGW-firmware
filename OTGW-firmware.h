@@ -109,7 +109,7 @@ bool      bDebugMQTT = true;
 
 // GPIO Output Settings
 bool      settingGPIOOUTPUTSenabled = false;
-int8_t    settingGPIOOUTPUTSpin = 10;
+int8_t    settingGPIOOUTPUTSpin = 16;
 int8_t    settingGPIOOUTPUTStriggerBit = 0;
 
 //Now load network suff
