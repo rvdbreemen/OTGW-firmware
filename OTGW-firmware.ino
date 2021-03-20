@@ -79,6 +79,8 @@ void setup() {
   startOTGWstream();    // start port 25238 
   checkOTWGpicforupdate();
   initSensors();        // init DS18B20
+  initOutputs();
+
   initWatchDog();       // setup the WatchDog
   sendOTGWbootcmd();   
   //Blink LED2 to signal setup done
