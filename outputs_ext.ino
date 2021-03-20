@@ -24,6 +24,10 @@ void initOutputs() {
 }
 
 // still need to hook into processOTGW
+void setOutput(uint8_t status = ON)
+{
+  (status == ON) ? setOutput(true) : setOutput(false);
+}
 void setOutput(bool set_HIGH = true)
 {
   if(!settingGPIOOUTPUTSenabled) return;
