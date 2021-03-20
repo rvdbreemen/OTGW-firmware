@@ -92,16 +92,20 @@ void outputsHook(const char * master, const char * slave)
   // master bits
   if (settingGPIOOUTPUTStriggerBit >= 0 && settingGPIOOUTPUTStriggerBit < 7)
   {
+    Debugf("inside master [%s] \r\n", master);
     if (stricmp((const char*)master[settingGPIOOUTPUTStriggerBit], ".")!=0) 
     {
-    if (stricmp((const char*)master[settingGPIOOUTPUTStriggerBit], "-")!=0) 
-    {
-      setOutputState(true);
-    } 
-    else
-    {
-      setOutputState(false);
-      /* code */
+      Debugf("valid bit master [%s] \r\n", master);
+      if (stricmp((const char*)master[settingGPIOOUTPUTStriggerBit], "-")!=0) 
+      {
+        Debugf("bit master on [%s] \r\n", master);
+        setOutputState(true);
+      } 
+      else
+      {
+        Debugf("bit master off [%s] \r\n", master);
+        setOutputState(false);
+        /* code */
     }
   }
   }
