@@ -766,7 +766,7 @@ void addOTWGcmdtoqueue(const char* buf, int len){
   cmdqueue[insertptr].cmdlen = strlcpy(cmdqueue[insertptr].cmd, buf, sizeof(cmdqueue[insertptr].cmd));
   cmdqueue[insertptr].retrycnt = 0;
   cmdqueue[insertptr].due = now(); //due right away
-  DebugTf("Insert queue in slot[%d]:[%d]\r\n", insertptr, cmdqueue[insertptr].cmd);
+  DebugTf("Insert queue in slot[%d]:[%s]\r\n", insertptr, cmdqueue[insertptr].cmd);
   //if not found
   if (!foundcmd) {
     //if not reached max of queue
@@ -783,7 +783,7 @@ void addOTWGcmdtoqueue(const char* buf, int len){
 */
 void handleOTGWqueue(){
   for (int i=0; i<cmdptr; i++) {
-    if (cmdqueue[i].due > now()) {
+    if (now() > cmdqueue[i].due) {
       sendOTGW(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
       cmdqueue[i].retrycnt++;
       cmdqueue[i].due = now() + OTGW_CMD_INTERVAL * 1000; //seconds
