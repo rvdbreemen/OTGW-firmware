@@ -90,7 +90,7 @@ void outputsHook(const char * master, const char * slave)
   // if trigger > 9 then the trigger is one of the slave bits
   // if trigger == 9 than something went wrong
   // master bits
-  if (settingGPIOOUTPUTStriggerBit >= 0 && settingGPIOOUTPUTStriggerBit < 7)
+  if (settingGPIOOUTPUTStriggerBit >= 0 && settingGPIOOUTPUTStriggerBit =< 7)
   {
     Debugf("inside master [%s] \r\n", master);
     if (stricmp((const char*)master[settingGPIOOUTPUTStriggerBit], ".")!=0) 
@@ -106,21 +106,32 @@ void outputsHook(const char * master, const char * slave)
         Debugf("bit master off [%s] \r\n", master);
         setOutputState(false);
         /* code */
+      }
     }
   }
-  }
+
   // slave bits
-  else if (settingGPIOOUTPUTStriggerBit >= 10 && settingGPIOOUTPUTStriggerBit < 17)
+  else if (settingGPIOOUTPUTStriggerBit >= 10 && settingGPIOOUTPUTStriggerBit =< 17)
   {
-    if (stricmp((const char*)master[settingGPIOOUTPUTStriggerBit - 10], "-")!=0)
+    Debugf("inside slave [%s] \r\n", slave);
+    if (stricmp((const char*)slave[settingGPIOOUTPUTStriggerBit], ".")!=0) 
     {
-      setOutputState(true);
-    }
-    else
-    {
-    setOutputState(false);
+      Debugf("valid bit slave [%s] \r\n", slave);
+      if (stricmp((const char*)slave[settingGPIOOUTPUTStriggerBit], "-")!=0) 
+      {
+        Debugf("bit slave on [%s] \r\n", slave);
+        setOutputState(true);
+      } 
+      else
+      {
+        Debugf("bit slave off [%s] \r\n", slave);
+        setOutputState(false);
+        /* code */
+      }
     }
   }
+  
+  
   else
   {
     // should never happen, error
