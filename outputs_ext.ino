@@ -6,17 +6,18 @@
 
 // adds support to activiate a digital output
 // 
+void setOutput(bool set_HIGH);
 
 
 void initOutputs() {
+  DebugTf("inside initOutputsO%d...\r\n", 1);
+
   if (!settingGPIOOUTPUTSenabled) return;
 
-  // DebugTf("init GPIO Output on GPIO%d...\r\n", settingGPIOOUTPUTSpin);
+  DebugTf("init GPIO Output on GPIO%d...\r\n", settingGPIOOUTPUTSpin);
 
-  // pinMode(settingGPIOOUTPUTSpin, OUTPUT);
-
-  blinkLED(LED2, 5, 100);
-  setLed(LED2, OFF);
+  pinMode(settingGPIOOUTPUTSpin, OUTPUT);
+  setOutput(true);
 
   // set the LED with the ledState of the variable:
   // digitalWrite(ledPin, ledState);
@@ -26,7 +27,7 @@ void initOutputs() {
 void setOutput(bool set_HIGH = true)
 {
   if(!settingGPIOOUTPUTSenabled) return;
-  digitalWrite(settingGPIOOUTPUTSpin,set_HIGH);
+  digitalWrite(settingGPIOOUTPUTSpin,ON);
 }
 
 void outputHook(const char * master, const char * slave)

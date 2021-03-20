@@ -31,6 +31,31 @@ void handleDebug(){
             case '1':   bDebugOTmsg = !bDebugOTmsg; DebugTf("\r\nDebug OTmsg: %s\r\n", CBOOLEAN(bDebugOTmsg)); break;
             case '2':   bDebugRestAPI = !bDebugRestAPI; DebugTf("\r\nDebug RestAPI: %s\r\n", CBOOLEAN(bDebugRestAPI)); break;
             case '3':   bDebugMQTT = !bDebugMQTT; DebugTf("\r\nDebug MQTT: %s\r\n", CBOOLEAN(bDebugMQTT)); break;
+            case 'b':
+                DebugTln("Blink led 1");
+                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
+                blinkLED(LED1, 5, 500);
+            break;
+            case 'i':
+                DebugTln("relay init");
+                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
+                initOutputs();
+            break;
+            case 'q':
+                DebugTln("led 1 on ");
+                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
+                digitalWrite(16,ON);
+            break;
+            case 's':
+                DebugTln("read settings");
+                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
+                readSettings(true);
+            break;
+            case 'w':
+                DebugTln("led 1 off ");
+                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
+                digitalWrite(16,OFF);
+            break;
             default:
             break;
         }
