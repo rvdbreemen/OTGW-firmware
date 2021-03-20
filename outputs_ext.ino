@@ -32,6 +32,7 @@ void setOutputState(bool set_HIGH = true)
 {
   if(!settingGPIOOUTPUTSenabled) return;
   digitalWrite(settingGPIOOUTPUTSpin,ON);
+  DebugTf("Output GPIO%d set to %d", settingGPIOOUTPUTSpin, digitalRead(settingGPIOOUTPUTSpin));
 }
 
 void outputsHook(const char * master, const char * slave)
@@ -79,6 +80,7 @@ void outputsHook(const char * master, const char * slave)
 
   Debugf("Master bits = M[%s] \r\n", master);
   Debugf("Slave  bits = S[%s] \r\n", slave);
+  DebugTf("current gpio output state: %d \r\n", digitalRead(settingGPIOOUTPUTSpin));
   DebugFlush();
 
   //only 8 bits so set it to a value we normally shouldn't reach to track for error
@@ -119,4 +121,5 @@ void outputsHook(const char * master, const char * slave)
     DebugTf("Illegal value for settingGPIOOUTPUTStriggerBit: ...\r\n", settingGPIOOUTPUTStriggerBit);
     return;
   }
+  DebugTf("end void: current gpio output state: %d \r\n", digitalRead(settingGPIOOUTPUTSpin));
 }
