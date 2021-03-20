@@ -136,7 +136,7 @@ void outputsHook(const char * master, const char * slave)
   {
     // should never happen, error
     // Debugln("Illegal value for settingGPIOOUTPUTStriggerBit: %d", settingGPIOOUTPUTStriggerBit);
-    DebugTf("Illegal value for settingGPIOOUTPUTStriggerBit: ...\r\n", settingGPIOOUTPUTStriggerBit);
+    DebugTf("Illegal value for settingGPIOOUTPUTStriggerBit: %d...\r\n", settingGPIOOUTPUTStriggerBit);
     return;
   }
   DebugTf("end void: current gpio output state: %d \r\n", digitalRead(settingGPIOOUTPUTSpin));

@@ -47,7 +47,7 @@ void handleDebug(){
                 digitalWrite(settingGPIOOUTPUTSpin, ON);
                 break;
             case 'a':
-                DebugTf("read gpio output state (0== led ON): %d", digitalRead(settingGPIOOUTPUTSpin));
+                DebugTf("read gpio output state (0== led ON): %d \r\n", digitalRead(settingGPIOOUTPUTSpin));
             break;
             case 's':
                 DebugTln("read settings");
