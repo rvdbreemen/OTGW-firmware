@@ -98,12 +98,12 @@ void outputsHook(const char * master, const char * slave)
       Debugf("valid bit master [%s] \r\n", master);
       if (stricmp((const char*)master[settingGPIOOUTPUTStriggerBit], "-")!=0) 
       {
-        Debugf("bit master on [%s] \r\n", master);
+        Debugf("bit master on [%d] \r\n", settingGPIOOUTPUTStriggerBit);
         setOutputState(true);
       } 
       else
       {
-        Debugf("bit master off [%s] \r\n", master);
+        Debugf("bit master off [%d] \r\n", settingGPIOOUTPUTStriggerBit);
         setOutputState(false);
         /* code */
       }
@@ -119,12 +119,12 @@ void outputsHook(const char * master, const char * slave)
       Debugf("valid bit slave [%s] \r\n", slave);
       if (stricmp((const char*)slave[settingGPIOOUTPUTStriggerBit], "-")!=0) 
       {
-        Debugf("bit slave on [%s] \r\n", slave);
+        Debugf("bit slave on [%d] \r\n", settingGPIOOUTPUTStriggerBit);
         setOutputState(true);
       } 
       else
       {
-        Debugf("bit slave off [%s] \r\n", slave);
+        Debugf("bit slave off [%d] \r\n", settingGPIOOUTPUTStriggerBit);
         setOutputState(false);
         /* code */
       }
