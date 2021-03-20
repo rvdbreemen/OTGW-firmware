@@ -93,42 +93,42 @@ void outputsHook(const char * master, const char * slave)
   if (settingGPIOOUTPUTStriggerBit >= 0 && settingGPIOOUTPUTStriggerBit <= 7)
   {
     Debugf("inside master [%s] \r\n", master);
-    if (stricmp((const char*)master[settingGPIOOUTPUTStriggerBit], ".")!=0) 
-    {
-      Debugf("valid bit master [%s] \r\n", master);
-      if (stricmp((const char*)master[settingGPIOOUTPUTStriggerBit], "-")!=0) 
-      {
-        Debugf("bit master on [%d] \r\n", settingGPIOOUTPUTStriggerBit);
-        setOutputState(true);
-      } 
-      else
-      {
-        Debugf("bit master off [%d] \r\n", settingGPIOOUTPUTStriggerBit);
-        setOutputState(false);
-        /* code */
-      }
-    }
+    // if (stricmp((const char*)master[settingGPIOOUTPUTStriggerBit], ".")!=0) 
+    // {
+    //   Debugf("valid bit master [%s] \r\n", master);
+    //   if (stricmp((const char*)master[settingGPIOOUTPUTStriggerBit], "-")!=0) 
+    //   {
+    //     Debugf("bit master on [%d] \r\n", settingGPIOOUTPUTStriggerBit);
+    //     setOutputState(true);
+    //   } 
+    //   else
+    //   {
+    //     Debugf("bit master off [%d] \r\n", settingGPIOOUTPUTStriggerBit);
+    //     setOutputState(false);
+    //     /* code */
+    //   }
+    // }
   }
 
   // slave bits
   else if (settingGPIOOUTPUTStriggerBit >= 10 && settingGPIOOUTPUTStriggerBit <= 17)
   {
     Debugf("inside slave [%s] \r\n", slave);
-    if (stricmp((const char*)slave[settingGPIOOUTPUTStriggerBit], ".")!=0) 
-    {
-      Debugf("valid bit slave [%s] \r\n", slave);
-      if (stricmp((const char*)slave[settingGPIOOUTPUTStriggerBit], "-")!=0) 
-      {
-        Debugf("bit slave on [%d] \r\n", settingGPIOOUTPUTStriggerBit);
-        setOutputState(true);
-      } 
-      else
-      {
-        Debugf("bit slave off [%d] \r\n", settingGPIOOUTPUTStriggerBit);
-        setOutputState(false);
-        /* code */
-      }
-    }
+    // if (stricmp((const char*)slave[settingGPIOOUTPUTStriggerBit], ".")!=0) 
+    // {
+    //   Debugf("valid bit slave [%s] \r\n", slave);
+    //   if (stricmp((const char*)slave[settingGPIOOUTPUTStriggerBit], "-")!=0) 
+    //   {
+    //     Debugf("bit slave on [%d] \r\n", settingGPIOOUTPUTStriggerBit);
+    //     setOutputState(true);
+    //   } 
+    //   else
+    //   {
+    //     Debugf("bit slave off [%d] \r\n", settingGPIOOUTPUTStriggerBit);
+    //     setOutputState(false);
+    //     /* code */
+    //   }
+    // }
   }
   
   
