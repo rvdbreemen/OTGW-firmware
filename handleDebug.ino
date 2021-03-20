@@ -44,10 +44,10 @@ void handleDebug(){
             case 'q':
                 DebugTln("gpio output on ");
                 // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
-                digitalWrite(settingGPIOSENSORSpin, ON);
+                digitalWrite(settingGPIOOUTPUTSpin, ON);
                 break;
             case 'a':
-                DebugTf("read gpio output state: %d", digitalRead(settingGPIOSENSORSpin));
+                DebugTf("read gpio output state: %d", digitalRead(settingGPIOOUTPUTSpin));
             break;
             case 's':
                 DebugTln("read settings");
@@ -57,7 +57,7 @@ void handleDebug(){
             case 'w':
                 DebugTln("gpio output on");
                 // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
-                digitalWrite(settingGPIOSENSORSpin, OFF);
+                digitalWrite(settingGPIOOUTPUTSpin, OFF);
                 break;
             default:
             break;
