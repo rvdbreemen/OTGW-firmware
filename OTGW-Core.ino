@@ -293,14 +293,15 @@ OpenThermMessageID getDataID(unsigned long frame)
 }
 
 //parsing responses - helper functions
-//  0: CH enable [ CH is disabled, CH is enabled]
-//  1: DHW enable [ DHW is disabled, DHW is enabled]
-//  2: Cooling enable [ Cooling is disabled, Cooling is enabled]]
-//  3: OTC active [OTC not active, OTC is active]
-//  4: CH2 enable [CH2 is disabled, CH2 is enabled]
-//  5: reserved
-//  6: reserved
-//  7: reserved
+// bit: description [ clear/0, set/1]
+// 0: CH enable [ CH is disabled, CH is enabled]
+// 1: DHW enable [ DHW is disabled, DHW is enabled]
+// 2: Cooling enable [ Cooling is disabled, Cooling is enabled]
+// 3: OTC active [OTC not active, OTC is active]
+// 4: CH2 enable [CH2 is disabled, CH2 is enabled]
+// 5: reserved
+// 6: reserved
+// 7: reserved
 
 bool isCentralHeatingEnabled() {
 	return OTdataObject.Status & 0x0100;
@@ -323,29 +324,30 @@ bool isCentralHeating2enabled() {
 }
 
 //Slave
-//  0: fault indication [ no fault, fault ]
-//  1: CH mode [CH not active, CH active]
-//  2: DHW mode [ DHW not active, DHW active]
-//  3: Flame status [ flame off, flame on ]
-//  4: Cooling status [ cooling mode not active, cooling mode active ]
-//  5: CH2 mode [CH2 not active, CH2 active]
-//  6: diagnostic indication [no diagnostics, diagnostic event]
-//  7: reserved
+// bit: description [ clear/0, set/1]
+// 0: fault indication [ no fault, fault ]
+// 1: CH mode [CH not active, CH active]
+// 2: DHW mode [ DHW not active, DHW active]
+// 3: Flame status [ flame off, flame on ]
+// 4: Cooling status [ cooling mode not active, cooling mode active ]
+// 5: CH2 mode [CH2 not active, CH2 active]
+// 6: diagnostic indication [no diagnostics, diagnostic event]
+// 7: reserved
 
 bool isFaultIndicator() {
-	return OTdataObject.Status & 0x001;
+	return OTdataObject.Status & 0x0001;
 }
 
 bool isCentralHeatingActive() {
-	return OTdataObject.Status & 0x002;
+	return OTdataObject.Status & 0x0002;
 }
 
 bool isDomesticHotWaterActive() {
-	return OTdataObject.Status & 0x004;
+	return OTdataObject.Status & 0x0004;
 }
 
 bool isFlameStatus() {
-	return OTdataObject.Status & 0x008;
+	return OTdataObject.Status & 0x0008;
 }
 
 bool isCoolingActive() {
@@ -742,13 +744,17 @@ void print_daytime(uint16_t *value)
 void addOTWGcmdtoqueue(const char* buf, int len){
   if ((len < 3) || (buf[2] != '=')){ 
     //no valid command of less then 2 bytes
-    DebugTf("Not a valid command=[%d]\r\n", buf);
+    DebugT("CmdQueue: Error:Not a valid command=[");
+    for (int i = 0; i < len; i++) {
+      Debug((char)buf[i]);
+    }
+    Debugf("] (%d)\r\n", len); 
   }
 
   //check to see if the cmd is in queue
   bool foundcmd = false;
   int8_t insertptr = cmdptr; //set insertprt to next empty slot
-  char cmd[2]={0};
+  char cmd[2]; memset( cmd, 0, sizeof(cmd));
   memcpy(cmd, buf, 2);
   for (int i=0; i<cmdptr; i++){
     if (strstr(cmdqueue[i].cmd, cmd)) {
@@ -759,21 +765,26 @@ void addOTWGcmdtoqueue(const char* buf, int len){
     }
   } 
 
-  if (foundcmd) DebugTf("Found cmd exists in slot [%d]\r\n", insertptr);
-  else DebugTf("Adding cmd end of queue, slot [%d]\r\n", insertptr );
+  if (foundcmd) DebugTf("CmdQueue: Found cmd exists in slot [%d]\r\n", insertptr);
+  else DebugTf("CmdQueue: Adding cmd end of queue, slot [%d]\r\n", insertptr);
 
   //insert to the queue
-  cmdqueue[insertptr].cmdlen = strlcpy(cmdqueue[insertptr].cmd, buf, sizeof(cmdqueue[insertptr].cmd));
+  DebugTf("CmdQueue: Insert queue in slot[%d]:[%s]\r\n", insertptr, cmdqueue[insertptr].cmd);
+  memset(cmdqueue[insertptr].cmd, 0, sizeof(cmdqueue[insertptr].cmd));
+  if (len>=sizeof(cmdqueue[insertptr].cmd)) len = sizeof(cmdqueue[insertptr].cmd)-1; //never longer than the buffer
+  memcpy(cmdqueue[insertptr].cmd, buf, len);
+  cmdqueue[insertptr].cmdlen = len;
   cmdqueue[insertptr].retrycnt = 0;
-  cmdqueue[insertptr].due = now(); //due right away
-  DebugTf("Insert queue in slot[%d]:[%s]\r\n", insertptr, cmdqueue[insertptr].cmd);
+  cmdqueue[insertptr].due = millis()+20000; //due right away
+
   //if not found
   if (!foundcmd) {
     //if not reached max of queue
     if (cmdptr < CMDQUEUE_MAX) {
       cmdptr++; //next free slot
-    } else DebugTln("Error: Reached max queue");
-  }
+      DebugTf("CmdQueue: Next free queue slot: [%d]\r\n", cmdptr);
+    } else DebugTln("CmdQueue: Error: Reached max queue");
+  } else DebugTf("CmdQueue: Found command at: [%d] - [%d]\r\n", insertptr, cmdptr);
 }
 
 /*
@@ -782,15 +793,17 @@ void addOTWGcmdtoqueue(const char* buf, int len){
   If retry max is reached the cmd is delete from the queue
 */
 void handleOTGWqueue(){
-  for (int i=0; i<cmdptr; i++) {
+  for (int i = 0; i<cmdptr; i++) {
+    DebugTf("CmdQueue: Checking due in queue slot[%d]:[%d]<[%d]\r\n", i, millis(), cmdqueue[i].due);
     if (now() > cmdqueue[i].due) {
+      DebugTf("CmdQueue: Queue slot [%d] due\r\n", i);
       sendOTGW(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
       cmdqueue[i].retrycnt++;
-      cmdqueue[i].due = now() + OTGW_CMD_INTERVAL * 1000; //seconds
+      cmdqueue[i].due = millis() + OTGW_CMD_INTERVAL * 1000; //seconds
       if (cmdqueue[i].retrycnt >= OTGW_CMD_RETRY){
         //max retry reached, so delete command from queue
-        for (int j=i; j<=cmdptr; j++){
-          DebugTf("Moving [%d] => [%d]\r\n", j+1, j);
+        for (int j=i; j<cmdptr; j++){
+          DebugTf("CmdQueue: Moving [%d] => [%d]\r\n", j+1, j);
           strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[i].cmd));
           cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
           cmdqueue[j].retrycnt = cmdqueue[j+1].retrycnt;
@@ -813,32 +826,42 @@ void handleOTGWqueue(){
 */
 void checkOTGWcmdqueue(const char *buf, int len){
   if ((len<3) || (buf[2]!=':')) {
-    DebugTf("Error: Not a command response [%s] [%d]", buf, len);
+    DebugT("CmdQueue: Error: Not a command response [");
+    for (int i = 0; i < len; i++) {
+      Debug((char)buf[i]);
+    }
+    Debugf("] (%d)\r\n", len); 
     return; //not a valid command response
   }
-  DebugTf("Verify command in queue [%s] [%d]", buf, len);
-  char cmd[2]={0};
-  char value[10]={0};
+
+  DebugT("CmdQueue: Checking if command is in in queue [");
+  for (int i = 0; i < len; i++) {
+    Debug((char)buf[i]);
+  }
+  Debugf("] (%d)\r\n", len); 
+
+  char cmd[3]; memset( cmd, 0, sizeof(cmd));
+  char value[11]; memset( value, 0, sizeof(value));
   memcpy(cmd, buf, 2);
   memcpy(value, buf+3, len-3);
   for (int i=0; i<cmdptr; i++){
-      DebugTf("Checking [%s]==>[%d]:[%s] from queue\r\n", cmd, i, cmdqueue[i].cmd); 
+      DebugTf("CmdQueue: Checking [%2s]==>[%d]:[%s] from queue\r\n", cmd, i, cmdqueue[i].cmd); 
     if (strstr(cmdqueue[i].cmd, cmd)){
       //command found, check value
-      DebugTf("Found cmd [%s]==>[%d]:[%s]\r\n", cmd, i, cmdqueue[i].cmd); 
-      if(strstr(cmdqueue[i].cmd, value)){
+      DebugTf("CmdQueue: Found cmd [%2s]==>[%d]:[%s]\r\n", cmd, i, cmdqueue[i].cmd); 
+      // if(strstr(cmdqueue[i].cmd, value)){
         //value found, thus remove command from queue
-        DebugTf("Found value [%s]==>[%d]:[%s]\r\n", value, i, cmdqueue[i].cmd); 
-        DebugTf("Remove from queue [%d]:[%s] from queue\r\n", i, cmdqueue[i].cmd);
+        DebugTf("CmdQueue: Found value [%s]==>[%d]:[%s]\r\n", value, i, cmdqueue[i].cmd); 
+        DebugTf("CmdQueue: Remove from queue [%d]:[%s] from queue\r\n", i, cmdqueue[i].cmd);
         for (int j=i; j<=cmdptr; j++){
-          DebugTf("Moving [%d] => [%d]\r\n", j+1, j);
+          DebugTf("CmdQueue: Moving [%d] => [%d]\r\n", j+1, j);
           strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[i].cmd));
           cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
           cmdqueue[j].retrycnt = cmdqueue[j+1].retrycnt;
           cmdqueue[j].due = cmdqueue[j+1].due;
         }
         cmdptr--;
-      } else DebugTf("Error: Did not find value [%s]==>[%d]:[%s]\r\n", value, i, cmdqueue[i].cmd); 
+      // } else DebugTf("Error: Did not find value [%s]==>[%d]:[%s]\r\n", value, i, cmdqueue[i].cmd); 
     }
   }
 }
@@ -913,7 +936,7 @@ void processOTGW(const char *buf, int len){
 
     const char *bufval = buf + 1;
     uint32_t value = strtoul(bufval, NULL, 16);
-    Debugf("msg=[%s] value=[%08x]", bufval, value);
+    // Debugf("msg=[%s] value=[%08x]", bufval, value);
 
     //split 32bit value into the relevant OT protocol parts
     OTdata.type = (value >> 28) & 0x7;         // byte 1 = take 3 bits that define msg msgType
@@ -922,7 +945,7 @@ void processOTGW(const char *buf, int len){
     OTdata.valueLB = value & 0xFF;             // byte 4 = low byte
 
     //print message frame
-    Debugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
+    // Debugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
 
     //print message Type and ID
     Debugf("[%-16s]\t", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
