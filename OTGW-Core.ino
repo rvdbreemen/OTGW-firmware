@@ -345,19 +345,19 @@ bool isCentralHeating2enabled() {
 //  7: reserved
 
 bool isFaultIndicator() {
-	return OTdataObject.Status & 0x001;
+	return OTdataObject.Status & 0x0001;
 }
 
 bool isCentralHeatingActive() {
-	return OTdataObject.Status & 0x002;
+	return OTdataObject.Status & 0x0002;
 }
 
 bool isDomesticHotWaterActive() {
-	return OTdataObject.Status & 0x004;
+	return OTdataObject.Status & 0x0004;
 }
 
 bool isFlameStatus() {
-	return OTdataObject.Status & 0x008;
+	return OTdataObject.Status & 0x0008;
 }
 
 bool isCoolingActive() {
@@ -367,7 +367,6 @@ bool isCoolingActive() {
 bool isCentralHeating2Active() {
 	return OTdataObject.Status & 0x0020;
 }
-
 
 bool isDiagnosticIndicator() {
 	return OTdataObject.Status & 0x0040;
