@@ -54,7 +54,7 @@ void processAPI()
     { //v1 API calls
       if (words[3] == "otgw"){
          if (words[4] == "telegraf") {
-          // GET /api/v1/otgw/telefraf
+          // GET /api/v1/otgw/telegraf
           // Response: see json response
           sendTelegraf();
          } else if (words[4] == "otmonitor") {
@@ -217,17 +217,22 @@ void sendTelegraf()
   sendStartJsonArray();
   
   sendJsonOTmonObj("flamestatus", isFlameStatus(), "", msglastupdated[Status]);
+
   sendJsonOTmonObj("chmodus", isCentralHeatingActive(),"", msglastupdated[Status]);
   sendJsonOTmonObj("chenable", isCentralHeatingEnabled(),"", msglastupdated[Status]);
+  
   sendJsonOTmonObj("ch2modus", isCentralHeating2Active(),"", msglastupdated[Status]);
   sendJsonOTmonObj("ch2enable", isCentralHeating2enabled(),"", msglastupdated[Status]);
+  
   sendJsonOTmonObj("dhwmode", isDomesticHotWaterActive(),"", msglastupdated[Status]);
   sendJsonOTmonObj("dhwenable", isDomesticHotWaterEnabled(),"", msglastupdated[Status]);
+  
   sendJsonOTmonObj("diagnosticindicator", isDiagnosticIndicator(),"", msglastupdated[Status]);
   sendJsonOTmonObj("faultindicator", isFaultIndicator(),"", msglastupdated[Status]);
   
   sendJsonOTmonObj("coolingmodus", isCoolingEnabled(),"", msglastupdated[Status]);
   sendJsonOTmonObj("coolingactive", isCoolingActive(),"", msglastupdated[Status]);  
+  
   sendJsonOTmonObj("otcactive", isOutsideTemperatureCompensationActive(),"", msglastupdated[Status]);
 
   sendJsonOTmonObj("servicerequest", isServiceRequest(),"", msglastupdated[ASFflags]);
