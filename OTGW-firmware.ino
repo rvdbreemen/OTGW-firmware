@@ -162,7 +162,7 @@ void doTaskEvery60s(){
 
 //===[ Do task every 5min ]===
 void do5minevent(){
-  DebugTf("Uptime seconds: %d", upTimeSeconds);
+  DebugTf("Uptime seconds: %d\r\n", upTimeSeconds);
   String sUptime = String(upTimeSeconds);
   sendMQTTData("otgw-firmware/uptime", sUptime, false);
 }
