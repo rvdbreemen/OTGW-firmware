@@ -104,6 +104,7 @@ void readSettings(bool show)
   settingGPIOSENSORSinterval = doc["GPIOSENSORSinterval"] | settingGPIOSENSORSinterval;
   settingOTGWcommandenable = doc["OTGWcommandenable"] | settingOTGWcommandenable;
   settingOTGWcommands     = doc["OTGWcommands"].as<String>();
+  if (settingOTGWcommands=="null") settingOTGWcommands ="GW=1\r\nAA=28\r\n";
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
