@@ -402,8 +402,6 @@ void sendDeviceSettings()
 
   sendJsonSettingObj("hostname", CSTR(settingHostname), "s", 32);
   sendJsonSettingObj("mqttenable", settingMQTTenable, "b");
-  // sendJsonSettingObj("mqttfieldset","on", "f");
-  // sendJsonSettingObj("mqttlegend","MQTT settings", "l");
   sendJsonSettingObj("mqttbroker", CSTR(settingMQTTbroker), "s", 32);
   sendJsonSettingObj("mqttbrokerport", settingMQTTbrokerPort, "i", 0, 65535);
   sendJsonSettingObj("mqttuser", CSTR(settingMQTTuser), "s", 32);
@@ -411,7 +409,6 @@ void sendDeviceSettings()
   sendJsonSettingObj("mqtttoptopic", CSTR(settingMQTTtopTopic), "s", 15);
   sendJsonSettingObj("mqtthaprefix", CSTR(settingMQTThaprefix), "s", 20);
   sendJsonSettingObj("mqttotmessage", settingMQTTOTmessage, "b");
-  // sendJsonSettingObj("mqttfieldset","off", "f");
   sendJsonSettingObj("ntpenable", settingNTPenable, "b");
   sendJsonSettingObj("ntptimezone", CSTR(settingNTPtimezone), "s", 50);
   sendJsonSettingObj("ledblink", settingLEDblink, "b");
