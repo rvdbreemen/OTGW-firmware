@@ -854,7 +854,7 @@ void checkOTGWcmdqueue(const char *buf, int len){
         //value found, thus remove command from queue
         DebugTf("CmdQueue: Found value [%s]==>[%d]:[%s]\r\n", value, i, cmdqueue[i].cmd); 
         DebugTf("CmdQueue: Remove from queue [%d]:[%s] from queue\r\n", i, cmdqueue[i].cmd);
-        for (int j=i; j<=cmdptr; j++){
+        for (int j=i; j<cmdptr; j++){
           DebugTf("CmdQueue: Moving [%d] => [%d]\r\n", j+1, j);
           strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[i].cmd));
           cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
