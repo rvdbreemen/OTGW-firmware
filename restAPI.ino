@@ -216,48 +216,43 @@ void sendTelegraf()
 
   sendStartJsonArray();
   
-  sendJsonOTmonObj("flamestatus", isFlameStatus(), "", msglastupdated[Status]);
+  sendJsonOTmonObj("flamestatus", isFlameStatus(), "", msglastupdated[OT_Statusflags]);
+  sendJsonOTmonObj("chmodus", isCentralHeatingActive(),"", msglastupdated[OT_Statusflags]);
+  sendJsonOTmonObj("chenable", isCentralHeatingEnabled(),"", msglastupdated[OT_Statusflags]);
+  sendJsonOTmonObj("ch2modus", isCentralHeating2Active(),"", msglastupdated[OT_Statusflags]);
+  sendJsonOTmonObj("ch2enable", isCentralHeating2enabled(),"", msglastupdated[OT_Statusflags]);
+  sendJsonOTmonObj("dhwmode", isDomesticHotWaterActive(),"", msglastupdated[OT_Statusflags]);
+  sendJsonOTmonObj("dhwenable", isDomesticHotWaterEnabled(),"", msglastupdated[OT_Statusflags]);
+  sendJsonOTmonObj("diagnosticindicator", isDiagnosticIndicator(),"", msglastupdated[OT_Statusflags]);
+  sendJsonOTmonObj("faultindicator", isFaultIndicator(),"", msglastupdated[OT_Statusflags]);
+  
+  sendJsonOTmonObj("coolingmodus", isCoolingEnabled(),"", msglastupdated[OT_Statusflags]);
+  sendJsonOTmonObj("coolingactive", isCoolingActive(),"", msglastupdated[OT_Statusflags]);  
+  sendJsonOTmonObj("otcactive", isOutsideTemperatureCompensationActive(),"", msglastupdated[OT_Statusflags]);
 
-  sendJsonOTmonObj("chmodus", isCentralHeatingActive(),"", msglastupdated[Status]);
-  sendJsonOTmonObj("chenable", isCentralHeatingEnabled(),"", msglastupdated[Status]);
-  
-  sendJsonOTmonObj("ch2modus", isCentralHeating2Active(),"", msglastupdated[Status]);
-  sendJsonOTmonObj("ch2enable", isCentralHeating2enabled(),"", msglastupdated[Status]);
-  
-  sendJsonOTmonObj("dhwmode", isDomesticHotWaterActive(),"", msglastupdated[Status]);
-  sendJsonOTmonObj("dhwenable", isDomesticHotWaterEnabled(),"", msglastupdated[Status]);
-  
-  sendJsonOTmonObj("diagnosticindicator", isDiagnosticIndicator(),"", msglastupdated[Status]);
-  sendJsonOTmonObj("faultindicator", isFaultIndicator(),"", msglastupdated[Status]);
-  
-  sendJsonOTmonObj("coolingmodus", isCoolingEnabled(),"", msglastupdated[Status]);
-  sendJsonOTmonObj("coolingactive", isCoolingActive(),"", msglastupdated[Status]);  
-  
-  sendJsonOTmonObj("otcactive", isOutsideTemperatureCompensationActive(),"", msglastupdated[Status]);
-
-  sendJsonOTmonObj("servicerequest", isServiceRequest(),"", msglastupdated[ASFflags]);
-  sendJsonOTmonObj("lockoutreset", isLockoutReset(),"", msglastupdated[ASFflags]);
-  sendJsonOTmonObj("lowwaterpressure", isLowWaterPressure(),"", msglastupdated[ASFflags]);
-  sendJsonOTmonObj("gasflamefault", isGasFlameFault(),"", msglastupdated[ASFflags]);
-  sendJsonOTmonObj("airtemp", isAirTemperature(),"", msglastupdated[ASFflags]);
-  sendJsonOTmonObj("waterovertemperature", isWaterOverTemperature(),"", msglastupdated[ASFflags]);
+  sendJsonOTmonObj("servicerequest", isServiceRequest(),"", msglastupdated[OT_ASFflags]);
+  sendJsonOTmonObj("lockoutreset", isLockoutReset(),"", msglastupdated[OT_ASFflags]);
+  sendJsonOTmonObj("lowwaterpressure", isLowWaterPressure(),"", msglastupdated[OT_ASFflags]);
+  sendJsonOTmonObj("gasflamefault", isGasFlameFault(),"", msglastupdated[OT_ASFflags]);
+  sendJsonOTmonObj("airtemp", isAirTemperature(),"", msglastupdated[OT_ASFflags]);
+  sendJsonOTmonObj("waterovertemperature", isWaterOverTemperature(),"", msglastupdated[OT_ASFflags]);
   
 
-  sendJsonOTmonObj("outsidetemperature", OTdataObject.Toutside, "°C", msglastupdated[Toutside]);
-  sendJsonOTmonObj("roomtemperature", OTdataObject.Tr, "°C", msglastupdated[Tr]);
-  sendJsonOTmonObj("roomsetpoint", OTdataObject.TrSet, "°C", msglastupdated[TrSet]);
-  sendJsonOTmonObj("remoteroomsetpoint", OTdataObject.TrOverride, "°C", msglastupdated[TrOverride]);
-  sendJsonOTmonObj("controlsetpoint", OTdataObject.TSet,"°C", msglastupdated[TSet]);
-  sendJsonOTmonObj("relmodlvl", OTdataObject.RelModLevel,"%", msglastupdated[RelModLevel]);
-  sendJsonOTmonObj("maxrelmodlvl", OTdataObject.MaxRelModLevelSetting, "%", msglastupdated[MaxRelModLevelSetting]);
+  sendJsonOTmonObj("outsidetemperature", OTdataObject.Toutside, "°C", msglastupdated[OT_Toutside]);
+  sendJsonOTmonObj("roomtemperature", OTdataObject.Tr, "°C", msglastupdated[OT_Tr]);
+  sendJsonOTmonObj("roomsetpoint", OTdataObject.TrSet, "°C", msglastupdated[OT_TrSet]);
+  sendJsonOTmonObj("remoteroomsetpoint", OTdataObject.TrOverride, "°C", msglastupdated[OT_TrOverride]);
+  sendJsonOTmonObj("controlsetpoint", OTdataObject.TSet,"°C", msglastupdated[OT_TSet]);
+  sendJsonOTmonObj("relmodlvl", OTdataObject.RelModLevel,"%", msglastupdated[OT_RelModLevel]);
+  sendJsonOTmonObj("maxrelmodlvl", OTdataObject.MaxRelModLevelSetting, "%", msglastupdated[OT_MaxRelModLevelSetting]);
  
-  sendJsonOTmonObj("boilertemperature", OTdataObject.Tboiler, "°C", msglastupdated[Tboiler]);
-  sendJsonOTmonObj("returnwatertemperature", OTdataObject.Tret,"°C", msglastupdated[Tret]);
-  sendJsonOTmonObj("dhwtemperature", OTdataObject.Tdhw,"°C", msglastupdated[Tdhw]);
-  sendJsonOTmonObj("dhwsetpoint", OTdataObject.TdhwSet,"°C", msglastupdated[TdhwSet]);
-  sendJsonOTmonObj("maxchwatersetpoint", OTdataObject.MaxTSet,"°C", msglastupdated[MaxTSet]);
-  sendJsonOTmonObj("chwaterpressure", OTdataObject.CHPressure, "bar", msglastupdated[CHPressure]);
-  sendJsonOTmonObj("oemfaultcode", OTdataObject.OEMDiagnosticCode, "", msglastupdated[OEMDiagnosticCode]);
+  sendJsonOTmonObj("boilertemperature", OTdataObject.Tboiler, "°C", msglastupdated[OT_Tboiler]);
+  sendJsonOTmonObj("returnwatertemperature", OTdataObject.Tret,"°C", msglastupdated[OT_Tret]);
+  sendJsonOTmonObj("dhwtemperature", OTdataObject.Tdhw,"°C", msglastupdated[OT_Tdhw]);
+  sendJsonOTmonObj("dhwsetpoint", OTdataObject.TdhwSet,"°C", msglastupdated[OT_TdhwSet]);
+  sendJsonOTmonObj("maxchwatersetpoint", OTdataObject.MaxTSet,"°C", msglastupdated[OT_MaxTSet]);
+  sendJsonOTmonObj("chwaterpressure", OTdataObject.CHPressure, "bar", msglastupdated[OT_CHPressure]);
+  sendJsonOTmonObj("oemfaultcode", OTdataObject.OEMDiagnosticCode, "", msglastupdated[OT_OEMDiagnosticCode]);
 
   sendEndJsonArray();
 
@@ -270,43 +265,46 @@ void sendOTmonitor()
 
   sendStartJsonObj("otmonitor");
 
-  sendJsonOTmonObj("flamestatus", CONOFF(isFlameStatus()),"", msglastupdated[Status]);
-  sendJsonOTmonObj("chmodus", CONOFF(isCentralHeatingActive()),"", msglastupdated[Status]);
-  sendJsonOTmonObj("chenable", CONOFF(isCentralHeatingEnabled()),"", msglastupdated[Status]);
-  sendJsonOTmonObj("ch2modus", CONOFF(isCentralHeating2Active()),"", msglastupdated[Status]);
-  sendJsonOTmonObj("ch2enable", CONOFF(isCentralHeating2enabled()),"", msglastupdated[Status]);
-  sendJsonOTmonObj("dhwmode", CONOFF(isDomesticHotWaterActive()),"", msglastupdated[Status]);
-  sendJsonOTmonObj("dhwenable", CONOFF(isDomesticHotWaterEnabled()),"", msglastupdated[Status]);
-  sendJsonOTmonObj("diagnosticindicator", CONOFF(isDiagnosticIndicator()),"", msglastupdated[Status]);
-  sendJsonOTmonObj("faultindicator", CONOFF(isFaultIndicator()),"", msglastupdated[Status]);
-  
-  sendJsonOTmonObj("coolingmodus", CONOFF(isCoolingEnabled()),"", msglastupdated[Status]);
-  sendJsonOTmonObj("coolingactive", CONOFF(isCoolingActive()),"", msglastupdated[Status]);  
-  sendJsonOTmonObj("otcactive", CONOFF(isOutsideTemperatureCompensationActive()),"", msglastupdated[Status]);
+  // sendJsonOTmonObj("status hb", byte_to_binary((OTdataObject.Statusflags>>8) & 0xFF),"", msglastupdated[OT_Statusflags]);
+  // sendJsonOTmonObj("status lb", byte_to_binary(OTdataObject.Statusflags & 0xFF),"", msglastupdated[OT_Statusflags]);
 
-  sendJsonOTmonObj("servicerequest", CONOFF(isServiceRequest()),"", msglastupdated[ASFflags]);
-  sendJsonOTmonObj("lockoutreset", CONOFF(isLockoutReset()),"", msglastupdated[ASFflags]);
-  sendJsonOTmonObj("lowwaterpressure", CONOFF(isLowWaterPressure()),"", msglastupdated[ASFflags]);
-  sendJsonOTmonObj("gasflamefault", CONOFF(isGasFlameFault()),"", msglastupdated[ASFflags]);
-  sendJsonOTmonObj("airtemp", CONOFF(isAirTemperature()),"", msglastupdated[ASFflags]);
-  sendJsonOTmonObj("waterovertemperature", CONOFF(isWaterOverTemperature()),"", msglastupdated[ASFflags]);
+  sendJsonOTmonObj("flamestatus", CONOFF(isFlameStatus()),"", msglastupdated[OT_Statusflags]);
+  sendJsonOTmonObj("chmodus", CONOFF(isCentralHeatingActive()),"", msglastupdated[OT_Statusflags]);
+  sendJsonOTmonObj("chenable", CONOFF(isCentralHeatingEnabled()),"", msglastupdated[OT_Statusflags]);
+  sendJsonOTmonObj("ch2modus", CONOFF(isCentralHeating2Active()),"", msglastupdated[OT_Statusflags]);
+  sendJsonOTmonObj("ch2enable", CONOFF(isCentralHeating2enabled()),"", msglastupdated[OT_Statusflags]);
+  sendJsonOTmonObj("dhwmode", CONOFF(isDomesticHotWaterActive()),"", msglastupdated[OT_Statusflags]);
+  sendJsonOTmonObj("dhwenable", CONOFF(isDomesticHotWaterEnabled()),"", msglastupdated[OT_Statusflags]);
+  sendJsonOTmonObj("diagnosticindicator", CONOFF(isDiagnosticIndicator()),"", msglastupdated[OT_Statusflags]);
+  sendJsonOTmonObj("faultindicator", CONOFF(isFaultIndicator()),"", msglastupdated[OT_Statusflags]);
+  
+  sendJsonOTmonObj("coolingmodus", CONOFF(isCoolingEnabled()),"", msglastupdated[OT_Statusflags]);
+  sendJsonOTmonObj("coolingactive", CONOFF(isCoolingActive()),"", msglastupdated[OT_Statusflags]);  
+  sendJsonOTmonObj("otcactive", CONOFF(isOutsideTemperatureCompensationActive()),"", msglastupdated[OT_Statusflags]);
+
+  sendJsonOTmonObj("servicerequest", CONOFF(isServiceRequest()),"", msglastupdated[OT_ASFflags]);
+  sendJsonOTmonObj("lockoutreset", CONOFF(isLockoutReset()),"", msglastupdated[OT_ASFflags]);
+  sendJsonOTmonObj("lowwaterpressure", CONOFF(isLowWaterPressure()),"", msglastupdated[OT_ASFflags]);
+  sendJsonOTmonObj("gasflamefault", CONOFF(isGasFlameFault()),"", msglastupdated[OT_ASFflags]);
+  sendJsonOTmonObj("airtemp", CONOFF(isAirTemperature()),"", msglastupdated[OT_ASFflags]);
+  sendJsonOTmonObj("waterovertemperature", CONOFF(isWaterOverTemperature()),"", msglastupdated[OT_ASFflags]);
   
 
-  sendJsonOTmonObj("outsidetemperature", OTdataObject.Toutside, "°C", msglastupdated[Toutside]);
-  sendJsonOTmonObj("roomtemperature", OTdataObject.Tr, "°C", msglastupdated[Tr]);
-  sendJsonOTmonObj("roomsetpoint", OTdataObject.TrSet, "°C", msglastupdated[TrSet]);
-  sendJsonOTmonObj("remoteroomsetpoint", OTdataObject.TrOverride, "°C", msglastupdated[TrOverride]);
-  sendJsonOTmonObj("controlsetpoint", OTdataObject.TSet,"°C", msglastupdated[TSet]);
-  sendJsonOTmonObj("relmodlvl", OTdataObject.RelModLevel,"%", msglastupdated[RelModLevel]);
-  sendJsonOTmonObj("maxrelmodlvl", OTdataObject.MaxRelModLevelSetting, "%", msglastupdated[MaxRelModLevelSetting]);
+  sendJsonOTmonObj("outsidetemperature", OTdataObject.Toutside, "°C", msglastupdated[OT_Toutside]);
+  sendJsonOTmonObj("roomtemperature", OTdataObject.Tr, "°C", msglastupdated[OT_Tr]);
+  sendJsonOTmonObj("roomsetpoint", OTdataObject.TrSet, "°C", msglastupdated[OT_TrSet]);
+  sendJsonOTmonObj("remoteroomsetpoint", OTdataObject.TrOverride, "°C", msglastupdated[OT_TrOverride]);
+  sendJsonOTmonObj("controlsetpoint", OTdataObject.TSet,"°C", msglastupdated[OT_TSet]);
+  sendJsonOTmonObj("relmodlvl", OTdataObject.RelModLevel,"%", msglastupdated[OT_RelModLevel]);
+  sendJsonOTmonObj("maxrelmodlvl", OTdataObject.MaxRelModLevelSetting, "%", msglastupdated[OT_MaxRelModLevelSetting]);
  
-  sendJsonOTmonObj("boilertemperature", OTdataObject.Tboiler, "°C", msglastupdated[Tboiler]);
-  sendJsonOTmonObj("returnwatertemperature", OTdataObject.Tret,"°C", msglastupdated[Tret]);
-  sendJsonOTmonObj("dhwtemperature", OTdataObject.Tdhw,"°C", msglastupdated[Tdhw]);
-  sendJsonOTmonObj("dhwsetpoint", OTdataObject.TdhwSet,"°C", msglastupdated[TdhwSet]);
-  sendJsonOTmonObj("maxchwatersetpoint", OTdataObject.MaxTSet,"°C", msglastupdated[MaxTSet]);
-  sendJsonOTmonObj("chwaterpressure", OTdataObject.CHPressure, "bar", msglastupdated[CHPressure]);
-  sendJsonOTmonObj("oemfaultcode", OTdataObject.OEMDiagnosticCode, "", msglastupdated[OEMDiagnosticCode]);
+  sendJsonOTmonObj("boilertemperature", OTdataObject.Tboiler, "°C", msglastupdated[OT_Tboiler]);
+  sendJsonOTmonObj("returnwatertemperature", OTdataObject.Tret,"°C", msglastupdated[OT_Tret]);
+  sendJsonOTmonObj("dhwtemperature", OTdataObject.Tdhw,"°C", msglastupdated[OT_Tdhw]);
+  sendJsonOTmonObj("dhwsetpoint", OTdataObject.TdhwSet,"°C", msglastupdated[OT_TdhwSet]);
+  sendJsonOTmonObj("maxchwatersetpoint", OTdataObject.MaxTSet,"°C", msglastupdated[OT_MaxTSet]);
+  sendJsonOTmonObj("chwaterpressure", OTdataObject.CHPressure, "bar", msglastupdated[OT_CHPressure]);
+  sendJsonOTmonObj("oemfaultcode", OTdataObject.OEMDiagnosticCode, "", msglastupdated[OT_OEMDiagnosticCode]);
 
   sendEndJsonObj("otmonitor");
 

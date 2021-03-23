@@ -343,6 +343,7 @@
               needReload = true;
             } 
             epoch.value = data[i].epoch;
+            update.textContent = data[i].value;
             //if (update.style.visibility == 'visible') update.textContent = data[i].value;
 
           }
