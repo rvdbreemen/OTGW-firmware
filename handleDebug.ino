@@ -9,9 +9,9 @@ void handleDebug(){
                 DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
                 doAutoConfigure();
             break;
-            case '1':   bDebugOTmsg = !bDebugOTmsg; DebugTf("Debug OTmsg: %d\r\n", CBOOLEAN(bDebugOTmsg)); break;
-            case '2':   bDebugRestAPI = !bDebugRestAPI; DebugTf("Debug RestAPI: %d\r\n", CBOOLEAN(bDebugRestAPI)); break;
-            case '3':   bDebugMQTT = !bDebugMQTT; DebugTf("Debug MQTT: %d\r\n", CBOOLEAN(bDebugMQTT)); break;
+            case '1':   bDebugOTmsg = !bDebugOTmsg; DebugTf("\r\nDebug OTmsg: %s\r\n", CBOOLEAN(bDebugOTmsg)); break;
+            case '2':   bDebugRestAPI = !bDebugRestAPI; DebugTf("\r\nDebug RestAPI: %s\r\n", CBOOLEAN(bDebugRestAPI)); break;
+            case '3':   bDebugMQTT = !bDebugMQTT; DebugTf("\r\nDebug MQTT: %s\r\n", CBOOLEAN(bDebugMQTT)); break;
             default:
             break;
         }
