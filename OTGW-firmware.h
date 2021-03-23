@@ -58,7 +58,6 @@ void sendMQTTData(const char*, const char*, const bool);
 
 //Global variables
 WiFiClient  wifiClient;
-bool        Verbose = false;
 char        cMsg[CMSG_SIZE];
 char        fChar[10];
 String      lastReset = "";
@@ -102,6 +101,11 @@ int16_t   settingGPIOSENSORSinterval = 5;
 // Boot commands
 bool      settingOTGWcommandenable = false;
 String    settingOTGWcommands = "GW=1\r\nAA=28\r\n";
+
+//debug flags
+bool      bDebugOTmsg = true;
+bool      bDebugRestAPI = false;
+bool      bDebugMQTT = false;
 
 //Now load network suff
 #include "networkStuff.h"
