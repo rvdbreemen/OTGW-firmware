@@ -162,7 +162,7 @@ void handleMQTT()
     break;
     
     case MQTT_STATE_IS_CONNECTED:
-      if (Verbose) DebugTln(F("MQTT State: MQTT is Connected"));
+      //if (bDebugMQTT) DebugTln(F("MQTT State: MQTT is Connected"));
       if (MQTTclient.connected()) 
       { //if the MQTT client is connected, then please do a .loop call...
         MQTTclient.loop();
@@ -188,7 +188,7 @@ void handleMQTT()
     
     case MQTT_STATE_WAIT_FOR_RECONNECT:
       //do non-blocking wait for 10 minutes, then try to connect again. 
-      if (Verbose) DebugTln(F("MQTT State: MQTT wait for reconnect"));
+      if (bDebugMQTT) DebugTln(F("MQTT State: MQTT wait for reconnect"));
       if (DUE(timerMQTTwaitforconnect))
       {
         //remember when you tried last time to reconnect
