@@ -104,13 +104,16 @@ void readSettings(bool show)
   settingGPIOSENSORSinterval = doc["GPIOSENSORSinterval"] | settingGPIOSENSORSinterval;
   settingOTGWcommandenable = doc["OTGWcommandenable"] | settingOTGWcommandenable;
   settingOTGWcommands     = doc["OTGWcommands"].as<String>();
-  //if (settingOTGWcommands=="null") settingOTGWcommands = "GW=1\r\nAA=28\r\n";
+  if (settingOTGWcommands=="null") settingOTGWcommands = "";
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
 
   //Update some settings right now 
   MDNS.setHostname(CSTR(settingHostname));    // start advertising with new(?) settingHostname
+  
+  //Resetart MQTT connection every "save settings"
+  startMQTT();
 
   DebugTln(F(" .. done\r\n"));
 

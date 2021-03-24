@@ -80,7 +80,7 @@ String    settingHostname = _HOSTNAME;
 
 //MQTT settings
 bool      statusMQTTconnection = false; 
-bool      settingMQTTenable = false;
+bool      settingMQTTenable = true;
 bool      settingMQTTsecure = false; 
 String    settingMQTTbroker= "192.168.88.254";
 int16_t   settingMQTTbrokerPort = 1883; 
@@ -100,12 +100,12 @@ int16_t   settingGPIOSENSORSinterval = 5;
 
 // Boot commands
 bool      settingOTGWcommandenable = false;
-String    settingOTGWcommands = "GW=1\r\nAA=28\r\n";
+String    settingOTGWcommands = "";
 
 //debug flags
 bool      bDebugOTmsg = true;
 bool      bDebugRestAPI = false;
-bool      bDebugMQTT = false;
+bool      bDebugMQTT = true;
 
 //Now load network suff
 #include "networkStuff.h"
