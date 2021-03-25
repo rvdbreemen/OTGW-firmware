@@ -33,6 +33,8 @@
 #define ON LOW
 #define OFF HIGH
 
+DECLARE_TIMER_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS);
+  
 //=====================================================================
 void setup() {
   // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
@@ -58,7 +60,7 @@ void setup() {
   // Connect to and initialise WiFi network
   OTGWSerial.println(F("Attempting to connect to WiFi network\r"));
   setLed(LED1, ON);
-  startWiFi(_HOSTNAME, 240);  // timeout 240 seconds
+  startWiFi(CSTR(settingHostname), 240);  // timeout 240 seconds
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
 
@@ -67,10 +69,8 @@ void setup() {
   startLLMNR(CSTR(settingHostname));
   startMQTT(); 
   startNTP();
-
   setupFSexplorer();
   startWebserver();
-
   OTGWSerial.println(F("Setup finished!\r\n"));
   // After resetting the OTGW PIC never send anything to Serial for debug
   // and switch to telnet port 23 for debug purposed. 
@@ -79,13 +79,13 @@ void setup() {
   startOTGWstream();    // start port 25238 
   checkOTWGpicforupdate();
   initSensors();        // init DS18B20
-
   initWatchDog();       // setup the WatchDog
+  sendOTGWbootcmd();   
   //Blink LED2 to signal setup done
   setLed(LED1, OFF);
   blinkLED(LED2, 3, 100);
   setLed(LED2, OFF);
-  }
+}
 
 //=====================================================================
 
@@ -131,13 +131,14 @@ void delayms(unsigned long delay_ms)
 //===[ Do task every 1s ]===
 void doTaskEvery1s(){
   //== do tasks ==
+  handleOTGWqueue(); //just check if there are commands to retry
   upTimeSeconds++;
 }
 
 //===[ Do task every 5s ]===
 void doTaskEvery5s(){
   //== do tasks ==
-  pollSensors();
+  
 }
 
 //===[ Do task every 30s ]===
@@ -152,7 +153,7 @@ void doTaskEvery60s(){
   if (WiFi.status() != WL_CONNECTED)
   {
     //disconnected, try to reconnect then...
-    startWiFi(_HOSTNAME, 240);
+    startWiFi(CSTR(settingHostname), 240);
     //check OTGW and telnet
     startTelnet();
     startOTGWstream(); 
@@ -161,7 +162,7 @@ void doTaskEvery60s(){
 
 //===[ Do task every 5min ]===
 void do5minevent(){
-  DebugTf("Uptime seconds: %d", upTimeSeconds);
+  DebugTf("Uptime seconds: %d\r\n", upTimeSeconds);
   String sUptime = String(upTimeSeconds);
   sendMQTTData("otgw-firmware/uptime", sUptime, false);
 }
@@ -184,9 +185,7 @@ void doBackgroundTasks()
   handleOTGW();                 // OTGW handling
   httpServer.handleClient();
   MDNS.update();
-  events();                     // trigger ezTime update etc.
-  // // 'blink' the status led every x ms
-  // if (settingLEDblink) blinkLEDms(1000);             
+  events();                     // trigger ezTime update etc       
   delay(1);
   handleDebug();
 }
@@ -199,14 +198,14 @@ void loop()
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(tmrcheckpic, 1440, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS);
-
-  if (DUE(timer1s))       doTaskEvery1s();
-  if (DUE(timer5s))       doTaskEvery5s();
-  if (DUE(timer30s))      doTaskEvery30s();
-  if (DUE(timer60s))      doTaskEvery60s();
-  if (DUE(tmrcheckpic))   docheckforpic();
-  if (DUE(timer5min))     do5minevent();
-
+  
+  if (DUE(timer1s))         doTaskEvery1s();
+  if (DUE(timer5s))         doTaskEvery5s();
+  if (DUE(timer30s))        doTaskEvery30s();
+  if (DUE(timer60s))        doTaskEvery60s();
+  if (DUE(tmrcheckpic))     docheckforpic();
+  if (DUE(timer5min))       do5minevent();
+  if (DUE(timerpollsensor)) pollSensors();
   doBackgroundTasks();
 }
 

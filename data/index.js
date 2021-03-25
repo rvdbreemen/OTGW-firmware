@@ -343,6 +343,7 @@
               needReload = true;
             } 
             epoch.value = data[i].epoch;
+            update.textContent = data[i].value;
             //if (update.style.visibility == 'visible') update.textContent = data[i].value;
 
           }
@@ -705,8 +706,13 @@
    ,[ "bootcount",                  "Nr. Reboots"] 
    ,[ "ledblink",                   "Heartbeat LED (on/off)"]
    ,[ "gpiosensorsenabled",         "GPIO Sensors Enabled"]
+   ,[ "gpiosensorsinterval",        "GPIO Publish Interval (sec)"]
    ,[ "gpiosensorspin",             "GPIO pin # (SD3 = GPIO10 => 10)"]
    ,[ "mqttotmessage",              "MQTT OT msg Enable"]
+   ,[ "otgwcommandenable",          "OTGW Boot Command Enabled"]
+   ,[ "otgwcommands",               "OTGW Boot Command"]
+   
+   
    
                  ];
   

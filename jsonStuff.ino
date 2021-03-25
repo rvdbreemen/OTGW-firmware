@@ -278,10 +278,13 @@ void sendJsonSettingObj(const char *cName, int iValue, const char *iType, int mi
 
 
 //=======================================================================
+
 void sendJsonSettingObj(const char *cName, const char *cValue, const char *sType, int maxLen)
 {
-  char jsonBuff[200] = "";
+  char jsonBuff[200] = {0};
+  char buffer[100] = {0};
 
+  str_cstrlit(cValue, buffer, sizeof(buffer));
   snprintf(jsonBuff, sizeof(jsonBuff), "{\"name\": \"%s\", \"value\":\"%s\", \"type\": \"%s\", \"maxlen\": %d}"
                                       , cName, cValue, sType, maxLen);
 

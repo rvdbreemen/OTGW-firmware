@@ -10,6 +10,13 @@
 ***************************************************************************      
 */
 
+#define MQTTDebugTln(...) ({ if (bDebugMQTT) DebugTln(__VA_ARGS__);    })
+#define MQTTDebugln(...)  ({ if (bDebugMQTT) Debugln(__VA_ARGS__);    })
+#define MQTTDebugTf(...)  ({ if (bDebugMQTT) DebugTf(__VA_ARGS__);    })
+#define MQTTDebugf(...)   ({ if (bDebugMQTT) Debugf(__VA_ARGS__);    })
+#define MQTTDebugT(...)   ({ if (bDebugMQTT) DebugT(__VA_ARGS__);    })
+#define MQTTDebug(...)    ({ if (bDebugMQTT) Debug(__VA_ARGS__);    })
+
 // Declare some variables within global scope
 
   static IPAddress  MQTTbrokerIP;
@@ -46,12 +53,13 @@ void startMQTT()
 // handles MQTT subscribe incoming stuff
 void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 
-  DebugT("Message arrived on topic ["); Debug(topic); Debug("] = [");
-  for (int i = 0; i < length; i++) {
-    Debug((char)payload[i]);
-  }
-  Debug("] ("); Debug(length); Debug(")"); Debugln();
-  
+  if (bDebugMQTT) {
+    DebugT("Message arrived on topic ["); Debug(topic); Debug("] = [");
+    for (int i = 0; i < length; i++) {
+      Debug((char)payload[i]);
+    }
+    Debug("] ("); Debug(length); Debug(")"); Debugln();
+  }  
   char subscribeTopic[100];
   // naming convention <mqtt top>/set/<node id>/<command>
   snprintf(subscribeTopic, sizeof(subscribeTopic), "%s/", MQTTSubNamespace.c_str());
@@ -60,7 +68,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   if (stricmp(topic, subscribeTopic) == 0) 
   {
     //incoming command to be forwarded to OTGW
-    sendOTGW((char *)payload, length);
+    addOTWGcmdtoqueue((char *)payload, length);
   }
 }
 
@@ -71,26 +79,33 @@ void handleMQTT()
   DECLARE_TIMER_MIN(timerMQTTwaitforconnect, 10, CATCH_UP_MISSED_TICKS);  // 10 minutes
   DECLARE_TIMER_SEC(timerMQTTwaitforretry, 3, CATCH_UP_MISSED_TICKS);     // 3 seconds backoff
 
+  //State debug timers
+  DECLARE_TIMER_SEC(timerMQTTwaitforreconnect, 30);
+  DECLARE_TIMER_SEC(timerMQTTerrorstate, 30);
+  DECLARE_TIMER_SEC(timerMQTTwaitconnectionattempt, 1);
+  DECLARE_TIMER_SEC(timerMQTTisconnected, 60);
+  
   switch(stateMQTT) 
   {
     case MQTT_STATE_INIT:  
-      DebugTln(F("MQTT State: MQTT Initializing")); 
+      MQTTDebugTln(F("MQTT State: MQTT Initializing")); 
       WiFi.hostByName(CSTR(settingMQTTbroker), MQTTbrokerIP);  // lookup the MQTTbroker convert to IP
       sprintf(MQTTbrokerIPchar, "%d.%d.%d.%d", MQTTbrokerIP[0], MQTTbrokerIP[1], MQTTbrokerIP[2], MQTTbrokerIP[3]);
       if (isValidIP(MQTTbrokerIP))  
       {
-        DebugTf("[%s] => setServer(%s, %d)\r\n", CSTR(settingMQTTbroker), MQTTbrokerIPchar, settingMQTTbrokerPort);
+        MQTTDebugTf("[%s] => setServer(%s, %d)\r\n", CSTR(settingMQTTbroker), MQTTbrokerIPchar, settingMQTTbrokerPort);
         MQTTclient.disconnect();
         MQTTclient.setServer(MQTTbrokerIPchar, settingMQTTbrokerPort);
         MQTTclient.setCallback(handleMQTTcallback);
         MQTTclient.setSocketTimeout(4); 
         MQTTclientId  = String(_HOSTNAME) + WiFi.macAddress();
         //skip try to connect
+        reconnectAttempts =0;
         stateMQTT = MQTT_STATE_TRY_TO_CONNECT;
       }
       else
       { // invalid IP, then goto error state
-        DebugTf("ERROR: [%s] => is not a valid URL\r\n", CSTR(settingMQTTbroker));
+        MQTTDebugTf("ERROR: [%s] => is not a valid URL\r\n", CSTR(settingMQTTbroker));
         stateMQTT = MQTT_STATE_ERROR;
         //DebugTln(F("Next State: MQTT_STATE_ERROR"));
       }    
@@ -98,21 +113,21 @@ void handleMQTT()
     break;
 
     case MQTT_STATE_TRY_TO_CONNECT:
-      DebugTln(F("MQTT State: MQTT try to connect"));
-      //DebugTf("MQTT server is [%s], IP[%s]\r\n", settingMQTTbroker.c_str(), MQTTbrokerIPchar);
+      MQTTDebugTln(F("MQTT State: MQTT try to connect"));
+      MQTTDebugTf("MQTT server is [%s], IP[%s]\r\n", settingMQTTbroker.c_str(), MQTTbrokerIPchar);
       
-      DebugT(F("Attempting MQTT connection .. "));
+      MQTTDebugT(F("Attempting MQTT connection .. "));
       reconnectAttempts++;
 
       //If no username, then anonymous connection to broker, otherwise assume username/password.
       if (settingMQTTuser.length() == 0) 
       {
-        Debug(F("without a Username/Password "));
+        MQTTDebug(F("without a Username/Password "));
         MQTTclient.connect(CSTR(MQTTclientId), CSTR(MQTTPubNamespace), 0, true, "offline");
       } 
       else 
       {
-        Debugf("Username [%s] ", CSTR(settingMQTTuser));
+        MQTTDebugf("Username [%s] ", CSTR(settingMQTTuser));
         MQTTclient.connect(CSTR(MQTTclientId), CSTR(settingMQTTuser), CSTR(settingMQTTpasswd), CSTR(MQTTPubNamespace), 0, true, "offline");
       }
 
@@ -120,9 +135,9 @@ void handleMQTT()
       if (MQTTclient.connected())
       {
         reconnectAttempts = 0;  
-        Debugln(F(" .. connected\r"));DebugFlush();
+        Debugln(F(" .. connected\r"));
         stateMQTT = MQTT_STATE_IS_CONNECTED;
-        //DebugTln(F("Next State: MQTT_STATE_IS_CONNECTED"));
+        MQTTDebugTln(F("Next State: MQTT_STATE_IS_CONNECTED"));
         // birth message, sendMQTT retains  by default
         sendMQTT(CSTR(MQTTPubNamespace), "online");
         //First do AutoConfiguration for Homeassistant
@@ -131,38 +146,37 @@ void handleMQTT()
         char topic[100];
         strcpy(topic, CSTR(MQTTSubNamespace));
         strlcat(topic, "/#", sizeof(topic));
-        DebugTf("Subscribe to MQTT: TopicId [%s]\r\n", topic);
+        MQTTDebugTf("Subscribe to MQTT: TopicId [%s]\r\n", topic);
         if (MQTTclient.subscribe(topic)){
-          DebugTf("MQTT: Subscribed successfully to TopicId [%s]\r\n", topic);
+          MQTTDebugTf("MQTT: Subscribed successfully to TopicId [%s]\r\n", topic);
         }
         else
         {
-          DebugTf("MQTT: Subscribe TopicId [%s] FAILED! \r\n", topic);
+          MQTTDebugTf("MQTT: Subscribe TopicId [%s] FAILED! \r\n", topic);
         }
-        DebugFlush();
         sendMQTTversioninfo();
       }
       else
       { // no connection, try again, do a non-blocking wait for 3 seconds.
-        Debugln(F(" .. \r"));
-        DebugTf("failed, retrycount=[%d], rc=[%d] ..  try again in 3 seconds\r\n", reconnectAttempts, MQTTclient.state());
+        MQTTDebugln(F(" .. \r"));
+        MQTTDebugTf("failed, retrycount=[%d], rc=[%d] ..  try again in 3 seconds\r\n", reconnectAttempts, MQTTclient.state());
         RESTART_TIMER(timerMQTTwaitforretry);
         stateMQTT = MQTT_STATE_WAIT_CONNECTION_ATTEMPT;  // if the re-connect did not work, then return to wait for reconnect
-        //DebugTln(F("Next State: MQTT_STATE_WAIT_CONNECTION_ATTEMPT"));
+        MQTTDebugTln(F("Next State: MQTT_STATE_WAIT_CONNECTION_ATTEMPT"));
       }
       
       //After 5 attempts... go wait for a while.
       if (reconnectAttempts >= 5)
       {
-        DebugTln(F("5 attempts have failed. Retry wait for next reconnect in 10 minutes\r"));
+        MQTTDebugTln(F("5 attempts have failed. Retry wait for next reconnect in 10 minutes\r"));
         RESTART_TIMER(timerMQTTwaitforconnect);
         stateMQTT = MQTT_STATE_WAIT_FOR_RECONNECT;  // if the re-connect did not work, then return to wait for reconnect
-        //DebugTln(F("Next State: MQTT_STATE_WAIT_FOR_RECONNECT"));
+        MQTTDebugTln(F("Next State: MQTT_STATE_WAIT_FOR_RECONNECT"));
       }   
     break;
     
     case MQTT_STATE_IS_CONNECTED:
-      if (Verbose) DebugTln(F("MQTT State: MQTT is Connected"));
+      if ((bDebugMQTT) && DUE(timerMQTTisconnected)) DebugTln(F("MQTT State: MQTT is Connected"));
       if (MQTTclient.connected()) 
       { //if the MQTT client is connected, then please do a .loop call...
         MQTTclient.loop();
@@ -171,47 +185,47 @@ void handleMQTT()
       { //else go and wait 10 minutes, before trying again.
         RESTART_TIMER(timerMQTTwaitforconnect);
         stateMQTT = MQTT_STATE_WAIT_FOR_RECONNECT;
-        //DebugTln(F("Next State: MQTT_STATE_WAIT_FOR_RECONNECT"));
+        MQTTDebugTln(F("Next State: MQTT_STATE_WAIT_FOR_RECONNECT"));
       }  
     break;
 
     case MQTT_STATE_WAIT_CONNECTION_ATTEMPT:
       //do non-blocking wait for 3 seconds
-      //DebugTln(F("MQTT State: MQTT_WAIT_CONNECTION_ATTEMPT"));
+      if ((bDebugMQTT) && DUE(timerMQTTwaitconnectionattempt)) DebugTln(F("MQTT State: MQTT_WAIT_CONNECTION_ATTEMPT"));
       if (DUE(timerMQTTwaitforretry))
       {
         //Try again... after waitforretry non-blocking delay
         stateMQTT = MQTT_STATE_TRY_TO_CONNECT;
-        //DebugTln(F("Next State: MQTT_STATE_TRY_TO_CONNECT"));
+        MQTTDebugTln(F("Next State: MQTT_STATE_TRY_TO_CONNECT"));
       }
     break;
     
     case MQTT_STATE_WAIT_FOR_RECONNECT:
       //do non-blocking wait for 10 minutes, then try to connect again. 
-      if (Verbose) DebugTln(F("MQTT State: MQTT wait for reconnect"));
-      if (DUE(timerMQTTwaitforconnect))
+      if ((bDebugMQTT) && DUE(timerMQTTwaitforreconnect)) DebugTln(F("MQTT State: MQTT wait for reconnect"));
+      if (DUE(timerMQTTwaitforreconnect))
       {
         //remember when you tried last time to reconnect
         RESTART_TIMER(timerMQTTwaitforretry);
         reconnectAttempts = 0; 
         stateMQTT = MQTT_STATE_TRY_TO_CONNECT;
-        //DebugTln(F("Next State: MQTT_STATE_TRY_TO_CONNECT"));
+        MQTTDebugTln(F("Next State: MQTT_STATE_TRY_TO_CONNECT"));
       }
     break;
 
     case MQTT_STATE_ERROR:
-      DebugTln(F("MQTT State: MQTT ERROR, wait for 10 minutes, before trying again"));
+      if ((bDebugMQTT) && DUE(timerMQTTerrorstate)) DebugTln(F("MQTT State: MQTT ERROR, wait for 10 minutes, before trying again"));
       //next retry in 10 minutes.
       RESTART_TIMER(timerMQTTwaitforconnect);
       stateMQTT = MQTT_STATE_WAIT_FOR_RECONNECT;
-      //DebugTln(F("Next State: MQTT_STATE_WAIT_FOR_RECONNECT"));
+      MQTTDebugTln(F("Next State: MQTT_STATE_WAIT_FOR_RECONNECT"));
     break;
 
     default:
-      DebugTln(F("MQTT State: default, this should NEVER happen!"));
+      MQTTDebugTln(F("MQTT State: default, this should NEVER happen!"));
       //do nothing, this state should not happen
       stateMQTT = MQTT_STATE_INIT;
-      //DebugTln(F("Next State: MQTT_STATE_INIT"));
+      DebugTln(F("Next State: MQTT_STATE_INIT"));
     break;
   }
   statusMQTTconnection = MQTTclient.connected();
@@ -245,11 +259,11 @@ void sendMQTTData(const char* topic, const char *json, const bool retain = false
 {
   if (!settingMQTTenable) return;
   if (!MQTTclient.connected() || !isValidIP(MQTTbrokerIP)) return;
-  // DebugTf("Sending data to MQTT server [%s]:[%d]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort);
+  MQTTDebugTf("Sending data to MQTT server [%s]:[%d]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort);
   char full_topic[100];
   snprintf(full_topic, sizeof(full_topic), "%s/", CSTR(MQTTPubNamespace));
   strlcat(full_topic, topic, sizeof(full_topic));
-  //DebugTf("Sending MQTT: TopicId [%s] Message [%s]\r\n", full_topic, json);
+  MQTTDebugTf("Sending MQTT: TopicId [%s] Message [%s]\r\n", full_topic, json);
   if (!MQTTclient.publish(full_topic, json, retain)) DebugTln("MQTT publish failed.");
   feedWatchDog();//feed the dog
 } // sendMQTTData()
@@ -268,8 +282,8 @@ void sendMQTT(const char* topic, const char *json, const size_t len)
 {
   if (!settingMQTTenable) return;
   if (!MQTTclient.connected() || !isValidIP(MQTTbrokerIP)) return;
-  //DebugTf("Sending data to MQTT server [%s]:[%d] ", settingMQTTbroker.c_str(), settingMQTTbrokerPort);  
-  //DebugTf("Sending MQTT: TopicId [%s] Message [%s]\r\n", topic, json);
+  MQTTDebugTf("Sending data to MQTT server [%s]:[%d] ", settingMQTTbroker.c_str(), settingMQTTbrokerPort);  
+  MQTTDebugTf("Sending MQTT: TopicId [%s] Message [%s]\r\n", topic, json);
   if (MQTTclient.getBufferSize() < len) MQTTclient.setBufferSize(len); //resize buffer when needed
 
   if (MQTTclient.beginPublish(topic, len, true)){
@@ -337,15 +351,15 @@ void doAutoConfigure(){
         if (splitString(sLine, ',', sTopic, sMsg))
         {
           // discovery topic prefix
-          DebugTf("sTopic[%s]==>", CSTR(sTopic)); 
+          MQTTDebugTf("sTopic[%s]==>", CSTR(sTopic)); 
           sTopic.replace("%homeassistant%", CSTR(settingMQTThaprefix));  
 
           /// node
           sTopic.replace("%node_id%", CSTR(NodeId));
-          Debugf("[%s]\r\n", CSTR(sTopic)); 
+          MQTTDebugf("[%s]\r\n", CSTR(sTopic)); 
           /// ----------------------
 
-          DebugTf("sMsg[%s]==>", CSTR(sMsg)); 
+          MQTTDebugTf("sMsg[%s]==>", CSTR(sMsg)); 
 
           /// node
           sMsg.replace("%node_id%", CSTR(NodeId));
@@ -368,7 +382,7 @@ void doAutoConfigure(){
           sendMQTT(sTopic, sMsg);
           resetMQTTBufferSize();
           delay(10);
-        } else DebugTf("Either comment or invalid config line: [%s]\r\n", CSTR(sLine));
+        } else MQTTDebugTf("Either comment or invalid config line: [%s]\r\n", CSTR(sLine));
       } // while available()
     fh.close();
 
