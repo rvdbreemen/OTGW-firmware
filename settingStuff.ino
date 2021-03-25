@@ -27,7 +27,7 @@ void writeSettings(bool show)
   DebugT(F("Start writing setting data "));
 
   //const size_t capacity = JSON_OBJECT_SIZE(6);  // save more setting, grow # of objects accordingly
-  DynamicJsonDocument doc(512);
+  DynamicJsonDocument doc(1024);
   JsonObject root  = doc.to<JsonObject>();
   root["hostname"] = settingHostname;
   root["MQTTenable"] = settingMQTTenable;
@@ -71,7 +71,7 @@ void readSettings(bool show)
   }
 
   // Deserialize the JSON document
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<1024> doc;
   DeserializationError error = deserializeJson(doc, file);
   if (error)
   {
@@ -108,12 +108,6 @@ void readSettings(bool show)
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
-
-  //Update some settings right now 
-  MDNS.setHostname(CSTR(settingHostname));    // start advertising with new(?) settingHostname
-  
-  //Resetart MQTT connection every "save settings"
-  startMQTT();
 
   DebugTln(F(" .. done\r\n"));
 
@@ -156,6 +150,13 @@ void updateSetting(const char *field, const char *newValue)
       settingMQTTtopTopic = settingMQTTtopTopic.substring(0, pos-1);
     }
     
+    //Update some settings right now 
+    startMDNS(CSTR(settingHostname));
+    startLLMNR(CSTR(settingHostname));
+  
+    //Resetart MQTT connection every "save settings"
+    startMQTT();
+
     Debugln();
     DebugTf("Need reboot before new %s.local will be available!\r\n\n", CSTR(settingHostname));
   }
@@ -173,9 +174,10 @@ void updateSetting(const char *field, const char *newValue)
   }
   if (stricmp(field, "MQTThaprefix")==0)    {
     settingMQTThaprefix = String(newValue);
-    if (settingMQTThaprefix.length()==0) settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
+    if (settingMQTThaprefix.length()==0)    settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
   }
-  if (stricmp(field, "MQTTOTmessage")==0)  settingMQTTOTmessage = EVALBOOLEAN(newValue);
+  if (stricmp(field, "MQTTOTmessage")==0)   settingMQTTOTmessage = EVALBOOLEAN(newValue);
+  if (strstr(field, "mqtt") != NULL)        startMQTT();//restart MQTT on change of any setting
   
   if (stricmp(field, "NTPenable")==0)      settingNTPenable = EVALBOOLEAN(newValue);
   if (stricmp(field, "NTPtimezone")==0)    {
@@ -204,6 +206,10 @@ void updateSetting(const char *field, const char *newValue)
 
   //finally update write settings
   writeSettings(false);
+  // if (strstr(field, "hostname")!= NULL) {
+  //   //restart wifi
+  //   startWIFI( CSTR(settingHostname), 240)
+  // } 
 
 } // updateSetting()
 
