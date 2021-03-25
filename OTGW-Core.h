@@ -20,12 +20,11 @@
 TelnetStreamClass OTGWstream(OTGW_SERIAL_PORT); 
 
 //Depends on the library 
-
 #define OTGW_COMMAND_TOPIC "command"
 
 typedef struct {
-	uint16_t 	Status = 0; 				// flag8 / flag8  Master and Slave Status flags. 
-	float 		TSet = 0.0; 					// f8.8  Control setpoint  ie CH  water temperature setpoint (°C)
+	uint16_t 	Statusflags = 0; // flag8 / flag8  Master and Slave Status flags. 
+	float 		TSet = 0.0; // f8.8  Control setpoint  ie CH  water temperature setpoint (°C)
 	uint16_t	MConfigMMemberIDcode = 0; 	// flag8 / u8  Master Configuration Flags /  Master MemberID Code 
 	uint16_t	SConfigSMemberIDcode = 0; // flag8 / u8  Slave Configuration Flags /  Slave MemberID Code 
 	uint16_t 	Command = 0; // u8 / u8  Remote Command 
@@ -59,7 +58,7 @@ typedef struct {
 	float 		Tdhw2 = 0.0 ; // f8.8  Domestic hot water temperature 2 (°C)
 	int16_t 	Texhaust = 0; // s16  Boiler exhaust temperature (°C)
 	uint16_t	FanSpeed = 0; // u16  Fan Speed (rpm)
-	float 		ElectricalCurrentBurnerFlame =0.0; // f88 Electrical current through burner flame (µA)
+	float 		ElectricalCurrentBurnerFlame = 0.0; // f88 Electrical current through burner flame (µA)
 	float 		TRoomCH2= 0.0; // f88  Room Temperature for 2nd CH circuit ("°C)
 	uint16_t	RelativeHumidity = 0; // u8 / u8 Relative Humidity (%)
 	uint16_t 	TdhwSetUBTdhwSetLB = 0 ; // s8 / s8  DHW setpoint upper & lower bounds for adjustment  (°C)
@@ -158,95 +157,95 @@ enum OpenThermMessageType {
 };
 
 enum OpenThermMessageID {
-	Status, // flag8 / flag8  Master and Slave Status flags. 
-	TSet, // f8.8  Control setpoint  ie CH  water temperature setpoint (°C)
-	MConfigMMemberIDcode, // flag8 / u8  Master Configuration Flags /  Master MemberID Code 
-	SConfigSMemberIDcode, // flag8 / u8  Slave Configuration Flags /  Slave MemberID Code 
-	Command, // u8 / u8  Remote Command 
-	ASFflags, // / OEM-fault-code  flag8 / u8  Application-specific fault flags and OEM fault code 
-	RBPflags, // flag8 / flag8  Remote boiler parameter transfer-enable & read/write flags 
-	CoolingControl, // f8.8  Cooling control signal (%) 
-	TsetCH2, // f8.8  Control setpoint for 2e CH circuit (°C)
-	TrOverride, // f8.8  Remote override room setpoint 
-	TSP, // u8 / u8  Number of Transparent-Slave-Parameters supported by slave 
-	TSPindexTSPvalue, // u8 / u8  Index number / Value of referred-to transparent slave parameter. 
-	FHBsize, // u8 / u8  Size of Fault-History-Buffer supported by slave 
-	FHBindexFHBvalue, // u8 / u8  Index number / Value of referred-to fault-history buffer entry. 
-	MaxRelModLevelSetting, // f8.8  Maximum relative modulation level setting (%) 
-	MaxCapacityMinModLevel, // u8 / u8  Maximum boiler capacity (kW) / Minimum boiler modulation level(%) 
-	TrSet, // f8.8  Room Setpoint (°C)
-	RelModLevel, // f8.8  Relative Modulation Level (%) 
-	CHPressure, // f8.8  Water pressure in CH circuit  (bar) 
-	DHWFlowRate, // f8.8  Water flow rate in DHW circuit. (litres/minute) 
-	DayTime, // special / u8  Day of Week and Time of Day 
-	Date, // u8 / u8  Calendar date 
-	Year, // u16  Calendar year 
-	TrSetCH2, // f8.8  Room Setpoint for 2nd CH circuit (°C)
-	Tr, // f8.8  Room temperature (°C)
-	Tboiler, // f8.8  Boiler flow water temperature (°C)
-	Tdhw, // f8.8  DHW temperature (°C)
-	Toutside, // f8.8  Outside temperature (°C)
-	Tret, // f8.8  Return water temperature (°C)
-	Tstorage, // f8.8  Solar storage temperature (°C)
-	Tcollector, // f8.8  Solar collector temperature (°C)
-	TflowCH2, // f8.8  Flow water temperature CH2 circuit (°C)
-	Tdhw2, // f8.8  Domestic hot water temperature 2 (°C)
-	Texhaust, // s16  Boiler exhaust temperature (°C)
-	FanSpeed = 35, // u16  Fan Speed (rpm)
-	ElectricalCurrentBurnerFlame, // f88 Electrical current through burner flame (µA)
-	TRoomCH2, // f88  Room Temperature for 2nd CH circuit ("°C)
-	RelativeHumidity, // u8 / u8 Relative Humidity (%)
-	TdhwSetUBTdhwSetLB = 48, // s8 / s8  DHW setpoint upper & lower bounds for adjustment  (°C)
-	MaxTSetUBMaxTSetLB, // s8 / s8  Max CH water setpoint upper & lower bounds for adjustment  (°C)
-	HcratioUBHcratioLB, // s8 / s8  OTC heat curve ratio upper & lower bounds for adjustment  
-	TdhwSet = 56, // f8.8  DHW setpoint (°C)    (Remote parameter 1)
-	MaxTSet, // f8.8  Max CH water setpoint (°C)  (Remote parameters 2)
-	Hcratio, // f8.8  OTC heat curve ratio (°C)  (Remote parameter 3)
-	StatusVH = 70, // flag8 / flag8 Status Ventilation/Heat recovery
-	ControlSetpointVH, // u8 Control setpoint V/H
-	FaultFlagsCodeVH, // flag8 / u8 Fault Flags/Code V/H
-	DiagnosticCodeVH, // u16 Diagnostic Code V/H
-	ConfigMemberIDVH, // flag8 / u8 Config/Member ID V/H
-	OpenthermVersionVH, // f8.8 OpenTherm Version V/H
-	VersionTypeVH,	// u8 / u8 Version & Type V/H
-	RelativeVentilation, // u8 Relative Ventilation (%)
-	RelativeHumidityVH, // u8 / u8 Relative Humidity (%)
-	CO2LevelVH, // u16 CO2 Level (ppm)
- 	SupplyInletTemperature,	// f8.8 Supply Inlet Temperature (°C)
- 	SupplyOutletTemperature, // f8.8 Supply Outlet Temperature(°C)
- 	ExhaustInletTemperature, // f8.8 Exhaust Inlet Temperature (°C)
- 	ExhaustOutletTemperature, // f8.8 Exhaust Outlet Temperature (°C)
-	ActualExhaustFanSpeed, // u16 Actual Exhaust Fan Speed (rpm)
-	ActualInletFanSpeed, // u16 Actual Inlet Fan Speed (rpm) 
-	RemoteParameterSettingVH, // flag8 / flag8 Remote Parameter Setting V/H
-	NominalVentilationValue, // u8 Nominal Ventilation Value
-	TSPNumberVH, // u8 / u8 TSP Number V/H
-	TSPEntryVH,	// u8 / u8 TSP Entry V/H
-	FaultBufferSizeVH, // u8 / u8 Fault Buffer Size V/H
-	FaultBufferEntryVH,	// u8 / u8 Fault Buffer Entry V/H
-	RFstrengthbatterylevel=98, // u8 / u8  RF strength and battery level
-	OperatingMode_HC1_HC2_DHW, // u8 / u8 Operating Mode HC1, HC2/ DHW
-	RemoteOverrideFunction = 100, // flag8 / -  Function of manual and program changes in master and remote room setpoint. 
-	ElectricityProducerStarts = 109, // u16 Electricity producer starts
-	ElectricityProducerHours, //u16 Electricity producer hours
-	ElectricityProduction, //u16 Electricity production
-	CumulativElectricityProduction, // u16 Cumulativ Electricity production
-	OEMDiagnosticCode = 115, // u16  OEM-specific diagnostic/service code 
-	BurnerStarts, // u16  Number of starts burner 
-	CHPumpStarts, // u16  Number of starts CH pump 
-	DHWPumpValveStarts, // u16  Number of starts DHW pump/valve 
-	DHWBurnerStarts, // u16  Number of starts burner during DHW mode 
-	BurnerOperationHours, // u16  Number of hours that burner is in operation (i.e. flame on) 
-	CHPumpOperationHours, // u16  Number of hours that CH pump has been running 
-	DHWPumpValveOperationHours, // u16  Number of hours that DHW pump has been running or DHW valve has been opened 
-	DHWBurnerOperationHours, // u16  Number of hours that burner is in operation during DHW mode 
-	OpenThermVersionMaster, // f8.8  The implemented version of the OpenTherm Protocol Specification in the master. 
-	OpenThermVersionSlave, // f8.8  The implemented version of the OpenTherm Protocol Specification in the slave. 
-	MasterVersion, // u8 / u8  Master product version number and type 
-	SlaveVersion, // u8 / u8  Slave product version number and type
-	RemehadFdUcodes, // u8 / u8 Remeha dF-/dU-codes
-	RemehaServicemessage, // u8 / u8 Remeha Servicemessage
-	RemehaDetectionConnectedSCU, // u8 / u8 Remeha detection connected SCU’s
+	OT_Statusflags, // flag8 / flag8  Master and Slave Status flags. 
+	OT_TSet, // f8.8  Control setpoint  ie CH  water temperature setpoint (°C)
+	OT_MConfigMMemberIDcode, // flag8 / u8  Master Configuration Flags /  Master MemberID Code 
+	OT_SConfigSMemberIDcode, // flag8 / u8  Slave Configuration Flags /  Slave MemberID Code 
+	OT_Command, // u8 / u8  Remote Command 
+	OT_ASFflags, // / OEM-fault-code  flag8 / u8  Application-specific fault flags and OEM fault code 
+	OT_RBPflags, // flag8 / flag8  Remote boiler parameter transfer-enable & read/write flags 
+	OT_CoolingControl, // f8.8  Cooling control signal (%) 
+	OT_TsetCH2, // f8.8  Control setpoint for 2e CH circuit (°C)
+	OT_TrOverride, // f8.8  Remote override room setpoint 
+	OT_TSP, // u8 / u8  Number of Transparent-Slave-Parameters supported by slave 
+	OT_TSPindexTSPvalue, // u8 / u8  Index number / Value of referred-to transparent slave parameter. 
+	OT_FHBsize, // u8 / u8  Size of Fault-History-Buffer supported by slave 
+	OT_FHBindexFHBvalue, // u8 / u8  Index number / Value of referred-to fault-history buffer entry. 
+	OT_MaxRelModLevelSetting, // f8.8  Maximum relative modulation level setting (%) 
+	OT_MaxCapacityMinModLevel, // u8 / u8  Maximum boiler capacity (kW) / Minimum boiler modulation level(%) 
+	OT_TrSet, // f8.8  Room Setpoint (°C)
+	OT_RelModLevel, // f8.8  Relative Modulation Level (%) 
+	OT_CHPressure, // f8.8  Water pressure in CH circuit  (bar) 
+	OT_DHWFlowRate, // f8.8  Water flow rate in DHW circuit. (litres/minute) 
+	OT_DayTime, // special / u8  Day of Week and Time of Day 
+	OT_Date, // u8 / u8  Calendar date 
+	OT_Year, // u16  Calendar year 
+	OT_TrSetCH2, // f8.8  Room Setpoint for 2nd CH circuit (°C)
+	OT_Tr, // f8.8  Room temperature (°C)
+	OT_Tboiler, // f8.8  Boiler flow water temperature (°C)
+	OT_Tdhw, // f8.8  DHW temperature (°C)
+	OT_Toutside, // f8.8  Outside temperature (°C)
+	OT_Tret, // f8.8  Return water temperature (°C)
+	OT_Tstorage, // f8.8  Solar storage temperature (°C)
+	OT_Tcollector, // f8.8  Solar collector temperature (°C)
+	OT_TflowCH2, // f8.8  Flow water temperature CH2 circuit (°C)
+	OT_Tdhw2, // f8.8  Domestic hot water temperature 2 (°C)
+	OT_Texhaust, // s16  Boiler exhaust temperature (°C)
+	OT_FanSpeed = 35, // u16  Fan Speed (rpm)
+	OT_ElectricalCurrentBurnerFlame, // f88 Electrical current through burner flame (µA)
+	OT_TRoomCH2, // f88  Room Temperature for 2nd CH circuit ("°C)
+	OT_RelativeHumidity, // u8 / u8 Relative Humidity (%)
+	OT_TdhwSetUBTdhwSetLB = 48, // s8 / s8  DHW setpoint upper & lower bounds for adjustment  (°C)
+	OT_MaxTSetUBMaxTSetLB, // s8 / s8  Max CH water setpoint upper & lower bounds for adjustment  (°C)
+	OT_HcratioUBHcratioLB, // s8 / s8  OTC heat curve ratio upper & lower bounds for adjustment  
+	OT_TdhwSet = 56, // f8.8  DHW setpoint (°C)    (Remote parameter 1)
+	OT_MaxTSet, // f8.8  Max CH water setpoint (°C)  (Remote parameters 2)
+	OT_Hcratio, // f8.8  OTC heat curve ratio (°C)  (Remote parameter 3)
+	OT_StatusVH = 70, // flag8 / flag8 Status Ventilation/Heat recovery
+	OT_ControlSetpointVH, // u8 Control setpoint V/H
+	OT_FaultFlagsCodeVH, // flag8 / u8 Fault Flags/Code V/H
+	OT_DiagnosticCodeVH, // u16 Diagnostic Code V/H
+	OT_ConfigMemberIDVH, // flag8 / u8 Config/Member ID V/H
+	OT_OpenthermVersionVH, // f8.8 OpenTherm Version V/H
+	OT_VersionTypeVH,	// u8 / u8 Version & Type V/H
+	OT_RelativeVentilation, // u8 Relative Ventilation (%)
+	OT_RelativeHumidityVH, // u8 / u8 Relative Humidity (%)
+	OT_CO2LevelVH, // u16 CO2 Level (ppm)
+ 	OT_SupplyInletTemperature,	// f8.8 Supply Inlet Temperature (°C)
+ 	OT_SupplyOutletTemperature, // f8.8 Supply Outlet Temperature(°C)
+ 	OT_ExhaustInletTemperature, // f8.8 Exhaust Inlet Temperature (°C)
+ 	OT_ExhaustOutletTemperature, // f8.8 Exhaust Outlet Temperature (°C)
+	OT_ActualExhaustFanSpeed, // u16 Actual Exhaust Fan Speed (rpm)
+	OT_ActualInletFanSpeed, // u16 Actual Inlet Fan Speed (rpm) 
+	OT_RemoteParameterSettingVH, // flag8 / flag8 Remote Parameter Setting V/H
+	OT_NominalVentilationValue, // u8 Nominal Ventilation Value
+	OT_TSPNumberVH, // u8 / u8 TSP Number V/H
+	OT_TSPEntryVH,	// u8 / u8 TSP Entry V/H
+	OT_FaultBufferSizeVH, // u8 / u8 Fault Buffer Size V/H
+	OT_FaultBufferEntryVH,	// u8 / u8 Fault Buffer Entry V/H
+	OT_RFstrengthbatterylevel=98, // u8 / u8  RF strength and battery level
+	OT_OperatingMode_HC1_HC2_DHW, // u8 / u8 Operating Mode HC1, HC2/ DHW
+	OT_RemoteOverrideFunction = 100, // flag8 / -  Function of manual and program changes in master and remote room setpoint. 
+	OT_ElectricityProducerStarts = 109, // u16 Electricity producer starts
+	OT_ElectricityProducerHours, //u16 Electricity producer hours
+	OT_ElectricityProduction, //u16 Electricity production
+	OT_CumulativElectricityProduction, // u16 Cumulativ Electricity production
+	OT_OEMDiagnosticCode = 115, // u16  OEM-specific diagnostic/service code 
+	OT_BurnerStarts, // u16  Number of starts burner 
+	OT_CHPumpStarts, // u16  Number of starts CH pump 
+	OT_DHWPumpValveStarts, // u16  Number of starts DHW pump/valve 
+	OT_DHWBurnerStarts, // u16  Number of starts burner during DHW mode 
+	OT_BurnerOperationHours, // u16  Number of hours that burner is in operation (i.e. flame on) 
+	OT_CHPumpOperationHours, // u16  Number of hours that CH pump has been running 
+	OT_DHWPumpValveOperationHours, // u16  Number of hours that DHW pump has been running or DHW valve has been opened 
+	OT_DHWBurnerOperationHours, // u16  Number of hours that burner is in operation during DHW mode 
+	OT_OpenThermVersionMaster, // f8.8  The implemented version of the OpenTherm Protocol Specification in the master. 
+	OT_OpenThermVersionSlave, // f8.8  The implemented version of the OpenTherm Protocol Specification in the slave. 
+	OT_MasterVersion, // u8 / u8  Master product version number and type 
+	OT_SlaveVersion, // u8 / u8  Slave product version number and type
+	OT_RemehadFdUcodes, // u8 / u8 Remeha dF-/dU-codes
+	OT_RemehaServicemessage, // u8 / u8 Remeha Servicemessage
+	OT_RemehaDetectionConnectedSCU, // u8 / u8 Remeha detection connected SCU’s
 };
 	enum OTtype_t { ot_f88, ot_s16, ot_s8s8, ot_u16, ot_u8u8, ot_flag8, ot_flag8flag8, ot_special, ot_flag8u8, ot_u8, ot_undef}; 
  	enum OTmsgcmd_t { OT_READ, OT_WRITE, OT_RW, OT_UNDEF };
@@ -402,6 +401,17 @@ enum OpenThermMessageID {
 #define OT_MSGID_MAX 133
 
 time_t msglastupdated[255] = {0}; //all msg, even if they are unknown
+
+struct OT_cmd_t { // see all possible commands for PIC here: https://otgw.tclcode.com/firmware.html
+	char cmd[15];
+	int cmdlen;
+	int retrycnt; 
+	time_t due;
+};
+
+#define CMDQUEUE_MAX 20
+struct OT_cmd_t cmdqueue[CMDQUEUE_MAX];
+static int cmdptr = 0;
 
 enum OpenThermStatus {
 	OT_NOT_INITIALIZED,
