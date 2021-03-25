@@ -60,7 +60,7 @@ void setup() {
   // Connect to and initialise WiFi network
   OTGWSerial.println(F("Attempting to connect to WiFi network\r"));
   setLed(LED1, ON);
-  startWiFi(_HOSTNAME, 240);  // timeout 240 seconds
+  startWiFi(CSTR(settingHostname), 240);  // timeout 240 seconds
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
 
@@ -153,7 +153,7 @@ void doTaskEvery60s(){
   if (WiFi.status() != WL_CONNECTED)
   {
     //disconnected, try to reconnect then...
-    startWiFi(_HOSTNAME, 240);
+    startWiFi(CSTR(settingHostname), 240);
     //check OTGW and telnet
     startTelnet();
     startOTGWstream(); 

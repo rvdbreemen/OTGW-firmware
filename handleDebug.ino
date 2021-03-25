@@ -4,6 +4,10 @@ void handleDebug(){
         char c;
         c = TelnetStream.read();
         switch (c){
+            case 'q':
+                DebugTln("Read settings");
+                readSettings(true);
+                break;
             case 'm':
                 DebugTln("Configure MQTT Discovery");
                 DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
@@ -13,7 +17,7 @@ void handleDebug(){
                 if (WiFi.status() != WL_CONNECTED)
                 {
                     DebugTln("Reconnecting to wifi");
-                    startWiFi(_HOSTNAME, 240);
+                    startWiFi(CSTR(settingHostname), 240);
                     //check OTGW and telnet
                     startTelnet();
                     startOTGWstream(); 
