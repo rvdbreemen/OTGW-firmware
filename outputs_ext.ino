@@ -35,7 +35,7 @@ void setOutputState(bool set_HIGH = true)
   DebugTf("Output GPIO%d set to %d", settingGPIOOUTPUTSpin, digitalRead(settingGPIOOUTPUTSpin));
 }
 
-void outputsHook(const char * master, const char * slave)
+void outputsHook( char * master,  char * slave)
 {
   // master
   // bit: [clear/0, set/1]
