@@ -108,6 +108,7 @@ bool      bDebugRestAPI = false;
 bool      bDebugMQTT = true;
 
 // GPIO Output Settings
+bool      settingMyDEBUG = false;
 bool      settingGPIOOUTPUTSenabled = false;
 int8_t    settingGPIOOUTPUTSpin = 16;
 int8_t    settingGPIOOUTPUTStriggerBit = 0;

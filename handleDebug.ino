@@ -59,6 +59,20 @@ void handleDebug(){
                 // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
                 digitalWrite(settingGPIOOUTPUTSpin, OFF);
                 break;
+            case 'd':
+                DebugTln("MyDEBUG =true");
+                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
+                settingMyDEBUG = true;
+                break;
+            case 'f':
+                if(settingMyDEBUG)
+                {
+                    DebugTln("MyDEBUG = true");
+                }else{
+                    DebugTln("MyDEBUG = false");
+                }
+                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
+                break;
             default:
             break;
         }
