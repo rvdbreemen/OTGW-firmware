@@ -37,6 +37,7 @@ void writeSettings(bool show)
   root["MQTTpasswd"] = settingMQTTpasswd;
   root["MQTTtoptopic"] = settingMQTTtopTopic;
   root["MQTThaprefix"] = settingMQTThaprefix;
+  root["MQTTuniqueid"] = settingMQTTuniqueid;
   root["MQTTOTmessage"] = settingMQTTOTmessage;
   root["NTPenable"] = settingNTPenable;
   root["NTPtimezone"] = settingNTPtimezone;
@@ -76,6 +77,7 @@ void readSettings(bool show)
   if (error)
   {
     DebugTln(F("Failed to read file, use existing defaults."));
+    DebugTf("Settings Deserialisation error:  %s \r\n", error.c_str());
     return;
   }
 
@@ -94,6 +96,9 @@ void readSettings(bool show)
   }
   settingMQTThaprefix     = doc["MQTThaprefix"].as<String>();
   if (settingMQTThaprefix=="null") settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
+  settingMQTTuniqueid     = doc["MQTTuniqueid"].as<String>();
+  if (settingMQTTuniqueid=="null") settingMQTTuniqueid = getUniqueId();
+
   settingMQTTOTmessage    = doc["MQTTOTmessage"]|settingMQTTOTmessage;
   settingNTPenable        = doc["NTPenable"]; 
   settingNTPtimezone      = doc["NTPtimezone"].as<String>();
@@ -121,6 +126,7 @@ void readSettings(bool show)
     Debugf("MQTT password : %s\r\n",  CSTR(settingMQTTpasswd));
     Debugf("MQTT toptopic : %s\r\n",  CSTR(settingMQTTtopTopic));
     Debugf("HA prefix     : %s\r\n",  CSTR(settingMQTThaprefix));
+    Debugf("MQTT uniqueid : %s\r\n",  CSTR(settingMQTTuniqueid));
     Debugf("NTP enabled   : %s\r\n",  CBOOLEAN(settingNTPenable));
     Debugf("NPT timezone  : %s\r\n",  CSTR(settingNTPtimezone));
     Debugf("Led Blink     : %s\r\n",  CBOOLEAN(settingLEDblink));
@@ -154,7 +160,7 @@ void updateSetting(const char *field, const char *newValue)
     startMDNS(CSTR(settingHostname));
     startLLMNR(CSTR(settingHostname));
   
-    //Resetart MQTT connection every "save settings"
+    //Restart MQTT connection every "save settings"
     startMQTT();
 
     Debugln();
@@ -175,6 +181,10 @@ void updateSetting(const char *field, const char *newValue)
   if (stricmp(field, "MQTThaprefix")==0)    {
     settingMQTThaprefix = String(newValue);
     if (settingMQTThaprefix.length()==0)    settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
+  }
+  if (stricmp(field, "MQTTuniqueid") == 0)  {
+    settingMQTTuniqueid = String(newValue);     
+    if (settingMQTTuniqueid.length() == 0)   settingMQTTuniqueid = getUniqueId();
   }
   if (stricmp(field, "MQTTOTmessage")==0)   settingMQTTOTmessage = EVALBOOLEAN(newValue);
   if (strstr(field, "mqtt") != NULL)        startMQTT();//restart MQTT on change of any setting
@@ -206,6 +216,10 @@ void updateSetting(const char *field, const char *newValue)
 
   //finally update write settings
   writeSettings(false);
+
+  //Restart MQTT connection every "save settings" (this seems to be save to do, but is called for each changed field now )
+  if (settingMQTTenable)   startMQTT();
+
   // if (strstr(field, "hostname")!= NULL) {
   //   //restart wifi
   //   startWIFI( CSTR(settingHostname), 240)
