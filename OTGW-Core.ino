@@ -11,6 +11,14 @@
 ***************************************************************************      
 */
 
+#define OTGWDebugTln(...) ({ if (bDebugOTmsg) DebugTln(__VA_ARGS__);    })
+#define OTGWDebugln(...)  ({ if (bDebugOTmsg) Debugln(__VA_ARGS__);    })
+#define OTGWDebugTf(...)  ({ if (bDebugOTmsg) DebugTf(__VA_ARGS__);    })
+#define OTGWDebugf(...)   ({ if (bDebugOTmsg) Debugf(__VA_ARGS__);    })
+#define OTGWDebugT(...)   ({ if (bDebugOTmsg) DebugT(__VA_ARGS__);    })
+#define OTGWDebug(...)    ({ if (bDebugOTmsg) Debug(__VA_ARGS__);    })
+
+
 //define Nodoshop OTGW hardware
 #define OTGW_BUTTON 0   //D3
 #define OTGW_RESET  14  //D5
@@ -62,14 +70,14 @@ void resetOTGW() {
   //then read the first response of the firmware to make sure it reads it
   String resp = OTGWSerial.readStringUntil('\n');
   resp.trim();
-  DebugTf("Received firmware version: [%s] [%s] (%d)\r\n", CSTR(resp), OTGWSerial.firmwareVersion(), strlen(OTGWSerial.firmwareVersion()));
+  OTGWDebugTf("Received firmware version: [%s] [%s] (%d)\r\n", CSTR(resp), OTGWSerial.firmwareVersion(), strlen(OTGWSerial.firmwareVersion()));
   bOTGWonline = (strlen(OTGWSerial.firmwareVersion())>0);
   if (bOTGWonline){
       if (resp.length()>0) {
         sPICfwversion = String(OTGWSerial.firmwareVersion());
       } else sPICfwversion ="No version found";
   } else sPICfwversion = "No OTGW connected!";
-  DebugTf("Current firmware version: %s\r\n", CSTR(sPICfwversion));
+  OTGWDebugTf("Current firmware version: %s\r\n", CSTR(sPICfwversion));
 }
 //===================[ getpicfwversion ]===========================
 String getpicfwversion(){
@@ -81,13 +89,13 @@ String getpicfwversion(){
     p += sizeof(OTGW_BANNER);
     _ret = line.substring(p);
   } else _ret ="No version found";
-  DebugTf("Current firmware version: %s\r\n", CSTR(_ret));
+  OTGWDebugTf("Current firmware version: %s\r\n", CSTR(_ret));
   _ret.trim();
   return _ret;
 }
 //===================[ checkOTWGpicforupdate ]=====================
 void checkOTWGpicforupdate(){
-  DebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
+  OTGWDebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
   String latest = checkforupdatepic("gateway.hex");
   if (!bOTGWonline) {
     sMessage = sPICfwversion; 
@@ -100,7 +108,7 @@ void checkOTWGpicforupdate(){
 //===================[ checkOTWGpicforupdate ]=====================
 void sendOTGWbootcmd(){
   if (!settingOTGWcommandenable) return;
-  DebugTf("OTGW boot message = [%s]\r\n", CSTR(settingOTGWcommands));
+  OTGWDebugTf("OTGW boot message = [%s]\r\n", CSTR(settingOTGWcommands));
   OTGWSerial.write(CSTR(settingOTGWcommands));
   OTGWSerial.flush();
 }
@@ -108,7 +116,7 @@ void sendOTGWbootcmd(){
 //===================[ OTGW Command & Response ]===================
 String executeCommand(const String sCmd){
   //send command to OTGW
-  DebugTf("OTGW Send Cmd [%s]\r\n", CSTR(sCmd));
+  OTGWDebugTf("OTGW Send Cmd [%s]\r\n", CSTR(sCmd));
   OTGWSerial.setTimeout(1000);
   DECLARE_TIMER_MS(tmrWaitForIt, 1000);
   while((OTGWSerial.availableForWrite() < sCmd.length()+2) && !DUE(tmrWaitForIt)){
@@ -123,7 +131,7 @@ String executeCommand(const String sCmd){
     feedWatchDog();
   }
   String _cmd = sCmd.substring(0,2);
-  DebugTf("Send command: [%s]\r\n", CSTR(_cmd));
+  OTGWDebugTf("Send command: [%s]\r\n", CSTR(_cmd));
   //fetch a line
   String line = OTGWSerial.readStringUntil('\n');
   line.trim();
@@ -154,7 +162,7 @@ String executeCommand(const String sCmd){
   } else {
     _ret = line; //some commands return a string, just return that.
   } 
-  DebugTf("Command send [%s]-[%s] - Response line: [%s] - Returned value: [%s]\r\n", CSTR(sCmd), CSTR(_cmd), CSTR(line), CSTR(_ret));
+  OTGWDebugTf("Command send [%s]-[%s] - Response line: [%s] - Returned value: [%s]\r\n", CSTR(sCmd), CSTR(_cmd), CSTR(line), CSTR(_ret));
   return _ret;
 }
 //===================[ Watchdog OTGW ]===============================
@@ -164,8 +172,8 @@ String initWatchDog() {
   // Code here is based on ESPEasy code, modified to work in the project.
 
   // configure hardware pins according to eeprom settings.
-  DebugTln("Setup Watchdog");
-  DebugTln(F("INIT : I2C"));
+  OTGWDebugTln("Setup Watchdog");
+  OTGWDebugTln(F("INIT : I2C"));
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);  //configure the I2C bus
   //=============================================
   // I2C Watchdog boot status check
@@ -183,7 +191,7 @@ String initWatchDog() {
     byte status = Wire.read();
     if (status & 0x1)
     {
-      DebugTln(F("INIT : Reset by WD!"));
+      OTGWDebugTln(F("INIT : Reset by WD!"));
       ReasonReset = "Reset by External WD";
       //lastReset = BOOT_CAUSE_EXT_WD;
     }
@@ -413,10 +421,10 @@ float print_f88()
 {
   //function to print data
   float _value = round(OTdata.f88()*100.0) / 100.0; // round float 2 digits, like this: x.xx 
-  // Debugf("%-37s = %3.2f %s\r\n", OTmap[OTdata.id].label, _value , OTmap[OTdata.id].unit);
+  // OTGWDebugf("%-37s = %3.2f %s\r\n", OTmap[OTdata.id].label, _value , OTmap[OTdata.id].unit);
   char _msg[15] {0};
   dtostrf(_value, 3, 2, _msg);
-  if (bDebugOTmsg) Debugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg , OTmap[OTdata.id].unit);
+  OTGWDebugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg , OTmap[OTdata.id].unit);
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
   return _value;
@@ -425,11 +433,11 @@ float print_f88()
 int16_t print_s16()
 {    
   int16_t _value = OTdata.s16(); 
-  // if (bDebugOTmsg) Debugf("%-37s = %5d %s\r\n", OTmap[OTdata.id].label, _value, OTmap[OTdata.id].unit);
+  // OTGWDebugf("%-37s = %5d %s\r\n", OTmap[OTdata.id].label, _value, OTmap[OTdata.id].unit);
   //Build string for MQTT
   char _msg[15] {0};
   itoa(_value, _msg, 10);
-  if (bDebugOTmsg) Debugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg, OTmap[OTdata.id].unit);
+  OTGWDebugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg, OTmap[OTdata.id].unit);
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
   return _value;
@@ -438,20 +446,20 @@ int16_t print_s16()
 uint16_t print_s8s8()
 {
   uint16_t _value = OTdata.u16();
-  if (bDebugOTmsg) Debugf("%-37s = %3d / %3d %s\r\n", OTmap[OTdata.id].label, (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB, OTmap[OTdata.id].unit);
+  OTGWDebugf("%-37s = %3d / %3d %s\r\n", OTmap[OTdata.id].label, (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB, OTmap[OTdata.id].unit);
   //Build string for MQTT
   char _msg[15] {0};
   char _topic[50] {0};
   itoa((int8_t)OTdata.valueHB, _msg, 10);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_value_hb", sizeof(_topic));
-  if (bDebugOTmsg) Debugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg, OTmap[OTdata.id].unit);
+  OTGWDebugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg, OTmap[OTdata.id].unit);
   sendMQTTData(_topic, _msg);
   //Build string for MQTT
   itoa((int8_t)OTdata.valueLB, _msg, 10);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_value_lb", sizeof(_topic));
-  if (bDebugOTmsg) Debugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg, OTmap[OTdata.id].unit);
+  OTGWDebugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg, OTmap[OTdata.id].unit);
   sendMQTTData(_topic, _msg);
   return _value;
 }
@@ -463,7 +471,7 @@ uint16_t print_u16()
   //Build string for MQTT
   char _msg[15] {0};
   utoa(_value, _msg, 10);
-  if (bDebugOTmsg) Debugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg, OTmap[OTdata.id].unit);
+  OTGWDebugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg, OTmap[OTdata.id].unit);
   //SendMQTT
   sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
   return _value;
@@ -493,7 +501,7 @@ uint16_t print_status()
   _flag8_master[7] = (((OTdata.valueHB) & 0x80) ? '.' : '-');
   _flag8_master[8] = '\0';
 
-  if (bDebugOTmsg) Debugf("%-37s = M[%s] \r\n", OTmap[OTdata.id].label, _flag8_master);
+  OTGWDebugf("%-37s = M[%s] \r\n", OTmap[OTdata.id].label, _flag8_master);
   //Master Status
   sendMQTTData("status_master", _flag8_master);
   sendMQTTData("ch_enable",             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
@@ -521,7 +529,7 @@ uint16_t print_status()
   _flag8_slave[7] = (((OTdata.valueLB) & 0x80) ? '.' : '-');
   _flag8_slave[8] = '\0';
 
-  DebugTf("%-37s = S[%s] \r\n", OTmap[OTdata.id].label, _flag8_slave);
+  OTGWDebugTf("%-37s = S[%s] \r\n", OTmap[OTdata.id].label, _flag8_slave);
 
   //Slave Status
   sendMQTTData("status_slave", _flag8_slave);
@@ -534,14 +542,14 @@ uint16_t print_status()
   sendMQTTData("diagnostic_indicator",  (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));
 
   uint16_t _value = OTdata.u16();
-  if (bDebugOTmsg) DebugTf("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]\r\n", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
+  OTGWDebugTf("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]\r\n", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
   return _value;
 }
 
 uint16_t print_ASFflags()
 {
   
-  if (bDebugOTmsg) Debugf("%-37s = M[%s] OEM fault code [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
+  OTGWDebugf("%-37s = M[%s] OEM fault code [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   //Build string for MQTT
   char _msg[15] {0};
   //Application Specific Fault
@@ -573,7 +581,7 @@ uint16_t print_ASFflags()
 
 uint16_t print_slavememberid()
 {
-  if (bDebugOTmsg) Debugf("%-37s = Slave Config[%s] MemberID code [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
+  OTGWDebugf("%-37s = Slave Config[%s] MemberID code [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   //Build string for SendMQTT
   sendMQTTData("slave_configuration", byte_to_binary(OTdata.valueHB));
   char _msg[15] {0};
@@ -605,7 +613,7 @@ uint16_t print_slavememberid()
 
 uint16_t print_mastermemberid()
 {
-  if (bDebugOTmsg) Debugf("%-37s = Master Config[%s] MemberID code [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
+  OTGWDebugf("%-37s = Master Config[%s] MemberID code [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   //Build string for MQTT
   char _msg[15] {0};
   sendMQTTData("master_configuration", byte_to_binary(OTdata.valueHB));
@@ -617,7 +625,7 @@ uint16_t print_mastermemberid()
 
 uint16_t print_flag8u8()
 {
-  if (bDebugOTmsg) Debugf("%-37s = M[%s] - [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
+  OTGWDebugf("%-37s = M[%s] - [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   //Build string for MQTT
   char _topic[50] {0};
   //flag8 value
@@ -637,7 +645,7 @@ uint16_t print_flag8u8()
 uint16_t print_flag8()
 {
   
-  if (bDebugOTmsg) Debugf("%-37s = flag8 = [%s] - decimal = [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
+  OTGWDebugf("%-37s = flag8 = [%s] - decimal = [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
 
   //Build string for MQTT
   char _topic[50] {0};
@@ -654,12 +662,12 @@ uint16_t print_flag8flag8()
   //Build string for MQTT
   char _topic[50] {0};
   //flag8 valueHB
-  if (bDebugOTmsg) Debugf("%-37s = HB flag8[%s] -[%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueHB);
+  OTGWDebugf("%-37s = HB flag8[%s] -[%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueHB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_hb_flag8", sizeof(_topic));
   sendMQTTData(_topic, byte_to_binary(OTdata.valueHB));
   //flag8 valueLB
-  if (bDebugOTmsg) Debugf("%-37s = LB flag8[%s] - [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
+  OTGWDebugf("%-37s = LB flag8[%s] - [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_lb_flag8", sizeof(_topic));
   sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
@@ -669,19 +677,19 @@ uint16_t print_flag8flag8()
 
 uint16_t print_u8u8()
 { 
-  if (bDebugOTmsg) Debugf("%-37s = %3d / %3d %s\r\n", OTmap[OTdata.id].label, (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, OTmap[OTdata.id].unit);
+  OTGWDebugf("%-37s = %3d / %3d %s\r\n", OTmap[OTdata.id].label, (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, OTmap[OTdata.id].unit);
   //Build string for MQTT
   char _topic[50] {0};
   char _msg[10] {0};
   //flag8 valueHB
   utoa((OTdata.valueHB), _msg, 10);
-  if (bDebugOTmsg) Debugf("%-37s = HB u8[%s] [%3d]\r\n", OTmap[OTdata.id].label, _msg, OTdata.valueHB);
+  OTGWDebugf("%-37s = HB u8[%s] [%3d]\r\n", OTmap[OTdata.id].label, _msg, OTdata.valueHB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_hb_u8", sizeof(_topic));
   sendMQTTData(_topic, _msg);
   //flag8 valueLB
   utoa((OTdata.valueLB), _msg, 10);
-  if (bDebugOTmsg) Debugf("%-37s = LB u8[%s] [%3d]\r\n", OTmap[OTdata.id].label, _msg, OTdata.valueLB);
+  OTGWDebugf("%-37s = LB u8[%s] [%3d]\r\n", OTmap[OTdata.id].label, _msg, OTdata.valueLB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_lb_u8", sizeof(_topic));
   sendMQTTData(_topic, _msg);
@@ -691,19 +699,19 @@ uint16_t print_u8u8()
 
 uint16_t print_date()
 { 
-  if (bDebugOTmsg) Debugf("%-37s = %3d / %3d %s\r\n", OTmap[OTdata.id].label, (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, OTmap[OTdata.id].unit);
+  OTGWDebugf("%-37s = %3d / %3d %s\r\n", OTmap[OTdata.id].label, (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, OTmap[OTdata.id].unit);
   //Build string for MQTT
   char _topic[50] {0};
   char _msg[10] {0};
   //flag8 valueHB
   utoa((OTdata.valueHB), _msg, 10);
-  if (bDebugOTmsg) Debugf("%-37s = HB u8[%s] [%3d]\r\n", OTmap[OTdata.id].label, _msg, OTdata.valueHB);
+  OTGWDebugf("%-37s = HB u8[%s] [%3d]\r\n", OTmap[OTdata.id].label, _msg, OTdata.valueHB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_month", sizeof(_topic));
   sendMQTTData(_topic, _msg);
   //flag8 valueLB
   utoa((OTdata.valueLB), _msg, 10);
-  if (bDebugOTmsg) Debugf("%-37s = LB u8[%s] [%3d]\r\n", OTmap[OTdata.id].label, _msg, OTdata.valueLB);
+  OTGWDebugf("%-37s = LB u8[%s] [%3d]\r\n", OTmap[OTdata.id].label, _msg, OTdata.valueLB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_day_of_month", sizeof(_topic));
   sendMQTTData(_topic, _msg);
@@ -715,7 +723,7 @@ uint16_t print_daytime()
 {
   //function to print data
   const char *dayOfWeekName[]  { "Unknown", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag", "Zondag", "Unknown" };
-  if (bDebugOTmsg) Debugf("%-37s = %s - %2d:%2d\r\n", OTmap[OTdata.id].label, dayOfWeekName[(OTdata.valueHB >> 5) & 0x7], (OTdata.valueHB & 0x1F), OTdata.valueLB); 
+  OTGWDebugf("%-37s = %s - %2d:%2d\r\n", OTmap[OTdata.id].label, dayOfWeekName[(OTdata.valueHB >> 5) & 0x7], (OTdata.valueHB & 0x1F), OTdata.valueLB); 
   //Build string for MQTT
   char _topic[50] {0};
   char _msg[10] {0};
@@ -748,11 +756,11 @@ uint16_t print_daytime()
 void addOTWGcmdtoqueue(const char* buf, int len){
   if ((len < 3) || (buf[2] != '=')){ 
     //no valid command of less then 2 bytes
-    DebugT("CmdQueue: Error:Not a valid command=[");
+    OTGWDebugT("CmdQueue: Error:Not a valid command=[");
     for (int i = 0; i < len; i++) {
-      Debug((char)buf[i]);
+      OTGWDebug((char)buf[i]);
     }
-    Debugf("] (%d)\r\n", len); 
+    OTGWDebugf("] (%d)\r\n", len); 
   }
 
   //check to see if the cmd is in queue
@@ -769,11 +777,11 @@ void addOTWGcmdtoqueue(const char* buf, int len){
     }
   } 
 
-  if (foundcmd) DebugTf("CmdQueue: Found cmd exists in slot [%d]\r\n", insertptr);
-  else DebugTf("CmdQueue: Adding cmd end of queue, slot [%d]\r\n", insertptr);
+  if (foundcmd) OTGWDebugTf("CmdQueue: Found cmd exists in slot [%d]\r\n", insertptr);
+  else OTGWDebugTf("CmdQueue: Adding cmd end of queue, slot [%d]\r\n", insertptr);
 
   //insert to the queue
-  DebugTf("CmdQueue: Insert queue in slot[%d]:[%s]\r\n", insertptr, cmdqueue[insertptr].cmd);
+  OTGWDebugTf("CmdQueue: Insert queue in slot[%d]:[%s]\r\n", insertptr, cmdqueue[insertptr].cmd);
   memset(cmdqueue[insertptr].cmd, 0, sizeof(cmdqueue[insertptr].cmd));
   if (len>=sizeof(cmdqueue[insertptr].cmd)) len = sizeof(cmdqueue[insertptr].cmd)-1; //never longer than the buffer
   memcpy(cmdqueue[insertptr].cmd, buf, len);
@@ -786,9 +794,9 @@ void addOTWGcmdtoqueue(const char* buf, int len){
     //if not reached max of queue
     if (cmdptr < CMDQUEUE_MAX) {
       cmdptr++; //next free slot
-      DebugTf("CmdQueue: Next free queue slot: [%d]\r\n", cmdptr);
-    } else DebugTln("CmdQueue: Error: Reached max queue");
-  } else DebugTf("CmdQueue: Found command at: [%d] - [%d]\r\n", insertptr, cmdptr);
+      OTGWDebugTf("CmdQueue: Next free queue slot: [%d]\r\n", cmdptr);
+    } else OTGWDebugTln("CmdQueue: Error: Reached max queue");
+  } else OTGWDebugTf("CmdQueue: Found command at: [%d] - [%d]\r\n", insertptr, cmdptr);
 }
 
 /*
@@ -798,16 +806,16 @@ void addOTWGcmdtoqueue(const char* buf, int len){
 */
 void handleOTGWqueue(){
   for (int i = 0; i<cmdptr; i++) {
-    DebugTf("CmdQueue: Checking due in queue slot[%d]:[%d]<[%d]\r\n", i, millis(), cmdqueue[i].due);
+    OTGWDebugTf("CmdQueue: Checking due in queue slot[%d]:[%d]<[%d]\r\n", i, millis(), cmdqueue[i].due);
     if (now() > cmdqueue[i].due) {
-      DebugTf("CmdQueue: Queue slot [%d] due\r\n", i);
+      OTGWDebugTf("CmdQueue: Queue slot [%d] due\r\n", i);
       sendOTGW(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
       cmdqueue[i].retrycnt++;
       cmdqueue[i].due = millis() + OTGW_CMD_INTERVAL * 1000; //seconds
       if (cmdqueue[i].retrycnt >= OTGW_CMD_RETRY){
         //max retry reached, so delete command from queue
         for (int j=i; j<cmdptr; j++){
-          DebugTf("CmdQueue: Moving [%d] => [%d]\r\n", j+1, j);
+          OTGWDebugTf("CmdQueue: Moving [%d] => [%d]\r\n", j+1, j);
           strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[i].cmd));
           cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
           cmdqueue[j].retrycnt = cmdqueue[j+1].retrycnt;
@@ -830,42 +838,42 @@ void handleOTGWqueue(){
 */
 void checkOTGWcmdqueue(const char *buf, int len){
   if ((len<3) || (buf[2]!=':')) {
-    DebugT("CmdQueue: Error: Not a command response [");
+    OTGWDebugT("CmdQueue: Error: Not a command response [");
     for (int i = 0; i < len; i++) {
-      Debug((char)buf[i]);
+      OTGWDebug((char)buf[i]);
     }
-    Debugf("] (%d)\r\n", len); 
+    OTGWDebugf("] (%d)\r\n", len); 
     return; //not a valid command response
   }
 
-  DebugT("CmdQueue: Checking if command is in in queue [");
+  OTGWDebugT("CmdQueue: Checking if command is in in queue [");
   for (int i = 0; i < len; i++) {
-    Debug((char)buf[i]);
+    OTGWDebug((char)buf[i]);
   }
-  Debugf("] (%d)\r\n", len); 
+  OTGWDebugf("] (%d)\r\n", len); 
 
   char cmd[3]; memset( cmd, 0, sizeof(cmd));
   char value[11]; memset( value, 0, sizeof(value));
   memcpy(cmd, buf, 2);
   memcpy(value, buf+3, len-3);
   for (int i=0; i<cmdptr; i++){
-      DebugTf("CmdQueue: Checking [%2s]==>[%d]:[%s] from queue\r\n", cmd, i, cmdqueue[i].cmd); 
+      OTGWDebugTf("CmdQueue: Checking [%2s]==>[%d]:[%s] from queue\r\n", cmd, i, cmdqueue[i].cmd); 
     if (strstr(cmdqueue[i].cmd, cmd)){
       //command found, check value
-      DebugTf("CmdQueue: Found cmd [%2s]==>[%d]:[%s]\r\n", cmd, i, cmdqueue[i].cmd); 
+      OTGWDebugTf("CmdQueue: Found cmd [%2s]==>[%d]:[%s]\r\n", cmd, i, cmdqueue[i].cmd); 
       // if(strstr(cmdqueue[i].cmd, value)){
         //value found, thus remove command from queue
-        DebugTf("CmdQueue: Found value [%s]==>[%d]:[%s]\r\n", value, i, cmdqueue[i].cmd); 
-        DebugTf("CmdQueue: Remove from queue [%d]:[%s] from queue\r\n", i, cmdqueue[i].cmd);
+        OTGWDebugTf("CmdQueue: Found value [%s]==>[%d]:[%s]\r\n", value, i, cmdqueue[i].cmd); 
+        OTGWDebugTf("CmdQueue: Remove from queue [%d]:[%s] from queue\r\n", i, cmdqueue[i].cmd);
         for (int j=i; j<cmdptr; j++){
-          DebugTf("CmdQueue: Moving [%d] => [%d]\r\n", j+1, j);
+          OTGWDebugTf("CmdQueue: Moving [%d] => [%d]\r\n", j+1, j);
           strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[i].cmd));
           cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
           cmdqueue[j].retrycnt = cmdqueue[j+1].retrycnt;
           cmdqueue[j].due = cmdqueue[j+1].due;
         }
         cmdptr--;
-      // } else DebugTf("Error: Did not find value [%s]==>[%d]:[%s]\r\n", value, i, cmdqueue[i].cmd); 
+      // } else OTGWDebugTf("Error: Did not find value [%s]==>[%d]:[%s]\r\n", value, i, cmdqueue[i].cmd); 
     }
   }
 }
@@ -875,12 +883,12 @@ int sendOTGW(const char* buf, int len)
   //Send the buffer to OTGW when the Serial interface is available
   if (OTGWSerial.availableForWrite()>=len+2) {
     //check the write buffer
-    //Debugf("Serial Write Buffer space = [%d] - needed [%d]\r\n",OTGWSerial.availableForWrite(), (len+2));
-    DebugT("Sending to Serial [");
+    //OTGWDebugf("Serial Write Buffer space = [%d] - needed [%d]\r\n",OTGWSerial.availableForWrite(), (len+2));
+    OTGWDebugT("Sending to Serial [");
     for (int i = 0; i < len; i++) {
-      Debug((char)buf[i]);
+      OTGWDebug((char)buf[i]);
     }
-    Debug("] ("); Debug(len); Debug(")"); Debugln();
+    OTGWDebug("] ("); OTGWDebug(len); OTGWDebug(")"); OTGWDebugln();
     
     while (OTGWSerial.availableForWrite()==(len+2)) {
       //cannot write, buffer full, wait for some space in serial out buffer
@@ -894,8 +902,8 @@ int sendOTGW(const char* buf, int len)
       OTGWSerial.write('\r');
       OTGWSerial.write('\n');
       OTGWSerial.flush(); 
-    } else Debugln("Error: Write buffer not big enough!");
-  } else Debugln("Error: Serial device not found!");
+    } else OTGWDebugln("Error: Write buffer not big enough!");
+  } else OTGWDebugln("Error: Serial device not found!");
 }
 
 /*
@@ -923,19 +931,19 @@ void processOTGW(const char *buf, int len){
     // source of otmsg
     if (buf[0]=='B')
     {
-      if (bDebugOTmsg) DebugT("Boiler           ");
+      OTGWDebugT("Boiler           ");
     } else if (buf[0]=='T')
     {
-      if (bDebugOTmsg) DebugT("Thermostat       ");
+      OTGWDebugT("Thermostat       ");
     } else if (buf[0]=='R')
     {
-      if (bDebugOTmsg) DebugT("Request Boiler   ");
+      OTGWDebugT("Request Boiler   ");
     } else if (buf[0]=='A')
     {
-      if (bDebugOTmsg) DebugT("Answer Themostat ");
+      OTGWDebugT("Answer Themostat ");
     } else if (buf[0]=='E')
     {
-      if (bDebugOTmsg) DebugT("Parity error     ");
+      OTGWDebugT("Parity error     ");
     } 
 
     const char *bufval = buf + 1;
@@ -949,11 +957,11 @@ void processOTGW(const char *buf, int len){
     OTdata.valueLB = value & 0xFF;             // byte 4 = low byte
 
     //print message frame
-    // Debugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
+    // OTGWDebugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
 
     //print message Type and ID
-    if (bDebugOTmsg) Debugf("[%-16s]\t", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
-    if (bDebugOTmsg) Debugf("[%-30s]\t", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
+    OTGWDebugf("[%-16s]\t", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
+    OTGWDebugf("[%-30s]\t", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
 
     //keep track of update
     msglastupdated[OTdata.id] = now();
@@ -961,7 +969,7 @@ void processOTGW(const char *buf, int len){
     //next step interpret the OT protocol
     if (static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_ACK || static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_DATA) {
 
-      //#define OTprint(data, value, text, format) ({ data= value; Debugf("[%37s]", text); Debugf("= [format]", data)})
+      //#define OTprint(data, value, text, format) ({ data= value; OTGWDebugf("[%37s]", text); OTGWDebugf("= [format]", data)})
       //interpret values f8.8
       switch (static_cast<OpenThermMessageID>(OTdata.id)) {   
         case OT_TSet:                          OTdataObject.TSet = print_f88(); break;         
@@ -1054,26 +1062,26 @@ void processOTGW(const char *buf, int len){
 	      case OT_RemehaServicemessage:          OTdataObject.RemehaServicemessage = print_u8u8(); break;
         case OT_RemehaDetectionConnectedSCU:   OTdataObject.RemehaDetectionConnectedSCU = print_u8u8(); break;
       }
-    } else Debugln(); //next line 
+    } else OTGWDebugln(); //next line 
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
     checkOTGWcmdqueue(buf, len);
   } else if (strstr(buf, "Error 01")!= NULL) {
     OTdataObject.error01++;
-    if (bDebugOTmsg) DebugTf("Error 01 = %d\r\n",OTdataObject.error01);
+    OTGWDebugTf("Error 01 = %d\r\n",OTdataObject.error01);
     sendMQTTData("Error 01", String(OTdataObject.error01));
   } else if (strstr(buf, "Error 02")!= NULL) {
     OTdataObject.error02++;
-    if (bDebugOTmsg) DebugTf("Error 02 = %d\r\n",OTdataObject.error02);
+    OTGWDebugTf("Error 02 = %d\r\n",OTdataObject.error02);
     sendMQTTData("Error 02", String(OTdataObject.error02));
   } else if (strstr(buf, "Error 03")!= NULL) {
     OTdataObject.error03++;
-    if (bDebugOTmsg) DebugTf("Error 03 = %d\r\n",OTdataObject.error03);
+    OTGWDebugTf("Error 03 = %d\r\n",OTdataObject.error03);
     sendMQTTData("Error 03", String(OTdataObject.error03));
   } else if (strstr(buf, "Error 04")!= NULL){
     OTdataObject.error04++;
-    if (bDebugOTmsg) DebugTf("Error 04 = %d\r\n",OTdataObject.error04);
+    OTGWDebugTf("Error 04 = %d\r\n",OTdataObject.error04);
     sendMQTTData("Error 04", String(OTdataObject.error04));
-  } else if (bDebugOTmsg) DebugTf("Not processed, received from OTGW => [%s] [%d]\r\n", buf, len);
+  } else OTGWDebugTf("Not processed, received from OTGW => [%s] [%d]\r\n", buf, len);
  
 }
 
@@ -1123,11 +1131,11 @@ void handleOTGW()
     if (outByte == '\n')
     { //on newline, do something...
       sWrite[bytes_write] = 0;
-      DebugTf("Net2Ser: Sending to OTGW: [%s] (%d)\r\n", sWrite, bytes_write);
+      OTGWDebugTf("Net2Ser: Sending to OTGW: [%s] (%d)\r\n", sWrite, bytes_write);
       //check for reset command
       if (stricmp(sWrite, "GW=R")==0){
         //detect [GW=R], then reset the gateway the gpio way
-        DebugTln("Detected: GW=R. Reset gateway command executed.");
+        OTGWDebugTln("Detected: GW=R. Reset gateway command executed.");
         resetOTGW();
       }
       bytes_write = 0; //start next line
@@ -1270,7 +1278,7 @@ void startOTGWstream()
 
 void upgradepicnow(const char *filename) {
   if (OTGWSerial.busy()) return; // if already in programming mode, never call it twice
-  DebugTln("Start PIC upgrade now.");
+  OTGWDebugTln("Start PIC upgrade now.");
   fwupgradestart(filename);  
   while (OTGWSerial.busy()){
     feedWatchDog();
@@ -1300,7 +1308,7 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
     case OTGW_ERROR_MISMATCHES:    errorupgrade = "Too many mismatches"; break;
     default:                       errorupgrade = "Unknown state"; break;
   }
-  DebugTf("Upgrade finished: Errorcode = %d - %s - %d retries, %d errors\n", result, CSTR(errorupgrade), retries, errors);
+  OTGWDebugTf("Upgrade finished: Errorcode = %d - %s - %d retries, %d errors\n", result, CSTR(errorupgrade), retries, errors);
 }
 
 
@@ -1328,10 +1336,10 @@ String checkforupdatepic(String filename){
   code = http.sendRequest("HEAD");
   if (code == HTTP_CODE_OK) {
     for (int i = 0; i< http.headers(); i++) {
-      DebugTf("%s: %s\r\n", hexheaders[i], http.header(i).c_str());
+      OTGWDebugTf("%s: %s\r\n", hexheaders[i], http.header(i).c_str());
     }
     latest = http.header(1);
-    DebugTf("Update %s -> %s\r\n", filename.c_str(), latest.c_str());
+    OTGWDebugTf("Update %s -> %s\r\n", filename.c_str(), latest.c_str());
     http.end();
   }
   return latest; 
@@ -1345,7 +1353,7 @@ void refreshpic(String filename, String version) {
 
   if (latest=checkforupdatepic(filename) != "") {
     if (latest != version) {
-      DebugTf("Update %s: %s -> %s\r\n", filename.c_str(), version.c_str(), latest.c_str());
+      OTGWDebugTf("Update %s: %s -> %s\r\n", filename.c_str(), version.c_str(), latest.c_str());
       http.begin(client, "http://otgw.tclcode.com/download/" + filename);
       code = http.GET();
       if (code == HTTP_CODE_OK) {
@@ -1359,7 +1367,7 @@ void refreshpic(String filename, String version) {
           if (f) {
             f.print(latest + "\n");
             f.close();
-            DebugTf("Update successful\n");
+            OTGWDebugTf("Update successful\n");
           }
         }
       }
@@ -1372,7 +1380,7 @@ void upgradepic() {
   String action = httpServer.arg("action");
   String filename = httpServer.arg("name");
   String version = httpServer.arg("version");
-  DebugTf("Action: %s %s %s\r\n", action.c_str(), filename.c_str(), version.c_str());
+  OTGWDebugTf("Action: %s %s %s\r\n", action.c_str(), filename.c_str(), version.c_str());
   if (action == "upgrade") {
     upgradepicnow(String("/" + filename).c_str());
   } else if (action == "refresh") {
