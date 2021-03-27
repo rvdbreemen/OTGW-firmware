@@ -35,16 +35,16 @@
   String            MQTTclientId;
   String            MQTTPubNamespace = "";
   String            MQTTSubNamespace = "";
-  String            NodeId = "";
+  // String            NodeId = "";
 //===========================================================================================
 void startMQTT() 
 {
   if (!settingMQTTenable) return;
   stateMQTT = MQTT_STATE_INIT;
   //setup for mqtt discovery
-  NodeId = getUniqueId();
-  MQTTPubNamespace = settingMQTTtopTopic + "/value/" + NodeId;
-  MQTTSubNamespace = settingMQTTtopTopic + "/set/" + NodeId;
+  // NodeId = getUniqueId();
+  MQTTPubNamespace = settingMQTTtopTopic + "/value/" + settingMQTTuniqueid;
+  MQTTSubNamespace = settingMQTTtopTopic + "/set/" + settingMQTTuniqueid;
   handleMQTT(); //initialize the MQTT statemachine
   // handleMQTT(); //then try to connect to MQTT
   // handleMQTT(); //now you should be connected to MQTT ready to send
@@ -355,14 +355,14 @@ void doAutoConfigure(){
           sTopic.replace("%homeassistant%", CSTR(settingMQTThaprefix));  
 
           /// node
-          sTopic.replace("%node_id%", CSTR(NodeId));
+          sTopic.replace("%node_id%", CSTR(settingMQTTuniqueid));
           MQTTDebugf("[%s]\r\n", CSTR(sTopic)); 
           /// ----------------------
 
           MQTTDebugTf("sMsg[%s]==>", CSTR(sMsg)); 
 
           /// node
-          sMsg.replace("%node_id%", CSTR(NodeId));
+          sMsg.replace("%node_id%", CSTR(settingMQTTuniqueid));
 
           /// hostname
           sMsg.replace("%hostname%", CSTR(settingHostname));

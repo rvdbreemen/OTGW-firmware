@@ -492,7 +492,12 @@
       //----document.getElementById("setFld_"+data[i].name).style.background = "white";
             document.getElementById(data[i].name).style.background = "white";
       //----document.getElementById("setFld_"+data[i].name).value = data[i].value;
-            document.getElementById(data[i].name).value = data[i].value;
+            // document.getElementById(data[i].name).value = data[i].value;
+            // FIX If checkbox change checked iso value
+            if (data[i].type == "b")
+              document.getElementById(data[i].name).checked = strToBool(data[i].value);
+            else document.getElementById(data[i].name).value = data[i].value;
+
           }
         }
         //console.log("-->done..");
@@ -637,6 +642,7 @@
    ,[ "mqttuser",                  "MQTT User" ]
    ,[ "mqttpasswd",                "Password MQTT User" ]
    ,[ "mqtttoptopic",              "MQTT Top Topic" ]
+   ,[ "mqttuniqueid",              "MQTT Uniqueid" ]
    ,[ "influxdbhostname",          "InfluxDB hostname"]
    ,[ "influxdbport",              "InfluxDB port (default: 8086)"]
    ,[ "influxdbdatabasename",      "InfluxDB database name"]
