@@ -374,7 +374,9 @@ void sendDeviceInfo()
   sendNestedJsonObj("uptime", upTime());
   sendNestedJsonObj("lastreset", lastReset);
   sendNestedJsonObj("bootcount", rebootCount);
-  
+  sendNestedJsonObj("thermostatconnected", CBOOLEAN(bOTGWthermostatstate));
+  sendNestedJsonObj("boilerconnected", CBOOLEAN(bOTGWboilerstate));      
+  sendNestedJsonObj("picconnected", CBOOLEAN(bOTGWonline));
   
   sendEndJsonObj("devinfo");
 
