@@ -10,6 +10,14 @@
 ***************************************************************************      
 */
 
+#define RESTDebugTln(...) ({ if (bDebugRestAPI) DebugTln(__VA_ARGS__);    })
+#define RESTDebugln(...)  ({ if (bDebugRestAPI) Debugln(__VA_ARGS__);    })
+#define RESTDebugTf(...)  ({ if (bDebugRestAPI) DebugTf(__VA_ARGS__);    })
+#define RESTDebugf(...)   ({ if (bDebugRestAPI) Debugf(__VA_ARGS__);    })
+#define RESTDebugT(...)   ({ if (bDebugRestAPI) DebugT(__VA_ARGS__);    })
+#define RESTDebug(...)    ({ if (bDebugRestAPI) Debug(__VA_ARGS__);    })
+
+
 
 //=======================================================================
 void processAPI() 
@@ -22,16 +30,16 @@ void processAPI()
   strlcpy( URI, httpServer.uri().c_str(), sizeof(URI) );
 
   if (httpServer.method() == HTTP_GET)
-        if (bDebugRestAPI) DebugTf("from[%s] URI[%s] method[GET] \r\n"
+        RESTDebugTf("from[%s] URI[%s] method[GET] \r\n"
                                   , httpServer.client().remoteIP().toString().c_str()
                                         , URI); 
-  else  if (bDebugRestAPI) DebugTf("from[%s] URI[%s] method[PUT] \r\n" 
+  else  RESTDebugTf("from[%s] URI[%s] method[PUT] \r\n" 
                                   , httpServer.client().remoteIP().toString().c_str()
                                         , URI); 
 
   if (ESP.getFreeHeap() < 8500) // to prevent firmware from crashing!
   {
-    if (bDebugRestAPI) DebugTf("==> Bailout due to low heap (%d bytes))\r\n", ESP.getFreeHeap() );
+    RESTDebugTf("==> Bailout due to low heap (%d bytes))\r\n", ESP.getFreeHeap() );
     httpServer.send(500, "text/plain", "500: internal server error (low heap)\r\n"); 
     return;
   }
@@ -156,7 +164,7 @@ void sendOTGWvalue(int msgid){
   } else if (msgid>= 0 && msgid<= OT_MSGID_MAX) 
   { //message id's need to be between 0 and 127
     //Debug print the values first
-    DebugTf("%s = %s %s\r\n", OTmap[msgid].label, getOTGWValue(msgid).c_str(), OTmap[msgid].unit);
+    RESTDebugTf("%s = %s %s\r\n", OTmap[msgid].label, getOTGWValue(msgid).c_str(), OTmap[msgid].unit);
     //build the json
     root["label"] = OTmap[msgid].label;
     if (OTmap[msgid].type == ot_f88) {
@@ -170,7 +178,7 @@ void sendOTGWvalue(int msgid){
   }
   String sBuff;
   serializeJsonPretty(root, sBuff);
-  //DebugTf("Json = %s\r\n", sBuff.c_str());
+  //RESTDebugTf("Json = %s\r\n", sBuff.c_str());
   //reply with json
   httpServer.sendHeader("Access-Control-Allow-Origin", "*");
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -190,8 +198,8 @@ void sendOTGWlabel(const char *msglabel){
     root["error"] = "message undefined: reserved for future use";
   } else 
   { //message id's need to be between 0 and OT_MSGID_MAX
-    //Debug print the values first
-    DebugTf("%s = %s %s\r\n", OTmap[msgid].label, getOTGWValue(msgid).c_str(), OTmap[msgid].unit);
+    //RESTDebug print the values first
+    RESTDebugTf("%s = %s %s\r\n", OTmap[msgid].label, getOTGWValue(msgid).c_str(), OTmap[msgid].unit);
     //build the json
     root["label"] = OTmap[msgid].label;
     if (OTmap[msgid].type == ot_f88) {
@@ -203,7 +211,7 @@ void sendOTGWlabel(const char *msglabel){
   } 
   String sBuff;
   serializeJsonPretty(root, sBuff);
-  //DebugTf("Json = %s\r\n", sBuff.c_str());
+  //RESTDebugTf("Json = %s\r\n", sBuff.c_str());
   //reply with json
   httpServer.sendHeader("Access-Control-Allow-Origin", "*");
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -212,7 +220,7 @@ void sendOTGWlabel(const char *msglabel){
 
 void sendTelegraf() 
 {
-  DebugTln("sending OT monitor values to Telegraf...\r");
+  RESTDebugTln("sending OT monitor values to Telegraf...\r");
 
   sendStartJsonArray();
   
@@ -261,7 +269,7 @@ void sendTelegraf()
 
 void sendOTmonitor() 
 {
-  DebugTln("sending OT monitor values ...\r");
+  RESTDebugTln("sending OT monitor values ...\r");
 
   sendStartJsonObj("otmonitor");
 
@@ -392,7 +400,7 @@ void sendDeviceTime()
 //=======================================================================
 void sendDeviceSettings() 
 {
-  DebugTln("sending device settings ...\r");
+  RESTDebugTln("sending device settings ...\r");
 
   sendStartJsonObj("settings");
   
@@ -442,13 +450,13 @@ void postSettings()
       int8_t wp = splitString(jsonIn.c_str(), ',',  wPair, 5) ;
       for (int i=0; i<wp; i++)
       {
-        //DebugTf("[%d] -> pair[%s]\r\n", i, wPair[i].c_str());
+        //RESTDebugTf("[%d] -> pair[%s]\r\n", i, wPair[i].c_str());
         int8_t wc = splitString(wPair[i].c_str(), ':',  wOut, 5) ;
-        //DebugTf("==> [%s] -> field[%s]->val[%s]\r\n", wPair[i].c_str(), wOut[0].c_str(), wOut[1].c_str());
+        //RESTDebugTf("==> [%s] -> field[%s]->val[%s]\r\n", wPair[i].c_str(), wOut[0].c_str(), wOut[1].c_str());
         if (wOut[0].equalsIgnoreCase("name"))  strCopy(field, sizeof(field), wOut[1].c_str());
         if (wOut[0].equalsIgnoreCase("value")) strCopy(newValue, sizeof(newValue), wOut[1].c_str());
       }
-      DebugTf("--> field[%s] => newValue[%s]\r\n", field, newValue);
+      RESTDebugTf("--> field[%s] => newValue[%s]\r\n", field, newValue);
       updateSetting(field, newValue);
       httpServer.send(200, "application/json", httpServer.arg(0));
 
