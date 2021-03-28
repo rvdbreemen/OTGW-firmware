@@ -925,6 +925,10 @@ bool isvalidotmsg(const char *buf, int len){
   - ...
 */
 void processOTGW(const char *buf, int len){
+  static timer_t epochBoilerlastseen = 0;
+  static timer_t epochThermostatlastseen = 0;
+  static bool bOTGWpreviousstate = false;
+
   if (isvalidotmsg(buf, len)) { 
     //OT protocol messages are 9 chars long
     if (settingMQTTOTmessage) sendMQTTData("otmessage", buf);
@@ -932,19 +936,35 @@ void processOTGW(const char *buf, int len){
     if (buf[0]=='B')
     {
       OTGWDebugT("Boiler           ");
+      epochBoilerlastseen = now();  
     } else if (buf[0]=='T')
     {
       OTGWDebugT("Thermostat       ");
+      epochThermostatlastseen = now();
     } else if (buf[0]=='R')
     {
       OTGWDebugT("Request Boiler   ");
+      epochBoilerlastseen = now();  
     } else if (buf[0]=='A')
     {
       OTGWDebugT("Answer Themostat ");
+      epochThermostatlastseen = now();
     } else if (buf[0]=='E')
     {
       OTGWDebugT("Parity error     ");
     } 
+
+    //If the Boiler or Thermostat messages have not been seen for 30 seconds, then set the state to false. 
+    bOTGWboilerstate = (now() < (epochBoilerlastseen+30));  
+    bOTGWthermostatstate = (now() < (epochThermostatlastseen+30));
+    //If either Boiler or Thermostat is offline, then the OTGW is considered offline as a whole.
+    bOTGWonline = bOTGWboilerstate && bOTGWthermostatstate;
+    if (bOTGWonline != bOTGWpreviousstate) {
+      sendMQTTData("otgw-pic/thermostat_connected", CBOOLEAN(bOTGWthermostatstate));
+      sendMQTTData("otgw-pic/boiler_connected", CBOOLEAN(bOTGWboilerstate));      
+      sendMQTTData("otgw-pic/pic_connected", CBOOLEAN(bOTGWonline));
+      bOTGWpreviousstate = bOTGWonline; //remember state, so we can detect statechanges
+    }
 
     const char *bufval = buf + 1;
     uint32_t value = strtoul(bufval, NULL, 16);
