@@ -17,7 +17,7 @@ void initOutputs() {
   DebugTf("init GPIO Output on GPIO%d...\r\n", settingGPIOOUTPUTSpin);
 
   pinMode(settingGPIOOUTPUTSpin, OUTPUT);
-  setOutputState(true);
+  setOutputState(OFF);
 
   // set the LED with the ledState of the variable:
   // digitalWrite(ledPin, ledState);
@@ -35,7 +35,7 @@ void setOutputState(bool set_HIGH = true)
   DebugTf("Output GPIO%d set to %d", settingGPIOOUTPUTSpin, digitalRead(settingGPIOOUTPUTSpin));
 }
 
-void outputsHook( char * master,  char * slave)
+void evalOutputs()
 {
   // master
   // bit: [clear/0, set/1]
@@ -48,16 +48,6 @@ void outputsHook( char * master,  char * slave)
   //  6: reserved
   //  7: reserved
 
-  // _flag8_master[0] = (((OTdata.valueHB) & 0x01) ? 'C' : '-');
-  // _flag8_master[1] = (((OTdata.valueHB) & 0x02) ? 'D' : '-');
-  // _flag8_master[2] = (((OTdata.valueHB) & 0x04) ? 'C' : '-');
-  // _flag8_master[3] = (((OTdata.valueHB) & 0x08) ? 'O' : '-');
-  // _flag8_master[4] = (((OTdata.valueHB) & 0x10) ? '2' : '-');
-  // _flag8_master[5] = (((OTdata.valueHB) & 0x20) ? '.' : '-');
-  // _flag8_master[6] = (((OTdata.valueHB) & 0x40) ? '.' : '-');
-  // _flag8_master[7] = (((OTdata.valueHB) & 0x80) ? '.' : '-');
-  // _flag8_master[8] = '\0';
-
   // slave
   //  0: fault indication [ no fault, fault ]
   //  1: CH mode [CH not active, CH active]
@@ -67,77 +57,20 @@ void outputsHook( char * master,  char * slave)
   //  5: CH2 mode [CH2 not active, CH2 active]
   //  6: diagnostic indication [no diagnostics, diagnostic event]
   //  7: reserved
-
-  // _flag8_slave[0] = (((OTdata.valueLB) & 0x01) ? 'E' : '-');
-  // _flag8_slave[1] = (((OTdata.valueLB) & 0x02) ? 'C' : '-');
-  // _flag8_slave[2] = (((OTdata.valueLB) & 0x04) ? 'W' : '-');
-  // _flag8_slave[3] = (((OTdata.valueLB) & 0x08) ? 'F' : '-');
-  // _flag8_slave[4] = (((OTdata.valueLB) & 0x10) ? 'C' : '-');
-  // _flag8_slave[5] = (((OTdata.valueLB) & 0x20) ? '2' : '-');
-  // _flag8_slave[6] = (((OTdata.valueLB) & 0x40) ? 'D' : '-');
-  // _flag8_slave[7] = (((OTdata.valueLB) & 0x80) ? '.' : '-');
-  // _flag8_slave[8] = '\0';
-
-  Debugf("Master bits = M[%s] \r\n", master);
-  Debugf("Slave  bits = S[%s] \r\n", slave);
+  if (!settingMyDEBUG)
+  {
+    return;
+  }
+  settingMyDEBUG = false;
   DebugTf("current gpio output state: %d \r\n", digitalRead(settingGPIOOUTPUTSpin));
   DebugFlush();
 
-  //only 8 bits so set it to a value we normally shouldn't reach to track for error
-  int dataIDbit = 9;
+  bool bitState = false;
 
-  // if trigger < 8 then the trigger is one of the master bits
-  // if trigger > 9 then the trigger is one of the slave bits
-  // if trigger == 9 than something went wrong
-  // master bits
-  if (settingGPIOOUTPUTStriggerBit >= 0 && settingGPIOOUTPUTStriggerBit <= 7)
-  {
-    Debugf("inside master [%s] \r\n", master);
-    // if (stricmp((const char*)master[settingGPIOOUTPUTStriggerBit], ".")!=0) 
-    // {
-    //   Debugf("valid bit master [%s] \r\n", master);
-    //   if (stricmp((const char*)master[settingGPIOOUTPUTStriggerBit], "-")!=0) 
-    //   {
-    //     Debugf("bit master on [%d] \r\n", settingGPIOOUTPUTStriggerBit);
-    //     setOutputState(true);
-    //   } 
-    //   else
-    //   {
-    //     Debugf("bit master off [%d] \r\n", settingGPIOOUTPUTStriggerBit);
-    //     setOutputState(false);
-    //     /* code */
-    //   }
-    // }
-  }
+  bitState = (OTdataObject.Statusflags & (2^settingGPIOOUTPUTStriggerBit));
+  DebugTf("bitState: bit: %d , state %d \r\n", settingGPIOOUTPUTStriggerBit, bitState);
 
-  // slave bits
-  else if (settingGPIOOUTPUTStriggerBit >= 10 && settingGPIOOUTPUTStriggerBit <= 17)
-  {
-    Debugf("inside slave [%s] \r\n", slave);
-    // if (stricmp((const char*)slave[settingGPIOOUTPUTStriggerBit], ".")!=0) 
-    // {
-    //   Debugf("valid bit slave [%s] \r\n", slave);
-    //   if (stricmp((const char*)slave[settingGPIOOUTPUTStriggerBit], "-")!=0) 
-    //   {
-    //     Debugf("bit slave on [%d] \r\n", settingGPIOOUTPUTStriggerBit);
-    //     setOutputState(true);
-    //   } 
-    //   else
-    //   {
-    //     Debugf("bit slave off [%d] \r\n", settingGPIOOUTPUTStriggerBit);
-    //     setOutputState(false);
-    //     /* code */
-    //   }
-    // }
-  }
-  
-  
-  else
-  {
-    // should never happen, error
-    // Debugln("Illegal value for settingGPIOOUTPUTStriggerBit: %d", settingGPIOOUTPUTStriggerBit);
-    DebugTf("Illegal value for settingGPIOOUTPUTStriggerBit: %d...\r\n", settingGPIOOUTPUTStriggerBit);
-    return;
-  }
+  setOutputState(bitState);
+
   DebugTf("end void: current gpio output state: %d \r\n", digitalRead(settingGPIOOUTPUTSpin));
 }

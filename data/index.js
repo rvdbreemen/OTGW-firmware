@@ -713,7 +713,7 @@
    ,[ "otgwcommands",               "OTGW Boot Command"]
    ,[ "gpiooutputsenabled",         "GPIO Output Enabled"]
    ,[ "gpiooutputspin",             "GPIO pin # to switch on/off"]
-   ,[ "gpiooutputstriggerbit",      "Bit # of the master/slave bits to trigger on master 0-7, slave 10-17"]
+   ,[ "gpiooutputstriggerbit",      "Bit # of the master/slave bits to trigger on (0-15)"]
    
                  ];
   
