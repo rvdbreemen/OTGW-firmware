@@ -71,8 +71,10 @@ const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
 
 //Information on OTGW 
 String    sPICfwversion = ""; 
-bool      bOTGWonline = true;
 String    errorupgrade = ""; 
+bool      bOTGWonline = true;
+bool      bOTGWboilerstate = false;
+bool      bOTGWthermostatstate = false;
 
 
 //All things that are settings 
