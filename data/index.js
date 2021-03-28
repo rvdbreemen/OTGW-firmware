@@ -711,9 +711,10 @@
    ,[ "mqttotmessage",              "MQTT OT msg Enable"]
    ,[ "otgwcommandenable",          "OTGW Boot Command Enabled"]
    ,[ "otgwcommands",               "OTGW Boot Command"]
-   
-   
-   
+   ,[ "thermostatconnected",        "OTGW Thermostate connected"]
+   ,[ "boilerconnected",            "OTGW Boiler connected"]
+   ,[ "picconnected",               "OTGW online"]
+      
                  ];
   
 /*
