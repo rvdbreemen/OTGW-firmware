@@ -445,7 +445,6 @@ int16_t print_s16()
 
 uint16_t print_s8s8()
 {
-  uint16_t _value = OTdata.u16();
   OTGWDebugf("%-37s = %3d / %3d %s\r\n", OTmap[OTdata.id].label, (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB, OTmap[OTdata.id].unit);
   //Build string for MQTT
   char _msg[15] {0};
@@ -461,9 +460,8 @@ uint16_t print_s8s8()
   strlcat(_topic, "_value_lb", sizeof(_topic));
   OTGWDebugf("%-37s = %s %s\r\n", OTmap[OTdata.id].label, _msg, OTmap[OTdata.id].unit);
   sendMQTTData(_topic, _msg);
-  return _value;
+  return OTdata.u16();
 }
-
 
 uint16_t print_u16()
 { 
@@ -478,8 +476,7 @@ uint16_t print_u16()
 }
 
 uint16_t print_status()
-{
-  
+{ 
   char _flag8_master[8] {0};
   char _flag8_slave[8] {0};
     //bit: [clear/0, set/1]
@@ -548,7 +545,6 @@ uint16_t print_status()
 
 uint16_t print_ASFflags()
 {
-  
   OTGWDebugf("%-37s = M[%s] OEM fault code [%3d]\r\n", OTmap[OTdata.id].label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   //Build string for MQTT
   char _msg[15] {0};
@@ -574,10 +570,8 @@ uint16_t print_ASFflags()
   sendMQTTData("gas_flame_fault",       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));
   sendMQTTData("air_pressure_fault",    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  
   sendMQTTData("water_over-temperature",(((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));
-  uint16_t _value=OTdata.u16();
-  return _value;
+  return OTdata.u16();
 }
-
 
 uint16_t print_slavememberid()
 {
@@ -607,8 +601,7 @@ uint16_t print_slavememberid()
   sendMQTTData("dhw_config",                              (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));
   sendMQTTData("master_low_off_pump_control_function",    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  
   sendMQTTData("ch2_present",                             (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));
-  uint16_t _value=OTdata.u16();
-  return _value;
+  return OTdata.u16();
 }
 
 uint16_t print_mastermemberid()
@@ -619,8 +612,7 @@ uint16_t print_mastermemberid()
   sendMQTTData("master_configuration", byte_to_binary(OTdata.valueHB));
   utoa(OTdata.valueLB, _msg, 10);
   sendMQTTData("master_memberid_code", _msg);
-  uint16_t _value=OTdata.u16();
-  return _value;
+  return OTdata.u16();
 }
 
 uint16_t print_flag8u8()
@@ -653,8 +645,7 @@ uint16_t print_flag8()
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_flag8", sizeof(_topic));
   sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
-  uint16_t _value=OTdata.u16();
-  return _value;
+  return OTdata.u16();
 }
 
 uint16_t print_flag8flag8()
@@ -671,8 +662,7 @@ uint16_t print_flag8flag8()
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_lb_flag8", sizeof(_topic));
   sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
-  uint16_t _value=OTdata.u16();
-  return _value;
+  return OTdata.u16();
 }
 
 uint16_t print_u8u8()
@@ -693,8 +683,7 @@ uint16_t print_u8u8()
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_lb_u8", sizeof(_topic));
   sendMQTTData(_topic, _msg);
-  uint16_t _value=OTdata.u16();
-  return _value;
+  return OTdata.u16();
 }
 
 uint16_t print_date()
@@ -715,8 +704,7 @@ uint16_t print_date()
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_day_of_month", sizeof(_topic));
   sendMQTTData(_topic, _msg);
-  uint16_t _value=OTdata.u16();
-  return _value;
+  return OTdata.u16();
 }
 
 uint16_t print_daytime()
@@ -739,8 +727,7 @@ uint16_t print_daytime()
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_minutes", sizeof(_topic));
   sendMQTTData(_topic, itoa((OTdata.valueLB), _msg, 10)); 
-  uint16_t _value=OTdata.u16();
-  return _value;
+  return OTdata.u16();
 }
 
 
