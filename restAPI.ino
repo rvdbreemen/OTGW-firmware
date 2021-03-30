@@ -95,26 +95,12 @@ void processAPI()
             /* how to post a command to OTGW
             ** POST or PUT = /api/v1/otgw/command/{command} = Any command you want
             ** Response: 200 OK
-            ** @@Todo: Check if command was executed correctly.
             */
-            //Send a command to OTGW
-            sendOTGW(CSTR(words[5]), words[5].length());
+            //Add a command to OTGW queue 
+            addOTWGcmdtoqueue(CSTR(words[5]), words[5].length());
             httpServer.send(200, "text/plain", "OK");
           } else sendApiNotFound(URI);
-        } else if (words[4] == "cmdrsp"){
-          if (httpServer.method() == HTTP_PUT || httpServer.method() == HTTP_POST)
-          {
-            /* how to post a command to OTGW
-            ** POST or PUT = /api/v1/otgw/cmdrsp/{command} = Any command you want
-            ** This fetches the response, if OTGW accepted the command, then the value of the response will be return.
-            ** OR and Error code is returned (read this section serial commands: https://otgw.tclcode.com/firmware.html) 
-            ** Response: 200 [response is value after {xx:value}]|[errorcode: {NG|SE|BV|OR|NS|NF|OE}]
-            */
-            //Send a command to OTGW and get the response too...
-            httpServer.send(200, "text/plain", executeCommand(words[5]));
-          } else sendApiNotFound(URI);
-        }
-        else sendApiNotFound(URI);
+        } else sendApiNotFound(URI);
       }
       else sendApiNotFound(URI);
     } 
