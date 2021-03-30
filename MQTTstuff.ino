@@ -76,7 +76,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 void handleMQTT() 
 {  
   if (!settingMQTTenable) return;
-  DECLARE_TIMER_MIN(timerMQTTwaitforconnect, 10, CATCH_UP_MISSED_TICKS);  // 10 minutes
+  DECLARE_TIMER_SEC(timerMQTTwaitforconnect, 42, CATCH_UP_MISSED_TICKS);   // retry after 42 seconds
   DECLARE_TIMER_SEC(timerMQTTwaitforretry, 3, CATCH_UP_MISSED_TICKS);     // 3 seconds backoff
 
   //State debug timers
@@ -176,7 +176,7 @@ void handleMQTT()
     break;
     
     case MQTT_STATE_IS_CONNECTED:
-      if ((bDebugMQTT) && DUE(timerMQTTisconnected)) DebugTln(F("MQTT State: MQTT is Connected"));
+      if DUE(timerMQTTisconnected) MQTTDebugTln(F("MQTT State: MQTT is Connected"));
       if (MQTTclient.connected()) 
       { //if the MQTT client is connected, then please do a .loop call...
         MQTTclient.loop();
@@ -191,7 +191,7 @@ void handleMQTT()
 
     case MQTT_STATE_WAIT_CONNECTION_ATTEMPT:
       //do non-blocking wait for 3 seconds
-      if ((bDebugMQTT) && DUE(timerMQTTwaitconnectionattempt)) DebugTln(F("MQTT State: MQTT_WAIT_CONNECTION_ATTEMPT"));
+      if  DUE(timerMQTTwaitconnectionattempt) MQTTDebugTln(F("MQTT State: MQTT_WAIT_CONNECTION_ATTEMPT"));
       if (DUE(timerMQTTwaitforretry))
       {
         //Try again... after waitforretry non-blocking delay
@@ -202,7 +202,7 @@ void handleMQTT()
     
     case MQTT_STATE_WAIT_FOR_RECONNECT:
       //do non-blocking wait for 10 minutes, then try to connect again. 
-      if ((bDebugMQTT) && DUE(timerMQTTwaitforreconnect)) DebugTln(F("MQTT State: MQTT wait for reconnect"));
+      if DUE(timerMQTTwaitforreconnect) MQTTDebugTln(F("MQTT State: MQTT wait for reconnect"));
       if (DUE(timerMQTTwaitforreconnect))
       {
         //remember when you tried last time to reconnect
@@ -214,7 +214,7 @@ void handleMQTT()
     break;
 
     case MQTT_STATE_ERROR:
-      if ((bDebugMQTT) && DUE(timerMQTTerrorstate)) DebugTln(F("MQTT State: MQTT ERROR, wait for 10 minutes, before trying again"));
+      if DUE(timerMQTTerrorstate) MQTTDebugTln(F("MQTT State: MQTT ERROR, wait for 10 minutes, before trying again"));
       //next retry in 10 minutes.
       RESTART_TIMER(timerMQTTwaitforconnect);
       stateMQTT = MQTT_STATE_WAIT_FOR_RECONNECT;
@@ -258,7 +258,8 @@ void sendMQTTData(const String topic, const String json, const bool retain = fal
 void sendMQTTData(const char* topic, const char *json, const bool retain = false) 
 {
   if (!settingMQTTenable) return;
-  if (!MQTTclient.connected() || !isValidIP(MQTTbrokerIP)) return;
+  if (!MQTTclient.connected()) {DebugTln("Error: MQTT broker not connected."); return;} 
+  if (!isValidIP(MQTTbrokerIP)) {DebugTln("Error: MQTT broker IP not valid."); return;} 
   MQTTDebugTf("Sending data to MQTT server [%s]:[%d]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort);
   char full_topic[100];
   snprintf(full_topic, sizeof(full_topic), "%s/", CSTR(MQTTPubNamespace));
@@ -281,7 +282,8 @@ void sendMQTT(String topic, String json){
 void sendMQTT(const char* topic, const char *json, const size_t len) 
 {
   if (!settingMQTTenable) return;
-  if (!MQTTclient.connected() || !isValidIP(MQTTbrokerIP)) return;
+  if (!MQTTclient.connected()) {DebugTln("Error: MQTT broker not connected."); return;} 
+  if (!isValidIP(MQTTbrokerIP)) {DebugTln("Error: MQTT broker IP not valid."); return;} 
   MQTTDebugTf("Sending data to MQTT server [%s]:[%d] ", settingMQTTbroker.c_str(), settingMQTTbrokerPort);  
   MQTTDebugTf("Sending MQTT: TopicId [%s] Message [%s]\r\n", topic, json);
   if (MQTTclient.getBufferSize() < len) MQTTclient.setBufferSize(len); //resize buffer when needed
@@ -328,8 +330,8 @@ bool splitString(String sIn, char del, String &cKey, String &cVal)
 //===========================================================================================
 void doAutoConfigure(){
   if (!settingMQTTenable) return;
-  if (!MQTTclient.connected()) {DebugTln("ERROR: MQTT broker not connected."); return;} 
-  if (!isValidIP(MQTTbrokerIP)) {DebugTln("ERROR: MQTT broker IP not valid."); return;} 
+  if (!MQTTclient.connected()) {DebugTln("Error: MQTT broker not connected."); return;} 
+  if (!isValidIP(MQTTbrokerIP)) {DebugTln("Error: MQTT broker IP not valid."); return;} 
   const char *cfgFilename = "/mqttha.cfg";
   String sTopic = "";
   String sMsg = "";

@@ -977,8 +977,7 @@ void processOTGW(const char *buf, int len){
     OTdata.valueLB = value & 0xFF;             // byte 4 = low byte
 
     //print message frame
-    // OTGWDebugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
-
+    //OTGWDebugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
     //print message Type and ID
     OTGWDebugf("[%-16s]\t", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
     OTGWDebugf("[%-30s]\t", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
@@ -1081,8 +1080,9 @@ void processOTGW(const char *buf, int len){
         case OT_RemehadFdUcodes:               OTdataObject.RemehadFdUcodes = print_u8u8(); break;
 	      case OT_RemehaServicemessage:          OTdataObject.RemehaServicemessage = print_u8u8(); break;
         case OT_RemehaDetectionConnectedSCU:   OTdataObject.RemehaDetectionConnectedSCU = print_u8u8(); break;
+        default: DebugTf("Unknown message [%02d] value [%04X]\r\n"); break;
       }
-    } else OTGWDebugln(); //next line 
+    } else OTGWDebugf("\thb[%3d] lb[%3d]\r\n", OTdata.valueHB, OTdata.valueLB);  
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
     checkOTGWcmdqueue(buf, len);
   } else if (strstr(buf, "Error 01")!= NULL) {
@@ -1287,7 +1287,7 @@ String getOTGWValue(int msgid)
     case OT_RemehadFdUcodes:                   return String(OTdataObject.RemehadFdUcodes); break;
     case OT_RemehaServicemessage:              return String(OTdataObject.RemehaServicemessage); break;
     case OT_RemehaDetectionConnectedSCU:       return String(OTdataObject.RemehaDetectionConnectedSCU); break;
-    default: return "not implemented yet!";
+    default: return "Error: not implemented yet!\r\n";
   } 
 }
 
