@@ -80,10 +80,10 @@ void handleMQTT()
   DECLARE_TIMER_SEC(timerMQTTwaitforretry, 3, CATCH_UP_MISSED_TICKS);     // 3 seconds backoff
 
   //State debug timers
-  DECLARE_TIMER_SEC(timerMQTTwaitforreconnect, 30);
-  DECLARE_TIMER_SEC(timerMQTTerrorstate, 30);
-  DECLARE_TIMER_SEC(timerMQTTwaitconnectionattempt, 1);
-  DECLARE_TIMER_SEC(timerMQTTisconnected, 60);
+  DECLARE_TIMER_SEC(timerMQTTdebugwaitforreconnect, 13);
+  DECLARE_TIMER_SEC(timerMQTTdebugerrorstate, 13);
+  DECLARE_TIMER_SEC(timerMQTTdebugwaitconnectionattempt, 1);
+  DECLARE_TIMER_SEC(timerMQTTdebugisconnected, 60);
   
   switch(stateMQTT) 
   {
@@ -176,7 +176,7 @@ void handleMQTT()
     break;
     
     case MQTT_STATE_IS_CONNECTED:
-      if DUE(timerMQTTisconnected) MQTTDebugTln(F("MQTT State: MQTT is Connected"));
+      if DUE(timerMQTTdebugisconnected) MQTTDebugTln(F("MQTT State: MQTT is Connected"));
       if (MQTTclient.connected()) 
       { //if the MQTT client is connected, then please do a .loop call...
         MQTTclient.loop();
@@ -191,7 +191,7 @@ void handleMQTT()
 
     case MQTT_STATE_WAIT_CONNECTION_ATTEMPT:
       //do non-blocking wait for 3 seconds
-      if  DUE(timerMQTTwaitconnectionattempt) MQTTDebugTln(F("MQTT State: MQTT_WAIT_CONNECTION_ATTEMPT"));
+      if  DUE(timerMQTTdebugwaitconnectionattempt) MQTTDebugTln(F("MQTT State: MQTT_WAIT_CONNECTION_ATTEMPT"));
       if (DUE(timerMQTTwaitforretry))
       {
         //Try again... after waitforretry non-blocking delay
@@ -202,8 +202,8 @@ void handleMQTT()
     
     case MQTT_STATE_WAIT_FOR_RECONNECT:
       //do non-blocking wait for 10 minutes, then try to connect again. 
-      if DUE(timerMQTTwaitforreconnect) MQTTDebugTln(F("MQTT State: MQTT wait for reconnect"));
-      if (DUE(timerMQTTwaitforreconnect))
+      if DUE(timerMQTTdebugwaitforreconnect) MQTTDebugTln(F("MQTT State: MQTT wait for reconnect"));
+      if (DUE(timerMQTTwaitforconnect))
       {
         //remember when you tried last time to reconnect
         RESTART_TIMER(timerMQTTwaitforretry);
@@ -214,7 +214,7 @@ void handleMQTT()
     break;
 
     case MQTT_STATE_ERROR:
-      if DUE(timerMQTTerrorstate) MQTTDebugTln(F("MQTT State: MQTT ERROR, wait for 10 minutes, before trying again"));
+      if DUE(timerMQTTdebugerrorstate) MQTTDebugTln(F("MQTT State: MQTT ERROR, wait for 10 minutes, before trying again"));
       //next retry in 10 minutes.
       RESTART_TIMER(timerMQTTwaitforconnect);
       stateMQTT = MQTT_STATE_WAIT_FOR_RECONNECT;
