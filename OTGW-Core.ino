@@ -950,6 +950,8 @@ void processOTGW(const char *buf, int len){
       sendMQTTData("otgw-pic/thermostat_connected", CBOOLEAN(bOTGWthermostatstate));
       sendMQTTData("otgw-pic/boiler_connected", CBOOLEAN(bOTGWboilerstate));      
       sendMQTTData("otgw-pic/pic_connected", CBOOLEAN(bOTGWonline));
+      sendMQTT(CSTR(MQTTPubNamespace), CBOOLEAN(bOTGWonline));
+      // nodeMCU online/offline zelf naar 'otgw-firmware/' pushen
       bOTGWpreviousstate = bOTGWonline; //remember state, so we can detect statechanges
     }
 
@@ -977,6 +979,26 @@ void processOTGW(const char *buf, int len){
 
       //#define OTprint(data, value, text, format) ({ data= value; OTGWDebugf("[%37s]", text); OTGWDebugf("= [format]", data)})
       //interpret values f8.8
+
+      // dynamisch parsen... todo...
+      // char _msg[15] {0};
+      // char _buf[120] {0};
+      // strlcpy(_buf, OTmap[OTdata.id).label, sizeof(_buf));
+      // switch(static_cast<OTtype_t>(OTmap[OTdata.id).type){
+      //   case ot_f88: strcat(_buf, dtostrf(round(OTdata.f88()*100.0) / 100.0, 3, 2, _msg)); break;
+      //   case ot_s16: strcat(_buf, itoa(_value, _msg, 10)); break;
+      //   case ot_s8s8: 
+      //   case ot_u16:
+      //   case ot_u8u8:
+      //   case ot_flag8:
+      //   case ot_flag8flag8:
+      //   case ot_special:
+      //   case ot_flag8u8:
+      //   case ot_u8:
+      //   case ot_undef:
+      //   default: 
+      // }
+
       switch (static_cast<OpenThermMessageID>(OTdata.id)) {   
         case OT_TSet:                          OTdataObject.TSet = print_f88(); break;         
         case OT_CoolingControl:                OTdataObject.CoolingControl = print_f88(); break;
