@@ -354,12 +354,12 @@ void sendDeviceInfo()
   );
   sendNestedJsonObj("ssid", CSTR(WiFi.SSID()));
   sendNestedJsonObj("wifirssi", WiFi.RSSI());
-  sendNestedJsonObj("mqttconnected", String(CBOOLEAN(statusMQTTconnection)));
   sendNestedJsonObj("ntpenable", String(CBOOLEAN(settingNTPenable)));
   sendNestedJsonObj("ntptimezone", CSTR(settingNTPtimezone));
   sendNestedJsonObj("uptime", upTime());
   sendNestedJsonObj("lastreset", lastReset);
   sendNestedJsonObj("bootcount", rebootCount);
+  sendNestedJsonObj("mqttconnected", String(CBOOLEAN(statusMQTTconnection)));
   sendNestedJsonObj("thermostatconnected", CBOOLEAN(bOTGWthermostatstate));
   sendNestedJsonObj("boilerconnected", CBOOLEAN(bOTGWboilerstate));      
   sendNestedJsonObj("picconnected", CBOOLEAN(bOTGWonline));
