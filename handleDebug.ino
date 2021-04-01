@@ -4,6 +4,17 @@ void handleDebug(){
         char c;
         c = TelnetStream.read();
         switch (c){
+            case 'h':
+                Debugln();
+                Debugln(F("---===[ Debug Help Menu ]===---"));
+                Debugln(F("1) Toggle verbose debug logging - OT message parsing"));
+                Debugln(F("2) Toggle verbose debug logging - API handeling"));
+                Debugln(F("3) Toggle verbose debug logging - MQTT module"));
+                Debugln(F("q) Force read settings"));
+                Debugln(F("m) Force MQTT discovery"));
+                Debugln(F("r) Reconnect wifi, telnet, otgwstream and mqtt"));
+                Debugln();
+                break;
             case 'q':
                 DebugTln("Read settings");
                 readSettings(true);
