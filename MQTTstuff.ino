@@ -123,12 +123,12 @@ void handleMQTT()
       if (settingMQTTuser.length() == 0) 
       {
         MQTTDebug(F("without a Username/Password "));
-        MQTTclient.connect(CSTR(MQTTclientId), CSTR(MQTTPubNamespace), 0, true, "offline");
+        if(!MQTTclient.connect(CSTR(MQTTclientId), CSTR(MQTTPubNamespace), 0, true, "offline")) PrintMQTTError();
       } 
       else 
       {
         MQTTDebugf("Username [%s] ", CSTR(settingMQTTuser));
-        MQTTclient.connect(CSTR(MQTTclientId), CSTR(settingMQTTuser), CSTR(settingMQTTpasswd), CSTR(MQTTPubNamespace), 0, true, "offline");
+        if(!MQTTclient.connect(CSTR(MQTTclientId), CSTR(settingMQTTuser), CSTR(settingMQTTpasswd), CSTR(MQTTPubNamespace), 0, true, "offline")) PrintMQTTError();
       }
 
       //If connection was made succesful, move on to next state...
@@ -153,6 +153,7 @@ void handleMQTT()
         else
         {
           MQTTDebugTf("MQTT: Subscribe TopicId [%s] FAILED! \r\n", topic);
+          PrintMQTTError();
         }
         sendMQTTversioninfo();
       }
@@ -239,6 +240,23 @@ String trimVal(char *in)
   return Out;
 } // trimVal()
 
+void PrintMQTTError(){
+  switch (MQTTclient.state())
+  {
+    case MQTT_CONNECTION_TIMEOUT     : MQTTDebugTln(F("Error: MQTT connection timeout"));break;
+    case MQTT_CONNECTION_LOST        : MQTTDebugTln(F("Error: MQTT connections lost"));break;
+    case MQTT_CONNECT_FAILED         : MQTTDebugTln(F("Error: MQTT connection failed"));break;
+    case MQTT_DISCONNECTED           : MQTTDebugTln(F("Error: MQTT disconnected"));break;
+    case MQTT_CONNECTED              : MQTTDebugTln(F("Error: MQTT connected"));break;
+    case MQTT_CONNECT_BAD_PROTOCOL   : MQTTDebugTln(F("Error: MQTT connect bad protocol"));break;
+    case MQTT_CONNECT_BAD_CLIENT_ID  : MQTTDebugTln(F("Error: MQTT connect bad client id"));break;
+    case MQTT_CONNECT_UNAVAILABLE    : MQTTDebugTln(F("Error: MQTT connect unavailable"));break;
+    case MQTT_CONNECT_BAD_CREDENTIALS: MQTTDebugTln(F("Error: MQTT connect bad credentials"));break;
+    case MQTT_CONNECT_UNAUTHORIZED   : MQTTDebugTln(F("Error: MQTT connect unauthorized"));break;
+    default: MQTTDebugTln(F("Error: MQTT unknown error"));
+  }
+}
+
 /* 
   topic:  <string> , sensor topic, will be automatically prefixed with <mqtt topic>/value/<node_id>
   json:   <string> , payload to send
@@ -258,14 +276,13 @@ void sendMQTTData(const String topic, const String json, const bool retain = fal
 void sendMQTTData(const char* topic, const char *json, const bool retain = false) 
 {
   if (!settingMQTTenable) return;
-  if (!MQTTclient.connected()) {DebugTln("Error: MQTT broker not connected."); return;} 
+  if (!MQTTclient.connected()) {DebugTln("Error: MQTT broker not connected."); PrintMQTTError(); return;} 
   if (!isValidIP(MQTTbrokerIP)) {DebugTln("Error: MQTT broker IP not valid."); return;} 
-  MQTTDebugTf("Sending data to MQTT server [%s]:[%d]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort);
   char full_topic[100];
   snprintf(full_topic, sizeof(full_topic), "%s/", CSTR(MQTTPubNamespace));
   strlcat(full_topic, topic, sizeof(full_topic));
-  MQTTDebugTf("Sending MQTT: TopicId [%s] Message [%s]\r\n", full_topic, json);
-  if (!MQTTclient.publish(full_topic, json, retain)) DebugTln("MQTT publish failed.");
+  MQTTDebugTf("Sending MQTT: server [%s]:[%d] => TopicId [%s] --> Message [%s]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort, full_topic, json);
+  if (!MQTTclient.publish(full_topic, json, retain)) PrintMQTTError();
   feedWatchDog();//feed the dog
 } // sendMQTTData()
 
@@ -282,16 +299,17 @@ void sendMQTT(String topic, String json){
 void sendMQTT(const char* topic, const char *json, const size_t len) 
 {
   if (!settingMQTTenable) return;
-  if (!MQTTclient.connected()) {DebugTln("Error: MQTT broker not connected."); return;} 
+  if (!MQTTclient.connected()) {DebugTln("Error: MQTT broker not connected."); PrintMQTTError(); return;} 
   if (!isValidIP(MQTTbrokerIP)) {DebugTln("Error: MQTT broker IP not valid."); return;} 
-  MQTTDebugTf("Sending data to MQTT server [%s]:[%d] ", settingMQTTbroker.c_str(), settingMQTTbrokerPort);  
-  MQTTDebugTf("Sending MQTT: TopicId [%s] Message [%s]\r\n", topic, json);
+  MQTTDebugTf("Sending MQTT: server [%s]:[%d] => TopicId [%s] --> Message [%s]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort, topic, json);
   if (MQTTclient.getBufferSize() < len) MQTTclient.setBufferSize(len); //resize buffer when needed
 
   if (MQTTclient.beginPublish(topic, len, true)){
-    for (size_t i = 0; i<len; i++) MQTTclient.write(json[i]);  
+    for (size_t i = 0; i<len; i++) {
+      if(!MQTTclient.write(json[i])) PrintMQTTError();
+    }  
     MQTTclient.endPublish();
-  } else DebugTln("MQTT publish failed.");
+  } else PrintMQTTError();
 
   feedWatchDog();
 } // sendMQTTData()
