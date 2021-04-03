@@ -720,7 +720,10 @@
    ,[ "thermostatconnected",        "OTGW Thermostate connected"]
    ,[ "boilerconnected",            "OTGW Boiler connected"]
    ,[ "picconnected",               "OTGW online"]
-      
+   ,[ "gpiooutputsenabled",         "GPIO Output Enabled"]
+   ,[ "gpiooutputspin",             "GPIO pin # to switch on/off"]
+   ,[ "gpiooutputstriggerbit",      "Bit # of the master/slave bits to trigger on (0-15)"]
+   
                  ];
   
 /*

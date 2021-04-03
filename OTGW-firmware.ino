@@ -34,6 +34,9 @@
 #define OFF HIGH
 
 DECLARE_TIMER_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS);
+
+// TODO need to determine interval
+DECLARE_TIMER_SEC(timersetoutput, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS);
   
 //=====================================================================
 void setup() {
@@ -79,6 +82,8 @@ void setup() {
   startOTGWstream();    // start port 25238 
   checkOTWGpicforupdate();
   initSensors();        // init DS18B20
+  initOutputs();
+
   initWatchDog();       // setup the WatchDog
   sendOTGWbootcmd();   
   //Blink LED2 to signal setup done
@@ -206,6 +211,7 @@ void loop()
   if (DUE(tmrcheckpic))     docheckforpic();
   if (DUE(timer5min))       do5minevent();
   if (DUE(timerpollsensor)) pollSensors();
+  if (DUE(timersetoutput))  evalOutputs();
   doBackgroundTasks();
 }
 
