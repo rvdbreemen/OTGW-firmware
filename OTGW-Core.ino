@@ -71,12 +71,12 @@ void resetOTGW() {
   String resp = OTGWSerial.readStringUntil('\n');
   resp.trim();
   OTGWDebugTf("Received firmware version: [%s] [%s] (%d)\r\n", CSTR(resp), OTGWSerial.firmwareVersion(), strlen(OTGWSerial.firmwareVersion()));
-  bOTGWonline = (strlen(OTGWSerial.firmwareVersion())>0);
-  if (bOTGWonline){
-      if (resp.length()>0) {
-        sPICfwversion = String(OTGWSerial.firmwareVersion());
-      } else sPICfwversion ="No version found";
-  } else sPICfwversion = "No OTGW connected!";
+  bOTGWonline = (resp.length()>0); 
+  if (bOTGWonline) {
+    sPICfwversion = String(OTGWSerial.firmwareVersion());
+  } else {
+    sPICfwversion ="No version found";
+  }
   OTGWDebugTf("Current firmware version: %s\r\n", CSTR(sPICfwversion));
 }
 //===================[ getpicfwversion ]===========================
