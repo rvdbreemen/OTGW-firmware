@@ -717,12 +717,12 @@
    ,[ "mqttotmessage",              "MQTT OT msg Enable"]
    ,[ "otgwcommandenable",          "OTGW Boot Command Enabled"]
    ,[ "otgwcommands",               "OTGW Boot Command"]
-   ,[ "thermostatconnected",        "OTGW Thermostate connected"]
-   ,[ "boilerconnected",            "OTGW Boiler connected"]
-   ,[ "picconnected",               "OTGW online"]
+   ,[ "thermostatconnected",        "Thermostate connected"]
+   ,[ "boilerconnected",            "Boiler connected"]
+   ,[ "picconnected",               "Pic connected"]
    ,[ "gpiooutputsenabled",         "GPIO Output Enabled"]
    ,[ "gpiooutputspin",             "GPIO pin # to switch on/off"]
-   ,[ "gpiooutputstriggerbit",      "Bit # of the master/slave bits to trigger on (0-15)"]
+   ,[ "gpiooutputstriggerbit",      "Bit X (master/slave) to trigger on (0-15)"]
    
                  ];
   
