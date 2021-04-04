@@ -66,17 +66,14 @@ OpenthermData OTdata;
 
 //===================[ Reset OTGW ]===============================
 void resetOTGW() {
+  sPICfwversion ="No version found"; //reset versionstring
   OTGWSerial.resetPic();
   //then read the first response of the firmware to make sure it reads it
   String resp = OTGWSerial.readStringUntil('\n');
   resp.trim();
   OTGWDebugTf("Received firmware version: [%s] [%s] (%d)\r\n", CSTR(resp), OTGWSerial.firmwareVersion(), strlen(OTGWSerial.firmwareVersion()));
   bOTGWonline = (resp.length()>0); 
-  if (bOTGWonline) {
-    sPICfwversion = String(OTGWSerial.firmwareVersion());
-  } else {
-    sPICfwversion ="No version found";
-  }
+  if (bOTGWonline) sPICfwversion = String(OTGWSerial.firmwareVersion());
   OTGWDebugTf("Current firmware version: %s\r\n", CSTR(sPICfwversion));
 }
 //===================[ getpicfwversion ]===========================
