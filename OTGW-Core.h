@@ -52,8 +52,8 @@ typedef struct {
 	float 		Tdhw = 0.0 ; // f8.8  DHW temperature (°C)
 	float 		Toutside = 0.0 ; // f8.8  Outside temperature (°C)
 	float 		Tret = 0.0 ; // f8.8  Return water temperature (°C)
-	float 		Tstorage = 0.0 ; // f8.8  Solar storage temperature (°C)
-	int16_t 	Tcollector = 0.0 ; // s16  Solar collector temperature (°C)
+	float 		Tsolarstorage = 0.0 ; // f8.8  Solar storage temperature (°C)
+	int16_t 	Tsolarcollector = 0.0 ; // s16  Solar collector temperature (°C)
 	float 		TflowCH2 = 0.0 ; // f8.8  Flow water temperature CH2 circuit (°C)
 	float 		Tdhw2 = 0.0 ; // f8.8  Domestic hot water temperature 2 (°C)
 	int16_t 	Texhaust = 0; // s16  Boiler exhaust temperature (°C)
@@ -186,8 +186,8 @@ enum OpenThermMessageID {
 	OT_Tdhw, // f8.8  DHW temperature (°C)
 	OT_Toutside, // f8.8  Outside temperature (°C)
 	OT_Tret, // f8.8  Return water temperature (°C)
-	OT_Tstorage, // f8.8  Solar storage temperature (°C)
-	OT_Tcollector, // s16  Solar collector temperature (°C)
+	OT_Tsolarstorage, // f8.8  Solar storage temperature (°C)
+	OT_Tsolarcollector, // s16  Solar collector temperature (°C)
 	OT_TflowCH2, // f8.8  Flow water temperature CH2 circuit (°C)
 	OT_Tdhw2, // f8.8  Domestic hot water temperature 2 (°C)
 	OT_Texhaust, // s16  Boiler exhaust temperature (°C)
@@ -290,8 +290,8 @@ enum OpenThermMessageID {
 		{  26, OT_READ  , ot_f88,        "Tdhw", "DHW temperature", "°C" },
 		{  27, OT_READ  , ot_f88,        "Toutside", "Outside temperature", "°C" },
 		{  28, OT_READ  , ot_f88,        "Tret", "Return water temperature", "°C" },
-		{  29, OT_READ  , ot_f88,        "Tstorage", "Solar storage temperature", "°C" },
-		{  30, OT_READ  , ot_s16,        "Tcollector", "Solar collector temperature", "°C" },
+		{  29, OT_READ  , ot_f88,        "Tshehehelarstorage", "Solar storage temperature", "°C" },
+		{  30, OT_READ  , ot_s16,        "Tsolarcollector", "Solar collector temperature", "°C" },
 		{  31, OT_READ  , ot_f88,        "TflowCH2", "Flow water temperature CH2 circuit", "°C" },
 		{  32, OT_READ  , ot_f88,        "Tdhw2", "Domestic hot water temperature 2", "°C" },
 		{  33, OT_READ  , ot_s16,        "Texhaust", "Boiler exhaust temperature", "°C" },

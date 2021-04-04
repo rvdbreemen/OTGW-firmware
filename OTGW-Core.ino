@@ -1013,8 +1013,8 @@ void processOTGW(const char *buf, int len){
         case OT_Tdhw:                          OTdataObject.Tdhw = print_f88(); break;
         case OT_Toutside:                      OTdataObject.Toutside = print_f88(); break;
         case OT_Tret:                          OTdataObject.Tret = print_f88(); break;
-        case OT_Tstorage:                      OTdataObject.Tstorage = print_f88(); break;
-        case OT_Tcollector:                    OTdataObject.Tcollector = print_s16(); break;
+        case OT_Tsolarstorage:                      OTdataObject.Tsolarstorage = print_f88(); break;
+        case OT_Tsolarcollector:                    OTdataObject.Tsolarcollector = print_s16(); break;
         case OT_TflowCH2:                      OTdataObject.TflowCH2 = print_f88(); break;          
         case OT_Tdhw2:                         OTdataObject.Tdhw2 = print_f88(); break;
         case OT_Texhaust:                      OTdataObject.Texhaust = print_s16(); break; 
@@ -1220,8 +1220,8 @@ String getOTGWValue(int msgid)
     case OT_Tdhw:                              return String(OTdataObject.Tdhw);  break;
     case OT_Toutside:                          return String(OTdataObject.Toutside);  break;
     case OT_Tret:                              return String(OTdataObject.Tret);  break;
-    case OT_Tstorage:                          return String(OTdataObject.Tstorage);  break;
-    case OT_Tcollector:                        return String(OTdataObject.Tcollector); break;
+    case OT_Tsolarstorage:                          return String(OTdataObject.Tsolarstorage);  break;
+    case OT_Tsolarcollector:                        return String(OTdataObject.Tsolarcollector); break;
     case OT_TflowCH2:                          return String(OTdataObject.TflowCH2); break;          
     case OT_Tdhw2:                             return String(OTdataObject.Tdhw2); break;
     case OT_Texhaust:                          return String(OTdataObject.Texhaust); break; 
