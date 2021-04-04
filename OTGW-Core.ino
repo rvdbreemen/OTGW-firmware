@@ -1014,7 +1014,7 @@ void processOTGW(const char *buf, int len){
         case OT_Toutside:                      OTdataObject.Toutside = print_f88(); break;
         case OT_Tret:                          OTdataObject.Tret = print_f88(); break;
         case OT_Tstorage:                      OTdataObject.Tstorage = print_f88(); break;
-        case OT_Tcollector:                    OTdataObject.Tcollector = print_f88(); break;
+        case OT_Tcollector:                    OTdataObject.Tcollector = print_s16(); break;
         case OT_TflowCH2:                      OTdataObject.TflowCH2 = print_f88(); break;          
         case OT_Tdhw2:                         OTdataObject.Tdhw2 = print_f88(); break;
         case OT_Texhaust:                      OTdataObject.Texhaust = print_s16(); break; 
