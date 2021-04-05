@@ -1220,8 +1220,8 @@ String getOTGWValue(int msgid)
     case OT_Tdhw:                              return String(OTdataObject.Tdhw);  break;
     case OT_Toutside:                          return String(OTdataObject.Toutside);  break;
     case OT_Tret:                              return String(OTdataObject.Tret);  break;
-    case OT_Tsolarstorage:                          return String(OTdataObject.Tsolarstorage);  break;
-    case OT_Tsolarcollector:                        return String(OTdataObject.Tsolarcollector); break;
+    case OT_Tsolarstorage:                     return String(OTdataObject.Tsolarstorage);  break;
+    case OT_Tsolarcollector:                   return String(OTdataObject.Tsolarcollector); break;
     case OT_TflowCH2:                          return String(OTdataObject.TflowCH2); break;          
     case OT_Tdhw2:                             return String(OTdataObject.Tdhw2); break;
     case OT_Texhaust:                          return String(OTdataObject.Texhaust); break; 
