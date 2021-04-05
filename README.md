@@ -27,9 +27,9 @@ The features of this Nodosop OpenTherm NodeMCU firmware are:
 - parsing all known OT protocol message ID's (OpenTherm v2.2+2.3b), including Heating/Ventilation and Remeha specific msgid's
 - wide range of connection and data sharing options:
   - telnet (interpreted data and debugging)
-  - MQTT (publishing every parsed OT message, subscribing for commands on OTGW/set/<node id>/command)
-  - simple REST API (http://<ip>/api/v0/otgw/{id})
-  - simple REST API (http://<ip>/api/v1/otgw/id/{id} or http://<ip>/api/v1/otgw/label/{textlabel eg. Tr or Toutside}, commands on /api/v1/otgw/command/{any command})
+  - MQTT (publishing every parsed OT message, subscribing for commands on `OTGW/set/<node id>/command`)
+  - simple REST API (`http://<ip>/api/v0/otgw/{id}`)
+  - simple REST API (`http://<ip>/api/v1/otgw/id/{id}` or `http://<ip>/api/v1/otgw/label/{textlabel eg. Tr or Toutside}`, commands on `/api/v1/otgw/command/{any command})`
   - serial interface on port 25238 for original OTmonitor application (bi-directional)
   - OTmonitor Web UI (standalone interface)
 - automatic integration with Home Assistant using _Home Assistant Discovery_ (Home Assistant Core v2021.2.0+)
@@ -59,22 +59,22 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
 | 0.7.6 | PIC firmware integration done. <br> New setting: NTP configurable <br> New setting: heartbeat led on/off <br> Update to REST API to include epoch of last update to message|
 | 0.7.5 | Complete set of status bits in UI and Central Heating 2 information |
 | 0.7.4 | Integration of the otgw-pic firmware upgrade code - upgrade to pic firmware version 5.0 (by Schelte Bron) |
-| 0.7.3 | Adding MQTT disable/enable option<br>Adding MQTT long password (max. 100 chars)<br>Adding executeCommand API (verify and return response for commands)<br>Adding RESTAPI /api/v1/otgw/cmdrsp/{command} that returns {response from command}<br>Added uptime and otgw fwversion in devinfo UI |
+| 0.7.3 | Adding MQTT disable/enable option<br>Adding MQTT long password (max. 100 chars)<br>Adding executeCommand API (verify and return response for commands)<br>Added uptime and otgw fwversion in devinfo UI |
 | 0.7.2 | **Breaking change: Moving over to LittleFS. This means you need to reflash your device using a USB cable.** |
 | 0.7.1 | Adding reset gateway to enter self-programming mode more reliable. <br> Changed to port 25238 for serial TCP connections (default of OTmonitor application by Schelte Bron)<br>Bugfix: Settings UI works even with "browserplugins". Thanks @STemplar   |
 | 0.7.0 | Added all Ventilation/Heat Recovery msgids (2.3b OT spec). Plus Remeha msgids. Thanks @STemplar <br>Added OTGW pic reset on bootup.<br> Translate dutch to english. <br>Bugfix: Serial flushing & writebuffer checking to prevent overflow during flashing.  |
 | 0.6.1 | Bugfix: setting page did not always work correctly, now it does. |
 | 0.6.0 | Standalone UI for simple OT monitor purposes and deviceinformation, moved index.html to SPIFF <br>OTA is possible after flashing 0.6.0 (Hardware watchdog is fed, during flash uploads now) |
-| 0.5.1 | REST APIs, v1, for OTmonitor values, GetByLabel, GetByID, POST otgw/command/{command} |
+| 0.5.1 | REST APIs, v1, for OTmonitor values, GetByLabel, GetByID, POST `otgw/command/{command}` |
 | 0.5.0 | Implemented the UI for settings (restapi, read/write file in json) |
 | 0.4.2 | Bi-directional serial communication on port 25238 (aka ser2net) for use with OTmonitor application|   
-| 0.4.1 | MQTT command sending now works, topic: OTGW/command and |   
-| 0.4.0 | RestAPI implemented - as simple as <ip>/api/v0/otgw/{id} to get the latest values |   
+| 0.4.1 | MQTT command sending now works, topic: `OTGW/command` |   
+| 0.4.0 | RestAPI implemented - as simple as `<ip>/api/v0/otgw/{id}` to get the latest values |   
 | 0.3.1 | Bug: Open AP after configuration, change ESP to STA mode on StartWifi <br> No more default Debug to Serial, only to port 23 telnet |   
 | 0.3.0 | Read only Serial stream implementend on port 25238 (debug port remains on port 23 - telnet) |   
-| 0.2.0 | Auto-discovery through MQTT implemented for integration with Home Assistant (and Domoticz)     |
+| 0.2.0 | Auto-discovery through MQTT implemented for integration with Home Assistant |
 | 0.1.0 | MQTT messaging implemented |
-| 0.0.1 | parsing of OT protocol implemented (use telnet to see)   Watchdog implemented |
+| 0.0.1 | parsing of OT protocol implemented (use telnet to see)<br>Watchdog feeding implemented |
 
 
 ## Credits
