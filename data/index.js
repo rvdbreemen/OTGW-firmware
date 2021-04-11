@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v0.8.2-beta
+**  Version  : v0.8.3
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **
@@ -492,7 +492,12 @@
       //----document.getElementById("setFld_"+data[i].name).style.background = "white";
             document.getElementById(data[i].name).style.background = "white";
       //----document.getElementById("setFld_"+data[i].name).value = data[i].value;
-            document.getElementById(data[i].name).value = data[i].value;
+            // document.getElementById(data[i].name).value = data[i].value;
+            // FIX If checkbox change checked iso value
+            if (data[i].type == "b")
+              document.getElementById(data[i].name).checked = strToBool(data[i].value);
+            else document.getElementById(data[i].name).value = data[i].value;
+
           }
         }
         //console.log("-->done..");
@@ -637,6 +642,7 @@
    ,[ "mqttuser",                  "MQTT User" ]
    ,[ "mqttpasswd",                "Password MQTT User" ]
    ,[ "mqtttoptopic",              "MQTT Top Topic" ]
+   ,[ "mqttuniqueid",              "MQTT Uniqueid" ]
    ,[ "influxdbhostname",          "InfluxDB hostname"]
    ,[ "influxdbport",              "InfluxDB port (default: 8086)"]
    ,[ "influxdbdatabasename",      "InfluxDB database name"]
@@ -711,8 +717,12 @@
    ,[ "mqttotmessage",              "MQTT OT msg Enable"]
    ,[ "otgwcommandenable",          "OTGW Boot Command Enabled"]
    ,[ "otgwcommands",               "OTGW Boot Command"]
-   
-   
+   ,[ "thermostatconnected",        "Thermostate connected"]
+   ,[ "boilerconnected",            "Boiler connected"]
+   ,[ "picconnected",               "Pic connected"]
+   ,[ "gpiooutputsenabled",         "GPIO Output Enabled"]
+   ,[ "gpiooutputspin",             "GPIO pin # to switch on/off"]
+   ,[ "gpiooutputstriggerbit",      "Bit X (master/slave) to trigger on (0-15)"]
    
                  ];
   

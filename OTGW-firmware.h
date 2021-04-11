@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v0.8.2-beta
+**  Version  : v0.8.3
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **
@@ -71,8 +71,10 @@ const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
 
 //Information on OTGW 
 String    sPICfwversion = ""; 
-bool      bOTGWonline = true;
 String    errorupgrade = ""; 
+bool      bOTGWonline = true;
+bool      bOTGWboilerstate = false;
+bool      bOTGWthermostatstate = false;
 
 
 //All things that are settings 
@@ -88,6 +90,7 @@ String    settingMQTTuser = "";
 String    settingMQTTpasswd = "";
 String    settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
 String    settingMQTTtopTopic = "otgw";
+String    settingMQTTuniqueid = ""; // Intialized in readsettings
 bool      settingMQTTOTmessage = false;
 bool      settingNTPenable = true;
 String    settingNTPtimezone = DEFAULT_TIMEZONE;
@@ -107,12 +110,18 @@ bool      bDebugOTmsg = true;
 bool      bDebugRestAPI = false;
 bool      bDebugMQTT = true;
 
+// GPIO Output Settings
+bool      settingMyDEBUG = false;
+bool      settingGPIOOUTPUTSenabled = false;
+int8_t    settingGPIOOUTPUTSpin = 16;
+int8_t    settingGPIOOUTPUTStriggerBit = 0;
+
 //Now load network suff
 #include "networkStuff.h"
 
-// That's all folks...
+    // That's all folks...
 
-/***************************************************************************
+    /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a
 * copy of this software and associated documentation files (the

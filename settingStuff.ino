@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v0.8.2-beta
+**  Version  : v0.8.3
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -37,6 +37,7 @@ void writeSettings(bool show)
   root["MQTTpasswd"] = settingMQTTpasswd;
   root["MQTTtoptopic"] = settingMQTTtopTopic;
   root["MQTThaprefix"] = settingMQTThaprefix;
+  root["MQTTuniqueid"] = settingMQTTuniqueid;
   root["MQTTOTmessage"] = settingMQTTOTmessage;
   root["NTPenable"] = settingNTPenable;
   root["NTPtimezone"] = settingNTPtimezone;
@@ -45,6 +46,9 @@ void writeSettings(bool show)
   root["GPIOSENSORSpin"] = settingGPIOSENSORSpin;
   root["OTGWcommandenable"] = settingOTGWcommandenable;
   root["OTGWcommands"] = settingOTGWcommands;
+  root["GPIOOUTPUTSenabled"] = settingGPIOOUTPUTSenabled;
+  root["GPIOOUTPUTSpin"] = settingGPIOOUTPUTSpin;
+  root["GPIOOUTPUTStriggerBit"] = settingGPIOOUTPUTStriggerBit;
 
   serializeJsonPretty(root, file);
   Debugln(F("... done!"));
@@ -76,6 +80,7 @@ void readSettings(bool show)
   if (error)
   {
     DebugTln(F("Failed to read file, use existing defaults."));
+    DebugTf("Settings Deserialisation error:  %s \r\n", error.c_str());
     return;
   }
 
@@ -94,6 +99,9 @@ void readSettings(bool show)
   }
   settingMQTThaprefix     = doc["MQTThaprefix"].as<String>();
   if (settingMQTThaprefix=="null") settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
+  settingMQTTuniqueid     = doc["MQTTuniqueid"].as<String>();
+  if (settingMQTTuniqueid=="null") settingMQTTuniqueid = getUniqueId();
+
   settingMQTTOTmessage    = doc["MQTTOTmessage"]|settingMQTTOTmessage;
   settingNTPenable        = doc["NTPenable"]; 
   settingNTPtimezone      = doc["NTPtimezone"].as<String>();
@@ -105,6 +113,9 @@ void readSettings(bool show)
   settingOTGWcommandenable = doc["OTGWcommandenable"] | settingOTGWcommandenable;
   settingOTGWcommands     = doc["OTGWcommands"].as<String>();
   if (settingOTGWcommands=="null") settingOTGWcommands = "";
+  settingGPIOOUTPUTSenabled = doc["GPIOOUTPUTSenabled"] | settingGPIOOUTPUTSenabled;
+  settingGPIOOUTPUTSpin = doc["GPIOOUTPUTSpin"] | settingGPIOOUTPUTSpin;
+  settingGPIOOUTPUTStriggerBit = doc["GPIOOUTPUTStriggerBit"] | settingGPIOOUTPUTStriggerBit;
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
@@ -113,23 +124,27 @@ void readSettings(bool show)
 
   if (show) {
     Debugln(F("\r\n==== read Settings ===================================================\r"));
-    Debugf("Hostname      : %s\r\n",  CSTR(settingHostname));
-    Debugf("MQTT enabled  : %s\r\n",  CBOOLEAN(settingMQTTenable));
-    Debugf("MQTT broker   : %s\r\n",  CSTR(settingMQTTbroker));
-    Debugf("MQTT port     : %d\r\n",  settingMQTTbrokerPort);
-    Debugf("MQTT username : %s\r\n",  CSTR(settingMQTTuser));
-    Debugf("MQTT password : %s\r\n",  CSTR(settingMQTTpasswd));
-    Debugf("MQTT toptopic : %s\r\n",  CSTR(settingMQTTtopTopic));
-    Debugf("HA prefix     : %s\r\n",  CSTR(settingMQTThaprefix));
-    Debugf("NTP enabled   : %s\r\n",  CBOOLEAN(settingNTPenable));
-    Debugf("NPT timezone  : %s\r\n",  CSTR(settingNTPtimezone));
-    Debugf("Led Blink     : %s\r\n",  CBOOLEAN(settingLEDblink));
-    Debugf("GPIO Sensors  : %s\r\n",  CBOOLEAN(settingGPIOSENSORSenabled));
-    Debugf("GPIO Sen. Pin : %d\r\n",  settingGPIOSENSORSpin);
-    Debugf("GPIO Interval : %s\r\n",  CBOOLEAN(settingGPIOSENSORSinterval));
-    Debugf("OTGW boot cmd enabled : %s\r\n",  CBOOLEAN(settingOTGWcommandenable));
-    Debugf("OTGW boot cmd         : %s\r\n",  CSTR(settingOTGWcommands));
- }
+    Debugf("Hostname              : %s\r\n", CSTR(settingHostname));
+    Debugf("MQTT enabled          : %s\r\n", CBOOLEAN(settingMQTTenable));
+    Debugf("MQTT broker           : %s\r\n", CSTR(settingMQTTbroker));
+    Debugf("MQTT port             : %d\r\n", settingMQTTbrokerPort);
+    Debugf("MQTT username         : %s\r\n", CSTR(settingMQTTuser));
+    Debugf("MQTT password         : %s\r\n", CSTR(settingMQTTpasswd));
+    Debugf("MQTT toptopic         : %s\r\n", CSTR(settingMQTTtopTopic));
+    Debugf("MQTT uniqueid         : %s\r\n", CSTR(settingMQTTuniqueid));
+    Debugf("HA prefix             : %s\r\n", CSTR(settingMQTThaprefix));
+    Debugf("NTP enabled           : %s\r\n", CBOOLEAN(settingNTPenable));
+    Debugf("NPT timezone          : %s\r\n", CSTR(settingNTPtimezone));
+    Debugf("Led Blink             : %s\r\n", CBOOLEAN(settingLEDblink));
+    Debugf("GPIO Sensors          : %s\r\n", CBOOLEAN(settingGPIOSENSORSenabled));
+    Debugf("GPIO Sen. Pin         : %d\r\n", settingGPIOSENSORSpin);
+    Debugf("GPIO Interval         : %s\r\n", CBOOLEAN(settingGPIOSENSORSinterval));
+    Debugf("OTGW boot cmd enabled : %s\r\n", CBOOLEAN(settingOTGWcommandenable));
+    Debugf("OTGW boot cmd         : %s\r\n", CSTR(settingOTGWcommands));
+    Debugf("GPIO Outputs          : %s\r\n", CBOOLEAN(settingGPIOOUTPUTSenabled));
+    Debugf("GPIO Out. Pin         : %d\r\n", settingGPIOOUTPUTSpin);
+    Debugf("GPIO Out. Trg. Bit    : %d\r\n", settingGPIOOUTPUTStriggerBit);
+    }
   
   Debugln(F("-\r\n"));
 
@@ -154,7 +169,7 @@ void updateSetting(const char *field, const char *newValue)
     startMDNS(CSTR(settingHostname));
     startLLMNR(CSTR(settingHostname));
   
-    //Resetart MQTT connection every "save settings"
+    //Restart MQTT connection every "save settings"
     startMQTT();
 
     Debugln();
@@ -175,6 +190,10 @@ void updateSetting(const char *field, const char *newValue)
   if (stricmp(field, "MQTThaprefix")==0)    {
     settingMQTThaprefix = String(newValue);
     if (settingMQTThaprefix.length()==0)    settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
+  }
+  if (stricmp(field, "MQTTuniqueid") == 0)  {
+    settingMQTTuniqueid = String(newValue);     
+    if (settingMQTTuniqueid.length() == 0)   settingMQTTuniqueid = getUniqueId();
   }
   if (stricmp(field, "MQTTOTmessage")==0)   settingMQTTOTmessage = EVALBOOLEAN(newValue);
   if (strstr(field, "mqtt") != NULL)        startMQTT();//restart MQTT on change of any setting
@@ -203,9 +222,31 @@ void updateSetting(const char *field, const char *newValue)
   }
   if (stricmp(field, "OTGWcommandenable")==0)    settingOTGWcommandenable = EVALBOOLEAN(newValue);
   if (stricmp(field, "OTGWcommands")==0)         settingOTGWcommands = String(newValue);
+  if (stricmp(field, "GPIOOUTPUTSenabled") == 0)
+  {
+    settingGPIOOUTPUTSenabled = EVALBOOLEAN(newValue);
+    Debugln();
+    DebugTf("Need reboot before GPIO OUTPUTS will be enabled on pin GPIO%d!\r\n\n", settingGPIOOUTPUTSenabled);
+  }
+  if (stricmp(field, "GPIOOUTPUTSpin") == 0)
+  {
+    settingGPIOOUTPUTSpin = atoi(newValue);
+    Debugln();
+    DebugTf("Need reboot before GPIO OUTPUTS will use new pin GPIO%d!\r\n\n", settingGPIOOUTPUTSpin);
+  }
+  if (stricmp(field, "GPIOOUTPUTStriggerBit") == 0)
+  {
+    settingGPIOOUTPUTStriggerBit = atoi(newValue);
+    Debugln();
+    DebugTf("Need reboot before GPIO OUTPUTS will use new trigger bit %d!\r\n\n", settingGPIOOUTPUTStriggerBit);
+  }
 
   //finally update write settings
   writeSettings(false);
+
+  //Restart MQTT connection every "save settings" (this seems to be save to do, but is called for each changed field now )
+  if (settingMQTTenable)   startMQTT();
+
   // if (strstr(field, "hostname")!= NULL) {
   //   //restart wifi
   //   startWIFI( CSTR(settingHostname), 240)
