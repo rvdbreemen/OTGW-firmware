@@ -115,6 +115,7 @@ bool      settingMyDEBUG = false;
 bool      settingGPIOOUTPUTSenabled = false;
 int8_t    settingGPIOOUTPUTSpin = 16;
 int8_t    settingGPIOOUTPUTStriggerBit = 0;
+#define   SETTINGGPIOOUTPUTSINTERVAL 5
 
 //Now load network suff
 #include "networkStuff.h"

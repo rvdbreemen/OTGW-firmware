@@ -34,10 +34,8 @@
 #define OFF HIGH
 
 DECLARE_TIMER_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS);
+DECLARE_TIMER_SEC(timersetoutput, SETTINGGPIOOUTPUTSINTERVAL, CATCH_UP_MISSED_TICKS);
 
-// TODO need to determine interval
-DECLARE_TIMER_SEC(timersetoutput, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS);
-  
 //=====================================================================
 void setup() {
   // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
