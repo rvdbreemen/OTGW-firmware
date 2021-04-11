@@ -44,6 +44,7 @@ void writeSettings(bool show)
   root["LEDblink"] = settingLEDblink;
   root["GPIOSENSORSenabled"] = settingGPIOSENSORSenabled;
   root["GPIOSENSORSpin"] = settingGPIOSENSORSpin;
+  root["GPIOSENSORSinterval"] = settingGPIOSENSORSinterval;
   root["OTGWcommandenable"] = settingOTGWcommandenable;
   root["OTGWcommands"] = settingOTGWcommands;
   root["GPIOOUTPUTSenabled"] = settingGPIOOUTPUTSenabled;

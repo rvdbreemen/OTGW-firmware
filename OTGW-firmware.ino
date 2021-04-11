@@ -60,6 +60,9 @@ void setup() {
   LittleFS.begin();
   readSettings(true);
 
+  CHANGE_INTERVAL_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS); 
+
+
   // Connect to and initialise WiFi network
   OTGWSerial.println(F("Attempting to connect to WiFi network\r"));
   setLed(LED1, ON);
