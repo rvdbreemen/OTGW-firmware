@@ -34,9 +34,6 @@
 #define OFF HIGH
 
 DECLARE_TIMER_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS);
-
-// TODO need to determine interval
-DECLARE_TIMER_SEC(timersetoutput, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS);
   
 //=====================================================================
 void setup() {
@@ -185,6 +182,8 @@ void docheckforpic(){
 //===[ Do the background tasks ]===
 void doBackgroundTasks()
 {
+  handleDebug();
+  evalOutputs();                // when the bits change, the output gpio bit will follow
   feedWatchDog();               // Feed the dog before it bites!
   handleMQTT();                 // MQTT transmissions
   handleOTGW();                 // OTGW handling
@@ -192,7 +191,6 @@ void doBackgroundTasks()
   MDNS.update();
   events();                     // trigger ezTime update etc       
   delay(1);
-  handleDebug();
 }
 
 void loop()
@@ -211,7 +209,7 @@ void loop()
   if (DUE(tmrcheckpic))     docheckforpic();
   if (DUE(timer5min))       do5minevent();
   if (DUE(timerpollsensor)) pollSensors();
-  if (DUE(timersetoutput))  evalOutputs();
+
   doBackgroundTasks();
 }
 
