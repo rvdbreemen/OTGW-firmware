@@ -29,19 +29,17 @@ void initOutputs() {
 }
 
 // still need to hook into processOTGW
-void setOutputState(uint8_t status = ON)
-{
+void setOutputState(uint8_t status = ON){
   (status == ON) ? setOutputState(true) : setOutputState(false);
 }
-void setOutputState(bool set_HIGH = true)
-{
+
+void setOutputState(bool set_HIGH = true){
   if(!settingGPIOOUTPUTSenabled) return;
   digitalWrite(settingGPIOOUTPUTSpin,ON);
   DebugTf("Output GPIO%d set to %d", settingGPIOOUTPUTSpin, digitalRead(settingGPIOOUTPUTSpin));
 }
 
-void evalOutputs()
-{
+void evalOutputs(){
   // master
   // bit: [clear/0, set/1]
   //  0: CH enable [ CH is disabled, CH is enabled]
@@ -62,10 +60,7 @@ void evalOutputs()
   //  5: CH2 mode [CH2 not active, CH2 active]
   //  6: diagnostic indication [no diagnostics, diagnostic event]
   //  7: reserved
-  if (!settingMyDEBUG)
-  {
-    return;
-  }
+  if (!settingMyDEBUG) return;
   settingMyDEBUG = false;
   DebugTf("current gpio output state: %d \r\n", digitalRead(settingGPIOOUTPUTSpin));
   DebugFlush();
