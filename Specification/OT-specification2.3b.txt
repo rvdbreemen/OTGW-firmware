@@ -161,3 +161,43 @@ ID90"Size of Fault-History-Buffer supported by ventilation / heat-recovery
 ID91: Index number / Value of referred-to fault-history buffer entry ventilation / heat-recovery
 ID98: For a specific RF sensor the RF strength and battery level is written
 ID99: perating Mode HC1, HC2/ Operating Mode DHW
+
+
+ID0:HB5: Master status: Summer/winter mode
+ID0:HB6: Master status: DHW blocking
+
+ID0:LB7: Slave Status: Electricity production
+
+ID2:HB0: Master configuration: Smart power
+
+ID3:HB6: Slave configuration: Remote water filling function
+ID3:HB7: Heat/cool mode control
+
+ID4 (HB=1): Remote Request Boiler Lockout-reset
+ID4 (HB=2): Remote Request Water filling
+ID4 (HB=10): Remote Request Service request reset
+
+ID70:HB0: Master status ventilation / heat-recovery: Ventilation enable
+ID70:HB1: Master status ventilation / heat-recovery: Bypass postion
+ID70:HB2: Master status ventilation / heat-recovery: Bypass mode
+ID70:HB3: Master status ventilation / heat-recovery: Free ventilation mode
+ID70:LB0: Slave status ventilation / heat-recovery: Fault indication
+ID70:LB1: Slave status ventilation / heat-recovery: Ventilation mode
+ID70:LB2: Slave status ventilation / heat-recovery: Bypass status
+ID70:LB3: Slave status ventilation / heat-recovery: Bypass automatic status
+ID70:LB4: Slave status ventilation / heat-recovery: Free ventilation status
+ID70:LB6: Slave status ventilation / heat-recovery: Diagnostic indication
+
+ID74:HB0: Slave Configuration ventilation / heat-recovery: System type
+ID74:HB1: Slave Configuration ventilation / heat-recovery: Bypass
+ID74:HB2: Slave Configuration ventilation / heat-recovery: Speed control
+
+ID86:HB0: Remote ventilation / heat-recovery parameter transfer-enable: Nominal ventilation value
+ID86:LB0: Remote ventilation / heat-recovery parameter read/write : Nominal ventilation value
+
+ID101:HB012: Master Solar Storage: Solar mode
+ID101:LB0: Slave Solar Storage: Fault indication
+ID101:LB123: Slave Solar Storage: Solar mode status
+ID101:LB45: Slave Solar Storage: Solar status
+
+ID103:HB0: Slave Configuration Solar Storage: System type

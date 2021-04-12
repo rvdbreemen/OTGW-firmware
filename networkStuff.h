@@ -110,7 +110,7 @@ void startWiFi(const char* hostname, int timeOut)
     delay(5000);  // Enough time to ensure we don't return.
   }
 
-  WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+ // WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   
   Debugln();
   DebugT(F("Connected to " )); Debugln(WiFi.SSID());
