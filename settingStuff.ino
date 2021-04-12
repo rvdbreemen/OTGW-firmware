@@ -44,6 +44,7 @@ void writeSettings(bool show)
   root["LEDblink"] = settingLEDblink;
   root["GPIOSENSORSenabled"] = settingGPIOSENSORSenabled;
   root["GPIOSENSORSpin"] = settingGPIOSENSORSpin;
+  root["GPIOSENSORSinterval"] = settingGPIOSENSORSinterval;
   root["OTGWcommandenable"] = settingOTGWcommandenable;
   root["OTGWcommands"] = settingOTGWcommands;
   root["GPIOOUTPUTSenabled"] = settingGPIOOUTPUTSenabled;
@@ -110,6 +111,7 @@ void readSettings(bool show)
   settingGPIOSENSORSenabled = doc["GPIOSENSORSenabled"] | settingGPIOSENSORSenabled;
   settingGPIOSENSORSpin = doc["GPIOSENSORSpin"] | settingGPIOSENSORSpin;
   settingGPIOSENSORSinterval = doc["GPIOSENSORSinterval"] | settingGPIOSENSORSinterval;
+  CHANGE_INTERVAL_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS); 
   settingOTGWcommandenable = doc["OTGWcommandenable"] | settingOTGWcommandenable;
   settingOTGWcommands     = doc["OTGWcommands"].as<String>();
   if (settingOTGWcommands=="null") settingOTGWcommands = "";
