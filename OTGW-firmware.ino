@@ -183,7 +183,6 @@ void docheckforpic(){
 void doBackgroundTasks()
 {
   handleDebug();
-  evalOutputs();                // when the bits change, the output gpio bit will follow
   feedWatchDog();               // Feed the dog before it bites!
   handleMQTT();                 // MQTT transmissions
   handleOTGW();                 // OTGW handling
@@ -208,8 +207,8 @@ void loop()
   if (DUE(timer60s))        doTaskEvery60s();
   if (DUE(tmrcheckpic))     docheckforpic();
   if (DUE(timer5min))       do5minevent();
-  if (DUE(timerpollsensor)) pollSensors();
-
+  if (DUE(timerpollsensor)) pollSensors();    // poll the temperature sensors connected to 2wire gpio pin 
+  evalOutputs();                              // when the bits change, the output gpio bit will follow
   doBackgroundTasks();
 }
 

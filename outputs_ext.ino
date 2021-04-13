@@ -40,7 +40,8 @@ void setOutputState(bool set_HIGH = true){
 }
 
 void evalOutputs(){
-  // master
+  if(!settingGPIOOUTPUTSenabled) return;
+  // master HB
   // bit: [clear/0, set/1]
   //  0: CH enable [ CH is disabled, CH is enabled]
   //  1: DHW enable [ DHW is disabled, DHW is enabled]
@@ -51,7 +52,7 @@ void evalOutputs(){
   //  6: reserved
   //  7: reserved
 
-  // slave
+  // slave LB
   //  0: fault indication [ no fault, fault ]
   //  1: CH mode [CH not active, CH active]
   //  2: DHW mode [ DHW not active, DHW active]
@@ -65,9 +66,7 @@ void evalOutputs(){
   DebugTf("current gpio output state: %d \r\n", digitalRead(settingGPIOOUTPUTSpin));
   DebugFlush();
 
-  bool bitState = false;
-
-  bitState = (OTdataObject.Statusflags & (2^settingGPIOOUTPUTStriggerBit));
+  bool bitState = (OTdataObject.Statusflags & (2^settingGPIOOUTPUTStriggerBit));
   DebugTf("bitState: bit: %d , state %d \r\n", settingGPIOOUTPUTStriggerBit, bitState);
 
   setOutputState(bitState);
