@@ -336,12 +336,13 @@
           else
           { //if the element exists, then update the value
             var update = document.getElementById("otmon_"+data[i].name);
+            update.style.visibility = ((data[i].epoch==0)?"collapse":"visible");
             var epoch = document.getElementById("otmon_epoch_"+data[i].name);
-            if ((Number(epoch.value)==0) && (Number(data[i].epoch)>0)) {
-              //console.log ("unhide based on epoch");
-              //setTimeout(function () { update.style.visibility = 'visible';}, 0);
-              needReload = true;
-            } 
+            // if ((Number(epoch.value)==0) && (Number(data[i].epoch)>0)) {
+            //   //console.log ("unhide based on epoch");
+            //   //setTimeout(function () { update.style.visibility = 'visible';}, 0);
+            //   needReload = true;
+            // } 
             epoch.value = data[i].epoch;
             update.textContent = data[i].value;
             //if (update.style.visibility == 'visible') update.textContent = data[i].value;
