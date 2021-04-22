@@ -1161,9 +1161,21 @@ void handleOTGW()
       OTGWDebugTf("Net2Ser: Sending to OTGW: [%s] (%d)\r\n", sWrite, bytes_write);
       //check for reset command
       if (stricmp(sWrite, "GW=R")==0){
-        //detect [GW=R], then reset the gateway the gpio way
+        //detected [GW=R], then reset the gateway the gpio way
         OTGWDebugTln("Detected: GW=R. Reset gateway command executed.");
         resetOTGW();
+      } else if (stricmp(sWrite, "PS=1")==0) {
+        //detected [PS=1], then PrintSummary mode = true --> From this point on you need to ask for summary.
+        bPrintSummarymode = true;
+        //reset all msglastupdated in webui
+        for(int i = 0; i <= OT_MSGID_MAX; i++){
+          msglastupdated[i] = 0; //clear epoch values
+        }
+        sMessage = "PS=1 mode; No UI updates.";
+      } else if (stricmp(sWrite, "PS=0")==0) {
+        //detected [PS=0], then PrintSummary mode = OFF --> Raw mode is turned on again.
+        bPrintSummarymode = false;
+        sMessage = "";
       }
       bytes_write = 0; //start next line
     } else if  (outByte == '\r')
