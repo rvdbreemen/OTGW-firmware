@@ -75,7 +75,7 @@ String    errorupgrade = "";
 bool      bOTGWonline = true;
 bool      bOTGWboilerstate = false;
 bool      bOTGWthermostatstate = false;
-
+bool      bPrintSummarymode = false;  //default to PS=0 mode
 
 //All things that are settings 
 String    settingHostname = _HOSTNAME;
