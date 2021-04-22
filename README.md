@@ -34,7 +34,7 @@ The features of this Nodosop OpenTherm NodeMCU firmware are:
   - OTmonitor Web UI (standalone interface)
 - automatic integration with Home Assistant using _Home Assistant Discovery_ (Home Assistant Core v2021.2.0+)
 - integration with any MQTT based Home Automation solution, like Domoticz (plugin available) & OpenHAB
-- reliable OTA upgrades of `OTGW-firmare` (the nodeMCU) itself (v0.6.0+)
+- reliable OTA upgrades of `PIC-based OTGW-firmware` (the nodeMCU) itself (v0.6.0+)
 - reliable OTGW PIC upgrades, to the latest firmware available at http://otgw.tclcode.com/download.html
 - cleaner RestAPI's for Telegraf OTmonitor integration
 - readout Dallas-type temperture sensors (eg. DS18B20) connected to GPIO
