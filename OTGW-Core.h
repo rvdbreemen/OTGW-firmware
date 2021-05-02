@@ -25,8 +25,8 @@ TelnetStreamClass OTGWstream(OTGW_SERIAL_PORT);
 typedef struct {
 	uint16_t 	Statusflags = 0; // flag8 / flag8  Master and Slave Status flags. 
 	float 		TSet = 0.0; // f8.8  Control setpoint  ie CH  water temperature setpoint (°C)
-	uint16_t	MConfigMMemberIDcode = 0; 	// flag8 / u8  Master Configuration Flags /  Master MemberID Code 
-	uint16_t	SConfigSMemberIDcode = 0; // flag8 / u8  Slave Configuration Flags /  Slave MemberID Code 
+	uint16_t	MasterConfigMemberIDcode = 0; 	// flag8 / u8  Master Configuration Flags /  Master MemberID Code 
+	uint16_t	SlaveConfigMemberIDcode = 0; // flag8 / u8  Slave Configuration Flags /  Slave MemberID Code 
 	uint16_t 	Command = 0; // u8 / u8  Remote Command 
 	uint16_t 	ASFflags = 0; // / OEM-fault-code  flag8 / u8  Application-specific fault flags and OEM fault code 
 	uint16_t 	RBPflags = 0; // flag8 / flag8  Remote boiler parameter transfer-enable & read/write flags 
@@ -79,23 +79,33 @@ typedef struct {
 	uint16_t 	ElectricityProduction = 0; // u16 Electricity production
 	uint16_t 	CumulativElectricityProduction = 0; // u16 Cumulativ Electricity production
 	
+	//Solar Storage
+	uint16_t 	SolarStorageMaster = 0;
+	uint16_t	SolarStorageASFflags = 0;
+	uint16_t	SolarStorageSlaveConfigMemberIDcode = 0;
+	uint16_t	SolarStorageVersionType = 0;
+	uint16_t 	SolarStorageTSP = 0;
+	uint16_t	SolarStorageTSPindexTSPvalue = 0;
+	uint16_t	SolarStorageFHBsize = 0;
+	uint16_t	SolarStorageFHBindexFHBvalue = 0;
+
 	//Ventilation/HeatRecovery Msgids
 	uint16_t	StatusVH = 0;
 	uint16_t	ControlSetpointVH = 0;  //should be uint8_t
-	uint16_t	FaultFlagsCodeVH = 0;
+	uint16_t	ASFFaultCodeVH = 0;
 	uint16_t	DiagnosticCodeVH = 0;
 	uint16_t	ConfigMemberIDVH = 0;
 	float		OpenthermVersionVH = 0.0;
 	uint16_t	VersionTypeVH = 0;
 	uint16_t	RelativeVentilation = 0;
-	uint16_t	RelativeHumidityVH = 0;
-	uint16_t	CO2LevelVH = 0;
+	uint16_t	RelativeHumidityExhaustAir = 0;
+	uint16_t	CO2LevelExhaustAir = 0;
 	float		SupplyInletTemperature = 0.0;
 	float		SupplyOutletTemperature = 0.0;
 	float		ExhaustInletTemperature = 0.0;
 	float		ExhaustOutletTemperature = 0.0;
 	uint16_t	ActualExhaustFanSpeed = 0;
-	uint16_t 	ActualInletFanSpeed = 0;
+	uint16_t 	ActualSupplyFanSpeed = 0;
 	uint16_t	RemoteParameterSettingVH = 0;
 	uint16_t	NominalVentilationValue = 0;
 	uint16_t	TSPNumberVH = 0;
@@ -103,8 +113,9 @@ typedef struct {
 	uint16_t	FaultBufferSizeVH = 0;
 	uint16_t	FaultBufferEntryVH = 0;
 
-
 	//Statitics
+	uint16_t 	BurnerUnsuccessfulStarts = 0;
+	uint16_t	FlameSignalTooLow = 0;
 	uint16_t 	RemoteOverrideFunction = 0; // flag8 / -  Function of manual and program changes in master and remote room setpoint. 
 	uint16_t 	OEMDiagnosticCode = 0; // u16  OEM-specific diagnostic/service code 
 	uint16_t 	BurnerStarts = 0; // u16  Number of starts burner 
@@ -159,8 +170,8 @@ enum OpenThermMessageType {
 enum OpenThermMessageID {
 	OT_Statusflags, // flag8 / flag8  Master and Slave Status flags. 
 	OT_TSet, // f8.8  Control setpoint  ie CH  water temperature setpoint (°C)
-	OT_MConfigMMemberIDcode, // flag8 / u8  Master Configuration Flags /  Master MemberID Code 
-	OT_SConfigSMemberIDcode, // flag8 / u8  Slave Configuration Flags /  Slave MemberID Code 
+	OT_MasterConfigMemberIDcode, // flag8 / u8  Master Configuration Flags /  Master MemberID Code 
+	OT_SlaveConfigMemberIDcode, // flag8 / u8  Slave Configuration Flags /  Slave MemberID Code 
 	OT_Command, // u8 / u8  Remote Command 
 	OT_ASFflags, // / OEM-fault-code  flag8 / u8  Application-specific fault flags and OEM fault code 
 	OT_RBPflags, // flag8 / flag8  Remote boiler parameter transfer-enable & read/write flags 
@@ -203,20 +214,20 @@ enum OpenThermMessageID {
 	OT_Hcratio, // f8.8  OTC heat curve ratio (°C)  (Remote parameter 3)
 	OT_StatusVH = 70, // flag8 / flag8 Status Ventilation/Heat recovery
 	OT_ControlSetpointVH, // u8 Control setpoint V/H
-	OT_FaultFlagsCodeVH, // flag8 / u8 Fault Flags/Code V/H
+	OT_ASFFaultCodeVH, // flag8 / u8 Aplication Specific Fault Flags/Code V/H
 	OT_DiagnosticCodeVH, // u16 Diagnostic Code V/H
 	OT_ConfigMemberIDVH, // flag8 / u8 Config/Member ID V/H
 	OT_OpenthermVersionVH, // f8.8 OpenTherm Version V/H
 	OT_VersionTypeVH,	// u8 / u8 Version & Type V/H
 	OT_RelativeVentilation, // u8 Relative Ventilation (%)
-	OT_RelativeHumidityVH, // u8 / u8 Relative Humidity (%)
-	OT_CO2LevelVH, // u16 CO2 Level (ppm)
+	OT_RelativeHumidityExhaustAir, // u8 / u8 Relative Humidity (%)
+	OT_CO2LevelExhaustAir, // u16 CO2 Level (ppm)
  	OT_SupplyInletTemperature,	// f8.8 Supply Inlet Temperature (°C)
  	OT_SupplyOutletTemperature, // f8.8 Supply Outlet Temperature(°C)
  	OT_ExhaustInletTemperature, // f8.8 Exhaust Inlet Temperature (°C)
  	OT_ExhaustOutletTemperature, // f8.8 Exhaust Outlet Temperature (°C)
 	OT_ActualExhaustFanSpeed, // u16 Actual Exhaust Fan Speed (rpm)
-	OT_ActualInletFanSpeed, // u16 Actual Inlet Fan Speed (rpm) 
+	OT_ActualSupplyFanSpeed, // u16 Actual Supply Fan Speed (rpm) 
 	OT_RemoteParameterSettingVH, // flag8 / flag8 Remote Parameter Setting V/H
 	OT_NominalVentilationValue, // u8 Nominal Ventilation Value
 	OT_TSPNumberVH, // u8 / u8 TSP Number V/H
@@ -225,12 +236,22 @@ enum OpenThermMessageID {
 	OT_FaultBufferEntryVH,	// u8 / u8 Fault Buffer Entry V/H
 	OT_RFstrengthbatterylevel=98, // u8 / u8  RF strength and battery level
 	OT_OperatingMode_HC1_HC2_DHW, // u8 / u8 Operating Mode HC1, HC2/ DHW
-	OT_RemoteOverrideFunction = 100, // flag8 / -  Function of manual and program changes in master and remote room setpoint. 
-	OT_ElectricityProducerStarts = 109, // u16 Electricity producer starts
+	OT_RemoteOverrideFunction, // flag8 / -  Function of manual and program changes in master and remote room setpoint. 
+	OT_SolarStorageMaster,	// flag8 / flag8  Solar Storage  Master flags.
+	OT_SolarStorageASFflags, // flag8 / u8 / Solar Storage OEM-fault-code  flag8 / u8  Application-specific fault flags and OEM fault code 
+	OT_SolarStorageSlaveConfigMemberIDcode, // flag8 / u8  Solar Storage Master Configuration Flags /  Master MemberID Code 
+	OT_SolarStorageVersionType, // u8 / u8 / Solar Storage product version number and type
+	OT_SolarStorageTSP,	// u8 / u8 / Solar Storage Number of Transparent-Slave-Parameters supported
+	OT_SolarStorageTSPindexTSPvalue, // u8 / u8 / Solar Storage Index number / Value of referred-to transparent slave parameter
+	OT_SolarStorageFHBsize, // u8 /u8 / Solar Storage Size of Fault-History-Buffer supported by slave
+	OT_SolarStorageFHBindexFHBvalue, // u8 /u8 / Solar Storage Index number / Value of referred-to fault-history buffer entry
+	OT_ElectricityProducerStarts, // u16 Electricity producer starts
 	OT_ElectricityProducerHours, //u16 Electricity producer hours
 	OT_ElectricityProduction, //u16 Electricity production
 	OT_CumulativElectricityProduction, // u16 Cumulativ Electricity production
-	OT_OEMDiagnosticCode = 115, // u16  OEM-specific diagnostic/service code 
+	OT_BurnerUnsuccessfulStarts, // u16 Number of Un-successful burner starts 
+	OT_FlameSignalTooLow, //u16 Number of times flame signal too low
+	OT_OEMDiagnosticCode, // u16  OEM-specific diagnostic/service code 
 	OT_BurnerStarts, // u16  Number of starts burner 
 	OT_CHPumpStarts, // u16  Number of starts CH pump 
 	OT_DHWPumpValveStarts, // u16  Number of starts DHW pump/valve 
@@ -263,11 +284,11 @@ enum OpenThermMessageID {
     OTlookup_t OTmap[] = {
         {   0, OT_READ  , ot_flag8flag8, "Status", "Master and Slave status", "" },
         {   1, OT_WRITE , ot_f88,        "TSet", "Control setpoint", "°C" },
-        {   2, OT_WRITE , ot_flag8u8,    "MConfigMMemberIDcode", "Master Config / Member ID", "" },
-        {   3, OT_READ  , ot_flag8u8,    "SConfigSMemberIDcode", "Slave Config / Member ID", "" },
+        {   2, OT_WRITE , ot_flag8u8,    "MasterConfigMemberIDcode", "Master Config / Member ID", "" },
+        {   3, OT_READ  , ot_flag8u8,    "SlaveConfigMemberIDcode", "Slave Config / Member ID", "" },
         {   4, OT_RW    , ot_u8u8,       "Command", "Command-Code", "" },
 		{   5, OT_READ  , ot_flag8u8,    "ASFflags", "Application-specific fault", "" },
-		{   6, OT_READ  , ot_flag8u8,    "RBPflags", "Remote-parameter flags ", "" },
+		{   6, OT_READ  , ot_flag8u8,    "RBPflags", "Remote-parameter flags", "" },
 		{   7, OT_WRITE , ot_f88,        "CoolingControl", "Cooling control signal", "%" },
 		{   8, OT_WRITE , ot_f88,        "TsetCH2", "Control setpoint for 2e CH circuit", "°C" },
 		{   9, OT_READ  , ot_f88,        "TrOverride", "Remote override room setpoint", "" },
@@ -290,7 +311,7 @@ enum OpenThermMessageID {
 		{  26, OT_READ  , ot_f88,        "Tdhw", "DHW temperature", "°C" },
 		{  27, OT_READ  , ot_f88,        "Toutside", "Outside temperature", "°C" },
 		{  28, OT_READ  , ot_f88,        "Tret", "Return water temperature", "°C" },
-		{  29, OT_READ  , ot_f88,        "Tshehehelarstorage", "Solar storage temperature", "°C" },
+		{  29, OT_READ  , ot_f88,        "Tsolarstorage", "Solar storage temperature", "°C" },
 		{  30, OT_READ  , ot_s16,        "Tsolarcollector", "Solar collector temperature", "°C" },
 		{  31, OT_READ  , ot_f88,        "TflowCH2", "Flow water temperature CH2 circuit", "°C" },
 		{  32, OT_READ  , ot_f88,        "Tdhw2", "Domestic hot water temperature 2", "°C" },
@@ -333,20 +354,20 @@ enum OpenThermMessageID {
 		{  69, OT_UNDEF , ot_undef, "", "", "" },
 		{  70, OT_READ  , ot_flag8flag8,  		"StatusVH", "Status Ventilation/Heat recovery", "" },
 		{  71, OT_WRITE , ot_u8, 				"ControlSetpointVH", "Control setpoint V/H", "" },
-		{  72, OT_READ  , ot_flag8u8, 			"FaultFlagsCodeVH", "Fault Flags/Code V/H", "" },
+		{  72, OT_READ  , ot_flag8u8, 			"ASFFaultCodeVH", "Application-specific Fault Flags/Code V/H", "" },
 		{  73, OT_READ  , ot_u16,		 		"DiagnosticCodeVH", "Diagnostic Code V/H", "" },
 		{  74, OT_READ  , ot_flag8u8,			"ConfigMemberIDVH", "Config/Member ID V/H", "" },
 		{  75, OT_READ  , ot_f88, 				"OpenthermVersionVH", "OpenTherm Version V/H", "" },
 		{  76, OT_READ  , ot_u8u8, 				"VersionTypeVH", "Version & Type V/H", "" },
 		{  77, OT_READ  , ot_u8, 				"RelativeVentilation", "Relative Ventilation", "%" },
-		{  78, OT_RW    , ot_u8u8, 				"RelativeHumidityVH", "Relative Humidity V/H", "%" },
-		{  79, OT_RW    , ot_u16, 				"CO2LevelVH", "CO2 Level V/H", "ppm" },
+		{  78, OT_RW    , ot_u8u8, 				"RelativeHumidityExhaustAir", "Relative Humidity Exaust Air", "%" },
+		{  79, OT_RW    , ot_u16, 				"CO2LevelExhaustAir", "CO2 Level Exhaust Air", "ppm" },
  		{  80, OT_READ  , ot_f88, 				"SupplyInletTemperature", "Supply Inlet Temperature", "°C" },
  		{  81, OT_READ  , ot_f88, 				"SupplyOutletTemperature", "Supply Outlet Temperature", "°C" },
  		{  82, OT_READ  , ot_f88, 				"ExhaustInletTemperature", "Exhaust Inlet Temperature", "°C" },
  		{  83, OT_READ  , ot_f88, 				"ExhaustOutletTemperature", "Exhaust Outlet Temperature", "°C" },
 		{  84, OT_READ  , ot_u16, 				"ActualExhaustFanSpeed", "Actual Exhaust Fan Speed", "rpm" },
-		{  85, OT_READ  , ot_u16, 				"ActualInletFanSpeed", "Actual Inlet Fan Speed", "rpm" },
+		{  85, OT_READ  , ot_u16, 				"ActualSupplyFanSpeed", "Actual Supply Fan Speed", "rpm" },
 		{  86, OT_READ  , ot_flag8flag8, 		"RemoteParameterSettingVH", "Remote Parameter Setting V/H", "" },
 		{  87, OT_RW 	, ot_u8, 				"NominalVentilationValue", "Nominal Ventilation Value", "" },
 		{  88, OT_READ  , ot_u8u8, 				"TSPNumberVH", "TSP Number V/H", "" },
@@ -362,33 +383,33 @@ enum OpenThermMessageID {
 		{  98, OT_READ  , ot_u8u8, 				"RFstrengthbatterylevel", "RF strength and battery level", "" },
 		{  99, OT_READ  , ot_u8u8, 				"OperatingMode_HC1_HC2_DHW", "Operating Mode HC1, HC2/ DHW", "" },
 		{ 100, OT_READ  , ot_flag8,       		"RoomRemoteOverrideFunction", "Function of manual and program changes in master and remote room setpoint.", "" },
-		{ 101, OT_UNDEF , ot_undef, "", "", "" },
-		{ 102, OT_UNDEF , ot_undef, "", "", "" },
-		{ 103, OT_UNDEF , ot_undef, "", "", "" },
-		{ 104, OT_UNDEF , ot_undef, "", "", "" },
-		{ 105, OT_UNDEF , ot_undef, "", "", "" },
-		{ 106, OT_UNDEF , ot_undef, "", "", "" },
-		{ 107, OT_UNDEF , ot_undef, "", "", "" },
-		{ 108, OT_UNDEF , ot_undef, "", "", "" },
-		{ 109, OT_READ  , ot_u16, 			"ElectricityProducerStarts", "Electricity producer starts", "" },
-		{ 110, OT_READ  , ot_u16, 			"ElectricityProducerHours", "Electricity producer hours", "" },
-		{ 111, OT_READ  , ot_u16, 			"ElectricityProduction", "Electricity production", "" },
-		{ 112, OT_READ  , ot_u16, 			"CumulativElectricityProduction", "Cumulativ Electricity production", "" },
-		{ 113, OT_UNDEF , ot_undef, "", "", "" },
-		{ 114, OT_UNDEF , ot_undef, "", "", "" },
-		{ 115, OT_READ  , ot_u16,         "OEMDiagnosticCode", "OEM-specific diagnostic/service code", "" },
-		{ 116, OT_RW    , ot_u16,         "BurnerStarts", "Nr of starts burner", "" },
-		{ 117, OT_RW    , ot_u16,         "CHPumpStarts", "Nr of starts CH pump", "" },
-		{ 118, OT_RW    , ot_u16,         "DHWPumpValveStarts", "Nr of starts DHW pump/valve", "" },
-		{ 119, OT_RW    , ot_u16,         "DHWBurnerStarts", "Nr of starts burner during DHW mode", "" },
-		{ 120, OT_RW    , ot_u16,         "BurnerOperationHours", "Nr of hours that burner is in operation (i.e. flame on)", "" },
-		{ 121, OT_RW    , ot_u16,         "CHPumpOperationHours", "Nr of hours that CH pump has been running", "" },
-		{ 122, OT_RW    , ot_u16,         "DHWPumpValveOperationHours", "Nr of hours that DHW pump has been running or DHW valve has been opened ", "" },
-		{ 123, OT_RW    , ot_u16,         "DHWBurnerOperationHours", "Nr of hours that burner is in operation during DHW mode", "" },
-		{ 124, OT_READ  , ot_f88,         "OpenThermVersionMaster", "Master Version OpenTherm Protocol Specification", "" },
-		{ 125, OT_READ  , ot_f88,         "OpenThermVersionSlave", "Slave Version OpenTherm Protocol Specification", "" },
-		{ 126, OT_READ  , ot_u8u8,        "MasterVersion", "Master product version number and type", "" },
-		{ 127, OT_READ  , ot_u8u8,        "SlaveVersion", "Slave product version number and type", "" },
+		{ 101, OT_READ  , ot_flag8flag8, 		"SolarStorageMaster", "Solar Storage Master mode", "" },
+		{ 102, OT_READ  , ot_flag8u8,    		"SolarStorageASFflags", "Solar Storage Application-specific flags and OEM fault", "" },
+        { 103, OT_READ  , ot_flag8u8,    		"SolarStorageSlaveConfigMemberIDcode", "Solar Storage Slave Config / Member ID", "" },
+		{ 104, OT_READ  , ot_u8u8,        		"SolarStorageVersionType", "Solar Storage product version number and type", "" },
+		{ 105, OT_READ  , ot_u8u8,       		"SolarStorageTSP", "Solar Storage Number of Transparent-Slave-Parameters supported", "" },
+		{ 106, OT_RW    , ot_u8u8,       		"SolarStorageTSPindexTSPvalue", "Solar Storage Index number / Value of referred-to transparent slave parameter", "" },
+		{ 107, OT_READ  , ot_u8u8,       		"SolarStorageFHBsize", "Solar Storage Size of Fault-History-Buffer supported by slave", "" },
+		{ 108, OT_READ  , ot_u8u8,       		"SolarStorageFHBindexFHBvalue", "Solar Storage Index number / Value of referred-to fault-history buffer entry", "" },
+		{ 109, OT_READ  , ot_u16, 				"ElectricityProducerStarts", "Electricity producer starts", "" },
+		{ 110, OT_READ  , ot_u16, 				"ElectricityProducerHours", "Electricity producer hours", "" },
+		{ 111, OT_READ  , ot_u16, 				"ElectricityProduction", "Electricity production", "" },
+		{ 112, OT_READ  , ot_u16, 				"CumulativElectricityProduction", "Cumulativ Electricity production", "" },
+		{ 113, OT_RW    , ot_u16,         		"BurnerUnsuccessfulStarts", "Nr of un-successful burner starts", "" },
+		{ 114, OT_RW    , ot_u16,         		"FlameSignalTooLow", "Nr of times flame signal was too low", "" },
+		{ 115, OT_READ  , ot_u16,         		"OEMDiagnosticCode", "OEM-specific diagnostic/service code", "" },
+		{ 116, OT_RW    , ot_u16,         		"BurnerStarts", "Nr of starts burner", "" },
+		{ 117, OT_RW    , ot_u16,         		"CHPumpStarts", "Nr of starts CH pump", "" },
+		{ 118, OT_RW    , ot_u16,         		"DHWPumpValveStarts", "Nr of starts DHW pump/valve", "" },
+		{ 119, OT_RW    , ot_u16,         		"DHWBurnerStarts", "Nr of starts burner during DHW mode", "" },
+		{ 120, OT_RW    , ot_u16,         		"BurnerOperationHours", "Nr of hours that burner is in operation (i.e. flame on)", "" },
+		{ 121, OT_RW    , ot_u16,         		"CHPumpOperationHours", "Nr of hours that CH pump has been running", "" },
+		{ 122, OT_RW    , ot_u16,         		"DHWPumpValveOperationHours", "Nr of hours that DHW pump has been running or DHW valve has been opened ", "" },
+		{ 123, OT_RW    , ot_u16,         		"DHWBurnerOperationHours", "Nr of hours that burner is in operation during DHW mode", "" },
+		{ 124, OT_READ  , ot_f88,         		"OpenThermVersionMaster", "Master Version OpenTherm Protocol Specification", "" },
+		{ 125, OT_READ  , ot_f88,         		"OpenThermVersionSlave", "Slave Version OpenTherm Protocol Specification", "" },
+		{ 126, OT_READ  , ot_u8u8,        		"MasterVersion", "Master product version number and type", "" },
+		{ 127, OT_READ  , ot_u8u8,        		"SlaveVersion", "Slave product version number and type", "" },
 		{ 128, OT_UNDEF , ot_undef, "", "", "" },
 		{ 129, OT_UNDEF , ot_undef, "", "", "" },
 		{ 130, OT_UNDEF , ot_undef, "", "", "" },
