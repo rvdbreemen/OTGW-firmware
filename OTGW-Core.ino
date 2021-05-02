@@ -476,7 +476,8 @@ uint16_t print_status()
 { 
   char _flag8_master[8] {0};
   char _flag8_slave[8] {0};
-    //bit: [clear/0, set/1]
+  
+  //bit: [clear/0, set/1]
   //  0: CH enable [ CH is disabled, CH is enabled]
   //  1: DHW enable [ DHW is disabled, DHW is enabled]
   //  2: Cooling enable [ Cooling is disabled, Cooling is enabled]]
@@ -505,7 +506,6 @@ uint16_t print_status()
   sendMQTTData("ch2_enable",            (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));
   sendMQTTData("summerwintertime",      (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));
   sendMQTTData("dhw_blocking",          (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));
-
   //Slave
   //  0: fault indication [ no fault, fault ]
   //  1: CH mode [CH not active, CH active]
@@ -537,7 +537,6 @@ uint16_t print_status()
   sendMQTTData("centralheating2",       (((OTdata.valueLB) & 0x20) ? "ON" : "OFF"));
   sendMQTTData("diagnostic_indicator",  (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));
   sendMQTTData("eletric_production",    (((OTdata.valueLB) & 0x80) ? "ON" : "OFF"));
-
 
   uint16_t _value = OTdata.u16();
   OTGWDebugTf("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]\r\n", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
@@ -1142,11 +1141,14 @@ void processOTGW(const char *buf, int len){
   if (isvalidotmsg(buf, len)) { 
     //OT protocol messages are 9 chars long
     if (settingMQTTOTmessage) sendMQTTData("otmessage", buf);
+   
     // source of otmsg
+    OTdata.master = 0;
     if (buf[0]=='B')
     {
       OTGWDebugT("Boiler           ");
-      epochBoilerlastseen = now();  
+      epochBoilerlastseen = now(); 
+      OTdata.master = 1; 
     } else if (buf[0]=='T')
     {
       OTGWDebugT("Thermostat       ");
@@ -1154,7 +1156,8 @@ void processOTGW(const char *buf, int len){
     } else if (buf[0]=='R')
     {
       OTGWDebugT("Request Boiler   ");
-      epochBoilerlastseen = now();  
+      epochBoilerlastseen = now();
+      OTdata.master = 1;  
     } else if (buf[0]=='A')
     {
       OTGWDebugT("Answer Themostat ");
@@ -1163,6 +1166,9 @@ void processOTGW(const char *buf, int len){
     {
       OTGWDebugT("Parity error     ");
     } 
+
+    //print OTmessage to debug
+    OTGWDebugf("[%s] ", buf);
 
     //If the Boiler or Thermostat messages have not been seen for 30 seconds, then set the state to false. 
     bOTGWboilerstate = (now() < (epochBoilerlastseen+30));  
@@ -1180,7 +1186,7 @@ void processOTGW(const char *buf, int len){
 
     const char *bufval = buf + 1;
     uint32_t value = strtoul(bufval, NULL, 16);
-    // Debugf("msg=[%s] value=[%08x]", bufval, value);
+    //Debugf("value=[%08x]", value);
 
     //split 32bit value into the relevant OT protocol parts
     OTdata.type = (value >> 28) & 0x7;         // byte 1 = take 3 bits that define msg msgType
@@ -1223,6 +1229,7 @@ void processOTGW(const char *buf, int len){
       // }
 
       switch (static_cast<OpenThermMessageID>(OTdata.id)) {   
+        case OT_Statusflags:                   if (OTdata.master==1) OTdataObject.Statusflags = print_status(); break;
         case OT_TSet:                          OTdataObject.TSet = print_f88(); break;         
         case OT_CoolingControl:                OTdataObject.CoolingControl = print_f88(); break;
         case OT_TsetCH2:                       OTdataObject.TsetCH2 = print_f88(); break;
@@ -1248,7 +1255,6 @@ void processOTGW(const char *buf, int len){
         case OT_Hcratio:                       OTdataObject.Hcratio = print_f88(); break;
         case OT_OpenThermVersionMaster:        OTdataObject.OpenThermVersionMaster = print_f88(); break;
         case OT_OpenThermVersionSlave:         OTdataObject.OpenThermVersionSlave = print_f88(); break;
-        case OT_Statusflags:                   OTdataObject.Statusflags = print_status(); break;
         case OT_ASFflags:                      OTdataObject.ASFflags = print_ASFflags(); break;
         case OT_MasterConfigMemberIDcode:      OTdataObject.MasterConfigMemberIDcode = print_mastermemberid(); break; 
         case OT_SlaveConfigMemberIDcode:       OTdataObject.SlaveConfigMemberIDcode = print_slavememberid(); break;   
