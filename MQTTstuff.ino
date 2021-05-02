@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v0.8.3
+**  Version  : v0.8.4
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
