@@ -476,7 +476,8 @@ uint16_t print_status()
 { 
   char _flag8_master[8] {0};
   char _flag8_slave[8] {0};
-    //bit: [clear/0, set/1]
+  
+  //bit: [clear/0, set/1]
   //  0: CH enable [ CH is disabled, CH is enabled]
   //  1: DHW enable [ DHW is disabled, DHW is enabled]
   //  2: Cooling enable [ Cooling is disabled, Cooling is enabled]]
@@ -505,7 +506,6 @@ uint16_t print_status()
   sendMQTTData("ch2_enable",            (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));
   sendMQTTData("summerwintertime",      (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));
   sendMQTTData("dhw_blocking",          (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));
-
   //Slave
   //  0: fault indication [ no fault, fault ]
   //  1: CH mode [CH not active, CH active]
@@ -537,7 +537,6 @@ uint16_t print_status()
   sendMQTTData("centralheating2",       (((OTdata.valueLB) & 0x20) ? "ON" : "OFF"));
   sendMQTTData("diagnostic_indicator",  (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));
   sendMQTTData("eletric_production",    (((OTdata.valueLB) & 0x80) ? "ON" : "OFF"));
-
 
   uint16_t _value = OTdata.u16();
   OTGWDebugTf("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]\r\n", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
@@ -954,15 +953,16 @@ uint16_t print_daytime()
 }
 
 
-//===================[ Send buffer to OTGW ]=============================
-// - zorg dat er maar 1 call is waar er data NAAR de otgw wordt gestuurd. In die call, store die commando's in een queue
-// - zorg dat er maar 1 call is waar inkomende data van de otgw word verwerkt. Filter die data op command response (3rd char == ':') en compare met queue.
-// - met een timer of ander loopje, check if een command in de queue te oud is. (now() - received > 5 sec ofzo) en dan stuur nogmaals
-// - voeg een counter toe hoe vaak een command verstuurd is, stop na 5x en gooi een error op de bus/mqtt etc.
+//===================[ Command Queue implementatoin ]=============================
 
 #define OTGW_CMD_RETRY 5
-#define OTGW_CMD_INTERVAL 5
-
+#define OTGW_CMD_INTERVAL_MS 5000
+#define OTGW_DELAY_SEND_MS 1000
+/*
+  addOTWGcmdtoqueue adds a command to the queue. 
+  First it checks the queue, if the command is in the queue, it's updated.
+  Otherwise it's simply added to the queue, unless there are no free queue slots.
+*/
 void addOTWGcmdtoqueue(const char* buf, int len){
   if ((len < 3) || (buf[2] != '=')){ 
     //no valid command of less then 2 bytes
@@ -991,13 +991,18 @@ void addOTWGcmdtoqueue(const char* buf, int len){
   else OTGWDebugTf("CmdQueue: Adding cmd end of queue, slot [%d]\r\n", insertptr);
 
   //insert to the queue
-  OTGWDebugTf("CmdQueue: Insert queue in slot[%d]:[%s]\r\n", insertptr, cmdqueue[insertptr].cmd);
+  OTGWDebugTf("CmdQueue: Insert queue in slot[%d]:", insertptr);
+  OTGWDebug("cmd[");
+  for (int i = 0; i < len; i++) {
+    OTGWDebug((char)buf[i]);
+  }
+  OTGWDebugf("] (%d)\r\n", len); 
   memset(cmdqueue[insertptr].cmd, 0, sizeof(cmdqueue[insertptr].cmd));
   if (len>=sizeof(cmdqueue[insertptr].cmd)) len = sizeof(cmdqueue[insertptr].cmd)-1; //never longer than the buffer
   memcpy(cmdqueue[insertptr].cmd, buf, len);
   cmdqueue[insertptr].cmdlen = len;
   cmdqueue[insertptr].retrycnt = 0;
-  cmdqueue[insertptr].due = millis()+20000; //due right away
+  cmdqueue[insertptr].due = millis() + OTGW_DELAY_SEND_MS; //due right away
 
   //if not found
   if (!foundcmd) {
@@ -1016,12 +1021,12 @@ void addOTWGcmdtoqueue(const char* buf, int len){
 */
 void handleOTGWqueue(){
   for (int i = 0; i<cmdptr; i++) {
-    OTGWDebugTf("CmdQueue: Checking due in queue slot[%d]:[%d]<[%d]\r\n", i, millis(), cmdqueue[i].due);
-    if (now() > cmdqueue[i].due) {
+    OTGWDebugTf("CmdQueue: Checking due in queue slot[%d]:[%d]=>[%d]\r\n", i, millis(), cmdqueue[i].due);
+    if (millis() >= cmdqueue[i].due) {
       OTGWDebugTf("CmdQueue: Queue slot [%d] due\r\n", i);
       sendOTGW(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
       cmdqueue[i].retrycnt++;
-      cmdqueue[i].due = millis() + OTGW_CMD_INTERVAL * 1000; //seconds
+      cmdqueue[i].due = millis() + OTGW_CMD_INTERVAL_MS;
       if (cmdqueue[i].retrycnt >= OTGW_CMD_RETRY){
         //max retry reached, so delete command from queue
         for (int j=i; j<cmdptr; j++){
@@ -1088,6 +1093,12 @@ void checkOTGWcmdqueue(const char *buf, int len){
   }
 }
 
+
+//===================[ Send buffer to OTGW ]=============================
+/* 
+  sendOTGW(const char* buf, int len) sends a string to the serial OTGW device.
+  The buffer is send out to OTGW on the serial device instantly, as long as there is space in the buffer.
+*/
 int sendOTGW(const char* buf, int len)
 {
   //Send the buffer to OTGW when the Serial interface is available
@@ -1119,11 +1130,13 @@ int sendOTGW(const char* buf, int len)
 /*
   This function checks if the string received is a valid "raw OT message".
   Raw OTmessages are 9 chars long and start with TBARE when talking to OTGW PIC.
+  Message is not an OTmessage if length is not 9 long OR 3th char is ':' (= OTGW command response)
 */
 bool isvalidotmsg(const char *buf, int len){
   char *chk = "TBARE";
-  bool _ret =  (len==9);
-  _ret &= (strchr(chk, buf[0])!=NULL);
+  bool _ret =  (len==9);    //check 9 chars long
+  _ret &= (buf[2]!=':');    //not a otgw command response 
+  _ret &= (strchr(chk, buf[0])!=NULL); //1 char matches any of 'B', 'T', 'A', 'R' or 'E'
   return _ret;
 }
 
@@ -1142,11 +1155,14 @@ void processOTGW(const char *buf, int len){
   if (isvalidotmsg(buf, len)) { 
     //OT protocol messages are 9 chars long
     if (settingMQTTOTmessage) sendMQTTData("otmessage", buf);
+   
     // source of otmsg
+    OTdata.master = 0;
     if (buf[0]=='B')
     {
       OTGWDebugT("Boiler           ");
-      epochBoilerlastseen = now();  
+      epochBoilerlastseen = now(); 
+      OTdata.master = 1; 
     } else if (buf[0]=='T')
     {
       OTGWDebugT("Thermostat       ");
@@ -1154,7 +1170,8 @@ void processOTGW(const char *buf, int len){
     } else if (buf[0]=='R')
     {
       OTGWDebugT("Request Boiler   ");
-      epochBoilerlastseen = now();  
+      epochBoilerlastseen = now();
+      OTdata.master = 1;  
     } else if (buf[0]=='A')
     {
       OTGWDebugT("Answer Themostat ");
@@ -1163,6 +1180,9 @@ void processOTGW(const char *buf, int len){
     {
       OTGWDebugT("Parity error     ");
     } 
+
+    //print OTmessage to debug
+    OTGWDebugf("[%s] ", buf);
 
     //If the Boiler or Thermostat messages have not been seen for 30 seconds, then set the state to false. 
     bOTGWboilerstate = (now() < (epochBoilerlastseen+30));  
@@ -1180,7 +1200,7 @@ void processOTGW(const char *buf, int len){
 
     const char *bufval = buf + 1;
     uint32_t value = strtoul(bufval, NULL, 16);
-    // Debugf("msg=[%s] value=[%08x]", bufval, value);
+    //Debugf("value=[%08x]", value);
 
     //split 32bit value into the relevant OT protocol parts
     OTdata.type = (value >> 28) & 0x7;         // byte 1 = take 3 bits that define msg msgType
@@ -1223,6 +1243,7 @@ void processOTGW(const char *buf, int len){
       // }
 
       switch (static_cast<OpenThermMessageID>(OTdata.id)) {   
+        case OT_Statusflags:                   if (OTdata.master==1) OTdataObject.Statusflags = print_status(); break;
         case OT_TSet:                          OTdataObject.TSet = print_f88(); break;         
         case OT_CoolingControl:                OTdataObject.CoolingControl = print_f88(); break;
         case OT_TsetCH2:                       OTdataObject.TsetCH2 = print_f88(); break;
@@ -1248,7 +1269,6 @@ void processOTGW(const char *buf, int len){
         case OT_Hcratio:                       OTdataObject.Hcratio = print_f88(); break;
         case OT_OpenThermVersionMaster:        OTdataObject.OpenThermVersionMaster = print_f88(); break;
         case OT_OpenThermVersionSlave:         OTdataObject.OpenThermVersionSlave = print_f88(); break;
-        case OT_Statusflags:                   OTdataObject.Statusflags = print_status(); break;
         case OT_ASFflags:                      OTdataObject.ASFflags = print_ASFflags(); break;
         case OT_MasterConfigMemberIDcode:      OTdataObject.MasterConfigMemberIDcode = print_mastermemberid(); break; 
         case OT_SlaveConfigMemberIDcode:       OTdataObject.SlaveConfigMemberIDcode = print_slavememberid(); break;   
