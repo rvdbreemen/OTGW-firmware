@@ -953,16 +953,16 @@ uint16_t print_daytime()
 }
 
 
-//===================[ Send buffer to OTGW ]=============================
-// - zorg dat er maar 1 call is waar er data NAAR de otgw wordt gestuurd. In die call, store die commando's in een queue
-// - zorg dat er maar 1 call is waar inkomende data van de otgw word verwerkt. Filter die data op command response (3rd char == ':') en compare met queue.
-// - met een timer of ander loopje, check if een command in de queue te oud is. (now() - received > 5 sec ofzo) en dan stuur nogmaals
-// - voeg een counter toe hoe vaak een command verstuurd is, stop na 5x en gooi een error op de bus/mqtt etc.
+//===================[ Command Queue implementatoin ]=============================
 
 #define OTGW_CMD_RETRY 5
 #define OTGW_CMD_INTERVAL_MS 5000
-#define OTGW_DELAY_SEND_MS 20000
-
+#define OTGW_DELAY_SEND_MS 1000
+/*
+  addOTWGcmdtoqueue adds a command to the queue. 
+  First it checks the queue, if the command is in the queue, it's updated.
+  Otherwise it's simply added to the queue, unless there are no free queue slots.
+*/
 void addOTWGcmdtoqueue(const char* buf, int len){
   if ((len < 3) || (buf[2] != '=')){ 
     //no valid command of less then 2 bytes
@@ -1093,6 +1093,12 @@ void checkOTGWcmdqueue(const char *buf, int len){
   }
 }
 
+
+//===================[ Send buffer to OTGW ]=============================
+/* 
+  sendOTGW(const char* buf, int len) sends a string to the serial OTGW device.
+  The buffer is send out to OTGW on the serial device instantly, as long as there is space in the buffer.
+*/
 int sendOTGW(const char* buf, int len)
 {
   //Send the buffer to OTGW when the Serial interface is available
@@ -1124,6 +1130,7 @@ int sendOTGW(const char* buf, int len)
 /*
   This function checks if the string received is a valid "raw OT message".
   Raw OTmessages are 9 chars long and start with TBARE when talking to OTGW PIC.
+  Message is not an OTmessage if length is not 9 long OR 3th char is ':' (= OTGW command response)
 */
 bool isvalidotmsg(const char *buf, int len){
   char *chk = "TBARE";
