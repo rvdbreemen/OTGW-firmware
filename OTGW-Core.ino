@@ -960,7 +960,8 @@ uint16_t print_daytime()
 // - voeg een counter toe hoe vaak een command verstuurd is, stop na 5x en gooi een error op de bus/mqtt etc.
 
 #define OTGW_CMD_RETRY 5
-#define OTGW_CMD_INTERVAL 5
+#define OTGW_CMD_INTERVAL_MS 5000
+#define OTGW_DELAY_SEND_MS 20000
 
 void addOTWGcmdtoqueue(const char* buf, int len){
   if ((len < 3) || (buf[2] != '=')){ 
@@ -990,13 +991,18 @@ void addOTWGcmdtoqueue(const char* buf, int len){
   else OTGWDebugTf("CmdQueue: Adding cmd end of queue, slot [%d]\r\n", insertptr);
 
   //insert to the queue
-  OTGWDebugTf("CmdQueue: Insert queue in slot[%d]:[%s]\r\n", insertptr, cmdqueue[insertptr].cmd);
+  OTGWDebugTf("CmdQueue: Insert queue in slot[%d]:", insertptr);
+  OTGWDebug("cmd[");
+  for (int i = 0; i < len; i++) {
+    OTGWDebug((char)buf[i]);
+  }
+  OTGWDebugf("] (%d)\r\n", len); 
   memset(cmdqueue[insertptr].cmd, 0, sizeof(cmdqueue[insertptr].cmd));
   if (len>=sizeof(cmdqueue[insertptr].cmd)) len = sizeof(cmdqueue[insertptr].cmd)-1; //never longer than the buffer
   memcpy(cmdqueue[insertptr].cmd, buf, len);
   cmdqueue[insertptr].cmdlen = len;
   cmdqueue[insertptr].retrycnt = 0;
-  cmdqueue[insertptr].due = millis()+20000; //due right away
+  cmdqueue[insertptr].due = millis() + OTGW_DELAY_SEND_MS; //due right away
 
   //if not found
   if (!foundcmd) {
@@ -1015,12 +1021,12 @@ void addOTWGcmdtoqueue(const char* buf, int len){
 */
 void handleOTGWqueue(){
   for (int i = 0; i<cmdptr; i++) {
-    OTGWDebugTf("CmdQueue: Checking due in queue slot[%d]:[%d]<[%d]\r\n", i, millis(), cmdqueue[i].due);
-    if (now() > cmdqueue[i].due) {
+    OTGWDebugTf("CmdQueue: Checking due in queue slot[%d]:[%d]=>[%d]\r\n", i, millis(), cmdqueue[i].due);
+    if (millis() >= cmdqueue[i].due) {
       OTGWDebugTf("CmdQueue: Queue slot [%d] due\r\n", i);
       sendOTGW(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
       cmdqueue[i].retrycnt++;
-      cmdqueue[i].due = millis() + OTGW_CMD_INTERVAL * 1000; //seconds
+      cmdqueue[i].due = millis() + OTGW_CMD_INTERVAL_MS;
       if (cmdqueue[i].retrycnt >= OTGW_CMD_RETRY){
         //max retry reached, so delete command from queue
         for (int j=i; j<cmdptr; j++){
@@ -1121,8 +1127,9 @@ int sendOTGW(const char* buf, int len)
 */
 bool isvalidotmsg(const char *buf, int len){
   char *chk = "TBARE";
-  bool _ret =  (len==9);
-  _ret &= (strchr(chk, buf[0])!=NULL);
+  bool _ret =  (len==9);    //check 9 chars long
+  _ret &= (buf[2]!=':');    //not a otgw command response 
+  _ret &= (strchr(chk, buf[0])!=NULL); //1 char matches any of 'B', 'T', 'A', 'R' or 'E'
   return _ret;
 }
 
