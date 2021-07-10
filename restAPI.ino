@@ -351,6 +351,10 @@ void sendDeviceInfo()
 #ifdef ESP8266_ESP12
      "ESP8266_ESP12"
 #endif
+#ifdef ARDUINO_ESP8266_WEMOS_D1MINI
+     "WEMOS_D1MINI"
+#endif
+
   );
   sendNestedJsonObj("ssid", CSTR(WiFi.SSID()));
   sendNestedJsonObj("wifirssi", WiFi.RSSI());
