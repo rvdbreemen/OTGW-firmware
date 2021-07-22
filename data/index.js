@@ -670,6 +670,7 @@
    ,[ "dhwtemperature",            "Domestic Hotwater Temperature"]
    ,[ "dhwsetpoint",               "Domestic Hotwater Setpoint"]
    ,[ "oemfaultcode",              "OEM Fault Code"]
+   ,[ "oemdiagnosticcode",         "OEM Diagnostic Code"]
    ,[ "coolingmodus",              "Cooling Enabled"]
    ,[ "coolingactive",             "Cooling Status"]
    ,[ "otcactive",                 "Outside Temp Compensation"]
