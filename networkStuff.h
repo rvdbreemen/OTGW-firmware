@@ -36,27 +36,60 @@
 */
 
 
-#include <ESP8266WiFi.h>        // ESP8266 Core WiFi Library         
-#include <ESP8266WebServer.h>   // Version 1.0.0 - part of ESP8266 Core https://github.com/esp8266/Arduino
-#include <ESP8266mDNS.h>        // part of ESP8266 Core https://github.com/esp8266/Arduino
-#include <ESP8266HTTPClient.h>
-#include <ESP8266LLMNR.h>
+#if defined(ESP8266)
+  // ESP8266 specific code here
+  #include <ESP8266WiFi.h>        //ESP8266 Core WiFi Library         
+  #include <ESP8266WebServer.h>   // Version 1.0.0 - part of ESP8266 Core https://github.com/esp8266/Arduino
+  #include <ESP8266HTTPClient.h>  
+  #include <ESP8266mDNS.h>        // part of ESP8266 Core https://github.com/esp8266/Arduino
+  #include <WiFiUdp.h>            // part of ESP8266 Core https://github.com/esp8266/Arduino
+  #include <WiFiManager.h>        // version 0.14.0 - https://github.com/tzapu/WiFiManager
 
-#include <WiFiUdp.h>            // part of ESP8266 Core https://github.com/esp8266/Arduino
-//#include "ESP8266HTTPUpdateServer.h"
-#include "OTGW-ModUpdateServer.h"   // <<special version for Nodoshop Watchdog needed>>
-#include "updateServerHtml.h"
-#include <WiFiManager.h>        // version 2.0.4-beta - use latest development branch  - https://github.com/tzapu/WiFiManager
-// included in main program: #include <TelnetStream.h>       // Version 0.0.1 - https://github.com/jandrassy/TelnetStream
+  #ifdef USE_UPDATE_SERVER
+    //#include "ESP8266HTTPUpdateServer.h"  //Original version of ESP8266HTTPUpdateServer.h from ESP8266 Core
+    #include "ModUpdateServer.h"            // https://github.com/mrWheel/ModUpdateServer
+    #include "UpdateServerHtml.h"
+  #endif
 
-//#include <FS.h>                 // part of ESP8266 Core https://github.com/esp8266/Arduino
-#include <LittleFS.h>
+  //  included in main program: #include <TelnetStream.h>       // Version 0.0.1 - https://github.com/jandrassy/TelnetStream
+  //  #include <Hash.h>
+  #include <FS.h>                                               // part of ESP8266 Core https://github.com/esp8266/Arduino
 
-ESP8266WebServer        httpServer (80);
-ESP8266HTTPUpdateServer httpUpdater(true);
 
-static      FSInfo LittleFSinfo;
-bool        LittleFSmounted; 
+  ESP8266WebServer        httpServer (80);
+  #ifdef USE_UPDATE_SERVER
+    ESP8266HTTPUpdateServer httpUpdater(true);
+  #endif
+#elif defined(ESP32) 
+  #include <WiFi.h>
+  #include <WiFiClient.h>
+  #include <HTTPClient.h>  
+  #include <WebServer.h>
+  #include <ESPmDNS.h>
+  #include <WiFiUdp.h>            // part of ESP32 Core
+  #include <WiFiManager.h>
+
+  #include <SPIFFS.h>
+
+  #ifdef USE_UPDATE_SERVER
+    #include "ESP32ModUpdateServer.h"  // <<modified version of ESP32ModUpdateServer.h by Robert>>
+    #include "UpdateServerHtml.h"   
+  #endif
+
+  WebServer        httpServer(80);
+  #ifdef USE_UPDATE_SERVER
+    ESP32HTTPUpdateServer httpUpdater(true);
+  #endif
+#else
+  #error unexpected / unsupported architecture, make sure to compile for ESP32 or ESP8266
+#endif
+
+
+#if defined(ESP8266)
+  static      FSInfo SPIFFSinfo;
+#elif defined(ESP32)
+#endif
+bool        SPIFFSmounted = false; 
 bool        isConnected = false;
 
 #define WM_DEBUG_PORT OTGWSerial
