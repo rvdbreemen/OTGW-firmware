@@ -27,7 +27,7 @@ The features of this Nodosop OpenTherm NodeMCU firmware are:
 - parsing all known OT protocol message ID's (OpenTherm v2.2+2.3b), including Heating/Ventilation and Remeha specific msgid's
 - wide range of connection and data sharing options:
   - telnet (interpreted data and debugging)
-  - MQTT (publishing every parsed OT message, subscribing for commands on `OTGW/set/<node id>/command`)
+  - MQTT (publishing every parsed OT message, publish commands to this topic `OTGW/set/<node id>/command`)
   - simple REST API (`http://<ip>/api/v0/otgw/{id}`)
   - simple REST API (`http://<ip>/api/v1/otgw/id/{id}` or `http://<ip>/api/v1/otgw/label/{textlabel eg. Tr or Toutside}`, commands on `/api/v1/otgw/command/{any command})`
   - serial interface on port 25238 for original OTmonitor application (bi-directional)
@@ -71,7 +71,6 @@ smartpower configruation detection<br>Added 2.3 spec status bits for (summer/win
 | 0.5.1 | REST APIs, v1, for OTmonitor values, GetByLabel, GetByID, POST `otgw/command/{command}` |
 | 0.5.0 | Implemented the UI for settings (restapi, read/write file in json) |
 | 0.4.2 | Bi-directional serial communication on port 25238 (aka ser2net) for use with OTmonitor application|   
-| 0.4.1 | MQTT command sending now works, topic: `OTGW/command` |   
 | 0.4.0 | RestAPI implemented - as simple as `<ip>/api/v0/otgw/{id}` to get the latest values |   
 | 0.3.1 | Bug: Open AP after configuration, change ESP to STA mode on StartWifi <br> No more default Debug to Serial, only to port 23 telnet |   
 | 0.3.0 | Read only Serial stream implementend on port 25238 (debug port remains on port 23 - telnet) |   
