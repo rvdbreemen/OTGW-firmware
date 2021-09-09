@@ -156,7 +156,8 @@ void doTaskEvery60s(){
   {
     //disconnected, try to reconnect then...
     WatchDogEnabled(0); // turn off watchdog
-    restartWiFi(CSTR(settingHostname));
+    //restartWiFi(CSTR(settingHostname), 30);
+    WiFi.begin();  //simply reconnect?
     WatchDogEnabled(1); // turn on watchdog
     if (WiFi.status() == WL_CONNECTED)
       {
