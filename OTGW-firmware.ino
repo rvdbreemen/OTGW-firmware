@@ -155,7 +155,9 @@ void doTaskEvery60s(){
   if (WiFi.status() != WL_CONNECTED)
   {
     //disconnected, try to reconnect then...
+    WatchDogEnabled(0); // turn off watchdog
     startWiFi(CSTR(settingHostname), 240);
+    WatchDogEnabled(1); // turn on watchdog
     //check OTGW and telnet
     startTelnet();
     startOTGWstream(); 
@@ -190,8 +192,8 @@ void doBackgroundTasks()
     handleOTGW();                 // OTGW handling
     httpServer.handleClient();
     MDNS.update();
+    events();                     // trigger ezTime update etc  
   } //otherwise, just wait until reconnected gracefully
-  events();                     // trigger ezTime update etc       
   delay(1);
 }
 
