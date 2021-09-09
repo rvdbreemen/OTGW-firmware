@@ -125,45 +125,6 @@ void startWiFi(const char* hostname, int timeOut)
   
 } // startWiFi()
 
-void restartWiFi(const char* hostname) 
-{    
-  WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-
-  WiFiManager manageWiFi;
-  String thisAP = String(hostname) + "-" + WiFi.macAddress();
-
-  OTGWSerial.println("Start Wifi ...");
-  manageWiFi.setDebugOutput(true);
-
-  //--- next line in release needs to be commented out!
-  // manageWiFi.resetSettings();
-
-  //--- set callback that gets called when connecting to previous WiFi fails, and enters Access Point mode
-  //manageWiFi.setAPCallback(configModeCallback);
-
-  //--- sets timeout until configuration portal gets turned off
-  //--- useful to make it all retry or go to sleep in seconds
-  //manageWiFi.setTimeout(240);  // 4 minuten
-  //manageWiFi.setTimeout(timeOut);  // in seconden ...
-  
-  //--- fetches ssid and pass and tries to connect
-  //--- if it does not connect it starts an access point with the specified name
-  //--- here  "<HOSTNAME>-<MAC>"
-  //--- and goes into a blocking loop awaiting configuration
-  OTGWSerial.printf("AutoConnect to: %s\r\n", thisAP.c_str());
-  manageWiFi.autoConnect(thisAP.c_str());
-  //In case it fails, it will try again in one minute...
-
-  // WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-  
-  Debugln();
-  DebugT(F("Connected to " )); Debugln(WiFi.SSID());
-  DebugT(F("IP address: " ));  Debugln(WiFi.localIP());
-  DebugT(F("IP gateway: " ));  Debugln(WiFi.gatewayIP());
-  Debugln();
-} // restartWiFi()
-
-
 //===========================================================================================
 void startTelnet() 
 {
