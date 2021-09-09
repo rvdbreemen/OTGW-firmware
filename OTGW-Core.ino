@@ -196,6 +196,14 @@ String initWatchDog() {
   return ReasonReset;
   //===========================================
 }
+
+void WatchDogEnabled(byte stateWatchdog){
+    Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   //Nodoshop design uses the hardware WD on I2C, address 0x26
+    Wire.write(7);                                //Write to register 7, the action register
+    Wire.write(stateWatchdog);                    //1 = armed to reset, 0 = turned off     
+    Wire.endTransmission();                       //That's all there is...
+}
+
 //===[ Feed the WatchDog before it bites! (1x per second) ]===
 void feedWatchDog() {
   //make sure to do this at least once a second
