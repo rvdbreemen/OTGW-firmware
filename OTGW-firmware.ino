@@ -182,12 +182,15 @@ void docheckforpic(){
 //===[ Do the background tasks ]===
 void doBackgroundTasks()
 {
-  handleDebug();
   feedWatchDog();               // Feed the dog before it bites!
-  handleMQTT();                 // MQTT transmissions
-  handleOTGW();                 // OTGW handling
-  httpServer.handleClient();
-  MDNS.update();
+  if (WiFi.status() == WL_CONNECTED) {
+    //while connected handle everything that uses network stuff
+    handleDebug();
+    handleMQTT();                 // MQTT transmissions
+    handleOTGW();                 // OTGW handling
+    httpServer.handleClient();
+    MDNS.update();
+  } //otherwise, just wait until reconnected gracefully
   events();                     // trigger ezTime update etc       
   delay(1);
 }
