@@ -156,12 +156,16 @@ void doTaskEvery60s(){
   {
     //disconnected, try to reconnect then...
     WatchDogEnabled(0); // turn off watchdog
-    startWiFi(CSTR(settingHostname), 240);
+    restartWiFi(CSTR(settingHostname));
     WatchDogEnabled(1); // turn on watchdog
-    //check OTGW and telnet
-    startTelnet();
-    startOTGWstream(); 
-  }
+    if (WiFi.status() == WL_CONNECTED)
+      {
+        //check OTGW and telnet
+        startTelnet();
+        startOTGWstream(); 
+        startMQTT();
+      }
+    }
 }
 
 //===[ Do task every 5min ]===
