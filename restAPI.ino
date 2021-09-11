@@ -69,6 +69,11 @@ void processAPI()
           // GET /api/v1/otgw/otmonitor
           // Response: see json response
           sendOTmonitor();
+        } else if (words[4] == "autoconfigure") {
+          // POST /api/v1/otgw/autoconfigure
+          // Response: sends all autodiscovery topics to MQTT for HA integration
+          httpServer.send(200, "text/plain", "OK");
+          doAutoConfigure();
         } else if (words[4] == "id"){
           //what the heck should I do?
           // /api/v1/otgw/id/{msgid}   msgid = OpenTherm Message Id (0-127)
