@@ -44,6 +44,7 @@ void setup() {
   OTGWSerial.println(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   OTGWSerial.printf("Booting....[%s]\r\n\r\n", String(_FW_VERSION).c_str());
   rebootCount = updateRebootCount();
+  WatchDogEnabled(0); // turn off watchdog
 
   //setup randomseed the right way
   randomSeed(RANDOM_REG32); //This is 8266 HWRNG used to seed the Random PRNG: Read more: https://config9.com/arduino/getting-a-truly-random-number-in-arduino/
@@ -80,19 +81,17 @@ void setup() {
   checkOTWGpicforupdate();
   initSensors();        // init DS18B20
   initOutputs();
-
   initWatchDog();       // setup the WatchDog
+  WatchDogEnabled(1);   // turn on watchdog
   sendOTGWbootcmd();   
   //Blink LED2 to signal setup done
   setLed(LED1, OFF);
   blinkLED(LED2, 3, 100);
   setLed(LED2, OFF);
 }
-
 //=====================================================================
 
 //===[ blink status led ]===
-
 void setLed(uint8_t led, uint8_t status){
   pinMode(led, OUTPUT);
   digitalWrite(led, status); 
@@ -153,10 +152,9 @@ void doTaskEvery60s(){
   //== do tasks ==
   //if no wifi, try reconnecting (once a minute)
   if (WiFi.status() != WL_CONNECTED)
-  {
+    {
     //disconnected, try to reconnect then...
     WatchDogEnabled(0); // turn off watchdog
-    //restartWiFi(CSTR(settingHostname), 30);
     WiFi.begin();  //simply reconnect?
     WatchDogEnabled(1); // turn on watchdog
     if (WiFi.status() == WL_CONNECTED)
