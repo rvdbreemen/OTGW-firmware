@@ -52,6 +52,8 @@
 //#include <FS.h>                 // part of ESP8266 Core https://github.com/esp8266/Arduino
 #include <LittleFS.h>
 
+#include <ESP8266Ping.h>          // https://github.com/dancol90/ESP8266Ping
+
 ESP8266WebServer        httpServer (80);
 ESP8266HTTPUpdateServer httpUpdater(true);
 
@@ -76,7 +78,9 @@ void configModeCallback (WiFiManager *myWiFiManager)
 //===========================================================================================
 void startWiFi(const char* hostname, int timeOut) 
 {    
+  WiFi.disconnect();
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+  WiFi.hostname(hostname);
 
   WiFiManager manageWiFi;
   uint32_t lTime = millis();
@@ -167,10 +171,13 @@ void startLLMNR(const char *hostname)
 
 void startNTP(){
   // Initialisation ezTime
+  #define NTP_HOST "time.google.com"
+
+  if (!Ping.ping(NTP_HOST)) return;  //when failing to ping the NTP server, stop trying.
   if (!settingNTPenable) return;
 
   setDebug(NONE); 
-  setServer("time.google.com");
+  setServer(NTP_HOST);
 
   if (settingNTPtimezone.length()==0) settingNTPtimezone = DEFAULT_TIMEZONE; //set back to default timezone
 
