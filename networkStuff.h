@@ -52,8 +52,6 @@
 //#include <FS.h>                 // part of ESP8266 Core https://github.com/esp8266/Arduino
 #include <LittleFS.h>
 
-#include <ESP8266Ping.h>          // https://github.com/dancol90/ESP8266Ping
-
 ESP8266WebServer        httpServer (80);
 ESP8266HTTPUpdateServer httpUpdater(true);
 
@@ -168,39 +166,6 @@ void startLLMNR(const char *hostname)
   }
 } // startLLMNR()
 
-
-void startNTP(){
-  // Initialisation ezTime
-  #define NTP_HOST "time.google.com"
-
-  if (!Ping.ping(NTP_HOST)) return;  //when failing to ping the NTP server, stop trying.
-  if (!settingNTPenable) return;
-
-  setDebug(NONE); 
-  setServer(NTP_HOST);
-
-  if (settingNTPtimezone.length()==0) settingNTPtimezone = DEFAULT_TIMEZONE; //set back to default timezone
-
-  if (myTZ.setLocation(settingNTPtimezone)){
-    DebugTf("Timezone set to: %s\r\n", CSTR(settingNTPtimezone));
-    DebugTf("Olson TZ : %s\r\n", CSTR(myTZ.getOlson()));
-    DebugTf("Posix TZ : %s\r\n", CSTR(myTZ.getPosix()));
-    DebugTf("TZ Name  : %s\r\n", CSTR(myTZ.getTimezoneName()));
-    DebugTf("TX Offset: %d\r\n", myTZ.getOffset());
-    DebugTf("DST      : %d\r\n", myTZ.isDST());
-  } else { 
-    DebugTf("Error setting Timezone: %s\r\n", CSTR(errorString()));
-    settingNTPtimezone = DEFAULT_TIMEZONE;
-  }
-
-  myTZ.setDefault();
-  updateNTP();        //force NTP sync
-  waitForSync(60);    //wait until valid time myTZ.setDefault();
-  setDebug(NONE);     //turn off any other debug information
-  
-  DebugTln("UTC time  : "+ UTC.dateTime());
-  DebugTln("local time: "+ myTZ.dateTime());
-}
 
 String getMacAddress() {
   uint8_t baseMac[6];
