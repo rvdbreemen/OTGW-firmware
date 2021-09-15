@@ -710,6 +710,7 @@
    ,[ "mqtthaprefix",               "MQTT Home Assistant prefix"]
    ,[ "ntpenable",                  "NTP Enable"]
    ,[ "ntptimezone",                "NTP Timezone"]
+   ,[ "ntphostname",                "NTP hostname"]
    ,[ "uptime",                     "Uptime since boot"]
    ,[ "bootcount",                  "Nr. Reboots"] 
    ,[ "ledblink",                   "Heartbeat LED (on/off)"]

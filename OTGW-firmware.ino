@@ -131,14 +131,12 @@ void restartWifi(){
 //====[ startNTP ]===
 void startNTP(){
   // Initialisation ezTime
-  #define NTP_HOST "time.google.com"
-
   if (!settingNTPenable) return;
 
   setDebug(NONE); 
-  setServer(NTP_HOST);
+  setServer(CSTR(settingNTPhostname));
 
-  if (settingNTPtimezone.length()==0) settingNTPtimezone = DEFAULT_TIMEZONE; //set back to default timezone
+  if (settingNTPtimezone.length()==0) settingNTPtimezone = NTP_DEFAULT_TIMEZONE; //set back to default timezone
 
   if (myTZ.setLocation(settingNTPtimezone)){
     DebugTf("Timezone set to: %s\r\n", CSTR(settingNTPtimezone));
@@ -149,7 +147,7 @@ void startNTP(){
     DebugTf("DST      : %d\r\n", myTZ.isDST());
   } else { 
     DebugTf("Error setting Timezone: %s\r\n", CSTR(errorString()));
-    settingNTPtimezone = DEFAULT_TIMEZONE;
+    settingNTPtimezone = NTP_DEFAULT_TIMEZONE;
   }
 
   myTZ.setDefault();
