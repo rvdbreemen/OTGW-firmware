@@ -152,9 +152,15 @@ void startNTP(){
 
   myTZ.setDefault();
   updateNTP();        //force NTP sync
-  WatchDogEnabled(0); //turn off WDT, while waiting for sync
-  waitForSync(60);    //wait until valid time myTZ.setDefault();
-  WatchDogEnabled(1); //turn WDT back on.
+  //active wait for sync for 60 seconds
+  DECLARE_TIMER_SEC(timeoutNTPsync, 60, CATCH_UP_MISSED_TICKS);
+  while (timeStatus() == timeNotSet) 
+  {  
+    delay(100);
+    feedWatchDog();  //feeding the dog, while waiting activly
+    if DUE(timeoutNTPsync) break; //timeout, then break out of this loop
+  }
+
   setDebug(NONE);     //turn off any other debug information
   
   DebugTln("UTC time  : "+ UTC.dateTime());
