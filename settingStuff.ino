@@ -106,7 +106,9 @@ void readSettings(bool show)
   settingMQTTOTmessage    = doc["MQTTOTmessage"]|settingMQTTOTmessage;
   settingNTPenable        = doc["NTPenable"]; 
   settingNTPtimezone      = doc["NTPtimezone"].as<String>();
-  if (settingNTPtimezone=="null")  settingNTPtimezone = "Europe/Amsterdam"; //default to amsterdam timezone
+  if (settingNTPtimezone=="null")  settingNTPtimezone = NTP_DEFAULT_TIMEZONE; //"Europe/Amsterdam"; //default to amsterdam timezone
+  settingNTPhostname      = doc["NTPhostname"].as<String>();
+  if (settingNTPhostname=="null")  settingNTPhostname = NTP_HOST_DEFAULT; 
   settingLEDblink         = doc["LEDblink"]|settingLEDblink;
   settingGPIOSENSORSenabled = doc["GPIOSENSORSenabled"] | settingGPIOSENSORSenabled;
   settingGPIOSENSORSpin = doc["GPIOSENSORSpin"] | settingGPIOSENSORSpin;
@@ -137,6 +139,7 @@ void readSettings(bool show)
     Debugf("HA prefix             : %s\r\n", CSTR(settingMQTThaprefix));
     Debugf("NTP enabled           : %s\r\n", CBOOLEAN(settingNTPenable));
     Debugf("NPT timezone          : %s\r\n", CSTR(settingNTPtimezone));
+    Debugf("NPT hostname          : %s\r\n", CSTR(settingNTPhostname));
     Debugf("Led Blink             : %s\r\n", CBOOLEAN(settingLEDblink));
     Debugf("GPIO Sensors          : %s\r\n", CBOOLEAN(settingGPIOSENSORSenabled));
     Debugf("GPIO Sen. Pin         : %d\r\n", settingGPIOSENSORSpin);
@@ -201,6 +204,7 @@ void updateSetting(const char *field, const char *newValue)
   if (strstr(field, "mqtt") != NULL)        startMQTT();//restart MQTT on change of any setting
   
   if (stricmp(field, "NTPenable")==0)      settingNTPenable = EVALBOOLEAN(newValue);
+  if (stricmp(field, "NTPhostname")==0)    settingNTPhostname = String(newValue);  
   if (stricmp(field, "NTPtimezone")==0)    {
     settingNTPtimezone = String(newValue);
     startNTP();  // update timezone if changed

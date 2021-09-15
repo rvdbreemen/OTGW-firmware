@@ -40,7 +40,8 @@ void setLed(int8_t, uint8_t);
 //Defaults and macro definitions
 #define _HOSTNAME       "OTGW"
 #define SETTINGS_FILE   "/settings.ini"
-#define DEFAULT_TIMEZONE "Europe/Amsterdam"
+#define NTP_DEFAULT_TIMEZONE "Europe/Amsterdam"
+#define NTP_HOST_DEFAULT "time.google.com"
 
 #define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"  // Home Assistant discovery prefix
 
@@ -93,7 +94,8 @@ String    settingMQTTtopTopic = "otgw";
 String    settingMQTTuniqueid = ""; // Intialized in readsettings
 bool      settingMQTTOTmessage = false;
 bool      settingNTPenable = true;
-String    settingNTPtimezone = DEFAULT_TIMEZONE;
+String    settingNTPtimezone = NTP_DEFAULT_TIMEZONE;
+String    settingNTPhostname = NTP_HOST_DEFAULT;
 bool      settingLEDblink = true;
 
 // GPIO Sensor Settings
