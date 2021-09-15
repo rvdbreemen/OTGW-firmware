@@ -91,6 +91,78 @@ void setup() {
 }
 //=====================================================================
 
+
+//====[ restartWifi ]===
+/*
+  The restartWifi function takes tries to just reconnect to the wifi. When the wifi is restated, it then waits for maximum of 30 seconds (timeout).
+  It keeps count of how many times it tried, when it tried to reconnect for 15 times. It goes into failsafe mode, and reboots the ESP.
+  The watchdog is turned off during this process
+*/
+void restartWifi(){
+  static int iTryRestarts = 0; //So if we have more than 15 restarts, then it's time to reboot
+  iTryRestarts++;          //Count the number of attempts
+
+  WiFi.hostname(CSTR(settingHostname));  //make sure hostname is set
+  if (WiFi.begin()) // if the wifi ssid exist, you can try to connect. 
+  {
+    //active wait for connections, this can take seconds
+    DECLARE_TIMER_SEC(timeoutWifiConnect, 30, CATCH_UP_MISSED_TICKS);
+    while ((WiFi.status() != WL_CONNECTED))
+    {  
+      delay(100);
+      feedWatchDog();  //feeding the dog, while waiting activly
+      if DUE(timeoutWifiConnect) break; //timeout, then break out of this loop
+    }
+  }
+
+  if (WiFi.status() == WL_CONNECTED)
+  { //when reconnect, restart some services, just to make sure all works
+    startTelnet();
+    startOTGWstream(); 
+    startMQTT();
+    iTryRestarts = 0; //reset attempt counter
+    return;
+  }
+
+  //if all fails, and retry 15 is hit, then reboot esp
+  if (iTryRestarts >= 15) doRestart("Too many wifi reconnect attempts");
+}
+
+//====[ startNTP ]===
+void startNTP(){
+  // Initialisation ezTime
+  #define NTP_HOST "time.google.com"
+
+  if (!settingNTPenable) return;
+
+  setDebug(NONE); 
+  setServer(NTP_HOST);
+
+  if (settingNTPtimezone.length()==0) settingNTPtimezone = DEFAULT_TIMEZONE; //set back to default timezone
+
+  if (myTZ.setLocation(settingNTPtimezone)){
+    DebugTf("Timezone set to: %s\r\n", CSTR(settingNTPtimezone));
+    DebugTf("Olson TZ : %s\r\n", CSTR(myTZ.getOlson()));
+    DebugTf("Posix TZ : %s\r\n", CSTR(myTZ.getPosix()));
+    DebugTf("TZ Name  : %s\r\n", CSTR(myTZ.getTimezoneName()));
+    DebugTf("TX Offset: %d\r\n", myTZ.getOffset());
+    DebugTf("DST      : %d\r\n", myTZ.isDST());
+  } else { 
+    DebugTf("Error setting Timezone: %s\r\n", CSTR(errorString()));
+    settingNTPtimezone = DEFAULT_TIMEZONE;
+  }
+
+  myTZ.setDefault();
+  updateNTP();        //force NTP sync
+  WatchDogEnabled(0); //turn off WDT, while waiting for sync
+  waitForSync(60);    //wait until valid time myTZ.setDefault();
+  WatchDogEnabled(1); //turn WDT back on.
+  setDebug(NONE);     //turn off any other debug information
+  
+  DebugTln("UTC time  : "+ UTC.dateTime());
+  DebugTln("local time: "+ myTZ.dateTime());
+}
+
 //===[ blink status led ]===
 void setLed(uint8_t led, uint8_t status){
   pinMode(led, OUTPUT);
@@ -151,21 +223,7 @@ void doTaskEvery30s(){
 void doTaskEvery60s(){
   //== do tasks ==
   //if no wifi, try reconnecting (once a minute)
-  if (WiFi.status() != WL_CONNECTED)
-    {
-    //disconnected, try to reconnect then...
-    WatchDogEnabled(0); // turn off watchdog
-    WiFi.hostname(CSTR(settingHostname));  //make sure hostname is set
-    WiFi.begin();  //simply reconnect?
-    WatchDogEnabled(1); // turn on watchdog
-    if (WiFi.status() == WL_CONNECTED)
-      {
-        //check OTGW and telnet
-        startTelnet();
-        startOTGWstream(); 
-        startMQTT();
-      }
-    }
+  if (WiFi.status() != WL_CONNECTED) restartWifi();
 }
 
 //===[ Do task every 5min ]===
