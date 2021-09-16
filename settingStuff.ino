@@ -41,6 +41,7 @@ void writeSettings(bool show)
   root["MQTTOTmessage"] = settingMQTTOTmessage;
   root["NTPenable"] = settingNTPenable;
   root["NTPtimezone"] = settingNTPtimezone;
+  root["NTPhostname"] = settingNTPhostname;
   root["LEDblink"] = settingLEDblink;
   root["GPIOSENSORSenabled"] = settingGPIOSENSORSenabled;
   root["GPIOSENSORSpin"] = settingGPIOSENSORSpin;
