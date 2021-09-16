@@ -107,7 +107,7 @@ void readSettings(bool show)
   settingMQTTOTmessage    = doc["MQTTOTmessage"]|settingMQTTOTmessage;
   settingNTPenable        = doc["NTPenable"]; 
   settingNTPtimezone      = doc["NTPtimezone"].as<String>();
-  if (settingNTPtimezone=="null")  settingNTPtimezone = NTP_DEFAULT_TIMEZONE; //"Europe/Amsterdam"; //default to amsterdam timezone
+  if (settingNTPtimezone=="null")  settingNTPtimezone = "Europe/Amsterdam"; //default to amsterdam timezone
   settingNTPhostname      = doc["NTPhostname"].as<String>();
   if (settingNTPhostname=="null")  settingNTPhostname = NTP_HOST_DEFAULT; 
   settingLEDblink         = doc["LEDblink"]|settingLEDblink;
@@ -205,7 +205,10 @@ void updateSetting(const char *field, const char *newValue)
   if (strstr(field, "mqtt") != NULL)        startMQTT();//restart MQTT on change of any setting
   
   if (stricmp(field, "NTPenable")==0)      settingNTPenable = EVALBOOLEAN(newValue);
-  if (stricmp(field, "NTPhostname")==0)    settingNTPhostname = String(newValue);  
+  if (stricmp(field, "NTPhostname")==0)    {
+    settingNTPhostname = String(newValue); 
+      startNTP();
+  }
   if (stricmp(field, "NTPtimezone")==0)    {
     settingNTPtimezone = String(newValue);
     startNTP();  // update timezone if changed

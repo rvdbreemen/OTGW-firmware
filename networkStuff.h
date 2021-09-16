@@ -76,9 +76,7 @@ void configModeCallback (WiFiManager *myWiFiManager)
 //===========================================================================================
 void startWiFi(const char* hostname, int timeOut) 
 {    
-  // WiFi.disconnect();
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-  WiFi.hostname(String(hostname));
 
   WiFiManager manageWiFi;
   uint32_t lTime = millis();

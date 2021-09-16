@@ -58,6 +58,9 @@ void setup() {
   LittleFS.begin();
   readSettings(true);
 
+  //start with setting wifi hostname
+  WiFi.hostname(String(settingHostname));
+
   // Connect to and initialise WiFi network
   OTGWSerial.println(F("Attempting to connect to WiFi network\r"));
   setLed(LED1, ON);
@@ -136,7 +139,7 @@ void startNTP(){
   setDebug(NONE); 
   setServer(CSTR(settingNTPhostname));
 
-  if (settingNTPtimezone.length()==0) settingNTPtimezone = NTP_DEFAULT_TIMEZONE; //set back to default timezone
+  if (settingNTPtimezone.length()==0) settingNTPtimezone = "Europe/Amsterdam"; //set back to default timezone
 
   if (myTZ.setLocation(settingNTPtimezone)){
     DebugTf("Timezone set to: %s\r\n", CSTR(settingNTPtimezone));
@@ -147,7 +150,7 @@ void startNTP(){
     DebugTf("DST      : %d\r\n", myTZ.isDST());
   } else { 
     DebugTf("Error setting Timezone: %s\r\n", CSTR(errorString()));
-    settingNTPtimezone = NTP_DEFAULT_TIMEZONE;
+    settingNTPtimezone = "Europe/Amsterdam";
   }
 
   myTZ.setDefault();
