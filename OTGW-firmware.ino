@@ -137,7 +137,6 @@ void startNTP(){
   if (!settingNTPenable) return;
 
   setDebug(NONE); 
-  setServer(CSTR(settingNTPhostname));
 
   if (settingNTPtimezone.length()==0) settingNTPtimezone = "Europe/Amsterdam"; //set back to default timezone
 
@@ -154,6 +153,7 @@ void startNTP(){
   }
 
   myTZ.setDefault();
+  setServer(CSTR(settingNTPhostname));
   updateNTP();        //force NTP sync
   //active wait for sync for 60 seconds
   DECLARE_TIMER_SEC(timeoutNTPsync, 60, CATCH_UP_MISSED_TICKS);
