@@ -102,7 +102,7 @@ void restartWifi(){
   static int iTryRestarts = 0; //So if we have more than 15 restarts, then it's time to reboot
   iTryRestarts++;          //Count the number of attempts
 
-  WiFi.hostname(settingHostname);  //make sure hostname is set
+  WiFi.hostname(settingHostname));  //make sure hostname is set
   if (WiFi.begin()) // if the wifi ssid exist, you can try to connect. 
   {
     //active wait for connections, this can take seconds
