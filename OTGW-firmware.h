@@ -10,7 +10,9 @@
 */
 
 #include <Arduino.h>
-#include <ezTime.h>             // https://github.com/ropg/ezTime
+//#include <ezTime.h>             // https://github.com/ropg/ezTime
+#include <AceTime.h>
+#include <TimeLib.h>
 #include <TelnetStream.h>       // https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
 #include <ArduinoJson.h>        // https://arduinojson.org/
 #include "Wire.h"
@@ -41,10 +43,9 @@ void setLed(int8_t, uint8_t);
 #define _HOSTNAME       "OTGW"
 #define SETTINGS_FILE   "/settings.ini"
 #define NTP_DEFAULT_TIMEZONE "Europe/Amsterdam"
-#define NTP_HOST_DEFAULT "time.google.com"
-
+#define NTP_HOST_DEFAULT "pool.ntp.org"
+#define NTP_RESYNC_TIME 1800 //seconds = every 30 minutes
 #define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"  // Home Assistant discovery prefix
-
 #define CMSG_SIZE 512
 #define JSON_BUFF_MAX   1024
 #define CSTR(x) x.c_str()
@@ -64,8 +65,13 @@ char        fChar[10];
 String      lastReset = "";
 uint32_t    upTimeSeconds = 0;
 uint32_t    rebootCount = 0;
-Timezone    myTZ; 
 String      sMessage = "";    
+
+//Use acetime
+using namespace ace_time;
+static BasicZoneProcessor timeProcessor;
+static const int CACHE_SIZE = 3;
+static BasicZoneManager<CACHE_SIZE> manager(zonedb::kZoneRegistrySize, zonedb::kZoneRegistry);
 
 const char *weekDayName[]  {  "Unknown", "Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag", "Unknown" };
 const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };

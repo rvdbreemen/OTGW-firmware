@@ -52,6 +52,19 @@
 //#include <FS.h>                 // part of ESP8266 Core https://github.com/esp8266/Arduino
 #include <LittleFS.h>
 
+//Use the NTP SDK ESP 8266 
+#include <time.h>
+
+enum NtpStatus_t {
+	TIME_NOTSET,
+	TIME_SYNC,
+	TIME_WAITFORSYNC,
+  TIME_NEEDSYNC
+};
+
+NtpStatus_t NtpStatus = TIME_NOTSET;
+time_t NtpLastSync = 0; //last sync moment in EPOCH seconds
+
 ESP8266WebServer        httpServer (80);
 ESP8266HTTPUpdateServer httpUpdater(true);
 
@@ -164,6 +177,50 @@ void startLLMNR(const char *hostname)
   }
 } // startLLMNR()
 
+
+//====[ startNTP ]===
+void startNTP(){
+  // Initialisation ezTime
+  if (!settingNTPenable) return;
+  if (settingNTPtimezone.length()==0) settingNTPtimezone = NTP_DEFAULT_TIMEZONE; //set back to default timezone
+  if (settingNTPhostname.length()==0) settingNTPhostname = NTP_HOST_DEFAULT; //set back to default timezone
+
+  //void configTime(int timezone_sec, int daylightOffset_sec, const char* server1, const char* server2, const char* server3)
+  configTime(0, 0, CSTR(settingNTPhostname), nullptr, nullptr);
+  NtpStatus = TIME_WAITFORSYNC;
+}
+
+void loopNTP(){
+if (!settingNTPenable) return;
+  switch (NtpStatus){
+    case TIME_NOTSET:
+    case TIME_NEEDSYNC:
+      NtpLastSync = time(nullptr); //remember last sync
+      startNTP();
+      NtpStatus = TIME_WAITFORSYNC;
+    break;
+    case TIME_WAITFORSYNC:
+      if ((time(nullptr)>0) || (time(nullptr) >= NtpLastSync)) { 
+        NtpLastSync = time(nullptr); //remember last sync 
+        auto myTz =  manager.createForZoneName(CSTR(settingNTPtimezone));
+        auto myTime = ZonedDateTime::forUnixSeconds(NtpLastSync, myTz);
+        setTime(myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
+        NtpStatus = TIME_SYNC;
+      } 
+    break;
+    case TIME_SYNC:
+      if ((time(nullptr)-NtpLastSync) > NTP_RESYNC_TIME){
+        //when xx seconds have passed, resync using NTP
+        NtpStatus = TIME_NEEDSYNC;
+      }
+    break;
+  } 
+
+
+ 
+  DECLARE_TIMER_SEC(timerNTPtime, 10, CATCH_UP_MISSED_TICKS);
+  if DUE(timerNTPtime) DebugTf("Epoch Sec (UTC): %d\n\r", time(nullptr)); //timeout, then break out of this loop
+}
 
 String getMacAddress() {
   uint8_t baseMac[6];
