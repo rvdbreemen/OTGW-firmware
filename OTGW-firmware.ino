@@ -131,45 +131,6 @@ void restartWifi(){
   if (iTryRestarts >= 15) doRestart("Too many wifi reconnect attempts");
 }
 
-//====[ startNTP ]===
-void startNTP(){
-  // Initialisation ezTime
-  if (!settingNTPenable) return;
-
-  setDebug(NONE); 
-
-  if (settingNTPtimezone.length()==0) settingNTPtimezone = "Europe/Amsterdam"; //set back to default timezone
-
-  if (myTZ.setLocation(settingNTPtimezone)){
-    DebugTf("Timezone set to: %s\r\n", CSTR(settingNTPtimezone));
-    DebugTf("Olson TZ : %s\r\n", CSTR(myTZ.getOlson()));
-    DebugTf("Posix TZ : %s\r\n", CSTR(myTZ.getPosix()));
-    DebugTf("TZ Name  : %s\r\n", CSTR(myTZ.getTimezoneName()));
-    DebugTf("TX Offset: %d\r\n", myTZ.getOffset());
-    DebugTf("DST      : %d\r\n", myTZ.isDST());
-  } else { 
-    DebugTf("Error setting Timezone: %s\r\n", CSTR(errorString()));
-    settingNTPtimezone = "Europe/Amsterdam";
-  }
-
-  myTZ.setDefault();
-  setServer(CSTR(settingNTPhostname));
-  updateNTP();        //force NTP sync
-  //active wait for sync for 60 seconds
-  DECLARE_TIMER_SEC(timeoutNTPsync, 60, CATCH_UP_MISSED_TICKS);
-  while (timeStatus() == timeNotSet) 
-  {  
-    delay(100);
-    feedWatchDog();  //feeding the dog, while waiting activly
-    if DUE(timeoutNTPsync) break; //timeout, then break out of this loop
-  }
-
-  setDebug(NONE);     //turn off any other debug information
-  
-  DebugTln("UTC time  : "+ UTC.dateTime());
-  DebugTln("local time: "+ myTZ.dateTime());
-}
-
 //===[ blink status led ]===
 void setLed(uint8_t led, uint8_t status){
   pinMode(led, OUTPUT);
@@ -261,7 +222,7 @@ void doBackgroundTasks()
     handleOTGW();                 // OTGW handling
     httpServer.handleClient();
     MDNS.update();
-    events();                     // trigger ezTime update etc  
+    loopNTP();
   } //otherwise, just wait until reconnected gracefully
   delay(1);
 }
