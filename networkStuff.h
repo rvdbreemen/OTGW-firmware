@@ -202,7 +202,14 @@ if (!settingNTPenable) return;
     case TIME_WAITFORSYNC:
       if ((time(nullptr)>0) || (time(nullptr) >= NtpLastSync)) { 
         NtpLastSync = time(nullptr); //remember last sync 
+        
         auto myTz =  manager.createForZoneName(CSTR(settingNTPtimezone));
+        if (myTz.isError()){
+          DebugTf("Error: Timezone Invalid/Not Found: [%s]", CSTR(settingNTPtimezone));
+          settingNTPtimezone = NTP_DEFAULT_TIMEZONE;
+          myTz = manager.createForZoneName(CSTR(settingNTPtimezone)); //try with default Timezone instead
+        }
+        
         auto myTime = ZonedDateTime::forUnixSeconds(NtpLastSync, myTz);
         setTime(myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
         NtpStatus = TIME_SYNC;
