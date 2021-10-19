@@ -196,6 +196,7 @@ if (!settingNTPenable) return;
     case TIME_NOTSET:
     case TIME_NEEDSYNC:
       NtpLastSync = time(nullptr); //remember last sync
+      DebugTln("Start time syncing");
       startNTP();
       NtpStatus = TIME_WAITFORSYNC;
     break;
@@ -203,21 +204,25 @@ if (!settingNTPenable) return;
       if ((time(nullptr)>0) || (time(nullptr) >= NtpLastSync)) { 
         NtpLastSync = time(nullptr); //remember last sync 
         
+        DebugTf("Timezone lookup for [%s]\r\n", CSTR(settingNTPtimezone));
         auto myTz =  manager.createForZoneName(CSTR(settingNTPtimezone));
+        
         if (myTz.isError()){
-          DebugTf("Error: Timezone Invalid/Not Found: [%s]", CSTR(settingNTPtimezone));
+          DebugTf("Error: Timezone Invalid/Not Found: [%s]\r\n", CSTR(settingNTPtimezone));
           settingNTPtimezone = NTP_DEFAULT_TIMEZONE;
           myTz = manager.createForZoneName(CSTR(settingNTPtimezone)); //try with default Timezone instead
-        }
+        } else DebugTln("Timezone lookup: successful");
         
         auto myTime = ZonedDateTime::forUnixSeconds(NtpLastSync, myTz);
         setTime(myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
         NtpStatus = TIME_SYNC;
+        DebugTln("Time synced!");
       } 
     break;
     case TIME_SYNC:
       if ((time(nullptr)-NtpLastSync) > NTP_RESYNC_TIME){
         //when xx seconds have passed, resync using NTP
+         DebugTln("Time resync needed");
         NtpStatus = TIME_NEEDSYNC;
       }
     break;
