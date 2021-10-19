@@ -207,7 +207,7 @@ void updateSetting(const char *field, const char *newValue)
   if (stricmp(field, "NTPenable")==0)      settingNTPenable = EVALBOOLEAN(newValue);
   if (stricmp(field, "NTPhostname")==0)    {
     settingNTPhostname = String(newValue); 
-      startNTP();
+    startNTP();
   }
   if (stricmp(field, "NTPtimezone")==0)    {
     settingNTPtimezone = String(newValue);
