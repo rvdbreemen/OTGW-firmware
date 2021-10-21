@@ -150,20 +150,21 @@ void processAPI()
 void sendOTGWvalue(int msgid){
   StaticJsonDocument<256> doc;
   JsonObject root  = doc.to<JsonObject>();
-  if (OTmap[msgid].type==ot_undef) {  //message is undefined, return error
+  PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
+  if (OTlookupitem.type==ot_undef) {  //message is undefined, return error
     root["error"] = "message undefined: reserved for future use";
   } else if (msgid>= 0 && msgid<= OT_MSGID_MAX) 
   { //message id's need to be between 0 and 127
     //Debug print the values first
-    RESTDebugTf("%s = %s %s\r\n", OTmap[msgid].label, getOTGWValue(msgid).c_str(), OTmap[msgid].unit);
+    RESTDebugTf("%s = %s %s\r\n", OTlookupitem.label, getOTGWValue(msgid).c_str(), OTlookupitem.unit);
     //build the json
-    root["label"] = OTmap[msgid].label;
-    if (OTmap[msgid].type == ot_f88) {
+    root["label"] = OTlookupitem.label;
+    if (OTlookupitem.type == ot_f88) {
       root["value"] = getOTGWValue(msgid).toFloat(); 
     } else {// all other message types convert to integer
       root["value"] = getOTGWValue(msgid).toInt();
     }
-    root["unit"] = OTmap[msgid].unit;    
+    root["unit"] = OTlookupitem.unit;    
   } else {
     root["error"] = "message id: reserved for future use";
   }
@@ -180,25 +181,26 @@ void sendOTGWlabel(const char *msglabel){
   StaticJsonDocument<256> doc;
   JsonObject root  = doc.to<JsonObject>();
   int msgid;
+  PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
   for (msgid = 0; msgid<= OT_MSGID_MAX; msgid++){
-    if (stricmp(OTmap[msgid].label, msglabel)==0) break;
+    if (stricmp(OTlookupitem.label, msglabel)==0) break;
   }
   if (msgid > OT_MSGID_MAX){
     root["error"] = "message id: reserved for future use";
-  } else if (OTmap[msgid].type==ot_undef) {  //message is undefined, return error
+  } else if (OTlookupitem.type==ot_undef) {  //message is undefined, return error
     root["error"] = "message undefined: reserved for future use";
   } else 
   { //message id's need to be between 0 and OT_MSGID_MAX
     //RESTDebug print the values first
-    RESTDebugTf("%s = %s %s\r\n", OTmap[msgid].label, getOTGWValue(msgid).c_str(), OTmap[msgid].unit);
+    RESTDebugTf("%s = %s %s\r\n", OTlookupitem.label, getOTGWValue(msgid).c_str(), OTlookupitem.unit);
     //build the json
-    root["label"] = OTmap[msgid].label;
-    if (OTmap[msgid].type == ot_f88) {
+    root["label"] = OTlookupitem.label;
+    if (OTlookupitem.type == ot_f88) {
       root["value"] = getOTGWValue(msgid).toFloat(); 
     } else {// all other message types convert to integer
       root["value"] = getOTGWValue(msgid).toInt();
     }
-    root["unit"] = OTmap[msgid].unit;    
+    root["unit"] = OTlookupitem.unit;    
   } 
   String sBuff;
   serializeJsonPretty(root, sBuff);
