@@ -281,7 +281,9 @@ enum OpenThermMessageID {
         char* unit;
     };
 
-    OTlookup_t OTmap[] = {
+	OTlookup_t OTlookupitem;
+
+    const OTlookup_t OTmap[] PROGMEM = {
         {   0, OT_READ  , ot_flag8flag8, "Status", "Master and Slave status", "" },
         {   1, OT_WRITE , ot_f88,        "TSet", "Control setpoint", "°C" },
         {   2, OT_WRITE , ot_flag8u8,    "MasterConfigMemberIDcode", "Master Config / Member ID", "" },
