@@ -169,7 +169,7 @@ String initWatchDog() {
   // Code here is based on ESPEasy code, modified to work in the project.
 
   // configure hardware pins according to eeprom settings.
-  OTGWDebugTln("Setup Watchdog");
+  OTGWDebugTln(F("Setup Watchdog"));
   OTGWDebugTln(F("INIT : I2C"));
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);  //configure the I2C bus
   //=============================================
@@ -1039,7 +1039,7 @@ void addOTWGcmdtoqueue(const char* buf, int len){
     if (cmdptr < CMDQUEUE_MAX) {
       cmdptr++; //next free slot
       OTGWDebugTf("CmdQueue: Next free queue slot: [%d]\r\n", cmdptr);
-    } else OTGWDebugTln("CmdQueue: Error: Reached max queue");
+    } else OTGWDebugTln(F("CmdQueue: Error: Reached max queue"));
   } else OTGWDebugTf("CmdQueue: Found command at: [%d] - [%d]\r\n", insertptr, cmdptr);
 }
 
@@ -1446,7 +1446,7 @@ void handleOTGW()
       //check for reset command
       if (stricmp(sWrite, "GW=R")==0){
         //detected [GW=R], then reset the gateway the gpio way
-        OTGWDebugTln("Detected: GW=R. Reset gateway command executed.");
+        OTGWDebugTln(F("Detected: GW=R. Reset gateway command executed."));
         resetOTGW();
       } else if (stricmp(sWrite, "PS=1")==0) {
         //detected [PS=1], then PrintSummary mode = true --> From this point on you need to ask for summary.
@@ -1610,7 +1610,7 @@ void startOTGWstream()
 
 void upgradepicnow(const char *filename) {
   if (OTGWSerial.busy()) return; // if already in programming mode, never call it twice
-  OTGWDebugTln("Start PIC upgrade now.");
+  OTGWDebugTln(F("Start PIC upgrade now."));
   fwupgradestart(filename);  
   while (OTGWSerial.busy()){
     feedWatchDog();
