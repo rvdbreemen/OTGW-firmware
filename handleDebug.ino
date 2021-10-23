@@ -16,44 +16,44 @@ void handleDebug(){
                 Debugln();
                 break;
             case 'q':
-                DebugTln("Read settings");
+                DebugTln(F("Read settings"));
                 readSettings(true);
                 break;
             case 'm':
-                DebugTln("Configure MQTT Discovery");
+                DebugTln(F("Configure MQTT Discovery"));
                 DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
                 doAutoConfigure();
                 break;
             case 'r':   
                 if (WiFi.status() != WL_CONNECTED)
                 {
-                    DebugTln("Reconnecting to wifi");
+                    DebugTln(F("Reconnecting to wifi"));
                     startWiFi(CSTR(settingHostname), 240);
                     //check OTGW and telnet
                     startTelnet();
                     startOTGWstream(); 
-                } else DebugTln("Wifi is connected");
+                } else DebugTln(F("Wifi is connected"));
                     
                 if (!statusMQTTconnection) {
-                    DebugTln("Reconnecting MQTT");
+                    DebugTln(F("Reconnecting MQTT"));
                     startMQTT();
-                } else DebugTln("MQTT is connected");
+                } else DebugTln(F("MQTT is connected"));
                 break;
             case '1':   bDebugOTmsg = !bDebugOTmsg; DebugTf("\r\nDebug OTmsg: %s\r\n", CBOOLEAN(bDebugOTmsg)); break;
             case '2':   bDebugRestAPI = !bDebugRestAPI; DebugTf("\r\nDebug RestAPI: %s\r\n", CBOOLEAN(bDebugRestAPI)); break;
             case '3':   bDebugMQTT = !bDebugMQTT; DebugTf("\r\nDebug MQTT: %s\r\n", CBOOLEAN(bDebugMQTT)); break;
             case 'b':
-                DebugTln("Blink led 1");
+                DebugTln(F("Blink led 1"));
                 // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
                 blinkLED(LED1, 5, 500);
             break;
             case 'i':
-                DebugTln("relay init");
+                DebugTln(F("relay init"));
                 // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
                 initOutputs();
             break;
             case 'u':
-                DebugTln("gpio output on ");
+                DebugTln(F("gpio output on "));
                 // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
                 digitalWrite(settingGPIOOUTPUTSpin, ON);
                 break;
@@ -61,7 +61,7 @@ void handleDebug(){
                 DebugTf("read gpio output state (0== led ON): %d \r\n", digitalRead(settingGPIOOUTPUTSpin));
             break;
             case 'k':
-                DebugTln("read settings");
+                DebugTln(F("read settings"));
                 // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
                 readSettings(true);
             break;
@@ -78,9 +78,9 @@ void handleDebug(){
             case 'f':
                 if(settingMyDEBUG)
                 {
-                    DebugTln("MyDEBUG = true");
+                    DebugTln(F("MyDEBUG = true"));
                 }else{
-                    DebugTln("MyDEBUG = false");
+                    DebugTln(F("MyDEBUG = false"));
                 }
                 // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
                 break;

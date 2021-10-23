@@ -213,7 +213,7 @@ void sendOTGWlabel(const char *msglabel){
 
 void sendTelegraf() 
 {
-  RESTDebugTln("sending OT monitor values to Telegraf...\r");
+  RESTDebugTln(F("sending OT monitor values to Telegraf...\r"));
 
   sendStartJsonArray();
   
@@ -262,7 +262,7 @@ void sendTelegraf()
 
 void sendOTmonitor() 
 {
-  RESTDebugTln("sending OT monitor values ...\r");
+  RESTDebugTln(F("sending OT monitor values ...\r"));
 
   sendStartJsonObj("otmonitor");
 
@@ -402,7 +402,7 @@ void sendDeviceTime()
 //=======================================================================
 void sendDeviceSettings() 
 {
-  RESTDebugTln("sending device settings ...\r");
+  RESTDebugTln(F("sending device settings ...\r"));
 
   sendStartJsonObj("settings");
   
