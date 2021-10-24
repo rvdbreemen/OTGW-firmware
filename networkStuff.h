@@ -123,8 +123,10 @@ void startWiFi(const char* hostname, int timeOut)
     delay(5000);  // Enough time to ensure we don't return.
   }
 
- // WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-  
+  // WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(true);
+
   Debugln();
   DebugT(F("Connected to " )); Debugln(WiFi.SSID());
   DebugT(F("IP address: " ));  Debugln(WiFi.localIP());
@@ -141,9 +143,9 @@ void startWiFi(const char* hostname, int timeOut)
 //===========================================================================================
 void startTelnet() 
 {
-  OTGWSerial.print("\r\nUse  'telnet ");
+  OTGWSerial.print(F("\r\nUse  'telnet "));
   OTGWSerial.print(WiFi.localIP());
-  OTGWSerial.println("' for debugging");
+  OTGWSerial.println(F("' for debugging"));
   TelnetStream.begin();
   DebugTln(F("\nTelnet server started .."));
   TelnetStream.flush();

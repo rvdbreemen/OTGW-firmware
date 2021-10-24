@@ -91,6 +91,8 @@ void setup() {
   setLed(LED1, OFF);
   blinkLED(LED2, 3, 100);
   setLed(LED2, OFF);
+  sendMQTTuptime();
+  sendMQTTversioninfo();
 }
 //=====================================================================
 
@@ -120,6 +122,8 @@ void restartWifi(){
 
   if (WiFi.status() == WL_CONNECTED)
   { //when reconnect, restart some services, just to make sure all works
+    WiFi.setAutoReconnect(true);
+    WiFi.persistent(true);
     startTelnet();
     startOTGWstream(); 
     startMQTT();
@@ -129,6 +133,12 @@ void restartWifi(){
 
   //if all fails, and retry 15 is hit, then reboot esp
   if (iTryRestarts >= 15) doRestart("Too many wifi reconnect attempts");
+}
+
+void sendMQTTuptime(){
+  DebugTf("Uptime seconds: %d\r\n", upTimeSeconds);
+  String sUptime = String(upTimeSeconds);
+  sendMQTTData(F("otgw-firmware/uptime"), sUptime, false);
 }
 
 //===[ blink status led ]===
@@ -196,9 +206,7 @@ void doTaskEvery60s(){
 
 //===[ Do task every 5min ]===
 void do5minevent(){
-  DebugTf("Uptime seconds: %d\r\n", upTimeSeconds);
-  String sUptime = String(upTimeSeconds);
-  sendMQTTData("otgw-firmware/uptime", sUptime, false);
+  sendMQTTuptime();
   sendMQTTversioninfo();
 }
 
