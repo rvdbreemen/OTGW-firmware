@@ -123,8 +123,10 @@ void startWiFi(const char* hostname, int timeOut)
     delay(5000);  // Enough time to ensure we don't return.
   }
 
- // WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-  
+  // WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(true);
+
   Debugln();
   DebugT(F("Connected to " )); Debugln(WiFi.SSID());
   DebugT(F("IP address: " ));  Debugln(WiFi.localIP());
@@ -141,9 +143,9 @@ void startWiFi(const char* hostname, int timeOut)
 //===========================================================================================
 void startTelnet() 
 {
-  OTGWSerial.print("\r\nUse  'telnet ");
+  OTGWSerial.print(F("\r\nUse  'telnet "));
   OTGWSerial.print(WiFi.localIP());
-  OTGWSerial.println("' for debugging");
+  OTGWSerial.println(F("' for debugging"));
   TelnetStream.begin();
   DebugTln(F("\nTelnet server started .."));
   TelnetStream.flush();
@@ -196,7 +198,7 @@ if (!settingNTPenable) return;
     case TIME_NOTSET:
     case TIME_NEEDSYNC:
       NtpLastSync = time(nullptr); //remember last sync
-      DebugTln("Start time syncing");
+      DebugTln(F("Start time syncing"));
       startNTP();
       NtpStatus = TIME_WAITFORSYNC;
     break;
@@ -211,18 +213,18 @@ if (!settingNTPenable) return;
           DebugTf("Error: Timezone Invalid/Not Found: [%s]\r\n", CSTR(settingNTPtimezone));
           settingNTPtimezone = NTP_DEFAULT_TIMEZONE;
           myTz = manager.createForZoneName(CSTR(settingNTPtimezone)); //try with default Timezone instead
-        } else DebugTln("Timezone lookup: successful");
+        } else DebugTln(F("Timezone lookup: successful"));
         
         auto myTime = ZonedDateTime::forUnixSeconds(NtpLastSync, myTz);
         setTime(myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
         NtpStatus = TIME_SYNC;
-        DebugTln("Time synced!");
+        DebugTln(F("Time synced!"));
       } 
     break;
     case TIME_SYNC:
       if ((time(nullptr)-NtpLastSync) > NTP_RESYNC_TIME){
         //when xx seconds have passed, resync using NTP
-         DebugTln("Time resync needed");
+         DebugTln(F("Time resync needed"));
         NtpStatus = TIME_NEEDSYNC;
       }
     break;

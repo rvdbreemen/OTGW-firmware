@@ -56,6 +56,7 @@ void setLed(int8_t, uint8_t);
 #define CBINARY(x) (x?"1":"0")
 #define EVALBOOLEAN(x) (stricmp(x,"true")==0||stricmp(x,"on")==0||stricmp(x,"1")==0)
 
+
 //prototype
 void sendMQTTData(const String, const String, const bool);
 void sendMQTTData(const char*, const char*, const bool);
