@@ -276,12 +276,12 @@ void sendMQTTData(const String topic, const String json, const bool retain = fal
 void sendMQTTData(const char* topic, const char *json, const bool retain = false) 
 {
   if (!settingMQTTenable) return;
-  if (!MQTTclient.connected()) {DebugTln("Error: MQTT broker not connected."); PrintMQTTError(); return;} 
-  if (!isValidIP(MQTTbrokerIP)) {DebugTln("Error: MQTT broker IP not valid."); return;} 
+  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
+  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
   char full_topic[100];
   snprintf(full_topic, sizeof(full_topic), "%s/", CSTR(MQTTPubNamespace));
   strlcat(full_topic, topic, sizeof(full_topic));
-  MQTTDebugTf("Sending MQTT: server [%s]:[%d] => TopicId [%s] --> Message [%s]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort, full_topic, json);
+  MQTTDebugTf("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort, full_topic, json);
   if (!MQTTclient.publish(full_topic, json, retain)) PrintMQTTError();
   feedWatchDog();//feed the dog
 } // sendMQTTData()
@@ -299,9 +299,9 @@ void sendMQTT(String topic, String json){
 void sendMQTT(const char* topic, const char *json, const size_t len) 
 {
   if (!settingMQTTenable) return;
-  if (!MQTTclient.connected()) {DebugTln("Error: MQTT broker not connected."); PrintMQTTError(); return;} 
-  if (!isValidIP(MQTTbrokerIP)) {DebugTln("Error: MQTT broker IP not valid."); return;} 
-  MQTTDebugTf("Sending MQTT: server [%s]:[%d] => TopicId [%s] --> Message [%s]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort, topic, json);
+  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
+  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
+  MQTTDebugTf("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort, topic, json);
   if (MQTTclient.getBufferSize() < len) MQTTclient.setBufferSize(len); //resize buffer when needed
 
   if (MQTTclient.beginPublish(topic, len, true)){
@@ -348,8 +348,8 @@ bool splitString(String sIn, char del, String &cKey, String &cVal)
 //===========================================================================================
 void doAutoConfigure(){
   if (!settingMQTTenable) return;
-  if (!MQTTclient.connected()) {DebugTln("Error: MQTT broker not connected."); return;} 
-  if (!isValidIP(MQTTbrokerIP)) {DebugTln("Error: MQTT broker IP not valid."); return;} 
+  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); return;} 
+  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
   const char *cfgFilename = "/mqttha.cfg";
   String sTopic = "";
   String sMsg = "";
