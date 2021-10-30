@@ -70,6 +70,22 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
     //incoming command to be forwarded to OTGW
     addOTWGcmdtoqueue((char *)payload, length);
   }
+  //detect home assistant going down...
+  char msgPayload[50];
+  strlcpy(msgPayload, (char *)payload, ((length+1<50)?(length+1):(50)));
+  if (stricmp(topic, "homeassistant/status") == 0) {
+    //incoming message on status, detect going down
+    if (stricmp(msgPayload, "offline") == 0){
+      //home assistant went down
+      DebugTln(F("Home Assistant went offline!"));
+    } else if (stricmp(msgPayload, "online") == 0){
+      DebugTln(F("Home Assistant went online!"));
+      //restart stuff, to make sure it works correctly again
+      startMQTT();  // fixing some issues with hanging HA AutoDiscovery in some scenario's?
+    } else {
+      DebugTf("Home Assistant Status=[%s]\r\n", msgPayload); 
+    }
+  }
 }
 
 //===========================================================================================
@@ -155,6 +171,7 @@ void handleMQTT()
           MQTTDebugTf("MQTT: Subscribe TopicId [%s] FAILED! \r\n", topic);
           PrintMQTTError();
         }
+        MQTTclient.subscribe("homeassistant/status"); //start monitoring the status of homeassistant, if it goes down, then force a restart after it comes back online.
         sendMQTTversioninfo();
       }
       else
