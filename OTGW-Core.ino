@@ -487,71 +487,77 @@ uint16_t print_u16()
 
 uint16_t print_status()
 { 
+
   char _flag8_master[8] {0};
   char _flag8_slave[8] {0};
-  
-  //bit: [clear/0, set/1]
-  //  0: CH enable [ CH is disabled, CH is enabled]
-  //  1: DHW enable [ DHW is disabled, DHW is enabled]
-  //  2: Cooling enable [ Cooling is disabled, Cooling is enabled]]
-  //  3: OTC active [OTC not active, OTC is active]
-  //  4: CH2 enable [CH2 is disabled, CH2 is enabled]
-  //  5: Summer/winter mode [Summertime, Wintertime]
-  //  6: DHW blocking [ DHW not blocking, DHW blocking ]
-  //  7: reserved
-  _flag8_master[0] = (((OTdata.valueHB) & 0x01) ? 'C' : '-');
-  _flag8_master[1] = (((OTdata.valueHB) & 0x02) ? 'D' : '-');
-  _flag8_master[2] = (((OTdata.valueHB) & 0x04) ? 'C' : '-'); 
-  _flag8_master[3] = (((OTdata.valueHB) & 0x08) ? 'O' : '-');
-  _flag8_master[4] = (((OTdata.valueHB) & 0x10) ? '2' : '-'); 
-  _flag8_master[5] = (((OTdata.valueHB) & 0x20) ? 'W' : 'S'); 
-  _flag8_master[6] = (((OTdata.valueHB) & 0x40) ? 'B' : '-'); 
-  _flag8_master[7] = (((OTdata.valueHB) & 0x80) ? '.' : '-');
-  _flag8_master[8] = '\0';
 
+  if (OTdata.master==1) {
+    // Parse master bits
+    //bit: [clear/0, set/1]
+    //  0: CH enable [ CH is disabled, CH is enabled]
+    //  1: DHW enable [ DHW is disabled, DHW is enabled]
+    //  2: Cooling enable [ Cooling is disabled, Cooling is enabled]]
+    //  3: OTC active [OTC not active, OTC is active]
+    //  4: CH2 enable [CH2 is disabled, CH2 is enabled]
+    //  5: Summer/winter mode [Summertime, Wintertime]
+    //  6: DHW blocking [ DHW not blocking, DHW blocking ]
+    //  7: reserved
+    _flag8_master[0] = (((OTdata.valueHB) & 0x01) ? 'C' : '-');
+    _flag8_master[1] = (((OTdata.valueHB) & 0x02) ? 'D' : '-');
+    _flag8_master[2] = (((OTdata.valueHB) & 0x04) ? 'C' : '-'); 
+    _flag8_master[3] = (((OTdata.valueHB) & 0x08) ? 'O' : '-');
+    _flag8_master[4] = (((OTdata.valueHB) & 0x10) ? '2' : '-'); 
+    _flag8_master[5] = (((OTdata.valueHB) & 0x20) ? 'W' : 'S'); 
+    _flag8_master[6] = (((OTdata.valueHB) & 0x40) ? 'B' : '-'); 
+    _flag8_master[7] = (((OTdata.valueHB) & 0x80) ? '.' : '-');
+    _flag8_master[8] = '\0';
 
-  PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
-  OTGWDebugf("%-37s = M[%s] \r\n", OTlookupitem.label, _flag8_master);
-  //Master Status
-  sendMQTTData("status_master", _flag8_master);
-  sendMQTTData("ch_enable",             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
-  sendMQTTData("dhw_enable",            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));
-  sendMQTTData("cooling_enable",        (((OTdata.valueHB) & 0x04) ? "ON" : "OFF")); 
-  sendMQTTData("otc_active",            (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));
-  sendMQTTData("ch2_enable",            (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));
-  sendMQTTData("summerwintertime",      (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));
-  sendMQTTData("dhw_blocking",          (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));
-  //Slave
-  //  0: fault indication [ no fault, fault ]
-  //  1: CH mode [CH not active, CH active]
-  //  2: DHW mode [ DHW not active, DHW active]
-  //  3: Flame status [ flame off, flame on ]
-  //  4: Cooling status [ cooling mode not active, cooling mode active ]
-  //  5: CH2 mode [CH2 not active, CH2 active]
-  //  6: diagnostic indication [no diagnostics, diagnostic event]
-  //  7: Electricity production [no eletric production, eletric production]
-  _flag8_slave[0] = (((OTdata.valueLB) & 0x01) ? 'E' : '-');
-  _flag8_slave[1] = (((OTdata.valueLB) & 0x02) ? 'C' : '-'); 
-  _flag8_slave[2] = (((OTdata.valueLB) & 0x04) ? 'W' : '-'); 
-  _flag8_slave[3] = (((OTdata.valueLB) & 0x08) ? 'F' : '-'); 
-  _flag8_slave[4] = (((OTdata.valueLB) & 0x10) ? 'C' : '-'); 
-  _flag8_slave[5] = (((OTdata.valueLB) & 0x20) ? '2' : '-'); 
-  _flag8_slave[6] = (((OTdata.valueLB) & 0x40) ? 'D' : '-'); 
-  _flag8_slave[7] = (((OTdata.valueLB) & 0x80) ? 'P' : '-');
-  _flag8_slave[8] = '\0';
+    PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
+    OTGWDebugf("%-37s = Master Status[%s] \r\n", OTlookupitem.label, _flag8_master);
 
-  OTGWDebugTf("%-37s = S[%s] \r\n", OTlookupitem.label, _flag8_slave);
+    //Master Status
+    sendMQTTData(F("status_master"), _flag8_master);
+    sendMQTTData(F("ch_enable"),             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delayms(50);
+    sendMQTTData(F("dhw_enable"),            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delayms(50);
+    sendMQTTData(F("cooling_enable"),        (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delayms(50); 
+    sendMQTTData(F("otc_active"),            (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delayms(50);
+    sendMQTTData(F("ch2_enable"),            (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  delayms(50);
+    sendMQTTData(F("summerwintertime"),      (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  delayms(50);
+    sendMQTTData(F("dhw_blocking"),          (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));  delayms(50);
+  } else {
+    // Parse slave bits
+    //  0: fault indication [ no fault, fault ]
+    //  1: CH mode [CH not active, CH active]
+    //  2: DHW mode [ DHW not active, DHW active]
+    //  3: Flame status [ flame off, flame on ]
+    //  4: Cooling status [ cooling mode not active, cooling mode active ]
+    //  5: CH2 mode [CH2 not active, CH2 active]
+    //  6: diagnostic indication [no diagnostics, diagnostic event]
+    //  7: Electricity production [no eletric production, eletric production]
+    _flag8_slave[0] = (((OTdata.valueLB) & 0x01) ? 'E' : '-');
+    _flag8_slave[1] = (((OTdata.valueLB) & 0x02) ? 'C' : '-'); 
+    _flag8_slave[2] = (((OTdata.valueLB) & 0x04) ? 'W' : '-'); 
+    _flag8_slave[3] = (((OTdata.valueLB) & 0x08) ? 'F' : '-'); 
+    _flag8_slave[4] = (((OTdata.valueLB) & 0x10) ? 'C' : '-'); 
+    _flag8_slave[5] = (((OTdata.valueLB) & 0x20) ? '2' : '-'); 
+    _flag8_slave[6] = (((OTdata.valueLB) & 0x40) ? 'D' : '-'); 
+    _flag8_slave[7] = (((OTdata.valueLB) & 0x80) ? 'P' : '-');
+    _flag8_slave[8] = '\0';
 
-  //Slave Status
-  sendMQTTData("status_slave", _flag8_slave);
-  sendMQTTData("fault",                 (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  
-  sendMQTTData("centralheating",        (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  
-  sendMQTTData("domestichotwater",      (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));  
-  sendMQTTData("flame",                 (((OTdata.valueLB) & 0x08) ? "ON" : "OFF"));
-  sendMQTTData("cooling",               (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  
-  sendMQTTData("centralheating2",       (((OTdata.valueLB) & 0x20) ? "ON" : "OFF"));
-  sendMQTTData("diagnostic_indicator",  (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));
-  sendMQTTData("eletric_production",    (((OTdata.valueLB) & 0x80) ? "ON" : "OFF"));
+    PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
+    OTGWDebugTf("%-37s = Slave Status [%s] \r\n", OTlookupitem.label, _flag8_slave);
+
+    //Slave Status
+    sendMQTTData(F("status_slave"), _flag8_slave);
+    sendMQTTData(F("fault"),                 (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  delayms(50);  
+    sendMQTTData(F("centralheating"),        (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  delayms(50);  
+    sendMQTTData(F("domestichotwater"),      (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));  delayms(50);  
+    sendMQTTData(F("flame"),                 (((OTdata.valueLB) & 0x08) ? "ON" : "OFF"));  delayms(50);
+    sendMQTTData(F("cooling"),               (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  delayms(50); 
+    sendMQTTData(F("centralheating2"),       (((OTdata.valueLB) & 0x20) ? "ON" : "OFF"));  delayms(50);
+    sendMQTTData(F("diagnostic_indicator"),  (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));  delayms(50);
+    sendMQTTData(F("eletric_production"),    (((OTdata.valueLB) & 0x80) ? "ON" : "OFF"));  delayms(50);
+  }
 
   uint16_t _value = OTdata.u16();
   OTGWDebugTf("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]\r\n", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
@@ -593,62 +599,65 @@ uint16_t print_statusVH()
   char _flag8_master[8] {0};
   char _flag8_slave[8] {0};
 
-  //bit: [clear/0, set/1]
-  // ID70:HB0: Master status ventilation / heat-recovery: Ventilation enable
-  // ID70:HB1: Master status ventilation / heat-recovery: Bypass postion
-  // ID70:HB2: Master status ventilation / heat-recovery: Bypass mode
-  // ID70:HB3: Master status ventilation / heat-recovery: Free ventilation mode
-  //  4: reserved
-  //  5: reserved
-  //  6: reserved
-  //  7: reserved
-  _flag8_master[0] = (((OTdata.valueHB) & 0x01) ? 'V' : '-');
-  _flag8_master[1] = (((OTdata.valueHB) & 0x02) ? 'P' : '-');
-  _flag8_master[2] = (((OTdata.valueHB) & 0x04) ? 'M' : '-'); 
-  _flag8_master[3] = (((OTdata.valueHB) & 0x08) ? 'F' : '-');
-  _flag8_master[4] = (((OTdata.valueHB) & 0x10) ? '.' : '-'); 
-  _flag8_master[5] = (((OTdata.valueHB) & 0x20) ? '.' : '-'); 
-  _flag8_master[6] = (((OTdata.valueHB) & 0x40) ? '.' : '-'); 
-  _flag8_master[7] = (((OTdata.valueHB) & 0x80) ? '.' : '-');
-  _flag8_master[8] = '\0';
+  if (OTdata.master == 1) {
+    // Parse master bits
+    //bit: [clear/0, set/1]
+    // ID70:HB0: Master status ventilation / heat-recovery: Ventilation enable
+    // ID70:HB1: Master status ventilation / heat-recovery: Bypass postion
+    // ID70:HB2: Master status ventilation / heat-recovery: Bypass mode
+    // ID70:HB3: Master status ventilation / heat-recovery: Free ventilation mode
+    //  4: reserved
+    //  5: reserved
+    //  6: reserved
+    //  7: reserved
+    _flag8_master[0] = (((OTdata.valueHB) & 0x01) ? 'V' : '-');
+    _flag8_master[1] = (((OTdata.valueHB) & 0x02) ? 'P' : '-');
+    _flag8_master[2] = (((OTdata.valueHB) & 0x04) ? 'M' : '-'); 
+    _flag8_master[3] = (((OTdata.valueHB) & 0x08) ? 'F' : '-');
+    _flag8_master[4] = (((OTdata.valueHB) & 0x10) ? '.' : '-'); 
+    _flag8_master[5] = (((OTdata.valueHB) & 0x20) ? '.' : '-'); 
+    _flag8_master[6] = (((OTdata.valueHB) & 0x40) ? '.' : '-'); 
+    _flag8_master[7] = (((OTdata.valueHB) & 0x80) ? '.' : '-');
+    _flag8_master[8] = '\0';
 
-  PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
-  OTGWDebugf("%-37s = VH Master [%s] \r\n", OTlookupitem.label, _flag8_master);
-  //Master Status
-  sendMQTTData("status_vh_master", _flag8_master);
-  sendMQTTData("vh_ventilation_enabled",        (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
-  sendMQTTData("vh_bypass_position",            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));
-  sendMQTTData("vh_bypass_mode",                (((OTdata.valueHB) & 0x04) ? "ON" : "OFF")); 
-  sendMQTTData("vh_free_ventlation_mode",       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));
+    PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
+    OTGWDebugf("%-37s = VH Master Status [%s] \r\n", OTlookupitem.label, _flag8_master);
+    //Master Status
+    sendMQTTData(F("status_vh_master"), _flag8_master);
+    sendMQTTData(F("vh_ventilation_enabled"),        (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delayms(50);
+    sendMQTTData(F("vh_bypass_position"),            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delayms(50);
+    sendMQTTData(F("vh_bypass_mode"),                (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delayms(50); 
+    sendMQTTData(F("vh_free_ventlation_mode"),       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delayms(50);
+  } else {
+    // Parse slave bits
+    // ID70:LB0: Slave status ventilation / heat-recovery: Fault indication
+    // ID70:LB1: Slave status ventilation / heat-recovery: Ventilation mode
+    // ID70:LB2: Slave status ventilation / heat-recovery: Bypass status
+    // ID70:LB3: Slave status ventilation / heat-recovery: Bypass automatic status
+    // ID70:LB4: Slave status ventilation / heat-recovery: Free ventilation status
+    // ID70:LB6: Slave status ventilation / heat-recovery: Diagnostic indication
+    _flag8_slave[0] = (((OTdata.valueLB) & 0x01) ? 'F' : '-');
+    _flag8_slave[1] = (((OTdata.valueLB) & 0x02) ? 'V' : '-'); 
+    _flag8_slave[2] = (((OTdata.valueLB) & 0x04) ? 'P' : '-'); 
+    _flag8_slave[3] = (((OTdata.valueLB) & 0x08) ? 'A' : '-'); 
+    _flag8_slave[4] = (((OTdata.valueLB) & 0x10) ? 'F' : '-'); 
+    _flag8_slave[5] = (((OTdata.valueLB) & 0x20) ? '.' : '-');
+    _flag8_slave[6] = (((OTdata.valueLB) & 0x40) ? 'D' : '-'); 
+    _flag8_slave[7] = (((OTdata.valueLB) & 0x80) ? '.' : '-');
+    _flag8_slave[8] = '\0';
 
-  //Slave
-  // ID70:LB0: Slave status ventilation / heat-recovery: Fault indication
-  // ID70:LB1: Slave status ventilation / heat-recovery: Ventilation mode
-  // ID70:LB2: Slave status ventilation / heat-recovery: Bypass status
-  // ID70:LB3: Slave status ventilation / heat-recovery: Bypass automatic status
-  // ID70:LB4: Slave status ventilation / heat-recovery: Free ventilation status
-  // ID70:LB6: Slave status ventilation / heat-recovery: Diagnostic indication
-  _flag8_slave[0] = (((OTdata.valueLB) & 0x01) ? 'F' : '-');
-  _flag8_slave[1] = (((OTdata.valueLB) & 0x02) ? 'V' : '-'); 
-  _flag8_slave[2] = (((OTdata.valueLB) & 0x04) ? 'P' : '-'); 
-  _flag8_slave[3] = (((OTdata.valueLB) & 0x08) ? 'A' : '-'); 
-  _flag8_slave[4] = (((OTdata.valueLB) & 0x10) ? 'F' : '-'); 
-  _flag8_slave[5] = (((OTdata.valueLB) & 0x20) ? '.' : '-');
-  _flag8_slave[6] = (((OTdata.valueLB) & 0x40) ? 'D' : '-'); 
-  _flag8_slave[7] = (((OTdata.valueLB) & 0x80) ? '.' : '-');
-  _flag8_slave[8] = '\0';
+    PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
+    OTGWDebugTf("%-37s = VH Slave Status [%s] \r\n", OTlookupitem.label, _flag8_slave);
 
-  OTGWDebugTf("%-37s = S[%s] \r\n", OTlookupitem.label, _flag8_slave);
-
-  //Slave Status
-  sendMQTTData("status_vh_slave", _flag8_slave);
-  sendMQTTData("vh_fault",                   (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  
-  sendMQTTData("vh_ventlation_mode",         (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  
-  sendMQTTData("vh_bypass_status",           (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));  
-  sendMQTTData("vh_bypass_automatic_status", (((OTdata.valueLB) & 0x08) ? "ON" : "OFF"));
-  sendMQTTData("vh_free_ventliation_status", (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  
-  sendMQTTData("vh_diagnostic_indicator",    (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));
-
+    //Slave Status
+    sendMQTTData(F("status_vh_slave"), _flag8_slave);
+    sendMQTTData(F("vh_fault"),                   (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  delayms(50);  
+    sendMQTTData(F("vh_ventlation_mode"),         (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  delayms(50);  
+    sendMQTTData(F("vh_bypass_status"),           (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));  delayms(50);  
+    sendMQTTData(F("vh_bypass_automatic_status"), (((OTdata.valueLB) & 0x08) ? "ON" : "OFF"));  delayms(50);
+    sendMQTTData(F("vh_free_ventliation_status"), (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  delayms(50);  
+    sendMQTTData(F("vh_diagnostic_indicator"),    (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));  delayms(50);
+  }
 
   uint16_t _value = OTdata.u16();
   OTGWDebugTf("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]\r\n", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
@@ -1246,33 +1255,35 @@ void processOTGW(const char *buf, int len){
     //keep track of update
     msglastupdated[OTdata.id] = now();
 
-    //next step interpret the OT protocol
-    if (static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_ACK || static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_DATA) {
+    //Read information from this OT message ready for use...
+    PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
 
+//   enum OpenThermMessageType {
+// 	/*  Master to Slave */
+// 	OT_READ_DATA       = B000,
+// 	OT_WRITE_DATA      = B001,
+// 	OT_INVALID_DATA    = B010,
+// 	OT_RESERVED        = B011,
+// 	/* Slave to Master */
+// 	OT_READ_ACK        = B100,
+// 	OT_WRITE_ACK       = B101,
+// 	OT_DATA_INVALID    = B110,
+// 	OT_UNKNOWN_DATA_ID = B111
+// };
+
+
+    //next step interpret the OT protocol
+    //On READ_DATA or READ_ACK, check to see if OTid message is actually
+    if ((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_DATA) && ((OTlookupitem.msg == OT_READ) || (OTlookupitem.msg == OT_RW))    ||
+        (static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_DATA) && ((OTlookupitem.msg == OT_WRITE) || (OTlookupitem.msg == OT_RW))  ||
+        (static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_ACK) && ((OTlookupitem.msg == OT_READ) || (OTlookupitem.msg == OT_RW))     ||
+        (static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_DATA) && ((OTlookupitem.msg == OT_WRITE) || (OTlookupitem.msg == OT_RW))  ) {
+        
       //#define OTprint(data, value, text, format) ({ data= value; OTGWDebugf("[%37s]", text); OTGWDebugf("= [format]", data)})
       //interpret values f8.8
 
-      // dynamisch parsen... todo...
-      // char _msg[15] {0};
-      // char _buf[120] {0};
-      // strlcpy(_buf, OTmap[OTdata.id).label, sizeof(_buf));
-      // switch(static_cast<OTtype_t>(OTmap[OTdata.id).type){
-      //   case ot_f88: strcat(_buf, dtostrf(round(OTdata.f88()*100.0) / 100.0, 3, 2, _msg)); break;
-      //   case ot_s16: strcat(_buf, itoa(_value, _msg, 10)); break;
-      //   case ot_s8s8: 
-      //   case ot_u16:
-      //   case ot_u8u8:
-      //   case ot_flag8:
-      //   case ot_flag8flag8:
-      //   case ot_special:
-      //   case ot_flag8u8:
-      //   case ot_u8:
-      //   case ot_undef:
-      //   default: 
-      // }
-
       switch (static_cast<OpenThermMessageID>(OTdata.id)) {   
-        case OT_Statusflags:                   if (OTdata.master==1) OTdataObject.Statusflags = print_status(); break;
+        case OT_Statusflags:                   OTdataObject.Statusflags = print_status(); break;
         case OT_TSet:                          OTdataObject.TSet = print_f88(); break;         
         case OT_CoolingControl:                OTdataObject.CoolingControl = print_f88(); break;
         case OT_TsetCH2:                       OTdataObject.TsetCH2 = print_f88(); break;
