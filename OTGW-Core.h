@@ -24,6 +24,8 @@ TelnetStreamClass OTGWstream(OTGW_SERIAL_PORT);
 
 typedef struct {
 	uint16_t 	Statusflags = 0; // flag8 / flag8  Master and Slave Status flags. 
+	uint8_t 	MasterStatus = 0; 
+	uint8_t 	SlaveStatus = 0;
 	float 		TSet = 0.0; // f8.8  Control setpoint  ie CH  water temperature setpoint (°C)
 	uint16_t	MasterConfigMemberIDcode = 0; 	// flag8 / u8  Master Configuration Flags /  Master MemberID Code 
 	uint16_t	SlaveConfigMemberIDcode = 0; // flag8 / u8  Slave Configuration Flags /  Slave MemberID Code 
@@ -80,7 +82,9 @@ typedef struct {
 	uint16_t 	CumulativElectricityProduction = 0; // u16 Cumulativ Electricity production
 	
 	//Solar Storage
-	uint16_t 	SolarStorageMaster = 0;
+	uint16_t 	SolarStorageStatus = 0;
+	uint8_t 	SolarMasterStatus = 0;
+	uint8_t 	SolarSlaveStatus = 0;	
 	uint16_t	SolarStorageASFflags = 0;
 	uint16_t	SolarStorageSlaveConfigMemberIDcode = 0;
 	uint16_t	SolarStorageVersionType = 0;
@@ -91,6 +95,8 @@ typedef struct {
 
 	//Ventilation/HeatRecovery Msgids
 	uint16_t	StatusVH = 0;
+	uint8_t 	MasterStatusVH = 0;
+	uint8_t 	SlaveStatusVH = 0;
 	uint16_t	ControlSetpointVH = 0;  //should be uint8_t
 	uint16_t	ASFFaultCodeVH = 0;
 	uint16_t	DiagnosticCodeVH = 0;
