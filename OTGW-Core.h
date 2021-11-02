@@ -463,7 +463,7 @@ enum OpenThermStatus {
  * Use f88(), u16() or s16() functions to get appropriate value of data packet according to id of message.
  */
 struct OpenthermData {
-  byte master; //1=master, 0=slave
+  byte masterslave; //0=master, 1=slave
   byte type;
   byte id;
   byte valueHB;
