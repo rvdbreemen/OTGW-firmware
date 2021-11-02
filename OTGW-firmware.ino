@@ -141,6 +141,29 @@ void sendMQTTuptime(){
   sendMQTTData(F("otgw-firmware/uptime"), sUptime, false);
 }
 
+void sendtimecommand(){
+  //send time / weekday
+  char msg[15]={0};
+  sprintf(msg,"SC=%d:%02d/%d", hour(), minute(), dayOfWeek(now()));
+  addOTWGcmdtoqueue(msg, strlen(msg));
+
+  static int lastDay = 0;
+  if (day(now())!=lastDay){
+    //Send msg id 21: month, day
+    lastDay = day(now());
+    sprintf(msg,"SR=21:%d,%d", month(now()), day(now()));
+    addOTWGcmdtoqueue(msg, strlen(msg));  
+  }
+  
+  static int lastYear = 0;
+  if (year(now())!=lastYear){
+    lastYear = year(now());
+    //Send msg id 22: HB of Year, LB of Year 
+    sprintf(msg,"SR=22:%d,%d", (lastYear >> 8) && 0xFF, lastYear && 0xFF);
+    addOTWGcmdtoqueue(msg, strlen(msg));
+  }
+}
+
 //===[ blink status led ]===
 void setLed(uint8_t led, uint8_t status){
   pinMode(led, OUTPUT);
@@ -202,6 +225,7 @@ void doTaskEvery60s(){
   //== do tasks ==
   //if no wifi, try reconnecting (once a minute)
   if (WiFi.status() != WL_CONNECTED) restartWifi();
+  sendtimecommand();
 }
 
 //===[ Do task every 5min ]===

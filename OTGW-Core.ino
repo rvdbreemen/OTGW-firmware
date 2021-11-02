@@ -491,7 +491,7 @@ uint16_t print_status()
   char _flag8_master[8] {0};
   char _flag8_slave[8] {0};
   
-  if (OTdata.master==1) {
+  if (OTdata.masterslave == 0) {
     // Parse master bits
     //bit: [clear/0, set/1]
     //  0: CH enable [ CH is disabled, CH is enabled]
@@ -526,7 +526,7 @@ uint16_t print_status()
     sendMQTTData(F("dhw_blocking"),          (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));  delayms(50);
 
     OTdataObject.MasterStatus = OTdata.valueHB;
-  } else {
+    } else {
     // Parse slave bits
     //  0: fault indication [ no fault, fault ]
     //  1: CH mode [CH not active, CH active]
@@ -562,7 +562,7 @@ uint16_t print_status()
 
     OTdataObject.SlaveStatus = OTdata.valueLB;
   }
-  
+
   uint16_t _value = OTdata.u16();
   OTGWDebugTf("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]\r\n", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
   return _value;
@@ -573,15 +573,14 @@ uint16_t print_solar_storage_status()
   char _msg[15] {0};
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
 
-  if (OTdata.master==1) {
+  if (OTdata.masterslave == 0) {
     // Master Solar Storage 
     // ID101:HB012: Master Solar Storage: Solar mode
     uint8_t MasterSolarMode = (OTdata.valueHB) & 0x7;
     OTGWDebugf("%s = Solar Storage Master Mode [%d] \r\n", OTlookupitem.label, MasterSolarMode);
     sendMQTTData(F("solar_storage_master_mode"), itoa(MasterSolarMode, _msg, 10));  delayms(50);
     OTdataObject.SolarMasterStatus = OTdata.valueHB;
-  } else 
-  {
+  } else { 
     //Slave
     // ID101:LB0: Slave Solar Storage: Fault indication
     uint8_t SlaveSolarFaultIndicator =  (OTdata.valueLB) & 0x01;
@@ -596,7 +595,7 @@ uint16_t print_solar_storage_status()
     sendMQTTData(F("solar_storage_mode_status"), itoa(SlaveSolarModeStatus, _msg, 10));  delayms(50);
     sendMQTTData(F("solar_storage_slave_status"), itoa(SlaveSolarStatus, _msg, 10));  delayms(50);
     OTdataObject.SolarSlaveStatus = OTdata.valueLB;
- } 
+  }
   uint16_t _value = OTdata.u16();
   OTGWDebugTf("Solar Storage Master / Slave Mode u16 [%04x] _value [%04x] hb [%02x] lb [%02x]\r\n", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
   return _value;
@@ -607,7 +606,8 @@ uint16_t print_statusVH()
   char _flag8_master[8] {0};
   char _flag8_slave[8] {0};
 
-  if (OTdata.master == 1) {
+  if (OTdata.masterslave == 0){
+      
     // Parse master bits
     //bit: [clear/0, set/1]
     // ID70:HB0: Master status ventilation / heat-recovery: Ventilation enable
@@ -638,7 +638,7 @@ uint16_t print_statusVH()
     sendMQTTData(F("vh_free_ventlation_mode"),       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delayms(50);
 
     OTdataObject.MasterStatusVH = OTdata.valueLB;
-  } else {
+    } else {
     // Parse slave bits
     // ID70:LB0: Slave status ventilation / heat-recovery: Fault indication
     // ID70:LB1: Slave status ventilation / heat-recovery: Ventilation mode
@@ -1008,6 +1008,7 @@ uint16_t print_daytime()
 #define OTGW_CMD_RETRY 5
 #define OTGW_CMD_INTERVAL_MS 5000
 #define OTGW_DELAY_SEND_MS 1000
+#define MAX_QUEUE_MSGSIZE 127
 /*
   addOTWGcmdtoqueue adds a command to the queue. 
   First it checks the queue, if the command is in the queue, it's updated.
@@ -1070,7 +1071,7 @@ void addOTWGcmdtoqueue(const char* buf, int len){
   If retry max is reached the cmd is delete from the queue
 */
 void handleOTGWqueue(){
-  OTGWDebugTf("CmdQueue: Commands in queue [%d]\r\n", (int)cmdptr);
+  // OTGWDebugTf("CmdQueue: Commands in queue [%d]\r\n", (int)cmdptr);
   for (int i = 0; i<cmdptr; i++) {
     OTGWDebugTf("CmdQueue: Checking due in queue slot[%d]:[%lu]=>[%lu]\r\n", (int)i, (unsigned long)millis(), (unsigned long)cmdqueue[i].due);
     if (millis() >= cmdqueue[i].due) {
@@ -1121,7 +1122,7 @@ void checkOTGWcmdqueue(const char *buf, int len){
   char cmd[3]; memset( cmd, 0, sizeof(cmd));
   char value[11]; memset( value, 0, sizeof(value));
   memcpy(cmd, buf, 2);
-  memcpy(value, buf+3, len-3);
+  memcpy(value, buf+3, (len-3<sizeof(value)-1)?(len-3):(sizeof(value)-1));
   for (int i=0; i<cmdptr; i++){
       OTGWDebugTf("CmdQueue: Checking [%2s]==>[%d]:[%s] from queue\r\n", cmd, i, cmdqueue[i].cmd); 
     if (strstr(cmdqueue[i].cmd, cmd)){
@@ -1216,27 +1217,22 @@ void processOTGW(const char *buf, int len){
     // sendMQTTData(F("otmsg_count"), itoa(cntOTmessagesprocessed, _msg, 10)); 
 
     // source of otmsg
-    OTdata.master = 0;
     if (buf[0]=='B')
     {
       OTGWDebugT("Boiler           ");
       epochBoilerlastseen = now(); 
-      OTdata.master = 0; 
     } else if (buf[0]=='T')
     {
       OTGWDebugT("Thermostat       ");
       epochThermostatlastseen = now();
-      OTdata.master = 1; 
     } else if (buf[0]=='R')
     {
       OTGWDebugT("Request Boiler   ");
       epochBoilerlastseen = now();
-      OTdata.master = 0;  
     } else if (buf[0]=='A')
     {
       OTGWDebugT("Answer Themostat ");
       epochThermostatlastseen = now();
-      OTdata.master = 1; 
     } else if (buf[0]=='E')
     {
       OTGWDebugT("Parity error     ");
@@ -1270,10 +1266,11 @@ void processOTGW(const char *buf, int len){
     //Debugf("value=[%08x]", value);
 
     //split 32bit value into the relevant OT protocol parts
-    OTdata.type = (value >> 28) & 0x7;         // byte 1 = take 3 bits that define msg msgType
-    OTdata.id = (value >> 16) & 0xFF;          // byte 2 = message id 8 bits 
-    OTdata.valueHB = (value >> 8) & 0xFF;      // byte 3 = high byte
-    OTdata.valueLB = value & 0xFF;             // byte 4 = low byte
+    OTdata.type = (value >> 28) & 0x7;                // byte 1 = take 3 bits that define msg msgType
+    OTdata.masterslave = (OTdata.type >> 2) & 0x1;    // MSB from type --> 0 = master and 1 = slave
+    OTdata.id = (value >> 16) & 0xFF;                 // byte 2 = message id 8 bits 
+    OTdata.valueHB = (value >> 8) & 0xFF;             // byte 3 = high byte
+    OTdata.valueLB = value & 0xFF;                    // byte 4 = low byte
 
     //print message frame
     //OTGWDebugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
@@ -1290,26 +1287,14 @@ void processOTGW(const char *buf, int len){
     //Read information from this OT message ready for use...
     PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
 
-//   enum OpenThermMessageType {
-// 	/*  Master to Slave */
-// 	OT_READ_DATA       = B000,
-// 	OT_WRITE_DATA      = B001,
-// 	OT_INVALID_DATA    = B010,
-// 	OT_RESERVED        = B011,
-// 	/* Slave to Master */
-// 	OT_READ_ACK        = B100,
-// 	OT_WRITE_ACK       = B101,
-// 	OT_DATA_INVALID    = B110,
-// 	OT_UNKNOWN_DATA_ID = B111
-// };
-
-
     //next step interpret the OT protocol
-    //On READ_DATA or READ_ACK, check to see if OTid message is actually
-    if ((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_DATA) && ((OTlookupitem.msg == OT_READ) || (OTlookupitem.msg == OT_RW))    ||
-        (static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_DATA) && ((OTlookupitem.msg == OT_WRITE) || (OTlookupitem.msg == OT_RW))  ||
-        (static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_ACK) && ((OTlookupitem.msg == OT_READ) || (OTlookupitem.msg == OT_RW))     ||
-        (static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_DATA) && ((OTlookupitem.msg == OT_WRITE) || (OTlookupitem.msg == OT_RW))  ) {
+    //On OT_WRITE_ACK or READ_ACK, or, status msgid's, then parse. 
+
+    if ((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_ACK)   && ((OTlookupitem.msg == OT_READ)  || (OTlookupitem.msg == OT_RW))  ||
+        (static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_ACK)  && ((OTlookupitem.msg == OT_WRITE) || (OTlookupitem.msg == OT_RW))  ||
+        (static_cast<OpenThermMessageID>(OTdata.id) == OT_Statusflags) ||
+        (static_cast<OpenThermMessageID>(OTdata.id) == OT_StatusVH) ||
+        (static_cast<OpenThermMessageID>(OTdata.id) == OT_SolarStorageMaster)) {
         
       //#define OTprint(data, value, text, format) ({ data= value; OTGWDebugf("[%37s]", text); OTGWDebugf("= [format]", data)})
       //interpret values f8.8
@@ -1369,7 +1354,7 @@ void processOTGW(const char *buf, int len){
         case OT_DHWBurnerOperationHours:       OTdataObject.DHWBurnerOperationHours = print_u16(); break; 
         case OT_MasterVersion:                 OTdataObject.MasterVersion = print_u8u8(); break; 
         case OT_SlaveVersion:                  OTdataObject.SlaveVersion = print_u8u8(); break;
-        case OT_StatusVH:                      OTdataObject.StatusVH = print_flag8flag8(); break;
+        case OT_StatusVH:                      OTdataObject.StatusVH = print_statusVH(); break;
 		    case OT_ControlSetpointVH:             OTdataObject.ControlSetpointVH = print_u8u8(); break;
         case OT_ASFFaultCodeVH:                OTdataObject.ASFFaultCodeVH = print_flag8u8(); break;
 		    case OT_DiagnosticCodeVH:              OTdataObject.DiagnosticCodeVH = print_u16(); break;
@@ -1482,8 +1467,8 @@ void handleOTGW()
     }
     OTGWSerial.write(outByte);        // write to serial port
     OTGWSerial.flush();               // wait for write to serial
-    if (outByte == '\n')
-    { //on newline, do something...
+    if (outByte == '\r')
+    { //on CR, do something...
       sWrite[bytes_write] = 0;
       OTGWDebugTf("Net2Ser: Sending to OTGW: [%s] (%d)\r\n", sWrite, bytes_write);
       //check for reset command
@@ -1505,9 +1490,9 @@ void handleOTGW()
         sMessage = "";
       }
       bytes_write = 0; //start next line
-    } else if  (outByte == '\r')
+    } else if  (outByte == '\n')
     {
-      // skip LF
+      // on LF, skip 
     } 
     else 
     {
@@ -1521,16 +1506,16 @@ void handleOTGW()
   {
     inByte = OTGWSerial.read();   // read from serial port
     OTGWstream.write(inByte); // write to port 25238
-    if (inByte== '\n')
-    { //line terminator, continue to process incoming message
+    if (inByte== '\r')
+    { //on CR, continue to process incoming message
       sRead[bytes_read] = 0;
       blinkLEDnow(LED2);
       processOTGW(sRead, bytes_read);
       bytes_read = 0;
       break; // to continue processing incoming message
     } 
-    else if (inByte == '\r')
-    { // just ignore LF... 
+    else if (inByte == '\n')
+    { // on LF, just ignore... 
     } 
     else
     {
