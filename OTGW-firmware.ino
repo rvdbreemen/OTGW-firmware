@@ -142,6 +142,9 @@ void sendMQTTuptime(){
 }
 
 void sendtimecommand(){
+  if (!settingNTPenable) return;        // if NTP is disabled, then return
+  if (NtpStatus != TIME_SYNC) return;   // only send time command when time is synced
+  //send time command to OTGW
   //send time / weekday
   char msg[15]={0};
   sprintf(msg,"SC=%d:%02d/%d", hour(), minute(), dayOfWeek(now()));
