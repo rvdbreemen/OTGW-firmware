@@ -486,8 +486,7 @@ uint16_t print_u16()
 }
 
 uint16_t print_status()
-{ 
-
+{
   char _flag8_master[8] {0};
   char _flag8_slave[8] {0};
   
