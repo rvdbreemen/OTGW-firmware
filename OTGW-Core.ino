@@ -1237,9 +1237,6 @@ void processOTGW(const char *buf, int len){
       OTGWDebugT("Parity error     ");
     } 
 
-    //print OTmessage to debug
-    OTGWDebugf("%s ", buf);
-
     //If the Boiler or Thermostat messages have not been seen for 30 seconds, then set the state to false. 
     bOTGWboilerstate = (now() < (epochBoilerlastseen+30));  
     if (bOTGWboilerstate != bOTGWboilerpreviousstate) {
@@ -1261,8 +1258,15 @@ void processOTGW(const char *buf, int len){
     }
 
     const char *bufval = buf + 1;
-    uint32_t value = strtoul(bufval, NULL, 16);
-    //Debugf("value=[%08x]", value);
+    //uint32_t value = strtoul(bufval, NULL, 16);
+    uint32_t value = 0;
+    sscanf(bufval, "%8x", &value);
+
+    //print OTmessage to debug
+    char otmsg[15]={0};
+    memcpy(otmsg, buf, len);
+    OTGWDebugf("%s (%d)", otmsg, len);
+    OTGWDebugf("[%08x]", value);
 
     //split 32bit value into the relevant OT protocol parts
     OTdata.type = (value >> 28) & 0x7;                // byte 1 = take 3 bits that define msg msgType
