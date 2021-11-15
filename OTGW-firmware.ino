@@ -148,22 +148,22 @@ void sendtimecommand(){
   //send time / weekday
   char msg[15]={0};
   sprintf(msg,"SC=%d:%02d/%d", hour(), minute(), dayOfWeek(now()));
-  addOTWGcmdtoqueue(msg, strlen(msg));
+  addOTWGcmdtoqueue(msg, strlen(msg), true);
 
   static int lastDay = 0;
   if (day(now())!=lastDay){
     //Send msg id 21: month, day
     lastDay = day(now());
     sprintf(msg,"SR=21:%d,%d", month(now()), day(now()));
-    addOTWGcmdtoqueue(msg, strlen(msg));  
+    addOTWGcmdtoqueue(msg, strlen(msg), true);  
   }
   
   static int lastYear = 0;
   if (year(now())!=lastYear){
     lastYear = year(now());
     //Send msg id 22: HB of Year, LB of Year 
-    sprintf(msg,"SR=22:%d,%d", (lastYear >> 8) && 0xFF, lastYear && 0xFF);
-    addOTWGcmdtoqueue(msg, strlen(msg));
+    sprintf(msg,"SR=22:%d,%d", (lastYear >> 8) & 0xFF, lastYear & 0xFF);
+    addOTWGcmdtoqueue(msg, strlen(msg), true);
   }
 }
 
