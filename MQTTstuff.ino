@@ -72,7 +72,8 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   }
   //detect home assistant going down...
   char msgPayload[50];
-  strlcpy(msgPayload, (char *)payload, ((length+1<50)?(length+1):(50)));
+  int msglen = min((int)(length)+1, (int)sizeof(msgPayload));
+  strlcpy(msgPayload, (char *)payload, msglen);
   if (stricmp(topic, "homeassistant/status") == 0) {
     //incoming message on status, detect going down
     if (stricmp(msgPayload, "offline") == 0){
