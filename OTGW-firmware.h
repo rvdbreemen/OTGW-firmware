@@ -60,6 +60,7 @@ void setLed(int8_t, uint8_t);
 //prototype
 void sendMQTTData(const String, const String, const bool);
 void sendMQTTData(const char*, const char*, const bool);
+void addOTWGcmdtoqueue(const char* ,  int , const bool);
 
 //Global variables
 WiFiClient  wifiClient;

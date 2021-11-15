@@ -1013,7 +1013,7 @@ uint16_t print_daytime()
   First it checks the queue, if the command is in the queue, it's updated.
   Otherwise it's simply added to the queue, unless there are no free queue slots.
 */
-void addOTWGcmdtoqueue(const char* buf, int len){
+void addOTWGcmdtoqueue(const char* buf, const int len, const bool force = false){
   if ((len < 3) || (buf[2] != '=')){ 
     //no valid command of less then 2 bytes
     OTGWDebugT("CmdQueue: Error:Not a valid command=[");
@@ -1026,17 +1026,18 @@ void addOTWGcmdtoqueue(const char* buf, int len){
   //check to see if the cmd is in queue
   bool foundcmd = false;
   int8_t insertptr = cmdptr; //set insertprt to next empty slot
-  char cmd[2]; memset( cmd, 0, sizeof(cmd));
-  memcpy(cmd, buf, 2);
-  for (int i=0; i<cmdptr; i++){
-    if (strstr(cmdqueue[i].cmd, cmd)) {
-      //found cmd exists, set the inertptr to found slot
-      foundcmd = true;
-      insertptr = i;
-      break;
-    }
+  if (!force){
+    char cmd[2]; memset( cmd, 0, sizeof(cmd));
+    memcpy(cmd, buf, 2);
+    for (int i=0; i<cmdptr; i++){
+      if (strstr(cmdqueue[i].cmd, cmd)) {
+        //found cmd exists, set the inertptr to found slot
+        foundcmd = true;
+        insertptr = i;
+        break;
+      }
+    } 
   } 
-
   if (foundcmd) OTGWDebugTf("CmdQueue: Found cmd exists in slot [%d]\r\n", insertptr);
   else OTGWDebugTf("CmdQueue: Adding cmd end of queue, slot [%d]\r\n", insertptr);
 
@@ -1047,10 +1048,12 @@ void addOTWGcmdtoqueue(const char* buf, int len){
     OTGWDebug((char)buf[i]);
   }
   OTGWDebugf("] (%d)\r\n", len); 
-  memset(cmdqueue[insertptr].cmd, 0, sizeof(cmdqueue[insertptr].cmd));
-  if (len>=sizeof(cmdqueue[insertptr].cmd)) len = sizeof(cmdqueue[insertptr].cmd)-1; //never longer than the buffer
-  memcpy(cmdqueue[insertptr].cmd, buf, len);
-  cmdqueue[insertptr].cmdlen = len;
+
+  //copy the command into the queue
+  int cmdlen = min((int)len , (int)(sizeof(cmdqueue[insertptr].cmd)-1));
+  memset(cmdqueue[insertptr].cmd, 0, cmdlen+1);
+  memcpy(cmdqueue[insertptr].cmd, buf, cmdlen);
+  cmdqueue[insertptr].cmdlen = cmdlen;
   cmdqueue[insertptr].retrycnt = 0;
   cmdqueue[insertptr].due = millis() + OTGW_DELAY_SEND_MS; //due right away
 

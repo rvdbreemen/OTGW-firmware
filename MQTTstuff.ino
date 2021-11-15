@@ -68,7 +68,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   if (stricmp(topic, subscribeTopic) == 0) 
   {
     //incoming command to be forwarded to OTGW
-    addOTWGcmdtoqueue((char *)payload, length);
+    addOTWGcmdtoqueue((char *)payload, length, false);
   }
   //detect home assistant going down...
   char msgPayload[50];
