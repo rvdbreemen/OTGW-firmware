@@ -43,14 +43,11 @@ void setup() {
   
   OTGWSerial.println(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   OTGWSerial.printf("Booting....[%s]\r\n\r\n", String(_FW_VERSION).c_str());
-  rebootCount = updateRebootCount();
   WatchDogEnabled(0); // turn off watchdog
 
   //setup randomseed the right way
   randomSeed(RANDOM_REG32); //This is 8266 HWRNG used to seed the Random PRNG: Read more: https://config9.com/arduino/getting-a-truly-random-number-in-arduino/
-  lastReset = ESP.getResetReason();
-  OTGWSerial.printf("Last reset reason: [%s]\r\n", CSTR(ESP.getResetReason()));
-
+ 
   //setup the status LED
   setLed(LED1, ON);
   setLed(LED2, ON);
@@ -75,6 +72,12 @@ void setup() {
   startNTP();
   setupFSexplorer();
   startWebserver();
+
+  lastReset = ESP.getResetReason();
+  OTGWSerial.printf("Last reset reason: [%s]\r\n", CSTR(ESP.getResetReason()));
+  rebootCount = updateRebootCount();
+  updateRebootLog(ESP.getResetReason());
+ 
   OTGWSerial.println(F("Setup finished!\r\n"));
   // After resetting the OTGW PIC never send anything to Serial for debug
   // and switch to telnet port 23 for debug purposed. 
