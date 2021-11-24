@@ -77,7 +77,7 @@ static BasicZoneProcessor timeProcessor;
 static const int CACHE_SIZE = 3;
 static BasicZoneManager<CACHE_SIZE> manager(zonedb::kZoneRegistrySize, zonedb::kZoneRegistry);
 
-const char *weekDayName[]  {  "Unknown", "Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag", "Unknown" };
+const char *weekDayName[]  {  "Unknown", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Unknown" };
 const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
 
 //Information on OTGW 

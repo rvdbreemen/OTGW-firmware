@@ -722,7 +722,7 @@
    ,[ "otgwcommands",               "OTGW Boot Command"]
    ,[ "thermostatconnected",        "Thermostate connected"]
    ,[ "boilerconnected",            "Boiler connected"]
-   ,[ "picconnected",               "Pic connected"]
+   ,[ "picconnected",               "OTGW online/offline"]
    ,[ "gpiooutputsenabled",         "GPIO Output Enabled"]
    ,[ "gpiooutputspin",             "GPIO pin # to switch on/off"]
    ,[ "gpiooutputstriggerbit",      "Bit X (master/slave) to trigger on (0-15)"]
