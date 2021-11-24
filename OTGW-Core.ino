@@ -980,7 +980,7 @@ uint16_t print_date()
 uint16_t print_daytime()
 {
   //function to print data
-  const char *dayOfWeekName[]  { "Unknown", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag", "Zondag", "Unknown" };
+  const char *dayOfWeekName[]  { "Unknown", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Unknown" };
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = %s - %2d:%2d\r\n", OTlookupitem.label, dayOfWeekName[(OTdata.valueHB >> 5) & 0x7], (OTdata.valueHB & 0x1F), OTdata.valueLB); 
   //Build string for MQTT

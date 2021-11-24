@@ -362,7 +362,7 @@ void sendDeviceInfo()
 #ifdef ARDUINO_ESP8266_WEMOS_D1MINI
      "WEMOS_D1MINI"
 #else 
-  "Unkown board"
+  "Unknown board"
 #endif
 
   );
