@@ -122,8 +122,9 @@ void restartWifi(){
 
   if (WiFi.status() == WL_CONNECTED)
   { //when reconnect, restart some services, just to make sure all works
-    WiFi.setAutoReconnect(true);
-    WiFi.persistent(true);
+    // Turn off ESP reconnect, to make sure that's not the issue (16/11/2021)
+    // WiFi.setAutoReconnect(true);   
+    // WiFi.persistent(true);
     startTelnet();
     startOTGWstream(); 
     startMQTT();
