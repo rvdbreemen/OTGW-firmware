@@ -347,22 +347,18 @@ void sendDeviceInfo()
   FlashMode_t ideMode = ESP.getFlashChipMode();
   sendNestedJsonObj("flashchipmode", flashMode[ideMode]);
   sendNestedJsonObj("boardtype",
-#ifdef ARDUINO_ESP8266_NODEMCU
+#if defined(ARDUINO_ESP8266_NODEMCU)
      "ESP8266_NODEMCU"
-#endif
-#ifdef ARDUINO_ESP8266_GENERIC
+#elif defined(ARDUINO_ESP8266_GENERIC)
      "ESP8266_GENERIC"
-#endif
-#ifdef ESP8266_ESP01
+#elif defined(ESP8266_ESP01)
      "ESP8266_ESP01"
-#endif
-#ifdef ESP8266_ESP12
+#elif defined(ESP8266_ESP12)
      "ESP8266_ESP12"
-#endif
-#ifdef ARDUINO_ESP8266_WEMOS_D1MINI
+#elif defined(ARDUINO_ESP8266_WEMOS_D1MINI)
      "WEMOS_D1MINI"
 #else 
-  "Unknown board"
+     "Unknown board"
 #endif
 
   );

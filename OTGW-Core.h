@@ -500,6 +500,91 @@ struct OpenthermData {
   void s16(int16_t value);
 };
 
+
+//** Moet ik nog iets mee? Of niet...**//
+
+// array set learn {
+  //     LA PR=L LB PR=L LC PR=L LD PR=L LE PR=L LF PR=L GA PR=G GB PR=G
+  //     VR PR=V GW PR=M IT PR=T SB PR=S HW PR=W
+  // }
+
+	// BoilerWaterTemperature	boilertemp	d
+	// BoilerWaterTemperature2	boilertemp2	d
+	// CHEnable		chenable	b
+	// CH2Enable		ch2enable	b
+	// CHSetpoint		chsetpoint	d
+	// CentralHeating		chmode		b
+	// CentralHeating2		ch2mode		b
+	// ControlSetpoint		controlsp	d
+	// ControlSetpoint2	controlsp2	d
+	// DHWEnable		dhwenable	b
+	// DHWSetpoint		dhwsetpoint	d
+	// DHWTemperature		dhwtemp		d
+	// DHWTemperature2		dhwtemp2	d
+	// Fault			fault		b
+	// Flame			flame		b
+	// HotWater		dhwmode		b
+	// Modulation		modulation	d
+	// OutsideTemperature	outside		d
+	// ReturnWaterTemperature	returntemp	d
+	// RoomTemperature		roomtemp	d
+	// RoomTemperature2	roomtemp2	d
+	// Setpoint		setpoint	d
+	// Setpoint2		setpoint2	d
+
+    // airpresfault	"Air pressure fault"
+    // boilertemp		"Boiler water temperature"
+    // boilertemp2		"Boiler water temperature 2"
+    // exhausttemp		"Boiler exhaust temperature"
+    // ch2enable		"Central heating 2 enable"
+    // ch2mode		"Central heating 2 mode"
+    // chenable		"Central heating enable"
+    // chmode		"Central heating mode"
+    // chwsetpoint		"Central heating setpoint"
+    // chbh		"CH burner hours"
+    // chbs		"CH burner starts"
+    // chph		"CH pump hours"
+    // chps		"CH pump starts"
+    // pressure		"CH water pressure"
+    // controlsp		"Control setpoint"
+    // controlsp2		"Control setpoint 2"
+    // coolingenable	"Cooling enable"
+    // coolingstatus	"Cooling status"
+    // diag		"Diagnostic indication"
+    // dhwbh		"DHW burner hours"
+    // dhwbs		"DHW burner starts"
+    // dhwflowrate		"DHW flow rate"
+    // dhwph		"DHW pump hours"
+    // dhwps		"DHW pump starts"
+    // dhwenable		"Domestic hot water enable"
+    // dhwmode		"Domestic hot water mode"
+    // dhwsetpoint		"Domestic hot water setpoint"
+    // dhwtemp		"Domestic hot water temp"
+    // dhwtemp2		"Domestic hot water temp 2"
+    // fault		"Fault indication"
+    // flame		"Flame"
+    // flamefault		"Gas/flame fault"
+    // lockoutreset	"Lockout-reset"
+    // lowpressure		"Low water pressure"
+    // maxmod		"Max rel modulation level"
+    // modulation		"Modulation"
+    // faultcode		"OEM fault/error code"
+    // otcstate		"Outside temp compensation"
+    // outside		"Outside temperature"
+    // override    	"Rem override room setpoint"
+    // returntemp		"Return water temperature"
+    // setpoint		"Room setpoint"
+    // setpoint2		"Room setpoint 2"
+    // roomtemp		"Room temperature"
+    // roomtemp2		"Room temperature 2"
+    // service		"Service request"
+    // timestamp		"Time stamp"
+    // overtemp		"Water over-temperature"
+
+
+
+
+
 #endif
 
 
