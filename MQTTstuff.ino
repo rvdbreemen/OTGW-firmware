@@ -19,23 +19,70 @@
 
 // Declare some variables within global scope
 
-  static IPAddress  MQTTbrokerIP;
-  static char       MQTTbrokerIPchar[20];
-  
-  #include <PubSubClient.h>           // MQTT client publish and subscribe functionality
+static IPAddress  MQTTbrokerIP;
+static char       MQTTbrokerIPchar[20];
 
-  static            PubSubClient MQTTclient(wifiClient);
+#include <PubSubClient.h>           // MQTT client publish and subscribe functionality
 
-  int8_t            reconnectAttempts = 0;
-  char              lastMQTTtimestamp[15] = "";
+static            PubSubClient MQTTclient(wifiClient);
 
-  enum states_of_MQTT { MQTT_STATE_INIT, MQTT_STATE_TRY_TO_CONNECT, MQTT_STATE_IS_CONNECTED, MQTT_STATE_WAIT_CONNECTION_ATTEMPT, MQTT_STATE_WAIT_FOR_RECONNECT, MQTT_STATE_ERROR };
-  enum states_of_MQTT stateMQTT = MQTT_STATE_INIT;
+int8_t            reconnectAttempts = 0;
+char              lastMQTTtimestamp[15] = "";
 
-  String            MQTTclientId;
-  String            MQTTPubNamespace = "";
-  String            MQTTSubNamespace = "";
-  String            NodeId = "";
+enum states_of_MQTT { MQTT_STATE_INIT, MQTT_STATE_TRY_TO_CONNECT, MQTT_STATE_IS_CONNECTED, MQTT_STATE_WAIT_CONNECTION_ATTEMPT, MQTT_STATE_WAIT_FOR_RECONNECT, MQTT_STATE_ERROR };
+enum states_of_MQTT stateMQTT = MQTT_STATE_INIT;
+
+String            MQTTclientId;
+String            MQTTPubNamespace = "";
+String            MQTTSubNamespace = "";
+String            NodeId = "";
+
+//set command list
+struct MQTT_set_cmd_t
+{
+    char* setcmd;
+    char* otgwcmd;
+    char* ottype;
+};
+
+
+const MQTT_set_cmd_t setcmds[] {
+  {   "command", "", "raw" },
+  {   "setpoint", "TT", "temp" },
+  {   "constant", "TC", "temp" },
+  {   "outside", "OT", "temp" },
+  {   "hotwater", "HW", "on" },
+  {   "gatewaymode", "GW", "on" },
+  {   "setback", "SB", "temp" },
+  {   "maxchsetpt", "SH", "temp" },
+  {   "maxdhwsetpt", "SW", "temp" },
+  {   "maxmodulation", "MM", "level" },        
+  {   "ctrlsetpt", "CS", "temp" },        
+  {   "ctrlsetpt2", "C2", "temp" },        
+  {   "chenable", "CH", "on" },        
+  {   "chenable2", "H2", "on" },        
+  {   "ventsetpt", "VS", "level" },
+  {   "temperaturesensor", "TS", "function" },
+  {   "addalternative", "AA", "function" },
+  {   "delalternative", "DA", "function" },
+  {   "unknownid", "UI", "function" },
+  {   "knownid", "KI", "function" },
+  {   "priomsg", "PM", "function" },
+  {   "setresponse", "SR", "function" },
+  {   "clearrespons", "CR", "function" },
+  {   "resetcounter", "RS", "function" },
+  {   "ignoretransitations", "IT", "function" },
+  {   "overridehb", "OH", "function" },
+  {   "forcethermostat", "FT", "function" },
+  {   "voltageref", "VR", "function" },
+  {   "debugptr", "DP", "function" },
+} ;
+
+const int nrcmds = sizeof(setcmds) / sizeof(setcmds[0]);
+
+// const char learnmsg[] { "LA", "PR=L", "LB", "PR=L", "LC", "PR=L", "LD", "PR=L", "LE", "PR=L", "LF", "PR=L", "GA", "PR=G", "GB", "PR=G", "VR", "PR=V", "GW", "PR=M", "IT", "PR=T", "SB", "PR=S", "HW", "PR=W" } ;
+// const int nrlearnmsg = sizeof(learnmsg) / sizeof(learnmsg[0]);
+
 //===========================================================================================
 void startMQTT() 
 {
@@ -60,16 +107,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
     }
     Debug("] ("); Debug(length); Debug(")"); Debugln();
   }  
-  char subscribeTopic[100];
-  // naming convention <mqtt top>/set/<node id>/<command>
-  snprintf(subscribeTopic, sizeof(subscribeTopic), "%s/", MQTTSubNamespace.c_str());
-  strlcat(subscribeTopic, OTGW_COMMAND_TOPIC, sizeof(subscribeTopic));
-  //what is the incoming message?  
-  if (stricmp(topic, subscribeTopic) == 0) 
-  {
-    //incoming command to be forwarded to OTGW
-    addOTWGcmdtoqueue((char *)payload, length, false);
-  }
+
   //detect home assistant going down...
   char msgPayload[50];
   int msglen = min((int)(length)+1, (int)sizeof(msgPayload));
@@ -85,6 +123,52 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
       startMQTT();  // fixing some issues with hanging HA AutoDiscovery in some scenario's?
     } else {
       DebugTf("Home Assistant Status=[%s]\r\n", msgPayload); 
+    }
+  }
+
+  // parse the incoming topic and execute commands
+  char* token;
+  char otgwcmd[20]={0};
+  // naming convention <mqtt top>/set/<node id>/<command>
+  token = strtok(topic, "/"); 
+  MQTTDebugT("Parsing topic: ");
+  MQTTDebugf("%s/", token);
+  if (stricmp(token, CSTR(settingMQTTtopTopic)) == 0) {
+    token = strtok(NULL, "/"); 
+    MQTTDebugf("%s/", token);
+    if (stricmp(token, "set") == 0) {
+      token = strtok(NULL, "/");
+      MQTTDebugf("%s/", token); 
+      if (stricmp(token, CSTR(NodeId)) == 0) {
+        token = strtok(NULL, "/");
+        MQTTDebugf("%s", token);
+        if (token != NULL){
+          //loop thru command list
+          int i;
+          for (i=0; i<nrcmds; i++){
+            if (stricmp(token, setcmds[i].setcmd) == 0){
+              //found a match
+              if (setcmds[i].ottype == "raw"){
+                //raw command
+                snprintf(otgwcmd, sizeof(otgwcmd), "%s", msgPayload);
+                MQTTDebugf(" found command, sending payload [%s]\r\n", otgwcmd);
+                addOTWGcmdtoqueue((char *)otgwcmd, strlen(otgwcmd), true);
+              } else {
+                //all other commands are <otgwcmd>=<payload message> 
+                snprintf(otgwcmd, sizeof(otgwcmd), "%s=%s", setcmds[i].otgwcmd, msgPayload);
+                MQTTDebugf(" found command, sending payload [%s]\r\n", otgwcmd);
+                addOTWGcmdtoqueue((char *)otgwcmd, strlen(otgwcmd), true);
+              }
+              break; //exit loop
+            } 
+          }
+          if (i >= nrcmds){
+            //no match found
+            MQTTDebugln();
+            MQTTDebugTf("No match found for command: [%s]\r\n", token);
+          }
+        }
+      }
     }
   }
 }
