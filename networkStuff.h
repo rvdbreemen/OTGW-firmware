@@ -203,6 +203,7 @@ if (!settingNTPenable) return;
       NtpStatus = TIME_WAITFORSYNC;
     break;
     case TIME_WAITFORSYNC:
+    
       if ((time(nullptr)>0) || (time(nullptr) >= NtpLastSync)) { 
         NtpLastSync = time(nullptr); //remember last sync 
         
@@ -216,9 +217,14 @@ if (!settingNTPenable) return;
         } else DebugTln(F("Timezone lookup: successful"));
         
         auto myTime = ZonedDateTime::forUnixSeconds(NtpLastSync, myTz);
-        setTime(myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
-        NtpStatus = TIME_SYNC;
-        DebugTln(F("Time synced!"));
+        if (myTime.isError()) {
+          DebugTln("Error: Time not set correctly, wait for sync");
+
+        } else {
+          setTime(myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
+          NtpStatus = TIME_SYNC;
+          DebugTln(F("Time synced!"));
+        }
       } 
     break;
     case TIME_SYNC:
