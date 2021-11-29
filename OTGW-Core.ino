@@ -96,6 +96,8 @@ void checkOTWGpicforupdate(){
   String latest = checkforupdatepic("gateway.hex");
   if (!bOTGWonline) {
     sMessage = sPICfwversion; 
+  } else if (latest.isEmpty() || sPICfwversion.isEmpty()) {
+    sMessage = ""; //two options: no internet connection OR no firmware version
   } else if (latest != sPICfwversion) {
     sMessage = "New PIC version " + latest + " available!";
   }
@@ -1707,7 +1709,7 @@ String checkforupdatepic(String filename){
     latest = http.header(1);
     OTGWDebugTf("Update %s -> %s\r\n", filename.c_str(), latest.c_str());
     http.end();
-  }
+  } else OTGWDebugln("Failed to fetch version from Schelte Bron website");
   return latest; 
 }
 
