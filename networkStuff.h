@@ -218,8 +218,8 @@ if (!settingNTPenable) return;
         
         auto myTime = ZonedDateTime::forUnixSeconds(NtpLastSync, myTz);
         if (myTime.isError()) {
+          NtpStatus = TIME_NEEDSYNC;
           DebugTln("Error: Time not set correctly, wait for sync");
-
         } else {
           setTime(myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
           NtpStatus = TIME_SYNC;
