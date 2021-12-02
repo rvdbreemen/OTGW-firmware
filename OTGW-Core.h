@@ -299,7 +299,7 @@ enum OpenThermMessageID {
 		{   6, OT_READ  , ot_flag8u8,    "RBPflags", "Remote-parameter flags", "" },
 		{   7, OT_WRITE , ot_f88,        "CoolingControl", "Cooling control signal", "%" },
 		{   8, OT_WRITE , ot_f88,        "TsetCH2", "Control setpoint for 2e CH circuit", "°C" },
-		{   9, OT_READ  , ot_f88,        "TrOverride", "Remote override room setpoint", "°C" },
+		{   9, OT_READ  , ot_f88,        "TrOverride", "Remote override room setpoint", "" },
 		{  10, OT_READ  , ot_u8u8,       "TSP", "Number of TSPs", "" },
 		{  11, OT_RW    , ot_u8u8,       "TSPindexTSPvalue", "Index number / Value of referred-to transparent slave parameter", "" },
 		{  12, OT_READ  , ot_u8u8,       "FHBsize", "Size of Fault-History-Buffer supported by slave", "" },
