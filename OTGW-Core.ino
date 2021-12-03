@@ -435,7 +435,7 @@ void print_f88(float& value)
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = %s %s\r\n", OTlookupitem.label, _msg , OTlookupitem.unit);
   //SendMQTT
-  if (!((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_DATA) && (OTdata.u16() == 0))) {
+  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
     value = _value;
   }
@@ -452,7 +452,7 @@ void print_s16(int16_t& value)
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = %s %s\r\n", OTlookupitem.label, _msg, OTlookupitem.unit);
   //SendMQTT
-  if (!((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_DATA) && (OTdata.u16() == 0))) {
+  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
     value = _value;
   }
@@ -469,7 +469,7 @@ void print_s8s8(uint16_t& value)
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_value_hb", sizeof(_topic));
   OTGWDebugf("%s = %s %s\r\n", OTlookupitem.label, _msg, OTlookupitem.unit);
-  if (!((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_DATA) && (OTdata.u16() == 0))) {
+  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
     sendMQTTData(_topic, _msg);
   }
   //Build string for MQTT
@@ -477,7 +477,7 @@ void print_s8s8(uint16_t& value)
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_value_lb", sizeof(_topic));
   OTGWDebugf("%s = %s %s\r\n", OTlookupitem.label, _msg, OTlookupitem.unit);
-  if (!((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_DATA) && (OTdata.u16() == 0))) {
+  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
     sendMQTTData(_topic, _msg);
     value = OTdata.u16();
   }
@@ -492,7 +492,7 @@ void print_u16(uint16_t& value)
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = %s %s\r\n", OTlookupitem.label, _msg, OTlookupitem.unit);
   //SendMQTT
-  if (!((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_DATA) && (OTdata.u16() == 0))) {
+  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
     value = _value;
   }
@@ -846,7 +846,7 @@ void print_flag8u8(uint16_t& value)
   //flag8 value
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_flag8", sizeof(_topic));
-  if (!((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_DATA) && (OTdata.u16() == 0))) {
+  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
     sendMQTTData(_topic, byte_to_binary(OTdata.valueHB));
   }
   //u8 value
@@ -854,7 +854,7 @@ void print_flag8u8(uint16_t& value)
   utoa(OTdata.valueLB, _msg, 10);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_code", sizeof(_topic));
-  if (!((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_DATA) && (OTdata.u16() == 0))) {
+  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
     sendMQTTData(_topic, _msg);
     value = OTdata.u16();
   }
@@ -870,11 +870,12 @@ void print_flag8(uint16_t& value)
   //flag8 value
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_flag8", sizeof(_topic));
-  if (!((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_DATA) && (OTdata.u16() == 0))) {
+  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
     sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
     value = OTdata.u16();
   }
 }
+
 
 void print_flag8flag8(uint16_t& value)
 { 
@@ -885,14 +886,14 @@ void print_flag8flag8(uint16_t& value)
   OTGWDebugf("%s = HB flag8[%s] -[%3d]\r\n", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueHB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_hb_flag8", sizeof(_topic));
-  if (!((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_DATA) && (OTdata.u16() == 0))) {
+  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
     sendMQTTData(_topic, byte_to_binary(OTdata.valueHB));
   }
   //flag8 valueLB
   OTGWDebugf("%s = LB flag8[%s] - [%3d]\r\n", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_lb_flag8", sizeof(_topic));
-  if (!((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_DATA) && (OTdata.u16() == 0))) {
+  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
     sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
     value = OTdata.u16();
   }
@@ -967,7 +968,7 @@ void print_u8u8(uint16_t& value)
   OTGWDebugf("%s = HB u8[%s] [%3d]\r\n", OTlookupitem.label, _msg, OTdata.valueHB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_hb_u8", sizeof(_topic));
-  if (!((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_DATA) && (OTdata.u16() == 0))) {
+  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
     sendMQTTData(_topic, _msg);
   }
   //flag8 valueLB
@@ -975,7 +976,7 @@ void print_u8u8(uint16_t& value)
   OTGWDebugf("%s = LB u8[%s] [%3d]\r\n", OTlookupitem.label, _msg, OTdata.valueLB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_lb_u8", sizeof(_topic));
-  if (!((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_DATA) && (OTdata.u16() == 0))) {
+  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
     sendMQTTData(_topic, _msg);
     value = OTdata.u16();
   }
@@ -1309,10 +1310,12 @@ void processOTGW(const char *buf, int len){
     OTdata.valueLB = value & 0xFF;                    // byte 4 = low byte
     OTdata.time = millis();
 
-    if (cntOTmessagesprocessed<=1) {
+    static bool override = true;
+    if (override) {
       //just store current message and delay processing
       delayedOTdata = OTdata;       //store current msg
-      OTGWDebugln("first msg delayed!");
+      OTGWDebugln("delaying message!");
+      override = false;
     } else {
       //delay buffer message to override if needed
       if (((OTdata.rsptype == OTGW_REQUEST_BOILER) && (delayedOTdata.rsptype == OTGW_BOILER)) ||
@@ -1320,6 +1323,7 @@ void processOTGW(const char *buf, int len){
           ((OTdata.time - delayedOTdata.time) < 500) ) { 
             OTGWDebugln(" override ");	
             delayedOTdata = OTdata;      //override delayed message
+            override = true;
       } 
     
       tmpOTdata = delayedOTdata;    //fetch delayed msg
