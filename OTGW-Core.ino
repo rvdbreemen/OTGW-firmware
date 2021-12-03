@@ -1350,7 +1350,7 @@ void processOTGW(const char *buf, int len){
         case OT_RelModLevel:                   print_f88(OTdataObject.RelModLevel); break;
         case OT_CHPressure:                    print_f88(OTdataObject.CHPressure); break;
         case OT_DHWFlowRate:                   print_f88(OTdataObject.DHWFlowRate); break;
-        case OT_Tr:                            print_f88(OTdataObject.DHWFlowRate); break;  
+        case OT_Tr:                            print_f88(OTdataObject.Tr); break;  
         case OT_Tboiler:                       print_f88(OTdataObject.Tboiler);break;
         case OT_Tdhw:                          print_f88(OTdataObject.Tdhw); break;
         case OT_Toutside:                      print_f88(OTdataObject.Toutside); break;
