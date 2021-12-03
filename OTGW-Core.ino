@@ -60,7 +60,7 @@ const char *hexheaders[] = {
 /* --- Endf of macro's --- */
 
 //some variable's
-OpenthermData OTdata;
+OpenthermData OTdata, delayedOTdata, tmpOTdata;
 
 #define OTGW_BANNER "OpenTherm Gateway"
 
@@ -1238,29 +1238,33 @@ void processOTGW(const char *buf, int len){
     //OT protocol messages are 9 chars long
     if (settingMQTTOTmessage) sendMQTTData(F("otmessage"), buf);
 
-    //counter of number of OT messages processed
-    // static int32_t cntOTmessagesprocessed = 0;
-    // cntOTmessagesprocessed++;
+    // counter of number of OT messages processed
+    static int32_t cntOTmessagesprocessed = 0;
+    cntOTmessagesprocessed++;
     // char _msg[15] {0};
     // sendMQTTData(F("otmsg_count"), itoa(cntOTmessagesprocessed, _msg, 10)); 
 
     // source of otmsg
     if (buf[0]=='B')
     {
-      OTGWDebugT("Boiler           ");
+      OTGWDebugT("Boiler            ");
       epochBoilerlastseen = now(); 
+      OTdata.rsptype = OTGW_BOILER;
     } else if (buf[0]=='T')
     {
-      OTGWDebugT("Thermostat       ");
+      OTGWDebugT("Thermostat        ");
       epochThermostatlastseen = now();
+      OTdata.rsptype = OTGW_THERMOSTAT;
     } else if (buf[0]=='R')
     {
-      OTGWDebugT("Request Boiler   ");
+      OTGWDebugT("Request Boiler    ");
       epochBoilerlastseen = now();
+      OTdata.rsptype = OTGW_REQUEST_BOILER;
     } else if (buf[0]=='A')
     {
-      OTGWDebugT("Answer Themostat ");
+      OTGWDebugT("Answer Thermostat ");
       epochThermostatlastseen = now();
+      OTdata.rsptype = OTGW_ANSWER_THERMOSTAT;
     } else if (buf[0]=='E')
     {
       OTGWDebugT("Parity error     ");
@@ -1303,144 +1307,167 @@ void processOTGW(const char *buf, int len){
     OTdata.id = (value >> 16) & 0xFF;                 // byte 2 = message id 8 bits 
     OTdata.valueHB = (value >> 8) & 0xFF;             // byte 3 = high byte
     OTdata.valueLB = value & 0xFF;                    // byte 4 = low byte
+    OTdata.time = millis();
 
-    //print message frame
-    //OTGWDebugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
-    //print message Type and ID
-    OTGWDebugf("[MsgID=%3d]", OTdata.id);
-    OTGWDebugf("[%-16s]", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
-    OTGWDebugf("[%-30s]", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
-    // OTGWDebugf("[M=%d]",OTdata.master);
-    OTGWDebug("\t");
+    if (cntOTmessagesprocessed<=1) {
+      //just store current message and delay processing
+      delayedOTdata = OTdata;       //store current msg
+      OTGWDebugln("first msg delayed!");
+    } else {
+      //delay buffer message to override if needed
+      if (((OTdata.rsptype == OTGW_REQUEST_BOILER) && (delayedOTdata.rsptype == OTGW_BOILER)) ||
+          ((OTdata.rsptype == OTGW_ANSWER_THERMOSTAT) && (delayedOTdata.rsptype == OTGW_THERMOSTAT)) &&
+          ((OTdata.time - delayedOTdata.time) < 500) ) { 
+            OTGWDebugln(" override ");	
+            delayedOTdata = OTdata;      //override delayed message
+      } 
+    
+      tmpOTdata = delayedOTdata;    //fetch delayed msg
+      delayedOTdata = OTdata;       //store current msg
+      OTdata = tmpOTdata;           //then process delayed msg
 
-    //keep track of update
-    msglastupdated[OTdata.id] = now();
+      //print message frame
+      //OTGWDebugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
+      //print message Type and ID
+      OTGWDebugf("[MsgID=%3d]", OTdata.id);
+      OTGWDebugf("[%-16s]", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
+      OTGWDebugf("[%-30s]", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
+      // OTGWDebugf("[M=%d]",OTdata.master);
+      OTGWDebug("\t");
 
-    //Read information from this OT message ready for use...
-    PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
+      //keep track of update
+      msglastupdated[OTdata.id] = now();
 
-    //next step interpret the OT protocol
-    //On OT_WRITE_ACK or READ_ACK, or, status msgid's, then parse. 
+      //Read information from this OT message ready for use...
+      PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
 
-    // if ((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_ACK)   && ((OTlookupitem.msg == OT_READ)  || (OTlookupitem.msg == OT_RW))  ||
-    //     (static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_ACK)  && ((OTlookupitem.msg == OT_WRITE) || (OTlookupitem.msg == OT_RW))  ||
-    //     (static_cast<OpenThermMessageID>(OTdata.id) == OT_Statusflags) ||
-    //     (static_cast<OpenThermMessageID>(OTdata.id) == OT_StatusVH) ||
-    //     (static_cast<OpenThermMessageID>(OTdata.id) == OT_SolarStorageMaster)) {
+      //next step interpret the OT protocol
+      //On OT_WRITE_ACK or READ_ACK, or, status msgid's, then parse. 
 
-    // if ((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_ACK)   && ((OTlookupitem.msg == OT_READ)  || (OTlookupitem.msg == OT_RW))  ||
-    //     (static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_ACK)  && ((OTlookupitem.msg == OT_WRITE) || (OTlookupitem.msg == OT_RW))  ||
-    //     (static_cast<OpenThermMessageID>(OTdata.id) == OT_Statusflags) ||
-    //     (static_cast<OpenThermMessageID>(OTdata.id) == OT_StatusVH) ||
-    //     (static_cast<OpenThermMessageID>(OTdata.id) == OT_SolarStorageMaster))
-    // {
-        
-      //#define OTprint(data, value, text, format) ({ data= value; OTGWDebugf("[%37s]", text); OTGWDebugf("= [format]", data)})
-      //interpret values f8.8
+      // if ((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_ACK)   && ((OTlookupitem.msg == OT_READ)  || (OTlookupitem.msg == OT_RW))  ||
+      //     (static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_ACK)  && ((OTlookupitem.msg == OT_WRITE) || (OTlookupitem.msg == OT_RW))  ||
+      //     (static_cast<OpenThermMessageID>(OTdata.id) == OT_Statusflags) ||
+      //     (static_cast<OpenThermMessageID>(OTdata.id) == OT_StatusVH) ||
+      //     (static_cast<OpenThermMessageID>(OTdata.id) == OT_SolarStorageMaster)) {
 
-      switch (static_cast<OpenThermMessageID>(OTdata.id)) {   
-        case OT_Statusflags:                   print_status(OTdataObject.Statusflags); break;
-        case OT_TSet:                          print_f88(OTdataObject.TSet); break;         
-        case OT_CoolingControl:                print_f88(OTdataObject.CoolingControl); break;
-        case OT_TsetCH2:                       print_f88(OTdataObject.TsetCH2); break;
-        case OT_TrOverride:                    print_f88(OTdataObject.TrOverride); break;        
-        case OT_MaxRelModLevelSetting:         print_f88(OTdataObject.MaxRelModLevelSetting); break;
-        case OT_TrSet:                         print_f88(OTdataObject.TrSet); break;
-        case OT_TrSetCH2:                      print_f88(OTdataObject.TrSetCH2); break;
-        case OT_RelModLevel:                   print_f88(OTdataObject.RelModLevel); break;
-        case OT_CHPressure:                    print_f88(OTdataObject.CHPressure); break;
-        case OT_DHWFlowRate:                   print_f88(OTdataObject.DHWFlowRate); break;
-        case OT_Tr:                            print_f88(OTdataObject.Tr); break;  
-        case OT_Tboiler:                       print_f88(OTdataObject.Tboiler);break;
-        case OT_Tdhw:                          print_f88(OTdataObject.Tdhw); break;
-        case OT_Toutside:                      print_f88(OTdataObject.Toutside); break;
-        case OT_Tret:                          print_f88(OTdataObject.Tret); break;
-        case OT_Tsolarstorage:                 print_f88(OTdataObject.Tsolarstorage); break;
-        case OT_Tsolarcollector:               print_s16(OTdataObject.Tsolarcollector); break;
-        case OT_TflowCH2:                      print_f88(OTdataObject.TflowCH2); break;          
-        case OT_Tdhw2:                         print_f88(OTdataObject.Tdhw2 ); break;
-        case OT_Texhaust:                      print_s16(OTdataObject.Texhaust); break; 
-        case OT_TdhwSet:                       print_f88(OTdataObject.TdhwSet); break;
-        case OT_MaxTSet:                       print_f88(OTdataObject.MaxTSet); break;
-        case OT_Hcratio:                       print_f88(OTdataObject.Hcratio ); break;
-        case OT_OpenThermVersionMaster:        print_f88(OTdataObject.OpenThermVersionMaster); break;
-        case OT_OpenThermVersionSlave:         print_f88(OTdataObject.OpenThermVersionSlave); break;
-        case OT_ASFflags:                      print_ASFflags(OTdataObject.ASFflags); break;
-        case OT_MasterConfigMemberIDcode:      print_mastermemberid(OTdataObject.MasterConfigMemberIDcode); break; 
-        case OT_SlaveConfigMemberIDcode:       print_slavememberid(OTdataObject.SlaveConfigMemberIDcode); break;   
-        case OT_Command:                       print_command(OTdataObject.Command );  break; 
-        case OT_RBPflags:                      print_RBPflags(OTdataObject.RBPflags); break; 
-        case OT_TSP:                           print_u8u8(OTdataObject.TSP); break; 
-        case OT_TSPindexTSPvalue:              print_u8u8(OTdataObject.TSPindexTSPvalue); break; 
-        case OT_FHBsize:                       print_u8u8(OTdataObject.FHBsize); break;  
-        case OT_FHBindexFHBvalue:              print_u8u8(OTdataObject.FHBindexFHBvalue); break; 
-        case OT_MaxCapacityMinModLevel:        print_u8u8(OTdataObject.MaxCapacityMinModLevel); break; 
-        case OT_DayTime:                       print_daytime(OTdataObject.DayTime); break; 
-        case OT_Date:                          print_date(OTdataObject.Date); break; 
-        case OT_Year:                          print_u16(OTdataObject.Year); break; 
-        case OT_TdhwSetUBTdhwSetLB:            print_s8s8(OTdataObject.TdhwSetUBTdhwSetLB ); break;  
-        case OT_MaxTSetUBMaxTSetLB:            print_s8s8(OTdataObject.MaxTSetUBMaxTSetLB); break;  
-        case OT_HcratioUBHcratioLB:            print_s8s8(OTdataObject.HcratioUBHcratioLB); break;  
-        case OT_RemoteOverrideFunction:        print_flag8(OTdataObject.RemoteOverrideFunction); break;
-        case OT_OEMDiagnosticCode:             print_u16(OTdataObject.OEMDiagnosticCode); break;
-        case OT_BurnerStarts:                  print_u16(OTdataObject.BurnerStarts); break; 
-        case OT_CHPumpStarts:                  print_u16(OTdataObject.CHPumpStarts); break; 
-        case OT_DHWPumpValveStarts:            print_u16(OTdataObject.DHWPumpValveStarts); break; 
-        case OT_DHWBurnerStarts:               print_u16(OTdataObject.DHWBurnerStarts); break;
-        case OT_BurnerOperationHours:          print_u16(OTdataObject.BurnerOperationHours); break;
-        case OT_CHPumpOperationHours:          print_u16(OTdataObject.CHPumpOperationHours); break; 
-        case OT_DHWPumpValveOperationHours:    print_u16(OTdataObject.DHWPumpValveOperationHours); break;  
-        case OT_DHWBurnerOperationHours:       print_u16(OTdataObject.DHWBurnerOperationHours); break; 
-        case OT_MasterVersion:                 print_u8u8(OTdataObject.MasterVersion ); break; 
-        case OT_SlaveVersion:                  print_u8u8(OTdataObject.SlaveVersion); break;
-        case OT_StatusVH:                      print_statusVH(OTdataObject.StatusVH); break;
-		    case OT_ControlSetpointVH:             print_u8u8(OTdataObject.ControlSetpointVH); break;
-        case OT_ASFFaultCodeVH:                print_flag8u8(OTdataObject.ASFFaultCodeVH); break;
-		    case OT_DiagnosticCodeVH:              print_u16(OTdataObject.DiagnosticCodeVH); break;
-        case OT_ConfigMemberIDVH:              print_vh_configmemberid(OTdataObject.ConfigMemberIDVH); break;
-		    case OT_OpenthermVersionVH:            print_f88(OTdataObject.OpenthermVersionVH); break;
-		    case OT_VersionTypeVH:                 print_u8u8(OTdataObject.VersionTypeVH ); break;
-		    case OT_RelativeVentilation:           print_u8u8(OTdataObject.RelativeVentilation); break;
-	      case OT_RelativeHumidityExhaustAir:    print_u8u8(OTdataObject.RelativeHumidityExhaustAir); break;
-		    case OT_CO2LevelExhaustAir:            print_u16(OTdataObject.CO2LevelExhaustAir); break;
- 		    case OT_SupplyInletTemperature:        print_f88(OTdataObject.SupplyInletTemperature); break;
- 		    case OT_SupplyOutletTemperature:       print_f88(OTdataObject.SupplyOutletTemperature); break;
- 		    case OT_ExhaustInletTemperature:       print_f88(OTdataObject.ExhaustInletTemperature); break;
- 		    case OT_ExhaustOutletTemperature:      print_f88(OTdataObject.ExhaustOutletTemperature); break;
-        case OT_ActualExhaustFanSpeed:         print_u16(OTdataObject.ActualExhaustFanSpeed); break;
-		    case OT_ActualSupplyFanSpeed:          print_u16(OTdataObject.ActualSupplyFanSpeed); break;
-		    case OT_RemoteParameterSettingVH:      print_vh_remoteparametersetting(OTdataObject.RemoteParameterSettingVH); break;
-		    case OT_NominalVentilationValue:       print_u8u8(OTdataObject.NominalVentilationValue); break;
-        case OT_TSPNumberVH:                   print_u8u8(OTdataObject.TSPNumberVH); break;
-		    case OT_TSPEntryVH:                    print_u8u8(OTdataObject.TSPEntryVH); break;
-		    case OT_FaultBufferSizeVH:             print_u8u8(OTdataObject.FaultBufferSizeVH); break;
-		    case OT_FaultBufferEntryVH:            print_u8u8(OTdataObject.FaultBufferEntryVH); break;
-        case OT_FanSpeed:                      print_u16(OTdataObject.FanSpeed); break;
-        case OT_ElectricalCurrentBurnerFlame:  print_f88(OTdataObject.ElectricalCurrentBurnerFlame); break;
-	      case OT_TRoomCH2:                      print_f88(OTdataObject.TRoomCH2); break;
-        case OT_RelativeHumidity:              print_u8u8(OTdataObject.RelativeHumidity); break;
-        case OT_RFstrengthbatterylevel:        print_u8u8(OTdataObject.RFstrengthbatterylevel); break;
-	      case OT_OperatingMode_HC1_HC2_DHW:     print_u8u8(OTdataObject.OperatingMode_HC1_HC2_DHW ); break; 
-        case OT_ElectricityProducerStarts:     print_u16(OTdataObject.ElectricityProducerStarts); break;
-	      case OT_ElectricityProducerHours:      print_u16(OTdataObject.ElectricityProducerHours); break;
-	      case OT_ElectricityProduction:         print_u16(OTdataObject.ElectricityProduction); break;
-        case OT_CumulativElectricityProduction:print_u16(OTdataObject.CumulativElectricityProduction); break;
-        case OT_RemehadFdUcodes:               print_u8u8(OTdataObject.RemehadFdUcodes); break;
-	      case OT_RemehaServicemessage:          print_u8u8(OTdataObject.RemehaServicemessage); break;
-        case OT_RemehaDetectionConnectedSCU:   print_u8u8(OTdataObject.RemehaDetectionConnectedSCU); break;
-        case OT_SolarStorageMaster:                     print_solar_storage_status(OTdataObject.SolarStorageStatus ); break;
-        case OT_SolarStorageASFflags:                   print_flag8u8(OTdataObject.SolarStorageASFflags); break;
-        case OT_SolarStorageSlaveConfigMemberIDcode:    print_solarstorage_slavememberid(OTdataObject.SolarStorageSlaveConfigMemberIDcode); break;
-        case OT_SolarStorageVersionType:                print_u8u8(OTdataObject.SolarStorageVersionType); break;
-        case OT_SolarStorageTSP:                        print_u8u8(OTdataObject.SolarStorageTSP ); break;
-        case OT_SolarStorageTSPindexTSPvalue:           print_u8u8(OTdataObject.SolarStorageTSPindexTSPvalue ); break;
-        case OT_SolarStorageFHBsize:                    print_u8u8(OTdataObject.SolarStorageFHBsize ); break;
-        case OT_SolarStorageFHBindexFHBvalue:           print_u8u8(OTdataObject.SolarStorageFHBindexFHBvalue ); break;
-        case OT_BurnerUnsuccessfulStarts:               print_u16(OTdataObject.BurnerUnsuccessfulStarts); break;
-	      case OT_FlameSignalTooLow:                      print_u16(OTdataObject.FlameSignalTooLow); break;
-        default: DebugTf("Unknown message [%02d] value [%04X]\r\n"); break;
-      }
-    // } else OTGWDebugf("hb[%3d] lb[%3d]\r\n", OTdata.valueHB, OTdata.valueLB);  
+          
+        //#define OTprint(data, value, text, format) ({ data= value; OTGWDebugf("[%37s]", text); OTGWDebugf("= [format]", data)})
+        //interpret values f8.8
+
+        switch (static_cast<OpenThermMessageID>(OTdata.id)) {   
+          case OT_Statusflags:                            print_status(OTdataObject.Statusflags); break;
+          case OT_TSet:                                   print_f88(OTdataObject.TSet); break;         
+          case OT_CoolingControl:                         print_f88(OTdataObject.CoolingControl); break;
+          case OT_TsetCH2:                                print_f88(OTdataObject.TsetCH2); break;
+          case OT_TrOverride:                             print_f88(OTdataObject.TrOverride); break;        
+          case OT_MaxRelModLevelSetting:                  print_f88(OTdataObject.MaxRelModLevelSetting); break;
+          case OT_TrSet:                                  print_f88(OTdataObject.TrSet); break;
+          case OT_TrSetCH2:                               print_f88(OTdataObject.TrSetCH2); break;
+          case OT_RelModLevel:                            print_f88(OTdataObject.RelModLevel); break;
+          case OT_CHPressure:                             print_f88(OTdataObject.CHPressure); break;
+          case OT_DHWFlowRate:                            print_f88(OTdataObject.DHWFlowRate); break;
+          case OT_Tr:                                     print_f88(OTdataObject.Tr); break;  
+          case OT_Tboiler:                                print_f88(OTdataObject.Tboiler);break;
+          case OT_Tdhw:                                   print_f88(OTdataObject.Tdhw); break;
+          case OT_Toutside:                               print_f88(OTdataObject.Toutside); break;
+          case OT_Tret:                                   print_f88(OTdataObject.Tret); break;
+          case OT_Tsolarstorage:                          print_f88(OTdataObject.Tsolarstorage); break;
+          case OT_Tsolarcollector:                        print_s16(OTdataObject.Tsolarcollector); break;
+          case OT_TflowCH2:                               print_f88(OTdataObject.TflowCH2); break;          
+          case OT_Tdhw2:                                  print_f88(OTdataObject.Tdhw2 ); break;
+          case OT_Texhaust:                               print_s16(OTdataObject.Texhaust); break; 
+          case OT_Theatexchanger:                         print_f88(OTdataObject.Theatexchanger); break;
+          case OT_TdhwSet:                                print_f88(OTdataObject.TdhwSet); break;
+          case OT_MaxTSet:                                print_f88(OTdataObject.MaxTSet); break;
+          case OT_Hcratio:                                print_f88(OTdataObject.Hcratio); break;
+          case OT_Remoteparameter4:                       print_f88(OTdataObject.Remoteparameter4); break;
+          case OT_Remoteparameter5:                       print_f88(OTdataObject.Remoteparameter5); break;
+          case OT_Remoteparameter6:                       print_f88(OTdataObject.Remoteparameter6); break;
+          case OT_Remoteparameter7:                       print_f88(OTdataObject.Remoteparameter7); break;
+          case OT_Remoteparameter8:                       print_f88(OTdataObject.Remoteparameter8); break;
+          case OT_OpenThermVersionMaster:                 print_f88(OTdataObject.OpenThermVersionMaster); break;
+          case OT_OpenThermVersionSlave:                  print_f88(OTdataObject.OpenThermVersionSlave); break;
+          case OT_ASFflags:                               print_ASFflags(OTdataObject.ASFflags); break;
+          case OT_MasterConfigMemberIDcode:               print_mastermemberid(OTdataObject.MasterConfigMemberIDcode); break; 
+          case OT_SlaveConfigMemberIDcode:                print_slavememberid(OTdataObject.SlaveConfigMemberIDcode); break;   
+          case OT_Command:                                print_command(OTdataObject.Command );  break; 
+          case OT_RBPflags:                               print_RBPflags(OTdataObject.RBPflags); break; 
+          case OT_TSP:                                    print_u8u8(OTdataObject.TSP); break; 
+          case OT_TSPindexTSPvalue:                       print_u8u8(OTdataObject.TSPindexTSPvalue); break; 
+          case OT_FHBsize:                                print_u8u8(OTdataObject.FHBsize); break;  
+          case OT_FHBindexFHBvalue:                       print_u8u8(OTdataObject.FHBindexFHBvalue); break; 
+          case OT_MaxCapacityMinModLevel:                 print_u8u8(OTdataObject.MaxCapacityMinModLevel); break; 
+          case OT_DayTime:                                print_daytime(OTdataObject.DayTime); break; 
+          case OT_Date:                                   print_date(OTdataObject.Date); break; 
+          case OT_Year:                                   print_u16(OTdataObject.Year); break; 
+          case OT_TdhwSetUBTdhwSetLB:                     print_s8s8(OTdataObject.TdhwSetUBTdhwSetLB ); break;  
+          case OT_MaxTSetUBMaxTSetLB:                     print_s8s8(OTdataObject.MaxTSetUBMaxTSetLB); break;  
+          case OT_HcratioUBHcratioLB:                     print_s8s8(OTdataObject.HcratioUBHcratioLB); break; 
+          case OT_Remoteparameter4boundaries:             print_s8s8(OTdataObject.Remoteparameter4boundaries); break;
+          case OT_Remoteparameter5boundaries:             print_s8s8(OTdataObject.Remoteparameter5boundaries); break;
+          case OT_Remoteparameter6boundaries:             print_s8s8(OTdataObject.Remoteparameter6boundaries); break;
+          case OT_Remoteparameter7boundaries:             print_s8s8(OTdataObject.Remoteparameter7boundaries); break;
+          case OT_Remoteparameter8boundaries:             print_s8s8(OTdataObject.Remoteparameter8boundaries); break;
+          case OT_RemoteOverrideFunction:                 print_flag8(OTdataObject.RemoteOverrideFunction); break;
+          case OT_OEMDiagnosticCode:                      print_u16(OTdataObject.OEMDiagnosticCode); break;
+          case OT_BurnerStarts:                           print_u16(OTdataObject.BurnerStarts); break; 
+          case OT_CHPumpStarts:                           print_u16(OTdataObject.CHPumpStarts); break; 
+          case OT_DHWPumpValveStarts:                     print_u16(OTdataObject.DHWPumpValveStarts); break; 
+          case OT_DHWBurnerStarts:                        print_u16(OTdataObject.DHWBurnerStarts); break;
+          case OT_BurnerOperationHours:                   print_u16(OTdataObject.BurnerOperationHours); break;
+          case OT_CHPumpOperationHours:                   print_u16(OTdataObject.CHPumpOperationHours); break; 
+          case OT_DHWPumpValveOperationHours:             print_u16(OTdataObject.DHWPumpValveOperationHours); break;  
+          case OT_DHWBurnerOperationHours:                print_u16(OTdataObject.DHWBurnerOperationHours); break; 
+          case OT_MasterVersion:                          print_u8u8(OTdataObject.MasterVersion ); break; 
+          case OT_SlaveVersion:                           print_u8u8(OTdataObject.SlaveVersion); break;
+          case OT_StatusVH:                               print_statusVH(OTdataObject.StatusVH); break;
+          case OT_ControlSetpointVH:                      print_u8u8(OTdataObject.ControlSetpointVH); break;
+          case OT_ASFFaultCodeVH:                         print_flag8u8(OTdataObject.ASFFaultCodeVH); break;
+          case OT_DiagnosticCodeVH:                       print_u16(OTdataObject.DiagnosticCodeVH); break;
+          case OT_ConfigMemberIDVH:                       print_vh_configmemberid(OTdataObject.ConfigMemberIDVH); break;
+          case OT_OpenthermVersionVH:                     print_f88(OTdataObject.OpenthermVersionVH); break;
+          case OT_VersionTypeVH:                          print_u8u8(OTdataObject.VersionTypeVH ); break;
+          case OT_RelativeVentilation:                    print_u8u8(OTdataObject.RelativeVentilation); break;
+          case OT_RelativeHumidityExhaustAir:             print_u8u8(OTdataObject.RelativeHumidityExhaustAir); break;
+          case OT_CO2LevelExhaustAir:                     print_u16(OTdataObject.CO2LevelExhaustAir); break;
+          case OT_SupplyInletTemperature:                 print_f88(OTdataObject.SupplyInletTemperature); break;
+          case OT_SupplyOutletTemperature:                print_f88(OTdataObject.SupplyOutletTemperature); break;
+          case OT_ExhaustInletTemperature:                print_f88(OTdataObject.ExhaustInletTemperature); break;
+          case OT_ExhaustOutletTemperature:               print_f88(OTdataObject.ExhaustOutletTemperature); break;
+          case OT_ActualExhaustFanSpeed:                  print_u16(OTdataObject.ActualExhaustFanSpeed); break;
+          case OT_ActualSupplyFanSpeed:                   print_u16(OTdataObject.ActualSupplyFanSpeed); break;
+          case OT_RemoteParameterSettingVH:               print_vh_remoteparametersetting(OTdataObject.RemoteParameterSettingVH); break;
+          case OT_NominalVentilationValue:                print_u8u8(OTdataObject.NominalVentilationValue); break;
+          case OT_TSPNumberVH:                            print_u8u8(OTdataObject.TSPNumberVH); break;
+          case OT_TSPEntryVH:                             print_u8u8(OTdataObject.TSPEntryVH); break;
+          case OT_FaultBufferSizeVH:                      print_u8u8(OTdataObject.FaultBufferSizeVH); break;
+          case OT_FaultBufferEntryVH:                     print_u8u8(OTdataObject.FaultBufferEntryVH); break;
+          case OT_FanSpeed:                               print_u16(OTdataObject.FanSpeed); break;
+          case OT_ElectricalCurrentBurnerFlame:           print_f88(OTdataObject.ElectricalCurrentBurnerFlame); break;
+          case OT_TRoomCH2:                               print_f88(OTdataObject.TRoomCH2); break;
+          case OT_RelativeHumidity:                       print_u8u8(OTdataObject.RelativeHumidity); break;
+          case OT_RFstrengthbatterylevel:                 print_u8u8(OTdataObject.RFstrengthbatterylevel); break;
+          case OT_OperatingMode_HC1_HC2_DHW:              print_u8u8(OTdataObject.OperatingMode_HC1_HC2_DHW ); break; 
+          case OT_ElectricityProducerStarts:              print_u16(OTdataObject.ElectricityProducerStarts); break;
+          case OT_ElectricityProducerHours:               print_u16(OTdataObject.ElectricityProducerHours); break;
+          case OT_ElectricityProduction:                  print_u16(OTdataObject.ElectricityProduction); break;
+          case OT_CumulativElectricityProduction:         print_u16(OTdataObject.CumulativElectricityProduction); break;
+          case OT_RemehadFdUcodes:                        print_u8u8(OTdataObject.RemehadFdUcodes); break;
+          case OT_RemehaServicemessage:                   print_u8u8(OTdataObject.RemehaServicemessage); break;
+          case OT_RemehaDetectionConnectedSCU:            print_u8u8(OTdataObject.RemehaDetectionConnectedSCU); break;
+          case OT_SolarStorageMaster:                     print_solar_storage_status(OTdataObject.SolarStorageStatus ); break;
+          case OT_SolarStorageASFflags:                   print_flag8u8(OTdataObject.SolarStorageASFflags); break;
+          case OT_SolarStorageSlaveConfigMemberIDcode:    print_solarstorage_slavememberid(OTdataObject.SolarStorageSlaveConfigMemberIDcode); break;
+          case OT_SolarStorageVersionType:                print_u8u8(OTdataObject.SolarStorageVersionType); break;
+          case OT_SolarStorageTSP:                        print_u8u8(OTdataObject.SolarStorageTSP ); break;
+          case OT_SolarStorageTSPindexTSPvalue:           print_u8u8(OTdataObject.SolarStorageTSPindexTSPvalue ); break;
+          case OT_SolarStorageFHBsize:                    print_u8u8(OTdataObject.SolarStorageFHBsize ); break;
+          case OT_SolarStorageFHBindexFHBvalue:           print_u8u8(OTdataObject.SolarStorageFHBindexFHBvalue ); break;
+          case OT_BurnerUnsuccessfulStarts:               print_u16(OTdataObject.BurnerUnsuccessfulStarts); break;
+          case OT_FlameSignalTooLow:                      print_u16(OTdataObject.FlameSignalTooLow); break;
+          default: DebugTf("Unknown message [%02d] value [%04X]\r\n"); break;
+        }
+    } 
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
     checkOTGWcmdqueue(buf, len);
   } else if (strstr(buf, "Error 01")!= NULL) {
@@ -1460,7 +1487,6 @@ void processOTGW(const char *buf, int len){
     OTGWDebugTf("Error 04 = %d\r\n",OTdataObject.error04);
     sendMQTTData(F("Error 04"), String(OTdataObject.error04));
   } else OTGWDebugTf("Not processed, received from OTGW => [%s] [%d]\r\n", buf, len);
- 
 }
 
 
@@ -1588,9 +1614,15 @@ String getOTGWValue(int msgid)
     case OT_TflowCH2:                          return String(OTdataObject.TflowCH2); break;          
     case OT_Tdhw2:                             return String(OTdataObject.Tdhw2); break;
     case OT_Texhaust:                          return String(OTdataObject.Texhaust); break; 
+    case OT_Theatexchanger:                    return String(OTdataObject.Theatexchanger); break;
     case OT_TdhwSet:                           return String(OTdataObject.TdhwSet); break;
     case OT_MaxTSet:                           return String(OTdataObject.MaxTSet); break;
     case OT_Hcratio:                           return String(OTdataObject.Hcratio); break;
+    case OT_Remoteparameter4:                  return String(OTdataObject.Remoteparameter4); break;
+    case OT_Remoteparameter5:                  return String(OTdataObject.Remoteparameter5); break;
+    case OT_Remoteparameter6:                  return String(OTdataObject.Remoteparameter6); break;
+    case OT_Remoteparameter7:                  return String(OTdataObject.Remoteparameter7); break;
+    case OT_Remoteparameter8:                  return String(OTdataObject.Remoteparameter8); break;
     case OT_OpenThermVersionMaster:            return String(OTdataObject.OpenThermVersionMaster); break;
     case OT_OpenThermVersionSlave:             return String(OTdataObject.OpenThermVersionSlave); break;
     case OT_Statusflags:                       return String(OTdataObject.Statusflags); break;
@@ -1609,7 +1641,12 @@ String getOTGWValue(int msgid)
     case OT_Year:                              return String(OTdataObject.Year);  break; 
     case OT_TdhwSetUBTdhwSetLB:                return String(OTdataObject.TdhwSetUBTdhwSetLB); break;  
     case OT_MaxTSetUBMaxTSetLB:                return String(OTdataObject.MaxTSetUBMaxTSetLB); break;  
-    case OT_HcratioUBHcratioLB:                return String(OTdataObject.HcratioUBHcratioLB); break;  
+    case OT_HcratioUBHcratioLB:                return String(OTdataObject.HcratioUBHcratioLB); break; 
+    case OT_Remoteparameter4boundaries:        return String(OTdataObject.Remoteparameter4boundaries); break; 
+    case OT_Remoteparameter5boundaries:        return String(OTdataObject.Remoteparameter5boundaries); break;
+    case OT_Remoteparameter6boundaries:        return String(OTdataObject.Remoteparameter6boundaries); break;
+    case OT_Remoteparameter7boundaries:        return String(OTdataObject.Remoteparameter7boundaries); break;
+    case OT_Remoteparameter8boundaries:        return String(OTdataObject.Remoteparameter8boundaries); break;     
     case OT_RemoteOverrideFunction:            return String(OTdataObject.RemoteOverrideFunction); break;
     case OT_OEMDiagnosticCode:                 return String(OTdataObject.OEMDiagnosticCode);  break;
     case OT_BurnerStarts:                      return String(OTdataObject.BurnerStarts);  break; 
