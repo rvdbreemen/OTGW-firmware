@@ -59,6 +59,7 @@ typedef struct {
 	float 		TflowCH2 = 0.0 ; // f8.8  Flow water temperature CH2 circuit (°C)
 	float 		Tdhw2 = 0.0 ; // f8.8  Domestic hot water temperature 2 (°C)
 	int16_t 	Texhaust = 0; // s16  Boiler exhaust temperature (°C)
+	float 		Theatexchanger = 0.0 ; // f8.8  Heat Exchanger (°C)
 	uint16_t	FanSpeed = 0; // u16  Fan Speed (rpm)
 	float 		ElectricalCurrentBurnerFlame = 0.0; // f88 Electrical current through burner flame (µA)
 	float 		TRoomCH2= 0.0; // f88  Room Temperature for 2nd CH circuit ("°C)
@@ -66,9 +67,19 @@ typedef struct {
 	uint16_t 	TdhwSetUBTdhwSetLB = 0 ; // s8 / s8  DHW setpoint upper & lower bounds for adjustment  (°C)
 	uint16_t 	MaxTSetUBMaxTSetLB = 0; // s8 / s8  Max CH water setpoint upper & lower bounds for adjustment  (°C)
 	uint16_t	HcratioUBHcratioLB = 0; // s8 / s8  OTC heat curve ratio upper & lower bounds for adjustment  
+	uint16_t	Remoteparameter4boundaries = 0; // s8 / s8  Remote parameter 4 upper & lower bounds for adjustment
+	uint16_t	Remoteparameter5boundaries = 0; // s8 / s8  Remote parameter 5 upper & lower bounds for adjustment
+	uint16_t	Remoteparameter6boundaries = 0; // s8 / s8  Remote parameter 6 upper & lower bounds for adjustment
+	uint16_t	Remoteparameter7boundaries = 0; // s8 / s8  Remote parameter 7 upper & lower bounds for adjustment
+	uint16_t	Remoteparameter8boundaries = 0; // s8 / s8  Remote parameter 8 upper & lower bounds for adjustment
 	float 		TdhwSet = 0.0 ; // f8.8  DHW setpoint (°C)    (Remote parameter 1)
 	float 		MaxTSet = 0.0 ; // f8.8  Max CH water setpoint (°C)  (Remote parameters 2)
 	float 		Hcratio = 0.0 ; // f8.8  OTC heat curve ratio (°C)  (Remote parameter 3)
+	float 		Remoteparameter4 = 0.0 ; // f8.8  Remote parameter 4
+	float 		Remoteparameter5 = 0.0 ; // f8.8  Remote parameter 5
+	float 		Remoteparameter6 = 0.0 ; // f8.8  Remote parameter 6
+	float 		Remoteparameter7 = 0.0 ; // f8.8  Remote parameter 7
+	float 		Remoteparameter8 = 0.0 ; // f8.8  Remote parameter 8
 
 	//RF
 	uint16_t	RFstrengthbatterylevel = 0; // u8/ u8 RF strength and battery level
@@ -208,6 +219,7 @@ enum OpenThermMessageID {
 	OT_TflowCH2, // f8.8  Flow water temperature CH2 circuit (°C)
 	OT_Tdhw2, // f8.8  Domestic hot water temperature 2 (°C)
 	OT_Texhaust, // s16  Boiler exhaust temperature (°C)
+	OT_Theatexchanger, // f8.8 Heat exchanger temperature (°C)
 	OT_FanSpeed = 35, // u16  Fan Speed (rpm)
 	OT_ElectricalCurrentBurnerFlame, // f88 Electrical current through burner flame (µA)
 	OT_TRoomCH2, // f88  Room Temperature for 2nd CH circuit ("°C)
@@ -215,9 +227,19 @@ enum OpenThermMessageID {
 	OT_TdhwSetUBTdhwSetLB = 48, // s8 / s8  DHW setpoint upper & lower bounds for adjustment  (°C)
 	OT_MaxTSetUBMaxTSetLB, // s8 / s8  Max CH water setpoint upper & lower bounds for adjustment  (°C)
 	OT_HcratioUBHcratioLB, // s8 / s8  OTC heat curve ratio upper & lower bounds for adjustment  
+	OT_Remoteparameter4boundaries, // s8 / s8  Remote Parameter ratio upper & lower bounds for adjustment
+	OT_Remoteparameter5boundaries, // s8 / s8  Remote Parameter upper & lower bounds for adjustment
+	OT_Remoteparameter6boundaries, // s8 / s8  Remote Parameter upper & lower bounds for adjustment
+	OT_Remoteparameter7boundaries, // s8 / s8  Remote Parameter upper & lower bounds for adjustment
+	OT_Remoteparameter8boundaries, // s8 / s8  Remote Parameter upper & lower bounds for adjustment
 	OT_TdhwSet = 56, // f8.8  DHW setpoint (°C)    (Remote parameter 1)
 	OT_MaxTSet, // f8.8  Max CH water setpoint (°C)  (Remote parameters 2)
 	OT_Hcratio, // f8.8  OTC heat curve ratio (°C)  (Remote parameter 3)
+	OT_Remoteparameter4, // f8.8  Remote parameter 4 (°C)  (Remote parameter 4)
+	OT_Remoteparameter5, // f8.8  Remote parameter 5 (°C)  (Remote parameter 5)
+	OT_Remoteparameter6, // f8.8  Remote parameter 6 (°C)  (Remote parameter 6)
+	OT_Remoteparameter7, // f8.8  Remote parameter 7 (°C)  (Remote parameter 7)
+	OT_Remoteparameter8, // f8.8  Remote parameter 8 (°C)  (Remote parameter 8)
 	OT_StatusVH = 70, // flag8 / flag8 Status Ventilation/Heat recovery
 	OT_ControlSetpointVH, // u8 Control setpoint V/H
 	OT_ASFFaultCodeVH, // flag8 / u8 Aplication Specific Fault Flags/Code V/H
@@ -324,7 +346,7 @@ enum OpenThermMessageID {
 		{  31, OT_READ  , ot_f88,        "TflowCH2", "Flow water temperature CH2", "°C" },
 		{  32, OT_READ  , ot_f88,        "Tdhw2", "DHW2 temperature", "°C" },
 		{  33, OT_READ  , ot_s16,        "Texhaust", "Exhaust temperature", "°C" },
-		{  34, OT_UNDEF , ot_f88, 	 	 "Theatexchanger", "Boiler heat exchanger temperature", "°C" },
+		{  34, OT_READ  , ot_f88, 	 	 "Theatexchanger", "Boiler heat exchanger temperature", "°C" },
 		{  35, OT_READ  , ot_u8u8,	 	 "FanSpeed", "Boiler fan speed and setpoint", "rpm" },
 		{  36, OT_READ  , ot_f88, 			"ElectricalCurrentBurnerFlame", "Electrical current through burner flame", "µA" },
 		{  37, OT_READ  , ot_f88, 			"TRoomCH2", "Room temperature for 2nd CH circuit", "°C" },
@@ -341,19 +363,19 @@ enum OpenThermMessageID {
 		{  48, OT_READ  , ot_s8s8,        "TdhwSetUBTdhwSetLB", "DHW setpoint upper & lower bounds for adjustment", "°C" },
 		{  49, OT_READ  , ot_s8s8,        "MaxTSetUBMaxTSetLB", "Max CH water setpoint upper & lower bounds for adjustment", "°C" },
 		{  50, OT_READ  , ot_s8s8,        "HcratioUBHcratioLB", "OTC heat curve ratio upper & lower bounds for adjustment", "°C" },
-		{  51, OT_UNDEF , ot_s8s8, 		  "Remoteparameter4boundaries", "Remote parameter 4 boundaries", "" },
-		{  52, OT_UNDEF , ot_s8s8, 		  "Remoteparameter5boundaries", "Remote parameter 5 boundaries", "" },
-		{  53, OT_UNDEF , ot_s8s8, 		  "Remoteparameter6boundaries", "Remote parameter 6 boundaries", "" },
-		{  54, OT_UNDEF , ot_s8s8, 		  "Remoteparameter7boundaries", "Remote parameter 7 boundaries", "" },
-		{  55, OT_UNDEF , ot_s8s8, 		  "Remoteparameter8boundaries", "Remote parameter 8 boundaries", "" },
+		{  51, OT_READ  , ot_s8s8, 		  "Remoteparameter4boundaries", "Remote parameter 4 boundaries", "" },
+		{  52, OT_READ  , ot_s8s8, 		  "Remoteparameter5boundaries", "Remote parameter 5 boundaries", "" },
+		{  53, OT_READ  , ot_s8s8, 		  "Remoteparameter6boundaries", "Remote parameter 6 boundaries", "" },
+		{  54, OT_READ  , ot_s8s8, 		  "Remoteparameter7boundaries", "Remote parameter 7 boundaries", "" },
+		{  55, OT_READ  , ot_s8s8, 		  "Remoteparameter8boundaries", "Remote parameter 8 boundaries", "" },
 		{  56, OT_RW    , ot_f88,         "TdhwSet", "DHW setpoint", "°C" },	
 		{  57, OT_RW    , ot_f88,         "MaxTSet", "Max CH water setpoint", "°C" },
 		{  58, OT_RW    , ot_f88,         "Hcratio", "OTC heat curve ratio", "°C" },
-		{  59, OT_UNDEF , ot_f88, 		  "Remoteparameter4", "Remote parameter 4", "" },
-		{  60, OT_UNDEF , ot_f88,         "Remoteparameter5", "Remote parameter 5", "" },
-		{  61, OT_UNDEF , ot_f88,         "Remoteparameter6", "Remote parameter 6", "" },
-		{  62, OT_UNDEF , ot_f88,         "Remoteparameter7", "Remote parameter 7", "" },
-		{  63, OT_UNDEF , ot_f88,         "Remoteparameter8", "Remote parameter 8", "" },
+		{  59, OT_RW 	, ot_f88, 		  "Remoteparameter4", "Remote parameter 4", "" },
+		{  60, OT_RW 	, ot_f88,         "Remoteparameter5", "Remote parameter 5", "" },
+		{  61, OT_RW 	, ot_f88,         "Remoteparameter6", "Remote parameter 6", "" },
+		{  62, OT_RW 	, ot_f88,         "Remoteparameter7", "Remote parameter 7", "" },
+		{  63, OT_RW 	, ot_f88,         "Remoteparameter8", "Remote parameter 8", "" },
 		{  64, OT_UNDEF , ot_undef, "", "", "" },
 		{  65, OT_UNDEF , ot_undef, "", "", "" },
 		{  66, OT_UNDEF , ot_undef, "", "", "" },
@@ -462,13 +484,22 @@ enum OpenThermStatus {
  * Structure to hold Opentherm data packet content.
  * Use f88(), u16() or s16() functions to get appropriate value of data packet according to id of message.
  */
+
+enum OTGW_response_type {
+	OTGW_BOILER,
+	OTGW_THERMOSTAT,
+	OTGW_ANSWER_THERMOSTAT,
+	OTGW_REQUEST_BOILER,
+	OTGW_UNDEF	
+};
 struct OpenthermData {
   byte masterslave; //0=master, 1=slave
   byte type;
   byte id;
   byte valueHB;
   byte valueLB;
-
+  byte rsptype;   
+  time_t time;  
   /**
    * @return float representation of data packet value
    */
