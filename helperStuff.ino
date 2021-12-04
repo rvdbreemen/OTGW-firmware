@@ -548,6 +548,120 @@ uint32_t updateRebootCount()
   return _reboot;
 }
 
+bool updateRebootLog(String text)
+{
+  #define REBOOTLOG_FILE "/reboot_log.txt"
+  #define TEMPLOG_FILE "/reboot_log.t.txt"
+  #define LOG_LINES 20
+  #define LOG_LINE_LENGTH 140
+
+  char log_line[LOG_LINE_LENGTH] = {0};
+  char log_line_regs[LOG_LINE_LENGTH] = {0};
+  char log_line_excpt[LOG_LINE_LENGTH] = {0};
+  uint32_t errorCode = -1;
+
+  loopNTP(); // make sure time is up to date
+
+  struct	rst_info	*rtc_info	=	system_get_rst_info();
+  
+  if (rtc_info == NULL) {
+    DebugTf("no reset info available:	%x\r\n",	errorCode);
+  } else {
+
+    DebugTf("reset reason:	%x\r\n",	rtc_info->reason);
+    errorCode = rtc_info->reason;
+    // Rst cause No.    Cause                     GPIO state
+    //--------------    -------------------       -------------
+    // 0                Power reboot              Changed
+    // 1                Hardware WDT reset        Changed
+    // 2                Fatal exception           Unchanged
+    // 3                Software watchdog reset   Unchanged
+    // 4                Software reset            Unchanged
+    // 5                Deep-sleep                Changed
+    // 6                Hardware reset            Changed
+
+    if	(rtc_info->reason	==	REASON_WDT_RST	|| rtc_info->reason	==	REASON_EXCEPTION_RST	|| rtc_info->reason	==	REASON_SOFT_WDT_RST)	{
+
+      //The	address	of	the	last	crash	is	printed,	which	is	used	to	debug	garbled	output
+      snprintf(log_line_regs, LOG_LINE_LENGTH,"ESP register contents: epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x, depc=0x%08x\r\n", rtc_info->epc1, rtc_info->epc2, rtc_info->epc3, rtc_info->excvaddr, rtc_info->depc);
+      Debugf(log_line_regs);
+    }
+
+    if	(rtc_info->reason	==	REASON_EXCEPTION_RST)	{
+
+      // Fatal exception No.    Description             Possible Causes
+      // -------------------    --------------          -------------------
+      //  0                     Invalid command         1. Damaged BIN binaries
+      //                                                2. Wild pointers
+      //
+      //  6                     Division by zero        Division by zero
+      //
+      //  9                     Unaligned read/write    1. Unaligned read/write Cache addresses
+      //                        operation addresses     2. Wild pointers
+      //
+      //  28/29                 Access to invalid       1. Access to Cache after it is turned off
+      //                        address                 2. Wild pointers
+      //
+      // more reasons can be found in the "corebits.h" file of the Extensa SDK
+
+      switch(rtc_info->exccause) {
+        case 0:   snprintf(log_line_excpt, LOG_LINE_LENGTH, "- Invalid command (0)"); break;
+        case 6:   snprintf(log_line_excpt, LOG_LINE_LENGTH, "- Division by zero (6)"); break;
+        case 9:   snprintf(log_line_excpt, LOG_LINE_LENGTH, "- Unaligned read/write operation addresses (9)"); break;
+        case 28:  snprintf(log_line_excpt, LOG_LINE_LENGTH, "- Access to invalid address (28)"); break;
+        case 29:  snprintf(log_line_excpt, LOG_LINE_LENGTH, "- Access to invalid address (29)"); break;
+        default:  snprintf(log_line_excpt, LOG_LINE_LENGTH, "- Other (not specified) (%d)", rtc_info->exccause); break;
+      }
+
+      Debugf("Fatal exception (%d): %s\r\n",	rtc_info->exccause, log_line_excpt);
+    }
+  }
+
+  snprintf(log_line, LOG_LINE_LENGTH, "%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n", year(),  month(), day(), hour(), minute(), second(), CSTR(text), errorCode, log_line_excpt);
+
+  if (LittleFS.begin()) {
+    //start with opening the file
+    File outfh = LittleFS.open(TEMPLOG_FILE, "w");
+
+    if (outfh) {
+      //write to _reboot to file
+      outfh.print(log_line);
+
+      if (strlen(log_line_regs)>2) {
+        outfh.print(log_line_regs);
+      }
+
+      File infh = LittleFS.open(REBOOTLOG_FILE, "r");
+      
+      int i = 1;
+      if (infh) {
+        //read from file
+        while (infh.available() && (i < LOG_LINES)){
+          //read the first line 
+          String line = infh.readStringUntil('\r\n');
+          if (line.length() > 3) { //TODO: check is no longer needed?
+            outfh.print(line);
+          }
+          i++;
+        }
+        infh.close();
+      }
+      outfh.close();
+      
+      if (LittleFS.exists(REBOOTLOG_FILE)) {
+        LittleFS.remove(REBOOTLOG_FILE);
+      }
+      
+      LittleFS.rename(TEMPLOG_FILE, REBOOTLOG_FILE);
+
+      return true; // succesfully logged
+    }
+  }
+  
+  return false; // logging unsuccesfull
+}
+
+
 void doRestart(const char* str) {
   DebugTln(str);
   delay(2000);  // Enough time for messages to be sent.
