@@ -192,6 +192,8 @@ void startNTP(){
   NtpStatus = TIME_WAITFORSYNC;
 }
 
+
+
 void loopNTP(){
 if (!settingNTPenable) return;
   switch (NtpStatus){
@@ -218,9 +220,10 @@ if (!settingNTPenable) return;
         
         auto myTime = ZonedDateTime::forUnixSeconds(NtpLastSync, myTz);
         if (myTime.isError()) {
-          NtpStatus = TIME_NEEDSYNC;
-          DebugTln("Error: Time not set correctly, wait for sync");
+          //NtpStatus = TIME_NEEDSYNC;
+          //DebugTln("Error: Time not set correctly, wait for sync");
         } else {
+          //finally time is synced!
           setTime(myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
           NtpStatus = TIME_SYNC;
           DebugTln(F("Time synced!"));
@@ -235,11 +238,32 @@ if (!settingNTPenable) return;
       }
     break;
   } 
-
-
  
   DECLARE_TIMER_SEC(timerNTPtime, 10, CATCH_UP_MISSED_TICKS);
   if DUE(timerNTPtime) DebugTf("Epoch Seconds: %d\r\n", time(nullptr)); //timeout, then break out of this loop
+}
+
+bool isNTPtimeSet(){
+  return NtpStatus == TIME_SYNC;
+}
+
+void waitforNTPsync(int16_t timeout = 60){  
+  //wait for time is synced to NTP server, for maximum of timeout seconds
+  //feed the watchdog while waiting 
+  //update NTP status
+  DECLARE_TIMER_SEC(waitforNTPsync, timeout, CATCH_UP_MISSED_TICKS);
+  while (true){
+    //feed the watchdog while waiting
+    Wire.beginTransmission(0x26);   
+    Wire.write(0xA5);   
+    Wire.endTransmission();
+    delay(100);
+    // update NTP status
+    loopNTP();
+    //stop waiting when NTP is synced or timeout is reached
+    if (isNTPtimeSet()) break;    
+    if DUE(waitforNTPsync) break; 
+  }
 }
 
 String getMacAddress() {
