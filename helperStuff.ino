@@ -548,7 +548,7 @@ uint32_t updateRebootCount()
   return _reboot;
 }
 
-bool updateRebootLog(String txt)
+bool updateRebootLog(String text)
 {
   #define REBOOTLOG_FILE "/reboot_log.txt"
   #define TEMPLOG_FILE "/reboot_log.t.txt"
@@ -575,7 +575,7 @@ bool updateRebootLog(String txt)
     // 0                Power reboot              Changed
     // 1                Hardware WDT reset        Changed
     // 2                Fatal exception           Unchanged
-    // 3                Software  reset   Unchanged
+    // 3                Software watchdog reset   Unchanged
     // 4                Software reset            Unchanged
     // 5                Deep-sleep                Changed
     // 6                Hardware reset            Changed
@@ -617,7 +617,7 @@ bool updateRebootLog(String txt)
     }
   }
 
-  snprintf(log_line, LOG_LINE_LENGTH, "%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n", year(),  month(), day(), hour(), minute(), second(), CSTR(txt), errorCode, log_line_excpt);
+  snprintf(log_line, LOG_LINE_LENGTH, "%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n", year(),  month(), day(), hour(), minute(), second(), CSTR(text), errorCode, log_line_excpt);
 
   if (LittleFS.begin()) {
     //start with opening the file
