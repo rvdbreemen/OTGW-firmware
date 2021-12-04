@@ -74,9 +74,10 @@ void setup() {
   startWebserver();
 
   lastReset = ESP.getResetReason();
-  OTGWSerial.printf("Last reset reason: [%s]\r\n", CSTR(ESP.getResetReason()));
+  OTGWSerial.printf("Last reset reason: [%s]\r\n", CSTR(lastReset));
   rebootCount = updateRebootCount();
-  updateRebootLog(ESP.getResetReason());
+  updateRebootLog(lastReset);
+  
  
   OTGWSerial.println(F("Setup finished!\r\n"));
   // After resetting the OTGW PIC never send anything to Serial for debug
