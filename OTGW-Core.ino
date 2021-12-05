@@ -1182,6 +1182,11 @@ void checkOTGWcmdqueue(const char *buf, int len){
 */
 void sendOTGW(const char* buf, int len)
 {
+  // while (OTGWSerial.availableForWrite() < (len+2)) {
+  //   //cannot write, buffer full, wait for some space in serial out buffer
+  // feedWatchDog();     //this yields for other processes
+  // }
+
   //Send the buffer to OTGW when the Serial interface is available
   if (OTGWSerial.availableForWrite()>=len+2) {
     //check the write buffer
@@ -1192,20 +1197,12 @@ void sendOTGW(const char* buf, int len)
     }
     OTGWDebug("] ("); OTGWDebug(len); OTGWDebug(")"); OTGWDebugln();
         
-    // while (OTGWSerial.availableForWrite()==(len+2)) {
-    //   //cannot write, buffer full, wait for some space in serial out buffer
-      // feedWatchDog();     //this yields for other processes
-    // }
-    // if (OTGWSerial.availableForWrite()>= (len+2)) {
-
-      //write buffer to serial
-      OTGWSerial.write(buf, len);         
-      // OTGWSerial.write("PS=0\r\n");
-      OTGWSerial.write('\r');
-      OTGWSerial.write('\n');            
-      OTGWSerial.flush(); 
-    } else OTGWDebugln("Error: Write buffer not big enough!");
-  // } else OTGWDebugln("Error: Serial device not found!");
+    //write buffer to serial
+    OTGWSerial.write(buf, len);         
+    OTGWSerial.write('\r');
+    OTGWSerial.write('\n');            
+    OTGWSerial.flush(); 
+  } else OTGWDebugln("Error: Write buffer not big enough!");
 }
 
 /*
