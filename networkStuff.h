@@ -210,12 +210,12 @@ if (!settingNTPenable) return;
         NtpLastSync = time(nullptr); //remember last sync 
         
         DebugTf("Timezone lookup for [%s]\r\n", CSTR(settingNTPtimezone));
-        auto myTz =  manager.createForZoneName(CSTR(settingNTPtimezone));
+        auto myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
         
         if (myTz.isError()){
           DebugTf("Error: Timezone Invalid/Not Found: [%s]\r\n", CSTR(settingNTPtimezone));
           settingNTPtimezone = NTP_DEFAULT_TIMEZONE;
-          myTz = manager.createForZoneName(CSTR(settingNTPtimezone)); //try with default Timezone instead
+          myTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone)); //try with default Timezone instead
         } else DebugTln(F("Timezone lookup: successful"));
         
         auto myTime = ZonedDateTime::forUnixSeconds(NtpLastSync, myTz);
