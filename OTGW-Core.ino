@@ -1466,7 +1466,10 @@ void processOTGW(const char *buf, int len){
           case OT_SolarStorageFHBindexFHBvalue:           print_u8u8(OTdataObject.SolarStorageFHBindexFHBvalue ); break;
           case OT_BurnerUnsuccessfulStarts:               print_u16(OTdataObject.BurnerUnsuccessfulStarts); break;
           case OT_FlameSignalTooLow:                      print_u16(OTdataObject.FlameSignalTooLow); break;
-          default: DebugTf("Unknown message [%02d] value [%04X]\r\n"); break;
+          default: 
+              DebugTf("Unknown message [%02d] value [%04X]\r\n");
+              DebugTf("f8.8 [%3.2f] u16 [%d] s16 [%d]\r\n", OTdata.f88(), OTdata.u16(), OTdata.s16()); 
+              break;
         }
     } 
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
