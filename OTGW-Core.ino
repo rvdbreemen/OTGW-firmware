@@ -1243,29 +1243,20 @@ void processOTGW(const char *buf, int len){
     // sendMQTTData(F("otmsg_count"), itoa(cntOTmessagesprocessed, _msg, 10)); 
 
     // source of otmsg
-    if (buf[0]=='B')
-    {
-      OTGWDebugT("Boiler            ");
+    if (buf[0]=='B'){
       epochBoilerlastseen = now(); 
       OTdata.rsptype = OTGW_BOILER;
-    } else if (buf[0]=='T')
-    {
-      OTGWDebugT("Thermostat        ");
+    } else if (buf[0]=='T'){
       epochThermostatlastseen = now();
       OTdata.rsptype = OTGW_THERMOSTAT;
-    } else if (buf[0]=='R')
-    {
-      OTGWDebugT("Request Boiler    ");
+    } else if (buf[0]=='R')    {
       epochBoilerlastseen = now();
       OTdata.rsptype = OTGW_REQUEST_BOILER;
-    } else if (buf[0]=='A')
-    {
-      OTGWDebugT("Answer Thermostat ");
+    } else if (buf[0]=='A')    {
       epochThermostatlastseen = now();
       OTdata.rsptype = OTGW_ANSWER_THERMOSTAT;
-    } else if (buf[0]=='E')
-    {
-      OTGWDebugT("Parity error     ");
+    } else if (buf[0]=='E')    {
+      OTdata.rsptype = OTGW_PARITY_ERROR;
     } 
 
     //If the Boiler or Thermostat messages have not been seen for 30 seconds, then set the state to false. 
@@ -1293,12 +1284,6 @@ void processOTGW(const char *buf, int len){
     uint32_t value = 0;
     sscanf(bufval, "%8x", &value);
 
-    //print OTmessage to debug
-    char otmsg[15]={0};
-    memcpy(otmsg, buf, len);
-    OTGWDebugf("%s (%d)", otmsg, len);
-    OTGWDebugf("[%08x]", value);
-
     //split 32bit value into the relevant OT protocol parts
     OTdata.type = (value >> 28) & 0x7;                // byte 1 = take 3 bits that define msg msgType
     OTdata.masterslave = (OTdata.type >> 2) & 0x1;    // MSB from type --> 0 = master and 1 = slave
@@ -1309,7 +1294,7 @@ void processOTGW(const char *buf, int len){
     OTdata.skipthis = false;                          // default: do not skip this message (will be sent to MQTT)
 
     
-    if (cntOTmessagesprocessed>1) {       //first message needs to be put in the buffer
+    if (cntOTmessagesprocessed == 1) {       //first message needs to be put in the buffer
       //just store current message and delay processing
       delayedOTdata = OTdata;       //store current msg
       OTGWDebugln("delaying message!");
@@ -1319,7 +1304,7 @@ void processOTGW(const char *buf, int len){
                       (((OTdata.rsptype == OTGW_REQUEST_BOILER) && (delayedOTdata.rsptype == OTGW_BOILER)) ||
                        ((OTdata.rsptype == OTGW_ANSWER_THERMOSTAT) && (delayedOTdata.rsptype == OTGW_THERMOSTAT))) ;
       if(skipthis) { 
-            OTGWDebugln(" override ");
+            OTGWDebugln(" skipthis ");
             delayedOTdata.skipthis = true;      //skip this message --> do decode for logging purposes, but do not send it to MQTT
       } 
     
@@ -1327,7 +1312,34 @@ void processOTGW(const char *buf, int len){
       delayedOTdata = OTdata;       //store current msg
       OTdata = tmpOTdata;           //then process delayed msg
 
-      //print message frame
+
+      // Decode and print OpenTherm Gateway Message
+      switch (OTdata.rsptype){
+        case OTGW_BOILER:
+          OTGWDebugT("Boiler            ");
+          break;
+        case OTGW_THERMOSTAT:
+          OTGWDebugT("Thermostat        ");
+          break;
+        case OTGW_REQUEST_BOILER:
+          OTGWDebugT("Request Boiler    ");
+          break;
+        case OTGW_ANSWER_THERMOSTAT:
+          OTGWDebugT("Answer Thermostat ");
+          break;
+        case OTGW_PARITY_ERROR:
+          OTGWDebugT("Parity Error      ");
+          break;
+        default:
+          OTGWDebugT("Unknown           ");
+          break;
+      }
+
+      //print OTmessage to debug
+      char otmsg[15]={0};
+      memcpy(otmsg, buf, len);
+      OTGWDebugf("%s (%d)", otmsg, len);
+      OTGWDebugf("[%08x]", value);      //print message frame
       //OTGWDebugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
       //print message Type and ID
       OTGWDebugf("[MsgID=%3d]", OTdata.id);
@@ -1344,13 +1356,6 @@ void processOTGW(const char *buf, int len){
 
       //next step interpret the OT protocol
       //On OT_WRITE_ACK or READ_ACK, or, status msgid's, then parse. 
-
-      // if ((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_ACK)   && ((OTlookupitem.msg == OT_READ)  || (OTlookupitem.msg == OT_RW))  ||
-      //     (static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_ACK)  && ((OTlookupitem.msg == OT_WRITE) || (OTlookupitem.msg == OT_RW))  ||
-      //     (static_cast<OpenThermMessageID>(OTdata.id) == OT_Statusflags) ||
-      //     (static_cast<OpenThermMessageID>(OTdata.id) == OT_StatusVH) ||
-      //     (static_cast<OpenThermMessageID>(OTdata.id) == OT_SolarStorageMaster)) {
-
           
         //#define OTprint(data, value, text, format) ({ data= value; OTGWDebugf("[%37s]", text); OTGWDebugf("= [format]", data)})
         //interpret values f8.8
