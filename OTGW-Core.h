@@ -494,6 +494,9 @@ enum OTGW_response_type {
 	OTGW_UNDEF	
 };
 struct OpenthermData {
+  char buf[10];	
+  byte len;
+  uint32_t value;
   byte masterslave; //0=master, 1=slave
   byte type;
   byte id;
