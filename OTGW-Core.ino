@@ -104,12 +104,22 @@ void checkOTWGpicforupdate(){
   if (!checklittlefshash()) sMessage = "Flash your littleFS with matching version!";
 }
 
-//===================[ checkOTWGpicforupdate ]=====================
+//===================[ sendOTGWbootcmd ]=====================
 void sendOTGWbootcmd(){
   if (!settingOTGWcommandenable) return;
   OTGWDebugTf("OTGW boot message = [%s]\r\n", CSTR(settingOTGWcommands));
-  OTGWSerial.write(CSTR(settingOTGWcommands));
-  OTGWSerial.flush();
+
+  // parse and execute commands
+  char bootcmds[settingOTGWcommands.length() + 1];
+  settingOTGWcommands.toCharArray(cmds, settingOTGWcommands.length() + 1);
+  char* cmd;
+  int i = 0;
+  cmd = strtok(bootcmds, ";");
+  while (cmd != NULL) {
+    OTGWDebugTf("Boot command[%d]: %s\r\n", i++, cmd);
+    addOTWGcmdtoqueue(cmd, strlen(cmd), true);
+    cmd = strtok(NULL, ";");
+  }
 }
 
 //===================[ OTGW Command & Response ]===================
@@ -1301,8 +1311,8 @@ void processOTGW(const char *buf, int len){
     } else {                              //any other message will be processed
       //delay buffer message to override if needed
       bool skipthis = ((OTdata.time - delayedOTdata.time) < 500) && 
-                      (((OTdata.rsptype == OTGW_REQUEST_BOILER) && (delayedOTdata.rsptype == OTGW_BOILER)) ||
-                       ((OTdata.rsptype == OTGW_ANSWER_THERMOSTAT) && (delayedOTdata.rsptype == OTGW_THERMOSTAT))) ;
+                      (((OTdata.rsptype == OTGW_ANSWER_THERMOSTAT) && (delayedOTdata.rsptype == OTGW_BOILER)) ||
+                       ((OTdata.rsptype == OTGW_REQUEST_BOILER) && (delayedOTdata.rsptype == OTGW_THERMOSTAT))) ;
       if(skipthis) { 
             OTGWDebugln(" skipthis ");
             delayedOTdata.skipthis = true;      //skip this message --> do decode for logging purposes, but do not send it to MQTT
