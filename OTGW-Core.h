@@ -536,6 +536,7 @@ struct OpenthermData {
   void s16(int16_t value);
 };
 
+
 #endif
 
 
