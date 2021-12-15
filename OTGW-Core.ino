@@ -111,7 +111,7 @@ void sendOTGWbootcmd(){
 
   // parse and execute commands
   char bootcmds[settingOTGWcommands.length() + 1];
-  settingOTGWcommands.toCharArray(cmds, settingOTGWcommands.length() + 1);
+  settingOTGWcommands.toCharArray(bootcmds, settingOTGWcommands.length() + 1);
   char* cmd;
   int i = 0;
   cmd = strtok(bootcmds, ";");
