@@ -115,16 +115,16 @@ bool      settingGPIOSENSORSenabled = false;
 int8_t    settingGPIOSENSORSpin = 10;
 int16_t   settingGPIOSENSORSinterval = 5;
 
-// Boot commands
+//boot commands
 bool      settingOTGWcommandenable = false;
 String    settingOTGWcommands = "";
 
-//debug flags
-bool      bDebugOTmsg = true;
+//debug flags 
+bool      bDebugOTmsg = true;    
 bool      bDebugRestAPI = false;
-bool      bDebugMQTT = true;
+bool      bDebugMQTT = false;
 
-// GPIO Output Settings
+//GPIO Output Settings
 bool      settingMyDEBUG = false;
 bool      settingGPIOOUTPUTSenabled = false;
 int8_t    settingGPIOOUTPUTSpin = 16;
