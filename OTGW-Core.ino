@@ -535,7 +535,7 @@ void print_status(uint16_t& value)
     _flag8_master[8] = '\0';
 
     PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
-    OTGWDebugf("%s = Master [%s] \r\n", OTlookupitem.label, _flag8_master);
+    OTGWDebugf("%s = Master [%s] ", OTlookupitem.label, _flag8_master);
 
     //Master Status
     sendMQTTData(F("status_master"), _flag8_master);
@@ -651,7 +651,7 @@ void print_statusVH(uint16_t& value)
     _flag8_master[8] = '\0';
 
     PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
-    OTGWDebugf("%s = VH Master [%s] \r\n", OTlookupitem.label, _flag8_master);
+    OTGWDebugf("%s = VH Master [%s] ", OTlookupitem.label, _flag8_master);
     //Master Status
     sendMQTTData(F("status_vh_master"), _flag8_master);
     sendMQTTData(F("vh_ventilation_enabled"),        (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delay(5);
@@ -1303,21 +1303,18 @@ void processOTGW(const char *buf, int len){
     OTdata.valueLB = value & 0xFF;                    // byte 4 = low byte
     OTdata.time = millis();                           // time of reception    
     OTdata.skipthis = false;                          // default: do not skip this message (will be sent to MQTT)
-
+    
+ 
     if (cntOTmessagesprocessed == 1) {       //first message needs to be put in the buffer
       //just store current message and delay processing
       delayedOTdata = OTdata;       //store current msg
-      OTGWDebugln("delaying message!");
+      OTGWDebugln("delaying first message!");
     } else {                              //any other message will be processed
       //delay buffer message to override if needed
-      bool skipthis = ((OTdata.time - delayedOTdata.time) < 500) && 
-                      (((OTdata.rsptype == OTGW_ANSWER_THERMOSTAT) && (delayedOTdata.rsptype == OTGW_BOILER)) ||
-                       ((OTdata.rsptype == OTGW_REQUEST_BOILER) && (delayedOTdata.rsptype == OTGW_THERMOSTAT))) ;
-      if(skipthis) { 
-            OTGWDebugln(" skipthis ");
-            delayedOTdata.skipthis = true;      //skip this message --> do decode for logging purposes, but do not send it to MQTT
-      } 
-    
+      delayedOTdata.skipthis = (delayedOTdata.id == OTdata.id) && (OTdata.time - delayedOTdata.time < 500) && 
+          (((OTdata.rsptype == OTGW_ANSWER_THERMOSTAT) && (delayedOTdata.rsptype == OTGW_BOILER)) ||
+            ((OTdata.rsptype == OTGW_REQUEST_BOILER) && (delayedOTdata.rsptype == OTGW_THERMOSTAT))) ;
+
       tmpOTdata = delayedOTdata;    //fetch delayed msg
       delayedOTdata = OTdata;       //store current msg
       OTdata = tmpOTdata;           //then process delayed msg
@@ -1354,6 +1351,7 @@ void processOTGW(const char *buf, int len){
       OTGWDebugf("[%-30s]", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
       // OTGWDebugf("[M=%d]",OTdata.master);
       OTGWDebug("\t");
+      if (OTdata.skipthis) OTGWDebug("skipthis ");
 
       //keep track of update
       msglastupdated[OTdata.id] = now();
@@ -1483,6 +1481,7 @@ void processOTGW(const char *buf, int len){
               DebugTf("f8.8 [%3.2f] u16 [%d] s16 [%d]\r\n", OTdata.f88(), OTdata.u16(), OTdata.s16()); 
               break;
         }
+      
     } 
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
     checkOTGWcmdqueue(buf, len);
