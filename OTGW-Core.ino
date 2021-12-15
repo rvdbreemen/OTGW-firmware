@@ -478,7 +478,7 @@ void print_s8s8(uint16_t& value)
   itoa((int8_t)OTdata.valueHB, _msg, 10);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_value_hb", sizeof(_topic));
-  OTGWDebugf("%s = %s %s\r\n", OTlookupitem.label, _msg, OTlookupitem.unit);
+  //OTGWDebugf("%s = %s %s\r\n", OTlookupitem.label, _msg, OTlookupitem.unit);
   if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
     sendMQTTData(_topic, _msg);
   }
@@ -486,7 +486,7 @@ void print_s8s8(uint16_t& value)
   itoa((int8_t)OTdata.valueLB, _msg, 10);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_value_lb", sizeof(_topic));
-  OTGWDebugf("%s = %s %s\r\n", OTlookupitem.label, _msg, OTlookupitem.unit);
+  //OTGWDebugf("%s = %s %s\r\n", OTlookupitem.label, _msg, OTlookupitem.unit);
   if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
     sendMQTTData(_topic, _msg);
     value = OTdata.u16();
@@ -535,7 +535,7 @@ void print_status(uint16_t& value)
     _flag8_master[8] = '\0';
 
     PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
-    OTGWDebugf("%s = Master [%s] ", OTlookupitem.label, _flag8_master);
+    OTGWDebugf("%s = Master [%s]\r\n", OTlookupitem.label, _flag8_master);
 
     //Master Status
     sendMQTTData(F("status_master"), _flag8_master);
@@ -569,7 +569,7 @@ void print_status(uint16_t& value)
     _flag8_slave[8] = '\0';
 
     PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
-    OTGWDebugf("%s = Slave [%s] \r\n", OTlookupitem.label, _flag8_slave);
+    OTGWDebugf("%s = Slave  [%s]\r\n", OTlookupitem.label, _flag8_slave);
 
     //Slave Status
     sendMQTTData(F("status_slave"), _flag8_slave);
@@ -586,7 +586,7 @@ void print_status(uint16_t& value)
   }
 
   uint16_t _value = OTdata.u16();
-  OTGWDebugTf("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]\r\n", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
+  // OTGWDebugf("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]\r\n", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
   value = _value;
 }
 
@@ -599,7 +599,7 @@ void print_solar_storage_status(uint16_t& value)
     // Master Solar Storage 
     // ID101:HB012: Master Solar Storage: Solar mode
     uint8_t MasterSolarMode = (OTdata.valueHB) & 0x7;
-    OTGWDebugf("%s = Solar Storage Master Mode [%d] \r\n", OTlookupitem.label, MasterSolarMode);
+    OTGWDebugf("%s = Solar Storage Master Mode [%d]\r\n", OTlookupitem.label, MasterSolarMode);
     sendMQTTData(F("solar_storage_master_mode"), itoa(MasterSolarMode, _msg, 10));  delayms(5);
     OTdataObject.SolarMasterStatus = OTdata.valueHB;
   } else { 
@@ -619,7 +619,7 @@ void print_solar_storage_status(uint16_t& value)
     OTdataObject.SolarSlaveStatus = OTdata.valueLB;
   }
   uint16_t _value = OTdata.u16();
-  OTGWDebugTf("Solar Storage Master / Slave Mode u16 [%04x] _value [%04x] hb [%02x] lb [%02x]\r\n", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
+  //OTGWDebugTf("Solar Storage Master / Slave Mode u16 [%04x] _value [%04x] hb [%02x] lb [%02x]\r\n", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
   value = _value;
 }
 
@@ -651,7 +651,7 @@ void print_statusVH(uint16_t& value)
     _flag8_master[8] = '\0';
 
     PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
-    OTGWDebugf("%s = VH Master [%s] ", OTlookupitem.label, _flag8_master);
+    OTGWDebugf("%s = VH Master [%s]\r\n", OTlookupitem.label, _flag8_master);
     //Master Status
     sendMQTTData(F("status_vh_master"), _flag8_master);
     sendMQTTData(F("vh_ventilation_enabled"),        (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delay(5);
@@ -679,7 +679,7 @@ void print_statusVH(uint16_t& value)
     _flag8_slave[8] = '\0';
 
     PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
-    OTGWDebugf("%s = VH Slave [%s] \r\n", OTlookupitem.label, _flag8_slave);
+    OTGWDebugf("%s = VH Slave  [%s]\r\n", OTlookupitem.label, _flag8_slave);
 
     //Slave Status
     sendMQTTData(F("status_vh_slave"), _flag8_slave);
@@ -694,7 +694,7 @@ void print_statusVH(uint16_t& value)
   }
 
   uint16_t _value = OTdata.u16();
-  OTGWDebugTf("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]\r\n", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
+  //OTGWDebugTf("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]\r\n", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
   value = _value;
 }
 
@@ -1294,6 +1294,7 @@ void processOTGW(const char *buf, int len){
     //split 32bit value into the relevant OT protocol parts
     memset(OTdata.buf, 0, sizeof(OTdata.buf));        // clear buffer
     memcpy(OTdata.buf, buf, len);                     // copy the raw message to the buffer
+    OTdata.len = len;                                 // set the length of the message  
     sscanf(bufval, "%8x", &value);                    // extract the value
     OTdata.value = value;                             // store the value
     OTdata.type = (value >> 28) & 0x7;                // byte 1 = take 3 bits that define msg msgType
@@ -1343,7 +1344,7 @@ void processOTGW(const char *buf, int len){
 
       //print OTmessage to debug
       OTGWDebugf("%s (%d)", OTdata.buf, OTdata.len);
-      OTGWDebugf("[%08x]", OTdata.value);      //print message frame
+      //OTGWDebugf("[%08x]", OTdata.value);      //print message frame
       //OTGWDebugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
       //print message Type and ID
       OTGWDebugf("[MsgID=%3d]", OTdata.id);
@@ -1351,7 +1352,7 @@ void processOTGW(const char *buf, int len){
       OTGWDebugf("[%-30s]", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
       // OTGWDebugf("[M=%d]",OTdata.master);
       OTGWDebug("\t");
-      if (OTdata.skipthis) OTGWDebug("skipthis ");
+      if (OTdata.skipthis) OTGWDebug(" skipthis ");
 
       //keep track of update
       msglastupdated[OTdata.id] = now();
