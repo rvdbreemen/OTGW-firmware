@@ -1,29 +1,35 @@
-# OTGW-firmware for NodeMCU - ESP 8266 
+# ESP8266 based OTGW-firmware for Nodoshop hardware
 
 [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
 
-OpenTherm Nodoshop firmware
+OpenTherm Nodoshop OTGW hardware - an ESP8266 firmware
 
-This is a custom firmware for the Nodoshop NodeMCU/ESP8266 version of the OpenTherm Gateway. 
+This project is an firmware for the Nodoshop OTGW hardware, based on ESP8266 devkits.
+
+Starting with version 2.3 of the Nodoshop hardware the devkit has changed from NodeMCU to a Wemos D1mini. This is fully supported by the hardware and this firmware.
+
+Supporting hardware version are:
+1.x-2.0   NodoMCU ESP8266 devkit
+2.3       Wemos D1mini ESP8266 devkit
 
 It can be found here: https://www.nodo-shop.nl/nl/opentherm-gateway/188-opentherm-gateway.html  
 More information on this gateway can be read here: http://otgw.tclcode.com/  (also location of the OTGW PIC firmware) 
 
-The goal of this project is to become a fully functioning ESP8266 firmware that operates the OTGW as a standalone application. Providing:
+The goal of this project is to become a fully functioning ESP8266 based OTGW-firmware that operates the OTGW as a standalone application. Providing:
 - a WebUI
 - bidirection MQTT support
 - a REST API
 - automatic integration with Home Assistant (Home Assistant Core v2021.2.0+)
 - and a TCP socket for serial connection
 
-**Breaking change: With version 0.8.0: MQTT Discovery topic naming convention has changed significantly, this will break MQTT based applications.**
+**Breaking change: With version 0.8.0 MQTT Discovery topic naming convention has changed significantly, this will break MQTT based applications.**
 **Breaking change: With version 0.7.2 (and up) the LitteFS filesystem is used. This means you need to reflash your device using a usb cable, all settings are lost in the process.**
 
 
-The features of this Nodosop OpenTherm NodeMCU firmware are:
-- configuration via the webUI on port 80: flash your nodeMCU and edit settings via the webUI
+The features of this Nodosop OpenTherm Gateware ESP8266 based firmware are:
+- configuration via the webUI on port 80: flash your ESP8266 and edit settings via the webUI
 - userfriendly file handling using LittleFS (breaking change v0.7.2+)
-- parsing the OT protocol on the NodeMCU (8266)
+- parsing the OT protocol on the ESP8266
 - parsing all known OT protocol message ID's (OpenTherm v2.2+2.3b), including Heating/Ventilation and Remeha specific msgid's
 - wide range of connection and data sharing options:
   - telnet (interpreted data and debugging)
@@ -34,8 +40,7 @@ The features of this Nodosop OpenTherm NodeMCU firmware are:
   - OTmonitor Web UI (standalone interface)
 - automatic integration with Home Assistant using _Home Assistant Discovery_ (Home Assistant Core v2021.2.0+)
 - integration with any MQTT based Home Automation solution, like Domoticz (plugin available) & OpenHAB
-- reliable OTA upgrades of `PIC-based OTGW-firmware` (the nodeMCU) itself (v0.6.0+)
-- reliable OTGW PIC upgrades, to the latest firmware available at http://otgw.tclcode.com/download.html
+- reliable OTGW PIC upgrades (v0.6.0+), to the latest firmware available at http://otgw.tclcode.com/download.html
 - cleaner RestAPI's for Telegraf OTmonitor integration
 - readout Dallas-type temperture sensors (eg. DS18B20) connected to GPIO
  
@@ -91,7 +96,7 @@ So shoutout to the following people for the collaboration on development:
 * @proditaki      for creating Domiticz plugin for OTGW-firmware
 * @tjfsteele      for endless hours of testing
 
-A big thank should goto **Schelte Bron** @hvlx for amazing work on the OpenTherm Gateway and for providing access to the upgrade routines of the PIC. Enabling this custom firmware a reliable way to upgrade you PIC firmware.
+A big thank should goto **Schelte Bron** @hvlx for amazing work on the OpenTherm Gateway project and for providing access to the upgrade routines of the PIC. Enabling this custom firmware a reliable way to upgrade you PIC firmware.
 
 If you want to thank Schelte Bron for his work on the OpenTherm Gateway project, just head over to his homepage and donate to him: https://otgw.tclcode.com/
 
