@@ -104,12 +104,22 @@ void checkOTWGpicforupdate(){
   if (!checklittlefshash()) sMessage = "Flash your littleFS with matching version!";
 }
 
-//===================[ checkOTWGpicforupdate ]=====================
+//===================[ sendOTGWbootcmd ]=====================
 void sendOTGWbootcmd(){
   if (!settingOTGWcommandenable) return;
   OTGWDebugTf("OTGW boot message = [%s]\r\n", CSTR(settingOTGWcommands));
-  OTGWSerial.write(CSTR(settingOTGWcommands));
-  OTGWSerial.flush();
+
+  // parse and execute commands
+  char bootcmds[settingOTGWcommands.length() + 1];
+  settingOTGWcommands.toCharArray(cmds, settingOTGWcommands.length() + 1);
+  char* cmd;
+  int i = 0;
+  cmd = strtok(bootcmds, ";");
+  while (cmd != NULL) {
+    OTGWDebugTf("Boot command[%d]: %s\r\n", i++, cmd);
+    addOTWGcmdtoqueue(cmd, strlen(cmd), true);
+    cmd = strtok(NULL, ";");
+  }
 }
 
 //===================[ OTGW Command & Response ]===================
@@ -435,7 +445,7 @@ void print_f88(float& value)
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = %s %s\r\n", OTlookupitem.label, _msg , OTlookupitem.unit);
   //SendMQTT
-  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
+  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
     value = _value;
   }
@@ -452,7 +462,7 @@ void print_s16(int16_t& value)
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = %s %s\r\n", OTlookupitem.label, _msg, OTlookupitem.unit);
   //SendMQTT
-  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
+  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
     value = _value;
   }
@@ -469,7 +479,7 @@ void print_s8s8(uint16_t& value)
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_value_hb", sizeof(_topic));
   OTGWDebugf("%s = %s %s\r\n", OTlookupitem.label, _msg, OTlookupitem.unit);
-  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
+  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
     sendMQTTData(_topic, _msg);
   }
   //Build string for MQTT
@@ -477,7 +487,7 @@ void print_s8s8(uint16_t& value)
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_value_lb", sizeof(_topic));
   OTGWDebugf("%s = %s %s\r\n", OTlookupitem.label, _msg, OTlookupitem.unit);
-  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
+  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
     sendMQTTData(_topic, _msg);
     value = OTdata.u16();
   }
@@ -492,7 +502,7 @@ void print_u16(uint16_t& value)
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = %s %s\r\n", OTlookupitem.label, _msg, OTlookupitem.unit);
   //SendMQTT
-  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
+  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
     value = _value;
   }
@@ -529,13 +539,13 @@ void print_status(uint16_t& value)
 
     //Master Status
     sendMQTTData(F("status_master"), _flag8_master);
-    sendMQTTData(F("ch_enable"),             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delayms(50);
-    sendMQTTData(F("dhw_enable"),            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delayms(50);
-    sendMQTTData(F("cooling_enable"),        (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delayms(50); 
-    sendMQTTData(F("otc_active"),            (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delayms(50);
-    sendMQTTData(F("ch2_enable"),            (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  delayms(50);
-    sendMQTTData(F("summerwintertime"),      (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  delayms(50);
-    sendMQTTData(F("dhw_blocking"),          (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));  delayms(50);
+    sendMQTTData(F("ch_enable"),             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("dhw_enable"),            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("cooling_enable"),        (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delay(5); 
+    sendMQTTData(F("otc_active"),            (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("ch2_enable"),            (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("summerwintertime"),      (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("dhw_blocking"),          (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));  delay(5);
 
     OTdataObject.MasterStatus = OTdata.valueHB;
     } else {
@@ -563,14 +573,14 @@ void print_status(uint16_t& value)
 
     //Slave Status
     sendMQTTData(F("status_slave"), _flag8_slave);
-    sendMQTTData(F("fault"),                 (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  delayms(50);  
-    sendMQTTData(F("centralheating"),        (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  delayms(50);  
-    sendMQTTData(F("domestichotwater"),      (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));  delayms(50);  
-    sendMQTTData(F("flame"),                 (((OTdata.valueLB) & 0x08) ? "ON" : "OFF"));  delayms(50);
-    sendMQTTData(F("cooling"),               (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  delayms(50); 
-    sendMQTTData(F("centralheating2"),       (((OTdata.valueLB) & 0x20) ? "ON" : "OFF"));  delayms(50);
-    sendMQTTData(F("diagnostic_indicator"),  (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));  delayms(50);
-    sendMQTTData(F("eletric_production"),    (((OTdata.valueLB) & 0x80) ? "ON" : "OFF"));  delayms(50);
+    sendMQTTData(F("fault"),                 (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  delayms(5);  
+    sendMQTTData(F("centralheating"),        (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  delayms(5);  
+    sendMQTTData(F("domestichotwater"),      (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));  delayms(5);  
+    sendMQTTData(F("flame"),                 (((OTdata.valueLB) & 0x08) ? "ON" : "OFF"));  delayms(5);
+    sendMQTTData(F("cooling"),               (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  delayms(5); 
+    sendMQTTData(F("centralheating2"),       (((OTdata.valueLB) & 0x20) ? "ON" : "OFF"));  delayms(5);
+    sendMQTTData(F("diagnostic_indicator"),  (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));  delayms(5);
+    sendMQTTData(F("eletric_production"),    (((OTdata.valueLB) & 0x80) ? "ON" : "OFF"));  delayms(5);
 
     OTdataObject.SlaveStatus = OTdata.valueLB;
   }
@@ -590,7 +600,7 @@ void print_solar_storage_status(uint16_t& value)
     // ID101:HB012: Master Solar Storage: Solar mode
     uint8_t MasterSolarMode = (OTdata.valueHB) & 0x7;
     OTGWDebugf("%s = Solar Storage Master Mode [%d] \r\n", OTlookupitem.label, MasterSolarMode);
-    sendMQTTData(F("solar_storage_master_mode"), itoa(MasterSolarMode, _msg, 10));  delayms(50);
+    sendMQTTData(F("solar_storage_master_mode"), itoa(MasterSolarMode, _msg, 10));  delayms(5);
     OTdataObject.SolarMasterStatus = OTdata.valueHB;
   } else { 
     //Slave
@@ -603,9 +613,9 @@ void print_solar_storage_status(uint16_t& value)
     OTGWDebugf("%s = Slave Solar Fault Indicator [%d] \r\n", OTlookupitem.label, SlaveSolarFaultIndicator);
     OTGWDebugf("%s = Slave Solar Mode Status [%d] \r\n", OTlookupitem.label, SlaveSolarModeStatus);
     OTGWDebugf("%s = Slave Solar Status [%d] \r\n", OTlookupitem.label, SlaveSolarStatus);
-    sendMQTTData(F("solar_storage_slave_fault_incidator"),  ((SlaveSolarFaultIndicator) ? "ON" : "OFF"));  delayms(50); 
-    sendMQTTData(F("solar_storage_mode_status"), itoa(SlaveSolarModeStatus, _msg, 10));  delayms(50);
-    sendMQTTData(F("solar_storage_slave_status"), itoa(SlaveSolarStatus, _msg, 10));  delayms(50);
+    sendMQTTData(F("solar_storage_slave_fault_incidator"),  ((SlaveSolarFaultIndicator) ? "ON" : "OFF"));  delay(5); 
+    sendMQTTData(F("solar_storage_mode_status"), itoa(SlaveSolarModeStatus, _msg, 10));  delay(5);
+    sendMQTTData(F("solar_storage_slave_status"), itoa(SlaveSolarStatus, _msg, 10));  delay(5);
     OTdataObject.SolarSlaveStatus = OTdata.valueLB;
   }
   uint16_t _value = OTdata.u16();
@@ -644,10 +654,10 @@ void print_statusVH(uint16_t& value)
     OTGWDebugf("%s = VH Master [%s] \r\n", OTlookupitem.label, _flag8_master);
     //Master Status
     sendMQTTData(F("status_vh_master"), _flag8_master);
-    sendMQTTData(F("vh_ventilation_enabled"),        (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delayms(50);
-    sendMQTTData(F("vh_bypass_position"),            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delayms(50);
-    sendMQTTData(F("vh_bypass_mode"),                (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delayms(50); 
-    sendMQTTData(F("vh_free_ventlation_mode"),       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delayms(50);
+    sendMQTTData(F("vh_ventilation_enabled"),        (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("vh_bypass_position"),            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("vh_bypass_mode"),                (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delay(5); 
+    sendMQTTData(F("vh_free_ventlation_mode"),       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delay(5);
 
     OTdataObject.MasterStatusVH = OTdata.valueLB;
     } else {
@@ -673,12 +683,12 @@ void print_statusVH(uint16_t& value)
 
     //Slave Status
     sendMQTTData(F("status_vh_slave"), _flag8_slave);
-    sendMQTTData(F("vh_fault"),                   (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  delayms(50);  
-    sendMQTTData(F("vh_ventlation_mode"),         (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  delayms(50);  
-    sendMQTTData(F("vh_bypass_status"),           (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));  delayms(50);  
-    sendMQTTData(F("vh_bypass_automatic_status"), (((OTdata.valueLB) & 0x08) ? "ON" : "OFF"));  delayms(50);
-    sendMQTTData(F("vh_free_ventliation_status"), (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  delayms(50);  
-    sendMQTTData(F("vh_diagnostic_indicator"),    (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));  delayms(50);
+    sendMQTTData(F("vh_fault"),                   (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  delay(5);  
+    sendMQTTData(F("vh_ventlation_mode"),         (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  delay(5);  
+    sendMQTTData(F("vh_bypass_status"),           (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));  delay(5);  
+    sendMQTTData(F("vh_bypass_automatic_status"), (((OTdata.valueLB) & 0x08) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("vh_free_ventliation_status"), (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  delay(5);  
+    sendMQTTData(F("vh_diagnostic_indicator"),    (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));  delay(5);
 
     OTdataObject.SlaveStatusVH = OTdata.valueLB;
   }
@@ -711,12 +721,12 @@ void print_ASFflags(uint16_t& value)
   //5: Water over-temp[ no OvT fault, over-temperat. Fault]
   //6: reserved
   //7: reserved
-  sendMQTTData(F("service_request"),       (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delayms(50);  
-  sendMQTTData(F("lockout_reset"),         (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delayms(50);  
-  sendMQTTData(F("low_water_pressure"),    (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delayms(50);  
-  sendMQTTData(F("gas_flame_fault"),       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delayms(50);
-  sendMQTTData(F("air_pressure_fault"),    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  delayms(50);  
-  sendMQTTData(F("water_over_temperature"),(((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  delayms(50);
+  sendMQTTData(F("service_request"),       (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delay(5);  
+  sendMQTTData(F("lockout_reset"),         (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delay(5);  
+  sendMQTTData(F("low_water_pressure"),    (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delay(5);  
+  sendMQTTData(F("gas_flame_fault"),       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delay(5);
+  sendMQTTData(F("air_pressure_fault"),    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  delay(5);  
+  sendMQTTData(F("water_over_temperature"),(((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  delay(5);
   value = OTdata.u16();
 }
 
@@ -727,8 +737,8 @@ void print_RBPflags(uint16_t& value)
   //Build string for MQTT
   char _msg[15] {0};
   //Remote Boiler Paramaters
-  sendMQTTData(F("RBP_flags_transfer_enable"), byte_to_binary(OTdata.valueHB));  delayms(50);
-  sendMQTTData(F("RBP_flags_read_write"), byte_to_binary(OTdata.valueLB));  delayms(50);
+  sendMQTTData(F("RBP_flags_transfer_enable"), byte_to_binary(OTdata.valueHB));  delay(5);
+  sendMQTTData(F("RBP_flags_read_write"), byte_to_binary(OTdata.valueLB));  delay(5);
 
   //bit: [clear/0, set/1]
   //0: DHW setpoint
@@ -739,8 +749,8 @@ void print_RBPflags(uint16_t& value)
   //5: reserved
   //6: reserved
   //7: reserved
-  sendMQTTData(F("rbp_dhw_setpoint"),       (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));   delayms(50); 
-  sendMQTTData(F("rbp_max_ch_setpoint"),    (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));   delayms(50); 
+  sendMQTTData(F("rbp_dhw_setpoint"),       (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));   delay(5); 
+  sendMQTTData(F("rbp_max_ch_setpoint"),    (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));   delay(5); 
 
   //bit: [clear/0, set/1]
   //0: read write  DHW setpoint
@@ -751,8 +761,8 @@ void print_RBPflags(uint16_t& value)
   //5: reserved
   //6: reserved
   //7: reserved
-  sendMQTTData(F("rbp_rw_dhw_setpoint"),       (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));   delayms(50); 
-  sendMQTTData(F("rbp_rw_max_ch_setpoint"),    (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));   delayms(50); 
+  sendMQTTData(F("rbp_rw_dhw_setpoint"),       (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));   delay(5); 
+  sendMQTTData(F("rbp_rw_max_ch_setpoint"),    (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));   delay(5); 
 
   value = OTdata.u16();
 }
@@ -781,14 +791,14 @@ void print_slavememberid(uint16_t& value)
   // 6:  Remote water filling function
   // 7:  Heat/cool mode control 
 
-  sendMQTTData(F("dhw_present"),                             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delayms(50);
-  sendMQTTData(F("control_type_modulation"),                 (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delayms(50);
-  sendMQTTData(F("cooling_config"),                          (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delayms(50);
-  sendMQTTData(F("dhw_config"),                              (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delayms(50);
-  sendMQTTData(F("master_low_off_pump_control_function"),    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  delayms(50); 
-  sendMQTTData(F("ch2_present"),                             (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  delayms(50);
-  sendMQTTData(F("remote_water_filling_function"),           (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));  delayms(50);  
-  sendMQTTData(F("heat_cool_mode_control"),                  (((OTdata.valueHB) & 0x80) ? "ON" : "OFF"));  delayms(50);
+  sendMQTTData(F("dhw_present"),                             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delay(5);
+  sendMQTTData(F("control_type_modulation"),                 (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delay(5);
+  sendMQTTData(F("cooling_config"),                          (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delay(5);
+  sendMQTTData(F("dhw_config"),                              (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delay(5);
+  sendMQTTData(F("master_low_off_pump_control_function"),    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  delay(5); 
+  sendMQTTData(F("ch2_present"),                             (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  delay(5);
+  sendMQTTData(F("remote_water_filling_function"),           (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));  delay(5);  
+  sendMQTTData(F("heat_cool_mode_control"),                  (((OTdata.valueHB) & 0x80) ? "ON" : "OFF"));  delay(5);
   value = OTdata.u16();
 }
 
@@ -812,10 +822,10 @@ void print_vh_configmemberid(uint16_t& value)
   OTGWDebugf("%s = VH Config[%s] MemberID code [%3d]\r\n", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   //Build string for MQTT
   char _msg[15] {0};
-  sendMQTTData(F("vh_configuration"), byte_to_binary(OTdata.valueHB)); delayms(50);
-  sendMQTTData(F("vh_configuration_system_type"),    (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delayms(50);
-  sendMQTTData(F("vh_configuration_bypass"),         (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delayms(50);
-  sendMQTTData(F("vh_configuration_speed_control"),  (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delayms(50);
+  sendMQTTData(F("vh_configuration"), byte_to_binary(OTdata.valueHB)); delay(5);
+  sendMQTTData(F("vh_configuration_system_type"),    (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delay(5);
+  sendMQTTData(F("vh_configuration_bypass"),         (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delay(5);
+  sendMQTTData(F("vh_configuration_speed_control"),  (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delay(5);
   
   utoa(OTdata.valueLB, _msg, 10);
   sendMQTTData(F("vh_memberid_code"), _msg);
@@ -846,7 +856,7 @@ void print_flag8u8(uint16_t& value)
   //flag8 value
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_flag8", sizeof(_topic));
-  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
+  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
     sendMQTTData(_topic, byte_to_binary(OTdata.valueHB));
   }
   //u8 value
@@ -854,7 +864,7 @@ void print_flag8u8(uint16_t& value)
   utoa(OTdata.valueLB, _msg, 10);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_code", sizeof(_topic));
-  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
+  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
     sendMQTTData(_topic, _msg);
     value = OTdata.u16();
   }
@@ -870,7 +880,7 @@ void print_flag8(uint16_t& value)
   //flag8 value
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_flag8", sizeof(_topic));
-  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
+  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
     sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
     value = OTdata.u16();
   }
@@ -886,14 +896,14 @@ void print_flag8flag8(uint16_t& value)
   OTGWDebugf("%s = HB flag8[%s] -[%3d]\r\n", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueHB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_hb_flag8", sizeof(_topic));
-  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
+  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
     sendMQTTData(_topic, byte_to_binary(OTdata.valueHB));
   }
   //flag8 valueLB
   OTGWDebugf("%s = LB flag8[%s] - [%3d]\r\n", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_lb_flag8", sizeof(_topic));
-  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
+  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
     sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
     value = OTdata.u16();
   }
@@ -968,7 +978,7 @@ void print_u8u8(uint16_t& value)
   OTGWDebugf("%s = HB u8[%s] [%3d]\r\n", OTlookupitem.label, _msg, OTdata.valueHB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_hb_u8", sizeof(_topic));
-  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
+  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
     sendMQTTData(_topic, _msg);
   }
   //flag8 valueLB
@@ -976,7 +986,7 @@ void print_u8u8(uint16_t& value)
   OTGWDebugf("%s = LB u8[%s] [%3d]\r\n", OTlookupitem.label, _msg, OTdata.valueLB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_lb_u8", sizeof(_topic));
-  if (static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) {
+  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
     sendMQTTData(_topic, _msg);
     value = OTdata.u16();
   }
@@ -1016,7 +1026,7 @@ void print_daytime(uint16_t& value)
   //dayofweek
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_dayofweek", sizeof(_topic));
-  sendMQTTData(_topic, dayOfWeekName[(OTdata.valueHB >> 5) & 0x7]);
+  sendMQTTData(_topic, dayOfWeekName[(OTdata.valueHB >> 5) & 0x7]); 
   //hour
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_hour", sizeof(_topic));
@@ -1243,29 +1253,20 @@ void processOTGW(const char *buf, int len){
     // sendMQTTData(F("otmsg_count"), itoa(cntOTmessagesprocessed, _msg, 10)); 
 
     // source of otmsg
-    if (buf[0]=='B')
-    {
-      OTGWDebugT("Boiler            ");
+    if (buf[0]=='B'){
       epochBoilerlastseen = now(); 
       OTdata.rsptype = OTGW_BOILER;
-    } else if (buf[0]=='T')
-    {
-      OTGWDebugT("Thermostat        ");
+    } else if (buf[0]=='T'){
       epochThermostatlastseen = now();
       OTdata.rsptype = OTGW_THERMOSTAT;
-    } else if (buf[0]=='R')
-    {
-      OTGWDebugT("Request Boiler    ");
+    } else if (buf[0]=='R')    {
       epochBoilerlastseen = now();
       OTdata.rsptype = OTGW_REQUEST_BOILER;
-    } else if (buf[0]=='A')
-    {
-      OTGWDebugT("Answer Thermostat ");
+    } else if (buf[0]=='A')    {
       epochThermostatlastseen = now();
       OTdata.rsptype = OTGW_ANSWER_THERMOSTAT;
-    } else if (buf[0]=='E')
-    {
-      OTGWDebugT("Parity error     ");
+    } else if (buf[0]=='E')    {
+      OTdata.rsptype = OTGW_PARITY_ERROR;
     } 
 
     //If the Boiler or Thermostat messages have not been seen for 30 seconds, then set the state to false. 
@@ -1288,46 +1289,64 @@ void processOTGW(const char *buf, int len){
       bOTGWpreviousstate = bOTGWonline; //remember state, so we can detect statechanges
     }
 
-    const char *bufval = buf + 1;
-    //uint32_t value = strtoul(bufval, NULL, 16);
+    const char *bufval = buf + 1; //skip the first char
     uint32_t value = 0;
-    sscanf(bufval, "%8x", &value);
-
-    //print OTmessage to debug
-    char otmsg[15]={0};
-    memcpy(otmsg, buf, len);
-    OTGWDebugf("%s (%d)", otmsg, len);
-    OTGWDebugf("[%08x]", value);
-
     //split 32bit value into the relevant OT protocol parts
+    memset(OTdata.buf, 0, sizeof(OTdata.buf));        // clear buffer
+    memcpy(OTdata.buf, buf, len);                     // copy the raw message to the buffer
+    sscanf(bufval, "%8x", &value);                    // extract the value
+    OTdata.value = value;                             // store the value
     OTdata.type = (value >> 28) & 0x7;                // byte 1 = take 3 bits that define msg msgType
     OTdata.masterslave = (OTdata.type >> 2) & 0x1;    // MSB from type --> 0 = master and 1 = slave
     OTdata.id = (value >> 16) & 0xFF;                 // byte 2 = message id 8 bits 
     OTdata.valueHB = (value >> 8) & 0xFF;             // byte 3 = high byte
     OTdata.valueLB = value & 0xFF;                    // byte 4 = low byte
-    OTdata.time = millis();
+    OTdata.time = millis();                           // time of reception    
+    OTdata.skipthis = false;                          // default: do not skip this message (will be sent to MQTT)
 
-    static bool override = true;
-    if (override) {
+    if (cntOTmessagesprocessed == 1) {       //first message needs to be put in the buffer
       //just store current message and delay processing
       delayedOTdata = OTdata;       //store current msg
       OTGWDebugln("delaying message!");
-      override = false;
-    } else {
+    } else {                              //any other message will be processed
       //delay buffer message to override if needed
-      if (((OTdata.rsptype == OTGW_REQUEST_BOILER) && (delayedOTdata.rsptype == OTGW_BOILER)) ||
-          ((OTdata.rsptype == OTGW_ANSWER_THERMOSTAT) && (delayedOTdata.rsptype == OTGW_THERMOSTAT)) &&
-          ((OTdata.time - delayedOTdata.time) < 500) ) { 
-            OTGWDebugln(" override ");	
-            delayedOTdata = OTdata;      //override delayed message
-            override = true;
+      bool skipthis = ((OTdata.time - delayedOTdata.time) < 500) && 
+                      (((OTdata.rsptype == OTGW_ANSWER_THERMOSTAT) && (delayedOTdata.rsptype == OTGW_BOILER)) ||
+                       ((OTdata.rsptype == OTGW_REQUEST_BOILER) && (delayedOTdata.rsptype == OTGW_THERMOSTAT))) ;
+      if(skipthis) { 
+            OTGWDebugln(" skipthis ");
+            delayedOTdata.skipthis = true;      //skip this message --> do decode for logging purposes, but do not send it to MQTT
       } 
     
       tmpOTdata = delayedOTdata;    //fetch delayed msg
       delayedOTdata = OTdata;       //store current msg
       OTdata = tmpOTdata;           //then process delayed msg
 
-      //print message frame
+      // Decode and print OpenTherm Gateway Message
+      switch (OTdata.rsptype){
+        case OTGW_BOILER:
+          OTGWDebugT("Boiler            ");
+          break;
+        case OTGW_THERMOSTAT:
+          OTGWDebugT("Thermostat        ");
+          break;
+        case OTGW_REQUEST_BOILER:
+          OTGWDebugT("Request Boiler    ");
+          break;
+        case OTGW_ANSWER_THERMOSTAT:
+          OTGWDebugT("Answer Thermostat ");
+          break;
+        case OTGW_PARITY_ERROR:
+          OTGWDebugT("Parity Error      ");
+          break;
+        default:
+          OTGWDebugT("Unknown           ");
+          break;
+      }
+
+      //print OTmessage to debug
+      OTGWDebugf("%s (%d)", OTdata.buf, OTdata.len);
+      OTGWDebugf("[%08x]", OTdata.value);      //print message frame
       //OTGWDebugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
       //print message Type and ID
       OTGWDebugf("[MsgID=%3d]", OTdata.id);
@@ -1344,13 +1363,6 @@ void processOTGW(const char *buf, int len){
 
       //next step interpret the OT protocol
       //On OT_WRITE_ACK or READ_ACK, or, status msgid's, then parse. 
-
-      // if ((static_cast<OpenThermMessageType>(OTdata.type) == OT_READ_ACK)   && ((OTlookupitem.msg == OT_READ)  || (OTlookupitem.msg == OT_RW))  ||
-      //     (static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_ACK)  && ((OTlookupitem.msg == OT_WRITE) || (OTlookupitem.msg == OT_RW))  ||
-      //     (static_cast<OpenThermMessageID>(OTdata.id) == OT_Statusflags) ||
-      //     (static_cast<OpenThermMessageID>(OTdata.id) == OT_StatusVH) ||
-      //     (static_cast<OpenThermMessageID>(OTdata.id) == OT_SolarStorageMaster)) {
-
           
         //#define OTprint(data, value, text, format) ({ data= value; OTGWDebugf("[%37s]", text); OTGWDebugf("= [format]", data)})
         //interpret values f8.8
@@ -1466,7 +1478,10 @@ void processOTGW(const char *buf, int len){
           case OT_SolarStorageFHBindexFHBvalue:           print_u8u8(OTdataObject.SolarStorageFHBindexFHBvalue ); break;
           case OT_BurnerUnsuccessfulStarts:               print_u16(OTdataObject.BurnerUnsuccessfulStarts); break;
           case OT_FlameSignalTooLow:                      print_u16(OTdataObject.FlameSignalTooLow); break;
-          default: DebugTf("Unknown message [%02d] value [%04X]\r\n"); break;
+          default: 
+              DebugTf("Unknown message [%02d] value [%04X]\r\n");
+              DebugTf("f8.8 [%3.2f] u16 [%d] s16 [%d]\r\n", OTdata.f88(), OTdata.u16(), OTdata.s16()); 
+              break;
         }
     } 
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
