@@ -493,7 +493,7 @@ enum OTGW_response_type {
 	OTGW_PARITY_ERROR,
 	OTGW_UNDEF	
 };
-struct OpenthermData {
+struct OpenthermData_t {
   char buf[10];	
   byte len;
   uint32_t value;

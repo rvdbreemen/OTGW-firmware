@@ -60,7 +60,7 @@ const char *hexheaders[] = {
 /* --- Endf of macro's --- */
 
 //some variable's
-OpenthermData OTdata, delayedOTdata, tmpOTdata;
+OpenthermData_t OTdata, delayedOTdata, tmpOTdata;
 
 #define OTGW_BANNER "OpenTherm Gateway"
 
@@ -236,12 +236,12 @@ void feedWatchDog() {
 //===================[ END Watchdog OTGW ]===============================
 
 //=======================================================================
-float OpenthermData::f88() {
+float OpenthermData_t::f88() {
   float value = (int8_t) valueHB;
   return value + (float)valueLB / 256.0;
 }
 
-void OpenthermData::f88(float value) {
+void OpenthermData_t::f88(float value) {
   if (value >= 0) {
     valueHB = (byte) value;
     float fraction = (value - valueHB);
@@ -254,22 +254,22 @@ void OpenthermData::f88(float value) {
   }
 }
 
-uint16_t OpenthermData::u16() {
+uint16_t OpenthermData_t::u16() {
   uint16_t value = valueHB;
   return ((value << 8) + valueLB);
 }
 
-void OpenthermData::u16(uint16_t value) {
+void OpenthermData_t::u16(uint16_t value) {
   valueLB = value & 0xFF;
   valueHB = (value >> 8) & 0xFF;
 }
 
-int16_t OpenthermData::s16() {
+int16_t OpenthermData_t::s16() {
   int16_t value = valueHB;
   return ((value << 8) + valueLB);
 }
 
-void OpenthermData::s16(int16_t value) {
+void OpenthermData_t::s16(int16_t value) {
   valueLB = value & 0xFF;
   valueHB = (value >> 8) & 0xFF;
 }
@@ -435,6 +435,15 @@ const char *byte_to_binary(int x)
     return b;
 }  //byte_to_binary
 
+bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
+  if (OT.skipthis) return false;
+  bool _valid = false;
+  _valid = _valid || ((OTlookup.type==OT_READ) && (static_cast<OpenThermMessageType>(OT.type) == OT_READ_ACK));
+  _valid = _valid || ((OTlookup.type==OT_WRITE) && (static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_DATA));
+  _valid = _valid || ((OTlookup.type==OT_RW) && (static_cast<OpenThermMessageType>(OT.type) == OT_READ_ACK) || (static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_DATA));
+  return _valid;
+}
+
 void print_f88(float& value)
 {
   //function to print data
@@ -445,7 +454,7 @@ void print_f88(float& value)
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = %s %s", OTlookupitem.label, _msg , OTlookupitem.unit);
   //SendMQTT
-  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
+  if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
     value = _value;
   }
@@ -462,7 +471,7 @@ void print_s16(int16_t& value)
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
   //SendMQTT
-  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
+  if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
     value = _value;
   }
@@ -479,7 +488,7 @@ void print_s8s8(uint16_t& value)
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_value_hb", sizeof(_topic));
   //OTGWDebugf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
-  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
+  if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(_topic, _msg);
   }
   //Build string for MQTT
@@ -487,7 +496,7 @@ void print_s8s8(uint16_t& value)
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_value_lb", sizeof(_topic));
   //OTGWDebugf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
-  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
+  if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(_topic, _msg);
     value = OTdata.u16();
   }
@@ -502,7 +511,7 @@ void print_u16(uint16_t& value)
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
   //SendMQTT
-  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
+  if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
     value = _value;
   }
@@ -856,7 +865,7 @@ void print_flag8u8(uint16_t& value)
   //flag8 value
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_flag8", sizeof(_topic));
-  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
+  if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(_topic, byte_to_binary(OTdata.valueHB));
   }
   //u8 value
@@ -864,7 +873,7 @@ void print_flag8u8(uint16_t& value)
   utoa(OTdata.valueLB, _msg, 10);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_code", sizeof(_topic));
-  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
+    if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(_topic, _msg);
     value = OTdata.u16();
   }
@@ -880,7 +889,7 @@ void print_flag8(uint16_t& value)
   //flag8 value
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_flag8", sizeof(_topic));
-  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
+  if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
     value = OTdata.u16();
   }
@@ -896,14 +905,14 @@ void print_flag8flag8(uint16_t& value)
   OTGWDebugf("%s = HB flag8[%s] -[%3d] ", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueHB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_hb_flag8", sizeof(_topic));
-  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
+    if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(_topic, byte_to_binary(OTdata.valueHB));
   }
   //flag8 valueLB
   OTGWDebugf("%s = LB flag8[%s] - [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_lb_flag8", sizeof(_topic));
-  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
+  if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
     value = OTdata.u16();
   }
@@ -978,7 +987,7 @@ void print_u8u8(uint16_t& value)
   //OTGWDebugf("%s = HB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueHB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_hb_u8", sizeof(_topic));
-  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
+  if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(_topic, _msg);
   }
   //flag8 valueLB
@@ -986,7 +995,7 @@ void print_u8u8(uint16_t& value)
   //OTGWDebugf("%s = LB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueLB);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_lb_u8", sizeof(_topic));
-  if ((static_cast<OpenThermMessageType>(OTdata.type) != OT_READ_DATA) && (OTdata.skipthis==false)) {
+  if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(_topic, _msg);
     value = OTdata.u16();
   }
@@ -1305,29 +1314,30 @@ void processOTGW(const char *buf, int len){
     OTdata.time = millis();                           // time of reception    
     OTdata.skipthis = false;                          // default: do not skip this message (will be sent to MQTT)
     
- 
     if (cntOTmessagesprocessed == 1) {       //first message needs to be put in the buffer
       //just store current message and delay processing
       delayedOTdata = OTdata;       //store current msg
       OTGWDebugln("delaying first message!");
     } else {                              //any other message will be processed
       //when the gateway overrides the boiler or thermostat, then do not use the results for decoding anywhere (skip this)
-      bool skipthis = (delayedOTdata.id == OTdata.id) && (OTdata.time - delayedOTdata.time < 500) && 
-          (((OTdata.rsptype == OTGW_ANSWER_THERMOSTAT) && (delayedOTdata.rsptype == OTGW_BOILER)) ||
+      //if B --> A, then gateway tells the thermostat what it needs to hear, then use current A message, and skip B value.
+      //if T --> R, then gateway overrides the thermostat, and tells the boiler what to do, then use current R message, and skip T value.
+      bool skipthis = (delayedOTdata.id == OTdata.id) && (OTdata.time - delayedOTdata.time < 500) &&  
+           (((OTdata.rsptype == OTGW_ANSWER_THERMOSTAT) && (delayedOTdata.rsptype == OTGW_BOILER)) ||
             ((OTdata.rsptype == OTGW_REQUEST_BOILER) && (delayedOTdata.rsptype == OTGW_THERMOSTAT))) ;
-      //if B --> A, then gateway tells the thermostat what it needs to hear, thus the boiler value is the real thing, then skip current A message, and use B value.
-      //if T --> R, then gateway overrides the thermostat, and tells the boiler what to do, thus the gateway value is the real thing, then use current R message, and skip T value.
-      if (OTdata.type != OT_WRITE_ACK) {
-        //ignore the request from the thermostat
-        delayedOTdata.skipthis = skipthis;
-      } else {
-        //ignore the response from the boiler
-        OTdata.skipthis = skipthis;
-      }
 
-      tmpOTdata = delayedOTdata;    //fetch delayed msg
-      delayedOTdata = OTdata;       //store current msg
-      OTdata = tmpOTdata;           //then process delayed msg
+      // if (OTdata.type != OT_WRITE_ACK) {
+      //   //ignore the request from the thermostat
+      //   delayedOTdata.skipthis = skipthis || delayedOTdata.skipthis; //In case it was true already, keep skipping it.
+      // } else {
+      //   //ignore the response from the boiler
+      //   OTdata.skipthis = skipthis;
+      // }
+
+      tmpOTdata = delayedOTdata;          //fetch delayed msg
+      delayedOTdata = OTdata;             //store current msg
+      OTdata = tmpOTdata;                 //then process delayed msg
+      OTdata.skipthis = skipthis;         //skip if needed
 
       // Decode and print OpenTherm Gateway Message
       switch (OTdata.rsptype){
