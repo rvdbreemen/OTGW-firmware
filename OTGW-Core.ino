@@ -1414,7 +1414,7 @@ void processOTGW(const char *buf, int len){
       PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
 
       if (OTdata.skipthis){
-        Debug("\tS");
+        Debug("\t-");
       } else {
         if (is_value_valid(OTdata, OTlookupitem)) {
           Debug("\t>");
