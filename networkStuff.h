@@ -54,6 +54,7 @@
 
 //Use the NTP SDK ESP 8266 
 #include <time.h>
+extern "C" int clock_gettime(clockid_t unused, struct timespec *tp);
 
 enum NtpStatus_t {
 	TIME_NOTSET,
@@ -180,7 +181,9 @@ void startLLMNR(const char *hostname)
 } // startLLMNR()
 
 
-//====[ startNTP ]===
+//==[ NTP stuff ]==============================================================
+
+
 void startNTP(){
   // Initialisation ezTime
   if (!settingNTPenable) return;
@@ -190,6 +193,20 @@ void startNTP(){
   //void configTime(int timezone_sec, int daylightOffset_sec, const char* server1, const char* server2, const char* server3)
   configTime(0, 0, CSTR(settingNTPhostname), nullptr, nullptr);
   NtpStatus = TIME_WAITFORSYNC;
+}
+
+
+void getNTPtime(){
+  struct timespec tp;   //to enable clock_gettime()
+  double tNow;
+  long dt_sec, dt_ms, dt_nsec;
+  clock_gettime(CLOCK_REALTIME, &tp);  
+  tNow = tp.tv_sec+(tp.tv_nsec/1.0e9);
+  dt_sec = tp.tv_sec;
+  dt_ms = tp.tv_nsec / 1000000UL;
+  dt_nsec = tp.tv_nsec;
+  DebugTf("tNow=%20.10f tNow_sec=%16.10ld tNow_nsec=%16.10ld dt_sec=%16li(s) dt_msec=%16li(sm) dt_nsec=%16li(ns)\r\n", tNow, tp.tv_sec,tp.tv_nsec, dt_sec, dt_ms, dt_nsec);
+  DebugFlush();
 }
 
 void loopNTP(){
@@ -232,8 +249,9 @@ if (!settingNTPenable) return;
     break;
   } 
  
-  DECLARE_TIMER_SEC(timerNTPtime, 10, CATCH_UP_MISSED_TICKS);
+  // DECLARE_TIMER_SEC(timerNTPtime, 10, CATCH_UP_MISSED_TICKS);
   // if DUE(timerNTPtime) DebugTf("Epoch Seconds: %d\r\n", time(nullptr)); //timeout, then break out of this loop
+  // if DUE(timerNTPtime) getNTPtime();
 }
 
 bool isNTPtimeSet(){
@@ -244,6 +262,7 @@ void waitforNTPsync(int16_t timeout = 60){
   //wait for time is synced to NTP server, for maximum of timeout seconds
   //feed the watchdog while waiting 
   //update NTP status
+  time_t t = time(nullptr); //get current time
   DebugTf("Waiting for NTP sync, timeout: %d\r\n", timeout);
   DECLARE_TIMER_SEC(waitforNTPsync, timeout, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timerWaiting, 5, CATCH_UP_MISSED_TICKS);
@@ -253,7 +272,7 @@ void waitforNTPsync(int16_t timeout = 60){
     Wire.write(0xA5);   
     Wire.endTransmission();
     delay(100);
-    if DUE(timerWaiting) DebugTf("Waiting for NTP sync: %d seconds\r\n", TIME_PAST_SEC(waitforNTPsync));
+    if DUE(timerWaiting) DebugTf("Waiting for NTP sync: %d seconds\r\n", (time(nullptr)-t));
     // update NTP status
     loopNTP();
     //stop waiting when NTP is synced 
@@ -268,6 +287,9 @@ void waitforNTPsync(int16_t timeout = 60){
     } 
   }
 }
+
+
+//==[ end of NTP stuff ]=======================================================
 
 String getMacAddress() {
   uint8_t baseMac[6];

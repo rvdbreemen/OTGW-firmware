@@ -66,12 +66,13 @@ void setup() {
   setLed(LED1, OFF);
 
   startTelnet();              // start the debug port 23
+  startNTP();
   startMDNS(CSTR(settingHostname));
   startLLMNR(CSTR(settingHostname));
-  startMQTT(); 
-  startNTP();
   setupFSexplorer();
   startWebserver();
+  startMQTT();               // start the MQTT after webserver, always.
+
 
   lastReset = ESP.getResetReason();
   OTGWSerial.printf("Last reset reason: [%s]\r\n", CSTR(lastReset));
