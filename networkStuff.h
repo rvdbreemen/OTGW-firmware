@@ -192,8 +192,6 @@ void startNTP(){
   NtpStatus = TIME_WAITFORSYNC;
 }
 
-
-
 void loopNTP(){
 if (!settingNTPenable) return;
   switch (NtpStatus){
@@ -248,19 +246,26 @@ void waitforNTPsync(int16_t timeout = 60){
   //update NTP status
   DebugTf("Waiting for NTP sync, timeout: %d\r\n", timeout);
   DECLARE_TIMER_SEC(waitforNTPsync, timeout, CATCH_UP_MISSED_TICKS);
-  DECLARE_TIMER_SEC(timerWaiting, 3, CATCH_UP_MISSED_TICKS);
+  DECLARE_TIMER_SEC(timerWaiting, 5, CATCH_UP_MISSED_TICKS);
   while (true){
     //feed the watchdog while waiting
     Wire.beginTransmission(0x26);   
     Wire.write(0xA5);   
     Wire.endTransmission();
     delay(100);
-    if DUE(timerWaiting) DebugTf("Waiting for NTP sync: %d seconds\r\n", TIME_PAST_SEC(timerWaiting));
+    if DUE(timerWaiting) DebugTf("Waiting for NTP sync: %d seconds\r\n", TIME_PAST_SEC(waitforNTPsync));
     // update NTP status
     loopNTP();
-    //stop waiting when NTP is synced or timeout is reached
-    if (isNTPtimeSet()) break;    
-    if DUE(waitforNTPsync) break; 
+    //stop waiting when NTP is synced 
+    if (isNTPtimeSet()) {
+      Debugln(F("NTP time synced!"));
+      break;
+    }
+    //stop waiting when timeout is reached 
+    if DUE(waitforNTPsync) {
+      DebugTln(F("NTP sync timeout!"));
+      break;
+    } 
   }
 }
 
