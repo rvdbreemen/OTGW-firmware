@@ -438,9 +438,9 @@ const char *byte_to_binary(int x)
 bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   if (OT.skipthis) return false;
   bool _valid = false;
-  _valid = _valid || ((OTlookup.type==OT_READ) && (static_cast<OpenThermMessageType>(OT.type) == OT_READ_ACK));
-  _valid = _valid || ((OTlookup.type==OT_WRITE) && (static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_DATA));
-  _valid = _valid || ((OTlookup.type==OT_RW) && (static_cast<OpenThermMessageType>(OT.type) == OT_READ_ACK) || (static_cast<OpenThermMessageType>(OTdata.type) == OT_WRITE_DATA));
+  _valid = _valid || (OTlookup.msgcmd==OT_READ && OT.type==OT_READ_ACK);
+  _valid = _valid || (OTlookup.msgcmd==OT_WRITE && OTdata.type==OT_WRITE_DATA);
+  _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OTdata.type==OT_WRITE_DATA));
   return _valid;
 }
 
@@ -1370,8 +1370,6 @@ void processOTGW(const char *buf, int len){
       OTGWDebugf("[%-16s]", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
       OTGWDebugf("[%-30s]", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
       // OTGWDebugf("[M=%d]",OTdata.master);
-      OTGWDebug("\t");
-      
 
       //keep track of update
       msglastupdated[OTdata.id] = now();
@@ -1379,6 +1377,15 @@ void processOTGW(const char *buf, int len){
       //Read information from this OT message ready for use...
       PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
 
+      if (OTdata.skipthis){
+        Debug("\tS");
+      } else {
+        if (is_value_valid(OTdata, OTlookupitem)) {
+          Debug("\t>");
+        } else {
+          Debug("\t ");
+        }
+      }
       //next step interpret the OT protocol
       //On OT_WRITE_ACK or READ_ACK, or, status msgid's, then parse. 
           
@@ -1521,7 +1528,10 @@ void processOTGW(const char *buf, int len){
     OTdataObject.error04++;
     OTGWDebugTf("\r\nError 04 = %d\r\n",OTdataObject.error04);
     sendMQTTData(F("Error 04"), String(OTdataObject.error04));
-  } else OTGWDebugTf("\r\nNot processed, received from OTGW => [%s] [%d]\r\n", buf, len);
+  } else {
+    OTGWDebugln();
+    OTGWDebugTf("Not processed, received from OTGW => [%s] [%d]\r\n", buf, len);
+  }
 }
 
 
