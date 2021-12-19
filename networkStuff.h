@@ -246,13 +246,16 @@ void waitforNTPsync(int16_t timeout = 60){
   //wait for time is synced to NTP server, for maximum of timeout seconds
   //feed the watchdog while waiting 
   //update NTP status
+  DebugTf("Waiting for NTP sync, timeout: %d\r\n", timeout);
   DECLARE_TIMER_SEC(waitforNTPsync, timeout, CATCH_UP_MISSED_TICKS);
+  DECLARE_TIMER_SEC(timerWaiting, 3, CATCH_UP_MISSED_TICKS);
   while (true){
     //feed the watchdog while waiting
     Wire.beginTransmission(0x26);   
     Wire.write(0xA5);   
     Wire.endTransmission();
     delay(100);
+    if DUE(timerWaiting) DebugTf("Waiting for NTP sync: %d seconds\r\n", TIME_PAST_SEC(timerWaiting));
     // update NTP status
     loopNTP();
     //stop waiting when NTP is synced or timeout is reached
