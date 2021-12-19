@@ -539,7 +539,7 @@ void print_status(uint16_t& value)
     _flag8_master[2] = (((OTdata.valueHB) & 0x04) ? 'C' : '-'); 
     _flag8_master[3] = (((OTdata.valueHB) & 0x08) ? 'O' : '-');
     _flag8_master[4] = (((OTdata.valueHB) & 0x10) ? '2' : '-'); 
-    _flag8_master[5] = (((OTdata.valueHB) & 0x20) ? 'W' : 'S'); 
+    _flag8_master[5] = (((OTdata.valueHB) & 0x20) ? 'S' : 'W'); 
     _flag8_master[6] = (((OTdata.valueHB) & 0x40) ? 'B' : '-'); 
     _flag8_master[7] = (((OTdata.valueHB) & 0x80) ? '.' : '-');
     _flag8_master[8] = '\0';
@@ -855,6 +855,41 @@ void print_solarstorage_slavememberid(uint16_t& value)
   //ID103:HB0: Slave Configuration Solar Storage: System type1
   sendMQTTData(F("solar_storage_system_type"),    (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
   value = OTdata.u16();
+}
+
+void print_remoteoverridefunction(uint16_t& value)
+{
+// MsdID 100 Remote override room setpoint 
+// LB: Remote override function 
+// bit: description  [ clear/0, set/1] 
+// 0:  Manual change priority [disable overruling remote 
+//     setpoint by manual setpoint change, enable overruling 
+//     remote setpoint by manual setpoint change ] 
+// 1:  Program change priority [disable overruling remote 
+//     setpoint by program setpoint change, enable overruling 
+//     remote setpoint by program setpoint change ] 
+// 2:  reserved  
+// 3:  reserved 
+// 4:  reserved 
+// 5:  reserved 
+// 6:  reserved 
+// 7:  reserved 
+// HB: reserved 
+  PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
+  OTGWDebugf("%s = flag8 = [%s] - decimal = [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
+
+  if (is_value_valid(OTdata, OTlookupitem)){
+    //Build string for MQTT
+    char _topic[50] {0};
+    //flag8 value
+    strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+    strlcat(_topic, "_flag8", sizeof(_topic));
+    sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
+    //report remote override flags to MQTT
+    sendMQTTData(F("remote_override_manual_change_priority"),             (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("remote_override_program_change_priority"),            (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  delay(5);
+    value = OTdata.u16();
+  }
 }
 
 void print_flag8u8(uint16_t& value)
@@ -1447,7 +1482,7 @@ void processOTGW(const char *buf, int len){
           case OT_Remoteparameter6boundaries:             print_s8s8(OTdataObject.Remoteparameter6boundaries); break;
           case OT_Remoteparameter7boundaries:             print_s8s8(OTdataObject.Remoteparameter7boundaries); break;
           case OT_Remoteparameter8boundaries:             print_s8s8(OTdataObject.Remoteparameter8boundaries); break;
-          case OT_RemoteOverrideFunction:                 print_flag8(OTdataObject.RemoteOverrideFunction); break;
+          case OT_RemoteOverrideFunction:                 print_remoteoverridefunction(OTdataObject.RemoteOverrideFunction); break;
           case OT_OEMDiagnosticCode:                      print_u16(OTdataObject.OEMDiagnosticCode); break;
           case OT_BurnerStarts:                           print_u16(OTdataObject.BurnerStarts); break; 
           case OT_CHPumpStarts:                           print_u16(OTdataObject.CHPumpStarts); break; 
