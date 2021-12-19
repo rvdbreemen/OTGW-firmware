@@ -39,7 +39,7 @@
 **      }
 */
 
-#define MAX_FILES_IN_LIST   25
+#define MAX_FILES_IN_LIST   40
 
 const char Helper[] = R"(
   <br>You first need to upload these two files:
@@ -172,6 +172,8 @@ void apifirmwarefilelist() {
 
 
 //=====================================================================================
+
+
 void apilistfiles()             // Senden aller Daten an den Client
 {   
   FSInfo LittleFSinfo;
