@@ -302,7 +302,7 @@ enum OpenThermMessageID {
 	struct OTlookup_t
     {
         int id;
-        OTmsgcmd_t msg;
+        OTmsgcmd_t msgcmd;
         OTtype_t type;
         char* label;
         char* friendlyname;

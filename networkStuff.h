@@ -202,31 +202,26 @@ if (!settingNTPenable) return;
       NtpLastSync = time(nullptr); //remember last sync
       DebugTln(F("Start time syncing"));
       startNTP();
+      DebugTf("Starting timezone lookup for [%s]\r\n", CSTR(settingNTPtimezone));
       NtpStatus = TIME_WAITFORSYNC;
-    break;
+      break;
     case TIME_WAITFORSYNC:
-    
       if ((time(nullptr)>0) || (time(nullptr) >= NtpLastSync)) { 
-        NtpLastSync = time(nullptr); //remember last sync 
-        
-        DebugTf("Timezone lookup for [%s]\r\n", CSTR(settingNTPtimezone));
+        NtpLastSync = time(nullptr); //remember last sync         
         auto myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
-        
         if (myTz.isError()){
-          DebugTf("Error: Timezone Invalid/Not Found: [%s]\r\n", CSTR(settingNTPtimezone));
+          //DebugTf("Error: Timezone Invalid/Not Found: [%s]\r\n", CSTR(settingNTPtimezone));
           settingNTPtimezone = NTP_DEFAULT_TIMEZONE;
           myTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone)); //try with default Timezone instead
-        } else DebugTln(F("Timezone lookup: successful"));
-        
-        auto myTime = ZonedDateTime::forUnixSeconds(NtpLastSync, myTz);
-        if (myTime.isError()) {
-          //NtpStatus = TIME_NEEDSYNC;
-          //DebugTln("Error: Time not set correctly, wait for sync");
         } else {
-          //finally time is synced!
-          setTime(myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
-          NtpStatus = TIME_SYNC;
-          DebugTln(F("Time synced!"));
+          //found the timezone, now set the time 
+          auto myTime = ZonedDateTime::forUnixSeconds(NtpLastSync, myTz);
+          if (!myTime.isError()) {
+            //finally time is synced!
+            setTime(myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
+            NtpStatus = TIME_SYNC;
+            DebugTln(F("Time synced!"));
+          }
         }
       } 
     break;
