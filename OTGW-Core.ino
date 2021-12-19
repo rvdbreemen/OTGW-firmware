@@ -1405,7 +1405,7 @@ void processOTGW(const char *buf, int len){
       OTGWDebugf("[MsgID=%3d]", OTdata.id);
       OTGWDebugf("[%-16s]", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
       //OTGWDebugf("[%-30s]", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
-      // OTGWDebugf("[M=%d]",OTdata.master);
+      //OTGWDebugf("[M=%d]",OTdata.master);
 
       //keep track of update
       msglastupdated[OTdata.id] = now();
