@@ -131,6 +131,7 @@ void setupFSexplorer(){
 
 //=====================================================================================
 void apifirmwarefilelist() {
+  DebugTf("API: apifirmwarefilelist()\r\n");
   char *s, buffer[400];
   String version, fwversion;
   Dir dir;
@@ -141,7 +142,8 @@ void apifirmwarefilelist() {
   dir = LittleFS.openDir("/");
   while (dir.next()) {
     if (dir.fileName().endsWith(".hex")) {
-      version="";fwversion="";
+      version="";
+      fwversion="";
       String verfile = "/" + dir.fileName();
       verfile.replace(".hex", ".ver");
       f = LittleFS.open(verfile, "r");

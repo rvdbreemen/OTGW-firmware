@@ -240,7 +240,7 @@ if (!settingNTPenable) return;
   } 
  
   DECLARE_TIMER_SEC(timerNTPtime, 10, CATCH_UP_MISSED_TICKS);
-  if DUE(timerNTPtime) DebugTf("Epoch Seconds: %d\r\n", time(nullptr)); //timeout, then break out of this loop
+  // if DUE(timerNTPtime) DebugTf("Epoch Seconds: %d\r\n", time(nullptr)); //timeout, then break out of this loop
 }
 
 bool isNTPtimeSet(){
