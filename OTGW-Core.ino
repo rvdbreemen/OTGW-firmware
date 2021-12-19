@@ -1414,12 +1414,12 @@ void processOTGW(const char *buf, int len){
       PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
 
       if (OTdata.skipthis){
-        Debug("\t-");
+        Debug("-");
       } else {
         if (is_value_valid(OTdata, OTlookupitem)) {
-          Debug("\t>");
+          Debug(">");
         } else {
-          Debug("\t ");
+          Debug(" ");
         }
       }
       //next step interpret the OT protocol
