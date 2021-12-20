@@ -9,8 +9,10 @@ This project is an firmware for the Nodoshop OTGW hardware, based on ESP8266 dev
 Starting with version 2.3 of the Nodoshop hardware the devkit has changed from NodeMCU to a Wemos D1mini. This is fully supported by the hardware and this firmware.
 
 Supporting hardware version are:
-1.x-2.0   NodoMCU ESP8266 devkit
-2.3       Wemos D1mini ESP8266 devkit
+| Version | Hardware supported |
+|-|-|
+|1.x-2.0|   NodoMCU ESP8266 devkit|
+|2.3|       Wemos D1mini ESP8266 devkit|
 
 It can be found here: https://www.nodo-shop.nl/nl/opentherm-gateway/188-opentherm-gateway.html  
 More information on this gateway can be read here: http://otgw.tclcode.com/  (also location of the OTGW PIC firmware) 
@@ -44,7 +46,7 @@ The features of this Nodosop OpenTherm Gateware ESP8266 based firmware are:
 - cleaner RestAPI's for Telegraf OTmonitor integration
 - readout Dallas-type temperture sensors (eg. DS18B20) connected to GPIO
  
-**Warning: Never flash your OTGW PIC firmware through wifi using OTmonitor application, you can brick your OTGW PIC. Instead use the buildin PIC firmware upgrade feature (based on code by Bron Schelte)**
+**Warning: Never flash your OTGW PIC firmware through wifi using OTmonitor application, you can brick your OTGW PIC. Instead use the buildin PIC firmware upgrade feature (based on code by Schelte Bron)**
 
 To do:
 - InfluxDB client to do direct logging 
