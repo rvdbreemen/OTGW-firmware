@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v0.9.0
+**  Version  : v0.9.1
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -39,7 +39,7 @@
 **      }
 */
 
-#define MAX_FILES_IN_LIST   25
+#define MAX_FILES_IN_LIST   40
 
 const char Helper[] = R"(
   <br>You first need to upload these two files:
@@ -131,6 +131,7 @@ void setupFSexplorer(){
 
 //=====================================================================================
 void apifirmwarefilelist() {
+  DebugTf("API: apifirmwarefilelist()\r\n");
   char *s, buffer[400];
   String version, fwversion;
   Dir dir;
@@ -141,7 +142,8 @@ void apifirmwarefilelist() {
   dir = LittleFS.openDir("/");
   while (dir.next()) {
     if (dir.fileName().endsWith(".hex")) {
-      version="";fwversion="";
+      version="";
+      fwversion="";
       String verfile = "/" + dir.fileName();
       verfile.replace(".hex", ".ver");
       f = LittleFS.open(verfile, "r");
@@ -170,6 +172,8 @@ void apifirmwarefilelist() {
 
 
 //=====================================================================================
+
+
 void apilistfiles()             // Senden aller Daten an den Client
 {   
   FSInfo LittleFSinfo;
