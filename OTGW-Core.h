@@ -137,10 +137,10 @@ typedef struct {
 	uint16_t 	MasterVersion = 0; // u8 / u8  Master product version number and type 
 	uint16_t 	SlaveVersion = 0; // u8 / u8  Slave product version number and type
 
-	//Rehmea
+	//Remeha
 	uint16_t	RemehadFdUcodes = 0; // u16 Remeha dF-/dU-codes
-	uint16_t 	RemehaServicemessage = 0; // u16 Remeha Servicemessage
-	uint16_t    RemehaDetectionConnectedSCU =0; // u16 Remeha detection connected SCU’s
+	uint16_t	RemehaServicemessage = 0; // u16 Remeha Servicemessage
+	uint16_t	RemehaDetectionConnectedSCU =0; // u16 Remeha detection connected SCU’s
 
 	//errors
 	uint16_t	error01 = 0;
@@ -324,7 +324,7 @@ enum OpenThermMessageID {
 		{  31, OT_READ  , ot_f88,        "TflowCH2", "Flow water temperature CH2 circuit", "°C" },
 		{  32, OT_READ  , ot_f88,        "Tdhw2", "Domestic hot water temperature 2", "°C" },
 		{  33, OT_READ  , ot_s16,        "Texhaust", "Boiler exhaust temperature", "°C" },
-		{  34, OT_UNDEF , ot_undef, "", "", "" },
+		{  34, OT_READ , ot_f88,         "Texchange", "Boiler heat exchanger temperature", "°C" },
 		{  35, OT_READ  , ot_u16,	 		"FanSpeed", "fan speed", "rpm" },
 		{  36, OT_READ  , ot_f88, 			"ElectricalCurrentBurnerFlame", "Electrical current through burner flame", "µA" },
 		{  37, OT_READ  , ot_f88, 			"TRoomCH2", "Room temperature for 2nd CH circuit", "°C" },
@@ -341,19 +341,19 @@ enum OpenThermMessageID {
 		{  48, OT_READ  , ot_s8s8,        "TdhwSetUBTdhwSetLB", "DHW setpoint upper & lower bounds for adjustment", "°C" },
 		{  49, OT_READ  , ot_s8s8,        "MaxTSetUBMaxTSetLB", "Max CH water setpoint upper & lower bounds for adjustment", "°C" },
 		{  50, OT_READ  , ot_s8s8,        "HcratioUBHcratioLB", "OTC heat curve ratio upper & lower bounds for adjustment", "" },
-		{  51, OT_UNDEF , ot_undef, "", "", "" },
-		{  52, OT_UNDEF , ot_undef, "", "", "" },
-		{  53, OT_UNDEF , ot_undef, "", "", "" },
-		{  54, OT_UNDEF , ot_undef, "", "", "" },
-		{  55, OT_UNDEF , ot_undef, "", "", "" },
+		{  51, OT_READ , ot_s8s8, "", "Remote parameter 4 boundaries", "" },
+		{  52, OT_READ , ot_s8s8, "", "Remote parameter 5 boundaries", "" },
+		{  53, OT_READ , ot_s8s8, "", "Remote parameter 6 boundaries", "" },
+		{  54, OT_READ , ot_s8s8, "", "Remote parameter 7 boundaries", "" },
+		{  55, OT_READ , ot_s8s8, "", "Remote parameter 8 boundaries", "" },
 		{  56, OT_RW    , ot_f88,         "TdhwSet", "DHW setpoint", "°C" },	
 		{  57, OT_RW    , ot_f88,         "MaxTSet", "MaxCH water setpoint", "°C" },
 		{  58, OT_RW    , ot_f88,         "Hcratio", "OTC heat curve ratio", "°C" },
-		{  59, OT_UNDEF , ot_undef, "", "", "" },
-		{  60, OT_UNDEF , ot_undef, "", "", "" },
-		{  61, OT_UNDEF , ot_undef, "", "", "" },
-		{  62, OT_UNDEF , ot_undef, "", "", "" },
-		{  63, OT_UNDEF , ot_undef, "", "", "" },
+		{  59, OT_RW    , ot_f88, "", "Remote parameter 4", "" },
+		{  60, OT_RW    , ot_f88, "", "Remote parameter 5", "" },
+		{  61, OT_RW    , ot_f88, "", "Remote parameter 6", "" },
+		{  62, OT_RW    , ot_f88, "", "Remote parameter 7", "" },
+		{  63, OT_RW    , ot_f88, "", "Remote parameter 8", "" },
 		{  64, OT_UNDEF , ot_undef, "", "", "" },
 		{  65, OT_UNDEF , ot_undef, "", "", "" },
 		{  66, OT_UNDEF , ot_undef, "", "", "" },
