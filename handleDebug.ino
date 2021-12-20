@@ -21,7 +21,7 @@ void handleDebug(){
                 break;
             case 'm':
                 DebugTln(F("Configure MQTT Discovery"));
-                DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
+                DebugTf("Enable MQTT: %s\r\n", CBOOLEAN(settingMQTTenable));
                 doAutoConfigure();
                 break;
             case 'r':   
@@ -39,40 +39,43 @@ void handleDebug(){
                     startMQTT();
                 } else DebugTln(F("MQTT is connected"));
                 break;
-            case '1':   bDebugOTmsg = !bDebugOTmsg; DebugTf("\r\nDebug OTmsg: %s\r\n", CBOOLEAN(bDebugOTmsg)); break;
-            case '2':   bDebugRestAPI = !bDebugRestAPI; DebugTf("\r\nDebug RestAPI: %s\r\n", CBOOLEAN(bDebugRestAPI)); break;
-            case '3':   bDebugMQTT = !bDebugMQTT; DebugTf("\r\nDebug MQTT: %s\r\n", CBOOLEAN(bDebugMQTT)); break;
+            case '1':   
+                bDebugOTmsg = !bDebugOTmsg; 
+                DebugTf("\r\nDebug OTmsg: %s\r\n", CBOOLEAN(bDebugOTmsg)); 
+                break;
+            case '2':   
+                bDebugRestAPI = !bDebugRestAPI; 
+                DebugTf("\r\nDebug RestAPI: %s\r\n", CBOOLEAN(bDebugRestAPI)); 
+                break;
+            case '3':   
+                bDebugMQTT = !bDebugMQTT; 
+                DebugTf("\r\nDebug MQTT: %s\r\n", CBOOLEAN(bDebugMQTT)); 
+                break;
             case 'b':
                 DebugTln(F("Blink led 1"));
-                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
                 blinkLED(LED1, 5, 500);
-            break;
+                break;
             case 'i':
                 DebugTln(F("relay init"));
-                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
                 initOutputs();
-            break;
+                break;
             case 'u':
                 DebugTln(F("gpio output on "));
-                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
                 digitalWrite(settingGPIOOUTPUTSpin, ON);
                 break;
             case 'j':
                 DebugTf("read gpio output state (0== led ON): %d \r\n", digitalRead(settingGPIOOUTPUTSpin));
-            break;
+                break;
             case 'k':
                 DebugTln(F("read settings"));
-                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
                 readSettings(true);
             break;
             case 'o':
                 DebugTln("gpio output off");
-                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
                 digitalWrite(settingGPIOOUTPUTSpin, OFF);
                 break;
             case 'l':
                 DebugTln("MyDEBUG =true");
-                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
                 settingMyDEBUG = true;
                 break;
             case 'f':
@@ -82,7 +85,6 @@ void handleDebug(){
                 }else{
                     DebugTln(F("MyDEBUG = false"));
                 }
-                // DebugTf("Enable MQTT: %s", CBOOLEAN(settingMQTTenable));
                 break;
             default:
             break;

@@ -10,8 +10,7 @@
 ** Modified: as OTGW actually uses the Serial interface, so no more debug to serial please.
 */
 
-/*---- sto wait
-art macro's ------------------------------------------------------------------*/
+/*---- start macro's ------------------------------------------------------------------*/
 
 #define Debug(...)      ({ TelnetStream.print(__VA_ARGS__);    })
 #define Debugln(...)    ({ TelnetStream.println(__VA_ARGS__);  })
@@ -34,14 +33,26 @@ art macro's ------------------------------------------------------------------*/
 
 // needs #include <TelnetStream.h>       // Version 0.0.1 - https://github.com/jandrassy/TelnetStream
 
+#include <time.h>
+extern "C" int clock_gettime(clockid_t unused, struct timespec *tp);
+
 char _bol[128];
 void _debugBOL(const char *fn, int line)
 {
-   
-  snprintf(_bol, sizeof(_bol), "%02d:%02d:%02d (%7u|%6u) %-12.12s(%4d): ", \
-                hour(), minute(), second(), \
+   //calculate fractional seconds to millis fraction
+   double fractional_seconds;
+   int microseconds;
+   struct timespec tp;   //to enable clock_gettime()  
+   clock_gettime(CLOCK_REALTIME, &tp); 
+   fractional_seconds = (double) tp.tv_nsec;
+   fractional_seconds /= 1e3;
+   fractional_seconds = round(fractional_seconds);
+   microseconds = (int) fractional_seconds;
+
+   snprintf(_bol, sizeof(_bol), "%02d:%02d:%02d.%06d (%7u|%6u) %-12.12s(%4d): ", \
+                hour(), minute(), second(), microseconds, \
                 ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(),\
                 fn, line);
                  
-  TelnetStream.print (_bol);
+   TelnetStream.print (_bol);
 }

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v0.9.0
+**  Version  : v0.9.1
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **
@@ -720,9 +720,9 @@
    ,[ "mqttotmessage",              "MQTT OT msg Enable"]
    ,[ "otgwcommandenable",          "OTGW Boot Command Enabled"]
    ,[ "otgwcommands",               "OTGW Boot Command"]
-   ,[ "thermostatconnected",        "Thermostat Connected"]
-   ,[ "boilerconnected",            "Boiler Connected"]
-   ,[ "picconnected",               "PIC Connected"]
+   ,[ "thermostatconnected",        "Thermostat connected"]
+   ,[ "boilerconnected",            "Boiler connected"]
+   ,[ "picconnected",               "OTGW online/offline"]
    ,[ "gpiooutputsenabled",         "GPIO Output Enabled"]
    ,[ "gpiooutputspin",             "GPIO pin # to switch on/off"]
    ,[ "gpiooutputstriggerbit",      "Bit X (master/slave) to trigger on (0-15)"]

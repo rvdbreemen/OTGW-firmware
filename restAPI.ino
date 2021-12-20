@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v0.9.0
+**  Version  : v0.9.1
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -347,22 +347,18 @@ void sendDeviceInfo()
   FlashMode_t ideMode = ESP.getFlashChipMode();
   sendNestedJsonObj("flashchipmode", flashMode[ideMode]);
   sendNestedJsonObj("boardtype",
-#ifdef ARDUINO_ESP8266_NODEMCU
+#if defined(ARDUINO_ESP8266_NODEMCU)
      "ESP8266_NODEMCU"
-#endif
-#ifdef ARDUINO_ESP8266_GENERIC
+#elif defined(ARDUINO_ESP8266_GENERIC)
      "ESP8266_GENERIC"
-#endif
-#ifdef ESP8266_ESP01
+#elif defined(ESP8266_ESP01)
      "ESP8266_ESP01"
-#endif
-#ifdef ESP8266_ESP12
+#elif defined(ESP8266_ESP12)
      "ESP8266_ESP12"
-#endif
-#ifdef ARDUINO_ESP8266_WEMOS_D1MINI
+#elif defined(ARDUINO_ESP8266_WEMOS_D1MINI)
      "WEMOS_D1MINI"
 #else 
-  "Unkown board"
+     "Unknown board"
 #endif
 
   );
@@ -431,7 +427,7 @@ void sendDeviceSettings()
   sendJsonSettingObj("gpiooutputspin", settingGPIOOUTPUTSpin, "i", 0, 16);
   sendJsonSettingObj("gpiooutputstriggerbit", settingGPIOOUTPUTStriggerBit, "i", 0,16);
   sendJsonSettingObj("otgwcommandenable", settingOTGWcommandenable, "b");
-  sendJsonSettingObj("otgwcommands", CSTR(settingOTGWcommands), "s", 32);
+  sendJsonSettingObj("otgwcommands", CSTR(settingOTGWcommands), "s", 128);
 
   sendEndJsonObj("settings");
 

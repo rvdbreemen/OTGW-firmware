@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v0.9.0
+**  Version  : v0.9.1
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **
@@ -60,6 +60,7 @@ void setLed(int8_t, uint8_t);
 //prototype
 void sendMQTTData(const String, const String, const bool);
 void sendMQTTData(const char*, const char*, const bool);
+void addOTWGcmdtoqueue(const char* ,  int , const bool);
 
 //Global variables
 WiFiClient  wifiClient;
@@ -74,9 +75,11 @@ String      sMessage = "";
 using namespace ace_time;
 static BasicZoneProcessor timeProcessor;
 static const int CACHE_SIZE = 3;
-static BasicZoneManager<CACHE_SIZE> manager(zonedb::kZoneRegistrySize, zonedb::kZoneRegistry);
+// static BasicZoneManager<CACHE_SIZE> manager(zonedb::kZoneRegistrySize, zonedb::kZoneRegistry);
+static BasicZoneProcessorCache<CACHE_SIZE> zoneProcessorCache;
+static BasicZoneManager timezoneManager(zonedb::kZoneRegistrySize, zonedb::kZoneRegistry, zoneProcessorCache);
 
-const char *weekDayName[]  {  "Unknown", "Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag", "Unknown" };
+const char *weekDayName[]  {  "Unknown", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Unknown" };
 const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
 
 //Information on OTGW 
@@ -112,16 +115,16 @@ bool      settingGPIOSENSORSenabled = false;
 int8_t    settingGPIOSENSORSpin = 10;
 int16_t   settingGPIOSENSORSinterval = 5;
 
-// Boot commands
+//boot commands
 bool      settingOTGWcommandenable = false;
 String    settingOTGWcommands = "";
 
-//debug flags
-bool      bDebugOTmsg = true;
+//debug flags 
+bool      bDebugOTmsg = true;    
 bool      bDebugRestAPI = false;
-bool      bDebugMQTT = true;
+bool      bDebugMQTT = false;
 
-// GPIO Output Settings
+//GPIO Output Settings
 bool      settingMyDEBUG = false;
 bool      settingGPIOOUTPUTSenabled = false;
 int8_t    settingGPIOOUTPUTSpin = 16;
@@ -132,7 +135,7 @@ int8_t    settingGPIOOUTPUTStriggerBit = 0;
 
     // That's all folks...
 
-    /***************************************************************************
+/***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a
 * copy of this software and associated documentation files (the

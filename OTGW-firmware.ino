@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v0.9.0
+**  Version  : v0.9.1
 **
 **  Copyright (c) 2021 Robert van den Breemen
 **
@@ -43,14 +43,11 @@ void setup() {
   
   OTGWSerial.println(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   OTGWSerial.printf("Booting....[%s]\r\n\r\n", String(_FW_VERSION).c_str());
-  rebootCount = updateRebootCount();
   WatchDogEnabled(0); // turn off watchdog
 
   //setup randomseed the right way
   randomSeed(RANDOM_REG32); //This is 8266 HWRNG used to seed the Random PRNG: Read more: https://config9.com/arduino/getting-a-truly-random-number-in-arduino/
-  lastReset = ESP.getResetReason();
-  OTGWSerial.printf("Last reset reason: [%s]\r\n", CSTR(ESP.getResetReason()));
-
+ 
   //setup the status LED
   setLed(LED1, ON);
   setLed(LED2, ON);
@@ -69,12 +66,20 @@ void setup() {
   setLed(LED1, OFF);
 
   startTelnet();              // start the debug port 23
+  startNTP();
   startMDNS(CSTR(settingHostname));
   startLLMNR(CSTR(settingHostname));
-  startMQTT(); 
-  startNTP();
   setupFSexplorer();
   startWebserver();
+  startMQTT();               // start the MQTT after webserver, always.
+
+
+  lastReset = ESP.getResetReason();
+  OTGWSerial.printf("Last reset reason: [%s]\r\n", CSTR(lastReset));
+  rebootCount = updateRebootCount();
+  updateRebootLog(lastReset);
+  
+ 
   OTGWSerial.println(F("Setup finished!\r\n"));
   // After resetting the OTGW PIC never send anything to Serial for debug
   // and switch to telnet port 23 for debug purposed. 
@@ -122,8 +127,9 @@ void restartWifi(){
 
   if (WiFi.status() == WL_CONNECTED)
   { //when reconnect, restart some services, just to make sure all works
-    WiFi.setAutoReconnect(true);
-    WiFi.persistent(true);
+    // Turn off ESP reconnect, to make sure that's not the issue (16/11/2021)
+    // WiFi.setAutoReconnect(true);   
+    // WiFi.persistent(true);
     startTelnet();
     startOTGWstream(); 
     startMQTT();
@@ -148,22 +154,22 @@ void sendtimecommand(){
   //send time / weekday
   char msg[15]={0};
   sprintf(msg,"SC=%d:%02d/%d", hour(), minute(), dayOfWeek(now()));
-  addOTWGcmdtoqueue(msg, strlen(msg));
+  addOTWGcmdtoqueue(msg, strlen(msg), true);
 
   static int lastDay = 0;
   if (day(now())!=lastDay){
     //Send msg id 21: month, day
     lastDay = day(now());
     sprintf(msg,"SR=21:%d,%d", month(now()), day(now()));
-    addOTWGcmdtoqueue(msg, strlen(msg));  
+    addOTWGcmdtoqueue(msg, strlen(msg), true);  
   }
   
   static int lastYear = 0;
   if (year(now())!=lastYear){
     lastYear = year(now());
     //Send msg id 22: HB of Year, LB of Year 
-    sprintf(msg,"SR=22:%d,%d", (lastYear >> 8) && 0xFF, lastYear && 0xFF);
-    addOTWGcmdtoqueue(msg, strlen(msg));
+    sprintf(msg,"SR=22:%d,%d", (lastYear >> 8) & 0xFF, lastYear & 0xFF);
+    addOTWGcmdtoqueue(msg, strlen(msg), true);
   }
 }
 
