@@ -637,7 +637,7 @@
   
   var translateFields = [
 
-    [ "hostname",                  "HostName" ]
+    [ "hostname",                  "Hostname" ]
    ,[ "mqttbroker",                "MQTT Broker IP/URL" ]
    ,[ "mqttbrokerport",            "MQTT Broker Port" ]
    ,[ "mqttuser",                  "MQTT User" ]
@@ -681,7 +681,7 @@
    ,[ "airtemp",                   "Air Temperature"]
    ,[ "waterovertemperature",      "Water Over-Temperature"]
    ,[ "author",                     "Developer"]
-   ,[ "fwversion",                  "NodeMCU Firmware Version"]
+   ,[ "fwversion",                  "ESP8266 Firmware Version"]
    ,[ "picfwversion",               "OTGW PIC Firmware Version"]
    ,[ "compiled",                   "Compiled on (date/time)"]
    ,[ "HostName",                   "Hostname (add .local)"]
@@ -710,8 +710,8 @@
    ,[ "mqtthaprefix",               "MQTT Home Assistant prefix"]
    ,[ "ntpenable",                  "NTP Enable"]
    ,[ "ntptimezone",                "NTP Timezone"]
-   ,[ "ntphostname",                "NTP hostname"]
-   ,[ "uptime",                     "Uptime since boot"]
+   ,[ "ntphostname",                "NTP Hostname"]
+   ,[ "uptime",                     "Uptime Since Boot"]
    ,[ "bootcount",                  "Nr. Reboots"] 
    ,[ "ledblink",                   "Heartbeat LED (on/off)"]
    ,[ "gpiosensorsenabled",         "GPIO Sensors Enabled"]
@@ -720,7 +720,7 @@
    ,[ "mqttotmessage",              "MQTT OT msg Enable"]
    ,[ "otgwcommandenable",          "OTGW Boot Command Enabled"]
    ,[ "otgwcommands",               "OTGW Boot Command"]
-   ,[ "thermostatconnected",        "Thermostate connected"]
+   ,[ "thermostatconnected",        "Thermostat connected"]
    ,[ "boilerconnected",            "Boiler connected"]
    ,[ "picconnected",               "OTGW online/offline"]
    ,[ "gpiooutputsenabled",         "GPIO Output Enabled"]
