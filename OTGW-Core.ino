@@ -661,7 +661,7 @@ uint16_t print_statusVH()
     //Slave Status
     sendMQTTData(F("status_vh_slave"), _flag8_slave);
     sendMQTTData(F("vh_fault"),                   (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  delayms(50);  
-    sendMQTTData(F("vh_ventlation_mode"),         (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  delayms(50);  
+    sendMQTTData(F("vh_ventilation_mode"),        (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  delayms(50);  
     sendMQTTData(F("vh_bypass_status"),           (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));  delayms(50);  
     sendMQTTData(F("vh_bypass_automatic_status"), (((OTdata.valueLB) & 0x08) ? "ON" : "OFF"));  delayms(50);
     sendMQTTData(F("vh_free_ventliation_status"), (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  delayms(50);  
