@@ -22,6 +22,7 @@
 
   window.onfocus = function() {
     if (needReload) {
+      needReload=false;
       window.location.reload(true);
     }
   };
