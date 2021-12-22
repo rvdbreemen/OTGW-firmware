@@ -161,7 +161,7 @@ typedef struct {
 
 } OTdataStruct;
 
-static OTdataStruct OTdataObject;   
+static OTdataStruct OTcurrentSystemState;   
 
 
 enum OpenThermResponseStatus {
