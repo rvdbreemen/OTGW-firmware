@@ -177,8 +177,8 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 void handleMQTT() 
 {  
   if (!settingMQTTenable) return;
-  DECLARE_TIMER_SEC(timerMQTTwaitforconnect, 42, CATCH_UP_MISSED_TICKS);   // retry after 42 seconds
-  DECLARE_TIMER_SEC(timerMQTTwaitforretry, 3, CATCH_UP_MISSED_TICKS);     // 3 seconds backoff
+  DECLARE_TIMER_SEC(timerMQTTwaitforconnect, 42, CATCH_UP_MISSED_TICKS);   // wait before trying to connect again
+  DECLARE_TIMER_SEC(timerMQTTwaitforretry, 3, CATCH_UP_MISSED_TICKS);     // wait for retry
 
   //State debug timers
   DECLARE_TIMER_SEC(timerMQTTdebugwaitforreconnect, 13);
@@ -186,6 +186,8 @@ void handleMQTT()
   DECLARE_TIMER_SEC(timerMQTTdebugwaitconnectionattempt, 1);
   DECLARE_TIMER_SEC(timerMQTTdebugisconnected, 60);
   
+  if (MQTTclient.connected()) MQTTclient.loop();  //always do a MQTTclient.loop() first
+
   switch(stateMQTT) 
   {
     case MQTT_STATE_INIT:  
@@ -318,7 +320,7 @@ void handleMQTT()
 
     case MQTT_STATE_ERROR:
       if DUE(timerMQTTdebugerrorstate) MQTTDebugTln(F("MQTT State: MQTT ERROR, wait for 10 minutes, before trying again"));
-      //next retry in 10 minutes.
+      //wait for next retry
       RESTART_TIMER(timerMQTTwaitforconnect);
       stateMQTT = MQTT_STATE_WAIT_FOR_RECONNECT;
       MQTTDebugTln(F("Next State: MQTT_STATE_WAIT_FOR_RECONNECT"));
