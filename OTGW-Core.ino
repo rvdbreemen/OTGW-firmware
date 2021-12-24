@@ -713,148 +713,161 @@ void print_ASFflags(uint16_t& value)
 {
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = ASF flags[%s] OEM fault code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-  //Build string for MQTT
-  char _msg[15] {0};
-  //Application Specific Fault
-  sendMQTTData(F("ASF_flags"), byte_to_binary(OTdata.valueHB));
-  //OEM fault code
-  utoa(OTdata.valueLB, _msg, 10);
-  sendMQTTData(F("ASF_oemfaultcode"), _msg);
+  
+  if (is_value_valid(OTdata, OTlookupitem)){
+    //Build string for MQTT
+    char _msg[15] {0};
+    //Application Specific Fault
+    sendMQTTData(F("ASF_flags"), byte_to_binary(OTdata.valueHB));
+    //OEM fault code
+    utoa(OTdata.valueLB, _msg, 10);
+    sendMQTTData(F("ASF_oemfaultcode"), _msg);
 
-  //bit: [clear/0, set/1]
     //bit: [clear/0, set/1]
-  //0: Service request [service not req’d, service required]
-  //1: Lockout-reset [ remote reset disabled, rr enabled]
-  //2: Low water press [ no WP fault, water pressure fault]
-  //3: Gas/flame fault [ no G/F fault, gas/flame fault ]
-  //4: Air press fault [ no AP fault, air pressure fault ]
-  //5: Water over-temp[ no OvT fault, over-temperat. Fault]
-  //6: reserved
-  //7: reserved
-  sendMQTTData(F("service_request"),       (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delay(5);  
-  sendMQTTData(F("lockout_reset"),         (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delay(5);  
-  sendMQTTData(F("low_water_pressure"),    (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delay(5);  
-  sendMQTTData(F("gas_flame_fault"),       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delay(5);
-  sendMQTTData(F("air_pressure_fault"),    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  delay(5);  
-  sendMQTTData(F("water_over_temperature"),(((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  delay(5);
-  value = OTdata.u16();
+      //bit: [clear/0, set/1]
+    //0: Service request [service not req’d, service required]
+    //1: Lockout-reset [ remote reset disabled, rr enabled]
+    //2: Low water press [ no WP fault, water pressure fault]
+    //3: Gas/flame fault [ no G/F fault, gas/flame fault ]
+    //4: Air press fault [ no AP fault, air pressure fault ]
+    //5: Water over-temp[ no OvT fault, over-temperat. Fault]
+    //6: reserved
+    //7: reserved
+    sendMQTTData(F("service_request"),       (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delay(5);  
+    sendMQTTData(F("lockout_reset"),         (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delay(5);  
+    sendMQTTData(F("low_water_pressure"),    (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delay(5);  
+    sendMQTTData(F("gas_flame_fault"),       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("air_pressure_fault"),    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  delay(5);  
+    sendMQTTData(F("water_over_temperature"),(((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  delay(5);
+    value = OTdata.u16();
+  }
 }
 
 void print_RBPflags(uint16_t& value)
 {
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = M[%s] OEM fault code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-  //Build string for MQTT
-  char _msg[15] {0};
-  //Remote Boiler Paramaters
-  sendMQTTData(F("RBP_flags_transfer_enable"), byte_to_binary(OTdata.valueHB));  delay(5);
-  sendMQTTData(F("RBP_flags_read_write"), byte_to_binary(OTdata.valueLB));  delay(5);
+  if (is_value_valid(OTdata, OTlookupitem)){
+    //Build string for MQTT
+    char _msg[15] {0};
+    //Remote Boiler Paramaters
+    sendMQTTData(F("RBP_flags_transfer_enable"), byte_to_binary(OTdata.valueHB));  delay(5);
+    sendMQTTData(F("RBP_flags_read_write"), byte_to_binary(OTdata.valueLB));  delay(5);
 
-  //bit: [clear/0, set/1]
-  //0: DHW setpoint
-  //1: max CH setpoint
-  //2: reserved
-  //3: reserved
-  //4: reserved
-  //5: reserved
-  //6: reserved
-  //7: reserved
-  sendMQTTData(F("rbp_dhw_setpoint"),       (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));   delay(5); 
-  sendMQTTData(F("rbp_max_ch_setpoint"),    (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));   delay(5); 
+    //bit: [clear/0, set/1]
+    //0: DHW setpoint
+    //1: max CH setpoint
+    //2: reserved
+    //3: reserved
+    //4: reserved
+    //5: reserved
+    //6: reserved
+    //7: reserved
+    sendMQTTData(F("rbp_dhw_setpoint"),       (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));   delay(5); 
+    sendMQTTData(F("rbp_max_ch_setpoint"),    (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));   delay(5); 
 
-  //bit: [clear/0, set/1]
-  //0: read write  DHW setpoint
-  //1: read write max CH setpoint
-  //2: reserved
-  //3: reserved
-  //4: reserved
-  //5: reserved
-  //6: reserved
-  //7: reserved
-  sendMQTTData(F("rbp_rw_dhw_setpoint"),       (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));   delay(5); 
-  sendMQTTData(F("rbp_rw_max_ch_setpoint"),    (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));   delay(5); 
+    //bit: [clear/0, set/1]
+    //0: read write  DHW setpoint
+    //1: read write max CH setpoint
+    //2: reserved
+    //3: reserved
+    //4: reserved
+    //5: reserved
+    //6: reserved
+    //7: reserved
+    sendMQTTData(F("rbp_rw_dhw_setpoint"),       (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));   delay(5); 
+    sendMQTTData(F("rbp_rw_max_ch_setpoint"),    (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));   delay(5); 
 
-  value = OTdata.u16();
+    value = OTdata.u16();
+  }
 }
 
 void print_slavememberid(uint16_t& value)
 {
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = Slave Config[%s] MemberID code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-  //Build string for SendMQTT
-  sendMQTTData(F("slave_configuration"), byte_to_binary(OTdata.valueHB));
-  char _msg[15] {0};
-  utoa(OTdata.valueLB, _msg, 10);
-  sendMQTTData(F("slave_memberid_code"), _msg);
+  if (is_value_valid(OTdata, OTlookupitem)){
+    //Build string for SendMQTT
+    sendMQTTData(F("slave_configuration"), byte_to_binary(OTdata.valueHB));
+    char _msg[15] {0};
+    utoa(OTdata.valueLB, _msg, 10);
+    sendMQTTData(F("slave_memberid_code"), _msg);
 
-  
-  // bit: description  [ clear/0, set/1] 
-  // 0:  DHW present  [ dhw not present, dhw is present ] 
-  // 1:  Control type  [ modulating, on/off ] 
-  // 2:  Cooling config  [ cooling not supported,  
-  //     cooling supported] 
-  // 3:  DHW config  [instantaneous or not-specified, 
-  //     storage tank] 
-  // 4:  Master low-off&pump control function [allowed, 
-  //     not allowed] 
-  // 5:  CH2 present  [CH2 not present, CH2 present] 
-  // 6:  Remote water filling function
-  // 7:  Heat/cool mode control 
+    
+    // bit: description  [ clear/0, set/1] 
+    // 0:  DHW present  [ dhw not present, dhw is present ] 
+    // 1:  Control type  [ modulating, on/off ] 
+    // 2:  Cooling config  [ cooling not supported,  
+    //     cooling supported] 
+    // 3:  DHW config  [instantaneous or not-specified, 
+    //     storage tank] 
+    // 4:  Master low-off&pump control function [allowed, 
+    //     not allowed] 
+    // 5:  CH2 present  [CH2 not present, CH2 present] 
+    // 6:  Remote water filling function
+    // 7:  Heat/cool mode control 
 
-  sendMQTTData(F("dhw_present"),                             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delay(5);
-  sendMQTTData(F("control_type_modulation"),                 (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delay(5);
-  sendMQTTData(F("cooling_config"),                          (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delay(5);
-  sendMQTTData(F("dhw_config"),                              (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delay(5);
-  sendMQTTData(F("master_low_off_pump_control_function"),    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  delay(5); 
-  sendMQTTData(F("ch2_present"),                             (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  delay(5);
-  sendMQTTData(F("remote_water_filling_function"),           (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));  delay(5);  
-  sendMQTTData(F("heat_cool_mode_control"),                  (((OTdata.valueHB) & 0x80) ? "ON" : "OFF"));  delay(5);
-  value = OTdata.u16();
+    sendMQTTData(F("dhw_present"),                             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("control_type_modulation"),                 (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("cooling_config"),                          (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("dhw_config"),                              (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("master_low_off_pump_control_function"),    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  delay(5); 
+    sendMQTTData(F("ch2_present"),                             (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("remote_water_filling_function"),           (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));  delay(5);  
+    sendMQTTData(F("heat_cool_mode_control"),                  (((OTdata.valueHB) & 0x80) ? "ON" : "OFF"));  delay(5);
+    value = OTdata.u16();
+  }
 }
 
 void print_mastermemberid(uint16_t& value)
 {
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = Master Config[%s] MemberID code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-  //Build string for MQTT
-  char _msg[15] {0};
-  sendMQTTData(F("master_configuration"), byte_to_binary(OTdata.valueHB));
-  sendMQTTData(F("master_configuration_smart_power"), (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
-  
-  utoa(OTdata.valueLB, _msg, 10);
-  sendMQTTData(F("master_memberid_code"), _msg);
-  value = OTdata.u16();
+  if (is_value_valid(OTdata, OTlookupitem)){
+    //Build string for MQTT
+    char _msg[15] {0};
+    sendMQTTData(F("master_configuration"), byte_to_binary(OTdata.valueHB));
+    sendMQTTData(F("master_configuration_smart_power"), (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
+    
+    utoa(OTdata.valueLB, _msg, 10);
+    sendMQTTData(F("master_memberid_code"), _msg);
+    value = OTdata.u16();
+  }
 }
 
 void print_vh_configmemberid(uint16_t& value)
 {
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = VH Config[%s] MemberID code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-  //Build string for MQTT
-  char _msg[15] {0};
-  sendMQTTData(F("vh_configuration"), byte_to_binary(OTdata.valueHB)); delay(5);
-  sendMQTTData(F("vh_configuration_system_type"),    (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delay(5);
-  sendMQTTData(F("vh_configuration_bypass"),         (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delay(5);
-  sendMQTTData(F("vh_configuration_speed_control"),  (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delay(5);
-  
-  utoa(OTdata.valueLB, _msg, 10);
-  sendMQTTData(F("vh_memberid_code"), _msg);
-  value = OTdata.u16();
+  if (is_value_valid(OTdata, OTlookupitem)){
+    //Build string for MQTT
+    char _msg[15] {0};
+    sendMQTTData(F("vh_configuration"), byte_to_binary(OTdata.valueHB)); delay(5);
+    sendMQTTData(F("vh_configuration_system_type"),    (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("vh_configuration_bypass"),         (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("vh_configuration_speed_control"),  (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delay(5);
+    
+    utoa(OTdata.valueLB, _msg, 10);
+    sendMQTTData(F("vh_memberid_code"), _msg);
+    value = OTdata.u16();
+  }
 }
 
 void print_solarstorage_slavememberid(uint16_t& value)
 {
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = Solar Storage Slave Config[%s] MemberID code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-  //Build string for SendMQTT
-  sendMQTTData(F("solar_storage_slave_configuration"), byte_to_binary(OTdata.valueHB));
-  char _msg[15] {0};
-  utoa(OTdata.valueLB, _msg, 10);
-  sendMQTTData(F("solar_storage_slave_memberid_code"), _msg);
+  if (is_value_valid(OTdata, OTlookupitem)){
+     //Build string for SendMQTT
+    sendMQTTData(F("solar_storage_slave_configuration"), byte_to_binary(OTdata.valueHB));
+    char _msg[15] {0};
+    utoa(OTdata.valueLB, _msg, 10);
+    sendMQTTData(F("solar_storage_slave_memberid_code"), _msg);
 
-  //ID103:HB0: Slave Configuration Solar Storage: System type1
-  sendMQTTData(F("solar_storage_system_type"),    (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
-  value = OTdata.u16();
+    //ID103:HB0: Slave Configuration Solar Storage: System type1
+    sendMQTTData(F("solar_storage_system_type"),    (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
+    value = OTdata.u16();
+  }
 }
 
 void print_remoteoverridefunction(uint16_t& value)
@@ -896,22 +909,20 @@ void print_flag8u8(uint16_t& value)
 {
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = M[%s] - [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-  //Build string for MQTT
-  char _topic[50] {0};
-  //flag8 value
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
-  strlcat(_topic, "_flag8", sizeof(_topic));
   if (is_value_valid(OTdata, OTlookupitem)){
+    //Build string for MQTT
+    char _topic[50] {0};
+    //flag8 value
+    strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+    strlcat(_topic, "_flag8", sizeof(_topic));
     sendMQTTData(_topic, byte_to_binary(OTdata.valueHB));
-  }
-  //u8 value
-  char _msg[15] {0};
-  utoa(OTdata.valueLB, _msg, 10);
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
-  strlcat(_topic, "_code", sizeof(_topic));
-    if (is_value_valid(OTdata, OTlookupitem)){
+    //u8 value
+    char _msg[15] {0};
+    utoa(OTdata.valueLB, _msg, 10);
+    strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+    strlcat(_topic, "_code", sizeof(_topic));
     sendMQTTData(_topic, _msg);
-    value = OTdata.u16();
+    value = OTdata.u16(); 
   }
 }
 
@@ -919,13 +930,12 @@ void print_flag8(uint16_t& value)
 {
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = flag8 = [%s] - decimal = [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
-
-  //Build string for MQTT
-  char _topic[50] {0};
-  //flag8 value
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
-  strlcat(_topic, "_flag8", sizeof(_topic));
-  if (is_value_valid(OTdata, OTlookupitem)){
+   if (is_value_valid(OTdata, OTlookupitem)){
+    //Build string for MQTT
+    char _topic[50] {0};
+    //flag8 value
+    strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+    strlcat(_topic, "_flag8", sizeof(_topic));
     sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
     value = OTdata.u16();
   }
@@ -939,16 +949,16 @@ void print_flag8flag8(uint16_t& value)
   //flag8 valueHB
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = HB flag8[%s] -[%3d] ", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueHB);
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
-  strlcat(_topic, "_hb_flag8", sizeof(_topic));
-    if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem)){
+    strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+    strlcat(_topic, "_hb_flag8", sizeof(_topic));
     sendMQTTData(_topic, byte_to_binary(OTdata.valueHB));
   }
   //flag8 valueLB
   OTGWDebugf("%s = LB flag8[%s] - [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
-  strlcat(_topic, "_lb_flag8", sizeof(_topic));
   if (is_value_valid(OTdata, OTlookupitem)){
+    strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+    strlcat(_topic, "_lb_flag8", sizeof(_topic));
     sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
     value = OTdata.u16();
   }
@@ -961,17 +971,21 @@ void print_vh_remoteparametersetting(uint16_t& value)
   //flag8 valueHB
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = HB flag8[%s] -[%3d] ", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueHB);
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
-  strlcat(_topic, "_hb_flag8", sizeof(_topic));
-  sendMQTTData(_topic, byte_to_binary(OTdata.valueHB));
-  sendMQTTData(F("vh_tramfer_enble_nominal_ventlation_value"),    (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
- //flag8 valueLB
+  if (is_value_valid(OTdata, OTlookupitem)){
+    strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+    strlcat(_topic, "_hb_flag8", sizeof(_topic));
+    sendMQTTData(_topic, byte_to_binary(OTdata.valueHB));
+    sendMQTTData(F("vh_tramfer_enble_nominal_ventlation_value"),    (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
+  }
+  //flag8 valueLB
   OTGWDebugf("%s = LB flag8[%s] - [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
-  strlcat(_topic, "_lb_flag8", sizeof(_topic));
-  sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
-  sendMQTTData(F("vh_rw_nominal_ventlation_value"),    (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  
-  value = OTdata.u16();
+  if (is_value_valid(OTdata, OTlookupitem)){
+    strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+    strlcat(_topic, "_lb_flag8", sizeof(_topic));
+    sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
+    sendMQTTData(F("vh_rw_nominal_ventlation_value"),    (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  
+    value = OTdata.u16();
+  }
 }
 
 
@@ -984,54 +998,54 @@ void print_command(uint16_t& value)
   // ID4 (HB=10): Remote Request Service request reset
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = %3d / %3d %s", OTlookupitem.label, (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, OTlookupitem.unit);
-  //Build string for MQTT
-  char _topic[50] {0};
-  char _msg[10] {0};
-  //flag8 valueHB
-  utoa((OTdata.valueHB), _msg, 10);
-  //OTGWDebugf("%s = HB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueHB);
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
-  strlcat(_topic, "_hb_u8", sizeof(_topic));
-  sendMQTTData(_topic, _msg);
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
-  strlcat(_topic, "_remote_command", sizeof(_topic));
-  switch (OTdata.valueHB) {
-    case 1: sendMQTTData(_topic, "Remote Request Boiler Lockout-reset");  OTGWDebugf("\r\n%s = remote command [%s]", OTlookupitem.label, "Remote Request Boiler Lockout-reset"); break;
-    case 2: sendMQTTData(_topic, "Remote Request Water filling"); OTGWDebugf("\r\n%s = remote command [%s]", OTlookupitem.label, "Remote Request Water filling"); break;
-    case 10: sendMQTTData(_topic, "Remote Request Service request reset");  OTGWDebugf("\r\n%s = remote command [%s]", OTlookupitem.label, "Remote Request Service request reset");break;
-    default: sendMQTTData(_topic, "Unknown command"); OTGWDebugf("\r\n%s = remote command [%s]", OTlookupitem.label, "Unknown command");break;
-  } 
+  if (is_value_valid(OTdata, OTlookupitem)){
+    //Build string for MQTT
+    char _topic[50] {0};
+    char _msg[10] {0};
+    //flag8 valueHB
+    utoa((OTdata.valueHB), _msg, 10);
+    //OTGWDebugf("%s = HB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueHB);
+    strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+    strlcat(_topic, "_hb_u8", sizeof(_topic));
+    sendMQTTData(_topic, _msg);
+    strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+    strlcat(_topic, "_remote_command", sizeof(_topic));
+    switch (OTdata.valueHB) {
+      case 1: sendMQTTData(_topic, "Remote Request Boiler Lockout-reset");  OTGWDebugf("\r\n%s = remote command [%s]", OTlookupitem.label, "Remote Request Boiler Lockout-reset"); break;
+      case 2: sendMQTTData(_topic, "Remote Request Water filling"); OTGWDebugf("\r\n%s = remote command [%s]", OTlookupitem.label, "Remote Request Water filling"); break;
+      case 10: sendMQTTData(_topic, "Remote Request Service request reset");  OTGWDebugf("\r\n%s = remote command [%s]", OTlookupitem.label, "Remote Request Service request reset");break;
+      default: sendMQTTData(_topic, "Unknown command"); OTGWDebugf("\r\n%s = remote command [%s]", OTlookupitem.label, "Unknown command");break;
+    } 
 
-  //flag8 valueLB
-  utoa((OTdata.valueLB), _msg, 10);
-  //OTGWDebugf("%s = LB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueLB);
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
-  strlcat(_topic, "_lb_u8", sizeof(_topic));
-  sendMQTTData(_topic, _msg);
-  value = OTdata.u16();
+    //flag8 valueLB
+    utoa((OTdata.valueLB), _msg, 10);
+    //OTGWDebugf("%s = LB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueLB);
+    strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+    strlcat(_topic, "_lb_u8", sizeof(_topic));
+    sendMQTTData(_topic, _msg);
+    value = OTdata.u16();
+  }
 }
 
 void print_u8u8(uint16_t& value)
 { 
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = %3d / %3d %s", OTlookupitem.label, (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, OTlookupitem.unit);
-  //Build string for MQTT
-  char _topic[50] {0};
-  char _msg[10] {0};
-  //flag8 valueHB
-  utoa((OTdata.valueHB), _msg, 10);
-  //OTGWDebugf("%s = HB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueHB);
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
-  strlcat(_topic, "_hb_u8", sizeof(_topic));
   if (is_value_valid(OTdata, OTlookupitem)){
+    //Build string for MQTT
+    char _topic[50] {0};
+    char _msg[10] {0};
+    //flag8 valueHB
+    utoa((OTdata.valueHB), _msg, 10);
+    //OTGWDebugf("%s = HB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueHB);
+    strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+    strlcat(_topic, "_hb_u8", sizeof(_topic));
     sendMQTTData(_topic, _msg);
-  }
-  //flag8 valueLB
-  utoa((OTdata.valueLB), _msg, 10);
-  //OTGWDebugf("%s = LB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueLB);
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
-  strlcat(_topic, "_lb_u8", sizeof(_topic));
-  if (is_value_valid(OTdata, OTlookupitem)){
+    //flag8 valueLB
+    utoa((OTdata.valueLB), _msg, 10);
+    //OTGWDebugf("%s = LB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueLB);
+    strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+    strlcat(_topic, "_lb_u8", sizeof(_topic));
     sendMQTTData(_topic, _msg);
     value = OTdata.u16();
   }
@@ -1041,22 +1055,24 @@ void print_date(uint16_t& value)
 { 
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = %3d / %3d %s", OTlookupitem.label, (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, OTlookupitem.unit);
-  //Build string for MQTT
-  char _topic[50] {0};
-  char _msg[10] {0};
-  //flag8 valueHB
-  utoa((OTdata.valueHB), _msg, 10);
-  //OTGWDebugf("%s = HB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueHB);
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
-  strlcat(_topic, "_month", sizeof(_topic));
-  sendMQTTData(_topic, _msg);
-  //flag8 valueLB
-  utoa((OTdata.valueLB), _msg, 10);
-  //OTGWDebugf("%s = LB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueLB);
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
-  strlcat(_topic, "_day_of_month", sizeof(_topic));
-  sendMQTTData(_topic, _msg);
-  value = OTdata.u16();
+  if (is_value_valid(OTdata, OTlookupitem)){
+    //Build string for MQTT
+    char _topic[50] {0};
+    char _msg[10] {0};
+    //flag8 valueHB
+    utoa((OTdata.valueHB), _msg, 10);
+    //OTGWDebugf("%s = HB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueHB);
+    strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+    strlcat(_topic, "_month", sizeof(_topic));
+    sendMQTTData(_topic, _msg);
+    //flag8 valueLB
+    utoa((OTdata.valueLB), _msg, 10);
+    //OTGWDebugf("%s = LB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueLB);
+    strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+    strlcat(_topic, "_day_of_month", sizeof(_topic));
+    sendMQTTData(_topic, _msg);
+    value = OTdata.u16();
+  }
 }
 
 void print_daytime(uint16_t& value)
@@ -1065,22 +1081,24 @@ void print_daytime(uint16_t& value)
   const char *dayOfWeekName[]  { "Unknown", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Unknown" };
   PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
   OTGWDebugf("%s = %s - %2d:%2d", OTlookupitem.label, dayOfWeekName[(OTdata.valueHB >> 5) & 0x7], (OTdata.valueHB & 0x1F), OTdata.valueLB); 
-  //Build string for MQTT
-  char _topic[50] {0};
-  char _msg[10] {0};
-  //dayofweek
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
-  strlcat(_topic, "_dayofweek", sizeof(_topic));
-  sendMQTTData(_topic, dayOfWeekName[(OTdata.valueHB >> 5) & 0x7]); 
-  //hour
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
-  strlcat(_topic, "_hour", sizeof(_topic));
-  sendMQTTData(_topic, itoa((OTdata.valueHB & 0x0F), _msg, 10)); 
-  //min
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
-  strlcat(_topic, "_minutes", sizeof(_topic));
-  sendMQTTData(_topic, itoa((OTdata.valueLB), _msg, 10)); 
-  value = OTdata.u16();
+  if (is_value_valid(OTdata, OTlookupitem)){
+    //Build string for MQTT
+    char _topic[50] {0};
+    char _msg[10] {0};
+    //dayofweek
+    strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+    strlcat(_topic, "_dayofweek", sizeof(_topic));
+    sendMQTTData(_topic, dayOfWeekName[(OTdata.valueHB >> 5) & 0x7]); 
+    //hour
+    strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+    strlcat(_topic, "_hour", sizeof(_topic));
+    sendMQTTData(_topic, itoa((OTdata.valueHB & 0x0F), _msg, 10)); 
+    //min
+    strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+    strlcat(_topic, "_minutes", sizeof(_topic));
+    sendMQTTData(_topic, itoa((OTdata.valueLB), _msg, 10)); 
+    value = OTdata.u16();
+  }
 }
 
 
