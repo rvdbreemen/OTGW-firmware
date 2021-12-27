@@ -17,6 +17,7 @@
 #define OTGWDebugf(...)   ({ if (bDebugOTmsg) Debugf(__VA_ARGS__);    })
 #define OTGWDebugT(...)   ({ if (bDebugOTmsg) DebugT(__VA_ARGS__);    })
 #define OTGWDebug(...)    ({ if (bDebugOTmsg) Debug(__VA_ARGS__);    })
+#define OTGWDebugFlush()  ({ if (bDebugOTmsg) DebugFlush();    })
 
 
 //define Nodoshop OTGW hardware
@@ -65,10 +66,10 @@ const char *hexheaders[] = {
 
 #define OT_LOG_BUFFER_SIZE 512
 char ot_log_buffer[OT_LOG_BUFFER_SIZE];
-#define ClrLog()      ({ memset[ot_log_buffer, 0, OT_LOG_BUFFER_SIZE]; })
-#define AddLogf(...)  ({ snprintf(ot_log_buffer+strlen(ot_log_buffer), OT_LOG_BUFFER_SIZE-strlen(ot_log_buffer), __VA_ARGS__); })
+#define ClrLog()            ({ ot_log_buffer[0] = '\0'; })
+#define AddLogf(...)        ({ snprintf(ot_log_buffer+strlen(ot_log_buffer), OT_LOG_BUFFER_SIZE-strlen(ot_log_buffer), __VA_ARGS__); })
 #define AddLog(logstring)   ({ strlcat(ot_log_buffer, logstring, OT_LOG_BUFFER_SIZE); })
-#define AddLogln()     ({ strlcat(ot_log_buffer, "\n", OT_LOG_BUFFER_SIZE); })
+#define AddLogln()          ({ strlcat(ot_log_buffer, "\r\n", OT_LOG_BUFFER_SIZE); })
 
 /* --- End of LOG marcro's ---*/
 
@@ -202,7 +203,7 @@ String initWatchDog() {
   // I2C Watchdog boot status check
   String ReasonReset = "";
   
-  delay(500);
+  delay(100);
   Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   // OTGW WD address
   Wire.write(0x83);             // command to set pointer
   Wire.write(17);               // pointer value to status byte
@@ -1188,6 +1189,7 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool force = false)
       OTGWDebugTf("CmdQueue: Next free queue slot: [%d]\r\n", cmdptr);
     } else OTGWDebugTln(F("CmdQueue: Error: Reached max queue"));
   } else OTGWDebugTf("CmdQueue: Found command at: [%d] - [%d]\r\n", insertptr, cmdptr);
+  OTGWDebugFlush();
 }
 
 /*
@@ -1198,7 +1200,7 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool force = false)
 void handleOTGWqueue(){
   // OTGWDebugTf("CmdQueue: Commands in queue [%d]\r\n", (int)cmdptr);
   for (int i = 0; i<cmdptr; i++) {
-    OTGWDebugTf("CmdQueue: Checking due in queue slot[%d]:[%lu]=>[%lu]\r\n", (int)i, (unsigned long)millis(), (unsigned long)cmdqueue[i].due);
+    // OTGWDebugTf("CmdQueue: Checking due in queue slot[%d]:[%lu]=>[%lu]\r\n", (int)i, (unsigned long)millis(), (unsigned long)cmdqueue[i].due);
     if (millis() >= cmdqueue[i].due) {
       OTGWDebugTf("CmdQueue: Queue slot [%d] due\r\n", i);
       sendOTGW(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
@@ -1206,8 +1208,9 @@ void handleOTGWqueue(){
       cmdqueue[i].due = millis() + OTGW_CMD_INTERVAL_MS;
       if (cmdqueue[i].retrycnt >= OTGW_CMD_RETRY){
         //max retry reached, so delete command from queue
+        OTGWDebugTf("CmdQueue: Delete [%d] from queue\r\n", i);
         for (int j=i; j<cmdptr; j++){
-          OTGWDebugTf("CmdQueue: Moving [%d] => [%d]\r\n", j+1, j);
+          // OTGWDebugTf("CmdQueue: Moving [%d] => [%d]\r\n", j+1, j);
           strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[i].cmd));
           cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
           cmdqueue[j].retrycnt = cmdqueue[j+1].retrycnt;
@@ -1219,6 +1222,7 @@ void handleOTGWqueue(){
       // return;
     }
   }
+  OTGWDebugFlush();
 }
 
 /*
@@ -1268,6 +1272,7 @@ void checkOTGWcmdqueue(const char *buf, int len){
       // } else OTGWDebugTf("Error: Did not find value [%s]==>[%d]:[%s]\r\n", value, i, cmdqueue[i].cmd); 
     }
   }
+  OTGWDebugFlush();
 }
 
 
@@ -1581,8 +1586,10 @@ void processOTGW(const char *buf, int len){
             break;
       }
       if (OTdata.skipthis) AddLog(" <ignored> ");
-      AddLogln(); // end of line
+      AddLogln();
       OTGWDebugT(ot_log_buffer);
+      OTGWDebugFlush();
+      ClrLog();
     } 
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
     checkOTGWcmdqueue(buf, len);
@@ -1603,8 +1610,7 @@ void processOTGW(const char *buf, int len){
     OTGWDebugTf("\r\nError 04 = %d\r\n",OTdataObject.error04);
     sendMQTTData(F("Error 04"), String(OTdataObject.error04));
   } else {
-    OTGWDebugln();
-    OTGWDebugTf("Not processed, received from OTGW => [%s] [%d]\r\n", buf, len);
+    OTGWDebugTf("Not processed, received from OTGW => (%s) [%d]\r\n", buf, len);
   }
 }
 
@@ -1694,7 +1700,7 @@ void handleOTGW()
     { //on CR, continue to process incoming message
       sRead[bytes_read] = 0;
       blinkLEDnow(LED2);
-      processOTGW(sRead, bytes_read);
+      if (bytes_read>0) processOTGW(sRead, bytes_read);
       bytes_read = 0;
       break; // to continue processing incoming message
     } 
