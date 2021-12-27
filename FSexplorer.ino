@@ -38,7 +38,6 @@
 **        .
 **      }
 */
-#include <WiFiManager.h>
 #define MAX_FILES_IN_LIST   40
 
 const char Helper[] = R"(
