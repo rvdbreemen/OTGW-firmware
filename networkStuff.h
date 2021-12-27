@@ -86,6 +86,13 @@ void configModeCallback (WiFiManager *myWiFiManager)
 
 } // configModeCallback()
 
+void resetWiFiSettings(void)
+{
+  // Is it safe to re-setup this object? other one only lives in 
+  // startWiFi.
+  WiFiManager manageWiFi;
+  manageWiFi.resetSettings();
+}
 
 //===========================================================================================
 void startWiFi(const char* hostname, int timeOut) 
