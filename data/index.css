@@ -352,6 +352,15 @@
     background: lightblue;
   }
   
+ /* SettingsPage */
+ #settingMessage {
+   background-color: coral;
+   width: 860px;
+   margin-left: 10px;
+   color: white;
+   text-align: center;
+ }
+
   /* define tag selectors () -------------------------------------------------- */
   
   button { width: 100px; }
