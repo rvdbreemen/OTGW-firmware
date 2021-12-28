@@ -545,11 +545,11 @@ bool doAutoConfigure(byte OTid)
     
     String sLine = fh.readStringUntil('\n');
     // DebugTf("sline[%s]\r\n", CSTR(sLine));
-    if (!splitLine(sLine, ',', lineID, sTopic, sMsg)) {  //splitLine() also filters comments
+    if (!splitLine(sLine, ';', lineID, sTopic, sMsg)) {  //splitLine() also filters comments
       MQTTDebugTf("Either comment or invalid config line: [%s]\r\n", CSTR(sLine));
       continue;
     }
-    
+
     // check if this is the specific line we are looking for
     if (lineID != OTid) continue;
 
