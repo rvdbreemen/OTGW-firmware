@@ -29,7 +29,6 @@
   }
   
   th {
-  
     white-space: nowrap;
     border-right: 1px solid #ddd;
     border-left: 1px solid #ddd;
@@ -37,7 +36,6 @@
   }
   
   td {
-  
     white-space: nowrap;
     border-bottom: 1px solid #ddd;
     border-right: 1px solid #ddd;
@@ -54,11 +52,6 @@
      padding-top: 3px;
      padding-bottom: 2px;
      font-size: 12pt;
-  }
-  
-  .settingDiv {
-    background: lightblue;  
-    white-space: nowrap;  
   }
   
   .outer-div {
@@ -107,60 +100,54 @@
     -webkit-flex-flow: column wrap;
     justify-content: flex-start;
     margin-top: 10px;
-  
   }
   
   /*--------------------- N A V - B A R -----------------*/
   .nav-container {
-    list-style: none;
-    margin: 0; 
-    
     background: #00bffe;
-    
-    display: -webkit-box;
-    display: -moz-box;
-    display: -ms-flexbox;
-    display: -webkit-flex;
-    display: flex-start;
-    -webkit-flex-flow: row wrap;
-    min-height: 24px; 
-  
-  }
-  
-  .nav-img {
-    top: 1px;
-    display: inline-block;
-    width: 40px;
-    height: 40px;
-  }
-  
-  .nav-item {
-    display: inline-block;
-    font-size: 16px;
-    padding: 10px 0;
-    height: 20px;
-    width: 110px;
-    border: none;
-    color: white;
-  
-  }
-  
-  .nav-left {
-    flex: 2 1 0;
-    text-align: center; 
-  }
-  
-  .nav-right {
-    flex: 1 1 0;
-    text-align: right;
-    width: 200px; 
+    padding: 6px;
   }
   
   .nav-container a:hover {
     color: black;
     background: skyblue; /* only for FSexplorer - Rest does not work */
   }
+
+  .nav-left {
+    display: flex;
+    flex-flow: row;
+    gap: 15px;
+    flex: 2 1 0;
+    justify-content: center; /* horizonal alignment */
+    align-items: center; /* horizonal alignment */
+  }
   
+  .nav-item {
+    font-size: 16px;
+    height: 40px;
+    width: 110px;
+    border: none;
+    border-radius: 5px;
+    color: white;
+    cursor: pointer;
+    box-shadow: 2px 2px 2px 0px grey;
+  }
+  
+  .nav-item:hover {
+    color: black;
+  }
+
+  .nav-item:active {
+    transform: translate(2px, 2px);
+    box-shadow: none;
+  }
+
+  .nav-img {
+    height: 30px;
+    object-fit: cover;
+    cursor: pointer;
+  }
+
   .nav-clock {
     top: 1px;
     color: black;
