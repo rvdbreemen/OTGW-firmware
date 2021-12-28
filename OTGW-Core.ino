@@ -1380,14 +1380,17 @@ void processOTGW(const char *buf, int len){
 
       // check wheter MQTT topic needs to be configuered
       if (is_value_valid(OTdata, OTlookupitem) && settingMQTTenable ) {
-        if(msglastupdated[OTdata.id]==0) {
+        if(getMQTTConfigDone(OTdata.id)==false) {
           Debugf("Need to set MQTT config for message %s (%d)\r\n", OTlookupitem.label, OTdata.id);
           bool success = doAutoConfigure(OTdata.id);
-          if(!success) {
+          if(success) {
+            Debugf("Successfully sent MQTT config for message %s (%d)\r\n", OTlookupitem.label, OTdata.id);
+            setMQTTConfigDone(OTdata.id);
+          } else {
             Debugf("Not able to complete MQTT configuration for message %s (%d)\r\n", OTlookupitem.label, OTdata.id);
           }
         } else {
-          Debugf("No need to set MQTT config for message %s (%d)\r\n", OTlookupitem.label, OTdata.id);
+          // Debugf("No need to set MQTT config for message %s (%d)\r\n", OTlookupitem.label, OTdata.id);
         }
       }
 
