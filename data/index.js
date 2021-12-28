@@ -437,7 +437,7 @@
             //--- field Name ---
               var fldDiv = document.createElement("div");
                   fldDiv.setAttribute("style", "margin-right: 10px;");
-                  fldDiv.style.width = "270px";
+                  fldDiv.style.width = "320px";
                   fldDiv.style.float = 'left';
                   fldDiv.textContent = translateToHuman(data[i].name);
                   rowDiv.appendChild(fldDiv);
