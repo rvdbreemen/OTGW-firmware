@@ -550,8 +550,12 @@ bool doAutoConfigure(byte OTid)
       continue;
     }
 
+    // DebugTf("looking in config file line for %d: [%d][%s] \r\n", OTid, lineID, CSTR(sTopic));
+    
     // check if this is the specific line we are looking for
     if (lineID != OTid) continue;
+
+    DebugTf("found line in config file for %d: [%d][%s] \r\n", OTid, lineID, CSTR(sTopic));
 
     // discovery topic prefix
     MQTTDebugTf("sTopic[%s]==>", CSTR(sTopic)); 
