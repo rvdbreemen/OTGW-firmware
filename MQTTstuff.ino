@@ -89,6 +89,7 @@ void startMQTT()
   if (!settingMQTTenable) return;
   stateMQTT = MQTT_STATE_INIT;
   //setup for mqtt discovery
+  clearMQTTConfigDone();
   NodeId = settingMQTTuniqueid;
   MQTTPubNamespace = settingMQTTtopTopic + "/value/" + NodeId;
   MQTTSubNamespace = settingMQTTtopTopic + "/set/" + NodeId;
@@ -509,6 +510,11 @@ bool setMQTTConfigDone(const int MSGid)
   } else {
     return false;
   }
+}
+//===========================================================================================
+void clearMQTTConfigDone()
+{
+  memset(MQTTautoConfigMap, 0, sizeof(MQTTautoConfigMap));
 }
 //===========================================================================================
 void doAutoConfigure(){
