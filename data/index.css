@@ -307,8 +307,8 @@
   .otmoncolumn1 {
     display: table-cell;
     float: left;
-    width: 270px;
-   
+    width: 320px;
+    padding-left: 10px;
   }
   .otmoncolumn2 {
     display: table-cell;
@@ -333,6 +333,7 @@
     display: table-cell;
     float: left;
     width: 160px;
+    padding-left: 10px;
     font-size: 12px;
   }
   .devinfocolumn2 {
