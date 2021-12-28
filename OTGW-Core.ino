@@ -1375,6 +1375,22 @@ void processOTGW(const char *buf, int len){
       OTdata = tmpOTdata;                 //then process delayed msg
       OTdata.skipthis = skipthis;         //skip if needed
 
+      //Read information from this OT message ready for use...
+      PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
+
+      // check wheter MQTT topic needs to be configuered
+      if (is_value_valid(OTdata, OTlookupitem) && settingMQTTenable ) {
+        if(msglastupdated[OTdata.id]==0) {
+          Debugf("Need to set MQTT config for message %s (%d)\r\n", OTlookupitem.label, OTdata.id);
+          bool success = doAutoConfigure(OTdata.id);
+          if(!success) {
+            Debugf("Not able to complete MQTT configuration for message %s (%d)\r\n", OTlookupitem.label, OTdata.id);
+          }
+        } else {
+          Debugf("No need to set MQTT config for message %s (%d)\r\n", OTlookupitem.label, OTdata.id);
+        }
+      }
+
       // Decode and print OpenTherm Gateway Message
       switch (OTdata.rsptype){
         case OTGW_BOILER:
@@ -1410,9 +1426,6 @@ void processOTGW(const char *buf, int len){
       //keep track of update
       msglastupdated[OTdata.id] = now();
 
-      //Read information from this OT message ready for use...
-      PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
-
       if (OTdata.skipthis){
         Debug("-");
       } else {
@@ -1422,6 +1435,7 @@ void processOTGW(const char *buf, int len){
           Debug(" ");
         }
       }
+      
       //next step interpret the OT protocol
       //On OT_WRITE_ACK or READ_ACK, or, status msgid's, then parse. 
           
