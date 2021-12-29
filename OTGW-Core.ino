@@ -237,7 +237,7 @@ void feedWatchDog() {
   //==== feed the WD over I2C ==== 
   // Address: 0x26
   // I2C Watchdog feed
-  DECLARE_TIMER_MS(timerWD, 1000, CATCH_UP_MISSED_TICKS);
+  DECLARE_TIMER_MS(timerWD, 3000, SKIP_MISSED_TICKS);
   if DUE(timerWD)
   {
     Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   //Nodoshop design uses the hardware WD on I2C, address 0x26
@@ -245,7 +245,7 @@ void feedWatchDog() {
     Wire.endTransmission();                       //That's all there is...
     blinkLEDnow(LED1);
   }
-  yield(); 
+  //yield(); 
 }
 
 //===================[ END Watchdog OTGW ]===============================
@@ -573,13 +573,13 @@ void print_status(uint16_t& value)
 
     //Master Status
     sendMQTTData(F("status_master"), _flag8_master);
-    sendMQTTData(F("ch_enable"),             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delay(5);
-    sendMQTTData(F("dhw_enable"),            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delay(5);
-    sendMQTTData(F("cooling_enable"),        (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delay(5); 
-    sendMQTTData(F("otc_active"),            (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delay(5);
-    sendMQTTData(F("ch2_enable"),            (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  delay(5);
-    sendMQTTData(F("summerwintertime"),      (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  delay(5);
-    sendMQTTData(F("dhw_blocking"),          (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("ch_enable"),             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData(F("dhw_enable"),            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData(F("cooling_enable"),        (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  // delay(5); 
+    sendMQTTData(F("otc_active"),            (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData(F("ch2_enable"),            (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData(F("summerwintertime"),      (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData(F("dhw_blocking"),          (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));  // delay(5);
 
     OTdataObject.MasterStatus = OTdata.valueHB;
     } else {
@@ -647,9 +647,9 @@ void print_solar_storage_status(uint16_t& value)
     AddLogf("\r\n%s = Slave Solar Fault Indicator [%d] ", OTlookupitem.label, SlaveSolarFaultIndicator);
     AddLogf("\r\n%s = Slave Solar Mode Status [%d] ", OTlookupitem.label, SlaveSolarModeStatus);
     AddLogf("\r\n%s = Slave Solar Status [%d] ", OTlookupitem.label, SlaveSolarStatus);
-    sendMQTTData(F("solar_storage_slave_fault_incidator"),  ((SlaveSolarFaultIndicator) ? "ON" : "OFF"));  delay(5); 
-    sendMQTTData(F("solar_storage_mode_status"), itoa(SlaveSolarModeStatus, _msg, 10));  delay(5);
-    sendMQTTData(F("solar_storage_slave_status"), itoa(SlaveSolarStatus, _msg, 10));  delay(5);
+    sendMQTTData(F("solar_storage_slave_fault_incidator"),  ((SlaveSolarFaultIndicator) ? "ON" : "OFF"));  // delay(5); 
+    sendMQTTData(F("solar_storage_mode_status"), itoa(SlaveSolarModeStatus, _msg, 10));  // delay(5);
+    sendMQTTData(F("solar_storage_slave_status"), itoa(SlaveSolarStatus, _msg, 10));  // delay(5);
     OTdataObject.SolarSlaveStatus = OTdata.valueLB;
   }
   uint16_t _value = OTdata.u16();
@@ -688,10 +688,10 @@ void print_statusVH(uint16_t& value)
     AddLogf("%s = VH Master [%s]", OTlookupitem.label, _flag8_master);
     //Master Status
     sendMQTTData(F("status_vh_master"), _flag8_master);
-    sendMQTTData(F("vh_ventilation_enabled"),        (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delay(5);
-    sendMQTTData(F("vh_bypass_position"),            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delay(5);
-    sendMQTTData(F("vh_bypass_mode"),                (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delay(5); 
-    sendMQTTData(F("vh_free_ventlation_mode"),       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("vh_ventilation_enabled"),        (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData(F("vh_bypass_position"),            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData(F("vh_bypass_mode"),                (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  // delay(5); 
+    sendMQTTData(F("vh_free_ventlation_mode"),       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  // delay(5);
 
     OTdataObject.MasterStatusVH = OTdata.valueLB;
     } else {
@@ -717,12 +717,12 @@ void print_statusVH(uint16_t& value)
 
     //Slave Status
     sendMQTTData(F("status_vh_slave"), _flag8_slave);
-    sendMQTTData(F("vh_fault"),                   (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  delay(5);  
-    sendMQTTData(F("vh_ventlation_mode"),         (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  delay(5);  
-    sendMQTTData(F("vh_bypass_status"),           (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));  delay(5);  
-    sendMQTTData(F("vh_bypass_automatic_status"), (((OTdata.valueLB) & 0x08) ? "ON" : "OFF"));  delay(5);
-    sendMQTTData(F("vh_free_ventliation_status"), (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  delay(5);  
-    sendMQTTData(F("vh_diagnostic_indicator"),    (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("vh_fault"),                   (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  // delay(5);  
+    sendMQTTData(F("vh_ventlation_mode"),         (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  // delay(5);  
+    sendMQTTData(F("vh_bypass_status"),           (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));  // delay(5);  
+    sendMQTTData(F("vh_bypass_automatic_status"), (((OTdata.valueLB) & 0x08) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData(F("vh_free_ventliation_status"), (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  // delay(5);  
+    sendMQTTData(F("vh_diagnostic_indicator"),    (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));  // delay(5);
 
     OTdataObject.SlaveStatusVH = OTdata.valueLB;
   }
@@ -757,12 +757,12 @@ void print_ASFflags(uint16_t& value)
     //5: Water over-temp[ no OvT fault, over-temperat. Fault]
     //6: reserved
     //7: reserved
-    sendMQTTData(F("service_request"),       (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delay(5);  
-    sendMQTTData(F("lockout_reset"),         (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delay(5);  
-    sendMQTTData(F("low_water_pressure"),    (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delay(5);  
-    sendMQTTData(F("gas_flame_fault"),       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delay(5);
-    sendMQTTData(F("air_pressure_fault"),    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  delay(5);  
-    sendMQTTData(F("water_over_temperature"),(((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("service_request"),       (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  // delay(5);  
+    sendMQTTData(F("lockout_reset"),         (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  // delay(5);  
+    sendMQTTData(F("low_water_pressure"),    (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  // delay(5);  
+    sendMQTTData(F("gas_flame_fault"),       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData(F("air_pressure_fault"),    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  // delay(5);  
+    sendMQTTData(F("water_over_temperature"),(((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  // delay(5);
     value = OTdata.u16();
   }
 }
@@ -775,8 +775,8 @@ void print_RBPflags(uint16_t& value)
     //Build string for MQTT
     char _msg[15] {0};
     //Remote Boiler Paramaters
-    sendMQTTData(F("RBP_flags_transfer_enable"), byte_to_binary(OTdata.valueHB));  delay(5);
-    sendMQTTData(F("RBP_flags_read_write"), byte_to_binary(OTdata.valueLB));  delay(5);
+    sendMQTTData(F("RBP_flags_transfer_enable"), byte_to_binary(OTdata.valueHB));  // delay(5);
+    sendMQTTData(F("RBP_flags_read_write"), byte_to_binary(OTdata.valueLB));  // delay(5);
 
     //bit: [clear/0, set/1]
     //0: DHW setpoint
@@ -787,8 +787,8 @@ void print_RBPflags(uint16_t& value)
     //5: reserved
     //6: reserved
     //7: reserved
-    sendMQTTData(F("rbp_dhw_setpoint"),       (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));   delay(5); 
-    sendMQTTData(F("rbp_max_ch_setpoint"),    (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));   delay(5); 
+    sendMQTTData(F("rbp_dhw_setpoint"),       (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));   // delay(5); 
+    sendMQTTData(F("rbp_max_ch_setpoint"),    (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));   // delay(5); 
 
     //bit: [clear/0, set/1]
     //0: read write  DHW setpoint
@@ -799,8 +799,8 @@ void print_RBPflags(uint16_t& value)
     //5: reserved
     //6: reserved
     //7: reserved
-    sendMQTTData(F("rbp_rw_dhw_setpoint"),       (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));   delay(5); 
-    sendMQTTData(F("rbp_rw_max_ch_setpoint"),    (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));   delay(5); 
+    sendMQTTData(F("rbp_rw_dhw_setpoint"),       (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));   // delay(5); 
+    sendMQTTData(F("rbp_rw_max_ch_setpoint"),    (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));   // delay(5); 
 
     value = OTdata.u16();
   }
@@ -831,14 +831,14 @@ void print_slavememberid(uint16_t& value)
     // 6:  Remote water filling function
     // 7:  Heat/cool mode control 
 
-    sendMQTTData(F("dhw_present"),                             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delay(5);
-    sendMQTTData(F("control_type_modulation"),                 (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delay(5);
-    sendMQTTData(F("cooling_config"),                          (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delay(5);
-    sendMQTTData(F("dhw_config"),                              (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  delay(5);
-    sendMQTTData(F("master_low_off_pump_control_function"),    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  delay(5); 
-    sendMQTTData(F("ch2_present"),                             (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  delay(5);
-    sendMQTTData(F("remote_water_filling_function"),           (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));  delay(5);  
-    sendMQTTData(F("heat_cool_mode_control"),                  (((OTdata.valueHB) & 0x80) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("dhw_present"),                             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData(F("control_type_modulation"),                 (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData(F("cooling_config"),                          (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData(F("dhw_config"),                              (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData(F("master_low_off_pump_control_function"),    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  // delay(5); 
+    sendMQTTData(F("ch2_present"),                             (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData(F("remote_water_filling_function"),           (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));  // delay(5);  
+    sendMQTTData(F("heat_cool_mode_control"),                  (((OTdata.valueHB) & 0x80) ? "ON" : "OFF"));  // delay(5);
     value = OTdata.u16();
   }
 }
@@ -866,10 +866,10 @@ void print_vh_configmemberid(uint16_t& value)
   if (is_value_valid(OTdata, OTlookupitem)){
     //Build string for MQTT
     char _msg[15] {0};
-    sendMQTTData(F("vh_configuration"), byte_to_binary(OTdata.valueHB)); delay(5);
-    sendMQTTData(F("vh_configuration_system_type"),    (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  delay(5);
-    sendMQTTData(F("vh_configuration_bypass"),         (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  delay(5);
-    sendMQTTData(F("vh_configuration_speed_control"),  (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("vh_configuration"), byte_to_binary(OTdata.valueHB)); // delay(5);
+    sendMQTTData(F("vh_configuration_system_type"),    (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData(F("vh_configuration_bypass"),         (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData(F("vh_configuration_speed_control"),  (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  // delay(5);
     
     utoa(OTdata.valueLB, _msg, 10);
     sendMQTTData(F("vh_memberid_code"), _msg);
@@ -923,8 +923,8 @@ void print_remoteoverridefunction(uint16_t& value)
     strlcat(_topic, "_flag8", sizeof(_topic));
     sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
     //report remote override flags to MQTT
-    sendMQTTData(F("remote_override_manual_change_priority"),             (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  delay(5);
-    sendMQTTData(F("remote_override_program_change_priority"),            (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  delay(5);
+    sendMQTTData(F("remote_override_manual_change_priority"),             (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData(F("remote_override_program_change_priority"),            (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  // delay(5);
     value = OTdata.u16();
   }
 }
@@ -1647,6 +1647,46 @@ void handleOTGW()
   static uint8_t inByte;
   static uint8_t outByte;
 
+  //Handle incoming data from OTGW through serial port (READ BUFFER)
+  size_t bytes_available = OTGWSerial.available();
+  if(bytes_available > 0) {
+    bytes_read = OTGWSerial.readBytesUntil('\n', sRead, sizeof(sRead));
+    if (bytes_read>0) {
+      sRead[strcspn(sRead, "\r\n")] = 0; // works for LF, CR, CRLF, LFCR, ...
+      bytes_read = strlen(sRead);
+      //OTGWDebugTf("Read from OTGW: (%s) [%d]\r\n", sRead, bytes_read);
+      blinkLEDnow(LED2);
+      processOTGW(sRead, bytes_read);
+      //make sure it ends with a newline
+      OTGWstream.write(sRead, bytes_read);
+      OTGWstream.write('\r');
+      OTGWstream.write('\n');
+    }
+  }
+
+  // //Handle incoming data from OTGW through serial port (READ BUFFER)
+  // while(OTGWSerial.available()) 
+  // {
+  //   inByte = OTGWSerial.read();   // read from serial port
+  //   OTGWstream.write(inByte);   // write to port 25238
+  //   if (inByte== '\n')
+  //   { //on CR, continue to process incoming message
+  //     sRead[bytes_read] = 0;
+  //     blinkLEDnow(LED2);
+  //     if (bytes_read>0) processOTGW(sRead, bytes_read);
+  //     bytes_read = 0;
+  //     break; // to continue processing incoming message
+  //   } 
+  //   else if (inByte == '\r')
+  //   { // on LF, just ignore... 
+  //   } 
+  //   else
+  //   {
+  //     if (bytes_read < (MAX_BUFFER_READ-1))
+  //       sRead[bytes_read++] = inByte;
+  //   }
+  // }
+
   //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
   while (OTGWstream.available()){
     //OTGWSerial.write(OTGWstream.read()); //just forward it directly to Serial
@@ -1656,7 +1696,7 @@ void handleOTGW()
       feedWatchDog();     //this yields for other processes
     }
     OTGWSerial.write(outByte);        // write to serial port
-    OTGWSerial.flush();               // wait for write to serial
+    //OTGWSerial.flush();               // wait for write to serial
     if (outByte == '\r')
     { //on CR, do something...
       sWrite[bytes_write] = 0;
@@ -1688,29 +1728,6 @@ void handleOTGW()
     {
       if (bytes_write < (MAX_BUFFER_WRITE-1))
         sWrite[bytes_write++] = outByte;
-    }
-  }
-  
-  //Handle incoming data from OTGW through serial port (READ BUFFER)
-  while(OTGWSerial.available()) 
-  {
-    inByte = OTGWSerial.read();   // read from serial port
-    OTGWstream.write(inByte); // write to port 25238
-    if (inByte== '\r')
-    { //on CR, continue to process incoming message
-      sRead[bytes_read] = 0;
-      blinkLEDnow(LED2);
-      if (bytes_read>0) processOTGW(sRead, bytes_read);
-      bytes_read = 0;
-      break; // to continue processing incoming message
-    } 
-    else if (inByte == '\n')
-    { // on LF, just ignore... 
-    } 
-    else
-    {
-      if (bytes_read < (MAX_BUFFER_READ-1))
-        sRead[bytes_read++] = inByte;
     }
   }
 }// END of handleOTGW
