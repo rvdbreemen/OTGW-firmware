@@ -69,6 +69,8 @@ class OTGWSerial: public HardwareSerial {
     int available();
     int read();
     int availableForWrite();
+    bool hasOverrun();
+    bool hasRxError();
     size_t write(uint8_t c);
     size_t write(const uint8_t *buffer, size_t len);
     size_t write(const char *buffer, size_t len) {
