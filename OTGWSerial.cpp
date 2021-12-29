@@ -78,6 +78,20 @@ OTGWSerial::OTGWSerial(int resetPin, int progressLed)
   _version_pos = 0;
 }
 
+
+bool OTGWSerial::hasOverrun(void)
+{
+  if (upgradeEvent()) return 0;
+  return HardwareSerial::hasOverrun();
+}
+
+bool OTGWSerial::hasRxError(void)
+{
+  if (upgradeEvent()) return 0;
+  return HardwareSerial::hasRxError();
+}
+
+
 int OTGWSerial::available() {
   if (upgradeEvent()) return 0;
   return HardwareSerial::available();

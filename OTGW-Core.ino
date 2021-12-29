@@ -1648,6 +1648,12 @@ void handleOTGW()
   static uint8_t outByte;
 
   //Handle incoming data from OTGW through serial port (READ BUFFER)
+  if (OTGWSerial.hasOverrun()) {
+    DebugT("Serial Overrun\r\n");
+  }
+  if (OTGWSerial.hasRxError()){
+    DebugT("Serial Rx Error\r\n");
+  }
   size_t bytes_available = OTGWSerial.available();
   if(bytes_available > 0) {
     bytes_read = OTGWSerial.readBytesUntil('\n', sRead, sizeof(sRead));
