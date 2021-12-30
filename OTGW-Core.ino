@@ -572,14 +572,14 @@ void print_status(uint16_t& value)
     AddLogf("%s = Master [%s]", OTlookupitem.label, _flag8_master);
 
     //Master Status
-    sendMQTTData(F("status_master"), _flag8_master);
-    sendMQTTData(F("ch_enable"),             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  // delay(5);
-    sendMQTTData(F("dhw_enable"),            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  // delay(5);
-    sendMQTTData(F("cooling_enable"),        (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  // delay(5); 
-    sendMQTTData(F("otc_active"),            (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  // delay(5);
-    sendMQTTData(F("ch2_enable"),            (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  // delay(5);
-    sendMQTTData(F("summerwintertime"),      (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  // delay(5);
-    sendMQTTData(F("dhw_blocking"),          (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData("status_master", _flag8_master);
+    sendMQTTData("ch_enable",             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData("dhw_enable",            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData("cooling_enable",        (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  // delay(5); 
+    sendMQTTData("otc_active",            (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData("ch2_enable",            (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData("summerwintertime",      (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  // delay(5);
+    sendMQTTData("dhw_blocking",          (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));  // delay(5);
 
     OTdataObject.MasterStatus = OTdata.valueHB;
     } else {
@@ -606,15 +606,15 @@ void print_status(uint16_t& value)
     AddLogf("%s = Slave  [%s]", OTlookupitem.label, _flag8_slave);
 
     //Slave Status
-    sendMQTTData(F("status_slave"), _flag8_slave);
-    sendMQTTData(F("fault"),                 (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  delayms(5);  
-    sendMQTTData(F("centralheating"),        (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  delayms(5);  
-    sendMQTTData(F("domestichotwater"),      (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));  delayms(5);  
-    sendMQTTData(F("flame"),                 (((OTdata.valueLB) & 0x08) ? "ON" : "OFF"));  delayms(5);
-    sendMQTTData(F("cooling"),               (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  delayms(5); 
-    sendMQTTData(F("centralheating2"),       (((OTdata.valueLB) & 0x20) ? "ON" : "OFF"));  delayms(5);
-    sendMQTTData(F("diagnostic_indicator"),  (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));  delayms(5);
-    sendMQTTData(F("eletric_production"),    (((OTdata.valueLB) & 0x80) ? "ON" : "OFF"));  delayms(5);
+    sendMQTTData("status_slave", _flag8_slave);
+    sendMQTTData("fault",                 (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  //delayms(5);  
+    sendMQTTData("centralheating",        (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  //delayms(5);  
+    sendMQTTData("domestichotwater",      (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));  //delayms(5);  
+    sendMQTTData("flame",                 (((OTdata.valueLB) & 0x08) ? "ON" : "OFF"));  //delayms(5);
+    sendMQTTData("cooling",               (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  //delayms(5); 
+    sendMQTTData("centralheating2",       (((OTdata.valueLB) & 0x20) ? "ON" : "OFF"));  //delayms(5);
+    sendMQTTData("diagnostic_indicator",  (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));  //delayms(5);
+    sendMQTTData("eletric_production",    (((OTdata.valueLB) & 0x80) ? "ON" : "OFF"));  //delayms(5);
 
     OTdataObject.SlaveStatus = OTdata.valueLB;
   }
@@ -634,7 +634,7 @@ void print_solar_storage_status(uint16_t& value)
     // ID101:HB012: Master Solar Storage: Solar mode
     uint8_t MasterSolarMode = (OTdata.valueHB) & 0x7;
     AddLogf("%s = Solar Storage Master Mode [%d] ", OTlookupitem.label, MasterSolarMode);
-    sendMQTTData(F("solar_storage_master_mode"), itoa(MasterSolarMode, _msg, 10));  delayms(5);
+    sendMQTTData(F("solar_storage_master_mode"), itoa(MasterSolarMode, _msg, 10));  //delayms(5);
     OTdataObject.SolarMasterStatus = OTdata.valueHB;
   } else { 
     //Slave
@@ -1326,7 +1326,7 @@ bool isvalidotmsg(const char *buf, int len){
   - error format
   - ...
 */
-void processOTGW(const char *buf, int len){
+void processOT(const char *buf, int len){
   static timer_t epochBoilerlastseen = 0;
   static timer_t epochThermostatlastseen = 0;
   static bool bOTGWboilerpreviousstate = false;
@@ -1633,7 +1633,7 @@ void processOTGW(const char *buf, int len){
 ** thru serial) and write buffer  (coming from 25238 going to serial).
 **
 ** The write buffer (incoming from port 25238) is also line printed to the Debug (port 23).
-** The read line buffer is per line parsed by the proces OT parser code (processOTGW (buf, len)).
+** The read line buffer is per line parsed by the proces OT parser code (processOT (buf, len)).
 */
 void handleOTGW()
 {
@@ -1663,10 +1663,10 @@ void handleOTGW()
       bytes_read = strlen(sRead);
       //OTGWDebugTf("Read from OTGW: (%s) [%d]\r\n", sRead, bytes_read);
       blinkLEDnow(LED2);
-      uint32_t tmr=micros();
-      processOTGW(sRead, bytes_read);
-      tmr=micros()-tmr;
-      DebugTf("processOTGW: (MsdID, Type, time_us) = %3d, %-16s, %6d\r\n", OTdata.id, messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)), tmr);
+      //uint32_t tmr=micros();  //profiling code
+      processOT(sRead, bytes_read);
+      //tmr=micros()-tmr;
+      //DebugTf("processOTGW: (MsdID, Type, time_us) = %3d, %-16s, %6d\r\n", OTdata.id, messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)), tmr);
       //make sure it ends with a newline
       OTGWstream.write(sRead, bytes_read);
       OTGWstream.write('\r');
