@@ -1638,7 +1638,7 @@ void processOTGW(const char *buf, int len){
 void handleOTGW()
 {
   //handle serial communication and line processing
-  #define MAX_BUFFER_READ 256
+  #define MAX_BUFFER_READ 128
   #define MAX_BUFFER_WRITE 128
   static char sRead[MAX_BUFFER_READ];
   static char sWrite[MAX_BUFFER_WRITE];
@@ -1669,29 +1669,6 @@ void handleOTGW()
       OTGWstream.write('\n');
     }
   }
-
-  // //Handle incoming data from OTGW through serial port (READ BUFFER)
-  // while(OTGWSerial.available()) 
-  // {
-  //   inByte = OTGWSerial.read();   // read from serial port
-  //   OTGWstream.write(inByte);   // write to port 25238
-  //   if (inByte== '\n')
-  //   { //on CR, continue to process incoming message
-  //     sRead[bytes_read] = 0;
-  //     blinkLEDnow(LED2);
-  //     if (bytes_read>0) processOTGW(sRead, bytes_read);
-  //     bytes_read = 0;
-  //     break; // to continue processing incoming message
-  //   } 
-  //   else if (inByte == '\r')
-  //   { // on LF, just ignore... 
-  //   } 
-  //   else
-  //   {
-  //     if (bytes_read < (MAX_BUFFER_READ-1))
-  //       sRead[bytes_read++] = inByte;
-  //   }
-  // }
 
   //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
   while (OTGWstream.available()){
