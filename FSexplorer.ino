@@ -38,7 +38,6 @@
 **        .
 **      }
 */
-
 #define MAX_FILES_IN_LIST   40
 
 const char Helper[] = R"(
@@ -102,6 +101,7 @@ void setupFSexplorer(){
   httpServer.on("/LittleFSformat", formatLittleFS);
   httpServer.on("/upload", HTTP_POST, []() {}, handleFileUpload);
   httpServer.on("/ReBoot", reBootESP);
+  httpServer.on("/ResetWireless", resetWirelessButton);
  
   httpServer.onNotFound([]() 
   {
@@ -343,6 +343,12 @@ void reBootESP()
   doRedirect("Reboot OTGW firmware ..", 120, "/", true);   
 } // reBootESP()
 
+void resetWirelessButton()
+{
+  DebugTln(F("Reset Wireless settings.."));
+  resetWiFiSettings();
+  doRedirect("Reboot OTGW firmware with reset wireless settings..", 120, "/", true);   
+}
 //=====================================================================================
 void doRedirect(String msg, int wait, const char* URL, bool reboot)
 {
