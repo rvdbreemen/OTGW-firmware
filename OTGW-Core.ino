@@ -1646,6 +1646,7 @@ void handleOTGW()
   static size_t bytes_write = 0;
   static uint8_t inByte;
   static uint8_t outByte;
+  
 
   //Handle incoming data from OTGW through serial port (READ BUFFER)
   if (OTGWSerial.hasOverrun()) {
@@ -1662,7 +1663,10 @@ void handleOTGW()
       bytes_read = strlen(sRead);
       //OTGWDebugTf("Read from OTGW: (%s) [%d]\r\n", sRead, bytes_read);
       blinkLEDnow(LED2);
+      uint32_t tmr=micros();
       processOTGW(sRead, bytes_read);
+      tmr=micros()-tmr;
+      DebugTf("processOTGW: (MsdID, Type, time_us) = %3d, %-16s, %6d\r\n", OTdata.id, messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)), tmr);
       //make sure it ends with a newline
       OTGWstream.write(sRead, bytes_read);
       OTGWstream.write('\r');
