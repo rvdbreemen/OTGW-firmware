@@ -7,11 +7,20 @@
 */
 body {
 	font-family: sans-serif;
-	//background-color: #a9a9a9;
+	/* background-color: #a9a9a9; */
 	background-color: lightblue;
 	display: flex;
 	flex-flow: column;
 	align-items: left;
+}
+tr:nth-child(even) {
+	background: #9dd0e1;
+}
+tr:nth-child(odd) {
+	background: #c4e3ed;
+}
+td:nth-child(n+5) {
+	background: lightblue;
 }
 h1,h2 {
 	color: #e1e1e1;
