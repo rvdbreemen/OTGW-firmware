@@ -437,7 +437,7 @@
             //--- field Name ---
               var fldDiv = document.createElement("div");
                   fldDiv.setAttribute("style", "margin-right: 10px;");
-                  fldDiv.style.width = "270px";
+                  fldDiv.style.width = "320px";
                   fldDiv.style.float = 'left';
                   fldDiv.textContent = translateToHuman(data[i].name);
                   rowDiv.appendChild(fldDiv);
@@ -535,13 +535,13 @@
         value = document.getElementById(field).value;
       }
       console.log("==> name["+field+"], value["+value+"]");
-      if (getBackGround(field).includes("lightgray"))
-      { //then it was changes, and needs to be saved
+
+      if (getBackGround(field).includes("lightgray")) {
+        //then it was changes, and needs to be saved
         setBackGround(field, "white");
         console.log("Changes where made in ["+field+"]["+value+"]");
         //processWithTimeout([(data.length -1), 0], 2, data, sendPostReading);
         document.getElementById("settingMessage").innerHTML = "Saving changes...";
-        setTimeout(function(){ document.getElementById("settingMessage").innerHTML = ""; }, 1000); //and clear the message
         sendPostSetting(field, value);
       }
     }
@@ -561,17 +561,23 @@
     };
 
     fetch(APIGW+"v0/settings", other_params)
-      .then(function(response) {
-            //console.log(response.status );    //=> number 100–599
-            //console.log(response.statusText); //=> String
-            //console.log(response.headers);    //=> Headers
-            //console.log(response.url);        //=> String
-            //console.log(response.text());
-            //return response.text()
-      }, function(error) {
-        console.log("Error["+error.message+"]"); //=> String
-      });
-      
+      .then((response) => {
+          //console.log(response.status );    //=> number 100–599
+          //console.log(response.statusText); //=> String
+          //console.log(response.headers);    //=> Headers
+          //console.log(response.url);        //=> String
+          //console.log(response.text());
+          //return response.text()
+          if (response.ok) {
+            document.getElementById("settingMessage").innerHTML = "Saving changes... SUCCESS";
+            setTimeout(function () { document.getElementById("settingMessage").innerHTML = ""; }, 2000); //and clear the message
+          } else {
+            document.getElementById("settingMessage").innerHTML = "Saving changes... FAILED";
+          }
+        }, (error) => {
+          console.log("Error[" + error.message + "]"); //=> String
+          return false;
+        });   
   } // sendPostSetting()
 
   
