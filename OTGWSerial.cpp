@@ -68,6 +68,7 @@ static const char banner[] = "OpenTherm Gateway ";
 
 OTGWSerial::OTGWSerial(int resetPin, int progressLed)
 : HardwareSerial(UART0), _reset(resetPin), _led(progressLed) {
+  HardwareSerial::setRxBufferSize(512);
   HardwareSerial::begin(9600, SERIAL_8N1);
   // The PIC may have been confused by garbage on the
   // serial interface when the NodeMCU resets.
@@ -76,6 +77,20 @@ OTGWSerial::OTGWSerial(int resetPin, int progressLed)
   _version[0] = '\0';
   _version_pos = 0;
 }
+
+
+bool OTGWSerial::hasOverrun(void)
+{
+  if (upgradeEvent()) return 0;
+  return HardwareSerial::hasOverrun();
+}
+
+bool OTGWSerial::hasRxError(void)
+{
+  if (upgradeEvent()) return 0;
+  return HardwareSerial::hasRxError();
+}
+
 
 int OTGWSerial::available() {
   if (upgradeEvent()) return 0;
