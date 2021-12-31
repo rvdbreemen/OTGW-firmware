@@ -28,7 +28,7 @@ template <typename T> T PROGMEM_getAnything (const T * sce)
 //===========================================================================================
 bool compare(String x, String y) 
 { 
-    for (int i = 0; i < min(x.length(), y.length()); i++) { 
+    for (unsigned int i = 0; i < min(x.length(), y.length()); i++) { 
       if (x[i] != y[i]) 
       {
         return (bool)(x[i] < y[i]); 
@@ -82,10 +82,6 @@ char *trimwhitespace(char *str)
 
 bool splitCString(char *sIn, const char *del, char *cKey, char *cValue)
 {
-  //printf("sIn=[%s]\r\n", sIn);
-  static char _key[128];
-  static char _value[256];
-
   char * token = strtok(sIn, del);
   // loop through the string to extract all other tokens
   while( token != NULL ) {
@@ -212,7 +208,7 @@ void strConcat(char *dest, int maxLen, int v)
 //===========================================================================================
 void strToLower(char *src)
 {
-  for (int i = 0; i < strlen(src); i++)
+  for (unsigned int i = 0; i < strlen(src); i++)
   {
     if (src[i] == '\0') return;
     if (src[i] >= 'A' && src[i] <= 'Z')
@@ -418,7 +414,6 @@ float strToFloat(const char *s, int dec)
 {
   float r =  0.0;
   int   p =  0;
-  int   d = -1;
   
   r = strtof(s, NULL);
   p = (int)(r*pow(10, dec));
@@ -638,7 +633,7 @@ bool updateRebootLog(String text)
         //read from file
         while (infh.available() && (i < LOG_LINES)){
           //read the first line 
-          String line = infh.readStringUntil('\r\n');
+          String line = infh.readStringUntil('\n');
           if (line.length() > 3) { //TODO: check is no longer needed?
             outfh.print(line);
           }

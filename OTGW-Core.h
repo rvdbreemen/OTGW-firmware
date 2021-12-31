@@ -304,9 +304,9 @@ enum OpenThermMessageID {
         int id;
         OTmsgcmd_t msgcmd;
         OTtype_t type;
-        char* label;
-        char* friendlyname;
-        char* unit;
+        const char* label;
+        const char* friendlyname;
+        const char* unit;
     };
 
 	OTlookup_t OTlookupitem;
@@ -457,7 +457,7 @@ struct OT_cmd_t { // see all possible commands for PIC here: https://otgw.tclcod
 	char cmd[15];
 	int cmdlen;
 	int retrycnt; 
-	time_t due;
+	unsigned long due;
 };
 
 #define CMDQUEUE_MAX 20

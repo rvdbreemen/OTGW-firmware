@@ -22,8 +22,6 @@
 //=======================================================================
 void processAPI() 
 {
-  static char response[80] = "";
-  char fName[40] = "";
   char URI[50]   = "";
   String words[10];
 

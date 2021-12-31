@@ -40,9 +40,9 @@ String            NodeId = "";
 //set command list
 struct MQTT_set_cmd_t
 {
-    char* setcmd;
-    char* otgwcmd;
-    char* ottype;
+    const char* setcmd;
+    const char* otgwcmd;
+    const char* ottype;
 };
 
 
@@ -102,7 +102,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 
   if (bDebugMQTT) {
     DebugT("Message arrived on topic ["); Debug(topic); Debug("] = [");
-    for (int i = 0; i < length; i++) {
+    for (unsigned int i = 0; i < length; i++) {
       Debug((char)payload[i]);
     }
     Debug("] ("); Debug(length); Debug(")"); Debugln();
@@ -148,7 +148,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
           for (i=0; i<nrcmds; i++){
             if (stricmp(token, setcmds[i].setcmd) == 0){
               //found a match
-              if (setcmds[i].ottype == "raw"){
+              if (stricmp(setcmds[i].ottype, "raw") == 0){
                 //raw command
                 snprintf(otgwcmd, sizeof(otgwcmd), "%s", msgPayload);
                 MQTTDebugf(" found command, sending payload [%s]\r\n", otgwcmd);
@@ -441,7 +441,7 @@ bool splitString(String sIn, char del, String &cKey, String &cVal)
   cVal = "";
   if (sIn.indexOf("//") == 0) return false; //comment, skip split
   if (sIn.length() <= 3) return false; //not enough buffer, skip split
-  int pos = sIn.indexOf(del); //determine split point
+  unsigned int pos = sIn.indexOf(del); //determine split point
   if ((pos == 0) || (pos == (sIn.length() - 1))) return false; // no key or no value
   cKey = sIn.substring(0, pos);
   cKey.trim(); //before, and trim spaces
