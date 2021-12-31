@@ -544,8 +544,8 @@ void print_u16(uint16_t& value)
 
 void print_status(uint16_t& value)
 {
-  char _flag8_master[8] {0};
-  char _flag8_slave[8] {0};
+  char _flag8_master[9] {0};
+  char _flag8_slave[9] {0};
   
   if (OTdata.masterslave == 0) {
     // Parse master bits
@@ -659,8 +659,8 @@ void print_solar_storage_status(uint16_t& value)
 
 void print_statusVH(uint16_t& value)
 { 
-  char _flag8_master[8] {0};
-  char _flag8_slave[8] {0};
+  char _flag8_master[9] {0};
+  char _flag8_slave[9] {0};
 
   if (OTdata.masterslave == 0){
       
