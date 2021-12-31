@@ -80,46 +80,11 @@ char *trimwhitespace(char *str)
 }
 
 
-bool splitCString(char *sIn, const char *del, char *cKey, char *cValue)
-{
-  char * token = strtok(sIn, del);
-  // loop through the string to extract all other tokens
-  while( token != NULL ) {
-      //now trim spaces from token and copy it to wOut
-      //strlcpy(wOut[wc++], trimwhitespace(token), sizeof(wOut[0]));
-      token = strtok(NULL, del);
-  }
-    
-  return true;
-}
-
-int8_t splitCString(char *sIn, const char *del, char wOut[][10], const int maxWords)
-{
-    //printf("sIn=[%s]\r\n", sIn);
-    int wc=0;    
-    for(int i = 0; i<maxWords; i++){
-        memset(wOut[i], '\0', sizeof(wOut[0]));  //make sure the c-strings are blank
-    }
-    char * token = strtok(sIn, del);
-    // loop through the string to extract all other tokens
-    while( token != NULL  && wc < maxWords) {
-        //now trim spaces from token and copy it to wOut
-        strlcpy(wOut[wc++], trimwhitespace(token), sizeof(wOut[0]));
-        token = strtok(NULL, del);
-    }
-        
-    // for (int i = 0; i<maxWords; i++){
-    //     printf("wOut[%d]=[%s]\r\n", i, wOut[i]);
-    // }
-
-    return wc;
-}
-
 //===========================================================================================
-int8_t splitString(String inStrng, char delimiter, String wOut[], uint8_t maxWords) 
+uint8_t splitString(String inStrng, char delimiter, String wOut[], uint8_t maxWords) 
 {
-  int16_t inxS = 0, inxE = 0, wordCount = 0;
-  
+    uint8_t wordCount = 0;
+    size_t inxE = 0, inxS = 0; 
     inStrng.trim();
     while(inxE < inStrng.length() && wordCount < maxWords) 
     {
@@ -148,62 +113,6 @@ int8_t splitString(String inStrng, char delimiter, String wOut[], uint8_t maxWor
 
 
 
-//===========================================================================================
-void strConcat(char *dest, int maxLen, const char *src)
-{
-  if (strlen(dest) + strlen(src) < maxLen) 
-  {
-    strcat(dest, src);
-  } 
-  else
-  {
-    DebugTf("Combined string > %d chars\r\n", maxLen);
-  }
-  
-} // strConcat()
-
-
-//===========================================================================================
-void strConcat(char *dest, int maxLen, float v, int dec)
-{
-  static char buff[25];
-  if (dec == 0)       sprintf(buff,"%.0f", v);
-  else if (dec == 1)  sprintf(buff,"%.1f", v);
-  else if (dec == 2)  sprintf(buff,"%.2f", v);
-  else if (dec == 3)  sprintf(buff,"%.3f", v);
-  else if (dec == 4)  sprintf(buff,"%.4f", v);
-  else if (dec == 5)  sprintf(buff,"%.5f", v);
-  else                sprintf(buff,"%f",   v);
-
-  if (strlen(dest) + strlen(buff) < maxLen) 
-  {
-    strcat(dest, buff);
-  } 
-  else
-  {
-    DebugTf("Combined string > %d chars\r\n", maxLen);
-  }
-  
-} // strConcat()
-
-
-//===========================================================================================
-void strConcat(char *dest, int maxLen, int v)
-{
-  static char buff[25];
-  sprintf(buff,"%d", v);
-
-  if (strlen(dest) + strlen(buff) < maxLen) 
-  {
-    strcat(dest, buff);
-  } 
-  else
-  {
-    DebugTf("Combined string > %d chars\r\n", maxLen);
-  }
-  
-} // strConcat()
-
 
 //===========================================================================================
 void strToLower(char *src)
@@ -216,137 +125,17 @@ void strToLower(char *src)
   }
 } // strToLower()
 
-//===========================================================================================
-// a 'save' string copy
-void strCopy(char *dest, int maxLen, const char *src, int frm, int to)
-{
-  int d=0;
-//DebugTf("dest[%s], src[%s] max[%d], frm[%d], to[%d] =>\r\n", dest, src, maxLen, frm, to);
-  dest[0] = '\0';
-  for (int i=0; i<=frm; i++)
-  {
-    if (src[i] == 0) return;
-  }
-  for (int i=frm; (src[i] != 0  && i<=to && d<maxLen); i++)
-  {
-    dest[d++] = src[i];
-  }
-  dest[d] = '\0';
-    
-} // strCopy()
 
 //===========================================================================================
 // a 'save' version of strncpy() that does not put a '\0' at
 // the end of dest if src >= maxLen!
-void strCopy(char *dest, int maxLen, const char *src)
+void strCopy(char *dest, size_t maxLen, const char *src)
 {
   dest[0] = '\0';
-  strcat(dest, src);
+  strncat(dest, src,maxLen);
     
 } // strCopy()
 
-//===========================================================================================
-// 'tttABCtDEtFGHttt' => 'ABCtDEtFGHttt'
-void strLTrim(char *dest, int maxLen, const char tChar )
-{
-  char tmp[maxLen];
-  int  tPos = 0;
-  bool done = false;
-  
-  tmp[0] = '\0';
-
-  for (int dPos=0; (dPos<maxLen && dest[dPos] != '\0'); dPos++)
-  {
-    if (dest[dPos] != tChar || done)
-    {
-      tmp[tPos++] = dest[dPos];
-      done = true;
-    }
-  }
-  tmp[tPos] = '\0';
-  strCopy(dest, maxLen, tmp);
-    
-} // strLTrim()
-
-//===========================================================================================
-// 'tttABCtDEtFGHttt' => 'tttABCtDEtFGH'
-void strRTrim(char *dest, int maxLen, const char tChar )
-{
-  char tmp[maxLen];
-  int dPos, tPos, dMax;
-  bool done = false;
-  
-  for(dMax=0; dMax<maxLen; dMax++) { tmp[dMax] = '\0'; }
-  
-  dMax = strlen(dest)-1;
-  for (dPos=dMax; (dPos>=0 && !done); dPos--)
-  {
-    if (dest[dPos] == tChar)
-    {
-      tPos = dPos;
-      tmp[tPos] = '\0';
-    }
-    else done = true;
-  }
-  dPos++;
-  for(dMax = 0; dMax <= dPos; dMax++)
-  {
-    tmp[dMax] = dest[dMax];
-  }
-  tmp[dMax+1] = '\0';
-  strCopy(dest, maxLen, tmp);
-    
-} // strRTrim()
-
-//===========================================================================================
-// 'tttABCtDEtFGHttt' => 'ABCtDEtFGH'
-void strTrim(char *dest, int maxLen, const char tChar )
-{
-  char sTmp[maxLen];
-  
-  strCopy(sTmp, maxLen, dest); 
-  strLTrim(sTmp, maxLen, tChar);
-  strRTrim(sTmp, maxLen, tChar);
-  strCopy(dest, maxLen, sTmp); 
-    
-} // strTrim()
-
-//===========================================================================================
-void strRemoveAll(char *dest, int maxLen, const char tChar)
-{
-  char tmp[maxLen];
-  int  tPos = 0;
-  tmp[0] = '\0';
-  for (int dPos=0; (dPos<maxLen && dest[dPos] != '\0'); dPos++)
-  {
-    if (dest[dPos] != tChar)
-    {
-      tmp[tPos++] = dest[dPos];
-    }
-  }
-  tmp[tPos] = '\0';
-  strCopy(dest, maxLen, tmp);
-    
-} // strRemoveAll()
-
-
-//===========================================================================================
-void strTrimCntr(char *dest, int maxLen)
-{
-  char tmp[maxLen];
-  int tPos = 0;
-  tmp[0] = '\0';
-  for (int dPos=0; (dPos<maxLen && dest[dPos] != '\0'); dPos++)
-  {
-    if (dest[dPos] >= ' ' && dest[dPos] <= '~')  // space = 32, '~' = 127
-    {
-      tmp[tPos++] = dest[dPos];
-    }
-  }
-  tmp[tPos] = '\0';
-  strCopy(dest, maxLen, tmp);
-    
-} // strTrimCntr()
 
 //===========================================================================================
 int strIndex(const char *haystack, const char *needle, int start)
@@ -423,26 +212,6 @@ float strToFloat(const char *s, int dec)
 
 } //  strToFloat()
 
-//===========================================================================================
-void parseJsonKey(const char *sIn, const char *key, char *val, int valLen)
-{
-  // json key-value pair looks like:
-  //      "samenv": "Zwaar bewolkt",
-  // or   "samenv": "Zwaar bewolkt"}
-  int keyStart   = strIndex(sIn, key);
-  int sepStart   = strIndex(sIn, ",", keyStart);
-  if (sepStart == -1) 
-  {
-    sepStart   = strIndex(sIn, "}", keyStart);
-  }
-  strCopy(val, valLen, sIn, keyStart+strlen(key), sepStart);
-  strRemoveAll(val, valLen, ':');
-  strRemoveAll(val, valLen, ',');
-  strRemoveAll(val, valLen, '}');
-  strRemoveAll(val, valLen, '"');
-  strTrim(val, valLen, ' ');
-  
-} // parseJsonKey()
 
 
 //===========================================================================================
