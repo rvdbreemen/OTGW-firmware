@@ -773,7 +773,6 @@ void print_RBPflags(uint16_t& value)
   AddLogf("%s = M[%s] OEM fault code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   if (is_value_valid(OTdata, OTlookupitem)){
     //Build string for MQTT
-    char _msg[15] {0};
     //Remote Boiler Paramaters
     sendMQTTData(F("RBP_flags_transfer_enable"), byte_to_binary(OTdata.valueHB));  // delay(5);
     sendMQTTData(F("RBP_flags_read_write"), byte_to_binary(OTdata.valueLB));  // delay(5);
@@ -1312,7 +1311,7 @@ void sendOTGW(const char* buf, int len)
   Message is not an OTmessage if length is not 9 long OR 3th char is ':' (= OTGW command response)
 */
 bool isvalidotmsg(const char *buf, int len){
-  char *chk = "TBARE";
+  const char *chk = "TBARE";
   bool _ret =  (len==9);    //check 9 chars long
   _ret &= (buf[2]!=':');    //not a otgw command response 
   _ret &= (strchr(chk, buf[0])!=NULL); //1 char matches any of 'B', 'T', 'A', 'R' or 'E'
@@ -1644,7 +1643,6 @@ void handleOTGW()
   static char sWrite[MAX_BUFFER_WRITE];
   static size_t bytes_read = 0;
   static size_t bytes_write = 0;
-  static uint8_t inByte;
   static uint8_t outByte;
   
 

@@ -51,10 +51,11 @@ void _debugBOL(const char *fn, int line)
    // fractional_seconds = round(fractional_seconds);
    // microseconds = (int) fractional_seconds;
      
-   // snprintf(_bol, sizeof(_bol), "%02d:%02d:%02d.%06d (%7u|%6u) %-12.12s(%4d): ", \
-   //              hour(), minute(), second(), microseconds, \
-   //              ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(),\
-   //              fn, line);
+   /* snprintf(_bol, sizeof(_bol), "%02d:%02d:%02d.%06d (%7u|%6u) %-12.12s(%4d): ", \
+                 hour(), minute(), second(), microseconds, \
+                 ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(),\
+                 fn, line);
+   */
                  
    //Alternative based on localtime function
    timeval now;

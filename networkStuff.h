@@ -144,7 +144,7 @@ void startWiFi(const char* hostname, int timeOut)
   httpUpdater.setup(&httpServer);
   httpUpdater.setIndexPage(UpdateServerIndex);
   httpUpdater.setSuccessPage(UpdateServerSuccess);
-  DebugTf(" took [%d] seconds => OK!\r\n", (millis() - lTime) / 1000);
+  DebugTf(" took [%lu] seconds => OK!\r\n", (millis() - lTime) / 1000);
   
 } // startWiFi()
 
@@ -279,7 +279,7 @@ void waitforNTPsync(int16_t timeout = 60){
     Wire.write(0xA5);   
     Wire.endTransmission();
     delay(100);
-    if DUE(timerWaiting) DebugTf("Waiting for NTP sync: %d seconds\r\n", (time(nullptr)-t));
+    if DUE(timerWaiting) DebugTf("Waiting for NTP sync: %lu seconds\r\n", (time(nullptr)-t));
     // update NTP status
     loopNTP();
     //stop waiting when NTP is synced 
