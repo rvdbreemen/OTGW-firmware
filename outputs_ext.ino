@@ -35,7 +35,7 @@ void setOutputState(uint8_t status = ON){
 
 void setOutputState(bool set_HIGH = true){
   if(!settingGPIOOUTPUTSenabled) return;
-  digitalWrite(settingGPIOOUTPUTSpin,ON);
+  digitalWrite(settingGPIOOUTPUTSpin,set_HIGH?HIGH:LOW);
   DebugTf("Output GPIO%d set to %d", settingGPIOOUTPUTSpin, digitalRead(settingGPIOOUTPUTSpin));
 }
 
