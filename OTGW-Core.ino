@@ -143,7 +143,7 @@ String executeCommand(const String sCmd){
   OTGWDebugTf("OTGW Send Cmd [%s]\r\n", CSTR(sCmd));
   OTGWSerial.setTimeout(1000);
   DECLARE_TIMER_MS(tmrWaitForIt, 1000);
-  while((OTGWSerial.availableForWrite() < sCmd.length()+2) && !DUE(tmrWaitForIt)){
+  while((OTGWSerial.availableForWrite() < (int)(sCmd.length()+2)) && !DUE(tmrWaitForIt)){
     feedWatchDog();
   }
   OTGWSerial.write(CSTR(sCmd));
@@ -773,7 +773,6 @@ void print_RBPflags(uint16_t& value)
   AddLogf("%s = M[%s] OEM fault code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   if (is_value_valid(OTdata, OTlookupitem)){
     //Build string for MQTT
-    char _msg[15] {0};
     //Remote Boiler Paramaters
     sendMQTTData(F("RBP_flags_transfer_enable"), byte_to_binary(OTdata.valueHB));  // delay(5);
     sendMQTTData(F("RBP_flags_read_write"), byte_to_binary(OTdata.valueLB));  // delay(5);
@@ -1232,10 +1231,10 @@ void handleOTGWqueue(){
   Then checks if incoming response matches what was to be set.
   Only then it's deleted from the queue.
 */
-void checkOTGWcmdqueue(const char *buf, int len){
+void checkOTGWcmdqueue(const char *buf, unsigned int len){
   if ((len<3) || (buf[2]!=':')) {
     OTGWDebugT("CmdQueue: Error: Not a command response [");
-    for (int i = 0; i < len; i++) {
+    for (unsigned int i = 0; i < len; i++) {
       OTGWDebug((char)buf[i]);
     }
     OTGWDebugf("] (%d)\r\n", len); 
@@ -1243,7 +1242,7 @@ void checkOTGWcmdqueue(const char *buf, int len){
   }
 
   OTGWDebugT("CmdQueue: Checking if command is in in queue [");
-  for (int i = 0; i < len; i++) {
+  for (unsigned int i = 0; i < len; i++) {
     OTGWDebug((char)buf[i]);
   }
   OTGWDebugf("] (%d)\r\n", len); 
@@ -1251,7 +1250,7 @@ void checkOTGWcmdqueue(const char *buf, int len){
   char cmd[3]; memset( cmd, 0, sizeof(cmd));
   char value[11]; memset( value, 0, sizeof(value));
   memcpy(cmd, buf, 2);
-  memcpy(value, buf+3, (len-3<sizeof(value)-1)?(len-3):(sizeof(value)-1));
+  memcpy(value, buf+3, ((len-3)<(sizeof(value)-1))?(len-3):(sizeof(value)-1));
   for (int i=0; i<cmdptr; i++){
       OTGWDebugTf("CmdQueue: Checking [%2s]==>[%d]:[%s] from queue\r\n", cmd, i, cmdqueue[i].cmd); 
     if (strstr(cmdqueue[i].cmd, cmd)){
@@ -1312,7 +1311,7 @@ void sendOTGW(const char* buf, int len)
   Message is not an OTmessage if length is not 9 long OR 3th char is ':' (= OTGW command response)
 */
 bool isvalidotmsg(const char *buf, int len){
-  char *chk = "TBARE";
+  const char *chk = "TBARE";
   bool _ret =  (len==9);    //check 9 chars long
   _ret &= (buf[2]!=':');    //not a otgw command response 
   _ret &= (strchr(chk, buf[0])!=NULL); //1 char matches any of 'B', 'T', 'A', 'R' or 'E'
@@ -1327,8 +1326,8 @@ bool isvalidotmsg(const char *buf, int len){
   - ...
 */
 void processOT(const char *buf, int len){
-  static timer_t epochBoilerlastseen = 0;
-  static timer_t epochThermostatlastseen = 0;
+  static time_t epochBoilerlastseen = 0;
+  static time_t epochThermostatlastseen = 0;
   static bool bOTGWboilerpreviousstate = false;
   static bool bOTGWthermostatpreviousstate = false;
   static bool bOTGWpreviousstate = false;
@@ -1644,7 +1643,6 @@ void handleOTGW()
   static char sWrite[MAX_BUFFER_WRITE];
   static size_t bytes_read = 0;
   static size_t bytes_write = 0;
-  static uint8_t inByte;
   static uint8_t outByte;
   
 
