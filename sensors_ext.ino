@@ -61,7 +61,7 @@ void initSensors() {
     if (sensors.getAddress(tempDeviceAddress, i))
     {
       //TODO: get real device address, push data to mqtt topic.
-      DebugTf("Device address %d device(s)\r\n", tempDeviceAddress);
+      DebugTf("Device address %u device(s)\r\n", (unsigned int) tempDeviceAddress);
       DebugFlush();
       realDeviceCount++;
     }

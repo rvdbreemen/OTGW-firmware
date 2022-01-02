@@ -22,8 +22,6 @@
 //=======================================================================
 void processAPI() 
 {
-  static char response[80] = "";
-  char fName[40] = "";
   char URI[50]   = "";
   String words[10];
 
@@ -44,12 +42,12 @@ void processAPI()
     return;
   }
 
-  int8_t wc = splitString(URI, '/', words, 10);
+  uint8_t wc = splitString(URI, '/', words, 10);
   
   if (bDebugRestAPI)
   {
     DebugT(">>");
-    for (int w=0; w<wc; w++)
+    for (uint_fast8_t  w=0; w<wc; w++)
     {
       Debugf("word[%d] => [%s], ", w, words[w].c_str());
     }
@@ -180,9 +178,9 @@ void sendOTGWvalue(int msgid){
 void sendOTGWlabel(const char *msglabel){
   StaticJsonDocument<256> doc;
   JsonObject root  = doc.to<JsonObject>();
-  int msgid;
-  PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
+  uint_fast8_t msgid;
   for (msgid = 0; msgid<= OT_MSGID_MAX; msgid++){
+    PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
     if (stricmp(OTlookupitem.label, msglabel)==0) break;
   }
   if (msgid > OT_MSGID_MAX){
@@ -451,14 +449,16 @@ void postSettings()
       jsonIn.replace("{", "");
       jsonIn.replace("}", "");
       jsonIn.replace("\"", "");
-      int8_t wp = splitString(jsonIn.c_str(), ',',  wPair, 5) ;
-      for (int i=0; i<wp; i++)
+      uint_fast8_t wp = splitString(jsonIn.c_str(), ',',  wPair, 5) ;
+      for (uint_fast8_t i=0; i<wp; i++)
       {
         //RESTDebugTf("[%d] -> pair[%s]\r\n", i, wPair[i].c_str());
-        int8_t wc = splitString(wPair[i].c_str(), ':',  wOut, 5) ;
+        uint8_t wc = splitString(wPair[i].c_str(), ':',  wOut, 5) ;
         //RESTDebugTf("==> [%s] -> field[%s]->val[%s]\r\n", wPair[i].c_str(), wOut[0].c_str(), wOut[1].c_str());
-        if (wOut[0].equalsIgnoreCase("name"))  strCopy(field, sizeof(field), wOut[1].c_str());
-        if (wOut[0].equalsIgnoreCase("value")) strCopy(newValue, sizeof(newValue), wOut[1].c_str());
+        if (wc>1) {
+            if (wOut[0].equalsIgnoreCase("name"))  strCopy(field, sizeof(field), wOut[1].c_str());
+            if (wOut[0].equalsIgnoreCase("value")) strCopy(newValue, sizeof(newValue), wOut[1].c_str());
+        }
       }
       RESTDebugTf("--> field[%s] => newValue[%s]\r\n", field, newValue);
       updateSetting(field, newValue);

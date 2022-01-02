@@ -34,7 +34,7 @@
 
 #define PICFIRMWARE "/gateway.hex"
 
-extern OTGWSerial OTGWSerial(PICRST, LED2);
+OTGWSerial OTGWSerial(PICRST, LED2);
 void fwupgradestart(const char *hexfile);
 
 void blinkLEDnow();
