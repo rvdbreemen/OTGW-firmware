@@ -441,28 +441,41 @@ void postSettings()
   //------------------------------------------------------------ 
   // so, why not use ArduinoJSON library?
   // I say: try it yourself ;-) It won't be easy
-      String wOut[5];
       String wPair[5];
       String jsonIn  = CSTR(httpServer.arg(0));
-      char field[25] = "";
-      char newValue[101]="";
+      char field[25] = {0,};
+      char newValue[101]={0,};
       jsonIn.replace("{", "");
       jsonIn.replace("}", "");
       jsonIn.replace("\"", "");
       uint_fast8_t wp = splitString(jsonIn.c_str(), ',',  wPair, 5) ;
       for (uint_fast8_t i=0; i<wp; i++)
       {
+        String wOut[5];
         //RESTDebugTf("[%d] -> pair[%s]\r\n", i, wPair[i].c_str());
         uint8_t wc = splitString(wPair[i].c_str(), ':',  wOut, 5) ;
         //RESTDebugTf("==> [%s] -> field[%s]->val[%s]\r\n", wPair[i].c_str(), wOut[0].c_str(), wOut[1].c_str());
         if (wc>1) {
-            if (wOut[0].equalsIgnoreCase("name"))  strCopy(field, sizeof(field), wOut[1].c_str());
-            if (wOut[0].equalsIgnoreCase("value")) strCopy(newValue, sizeof(newValue), wOut[1].c_str());
+            if (wOut[0].equalsIgnoreCase("name")) {
+              if ( wOut[1].length() < (sizeof(field)-1) ) {
+                strncpy(field, wOut[1].c_str(), sizeof(field));
+              }
+            }
+            else if (wOut[0].equalsIgnoreCase("value")) {
+              if ( wOut[1].length() < (sizeof(newValue)-1) ) {
+                strncpy(newValue, wOut[1].c_str(), sizeof(newValue) );
+              }
+            }
         }
       }
-      RESTDebugTf("--> field[%s] => newValue[%s]\r\n", field, newValue);
-      updateSetting(field, newValue);
-      httpServer.send(200, "application/json", httpServer.arg(0));
+      if ( field[0] != 0 && newValue[0] != 0 ) {
+        RESTDebugTf("--> field[%s] => newValue[%s]\r\n", field, newValue);
+        updateSetting(field, newValue);
+        httpServer.send(200, "application/json", httpServer.arg(0));
+      } else {
+        // Internal client error? It could not proess the client request.
+        httpServer.send(400, "application/json", httpServer.arg(0));
+      }
 
 } // postSettings()
 
