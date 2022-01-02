@@ -1326,8 +1326,8 @@ bool isvalidotmsg(const char *buf, int len){
   - ...
 */
 void processOT(const char *buf, int len){
-  static timer_t epochBoilerlastseen = 0;
-  static timer_t epochThermostatlastseen = 0;
+  static time_t epochBoilerlastseen = 0;
+  static time_t epochThermostatlastseen = 0;
   static bool bOTGWboilerpreviousstate = false;
   static bool bOTGWthermostatpreviousstate = false;
   static bool bOTGWpreviousstate = false;

@@ -7,10 +7,10 @@
 
 static const char banner[] = "OpenTherm Gateway ";
 
-char *GetVersion(String hexfile){
-  char hexbuf[48];
+String GetVersion(const String hexfile){
+  char hexbuf[48]={0};
   int len, addr, tag, data, offs, linecnt = 0;
-  char datamem[256];
+  char datamem[256]={0};
   unsigned short ptr;
   File f;
   //DebugTf("GetVersion opening %s\n",hexfile.c_str());
@@ -74,8 +74,9 @@ char *GetVersion(String hexfile){
         ptr += strnlen((char *)datamem + ptr, 256 - ptr) + 1;
       } else {
         //DebugTf("hit the banner! returning version string %s\n",s);
-        s += sizeof(banner) - 1; return (s);
+        s += sizeof(banner) - 1; return String(s);
       }
     }
   }
+  return "0.0";
 }
