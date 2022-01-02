@@ -265,7 +265,7 @@ bool isNTPtimeSet(){
   return NtpStatus == TIME_SYNC;
 }
 
-void waitforNTPsync(int16_t timeout = 60){  
+void waitforNTPsync(int16_t timeout = 30){  
   //wait for time is synced to NTP server, for maximum of timeout seconds
   //feed the watchdog while waiting 
   //update NTP status
