@@ -3,7 +3,7 @@
 **  Program  : helperStuff
 **  Version  : v0.9.1
 **
-**  Copyright (c) 2021 Robert van den Breemen
+**  Copyright (c) 2021-2022 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
@@ -24,34 +24,6 @@ template <typename T> T PROGMEM_getAnything (const T * sce)
   return temp;
 }
 
-
-//===========================================================================================
-bool compare(String x, String y) 
-{ 
-    for (unsigned int i = 0; i < min(x.length(), y.length()); i++) { 
-      if (x[i] != y[i]) 
-      {
-        return (bool)(x[i] < y[i]); 
-      }
-    } 
-    return x.length() < y.length(); 
-    
-} // compare()
-
-
-//===========================================================================================
-bool isNumericp(const char *timeStamp, int8_t len)
-{
-  for (int i=0; (i<len && i<12);i++)
-  {
-    if (timeStamp[i] < '0' || timeStamp[i] > '9')
-    {
-      return false;
-    }
-  }
-  return true;
-  
-} // isNumericp()
 
 //===========================================================================================
 // Note: This function returns a pointer to a substring of the original string.
@@ -112,38 +84,6 @@ uint8_t splitString(String inStrng, char delimiter, String wOut[], uint8_t maxWo
 } // splitString()
 
 
-
-
-//===========================================================================================
-void strToLower(char *src)
-{
-  for (unsigned int i = 0; i < strlen(src); i++)
-  {
-    if (src[i] == '\0') return;
-    if (src[i] >= 'A' && src[i] <= 'Z')
-        src[i] += 32;
-  }
-} // strToLower()
-
-//===========================================================================================
-int strIndex(const char *haystack, const char *needle, int start)
-{
-  char *p = strstr (haystack+start, needle);
-  if (p) {
-    //DebugTf("found [%s] at position [%d]\r\n", needle, (p - haystack));
-    return (p - haystack);
-  }
-  return -1;
-  
-} // strIndex()
-
-//===========================================================================================
-int strIndex(const char *haystack, const char *needle)
-{
-  return strIndex(haystack, needle, 0);
-  
-} // strIndex()
-
 //===========================================================================================
 int stricmp(const char *a, const char *b)
 {
@@ -155,29 +95,6 @@ int stricmp(const char *a, const char *b)
     
 } // stricmp()
 
-//===========================================================================================
-char *intToStr(int32_t v)
-{
-  static char buff[25];
-  sprintf(buff,"%d", v);
-  return buff;
-  
-} // intToStr()
-
-//===========================================================================================
-char *floatToStr(float v, int dec)
-{
-  static char buff[25];
-  if (dec == 0)       sprintf(buff,"%.0f", v);
-  else if (dec == 1)  sprintf(buff,"%.1f", v);
-  else if (dec == 2)  sprintf(buff,"%.2f", v);
-  else if (dec == 3)  sprintf(buff,"%.3f", v);
-  else if (dec == 4)  sprintf(buff,"%.4f", v);
-  else if (dec == 5)  sprintf(buff,"%.5f", v);
-  else                sprintf(buff,"%f",   v);
-  return buff;
-  
-} // floattToStr()
 
 //===========================================================================================
 float formatFloat(float v, int dec)
@@ -185,23 +102,6 @@ float formatFloat(float v, int dec)
   return (String(v, dec).toFloat());
 
 } //  formatFloat()
-
-//===========================================================================================
-float strToFloat(const char *s, int dec)
-{
-  float r =  0.0;
-  int   p =  0;
-  
-  r = strtof(s, NULL);
-  p = (int)(r*pow(10, dec));
-  r = p / pow(10, dec);
-  //DebugTf("[%s][%d] => p[%d] -> r[%f]\r\n", s, dec, p, r);
-  return r; 
-
-} //  strToFloat()
-
-
-
 //===========================================================================================
 boolean isValidIP(IPAddress ip)
 {
@@ -531,6 +431,7 @@ void str_cstrlit(const char *str, char *buffer, size_t buflen)
     }
     *buffer = '\0';
 }
+
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a
