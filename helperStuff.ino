@@ -125,18 +125,6 @@ void strToLower(char *src)
   }
 } // strToLower()
 
-
-//===========================================================================================
-// a 'save' version of strncpy() that does not put a '\0' at
-// the end of dest if src >= maxLen!
-void strCopy(char *dest, size_t maxLen, const char *src)
-{
-  dest[0] = '\0';
-  strncat(dest, src,maxLen);
-    
-} // strCopy()
-
-
 //===========================================================================================
 int strIndex(const char *haystack, const char *needle, int start)
 {
