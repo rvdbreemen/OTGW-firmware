@@ -216,7 +216,7 @@ String initWatchDog() {
     if (status & 0x1)
     {
       OTGWDebugTln(F("INIT : Reset by WD!"));
-      ReasonReset = "Reset by External WD";
+      ReasonReset = "Reset by External WD\r\n";
       //lastReset = BOOT_CAUSE_EXT_WD;
     }
   }

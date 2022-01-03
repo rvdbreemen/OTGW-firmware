@@ -72,8 +72,8 @@ void setup() {
   setupFSexplorer();
   startWebserver();
   startMQTT();               // start the MQTT after webserver, always.
-
-
+ 
+  initWatchDog();            // setup the WatchDog
   lastReset = ESP.getResetReason();
   OTGWSerial.printf("Last reset reason: [%s]\r\n", CSTR(lastReset));
   rebootCount = updateRebootCount();
@@ -89,7 +89,7 @@ void setup() {
   checkOTWGpicforupdate();
   initSensors();        // init DS18B20
   initOutputs();
-  initWatchDog();       // setup the WatchDog
+  
   WatchDogEnabled(1);   // turn on watchdog
   sendOTGWbootcmd();   
   //Blink LED2 to signal setup done
