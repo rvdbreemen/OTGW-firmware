@@ -237,7 +237,7 @@ void feedWatchDog() {
   //==== feed the WD over I2C ==== 
   // Address: 0x26
   // I2C Watchdog feed
-  DECLARE_TIMER_MS(timerWD, 3000, SKIP_MISSED_TICKS);
+  DECLARE_TIMER_MS(timerWD, 1000, SKIP_MISSED_TICKS);
   if DUE(timerWD)
   {
     Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   //Nodoshop design uses the hardware WD on I2C, address 0x26
@@ -1690,6 +1690,7 @@ void handleOTGW()
   }
   size_t bytes_available = OTGWSerial.available();
   if(bytes_available > 0) {
+    OTGWSerial.setTimeout(1000);//never more then 1 second blocking
     bytes_read = OTGWSerial.readBytesUntil('\n', sRead, sizeof(sRead));
     if (bytes_read>0) {
       sRead[strcspn(sRead, "\r\n")] = 0; // works for LF, CR, CRLF, LFCR, ...
@@ -1711,10 +1712,10 @@ void handleOTGW()
   while (OTGWstream.available()){
     //OTGWSerial.write(OTGWstream.read()); //just forward it directly to Serial
     outByte = OTGWstream.read();  // read from port 25238
-    while (OTGWSerial.availableForWrite()==0) {
-      //cannot write, buffer full, wait for some space in serial out buffer
-      feedWatchDog();     //this yields for other processes
-    }
+    // while (OTGWSerial.availableForWrite()==0) {
+    //   //cannot write, buffer full, wait for some space in serial out buffer
+    //   feedWatchDog();     //this yields for other processes
+    // }
     OTGWSerial.write(outByte);        // write to serial port
     //OTGWSerial.flush();               // wait for write to serial
     if (outByte == '\r')
