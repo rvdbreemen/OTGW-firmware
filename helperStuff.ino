@@ -212,7 +212,7 @@ bool updateRebootLog(String text)
   char log_line_excpt[LOG_LINE_LENGTH] = {0};
   uint32_t errorCode = -1;
 
-  waitforNTPsync();
+  //waitforNTPsync();
 
   struct	rst_info	*rtc_info	=	system_get_rst_info();
   
@@ -237,6 +237,12 @@ bool updateRebootLog(String text)
       //The	address	of	the	last	crash	is	printed,	which	is	used	to	debug	garbled	output
       snprintf(log_line_regs, LOG_LINE_LENGTH,"ESP register contents: epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x, depc=0x%08x\r\n", rtc_info->epc1, rtc_info->epc2, rtc_info->epc3, rtc_info->excvaddr, rtc_info->depc);
       Debugf(log_line_regs);
+    }
+
+    if (rtc_info->reason == REASON_EXT_SYS_RST) {
+      //external reset, so try to fetch the reset reason from the tiny watchdog and print that
+      snprintf(log_line_regs, LOG_LINE_LENGTH,"External Reason: External Watchdog reason: %s\r\n", CSTR(initWatchDog()));
+      Debugf(log_line_regs);      
     }
 
     if	(rtc_info->reason	==	REASON_EXCEPTION_RST)	{
