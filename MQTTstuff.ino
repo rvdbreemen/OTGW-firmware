@@ -475,7 +475,7 @@ bool getMQTTConfigDone(const uint8_t MSGid)
   group = group>>5;
   uint8_t index = MSGid & 0b00011111;
   uint32_t result = bitRead(MQTTautoConfigMap[group], index);
-  Debugf("Reading bit %d from group %d for MSGid %d: result = %d\r\n", index, group, MSGid, result);
+  MQTTDebugTf("Reading bit %d from group %d for MSGid %d: result = %d\r\n", index, group, MSGid, result);
   if (result > 0) {
     return true;
   } else {
@@ -488,10 +488,10 @@ bool setMQTTConfigDone(const uint8_t MSGid)
   uint8_t group = MSGid & 0b11100000;
   group = group>>5;
   uint8_t index = MSGid & 0b00011111;
-  Debugf("Setting bit %d from group %d for MSGid %d\r\n", index, group, MSGid);
-  Debugf("Value before setting bit %d\r\n", MQTTautoConfigMap[group]);
+  MQTTDebugTf("Setting bit %d from group %d for MSGid %d\r\n", index, group, MSGid);
+  MQTTDebugTf("Value before setting bit %d\r\n", MQTTautoConfigMap[group]);
   if(bitSet(MQTTautoConfigMap[group], index) > 0) {
-    Debugf("Value after setting bit  %d\r\n", MQTTautoConfigMap[group]);
+    MQTTDebugTf("Value after setting bit  %d\r\n", MQTTautoConfigMap[group]);
     return true;
   } else {
     return false;
@@ -567,7 +567,7 @@ bool doAutoConfigure(byte OTid)
     sMsg.replace("%hostname%", CSTR(settingHostname));
 
     /// version
-    sMsg.replace("%version%", CSTR(String(_VERSION)));
+    sMsg.replace("%version%", _VERSION);
 
     // pub topics prefix
     sMsg.replace("%mqtt_pub_topic%", CSTR(MQTTPubNamespace));
