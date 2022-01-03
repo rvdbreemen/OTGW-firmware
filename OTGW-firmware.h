@@ -70,6 +70,7 @@ String      lastReset = "";
 uint32_t    upTimeSeconds = 0;
 uint32_t    rebootCount = 0;
 String      sMessage = "";    
+uint32_t    MQTTautoConfigMap[8] = { 0 };
 
 //Use acetime
 using namespace ace_time;
