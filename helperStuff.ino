@@ -211,7 +211,7 @@ bool updateRebootLog(String text)
   char log_line_excpt[LOG_LINE_LENGTH] = {0};
   uint32_t errorCode = -1;
 
-  waitforNTPsync();
+  //waitforNTPsync();
 
   struct	rst_info	*rtc_info	=	system_get_rst_info();
   
