@@ -348,6 +348,7 @@ String trimVal(char *in)
 } // trimVal()
 
 void PrintMQTTError(){
+  MQTTDebugln();
   switch (MQTTclient.state())
   {
     case MQTT_CONNECTION_TIMEOUT     : MQTTDebugTln(F("Error: MQTT connection timeout"));break;
@@ -504,10 +505,14 @@ void clearMQTTConfigDone()
 }
 //===========================================================================================
 void doAutoConfigure(){
+  //force all sensors to be sent to auto configuration
+  for (int i=0; i<255; i++){
+    doAutoConfigureMsgid((byte)i);
+  }
 //  bool success = doAutoConfigure("config"); // the string "config" should match every line non-comment in mqttha.cfg
 }
 //===========================================================================================
-bool doAutoConfigure(byte OTid)
+bool doAutoConfigureMsgid(byte OTid)
 {
   bool _result = false;
   

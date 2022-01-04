@@ -1442,16 +1442,16 @@ void processOT(const char *buf, int len){
       // check wheter MQTT topic needs to be configuered
       if (is_value_valid(OTdata, OTlookupitem) && settingMQTTenable ) {
         if(getMQTTConfigDone(OTdata.id)==false) {
-          Debugf("Need to set MQTT config for message %s (%d)\r\n", OTlookupitem.label, OTdata.id);
-          bool success = doAutoConfigure(OTdata.id);
+          MQTTDebugTf("Need to set MQTT config for message %s (%d)\r\n", OTlookupitem.label, OTdata.id);
+          bool success = doAutoConfigureMsgid(OTdata.id);
           if(success) {
-            Debugf("Successfully sent MQTT config for message %s (%d)\r\n", OTlookupitem.label, OTdata.id);
+            MQTTDebugTf("Successfully sent MQTT config for message %s (%d)\r\n", OTlookupitem.label, OTdata.id);
             setMQTTConfigDone(OTdata.id);
           } else {
-            Debugf("Not able to complete MQTT configuration for message %s (%d)\r\n", OTlookupitem.label, OTdata.id);
+            MQTTDebugTf("Not able to complete MQTT configuration for message %s (%d)\r\n", OTlookupitem.label, OTdata.id);
           }
         } else {
-          // Debugf("No need to set MQTT config for message %s (%d)\r\n", OTlookupitem.label, OTdata.id);
+          // MQTTDebugTf("No need to set MQTT config for message %s (%d)\r\n", OTlookupitem.label, OTdata.id);
         }
       }
 
