@@ -69,7 +69,7 @@ void handleDebug(){
             case 'k':
                 DebugTln(F("read settings"));
                 readSettings(true);
-            break;
+                break;
             case 'o':
                 DebugTln("gpio output off");
                 digitalWrite(settingGPIOOUTPUTSpin, OFF);
@@ -87,7 +87,7 @@ void handleDebug(){
                 }
                 break;
             default:
-            break;
+                break;
         }
 
     }

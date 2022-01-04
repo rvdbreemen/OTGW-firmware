@@ -40,20 +40,6 @@ bool compare(String x, String y)
 
 
 //===========================================================================================
-bool isNumericp(const char *timeStamp, int8_t len)
-{
-  for (int i=0; (i<len && i<12);i++)
-  {
-    if (timeStamp[i] < '0' || timeStamp[i] > '9')
-    {
-      return false;
-    }
-  }
-  return true;
-  
-} // isNumericp()
-
-//===========================================================================================
 // Note: This function returns a pointer to a substring of the original string.
 // If the given string was allocated dynamically, the caller must not overwrite
 // that pointer with the returned value, since the original pointer must be
