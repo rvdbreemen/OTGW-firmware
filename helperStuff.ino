@@ -3,7 +3,7 @@
 **  Program  : helperStuff
 **  Version  : v0.9.1
 **
-**  Copyright (c) 2021 Robert van den Breemen
+**  Copyright (c) 2021-2022 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
@@ -23,21 +23,6 @@ template <typename T> T PROGMEM_getAnything (const T * sce)
   memcpy_P (&temp, sce, sizeof (T));
   return temp;
 }
-
-
-//===========================================================================================
-bool compare(String x, String y) 
-{ 
-    for (unsigned int i = 0; i < min(x.length(), y.length()); i++) { 
-      if (x[i] != y[i]) 
-      {
-        return (bool)(x[i] < y[i]); 
-      }
-    } 
-    return x.length() < y.length(); 
-    
-} // compare()
-
 
 //===========================================================================================
 // Note: This function returns a pointer to a substring of the original string.
