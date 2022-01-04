@@ -112,12 +112,12 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   char msgPayload[50];
   int msglen = min((int)(length)+1, (int)sizeof(msgPayload));
   strlcpy(msgPayload, (char *)payload, msglen);
-  if (stricmp(topic, "homeassistant/status") == 0) {
+  if (strcasecmp(topic, "homeassistant/status") == 0) {
     //incoming message on status, detect going down
-    if (stricmp(msgPayload, "offline") == 0){
+    if (strcasecmp(msgPayload, "offline") == 0){
       //home assistant went down
       DebugTln(F("Home Assistant went offline!"));
-    } else if (stricmp(msgPayload, "online") == 0){
+    } else if (strcasecmp(msgPayload, "online") == 0){
       DebugTln(F("Home Assistant went online!"));
       //restart stuff, to make sure it works correctly again
       startMQTT();  // fixing some issues with hanging HA AutoDiscovery in some scenario's?
@@ -133,22 +133,22 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   token = strtok(topic, "/"); 
   MQTTDebugT("Parsing topic: ");
   MQTTDebugf("%s/", token);
-  if (stricmp(token, CSTR(settingMQTTtopTopic)) == 0) {
+  if (strcasecmp(token, CSTR(settingMQTTtopTopic)) == 0) {
     token = strtok(NULL, "/"); 
     MQTTDebugf("%s/", token);
-    if (stricmp(token, "set") == 0) {
+    if (strcasecmp(token, "set") == 0) {
       token = strtok(NULL, "/");
       MQTTDebugf("%s/", token); 
-      if (stricmp(token, CSTR(NodeId)) == 0) {
+      if (strcasecmp(token, CSTR(NodeId)) == 0) {
         token = strtok(NULL, "/");
         MQTTDebugf("%s", token);
         if (token != NULL){
           //loop thru command list
           int i;
           for (i=0; i<nrcmds; i++){
-            if (stricmp(token, setcmds[i].setcmd) == 0){
+            if (strcasecmp(token, setcmds[i].setcmd) == 0){
               //found a match
-              if (stricmp(setcmds[i].ottype, "raw") == 0){
+              if (strcasecmp(setcmds[i].ottype, "raw") == 0){
                 //raw command
                 snprintf(otgwcmd, sizeof(otgwcmd), "%s", msgPayload);
                 MQTTDebugf(" found command, sending payload [%s]\r\n", otgwcmd);

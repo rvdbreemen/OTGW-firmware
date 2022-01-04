@@ -162,7 +162,7 @@ void updateSetting(const char *field, const char *newValue)
 { //do not just trust the caller to do the right thing, server side validation is here!
   DebugTf("-> field[%s], newValue[%s]\r\n", field, newValue);
 
-  if (stricmp(field, "hostname")==0) 
+  if (strcasecmp(field, "hostname")==0) 
   { //make sure we have a valid hostname here...
     settingHostname = String(newValue);
     if (settingHostname.length()==0) settingHostname=_HOSTNAME; 
@@ -181,70 +181,70 @@ void updateSetting(const char *field, const char *newValue)
     Debugln();
     DebugTf("Need reboot before new %s.local will be available!\r\n\n", CSTR(settingHostname));
   }
-  if (stricmp(field, "MQTTenable")==0)      settingMQTTenable = EVALBOOLEAN(newValue);
-  if (stricmp(field, "MQTTbroker")==0)      settingMQTTbroker = String(newValue);
-  if (stricmp(field, "MQTTbrokerPort")==0)  settingMQTTbrokerPort = atoi(newValue);
-  if (stricmp(field, "MQTTuser")==0)        settingMQTTuser = String(newValue);
-  if (stricmp(field, "MQTTpasswd")==0)      settingMQTTpasswd = String(newValue);
-  if (stricmp(field, "MQTTtoptopic")==0)    {
+  if (strcasecmp(field, "MQTTenable")==0)      settingMQTTenable = EVALBOOLEAN(newValue);
+  if (strcasecmp(field, "MQTTbroker")==0)      settingMQTTbroker = String(newValue);
+  if (strcasecmp(field, "MQTTbrokerPort")==0)  settingMQTTbrokerPort = atoi(newValue);
+  if (strcasecmp(field, "MQTTuser")==0)        settingMQTTuser = String(newValue);
+  if (strcasecmp(field, "MQTTpasswd")==0)      settingMQTTpasswd = String(newValue);
+  if (strcasecmp(field, "MQTTtoptopic")==0)    {
     settingMQTTtopTopic = String(newValue);
     if (settingMQTTtopTopic.length()==0)    {
       settingMQTTtopTopic = _HOSTNAME;
       settingMQTTtopTopic.toLowerCase();
     }
   }
-  if (stricmp(field, "MQTThaprefix")==0)    {
+  if (strcasecmp(field, "MQTThaprefix")==0)    {
     settingMQTThaprefix = String(newValue);
     if (settingMQTThaprefix.length()==0)    settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
   }
-  if (stricmp(field, "MQTTuniqueid") == 0)  {
+  if (strcasecmp(field, "MQTTuniqueid") == 0)  {
     settingMQTTuniqueid = String(newValue);     
     if (settingMQTTuniqueid.length() == 0)   settingMQTTuniqueid = getUniqueId();
   }
-  if (stricmp(field, "MQTTOTmessage")==0)   settingMQTTOTmessage = EVALBOOLEAN(newValue);
+  if (strcasecmp(field, "MQTTOTmessage")==0)   settingMQTTOTmessage = EVALBOOLEAN(newValue);
   if (strstr(field, "mqtt") != NULL)        startMQTT();//restart MQTT on change of any setting
   
-  if (stricmp(field, "NTPenable")==0)      settingNTPenable = EVALBOOLEAN(newValue);
-  if (stricmp(field, "NTPhostname")==0)    {
+  if (strcasecmp(field, "NTPenable")==0)      settingNTPenable = EVALBOOLEAN(newValue);
+  if (strcasecmp(field, "NTPhostname")==0)    {
     settingNTPhostname = String(newValue); 
     startNTP();
   }
-  if (stricmp(field, "NTPtimezone")==0)    {
+  if (strcasecmp(field, "NTPtimezone")==0)    {
     settingNTPtimezone = String(newValue);
     startNTP();  // update timezone if changed
   }
-  if (stricmp(field, "LEDblink")==0)      settingLEDblink = EVALBOOLEAN(newValue);
-  if (stricmp(field, "GPIOSENSORSenabled") == 0)
+  if (strcasecmp(field, "LEDblink")==0)      settingLEDblink = EVALBOOLEAN(newValue);
+  if (strcasecmp(field, "GPIOSENSORSenabled") == 0)
   {
     settingGPIOSENSORSenabled = EVALBOOLEAN(newValue);
     Debugln();
     DebugTf("Need reboot before GPIO SENSORS will search for sensors on pin GPIO%d!\r\n\n", settingGPIOSENSORSpin);
   }
-  if (stricmp(field, "GPIOSENSORSpin") == 0)    
+  if (strcasecmp(field, "GPIOSENSORSpin") == 0)    
   {
     settingGPIOSENSORSpin = atoi(newValue);
     Debugln();
     DebugTf("Need reboot before GPIO SENSORS will use new pin GPIO%d!\r\n\n", settingGPIOSENSORSpin);
   }
-  if (stricmp(field, "GPIOSENSORSinterval") == 0) {
+  if (strcasecmp(field, "GPIOSENSORSinterval") == 0) {
     settingGPIOSENSORSinterval = atoi(newValue);
     CHANGE_INTERVAL_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS); 
   }
-  if (stricmp(field, "OTGWcommandenable")==0)    settingOTGWcommandenable = EVALBOOLEAN(newValue);
-  if (stricmp(field, "OTGWcommands")==0)         settingOTGWcommands = String(newValue);
-  if (stricmp(field, "GPIOOUTPUTSenabled") == 0)
+  if (strcasecmp(field, "OTGWcommandenable")==0)    settingOTGWcommandenable = EVALBOOLEAN(newValue);
+  if (strcasecmp(field, "OTGWcommands")==0)         settingOTGWcommands = String(newValue);
+  if (strcasecmp(field, "GPIOOUTPUTSenabled") == 0)
   {
     settingGPIOOUTPUTSenabled = EVALBOOLEAN(newValue);
     Debugln();
     DebugTf("Need reboot before GPIO OUTPUTS will be enabled on pin GPIO%d!\r\n\n", settingGPIOOUTPUTSenabled);
   }
-  if (stricmp(field, "GPIOOUTPUTSpin") == 0)
+  if (strcasecmp(field, "GPIOOUTPUTSpin") == 0)
   {
     settingGPIOOUTPUTSpin = atoi(newValue);
     Debugln();
     DebugTf("Need reboot before GPIO OUTPUTS will use new pin GPIO%d!\r\n\n", settingGPIOOUTPUTSpin);
   }
-  if (stricmp(field, "GPIOOUTPUTStriggerBit") == 0)
+  if (strcasecmp(field, "GPIOOUTPUTStriggerBit") == 0)
   {
     settingGPIOOUTPUTStriggerBit = atoi(newValue);
     Debugln();
