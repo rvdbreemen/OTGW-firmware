@@ -298,6 +298,12 @@ int OTGWSerial::versionCompare(const char *version1, const char* version2) {
     s1++;
     s2++;
   }
+  // we need to return something when dropping out of while.
+  // if both are eos, they are equal.
+  // if s1 is equal first, return -1, otherwise 1.
+  if ( *s1 == 0 && *s2 == 0 ) return 0;
+  if (*s1 == 0) return -1;
+  return 1;
 }
 
 int OTGWSerial::eepromSettings(const char *version, OTGWTransferData *xfer) {
@@ -311,7 +317,7 @@ int OTGWSerial::eepromSettings(const char *version, OTGWTransferData *xfer) {
     len = f.readBytesUntil('\n', buffer, sizeof(buffer) - 1);
     buffer[len] = '\0';
     if ((n = sscanf(buffer, "%d %n%*s%n %x %d %x", &id, &p1, &p2, &addr, &size, &mask)) == 4) {
-      if (id >= XFER_MAX_ID);
+      if (id >= XFER_MAX_ID) continue;
       buffer[p2] = '\0';
       if (versionCompare(version, buffer + p1) < 0) continue;
       xfer[id].addr = addr;
@@ -342,7 +348,7 @@ void OTGWSerial::transferSettings(const char *ver1, const char *ver2) {
           // Combine the masks
           mask = xfer1[i].mask | xfer2[i].mask;
           // Insert the old data into the data array
-          _upgrade_data->datamem[xfer2[i].addr + j] = _upgrade_data->datamem[xfer2[i].addr + j] & mask | value & ~mask;
+          _upgrade_data->datamem[xfer2[i].addr + j] = (_upgrade_data->datamem[xfer2[i].addr + j] & mask) | (value & ~mask);
         }
       }
     }
@@ -540,7 +546,7 @@ void OTGWSerial::stateMachine(const unsigned char *packet, int len) {
         if ((_upgrade_data->protectstart & 0x800) == 0) {
           _upgrade_data->failsafe[0] = 0x118a;                        // BCF PCLATH,3
         }
-        _upgrade_data->failsafe[1] = 0x2000 | _upgrade_data->protectstart & 0x7ff; // CALL SelfProg
+        _upgrade_data->failsafe[1] = 0x2000 | (_upgrade_data->protectstart & 0x7ff); // CALL SelfProg
         _upgrade_data->failsafe[2] = 0x118a;                          // BCF PCLATH,3
         _upgrade_data->failsafe[3] = 0x2820;                          // GOTO 0x20
         progress(WEIGHT_VERSION);
