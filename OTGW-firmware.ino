@@ -3,7 +3,7 @@
 **  Program  : OTGW-firmware.ino
 **  Version  : v0.9.1
 **
-**  Copyright (c) 2021 Robert van den Breemen
+**  Copyright (c) 2021-2022 Robert van den Breemen
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
@@ -72,8 +72,8 @@ void setup() {
   setupFSexplorer();
   startWebserver();
   startMQTT();               // start the MQTT after webserver, always.
-
-
+ 
+  initWatchDog();            // setup the WatchDog
   lastReset = ESP.getResetReason();
   OTGWSerial.printf("Last reset reason: [%s]\r\n", CSTR(lastReset));
   rebootCount = updateRebootCount();
@@ -89,7 +89,7 @@ void setup() {
   checkOTWGpicforupdate();
   initSensors();        // init DS18B20
   initOutputs();
-  initWatchDog();       // setup the WatchDog
+  
   WatchDogEnabled(1);   // turn on watchdog
   sendOTGWbootcmd();   
   //Blink LED2 to signal setup done

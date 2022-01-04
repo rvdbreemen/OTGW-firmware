@@ -4,9 +4,9 @@
 **
 **  Version  : v0.9.1
 **
-**  Copyright (c) 2021 Robert van den Breemen
+**  Copyright (c) 2021-2022 Robert van den Breemen
 **
-**  Copyright (c) 2021 Robert van den Breemen
+**  Copyright (c) 2021-2022 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
@@ -265,7 +265,7 @@ bool isNTPtimeSet(){
   return NtpStatus == TIME_SYNC;
 }
 
-void waitforNTPsync(int16_t timeout = 60){  
+void waitforNTPsync(int16_t timeout = 30){  
   //wait for time is synced to NTP server, for maximum of timeout seconds
   //feed the watchdog while waiting 
   //update NTP status
