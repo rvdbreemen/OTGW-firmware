@@ -54,7 +54,7 @@ void setLed(int8_t, uint8_t);
 #define CBOOLEAN(x) (x?"true":"false")
 #define CONOFF(x) (x?"On":"Off")
 #define CBINARY(x) (x?"1":"0")
-#define EVALBOOLEAN(x) (stricmp(x,"true")==0||stricmp(x,"on")==0||stricmp(x,"1")==0)
+#define EVALBOOLEAN(x) (strcasecmp(x,"true")==0||strcasecmp(x,"on")==0||strcasecmp(x,"1")==0)
 
 
 //prototype

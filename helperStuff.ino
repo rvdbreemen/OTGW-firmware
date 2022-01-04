@@ -85,18 +85,6 @@ uint8_t splitString(String inStrng, char delimiter, String wOut[], uint8_t maxWo
 
 
 //===========================================================================================
-int stricmp(const char *a, const char *b)
-{
-    for (;; a++, b++) {
-        int d = tolower((unsigned char)*a) - tolower((unsigned char)*b);
-        if (d != 0 || !*a)
-            return d;
-    }
-    
-} // stricmp()
-
-
-//===========================================================================================
 float formatFloat(float v, int dec)
 {
   return (String(v, dec).toFloat());
@@ -375,7 +363,7 @@ bool checklittlefshash(){
       }
     }
     DebugTf("Check githash = [%s]\r\n", CSTR(_githash));
-    return (stricmp(CSTR(_githash), _VERSION_GITHASH)==0);
+    return (strcasecmp(CSTR(_githash), _VERSION_GITHASH)==0);
   }
   return false;
 }
