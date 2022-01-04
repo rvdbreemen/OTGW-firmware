@@ -98,6 +98,8 @@ void startMQTT()
   // handleMQTT(); //now you should be connected to MQTT ready to send
 }
 
+bool bHAcycle = false;
+
 // handles MQTT subscribe incoming stuff
 void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 
@@ -118,12 +120,14 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
     if (stricmp(msgPayload, "offline") == 0){
       //home assistant went down
       DebugTln(F("Home Assistant went offline!"));
-    } else if (stricmp(msgPayload, "online") == 0){
+      bHAcycle = true; //set flag, so it triggers when it goes back online
+    } else if ((stricmp(msgPayload, "online") == 0) && bHAcycle){
       DebugTln(F("Home Assistant went online!"));
+      bHAcycle = false; //clear flag, so it does not trigger again
       //restart stuff, to make sure it works correctly again
       startMQTT();  // fixing some issues with hanging HA AutoDiscovery in some scenario's?
     } else {
-      DebugTf("Home Assistant Status=[%s]\r\n", msgPayload); 
+      DebugTf("Home Assistant Status=[%s] and HA cycle status [%s]\r\n", msgPayload, CBOOLEAN(bHAcycle)); 
     }
   }
 
@@ -423,6 +427,15 @@ void sendMQTT(const char* topic, const char *json, const size_t len)
 } // sendMQTTData()
 
 //===========================================================================================
+/*
+Publish state of thermostate, boiler, gateway and the otgw as a whole.
+*/
+void sendMQTTstateinfo(){
+  sendMQTTData(F("otgw-pic/thermostat_connected"), CBOOLEAN(false));  
+  sendMQTTData(F("otgw-pic/boiler_connected"), CBOOLEAN(false));  
+  sendMQTTData(F("otgw-pic/gateway_mode"), CBOOLEAN(false));      
+  sendMQTTData(F("otgw-pic/otgw_connected"), CBOOLEAN(false));  
+}
 /*
 Publish usefull firmware version information to MQTT broker.
 */

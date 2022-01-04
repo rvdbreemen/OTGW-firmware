@@ -1346,8 +1346,10 @@ bool isvalidotmsg(const char *buf, int len){
 void processOT(const char *buf, int len){
   static time_t epochBoilerlastseen = 0;
   static time_t epochThermostatlastseen = 0;
+  static time_t epochGatewaylastseen = 0;
   static bool bOTGWboilerpreviousstate = false;
   static bool bOTGWthermostatpreviousstate = false;
+  static bool bOTGWgatewaypreviousstate = false;
   static bool bOTGWpreviousstate = false;
 
   if (isvalidotmsg(buf, len)) { 
@@ -1367,31 +1369,42 @@ void processOT(const char *buf, int len){
     } else if (buf[0]=='T'){
       epochThermostatlastseen = now();
       OTdata.rsptype = OTGW_THERMOSTAT;
-    } else if (buf[0]=='R')    {
-      epochBoilerlastseen = now();
-      OTdata.rsptype = OTGW_REQUEST_BOILER;
-    } else if (buf[0]=='A')    {
-      epochThermostatlastseen = now();
-      OTdata.rsptype = OTGW_ANSWER_THERMOSTAT;
     } else if (buf[0]=='E')    {
       OTdata.rsptype = OTGW_PARITY_ERROR;
-    } 
+    } else if (buf[0]=='R')    {
+      epochGatewaylastseen = now();
+      OTdata.rsptype = OTGW_REQUEST_BOILER;
+    } else if (buf[0]=='A')    {
+      epochGatewaylastseen = now();
+      OTdata.rsptype = OTGW_ANSWER_THERMOSTAT;
+    }
 
-    //If the Boiler or Thermostat messages have not been seen for 30 seconds, then set the state to false. 
+    //If the Boiler messages have not been seen for 30 seconds, then set the state to false. 
     bOTGWboilerstate = (now() < (epochBoilerlastseen+30));  
     if (bOTGWboilerstate != bOTGWboilerpreviousstate) {
       sendMQTTData(F("otgw-pic/boiler_connected"), CBOOLEAN(bOTGWboilerstate)); 
       bOTGWboilerpreviousstate = bOTGWboilerstate;
     }
+
+    //If the Thermostat messages have not been seen for 30 seconds, then set the state to false. 
     bOTGWthermostatstate = (now() < (epochThermostatlastseen+30));
     if (bOTGWthermostatstate != bOTGWthermostatpreviousstate) {      
       sendMQTTData(F("otgw-pic/thermostat_connected"), CBOOLEAN(bOTGWthermostatstate));
       bOTGWthermostatpreviousstate = bOTGWthermostatstate;
     }
-    //If either Boiler or Thermostat is offline, then the OTGW is considered offline as a whole.
-    bOTGWonline = bOTGWboilerstate && bOTGWthermostatstate;
+    
+    //If the Gateway (A or R) messages have not been seen for 30 seconds, then set the state to false. 
+    //If the Thermostat is NOT connected (so false), then the Gateway will be continuously sending R messages to the boiler, in face the Gateway the acts as the Thermostat
+    bOTGWgatewaystate = (now() < (epochGatewaylastseen+30));
+    if (bOTGWgatewaystate != bOTGWgatewaypreviousstate) {      
+      sendMQTTData(F("otgw-pic/gateway_mode"), CBOOLEAN(bOTGWgatewaystate));
+      bOTGWgatewaypreviousstate = bOTGWgatewaystate;
+    }
+
+    //If both (Boiler and Thermostat and Gateway) are offline, then the OTGW is considered offline as a whole.
+    bOTGWonline = (bOTGWboilerstate && bOTGWthermostatstate && bOTGWgatewaystate);
     if (bOTGWonline != bOTGWpreviousstate) {
-      sendMQTTData(F("otgw-pic/pic_connected"), CBOOLEAN(bOTGWonline));
+      sendMQTTData(F("otgw-pic/otgw_connected"), CBOOLEAN(bOTGWonline));
       sendMQTT(CSTR(MQTTPubNamespace), CBOOLEAN(bOTGWonline));
       // nodeMCU online/offline zelf naar 'otgw-firmware/' pushen
       bOTGWpreviousstate = bOTGWonline; //remember state, so we can detect statechanges
