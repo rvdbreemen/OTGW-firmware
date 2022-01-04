@@ -428,15 +428,6 @@ void sendMQTT(const char* topic, const char *json, const size_t len)
 
 //===========================================================================================
 /*
-Publish state of thermostate, boiler, gateway and the otgw as a whole.
-*/
-void sendMQTTstateinfo(){
-  sendMQTTData(F("otgw-pic/thermostat_connected"), CBOOLEAN(false));  
-  sendMQTTData(F("otgw-pic/boiler_connected"), CBOOLEAN(false));  
-  sendMQTTData(F("otgw-pic/gateway_mode"), CBOOLEAN(false));      
-  sendMQTTData(F("otgw-pic/otgw_connected"), CBOOLEAN(false));  
-}
-/*
 Publish usefull firmware version information to MQTT broker.
 */
 void sendMQTTversioninfo(){
