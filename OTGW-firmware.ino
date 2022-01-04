@@ -98,6 +98,7 @@ void setup() {
   setLed(LED2, OFF);
   sendMQTTuptime();
   sendMQTTversioninfo();
+  sendMQTTstateinfo();
 }
 //=====================================================================
 

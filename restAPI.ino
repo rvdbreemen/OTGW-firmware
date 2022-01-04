@@ -370,7 +370,8 @@ void sendDeviceInfo()
   sendNestedJsonObj("mqttconnected", String(CBOOLEAN(statusMQTTconnection)));
   sendNestedJsonObj("thermostatconnected", CBOOLEAN(bOTGWthermostatstate));
   sendNestedJsonObj("boilerconnected", CBOOLEAN(bOTGWboilerstate));      
-  sendNestedJsonObj("picconnected", CBOOLEAN(bOTGWonline));
+  sendNestedJsonObj("gatewaymode", CBOOLEAN(bOTGWgatewaystate));      
+  sendNestedJsonObj("otgwconnected", CBOOLEAN(bOTGWonline));
   
   sendEndJsonObj("devinfo");
 
