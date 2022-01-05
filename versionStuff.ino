@@ -74,7 +74,8 @@ String GetVersion(const String hexfile){
         ptr += strnlen((char *)datamem + ptr, 256 - ptr) + 1;
       } else {
         //DebugTf("hit the banner! returning version string %s\n",s);
-        s += sizeof(banner) - 1; return String(s);
+        s += sizeof(banner) - 1;
+        return String(s);
       }
     }
   }
