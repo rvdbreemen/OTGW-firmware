@@ -1381,7 +1381,7 @@ void processOT(const char *buf, int len){
 
     //If the Boiler messages have not been seen for 30 seconds, then set the state to false. 
     bOTGWboilerstate = (now() < (epochBoilerlastseen+30));  
-    if (((bOTGWboilerstate != bOTGWboilerpreviousstate) || (cntOTmessagesprocessed==1)) {
+    if ((bOTGWboilerstate != bOTGWboilerpreviousstate) || (cntOTmessagesprocessed==1)) {
       sendMQTTData(F("otgw-pic/boiler_connected"), CBOOLEAN(bOTGWboilerstate)); 
       bOTGWboilerpreviousstate = bOTGWboilerstate;
     }

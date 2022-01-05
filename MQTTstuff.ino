@@ -547,7 +547,7 @@ bool doAutoConfigureMsgid(byte OTid)
     String sLine = fh.readStringUntil('\n');
     // DebugTf("sline[%s]\r\n", CSTR(sLine));
     if (!splitLine(sLine, ';', lineID, sTopic, sMsg)) {  //splitLine() also filters comments
-      MQTTDebugTf("Either comment or invalid config line: [%s]\r\n", CSTR(sLine));
+      //MQTTDebugTf("Either comment or invalid config line: [%s]\r\n", CSTR(sLine));
       continue;
     }
 
@@ -556,7 +556,7 @@ bool doAutoConfigureMsgid(byte OTid)
     // check if this is the specific line we are looking for
     if (lineID != OTid) continue;
 
-    DebugTf("found line in config file for %d: [%d][%s] \r\n", OTid, lineID, CSTR(sTopic));
+    MQTTDebugTf("Found line in config file for %d: [%d][%s] \r\n", OTid, lineID, CSTR(sTopic));
 
     // discovery topic prefix
     MQTTDebugTf("sTopic[%s]==>", CSTR(sTopic)); 
@@ -584,7 +584,8 @@ bool doAutoConfigureMsgid(byte OTid)
     // sub topics
     sMsg.replace("%mqtt_sub_topic%", CSTR(MQTTSubNamespace));
 
-    Debugf("[%s]\r\n", CSTR(sMsg)); DebugFlush();
+    MQTTDebugf("[%s]\r\n", CSTR(sMsg)); 
+    DebugFlush();
 
     //sendMQTT(CSTR(sTopic), CSTR(sMsg), (sTopic.length() + sMsg.length()+2));
     sendMQTT(sTopic, sMsg);
