@@ -245,6 +245,7 @@ void doTaskEvery60s(){
 void do5minevent(){
   sendMQTTuptime();
   sendMQTTversioninfo();
+  sendMQTTstateinformation();
 }
 
 //===[ check for new pic version  ]===

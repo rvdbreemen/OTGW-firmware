@@ -79,6 +79,29 @@ OpenthermData_t OTdata, delayedOTdata, tmpOTdata;
 
 #define OTGW_BANNER "OpenTherm Gateway"
 
+//===================[ Send useful information to MQWTT ]=====================
+
+/*
+Publish usefull firmware version information to MQTT broker.
+*/
+void sendMQTTversioninfo(){
+  sendMQTTData("otgw-firmware/version", _VERSION);
+  sendMQTTData("otgw-firmware/reboot_count", String(rebootCount));
+  sendMQTTData("otgw-firmware/reboot_reason", CSTR(ESP.getResetReason()));
+  sendMQTTData("otgw-pic/version", sPICfwversion);
+}
+
+/*
+Publish state information of PIC firmware version information to MQTT broker.
+*/
+void sendMQTTstateinformation(){
+  sendMQTTData(F("otgw-pic/boiler_connected"), CBOOLEAN(bOTGWboilerstate)); 
+  sendMQTTData(F("otgw-pic/thermostat_connected"), CBOOLEAN(bOTGWthermostatstate));
+  sendMQTTData(F("otgw-pic/gateway_mode"), CBOOLEAN(bOTGWgatewaystate));
+  sendMQTTData(F("otgw-pic/otgw_connected"), CBOOLEAN(bOTGWonline));
+  sendMQTT(CSTR(MQTTPubNamespace), CBOOLEAN(bOTGWonline));
+}
+
 //===================[ Reset OTGW ]===============================
 void resetOTGW() {
   sPICfwversion ="No version found"; //reset versionstring
@@ -1887,6 +1910,8 @@ void startOTGWstream()
 {
   OTGWstream.begin();
 }
+
+//---------[ Upgrade PIC stuff taken from Schelte Bron's NodeMCU Firmware ]---------
 
 void upgradepicnow(const char *filename) {
   if (OTGWSerial.busy()) return; // if already in programming mode, never call it twice

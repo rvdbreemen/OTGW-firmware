@@ -367,6 +367,7 @@ void sendDeviceInfo()
   sendNestedJsonObj("uptime", upTime());
   sendNestedJsonObj("lastreset", lastReset);
   sendNestedJsonObj("bootcount", rebootCount);
+  sendNestedJsonObj("rebootreason", CSTR(ESP.getResetReason()));
   sendNestedJsonObj("mqttconnected", String(CBOOLEAN(statusMQTTconnection)));
   sendNestedJsonObj("thermostatconnected", CBOOLEAN(bOTGWthermostatstate));
   sendNestedJsonObj("boilerconnected", CBOOLEAN(bOTGWboilerstate));      
