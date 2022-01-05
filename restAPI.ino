@@ -181,7 +181,7 @@ void sendOTGWlabel(const char *msglabel){
   uint_fast8_t msgid;
   for (msgid = 0; msgid<= OT_MSGID_MAX; msgid++){
     PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
-    if (stricmp(OTlookupitem.label, msglabel)==0) break;
+    if (strcasecmp(OTlookupitem.label, msglabel)==0) break;
   }
   if (msgid > OT_MSGID_MAX){
     root["error"] = "message id: reserved for future use";
