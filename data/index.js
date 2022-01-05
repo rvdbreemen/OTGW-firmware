@@ -720,6 +720,7 @@
    ,[ "ntphostname",                "NTP hostname"]
    ,[ "uptime",                     "Uptime Since Boot"]
    ,[ "bootcount",                  "Nr. Reboots"] 
+   ,[ "rebootreason",               "Last Reboot Reason"] 
    ,[ "ledblink",                   "Heartbeat LED (on/off)"]
    ,[ "gpiosensorsenabled",         "GPIO Sensors Enabled"]
    ,[ "gpiosensorsinterval",        "GPIO Publish Interval (sec)"]

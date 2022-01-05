@@ -426,15 +426,7 @@ void sendMQTT(const char* topic, const char *json, const size_t len)
   feedWatchDog();
 } // sendMQTTData()
 
-//===========================================================================================
-/*
-Publish usefull firmware version information to MQTT broker.
-*/
-void sendMQTTversioninfo(){
-  sendMQTTData("otgw-firmware/version", _VERSION);
-  sendMQTTData("otgw-firmware/reboot_count", String(rebootCount));
-  sendMQTTData("otgw-pic/version", sPICfwversion);
-}
+
 //===========================================================================================
 void resetMQTTBufferSize()
 {
