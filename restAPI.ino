@@ -237,21 +237,21 @@ void sendTelegraf()
   sendJsonOTmonObj("waterovertemperature", isWaterOverTemperature(),"", msglastupdated[OT_ASFflags]);
   
 
-  sendJsonOTmonObj("outsidetemperature", OTdataObject.Toutside, "°C", msglastupdated[OT_Toutside]);
-  sendJsonOTmonObj("roomtemperature", OTdataObject.Tr, "°C", msglastupdated[OT_Tr]);
-  sendJsonOTmonObj("roomsetpoint", OTdataObject.TrSet, "°C", msglastupdated[OT_TrSet]);
-  sendJsonOTmonObj("remoteroomsetpoint", OTdataObject.TrOverride, "°C", msglastupdated[OT_TrOverride]);
-  sendJsonOTmonObj("controlsetpoint", OTdataObject.TSet,"°C", msglastupdated[OT_TSet]);
-  sendJsonOTmonObj("relmodlvl", OTdataObject.RelModLevel,"%", msglastupdated[OT_RelModLevel]);
-  sendJsonOTmonObj("maxrelmodlvl", OTdataObject.MaxRelModLevelSetting, "%", msglastupdated[OT_MaxRelModLevelSetting]);
+  sendJsonOTmonObj("outsidetemperature", OTcurrentSystemState.Toutside, "°C", msglastupdated[OT_Toutside]);
+  sendJsonOTmonObj("roomtemperature", OTcurrentSystemState.Tr, "°C", msglastupdated[OT_Tr]);
+  sendJsonOTmonObj("roomsetpoint", OTcurrentSystemState.TrSet, "°C", msglastupdated[OT_TrSet]);
+  sendJsonOTmonObj("remoteroomsetpoint", OTcurrentSystemState.TrOverride, "°C", msglastupdated[OT_TrOverride]);
+  sendJsonOTmonObj("controlsetpoint", OTcurrentSystemState.TSet,"°C", msglastupdated[OT_TSet]);
+  sendJsonOTmonObj("relmodlvl", OTcurrentSystemState.RelModLevel,"%", msglastupdated[OT_RelModLevel]);
+  sendJsonOTmonObj("maxrelmodlvl", OTcurrentSystemState.MaxRelModLevelSetting, "%", msglastupdated[OT_MaxRelModLevelSetting]);
  
-  sendJsonOTmonObj("boilertemperature", OTdataObject.Tboiler, "°C", msglastupdated[OT_Tboiler]);
-  sendJsonOTmonObj("returnwatertemperature", OTdataObject.Tret,"°C", msglastupdated[OT_Tret]);
-  sendJsonOTmonObj("dhwtemperature", OTdataObject.Tdhw,"°C", msglastupdated[OT_Tdhw]);
-  sendJsonOTmonObj("dhwsetpoint", OTdataObject.TdhwSet,"°C", msglastupdated[OT_TdhwSet]);
-  sendJsonOTmonObj("maxchwatersetpoint", OTdataObject.MaxTSet,"°C", msglastupdated[OT_MaxTSet]);
-  sendJsonOTmonObj("chwaterpressure", OTdataObject.CHPressure, "bar", msglastupdated[OT_CHPressure]);
-  sendJsonOTmonObj("oemfaultcode", OTdataObject.OEMDiagnosticCode, "", msglastupdated[OT_OEMDiagnosticCode]);
+  sendJsonOTmonObj("boilertemperature", OTcurrentSystemState.Tboiler, "°C", msglastupdated[OT_Tboiler]);
+  sendJsonOTmonObj("returnwatertemperature", OTcurrentSystemState.Tret,"°C", msglastupdated[OT_Tret]);
+  sendJsonOTmonObj("dhwtemperature", OTcurrentSystemState.Tdhw,"°C", msglastupdated[OT_Tdhw]);
+  sendJsonOTmonObj("dhwsetpoint", OTcurrentSystemState.TdhwSet,"°C", msglastupdated[OT_TdhwSet]);
+  sendJsonOTmonObj("maxchwatersetpoint", OTcurrentSystemState.MaxTSet,"°C", msglastupdated[OT_MaxTSet]);
+  sendJsonOTmonObj("chwaterpressure", OTcurrentSystemState.CHPressure, "bar", msglastupdated[OT_CHPressure]);
+  sendJsonOTmonObj("oemfaultcode", OTcurrentSystemState.OEMDiagnosticCode, "", msglastupdated[OT_OEMDiagnosticCode]);
 
   sendEndJsonArray();
 
@@ -264,8 +264,8 @@ void sendOTmonitor()
 
   sendStartJsonObj("otmonitor");
 
-  // sendJsonOTmonObj("status hb", byte_to_binary((OTdataObject.Statusflags>>8) & 0xFF),"", msglastupdated[OT_Statusflags]);
-  // sendJsonOTmonObj("status lb", byte_to_binary(OTdataObject.Statusflags & 0xFF),"", msglastupdated[OT_Statusflags]);
+  // sendJsonOTmonObj("status hb", byte_to_binary((OTcurrentSystemState.Statusflags>>8) & 0xFF),"", msglastupdated[OT_Statusflags]);
+  // sendJsonOTmonObj("status lb", byte_to_binary(OTcurrentSystemState.Statusflags & 0xFF),"", msglastupdated[OT_Statusflags]);
 
   sendJsonOTmonObj("flamestatus", CONOFF(isFlameStatus()),"", msglastupdated[OT_Statusflags]);
   sendJsonOTmonObj("chmodus", CONOFF(isCentralHeatingActive()),"", msglastupdated[OT_Statusflags]);
@@ -289,22 +289,22 @@ void sendOTmonitor()
   sendJsonOTmonObj("waterovertemperature", CONOFF(isWaterOverTemperature()),"", msglastupdated[OT_ASFflags]);
   
 
-  sendJsonOTmonObj("outsidetemperature", OTdataObject.Toutside, "°C", msglastupdated[OT_Toutside]);
-  sendJsonOTmonObj("roomtemperature", OTdataObject.Tr, "°C", msglastupdated[OT_Tr]);
-  sendJsonOTmonObj("roomsetpoint", OTdataObject.TrSet, "°C", msglastupdated[OT_TrSet]);
-  sendJsonOTmonObj("remoteroomsetpoint", OTdataObject.TrOverride, "°C", msglastupdated[OT_TrOverride]);
-  sendJsonOTmonObj("controlsetpoint", OTdataObject.TSet,"°C", msglastupdated[OT_TSet]);
-  sendJsonOTmonObj("relmodlvl", OTdataObject.RelModLevel,"%", msglastupdated[OT_RelModLevel]);
-  sendJsonOTmonObj("maxrelmodlvl", OTdataObject.MaxRelModLevelSetting, "%", msglastupdated[OT_MaxRelModLevelSetting]);
+  sendJsonOTmonObj("outsidetemperature", OTcurrentSystemState.Toutside, "°C", msglastupdated[OT_Toutside]);
+  sendJsonOTmonObj("roomtemperature", OTcurrentSystemState.Tr, "°C", msglastupdated[OT_Tr]);
+  sendJsonOTmonObj("roomsetpoint", OTcurrentSystemState.TrSet, "°C", msglastupdated[OT_TrSet]);
+  sendJsonOTmonObj("remoteroomsetpoint", OTcurrentSystemState.TrOverride, "°C", msglastupdated[OT_TrOverride]);
+  sendJsonOTmonObj("controlsetpoint", OTcurrentSystemState.TSet,"°C", msglastupdated[OT_TSet]);
+  sendJsonOTmonObj("relmodlvl", OTcurrentSystemState.RelModLevel,"%", msglastupdated[OT_RelModLevel]);
+  sendJsonOTmonObj("maxrelmodlvl", OTcurrentSystemState.MaxRelModLevelSetting, "%", msglastupdated[OT_MaxRelModLevelSetting]);
  
-  sendJsonOTmonObj("boilertemperature", OTdataObject.Tboiler, "°C", msglastupdated[OT_Tboiler]);
-  sendJsonOTmonObj("returnwatertemperature", OTdataObject.Tret,"°C", msglastupdated[OT_Tret]);
-  sendJsonOTmonObj("dhwtemperature", OTdataObject.Tdhw,"°C", msglastupdated[OT_Tdhw]);
-  sendJsonOTmonObj("dhwsetpoint", OTdataObject.TdhwSet,"°C", msglastupdated[OT_TdhwSet]);
-  sendJsonOTmonObj("maxchwatersetpoint", OTdataObject.MaxTSet,"°C", msglastupdated[OT_MaxTSet]);
-  sendJsonOTmonObj("chwaterpressure", OTdataObject.CHPressure, "bar", msglastupdated[OT_CHPressure]);
-  sendJsonOTmonObj("oemdiagnosticcode", OTdataObject.OEMDiagnosticCode, "", msglastupdated[OT_OEMDiagnosticCode]);
-  sendJsonOTmonObj("oemfaultcode", OTdataObject.ASFflags && 0xFF, "", msglastupdated[OT_ASFflags]);
+  sendJsonOTmonObj("boilertemperature", OTcurrentSystemState.Tboiler, "°C", msglastupdated[OT_Tboiler]);
+  sendJsonOTmonObj("returnwatertemperature", OTcurrentSystemState.Tret,"°C", msglastupdated[OT_Tret]);
+  sendJsonOTmonObj("dhwtemperature", OTcurrentSystemState.Tdhw,"°C", msglastupdated[OT_Tdhw]);
+  sendJsonOTmonObj("dhwsetpoint", OTcurrentSystemState.TdhwSet,"°C", msglastupdated[OT_TdhwSet]);
+  sendJsonOTmonObj("maxchwatersetpoint", OTcurrentSystemState.MaxTSet,"°C", msglastupdated[OT_MaxTSet]);
+  sendJsonOTmonObj("chwaterpressure", OTcurrentSystemState.CHPressure, "bar", msglastupdated[OT_CHPressure]);
+  sendJsonOTmonObj("oemdiagnosticcode", OTcurrentSystemState.OEMDiagnosticCode, "", msglastupdated[OT_OEMDiagnosticCode]);
+  sendJsonOTmonObj("oemfaultcode", OTcurrentSystemState.ASFflags && 0xFF, "", msglastupdated[OT_ASFflags]);
   
   sendEndJsonObj("otmonitor");
 
@@ -370,7 +370,8 @@ void sendDeviceInfo()
   sendNestedJsonObj("mqttconnected", String(CBOOLEAN(statusMQTTconnection)));
   sendNestedJsonObj("thermostatconnected", CBOOLEAN(bOTGWthermostatstate));
   sendNestedJsonObj("boilerconnected", CBOOLEAN(bOTGWboilerstate));      
-  sendNestedJsonObj("picconnected", CBOOLEAN(bOTGWonline));
+  sendNestedJsonObj("gatewaymode", CBOOLEAN(bOTGWgatewaystate));      
+  sendNestedJsonObj("otgwconnected", CBOOLEAN(bOTGWonline));
   
   sendEndJsonObj("devinfo");
 

@@ -66,7 +66,7 @@ void evalOutputs(){
   DebugTf("current gpio output state: %d \r\n", digitalRead(settingGPIOOUTPUTSpin));
   DebugFlush();
 
-  bool bitState = (OTdataObject.Statusflags & (2^settingGPIOOUTPUTStriggerBit));
+  bool bitState = (OTcurrentSystemState.Statusflags & (2^settingGPIOOUTPUTStriggerBit));
   DebugTf("bitState: bit: %d , state %d \r\n", settingGPIOOUTPUTStriggerBit, bitState);
 
   setOutputState(bitState);

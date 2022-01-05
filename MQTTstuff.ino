@@ -10,6 +10,8 @@
 ***************************************************************************      
 */
 
+#include <PubSubClient.h>           // MQTT client publish and subscribe functionality
+
 #define MQTTDebugTln(...) ({ if (bDebugMQTT) DebugTln(__VA_ARGS__);    })
 #define MQTTDebugln(...)  ({ if (bDebugMQTT) Debugln(__VA_ARGS__);    })
 #define MQTTDebugTf(...)  ({ if (bDebugMQTT) DebugTf(__VA_ARGS__);    })
@@ -21,8 +23,6 @@
 
 static IPAddress  MQTTbrokerIP;
 static char       MQTTbrokerIPchar[20];
-
-#include <PubSubClient.h>           // MQTT client publish and subscribe functionality
 
 static            PubSubClient MQTTclient(wifiClient);
 
@@ -89,6 +89,7 @@ void startMQTT()
   if (!settingMQTTenable) return;
   stateMQTT = MQTT_STATE_INIT;
   //setup for mqtt discovery
+  clearMQTTConfigDone();
   NodeId = settingMQTTuniqueid;
   MQTTPubNamespace = settingMQTTtopTopic + "/value/" + NodeId;
   MQTTSubNamespace = settingMQTTtopTopic + "/set/" + NodeId;
@@ -96,6 +97,8 @@ void startMQTT()
   // handleMQTT(); //then try to connect to MQTT
   // handleMQTT(); //now you should be connected to MQTT ready to send
 }
+
+bool bHAcycle = false;
 
 // handles MQTT subscribe incoming stuff
 void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
@@ -117,12 +120,14 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
     if (stricmp(msgPayload, "offline") == 0){
       //home assistant went down
       DebugTln(F("Home Assistant went offline!"));
-    } else if (stricmp(msgPayload, "online") == 0){
+      bHAcycle = true; //set flag, so it triggers when it goes back online
+    } else if ((stricmp(msgPayload, "online") == 0) && bHAcycle){
       DebugTln(F("Home Assistant went online!"));
+      bHAcycle = false; //clear flag, so it does not trigger again
       //restart stuff, to make sure it works correctly again
       startMQTT();  // fixing some issues with hanging HA AutoDiscovery in some scenario's?
     } else {
-      DebugTf("Home Assistant Status=[%s]\r\n", msgPayload); 
+      DebugTf("Home Assistant Status=[%s] and HA cycle status [%s]\r\n", msgPayload, CBOOLEAN(bHAcycle)); 
     }
   }
 
@@ -243,8 +248,10 @@ void handleMQTT()
         MQTTDebugTln(F("Next State: MQTT_STATE_IS_CONNECTED"));
         // birth message, sendMQTT retains  by default
         sendMQTT(CSTR(MQTTPubNamespace), "online");
-        //First do AutoConfiguration for Homeassistant
-        doAutoConfigure();
+
+        // First do AutoConfiguration for Homeassistant
+        // doAutoConfigure();
+
         //Subscribe to topics
         char topic[100];
         strcpy(topic, CSTR(MQTTSubNamespace));
@@ -345,6 +352,7 @@ String trimVal(char *in)
 } // trimVal()
 
 void PrintMQTTError(){
+  MQTTDebugln();
   switch (MQTTclient.state())
   {
     case MQTT_CONNECTION_TIMEOUT     : MQTTDebugTln(F("Error: MQTT connection timeout"));break;
@@ -434,86 +442,168 @@ void resetMQTTBufferSize()
   MQTTclient.setBufferSize(256);
 }
 //===========================================================================================
-bool splitString(String sIn, char del, String &cKey, String &cVal)
-{
+bool splitLine(String sIn, char del, byte &cID, String &cKey, String &cVal) {
   sIn.trim(); //trim spaces
+  cID = 39; // ID 39 is unused in the OT spec
   cKey = "";
   cVal = "";
-  if (sIn.indexOf("//") == 0) return false; //comment, skip split
+  
+  int posC = sIn.indexOf("//");
+  if (posC > -1) sIn.remove(posC); // strip comments
+
   if (sIn.length() <= 3) return false; //not enough buffer, skip split
-  int pos = sIn.indexOf(del); //determine split point
-  if ((pos <= 0) || (((unsigned int)pos) == (sIn.length() - 1))) return false; // no key or no value
-  cKey = sIn.substring(0, pos);
+
+  unsigned int pos = sIn.indexOf(del); //determine first split point
+  if ((pos <= 0) || (pos == (sIn.length() - 1))) return false; // no key or no value
+
+  unsigned int pos2 = sIn.indexOf(del, pos+1); //determine second split point, starting from the first found
+  if ((pos2 <= 0) || (pos2 <= pos) || (pos2 == (sIn.length() - 1))) return false; // no key or no value
+
+  String sID = sIn.substring(0, pos);
+  sID.trim();
+  cID = (byte)sID.toInt();
+ 
+  cKey = sIn.substring(pos+1, pos2);
   cKey.trim(); //before, and trim spaces
-  cVal = sIn.substring(pos + 1);
+ 
+  cVal = sIn.substring(pos2 + 1);
   cVal.trim(); //after,and trim spaces
+
+  // Debugf("Split line into: [%d] [%s] [%s]\r\n", cID, CSTR(cKey), CSTR(cVal)); DebugFlush();
+
   return true;
 }
 //===========================================================================================
+bool getMQTTConfigDone(const uint8_t MSGid)
+{
+  uint8_t group = MSGid & 0b11100000;
+  group = group>>5;
+  uint8_t index = MSGid & 0b00011111;
+  uint32_t result = bitRead(MQTTautoConfigMap[group], index);
+  MQTTDebugTf("Reading bit %d from group %d for MSGid %d: result = %d\r\n", index, group, MSGid, result);
+  if (result > 0) {
+    return true;
+  } else {
+    return false;
+  }
+}
+//===========================================================================================
+bool setMQTTConfigDone(const uint8_t MSGid)
+{
+  uint8_t group = MSGid & 0b11100000;
+  group = group>>5;
+  uint8_t index = MSGid & 0b00011111;
+  MQTTDebugTf("Setting bit %d from group %d for MSGid %d\r\n", index, group, MSGid);
+  MQTTDebugTf("Value before setting bit %d\r\n", MQTTautoConfigMap[group]);
+  if(bitSet(MQTTautoConfigMap[group], index) > 0) {
+    MQTTDebugTf("Value after setting bit  %d\r\n", MQTTautoConfigMap[group]);
+    return true;
+  } else {
+    return false;
+  }
+}
+//===========================================================================================
+void clearMQTTConfigDone()
+{
+  memset(MQTTautoConfigMap, 0, sizeof(MQTTautoConfigMap));
+}
+//===========================================================================================
 void doAutoConfigure(){
-  if (!settingMQTTenable) return;
-  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); return;} 
-  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
-  const char *cfgFilename = "/mqttha.cfg";
-  String sTopic = "";
+  //force all sensors to be sent to auto configuration
+  for (int i=0; i<255; i++){
+    doAutoConfigureMsgid((byte)i);
+  }
+//  bool success = doAutoConfigure("config"); // the string "config" should match every line non-comment in mqttha.cfg
+}
+//===========================================================================================
+bool doAutoConfigureMsgid(byte OTid)
+{
+  bool _result = false;
+  
+  if (!settingMQTTenable) return _result;
+  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); return _result;} 
+  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return _result;} 
+
+  byte lineID = 39; // 39 is unused in OT protocol so is a safe value
   String sMsg = "";
-  File fh; //filehandle
+  String sTopic = "";
+
   //Let's open the MQTT autoconfig file
+  File fh; //filehandle
+  const char *cfgFilename = "/mqttha.cfg";
   LittleFS.begin();
-  if (LittleFS.exists(cfgFilename))
-  {
-    fh = LittleFS.open(cfgFilename, "r");
-    if (fh)
-    {
-      //Lets go read the config and send it out to MQTT line by line
-      while (fh.available())
-      {                 //read file line by line, split and send to MQTT (topic, msg)
-        feedWatchDog(); //start with feeding the dog
-        
-        String sLine = fh.readStringUntil('\n');
-        // DebugTf("sline[%s]\r\n", CSTR(sLine));
-        if (splitString(sLine, ',', sTopic, sMsg))
-        {
-          // discovery topic prefix
-          MQTTDebugTf("sTopic[%s]==>", CSTR(sTopic)); 
-          sTopic.replace("%homeassistant%", CSTR(settingMQTThaprefix));  
 
-          /// node
-          sTopic.replace("%node_id%", CSTR(NodeId));
-          MQTTDebugf("[%s]\r\n", CSTR(sTopic)); 
-          /// ----------------------
+  if (!LittleFS.exists(cfgFilename)) {DebugTln(F("Error: confuration file not found.")); return _result;} 
 
-          MQTTDebugTf("sMsg[%s]==>", CSTR(sMsg)); 
+  fh = LittleFS.open(cfgFilename, "r");
 
-          /// node
-          sMsg.replace("%node_id%", CSTR(NodeId));
+  if (!fh) {DebugTln(F("Error: could not open confuration file.")); return _result;} 
 
-          /// hostname
-          sMsg.replace("%hostname%", CSTR(settingHostname));
+  //Lets go read the config and send it out to MQTT line by line
+  while (fh.available())
+  {                 //read file line by line, split and send to MQTT (topic, msg)
+    feedWatchDog(); //start with feeding the dog
+    
+    String sLine = fh.readStringUntil('\n');
+    // DebugTf("sline[%s]\r\n", CSTR(sLine));
+    if (!splitLine(sLine, ';', lineID, sTopic, sMsg)) {  //splitLine() also filters comments
+      //MQTTDebugTf("Either comment or invalid config line: [%s]\r\n", CSTR(sLine));
+      continue;
+    }
 
-          /// version
-          sMsg.replace("%version%", CSTR(String(_VERSION)));
+    // DebugTf("looking in config file line for %d: [%d][%s] \r\n", OTid, lineID, CSTR(sTopic));
+    
+    // check if this is the specific line we are looking for
+    if (lineID != OTid) continue;
 
-          // pub topics prefix
-          sMsg.replace("%mqtt_pub_topic%", CSTR(MQTTPubNamespace));
+    MQTTDebugTf("Found line in config file for %d: [%d][%s] \r\n", OTid, lineID, CSTR(sTopic));
 
-          // sub topics
-          sMsg.replace("%mqtt_sub_topic%", CSTR(MQTTSubNamespace));
+    // discovery topic prefix
+    MQTTDebugTf("sTopic[%s]==>", CSTR(sTopic)); 
+    sTopic.replace("%homeassistant%", CSTR(settingMQTThaprefix));  
 
-          Debugf("[%s]\r\n", CSTR(sMsg)); DebugFlush();
+    /// node
+    sTopic.replace("%node_id%", CSTR(NodeId));
+    MQTTDebugf("[%s]\r\n", CSTR(sTopic)); 
+    /// ----------------------
 
-          //sendMQTT(CSTR(sTopic), CSTR(sMsg), (sTopic.length() + sMsg.length()+2));
-          sendMQTT(sTopic, sMsg);
-          resetMQTTBufferSize();
-          delay(10);
-        } else MQTTDebugTf("Either comment or invalid config line: [%s]\r\n", CSTR(sLine));
-      } // while available()
-    fh.close();
+    MQTTDebugTf("sMsg[%s]==>", CSTR(sMsg)); 
 
-    // HA discovery msg's are rather large, reset the buffer size to release some memory
+    /// node
+    sMsg.replace("%node_id%", CSTR(NodeId));
+
+    /// hostname
+    sMsg.replace("%hostname%", CSTR(settingHostname));
+
+    /// version
+    sMsg.replace("%version%", _VERSION);
+
+    // pub topics prefix
+    sMsg.replace("%mqtt_pub_topic%", CSTR(MQTTPubNamespace));
+
+    // sub topics
+    sMsg.replace("%mqtt_sub_topic%", CSTR(MQTTSubNamespace));
+
+    MQTTDebugf("[%s]\r\n", CSTR(sMsg)); 
+    DebugFlush();
+
+    //sendMQTT(CSTR(sTopic), CSTR(sMsg), (sTopic.length() + sMsg.length()+2));
+    sendMQTT(sTopic, sMsg);
     resetMQTTBufferSize();
-    } 
-  }  
+    delay(10);
+    _result = true;
+
+    // TODO: enable this break if we are sure the old config dump method is no longer needed
+    // break;
+
+  } // while available()
+  
+  fh.close();
+
+  // HA discovery msg's are rather large, reset the buffer size to release some memory
+  resetMQTTBufferSize();
+
+  return _result;
 }
 
 
