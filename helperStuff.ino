@@ -24,7 +24,6 @@ template <typename T> T PROGMEM_getAnything (const T * sce)
   return temp;
 }
 
-
 //===========================================================================================
 // Note: This function returns a pointer to a substring of the original string.
 // If the given string was allocated dynamically, the caller must not overwrite
@@ -437,7 +436,6 @@ void str_cstrlit(const char *str, char *buffer, size_t buflen)
     }
     *buffer = '\0';
 }
-
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a
