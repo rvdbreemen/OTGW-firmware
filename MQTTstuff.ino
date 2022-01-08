@@ -108,7 +108,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
     for (unsigned int i = 0; i < length; i++) {
       Debug((char)payload[i]);
     }
-    Debug("] ("); Debug(length); Debug(")"); Debugln();
+    Debug("] ("); Debug(length); Debug(")"); Debugln(); DebugFlush();
   }  
 
   //detect home assistant going down...
@@ -131,47 +131,54 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
     }
   }
 
+
   // parse the incoming topic and execute commands
   char* token;
   char otgwcmd[20]={0};
-  // naming convention <mqtt top>/set/<node id>/<command>
+
+  //first check toptopic part, it can include the seperator, e.g. "myHome/OTGW" or "OTGW""
+  if (strncmp(topic, settingMQTTtopTopic.c_str(), settingMQTTtopTopic.length()) != 0) {
+    MQTTDebugln(F("MQTT: wrong top topic"));
+    return;
+  } else {
+    //remove the top topic part
+    MQTTDebugTf("Parsing topic: %s/", settingMQTTtopTopic.c_str());
+    topic += settingMQTTtopTopic.length();
+    if (*topic == '/') topic++;
+  }
+  // naming convention /set/<node id>/<command>
   token = strtok(topic, "/"); 
-  MQTTDebugT("Parsing topic: ");
   MQTTDebugf("%s/", token);
-  if (strcasecmp(token, CSTR(settingMQTTtopTopic)) == 0) {
-    token = strtok(NULL, "/"); 
-    MQTTDebugf("%s/", token);
-    if (strcasecmp(token, "set") == 0) {
+  if (strcasecmp(token, "set") == 0) {
+    token = strtok(NULL, "/");
+    MQTTDebugf("%s/", token); 
+    if (strcasecmp(token, CSTR(NodeId)) == 0) {
       token = strtok(NULL, "/");
-      MQTTDebugf("%s/", token); 
-      if (strcasecmp(token, CSTR(NodeId)) == 0) {
-        token = strtok(NULL, "/");
-        MQTTDebugf("%s", token);
-        if (token != NULL){
-          //loop thru command list
-          int i;
-          for (i=0; i<nrcmds; i++){
-            if (strcasecmp(token, setcmds[i].setcmd) == 0){
-              //found a match
-              if (strcasecmp(setcmds[i].ottype, "raw") == 0){
-                //raw command
-                snprintf(otgwcmd, sizeof(otgwcmd), "%s", msgPayload);
-                MQTTDebugf(" found command, sending payload [%s]\r\n", otgwcmd);
-                addOTWGcmdtoqueue((char *)otgwcmd, strlen(otgwcmd), true);
-              } else {
-                //all other commands are <otgwcmd>=<payload message> 
-                snprintf(otgwcmd, sizeof(otgwcmd), "%s=%s", setcmds[i].otgwcmd, msgPayload);
-                MQTTDebugf(" found command, sending payload [%s]\r\n", otgwcmd);
-                addOTWGcmdtoqueue((char *)otgwcmd, strlen(otgwcmd), true);
-              }
-              break; //exit loop
-            } 
-          }
-          if (i >= nrcmds){
-            //no match found
-            MQTTDebugln();
-            MQTTDebugTf("No match found for command: [%s]\r\n", token);
-          }
+      MQTTDebugf("%s", token);
+      if (token != NULL){
+        //loop thru command list
+        int i;
+        for (i=0; i<nrcmds; i++){
+          if (strcasecmp(token, setcmds[i].setcmd) == 0){
+            //found a match
+            if (strcasecmp(setcmds[i].ottype, "raw") == 0){
+              //raw command
+              snprintf(otgwcmd, sizeof(otgwcmd), "%s", msgPayload);
+              MQTTDebugf(" found command, sending payload [%s]\r\n", otgwcmd);
+              addOTWGcmdtoqueue((char *)otgwcmd, strlen(otgwcmd), true);
+            } else {
+              //all other commands are <otgwcmd>=<payload message> 
+              snprintf(otgwcmd, sizeof(otgwcmd), "%s=%s", setcmds[i].otgwcmd, msgPayload);
+              MQTTDebugf(" found command, sending payload [%s]\r\n", otgwcmd);
+              addOTWGcmdtoqueue((char *)otgwcmd, strlen(otgwcmd), true);
+            }
+            break; //exit loop
+          } 
+        }
+        if (i >= nrcmds){
+          //no match found
+          MQTTDebugln();
+          MQTTDebugTf("No match found for command: [%s]\r\n", token);
         }
       }
     }
