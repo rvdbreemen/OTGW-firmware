@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v0.9.2-beta
+**  Version  : v0.9.2
 **
 **  Copyright (c) 2021-2022 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
