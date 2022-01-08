@@ -1,8 +1,8 @@
 /*********
 **  Program  : output_ext.ino
-**  Version  : v0.9.1
+**  Version  : v0.9.2-beta
 **
-**  Copyright (c) 2021 Robert van den Breemen
+**  Copyright (c) 2021-2022 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
 **
 **  TERMS OF USE: MIT License. See bottom of file.   
@@ -35,7 +35,7 @@ void setOutputState(uint8_t status = ON){
 
 void setOutputState(bool set_HIGH = true){
   if(!settingGPIOOUTPUTSenabled) return;
-  digitalWrite(settingGPIOOUTPUTSpin,ON);
+  digitalWrite(settingGPIOOUTPUTSpin,set_HIGH?HIGH:LOW);
   DebugTf("Output GPIO%d set to %d", settingGPIOOUTPUTSpin, digitalRead(settingGPIOOUTPUTSpin));
 }
 
@@ -66,7 +66,7 @@ void evalOutputs(){
   DebugTf("current gpio output state: %d \r\n", digitalRead(settingGPIOOUTPUTSpin));
   DebugFlush();
 
-  bool bitState = (OTdataObject.Statusflags & (2^settingGPIOOUTPUTStriggerBit));
+  bool bitState = (OTcurrentSystemState.Statusflags & (2^settingGPIOOUTPUTStriggerBit));
   DebugTf("bitState: bit: %d , state %d \r\n", settingGPIOOUTPUTStriggerBit, bitState);
 
   setOutputState(bitState);

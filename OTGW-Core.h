@@ -1,9 +1,9 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h 
-**  Version  : v0.9.1
+**  Version  : v0.9.2-beta
 **
-**  Copyright (c) 2021 Robert van den Breemen
+**  Copyright (c) 2021-2022 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
 **      https://github.com/jpraus/arduino-opentherm
 **
@@ -161,7 +161,7 @@ typedef struct {
 
 } OTdataStruct;
 
-static OTdataStruct OTdataObject;   
+static OTdataStruct OTcurrentSystemState;   
 
 
 enum OpenThermResponseStatus {
@@ -304,9 +304,9 @@ enum OpenThermMessageID {
         int id;
         OTmsgcmd_t msgcmd;
         OTtype_t type;
-        char* label;
-        char* friendlyname;
-        char* unit;
+        const char* label;
+        const char* friendlyname;
+        const char* unit;
     };
 
 	OTlookup_t OTlookupitem;
@@ -436,11 +436,11 @@ enum OpenThermMessageID {
 		{ 121, OT_RW    , ot_u16,         	"CHPumpOperationHours", "CH pump operation hours", "hrs" },
 		{ 122, OT_RW    , ot_u16,         	"DHWPumpValveOperationHours", "DHW pump/valve operation hours", "hrs" },
 		{ 123, OT_RW    , ot_u16,         	"DHWBurnerOperationHours", "DHW burner operation hours", "hrs" },
-		{ 124, OT_READ  , ot_f88,         	"OpenThermVersionMaster", "Master Version OpenTherm Protocol Specification", "" },
-		{ 125, OT_READ  , ot_f88,         	"OpenThermVersionSlave", "Slave Version OpenTherm Protocol Specification", "" },
-		{ 126, OT_READ  , ot_u8u8,        	"MasterVersion", "Master product version number and type", "" },
-		{ 127, OT_READ  , ot_u8u8,        	"SlaveVersion", "Slave product version number and type", "" },
-		{ 128, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 124, OT_READ  , ot_f88,			"OpenThermVersionMaster", "Master Version OpenTherm Protocol Specification", "" },
+		{ 125, OT_READ  , ot_f88,			"OpenThermVersionSlave", "Slave Version OpenTherm Protocol Specification", "" },
+		{ 126, OT_READ  , ot_u8u8,			"MasterVersion", "Master product version number and type", "" },
+		{ 127, OT_READ  , ot_u8u8,			"SlaveVersion", "Slave product version number and type", "" },
+		{ 128, OT_UNDEF , ot_undef,			"", "", "" },
 		{ 129, OT_UNDEF , ot_undef, 		"", "", "" },
 		{ 130, OT_UNDEF , ot_undef, 		"", "", "" },
 		{ 131, OT_RW 	, ot_u8u8, 			"RemehadFdUcodes", "Remeha dF-/dU-codes", "" },
@@ -457,7 +457,7 @@ struct OT_cmd_t { // see all possible commands for PIC here: https://otgw.tclcod
 	char cmd[15];
 	int cmdlen;
 	int retrycnt; 
-	time_t due;
+	unsigned long due;
 };
 
 #define CMDQUEUE_MAX 20

@@ -2,11 +2,11 @@
 ***************************************************************************  
 **  Program : networkStuff.h
 **
-**  Version  : v0.9.1
+**  Version  : v0.9.2-beta
 **
-**  Copyright (c) 2021 Robert van den Breemen
+**  Copyright (c) 2021-2022 Robert van den Breemen
 **
-**  Copyright (c) 2021 Robert van den Breemen
+**  Copyright (c) 2021-2022 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
@@ -144,7 +144,7 @@ void startWiFi(const char* hostname, int timeOut)
   httpUpdater.setup(&httpServer);
   httpUpdater.setIndexPage(UpdateServerIndex);
   httpUpdater.setSuccessPage(UpdateServerSuccess);
-  DebugTf(" took [%d] seconds => OK!\r\n", (millis() - lTime) / 1000);
+  DebugTf(" took [%lu] seconds => OK!\r\n", (millis() - lTime) / 1000);
   
 } // startWiFi()
 
@@ -265,7 +265,7 @@ bool isNTPtimeSet(){
   return NtpStatus == TIME_SYNC;
 }
 
-void waitforNTPsync(int16_t timeout = 60){  
+void waitforNTPsync(int16_t timeout = 30){  
   //wait for time is synced to NTP server, for maximum of timeout seconds
   //feed the watchdog while waiting 
   //update NTP status
@@ -279,7 +279,7 @@ void waitforNTPsync(int16_t timeout = 60){
     Wire.write(0xA5);   
     Wire.endTransmission();
     delay(100);
-    if DUE(timerWaiting) DebugTf("Waiting for NTP sync: %d seconds\r\n", (time(nullptr)-t));
+    if DUE(timerWaiting) DebugTf("Waiting for NTP sync: %lu seconds\r\n", (time(nullptr)-t));
     // update NTP status
     loopNTP();
     //stop waiting when NTP is synced 
