@@ -1,9 +1,9 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v0.9.1
+**  Version  : v0.9.2-beta
 **
-**  Copyright (c) 2021 Robert van den Breemen
+**  Copyright (c) 2021-2022 Robert van den Breemen
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
@@ -34,7 +34,7 @@
 
 #define PICFIRMWARE "/gateway.hex"
 
-extern OTGWSerial OTGWSerial(PICRST, LED2);
+OTGWSerial OTGWSerial(PICRST, LED2);
 void fwupgradestart(const char *hexfile);
 
 void blinkLEDnow();
@@ -53,8 +53,9 @@ void setLed(int8_t, uint8_t);
 #define CSTR(x) x.c_str()
 #define CBOOLEAN(x) (x?"true":"false")
 #define CONOFF(x) (x?"On":"Off")
+#define CCONOFF(x) (x?"ON":"OFF")
 #define CBINARY(x) (x?"1":"0")
-#define EVALBOOLEAN(x) (stricmp(x,"true")==0||stricmp(x,"on")==0||stricmp(x,"1")==0)
+#define EVALBOOLEAN(x) (strcasecmp(x,"true")==0||strcasecmp(x,"on")==0||strcasecmp(x,"1")==0)
 
 
 //prototype
@@ -70,6 +71,7 @@ String      lastReset = "";
 uint32_t    upTimeSeconds = 0;
 uint32_t    rebootCount = 0;
 String      sMessage = "";    
+uint32_t    MQTTautoConfigMap[8] = { 0 };
 
 //Use acetime
 using namespace ace_time;
@@ -88,6 +90,7 @@ String    errorupgrade = "";
 bool      bOTGWonline = true;
 bool      bOTGWboilerstate = false;
 bool      bOTGWthermostatstate = false;
+bool      bOTGWgatewaystate = false;
 bool      bPrintSummarymode = false;  //default to PS=0 mode
 
 //All things that are settings 

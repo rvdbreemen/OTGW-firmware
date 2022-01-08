@@ -1,6 +1,4 @@
 // device
-//       "action_template": "{% if value == 'ON' %}heating{% else %}idle{% endif %}"
-//       "action_topic": "%mqtt_pub_topic%/ch_enable"
 //        # "avty_t": "%mqtt_pub_topic%", // this should be the online/offline topic , left it out as i couldn"t find it
 //       "dev": 
 //            {
@@ -19,7 +17,7 @@
 //        "min_temp": "16",
 //        # "mode_command_topic": None,
 //        "mode_stat_tpl": "{% if value == 'ON' %}heat{% else %}off{% endif %}",
-//        "mode_stat_t": "%mqtt_pub_topic%/otgw-pic/thermostat_connected", // this should be the ch_enable topic, bit 8 of ID 0
+//        "mode_stat_t": "%mqtt_pub_topic%/ch_enable", // this should be the ch_enable topic, bit 8 of ID 0
 //        "modes": ["off", "heat"],
 //        "precision": 0.1,
 //        # using temporary allows local thermostat override. use /constant to block
@@ -35,7 +33,7 @@
 // climate requires at least HA Core 2021.2.0 for 'temperature_command_template' ('temp_cmd_tepl') support
 // https://github.com/home-assistant/core/releases/tag/2021.2.0 
 // commit: https://github.com/home-assistant/core/commit/baab9b9a815de0696e5c5a986f1bc68227b1b5b6 
-0 ; %homeassistant%/climate/%node_id%/climate/config ; {"action_template": "{% if value == 'ON' %}heating{% else %}idle{% endif %}", "action_topic": "%mqtt_pub_topic%/ch_enable", "avty_t": "%mqtt_pub_topic%", "dev": {"identifiers": "%node_id%", "manufacturer": "Schelte Bron", "model": "otgw-nodo", "name": "OpenTherm Gateway (%hostname%)", "sw_version": "%version%"}, "name": "%hostname%_Thermostat", "uniq_id": "%node_id%-thermostat", "curr_temp_t": "%mqtt_pub_topic%/Tr", "initial": "20", "max_temp": "28", "min_temp": "12", "mode_stat_tpl": "{% if value == 'ON' %}heat{% else %}off{% endif %}", "mode_stat_t": "%mqtt_pub_topic%/otgw-pic/thermostat_connected", "modes": ["off", "heat"], "precision": 0.1, "temp_cmd_t": "%mqtt_sub_topic%/command", "temp_cmd_tpl": "TT={{ value }}", "temp_stat_t": "%mqtt_pub_topic%/TrSet", "temp_unit": "C", "temp_step": "0.5", "payload_off": 0, "payload_on": 1 }
+16 ; %homeassistant%/climate/%node_id%/climate/config ; {"avty_t": "%mqtt_pub_topic%", "dev": {"identifiers": "%node_id%", "manufacturer": "Schelte Bron", "model": "otgw-nodo", "name": "OpenTherm Gateway (%hostname%)", "sw_version": "%version%"}, "name": "%hostname%_Thermostat", "uniq_id": "%node_id%-thermostat", "curr_temp_t": "%mqtt_pub_topic%/Tr", "initial": "20", "max_temp": "28", "min_temp": "12", "mode_stat_tpl": "{% if value == 'ON' %}heat{% else %}off{% endif %}", "mode_stat_t": "%mqtt_pub_topic%/ch_enable", "modes": ["off", "heat"], "precision": 0.1, "temp_cmd_t": "%mqtt_sub_topic%/command", "temp_cmd_tpl": "TT={{ value }}", "temp_stat_t": "%mqtt_pub_topic%/TrSet", "temp_unit": "C", "temp_step": "0.5", "payload_off": 0, "payload_on": 1 }
 // split
 // Configuration topic no1: %homeassistant%/sensor/<name node>/config
 0 ; %homeassistant%/binary_sensor/%node_id%/fault/config ; {"avty_t": "%mqtt_pub_topic%", "dev": {"identifiers": "%node_id%", "manufacturer": "Schelte Bron", "model": "otgw-nodo", "name": "OpenTherm Gateway (%hostname%)", "sw_version": "%version%"}, "uniq_id": "%node_id%-fault", "name": "%hostname%_Fault", "stat_t": "%mqtt_pub_topic%/fault"}
@@ -51,8 +49,6 @@
 0 ; %homeassistant%/binary_sensor/%node_id%/cooling_enable/config ; {"avty_t": "%mqtt_pub_topic%", "dev": {"identifiers": "%node_id%", "manufacturer": "Schelte Bron", "model": "otgw-nodo", "name": "OpenTherm Gateway (%hostname%)", "sw_version": "%version%"}, "uniq_id": "%node_id%-cooling_enable", "name": "%hostname%_Cooling_enable", "stat_t": "%mqtt_pub_topic%/cooling_enable"}
 0 ; %homeassistant%/binary_sensor/%node_id%/otc_active/config ; {"avty_t": "%mqtt_pub_topic%", "dev": {"identifiers": "%node_id%", "manufacturer": "Schelte Bron", "model": "otgw-nodo", "name": "OpenTherm Gateway (%hostname%)", "sw_version": "%version%"}, "uniq_id": "%node_id%-otc_active", "name": "%hostname%_OTC_enable", "stat_t": "%mqtt_pub_topic%/otc_active"}
 0 ; %homeassistant%/binary_sensor/%node_id%/ch2_enable/config ; {"avty_t": "%mqtt_pub_topic%", "dev": {"identifiers": "%node_id%", "manufacturer": "Schelte Bron", "model": "otgw-nodo", "name": "OpenTherm Gateway (%hostname%)", "sw_version": "%version%"}, "uniq_id": "%node_id%-ch2_enable", "name": "%hostname%_central_heating_2_enable", "stat_t": "%mqtt_pub_topic%/ch2_enable"}
-0 ; %homeassistant%/binary_sensor/%node_id%/thermostat_connected/config ; {"avty_t": "%mqtt_pub_topic%", "dev": {"identifiers": "%node_id%", "manufacturer": "Schelte Bron", "model": "otgw-nodo", "name": "OpenTherm Gateway (%hostname%)", "sw_version": "%version%"}, "uniq_id": "%node_id%-thermostat_connected", "name": "%hostname%_Thermostat_Connected", "stat_t": "%mqtt_pub_topic%/otgw-pic/thermostat_connected" }
-0 ; %homeassistant%/binary_sensor/%node_id%/boiler_connected/config ; {"avty_t": "%mqtt_pub_topic%", "dev": {"identifiers": "%node_id%", "manufacturer": "Schelte Bron", "model": "otgw-nodo", "name": "OpenTherm Gateway (%hostname%)", "sw_version": "%version%"}, "uniq_id": "%node_id%-boiler_connected", "name": "%hostname%_Boiler_Connected", "stat_t": "%mqtt_pub_topic%/otgw-pic/boiler_connected" }
 // split
 5 ; %homeassistant%/binary_sensor/%node_id%/service_request/config ; {"avty_t": "%mqtt_pub_topic%", "dev": {"identifiers": "%node_id%", "manufacturer": "Schelte Bron", "model": "otgw-nodo", "name": "OpenTherm Gateway (%hostname%)", "sw_version": "%version%"}, "uniq_id": "%node_id%-service_request", "name": "%hostname%_Service_request", "stat_t": "%mqtt_pub_topic%/service_request"}
 5 ; %homeassistant%/binary_sensor/%node_id%/lockout_reset/config ; {"avty_t": "%mqtt_pub_topic%", "dev": {"identifiers": "%node_id%", "manufacturer": "Schelte Bron", "model": "otgw-nodo", "name": "OpenTherm Gateway (%hostname%)", "sw_version": "%version%"}, "uniq_id": "%node_id%-lockout_reset", "name": "%hostname%_Lockout_reset", "stat_t": "%mqtt_pub_topic%/lockout_reset"}

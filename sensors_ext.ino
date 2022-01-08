@@ -1,8 +1,8 @@
 /*
 **  Program  : output_ext.ino
-**  Version  : v0.9.1
+**  Version  : v0.9.2-beta
 **
-**  Copyright (c) 2021 Robert van den Breemen
+**  Copyright (c) 2021-2022 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
 **
 **  TERMS OF USE: MIT License. See bottom of file.   
@@ -61,7 +61,7 @@ void initSensors() {
     if (sensors.getAddress(tempDeviceAddress, i))
     {
       //TODO: get real device address, push data to mqtt topic.
-      DebugTf("Device address %d device(s)\r\n", tempDeviceAddress);
+      DebugTf("Device address %u device(s)\r\n", (unsigned int) tempDeviceAddress);
       DebugFlush();
       realDeviceCount++;
     }

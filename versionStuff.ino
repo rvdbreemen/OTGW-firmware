@@ -7,14 +7,11 @@
 
 static const char banner[] = "OpenTherm Gateway ";
 
-char *GetVersion(String hexfile){
-  char hexbuf[48];
-  int len, addr, tag, data, offs, linecnt = 0, weight;
-  uint32_t codemap[4] = {};
-  byte datamap = 0;
-  char datamem[256], version[8] = "";
+String GetVersion(const String hexfile){
+  char hexbuf[48]={0};
+  int len, addr, tag, data, offs, linecnt = 0;
+  char datamem[256]={0};
   unsigned short ptr;
-  char *s="";
   File f;
   //DebugTf("GetVersion opening %s\n",hexfile.c_str());
   f = LittleFS.open(hexfile, "r");
@@ -70,15 +67,17 @@ char *GetVersion(String hexfile){
     while (ptr < 256)
     {
       //DebugTf("checking for %s at char pos %d\n",banner,ptr);
-      s = strstr((char *)datamem + ptr, banner);
+      char *s = strstr((char *)datamem + ptr, banner);
       if (!s)
       {
         //DebugTf("did not find the banner\n");
         ptr += strnlen((char *)datamem + ptr, 256 - ptr) + 1;
       } else {
         //DebugTf("hit the banner! returning version string %s\n",s);
-        s += sizeof(banner) - 1; return (s);
+        s += sizeof(banner) - 1;
+        return String(s);
       }
     }
   }
+  return "0.0";
 }

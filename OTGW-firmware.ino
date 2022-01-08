@@ -1,9 +1,9 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v0.9.1
+**  Version  : v0.9.2-beta
 **
-**  Copyright (c) 2021 Robert van den Breemen
+**  Copyright (c) 2021-2022 Robert van den Breemen
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
@@ -72,8 +72,8 @@ void setup() {
   setupFSexplorer();
   startWebserver();
   startMQTT();               // start the MQTT after webserver, always.
-
-
+ 
+  initWatchDog();            // setup the WatchDog
   lastReset = ESP.getResetReason();
   OTGWSerial.printf("Last reset reason: [%s]\r\n", CSTR(lastReset));
   rebootCount = updateRebootCount();
@@ -89,7 +89,7 @@ void setup() {
   checkOTWGpicforupdate();
   initSensors();        // init DS18B20
   initOutputs();
-  initWatchDog();       // setup the WatchDog
+  
   WatchDogEnabled(1);   // turn on watchdog
   sendOTGWbootcmd();   
   //Blink LED2 to signal setup done
@@ -153,7 +153,8 @@ void sendtimecommand(){
   //send time command to OTGW
   //send time / weekday
   char msg[15]={0};
-  sprintf(msg,"SC=%d:%02d/%d", hour(), minute(), dayOfWeek(now()));
+  #define calc_ot_dow(dow) ((dow+5)%7+1) 
+  sprintf(msg,"SC=%d:%02d/%ld", hour(), minute(), calc_ot_dow(dayOfWeek(now())));
   addOTWGcmdtoqueue(msg, strlen(msg), true);
 
   static int lastDay = 0;
@@ -198,7 +199,10 @@ void blinkLED(uint8_t led, int nr, uint32_t waittime_ms){
 
 void blinkLEDnow(uint8_t led = LED1){
   pinMode(led, OUTPUT);
-  digitalWrite(led, !digitalRead(led));
+  if (settingLEDblink) {
+    digitalWrite(led, !digitalRead(led));
+  } else setLed(led, OFF);
+
 }
 
 //===[ no-blocking delay with running background tasks in ms ]===
@@ -241,6 +245,7 @@ void doTaskEvery60s(){
 void do5minevent(){
   sendMQTTuptime();
   sendMQTTversioninfo();
+  sendMQTTstateinformation();
 }
 
 //===[ check for new pic version  ]===
@@ -271,20 +276,20 @@ void doBackgroundTasks()
 
 void loop()
 {
-  DECLARE_TIMER_SEC(timer1s, 1, CATCH_UP_MISSED_TICKS);
-  DECLARE_TIMER_SEC(timer5s, 5, CATCH_UP_MISSED_TICKS);
+  DECLARE_TIMER_SEC(timer1s, 1, SKIP_MISSED_TICKS);
+  DECLARE_TIMER_SEC(timer5s, 5, SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer30s, 30, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(tmrcheckpic, 1440, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS);
   
-  if (DUE(timer1s))         doTaskEvery1s();
-  if (DUE(timer5s))         doTaskEvery5s();
-  if (DUE(timer30s))        doTaskEvery30s();
-  if (DUE(timer60s))        doTaskEvery60s();
-  if (DUE(tmrcheckpic))     docheckforpic();
-  if (DUE(timer5min))       do5minevent();
   if (DUE(timerpollsensor)) pollSensors();    // poll the temperature sensors connected to 2wire gpio pin 
+  if (DUE(timer5min))       do5minevent();
+  if (DUE(timer60s))        doTaskEvery60s();
+  if (DUE(timer30s))        doTaskEvery30s();
+  if (DUE(timer5s))         doTaskEvery5s();
+  if (DUE(timer1s))         doTaskEvery1s();
+  if (DUE(tmrcheckpic))     docheckforpic();
   evalOutputs();                              // when the bits change, the output gpio bit will follow
   doBackgroundTasks();
 }
