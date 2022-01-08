@@ -121,7 +121,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
       //home assistant went down
       DebugTln(F("Home Assistant went offline!"));
       bHAcycle = true; //set flag, so it triggers when it goes back online
-    } else if ((strcasecmp(msgPayload, "online") == 0)&& bHAcycle){
+    } else if ((strcasecmp(msgPayload, "online") == 0) && bHAcycle){
       DebugTln(F("Home Assistant went online!"));
       bHAcycle = false; //clear flag, so it does not trigger again
       //restart stuff, to make sure it works correctly again
@@ -500,10 +500,13 @@ void clearMQTTConfigDone()
   memset(MQTTautoConfigMap, 0, sizeof(MQTTautoConfigMap));
 }
 //===========================================================================================
-void doAutoConfigure(){
+void doAutoConfigure(bool bForcaAll = false){
   //force all sensors to be sent to auto configuration
   for (int i=0; i<255; i++){
-    doAutoConfigureMsgid((byte)i);
+    if ((getMQTTConfigDone((byte)i)==true) || bForcaAll) {
+      MQTTDebugTf("Sending auto configuration for sensor %d\r\n", i);
+      doAutoConfigureMsgid((byte)i);
+    }
   }
 //  bool success = doAutoConfigure("config"); // the string "config" should match every line non-comment in mqttha.cfg
 }
