@@ -79,5 +79,5 @@ String GetVersion(const String hexfile){
       }
     }
   }
-  return "0.0";
+  return ("");
 }

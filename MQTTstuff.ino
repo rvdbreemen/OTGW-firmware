@@ -144,7 +144,9 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
     //remove the top topic part
     MQTTDebugTf("Parsing topic: %s/", settingMQTTtopTopic.c_str());
     topic += settingMQTTtopTopic.length();
-    if (*topic == '/') topic++;
+    while (*topic == '/') {
+      topic++;
+    }
   }
   // naming convention /set/<node id>/<command>
   token = strtok(topic, "/"); 
