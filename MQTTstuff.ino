@@ -117,6 +117,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   strlcpy(msgPayload, (char *)payload, msglen);
   if (strcasecmp(topic, "homeassistant/status") == 0) {
     //incoming message on status, detect going down
+    bHAcycle = true; //exprimental buid 20220109 - turning off detection of HA going down
     if (strcasecmp(msgPayload, "offline") == 0){
       //home assistant went down
       DebugTln(F("Home Assistant went offline!"));
@@ -252,7 +253,8 @@ void handleMQTT()
       if (MQTTclient.connected())
       {
         reconnectAttempts = 0;  
-        Debugln(F(" .. connected\r"));
+        MQTTDebugln(F(" .. connected\r"));
+        Debugln(F("MQTT connected"));	
         stateMQTT = MQTT_STATE_IS_CONNECTED;
         MQTTDebugTln(F("Next State: MQTT_STATE_IS_CONNECTED"));
         // birth message, sendMQTT retains  by default
@@ -515,6 +517,7 @@ void doAutoConfigure(bool bForcaAll = false){
     if ((getMQTTConfigDone((byte)i)==true) || bForcaAll) {
       MQTTDebugTf("Sending auto configuration for sensor %d\r\n", i);
       doAutoConfigureMsgid((byte)i);
+      doBackgroundTasks();
     }
   }
 //  bool success = doAutoConfigure("config"); // the string "config" should match every line non-comment in mqttha.cfg
@@ -524,9 +527,17 @@ bool doAutoConfigureMsgid(byte OTid)
 {
   bool _result = false;
   
-  if (!settingMQTTenable) return _result;
-  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); return _result;} 
-  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return _result;} 
+  if (!settingMQTTenable) {
+    return _result;
+  }
+  if (!MQTTclient.connected()) {
+    DebugTln(F("Error: MQTT broker not connected.")); 
+    return _result;
+  } 
+  if (!isValidIP(MQTTbrokerIP)) {
+    DebugTln(F("Error: MQTT broker IP not valid.")); 
+    return _result;
+  } 
 
   byte lineID = 39; // 39 is unused in OT protocol so is a safe value
   String sMsg = "";
@@ -537,15 +548,22 @@ bool doAutoConfigureMsgid(byte OTid)
   const char *cfgFilename = "/mqttha.cfg";
   LittleFS.begin();
 
-  if (!LittleFS.exists(cfgFilename)) {DebugTln(F("Error: confuration file not found.")); return _result;} 
+  if (!LittleFS.exists(cfgFilename)) {
+    DebugTln(F("Error: confuration file not found.")); 
+    return _result;
+  } 
 
   fh = LittleFS.open(cfgFilename, "r");
 
-  if (!fh) {DebugTln(F("Error: could not open confuration file.")); return _result;} 
+  if (!fh) {
+    DebugTln(F("Error: could not open confuration file.")); 
+    return _result;
+  } 
 
   //Lets go read the config and send it out to MQTT line by line
   while (fh.available())
-  {                 //read file line by line, split and send to MQTT (topic, msg)
+  {
+    //read file line by line, split and send to MQTT (topic, msg)
     feedWatchDog(); //start with feeding the dog
     
     String sLine = fh.readStringUntil('\n');
@@ -594,7 +612,7 @@ bool doAutoConfigureMsgid(byte OTid)
     //sendMQTT(CSTR(sTopic), CSTR(sMsg), (sTopic.length() + sMsg.length()+2));
     sendMQTT(sTopic, sMsg);
     resetMQTTBufferSize();
-    delay(10);
+    // delay(10);
     _result = true;
 
     // TODO: enable this break if we are sure the old config dump method is no longer needed

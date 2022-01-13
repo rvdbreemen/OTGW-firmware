@@ -20,6 +20,7 @@
 
 
 //=======================================================================
+
 void processAPI() 
 {
   char URI[50]   = "";
@@ -27,13 +28,7 @@ void processAPI()
 
   strlcpy( URI, httpServer.uri().c_str(), sizeof(URI) );
 
-  if (httpServer.method() == HTTP_GET)
-        RESTDebugTf("from[%s] URI[%s] method[GET] \r\n"
-                                  , httpServer.client().remoteIP().toString().c_str()
-                                        , URI); 
-  else  RESTDebugTf("from[%s] URI[%s] method[PUT] \r\n" 
-                                  , httpServer.client().remoteIP().toString().c_str()
-                                        , URI); 
+  RESTDebugTf("from[%s] URI[%s] method[%s] \r\n", httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(httpServer.method()).c_str());
 
   if (ESP.getFreeHeap() < 8500) // to prevent firmware from crashing!
   {

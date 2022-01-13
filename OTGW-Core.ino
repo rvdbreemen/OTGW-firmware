@@ -104,14 +104,20 @@ void sendMQTTstateinformation(){
 
 //===================[ Reset OTGW ]===============================
 void resetOTGW() {
-  sPICfwversion ="No version found"; //reset versionstring
+  //sPICfwversion ="No version found"; //reset versionstring
   OTGWSerial.resetPic();
   //then read the first response of the firmware to make sure it reads it
   String resp = OTGWSerial.readStringUntil('\n');
   resp.trim();
   OTGWDebugTf("Received firmware version: [%s] [%s] (%d)\r\n", CSTR(resp), OTGWSerial.firmwareVersion(), strlen(OTGWSerial.firmwareVersion()));
   bOTGWonline = (resp.length()>0); 
-  if (bOTGWonline) sPICfwversion = String(OTGWSerial.firmwareVersion());
+  if (bOTGWonline) 
+  {
+    sPICfwversion = String(OTGWSerial.firmwareVersion());
+  } else {
+    //try it one more time
+    sPICfwversion =  getpicfwversion();
+  }
   OTGWDebugTf("Current firmware version: %s\r\n", CSTR(sPICfwversion));
 }
 //===================[ getpicfwversion ]===========================
@@ -123,7 +129,9 @@ String getpicfwversion(){
   if (p >= 0) {
     p += sizeof(OTGW_BANNER);
     _ret = line.substring(p);
-  } else _ret ="No version found";
+  } else {
+    _ret ="No version found";
+  }
   OTGWDebugTf("Current firmware version: %s\r\n", CSTR(_ret));
   _ret.trim();
   return _ret;
@@ -1679,6 +1687,11 @@ void processOT(const char *buf, int len){
     OTcurrentSystemState.error04++;
     OTGWDebugTf("\r\nError 04 = %d\r\n",OTcurrentSystemState.error04);
     sendMQTTData(F("Error 04"), String(OTcurrentSystemState.error04));
+  } else if (strstr(buf, OTGW_BANNER)!=NULL){
+    //found a banner, so get the version of PIC
+    char *p = strstr(buf, OTGW_BANNER);
+    p += sizeof(OTGW_BANNER);
+    sPICfwversion = String(p);
   } else {
     OTGWDebugTf("Not processed, received from OTGW => (%s) [%d]\r\n", buf, len);
   }
