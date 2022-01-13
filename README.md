@@ -36,8 +36,9 @@ The features of this Nodosop OpenTherm Gateware ESP8266 based firmware are:
 - wide range of connection and data sharing options:
   - telnet (interpreted data and debugging)
   - MQTT (publishing every parsed OT message, publish commands to this topic `OTGW/set/<node id>/command`)
-  - simple REST API (`http://<ip>/api/v0/otgw/{id}`)
-  - simple REST API (`http://<ip>/api/v1/otgw/id/{id}` or `http://<ip>/api/v1/otgw/label/{textlabel eg. Tr or Toutside}`, commands on `/api/v1/otgw/command/{any command})`
+  - simple REST GET API (`http://<ip>/api/v0/otgw/{id}`)
+  - simple REST GET API (`http://<ip>/api/v1/otgw/id/{id}` or `http://<ip>/api/v1/otgw/label/{textlabel eg. Tr or Toutside}`
+  - simple REST PUT or POST commands on `/api/v1/otgw/command/{any command})`
   - serial interface on port 25238 for original OTmonitor application (bi-directional)
   - OTmonitor Web UI (standalone interface)
 - automatic integration with Home Assistant using _Home Assistant Discovery_ (Home Assistant Core v2021.2.0+)
