@@ -424,6 +424,29 @@ void str_cstrlit(const char *str, char *buffer, size_t buflen)
     }
     *buffer = '\0';
 }
+
+String strHTTPmethod(HTTPMethod method)
+{
+  switch (method)
+  {
+    case HTTPMethod::HTTP_GET:
+      return "GET";
+    case HTTPMethod::HTTP_POST:
+      return "POST";
+    case HTTPMethod::HTTP_PUT:
+      return "PUT";
+    case HTTPMethod::HTTP_PATCH:
+      return "PATCH";
+    case HTTPMethod::HTTP_DELETE:
+      return "DELETE";
+    case HTTPMethod::HTTP_OPTIONS:
+      return "OPTIONS";
+    case HTTPMethod::HTTP_HEAD:
+      return "HEAD";
+    default:
+      return "";
+  }
+}
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a
