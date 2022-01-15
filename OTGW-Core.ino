@@ -1692,6 +1692,7 @@ void processOT(const char *buf, int len){
     char *p = strstr(buf, OTGW_BANNER);
     p += sizeof(OTGW_BANNER);
     sPICfwversion = String(p);
+    OTGWDebugTf("Detected PIC firmware version: %s\r\n", CSTR(sPICfwversion));	
   } else {
     OTGWDebugTf("Not processed, received from OTGW => (%s) [%d]\r\n", buf, len);
   }
