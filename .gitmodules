@@ -7,9 +7,12 @@
 [submodule "Arduino/libraries/TelnetStream"]
 	path = Arduino/libraries/TelnetStream
 	url = https://github.com/jandrassy/TelnetStream
-[submodule "Arduino/libraries/ezTime"]
-	path = Arduino/libraries/ezTime
-	url = https://github.com/ropg/ezTime.git
+[submodule "Arduino/libraries/aceTime"]
+	path = Arduino/libraries/aceTime
+	url = https://github.com/bxparks/AceTime
+[submodule "Arduino/libraries/Time"]
+	path = Arduino/libraries/Time
+	url = https://github.com/PaulStoffregen/Time.git
 [submodule "Arduino/libraries/ArduinoJson"]
 	path = Arduino/libraries/ArduinoJson
 	url = https://github.com/bblanchon/ArduinoJson
