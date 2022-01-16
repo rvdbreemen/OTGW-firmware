@@ -105,6 +105,7 @@ int16_t   settingMQTTbrokerPort = 1883;
 String    settingMQTTuser = "";
 String    settingMQTTpasswd = "";
 String    settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
+bool      settingMQTTharebootdetection = true;
 String    settingMQTTtopTopic = "otgw";
 String    settingMQTTuniqueid = ""; // Intialized in readsettings
 bool      settingMQTTOTmessage = false;

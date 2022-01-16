@@ -117,7 +117,11 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   strlcpy(msgPayload, (char *)payload, msglen);
   if (strcasecmp(topic, "homeassistant/status") == 0) {
     //incoming message on status, detect going down
-    bHAcycle = true; //exprimental buid 20220109 - turning off detection of HA going down
+    if (!settingMQTTharebootdetection) {
+      //So if the HA reboot detection is turned of, we will just look for HA going online.
+      //This means everytime there is "online" message, we will restart MQTT configuration, including the HA Auto Discovery. 
+      bHAcycle = true; 
+    }
     if (strcasecmp(msgPayload, "offline") == 0){
       //home assistant went down
       DebugTln(F("Home Assistant went offline!"));
