@@ -715,6 +715,7 @@
    ,[ "mqttconnected",              "MQTT Connected"]
    ,[ "mqttenable",                 "MQTT Enable"]
    ,[ "mqtthaprefix",               "MQTT Home Assistant prefix"]
+   ,[ "mqtthaprefix",               "MQTT Home Assistant reboot detection"]
    ,[ "ntpenable",                  "NTP Enable"]
    ,[ "ntptimezone",                "NTP Timezone"]
    ,[ "ntphostname",                "NTP hostname"]
