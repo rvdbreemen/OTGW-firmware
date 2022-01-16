@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v0.9.2
+**  Version  : v0.9.3-beta
 **
 **  Copyright (c) 2021-2022 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -20,6 +20,7 @@
 
 
 //=======================================================================
+
 void processAPI() 
 {
   char URI[50]   = "";
@@ -27,13 +28,7 @@ void processAPI()
 
   strlcpy( URI, httpServer.uri().c_str(), sizeof(URI) );
 
-  if (httpServer.method() == HTTP_GET)
-        RESTDebugTf("from[%s] URI[%s] method[GET] \r\n"
-                                  , httpServer.client().remoteIP().toString().c_str()
-                                        , URI); 
-  else  RESTDebugTf("from[%s] URI[%s] method[PUT] \r\n" 
-                                  , httpServer.client().remoteIP().toString().c_str()
-                                        , URI); 
+  RESTDebugTf("from[%s] URI[%s] method[%s] \r\n", httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(httpServer.method()).c_str());
 
   if (ESP.getFreeHeap() < 8500) // to prevent firmware from crashing!
   {
@@ -413,6 +408,7 @@ void sendDeviceSettings()
   sendJsonSettingObj("mqttpasswd", CSTR(settingMQTTpasswd), "s", 100);
   sendJsonSettingObj("mqtttoptopic", CSTR(settingMQTTtopTopic), "s", 15);
   sendJsonSettingObj("mqtthaprefix", CSTR(settingMQTThaprefix), "s", 20);
+  sendJsonSettingObj("mqttharebootdetection", settingMQTTharebootdetection, "b");
   sendJsonSettingObj("mqttuniqueid", CSTR(settingMQTTuniqueid), "s", 20);
   sendJsonSettingObj("mqttotmessage", settingMQTTOTmessage, "b");
   sendJsonSettingObj("ntpenable", settingNTPenable, "b");
