@@ -1722,14 +1722,13 @@ void processOT(const char *buf, int len){
 void handleOTGW()
 {
   //handle serial communication and line processing
-  #define MAX_BUFFER_READ 128
+  #define MAX_BUFFER_READ 256       //need to be 256 because of long PS=1 responses 
   #define MAX_BUFFER_WRITE 128
   static char sRead[MAX_BUFFER_READ];
   static char sWrite[MAX_BUFFER_WRITE];
   static size_t bytes_read = 0;
   static size_t bytes_write = 0;
   static uint8_t outByte;
-  
 
   //Handle incoming data from OTGW through serial port (READ BUFFER)
   if (OTGWSerial.hasOverrun()) {
