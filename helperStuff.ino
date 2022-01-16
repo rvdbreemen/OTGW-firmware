@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v0.9.2
+**  Version  : v0.9.3-beta
 **
 **  Copyright (c) 2021-2022 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -423,6 +423,29 @@ void str_cstrlit(const char *str, char *buffer, size_t buflen)
         buflen -= len;
     }
     *buffer = '\0';
+}
+
+String strHTTPmethod(HTTPMethod method)
+{
+  switch (method)
+  {
+    case HTTPMethod::HTTP_GET:
+      return "GET";
+    case HTTPMethod::HTTP_POST:
+      return "POST";
+    case HTTPMethod::HTTP_PUT:
+      return "PUT";
+    case HTTPMethod::HTTP_PATCH:
+      return "PATCH";
+    case HTTPMethod::HTTP_DELETE:
+      return "DELETE";
+    case HTTPMethod::HTTP_OPTIONS:
+      return "OPTIONS";
+    case HTTPMethod::HTTP_HEAD:
+      return "HEAD";
+    default:
+      return "";
+  }
 }
 /***************************************************************************
 *

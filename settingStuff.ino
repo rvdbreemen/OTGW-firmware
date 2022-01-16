@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v0.9.2
+**  Version  : v0.9.3-beta
 **
 **  Copyright (c) 2021-2022 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -101,6 +101,7 @@ void readSettings(bool show)
   }
   settingMQTThaprefix     = doc["MQTThaprefix"].as<String>();
   if (settingMQTThaprefix=="null") settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
+  settingMQTTharebootdetection = doc["MQTTharebootdetection"]|settingMQTTharebootdetection;	  
   settingMQTTuniqueid     = doc["MQTTuniqueid"].as<String>();
   if (settingMQTTuniqueid=="null") settingMQTTuniqueid = getUniqueId();
 
@@ -138,6 +139,7 @@ void readSettings(bool show)
     Debugf("MQTT toptopic         : %s\r\n", CSTR(settingMQTTtopTopic));
     Debugf("MQTT uniqueid         : %s\r\n", CSTR(settingMQTTuniqueid));
     Debugf("HA prefix             : %s\r\n", CSTR(settingMQTThaprefix));
+    Debugf("HA reboot detection   : %s\r\n", CBOOLEAN(settingMQTTharebootdetection));
     Debugf("NTP enabled           : %s\r\n", CBOOLEAN(settingNTPenable));
     Debugf("NPT timezone          : %s\r\n", CSTR(settingNTPtimezone));
     Debugf("NPT hostname          : %s\r\n", CSTR(settingNTPhostname));
@@ -197,6 +199,7 @@ void updateSetting(const char *field, const char *newValue)
     settingMQTThaprefix = String(newValue);
     if (settingMQTThaprefix.length()==0)    settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
   }
+  if (strcasecmp(field, "MQTTharebootdetection")==0)      settingMQTTharebootdetection = EVALBOOLEAN(newValue);
   if (strcasecmp(field, "MQTTuniqueid") == 0)  {
     settingMQTTuniqueid = String(newValue);     
     if (settingMQTTuniqueid.length() == 0)   settingMQTTuniqueid = getUniqueId();

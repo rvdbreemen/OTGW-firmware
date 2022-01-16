@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v0.9.2
+**  Version  : v0.9.3-beta
 **
 **  Copyright (c) 2021-2022 Robert van den Breemen
 **
@@ -105,6 +105,7 @@ int16_t   settingMQTTbrokerPort = 1883;
 String    settingMQTTuser = "";
 String    settingMQTTpasswd = "";
 String    settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
+bool      settingMQTTharebootdetection = true;
 String    settingMQTTtopTopic = "otgw";
 String    settingMQTTuniqueid = ""; // Intialized in readsettings
 bool      settingMQTTOTmessage = false;

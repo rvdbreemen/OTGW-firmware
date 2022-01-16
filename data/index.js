@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v0.9.2
+**  Version  : v0.9.3-beta
 **
 **  Copyright (c) 2021-2022 Robert van den Breemen
 **
@@ -715,6 +715,7 @@
    ,[ "mqttconnected",              "MQTT Connected"]
    ,[ "mqttenable",                 "MQTT Enable"]
    ,[ "mqtthaprefix",               "MQTT Home Assistant prefix"]
+   ,[ "mqttharebootdetection",      "MQTT Home Assistant reboot detection"]
    ,[ "ntpenable",                  "NTP Enable"]
    ,[ "ntptimezone",                "NTP Timezone"]
    ,[ "ntphostname",                "NTP hostname"]
