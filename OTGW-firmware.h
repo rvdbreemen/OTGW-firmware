@@ -22,6 +22,10 @@
 #include "safeTimers.h"
 #include "OTGWSerial.h"         // Bron Schelte's Serial class - it upgrades and more
 #include "OTGW-Core.h"          // Core code for this firmware 
+#include "LittleFS.h"
+
+#define NO_GLOBAL_LITTLEFS  // prevent the libary from creating a filesystem
+FS LittleFS = FS(FSImplPtr(new littlefs_impl::LittleFSImpl(FS_PHYS_ADDR, FS_PHYS_SIZE, FS_PHYS_PAGE, FS_PHYS_BLOCK, FS_MAX_OPEN_FILES)));
 
 //OTGW Nodoshop hardware definitions
 #define I2CSCL D1
