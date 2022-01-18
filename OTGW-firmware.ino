@@ -34,7 +34,9 @@
 #define OFF HIGH
 
 DECLARE_TIMER_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS);
-  
+
+extern FS SystemFS;  //the global fs
+
 //=====================================================================
 void setup() {
   // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
@@ -52,7 +54,7 @@ void setup() {
   setLed(LED1, ON);
   setLed(LED2, ON);
 
-  LittleFS.begin();
+  SystemFS.begin();
   readSettings(true);
 
   //start with setting wifi hostname

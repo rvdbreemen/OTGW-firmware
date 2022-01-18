@@ -27,6 +27,8 @@
 #include <LittleFS.h>
 #include "OTGWSerial.h"
 
+extern FS SystemFS;
+
 #define STX ((uint8_t)0x0F)
 #define ETX ((uint8_t)0x04)
 #define DLE ((uint8_t)0x05)
@@ -204,7 +206,7 @@ OTGWError OTGWSerial::readHexFile(const char *hexfile, int *total) {
   OTGWError rc = OTGW_ERROR_HEX_FORMAT;
   File f;
 
-  f = LittleFS.open(hexfile, "r");
+  f = SystemFS.open(hexfile, "r");
   if (!f) return OTGW_ERROR_HEX_ACCESS;
   memset(_upgrade_data->codemem, -1, 4096 * sizeof(short));
   memset(_upgrade_data->datamem, -1, 256 * sizeof(char));
@@ -311,7 +313,7 @@ int OTGWSerial::eepromSettings(const char *version, OTGWTransferData *xfer) {
   int last = 0, len, id, p1, p2, addr, size, mask, n;
   File f;
 
-  f = LittleFS.open("/transfer.dat", "r");
+  f = SystemFS.open("/transfer.dat", "r");
   if (!f) return last;
   while (f.available()) {
     len = f.readBytesUntil('\n', buffer, sizeof(buffer) - 1);

@@ -24,7 +24,7 @@
 **      setup()
 **      {
 **        setupFSexplorer();
-**        httpServer.serveStatic("/FSexplorer.png",   LittleFS, "/FSexplorer.png");
+**        httpServer.serveStatic("/FSexplorer.png",   SystemFS, "/FSexplorer.png");
 **        httpServer.on("/",          sendIndexPage);
 **        httpServer.on("/index",     sendIndexPage);
 **        httpServer.on("/index.html",sendIndexPage);
@@ -61,18 +61,18 @@ const char Header[] = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCache-Cont
 
 //=====================================================================================
 void startWebserver(){
-  if (!LittleFS.exists("/index.html")) {
-    httpServer.serveStatic("/",           LittleFS, "/FSexplorer.html");
-    httpServer.serveStatic("/index",      LittleFS, "/FSexplorer.html");
-    httpServer.serveStatic("/index.html", LittleFS, "/FSexplorer.html");
+  if (!SystemFS.exists("/index.html")) {
+    httpServer.serveStatic("/",           SystemFS, "/FSexplorer.html");
+    httpServer.serveStatic("/index",      SystemFS, "/FSexplorer.html");
+    httpServer.serveStatic("/index.html", SystemFS, "/FSexplorer.html");
   } else{
-    httpServer.serveStatic("/",           LittleFS, "/index.html");
-    httpServer.serveStatic("/index",      LittleFS, "/index.html");
-    httpServer.serveStatic("/index.html", LittleFS, "/index.html");
+    httpServer.serveStatic("/",           SystemFS, "/index.html");
+    httpServer.serveStatic("/index",      SystemFS, "/index.html");
+    httpServer.serveStatic("/index.html", SystemFS, "/index.html");
   } 
-  httpServer.serveStatic("/FSexplorer.png",   LittleFS, "/FSexplorer.png");
-  httpServer.serveStatic("/index.css", LittleFS, "/index.css");
-  httpServer.serveStatic("/index.js",  LittleFS, "/index.js");
+  httpServer.serveStatic("/FSexplorer.png",   SystemFS, "/FSexplorer.png");
+  httpServer.serveStatic("/index.css", SystemFS, "/index.css");
+  httpServer.serveStatic("/index.js",  SystemFS, "/index.js");
   //otgw pic functions
   httpServer.on("/pic", upgradepic);
   // all other api calls are catched in FSexplorer onNotFounD!
@@ -86,11 +86,11 @@ void startWebserver(){
 }
 //=====================================================================================
 void setupFSexplorer(){    
-  LittleFS.begin();
-  if (LittleFS.exists("/FSexplorer.html")) 
+  SystemFS.begin();
+  if (SystemFS.exists("/FSexplorer.html")) 
   {
-    httpServer.serveStatic("/FSexplorer.html", LittleFS, "/FSexplorer.html");
-    httpServer.serveStatic("/FSexplorer",      LittleFS, "/FSexplorer.html");
+    httpServer.serveStatic("/FSexplorer.html", SystemFS, "/FSexplorer.html");
+    httpServer.serveStatic("/FSexplorer",      SystemFS, "/FSexplorer.html");
   }
   else 
   {
@@ -139,14 +139,14 @@ void apifirmwarefilelist() {
       
   s = buffer;
   s += sprintf(buffer, "[");
-  dir = LittleFS.openDir("/");
+  dir = SystemFS.openDir("/");
   while (dir.next()) {
     if (dir.fileName().endsWith(".hex")) {
       version="";
       fwversion="";
       String verfile = "/" + dir.fileName();
       verfile.replace(".hex", ".ver");
-      f = LittleFS.open(verfile, "r");
+      f = SystemFS.open(verfile, "r");
       if (f) {
         version = f.readStringUntil('\n');
         version.trim();
@@ -156,7 +156,7 @@ void apifirmwarefilelist() {
       DebugTf("GetVersion(%s) returned %s\n", dir.fileName().c_str(), fwversion.c_str());  
       if (fwversion.length() && strcmp(fwversion.c_str(),version.c_str())) { // versions do not match
         version=fwversion; // assign hex file version to version
-        if (f = LittleFS.open(verfile, "w")) { // write to .ver file
+        if (f = SystemFS.open(verfile, "w")) { // write to .ver file
           DebugTf("writing %s to %s\n",version.c_str(),verfile.c_str());
           f.print(version + "\n");
           f.close();
@@ -187,7 +187,7 @@ void apilistfiles()             // Senden aller Daten an den Client
   _fileMeta dirMap[MAX_FILES_IN_LIST+1];
   int fileNr = 0;
     
-  Dir dir = LittleFS.openDir("/");         // List files on LittleFS
+  Dir dir = SystemFS.openDir("/");         // List files on SystemFS
   while (dir.next() && (fileNr < MAX_FILES_IN_LIST))  
   {
     dirMap[fileNr].Name[0] = '\0';
@@ -231,7 +231,7 @@ void apilistfiles()             // Senden aller Daten an den Client
     temp += R"({"name":")" + String(dirMap[f].Name) + R"(","size":")" + formatBytes(dirMap[f].Size) + R"("},)";
   }
 
-  LittleFS.info(LittleFSinfo);
+  SystemFS.info(LittleFSinfo);
   temp += R"({"usedBytes":")" + formatBytes(LittleFSinfo.usedBytes * 1.05) + R"(",)" +       // Berechnet den verwendeten Speicherplatz + 5% Sicherheitsaufschlag
           R"("totalBytes":")" + formatBytes(LittleFSinfo.totalBytes) + R"(","freeBytes":")" + // Zeigt die Größe des Speichers
           (LittleFSinfo.totalBytes - (LittleFSinfo.usedBytes * 1.05)) + R"("}])";               // Berechnet den freien Speicherplatz + 5% Sicherheitsaufschlag
@@ -247,13 +247,13 @@ bool handleFile(String&& path)
   if (httpServer.hasArg("delete")) 
   {
     DebugTf("Delete -> [%s]\n\r",  httpServer.arg("delete").c_str());
-    LittleFS.remove(httpServer.arg("delete"));    // Datei löschen
+    SystemFS.remove(httpServer.arg("delete"));    // Datei löschen
     httpServer.sendContent(Header);
     return true;
   }
-  if (!LittleFS.exists("/FSexplorer.html")) httpServer.send(200, "text/html", Helper); //Upload the FSexplorer.html
+  if (!SystemFS.exists("/FSexplorer.html")) httpServer.send(200, "text/html", Helper); //Upload the FSexplorer.html
   if (path.endsWith("/")) path += "index.html";
-  return LittleFS.exists(path) ? ({File f = LittleFS.open(path, "r"); httpServer.streamFile(f, contentType(path)); f.close(); true;}) : false;
+  return SystemFS.exists(path) ? ({File f = SystemFS.open(path, "r"); httpServer.streamFile(f, contentType(path)); f.close(); true;}) : false;
 
 } // handleFile()
 
@@ -270,7 +270,7 @@ void handleFileUpload()
       upload.filename = upload.filename.substring(upload.filename.length() - 30, upload.filename.length());  // Dateinamen auf 30 Zeichen kürzen
     }
     Debugln("FileUpload Name: " + upload.filename);
-    fsUploadFile = LittleFS.open("/" + httpServer.urlDecode(upload.filename), "w");
+    fsUploadFile = SystemFS.open("/" + httpServer.urlDecode(upload.filename), "w");
   } 
   else if (upload.status == UPLOAD_FILE_WRITE) 
   {
@@ -292,9 +292,9 @@ void handleFileUpload()
 //=====================================================================================
 void formatLittleFS() 
 {       //Formatiert den Speicher
-  if (!LittleFS.exists("/!format")) return;
-  DebugTln(F("Format LittleFS"));
-  LittleFS.format();
+  if (!SystemFS.exists("/!format")) return;
+  DebugTln(F("Format SystemFS"));
+  SystemFS.format();
   httpServer.sendContent(Header);
   
 } // formatLittleFS()
@@ -330,8 +330,8 @@ const String &contentType(String& filename)
 bool freeSpace(uint16_t const& printsize) 
 {    
   FSInfo LittleFSinfo;
-  LittleFS.info(LittleFSinfo);
-  Debugln(formatBytes(LittleFSinfo.totalBytes - (LittleFSinfo.usedBytes * 1.05)) + " im LittleFS frei");
+  SystemFS.info(LittleFSinfo);
+  Debugln(formatBytes(LittleFSinfo.totalBytes - (LittleFSinfo.usedBytes * 1.05)) + " im SystemFS frei");
   return (LittleFSinfo.totalBytes - (LittleFSinfo.usedBytes * 1.05) > printsize) ? true : false;
   
 } // freeSpace()

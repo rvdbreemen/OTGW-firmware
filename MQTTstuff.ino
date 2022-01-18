@@ -550,14 +550,14 @@ bool doAutoConfigureMsgid(byte OTid)
   //Let's open the MQTT autoconfig file
   File fh; //filehandle
   const char *cfgFilename = "/mqttha.cfg";
-  LittleFS.begin();
+  SystemFS.begin();
 
-  if (!LittleFS.exists(cfgFilename)) {
+  if (!SystemFS.exists(cfgFilename)) {
     DebugTln(F("Error: confuration file not found.")); 
     return _result;
   } 
 
-  fh = LittleFS.open(cfgFilename, "r");
+  fh = SystemFS.open(cfgFilename, "r");
 
   if (!fh) {
     DebugTln(F("Error: could not open confuration file.")); 
