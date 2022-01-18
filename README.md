@@ -14,7 +14,7 @@ Supporting hardware version are:
 |1.x-2.0|   NodoMCU ESP8266 devkit|
 |2.3|       Wemos D1mini ESP8266 devkit|
 
-It can be found here: https://www.nodo-shop.nl/nl/opentherm-gateway/188-opentherm-gateway.html  
+It can be found here: https://www.nodo-shop.nl/nl/opentherm-gateway/211-opentherm-gateway.html  
 More information on this gateway can be read here: http://otgw.tclcode.com/  (also location of the OTGW PIC firmware) 
 
 The goal of this project is to become a fully functioning ESP8266 based OTGW-firmware that operates the OTGW as a standalone application. Providing:
