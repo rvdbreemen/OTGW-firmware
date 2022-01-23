@@ -9,7 +9,8 @@
 ***************************************************************************      
 */
   const localURL='http://'+window.location.host; 
-  const APIGW='http://'+window.location.host+'/api/';
+  // const APIGW='http://'+window.location.host+'/api/';
+  const APIGW='http://192.168.4.252/api/';
   
   "use strict";
 
@@ -43,11 +44,12 @@
         })        
       }
     );
-    Array.from(document.getElementsByClassName('SaveSettings')).forEach(
+    Array.from(document.getElementsByClassName('btnSaveSettings')).forEach(
       function(el, idx, arr) {
         el.addEventListener('click',function(){
           saveSettings();
-          toggleDropdown(true);
+          toggleHidden('adv_dropdown', true);
+          toggleHidden('btnSaveSettings', true);
         });
       }
     );
@@ -55,7 +57,8 @@
       function(el, idx, arr) {
         el.addEventListener('click',function(){
           deviceinfoPage();
-          toggleDropdown(true);
+          toggleHidden('adv_dropdown', true);
+          toggleHidden('btnSaveSettings', true);
         });
       }
     );
@@ -63,7 +66,8 @@
       function (el, idx, arr) {
         el.addEventListener('click',function() {
           firmwarePage();
-          toggleDropdown(true);
+          toggleHidden('adv_dropdown', true);
+          toggleHidden('btnSaveSettings', true);
         });
       }
     );
@@ -71,13 +75,14 @@
       function(el, idx, arr) {
         el.addEventListener('click',function(){
           settingsPage();
-          toggleDropdown(true);
+          toggleHidden('adv_dropdown', true);
+          toggleHidden('btnSaveSettings', false);
         });
       }
     );
     Array.from(document.getElementsByClassName('adminSettings')).forEach(
       function(el, idx, arr) {
-        el.addEventListener('click', function() {toggleDropdown();});
+        el.addEventListener('click', function() {toggleHidden('adv_dropdown', false);});
       }
     );
     Array.from(document.getElementsByClassName('home')).forEach(
@@ -143,8 +148,8 @@
     
   } // settingsPage()
   
-  function toggleDropdown(hideOnly) {
-    Array.from(document.getElementsByClassName('adv_dropdown')).forEach(
+  function toggleHidden(className, hideOnly) {
+    Array.from(document.getElementsByClassName(className)).forEach(
       function(el, idx, arr) {
         if ( ! el.classList.contains("hidden")) {
           el.classList.add("hidden");
@@ -188,7 +193,13 @@
       .then(files => {
         console.log("parsed ... data is ["+ JSON.stringify(files)+"]");
         
-        var displayPICpage = document.getElementById('displayPICflash');          
+        let displayPICpage = document.getElementById('displayPICpage');
+        while (displayPICpage.lastChild) {
+          displayPICpage.lastChild.remove();
+        }
+        let tableDiv = document.createElement("div");
+        tableDiv.setAttribute("class", "pictable");
+        
         var rowDiv = document.createElement("div");
         rowDiv.setAttribute("class", "picrow");
         rowDiv.setAttribute("id", "firmwarename");
@@ -216,13 +227,13 @@
         //--- flash to pic icon---
         var btn = document.createElement("div");
         rowDiv.appendChild(btn); 
-        displayPICpage.appendChild(rowDiv);
+        tableDiv.appendChild(rowDiv);
 
         for( let i in files )
         {
           console.log("["+files[i].name+"]=>["+files[i].version+"]=>["+files[i].size+"]");
 
-          var displayPICpage = document.getElementById('displayPICflash');          
+          // var displayPICflash = document.getElementById('displayPICflash');          
           var rowDiv = document.createElement("div");
           rowDiv.setAttribute("class", "picrow");
           rowDiv.setAttribute("id", "firmware_"+files[i].name);
@@ -241,7 +252,6 @@
           var sizDiv = document.createElement("div");
           sizDiv.setAttribute("class", "piccolumn3");                  
           sizDiv.textContent = files[i].size; 
-          sizDiv.style.textAlign = "right";
           rowDiv.appendChild(sizDiv);
           //--- refresh icon ---
           var btn = document.createElement("div");
@@ -252,6 +262,7 @@
             img.src = localURL+'/refresh-page-option.png';
             img.style.width = '16px';
             img.style.height = 'auto';
+            img.setAttribute=("alt", "Refresh");
             a.appendChild(img);
             btn.appendChild(a); 
           rowDiv.appendChild(btn); 
@@ -264,13 +275,13 @@
             img.src = localURL+'/download-to-storage-drive.png'
             img.style.width = '16px';
             img.style.height = 'auto';
+            img.setAttribute=("alt", "Download");
             a.appendChild(img);
             btn.appendChild(a); 
           rowDiv.appendChild(btn); 
-          displayPICpage.appendChild(rowDiv);
-
-          
+          tableDiv.appendChild(rowDiv);
         }
+        displayPICpage.appendChild(tableDiv);
  
       })
       .catch(function(error) {
@@ -330,11 +341,18 @@
         //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
         needReload = false;
         data = json.otmonitor;
+
+        let otMonPage = document.getElementById('mainPage');
+        while (otMonPage.lastChild) {
+          otMonPage.lastChild.remove();
+        }
+        let otMonTable = document.createElement("div");
+        otMonTable.setAttribute("class", "otmontable");
+        
         for( let i in data )
         {
-          document.getElementById("waiting").innerHTML = "";
           //console.log("["+data[i].name+"]=>["+data[i].value+"]");
-          var mainPage = document.getElementById('mainPage');
+          
           if( ( document.getElementById("otmon_"+data[i].name)) == null )
           { // if element does not exists yet, then build page
             var rowDiv = document.createElement("div");
@@ -365,7 +383,7 @@
             unitDiv.setAttribute("class", "otmoncolumn3");
             unitDiv.textContent = data[i].unit; 
             rowDiv.appendChild(unitDiv);
-            mainPage.appendChild(rowDiv);
+            otMonTable.appendChild(rowDiv);
           }
           else
           { //if the element exists, then update the value
@@ -383,6 +401,7 @@
 
           }
         }
+        otMonPage.appendChild(otMonTable);
         if (needReload) window.location.reload(true);
       })
       .catch(function(error) {
@@ -462,9 +481,9 @@
       //----rowDiv.setAttribute("id", "settingR_"+data[i].name);
             rowDiv.setAttribute("id", "D_"+data[i].name);
             rowDiv.setAttribute("style", "text-align: right;");
-            rowDiv.style.marginLeft = "10px";
-            rowDiv.style.marginRight = "10px";
-            rowDiv.style.width = "850px";
+            // rowDiv.style.marginLeft = "10px";
+            // rowDiv.style.marginRight = "10px";
+            rowDiv.style.minWidth = "850px";
             rowDiv.style.border = "thick solid lightblue";
             rowDiv.style.background = "lightblue";
             //--- field Name ---
@@ -548,7 +567,7 @@
     
 
   //============================================================================  
-  function saveSettings() 
+  function saveSettings()
   {
     console.log("saveSettings() ...");
     let changes = false;
