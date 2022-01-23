@@ -146,6 +146,7 @@
     background-color: white;
     padding: 10px 20px;
     background-color: lightblue;
+    box-shadow: 2px 2px 2px 0px grey;
   }
   .nav-right .adv_dropdown.hidden {
     display: none;
