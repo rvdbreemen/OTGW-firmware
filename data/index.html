@@ -3,13 +3,12 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">  
-    <link rel="stylesheet" type="text/css" href="/index.css">
-    <script src="/index.js"></script>
+    <link rel="stylesheet" type="text/css" href="./index.css">
+    <script src="./index.js"></script>
     <title>OTGW firmware</title>
   </head>
   <body>
     <font face="Arial">
-    <!-- <div class="dev-header"> -->
     <div class="headerrow">
         <div class="headercolumnbig" id="sysName">OTGW firmware</div>
         <div class="headercolumn" id="devName">[hostname]</div>
@@ -17,46 +16,72 @@
         <div class="headercolumn" id='theTime'>[00:00:00]</div>
     </div>
     </font>
-    <div id="displayMainPage"      style="display:none">
+    <div id="displayMainPage">
       <div class="nav-container">
         <div class='nav-left'>
-          <button id='tabPICflash' class='nav-item tabButton' style="background: lightblue;">PIC firmware</button>
-          <button id='tabDeviceInfo' class='nav-item tabButton' style="background: lightblue;">Device Info</button>
-          <img id='M_FSexplorer'  class='nav-img'src='/FSexplorer.png' alt='FSexplorer'>
-          <img id='tabSettings'   class='nav-img'src='/settings.png' alt='Settings'>
+          <button class='home nav-item tabButton'>Home</button>
+        </div>
+        <div class='nav-right'>
+          <button class='adminSettings nav-item tabButton'>Advanced</button>
+          <div class="adv_dropdown hidden">
+            <span class="list_item tabPICflash">PIC firmware</span>
+            <span class="list_item tabDeviceInfo">Device Information</span>
+            <span class="list_item FSexplorer">File system contents</span>
+            <span class="list_item tabSettings">OTGW Settings</span>
+          </div>
         </div>
       </div>
-      <br/>
       <div id="mainPage">
         <div id="waiting">Wait for it...</div>
       </div>
     </div>
-    <div id="displayPICflash"  style="display:none">
+    <div id="displayPICflash">
       <div class="nav-container">
         <div class='nav-left'>
-          <button id='F_back' class='nav-item tabButton' style="background: lightblue;">Back</button>
-          <img id='F_FSexplorer' class='nav-img' src='/FSexplorer.png' alt='FSexplorer'>
+          <button class='home nav-item tabButton'>Home</button>
+        </div>
+        <div class='nav-right'>
+          <button class='adminSettings nav-item tabButton'>Advanced</button>
+          <div class="adv_dropdown hidden">
+            <span class="list_item tabPICflash">PIC firmware</span>
+            <span class="list_item tabDeviceInfo">Device Information</span>
+            <span class="list_item FSexplorer">File system contents</span>
+            <span class="list_item tabSettings">OTGW Settings</span>
+          </div>
         </div>
       </div>
-      <br/>
       <div id="displayPICpage"></div>
     </div>
-    <div id="displayDeviceInfo"  style="display:none">
+    <div id="displayDeviceInfo">
       <div class="nav-container">
         <div class='nav-left'>
-          <button id='D_back' class='nav-item tabButton' style="background: lightblue;">Back</button>
-          <img id='D_FSexplorer' class='nav-img' src='/FSexplorer.png' alt='FSexplorer'>
+          <button class='home nav-item tabButton'>Home</button>
+        </div>
+        <div class='nav-right'>
+          <button class='adminSettings nav-item tabButton'>Advanced</button>
+          <div class="adv_dropdown hidden">
+            <span class="list_item tabPICflash">PIC firmware</span>
+            <span class="list_item tabDeviceInfo">Device Information</span>
+            <span class="list_item FSexplorer">File system contents</span>
+            <span class="list_item tabSettings">OTGW Settings</span>
+          </div>
         </div>
       </div>
-      <br/>
       <div id="deviceinfoPage"></div>
     </div>
-    <div id="displaySettingsPage"  style="display:none">
+    <div id="displaySettingsPage">
       <div class="nav-container">
         <div class='nav-left'>
-          <button id='S_back' class='nav-item tabButton' style="background: lightblue;">Back</button>
-          <button id='S_saveSettings' class='nav-item tabButton' style="background: lightblue;">Save</button>
-          <img id='S_FSexplorer' class='nav-img' src='/FSexplorer.png' alt='FSexplorer'>
+          <button class='home nav-item tabButton'>Home</button>
+        </div>
+        <div class='nav-right'>
+          <button class='adminSettings nav-item tabButton'>Advanced</button>
+          <div class="adv_dropdown hidden">
+            <span class="list_item tabPICflash">PIC firmware</span>
+            <span class="list_item tabDeviceInfo">Device Information</span>
+            <span class="list_item FSexplorer">File system contents</span>
+            <span class="list_item tabSettings">OTGW Settings</span>
+          </div>
         </div>
       </div>
       <br/>

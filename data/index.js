@@ -10,7 +10,7 @@
 */
   const localURL='http://'+window.location.host; 
   const APIGW='http://'+window.location.host+'/api/';
-
+  
   "use strict";
 
   let needReload  = true;
@@ -35,38 +35,59 @@
   function initMainPage() {
     console.log("initMainPage()");
   
-    document.getElementById('M_FSexplorer').addEventListener('click',function() 
-                                                { console.log("newTab: goFSexplorer");
-                                                  location.href = "/FSexplorer";
-                                                });
-    document.getElementById('D_FSexplorer').addEventListener('click',function() 
-                                                { console.log("newTab: goFSexplorer");
-                                                  location.href = "/FSexplorer";
-                                                });
-    document.getElementById('S_FSexplorer').addEventListener('click',function() 
-                                                { console.log("newTab: goFSexplorer");
-                                                  location.href = "/FSexplorer";
-                                                });
-    document.getElementById('F_FSexplorer').addEventListener('click',function() 
-                                                { console.log("newTab: goFSexplorer");
-                                                  location.href = "/FSexplorer";
-                                                });                                                
-    document.getElementById('D_back').addEventListener('click',function()
-                                                { console.log("newTab: goBack");
-                                                location.href = "/";
-                                                });
-    document.getElementById('S_back').addEventListener('click',function()
-                                                { console.log("newTab: goBack");
-                                                location.href = "/";
-                                                });
-    document.getElementById('F_back').addEventListener('click',function()
-                                                { console.log("newTab: goBack");
-                                                location.href = "/";
-                                                });
-    document.getElementById('S_saveSettings').addEventListener('click',function(){saveSettings();});
-    document.getElementById('tabDeviceInfo').addEventListener('click',function(){deviceinfoPage();});
-    document.getElementById('tabPICflash').addEventListener('click',function(){firmwarePage();});
-    document.getElementById('tabSettings').addEventListener('click',function(){settingsPage();});
+    Array.from(document.getElementsByClassName('FSexplorer')).forEach(
+      function(el, idx, arr) {
+        el.addEventListener('click',function() {
+          console.log("newTab: goFSexplorer");
+          location.href = "/FSexplorer";
+        })        
+      }
+    );
+    Array.from(document.getElementsByClassName('SaveSettings')).forEach(
+      function(el, idx, arr) {
+        el.addEventListener('click',function(){
+          saveSettings();
+          toggleDropdown(true);
+        });
+      }
+    );
+    Array.from(document.getElementsByClassName('tabDeviceInfo')).forEach(
+      function(el, idx, arr) {
+        el.addEventListener('click',function(){
+          deviceinfoPage();
+          toggleDropdown(true);
+        });
+      }
+    );
+    Array.from(document.getElementsByClassName('tabPICflash')).forEach(
+      function (el, idx, arr) {
+        el.addEventListener('click',function() {
+          firmwarePage();
+          toggleDropdown(true);
+        });
+      }
+    );
+    Array.from(document.getElementsByClassName('tabSettings')).forEach(
+      function(el, idx, arr) {
+        el.addEventListener('click',function(){
+          settingsPage();
+          toggleDropdown(true);
+        });
+      }
+    );
+    Array.from(document.getElementsByClassName('adminSettings')).forEach(
+      function(el, idx, arr) {
+        el.addEventListener('click', function() {toggleDropdown();});
+      }
+    );
+    Array.from(document.getElementsByClassName('home')).forEach(
+      function(el, idx, arr) {
+        el.addEventListener('click', function() {
+          console.log("newTab: goBack");
+          location.href = "/";
+        });
+      }
+    );
     needReload = false;
     refreshDevInfo();
     refreshOTmonitor();
@@ -122,6 +143,18 @@
     
   } // settingsPage()
   
+  function toggleDropdown(hideOnly) {
+    Array.from(document.getElementsByClassName('adv_dropdown')).forEach(
+      function(el, idx, arr) {
+        if ( ! el.classList.contains("hidden")) {
+          el.classList.add("hidden");
+        } else if (! hideOnly ) {
+          el.classList.remove("hidden");
+        }
+      }
+    );
+  }
+
   //============================================================================  
   function refreshDevTime()
   {

@@ -106,6 +106,10 @@
   .nav-container {
     background: #00bffe;
     padding: 6px;
+    min-height: 50px;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
   }
   
   .nav-container a:hover {
@@ -114,21 +118,58 @@
   }
 
   .nav-left {
+    flex-basis: 10%;
     display: flex;
-    flex-flow: row;
+    flex-grow: 1;
     gap: 15px;
     flex: 2 1 0;
-    justify-content: center; /* horizonal alignment */
+    justify-content: left; /* horizonal alignment */
     align-items: center; /* horizonal alignment */
+    min-height: 50px;
   }
+
+  .nav-right {
+    flex-basis: 80%;
+    display: flex;
+    flex-grow: 9;
+    gap: 15px;
+    flex: 2 1 0;
+    justify-content: right; /* horizonal alignment */
+    align-items: center; /* horizonal alignment */
+    min-height: 50px;
+  }
+
+  .nav-right .adv_dropdown {
+    display: block;
+    position: absolute;
+    top: 121px;
+    background-color: white;
+    padding: 10px 20px;
+    background-color: lightblue;
+  }
+  .nav-right .adv_dropdown.hidden {
+    display: none;
+  }
+
+  .nav-right .adv_dropdown span {
+    display: block;
+    height: 2em;
+    line-height: 2em;
+    width: auto;
+    cursor: pointer;
+  }
+  .nav-right .adv_dropdown span:hover {
+    background-color: #bde8f6;
+  } 
   
   .nav-item {
     font-size: 16px;
     height: 40px;
     width: 110px;
+    background-color: lightblue;
     border: none;
     border-radius: 5px;
-    color: white;
+    color: #505050;
     cursor: pointer;
     box-shadow: 2px 2px 2px 0px grey;
   }
@@ -177,10 +218,6 @@
     }
   }
   ***/
-  
-  .tabButton {
-    background-color: white;
-  }
   
   .tabButton a:hover {
     background-color: gray;
