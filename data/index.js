@@ -9,8 +9,7 @@
 ***************************************************************************      
 */
   const localURL='http://'+window.location.host; 
-  // const APIGW='http://'+window.location.host+'/api/';
-  const APIGW='http://192.168.4.252/api/';
+  const APIGW='http://'+window.location.host+'/api/';
   
   "use strict";
 
