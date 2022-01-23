@@ -322,7 +322,7 @@
 }
 .piccolumn1 {
   display: table-cell;
-  width: 150px;
+  width: 170px;
   margin: 5px;
 }
 .piccolumn2 {
@@ -365,7 +365,7 @@
 .otmoncolumn1 {
   display: table-cell;
   float: left;
-  min-width: 270px;
+  min-width: 170px;
   width: 30%;
   padding-left: 10px;
 }
