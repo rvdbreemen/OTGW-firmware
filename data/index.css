@@ -103,7 +103,7 @@
   }
   
   /*--------------------- N A V - B A R -----------------*/
-  .nav-container {
+  .nav-container,.footer {
     background: #00bffe;
     padding: 6px;
     min-height: 50px;
@@ -112,6 +112,10 @@
     flex-wrap: wrap;
   }
   
+  .footer {
+    background-color: #e6ffff;
+  }
+
   .nav-container a:hover {
     color: black;
     background: skyblue; /* only for FSexplorer - Rest does not work */
@@ -126,6 +130,11 @@
     justify-content: left; /* horizonal alignment */
     align-items: center; /* horizonal alignment */
     min-height: 50px;
+  }
+
+
+  .nav-left .hidden {
+    display: none;
   }
 
   .nav-right {
@@ -148,6 +157,7 @@
     background-color: lightblue;
     box-shadow: 2px 2px 2px 0px grey;
   }
+
   .nav-right .adv_dropdown.hidden {
     display: none;
   }
@@ -299,17 +309,20 @@
   }
   
   /* PIC firmware page */
-#table {
+.pictable {
   display: table;
-  padding: 5px;
+  width: 100%;
+  min-width: 600px;
 }
 .picrow {
   display: table-row;
   padding: 5px;
+  width: 100%;
+  min-width: 600px;
 }
 .piccolumn1 {
   display: table-cell;
-  width: 150px;
+  width: 170px;
   margin: 5px;
 }
 .piccolumn2 {
@@ -337,58 +350,67 @@
 }
 
   
-  /* OTmonitor */
-  .otmonrow {
-    background: lightblue;
-    display: table-row;
-  }
-  .otmoncolumn1 {
-    display: table-cell;
-    float: left;
-    width: 270px;
-    padding-left: 10px;
-  }
-  .otmoncolumn2 {
-    display: table-cell;
-    float: left;
-    width: 40px;
-    text-align: right;
-  }
-  .otmoncolumn3 {
-    display: table-cell;
-    float: left;
-    width: 30px;
-    margin-left: 2px;
-  }
-  
-  /* DevInfo */
-  .devinfonrow {
-    background: lightblue;
-    display: table-row;
-    font-size: 14px;
-  }
-  .devinfocolumn1 {
-    display: table-cell;
-    float: left;
-    width: 160px;
-    padding-left: 10px;
-    font-size: 12px;
-  }
-  .devinfocolumn2 {
-    display: table-cell;
-    float: left;
-    width: 160px;
-    text-align: left;
-    font-size: 12px;
-  }
-  
-  /* Clear floats after the columns */
-  .devinforow:after {
-    content: "";
-    display: table;
-    clear: both;
-    background: lightblue;
-  }
+/* OTmonitor */
+.otmontable {
+  display: table;
+  width: 100%;
+  min-width: 600px;
+}
+.otmonrow {
+  background: lightblue;
+  display: table-row;
+  width: 100%;
+  min-width: 600px;
+}
+.otmoncolumn1 {
+  display: table-cell;
+  float: left;
+  min-width: 170px;
+  width: 30%;
+  padding-left: 10px;
+}
+.otmoncolumn2 {
+  display: table-cell;
+  float: left;
+  min-width: 40px;
+  width: 20%;
+  text-align: right;
+}
+.otmoncolumn3 {
+  display: table-cell;
+  float: left;
+  min-width: 20px;
+  margin-left: 2px;
+}
+
+/* DevInfo */
+.devinfonrow {
+  background: lightblue;
+  display: table-row;
+  font-size: 14px;
+}
+.devinfocolumn1 {
+  display: table-cell;
+  float: left;
+  width: 160px;
+  padding-left: 10px;
+  font-size: 12px;
+}
+.devinfocolumn2 {
+  display: table-cell;
+  float: left;
+  width: 160px;
+  text-align: left;
+  font-size: 12px;
+}
+
+/* Clear floats after the columns */
+.devinforow:after {
+  content: "";
+  display: table;
+  clear: both;
+  background: lightblue;
+}
   
  /* SettingsPage */
  #settingMessage {
