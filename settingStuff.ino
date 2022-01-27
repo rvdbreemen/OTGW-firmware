@@ -46,6 +46,11 @@ void writeSettings(bool show)
   root["GPIOSENSORSenabled"] = settingGPIOSENSORSenabled;
   root["GPIOSENSORSpin"] = settingGPIOSENSORSpin;
   root["GPIOSENSORSinterval"] = settingGPIOSENSORSinterval;
+  root["S0COUNTERenabled"] = settingS0COUNTERenabled;
+  root["S0COUNTERpin"] = settingS0COUNTERpin;
+  root["S0COUNTERdebouncetime"] = settingS0COUNTERdebouncetime;
+  root["S0COUNTERpulsekw"] = settingS0COUNTERpulsekw;
+  root["S0COUNTERinterval"] = settingS0COUNTERinterval;
   root["OTGWcommandenable"] = settingOTGWcommandenable;
   root["OTGWcommands"] = settingOTGWcommands;
   root["GPIOOUTPUTSenabled"] = settingGPIOOUTPUTSenabled;
@@ -116,6 +121,12 @@ void readSettings(bool show)
   settingGPIOSENSORSpin = doc["GPIOSENSORSpin"] | settingGPIOSENSORSpin;
   settingGPIOSENSORSinterval = doc["GPIOSENSORSinterval"] | settingGPIOSENSORSinterval;
   CHANGE_INTERVAL_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS); 
+  settingS0COUNTERenabled = doc["S0COUNTERenabled"] | settingS0COUNTERenabled;
+  settingS0COUNTERpin = doc["S0COUNTERpin"] | settingS0COUNTERpin;
+  settingS0COUNTERdebouncetime = doc["S0COUNTERdebouncetime"] | settingS0COUNTERdebouncetime;
+  settingS0COUNTERpulsekw = doc["S0COUNTERpulsekw"] | settingS0COUNTERpulsekw;
+  settingS0COUNTERinterval = doc["S0COUNTERinterval"] | settingS0COUNTERinterval;
+  CHANGE_INTERVAL_SEC(timers0counter, settingS0COUNTERinterval, CATCH_UP_MISSED_TICKS); 
   settingOTGWcommandenable = doc["OTGWcommandenable"] | settingOTGWcommandenable;
   settingOTGWcommands     = doc["OTGWcommands"].as<String>();
   if (settingOTGWcommands=="null") settingOTGWcommands = "";
@@ -146,7 +157,12 @@ void readSettings(bool show)
     Debugf("Led Blink             : %s\r\n", CBOOLEAN(settingLEDblink));
     Debugf("GPIO Sensors          : %s\r\n", CBOOLEAN(settingGPIOSENSORSenabled));
     Debugf("GPIO Sen. Pin         : %d\r\n", settingGPIOSENSORSpin);
-    Debugf("GPIO Interval         : %s\r\n", CBOOLEAN(settingGPIOSENSORSinterval));
+    Debugf("GPIO Interval         : %d\r\n", settingGPIOSENSORSinterval);
+    Debugf("S0 Counter            : %s\r\n", CBOOLEAN(settingS0COUNTERenabled));
+    Debugf("S0 Counter Pin        : %d\r\n", settingS0COUNTERpin);
+    Debugf("S0 Counter Debouncetime:%d\r\n", settingS0COUNTERdebouncetime);
+    Debugf("S0 Counter Pulses/kw  : %d\r\n", settingS0COUNTERpulsekw);
+    Debugf("S0 Counter Interval   : %d\r\n", settingS0COUNTERinterval);
     Debugf("OTGW boot cmd enabled : %s\r\n", CBOOLEAN(settingOTGWcommandenable));
     Debugf("OTGW boot cmd         : %s\r\n", CSTR(settingOTGWcommands));
     Debugf("GPIO Outputs          : %s\r\n", CBOOLEAN(settingGPIOOUTPUTSenabled));
@@ -232,6 +248,25 @@ void updateSetting(const char *field, const char *newValue)
   if (strcasecmp(field, "GPIOSENSORSinterval") == 0) {
     settingGPIOSENSORSinterval = atoi(newValue);
     CHANGE_INTERVAL_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS); 
+  }
+  if (strcasecmp(field, "S0COUNTERenabled") == 0)
+  {
+    settingS0COUNTERenabled = EVALBOOLEAN(newValue);
+    Debugln();
+    DebugTf("Need reboot before S0 Counter starts counting on pin GPIO%d!\r\n\n", settingS0COUNTERpin);
+  }
+  if (strcasecmp(field, "S0COUNTERpin") == 0)    
+  {
+    settingS0COUNTERpin = atoi(newValue);
+    Debugln();
+    DebugTf("Need reboot before S0 Counter will use new pin GPIO%d!\r\n\n", settingS0COUNTERpin);
+  }
+  if (strcasecmp(field, "S0COUNTERdebouncetime") == 0) settingS0COUNTERdebouncetime = atoi(newValue);
+  if (strcasecmp(field, "S0COUNTERpulsekw") == 0)      settingS0COUNTERpulsekw = atoi(newValue);
+
+  if (strcasecmp(field, "S0COUNTERinterval") == 0) {
+    settingS0COUNTERinterval = atoi(newValue);
+    CHANGE_INTERVAL_SEC(timers0counter, settingS0COUNTERinterval, CATCH_UP_MISSED_TICKS); 
   }
   if (strcasecmp(field, "OTGWcommandenable")==0)    settingOTGWcommandenable = EVALBOOLEAN(newValue);
   if (strcasecmp(field, "OTGWcommands")==0)         settingOTGWcommands = String(newValue);

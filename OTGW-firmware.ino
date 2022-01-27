@@ -34,6 +34,7 @@
 #define OFF HIGH
 
 DECLARE_TIMER_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS);
+DECLARE_TIMER_SEC(timers0counter, settingS0COUNTERinterval, CATCH_UP_MISSED_TICKS);
   
 //=====================================================================
 void setup() {
@@ -87,6 +88,7 @@ void setup() {
   resetOTGW();          // reset the OTGW pic
   startOTGWstream();    // start port 25238 
   checkOTWGpicforupdate();
+  initS0Count();
   initSensors();        // init DS18B20
   initOutputs();
   
@@ -284,6 +286,7 @@ void loop()
   DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS);
   
   if (DUE(timerpollsensor)) pollSensors();    // poll the temperature sensors connected to 2wire gpio pin 
+  if (DUE(timers0counter))  sendS0Counters();    // send the S0 counters 
   if (DUE(timer5min))       do5minevent();
   if (DUE(timer60s))        doTaskEvery60s();
   if (DUE(timer30s))        doTaskEvery30s();

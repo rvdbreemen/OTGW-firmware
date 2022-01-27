@@ -119,6 +119,17 @@ bool      settingGPIOSENSORSenabled = false;
 int8_t    settingGPIOSENSORSpin = 10;
 int16_t   settingGPIOSENSORSinterval = 5;
 
+// S0 Counter Settings
+bool      settingS0COUNTERenabled = false;
+uint8_t   settingS0COUNTERpin = 12;
+uint16_t  settingS0COUNTERdebouncetime = 80;
+uint16_t  settingS0COUNTERpulsekw = 1000;
+uint16_t  settingS0COUNTERinterval = 60;
+uint16_t  OTGWpulseCount = 0;  
+uint32_t  OTGWpulseCountTot = 0;  
+float     OTGWS0kW = 0 ;
+time_t    OTGWS0lasttime = 0;
+
 //boot commands
 bool      settingOTGWcommandenable = false;
 String    settingOTGWcommands = "";

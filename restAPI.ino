@@ -301,6 +301,11 @@ void sendOTmonitor()
   sendJsonOTmonObj("oemdiagnosticcode", OTcurrentSystemState.OEMDiagnosticCode, "", msglastupdated[OT_OEMDiagnosticCode]);
   sendJsonOTmonObj("oemfaultcode", OTcurrentSystemState.ASFflags && 0xFF, "", msglastupdated[OT_ASFflags]);
   
+  if (settingS0COUNTERenabled) {
+      sendJsonOTmonObj("s0kW", OTGWS0kW , "kW", OTGWS0lasttime);
+      sendJsonOTmonObj("s0intervalcount", OTGWpulseCount , "", OTGWS0lasttime);
+      sendJsonOTmonObj("s0totalcount", OTGWpulseCountTot , "", OTGWS0lasttime);
+  }
   sendEndJsonObj("otmonitor");
 
 } // sendOTmonitor()
@@ -367,6 +372,12 @@ void sendDeviceInfo()
   sendNestedJsonObj("boilerconnected", CBOOLEAN(bOTGWboilerstate));      
   sendNestedJsonObj("gatewaymode", CBOOLEAN(bOTGWgatewaystate));      
   sendNestedJsonObj("otgwconnected", CBOOLEAN(bOTGWonline));
+    if (settingS0COUNTERenabled) {
+      sendNestedJsonObj("s0kW", String(OTGWS0kW));
+      sendNestedJsonObj("s0intervalcount", String(OTGWpulseCount));
+      sendNestedJsonObj("s0totalcount", String(OTGWpulseCountTot));
+  }
+
   
   sendEndJsonObj("devinfo");
 
@@ -418,6 +429,11 @@ void sendDeviceSettings()
   sendJsonSettingObj("gpiosensorsenabled", settingGPIOSENSORSenabled, "b");
   sendJsonSettingObj("gpiosensorspin", settingGPIOSENSORSpin, "i", 0, 16);
   sendJsonSettingObj("gpiosensorsinterval", settingGPIOSENSORSinterval, "i", 5, 65535);
+  sendJsonSettingObj("s0counterenabled", settingS0COUNTERenabled, "b");
+  sendJsonSettingObj("s0counterpin", settingS0COUNTERpin, "i", 0, 16);
+  sendJsonSettingObj("s0counterdebouncetime", settingS0COUNTERdebouncetime, "i", 0, 500);
+  sendJsonSettingObj("s0counterpulsekw", settingS0COUNTERpulsekw, "i", 0, 5000);
+  sendJsonSettingObj("s0counterinterval", settingS0COUNTERinterval, "i", 5, 65535);
   sendJsonSettingObj("gpiooutputsenabled", settingGPIOOUTPUTSenabled, "b");
   sendJsonSettingObj("gpiooutputspin", settingGPIOOUTPUTSpin, "i", 0, 16);
   sendJsonSettingObj("gpiooutputstriggerbit", settingGPIOOUTPUTStriggerBit, "i", 0,16);
