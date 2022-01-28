@@ -1,28 +1,36 @@
-/*
+/* 
+***************************************************************************  
+**  Program  : s0PulseCount
+**  Version  : v0.0.2
+**
+**  Copyright (c) 2021-2022 Rob Roos / Robert van Breemen
+**     based on Framework ESP8266 from Willem Aandewiel
+**
+**  TERMS OF USE: MIT License. See bottom of file.                                                            
+***************************************************************************      
+
+Functionality to measure number of pulses from a S0 output, eg from an energy consumption meter.
+The S0 port is to be connected in a NO mode, with pulse closing contact pulling a configurable pin to Low.
 
 // S0 Counter Settings and variables with global scope, to be defined in xx.h 
-bool      settingS0COUNTERenabled = false;
-int8_t    settingS0COUNTERpin = 12;
-int16_t   settingS0COUNTERdebouncetime = 80;
-int16_t   settingS0COUNTERpulsekw = 1000;
-int16_t   settingS0COUNTERinterval = 60;
-unsigned long OTGWpulseCount;  
-unsigned long OTGWpulseCountTot = 0;  
-float OTGWS0kW = 0 ;
-
+bool      settingS0COUNTERenabled = false;      
+int8_t    settingS0COUNTERpin = 12;               // GPIO 12 = D6, preferred, can be any pin with Interupt support
+int16_t   settingS0COUNTERdebouncetime = 80;      // Depending on S0 switch a debouncetime should be tailored
+int16_t   settingS0COUNTERpulsekw = 1000;         // Most S0 counters have 1000 pulses per kW, but this can be different
+int16_t   settingS0COUNTERinterval = 60;          // Sugggested measurement reporting interval
+int16_t   OTGWpulseCount;                         // Number of S0 pulses in measurement interval
+int32_t   OTGWpulseCountTot = 0;                  // Number of S0 pulses since start of measurement
+float     OTGWS0kW = 0 ;                          // Calculated kW actual consumption based on pulses and settings
+time_t    OTGWS0lasttime = 0;                     // Last time S0 counters have been read
 
 
 */
 #include <Arduino.h>
 //-----------------------------------------------------------------------------------------------------------
-// const byte pulse_count_pin=        12;  // GPIO 12 = D6 for now, should be setting                 
-
-// Pulse counting settings 
 volatile unsigned int pulseCount = 0;                  // Number of pulses, used to measure energy.
 unsigned long timeS0Count = 0 ;
 unsigned long lastS0Count = 0 ;
 
-//-----------------------------------------------------------------------------------------------------------
 //-----------------------------------------------------------------------------------------------------------
 void IRAM_ATTR IRQcounter() {
  volatile unsigned long last_interrupt_time = 0;
@@ -73,3 +81,26 @@ void sendS0Counters()
 
   }
 } 
+/***************************************************************************
+*
+* Permission is hereby granted, free of charge, to any person obtaining a
+* copy of this software and associated documentation files (the
+* "Software"), to deal in the Software without restriction, including
+* without limitation the rights to use, copy, modify, merge, publish,
+* distribute, sublicense, and/or sell copies of the Software, and to permit
+* persons to whom the Software is furnished to do so, subject to the
+* following conditions:
+*
+* The above copyright notice and this permission notice shall be included
+* in all copies or substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+* OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT
+* OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+* THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+* 
+****************************************************************************
+*/

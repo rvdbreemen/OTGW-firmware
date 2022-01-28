@@ -302,7 +302,7 @@ void sendOTmonitor()
   sendJsonOTmonObj("oemfaultcode", OTcurrentSystemState.ASFflags && 0xFF, "", msglastupdated[OT_ASFflags]);
   
   if (settingS0COUNTERenabled) {
-      sendJsonOTmonObj("s0kW", OTGWS0kW , "kW", OTGWS0lasttime);
+      sendJsonOTmonObj("s0kw", OTGWS0kW , "kW", OTGWS0lasttime);
       sendJsonOTmonObj("s0intervalcount", OTGWpulseCount , "", OTGWS0lasttime);
       sendJsonOTmonObj("s0totalcount", OTGWpulseCountTot , "", OTGWS0lasttime);
   }
