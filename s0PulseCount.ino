@@ -28,8 +28,10 @@ time_t    OTGWS0lasttime = 0;                     // Last time S0 counters have 
 #include <Arduino.h>
 //-----------------------------------------------------------------------------------------------------------
 volatile unsigned int pulseCount = 0;                  // Number of pulses, used to measure energy.
-unsigned long timeS0Count = 0 ;
-unsigned long lastS0Count = 0 ;
+uint32_t timeS0Count = 0 ;
+uint32_t lastS0Count = 0 ;
+float   s0avgtime ;
+
 
 //-----------------------------------------------------------------------------------------------------------
 void IRAM_ATTR IRQcounter() {
@@ -61,7 +63,6 @@ void sendS0Counters()
   if (!settingS0COUNTERenabled) return;
 
   if (pulseCount != 0 ) {
-    float avgtimeS0 ;
     noInterrupts();
     OTGWpulseCount = pulseCount; 
     OTGWpulseCountTot = OTGWpulseCountTot + pulseCount; 
@@ -69,18 +70,41 @@ void sendS0Counters()
     interrupts();
 
     timeS0Count = millis();
-    avgtimeS0 = ( timeS0Count - lastS0Count ) / OTGWpulseCount ; 
-    OTGWS0kW = 3600000 / avgtimeS0 / settingS0COUNTERpulsekw ;
+    s0avgtime = ( timeS0Count - lastS0Count ) / OTGWpulseCount ; 
+    OTGWS0kW = 3600000 / s0avgtime / settingS0COUNTERpulsekw ;
     OTGWDebugTf("*** S0PulseCount( %d ) S0PulseCountTot( %d )\r\n", OTGWpulseCount, OTGWpulseCountTot) ;
     OTGWDebugTf("*** timeS0Count( %d ) lastS0count( %d )\r\n", timeS0Count, lastS0Count) ;
-    OTGWDebugTf("*** S0Pulsetimeavg: %f\r\n", avgtimeS0 ) ;
+    OTGWDebugTf("*** S0Pulsetimeavg: %f\r\n", s0avgtime ) ;
     OTGWDebugTf("*** S0Pulsekw: %f\r\n", OTGWS0kW ) ;
 
     lastS0Count = timeS0Count ;
     OTGWS0lasttime = now() ;
-
+    s0sendMQ() ; 
   }
 } 
+
+void s0sendMQ() 
+{
+//Build string for MQTT
+char _msg[15]{0};
+char _topic[50]{0};
+snprintf(_topic, sizeof _topic, "otgw-firmware/sensors/s0pulsecount");
+snprintf(_msg, sizeof _msg, "%d", OTGWpulseCount);
+sendMQTTData(_topic, _msg);
+
+snprintf(_topic, sizeof _topic, "otgw-firmware/sensors/s0pulsecounttot");
+snprintf(_msg, sizeof _msg, "%d", OTGWpulseCountTot);
+sendMQTTData(_topic, _msg);
+
+snprintf(_topic, sizeof _topic, "otgw-firmware/sensors/s0pulsetime");
+snprintf(_msg, sizeof _msg, "%f", s0avgtime);
+sendMQTTData(_topic, _msg);
+
+snprintf(_topic, sizeof _topic, "otgw-firmware/sensors/s0kw");
+snprintf(_msg, sizeof _msg, "%f", OTGWS0kW);
+sendMQTTData(_topic, _msg);
+
+}
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a

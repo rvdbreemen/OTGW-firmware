@@ -373,7 +373,7 @@ void sendDeviceInfo()
   sendNestedJsonObj("gatewaymode", CBOOLEAN(bOTGWgatewaystate));      
   sendNestedJsonObj("otgwconnected", CBOOLEAN(bOTGWonline));
     if (settingS0COUNTERenabled) {
-      sendNestedJsonObj("s0kW", String(OTGWS0kW));
+      sendNestedJsonObj("s0kw", String(OTGWS0kW));
       sendNestedJsonObj("s0intervalcount", String(OTGWpulseCount));
       sendNestedJsonObj("s0totalcount", String(OTGWpulseCountTot));
   }
