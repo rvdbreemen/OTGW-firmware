@@ -127,7 +127,7 @@ int16_t   settingS0COUNTERpulsekw = 1000;         // Most S0 counters have 1000 
 int16_t   settingS0COUNTERinterval = 60;          // Sugggested measurement reporting interval
 int16_t   OTGWpulseCount;                         // Number of S0 pulses in measurement interval
 int32_t   OTGWpulseCountTot = 0;                  // Number of S0 pulses since start of measurement
-float     OTGWS0kW = 0 ;                          // Calculated kW actual consumption based on pulses and settings
+float     OTGWs0intervalkw = 0 ;                          // Calculated kW actual consumption based on pulses and settings
 time_t    OTGWS0lasttime = 0;                     // Last time S0 counters have been read
 
 //boot commands

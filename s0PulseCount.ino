@@ -20,7 +20,7 @@ int16_t   settingS0COUNTERpulsekw = 1000;         // Most S0 counters have 1000 
 int16_t   settingS0COUNTERinterval = 60;          // Sugggested measurement reporting interval
 int16_t   OTGWpulseCount;                         // Number of S0 pulses in measurement interval
 int32_t   OTGWpulseCountTot = 0;                  // Number of S0 pulses since start of measurement
-float     OTGWS0kW = 0 ;                          // Calculated kW actual consumption based on pulses and settings
+float     OTGWs0intervalkw = 0 ;                          // Calculated kW actual consumption based on pulses and settings
 time_t    OTGWS0lasttime = 0;                     // Last time S0 counters have been read
 
 
@@ -35,7 +35,7 @@ float   s0avgtime ;
 
 //-----------------------------------------------------------------------------------------------------------
 void IRAM_ATTR IRQcounter() {
- volatile unsigned long last_interrupt_time = 0;
+ static unsigned long last_interrupt_time = 0;
  volatile unsigned long interrupt_time = millis();
  // If interrupts come faster than 150ms, assume it's a bounce and ignore
  if (interrupt_time - last_interrupt_time > settingS0COUNTERdebouncetime)
@@ -71,11 +71,11 @@ void sendS0Counters()
 
     timeS0Count = millis();
     s0avgtime = ( timeS0Count - lastS0Count ) / OTGWpulseCount ; 
-    OTGWS0kW = 3600000 / s0avgtime / settingS0COUNTERpulsekw ;
+    OTGWs0intervalkw = 3600000 / s0avgtime / settingS0COUNTERpulsekw ;
     OTGWDebugTf("*** S0PulseCount( %d ) S0PulseCountTot( %d )\r\n", OTGWpulseCount, OTGWpulseCountTot) ;
     OTGWDebugTf("*** timeS0Count( %d ) lastS0count( %d )\r\n", timeS0Count, lastS0Count) ;
     OTGWDebugTf("*** S0Pulsetimeavg: %f\r\n", s0avgtime ) ;
-    OTGWDebugTf("*** S0Pulsekw: %f\r\n", OTGWS0kW ) ;
+    OTGWDebugTf("*** S0Pulsekw: %f\r\n", OTGWs0intervalkw ) ;
 
     lastS0Count = timeS0Count ;
     OTGWS0lasttime = now() ;
@@ -88,20 +88,20 @@ void s0sendMQ()
 //Build string for MQTT
 char _msg[15]{0};
 char _topic[50]{0};
-snprintf(_topic, sizeof _topic, "otgw-firmware/sensors/s0pulsecount");
+snprintf(_topic, sizeof _topic, "s0pulsecount");
 snprintf(_msg, sizeof _msg, "%d", OTGWpulseCount);
 sendMQTTData(_topic, _msg);
 
-snprintf(_topic, sizeof _topic, "otgw-firmware/sensors/s0pulsecounttot");
+snprintf(_topic, sizeof _topic, "s0pulsecounttot");
 snprintf(_msg, sizeof _msg, "%d", OTGWpulseCountTot);
 sendMQTTData(_topic, _msg);
 
-snprintf(_topic, sizeof _topic, "otgw-firmware/sensors/s0pulsetime");
+snprintf(_topic, sizeof _topic, "s0pulsetime");
 snprintf(_msg, sizeof _msg, "%f", s0avgtime);
 sendMQTTData(_topic, _msg);
 
-snprintf(_topic, sizeof _topic, "otgw-firmware/sensors/s0kw");
-snprintf(_msg, sizeof _msg, "%f", OTGWS0kW);
+snprintf(_topic, sizeof _topic, "s0intervalkw");
+snprintf(_msg, sizeof _msg, "%f", OTGWs0intervalkw);
 sendMQTTData(_topic, _msg);
 
 }

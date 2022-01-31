@@ -271,7 +271,6 @@ void sendOTmonitor()
   sendJsonOTmonObj("dhwenable", CONOFF(isDomesticHotWaterEnabled()),"", msglastupdated[OT_Statusflags]);
   sendJsonOTmonObj("diagnosticindicator", CONOFF(isDiagnosticIndicator()),"", msglastupdated[OT_Statusflags]);
   sendJsonOTmonObj("faultindicator", CONOFF(isFaultIndicator()),"", msglastupdated[OT_Statusflags]);
-  
   sendJsonOTmonObj("coolingmodus", CONOFF(isCoolingEnabled()),"", msglastupdated[OT_Statusflags]);
   sendJsonOTmonObj("coolingactive", CONOFF(isCoolingActive()),"", msglastupdated[OT_Statusflags]);  
   sendJsonOTmonObj("otcactive", CONOFF(isOutsideTemperatureCompensationActive()),"", msglastupdated[OT_Statusflags]);
@@ -301,10 +300,11 @@ void sendOTmonitor()
   sendJsonOTmonObj("oemdiagnosticcode", OTcurrentSystemState.OEMDiagnosticCode, "", msglastupdated[OT_OEMDiagnosticCode]);
   sendJsonOTmonObj("oemfaultcode", OTcurrentSystemState.ASFflags && 0xFF, "", msglastupdated[OT_ASFflags]);
   
-  if (settingS0COUNTERenabled) {
-      sendJsonOTmonObj("s0kw", OTGWS0kW , "kW", OTGWS0lasttime);
-      sendJsonOTmonObj("s0intervalcount", OTGWpulseCount , "", OTGWS0lasttime);
-      sendJsonOTmonObj("s0totalcount", OTGWpulseCountTot , "", OTGWS0lasttime);
+  if (settingS0COUNTERenabled) 
+  {
+    sendJsonOTmonObj("s0intervalkw", OTGWs0intervalkw , "kW", OTGWS0lasttime);
+    sendJsonOTmonObj("s0intervalcount", OTGWpulseCount , "", OTGWS0lasttime);
+    sendJsonOTmonObj("s0totalcount", OTGWpulseCountTot , "", OTGWS0lasttime);
   }
   sendEndJsonObj("otmonitor");
 
@@ -373,7 +373,7 @@ void sendDeviceInfo()
   sendNestedJsonObj("gatewaymode", CBOOLEAN(bOTGWgatewaystate));      
   sendNestedJsonObj("otgwconnected", CBOOLEAN(bOTGWonline));
     if (settingS0COUNTERenabled) {
-      sendNestedJsonObj("s0kw", String(OTGWS0kW));
+      sendNestedJsonObj("s0intervalkw", String(OTGWs0intervalkw));
       sendNestedJsonObj("s0intervalcount", String(OTGWpulseCount));
       sendNestedJsonObj("s0totalcount", String(OTGWpulseCountTot));
   }
