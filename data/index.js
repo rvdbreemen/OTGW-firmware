@@ -781,7 +781,7 @@
    ,[ "s0counterpin",               "S0 Counter pin # (SD6 = GPIO12 => 12)"]
    ,[ "s0counterdebouncetime",      "S0 Counter debouncetime (mS)"]
    ,[ "s0counterpulsekw",           "S0 pulses per kW"]
-   ,[ "s0intervalkw",               "S0 interval kW"]
+   ,[ "s0powerkw",                       "S0 actual power (kW)"]
    ,[ "s0intervalcount",            "S0 interval pulses"]
    ,[ "s0totalcount",               "S0 total pulses"]
    ,[ "mqttotmessage",              "MQTT OT msg Enable"]

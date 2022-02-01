@@ -119,15 +119,15 @@ bool      settingGPIOSENSORSenabled = false;
 int8_t    settingGPIOSENSORSpin = 10;
 int16_t   settingGPIOSENSORSinterval = 5;
 
-// S0 Counter Settings and variables with global scope, to be defined in xx.h 
+// S0 Counter Settings and variables with global scope
 bool      settingS0COUNTERenabled = false;      
-int8_t    settingS0COUNTERpin = 12;               // GPIO 12 = D6, preferred, can be any pin with Interupt support
-int16_t   settingS0COUNTERdebouncetime = 80;      // Depending on S0 switch a debouncetime should be tailored
-int16_t   settingS0COUNTERpulsekw = 1000;         // Most S0 counters have 1000 pulses per kW, but this can be different
-int16_t   settingS0COUNTERinterval = 60;          // Sugggested measurement reporting interval
-int16_t   OTGWpulseCount;                         // Number of S0 pulses in measurement interval
-int32_t   OTGWpulseCountTot = 0;                  // Number of S0 pulses since start of measurement
-float     OTGWs0intervalkw = 0 ;                          // Calculated kW actual consumption based on pulses and settings
+uint8_t   settingS0COUNTERpin = 12;               // GPIO 12 = D6, preferred, can be any pin with Interupt support
+uint16_t  settingS0COUNTERdebouncetime = 80;      // Depending on S0 switch a debouncetime should be tailored
+uint16_t  settingS0COUNTERpulsekw = 1000;         // Most S0 counters have 1000 pulses per kW, but this can be different
+uint16_t  settingS0COUNTERinterval = 60;          // Sugggested measurement reporting interval
+uint16_t  OTGWpulseCount;                         // Number of S0 pulses in measurement interval
+uint32_t  OTGWpulseCountTot = 0;                  // Number of S0 pulses since start of measurement
+float     OTGWs0powerkw = 0 ;                          // Calculated kW actual consumption based on time between last pulses and settings
 time_t    OTGWS0lasttime = 0;                     // Last time S0 counters have been read
 
 //boot commands

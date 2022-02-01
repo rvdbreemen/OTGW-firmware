@@ -14,33 +14,33 @@ The S0 port is to be connected in a NO mode, with pulse closing contact pulling 
 
 // S0 Counter Settings and variables with global scope, to be defined in xx.h 
 bool      settingS0COUNTERenabled = false;      
-int8_t    settingS0COUNTERpin = 12;               // GPIO 12 = D6, preferred, can be any pin with Interupt support
-int16_t   settingS0COUNTERdebouncetime = 80;      // Depending on S0 switch a debouncetime should be tailored
-int16_t   settingS0COUNTERpulsekw = 1000;         // Most S0 counters have 1000 pulses per kW, but this can be different
-int16_t   settingS0COUNTERinterval = 60;          // Sugggested measurement reporting interval
-int16_t   OTGWpulseCount;                         // Number of S0 pulses in measurement interval
-int32_t   OTGWpulseCountTot = 0;                  // Number of S0 pulses since start of measurement
-float     OTGWs0intervalkw = 0 ;                          // Calculated kW actual consumption based on pulses and settings
+uint8_t   settingS0COUNTERpin = 12;               // GPIO 12 = D6, preferred, can be any pin with Interupt support
+uint16_t  settingS0COUNTERdebouncetime = 80;      // Depending on S0 switch a debouncetime should be tailored
+uint16_t  settingS0COUNTERpulsekw = 1000;         // Most S0 counters have 1000 pulses per kW, but this can be different
+uint16_t  settingS0COUNTERinterval = 60;          // Sugggested measurement reporting interval
+uint16_t  OTGWpulseCount;                         // Number of S0 pulses in measurement interval
+uint32_t  OTGWpulseCountTot = 0;                  // Number of S0 pulses since start of measurement
+float     OTGWs0powerkw = 0 ;                          // Calculated kW actual consumption based on time between last pulses and settings
 time_t    OTGWS0lasttime = 0;                     // Last time S0 counters have been read
 
 
 */
 #include <Arduino.h>
 //-----------------------------------------------------------------------------------------------------------
-volatile unsigned int pulseCount = 0;                  // Number of pulses, used to measure energy.
-uint32_t timeS0Count = 0 ;
-uint32_t lastS0Count = 0 ;
-float   s0avgtime ;
-
+volatile uint8_t pulseCount = 0;                  // Number of pulses, used to measure energy.
+volatile uint32_t last_pulse_duration = 0;     // Duration of the time between last pulses
 
 //-----------------------------------------------------------------------------------------------------------
 void IRAM_ATTR IRQcounter() {
- static unsigned long last_interrupt_time = 0;
- volatile unsigned long interrupt_time = millis();
- // If interrupts come faster than 150ms, assume it's a bounce and ignore
+ static uint32_t last_interrupt_time = 0;
+ volatile uint32_t interrupt_time;
+
+interrupt_time = millis() ;
+ // If interrupts come faster than debouncetime, assume it's a bounce and ignore
  if (interrupt_time - last_interrupt_time > settingS0COUNTERdebouncetime)
  {
    pulseCount++;
+   last_pulse_duration = interrupt_time - last_interrupt_time ;
  }
  last_interrupt_time = interrupt_time;
 }
@@ -54,8 +54,6 @@ void initS0Count()
   pinMode(settingS0COUNTERpin, INPUT_PULLUP);           // Set interrupt pulse counting pin as input (Dig 3 / INT1)
   OTGWpulseCount=0;                                 // Make sure pulse count starts at zero
   attachInterrupt(digitalPinToInterrupt(settingS0COUNTERpin), IRQcounter, FALLING) ;
-  lastS0Count = millis();  // Initialise first timecount
-  timeS0Count = millis();  // Initialise first timecount
 } //end SETUP
 
 void sendS0Counters() 
@@ -69,15 +67,9 @@ void sendS0Counters()
     pulseCount=0; 
     interrupts();
 
-    timeS0Count = millis();
-    s0avgtime = ( timeS0Count - lastS0Count ) / OTGWpulseCount ; 
-    OTGWs0intervalkw = 3600000 / s0avgtime / settingS0COUNTERpulsekw ;
-    OTGWDebugTf("*** S0PulseCount( %d ) S0PulseCountTot( %d )\r\n", OTGWpulseCount, OTGWpulseCountTot) ;
-    OTGWDebugTf("*** timeS0Count( %d ) lastS0count( %d )\r\n", timeS0Count, lastS0Count) ;
-    OTGWDebugTf("*** S0Pulsetimeavg: %f\r\n", s0avgtime ) ;
-    OTGWDebugTf("*** S0Pulsekw: %f\r\n", OTGWs0intervalkw ) ;
-
-    lastS0Count = timeS0Count ;
+    OTGWs0powerkw =  (float) 3600000 / (float)settingS0COUNTERpulsekw  / (float)last_pulse_duration ;
+    OTGWDebugTf("*** S0PulseCount(%d) S0PulseCountTot(%d)\r\n", OTGWpulseCount, OTGWpulseCountTot) ;
+    OTGWDebugTf("*** S0LastPulsetime(%d) S0Pulsekw:(%4.3f) \r\n", last_pulse_duration, OTGWs0powerkw) ;
     OTGWS0lasttime = now() ;
     s0sendMQ() ; 
   }
@@ -97,11 +89,11 @@ snprintf(_msg, sizeof _msg, "%d", OTGWpulseCountTot);
 sendMQTTData(_topic, _msg);
 
 snprintf(_topic, sizeof _topic, "s0pulsetime");
-snprintf(_msg, sizeof _msg, "%f", s0avgtime);
+snprintf(_msg, sizeof _msg, "%d", last_pulse_duration);
 sendMQTTData(_topic, _msg);
 
-snprintf(_topic, sizeof _topic, "s0intervalkw");
-snprintf(_msg, sizeof _msg, "%f", OTGWs0intervalkw);
+snprintf(_topic, sizeof _topic, "s0powerkw");
+snprintf(_msg, sizeof _msg, "%4.3f", OTGWs0powerkw);
 sendMQTTData(_topic, _msg);
 
 }
