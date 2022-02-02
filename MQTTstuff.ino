@@ -520,14 +520,14 @@ void doAutoConfigure(bool bForcaAll = false){
   for (int i=0; i<255; i++){
     if ((getMQTTConfigDone((byte)i)==true) || bForcaAll) {
       MQTTDebugTf("Sending auto configuration for sensor %d\r\n", i);
-      doAutoConfigureMsgid((byte)i);
+      doAutoConfigureMsgid((byte)i, NodeId);
       doBackgroundTasks();
     }
   }
 //  bool success = doAutoConfigure("config"); // the string "config" should match every line non-comment in mqttha.cfg
 }
 //===========================================================================================
-bool doAutoConfigureMsgid(byte OTid)
+bool doAutoConfigureMsgid(byte OTid, String cfgNodeId)
 {
   bool _result = false;
   
@@ -589,14 +589,14 @@ bool doAutoConfigureMsgid(byte OTid)
     sTopic.replace("%homeassistant%", CSTR(settingMQTThaprefix));  
 
     /// node
-    sTopic.replace("%node_id%", CSTR(NodeId));
+    sTopic.replace("%node_id%", CSTR(cfgNodeId));
     MQTTDebugf("[%s]\r\n", CSTR(sTopic)); 
     /// ----------------------
 
     MQTTDebugTf("sMsg[%s]==>", CSTR(sMsg)); 
 
     /// node
-    sMsg.replace("%node_id%", CSTR(NodeId));
+    sMsg.replace("%node_id%", CSTR(cfgNodeId));
 
     /// hostname
     sMsg.replace("%hostname%", CSTR(settingHostname));

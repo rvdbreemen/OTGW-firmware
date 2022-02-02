@@ -447,6 +447,7 @@ enum OpenThermMessageID {
 		{ 132, OT_READ 	, ot_u8u8, 			"RemehaServicemessage", "Remeha Servicemessage", "" },
 		{ 133, OT_READ 	, ot_u8u8, 			"RemehaDetectionConnectedSCU", "Remeha detection connected SCU’s", "" },
 		// all data ids are not defined above are resevered for future use
+		// RRRR Add comment about reserved use for sensors on GPIO ports
 	};
 
 #define OT_MSGID_MAX 133

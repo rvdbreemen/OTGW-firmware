@@ -18,11 +18,11 @@ uint8_t   settingS0COUNTERpin = 12;               // GPIO 12 = D6, preferred, ca
 uint16_t  settingS0COUNTERdebouncetime = 80;      // Depending on S0 switch a debouncetime should be tailored
 uint16_t  settingS0COUNTERpulsekw = 1000;         // Most S0 counters have 1000 pulses per kW, but this can be different
 uint16_t  settingS0COUNTERinterval = 60;          // Sugggested measurement reporting interval
-uint16_t  OTGWpulseCount;                         // Number of S0 pulses in measurement interval
-uint32_t  OTGWpulseCountTot = 0;                  // Number of S0 pulses since start of measurement
-float     OTGWs0powerkw = 0 ;                          // Calculated kW actual consumption based on time between last pulses and settings
-time_t    OTGWS0lasttime = 0;                     // Last time S0 counters have been read
-
+uint16_t  OTGWs0pulseCount;                       // Number of S0 pulses in measurement interval
+uint32_t  OTGWs0pulseCountTot = 0;                // Number of S0 pulses since start of measurement
+float     OTGWs0powerkw = 0 ;                     // Calculated kW actual consumption based on time between last pulses and settings
+time_t    OTGWs0lasttime = 0;                     // Last time S0 counters have been read
+byte      OTGWs0dataid = 245;                     // Phantom dataid to be used to do autoconfigure, align value with mqttha.cfg contents
 
 */
 #include <Arduino.h>
@@ -52,7 +52,7 @@ void initS0Count()
   //------------------------------------------------------------------------------------------------------------------------------
 
   pinMode(settingS0COUNTERpin, INPUT_PULLUP);           // Set interrupt pulse counting pin as input (Dig 3 / INT1)
-  OTGWpulseCount=0;                                 // Make sure pulse count starts at zero
+  OTGWs0pulseCount=0;                                 // Make sure pulse count starts at zero
   attachInterrupt(digitalPinToInterrupt(settingS0COUNTERpin), IRQcounter, FALLING) ;
 } //end SETUP
 
@@ -62,16 +62,19 @@ void sendS0Counters()
 
   if (pulseCount != 0 ) {
     noInterrupts();
-    OTGWpulseCount = pulseCount; 
-    OTGWpulseCountTot = OTGWpulseCountTot + pulseCount; 
+    OTGWs0pulseCount = pulseCount; 
+    OTGWs0pulseCountTot = OTGWs0pulseCountTot + pulseCount; 
     pulseCount=0; 
     interrupts();
 
     OTGWs0powerkw =  (float) 3600000 / (float)settingS0COUNTERpulsekw  / (float)last_pulse_duration ;
-    OTGWDebugTf("*** S0PulseCount(%d) S0PulseCountTot(%d)\r\n", OTGWpulseCount, OTGWpulseCountTot) ;
+    OTGWDebugTf("*** S0PulseCount(%d) S0PulseCountTot(%d)\r\n", OTGWs0pulseCount, OTGWs0pulseCountTot) ;
     OTGWDebugTf("*** S0LastPulsetime(%d) S0Pulsekw:(%4.3f) \r\n", last_pulse_duration, OTGWs0powerkw) ;
-    OTGWS0lasttime = now() ;
-    s0sendMQ() ; 
+    OTGWs0lasttime = now() ;
+    if (settingMQTTenable ) {
+      sensorAutoConfigure(OTGWs0dataid, NodeId) ;     // Configure S0 sensor with the NodeId 
+      s0sendMQ() ; 
+    }  
   }
 } 
 
@@ -81,11 +84,11 @@ void s0sendMQ()
 char _msg[15]{0};
 char _topic[50]{0};
 snprintf(_topic, sizeof _topic, "s0pulsecount");
-snprintf(_msg, sizeof _msg, "%d", OTGWpulseCount);
+snprintf(_msg, sizeof _msg, "%d", OTGWs0pulseCount);
 sendMQTTData(_topic, _msg);
 
 snprintf(_topic, sizeof _topic, "s0pulsecounttot");
-snprintf(_msg, sizeof _msg, "%d", OTGWpulseCountTot);
+snprintf(_msg, sizeof _msg, "%d", OTGWs0pulseCountTot);
 sendMQTTData(_topic, _msg);
 
 snprintf(_topic, sizeof _topic, "s0pulsetime");
@@ -97,6 +100,24 @@ snprintf(_msg, sizeof _msg, "%4.3f", OTGWs0powerkw);
 sendMQTTData(_topic, _msg);
 
 }
+
+void sensorAutoConfigure(byte dataid,String cfgNodeId ) {
+        // check wheter MQTT topic needs to be configuered
+        // cfgNodeId can be set to alternate NodeId to allow for multiple temperature sensors
+        if(getMQTTConfigDone(dataid)==false) {
+          MQTTDebugTf("Need to set MQTT config for sensor id(%d)\r\n",dataid);
+          bool success = doAutoConfigureMsgid(dataid,cfgNodeId);
+          if(success) {
+            MQTTDebugTf("Successfully sent MQTT config for sensor id(%d)\r\n",dataid);
+            setMQTTConfigDone(dataid);
+          } else {
+            MQTTDebugTf("Not able to complete MQTT configuration for sensor id(%d)\r\n",dataid);
+          }
+        } else {
+          MQTTDebugTf("No need to set MQTT config for sensor id(%d)\r\n",dataid);
+        }
+}
+
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a

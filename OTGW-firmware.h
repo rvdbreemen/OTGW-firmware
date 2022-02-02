@@ -125,10 +125,11 @@ uint8_t   settingS0COUNTERpin = 12;               // GPIO 12 = D6, preferred, ca
 uint16_t  settingS0COUNTERdebouncetime = 80;      // Depending on S0 switch a debouncetime should be tailored
 uint16_t  settingS0COUNTERpulsekw = 1000;         // Most S0 counters have 1000 pulses per kW, but this can be different
 uint16_t  settingS0COUNTERinterval = 60;          // Sugggested measurement reporting interval
-uint16_t  OTGWpulseCount;                         // Number of S0 pulses in measurement interval
-uint32_t  OTGWpulseCountTot = 0;                  // Number of S0 pulses since start of measurement
-float     OTGWs0powerkw = 0 ;                          // Calculated kW actual consumption based on time between last pulses and settings
-time_t    OTGWS0lasttime = 0;                     // Last time S0 counters have been read
+uint16_t  OTGWs0pulseCount;                       // Number of S0 pulses in measurement interval
+uint32_t  OTGWs0pulseCountTot = 0;                // Number of S0 pulses since start of measurement
+float     OTGWs0powerkw = 0 ;                     // Calculated kW actual consumption based on time between last pulses and settings
+time_t    OTGWs0lasttime = 0;                     // Last time S0 counters have been read
+byte      OTGWs0dataid = 245;                     // Phantom dataid to be used to do autoconfigure
 
 //boot commands
 bool      settingOTGWcommandenable = false;

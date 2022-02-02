@@ -302,9 +302,9 @@ void sendOTmonitor()
   
   if (settingS0COUNTERenabled) 
   {
-    sendJsonOTmonObj("s0powerkw", formatFloat(OTGWs0powerkw,3) , "kW", OTGWS0lasttime);
-    sendJsonOTmonObj("s0intervalcount", OTGWpulseCount , "", OTGWS0lasttime);
-    sendJsonOTmonObj("s0totalcount", OTGWpulseCountTot , "", OTGWS0lasttime);
+    sendJsonOTmonObj("s0powerkw", formatFloat(OTGWs0powerkw,3) , "kW", OTGWs0lasttime);
+    sendJsonOTmonObj("s0intervalcount", OTGWs0pulseCount , "", OTGWs0lasttime);
+    sendJsonOTmonObj("s0totalcount", OTGWs0pulseCountTot , "", OTGWs0lasttime);
   }
   sendEndJsonObj("otmonitor");
 
