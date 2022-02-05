@@ -306,6 +306,11 @@ void sendOTmonitor()
     sendJsonOTmonObj("s0intervalcount", OTGWs0pulseCount , "", OTGWs0lasttime);
     sendJsonOTmonObj("s0totalcount", OTGWs0pulseCountTot , "", OTGWs0lasttime);
   }
+  if (settingGPIOSENSORSenabled) 
+  {
+    sendJsonOTmonObj("numberofsensors", DallasrealDeviceCount , "", now());
+  }
+
   sendEndJsonObj("otmonitor");
 
 } // sendOTmonitor()
@@ -329,8 +334,8 @@ void sendDeviceInfo()
   sendNestedJsonObj("coreversion", CSTR(ESP.getCoreVersion()) );
   sendNestedJsonObj("sdkversion",  ESP.getSdkVersion());
   sendNestedJsonObj("cpufreq", ESP.getCpuFreqMHz());
-  sendNestedJsonObj("sketchsize", formatFloat( (ESP.getSketchSize() / 1024.0), 3));
-  sendNestedJsonObj("freesketchspace", formatFloat( (ESP.getFreeSketchSpace() / 1024.0), 3));
+  sendNestedJsonObj("sketchsize", ESP.getSketchSize() );
+  sendNestedJsonObj("freesketchspace",  ESP.getFreeSketchSpace() );
 
   snprintf(cMsg, sizeof(cMsg), "%08X", ESP.getFlashChipId());
   sendNestedJsonObj("flashchipid", cMsg);  // flashChipId

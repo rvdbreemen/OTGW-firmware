@@ -12,6 +12,8 @@
 Functionality to measure number of pulses from a S0 output, eg from an energy consumption meter.
 The S0 port is to be connected in a NO mode, with pulse closing contact pulling a configurable pin to Low.
 
+MQ interface is enabled with Home Assistant AutoConfigure, for this the OTGW function is reused by using a foney dataid (245)
+
 // S0 Counter Settings and variables with global scope, to be defined in xx.h 
 bool      settingS0COUNTERenabled = false;      
 uint8_t   settingS0COUNTERpin = 12;               // GPIO 12 = D6, preferred, can be any pin with Interupt support
@@ -22,7 +24,7 @@ uint16_t  OTGWs0pulseCount;                       // Number of S0 pulses in meas
 uint32_t  OTGWs0pulseCountTot = 0;                // Number of S0 pulses since start of measurement
 float     OTGWs0powerkw = 0 ;                     // Calculated kW actual consumption based on time between last pulses and settings
 time_t    OTGWs0lasttime = 0;                     // Last time S0 counters have been read
-byte      OTGWs0dataid = 245;                     // Phantom dataid to be used to do autoconfigure, align value with mqttha.cfg contents
+byte      OTGWs0dataid = 245;                     // Foney dataid to be used to do autoconfigure, align value with mqttha.cfg contents
 
 */
 #include <Arduino.h>
@@ -51,7 +53,7 @@ void initS0Count()
   if (!settingS0COUNTERenabled) return;
   //------------------------------------------------------------------------------------------------------------------------------
 
-  pinMode(settingS0COUNTERpin, INPUT_PULLUP);           // Set interrupt pulse counting pin as input (Dig 3 / INT1)
+  pinMode(settingS0COUNTERpin, INPUT_PULLUP);         // Set interrupt pulse counting pin as input (Dig 3 / INT1)
   OTGWs0pulseCount=0;                                 // Make sure pulse count starts at zero
   attachInterrupt(digitalPinToInterrupt(settingS0COUNTERpin), IRQcounter, FALLING) ;
 } //end SETUP
@@ -68,11 +70,11 @@ void sendS0Counters()
     interrupts();
 
     OTGWs0powerkw =  (float) 3600000 / (float)settingS0COUNTERpulsekw  / (float)last_pulse_duration ;
-    OTGWDebugTf("*** S0PulseCount(%d) S0PulseCountTot(%d)\r\n", OTGWs0pulseCount, OTGWs0pulseCountTot) ;
-    OTGWDebugTf("*** S0LastPulsetime(%d) S0Pulsekw:(%4.3f) \r\n", last_pulse_duration, OTGWs0powerkw) ;
+    if (bDebugSensors) DebugTf("*** S0PulseCount(%d) S0PulseCountTot(%d)\r\n", OTGWs0pulseCount, OTGWs0pulseCountTot) ;
+    if (bDebugSensors) DebugTf("*** S0LastPulsetime(%d) S0Pulsekw:(%4.3f) \r\n", last_pulse_duration, OTGWs0powerkw) ;
     OTGWs0lasttime = now() ;
     if (settingMQTTenable ) {
-      sensorAutoConfigure(OTGWs0dataid, NodeId) ;     // Configure S0 sensor with the NodeId 
+      sensorAutoConfigure(OTGWs0dataid, true , "" ) ;     // Configure S0 sensor with the  
       s0sendMQ() ; 
     }  
   }
@@ -101,22 +103,6 @@ sendMQTTData(_topic, _msg);
 
 }
 
-void sensorAutoConfigure(byte dataid,String cfgNodeId ) {
-        // check wheter MQTT topic needs to be configuered
-        // cfgNodeId can be set to alternate NodeId to allow for multiple temperature sensors
-        if(getMQTTConfigDone(dataid)==false) {
-          MQTTDebugTf("Need to set MQTT config for sensor id(%d)\r\n",dataid);
-          bool success = doAutoConfigureMsgid(dataid,cfgNodeId);
-          if(success) {
-            MQTTDebugTf("Successfully sent MQTT config for sensor id(%d)\r\n",dataid);
-            setMQTTConfigDone(dataid);
-          } else {
-            MQTTDebugTf("Not able to complete MQTT configuration for sensor id(%d)\r\n",dataid);
-          }
-        } else {
-          MQTTDebugTf("No need to set MQTT config for sensor id(%d)\r\n",dataid);
-        }
-}
 
 /***************************************************************************
 *

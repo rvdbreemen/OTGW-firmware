@@ -89,7 +89,6 @@ void setup() {
   startOTGWstream();    // start port 25238 
   checkOTWGpicforupdate();
   initS0Count();
-  initSensors();        // init DS18B20
   initOutputs();
   
   WatchDogEnabled(1);   // turn on watchdog
@@ -100,6 +99,7 @@ void setup() {
   setLed(LED2, OFF);
   sendMQTTuptime();
   sendMQTTversioninfo();
+  initSensors();        // init DS18B20 (after MQ is up!)
 }
 //=====================================================================
 

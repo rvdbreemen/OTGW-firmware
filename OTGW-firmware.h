@@ -118,6 +118,9 @@ bool      settingLEDblink = true;
 bool      settingGPIOSENSORSenabled = false;
 int8_t    settingGPIOSENSORSpin = 10;
 int16_t   settingGPIOSENSORSinterval = 5;
+byte      OTGWdallasdataid = 246;                // foney dataid to be used to do autoconfigure for temp sensors
+int       DallasrealDeviceCount = 0;
+
 
 // S0 Counter Settings and variables with global scope
 bool      settingS0COUNTERenabled = false;      
@@ -129,16 +132,17 @@ uint16_t  OTGWs0pulseCount;                       // Number of S0 pulses in meas
 uint32_t  OTGWs0pulseCountTot = 0;                // Number of S0 pulses since start of measurement
 float     OTGWs0powerkw = 0 ;                     // Calculated kW actual consumption based on time between last pulses and settings
 time_t    OTGWs0lasttime = 0;                     // Last time S0 counters have been read
-byte      OTGWs0dataid = 245;                     // Phantom dataid to be used to do autoconfigure
+byte      OTGWs0dataid = 245;                     // foney dataid to be used to do autoconfigure for counter
 
 //boot commands
 bool      settingOTGWcommandenable = false;
 String    settingOTGWcommands = "";
 
 //debug flags 
-bool      bDebugOTmsg = true;    
+bool      bDebugOTmsg = false;    
 bool      bDebugRestAPI = false;
 bool      bDebugMQTT = false;
+bool      bDebugSensors = false;
 
 //GPIO Output Settings
 bool      settingMyDEBUG = false;
