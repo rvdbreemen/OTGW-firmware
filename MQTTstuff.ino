@@ -527,6 +527,36 @@ void doAutoConfigure(bool bForcaAll = false){
 //  bool success = doAutoConfigure("config"); // the string "config" should match every line non-comment in mqttha.cfg
 }
 //===========================================================================================
+
+bool copyMQTTcfg() {
+
+  DebugTln(F("Error: mqttha.cfg not present in user filesystem. Copying!")); 
+
+  String sLine = "";
+
+  const char *cfgFilename = "/mqttha.cfg";
+  SystemFS.begin();
+  UserFS.begin();
+
+  File fin = SystemFS.open(cfgFilename, "r");
+  File fout = UserFS.open(cfgFilename, "w");
+
+  if ((!fin) || (!fout)) {
+    DebugTln(F("Error: couldn't open source or destination for copying!")); 
+    return false;
+  }
+  
+  while (fin.available()) {
+    sLine = fin.readStringUntil('\n');
+    fout.println(sLine.c_str());
+  }
+
+  fin.close();
+  fout.close();
+  return true;
+}
+
+//===========================================================================================
 bool doAutoConfigureMsgid(byte OTid)
 {
   bool _result = false;
@@ -550,11 +580,11 @@ bool doAutoConfigureMsgid(byte OTid)
   //Let's open the MQTT autoconfig file
   File fh; //filehandle
   const char *cfgFilename = "/mqttha.cfg";
-  SystemFS.begin();
+  UserFS.begin();
 
-  if (!SystemFS.exists(cfgFilename)) {
+  if (!UserFS.exists(cfgFilename)) {
     DebugTln(F("Error: confuration file not found.")); 
-    return _result;
+    if(!copyMQTTcfg()) { return _result; }
   } 
 
   fh = SystemFS.open(cfgFilename, "r");
