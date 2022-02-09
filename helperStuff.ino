@@ -162,9 +162,9 @@ uint32_t updateRebootCount()
   //return: number of reboots (if it goes as planned)
   uint32_t _reboot = 0;
   #define REBOOTCNT_FILE "/reboot_count.txt"
-  if (SystemFS.begin()) {
+  if (UserFS.begin()) {
     //start with opening the file
-    File fh = SystemFS.open(REBOOTCNT_FILE, "r");
+    File fh = UserFS.open(REBOOTCNT_FILE, "r");
     if (fh) {
       //read from file
       if (fh.available()){
@@ -176,7 +176,7 @@ uint32_t updateRebootCount()
     //increment reboot counter
     _reboot++;
     //write back the reboot counter
-    fh = SystemFS.open(REBOOTCNT_FILE, "w");
+    fh = UserFS.open(REBOOTCNT_FILE, "w");
     if (fh) {
       //write to _reboot to file
       fh.println(_reboot);
@@ -264,9 +264,9 @@ bool updateRebootLog(String text)
 
   snprintf(log_line, LOG_LINE_LENGTH, "%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n", year(),  month(), day(), hour(), minute(), second(), CSTR(text), errorCode, log_line_excpt);
 
-  if (SystemFS.begin()) {
+  if (UserFS.begin()) {
     //start with opening the file
-    File outfh = SystemFS.open(TEMPLOG_FILE, "w");
+    File outfh = UserFS.open(TEMPLOG_FILE, "w");
 
     if (outfh) {
       //write to _reboot to file
@@ -276,7 +276,7 @@ bool updateRebootLog(String text)
         outfh.print(log_line_regs);
       }
 
-      File infh = SystemFS.open(REBOOTLOG_FILE, "r");
+      File infh = UserFS.open(REBOOTLOG_FILE, "r");
       
       int i = 1;
       if (infh) {
@@ -293,11 +293,11 @@ bool updateRebootLog(String text)
       }
       outfh.close();
       
-      if (SystemFS.exists(REBOOTLOG_FILE)) {
-        SystemFS.remove(REBOOTLOG_FILE);
+      if (UserFS.exists(REBOOTLOG_FILE)) {
+        UserFS.remove(REBOOTLOG_FILE);
       }
       
-      SystemFS.rename(TEMPLOG_FILE, REBOOTLOG_FILE);
+      UserFS.rename(TEMPLOG_FILE, REBOOTLOG_FILE);
 
       return true; // succesfully logged
     }
