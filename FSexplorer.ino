@@ -98,8 +98,10 @@ void setupFSexplorer(){
   }
   httpServer.on("/api/firmwarefilelist", apifirmwarefilelist); 
   httpServer.on("/api/listfiles", apilistfiles);
+  httpServer.on("/api/listuserfiles", apilistuserfiles);
   httpServer.on("/LittleFSformat", formatLittleFS);
-  httpServer.on("/upload", HTTP_POST, []() {}, handleFileUpload);
+  httpServer.on("/upload", HTTP_POST, []() {}, handleSysFileUpload);
+  httpServer.on("/uploadusr", HTTP_POST, []() {}, handleUserFileUpload);
   httpServer.on("/ReBoot", reBootESP);
   httpServer.on("/ResetWireless", resetWirelessButton);
  
@@ -120,6 +122,7 @@ void setupFSexplorer(){
     {
       if (bDebugRestAPI) DebugTf("next: handleFile(%s)\r\n"
                       , String(httpServer.urlDecode(httpServer.uri())).c_str());
+
       if (!handleFile(httpServer.urlDecode(httpServer.uri())))
       {
         httpServer.send(404, "text/plain", "FileNotFound\r\n");
@@ -173,8 +176,20 @@ void apifirmwarefilelist() {
 
 //=====================================================================================
 
+void apilistfiles() {
+  apilistFSfiles(SystemFS);
+}
 
-void apilistfiles()             // Senden aller Daten an den Client
+void apilistuserfiles() {
+  if(bUserFSpresent) {
+    apilistFSfiles(UserFS);
+  } else {
+    httpServer.send(200, "application/json", "");
+//    httpServer.send(404, "text/plain", "");
+  }
+}
+
+void apilistFSfiles(FS thisFS)             // Senden aller Daten an den Client
 {   
   FSInfo LittleFSinfo;
 
@@ -187,7 +202,7 @@ void apilistfiles()             // Senden aller Daten an den Client
   _fileMeta dirMap[MAX_FILES_IN_LIST+1];
   int fileNr = 0;
     
-  Dir dir = SystemFS.openDir("/");         // List files on SystemFS
+  Dir dir = thisFS.openDir("/");         // List files on SystemFS
   while (dir.next() && (fileNr < MAX_FILES_IN_LIST))  
   {
     dirMap[fileNr].Name[0] = '\0';
@@ -231,7 +246,7 @@ void apilistfiles()             // Senden aller Daten an den Client
     temp += R"({"name":")" + String(dirMap[f].Name) + R"(","size":")" + formatBytes(dirMap[f].Size) + R"("},)";
   }
 
-  SystemFS.info(LittleFSinfo);
+  thisFS.info(LittleFSinfo);
   temp += R"({"usedBytes":")" + formatBytes(LittleFSinfo.usedBytes * 1.05) + R"(",)" +       // Berechnet den verwendeten Speicherplatz + 5% Sicherheitsaufschlag
           R"("totalBytes":")" + formatBytes(LittleFSinfo.totalBytes) + R"(","freeBytes":")" + // Zeigt die Größe des Speichers
           (LittleFSinfo.totalBytes - (LittleFSinfo.usedBytes * 1.05)) + R"("}])";               // Berechnet den freien Speicherplatz + 5% Sicherheitsaufschlag
@@ -244,22 +259,56 @@ void apilistfiles()             // Senden aller Daten an den Client
 //=====================================================================================
 bool handleFile(String&& path) 
 {
-  if (httpServer.hasArg("delete")) 
-  {
-    DebugTf("Delete -> [%s]\n\r",  httpServer.arg("delete").c_str());
-    SystemFS.remove(httpServer.arg("delete"));    // Datei löschen
-    httpServer.sendContent(Header);
-    return true;
-  }
+  bool success = false;
+
   if (!SystemFS.exists("/FSexplorer.html")) httpServer.send(200, "text/html", Helper); //Upload the FSexplorer.html
   if (path.endsWith("/")) path += "index.html";
-  return SystemFS.exists(path) ? ({File f = SystemFS.open(path, "r"); httpServer.streamFile(f, contentType(path)); f.close(); true;}) : false;
+
+  success = httpServer.hasArg("user") ? handleFSfile(UserFS, path) : handleFSfile(SystemFS, path);
+  
+  return success;
 
 } // handleFile()
 
+bool handleFSfile(FS sourceFS, String& path) 
+{
+  if (httpServer.hasArg("delete")) 
+  {
+    DebugTf("Delete -> [%s]\n\r",  httpServer.arg("delete").c_str());
+    sourceFS.remove(httpServer.arg("delete"));    // Datei löschen
+    httpServer.sendContent(Header);
+    return true;
+  }
+  
+  if(!sourceFS.exists(path)) { return false;}
+
+  DebugTf("Serving file [%s] from -> %s partition \n\r",  path.c_str(), httpServer.hasArg("user") ? "user" : "system");
+
+  File f = sourceFS.open(path, "r"); 
+  httpServer.streamFile(f, contentType(path));
+  f.close();
+
+  return true;
+
+} // handleFSfile()
+
 
 //=====================================================================================
-void handleFileUpload() 
+void handleSysFileUpload() 
+{
+  handleFSFileUpload(SystemFS); 
+}
+
+//=====================================================================================
+
+void handleUserFileUpload() 
+{
+  handleFSFileUpload(UserFS); 
+}
+
+//=====================================================================================
+
+void handleFSFileUpload(FS destinationFS) 
 {
   static File fsUploadFile;
   HTTPUpload& upload = httpServer.upload();
@@ -270,7 +319,7 @@ void handleFileUpload()
       upload.filename = upload.filename.substring(upload.filename.length() - 30, upload.filename.length());  // Dateinamen auf 30 Zeichen kürzen
     }
     Debugln("FileUpload Name: " + upload.filename);
-    fsUploadFile = SystemFS.open("/" + httpServer.urlDecode(upload.filename), "w");
+    fsUploadFile = destinationFS.open("/" + httpServer.urlDecode(upload.filename), "w");
   } 
   else if (upload.status == UPLOAD_FILE_WRITE) 
   {

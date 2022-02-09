@@ -10,128 +10,164 @@
 -->
 <!DOCTYPE HTML>
 <html lang="en">
-   <head>
-      <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
-      <link rel="stylesheet" href="FSexplorer.css">
-      <title>FSexplorer ESP</title>
-      <script>
-         document.addEventListener('DOMContentLoaded', () => {
-             let span = document.querySelector('span');
-             let main = document.querySelector('main');
-             let fileSize = document.querySelector('fileSize');
-             let elem = document.querySelectorAll('input');
-             //fetch('json').then(function (response) {
-             fetch('api/listfiles').then(function (response) {
-                 return response.json();
-             }).then(function (json) {
-               let dir = '<table width=90%>';
-               for (var i = 0; i < json.length - 1; i++) {
-                 dir += "<tr>";
-                 if (json[i].name.indexOf("More files not") > -1)
-                 {
-                   dir += `<td width=20% nowrap>${json[i].name}</td>`;
-                   dir += `<td width=10% nowrap></td>`;
-                   dir += `<td width=10% nowrap></td>`;
-                   dir += `<td width=10% nowrap></td>`;
-                 } 
-                 else
-                 {
-                   dir += `<td width=20% nowrap><a href ="${json[i].name}" target="_blank">${json[i].name}</a></td>`;
-                   dir += `<td width=10% nowrap><small>${json[i].size}</small></td>`;
-                   dir += `<td width=10% nowrap><a href ="${json[i].name}"download="${json[i].name}"> Download </a></td>`;
-                   if (   json[i].name != 'FSexplorer.html' && json[i].name != 'FSexplorer.css' && json[i].name != 'FSexplorer.png'
-                       && json[i].name != 'index.html'      && json[i].name != 'index.js'       && json[i].name != 'index.css'
-                   	  && json[i].name != 'settings.png'
-                 	 ) 
-                   {
-                     dir += `<td width=10% nowrap><a href ="${json[i].name}?delete=/${json[i].name}"> Delete </a></td>`;
-                     if (json[i].name == '!format') 
-                     {
-                 	    document.getElementById('FormatLittleFS').disabled = false;
-                     }
-                   }
-                   else 
-                   {
-                     dir += `<td width=10% nowrap> </td>`;
-                   }
-                 }                 	 
-                 dir += "<td width=50%> </td></tr>";
-               }	// for ..
-               main.insertAdjacentHTML('beforeend', dir);
-               document.querySelectorAll('[href*=delete]').forEach((node) => {
-               		 node.addEventListener('click', () => {
-               		 		 if (!confirm('Are you sure you want to delete this file?')) event.preventDefault();  
-               		 });
-               });
-               main.insertAdjacentHTML('beforeend', '</table>');
-               main.insertAdjacentHTML('beforeend', `<p><b>LittleFS</b> used ${json[i].usedBytes} by ${json[i].totalBytes}`);
-               free = json[i].freeBytes;
-               fileSize.innerHTML = "<b> &nbsp; </b><p>";    // spacer                
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+<link rel="stylesheet" href="FSexplorer.css">
+<title>FSexplorer ESP</title>
+<script>
+  const restricted_files = ['FSexplorer.html', 'FSexplorer.css', 'FSexplorer.png', 'index.html', 'index.js', 'index.css', 'settings.png'];
+  
+  function outputFileTable(json, param) {
+    if (json.length == 0) return "";
+    
+    let dir = '<table width=90%>';
+    for (var i = 0; i < json.length - 1; i++) {
+      dir += "<tr>";
+        if (json[i].name.indexOf("More files not") > -1)
+        {
+          dir += `<td width=20% nowrap>${json[i].name}</td>`;
+          dir += `<td width=10% nowrap></td>`;
+          dir += `<td width=10% nowrap></td>`;
+          dir += `<td width=10% nowrap></td>`;
+        } 
+        else
+        {
+          dir += `<td width=20% nowrap><a href ="${json[i].name}?${param}" target="_blank">${json[i].name}</a></td>`;
+          dir += `<td width=10% nowrap><small>${json[i].size}</small></td>`;
+          dir += `<td width=10% nowrap><a href ="${json[i].name}?${param}"download="${json[i].name}?${param}"> Download </a></td>`;
+          if (restricted_files.includes(json[i].name)) 
+          {
+            dir += `<td width=10% nowrap> </td>`;
+          } else {
+            dir += `<td width=10% nowrap><a href ="${json[i].name}?delete=/${json[i].name}&${param}"> Delete </a></td>`;
+          }
+        }                 	 
+        dir += `<td width=50%> </td></tr>`;
+        if (json[i].name == '!format') 
+        {
+          document.getElementById('FormatLittleFS').disabled = false;
+        }
+        
+      }	// for ..
+      dir += `</table><p><b>LittleFS</b> used ${json[i].usedBytes} of ${json[i].totalBytes}`;
+      free = json[i].freeBytes;
+      return dir;
+  }	// function outputFileTable (json)
+        
+  document.addEventListener('DOMContentLoaded', () => {
+    let span = document.querySelector('span');
+    let main = document.querySelector('main');
+    let fileSize = document.querySelector('fileSize');
+    let elem = document.querySelectorAll('input');
+    let free, sys_free, user_free = 0;
+    
+    //fetch('json').then(function (response) {
+    fetch('api/listuserfiles')
+    .then(response => response.json())
+    .then(data => outputFileTable(data, "user=true"))
+    .then(output => document.querySelector('#userfiles').insertAdjacentHTML('beforeend', output));
+    user_free = free;
+    
+    if (document.getElementById("userfiles").innerHTML.length < 1) document.getElementById("useruploadform").style.display = "none";
 
-             });	// function(json)
-             elem[0].addEventListener('change', () => {
-                 let nBytes = elem[0].files[0].size, output = `${nBytes} Byte`;
-                 for (var aMultiples = [
-                     ' KB',
-                     ' MB'
-                    ], i = 0, nApprox = nBytes / 1024; nApprox > 1; nApprox /= 1024, i++) {
-                      output = nApprox.toFixed(2) + aMultiples[i];
-                    }
-                    if (nBytes > free) {
-                      fileSize.innerHTML = `<p><small> Filesize : ${output}</small><strong style="color: red;"> not enough space! </strong><p>`;
-                      elem[1].setAttribute('disabled', 'disabled');
-                    } 
-                    else {
-                      fileSize.innerHTML = `<b>Filesize:</b> ${output}<p>`;
-                      elem[1].removeAttribute('disabled');
-                    }
-             });
-             //elem[6].addEventListener('click', () => {
-             document.getElementById('FormatLittleFS').addEventListener('click', () => {
-                 if (!confirm(`Are you sure you want to execute this function?\nWhen you continue you have to upload FSexplorer.html and all other system files again!!.`)) event.preventDefault();
-             }); 
-          });
-      </script>
-   </head>
-   <body>
-      <h2>FSexplorer ESP</h2>
-      <div>
-         <main></main>
-      </div>
-      <form action="/upload" method="POST" enctype="multipart/form-data"><input type="file" name="upload">
-         <input type="submit" value="Upload" disabled>
-      </form>
-      <span></span>
-      <fileSize></fileSize>
-      <hr>
-      <div style='width: 40%'>
-        <span>
-        <form style='float: left;' action='/update' method='GET'>
-          <input type='submit' class='button' name='SUBMIT' value='Update Firmware' ENABLED/>
-        </form>
-        <form style='float: right;' action='/'>
-          <input type='submit' class='button' name='SUBMIT' value='Exit FSexplorer'>
-        </form>
-        </span>
-      </div>
-      <div style='width: 40%'>
-        <span>
-        <form style='float: left;' action='/ReBoot'>
-          <input type='submit' class='button' name='SUBMIT' value='ReBoot'>
-        </form>
-        <form style='float: right;' action='/ResetWireless'>
-          <input type='submit' class='button' name='SUBMIT' value='Reset Wireless'>
-        </form>
-      </div>
-<!--
-      <div style='width: 40%'>
-        <span>
-        <form style='float right;' action="/LittleFSformat" method="POST">
-          <input id='FormatLittleFS' type='submit' class='button' name='SUBMIT' value='Format LittleFS' DISABLED/>
-        </form>
-        </span>
-      </div>
-   </body>
-</html>
+    fetch('api/listfiles')
+    .then(response => response.json())
+    .then(data => outputFileTable(data, ""))
+    .then(output => document.querySelector('#systemfiles').insertAdjacentHTML('beforeend', output));
+    sys_free = free;
+    
+    fileSize.innerHTML = "<b> &nbsp; </b><p>";    // spacer                
+        
+    document.querySelectorAll('[href*=delete]').forEach((node) => {
+      node.addEventListener('click', () => {
+        if (!confirm('Are you sure you want to delete this file?')) event.preventDefault();  
+      });
+    });
+    
+    document.querySelector('#userfile').addEventListener('change', () => {
+      let nBytes = document.querySelector('#userfile').files[0].size, output = `${nBytes} Byte`;
+      for (var aMultiples = [' KB',' MB'], i = 0, nApprox = nBytes / 1024; nApprox > 1; nApprox /= 1024, i++) {
+        output = nApprox.toFixed(2) + aMultiples[i];
+      }
+      if (nBytes > user_free) {
+        fileSize.innerHTML = `<p><small> Filesize : ${output}</small><strong style="color: red;"> not enough space! </strong><p>`;
+          document.querySelector('#userupload').setAttribute('disabled', 'disabled');
+      } else {
+          fileSize.innerHTML = `<b>Filesize:</b> ${output}<p>`;
+            document.querySelector('#userupload').removeAttribute('disabled');
+      }
+    });
+            
+    document.querySelector('#sysfile').addEventListener('change', () => {
+      let nBytes = document.querySelector('#sysfile').files[0].size, output = `${nBytes} Byte`;
+      for (var aMultiples = [
+      ' KB',
+      ' MB'
+      ], i = 0, nApprox = nBytes / 1024; nApprox > 1; nApprox /= 1024, i++) {
+        output = nApprox.toFixed(2) + aMultiples[i];
+      }
+      if (nBytes > sys_free) {
+        fileSize.innerHTML = `<p><small> Filesize : ${output}</small><strong style="color: red;"> not enough space! </strong><p>`;
+          document.querySelector('#systemupload').setAttribute('disabled', 'disabled');
+        } 
+        else {
+          fileSize.innerHTML = `<b>Filesize:</b> ${output}<p>`;
+            document.querySelector('#systemupload').removeAttribute('disabled');
+          }
+        });
+        
+        //elem[6].addEventListener('click', () => {
+          document.getElementById('FormatLittleFS').addEventListener('click', () => {
+            if (!confirm(`Are you sure you want to execute this function?\nWhen you continue you have to upload FSexplorer.html and all other system files again!!.`)) event.preventDefault();
+          }); 
+  }); // DOMContentLoaded
+</script>
+</head>
+<body>
+<h2>FSexplorer ESP</h2>
+<div>
+  <main>
+    <div id="userfiles"></div>
+    <form id="useruploadform" action="/uploadusr" method="POST" enctype="multipart/form-data"><input id="userfile" type="file" name="upload">
+      <input id="userupload" type="submit" value="Upload" disabled>
+    </form>
+    <div id="systemfiles"></div>
+    <form id="systemuploadform" action="/upload" method="POST" enctype="multipart/form-data"><input id="sysfile" type="file" name="upload">
+      <input id="systemupload" type="submit" value="Upload" disabled>
+    </form>
+  </main>
+</div>
+<span></span>
+<fileSize></fileSize>
+<hr>
+<div style='width: 40%'>
+  <span>
+    <form style='float: left;' action='/update' method='GET'>
+      <input type='submit' class='button' name='SUBMIT' value='Update Firmware' ENABLED/>
+    </form>
+    <form style='float: right;' action='/'>
+      <input type='submit' class='button' name='SUBMIT' value='Exit FSexplorer'>
+    </form>
+  </span>
+</div>
+<div style='width: 40%'>
+  <span>
+    <form style='float: left;' action='/ReBoot'>
+      <input type='submit' class='button' name='SUBMIT' value='ReBoot'>
+    </form>
+    <form style='float: right;' action='/ResetWireless'>
+      <input type='submit' class='button' name='SUBMIT' value='Reset Wireless'>
+    </form>
+  </span> 
+</div>
+<div style='width: 40%' >
+  <span>
+    <form style='float: right;' action="/LittleFSformat" method="POST">
+      <input id='FormatLittleFS' type='submit' class='button' name='SUBMIT' value='Format LittleFS' DISABLED/>
+    </form>
+  </span>
+</div>
+</body>
+</html>                  
