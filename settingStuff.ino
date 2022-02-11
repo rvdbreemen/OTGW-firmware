@@ -11,20 +11,19 @@
 */
 
 //=======================================================================
-void writeSettings(bool show) 
+bool writeSettings(bool show) 
 {
+  bool succeeded = false;
 
   //let's use JSON to write the setting file
   DebugTf("Writing to [%s] ..\r\n", SETTINGS_FILE);
   File file = UserFS.open(SETTINGS_FILE, "w"); // open for reading and writing
   if (!file) 
   {
-    DebugTf("open(%s, 'w') FAILED!!! --> Bailout\r\n", SETTINGS_FILE);
-    return;
+    DebugTf("open(%s, 'w') for writing FAILED!!! --> Bailout\r\n", SETTINGS_FILE);
+    return succeeded;
   }
   yield();
-
-  DebugT(F("Start writing setting data "));
 
   //const size_t capacity = JSON_OBJECT_SIZE(6);  // save more setting, grow # of objects accordingly
   DynamicJsonDocument doc(1024);
@@ -52,11 +51,20 @@ void writeSettings(bool show)
   root["GPIOOUTPUTSpin"] = settingGPIOOUTPUTSpin;
   root["GPIOOUTPUTStriggerBit"] = settingGPIOOUTPUTStriggerBit;
 
-  serializeJsonPretty(root, file);
-  Debugln(F("... done!"));
-  if (show)  serializeJsonPretty(root, TelnetStream); //Debug stream ;-)
+  DebugT(F("Start writing setting data "));
+
+  if(serializeJsonPretty(root, file) > 0) { //more than 0 bytes written
+      Debugln(F("... done!"));
+      succeeded = true;
+  } else {
+      Debugln(F("... failed!"));
+  }
+
   file.close();  
 
+  if (succeeded && show) serializeJsonPretty(root, TelnetStream); //Debug stream ;-)
+
+  return succeeded;
 } // writeSettings()
 
 
