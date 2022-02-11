@@ -207,6 +207,7 @@ bool setupFilesystems() {
     if (UserFS.exists("/")) {  //since we are creating the user partition, there is no reason to test further than this
       OTGWSerial.println("User partition is accessable");
       bUserFSpresent = true;
+      printFSinfo(OTGWSerial, UserFS);
     } else {
       OTGWSerial.printf("Formatting the user partition: %s\n", UserFS.format() ? "success" : "failed");
     }
