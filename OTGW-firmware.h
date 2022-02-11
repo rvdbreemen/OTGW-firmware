@@ -114,24 +114,6 @@ bool      bPrintSummarymode = false;  //default to PS=0 mode
 //All things that are settings 
 String    settingHostname = _HOSTNAME;
 
-//MQTT settings
-bool      statusMQTTconnection = false; 
-bool      settingMQTTenable = true;
-bool      settingMQTTsecure = false; 
-String    settingMQTTbroker= "192.168.88.254";
-int16_t   settingMQTTbrokerPort = 1883; 
-String    settingMQTTuser = "";
-String    settingMQTTpasswd = "";
-String    settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
-bool      settingMQTTharebootdetection = true;
-String    settingMQTTtopTopic = "otgw";
-String    settingMQTTuniqueid = ""; // Intialized in readsettings
-bool      settingMQTTOTmessage = false;
-bool      settingNTPenable = true;
-String    settingNTPtimezone = NTP_DEFAULT_TIMEZONE;
-String    settingNTPhostname = NTP_HOST_DEFAULT;
-bool      settingLEDblink = true;
-
 // GPIO Sensor Settings
 bool      settingGPIOSENSORSenabled = false;
 int8_t    settingGPIOSENSORSpin = 10;
@@ -152,10 +134,29 @@ bool      settingGPIOOUTPUTSenabled = false;
 int8_t    settingGPIOOUTPUTSpin = 16;
 int8_t    settingGPIOOUTPUTStriggerBit = 0;
 
+bool      settingNTPenable = true;
+String    settingNTPtimezone = NTP_DEFAULT_TIMEZONE;
+String    settingNTPhostname = NTP_HOST_DEFAULT;
+bool      settingLEDblink = true;
+
 //Now load network suff
 #include "networkStuff.h"
 
-    // That's all folks...
+//MQTT settings
+bool      statusMQTTconnection = false; 
+bool      settingMQTTenable = true;
+bool      settingMQTTsecure = false; 
+String    settingMQTTbroker= "192.168.88.254";
+int16_t   settingMQTTbrokerPort = 1883; 
+String    settingMQTTuser = "";
+String    settingMQTTpasswd = "";
+String    settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
+bool      settingMQTTharebootdetection = true;
+String    settingMQTTtopTopic = "otgw";
+String    settingMQTTuniqueid = getUniqueId(); // Intialization moved here from readsettings
+bool      settingMQTTOTmessage = false;
+
+// That's all folks...
 
 /***************************************************************************
 *
