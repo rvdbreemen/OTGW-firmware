@@ -167,7 +167,7 @@ void readSettings(bool show)
 
 
 //=======================================================================
-void updateSetting(const char *field, const char *newValue)
+void updateSetting(const char *field, const char *newValue)  //used by RestAPI
 { //do not just trust the caller to do the right thing, server side validation is here!
   DebugTf("-> field[%s], newValue[%s]\r\n", field, newValue);
 

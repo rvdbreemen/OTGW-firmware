@@ -178,20 +178,6 @@ bool testFileSystem(FS &aFS, char *testFilename) {
 bool setupFilesystems() {
   bool s_mounted, u_mounted = false;
 
-  // try the smaller implementation first
-  // SystemFS = FS(FSImplPtr(new littlefs_impl::LittleFSImpl(sFS_PHYS_ADDR, sFS_PHYS_SIZE, sFS_PHYS_PAGE, sFS_PHYS_BLOCK, sFS_MAX_OPEN_FILES))); // moved to header
-
-//  SystemFS = FS(FSImplPtr(new littlefs_impl::LittleFSImpl(sFS_PHYS_ADDR, sFS_PHYS_SIZE, sFS_PHYS_PAGE, sFS_PHYS_BLOCK, sFS_MAX_OPEN_FILES)));
-//  SystemFS = FS(FSImplPtr(new littlefs_impl::LittleFSImpl(FS_PHYS_ADDR, FS_PHYS_SIZE, FS_PHYS_PAGE, FS_PHYS_BLOCK, sFS_MAX_OPEN_FILES)));
-//  LittleFSinfo myFSinfo;
-//  if (SystemFS.info(myFSinfo)) {
-//    OTGWSerial.printf("LittleFS params initial filesystem: FS_PHYS_ADDR %x, FS_PHYS_SIZE %x, FS_PHYS_PAGE %x, FS_PHYS_BLOCK %x, sFS_MAX_OPEN_FILES %x\n", myFSinfo. FS_PHYS_ADDR, FS_PHYS_SIZE, FS_PHYS_PAGE, FS_PHYS_BLOCK, sFS_MAX_OPEN_FILES);
-//  } else {
-//      OTGWSerial.println("Failed to get info for the intially configured filesystem");
-//  }
-
-//  OTGWSerial.printf("LittleFS params: FS_PHYS_ADDR %x, FS_PHYS_SIZE %x, FS_PHYS_PAGE %x, FS_PHYS_BLOCK %x, sFS_MAX_OPEN_FILES %x\n", FS_PHYS_ADDR, FS_PHYS_SIZE, FS_PHYS_PAGE, FS_PHYS_BLOCK, sFS_MAX_OPEN_FILES);
-
   #define CHECK_FILE "/index.js"  // a file over 8k in size, containing clear text, to be used to test for successful mounting of the filesystem
 
   LittleFSConfig cfg;
@@ -232,36 +218,6 @@ bool setupFilesystems() {
     u_mounted = true;
   }
 
-  // From boards.txt
-  // nodemcuv2.menu.eesz.4M2M=4MB (FS:2MB OTA:~1019KB)
-  // nodemcuv2.menu.eesz.4M2M.build.flash_size=4M
-  // nodemcuv2.menu.eesz.4M2M.build.flash_size_bytes=0x400000
-  // nodemcuv2.menu.eesz.4M2M.build.flash_ld=eagle.flash.4m2m.ld
-  // nodemcuv2.menu.eesz.4M2M.build.spiffs_pagesize=256
-  // nodemcuv2.menu.eesz.4M2M.upload.maximum_size=1044464
-  // nodemcuv2.menu.eesz.4M2M.build.rfcal_addr=0x3FC000
-  // nodemcuv2.menu.eesz.4M2M.build.spiffs_start=0x200000
-  // nodemcuv2.menu.eesz.4M2M.build.spiffs_end=0x3FA000
-  // nodemcuv2.menu.eesz.4M2M.build.spiffs_blocksize=8192
-
-
-  // FS_PHYS_ADDR, 
-  // FS_PHYS_SIZE, 
-  // FS_PHYS_PAGE, 
-  // FS_PHYS_BLOCK, 
-  // FS_MAX_OPEN_FILES
-
-
-
-  // FS SystemFS  = FS(FSImplPtr(new littlefs_impl::LittleFSImpl(sFS_PHYS_ADDR, sFS_PHYS_SIZE, sFS_PHYS_PAGE, sFS_PHYS_BLOCK, sFS_MAX_OPEN_FILES)));
-  // FS UserFS    = FS(FSImplPtr(new littlefs_impl::LittleFSImpl(uFS_PHYS_ADDR, uFS_PHYS_SIZE, uFS_PHYS_PAGE, uFS_PHYS_BLOCK, uFS_MAX_OPEN_FILES)));
-  //
-  // FS_PHYS_ADDR, FS_PHYS_SIZE, FS_PHYS_PAGE, FS_PHYS_BLOCK are declared by arduino IDE. Default arduino IDE parameters (for flash = 4MB) has the following mapping:
-  // 0..1MB: sketch
-  // 1..2MB: empty, usable for a temporary FS, used for OTA
-  // 2..4MB: default area for FS
-  // 3.99..4MB: eeprom + firmware area
-  // Robbert: get from boards.txt
   return s_mounted && u_mounted;
 }
 
