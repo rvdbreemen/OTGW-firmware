@@ -74,14 +74,12 @@ void readSettings(bool show)
 
   // Open file for reading
 
+  DebugTf("Open file for reading %s ..\r\n", SETTINGS_FILE);
   File file =  UserFS.open(SETTINGS_FILE, "r");
 
-  if (!UserFS.exists(SETTINGS_FILE)) 
-  DebugTf(" %s ..\r\n", SETTINGS_FILE);
-  {  //create settings file if it does not exist yet.
-    DebugTln(F(" .. file not found! --> created file!"));
-    writeSettings(show);
-    readSettings(false); //now it should work...
+  if (!file) 
+  {  // settings file if it does not exist yet.
+    DebugTf("%s file not found! --> file will be created next time you save your settings!\r\n", SETTINGS_FILE);
     return;
   }
 
@@ -112,7 +110,7 @@ void readSettings(bool show)
   if (settingMQTThaprefix=="null") settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
   settingMQTTharebootdetection = doc["MQTTharebootdetection"]|settingMQTTharebootdetection;	  
   settingMQTTuniqueid     = doc["MQTTuniqueid"].as<String>();
-  if (settingMQTTuniqueid=="null") settingMQTTuniqueid = getUniqueId();
+  if ((settingMQTTuniqueid=="null") || (settingMQTTuniqueid=="")) settingMQTTuniqueid = getUniqueId();
 
   settingMQTTOTmessage    = doc["MQTTOTmessage"]|settingMQTTOTmessage;
   settingNTPenable        = doc["NTPenable"]; 
