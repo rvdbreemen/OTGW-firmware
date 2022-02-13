@@ -7,9 +7,10 @@ void handleDebug(){
             case 'h':
                 Debugln();
                 Debugln(F("---===[ Debug Help Menu ]===---"));
-                Debugln(F("1) Toggle verbose debug logging - OT message parsing"));
-                Debugln(F("2) Toggle verbose debug logging - API handeling"));
-                Debugln(F("3) Toggle verbose debug logging - MQTT module"));
+                Debugf("1) Toggle debuglog - OT message parsing: %s\r\n", CBOOLEAN(bDebugOTmsg));
+                Debugf("2) Toggle debuglog - API handeling: %s\r\n", CBOOLEAN(bDebugRestAPI));
+                Debugf("3) Toggle debuglog - MQTT module: %s\r\n", CBOOLEAN(bDebugMQTT));
+                Debugf("4) Toggle debuglog - Sensor modules: %s\r\n", CBOOLEAN(bDebugSensors));
                 Debugln(F("q) Force read settings"));
                 Debugln(F("m) Force MQTT discovery"));
                 Debugln(F("r) Reconnect wifi, telnet, otgwstream and mqtt"));
@@ -50,6 +51,10 @@ void handleDebug(){
             case '3':   
                 bDebugMQTT = !bDebugMQTT; 
                 DebugTf("\r\nDebug MQTT: %s\r\n", CBOOLEAN(bDebugMQTT)); 
+                break;
+            case '4':   
+                bDebugSensors = !bDebugSensors;
+                DebugTf("\r\nDebug Sensors: %s\r\n", CBOOLEAN(bDebugSensors)); 
                 break;
             case 'b':
                 DebugTln(F("Blink led 1"));

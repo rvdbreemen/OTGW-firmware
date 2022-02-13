@@ -515,10 +515,10 @@ void clearMQTTConfigDone()
   memset(MQTTautoConfigMap, 0, sizeof(MQTTautoConfigMap));
 }
 //===========================================================================================
-void doAutoConfigure(bool bForcaAll = false){
+void doAutoConfigure(bool bForceAll = false){
   //force all sensors to be sent to auto configuration
   for (int i=0; i<255; i++){
-    if ((getMQTTConfigDone((byte)i)==true) || bForcaAll) {
+    if ((getMQTTConfigDone((byte)i)==true) || bForceAll) {
       MQTTDebugTf("Sending auto configuration for sensor %d\r\n", i);
       doAutoConfigureMsgid((byte)i);
       doBackgroundTasks();
@@ -528,6 +528,12 @@ void doAutoConfigure(bool bForcaAll = false){
 }
 //===========================================================================================
 bool doAutoConfigureMsgid(byte OTid)
+{ 
+  String cfgSensorId = "" ;
+  return doAutoConfigureMsgid(OTid, cfgSensorId); 
+}
+
+bool doAutoConfigureMsgid(byte OTid, String cfgSensorId )
 {
   bool _result = false;
   
@@ -590,13 +596,20 @@ bool doAutoConfigureMsgid(byte OTid)
 
     /// node
     sTopic.replace("%node_id%", CSTR(NodeId));
+    
+    /// SensorId
+    sTopic.replace("%sensor_id%", CSTR(cfgSensorId));
     MQTTDebugf("[%s]\r\n", CSTR(sTopic)); 
+
     /// ----------------------
 
     MQTTDebugTf("sMsg[%s]==>", CSTR(sMsg)); 
 
     /// node
     sMsg.replace("%node_id%", CSTR(NodeId));
+
+    /// SensorId
+    sMsg.replace("%sensor_id%", CSTR(cfgSensorId));
 
     /// hostname
     sMsg.replace("%hostname%", CSTR(settingHostname));
@@ -632,6 +645,24 @@ bool doAutoConfigureMsgid(byte OTid)
   return _result;
 }
 
+void sensorAutoConfigure(byte dataid, bool finishflag , String cfgSensorId = "") {
+// Special version of Autoconfigure for sensors
+// dataid is a foney id, not used by OT 
+// check wheter MQTT topic needs to be configured
+// cfgNodeId can be set to alternate NodeId to allow for multiple temperature sensors, should normally be NodeId
+if(getMQTTConfigDone(dataid)==false) {
+  MQTTDebugTf("Need to set MQTT config for sensor id(%d)\r\n",dataid);
+  bool success = doAutoConfigureMsgid(dataid,cfgSensorId);
+  if(success) {
+    MQTTDebugTf("Successfully sent MQTT config for sensor id(%d)\r\n",dataid);
+    if (finishflag) setMQTTConfigDone(dataid);
+    } else {
+      MQTTDebugTf("Not able to complete MQTT configuration for sensor id(%d)\r\n",dataid);
+    }
+  } else {
+  // MQTTDebugTf("No need to set MQTT config for sensor id(%d)\r\n",dataid);
+  }
+}
 
 
 /***************************************************************************

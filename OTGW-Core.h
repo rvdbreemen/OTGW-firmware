@@ -447,6 +447,9 @@ enum OpenThermMessageID {
 		{ 132, OT_READ 	, ot_u8u8, 			"RemehaServicemessage", "Remeha Servicemessage", "" },
 		{ 133, OT_READ 	, ot_u8u8, 			"RemehaDetectionConnectedSCU", "Remeha detection connected SCU’s", "" },
 		// all data ids are not defined above are resevered for future use
+		// A foney id is used for sensors on GPIO ports, 
+		// 245 for counter and 
+		// 246 for Dallas temperature sensors
 	};
 
 #define OT_MSGID_MAX 133
