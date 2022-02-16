@@ -56,6 +56,7 @@ void initS0Count()
   pinMode(settingS0COUNTERpin, INPUT_PULLUP);         // Set interrupt pulse counting pin as input (Dig 3 / INT1)
   OTGWs0pulseCount=0;                                 // Make sure pulse count starts at zero
   attachInterrupt(digitalPinToInterrupt(settingS0COUNTERpin), IRQcounter, FALLING) ;
+  if (bDebugSensors) DebugTf("*** S0PulseCounter initialized on GPIO[%d] )\r\n", settingS0COUNTERpin) ;
 } //end SETUP
 
 void sendS0Counters() 

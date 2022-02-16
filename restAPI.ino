@@ -309,6 +309,10 @@ void sendOTmonitor()
   if (settingGPIOSENSORSenabled) 
   {
     sendJsonOTmonObj("numberofsensors", DallasrealDeviceCount , "", now());
+    for (int i = 0; i < DallasrealDeviceCount; i++) {
+      const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
+      sendJsonOTmonObj(strDeviceAddress, formatFloat(DallasrealDevice[i].tempC,1) , "°C", DallasrealDevice[i].lasttime);
+    }
   }
 
   sendEndJsonObj("otmonitor");

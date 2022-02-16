@@ -22,6 +22,8 @@
 #include "safeTimers.h"
 #include "OTGWSerial.h"         // Bron Schelte's Serial class - it upgrades and more
 #include "OTGW-Core.h"          // Core code for this firmware 
+#include <OneWire.h>            // required for Dallas sensor library
+#include <DallasTemperature.h>  // Miles Burton's - Arduino Dallas library
 
 //OTGW Nodoshop hardware definitions
 #define I2CSCL D1
@@ -116,10 +118,22 @@ bool      settingLEDblink = true;
 
 // GPIO Sensor Settings
 bool      settingGPIOSENSORSenabled = false;
-int8_t    settingGPIOSENSORSpin = 10;
-int16_t   settingGPIOSENSORSinterval = 5;
+int8_t    settingGPIOSENSORSpin = 13;            // GPIO 13 = D7, GPIO 10 = SDIO 3  
+int16_t   settingGPIOSENSORSinterval = 20;       // Interval time to read out temp and send to MQ
 byte      OTGWdallasdataid = 246;                // foney dataid to be used to do autoconfigure for temp sensors
-int       DallasrealDeviceCount = 0;
+int       DallasrealDeviceCount = 0;             // Total temperature devices found on the bus
+#define   MAXDALLASDEVICES 16                    // maximum number of devices on the bus
+
+// Define structure to store temperature device addresses found on bus with their latest tempC value
+struct
+{
+  int id;
+  DeviceAddress addr;
+  float tempC;
+  time_t lasttime;  
+} DallasrealDevice[MAXDALLASDEVICES];
+// prototype to allow use in restAPI.ino
+char* getDallasAddress(DeviceAddress deviceAddress);
 
 
 // S0 Counter Settings and variables with global scope

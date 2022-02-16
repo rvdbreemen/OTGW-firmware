@@ -1,31 +1,42 @@
 /*
 **  Program  : output_ext.ino
-**  Version  : v0.9.3
+**  Version  : v1.0.0
 **
 **  Copyright (c) 2021-2022 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
+**  Modified by Rob Roos to enable MQ autoconfigure and cleanup
 **
 **  TERMS OF USE: MIT License. See bottom of file.   
 ** 
 ** most code shamelessly copied from Miles Burton's - Arduino Dallas library
 ** example 'Multiple'   
+** 
 */
-
-#include <OneWire.h>
-#include <DallasTemperature.h>
-
-//prototype
-char* getDallasAddress(DeviceAddress deviceAddress);
-
-// GPIO where the DS18B20 is connected to
-// Data wire is plugged TO GPIO 10
-// #define ONE_WIRE_BUS 10
+// To be included in OTGW-firmware.h 
+// #include <OneWire.h>
+// #include <DallasTemperature.h>
+// GPIO Sensor Settings
+// bool      settingGPIOSENSORSenabled = false;
+// int8_t    settingGPIOSENSORSpin = 10;             
+// int16_t   settingGPIOSENSORSinterval = 20;       // Interval time to read out temp and send to MQ
+// byte      OTGWdallasdataid = 246;                // foney dataid to be used to do autoconfigure for temp sensors
+// int       DallasrealDeviceCount = 0;             // Total temperature devices found on the bus
+// #define   MAXDALLASDEVICES 16                    // maximum number of devices on the bus
+//
+// // Define structure to store temperature device addresses found on bus with their latest tempC value
+// struct
+// {
+//   int id;
+//   DeviceAddress addr;
+//   float tempC;
+//   time_t lasttime;
+// } DallasrealDevice[MAXDALLASDEVICES];
+//
+// prototype to allow use in restAPI.ino
+// char* getDallasAddress(DeviceAddress deviceAddress);
 
 // Number of temperature devices found
 int numberOfDevices;
-
-// We'll use this variable to store a found device address
-DeviceAddress tempDeviceAddress;
 
 // Setup a oneWire instance to communicate with any OneWire devices
 // needs a PIN to init correctly, pin is changed when we initSensors()
@@ -38,11 +49,11 @@ OneWire oneWire(settingGPIOSENSORSpin);
 // Pass our oneWire reference to Dallas Temperature sensor 
 DallasTemperature sensors(&oneWire);
 
-
+// Initialise the oneWire bus on the GPIO pin 
 void initSensors() {
   if (!settingGPIOSENSORSenabled) return;
 
-  if (bDebugSensors) DebugTf("init GPIO Sensors on GPIO%d...\r\n", settingGPIOSENSORSpin);
+  if (bDebugSensors) DebugTf("Init GPIO temperature sensors on GPIO[%d]\r\n", settingGPIOSENSORSpin);
 
   oneWire.begin(settingGPIOSENSORSpin);
 
@@ -51,98 +62,100 @@ void initSensors() {
 
   // Grab a count of devices on the wire
   numberOfDevices = sensors.getDeviceCount();
+  
+  DallasrealDeviceCount = 0;   // To determine the total found real temp sensors
 
+  if (numberOfDevices > MAXDALLASDEVICES) 
+  {
+    DebugTf("***ERR More (%d) sensor devices found than allowed(%d) on the bus\r\n", numberOfDevices, MAXDALLASDEVICES);
+    numberOfDevices = MAXDALLASDEVICES ;  // limit to max number of devices
+  }
   if (bDebugSensors) DebugTf("Sensors: Found %d device(s)\r\n", numberOfDevices);
-  // int DallasrealDeviceCount  = 0;  // now in .h
-  DallasrealDeviceCount = 0;
-  // Loop through each device, print out address
+  // Loop through each device, check if it is real temp sensor
   for (int i = 0; i < numberOfDevices; i++)
   {
     // Search the wire for address
-    if (sensors.getAddress(tempDeviceAddress, i))
+    if (sensors.getAddress(DallasrealDevice[i].addr, i))
     {
-      //TODO: get real device address, push data to mqtt topic.
-      if (bDebugSensors) DebugTf("Device address %u device(s)\r\n", (unsigned int) tempDeviceAddress);
-      if (bDebugSensors) DebugFlush();
+      if (bDebugSensors) DebugTf("Device address %u device(s)\r\n", (unsigned int) DallasrealDevice[i].addr);
+      DallasrealDevice[i].id = DallasrealDeviceCount ;
+      DallasrealDevice[i].tempC = 0 ;
+      DallasrealDevice[i].lasttime = 0 ;
       DallasrealDeviceCount++;
-
-      if (settingMQTTenable ) {
-        // Now configure the MQ interface, it will return immediatly when already configured
-        const char * strDeviceAddress = getDallasAddress(tempDeviceAddress);
-        if (bDebugSensors) DebugTf("Device MQ configuration: %s \r\n", strDeviceAddress);
-        sensorAutoConfigure(OTGWdallasdataid, false, strDeviceAddress) ;     // Configure sensor with the Dallas Deviceaddress
-      }
     }
     else
     {
-      DebugTf("Found ghost device %d but could not detect address. Check power and cabling\r\n", i);
+      DebugTf("***ERR Found ghost device %d but could not detect address. Check power and cabling\r\n", i);
     }
   }
-  if (settingMQTTenable ) { 
-     setMQTTConfigDone(OTGWdallasdataid);
-  }
+
   if (numberOfDevices < 1 or DallasrealDeviceCount  < 1)
   {
-    DebugTln("No Sensors Found, disabled GPIO Sensors! Reboot node to search again.");
+    DebugTln("***ERR No Sensors Found, disabled GPIO Sensors! Reboot node to search again.");
     settingGPIOSENSORSenabled = false;
     return;
   }
 }
 
-int pollSensors()
+// Send the sensor device address to MQ for Autoconfigure
+void configSensors() 
 {
-  if (!settingGPIOSENSORSenabled) return 1;
-  // Setup a oneWire instance to communicate with any OneWire devices
-  // oneWire.begin(settingGPIOSENSORSpin);
+  if (settingMQTTenable && getMQTTConfigDone(OTGWdallasdataid)==false) {
+      if (bDebugSensors) DebugTf("Sensor Device MQ configuration started \r\n");
 
-  // Pass our oneWire reference to Dallas Temperature sensor 
-  DallasTemperature sensors(&oneWire);
-
-  if (numberOfDevices < 1)
-  {
-    DebugTln("No Sensors Found, please reboot the node to search for sensors");
-    return 1;
+      for (int i = 0; i < DallasrealDeviceCount ; i++) 
+      {
+        // Now configure the MQ interface, it will return immediatly when already configured
+        const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
+        if (bDebugSensors) DebugTf("Sensor Device MQ configuration for device no[%d] addr[%s] \r\n", i, strDeviceAddress);
+        sensorAutoConfigure(OTGWdallasdataid, false, strDeviceAddress) ;     // Configure sensor with the Dallas Deviceaddress
+      }
+    // after last sensor set the ConfigDone flag
+    setMQTTConfigDone(OTGWdallasdataid);
   }
-  // DebugTln("start polling sensors");
+} // configSensors()
+
+void pollSensors()
+{
+  if (!settingGPIOSENSORSenabled) return;
   sensors.requestTemperatures(); // Send the command to get temperatures
 
-  // Loop through each device, print out temperature data
-  for (int i = 0; i < numberOfDevices; i++)
+  // check if HA Autoconfigure must be performed (initial or as repeat for HA reboot)
+  if (settingMQTTenable && getMQTTConfigDone(OTGWdallasdataid)==false) configSensors() ;
+
+  // Loop through each real device, store temperature data and send to MQ 
+  for (int i = 0; i < DallasrealDeviceCount; i++)
   {
-    // Search the wire for address
-    if (sensors.getAddress(tempDeviceAddress, i))
-    {
-      // Output the device ID
-      // Print the data
+    // Convert device address to string
+    const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
+    // Store the C temp in struc to allow it to be shown on Homepage through restAPI.ino
+    DallasrealDevice[i].tempC = sensors.getTempC(DallasrealDevice[i].addr);
+    DallasrealDevice[i].lasttime = now() ;
+    
+    if (bDebugSensors) DebugTf("Sensor device no[%d] addr[%s] TempC: %f\r\n", i, strDeviceAddress, DallasrealDevice[i].tempC);
 
-      const char * strDeviceAddress = getDallasAddress(tempDeviceAddress);
+    if (settingMQTTenable ) {
 
-      float tempC = sensors.getTempC(tempDeviceAddress);
-      if (bDebugSensors) DebugTf("Device: %s, TempC: %f\r\n", strDeviceAddress, tempC);
+      //Build string for MQTT, rse sendMQTTData for this
+      // ref MQTTPubNamespace = settingMQTTtopTopic + "/value/" + strDeviceAddress ;
 
-      if (settingMQTTenable ) {
+      char _msg[15]{0};
+      char _topic[50]{0};
+      
+      snprintf(_topic, sizeof _topic, "%s", strDeviceAddress);
+      snprintf(_msg, sizeof _msg, "%4.1f", DallasrealDevice[i].tempC);
 
-        //Build string for MQTT
-        // ref MQTTPubNamespace = settingMQTTtopTopic + "/value/" + strDeviceAddress + "/temperature";
+      // DebugTf("Topic: %s -- Payload: %s\r\n", _topic, _msg);
+      if (bDebugSensors) DebugFlush();
 
-        char _msg[15]{0};
-        char _topic[50]{0};
-        
-        snprintf(_topic, sizeof _topic, "%s", strDeviceAddress);
-        snprintf(_msg, sizeof _msg, "%4.1f", tempC);
-
-        // DebugTf("Topic: %s -- Payload: %s\r\n", _topic, _msg);
-        if (bDebugSensors) DebugFlush();
-
-        // sendMQTTData(_topic, _msg);
-        sendMQTTData(_topic, _msg);
-        // Serial.println(DallasTemperature::toFahrenheit(tempC)); // Converts tempC to Fahrenheit
+      // sendMQTTData(_topic, _msg);
+      sendMQTTData(_topic, _msg);
+      // Serial.println(DallasTemperature::toFahrenheit(tempC)); // Converts tempC to Fahrenheit
       }  
-    }
+    // }
   }
   // DebugTln("end polling sensors");
   DebugFlush();
-  return 0;
 }
 
 // function to print a device address
