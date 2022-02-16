@@ -2007,13 +2007,13 @@ void refreshpic(String filename, String version) {
       http.begin(client, "http://otgw.tclcode.com/download/" + filename);
       code = http.GET();
       if (code == HTTP_CODE_OK) {
-        File f = LittleFS.open("/" + filename, "w");
+        File f = SystemFS.open("/" + filename, "w");
         if (f) {
           http.writeToStream(&f);
           f.close();
           String verfile = "/" + filename;
           verfile.replace(".hex", ".ver");
-          f = LittleFS.open(verfile, "w");
+          f = SystemFS.open(verfile, "w");
           if (f) {
             f.print(latest + "\n");
             f.close();
@@ -2037,9 +2037,9 @@ void upgradepic() {
     refreshpic(filename, version);
   } else if (action == "delete") {
     String path = "/" + filename;
-    LittleFS.remove(path);
+    SystemFS.remove(path);
     path.replace(".hex", ".ver");
-    LittleFS.remove(path);
+    SystemFS.remove(path);
   }
   httpServer.sendHeader("Location", "index.html#tabPICflash", true);
   httpServer.send(303, "text/html", "<a href='index.html#tabPICflash'>Return</a>");

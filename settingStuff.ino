@@ -11,20 +11,19 @@
 */
 
 //=======================================================================
-void writeSettings(bool show) 
+bool writeSettings(bool show) 
 {
+  bool succeeded = false;
 
   //let's use JSON to write the setting file
   DebugTf("Writing to [%s] ..\r\n", SETTINGS_FILE);
-  File file = LittleFS.open(SETTINGS_FILE, "w"); // open for reading and writing
+  File file = UserFS.open(SETTINGS_FILE, "w"); // open for reading and writing
   if (!file) 
   {
-    DebugTf("open(%s, 'w') FAILED!!! --> Bailout\r\n", SETTINGS_FILE);
-    return;
+    DebugTf("open(%s, 'w') for writing FAILED!!! --> Bailout\r\n", SETTINGS_FILE);
+    return succeeded;
   }
   yield();
-
-  DebugT(F("Start writing setting data "));
 
   //const size_t capacity = JSON_OBJECT_SIZE(6);  // save more setting, grow # of objects accordingly
   DynamicJsonDocument doc(1024);
@@ -52,11 +51,20 @@ void writeSettings(bool show)
   root["GPIOOUTPUTSpin"] = settingGPIOOUTPUTSpin;
   root["GPIOOUTPUTStriggerBit"] = settingGPIOOUTPUTStriggerBit;
 
-  serializeJsonPretty(root, file);
-  Debugln(F("... done!"));
-  if (show)  serializeJsonPretty(root, TelnetStream); //Debug stream ;-)
+  DebugT(F("Start writing setting data "));
+
+  if(serializeJsonPretty(root, file) > 0) { //more than 0 bytes written
+      Debugln(F("... done!"));
+      succeeded = true;
+  } else {
+      Debugln(F("... failed!"));
+  }
+
   file.close();  
 
+  if (succeeded && show) serializeJsonPretty(root, TelnetStream); //Debug stream ;-)
+
+  return succeeded;
 } // writeSettings()
 
 
@@ -65,10 +73,10 @@ void readSettings(bool show)
 {
 
   // Open file for reading
-  File file =  LittleFS.open(SETTINGS_FILE, "r");
+  File file =  UserFS.open(SETTINGS_FILE, "r");
 
   DebugTf(" %s ..\r\n", SETTINGS_FILE);
-  if (!LittleFS.exists(SETTINGS_FILE)) 
+  if (!UserFS.exists(SETTINGS_FILE)) 
   {  //create settings file if it does not exist yet.
     DebugTln(F(" .. file not found! --> created file!"));
     writeSettings(show);
@@ -103,7 +111,7 @@ void readSettings(bool show)
   if (settingMQTThaprefix=="null") settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
   settingMQTTharebootdetection = doc["MQTTharebootdetection"]|settingMQTTharebootdetection;	  
   settingMQTTuniqueid     = doc["MQTTuniqueid"].as<String>();
-  if (settingMQTTuniqueid=="null") settingMQTTuniqueid = getUniqueId();
+  if ((settingMQTTuniqueid=="null") || (settingMQTTuniqueid=="")) settingMQTTuniqueid = getUniqueId();
 
   settingMQTTOTmessage    = doc["MQTTOTmessage"]|settingMQTTOTmessage;
   settingNTPenable        = doc["NTPenable"]; 
@@ -160,7 +168,7 @@ void readSettings(bool show)
 
 
 //=======================================================================
-void updateSetting(const char *field, const char *newValue)
+void updateSetting(const char *field, const char *newValue)  //used by RestAPI
 { //do not just trust the caller to do the right thing, server side validation is here!
   DebugTf("-> field[%s], newValue[%s]\r\n", field, newValue);
 
