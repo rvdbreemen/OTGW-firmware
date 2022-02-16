@@ -515,10 +515,10 @@ void clearMQTTConfigDone()
   memset(MQTTautoConfigMap, 0, sizeof(MQTTautoConfigMap));
 }
 //===========================================================================================
-void doAutoConfigure(bool bForcaAll = false){
+void doAutoConfigure(bool bForceAll = false){
   //force all sensors to be sent to auto configuration
   for (int i=0; i<255; i++){
-    if ((getMQTTConfigDone((byte)i)==true) || bForcaAll) {
+    if ((getMQTTConfigDone((byte)i)==true) || bForceAll) {
       MQTTDebugTf("Sending auto configuration for sensor %d\r\n", i);
       doAutoConfigureMsgid((byte)i);
       doBackgroundTasks();
