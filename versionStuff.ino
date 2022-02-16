@@ -14,7 +14,7 @@ String GetVersion(const String hexfile){
   unsigned short ptr;
   File f;
   //DebugTf("GetVersion opening %s\n",hexfile.c_str());
-  f = LittleFS.open(hexfile, "r");
+  f = SystemFS.open(hexfile, "r");
   if (f)  // only proceed if file exists
   {
     while (f.readBytesUntil('\n', hexbuf, sizeof(hexbuf)) != 0) {

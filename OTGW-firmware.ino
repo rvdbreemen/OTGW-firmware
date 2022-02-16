@@ -34,7 +34,11 @@
 #define OFF HIGH
 
 DECLARE_TIMER_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS);
-  
+
+//FS SystemFS = FS(FSImplPtr(new littlefs_impl::LittleFSImpl(FS_PHYS_ADDR, FS_PHYS_SIZE, FS_PHYS_PAGE, FS_PHYS_BLOCK, sFS_MAX_OPEN_FILES)));;  //the global fs
+FS SystemFS = FS(FSImplPtr(new littlefs_impl::LittleFSImpl(sFS_PHYS_ADDR, sFS_PHYS_SIZE, sFS_PHYS_PAGE, sFS_PHYS_BLOCK, sFS_MAX_OPEN_FILES)));  //the global fs
+FS UserFS = FS(FSImplPtr(new littlefs_impl::LittleFSImpl(uFS_PHYS_ADDR, uFS_PHYS_SIZE, uFS_PHYS_PAGE, uFS_PHYS_BLOCK, uFS_MAX_OPEN_FILES)));  //the global fs
+
 //=====================================================================
 void setup() {
   // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
@@ -52,9 +56,6 @@ void setup() {
   setLed(LED1, ON);
   setLed(LED2, ON);
 
-  LittleFS.begin();
-  readSettings(true);
-
   //start with setting wifi hostname
   WiFi.hostname(String(settingHostname));
 
@@ -66,6 +67,15 @@ void setup() {
   setLed(LED1, OFF);
 
   startTelnet();              // start the debug port 23
+
+  bool fsready = setupFilesystems();
+  if (fsready) {
+     SystemFS.begin();
+     readSettings(true);
+  } else {
+    blinkLED(LED1, 6, 500);
+  }
+
   startNTP();
   startMDNS(CSTR(settingHostname));
   startLLMNR(CSTR(settingHostname));
@@ -101,6 +111,116 @@ void setup() {
 }
 //=====================================================================
 
+
+void printFSinfo(Stream &out, FS &aFS) {
+
+  FSInfo fs_info;
+  aFS.info(fs_info);
+
+  out.print("totalBytes: "); out.println(fs_info.totalBytes);
+  out.print("usedBytes: "); out.println(fs_info.usedBytes);
+  out.print("blockSize: "); out.println(fs_info.blockSize);
+  out.print("pageSize: "); out.println(fs_info.pageSize);
+  out.print("maxOpenFiles: "); out.println(fs_info.maxOpenFiles);
+  out.print("maxPathLength: "); out.println(fs_info.maxPathLength);
+}
+
+void printFScontents(Stream &out, FS &aFS) {
+  if (aFS.begin()) {
+    out.println("Filesystem contents:");
+    Dir dir = aFS.openDir("/");
+    while (dir.next()) {
+      out.println(dir.fileName().c_str());
+    }
+    SystemFS.end();
+  } else {
+    out.println("Error: cannot print filesystem contents");
+  }
+}
+
+bool testFileSystem(FS &aFS, char *testFilename) {
+
+  bool mounted = aFS.begin();
+  if (!mounted) { return false; }
+
+  printFSinfo(OTGWSerial, aFS);
+
+  OTGWSerial.println("Succesfully mounted the filesystem, now testing file access");
+  bool _success = aFS.exists(testFilename);
+  if (!_success) {
+    OTGWSerial.println("Test file does not exist on the filesystem");
+    return false;
+  }
+  
+  OTGWSerial.println("Test file is reported to exist by filesystem");
+  File fh = aFS.open(testFilename, "r");
+
+  if(!fh) {
+    OTGWSerial.println("Cannot open test file");
+    return false;
+  }
+
+  String _line = fh.readStringUntil('\n');
+  if(_line.isEmpty()) {
+    OTGWSerial.printf("%s file cannot be read. Unmounting\n", testFilename);
+    _success = false;
+  } else {
+    OTGWSerial.printf("Check file %s contains: %s; and: \n %s\n", testFilename, _line.c_str(), fh.readStringUntil('\n').c_str());
+  }
+  
+  fh.close();
+  aFS.end();
+
+  return _success;
+}
+
+//=====================================================================
+bool setupFilesystems() {
+  bool s_mounted, u_mounted = false;
+
+  #define CHECK_FILE "/index.js"  // a file over 8k in size, containing clear text, to be used to test for successful mounting of the filesystem
+
+  LittleFSConfig cfg;
+  cfg.setAutoFormat(false); // prevent the fs from being formatted if it is actually the larger size
+  SystemFS.setConfig(cfg);
+  OTGWSerial.println("Attempting to mount the system partition");
+
+  s_mounted = testFileSystem(SystemFS, CHECK_FILE);
+
+ if(s_mounted) {
+    OTGWSerial.println("Attempting to mount the user partition");
+    u_mounted = UserFS.begin();
+    if (UserFS.exists("/")) {  //since we are creating the user partition, there is no reason to test further than this
+      OTGWSerial.println("User partition is accessable");
+      bUserFSpresent = true;
+      printFSinfo(OTGWSerial, UserFS);
+      printFScontents(OTGWSerial, UserFS);
+    } else {
+      OTGWSerial.printf("Formatting the user partition: %s\n", UserFS.format() ? "success" : "failed");
+    }
+  }
+
+  if (!s_mounted) {  // smaller fs not mounted succesfully, try the original size with the generated parameters FS_* (i.e. no u or s prefix)
+    OTGWSerial.println("Failed to mount the 1M filesystem, fall back to the original 2M sized one");
+    SystemFS = FS(FSImplPtr(new littlefs_impl::LittleFSImpl(FS_PHYS_ADDR, FS_PHYS_SIZE, FS_PHYS_PAGE, FS_PHYS_BLOCK, sFS_MAX_OPEN_FILES)));
+    SystemFS.setConfig(cfg);
+  
+    s_mounted = testFileSystem(SystemFS, CHECK_FILE);
+
+    if (!s_mounted) { 
+        OTGWSerial.println("Failed to mount the original 2M filesystem, please reflash the firmware over usb");
+        return false;
+    }
+
+    OTGWSerial.println("Succesfully mounted the original 2M filesystem");
+    OTGWSerial.println("Redirecting user partition to the system partion");
+    UserFS = SystemFS;
+    bUserFSpresent = false;  //technically not necessary since default state is false;
+    u_mounted = true;
+  }
+
+  return s_mounted && u_mounted;
+}
 
 //====[ restartWifi ]===
 /*

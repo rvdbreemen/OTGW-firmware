@@ -4,6 +4,19 @@ void handleDebug(){
         char c;
         c = TelnetStream.read();
         switch (c){
+            case 'f':
+                DebugTln(F("Filesystem information"));
+                DebugTln(F("System partition:"));
+                Debugf("physical address: %x\r\n", sFS_PHYS_ADDR);
+
+                printFSinfo(TelnetStream, SystemFS);
+                Debugf("User partition internal setting: %s\n", bUserFSpresent ? "TRUE" : "FALSE");  //F() macro not working?
+                if(bUserFSpresent) {
+                    DebugTln(F("User partition:"));
+                    Debugf("physical address: %x\r\n", uFS_PHYS_ADDR);
+                    printFSinfo(TelnetStream, UserFS);
+                }
+                break;
             case 'h':
                 Debugln();
                 Debugln(F("---===[ Debug Help Menu ]===---"));
@@ -78,7 +91,7 @@ void handleDebug(){
                 DebugTln("MyDEBUG =true");
                 settingMyDEBUG = true;
                 break;
-            case 'f':
+            case 'c':
                 if(settingMyDEBUG)
                 {
                     DebugTln(F("MyDEBUG = true"));
