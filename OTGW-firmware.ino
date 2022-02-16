@@ -194,6 +194,7 @@ bool setupFilesystems() {
       OTGWSerial.println("User partition is accessable");
       bUserFSpresent = true;
       printFSinfo(OTGWSerial, UserFS);
+      printFScontents(OTGWSerial, UserFS);
     } else {
       OTGWSerial.printf("Formatting the user partition: %s\n", UserFS.format() ? "success" : "failed");
     }

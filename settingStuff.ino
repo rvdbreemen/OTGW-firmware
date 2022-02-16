@@ -73,13 +73,14 @@ void readSettings(bool show)
 {
 
   // Open file for reading
-
-  DebugTf("Open file for reading %s ..\r\n", SETTINGS_FILE);
   File file =  UserFS.open(SETTINGS_FILE, "r");
 
-  if (!file) 
-  {  // settings file if it does not exist yet.
-    DebugTf("%s file not found! --> file will be created next time you save your settings!\r\n", SETTINGS_FILE);
+  DebugTf(" %s ..\r\n", SETTINGS_FILE);
+  if (!UserFS.exists(SETTINGS_FILE)) 
+  {  //create settings file if it does not exist yet.
+    DebugTln(F(" .. file not found! --> created file!"));
+    writeSettings(show);
+    readSettings(false); //now it should work...
     return;
   }
 
