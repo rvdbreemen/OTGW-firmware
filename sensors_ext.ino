@@ -100,7 +100,7 @@ void initSensors() {
 // Send the sensor device address to MQ for Autoconfigure
 void configSensors() 
 {
-  if (settingMQTTenable && getMQTTConfigDone(OTGWdallasdataid)==false) {
+  if (settingMQTTenable) {
       if (bDebugSensors) DebugTf("Sensor Device MQ configuration started \r\n");
 
       for (int i = 0; i < DallasrealDeviceCount ; i++) 

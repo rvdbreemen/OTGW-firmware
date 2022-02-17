@@ -530,7 +530,13 @@ void doAutoConfigure(bool bForceAll = false){
 bool doAutoConfigureMsgid(byte OTid)
 { 
   String cfgSensorId = "" ;
-  return doAutoConfigureMsgid(OTid, cfgSensorId); 
+  // check if foney dataid is called to do autoconfigure for temp sensors, call configsensors instead 
+  if (OTid == OTGWdallasdataid) {
+    MQTTDebugTf("Sending auto configuration for temp sensors %d\r\n", OTid);
+    configSensors() ;
+    return true;
+  }  
+  else return doAutoConfigureMsgid(OTid, cfgSensorId); 
 }
 
 bool doAutoConfigureMsgid(byte OTid, String cfgSensorId )
@@ -650,7 +656,8 @@ void sensorAutoConfigure(byte dataid, bool finishflag , String cfgSensorId = "")
 // dataid is a foney id, not used by OT 
 // check wheter MQTT topic needs to be configured
 // cfgNodeId can be set to alternate NodeId to allow for multiple temperature sensors, should normally be NodeId
-if(getMQTTConfigDone(dataid)==false) {
+// When finishflag is true, check on dataid is already done and complete the config.  On false do the config and leave completion to caller
+if(getMQTTConfigDone(dataid)==false or !finishflag) {
   MQTTDebugTf("Need to set MQTT config for sensor id(%d)\r\n",dataid);
   bool success = doAutoConfigureMsgid(dataid,cfgSensorId);
   if(success) {
