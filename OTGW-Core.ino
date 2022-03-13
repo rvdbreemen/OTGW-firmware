@@ -1992,6 +1992,14 @@ String checkforupdatepic(String filename){
     OTGWDebugTf("Update %s -> %s\r\n", filename.c_str(), latest.c_str());
     http.end();
   } else OTGWDebugln("Failed to fetch version from Schelte Bron website");
+
+  //When returned version > 5.x it's for the new PIC, so block this update check.
+  if (latest.toInt()>5){
+    OTGWDebugTf("New pic version: %s\r\n", latest.c_str());
+    OTGWDebugTln("Not comptible with PIC 16F88");
+    latest == ""; //clear the version number returned 
+  }
+
   return latest; 
 }
 
