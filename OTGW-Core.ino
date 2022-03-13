@@ -1986,18 +1986,18 @@ String checkforupdatepic(String filename){
   code = http.sendRequest("HEAD");
   if (code == HTTP_CODE_OK) {
     for (int i = 0; i< http.headers(); i++) {
-      OTGWDebugTf("%s: %s\r\n", hexheaders[i], http.header(i).c_str());
+      DebugTf("%s: %s\r\n", hexheaders[i], http.header(i).c_str());
     }
     latest = http.header(1);
-    OTGWDebugTf("Update %s -> %s\r\n", filename.c_str(), latest.c_str());
+    DebugTf("Update %s -> [%s]\r\n", filename.c_str(), latest.c_str());
     http.end();
   } else OTGWDebugln("Failed to fetch version from Schelte Bron website");
 
-  //When returned version > 5.x it's for the new PIC, so block this update check.
-  if (latest.toInt()>5){
-    OTGWDebugTf("New pic version: %s\r\n", latest.c_str());
-    OTGWDebugTln("Not comptible with PIC 16F88");
-    latest == ""; //clear the version number returned 
+  //When returned version > 6.x it's for the new PIC, so block this update check.
+  if (latest.toFloat()>=6){
+    DebugTf("New pic version: %s\r\n", latest.c_str());
+    DebugTln("Not comptible with PIC P16F88");
+    return ("");
   }
 
   return latest; 
