@@ -1928,6 +1928,7 @@ void startOTGWstream()
 
 void upgradepicnow(const char *filename) {
   if (OTGWSerial.busy()) return; // if already in programming mode, never call it twice
+  if (sPICfwversion.toFloat()>=6) return; // do not upgrade on 6.x for PIC P16F88  
   OTGWDebugTln(F("Start PIC upgrade now."));
   fwupgradestart(filename);  
   while (OTGWSerial.busy()){
