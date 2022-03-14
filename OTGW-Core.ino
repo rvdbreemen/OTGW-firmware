@@ -1994,6 +1994,7 @@ String checkforupdatepic(String filename){
     http.end();
   } else OTGWDebugln("Failed to fetch version from Schelte Bron website");
 
+  //Fix for 6.x firmware, for now block updates to 6.x.
   //When returned version > 6.x it's for the new PIC, so block this update check.
   if (latest.toFloat()>=6){
     DebugTf("New pic version: %s\r\n", latest.c_str());
@@ -2010,24 +2011,29 @@ void refreshpic(String filename, String version) {
   String latest;
   int code;
 
-  if (latest=checkforupdatepic(filename) != "") {
-    if (latest != version) {
-      OTGWDebugTf("Update %s: %s -> %s\r\n", filename.c_str(), version.c_str(), latest.c_str());
-      http.begin(client, "http://otgw.tclcode.com/download/" + filename);
-      code = http.GET();
-      if (code == HTTP_CODE_OK) {
-        File f = LittleFS.open("/" + filename, "w");
+  latest=checkforupdatepic(filename);
+  //Fix for 6.x firmware, fow now block updates to 6.x.
+  if (latest.isEmpty()) {
+    OTGWDebugTf("No updated done\n");
+    return;
+  }
+
+  if (latest != version) {
+    OTGWDebugTf("Update %s: %s -> %s\r\n", filename.c_str(), version.c_str(), latest.c_str());
+    http.begin(client, "http://otgw.tclcode.com/download/" + filename);
+    code = http.GET();
+    if (code == HTTP_CODE_OK) {
+      File f = LittleFS.open("/" + filename, "w");
+      if (f) {
+        http.writeToStream(&f);
+        f.close();
+        String verfile = "/" + filename;
+        verfile.replace(".hex", ".ver");
+        f = LittleFS.open(verfile, "w");
         if (f) {
-          http.writeToStream(&f);
+          f.print(latest + "\n");
           f.close();
-          String verfile = "/" + filename;
-          verfile.replace(".hex", ".ver");
-          f = LittleFS.open(verfile, "w");
-          if (f) {
-            f.print(latest + "\n");
-            f.close();
-            OTGWDebugTf("Update successful\n");
-          }
+          OTGWDebugTf("Update successful\n");
         }
       }
     }
