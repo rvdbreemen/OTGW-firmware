@@ -37,6 +37,7 @@ void writeSettings(bool show)
   root["MQTTpasswd"] = settingMQTTpasswd;
   root["MQTTtoptopic"] = settingMQTTtopTopic;
   root["MQTThaprefix"] = settingMQTThaprefix;
+  root["MQTTharebootdetection"]= settingMQTTharebootdetection;	  
   root["MQTTuniqueid"] = settingMQTTuniqueid;
   root["MQTTOTmessage"] = settingMQTTOTmessage;
   root["NTPenable"] = settingNTPenable;
