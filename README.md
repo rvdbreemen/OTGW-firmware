@@ -11,8 +11,8 @@ Starting with version 2.3 of the Nodoshop hardware the devkit has changed from N
 Supporting hardware version are:
 | Version | Hardware supported |
 |-|-|
-|1.x-2.0|   NodoMCU ESP8266 devkit|
-|2.3|       Wemos D1mini ESP8266 devkit|
+|1.x-2.0|NodoMCU ESP8266 devkit|
+|2.3-2.x|Wemos D1mini ESP8266 devkit|
 
 It can be found here: https://www.nodo-shop.nl/nl/opentherm-gateway/211-opentherm-gateway.html  
 More information on this gateway can be read here: http://otgw.tclcode.com/  (also location of the OTGW PIC firmware) 
