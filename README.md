@@ -11,8 +11,8 @@ Starting with version 2.3 of the Nodoshop hardware the devkit has changed from N
 Supporting hardware version are:
 | Version | Hardware supported |
 |-|-|
-|1.x-2.0|   NodoMCU ESP8266 devkit|
-|2.3|       Wemos D1mini ESP8266 devkit|
+|1.x-2.0|NodoMCU ESP8266 devkit|
+|2.3-2.x|Wemos D1mini ESP8266 devkit|
 
 It can be found here: https://www.nodo-shop.nl/nl/opentherm-gateway/211-opentherm-gateway.html  
 More information on this gateway can be read here: http://otgw.tclcode.com/  (also location of the OTGW PIC firmware) 
@@ -58,6 +58,7 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
 
 | Version | Release notes |
 |-|-|
+| 0.9.4 | Update: New firmware included gateway version 5.3 for PIC P16F88.<br>Update: Preventing >5.x PIC firmwares to be detected, incompatible (for now)| 
 | 0.9.3 | Bugfix: Small buffer of serial input, broke the PS=1 command, causing integrations of Domoticz and HA to break<br>Added: Setting for HA reboot detections, this enables a user to change the behaviour of HA reboot detection<br>Bugfix: PIC version detection fixed<br>Improving: Top topics parsing broke with 0.9.2, now you can once more use "/Myhome/OTGW/" as your toptopics |
 | 0.9.2 | New feature: Just In Time Home Assistant Auto Discovery topics. Now only sensors that actually have msgids from OpenTherm are send to Home Assistant. (thanks to @rlagerweij)<br>Improvement: Climate Entity (Home Assistant) got improved to detect Thermostat availablity (by @sergantd)<br>Bugfix: Alternating values on status bits (thanks @binsentsu)<br>Bugfix: Blue blinking leds of nodemcu should be off using WebUI (thanks @fsfikke)<br>New feature: Reset wifi button in webUI (thanks @DaveDavenport)<br>Improved: More UI improvements (thanks @rlagerweij)<br>Improved: Serial handling improvements<br>Fixed: Codecleanup (removal of errorprone string functions), removal of potential bufferoverflow, removed all warnings in code compile (thanks @DaveDavenport)<br>Improved: Reboot logging, now includes external watchdog reason.|
 | 0.9.1 | New feature: Added new set commands topics for most OTGW features, read more on the wiki<br>New feature: Reset bootlog to filesystem, for debug purposes<br>Improved: Stability, due to removal of ESP based auto-wifi-reconnect<br>Improved: the OT decoding algoritm, so values on MQTT, REST and WebUI now should be more reliable<br>Added: Override decoding of B and T when followed by A and R of the same MsgID, because this means OTGW overrides messages<br>Improved: No messages on versions when not connected to internet<br>Added: Proper msgid 100: remote override room setpoint flags decoding<br>Added: Missing some msgids to OT decoding|
