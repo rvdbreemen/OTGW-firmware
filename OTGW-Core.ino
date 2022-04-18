@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v0.9.3
+**  Version  : v0.9.4
 **
 **  Copyright (c) 2021-2022 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1928,6 +1928,7 @@ void startOTGWstream()
 
 void upgradepicnow(const char *filename) {
   if (OTGWSerial.busy()) return; // if already in programming mode, never call it twice
+  if (sPICfwversion.toFloat()>=6) return; // do not upgrade on 6.x for PIC P16F88  
   OTGWDebugTln(F("Start PIC upgrade now."));
   fwupgradestart(filename);  
   while (OTGWSerial.busy()){
@@ -1986,12 +1987,21 @@ String checkforupdatepic(String filename){
   code = http.sendRequest("HEAD");
   if (code == HTTP_CODE_OK) {
     for (int i = 0; i< http.headers(); i++) {
-      OTGWDebugTf("%s: %s\r\n", hexheaders[i], http.header(i).c_str());
+      DebugTf("%s: %s\r\n", hexheaders[i], http.header(i).c_str());
     }
     latest = http.header(1);
-    OTGWDebugTf("Update %s -> %s\r\n", filename.c_str(), latest.c_str());
+    DebugTf("Update %s -> [%s]\r\n", filename.c_str(), latest.c_str());
     http.end();
   } else OTGWDebugln("Failed to fetch version from Schelte Bron website");
+
+  //Fix for 6.x firmware, for now block updates to 6.x.
+  //When returned version > 6.x it's for the new PIC, so block this update check.
+  if (latest.toFloat()>=6){
+    DebugTf("New pic version: %s\r\n", latest.c_str());
+    DebugTln("Not comptible with PIC P16F88");
+    return ("");
+  }
+
   return latest; 
 }
 
@@ -2001,24 +2011,29 @@ void refreshpic(String filename, String version) {
   String latest;
   int code;
 
-  if (latest=checkforupdatepic(filename) != "") {
-    if (latest != version) {
-      OTGWDebugTf("Update %s: %s -> %s\r\n", filename.c_str(), version.c_str(), latest.c_str());
-      http.begin(client, "http://otgw.tclcode.com/download/" + filename);
-      code = http.GET();
-      if (code == HTTP_CODE_OK) {
-        File f = LittleFS.open("/" + filename, "w");
+  latest=checkforupdatepic(filename);
+  //Fix for 6.x firmware, fow now block updates to 6.x.
+  if (latest.isEmpty()) {
+    OTGWDebugTf("No updated done\n");
+    return;
+  }
+
+  if (latest != version) {
+    OTGWDebugTf("Update %s: %s -> %s\r\n", filename.c_str(), version.c_str(), latest.c_str());
+    http.begin(client, "http://otgw.tclcode.com/download/" + filename);
+    code = http.GET();
+    if (code == HTTP_CODE_OK) {
+      File f = LittleFS.open("/" + filename, "w");
+      if (f) {
+        http.writeToStream(&f);
+        f.close();
+        String verfile = "/" + filename;
+        verfile.replace(".hex", ".ver");
+        f = LittleFS.open(verfile, "w");
         if (f) {
-          http.writeToStream(&f);
+          f.print(latest + "\n");
           f.close();
-          String verfile = "/" + filename;
-          verfile.replace(".hex", ".ver");
-          f = LittleFS.open(verfile, "w");
-          if (f) {
-            f.print(latest + "\n");
-            f.close();
-            OTGWDebugTf("Update successful\n");
-          }
+          OTGWDebugTf("Update successful\n");
         }
       }
     }
