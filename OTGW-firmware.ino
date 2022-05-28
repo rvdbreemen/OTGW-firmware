@@ -86,7 +86,6 @@ void setup() {
   // Setup the OTGW PIC
   resetOTGW();          // reset the OTGW pic
   startOTGWstream();    // start port 25238 
-  checkOTWGpicforupdate();
   initSensors();        // init DS18B20
   initOutputs();
   
@@ -248,16 +247,6 @@ void do5minevent(){
   sendMQTTstateinformation();
 }
 
-//===[ check for new pic version  ]===
-void docheckforpic(){
-  String latest = checkforupdatepic("gateway.hex");
-  if (!bOTGWonline) {
-    sMessage = sPICfwversion; 
-  } else if (latest != sPICfwversion) {
-    sMessage = "New PIC version " + latest + " available!";
-  }
-}
-
 //===[ Do the background tasks ]===
 void doBackgroundTasks()
 {
@@ -280,17 +269,19 @@ void loop()
   DECLARE_TIMER_SEC(timer5s, 5, SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer30s, 30, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
-  DECLARE_TIMER_MIN(tmrcheckpic, 1440, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS);
+  DECLARE_TIMER_MIN(timer5mincheck, 5, CATCH_UP_MISSED_TICKS);
+  DECLARE_TIMER_MIN(tmrcheckpic, 1440, CATCH_UP_MISSED_TICKS);
   
-  if (DUE(timerpollsensor)) pollSensors();    // poll the temperature sensors connected to 2wire gpio pin 
-  if (DUE(timer5min))       do5minevent();
-  if (DUE(timer60s))        doTaskEvery60s();
-  if (DUE(timer30s))        doTaskEvery30s();
-  if (DUE(timer5s))         doTaskEvery5s();
-  if (DUE(timer1s))         doTaskEvery1s();
-  if (DUE(tmrcheckpic))     docheckforpic();
-  evalOutputs();                              // when the bits change, the output gpio bit will follow
+  if (DUE(timerpollsensor))         pollSensors();    // poll the temperature sensors connected to 2wire gpio pin 
+  if (DUE(timer5min))               do5minevent();
+  if (DUE(timer60s))                doTaskEvery60s();
+  if (DUE(timer30s))                doTaskEvery30s();
+  if (DUE(timer5s))                 doTaskEvery5s();
+  if (DUE(timer1s))                 doTaskEvery1s();
+  if (DUE(tmrcheckpic))             checkOTWGpicforupdate();    //every 24 hours
+  if (TIME_LEFT(timer5mincheck)==0) checkOTWGpicforupdate();    //5 minutes after reboot
+  evalOutputs();                                // when the bits change, the output gpio bit will follow
   doBackgroundTasks();
 }
 
