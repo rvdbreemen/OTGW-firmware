@@ -89,6 +89,7 @@ void sendMQTTversioninfo(){
   sendMQTTData("otgw-firmware/reboot_count", String(rebootCount));
   sendMQTTData("otgw-firmware/reboot_reason", lastReset);
   sendMQTTData("otgw-pic/version", sPICfwversion);
+  sendMQTTData("otgw-pic/deviceid", sPICdeviceid);
 }
 
 /*
@@ -99,7 +100,7 @@ void sendMQTTstateinformation(){
   sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(bOTGWthermostatstate));
   sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(bOTGWgatewaystate));
   sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(bOTGWonline));
-  sendMQTT(CSTR(MQTTPubNamespace), CBOOLEAN(bOTGWonline));
+  sendMQTT(CSTR(MQTTPubNamespace), CONLINEOFFLINE(bOTGWonline));
 }
 
 //===================[ Reset OTGW ]===============================
@@ -119,6 +120,18 @@ void resetOTGW() {
     sPICfwversion =  getpicfwversion();
   }
   OTGWDebugTf("Current firmware version: %s\r\n", CSTR(sPICfwversion));
+
+  //determine the version of the device
+  if (sPICfwversion.length()>0) {
+    sPICdeviceid = "pic16f88";  //default to PIC16F88
+    if (sPICfwversion.toFloat()>=6){
+      sPICdeviceid = "pic16f1847"; //version >=6.x, then it must be PIC16F1847
+    }
+  } else {
+    // no version found, so no way to determine the pic device id
+    sPICdeviceid = "";	
+  }
+  OTGWDebugTf("Current device id: %s\r\n", CSTR(sPICdeviceid));
 }
 //===================[ getpicfwversion ]===========================
 String getpicfwversion(){
@@ -138,15 +151,27 @@ String getpicfwversion(){
 }
 //===================[ checkOTWGpicforupdate ]=====================
 void checkOTWGpicforupdate(){
-  OTGWDebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
-  String latest = checkforupdatepic("gateway.hex");
-  if (!bOTGWonline) {
-    sMessage = sPICfwversion; 
-  } else if (latest.isEmpty() || sPICfwversion.isEmpty()) {
-    sMessage = ""; //two options: no internet connection OR no firmware version
-  } else if (latest != sPICfwversion) {
-    sMessage = "New PIC version " + latest + " available!";
+  if (sPICfwversion.isEmpty()) {
+    sMessage = ""; //no firmware version found for some reason
+  } else {
+    OTGWDebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
+    if (sPICfwversion.toFloat()>=6) {
+      // found a 6.x for PIC 16F1847, no upgrade route available yet  
+      OTGWDebugTln("Found version >6.x, thus a PIC 16F1847, no upgrade available yet");
+      sMessage = "";
+    } else {
+      //found a 5.x for PIC 16F88, check for update
+      String latest = checkforupdatepic("gateway.hex");
+      if (!bOTGWonline) {
+        sMessage = sPICfwversion; 
+      } else if (latest.isEmpty()) {
+        sMessage = ""; //two options: no internet connection OR no firmware version
+      } else if (latest != sPICfwversion) {
+        sMessage = "New PIC version " + latest + " available!";
+      }
+    }
   }
+  //check if the esp8266 and the littlefs versions match
   if (!checklittlefshash()) sMessage = "Flash your littleFS with matching version!";
 }
 
@@ -1436,7 +1461,7 @@ void processOT(const char *buf, int len){
     bOTGWonline = (bOTGWboilerstate && bOTGWthermostatstate) || (bOTGWboilerstate && bOTGWgatewaystate);
     if ((bOTGWonline != bOTGWpreviousstate) || (cntOTmessagesprocessed==1)){
       sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(bOTGWonline));
-      sendMQTT(CSTR(MQTTPubNamespace), CBOOLEAN(bOTGWonline));
+      sendMQTT(CSTR(MQTTPubNamespace), CONLINEOFFLINE(bOTGWonline));
       // nodeMCU online/offline zelf naar 'otgw-firmware/' pushen
       bOTGWpreviousstate = bOTGWonline; //remember state, so we can detect statechanges
     }
@@ -1982,7 +2007,7 @@ String checkforupdatepic(String filename){
   String latest = "";
   int code;
 
-  http.begin(client, "http://otgw.tclcode.com/download/" + filename);
+  http.begin(client, "http://otgw.tclcode.com/download/" + sPICdeviceid + "/" + filename);
   http.collectHeaders(hexheaders, 2);
   code = http.sendRequest("HEAD");
   if (code == HTTP_CODE_OK) {
@@ -1994,33 +2019,25 @@ String checkforupdatepic(String filename){
     http.end();
   } else OTGWDebugln("Failed to fetch version from Schelte Bron website");
 
-  //Fix for 6.x firmware, for now block updates to 6.x.
-  //When returned version > 6.x it's for the new PIC, so block this update check.
-  if (latest.toFloat()>=6){
-    DebugTf("New pic version: %s\r\n", latest.c_str());
-    DebugTln("Not comptible with PIC P16F88");
-    return ("");
-  }
-
   return latest; 
 }
 
 void refreshpic(String filename, String version) {
+  if (sPICdeviceid.isEmpty()){
+    // no pic version found, don't upgrade
+    return;
+  }
+
   WiFiClient client;
   HTTPClient http;
   String latest;
   int code;
 
-  latest=checkforupdatepic(filename);
-  //Fix for 6.x firmware, fow now block updates to 6.x.
-  if (latest.isEmpty()) {
-    OTGWDebugTf("No updated done\n");
-    return;
-  }
+  latest = checkforupdatepic(filename);
 
   if (latest != version) {
-    OTGWDebugTf("Update %s: %s -> %s\r\n", filename.c_str(), version.c_str(), latest.c_str());
-    http.begin(client, "http://otgw.tclcode.com/download/" + filename);
+    OTGWDebugTf("Update %s:%s: %s -> %s\r\n", sPICdeviceid.c_str(), filename.c_str(), version.c_str(), latest.c_str());
+    http.begin(client, "http://otgw.tclcode.com/download/" + sPICdeviceid + "/" + filename);
     code = http.GET();
     if (code == HTTP_CODE_OK) {
       File f = LittleFS.open("/" + filename, "w");
