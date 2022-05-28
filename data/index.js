@@ -741,6 +741,7 @@
    ,[ "author",                     "Developer"]
    ,[ "fwversion",                  "ESP8266 Firmware Version"]
    ,[ "picfwversion",               "OTGW PIC Firmware Version"]
+   ,[ "picdeviceid",                "OTGW PIC Device ID"]
    ,[ "compiled",                   "Compiled on (date/time)"]
    ,[ "HostName",                   "Hostname (add .local)"]
    ,[ "ipaddress",                  "IP address"]
