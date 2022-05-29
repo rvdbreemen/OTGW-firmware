@@ -2008,6 +2008,10 @@ String checkforupdatepic(String filename){
   int code;
 
   http.begin(client, "http://otgw.tclcode.com/download/" + sPICdeviceid + "/" + filename);
+  char useragent[40] = "esp8266-otgw-firmware/";
+  strlcat(useragent, _SEMVER_CORE, sizeof(useragent));
+  http.setUserAgent(useragent);
+  http.collectHeaders(hexheaders, 2);
   http.collectHeaders(hexheaders, 2);
   code = http.sendRequest("HEAD");
   if (code == HTTP_CODE_OK) {
@@ -2038,6 +2042,10 @@ void refreshpic(String filename, String version) {
   if (latest != version) {
     OTGWDebugTf("Update %s:%s: %s -> %s\r\n", sPICdeviceid.c_str(), filename.c_str(), version.c_str(), latest.c_str());
     http.begin(client, "http://otgw.tclcode.com/download/" + sPICdeviceid + "/" + filename);
+    char useragent[40] = "esp8266-otgw-firmware/";
+    strlcat(useragent, _SEMVER_CORE, sizeof(useragent));
+    http.setUserAgent(useragent);
+    http.collectHeaders(hexheaders, 2);
     code = http.GET();
     if (code == HTTP_CODE_OK) {
       File f = LittleFS.open("/" + filename, "w");
