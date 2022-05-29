@@ -1954,7 +1954,7 @@ void startOTGWstream()
 void upgradepicnow(const char *filename) {
   if (OTGWSerial.busy()) return; // if already in programming mode, never call it twice
   if (sPICfwversion.toFloat()>=6) return; // do not upgrade on 6.x for PIC P16F88  
-  OTGWDebugTln(F("Start PIC upgrade now."));
+  OTGWDebugTf("Start PIC upgrade now: %s\r\n", filename);
   fwupgradestart(filename);  
   while (OTGWSerial.busy()){
     feedWatchDog();
@@ -1990,6 +1990,8 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
 
 // Schelte's firmware integration
 void fwupgradestart(const char *hexfile) {
+  if (sPICdeviceid.isEmpty()) return; // no pic version found, don't upgrade
+  DebugTf("Start PIC upgrade with hexfile: %s\n\r", hexfile);
   OTGWError result;
   
   digitalWrite(LED1, LOW);
@@ -2008,6 +2010,9 @@ String checkforupdatepic(String filename){
   int code;
 
   http.begin(client, "http://otgw.tclcode.com/download/" + sPICdeviceid + "/" + filename);
+  char useragent[40] = "esp8266-otgw-firmware/";
+  strlcat(useragent, _SEMVER_CORE, sizeof(useragent));
+  http.setUserAgent(useragent);
   http.collectHeaders(hexheaders, 2);
   code = http.sendRequest("HEAD");
   if (code == HTTP_CODE_OK) {
@@ -2017,16 +2022,13 @@ String checkforupdatepic(String filename){
     latest = http.header(1);
     DebugTf("Update %s -> [%s]\r\n", filename.c_str(), latest.c_str());
     http.end();
-  } else OTGWDebugln("Failed to fetch version from Schelte Bron website");
+  } else OTGWDebugln(F("Failed to fetch version from Schelte Bron website"));
 
   return latest; 
 }
 
 void refreshpic(String filename, String version) {
-  if (sPICdeviceid.isEmpty()){
-    // no pic version found, don't upgrade
-    return;
-  }
+  if (sPICdeviceid.isEmpty()) return; // no pic version found, don't upgrade
 
   WiFiClient client;
   HTTPClient http;
@@ -2036,21 +2038,24 @@ void refreshpic(String filename, String version) {
   latest = checkforupdatepic(filename);
 
   if (latest != version) {
-    OTGWDebugTf("Update %s:%s: %s -> %s\r\n", sPICdeviceid.c_str(), filename.c_str(), version.c_str(), latest.c_str());
+    OTGWDebugTf("Update (%s)%s: %s -> %s\r\n", sPICdeviceid.c_str(), filename.c_str(), version.c_str(), latest.c_str());
     http.begin(client, "http://otgw.tclcode.com/download/" + sPICdeviceid + "/" + filename);
+    char useragent[40] = "esp8266-otgw-firmware/";
+    strlcat(useragent, _SEMVER_CORE, sizeof(useragent));
+    http.setUserAgent(useragent);
     code = http.GET();
     if (code == HTTP_CODE_OK) {
-      File f = LittleFS.open("/" + filename, "w");
+      File f = LittleFS.open("/" + sPICdeviceid + "/" + filename, "w");
       if (f) {
         http.writeToStream(&f);
         f.close();
-        String verfile = "/" + filename;
+        String verfile = "/" + sPICdeviceid + "/" + filename;
         verfile.replace(".hex", ".ver");
         f = LittleFS.open(verfile, "w");
         if (f) {
           f.print(latest + "\n");
           f.close();
-          OTGWDebugTf("Update successful\n");
+          OTGWDebugTln(F("Update successful"));
         }
       }
     }
@@ -2059,16 +2064,17 @@ void refreshpic(String filename, String version) {
 }
 
 void upgradepic() {
+  if (sPICdeviceid.isEmpty()) return; // no pic version found, don't upgrade
   String action = httpServer.arg("action");
   String filename = httpServer.arg("name");
   String version = httpServer.arg("version");
   OTGWDebugTf("Action: %s %s %s\r\n", action.c_str(), filename.c_str(), version.c_str());
   if (action == "upgrade") {
-    upgradepicnow(String("/" + filename).c_str());
+    upgradepicnow(String("/" + sPICdeviceid + "/" + filename).c_str());
   } else if (action == "refresh") {
     refreshpic(filename, version);
   } else if (action == "delete") {
-    String path = "/" + filename;
+    String path = "/" + sPICdeviceid + "/" + filename;
     LittleFS.remove(path);
     path.replace(".hex", ".ver");
     LittleFS.remove(path);

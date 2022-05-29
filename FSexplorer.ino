@@ -136,15 +136,16 @@ void apifirmwarefilelist() {
   String version, fwversion;
   Dir dir;
   File f;
+  String dirpath = "/" + sPICdeviceid + "/";
       
   s = buffer;
   s += sprintf(buffer, "[");
-  dir = LittleFS.openDir("/");
+  dir = LittleFS.openDir(dirpath);	
   while (dir.next()) {
     if (dir.fileName().endsWith(".hex")) {
       version="";
       fwversion="";
-      String verfile = "/" + dir.fileName();
+      String verfile = dirpath + dir.fileName();
       verfile.replace(".hex", ".ver");
       f = LittleFS.open(verfile, "r");
       if (f) {
@@ -152,7 +153,7 @@ void apifirmwarefilelist() {
         version.trim();
         f.close();
       } 
-      fwversion = GetVersion("/"+dir.fileName()); // only check if gateway firmware
+      fwversion = GetVersion(dirpath+dir.fileName()); // only check if gateway firmware
       DebugTf("GetVersion(%s) returned %s\n", dir.fileName().c_str(), fwversion.c_str());  
       if (fwversion.length() && strcmp(fwversion.c_str(),version.c_str())) { // versions do not match
         version=fwversion; // assign hex file version to version
