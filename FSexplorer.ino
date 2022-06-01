@@ -136,16 +136,18 @@ void apifirmwarefilelist() {
   String version, fwversion;
   Dir dir;
   File f;
-  String dirpath = "/" + sPICdeviceid + "/";
+  String dirpath = "/" + sPICdeviceid;
+  DebugTf("dirpath=%s\r\n", dirpath.c_str());
       
   s = buffer;
   s += sprintf(buffer, "[");
   dir = LittleFS.openDir(dirpath);	
   while (dir.next()) {
+    DebugTf("dir.fileName()=%s\r\n", dir.fileName().c_str());
     if (dir.fileName().endsWith(".hex")) {
       version="";
       fwversion="";
-      String verfile = dirpath + dir.fileName();
+      String verfile = dirpath + "/" + dir.fileName();
       verfile.replace(".hex", ".ver");
       f = LittleFS.open(verfile, "r");
       if (f) {
@@ -153,21 +155,23 @@ void apifirmwarefilelist() {
         version.trim();
         f.close();
       } 
-      fwversion = GetVersion(dirpath+dir.fileName()); // only check if gateway firmware
-      DebugTf("GetVersion(%s) returned %s\n", dir.fileName().c_str(), fwversion.c_str());  
+      DebugTf("version=%s\r\n", version.c_str());	
+      fwversion = GetVersion(dirpath + "/" + dir.fileName()); // only check if gateway firmware
+      DebugTf("GetVersion(%s) returned [%s]\r\n", verfile.c_str(), fwversion.c_str());  
       if (fwversion.length() && strcmp(fwversion.c_str(),version.c_str())) { // versions do not match
         version=fwversion; // assign hex file version to version
         if (f = LittleFS.open(verfile, "w")) { // write to .ver file
-          DebugTf("writing %s to %s\n",version.c_str(),verfile.c_str());
+          DebugTf("writing %s to %s\r\n",version.c_str(),verfile.c_str());
           f.print(version + "\n");
           f.close();
         } 
       }
+      Debugln();
       s += snprintf( s, sizeof(buffer), "{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d},", CSTR(dir.fileName()), CSTR(version), dir.fileSize());
     }
   }
-  s += sprintf(--s, "]\n");
-  DebugTf("filelist response: [%s]\r\n", buffer);
+  s += sprintf(--s, "]\r\n");
+  DebugTf("filelist response: %s\r\n", buffer);
   httpServer.send(200, "application/json", buffer);
 }
 
