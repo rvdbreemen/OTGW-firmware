@@ -13,7 +13,7 @@ String GetVersion(const String hexfile){
   char datamem[256]={0};
   unsigned short ptr;
   File f;
-  //DebugTf("GetVersion opening %s\n",hexfile.c_str());
+  DebugTf("GetVersion opening %s\r\n",hexfile.c_str());
   f = LittleFS.open(hexfile, "r");
   if (f)  // only proceed if file exists
   {
