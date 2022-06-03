@@ -108,29 +108,31 @@ void resetOTGW() {
   //sPICfwversion ="No version found"; //reset versionstring
   OTGWSerial.resetPic();
   //then read the first response of the firmware to make sure it reads it
-  String resp = OTGWSerial.readStringUntil('\n');
-  resp.trim();
-  OTGWDebugTf("Received firmware version: [%s] [%s] (%d)\r\n", CSTR(resp), OTGWSerial.firmwareVersion(), strlen(OTGWSerial.firmwareVersion()));
-  bOTGWonline = (resp.length()>0); 
-  if (bOTGWonline) 
-  {
-    sPICfwversion = String(OTGWSerial.firmwareVersion());
-  } else {
-    //try it one more time
-    sPICfwversion =  getpicfwversion();
-  }
-  OTGWDebugTf("Current firmware version: %s\r\n", CSTR(sPICfwversion));
-
+  // String resp = OTGWSerial.readStringUntil('\n');
+  // resp.trim();
+  // OTGWDebugTf("Received firmware version: [%s] [%s] (%d)\r\n", CSTR(resp), OTGWSerial.firmwareVersion(), strlen(OTGWSerial.firmwareVersion()));
+  // bOTGWonline = (resp.length()>0); 
+  // if (bOTGWonline) 
+  // {
+  //   sPICfwversion = String(OTGWSerial.firmwareVersion());
+  // } else {
+  //   //try it one more time
+  //   sPICfwversion =  getpicfwversion();
+  // }
+  //OTGWSerial.firmwareToString().c_str();
   //determine the version of the device
-  if (sPICfwversion.length()>0) {
-    sPICdeviceid = "pic16f88";  //default to PIC16F88
-    if (sPICfwversion.toFloat()>=6){
-      sPICdeviceid = "pic16f1847"; //version >=6.x, then it must be PIC16F1847
-    }
-  } else {
-    // no version found, so no way to determine the pic device id
-    sPICdeviceid = "";	
-  }
+  // if (sPICfwversion.length()>0) {
+  //   sPICdeviceid = "pic16f88";  //default to PIC16F88
+  //   if (sPICfwversion.toFloat()>=6){
+  //     sPICdeviceid = "pic16f1847"; //version >=6.x, then it must be PIC16F1847
+  //   }
+  // } else {
+  //   // no version found, so no way to determine the pic device id
+  //   sPICdeviceid = "pic unknown";	
+  // }
+  sPICfwversion = String(OTGWSerial.firmwareVersion());
+  OTGWDebugTf("Current firmware version: %s\r\n", CSTR(sPICfwversion));
+  sPICdeviceid = OTGWSerial.processorToString();
   OTGWDebugTf("Current device id: %s\r\n", CSTR(sPICdeviceid));
 }
 //===================[ getpicfwversion ]===========================
