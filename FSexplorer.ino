@@ -136,6 +136,7 @@ void apifirmwarefilelist() {
   String version, fwversion;
   Dir dir;
   File f;
+
   String dirpath = "/" + sPICdeviceid;
   DebugTf("dirpath=%s\r\n", dirpath.c_str());
       
