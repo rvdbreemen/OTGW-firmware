@@ -148,7 +148,7 @@ void apifirmwarefilelist() {
     if (dir.fileName().endsWith(".hex")) {
       version="";
       fwversion="";
-      String verfile = dirpath + "/" + dir.fileName();
+      String verfile = hexfile = dirpath + "/" + dir.fileName();      
       verfile.replace(".hex", ".ver");
       f = LittleFS.open(verfile, "r");
       if (f) {
@@ -157,8 +157,8 @@ void apifirmwarefilelist() {
         f.close();
       } 
       DebugTf("version=%s\r\n", version.c_str());	
-      fwversion = GetVersion(dirpath + "/" + dir.fileName()); // only check if gateway firmware
-      DebugTf("GetVersion(%s) returned [%s]\r\n", verfile.c_str(), fwversion.c_str());  
+      fwversion = GetVersion(hexfile); // only check if gateway firmware
+      DebugTf("GetVersion(%s) returned [%s]\r\n", hexfile.c_str(), fwversion.c_str());  
       if (fwversion.length() && strcmp(fwversion.c_str(),version.c_str())) { // versions do not match
         version=fwversion; // assign hex file version to version
         if (f = LittleFS.open(verfile, "w")) { // write to .ver file
