@@ -108,10 +108,15 @@ void resetOTGW() {
   //sPICfwversion ="No version found"; //reset versionstring
   OTGWSerial.resetPic();
   //then read the first response of the firmware to make sure it reads it
-  // String resp = OTGWSerial.readStringUntil('\n');
-  // resp.trim();
-  // OTGWDebugTf("Received firmware version: [%s] [%s] (%d)\r\n", CSTR(resp), OTGWSerial.firmwareVersion(), strlen(OTGWSerial.firmwareVersion()));
-  // bOTGWonline = (resp.length()>0); 
+  String resp = OTGWSerial.readStringUntil('\n');
+  resp.trim();
+  OTGWDebugTf("Received firmware version: [%s] [%s] (%d)\r\n", CSTR(resp), OTGWSerial.firmwareVersion(), strlen(OTGWSerial.firmwareVersion()));
+  bOTGWonline = (resp.length()>0); 
+  sPICfwversion = String(OTGWSerial.firmwareVersion());
+  OTGWDebugTf("Current firmware version: %s\r\n", CSTR(sPICfwversion));
+  sPICdeviceid = OTGWSerial.processorToString();
+  OTGWDebugTf("Current device id: %s\r\n", CSTR(sPICdeviceid));
+
   // if (bOTGWonline) 
   // {
   //   sPICfwversion = String(OTGWSerial.firmwareVersion());
@@ -130,10 +135,7 @@ void resetOTGW() {
   //   // no version found, so no way to determine the pic device id
   //   sPICdeviceid = "pic unknown";	
   // }
-  sPICfwversion = String(OTGWSerial.firmwareVersion());
-  OTGWDebugTf("Current firmware version: %s\r\n", CSTR(sPICfwversion));
-  sPICdeviceid = OTGWSerial.processorToString();
-  OTGWDebugTf("Current device id: %s\r\n", CSTR(sPICdeviceid));
+
 }
 //===================[ getpicfwversion ]===========================
 String getpicfwversion(){
@@ -1716,10 +1718,10 @@ void processOT(const char *buf, int len){
     sendMQTTData(F("Error 04"), String(OTcurrentSystemState.error04));
   } else if (strstr(buf, OTGW_BANNER)!=NULL){
     //found a banner, so get the version of PIC
-    char *p = strstr(buf, OTGW_BANNER);
-    p += sizeof(OTGW_BANNER);
-    sPICfwversion = String(p);
-    OTGWDebugTf("Detected PIC firmware version: %s\r\n", CSTR(sPICfwversion));	
+    sPICfwversion = String(OTGWSerial.firmwareVersion());
+    OTGWDebugTf("Current firmware version: %s\r\n", CSTR(sPICfwversion));
+    sPICdeviceid = OTGWSerial.processorToString();
+    OTGWDebugTf("Current device id: %s\r\n", CSTR(sPICdeviceid));
   } else {
     OTGWDebugTf("Not processed, received from OTGW => (%s) [%d]\r\n", buf, len);
   }
@@ -1955,8 +1957,7 @@ void startOTGWstream()
 
 void upgradepicnow(const char *filename) {
   if (OTGWSerial.busy()) return; // if already in programming mode, never call it twice
-  if (sPICfwversion.toFloat()>=6) return; // do not upgrade on 6.x for PIC P16F88  
-  OTGWDebugTf("Start PIC upgrade now: %s\r\n", filename);
+  DebugTf("Start PIC upgrade now: %s\r\n", filename);
   fwupgradestart(filename);  
   while (OTGWSerial.busy()){
     feedWatchDog();
@@ -1992,7 +1993,7 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
 
 // Schelte's firmware integration
 void fwupgradestart(const char *hexfile) {
-  if (sPICdeviceid.isEmpty()) return; // no pic version found, don't upgrade
+  if (sPICdeviceid=="unknown") return; // no pic version found, don't upgrade
   DebugTf("Start PIC upgrade with hexfile: %s\n\r", hexfile);
   OTGWError result;
   
@@ -2030,7 +2031,7 @@ String checkforupdatepic(String filename){
 }
 
 void refreshpic(String filename, String version) {
-  if (sPICdeviceid.isEmpty()) return; // no pic version found, don't upgrade
+  if (sPICdeviceid=="unknown") return; // no pic version found, don't upgrade
 
   WiFiClient client;
   HTTPClient http;
@@ -2066,16 +2067,22 @@ void refreshpic(String filename, String version) {
 }
 
 void upgradepic() {
-  if (sPICdeviceid.isEmpty()) return; // no pic version found, don't upgrade
   String action = httpServer.arg("action");
   String filename = httpServer.arg("name");
   String version = httpServer.arg("version");
-  OTGWDebugTf("Action: %s %s %s\r\n", action.c_str(), filename.c_str(), version.c_str());
+  DebugTf("Action: %s %s %s\r\n", action.c_str(), filename.c_str(), version.c_str());
+  if (sPICdeviceid=="unknown") {
+    DebugTln("No PIC device id is unknown, don't upgrade");
+    return; // no pic version found, don't upgrade
+  }
   if (action == "upgrade") {
+    DebugTf("Upgrade /%s/%s\r\n", sPICdeviceid.c_str(), filename.c_str());
     upgradepicnow(String("/" + sPICdeviceid + "/" + filename).c_str());
   } else if (action == "refresh") {
+    DebugTf("Refresh %s/%s\r\n", sPICdeviceid.c_str(), filename.c_str());
     refreshpic(filename, version);
   } else if (action == "delete") {
+    DebugTf("Delete %s/%s\r\n", sPICdeviceid.c_str(), filename.c_str());
     String path = "/" + sPICdeviceid + "/" + filename;
     LittleFS.remove(path);
     path.replace(".hex", ".ver");
