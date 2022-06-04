@@ -1801,7 +1801,7 @@ void handleOTGW()
       sWrite[bytes_write] = 0;
       OTGWDebugTf("Net2Ser: Sending to OTGW: [%s] (%d)\r\n", sWrite, bytes_write);
       //check for reset command
-      if (strcasecmp(sWrite, "GW=R")==0){
+      if (strcmp(sWrite, "GW=R")==0){
         //detected [GW=R], then reset the gateway the gpio way
         OTGWDebugTln(F("Detected: GW=R. Reset gateway command executed."));
         resetOTGW();
