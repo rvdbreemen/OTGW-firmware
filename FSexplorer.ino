@@ -148,7 +148,8 @@ void apifirmwarefilelist() {
     if (dir.fileName().endsWith(".hex")) {
       version="";
       fwversion="";
-      String verfile = hexfile = dirpath + "/" + dir.fileName();      
+      String hexfile = dirpath + "/" + dir.fileName();   
+      String verfile = hexfile;
       verfile.replace(".hex", ".ver");
       f = LittleFS.open(verfile, "r");
       if (f) {
