@@ -238,6 +238,14 @@ void doTaskEvery60s(){
   //if no wifi, try reconnecting (once a minute)
   if (WiFi.status() != WL_CONNECTED) restartWifi();
   sendtimecommand();
+  if (sPICdeviceid=="unknown"){
+    //keep trying to figure out which pic is used!
+    sPICfwversion =  getpicfwversion();
+    sPICfwversion = String(OTGWSerial.firmwareVersion());
+    DebugTf("Current firmware version: %s\r\n", CSTR(sPICfwversion));
+    sPICdeviceid = OTGWSerial.processorToString();
+    DebugTf("Current device id: %s\r\n", CSTR(sPICdeviceid));
+  }
 }
 
 //===[ Do task every 5min ]===

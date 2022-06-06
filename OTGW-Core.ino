@@ -107,23 +107,23 @@ void sendMQTTstateinformation(){
 void resetOTGW() {
   //sPICfwversion ="No version found"; //reset versionstring
   OTGWSerial.resetPic();
-  //then read the first response of the firmware to make sure it reads it
-  String resp = OTGWSerial.readStringUntil('\n');
-  resp.trim();
-  OTGWDebugTf("Received firmware version: [%s] [%s] (%d)\r\n", CSTR(resp), OTGWSerial.firmwareVersion(), strlen(OTGWSerial.firmwareVersion()));
-  bOTGWonline = (resp.length()>0); 
+  // //then read the first response of the firmware to make sure it reads it
+  // String resp = OTGWSerial.readStringUntil('\n');
+  // resp.trim();
+  // OTGWDebugTf("Received firmware version: [%s] [%s] (%d)\r\n", CSTR(resp), OTGWSerial.firmwareVersion(), strlen(OTGWSerial.firmwareVersion()));
+  // bOTGWonline = (resp.length()>0); 
+  // if (!bOTGWonline) 
+  // {
+  //   //use a PR=A to fetch banner?
+  //   sPICfwversion =  getpicfwversion();
+  // }
+
+
   sPICfwversion = String(OTGWSerial.firmwareVersion());
   OTGWDebugTf("Current firmware version: %s\r\n", CSTR(sPICfwversion));
   sPICdeviceid = OTGWSerial.processorToString();
   OTGWDebugTf("Current device id: %s\r\n", CSTR(sPICdeviceid));
 
-  // if (bOTGWonline) 
-  // {
-  //   sPICfwversion = String(OTGWSerial.firmwareVersion());
-  // } else {
-  //   //try it one more time
-  //   sPICfwversion =  getpicfwversion();
-  // }
   //OTGWSerial.firmwareToString().c_str();
   //determine the version of the device
   // if (sPICfwversion.length()>0) {
@@ -684,16 +684,14 @@ void print_status(uint16_t& value)
   }
 
   if (is_value_valid(OTdata, OTlookupitem)){
-    uint16_t _value = OTdata.u16();
     // AddLogf("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
-    value = _value;
+    value = (OTcurrentSystemState.MasterStatus<<8) & OTcurrentSystemState.SlaveStatus;
   }
 }
 
 void print_solar_storage_status(uint16_t& value)
 { 
   char _msg[15] {0};
-  
 
   if (OTdata.masterslave == 0) {
     // Master Solar Storage 
@@ -723,9 +721,8 @@ void print_solar_storage_status(uint16_t& value)
     }
   }
   if (is_value_valid(OTdata, OTlookupitem)){
-    uint16_t _value = OTdata.u16();
     //OTGWDebugTf("Solar Storage Master / Slave Mode u16 [%04x] _value [%04x] hb [%02x] lb [%02x]", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
-    value = _value;
+    value = (OTcurrentSystemState.SolarMasterStatus<<8) & OTcurrentSystemState.SolarSlaveStatus;
   }
 }
 
@@ -804,9 +801,8 @@ void print_statusVH(uint16_t& value)
   }
 
   if (is_value_valid(OTdata, OTlookupitem)){
-    uint16_t _value = OTdata.u16();
     //OTGWDebugTf("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
-    value = _value;
+    value = (OTcurrentSystemState.MasterStatusVH<<8) && OTcurrentSystemState.SlaveStatusVH;
   }
 }
 
@@ -1974,20 +1970,21 @@ void upgradepicnow(const char *filename) {
 void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   
   switch (result) {
-    case OTGW_ERROR_NONE:          errorupgrade = "PIC upgrade was succesful"; break;
-    case OTGW_ERROR_MEMORY:        errorupgrade = "Not enough memory available"; break;
-    case OTGW_ERROR_INPROG:        errorupgrade = "Firmware upgrade in progress"; break;
-    case OTGW_ERROR_HEX_ACCESS:    errorupgrade = "Could not open hex file"; break;
-    case OTGW_ERROR_HEX_FORMAT:    errorupgrade = "Invalid format of hex file"; break;
-    case OTGW_ERROR_HEX_DATASIZE:  errorupgrade = "Wrong data size in hex file"; break;
-    case OTGW_ERROR_HEX_CHECKSUM:  errorupgrade = "Bad checksum in hex file"; break;
-    case OTGW_ERROR_MAGIC:         errorupgrade = "Hex file does not contain expected data"; break;
-    case OTGW_ERROR_RESET:         errorupgrade = "PIC reset failed"; break;
-    case OTGW_ERROR_RETRIES:       errorupgrade = "Too many retries"; break;
-    case OTGW_ERROR_MISMATCHES:    errorupgrade = "Too many mismatches"; break;
+    case OTGWError::OTGW_ERROR_NONE:          errorupgrade = "PIC upgrade was succesful"; break;
+    case OTGWError::OTGW_ERROR_MEMORY:        errorupgrade = "Not enough memory available"; break;
+    case OTGWError::OTGW_ERROR_INPROG:        errorupgrade = "Firmware upgrade in progress"; break;
+    case OTGWError::OTGW_ERROR_HEX_ACCESS:    errorupgrade = "Could not open hex file"; break;
+    case OTGWError::OTGW_ERROR_HEX_FORMAT:    errorupgrade = "Invalid format of hex file"; break;
+    case OTGWError::OTGW_ERROR_HEX_DATASIZE:  errorupgrade = "Wrong data size in hex file"; break;
+    case OTGWError::OTGW_ERROR_HEX_CHECKSUM:  errorupgrade = "Bad checksum in hex file"; break;
+    case OTGWError::OTGW_ERROR_MAGIC:         errorupgrade = "Hex file does not contain expected data"; break;
+    case OTGWError::OTGW_ERROR_RESET:         errorupgrade = "PIC reset failed"; break;
+    case OTGWError::OTGW_ERROR_RETRIES:       errorupgrade = "Too many retries"; break;
+    case OTGWError::OTGW_ERROR_MISMATCHES:    errorupgrade = "Too many mismatches"; break;
+    case OTGWError::OTGW_ERROR_DEVICE:        errorupgrade = "Wrong PIC (16F88 <=> 16F1847)"; break;
     default:                       errorupgrade = "Unknown state"; break;
   }
-  OTGWDebugTf("Upgrade finished: Errorcode = %d - %s - %d retries, %d errors\n", result, CSTR(errorupgrade), retries, errors);
+  OTGWDebugTf("Upgrade finished: Errorcode = %d - %s - %d retries, %d errors\r\n", result, CSTR(errorupgrade), retries, errors);
 }
 
 
@@ -1999,7 +1996,7 @@ void fwupgradestart(const char *hexfile) {
   
   digitalWrite(LED1, LOW);
   result = OTGWSerial.startUpgrade(hexfile);
-  if (result!= OTGW_ERROR_NONE) {
+  if (result!= OTGWError::OTGW_ERROR_NONE) {
     fwupgradedone(result);
   } else {
     OTGWSerial.registerFinishedCallback(fwupgradedone);
