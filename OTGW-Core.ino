@@ -2074,7 +2074,7 @@ void upgradepic() {
   }
   if (action == "upgrade") {
     DebugTf("Upgrade /%s/%s\r\n", sPICdeviceid.c_str(), filename.c_str());
-    upgradepicnow(String("/" + sPICdeviceid + "/" + filename).c_str());
+    upgradepicnow(String(filename).c_str());
   } else if (action == "refresh") {
     DebugTf("Refresh %s/%s\r\n", sPICdeviceid.c_str(), filename.c_str());
     refreshpic(filename, version);
