@@ -1990,7 +1990,6 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
 
 // Schelte's firmware integration
 void fwupgradestart(const char *hexfile) {
-  if (sPICdeviceid=="unknown") return; // no pic version found, don't upgrade
   DebugTf("Start PIC upgrade with hexfile: %s\n\r", hexfile);
   OTGWError result;
   
