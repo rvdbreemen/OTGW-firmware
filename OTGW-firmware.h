@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v0.9.3
+**  Version  : v0.9.5
 **
 **  Copyright (c) 2021-2022 Robert van den Breemen
 **
@@ -53,6 +53,7 @@ void setLed(int8_t, uint8_t);
 #define CMSG_SIZE 512
 #define JSON_BUFF_MAX   1024
 #define CSTR(x) x.c_str()
+#define CONLINEOFFLINE(x) (x?"online":"offline")
 #define CBOOLEAN(x) (x?"true":"false")
 #define CONOFF(x) (x?"On":"Off")
 #define CCONOFF(x) (x?"ON":"OFF")
@@ -88,12 +89,14 @@ const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
 
 //Information on OTGW 
 String    sPICfwversion = ""; 
+String    sPICdeviceid = "";
 String    errorupgrade = ""; 
 bool      bOTGWonline = true;
 bool      bOTGWboilerstate = false;
 bool      bOTGWthermostatstate = false;
 bool      bOTGWgatewaystate = false;
 bool      bPrintSummarymode = false;  //default to PS=0 mode
+bool      bCheckOTGWPICupdate = true;  
 
 //All things that are settings 
 String    settingHostname = _HOSTNAME;

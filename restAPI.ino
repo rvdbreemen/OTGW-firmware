@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v0.9.3
+**  Version  : v0.9.5
 **
 **  Copyright (c) 2021-2022 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -327,6 +327,7 @@ void sendDeviceInfo()
   sendNestedJsonObj("author", "Robert van den Breemen");
   sendNestedJsonObj("fwversion", _FW_VERSION);
   sendNestedJsonObj("picfwversion", CSTR(sPICfwversion));
+  sendNestedJsonObj("picdeviceid", CSTR(sPICdeviceid));
   snprintf(cMsg, sizeof(cMsg), "%s %s", __DATE__, __TIME__);
   sendNestedJsonObj("compiled", cMsg);
   sendNestedJsonObj("hostname", CSTR(settingHostname));

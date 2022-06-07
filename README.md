@@ -11,8 +11,8 @@ Starting with version 2.3 of the Nodoshop hardware the devkit has changed from N
 Supporting hardware version are:
 | Version | Hardware supported |
 |-|-|
-|1.x-2.0|   NodoMCU ESP8266 devkit|
-|2.3|       Wemos D1mini ESP8266 devkit|
+|1.x-2.0|NodoMCU ESP8266 devkit|
+|2.3-2.x|Wemos D1mini ESP8266 devkit|
 
 It can be found here: https://www.nodo-shop.nl/nl/opentherm-gateway/211-opentherm-gateway.html  
 More information on this gateway can be read here: http://otgw.tclcode.com/  (also location of the OTGW PIC firmware) 
@@ -53,14 +53,14 @@ The features of this Nodosop OpenTherm Gateware ESP8266 based firmware are:
 To do:
 - InfluxDB client to do direct logging 
 - Instant update of webUI using websockets
-- Showing log of OT messages using websockets
+- Showing log of OT messages using websockets847
 
 Looking for the documentation, go here (work in progress):  <br> https://github.com/rvdbreemen/OTGW-firmware/wiki/Documentation-of-OTGW-firmware
 
 | Version | Release notes |
 |-|-|
-| 0.10.1 | Fix missing settings save value for HA reboot detection|
 | 0.10.0 | Readout S0 output from configurable GPIO, interupt rtn added for this, enhanced Dallas-type sensor logic (autoconfigure, code cleanup)|
+| 0.9.5 | Improved: WebUI improved by community<br>Bugfix: Device Online status indicator for Home Assistant<br>Improved: Update of 5.x series (pic16f88) firmwares, preparing for 6.x (pic16f1847) updates.<br>Bugfix: Prevent spamming OTGW firmware website in case of rebootloop<br>Added: Unique useragent|
 | 0.9.4 | Update: New firmware included gateway version 5.3 for PIC P16F88.<br>Update: Preventing >5.x PIC firmwares to be detected, incompatible (for now)| 
 | 0.9.3 | Bugfix: Small buffer of serial input, broke the PS=1 command, causing integrations of Domoticz and HA to break<br>Added: Setting for HA reboot detections, this enables a user to change the behaviour of HA reboot detection<br>Bugfix: PIC version detection fixed<br>Improving: Top topics parsing broke with 0.9.2, now you can once more use "/Myhome/OTGW/" as your toptopics |
 | 0.9.2 | New feature: Just In Time Home Assistant Auto Discovery topics. Now only sensors that actually have msgids from OpenTherm are send to Home Assistant. (thanks to @rlagerweij)<br>Improvement: Climate Entity (Home Assistant) got improved to detect Thermostat availablity (by @sergantd)<br>Bugfix: Alternating values on status bits (thanks @binsentsu)<br>Bugfix: Blue blinking leds of nodemcu should be off using WebUI (thanks @fsfikke)<br>New feature: Reset wifi button in webUI (thanks @DaveDavenport)<br>Improved: More UI improvements (thanks @rlagerweij)<br>Improved: Serial handling improvements<br>Fixed: Codecleanup (removal of errorprone string functions), removal of potential bufferoverflow, removed all warnings in code compile (thanks @DaveDavenport)<br>Improved: Reboot logging, now includes external watchdog reason.|
@@ -105,7 +105,7 @@ So shoutout to the following people for the collaboration on development:
 * @proditaki      for creating Domiticz plugin for OTGW-firmware
 * @tjfsteele      for endless hours of testing
 
-A big thank should goto **Schelte Bron** @hvlx for amazing work on the OpenTherm Gateway project and for providing access to the upgrade routines of the PIC. Enabling this custom firmware a reliable way to upgrade you PIC firmware.
+A big thank should goto **Schelte Bron** @hvxl for amazing work on the OpenTherm Gateway project and for providing access to the upgrade routines of the PIC. Enabling this custom firmware a reliable way to upgrade you PIC firmware.
 
 If you want to thank Schelte Bron for his work on the OpenTherm Gateway project, just head over to his homepage and donate to him: https://otgw.tclcode.com/
 

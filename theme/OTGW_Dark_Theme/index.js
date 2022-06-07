@@ -43,12 +43,11 @@
         })        
       }
     );
-    Array.from(document.getElementsByClassName('btnSaveSettings')).forEach(
+    Array.from(document.getElementsByClassName('SaveSettings')).forEach(
       function(el, idx, arr) {
         el.addEventListener('click',function(){
           saveSettings();
-          toggleHidden('adv_dropdown', true);
-          toggleHidden('btnSaveSettings', true);
+          toggleDropdown(true);
         });
       }
     );
@@ -56,8 +55,7 @@
       function(el, idx, arr) {
         el.addEventListener('click',function(){
           deviceinfoPage();
-          toggleHidden('adv_dropdown', true);
-          toggleHidden('btnSaveSettings', true);
+          toggleDropdown(true);
         });
       }
     );
@@ -65,8 +63,7 @@
       function (el, idx, arr) {
         el.addEventListener('click',function() {
           firmwarePage();
-          toggleHidden('adv_dropdown', true);
-          toggleHidden('btnSaveSettings', true);
+          toggleDropdown(true);
         });
       }
     );
@@ -74,14 +71,13 @@
       function(el, idx, arr) {
         el.addEventListener('click',function(){
           settingsPage();
-          toggleHidden('adv_dropdown', true);
-          toggleHidden('btnSaveSettings', false);
+          toggleDropdown(true);
         });
       }
     );
     Array.from(document.getElementsByClassName('adminSettings')).forEach(
       function(el, idx, arr) {
-        el.addEventListener('click', function() {toggleHidden('adv_dropdown', false);});
+        el.addEventListener('click', function() {toggleDropdown();});
       }
     );
     Array.from(document.getElementsByClassName('home')).forEach(
@@ -147,8 +143,8 @@
     
   } // settingsPage()
   
-  function toggleHidden(className, hideOnly) {
-    Array.from(document.getElementsByClassName(className)).forEach(
+  function toggleDropdown(hideOnly) {
+    Array.from(document.getElementsByClassName('adv_dropdown')).forEach(
       function(el, idx, arr) {
         if ( ! el.classList.contains("hidden")) {
           el.classList.add("hidden");
@@ -192,17 +188,11 @@
       .then(files => {
         console.log("parsed ... data is ["+ JSON.stringify(files)+"]");
         
-        let displayPICpage = document.getElementById('displayPICpage');
-        while (displayPICpage.lastChild) {
-          displayPICpage.lastChild.remove();
-        }
-        let tableDiv = document.createElement("div");
-        tableDiv.setAttribute("class", "pictable");
-        
+        var displayPICpage = document.getElementById('displayPICflash');          
         var rowDiv = document.createElement("div");
         rowDiv.setAttribute("class", "picrow");
         rowDiv.setAttribute("id", "firmwarename");
-        rowDiv.style.background = "lightblue";
+        rowDiv.style.background = "rgb(28, 28, 30)";
         rowDiv.style.fontWeight = "bold";
         //--- field Name ---
         var fldDiv = document.createElement("div");
@@ -226,17 +216,17 @@
         //--- flash to pic icon---
         var btn = document.createElement("div");
         rowDiv.appendChild(btn); 
-        tableDiv.appendChild(rowDiv);
+        displayPICpage.appendChild(rowDiv);
 
         for( let i in files )
         {
           console.log("["+files[i].name+"]=>["+files[i].version+"]=>["+files[i].size+"]");
 
-          // var displayPICflash = document.getElementById('displayPICflash');          
+          var displayPICpage = document.getElementById('displayPICflash');          
           var rowDiv = document.createElement("div");
           rowDiv.setAttribute("class", "picrow");
           rowDiv.setAttribute("id", "firmware_"+files[i].name);
-          rowDiv.style.background = "lightblue";
+          rowDiv.style.background = "rgb(28, 28, 30)";
           //--- field Name ---
           var fldDiv = document.createElement("div");
           fldDiv.setAttribute("class", "piccolumn1");
@@ -251,6 +241,7 @@
           var sizDiv = document.createElement("div");
           sizDiv.setAttribute("class", "piccolumn3");                  
           sizDiv.textContent = files[i].size; 
+          sizDiv.style.textAlign = "right";
           rowDiv.appendChild(sizDiv);
           //--- refresh icon ---
           var btn = document.createElement("div");
@@ -261,7 +252,6 @@
             img.src = localURL+'/refresh-page-option.png';
             img.style.width = '16px';
             img.style.height = 'auto';
-            img.setAttribute=("alt", "Refresh");
             a.appendChild(img);
             btn.appendChild(a); 
           rowDiv.appendChild(btn); 
@@ -274,13 +264,13 @@
             img.src = localURL+'/download-to-storage-drive.png'
             img.style.width = '16px';
             img.style.height = 'auto';
-            img.setAttribute=("alt", "Download");
             a.appendChild(img);
             btn.appendChild(a); 
           rowDiv.appendChild(btn); 
-          tableDiv.appendChild(rowDiv);
+          displayPICpage.appendChild(rowDiv);
+
+          
         }
-        displayPICpage.appendChild(tableDiv);
  
       })
       .catch(function(error) {
@@ -340,24 +330,17 @@
         //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
         needReload = false;
         data = json.otmonitor;
-
-        let otMonPage = document.getElementById('mainPage');
-        while (otMonPage.lastChild) {
-          otMonPage.lastChild.remove();
-        }
-        let otMonTable = document.createElement("div");
-        otMonTable.setAttribute("class", "otmontable");
-        
         for( let i in data )
         {
+          document.getElementById("waiting").innerHTML = "";
           //console.log("["+data[i].name+"]=>["+data[i].value+"]");
-          
+          var mainPage = document.getElementById('mainPage');
           if( ( document.getElementById("otmon_"+data[i].name)) == null )
           { // if element does not exists yet, then build page
             var rowDiv = document.createElement("div");
             rowDiv.setAttribute("class", "otmonrow");
             //rowDiv.setAttribute("id", "otmon_"+data[i].name);
-            rowDiv.style.background = "lightblue";
+            rowDiv.style.background = "rgb(28, 28, 30)";
             rowDiv.style.visibility = ((data[i].epoch==0)?"collapse":"visible");
             // rowDiv.style.display = ((data[i].epoch==0)?"none":"table-row");
             var epoch = document.createElement("INPUT");
@@ -382,7 +365,7 @@
             unitDiv.setAttribute("class", "otmoncolumn3");
             unitDiv.textContent = data[i].unit; 
             rowDiv.appendChild(unitDiv);
-            otMonTable.appendChild(rowDiv);
+            mainPage.appendChild(rowDiv);
           }
           else
           { //if the element exists, then update the value
@@ -400,7 +383,6 @@
 
           }
         }
-        otMonPage.appendChild(otMonTable);
         if (needReload) window.location.reload(true);
       })
       .catch(function(error) {
@@ -433,7 +415,7 @@
             var rowDiv = document.createElement("div");
             rowDiv.setAttribute("class", "devinforow");
             rowDiv.setAttribute("id", "devinfo_"+data[i].name);
-            rowDiv.style.background = "lightblue";
+            rowDiv.style.background = "rgb(28, 28, 30)";
             //--- field Name ---
             var fldDiv = document.createElement("div");
             fldDiv.setAttribute("class", "devinfocolumn1");
@@ -479,12 +461,14 @@
             rowDiv.setAttribute("class", "settingDiv");
       //----rowDiv.setAttribute("id", "settingR_"+data[i].name);
             rowDiv.setAttribute("id", "D_"+data[i].name);
-            rowDiv.setAttribute("style", "text-align: right;");
-            // rowDiv.style.marginLeft = "10px";
-            // rowDiv.style.marginRight = "10px";
-            rowDiv.style.minWidth = "850px";
-            rowDiv.style.border = "thick solid lightblue";
-            rowDiv.style.background = "lightblue";
+            rowDiv.setAttribute("style", "text-align: left;");
+            rowDiv.style.marginLeft = "10px";
+            rowDiv.style.marginRight = "10px";
+            rowDiv.style.width = "850px";
+            rowDiv.style.borderBottomStyle = "solid";
+            rowDiv.style.borderBottomWidth = "1px";
+            rowDiv.style.borderBottomColor = "rgb(72, 72, 74)";
+            rowDiv.style.background = "rgb(28, 28, 30)";
             //--- field Name ---
               var fldDiv = document.createElement("div");
                   fldDiv.setAttribute("style", "margin-right: 10px;");
@@ -566,7 +550,7 @@
     
 
   //============================================================================  
-  function saveSettings()
+  function saveSettings() 
   {
     console.log("saveSettings() ...");
     let changes = false;
@@ -741,7 +725,6 @@
    ,[ "author",                     "Developer"]
    ,[ "fwversion",                  "ESP8266 Firmware Version"]
    ,[ "picfwversion",               "OTGW PIC Firmware Version"]
-   ,[ "picdeviceid",                "OTGW PIC Device ID"]
    ,[ "compiled",                   "Compiled on (date/time)"]
    ,[ "HostName",                   "Hostname (add .local)"]
    ,[ "ipaddress",                  "IP address"]
@@ -777,15 +760,6 @@
    ,[ "gpiosensorsenabled",         "GPIO Sensors Enabled"]
    ,[ "gpiosensorsinterval",        "GPIO Publish Interval (sec)"]
    ,[ "gpiosensorspin",             "GPIO pin # (SD3 = GPIO10 => 10)"]
-   ,[ "numberofsensors",            "Number of temperature sensors"]
-   ,[ "s0counterenabled",           "S0 Counter Enabled"]
-   ,[ "s0counterinterval",          "S0 Counter Interval (sec)"]
-   ,[ "s0counterpin",               "S0 Counter pin # (D6 = GPIO12 => 12)"]
-   ,[ "s0counterdebouncetime",      "S0 Counter debouncetime (mS)"]
-   ,[ "s0counterpulsekw",           "S0 pulses per kW"]
-   ,[ "s0powerkw",                  "S0 actual power (kW)"]
-   ,[ "s0intervalcount",            "S0 interval pulses"]
-   ,[ "s0totalcount",               "S0 total pulses"]
    ,[ "mqttotmessage",              "MQTT OT msg Enable"]
    ,[ "otgwcommandenable",          "OTGW Boot Command Enabled"]
    ,[ "otgwcommands",               "OTGW Boot Command"]

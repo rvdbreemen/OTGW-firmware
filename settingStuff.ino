@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v0.9.3
+**  Version  : v0.9.5
 **
 **  Copyright (c) 2021-2022 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -40,6 +40,7 @@ void writeSettings(bool show)
   root["MQTTharebootdetection"]= settingMQTTharebootdetection;	  
   root["MQTTuniqueid"] = settingMQTTuniqueid;
   root["MQTTOTmessage"] = settingMQTTOTmessage;
+  root["MQTTharebootdetection"]= settingMQTTharebootdetection;  
   root["NTPenable"] = settingNTPenable;
   root["NTPtimezone"] = settingNTPtimezone;
   root["NTPhostname"] = settingNTPhostname;
