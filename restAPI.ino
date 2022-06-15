@@ -299,7 +299,7 @@ void sendOTmonitor()
   sendJsonOTmonObj("maxchwatersetpoint", OTcurrentSystemState.MaxTSet,"°C", msglastupdated[OT_MaxTSet]);
   sendJsonOTmonObj("chwaterpressure", OTcurrentSystemState.CHPressure, "bar", msglastupdated[OT_CHPressure]);
   sendJsonOTmonObj("oemdiagnosticcode", OTcurrentSystemState.OEMDiagnosticCode, "", msglastupdated[OT_OEMDiagnosticCode]);
-  sendJsonOTmonObj("oemfaultcode", OTcurrentSystemState.ASFflags && 0xFF, "", msglastupdated[OT_ASFflags]);
+  sendJsonOTmonObj("oemfaultcode", OTcurrentSystemState.ASFflags & 0xFF, "", msglastupdated[OT_ASFflags]);
   
   sendEndJsonObj("otmonitor");
 
