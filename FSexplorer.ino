@@ -159,6 +159,8 @@ void apifirmwarefilelist() {
       } 
       DebugTf("version=%s\r\n", version.c_str());	
       fwversion = GetVersion(hexfile); // only check if gateway firmware
+      // String hexversion = OTGWSerial.readHexFileVersion(hexfile.c_str());
+      // DebugTf("File version on hexfile: %s\r\n", hexversion.c_str());
       DebugTf("GetVersion(%s) returned [%s]\r\n", hexfile.c_str(), fwversion.c_str());  
       if (fwversion.length() && strcmp(fwversion.c_str(),version.c_str())) { // versions do not match
         version=fwversion; // assign hex file version to version
