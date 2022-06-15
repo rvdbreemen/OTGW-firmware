@@ -37,6 +37,8 @@ DECLARE_TIMER_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_T
   
 //=====================================================================
 void setup() {
+
+ 
   // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
   // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
   // while (!Serial) {} //Wait for OK
@@ -44,6 +46,7 @@ void setup() {
   OTGWSerial.println(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   OTGWSerial.printf("Booting....[%s]\r\n\r\n", String(_FW_VERSION).c_str());
   WatchDogEnabled(0); // turn off watchdog
+  
 
   //setup randomseed the right way
   randomSeed(RANDOM_REG32); //This is 8266 HWRNG used to seed the Random PRNG: Read more: https://config9.com/arduino/getting-a-truly-random-number-in-arduino/
@@ -81,6 +84,16 @@ void setup() {
   
  
   OTGWSerial.println(F("Setup finished!\r\n"));
+
+  // //delay for debugging
+  // OTGWSerial.print("bootdelay ");
+  // for (int i =0; i <10; i++) {
+  //   delay(1000);
+  //   OTGWSerial.print(i);
+  //   OTGWSerial.print(" ");	
+  // }
+  // OTGWSerial.println();
+  
   // After resetting the OTGW PIC never send anything to Serial for debug
   // and switch to telnet port 23 for debug purposed. 
   // Setup the OTGW PIC

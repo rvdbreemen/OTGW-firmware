@@ -106,7 +106,33 @@ void sendMQTTstateinformation(){
 //===================[ Reset OTGW ]===============================
 void resetOTGW() {
   //sPICfwversion ="No version found"; //reset versionstring
+
   OTGWSerial.resetPic();
+
+  // 12 june 2022 - trying to determine the PIC hardware on reboot
+  // char buffer[80]={0};
+  // delay(100);
+  // OTGWSerial.write(0x0f);
+  // OTGWSerial.write(0x00);
+  // OTGWSerial.write(0x03); 
+  // OTGWSerial.write(0xfd);
+  // OTGWSerial.write(0x04);
+  // delay(100);
+  // OTGWSerial.write(0x0f);
+  // OTGWSerial.write(0x08);
+  // OTGWSerial.write(0x00);
+  // OTGWSerial.write(0xf8);
+  // OTGWSerial.write(0x04);
+  // delay(100);
+  // //then read the first response of the firmware to make sure it reads it
+  // size_t lenbuf = OTGWSerial.readBytesUntil('\n', buffer, sizeof(buffer));
+  
+  // OTGWDebugT("resetOTGW: ");
+  // for (int i=0; i<(int)lenbuf; i++) {
+  //   OTGWDebugf("%02x ", buffer[i]);
+  // }
+
+  
   // //then read the first response of the firmware to make sure it reads it
   // String resp = OTGWSerial.readStringUntil('\n');
   // resp.trim();

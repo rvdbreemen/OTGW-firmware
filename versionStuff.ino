@@ -10,7 +10,7 @@ static const char banner[] = "OpenTherm Gateway ";
 String GetVersion(const String hexfile){
   char hexbuf[48]={0};
   int len, addr, tag, data, offs, linecnt = 0;
-  char datamem[256]={0};
+  char datamem[256]={0}; // prevent buffer overrun
   unsigned short ptr;
   File f;
   DebugTf("GetVersion opening %s\r\n",hexfile.c_str());
@@ -19,13 +19,13 @@ String GetVersion(const String hexfile){
   {
     while (f.readBytesUntil('\n', hexbuf, sizeof(hexbuf)) != 0) {
       linecnt++;
-      //DebugTf("reading line %d %s\n",linecnt,hexbuf);
+      // DebugTf("reading line %d %s\n",linecnt,hexbuf);
       if (sscanf(hexbuf, ":%2x%4x%2x", &len, &addr, &tag) != 3)
       {
         DebugTf("Parse error on line %d\n",linecnt);// Parse error
         break;
       }
-      //DebugTf("Read in %2x %4x %2x\n",len,addr,tag);
+      // DebugTf("Read in %2x %4x %2x\n",len,addr,tag);
       if (len & 1)
       {
         DebugTf("Invalid data size on line %d\n",linecnt);// Invalid data size
@@ -35,11 +35,26 @@ String GetVersion(const String hexfile){
       len >>= 1;
       if (tag == 0)
       {
-        //DebugTf("Checking address %4x on line %d\n",addr,linecnt);// Invalid data size
-        if (addr >= 0x4200 && addr <= 0x4400)
+       // DebugTf("Checking address %4x on line %d\r\n",addr,linecnt);// Invalid data size
+        if (addr >= 0x4200 && addr <= 0x4300)
         {
-          // Data memory
+          // Data memory 16f88
           addr = (addr - 0x4200) >> 1;
+          while (len > 0)
+          {
+            if (sscanf(hexbuf + offs, "%04x", &data) != 1)
+              break;
+            // if (!bitRead(datamap, addr / 64)) weight += WEIGHT_DATAPROG;
+            // bitSet(datamap, addr / 64);
+            //DebugTf("storing %x in %x\r\n",data,addr);
+            datamem[addr++] = byteswap(data);
+            offs += 4;
+            len--;
+          }
+        } else if (addr >= 0xe000 && addr <= 0xe100)
+        {
+          // Data memory 16f1847
+          addr = (addr - 0xe000) >> 1;
           while (len > 0)
           {
             if (sscanf(hexbuf + offs, "%04x", &data) != 1)
@@ -66,14 +81,14 @@ String GetVersion(const String hexfile){
     ptr = 0; 
     while (ptr < 256)
     {
-      //DebugTf("checking for %s at char pos %d\n",banner,ptr);
+      //DebugTf("checking for %s at char pos %d\r\n",banner,ptr);
       char *s = strstr((char *)datamem + ptr, banner);
       if (!s)
       {
-        //DebugTf("did not find the banner\n");
+        //DebugTf("did not find the banner\r\n");
         ptr += strnlen((char *)datamem + ptr, 256 - ptr) + 1;
       } else {
-        //DebugTf("hit the banner! returning version string %s\n",s);
+        //DebugTf("hit the banner! returning version string %s\r\n",s);
         s += sizeof(banner) - 1;
         return String(s);
       }
