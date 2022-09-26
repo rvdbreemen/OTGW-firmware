@@ -624,7 +624,7 @@ void print_status(uint16_t& value)
     //  4: Cooling status [ cooling mode not active, cooling mode active ]
     //  5: CH2 mode [CH2 not active, CH2 active]
     //  6: diagnostic indication [no diagnostics, diagnostic event]
-    //  7: Electricity production [no eletric production, eletric production]
+    //  7: Electricity production [no electric production, electric production]
     _flag8_slave[0] = (((OTdata.valueLB) & 0x01) ? 'E' : '-');
     _flag8_slave[1] = (((OTdata.valueLB) & 0x02) ? 'C' : '-'); 
     _flag8_slave[2] = (((OTdata.valueLB) & 0x04) ? 'W' : '-'); 
@@ -648,7 +648,7 @@ void print_status(uint16_t& value)
       sendMQTTData("cooling",               (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  //delayms(5); 
       sendMQTTData("centralheating2",       (((OTdata.valueLB) & 0x20) ? "ON" : "OFF"));  //delayms(5);
       sendMQTTData("diagnostic_indicator",  (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));  //delayms(5);
-      sendMQTTData("eletric_production",    (((OTdata.valueLB) & 0x80) ? "ON" : "OFF"));  //delayms(5);
+      sendMQTTData("electric_production",    (((OTdata.valueLB) & 0x80) ? "ON" : "OFF"));  //delayms(5);
 
       OTcurrentSystemState.SlaveStatus = OTdata.valueLB;
     }
