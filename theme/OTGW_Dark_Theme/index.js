@@ -17,8 +17,6 @@
   refreshDevTime();
 
   console.log("Hash="+window.location.hash);
-  window.onload=initMainPage;
- 
 
   window.onfocus = function() {
     if (needReload) {
