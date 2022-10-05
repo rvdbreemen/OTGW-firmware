@@ -14,7 +14,6 @@
   "use strict";
 
   let needReload  = true;
-  refreshDevTime();
 
   console.log("Hash="+window.location.hash);
 
@@ -27,7 +26,7 @@
 
   
   var tid = 0;
-  var timeupdate = setInterval(function(){refreshDevTime(); }, 1000); //delay is in milliseconds
+  var timeupdate = 0;
     
   //============================================================================  
   function initMainPage() {
@@ -87,9 +86,11 @@
       }
     );
     needReload = false;
+    refreshDevTime();
     refreshDevInfo();
     refreshOTmonitor();
     tid = setInterval(function(){refreshOTmonitor(); }, 1000); //delay is in milliseconds 
+    timeupdate = setInterval(function(){refreshDevTime(); }, 1000); //delay is in milliseconds
 
     document.getElementById("displayMainPage").style.display       = "block";
     document.getElementById("displaySettingsPage").style.display   = "none";
