@@ -90,7 +90,7 @@
     refreshDevInfo();
     refreshOTmonitor();
     tid = setInterval(function(){refreshOTmonitor(); }, 1000); //delay is in milliseconds 
-    timeupdate = setInterval(function(){refreshDevTime(); }, 1000); //delay is in milliseconds
+    timeupdate = setInterval(function(){refreshDevTime(); }, 5000); //delay is in milliseconds
 
     document.getElementById("displayMainPage").style.display       = "block";
     document.getElementById("displaySettingsPage").style.display   = "none";
