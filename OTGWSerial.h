@@ -96,6 +96,7 @@ typedef struct {
 
 typedef void OTGWUpgradeFinished(OTGWError result, short errors, short retries);
 typedef void OTGWUpgradeProgress(int pct);
+typedef void OTGWFirmwareReport(OTGWFirmware fw, const char *version);
 typedef void OTGWDebugFunction(const char *fmt, ...);
 
 class OTGWSerial: public HardwareSerial {
@@ -136,6 +137,7 @@ public:
    OTGWError startUpgrade(const char *hexfile);
    void registerFinishedCallback(OTGWUpgradeFinished *func);
    void registerProgressCallback(OTGWUpgradeProgress *func);
+   void registerFirmwareCallback(OTGWFirmwareReport *func);
 #ifdef DEBUG
    void registerDebugFunc(OTGWDebugFunction *func);
 #endif
@@ -144,6 +146,7 @@ protected:
    OTGWUpgradeData *_upgrade_data = nullptr;
    OTGWUpgradeFinished *_finishedFunc = nullptr;
    OTGWUpgradeProgress *_progressFunc = nullptr;
+   OTGWFirmwareReport *_firmwareFunc = nullptr;
    OTGWProcessor model = PIC16F88;
    char _version[16];
    int _reset, _led;

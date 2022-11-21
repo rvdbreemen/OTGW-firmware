@@ -239,6 +239,10 @@ void OTGWSerial::registerProgressCallback(OTGWUpgradeProgress *func) {
     _progressFunc = func;
 }
 
+void OTGWSerial::registerFirmwareCallback(OTGWFirmwareReport *func) {
+    _firmwareFunc = func;
+}
+
 void OTGWSerial::SetLED(int state) {
     if (_led >= 0) {
         digitalWrite(_led, state ? LOW : HIGH);
@@ -263,6 +267,9 @@ void OTGWSerial::matchBanner(char ch) {
                 _firmware = (OTGWFirmware)i;
                 _banner_matched[i] = 0;
                 _version_pos = 0;
+                if (_firmwareFunc) {
+                    _firmwareFunc(_firmware, _version);
+                }
             } else {
                 _version[_version_pos++] = ch;
             }
@@ -461,7 +468,7 @@ int OTGWSerial::eepromSettings(const char *version, OTGWTransferData *xfer) {
         len = f.readBytesUntil('\n', buffer, sizeof(buffer) - 1);
         buffer[len] = '\0';
         if ((n = sscanf(buffer, "%d %n%*s%n %x %d %x", &id, &p1, &p2, &addr, &size, &mask)) == 4) {
-            if (id >= XFER_MAX_ID);
+            if (id >= XFER_MAX_ID) break;
             buffer[p2] = '\0';
             if (versionCompare(version, buffer + p1) < 0) continue;
             xfer[id].addr = addr;
