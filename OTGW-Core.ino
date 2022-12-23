@@ -185,20 +185,13 @@ void checkOTWGpicforupdate(){
     sMessage = ""; //no firmware version found for some reason
   } else {
     OTGWDebugTf("OTGW PIC firmware version = [%s]\r\n", CSTR(sPICfwversion));
-    if (sPICfwversion.toFloat()>=6) {
-      // found a 6.x for PIC 16F1847, no upgrade route available yet  
-      OTGWDebugTln("Found version >6.x, thus a PIC 16F1847, no upgrade available yet");
-      sMessage = "";
-    } else {
-      //found a 5.x for PIC 16F88, check for update
-      String latest = checkforupdatepic("gateway.hex");
-      if (!bOTGWonline) {
-        sMessage = sPICfwversion; 
-      } else if (latest.isEmpty()) {
-        sMessage = ""; //two options: no internet connection OR no firmware version
-      } else if (latest != sPICfwversion) {
-        sMessage = "New PIC version " + latest + " available!";
-      }
+    String latest = checkforupdatepic("gateway.hex");
+    if (!bOTGWonline) {
+      sMessage = sPICfwversion; 
+    } else if (latest.isEmpty()) {
+      sMessage = ""; //two options: no internet connection OR no firmware version
+    } else if (latest != sPICfwversion) {
+      sMessage = "New PIC version " + latest + " available!";
     }
   }
   //check if the esp8266 and the littlefs versions match
