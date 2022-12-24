@@ -1776,10 +1776,10 @@ void handleOTGW()
 
   //Handle incoming data from OTGW through serial port (READ BUFFER)
   if (OTGWSerial.hasOverrun()) {
-    DebugT("Serial Overrun\r\n");
+    DebugT(F("Serial Overrun\r\n"));
   }
   if (OTGWSerial.hasRxError()){
-    DebugT("Serial Rx Error\r\n");
+    DebugT(F("Serial Rx Error\r\n"));
   }
   size_t bytes_available = OTGWSerial.available();
   if(bytes_available > 0) {
@@ -1987,27 +1987,28 @@ void upgradepicnow(const char *filename) {
 }
 
 void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
-  
   switch (result) {
-    case OTGWError::OTGW_ERROR_NONE:          errorupgrade = "PIC upgrade was succesful"; break;
-    case OTGWError::OTGW_ERROR_MEMORY:        errorupgrade = "Not enough memory available"; break;
-    case OTGWError::OTGW_ERROR_INPROG:        errorupgrade = "Firmware upgrade in progress"; break;
-    case OTGWError::OTGW_ERROR_HEX_ACCESS:    errorupgrade = "Could not open hex file"; break;
-    case OTGWError::OTGW_ERROR_HEX_FORMAT:    errorupgrade = "Invalid format of hex file"; break;
-    case OTGWError::OTGW_ERROR_HEX_DATASIZE:  errorupgrade = "Wrong data size in hex file"; break;
-    case OTGWError::OTGW_ERROR_HEX_CHECKSUM:  errorupgrade = "Bad checksum in hex file"; break;
-    case OTGWError::OTGW_ERROR_MAGIC:         errorupgrade = "Hex file does not contain expected data"; break;
-    case OTGWError::OTGW_ERROR_RESET:         errorupgrade = "PIC reset failed"; break;
-    case OTGWError::OTGW_ERROR_RETRIES:       errorupgrade = "Too many retries"; break;
-    case OTGWError::OTGW_ERROR_MISMATCHES:    errorupgrade = "Too many mismatches"; break;
-    case OTGWError::OTGW_ERROR_DEVICE:        errorupgrade = "Wrong PIC (16F88 <=> 16F1847)"; break;
-    default:                       errorupgrade = "Unknown state"; break;
+    case OTGWError::OTGW_ERROR_NONE:          errorupgrade = F("PIC upgrade was succesful"); break;
+    case OTGWError::OTGW_ERROR_MEMORY:        errorupgrade = F("Not enough memory available"); break;
+    case OTGWError::OTGW_ERROR_INPROG:        errorupgrade = F("Firmware upgrade in progress"); break;
+    case OTGWError::OTGW_ERROR_HEX_ACCESS:    errorupgrade = F("Could not open hex file"); break;
+    case OTGWError::OTGW_ERROR_HEX_FORMAT:    errorupgrade = F("Invalid format of hex file"); break;
+    case OTGWError::OTGW_ERROR_HEX_DATASIZE:  errorupgrade = F("Wrong data size in hex file"); break;
+    case OTGWError::OTGW_ERROR_HEX_CHECKSUM:  errorupgrade = F("Bad checksum in hex file"); break;
+    case OTGWError::OTGW_ERROR_MAGIC:         errorupgrade = F("Hex file does not contain expected data"); break;
+    case OTGWError::OTGW_ERROR_RESET:         errorupgrade = F("PIC reset failed"); break;
+    case OTGWError::OTGW_ERROR_RETRIES:       errorupgrade = F("Too many retries"); break;
+    case OTGWError::OTGW_ERROR_MISMATCHES:    errorupgrade = F("Too many mismatches"); break;
+    case OTGWError::OTGW_ERROR_DEVICE:        errorupgrade = F("Wrong PIC (16F88 <=> 16F1847)"); break;
+    default:                       errorupgrade = F("Unknown state"); break;
   }
-  OTGWDebugTf("Upgrade finished: Errorcode = %d - %s - %d retries, %d errors\r\n", result, CSTR(errorupgrade), retries, errors);
+  OTGWDebugTf(PSTR("Upgrade finished: Errorcode = %d - %s - %d retries, %d errors\r\n"), result, CSTR(errorupgrade), retries, errors);
 }
 
+void fwupgradestep(int pct) {
+  OTGWDebugTf(PSTR("Upgrade: %d%%\n"), pct);
+}
 
-// Schelte's firmware integration
 void fwupgradestart(const char *hexfile) {
   DebugTf("Start PIC upgrade with hexfile: %s\n\r", hexfile);
   OTGWError result;
@@ -2018,6 +2019,7 @@ void fwupgradestart(const char *hexfile) {
     fwupgradedone(result);
   } else {
     OTGWSerial.registerFinishedCallback(fwupgradedone);
+    OTGWSerial.registerProgressCallback(fwupgradestep);
   }
 }
 
