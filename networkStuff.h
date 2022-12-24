@@ -237,7 +237,7 @@ if (!settingNTPenable) return;
           myTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone)); //try with default Timezone instead
         } else {
           //found the timezone, now set the time 
-          auto myTime = ZonedDateTime::forUnixSeconds(NtpLastSync, myTz);
+          auto myTime = ZonedDateTime::forEpochSeconds(NtpLastSync, myTz);
           if (!myTime.isError()) {
             //finally time is synced!
             setTime(myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
