@@ -383,7 +383,8 @@ void sendDeviceTime()
   snprintf(actTime, 49, "%04d-%02d-%02d %02d:%02d:%02d", year(), month(), day()
                                                        , hour(), minute(), second());
   sendNestedJsonObj("dateTime", actTime); 
-  sendNestedJsonObj("epoch", (int)now());
+  int32_t now = time(nullptr);
+  sendNestedJsonObj("epoch", (int)now);
   sendNestedJsonObj("message", sMessage);
 
   sendEndJsonObj("devtime");

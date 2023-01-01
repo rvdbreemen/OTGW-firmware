@@ -199,6 +199,8 @@ void startNTP(){
 
   //void configTime(int timezone_sec, int daylightOffset_sec, const char* server1, const char* server2, const char* server3)
   configTime(0, 0, CSTR(settingNTPhostname), nullptr, nullptr);
+  // Configure NTP before WiFi, so DHCP can override the NTP server(s)
+  
   NtpStatus = TIME_WAITFORSYNC;
 }
 
@@ -237,7 +239,8 @@ if (!settingNTPenable) return;
           myTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone)); //try with default Timezone instead
         } else {
           //found the timezone, now set the time 
-          auto myTime = ZonedDateTime::forEpochSeconds(NtpLastSync, myTz);
+          auto myTime = ZonedDateTime::forUnixSeconds64(NtpLastSync, myTz);
+          DebugTf("%02d:%02d:%02d %02d-%02d-%04d", myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
           if (!myTime.isError()) {
             //finally time is synced!
             setTime(myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
@@ -256,44 +259,51 @@ if (!settingNTPenable) return;
     break;
   } 
  
-  // DECLARE_TIMER_SEC(timerNTPtime, 10, CATCH_UP_MISSED_TICKS);
-  // if DUE(timerNTPtime) DebugTf("Epoch Seconds: %d\r\n", time(nullptr)); //timeout, then break out of this loop
-  // if DUE(timerNTPtime) getNTPtime();
+  DECLARE_TIMER_SEC(timerNTPtime, 10, CATCH_UP_MISSED_TICKS);
+  if DUE(timerNTPtime) 
+  {
+    DebugTf("Epoch Seconds: %d\r\n", time(nullptr)); //timeout, then break out of this loop
+    auto myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+    auto myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
+    DebugTf("Epoch Seconds MyTime: %d\r\n", myTime); //timeout, then break out of this loop
+    DebugTf("%02d:%02d:%02d %02d-%02d-%04d", myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
+  }
+  if DUE(timerNTPtime) getNTPtime();
 }
 
 bool isNTPtimeSet(){
   return NtpStatus == TIME_SYNC;
 }
 
-void waitforNTPsync(int16_t timeout = 30){  
-  //wait for time is synced to NTP server, for maximum of timeout seconds
-  //feed the watchdog while waiting 
-  //update NTP status
-  time_t t = time(nullptr); //get current time
-  DebugTf("Waiting for NTP sync, timeout: %d\r\n", timeout);
-  DECLARE_TIMER_SEC(waitforNTPsync, timeout, CATCH_UP_MISSED_TICKS);
-  DECLARE_TIMER_SEC(timerWaiting, 5, CATCH_UP_MISSED_TICKS);
-  while (true){
-    //feed the watchdog while waiting
-    Wire.beginTransmission(0x26);   
-    Wire.write(0xA5);   
-    Wire.endTransmission();
-    delay(100);
-    if DUE(timerWaiting) DebugTf("Waiting for NTP sync: %lu seconds\r\n", (time(nullptr)-t));
-    // update NTP status
-    loopNTP();
-    //stop waiting when NTP is synced 
-    if (isNTPtimeSet()) {
-      Debugln(F("NTP time synced!"));
-      break;
-    }
-    //stop waiting when timeout is reached 
-    if DUE(waitforNTPsync) {
-      DebugTln(F("NTP sync timeout!"));
-      break;
-    } 
-  }
-}
+// void waitforNTPsync(int16_t timeout = 30){  
+//   //wait for time is synced to NTP server, for maximum of timeout seconds
+//   //feed the watchdog while waiting 
+//   //update NTP status
+//   time_t t = time(nullptr); //get current time
+//   DebugTf("Waiting for NTP sync, timeout: %d\r\n", timeout);
+//   DECLARE_TIMER_SEC(waitforNTPsync, timeout, CATCH_UP_MISSED_TICKS);
+//   DECLARE_TIMER_SEC(timerWaiting, 5, CATCH_UP_MISSED_TICKS);
+//   while (true){
+//     //feed the watchdog while waiting
+//     Wire.beginTransmission(0x26);   
+//     Wire.write(0xA5);   
+//     Wire.endTransmission();
+//     delay(100);
+//     if DUE(timerWaiting) DebugTf("Waiting for NTP sync: %lu seconds\r\n", (time(nullptr)-t));
+//     // update NTP status
+//     loopNTP();
+//     //stop waiting when NTP is synced 
+//     if (isNTPtimeSet()) {
+//       Debugln(F("NTP time synced!"));
+//       break;
+//     }
+//     //stop waiting when timeout is reached 
+//     if DUE(waitforNTPsync) {
+//       DebugTln(F("NTP sync timeout!"));
+//       break;
+//     } 
+//   }
+// }
 
 
 //==[ end of NTP stuff ]=======================================================

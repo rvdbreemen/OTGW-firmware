@@ -64,12 +64,12 @@ void setup() {
   // Connect to and initialise WiFi network
   OTGWSerial.println(F("Attempting to connect to WiFi network\r"));
   setLed(LED1, ON);
+  startNTP();
   startWiFi(CSTR(settingHostname), 240);  // timeout 240 seconds
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
 
   startTelnet();              // start the debug port 23
-  startNTP();
   startMDNS(CSTR(settingHostname));
   startLLMNR(CSTR(settingHostname));
   setupFSexplorer();
