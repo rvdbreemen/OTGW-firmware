@@ -262,7 +262,9 @@ bool updateRebootLog(String text)
     }
   }
 
-  snprintf(log_line, LOG_LINE_LENGTH, "%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n", year(),  month(), day(), hour(), minute(), second(), CSTR(text), errorCode, log_line_excpt);
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
+  snprintf(log_line, LOG_LINE_LENGTH, "%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n", myTime.year(),  myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second(), CSTR(text), errorCode, log_line_excpt);
 
   if (LittleFS.begin()) {
     //start with opening the file
@@ -334,14 +336,18 @@ bool prefix(const char *pre, const char *str)
 
 bool dayChanged(){
   static int8_t lastday = 0;
-  if (lastday==0) lastday = day();
-  return (lastday != day());
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
+  if (lastday==0) lastday = myTime.day();
+  return (lastday != myTime.day());
 }
 
 bool hourChanged(){
   static int8_t lasthour = 0;
-  if (lasthour==0) lasthour = hour();
-  return (lasthour != hour());
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
+  if (lasthour==0) lasthour = myTime.hour();
+  return (lasthour != myTime.hour());
 }
 
 /*

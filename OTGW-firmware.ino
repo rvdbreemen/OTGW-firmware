@@ -164,22 +164,28 @@ void sendtimecommand(){
   if (NtpStatus != TIME_SYNC) return;   // only send time command when time is synced
   //send time command to OTGW
   //send time / weekday
+
+  time_t now = time(nullptr);
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
+  //DebugTf("%02d:%02d:%02d %02d-%02d-%04d\r\n", myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
+
   char msg[15]={0};
-  #define calc_ot_dow(dow) ((dow+5)%7+1) 
-  sprintf(msg,"SC=%d:%02d/%ld", hour(), minute(), calc_ot_dow(dayOfWeek(now())));
+  int day_of_week = (myTime.dayOfWeek()+5)%7+1;
+  sprintf(msg,"SC=%d:%02d/%d", myTime.hour(), myTime.minute(), day_of_week);
   addOTWGcmdtoqueue(msg, strlen(msg), true);
 
   static int lastDay = 0;
-  if (day(now())!=lastDay){
+  if (myTime.day()!=lastDay){
     //Send msg id 21: month, day
-    lastDay = day(now());
-    sprintf(msg,"SR=21:%d,%d", month(now()), day(now()));
+    lastDay = myTime.day();
+    sprintf(msg,"SR=21:%d,%d", myTime.month(), myTime.day());
     addOTWGcmdtoqueue(msg, strlen(msg), true);  
   }
   
   static int lastYear = 0;
-  if (year(now())!=lastYear){
-    lastYear = year(now());
+  if (myTime.year()!=lastYear){
+    lastYear = myTime.year();
     //Send msg id 22: HB of Year, LB of Year 
     sprintf(msg,"SR=22:%d,%d", (lastYear >> 8) & 0xFF, lastYear & 0xFF);
     addOTWGcmdtoqueue(msg, strlen(msg), true);

@@ -821,7 +821,7 @@ void print_statusVH(uint16_t& value)
 
   if (is_value_valid(OTdata, OTlookupitem)){
     //OTGWDebugTf("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
-    value = (OTcurrentSystemState.MasterStatusVH<<8) && OTcurrentSystemState.SlaveStatusVH;
+    value = (OTcurrentSystemState.MasterStatusVH<<8) & OTcurrentSystemState.SlaveStatusVH;
   }
 }
 
@@ -1426,6 +1426,7 @@ void processOT(const char *buf, int len){
   static bool bOTGWthermostatpreviousstate = false;
   static bool bOTGWgatewaypreviousstate = false;
   static bool bOTGWpreviousstate = false;
+  time_t now = time(nullptr);
 
   if (isvalidotmsg(buf, len)) { 
     //OT protocol messages are 9 chars long
@@ -1439,30 +1440,30 @@ void processOT(const char *buf, int len){
 
     // source of otmsg
     if (buf[0]=='B'){
-      epochBoilerlastseen = now(); 
+      epochBoilerlastseen = now; 
       OTdata.rsptype = OTGW_BOILER;
     } else if (buf[0]=='T'){
-      epochThermostatlastseen = now();
+      epochThermostatlastseen = now;
       OTdata.rsptype = OTGW_THERMOSTAT;
     } else if (buf[0]=='R')    {
-      epochGatewaylastseen = now();
+      epochGatewaylastseen = now;
       OTdata.rsptype = OTGW_REQUEST_BOILER;
     } else if (buf[0]=='A')    {
-      epochGatewaylastseen = now();
+      epochGatewaylastseen = now;
       OTdata.rsptype = OTGW_ANSWER_THERMOSTAT;
     } else if (buf[0]=='E')    {
       OTdata.rsptype = OTGW_PARITY_ERROR;
     } 
 
     //If the Boiler messages have not been seen for 30 seconds, then set the state to false. 
-    bOTGWboilerstate = (now() < (epochBoilerlastseen+30));  
+    bOTGWboilerstate = (now < (epochBoilerlastseen+30));  
     if ((bOTGWboilerstate != bOTGWboilerpreviousstate) || (cntOTmessagesprocessed==1)) {
       sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(bOTGWboilerstate)); 
       bOTGWboilerpreviousstate = bOTGWboilerstate;
     }
 
     //If the Thermostat messages have not been seen for 30 seconds, then set the state to false. 
-    bOTGWthermostatstate = (now() < (epochThermostatlastseen+30));
+    bOTGWthermostatstate = (now < (epochThermostatlastseen+30));
     if ((bOTGWthermostatstate != bOTGWthermostatpreviousstate) || (cntOTmessagesprocessed==1)){      
       sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(bOTGWthermostatstate));
       bOTGWthermostatpreviousstate = bOTGWthermostatstate;
@@ -1470,7 +1471,7 @@ void processOT(const char *buf, int len){
     
     //If the Gateway (A or R) messages have not been seen for 30 seconds, then set the state to false. 
     //If the Thermostat is NOT connected (so false), then the Gateway will be continuously sending R messages to the boiler, in face the Gateway the acts as the Thermostat
-    bOTGWgatewaystate = (now() < (epochGatewaylastseen+30));
+    bOTGWgatewaystate = (now < (epochGatewaylastseen+30));
     if ((bOTGWgatewaystate != bOTGWgatewaypreviousstate) || (cntOTmessagesprocessed==1)){      
       sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(bOTGWgatewaystate));
       bOTGWgatewaypreviousstate = bOTGWgatewaystate;
@@ -1522,7 +1523,7 @@ void processOT(const char *buf, int len){
       OTdata.skipthis = skipthis;         //skip if needed
 
       //keep track of last update time of each message id
-      msglastupdated[OTdata.id] = now();
+      msglastupdated[OTdata.id] = now;
       
       //Read information from this OT message ready for use...
       PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);

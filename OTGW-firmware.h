@@ -10,15 +10,12 @@
 */
 
 #include <Arduino.h>
-//#include <ezTime.h>             // https://github.com/ropg/ezTime
-
 #include <AceTime.h>
-#include <TimeLib.h>
+// #include <TimeLib.h>
 
 #include <TelnetStream.h>       // https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
 #include <ArduinoJson.h>        // https://arduinojson.org/
 #include "Wire.h"
-#include "Debug.h"
 #include "safeTimers.h"
 #include "OTGWSerial.h"         // Bron Schelte's Serial class - it upgrades and more
 #include "OTGW-Core.h"          // Core code for this firmware 
@@ -76,11 +73,18 @@ uint32_t    MQTTautoConfigMap[8] = { 0 };
 
 //Use acetime
 using namespace ace_time;
-static BasicZoneProcessor timeProcessor;
-static const int CACHE_SIZE = 3;
+//static BasicZoneProcessor timeProcessor;
+//static const int CACHE_SIZE = 3;
 // static BasicZoneManager<CACHE_SIZE> manager(zonedb::kZoneRegistrySize, zonedb::kZoneRegistry);
-static BasicZoneProcessorCache<CACHE_SIZE> zoneProcessorCache;
-static BasicZoneManager timezoneManager(zonedb::kZoneRegistrySize, zonedb::kZoneRegistry, zoneProcessorCache);
+//static BasicZoneProcessorCache<CACHE_SIZE> zoneProcessorCache;
+//static BasicZoneManager timezoneManager(zonedb::kZoneAndLinkRegistrySize, zonedb::kZoneAndLinkRegistry, zoneProcessorCache);
+static ExtendedZoneProcessor tzProcessor;
+static const int CACHE_SIZE = 3;
+static ExtendedZoneProcessorCache<CACHE_SIZE> zoneProcessorCache;
+static ExtendedZoneManager timezoneManager(
+  zonedbx::kZoneAndLinkRegistrySize,
+  zonedbx::kZoneAndLinkRegistry,
+  zoneProcessorCache);
 
 const char *weekDayName[]  {  "Unknown", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Unknown" };
 const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
@@ -137,8 +141,10 @@ bool      settingGPIOOUTPUTSenabled = false;
 int8_t    settingGPIOOUTPUTSpin = 16;
 int8_t    settingGPIOOUTPUTStriggerBit = 0;
 
-//Now load network suff
+//Now load Debug & network library
+#include "Debug.h"
 #include "networkStuff.h"
+
 
     // That's all folks...
 

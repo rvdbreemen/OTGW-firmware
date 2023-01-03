@@ -64,6 +64,7 @@ enum NtpStatus_t {
 };
 
 NtpStatus_t NtpStatus = TIME_NOTSET;
+static const time_t EPOCH_2000_01_01 = 946684800;
 time_t NtpLastSync = 0; //last sync moment in EPOCH seconds
 
 ESP8266WebServer        httpServer (80);
@@ -116,6 +117,12 @@ void startWiFi(const char* hostname, int timeOut)
   //--- useful to make it all retry or go to sleep in seconds
   //manageWiFi.setTimeout(240);  // 4 minuten
   manageWiFi.setTimeout(timeOut);  // in seconden ...
+
+  //--- remove Info and Update buttons from Configuration Portal (security improvement 20230102)
+  std::vector<const char *> wm_menu  = {"wifi", "exit"};
+  manageWiFi.setShowInfoUpdate(false);
+  manageWiFi.setShowInfoErase(false);
+  manageWiFi.setMenu(wm_menu);
   
   //--- fetches ssid and pass and tries to connect
   //--- if it does not connect it starts an access point with the specified name
@@ -214,36 +221,39 @@ void getNTPtime(){
   dt_sec = tp.tv_sec;
   dt_ms = tp.tv_nsec / 1000000UL;
   dt_nsec = tp.tv_nsec;
-  DebugTf("tNow=%20.10f tNow_sec=%16.10ld tNow_nsec=%16.10ld dt_sec=%16li(s) dt_msec=%16li(sm) dt_nsec=%16li(ns)\r\n", tNow, tp.tv_sec,tp.tv_nsec, dt_sec, dt_ms, dt_nsec);
+  DebugTf("tNow=%20.10f tNow_sec=%16.10ld tNow_nsec=%16.10ld dt_sec=%16li(s) dt_msec=%16li(sm) dt_nsec=%16li(ns)\r\n", (double)tNow, tp.tv_sec,tp.tv_nsec, dt_sec, dt_ms, dt_nsec);
   DebugFlush();
 }
 
 void loopNTP(){
+time_t now;
+now = time(nullptr); //this is now...
 if (!settingNTPenable) return;
   switch (NtpStatus){
     case TIME_NOTSET:
     case TIME_NEEDSYNC:
-      NtpLastSync = time(nullptr); //remember last sync
+      NtpLastSync = now; //remember last sync
       DebugTln(F("Start time syncing"));
       startNTP();
       DebugTf("Starting timezone lookup for [%s]\r\n", CSTR(settingNTPtimezone));
       NtpStatus = TIME_WAITFORSYNC;
       break;
     case TIME_WAITFORSYNC:
-      if ((time(nullptr)>0) || (time(nullptr) >= NtpLastSync)) { 
-        NtpLastSync = time(nullptr); //remember last sync         
-        auto myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+      if ((now > EPOCH_2000_01_01) && (now >= NtpLastSync)) { 
+        //DebugTf("Waited for sync: epoch: %lld\r\n", time(nullptr));
+        NtpLastSync = now; //remember last sync         
+        TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
         if (myTz.isError()){
-          //DebugTf("Error: Timezone Invalid/Not Found: [%s]\r\n", CSTR(settingNTPtimezone));
+          DebugTf("Error: Timezone Invalid/Not Found: [%s]\r\n", CSTR(settingNTPtimezone));
           settingNTPtimezone = NTP_DEFAULT_TIMEZONE;
           myTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone)); //try with default Timezone instead
         } else {
           //found the timezone, now set the time 
-          auto myTime = ZonedDateTime::forUnixSeconds64(NtpLastSync, myTz);
-          DebugTf("%02d:%02d:%02d %02d-%02d-%04d", myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
+          ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
+          DebugTf("%02d:%02d:%02d %02d-%02d-%04d\n\r", myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
           if (!myTime.isError()) {
             //finally time is synced!
-            setTime(myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
+            //setTime(myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
             NtpStatus = TIME_SYNC;
             DebugTln(F("Time synced!"));
           }
@@ -251,7 +261,7 @@ if (!settingNTPenable) return;
       } 
     break;
     case TIME_SYNC:
-      if ((time(nullptr)-NtpLastSync) > NTP_RESYNC_TIME){
+      if ((now -  NtpLastSync) > NTP_RESYNC_TIME){
         //when xx seconds have passed, resync using NTP
          DebugTln(F("Time resync needed"));
         NtpStatus = TIME_NEEDSYNC;
@@ -259,16 +269,21 @@ if (!settingNTPenable) return;
     break;
   } 
  
-  DECLARE_TIMER_SEC(timerNTPtime, 10, CATCH_UP_MISSED_TICKS);
-  if DUE(timerNTPtime) 
-  {
-    DebugTf("Epoch Seconds: %d\r\n", time(nullptr)); //timeout, then break out of this loop
-    auto myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
-    auto myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
-    DebugTf("Epoch Seconds MyTime: %d\r\n", myTime); //timeout, then break out of this loop
-    DebugTf("%02d:%02d:%02d %02d-%02d-%04d", myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
-  }
-  if DUE(timerNTPtime) getNTPtime();
+  // DECLARE_TIMER_SEC(timerNTPtime, 10, CATCH_UP_MISSED_TICKS);
+  // if DUE(timerNTPtime) 
+  // {
+  //   //DebugTf("Epoch Seconds: %lld\r\n", now); //timeout, then break out of this loop
+  //   DebugT("Now: ");
+  //   Debug(now);
+  //   Debugln();
+  //   DebugT("Timezone : ");
+  //   Debugln(CSTR(settingNTPtimezone));
+  //   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  //   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
+    
+  //   DebugTf("%02d:%02d:%02d %02d-%02d-%04d\r\n", myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
+  // }
+  // if DUE(timerNTPtime) getNTPtime();
 }
 
 bool isNTPtimeSet(){

@@ -59,12 +59,24 @@ void _debugBOL(const char *fn, int line)
                  
    //Alternative based on localtime function
    timeval now;
-   struct tm *tod;
+   //struct tm *tod;
    gettimeofday(&now, nullptr);
-   tod = localtime(&now.tv_sec);
+   //tod = localtime(&now.tv_sec);
 
+   /*
    snprintf(_bol, sizeof(_bol), "%02d:%02d:%02d.%06d (%7u|%6u) %-12.12s(%4d): ", \
                   tod->tm_hour, tod->tm_min, tod->tm_sec, (int)now.tv_usec, \
+                  ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(),\
+                  fn, line);
+   */
+
+   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
+   
+   //DebugTf("%02d:%02d:%02d %02d-%02d-%04d\r\n", myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
+
+   snprintf(_bol, sizeof(_bol), "%02d:%02d:%02d.%06d (%7u|%6u) %-12.12s(%4d): ", \
+                  myTime.hour(), myTime.minute(), myTime.second(), (int)now.tv_usec, \
                   ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(),\
                   fn, line);
 

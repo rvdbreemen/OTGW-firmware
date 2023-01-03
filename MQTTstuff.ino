@@ -139,7 +139,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 
   // parse the incoming topic and execute commands
   char* token;
-  char otgwcmd[20]={0};
+  char otgwcmd[51]={0};
 
   //first check toptopic part, it can include the seperator, e.g. "myHome/OTGW" or "OTGW""
   if (strncmp(topic, settingMQTTtopTopic.c_str(), settingMQTTtopTopic.length()) != 0) {
