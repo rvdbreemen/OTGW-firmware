@@ -2090,7 +2090,7 @@ void upgradepic() {
   String version = httpServer.arg("version");
   DebugTf(PSTR("Action: %s %s %s\r\n"), action.c_str(), filename.c_str(), version.c_str());
   if (sPICdeviceid=="unknown") {
-    DebugTln("No PIC device id is unknown, don't upgrade");
+    DebugTln(PSTR("No PIC device id is unknown, don't upgrade"));
     return; // no pic version found, don't upgrade
   }
   if (action == "upgrade") {
