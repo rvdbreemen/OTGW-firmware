@@ -21,7 +21,7 @@ void handleDebug(){
                 break;
             case 'm':
                 DebugTln(F("Configure MQTT Discovery"));
-                DebugTf("Enable MQTT: %s\r\n", CBOOLEAN(settingMQTTenable));
+                DebugTf(PSTR("Enable MQTT: %s\r\n"), CBOOLEAN(settingMQTTenable));
                 doAutoConfigure();
                 break;
             case 'r':   
@@ -41,15 +41,15 @@ void handleDebug(){
                 break;
             case '1':   
                 bDebugOTmsg = !bDebugOTmsg; 
-                DebugTf("\r\nDebug OTmsg: %s\r\n", CBOOLEAN(bDebugOTmsg)); 
+                DebugTf(PSTR("\r\nDebug OTmsg: %s\r\n"), CBOOLEAN(bDebugOTmsg)); 
                 break;
             case '2':   
                 bDebugRestAPI = !bDebugRestAPI; 
-                DebugTf("\r\nDebug RestAPI: %s\r\n", CBOOLEAN(bDebugRestAPI)); 
+                DebugTf(PSTR("\r\nDebug RestAPI: %s\r\n"), CBOOLEAN(bDebugRestAPI)); 
                 break;
             case '3':   
                 bDebugMQTT = !bDebugMQTT; 
-                DebugTf("\r\nDebug MQTT: %s\r\n", CBOOLEAN(bDebugMQTT)); 
+                DebugTf(PSTR("\r\nDebug MQTT: %s\r\n"), CBOOLEAN(bDebugMQTT)); 
                 break;
             case 'b':
                 DebugTln(F("Blink led 1"));
@@ -64,7 +64,7 @@ void handleDebug(){
                 digitalWrite(settingGPIOOUTPUTSpin, ON);
                 break;
             case 'j':
-                DebugTf("read gpio output state (0== led ON): %d \r\n", digitalRead(settingGPIOOUTPUTSpin));
+                DebugTf(PSTR("read gpio output state (0== led ON): %d \r\n"), digitalRead(settingGPIOOUTPUTSpin));
                 break;
             case 'k':
                 DebugTln(F("read settings"));

@@ -154,7 +154,7 @@ void restartWifi(){
 }
 
 void sendMQTTuptime(){
-  DebugTf("Uptime seconds: %d\r\n", upTimeSeconds);
+  DebugTf(PSTR("Uptime seconds: %d\r\n"), upTimeSeconds);
   String sUptime = String(upTimeSeconds);
   sendMQTTData(F("otgw-firmware/uptime"), sUptime, false);
 }
@@ -168,7 +168,7 @@ void sendtimecommand(){
   time_t now = time(nullptr);
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
-  //DebugTf("%02d:%02d:%02d %02d-%02d-%04d\r\n", myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
+  //DebugTf(PSTR("%02d:%02d:%02d %02d-%02d-%04d\r\n"), myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
 
   char msg[15]={0};
   int day_of_week = (myTime.dayOfWeek()+5)%7+1;
@@ -261,9 +261,9 @@ void doTaskEvery60s(){
     //keep trying to figure out which pic is used!
     sPICfwversion =  getpicfwversion();
     sPICfwversion = String(OTGWSerial.firmwareVersion());
-    DebugTf("Current firmware version: %s\r\n", CSTR(sPICfwversion));
+    DebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
     sPICdeviceid = OTGWSerial.processorToString();
-    DebugTf("Current device id: %s\r\n", CSTR(sPICdeviceid));
+    DebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));
   }
 }
 

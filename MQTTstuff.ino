@@ -132,7 +132,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
       //restart stuff, to make sure it works correctly again
       startMQTT();  // fixing some issues with hanging HA AutoDiscovery in some scenario's?
     } else {
-      DebugTf("Home Assistant Status=[%s] and HA cycle status [%s]\r\n", msgPayload, CBOOLEAN(bHAcycle)); 
+      DebugTf(PSTR("Home Assistant Status=[%s] and HA cycle status [%s]\r\n"), msgPayload, CBOOLEAN(bHAcycle)); 
     }
   }
 
@@ -147,7 +147,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
     return;
   } else {
     //remove the top topic part
-    MQTTDebugTf("Parsing topic: %s/", settingMQTTtopTopic.c_str());
+    MQTTDebugTf(PSTR("Parsing topic: %s/"), settingMQTTtopTopic.c_str());
     topic += settingMQTTtopTopic.length();
     while (*topic == '/') {
       topic++;
@@ -185,7 +185,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
         if (i >= nrcmds){
           //no match found
           MQTTDebugln();
-          MQTTDebugTf("No match found for command: [%s]\r\n", token);
+          MQTTDebugTf(PSTR("No match found for command: [%s]\r\n"), token);
         }
       }
     }
@@ -215,7 +215,7 @@ void handleMQTT()
       sprintf(MQTTbrokerIPchar, "%d.%d.%d.%d", MQTTbrokerIP[0], MQTTbrokerIP[1], MQTTbrokerIP[2], MQTTbrokerIP[3]);
       if (isValidIP(MQTTbrokerIP))  
       {
-        MQTTDebugTf("[%s] => setServer(%s, %d)\r\n", CSTR(settingMQTTbroker), MQTTbrokerIPchar, settingMQTTbrokerPort);
+        MQTTDebugTf(PSTR("[%s] => setServer(%s, %d)\r\n"), CSTR(settingMQTTbroker), MQTTbrokerIPchar, settingMQTTbrokerPort);
         MQTTclient.disconnect();
         MQTTclient.setServer(MQTTbrokerIPchar, settingMQTTbrokerPort);
         MQTTclient.setCallback(handleMQTTcallback);
@@ -227,7 +227,7 @@ void handleMQTT()
       }
       else
       { // invalid IP, then goto error state
-        MQTTDebugTf("ERROR: [%s] => is not a valid URL\r\n", CSTR(settingMQTTbroker));
+        MQTTDebugTf(PSTR("ERROR: [%s] => is not a valid URL\r\n"), CSTR(settingMQTTbroker));
         stateMQTT = MQTT_STATE_ERROR;
         //DebugTln(F("Next State: MQTT_STATE_ERROR"));
       }    
@@ -236,7 +236,7 @@ void handleMQTT()
 
     case MQTT_STATE_TRY_TO_CONNECT:
       MQTTDebugTln(F("MQTT State: MQTT try to connect"));
-      MQTTDebugTf("MQTT server is [%s], IP[%s]\r\n", settingMQTTbroker.c_str(), MQTTbrokerIPchar);
+      MQTTDebugTf(PSTR("MQTT server is [%s], IP[%s]\r\n"), settingMQTTbroker.c_str(), MQTTbrokerIPchar);
       
       MQTTDebugT(F("Attempting MQTT connection .. "));
       reconnectAttempts++;
@@ -271,13 +271,13 @@ void handleMQTT()
         char topic[100];
         strcpy(topic, CSTR(MQTTSubNamespace));
         strlcat(topic, "/#", sizeof(topic));
-        MQTTDebugTf("Subscribe to MQTT: TopicId [%s]\r\n", topic);
+        MQTTDebugTf(PSTR("Subscribe to MQTT: TopicId [%s]\r\n"), topic);
         if (MQTTclient.subscribe(topic)){
-          MQTTDebugTf("MQTT: Subscribed successfully to TopicId [%s]\r\n", topic);
+          MQTTDebugTf(PSTR("MQTT: Subscribed successfully to TopicId [%s]\r\n"), topic);
         }
         else
         {
-          MQTTDebugTf("MQTT: Subscribe TopicId [%s] FAILED! \r\n", topic);
+          MQTTDebugTf(PSTR("MQTT: Subscribe TopicId [%s] FAILED! \r\n"), topic);
           PrintMQTTError();
         }
         MQTTclient.subscribe("homeassistant/status"); //start monitoring the status of homeassistant, if it goes down, then force a restart after it comes back online.
@@ -286,7 +286,7 @@ void handleMQTT()
       else
       { // no connection, try again, do a non-blocking wait for 3 seconds.
         MQTTDebugln(F(" .. \r"));
-        MQTTDebugTf("failed, retrycount=[%d], rc=[%d] ..  try again in 3 seconds\r\n", reconnectAttempts, MQTTclient.state());
+        MQTTDebugTf(PSTR("failed, retrycount=[%d], rc=[%d] ..  try again in 3 seconds\r\n"), reconnectAttempts, MQTTclient.state());
         RESTART_TIMER(timerMQTTwaitforretry);
         stateMQTT = MQTT_STATE_WAIT_CONNECTION_ATTEMPT;  // if the re-connect did not work, then return to wait for reconnect
         MQTTDebugTln(F("Next State: MQTT_STATE_WAIT_CONNECTION_ATTEMPT"));
@@ -408,7 +408,7 @@ void sendMQTTData(const char* topic, const char *json, const bool retain = false
   char full_topic[100];
   snprintf(full_topic, sizeof(full_topic), "%s/", CSTR(MQTTPubNamespace));
   strlcat(full_topic, topic, sizeof(full_topic));
-  MQTTDebugTf("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort, full_topic, json);
+  MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settingMQTTbroker.c_str(), settingMQTTbrokerPort, full_topic, json);
   if (!MQTTclient.publish(full_topic, json, retain)) PrintMQTTError();
   feedWatchDog();//feed the dog
 } // sendMQTTData()
@@ -428,7 +428,7 @@ void sendMQTT(const char* topic, const char *json, const size_t len)
   if (!settingMQTTenable) return;
   if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
   if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
-  MQTTDebugTf("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n", settingMQTTbroker.c_str(), settingMQTTbrokerPort, topic, json);
+  MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settingMQTTbroker.c_str(), settingMQTTbrokerPort, topic, json);
   if (MQTTclient.getBufferSize() < len) MQTTclient.setBufferSize(len); //resize buffer when needed
 
   if (MQTTclient.beginPublish(topic, len, true)){
@@ -487,7 +487,7 @@ bool getMQTTConfigDone(const uint8_t MSGid)
   group = group>>5;
   uint8_t index = MSGid & 0b00011111;
   uint32_t result = bitRead(MQTTautoConfigMap[group], index);
-  MQTTDebugTf("Reading bit %d from group %d for MSGid %d: result = %d\r\n", index, group, MSGid, result);
+  MQTTDebugTf(PSTR("Reading bit %d from group %d for MSGid %d: result = %d\r\n"), index, group, MSGid, result);
   if (result > 0) {
     return true;
   } else {
@@ -500,10 +500,10 @@ bool setMQTTConfigDone(const uint8_t MSGid)
   uint8_t group = MSGid & 0b11100000;
   group = group>>5;
   uint8_t index = MSGid & 0b00011111;
-  MQTTDebugTf("Setting bit %d from group %d for MSGid %d\r\n", index, group, MSGid);
-  MQTTDebugTf("Value before setting bit %d\r\n", MQTTautoConfigMap[group]);
+  MQTTDebugTf(PSTR("Setting bit %d from group %d for MSGid %d\r\n"), index, group, MSGid);
+  MQTTDebugTf(PSTR("Value before setting bit %d\r\n"), MQTTautoConfigMap[group]);
   if(bitSet(MQTTautoConfigMap[group], index) > 0) {
-    MQTTDebugTf("Value after setting bit  %d\r\n", MQTTautoConfigMap[group]);
+    MQTTDebugTf(PSTR("Value after setting bit  %d\r\n"), MQTTautoConfigMap[group]);
     return true;
   } else {
     return false;
@@ -519,7 +519,7 @@ void doAutoConfigure(bool bForcaAll = false){
   //force all sensors to be sent to auto configuration
   for (int i=0; i<255; i++){
     if ((getMQTTConfigDone((byte)i)==true) || bForcaAll) {
-      MQTTDebugTf("Sending auto configuration for sensor %d\r\n", i);
+      MQTTDebugTf(PSTR("Sending auto configuration for sensor %d\r\n"), i);
       doAutoConfigureMsgid((byte)i);
       doBackgroundTasks();
     }
@@ -571,21 +571,21 @@ bool doAutoConfigureMsgid(byte OTid)
     feedWatchDog(); //start with feeding the dog
     
     String sLine = fh.readStringUntil('\n');
-    // DebugTf("sline[%s]\r\n", CSTR(sLine));
+    // DebugTf(PSTR("sline[%s]\r\n"), CSTR(sLine));
     if (!splitLine(sLine, ';', lineID, sTopic, sMsg)) {  //splitLine() also filters comments
-      //MQTTDebugTf("Either comment or invalid config line: [%s]\r\n", CSTR(sLine));
+      //MQTTDebugTf(PSTR("Either comment or invalid config line: [%s]\r\n"), CSTR(sLine));
       continue;
     }
 
-    // DebugTf("looking in config file line for %d: [%d][%s] \r\n", OTid, lineID, CSTR(sTopic));
+    // DebugTf(PSTR("looking in config file line for %d: [%d][%s] \r\n"), OTid, lineID, CSTR(sTopic));
     
     // check if this is the specific line we are looking for
     if (lineID != OTid) continue;
 
-    MQTTDebugTf("Found line in config file for %d: [%d][%s] \r\n", OTid, lineID, CSTR(sTopic));
+    MQTTDebugTf(PSTR("Found line in config file for %d: [%d][%s] \r\n"), OTid, lineID, CSTR(sTopic));
 
     // discovery topic prefix
-    MQTTDebugTf("sTopic[%s]==>", CSTR(sTopic)); 
+    MQTTDebugTf(PSTR("sTopic[%s]==>"), CSTR(sTopic)); 
     sTopic.replace("%homeassistant%", CSTR(settingMQTThaprefix));  
 
     /// node
@@ -593,7 +593,7 @@ bool doAutoConfigureMsgid(byte OTid)
     MQTTDebugf("[%s]\r\n", CSTR(sTopic)); 
     /// ----------------------
 
-    MQTTDebugTf("sMsg[%s]==>", CSTR(sMsg)); 
+    MQTTDebugTf(PSTR("sMsg[%s]==>"), CSTR(sMsg)); 
 
     /// node
     sMsg.replace("%node_id%", CSTR(NodeId));

@@ -62,7 +62,7 @@ uint8_t splitString(String inStrng, char delimiter, String wOut[], uint8_t maxWo
       inxE  = inStrng.indexOf(delimiter, inxS);         //finds location of first ,
       wOut[wordCount] = inStrng.substring(inxS, inxE);  //captures first data String
       wOut[wordCount].trim();
-      //DebugTf("[%d] => [%c] @[%d] found[%s]\r\n", wordCount, delimiter, inxE, wOut[wordCount].c_str());
+      //DebugTf(PSTR("[%d] => [%c] @[%d] found[%s]\r\n"), wordCount, delimiter, inxE, wOut[wordCount].c_str());
       inxS = inxE;
       inxS++;
       wordCount++;
@@ -183,7 +183,7 @@ uint32_t updateRebootCount()
     }
     fh.close();
   }
-  DebugTf("Reboot count = [%d]\r\n", rebootCount);
+  DebugTf(PSTR("Reboot count = [%d]\r\n"), rebootCount);
   return _reboot;
 }
 
@@ -204,10 +204,10 @@ bool updateRebootLog(String text)
   struct	rst_info	*rtc_info	=	system_get_rst_info();
   
   if (rtc_info == NULL) {
-    DebugTf("no reset info available:	%x\r\n",	errorCode);
+    DebugTf(PSTR("no reset info available:	%x\r\n"),	errorCode);
   } else {
 
-    DebugTf("reset reason:	%x\r\n",	rtc_info->reason);
+    DebugTf(PSTR("reset reason:	%x\r\n"),	rtc_info->reason);
     errorCode = rtc_info->reason;
     // Rst cause No.    Cause                     GPIO state
     //--------------    -------------------       -------------
@@ -367,7 +367,7 @@ bool checklittlefshash(){
          _githash = fh.readStringUntil('\n');
       }
     }
-    DebugTf("Check githash = [%s]\r\n", CSTR(_githash));
+    DebugTf(PSTR("Check githash = [%s]\r\n"), CSTR(_githash));
     return (strcasecmp(CSTR(_githash), _VERSION_GITHASH)==0);
   }
   return false;

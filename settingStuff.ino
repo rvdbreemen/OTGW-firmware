@@ -15,11 +15,11 @@ void writeSettings(bool show)
 {
 
   //let's use JSON to write the setting file
-  DebugTf("Writing to [%s] ..\r\n", SETTINGS_FILE);
+  DebugTf(PSTR("Writing to [%s] ..\r\n"), SETTINGS_FILE);
   File file = LittleFS.open(SETTINGS_FILE, "w"); // open for reading and writing
   if (!file) 
   {
-    DebugTf("open(%s, 'w') FAILED!!! --> Bailout\r\n", SETTINGS_FILE);
+    DebugTf(PSTR("open(%s, 'w') FAILED!!! --> Bailout\r\n"), SETTINGS_FILE);
     return;
   }
   yield();
@@ -68,7 +68,7 @@ void readSettings(bool show)
   // Open file for reading
   File file =  LittleFS.open(SETTINGS_FILE, "r");
 
-  DebugTf(" %s ..\r\n", SETTINGS_FILE);
+  DebugTf(PSTR(" %s ..\r\n"), SETTINGS_FILE);
   if (!LittleFS.exists(SETTINGS_FILE)) 
   {  //create settings file if it does not exist yet.
     DebugTln(F(" .. file not found! --> created file!"));
@@ -83,7 +83,7 @@ void readSettings(bool show)
   if (error)
   {
     DebugTln(F("Failed to read file, use existing defaults."));
-    DebugTf("Settings Deserialisation error:  %s \r\n", error.c_str());
+    DebugTf(PSTR("Settings Deserialisation error:  %s \r\n"), error.c_str());
     return;
   }
 
@@ -163,7 +163,7 @@ void readSettings(bool show)
 //=======================================================================
 void updateSetting(const char *field, const char *newValue)
 { //do not just trust the caller to do the right thing, server side validation is here!
-  DebugTf("-> field[%s], newValue[%s]\r\n", field, newValue);
+  DebugTf(PSTR("-> field[%s], newValue[%s]\r\n"), field, newValue);
 
   if (strcasecmp(field, "hostname")==0) 
   { //make sure we have a valid hostname here...
@@ -182,7 +182,7 @@ void updateSetting(const char *field, const char *newValue)
     startMQTT();
 
     Debugln();
-    DebugTf("Need reboot before new %s.local will be available!\r\n\n", CSTR(settingHostname));
+    DebugTf(PSTR("Need reboot before new %s.local will be available!\r\n\n"), CSTR(settingHostname));
   }
   if (strcasecmp(field, "MQTTenable")==0)      settingMQTTenable = EVALBOOLEAN(newValue);
   if (strcasecmp(field, "MQTTbroker")==0)      settingMQTTbroker = String(newValue);
@@ -222,13 +222,13 @@ void updateSetting(const char *field, const char *newValue)
   {
     settingGPIOSENSORSenabled = EVALBOOLEAN(newValue);
     Debugln();
-    DebugTf("Need reboot before GPIO SENSORS will search for sensors on pin GPIO%d!\r\n\n", settingGPIOSENSORSpin);
+    DebugTf(PSTR("Need reboot before GPIO SENSORS will search for sensors on pin GPIO%d!\r\n\n"), settingGPIOSENSORSpin);
   }
   if (strcasecmp(field, "GPIOSENSORSpin") == 0)    
   {
     settingGPIOSENSORSpin = atoi(newValue);
     Debugln();
-    DebugTf("Need reboot before GPIO SENSORS will use new pin GPIO%d!\r\n\n", settingGPIOSENSORSpin);
+    DebugTf(PSTR("Need reboot before GPIO SENSORS will use new pin GPIO%d!\r\n\n"), settingGPIOSENSORSpin);
   }
   if (strcasecmp(field, "GPIOSENSORSinterval") == 0) {
     settingGPIOSENSORSinterval = atoi(newValue);
@@ -240,19 +240,19 @@ void updateSetting(const char *field, const char *newValue)
   {
     settingGPIOOUTPUTSenabled = EVALBOOLEAN(newValue);
     Debugln();
-    DebugTf("Need reboot before GPIO OUTPUTS will be enabled on pin GPIO%d!\r\n\n", settingGPIOOUTPUTSenabled);
+    DebugTf(PSTR("Need reboot before GPIO OUTPUTS will be enabled on pin GPIO%d!\r\n\n"), settingGPIOOUTPUTSenabled);
   }
   if (strcasecmp(field, "GPIOOUTPUTSpin") == 0)
   {
     settingGPIOOUTPUTSpin = atoi(newValue);
     Debugln();
-    DebugTf("Need reboot before GPIO OUTPUTS will use new pin GPIO%d!\r\n\n", settingGPIOOUTPUTSpin);
+    DebugTf(PSTR("Need reboot before GPIO OUTPUTS will use new pin GPIO%d!\r\n\n"), settingGPIOOUTPUTSpin);
   }
   if (strcasecmp(field, "GPIOOUTPUTStriggerBit") == 0)
   {
     settingGPIOOUTPUTStriggerBit = atoi(newValue);
     Debugln();
-    DebugTf("Need reboot before GPIO OUTPUTS will use new trigger bit %d!\r\n\n", settingGPIOOUTPUTStriggerBit);
+    DebugTf(PSTR("Need reboot before GPIO OUTPUTS will use new trigger bit %d!\r\n\n"), settingGPIOOUTPUTStriggerBit);
   }
 
   //finally update write settings

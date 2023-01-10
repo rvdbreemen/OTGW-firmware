@@ -13,29 +13,29 @@ String GetVersion(const String hexfile){
   char datamem[256]={0}; // prevent buffer overrun
   unsigned short ptr;
   File f;
-  DebugTf("GetVersion opening %s\r\n",hexfile.c_str());
+  DebugTf(PSTR("GetVersion opening %s\r\n"),hexfile.c_str());
   f = LittleFS.open(hexfile, "r");
   if (f)  // only proceed if file exists
   {
     while (f.readBytesUntil('\n', hexbuf, sizeof(hexbuf)) != 0) {
       linecnt++;
-      // DebugTf("reading line %d %s\n",linecnt,hexbuf);
+      // DebugTf(PSTR("reading line %d %s\n"),linecnt,hexbuf);
       if (sscanf(hexbuf, ":%2x%4x%2x", &len, &addr, &tag) != 3)
       {
-        DebugTf("Parse error on line %d\n",linecnt);// Parse error
+        DebugTf(PSTR("Parse error on line %d\n"),linecnt);// Parse error
         break;
       }
-      // DebugTf("Read in %2x %4x %2x\n",len,addr,tag);
+      // DebugTf(PSTR("Read in %2x %4x %2x\n"),len,addr,tag);
       if (len & 1)
       {
-        DebugTf("Invalid data size on line %d\n",linecnt);// Invalid data size
+        DebugTf(PSTR("Invalid data size on line %d\n"),linecnt);// Invalid data size
         break;
       }
       offs = 9;
       len >>= 1;
       if (tag == 0)
       {
-       // DebugTf("Checking address %4x on line %d\r\n",addr,linecnt);// Invalid data size
+       // DebugTf(PSTR("Checking address %4x on line %d\r\n"),addr,linecnt);// Invalid data size
         if (addr >= 0x4200 && addr <= 0x4300)
         {
           // Data memory 16f88
@@ -46,7 +46,7 @@ String GetVersion(const String hexfile){
               break;
             // if (!bitRead(datamap, addr / 64)) weight += WEIGHT_DATAPROG;
             // bitSet(datamap, addr / 64);
-            //DebugTf("storing %x in %x\r\n",data,addr);
+            //DebugTf(PSTR("storing %x in %x\r\n"),data,addr);
             datamem[addr++] = byteswap(data);
             offs += 4;
             len--;
@@ -61,7 +61,7 @@ String GetVersion(const String hexfile){
               break;
             // if (!bitRead(datamap, addr / 64)) weight += WEIGHT_DATAPROG;
             // bitSet(datamap, addr / 64);
-            //DebugTf("storing %x in %x\n",data,addr);
+            //DebugTf(PSTR("storing %x in %x\n"),data,addr);
             datamem[addr++] = byteswap(data);
             offs += 4;
             len--;
@@ -81,14 +81,14 @@ String GetVersion(const String hexfile){
     ptr = 0; 
     while (ptr < 256)
     {
-      //DebugTf("checking for %s at char pos %d\r\n",banner,ptr);
+      //DebugTf(PSTR("checking for %s at char pos %d\r\n"),banner,ptr);
       char *s = strstr((char *)datamem + ptr, banner);
       if (!s)
       {
         //DebugTf("did not find the banner\r\n");
         ptr += strnlen((char *)datamem + ptr, 256 - ptr) + 1;
       } else {
-        //DebugTf("hit the banner! returning version string %s\r\n",s);
+        //DebugTf(PSTR("hit the banner! returning version string %s\r\n"),s);
         s += sizeof(banner) - 1;
         return String(s);
       }
