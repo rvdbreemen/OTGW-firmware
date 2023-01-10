@@ -73,7 +73,7 @@ void initSensors() {
 
   if (numberOfDevices < 1 or realDeviceCount < 1)
   {
-    DebugTln(PSTR("No Sensors Found, disabled GPIO Sensors! Reboot node to search again."));
+    DebugTln("No Sensors Found, disabled GPIO Sensors! Reboot node to search again.");
     settingGPIOSENSORSenabled = false;
     return;
   }
@@ -90,10 +90,10 @@ int pollSensors()
 
   if (numberOfDevices < 1)
   {
-    DebugTln(PSTR("No Sensors Found, please reboot the node to search for sensors"));
+    DebugTln("No Sensors Found, please reboot the node to search for sensors");
     return 1;
   }
-  // DebugTln(PSTR("start polling sensors"));
+  // DebugTln("start polling sensors");
   sensors.requestTemperatures(); // Send the command to get temperatures
 
   // Loop through each device, print out temperature data
@@ -124,7 +124,7 @@ int pollSensors()
     }
   }
   delay(100);
-  // DebugTln(PSTR("end polling sensors"));
+  // DebugTln("end polling sensors");
   DebugFlush();
   return 0;
 }

@@ -71,11 +71,11 @@ void handleDebug(){
                 readSettings(true);
                 break;
             case 'o':
-                DebugTln(PSTR("gpio output off"));
+                DebugTln("gpio output off");
                 digitalWrite(settingGPIOOUTPUTSpin, OFF);
                 break;
             case 'l':
-                DebugTln(PSTR("MyDEBUG =true"));
+                DebugTln("MyDEBUG =true");
                 settingMyDEBUG = true;
                 break;
             case 'f':
