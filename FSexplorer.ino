@@ -105,10 +105,10 @@ void setupFSexplorer(){
  
   httpServer.onNotFound([]() 
   {
-    if (bDebugRestAPI) DebugTf("in 'onNotFound()'!! [%s] => \r\n", String(httpServer.uri()).c_str());
+    if (bDebugRestAPI) DebugTf(PSTR("in 'onNotFound()'!! [%s] => \r\n"), String(httpServer.uri()).c_str());
     if (httpServer.uri().indexOf("/api/") == 0) 
     {
-      if (bDebugRestAPI) DebugTf("next: processAPI(%s)\r\n", String(httpServer.uri()).c_str());
+      if (bDebugRestAPI) DebugTf(PSTR("next: processAPI(%s)\r\n"), String(httpServer.uri()).c_str());
       processAPI();
     }
     // else if (httpServer.uri() == "/")
@@ -138,13 +138,13 @@ void apifirmwarefilelist() {
   File f;
 
   String dirpath = "/" + sPICdeviceid;
-  DebugTf("dirpath=%s\r\n", dirpath.c_str());
+  DebugTf(PSTR("dirpath=%s\r\n"), dirpath.c_str());
       
   s = buffer;
   s += sprintf(buffer, "[");
   dir = LittleFS.openDir(dirpath);	
   while (dir.next()) {
-    DebugTf("dir.fileName()=%s\r\n", dir.fileName().c_str());
+    DebugTf(PSTR("dir.fileName()=%s\r\n"), dir.fileName().c_str());
     if (dir.fileName().endsWith(".hex")) {
       version="";
       fwversion="";
@@ -157,15 +157,15 @@ void apifirmwarefilelist() {
         version.trim();
         f.close();
       } 
-      DebugTf("version=%s\r\n", version.c_str());	
+      DebugTf(PSTR("version=%s\r\n"), version.c_str());	
       fwversion = GetVersion(hexfile); // only check if gateway firmware
       // String hexversion = OTGWSerial.readHexFileVersion(hexfile.c_str());
-      // DebugTf("File version on hexfile: %s\r\n", hexversion.c_str());
-      DebugTf("GetVersion(%s) returned [%s]\r\n", hexfile.c_str(), fwversion.c_str());  
+      // DebugTf(PSTR("File version on hexfile: %s\r\n"), hexversion.c_str());
+      DebugTf(PSTR("GetVersion(%s) returned [%s]\r\n"), hexfile.c_str(), fwversion.c_str());  
       if (fwversion.length() && strcmp(fwversion.c_str(),version.c_str())) { // versions do not match
         version=fwversion; // assign hex file version to version
         if (f = LittleFS.open(verfile, "w")) { // write to .ver file
-          DebugTf("writing %s to %s\r\n",version.c_str(),verfile.c_str());
+          DebugTf(PSTR("writing %s to %s\r\n"),version.c_str(),verfile.c_str());
           f.print(version + "\n");
           f.close();
         } 
@@ -175,7 +175,7 @@ void apifirmwarefilelist() {
     }
   }
   s += sprintf(--s, "]\r\n");
-  DebugTf("filelist response: %s\r\n", buffer);
+  DebugTf(PSTR("filelist response: %s\r\n"), buffer);
   httpServer.send(200, "application/json", buffer);
 }
 
@@ -204,13 +204,13 @@ void apilistfiles()             // Senden aller Daten an den Client
     dirMap[fileNr].Size = dir.fileSize();
     fileNr++;
   }
-  //DebugTf("fileNr[%d], Max[%d]\r\n", fileNr, MAX_FILES_IN_LIST);
+  //DebugTf(PSTR("fileNr[%d], Max[%d]\r\n"), fileNr, MAX_FILES_IN_LIST);
 
   // -- bubble sort dirMap op .Name--
   for (int8_t y = 0; y < fileNr; y++) {
     yield();
     for (int8_t x = y + 1; x < fileNr; x++)  {
-      //DebugTf("y[%d], x[%d] => seq[y][%s] / seq[x][%s] ", y, x, dirMap[y].Name, dirMap[x].Name);
+      //DebugTf(PSTR("y[%d], x[%d] => seq[y][%s] / seq[x][%s] "), y, x, dirMap[y].Name, dirMap[x].Name);
       if (strcasecmp(dirMap[x].Name, dirMap[y].Name) <= 0)
       {
         //Debug(" !switch!");
@@ -236,7 +236,7 @@ void apilistfiles()             // Senden aller Daten an den Client
   String temp = "[";
   for (int f=0; f < fileNr; f++)  
   {
-    DebugTf("[%3d] >> [%s]\r\n", f, dirMap[f].Name);
+    DebugTf(PSTR("[%3d] >> [%s]\r\n"), f, dirMap[f].Name);
     temp += R"({"name":")" + String(dirMap[f].Name) + R"(","size":")" + formatBytes(dirMap[f].Size) + R"("},)";
   }
 
@@ -255,7 +255,7 @@ bool handleFile(String&& path)
 {
   if (httpServer.hasArg("delete")) 
   {
-    DebugTf("Delete -> [%s]\n\r",  httpServer.arg("delete").c_str());
+    DebugTf(PSTR("Delete -> [%s]\n\r"),  httpServer.arg("delete").c_str());
     LittleFS.remove(httpServer.arg("delete"));    // Datei löschen
     httpServer.sendContent(Header);
     return true;

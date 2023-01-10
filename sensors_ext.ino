@@ -42,7 +42,7 @@ DallasTemperature sensors(&oneWire);
 void initSensors() {
   if (!settingGPIOSENSORSenabled) return;
 
-  DebugTf("init GPIO Sensors on GPIO%d...\r\n", settingGPIOSENSORSpin);
+  DebugTf(PSTR("init GPIO Sensors on GPIO%d...\r\n"), settingGPIOSENSORSpin);
 
   oneWire.begin(settingGPIOSENSORSpin);
 
@@ -52,7 +52,7 @@ void initSensors() {
   // Grab a count of devices on the wire
   numberOfDevices = sensors.getDeviceCount();
 
-  DebugTf("Found %d device(s)\r\n", numberOfDevices);
+  DebugTf(PSTR("Found %d device(s)\r\n"), numberOfDevices);
   int realDeviceCount = 0;
   // Loop through each device, print out address
   for (int i = 0; i < numberOfDevices; i++)
@@ -61,13 +61,13 @@ void initSensors() {
     if (sensors.getAddress(tempDeviceAddress, i))
     {
       //TODO: get real device address, push data to mqtt topic.
-      DebugTf("Device address %u device(s)\r\n", (unsigned int) tempDeviceAddress);
+      DebugTf(PSTR("Device address %u device(s)\r\n"), (unsigned int) tempDeviceAddress);
       DebugFlush();
       realDeviceCount++;
     }
     else
     {
-      DebugTf("Found ghost device %d but could not detect address. Check power and cabling\r\n", i);
+      DebugTf(PSTR("Found ghost device %d but could not detect address. Check power and cabling\r\n"), i);
     }
   }
 
@@ -108,7 +108,7 @@ int pollSensors()
       const char * strDeviceAddress = getDallasAddress(tempDeviceAddress);
 
       float tempC = sensors.getTempC(tempDeviceAddress);
-      DebugTf("Device: %s, TempC: %f\r\n", strDeviceAddress, tempC);
+      DebugTf(PSTR("Device: %s, TempC: %f\r\n"), strDeviceAddress, tempC);
 
       //Build string for MQTT
       char _msg[15]{0};
@@ -116,7 +116,7 @@ int pollSensors()
       snprintf(_topic, sizeof _topic, "otgw-firmware/sensors/%s", strDeviceAddress);
       snprintf(_msg, sizeof _msg, "%f", tempC);
 
-      // DebugTf("Topic: %s -- Payload: %s\r\n", _topic, _msg);
+      // DebugTf(PSTR("Topic: %s -- Payload: %s\r\n"), _topic, _msg);
       DebugFlush();
 
       sendMQTTData(_topic, _msg);
@@ -146,7 +146,7 @@ char* getDallasAddress(DeviceAddress deviceAddress)
     }
     // Serial.print(deviceAddress[i], HEX);
     sprintf(dest+i, "%X", deviceAddress[i]);
-    // DebugTf("blah: %s\r\n", dest);
+    // DebugTf(PSTR("blah: %s\r\n"), dest);
     // DebugFlush();
   }
   return dest;
