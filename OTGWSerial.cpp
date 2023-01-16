@@ -440,6 +440,7 @@ void OTGWUpgrade::fwCommand(const unsigned char *cmd, int len) {
 
 void OTGWUpgrade::eraseCode(short addr) {
     byte fwcommand[] = {CMD_ERASEPROG, 1, 0, 0};
+    Dprintf("Erase Program Memory %d blocks @0x%04x\n", 1, addr);
     fwcommand[2] = addr & 0xff;
     fwcommand[3] = addr >> 8;
     fwCommand(fwcommand, sizeof(fwcommand));
@@ -450,6 +451,7 @@ short OTGWUpgrade::loadCode(short addr, const unsigned short *code, short len) {
     unsigned short *data = (unsigned short *)fwcommand + 2;
     short size = 0;
 
+    Dprintf("Write Program Memory %d words @0x%04x\n", len, addr);
     for (i = 0; i < len; i++) {
         data[i] = code[i] & 0x3fff;
         if (data[i] != 0x3fff) size = i + 1;
@@ -471,6 +473,7 @@ short OTGWUpgrade::loadCode(short addr, const unsigned short *code, short len) {
 
 void OTGWUpgrade::readCode(short addr, short len) {
     byte fwcommand[] = {CMD_READPROG, 32, 0, 0};
+    Dprintf("Read Program Memory %d words @0x%04x\n", len, addr);
     fwcommand[1] = len;
     fwcommand[2] = addr & 0xff;
     fwcommand[3] = addr >> 8;
@@ -483,6 +486,8 @@ bool OTGWUpgrade::verifyCode(const unsigned short *code, const unsigned short *d
 
     for (i = 0; i < len; i++) {
         if (data[i] != (code[i] & 0x3fff)) {
+            Dprintf("Verify Program 0x%04x: 0x%04x <> 0x%04x\n",
+              pc + i, data[i], code[i] & 0x3fff);
             errcnt++;
             rc = false;
         }
@@ -503,6 +508,7 @@ short OTGWUpgrade::loadData(short addr) {
         fwcommand[ptr++] = datamem[pc];
     }
     if (first < 0) return 0;
+    Dprintf("Write EEDATA Memory %d bytes @0x%04x\n", last - first + 1, first);
     fwcommand[1] = last - first + 1;
     fwcommand[2] = first & 0xff;
     fwcommand[3] = first >> 8;
@@ -512,6 +518,7 @@ short OTGWUpgrade::loadData(short addr) {
 
 void OTGWUpgrade::readData(short addr, short len) {
     byte fwcommand[] = {CMD_READDATA, (byte)len, 0, 0};
+    Dprintf("Read EEDATA Memory %d bytes @0x%04x\n", len, addr);
     fwcommand[2] = addr & 0xff;
     fwCommand(fwcommand, sizeof(fwcommand));
 }
@@ -522,9 +529,12 @@ bool OTGWUpgrade::verifyData(short addr, const byte *data, short len) {
     for (short i = 0, pc = addr; i < len; i++, pc++) {
         if (datamem[pc] != eedata[pc]) {
             if (data[i] != datamem[pc]) {
+                Dprintf("Verify EEDATA 0x%04x: 0x%02x <> 0x%02x\n",
+                  pc, data[i], datamem[pc]);
                 errcnt++;
                 rc = false;
             }
+            eedata[pc] = data[i];
         }
     }
     return rc;
@@ -532,6 +542,7 @@ bool OTGWUpgrade::verifyData(short addr, const byte *data, short len) {
 
 void OTGWUpgrade::stateMachine(const unsigned char *packet, int len) {
     const unsigned short *data = (const unsigned short *)packet;
+    byte cmd = cmdcode;
 
     if (stage != FWSTATE_IDLE && packet == nullptr) {
         int maxtries = (stage == FWSTATE_CODE || stage == FWSTATE_DATA ? 100 : 10);
@@ -540,8 +551,27 @@ void OTGWUpgrade::stateMachine(const unsigned char *packet, int len) {
             finishUpgrade(OTGW_ERROR_RETRIES);
             return;
         }
-        Dprintf("Retry (%d): no response received - stage = %d, pc = 0x%04x, cmd = %d\n",
+        Dprintf("Retry (%d): stage = %d, pc = 0x%04x, cmd = %d\n",
           retries, stage, pc, cmdcode);
+    } else {
+        // Determine the most likely next command
+        switch (cmdcode) {
+         case CMD_READPROG:
+            cmd = CMD_ERASEPROG;
+            break;
+         case CMD_WRITEPROG:
+            cmd = CMD_READPROG;
+            break;
+         case CMD_ERASEPROG:
+            cmd = CMD_WRITEPROG;
+            break;
+         case CMD_READDATA:
+            cmd = CMD_WRITEDATA;
+            break;
+         case CMD_WRITEDATA:
+            cmd = CMD_READDATA;
+            break;
+        }
     }
 
     switch (stage) {
@@ -646,9 +676,9 @@ void OTGWUpgrade::stateMachine(const unsigned char *packet, int len) {
 
         // Programming has started; invalidate the firmware version
         *fwversion = '\0';
-        if (cmdcode == CMD_ERASEPROG) {
+        if (cmd == CMD_WRITEPROG) {
             loadCode(info.erasesize, failsafe, 4);
-        } else if (cmdcode == CMD_WRITEPROG) {
+        } else if (cmd == CMD_READPROG) {
             readCode(info.erasesize, 4);
         } else {
             if (packet != nullptr && packet[1] == 4 && data[1] == info.erasesize && verifyCode(failsafe, data + 2, 4)) {
@@ -670,15 +700,14 @@ void OTGWUpgrade::stateMachine(const unsigned char *packet, int len) {
         }
         break;
      case FWSTATE_CODE:
-        if (cmdcode == CMD_ERASEPROG) {
+        if (cmd == CMD_WRITEPROG) {
             // digitalWrite(LED2, LOW);
             loadCode(pc, codemem);
-        } else if (cmdcode == CMD_WRITEPROG) {
+        } else if (cmd == CMD_READPROG) {
             // digitalWrite(LED2, HIGH);
             readCode(pc);
-        } else if (cmdcode == CMD_READPROG) {
+        } else if (cmd == CMD_ERASEPROG) {
             if (packet != nullptr && packet[1] == 32 && data[1] == pc && verifyCode(codemem, data + 2)) {
-                Dprintf("Code block loaded: 0x%04x\n", pc);
               do {
                   pc = prepareCode(codemem);
               } while (pc + 31 >= protectstart && pc <= protectend);
@@ -699,18 +728,16 @@ void OTGWUpgrade::stateMachine(const unsigned char *packet, int len) {
                     break;
                 }
             } else {
-                Dprintf("Code block failed: 0x%04x\n", pc);
                 eraseCode(pc);
             }
         }
         break;
      case FWSTATE_DATA:
-        if (cmdcode == CMD_WRITEDATA) {
+        if (cmd == CMD_READDATA) {
             // digitalWrite(LED2, HIGH);
             readData(pc);
-        } else if (cmdcode == CMD_READDATA) {
+        } else if (cmd == CMD_WRITEDATA) {
             if (packet != nullptr && verifyData(pc, packet + 4)) {
-                Dprintf("Data block loaded: 0x%04x\n", pc);
                 progress(WEIGHT_DATAPROG);
                 do {
                     pc += 64;
@@ -763,6 +790,7 @@ void OTGWUpgrade::upgradeEvent(int ch) {
             stateMachine(buffer, bufpos);
         } else {
             // Checksum mismatch
+            Dprintf("Invalid checksum: 0x%02x\n", checksum);
             stateMachine();
         }
     } else if (bufpos >= sizeof(buffer)) {
@@ -781,9 +809,10 @@ bool OTGWUpgrade::upgradeTick() {
         return false;
     } else if (millis() - lastaction > 1000) {
         // Too much time has passed since the last action
+        Dprintf("Timeout:");
         if (bufpos) {
             for (int i = 0; i < bufpos; i++) {
-                Dprintf("%02x ", buffer[i]);
+                Dprintf(" %02x", buffer[i]);
             }
             Dprintf("\n");
             bufpos = 0;
@@ -977,7 +1006,6 @@ OTGWError OTGWSerial::startUpgrade(const char *hexfile) {
     }
 
     _upgrade = new OTGWUpgrade(this);
-    Dprintf("OTGWUpgrade: %d\n", sizeof(*_upgrade));
 
     if (_upgrade == nullptr) {
         return OTGW_ERROR_MEMORY;
