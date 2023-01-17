@@ -145,7 +145,7 @@ void resetOTGW() {
   // }
 
 
-  sPICfwversion = String(OTGWSerial.firmwareVersion());
+  sPICfwversion = OTGWSerial.firmwareToString();
   OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
   sPICdeviceid = OTGWSerial.processorToString();
   OTGWDebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));
@@ -2001,13 +2001,13 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
     case OTGWError::OTGW_ERROR_RETRIES:       errorupgrade = F("Too many retries"); break;
     case OTGWError::OTGW_ERROR_MISMATCHES:    errorupgrade = F("Too many mismatches"); break;
     case OTGWError::OTGW_ERROR_DEVICE:        errorupgrade = F("Wrong PIC (16F88 <=> 16F1847)"); break;
-    default:                       errorupgrade = F("Unknown state"); break;
+    default:                                  errorupgrade = F("Unknown state"); break;
   }
   OTGWDebugTf(PSTR("Upgrade finished: Errorcode = %d - %s - %d retries, %d errors\r\n"), result, CSTR(errorupgrade), retries, errors);
 }
 
 void fwupgradestep(int pct) {
-  OTGWDebugTf(PSTR("Upgrade: %d%%\n"), pct);
+  OTGWDebugTf(PSTR("Upgrade: %d%%\n\r"), pct);
 }
 
 void fwupgradestart(const char *hexfile) {
@@ -2090,7 +2090,7 @@ void upgradepic() {
   String version = httpServer.arg("version");
   DebugTf(PSTR("Action: %s %s %s\r\n"), action.c_str(), filename.c_str(), version.c_str());
   if (sPICdeviceid=="unknown") {
-    DebugTln("No PIC device id is unknown, don't upgrade");
+    DebugTln(F("No PIC device id is unknown, don't upgrade"));
     return; // no pic version found, don't upgrade
   }
   if (action == "upgrade") {
