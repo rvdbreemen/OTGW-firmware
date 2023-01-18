@@ -1783,35 +1783,23 @@ void handleOTGW()
     DebugT(F("Serial Rx Error\r\n"));
   }
   size_t bytes_available = OTGWSerial.available();
-  if(bytes_available > 0) {
-    OTGWSerial.setTimeout(1000);//never more then 1 second blocking
-    bytes_read = OTGWSerial.readBytesUntil('\n', sRead, sizeof(sRead));
-    if (bytes_read>0) {
-      sRead[strcspn(sRead, "\r\n")] = 0; // works for LF, CR, CRLF, LFCR, ...
-      bytes_read = strlen(sRead);
-      //OTGWDebugTf(PSTR("Read from OTGW: (%s) [%d]\r\n"), sRead, bytes_read);
+  while (OTGWSerial.available()) {
+    outByte = OTGWSerial.read();
+    OTGWstream.write(outByte);
+    if (outByte == '\r' || outByte == '\n') {
+      if (bytes_read == 0) continue;
       blinkLEDnow(LED2);
-      //uint32_t tmr=micros();  //profiling code
+      sRead[bytes_read] = '\0';
       processOT(sRead, bytes_read);
-      //tmr=micros()-tmr;
-      //DebugTf(PSTR("processOTGW: (MsdID, Type, time_us) = %3d, %-16s, %6d\r\n"), OTdata.id, messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)), tmr);
-      //make sure it ends with a newline
-      OTGWstream.write(sRead, bytes_read);
-      OTGWstream.write('\r');
-      OTGWstream.write('\n');
-    }
+      bytes_read = 0;
+    } else if (bytes_read < (MAX_BUFFER_READ-1))
+      sRead[bytes_read++] = outByte;
   }
 
   //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
   while (OTGWstream.available()){
-    //OTGWSerial.write(OTGWstream.read()); //just forward it directly to Serial
     outByte = OTGWstream.read();  // read from port 25238
-    // while (OTGWSerial.availableForWrite()==0) {
-    //   //cannot write, buffer full, wait for some space in serial out buffer
-    //   feedWatchDog();     //this yields for other processes
-    // }
-    OTGWSerial.write(outByte);        // write to serial port
-    //OTGWSerial.flush();               // wait for write to serial
+    OTGWSerial.write(outByte);    // write to serial port
     if (outByte == '\r')
     { //on CR, do something...
       sWrite[bytes_write] = 0;

@@ -13,7 +13,21 @@ void handleDebug(){
                 Debugln(F("q) Force read settings"));
                 Debugln(F("m) Force MQTT discovery"));
                 Debugln(F("r) Reconnect wifi, telnet, otgwstream and mqtt"));
+                Debugln(F("p) Reset PIC manually"));
+                Debugln(F("a) Send PR=A command to ID PIC firmware version and type"));
                 Debugln();
+                break;
+            case 'p':
+                DebugTln(F("Manual reset PIC"));
+                resetOTGW();
+                break;
+            case 'a':
+                DebugTln(F("Send PR=A command, to ID the chip"));
+                getpicfwversion();
+                sPICfwversion = OTGWSerial.firmwareToString();
+                OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
+                sPICdeviceid = OTGWSerial.processorToString();
+                OTGWDebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));
                 break;
             case 'q':
                 DebugTln(F("Read settings"));
