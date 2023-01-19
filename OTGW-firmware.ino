@@ -256,7 +256,10 @@ void doTaskEvery60s(){
   //== do tasks ==
   //if no wifi, try reconnecting (once a minute)
   if (WiFi.status() != WL_CONNECTED) restartWifi();
-  sendtimecommand();
+  //only send timecommand when in gateway firmware, not in diagnotic or interface mode
+  if (OTGWSerial.firmwareType() == FIRMWARE_OTGW) {
+    sendtimecommand();
+  }
   if (sPICdeviceid=="unknown"){
     //keep trying to figure out which pic is used!
     sPICfwversion =  getpicfwversion();
