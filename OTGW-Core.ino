@@ -109,59 +109,12 @@ void resetOTGW() {
 
   OTGWSerial.resetPic();
 
-  // 12 june 2022 - trying to determine the PIC hardware on reboot
-  // char buffer[80]={0};
-  // delay(100);
-  // OTGWSerial.write(0x0f);
-  // OTGWSerial.write(0x00);
-  // OTGWSerial.write(0x03); 
-  // OTGWSerial.write(0xfd);
-  // OTGWSerial.write(0x04);
-  // delay(100);
-  // OTGWSerial.write(0x0f);
-  // OTGWSerial.write(0x08);
-  // OTGWSerial.write(0x00);
-  // OTGWSerial.write(0xf8);
-  // OTGWSerial.write(0x04);
-  // delay(100);
-  // //then read the first response of the firmware to make sure it reads it
-  // size_t lenbuf = OTGWSerial.readBytesUntil('\n', buffer, sizeof(buffer));
-  
-  // OTGWDebugT("resetOTGW: ");
-  // for (int i=0; i<(int)lenbuf; i++) {
-  //   OTGWDebugf("%02x ", buffer[i]);
-  // }
-
-  
-  // //then read the first response of the firmware to make sure it reads it
-  // String resp = OTGWSerial.readStringUntil('\n');
-  // resp.trim();
-  // OTGWDebugTf(PSTR("Received firmware version: [%s] [%s] (%d)\r\n"), CSTR(resp), OTGWSerial.firmwareVersion(), strlen(OTGWSerial.firmwareVersion()));
-  // bOTGWonline = (resp.length()>0); 
-  // if (!bOTGWonline) 
-  // {
-  //   //use a PR=A to fetch banner?
-  //   sPICfwversion =  getpicfwversion();
-  // }
-
-
-  sPICfwversion = OTGWSerial.firmwareToString();
+  sPICfwversion = String(OTGWSerial.firmwareVersion());
   OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
   sPICdeviceid = OTGWSerial.processorToString();
   OTGWDebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));
-
-  //OTGWSerial.firmwareToString().c_str();
-  //determine the version of the device
-  // if (sPICfwversion.length()>0) {
-  //   sPICdeviceid = "pic16f88";  //default to PIC16F88
-  //   if (sPICfwversion.toFloat()>=6){
-  //     sPICdeviceid = "pic16f1847"; //version >=6.x, then it must be PIC16F1847
-  //   }
-  // } else {
-  //   // no version found, so no way to determine the pic device id
-  //   sPICdeviceid = "pic unknown";	
-  // }
-
+  sPICtype = OTGWSerial.firmwareTypeToString();
+  OTGWDebugTf(PSTR("Current type: %s\r\n"), CSTR(sPICtype));
 }
 //===================[ getpicfwversion ]===========================
 String getpicfwversion(){
