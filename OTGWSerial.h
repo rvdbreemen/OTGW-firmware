@@ -113,7 +113,11 @@ protected:
 
    OTGWSerial *serial;
    unsigned char buffer[80];
-   unsigned char datamem[256];
+   // File name and data memory are not needed at the same time
+   union {
+       char filename[256];
+       unsigned char datamem[256];
+   };
    unsigned char eedata[256];
    // Enough for one memory row
    unsigned short codemem[32];
@@ -129,10 +133,7 @@ protected:
    short hexseg;
    byte hexlen, hexpos;
    unsigned short hexdata[8];
-   union {
-       char *version;
-       const char *filename;
-   };
+   char *version;
 };
 
 class OTGWSerial: public HardwareSerial {

@@ -134,7 +134,8 @@ OTGWError OTGWUpgrade::start(const char *hexfile) {
         // A relative file name takes the file from the directory for the
         // current PIC, which is determined based on the bootloader version
         model = PICPROBE;
-        filename = hexfile;
+        // Copy the file name, in case it points to some temporary storage
+        strncpy(filename, hexfile, sizeof(filename));
         total = WEIGHT_MAXIMUM;
     }
     stateMachine();
@@ -554,7 +555,7 @@ void OTGWUpgrade::stateMachine(const unsigned char *packet, int len) {
         Dprintf("Retry (%d): stage = %d, pc = 0x%04x, cmd = %d\n",
           retries, stage, pc, cmdcode);
     } else {
-        // Determine the most likely next command
+        // Determine the (most likely) next command
         switch (cmdcode) {
          case CMD_READPROG:
             cmd = CMD_ERASEPROG;
