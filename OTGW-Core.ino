@@ -113,7 +113,7 @@ void resetOTGW() {
   OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
   sPICdeviceid = OTGWSerial.processorToString();
   OTGWDebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));
-  sPICtype = OTGWSerial.firmwareType();
+  sPICtype = OTGWSerial.firmwareToString();
   OTGWDebugTf(PSTR("Current type: %s\r\n"), CSTR(sPICtype));
 }
 //===================[ getpicfwversion ]===========================
