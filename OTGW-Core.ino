@@ -1735,7 +1735,7 @@ void handleOTGW()
   if (OTGWSerial.hasRxError()){
     DebugT(F("Serial Rx Error\r\n"));
   }
-  size_t bytes_available = OTGWSerial.available();
+  
   while (OTGWSerial.available()) {
     outByte = OTGWSerial.read();
     OTGWstream.write(outByte);

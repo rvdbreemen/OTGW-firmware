@@ -209,7 +209,7 @@ OTGWError OTGWUpgrade::readHexRecord() {
 }
 
 OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
-    int linecnt = 0, addr = 0, weight, rowsize;
+    int linecnt = 0, addr = 0, weight, rowsize = 0;
     byte datamap = 0;
     OTGWError rc = OTGW_ERROR_NONE;
 
@@ -342,6 +342,7 @@ int OTGWUpgrade::versionCompare(const char *version1, const char* version2) {
         s1++;
         s2++;
     }
+    return 0;
 }
 
 int OTGWUpgrade::eepromSettings(const char *version, OTGWTransferData *xfer) {
@@ -808,7 +809,9 @@ void OTGWUpgrade::upgradeEvent(int ch) {
 bool OTGWUpgrade::upgradeTick() {
     if (stage == FWSTATE_IDLE) {
         return false;
-    } else if (millis() - lastaction > 1000) {
+    } 
+    
+    if (millis() - lastaction > 1000) {
         // Too much time has passed since the last action
         Dprintf("Timeout:");
         if (bufpos) {
@@ -822,8 +825,8 @@ bool OTGWUpgrade::upgradeTick() {
         // a DLE. Choosing newline so a next GW=R command will be recognized.
         serial->putbyte('\n');
         stateMachine();
-        return true;
     }
+    return true;
 }
 
 OTGWSerial::OTGWSerial(int resetPin, int progressLed)
