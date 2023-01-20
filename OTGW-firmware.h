@@ -17,7 +17,7 @@
 #include <ArduinoJson.h>        // https://arduinojson.org/
 #include "Wire.h"
 #include "safeTimers.h"
-#include "OTGWSerial.h"         // Bron Schelte's Serial class - it upgrades and more
+#include "src/libraries/OTGWSerial/OTGWSerial.h"         // Bron Schelte's Serial class - it upgrades and more
 #include "OTGW-Core.h"          // Core code for this firmware 
 
 //OTGW Nodoshop hardware definitions

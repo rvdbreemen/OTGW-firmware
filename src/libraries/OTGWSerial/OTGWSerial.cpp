@@ -809,8 +809,8 @@ void OTGWUpgrade::upgradeEvent(int ch) {
 bool OTGWUpgrade::upgradeTick() {
     if (stage == FWSTATE_IDLE) {
         return false;
-    } 
-    
+    }
+
     if (millis() - lastaction > 1000) {
         // Too much time has passed since the last action
         Dprintf("Timeout:");
