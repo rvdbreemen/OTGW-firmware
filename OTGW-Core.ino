@@ -90,6 +90,8 @@ void sendMQTTversioninfo(){
   sendMQTTData("otgw-firmware/reboot_reason", lastReset);
   sendMQTTData("otgw-pic/version", sPICfwversion);
   sendMQTTData("otgw-pic/deviceid", sPICdeviceid);
+  sPICtype = OTGWSerial.firmwareToString();
+  sendMQTTData("otgw-pic/firmwaretype", sPICdeviceid);
 }
 
 /*

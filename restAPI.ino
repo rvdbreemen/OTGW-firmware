@@ -314,6 +314,7 @@ void sendDeviceInfo()
   sendNestedJsonObj("fwversion", _FW_VERSION);
   sendNestedJsonObj("picfwversion", CSTR(sPICfwversion));
   sendNestedJsonObj("picdeviceid", CSTR(sPICdeviceid));
+  sPICtype = OTGWSerial.firmwareToString(); 
   sendNestedJsonObj("picfwtype", CSTR(sPICtype));
   snprintf(cMsg, sizeof(cMsg), "%s %s", __DATE__, __TIME__);
   sendNestedJsonObj("compiled", cMsg);
