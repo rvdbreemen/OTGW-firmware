@@ -104,7 +104,7 @@ So shoutout to the following people for the collaboration on development:
 * @proditaki      for creating Domiticz plugin for OTGW-firmware
 * @tjfsteele      for endless hours of testing
 
-A big thank should goto **Schelte Bron** @hvlx for amazing work on the OpenTherm Gateway project and for providing access to the upgrade routines of the PIC. Enabling this custom firmware a reliable way to upgrade you PIC firmware.
+A big thank should goto **Schelte Bron** @hvxl for amazing work on the OpenTherm Gateway project and for providing access to the upgrade routines of the PIC. Enabling this custom firmware a reliable way to upgrade you PIC firmware.
 
 If you want to thank Schelte Bron for his work on the OpenTherm Gateway project, just head over to his homepage and donate to him: https://otgw.tclcode.com/
 
