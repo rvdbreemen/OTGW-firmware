@@ -4,9 +4,9 @@
 **
 **  Version  : v0.9.5
 **
-**  Copyright (c) 2021-2022 Robert van den Breemen
+**  Copyright (c) 2021-2023 Robert van den Breemen
 **
-**  Copyright (c) 2021-2022 Robert van den Breemen
+**  Copyright (c) 2021-2023 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
@@ -64,6 +64,7 @@ enum NtpStatus_t {
 };
 
 NtpStatus_t NtpStatus = TIME_NOTSET;
+static const time_t EPOCH_2000_01_01 = 946684800;
 time_t NtpLastSync = 0; //last sync moment in EPOCH seconds
 
 ESP8266WebServer        httpServer (80);
@@ -116,6 +117,12 @@ void startWiFi(const char* hostname, int timeOut)
   //--- useful to make it all retry or go to sleep in seconds
   //manageWiFi.setTimeout(240);  // 4 minuten
   manageWiFi.setTimeout(timeOut);  // in seconden ...
+
+  //--- remove Info and Update buttons from Configuration Portal (security improvement 20230102)
+  std::vector<const char *> wm_menu  = {"wifi", "exit"};
+  manageWiFi.setShowInfoUpdate(false);
+  manageWiFi.setShowInfoErase(false);
+  manageWiFi.setMenu(wm_menu);
   
   //--- fetches ssid and pass and tries to connect
   //--- if it does not connect it starts an access point with the specified name
@@ -144,7 +151,7 @@ void startWiFi(const char* hostname, int timeOut)
   httpUpdater.setup(&httpServer);
   httpUpdater.setIndexPage(UpdateServerIndex);
   httpUpdater.setSuccessPage(UpdateServerSuccess);
-  DebugTf(" took [%lu] seconds => OK!\r\n", (millis() - lTime) / 1000);
+  DebugTf(PSTR(" took [%lu] seconds => OK!\r\n"), (millis() - lTime) / 1000);
   
 } // startWiFi()
 
@@ -162,10 +169,10 @@ void startTelnet()
 //=======================================================================
 void startMDNS(const char *hostname) 
 {
-  DebugTf("mDNS setup as [%s.local]\r\n", hostname);
+  DebugTf(PSTR("mDNS setup as [%s.local]\r\n"), hostname);
   if (MDNS.begin(hostname))               // Start the mDNS responder for Hostname.local
   {
-    DebugTf("mDNS responder started as [%s.local]\r\n", hostname);
+    DebugTf(PSTR("mDNS responder started as [%s.local]\r\n"), hostname);
   } 
   else 
   {
@@ -176,10 +183,10 @@ void startMDNS(const char *hostname)
 
 void startLLMNR(const char *hostname) 
 {
-  DebugTf("LLMNR setup as [%s]\r\n", hostname);
+  DebugTf(PSTR("LLMNR setup as [%s]\r\n"), hostname);
   if (LLMNR.begin(hostname))               // Start the LLMNR responder for hostname
   {
-    DebugTf("LLMNR responder started as [%s]\r\n", hostname);
+    DebugTf(PSTR("LLMNR responder started as [%s]\r\n"), hostname);
   } 
   else 
   {
@@ -199,6 +206,8 @@ void startNTP(){
 
   //void configTime(int timezone_sec, int daylightOffset_sec, const char* server1, const char* server2, const char* server3)
   configTime(0, 0, CSTR(settingNTPhostname), nullptr, nullptr);
+  // Configure NTP before WiFi, so DHCP can override the NTP server(s)
+  
   NtpStatus = TIME_WAITFORSYNC;
 }
 
@@ -212,35 +221,39 @@ void getNTPtime(){
   dt_sec = tp.tv_sec;
   dt_ms = tp.tv_nsec / 1000000UL;
   dt_nsec = tp.tv_nsec;
-  DebugTf("tNow=%20.10f tNow_sec=%16.10ld tNow_nsec=%16.10ld dt_sec=%16li(s) dt_msec=%16li(sm) dt_nsec=%16li(ns)\r\n", tNow, tp.tv_sec,tp.tv_nsec, dt_sec, dt_ms, dt_nsec);
+  DebugTf(PSTR("tNow=%20.10f tNow_sec=%16.10ld tNow_nsec=%16.10ld dt_sec=%16li(s) dt_msec=%16li(sm) dt_nsec=%16li(ns)\r\n"), (double)tNow, tp.tv_sec,tp.tv_nsec, dt_sec, dt_ms, dt_nsec);
   DebugFlush();
 }
 
 void loopNTP(){
+time_t now;
+now = time(nullptr); //this is now...
 if (!settingNTPenable) return;
   switch (NtpStatus){
     case TIME_NOTSET:
     case TIME_NEEDSYNC:
-      NtpLastSync = time(nullptr); //remember last sync
+      NtpLastSync = now; //remember last sync
       DebugTln(F("Start time syncing"));
       startNTP();
-      DebugTf("Starting timezone lookup for [%s]\r\n", CSTR(settingNTPtimezone));
+      DebugTf(PSTR("Starting timezone lookup for [%s]\r\n"), CSTR(settingNTPtimezone));
       NtpStatus = TIME_WAITFORSYNC;
       break;
     case TIME_WAITFORSYNC:
-      if ((time(nullptr)>0) || (time(nullptr) >= NtpLastSync)) { 
-        NtpLastSync = time(nullptr); //remember last sync         
-        auto myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+      if ((now > EPOCH_2000_01_01) && (now >= NtpLastSync)) { 
+        //DebugTf(PSTR("Waited for sync: epoch: %lld\r\n"), time(nullptr));
+        NtpLastSync = now; //remember last sync         
+        TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
         if (myTz.isError()){
-          //DebugTf("Error: Timezone Invalid/Not Found: [%s]\r\n", CSTR(settingNTPtimezone));
+          DebugTf(PSTR("Error: Timezone Invalid/Not Found: [%s]\r\n"), CSTR(settingNTPtimezone));
           settingNTPtimezone = NTP_DEFAULT_TIMEZONE;
           myTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone)); //try with default Timezone instead
         } else {
           //found the timezone, now set the time 
-          auto myTime = ZonedDateTime::forUnixSeconds(NtpLastSync, myTz);
+          ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
+          DebugTf(PSTR("%02d:%02d:%02d %02d-%02d-%04d\n\r"), myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
           if (!myTime.isError()) {
             //finally time is synced!
-            setTime(myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
+            //setTime(myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
             NtpStatus = TIME_SYNC;
             DebugTln(F("Time synced!"));
           }
@@ -248,7 +261,7 @@ if (!settingNTPenable) return;
       } 
     break;
     case TIME_SYNC:
-      if ((time(nullptr)-NtpLastSync) > NTP_RESYNC_TIME){
+      if ((now -  NtpLastSync) > NTP_RESYNC_TIME){
         //when xx seconds have passed, resync using NTP
          DebugTln(F("Time resync needed"));
         NtpStatus = TIME_NEEDSYNC;
@@ -257,7 +270,19 @@ if (!settingNTPenable) return;
   } 
  
   // DECLARE_TIMER_SEC(timerNTPtime, 10, CATCH_UP_MISSED_TICKS);
-  // if DUE(timerNTPtime) DebugTf("Epoch Seconds: %d\r\n", time(nullptr)); //timeout, then break out of this loop
+  // if DUE(timerNTPtime) 
+  // {
+  //   //DebugTf(PSTR("Epoch Seconds: %lld\r\n"), now); //timeout, then break out of this loop
+  //   DebugT("Now: ");
+  //   Debug(now);
+  //   Debugln();
+  //   DebugT("Timezone : ");
+  //   Debugln(CSTR(settingNTPtimezone));
+  //   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  //   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
+    
+  //   DebugTf(PSTR("%02d:%02d:%02d %02d-%02d-%04d\r\n"), myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
+  // }
   // if DUE(timerNTPtime) getNTPtime();
 }
 
@@ -265,35 +290,35 @@ bool isNTPtimeSet(){
   return NtpStatus == TIME_SYNC;
 }
 
-void waitforNTPsync(int16_t timeout = 30){  
-  //wait for time is synced to NTP server, for maximum of timeout seconds
-  //feed the watchdog while waiting 
-  //update NTP status
-  time_t t = time(nullptr); //get current time
-  DebugTf("Waiting for NTP sync, timeout: %d\r\n", timeout);
-  DECLARE_TIMER_SEC(waitforNTPsync, timeout, CATCH_UP_MISSED_TICKS);
-  DECLARE_TIMER_SEC(timerWaiting, 5, CATCH_UP_MISSED_TICKS);
-  while (true){
-    //feed the watchdog while waiting
-    Wire.beginTransmission(0x26);   
-    Wire.write(0xA5);   
-    Wire.endTransmission();
-    delay(100);
-    if DUE(timerWaiting) DebugTf("Waiting for NTP sync: %lu seconds\r\n", (time(nullptr)-t));
-    // update NTP status
-    loopNTP();
-    //stop waiting when NTP is synced 
-    if (isNTPtimeSet()) {
-      Debugln(F("NTP time synced!"));
-      break;
-    }
-    //stop waiting when timeout is reached 
-    if DUE(waitforNTPsync) {
-      DebugTln(F("NTP sync timeout!"));
-      break;
-    } 
-  }
-}
+// void waitforNTPsync(int16_t timeout = 30){  
+//   //wait for time is synced to NTP server, for maximum of timeout seconds
+//   //feed the watchdog while waiting 
+//   //update NTP status
+//   time_t t = time(nullptr); //get current time
+//   DebugTf(PSTR("Waiting for NTP sync, timeout: %d\r\n"), timeout);
+//   DECLARE_TIMER_SEC(waitforNTPsync, timeout, CATCH_UP_MISSED_TICKS);
+//   DECLARE_TIMER_SEC(timerWaiting, 5, CATCH_UP_MISSED_TICKS);
+//   while (true){
+//     //feed the watchdog while waiting
+//     Wire.beginTransmission(0x26);   
+//     Wire.write(0xA5);   
+//     Wire.endTransmission();
+//     delay(100);
+//     if DUE(timerWaiting) DebugTf(PSTR("Waiting for NTP sync: %lu seconds\r\n"), (time(nullptr)-t));
+//     // update NTP status
+//     loopNTP();
+//     //stop waiting when NTP is synced 
+//     if (isNTPtimeSet()) {
+//       Debugln(F("NTP time synced!"));
+//       break;
+//     }
+//     //stop waiting when timeout is reached 
+//     if DUE(waitforNTPsync) {
+//       DebugTln(F("NTP sync timeout!"));
+//       break;
+//     } 
+//   }
+// }
 
 
 //==[ end of NTP stuff ]=======================================================

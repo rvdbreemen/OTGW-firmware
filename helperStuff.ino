@@ -3,7 +3,7 @@
 **  Program  : helperStuff
 **  Version  : v0.9.5
 **
-**  Copyright (c) 2021-2022 Robert van den Breemen
+**  Copyright (c) 2021-2023 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
@@ -62,7 +62,7 @@ uint8_t splitString(String inStrng, char delimiter, String wOut[], uint8_t maxWo
       inxE  = inStrng.indexOf(delimiter, inxS);         //finds location of first ,
       wOut[wordCount] = inStrng.substring(inxS, inxE);  //captures first data String
       wOut[wordCount].trim();
-      //DebugTf("[%d] => [%c] @[%d] found[%s]\r\n", wordCount, delimiter, inxE, wOut[wordCount].c_str());
+      //DebugTf(PSTR("[%d] => [%c] @[%d] found[%s]\r\n"), wordCount, delimiter, inxE, wOut[wordCount].c_str());
       inxS = inxE;
       inxS++;
       wordCount++;
@@ -183,7 +183,7 @@ uint32_t updateRebootCount()
     }
     fh.close();
   }
-  DebugTf("Reboot count = [%d]\r\n", rebootCount);
+  DebugTf(PSTR("Reboot count = [%d]\r\n"), rebootCount);
   return _reboot;
 }
 
@@ -204,10 +204,10 @@ bool updateRebootLog(String text)
   struct	rst_info	*rtc_info	=	system_get_rst_info();
   
   if (rtc_info == NULL) {
-    DebugTf("no reset info available:	%x\r\n",	errorCode);
+    DebugTf(PSTR("no reset info available:	%x\r\n"),	errorCode);
   } else {
 
-    DebugTf("reset reason:	%x\r\n",	rtc_info->reason);
+    DebugTf(PSTR("reset reason:	%x\r\n"),	rtc_info->reason);
     errorCode = rtc_info->reason;
     // Rst cause No.    Cause                     GPIO state
     //--------------    -------------------       -------------
@@ -262,7 +262,9 @@ bool updateRebootLog(String text)
     }
   }
 
-  snprintf(log_line, LOG_LINE_LENGTH, "%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n", year(),  month(), day(), hour(), minute(), second(), CSTR(text), errorCode, log_line_excpt);
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
+  snprintf(log_line, LOG_LINE_LENGTH, "%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n", myTime.year(),  myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second(), CSTR(text), errorCode, log_line_excpt);
 
   if (LittleFS.begin()) {
     //start with opening the file
@@ -334,14 +336,18 @@ bool prefix(const char *pre, const char *str)
 
 bool dayChanged(){
   static int8_t lastday = 0;
-  if (lastday==0) lastday = day();
-  return (lastday != day());
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
+  if (lastday==0) lastday = myTime.day();
+  return (lastday != myTime.day());
 }
 
 bool hourChanged(){
   static int8_t lasthour = 0;
-  if (lasthour==0) lasthour = hour();
-  return (lasthour != hour());
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
+  if (lasthour==0) lasthour = myTime.hour();
+  return (lasthour != myTime.hour());
 }
 
 /*
@@ -361,7 +367,7 @@ bool checklittlefshash(){
          _githash = fh.readStringUntil('\n');
       }
     }
-    DebugTf("Check githash = [%s]\r\n", CSTR(_githash));
+    DebugTf(PSTR("Check githash = [%s]\r\n"), CSTR(_githash));
     return (strcasecmp(CSTR(_githash), _VERSION_GITHASH)==0);
   }
   return false;

@@ -2,7 +2,7 @@
 **  Program  : output_ext.ino
 **  Version  : v0.9.5
 **
-**  Copyright (c) 2021-2022 Robert van den Breemen
+**  Copyright (c) 2021-2023 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
 **
 **  TERMS OF USE: MIT License. See bottom of file.   
@@ -15,11 +15,11 @@ void setOutputState(bool set_HIGH);
 
 
 void initOutputs() {
-  DebugTf("inside initOutputsO%d...\r\n", 1);
+  DebugTf(PSTR("inside initOutputsO%d...\r\n"), 1);
 
   if (!settingGPIOOUTPUTSenabled) return;
 
-  DebugTf("init GPIO Output on GPIO%d...\r\n", settingGPIOOUTPUTSpin);
+  DebugTf(PSTR("init GPIO Output on GPIO%d...\r\n"), settingGPIOOUTPUTSpin);
 
   pinMode(settingGPIOOUTPUTSpin, OUTPUT);
   setOutputState(OFF);
@@ -36,7 +36,7 @@ void setOutputState(uint8_t status = ON){
 void setOutputState(bool set_HIGH = true){
   if(!settingGPIOOUTPUTSenabled) return;
   digitalWrite(settingGPIOOUTPUTSpin,set_HIGH?HIGH:LOW);
-  DebugTf("Output GPIO%d set to %d", settingGPIOOUTPUTSpin, digitalRead(settingGPIOOUTPUTSpin));
+  DebugTf(PSTR("Output GPIO%d set to %d"), settingGPIOOUTPUTSpin, digitalRead(settingGPIOOUTPUTSpin));
 }
 
 void evalOutputs(){
@@ -63,15 +63,15 @@ void evalOutputs(){
   //  7: reserved
   if (!settingMyDEBUG) return;
   settingMyDEBUG = false;
-  DebugTf("current gpio output state: %d \r\n", digitalRead(settingGPIOOUTPUTSpin));
+  DebugTf(PSTR("current gpio output state: %d \r\n"), digitalRead(settingGPIOOUTPUTSpin));
   DebugFlush();
 
   bool bitState = (OTcurrentSystemState.Statusflags & (2^settingGPIOOUTPUTStriggerBit));
-  DebugTf("bitState: bit: %d , state %d \r\n", settingGPIOOUTPUTStriggerBit, bitState);
+  DebugTf(PSTR("bitState: bit: %d , state %d \r\n"), settingGPIOOUTPUTStriggerBit, bitState);
 
   setOutputState(bitState);
 
-  DebugTf("end void: current gpio output state: %d \r\n", digitalRead(settingGPIOOUTPUTSpin));
+  DebugTf(PSTR("end void: current gpio output state: %d \r\n"), digitalRead(settingGPIOOUTPUTSpin));
 }
 
 /***************************************************************************

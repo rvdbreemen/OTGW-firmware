@@ -3,7 +3,7 @@
 **  Program  : restAPI
 **  Version  : v0.9.5
 **
-**  Copyright (c) 2021-2022 Robert van den Breemen
+**  Copyright (c) 2021-2023 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
@@ -28,11 +28,11 @@ void processAPI()
 
   strlcpy( URI, httpServer.uri().c_str(), sizeof(URI) );
 
-  RESTDebugTf("from[%s] URI[%s] method[%s] \r\n", httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(httpServer.method()).c_str());
+  RESTDebugTf(PSTR("from[%s] URI[%s] method[%s] \r\n"), httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(httpServer.method()).c_str());
 
   if (ESP.getFreeHeap() < 8500) // to prevent firmware from crashing!
   {
-    RESTDebugTf("==> Bailout due to low heap (%d bytes))\r\n", ESP.getFreeHeap() );
+    RESTDebugTf(PSTR("==> Bailout due to low heap (%d bytes))\r\n"), ESP.getFreeHeap() );
     httpServer.send(500, "text/plain", "500: internal server error (low heap)\r\n"); 
     return;
   }
@@ -149,7 +149,7 @@ void sendOTGWvalue(int msgid){
   } else if (msgid>= 0 && msgid<= OT_MSGID_MAX) 
   { //message id's need to be between 0 and 127
     //Debug print the values first
-    RESTDebugTf("%s = %s %s\r\n", OTlookupitem.label, getOTGWValue(msgid).c_str(), OTlookupitem.unit);
+    RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid).c_str(), OTlookupitem.unit);
     //build the json
     root["label"] = OTlookupitem.label;
     if (OTlookupitem.type == ot_f88) {
@@ -163,7 +163,7 @@ void sendOTGWvalue(int msgid){
   }
   String sBuff;
   serializeJsonPretty(root, sBuff);
-  //RESTDebugTf("Json = %s\r\n", sBuff.c_str());
+  //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff.c_str());
   //reply with json
   httpServer.sendHeader("Access-Control-Allow-Origin", "*");
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -185,7 +185,7 @@ void sendOTGWlabel(const char *msglabel){
   } else 
   { //message id's need to be between 0 and OT_MSGID_MAX
     //RESTDebug print the values first
-    RESTDebugTf("%s = %s %s\r\n", OTlookupitem.label, getOTGWValue(msgid).c_str(), OTlookupitem.unit);
+    RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid).c_str(), OTlookupitem.unit);
     //build the json
     root["label"] = OTlookupitem.label;
     if (OTlookupitem.type == ot_f88) {
@@ -197,7 +197,7 @@ void sendOTGWlabel(const char *msglabel){
   } 
   String sBuff;
   serializeJsonPretty(root, sBuff);
-  //RESTDebugTf("Json = %s\r\n", sBuff.c_str());
+  //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff.c_str());
   //reply with json
   httpServer.sendHeader("Access-Control-Allow-Origin", "*");
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -314,6 +314,8 @@ void sendDeviceInfo()
   sendNestedJsonObj("fwversion", _FW_VERSION);
   sendNestedJsonObj("picfwversion", CSTR(sPICfwversion));
   sendNestedJsonObj("picdeviceid", CSTR(sPICdeviceid));
+  sPICtype = OTGWSerial.firmwareToString(); 
+  sendNestedJsonObj("picfwtype", CSTR(sPICtype));
   snprintf(cMsg, sizeof(cMsg), "%s %s", __DATE__, __TIME__);
   sendNestedJsonObj("compiled", cMsg);
   sendNestedJsonObj("hostname", CSTR(settingHostname));
@@ -377,13 +379,16 @@ void sendDeviceInfo()
 //=======================================================================
 void sendDeviceTime() 
 {
-  char actTime[50];
+  char buf[50];
   
   sendStartJsonObj("devtime");
-  snprintf(actTime, 49, "%04d-%02d-%02d %02d:%02d:%02d", year(), month(), day()
-                                                       , hour(), minute(), second());
-  sendNestedJsonObj("dateTime", actTime); 
-  sendNestedJsonObj("epoch", (int)now());
+  time_t now = time(nullptr);
+  //Timezone based devtime
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
+  snprintf(buf, 49, PSTR("%04d-%02d-%02d %02d:%02d:%02d"), myTime.year(), myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second());
+  sendNestedJsonObj("dateTime", buf); 
+  sendNestedJsonObj("epoch", (int)now);
   sendNestedJsonObj("message", sMessage);
 
   sendEndJsonObj("devtime");
@@ -450,9 +455,9 @@ void postSettings()
       for (uint_fast8_t i=0; i<wp; i++)
       {
         String wOut[5];
-        //RESTDebugTf("[%d] -> pair[%s]\r\n", i, wPair[i].c_str());
+        //RESTDebugTf(PSTR("[%d] -> pair[%s]\r\n"), i, wPair[i].c_str());
         uint8_t wc = splitString(wPair[i].c_str(), ':',  wOut, 5) ;
-        //RESTDebugTf("==> [%s] -> field[%s]->val[%s]\r\n", wPair[i].c_str(), wOut[0].c_str(), wOut[1].c_str());
+        //RESTDebugTf(PSTR("==> [%s] -> field[%s]->val[%s]\r\n"), wPair[i].c_str(), wOut[0].c_str(), wOut[1].c_str());
         if (wc>1) {
             if (wOut[0].equalsIgnoreCase("name")) {
               if ( wOut[1].length() < (sizeof(field)-1) ) {
@@ -467,7 +472,7 @@ void postSettings()
         }
       }
       if ( field[0] != 0 && newValue[0] != 0 ) {
-        RESTDebugTf("--> field[%s] => newValue[%s]\r\n", field, newValue);
+        RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
         updateSetting(field, newValue);
         httpServer.send(200, "application/json", httpServer.arg(0));
       } else {

@@ -3,7 +3,7 @@
 **  Program  : OTGW-firmware.ino
 **  Version  : v0.9.5
 **
-**  Copyright (c) 2021-2022 Robert van den Breemen
+**  Copyright (c) 2021-2023 Robert van den Breemen
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
@@ -37,6 +37,8 @@ DECLARE_TIMER_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_T
   
 //=====================================================================
 void setup() {
+
+ 
   // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
   // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
   // while (!Serial) {} //Wait for OK
@@ -44,6 +46,7 @@ void setup() {
   OTGWSerial.println(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   OTGWSerial.printf("Booting....[%s]\r\n\r\n", String(_FW_VERSION).c_str());
   WatchDogEnabled(0); // turn off watchdog
+  
 
   //setup randomseed the right way
   randomSeed(RANDOM_REG32); //This is 8266 HWRNG used to seed the Random PRNG: Read more: https://config9.com/arduino/getting-a-truly-random-number-in-arduino/
@@ -61,12 +64,12 @@ void setup() {
   // Connect to and initialise WiFi network
   OTGWSerial.println(F("Attempting to connect to WiFi network\r"));
   setLed(LED1, ON);
+  startNTP();
   startWiFi(CSTR(settingHostname), 240);  // timeout 240 seconds
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
 
   startTelnet();              // start the debug port 23
-  startNTP();
   startMDNS(CSTR(settingHostname));
   startLLMNR(CSTR(settingHostname));
   setupFSexplorer();
@@ -81,6 +84,16 @@ void setup() {
   
  
   OTGWSerial.println(F("Setup finished!\r\n"));
+
+  // //delay for debugging
+  // OTGWSerial.print("bootdelay ");
+  // for (int i =0; i <10; i++) {
+  //   delay(1000);
+  //   OTGWSerial.print(i);
+  //   OTGWSerial.print(" ");	
+  // }
+  // OTGWSerial.println();
+  
   // After resetting the OTGW PIC never send anything to Serial for debug
   // and switch to telnet port 23 for debug purposed. 
   // Setup the OTGW PIC
@@ -141,7 +154,7 @@ void restartWifi(){
 }
 
 void sendMQTTuptime(){
-  DebugTf("Uptime seconds: %d\r\n", upTimeSeconds);
+  DebugTf(PSTR("Uptime seconds: %d\r\n"), upTimeSeconds);
   String sUptime = String(upTimeSeconds);
   sendMQTTData(F("otgw-firmware/uptime"), sUptime, false);
 }
@@ -151,22 +164,28 @@ void sendtimecommand(){
   if (NtpStatus != TIME_SYNC) return;   // only send time command when time is synced
   //send time command to OTGW
   //send time / weekday
+
+  time_t now = time(nullptr);
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
+  //DebugTf(PSTR("%02d:%02d:%02d %02d-%02d-%04d\r\n"), myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
+
   char msg[15]={0};
-  #define calc_ot_dow(dow) ((dow+5)%7+1) 
-  sprintf(msg,"SC=%d:%02d/%ld", hour(), minute(), calc_ot_dow(dayOfWeek(now())));
+  int day_of_week = (myTime.dayOfWeek()+5)%7+1;
+  sprintf(msg,"SC=%d:%02d/%d", myTime.hour(), myTime.minute(), day_of_week);
   addOTWGcmdtoqueue(msg, strlen(msg), true);
 
   static int lastDay = 0;
-  if (day(now())!=lastDay){
+  if (myTime.day()!=lastDay){
     //Send msg id 21: month, day
-    lastDay = day(now());
-    sprintf(msg,"SR=21:%d,%d", month(now()), day(now()));
+    lastDay = myTime.day();
+    sprintf(msg,"SR=21:%d,%d", myTime.month(), myTime.day());
     addOTWGcmdtoqueue(msg, strlen(msg), true);  
   }
   
   static int lastYear = 0;
-  if (year(now())!=lastYear){
-    lastYear = year(now());
+  if (myTime.year()!=lastYear){
+    lastYear = myTime.year();
     //Send msg id 22: HB of Year, LB of Year 
     sprintf(msg,"SR=22:%d,%d", (lastYear >> 8) & 0xFF, lastYear & 0xFF);
     addOTWGcmdtoqueue(msg, strlen(msg), true);
@@ -237,7 +256,18 @@ void doTaskEvery60s(){
   //== do tasks ==
   //if no wifi, try reconnecting (once a minute)
   if (WiFi.status() != WL_CONNECTED) restartWifi();
-  sendtimecommand();
+  //only send timecommand when in gateway firmware, not in diagnotic or interface mode
+  if (OTGWSerial.firmwareType() == FIRMWARE_OTGW) {
+    sendtimecommand();
+  }
+  if (sPICdeviceid=="unknown"){
+    //keep trying to figure out which pic is used!
+    sPICfwversion =  getpicfwversion();
+    sPICfwversion = String(OTGWSerial.firmwareVersion());
+    DebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
+    sPICdeviceid = OTGWSerial.processorToString();
+    DebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));
+  }
 }
 
 //===[ Do task every 5min ]===
