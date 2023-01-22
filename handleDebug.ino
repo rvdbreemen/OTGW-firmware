@@ -24,12 +24,13 @@ void handleDebug(){
             case 'a':
                 DebugTln(F("Send PR=A command, to ID the chip"));
                 getpicfwversion();
+                DebugTln("Debug --> PR=A report firmware version, type");
                 sPICfwversion = String(OTGWSerial.firmwareVersion());
                 OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
                 sPICdeviceid = OTGWSerial.processorToString();
                 OTGWDebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));
                 sPICtype = OTGWSerial.firmwareToString();
-                OTGWDebugTf(PSTR("Current type: %s\r\n"), CSTR(sPICtype));
+                OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), CSTR(sPICtype));
                 break;
             case 'q':
                 DebugTln(F("Read settings"));

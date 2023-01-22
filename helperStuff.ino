@@ -334,20 +334,60 @@ bool prefix(const char *pre, const char *str)
     return strncmp(pre, str, strlen(pre)) == 0;
 }
 
-bool dayChanged(){
-  static int8_t lastday = 0;
+bool yearChanged(){
+  static int8_t lastyear = 0;
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
-  if (lastday==0) lastday = myTime.day();
-  return (lastday != myTime.day());
+  int8_t thisyear = myTime.year();
+  if (lastyear==-1) lastyear = thisyear;
+  bool _ret = (lastyear != thisyear); //year changed
+  if (_ret) {
+    //year changed
+    lastyear = thisyear;
+  }
+  return _ret;
+}
+
+bool dayChanged(){
+  static int8_t lastday = -1;
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
+  int8_t thisday = myTime.day();
+  if (lastday==-1) lastday = thisday;
+  bool _ret = (lastday != thisday);
+  if (_ret) {
+    //day changed
+    lastday = thisday;
+  }
+  return _ret;
 }
 
 bool hourChanged(){
-  static int8_t lasthour = 0;
+  static int8_t lasthour = -1;
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
-  if (lasthour==0) lasthour = myTime.hour();
-  return (lasthour != myTime.hour());
+  int8_t thishour = myTime.hour();
+  if (lasthour==-1) lasthour = thishour;
+  bool _ret = (lasthour != thishour);
+  if (_ret){
+    //hour changed
+    lasthour = thishour;
+  }
+  return _ret;
+}
+
+bool minuteChanged(){
+  static int8_t lastminute = -1;
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
+  int8_t thisminute = myTime.minute();
+  if (lastminute==-1) lastminute = thisminute;
+  bool _ret = (lastminute != thisminute);
+  if (_ret){
+    //minute changed
+    lastminute = thisminute;
+  }
+  return _ret;
 }
 
 /*

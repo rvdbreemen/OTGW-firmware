@@ -90,7 +90,7 @@ void sendMQTTversioninfo(){
   sendMQTTData("otgw-firmware/reboot_reason", lastReset);
   sendMQTTData("otgw-pic/version", sPICfwversion);
   sendMQTTData("otgw-pic/deviceid", sPICdeviceid);
-  sPICtype = OTGWSerial.firmwareToString();
+  //sPICtype = OTGWSerial.firmwareToString();
   sendMQTTData("otgw-pic/firmwaretype", sPICdeviceid);
 }
 
@@ -111,12 +111,12 @@ void resetOTGW() {
 
   OTGWSerial.resetPic();
 
-  sPICfwversion = String(OTGWSerial.firmwareVersion());
-  OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
-  sPICdeviceid = OTGWSerial.processorToString();
-  OTGWDebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));
-  sPICtype = OTGWSerial.firmwareToString();
-  OTGWDebugTf(PSTR("Current type: %s\r\n"), CSTR(sPICtype));
+//   sPICfwversion = String(OTGWSerial.firmwareVersion());
+//   OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
+//   sPICdeviceid = OTGWSerial.processorToString();
+//   OTGWDebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));
+//   sPICtype = OTGWSerial.firmwareToString();
+//   OTGWDebugTf(PSTR("Current type: %s\r\n"), CSTR(sPICtype));
 }
 //===================[ getpicfwversion ]===========================
 String getpicfwversion(){
@@ -130,7 +130,7 @@ String getpicfwversion(){
   } else {
     _ret ="No version found";
   }
-  OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(_ret));
+  OTGWDebugTf(PSTR("getpicfwversion: Current firmware version: %s\r\n"), CSTR(_ret));
   _ret.trim();
   return _ret;
 }
@@ -1692,7 +1692,9 @@ void processOT(const char *buf, int len){
     sPICfwversion = String(OTGWSerial.firmwareVersion());
     OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
     sPICdeviceid = OTGWSerial.processorToString();
-    OTGWDebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));
+    OTGWDebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));    
+    sPICtype = OTGWSerial.firmwareToString();
+    OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), CSTR(sPICtype));
   } else {
     OTGWDebugTf(PSTR("Not processed, received from OTGW => (%s) [%d]\r\n"), buf, len);
   }
@@ -1951,6 +1953,18 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
 
 void fwupgradestep(int pct) {
   OTGWDebugTf(PSTR("Upgrade: %d%%\n\r"), pct);
+}
+
+void fwreportinfo(OTGWFirmware fw, const char *version) {
+    DebugTln(PSTR("Callback: fwreportinfo"));
+    //sPICfwversion = String(fwreportinfo);
+    sPICfwversion = String(OTGWSerial.firmwareVersion());
+    DebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
+    sPICdeviceid = OTGWSerial.processorToString();
+    DebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));
+    //instead of using the firmware string
+    sPICtype = OTGWSerial.firmwareToString(fw);
+    OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), CSTR(sPICtype));
 }
 
 void fwupgradestart(const char *hexfile) {
