@@ -90,9 +90,9 @@ const char *weekDayName[]  {  "Unknown", "Sunday", "Monday", "Tuesday", "Wednesd
 const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
 
 //Information on OTGW 
-String    sPICfwversion = ""; 
-String    sPICdeviceid = "";
-String    sPICtype = "";
+String    sPICfwversion = "no pic found"; 
+String    sPICdeviceid = "no pic found";
+String    sPICtype = "no pic found";
 String    errorupgrade = ""; 
 bool      bOTGWonline = true;
 bool      bOTGWboilerstate = false;

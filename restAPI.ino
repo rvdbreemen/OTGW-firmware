@@ -311,10 +311,10 @@ void sendDeviceInfo()
   sendStartJsonObj("devinfo");
 
   sendNestedJsonObj("author", "Robert van den Breemen");
-  sendNestedJsonObj("fwversion", _FW_VERSION);
+  sendNestedJsonObj("fwversion", _VERSION);
   sendNestedJsonObj("picfwversion", CSTR(sPICfwversion));
   sendNestedJsonObj("picdeviceid", CSTR(sPICdeviceid));
-  sPICtype = OTGWSerial.firmwareToString(); 
+  // sPICtype = OTGWSerial.firmwareToString(); 
   sendNestedJsonObj("picfwtype", CSTR(sPICtype));
   snprintf(cMsg, sizeof(cMsg), "%s %s", __DATE__, __TIME__);
   sendNestedJsonObj("compiled", cMsg);
