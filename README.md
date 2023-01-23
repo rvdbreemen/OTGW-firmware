@@ -45,7 +45,9 @@ The features of this Nodosop OpenTherm Gateware ESP8266 based firmware are:
 - integration with any MQTT based Home Automation solution, like Domoticz (plugin available) & OpenHAB
 - reliable OTGW PIC upgrades (v0.6.0+), to the latest firmware available at http://otgw.tclcode.com/download.html
 - cleaner RestAPI's for Telegraf OTmonitor integration
-- readout Dallas-type temperture sensors (eg. DS18B20) connected to GPIO
+- readout Dallas-type temperture sensors (eg. DS18B20) connected to GPIO, added automatic Home Assistant Discovery
+- readout S0 output counter and timing from kWh meter connected to configurable GPIO
+- Enhance Home Assistant discovery for Dallas sensors and S0 output counter
  
 **Warning: Never flash your OTGW PIC firmware through wifi using OTmonitor application, you can brick your OTGW PIC. Instead use the buildin PIC firmware upgrade feature (based on code by Schelte Bron)**
 
@@ -58,6 +60,7 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
 
 | Version | Release notes |
 |-|-|
+| 0.10.0 | Readout S0 output from configurable GPIO, interupt rtn added for this, enhanced Dallas-type sensor logic (autoconfigure, code cleanup)|
 | 0.9.6 | Bugfix: bitwise not bytewise AND operation for ASF flags OEM codes |
 | 0.9.5 | Improved: WebUI improved by community<br>Bugfix: Device Online status indicator for Home Assistant<br>Improved: Update of 5.x series (pic16f88) firmwares, preparing for 6.x (pic16f1847) updates.<br>Bugfix: Prevent spamming OTGW firmware website in case of rebootloop<br>Added: Unique useragent|
 | 0.9.4 | Update: New firmware included gateway version 5.3 for PIC P16F88.<br>Update: Preventing >5.x PIC firmwares to be detected, incompatible (for now)| 

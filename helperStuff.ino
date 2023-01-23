@@ -200,6 +200,7 @@ bool updateRebootLog(String text)
   uint32_t errorCode = -1;
 
   //waitforNTPsync();
+  loopNTP(); // make sure time is up to date (improved error logging)
 
   struct	rst_info	*rtc_info	=	system_get_rst_info();
   
