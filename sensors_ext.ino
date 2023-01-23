@@ -130,7 +130,7 @@ if (settingMQTTenable) {
     const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
     // Store the C temp in struc to allow it to be shown on Homepage through restAPI.ino
     DallasrealDevice[i].tempC = sensors.getTempC(DallasrealDevice[i].addr);
-    DallasrealDevice[i].lasttime = int(now) ;
+    DallasrealDevice[i].lasttime = now ;
     if (settingMQTTenable ) {
       //Build string for MQTT, rse sendMQTTData for this
       // ref MQTTPubNamespace = settingMQTTtopTopic + "/value/" + strDeviceAddress ;
