@@ -147,7 +147,7 @@ void readSettings(bool show)
     Debugf("Led Blink             : %s\r\n", CBOOLEAN(settingLEDblink));
     Debugf("GPIO Sensors          : %s\r\n", CBOOLEAN(settingGPIOSENSORSenabled));
     Debugf("GPIO Sen. Pin         : %d\r\n", settingGPIOSENSORSpin);
-    Debugf("GPIO Interval         : %s\r\n", CBOOLEAN(settingGPIOSENSORSinterval));
+    Debugf("GPIO Interval         : %d\r\n", settingGPIOSENSORSinterval);
     Debugf("OTGW boot cmd enabled : %s\r\n", CBOOLEAN(settingOTGWcommandenable));
     Debugf("OTGW boot cmd         : %s\r\n", CSTR(settingOTGWcommands));
     Debugf("GPIO Outputs          : %s\r\n", CBOOLEAN(settingGPIOOUTPUTSenabled));
