@@ -70,7 +70,7 @@
      OTGWs0powerkw =  (float) 3600000 / (float)settingS0COUNTERpulsekw  / (float)last_pulse_duration ;
      if (bDebugSensors) DebugTf(PSTR("*** S0PulseCount(%d) S0PulseCountTot(%d)\r\n"), OTGWs0pulseCount, OTGWs0pulseCountTot) ;
      if (bDebugSensors) DebugTf(PSTR("*** S0LastPulsetime(%d) S0Pulsekw:(%4.3f) \r\n"), last_pulse_duration, OTGWs0powerkw) ;
-     OTGWs0lasttime = int(now) ;
+     OTGWs0lasttime = now ;
      if (settingMQTTenable ) {
        sensorAutoConfigure(OTGWs0dataid, true , "" ) ;     // Configure S0 sensor with the  
        s0sendMQ() ; 
