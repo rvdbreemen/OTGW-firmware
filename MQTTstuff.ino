@@ -605,6 +605,7 @@ bool doAutoConfigureMsgid(byte OTid)
 
     /// SensorId
     sTopic.replace("%sensor_id%", CSTR(cfgSensorId));
+
     MQTTDebugf("[%s]\r\n", CSTR(sTopic)); 
     /// ----------------------
 
@@ -614,7 +615,7 @@ bool doAutoConfigureMsgid(byte OTid)
     sMsg.replace("%node_id%", CSTR(NodeId));
 
     /// SensorId
-    sTopic.replace("%sensor_id%", CSTR(cfgSensorId));
+    sMsg.replace("%sensor_id%", CSTR(cfgSensorId));
 
     /// hostname
     sMsg.replace("%hostname%", CSTR(settingHostname));
