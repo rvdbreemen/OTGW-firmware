@@ -1956,7 +1956,7 @@ void fwupgradestep(int pct) {
 }
 
 void fwreportinfo(OTGWFirmware fw, const char *version) {
-    DebugTln(PSTR("Callback: fwreportinfo"));
+    DebugTln(F("Callback: fwreportinfo"));
     sPICfwversion = String(version);
     //sPICfwversion = String(OTGWSerial.firmwareVersion());
     DebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
