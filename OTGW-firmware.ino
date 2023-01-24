@@ -28,13 +28,22 @@
 #include "version.h"
 #include "OTGW-firmware.h"
 
-#define SetupDebugTln(...) ({ if (sPICtype!="no pic found") DebugTln(__VA_ARGS__);    })
-#define SetupDebugln(...)  ({ if (sPICtype!="no pic found") Debugln(__VA_ARGS__);    })
-#define SetupDebugTf(...)  ({ if (sPICtype!="no pic found") DebugTf(__VA_ARGS__);    })
-#define SetupDebugf(...)   ({ if (sPICtype!="no pic found") Debugf(__VA_ARGS__);    })
-#define SetupDebugT(...)   ({ if (sPICtype!="no pic found") DebugT(__VA_ARGS__);    })
-#define SetupDebug(...)    ({ if (sPICtype!="no pic found") Debug(__VA_ARGS__);    })
-#define SetupDebugFlush()  ({ if (sPICtype!="no pic found") DebugFlush();    })
+// temporary moved out, until there is a reliable way to detect pic
+// #define SetupDebugTln(...) ({ if (sPICtype!="no pic found") DebugTln(__VA_ARGS__);    })
+// #define SetupDebugln(...)  ({ if (sPICtype!="no pic found") Debugln(__VA_ARGS__);    })
+// #define SetupDebugTf(...)  ({ if (sPICtype!="no pic found") DebugTf(__VA_ARGS__);    })
+// #define SetupDebugf(...)   ({ if (sPICtype!="no pic found") Debugf(__VA_ARGS__);    })
+// #define SetupDebugT(...)   ({ if (sPICtype!="no pic found") DebugT(__VA_ARGS__);    })
+// #define SetupDebug(...)    ({ if (sPICtype!="no pic found") Debug(__VA_ARGS__);    })
+// #define SetupDebugFlush()  ({ if (sPICtype!="no pic found") DebugFlush();    })
+
+#define SetupDebugTln(...) ({  DebugTln(__VA_ARGS__);    })
+#define SetupDebugln(...)  ({  Debugln(__VA_ARGS__);    })
+#define SetupDebugTf(...)  ({  DebugTf(__VA_ARGS__);    })
+#define SetupDebugf(...)   ({  Debugf(__VA_ARGS__);    })
+#define SetupDebugT(...)   ({  DebugT(__VA_ARGS__);    })
+#define SetupDebug(...)    ({  Debug(__VA_ARGS__);    })
+#define SetupDebugFlush()  ({  DebugFlush();    })
 
 
 #define ON LOW
@@ -49,13 +58,13 @@ void setup() {
   // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
   // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
   // while (!Serial) {} //Wait for OK
-  
+  WatchDogEnabled(0); // turn off watchdog
+
   SetupDebugln(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   SetupDebugf("Booting....[%s]\r\n\r\n", _VERSION);
-  //OTGWSerial.registerFirmwareCallback(fwreportinfo);
+  
+  OTGWSerial.registerFirmwareCallback(fwreportinfo);
   OTGWSerial.resetPic(); // make sure it the firmware is detected
-
-  WatchDogEnabled(0); // turn off watchdog
 
   //setup randomseed the right way
   randomSeed(RANDOM_REG32); //This is 8266 HWRNG used to seed the Random PRNG: Read more: https://config9.com/arduino/getting-a-truly-random-number-in-arduino/
@@ -177,17 +186,20 @@ void sendtimecommand(){
   int day_of_week = (myTime.dayOfWeek()+6)%7+1;
   sprintf(msg,"SC=%d:%02d/%d", myTime.hour(), myTime.minute(), day_of_week);
   addOTWGcmdtoqueue(msg, strlen(msg), true);
+  handleOTGWqueue(); //send command right away
 
   if (dayChanged()){
     //Send msg id 21: month, day
     sprintf(msg,"SR=21:%d,%d", myTime.month(), myTime.day());
-    addOTWGcmdtoqueue(msg, strlen(msg), true);  
+    addOTWGcmdtoqueue(msg, strlen(msg), true); 
+    handleOTGWqueue(); //send command right away
   }
   
   if (yearChanged()){
     //Send msg id 22: HB of Year, LB of Year 
     sprintf(msg,"SR=22:%d,%d", (myTime.year() >> 8) & 0xFF, myTime.year() & 0xFF);
     addOTWGcmdtoqueue(msg, strlen(msg), true);
+    handleOTGWqueue(); //send command right away
   }
 }
 

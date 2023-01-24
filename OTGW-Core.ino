@@ -1957,8 +1957,8 @@ void fwupgradestep(int pct) {
 
 void fwreportinfo(OTGWFirmware fw, const char *version) {
     DebugTln(PSTR("Callback: fwreportinfo"));
-    //sPICfwversion = String(fwreportinfo);
-    sPICfwversion = String(OTGWSerial.firmwareVersion());
+    sPICfwversion = String(version);
+    //sPICfwversion = String(OTGWSerial.firmwareVersion());
     DebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
     sPICdeviceid = OTGWSerial.processorToString();
     DebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));

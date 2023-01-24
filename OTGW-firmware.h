@@ -54,7 +54,7 @@ void setLed(int8_t, uint8_t);
 #define CCONOFF(x) (x?"ON":"OFF")
 #define CBINARY(x) (x?"1":"0")
 #define EVALBOOLEAN(x) (strcasecmp(x,"true")==0||strcasecmp(x,"on")==0||strcasecmp(x,"1")==0)
-
+#define ETX ((uint8_t)0x04)
 
 //prototype
 void sendMQTTData(const String, const String, const bool);
