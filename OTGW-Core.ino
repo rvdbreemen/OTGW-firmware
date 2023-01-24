@@ -287,19 +287,19 @@ void feedWatchDog() {
 //=======================================================================
 float OpenthermData_t::f88() {
   float value = (int8_t) valueHB;
-  return value + (float)valueLB / 256.0;
+  return value + (float)valueLB / 256.0f;
 }
 
 void OpenthermData_t::f88(float value) {
   if (value >= 0) {
     valueHB = (byte) value;
     float fraction = (value - valueHB);
-    valueLB = fraction * 256.0;
+    valueLB = fraction * 256.0f;
   }
   else {
     valueHB = (byte)(value - 1);
     float fraction = (value - valueHB - 1);
-    valueLB = fraction * 256.0;
+    valueLB = fraction * 256.0f;
   }
 }
 
@@ -507,7 +507,7 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
 void print_f88(float& value)
 {
   //function to print data
-  float _value = round(OTdata.f88()*100.0) / 100.0; // round float 2 digits, like this: x.xx 
+  float _value = roundf(OTdata.f88()*100.0f) / 100.0f; // round float 2 digits, like this: x.xx 
   // AddLog("%s = %3.2f %s", OTlookupitem.label, _value , OTlookupitem.unit);
   char _msg[15] {0};
   dtostrf(_value, 3, 2, _msg);
