@@ -335,11 +335,10 @@ bool prefix(const char *pre, const char *str)
 }
 
 bool yearChanged(){
-  static int8_t lastyear = 0;
+  static int16_t lastyear = -1;
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
   int8_t thisyear = myTime.year();
-  if (lastyear==-1) lastyear = thisyear;
   bool _ret = (lastyear != thisyear); //year changed
   if (_ret) {
     //year changed
@@ -353,7 +352,6 @@ bool dayChanged(){
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
   int8_t thisday = myTime.day();
-  if (lastday==-1) lastday = thisday;
   bool _ret = (lastday != thisday);
   if (_ret) {
     //day changed
@@ -367,7 +365,6 @@ bool hourChanged(){
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
   int8_t thishour = myTime.hour();
-  if (lasthour==-1) lasthour = thishour;
   bool _ret = (lasthour != thishour);
   if (_ret){
     //hour changed
@@ -381,7 +378,6 @@ bool minuteChanged(){
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
   int8_t thisminute = myTime.minute();
-  if (lastminute==-1) lastminute = thisminute;
   bool _ret = (lastminute != thisminute);
   if (_ret){
     //minute changed
