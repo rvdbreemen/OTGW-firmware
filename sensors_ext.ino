@@ -132,7 +132,7 @@ if (settingMQTTenable) {
     DallasrealDevice[i].tempC = sensors.getTempC(DallasrealDevice[i].addr);
     DallasrealDevice[i].lasttime = now ;
     
-    if (bDebugSensors) DebugTf("Sensor device no[%d] addr[%s] TempC: %f\r\n", i, strDeviceAddress, DallasrealDevice[i].tempC);
+    if (bDebugSensors) DebugTf(PSTR("Sensor device no[%d] addr[%s] TempC: %f\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
 
     if (settingMQTTenable ) {
       //Build string for MQTT, rse sendMQTTData for this
