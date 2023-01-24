@@ -131,6 +131,9 @@ if (settingMQTTenable) {
     // Store the C temp in struc to allow it to be shown on Homepage through restAPI.ino
     DallasrealDevice[i].tempC = sensors.getTempC(DallasrealDevice[i].addr);
     DallasrealDevice[i].lasttime = now ;
+    
+    if (bDebugSensors) DebugTf("Sensor device no[%d] addr[%s] TempC: %f\r\n", i, strDeviceAddress, DallasrealDevice[i].tempC);
+
     if (settingMQTTenable ) {
       //Build string for MQTT, rse sendMQTTData for this
       // ref MQTTPubNamespace = settingMQTTtopTopic + "/value/" + strDeviceAddress ;
