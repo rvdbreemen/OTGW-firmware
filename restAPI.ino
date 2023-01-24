@@ -328,7 +328,7 @@ void sendDeviceInfo()
   sendNestedJsonObj("sdkversion",  ESP.getSdkVersion());
   sendNestedJsonObj("cpufreq", ESP.getCpuFreqMHz());
   sendNestedJsonObj("sketchsize",  ESP.getSketchSize());
-  sendNestedJsonObj("freesketchspace",  ESP.getFreeSketchSpace() );
+  sendNestedJsonObj("freesketchspace", ESP.getFreeSketchSpace());
 
   snprintf(cMsg, sizeof(cMsg), "%08X", ESP.getFlashChipId());
   sendNestedJsonObj("flashchipid", cMsg);  // flashChipId
@@ -336,7 +336,7 @@ void sendDeviceInfo()
   sendNestedJsonObj("flashchiprealsize", (ESP.getFlashChipRealSize() / 1024.0f / 1024.0f));
 
   LittleFS.info(LittleFSinfo);
-  sendNestedJsonObj("LittleFSsize", floorf( (LittleFSinfo.totalBytes / (1024.0f * 1024.0f))));
+  sendNestedJsonObj("LittleFSsize", floorf((LittleFSinfo.totalBytes / (1024.0f * 1024.0f))));
 
   sendNestedJsonObj("flashchipspeed", floorf((ESP.getFlashChipSpeed() / 1000.0f / 1000.0f)));
 
