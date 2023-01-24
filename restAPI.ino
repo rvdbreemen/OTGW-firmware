@@ -327,7 +327,7 @@ void sendDeviceInfo()
   sendNestedJsonObj("coreversion", CSTR(ESP.getCoreVersion()) );
   sendNestedJsonObj("sdkversion",  ESP.getSdkVersion());
   sendNestedJsonObj("cpufreq", ESP.getCpuFreqMHz());
-  sendNestedJsonObj("sketchsize",  ESP.getSketchSize());
+  sendNestedJsonObj("sketchsize", ESP.getSketchSize());
   sendNestedJsonObj("freesketchspace", ESP.getFreeSketchSpace());
 
   snprintf(cMsg, sizeof(cMsg), "%08X", ESP.getFlashChipId());
