@@ -17,19 +17,15 @@
     -moz-osx-font-smoothing: grayscale;
     font-family: 'Dosis', sans-serif;
     line-height: 1.6;
-    color: black;
-    background: #e6ffff;
+    color: white;
+    background: rgb(28, 28, 30);
   }
   
-  body {
-    max-width: 1000px;
-  }
-
   table {
     color: black;
     border-collapse: collapse;
     width: 90%;
-    background: lightblue;
+    background: rgb(28, 28, 30);
   }
   
   th {
@@ -49,7 +45,7 @@
   
   tfoot {
     font-size: 12px;
-    color: darkblue;
+    color: rgb(44, 44, 46);
   }
   
   input {
@@ -61,14 +57,14 @@
   .outer-div {
     /*width: 90%; */
     text-align: center;
-    background-color: #e6ffff 
+    background-color: rgb(28, 28, 30) 
   }
   .inner-div {
     display: inline-block; 
     /*
     margin: 0 auto;
     padding: 3px;
-    background-color: lightblue
+    background-color: rgb(28, 28, 30)
     */
   }
   
@@ -107,38 +103,53 @@
   }
   
   /*--------------------- N A V - B A R -----------------*/
-  .nav-container,.footer {
-    background: #00bffe;
-    padding: 6px;
+  .nav-container {
+    background: rgb(44, 44, 46);
+    padding-top: 6px;
+    padding-left: 1px;
+    padding-right: 1px;
+    padding-bottom: 6px;
     min-height: 50px;
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
+    border-top-style: solid;
+    border-top-width: 1px;
+    border-top-color: rgb(72, 72, 74);
+    border-bottom-style: solid;
+    border-bottom-width: 1px;
+    border-bottom-color: rgb(72, 72, 74);
   }
   
-  .footer {
-    background-color: #e6ffff;
-  }
-
   .nav-container a:hover {
-    color: black;
-    background: skyblue; /* only for FSexplorer - Rest does not work */
+    color: white;
+    background: rgb(44, 44, 46); /* only for FSexplorer - Rest does not work */
   }
 
   .nav-left {
     flex-basis: 10%;
     display: flex;
     flex-grow: 1;
-    gap: 15px;
+    gap: 0px;
     flex: 2 1 0;
     justify-content: left; /* horizonal alignment */
     align-items: center; /* horizonal alignment */
     min-height: 50px;
+    font-size: 26px;
+    font-weight: bold;
   }
 
-
-  .nav-left .hidden {
-    display: none;
+  .nav-centered {
+    flex-basis: 10%;
+    display: flex;
+    flex-grow: 1;
+    gap: 0px;
+    flex: 2 1 0;
+    justify-content: left; /* horizonal alignment */
+    align-items: center; /* horizonal alignment */
+    min-height: 50px;
+    font-size: 26px;
+    font-weight: thin;
   }
 
   .nav-right {
@@ -156,12 +167,9 @@
     display: block;
     position: absolute;
     top: 121px;
-    background-color: white;
-    padding: 10px 20px;
-    background-color: lightblue;
-    box-shadow: 2px 2px 2px 0px grey;
+    background-color: rgb(44, 44, 46);
+    
   }
-
   .nav-right .adv_dropdown.hidden {
     display: none;
   }
@@ -174,23 +182,19 @@
     cursor: pointer;
   }
   .nav-right .adv_dropdown span:hover {
-    background-color: #bde8f6;
+    background-color: rgb(44, 44, 46);
   } 
   
   .nav-item {
     font-size: 16px;
     height: 40px;
     width: 110px;
-    background-color: lightblue;
+    background-color: rgb(44, 44, 46);
     border: none;
     border-radius: 5px;
-    color: #505050;
+    color: white;
     cursor: pointer;
-    box-shadow: 2px 2px 2px 0px grey;
-  }
-  
-  .nav-item:hover {
-    color: black;
+    box-shadow: none;
   }
 
   .nav-item:active {
@@ -202,19 +206,20 @@
     height: 30px;
     object-fit: cover;
     cursor: pointer;
+    color:rgba(87, 152, 203, 1);
   }
 
   .nav-clock {
     top: 1px;
-    color: black;
+    color: white;
     float: right;
     font-size: small;
     font-weight:bold;
     text-align: right;
-    background: white; 
+    background: rgb(28, 28, 30); 
     width: 200px; 
     padding-right: 10px;
-    background: #e6ffff;
+    background: rgb(28, 28, 30);
   }
   
   /*-------------------------*/
@@ -235,7 +240,7 @@
   ***/
   
   .tabButton a:hover {
-    background-color: gray;
+    background-color: rgb(99, 99, 102);
   }
   
   
@@ -261,7 +266,7 @@
     margin-top: 10px;
   }
   .div1 a:link, a:visited { 
-    background-color: deepSkyBlue; 
+    background-color: rgb(28, 28, 30); 
     color: white; 
     padding: 5px 15px; 
     width: 210px; 
@@ -270,7 +275,7 @@
     display: inline-block;
   }
   .div1 a:hover, a:active { 
-    background-color: deepSkyBlue;
+    background-color: rgb(28, 28, 30);
     color: black;
   }
   
@@ -313,20 +318,17 @@
   }
   
   /* PIC firmware page */
-.pictable {
+#table {
   display: table;
-  width: 100%;
-  min-width: 600px;
+  padding: 5px;
 }
 .picrow {
   display: table-row;
   padding: 5px;
-  width: 100%;
-  min-width: 600px;
 }
 .piccolumn1 {
   display: table-cell;
-  width: 170px;
+  width: 150px;
   margin: 5px;
 }
 .piccolumn2 {
@@ -354,71 +356,62 @@
 }
 
   
-/* OTmonitor */
-.otmontable {
-  display: table;
-  width: 100%;
-  min-width: 600px;
-}
-.otmonrow {
-  background: lightblue;
-  display: table-row;
-  width: 100%;
-  min-width: 600px;
-}
-.otmoncolumn1 {
-  display: table-cell;
-  float: left;
-  min-width: 170px;
-  width: 30%;
-  padding-left: 10px;
-}
-.otmoncolumn2 {
-  display: table-cell;
-  float: left;
-  min-width: 40px;
-  width: 20%;
-  text-align: right;
-}
-.otmoncolumn3 {
-  display: table-cell;
-  float: left;
-  min-width: 20px;
-  margin-left: 2px;
-}
-
-/* DevInfo */
-.devinfonrow {
-  background: lightblue;
-  display: table-row;
-  font-size: 14px;
-}
-.devinfocolumn1 {
-  display: table-cell;
-  float: left;
-  width: 160px;
-  padding-left: 10px;
-  font-size: 12px;
-}
-.devinfocolumn2 {
-  display: table-cell;
-  float: left;
-  width: 160px;
-  text-align: left;
-  font-size: 12px;
-}
-
-/* Clear floats after the columns */
-.devinforow:after {
-  content: "";
-  display: table;
-  clear: both;
-  background: lightblue;
-}
+  /* OTmonitor */
+  .otmonrow {
+    background: rgb(28, 28, 30);
+    display: table-row;
+  }
+  .otmoncolumn1 {
+    display: table-cell;
+    float: left;
+    width: 270px;
+    padding-left: 10px;
+  }
+  .otmoncolumn2 {
+    display: table-cell;
+    float: left;
+    width: 40px;
+    text-align: right;
+  }
+  .otmoncolumn3 {
+    display: table-cell;
+    float: left;
+    width: 30px;
+    margin-left: 2px;
+  }
+  
+  /* DevInfo */
+  .devinfonrow {
+    background: rgb(28, 28, 30);
+    display: table-row;
+    font-size: 14px;
+  }
+  .devinfocolumn1 {
+    display: table-cell;
+    float: left;
+    width: 160px;
+    padding-left: 10px;
+    font-size: 12px;
+  }
+  .devinfocolumn2 {
+    display: table-cell;
+    float: left;
+    width: 160px;
+    text-align: left;
+    font-size: 12px;
+  }
+  
+  /* Clear floats after the columns */
+  .devinforow:after {
+    content: "";
+    display: table;
+    clear: both;
+    background: rgb(28, 28, 30);
+  }
   
  /* SettingsPage */
  #settingMessage {
-   background-color: coral;
+   background-color: rgba(87, 152, 203, 1);
    width: 860px;
    margin-left: 10px;
    color: white;

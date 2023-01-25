@@ -137,15 +137,19 @@
 #define TIME_LEFT_MIN(timerName)      ( (TIME_LEFT(timerName) ) / (60 * 1000))
 #define TIME_LEFT_SEC(timerName)      ( (TIME_LEFT(timerName) ) / 1000 )
 
+#define ONCE(timerName)                ( __Once__(timerName##_due) )
+#define ONCE_MS(timerName)             ( (ONCE(timerName) ) )
+#define ONCE_MIN(timerName)            ( (ONCE(timerName) ) / (60 * 1000))
+#define ONCE_SEC(timerName)            ( (ONCE(timerName) ) / 1000 ) 
+
 #define TIME_PAST(timerName)          ( (timerName##_interval - TIME_LEFT(timerName)) )
-#define TIME_PAST_MS(timerName)       ( (TIME_PAST(timerName) )
+#define TIME_PAST_MS(timerName)       ( (TIME_PAST(timerName) ) )
 #define TIME_PAST_SEC(timerName)      ( (TIME_PAST(timerName) / 1000) )
 #define TIME_PAST_MIN(timerName)      ( (TIME_PAST(timerName) / (60*1000)) )
 
 #define RESTART_TIMER(timerName)      ( timerName##_due = millis()+timerName##_interval ); 
 
 #define DUE(timerName)                ( __Due__(timerName##_due, timerName##_interval, timerName##_type) )
-
 
 uint32_t __Due__(uint32_t &timer_due, uint32_t timer_interval, byte timerType)
 {
@@ -186,7 +190,6 @@ uint32_t __Due__(uint32_t &timer_due, uint32_t timer_interval, byte timerType)
   
 } // __Due__()
 
-
 uint32_t __TimeLeft__(uint32_t timer_due)
 {
   uint32_t tmp;
@@ -222,6 +225,12 @@ uint32_t __TimeLeft__(uint32_t timer_due)
   
 } // __TimeLeft__()
 
+uint32_t __Once__(uint32_t timer_due)
+{
+  //false if timer is not due
+  if (__TimeLeft__(timer_due) > 0) return 0;
+  else return 1;
+} // __Once__()
 
 // process variadic from macro's
 uint32_t getParam(uint32_t i, ...) 
