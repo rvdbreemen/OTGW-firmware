@@ -311,7 +311,8 @@ void sendDeviceInfo()
   sendStartJsonObj("devinfo");
 
   sendNestedJsonObj("author", "Robert van den Breemen");
-  sendNestedJsonObj("fwversion", _VERSION);
+  sendNestedJsonObj("fwversion", _SEMVER_FULL);
+  sendNestedJsonObj("picavailable", CBOOLEAN(bPICavailable));
   sendNestedJsonObj("picfwversion", CSTR(sPICfwversion));
   sendNestedJsonObj("picdeviceid", CSTR(sPICdeviceid));
   sendNestedJsonObj("picfwtype", CSTR(sPICtype));

@@ -93,6 +93,7 @@ const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
 String    sPICfwversion = "no pic found"; 
 String    sPICdeviceid = "no pic found";
 String    sPICtype = "no pic found";
+bool      bPICavailable = false;
 String    errorupgrade = ""; 
 bool      bOTGWonline = true;
 bool      bOTGWboilerstate = false;

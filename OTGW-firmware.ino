@@ -28,23 +28,13 @@
 #include "version.h"
 #include "OTGW-firmware.h"
 
-// temporary moved out, until there is a reliable way to detect pic
-// #define SetupDebugTln(...) ({ if (sPICtype!="no pic found") DebugTln(__VA_ARGS__);    })
-// #define SetupDebugln(...)  ({ if (sPICtype!="no pic found") Debugln(__VA_ARGS__);    })
-// #define SetupDebugTf(...)  ({ if (sPICtype!="no pic found") DebugTf(__VA_ARGS__);    })
-// #define SetupDebugf(...)   ({ if (sPICtype!="no pic found") Debugf(__VA_ARGS__);    })
-// #define SetupDebugT(...)   ({ if (sPICtype!="no pic found") DebugT(__VA_ARGS__);    })
-// #define SetupDebug(...)    ({ if (sPICtype!="no pic found") Debug(__VA_ARGS__);    })
-// #define SetupDebugFlush()  ({ if (sPICtype!="no pic found") DebugFlush();    })
-
-#define SetupDebugTln(...) ({  DebugTln(__VA_ARGS__);    })
-#define SetupDebugln(...)  ({  Debugln(__VA_ARGS__);    })
-#define SetupDebugTf(...)  ({  DebugTf(__VA_ARGS__);    })
-#define SetupDebugf(...)   ({  Debugf(__VA_ARGS__);    })
-#define SetupDebugT(...)   ({  DebugT(__VA_ARGS__);    })
-#define SetupDebug(...)    ({  Debug(__VA_ARGS__);    })
-#define SetupDebugFlush()  ({  DebugFlush();    })
-
+#define SetupDebugTln(...) ({ if (bPICavailable) DebugTln(__VA_ARGS__);    })
+#define SetupDebugln(...)  ({ if (bPICavailable) Debugln(__VA_ARGS__);    })
+#define SetupDebugTf(...)  ({ if (bPICavailable) DebugTf(__VA_ARGS__);    })
+#define SetupDebugf(...)   ({ if (bPICavailable) Debugf(__VA_ARGS__);    })
+#define SetupDebugT(...)   ({ if (bPICavailable) DebugT(__VA_ARGS__);    })
+#define SetupDebug(...)    ({ if (bPICavailable) Debug(__VA_ARGS__);    })
+#define SetupDebugFlush()  ({ if (bPICavailable) DebugFlush();    })
 
 #define ON LOW
 #define OFF HIGH
@@ -63,8 +53,8 @@ void setup() {
   SetupDebugln(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   SetupDebugf("Booting....[%s]\r\n\r\n", _VERSION);
   
-  OTGWSerial.registerFirmwareCallback(fwreportinfo);
-  OTGWSerial.resetPic(); // make sure it the firmware is detected
+  
+  detectPIC();
 
   //setup randomseed the right way
   randomSeed(RANDOM_REG32); //This is 8266 HWRNG used to seed the Random PRNG: Read more: https://config9.com/arduino/getting-a-truly-random-number-in-arduino/

@@ -740,6 +740,7 @@
    ,[ "waterovertemperature",      "Water Over-Temperature"]
    ,[ "author",                     "Developer"]
    ,[ "fwversion",                  "ESP8266 Firmware Version"]
+   ,[ "picavailable",               "OTGW PIC Available"]
    ,[ "picfwversion",               "OTGW PIC Firmware Version"]
    ,[ "picdeviceid",                "OTGW PIC Device ID"]   
    ,[ "picfwtype",                  "OTGW PIC Firmware Type"]

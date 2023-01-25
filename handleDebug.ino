@@ -21,7 +21,7 @@ void handleDebug(){
                 DebugTln(F("Manual reset PIC"));
                 resetOTGW();
                 uint8_t ch;
-                ch = OTGWSerial.read();
+                OTGWSerial.readBytes(&ch, 1); //Wait for ETX or not
                 if (ch == ETX) {
                     DebugTln("ETX found after reset: Pic detected!");
                 } else {
