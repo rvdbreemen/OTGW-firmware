@@ -111,6 +111,7 @@ void resetOTGW() {
 
   OTGWSerial.resetPic();
 
+
 //   sPICfwversion = String(OTGWSerial.firmwareVersion());
 //   OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
 //   sPICdeviceid = OTGWSerial.processorToString();
@@ -118,6 +119,24 @@ void resetOTGW() {
 //   sPICtype = OTGWSerial.firmwareToString();
 //   OTGWDebugTf(PSTR("Current type: %s\r\n"), CSTR(sPICtype));
 }
+
+/*
+detectPIC()
+*/
+void detectPIC(){
+  OTGWSerial.registerFirmwareCallback(fwreportinfo); //register the callback to report version, type en device ID
+  OTGWSerial.resetPic(); // make sure it the firmware is detected
+  uint8_t ch;
+  OTGWSerial.readBytes(&ch, 1); //Wait for ETX or not
+  bPICavailable = (ch == ETX);
+  if (bPICavailable) {
+      DebugTln("ETX found after reset: Pic detected!");
+  } else {
+      DebugTln("No ETX found after reset: no Pic detected!");
+  }
+
+}
+
 //===================[ getpicfwversion ]===========================
 String getpicfwversion(){
   String _ret="";
