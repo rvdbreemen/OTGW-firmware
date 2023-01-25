@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html charset="UTF-8">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">  
+    <link rel="stylesheet" type="text/css" href="./index.css">
+    <script src="./index.js"></script>
+    <title>OTGW firmware</title>
+  </head>
+  <body>
+    <font face="Helvetica">
+    <div class="headerrow">
+        <div class="headercolumnbig" id="sysName">OTGW-Firmware</div>
+        <div class="headercolumn" id="devName">[hostname]</div>
+    </div>
+    <div class="headerrow">
+        <img class='nav-left home' src='/home.png' alt='Home'
+  </div>
+    </font>
+    <div id="displayMainPage">
+      <div class="nav-container">
+        <div class='nav-left'>
+          <div class="nav-centered">Parameters</div>
+        </div>
+        <div class='nav-right'>
+          <img class='adminSettings'src='/dots-vertical.png' alt='•••'>
+          <div class="adv_dropdown hidden">
+            <span class="list_item tabPICflash">PIC firmware</span>
+            <span class="list_item tabDeviceInfo">Device Information</span>
+            <span class="list_item tabSettings">OTGW Settings</span>
+            <span class="list_item FSexplorer">File System Contents</span>
+          </div>
+        </div>
+      </div>
+      <div id="mainPage">
+        <div id="waiting">Wait for it...</div>
+      </div>
+    </div>
+    <div id="displayPICflash">
+      <div class="nav-container">
+        <div class='nav-left'>
+          <div class='nav-centered'>PIC Firmware</div>
+        </div>
+        <div class='nav-right'>
+          <img class='adminSettings'src='/dots-vertical.png' alt='•••'>
+          <div class="adv_dropdown hidden">
+            <span class="list_item tabPICflash">PIC firmware</span>
+            <span class="list_item tabDeviceInfo">Device Information</span>
+            <span class="list_item FSexplorer">File system contents</span>
+            <span class="list_item tabSettings">OTGW Settings</span>
+          </div>
+        </div>
+      </div>
+      <div id="displayPICpage"></div>
+    </div>
+    <div id="displayDeviceInfo">
+      <div class="nav-container">
+        <div class='nav-left'>
+          <div class="nav-centered">Device Info</div>
+        </div>
+        <div class='nav-right'>
+          <img class='adminSettings'src='/dots-vertical.png' alt='•••'>
+          <div class="adv_dropdown hidden">
+            <span class="list_item tabPICflash">PIC firmware</span>
+            <span class="list_item tabDeviceInfo">Device Information</span>
+            <span class="list_item FSexplorer">File system contents</span>
+            <span class="list_item tabSettings">OTGW Settings</span>
+          </div>
+        </div>
+      </div>
+      <div id="deviceinfoPage"></div>
+    </div>
+    <div id="displaySettingsPage">
+      <div class="nav-container">
+        <div class='nav-left'>
+          <div class="nav-centered">Settings</div>
+        </div>
+        <div class='nav-right'>
+          <img class='adminSettings'src='/dots-vertical.png' alt='•••'>
+          <div class="adv_dropdown hidden">
+            <span class="list_item tabPICflash">PIC firmware</span>
+            <span class="list_item tabDeviceInfo">Device Information</span>
+            <span class="list_item FSexplorer">File system contents</span>
+            <span class="list_item tabSettings">OTGW Settings</span>
+          </div>
+        </div>
+      </div>
+      <br/>
+      <div id="settingsPage"></div>
+      <div id="settingMessage">Loading...</div>
+    </div>
+  
+    <!-- KEEP THIS --->
+
+    <!-- Pin to bottom right corner -->
+    <div class="bottom right-0">2021 &copy; Robert van den Breemen</div>
+
+    <!-- Pin to bottom left corner -->
+    <div id="message" class="bottom left-0"></div>
+  
+    <script>
+       window.onload=initMainPage;
+    </script>
+
+  </body>
+
+</html>
