@@ -40,6 +40,7 @@
 #define OFF HIGH
 
 DECLARE_TIMER_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS);
+DECLARE_TIMER_SEC(timers0counter, settingS0COUNTERinterval, CATCH_UP_MISSED_TICKS);
   
 //=====================================================================
 void setup() {
@@ -99,7 +100,7 @@ void setup() {
   // Setup the OTGW PIC
   resetOTGW();          // reset the OTGW pic
   startOTGWstream();    // start port 25238 
-  initSensors();        // init DS18B20
+ // initSensors();        // init DS18B20 (after MQ is up! )
   initOutputs();
   
   WatchDogEnabled(1);   // turn on watchdog
@@ -110,6 +111,8 @@ void setup() {
   setLed(LED2, OFF);
   sendMQTTuptime();
   sendMQTTversioninfo();
+  initS0Count();        // init S0 counter
+  initSensors();        // init DS18B20 (after MQ is up!)
 }
 //=====================================================================
 
@@ -319,6 +322,7 @@ void loop()
   DECLARE_TIMER_MIN(timer24h, 1440, CATCH_UP_MISSED_TICKS);
   
   if (DUE(timerpollsensor))         pollSensors();    // poll the temperature sensors connected to 2wire gpio pin 
+  if (DUE(timers0counter))          sendS0Counters(); // poll the s0 counter connected to gpio pin when due
   if (DUE(timer5min))               do5minevent();
   if (DUE(timer60s))                doTaskEvery60s();
   if (DUE(timer30s))                doTaskEvery30s();
