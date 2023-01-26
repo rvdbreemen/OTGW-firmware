@@ -126,9 +126,7 @@ detectPIC()
 void detectPIC(){
   OTGWSerial.registerFirmwareCallback(fwreportinfo); //register the callback to report version, type en device ID
   OTGWSerial.resetPic(); // make sure it the firmware is detected
-  uint8_t ch;
-  OTGWSerial.readBytes(&ch, 1); //Wait for ETX or not
-  bPICavailable = (ch == ETX);
+  bPICavailable = OTGWSerial.find(ETX);
   if (bPICavailable) {
       DebugTln("ETX found after reset: Pic detected!");
   } else {
@@ -1552,8 +1550,6 @@ void processOT(const char *buf, int len){
       AddLogf("[%-16s]", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
       //OTGWDebugf("[%-30s]", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
       //OTGWDebugf("[M=%d]",OTdata.master);
-
-
 
       if (OTdata.skipthis){
         if ((OTdata.rsptype == OTGW_PARITY_ERROR)) {
