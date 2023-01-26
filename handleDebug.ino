@@ -20,15 +20,7 @@ void handleDebug(){
                 break;
             case 'p':
                 DebugTln(F("Manual reset PIC"));
-                resetOTGW();
-                uint8_t ch;
-                OTGWSerial.readBytes(&ch, 1); //Wait for ETX or not
-                if (ch == ETX) {
-                    DebugTln("ETX found after reset: Pic detected!");
-                } else {
-                    DebugTln("No ETX found after reset: no Pic detected!");
-                }
-
+                detectPIC();
                 break;
             case 'a':
                 DebugTln(F("Send PR=A command, to ID the chip"));
