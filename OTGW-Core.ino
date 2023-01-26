@@ -1477,7 +1477,7 @@ void processOT(const char *buf, int len){
     OTdata.valueHB = (value >> 8) & 0xFF;             // byte 3 = high byte
     OTdata.valueLB = value & 0xFF;                    // byte 4 = low byte
     OTdata.time = millis();                           // time of reception    
-    OTdata.skipthis = false;                          // default: do not skip this message (will be sent to MQTT)
+    OTdata.skipthis = false;                          // default: do not skip this message (will be sent to MQTT and not stored in state data object)
     
     if (cntOTmessagesprocessed == 1) {       //first message needs to be put in the buffer
       //just store current message and delay processing
@@ -1489,7 +1489,10 @@ void processOT(const char *buf, int len){
       //if T --> R, then gateway overrides the thermostat, and tells the boiler what to do, then use current R message, and skip T value.
       bool skipthis = (delayedOTdata.id == OTdata.id) && (OTdata.time - delayedOTdata.time < 500) &&  
            (((OTdata.rsptype == OTGW_ANSWER_THERMOSTAT) && (delayedOTdata.rsptype == OTGW_BOILER)) ||
-            ((OTdata.rsptype == OTGW_REQUEST_BOILER) && (delayedOTdata.rsptype == OTGW_THERMOSTAT))) ;
+            ((OTdata.rsptype == OTGW_REQUEST_BOILER) && (delayedOTdata.rsptype == OTGW_THERMOSTAT)));
+      
+      //when parity error in OTGW then skip data to MQTT nor store it local in data object
+      bool skipthis |= (OTdata.rsptype == OTGW_PARITY_ERROR);
 
       tmpOTdata = delayedOTdata;          //fetch delayed msg
       delayedOTdata = OTdata;             //store current msg
