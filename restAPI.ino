@@ -304,7 +304,7 @@ void sendOTmonitor()
 
   if (settingS0COUNTERenabled) 
   {
-    sendJsonOTmonObj("s0powerkw", formatFloat(OTGWs0powerkw,3) , "kW", OTGWs0lasttime);
+    sendJsonOTmonObj("s0powerkw", String(OTGWs0powerkw,3) , "kW", OTGWs0lasttime);
     sendJsonOTmonObj("s0intervalcount", OTGWs0pulseCount , "", OTGWs0lasttime);
     sendJsonOTmonObj("s0totalcount", OTGWs0pulseCountTot , "", OTGWs0lasttime);
   }
@@ -313,7 +313,7 @@ void sendOTmonitor()
     sendJsonOTmonObj("numberofsensors", DallasrealDeviceCount , "", now );
     for (int i = 0; i < DallasrealDeviceCount; i++) {
       const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
-      sendJsonOTmonObj(strDeviceAddress, formatFloat(DallasrealDevice[i].tempC,1) , "°C", DallasrealDevice[i].lasttime);
+      sendJsonOTmonObj(strDeviceAddress, String(DallasrealDevice[i].tempC,1) , "°C", DallasrealDevice[i].lasttime);
     }
   }
 
