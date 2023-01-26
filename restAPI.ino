@@ -255,6 +255,7 @@ void sendTelegraf()
 
 void sendOTmonitor() 
 {
+  time_t now = time(nullptr); // needed for Dallas sensor display
   RESTDebugTln(F("sending OT monitor values ...\r"));
 
   sendStartJsonObj("otmonitor");
@@ -300,7 +301,22 @@ void sendOTmonitor()
   sendJsonOTmonObj("chwaterpressure", OTcurrentSystemState.CHPressure, "bar", msglastupdated[OT_CHPressure]);
   sendJsonOTmonObj("oemdiagnosticcode", OTcurrentSystemState.OEMDiagnosticCode, "", msglastupdated[OT_OEMDiagnosticCode]);
   sendJsonOTmonObj("oemfaultcode", OTcurrentSystemState.ASFflags & 0xFF, "", msglastupdated[OT_ASFflags]);
-  
+
+  if (settingS0COUNTERenabled) 
+  {
+    sendJsonOTmonObj("s0powerkw", formatFloat(OTGWs0powerkw,3) , "kW", OTGWs0lasttime);
+    sendJsonOTmonObj("s0intervalcount", OTGWs0pulseCount , "", OTGWs0lasttime);
+    sendJsonOTmonObj("s0totalcount", OTGWs0pulseCountTot , "", OTGWs0lasttime);
+  }
+  if (settingGPIOSENSORSenabled) 
+  {
+    sendJsonOTmonObj("numberofsensors", DallasrealDeviceCount , "", now );
+    for (int i = 0; i < DallasrealDeviceCount; i++) {
+      const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
+      sendJsonOTmonObj(strDeviceAddress, formatFloat(DallasrealDevice[i].tempC,1) , "°C", DallasrealDevice[i].lasttime);
+    }
+  }
+
   sendEndJsonObj("otmonitor");
 
 } // sendOTmonitor()
@@ -327,8 +343,8 @@ void sendDeviceInfo()
   sendNestedJsonObj("coreversion", CSTR(ESP.getCoreVersion()) );
   sendNestedJsonObj("sdkversion",  ESP.getSdkVersion());
   sendNestedJsonObj("cpufreq", ESP.getCpuFreqMHz());
-  sendNestedJsonObj("sketchsize", formatFloat( (ESP.getSketchSize() / 1024.0), 3));
-  sendNestedJsonObj("freesketchspace", formatFloat( (ESP.getFreeSketchSpace() / 1024.0), 3));
+  sendNestedJsonObj("sketchsize", ESP.getSketchSize() );
+  sendNestedJsonObj("freesketchspace",  ESP.getFreeSketchSpace() );
 
   snprintf(cMsg, sizeof(cMsg), "%08X", ESP.getFlashChipId());
   sendNestedJsonObj("flashchipid", cMsg);  // flashChipId
@@ -424,6 +440,11 @@ void sendDeviceSettings()
   sendJsonSettingObj("gpiosensorsenabled", settingGPIOSENSORSenabled, "b");
   sendJsonSettingObj("gpiosensorspin", settingGPIOSENSORSpin, "i", 0, 16);
   sendJsonSettingObj("gpiosensorsinterval", settingGPIOSENSORSinterval, "i", 5, 65535);
+  sendJsonSettingObj("s0counterenabled", settingS0COUNTERenabled, "b");
+  sendJsonSettingObj("s0counterpin", settingS0COUNTERpin, "i", 1, 16);
+  sendJsonSettingObj("s0counterdebouncetime", settingS0COUNTERdebouncetime, "i", 0, 1000);
+  sendJsonSettingObj("s0counterpulsekw", settingS0COUNTERpulsekw, "i", 1, 5000);
+  sendJsonSettingObj("s0counterinterval", settingS0COUNTERinterval, "i", 5, 65535);
   sendJsonSettingObj("gpiooutputsenabled", settingGPIOOUTPUTSenabled, "b");
   sendJsonSettingObj("gpiooutputspin", settingGPIOOUTPUTSpin, "i", 0, 16);
   sendJsonSettingObj("gpiooutputstriggerbit", settingGPIOOUTPUTStriggerBit, "i", 0,16);
