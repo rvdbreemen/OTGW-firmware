@@ -21,6 +21,10 @@
     background: #e6ffff;
   }
   
+  body {
+    max-width: 1000px;
+  }
+
   table {
     color: black;
     border-collapse: collapse;
