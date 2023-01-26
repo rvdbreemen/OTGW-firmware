@@ -313,7 +313,9 @@ void sendOTmonitor()
     sendJsonOTmonObj("numberofsensors", DallasrealDeviceCount , "", now );
     for (int i = 0; i < DallasrealDeviceCount; i++) {
       const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
-      sendJsonOTmonObj(strDeviceAddress, roundf(DallasrealDevice[i].tempC*10.0f)/10.0f , "°C", DallasrealDevice[i].lasttime);
+      char buf[16];
+      snprintf(buf, sizeof(buf), "%.1f", DallasrealDevice[i].tempC);
+      sendJsonOTmonObj(strDeviceAddress, buf, "°C", DallasrealDevice[i].lasttime);
     }
   }
 
