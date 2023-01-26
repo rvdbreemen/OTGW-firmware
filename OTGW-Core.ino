@@ -1492,7 +1492,7 @@ void processOT(const char *buf, int len){
             ((OTdata.rsptype == OTGW_REQUEST_BOILER) && (delayedOTdata.rsptype == OTGW_THERMOSTAT)));
       
       //when parity error in OTGW then skip data to MQTT nor store it local in data object
-      bool skipthis |= (OTdata.rsptype == OTGW_PARITY_ERROR);
+      skipthis = skipthis || (OTdata.rsptype == OTGW_PARITY_ERROR);
 
       tmpOTdata = delayedOTdata;          //fetch delayed msg
       delayedOTdata = OTdata;             //store current msg
