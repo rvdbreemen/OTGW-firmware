@@ -60,7 +60,7 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
 
 | Version | Release notes |
 |-|-|
-| 0.10.0 | Updated: Added support fox 6.x firmware (pic16f1847) (Thanks to @hvxl / Schelte Bron)<br>Added reporting of "firmware type"<br>Improved: DHCP can override NTP settings now<br>Improved: Sending SC command on the minute (00 second), after reset ESP all commands (SR 21, SR 22) are resend<br>Bugfix: bitwise not bytewise AND operation for ASF flags OEM codes <br>Readout S0 output from configurable GPIO, interupt rtn added for this, enhanced Dallas-type sensor logic (autoconfigure, code cleanup)|
+| 0.10.0 | Updated: Added support fox 6.x firmware (pic16f1847) (Thanks to @hvxl / Schelte Bron)<br>Added reporting of "firmware type"<br>Improved: DHCP can override NTP settings now<br>Improved: Sending SC command on the minute (00 second), after reset ESP all commands (SR 21, SR 22) are resend<br>Bugfix: bitwise not bytewise AND operation for ASF flags OEM codes <br>Readout S0 output from configurable GPIO, interupt rtn added for this, enhanced Dallas-type sensor logic (autoconfigure, code cleanup)<br>Web UI improvements by @rlagerwij and @Nicole|
 | 0.9.5 | Improved: WebUI improved by community<br>Bugfix: Device Online status indicator for Home Assistant<br>Improved: Update of 5.x series (pic16f88) firmwares, preparing for 6.x (pic16f1847) updates.<br>Bugfix: Prevent spamming OTGW firmware website in case of rebootloop<br>Added: Unique useragent|
 | 0.9.4 | Update: New firmware included gateway version 5.3 for PIC P16F88.<br>Update: Preventing >5.x PIC firmwares to be detected, incompatible (for now)| 
 | 0.9.3 | Bugfix: Small buffer of serial input, broke the PS=1 command, causing integrations of Domoticz and HA to break<br>Added: Setting for HA reboot detections, this enables a user to change the behaviour of HA reboot detection<br>Bugfix: PIC version detection fixed<br>Improving: Top topics parsing broke with 0.9.2, now you can once more use "/Myhome/OTGW/" as your toptopics |
@@ -100,16 +100,17 @@ Looking for the documentation, go here (work in progress):  <br> https://github.
 Shoutout to early adopters helping me out testing and discussing the firmware in development. For pushing features, testing and living on the edge. 
 
 So shoutout to the following people for the collaboration on development: 
-* @hvxl           for all his work on the OTGW hardware, PIC firmware and ESP coding. OpenTherm Gateway would not have existed without you!
+* @hvxl           for all his work on the OTGW hardware, PIC firmware and ESP coding. 
 * @sjorsjuhmaniac for improving the MQTT naming convention and HA integration, adding climate entity and otgw device 
 * @vampywiz17     early adopter and tester 
 * @Stemplar       reporting issues realy on
 * @proditaki      for creating Domiticz plugin for OTGW-firmware
 * @tjfsteele      for endless hours of testing
+* @DaveDavenport  for fixing all known and unknown issues with the codebase, it's stable with you
 
-A big thank should goto **Schelte Bron** @hvxl for amazing work on the OpenTherm Gateway project and for providing access to the upgrade routines of the PIC. Enabling this custom firmware a reliable way to upgrade you PIC firmware.
+And for all those people that keep reporting issue, pushing for more and helping other in the community all the time.
 
-If you want to thank Schelte Bron for his work on the OpenTherm Gateway project, just head over to his homepage and donate to him: https://otgw.tclcode.com/
+A big thank should goto **Schelte Bron** @hvxl for amazing work on the OpenTherm Gateway project and for providing access to the upgrade routines of the PIC. Enabling this custom firmware a reliable way to upgrade you PIC firmware. If you want to thank Schelte Bron for his work on the OpenTherm Gateway project, just head over to his homepage and donate to him: https://otgw.tclcode.com/
 
 ## Buy me a coffee
 In case you want to buy me a coffee, head over here:
