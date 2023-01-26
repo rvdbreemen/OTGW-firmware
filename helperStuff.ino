@@ -84,17 +84,6 @@ uint8_t splitString(String inStrng, char delimiter, String wOut[], uint8_t maxWo
 
 
 //===========================================================================================
-// float formatFloat(float v, int dec)
-// {
-//   return (String(v, dec).toFloat());
-
-// } //  formatFloat()
-//===========================================================================================
-String formatFloat(float v, int dec)
-{
-  return String(v, dec);
-} //  formatFloat()
-//===========================================================================================
 boolean isValidIP(IPAddress ip)
 {
  /* Works as follows:
