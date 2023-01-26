@@ -348,13 +348,13 @@ void sendDeviceInfo()
 
   snprintf(cMsg, sizeof(cMsg), "%08X", ESP.getFlashChipId());
   sendNestedJsonObj("flashchipid", cMsg);  // flashChipId
-  sendNestedJsonObj("flashchipsize", formatFloat((ESP.getFlashChipSize() / 1024.0 / 1024.0), 3));
-  sendNestedJsonObj("flashchiprealsize", formatFloat((ESP.getFlashChipRealSize() / 1024.0 / 1024.0), 3));
+  sendNestedJsonObj("flashchipsize", (ESP.getFlashChipSize() / 1024.0f / 1024.0f));
+  sendNestedJsonObj("flashchiprealsize", (ESP.getFlashChipRealSize() / 1024.0f / 1024.0f));
 
   LittleFS.info(LittleFSinfo);
-  sendNestedJsonObj("LittleFSsize", formatFloat( (LittleFSinfo.totalBytes / (1024.0 * 1024.0)), 0));
+  sendNestedJsonObj("LittleFSsize", floorf((LittleFSinfo.totalBytes / (1024.0f * 1024.0f))));
 
-  sendNestedJsonObj("flashchipspeed", formatFloat((ESP.getFlashChipSpeed() / 1000.0 / 1000.0), 0));
+  sendNestedJsonObj("flashchipspeed", floorf((ESP.getFlashChipSpeed() / 1000.0f / 1000.0f)));
 
   FlashMode_t ideMode = ESP.getFlashChipMode();
   sendNestedJsonObj("flashchipmode", flashMode[ideMode]);
