@@ -107,6 +107,8 @@ So shoutout to the following people for the collaboration on development:
 * @proditaki      for creating Domiticz plugin for OTGW-firmware
 * @tjfsteele      for endless hours of testing
 * @DaveDavenport  for fixing all known and unknown issues with the codebase, it's stable with you
+* @DutchessNicole for fixing the Web UI over time
+* @RobR           for his work in the s0 counter implementation
 
 And for all those people that keep reporting issue, pushing for more and helping other in the community all the time.
 
