@@ -1556,7 +1556,12 @@ void processOT(const char *buf, int len){
 
 
       if (OTdata.skipthis){
-        AddLog("-");
+        if ((OTdata.rsptype == OTGW_PARITY_ERROR)) {
+          AddLog("P"); //skipped due to parity error
+        } else {
+          AddLog("-"); //skipped
+        }
+          
       } else {
         if (is_value_valid(OTdata, OTlookupitem)) {
           AddLog(">");
