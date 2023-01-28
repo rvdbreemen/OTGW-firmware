@@ -70,9 +70,9 @@
         });
       }
     );
-    Array.from(document.getElementsByClassName('tabSettings')).forEach(
+    Array.from(document.getElementsByClassName('basicSettings')).forEach(
       function(el, idx, arr) {
-        el.addEventListener('click',function(){
+        el.addEventListener('click',function() {
           settingsPage();
           toggleHidden('adv_dropdown', true);
           toggleHidden('btnSaveSettings', false);
@@ -92,6 +92,7 @@
         });
       }
     );
+ 
     needReload = false;
     refreshDevInfo();
     refreshOTmonitor();
@@ -255,28 +256,30 @@
           //--- refresh icon ---
           var btn = document.createElement("div");
           btn.setAttribute("class", "piccolumn4");
-            var a = document.createElement('a');
-            a.href = localURL+'/pic?action=refresh&name='+files[i].name+'&version='+files[i].version;
-            var img = document.createElement('img'); 
-            img.src = localURL+'/refresh-page-option.png';
-            img.style.width = '16px';
-            img.style.height = 'auto';
-            img.setAttribute=("alt", "Refresh");
-            a.appendChild(img);
-            btn.appendChild(a); 
+          var a = document.createElement('a');
+          a.href = localURL+'/pic?action=refresh&name='+files[i].name+'&version='+files[i].version;
+          var img = document.createElement('img'); 
+          img.src = localURL+'/update.png';
+          img.style.width = '16px';
+          img.style.height = 'auto';
+          img.setAttribute=("alt", "Update");
+          a.appendChild(img);
+          btn.setAttribute("data-tooltip", "Update");
+          btn.appendChild(a); 
           rowDiv.appendChild(btn); 
           //--- flash to pic icon---
           var btn = document.createElement("div");
           btn.setAttribute("class", "piccolumn5");
           var a = document.createElement('a');
-            a.href = localURL+'/pic?action=upgrade&name='+files[i].name+'&version='+files[i].version;
-            var img = document.createElement('img'); 
-            img.src = localURL+'/download-to-storage-drive.png'
-            img.style.width = '16px';
-            img.style.height = 'auto';
-            img.setAttribute=("alt", "Download");
-            a.appendChild(img);
-            btn.appendChild(a); 
+          a.href = localURL+'/pic?action=upgrade&name='+files[i].name+'&version='+files[i].version;
+          var img = document.createElement('img'); 
+          img.src = localURL+'/system_update.png'
+          img.style.width = '16px';
+          img.style.height = 'auto';
+          img.setAttribute=("alt", "Install");
+          a.appendChild(img);
+          btn.setAttribute("data-tooltip", "Install");
+          btn.appendChild(a); 
           rowDiv.appendChild(btn); 
           tableDiv.appendChild(rowDiv);
         }
