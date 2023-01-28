@@ -1168,7 +1168,7 @@ void print_daytime(uint16_t& value)
   //function to print data
   const char *dayOfWeekName[]  { "Unknown", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Unknown" };
   
-  AddLogf("%s = %s - %2d:%2d", OTlookupitem.label, dayOfWeekName[(OTdata.valueHB >> 5) & 0x7], (OTdata.valueHB & 0x1F), OTdata.valueLB); 
+  AddLogf("%s = %s - %.2d:%.2d", OTlookupitem.label, dayOfWeekName[(OTdata.valueHB >> 5) & 0x7], (OTdata.valueHB & 0x1F), OTdata.valueLB); 
   if (is_value_valid(OTdata, OTlookupitem)){
     //Build string for MQTT
     char _topic[50] {0};
