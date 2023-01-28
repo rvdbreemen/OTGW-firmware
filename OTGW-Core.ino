@@ -85,13 +85,13 @@ OpenthermData_t OTdata, delayedOTdata, tmpOTdata;
 Publish usefull firmware version information to MQTT broker.
 */
 void sendMQTTversioninfo(){
-  sendMQTTData("otgw-firmware/version", _VERSION);
+  sendMQTTData("otgw-firmware/version", _SEMVER_FULL);
   sendMQTTData("otgw-firmware/reboot_count", String(rebootCount));
   sendMQTTData("otgw-firmware/reboot_reason", lastReset);
   sendMQTTData("otgw-pic/version", sPICfwversion);
   sendMQTTData("otgw-pic/deviceid", sPICdeviceid);
-  //sPICtype = OTGWSerial.firmwareToString();
   sendMQTTData("otgw-pic/firmwaretype", sPICdeviceid);
+  sendMQTTData("otgw-pic/picavailable", CONOFF(bPICavailable));
 }
 
 /*
@@ -107,21 +107,12 @@ void sendMQTTstateinformation(){
 
 //===================[ Reset OTGW ]===============================
 void resetOTGW() {
-  //sPICfwversion ="No version found"; //reset versionstring
-
   OTGWSerial.resetPic();
-
-
-//   sPICfwversion = String(OTGWSerial.firmwareVersion());
-//   OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
-//   sPICdeviceid = OTGWSerial.processorToString();
-//   OTGWDebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));
-//   sPICtype = OTGWSerial.firmwareToString();
-//   OTGWDebugTf(PSTR("Current type: %s\r\n"), CSTR(sPICtype));
 }
 
 /*
-detectPIC()
+  To detect the pic, reset the pic, then find ETX in the response after reset (within 1 second).
+  The ETX response is send by the bootload, when received it also means you have a pic connected.
 */
 void detectPIC(){
   OTGWSerial.registerFirmwareCallback(fwreportinfo); //register the callback to report version, type en device ID
@@ -132,10 +123,13 @@ void detectPIC(){
   } else {
       DebugTln("No ETX found after reset: no Pic detected!");
   }
-
 }
 
 //===================[ getpicfwversion ]===========================
+/*
+Get the information of the pic firmware: version  number, device type and firmware type. 
+This is done by sending a PR=A command, requesting a banner from the PIC. This will trigger detection of version.
+*/
 String getpicfwversion(){
   String _ret="";
 
