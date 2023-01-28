@@ -165,6 +165,7 @@ void sendMQTTuptime(){
 void sendtimecommand(){
   if (!settingNTPenable) return;        // if NTP is disabled, then return
   if (NtpStatus != TIME_SYNC) return;   // only send time command when time is synced
+  if (!bPICavailable) return;           // only send when pic is available
   if (OTGWSerial.firmwareType() != FIRMWARE_OTGW) return; //only send timecommand when in gateway firmware, not in diagnostic or interface mode
 
   //send time command to OTGW
