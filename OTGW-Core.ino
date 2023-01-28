@@ -1201,7 +1201,9 @@ void print_daytime(uint16_t& value)
   First it checks the queue, if the command is in the queue, it's updated.
   Otherwise it's simply added to the queue, unless there are no free queue slots.
 */
-void addOTWGcmdtoqueue(const char* buf, const int len, const bool force = false){
+
+//void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue = false, const int16_t delay = OTGW_DELAY_SEND_MS);
+void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, const int16_t delay){
   if ((len < 3) || (buf[2] != '=')){ 
     //no valid command of less then 2 bytes
     OTGWDebugT("CmdQueue: Error:Not a valid command=[");
@@ -1214,7 +1216,7 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool force = false)
   //check to see if the cmd is in queue
   bool foundcmd = false;
   int8_t insertptr = cmdptr; //set insertprt to next empty slot
-  if (!force){
+  if (!forceQueue){
     char cmd[2]; memset( cmd, 0, sizeof(cmd));
     memcpy(cmd, buf, 2);
     for (int i=0; i<cmdptr; i++){
@@ -1243,7 +1245,7 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool force = false)
   memcpy(cmdqueue[insertptr].cmd, buf, cmdlen);
   cmdqueue[insertptr].cmdlen = cmdlen;
   cmdqueue[insertptr].retrycnt = 0;
-  cmdqueue[insertptr].due = millis() + OTGW_DELAY_SEND_MS; //due right away
+  cmdqueue[insertptr].due = millis() + delay; //due right away
 
   //if not found
   if (!foundcmd) {
@@ -1488,14 +1490,15 @@ void processOT(const char *buf, int len){
       bool skipthis = (delayedOTdata.id == OTdata.id) && (OTdata.time - delayedOTdata.time < 500) &&  
            (((OTdata.rsptype == OTGW_ANSWER_THERMOSTAT) && (delayedOTdata.rsptype == OTGW_BOILER)) ||
             ((OTdata.rsptype == OTGW_REQUEST_BOILER) && (delayedOTdata.rsptype == OTGW_THERMOSTAT)));
-      
-      //when parity error in OTGW then skip data to MQTT nor store it local in data object
-      skipthis = skipthis || (OTdata.rsptype == OTGW_PARITY_ERROR);
 
+      //delay message processing by 1 message, to make sure detection of value decoding is done correctly with R and A message.
       tmpOTdata = delayedOTdata;          //fetch delayed msg
       delayedOTdata = OTdata;             //store current msg
       OTdata = tmpOTdata;                 //then process delayed msg
       OTdata.skipthis = skipthis;         //skip if needed
+
+      //when parity error in OTGW then skip data to MQTT nor store it local in data object
+      OTdata.skipthis |= (OTdata.rsptype == OTGW_PARITY_ERROR);
 
       //keep track of last update time of each message id
       msglastupdated[OTdata.id] = now;
@@ -1552,10 +1555,10 @@ void processOT(const char *buf, int len){
       //OTGWDebugf("[M=%d]",OTdata.master);
 
       if (OTdata.skipthis){
-        if ((OTdata.rsptype == OTGW_PARITY_ERROR)) {
+        if (OTdata.rsptype == OTGW_PARITY_ERROR) {
           AddLog("P"); //skipped due to parity error
         } else {
-          AddLog("-"); //skipped
+          AddLog("-"); //skipped due to R or A message
         }
           
       } else {
