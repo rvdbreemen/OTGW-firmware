@@ -178,20 +178,20 @@ void sendtimecommand(){
   //Send msg id xx: hour:minute/day of week
   int day_of_week = (myTime.dayOfWeek()+6)%7+1;
   sprintf(msg,"SC=%d:%02d/%d", myTime.hour(), myTime.minute(), day_of_week);
-  addOTWGcmdtoqueue(msg, strlen(msg), true);
+  addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
   handleOTGWqueue(); //send command right away
 
   if (dayChanged()){
     //Send msg id 21: month, day
     sprintf(msg,"SR=21:%d,%d", myTime.month(), myTime.day());
-    addOTWGcmdtoqueue(msg, strlen(msg), true); 
+    addOTWGcmdtoqueue(msg, strlen(msg), true, 0); 
     handleOTGWqueue(); //send command right away
   }
   
   if (yearChanged()){
     //Send msg id 22: HB of Year, LB of Year 
     sprintf(msg,"SR=22:%d,%d", (myTime.year() >> 8) & 0xFF, myTime.year() & 0xFF);
-    addOTWGcmdtoqueue(msg, strlen(msg), true);
+    addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
     handleOTGWqueue(); //send command right away
   }
 }
