@@ -257,6 +257,7 @@
           var btn = document.createElement("div");
           btn.setAttribute("class", "piccolumn4");
           var a = document.createElement('a');
+          a.setAttribute("data-tooltip", "Update");
           a.href = localURL+'/pic?action=refresh&name='+files[i].name+'&version='+files[i].version;
           var img = document.createElement('img'); 
           img.src = localURL+'/update.png';
@@ -264,7 +265,6 @@
           img.style.height = 'auto';
           img.setAttribute=("alt", "Update");
           a.appendChild(img);
-          btn.setAttribute("data-tooltip", "Update");
           btn.appendChild(a); 
           rowDiv.appendChild(btn); 
           //--- flash to pic icon---
@@ -272,13 +272,13 @@
           btn.setAttribute("class", "piccolumn5");
           var a = document.createElement('a');
           a.href = localURL+'/pic?action=upgrade&name='+files[i].name+'&version='+files[i].version;
+          a.setAttribute("data-tooltip", "Install");
           var img = document.createElement('img'); 
           img.src = localURL+'/system_update.png'
           img.style.width = '16px';
           img.style.height = 'auto';
           img.setAttribute=("alt", "Install");
           a.appendChild(img);
-          btn.setAttribute("data-tooltip", "Install");
           btn.appendChild(a); 
           rowDiv.appendChild(btn); 
           tableDiv.appendChild(rowDiv);
