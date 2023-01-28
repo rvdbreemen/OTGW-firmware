@@ -257,10 +257,11 @@
           var btn = document.createElement("div");
           btn.setAttribute("class", "piccolumn4");
           var a = document.createElement('a');
-          a.setAttribute("data-tooltip", "Update");
+          // a.title = "Update";
           a.href = localURL+'/pic?action=refresh&name='+files[i].name+'&version='+files[i].version;
           var img = document.createElement('img'); 
           img.src = localURL+'/update.png';
+          img.title = "Update firmware from web";
           img.style.width = '16px';
           img.style.height = 'auto';
           img.setAttribute=("alt", "Update");
@@ -272,9 +273,9 @@
           btn.setAttribute("class", "piccolumn5");
           var a = document.createElement('a');
           a.href = localURL+'/pic?action=upgrade&name='+files[i].name+'&version='+files[i].version;
-          a.setAttribute("data-tooltip", "Install");
           var img = document.createElement('img'); 
           img.src = localURL+'/system_update.png'
+          img.title = "Install firmware onto pic";
           img.style.width = '16px';
           img.style.height = 'auto';
           img.setAttribute=("alt", "Install");
