@@ -143,8 +143,6 @@ void restartWifi(){
   if (WiFi.status() == WL_CONNECTED)
   { //when reconnect, restart some services, just to make sure all works
     // Turn off ESP reconnect, to make sure that's not the issue (16/11/2021)
-    // WiFi.setAutoReconnect(true);   
-    // WiFi.persistent(true);
     startTelnet();
     startOTGWstream(); 
     startMQTT();
@@ -179,9 +177,8 @@ void sendtimecommand(){
   //Send msg id xx: hour:minute/day of week
   int day_of_week = (myTime.dayOfWeek()+6)%7+1;
   sprintf(msg,"SC=%d:%02d/%d", myTime.hour(), myTime.minute(), day_of_week);
-  addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
-  handleOTGWqueue(); //send command right away
-
+  sendOTGW(msg, strlen(msg)); //bypass command queue, no delays
+  
   if (dayChanged()){
     //Send msg id 21: month, day
     sprintf(msg,"SR=21:%d,%d", myTime.month(), myTime.day());
@@ -262,7 +259,9 @@ void doTaskEvery60s(){
   if (sPICdeviceid=="unknown"){
     //keep trying to figure out which pic is used!
     DebugTln("PIC is unknown, probe pic using PR=A");
-    sPICfwversion =  getpicfwversion();
+    //Force banner fetch
+    getpicfwversion();
+    //This should retreive the information here
     sPICfwversion = String(OTGWSerial.firmwareVersion());
     DebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
     sPICdeviceid = OTGWSerial.processorToString();
