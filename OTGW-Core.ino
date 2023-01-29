@@ -804,7 +804,7 @@ void print_ASFflags(uint16_t& value)
     sendMQTTData(F("ASF_flags"), byte_to_binary(OTdata.valueHB));
     //OEM fault code
     utoa(OTdata.valueLB, _msg, 10);
-    sendMQTTData(F("ASF_oemfaultcode"), _msg);
+    sendMQTTData(F("ASF_OEMFaultCode"), _msg);
 
     //bit: [clear/0, set/1]
       //bit: [clear/0, set/1]
