@@ -51,20 +51,24 @@ void OTGW_Display::draw_main_screen()
 
 void OTGW_Display::tick()
 {
-    u8g2->drawFrame(0,0,128,64);
+  // If no display is available, lets not do anything.
+  if ( u8g2 == nullptr ) {
+    return;
+  }
+  u8g2->drawFrame(0,0,128,64);
 
-    if ( _message.length() > 0 ) {
-      draw_message ();
-    } else {
-      draw_main_screen ();
-    }
+  if ( _message.length() > 0 ) {
+    draw_message ();
+  } else {
+    draw_main_screen ();
+  }
 
-    // Send towards screen.
-    u8g2->sendBuffer();
+  // Send towards screen.
+  u8g2->sendBuffer();
 }
 
 void OTGW_Display::message(const String &str )
 {
-
+  _message = str;
   this->tick();
 }
