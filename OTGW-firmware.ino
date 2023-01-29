@@ -58,7 +58,6 @@ void setup() {
   SetupDebugln(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   SetupDebugf("Booting....[%s]\r\n\r\n", _VERSION);
 
-  display.begin();
 
   detectPIC();
 
@@ -98,6 +97,7 @@ void setup() {
   rebootCount = updateRebootCount();
   updateRebootLog(lastReset);
   
+  display.begin();
   SetupDebugln(F("Setup finished!\r\n"));
 
   // After resetting the OTGW PIC never send anything to Serial for debug
