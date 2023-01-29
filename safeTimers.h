@@ -8,7 +8,8 @@
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
 */
-
+#ifndef SAFETIMERS_H
+#define SAFETIMERS_H
 
 /*
  * safeTimers.h (original name timers.h) is developed by Erik
@@ -246,6 +247,7 @@ uint32_t getParam(uint32_t i, ...)
   return parm;
 } // getParam()
 
+#endif
 
 /***************************************************************************
 *

@@ -10,7 +10,11 @@
 ** Modified: as OTGW actually uses the Serial interface, so no more debug to serial please.
 */
 
+ #ifndef DEBUG_H
+ #define DEBUG_H
+
 /*---- start macro's ------------------------------------------------------------------*/
+
 
 #define Debug(...)      ({ TelnetStream.print(__VA_ARGS__);    })
 #define Debugln(...)    ({ TelnetStream.println(__VA_ARGS__);  })
@@ -37,9 +41,10 @@
 // #include <time.h>
 // extern "C" int clock_gettime(clockid_t unused, struct timespec *tp);
 
-char _bol[128];
+
 void _debugBOL(const char *fn, int line)
 {
+   char _bol[128];
    // This commented out code is using mix of system time and acetime to print, but it will not work on microsecond level correctly
    // // //calculate fractional seconds to millis fraction
    // double fractional_seconds;
@@ -82,3 +87,4 @@ void _debugBOL(const char *fn, int line)
 
    TelnetStream.print (_bol);
 }
+#endif
