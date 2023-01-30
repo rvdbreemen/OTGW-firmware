@@ -27,6 +27,7 @@
 
 #include "version.h"
 #include "OTGW-firmware.h"
+#include "OTGW-Display.h"
 
 #define SetupDebugTln(...) ({ if (bPICavailable) DebugTln(__VA_ARGS__);    })
 #define SetupDebugln(...)  ({ if (bPICavailable) Debugln(__VA_ARGS__);    })
@@ -41,6 +42,9 @@
 
 DECLARE_TIMER_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS);
 DECLARE_TIMER_SEC(timers0counter, settingS0COUNTERinterval, CATCH_UP_MISSED_TICKS);
+
+// Small status display interface.
+OTGW_Display display;
   
 //=====================================================================
 void setup() {
@@ -53,8 +57,8 @@ void setup() {
 
   SetupDebugln(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   SetupDebugf("Booting....[%s]\r\n\r\n", _VERSION);
-  
-  
+
+
   detectPIC();
 
   //setup randomseed the right way
@@ -93,6 +97,10 @@ void setup() {
   rebootCount = updateRebootCount();
   updateRebootLog(lastReset);
   
+  // Initialize the display.
+  // We need to do this after the watchdog has initialized the TwoWire (IIC)
+  // module.
+  display.begin();
   SetupDebugln(F("Setup finished!\r\n"));
 
   // After resetting the OTGW PIC never send anything to Serial for debug
@@ -245,7 +253,8 @@ void doTaskEvery1s(){
 //===[ Do task every 5s ]===
 void doTaskEvery5s(){
   //== do tasks ==
-  
+  //== Update Display ==
+  display.tick();
 }
 
 //===[ Do task every 30s ]===
