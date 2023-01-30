@@ -97,6 +97,9 @@ void setup() {
   rebootCount = updateRebootCount();
   updateRebootLog(lastReset);
   
+  // Initialize the display.
+  // We need to do this after the watchdog has initialized the TwoWire (IIC)
+  // module.
   display.begin();
   SetupDebugln(F("Setup finished!\r\n"));
 

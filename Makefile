@@ -74,7 +74,7 @@ libraries/TelnetStream:
 libraries/Acetime:
 	$(CLI) lib install Acetime@2.0.1
 
-libraries/u8g2:
+libraries/U8g2:
 	$(CLI) lib install u8g2@2.33.15 
 
 libraries/Time:

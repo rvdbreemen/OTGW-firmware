@@ -9,7 +9,6 @@
 ***************************************************************************      
 ** Modified: as OTGW actually uses the Serial interface, so no more debug to serial please.
 */
-#pragma once
 
 /*---- start macro's ------------------------------------------------------------------*/
 
