@@ -5,4 +5,4 @@ package-lock.json
 .vscode/*
 .DS_Store
 **/.DS_Store
-Arduino/packages/esp8266
+Arduino/**
