@@ -747,7 +747,7 @@ void print_statusVH(uint16_t& value)
       sendMQTTData(F("vh_bypass_mode"),                (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));   
       sendMQTTData(F("vh_free_ventlation_mode"),       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  
 
-      OTcurrentSystemState.MasterStatusVH = OTdata.valueLB;
+      OTcurrentSystemState.MasterStatusVH = OTdata.valueHB;
     }
   } else {
     // Parse slave bits
