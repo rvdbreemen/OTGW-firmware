@@ -1,0 +1,21 @@
+name: CI Build Setup
+description: Sets up build dependencies
+
+runs:
+  using: composite
+  steps:
+    - id: python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+    - id: apt
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential
+      shell: bash
+    - id: arduino-cli
+      run: |
+        curl -fsSL \
+        https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+      shell: bash
