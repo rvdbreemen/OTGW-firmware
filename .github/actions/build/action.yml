@@ -6,7 +6,7 @@ runs:
   using: composite
   steps:
     - id: build
-      run: make
+      run: make -j$(nproc)
       shell: bash
     - id: filesys
       run: make filesys.bin
