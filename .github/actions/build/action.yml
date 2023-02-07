@@ -9,7 +9,7 @@ runs:
       run: make -j$(nproc)
       shell: bash
     - id: filesys
-      run: make filesys.bin
+      run: make build/filesys.bin
       shell: bash
     - id: upload
       uses: actions/upload-artifact@v3
@@ -18,4 +18,4 @@ runs:
         path: |
           build/**/*.bin
           build/**/*.elf
-          filesys.bin
+          build/filesys.bin
