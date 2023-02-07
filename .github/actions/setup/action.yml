@@ -17,5 +17,5 @@ runs:
     - id: arduino-cli
       run: |
         curl -fsSL \
-        https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+        https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh
       shell: bash
