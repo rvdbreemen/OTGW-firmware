@@ -6,6 +6,7 @@ on:
       - dev
       - main
       - actions
+      - make-tweaks
 
 jobs:
   build:
