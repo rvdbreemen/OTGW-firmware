@@ -1,0 +1,21 @@
+name: arduino-cli build
+description: Build using arduino-cli and makefile 
+
+
+runs:
+  using: composite
+  steps:
+    - id: build
+      run: make
+      shell: bash
+    - id: filesys
+      run: make filesys.bin
+      shell: bash
+    - id: upload
+      uses: actions/upload-artifact@v3
+      with:
+        name: tarballs
+        path: |
+          build/**/*.bin
+          build/**/*.elf
+          filesys.bin
