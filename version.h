@@ -1,10 +1,10 @@
 //The version number conforms to semver.org format
 #define _VERSION_MAJOR 0
 #define _VERSION_MINOR 10  
-#define _VERSION_PATCH 0
+#define _VERSION_PATCH 1
 #define _VERSION_BUILD 2017
 #define _VERSION_GITHASH "244b604"
-#define _VERSION_PRERELEASE dev
+#define _VERSION_PRERELEASE beta
 #define _VERSION_DATE "04-02-2023"
 #define _VERSION_TIME "18:20:14"
 #define _SEMVER_CORE "0.10.0"
