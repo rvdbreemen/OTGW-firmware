@@ -13,7 +13,7 @@ CLI := arduino-cli
 PLATFORM := esp8266:esp8266
 CFGFILE := arduino-cli.yaml
 ESP8266URL := https://github.com/esp8266/Arduino/releases/download/3.0.2/package_esp8266com_index.json
-LIBRARIES := libraries/WiFiManager libraries/ArduinoJson libraries/pubsubclient libraries/TelnetStream libraries/Acetime libraries/Time libraries/OneWire libraries/DallasTemperature
+LIBRARIES := libraries/WiFiManager libraries/ArduinoJson libraries/PubSubClient libraries/TelnetStream libraries/AceTime libraries/Time libraries/OneWire libraries/DallasTemperature
 BOARDS := arduino/package_esp8266com_index.json
 # PORT can be overridden by the environment or on the command line. E.g.:
 # export PORT=/dev/ttyUSB2; make upload, or: make upload PORT=/dev/ttyUSB2
@@ -27,7 +27,7 @@ ESPTOOL = python3 $(TOOLS)/esptool/esptool.py
 BOARD = $(PLATFORM):d1_mini
 FQBN = $(BOARD):eesz=4M2M,xtal=160
 IMAGE = build/$(subst :,.,$(BOARD))/$(INO).bin
-FILESYS = filesys.bin
+FILESYS = build/filesys.bin
 
 export PYTHONPATH = $(TOOLS)/pyserial
 
@@ -41,7 +41,7 @@ clean:
 	find $(FSDIR) -name '*~' -exec rm {} +
 
 distclean: clean
-	rm *~
+	rm -f *~
 	rm -rf arduino build libraries staging arduino-cli.yaml
 
 $(CFGFILE):
@@ -52,6 +52,11 @@ $(CFGFILE):
 	$(CLI) config set directories.user $(PWD)
 	$(CLI) config set sketch.always_export_binaries true
 	$(CLI) config set library.enable_unsafe_install true
+
+##
+# Make sure CFG is updated before libraries are called.
+##
+$(LIBRARIES): | $(CFGFILE)
 
 $(BOARDS): | $(CFGFILE)
 	$(CLI) core update-index
@@ -69,13 +74,13 @@ libraries/WiFiManager: | $(BOARDS)
 libraries/ArduinoJson:
 	$(CLI) lib install ArduinoJson@6.17.2
 
-libraries/pubsubclient:
+libraries/PubSubClient:
 	$(CLI) lib install pubsubclient@2.8.0
 
 libraries/TelnetStream:
 	$(CLI) lib install TelnetStream@1.2.2
 
-libraries/Acetime:
+libraries/AceTime:
 	$(CLI) lib install Acetime@2.0.1
 
 libraries/Time:
@@ -85,10 +90,11 @@ libraries/Time:
 libraries/OneWire:
 	$(CLI) lib install OneWire@2.3.6
 
-libraries/DallasTemperature:
+libraries/DallasTemperature: | libraries/OneWire
 	$(CLI) lib install DallasTemperature@3.9.0
 
 $(IMAGE): $(BOARDS) $(LIBRARIES) $(SOURCES)
+	$(info Build code)
 	$(CLI) compile --config-file $(CFGFILE) --fqbn=$(FQBN) --warnings default --verbose --build-property compiler.cpp.extra_flags="$(CFLAGS)"
 
 $(FILESYS): $(FILES) $(CONF) | $(BOARDS) clean
