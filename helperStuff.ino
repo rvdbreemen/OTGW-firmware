@@ -511,6 +511,27 @@ int dBmtoPercentage(int dBm)
 }//dBmtoPercentage 
 
 /*
+  RSSI signal quality to percentage quad function
+  https://www.intuitibits.com/2016/03/23/dbm-to-percent-conversion/#comment-9
+  https://gist.github.com/senseisimple/002cdba344de92748695a371cef0176a
+*/
+
+int signal_quality_perc_quad(int rssi) {
+  const int perfect_rssi = -50;
+  const int worst_rssi = -100;
+  int nominal_rssi = perfect_rssi - worst_rssi;
+  int signal_quality = ceil(100 * nominal_rssi * nominal_rssi - (perfect_rssi - rssi) * (15 * nominal_rssi + 62 * (perfect_rssi - rssi))) / (nominal_rssi * nominal_rssi);
+  if (signal_quality > 100) {
+      signal_quality = 100;
+  } else if (signal_quality < 1) {
+      signal_quality = 0;
+  }
+  return signal_quality;
+}
+
+
+
+/*
   dBm to Quality statement TL:DR 
   --> https://support.randomsolutions.nl/827069-Best-dBm-Values-for-Wifi
   --> https://www.metageek.com/training/resources/wifi-signal-strength-basics/
@@ -519,10 +540,10 @@ int dBmtoPercentage(int dBm)
 String dBmtoQuality(int dBm)
 {
   String _ret="Amazing";
-  if (dBm<=-90) { _ret = "Unusable";}
-  if (dBm<=-80) { _ret = "Not good enough";}
-  if (dBm<=-70) { _ret = "Okay";}
   if (dBm<=-67) { _ret = "Very good";}
+  if (dBm<=-70) { _ret = "Okay";}
+  if (dBm<=-80) { _ret = "Not good enough";}
+  if (dBm<=-90) { _ret = "Unusable";}
   //if (dBm<=-30) { _ret = "Amazing";}
 
   return (_ret);
