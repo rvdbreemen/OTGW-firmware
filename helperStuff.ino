@@ -485,6 +485,29 @@ String strHTTPmethod(HTTPMethod method)
   }
 }
 
+/*
+ * Written by Ahmad Shamshiri
+  * with lots of research, this sources was used:
+ * https://support.randomsolutions.nl/827069-Best-dBm-Values-for-Wifi 
+ * This is approximate percentage calculation of RSSI
+ * WiFi Signal Strength Calculation
+ * Written Aug 08, 2019 at 21:45 in Ajax, Ontario, Canada
+ */
+
+int dBmtoPercentage(int dBm)
+{
+  int quality;
+    if(dBm <= RSSI_MIN){
+      quality = 0;
+    } else if(dBm >= RSSI_MAX) {  
+      quality = 100;
+    } else {
+      quality = 2 * (dBm + 100);
+    }
+
+  return quality;
+}//dBmtoPercentage 
+
 
 /***************************************************************************
 *
