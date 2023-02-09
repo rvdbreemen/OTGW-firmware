@@ -496,6 +496,8 @@ String strHTTPmethod(HTTPMethod method)
 
 int dBmtoPercentage(int dBm)
 {
+  const int RSSI_MAX =-50;// define maximum strength of signal in dBm
+  const int RSSI_MIN =-100;// define minimum strength of signal in dBm
   int quality;
     if(dBm <= RSSI_MIN){
       quality = 0;
