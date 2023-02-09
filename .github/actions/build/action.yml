@@ -11,10 +11,13 @@ runs:
     - id: filesys
       run: make filesystem
       shell: bash
+    - id: semver
+      run: cat version.h  | sed  -n  '/^#define _SEMVER_FULL.*$/s/^#.*"\(.*\)"$/semver=\1/p' >> $GITHUB_OUTPUT
+      shell: bash
     - id: upload
       uses: actions/upload-artifact@v3
       with:
-        name: tarballs
+        name: OTGW-firmware-${{steps.semver.outputs.semver}} 
         path: |
           build/**/*.bin
           build/**/*.elf
