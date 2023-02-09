@@ -18,4 +18,4 @@ runs:
         path: |
           build/**/*.bin
           build/**/*.elf
-          build/filesys.bin
+          build/*.bin
