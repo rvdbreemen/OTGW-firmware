@@ -13,6 +13,7 @@ runs:
       shell: bash
     - id: semver
       run: cat version.h  | sed  -n  '/^#define _SEMVER_FULL.*$/s/^#.*"\(.*\)"$/semver=\1/p' >> $GITHUB_OUTPUT
+      shell: bash
     - id: upload
       uses: actions/upload-artifact@v3
       with:
