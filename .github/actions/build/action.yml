@@ -14,7 +14,7 @@ runs:
     - id: upload
       uses: actions/upload-artifact@v3
       with:
-        name: tarballs
+        name: OTGW-firmware-${{github.ref_name}} 
         path: |
           build/**/*.bin
           build/**/*.elf
