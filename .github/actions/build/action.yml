@@ -1,5 +1,5 @@
 name: arduino-cli build
-description: Build using arduino-cli and makefile 
+description: Build using arduino-cli and makefile
 
 
 runs:
@@ -9,7 +9,7 @@ runs:
       run: make -j$(nproc)
       shell: bash
     - id: filesys
-      run: make build/filesys.bin
+      run: make filesystem
       shell: bash
     - id: upload
       uses: actions/upload-artifact@v3
@@ -18,4 +18,4 @@ runs:
         path: |
           build/**/*.bin
           build/**/*.elf
-          build/filesys.bin
+          build/*.bin
