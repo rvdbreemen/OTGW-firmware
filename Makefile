@@ -97,6 +97,8 @@ $(IMAGE): $(BOARDS) $(LIBRARIES) $(SOURCES)
 	$(info Build code)
 	$(CLI) compile --config-file $(CFGFILE) --fqbn=$(FQBN) --warnings default --verbose --build-property compiler.cpp.extra_flags="$(CFLAGS)"
 
+filesystem: $(FILESYS)
+
 $(FILESYS): $(FILES) $(CONF) | $(BOARDS) clean
 	$(MKFS) -p 256 -b 8192 -s 1024000 -c $(FSDIR) $@
 
@@ -126,7 +128,7 @@ upload-fs: $(FILESYS)
 install: $(IMAGE) $(FILESYS)
 	$(ESPTOOL) --port $(PORT) -b $(BAUD) write_flash 0x0 $(IMAGE) 0x200000 $(FILESYS)
 
-.PHONY: binaries platform publish clean upload upload-fs install debug
+.PHONY: binaries platform publish clean upload upload-fs install debug filesystem
 
 ### Allow customization through a local Makefile: Makefile-local.mk
 
