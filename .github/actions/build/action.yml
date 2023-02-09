@@ -11,10 +11,12 @@ runs:
     - id: filesys
       run: make build/filesys.bin
       shell: bash
+    - id: semver
+      run: cat version.h  | sed  -n  '/^#define _SEMVER_FULL.*$/s/^#.*"\(.*\)"$/semver=\1/p' >> $GITHUB_OUTPUT
     - id: upload
       uses: actions/upload-artifact@v3
       with:
-        name: OTGW-firmware-${{github.ref_name}} 
+        name: OTGW-firmware-${{steps.semver.outputs.semver}} 
         path: |
           build/**/*.bin
           build/**/*.elf
