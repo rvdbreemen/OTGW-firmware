@@ -770,6 +770,7 @@
    ,[ "ssid",                       "Wifi Network (SSID)"]
    ,[ "wifirssi",                   "Wifi Receive Power (dBm)"]
    ,[ "wifiquality",                "Wifi Quality (%)"]
+   ,[ "wifiqualitytldr",            "Wifi Quality"]
    ,[ "lastreset",                  "Last Reset Reason"]
    ,[ "mqttconnected",              "MQTT Connected"]
    ,[ "mqttenable",                 "MQTT Enable"]

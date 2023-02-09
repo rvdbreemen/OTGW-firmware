@@ -510,6 +510,23 @@ int dBmtoPercentage(int dBm)
   return quality;
 }//dBmtoPercentage 
 
+/*
+  dBm to Quality statement TL:DR 
+  --> https://support.randomsolutions.nl/827069-Best-dBm-Values-for-Wifi
+  --> https://www.metageek.com/training/resources/wifi-signal-strength-basics/
+  TL;DR strings on quality is based on this
+*/
+String dBmtoQuality(int dBm)
+{
+  String _ret="Amazing";
+  if (dBm<=-90) { _ret = "Unusable";}
+  if (dBm<=-80) { _ret = "Not good enough";}
+  if (dBm<=-70) { _ret = "Okay";}
+  if (dBm<=-67) { _ret = "Very good";}
+  //if (dBm<=-30) { _ret = "Amazing";}
+
+  return (_ret);
+}//dBmtoPercentage 
 
 /***************************************************************************
 *
