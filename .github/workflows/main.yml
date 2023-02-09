@@ -7,7 +7,7 @@ on:
       - main
       - actions
       - make-tweaks
-      - rename-littlefs
+      - tarball-naming
 
 jobs:
   build:
