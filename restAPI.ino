@@ -378,6 +378,7 @@ void sendDeviceInfo()
 //   );
   sendNestedJsonObj("ssid", CSTR(WiFi.SSID()));
   sendNestedJsonObj("wifirssi", WiFi.RSSI());
+  sendNestedJsonObj("wifiquality", dBmtoPercentage(WiFi.RSSI()));
   sendNestedJsonObj("ntpenable", String(CBOOLEAN(settingNTPenable)));
   sendNestedJsonObj("ntptimezone", CSTR(settingNTPtimezone));
   sendNestedJsonObj("uptime", upTime());
