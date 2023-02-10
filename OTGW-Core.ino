@@ -1776,7 +1776,7 @@ void handleOTGW()
         resetOTGW();
       } else if (strcasecmp(sWrite, "PS=1")==0) {
         //detected [PS=1], then PrintSummary mode = true --> From this point on you need to ask for summary.
-        bPrintSummarymode = true;
+        bPSmode = true;
         //reset all msglastupdated in webui
         for(int i = 0; i <= OT_MSGID_MAX; i++){
           msglastupdated[i] = 0; //clear epoch values
@@ -1784,7 +1784,7 @@ void handleOTGW()
         sMessage = "PS=1 mode; No UI updates.";
       } else if (strcasecmp(sWrite, "PS=0")==0) {
         //detected [PS=0], then PrintSummary mode = OFF --> Raw mode is turned on again.
-        bPrintSummarymode = false;
+        bPSmode = false;
         sMessage = "";
       }
       bytes_write = 0; //start next line
