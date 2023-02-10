@@ -768,7 +768,7 @@
    ,[ "flashchipmode",              "Flash Mode"]
    ,[ "boardtype",                  "Board Type"]
    ,[ "ssid",                       "Wifi Network (SSID)"]
-   ,[ "wifirssi",                   "Wifi Receive Power (dBm)"]
+   ,[ "wifirssi",                   "Wifi RX Power (dBm)"]
    ,[ "wifiquality",                "Wifi Quality (%)"]
    ,[ "wifiqualitytldr",            "Wifi Quality"]
    ,[ "lastreset",                  "Last Reset Reason"]
