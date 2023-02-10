@@ -518,7 +518,7 @@ int dBmtoPercentage(int dBm)
 
 int signal_quality_perc_quad(int rssi) {
   const int perfect_rssi = -50;
-  const int worst_rssi = -100;
+  const int worst_rssi = -85;
   int nominal_rssi = perfect_rssi - worst_rssi;
   int signal_quality = ceil(100 * nominal_rssi * nominal_rssi - (perfect_rssi - rssi) * (15 * nominal_rssi + 62 * (perfect_rssi - rssi))) / (nominal_rssi * nominal_rssi);
   if (signal_quality > 100) {
