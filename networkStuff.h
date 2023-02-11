@@ -53,7 +53,7 @@
 #include <LittleFS.h>
 
 //Use the NTP SDK ESP 8266 
-#include <time.h>
+//#include <time.h>
 extern "C" int clock_gettime(clockid_t unused, struct timespec *tp);
 
 enum NtpStatus_t {
