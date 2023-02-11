@@ -13,7 +13,7 @@ CLI := arduino-cli
 PLATFORM := esp8266:esp8266
 CFGFILE := arduino-cli.yaml
 ESP8266URL := https://github.com/esp8266/Arduino/releases/download/3.0.2/package_esp8266com_index.json
-LIBRARIES := libraries/WiFiManager libraries/ArduinoJson libraries/PubSubClient libraries/TelnetStream libraries/AceTime libraries/Time libraries/OneWire libraries/DallasTemperature
+LIBRARIES := libraries/WiFiManager libraries/ArduinoJson libraries/PubSubClient libraries/TelnetStream libraries/AceTime libraries/OneWire libraries/DallasTemperature
 BOARDS := arduino/package_esp8266com_index.json
 # PORT can be overridden by the environment or on the command line. E.g.:
 # export PORT=/dev/ttyUSB2; make upload, or: make upload PORT=/dev/ttyUSB2
@@ -83,9 +83,9 @@ libraries/TelnetStream:
 libraries/AceTime:
 	$(CLI) lib install Acetime@2.0.1
 
-libraries/Time:
-	$(CLI) lib install --git-url https://github.com/PaulStoffregen/Time
-	# https://github.com/PaulStoffregen/Time/archive/refs/tags/v1.6.1.zip
+# libraries/Time:
+# 	$(CLI) lib install --git-url https://github.com/PaulStoffregen/Time
+# 	# https://github.com/PaulStoffregen/Time/archive/refs/tags/v1.6.1.zip
 
 libraries/OneWire:
 	$(CLI) lib install OneWire@2.3.6
