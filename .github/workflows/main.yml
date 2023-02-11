@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - dev
+      - dev-remove-gitsubmods
       - main
       - actions
       - make-tweaks
