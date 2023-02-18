@@ -6,6 +6,6 @@ package-lock.json
 .DS_Store
 **/.DS_Store
 Arduino/**
-staging/**
 libraries/**
+staging/**
 arduino-cli.yaml
