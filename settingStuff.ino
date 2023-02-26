@@ -27,7 +27,7 @@ void writeSettings(bool show)
   DebugT(F("Start writing setting data "));
 
   //const size_t capacity = JSON_OBJECT_SIZE(6);  // save more setting, grow # of objects accordingly
-  DynamicJsonDocument doc(1024);
+  DynamicJsonDocument doc(1280);
   JsonObject root  = doc.to<JsonObject>();
   root["hostname"] = settingHostname;
   root["MQTTenable"] = settingMQTTenable;
@@ -69,7 +69,6 @@ void writeSettings(bool show)
 //=======================================================================
 void readSettings(bool show) 
 {
-
   // Open file for reading
   File file =  LittleFS.open(SETTINGS_FILE, "r");
 
@@ -83,7 +82,7 @@ void readSettings(bool show)
   }
 
   // Deserialize the JSON document
-  StaticJsonDocument<1024> doc;
+  StaticJsonDocument<1280> doc;
   DeserializationError error = deserializeJson(doc, file);
   if (error)
   {
