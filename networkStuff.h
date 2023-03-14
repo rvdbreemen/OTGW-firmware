@@ -123,6 +123,7 @@ void startWiFi(const char* hostname, int timeOut)
   manageWiFi.setShowInfoUpdate(false);
   manageWiFi.setShowInfoErase(false);
   manageWiFi.setMenu(wm_menu);
+  manageWiFi.setHostname(hostname);
   
   //--- fetches ssid and pass and tries to connect
   //--- if it does not connect it starts an access point with the specified name

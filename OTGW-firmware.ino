@@ -75,7 +75,6 @@ void setup() {
   startNTP();
 
   //start with setting wifi hostname
-  WiFi.hostname(String(settingHostname));
   startWiFi(CSTR(settingHostname), 240);  // timeout 240 seconds
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
