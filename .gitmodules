@@ -1,0 +1,6 @@
+[submodule "Arduino/libraries/aceTime"]
+	path = Arduino/libraries/aceTime
+	url = https://github.com/bxparks/AceTime
+[submodule "Arduino/libraries/Time"]
+	path = Arduino/libraries/Time
+	url = https://github.com/PaulStoffregen/Time.git
