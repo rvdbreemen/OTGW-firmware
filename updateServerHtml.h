@@ -69,4 +69,3 @@ static const char UpdateServerSuccess[] PROGMEM =
      </script>
      </html>)";
      
-

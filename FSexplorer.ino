@@ -397,4 +397,3 @@ void doRedirect(String msg, int wait, const char* URL, bool reboot)
   if (reboot) doRestart("Reboot after upgrade");
   
 } // doRedirect()
-

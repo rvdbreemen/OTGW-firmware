@@ -87,4 +87,3 @@ using ESP8266HTTPUpdateServerSecure = esp8266httpupdateserver::ESP8266HTTPUpdate
 };
 
 #endif
-
