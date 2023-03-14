@@ -4,7 +4,7 @@
 #define _VERSION_PATCH 2
 #define _VERSION_BUILD 2087
 #define _VERSION_GITHASH "fa737be"
-#define _VERSION_PRERELEASE beta
+// #define _VERSION_PRERELEASE beta
 #define _VERSION_DATE "14-03-2023"
 #define _VERSION_TIME "22:07:39"
 #define _SEMVER_CORE "0.10.2"
