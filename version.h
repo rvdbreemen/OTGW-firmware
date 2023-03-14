@@ -14,4 +14,3 @@
 #define _SEMVER_NOBUILD "0.10.2-beta (14-03-2023)"
 #define _VERSION "0.10.2-beta+fa737be (14-03-2023)"
 //The version information is created automatically, more information here: https://github.com/rvdbreemen/autoinc-semver
-

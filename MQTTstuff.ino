@@ -696,4 +696,3 @@ void sensorAutoConfigure(byte dataid, bool finishflag , String cfgSensorId = "")
 * THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 * 
 ***************************************************************************/
-

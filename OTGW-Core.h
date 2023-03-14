@@ -565,4 +565,3 @@ struct OpenthermData_t {
 * THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 * 
 ***************************************************************************/
-
