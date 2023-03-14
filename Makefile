@@ -12,7 +12,9 @@ CFLAGS = $(CFLAGS_DEFAULT)
 CLI := arduino-cli
 PLATFORM := esp8266:esp8266
 CFGFILE := arduino-cli.yaml
-ESP8266URL := https://github.com/esp8266/Arduino/releases/download/3.0.2/package_esp8266com_index.json
+# bug in http stream, fallback to 2.7.4 
+# ESP8266URL := https://github.com/esp8266/Arduino/releases/download/3.0.2/package_esp8266com_index.json
+ESP8266URL := https://github.com/esp8266/Arduino/releases/download/2.7.4/package_esp8266com_index.json
 LIBRARIES := libraries/WiFiManager libraries/ArduinoJson libraries/PubSubClient libraries/TelnetStream libraries/AceTime libraries/OneWire libraries/DallasTemperature
 BOARDS := arduino/package_esp8266com_index.json
 # PORT can be overridden by the environment or on the command line. E.g.:
@@ -78,7 +80,7 @@ libraries/PubSubClient:
 	$(CLI) lib install pubsubclient@2.8.0
 
 libraries/TelnetStream:
-	$(CLI) lib install TelnetStream@1.2.2
+	$(CLI) lib install TelnetStream@1.2.4
 
 libraries/AceTime:
 	$(CLI) lib install Acetime@2.0.1
