@@ -176,3 +176,4 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_setUpdaterError()
 }
 
 };
+

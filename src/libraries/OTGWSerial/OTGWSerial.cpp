@@ -1042,3 +1042,4 @@ bool OTGWSerial::upgradeEvent() {
     if (!_upgrade) return false;
     return _upgrade->upgradeTick();
 }
+
