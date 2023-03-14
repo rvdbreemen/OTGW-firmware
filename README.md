@@ -54,7 +54,7 @@ The features of this Nodosop OpenTherm Gateware ESP8266 based firmware are:
 To do:
 - InfluxDB client to do direct logging 
 - Instant update of webUI using websockets
-- Showing log of OT messages using websockets847
+- Showing log of OT messages using websockets
 
 Looking for the documentation, go here (work in progress):  <br> https://github.com/rvdbreemen/OTGW-firmware/wiki/Documentation-of-OTGW-firmware
 
