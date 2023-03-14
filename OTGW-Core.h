@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h 
-**  Version  : v0.10.0
+**  Version  : v0.10.2
 **
 **  Copyright (c) 2021-2023 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
