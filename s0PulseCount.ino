@@ -1,7 +1,7 @@
 /* 
  ***************************************************************************  
  **  Program  : s0PulseCount
- **  Version  : v0.10.0
+ **  Version  : v0.10.2
  **
  **  Copyright (c) 2021-2023 Rob Roos / Robert van Breemen
  **     based on Framework ESP8266 from Willem Aandewiel
