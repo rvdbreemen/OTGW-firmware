@@ -49,7 +49,6 @@ void setup() {
   // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
   // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
   // while (!Serial) {} //Wait for OK
-  initWatchDog();     // setup the WatchDog
   WatchDogEnabled(0); // turn off watchdog
 
   SetupDebugln(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
@@ -65,7 +64,6 @@ void setup() {
   setLed(LED1, ON);
   setLed(LED2, ON);
 
-  
   LittleFS.begin();
   readSettings(true);
 
@@ -80,7 +78,7 @@ void setup() {
   startWiFi(CSTR(settingHostname), 240);  // timeout 240 seconds
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
-  
+
   startTelnet();              // start the debug port 23
   startMDNS(CSTR(settingHostname));
   startLLMNR(CSTR(settingHostname));
@@ -88,6 +86,7 @@ void setup() {
   startWebserver();
   startMQTT();               // start the MQTT after webserver, always.
  
+  initWatchDog();            // setup the WatchDog
   lastReset = ESP.getResetReason();
   SetupDebugf("Last reset reason: [%s]\r\n", CSTR(lastReset));
   rebootCount = updateRebootCount();
@@ -100,7 +99,7 @@ void setup() {
   // Setup the OTGW PIC
   resetOTGW();          // reset the OTGW pic
   startOTGWstream();    // start port 25238 
-  // initSensors();        // init DS18B20 (after MQ is up! )
+ // initSensors();        // init DS18B20 (after MQ is up! )
   initOutputs();
   
   WatchDogEnabled(1);   // turn on watchdog
