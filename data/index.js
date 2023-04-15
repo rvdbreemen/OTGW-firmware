@@ -8,8 +8,8 @@
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
 */
-  const localURL='http://'+window.location.host; 
-  const APIGW='http://'+window.location.host+'/api/';
+  const localURL=window.location.protocol+'//'+window.location.host; 
+  const APIGW=window.location.protocol+'//'+window.location.host+'/api/';
   
   "use strict";
 
