@@ -525,7 +525,7 @@ void print_f88(float& value)
   
   AddLogf("%s = %s %s", OTlookupitem.label, _msg , OTlookupitem.unit);
   //SendMQTT
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != _value)){
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
     value = _value;
   }
@@ -541,7 +541,7 @@ void print_s16(int16_t& value)
   itoa(_value, _msg, 10);
   AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
   //SendMQTT
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != _value)){
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
     value = _value;
   }
@@ -565,7 +565,7 @@ void print_s8s8(uint16_t& value)
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_value_lb", sizeof(_topic));
   //AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != OTdata.u16())){
     sendMQTTData(_topic, _msg);
     value = OTdata.u16();
   }
@@ -580,7 +580,7 @@ void print_u16(uint16_t& value)
   
   AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
   //SendMQTT
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != _value)){
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
     value = _value;
   }
@@ -616,7 +616,7 @@ void print_status(uint16_t& value)
     AddLogf("%s = Master [%s]", OTlookupitem.label, _flag8_master);
 
     //Master Status
-    if (is_value_valid(OTdata, OTlookupitem)){
+    if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || OTcurrentSystemState.MasterStatus != OTdata.valueHB)){
       sendMQTTData("status_master", _flag8_master);
       sendMQTTData("ch_enable",             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
       sendMQTTData("dhw_enable",            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  
@@ -652,7 +652,7 @@ void print_status(uint16_t& value)
     AddLogf("%s = Slave  [%s]", OTlookupitem.label, _flag8_slave);
 
     //Slave Status
-    if (is_value_valid(OTdata, OTlookupitem)){
+    if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || OTcurrentSystemState.SlaveStatus != OTdata.valueLB)){
       sendMQTTData("status_slave", _flag8_slave);
       sendMQTTData("fault",                 (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  //delayms(5);  
       sendMQTTData("centralheating",        (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  //delayms(5);  
@@ -682,7 +682,7 @@ void print_solar_storage_status(uint16_t& value)
     // ID101:HB012: Master Solar Storage: Solar mode
     uint8_t MasterSolarMode = (OTdata.valueHB) & 0x7;
     AddLogf("%s = Solar Storage Master Mode [%d] ", OTlookupitem.label, MasterSolarMode);
-    if (is_value_valid(OTdata, OTlookupitem)){
+    if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || OTcurrentSystemState.SolarMasterStatus != OTdata.valueHB)){
       sendMQTTData(F("solar_storage_master_mode"), itoa(MasterSolarMode, _msg, 10));  //delayms(5);
       OTcurrentSystemState.SolarMasterStatus = OTdata.valueHB;
     }
@@ -697,7 +697,7 @@ void print_solar_storage_status(uint16_t& value)
     AddLogf("\r\n%s = Slave Solar Fault Indicator [%d] ", OTlookupitem.label, SlaveSolarFaultIndicator);
     AddLogf("\r\n%s = Slave Solar Mode Status [%d] ", OTlookupitem.label, SlaveSolarModeStatus);
     AddLogf("\r\n%s = Slave Solar Status [%d] ", OTlookupitem.label, SlaveSolarStatus);
-    if (is_value_valid(OTdata, OTlookupitem)){
+    if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || OTcurrentSystemState.SolarSlaveStatus != OTdata.valueLB)){
       sendMQTTData(F("solar_storage_slave_fault_incidator"),  ((SlaveSolarFaultIndicator) ? "ON" : "OFF"));   
       sendMQTTData(F("solar_storage_mode_status"), itoa(SlaveSolarModeStatus, _msg, 10));  
       sendMQTTData(F("solar_storage_slave_status"), itoa(SlaveSolarStatus, _msg, 10));  
@@ -740,7 +740,7 @@ void print_statusVH(uint16_t& value)
     
     AddLogf("%s = VH Master [%s]", OTlookupitem.label, _flag8_master);
     //Master Status
-    if (is_value_valid(OTdata, OTlookupitem)){
+    if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || OTcurrentSystemState.MasterStatusVH != OTdata.valueHB)){
       sendMQTTData(F("status_vh_master"), _flag8_master);
       sendMQTTData(F("vh_ventilation_enabled"),        (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
       sendMQTTData(F("vh_bypass_position"),            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  
@@ -771,7 +771,7 @@ void print_statusVH(uint16_t& value)
     AddLogf("%s = VH Slave  [%s]", OTlookupitem.label, _flag8_slave);
 
     //Slave Status
-    if (is_value_valid(OTdata, OTlookupitem)){
+    if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || OTcurrentSystemState.SlaveStatusVH != OTdata.valueLB)){
       sendMQTTData(F("status_vh_slave"), _flag8_slave);
       sendMQTTData(F("vh_fault"),                   (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));    
       sendMQTTData(F("vh_ventlation_mode"),         (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));    
@@ -795,7 +795,7 @@ void print_ASFflags(uint16_t& value)
 {
   AddLogf("%s = ASF flags[%s] OEM faultcode [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != OTdata.u16())){
     //Build string for MQTT
     char _msg[15] {0};
     //Application Specific Fault
@@ -826,7 +826,7 @@ void print_ASFflags(uint16_t& value)
 void print_RBPflags(uint16_t& value)
 {
   AddLogf("%s = M[%s] OEM fault code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != OTdata.u16())){
     //Build string for MQTT
     //Remote Boiler Paramaters
     sendMQTTData(F("RBP_flags_transfer_enable"), byte_to_binary(OTdata.valueHB));  
@@ -863,7 +863,7 @@ void print_RBPflags(uint16_t& value)
 void print_slavememberid(uint16_t& value)
 {
   AddLogf("%s = Slave Config[%s] MemberID code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != OTdata.u16())){
     //Build string for SendMQTT
     sendMQTTData(F("slave_configuration"), byte_to_binary(OTdata.valueHB));
     char _msg[15] {0};
@@ -899,7 +899,7 @@ void print_slavememberid(uint16_t& value)
 void print_mastermemberid(uint16_t& value)
 {
   AddLogf("%s = Master Config[%s] MemberID code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != OTdata.u16())){
     //Build string for MQTT
     char _msg[15] {0};
     sendMQTTData(F("master_configuration"), byte_to_binary(OTdata.valueHB));
@@ -914,7 +914,7 @@ void print_mastermemberid(uint16_t& value)
 void print_vh_configmemberid(uint16_t& value)
 {
   AddLogf("%s = VH Config[%s] MemberID code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != OTdata.u16())){
     //Build string for MQTT
     char _msg[15] {0};
     sendMQTTData(F("vh_configuration"), byte_to_binary(OTdata.valueHB)); 
@@ -931,7 +931,7 @@ void print_vh_configmemberid(uint16_t& value)
 void print_solarstorage_slavememberid(uint16_t& value)
 {
   AddLogf("%s = Solar Storage Slave Config[%s] MemberID code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != OTdata.u16())){
      //Build string for SendMQTT
     sendMQTTData(F("solar_storage_slave_configuration"), byte_to_binary(OTdata.valueHB));
     char _msg[15] {0};
@@ -965,7 +965,7 @@ void print_remoteoverridefunction(uint16_t& value)
   
   AddLogf("%s = flag8 = [%s] - decimal = [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
 
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != OTdata.u16())){
     //Build string for MQTT
     char _topic[50] {0};
     //flag8 value
@@ -982,7 +982,7 @@ void print_remoteoverridefunction(uint16_t& value)
 void print_flag8u8(uint16_t& value)
 {
   AddLogf("%s = M[%s] - [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != OTdata.u16())){
     //Build string for MQTT
     char _topic[50] {0};
     //flag8 value
@@ -1003,7 +1003,7 @@ void print_flag8(uint16_t& value)
 {
   
   AddLogf("%s = flag8 = [%s] - decimal = [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
-   if (is_value_valid(OTdata, OTlookupitem)){
+   if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != OTdata.u16())){
     //Build string for MQTT
     char _topic[50] {0};
     //flag8 value
@@ -1029,7 +1029,7 @@ void print_flag8flag8(uint16_t& value)
   }
   //flag8 valueLB
   AddLogf("%s = LB flag8[%s] - [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != OTdata.u16())){
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_lb_flag8", sizeof(_topic));
     sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
@@ -1052,7 +1052,7 @@ void print_vh_remoteparametersetting(uint16_t& value)
   }
   //flag8 valueLB
   AddLogf("%s = LB flag8[%s] - [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != OTdata.u16())){
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_lb_flag8", sizeof(_topic));
     sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
@@ -1069,7 +1069,7 @@ void print_command(uint16_t& value)
   // ID4 (HB=10): Remote Request Service request reset
   
   AddLogf("%s = %3d / %3d %s", OTlookupitem.label, (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, OTlookupitem.unit);
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != OTdata.u16())){
     //Build string for MQTT
     char _topic[50] {0};
     char _msg[10] {0};
@@ -1102,7 +1102,7 @@ void print_u8u8(uint16_t& value)
 { 
   
   AddLogf("%s = %3d / %3d %s", OTlookupitem.label, (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, OTlookupitem.unit);
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != OTdata.u16())){
     //Build string for MQTT
     char _topic[50] {0};
     char _msg[10] {0};
@@ -1126,7 +1126,7 @@ void print_date(uint16_t& value)
 { 
   
   AddLogf("%s = %3d / %3d %s", OTlookupitem.label, (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, OTlookupitem.unit);
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != OTdata.u16())){
     //Build string for MQTT
     char _topic[50] {0};
     char _msg[10] {0};
@@ -1152,7 +1152,7 @@ void print_daytime(uint16_t& value)
   const char *dayOfWeekName[]  { "Unknown", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Unknown" };
   
   AddLogf("%s = %s - %.2d:%.2d", OTlookupitem.label, dayOfWeekName[(OTdata.valueHB >> 5) & 0x7], (OTdata.valueHB & 0x1F), OTdata.valueLB); 
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid(OTdata, OTlookupitem) && (!settingMQTTchangesonly || value != OTdata.u16())){
     //Build string for MQTT
     char _topic[50] {0};
     char _msg[10] {0};
