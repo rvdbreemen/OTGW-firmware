@@ -11,7 +11,7 @@ CFLAGS = $(CFLAGS_DEFAULT)
 
 CLI := arduino-cli
 PLATFORM := esp8266:esp8266
-CFGFILE := arduino-cli.yaml
+CFGFILE := $(PWD)/arduino/arduino-cli.yaml
 # bug in http stream, fallback to 2.7.4 
 # ESP8266URL := https://github.com/esp8266/Arduino/releases/download/3.0.2/package_esp8266com_index.json
 ESP8266URL := https://github.com/esp8266/Arduino/releases/download/2.7.4/package_esp8266com_index.json
@@ -48,8 +48,8 @@ distclean: clean
 
 $(CFGFILE):
 	$(CLI) config init --dest-file $(CFGFILE)
-	$(CLI) config set board_manager.additional_urls $(ESP8266URL)
 	$(CLI) config set directories.data $(PWD)/arduino
+	$(CLI) config set board_manager.additional_urls $(ESP8266URL)
 	$(CLI) config set directories.downloads $(PWD)/staging
 	$(CLI) config set directories.user $(PWD)
 	$(CLI) config set sketch.always_export_binaries true
