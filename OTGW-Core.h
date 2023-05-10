@@ -327,7 +327,7 @@ enum OpenThermMessageID {
 		{  12, OT_READ  , ot_u8u8,       	"FHBsize", "Size of Fault-History-Buffer supported by slave", "" },
 		{  13, OT_READ  , ot_u8u8,       	"FHBindexFHBvalue", "Index number / Value of referred-to fault-history buffer entry", "" },
 		{  14, OT_WRITE , ot_f88,        	"MaxRelModLevelSetting", "Maximum relative modulation level setting", "%" },
-		{  15, OT_READ  , ot_u8u8,       	"MaxCapacityMinModLevell", "Maximum boiler capacity (kW) / Minimum boiler modulation level(%)", "kW/%" },
+		{  15, OT_READ  , ot_u8u8,       	"MaxCapacityMinModLevel", "Maximum boiler capacity (kW) / Minimum boiler modulation level(%)", "kW/%" },
 		{  16, OT_WRITE , ot_f88,        	"TrSet", "Room Setpoint", "°C" },
 		{  17, OT_READ  , ot_f88,        	"RelModLevel", "Relative Modulation Level", "%" },
 		{  18, OT_READ  , ot_f88,        	"CHPressure", "CH water pressure", "bar" },
