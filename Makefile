@@ -12,7 +12,9 @@ CFLAGS = $(CFLAGS_DEFAULT)
 CLI := arduino-cli
 PLATFORM := esp8266:esp8266
 CFGFILE := $(PWD)/arduino/arduino-cli.yaml
-# bug in http stream, fallback to 2.7.4 
+# Add CLICFG command to add config file location to CLI command
+CLICFG := $(CLI) --config-file $(CFGFILE)
+# bug in http stream, fallback to 2.7.4
 # ESP8266URL := https://github.com/esp8266/Arduino/releases/download/3.0.2/package_esp8266com_index.json
 ESP8266URL := https://github.com/esp8266/Arduino/releases/download/2.7.4/package_esp8266com_index.json
 LIBRARIES := libraries/WiFiManager libraries/ArduinoJson libraries/PubSubClient libraries/TelnetStream libraries/AceTime libraries/OneWire libraries/DallasTemperature
@@ -48,12 +50,12 @@ distclean: clean
 
 $(CFGFILE):
 	$(CLI) config init --dest-file $(CFGFILE)
-	$(CLI) config set directories.data $(PWD)/arduino --config-file $(CFGFILE)
-	$(CLI) config set board_manager.additional_urls $(ESP8266URL)
-	$(CLI) config set directories.downloads $(PWD)/staging
-	$(CLI) config set directories.user $(PWD)
-	$(CLI) config set sketch.always_export_binaries true
-	$(CLI) config set library.enable_unsafe_install true
+	$(CLICFG) config set directories.data $(PWD)/arduino
+	$(CLICFG) config set board_manager.additional_urls $(ESP8266URL)
+	$(CLICFG) config set directories.downloads $(PWD)/staging
+	$(CLICFG) config set directories.user $(PWD)
+	$(CLICFG) config set sketch.always_export_binaries true
+	$(CLICFG) config set library.enable_unsafe_install true
 
 ##
 # Make sure CFG is updated before libraries are called.
@@ -61,43 +63,43 @@ $(CFGFILE):
 $(LIBRARIES): | $(CFGFILE)
 
 $(BOARDS): | $(CFGFILE)
-	$(CLI) core update-index
-	$(CLI) core install $(PLATFORM)
+	$(CLICFG) core update-index
+	$(CLICFG) core install $(PLATFORM)
 
 refresh: | $(CFGFILE)
-	$(CLI) lib update-index
+	$(CLICFG) lib update-index
 
 flush: | $(CFGFILE)
-	$(CLI) cache clean
+	$(CLICFG) cache clean
 
 libraries/WiFiManager: | $(BOARDS)
-	$(CLI) lib install WiFiManager@2.0.15-rc.1
+	$(CLICFG) lib install WiFiManager@2.0.15-rc.1
 
 libraries/ArduinoJson:
-	$(CLI) lib install ArduinoJson@6.17.2
+	$(CLICFG) lib install ArduinoJson@6.17.2
 
 libraries/PubSubClient:
-	$(CLI) lib install pubsubclient@2.8.0
+	$(CLICFG) lib install pubsubclient@2.8.0
 
 libraries/TelnetStream:
-	$(CLI) lib install TelnetStream@1.2.4
+	$(CLICFG) lib install TelnetStream@1.2.4
 
 libraries/AceTime:
-	$(CLI) lib install Acetime@2.0.1
+	$(CLICFG) lib install Acetime@2.0.1
 
 # libraries/Time:
 # 	$(CLI) lib install --git-url https://github.com/PaulStoffregen/Time
 # 	# https://github.com/PaulStoffregen/Time/archive/refs/tags/v1.6.1.zip
 
 libraries/OneWire:
-	$(CLI) lib install OneWire@2.3.6
+	$(CLICFG) lib install OneWire@2.3.6
 
 libraries/DallasTemperature: | libraries/OneWire
-	$(CLI) lib install DallasTemperature@3.9.0
+	$(CLICFG) lib install DallasTemperature@3.9.0
 
 $(IMAGE): $(BOARDS) $(LIBRARIES) $(SOURCES)
 	$(info Build code)
-	$(CLI) compile --config-file $(CFGFILE) --fqbn=$(FQBN) --warnings default --verbose --build-property compiler.cpp.extra_flags="$(CFLAGS)"
+	$(CLICFG) compile --fqbn=$(FQBN) --warnings default --verbose --build-property compiler.cpp.extra_flags="$(CFLAGS)"
 
 filesystem: $(FILESYS)
 
@@ -117,7 +119,7 @@ $(PROJ).zip: $(PROJ)-fw.bin $(PROJ)-fs.bin
 # Build the image with debugging output
 debug: CFLAGS = $(CFLAGS_DEFAULT) -DDEBUG
 debug: $(IMAGE)
-	
+
 # Load only the sketch into the device
 upload: $(IMAGE)
 	$(ESPTOOL) --port $(PORT) -b $(BAUD) write_flash 0x0 $(IMAGE)
