@@ -48,7 +48,7 @@ distclean: clean
 
 $(CFGFILE):
 	$(CLI) config init --dest-file $(CFGFILE)
-	$(CLI) config set directories.data $(PWD)/arduino
+	$(CLI) config set directories.data $(PWD)/arduino --config-file $(CFGFILE)
 	$(CLI) config set board_manager.additional_urls $(ESP8266URL)
 	$(CLI) config set directories.downloads $(PWD)/staging
 	$(CLI) config set directories.user $(PWD)
