@@ -56,7 +56,7 @@ To do:
 - Instant update of webUI using websockets
 - Showing log of OT messages using websockets
 
-Looking for the documentation, go here (work in progress):  <br> https://github.com/rvdbreemen/OTGW-firmware/wiki/Documentation-of-OTGW-firmware
+Looking for the documentation, go here (work in progress):  <br> [Wiki with Documentation](https://github.com/rvdbreemen/OTGW-firmware/wiki)
 
 | Version | Release notes |
 |-|-|
