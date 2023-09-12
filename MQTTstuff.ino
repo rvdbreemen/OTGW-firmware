@@ -261,6 +261,7 @@ void handleMQTT()
         Debugln(F("MQTT connected"));	
         stateMQTT = MQTT_STATE_IS_CONNECTED;
         MQTTDebugTln(F("Next State: MQTT_STATE_IS_CONNECTED"));
+        MQTTinit();
         // birth message, sendMQTT retains  by default
         sendMQTT(CSTR(MQTTPubNamespace), "online");
 

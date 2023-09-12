@@ -39,6 +39,7 @@ void writeSettings(bool show)
   root["MQTThaprefix"] = settingMQTThaprefix;
   root["MQTTuniqueid"] = settingMQTTuniqueid;
   root["MQTTOTmessage"] = settingMQTTOTmessage;
+  root["MQTTchangesonly"] = settingMQTTchangesonly;
   root["MQTTharebootdetection"]= settingMQTTharebootdetection;  
   root["NTPenable"] = settingNTPenable;
   root["NTPtimezone"] = settingNTPtimezone;
@@ -111,6 +112,7 @@ void readSettings(bool show)
   if (settingMQTTuniqueid=="null") settingMQTTuniqueid = getUniqueId();
 
   settingMQTTOTmessage    = doc["MQTTOTmessage"]|settingMQTTOTmessage;
+  settingMQTTchangesonly  = doc["MQTTchangesonly"]|settingMQTTchangesonly;
   settingNTPenable        = doc["NTPenable"]; 
   settingNTPtimezone      = doc["NTPtimezone"].as<String>();
   if (settingNTPtimezone=="null")  settingNTPtimezone = "Europe/Amsterdam"; //default to amsterdam timezone
@@ -221,6 +223,7 @@ void updateSetting(const char *field, const char *newValue)
     if (settingMQTTuniqueid.length() == 0)   settingMQTTuniqueid = getUniqueId();
   }
   if (strcasecmp(field, "MQTTOTmessage")==0)   settingMQTTOTmessage = EVALBOOLEAN(newValue);
+  if (strcasecmp(field, "MQTTchangesonly")==0)   settingMQTTchangesonly = EVALBOOLEAN(newValue);
   if (strstr(field, "mqtt") != NULL)        startMQTT();//restart MQTT on change of any setting
   
   if (strcasecmp(field, "NTPenable")==0)      settingNTPenable = EVALBOOLEAN(newValue);

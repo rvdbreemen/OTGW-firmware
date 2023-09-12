@@ -760,6 +760,7 @@
    ,[ "gpiosensorsinterval",        "GPIO Publish Interval (sec)"]
    ,[ "gpiosensorspin",             "GPIO pin # (SD3 = GPIO10 => 10)"]
    ,[ "mqttotmessage",              "MQTT OT msg Enable"]
+   ,[ "mqttchangesonly",            "MQTT changes only"]
    ,[ "otgwcommandenable",          "OTGW Boot Command Enabled"]
    ,[ "otgwcommands",               "OTGW Boot Command"]
    ,[ "thermostatconnected",        "Thermostat Connected"]

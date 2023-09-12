@@ -437,6 +437,7 @@ void sendDeviceSettings()
   sendJsonSettingObj("mqttharebootdetection", settingMQTTharebootdetection, "b");
   sendJsonSettingObj("mqttuniqueid", CSTR(settingMQTTuniqueid), "s", 20);
   sendJsonSettingObj("mqttotmessage", settingMQTTOTmessage, "b");
+  sendJsonSettingObj("mqttchangesonly", settingMQTTchangesonly, "b");
   sendJsonSettingObj("ntpenable", settingNTPenable, "b");
   sendJsonSettingObj("ntptimezone", CSTR(settingNTPtimezone), "s", 50);
   sendJsonSettingObj("ntphostname", CSTR(settingNTPhostname), "s", 50);

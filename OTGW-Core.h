@@ -21,6 +21,7 @@ TelnetStreamClass OTGWstream(OTGW_SERIAL_PORT);
 
 //Depends on the library 
 #define OTGW_COMMAND_TOPIC "command"
+#define OTGW_MQTT_UPDATE_FREQ 90000 // milliseconds
 
 typedef struct {
 	uint16_t 	Statusflags = 0; // flag8 / flag8  Master and Slave Status flags. 
@@ -455,6 +456,7 @@ enum OpenThermMessageID {
 #define OT_MSGID_MAX 133
 
 time_t msglastupdated[255] = {0}; //all msg, even if they are unknown
+time_t msglastsent[255] = {0};
 
 struct OT_cmd_t { // see all possible commands for PIC here: https://otgw.tclcode.com/firmware.html
 	char cmd[15];

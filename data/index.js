@@ -795,6 +795,7 @@
    ,[ "s0intervalcount",            "S0 interval pulses"]
    ,[ "s0totalcount",               "S0 total pulses"]
    ,[ "mqttotmessage",              "MQTT OT msg Enable"]
+   ,[ "mqttchangesonly",            "MQTT changes only"]
    ,[ "otgwcommandenable",          "Boot Command Enabled"]
    ,[ "otgwcommands",               "Boot Command"]
    ,[ "thermostatconnected",        "Thermostat Connected"]
