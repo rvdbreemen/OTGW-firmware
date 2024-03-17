@@ -13,7 +13,7 @@ runs:
     - id: filesys
       run: |
         make filesystem
-        mv build/littlefs.bin build/littlefs-${{steps.semver.outputs.semver}}.bin
+        for file in build/*.littlefs.bin; do mv "$file" "build/$(basename ${file%.*}).${{steps.semver.outputs.semver}}.littlefs.bin"; done
       shell: bash
     - id: build
       run: |

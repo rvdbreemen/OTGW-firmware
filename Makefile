@@ -30,8 +30,8 @@ TOOLS = $(wildcard arduino/packages/esp8266/hardware/esp8266/*/tools)
 ESPTOOL = python3 $(TOOLS)/esptool/esptool.py
 BOARD = $(PLATFORM):d1_mini
 FQBN = $(BOARD):eesz=4M2M,xtal=160
-IMAGE = build/$(subst :,.,$(BOARD))/$(INO).bin
-FILESYS = build/littlefs.bin
+IMAGE = build/$(INO).bin
+FILESYS = build/$(INO).littlefs.bin
 
 export PYTHONPATH = $(TOOLS)/pyserial
 
