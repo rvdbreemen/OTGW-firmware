@@ -20,7 +20,7 @@ runs:
     - id: filesys
       run: |
         make filesystem
-        for file in build/*.littlefs.bin; do mv "$file" "build/$(basename -s .littlefs.bin $file).${{steps.semver.outputs.semver}}.littlefs.bin"; done
+        for file in build/*.ino.littlefs.bin; do mv "$file" "build/$(basename -s .ino.littlefs.bin $file).${{steps.semver.outputs.semver}}.littlefs.bin"; done
       shell: bash
 
     - id: upload
