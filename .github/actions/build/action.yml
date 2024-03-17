@@ -15,12 +15,11 @@ runs:
         make filesystem
         mv build/littlefs.bin build/littlefs-${{steps.semver.outputs.semver}}.bin
       shell: bash
-- id: build
-  run: |
-    make -j$(nproc)
-    for file in build/**/*.bin; do mv "$file" "${file%.*}-${{steps.semver.outputs.semver}}.bin"; done
-    for file in build/**/*.elf; do mv "$file" "${file%.*}-${{steps.semver.outputs.semver}}.elf"; done
-  shell: bash
+    - id: build
+      run: |
+        make -j$(nproc)
+        for file in build/**/*.bin; do mv "$file" "${file%.*}-${{steps.semver.outputs.semver}}.bin"; done
+        for file in build/**/*.elf; do mv "$file" "${file%.*}-${{steps.semver.outputs.semver}}.elf"; done
       shell: bash
     - id: upload
       uses: actions/upload-artifact@v4
