@@ -7,6 +7,9 @@ runs:
     - id: semver
       run: cat version.h  | sed  -n  '/^#define _SEMVER_FULL.*$/s/^#.*"\(.*\)"$/semver=\1/p' >> $GITHUB_OUTPUT
       shell: bash
+    - id: create-build-dir
+      run: mkdir -p build
+      shell: bash
     - id: filesys
       run: |
         make filesystem
