@@ -14,11 +14,17 @@ runs:
     - id: semver
       run: cat version.h  | sed  -n  '/^#define _SEMVER_FULL.*$/s/^#.*"\(.*\)"$/semver=\1/p' >> $GITHUB_OUTPUT
       shell: bash
+    - if: rename
+      run: |
+        mv build/*.bin build/*-${{steps.semver.outputs.semver}}.bin
+        mv build/**/*.bin build/*-${{steps.semver.outputs.semver}}.bin
+        mv build/**/*.elf build/*-${{steps.semver.outputs.semver}}.elf
+      shell:  bash
     - id: upload
       uses: actions/upload-artifact@v4
       with:
         name: OTGW-firmware-${{steps.semver.outputs.semver}} 
         path: |
-          build/**/*-${{steps.semver.outputs.semver}}.bin
-          build/**/*-${{steps.semver.outputs.semver}}.elf
-          build/*-${{steps.semver.outputs.semver}}.bin
+          build/**/*.bin
+          build/**/*.elf
+          build/*.bin
