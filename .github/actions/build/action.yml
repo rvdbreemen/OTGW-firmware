@@ -26,5 +26,5 @@ runs:
       with:
         name: OTGW-firmware-${{steps.semver.outputs.semver}} 
         path: |
-          build/**.elf
+          build/*.elf
           build/*.bin
