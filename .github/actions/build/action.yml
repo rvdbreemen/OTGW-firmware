@@ -1,23 +1,22 @@
 name: arduino-cli build
 description: Build using arduino-cli and makefile
 
-
 runs:
   using: composite
   steps:
+    - id: semver
+      run: cat version.h  | sed  -n  '/^#define _SEMVER_FULL.*$/s/^#.*"\(.*\)"$/semver=\1/p' >> $GITHUB_OUTPUT
+      shell: bash
     - id: filesys
       run: |
         make filesystem
         mv build/littlefs.bin build/littlefs-${{steps.semver.outputs.semver}}.bin
+      shell: bash
     - id: build
       run: |
         make -j$(nproc)
         mv build/**/*.bin build/*-${{steps.semver.outputs.semver}}.bin
         mv build/**/*.elf build/*-${{steps.semver.outputs.semver}}.elf
-      shell: bash
-      shell: bash
-    - id: semver
-      run: cat version.h  | sed  -n  '/^#define _SEMVER_FULL.*$/s/^#.*"\(.*\)"$/semver=\1/p' >> $GITHUB_OUTPUT
       shell: bash
     - id: upload
       uses: actions/upload-artifact@v4
