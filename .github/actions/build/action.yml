@@ -10,11 +10,6 @@ runs:
     - id: create-build-dir
       run: mkdir -p build
       shell: bash
-    - id: filesys
-      run: |
-        make filesystem
-        for file in build/*.littlefs.bin; do mv "$file" "build/$(basename ${file%.*}).${{steps.semver.outputs.semver}}.littlefs.bin"; done
-      shell: bash
     - id: build
       run: |
         make -j$(nproc)
@@ -22,6 +17,12 @@ runs:
         for file in build/**/*.bin; do mv "$file" "build/$(basename ${file%.*})-${{steps.semver.outputs.semver}}.bin"; done
         for file in build/**/*.elf; do mv "$file" "build/$(basename ${file%.*})-${{steps.semver.outputs.semver}}.elf"; done
       shell: bash
+    - id: filesys
+      run: |
+        make filesystem
+        for file in build/*.littlefs.bin; do mv "$file" "build/$(basename -s .littlefs.bin $file).${{steps.semver.outputs.semver}}.littlefs.bin"; done
+      shell: bash
+
     - id: upload
       uses: actions/upload-artifact@v4
       with:
