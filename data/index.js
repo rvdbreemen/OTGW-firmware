@@ -8,11 +8,11 @@
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
 */
-  const localURL=window.location.protocol+'//'+window.location.host; 
-  const APIGW=window.location.protocol+'//'+window.location.host+'/api/';
-  
   "use strict";
-
+  
+  const localURL=window.location.protocol+'//'+window.location.host; 
+  const APIGW=localURL+'/api/';
+  
   let needReload  = true;
   refreshDevTime();
 
@@ -161,21 +161,20 @@
   }
 
   //============================================================================  
-  function refreshDevTime()
-  {
-    //console.log("Refresh api/v0/devtime ..");
-    fetch(APIGW+"v0/devtime")
+  function refreshDevTime() {
+    fetch(APIGW + "v0/devtime")
       .then(response => response.json())
       .then(json => {
-        //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
-        for( let i in json.devtime ){
-            if (json.devtime[i].name == "dateTime")
-            {
-              //console.log("Got new time ["+json.devtime[i].value+"]");
-              document.getElementById('theTime').innerHTML = json.devtime[i].value;
-            }
-            if (json.devtime[i].name == "message") document.getElementById('message').innerHTML = json.devtime[i].value;
-          }
+        const dateTime = json.devtime.find(item => item.name === "dateTime");
+        const message = json.devtime.find(item => item.name === "message");
+        
+        if (dateTime) {
+          document.getElementById('theTime').innerHTML = dateTime.value;
+        }
+        
+        if (message) {
+          document.getElementById('message').innerHTML = message.value;
+        }
       })
       .catch(function(error) {
         var p = document.createElement('p');
@@ -183,23 +182,22 @@
           document.createTextNode('Error: ' + error.message)
         );
       });     
-      
   } // refreshDevTime()
   //============================================================================      
-  function refreshFirmware(){
-    console.log("refreshFirmware() .. "+APIGW+"firmwarefilelist");
-    fetch(APIGW+"firmwarefilelist")
+  function refreshFirmware() {
+    console.log("refreshFirmware() .. " + APIGW + "firmwarefilelist");
+    fetch(APIGW + "firmwarefilelist")
       .then(response => response.json())
       .then(files => {
-        console.log("parsed ... data is ["+ JSON.stringify(files)+"]");
-        
+        console.log("parsed ... data is [" + JSON.stringify(files) + "]");
+
         let displayPICpage = document.getElementById('displayPICpage');
         while (displayPICpage.lastChild) {
           displayPICpage.lastChild.remove();
         }
         let tableDiv = document.createElement("div");
         tableDiv.setAttribute("class", "pictable");
-        
+
         var rowDiv = document.createElement("div");
         rowDiv.setAttribute("class", "picrow");
         rowDiv.setAttribute("id", "firmwarename");
@@ -212,31 +210,29 @@
         rowDiv.appendChild(fldDiv);
         //--- version on screen ---
         var valDiv = document.createElement("div");
-        valDiv.setAttribute("class", "piccolumn2");                  
-        valDiv.textContent = "Version" 
+        valDiv.setAttribute("class", "piccolumn2");
+        valDiv.textContent = "Version"
         rowDiv.appendChild(valDiv);
         //--- size on screen ---
         var sizDiv = document.createElement("div");
-        sizDiv.setAttribute("class", "piccolumn3");                  
-        sizDiv.textContent = "Size" 
+        sizDiv.setAttribute("class", "piccolumn3");
+        sizDiv.textContent = "Size"
         rowDiv.appendChild(sizDiv);
         //--- refresh icon ---
         var btn = document.createElement("div");
         btn.setAttribute("class", "piccolumn4");
-        rowDiv.appendChild(btn); 
+        rowDiv.appendChild(btn);
         //--- flash to pic icon---
         var btn = document.createElement("div");
-        rowDiv.appendChild(btn); 
+        rowDiv.appendChild(btn);
         tableDiv.appendChild(rowDiv);
 
-        for( let i in files )
-        {
-          console.log("["+files[i].name+"]=>["+files[i].version+"]=>["+files[i].size+"]");
+        for (let i in files) {
+          console.log("[" + files[i].name + "]=>[" + files[i].version + "]=>[" + files[i].size + "]");
 
-          // var displayPICflash = document.getElementById('displayPICflash');          
           var rowDiv = document.createElement("div");
           rowDiv.setAttribute("class", "picrow");
-          rowDiv.setAttribute("id", "firmware_"+files[i].name);
+          rowDiv.setAttribute("id", "firmware_" + files[i].name);
           rowDiv.style.background = "lightblue";
           //--- field Name ---
           var fldDiv = document.createElement("div");
@@ -245,56 +241,54 @@
           rowDiv.appendChild(fldDiv);
           //--- version on screen ---
           var valDiv = document.createElement("div");
-          valDiv.setAttribute("class", "piccolumn2");                  
-          valDiv.textContent = files[i].version; 
+          valDiv.setAttribute("class", "piccolumn2");
+          valDiv.textContent = files[i].version;
           rowDiv.appendChild(valDiv);
           //--- size on screen ---
           var sizDiv = document.createElement("div");
-          sizDiv.setAttribute("class", "piccolumn3");                  
-          sizDiv.textContent = files[i].size; 
+          sizDiv.setAttribute("class", "piccolumn3");
+          sizDiv.textContent = files[i].size;
           rowDiv.appendChild(sizDiv);
           //--- refresh icon ---
           var btn = document.createElement("div");
           btn.setAttribute("class", "piccolumn4");
           var a = document.createElement('a');
           // a.title = "Update";
-          a.href = localURL+'/pic?action=refresh&name='+files[i].name+'&version='+files[i].version;
-          var img = document.createElement('img'); 
-          img.src = localURL+'/update.png';
+          a.href = localURL + '/pic?action=refresh&name=' + files[i].name + '&version=' + files[i].version;
+          var img = document.createElement('img');
+          img.src = localURL + '/update.png';
           img.title = "Update firmware from web";
           img.style.width = '16px';
           img.style.height = 'auto';
-          img.setAttribute=("alt", "Update");
+          img.setAttribute = ("alt", "Update");
           a.appendChild(img);
-          btn.appendChild(a); 
-          rowDiv.appendChild(btn); 
+          btn.appendChild(a);
+          rowDiv.appendChild(btn);
           //--- flash to pic icon---
           var btn = document.createElement("div");
           btn.setAttribute("class", "piccolumn5");
           var a = document.createElement('a');
-          a.href = localURL+'/pic?action=upgrade&name='+files[i].name+'&version='+files[i].version;
-          var img = document.createElement('img'); 
-          img.src = localURL+'/system_update.png'
+          a.href = localURL + '/pic?action=upgrade&name=' + files[i].name + '&version=' + files[i].version;
+          var img = document.createElement('img');
+          img.src = localURL + '/system_update.png'
           img.title = "Install firmware onto pic";
           img.style.width = '16px';
           img.style.height = 'auto';
-          img.setAttribute=("alt", "Install");
+          img.setAttribute = ("alt", "Install");
           a.appendChild(img);
-          btn.appendChild(a); 
-          rowDiv.appendChild(btn); 
+          btn.appendChild(a);
+          rowDiv.appendChild(btn);
           tableDiv.appendChild(rowDiv);
         }
         displayPICpage.appendChild(tableDiv);
- 
+
       })
-      .catch(function(error) {
+      .catch(function (error) {
         var p = document.createElement('p');
         p.appendChild(
           document.createTextNode('Error: ' + error.message)
         );
-      });   
-
-   
+      });
   }
 
   

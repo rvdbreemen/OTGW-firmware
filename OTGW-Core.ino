@@ -669,7 +669,7 @@ void print_status(uint16_t& value)
 
   if (is_value_valid(OTdata, OTlookupitem)){
     // AddLogf("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
-    value = (OTcurrentSystemState.MasterStatus<<8) & OTcurrentSystemState.SlaveStatus;
+    value = (OTcurrentSystemState.MasterStatus<<8) | OTcurrentSystemState.SlaveStatus;
   }
 }
 
