@@ -21,4 +21,6 @@ jobs:
         with:
           files: |
             Release-${{ github.ref_name }}.txt
+            build/*.elf
+            build/*.bin
             LICENSE
