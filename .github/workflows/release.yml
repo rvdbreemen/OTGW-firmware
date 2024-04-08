@@ -12,8 +12,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Build
+        uses: ./.github/actions/setup
         uses: ./.github/actions/build
-        #run: echo ${{ github.sha }} > Release-${{ github.ref_name }}.txt
+        run: echo ${{ github.sha }} > Release-${{ github.ref_name }}.txt
       - name: Test
         run: cat Release-${{ github.ref_name }}.txt
       - name: Release
