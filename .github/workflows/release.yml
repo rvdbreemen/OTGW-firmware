@@ -15,9 +15,6 @@ jobs:
         uses: ./.github/actions/setup
       - name: Build
         uses: ./.github/actions/build
-        #run: echo ${{ github.sha }} > Release-${{ github.ref_name }}.txt
-      - name: Test
-        run: cat Release-${{ github.ref_name }}.txt
       - name: Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
@@ -26,4 +23,3 @@ jobs:
             build/*.elf
             build/*.bin
             LICENSE
-            Release-${{ github.ref_name }}.txt
