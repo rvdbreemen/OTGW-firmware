@@ -514,6 +514,12 @@
                       sInput.setAttribute("maxlength", data[i].maxlen);
                       sInput.setAttribute("size", (data[i].maxlen > 20 ? 20 : data[i].maxlen));
                     }
+                    else if (data[i].type == "p")
+                    {
+                      sInput.setAttribute("type", "password");
+                      sInput.setAttribute("maxlength", data[i].maxlen);
+                      sInput.setAttribute("size", (data[i].maxlen > 20 ? 20 : data[i].maxlen));
+                    }
                     else if (data[i].type == "f")
                     {
                       sInput.setAttribute("type", "number");
