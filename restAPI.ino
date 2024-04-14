@@ -421,7 +421,8 @@ void sendDeviceSettings()
   RESTDebugTln(F("sending device settings ...\r"));
 
   sendStartJsonObj("settings");
-  
+
+  //sendJsonSettingObj("string",   settingString,   "p", sizeof(settingString)-1);  
   //sendJsonSettingObj("string",   settingString,   "s", sizeof(settingString)-1);
   //sendJsonSettingObj("float",    settingFloat,    "f", 0, 10,  5);
   //sendJsonSettingObj("intager",  settingInteger , "i", 2, 60);
@@ -431,7 +432,7 @@ void sendDeviceSettings()
   sendJsonSettingObj("mqttbroker", CSTR(settingMQTTbroker), "s", 32);
   sendJsonSettingObj("mqttbrokerport", settingMQTTbrokerPort, "i", 0, 65535);
   sendJsonSettingObj("mqttuser", CSTR(settingMQTTuser), "s", 32);
-  sendJsonSettingObj("mqttpasswd", CSTR(settingMQTTpasswd), "s", 100);
+  sendJsonSettingObj("mqttpasswd", CSTR(settingMQTTpasswd), "p", 100);
   sendJsonSettingObj("mqtttoptopic", CSTR(settingMQTTtopTopic), "s", 15);
   sendJsonSettingObj("mqtthaprefix", CSTR(settingMQTThaprefix), "s", 20);
   sendJsonSettingObj("mqttharebootdetection", settingMQTTharebootdetection, "b");

@@ -6,7 +6,7 @@ OpenTherm Nodoshop OTGW hardware - an ESP8266 firmware
 
 This project is an firmware for the Nodoshop OTGW hardware, based on ESP8266 devkits.
 
-Starting with version 2.3 of the Nodoshop hardware the devkit has changed from NodeMCU to a Wemos D1mini. This is fully supported by the hardware and this firmware.
+Starting with version 2.3 of the Nodoshop hardware the devkit has changed from NodeMCU to a Wemos D1mini. This is fully supported by the hardware and this firmware. 
 
 Supporting hardware version are:
 | Version | Hardware supported |
@@ -56,7 +56,7 @@ To do:
 - Instant update of webUI using websockets
 - Showing log of OT messages using websockets
 
-Looking for the documentation, go here (work in progress):  <br> https://github.com/rvdbreemen/OTGW-firmware/wiki/Documentation-of-OTGW-firmware
+Looking for the documentation, go here (work in progress):  <br> [Wiki with Documentation](https://github.com/rvdbreemen/OTGW-firmware/wiki)
 
 | Version | Release notes |
 |-|-|
