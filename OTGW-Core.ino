@@ -669,7 +669,7 @@ void print_status(uint16_t& value)
 
   if (is_value_valid(OTdata, OTlookupitem)){
     // AddLogf("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
-    value = (OTcurrentSystemState.MasterStatus<<8) & OTcurrentSystemState.SlaveStatus;
+    value = (OTcurrentSystemState.MasterStatus<<8) | OTcurrentSystemState.SlaveStatus;
   }
 }
 
@@ -706,7 +706,7 @@ void print_solar_storage_status(uint16_t& value)
   }
   if (is_value_valid(OTdata, OTlookupitem)){
     //OTGWDebugTf(PSTR("Solar Storage Master / Slave Mode u16 [%04x] _value [%04x] hb [%02x] lb [%02x]"), OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
-    value = (OTcurrentSystemState.SolarMasterStatus<<8) & OTcurrentSystemState.SolarSlaveStatus;
+    value = (OTcurrentSystemState.SolarMasterStatus<<8) | OTcurrentSystemState.SolarSlaveStatus;
   }
 }
 
@@ -786,7 +786,7 @@ void print_statusVH(uint16_t& value)
 
   if (is_value_valid(OTdata, OTlookupitem)){
     //OTGWDebugTf(PSTR("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]"), OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
-    value = (OTcurrentSystemState.MasterStatusVH<<8) & OTcurrentSystemState.SlaveStatusVH;
+    value = (OTcurrentSystemState.MasterStatusVH<<8) | OTcurrentSystemState.SlaveStatusVH;
   }
 }
 

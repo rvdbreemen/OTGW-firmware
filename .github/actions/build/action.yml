@@ -1,24 +1,32 @@
 name: arduino-cli build
 description: Build using arduino-cli and makefile
 
-
 runs:
   using: composite
   steps:
-    - id: build
-      run: make -j$(nproc)
-      shell: bash
-    - id: filesys
-      run: make filesystem
-      shell: bash
     - id: semver
       run: cat version.h  | sed  -n  '/^#define _SEMVER_FULL.*$/s/^#.*"\(.*\)"$/semver=\1/p' >> $GITHUB_OUTPUT
       shell: bash
+    - id: create-build-dir
+      run: mkdir -p build
+      shell: bash
+    - id: build
+      run: |
+        make -j$(nproc)
+        find build -type f
+        for file in build/**/*.ino.bin; do mv "$file" "build/$(basename -s .ino.bin ${file})-${{steps.semver.outputs.semver}}.ino.bin"; done
+        for file in build/**/*.ino.elf; do mv "$file" "build/$(basename -s .ino.elf ${file})-${{steps.semver.outputs.semver}}.ino.elf"; done
+      shell: bash
+    - id: filesys
+      run: |
+        make filesystem
+        for file in build/*.ino.littlefs.bin; do mv "$file" "build/$(basename -s .ino.littlefs.bin $file).${{steps.semver.outputs.semver}}.littlefs.bin"; done
+      shell: bash
+
     - id: upload
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: OTGW-firmware-${{steps.semver.outputs.semver}} 
         path: |
-          build/**/*.bin
-          build/**/*.elf
+          build/*.elf
           build/*.bin

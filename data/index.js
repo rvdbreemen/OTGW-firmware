@@ -8,8 +8,8 @@
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
 */
-  const localURL='http://'+window.location.host; 
-  const APIGW='http://'+window.location.host+'/api/';
+  const localURL=window.location.protocol+'//'+window.location.host; 
+  const APIGW=window.location.protocol+'//'+window.location.host+'/api/';
   
   "use strict";
 
@@ -511,6 +511,12 @@
                     else if (data[i].type == "s")
                     {
                       sInput.setAttribute("type", "text");
+                      sInput.setAttribute("maxlength", data[i].maxlen);
+                      sInput.setAttribute("size", (data[i].maxlen > 20 ? 20 : data[i].maxlen));
+                    }                    
+                    else if (data[i].type == "p")
+                    {
+                      sInput.setAttribute("type", "password");
                       sInput.setAttribute("maxlength", data[i].maxlen);
                       sInput.setAttribute("size", (data[i].maxlen > 20 ? 20 : data[i].maxlen));
                     }
