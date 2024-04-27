@@ -203,7 +203,11 @@ void updateSetting(const char *field, const char *newValue)
   if (strcasecmp(field, "MQTTbroker")==0)      settingMQTTbroker = String(newValue);
   if (strcasecmp(field, "MQTTbrokerPort")==0)  settingMQTTbrokerPort = atoi(newValue);
   if (strcasecmp(field, "MQTTuser")==0)        settingMQTTuser = String(newValue);
-  if (strcasecmp(field, "MQTTpasswd")==0)      settingMQTTpasswd = String(newValue);
+  if (strcasecmp(field, "MQTTpasswd")==0){
+    if ( newValue && strcasecmp(newValue, "notthepassword") != 0 ){
+      settingMQTTpasswd = String(newValue);
+    }
+  }
   if (strcasecmp(field, "MQTTtoptopic")==0)    {
     settingMQTTtopTopic = String(newValue);
     if (settingMQTTtopTopic.length()==0)    {

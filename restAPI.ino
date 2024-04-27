@@ -432,7 +432,7 @@ void sendDeviceSettings()
   sendJsonSettingObj("mqttbroker", CSTR(settingMQTTbroker), "s", 32);
   sendJsonSettingObj("mqttbrokerport", settingMQTTbrokerPort, "i", 0, 65535);
   sendJsonSettingObj("mqttuser", CSTR(settingMQTTuser), "s", 32);
-  sendJsonSettingObj("mqttpasswd", CSTR(settingMQTTpasswd), "p", 100);
+  sendJsonSettingObj("mqttpasswd", "notthepassword", "p", 100);
   sendJsonSettingObj("mqtttoptopic", CSTR(settingMQTTtopTopic), "s", 15);
   sendJsonSettingObj("mqtthaprefix", CSTR(settingMQTThaprefix), "s", 20);
   sendJsonSettingObj("mqttharebootdetection", settingMQTTharebootdetection, "b");
