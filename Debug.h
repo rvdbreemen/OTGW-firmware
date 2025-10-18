@@ -69,7 +69,7 @@ void _debugBOL(const char *fn, int line)
    gettimeofday(&now, nullptr);
    
    // If timezone not yet initialized, try to initialize it now (first call fallback)
-   // This handles the case when time is not set yet (now_sec <= 0)
+   // This handles cases when time is not set yet (now_sec <= 0) or when primary initialization failed
    if (!tzInitialized) {
      cachedTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
      tzInitialized = true;  // Mark as initialized to avoid repeated attempts on every call
