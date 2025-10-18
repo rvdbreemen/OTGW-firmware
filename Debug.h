@@ -69,9 +69,11 @@ void _debugBOL(const char *fn, int line)
    gettimeofday(&now, nullptr);
    
    // If timezone not yet initialized, try to initialize it now (first call fallback)
+   // This handles the case when time is not set yet (now_sec <= 0)
    if (!tzInitialized) {
      cachedTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
-     tzInitialized = true;  // Set to true even if it fails to avoid repeated attempts
+     tzInitialized = true;  // Mark as initialized to avoid repeated attempts on every call
+     // Note: Even if timezone creation fails, the error object is safe to use
    }
    
    ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now_sec, cachedTz);
