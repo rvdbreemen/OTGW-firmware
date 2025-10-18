@@ -68,6 +68,12 @@ void _debugBOL(const char *fn, int line)
    timeval now;
    gettimeofday(&now, nullptr);
    
+   // If timezone not yet initialized, try to initialize it now (first call fallback)
+   if (!tzInitialized) {
+     cachedTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+     tzInitialized = true;  // Set to true even if it fails to avoid repeated attempts
+   }
+   
    ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now_sec, cachedTz);
    
    // Use snprintf safely with return value checking
