@@ -49,16 +49,18 @@ void _debugBOL(const char *fn, int line)
    // Cache timezone manager calls to avoid recreating objects
    static TimeZone cachedTz;
    static time_t lastTzUpdate = 0;
+   static bool tzInitialized = false;
    time_t now_sec = time(nullptr);
    
-   // Only update timezone every 5 minutes (300 seconds) or on first call
+   // Initialize timezone on first call or refresh every 5 minutes (300 seconds)
    // Check now_sec > 0 to ensure time is set
-   if ((now_sec > 0) && (now_sec - lastTzUpdate > 300)) {
+   if (now_sec > 0 && (!tzInitialized || now_sec - lastTzUpdate > 300)) {
      TimeZone newTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
      // Only update cache if timezone is valid
      if (!newTz.isError()) {
        cachedTz = newTz;
        lastTzUpdate = now_sec;
+       tzInitialized = true;
      }
      // If timezone creation fails, keep using previous cached timezone
    }
