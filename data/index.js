@@ -425,13 +425,41 @@
     fetch(APIGW+"v0/devinfo")
       .then(response => response.json())
       .then(json => {
-        console.log("then(json => ..)");
+        console.log("then(json => ..")");
         //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
         data = json.devinfo;
+        
+        // Add connection info header if it doesn't exist yet
+        var deviceinfoPage = document.getElementById('deviceinfoPage');
+        if (!document.getElementById("connection_info_header")) {
+          var infoDiv = document.createElement("div");
+          infoDiv.setAttribute("id", "connection_info_header");
+          infoDiv.setAttribute("class", "devinforow");
+          infoDiv.style.background = "#e8f4f8";
+          infoDiv.style.padding = "10px";
+          infoDiv.style.marginBottom = "10px";
+          infoDiv.style.border = "1px solid #b0d4e0";
+          infoDiv.style.borderRadius = "4px";
+          
+          var ipAddress = "";
+          var serialPort = "";
+          for (let i in data) {
+            if (data[i].name === "ipaddress") ipAddress = data[i].value;
+            if (data[i].name === "serialtcpport") serialPort = data[i].value;
+          }
+          
+          infoDiv.innerHTML = "<b>Connection Information:</b><br>" +
+            "• Web Interface: <a href='http://" + ipAddress + "' target='_blank'>http://" + ipAddress + "</a><br>" +
+            "• Telnet (Debug): <code>telnet " + ipAddress + " 23</code><br>" +
+            "• Serial (OTmonitor/HA): <code>socket://" + ipAddress + ":" + serialPort + "</code><br>" +
+            "<small style='color: #666;'>For Home Assistant OpenTherm Gateway integration, use the Serial connection string above.</small>";
+          
+          deviceinfoPage.insertBefore(infoDiv, deviceinfoPage.firstChild);
+        }
+        
         for( let i in data )
         {
           console.log("["+data[i].name+"]=>["+data[i].value+"]");
-          var deviceinfoPage = document.getElementById('deviceinfoPage');
           if( ( document.getElementById("devinfo_"+data[i].name)) == null )
           { // if element does not exists yet, then build page
             var rowDiv = document.createElement("div");
@@ -758,6 +786,7 @@
    ,[ "HostName",                   "Hostname (add .local)"]
    ,[ "ipaddress",                  "IP address"]
    ,[ "macaddress",                 "MAC address"]
+   ,[ "serialtcpport",              "Serial TCP Port (for HA/OTmonitor)"]
    ,[ "freeheap",                   "Free Heap Mem (bytes)"]
    ,[ "maxfreeblock",               "Max. Free Mem (bytes)"]
    ,[ "chipid",                     "Unique Chip ID"]
