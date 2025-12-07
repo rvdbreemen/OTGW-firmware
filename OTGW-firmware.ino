@@ -162,6 +162,7 @@ void sendMQTTuptime(){
 void sendtimecommand(){
   if (bPSmode) return;                  // when in Print Summary mode (PS=1), no timesync commands (improving legacy/Domoticz compatibility)
   if (!settingNTPenable) return;        // if NTP is disabled, then return
+  if (!settingNTPsendtime) return;      // if NTP send time is disabled, then return
   if (NtpStatus != TIME_SYNC) return;   // only send time command when time is synced
   if (!bPICavailable) return;           // only send when pic is available
   if (OTGWSerial.firmwareType() != FIRMWARE_OTGW) return; //only send timecommand when in gateway firmware, not in diagnostic or interface mode

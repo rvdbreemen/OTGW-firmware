@@ -441,6 +441,7 @@ void sendDeviceSettings()
   sendJsonSettingObj("ntpenable", settingNTPenable, "b");
   sendJsonSettingObj("ntptimezone", CSTR(settingNTPtimezone), "s", 50);
   sendJsonSettingObj("ntphostname", CSTR(settingNTPhostname), "s", 50);
+  sendJsonSettingObj("ntpsendtime", settingNTPsendtime, "b");
   sendJsonSettingObj("ledblink", settingLEDblink, "b");
   sendJsonSettingObj("gpiosensorsenabled", settingGPIOSENSORSenabled, "b");
   sendJsonSettingObj("gpiosensorspin", settingGPIOSENSORSpin, "i", 0, 16);
