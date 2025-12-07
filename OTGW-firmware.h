@@ -123,6 +123,7 @@ bool      settingMQTTOTmessage = false;
 bool      settingNTPenable = true;
 String    settingNTPtimezone = NTP_DEFAULT_TIMEZONE;
 String    settingNTPhostname = NTP_HOST_DEFAULT;
+bool      settingNTPsendtime = false;
 bool      settingLEDblink = true;
 
 // GPIO Sensor Settings

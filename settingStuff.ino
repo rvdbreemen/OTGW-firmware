@@ -43,6 +43,7 @@ void writeSettings(bool show)
   root["NTPenable"] = settingNTPenable;
   root["NTPtimezone"] = settingNTPtimezone;
   root["NTPhostname"] = settingNTPhostname;
+  root["NTPsendtime"] = settingNTPsendtime;
   root["LEDblink"] = settingLEDblink;
   root["GPIOSENSORSenabled"] = settingGPIOSENSORSenabled;
   root["GPIOSENSORSpin"] = settingGPIOSENSORSpin;
@@ -116,6 +117,7 @@ void readSettings(bool show)
   if (settingNTPtimezone=="null")  settingNTPtimezone = "Europe/Amsterdam"; //default to amsterdam timezone
   settingNTPhostname      = doc["NTPhostname"].as<String>();
   if (settingNTPhostname=="null")  settingNTPhostname = NTP_HOST_DEFAULT; 
+  settingNTPsendtime      = doc["NTPsendtime"]|settingNTPsendtime;
   settingLEDblink         = doc["LEDblink"]|settingLEDblink;
   settingGPIOSENSORSenabled = doc["GPIOSENSORSenabled"] | settingGPIOSENSORSenabled;
   settingGPIOSENSORSpin = doc["GPIOSENSORSpin"] | settingGPIOSENSORSpin;
@@ -154,6 +156,7 @@ void readSettings(bool show)
     Debugf("NTP enabled           : %s\r\n", CBOOLEAN(settingNTPenable));
     Debugf("NPT timezone          : %s\r\n", CSTR(settingNTPtimezone));
     Debugf("NPT hostname          : %s\r\n", CSTR(settingNTPhostname));
+    Debugf("NPT send time         : %s\r\n", CBOOLEAN(settingNTPsendtime));
     Debugf("Led Blink             : %s\r\n", CBOOLEAN(settingLEDblink));
     Debugf("GPIO Sensors          : %s\r\n", CBOOLEAN(settingGPIOSENSORSenabled));
     Debugf("GPIO Sen. Pin         : %d\r\n", settingGPIOSENSORSpin);
@@ -236,6 +239,7 @@ void updateSetting(const char *field, const char *newValue)
     settingNTPtimezone = String(newValue);
     startNTP();  // update timezone if changed
   }
+  if (strcasecmp(field, "NTPsendtime")==0)    settingNTPsendtime = EVALBOOLEAN(newValue);
   if (strcasecmp(field, "LEDblink")==0)      settingLEDblink = EVALBOOLEAN(newValue);
   if (strcasecmp(field, "GPIOSENSORSenabled") == 0)
   {
