@@ -1,0 +1,14 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📖 Documentation & Wiki
+    url: https://github.com/rvdbreemen/OTGW-firmware/wiki
+    about: Read the documentation and wiki for guides and information
+  - name: 💬 Discord Community
+    url: https://discord.gg/zjW3ju7vGQ
+    about: Join our Discord server for community support and discussion
+  - name: ❓ FAQ
+    url: https://github.com/rvdbreemen/OTGW-firmware/blob/main/docs/FAQ.md
+    about: Check the FAQ for common questions and answers
+  - name: 🔧 DHW Setpoint Issues
+    url: https://github.com/rvdbreemen/OTGW-firmware/blob/main/docs/DHW-Setpoint-Troubleshooting.md
+    about: Having trouble setting hot water temperature? Read this guide first

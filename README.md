@@ -58,6 +58,10 @@ To do:
 
 Looking for the documentation, go here (work in progress):  <br> [Wiki with Documentation](https://github.com/rvdbreemen/OTGW-firmware/wiki)
 
+**Quick Links:**
+- [FAQ - Frequently Asked Questions](docs/FAQ.md)
+- [DHW Setpoint Troubleshooting Guide](docs/DHW-Setpoint-Troubleshooting.md) - If you can't change hot water temperature
+
 | Version | Release notes |
 |-|-|
 | 0.10.2 | Bugfix: issue #213 which caused 0 bytes after update of PIC firwmare (dropped to Adruino core 2.7.4)<br>Update to filesystem to include latest PIC firmware (6.5 and 5.8, released 12 march 2023)<br>Fix: Back to correct hostname to wifi (credits to @hvxl)<br>Fix: Adding a little memory for use with larger settings.|
