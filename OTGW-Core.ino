@@ -1757,8 +1757,22 @@ void handleOTGW()
       sRead[bytes_read] = '\0';
       processOT(sRead, bytes_read);
       bytes_read = 0;
-    } else if (bytes_read < (MAX_BUFFER_READ-1))
+    } else if (bytes_read < (MAX_BUFFER_READ-1)) {
       sRead[bytes_read++] = outByte;
+    } else {
+      // Buffer overflow detected - discard current buffer and log error
+      OTcurrentSystemState.errorBufferOverflow++;
+      DebugTf(PSTR("Serial Buffer Overflow! Discarding %d bytes. Total overflows: %d\r\n"), 
+              bytes_read, OTcurrentSystemState.errorBufferOverflow);
+      sendMQTTData(F("Error_BufferOverflow"), String(OTcurrentSystemState.errorBufferOverflow));
+      // Reset buffer to prevent processing corrupted data
+      bytes_read = 0;
+      // Skip remaining bytes until we hit a line terminator to resync
+      while (OTGWSerial.available() && outByte != '\r' && outByte != '\n') {
+        outByte = OTGWSerial.read();
+        OTGWstream.write(outByte);
+      }
+    }
   }
 
   //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
