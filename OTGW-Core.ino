@@ -1764,13 +1764,21 @@ void handleOTGW()
       OTcurrentSystemState.errorBufferOverflow++;
       DebugTf(PSTR("Serial Buffer Overflow! Discarding %d bytes. Total overflows: %d\r\n"), 
               bytes_read, OTcurrentSystemState.errorBufferOverflow);
-      sendMQTTData(F("Error_BufferOverflow"), String(OTcurrentSystemState.errorBufferOverflow));
+      // Rate limit MQTT notifications - only send every 10 overflows to avoid overwhelming broker
+      static uint16_t lastReportedOverflow = 0;
+      if (OTcurrentSystemState.errorBufferOverflow - lastReportedOverflow >= 10) {
+        sendMQTTData(F("Error_BufferOverflow"), String(OTcurrentSystemState.errorBufferOverflow));
+        lastReportedOverflow = OTcurrentSystemState.errorBufferOverflow;
+      }
       // Reset buffer to prevent processing corrupted data
       bytes_read = 0;
       // Skip remaining bytes until we hit a line terminator to resync
-      while (OTGWSerial.available() && outByte != '\r' && outByte != '\n') {
+      while (OTGWSerial.available()) {
         outByte = OTGWSerial.read();
         OTGWstream.write(outByte);
+        if (outByte == '\r' || outByte == '\n') {
+          break;
+        }
       }
     }
   }
