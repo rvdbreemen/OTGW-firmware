@@ -8,7 +8,7 @@ assignees: ''
 
 ## ⚠️ Before Opening This Issue
 
-**Please read the [DHW Setpoint Troubleshooting Guide](../../docs/DHW-Setpoint-Troubleshooting.md) first!**
+**Please read the [DHW Setpoint Troubleshooting Guide](https://github.com/rvdbreemen/OTGW-firmware/blob/main/docs/DHW-Setpoint-Troubleshooting.md) first!**
 
 Most DHW setpoint issues are **hardware limitations of your boiler**, not bugs in the firmware. The boiler may only accept DHW setpoint changes from a thermostat.
 
@@ -91,7 +91,7 @@ If possible, please provide:
 
 ## Additional Context
 
-**Have you tried the workarounds from the troubleshooting guide?**
+**Have you tried the workarounds from the [troubleshooting guide](https://github.com/rvdbreemen/OTGW-firmware/blob/main/docs/DHW-Setpoint-Troubleshooting.md)?**
 - [ ] Checked boiler's "external control" mode setting
 - [ ] Tried using with a thermostat (gateway mode)
 - [ ] Verified OTGW is sending the command
@@ -104,7 +104,7 @@ If possible, please provide:
 
 ## Checklist
 
-- [ ] I have read the [DHW Setpoint Troubleshooting Guide](../../docs/DHW-Setpoint-Troubleshooting.md)
+- [ ] I have read the [DHW Setpoint Troubleshooting Guide](https://github.com/rvdbreemen/OTGW-firmware/blob/main/docs/DHW-Setpoint-Troubleshooting.md)
 - [ ] I have checked Message ID 6 (RBP flags)
 - [ ] I have verified the OTGW is sending the command
 - [ ] I have searched for similar issues

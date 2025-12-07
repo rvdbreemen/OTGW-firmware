@@ -212,4 +212,4 @@ Open a feature request on GitHub Issues with:
 
 ---
 
-*Last updated: 2024*
+*Last updated: December 2024*

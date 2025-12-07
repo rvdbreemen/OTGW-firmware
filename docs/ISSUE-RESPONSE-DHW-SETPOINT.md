@@ -8,11 +8,11 @@ This document provides a template response for issues related to DHW setpoint no
 
 Hi @[username],
 
-Thank you for reporting this issue. I understand you're unable to set the DHW setpoint on your **[Boiler Model]** when using the OTGW in Gateway mode.
+Thank you for reporting this issue. I understand you're unable to set the DHW setpoint on your **[BOILER_MANUFACTURER] [BOILER_MODEL]** when using the OTGW in Gateway mode.
 
 ### This is a Known Hardware Limitation
 
-Unfortunately, **this is not a firmware bug** but rather a **hardware limitation of your boiler**. Many boilers, including various Cosmogas, De Dietrich, and Remeha models, only accept DHW setpoint changes from an OpenTherm thermostat and will ignore or revert commands sent by the OTGW in standalone mode.
+Unfortunately, **this is not a firmware bug** but rather a **hardware limitation of your boiler**. Many boilers, including various [MANUFACTURER] models like yours, only accept DHW setpoint changes from an OpenTherm thermostat and will ignore or revert commands sent by the OTGW in standalone mode.
 
 ### Technical Explanation
 
@@ -76,7 +76,7 @@ I've created comprehensive documentation to help with this issue:
 
 While I understand this is frustrating, this behavior is **by design of your boiler**, not a bug in the OTGW firmware. The firmware is functioning correctly and following the OpenTherm protocol specification. Your boiler's implementation simply requires a thermostat for DHW setpoint control.
 
-If you'd like to discuss this further or if you find a workaround specific to the Cosmogas Q30B, please share it in the comments so others can benefit!
+If you'd like to discuss this further or if you find a workaround specific to your [BOILER_MANUFACTURER] [BOILER_MODEL], please share it in the comments so others can benefit!
 
 ---
 

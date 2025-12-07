@@ -72,7 +72,7 @@ assignees: ''
 
 ## Checklist
 
-- [ ] I have checked the [FAQ](../../docs/FAQ.md)
+- [ ] I have checked the [FAQ](https://github.com/rvdbreemen/OTGW-firmware/blob/main/docs/FAQ.md)
 - [ ] I have searched for similar issues
 - [ ] I have provided debug logs
 - [ ] I have provided all relevant version information
