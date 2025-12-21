@@ -212,7 +212,7 @@ void handleMQTT()
     case MQTT_STATE_INIT:  
       MQTTDebugTln(F("MQTT State: MQTT Initializing")); 
       WiFi.hostByName(CSTR(settingMQTTbroker), MQTTbrokerIP);  // lookup the MQTTbroker convert to IP
-      sprintf(MQTTbrokerIPchar, "%d.%d.%d.%d", MQTTbrokerIP[0], MQTTbrokerIP[1], MQTTbrokerIP[2], MQTTbrokerIP[3]);
+      snprintf(MQTTbrokerIPchar, sizeof(MQTTbrokerIPchar), "%d.%d.%d.%d", MQTTbrokerIP[0], MQTTbrokerIP[1], MQTTbrokerIP[2], MQTTbrokerIP[3]);
       if (isValidIP(MQTTbrokerIP))  
       {
         MQTTDebugTf(PSTR("[%s] => setServer(%s, %d)\r\n"), CSTR(settingMQTTbroker), MQTTbrokerIPchar, settingMQTTbrokerPort);
