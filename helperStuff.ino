@@ -418,7 +418,7 @@ void chr_cstrlit(unsigned char u, char *buffer, size_t buflen)
     if (buflen < 2)
         *buffer = '\0';
     else if (isprint(u) && u != '\'' && u != '\"' && u != '\\' && u != '\?')
-        sprintf(buffer, "%c", u);
+        snprintf(buffer, buflen, "%c", u);
     else if (buflen < 3)
         *buffer = '\0';
     else
@@ -440,7 +440,7 @@ void chr_cstrlit(unsigned char u, char *buffer, size_t buflen)
             if (buflen < 5)
                 *buffer = '\0';
             else
-                sprintf(buffer, "\\%03o", u);
+                snprintf(buffer, buflen, "\\%03o", u);
             break;
         }
     }
