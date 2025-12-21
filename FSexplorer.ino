@@ -132,7 +132,11 @@ void setupFSexplorer(){
 //=====================================================================================
 void apifirmwarefilelist() {
   DebugTf("API: apifirmwarefilelist()\r\n");
-  char *s, buffer[400];
+  char buffer[1024];
+  char *s = buffer;
+  size_t left = sizeof(buffer);
+  int len;
+
   String version, fwversion;
   Dir dir;
   File f;
@@ -140,8 +144,9 @@ void apifirmwarefilelist() {
   String dirpath = "/" + sPICdeviceid;
   DebugTf(PSTR("dirpath=%s\r\n"), dirpath.c_str());
       
-  s = buffer;
-  s += sprintf(buffer, "[");
+  len = snprintf(s, left, "[");
+  s += len; left -= len;
+
   dir = LittleFS.openDir(dirpath);	
   while (dir.next()) {
     DebugTf(PSTR("dir.fileName()=%s\r\n"), dir.fileName().c_str());
@@ -171,10 +176,18 @@ void apifirmwarefilelist() {
         } 
       }
       Debugln();
-      s += snprintf( s, sizeof(buffer), "{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d},", CSTR(dir.fileName()), CSTR(version), dir.fileSize());
+      
+      len = snprintf( s, left, "{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d},", CSTR(dir.fileName()), CSTR(version), dir.fileSize());
+      if (len < 0 || (size_t)len >= left) break;
+      s += len; left -= len;
     }
   }
-  s += sprintf(--s, "]\r\n");
+  
+  if (*(s-1) == ',') {
+    s--; left++;
+  }
+  snprintf(s, left, "]\r\n");
+
   DebugTf(PSTR("filelist response: %s\r\n"), buffer);
   httpServer.send(200, "application/json", buffer);
 }
