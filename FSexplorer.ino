@@ -81,7 +81,7 @@ void startWebserver(){
   httpServer.begin();
   // Set up first message as the IP address
   OTGWSerial.println("\nHTTP Server started\r");  
-  sprintf(cMsg, "%03d.%03d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
+  snprintf(cMsg, sizeof(cMsg), "%03d.%03d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
   OTGWSerial.printf("\nAssigned IP=%s\r\n", cMsg);
 }
 //=====================================================================================
