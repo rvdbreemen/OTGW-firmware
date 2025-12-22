@@ -331,9 +331,9 @@ void sendDeviceInfo()
   sendNestedJsonObj("author", "Robert van den Breemen");
   sendNestedJsonObj("fwversion", _SEMVER_FULL);
   sendNestedJsonObj("picavailable", CBOOLEAN(bPICavailable));
-  sendNestedJsonObj("picfwversion", CSTR(sPICfwversion));
-  sendNestedJsonObj("picdeviceid", CSTR(sPICdeviceid));
-  sendNestedJsonObj("picfwtype", CSTR(sPICtype));
+  sendNestedJsonObj("picfwversion", sPICfwversion);
+  sendNestedJsonObj("picdeviceid", sPICdeviceid);
+  sendNestedJsonObj("picfwtype", sPICtype);
   snprintf(cMsg, sizeof(cMsg), "%s %s", __DATE__, __TIME__);
   sendNestedJsonObj("compiled", cMsg);
   sendNestedJsonObj("hostname", CSTR(settingHostname));

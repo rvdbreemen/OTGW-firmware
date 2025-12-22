@@ -257,18 +257,18 @@ void doTaskEvery30s(){
 //===[ Do task every 60s ]===
 void doTaskEvery60s(){
   //== do tasks ==
-  if (sPICdeviceid=="unknown"){
+  if (strcmp(sPICdeviceid, "unknown") == 0){
     //keep trying to figure out which pic is used!
     DebugTln("PIC is unknown, probe pic using PR=A");
     //Force banner fetch
     getpicfwversion();
     //This should retreive the information here
-    sPICfwversion = String(OTGWSerial.firmwareVersion());
-    DebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
-    sPICdeviceid = OTGWSerial.processorToString();
-    DebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));    
-    sPICtype = OTGWSerial.firmwareToString();
-    DebugTf(PSTR("Current firmware type: %s\r\n"), CSTR(sPICtype));
+    strlcpy(sPICfwversion, OTGWSerial.firmwareVersion().c_str(), sizeof(sPICfwversion));
+    DebugTf(PSTR("Current firmware version: %s\r\n"), sPICfwversion);
+    strlcpy(sPICdeviceid, OTGWSerial.processorToString().c_str(), sizeof(sPICdeviceid));
+    DebugTf(PSTR("Current device id: %s\r\n"), sPICdeviceid);    
+    strlcpy(sPICtype, OTGWSerial.firmwareToString().c_str(), sizeof(sPICtype));
+    DebugTf(PSTR("Current firmware type: %s\r\n"), sPICtype
   }
 }
 
