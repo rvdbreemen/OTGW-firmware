@@ -147,16 +147,16 @@ String getpicfwversion(){
 }
 //===================[ checkOTWGpicforupdate ]=====================
 void checkOTWGpicforupdate(){
-  if (sPICfwversion.isEmpty()) {
+  if (sPICfwversion[0] == '\0') {
     sMessage = ""; //no firmware version found for some reason
   } else {
-    OTGWDebugTf(PSTR("OTGW PIC firmware version = [%s]\r\n"), CSTR(sPICfwversion));
+    OTGWDebugTf(PSTR("OTGW PIC firmware version = [%s]\r\n"), sPICfwversion);
     String latest = checkforupdatepic("gateway.hex");
     if (!bOTGWonline) {
-      sMessage = sPICfwversion; 
+      sMessage = String(sPICfwversion); 
     } else if (latest.isEmpty()) {
       sMessage = ""; //two options: no internet connection OR no firmware version
-    } else if (latest != sPICfwversion) {
+    } else if (latest != String(sPICfwversion)) {
       sMessage = "New PIC version " + latest + " available!";
     }
   }
@@ -1697,12 +1697,12 @@ void processOT(const char *buf, int len){
     sendMQTTData(F("Error 04"), String(OTcurrentSystemState.error04));
   } else if (strstr(buf, OTGW_BANNER)!=NULL){
     //found a banner, so get the version of PIC
-    sPICfwversion = String(OTGWSerial.firmwareVersion());
-    OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
-    sPICdeviceid = OTGWSerial.processorToString();
-    OTGWDebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));    
-    sPICtype = OTGWSerial.firmwareToString();
-    OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), CSTR(sPICtype));
+    strlcpy(sPICfwversion, OTGWSerial.firmwareVersion().c_str(), sizeof(sPICfwversion));
+    OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), sPICfwversion);
+    strlcpy(sPICdeviceid, OTGWSerial.processorToString().c_str(), sizeof(sPICdeviceid));
+    OTGWDebugTf(PSTR("Current device id: %s\r\n"), sPICdeviceid);    
+    strlcpy(sPICtype, OTGWSerial.firmwareToString().c_str(), sizeof(sPICtype));
+    OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), sPICtype);
   } else {
     OTGWDebugTf(PSTR("Not processed, received from OTGW => (%s) [%d]\r\n"), buf, len);
   }
@@ -1965,14 +1965,14 @@ void fwupgradestep(int pct) {
 
 void fwreportinfo(OTGWFirmware fw, const char *version) {
     DebugTln(F("Callback: fwreportinfo"));
-    sPICfwversion = String(version);
+    strlcpy(sPICfwversion, version, sizeof(sPICfwversion));
     //sPICfwversion = String(OTGWSerial.firmwareVersion());
-    DebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
-    sPICdeviceid = OTGWSerial.processorToString();
-    DebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));
+    DebugTf(PSTR("Current firmware version: %s\r\n"), sPICfwversion);
+    strlcpy(sPICdeviceid, OTGWSerial.processorToString().c_str(), sizeof(sPICdeviceid));
+    DebugTf(PSTR("Current device id: %s\r\n"), sPICdeviceid);
     //instead of using the firmware string
-    sPICtype = OTGWSerial.firmwareToString(fw);
-    OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), CSTR(sPICtype));
+    strlcpy(sPICtype, OTGWSerial.firmwareToString(fw).c_str(), sizeof(sPICtype));
+    OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), sPICtype);
 }
 
 void fwupgradestart(const char *hexfile) {
@@ -1995,7 +1995,7 @@ String checkforupdatepic(String filename){
   String latest = "";
   int code;
 
-  http.begin(client, "http://otgw.tclcode.com/download/" + sPICdeviceid + "/" + filename);
+  http.begin(client, "http://otgw.tclcode.com/download/" + String(sPICdeviceid) + "/" + filename);
   char useragent[40] = "esp8266-otgw-firmware/";
   strlcat(useragent, _SEMVER_CORE, sizeof(useragent));
   http.setUserAgent(useragent);
@@ -2014,7 +2014,7 @@ String checkforupdatepic(String filename){
 }
 
 void refreshpic(String filename, String version) {
-  if (sPICdeviceid=="unknown") return; // no pic version found, don't upgrade
+  if (strcmp(sPICdeviceid, "unknown") == 0) return; // no pic version found, don't upgrade
 
   WiFiClient client;
   HTTPClient http;
@@ -2024,18 +2024,18 @@ void refreshpic(String filename, String version) {
   latest = checkforupdatepic(filename);
 
   if (latest != version) {
-    OTGWDebugTf(PSTR("Update (%s)%s: %s -> %s\r\n"), sPICdeviceid.c_str(), filename.c_str(), version.c_str(), latest.c_str());
-    http.begin(client, "http://otgw.tclcode.com/download/" + sPICdeviceid + "/" + filename);
+    OTGWDebugTf(PSTR("Update (%s)%s: %s -> %s\r\n"), sPICdeviceid, filename.c_str(), version.c_str(), latest.c_str());
+    http.begin(client, "http://otgw.tclcode.com/download/" + String(sPICdeviceid) + "/" + filename);
     char useragent[40] = "esp8266-otgw-firmware/";
     strlcat(useragent, _SEMVER_CORE, sizeof(useragent));
     http.setUserAgent(useragent);
     code = http.GET();
     if (code == HTTP_CODE_OK) {
-      File f = LittleFS.open("/" + sPICdeviceid + "/" + filename, "w");
+      File f = LittleFS.open("/" + String(sPICdeviceid) + "/" + filename, "w");
       if (f) {
         http.writeToStream(&f);
         f.close();
-        String verfile = "/" + sPICdeviceid + "/" + filename;
+        String verfile = "/" + String(sPICdeviceid) + "/" + filename;
         verfile.replace(".hex", ".ver");
         f = LittleFS.open(verfile, "w");
         if (f) {
@@ -2050,26 +2050,33 @@ void refreshpic(String filename, String version) {
 }
 
 void upgradepic() {
-  String action = httpServer.arg("action");
-  String filename = httpServer.arg("name");
-  String version = httpServer.arg("version");
-  DebugTf(PSTR("Action: %s %s %s\r\n"), action.c_str(), filename.c_str(), version.c_str());
-  if (sPICdeviceid=="unknown") {
+  const char *action = httpServer.arg("action").c_str();
+  const char *filename = httpServer.arg("name").c_str();
+  const char *version = httpServer.arg("version").c_str();
+  
+  DebugTf(PSTR("Action: %s %s %s\r\n"), action, filename, version);
+  
+  if (strcmp(sPICdeviceid, "unknown") == 0) {
     DebugTln(F("No PIC device id is unknown, don't upgrade"));
     return; // no pic version found, don't upgrade
   }
-  if (action == "upgrade") {
-    DebugTf(PSTR("Upgrade /%s/%s\r\n"), sPICdeviceid.c_str(), filename.c_str());
-    upgradepicnow(String(filename).c_str());
-  } else if (action == "refresh") {
-    DebugTf(PSTR("Refresh %s/%s\r\n"), sPICdeviceid.c_str(), filename.c_str());
+  
+  if (strcmp(action, "upgrade") == 0) {
+    DebugTf(PSTR("Upgrade /%s/%s\r\n"), sPICdeviceid, filename);
+    upgradepicnow(filename);
+  } else if (strcmp(action, "refresh") == 0) {
+    DebugTf(PSTR("Refresh %s/%s\r\n"), sPICdeviceid, filename);
     refreshpic(filename, version);
-  } else if (action == "delete") {
-    DebugTf(PSTR("Delete %s/%s\r\n"), sPICdeviceid.c_str(), filename.c_str());
-    String path = "/" + sPICdeviceid + "/" + filename;
+  } else if (strcmp(action, "delete") == 0) {
+    DebugTf(PSTR("Delete %s/%s\r\n"), sPICdeviceid, filename);
+    char path[64];
+    snprintf(path, sizeof(path), "/%s/%s", sPICdeviceid, filename);
     LittleFS.remove(path);
-    path.replace(".hex", ".ver");
-    LittleFS.remove(path);
+    char *ext = strstr(path, ".hex");
+    if (ext) {
+      strcpy(ext, ".ver");
+      LittleFS.remove(path);
+    }
   }
   httpServer.sendHeader("Location", "index.html#tabPICflash", true);
   httpServer.send(303, "text/html", "<a href='index.html#tabPICflash'>Return</a>");

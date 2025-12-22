@@ -141,7 +141,7 @@ void apifirmwarefilelist() {
   Dir dir;
   File f;
 
-  String dirpath = "/" + sPICdeviceid;
+  String dirpath = "/" + String(sPICdeviceid);
   DebugTf(PSTR("dirpath=%s\r\n"), dirpath.c_str());
       
   len = snprintf(s, left, "[");
