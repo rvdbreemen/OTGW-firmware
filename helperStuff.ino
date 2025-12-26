@@ -52,30 +52,29 @@ char *trimwhitespace(char *str)
 
 
 //===========================================================================================
-uint8_t splitString(String inStrng, char delimiter, String wOut[], uint8_t maxWords) 
+uint8_t splitString(char* inStrng, char delimiter, char* wOut[], uint8_t maxWords) 
 {
     uint8_t wordCount = 0;
-    size_t inxE = 0, inxS = 0; 
-    inStrng.trim();
-    while(inxE < inStrng.length() && wordCount < maxWords) 
+    char* next = trimwhitespace(inStrng);
+    
+    while(next && *next && wordCount < maxWords) 
     {
-      inxE  = inStrng.indexOf(delimiter, inxS);         //finds location of first ,
-      wOut[wordCount] = inStrng.substring(inxS, inxE);  //captures first data String
-      wOut[wordCount].trim();
-      //DebugTf(PSTR("[%d] => [%c] @[%d] found[%s]\r\n"), wordCount, delimiter, inxE, wOut[wordCount].c_str());
-      inxS = inxE;
-      inxS++;
+      char* found = strchr(next, delimiter);
+      if (found) {
+        *found = '\0'; // terminate token
+        wOut[wordCount] = trimwhitespace(next);
+        next = found + 1;
+      } else {
+        // Last word
+        wOut[wordCount] = trimwhitespace(next);
+        next = NULL;
+      }
       wordCount++;
     }
     // zero rest of the words
     for(int i=wordCount; i< maxWords; i++)
     {
-      wOut[wordCount][0] = 0;
-    }
-    // if not whole string processed place rest in last word
-    if (inxS < inStrng.length()) 
-    {
-      wOut[maxWords-1] = inStrng.substring(inxS, inStrng.length());  // store rest of String      
+      wOut[i] = NULL;
     }
 
     return wordCount;
