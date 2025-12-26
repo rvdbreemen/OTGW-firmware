@@ -39,8 +39,9 @@ void processAPI()
   char* words[10];
 
   size_t uriLen = strlcpy( URI, httpServer.uri().c_str(), sizeof(URI) );
+  HTTPMethod method = httpServer.method();
 
-  RESTDebugTf(PSTR("from[%s] URI[%s] method[%s] \r\n"), httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(httpServer.method()).c_str());
+  RESTDebugTf(PSTR("from[%s] URI[%s] method[%s] \r\n"), httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(method).c_str());
 
   if (uriLen >= sizeof(URI))
   {
@@ -68,6 +69,9 @@ void processAPI()
     Debugln(" ");
   }
 
+  const bool isGet = (method == HTTP_GET);
+  const bool isPostOrPut = (method == HTTP_PUT || method == HTTP_POST);
+
   if (words[1] && strcmp(words[1], "api") == 0){
 
     if (words[2] && strcmp(words[2], "v1") == 0) 
@@ -76,14 +80,17 @@ void processAPI()
          if (words[4] && strcmp(words[4], "telegraf") == 0) {
           // GET /api/v1/otgw/telegraf
           // Response: see json response
+          if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
           sendTelegraf();
          } else if (words[4] && strcmp(words[4], "otmonitor") == 0) {
           // GET /api/v1/otgw/otmonitor
           // Response: see json response
+          if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
           sendOTmonitor();
         } else if (words[4] && strcmp(words[4], "autoconfigure") == 0) {
           // POST /api/v1/otgw/autoconfigure
           // Response: sends all autodiscovery topics to MQTT for HA integration
+          if (!isPostOrPut) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
           httpServer.send(200, "text/plain", "OK");
           doAutoConfigure();
         } else if (words[4] && strcmp(words[4], "id") == 0){
@@ -95,6 +102,7 @@ void processAPI()
           //   "value": "0.00",
           //   "unit": "°C"
           // }
+          if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
           if (words[5] && isDigitStr(words[5])) {
             sendOTGWvalue(atoi(words[5]));  
           } else {
@@ -109,10 +117,11 @@ void processAPI()
           //   "value": "0.00",
           //   "unit": "°C"
           // }   
+          if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
           if (words[5] && *words[5]) sendOTGWlabel(words[5]);
           else httpServer.send(400, "text/plain", "400: missing label\r\n");
         } else if (words[4] && strcmp(words[4], "command") == 0){
-          if (httpServer.method() == HTTP_PUT || httpServer.method() == HTTP_POST)
+          if (isPostOrPut)
           {
             /* how to post a command to OTGW
             ** POST or PUT = /api/v1/otgw/command/{command} = Any command you want
@@ -121,11 +130,16 @@ void processAPI()
             //Add a command to OTGW queue 
             if (words[5] && *words[5]) {
               constexpr size_t kMaxCmdLen = sizeof(cmdqueue[0].cmd) - 1; // matches OT_cmd_t::cmd buffer (14 bytes)
-              if (strlen(words[5]) > kMaxCmdLen) {
+              size_t cmdLen = strlen(words[5]);
+              if ((cmdLen < 3) || words[5][2] != '=') {
+                httpServer.send(400, "text/plain", "400: invalid command format\r\n");
+                return;
+              }
+              if (cmdLen > kMaxCmdLen) {
                 httpServer.send(413, "text/plain", "413: command too long\r\n");
                 return;
               }
-              addOTWGcmdtoqueue(words[5], strlen(words[5]));
+              addOTWGcmdtoqueue(words[5], cmdLen);
               httpServer.send(200, "text/plain", "OK");
             } else {
               httpServer.send(400, "text/plain", "400: missing command\r\n");
@@ -146,6 +160,7 @@ void processAPI()
         //   "value": "0.00",
         //   "unit": "°C"
         // }
+        if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
         if (words[4] && isDigitStr(words[4])) {
           sendOTGWvalue(atoi(words[4])); 
         } else {
@@ -154,10 +169,12 @@ void processAPI()
       } 
       else if (words[3] && strcmp(words[3], "devinfo") == 0)
       {
+        if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
         sendDeviceInfo();
       }
       else if (words[3] && strcmp(words[3], "devtime") == 0)
       {
+        if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
         sendDeviceTime();
       }
       else if (words[3] && strcmp(words[3], "settings") == 0)
