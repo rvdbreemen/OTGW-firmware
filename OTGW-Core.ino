@@ -1697,7 +1697,7 @@ void processOT(const char *buf, int len){
     sendMQTTData(F("Error 04"), String(OTcurrentSystemState.error04));
   } else if (strstr(buf, OTGW_BANNER)!=NULL){
     //found a banner, so get the version of PIC
-    strlcpy(sPICfwversion, OTGWSerial.firmwareVersion().c_str(), sizeof(sPICfwversion));
+    strlcpy(sPICfwversion, OTGWSerial.firmwareVersion(), sizeof(sPICfwversion));
     OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), sPICfwversion);
     strlcpy(sPICdeviceid, OTGWSerial.processorToString().c_str(), sizeof(sPICdeviceid));
     OTGWDebugTf(PSTR("Current device id: %s\r\n"), sPICdeviceid);    
