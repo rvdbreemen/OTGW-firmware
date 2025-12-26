@@ -373,6 +373,21 @@ void resetWirelessButton()
 //=====================================================================================
 void doRedirect(String msg, int wait, const char* URL, bool reboot)
 {
+  // clamp wait to sane bounds
+  int safeWait = max(0, min(wait, 3600)); // 1 hour max
+
+  // escape dynamic parts
+  String safeMsg = msg;
+  safeMsg.replace("&", "&amp;");
+  safeMsg.replace("<", "&lt;");
+  safeMsg.replace(">", "&gt;");
+  safeMsg.replace("\"", "&quot;");
+  safeMsg.replace("'", "&#39;");
+
+  String safeURL = String(URL);
+  safeURL.replace("'", "%27");
+  safeURL.replace("\"", "%22");
+
   String redirectHTML = 
   "<!DOCTYPE HTML><html lang='en-US'>"
   "<head>"
@@ -383,28 +398,30 @@ void doRedirect(String msg, int wait, const char* URL, bool reboot)
   "<title>Redirect to ...</title>"
   "</head>"
   "<body><h1>FSexplorer</h1>"
-  "<h3>"+msg+"</h3>"
+  "<h3>"+safeMsg+"</h3>"
   "<br><div style='width: 500px; position: relative; font-size: 25px;'>"
   "  <div style='float: left;'>Redirect in &nbsp;</div>"
-  "  <div style='float: left;' id='counter'>"+String(wait)+"</div>"
+  "  <div style='float: left;' id='counter'>"+String(safeWait)+"</div>"
   "  <div style='float: left;'>&nbsp; seconds ...</div>"
   "  <div style='float: right;'>&nbsp;</div>"
   "</div>"
   "<!-- Note: don't tell people to `click` the link, just tell them that it is a link. -->"
-  "<br><br><hr>Wait for the redirect. In case you are not redirected automatically, then click this <a href='/'>link to continue</a>."
+  "<br><br><hr>Wait for the redirect. In case you are not redirected automatically, then click this <a href='"+safeURL+"'>link to continue</a>."
   "  <script>"
   "      setInterval(function() {"
   "          var div = document.querySelector('#counter');"
   "          var count = div.textContent * 1 - 1;"
   "          div.textContent = count;"
   "          if (count <= 0) {"
-  "              window.location.replace('"+String(URL)+"'); "
+  "              window.location.replace('"+safeURL+"'); "
   "          } "
   "      }, 1000); "
   "  </script> "
   "</body></html>\r\n";
   
   DebugTln(msg);
+  // add non-JS fallback for redirect
+  httpServer.sendHeader("Refresh", String(safeWait) + ";url=" + safeURL);
   httpServer.send(200, "text/html", redirectHTML);
   if (reboot) doRestart("Reboot after upgrade");
   
