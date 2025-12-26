@@ -268,7 +268,7 @@ void doTaskEvery60s(){
     strlcpy(sPICdeviceid, OTGWSerial.processorToString().c_str(), sizeof(sPICdeviceid));
     DebugTf(PSTR("Current device id: %s\r\n"), sPICdeviceid);    
     strlcpy(sPICtype, OTGWSerial.firmwareToString().c_str(), sizeof(sPICtype));
-    DebugTf(PSTR("Current firmware type: %s\r\n"), sPICtype
+    DebugTf(PSTR("Current firmware type: %s\r\n"), sPICtype);
   }
 }
 
