@@ -11,6 +11,7 @@
 */
 
 #include <PubSubClient.h>           // MQTT client publish and subscribe functionality
+#include <ctype.h>
 
 #define MQTTDebugTln(...) ({ if (bDebugMQTT) DebugTln(__VA_ARGS__);    })
 #define MQTTDebugln(...)  ({ if (bDebugMQTT) Debugln(__VA_ARGS__);    })
@@ -23,6 +24,11 @@
 
 static IPAddress  MQTTbrokerIP;
 static char       MQTTbrokerIPchar[20];
+constexpr size_t  MQTT_ID_MAX_LEN = 96;
+constexpr size_t  MQTT_NAMESPACE_MAX_LEN = 192;
+constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
+constexpr size_t  MQTT_MSG_MAX_LEN = 512;
+constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 256;
 
 static            PubSubClient MQTTclient(wifiClient);
 
@@ -32,10 +38,90 @@ char              lastMQTTtimestamp[15] = "";
 enum states_of_MQTT { MQTT_STATE_INIT, MQTT_STATE_TRY_TO_CONNECT, MQTT_STATE_IS_CONNECTED, MQTT_STATE_WAIT_CONNECTION_ATTEMPT, MQTT_STATE_WAIT_FOR_RECONNECT, MQTT_STATE_ERROR };
 enum states_of_MQTT stateMQTT = MQTT_STATE_INIT;
 
-String            MQTTclientId;
-String            MQTTPubNamespace = "";
-String            MQTTSubNamespace = "";
-String            NodeId = "";
+static char       MQTTclientId[MQTT_ID_MAX_LEN];
+static char       MQTTPubNamespace[MQTT_NAMESPACE_MAX_LEN];
+static char       MQTTSubNamespace[MQTT_NAMESPACE_MAX_LEN];
+static char       NodeId[MQTT_ID_MAX_LEN];
+
+// Trim whitespace on both sides in-place
+static void trimInPlace(char *buffer) {
+  if (buffer == nullptr) return;
+  size_t len = strlen(buffer);
+  while (len > 0 && isspace(static_cast<unsigned char>(buffer[len - 1]))) {
+    buffer[--len] = '\0';
+  }
+  size_t start = 0;
+  while (buffer[start] != '\0' && isspace(static_cast<unsigned char>(buffer[start]))) {
+    start++;
+  }
+  if (start > 0) {
+    memmove(buffer, buffer + start, len - start + 1);
+  }
+}
+
+// Replace all occurrences of token with replacement, guarding buffer size
+static bool replaceAll(char *buffer, const size_t bufSize, const char *token, const char *replacement) {
+  if (!buffer || !token || !replacement) return false;
+  const size_t tokenLen = strlen(token);
+  const size_t replLen = strlen(replacement);
+  if (tokenLen == 0) return true;
+
+  char *pos = strstr(buffer, token);
+  while (pos) {
+    const size_t tailLen = strlen(pos + tokenLen);
+    const size_t required = (pos - buffer) + replLen + tailLen + 1;
+    if (required > bufSize) return false;
+    memmove(pos + replLen, pos + tokenLen, tailLen + 1);
+    memcpy(pos, replacement, replLen);
+    pos = strstr(pos + replLen, token);
+  }
+  return true;
+}
+
+static bool splitLine(char *sIn, char del, byte &cID, char *cKey, size_t keySize, char *cVal, size_t valSize) {
+  if (!sIn || !cKey || !cVal) return false;
+  char *comment = strstr(sIn, "//");
+  if (comment) *comment = '\0';
+
+  trimInPlace(sIn);
+  if (strlen(sIn) <= 3) return false;
+
+  char *firstDel = strchr(sIn, del);
+  if (firstDel == nullptr || firstDel == sIn || *(firstDel + 1) == '\0') return false;
+  char *secondDel = strchr(firstDel + 1, del);
+  if (secondDel == nullptr || secondDel <= firstDel + 1 || *(secondDel + 1) == '\0') return false;
+
+  char idBuf[8]{0};
+  strlcpy(idBuf, sIn, sizeof(idBuf));
+  char *idDel = strchr(idBuf, del);
+  if (!idDel) return false;
+  *idDel = '\0';
+  trimInPlace(idBuf);
+  cID = static_cast<byte>(strtoul(idBuf, nullptr, 10));
+
+  strlcpy(cKey, firstDel + 1, keySize);
+  char *keyEnd = strchr(cKey, del);
+  if (!keyEnd) return false;
+  *keyEnd = '\0';
+  trimInPlace(cKey);
+
+  strlcpy(cVal, secondDel + 1, valSize);
+  trimInPlace(cVal);
+
+  return strlen(cKey) > 0 && strlen(cVal) > 0;
+}
+
+static void buildNamespace(char *dest, size_t destSize, const char *base, const char *segment, const char *node) {
+  dest[0] = '\0';
+  if (!dest || !base || !segment || !node) return;
+  strlcpy(dest, base, destSize);
+  size_t len = strlen(dest);
+  if (len > 0 && dest[len - 1] == '/') dest[len - 1] = '\0';
+  strlcat(dest, "/", destSize);
+  strlcat(dest, segment, destSize);
+  strlcat(dest, "/", destSize);
+  strlcat(dest, node, destSize);
+}
 
 //set command list
 struct MQTT_set_cmd_t
@@ -90,9 +176,9 @@ void startMQTT()
   stateMQTT = MQTT_STATE_INIT;
   //setup for mqtt discovery
   clearMQTTConfigDone();
-  NodeId = settingMQTTuniqueid;
-  MQTTPubNamespace = settingMQTTtopTopic + "/value/" + NodeId;
-  MQTTSubNamespace = settingMQTTtopTopic + "/set/" + NodeId;
+  strlcpy(NodeId, CSTR(settingMQTTuniqueid), sizeof(NodeId));
+  buildNamespace(MQTTPubNamespace, sizeof(MQTTPubNamespace), CSTR(settingMQTTtopTopic), "value", NodeId);
+  buildNamespace(MQTTSubNamespace, sizeof(MQTTSubNamespace), CSTR(settingMQTTtopTopic), "set", NodeId);
   handleMQTT(); //initialize the MQTT statemachine
   // handleMQTT(); //then try to connect to MQTT
   // handleMQTT(); //now you should be connected to MQTT ready to send
@@ -142,13 +228,14 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   char otgwcmd[51]={0};
 
   //first check toptopic part, it can include the seperator, e.g. "myHome/OTGW" or "OTGW""
-  if (strncmp(topic, settingMQTTtopTopic.c_str(), settingMQTTtopTopic.length()) != 0) {
+  const size_t topTopicLen = strlen(CSTR(settingMQTTtopTopic));
+  if (strncmp(topic, CSTR(settingMQTTtopTopic), topTopicLen) != 0) {
     MQTTDebugln(F("MQTT: wrong top topic"));
     return;
   } else {
     //remove the top topic part
-    MQTTDebugTf(PSTR("Parsing topic: %s/"), settingMQTTtopTopic.c_str());
-    topic += settingMQTTtopTopic.length();
+    MQTTDebugTf(PSTR("Parsing topic: %s/"), CSTR(settingMQTTtopTopic));
+    topic += topTopicLen;
     while (*topic == '/') {
       topic++;
     }
@@ -159,7 +246,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   if (strcasecmp(token, "set") == 0) {
     token = strtok(NULL, "/");
     MQTTDebugf("%s/", token); 
-    if (strcasecmp(token, CSTR(NodeId)) == 0) {
+    if (strcasecmp(token, NodeId) == 0) {
       token = strtok(NULL, "/");
       MQTTDebugf("%s", token);
       if (token != NULL){
@@ -220,7 +307,9 @@ void handleMQTT()
         MQTTclient.setServer(MQTTbrokerIPchar, settingMQTTbrokerPort);
         MQTTclient.setCallback(handleMQTTcallback);
         MQTTclient.setSocketTimeout(4); 
-        MQTTclientId  = String(_HOSTNAME) + WiFi.macAddress();
+        uint8_t mac[6]{0};
+        WiFi.macAddress(mac);
+        snprintf(MQTTclientId, sizeof(MQTTclientId), "%s%02X%02X%02X%02X%02X%02X", _HOSTNAME, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
         //skip try to connect
         reconnectAttempts =0;
         stateMQTT = MQTT_STATE_TRY_TO_CONNECT;
@@ -245,12 +334,12 @@ void handleMQTT()
       if (settingMQTTuser.length() == 0) 
       {
         MQTTDebug(F("without a Username/Password "));
-        if(!MQTTclient.connect(CSTR(MQTTclientId), CSTR(MQTTPubNamespace), 0, true, "offline")) PrintMQTTError();
+        if(!MQTTclient.connect(MQTTclientId, MQTTPubNamespace, 0, true, "offline")) PrintMQTTError();
       } 
       else 
       {
         MQTTDebugf("Username [%s] ", CSTR(settingMQTTuser));
-        if(!MQTTclient.connect(CSTR(MQTTclientId), CSTR(settingMQTTuser), CSTR(settingMQTTpasswd), CSTR(MQTTPubNamespace), 0, true, "offline")) PrintMQTTError();
+        if(!MQTTclient.connect(MQTTclientId, CSTR(settingMQTTuser), CSTR(settingMQTTpasswd), MQTTPubNamespace, 0, true, "offline")) PrintMQTTError();
       }
 
       //If connection was made succesful, move on to next state...
@@ -262,14 +351,14 @@ void handleMQTT()
         stateMQTT = MQTT_STATE_IS_CONNECTED;
         MQTTDebugTln(F("Next State: MQTT_STATE_IS_CONNECTED"));
         // birth message, sendMQTT retains  by default
-        sendMQTT(CSTR(MQTTPubNamespace), "online");
+        sendMQTT(MQTTPubNamespace, "online");
 
         // First do AutoConfiguration for Homeassistant
         // doAutoConfigure();
 
         //Subscribe to topics
         char topic[100];
-        strcpy(topic, CSTR(MQTTSubNamespace));
+        strlcpy(topic, MQTTSubNamespace, sizeof(topic));
         strlcat(topic, "/#", sizeof(topic));
         MQTTDebugTf(PSTR("Subscribe to MQTT: TopicId [%s]\r\n"), topic);
         if (MQTTclient.subscribe(topic)){
@@ -358,14 +447,6 @@ void handleMQTT()
   statusMQTTconnection = MQTTclient.connected();
 } // handleMQTT()
 
-//===========================================================================================
-String trimVal(char *in) 
-{
-  String Out = in;
-  Out.trim();
-  return Out;
-} // trimVal()
-
 void PrintMQTTError(){
   MQTTDebugln();
   switch (MQTTclient.state())
@@ -389,39 +470,34 @@ void PrintMQTTError(){
   json:   <string> , payload to send
   retain: <bool> , retain mqtt message  
 */
-void sendMQTTData(const String topic, const String json, const bool retain = false)
-{
-  if (!settingMQTTenable) return;
-  sendMQTTData(CSTR(topic), CSTR(json), retain);
-}
-
-/* 
-  topic:  <string> , sensor topic, will be automatically prefixed with <mqtt topic>/value/<node_id>
-  json:   <string> , payload to send
-  retain: <bool> , retain mqtt message  
-*/
 void sendMQTTData(const char* topic, const char *json, const bool retain = false) 
 {
   if (!settingMQTTenable) return;
   if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
   if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
-  char full_topic[100];
-  snprintf(full_topic, sizeof(full_topic), "%s/", CSTR(MQTTPubNamespace));
+  char full_topic[MQTT_TOPIC_MAX_LEN];
+  snprintf(full_topic, sizeof(full_topic), "%s/", MQTTPubNamespace);
   strlcat(full_topic, topic, sizeof(full_topic));
   MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settingMQTTbroker.c_str(), settingMQTTbrokerPort, full_topic, json);
   if (!MQTTclient.publish(full_topic, json, retain)) PrintMQTTError();
   feedWatchDog();//feed the dog
 } // sendMQTTData()
 
+void sendMQTTData(const __FlashStringHelper *topic, const char *json, const bool retain = false)
+{
+  char topicBuf[MQTT_TOPIC_MAX_LEN];
+  strlcpy_P(topicBuf, (PGM_P)topic, sizeof(topicBuf));
+  sendMQTTData(topicBuf, json, retain);
+}
+
 /* 
 * topic:  <string> , topic will be used as is (no prefixing), retained = true
 * json:   <string> , payload to send
 */
 //===========================================================================================
-void sendMQTT(String topic, String json){
-  if (!settingMQTTenable) return;
-  sendMQTT(CSTR(topic), CSTR(json), json.length());
-} 
+void sendMQTT(const char* topic, const char *json) {
+  sendMQTT(topic, json, strlen(json));
+}
 
 void sendMQTT(const char* topic, const char *json, const size_t len) 
 {
@@ -447,38 +523,6 @@ void resetMQTTBufferSize()
 {
   if (!settingMQTTenable) return;
   MQTTclient.setBufferSize(256);
-}
-//===========================================================================================
-bool splitLine(String sIn, char del, byte &cID, String &cKey, String &cVal) {
-  sIn.trim(); //trim spaces
-  cID = 39; // ID 39 is unused in the OT spec
-  cKey = "";
-  cVal = "";
-  
-  int posC = sIn.indexOf("//");
-  if (posC > -1) sIn.remove(posC); // strip comments
-
-  if (sIn.length() <= 3) return false; //not enough buffer, skip split
-
-  unsigned int pos = sIn.indexOf(del); //determine first split point
-  if ((pos <= 0) || (pos == (sIn.length() - 1))) return false; // no key or no value
-
-  unsigned int pos2 = sIn.indexOf(del, pos+1); //determine second split point, starting from the first found
-  if ((pos2 <= 0) || (pos2 <= pos) || (pos2 == (sIn.length() - 1))) return false; // no key or no value
-
-  String sID = sIn.substring(0, pos);
-  sID.trim();
-  cID = (byte)sID.toInt();
- 
-  cKey = sIn.substring(pos+1, pos2);
-  cKey.trim(); //before, and trim spaces
- 
-  cVal = sIn.substring(pos2 + 1);
-  cVal.trim(); //after,and trim spaces
-
-  // Debugf("Split line into: [%d] [%s] [%s]\r\n", cID, CSTR(cKey), CSTR(cVal)); DebugFlush();
-
-  return true;
 }
 //===========================================================================================
 bool getMQTTConfigDone(const uint8_t MSGid)
@@ -529,19 +573,19 @@ void doAutoConfigure(bool bForcaAll = false){
 //===========================================================================================
 bool doAutoConfigureMsgid(byte OTid)
 { 
-   String cfgSensorId = "" ;
-   // check if foney dataid is called to do autoconfigure for temp sensors, call configsensors instead 
-   if (OTid == OTGWdallasdataid) {
-     MQTTDebugTf(PSTR("Sending auto configuration for temp sensors %d\r\n"), OTid);
-     configSensors() ;
-     return true;
-   }  
-   else return doAutoConfigureMsgid(OTid, cfgSensorId); 
- }
+  // check if foney dataid is called to do autoconfigure for temp sensors, call configsensors instead 
+  if (OTid == OTGWdallasdataid) {
+    MQTTDebugTf(PSTR("Sending auto configuration for temp sensors %d\r\n"), OTid);
+    configSensors() ;
+    return true;
+  }  
+  return doAutoConfigureMsgid(OTid, "");
+}
 
- bool doAutoConfigureMsgid(byte OTid, String cfgSensorId )
+ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
 {
   bool _result = false;
+  const char *sensorId = (cfgSensorId != nullptr) ? cfgSensorId : "";
   
   if (!settingMQTTenable) {
     return _result;
@@ -556,8 +600,8 @@ bool doAutoConfigureMsgid(byte OTid)
   } 
 
   byte lineID = 39; // 39 is unused in OT protocol so is a safe value
-  String sMsg = "";
-  String sTopic = "";
+  char sMsg[MQTT_MSG_MAX_LEN];
+  char sTopic[MQTT_TOPIC_MAX_LEN];
 
   //Let's open the MQTT autoconfig file
   File fh; //filehandle
@@ -579,63 +623,61 @@ bool doAutoConfigureMsgid(byte OTid)
   //Lets go read the config and send it out to MQTT line by line
   while (fh.available())
   {
+    memset(sTopic, 0, sizeof(sTopic));
+    memset(sMsg, 0, sizeof(sMsg));
     //read file line by line, split and send to MQTT (topic, msg)
     feedWatchDog(); //start with feeding the dog
     
-    String sLine = fh.readStringUntil('\n');
-    // DebugTf(PSTR("sline[%s]\r\n"), CSTR(sLine));
-    if (!splitLine(sLine, ';', lineID, sTopic, sMsg)) {  //splitLine() also filters comments
-      //MQTTDebugTf(PSTR("Either comment or invalid config line: [%s]\r\n"), CSTR(sLine));
+    char sLine[MQTT_CFG_LINE_MAX_LEN];
+    size_t len = fh.readBytesUntil('\n', sLine, sizeof(sLine) - 1);
+    sLine[len] = '\0';
+    if (!splitLine(sLine, ';', lineID, sTopic, sizeof(sTopic), sMsg, sizeof(sMsg))) {  //splitLine() also filters comments
       continue;
     }
 
-    // DebugTf(PSTR("looking in config file line for %d: [%d][%s] \r\n"), OTid, lineID, CSTR(sTopic));
-    
     // check if this is the specific line we are looking for
     if (lineID != OTid) continue;
 
-    MQTTDebugTf(PSTR("Found line in config file for %d: [%d][%s] \r\n"), OTid, lineID, CSTR(sTopic));
+    MQTTDebugTf(PSTR("Found line in config file for %d: [%d][%s] \r\n"), OTid, lineID, sTopic);
 
     // discovery topic prefix
-    MQTTDebugTf(PSTR("sTopic[%s]==>"), CSTR(sTopic)); 
-    sTopic.replace("%homeassistant%", CSTR(settingMQTThaprefix));  
+    MQTTDebugTf(PSTR("sTopic[%s]==>"), sTopic); 
+    if (!replaceAll(sTopic, sizeof(sTopic), "%homeassistant%", CSTR(settingMQTThaprefix))) { MQTTDebugTln(F("MQTT: topic replacement overflow")); continue; }
 
     /// node
-    sTopic.replace("%node_id%", CSTR(NodeId));
+    if (!replaceAll(sTopic, sizeof(sTopic), "%node_id%", NodeId)) { MQTTDebugTln(F("MQTT: node_id replacement overflow")); continue; }
 
     /// SensorId
-    sTopic.replace("%sensor_id%", CSTR(cfgSensorId));
+    if (!replaceAll(sTopic, sizeof(sTopic), "%sensor_id%", sensorId)) { MQTTDebugTln(F("MQTT: sensor_id replacement overflow")); continue; }
 
-    MQTTDebugf("[%s]\r\n", CSTR(sTopic)); 
+    MQTTDebugf("[%s]\r\n", sTopic); 
     /// ----------------------
 
-    MQTTDebugTf(PSTR("sMsg[%s]==>"), CSTR(sMsg)); 
+    MQTTDebugTf(PSTR("sMsg[%s]==>"), sMsg); 
 
     /// node
-    sMsg.replace("%node_id%", CSTR(NodeId));
+    if (!replaceAll(sMsg, sizeof(sMsg), "%node_id%", NodeId)) { MQTTDebugTln(F("MQTT: node_id replacement overflow")); continue; }
 
     /// SensorId
-    sMsg.replace("%sensor_id%", CSTR(cfgSensorId));
+    if (!replaceAll(sMsg, sizeof(sMsg), "%sensor_id%", sensorId)) { MQTTDebugTln(F("MQTT: sensor_id replacement overflow")); continue; }
 
     /// hostname
-    sMsg.replace("%hostname%", CSTR(settingHostname));
+    if (!replaceAll(sMsg, sizeof(sMsg), "%hostname%", CSTR(settingHostname))) { MQTTDebugTln(F("MQTT: hostname replacement overflow")); continue; }
 
     /// version
-    sMsg.replace("%version%", _VERSION);
+    if (!replaceAll(sMsg, sizeof(sMsg), "%version%", _VERSION)) { MQTTDebugTln(F("MQTT: version replacement overflow")); continue; }
 
     // pub topics prefix
-    sMsg.replace("%mqtt_pub_topic%", CSTR(MQTTPubNamespace));
+    if (!replaceAll(sMsg, sizeof(sMsg), "%mqtt_pub_topic%", MQTTPubNamespace)) { MQTTDebugTln(F("MQTT: mqtt_pub_topic replacement overflow")); continue; }
 
     // sub topics
-    sMsg.replace("%mqtt_sub_topic%", CSTR(MQTTSubNamespace));
+    if (!replaceAll(sMsg, sizeof(sMsg), "%mqtt_sub_topic%", MQTTSubNamespace)) { MQTTDebugTln(F("MQTT: mqtt_sub_topic replacement overflow")); continue; }
 
-    MQTTDebugf("[%s]\r\n", CSTR(sMsg)); 
+    MQTTDebugf("[%s]\r\n", sMsg); 
     DebugFlush();
 
-    //sendMQTT(CSTR(sTopic), CSTR(sMsg), (sTopic.length() + sMsg.length()+2));
-    sendMQTT(sTopic, sMsg);
+    sendMQTT(sTopic, sMsg, strlen(sMsg));
     resetMQTTBufferSize();
-    // delay(10);
     _result = true;
 
     // TODO: enable this break if we are sure the old config dump method is no longer needed
@@ -651,7 +693,7 @@ bool doAutoConfigureMsgid(byte OTid)
   return _result;
 }
 
-void sensorAutoConfigure(byte dataid, bool finishflag , String cfgSensorId = "") {
+void sensorAutoConfigure(byte dataid, bool finishflag , const char *cfgSensorId = "") {
  // Special version of Autoconfigure for sensors
  // dataid is a foney id, not used by OT 
  // check wheter MQTT topic needs to be configured

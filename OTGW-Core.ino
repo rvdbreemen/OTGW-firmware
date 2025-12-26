@@ -85,9 +85,11 @@ OpenthermData_t OTdata, delayedOTdata, tmpOTdata;
 Publish usefull firmware version information to MQTT broker.
 */
 void sendMQTTversioninfo(){
+  char rebootCountBuf[12];
+  snprintf(rebootCountBuf, sizeof(rebootCountBuf), "%lu", static_cast<unsigned long>(rebootCount));
   sendMQTTData("otgw-firmware/version", _SEMVER_FULL);
-  sendMQTTData("otgw-firmware/reboot_count", String(rebootCount));
-  sendMQTTData("otgw-firmware/reboot_reason", lastReset);
+  sendMQTTData("otgw-firmware/reboot_count", rebootCountBuf);
+  sendMQTTData("otgw-firmware/reboot_reason", lastReset.c_str());
   sendMQTTData("otgw-pic/version", sPICfwversion);
   sendMQTTData("otgw-pic/deviceid", sPICdeviceid);
   sendMQTTData("otgw-pic/firmwaretype", sPICdeviceid);
@@ -102,7 +104,7 @@ void sendMQTTstateinformation(){
   sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(bOTGWthermostatstate));
   sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(bOTGWgatewaystate));
   sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(bOTGWonline));
-  sendMQTT(CSTR(MQTTPubNamespace), CONLINEOFFLINE(bOTGWonline));
+  sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(bOTGWonline));
 }
 
 //===================[ Reset OTGW ]===============================
@@ -1395,6 +1397,7 @@ void processOT(const char *buf, int len){
     // sendMQTTData(F("otmsg_count"), itoa(cntOTmessagesprocessed, _msg, 10)); 
 
     // source of otmsg
+    char errorBuf[12];
     if (buf[0]=='B'){
       epochBoilerlastseen = now; 
       OTdata.rsptype = OTGW_BOILER;
@@ -1437,7 +1440,7 @@ void processOT(const char *buf, int len){
     bOTGWonline = (bOTGWboilerstate && bOTGWthermostatstate) || (bOTGWboilerstate && bOTGWgatewaystate);
     if ((bOTGWonline != bOTGWpreviousstate) || (cntOTmessagesprocessed==1)){
       sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(bOTGWonline));
-      sendMQTT(CSTR(MQTTPubNamespace), CONLINEOFFLINE(bOTGWonline));
+      sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(bOTGWonline));
       // nodeMCU online/offline zelf naar 'otgw-firmware/' pushen
       bOTGWpreviousstate = bOTGWonline; //remember state, so we can detect statechanges
     }
@@ -1682,19 +1685,23 @@ void processOT(const char *buf, int len){
   } else if (strstr(buf, "\r\nError 01")!= NULL) {
     OTcurrentSystemState.error01++;
     OTGWDebugTf(PSTR("\r\nError 01 = %d\r\n"),OTcurrentSystemState.error01);
-    sendMQTTData(F("Error 01"), String(OTcurrentSystemState.error01));
+    snprintf(errorBuf, sizeof(errorBuf), "%u", OTcurrentSystemState.error01);
+    sendMQTTData(F("Error 01"), errorBuf);
   } else if (strstr(buf, "Error 02")!= NULL) {
     OTcurrentSystemState.error02++;
     OTGWDebugTf(PSTR("\r\nError 02 = %d\r\n"),OTcurrentSystemState.error02);
-    sendMQTTData(F("Error 02"), String(OTcurrentSystemState.error02));
+    snprintf(errorBuf, sizeof(errorBuf), "%u", OTcurrentSystemState.error02);
+    sendMQTTData(F("Error 02"), errorBuf);
   } else if (strstr(buf, "Error 03")!= NULL) {
     OTcurrentSystemState.error03++;
     OTGWDebugTf(PSTR("\r\nError 03 = %d\r\n"),OTcurrentSystemState.error03);
-    sendMQTTData(F("Error 03"), String(OTcurrentSystemState.error03));
+    snprintf(errorBuf, sizeof(errorBuf), "%u", OTcurrentSystemState.error03);
+    sendMQTTData(F("Error 03"), errorBuf);
   } else if (strstr(buf, "Error 04")!= NULL){
     OTcurrentSystemState.error04++;
     OTGWDebugTf(PSTR("\r\nError 04 = %d\r\n"),OTcurrentSystemState.error04);
-    sendMQTTData(F("Error 04"), String(OTcurrentSystemState.error04));
+    snprintf(errorBuf, sizeof(errorBuf), "%u", OTcurrentSystemState.error04);
+    sendMQTTData(F("Error 04"), errorBuf);
   } else if (strstr(buf, OTGW_BANNER)!=NULL){
     //found a banner, so get the version of PIC
     strlcpy(sPICfwversion, OTGWSerial.firmwareVersion().c_str(), sizeof(sPICfwversion));
