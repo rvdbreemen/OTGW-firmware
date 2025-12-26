@@ -59,8 +59,8 @@ void setLed(int8_t, uint8_t);
 #define ETX ((uint8_t)0x04)
 
 //prototype
-void sendMQTTData(const String, const String, const bool);
-void sendMQTTData(const char*, const char*, const bool);
+void sendMQTTData(const char*, const char*, const bool = false);
+void sendMQTTData(const __FlashStringHelper*, const char*, const bool = false);
 void addOTWGcmdtoqueue(const char* ,  int , const bool = false, const int16_t = 1000);
 
 //Global variables
