@@ -1397,7 +1397,6 @@ void processOT(const char *buf, int len){
     // sendMQTTData(F("otmsg_count"), itoa(cntOTmessagesprocessed, _msg, 10)); 
 
     // source of otmsg
-    char errorBuf[12];
     if (buf[0]=='B'){
       epochBoilerlastseen = now; 
       OTdata.rsptype = OTGW_BOILER;
@@ -1683,21 +1682,25 @@ void processOT(const char *buf, int len){
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
     checkOTGWcmdqueue(buf, len);
   } else if (strstr(buf, "\r\nError 01")!= NULL) {
+    char errorBuf[12];
     OTcurrentSystemState.error01++;
     OTGWDebugTf(PSTR("\r\nError 01 = %d\r\n"),OTcurrentSystemState.error01);
     snprintf(errorBuf, sizeof(errorBuf), "%u", OTcurrentSystemState.error01);
     sendMQTTData(F("Error 01"), errorBuf);
   } else if (strstr(buf, "Error 02")!= NULL) {
+    char errorBuf[12];
     OTcurrentSystemState.error02++;
     OTGWDebugTf(PSTR("\r\nError 02 = %d\r\n"),OTcurrentSystemState.error02);
     snprintf(errorBuf, sizeof(errorBuf), "%u", OTcurrentSystemState.error02);
     sendMQTTData(F("Error 02"), errorBuf);
   } else if (strstr(buf, "Error 03")!= NULL) {
+    char errorBuf[12];
     OTcurrentSystemState.error03++;
     OTGWDebugTf(PSTR("\r\nError 03 = %d\r\n"),OTcurrentSystemState.error03);
     snprintf(errorBuf, sizeof(errorBuf), "%u", OTcurrentSystemState.error03);
     sendMQTTData(F("Error 03"), errorBuf);
   } else if (strstr(buf, "Error 04")!= NULL){
+    char errorBuf[12];
     OTcurrentSystemState.error04++;
     OTGWDebugTf(PSTR("\r\nError 04 = %d\r\n"),OTcurrentSystemState.error04);
     snprintf(errorBuf, sizeof(errorBuf), "%u", OTcurrentSystemState.error04);
