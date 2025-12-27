@@ -616,25 +616,25 @@ void postSettings()
       strcpy(jsonIn, jsonInStr.c_str());
 
       uint_fast8_t wp = splitString(jsonIn, ',',  wPair, 5) ;
-      for (uint_fast8_t i=0; i<wp; i++)
-      {
-        char* wOut[5];
-        //RESTDebugTf(PSTR("[%d] -> pair[%s]\r\n"), i, wPair[i]);
-        uint8_t wc = splitString(wPair[i], ':',  wOut, 5) ;
-        //RESTDebugTf(PSTR("==> [%s] -> field[%s]->val[%s]\r\n"), wPair[i], wOut[0], wOut[1]);
-        if (wc>1) {
-            if (wOut[0].equalsIgnoreCase("name")) {
-              if ( wOut[1].length() < (sizeof(field)-1) ) {
-                strncpy(field, wOut[1].c_str(), sizeof(field));
-              }
-            }
-            else if (wOut[0].equalsIgnoreCase("value")) {
-              if ( wOut[1].length() < (sizeof(newValue)-1) ) {
-                strncpy(newValue, wOut[1].c_str(), sizeof(newValue) );
-              }
-            }
-        }
-      }
+	      for (uint_fast8_t i=0; i<wp; i++)
+	      {
+	        char* wOut[5];
+	        //RESTDebugTf(PSTR("[%d] -> pair[%s]\r\n"), i, wPair[i]);
+	        uint8_t wc = splitString(wPair[i], ':',  wOut, 5) ;
+	        //RESTDebugTf(PSTR("==> [%s] -> field[%s]->val[%s]\r\n"), wPair[i], wOut[0], wOut[1]);
+	        if (wc>1) {
+	            if (wOut[0] && strcasecmp(wOut[0], "name") == 0) {
+	              if (wOut[1] && (strlen(wOut[1]) < (sizeof(field) - 1))) {
+	                strlcpy(field, wOut[1], sizeof(field));
+	              }
+	            }
+	            else if (wOut[0] && strcasecmp(wOut[0], "value") == 0) {
+	              if (wOut[1] && (strlen(wOut[1]) < (sizeof(newValue) - 1))) {
+	                strlcpy(newValue, wOut[1], sizeof(newValue));
+	              }
+	            }
+	        }
+	      }
       if ( field[0] != 0 && newValue[0] != 0 ) {
         RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
         updateSetting(field, newValue);
