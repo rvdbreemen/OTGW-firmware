@@ -27,6 +27,8 @@ void processAPI()
   String words[10];
 
   strlcpy( URI, httpServer.uri().c_str(), sizeof(URI) );
+  const bool isGet = (httpServer.method() == HTTP_GET);
+  const bool isPostOrPut = (httpServer.method() == HTTP_POST || httpServer.method() == HTTP_PUT);
 
   RESTDebugTf(PSTR("from[%s] URI[%s] method[%s] \r\n"), httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(httpServer.method()).c_str());
 
@@ -88,7 +90,7 @@ void processAPI()
           // }   
           sendOTGWlabel(CSTR(words[5]));
         } else if (words[4] == "command"){
-          if (httpServer.method() == HTTP_PUT || httpServer.method() == HTTP_POST)
+          if (isPostOrPut)
           {
             /* how to post a command to OTGW
             ** POST or PUT = /api/v1/otgw/command/{command} = Any command you want
@@ -125,7 +127,7 @@ void processAPI()
       }
       else if (words[3] == "settings")
       {
-        if (httpServer.method() == HTTP_PUT || httpServer.method() == HTTP_POST)
+        if (isPostOrPut)
         {
           postSettings();
         }
