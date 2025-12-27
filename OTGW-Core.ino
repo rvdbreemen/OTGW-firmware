@@ -1188,23 +1188,36 @@ void print_daytime(uint16_t& value)
 
 //void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue = false, const int16_t delay = OTGW_DELAY_SEND_MS);
 void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, const int16_t delay){
+  constexpr int kMaxCmdLen = (int)(sizeof(cmdqueue[0].cmd) - 1);
+
+  if (buf == nullptr) {
+    OTGWDebugTln(F("CmdQueue: Error: null command"));
+    return;
+  }
   if ((len < 3) || (buf[2] != '=')){ 
-    //no valid command of less then 2 bytes
-    OTGWDebugT("CmdQueue: Error:Not a valid command=[");
+    // Not a valid command
+    OTGWDebugT("CmdQueue: Error: Not a valid command=[");
     for (int i = 0; i < len; i++) {
       OTGWDebug((char)buf[i]);
     }
-    OTGWDebugf("] (%d)\r\n", len); 
+    OTGWDebugf("] (%d)\r\n", len);
+    return;
+  }
+  if (len > kMaxCmdLen) {
+    OTGWDebugTf(PSTR("CmdQueue: Error: command too long (%d > %d)\r\n"), len, kMaxCmdLen);
+    OTGWDebugFlush();
+    return;
   }
 
   //check to see if the cmd is in queue
   bool foundcmd = false;
-  int8_t insertptr = cmdptr; //set insertprt to next empty slot
+  int8_t insertptr = cmdptr; //set insertptr to next empty slot
   if (!forceQueue){
-    char cmd[2]; memset( cmd, 0, sizeof(cmd));
+    char cmd[3];
+    memset(cmd, 0, sizeof(cmd));
     memcpy(cmd, buf, 2);
     for (int i=0; i<cmdptr; i++){
-      if (strstr(cmdqueue[i].cmd, cmd)) {
+      if (strncmp(cmdqueue[i].cmd, cmd, 2) == 0) {
         //found cmd exists, set the inertptr to found slot
         foundcmd = true;
         insertptr = i;
@@ -1214,6 +1227,17 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
   } 
   if (foundcmd) OTGWDebugTf(PSTR("CmdQueue: Found cmd exists in slot [%d]\r\n"), insertptr);
   else OTGWDebugTf(PSTR("CmdQueue: Adding cmd end of queue, slot [%d]\r\n"), insertptr);
+
+  if (!foundcmd && cmdptr >= CMDQUEUE_MAX) {
+    OTGWDebugTln(F("CmdQueue: Error: Reached max queue"));
+    OTGWDebugFlush();
+    return;
+  }
+  if (insertptr < 0 || insertptr >= CMDQUEUE_MAX) {
+    OTGWDebugTf(PSTR("CmdQueue: Error: Invalid insert slot [%d]\r\n"), insertptr);
+    OTGWDebugFlush();
+    return;
+  }
 
   //insert to the queue
   OTGWDebugTf(PSTR("CmdQueue: Insert queue in slot[%d]:"), insertptr);
@@ -1229,7 +1253,8 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
   memcpy(cmdqueue[insertptr].cmd, buf, cmdlen);
   cmdqueue[insertptr].cmdlen = cmdlen;
   cmdqueue[insertptr].retrycnt = 0;
-  cmdqueue[insertptr].due = millis() + delay; //due right away
+  const uint32_t safeDelay = (delay <= 0) ? 0u : (uint32_t)delay;
+  cmdqueue[insertptr].due = millis() + safeDelay;
 
   //if not found
   if (!foundcmd) {
@@ -1237,7 +1262,10 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
     if (cmdptr < CMDQUEUE_MAX) {
       cmdptr++; //next free slot
       OTGWDebugTf(PSTR("CmdQueue: Next free queue slot: [%d]\r\n"), cmdptr);
-    } else OTGWDebugTln(F("CmdQueue: Error: Reached max queue"));
+    } else {
+      // Should be prevented above; keep as defensive fallback.
+      OTGWDebugTln(F("CmdQueue: Error: Reached max queue"));
+    }
   } else OTGWDebugTf(PSTR("CmdQueue: Found command at: [%d] - [%d]\r\n"), insertptr, cmdptr);
   OTGWDebugFlush();
 }
@@ -1249,24 +1277,30 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
 */
 void handleOTGWqueue(){
   // OTGWDebugTf(PSTR("CmdQueue: Commands in queue [%d]\r\n"), (int)cmdptr);
-  for (int i = 0; i<cmdptr; i++) {
+  const uint32_t now = millis();
+  for (int i = 0; i < cmdptr; i++) {
     // OTGWDebugTf(PSTR("CmdQueue: Checking due in queue slot[%d]:[%lu]=>[%lu]\r\n"), (int)i, (unsigned long)millis(), (unsigned long)cmdqueue[i].due);
-    if (millis() >= cmdqueue[i].due) {
+    if ((int32_t)(now - cmdqueue[i].due) >= 0) {
       OTGWDebugTf(PSTR("CmdQueue: Queue slot [%d] due\r\n"), i);
       sendOTGW(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
       cmdqueue[i].retrycnt++;
-      cmdqueue[i].due = millis() + OTGW_CMD_INTERVAL_MS;
+      cmdqueue[i].due = now + OTGW_CMD_INTERVAL_MS;
       if (cmdqueue[i].retrycnt >= OTGW_CMD_RETRY){
         //max retry reached, so delete command from queue
         OTGWDebugTf(PSTR("CmdQueue: Delete [%d] from queue\r\n"), i);
-        for (int j=i; j<cmdptr; j++){
+        for (int j = i; j < (cmdptr - 1); j++){
           // OTGWDebugTf(PSTR("CmdQueue: Moving [%d] => [%d]\r\n"), j+1, j);
-          strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[i].cmd));
+          strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[j].cmd));
           cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
           cmdqueue[j].retrycnt = cmdqueue[j+1].retrycnt;
           cmdqueue[j].due = cmdqueue[j+1].due;
         }
         cmdptr--;
+        cmdqueue[cmdptr].cmd[0] = '\0';
+        cmdqueue[cmdptr].cmdlen = 0;
+        cmdqueue[cmdptr].retrycnt = 0;
+        cmdqueue[cmdptr].due = 0;
+        i--; // re-check current index after shift
       }
       // //exit queue handling, after 1 command
       // return;
@@ -1304,21 +1338,26 @@ void checkOTGWcmdqueue(const char *buf, unsigned int len){
   memcpy(value, buf+3, ((len-3)<(sizeof(value)-1))?(len-3):(sizeof(value)-1));
   for (int i=0; i<cmdptr; i++){
       OTGWDebugTf(PSTR("CmdQueue: Checking [%2s]==>[%d]:[%s] from queue\r\n"), cmd, i, cmdqueue[i].cmd); 
-    if (strstr(cmdqueue[i].cmd, cmd)){
+    if (strncmp(cmdqueue[i].cmd, cmd, 2) == 0){
       //command found, check value
       OTGWDebugTf(PSTR("CmdQueue: Found cmd [%2s]==>[%d]:[%s]\r\n"), cmd, i, cmdqueue[i].cmd); 
       // if(strstr(cmdqueue[i].cmd, value)){
         //value found, thus remove command from queue
         OTGWDebugTf(PSTR("CmdQueue: Found value [%s]==>[%d]:[%s]\r\n"), value, i, cmdqueue[i].cmd); 
         OTGWDebugTf(PSTR("CmdQueue: Remove from queue [%d]:[%s] from queue\r\n"), i, cmdqueue[i].cmd);
-        for (int j=i; j<cmdptr; j++){
+        for (int j = i; j < (cmdptr - 1); j++){
           OTGWDebugTf(PSTR("CmdQueue: Moving [%d] => [%d]\r\n"), j+1, j);
-          strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[i].cmd));
+          strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[j].cmd));
           cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
           cmdqueue[j].retrycnt = cmdqueue[j+1].retrycnt;
           cmdqueue[j].due = cmdqueue[j+1].due;
         }
         cmdptr--;
+        cmdqueue[cmdptr].cmd[0] = '\0';
+        cmdqueue[cmdptr].cmdlen = 0;
+        cmdqueue[cmdptr].retrycnt = 0;
+        cmdqueue[cmdptr].due = 0;
+        break;
       // } else OTGWDebugTf(PSTR("Error: Did not find value [%s]==>[%d]:[%s]\r\n"), value, i, cmdqueue[i].cmd); 
     }
   }
