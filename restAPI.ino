@@ -10,8 +10,6 @@
 ***************************************************************************      
 */
 
-#include <ctype.h>
-
 #include <string.h>
 #include <ctype.h>
 
@@ -36,34 +34,6 @@ static bool parseMsgId(const char *token, uint8_t &msgId) {
   long val = strtol(token, nullptr, 10);
   if (val < 0 || val > OT_MSGID_MAX) return false;
   msgId = static_cast<uint8_t>(val);
-  return true;
-}
-
-static bool isDigitStr(const char *s) {
-  if (s == nullptr || *s == '\0') return false;
-  while (*s) {
-    if (!isdigit(static_cast<unsigned char>(*s))) return false;
-    s++;
-  }
-  return true;
-}
-
-static bool parseMsgId(const char *token, uint8_t &msgId) {
-  if (!isDigitStr(token)) return false;
-  long val = strtol(token, nullptr, 10);
-  if (val < 0 || val > OT_MSGID_MAX) return false;
-  msgId = static_cast<uint8_t>(val);
-  return true;
-}
-
-// Simple digit check to validate numeric path segments before atoi()
-static bool isDigitStr(const char *s)
-{
-  if (!s || *s == '\0') return false;
-  while (*s) {
-    if (!isdigit(static_cast<unsigned char>(*s))) return false;
-    s++;
-  }
   return true;
 }
 
