@@ -10,6 +10,8 @@
 ***************************************************************************      
 */
 
+#include <ctype.h>
+
 #include <string.h>
 #include <ctype.h>
 
@@ -37,6 +39,33 @@ static bool parseMsgId(const char *token, uint8_t &msgId) {
   return true;
 }
 
+static bool isDigitStr(const char *s) {
+  if (s == nullptr || *s == '\0') return false;
+  while (*s) {
+    if (!isdigit(static_cast<unsigned char>(*s))) return false;
+    s++;
+  }
+  return true;
+}
+
+static bool parseMsgId(const char *token, uint8_t &msgId) {
+  if (!isDigitStr(token)) return false;
+  long val = strtol(token, nullptr, 10);
+  if (val < 0 || val > OT_MSGID_MAX) return false;
+  msgId = static_cast<uint8_t>(val);
+  return true;
+}
+
+// Simple digit check to validate numeric path segments before atoi()
+static bool isDigitStr(const char *s)
+{
+  if (!s || *s == '\0') return false;
+  while (*s) {
+    if (!isdigit(static_cast<unsigned char>(*s))) return false;
+    s++;
+  }
+  return true;
+}
 
 
 //=======================================================================
@@ -54,7 +83,14 @@ void processAPI()
   const bool isGet = (httpServer.method() == HTTP_GET);
   const bool isPostOrPut = (httpServer.method() == HTTP_POST || httpServer.method() == HTTP_PUT);
 
-  RESTDebugTf(PSTR("from[%s] URI[%s] method[%s] \r\n"), httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(httpServer.method()).c_str());
+  RESTDebugTf(PSTR("from[%s] URI[%s] method[%s] \r\n"), httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(method).c_str());
+
+  if (uriLen >= sizeof(URI))
+  {
+    RESTDebugTln(F("==> Bailout due to oversized URI"));
+    httpServer.send(414, "text/plain", "414: URI too long\r\n");
+    return;
+  }
 
   if (ESP.getFreeHeap() < 8500) // to prevent firmware from crashing!
   {
@@ -90,14 +126,17 @@ void processAPI()
          if (wc > 4 && strcmp(words[4], "telegraf") == 0) {
           // GET /api/v1/otgw/telegraf
           // Response: see json response
+          if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
           sendTelegraf();
          } else if (wc > 4 && strcmp(words[4], "otmonitor") == 0) {
           // GET /api/v1/otgw/otmonitor
           // Response: see json response
+          if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
           sendOTmonitor();
         } else if (wc > 4 && strcmp(words[4], "autoconfigure") == 0) {
           // POST /api/v1/otgw/autoconfigure
           // Response: sends all autodiscovery topics to MQTT for HA integration
+          if (!isPostOrPut) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
           httpServer.send(200, "text/plain", "OK");
           doAutoConfigure();
         } else if (wc > 5 && strcmp(words[4], "id") == 0){
@@ -130,6 +169,24 @@ void processAPI()
             httpServer.send(200, "text/plain", "OK");
           } else sendApiNotFound(originalURI);
         } else sendApiNotFound(originalURI);
+            if (words[5] && *words[5]) {
+              constexpr size_t kMaxCmdLen = sizeof(cmdqueue[0].cmd) - 1; // matches OT_cmd_t::cmd buffer (14 bytes)
+              size_t cmdLen = strlen(words[5]);
+              if ((cmdLen < 3) || words[5][2] != '=') {
+                httpServer.send(400, "text/plain", "400: invalid command format\r\n");
+                return;
+              }
+              if (cmdLen > kMaxCmdLen) {
+                httpServer.send(413, "text/plain", "413: command too long\r\n");
+                return;
+              }
+              addOTWGcmdtoqueue(words[5], cmdLen);
+              httpServer.send(200, "text/plain", "OK");
+            } else {
+              httpServer.send(400, "text/plain", "400: missing command\r\n");
+            }
+          } else sendApiNotFound(URI);
+        } else sendApiNotFound(URI);
       }
       else sendApiNotFound(originalURI);
     } 
@@ -154,10 +211,12 @@ void processAPI()
       } 
       else if (strcmp(words[3], "devinfo") == 0)
       {
+        if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
         sendDeviceInfo();
       }
       else if (strcmp(words[3], "devtime") == 0)
       {
+        if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
         sendDeviceTime();
       }
       else if (strcmp(words[3], "settings") == 0)
@@ -508,29 +567,33 @@ void postSettings()
   //------------------------------------------------------------ 
   // so, why not use ArduinoJSON library?
   // I say: try it yourself ;-) It won't be easy
-      String wPair[5];
-      String jsonIn  = CSTR(httpServer.arg(0));
+      char* wPair[5];
+      String jsonInStr  = CSTR(httpServer.arg(0));
       char field[25] = {0,};
       char newValue[101]={0,};
-      jsonIn.replace("{", "");
-      jsonIn.replace("}", "");
-      jsonIn.replace("\"", "");
-      uint_fast8_t wp = splitString(jsonIn.c_str(), ',',  wPair, 5) ;
+      jsonInStr.replace("{", "");
+      jsonInStr.replace("}", "");
+      jsonInStr.replace("\"", "");
+      
+      char jsonIn[jsonInStr.length() + 1];
+      strcpy(jsonIn, jsonInStr.c_str());
+
+      uint_fast8_t wp = splitString(jsonIn, ',',  wPair, 5) ;
       for (uint_fast8_t i=0; i<wp; i++)
       {
-        String wOut[5];
-        //RESTDebugTf(PSTR("[%d] -> pair[%s]\r\n"), i, wPair[i].c_str());
-        uint8_t wc = splitString(wPair[i].c_str(), ':',  wOut, 5) ;
-        //RESTDebugTf(PSTR("==> [%s] -> field[%s]->val[%s]\r\n"), wPair[i].c_str(), wOut[0].c_str(), wOut[1].c_str());
+        char* wOut[5];
+        //RESTDebugTf(PSTR("[%d] -> pair[%s]\r\n"), i, wPair[i]);
+        uint8_t wc = splitString(wPair[i], ':',  wOut, 5) ;
+        //RESTDebugTf(PSTR("==> [%s] -> field[%s]->val[%s]\r\n"), wPair[i], wOut[0], wOut[1]);
         if (wc>1) {
             if (wOut[0].equalsIgnoreCase("name")) {
               if ( wOut[1].length() < (sizeof(field)-1) ) {
-                strlcpy(field, wOut[1].c_str(), sizeof(field));
+                strncpy(field, wOut[1].c_str(), sizeof(field));
               }
             }
             else if (wOut[0].equalsIgnoreCase("value")) {
               if ( wOut[1].length() < (sizeof(newValue)-1) ) {
-                strlcpy(newValue, wOut[1].c_str(), sizeof(newValue) );
+                strncpy(newValue, wOut[1].c_str(), sizeof(newValue) );
               }
             }
         }
