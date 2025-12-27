@@ -11,6 +11,7 @@
 */
 
 #include <string.h>
+#include <ctype.h>
 
 #define RESTDebugTln(...) ({ if (bDebugRestAPI) DebugTln(__VA_ARGS__);    })
 #define RESTDebugln(...)  ({ if (bDebugRestAPI) Debugln(__VA_ARGS__);    })
@@ -18,6 +19,23 @@
 #define RESTDebugf(...)   ({ if (bDebugRestAPI) Debugf(__VA_ARGS__);    })
 #define RESTDebugT(...)   ({ if (bDebugRestAPI) DebugT(__VA_ARGS__);    })
 #define RESTDebug(...)    ({ if (bDebugRestAPI) Debug(__VA_ARGS__);    })
+
+static bool isDigitStr(const char *s) {
+  if (s == nullptr || *s == '\0') return false;
+  while (*s) {
+    if (!isdigit(static_cast<unsigned char>(*s))) return false;
+    s++;
+  }
+  return true;
+}
+
+static bool parseMsgId(const char *token, uint8_t &msgId) {
+  if (!isDigitStr(token)) return false;
+  long val = strtol(token, nullptr, 10);
+  if (val < 0 || val > OT_MSGID_MAX) return false;
+  msgId = static_cast<uint8_t>(val);
+  return true;
+}
 
 
 
@@ -83,6 +101,14 @@ void processAPI()
           httpServer.send(200, "text/plain", "OK");
           doAutoConfigure();
         } else if (wc > 5 && strcmp(words[4], "id") == 0){
+          if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
+          uint8_t msgId = 0;
+          if (parseMsgId(words[5], msgId)) {
+            sendOTGWvalue(msgId);  
+          } else {
+            httpServer.send(400, "text/plain", "400: invalid msgid\r\n");
+          }
+        } else if (wc > 5 && strcmp(words[4], "label") == 0){
           //what the heck should I do?
           // /api/v1/otgw/id/{msgid}   msgid = OpenTherm Message Id (0-127)
           // Response: label, value, unit
@@ -128,7 +154,13 @@ void processAPI()
         //   "value": "0.00",
         //   "unit": "°C"
         // }
-        sendOTGWvalue((wc > 4) ? atoi(words[4]) : 0); 
+        if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
+        uint8_t msgId = 0;
+        if (wc > 4 && parseMsgId(words[4], msgId)) {
+          sendOTGWvalue(msgId); 
+        } else {
+          httpServer.send(400, "text/plain", "400: invalid msgid\r\n");
+        }
       } 
       else if (strcmp(words[3], "devinfo") == 0)
       {
