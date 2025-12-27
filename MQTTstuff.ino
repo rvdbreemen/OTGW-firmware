@@ -112,8 +112,9 @@ static bool splitLine(char *sIn, char del, byte &cID, char *cKey, size_t keySize
 }
 
 static void buildNamespace(char *dest, size_t destSize, const char *base, const char *segment, const char *node) {
+  if (!dest) return;
   dest[0] = '\0';
-  if (!dest || !base || !segment || !node) return;
+  if (!base || !segment || !node) return;
   strlcpy(dest, base, destSize);
   size_t len = strlen(dest);
   if (len > 0 && dest[len - 1] == '/') dest[len - 1] = '\0';

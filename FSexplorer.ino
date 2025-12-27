@@ -376,11 +376,11 @@ void doRedirect(String msg, int wait, const char* URL, bool reboot)
 {
   // Escape characters that break JS string literals when embedding URL
   String safeURL = String(URL);
-  safeURL.replace("\\", "\\\\");
   safeURL.replace("'", "\\'");
   safeURL.replace("\"", "\\\"");
   safeURL.replace("\n", "\\n");
   safeURL.replace("\r", "\\r");
+  safeURL.replace("\\", "\\\\");
   String redirectHTML = 
   "<!DOCTYPE HTML><html lang='en-US'>"
   "<head>"
