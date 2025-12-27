@@ -133,9 +133,9 @@ void processAPI()
       }
       else sendApiNotFound(originalURI);
     } 
-    else if (wc > 3 && strcmp(words[2], "v0") == 0)
+    else if (wc > 2 && strcmp(words[2], "v0") == 0)
     { //v0 API calls
-      if (strcmp(words[3], "otgw") == 0){
+      if (wc > 3 && strcmp(words[3], "otgw") == 0){
         //what the heck should I do?
         // /api/v0/otgw/{msgid}   msgid = OpenTherm Message Id
         // Response: label, value, unit
@@ -152,15 +152,15 @@ void processAPI()
           httpServer.send(400, "text/plain", "400: invalid msgid\r\n");
         }
       } 
-      else if (strcmp(words[3], "devinfo") == 0)
+      else if (wc > 3 && strcmp(words[3], "devinfo") == 0)
       {
         sendDeviceInfo();
       }
-      else if (strcmp(words[3], "devtime") == 0)
+      else if (wc > 3 && strcmp(words[3], "devtime") == 0)
       {
         sendDeviceTime();
       }
-      else if (strcmp(words[3], "settings") == 0)
+      else if (wc > 3 && strcmp(words[3], "settings") == 0)
       {
         if (isPostOrPut)
         {
