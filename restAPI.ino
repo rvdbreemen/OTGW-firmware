@@ -10,6 +10,8 @@
 ***************************************************************************      
 */
 
+#include <string.h>
+
 #define RESTDebugTln(...) ({ if (bDebugRestAPI) DebugTln(__VA_ARGS__);    })
 #define RESTDebugln(...)  ({ if (bDebugRestAPI) Debugln(__VA_ARGS__);    })
 #define RESTDebugTf(...)  ({ if (bDebugRestAPI) DebugTf(__VA_ARGS__);    })
@@ -23,10 +25,14 @@
 
 void processAPI() 
 {
+  constexpr uint8_t MAX_WORDS = 10;
+  constexpr size_t WORD_LEN = 32;
   char URI[50]   = "";
-  String words[10];
+  char words[MAX_WORDS][WORD_LEN] = {{0}};
 
   strlcpy( URI, httpServer.uri().c_str(), sizeof(URI) );
+  char originalURI[sizeof(URI)];
+  strlcpy(originalURI, URI, sizeof(originalURI));
   const bool isGet = (httpServer.method() == HTTP_GET);
   const bool isPostOrPut = (httpServer.method() == HTTP_POST || httpServer.method() == HTTP_PUT);
 
@@ -39,37 +45,44 @@ void processAPI()
     return;
   }
 
-  uint8_t wc = splitString(URI, '/', words, 10);
+  uint8_t wc = 0;
+  {
+    char *savePtr = nullptr;
+    for (char *token = strtok_r(URI, "/", &savePtr); token && wc < MAX_WORDS; token = strtok_r(nullptr, "/", &savePtr)) {
+      strlcpy(words[wc], token, WORD_LEN);
+      wc++;
+    }
+  }
   
   if (bDebugRestAPI)
   {
     DebugT(">>");
     for (uint_fast8_t  w=0; w<wc; w++)
     {
-      Debugf("word[%d] => [%s], ", w, words[w].c_str());
+      Debugf("word[%d] => [%s], ", w, words[w]);
     }
     Debugln(" ");
   }
 
-  if (words[1] == "api"){
+  if (wc > 1 && strcmp(words[1], "api") == 0){
 
-    if (words[2] == "v1") 
+    if (wc > 2 && strcmp(words[2], "v1") == 0) 
     { //v1 API calls
-      if (words[3] == "otgw"){
-         if (words[4] == "telegraf") {
+      if (wc > 3 && strcmp(words[3], "otgw") == 0){
+         if (wc > 4 && strcmp(words[4], "telegraf") == 0) {
           // GET /api/v1/otgw/telegraf
           // Response: see json response
           sendTelegraf();
-         } else if (words[4] == "otmonitor") {
+         } else if (wc > 4 && strcmp(words[4], "otmonitor") == 0) {
           // GET /api/v1/otgw/otmonitor
           // Response: see json response
           sendOTmonitor();
-        } else if (words[4] == "autoconfigure") {
+        } else if (wc > 4 && strcmp(words[4], "autoconfigure") == 0) {
           // POST /api/v1/otgw/autoconfigure
           // Response: sends all autodiscovery topics to MQTT for HA integration
           httpServer.send(200, "text/plain", "OK");
           doAutoConfigure();
-        } else if (words[4] == "id"){
+        } else if (wc > 5 && strcmp(words[4], "id") == 0){
           //what the heck should I do?
           // /api/v1/otgw/id/{msgid}   msgid = OpenTherm Message Id (0-127)
           // Response: label, value, unit
@@ -78,8 +91,8 @@ void processAPI()
           //   "value": "0.00",
           //   "unit": "°C"
           // }
-          sendOTGWvalue(words[5].toInt());  
-        } else if (words[4] == "label"){
+          sendOTGWvalue(atoi(words[5]));  
+        } else if (wc > 5 && strcmp(words[4], "label") == 0){
           //what the heck should I do?
           // /api/v1/otgw/label/{msglabel} = OpenTherm Label (matching string)
           // Response: label, value, unit
@@ -88,25 +101,25 @@ void processAPI()
           //   "value": "0.00",
           //   "unit": "°C"
           // }   
-          sendOTGWlabel(CSTR(words[5]));
-        } else if (words[4] == "command"){
-          if (isPostOrPut)
+          sendOTGWlabel(words[5]);
+        } else if (wc > 5 && strcmp(words[4], "command") == 0){
+          if (isPostOrPut && words[5][0] != '\0')
           {
             /* how to post a command to OTGW
             ** POST or PUT = /api/v1/otgw/command/{command} = Any command you want
             ** Response: 200 OK
             */
             //Add a command to OTGW queue 
-            addOTWGcmdtoqueue(CSTR(words[5]), words[5].length());
+            addOTWGcmdtoqueue(words[5], strlen(words[5]));
             httpServer.send(200, "text/plain", "OK");
-          } else sendApiNotFound(URI);
-        } else sendApiNotFound(URI);
+          } else sendApiNotFound(originalURI);
+        } else sendApiNotFound(originalURI);
       }
-      else sendApiNotFound(URI);
+      else sendApiNotFound(originalURI);
     } 
-    else if (words[2] == "v0")
+    else if (wc > 3 && strcmp(words[2], "v0") == 0)
     { //v0 API calls
-      if (words[3] == "otgw"){
+      if (strcmp(words[3], "otgw") == 0){
         //what the heck should I do?
         // /api/v0/otgw/{msgid}   msgid = OpenTherm Message Id
         // Response: label, value, unit
@@ -115,17 +128,17 @@ void processAPI()
         //   "value": "0.00",
         //   "unit": "°C"
         // }
-        sendOTGWvalue(words[4].toInt()); 
+        sendOTGWvalue((wc > 4) ? atoi(words[4]) : 0); 
       } 
-      else if (words[3] == "devinfo")
+      else if (strcmp(words[3], "devinfo") == 0)
       {
         sendDeviceInfo();
       }
-      else if (words[3] == "devtime")
+      else if (strcmp(words[3], "devtime") == 0)
       {
         sendDeviceTime();
       }
-      else if (words[3] == "settings")
+      else if (strcmp(words[3], "settings") == 0)
       {
         if (isPostOrPut)
         {
@@ -135,9 +148,9 @@ void processAPI()
         {
           sendDeviceSettings();
         }
-      } else sendApiNotFound(URI);
-    } else sendApiNotFound(URI);
-  } else sendApiNotFound(URI);
+      } else sendApiNotFound(originalURI);
+    } else sendApiNotFound(originalURI);
+  } else sendApiNotFound(originalURI);
 } // processAPI()
 
 
