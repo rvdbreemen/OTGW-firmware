@@ -110,11 +110,13 @@ void processAPI()
   char URI[50]   = "";
   char words[MAX_WORDS][WORD_LEN] = {{0}};
 
-  strlcpy( URI, httpServer.uri().c_str(), sizeof(URI) );
+  const HTTPMethod method = httpServer.method();
+  const bool isGet = (method == HTTP_GET);
+  const bool isPostOrPut = (method == HTTP_POST || method == HTTP_PUT);
+
+  const size_t uriLen = strlcpy(URI, httpServer.uri().c_str(), sizeof(URI));
   char originalURI[sizeof(URI)];
   strlcpy(originalURI, URI, sizeof(originalURI));
-  const bool isGet = (httpServer.method() == HTTP_GET);
-  const bool isPostOrPut = (httpServer.method() == HTTP_POST || httpServer.method() == HTTP_PUT);
 
   RESTDebugTf(PSTR("from[%s] URI[%s] method[%s] \r\n"), httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(method).c_str());
 
@@ -135,6 +137,12 @@ void processAPI()
   uint8_t wc = 0;
   {
     char *savePtr = nullptr;
+
+    if (URI[0] == '/' && wc < MAX_WORDS) {
+      words[wc][0] = '\0';
+      wc++;
+    }
+
     for (char *token = strtok_r(URI, "/", &savePtr); token && wc < MAX_WORDS; token = strtok_r(nullptr, "/", &savePtr)) {
       strlcpy(words[wc], token, WORD_LEN);
       wc++;
@@ -151,17 +159,17 @@ void processAPI()
     Debugln(" ");
   }
 
-  if (wc > 1 && strcmp(words[1], "api") == 0){
+  if (wc > 1 && strcmp(words[1], "api") == 0) {
 
-    if (wc > 2 && strcmp(words[2], "v1") == 0) 
+    if (wc > 2 && strcmp(words[2], "v1") == 0)
     { //v1 API calls
-      if (wc > 3 && strcmp(words[3], "otgw") == 0){
-         if (wc > 4 && strcmp(words[4], "telegraf") == 0) {
+      if (wc > 3 && strcmp(words[3], "otgw") == 0) {
+        if (wc > 4 && strcmp(words[4], "telegraf") == 0) {
           // GET /api/v1/otgw/telegraf
           // Response: see json response
           if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
           sendTelegraf();
-         } else if (wc > 4 && strcmp(words[4], "otmonitor") == 0) {
+        } else if (wc > 4 && strcmp(words[4], "otmonitor") == 0) {
           // GET /api/v1/otgw/otmonitor
           // Response: see json response
           if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
@@ -172,109 +180,95 @@ void processAPI()
           if (!isPostOrPut) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
           httpServer.send(200, "text/plain", "OK");
           doAutoConfigure();
-        } else if (wc > 5 && strcmp(words[4], "id") == 0){
+        } else if (wc > 5 && strcmp(words[4], "id") == 0) {
           if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
           uint8_t msgId = 0;
           if (parseMsgId(words[5], msgId)) {
-            sendOTGWvalue(msgId);  
+            sendOTGWvalue(msgId);
           } else {
             httpServer.send(400, "text/plain", "400: invalid msgid\r\n");
           }
-        } else if (wc > 5 && strcmp(words[4], "label") == 0){
-          //what the heck should I do?
-          // /api/v1/otgw/label/{msglabel} = OpenTherm Label (matching string)
-          // Response: label, value, unit
-          // {
-          //   "label": "Tr",
-          //   "value": "0.00",
-          //   "unit": "°C"
-          // }   
+        } else if (wc > 5 && strcmp(words[4], "label") == 0) {
+          // GET /api/v1/otgw/label/{msglabel}
+          if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
+          if (words[5][0] == '\0') { httpServer.send(400, "text/plain", "400: missing label\r\n"); return; }
           sendOTGWlabel(words[5]);
-        } else if (wc > 5 && strcmp(words[4], "command") == 0){
-          if (isPostOrPut && words[5][0] != '\0')
-          {
-            /* how to post a command to OTGW
-            ** POST or PUT = /api/v1/otgw/command/{command} = Any command you want
-            ** Response: 200 OK
-            */
-            // CSRF protection: validate origin
-            if (!isValidOrigin()) {
-              httpServer.send(403, "text/plain", "403: Forbidden - Invalid origin\r\n");
-              return;
-            }
-            //Add a command to OTGW queue 
-            addOTWGcmdtoqueue(words[5], strlen(words[5]));
-            httpServer.send(200, "text/plain", "OK");
-          } else sendApiNotFound(originalURI);
-        } else sendApiNotFound(originalURI);
-            if (words[5] && *words[5]) {
-              constexpr size_t kMaxCmdLen = sizeof(cmdqueue[0].cmd) - 1; // matches OT_cmd_t::cmd buffer (14 bytes)
-              size_t cmdLen = strlen(words[5]);
-              if ((cmdLen < 3) || words[5][2] != '=') {
-                httpServer.send(400, "text/plain", "400: invalid command format\r\n");
-                return;
-              }
-              if (cmdLen > kMaxCmdLen) {
-                httpServer.send(413, "text/plain", "413: command too long\r\n");
-                return;
-              }
-              addOTWGcmdtoqueue(words[5], cmdLen);
-              httpServer.send(200, "text/plain", "OK");
-            } else {
-              httpServer.send(400, "text/plain", "400: missing command\r\n");
-            }
-          } else sendApiNotFound(URI);
-        } else sendApiNotFound(URI);
+        } else if (wc > 5 && strcmp(words[4], "command") == 0) {
+          if (!isPostOrPut) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
+
+          // CSRF protection: validate origin
+          if (!isValidOrigin()) {
+            httpServer.send(403, "text/plain", "403: Forbidden - Invalid origin\r\n");
+            return;
+          }
+
+          if (words[5][0] == '\0') {
+            httpServer.send(400, "text/plain", "400: missing command\r\n");
+            return;
+          }
+
+          constexpr size_t kMaxCmdLen = sizeof(cmdqueue[0].cmd) - 1; // matches OT_cmd_t::cmd buffer
+          const size_t cmdLen = strlen(words[5]);
+          if ((cmdLen < 3) || (words[5][2] != '=')) {
+            httpServer.send(400, "text/plain", "400: invalid command format\r\n");
+            return;
+          }
+          if (cmdLen > kMaxCmdLen) {
+            httpServer.send(413, "text/plain", "413: command too long\r\n");
+            return;
+          }
+
+          addOTWGcmdtoqueue(words[5], static_cast<int>(cmdLen));
+          httpServer.send(200, "text/plain", "OK");
+        } else {
+          sendApiNotFound(originalURI);
+        }
+      } else {
+        sendApiNotFound(originalURI);
       }
-      else sendApiNotFound(originalURI);
-    } 
+    }
     else if (wc > 2 && strcmp(words[2], "v0") == 0)
     { //v0 API calls
-      if (wc > 3 && strcmp(words[3], "otgw") == 0){
-        //what the heck should I do?
-        // /api/v0/otgw/{msgid}   msgid = OpenTherm Message Id
-        // Response: label, value, unit
-        // {
-        //   "label": "Tr",
-        //   "value": "0.00",
-        //   "unit": "°C"
-        // }
+      if (wc > 3 && strcmp(words[3], "otgw") == 0) {
+        // GET /api/v0/otgw/{msgid}
         if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
         uint8_t msgId = 0;
         if (wc > 4 && parseMsgId(words[4], msgId)) {
-          sendOTGWvalue(msgId); 
+          sendOTGWvalue(msgId);
         } else {
           httpServer.send(400, "text/plain", "400: invalid msgid\r\n");
         }
-      } 
-      else if (wc > 3 && strcmp(words[3], "devinfo") == 0)
-      {
+      }
+      else if (wc > 3 && strcmp(words[3], "devinfo") == 0) {
         if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
         sendDeviceInfo();
       }
-      else if (wc > 3 && strcmp(words[3], "devtime") == 0)
-      {
+      else if (wc > 3 && strcmp(words[3], "devtime") == 0) {
         if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
         sendDeviceTime();
       }
-      else if (wc > 3 && strcmp(words[3], "settings") == 0)
-      {
-        if (isPostOrPut)
-        {
+      else if (wc > 3 && strcmp(words[3], "settings") == 0) {
+        if (isPostOrPut) {
           // CSRF protection: validate origin
           if (!isValidOrigin()) {
             httpServer.send(403, "text/plain", "403: Forbidden - Invalid origin\r\n");
             return;
           }
           postSettings();
-        }
-        else
-        {
+        } else if (isGet) {
           sendDeviceSettings();
+        } else {
+          httpServer.send(405, "text/plain", "405: method not allowed\r\n");
         }
-      } else sendApiNotFound(originalURI);
-    } else sendApiNotFound(originalURI);
-  } else sendApiNotFound(originalURI);
+      } else {
+        sendApiNotFound(originalURI);
+      }
+    } else {
+      sendApiNotFound(originalURI);
+    }
+  } else {
+    sendApiNotFound(originalURI);
+  }
 } // processAPI()
 
 
