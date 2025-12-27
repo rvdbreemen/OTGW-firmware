@@ -525,12 +525,12 @@ void postSettings()
         if (wc>1) {
             if (wOut[0].equalsIgnoreCase("name")) {
               if ( wOut[1].length() < (sizeof(field)-1) ) {
-                strncpy(field, wOut[1].c_str(), sizeof(field));
+                strlcpy(field, wOut[1].c_str(), sizeof(field));
               }
             }
             else if (wOut[0].equalsIgnoreCase("value")) {
               if ( wOut[1].length() < (sizeof(newValue)-1) ) {
-                strncpy(newValue, wOut[1].c_str(), sizeof(newValue) );
+                strlcpy(newValue, wOut[1].c_str(), sizeof(newValue) );
               }
             }
         }
