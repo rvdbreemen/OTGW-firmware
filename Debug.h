@@ -44,47 +44,52 @@
 
 void _debugBOL(const char *fn, int line)
 {
-   char _bol[128];
-   // This commented out code is using mix of system time and acetime to print, but it will not work on microsecond level correctly
-   // // //calculate fractional seconds to millis fraction
-   // double fractional_seconds;
-   // int microseconds;
-   // struct timespec tp;   //to enable clock_gettime()  
-   // clock_gettime(CLOCK_REALTIME, &tp); 
-   // fractional_seconds = (double) tp.tv_nsec;
-   // fractional_seconds /= 1e3;
-   // fractional_seconds = round(fractional_seconds);
-   // microseconds = (int) fractional_seconds;
-     
-   /* snprintf(_bol, sizeof(_bol), "%02d:%02d:%02d.%06d (%7u|%6u) %-12.12s(%4d): ", \
-                 hour(), minute(), second(), microseconds, \
-                 ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(),\
-                 fn, line);
-   */
-                 
-   //Alternative based on localtime function
-   timeval now;
-   //struct tm *tod;
-   gettimeofday(&now, nullptr);
-   //tod = localtime(&now.tv_sec);
-
-   /*
-   snprintf(_bol, sizeof(_bol), "%02d:%02d:%02d.%06d (%7u|%6u) %-12.12s(%4d): ", \
-                  tod->tm_hour, tod->tm_min, tod->tm_sec, (int)now.tv_usec, \
-                  ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(),\
-                  fn, line);
-   */
-
-   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
-   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
+   static char _bol[160];  // Increased size + static for stack reduction
    
-   //DebugTf(PSTR("%02d:%02d:%02d %02d-%02d-%04d\r\n"), myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
-
-   snprintf(_bol, sizeof(_bol), "%02d:%02d:%02d.%06d (%7u|%6u) %-12.12s(%4d): ", \
-                  myTime.hour(), myTime.minute(), myTime.second(), (int)now.tv_usec, \
-                  ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(),\
-                  fn, line);
-
-   TelnetStream.print (_bol);
+   // Cache timezone manager calls to avoid recreating objects
+   static TimeZone cachedTz;
+   static time_t lastTzUpdate = 0;
+   static bool tzInitialized = false;
+   time_t now_sec = time(nullptr);
+   
+   // Initialize timezone on first call or refresh every 5 minutes (300 seconds)
+   // Check now_sec > 0 to ensure time is set
+   if (now_sec > 0 && (!tzInitialized || now_sec - lastTzUpdate > 300)) {
+     TimeZone newTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+     // Only update cache if timezone is valid
+     if (!newTz.isError()) {
+       cachedTz = newTz;
+       lastTzUpdate = now_sec;
+       tzInitialized = true;
+     }
+     // If timezone creation fails, keep using previous cached timezone
+   }
+   
+   timeval now;
+   gettimeofday(&now, nullptr);
+   
+   // If timezone not yet initialized, try to initialize it now (first call fallback)
+   // This handles cases when time is not set yet (now_sec <= 0) or when primary initialization failed
+   if (!tzInitialized) {
+     cachedTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+     tzInitialized = true;  // Mark as initialized to avoid repeated attempts on every call
+     // Note: Even if timezone creation fails, the error object is safe to use
+   }
+   
+   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now_sec, cachedTz);
+   
+   // Use snprintf safely with return value checking
+   int written = snprintf(_bol, sizeof(_bol), 
+                 "%02d:%02d:%02d.%06d (%7u|%6u) %-12.12s(%4d): ", 
+                 myTime.hour(), myTime.minute(), myTime.second(), (int)now.tv_usec, 
+                 ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(),
+                 fn, line);
+   
+   // Ensure null termination even if truncated
+   if (written >= (int)sizeof(_bol)) {
+       _bol[sizeof(_bol) - 1] = '\0';
+   }
+   
+   TelnetStream.print(_bol);
 }
 #endif
