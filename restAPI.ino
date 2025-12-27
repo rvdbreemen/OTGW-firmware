@@ -37,6 +37,60 @@ static bool parseMsgId(const char *token, uint8_t &msgId) {
   return true;
 }
 
+// Helper function to validate that requests originate from the same device
+// Provides basic CSRF protection by checking Origin or Referer headers
+static bool isValidOrigin() {
+  // Get the Origin header (sent by modern browsers for POST/PUT)
+  String origin = httpServer.header("Origin");
+  // Get the Referer header as fallback
+  String referer = httpServer.header("Referer");
+  
+  // Get the Host header to compare against
+  String host = httpServer.header("Host");
+  
+  // If there's no Origin or Referer, reject (likely not from a browser or a direct API call)
+  // This prevents simple curl/wget attacks but allows legitimate browser usage
+  if (origin.length() == 0 && referer.length() == 0) {
+    RESTDebugTln(F("Rejected: No Origin or Referer header"));
+    return false;
+  }
+  
+  // Check if Origin matches our host
+  if (origin.length() > 0) {
+    // Origin format: http://host:port or https://host:port
+    // Extract just the host:port part
+    String originHost = origin;
+    originHost.replace("http://", "");
+    originHost.replace("https://", "");
+    
+    if (originHost != host) {
+      RESTDebugTf(PSTR("Rejected: Origin [%s] doesn't match Host [%s]\r\n"), originHost.c_str(), host.c_str());
+      return false;
+    }
+    return true;
+  }
+  
+  // Check if Referer matches our host
+  if (referer.length() > 0) {
+    // Referer format: http://host:port/path or https://host:port/path
+    String refererHost = referer;
+    refererHost.replace("http://", "");
+    refererHost.replace("https://", "");
+    int slashPos = refererHost.indexOf('/');
+    if (slashPos > 0) {
+      refererHost = refererHost.substring(0, slashPos);
+    }
+    
+    if (refererHost != host) {
+      RESTDebugTf(PSTR("Rejected: Referer [%s] doesn't match Host [%s]\r\n"), refererHost.c_str(), host.c_str());
+      return false;
+    }
+    return true;
+  }
+  
+  return false;
+}
+
 
 
 //=======================================================================
@@ -125,6 +179,11 @@ void processAPI()
             ** POST or PUT = /api/v1/otgw/command/{command} = Any command you want
             ** Response: 200 OK
             */
+            // CSRF protection: validate origin
+            if (!isValidOrigin()) {
+              httpServer.send(403, "text/plain", "403: Forbidden - Invalid origin\r\n");
+              return;
+            }
             //Add a command to OTGW queue 
             addOTWGcmdtoqueue(words[5], strlen(words[5]));
             httpServer.send(200, "text/plain", "OK");
@@ -164,6 +223,11 @@ void processAPI()
       {
         if (isPostOrPut)
         {
+          // CSRF protection: validate origin
+          if (!isValidOrigin()) {
+            httpServer.send(403, "text/plain", "403: Forbidden - Invalid origin\r\n");
+            return;
+          }
           postSettings();
         }
         else
