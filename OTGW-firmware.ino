@@ -154,9 +154,10 @@ void restartWifi(){
 }
 
 void sendMQTTuptime(){
-  DebugTf(PSTR("Uptime seconds: %d\r\n"), upTimeSeconds);
-  String sUptime = String(upTimeSeconds);
-  sendMQTTData(F("otgw-firmware/uptime"), sUptime, false);
+  DebugTf(PSTR("Uptime seconds: %lu\r\n"), (unsigned long)upTimeSeconds);
+  char uptimeBuf[11] = {0};
+  snprintf(uptimeBuf, sizeof(uptimeBuf), "%lu", (unsigned long)upTimeSeconds);
+  sendMQTTData(F("otgw-firmware/uptime"), uptimeBuf, false);
 }
 
 void sendtimecommand(){

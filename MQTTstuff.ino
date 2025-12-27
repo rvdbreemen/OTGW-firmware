@@ -12,6 +12,7 @@
 
 #include <PubSubClient.h>           // MQTT client publish and subscribe functionality
 #include <ctype.h>
+#include <pgmspace.h>
 
 #define MQTTDebugTln(...) ({ if (bDebugMQTT) DebugTln(__VA_ARGS__);    })
 #define MQTTDebugln(...)  ({ if (bDebugMQTT) Debugln(__VA_ARGS__);    })
@@ -471,7 +472,7 @@ void PrintMQTTError(){
   json:   <string> , payload to send
   retain: <bool> , retain mqtt message  
 */
-void sendMQTTData(const char* topic, const char *json, const bool retain = false) 
+void sendMQTTData(const char* topic, const char *json, const bool retain) 
 {
   if (!settingMQTTenable) return;
   if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
@@ -484,10 +485,11 @@ void sendMQTTData(const char* topic, const char *json, const bool retain = false
   feedWatchDog();//feed the dog
 } // sendMQTTData()
 
-void sendMQTTData(const __FlashStringHelper *topic, const char *json, const bool retain = false)
+void sendMQTTData(const __FlashStringHelper *topic, const char *json, const bool retain)
 {
   char topicBuf[MQTT_TOPIC_MAX_LEN];
-  strlcpy_P(topicBuf, (PGM_P)topic, sizeof(topicBuf));
+  strncpy_P(topicBuf, reinterpret_cast<PGM_P>(topic), sizeof(topicBuf) - 1);
+  topicBuf[sizeof(topicBuf) - 1] = '\0';
   sendMQTTData(topicBuf, json, retain);
 }
 
