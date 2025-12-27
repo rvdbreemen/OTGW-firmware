@@ -374,6 +374,13 @@ void resetWirelessButton()
 //=====================================================================================
 void doRedirect(String msg, int wait, const char* URL, bool reboot)
 {
+  // Escape characters that break JS string literals when embedding URL
+  String safeURL = String(URL);
+  safeURL.replace("\\", "\\\\");
+  safeURL.replace("'", "\\'");
+  safeURL.replace("\"", "\\\"");
+  safeURL.replace("\n", "\\n");
+  safeURL.replace("\r", "\\r");
   String redirectHTML = 
   "<!DOCTYPE HTML><html lang='en-US'>"
   "<head>"
@@ -399,7 +406,7 @@ void doRedirect(String msg, int wait, const char* URL, bool reboot)
   "          var count = div.textContent * 1 - 1;"
   "          div.textContent = count;"
   "          if (count <= 0) {"
-  "              window.location.replace('"+String(URL)+"'); "
+  "              window.location.replace('"+safeURL+"'); "
   "          } "
   "      }, 1000); "
   "  </script> "
