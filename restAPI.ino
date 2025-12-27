@@ -110,16 +110,6 @@ void processAPI()
           }
         } else if (wc > 5 && strcmp(words[4], "label") == 0){
           //what the heck should I do?
-          // /api/v1/otgw/id/{msgid}   msgid = OpenTherm Message Id (0-127)
-          // Response: label, value, unit
-          // {
-          //   "label": "Tr",
-          //   "value": "0.00",
-          //   "unit": "°C"
-          // }
-          sendOTGWvalue(atoi(words[5]));  
-        } else if (wc > 5 && strcmp(words[4], "label") == 0){
-          //what the heck should I do?
           // /api/v1/otgw/label/{msglabel} = OpenTherm Label (matching string)
           // Response: label, value, unit
           // {
