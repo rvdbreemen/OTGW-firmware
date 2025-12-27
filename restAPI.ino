@@ -50,6 +50,8 @@ static bool isValidOrigin() {
   
   // If there's no Origin or Referer, reject (likely not from a browser or a direct API call)
   // This prevents simple curl/wget attacks but allows legitimate browser usage
+  // Note: Legitimate automation tools that need access should use the web UI or 
+  // have the device configured with authentication in a future update
   if (origin.length() == 0 && referer.length() == 0) {
     RESTDebugTln(F("Rejected: No Origin or Referer header"));
     return false;
@@ -57,11 +59,13 @@ static bool isValidOrigin() {
   
   // Check if Origin matches our host
   if (origin.length() > 0) {
-    // Origin format: http://host:port or https://host:port
-    // Extract just the host:port part
+    // Origin format: protocol://host:port
+    // Find the position after "://" to extract host:port
+    int protoEnd = origin.indexOf("://");
     String originHost = origin;
-    originHost.replace("http://", "");
-    originHost.replace("https://", "");
+    if (protoEnd >= 0) {
+      originHost = origin.substring(protoEnd + 3); // Skip "://"
+    }
     
     if (originHost != host) {
       RESTDebugTf(PSTR("Rejected: Origin [%s] doesn't match Host [%s]\r\n"), originHost.c_str(), host.c_str());
@@ -72,12 +76,17 @@ static bool isValidOrigin() {
   
   // Check if Referer matches our host
   if (referer.length() > 0) {
-    // Referer format: http://host:port/path or https://host:port/path
+    // Referer format: protocol://host:port/path
+    // Find the position after "://" to extract host:port
+    int protoEnd = referer.indexOf("://");
     String refererHost = referer;
-    refererHost.replace("http://", "");
-    refererHost.replace("https://", "");
+    if (protoEnd >= 0) {
+      refererHost = referer.substring(protoEnd + 3); // Skip "://"
+    }
+    
+    // Extract just the host:port part (before the path)
     int slashPos = refererHost.indexOf('/');
-    if (slashPos > 0) {
+    if (slashPos >= 0) {
       refererHost = refererHost.substring(0, slashPos);
     }
     
