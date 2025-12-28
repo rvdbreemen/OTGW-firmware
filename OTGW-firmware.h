@@ -105,7 +105,6 @@ bool      bPSmode = false;  //default to PS=0 mode
 
 //All things that are settings 
 String    settingHostname = _HOSTNAME;
-bool      settingOTGWPICautoUpdate = true;
 
 //MQTT settings
 bool      statusMQTTconnection = false; 

@@ -778,8 +778,7 @@ var translateFields = [
   , ["gpiooutputsenabled", "GPIO Output Enabled"]
   , ["gpiooutputspin", "GPIO pin # to switch on/off"]
   , ["gpiooutputstriggerbit", "Bit X (master/slave) to trigger on (0-15)"]
-  , ["otgwpicautoupdate", "Automatically check for PIC firmware update"]
-
+  
 ];
 
 /*
