@@ -129,14 +129,16 @@ void startWiFi(const char* hostname, int timeOut)
   //--- if it does not connect it starts an access point with the specified name
   //--- here  "<HOSTNAME>-<MAC>"
   //--- and goes into a blocking loop awaiting configuration
-  OTGWSerial.printf("AutoConnect to: %s\r\n", thisAP.c_str());
-  if (!manageWiFi.autoConnect(thisAP.c_str()))
-  {
-    //-- fail to connect? Have you tried turning it off and on again? 
-    DebugTln(F("failed to connect and hit timeout"));
-    delay(2000);  // Enough time for messages to be sent.
-    ESP.restart();
-    delay(5000);  // Enough time to ensure we don't return.
+  if ( ! manageWiFi.getWiFiIsSaved()  || ESP.getResetReason() == "External System"){
+    OTGWSerial.printf("AutoConnect to: %s\r\n", thisAP.c_str());
+    if (!manageWiFi.startConfigPortal(thisAP.c_str()))
+    {
+      //-- fail to connect? Have you tried turning it off and on again?
+      DebugTln(F("failed to connect and hit timeout"));
+      delay(2000);  // Enough time for messages to be sent.
+      ESP.restart();
+      delay(5000);  // Enough time to ensure we don't return.
+    }
   }
 
   // WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
