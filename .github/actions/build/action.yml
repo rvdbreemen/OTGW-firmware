@@ -4,6 +4,10 @@ description: Build using arduino-cli and makefile
 runs:
   using: composite
   steps:
+    - id: autoinc-semver
+      run: |
+        python scripts/autoinc-semver.py . --filename version.h --githash "$GITHUB_SHA"
+      shell: bash
     - id: semver
       run: cat version.h  | sed  -n  '/^#define _SEMVER_FULL.*$/s/^#.*"\(.*\)"$/semver=\1/p' >> $GITHUB_OUTPUT
       shell: bash
