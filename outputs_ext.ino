@@ -13,15 +13,30 @@
 // 
 void setOutputState(bool set_HIGH);
 
+static bool outputsInitialized = false;
+
+static bool validateGPIOOutputsConfig() {
+  if (settingGPIOOUTPUTSpin < 0 || settingGPIOOUTPUTSpin > 16) {
+    DebugTf(PSTR("GPIO Outputs: invalid pin %d\r\n"), settingGPIOOUTPUTSpin);
+    return false;
+  }
+  if (settingGPIOOUTPUTStriggerBit < 0 || settingGPIOOUTPUTStriggerBit > 7) {
+    DebugTf(PSTR("GPIO Outputs: invalid trigger bit %d\r\n"), settingGPIOOUTPUTStriggerBit);
+    return false;
+  }
+  return true;
+}
 
 void initOutputs() {
   DebugTf(PSTR("inside initOutputsO%d...\r\n"), 1);
 
   if (!settingGPIOOUTPUTSenabled) return;
+  if (!validateGPIOOutputsConfig()) return;
 
   DebugTf(PSTR("init GPIO Output on GPIO%d...\r\n"), settingGPIOOUTPUTSpin);
 
   pinMode(settingGPIOOUTPUTSpin, OUTPUT);
+  outputsInitialized = true;
   setOutputState(OFF);
 
   // set the LED with the ledState of the variable:
@@ -35,12 +50,18 @@ void setOutputState(uint8_t status = ON){
 
 void setOutputState(bool set_HIGH = true){
   if(!settingGPIOOUTPUTSenabled) return;
+  if (!validateGPIOOutputsConfig()) return;
+  if (!outputsInitialized) {
+    pinMode(settingGPIOOUTPUTSpin, OUTPUT);
+    outputsInitialized = true;
+  }
   digitalWrite(settingGPIOOUTPUTSpin,set_HIGH?HIGH:LOW);
   DebugTf(PSTR("Output GPIO%d set to %d"), settingGPIOOUTPUTSpin, digitalRead(settingGPIOOUTPUTSpin));
 }
 
 void evalOutputs(){
   if(!settingGPIOOUTPUTSenabled) return;
+  if (!validateGPIOOutputsConfig()) return;
   // master HB
   // bit: [clear/0, set/1]
   //  0: CH enable [ CH is disabled, CH is enabled]
@@ -66,7 +87,7 @@ void evalOutputs(){
   DebugTf(PSTR("current gpio output state: %d \r\n"), digitalRead(settingGPIOOUTPUTSpin));
   DebugFlush();
 
-  bool bitState = (OTcurrentSystemState.Statusflags & (2^settingGPIOOUTPUTStriggerBit));
+  bool bitState = (OTcurrentSystemState.Statusflags & (1U << settingGPIOOUTPUTStriggerBit)) != 0;
   DebugTf(PSTR("bitState: bit: %d , state %d \r\n"), settingGPIOOUTPUTStriggerBit, bitState);
 
   setOutputState(bitState);
