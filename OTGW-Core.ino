@@ -85,9 +85,11 @@ OpenthermData_t OTdata, delayedOTdata, tmpOTdata;
 Publish usefull firmware version information to MQTT broker.
 */
 void sendMQTTversioninfo(){
+  char rebootCountBuf[12];
+  snprintf(rebootCountBuf, sizeof(rebootCountBuf), "%lu", static_cast<unsigned long>(rebootCount));
   sendMQTTData("otgw-firmware/version", _SEMVER_FULL);
-  sendMQTTData("otgw-firmware/reboot_count", String(rebootCount));
-  sendMQTTData("otgw-firmware/reboot_reason", lastReset);
+  sendMQTTData("otgw-firmware/reboot_count", rebootCountBuf);
+  sendMQTTData("otgw-firmware/reboot_reason", lastReset.c_str());
   sendMQTTData("otgw-pic/version", sPICfwversion);
   sendMQTTData("otgw-pic/deviceid", sPICdeviceid);
   sendMQTTData("otgw-pic/firmwaretype", sPICdeviceid);
@@ -102,7 +104,7 @@ void sendMQTTstateinformation(){
   sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(bOTGWthermostatstate));
   sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(bOTGWgatewaystate));
   sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(bOTGWonline));
-  sendMQTT(CSTR(MQTTPubNamespace), CONLINEOFFLINE(bOTGWonline));
+  sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(bOTGWonline));
 }
 
 //===================[ Reset OTGW ]===============================
@@ -147,16 +149,16 @@ String getpicfwversion(){
 }
 //===================[ checkOTWGpicforupdate ]=====================
 void checkOTWGpicforupdate(){
-  if (sPICfwversion.isEmpty()) {
+  if (sPICfwversion[0] == '\0') {
     sMessage = ""; //no firmware version found for some reason
   } else {
-    OTGWDebugTf(PSTR("OTGW PIC firmware version = [%s]\r\n"), CSTR(sPICfwversion));
+    OTGWDebugTf(PSTR("OTGW PIC firmware version = [%s]\r\n"), sPICfwversion);
     String latest = checkforupdatepic("gateway.hex");
     if (!bOTGWonline) {
-      sMessage = sPICfwversion; 
+      sMessage = String(sPICfwversion); 
     } else if (latest.isEmpty()) {
       sMessage = ""; //two options: no internet connection OR no firmware version
-    } else if (latest != sPICfwversion) {
+    } else if (latest != String(sPICfwversion)) {
       sMessage = "New PIC version " + latest + " available!";
     }
   }
@@ -1186,23 +1188,36 @@ void print_daytime(uint16_t& value)
 
 //void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue = false, const int16_t delay = OTGW_DELAY_SEND_MS);
 void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, const int16_t delay){
+  constexpr int kMaxCmdLen = (int)(sizeof(cmdqueue[0].cmd) - 1);
+
+  if (buf == nullptr) {
+    OTGWDebugTln(F("CmdQueue: Error: null command"));
+    return;
+  }
   if ((len < 3) || (buf[2] != '=')){ 
-    //no valid command of less then 2 bytes
-    OTGWDebugT("CmdQueue: Error:Not a valid command=[");
+    // Not a valid command
+    OTGWDebugT("CmdQueue: Error: Not a valid command=[");
     for (int i = 0; i < len; i++) {
       OTGWDebug((char)buf[i]);
     }
-    OTGWDebugf("] (%d)\r\n", len); 
+    OTGWDebugf("] (%d)\r\n", len);
+    return;
+  }
+  if (len > kMaxCmdLen) {
+    OTGWDebugTf(PSTR("CmdQueue: Error: command too long (%d > %d)\r\n"), len, kMaxCmdLen);
+    OTGWDebugFlush();
+    return;
   }
 
   //check to see if the cmd is in queue
   bool foundcmd = false;
-  int8_t insertptr = cmdptr; //set insertprt to next empty slot
+  int8_t insertptr = cmdptr; //set insertptr to next empty slot
   if (!forceQueue){
-    char cmd[2]; memset( cmd, 0, sizeof(cmd));
+    char cmd[3];
+    memset(cmd, 0, sizeof(cmd));
     memcpy(cmd, buf, 2);
     for (int i=0; i<cmdptr; i++){
-      if (strstr(cmdqueue[i].cmd, cmd)) {
+      if (strncmp(cmdqueue[i].cmd, cmd, 2) == 0) {
         //found cmd exists, set the inertptr to found slot
         foundcmd = true;
         insertptr = i;
@@ -1212,6 +1227,17 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
   } 
   if (foundcmd) OTGWDebugTf(PSTR("CmdQueue: Found cmd exists in slot [%d]\r\n"), insertptr);
   else OTGWDebugTf(PSTR("CmdQueue: Adding cmd end of queue, slot [%d]\r\n"), insertptr);
+
+  if (!foundcmd && cmdptr >= CMDQUEUE_MAX) {
+    OTGWDebugTln(F("CmdQueue: Error: Reached max queue"));
+    OTGWDebugFlush();
+    return;
+  }
+  if (insertptr < 0 || insertptr >= CMDQUEUE_MAX) {
+    OTGWDebugTf(PSTR("CmdQueue: Error: Invalid insert slot [%d]\r\n"), insertptr);
+    OTGWDebugFlush();
+    return;
+  }
 
   //insert to the queue
   OTGWDebugTf(PSTR("CmdQueue: Insert queue in slot[%d]:"), insertptr);
@@ -1227,7 +1253,8 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
   memcpy(cmdqueue[insertptr].cmd, buf, cmdlen);
   cmdqueue[insertptr].cmdlen = cmdlen;
   cmdqueue[insertptr].retrycnt = 0;
-  cmdqueue[insertptr].due = millis() + delay; //due right away
+  const uint32_t safeDelay = (delay <= 0) ? 0u : (uint32_t)delay;
+  cmdqueue[insertptr].due = millis() + safeDelay;
 
   //if not found
   if (!foundcmd) {
@@ -1235,7 +1262,10 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
     if (cmdptr < CMDQUEUE_MAX) {
       cmdptr++; //next free slot
       OTGWDebugTf(PSTR("CmdQueue: Next free queue slot: [%d]\r\n"), cmdptr);
-    } else OTGWDebugTln(F("CmdQueue: Error: Reached max queue"));
+    } else {
+      // Should be prevented above; keep as defensive fallback.
+      OTGWDebugTln(F("CmdQueue: Error: Reached max queue"));
+    }
   } else OTGWDebugTf(PSTR("CmdQueue: Found command at: [%d] - [%d]\r\n"), insertptr, cmdptr);
   OTGWDebugFlush();
 }
@@ -1247,24 +1277,30 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
 */
 void handleOTGWqueue(){
   // OTGWDebugTf(PSTR("CmdQueue: Commands in queue [%d]\r\n"), (int)cmdptr);
-  for (int i = 0; i<cmdptr; i++) {
+  const uint32_t now = millis();
+  for (int i = 0; i < cmdptr; i++) {
     // OTGWDebugTf(PSTR("CmdQueue: Checking due in queue slot[%d]:[%lu]=>[%lu]\r\n"), (int)i, (unsigned long)millis(), (unsigned long)cmdqueue[i].due);
-    if (millis() >= cmdqueue[i].due) {
+    if ((int32_t)(now - cmdqueue[i].due) >= 0) {
       OTGWDebugTf(PSTR("CmdQueue: Queue slot [%d] due\r\n"), i);
       sendOTGW(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
       cmdqueue[i].retrycnt++;
-      cmdqueue[i].due = millis() + OTGW_CMD_INTERVAL_MS;
+      cmdqueue[i].due = now + OTGW_CMD_INTERVAL_MS;
       if (cmdqueue[i].retrycnt >= OTGW_CMD_RETRY){
         //max retry reached, so delete command from queue
         OTGWDebugTf(PSTR("CmdQueue: Delete [%d] from queue\r\n"), i);
-        for (int j=i; j<cmdptr; j++){
+        for (int j = i; j < (cmdptr - 1); j++){
           // OTGWDebugTf(PSTR("CmdQueue: Moving [%d] => [%d]\r\n"), j+1, j);
-          strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[i].cmd));
+          strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[j].cmd));
           cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
           cmdqueue[j].retrycnt = cmdqueue[j+1].retrycnt;
           cmdqueue[j].due = cmdqueue[j+1].due;
         }
         cmdptr--;
+        cmdqueue[cmdptr].cmd[0] = '\0';
+        cmdqueue[cmdptr].cmdlen = 0;
+        cmdqueue[cmdptr].retrycnt = 0;
+        cmdqueue[cmdptr].due = 0;
+        i--; // re-check current index after shift
       }
       // //exit queue handling, after 1 command
       // return;
@@ -1302,21 +1338,26 @@ void checkOTGWcmdqueue(const char *buf, unsigned int len){
   memcpy(value, buf+3, ((len-3)<(sizeof(value)-1))?(len-3):(sizeof(value)-1));
   for (int i=0; i<cmdptr; i++){
       OTGWDebugTf(PSTR("CmdQueue: Checking [%2s]==>[%d]:[%s] from queue\r\n"), cmd, i, cmdqueue[i].cmd); 
-    if (strstr(cmdqueue[i].cmd, cmd)){
+    if (strncmp(cmdqueue[i].cmd, cmd, 2) == 0){
       //command found, check value
       OTGWDebugTf(PSTR("CmdQueue: Found cmd [%2s]==>[%d]:[%s]\r\n"), cmd, i, cmdqueue[i].cmd); 
       // if(strstr(cmdqueue[i].cmd, value)){
         //value found, thus remove command from queue
         OTGWDebugTf(PSTR("CmdQueue: Found value [%s]==>[%d]:[%s]\r\n"), value, i, cmdqueue[i].cmd); 
         OTGWDebugTf(PSTR("CmdQueue: Remove from queue [%d]:[%s] from queue\r\n"), i, cmdqueue[i].cmd);
-        for (int j=i; j<cmdptr; j++){
+        for (int j = i; j < (cmdptr - 1); j++){
           OTGWDebugTf(PSTR("CmdQueue: Moving [%d] => [%d]\r\n"), j+1, j);
-          strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[i].cmd));
+          strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[j].cmd));
           cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
           cmdqueue[j].retrycnt = cmdqueue[j+1].retrycnt;
           cmdqueue[j].due = cmdqueue[j+1].due;
         }
         cmdptr--;
+        cmdqueue[cmdptr].cmd[0] = '\0';
+        cmdqueue[cmdptr].cmdlen = 0;
+        cmdqueue[cmdptr].retrycnt = 0;
+        cmdqueue[cmdptr].due = 0;
+        break;
       // } else OTGWDebugTf(PSTR("Error: Did not find value [%s]==>[%d]:[%s]\r\n"), value, i, cmdqueue[i].cmd); 
     }
   }
@@ -1437,7 +1478,7 @@ void processOT(const char *buf, int len){
     bOTGWonline = (bOTGWboilerstate && bOTGWthermostatstate) || (bOTGWboilerstate && bOTGWgatewaystate);
     if ((bOTGWonline != bOTGWpreviousstate) || (cntOTmessagesprocessed==1)){
       sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(bOTGWonline));
-      sendMQTT(CSTR(MQTTPubNamespace), CONLINEOFFLINE(bOTGWonline));
+      sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(bOTGWonline));
       // nodeMCU online/offline zelf naar 'otgw-firmware/' pushen
       bOTGWpreviousstate = bOTGWonline; //remember state, so we can detect statechanges
     }
@@ -1680,29 +1721,37 @@ void processOT(const char *buf, int len){
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
     checkOTGWcmdqueue(buf, len);
   } else if (strstr(buf, "\r\nError 01")!= NULL) {
+    char errorBuf[12];
     OTcurrentSystemState.error01++;
     OTGWDebugTf(PSTR("\r\nError 01 = %d\r\n"),OTcurrentSystemState.error01);
-    sendMQTTData(F("Error 01"), String(OTcurrentSystemState.error01));
+    snprintf(errorBuf, sizeof(errorBuf), "%u", OTcurrentSystemState.error01);
+    sendMQTTData(F("Error 01"), errorBuf);
   } else if (strstr(buf, "Error 02")!= NULL) {
+    char errorBuf[12];
     OTcurrentSystemState.error02++;
     OTGWDebugTf(PSTR("\r\nError 02 = %d\r\n"),OTcurrentSystemState.error02);
-    sendMQTTData(F("Error 02"), String(OTcurrentSystemState.error02));
+    snprintf(errorBuf, sizeof(errorBuf), "%u", OTcurrentSystemState.error02);
+    sendMQTTData(F("Error 02"), errorBuf);
   } else if (strstr(buf, "Error 03")!= NULL) {
+    char errorBuf[12];
     OTcurrentSystemState.error03++;
     OTGWDebugTf(PSTR("\r\nError 03 = %d\r\n"),OTcurrentSystemState.error03);
-    sendMQTTData(F("Error 03"), String(OTcurrentSystemState.error03));
+    snprintf(errorBuf, sizeof(errorBuf), "%u", OTcurrentSystemState.error03);
+    sendMQTTData(F("Error 03"), errorBuf);
   } else if (strstr(buf, "Error 04")!= NULL){
+    char errorBuf[12];
     OTcurrentSystemState.error04++;
     OTGWDebugTf(PSTR("\r\nError 04 = %d\r\n"),OTcurrentSystemState.error04);
-    sendMQTTData(F("Error 04"), String(OTcurrentSystemState.error04));
+    snprintf(errorBuf, sizeof(errorBuf), "%u", OTcurrentSystemState.error04);
+    sendMQTTData(F("Error 04"), errorBuf);
   } else if (strstr(buf, OTGW_BANNER)!=NULL){
     //found a banner, so get the version of PIC
-    sPICfwversion = String(OTGWSerial.firmwareVersion());
-    OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
-    sPICdeviceid = OTGWSerial.processorToString();
-    OTGWDebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));    
-    sPICtype = OTGWSerial.firmwareToString();
-    OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), CSTR(sPICtype));
+    strlcpy(sPICfwversion, OTGWSerial.firmwareVersion(), sizeof(sPICfwversion));
+    OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), sPICfwversion);
+    strlcpy(sPICdeviceid, OTGWSerial.processorToString().c_str(), sizeof(sPICdeviceid));
+    OTGWDebugTf(PSTR("Current device id: %s\r\n"), sPICdeviceid);    
+    strlcpy(sPICtype, OTGWSerial.firmwareToString().c_str(), sizeof(sPICtype));
+    OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), sPICtype);
   } else {
     OTGWDebugTf(PSTR("Not processed, received from OTGW => (%s) [%d]\r\n"), buf, len);
   }
@@ -1757,8 +1806,33 @@ void handleOTGW()
       sRead[bytes_read] = '\0';
       processOT(sRead, bytes_read);
       bytes_read = 0;
-    } else if (bytes_read < (MAX_BUFFER_READ-1))
+    } else if (bytes_read < (MAX_BUFFER_READ-1)) {
       sRead[bytes_read++] = outByte;
+    } else {
+      // Buffer overflow detected - discard current buffer and log error
+      OTcurrentSystemState.errorBufferOverflow++;
+      DebugTf(PSTR("Serial Buffer Overflow! Discarding %d bytes. Total overflows: %d\r\n"), 
+              bytes_read, OTcurrentSystemState.errorBufferOverflow);
+      // Rate limit MQTT notifications - only send every 10 overflows to avoid overwhelming broker
+      static uint8_t overflowsSinceLastReport = 0;
+      overflowsSinceLastReport++;
+      if (overflowsSinceLastReport >= 10) {
+        sendMQTTData(F("Error_BufferOverflow"), String(OTcurrentSystemState.errorBufferOverflow));
+        overflowsSinceLastReport = 0;
+      }
+      // Reset buffer to prevent processing corrupted data
+      bytes_read = 0;
+      // Skip remaining bytes until we hit a line terminator to resync (max 256 bytes to prevent blocking)
+      uint16_t skipCount = 0;
+      while (OTGWSerial.available() && skipCount < MAX_BUFFER_READ) {
+        outByte = OTGWSerial.read();
+        OTGWstream.write(outByte);
+        skipCount++;
+        if (outByte == '\r' || outByte == '\n') {
+          break;
+        }
+      }
+    }
   }
 
   //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
@@ -1965,14 +2039,14 @@ void fwupgradestep(int pct) {
 
 void fwreportinfo(OTGWFirmware fw, const char *version) {
     DebugTln(F("Callback: fwreportinfo"));
-    sPICfwversion = String(version);
+    strlcpy(sPICfwversion, version, sizeof(sPICfwversion));
     //sPICfwversion = String(OTGWSerial.firmwareVersion());
-    DebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
-    sPICdeviceid = OTGWSerial.processorToString();
-    DebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));
+    DebugTf(PSTR("Current firmware version: %s\r\n"), sPICfwversion);
+    strlcpy(sPICdeviceid, OTGWSerial.processorToString().c_str(), sizeof(sPICdeviceid));
+    DebugTf(PSTR("Current device id: %s\r\n"), sPICdeviceid);
     //instead of using the firmware string
-    sPICtype = OTGWSerial.firmwareToString(fw);
-    OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), CSTR(sPICtype));
+    strlcpy(sPICtype, OTGWSerial.firmwareToString(fw).c_str(), sizeof(sPICtype));
+    OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), sPICtype);
 }
 
 void fwupgradestart(const char *hexfile) {
@@ -1995,7 +2069,7 @@ String checkforupdatepic(String filename){
   String latest = "";
   int code;
 
-  http.begin(client, "http://otgw.tclcode.com/download/" + sPICdeviceid + "/" + filename);
+  http.begin(client, "http://otgw.tclcode.com/download/" + String(sPICdeviceid) + "/" + filename);
   char useragent[40] = "esp8266-otgw-firmware/";
   strlcat(useragent, _SEMVER_CORE, sizeof(useragent));
   http.setUserAgent(useragent);
@@ -2014,7 +2088,7 @@ String checkforupdatepic(String filename){
 }
 
 void refreshpic(String filename, String version) {
-  if (sPICdeviceid=="unknown") return; // no pic version found, don't upgrade
+  if (strcmp(sPICdeviceid, "unknown") == 0) return; // no pic version found, don't upgrade
 
   WiFiClient client;
   HTTPClient http;
@@ -2024,18 +2098,18 @@ void refreshpic(String filename, String version) {
   latest = checkforupdatepic(filename);
 
   if (latest != version) {
-    OTGWDebugTf(PSTR("Update (%s)%s: %s -> %s\r\n"), sPICdeviceid.c_str(), filename.c_str(), version.c_str(), latest.c_str());
-    http.begin(client, "http://otgw.tclcode.com/download/" + sPICdeviceid + "/" + filename);
+    OTGWDebugTf(PSTR("Update (%s)%s: %s -> %s\r\n"), sPICdeviceid, filename.c_str(), version.c_str(), latest.c_str());
+    http.begin(client, "http://otgw.tclcode.com/download/" + String(sPICdeviceid) + "/" + filename);
     char useragent[40] = "esp8266-otgw-firmware/";
     strlcat(useragent, _SEMVER_CORE, sizeof(useragent));
     http.setUserAgent(useragent);
     code = http.GET();
     if (code == HTTP_CODE_OK) {
-      File f = LittleFS.open("/" + sPICdeviceid + "/" + filename, "w");
+      File f = LittleFS.open("/" + String(sPICdeviceid) + "/" + filename, "w");
       if (f) {
         http.writeToStream(&f);
         f.close();
-        String verfile = "/" + sPICdeviceid + "/" + filename;
+        String verfile = "/" + String(sPICdeviceid) + "/" + filename;
         verfile.replace(".hex", ".ver");
         f = LittleFS.open(verfile, "w");
         if (f) {
@@ -2050,26 +2124,33 @@ void refreshpic(String filename, String version) {
 }
 
 void upgradepic() {
-  String action = httpServer.arg("action");
-  String filename = httpServer.arg("name");
-  String version = httpServer.arg("version");
-  DebugTf(PSTR("Action: %s %s %s\r\n"), action.c_str(), filename.c_str(), version.c_str());
-  if (sPICdeviceid=="unknown") {
+  const char *action = httpServer.arg("action").c_str();
+  const char *filename = httpServer.arg("name").c_str();
+  const char *version = httpServer.arg("version").c_str();
+  
+  DebugTf(PSTR("Action: %s %s %s\r\n"), action, filename, version);
+  
+  if (strcmp(sPICdeviceid, "unknown") == 0) {
     DebugTln(F("No PIC device id is unknown, don't upgrade"));
     return; // no pic version found, don't upgrade
   }
-  if (action == "upgrade") {
-    DebugTf(PSTR("Upgrade /%s/%s\r\n"), sPICdeviceid.c_str(), filename.c_str());
-    upgradepicnow(String(filename).c_str());
-  } else if (action == "refresh") {
-    DebugTf(PSTR("Refresh %s/%s\r\n"), sPICdeviceid.c_str(), filename.c_str());
+  
+  if (strcmp(action, "upgrade") == 0) {
+    DebugTf(PSTR("Upgrade /%s/%s\r\n"), sPICdeviceid, filename);
+    upgradepicnow(filename);
+  } else if (strcmp(action, "refresh") == 0) {
+    DebugTf(PSTR("Refresh %s/%s\r\n"), sPICdeviceid, filename);
     refreshpic(filename, version);
-  } else if (action == "delete") {
-    DebugTf(PSTR("Delete %s/%s\r\n"), sPICdeviceid.c_str(), filename.c_str());
-    String path = "/" + sPICdeviceid + "/" + filename;
+  } else if (strcmp(action, "delete") == 0) {
+    DebugTf(PSTR("Delete %s/%s\r\n"), sPICdeviceid, filename);
+    char path[64];
+    snprintf(path, sizeof(path), "/%s/%s", sPICdeviceid, filename);
     LittleFS.remove(path);
-    path.replace(".hex", ".ver");
-    LittleFS.remove(path);
+    char *ext = strstr(path, ".hex");
+    if (ext) {
+      strcpy(ext, ".ver");
+      LittleFS.remove(path);
+    }
   }
   httpServer.sendHeader("Location", "index.html#tabPICflash", true);
   httpServer.send(303, "text/html", "<a href='index.html#tabPICflash'>Return</a>");

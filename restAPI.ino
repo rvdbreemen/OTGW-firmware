@@ -10,6 +10,9 @@
 ***************************************************************************      
 */
 
+#include <string.h>
+#include <ctype.h>
+
 #define RESTDebugTln(...) ({ if (bDebugRestAPI) DebugTln(__VA_ARGS__);    })
 #define RESTDebugln(...)  ({ if (bDebugRestAPI) Debugln(__VA_ARGS__);    })
 #define RESTDebugTf(...)  ({ if (bDebugRestAPI) DebugTf(__VA_ARGS__);    })
@@ -17,18 +20,112 @@
 #define RESTDebugT(...)   ({ if (bDebugRestAPI) DebugT(__VA_ARGS__);    })
 #define RESTDebug(...)    ({ if (bDebugRestAPI) Debug(__VA_ARGS__);    })
 
+static bool isDigitStr(const char *s) {
+  if (s == nullptr || *s == '\0') return false;
+  while (*s) {
+    if (!isdigit(static_cast<unsigned char>(*s))) return false;
+    s++;
+  }
+  return true;
+}
+
+static bool parseMsgId(const char *token, uint8_t &msgId) {
+  if (!isDigitStr(token)) return false;
+  long val = strtol(token, nullptr, 10);
+  if (val < 0 || val > OT_MSGID_MAX) return false;
+  msgId = static_cast<uint8_t>(val);
+  return true;
+}
+
+// Helper function to validate that requests originate from the same device
+// Provides basic CSRF protection by checking Origin or Referer headers
+static bool isValidOrigin() {
+  // Get the Origin header (sent by modern browsers for POST/PUT)
+  String origin = httpServer.header("Origin");
+  // Get the Referer header as fallback
+  String referer = httpServer.header("Referer");
+  
+  // Get the Host header to compare against
+  String host = httpServer.header("Host");
+  
+  // If there's no Origin or Referer, reject (likely not from a browser or a direct API call)
+  // This prevents simple curl/wget attacks but allows legitimate browser usage
+  // Note: Legitimate automation tools that need access should use the web UI or 
+  // have the device configured with authentication in a future update
+  if (origin.length() == 0 && referer.length() == 0) {
+    RESTDebugTln(F("Rejected: No Origin or Referer header"));
+    return false;
+  }
+  
+  // Check if Origin matches our host
+  if (origin.length() > 0) {
+    // Origin format: protocol://host:port
+    // Find the position after "://" to extract host:port
+    int protoEnd = origin.indexOf("://");
+    String originHost = origin;
+    if (protoEnd >= 0) {
+      originHost = origin.substring(protoEnd + 3); // Skip "://"
+    }
+    
+    if (originHost != host) {
+      RESTDebugTf(PSTR("Rejected: Origin [%s] doesn't match Host [%s]\r\n"), originHost.c_str(), host.c_str());
+      return false;
+    }
+    return true;
+  }
+  
+  // Check if Referer matches our host
+  if (referer.length() > 0) {
+    // Referer format: protocol://host:port/path
+    // Find the position after "://" to extract host:port
+    int protoEnd = referer.indexOf("://");
+    String refererHost = referer;
+    if (protoEnd >= 0) {
+      refererHost = referer.substring(protoEnd + 3); // Skip "://"
+    }
+    
+    // Extract just the host:port part (before the path)
+    int slashPos = refererHost.indexOf('/');
+    if (slashPos >= 0) {
+      refererHost = refererHost.substring(0, slashPos);
+    }
+    
+    if (refererHost != host) {
+      RESTDebugTf(PSTR("Rejected: Referer [%s] doesn't match Host [%s]\r\n"), refererHost.c_str(), host.c_str());
+      return false;
+    }
+    return true;
+  }
+  
+  return false;
+}
 
 
 //=======================================================================
 
 void processAPI() 
 {
+  constexpr uint8_t MAX_WORDS = 10;
+  constexpr size_t WORD_LEN = 32;
   char URI[50]   = "";
-  String words[10];
+  char words[MAX_WORDS][WORD_LEN] = {{0}};
 
-  strlcpy( URI, httpServer.uri().c_str(), sizeof(URI) );
+  const HTTPMethod method = httpServer.method();
+  const bool isGet = (method == HTTP_GET);
+  const bool isPostOrPut = (method == HTTP_POST || method == HTTP_PUT);
 
-  RESTDebugTf(PSTR("from[%s] URI[%s] method[%s] \r\n"), httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(httpServer.method()).c_str());
+  const size_t uriLen = strlcpy(URI, httpServer.uri().c_str(), sizeof(URI));
+  char originalURI[sizeof(URI)];
+  strlcpy(originalURI, URI, sizeof(originalURI));
+
+  RESTDebugTf(PSTR("from[%s] URI[%s] method[%s] \r\n"), httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(method).c_str());
+
+  if (uriLen >= sizeof(URI))
+  {
+    RESTDebugTln(F("==> Bailout due to oversized URI"));
+    httpServer.send(414, "text/plain", "414: URI too long\r\n");
+    return;
+  }
 
   if (ESP.getFreeHeap() < 8500) // to prevent firmware from crashing!
   {
@@ -37,105 +134,141 @@ void processAPI()
     return;
   }
 
-  uint8_t wc = splitString(URI, '/', words, 10);
+  uint8_t wc = 0;
+  {
+    char *savePtr = nullptr;
+
+    if (URI[0] == '/' && wc < MAX_WORDS) {
+      words[wc][0] = '\0';
+      wc++;
+    }
+
+    for (char *token = strtok_r(URI, "/", &savePtr); token && wc < MAX_WORDS; token = strtok_r(nullptr, "/", &savePtr)) {
+      strlcpy(words[wc], token, WORD_LEN);
+      wc++;
+    }
+  }
   
   if (bDebugRestAPI)
   {
     DebugT(">>");
     for (uint_fast8_t  w=0; w<wc; w++)
     {
-      Debugf("word[%d] => [%s], ", w, words[w].c_str());
+      Debugf("word[%d] => [%s], ", w, words[w]);
     }
     Debugln(" ");
   }
 
-  if (words[1] == "api"){
+  if (wc > 1 && strcmp(words[1], "api") == 0) {
 
-    if (words[2] == "v1") 
+    if (wc > 2 && strcmp(words[2], "v1") == 0)
     { //v1 API calls
-      if (words[3] == "otgw"){
-         if (words[4] == "telegraf") {
+      if (wc > 3 && strcmp(words[3], "otgw") == 0) {
+        if (wc > 4 && strcmp(words[4], "telegraf") == 0) {
           // GET /api/v1/otgw/telegraf
           // Response: see json response
+          if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
           sendTelegraf();
-         } else if (words[4] == "otmonitor") {
+        } else if (wc > 4 && strcmp(words[4], "otmonitor") == 0) {
           // GET /api/v1/otgw/otmonitor
           // Response: see json response
+          if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
           sendOTmonitor();
-        } else if (words[4] == "autoconfigure") {
+        } else if (wc > 4 && strcmp(words[4], "autoconfigure") == 0) {
           // POST /api/v1/otgw/autoconfigure
           // Response: sends all autodiscovery topics to MQTT for HA integration
+          if (!isPostOrPut) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
           httpServer.send(200, "text/plain", "OK");
           doAutoConfigure();
-        } else if (words[4] == "id"){
-          //what the heck should I do?
-          // /api/v1/otgw/id/{msgid}   msgid = OpenTherm Message Id (0-127)
-          // Response: label, value, unit
-          // {
-          //   "label": "Tr",
-          //   "value": "0.00",
-          //   "unit": "°C"
-          // }
-          sendOTGWvalue(words[5].toInt());  
-        } else if (words[4] == "label"){
-          //what the heck should I do?
-          // /api/v1/otgw/label/{msglabel} = OpenTherm Label (matching string)
-          // Response: label, value, unit
-          // {
-          //   "label": "Tr",
-          //   "value": "0.00",
-          //   "unit": "°C"
-          // }   
-          sendOTGWlabel(CSTR(words[5]));
-        } else if (words[4] == "command"){
-          if (httpServer.method() == HTTP_PUT || httpServer.method() == HTTP_POST)
-          {
-            /* how to post a command to OTGW
-            ** POST or PUT = /api/v1/otgw/command/{command} = Any command you want
-            ** Response: 200 OK
-            */
-            //Add a command to OTGW queue 
-            addOTWGcmdtoqueue(CSTR(words[5]), words[5].length());
-            httpServer.send(200, "text/plain", "OK");
-          } else sendApiNotFound(URI);
-        } else sendApiNotFound(URI);
+        } else if (wc > 5 && strcmp(words[4], "id") == 0) {
+          if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
+          uint8_t msgId = 0;
+          if (parseMsgId(words[5], msgId)) {
+            sendOTGWvalue(msgId);
+          } else {
+            httpServer.send(400, "text/plain", "400: invalid msgid\r\n");
+          }
+        } else if (wc > 5 && strcmp(words[4], "label") == 0) {
+          // GET /api/v1/otgw/label/{msglabel}
+          if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
+          if (words[5][0] == '\0') { httpServer.send(400, "text/plain", "400: missing label\r\n"); return; }
+          sendOTGWlabel(words[5]);
+        } else if (wc > 5 && strcmp(words[4], "command") == 0) {
+          if (!isPostOrPut) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
+
+          // CSRF protection: validate origin
+          if (!isValidOrigin()) {
+            httpServer.send(403, "text/plain", "403: Forbidden - Invalid origin\r\n");
+            return;
+          }
+
+          if (words[5][0] == '\0') {
+            httpServer.send(400, "text/plain", "400: missing command\r\n");
+            return;
+          }
+
+          constexpr size_t kMaxCmdLen = sizeof(cmdqueue[0].cmd) - 1; // matches OT_cmd_t::cmd buffer
+          const size_t cmdLen = strlen(words[5]);
+          if ((cmdLen < 3) || (words[5][2] != '=')) {
+            httpServer.send(400, "text/plain", "400: invalid command format\r\n");
+            return;
+          }
+          if (cmdLen > kMaxCmdLen) {
+            httpServer.send(413, "text/plain", "413: command too long\r\n");
+            return;
+          }
+
+          addOTWGcmdtoqueue(words[5], static_cast<int>(cmdLen));
+          httpServer.send(200, "text/plain", "OK");
+        } else {
+          sendApiNotFound(originalURI);
+        }
+      } else {
+        sendApiNotFound(originalURI);
       }
-      else sendApiNotFound(URI);
-    } 
-    else if (words[2] == "v0")
+    }
+    else if (wc > 2 && strcmp(words[2], "v0") == 0)
     { //v0 API calls
-      if (words[3] == "otgw"){
-        //what the heck should I do?
-        // /api/v0/otgw/{msgid}   msgid = OpenTherm Message Id
-        // Response: label, value, unit
-        // {
-        //   "label": "Tr",
-        //   "value": "0.00",
-        //   "unit": "°C"
-        // }
-        sendOTGWvalue(words[4].toInt()); 
-      } 
-      else if (words[3] == "devinfo")
-      {
+      if (wc > 3 && strcmp(words[3], "otgw") == 0) {
+        // GET /api/v0/otgw/{msgid}
+        if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
+        uint8_t msgId = 0;
+        if (wc > 4 && parseMsgId(words[4], msgId)) {
+          sendOTGWvalue(msgId);
+        } else {
+          httpServer.send(400, "text/plain", "400: invalid msgid\r\n");
+        }
+      }
+      else if (wc > 3 && strcmp(words[3], "devinfo") == 0) {
+        if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
         sendDeviceInfo();
       }
-      else if (words[3] == "devtime")
-      {
+      else if (wc > 3 && strcmp(words[3], "devtime") == 0) {
+        if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
         sendDeviceTime();
       }
-      else if (words[3] == "settings")
-      {
-        if (httpServer.method() == HTTP_PUT || httpServer.method() == HTTP_POST)
-        {
+      else if (wc > 3 && strcmp(words[3], "settings") == 0) {
+        if (isPostOrPut) {
+          // CSRF protection: validate origin
+          if (!isValidOrigin()) {
+            httpServer.send(403, "text/plain", "403: Forbidden - Invalid origin\r\n");
+            return;
+          }
           postSettings();
-        }
-        else
-        {
+        } else if (isGet) {
           sendDeviceSettings();
+        } else {
+          httpServer.send(405, "text/plain", "405: method not allowed\r\n");
         }
-      } else sendApiNotFound(URI);
-    } else sendApiNotFound(URI);
-  } else sendApiNotFound(URI);
+      } else {
+        sendApiNotFound(originalURI);
+      }
+    } else {
+      sendApiNotFound(originalURI);
+    }
+  } else {
+    sendApiNotFound(originalURI);
+  }
 } // processAPI()
 
 
@@ -331,9 +464,9 @@ void sendDeviceInfo()
   sendNestedJsonObj("author", "Robert van den Breemen");
   sendNestedJsonObj("fwversion", _SEMVER_FULL);
   sendNestedJsonObj("picavailable", CBOOLEAN(bPICavailable));
-  sendNestedJsonObj("picfwversion", CSTR(sPICfwversion));
-  sendNestedJsonObj("picdeviceid", CSTR(sPICdeviceid));
-  sendNestedJsonObj("picfwtype", CSTR(sPICtype));
+  sendNestedJsonObj("picfwversion", sPICfwversion);
+  sendNestedJsonObj("picdeviceid", sPICdeviceid);
+  sendNestedJsonObj("picfwtype", sPICtype);
   snprintf(cMsg, sizeof(cMsg), "%s %s", __DATE__, __TIME__);
   sendNestedJsonObj("compiled", cMsg);
   sendNestedJsonObj("hostname", CSTR(settingHostname));
@@ -441,6 +574,7 @@ void sendDeviceSettings()
   sendJsonSettingObj("ntpenable", settingNTPenable, "b");
   sendJsonSettingObj("ntptimezone", CSTR(settingNTPtimezone), "s", 50);
   sendJsonSettingObj("ntphostname", CSTR(settingNTPhostname), "s", 50);
+  sendJsonSettingObj("ntpsendtime", settingNTPsendtime, "b");
   sendJsonSettingObj("ledblink", settingLEDblink, "b");
   sendJsonSettingObj("gpiosensorsenabled", settingGPIOSENSORSenabled, "b");
   sendJsonSettingObj("gpiosensorspin", settingGPIOSENSORSpin, "i", 0, 16);
@@ -471,33 +605,37 @@ void postSettings()
   //------------------------------------------------------------ 
   // so, why not use ArduinoJSON library?
   // I say: try it yourself ;-) It won't be easy
-      String wPair[5];
-      String jsonIn  = CSTR(httpServer.arg(0));
+      char* wPair[5];
+      String jsonInStr  = CSTR(httpServer.arg(0));
       char field[25] = {0,};
       char newValue[101]={0,};
-      jsonIn.replace("{", "");
-      jsonIn.replace("}", "");
-      jsonIn.replace("\"", "");
-      uint_fast8_t wp = splitString(jsonIn.c_str(), ',',  wPair, 5) ;
-      for (uint_fast8_t i=0; i<wp; i++)
-      {
-        String wOut[5];
-        //RESTDebugTf(PSTR("[%d] -> pair[%s]\r\n"), i, wPair[i].c_str());
-        uint8_t wc = splitString(wPair[i].c_str(), ':',  wOut, 5) ;
-        //RESTDebugTf(PSTR("==> [%s] -> field[%s]->val[%s]\r\n"), wPair[i].c_str(), wOut[0].c_str(), wOut[1].c_str());
-        if (wc>1) {
-            if (wOut[0].equalsIgnoreCase("name")) {
-              if ( wOut[1].length() < (sizeof(field)-1) ) {
-                strncpy(field, wOut[1].c_str(), sizeof(field));
-              }
-            }
-            else if (wOut[0].equalsIgnoreCase("value")) {
-              if ( wOut[1].length() < (sizeof(newValue)-1) ) {
-                strncpy(newValue, wOut[1].c_str(), sizeof(newValue) );
-              }
-            }
-        }
-      }
+      jsonInStr.replace("{", "");
+      jsonInStr.replace("}", "");
+      jsonInStr.replace("\"", "");
+      
+      char jsonIn[jsonInStr.length() + 1];
+      strcpy(jsonIn, jsonInStr.c_str());
+
+      uint_fast8_t wp = splitString(jsonIn, ',',  wPair, 5) ;
+	      for (uint_fast8_t i=0; i<wp; i++)
+	      {
+	        char* wOut[5];
+	        //RESTDebugTf(PSTR("[%d] -> pair[%s]\r\n"), i, wPair[i]);
+	        uint8_t wc = splitString(wPair[i], ':',  wOut, 5) ;
+	        //RESTDebugTf(PSTR("==> [%s] -> field[%s]->val[%s]\r\n"), wPair[i], wOut[0], wOut[1]);
+	        if (wc>1) {
+	            if (wOut[0] && strcasecmp(wOut[0], "name") == 0) {
+	              if (wOut[1] && (strlen(wOut[1]) < (sizeof(field) - 1))) {
+	                strlcpy(field, wOut[1], sizeof(field));
+	              }
+	            }
+	            else if (wOut[0] && strcasecmp(wOut[0], "value") == 0) {
+	              if (wOut[1] && (strlen(wOut[1]) < (sizeof(newValue) - 1))) {
+	                strlcpy(newValue, wOut[1], sizeof(newValue));
+	              }
+	            }
+	        }
+	      }
       if ( field[0] != 0 && newValue[0] != 0 ) {
         RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
         updateSetting(field, newValue);
