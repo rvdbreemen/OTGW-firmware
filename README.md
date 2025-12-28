@@ -34,42 +34,20 @@ The features of this Nodosop OpenTherm Gateware ESP8266 based firmware are:
 - parsing the OT protocol on the ESP8266
 - parsing all known OT protocol message ID's (OpenTherm v2.2+2.3b), including Heating/Ventilation and Remeha specific msgid's
 - wide range of connection and data sharing options:
-  - telnet on port 23 (interpreted data and debugging)
+  - telnet (interpreted data and debugging)
   - MQTT (publishing every parsed OT message, publish commands to this topic `OTGW/set/<node id>/command`)
   - simple REST GET API (`http://<ip>/api/v0/otgw/{id}`)
   - simple REST GET API (`http://<ip>/api/v1/otgw/id/{id}` or `http://<ip>/api/v1/otgw/label/{textlabel eg. Tr or Toutside}`
   - simple REST PUT or POST commands on `/api/v1/otgw/command/{any command})`
   - serial interface on port 25238 for original OTmonitor application (bi-directional)
   - OTmonitor Web UI (standalone interface)
-- automatic integration with Home Assistant using _Home Assistant Discovery_ (Home Assistant Core v2021.2.0+) via MQTT
-- alternative Home Assistant integration using the [OpenTherm Gateway integration](https://www.home-assistant.io/integrations/opentherm_gw/) with connection type `socket://<ip>:25238`
+- automatic integration with Home Assistant using _Home Assistant Discovery_ (Home Assistant Core v2021.2.0+)
 - integration with any MQTT based Home Automation solution, like Domoticz (plugin available) & OpenHAB
 - reliable OTGW PIC upgrades (v0.6.0+), to the latest firmware available at http://otgw.tclcode.com/download.html
 - cleaner RestAPI's for Telegraf OTmonitor integration
 - readout Dallas-type temperture sensors (eg. DS18B20) connected to GPIO, added automatic Home Assistant Discovery
 - readout S0 output counter and timing from kWh meter connected to configurable GPIO
 - Enhance Home Assistant discovery for Dallas sensors and S0 output counter
-
-## Connectivity Options
-
-This firmware provides multiple ways to connect and interact with your OpenTherm Gateway:
-
-| Port | Protocol | Purpose | Usage |
-|------|----------|---------|-------|
-| 80 | HTTP | Web Interface & REST API | Access the configuration interface at `http://<ip>` |
-| 23 | Telnet | Debug & Logging | Connect for real-time debugging: `telnet <ip>` |
-| 25238 | Serial over TCP | OTGW Serial Interface | For OTmonitor app or Home Assistant OpenTherm Gateway integration: `socket://<ip>:25238` |
-| MQTT | MQTT | Home Automation Integration | Recommended for Home Assistant (auto-discovery enabled) |
-
-### Home Assistant Integration
-
-There are two ways to integrate with Home Assistant:
-
-1. **Recommended: MQTT Auto-Discovery** - Configure MQTT settings in the web interface. Home Assistant will automatically discover all sensors and controls.
-
-2. **Alternative: OpenTherm Gateway Integration** - Use Home Assistant's [OpenTherm Gateway integration](https://www.home-assistant.io/integrations/opentherm_gw/) with the connection string: `socket://<ip>:25238` (where `<ip>` is your device's IP address).
-
-   **Important:** Use port `25238`, not port `23`. Port 23 is for debugging only and will not work with the Home Assistant integration.
  
 **Warning: Never flash your OTGW PIC firmware through wifi using OTmonitor application, you can brick your OTGW PIC. Instead use the buildin PIC firmware upgrade feature (based on code by Schelte Bron)**
 
