@@ -278,19 +278,17 @@ void WatchDogEnabled(byte stateWatchdog){
 
 //===[ Feed the WatchDog before it bites! ]===
 void feedWatchDog() {
-  //Feed the watchdog every time this function is called to prevent hardware watchdog resets
-  //during blocking operations (e.g., serial waits, MQTT operations, file I/O)
+  //Feed the watchdog at most every 100ms to prevent hardware watchdog resets
+  //during blocking operations while limiting I2C bus traffic
   //==== feed the WD over I2C ==== 
   // Address: 0x26
-  // I2C Watchdog feed - always execute
-  Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   //Nodoshop design uses the hardware WD on I2C, address 0x26
-  Wire.write(0xA5);                             //Feed the dog, before it bites.
-  Wire.endTransmission();                       //That's all there is...
-  
-  //Blink LED at most once per second to provide visual feedback without excessive toggling
-  DECLARE_TIMER_MS(timerLEDBlink, 1000, SKIP_MISSED_TICKS);
-  if DUE(timerLEDBlink)
+  // I2C Watchdog feed - rate limited to 100ms
+  DECLARE_TIMER_MS(timerWD, 100, SKIP_MISSED_TICKS);
+  if DUE(timerWD)
   {
+    Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   //Nodoshop design uses the hardware WD on I2C, address 0x26
+    Wire.write(0xA5);                             //Feed the dog, before it bites.
+    Wire.endTransmission();                       //That's all there is...
     blinkLEDnow(LED1);
   }
   //yield(); 
