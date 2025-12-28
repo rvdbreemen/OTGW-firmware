@@ -67,9 +67,9 @@ const char *hexheaders[] = {
 #define OT_LOG_BUFFER_SIZE 512
 char ot_log_buffer[OT_LOG_BUFFER_SIZE];
 #define ClrLog()            ({ ot_log_buffer[0] = '\0'; })
-#define AddLogf(...)        ({ snprintf(ot_log_buffer+strlen(ot_log_buffer), OT_LOG_BUFFER_SIZE-strlen(ot_log_buffer), __VA_ARGS__); })
-#define AddLog(logstring)   ({ strlcat(ot_log_buffer, logstring, OT_LOG_BUFFER_SIZE); })
-#define AddLogln()          ({ strlcat(ot_log_buffer, "\r\n", OT_LOG_BUFFER_SIZE); })
+#define AddLogf(...)        ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { snprintf(ot_log_buffer + _len, OT_LOG_BUFFER_SIZE - _len, __VA_ARGS__); } })
+#define AddLog(logstring)   ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, logstring, OT_LOG_BUFFER_SIZE); } })
+#define AddLogln()          ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, "\r\n", OT_LOG_BUFFER_SIZE); } })
 
 /* --- End of LOG marcro's ---*/
 
@@ -172,8 +172,12 @@ void sendOTGWbootcmd(){
   OTGWDebugTf(PSTR("OTGW boot message = [%s]\r\n"), CSTR(settingOTGWcommands));
 
   // parse and execute commands
-  char bootcmds[settingOTGWcommands.length() + 1];
-  settingOTGWcommands.toCharArray(bootcmds, settingOTGWcommands.length() + 1);
+  char bootcmds[128];
+  size_t cmdLen = settingOTGWcommands.length();
+  if (cmdLen >= sizeof(bootcmds)) {
+    cmdLen = sizeof(bootcmds) - 1;
+  }
+  settingOTGWcommands.substring(0, cmdLen).toCharArray(bootcmds, sizeof(bootcmds));
   char* cmd;
   int i = 0;
   cmd = strtok(bootcmds, ";");
@@ -188,6 +192,10 @@ void sendOTGWbootcmd(){
 String executeCommand(const String sCmd){
   //send command to OTGW
   OTGWDebugTf(PSTR("OTGW Send Cmd [%s]\r\n"), CSTR(sCmd));
+  if (sCmd.length() < 2) {
+    OTGWDebugTln(F("Send command too short"));
+    return "SE - Command too short.";
+  }
   OTGWSerial.setTimeout(1000);
   DECLARE_TIMER_MS(tmrWaitForIt, 1000);
   while((OTGWSerial.availableForWrite() < (int)(sCmd.length()+2)) && !DUE(tmrWaitForIt)){
@@ -207,7 +215,7 @@ String executeCommand(const String sCmd){
   String line = OTGWSerial.readStringUntil('\n');
   line.trim();
   String _ret ="";
-  if (line.startsWith(_cmd)){
+  if (line.length() >= 3 && line.startsWith(_cmd) && line.charAt(2) == ':'){
     // Responses: When a serial command is accepted by the gateway, it responds with the two letters of the command code, a colon, and the interpreted data value.
     // Command:   "TT=19.125"
     // Response:  "TT: 19.13"
@@ -2126,27 +2134,32 @@ void refreshpic(String filename, String version) {
 }
 
 void upgradepic() {
-  const char *action = httpServer.arg("action").c_str();
-  const char *filename = httpServer.arg("name").c_str();
-  const char *version = httpServer.arg("version").c_str();
+  const String action = httpServer.arg("action");
+  const String filename = httpServer.arg("name");
+  const String version = httpServer.arg("version");
   
-  DebugTf(PSTR("Action: %s %s %s\r\n"), action, filename, version);
+  DebugTf(PSTR("Action: %s %s %s\r\n"), action.c_str(), filename.c_str(), version.c_str());
   
+  if (action.isEmpty() || filename.isEmpty()) {
+    httpServer.send(400, "text/plain", "Missing action or name");
+    return;
+  }
+
   if (strcmp(sPICdeviceid, "unknown") == 0) {
     DebugTln(F("No PIC device id is unknown, don't upgrade"));
     return; // no pic version found, don't upgrade
   }
   
-  if (strcmp(action, "upgrade") == 0) {
-    DebugTf(PSTR("Upgrade /%s/%s\r\n"), sPICdeviceid, filename);
-    upgradepicnow(filename);
-  } else if (strcmp(action, "refresh") == 0) {
-    DebugTf(PSTR("Refresh %s/%s\r\n"), sPICdeviceid, filename);
+  if (action == "upgrade") {
+    DebugTf(PSTR("Upgrade /%s/%s\r\n"), sPICdeviceid, filename.c_str());
+    upgradepicnow(filename.c_str());
+  } else if (action == "refresh") {
+    DebugTf(PSTR("Refresh %s/%s\r\n"), sPICdeviceid, filename.c_str());
     refreshpic(filename, version);
-  } else if (strcmp(action, "delete") == 0) {
-    DebugTf(PSTR("Delete %s/%s\r\n"), sPICdeviceid, filename);
+  } else if (action == "delete") {
+    DebugTf(PSTR("Delete %s/%s\r\n"), sPICdeviceid, filename.c_str());
     char path[64];
-    snprintf(path, sizeof(path), "/%s/%s", sPICdeviceid, filename);
+    snprintf(path, sizeof(path), "/%s/%s", sPICdeviceid, filename.c_str());
     LittleFS.remove(path);
     char *ext = strstr(path, ".hex");
     if (ext) {
