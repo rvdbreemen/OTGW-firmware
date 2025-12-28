@@ -156,22 +156,11 @@ if (settingMQTTenable) {
 // function to print a device address
 char* getDallasAddress(DeviceAddress deviceAddress)
 {
-  // DebugTf("\r\n");
-  static char dest[10];
-  dest[0] = '\0';
+  static char dest[17]; // 8 bytes * 2 chars + 1 null
   
   for (uint8_t i = 0; i < 8; i++)
   {
-    // zero pad the address if necessary
-    if (deviceAddress[i] < 16)
-    {
-      // Serial.print("0");
-      strcat(dest, "0");
-    }
-    // Serial.print(deviceAddress[i], HEX);
-    sprintf(dest+i, "%X", deviceAddress[i]);
-    // DebugTf(PSTR("blah: %s\r\n"), dest);
-    // DebugFlush();
+    snprintf(dest + (i * 2), 3, "%02X", deviceAddress[i]);
   }
   return dest;
 }

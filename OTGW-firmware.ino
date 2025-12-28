@@ -154,14 +154,16 @@ void restartWifi(){
 }
 
 void sendMQTTuptime(){
-  DebugTf(PSTR("Uptime seconds: %d\r\n"), upTimeSeconds);
-  String sUptime = String(upTimeSeconds);
-  sendMQTTData(F("otgw-firmware/uptime"), sUptime, false);
+  DebugTf(PSTR("Uptime seconds: %lu\r\n"), (unsigned long)upTimeSeconds);
+  char uptimeBuf[11] = {0};
+  snprintf(uptimeBuf, sizeof(uptimeBuf), "%lu", (unsigned long)upTimeSeconds);
+  sendMQTTData(F("otgw-firmware/uptime"), uptimeBuf, false);
 }
 
 void sendtimecommand(){
   if (bPSmode) return;                  // when in Print Summary mode (PS=1), no timesync commands (improving legacy/Domoticz compatibility)
   if (!settingNTPenable) return;        // if NTP is disabled, then return
+  if (!settingNTPsendtime) return;      // if NTP send time is disabled, then return
   if (NtpStatus != TIME_SYNC) return;   // only send time command when time is synced
   if (!bPICavailable) return;           // only send when pic is available
   if (OTGWSerial.firmwareType() != FIRMWARE_OTGW) return; //only send timecommand when in gateway firmware, not in diagnostic or interface mode
@@ -176,19 +178,19 @@ void sendtimecommand(){
   char msg[15]={0};
   //Send msg id xx: hour:minute/day of week
   int day_of_week = (myTime.dayOfWeek()+6)%7+1;
-  sprintf(msg,"SC=%d:%02d/%d", myTime.hour(), myTime.minute(), day_of_week);
+  snprintf(msg, sizeof(msg), "SC=%d:%02d/%d", myTime.hour(), myTime.minute(), day_of_week);
   sendOTGW(msg, strlen(msg)); //bypass command queue, no delays
   
   if (dayChanged()){
     //Send msg id 21: month, day
-    sprintf(msg,"SR=21:%d,%d", myTime.month(), myTime.day());
+    snprintf(msg, sizeof(msg), "SR=21:%d,%d", myTime.month(), myTime.day());
     addOTWGcmdtoqueue(msg, strlen(msg), true, 0); 
     handleOTGWqueue(); //send command right away
   }
   
   if (yearChanged()){
     //Send msg id 22: HB of Year, LB of Year 
-    sprintf(msg,"SR=22:%d,%d", (myTime.year() >> 8) & 0xFF, myTime.year() & 0xFF);
+    snprintf(msg, sizeof(msg), "SR=22:%d,%d", (myTime.year() >> 8) & 0xFF, myTime.year() & 0xFF);
     addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
     handleOTGWqueue(); //send command right away
   }
@@ -256,18 +258,18 @@ void doTaskEvery30s(){
 //===[ Do task every 60s ]===
 void doTaskEvery60s(){
   //== do tasks ==
-  if (sPICdeviceid=="unknown"){
+  if (strcmp(sPICdeviceid, "unknown") == 0){
     //keep trying to figure out which pic is used!
     DebugTln("PIC is unknown, probe pic using PR=A");
     //Force banner fetch
     getpicfwversion();
     //This should retreive the information here
-    sPICfwversion = String(OTGWSerial.firmwareVersion());
-    DebugTf(PSTR("Current firmware version: %s\r\n"), CSTR(sPICfwversion));
-    sPICdeviceid = OTGWSerial.processorToString();
-    DebugTf(PSTR("Current device id: %s\r\n"), CSTR(sPICdeviceid));    
-    sPICtype = OTGWSerial.firmwareToString();
-    DebugTf(PSTR("Current firmware type: %s\r\n"), CSTR(sPICtype));
+    strlcpy(sPICfwversion, OTGWSerial.firmwareVersion(), sizeof(sPICfwversion));
+    DebugTf(PSTR("Current firmware version: %s\r\n"), sPICfwversion);
+    strlcpy(sPICdeviceid, OTGWSerial.processorToString().c_str(), sizeof(sPICdeviceid));
+    DebugTf(PSTR("Current device id: %s\r\n"), sPICdeviceid);    
+    strlcpy(sPICtype, OTGWSerial.firmwareToString().c_str(), sizeof(sPICtype));
+    DebugTf(PSTR("Current firmware type: %s\r\n"), sPICtype);
   }
 }
 

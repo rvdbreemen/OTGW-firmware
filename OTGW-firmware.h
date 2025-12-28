@@ -59,8 +59,8 @@ void setLed(int8_t, uint8_t);
 #define ETX ((uint8_t)0x04)
 
 //prototype
-void sendMQTTData(const String, const String, const bool);
-void sendMQTTData(const char*, const char*, const bool);
+void sendMQTTData(const char*, const char*, const bool = false);
+void sendMQTTData(const __FlashStringHelper*, const char*, const bool = false);
 void addOTWGcmdtoqueue(const char* ,  int , const bool = false, const int16_t = 1000);
 
 //Global variables
@@ -92,9 +92,9 @@ const char *weekDayName[]  {  "Unknown", "Sunday", "Monday", "Tuesday", "Wednesd
 const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
 
 //Information on OTGW 
-String    sPICfwversion = "no pic found"; 
-String    sPICdeviceid = "no pic found";
-String    sPICtype = "no pic found";
+char      sPICfwversion[32] = "no pic found"; 
+char      sPICdeviceid[32] = "no pic found";
+char      sPICtype[32] = "no pic found";
 bool      bPICavailable = false;
 String    errorupgrade = ""; 
 bool      bOTGWonline = true;
@@ -124,6 +124,7 @@ bool      settingMQTTOTmessage = false;
 bool      settingNTPenable = true;
 String    settingNTPtimezone = NTP_DEFAULT_TIMEZONE;
 String    settingNTPhostname = NTP_HOST_DEFAULT;
+bool      settingNTPsendtime = false;
 bool      settingLEDblink = true;
 
 // GPIO Sensor Settings

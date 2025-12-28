@@ -158,6 +158,7 @@ typedef struct {
 	uint16_t	error02 = 0;
 	uint16_t	error03 = 0;
 	uint16_t	error04 = 0;
+	uint16_t	errorBufferOverflow = 0;
 
 } OTdataStruct;
 
@@ -318,7 +319,7 @@ enum OpenThermMessageID {
         {   3, OT_READ  , ot_flag8u8,    	"SlaveConfigMemberIDcode", "Slave Config / Member ID", "" },
         {   4, OT_RW    , ot_u8u8,       	"Command", "Command-Code", "" },
 		{   5, OT_READ  , ot_flag8u8,    	"ASFflags", "Application-specific fault", "" },
-		{   6, OT_READ  , ot_flag8u8,    	"RBPflags", "Remote-parameter flags", "" },
+		{   6, OT_READ  , ot_flag8flag8,    "RBPflags", "Remote-parameter flags", "" },
 		{   7, OT_WRITE , ot_f88,        	"CoolingControl", "Cooling control signal", "%" },
 		{   8, OT_WRITE , ot_f88,        	"TsetCH2", "Control setpoint for 2e CH circuit", "°C" },
 		{   9, OT_READ  , ot_f88,        	"TrOverride", "Remote override room setpoint", "°C" },
