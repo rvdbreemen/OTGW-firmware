@@ -1817,7 +1817,9 @@ void handleOTGW()
       static uint8_t overflowsSinceLastReport = 0;
       overflowsSinceLastReport++;
       if (overflowsSinceLastReport >= 10) {
-        sendMQTTData(F("Error_BufferOverflow"), String(OTcurrentSystemState.errorBufferOverflow));
+        char overflowCountBuf[7] = {0};
+        utoa(OTcurrentSystemState.errorBufferOverflow, overflowCountBuf, 10);
+        sendMQTTData(F("Error_BufferOverflow"), overflowCountBuf);
         overflowsSinceLastReport = 0;
       }
       // Reset buffer to prevent processing corrupted data
