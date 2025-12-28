@@ -34,3 +34,17 @@ runs:
         path: |
           build/*.elf
           build/*.bin
+          version.h
+    - id: push-version
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/dev' || startsWith(github.ref, 'refs/heads/dev-'))
+      run: |
+        if git diff --quiet -- version.h; then
+          echo "version.h unchanged; skipping commit."
+          exit 0
+        fi
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add version.h
+        git commit -m "CI: update version.h"
+        git push origin HEAD:dev
+      shell: bash
