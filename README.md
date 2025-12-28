@@ -1,62 +1,97 @@
-# ESP8266 based OTGW-firmware for Nodoshop hardware
+# OTGW-firmware (ESP8266) for NodoShop OpenTherm Gateway
 
 [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
 
-OpenTherm Nodoshop OTGW hardware - an ESP8266 firmware
-
-This project is an firmware for the Nodoshop OTGW hardware, based on ESP8266 devkits.
-
-Starting with version 2.3 of the Nodoshop hardware the devkit has changed from NodeMCU to a Wemos D1mini. This is fully supported by the hardware and this firmware. 
-
-Supporting hardware version are:
-| Version | Hardware supported |
-|-|-|
-|1.x-2.0|NodoMCU ESP8266 devkit|
-|2.3-2.x|Wemos D1mini ESP8266 devkit|
-
-It can be found here: https://www.nodo-shop.nl/nl/opentherm-gateway/211-opentherm-gateway.html  
-More information on this gateway can be read here: http://otgw.tclcode.com/  (also location of the OTGW PIC firmware) 
-
-The goal of this project is to become a fully functioning ESP8266 based OTGW-firmware that operates the OTGW as a standalone application. Providing:
-- a WebUI
-- bidirection MQTT support
+This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 “devkit” that is part of the NodoShop OTGW and turns the gateway into a standalone network device with:
+- a Web UI
+- MQTT (including Home Assistant MQTT Auto Discovery)
 - a REST API
-- automatic integration with Home Assistant (Home Assistant Core v2021.2.0+)
-- and a TCP socket for serial connection
+- a TCP serial socket compatible with OTmonitor
 
-**Breaking change: With version 0.8.0 MQTT Discovery topic naming convention has changed significantly, this will break MQTT based applications.**
-**Breaking change: With version 0.7.2 (and up) the LitteFS filesystem is used. This means you need to reflash your device using a usb cable, all settings are lost in the process.**
+The primary goal is **reliable Home Assistant integration** via MQTT and auto discovery, while keeping the OTGW behaviour compatible with existing OpenTherm tooling.
 
+## History and scope
 
-The features of this Nodosop OpenTherm Gateware ESP8266 based firmware are:
-- configuration via the webUI on port 80: flash your ESP8266 and edit settings via the webUI
-- userfriendly file handling using LittleFS (breaking change v0.7.2+)
-- parsing the OT protocol on the ESP8266
-- parsing all known OT protocol message ID's (OpenTherm v2.2+2.3b), including Heating/Ventilation and Remeha specific msgid's
-- wide range of connection and data sharing options:
-  - telnet (interpreted data and debugging)
-  - MQTT (publishing every parsed OT message, publish commands to this topic `OTGW/set/<node id>/command`)
-  - simple REST GET API (`http://<ip>/api/v0/otgw/{id}`)
-  - simple REST GET API (`http://<ip>/api/v1/otgw/id/{id}` or `http://<ip>/api/v1/otgw/label/{textlabel eg. Tr or Toutside}`
-  - simple REST PUT or POST commands on `/api/v1/otgw/command/{any command})`
-  - serial interface on port 25238 for original OTmonitor application (bi-directional)
-  - OTmonitor Web UI (standalone interface)
-- automatic integration with Home Assistant using _Home Assistant Discovery_ (Home Assistant Core v2021.2.0+)
-- integration with any MQTT based Home Automation solution, like Domoticz (plugin available) & OpenHAB
-- reliable OTGW PIC upgrades (v0.6.0+), to the latest firmware available at http://otgw.tclcode.com/download.html
-- cleaner RestAPI's for Telegraf OTmonitor integration
-- readout Dallas-type temperture sensors (eg. DS18B20) connected to GPIO, added automatic Home Assistant Discovery
-- readout S0 output counter and timing from kWh meter connected to configurable GPIO
-- Enhance Home Assistant discovery for Dallas sensors and S0 output counter
- 
-**Warning: Never flash your OTGW PIC firmware through wifi using OTmonitor application, you can brick your OTGW PIC. Instead use the buildin PIC firmware upgrade feature (based on code by Schelte Bron)**
+The OpenTherm Gateway itself (hardware + PIC firmware + OTmonitor tooling) originates from **Schelte Bron’s OTGW project**. This firmware builds on that ecosystem by running on the ESP8266 inside the **NodoShop OTGW** to expose OTGW data and controls over the network.
 
-To do:
-- InfluxDB client to do direct logging 
-- Instant update of webUI using websockets
-- Showing log of OT messages using websockets
+This project is therefore **primarily designed for the NodoShop OTGW hardware with an ESP8266** (NodeMCU / Wemos D1 mini depending on hardware revision). If you have a different OTGW build, it may work, but NodoShop OTGW compatibility is the main target.
 
-Looking for the documentation, go here (work in progress):  <br> [Wiki with Documentation](https://github.com/rvdbreemen/OTGW-firmware/wiki)
+## Hardware support
+
+Starting with hardware version 2.3, the included ESP8266 devkit changed from NodeMCU to a Wemos D1 mini. Both are supported by this firmware.
+
+| NodoShop OTGW version | ESP8266 devkit |
+|---|---|
+| 1.x–2.0 | NodeMCU ESP8266 devkit |
+| 2.3–2.x | Wemos D1 mini ESP8266 devkit |
+
+## Documentation and links
+
+- Wiki / documentation (recommended starting point): https://github.com/rvdbreemen/OTGW-firmware/wiki
+- NodoShop OTGW product page: https://www.nodo-shop.nl/nl/opentherm-gateway/211-opentherm-gateway.html
+- Original OTGW project site (Schelte Bron): http://otgw.tclcode.com/
+- OTGW PIC firmware downloads: http://otgw.tclcode.com/download.html
+- GitHub releases (prebuilt firmware binaries): https://github.com/rvdbreemen/OTGW-firmware/releases
+
+## Quick start (high level)
+
+The exact steps and screenshots live in the wiki, but the general flow is:
+
+1. Flash the latest firmware release to your ESP8266 (and flash the matching LittleFS image when required by the release).
+2. Connect the OTGW to your network and open the Web UI via `http://<device-ip>/`.
+3. Configure MQTT (broker, credentials, topic prefix) and enable Home Assistant MQTT Auto Discovery.
+4. Add the MQTT integration in Home Assistant; entities should appear automatically.
+
+## Security note
+
+The Web UI and APIs are designed for use on a trusted local network. Do not expose the device directly to the internet; use a VPN or a properly secured reverse proxy if remote access is needed.
+
+## Community and support
+
+- Discord: https://discord.gg/zjW3ju7vGQ
+- Issues / bug reports: https://github.com/rvdbreemen/OTGW-firmware/issues
+
+## What you can do with this firmware
+
+### Web UI
+- Configure the gateway via HTTP (default port 80).
+- Manage settings stored on LittleFS.
+- Perform PIC firmware maintenance (see warning below).
+
+### MQTT (including Home Assistant Auto Discovery)
+- Publishes parsed OpenTherm values to MQTT using a configurable topic prefix.
+- Supports Home Assistant MQTT Auto Discovery (Home Assistant Core v2021.2.0+).
+- Accepts OTGW commands via MQTT (topic structure depends on your configured prefix; see the wiki for exact topics and examples).
+
+### REST API
+- Read OpenTherm values via `/api/v0/` and `/api/v1/` endpoints.
+- Send OTGW commands via `/api/v1/otgw/command/...` (POST/PUT).
+
+### TCP serial socket (OTmonitor compatible)
+- Exposes a TCP socket on port `25238` for OTmonitor and other tools that speak the OTGW serial protocol.
+
+### Extra sensors
+- Dallas temperature sensors (e.g. DS18B20) with Home Assistant discovery support.
+- S0 pulse counter for kWh meters on a configurable GPIO.
+
+## Important warnings / breaking changes
+
+- **Do not flash OTGW PIC firmware over Wi-Fi using OTmonitor.** You can brick the PIC. Use the built-in PIC firmware upgrade feature instead (based on code by Schelte Bron).
+- **Breaking change (v0.8.0):** MQTT topic naming conventions changed; MQTT-based integrations may need updates.
+- **Breaking change (v0.7.2+):** LittleFS is used; switching required a full reflash via USB and settings are not preserved.
+
+## Roadmap ideas
+
+- InfluxDB client for direct logging
+- Live Web UI updates via websockets
+- Streaming OT message log via websockets
+
+## Release notes
+
+For release artifacts, see https://github.com/rvdbreemen/OTGW-firmware/releases. A running summary is kept below.
+
+<details>
+<summary>Release notes table</summary>
 
 | Version | Release notes |
 |-|-|
@@ -77,7 +112,7 @@ Looking for the documentation, go here (work in progress):  <br> [Wiki with Docu
 | 0.8.3 | New feature: Unique ID is configurable (thanks to @RobR)<br>New feature: GPIO pins follow status bits (master/slave) (thanks to @sjorsjuhmaniac)<br>Improved: Detecting online status of thermostat and boiler<br>Improved: MQTT Debug error logging<br>Fixed bug: reconnect MQTT timer and changed wait for reconnect to 42 seconds<br>Added: Rest API command now uses queues for sending commands<br>Fixed bug: msgid 32/33 type switch around<br>Changed: Solar Storage and Collector now proper names (breaking change)|  
 | 0.8.2 | Added: Command Queue to MQTT command topic<br>Bugfix: Values not updating in WebUI fixed<br>Added: verbose debug modes<br> Added check for littlefs githash<br>Added: Interval setting for sensor readout<br>Adding: Send OTGW commands on boot<br>Bugfix: Hostname now actually changes if needed.|  
 | 0.8.1 | Improved ot msg processing<br>MQTT: added `otgw-firmware/version`, `otgw-firmware/reboot_count`, `otgw-firmware/version` and `otgw-firmware/uptime` (seconds)<br>Bugfix: typoo in topic name `master_low_off_pomp_control_function` -> `master_low_off_pump_control_function`<br>Bugfix: Home Assistant thermostat operation mode (flame icon) template<br>Feature: Add support for Dallas temperature sensors, defaults GPIO10, pushes data to `otgw-firmware/sensors/<Dallas-sensor-ID>` |
-| 0.8.0 | **Breaking Change: MQTT topic naming convention has changed from `<mqqt top prefix>/<sensor>` to `<mqtt top prefix>/value/<node id>/<sensor>` for data publshed and `<mqtt top prefix>/set/<node id>/<command>` for subscriptions** <br> Update Homeasssistant Discovery: add OTGW as a device and group all exposed entities as childs <br> Update Homeasssistant Discovery: add climate (thermostat) enity, uses temporary temperature override (OTGW `TT` command) (Home Assistant Core v2021.2.0+)<br> Bugfix #14: reduce MQTT connect timeout < the watchdog timeout to prevent reboot on a timout<br> Adding LLMNR responder (http://otgw/ will work now too)<br>New restapi: Telegraf endpoint (/api/v1/otgw/telegraf)<br> Fixing bugs in core OTGW msg processor for ASF flas|
+| 0.8.0 | **Breaking Change: MQTT topic naming convention has changed from `<mqtt top prefix>/<sensor>` to `<mqtt top prefix>/value/<node id>/<sensor>` for data published and `<mqtt top prefix>/set/<node id>/<command>` for subscriptions** <br> Update Home Assistant Discovery: add OTGW as a device and group all exposed entities as children <br> Update Home Assistant Discovery: add climate (thermostat) entity, uses temporary temperature override (OTGW `TT` command) (Home Assistant Core v2021.2.0+)<br> Bugfix #14: reduce MQTT connect timeout < the watchdog timeout to prevent reboot on a timeout<br> Adding LLMNR responder (http://otgw/ will work now too)<br>New REST API: Telegraf endpoint (/api/v1/otgw/telegraf)<br> Fixing bugs in core OTGW message processor for ASF flags|
 | 0.7.8 | Update Home Assistant Discovery <br> Flexible Home Assistant prefix <br> Bugfix: Removed hardcoded OTGW topic <br> Bugfix: NTP timezone discovery removed |
 | 0.7.7 | UI improved: Only show updates values in web UI <br> Bugifx: Serial not found error when sending commands thru MQTT fixed |
 | 0.7.6 | PIC firmware integration done. <br> New setting: NTP configurable <br> New setting: heartbeat led on/off <br> Update to REST API to include epoch of last update to message|
@@ -99,6 +134,7 @@ Looking for the documentation, go here (work in progress):  <br> [Wiki with Docu
 | 0.1.0 | MQTT messaging implemented |
 | 0.0.1 | parsing of OT protocol implemented (use telnet to see)<br>Watchdog feeding implemented |
 
+</details>
 
 ## Credits
 Shoutout to early adopters helping me out testing and discussing the firmware in development. For pushing features, testing and living on the edge. 
@@ -122,3 +158,7 @@ A big thank should goto **Schelte Bron** @hvxl for amazing work on the OpenTherm
 In case you want to buy me a coffee, head over here:
 
 <a href="https://www.buymeacoffee.com/rvdbreemen"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=rvdbreemen&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00"></a>
+
+## License
+
+MIT. See `LICENSE`.
