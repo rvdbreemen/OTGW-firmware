@@ -34,7 +34,6 @@ runs:
         path: |
           build/*.elf
           build/*.bin
-          version.h
     - id: push-version
       if: github.event_name == 'push' && (github.ref == 'refs/heads/dev' || startsWith(github.ref, 'refs/heads/dev-'))
       run: |
