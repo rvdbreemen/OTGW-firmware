@@ -158,6 +158,7 @@ typedef struct {
 	uint16_t	error02 = 0;
 	uint16_t	error03 = 0;
 	uint16_t	error04 = 0;
+	uint16_t	errorBufferOverflow = 0;
 
 } OTdataStruct;
 
