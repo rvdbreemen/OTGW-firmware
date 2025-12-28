@@ -13,7 +13,7 @@ import sys
 
 
 DEFINE_RE = re.compile(r"^\s*#define\s+(\w+)\s+(.+?)\s*$")
-DEFINE_RE_WITH_GROUPS = re.compile(r"^(\s*#define\s+)(\w+)(\s+)(.+?)(\s*)$")
+DEFINE_RE_WITH_GROUPS = re.compile(r"^(\s*#define\s+)(\w+)(\s+)(.+?)([ \t]*)$")
 
 
 def normalize_token(value):
@@ -140,13 +140,24 @@ def update_version_header(path, version_info, githash, date_str, time_str, incre
 
     found = set()
     output_lines = []
-    with open(path, "r", encoding="utf-8") as file:
+    with open(path, "r", encoding="utf-8", newline="") as file:
         for line in file:
-            match = DEFINE_RE_WITH_GROUPS.match(line)
+            line_ending = ""
+            line_body = line
+            if line.endswith("\r\n"):
+                line_ending = "\r\n"
+                line_body = line[:-2]
+            elif line.endswith("\n"):
+                line_ending = "\n"
+                line_body = line[:-1]
+
+            match = DEFINE_RE_WITH_GROUPS.match(line_body)
             if match:
                 prefix, key, spacer, _value, suffix = match.groups()
                 if key in updates:
-                    output_lines.append(f"{prefix}{key}{spacer}{updates[key]}{suffix}\n")
+                    output_lines.append(
+                        f"{prefix}{key}{spacer}{updates[key]}{suffix}{line_ending}"
+                    )
                     found.add(key)
                     continue
             output_lines.append(line)
@@ -155,7 +166,7 @@ def update_version_header(path, version_info, githash, date_str, time_str, incre
     if missing:
         logging.warning("Did not update keys in %s: %s", path, ", ".join(sorted(missing)))
 
-    with open(path, "w", encoding="utf-8") as file:
+    with open(path, "w", encoding="utf-8", newline="") as file:
         file.writelines(output_lines)
 
     version_info["_VERSION_BUILD"] = str(build)
@@ -177,12 +188,12 @@ def update_version_in_file(filepath, version_info):
     if version_info.get("PRERELEASE"):
         new_version += f"-{version_info['PRERELEASE']}"
 
-    with open(filepath, "r", encoding="utf-8") as file:
+    with open(filepath, "r", encoding="utf-8", newline="") as file:
         content = file.read()
 
     updated_content = version_pattern.sub(lambda m: m.group(1) + new_version, content)
 
-    with open(filepath, "w", encoding="utf-8") as file:
+    with open(filepath, "w", encoding="utf-8", newline="") as file:
         file.write(updated_content)
 
 
