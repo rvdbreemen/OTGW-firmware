@@ -39,6 +39,7 @@ The exact steps and screenshots live in the wiki, but the general flow is:
 
 1. Flash the latest firmware release to your ESP8266 (and flash the matching LittleFS image when required by the release).
 2. Connect the OTGW to your network and open the Web UI via `http://<device-ip>/`.
+   If the device cannot connect, it starts a Wi-Fi configuration portal using an AP named `<hostname>-<mac>`.
 3. Configure MQTT (broker, credentials, topic prefix) and enable Home Assistant MQTT Auto Discovery.
 4. Add the MQTT integration in Home Assistant; entities should appear automatically.
 
@@ -74,6 +75,30 @@ The Web UI and APIs are designed for use on a trusted local network. Do not expo
 - Dallas temperature sensors (e.g. DS18B20) with Home Assistant discovery support.
 - S0 pulse counter for kWh meters on a configurable GPIO.
 
+## Connectivity options
+
+This firmware provides multiple ways to connect and interact with your OpenTherm Gateway:
+
+| Port | Protocol | Purpose | Usage |
+|------|----------|---------|-------|
+| 80 | HTTP | Web Interface & REST API | Access the configuration interface at `http://<ip>` |
+| 23 | Telnet | Debug & Logging | Connect for real-time debugging: `telnet <ip>` |
+| 25238 | Serial over TCP | OTGW Serial Interface | For OTmonitor app or Home Assistant OpenTherm Gateway integration: `socket://<ip>:25238` |
+| MQTT | MQTT | Home Automation Integration | Recommended for Home Assistant (auto-discovery enabled) |
+
+The firmware also exposes a Wi-Fi configuration portal (AP mode) when it cannot connect to a saved network.
+Use it to set up Wi-Fi credentials and reboot into normal STA mode.
+
+### Home Assistant integration
+
+There are two ways to integrate with Home Assistant:
+
+1. **Recommended: MQTT Auto-Discovery** - Configure MQTT settings in the Web UI. Home Assistant will automatically discover all sensors and controls.
+
+2. **Alternative: OpenTherm Gateway Integration** - Use Home Assistant's [OpenTherm Gateway integration](https://www.home-assistant.io/integrations/opentherm_gw/) with the connection string: `socket://<ip>:25238` (where `<ip>` is your device's IP address).
+
+   **Important:** Use port `25238`, not port `23`. Port 23 is for debugging only and will not work with the Home Assistant integration.
+
 ## Important warnings / breaking changes
 
 - **Do not flash OTGW PIC firmware over Wi-Fi using OTmonitor.** You can brick the PIC. Use the built-in PIC firmware upgrade feature instead (based on code by Schelte Bron).
@@ -95,7 +120,7 @@ For release artifacts, see https://github.com/rvdbreemen/OTGW-firmware/releases.
 
 | Version | Release notes |
 |-|-|
-| 0.10.4 | Feature: Optional NTP time sync to OTGW (new `NTPsendtime` setting)<br>Feature: PIC firmware update checks are no longer automatic; only run when manually triggered by the user<br>Feature: MQTT password is masked in the Web UI<br>Feature: Add basic CSRF protection for sensitive REST API endpoints (Origin/Referer validation)<br>Update: Bundled PIC16F1847 gateway firmware updated<br>Docs: Add OpenTherm Protocol Specification v4.2<br>Other: Many memory/robustness fixes (reduce heap fragmentation by replacing `String`/unsafe formatting with bounded buffers, fix serial buffer overflow causing data loss, fix multiple buffer overruns/bounds checks, harden REST API parsing/method validation and command queue handling, and improve URL parsing/escaping and redirect sanitization). |
+| 0.10.4 | Feature: Optional NTP time sync to OTGW (new `NTPsendtime` setting)<br>Feature: PIC firmware update checks are no longer automatic; only run when manually triggered by the user<br>Feature: MQTT password is masked in the Web UI<br>Feature: Add basic CSRF protection for sensitive REST API endpoints (Origin/Referer validation)<br>Feature: Wi-Fi configuration portal improvements (hotspot/AP behavior)<br>Update: Bundled PIC16F1847 gateway firmware updated<br>Docs: Add OpenTherm Protocol Specification v4.2<br>Fix: Improve PIC upgrade command handling/logging and GPIO output validation/initialization<br>Other: Many memory/robustness fixes (reduce heap fragmentation by replacing `String`/unsafe formatting with bounded buffers, fix serial buffer overflow causing data loss, fix multiple buffer overruns/bounds checks, harden REST API parsing/method validation and command queue handling, and improve URL parsing/escaping and redirect sanitization). |
 | 0.10.3 | Web UI: Mask MQTT password field and support running behind a reverse proxy (auto-detect http/https)<br>Home Assistant: Improve discovery templates (remove empty unit_of_measurement and add additional sensors/boundary values)<br>Fix: Status functions and REST API status reporting<br>CI: Improved GitHub Actions build/release workflow and release artifacts. |
 | 0.10.2 | Bugfix: issue #213 which caused 0 bytes after update of PIC firwmare (dropped to Adruino core 2.7.4)<br>Update to filesystem to include latest PIC firmware (6.5 and 5.8, released 12 march 2023)<br>Fix: Back to correct hostname to wifi (credits to @hvxl)<br>Fix: Adding a little memory for use with larger settings.|
 | 0.10.1 | Beter build processes to generate consistant quality using aruidno-cli and github actions (Thx to @hvxl and @DaveDavenport)<br>Maintaince to sourcetree, removed cruft, time.h library, submodules<br>Fix: parsing VH Status Master correctly<br>Enhancement: Stopping send time commands on detections of PS=1 mode<br>Fix: Mistake in MQTT configuration of auto discovery template for OEM fault code<br>Added wifi quality indication (so you can understand better)<br>Remove: Boardtype, as it was static in compiletime building|
