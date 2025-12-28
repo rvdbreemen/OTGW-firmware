@@ -589,7 +589,6 @@ void sendDeviceSettings()
   sendJsonSettingObj("gpiooutputstriggerbit", settingGPIOOUTPUTStriggerBit, "i", 0,16);
   sendJsonSettingObj("otgwcommandenable", settingOTGWcommandenable, "b");
   sendJsonSettingObj("otgwcommands", CSTR(settingOTGWcommands), "s", 128);
-  sendJsonSettingObj("otgwpicautoupdate", settingOTGWPICautoUpdate, "b");
 
   sendEndJsonObj("settings");
 
