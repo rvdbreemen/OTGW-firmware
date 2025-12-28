@@ -228,7 +228,7 @@ def main(directory, filename, git_enabled, increment, githash_override, githash_
     os.chdir(directory)
 
     version_info = parse_version_file(filename)
-    now = dt.datetime.utcnow()
+    now = dt.datetime.now(dt.timezone.utc)
     date_str = now.strftime("%d-%m-%Y")
     time_str = now.strftime("%H:%M:%S")
     githash = resolve_githash(githash_override, githash_len)
