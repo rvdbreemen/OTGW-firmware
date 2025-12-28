@@ -106,6 +106,7 @@ bool      bCheckOTGWPICupdate = true;
 
 //All things that are settings 
 String    settingHostname = _HOSTNAME;
+bool      settingOTGWPICautoUpdate = true;
 
 //MQTT settings
 bool      statusMQTTconnection = false; 

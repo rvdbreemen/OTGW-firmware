@@ -58,6 +58,7 @@ void writeSettings(bool show)
   root["GPIOOUTPUTSenabled"] = settingGPIOOUTPUTSenabled;
   root["GPIOOUTPUTSpin"] = settingGPIOOUTPUTSpin;
   root["GPIOOUTPUTStriggerBit"] = settingGPIOOUTPUTStriggerBit;
+  root["OTGWPICautoUpdate"] = settingOTGWPICautoUpdate;
 
   serializeJsonPretty(root, file);
   Debugln(F("... done!"));
@@ -95,7 +96,8 @@ void readSettings(bool show)
   // Copy values from the JsonDocument to the Config 
   settingHostname         = doc["hostname"].as<String>();
   if (settingHostname.length()==0) settingHostname = _HOSTNAME;
-  settingMQTTenable       = doc["MQTTenable"]|settingMQTTenable; 
+  settingMQTTenable       = doc["MQTTenable"]|settingMQTTenable;
+  settingOTGWPICautoUpdate = doc["OTGWPICautoUpdate"] | settingOTGWPICautoUpdate;
   settingMQTTbroker       = doc["MQTTbroker"].as<String>();
   settingMQTTbrokerPort   = doc["MQTTbrokerPort"]; //default port
   settingMQTTuser         = doc["MQTTuser"].as<String>();
@@ -171,6 +173,7 @@ void readSettings(bool show)
     Debugf("GPIO Outputs          : %s\r\n", CBOOLEAN(settingGPIOOUTPUTSenabled));
     Debugf("GPIO Out. Pin         : %d\r\n", settingGPIOOUTPUTSpin);
     Debugf("GPIO Out. Trg. Bit    : %d\r\n", settingGPIOOUTPUTStriggerBit);
+    Debugf("PIC autoupdate enabled: %s\r\n", CBOOLEAN(settingOTGWPICautoUpdate));
     }
   
   Debugln(F("-\r\n"));
@@ -296,6 +299,9 @@ void updateSetting(const char *field, const char *newValue)
     Debugln();
     DebugTf(PSTR("Need reboot before GPIO OUTPUTS will use new trigger bit %d!\r\n\n"), settingGPIOOUTPUTStriggerBit);
   }
+
+  if (strcasecmp(field, "OTGWPICautoUpdate") == 0)
+    settingOTGWPICautoUpdate = EVALBOOLEAN(newValue);
 
   //finally update write settings
   writeSettings(false);

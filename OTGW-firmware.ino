@@ -287,7 +287,7 @@ void do5minevent(){
   sendMQTTuptime();
   sendMQTTversioninfo();
   sendMQTTstateinformation();
-  if (bCheckOTGWPICupdate) {
+  if (settingOTGWPICautoUpdate && bCheckOTGWPICupdate) {
     bCheckOTGWPICupdate = false;
     checkOTWGpicforupdate();
   }
