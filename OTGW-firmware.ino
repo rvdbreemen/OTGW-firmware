@@ -287,15 +287,6 @@ void do5minevent(){
   sendMQTTuptime();
   sendMQTTversioninfo();
   sendMQTTstateinformation();
-  if (bCheckOTGWPICupdate) {
-    bCheckOTGWPICupdate = false;
-    checkOTWGpicforupdate();
-  }
-}
-
-//===[ Do task every 24 hours ]===
-void doTaskEvery24h(){
-  bCheckOTGWPICupdate = true;
 }
 
 //===[ Do the background tasks ]===
@@ -321,7 +312,6 @@ void loop()
   DECLARE_TIMER_SEC(timer30s, 30, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS);
-  DECLARE_TIMER_MIN(timer24h, 1440, CATCH_UP_MISSED_TICKS);
   
   if (DUE(timerpollsensor))         pollSensors();    // poll the temperature sensors connected to 2wire gpio pin 
   if (DUE(timers0counter))          sendS0Counters(); // poll the s0 counter connected to gpio pin when due
@@ -330,7 +320,6 @@ void loop()
   if (DUE(timer30s))                doTaskEvery30s();
   if (DUE(timer5s))                 doTaskEvery5s();
   if (DUE(timer1s))                 doTaskEvery1s();
-  if (DUE(timer24h))                doTaskEvery24h();
   if (minuteChanged())              doTaskMinuteChanged(); //exactly on the minute
   evalOutputs();                                // when the bits change, the output gpio bit will follow
   doBackgroundTasks();

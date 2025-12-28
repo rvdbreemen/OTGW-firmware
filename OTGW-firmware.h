@@ -102,7 +102,6 @@ bool      bOTGWboilerstate = false;
 bool      bOTGWthermostatstate = false;
 bool      bOTGWgatewaystate = false;
 bool      bPSmode = false;  //default to PS=0 mode
-bool      bCheckOTGWPICupdate = true;  
 
 //All things that are settings 
 String    settingHostname = _HOSTNAME;
