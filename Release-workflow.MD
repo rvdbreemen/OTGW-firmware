@@ -29,3 +29,9 @@ Release workflow
   - checkout `dev`
   - update version.h and increment the minor release with +1
   - commit change
+
+Automated release workflow
+
+ - The `.github/workflows/release.yml` workflow runs whenever you publish (not draft) a release on GitHub.
+ - It verifies the release tag exists in the repository before doing any work; if the tag is missing, the workflow stops.
+ - When the tag exists, it checks out the released tag, runs the shared setup and build scripts, and then pushes the compiled `build/*.elf`, `build/*.bin`, `build/*.littlefs.bin`, and `LICENSE` files into the GitHub Release assets via `softprops/action-gh-release`, inheriting the release metadata (name/body/prerelease) and preventing duplicate uploads with `allow_updates: true`.
