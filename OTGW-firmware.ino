@@ -257,6 +257,7 @@ void doTaskEvery30s(){
 
 //===[ Do task every 60s ]===
 void doTaskEvery60s(){
+
   //== do tasks ==
   if (strcmp(sPICdeviceid, "unknown") == 0){
     //keep trying to figure out which pic is used!
@@ -277,7 +278,9 @@ void doTaskEvery60s(){
 void doTaskMinuteChanged(){
   //== do tasks ==
   //if no wifi, try reconnecting (once a minute)
-  if (WiFi.status() != WL_CONNECTED) restartWifi();
+  if (WiFi.status() != WL_CONNECTED) {
+    restartWifi();
+  }
   DebugTln("Minute changed, sending time command to OTGW");
   sendtimecommand();
 }
@@ -321,7 +324,7 @@ void loop()
   if (DUE(timer5s))                 doTaskEvery5s();
   if (DUE(timer1s))                 doTaskEvery1s();
   if (minuteChanged())              doTaskMinuteChanged(); //exactly on the minute
-  evalOutputs();                                // when the bits change, the output gpio bit will follow
+  evalOutputs();                    // when the bits change, the output gpio bit will follow
   doBackgroundTasks();
 }
 
