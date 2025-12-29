@@ -286,13 +286,14 @@ void WatchDogEnabled(byte stateWatchdog){
     Wire.endTransmission();                       //That's all there is...
 }
 
-//===[ Feed the WatchDog before it bites! (1x per second) ]===
+//===[ Feed the WatchDog before it bites! ]===
 void feedWatchDog() {
-  //make sure to do this at least once a second
+  //Feed the watchdog at most every 100ms to prevent hardware watchdog resets
+  //during blocking operations while limiting I2C bus traffic
   //==== feed the WD over I2C ==== 
   // Address: 0x26
-  // I2C Watchdog feed
-  DECLARE_TIMER_MS(timerWD, 1000, SKIP_MISSED_TICKS);
+  // I2C Watchdog feed - rate limited to 100ms
+  DECLARE_TIMER_MS(timerWD, 100, SKIP_MISSED_TICKS);
   if DUE(timerWD)
   {
     Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   //Nodoshop design uses the hardware WD on I2C, address 0x26
