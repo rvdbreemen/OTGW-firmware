@@ -28,13 +28,13 @@
 #include "version.h"
 #include "OTGW-firmware.h"
 
-#define SetupDebugTln(...) ({ if (bPICavailable) DebugTln(__VA_ARGS__);    })
-#define SetupDebugln(...)  ({ if (bPICavailable) Debugln(__VA_ARGS__);    })
-#define SetupDebugTf(...)  ({ if (bPICavailable) DebugTf(__VA_ARGS__);    })
-#define SetupDebugf(...)   ({ if (bPICavailable) Debugf(__VA_ARGS__);    })
-#define SetupDebugT(...)   ({ if (bPICavailable) DebugT(__VA_ARGS__);    })
-#define SetupDebug(...)    ({ if (bPICavailable) Debug(__VA_ARGS__);    })
-#define SetupDebugFlush()  ({ if (bPICavailable) DebugFlush();    })
+#define SetupDebugTln(...) ({  DebugTln(__VA_ARGS__);    })
+#define SetupDebugln(...)  ({  Debugln(__VA_ARGS__);    })
+#define SetupDebugTf(...)  ({  DebugTf(__VA_ARGS__);    })
+#define SetupDebugf(...)   ({  Debugf(__VA_ARGS__);    })
+#define SetupDebugT(...)   ({  DebugT(__VA_ARGS__);    })
+#define SetupDebug(...)    ({  Debug(__VA_ARGS__);    })
+#define SetupDebugFlush()  ({  DebugFlush();    })
 
 #define ON LOW
 #define OFF HIGH
