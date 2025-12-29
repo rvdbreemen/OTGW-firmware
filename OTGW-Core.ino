@@ -299,6 +299,13 @@ void feedWatchDog() {
     Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   //Nodoshop design uses the hardware WD on I2C, address 0x26
     Wire.write(0xA5);                             //Feed the dog, before it bites.
     Wire.endTransmission();                       //That's all there is...
+
+  }
+
+  //==== blink LED1 once a second to show we are alive ====
+  DECLARE_TIMER_MS(timerWDBlink, 1000, SKIP_MISSED_TICKS);
+  if DUE(timerWDBlink)
+  {
     blinkLEDnow(LED1);
   }
   //yield(); 
