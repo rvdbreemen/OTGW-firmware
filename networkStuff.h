@@ -76,6 +76,8 @@ bool        isConnected = false;
 
 #define WM_DEBUG_PORT OTGWSerial
 
+void feedWatchDog();
+
 //gets called when WiFiManager enters configuration mode
 //===========================================================================================
 void configModeCallback (WiFiManager *myWiFiManager) 
@@ -104,8 +106,7 @@ void startWiFi(const char* hostname, int timeOut)
   uint32_t lTime = millis();
   String thisAP = String(hostname) + "-" + WiFi.macAddress();
 
-  OTGWSerial.println("\n
-    Start Wifi ...");
+  OTGWSerial.println("\nStart Wifi ...");
   manageWiFi.setDebugOutput(true);
 
   //--- next line in release needs to be commented out!
@@ -145,6 +146,18 @@ void startWiFi(const char* hostname, int timeOut)
   // WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
+
+  // Wait for connection to wifi  
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    DECLARE_TIMER_SEC(timeoutWifiConnect, timeOut, CATCH_UP_MISSED_TICKS);
+    while ((WiFi.status() != WL_CONNECTED))
+    {
+      delay(100);
+      feedWatchDog();
+      if DUE(timeoutWifiConnect) break;
+    }
+  }
 
   Debugln();
   DebugT(F("Connected to " )); Debugln(WiFi.SSID());
