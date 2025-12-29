@@ -133,6 +133,7 @@ void startWiFi(const char* hostname, int timeOut)
   //--- and goes into a blocking loop awaiting configuration
   // Check if we need to start the config portal
  
+  OTGWSerial.printf("Wifi status: %s\r\n", Wifi.status() == WL_CONNECTED ? "Connected" : "Not connected");
   OTGWSerial.printf("AutoConnect to: %s\r\n", thisAP.c_str());
   if (!manageWiFi.startConfigPortal(thisAP.c_str()))
   {
@@ -142,12 +143,14 @@ void startWiFi(const char* hostname, int timeOut)
     ESP.restart();
     delay(5000);  // Enough time to ensure we don't return.
   }
- 
+  OTGWSerial.printf("Wifi status: %s\r\n", Wifi.status() == WL_CONNECTED ? "Connected" : "Not connected");
+  OTGWSerial.printf("Connected to: %s\r\n", WiFi.localIP().toString().c_str());
   // WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
 
   // Wait for connection to wifi  
+  OTGWSerial.printf("Wifi status: %s\r\n", Wifi.status() == WL_CONNECTED ? "Connected" : "Not connected");
   if (WiFi.status() != WL_CONNECTED)
   {
     DECLARE_TIMER_SEC(timeoutWifiConnect, timeOut, CATCH_UP_MISSED_TICKS);
