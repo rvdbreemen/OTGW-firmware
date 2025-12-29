@@ -278,7 +278,7 @@ void doTaskMinuteChanged(){
   //== do tasks ==
   //if no wifi, try reconnecting (once a minute)
   if (WiFi.status() != WL_CONNECTED) restartWifi();
-  DebugTln("Minute changed:");
+  DebugTln("Minute changed, sending time command to OTGW");
   sendtimecommand();
 }
 
