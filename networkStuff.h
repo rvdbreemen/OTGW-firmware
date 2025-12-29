@@ -129,7 +129,14 @@ void startWiFi(const char* hostname, int timeOut)
   //--- if it does not connect it starts an access point with the specified name
   //--- here  "<HOSTNAME>-<MAC>"
   //--- and goes into a blocking loop awaiting configuration
-  if ( ! manageWiFi.getWiFiIsSaved()  || ESP.getResetReason() == "External System"){
+  // Check if we need to start the config portal
+  bool wifiSaved = manageWiFi.getWiFiIsSaved();
+  String resetReason = ESP.getResetReason();
+  
+  if (!wifiSaved || resetReason == "External System") {
+    DebugTln(F("Starting Config Portal because:"));
+    if (!wifiSaved) DebugTln(F(" - WiFi credentials are not saved"));
+    if (resetReason == "External System") DebugTln(F(" - External System Reset detected"));
     OTGWSerial.printf("AutoConnect to: %s\r\n", thisAP.c_str());
     if (!manageWiFi.startConfigPortal(thisAP.c_str()))
     {
