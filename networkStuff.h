@@ -74,6 +74,8 @@ static      FSInfo LittleFSinfo;
 bool        LittleFSmounted; 
 bool        isConnected = false;
 
+extern void feedWatchDog();
+
 #define WM_DEBUG_PORT OTGWSerial
 
 //gets called when WiFiManager enters configuration mode
@@ -151,6 +153,17 @@ void startWiFi(const char* hostname, int timeOut)
   // WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
+
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    DECLARE_TIMER_SEC(timeoutWifiConnect, timeOut, CATCH_UP_MISSED_TICKS);
+    while ((WiFi.status() != WL_CONNECTED))
+    {
+      delay(100);
+      feedWatchDog();
+      if DUE(timeoutWifiConnect) break;
+    }
+  }
 
   Debugln();
   DebugT(F("Connected to " )); Debugln(WiFi.SSID());
