@@ -35,7 +35,7 @@ runs:
           build/*.elf
           build/*.bin
     - id: push-version
-      if: github.event_name == 'push' && (github.ref == 'refs/heads/dev' || startsWith(github.ref, 'refs/heads/dev-'))
+      if: github.event_name == 'push' && github.ref_type == 'branch'
       run: |
         if git diff --quiet -- version.h; then
           echo "version.h unchanged; skipping commit."
@@ -45,5 +45,5 @@ runs:
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git add version.h
         git commit -m "CI: update version.h"
-        git push origin HEAD:dev
+        git push origin "HEAD:${GITHUB_REF_NAME}"
       shell: bash
