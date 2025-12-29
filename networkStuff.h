@@ -82,6 +82,9 @@ void feedWatchDog();
 //===========================================================================================
 void configModeCallback (WiFiManager *myWiFiManager) 
 {
+  OTGWSerial.println("\nEntered config mode");
+  OTGWSerial.printf("SSID: %s\r\n", myWiFiManager->getConfigPortalSSID().c_str());
+  OTGWSerial.printf("IP address: %s\r\n", WiFi.softAPIP().toString().c_str());
   DebugTln(F("Entered config mode\r"));
   DebugTln(WiFi.softAPIP().toString());
   //if you used auto generated SSID, print it
