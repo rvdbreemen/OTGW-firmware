@@ -103,7 +103,7 @@ static const char UpdateServerIndex[] PROGMEM =
            }
            
            // Implement exponential backoff retry logic
-           if (sseRetryCount < sseMaxRetries) {
+           if (sseRetryCount <= sseMaxRetries) {
              sseRetryCount++;
              // Exponential backoff: 1s, 2s, 4s (capped at maxRetryDelay)
              var delay = Math.min(sseRetryDelay * Math.pow(2, sseRetryCount - 1), maxRetryDelay);
