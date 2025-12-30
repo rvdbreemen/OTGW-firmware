@@ -40,13 +40,21 @@
 namespace esp8266httpupdateserver {
 using namespace esp8266webserver;
 namespace {
-volatile UpdateStatus gUpdateStatus = {0, 0, 0, 0, "Idle"};
+// Use static storage for update status
+UpdateStatus gUpdateStatus = {0, 0, 0, 0, "Idle"};
 WiFiClient gSseClient;
 bool gSseActive = false;
 UpdateStatus gSseLastSent = {0, 0, 0, 0, ""};
 uint32_t gSseLastSendMs = 0;
 
+// Constants for SSE and JSON handling
+constexpr size_t JSON_STATUS_BUFFER_SIZE = 512;
+constexpr uint32_t SSE_KEEPALIVE_INTERVAL_MS = 10000;
+
 void setUpdateStatus(uint8_t state, uint8_t percent, uint32_t transferred, uint32_t total, const char *message) {
+  // Disable interrupts for atomic access on ESP8266
+  noInterrupts();
+  
   gUpdateStatus.state = state;
   gUpdateStatus.percent = percent;
   gUpdateStatus.transferred = transferred;
@@ -54,40 +62,67 @@ void setUpdateStatus(uint8_t state, uint8_t percent, uint32_t transferred, uint3
   if (message && *message) {
     strlcpy(gUpdateStatus.message, message, sizeof(gUpdateStatus.message));
   }
+  
+  interrupts();
 }
 
 void sanitizeJsonString(const char *src, char *dst, size_t len) {
   if (!dst || len == 0) return;
   size_t w = 0;
-  for (size_t r = 0; src && src[r] != '\0' && w + 1 < len; r++) {
-    char c = src[r];
-    if (c == '"' || c == '\\') c = '\'';
-    dst[w++] = c;
+  for (size_t r = 0; src && src[r] != '\0'; r++) {
+    unsigned char c = static_cast<unsigned char>(src[r]);
+    // Escape control characters and JSON special characters
+    if (c == '\n' || c == '\r' || c == '\t' || c == '\f' || c == '\b') {
+      if (w >= len - 1) break;  // Reserve space for null terminator
+      dst[w++] = ' ';  // Replace control chars with space
+    } else if (c == '"' || c == '\\') {
+      if (w > len - 3) break;  // Reserve space for escape char, char itself, and null terminator
+      dst[w++] = '\\';
+      dst[w++] = c;
+    } else if (c < 0x20 || c == 0x7F) {
+      if (w >= len - 1) break;  // Reserve space for null terminator
+      dst[w++] = ' ';  // Replace other control chars with space
+    } else {
+      if (w >= len - 1) break;  // Reserve space for null terminator
+      dst[w++] = static_cast<char>(c);
+    }
   }
   dst[w] = '\0';
 }
 } // namespace
 
 void getUpdateStatus(UpdateStatus &out) {
+  // Disable interrupts for atomic access on ESP8266
+  noInterrupts();
+  
   out.state = gUpdateStatus.state;
   out.percent = gUpdateStatus.percent;
   out.transferred = gUpdateStatus.transferred;
   out.total = gUpdateStatus.total;
   strlcpy(out.message, gUpdateStatus.message, sizeof(out.message));
+  
+  interrupts();
 }
 
-void updateStatusToJson(char *buf, size_t len) {
+size_t updateStatusToJson(char *buf, size_t len) {
   UpdateStatus s{};
   getUpdateStatus(s);
   char msg[sizeof(s.message)] = {0};
   sanitizeJsonString(s.message, msg, sizeof(msg));
-  snprintf(buf, len,
+  int written = snprintf(buf, len,
            "{\"state\":%u,\"percent\":%u,\"transferred\":%lu,\"total\":%lu,\"message\":\"%s\"}",
            static_cast<unsigned>(s.state),
            static_cast<unsigned>(s.percent),
            static_cast<unsigned long>(s.transferred),
            static_cast<unsigned long>(s.total),
            msg);
+  // Return actual size written only if successful (no truncation)
+  // snprintf returns number of chars that would be written (excluding null)
+  // Success: written >= 0 && written < len (fits in buffer)
+  if (written >= 0 && static_cast<size_t>(written) < len) {
+    return static_cast<size_t>(written);
+  }
+  return 0;  // Indicate failure if truncation occurred or error
 }
 
 static bool sseStatusChanged(const UpdateStatus &a, const UpdateStatus &b) {
@@ -110,12 +145,16 @@ void beginUpdateEventStream(ESP8266WebServer &server) {
   gSseClient = server.client();
   gSseClient.setNoDelay(true);
   gSseActive = true;
-  gSseLastSendMs = 0;
+  // Reset last-sent status so a new client always receives an initial update
+  UpdateStatus resetStatus = {0, 0, 0, 0, ""};
+  gSseLastSent = resetStatus;
+  gSseLastSendMs = millis();  // Initialize with current time for accurate first interval calculation
 }
 
 void pumpUpdateEventStream() {
   if (!gSseActive) return;
   if (!gSseClient || !gSseClient.connected()) {
+    gSseClient.stop();
     gSseActive = false;
     return;
   }
@@ -124,18 +163,55 @@ void pumpUpdateEventStream() {
   getUpdateStatus(now);
   const uint32_t tick = millis();
   const bool changed = sseStatusChanged(now, gSseLastSent);
+  
+  // Use rollover-safe time difference calculation
+  // Unsigned arithmetic handles millis() rollover correctly:
+  // e.g., (5 - 4294967290) = 11 when tick wraps from 4294967295 to 5
+  uint32_t timeSinceLastSend = tick - gSseLastSendMs;
 
-  if (changed || (tick - gSseLastSendMs) > 1000) {
-    char json[200];
-    updateStatusToJson(json, sizeof(json));
-    gSseClient.print("event: update\n");
-    gSseClient.print("data: ");
-    gSseClient.print(json);
-    gSseClient.print("\n\n");
+  if (changed) {
+    // Send update immediately on status change
+    char json[JSON_STATUS_BUFFER_SIZE];
+    size_t jsonLen = updateStatusToJson(json, sizeof(json));
+    
+    // Validate JSON was generated successfully
+    if (jsonLen == 0) {
+      gSseClient.stop();
+      gSseActive = false;
+      return;
+    }
+    
+    // Check for write errors
+    if (gSseClient.print("event: update\n") <= 0) {
+      gSseClient.stop();
+      gSseActive = false;
+      return;
+    }
+    if (gSseClient.print("data: ") <= 0) {
+      gSseClient.stop();
+      gSseActive = false;
+      return;
+    }
+    if (gSseClient.print(json) <= 0) {
+      gSseClient.stop();
+      gSseActive = false;
+      return;
+    }
+    if (gSseClient.print("\n\n") <= 0) {
+      gSseClient.stop();
+      gSseActive = false;
+      return;
+    }
+    
     gSseLastSent = now;
     gSseLastSendMs = tick;
-  } else if ((tick - gSseLastSendMs) > 10000) {
-    gSseClient.print(": ping\n\n");
+  } else if (timeSinceLastSend > SSE_KEEPALIVE_INTERVAL_MS) {
+    // Send keepalive ping every 10 seconds when no changes
+    if (gSseClient.print(": ping\n\n") <= 0) {
+      gSseClient.stop();
+      gSseActive = false;
+      return;
+    }
     gSseLastSendMs = tick;
   }
 }
@@ -194,7 +270,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _server->send(200, F("text/html"), String(F("Update error: ")) + _updaterError);
       } else {
         _server->client().setNoDelay(true);
-        setUpdateStatus(2, 100, gUpdateStatus.transferred, gUpdateStatus.total, "Update successful");
+        // Status already set to success in UPLOAD_FILE_END handler
         _server->send_P(200, PSTR("text/html"), _serverSuccess);
         _server->client().stop();
         delay(1000);

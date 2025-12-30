@@ -42,6 +42,13 @@ static const char UpdateServerIndex[] PROGMEM =
          }, 1000);
      </script>-->
      <script>
+       var pollIntervalId = null;  // Track polling interval
+       var eventSourceInstance = null;  // Track EventSource to prevent leaks
+       var sseRetryCount = 0;
+       var sseMaxRetries = 3;
+       var sseRetryDelay = 1000;  // Start with 1 second
+       var maxRetryDelay = 8000;  // Cap exponential backoff at 8 seconds
+       
        function applyUpdateStatus(data) {
          var pct = data.percent || 0;
          document.getElementById('updateProgress').value = pct;
@@ -56,28 +63,93 @@ static const char UpdateServerIndex[] PROGMEM =
 
        function pollUpdateStatus() {
          fetch('/api/v0/update/status')
-           .then(response => response.json())
+           .then(function(response) { return response.json(); })
            .then(applyUpdateStatus)
-           .catch(function() {});
+           .catch(function(err) {
+             if (window.console && console.error) {
+               console.error('pollUpdateStatus error:', err);
+             }
+           });
+       }
+       
+       function startPolling() {
+         // Clear any existing interval before creating a new one
+         if (pollIntervalId !== null) {
+           clearInterval(pollIntervalId);
+         }
+         pollIntervalId = setInterval(pollUpdateStatus, 500);
        }
 
        function startSse() {
          if (!window.EventSource) return false;
+         
+         // Close any existing EventSource before creating a new one
+         if (eventSourceInstance !== null) {
+           try {
+             eventSourceInstance.close();
+           } catch (err) {
+             // Ignore errors closing previous instance
+           }
+           eventSourceInstance = null;
+         }
+         
          var es = new EventSource('/api/v0/update/events');
+         eventSourceInstance = es;  // Store for cleanup
+         
          es.addEventListener('update', function(e) {
-           try { applyUpdateStatus(JSON.parse(e.data)); } catch (err) {}
+           try { 
+             applyUpdateStatus(JSON.parse(e.data));
+             sseRetryCount = 0;  // Reset retry count on successful message
+           } catch (err) {
+             if (window.console && console.error) {
+               console.error('SSE message parse error:', err, 'Data:', e.data);
+             }
+           }
          });
+         
          es.onerror = function() {
-           es.close();
-           setInterval(pollUpdateStatus, 500);
+           try {
+             es.close();
+           } catch (err) {
+             // EventSource may already be closed, ignore errors
+           }
+           eventSourceInstance = null;  // Clear reference
+           
+           // Implement exponential backoff retry logic
+           if (sseRetryCount <= sseMaxRetries) {
+             sseRetryCount++;
+             // Exponential backoff: 1s, 2s, 4s (capped at maxRetryDelay)
+             var delay = Math.min(sseRetryDelay * Math.pow(2, sseRetryCount - 1), maxRetryDelay);
+             if (window.console && console.log) {
+               console.log('SSE connection failed, retrying in ' + delay + 'ms (attempt ' + sseRetryCount + '/' + sseMaxRetries + ')');
+             }
+             setTimeout(function() {
+               startSse();
+             }, delay);
+           } else {
+             // Permanent fallback to polling after retries exhausted
+             if (window.console && console.log) {
+               console.log('SSE connection failed permanently, falling back to polling');
+             }
+             startPolling();
+           }
          };
+         
          return true;
        }
 
        if (!startSse()) {
-         setInterval(pollUpdateStatus, 500);
+         startPolling();
        }
-       pollUpdateStatus();
+       
+       // Initial status fetch with error handling
+       try {
+         pollUpdateStatus();
+       } catch (err) {
+         if (window.console && console.error) {
+           console.error('Initial pollUpdateStatus call failed:', err);
+         }
+       }
      </script>
      </html>)";
 

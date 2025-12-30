@@ -98,9 +98,15 @@ void setupFSexplorer(){
   httpServer.on("/api/firmwarefilelist", apifirmwarefilelist); 
   httpServer.on("/api/listfiles", apilistfiles);
   httpServer.on("/api/v0/update/status", []() {
-    char buf[200];
-    esp8266httpupdateserver::updateStatusToJson(buf, sizeof(buf));
-    httpServer.send(200, "application/json", buf);
+    // Buffer size must match JSON_STATUS_BUFFER_SIZE in OTGW-ModUpdateServer-impl.h
+    constexpr size_t JSON_STATUS_BUFFER_SIZE = 512;
+    char buf[JSON_STATUS_BUFFER_SIZE];
+    size_t len = updateStatusToJson(buf, sizeof(buf));
+    if (len > 0) {
+      httpServer.send(200, "application/json", buf);
+    } else {
+      httpServer.send(500, "application/json", "{\"error\":\"JSON generation error\"}");
+    }
   });
   httpServer.on("/api/v0/update/events", HTTP_GET, []() {
     esp8266httpupdateserver::beginUpdateEventStream(httpServer);
