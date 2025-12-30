@@ -34,7 +34,7 @@ struct UpdateStatus {
 };
 
 void getUpdateStatus(UpdateStatus &out);
-void updateStatusToJson(char *buf, size_t len);
+size_t updateStatusToJson(char *buf, size_t len);
 void beginUpdateEventStream(ESP8266WebServer &server);
 void pumpUpdateEventStream();
 
