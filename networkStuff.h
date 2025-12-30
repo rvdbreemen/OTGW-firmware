@@ -136,16 +136,50 @@ void startWiFi(const char* hostname, int timeOut)
   //--- and goes into a blocking loop awaiting configuration
   // Check if we need to start the config portal
  
-  OTGWSerial.printf("Wifi status: %s\r\n", WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
-  OTGWSerial.printf("Wifi AP storaged: %s\r\n", manageWiFi.getWiFiIsSaved() ? "Yes" : "No");
-  OTGWSerial.printf("AutoConnect to: %s\r\n", thisAP.c_str());
-  if (!manageWiFi.startConfigPortal(thisAP.c_str()))
+  bool wifiSaved = manageWiFi.getWiFiIsSaved();
+  bool wifiConnected = (WiFi.status() == WL_CONNECTED);
+
+  OTGWSerial.printf("Wifi status: %s\r\n", wifiConnected ? "Connected" : "Not connected");
+  OTGWSerial.printf("Wifi AP stored: %s\r\n", wifiSaved ? "Yes" : "No");
+  OTGWSerial.printf("Config portal SSID: %s\r\n", thisAP.c_str());
+
+  if (wifiConnected)
   {
-    //-- fail to connect? Have you tried turning it off and on again?
-    DebugTln(F("failed to connect and hit timeout"));
-    delay(2000);  // Enough time for messages to be sent.
-    ESP.restart();
-    delay(5000);  // Enough time to ensure we don't return.
+    OTGWSerial.println("Wifi already connected, skipping connect.");
+  }
+  else if (wifiSaved)
+  {
+    OTGWSerial.println("Saved WiFi found, attempting direct connect...");
+    int directConnectTimeout = timeOut / 2;
+    if (directConnectTimeout < 5) directConnectTimeout = 5;
+    OTGWSerial.printf("Direct connect timeout: %d sec\r\n", directConnectTimeout);
+    WiFi.begin(); // use stored credentials
+    DECLARE_TIMER_SEC(timeoutWifiConnectInitial, directConnectTimeout, CATCH_UP_MISSED_TICKS);
+    while (WiFi.status() != WL_CONNECTED)
+    {
+      delay(100);
+      feedWatchDog();
+      if DUE(timeoutWifiConnectInitial) break;
+    }
+    wifiConnected = (WiFi.status() == WL_CONNECTED);
+    OTGWSerial.printf("Direct connect result: %s\r\n", wifiConnected ? "Connected" : "Failed");
+  }
+  else
+  {
+    OTGWSerial.println("No saved WiFi, starting config portal.");
+  }
+
+  if (!wifiConnected)
+  {
+    OTGWSerial.println("Starting config portal...");
+    if (!manageWiFi.startConfigPortal(thisAP.c_str()))
+    {
+      //-- fail to connect? Have you tried turning it off and on again?
+      DebugTln(F("failed to connect and hit timeout"));
+      delay(2000);  // Enough time for messages to be sent.
+      ESP.restart();
+      delay(5000);  // Enough time to ensure we don't return.
+    }
   }
   OTGWSerial.printf("Wifi status: %s\r\n", WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
   OTGWSerial.printf("Connected to: %s\r\n", WiFi.localIP().toString().c_str());
@@ -157,12 +191,12 @@ void startWiFi(const char* hostname, int timeOut)
   OTGWSerial.printf("Wifi status: %s\r\n", WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
   if (WiFi.status() != WL_CONNECTED)
   {
-    DECLARE_TIMER_SEC(timeoutWifiConnect, timeOut, CATCH_UP_MISSED_TICKS);
+    DECLARE_TIMER_SEC(timeoutWifiConnectFinal, timeOut, CATCH_UP_MISSED_TICKS);
     while ((WiFi.status() != WL_CONNECTED))
     {
       delay(100);
       feedWatchDog();
-      if DUE(timeoutWifiConnect) break;
+      if DUE(timeoutWifiConnectFinal) break;
     }
   }
 
