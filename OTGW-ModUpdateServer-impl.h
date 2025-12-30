@@ -76,7 +76,7 @@ void sanitizeJsonString(const char *src, char *dst, size_t len) {
       if (w >= len - 1) break;  // Reserve space for null terminator
       dst[w++] = ' ';  // Replace control chars with space
     } else if (c == '"' || c == '\\') {
-      if (w >= len - 2) break;  // Reserve space for 2 chars + null terminator
+      if (w > len - 3) break;  // Reserve space for escape char, char itself, and null terminator
       dst[w++] = '\\';
       dst[w++] = c;
     } else if (c < 0x20 || c == 0x7F) {
