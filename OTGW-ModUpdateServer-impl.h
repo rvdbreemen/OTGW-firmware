@@ -151,6 +151,7 @@ void beginUpdateEventStream(ESP8266WebServer &server) {
 void pumpUpdateEventStream() {
   if (!gSseActive) return;
   if (!gSseClient || !gSseClient.connected()) {
+    gSseClient.stop();
     gSseActive = false;
     return;
   }
@@ -172,24 +173,29 @@ void pumpUpdateEventStream() {
     
     // Validate JSON was generated successfully
     if (jsonLen == 0) {
+      gSseClient.stop();
       gSseActive = false;
       return;
     }
     
     // Check for write errors
     if (gSseClient.print("event: update\n") <= 0) {
+      gSseClient.stop();
       gSseActive = false;
       return;
     }
     if (gSseClient.print("data: ") <= 0) {
+      gSseClient.stop();
       gSseActive = false;
       return;
     }
     if (gSseClient.print(json) <= 0) {
+      gSseClient.stop();
       gSseActive = false;
       return;
     }
     if (gSseClient.print("\n\n") <= 0) {
+      gSseClient.stop();
       gSseActive = false;
       return;
     }
@@ -199,6 +205,7 @@ void pumpUpdateEventStream() {
   } else if (timeSinceLastSend > SSE_KEEPALIVE_INTERVAL_MS) {
     // Send keepalive ping every 10 seconds when no changes
     if (gSseClient.print(": ping\n\n") <= 0) {
+      gSseClient.stop();
       gSseActive = false;
       return;
     }
