@@ -100,7 +100,8 @@ static const char UpdateServerIndex[] PROGMEM =
            // Implement exponential backoff retry logic
            if (sseRetryCount < sseMaxRetries) {
              sseRetryCount++;
-             var delay = sseRetryDelay * Math.pow(2, sseRetryCount - 1);
+             // Cap delay at 8 seconds to prevent excessively long waits
+             var delay = Math.min(sseRetryDelay * Math.pow(2, sseRetryCount - 1), 8000);
              if (window.console && console.log) {
                console.log('SSE connection failed, retrying in ' + delay + 'ms (attempt ' + sseRetryCount + '/' + sseMaxRetries + ')');
              }

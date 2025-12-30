@@ -111,8 +111,12 @@ size_t updateStatusToJson(char *buf, size_t len) {
            static_cast<unsigned long>(s.transferred),
            static_cast<unsigned long>(s.total),
            msg);
-  // Return actual size written (or would have been written)
-  return (written > 0 && static_cast<size_t>(written) < len) ? static_cast<size_t>(written) : 0;
+  // Return actual size written only if successful (no truncation)
+  // snprintf returns number of chars that would be written (excluding null)
+  if (written > 0 && static_cast<size_t>(written) < len) {
+    return static_cast<size_t>(written);
+  }
+  return 0;  // Indicate failure if truncation occurred or error
 }
 
 static bool sseStatusChanged(const UpdateStatus &a, const UpdateStatus &b) {
@@ -157,6 +161,12 @@ void pumpUpdateEventStream() {
     // Send update immediately on status change
     char json[512];  // Increased buffer size
     size_t jsonLen = updateStatusToJson(json, sizeof(json));
+    
+    // Validate JSON was generated successfully
+    if (jsonLen == 0) {
+      gSseActive = false;
+      return;
+    }
     
     // Check for write errors
     if (gSseClient.print("event: update\n") <= 0) {
