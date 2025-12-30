@@ -1736,6 +1736,21 @@ void processOT(const char *buf, int len){
     } 
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
     checkOTGWcmdqueue(buf, len);
+  } else if (strcmp(buf, "Thermostat disconnected") == 0) {
+    Debugln(F("Thermostat disconnected"));
+    sendMQTTData(F("event_report"), F("Thermostat disconnected"));
+  } else if (strcmp(buf, "Thermostat connected") == 0) {
+    Debugln(F("Thermostat connected"));
+    sendMQTTData(F("event_report"), F("Thermostat connected"));
+  } else if (strcmp(buf, "Low power") == 0) {
+    Debugln(F("Low power"));
+    sendMQTTData(F("event_report"), F("Low power"));
+  } else if (strcmp(buf, "Medium power") == 0) {
+    Debugln(F("Medium power"));
+    sendMQTTData(F("event_report"), F("Medium power"));
+  } else if (strcmp(buf, "High power") == 0) {
+    Debugln(F("High power"));
+    sendMQTTData(F("event_report"), F("High power"));
   } else if (strstr(buf, "\r\nError 01")!= NULL) {
     char errorBuf[12];
     OTcurrentSystemState.error01++;
