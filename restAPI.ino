@@ -37,70 +37,6 @@ static bool parseMsgId(const char *token, uint8_t &msgId) {
   return true;
 }
 
-// Helper function to validate that requests originate from the same device
-// Provides basic CSRF protection by checking Origin or Referer headers
-static bool isValidOrigin() {
-  // Get the Origin header (sent by modern browsers for POST/PUT)
-  String origin = httpServer.header("Origin");
-  // Get the Referer header as fallback
-  String referer = httpServer.header("Referer");
-  
-  // Get the Host header to compare against
-  String host = httpServer.header("Host");
-  
-  // If there's no Origin or Referer, reject (likely not from a browser or a direct API call)
-  // This prevents simple curl/wget attacks but allows legitimate browser usage
-  // Note: Legitimate automation tools that need access should use the web UI or 
-  // have the device configured with authentication in a future update
-  if (origin.length() == 0 && referer.length() == 0) {
-    RESTDebugTln(F("Rejected: No Origin or Referer header"));
-    return false;
-  }
-  
-  // Check if Origin matches our host
-  if (origin.length() > 0) {
-    // Origin format: protocol://host:port
-    // Find the position after "://" to extract host:port
-    int protoEnd = origin.indexOf("://");
-    String originHost = origin;
-    if (protoEnd >= 0) {
-      originHost = origin.substring(protoEnd + 3); // Skip "://"
-    }
-    
-    if (originHost != host) {
-      RESTDebugTf(PSTR("Rejected: Origin [%s] doesn't match Host [%s]\r\n"), originHost.c_str(), host.c_str());
-      return false;
-    }
-    return true;
-  }
-  
-  // Check if Referer matches our host
-  if (referer.length() > 0) {
-    // Referer format: protocol://host:port/path
-    // Find the position after "://" to extract host:port
-    int protoEnd = referer.indexOf("://");
-    String refererHost = referer;
-    if (protoEnd >= 0) {
-      refererHost = referer.substring(protoEnd + 3); // Skip "://"
-    }
-    
-    // Extract just the host:port part (before the path)
-    int slashPos = refererHost.indexOf('/');
-    if (slashPos >= 0) {
-      refererHost = refererHost.substring(0, slashPos);
-    }
-    
-    if (refererHost != host) {
-      RESTDebugTf(PSTR("Rejected: Referer [%s] doesn't match Host [%s]\r\n"), refererHost.c_str(), host.c_str());
-      return false;
-    }
-    return true;
-  }
-  
-  return false;
-}
-
-
 //=======================================================================
 
 void processAPI() 
@@ -196,12 +132,6 @@ void processAPI()
         } else if (wc > 5 && strcmp(words[4], "command") == 0) {
           if (!isPostOrPut) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
 
-          // CSRF protection: validate origin
-          if (!isValidOrigin()) {
-            httpServer.send(403, "text/plain", "403: Forbidden - Invalid origin\r\n");
-            return;
-          }
-
           if (words[5][0] == '\0') {
             httpServer.send(400, "text/plain", "400: missing command\r\n");
             return;
@@ -249,11 +179,6 @@ void processAPI()
       }
       else if (wc > 3 && strcmp(words[3], "settings") == 0) {
         if (isPostOrPut) {
-          // CSRF protection: validate origin
-          if (!isValidOrigin()) {
-            httpServer.send(403, "text/plain", "403: Forbidden - Invalid origin\r\n");
-            return;
-          }
           postSettings();
         } else if (isGet) {
           sendDeviceSettings();
