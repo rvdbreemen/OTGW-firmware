@@ -50,8 +50,7 @@ void setup() {
   // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
   // while (!Serial) {} //Wait for OK
   WatchDogEnabled(0); // turn off watchdog
-  resetOTGW();          // reset the OTGW pic
-
+  
   SetupDebugln(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   SetupDebugf("Booting....[%s]\r\n\r\n", _VERSION);
   

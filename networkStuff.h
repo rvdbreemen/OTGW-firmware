@@ -137,6 +137,7 @@ void startWiFi(const char* hostname, int timeOut)
   // Check if we need to start the config portal
  
   OTGWSerial.printf("Wifi status: %s\r\n", WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
+  OTGWSerial.printf("Wifi AP storaged: %s\r\n", manageWiFi.getWiFiIsSaved() ? "Yes" : "No");
   OTGWSerial.printf("AutoConnect to: %s\r\n", thisAP.c_str());
   if (!manageWiFi.startConfigPortal(thisAP.c_str()))
   {
