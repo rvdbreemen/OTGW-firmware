@@ -99,11 +99,11 @@ void setupFSexplorer(){
   httpServer.on("/api/listfiles", apilistfiles);
   httpServer.on("/api/v0/update/status", []() {
     char buf[200];
-    updateStatusToJson(buf, sizeof(buf));
+    esp8266httpupdateserver::updateStatusToJson(buf, sizeof(buf));
     httpServer.send(200, "application/json", buf);
   });
   httpServer.on("/api/v0/update/events", HTTP_GET, []() {
-    beginUpdateEventStream(httpServer);
+    esp8266httpupdateserver::beginUpdateEventStream(httpServer);
   });
   httpServer.on("/LittleFSformat", formatLittleFS);
   httpServer.on("/upload", HTTP_POST, []() {}, handleFileUpload);
