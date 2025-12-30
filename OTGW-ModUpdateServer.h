@@ -25,6 +25,19 @@
 namespace esp8266httpupdateserver {
 using namespace esp8266webserver;
 
+struct UpdateStatus {
+  uint8_t state;       // 0=idle,1=uploading,2=success,3=error
+  uint8_t percent;
+  uint32_t transferred;
+  uint32_t total;
+  char message[64];
+};
+
+void getUpdateStatus(UpdateStatus &out);
+void updateStatusToJson(char *buf, size_t len);
+void beginUpdateEventStream(ESP8266WebServer &server);
+void pumpUpdateEventStream();
+
 template <typename ServerType>
 class ESP8266HTTPUpdateServerTemplate
 {

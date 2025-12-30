@@ -39,6 +39,106 @@
 
 namespace esp8266httpupdateserver {
 using namespace esp8266webserver;
+namespace {
+volatile UpdateStatus gUpdateStatus = {0, 0, 0, 0, "Idle"};
+WiFiClient gSseClient;
+bool gSseActive = false;
+UpdateStatus gSseLastSent = {0, 0, 0, 0, ""};
+uint32_t gSseLastSendMs = 0;
+
+void setUpdateStatus(uint8_t state, uint8_t percent, uint32_t transferred, uint32_t total, const char *message) {
+  gUpdateStatus.state = state;
+  gUpdateStatus.percent = percent;
+  gUpdateStatus.transferred = transferred;
+  gUpdateStatus.total = total;
+  if (message && *message) {
+    strlcpy(gUpdateStatus.message, message, sizeof(gUpdateStatus.message));
+  }
+}
+
+void sanitizeJsonString(const char *src, char *dst, size_t len) {
+  if (!dst || len == 0) return;
+  size_t w = 0;
+  for (size_t r = 0; src && src[r] != '\0' && w + 1 < len; r++) {
+    char c = src[r];
+    if (c == '"' || c == '\\') c = '\'';
+    dst[w++] = c;
+  }
+  dst[w] = '\0';
+}
+} // namespace
+
+void getUpdateStatus(UpdateStatus &out) {
+  out.state = gUpdateStatus.state;
+  out.percent = gUpdateStatus.percent;
+  out.transferred = gUpdateStatus.transferred;
+  out.total = gUpdateStatus.total;
+  strlcpy(out.message, gUpdateStatus.message, sizeof(out.message));
+}
+
+void updateStatusToJson(char *buf, size_t len) {
+  UpdateStatus s{};
+  getUpdateStatus(s);
+  char msg[sizeof(s.message)] = {0};
+  sanitizeJsonString(s.message, msg, sizeof(msg));
+  snprintf(buf, len,
+           "{\"state\":%u,\"percent\":%u,\"transferred\":%lu,\"total\":%lu,\"message\":\"%s\"}",
+           static_cast<unsigned>(s.state),
+           static_cast<unsigned>(s.percent),
+           static_cast<unsigned long>(s.transferred),
+           static_cast<unsigned long>(s.total),
+           msg);
+}
+
+static bool sseStatusChanged(const UpdateStatus &a, const UpdateStatus &b) {
+  if (a.state != b.state) return true;
+  if (a.percent != b.percent) return true;
+  if (a.transferred != b.transferred) return true;
+  if (a.total != b.total) return true;
+  return (strncmp(a.message, b.message, sizeof(a.message)) != 0);
+}
+
+void beginUpdateEventStream(ESP8266WebServer &server) {
+  if (gSseClient && gSseClient.connected()) {
+    gSseClient.stop();
+  }
+  server.sendHeader("Cache-Control", "no-cache");
+  server.sendHeader("Connection", "keep-alive");
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, "text/event-stream", "");
+  gSseClient = server.client();
+  gSseClient.setNoDelay(true);
+  gSseActive = true;
+  gSseLastSendMs = 0;
+}
+
+void pumpUpdateEventStream() {
+  if (!gSseActive) return;
+  if (!gSseClient || !gSseClient.connected()) {
+    gSseActive = false;
+    return;
+  }
+
+  UpdateStatus now{};
+  getUpdateStatus(now);
+  const uint32_t tick = millis();
+  const bool changed = sseStatusChanged(now, gSseLastSent);
+
+  if (changed || (tick - gSseLastSendMs) > 1000) {
+    char json[200];
+    updateStatusToJson(json, sizeof(json));
+    gSseClient.print("event: update\n");
+    gSseClient.print("data: ");
+    gSseClient.print(json);
+    gSseClient.print("\n\n");
+    gSseLastSent = now;
+    gSseLastSendMs = tick;
+  } else if ((tick - gSseLastSendMs) > 10000) {
+    gSseClient.print(": ping\n\n");
+    gSseLastSendMs = tick;
+  }
+}
 /**
 static const char serverIndex2[] PROGMEM =
   R"(<html charset="UTF-8">
@@ -81,6 +181,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
     _server->on(path.c_str(), HTTP_GET, [&](){
       if(_username != emptyString && _password != emptyString && !_server->authenticate(_username.c_str(), _password.c_str()))
         return _server->requestAuthentication();
+      setUpdateStatus(0, 0, 0, 0, "Idle");
       _server->send_P(200, PSTR("text/html"), _serverIndex);
     });
 
@@ -89,9 +190,11 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
       if(!_authenticated)
         return _server->requestAuthentication();
       if (Update.hasError()) {
+        setUpdateStatus(3, gUpdateStatus.percent, gUpdateStatus.transferred, gUpdateStatus.total, _updaterError.c_str());
         _server->send(200, F("text/html"), String(F("Update error: ")) + _updaterError);
       } else {
         _server->client().setNoDelay(true);
+        setUpdateStatus(2, 100, gUpdateStatus.transferred, gUpdateStatus.total, "Update successful");
         _server->send_P(200, PSTR("text/html"), _serverSuccess);
         _server->client().stop();
         delay(1000);
@@ -130,6 +233,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
             _setUpdaterError();
           }
         }
+        setUpdateStatus(1, 0, 0, Update.size(), "Upload started");
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
         if (_serial_output) {Debug("."); blinkLEDnow(LED1);}
         // Feed the dog before it bites!
@@ -137,17 +241,26 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         // End of feeding hack
         if(Update.write(upload.buf, upload.currentSize) != upload.currentSize){
           _setUpdaterError();
+          setUpdateStatus(3, gUpdateStatus.percent, gUpdateStatus.transferred, gUpdateStatus.total, _updaterError.c_str());
+        } else {
+          uint32_t total = Update.size();
+          uint32_t progress = Update.progress();
+          uint8_t pct = (total > 0) ? static_cast<uint8_t>((progress * 100U) / total) : 0;
+          setUpdateStatus(1, pct, progress, total, "Uploading");
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
         if(Update.end(true)){ //true to set the size to the current progress
           if (_serial_output) Debugf("\r\nUpdate Success: %u\r\nRebooting...\r\n", upload.totalSize);
+          setUpdateStatus(2, 100, Update.progress(), Update.size(), "Update finished, rebooting");
         } else {
           _setUpdaterError();
+          setUpdateStatus(3, gUpdateStatus.percent, gUpdateStatus.transferred, gUpdateStatus.total, _updaterError.c_str());
         }
         // if (_serial_output) 
         //   OTGWSerial.setDebugOutput(false);
       } else if(_authenticated && upload.status == UPLOAD_FILE_ABORTED){
         Update.end();
+        setUpdateStatus(3, gUpdateStatus.percent, gUpdateStatus.transferred, gUpdateStatus.total, "Update aborted");
         if (_serial_output) Debugln("Update was aborted");
       }
       delay(0);
