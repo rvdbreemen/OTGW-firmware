@@ -43,6 +43,7 @@ static const char UpdateServerIndex[] PROGMEM =
      </script>-->
      <script>
        var pollIntervalId = null;  // Track polling interval
+       var eventSourceInstance = null;  // Track EventSource to prevent leaks
        var sseRetryCount = 0;
        var sseMaxRetries = 3;
        var sseRetryDelay = 1000;  // Start with 1 second
@@ -82,7 +83,18 @@ static const char UpdateServerIndex[] PROGMEM =
        function startSse() {
          if (!window.EventSource) return false;
          
+         // Close any existing EventSource before creating a new one
+         if (eventSourceInstance !== null) {
+           try {
+             eventSourceInstance.close();
+           } catch (err) {
+             // Ignore errors closing previous instance
+           }
+           eventSourceInstance = null;
+         }
+         
          var es = new EventSource('/api/v0/update/events');
+         eventSourceInstance = es;  // Store for cleanup
          
          es.addEventListener('update', function(e) {
            try { 
@@ -101,6 +113,7 @@ static const char UpdateServerIndex[] PROGMEM =
            } catch (err) {
              // EventSource may already be closed, ignore errors
            }
+           eventSourceInstance = null;  // Clear reference
            
            // Implement exponential backoff retry logic
            if (sseRetryCount <= sseMaxRetries) {
