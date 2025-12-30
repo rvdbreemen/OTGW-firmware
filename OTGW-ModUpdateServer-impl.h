@@ -145,6 +145,9 @@ void beginUpdateEventStream(ESP8266WebServer &server) {
   gSseClient = server.client();
   gSseClient.setNoDelay(true);
   gSseActive = true;
+  // Reset last-sent status so a new client always receives an initial update
+  UpdateStatus resetStatus = {0, 0, 0, 0, ""};
+  gSseLastSent = resetStatus;
   gSseLastSendMs = millis();  // Initialize with current time for accurate first interval calculation
 }
 
