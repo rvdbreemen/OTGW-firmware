@@ -89,7 +89,7 @@ static const char UpdateServerIndex[] PROGMEM =
              sseRetryCount = 0;  // Reset retry count on successful message
            } catch (err) {
              if (window.console && console.error) {
-               console.error('SSE message parse error:', err);
+               console.error('SSE message parse error:', err, 'Data:', e.data);
              }
            }
          });

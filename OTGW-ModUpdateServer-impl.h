@@ -65,17 +65,21 @@ void setUpdateStatus(uint8_t state, uint8_t percent, uint32_t transferred, uint3
 void sanitizeJsonString(const char *src, char *dst, size_t len) {
   if (!dst || len == 0) return;
   size_t w = 0;
-  for (size_t r = 0; src && src[r] != '\0' && w + 2 < len; r++) {
+  for (size_t r = 0; src && src[r] != '\0'; r++) {
     unsigned char c = static_cast<unsigned char>(src[r]);
     // Escape control characters and JSON special characters
     if (c == '\n' || c == '\r' || c == '\t' || c == '\f' || c == '\b') {
+      if (w + 1 >= len) break;  // Space check for single char
       dst[w++] = ' ';  // Replace control chars with space
     } else if (c == '"' || c == '\\') {
+      if (w + 2 >= len) break;  // Space check for escape sequence
       dst[w++] = '\\';
       dst[w++] = c;
     } else if (c < 0x20 || c == 0x7F) {
+      if (w + 1 >= len) break;  // Space check for single char
       dst[w++] = ' ';  // Replace other control chars with space
     } else {
+      if (w + 1 >= len) break;  // Space check for single char
       dst[w++] = static_cast<char>(c);
     }
   }
@@ -136,7 +140,7 @@ void beginUpdateEventStream(ESP8266WebServer &server) {
   gSseClient = server.client();
   gSseClient.setNoDelay(true);
   gSseActive = true;
-  gSseLastSendMs = 0;
+  gSseLastSendMs = millis();  // Initialize with current time to avoid underflow
 }
 
 void pumpUpdateEventStream() {
