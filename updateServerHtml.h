@@ -6,6 +6,9 @@ static const char UpdateServerIndex[] PROGMEM =
      </style>
      <body>
      <h1>OTGW firmware Flash utility</h1>
+     <div id="updateStatus">Idle</div>
+     <progress id="updateProgress" value="0" max="100" style="width: 100%; max-width: 420px;"></progress>
+     <div id="updateDetail"></div>
      <form method='POST' action='?cmd=0' enctype='multipart/form-data'>
           Select a "<b>.ino.bin</b>" file to flash<br/>
           <input type='file' accept='ino.bin' name='firmware'>
@@ -38,6 +41,44 @@ static const char UpdateServerIndex[] PROGMEM =
            }
          }, 1000);
      </script>-->
+     <script>
+       function applyUpdateStatus(data) {
+         var pct = data.percent || 0;
+         document.getElementById('updateProgress').value = pct;
+         document.getElementById('updateStatus').textContent = data.message || 'Idle';
+         if (data.total > 0) {
+           document.getElementById('updateDetail').textContent =
+             data.transferred + ' / ' + data.total + ' bytes (' + pct + '%)';
+         } else {
+           document.getElementById('updateDetail').textContent = '';
+         }
+       }
+
+       function pollUpdateStatus() {
+         fetch('/api/v0/update/status')
+           .then(response => response.json())
+           .then(applyUpdateStatus)
+           .catch(function() {});
+       }
+
+       function startSse() {
+         if (!window.EventSource) return false;
+         var es = new EventSource('/api/v0/update/events');
+         es.addEventListener('update', function(e) {
+           try { applyUpdateStatus(JSON.parse(e.data)); } catch (err) {}
+         });
+         es.onerror = function() {
+           es.close();
+           setInterval(pollUpdateStatus, 500);
+         };
+         return true;
+       }
+
+       if (!startSse()) {
+         setInterval(pollUpdateStatus, 500);
+       }
+       pollUpdateStatus();
+     </script>
      </html>)";
 
 static const char UpdateServerSuccess[] PROGMEM = 

@@ -300,6 +300,7 @@ void doBackgroundTasks()
     handleDebug();
     handleMQTT();                 // MQTT transmissions
     handleOTGW();                 // OTGW handling
+    pumpUpdateEventStream();
     httpServer.handleClient();
     MDNS.update();
     loopNTP();
