@@ -47,6 +47,10 @@ bool gSseActive = false;
 UpdateStatus gSseLastSent = {0, 0, 0, 0, ""};
 uint32_t gSseLastSendMs = 0;
 
+// Constants for SSE and JSON handling
+constexpr size_t JSON_STATUS_BUFFER_SIZE = 512;
+constexpr uint32_t SSE_KEEPALIVE_INTERVAL_MS = 10000;
+
 void setUpdateStatus(uint8_t state, uint8_t percent, uint32_t transferred, uint32_t total, const char *message) {
   // Disable interrupts for atomic access on ESP8266
   noInterrupts();
@@ -69,17 +73,17 @@ void sanitizeJsonString(const char *src, char *dst, size_t len) {
     unsigned char c = static_cast<unsigned char>(src[r]);
     // Escape control characters and JSON special characters
     if (c == '\n' || c == '\r' || c == '\t' || c == '\f' || c == '\b') {
-      if (w + 1 >= len) break;  // Space check for single char
+      if (w >= len - 1) break;  // Reserve space for null terminator
       dst[w++] = ' ';  // Replace control chars with space
     } else if (c == '"' || c == '\\') {
-      if (w + 2 >= len) break;  // Space check for escape sequence
+      if (w >= len - 2) break;  // Reserve space for 2 chars + null terminator
       dst[w++] = '\\';
       dst[w++] = c;
     } else if (c < 0x20 || c == 0x7F) {
-      if (w + 1 >= len) break;  // Space check for single char
+      if (w >= len - 1) break;  // Reserve space for null terminator
       dst[w++] = ' ';  // Replace other control chars with space
     } else {
-      if (w + 1 >= len) break;  // Space check for single char
+      if (w >= len - 1) break;  // Reserve space for null terminator
       dst[w++] = static_cast<char>(c);
     }
   }
@@ -114,7 +118,8 @@ size_t updateStatusToJson(char *buf, size_t len) {
            msg);
   // Return actual size written only if successful (no truncation)
   // snprintf returns number of chars that would be written (excluding null)
-  if (written > 0 && static_cast<size_t>(written) < len) {
+  // Success: written >= 0 && written < len (fits in buffer)
+  if (written >= 0 && static_cast<size_t>(written) < len) {
     return static_cast<size_t>(written);
   }
   return 0;  // Indicate failure if truncation occurred or error
@@ -160,7 +165,7 @@ void pumpUpdateEventStream() {
 
   if (changed) {
     // Send update immediately on status change
-    char json[512];  // Increased buffer size
+    char json[JSON_STATUS_BUFFER_SIZE];
     size_t jsonLen = updateStatusToJson(json, sizeof(json));
     
     // Validate JSON was generated successfully
@@ -189,7 +194,7 @@ void pumpUpdateEventStream() {
     
     gSseLastSent = now;
     gSseLastSendMs = tick;
-  } else if (timeSinceLastSend > 10000) {
+  } else if (timeSinceLastSend > SSE_KEEPALIVE_INTERVAL_MS) {
     // Send keepalive ping every 10 seconds when no changes
     if (gSseClient.print(": ping\n\n") <= 0) {
       gSseActive = false;

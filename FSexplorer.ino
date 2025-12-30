@@ -98,7 +98,8 @@ void setupFSexplorer(){
   httpServer.on("/api/firmwarefilelist", apifirmwarefilelist); 
   httpServer.on("/api/listfiles", apilistfiles);
   httpServer.on("/api/v0/update/status", []() {
-    char buf[512];  // Increased from 200 to prevent truncation
+    constexpr size_t JSON_STATUS_BUFFER_SIZE = 512;
+    char buf[JSON_STATUS_BUFFER_SIZE];
     size_t len = updateStatusToJson(buf, sizeof(buf));
     if (len > 0) {
       httpServer.send(200, "application/json", buf);

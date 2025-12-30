@@ -46,6 +46,7 @@ static const char UpdateServerIndex[] PROGMEM =
        var sseRetryCount = 0;
        var sseMaxRetries = 3;
        var sseRetryDelay = 1000;  // Start with 1 second
+       var maxRetryDelay = 8000;  // Cap exponential backoff at 8 seconds
        
        function applyUpdateStatus(data) {
          var pct = data.percent || 0;
@@ -100,8 +101,8 @@ static const char UpdateServerIndex[] PROGMEM =
            // Implement exponential backoff retry logic
            if (sseRetryCount < sseMaxRetries) {
              sseRetryCount++;
-             // Exponential backoff: 1s, 2s, 4s (capped at 8s)
-             var delay = Math.min(sseRetryDelay * Math.pow(2, sseRetryCount - 1), 8000);
+             // Exponential backoff: 1s, 2s, 4s (capped at maxRetryDelay)
+             var delay = Math.min(sseRetryDelay * Math.pow(2, sseRetryCount - 1), maxRetryDelay);
              if (window.console && console.log) {
                console.log('SSE connection failed, retrying in ' + delay + 'ms (attempt ' + sseRetryCount + '/' + sseMaxRetries + ')');
              }
