@@ -40,18 +40,16 @@
 namespace esp8266httpupdateserver {
 using namespace esp8266webserver;
 namespace {
-// Use static storage instead of volatile for thread safety
+// Use static storage for update status
 UpdateStatus gUpdateStatus = {0, 0, 0, 0, "Idle"};
-bool gUpdateStatusLock = false;  // Simple lock flag for ESP8266
 WiFiClient gSseClient;
 bool gSseActive = false;
 UpdateStatus gSseLastSent = {0, 0, 0, 0, ""};
 uint32_t gSseLastSendMs = 0;
 
 void setUpdateStatus(uint8_t state, uint8_t percent, uint32_t transferred, uint32_t total, const char *message) {
-  // Wait for lock (simple spinlock for ESP8266 single-core)
-  while (gUpdateStatusLock) { yield(); }
-  gUpdateStatusLock = true;
+  // Disable interrupts for atomic access on ESP8266
+  noInterrupts();
   
   gUpdateStatus.state = state;
   gUpdateStatus.percent = percent;
@@ -61,7 +59,7 @@ void setUpdateStatus(uint8_t state, uint8_t percent, uint32_t transferred, uint3
     strlcpy(gUpdateStatus.message, message, sizeof(gUpdateStatus.message));
   }
   
-  gUpdateStatusLock = false;
+  interrupts();
 }
 
 void sanitizeJsonString(const char *src, char *dst, size_t len) {
@@ -86,9 +84,8 @@ void sanitizeJsonString(const char *src, char *dst, size_t len) {
 } // namespace
 
 void getUpdateStatus(UpdateStatus &out) {
-  // Wait for lock (simple spinlock for ESP8266 single-core)
-  while (gUpdateStatusLock) { yield(); }
-  gUpdateStatusLock = true;
+  // Disable interrupts for atomic access on ESP8266
+  noInterrupts();
   
   out.state = gUpdateStatus.state;
   out.percent = gUpdateStatus.percent;
@@ -96,7 +93,7 @@ void getUpdateStatus(UpdateStatus &out) {
   out.total = gUpdateStatus.total;
   strlcpy(out.message, gUpdateStatus.message, sizeof(out.message));
   
-  gUpdateStatusLock = false;
+  interrupts();
 }
 
 size_t updateStatusToJson(char *buf, size_t len) {
