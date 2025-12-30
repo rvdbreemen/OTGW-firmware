@@ -96,7 +96,11 @@ static const char UpdateServerIndex[] PROGMEM =
          });
          
          es.onerror = function() {
-           es.close();
+           try {
+             es.close();
+           } catch (err) {
+             // EventSource may already be closed, ignore errors
+           }
            
            // Implement exponential backoff retry logic
            if (sseRetryCount < sseMaxRetries) {

@@ -145,7 +145,7 @@ void beginUpdateEventStream(ESP8266WebServer &server) {
   gSseClient = server.client();
   gSseClient.setNoDelay(true);
   gSseActive = true;
-  gSseLastSendMs = millis();  // Initialize with current time to avoid underflow
+  gSseLastSendMs = millis();  // Initialize with current time for accurate first interval calculation
 }
 
 void pumpUpdateEventStream() {
