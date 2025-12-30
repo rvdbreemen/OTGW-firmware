@@ -98,6 +98,7 @@ void setupFSexplorer(){
   httpServer.on("/api/firmwarefilelist", apifirmwarefilelist); 
   httpServer.on("/api/listfiles", apilistfiles);
   httpServer.on("/api/v0/update/status", []() {
+    // Buffer size must match JSON_STATUS_BUFFER_SIZE in OTGW-ModUpdateServer-impl.h
     constexpr size_t JSON_STATUS_BUFFER_SIZE = 512;
     char buf[JSON_STATUS_BUFFER_SIZE];
     size_t len = updateStatusToJson(buf, sizeof(buf));

@@ -161,6 +161,8 @@ void pumpUpdateEventStream() {
   const bool changed = sseStatusChanged(now, gSseLastSent);
   
   // Use rollover-safe time difference calculation
+  // Unsigned arithmetic handles millis() rollover correctly:
+  // e.g., (5 - 4294967290) = 11 when tick wraps from 4294967295 to 5
   uint32_t timeSinceLastSend = tick - gSseLastSendMs;
 
   if (changed) {
