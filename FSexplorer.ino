@@ -105,7 +105,7 @@ void setupFSexplorer(){
     if (len > 0) {
       httpServer.send(200, "application/json", buf);
     } else {
-      httpServer.send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
+      httpServer.send(500, "application/json", "{\"error\":\"JSON generation error\"}");
     }
   });
   httpServer.on("/api/v0/update/events", HTTP_GET, []() {
