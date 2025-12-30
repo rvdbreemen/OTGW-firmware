@@ -42,6 +42,11 @@ static const char UpdateServerIndex[] PROGMEM =
          }, 1000);
      </script>-->
      <script>
+       var pollIntervalId = null;  // Track polling interval
+       var sseRetryCount = 0;
+       var sseMaxRetries = 3;
+       var sseRetryDelay = 1000;  // Start with 1 second
+       
        function applyUpdateStatus(data) {
          var pct = data.percent || 0;
          document.getElementById('updateProgress').value = pct;
@@ -56,28 +61,76 @@ static const char UpdateServerIndex[] PROGMEM =
 
        function pollUpdateStatus() {
          fetch('/api/v0/update/status')
-           .then(response => response.json())
+           .then(function(response) { return response.json(); })
            .then(applyUpdateStatus)
-           .catch(function() {});
+           .catch(function(err) {
+             if (window.console && console.error) {
+               console.error('pollUpdateStatus error:', err);
+             }
+           });
+       }
+       
+       function startPolling() {
+         // Clear any existing interval before creating a new one
+         if (pollIntervalId !== null) {
+           clearInterval(pollIntervalId);
+         }
+         pollIntervalId = setInterval(pollUpdateStatus, 500);
        }
 
        function startSse() {
          if (!window.EventSource) return false;
+         
          var es = new EventSource('/api/v0/update/events');
+         
          es.addEventListener('update', function(e) {
-           try { applyUpdateStatus(JSON.parse(e.data)); } catch (err) {}
+           try { 
+             applyUpdateStatus(JSON.parse(e.data));
+             sseRetryCount = 0;  // Reset retry count on successful message
+           } catch (err) {
+             if (window.console && console.error) {
+               console.error('SSE message parse error:', err);
+             }
+           }
          });
+         
          es.onerror = function() {
            es.close();
-           setInterval(pollUpdateStatus, 500);
+           
+           // Implement exponential backoff retry logic
+           if (sseRetryCount < sseMaxRetries) {
+             sseRetryCount++;
+             var delay = sseRetryDelay * Math.pow(2, sseRetryCount - 1);
+             if (window.console && console.log) {
+               console.log('SSE connection failed, retrying in ' + delay + 'ms (attempt ' + sseRetryCount + '/' + sseMaxRetries + ')');
+             }
+             setTimeout(function() {
+               startSse();
+             }, delay);
+           } else {
+             // Permanent fallback to polling after retries exhausted
+             if (window.console && console.log) {
+               console.log('SSE connection failed permanently, falling back to polling');
+             }
+             startPolling();
+           }
          };
+         
          return true;
        }
 
        if (!startSse()) {
-         setInterval(pollUpdateStatus, 500);
+         startPolling();
        }
-       pollUpdateStatus();
+       
+       // Initial status fetch with error handling
+       try {
+         pollUpdateStatus();
+       } catch (err) {
+         if (window.console && console.error) {
+           console.error('Initial pollUpdateStatus call failed:', err);
+         }
+       }
      </script>
      </html>)";
 

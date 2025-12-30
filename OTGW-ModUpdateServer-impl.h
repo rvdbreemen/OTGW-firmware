@@ -40,13 +40,19 @@
 namespace esp8266httpupdateserver {
 using namespace esp8266webserver;
 namespace {
-volatile UpdateStatus gUpdateStatus = {0, 0, 0, 0, "Idle"};
+// Use static storage instead of volatile for thread safety
+UpdateStatus gUpdateStatus = {0, 0, 0, 0, "Idle"};
+bool gUpdateStatusLock = false;  // Simple lock flag for ESP8266
 WiFiClient gSseClient;
 bool gSseActive = false;
 UpdateStatus gSseLastSent = {0, 0, 0, 0, ""};
 uint32_t gSseLastSendMs = 0;
 
 void setUpdateStatus(uint8_t state, uint8_t percent, uint32_t transferred, uint32_t total, const char *message) {
+  // Wait for lock (simple spinlock for ESP8266 single-core)
+  while (gUpdateStatusLock) { yield(); }
+  gUpdateStatusLock = true;
+  
   gUpdateStatus.state = state;
   gUpdateStatus.percent = percent;
   gUpdateStatus.transferred = transferred;
@@ -54,40 +60,59 @@ void setUpdateStatus(uint8_t state, uint8_t percent, uint32_t transferred, uint3
   if (message && *message) {
     strlcpy(gUpdateStatus.message, message, sizeof(gUpdateStatus.message));
   }
+  
+  gUpdateStatusLock = false;
 }
 
 void sanitizeJsonString(const char *src, char *dst, size_t len) {
   if (!dst || len == 0) return;
   size_t w = 0;
-  for (size_t r = 0; src && src[r] != '\0' && w + 1 < len; r++) {
-    char c = src[r];
-    if (c == '"' || c == '\\') c = '\'';
-    dst[w++] = c;
+  for (size_t r = 0; src && src[r] != '\0' && w + 2 < len; r++) {
+    unsigned char c = static_cast<unsigned char>(src[r]);
+    // Escape control characters and JSON special characters
+    if (c == '\n' || c == '\r' || c == '\t' || c == '\f' || c == '\b') {
+      dst[w++] = ' ';  // Replace control chars with space
+    } else if (c == '"' || c == '\\') {
+      dst[w++] = '\\';
+      dst[w++] = c;
+    } else if (c < 0x20 || c == 0x7F) {
+      dst[w++] = ' ';  // Replace other control chars with space
+    } else {
+      dst[w++] = static_cast<char>(c);
+    }
   }
   dst[w] = '\0';
 }
 } // namespace
 
 void getUpdateStatus(UpdateStatus &out) {
+  // Wait for lock (simple spinlock for ESP8266 single-core)
+  while (gUpdateStatusLock) { yield(); }
+  gUpdateStatusLock = true;
+  
   out.state = gUpdateStatus.state;
   out.percent = gUpdateStatus.percent;
   out.transferred = gUpdateStatus.transferred;
   out.total = gUpdateStatus.total;
   strlcpy(out.message, gUpdateStatus.message, sizeof(out.message));
+  
+  gUpdateStatusLock = false;
 }
 
-void updateStatusToJson(char *buf, size_t len) {
+size_t updateStatusToJson(char *buf, size_t len) {
   UpdateStatus s{};
   getUpdateStatus(s);
   char msg[sizeof(s.message)] = {0};
   sanitizeJsonString(s.message, msg, sizeof(msg));
-  snprintf(buf, len,
+  int written = snprintf(buf, len,
            "{\"state\":%u,\"percent\":%u,\"transferred\":%lu,\"total\":%lu,\"message\":\"%s\"}",
            static_cast<unsigned>(s.state),
            static_cast<unsigned>(s.percent),
            static_cast<unsigned long>(s.transferred),
            static_cast<unsigned long>(s.total),
            msg);
+  // Return actual size written (or would have been written)
+  return (written > 0 && static_cast<size_t>(written) < len) ? static_cast<size_t>(written) : 0;
 }
 
 static bool sseStatusChanged(const UpdateStatus &a, const UpdateStatus &b) {
@@ -124,18 +149,41 @@ void pumpUpdateEventStream() {
   getUpdateStatus(now);
   const uint32_t tick = millis();
   const bool changed = sseStatusChanged(now, gSseLastSent);
+  
+  // Use rollover-safe time difference calculation
+  uint32_t timeSinceLastSend = tick - gSseLastSendMs;
 
-  if (changed || (tick - gSseLastSendMs) > 1000) {
-    char json[200];
-    updateStatusToJson(json, sizeof(json));
-    gSseClient.print("event: update\n");
-    gSseClient.print("data: ");
-    gSseClient.print(json);
-    gSseClient.print("\n\n");
+  if (changed) {
+    // Send update immediately on status change
+    char json[512];  // Increased buffer size
+    size_t jsonLen = updateStatusToJson(json, sizeof(json));
+    
+    // Check for write errors
+    if (gSseClient.print("event: update\n") <= 0) {
+      gSseActive = false;
+      return;
+    }
+    if (gSseClient.print("data: ") <= 0) {
+      gSseActive = false;
+      return;
+    }
+    if (gSseClient.print(json) <= 0) {
+      gSseActive = false;
+      return;
+    }
+    if (gSseClient.print("\n\n") <= 0) {
+      gSseActive = false;
+      return;
+    }
+    
     gSseLastSent = now;
     gSseLastSendMs = tick;
-  } else if ((tick - gSseLastSendMs) > 10000) {
-    gSseClient.print(": ping\n\n");
+  } else if (timeSinceLastSend > 10000) {
+    // Send keepalive ping every 10 seconds when no changes
+    if (gSseClient.print(": ping\n\n") <= 0) {
+      gSseActive = false;
+      return;
+    }
     gSseLastSendMs = tick;
   }
 }
@@ -194,7 +242,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _server->send(200, F("text/html"), String(F("Update error: ")) + _updaterError);
       } else {
         _server->client().setNoDelay(true);
-        setUpdateStatus(2, 100, gUpdateStatus.transferred, gUpdateStatus.total, "Update successful");
+        // Status already set to success in UPLOAD_FILE_END handler
         _server->send_P(200, PSTR("text/html"), _serverSuccess);
         _server->client().stop();
         delay(1000);

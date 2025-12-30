@@ -98,9 +98,13 @@ void setupFSexplorer(){
   httpServer.on("/api/firmwarefilelist", apifirmwarefilelist); 
   httpServer.on("/api/listfiles", apilistfiles);
   httpServer.on("/api/v0/update/status", []() {
-    char buf[200];
-    updateStatusToJson(buf, sizeof(buf));
-    httpServer.send(200, "application/json", buf);
+    char buf[512];  // Increased from 200 to prevent truncation
+    size_t len = updateStatusToJson(buf, sizeof(buf));
+    if (len > 0) {
+      httpServer.send(200, "application/json", buf);
+    } else {
+      httpServer.send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
+    }
   });
   httpServer.on("/api/v0/update/events", HTTP_GET, []() {
     beginUpdateEventStream(httpServer);
