@@ -493,6 +493,14 @@ void sendMQTTData(const __FlashStringHelper *topic, const char *json, const bool
   sendMQTTData(topicBuf, json, retain);
 }
 
+void sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *json, const bool retain)
+{
+  char payloadBuf[MQTT_MSG_MAX_LEN];
+  strncpy_P(payloadBuf, reinterpret_cast<PGM_P>(json), sizeof(payloadBuf) - 1);
+  payloadBuf[sizeof(payloadBuf) - 1] = '\0';
+  sendMQTTData(topic, payloadBuf, retain);
+}
+
 /* 
 * topic:  <string> , topic will be used as is (no prefixing), retained = true
 * json:   <string> , payload to send
