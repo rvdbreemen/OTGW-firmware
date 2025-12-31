@@ -394,7 +394,8 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
   }
   unsigned long now = millis();
   // Use int32_t cast to handle millis() overflow correctly (wraps every ~49 days)
-  if (_status.phase == _lastEventPhase && (int32_t)(now - _lastEventMs) < 250) {
+  // Throttle to 1000ms to avoid flooding
+  if (_status.phase == _lastEventPhase && (int32_t)(now - _lastEventMs) < 1000) {
     return;
   }
   _lastEventMs = now;
@@ -432,10 +433,14 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
     return;
   }
   
-  _eventClient.print(F("event: status\n"));
-  _eventClient.print(F("data: "));
-  _eventClient.print(buf);
-  _eventClient.print(F("\n\n"));
+  // Send in one packet to avoid fragmentation and improve reliability
+  String msg;
+  msg.reserve(written + 40);
+  msg = F("event: status\n");
+  msg += F("data: ");
+  msg += buf;
+  msg += F("\n\n");
+  _eventClient.print(msg);
 }
 
 };
