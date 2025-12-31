@@ -67,6 +67,7 @@ static const char UpdateServerIndex[] PROGMEM =
          var successPanel = document.getElementById('successPanel');
          var successMessageEl = document.getElementById('successMessage');
          var successCountdownEl = document.getElementById('successCountdown');
+         var eventSource = null;
          var pollTimer = null;
          var uploadInFlight = false;
          var successTimer = null;
@@ -158,8 +159,7 @@ static const char UpdateServerIndex[] PROGMEM =
           if (successMessageEl) successMessageEl.textContent = 'Update successful. Rebooting device...';
         }
 
-        function updateDeviceStatus(status) {
-           if (!status) return;
+        function updateDeviceStatus(status) {           console.log('Device status:', status);           if (!status) return;
            var state = status.state || 'idle';
            if (state !== 'idle') {
              showProgressPage('Flashing in progress');
@@ -191,17 +191,17 @@ static const char UpdateServerIndex[] PROGMEM =
              successShown = true;
              if (successPanel) successPanel.style.display = 'block';
              startSuccessCountdown();
-             stopPolling();
+             stopEvents();
            } else if (state === 'error') {
              progressTitle.textContent = 'Update error';
              successShown = false;
              if (successPanel) successPanel.style.display = 'none';
-             stopPolling();
+             stopEvents();
            } else if (state === 'abort') {
              progressTitle.textContent = 'Update aborted';
              successShown = false;
              if (successPanel) successPanel.style.display = 'none';
-             stopPolling();
+             stopEvents();
            } else {
              progressTitle.textContent = 'Flashing in progress';
              if (successPanel && !successShown) successPanel.style.display = 'none';
@@ -209,18 +209,38 @@ static const char UpdateServerIndex[] PROGMEM =
          }
 
          function fetchStatus() {
-           fetch('/update/status', { cache: 'no-store' })
+           fetch('/status', { cache: 'no-store' })
              .then(function(response) { return response.json(); })
              .then(function(json) { updateDeviceStatus(json); })
-             .catch(function() {});
+             .catch(function(e) { console.log('Fetch status error:', e); });
          }
 
-         function startPolling() {
-           if (pollTimer) return;
-           pollTimer = setInterval(fetchStatus, 1000);
+         function startEvents() {
+           if (!!window.EventSource) {
+             if (eventSource) return;
+             eventSource = new EventSource('/events');
+             eventSource.addEventListener('open', function(e) {
+               console.log("Events Connected");
+             }, false);
+             eventSource.addEventListener('error', function(e) {
+               if (e.target.readyState != EventSource.OPEN) {
+                 console.log("Events Disconnected");
+               }
+             }, false);
+             eventSource.addEventListener('status', function(e) {
+               var json = JSON.parse(e.data);
+               updateDeviceStatus(json);
+             }, false);
+           } else {
+             if (!pollTimer) pollTimer = setInterval(fetchStatus, 1000);
+           }
          }
 
-         function stopPolling() {
+         function stopEvents() {
+           if (eventSource) {
+             eventSource.close();
+             eventSource = null;
+           }
            if (pollTimer) {
              clearInterval(pollTimer);
              pollTimer = null;
@@ -267,15 +287,11 @@ static const char UpdateServerIndex[] PROGMEM =
              xhr.open('POST', action, true);
              xhr.setRequestHeader('X-File-Size', input.files[0].size);
              xhr.upload.onprogress = function(ev) {
+               console.log('Upload progress:', ev.loaded, ev.total);
                var total = ev.lengthComputable ? ev.total : 0;
                lastUploadLoaded = ev.loaded;
                lastUploadTotal = total;
                setUploadProgress(ev.loaded, total);
-               if (total > 0) {
-                 setFlashProgress(ev.loaded, total);
-               } else {
-                 setFlashProgressUnknown(ev.loaded);
-               }
                if (total > 0) {
                  uploadStateEl.textContent = 'Upload: ' + Math.round((ev.loaded / total) * 100) + '%';
                } else {
@@ -283,6 +299,7 @@ static const char UpdateServerIndex[] PROGMEM =
                }
              };
              xhr.onload = function() {
+               console.log('Upload finished, status:', xhr.status);
                if (xhr.status >= 200 && xhr.status < 300) {
                  var responseText = xhr.responseText || '';
                  if (responseText.indexOf('Update error') !== -1) {
@@ -322,7 +339,7 @@ static const char UpdateServerIndex[] PROGMEM =
          initUploadForm('fwForm', 'flash');
          initUploadForm('fsForm', 'filesystem');
          fetchStatus();
-         startPolling();
+         startEvents();
        })();
      </script>
      </html>)";
