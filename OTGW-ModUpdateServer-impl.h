@@ -389,17 +389,17 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
 {
   if (!_eventClientActive) return;
   if (!_eventClient || !_eventClient.connected()) {
+    if (_serial_output) Debugln("SSE: Client disconnected");
     _eventClientActive = false;
     return;
   }
   unsigned long now = millis();
   // Use int32_t cast to handle millis() overflow correctly (wraps every ~49 days)
-  // Throttle to 1000ms to avoid flooding
-  if (_status.phase == _lastEventPhase && (int32_t)(now - _lastEventMs) < 1000) {
+  // Throttle to 500ms to be responsive but not flood
+  if (_status.phase == _lastEventPhase && (int32_t)(now - _lastEventMs) < 500) {
     return;
   }
-  _lastEventMs = now;
-  _lastEventPhase = _status.phase;
+  // Note: _lastEventMs and _lastEventPhase are updated ONLY after successful send
 
   constexpr size_t JSON_STATUS_BUFFER_SIZE = 512;
   char buf[JSON_STATUS_BUFFER_SIZE];
@@ -440,7 +440,22 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
   msg += F("data: ");
   msg += buf;
   msg += F("\n\n");
-  _eventClient.print(msg);
+  
+  // Robustness: Check if we can write without blocking
+  // If the send buffer is full (e.g. network congestion), skip this update
+  // to prioritize the file upload process.
+  size_t msgLen = msg.length();
+  size_t available = _eventClient.availableForWrite();
+  if (available >= msgLen) {
+      _eventClient.print(msg);
+      _lastEventMs = now;
+      _lastEventPhase = _status.phase;
+      yield(); 
+  } else {
+      if (_serial_output) {
+          Debugf("SSE: Buffer full (avail: %u, need: %u). Skipping update.\r\n", available, msgLen);
+      }
+  }
 }
 
 };
