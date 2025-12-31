@@ -268,6 +268,11 @@ static const char UpdateServerIndex[] PROGMEM =
 
          function stopEvents() {
            if (eventSource) {
+             // Prevent onclose/onerror from triggering fallback when we intentionally close
+             if (eventSource instanceof WebSocket) {
+                eventSource.onclose = null;
+                eventSource.onerror = null;
+             }
              eventSource.close();
              eventSource = null;
            }
