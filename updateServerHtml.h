@@ -191,14 +191,17 @@ static const char UpdateServerIndex[] PROGMEM =
              successShown = true;
              if (successPanel) successPanel.style.display = 'block';
              startSuccessCountdown();
+             stopPolling();
            } else if (state === 'error') {
              progressTitle.textContent = 'Update error';
              successShown = false;
              if (successPanel) successPanel.style.display = 'none';
+             stopPolling();
            } else if (state === 'abort') {
              progressTitle.textContent = 'Update aborted';
              successShown = false;
              if (successPanel) successPanel.style.display = 'none';
+             stopPolling();
            } else {
              progressTitle.textContent = 'Flashing in progress';
              if (successPanel && !successShown) successPanel.style.display = 'none';
@@ -215,6 +218,13 @@ static const char UpdateServerIndex[] PROGMEM =
          function startPolling() {
            if (pollTimer) return;
            pollTimer = setInterval(fetchStatus, 1000);
+         }
+
+         function stopPolling() {
+           if (pollTimer) {
+             clearInterval(pollTimer);
+             pollTimer = null;
+           }
          }
 
          function initUploadForm(formId, targetName) {
