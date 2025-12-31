@@ -216,7 +216,37 @@ static const char UpdateServerIndex[] PROGMEM =
          }
 
          function startEvents() {
-           if (!!window.EventSource) {
+           if (!!window.WebSocket) {
+             if (eventSource) return;
+             var protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+             var wsUrl = protocol + window.location.host + '/events';
+             eventSource = new WebSocket(wsUrl);
+             
+             eventSource.onopen = function(e) {
+               console.log("WS Connected");
+             };
+             
+             eventSource.onmessage = function(e) {
+               // console.log("WS Message", e.data);
+               try {
+                 var json = JSON.parse(e.data);
+                 updateDeviceStatus(json);
+               } catch (err) {
+                 console.log("WS JSON Error", err);
+               }
+             };
+             
+             eventSource.onerror = function(e) {
+               console.log("WS Error", e);
+             };
+             
+             eventSource.onclose = function(e) {
+               console.log("WS Disconnected");
+               eventSource = null;
+               // Fallback to polling if WS fails
+               if (!pollTimer) pollTimer = setInterval(fetchStatus, 1000);
+             };
+           } else if (!!window.EventSource) {
              if (eventSource) return;
              eventSource = new EventSource('/events');
              eventSource.addEventListener('open', function(e) {

@@ -101,6 +101,7 @@ class ESP8266HTTPUpdateServerTemplate
     UpdateStatus _status;
     WiFiClient _eventClient;
     bool _eventClientActive;
+    bool _isWebSocket;
     unsigned long _lastEventMs;
     UpdatePhase _lastEventPhase;
 };
