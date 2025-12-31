@@ -10,6 +10,7 @@ This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gatew
 
 The primary goal is **reliable Home Assistant integration** via MQTT and auto discovery, while keeping the OTGW behaviour compatible with existing OpenTherm tooling.
 
+
 ## History and scope
 
 The OpenTherm Gateway itself (hardware + PIC firmware + OTmonitor tooling) originates from **Schelte Bron’s OTGW project**. This firmware builds on that ecosystem by running on the ESP8266 inside the **NodoShop OTGW** to expose OTGW data and controls over the network.
