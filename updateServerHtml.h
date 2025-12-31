@@ -81,8 +81,18 @@ static const char UpdateServerIndex[] PROGMEM =
              pct = Math.round((loaded / total) * 100);
              if (pct > 100) pct = 100;
            }
+           if (!progressEl.hasAttribute('value')) {
+             progressEl.setAttribute('value', '0');
+           }
            progressEl.value = pct;
            progressTextEl.textContent = 'Upload: ' + pct + '% (' + formatBytes(loaded) + ' / ' + (total > 0 ? formatBytes(total) : '?') + ')';
+         }
+
+         function setUploadProgressUnknown(loaded) {
+           if (progressEl.hasAttribute('value')) {
+             progressEl.removeAttribute('value');
+           }
+           progressTextEl.textContent = 'Upload: ? (' + formatBytes(loaded) + ' / ?)';
          }
 
          function updateDeviceStatus(status) {
@@ -101,6 +111,8 @@ static const char UpdateServerIndex[] PROGMEM =
            }
            if (!uploadInFlight && status.received && status.total) {
              setUploadProgress(status.received, status.total);
+           } else if (!uploadInFlight && status.received) {
+             setUploadProgressUnknown(status.received);
            }
            if (status.received && status.total) {
              deviceBytesEl.textContent = 'Device bytes (HTTP): ' + formatBytes(status.received) + ' / ' + formatBytes(status.total);

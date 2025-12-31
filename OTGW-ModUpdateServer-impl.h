@@ -147,29 +147,25 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         if (_serial_output)
           Debugf("Update: %s\r\n", upload.filename.c_str());
 
-        size_t uploadTotal = _server->contentLength();
-        if (uploadTotal == static_cast<size_t>(-1)) {
-          uploadTotal = 0;
-        }
         if (upload.name == "filesystem") {
           size_t fsSize = ((size_t) &_FS_end - (size_t) &_FS_start);
           close_all_fs();
           if (!Update.begin(fsSize, U_FS)){//start with max available size
             if (_serial_output) Update.printError(OTGWSerial);
             _setUpdaterError();
-            _setStatus(UPDATE_ERROR, "filesystem", 0, uploadTotal, upload.filename, _updaterError);
+            _setStatus(UPDATE_ERROR, "filesystem", 0, 0, upload.filename, _updaterError);
             _sendStatusEvent();
           }
-          _setStatus(UPDATE_START, "filesystem", 0, uploadTotal, upload.filename, emptyString);
+          _setStatus(UPDATE_START, "filesystem", 0, 0, upload.filename, emptyString);
           _sendStatusEvent();
         } else {
           uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
           if (!Update.begin(maxSketchSpace, U_FLASH)){//start with max available size
             _setUpdaterError();
-            _setStatus(UPDATE_ERROR, "flash", 0, uploadTotal, upload.filename, _updaterError);
+            _setStatus(UPDATE_ERROR, "flash", 0, 0, upload.filename, _updaterError);
             _sendStatusEvent();
           }
-          _setStatus(UPDATE_START, "flash", 0, uploadTotal, upload.filename, emptyString);
+          _setStatus(UPDATE_START, "flash", 0, 0, upload.filename, emptyString);
           _sendStatusEvent();
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
