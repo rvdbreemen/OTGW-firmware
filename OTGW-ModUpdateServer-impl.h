@@ -102,10 +102,23 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
       _server->sendHeader(F("Connection"), F("keep-alive"));
       _server->setContentLength(CONTENT_LENGTH_UNKNOWN);
       _server->send(200, F("text/event-stream"), "");
+
+      // Clean up any previously active event client before assigning a new one
+      if (_eventClientActive) {
+        if (_eventClient.connected()) {
+          _eventClient.stop();
+        }
+        _eventClientActive = false;
+      }
+
       _eventClient = _server->client();
       _eventClient.setNoDelay(true);
-      _eventClientActive = true;
-      _sendStatusEvent();
+
+      // Only mark the client active and send an event if the connection is valid
+      if (_eventClient.connected()) {
+        _eventClientActive = true;
+        _sendStatusEvent();
+      }
     });
 
     // handler for the /update form POST (once file upload finishes)
