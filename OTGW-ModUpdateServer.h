@@ -82,6 +82,10 @@ class ESP8266HTTPUpdateServerTemplate
       const char *target;
       size_t received;
       size_t total;
+      size_t upload_received;
+      size_t upload_total;
+      size_t flash_written;
+      size_t flash_total;
       String filename;
       String error;
     };

@@ -138,6 +138,10 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         if(!_authenticated){
           if (_serial_output)
             Debugln("Unauthenticated Update\n");
+          _status.upload_received = 0;
+          _status.upload_total = 0;
+          _status.flash_written = 0;
+          _status.flash_total = 0;
           _setStatus(UPDATE_ERROR, "unknown", 0, 0, upload.filename, "unauthenticated");
           _sendStatusEvent();
           return;
@@ -147,25 +151,38 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         if (_serial_output)
           Debugf("Update: %s\r\n", upload.filename.c_str());
 
+        size_t uploadTotal = 0;
+        String sizeArg = _server->arg("size");
+        if (sizeArg.length()) {
+          long parsedSize = sizeArg.toInt();
+          if (parsedSize > 0) {
+            uploadTotal = static_cast<size_t>(parsedSize);
+          }
+        }
+        _status.upload_total = uploadTotal;
+        _status.upload_received = 0;
+        _status.flash_total = uploadTotal;
+        _status.flash_written = 0;
+
         if (upload.name == "filesystem") {
           size_t fsSize = ((size_t) &_FS_end - (size_t) &_FS_start);
           close_all_fs();
           if (!Update.begin(fsSize, U_FS)){//start with max available size
             if (_serial_output) Update.printError(OTGWSerial);
             _setUpdaterError();
-            _setStatus(UPDATE_ERROR, "filesystem", 0, 0, upload.filename, _updaterError);
+            _setStatus(UPDATE_ERROR, "filesystem", 0, uploadTotal, upload.filename, _updaterError);
             _sendStatusEvent();
           }
-          _setStatus(UPDATE_START, "filesystem", 0, 0, upload.filename, emptyString);
+          _setStatus(UPDATE_START, "filesystem", 0, uploadTotal, upload.filename, emptyString);
           _sendStatusEvent();
         } else {
           uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
           if (!Update.begin(maxSketchSpace, U_FLASH)){//start with max available size
             _setUpdaterError();
-            _setStatus(UPDATE_ERROR, "flash", 0, 0, upload.filename, _updaterError);
+            _setStatus(UPDATE_ERROR, "flash", 0, uploadTotal, upload.filename, _updaterError);
             _sendStatusEvent();
           }
-          _setStatus(UPDATE_START, "flash", 0, 0, upload.filename, emptyString);
+          _setStatus(UPDATE_START, "flash", 0, uploadTotal, upload.filename, emptyString);
           _sendStatusEvent();
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
@@ -173,23 +190,35 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         // Feed the dog before it bites!
         Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
         // End of feeding hack
-        if(Update.write(upload.buf, upload.currentSize) != upload.currentSize){
+        size_t written = Update.write(upload.buf, upload.currentSize);
+        _status.upload_received = upload.totalSize;
+        _status.flash_written += written;
+        if (written != upload.currentSize) {
           _setUpdaterError();
-          _setStatus(UPDATE_ERROR, _status.target, _status.received, _status.total, _status.filename, _updaterError);
+          _setStatus(UPDATE_ERROR, _status.target, _status.flash_written, _status.flash_total, _status.filename, _updaterError);
           _sendStatusEvent();
         } else {
-          size_t received = upload.totalSize;
-          _setStatus(UPDATE_WRITE, _status.target, received, _status.total, _status.filename, emptyString);
+          _setStatus(UPDATE_WRITE, _status.target, _status.flash_written, _status.flash_total, _status.filename, emptyString);
           _sendStatusEvent();
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
         if(Update.end(true)){ //true to set the size to the current progress
           if (_serial_output) Debugf("\r\nUpdate Success: %u\r\nRebooting...\r\n", upload.totalSize);
-          _setStatus(UPDATE_END, _status.target, upload.totalSize, upload.totalSize, _status.filename, emptyString);
+          _status.upload_received = upload.totalSize;
+          if (_status.upload_total == 0 && upload.totalSize > 0) {
+            _status.upload_total = upload.totalSize;
+          }
+          if (_status.flash_total == 0 && upload.totalSize > 0) {
+            _status.flash_total = upload.totalSize;
+          }
+          if (_status.flash_written < upload.totalSize) {
+            _status.flash_written = upload.totalSize;
+          }
+          _setStatus(UPDATE_END, _status.target, _status.flash_written, _status.flash_total, _status.filename, emptyString);
           _sendStatusEvent();
         } else {
           _setUpdaterError();
-          _setStatus(UPDATE_ERROR, _status.target, _status.received, _status.total, _status.filename, _updaterError);
+          _setStatus(UPDATE_ERROR, _status.target, _status.flash_written, _status.flash_total, _status.filename, _updaterError);
           _sendStatusEvent();
         }
         // if (_serial_output) 
@@ -197,7 +226,14 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
       } else if(_authenticated && upload.status == UPLOAD_FILE_ABORTED){
         Update.end();
         if (_serial_output) Debugln("Update was aborted");
-        _setStatus(UPDATE_ABORT, _status.target, _status.received, _status.total, _status.filename, emptyString);
+        _status.upload_received = upload.totalSize;
+        if (_status.upload_total == 0 && upload.totalSize > 0) {
+          _status.upload_total = upload.totalSize;
+        }
+        if (_status.flash_total == 0 && upload.totalSize > 0) {
+          _status.flash_total = upload.totalSize;
+        }
+        _setStatus(UPDATE_ABORT, _status.target, _status.flash_written, _status.flash_total, _status.filename, emptyString);
         _sendStatusEvent();
       }
       delay(0);
@@ -232,6 +268,10 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_resetStatus()
   _status.target = "unknown";
   _status.received = 0;
   _status.total = 0;
+  _status.upload_received = 0;
+  _status.upload_total = 0;
+  _status.flash_written = 0;
+  _status.flash_total = 0;
   _status.filename = emptyString;
   _status.error = emptyString;
   _eventClientActive = false;
@@ -244,6 +284,14 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_setStatus(uint8_t phase, cons
   _status.target = target ? target : "unknown";
   _status.received = received;
   _status.total = total;
+  if (_status.flash_total > 0 && _status.flash_written > _status.flash_total) {
+    if (_serial_output) {
+      Debugf("Update warning: flash_written (%u) > flash_total (%u)\r\n",
+             static_cast<unsigned>(_status.flash_written),
+             static_cast<unsigned>(_status.flash_total));
+    }
+    _status.flash_written = _status.flash_total;
+  }
   _status.filename = filename;
   _status.error = error;
 }
@@ -285,7 +333,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_jsonEscape(const String &in, 
 template <typename ServerType>
 void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusJson()
 {
-  constexpr size_t JSON_STATUS_BUFFER_SIZE = 256;
+  constexpr size_t JSON_STATUS_BUFFER_SIZE = 512;
   char buf[JSON_STATUS_BUFFER_SIZE];
   char filenameEsc[64];
   char errorEsc[96];
@@ -294,11 +342,15 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusJson()
   snprintf(
     buf,
     sizeof(buf),
-    "{\"state\":\"%s\",\"target\":\"%s\",\"received\":%u,\"total\":%u,\"filename\":\"%s\",\"error\":\"%s\"}",
+    "{\"state\":\"%s\",\"target\":\"%s\",\"received\":%u,\"total\":%u,\"upload_received\":%u,\"upload_total\":%u,\"flash_written\":%u,\"flash_total\":%u,\"filename\":\"%s\",\"error\":\"%s\"}",
     _phaseToString(_status.phase),
     _status.target ? _status.target : "unknown",
     static_cast<unsigned>(_status.received),
     static_cast<unsigned>(_status.total),
+    static_cast<unsigned>(_status.upload_received),
+    static_cast<unsigned>(_status.upload_total),
+    static_cast<unsigned>(_status.flash_written),
+    static_cast<unsigned>(_status.flash_total),
     filenameEsc,
     errorEsc
   );
@@ -320,7 +372,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
   _lastEventMs = now;
   _lastEventPhase = _status.phase;
 
-  constexpr size_t JSON_STATUS_BUFFER_SIZE = 256;
+  constexpr size_t JSON_STATUS_BUFFER_SIZE = 512;
   char buf[JSON_STATUS_BUFFER_SIZE];
   char filenameEsc[64];
   char errorEsc[96];
@@ -329,11 +381,15 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
   snprintf(
     buf,
     sizeof(buf),
-    "{\"state\":\"%s\",\"target\":\"%s\",\"received\":%u,\"total\":%u,\"filename\":\"%s\",\"error\":\"%s\"}",
+    "{\"state\":\"%s\",\"target\":\"%s\",\"received\":%u,\"total\":%u,\"upload_received\":%u,\"upload_total\":%u,\"flash_written\":%u,\"flash_total\":%u,\"filename\":\"%s\",\"error\":\"%s\"}",
     _phaseToString(_status.phase),
     _status.target ? _status.target : "unknown",
     static_cast<unsigned>(_status.received),
     static_cast<unsigned>(_status.total),
+    static_cast<unsigned>(_status.upload_received),
+    static_cast<unsigned>(_status.upload_total),
+    static_cast<unsigned>(_status.flash_written),
+    static_cast<unsigned>(_status.flash_total),
     filenameEsc,
     errorEsc
   );
