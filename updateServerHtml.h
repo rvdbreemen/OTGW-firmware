@@ -14,12 +14,12 @@ static const char UpdateServerIndex[] PROGMEM =
        <h1>OTGW firmware Flash utility</h1>
        <form id='fwForm' method='POST' action='?cmd=0' enctype='multipart/form-data'>
             Select a "<b>.ino.bin</b>" file to flash<br/>
-            <input type='file' accept='ino.bin' name='firmware' required>
+            <input type='file' accept='.ino.bin' name='firmware' required>
             <input id='fwSubmit' type='submit' value='Flash Firmware' disabled>
         </form>
         <form id='fsForm' method='POST' action='?cmd=100' enctype='multipart/form-data'> 
             Select a "<b>.littlefs.bin</b>" file to flash<br/>
-            <input type='file' accept='littlefs.bin' name='filesystem' required>
+            <input type='file' accept='.littlefs.bin' name='filesystem' required>
             <input id='fsSubmit' type='submit' value='Flash LittleFS' disabled>
         </form>
         <div id='formError' class='small' style='color: #b00020; font-weight: bold;'></div>
