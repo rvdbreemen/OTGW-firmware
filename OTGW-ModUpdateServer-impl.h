@@ -172,18 +172,20 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
             _setUpdaterError();
             _setStatus(UPDATE_ERROR, "filesystem", 0, uploadTotal, upload.filename, _updaterError);
             _sendStatusEvent();
+          } else {
+            _setStatus(UPDATE_START, "filesystem", 0, uploadTotal, upload.filename, emptyString);
+            _sendStatusEvent();
           }
-          _setStatus(UPDATE_START, "filesystem", 0, uploadTotal, upload.filename, emptyString);
-          _sendStatusEvent();
         } else {
           uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
           if (!Update.begin(maxSketchSpace, U_FLASH)){//start with max available size
             _setUpdaterError();
             _setStatus(UPDATE_ERROR, "flash", 0, uploadTotal, upload.filename, _updaterError);
             _sendStatusEvent();
+          } else {
+            _setStatus(UPDATE_START, "flash", 0, uploadTotal, upload.filename, emptyString);
+            _sendStatusEvent();
           }
-          _setStatus(UPDATE_START, "flash", 0, uploadTotal, upload.filename, emptyString);
-          _sendStatusEvent();
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
         if (_serial_output) {Debug("."); blinkLEDnow(LED1);}
