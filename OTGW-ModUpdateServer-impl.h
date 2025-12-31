@@ -380,7 +380,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
   char errorEsc[96];
   _jsonEscape(_status.filename, filenameEsc, sizeof(filenameEsc));
   _jsonEscape(_status.error, errorEsc, sizeof(errorEsc));
-  snprintf(
+  int written = snprintf(
     buf,
     sizeof(buf),
     "{\"state\":\"%s\",\"target\":\"%s\",\"received\":%u,\"total\":%u,\"upload_received\":%u,\"upload_total\":%u,\"flash_written\":%u,\"flash_total\":%u,\"filename\":\"%s\",\"error\":\"%s\"}",
@@ -395,6 +395,19 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
     filenameEsc,
     errorEsc
   );
+  
+  // Check if the output was truncated
+  if (written >= (int)sizeof(buf)) {
+    if (_serial_output) {
+      Debugf("Warning: SSE status JSON truncated (%d chars needed, %d available)\r\n", 
+             written, (int)sizeof(buf));
+    }
+    // Ensure null termination
+    buf[sizeof(buf) - 1] = '\0';
+    // Don't send truncated/malformed JSON
+    return;
+  }
+  
   _eventClient.print(F("event: status\n"));
   _eventClient.print(F("data: "));
   _eventClient.print(buf);
