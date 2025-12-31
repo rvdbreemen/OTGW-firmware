@@ -27,6 +27,8 @@
 #include "StreamString.h"
 #include "Wire.h"
 #include "OTGW-ModUpdateServer.h"
+#include <Hash.h>
+#include <base64.h>
 
 #ifndef Debug
   //#warning Debug() was not defined!
@@ -69,6 +71,7 @@ ESP8266HTTPUpdateServerTemplate<ServerType>::ESP8266HTTPUpdateServerTemplate(boo
   _password = emptyString;
   _authenticated = false;
   _eventClientActive = false;
+  _isWebSocket = false;
   _lastEventMs = 0;
   _lastEventPhase = UPDATE_IDLE;
   _resetStatus();
@@ -81,6 +84,11 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
     _username = username;
     _password = password;
     _resetStatus();
+
+    // Collect headers needed for WebSocket handshake
+    const char * headerkeys[] = {"Upgrade", "Sec-WebSocket-Key", "Sec-WebSocket-Version"};
+    size_t headerkeyssize = sizeof(headerkeys)/sizeof(char*);
+    _server->collectHeaders(headerkeys, headerkeyssize);
 
     // handler for the /update form page
     _server->on(path.c_str(), HTTP_GET, [&](){
@@ -98,6 +106,30 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
     _server->on("/events", HTTP_GET, [&](){
       if(_username != emptyString && _password != emptyString && !_server->authenticate(_username.c_str(), _password.c_str()))
         return _server->requestAuthentication();
+
+      // Check for WebSocket Upgrade
+      if (_server->header("Upgrade").equalsIgnoreCase("websocket")) {
+          String key = _server->header("Sec-WebSocket-Key");
+          if (key.length() > 0) {
+              // Calculate Sec-WebSocket-Accept
+              uint8_t hash[20];
+              sha1(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11", &hash[0]);
+              String accept = base64::encode(hash, 20);
+
+              _server->sendHeader("Upgrade", "websocket");
+              _server->sendHeader("Connection", "Upgrade");
+              _server->sendHeader("Sec-WebSocket-Accept", accept);
+              _server->send(101);
+
+              _eventClient = _server->client();
+              _eventClientActive = true;
+              _isWebSocket = true;
+              if (_serial_output) Debugln("WS: Connected");
+              return;
+          }
+      }
+
+      // Fallback to SSE
       _server->sendHeader(F("Cache-Control"), F("no-cache"));
       _server->sendHeader(F("Connection"), F("keep-alive"));
       _server->setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -113,6 +145,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
 
       _eventClient = _server->client();
       _eventClient.setNoDelay(true);
+      _isWebSocket = false;
 
       // Only mark the client active and send an event if the connection is valid
       if (_eventClient.connected()) {
@@ -426,20 +459,35 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
   // Check if the output was truncated
   if (written >= (int)sizeof(buf)) {
     if (_serial_output) {
-      Debugf("Warning: SSE status JSON truncated (%d chars needed, %d available)\r\n", 
+      Debugf("Warning: Status JSON truncated (%d chars needed, %d available)\r\n", 
              written, (int)sizeof(buf));
     }
     // Don't send truncated/malformed JSON
     return;
   }
   
-  // Send in one packet to avoid fragmentation and improve reliability
   String msg;
-  msg.reserve(written + 40);
-  msg = F("event: status\n");
-  msg += F("data: ");
-  msg += buf;
-  msg += F("\n\n");
+  if (_isWebSocket) {
+      // WebSocket Frame: FIN + Text (0x81)
+      msg += (char)0x81;
+      
+      size_t len = written; // Payload length
+      if (len < 126) {
+          msg += (char)len;
+      } else {
+          msg += (char)126;
+          msg += (char)((len >> 8) & 0xFF);
+          msg += (char)(len & 0xFF);
+      }
+      msg += buf;
+  } else {
+      // SSE Format
+      msg.reserve(written + 40);
+      msg = F("event: status\n");
+      msg += F("data: ");
+      msg += buf;
+      msg += F("\n\n");
+  }
   
   // Robustness: Check if we can write without blocking
   // If the send buffer is full (e.g. network congestion), skip this update
@@ -453,7 +501,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
       yield(); 
   } else {
       if (_serial_output) {
-          Debugf("SSE: Buffer full (avail: %u, need: %u). Skipping update.\r\n", available, msgLen);
+          Debugf("WS/SSE: Buffer full (avail: %u, need: %u). Skipping update.\r\n", available, msgLen);
       }
   }
 }
