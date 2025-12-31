@@ -89,13 +89,13 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
       _server->send_P(200, PSTR("text/html"), _serverIndex);
     });
 
-    _server->on("/update/status", HTTP_GET, [&](){
+    _server->on("/status", HTTP_GET, [&](){
       if(_username != emptyString && _password != emptyString && !_server->authenticate(_username.c_str(), _password.c_str()))
         return _server->requestAuthentication();
       _sendStatusJson();
     });
 
-    _server->on("/update/events", HTTP_GET, [&](){
+    _server->on("/events", HTTP_GET, [&](){
       if(_username != emptyString && _password != emptyString && !_server->authenticate(_username.c_str(), _password.c_str()))
         return _server->requestAuthentication();
       _server->sendHeader(F("Cache-Control"), F("no-cache"));
