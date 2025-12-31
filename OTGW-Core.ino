@@ -1736,6 +1736,29 @@ void processOT(const char *buf, int len){
     } 
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
     checkOTGWcmdqueue(buf, len);
+    Debugln(buf);
+    sendMQTTData(F("event_report"), buf);
+  } else if (strcmp(buf, "NG") == 0) {
+    Debugln(F("NG - No Good. The command code is unknown."));
+    sendMQTTData(F("event_report"), F("NG - No Good. The command code is unknown."));
+  } else if (strcmp(buf, "SE") == 0) {
+    Debugln(F("SE - Syntax Error. The command contained an unexpected character or was incomplete."));
+    sendMQTTData(F("event_report"), F("SE - Syntax Error. The command contained an unexpected character or was incomplete."));
+  } else if (strcmp(buf, "BV") == 0) {
+    Debugln(F("BV - Bad Value. The command contained a data value that is not allowed."));
+    sendMQTTData(F("event_report"), F("BV - Bad Value. The command contained a data value that is not allowed."));
+  } else if (strcmp(buf, "OR") == 0) {
+    Debugln(F("OR - Out of Range. A number was specified outside of the allowed range."));
+    sendMQTTData(F("event_report"), F("OR - Out of Range. A number was specified outside of the allowed range."));
+  } else if (strcmp(buf, "NS") == 0) {
+    Debugln(F("NS - No Space. The alternative Data-ID could not be added because the table is full."));
+    sendMQTTData(F("event_report"), F("NS - No Space. The alternative Data-ID could not be added because the table is full."));
+  } else if (strcmp(buf, "NF") == 0) {
+    Debugln(F("NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table."));
+    sendMQTTData(F("event_report"), F("NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table."));
+  } else if (strcmp(buf, "OE") == 0) {
+    Debugln(F("OE - Overrun Error. The processor was busy and failed to process all received characters."));
+    sendMQTTData(F("event_report"), F("OE - Overrun Error. The processor was busy and failed to process all received characters."));
   } else if (strcmp(buf, "Thermostat disconnected") == 0) {
     Debugln(F("Thermostat disconnected"));
     sendMQTTData(F("event_report"), F("Thermostat disconnected"));
