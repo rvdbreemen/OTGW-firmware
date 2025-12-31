@@ -368,7 +368,8 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
     return;
   }
   unsigned long now = millis();
-  if (_status.phase == _lastEventPhase && (now - _lastEventMs) < 250) {
+  // Use int32_t cast to handle millis() overflow correctly (wraps every ~49 days)
+  if (_status.phase == _lastEventPhase && (int32_t)(now - _lastEventMs) < 250) {
     return;
   }
   _lastEventMs = now;
