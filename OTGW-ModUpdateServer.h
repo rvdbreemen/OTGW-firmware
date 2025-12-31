@@ -21,6 +21,7 @@
 #define __HTTP_UPDATE_SERVER_H
 
 #include <ESP8266WebServer.h>
+#include <WiFiClient.h>
 
 namespace esp8266httpupdateserver {
 using namespace esp8266webserver;
@@ -59,8 +60,32 @@ class ESP8266HTTPUpdateServerTemplate
 
   protected:
     void _setUpdaterError();
+    void _resetStatus();
+    void _setStatus(uint8_t phase, const char *target, size_t received, size_t total, const String &filename, const String &error);
+    void _sendStatusJson();
+    void _sendStatusEvent();
+    void _jsonEscape(const String &in, char *out, size_t outSize);
+    const char *_phaseToString(uint8_t phase);
 
   private:
+    enum UpdatePhase : uint8_t {
+      UPDATE_IDLE = 0,
+      UPDATE_START,
+      UPDATE_WRITE,
+      UPDATE_END,
+      UPDATE_ERROR,
+      UPDATE_ABORT
+    };
+
+    struct UpdateStatus {
+      UpdatePhase phase;
+      const char *target;
+      size_t received;
+      size_t total;
+      String filename;
+      String error;
+    };
+
     bool _serial_output;
     ESP8266WebServerTemplate<ServerType> *_server;
     String _username;
@@ -69,6 +94,11 @@ class ESP8266HTTPUpdateServerTemplate
     String _updaterError;
     const char *_serverIndex;
     const char *_serverSuccess;
+    UpdateStatus _status;
+    WiFiClient _eventClient;
+    bool _eventClientActive;
+    unsigned long _lastEventMs;
+    UpdatePhase _lastEventPhase;
 };
 
 };
