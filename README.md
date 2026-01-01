@@ -40,7 +40,10 @@ Starting with hardware version 2.3, the included ESP8266 devkit changed from Nod
 The exact steps and screenshots live in the wiki, but the general flow is:
 
 1. Flash the latest firmware release to your ESP8266 (and flash the matching LittleFS image when required by the release).
-   - **Easy method**: Use the included `flash_esp.py` script (see [FLASH_GUIDE.md](FLASH_GUIDE.md))
+   - **Easy method (recommended)**: Use the included `flash_esp.py` script:
+     - `python3 flash_esp.py --download` - Downloads and flashes the latest release
+     - `python3 flash_esp.py --build` - Builds from source and flashes (for developers)
+     - See [FLASH_GUIDE.md](FLASH_GUIDE.md) for detailed instructions
    - **Manual method**: Follow the wiki instructions
 2. Connect the OTGW to your network and open the Web UI via `http://<device-ip>/`.
    If the device cannot connect, it starts a Wi-Fi configuration portal using an AP named `<hostname>-<mac>`.
