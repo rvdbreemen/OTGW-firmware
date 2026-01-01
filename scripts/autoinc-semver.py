@@ -177,15 +177,45 @@ def update_version_header(path, version_info, githash, date_str, time_str, incre
     return version_info
 
 
+def extract_version_from_file(filepath):
+    """Extract version string from a file to check if it needs updating."""
+    pre_version_text = r"((\*\*|//)\s*Version\s*:\s*v)(\d+\.\d+\.\d+)(.*)"
+    version_pattern = re.compile(pre_version_text)
+    
+    try:
+        with open(filepath, "r", encoding="utf-8", newline="") as file:
+            content = file.read()
+    except UnicodeDecodeError:
+        try:
+            with open(filepath, "r", encoding="latin-1", newline="") as file:
+                content = file.read()
+        except Exception:
+            return None
+    except Exception:
+        return None
+    
+    match = version_pattern.search(content)
+    if match:
+        version = match.group(3)  # The semver part (e.g., "0.10.4")
+        suffix = match.group(4).strip()  # The suffix part (e.g., "-alpha" or "")
+        return version + suffix
+    return None
+
+
 def update_version_in_file(filepath, version_info):
     """Replace the version string in the specified file."""
     pre_version_text = r"((\*\*|//)\s*Version\s*:\s*v)(\d+\.\d+\.\d+)(.*)"
     version_pattern = re.compile(pre_version_text)
-    new_version = (
-        f"{version_info['MAJOR']}.{version_info['MINOR']}.{version_info['PATCH']}"
-    )
-    if version_info.get("PRERELEASE"):
-        new_version += f"-{version_info['PRERELEASE']}"
+    
+    major = parse_int(version_info["_VERSION_MAJOR"], "major")
+    minor = parse_int(version_info["_VERSION_MINOR"], "minor")
+    patch = parse_int(version_info["_VERSION_PATCH"], "patch")
+    prerelease_raw = version_info["_VERSION_PRERELEASE"]
+    prerelease_value = normalize_token(prerelease_raw)
+    
+    new_version = f"{major}.{minor}.{patch}"
+    if prerelease_value and prerelease_value.lower() not in {"none", "null", "n/a", "na"}:
+        new_version += f"-{prerelease_value}"
 
     # Try UTF-8 first, fall back to latin-1 if that fails, or skip if neither works
     try:
@@ -206,31 +236,101 @@ def update_version_in_file(filepath, version_info):
     if updated_content != content:
         with open(filepath, "w", encoding="utf-8", newline="") as file:
             file.write(updated_content)
+        return True
+    return False
 
 
-def update_files(directory, version_info, ext_list):
-    """Update version in files within the specified directory."""
+def should_skip_path(path, base_dir):
+    """Check if a path should be skipped based on exclusion rules."""
+    rel_path = os.path.relpath(path, base_dir)
+    path_parts = rel_path.split(os.sep)
+    
+    # Directories to skip (third-party code, build artifacts, dependencies, internal)
+    skip_dirs = {
+        "arduino", "Arduino", "libraries", "staging", "build", 
+        "node_modules", ".git", "__pycache__", ".github",
+        "scripts", "docs", "hardware", "example-api", "Specification",
+        "specification", "theme", "data"
+    }
+    
+    # Check if any part of the path is in skip_dirs
+    for part in path_parts:
+        if part in skip_dirs:
+            return True
+        # Also skip hidden directories
+        if part.startswith('.') and part not in {'.'}:
+            return True
+    
+    return False
+
+
+def update_files(directory, version_info, ext_list, check_only=False):
+    """Update version in files within the specified directory.
+    
+    Args:
+        directory: Root directory to search
+        version_info: Dictionary with version information from version.h
+        ext_list: List of file extensions to process
+        check_only: If True, only check if updates are needed without making changes
+        
+    Returns:
+        Number of files updated (or that would be updated if check_only=True)
+    """
     if not os.path.exists(directory):
         logging.error("Directory %s does not exist.", directory)
-        return
+        return 0
     if not os.listdir(directory):
         logging.error("Directory %s is empty.", directory)
-        return
+        return 0
 
-    # Directories to skip (third-party code, build artifacts, dependencies)
-    skip_dirs = {"arduino", "Arduino", "libraries", "staging", "build", "node_modules", ".git", "__pycache__"}
+    # Build the expected version string
+    major = parse_int(version_info["_VERSION_MAJOR"], "major")
+    minor = parse_int(version_info["_VERSION_MINOR"], "minor")
+    patch = parse_int(version_info["_VERSION_PATCH"], "patch")
+    prerelease_raw = version_info["_VERSION_PRERELEASE"]
+    prerelease_value = normalize_token(prerelease_raw)
+    
+    expected_version = f"{major}.{minor}.{patch}"
+    if prerelease_value and prerelease_value.lower() not in {"none", "null", "n/a", "na"}:
+        expected_version += f"-{prerelease_value}"
+
+    files_updated = 0
+    files_checked = 0
 
     for root, dirs, files in os.walk(directory):
         # Skip excluded directories
-        dirs[:] = [d for d in dirs if d not in skip_dirs]
+        dirs[:] = [d for d in dirs if not should_skip_path(os.path.join(root, d), directory)]
         
         for file in files:
+            filepath = os.path.join(root, file)
+            
+            # Skip if path should be excluded
+            if should_skip_path(filepath, directory):
+                continue
+                
             _, ext = os.path.splitext(file)
             if ext in ext_list:
+                files_checked += 1
                 try:
-                    update_version_in_file(os.path.join(root, file), version_info)
+                    current_version = extract_version_from_file(filepath)
+                    if current_version and current_version != expected_version:
+                        if check_only:
+                            logging.info("Would update %s: %s -> %s", 
+                                       os.path.relpath(filepath, directory),
+                                       current_version, expected_version)
+                            files_updated += 1
+                        else:
+                            if update_version_in_file(filepath, version_info):
+                                logging.info("Updated %s: %s -> %s", 
+                                           os.path.relpath(filepath, directory),
+                                           current_version, expected_version)
+                                files_updated += 1
                 except Exception as exc:
-                    logging.warning("Failed to update %s: %s", file, exc)
+                    logging.warning("Failed to process %s: %s", 
+                                  os.path.relpath(filepath, directory), exc)
+    
+    logging.info("Checked %d files, updated %d files", files_checked, files_updated)
+    return files_updated
 
 
 def update_version_hash(path, githash):
@@ -251,16 +351,19 @@ def git_commit_changes(directory, version):
     subprocess.run(["git", "tag", f"auto-update-version-{version}"], cwd=directory, check=False)
 
 
-def main(directory, filename, git_enabled, increment, githash_override, githash_len, prerelease_override):
+def main(directory, filename, git_enabled, increment, githash_override, githash_len, prerelease_override, update_all):
     directory = os.path.abspath(directory)
     os.chdir(directory)
 
+    # Parse the current version.h to get the authoritative version
     version_info = parse_version_file(filename)
+    
     now = dt.datetime.now(dt.timezone.utc)
     date_str = now.strftime("%d-%m-%Y")
     time_str = now.strftime("%H:%M:%S")
     githash = resolve_githash(githash_override, githash_len)
 
+    # Update version.h with new build, githash, date, time
     version_info = update_version_header(
         filename,
         version_info,
@@ -271,7 +374,60 @@ def main(directory, filename, git_enabled, increment, githash_override, githash_
         prerelease_override,
     )
 
+    # Get the authoritative semver from version.h (without build number)
+    major = parse_int(version_info["_VERSION_MAJOR"], "major")
+    minor = parse_int(version_info["_VERSION_MINOR"], "minor")
+    patch = parse_int(version_info["_VERSION_PATCH"], "patch")
+    prerelease = normalize_token(version_info["_VERSION_PRERELEASE"])
+    
+    authoritative_semver = f"{major}.{minor}.{patch}"
+    if prerelease and prerelease.lower() not in {"none", "null", "n/a", "na"}:
+        authoritative_semver += f"-{prerelease}"
+    
+    # Update version.hash
     update_version_hash(os.path.join("data", "version.hash"), githash)
+
+    # Check if any project files need updating (have different version than version.h)
+    ext_list = [".h", ".ino", ".cpp", ".c"]
+    needs_update = False
+    
+    if not update_all:
+        # Quick check: scan files to see if any have a different version
+        for root, dirs, files in os.walk(directory):
+            dirs[:] = [d for d in dirs if not should_skip_path(os.path.join(root, d), directory)]
+            
+            for file in files:
+                filepath = os.path.join(root, file)
+                if should_skip_path(filepath, directory):
+                    continue
+                    
+                _, ext = os.path.splitext(file)
+                if ext in ext_list:
+                    try:
+                        current_version = extract_version_from_file(filepath)
+                        if current_version and current_version != authoritative_semver:
+                            needs_update = True
+                            logging.info("Detected version mismatch in %s: %s (expected: %s)",
+                                       os.path.relpath(filepath, directory),
+                                       current_version,
+                                       authoritative_semver)
+                            break
+                    except Exception:
+                        pass
+            if needs_update:
+                break
+    
+    # Update all files if requested or if version mismatch detected
+    if update_all or needs_update:
+        if needs_update and not update_all:
+            logging.info("Version mismatch detected, automatically updating all project files")
+        
+        files_updated = update_files(directory, version_info, ext_list, check_only=False)
+        
+        if files_updated > 0:
+            logging.info("Updated version strings in %d file(s)", files_updated)
+        else:
+            logging.info("No files needed version updates")
 
     if git_enabled:
         git_commit_changes(
@@ -317,6 +473,11 @@ if __name__ == "__main__":
         default=None,
         help="Override prerelease identifier",
     )
+    parser.add_argument(
+        "--update-all",
+        action="store_true",
+        help="Update version strings in all project files (automatically enabled on semver changes)",
+    )
     args = parser.parse_args()
     main(
         args.directory,
@@ -326,4 +487,5 @@ if __name__ == "__main__":
         args.githash,
         args.githash_length,
         args.prerelease,
+        args.update_all,
     )
