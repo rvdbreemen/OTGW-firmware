@@ -173,32 +173,29 @@ def download_release_assets(release_info, download_dir):
 
 
 def build_firmware():
-    """Build the firmware using make."""
+    """Build the firmware using build.py script."""
     script_dir = Path(__file__).parent.resolve()
-    makefile_path = script_dir / "Makefile"
+    build_script = script_dir / "build.py"
     
-    if not makefile_path.exists():
-        print_error("Makefile not found in repository root")
+    if not build_script.exists():
+        print_error("build.py script not found in repository root")
         return None
     
     print_header("Building Firmware")
-    print_info("Running 'make binaries' to build firmware...")
+    print_info("Running build.py to build firmware and filesystem...")
     print_info("This may take several minutes...")
+    print_info("The build script will automatically install arduino-cli if needed...")
     
     try:
-        # Run make binaries
+        # Run build.py script with --no-rename to keep simple filenames
         result = subprocess.run(
-            ["make", "binaries"],
+            [sys.executable, str(build_script), "--no-rename"],
             cwd=script_dir,
-            capture_output=True,
-            text=True,
             check=False
         )
         
         if result.returncode != 0:
             print_error("Build failed!")
-            print(result.stdout)
-            print(result.stderr, file=sys.stderr)
             return None
         
         print_success("Build completed successfully")
@@ -223,16 +220,6 @@ def build_firmware():
         
         print_info(f"Found firmware: {firmware_file.name}")
         
-        # Build filesystem if needed
-        print_info("Building filesystem...")
-        result = subprocess.run(
-            ["make", "filesystem"],
-            cwd=script_dir,
-            capture_output=True,
-            text=True,
-            check=False
-        )
-        
         # Find filesystem file
         filesystem_file = None
         for pattern in ["*.littlefs.bin", "OTGW-firmware.ino.littlefs.bin"]:
@@ -251,11 +238,6 @@ def build_firmware():
             'filesystem': filesystem_file
         }
         
-    except FileNotFoundError:
-        print_error("'make' command not found. Please install build tools.")
-        print_info("On Ubuntu/Debian: sudo apt install build-essential")
-        print_info("On macOS: xcode-select --install")
-        return None
     except Exception as e:
         print_error(f"Build failed: {e}")
         return None
@@ -444,6 +426,108 @@ def find_firmware_files():
     return firmware_files, filesystem_files
 
 
+def check_build_artifacts():
+    """Check if build artifacts exist in the build directory."""
+    script_dir = Path(__file__).parent.resolve()
+    build_dir = script_dir / "build"
+    
+    if not build_dir.exists():
+        return None
+    
+    # Look for firmware file
+    firmware_file = None
+    for pattern in ["*.ino.bin", "OTGW-firmware.ino.bin"]:
+        matches = list(build_dir.glob(pattern))
+        if matches:
+            firmware_file = matches[0]
+            break
+    
+    # Look for filesystem file
+    filesystem_file = None
+    for pattern in ["*.littlefs.bin", "OTGW-firmware.ino.littlefs.bin"]:
+        matches = list(build_dir.glob(pattern))
+        if matches:
+            filesystem_file = matches[0]
+            break
+    
+    if firmware_file:
+        return {
+            'firmware': firmware_file,
+            'filesystem': filesystem_file
+        }
+    
+    return None
+
+
+def interactive_mode_selection():
+    """Interactive menu for selecting flash mode when no arguments provided."""
+    print_header("OTGW-firmware Flash Tool - Interactive Mode")
+    
+    print(f"{Colors.BOLD}Available Options:{Colors.ENDC}\n")
+    print(f"{Colors.OKBLUE}1. BUILD MODE{Colors.ENDC}")
+    print("   - Build firmware locally from source code")
+    print("   - Requires build tools (arduino-cli, make)")
+    print("   - Best for developers making code changes")
+    print("   - Takes several minutes to complete\n")
+    
+    print(f"{Colors.OKBLUE}2. DOWNLOAD MODE{Colors.ENDC}")
+    print("   - Download latest official release from GitHub")
+    print("   - Fast and easy")
+    print("   - Best for regular users")
+    print("   - Requires internet connection\n")
+    
+    # Check for existing build artifacts
+    artifacts = check_build_artifacts()
+    
+    if artifacts:
+        print_success("Found existing build artifacts!")
+        if artifacts['firmware']:
+            print(f"  Firmware: {artifacts['firmware'].name}")
+        if artifacts['filesystem']:
+            print(f"  Filesystem: {artifacts['filesystem'].name}")
+        
+        print(f"\n{Colors.BOLD}What would you like to do?{Colors.ENDC}")
+        print("  1. Flash existing build artifacts")
+        print("  2. Rebuild and flash")
+        print("  3. Download latest release and flash")
+        print("  4. Exit")
+        
+        while True:
+            choice = input(f"\n{Colors.BOLD}Enter your choice (1-4): {Colors.ENDC}").strip()
+            
+            if choice == "1":
+                return "flash_artifacts", artifacts
+            elif choice == "2":
+                return "build", None
+            elif choice == "3":
+                return "download", None
+            elif choice == "4":
+                print_info("Exiting...")
+                sys.exit(0)
+            else:
+                print_error("Invalid choice. Please enter 1, 2, 3, or 4.")
+    else:
+        print_info("No existing build artifacts found in build/ directory.\n")
+        
+        print(f"{Colors.BOLD}What would you like to do?{Colors.ENDC}")
+        print("  1. Build firmware locally and flash")
+        print("  2. Download latest release and flash")
+        print("  3. Exit")
+        
+        while True:
+            choice = input(f"\n{Colors.BOLD}Enter your choice (1-3): {Colors.ENDC}").strip()
+            
+            if choice == "1":
+                return "build", None
+            elif choice == "2":
+                return "download", None
+            elif choice == "3":
+                print_info("Exiting...")
+                sys.exit(0)
+            else:
+                print_error("Invalid choice. Please enter 1, 2, or 3.")
+
+
 def select_file(files, file_type):
     """Interactively select a file from the list."""
     if not files:
@@ -582,13 +666,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Flash Modes:
-  (default)         Download latest release from GitHub (if no --firmware or --filesystem specified)
-  --download        Explicitly use download mode
+  (default)         Interactive mode - choose between build or download
+  --download        Explicitly use download mode (fetch latest release from GitHub)
   --build           Build firmware locally then flash (developer mode)
   --firmware/--filesystem    Use manual mode with specific files
 
 Examples:
-  # Download and flash latest release (default behavior)
+  # Interactive mode - explains options and guides you (default)
   python3 flash_esp.py
   
   # Explicitly download and flash latest release
@@ -618,7 +702,7 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
     mode_group.add_argument(
         "-d", "--download",
         action="store_true",
-        help="Download latest release from GitHub and flash (default if no files specified)"
+        help="Download latest release from GitHub and flash"
     )
     mode_group.add_argument(
         "--build",
@@ -732,34 +816,69 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
             sys.exit(1)
     
     else:
-        # Default to download mode if no mode specified and no manual files provided
+        # No mode specified - check if manual files provided or use interactive mode
         if not args.firmware and not args.filesystem:
-            # Download mode (default)
-            mode = "download"
-            print_header("Download Mode (Default) - Fetching Latest Release")
-            
-            release_info = get_latest_release_info()
-            if not release_info:
-                print_error("Failed to fetch release information")
+            # No files specified - use interactive mode (unless --no-interactive)
+            if args.no_interactive:
+                print_error("When using --no-interactive, you must specify a mode (--download, --build) or files (--firmware/--filesystem)")
                 sys.exit(1)
             
-            version_info = f"{release_info['name']} ({release_info['tag_name']})"
+            # Interactive mode selection
+            selected_mode, artifacts = interactive_mode_selection()
             
-            # Create temporary directory for downloads
-            temp_dir = Path(tempfile.mkdtemp(prefix="otgw_flash_"))
-            print_info(f"Download directory: {temp_dir}")
-            
-            try:
-                downloaded = download_release_assets(release_info, temp_dir)
-                firmware_file = downloaded.get('firmware')
-                filesystem_file = downloaded.get('filesystem')
+            if selected_mode == "flash_artifacts":
+                # Flash existing build artifacts
+                mode = "artifacts"
+                firmware_file = artifacts.get('firmware')
+                filesystem_file = artifacts.get('filesystem')
+                version_info = "Existing Build Artifacts"
+                print_header("Flashing Existing Build Artifacts")
+                
+            elif selected_mode == "build":
+                # Build mode
+                mode = "build"
+                print_header("Build Mode - Building Firmware Locally")
+                
+                build_result = build_firmware()
+                if not build_result:
+                    print_error("Build failed")
+                    sys.exit(1)
+                
+                firmware_file = build_result.get('firmware')
+                filesystem_file = build_result.get('filesystem')
+                version_info = "Local Build"
                 
                 if not firmware_file:
-                    print_error("No firmware file found in release")
+                    print_error("Build did not produce firmware file")
                     sys.exit(1)
-            except Exception as e:
-                print_error(f"Download failed: {e}")
-                sys.exit(1)
+                    
+            elif selected_mode == "download":
+                # Download mode
+                mode = "download"
+                print_header("Download Mode - Fetching Latest Release")
+                
+                release_info = get_latest_release_info()
+                if not release_info:
+                    print_error("Failed to fetch release information")
+                    sys.exit(1)
+                
+                version_info = f"{release_info['name']} ({release_info['tag_name']})"
+                
+                # Create temporary directory for downloads
+                temp_dir = Path(tempfile.mkdtemp(prefix="otgw_flash_"))
+                print_info(f"Download directory: {temp_dir}")
+                
+                try:
+                    downloaded = download_release_assets(release_info, temp_dir)
+                    firmware_file = downloaded.get('firmware')
+                    filesystem_file = downloaded.get('filesystem')
+                    
+                    if not firmware_file:
+                        print_error("No firmware file found in release")
+                        sys.exit(1)
+                except Exception as e:
+                    print_error(f"Download failed: {e}")
+                    sys.exit(1)
         else:
             # Manual mode - use provided files or search for them
             if args.firmware:
