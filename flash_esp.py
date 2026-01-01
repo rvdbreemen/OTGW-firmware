@@ -173,32 +173,29 @@ def download_release_assets(release_info, download_dir):
 
 
 def build_firmware():
-    """Build the firmware using make."""
+    """Build the firmware using build.py script."""
     script_dir = Path(__file__).parent.resolve()
-    makefile_path = script_dir / "Makefile"
+    build_script = script_dir / "build.py"
     
-    if not makefile_path.exists():
-        print_error("Makefile not found in repository root")
+    if not build_script.exists():
+        print_error("build.py script not found in repository root")
         return None
     
     print_header("Building Firmware")
-    print_info("Running 'make binaries' to build firmware...")
+    print_info("Running build.py to build firmware and filesystem...")
     print_info("This may take several minutes...")
+    print_info("The build script will automatically install arduino-cli if needed...")
     
     try:
-        # Run make binaries
+        # Run build.py script with --no-rename to keep simple filenames
         result = subprocess.run(
-            ["make", "binaries"],
+            [sys.executable, str(build_script), "--no-rename"],
             cwd=script_dir,
-            capture_output=True,
-            text=True,
             check=False
         )
         
         if result.returncode != 0:
             print_error("Build failed!")
-            print(result.stdout)
-            print(result.stderr, file=sys.stderr)
             return None
         
         print_success("Build completed successfully")
@@ -223,16 +220,6 @@ def build_firmware():
         
         print_info(f"Found firmware: {firmware_file.name}")
         
-        # Build filesystem if needed
-        print_info("Building filesystem...")
-        result = subprocess.run(
-            ["make", "filesystem"],
-            cwd=script_dir,
-            capture_output=True,
-            text=True,
-            check=False
-        )
-        
         # Find filesystem file
         filesystem_file = None
         for pattern in ["*.littlefs.bin", "OTGW-firmware.ino.littlefs.bin"]:
@@ -251,11 +238,6 @@ def build_firmware():
             'filesystem': filesystem_file
         }
         
-    except FileNotFoundError:
-        print_error("'make' command not found. Please install build tools.")
-        print_info("On Ubuntu/Debian: sudo apt install build-essential")
-        print_info("On macOS: xcode-select --install")
-        return None
     except Exception as e:
         print_error(f"Build failed: {e}")
         return None
