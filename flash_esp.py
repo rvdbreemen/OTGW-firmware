@@ -820,7 +820,7 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
         if not args.firmware and not args.filesystem:
             # No files specified - use interactive mode (unless --no-interactive)
             if args.no_interactive:
-                print_error("No mode or files specified. Use --download, --build, or specify files with --firmware/--filesystem")
+                print_error("When using --no-interactive, you must specify a mode (--download, --build) or files (--firmware/--filesystem)")
                 sys.exit(1)
             
             # Interactive mode selection
@@ -828,7 +828,7 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
             
             if selected_mode == "flash_artifacts":
                 # Flash existing build artifacts
-                mode = "build"
+                mode = "artifacts"
                 firmware_file = artifacts.get('firmware')
                 filesystem_file = artifacts.get('filesystem')
                 version_info = "Existing Build Artifacts"
