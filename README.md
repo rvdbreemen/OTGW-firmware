@@ -41,7 +41,7 @@ The exact steps and screenshots live in the wiki, but the general flow is:
 
 1. Flash the latest firmware release to your ESP8266 (and flash the matching LittleFS image when required by the release).
    - **Easy method (recommended)**: Use the included `flash_esp.py` script:
-     - `python3 flash_esp.py --download` - Downloads and flashes the latest release
+     - `python3 flash_esp.py` - Downloads and flashes the latest release (default)
      - `python3 flash_esp.py --build` - Builds from source and flashes (for developers)
      - See [FLASH_GUIDE.md](FLASH_GUIDE.md) for detailed instructions
    - **Manual method**: Follow the wiki instructions
