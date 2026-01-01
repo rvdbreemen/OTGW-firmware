@@ -85,7 +85,7 @@ def print_info(message):
     print(f"{Colors.OKCYAN}ℹ {message}{Colors.ENDC}")
 
 
-def run_command(cmd, cwd=None, env=None, check=True, capture_output=False):
+def run_command(cmd, cwd=None, env=None, check=True, capture_output=False, show_output=True):
     """Run a shell command and handle errors"""
     try:
         if isinstance(cmd, str):
@@ -97,15 +97,29 @@ def run_command(cmd, cwd=None, env=None, check=True, capture_output=False):
         
         print_info(f"Running: {cmd_str}")
         
-        result = subprocess.run(
-            cmd,
-            cwd=cwd,
-            env=env,
-            check=check,
-            shell=shell,
-            capture_output=capture_output,
-            text=True
-        )
+        if capture_output:
+            # Capture output for checking
+            result = subprocess.run(
+                cmd,
+                cwd=cwd,
+                env=env,
+                check=check,
+                shell=shell,
+                capture_output=True,
+                text=True
+            )
+        else:
+            # Stream output in real-time for better visibility
+            result = subprocess.run(
+                cmd,
+                cwd=cwd,
+                env=env,
+                check=check,
+                shell=shell,
+                stdout=None if show_output else subprocess.DEVNULL,
+                stderr=None if show_output else subprocess.DEVNULL,
+                text=True
+            )
         return result
     except subprocess.CalledProcessError as e:
         print_error(f"Command failed: {cmd_str}")
@@ -338,8 +352,11 @@ def build_firmware(project_dir):
     except (NotImplementedError, OSError):
         num_cores = 1
     
+    print_info(f"Starting compilation (this may take several minutes)...")
+    print_info(f"Using {num_cores} parallel jobs")
+    
     cmd = ["make", f"-j{num_cores}"]
-    run_command(cmd, cwd=project_dir)
+    run_command(cmd, cwd=project_dir, show_output=True)
     print_success("Firmware build complete")
 
 
@@ -347,8 +364,10 @@ def build_filesystem(project_dir):
     """Build filesystem using make"""
     print_step("Building filesystem")
     
+    print_info("Creating LittleFS filesystem image...")
+    
     cmd = ["make", "filesystem"]
-    run_command(cmd, cwd=project_dir)
+    run_command(cmd, cwd=project_dir, show_output=True)
     print_success("Filesystem build complete")
 
 
