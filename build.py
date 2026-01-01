@@ -335,8 +335,21 @@ def get_semver(project_dir):
 
 
 def create_build_directory(project_dir):
-    """Create build directory"""
+    """Create and clean build directory"""
+    print_step("Preparing build directory")
+    
     build_dir = project_dir / "build"
+    
+    # Clean existing build directory if it exists
+    if build_dir.exists():
+        print_info("Cleaning existing build directory...")
+        try:
+            shutil.rmtree(build_dir)
+            print_success("Build directory cleaned")
+        except Exception as e:
+            print_warning(f"Could not clean build directory: {e}")
+    
+    # Create fresh build directory
     build_dir.mkdir(exist_ok=True)
     print_success(f"Build directory ready: {build_dir}")
     return build_dir
