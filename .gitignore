@@ -2,11 +2,17 @@ node_modules/*
 package-lock.json
 *.log
 *.bin
+*.elf
 .vscode/*
 .DS_Store
 **/.DS_Store
 Arduino/**
+arduino/**
 libraries/**
 staging/**
+build/**
 arduino-cli.yaml
 _codeql_detected_source_root
+__pycache__/
+*.pyc
+*.pyo
