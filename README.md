@@ -30,6 +30,7 @@ Starting with hardware version 2.3, the included ESP8266 devkit changed from Nod
 
 - Wiki / documentation (recommended starting point): https://github.com/rvdbreemen/OTGW-firmware/wiki
 - **Flash guide** (platform-independent Python script): [FLASH_GUIDE.md](FLASH_GUIDE.md)
+- **Local build guide** (Windows/Mac): [BUILD.md](BUILD.md)
 - NodoShop OTGW product page: https://www.nodo-shop.nl/nl/opentherm-gateway/211-opentherm-gateway.html
 - Original OTGW project site (Schelte Bron): http://otgw.tclcode.com/
 - OTGW PIC firmware downloads: http://otgw.tclcode.com/download.html
