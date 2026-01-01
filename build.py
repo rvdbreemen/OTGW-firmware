@@ -18,13 +18,17 @@ Usage:
 """
 
 import argparse
+import multiprocessing
 import os
 import platform
-import subprocess
-import sys
-import urllib.request
 import shutil
 import stat
+import subprocess
+import sys
+import tarfile
+import traceback
+import urllib.request
+import zipfile
 from pathlib import Path
 
 
@@ -206,11 +210,9 @@ def install_arduino_cli(system):
         # Extract
         print_info("Extracting...")
         if filename.endswith(".tar.gz"):
-            import tarfile
             with tarfile.open(download_path, "r:gz") as tar:
                 tar.extractall(temp_dir)
         elif filename.endswith(".zip"):
-            import zipfile
             with zipfile.ZipFile(download_path, "r") as zip_ref:
                 zip_ref.extractall(temp_dir)
         
@@ -277,7 +279,7 @@ def update_version(project_dir):
             check=False
         )
         githash = result.stdout.strip() if result.returncode == 0 else "local"
-    except:
+    except (subprocess.SubprocessError, FileNotFoundError, OSError):
         githash = "local"
     
     # Run autoinc-semver.py
@@ -306,7 +308,7 @@ def get_semver(project_dir):
                     parts = line.split('"')
                     if len(parts) >= 2:
                         return parts[1]
-    except:
+    except (IOError, OSError):
         pass
     return "unknown"
 
@@ -325,9 +327,8 @@ def build_firmware(project_dir):
     
     # Get number of CPU cores for parallel build
     try:
-        import multiprocessing
         num_cores = multiprocessing.cpu_count()
-    except:
+    except (NotImplementedError, OSError):
         num_cores = 1
     
     cmd = ["make", f"-j{num_cores}"]
@@ -548,6 +549,5 @@ if __name__ == "__main__":
         sys.exit(1)
     except Exception as e:
         print_error(f"Unexpected error: {e}")
-        import traceback
         traceback.print_exc()
         sys.exit(1)
