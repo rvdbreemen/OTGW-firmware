@@ -152,17 +152,28 @@ def check_make():
 
 
 def install_arduino_cli(system):
-    """Install arduino-cli if not present"""
+    """Install arduino-cli if not present. Returns the installation directory."""
     print_step("Checking for arduino-cli")
     
-    # Check if arduino-cli is already installed
+    # Determine installation directory
+    if system == "Windows":
+        install_dir = Path.home() / "AppData" / "Local" / "Arduino15" / "bin"
+    else:
+        install_dir = Path.home() / ".local" / "bin"
+    
+    # Check if arduino-cli is already installed in PATH or install_dir
     try:
         result = run_command(["arduino-cli", "version"], capture_output=True, check=False)
         if result.returncode == 0:
             print_success(f"arduino-cli is already installed: {result.stdout.strip()}")
-            return
+            return install_dir
     except FileNotFoundError:
-        pass
+        # Check in the expected install directory
+        cli_exe_name = "arduino-cli.exe" if system == "Windows" else "arduino-cli"
+        cli_path = install_dir / cli_exe_name
+        if cli_path.exists():
+            print_success(f"arduino-cli found at {cli_path}")
+            return install_dir
     
     print_info("arduino-cli not found, installing...")
     
@@ -248,12 +259,8 @@ def install_arduino_cli(system):
         
         print_success(f"arduino-cli installed to {dest_path}")
         
-        # Add to PATH instructions
-        if system != "Windows":
-            print_warning(f"Please add {install_dir} to your PATH if not already present:")
-            print(f"  export PATH=\"{install_dir}:$PATH\"")
-        else:
-            print_warning(f"Please add {install_dir} to your PATH if not already present")
+        # Return the installation directory
+        return install_dir
         
     finally:
         # Clean up
@@ -500,9 +507,14 @@ Examples:
             print_info("Or use Chocolatey: choco install make")
         sys.exit(1)
     
-    # Install arduino-cli if needed
+    # Install arduino-cli if needed and add to PATH
     if not args.no_install_cli:
-        install_arduino_cli(system)
+        cli_install_dir = install_arduino_cli(system)
+        # Add arduino-cli to PATH for subprocess calls
+        if cli_install_dir:
+            current_path = os.environ.get("PATH", "")
+            os.environ["PATH"] = f"{cli_install_dir}{os.pathsep}{current_path}"
+            print_info(f"Added {cli_install_dir} to PATH for this build session")
     
     # Update version
     update_version(project_dir)
