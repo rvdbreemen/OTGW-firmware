@@ -550,28 +550,32 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Flash Modes:
-  --download        Download latest release from GitHub (simple mode, default)
+  (default)         Download latest release from GitHub (if no --firmware or --filesystem specified)
+  --download        Explicitly use download mode
   --build           Build firmware locally then flash (developer mode)
-  (manual)          Use existing binary files (if --firmware or --filesystem specified)
+  --firmware/--filesystem    Use manual mode with specific files
 
 Examples:
-  # Download and flash latest release (simple mode)
+  # Download and flash latest release (default behavior)
+  python3 flash_esp.py
+  
+  # Explicitly download and flash latest release
   python3 flash_esp.py --download
   
   # Build locally and flash (developer mode)
   python3 flash_esp.py --build
   
-  # Flash specific firmware file
+  # Flash specific firmware file (manual mode)
   python3 flash_esp.py --firmware build/OTGW-firmware.ino.bin
   
-  # Flash both firmware and filesystem
+  # Flash both firmware and filesystem (manual mode)
   python3 flash_esp.py --firmware build/OTGW-firmware.ino.bin --filesystem build/OTGW-firmware.ino.littlefs.bin
   
   # Specify port and baud rate
-  python3 flash_esp.py --download --port /dev/ttyUSB0 --baud 115200
+  python3 flash_esp.py --port /dev/ttyUSB0 --baud 115200
   
   # Erase flash before flashing (recommended for first install)
-  python3 flash_esp.py --download --erase
+  python3 flash_esp.py --erase
   
 For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
 """
@@ -582,7 +586,7 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
     mode_group.add_argument(
         "-d", "--download",
         action="store_true",
-        help="Download latest release from GitHub and flash (simple mode)"
+        help="Download latest release from GitHub and flash (default if no files specified)"
     )
     mode_group.add_argument(
         "--build",
@@ -696,27 +700,56 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
             sys.exit(1)
     
     else:
-        # Manual mode - use provided files or search for them
-        if args.firmware:
-            firmware_file = Path(args.firmware)
-            if not firmware_file.exists():
-                print_error(f"Firmware file not found: {args.firmware}")
+        # Default to download mode if no mode specified and no manual files provided
+        if not args.firmware and not args.filesystem:
+            # Download mode (default)
+            mode = "download"
+            print_header("Download Mode (Default) - Fetching Latest Release")
+            
+            release_info = get_latest_release_info()
+            if not release_info:
+                print_error("Failed to fetch release information")
                 sys.exit(1)
-        
-        if args.filesystem:
-            filesystem_file = Path(args.filesystem)
-            if not filesystem_file.exists():
-                print_error(f"Filesystem file not found: {args.filesystem}")
+            
+            version_info = f"{release_info['name']} ({release_info['tag_name']})"
+            
+            # Create temporary directory for downloads
+            temp_dir = Path(tempfile.mkdtemp(prefix="otgw_flash_"))
+            print_info(f"Download directory: {temp_dir}")
+            
+            try:
+                downloaded = download_release_assets(release_info, temp_dir)
+                firmware_file = downloaded.get('firmware')
+                filesystem_file = downloaded.get('filesystem')
+                
+                if not firmware_file:
+                    print_error("No firmware file found in release")
+                    sys.exit(1)
+            except Exception as e:
+                print_error(f"Download failed: {e}")
                 sys.exit(1)
-        
-        # If no files specified and not in no-interactive mode, search for files
-        if not firmware_file and not filesystem_file and not args.no_interactive:
-            print_header("Manual Mode - Searching for Binary Files")
-            firmware_files, filesystem_files = find_firmware_files()
-            firmware_file = select_file(firmware_files, "firmware")
-            filesystem_file = select_file(filesystem_files, "filesystem")
-        
-        version_info = "Manual Selection"
+        else:
+            # Manual mode - use provided files or search for them
+            if args.firmware:
+                firmware_file = Path(args.firmware)
+                if not firmware_file.exists():
+                    print_error(f"Firmware file not found: {args.firmware}")
+                    sys.exit(1)
+            
+            if args.filesystem:
+                filesystem_file = Path(args.filesystem)
+                if not filesystem_file.exists():
+                    print_error(f"Filesystem file not found: {args.filesystem}")
+                    sys.exit(1)
+            
+            # If no files specified and not in no-interactive mode, search for files
+            if not firmware_file and not filesystem_file and not args.no_interactive:
+                print_header("Manual Mode - Searching for Binary Files")
+                firmware_files, filesystem_files = find_firmware_files()
+                firmware_file = select_file(firmware_files, "firmware")
+                filesystem_file = select_file(filesystem_files, "filesystem")
+            
+            version_info = "Manual Selection"
     
     # Detect or select port
     port = args.port

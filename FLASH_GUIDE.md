@@ -35,20 +35,26 @@ Depending on your ESP8266 board and operating system, you may need to install US
 
 ## Quick Start
 
-### Simple Mode - Download Latest Release (Recommended for Users)
+### Simple Mode - Download Latest Release (Default)
 
-The easiest way to flash your ESP8266 is to use the download mode, which automatically fetches the latest release from GitHub:
+The easiest way to flash your ESP8266 is to simply run the script without any arguments:
 
 ```bash
-python3 flash_esp.py --download
+python3 flash_esp.py
 ```
 
-This mode will:
+This will automatically:
 1. Check for and install `esptool` if needed
 2. Fetch the latest release from GitHub
 3. Download the firmware and filesystem files
 4. Auto-detect available serial ports
 5. Guide you through the flashing process
+
+You can also explicitly specify download mode:
+
+```bash
+python3 flash_esp.py --download
+```
 
 ### Developer Mode - Build and Flash
 
@@ -84,6 +90,12 @@ python3 flash_esp.py
 For a clean first-time installation with the latest release, it's recommended to erase the flash first:
 
 ```bash
+python3 flash_esp.py --erase
+```
+
+Or explicitly with download mode:
+
+```bash
 python3 flash_esp.py --download --erase
 ```
 
@@ -107,11 +119,12 @@ python3 flash_esp.py [OPTIONS]
 
 | Option | Description |
 |--------|-------------|
-| `-d`, `--download` | Download latest release from GitHub and flash (simple mode) |
+| *(default)* | Download latest release from GitHub (if no `--firmware` or `--filesystem` specified) |
+| `-d`, `--download` | Explicitly use download mode |
 | `--build` | Build firmware locally and flash (developer mode) |
 | `-p PORT`, `--port PORT` | Serial port (e.g., `COM5`, `/dev/ttyUSB0`). Auto-detected if not specified. |
-| `-f FILE`, `--firmware FILE` | Path to firmware binary file (`.bin`) - for manual mode |
-| `-s FILE`, `--filesystem FILE` | Path to filesystem binary file (`.littlefs.bin`) - for manual mode |
+| `-f FILE`, `--firmware FILE` | Path to firmware binary file (`.bin`) - enables manual mode |
+| `-s FILE`, `--filesystem FILE` | Path to filesystem binary file (`.littlefs.bin`) - enables manual mode |
 | `-b BAUD`, `--baud BAUD` | Baud rate for flashing (default: 460800) |
 | `-e`, `--erase` | Erase flash before flashing (recommended for first install) |
 | `--no-interactive` | Disable interactive prompts (for automation) |
@@ -119,7 +132,14 @@ python3 flash_esp.py [OPTIONS]
 
 ## Examples
 
-### Download and Flash Latest Release (Simple Mode)
+### Download and Flash Latest Release (Default/Simple Mode)
+
+```bash
+# Simplest form - uses download mode by default
+python3 flash_esp.py
+```
+
+Or explicitly:
 
 ```bash
 python3 flash_esp.py --download
@@ -132,6 +152,13 @@ python3 flash_esp.py --build
 ```
 
 ### Download with Specific Port
+
+```bash
+# Default mode with specific port
+python3 flash_esp.py --port /dev/ttyUSB0
+```
+
+Or:
 
 ```bash
 python3 flash_esp.py --download --port /dev/ttyUSB0
@@ -169,9 +196,14 @@ python3 flash_esp.py \
 ### Download Mode - Complete Flash with Erase (Recommended for First Install)
 
 ```bash
-python3 flash_esp.py \
-  --download \
-  --erase
+# Simplest form
+python3 flash_esp.py --erase
+```
+
+Or explicitly:
+
+```bash
+python3 flash_esp.py --download --erase
 ```
 
 ### Build Mode - Complete Flash with Erase
@@ -188,10 +220,13 @@ For use in scripts or CI/CD:
 
 **Download mode:**
 ```bash
-python3 flash_esp.py \
-  --download \
-  --no-interactive \
-  --port /dev/ttyUSB0
+# Default mode
+python3 flash_esp.py --no-interactive --port /dev/ttyUSB0
+```
+
+Or explicitly:
+```bash
+python3 flash_esp.py --download --no-interactive --port /dev/ttyUSB0
 ```
 
 **Build mode:**
@@ -226,7 +261,14 @@ python3 flash_esp.py \
 
 You have three options:
 
-**Option A: Download Latest Release (Simple Mode - Recommended)**
+**Option A: Download Latest Release (Default - Recommended)**
+```bash
+# Simplest - just run the script
+python3 flash_esp.py
+```
+
+Or explicitly:
+
 ```bash
 python3 flash_esp.py --download
 ```
@@ -245,7 +287,13 @@ The script will automatically build the firmware using `make`.
 
 ### 3. Run the Flash Script
 
-**Simple Mode (Download Latest Release):**
+**Simple Mode (Download Latest Release - Default):**
+```bash
+# Simplest form
+python3 flash_esp.py
+```
+
+Or explicitly:
 ```bash
 python3 flash_esp.py --download
 ```
