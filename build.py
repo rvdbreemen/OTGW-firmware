@@ -371,6 +371,53 @@ def build_filesystem(project_dir):
     print_success("Filesystem build complete")
 
 
+def consolidate_build_artifacts(project_dir):
+    """Move all build artifacts from subdirectories to build root and clean up"""
+    print_step("Consolidating build artifacts")
+    
+    build_dir = project_dir / "build"
+    if not build_dir.exists():
+        print_warning("Build directory not found, skipping consolidation")
+        return
+    
+    moved = []
+    
+    # Find and move all binary artifacts to build root
+    patterns = ["**/*.ino.bin", "**/*.ino.elf", "**/*.littlefs.bin"]
+    for pattern in patterns:
+        for file_path in build_dir.glob(pattern):
+            # Skip files already in build root
+            if file_path.parent == build_dir:
+                continue
+            
+            # Move to build root
+            dest_path = build_dir / file_path.name
+            
+            # Handle name conflicts
+            if dest_path.exists():
+                print_warning(f"File {dest_path.name} already exists, overwriting")
+                dest_path.unlink()
+            
+            shutil.move(str(file_path), str(dest_path))
+            moved.append(dest_path)
+            print_info(f"Moved: {file_path.relative_to(build_dir)} -> {file_path.name}")
+    
+    if moved:
+        print_success(f"Moved {len(moved)} artifact(s) to build root")
+    
+    # Remove empty subdirectories and any remaining files
+    for item in build_dir.iterdir():
+        if item.is_dir():
+            try:
+                # Remove the entire subdirectory tree
+                shutil.rmtree(item)
+                print_info(f"Removed directory: {item.name}")
+            except Exception as e:
+                print_warning(f"Could not remove {item.name}: {e}")
+    
+    print_success("Build directory cleaned")
+
+
 def rename_build_artifacts(project_dir, semver):
     """Rename build artifacts with version number"""
     print_step("Renaming build artifacts")
@@ -382,8 +429,8 @@ def rename_build_artifacts(project_dir, semver):
     
     renamed = []
     
-    # Find and rename .bin and .elf files
-    for pattern in ["**/*.ino.bin", "**/*.ino.elf"]:
+    # Find and rename .bin and .elf files (only in build root)
+    for pattern in ["*.ino.bin", "*.ino.elf"]:
         for file_path in build_dir.glob(pattern):
             # Create new name with version
             if file_path.suffix == ".bin":
@@ -399,8 +446,12 @@ def rename_build_artifacts(project_dir, semver):
             print_info(f"Renamed: {file_path.name} -> {new_name}")
     
     # Rename filesystem
-    for file_path in build_dir.glob("*.ino.littlefs.bin"):
-        new_name = file_path.stem.replace(".ino.littlefs", "") + f".{semver}.littlefs.bin"
+    for file_path in build_dir.glob("*.littlefs.bin"):
+        # Handle both *.ino.littlefs.bin and *.littlefs.bin patterns
+        if ".ino.littlefs" in file_path.name:
+            new_name = file_path.stem.replace(".ino.littlefs", "") + f".{semver}.littlefs.bin"
+        else:
+            new_name = file_path.stem + f".{semver}.littlefs.bin"
         new_path = file_path.parent / new_name
         file_path.rename(new_path)
         renamed.append(new_path)
@@ -556,6 +607,9 @@ Examples:
         # Full build (default)
         build_firmware(project_dir)
         build_filesystem(project_dir)
+    
+    # Consolidate build artifacts from subdirectories
+    consolidate_build_artifacts(project_dir)
     
     # Rename artifacts with version
     if not args.no_rename:
