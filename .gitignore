@@ -14,5 +14,3 @@ build/**
 arduino-cli.yaml
 _codeql_detected_source_root
 __pycache__/
-*.pyc
-*.pyo
