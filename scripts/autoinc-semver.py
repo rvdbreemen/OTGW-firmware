@@ -188,13 +188,25 @@ def update_version_in_file(filepath, version_info):
     if version_info.get("PRERELEASE"):
         new_version += f"-{version_info['PRERELEASE']}"
 
-    with open(filepath, "r", encoding="utf-8", newline="") as file:
-        content = file.read()
+    # Try UTF-8 first, fall back to latin-1 if that fails, or skip if neither works
+    try:
+        with open(filepath, "r", encoding="utf-8", newline="") as file:
+            content = file.read()
+    except UnicodeDecodeError:
+        # File is not UTF-8, try latin-1 or skip
+        try:
+            with open(filepath, "r", encoding="latin-1", newline="") as file:
+                content = file.read()
+        except Exception:
+            # If we can't read it, skip it
+            raise
 
     updated_content = version_pattern.sub(lambda m: m.group(1) + new_version, content)
 
-    with open(filepath, "w", encoding="utf-8", newline="") as file:
-        file.write(updated_content)
+    # Only write if content changed
+    if updated_content != content:
+        with open(filepath, "w", encoding="utf-8", newline="") as file:
+            file.write(updated_content)
 
 
 def update_files(directory, version_info, ext_list):
@@ -206,7 +218,13 @@ def update_files(directory, version_info, ext_list):
         logging.error("Directory %s is empty.", directory)
         return
 
-    for root, _dirs, files in os.walk(directory):
+    # Directories to skip (third-party code, build artifacts, dependencies)
+    skip_dirs = {"arduino", "Arduino", "libraries", "staging", "build", "node_modules", ".git", "__pycache__"}
+
+    for root, dirs, files in os.walk(directory):
+        # Skip excluded directories
+        dirs[:] = [d for d in dirs if d not in skip_dirs]
+        
         for file in files:
             _, ext = os.path.splitext(file)
             if ext in ext_list:
