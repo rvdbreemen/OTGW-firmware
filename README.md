@@ -29,6 +29,7 @@ Starting with hardware version 2.3, the included ESP8266 devkit changed from Nod
 ## Documentation and links
 
 - Wiki / documentation (recommended starting point): https://github.com/rvdbreemen/OTGW-firmware/wiki
+- **Flash guide** (platform-independent Python script): [FLASH_GUIDE.md](FLASH_GUIDE.md)
 - **Local build guide** (Windows/Mac): [BUILD.md](BUILD.md)
 - NodoShop OTGW product page: https://www.nodo-shop.nl/nl/opentherm-gateway/211-opentherm-gateway.html
 - Original OTGW project site (Schelte Bron): http://otgw.tclcode.com/
@@ -40,6 +41,11 @@ Starting with hardware version 2.3, the included ESP8266 devkit changed from Nod
 The exact steps and screenshots live in the wiki, but the general flow is:
 
 1. Flash the latest firmware release to your ESP8266 (and flash the matching LittleFS image when required by the release).
+   - **Easy method (recommended)**: Use the included `flash_esp.py` script:
+     - `python3 flash_esp.py` - Downloads and flashes the latest release (default)
+     - `python3 flash_esp.py --build` - Builds from source and flashes (for developers)
+     - See [FLASH_GUIDE.md](FLASH_GUIDE.md) for detailed instructions
+   - **Manual method**: Follow the wiki instructions
 2. Connect the OTGW to your network and open the Web UI via `http://<device-ip>/`.
    If the device cannot connect, it starts a Wi-Fi configuration portal using an AP named `<hostname>-<mac>`.
 3. Configure MQTT (broker, credentials, topic prefix) and enable Home Assistant MQTT Auto Discovery.
