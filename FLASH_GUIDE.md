@@ -12,6 +12,35 @@ This guide explains how to use the `flash_esp.py` script to flash the OTGW-firmw
 ### Software
 - Python 3.6 or higher
 - The `flash_esp.py` script will automatically install `esptool` if needed
+  - On macOS with Homebrew Python, you may need to install manually (see below)
+
+### Installing esptool Manually (if auto-install fails)
+
+If the script cannot automatically install esptool (common on macOS with Homebrew Python), install it manually:
+
+#### macOS (Homebrew)
+```bash
+# Option 1: Using Homebrew (recommended)
+brew install esptool
+
+# Option 2: Using pipx (also recommended)
+brew install pipx
+pipx install esptool
+
+# Option 3: Using pip with --break-system-packages (not recommended)
+pip install --break-system-packages esptool
+```
+
+#### Other Systems
+```bash
+# Using pip with --user flag
+pip install --user esptool
+
+# Or in a virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install esptool
+```
 
 ### USB Drivers
 
@@ -392,14 +421,36 @@ sudo python3 flash_esp.py
 **Problem**: "esptool not found" or installation fails
 
 **Solutions**:
-1. **Install manually**:
+
+**On macOS with Homebrew Python** (externally-managed environment):
+```bash
+# Option 1: Using Homebrew (recommended)
+brew install esptool
+
+# Option 2: Using pipx (also recommended)
+brew install pipx
+pipx install esptool
+
+# Option 3: Using pip with --break-system-packages (not recommended)
+pip install --break-system-packages esptool
+```
+
+**On other systems**:
+1. **Install manually with pip**:
    ```bash
    pip3 install --user esptool
    ```
 
 2. **Use system package manager**:
    - **Ubuntu/Debian**: `sudo apt install esptool`
-   - **macOS**: `brew install esptool`
+   - **Fedora/RHEL**: `sudo dnf install esptool`
+
+3. **Use virtual environment**:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install esptool
+   ```
 
 ### Wrong Chip Detected
 
