@@ -134,6 +134,8 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
   - Other files in the `Specification` folder provide additional information
 - **PIC Firmware & Hardware**:
   - Schelte Bron's website: https://otgw.tclcode.com/index.html#intro
+  - Firmware commands: https://otgw.tclcode.com/firmware.html
+  - Support Forum: https://otgw.tclcode.com/support/forum
   - **Critical source** for PIC firmware behavior and serial port communication documentation.
   - Consult this for any issues related to the PIC controller.
 
