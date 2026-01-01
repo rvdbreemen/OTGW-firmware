@@ -26,9 +26,9 @@ python scripts/autoinc-semver.py . --filename version.h --githash <hash>
 
 1. Parses `version.h` to extract version components
 2. Increments the build number
-3. Updates timestamp and git hash
-4. Generates semantic version strings (_SEMVER_FULL, _SEMVER_CORE, etc.)
-5. Updates version strings in source files (.ino, .h, .c, .cpp, etc.)
+3. Updates timestamp and git hash in `version.h`
+4. Generates semantic version strings (_SEMVER_FULL, _SEMVER_CORE, etc.) in `version.h`
+5. Updates `data/version.hash` with the git hash
 6. Optionally commits changes to git
 
 This script is used both by the CI/CD workflow and the local build script.
