@@ -54,7 +54,6 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
 
 - Validate all user inputs (REST API, MQTT commands, Web UI)
 - Check buffer bounds before copying data
-- Use Origin/Referer validation for sensitive endpoints (CSRF protection)
 - Sanitize URL parameters and redirects
 - Never expose passwords in plain text (use masking in Web UI)
 
@@ -106,7 +105,7 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
 
 - OTGW commands are queued to prevent overrunning the serial buffer
 - Use `addOTWGcmdtoqueue(command)` to queue commands
-- Never send commands directly to Serial
+- Never send commands directly to Serials
 
 ### Timer Management
 
@@ -128,6 +127,15 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
 - Flash instructions: `FLASH_GUIDE.md`
 - Update README.md for significant feature changes
 - Keep release notes format consistent (see README.md)
+- **OpenTherm Protocol**:
+  - Documentation is found in the `Specification` folder
+  - Version 2.2: `Specification/Opentherm Protocol v2.2.pdf`
+  - Version 4.2: `Specification/OpenTherm-Protocol-Specification-v4.2.pdf`
+  - Other files in the `Specification` folder provide additional information
+- **PIC Firmware & Hardware**:
+  - Schelte Bron's website: https://otgw.tclcode.com/index.html#intro
+  - **Critical source** for PIC firmware behavior and serial port communication documentation.
+  - Consult this for any issues related to the PIC controller.
 
 ## Important Constraints
 
