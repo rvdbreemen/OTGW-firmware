@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # This script is part of the autoinc-semver project.
-# It increments the build number in version.h, updates timestamp and githash,
-# and propagates the core/prerelease version to other source files.
+# It increments the build number in version.h and updates timestamp and githash.
 
 import argparse
 import datetime as dt
@@ -274,20 +273,6 @@ def main(directory, filename, git_enabled, increment, githash_override, githash_
 
     update_version_hash(os.path.join("data", "version.hash"), githash)
 
-    ext_list = [".ino", ".h", ".c", ".cpp", ".js", ".css", ".html", ".inc", ".cfg"]
-    update_files(
-        directory,
-        {
-            "MAJOR": parse_int(version_info["_VERSION_MAJOR"], "major"),
-            "MINOR": parse_int(version_info["_VERSION_MINOR"], "minor"),
-            "PATCH": parse_int(version_info["_VERSION_PATCH"], "patch"),
-            "PRERELEASE": prerelease_override
-            if prerelease_override is not None
-            else normalize_token(version_info["_VERSION_PRERELEASE"]),
-        },
-        ext_list,
-    )
-
     if git_enabled:
         git_commit_changes(
             directory,
@@ -298,7 +283,7 @@ def main(directory, filename, git_enabled, increment, githash_override, githash_
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     parser = argparse.ArgumentParser(
-        description="Increment build number, update version.h, and propagate version strings."
+        description="Increment build number and update version.h with timestamp and githash."
     )
     parser.add_argument("directory", type=str, help="Directory to update files in")
     parser.add_argument(
