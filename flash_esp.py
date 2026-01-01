@@ -282,17 +282,47 @@ def check_esptool():
         pass
 
     print_info("esptool not found. Installing...")
-    try:
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install", "--user", "esptool"],
-            check=True
-        )
-        print_success("esptool installed successfully")
-        return True
-    except subprocess.CalledProcessError as e:
-        print_error(f"Failed to install esptool: {e}")
-        print_info("Please install manually: pip install esptool")
-        return False
+    
+    # Try multiple installation strategies for different environments
+    install_attempts = [
+        # Try with --user flag first (works on most systems)
+        ([sys.executable, "-m", "pip", "install", "--user", "esptool"], "user installation"),
+        # Try with --break-system-packages for PEP 668 environments (newer macOS/Python)
+        ([sys.executable, "-m", "pip", "install", "--break-system-packages", "esptool"], "system installation with override"),
+        # Try without any flags (works in virtual environments)
+        ([sys.executable, "-m", "pip", "install", "esptool"], "standard installation"),
+    ]
+    
+    for cmd, description in install_attempts:
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            if result.returncode == 0:
+                print_success(f"esptool installed successfully ({description})")
+                return True
+        except Exception:
+            continue
+    
+    # All installation attempts failed
+    print_error("Failed to install esptool automatically")
+    print_info("\nPlease install esptool manually using one of these methods:")
+    print_info("  1. Using pipx (recommended on macOS with Homebrew):")
+    print_info("     brew install pipx")
+    print_info("     pipx install esptool")
+    print_info("  2. Using Homebrew:")
+    print_info("     brew install esptool")
+    print_info("  3. Using pip in a virtual environment:")
+    print_info("     python3 -m venv venv")
+    print_info("     source venv/bin/activate")
+    print_info("     pip install esptool")
+    print_info("  4. Using pip with --break-system-packages (not recommended):")
+    print_info("     pip install --break-system-packages esptool")
+    
+    return False
 
 
 def detect_serial_ports():
