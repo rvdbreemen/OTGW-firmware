@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # This script is part of the autoinc-semver project.
-# It increments the build number in version.h, updates timestamp and githash,
-# and propagates the core/prerelease version to other source files.
+# It increments the build number in version.h and updates timestamp and githash.
 
 import argparse
 import datetime as dt
@@ -188,13 +187,25 @@ def update_version_in_file(filepath, version_info):
     if version_info.get("PRERELEASE"):
         new_version += f"-{version_info['PRERELEASE']}"
 
-    with open(filepath, "r", encoding="utf-8", newline="") as file:
-        content = file.read()
+    # Try UTF-8 first, fall back to latin-1 if that fails, or skip if neither works
+    try:
+        with open(filepath, "r", encoding="utf-8", newline="") as file:
+            content = file.read()
+    except UnicodeDecodeError:
+        # File is not UTF-8, try latin-1 or skip
+        try:
+            with open(filepath, "r", encoding="latin-1", newline="") as file:
+                content = file.read()
+        except Exception:
+            # If we can't read it, skip it
+            raise
 
     updated_content = version_pattern.sub(lambda m: m.group(1) + new_version, content)
 
-    with open(filepath, "w", encoding="utf-8", newline="") as file:
-        file.write(updated_content)
+    # Only write if content changed
+    if updated_content != content:
+        with open(filepath, "w", encoding="utf-8", newline="") as file:
+            file.write(updated_content)
 
 
 def update_files(directory, version_info, ext_list):
@@ -206,7 +217,13 @@ def update_files(directory, version_info, ext_list):
         logging.error("Directory %s is empty.", directory)
         return
 
-    for root, _dirs, files in os.walk(directory):
+    # Directories to skip (third-party code, build artifacts, dependencies)
+    skip_dirs = {"arduino", "Arduino", "libraries", "staging", "build", "node_modules", ".git", "__pycache__"}
+
+    for root, dirs, files in os.walk(directory):
+        # Skip excluded directories
+        dirs[:] = [d for d in dirs if d not in skip_dirs]
+        
         for file in files:
             _, ext = os.path.splitext(file)
             if ext in ext_list:
@@ -256,20 +273,6 @@ def main(directory, filename, git_enabled, increment, githash_override, githash_
 
     update_version_hash(os.path.join("data", "version.hash"), githash)
 
-    ext_list = [".ino", ".h", ".c", ".cpp", ".js", ".css", ".html", ".inc", ".cfg"]
-    update_files(
-        directory,
-        {
-            "MAJOR": parse_int(version_info["_VERSION_MAJOR"], "major"),
-            "MINOR": parse_int(version_info["_VERSION_MINOR"], "minor"),
-            "PATCH": parse_int(version_info["_VERSION_PATCH"], "patch"),
-            "PRERELEASE": prerelease_override
-            if prerelease_override is not None
-            else normalize_token(version_info["_VERSION_PRERELEASE"]),
-        },
-        ext_list,
-    )
-
     if git_enabled:
         git_commit_changes(
             directory,
@@ -280,7 +283,7 @@ def main(directory, filename, git_enabled, increment, githash_override, githash_
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     parser = argparse.ArgumentParser(
-        description="Increment build number, update version.h, and propagate version strings."
+        description="Increment build number and update version.h with timestamp and githash."
     )
     parser.add_argument("directory", type=str, help="Directory to update files in")
     parser.add_argument(
