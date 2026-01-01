@@ -127,9 +127,11 @@ def download_release_assets(release_info, download_dir):
     
     for asset in assets:
         name = asset['name'].lower()
-        if ('fw.bin' in name or 'firmware.bin' in name) and not filesystem_asset:
+        # Match firmware files: .ino.bin, -fw.bin, firmware.bin
+        if not firmware_asset and ('.ino.bin' in name or 'fw.bin' in name or 'firmware.bin' in name) and 'littlefs' not in name:
             firmware_asset = asset
-        elif ('fs.bin' in name or 'littlefs.bin' in name) and not firmware_asset:
+        # Match filesystem files: .littlefs.bin, -fs.bin, filesystem.bin
+        elif not filesystem_asset and ('littlefs.bin' in name or 'fs.bin' in name or 'filesystem.bin' in name):
             filesystem_asset = asset
     
     downloaded_files = {}
