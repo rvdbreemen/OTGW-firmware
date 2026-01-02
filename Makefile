@@ -17,7 +17,7 @@ CLICFG := $(CLI) --config-file $(CFGFILE)
 # bug in http stream, fallback to 2.7.4
 # ESP8266URL := https://github.com/esp8266/Arduino/releases/download/3.0.2/package_esp8266com_index.json
 ESP8266URL := https://github.com/esp8266/Arduino/releases/download/2.7.4/package_esp8266com_index.json
-LIBRARIES := libraries/WiFiManager libraries/ArduinoJson libraries/PubSubClient libraries/TelnetStream libraries/AceTime libraries/OneWire libraries/DallasTemperature
+LIBRARIES := libraries/WiFiManager libraries/ArduinoJson libraries/PubSubClient libraries/TelnetStream libraries/NetApiHelpers libraries/AceTime libraries/OneWire libraries/DallasTemperature
 BOARDS := arduino/package_esp8266com_index.json
 # PORT can be overridden by the environment or on the command line. E.g.:
 # export PORT=/dev/ttyUSB2; make upload, or: make upload PORT=/dev/ttyUSB2
@@ -73,7 +73,7 @@ flush: | $(CFGFILE)
 	$(CLICFG) cache clean
 
 libraries/WiFiManager: | $(BOARDS)
-	$(CLICFG) lib install WiFiManager@2.0.15-rc.1
+	$(CLICFG) lib install WiFiManager@2.0.17
 
 libraries/ArduinoJson:
 	$(CLICFG) lib install ArduinoJson@6.17.2
@@ -82,20 +82,23 @@ libraries/PubSubClient:
 	$(CLICFG) lib install pubsubclient@2.8.0
 
 libraries/TelnetStream:
-	$(CLICFG) lib install TelnetStream@1.2.4
+	$(CLICFG) lib install TelnetStream@1.3.0
+
+libraries/NetApiHelpers:
+	$(CLICFG) lib install NetApiHelpers
 
 libraries/AceTime:
-	$(CLICFG) lib install Acetime@2.0.1
+	$(CLICFG) lib install Acetime@4.1.0
 
 # libraries/Time:
 # 	$(CLI) lib install --git-url https://github.com/PaulStoffregen/Time
 # 	# https://github.com/PaulStoffregen/Time/archive/refs/tags/v1.6.1.zip
 
 libraries/OneWire:
-	$(CLICFG) lib install OneWire@2.3.6
+	$(CLICFG) lib install OneWire@2.3.8
 
 libraries/DallasTemperature: | libraries/OneWire
-	$(CLICFG) lib install DallasTemperature@3.9.0
+	$(CLICFG) lib install DallasTemperature@4.0.5
 
 $(IMAGE): $(BOARDS) $(LIBRARIES) $(SOURCES)
 	$(info Build code)
