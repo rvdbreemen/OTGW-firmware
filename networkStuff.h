@@ -48,6 +48,7 @@
 #include "updateServerHtml.h"
 #include <WiFiManager.h>        // version 2.0.4-beta - use latest development branch  - https://github.com/tzapu/WiFiManager
 // included in main program: #include <TelnetStream.h>       // Version 0.0.1 - https://github.com/jandrassy/TelnetStream
+#include <WebSocketsServer.h>   // WebSocket server for streaming OT log messages to WebUI
 
 //#include <FS.h>                 // part of ESP8266 Core https://github.com/esp8266/Arduino
 #include <LittleFS.h>

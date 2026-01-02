@@ -83,6 +83,7 @@ void setup() {
   startLLMNR(CSTR(settingHostname));
   setupFSexplorer();
   startWebserver();
+  startWebSocket();          // start the WebSocket server for OT log streaming
   startMQTT();               // start the MQTT after webserver, always.
  
   initWatchDog();            // setup the WatchDog
@@ -300,6 +301,7 @@ void doBackgroundTasks()
     handleDebug();
     handleMQTT();                 // MQTT transmissions
     handleOTGW();                 // OTGW handling
+    handleWebSocket();            // WebSocket handling for OT log streaming
     httpServer.handleClient();
     MDNS.update();
     loopNTP();

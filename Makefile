@@ -17,7 +17,7 @@ CLICFG := $(CLI) --config-file $(CFGFILE)
 # bug in http stream, fallback to 2.7.4
 # ESP8266URL := https://github.com/esp8266/Arduino/releases/download/3.0.2/package_esp8266com_index.json
 ESP8266URL := https://github.com/esp8266/Arduino/releases/download/2.7.4/package_esp8266com_index.json
-LIBRARIES := libraries/WiFiManager libraries/ArduinoJson libraries/PubSubClient libraries/TelnetStream libraries/AceTime libraries/OneWire libraries/DallasTemperature
+LIBRARIES := libraries/WiFiManager libraries/ArduinoJson libraries/PubSubClient libraries/TelnetStream libraries/AceTime libraries/OneWire libraries/DallasTemperature libraries/WebSockets
 BOARDS := arduino/package_esp8266com_index.json
 # PORT can be overridden by the environment or on the command line. E.g.:
 # export PORT=/dev/ttyUSB2; make upload, or: make upload PORT=/dev/ttyUSB2
@@ -96,6 +96,9 @@ libraries/OneWire:
 
 libraries/DallasTemperature: | libraries/OneWire
 	$(CLICFG) lib install DallasTemperature@3.9.0
+
+libraries/WebSockets:
+	$(CLICFG) lib install WebSockets@2.4.1
 
 $(IMAGE): $(BOARDS) $(LIBRARIES) $(SOURCES)
 	$(info Build code)
