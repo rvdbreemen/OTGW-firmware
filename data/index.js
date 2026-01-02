@@ -42,6 +42,7 @@ let autoScroll = true;
 let showTimestamps = true;
 let logExpanded = false;
 let searchTerm = '';
+let otLogControlsInitialized = false;
 
 //============================================================================
 function initOTLogWebSocket() {
@@ -172,6 +173,12 @@ function updateLogCounters() {
 
 //============================================================================
 function setupOTLogControls() {
+  // Only setup event listeners once to prevent duplicates
+  if (otLogControlsInitialized) {
+    return;
+  }
+  otLogControlsInitialized = true;
+  
   // Toggle expand/collapse
   document.getElementById('btnToggleLog').addEventListener('click', function() {
     logExpanded = !logExpanded;
