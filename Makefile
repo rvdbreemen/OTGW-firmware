@@ -73,7 +73,7 @@ flush: | $(CFGFILE)
 	$(CLICFG) cache clean
 
 libraries/WiFiManager: | $(BOARDS)
-	$(CLICFG) lib install WiFiManager@2.0.15-rc.1
+	$(CLICFG) lib install WiFiManager@2.0.17
 
 libraries/ArduinoJson:
 	$(CLICFG) lib install ArduinoJson@6.17.2
@@ -82,7 +82,7 @@ libraries/PubSubClient:
 	$(CLICFG) lib install pubsubclient@2.8.0
 
 libraries/TelnetStream:
-	$(CLICFG) lib install TelnetStream@1.2.4
+	$(CLICFG) lib install TelnetStream@1.3.0
 
 libraries/AceTime:
 	$(CLICFG) lib install Acetime@2.0.1
@@ -92,10 +92,10 @@ libraries/AceTime:
 # 	# https://github.com/PaulStoffregen/Time/archive/refs/tags/v1.6.1.zip
 
 libraries/OneWire:
-	$(CLICFG) lib install OneWire@2.3.6
+	$(CLICFG) lib install OneWire@2.3.8
 
 libraries/DallasTemperature: | libraries/OneWire
-	$(CLICFG) lib install DallasTemperature@3.9.0
+	$(CLICFG) lib install DallasTemperature@4.0.5
 
 $(IMAGE): $(BOARDS) $(LIBRARIES) $(SOURCES)
 	$(info Build code)
