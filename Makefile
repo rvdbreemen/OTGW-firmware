@@ -98,7 +98,7 @@ libraries/DallasTemperature: | libraries/OneWire
 	$(CLICFG) lib install DallasTemperature@3.9.0
 
 libraries/WebSockets:
-	$(CLICFG) lib install WebSockets@2.4.1
+	$(CLICFG) lib install WebSockets@2.3.6
 
 $(IMAGE): $(BOARDS) $(LIBRARIES) $(SOURCES)
 	$(info Build code)
