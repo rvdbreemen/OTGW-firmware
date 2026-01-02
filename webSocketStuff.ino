@@ -18,16 +18,27 @@
 **  - Broadcasts log messages to all connected clients
 **  - Minimal memory footprint (no server-side buffering)
 **  - Auto-cleanup of disconnected clients
+**
+**  Security:
+**  - The WebSocket server is UNAUTHENTICATED: any client on the reachable
+**    network can connect and receive OpenTherm log messages.
+**  - This is intended for use ONLY on trusted local networks. Do NOT expose
+**    port 81 directly to the internet or untrusted networks.
+**  - OpenTherm logs may reveal details about your heating system usage and
+**    configuration. Protect network access accordingly (firewall, VLAN, etc.).
 ***************************************************************************
 */
 
 #include <WebSocketsServer.h>
 
-// WebSocket server on port 81
+// WebSocket server on port 81 (no built-in authentication; local network use only)
 WebSocketsServer webSocket = WebSocketsServer(81);
 
 // Track number of connected WebSocket clients
 static uint8_t wsClientCount = 0;
+
+// Track WebSocket initialization state
+static bool wsInitialized = false;
 
 //===========================================================================================
 // WebSocket event handler
@@ -90,6 +101,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 void startWebSocket() {
   webSocket.begin();
   webSocket.onEvent(webSocketEvent);
+  wsInitialized = true;
   DebugTln(F("WebSocket server started on port 81"));
 }
 
@@ -105,8 +117,8 @@ void handleWebSocket() {
 // This is called from OTGW-Core.ino when a new log line is ready
 //===========================================================================================
 void sendLogToWebSocket(const char* logMessage) {
-  // Only send if there are connected clients (saves CPU cycles)
-  if (wsClientCount > 0 && logMessage != nullptr) {
+  // Only send if WebSocket is initialized, there are connected clients, and message is valid
+  if (wsInitialized && wsClientCount > 0 && logMessage != nullptr) {
     webSocket.broadcastTXT(logMessage);
   }
 }
