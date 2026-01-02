@@ -65,7 +65,7 @@ const char *hexheaders[] = {
 /* --- LOG marcro's ---*/
 
 #define OT_LOG_BUFFER_SIZE 512
-char ot_log_buffer[OT_LOG_BUFFER_SIZE];
+char [OT_LOG_BUFFER_SIZE];
 #define ClrLog()            ({ ot_log_buffer[0] = '\0'; })
 #define AddLogf(...)        ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { snprintf(ot_log_buffer + _len, OT_LOG_BUFFER_SIZE - _len, __VA_ARGS__); } })
 #define AddLog(logstring)   ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, logstring, OT_LOG_BUFFER_SIZE); } })
@@ -1731,6 +1731,7 @@ void processOT(const char *buf, int len){
       if (OTdata.skipthis) AddLog(" <ignored> ");
       AddLogln();
       OTGWDebugT(ot_log_buffer);
+      sendLogToWebSocket(ot_log_buffer);  // Send log to WebSocket clients
       OTGWDebugFlush();
       ClrLog();
     } 

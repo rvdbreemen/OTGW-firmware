@@ -31,6 +31,251 @@ window.onfocus = function () {
 var tid = 0;
 var timeupdate = setInterval(function () { refreshDevTime(); }, 1000); //delay is in milliseconds
 
+//============================================================================
+// OpenTherm Log WebSocket Variables and Functions
+//============================================================================
+let otLogWS = null;
+let otLogBuffer = [];
+let otLogFilteredBuffer = [];
+const MAX_LOG_LINES = 10000;
+let autoScroll = true;
+let showTimestamps = true;
+let logExpanded = false;
+let searchTerm = '';
+
+//============================================================================
+function initOTLogWebSocket() {
+  const wsHost = window.location.hostname;
+  const wsPort = 81;
+  const wsURL = 'ws://' + wsHost + ':' + wsPort + '/';
+  
+  console.log('Connecting to WebSocket: ' + wsURL);
+  
+  try {
+    otLogWS = new WebSocket(wsURL);
+    
+    otLogWS.onopen = function() {
+      console.log('OT Log WebSocket connected');
+      updateWSStatus(true);
+    };
+    
+    otLogWS.onclose = function() {
+      console.log('OT Log WebSocket disconnected');
+      updateWSStatus(false);
+      // Attempt to reconnect after 5 seconds
+      setTimeout(initOTLogWebSocket, 5000);
+    };
+    
+    otLogWS.onerror = function(error) {
+      console.error('OT Log WebSocket error:', error);
+      updateWSStatus(false);
+    };
+    
+    otLogWS.onmessage = function(event) {
+      addLogLine(event.data);
+    };
+    
+  } catch (e) {
+    console.error('Failed to create WebSocket:', e);
+    updateWSStatus(false);
+    setTimeout(initOTLogWebSocket, 5000);
+  }
+  
+  // Setup UI event handlers
+  setupOTLogControls();
+}
+
+//============================================================================
+function updateWSStatus(connected) {
+  const statusEl = document.getElementById('wsStatus');
+  const statusTextEl = document.getElementById('wsStatusText');
+  
+  if (connected) {
+    statusEl.className = 'ws-status ws-connected';
+    statusTextEl.textContent = 'Connected';
+  } else {
+    statusEl.className = 'ws-status ws-disconnected';
+    statusTextEl.textContent = 'Disconnected';
+  }
+}
+
+//============================================================================
+function addLogLine(logLine) {
+  if (!logLine || logLine.trim() === '') return;
+  
+  const timestamp = new Date().toLocaleTimeString();
+  const logEntry = {
+    time: timestamp,
+    text: logLine,
+    raw: logLine
+  };
+  
+  // Add to buffer
+  otLogBuffer.push(logEntry);
+  
+  // Trim buffer if exceeds max
+  if (otLogBuffer.length > MAX_LOG_LINES) {
+    otLogBuffer.shift();
+  }
+  
+  // Update filtered buffer
+  updateFilteredBuffer();
+  
+  // Update display
+  updateLogDisplay();
+  
+  // Update counters
+  updateLogCounters();
+}
+
+//============================================================================
+function updateFilteredBuffer() {
+  if (!searchTerm || searchTerm.trim() === '') {
+    otLogFilteredBuffer = otLogBuffer.slice();
+  } else {
+    const term = searchTerm.toLowerCase();
+    otLogFilteredBuffer = otLogBuffer.filter(entry => 
+      entry.text.toLowerCase().includes(term)
+    );
+  }
+}
+
+//============================================================================
+function updateLogDisplay() {
+  const container = document.getElementById('otLogContent');
+  if (!container) return;
+  
+  const displayCount = logExpanded ? otLogFilteredBuffer.length : Math.min(10, otLogFilteredBuffer.length);
+  const startIndex = Math.max(0, otLogFilteredBuffer.length - displayCount);
+  const linesToShow = otLogFilteredBuffer.slice(startIndex);
+  
+  // Build HTML
+  let html = '';
+  linesToShow.forEach(entry => {
+    const line = showTimestamps ? `[${entry.time}] ${entry.text}` : entry.text;
+    html += escapeHtml(line) + '\n';
+  });
+  
+  container.textContent = html;
+  
+  // Auto-scroll to bottom if enabled
+  if (autoScroll) {
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+//============================================================================
+function updateLogCounters() {
+  document.getElementById('logLineCount').textContent = otLogBuffer.length;
+  document.getElementById('logFilteredCount').textContent = otLogFilteredBuffer.length;
+}
+
+//============================================================================
+function setupOTLogControls() {
+  // Toggle expand/collapse
+  document.getElementById('btnToggleLog').addEventListener('click', function() {
+    logExpanded = !logExpanded;
+    const container = document.getElementById('otLogContainer');
+    const btn = document.getElementById('btnToggleLog');
+    
+    if (logExpanded) {
+      container.classList.remove('collapsed');
+      btn.textContent = '▼ Show Less';
+    } else {
+      container.classList.add('collapsed');
+      btn.textContent = '▲ Show More';
+    }
+    
+    updateLogDisplay();
+  });
+  
+  // Toggle auto-scroll
+  document.getElementById('btnAutoScroll').addEventListener('click', function() {
+    autoScroll = !autoScroll;
+    const btn = document.getElementById('btnAutoScroll');
+    
+    if (autoScroll) {
+      btn.classList.add('btn-active');
+    } else {
+      btn.classList.remove('btn-active');
+    }
+  });
+  
+  // Clear log
+  document.getElementById('btnClearLog').addEventListener('click', function() {
+    if (confirm('Clear all log messages from buffer?')) {
+      otLogBuffer = [];
+      otLogFilteredBuffer = [];
+      updateLogDisplay();
+      updateLogCounters();
+    }
+  });
+  
+  // Download log
+  document.getElementById('btnDownloadLog').addEventListener('click', function() {
+    downloadLog();
+  });
+  
+  // Search functionality
+  document.getElementById('searchLog').addEventListener('input', function(e) {
+    searchTerm = e.target.value;
+    updateFilteredBuffer();
+    updateLogDisplay();
+    updateLogCounters();
+  });
+  
+  // Toggle timestamps
+  document.getElementById('chkShowTimestamp').addEventListener('change', function(e) {
+    showTimestamps = e.target.checked;
+    updateLogDisplay();
+  });
+  
+  // Manual scroll detection (disable auto-scroll if user scrolls up)
+  document.getElementById('otLogContent').addEventListener('scroll', function(e) {
+    const container = e.target;
+    const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
+    
+    if (!isAtBottom && autoScroll) {
+      // User scrolled up, disable auto-scroll
+      autoScroll = false;
+      document.getElementById('btnAutoScroll').classList.remove('btn-active');
+    }
+  });
+}
+
+//============================================================================
+function downloadLog() {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+  const filename = `otgw-log-${timestamp}.txt`;
+  
+  let content = '# OTGW Log Export\n';
+  content += `# Exported: ${new Date().toLocaleString()}\n`;
+  content += `# Total Lines: ${otLogBuffer.length}\n`;
+  content += '#' + '='.repeat(70) + '\n\n';
+  
+  otLogBuffer.forEach(entry => {
+    const line = showTimestamps ? `[${entry.time}] ${entry.text}` : entry.text;
+    content += line + '\n';
+  });
+  
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+//============================================================================
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 //============================================================================  
 function initMainPage() {
   console.log("initMainPage()");
@@ -97,6 +342,9 @@ function initMainPage() {
   refreshDevInfo();
   refreshOTmonitor();
   tid = setInterval(function () { refreshOTmonitor(); }, 1000); //delay is in milliseconds 
+  
+  // Initialize WebSocket for OT log streaming
+  initOTLogWebSocket();
 
   document.getElementById("displayMainPage").style.display = "block";
   document.getElementById("displaySettingsPage").style.display = "none";

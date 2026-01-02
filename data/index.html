@@ -34,6 +34,38 @@
       <div id="mainPage">
         <div id="waiting">Wait for it...</div>
       </div>
+      
+      <!-- OpenTherm Log Viewer Section -->
+      <div id="otLogSection" class="ot-log-section">
+        <div class="ot-log-header">
+          <h3>OpenTherm Message Log</h3>
+          <div class="ot-log-status">
+            <span id="wsStatus" class="ws-status ws-disconnected">●</span>
+            <span id="wsStatusText">Disconnected</span>
+          </div>
+        </div>
+        
+        <div class="ot-log-controls">
+          <button id="btnToggleLog" class="btn-log-control" title="Expand/Collapse Log">▲ Show More</button>
+          <button id="btnAutoScroll" class="btn-log-control btn-active" title="Auto-scroll with new messages">📜 Auto-scroll</button>
+          <button id="btnClearLog" class="btn-log-control" title="Clear log buffer">🗑 Clear</button>
+          <button id="btnDownloadLog" class="btn-log-control" title="Download log to file">💾 Download</button>
+          <input type="text" id="searchLog" class="log-search" placeholder="🔍 Search logs..." />
+          <label class="log-control-label">
+            <input type="checkbox" id="chkShowTimestamp" checked />
+            Timestamps
+          </label>
+        </div>
+        
+        <div id="otLogContainer" class="ot-log-container collapsed">
+          <div id="otLogContent" class="ot-log-content"></div>
+        </div>
+        
+        <div class="ot-log-footer">
+          <span>Lines: <span id="logLineCount">0</span> / 10000</span>
+          <span>Filtered: <span id="logFilteredCount">0</span></span>
+        </div>
+      </div>
     </div>
     <div id="displayPICflash">
       <div class="nav-container">
