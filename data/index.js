@@ -42,6 +42,7 @@ let autoScroll = true;
 let showTimestamps = true;
 let logExpanded = false;
 let searchTerm = '';
+let otLogControlsInitialized = false;
 
 // WebSocket configuration: MUST match the WebSocket port definition in webSocketStuff.ino (e.g. WEBSOCKET_PORT on line 27).
 const WEBSOCKET_PORT = 81;
@@ -176,6 +177,11 @@ function updateLogCounters() {
 
 //============================================================================
 function setupOTLogControls() {
+  // Only setup event listeners once to prevent duplicates
+  if (otLogControlsInitialized) {
+    return;
+  }
+  
   // Toggle expand/collapse
   document.getElementById('btnToggleLog').addEventListener('click', function() {
     logExpanded = !logExpanded;
@@ -245,6 +251,9 @@ function setupOTLogControls() {
       document.getElementById('btnAutoScroll').classList.remove('btn-active');
     }
   });
+  
+  // Mark as initialized after all listeners are successfully registered
+  otLogControlsInitialized = true;
 }
 
 //============================================================================
