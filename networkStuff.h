@@ -87,6 +87,14 @@
 //#include <FS.h>                 // part of ESP8266 Core https://github.com/esp8266/Arduino
 #include <LittleFS.h>
 
+//===========================================================================================
+// WebSocket function prototypes (implemented in webSocketStuff.ino)
+//===========================================================================================
+void startWebSocket();
+void handleWebSocket();
+uint8_t getWebSocketClientCount();
+void sendLogToWebSocket(const char* logMessage);
+
 //Use the NTP SDK ESP 8266 
 //#include <time.h>
 extern "C" int clock_gettime(clockid_t unused, struct timespec *tp);

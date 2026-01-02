@@ -47,8 +47,16 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 num, ip[0], ip[1], ip[2], ip[3], wsClientCount);
         
         // Send welcome message to newly connected client
+        // Validate hostname length to prevent buffer overflow
+        const size_t MAX_HOSTNAME_LEN = 50; // Reserve space for message prefix/suffix
         char welcomeMsg[80];
-        snprintf(welcomeMsg, sizeof(welcomeMsg), "Connected to OTGW Log Stream - %s", CSTR(settingHostname));
+        
+        // Safely truncate hostname if too long
+        char safeHostname[MAX_HOSTNAME_LEN + 1];
+        strncpy(safeHostname, CSTR(settingHostname), MAX_HOSTNAME_LEN);
+        safeHostname[MAX_HOSTNAME_LEN] = '\0';
+        
+        snprintf(welcomeMsg, sizeof(welcomeMsg), PSTR("Connected to OTGW Log Stream - %s"), safeHostname);
         webSocket.sendTXT(num, welcomeMsg);
       }
       break;
@@ -97,6 +105,8 @@ void startWebSocket() {
 //===========================================================================================
 void handleWebSocket() {
   webSocket.loop();
+  // Feed watchdog to prevent resets during WebSocket event processing
+  FEEDWATCHDOGNOW;
 }
 
 //===========================================================================================
@@ -107,7 +117,37 @@ void sendLogToWebSocket(const char* logMessage);
 void sendLogToWebSocket(const char* logMessage) {
   // Only send if there are connected clients (saves CPU cycles)
   if (wsClientCount > 0 && logMessage != nullptr) {
-    webSocket.broadcastTXT(logMessage);
+    const size_t WS_MAX_LOG_MESSAGE_LEN = 1024;
+    size_t msgLen = strlen(logMessage);
+
+    // Ignore empty messages to avoid unnecessary WebSocket frames
+    if (msgLen == 0) {
+      DebugTln(F("WebSocket: Ignored empty log message"));
+      return;
+    }
+
+    // Guard against excessively long messages that could overflow internal buffers
+    if (msgLen > WS_MAX_LOG_MESSAGE_LEN) {
+      DebugTf(PSTR("WebSocket: Log message too long (%u bytes), truncating to %u bytes\r\n"),
+              (unsigned int)msgLen,
+              (unsigned int)WS_MAX_LOG_MESSAGE_LEN);
+
+      // Truncate message to a safe length before sending
+      char truncated[WS_MAX_LOG_MESSAGE_LEN + 1];
+      memcpy(truncated, logMessage, WS_MAX_LOG_MESSAGE_LEN);
+      truncated[WS_MAX_LOG_MESSAGE_LEN] = '\0';
+      
+      // Attempt broadcast and log if it fails
+      if (!webSocket.broadcastTXT(truncated)) {
+        DebugTln(F("WebSocket: Failed to broadcast truncated message"));
+      }
+      return;
+    }
+
+    // Message length is within safe bounds, broadcast it
+    if (!webSocket.broadcastTXT(logMessage)) {
+      DebugTln(F("WebSocket: Failed to broadcast message"));
+    }
   }
 }
 

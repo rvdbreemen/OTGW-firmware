@@ -98,6 +98,8 @@ libraries/DallasTemperature: | libraries/OneWire
 	$(CLICFG) lib install DallasTemperature@3.9.0
 
 libraries/WebSockets:
+	# WebSockets@2.3.6 is intentionally pinned for compatibility with ESP8266 Arduino Core 2.7.4.
+	# Newer WebSockets releases have not been validated on this firmware and may introduce regressions.
 	$(CLICFG) lib install WebSockets@2.3.6
 
 $(IMAGE): $(BOARDS) $(LIBRARIES) $(SOURCES)

@@ -42,29 +42,51 @@ let autoScroll = true;
 let showTimestamps = true;
 let logExpanded = false;
 let searchTerm = '';
+let wsReconnecting = false; // Track reconnection state to prevent multiple attempts
+let otLogControlsSetup = false; // Track if controls have been initialized
 
 // WebSocket configuration: MUST match the WebSocket port definition in webSocketStuff.ino (e.g. WEBSOCKET_PORT on line 27).
 const WEBSOCKET_PORT = 81;
 
 //============================================================================
 function initOTLogWebSocket() {
+  // Prevent multiple simultaneous connection attempts
+  if (wsReconnecting) {
+    console.log('WebSocket reconnection already in progress, skipping...');
+    return;
+  }
+  
+  // Close existing WebSocket if it exists
+  if (otLogWS !== null) {
+    try {
+      otLogWS.close();
+    } catch (e) {
+      console.error('Error closing existing WebSocket:', e);
+    }
+    otLogWS = null;
+  }
+  
   const wsHost = window.location.hostname;
   const wsPort = WEBSOCKET_PORT;
   const wsURL = 'ws://' + wsHost + ':' + wsPort + '/';
   
   console.log('Connecting to WebSocket: ' + wsURL);
+  wsReconnecting = true;
   
   try {
     otLogWS = new WebSocket(wsURL);
     
     otLogWS.onopen = function() {
       console.log('OT Log WebSocket connected');
+      wsReconnecting = false;
       updateWSStatus(true);
     };
     
     otLogWS.onclose = function() {
       console.log('OT Log WebSocket disconnected');
       updateWSStatus(false);
+      otLogWS = null;
+      wsReconnecting = false;
       // Attempt to reconnect after 5 seconds
       setTimeout(initOTLogWebSocket, 5000);
     };
@@ -72,6 +94,7 @@ function initOTLogWebSocket() {
     otLogWS.onerror = function(error) {
       console.error('OT Log WebSocket error:', error);
       updateWSStatus(false);
+      wsReconnecting = false;
     };
     
     otLogWS.onmessage = function(event) {
@@ -81,11 +104,10 @@ function initOTLogWebSocket() {
   } catch (e) {
     console.error('Failed to create WebSocket:', e);
     updateWSStatus(false);
+    otLogWS = null;
+    wsReconnecting = false;
     setTimeout(initOTLogWebSocket, 5000);
   }
-  
-  // Setup UI event handlers
-  setupOTLogControls();
 }
 
 //============================================================================
@@ -145,27 +167,38 @@ function updateFilteredBuffer() {
 }
 
 //============================================================================
+// Update display efficiently using requestAnimationFrame for better performance
+let displayUpdateScheduled = false;
+
 function updateLogDisplay() {
-  const container = document.getElementById('otLogContent');
-  if (!container) return;
+  if (displayUpdateScheduled) return;
   
-  const displayCount = logExpanded ? otLogFilteredBuffer.length : Math.min(10, otLogFilteredBuffer.length);
-  const startIndex = Math.max(0, otLogFilteredBuffer.length - displayCount);
-  const linesToShow = otLogFilteredBuffer.slice(startIndex);
-  
-  // Build HTML
-  let html = '';
-  linesToShow.forEach(entry => {
-    const line = showTimestamps ? `[${entry.time}] ${entry.text}` : entry.text;
-    html += escapeHtml(line) + '\n';
+  displayUpdateScheduled = true;
+  requestAnimationFrame(() => {
+    displayUpdateScheduled = false;
+    
+    const container = document.getElementById('otLogContent');
+    if (!container) return;
+    
+    const displayCount = logExpanded ? otLogFilteredBuffer.length : Math.min(10, otLogFilteredBuffer.length);
+    const startIndex = Math.max(0, otLogFilteredBuffer.length - displayCount);
+    const linesToShow = otLogFilteredBuffer.slice(startIndex);
+    
+    // Build plain text content (escapeHtml converts special chars to entities for safe display as text)
+    let textContent = '';
+    linesToShow.forEach(entry => {
+      const line = showTimestamps ? `[${entry.time}] ${entry.text}` : entry.text;
+      textContent += escapeHtml(line) + '\n';
+    });
+    
+    // Use textContent for security - treats everything as plain text, prevents XSS
+    container.textContent = textContent;
+    
+    // Auto-scroll to bottom if enabled
+    if (autoScroll) {
+      container.scrollTop = container.scrollHeight;
+    }
   });
-  
-  container.textContent = html;
-  
-  // Auto-scroll to bottom if enabled
-  if (autoScroll) {
-    container.scrollTop = container.scrollHeight;
-  }
 }
 
 //============================================================================
@@ -176,6 +209,12 @@ function updateLogCounters() {
 
 //============================================================================
 function setupOTLogControls() {
+  // Only setup controls once to prevent duplicate event listeners
+  if (otLogControlsSetup) {
+    return;
+  }
+  otLogControlsSetup = true;
+  
   // Toggle expand/collapse
   document.getElementById('btnToggleLog').addEventListener('click', function() {
     logExpanded = !logExpanded;
@@ -200,8 +239,10 @@ function setupOTLogControls() {
     
     if (autoScroll) {
       btn.classList.add('btn-active');
+      btn.setAttribute('aria-pressed', 'true');
     } else {
       btn.classList.remove('btn-active');
+      btn.setAttribute('aria-pressed', 'false');
     }
   });
   
@@ -242,7 +283,9 @@ function setupOTLogControls() {
     if (!isAtBottom && autoScroll) {
       // User scrolled up, disable auto-scroll
       autoScroll = false;
-      document.getElementById('btnAutoScroll').classList.remove('btn-active');
+      const btn = document.getElementById('btnAutoScroll');
+      btn.classList.remove('btn-active');
+      btn.setAttribute('aria-pressed', 'false');
     }
   });
 }
@@ -349,6 +392,9 @@ function initMainPage() {
   
   // Initialize WebSocket for OT log streaming
   initOTLogWebSocket();
+  
+  // Setup OT log UI controls once during page load
+  setupOTLogControls();
 
   document.getElementById("displayMainPage").style.display = "block";
   document.getElementById("displaySettingsPage").style.display = "none";
