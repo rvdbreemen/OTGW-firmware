@@ -106,7 +106,8 @@ function addLogLine(logLine) {
   const timestamp = new Date().toLocaleTimeString();
   const logEntry = {
     time: timestamp,
-    text: logLine,
+    // Store a processed version for display, keep original in `raw`
+    text: logLine.trimEnd(),
     raw: logLine
   };
   
