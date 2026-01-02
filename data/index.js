@@ -184,6 +184,9 @@ function updateLogCounters() {
 
 //============================================================================
 function setupOTLogControls() {
+  // Note: User-triggered events call updateLogDisplay() directly (not throttled)
+  // for immediate visual feedback. Throttling is only for high-frequency WebSocket messages.
+  
   // Toggle expand/collapse
   document.getElementById('btnToggleLog').addEventListener('click', function() {
     logExpanded = !logExpanded;
