@@ -43,10 +43,13 @@ let showTimestamps = true;
 let logExpanded = false;
 let searchTerm = '';
 
+// WebSocket configuration: MUST match the WebSocket port definition in webSocketStuff.ino (e.g. WEBSOCKET_PORT on line 27).
+const WEBSOCKET_PORT = 81;
+
 //============================================================================
 function initOTLogWebSocket() {
   const wsHost = window.location.hostname;
-  const wsPort = 81;
+  const wsPort = WEBSOCKET_PORT;
   const wsURL = 'ws://' + wsHost + ':' + wsPort + '/';
   
   console.log('Connecting to WebSocket: ' + wsURL);
