@@ -42,6 +42,8 @@ let autoScroll = true;
 let showTimestamps = true;
 let logExpanded = false;
 let searchTerm = '';
+let updatePending = false;
+let otLogControlsInitialized = false;
 
 // WebSocket configuration: MUST match the WebSocket port definition in webSocketStuff.ino (e.g. WEBSOCKET_PORT on line 27).
 const WEBSOCKET_PORT = 81;
@@ -84,8 +86,11 @@ function initOTLogWebSocket() {
     setTimeout(initOTLogWebSocket, 5000);
   }
   
-  // Setup UI event handlers
-  setupOTLogControls();
+  // Setup UI event handlers only once
+  if (!otLogControlsInitialized) {
+    setupOTLogControls();
+    otLogControlsInitialized = true;
+  }
 }
 
 //============================================================================
@@ -125,11 +130,22 @@ function addLogLine(logLine) {
   // Update filtered buffer
   updateFilteredBuffer();
   
-  // Update display
-  updateLogDisplay();
-  
-  // Update counters
-  updateLogCounters();
+  // Schedule display update (throttled)
+  scheduleDisplayUpdate();
+}
+
+//============================================================================
+function scheduleDisplayUpdate() {
+  // Use requestAnimationFrame to throttle updates
+  // This batches multiple rapid updates into a single render
+  if (!updatePending) {
+    updatePending = true;
+    requestAnimationFrame(() => {
+      updatePending = false;
+      updateLogDisplay();
+      updateLogCounters();
+    });
+  }
 }
 
 //============================================================================
@@ -176,6 +192,11 @@ function updateLogCounters() {
 
 //============================================================================
 function setupOTLogControls() {
+  // Only setup event listeners once to prevent duplicates
+  if (otLogControlsInitialized) {
+    return;
+  }
+  
   // Toggle expand/collapse
   document.getElementById('btnToggleLog').addEventListener('click', function() {
     logExpanded = !logExpanded;
@@ -245,6 +266,9 @@ function setupOTLogControls() {
       document.getElementById('btnAutoScroll').classList.remove('btn-active');
     }
   });
+  
+  // Mark as initialized after all listeners are successfully registered
+  otLogControlsInitialized = true;
 }
 
 //============================================================================
