@@ -37,17 +37,21 @@ var timeupdate = setInterval(function () { refreshDevTime(); }, 1000); //delay i
 let otLogWS = null;
 let otLogBuffer = [];
 let otLogFilteredBuffer = [];
-const MAX_LOG_LINES = 10000;
+const MAX_LOG_LINES = 2000; // limit client-side log buffer to reduce browser memory usage
 let autoScroll = true;
 let showTimestamps = true;
 let logExpanded = false;
 let searchTerm = '';
 let updatePending = false;
+let otLogControlsInitialized = false;
+
+// WebSocket configuration: MUST match the WebSocket port definition in webSocketStuff.ino (e.g. WEBSOCKET_PORT on line 27).
+const WEBSOCKET_PORT = 81;
 
 //============================================================================
 function initOTLogWebSocket() {
   const wsHost = window.location.hostname;
-  const wsPort = 81;
+  const wsPort = WEBSOCKET_PORT;
   const wsURL = 'ws://' + wsHost + ':' + wsPort + '/';
   
   console.log('Connecting to WebSocket: ' + wsURL);
@@ -82,8 +86,11 @@ function initOTLogWebSocket() {
     setTimeout(initOTLogWebSocket, 5000);
   }
   
-  // Setup UI event handlers
-  setupOTLogControls();
+  // Setup UI event handlers only once
+  if (!otLogControlsInitialized) {
+    setupOTLogControls();
+    otLogControlsInitialized = true;
+  }
 }
 
 //============================================================================
@@ -107,7 +114,8 @@ function addLogLine(logLine) {
   const timestamp = new Date().toLocaleTimeString();
   const logEntry = {
     time: timestamp,
-    text: logLine,
+    // Store a processed version for display, keep original in `raw`
+    text: logLine.trimEnd(),
     raw: logLine
   };
   
@@ -184,8 +192,10 @@ function updateLogCounters() {
 
 //============================================================================
 function setupOTLogControls() {
-  // Note: User-triggered events call updateLogDisplay() directly (not throttled)
-  // for immediate visual feedback. Throttling is only for high-frequency WebSocket messages.
+  // Only setup event listeners once to prevent duplicates
+  if (otLogControlsInitialized) {
+    return;
+  }
   
   // Toggle expand/collapse
   document.getElementById('btnToggleLog').addEventListener('click', function() {
@@ -256,6 +266,9 @@ function setupOTLogControls() {
       document.getElementById('btnAutoScroll').classList.remove('btn-active');
     }
   });
+  
+  // Mark as initialized after all listeners are successfully registered
+  otLogControlsInitialized = true;
 }
 
 //============================================================================
