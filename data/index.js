@@ -42,6 +42,7 @@ let autoScroll = true;
 let showTimestamps = true;
 let logExpanded = false;
 let searchTerm = '';
+let updatePending = false;
 
 //============================================================================
 function initOTLogWebSocket() {
@@ -121,11 +122,22 @@ function addLogLine(logLine) {
   // Update filtered buffer
   updateFilteredBuffer();
   
-  // Update display
-  updateLogDisplay();
-  
-  // Update counters
-  updateLogCounters();
+  // Schedule display update (throttled)
+  scheduleDisplayUpdate();
+}
+
+//============================================================================
+function scheduleDisplayUpdate() {
+  // Use requestAnimationFrame to throttle updates
+  // This batches multiple rapid updates into a single render
+  if (!updatePending) {
+    updatePending = true;
+    requestAnimationFrame(() => {
+      updatePending = false;
+      updateLogDisplay();
+      updateLogCounters();
+    });
+  }
 }
 
 //============================================================================
