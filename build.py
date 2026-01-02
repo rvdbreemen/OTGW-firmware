@@ -14,6 +14,7 @@ Usage:
     python build.py --firmware   # Build firmware only
     python build.py --filesystem # Build filesystem only
     python build.py --clean      # Clean build artifacts
+    python build.py --distclean  # Clean build + cached dependencies
     python build.py --help       # Show help
 """
 
@@ -501,11 +502,107 @@ def list_build_artifacts(project_dir):
 
 def clean_build(project_dir):
     """Clean build artifacts"""
-    print_step("Cleaning build artifacts")
-    
-    cmd = ["make", "distclean"]
-    run_command(cmd, cwd=project_dir)
-    print_success("Clean complete")
+    clean_build_artifacts(project_dir, distclean=False)
+
+
+def _handle_remove_readonly(func, path, exc_info):
+    """Error handler for shutil.rmtree to handle read-only files."""
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except Exception:
+        raise
+
+
+def remove_path_fast(path: Path):
+    """Remove a file or directory tree with a fast OS-native path when possible."""
+    if not path.exists():
+        return
+
+    try:
+        if path.is_file() or path.is_symlink():
+            path.unlink()
+            return
+
+        # Prefer OS-native deletion for speed on large trees.
+        if platform.system() == "Windows":
+            # rmdir handles junctions/dirs; /q suppresses prompts.
+            result = subprocess.run(
+                ["cmd", "/c", "rmdir", "/s", "/q", str(path)],
+                cwd=str(path.parent),
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0:
+                return
+        else:
+            result = subprocess.run(
+                ["rm", "-rf", "--", str(path)],
+                cwd=str(path.parent),
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0:
+                return
+    except Exception:
+        # Fall back to shutil below.
+        pass
+
+    shutil.rmtree(path, onerror=_handle_remove_readonly)
+
+
+def clean_build_artifacts(project_dir: Path, distclean: bool = False):
+    """Clean build outputs.
+
+    By default this removes only build outputs (fast). Use distclean=True to
+    remove downloaded cores/libraries and other cached build dependencies.
+    """
+    if distclean:
+        print_step("Cleaning build artifacts (distclean)")
+    else:
+        print_step("Cleaning build artifacts")
+
+    removed_any = False
+
+    # Always remove the build output directory.
+    build_dir = project_dir / "build"
+    if build_dir.exists():
+        print_info(f"Removing {build_dir}...")
+        remove_path_fast(build_dir)
+        removed_any = True
+
+    # These are publish outputs created by the Makefile in the repo root.
+    for pattern in ("*-fw.bin", "*-fs.bin", "*.zip"):
+        for file_path in project_dir.glob(pattern):
+            try:
+                print_info(f"Removing {file_path.name}...")
+                file_path.unlink()
+                removed_any = True
+            except OSError as e:
+                print_warning(f"Could not remove {file_path}: {e}")
+
+    if distclean:
+        # Match Makefile's distclean intent.
+        for name in ("arduino", "libraries", "staging"):
+            path = project_dir / name
+            if path.exists():
+                print_info(f"Removing {path}...")
+                remove_path_fast(path)
+                removed_any = True
+
+        cli_cfg = project_dir / "arduino-cli.yaml"
+        if cli_cfg.exists():
+            try:
+                print_info(f"Removing {cli_cfg.name}...")
+                cli_cfg.unlink()
+                removed_any = True
+            except OSError as e:
+                print_warning(f"Could not remove {cli_cfg}: {e}")
+
+    if not removed_any:
+        print_warning("Nothing to clean")
+    else:
+        print_success("Clean complete")
 
 
 def main():
@@ -519,6 +616,7 @@ Examples:
   python build.py --firmware       # Build firmware only
   python build.py --filesystem     # Build filesystem only
   python build.py --clean          # Clean build artifacts
+  python build.py --distclean      # Also remove cores/libraries cache
   python build.py --no-rename      # Build without renaming artifacts
         """
     )
@@ -537,6 +635,11 @@ Examples:
         "--clean",
         action="store_true",
         help="Clean build artifacts"
+    )
+    parser.add_argument(
+        "--distclean",
+        action="store_true",
+        help="Remove build artifacts plus downloaded cores/libraries (slower)"
     )
     parser.add_argument(
         "--no-rename",
@@ -575,9 +678,15 @@ Examples:
     # Check Python version
     check_python_version()
     
-    # Handle clean
+    # Handle cleaning options
+    if args.distclean and args.clean:
+        print_error("Use only one of --clean or --distclean")
+        sys.exit(2)
     if args.clean:
-        clean_build(project_dir)
+        clean_build_artifacts(project_dir, distclean=False)
+        return
+    if args.distclean:
+        clean_build_artifacts(project_dir, distclean=True)
         return
     
     # Check for make
