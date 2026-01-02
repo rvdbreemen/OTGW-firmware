@@ -45,7 +45,7 @@ let searchTerm = '';
 let updatePending = false;
 let otLogControlsInitialized = false;
 
-// WebSocket configuration: MUST match the WebSocket port definition in webSocketStuff.ino (e.g. WEBSOCKET_PORT on line 27).
+// WebSocket configuration: must match the WebSocket port used in webSocketStuff.ino (currently hardcoded as 81 in the WebSocketsServer constructor).
 const WEBSOCKET_PORT = 81;
 
 //============================================================================
@@ -97,6 +97,8 @@ function initOTLogWebSocket() {
 function updateWSStatus(connected) {
   const statusEl = document.getElementById('wsStatus');
   const statusTextEl = document.getElementById('wsStatusText');
+  
+  if (!statusEl || !statusTextEl) return;
   
   if (connected) {
     statusEl.className = 'ws-status ws-connected';
@@ -161,33 +163,59 @@ function updateFilteredBuffer() {
 }
 
 //============================================================================
-function updateLogDisplay() {
+// Flag to ensure we only render at most once per animation frame
+let logRenderScheduled = false;
+
+// Internal function that performs the actual DOM update
+function renderLogDisplay() {
   const container = document.getElementById('otLogContent');
   if (!container) return;
-  
+
   const displayCount = logExpanded ? otLogFilteredBuffer.length : Math.min(10, otLogFilteredBuffer.length);
   const startIndex = Math.max(0, otLogFilteredBuffer.length - displayCount);
   const linesToShow = otLogFilteredBuffer.slice(startIndex);
-  
+
   // Build HTML
   let html = '';
   linesToShow.forEach(entry => {
     const line = showTimestamps ? `[${entry.time}] ${entry.text}` : entry.text;
     html += escapeHtml(line) + '\n';
   });
-  
+
   container.textContent = html;
-  
+
   // Auto-scroll to bottom if enabled
   if (autoScroll) {
     container.scrollTop = container.scrollHeight;
   }
 }
 
+// Public function: schedule a render, coalescing multiple updates
+function updateLogDisplay() {
+  if (logRenderScheduled) {
+    return;
+  }
+
+  logRenderScheduled = true;
+
+  window.requestAnimationFrame(function () {
+    logRenderScheduled = false;
+    renderLogDisplay();
+  });
+}
+
 //============================================================================
 function updateLogCounters() {
-  document.getElementById('logLineCount').textContent = otLogBuffer.length;
-  document.getElementById('logFilteredCount').textContent = otLogFilteredBuffer.length;
+  const logLineCountEl = document.getElementById('logLineCount');
+  const logFilteredCountEl = document.getElementById('logFilteredCount');
+
+  if (logLineCountEl) {
+    logLineCountEl.textContent = otLogBuffer.length;
+  }
+
+  if (logFilteredCountEl) {
+    logFilteredCountEl.textContent = otLogFilteredBuffer.length;
+  }
 }
 
 //============================================================================
