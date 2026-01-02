@@ -47,8 +47,12 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 num, ip[0], ip[1], ip[2], ip[3], wsClientCount);
         
         // Send welcome message to newly connected client
+        // Buffer sized for message prefix (33) + max hostname (32) + null terminator + margin
         char welcomeMsg[80];
-        snprintf(welcomeMsg, sizeof(welcomeMsg), "Connected to OTGW Log Stream - %s", CSTR(settingHostname));
+        int written = snprintf(welcomeMsg, sizeof(welcomeMsg), "Connected to OTGW Log Stream - %s", CSTR(settingHostname));
+        if (written >= sizeof(welcomeMsg)) {
+          DebugTf(PSTR("WebSocket[%u] warning: welcome message truncated (hostname too long)\r\n"), num);
+        }
         webSocket.sendTXT(num, welcomeMsg);
       }
       break;
