@@ -104,7 +104,6 @@ void handleWebSocket() {
 // Send log message to all connected WebSocket clients
 // This is called from OTGW-Core.ino when a new log line is ready
 //===========================================================================================
-void sendLogToWebSocket(const char* logMessage);
 void sendLogToWebSocket(const char* logMessage) {
   // Only send if there are connected clients (saves CPU cycles)
   if (wsClientCount > 0 && logMessage != nullptr) {
