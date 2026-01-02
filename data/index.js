@@ -85,8 +85,11 @@ function initOTLogWebSocket() {
     setTimeout(initOTLogWebSocket, 5000);
   }
   
-  // Setup UI event handlers
-  setupOTLogControls();
+  // Setup UI event handlers only once
+  if (!otLogControlsInitialized) {
+    setupOTLogControls();
+    otLogControlsInitialized = true;
+  }
 }
 
 //============================================================================
