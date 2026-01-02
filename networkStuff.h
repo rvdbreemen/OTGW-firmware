@@ -50,6 +50,40 @@
 // included in main program: #include <TelnetStream.h>       // Version 0.0.1 - https://github.com/jandrassy/TelnetStream
 #include <WebSocketsServer.h>   // WebSocket server for streaming OT log messages to WebUI
 
+/*
+ * WebSocket log viewer
+ * --------------------
+ * The firmware exposes a WebSocket endpoint that streams OpenTherm Gateway log
+ * messages to the Web UI. The browser connects to this WebSocket and receives
+ * a live feed of OTGW traffic without polling.
+ *
+ * Usage / setup:
+ * - Connect the OTGW to your WiFi network (see WiFiManager usage above).
+ * - Open the Web UI in a browser using the device hostname or IP address.
+ * - Use the log / console page in the Web UI; it will automatically open a
+ *   WebSocket connection to the firmware and start streaming log lines.
+ *
+ * Security considerations:
+ * - The WebSocket log stream is intended for LOCAL NETWORK USE ONLY.
+ * - There is no authentication on the WebSocket endpoint; anyone with access
+ *   to the device on the network can read OTGW log messages.
+ * - Do NOT expose the OTGW HTTP/WebSocket ports directly to the internet.
+ *   If remote access is required, use a secure tunnel/VPN that protects the
+ *   entire local network segment.
+ *
+ * Troubleshooting:
+ * - If the Web UI log viewer stays empty:
+ *   - Verify the Web UI is reachable from your browser (HTTP access works).
+ *   - Ensure the device is connected to WiFi (see status page / LEDs).
+ *   - Make sure your browser supports WebSockets (all modern browsers do).
+ *   - Check that local firewalls or browser extensions are not blocking
+ *     WebSocket connections to the device.
+ *
+ * Implementation detail:
+ * - The actual WebSocket server instance and port are configured elsewhere in
+ *   the firmware. This header only documents the feature and its intended
+ *   local-network-only usage.
+ */
 //#include <FS.h>                 // part of ESP8266 Core https://github.com/esp8266/Arduino
 #include <LittleFS.h>
 
