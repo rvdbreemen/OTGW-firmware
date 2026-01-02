@@ -177,7 +177,6 @@ function setupOTLogControls() {
   if (otLogControlsInitialized) {
     return;
   }
-  otLogControlsInitialized = true;
   
   // Toggle expand/collapse
   document.getElementById('btnToggleLog').addEventListener('click', function() {
@@ -248,6 +247,9 @@ function setupOTLogControls() {
       document.getElementById('btnAutoScroll').classList.remove('btn-active');
     }
   });
+  
+  // Mark as initialized after all listeners are successfully registered
+  otLogControlsInitialized = true;
 }
 
 //============================================================================
