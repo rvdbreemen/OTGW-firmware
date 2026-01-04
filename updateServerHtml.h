@@ -141,8 +141,9 @@ static const char UpdateServerIndex[] PROGMEM =
                successTimer = null;
                successCountdownEl.textContent = '0';
                if (successMessageEl) {
-                 successMessageEl.textContent = 'Update successful. You can return to the main page.';
+                 successMessageEl.textContent = 'Update successful. Redirecting...';
                }
+               window.location.assign("/");
                return;
              }
             successCountdownEl.textContent = remaining;
@@ -336,7 +337,7 @@ static const char UpdateServerIndex[] PROGMEM =
                if (total > 0) {
                  var pct = Math.round((ev.loaded / total) * 100);
                  if (pct >= 100) {
-                   uploadStateEl.textContent = 'Upload: complete, flashing...';
+                   uploadStateEl.textContent = 'Upload: complete upload...';
                  } else {
                    uploadStateEl.textContent = 'Upload: ' + pct + '%';
                  }
@@ -355,7 +356,7 @@ static const char UpdateServerIndex[] PROGMEM =
                    successShown = false;
                    if (successPanel) successPanel.style.display = 'none';
                  } else {
-                   uploadStateEl.textContent = 'Upload: complete, flashing...';
+                   uploadStateEl.textContent = 'Upload: complete upload...';
                    if (lastUploadTotal > 0) {
                      setFlashProgress(lastUploadTotal, lastUploadTotal);
                    } else if (lastUploadLoaded > 0) {

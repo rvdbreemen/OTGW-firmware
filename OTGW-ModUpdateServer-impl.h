@@ -351,7 +351,7 @@ const char *ESP8266HTTPUpdateServerTemplate<ServerType>::_phaseToString(uint8_t 
   switch (static_cast<UpdatePhase>(phase)) {
     case UPDATE_START: return "start flashing";
     case UPDATE_WRITE: return "write block to flash";
-    case UPDATE_END: return "end, done flashing";
+    case UPDATE_END: return "end, done flashing...";
     case UPDATE_ERROR: return "error flashing";
     case UPDATE_ABORT: return "abort flashing";
     case UPDATE_IDLE:
@@ -516,7 +516,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
       yield(); 
   } else {
       if (_serial_output) {
-          Debugf("WS/SSE: Buffer full (avail: %u, need: %u). Skipping update.\r\n", available, msgLen);
+          Debugf("WS: Buffer full (avail: %u, need: %u). Skipping update.\r\n", available, msgLen);
       }
   }
 }
