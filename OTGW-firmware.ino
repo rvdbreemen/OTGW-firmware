@@ -145,6 +145,7 @@ void restartWifi(){
     startTelnet();
     startOTGWstream(); 
     startMQTT();
+    startWebSocket(); // Restart WebSocket server
     iTryRestarts = 0; //reset attempt counter
     return;
   }

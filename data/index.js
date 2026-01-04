@@ -47,13 +47,28 @@ let otLogControlsInitialized = false;
 
 // WebSocket configuration: must match the WebSocket port used in webSocketStuff.ino (currently hardcoded as 81 in the WebSocketsServer constructor).
 const WEBSOCKET_PORT = 81;
+let wsReconnectTimer = null;
 
 //============================================================================
 function initOTLogWebSocket() {
+  // Clear any pending reconnect timer
+  if (wsReconnectTimer) {
+    clearTimeout(wsReconnectTimer);
+    wsReconnectTimer = null;
+  }
+
   const wsHost = window.location.hostname;
   const wsPort = WEBSOCKET_PORT;
   const wsURL = 'ws://' + wsHost + ':' + wsPort + '/';
   
+  // Close existing connection if it exists
+  if (otLogWS) {
+    if (otLogWS.readyState === WebSocket.OPEN || otLogWS.readyState === WebSocket.CONNECTING) {
+      otLogWS.close();
+    }
+    otLogWS = null;
+  }
+
   console.log('Connecting to WebSocket: ' + wsURL);
   
   try {
@@ -62,18 +77,26 @@ function initOTLogWebSocket() {
     otLogWS.onopen = function() {
       console.log('OT Log WebSocket connected');
       updateWSStatus(true);
+      // Clear any reconnect timer just in case
+      if (wsReconnectTimer) {
+        clearTimeout(wsReconnectTimer);
+        wsReconnectTimer = null;
+      }
     };
     
     otLogWS.onclose = function() {
       console.log('OT Log WebSocket disconnected');
       updateWSStatus(false);
-      // Attempt to reconnect after 5 seconds
-      setTimeout(initOTLogWebSocket, 5000);
+      // Attempt to reconnect after 5 seconds if not already scheduled
+      if (!wsReconnectTimer) {
+        wsReconnectTimer = setTimeout(initOTLogWebSocket, 5000);
+      }
     };
     
     otLogWS.onerror = function(error) {
       console.error('OT Log WebSocket error:', error);
       updateWSStatus(false);
+      // onclose will usually follow, but we ensure cleanup
     };
     
     otLogWS.onmessage = function(event) {
@@ -83,7 +106,9 @@ function initOTLogWebSocket() {
   } catch (e) {
     console.error('Failed to create WebSocket:', e);
     updateWSStatus(false);
-    setTimeout(initOTLogWebSocket, 5000);
+    if (!wsReconnectTimer) {
+      wsReconnectTimer = setTimeout(initOTLogWebSocket, 5000);
+    }
   }
   
   // Setup UI event handlers only once
@@ -268,6 +293,14 @@ function setupOTLogControls() {
   document.getElementById('btnDownloadLog').addEventListener('click', function() {
     downloadLog();
   });
+  
+  // Test log
+  const btnTestLog = document.getElementById('btnTestLog');
+  if (btnTestLog) {
+    btnTestLog.addEventListener('click', function() {
+      addLogLine("Test log message " + new Date().toLocaleTimeString());
+    });
+  }
   
   // Search functionality
   document.getElementById('searchLog').addEventListener('input', function(e) {
