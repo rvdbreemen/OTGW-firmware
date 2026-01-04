@@ -31,6 +31,388 @@ window.onfocus = function () {
 var tid = 0;
 var timeupdate = setInterval(function () { refreshDevTime(); }, 1000); //delay is in milliseconds
 
+//============================================================================
+// OpenTherm Log WebSocket Variables and Functions
+//============================================================================
+let otLogWS = null;
+let otLogBuffer = [];
+let otLogFilteredBuffer = [];
+const MAX_LOG_LINES = 2000; // limit client-side log buffer to reduce browser memory usage
+let autoScroll = true;
+let showTimestamps = true;
+let logExpanded = false;
+let searchTerm = '';
+let updatePending = false;
+let otLogControlsInitialized = false;
+
+// WebSocket configuration: must match the WebSocket port used in webSocketStuff.ino (currently hardcoded as 81 in the WebSocketsServer constructor).
+const WEBSOCKET_PORT = 81;
+let wsReconnectTimer = null;
+
+//============================================================================
+function initOTLogWebSocket() {
+  // Detect smartphone (iPhone or Android Phone)
+  const isPhone = /iPhone|iPod/.test(navigator.userAgent) || 
+                 (/Android/.test(navigator.userAgent) && /Mobile/.test(navigator.userAgent));
+  
+  // Also check screen width as a fallback (standard breakpoint for tablets is 768px)
+  const isSmallScreen = window.innerWidth < 768;
+
+  if (isPhone || isSmallScreen) {
+    console.log("Smartphone or small screen detected. Disabling OpenTherm Message Log.");
+    const logSection = document.getElementById('otLogSection');
+    if (logSection) {
+      logSection.style.display = 'none';
+    }
+    return; // Do not connect WebSocket
+  }
+
+  // Clear any pending reconnect timer
+  if (wsReconnectTimer) {
+    clearTimeout(wsReconnectTimer);
+    wsReconnectTimer = null;
+  }
+
+  const wsHost = window.location.hostname;
+  const wsPort = WEBSOCKET_PORT;
+  const wsURL = 'ws://' + wsHost + ':' + wsPort + '/';
+  
+  // Close existing connection if it exists
+  if (otLogWS) {
+    if (otLogWS.readyState === WebSocket.OPEN || otLogWS.readyState === WebSocket.CONNECTING) {
+      otLogWS.close();
+    }
+    otLogWS = null;
+  }
+
+  console.log('Connecting to WebSocket: ' + wsURL);
+  
+  try {
+    otLogWS = new WebSocket(wsURL);
+    
+    otLogWS.onopen = function() {
+      console.log('OT Log WebSocket connected');
+      updateWSStatus(true);
+      // Clear any reconnect timer just in case
+      if (wsReconnectTimer) {
+        clearTimeout(wsReconnectTimer);
+        wsReconnectTimer = null;
+      }
+    };
+    
+    otLogWS.onclose = function() {
+      console.log('OT Log WebSocket disconnected');
+      updateWSStatus(false);
+      // Attempt to reconnect after 5 seconds if not already scheduled
+      if (!wsReconnectTimer) {
+        wsReconnectTimer = setTimeout(initOTLogWebSocket, 5000);
+      }
+    };
+    
+    otLogWS.onerror = function(error) {
+      console.error('OT Log WebSocket error:', error);
+      updateWSStatus(false);
+      // onclose will usually follow, but we ensure cleanup
+    };
+    
+    otLogWS.onmessage = function(event) {
+      // console.log("WS received:", event.data); // Debug
+      addLogLine(event.data);
+    };
+    
+  } catch (e) {
+    console.error('Failed to create WebSocket:', e);
+    updateWSStatus(false);
+    if (!wsReconnectTimer) {
+      wsReconnectTimer = setTimeout(initOTLogWebSocket, 5000);
+    }
+  }
+  
+  // Setup UI event handlers only once
+  if (!otLogControlsInitialized) {
+    setupOTLogControls();
+    otLogControlsInitialized = true;
+  }
+}
+
+//============================================================================
+function disconnectOTLogWebSocket() {
+  // Clear any pending reconnect timer
+  if (wsReconnectTimer) {
+    clearTimeout(wsReconnectTimer);
+    wsReconnectTimer = null;
+  }
+
+  if (otLogWS) {
+    console.log('Disconnecting OT Log WebSocket');
+    // Remove event listeners to prevent auto-reconnect
+    otLogWS.onclose = null;
+    otLogWS.onerror = null;
+    
+    if (otLogWS.readyState === WebSocket.OPEN || otLogWS.readyState === WebSocket.CONNECTING) {
+      otLogWS.close();
+    }
+    otLogWS = null;
+  }
+  updateWSStatus(false);
+}
+
+//============================================================================
+function updateWSStatus(connected) {
+  const statusEl = document.getElementById('wsStatus');
+  const statusTextEl = document.getElementById('wsStatusText');
+  
+  if (!statusEl || !statusTextEl) return;
+  
+  if (connected) {
+    statusEl.className = 'ws-status ws-connected';
+    statusTextEl.textContent = 'Connected';
+    // statusEl.style.color = 'green'; // Force color - removed, using CSS class
+  } else {
+    statusEl.className = 'ws-status ws-disconnected';
+    statusTextEl.textContent = 'Disconnected';
+    // statusEl.style.color = 'red'; // Force color - removed, using CSS class
+  }
+}
+
+//============================================================================
+function addLogLine(logLine) {
+  if (!logLine || logLine.trim() === '') return;
+  
+  const now = new Date();
+  const timestamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(now.getMilliseconds()).padStart(3, '0')}`;
+  
+  const logEntry = {
+    time: timestamp,
+    // Store a processed version for display, keep original in `raw`
+    text: logLine.trimEnd(),
+    raw: logLine
+  };
+  
+  // Add to buffer
+  otLogBuffer.push(logEntry);
+  
+  // Trim buffer if exceeds max
+  if (otLogBuffer.length > MAX_LOG_LINES) {
+    otLogBuffer.shift();
+  }
+  
+  // Update filtered buffer
+  updateFilteredBuffer();
+  
+  // Schedule display update (throttled)
+  scheduleDisplayUpdate();
+}
+
+//============================================================================
+function scheduleDisplayUpdate() {
+  // Use requestAnimationFrame to throttle updates
+  // This batches multiple rapid updates into a single render
+  if (!updatePending) {
+    updatePending = true;
+    requestAnimationFrame(() => {
+      updatePending = false;
+      updateLogDisplay();
+      updateLogCounters();
+    });
+  }
+}
+
+//============================================================================
+function updateFilteredBuffer() {
+  if (!searchTerm || searchTerm.trim() === '') {
+    otLogFilteredBuffer = otLogBuffer.slice();
+  } else {
+    const term = searchTerm.toLowerCase();
+    otLogFilteredBuffer = otLogBuffer.filter(entry => 
+      entry.text.toLowerCase().includes(term)
+    );
+  }
+}
+
+//============================================================================
+// Flag to ensure we only render at most once per animation frame
+let logRenderScheduled = false;
+
+// Internal function that performs the actual DOM update
+function renderLogDisplay() {
+  const container = document.getElementById('otLogContent');
+  if (!container) {
+    console.error("otLogContent element not found!");
+    return;
+  }
+
+  const displayCount = logExpanded ? otLogFilteredBuffer.length : Math.min(10, otLogFilteredBuffer.length);
+  const startIndex = Math.max(0, otLogFilteredBuffer.length - displayCount);
+  const linesToShow = otLogFilteredBuffer.slice(startIndex);
+
+  // console.log("Rendering logs. Total:", otLogFilteredBuffer.length, "Showing:", linesToShow.length); // Debug
+
+  // Build HTML
+  let html = '';
+  linesToShow.forEach(entry => {
+    const line = showTimestamps ? `${entry.time} ${entry.text}` : entry.text;
+    html += escapeHtml(line) + '\n';
+  });
+
+  container.innerHTML = html;
+
+  // Auto-scroll to bottom if enabled
+  if (autoScroll) {
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+// Public function: schedule a render, coalescing multiple updates
+function updateLogDisplay() {
+  if (logRenderScheduled) {
+    return;
+  }
+
+  logRenderScheduled = true;
+
+  window.requestAnimationFrame(function () {
+    logRenderScheduled = false;
+    renderLogDisplay();
+  });
+}
+
+//============================================================================
+function updateLogCounters() {
+  const logLineCountEl = document.getElementById('logLineCount');
+  const logFilteredCountEl = document.getElementById('logFilteredCount');
+
+  if (logLineCountEl) {
+    logLineCountEl.textContent = otLogBuffer.length;
+  }
+
+  if (logFilteredCountEl) {
+    logFilteredCountEl.textContent = otLogFilteredBuffer.length;
+  }
+}
+
+//============================================================================
+function setupOTLogControls() {
+  // Only setup event listeners once to prevent duplicates
+  if (otLogControlsInitialized) {
+    return;
+  }
+  
+  // Toggle expand/collapse
+  document.getElementById('btnToggleLog').addEventListener('click', function() {
+    logExpanded = !logExpanded;
+    const container = document.getElementById('otLogContainer');
+    const btn = document.getElementById('btnToggleLog');
+    
+    if (logExpanded) {
+      container.classList.remove('collapsed');
+      btn.textContent = '▼ Show Less';
+    } else {
+      container.classList.add('collapsed');
+      btn.textContent = '▲ Show More';
+    }
+    
+    updateLogDisplay();
+  });
+  
+  // Toggle auto-scroll
+  document.getElementById('btnAutoScroll').addEventListener('click', function() {
+    autoScroll = !autoScroll;
+    const btn = document.getElementById('btnAutoScroll');
+    
+    if (autoScroll) {
+      btn.classList.add('btn-active');
+    } else {
+      btn.classList.remove('btn-active');
+    }
+  });
+  
+  // Clear log
+  document.getElementById('btnClearLog').addEventListener('click', function() {
+    if (confirm('Clear all log messages from buffer?')) {
+      otLogBuffer = [];
+      otLogFilteredBuffer = [];
+      updateLogDisplay();
+      updateLogCounters();
+    }
+  });
+  
+  // Download log
+  document.getElementById('btnDownloadLog').addEventListener('click', function() {
+    downloadLog();
+  });
+  
+  // Search functionality
+  document.getElementById('searchLog').addEventListener('input', function(e) {
+    searchTerm = e.target.value;
+    updateFilteredBuffer();
+    updateLogDisplay();
+    updateLogCounters();
+  });
+  
+  // Toggle timestamps
+  document.getElementById('chkShowTimestamp').addEventListener('change', function(e) {
+    showTimestamps = e.target.checked;
+    updateLogDisplay();
+  });
+  
+  // Manual scroll detection (disable auto-scroll if user scrolls up)
+  let manualScrollTimeout = null;
+  document.getElementById('otLogContent').addEventListener('scroll', function(e) {
+    // Debounce scroll handling to avoid excessive DOM reads/writes
+    if (manualScrollTimeout !== null) {
+      clearTimeout(manualScrollTimeout);
+    }
+    
+    const container = e.target;
+    manualScrollTimeout = setTimeout(function() {
+      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
+      
+      if (!isAtBottom && autoScroll) {
+        // User scrolled up, disable auto-scroll
+        autoScroll = false;
+        document.getElementById('btnAutoScroll').classList.remove('btn-active');
+      }
+    }, 100);
+  });
+  
+  // Mark as initialized after all listeners are successfully registered
+  otLogControlsInitialized = true;
+}
+
+//============================================================================
+function downloadLog() {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+  const filename = `otgw-log-${timestamp}.txt`;
+  
+  let content = '# OTGW Log Export\n';
+  content += `# Exported: ${new Date().toLocaleString()}\n`;
+  content += `# Total Lines: ${otLogBuffer.length}\n`;
+  content += '#' + '='.repeat(70) + '\n\n';
+  
+  otLogBuffer.forEach(entry => {
+    const line = showTimestamps ? `${entry.time} ${entry.text}` : entry.text;
+    content += line + '\n';
+  });
+  
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+//============================================================================
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 //============================================================================  
 function initMainPage() {
   console.log("initMainPage()");
@@ -88,29 +470,40 @@ function initMainPage() {
     function (el, idx, arr) {
       el.addEventListener('click', function () {
         console.log("newTab: goBack");
-        location.href = "/";
+        showMainPage();
       });
     }
   );
 
   needReload = false;
-  refreshDevInfo();
-  refreshOTmonitor();
-  tid = setInterval(function () { refreshOTmonitor(); }, 1000); //delay is in milliseconds 
+  
+  if (window.location.hash == "#tabPICflash") {
+    firmwarePage();
+  } else {
+    showMainPage();
+  }
+} // initMainPage()
 
+function showMainPage() {
+  console.log("showMainPage()");
+  clearInterval(tid);
+  refreshDevTime();
+  
   document.getElementById("displayMainPage").style.display = "block";
   document.getElementById("displaySettingsPage").style.display = "none";
   document.getElementById("displayDeviceInfo").style.display = "none";
   document.getElementById("displayPICflash").style.display = "none";
-
-  if (window.location.hash == "#tabPICflash") {
-    setTimeout(function () {
-      firmwarePage();
-    }, 150);
-  };
-} // initMainPage()
+  
+  refreshDevInfo();
+  refreshOTmonitor();
+  tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+  
+  // Initialize WebSocket for OT log streaming
+  initOTLogWebSocket();
+}
 
 function firmwarePage() {
+  disconnectOTLogWebSocket();
   clearInterval(tid);
   refreshDevTime();
   document.getElementById("displayMainPage").style.display = "none";
@@ -122,6 +515,7 @@ function firmwarePage() {
 } // deviceinfoPage()
 
 function deviceinfoPage() {
+  disconnectOTLogWebSocket();
   clearInterval(tid);
   refreshDevTime();
   document.getElementById("displayMainPage").style.display = "none";
@@ -134,6 +528,7 @@ function deviceinfoPage() {
 } // deviceinfoPage()
 
 function settingsPage() {
+  disconnectOTLogWebSocket();
   clearInterval(tid);
   refreshDevTime();
   document.getElementById("displayMainPage").style.display = "none";
