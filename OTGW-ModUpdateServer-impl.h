@@ -109,6 +109,15 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
 
       // Check for WebSocket Upgrade
       if (_server->header("Upgrade").equalsIgnoreCase("websocket")) {
+          // RFC 6455: Validate Sec-WebSocket-Version header
+          String version = _server->header("Sec-WebSocket-Version");
+          if (version != "13") {
+              // Return 400 Bad Request with supported version per RFC 6455
+              _server->sendHeader("Sec-WebSocket-Version", "13");
+              _server->send(400, "text/plain", "WebSocket version not supported");
+              return;
+          }
+
           String key = _server->header("Sec-WebSocket-Key");
           if (key.length() > 0) {
               // Calculate Sec-WebSocket-Accept
