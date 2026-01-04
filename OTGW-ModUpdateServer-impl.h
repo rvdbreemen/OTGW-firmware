@@ -114,7 +114,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           if (keyHeader.length() == 24) {
               // Calculate Sec-WebSocket-Accept
               // Use char buffer to avoid heap fragmentation from String concatenation
-              char keyWithMagic[64]; // 24 (base64 key) + 36 (magic string) + 1 (null) = 61, rounded to 64
+              // Buffer size: 24 (validated key) + 36 (magic string) + 1 (null) = 61 bytes
+              // Allocated 64 bytes for alignment and safety margin
+              char keyWithMagic[64];
               snprintf(keyWithMagic, sizeof(keyWithMagic), "%s258EAFA5-E914-47DA-95CA-C5AB0DC85B11", keyHeader.c_str());
               
               uint8_t hash[20];
