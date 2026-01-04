@@ -7,7 +7,6 @@ replicating the CI/CD workflow for local development.
 Requirements:
 - Python 3.x
 - arduino-cli (installed automatically if not found)
-- make (for running Makefile targets)
 
 Usage:
     python build.py              # Full build (firmware + filesystem)
@@ -150,20 +149,66 @@ def check_python_version():
     print_success(f"Python {version.major}.{version.minor}.{version.micro}")
 
 
-def check_make():
-    """Check if make is installed"""
-    print_step("Checking for make")
-    try:
-        result = run_command(["make", "--version"], capture_output=True, check=False)
-        if result.returncode == 0:
-            print_success("make is installed")
-            return True
-        else:
-            print_warning("make not found in PATH")
-            return False
-    except FileNotFoundError:
-        print_warning("make not found in PATH")
-        return False
+def setup_arduino_config(project_dir):
+    """Setup arduino-cli configuration"""
+    print_step("Configuring arduino-cli")
+    
+    arduino_dir = project_dir / "arduino"
+    arduino_dir.mkdir(exist_ok=True)
+    
+    config_file = arduino_dir / "arduino-cli.yaml"
+    
+    # Initialize config
+    run_command(["arduino-cli", "config", "init", "--dest-file", str(config_file), "--overwrite"])
+    
+    # Set config values
+    configs = [
+        ["directories.data", str(arduino_dir)],
+        ["board_manager.additional_urls", "https://github.com/esp8266/Arduino/releases/download/2.7.4/package_esp8266com_index.json"],
+        ["directories.downloads", str(project_dir / "staging")],
+        ["directories.user", str(project_dir)],
+        ["sketch.always_export_binaries", "true"],
+        ["library.enable_unsafe_install", "true"]
+    ]
+    
+    for key, value in configs:
+        run_command(["arduino-cli", "config", "set", key, value, "--config-file", str(config_file)])
+        
+    return config_file
+
+
+def install_dependencies(project_dir, config_file):
+    """Install core and libraries"""
+    print_step("Installing dependencies")
+    
+    cmd_base = ["arduino-cli", "--config-file", str(config_file)]
+    
+    # Update index
+    print_info("Updating core index...")
+    run_command(cmd_base + ["core", "update-index"])
+    
+    # Install core
+    print_info("Installing ESP8266 core...")
+    run_command(cmd_base + ["core", "install", "esp8266:esp8266"])
+    
+    # Update lib index
+    print_info("Updating library index...")
+    run_command(cmd_base + ["lib", "update-index"])
+    
+    # Install libraries
+    libraries = [
+        "WiFiManager@2.0.15-rc.1",
+        "ArduinoJson@6.17.2",
+        "pubsubclient@2.8.0",
+        "TelnetStream@1.2.4",
+        "Acetime@2.0.1",
+        "OneWire@2.3.6",
+        "DallasTemperature@3.9.0"
+    ]
+    
+    for lib in libraries:
+        print_info(f"Installing {lib}...")
+        run_command(cmd_base + ["lib", "install", lib])
 
 
 def install_arduino_cli(system):
@@ -356,31 +401,64 @@ def create_build_directory(project_dir):
     return build_dir
 
 
-def build_firmware(project_dir):
-    """Build firmware using make"""
+def build_firmware(project_dir, config_file):
+    """Build firmware using arduino-cli"""
     print_step("Building firmware")
     
-    # Get number of CPU cores for parallel build
-    try:
-        num_cores = multiprocessing.cpu_count()
-    except (NotImplementedError, OSError):
-        num_cores = 1
+    fqbn = "esp8266:esp8266:d1_mini:eesz=4M2M,xtal=160"
+    cflags = "-DNO_GLOBAL_HTTPUPDATE"
     
-    print_info(f"Starting compilation (this may take several minutes)...")
-    print_info(f"Using {num_cores} parallel jobs")
+    cmd = [
+        "arduino-cli",
+        "compile",
+        "--fqbn", fqbn,
+        "--warnings", "default",
+        "--verbose",
+        "--build-property", f"compiler.cpp.extra_flags=\"{cflags}\"",
+        "--config-file", str(config_file),
+        str(project_dir)
+    ]
     
-    cmd = ["make", f"-j{num_cores}"]
     run_command(cmd, cwd=project_dir, show_output=True)
     print_success("Firmware build complete")
 
 
-def build_filesystem(project_dir):
-    """Build filesystem using make"""
+def build_filesystem(project_dir, config_file):
+    """Build filesystem using mklittlefs"""
     print_step("Building filesystem")
     
-    print_info("Creating LittleFS filesystem image...")
+    # Find mklittlefs
+    # It should be in arduino/packages/esp8266/tools/mklittlefs/*/mklittlefs(.exe)
+    tools_dir = project_dir / "arduino" / "packages" / "esp8266" / "tools" / "mklittlefs"
     
-    cmd = ["make", "filesystem"]
+    mklittlefs_path = None
+    if tools_dir.exists():
+        for path in tools_dir.glob("**/mklittlefs*"):
+            if path.is_file() and (path.name == "mklittlefs" or path.name == "mklittlefs.exe"):
+                mklittlefs_path = path
+                break
+    
+    if not mklittlefs_path:
+        print_error("mklittlefs not found. Make sure the ESP8266 core is installed.")
+        sys.exit(1)
+        
+    print_info(f"Using mklittlefs: {mklittlefs_path}")
+    
+    fs_dir = project_dir / "data"
+    output_file = project_dir / "build" / "OTGW-firmware.littlefs.bin"
+    
+    # Ensure build dir exists
+    output_file.parent.mkdir(exist_ok=True)
+    
+    cmd = [
+        str(mklittlefs_path),
+        "-p", "256",
+        "-b", "8192",
+        "-s", "1024000",
+        "-c", str(fs_dir),
+        str(output_file)
+    ]
+    
     run_command(cmd, cwd=project_dir, show_output=True)
     print_success("Filesystem build complete")
 
@@ -502,107 +580,21 @@ def list_build_artifacts(project_dir):
 
 def clean_build(project_dir):
     """Clean build artifacts"""
-    clean_build_artifacts(project_dir, distclean=False)
-
-
-def _handle_remove_readonly(func, path, exc_info):
-    """Error handler for shutil.rmtree to handle read-only files."""
-    try:
-        os.chmod(path, stat.S_IWRITE)
-        func(path)
-    except Exception:
-        raise
-
-
-def remove_path_fast(path: Path):
-    """Remove a file or directory tree with a fast OS-native path when possible."""
-    if not path.exists():
-        return
-
-    try:
-        if path.is_file() or path.is_symlink():
-            path.unlink()
-            return
-
-        # Prefer OS-native deletion for speed on large trees.
-        if platform.system() == "Windows":
-            # rmdir handles junctions/dirs; /q suppresses prompts.
-            result = subprocess.run(
-                ["cmd", "/c", "rmdir", "/s", "/q", str(path)],
-                cwd=str(path.parent),
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode == 0:
-                return
-        else:
-            result = subprocess.run(
-                ["rm", "-rf", "--", str(path)],
-                cwd=str(path.parent),
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode == 0:
-                return
-    except Exception:
-        # Fall back to shutil below.
-        pass
-
-    shutil.rmtree(path, onerror=_handle_remove_readonly)
-
-
-def clean_build_artifacts(project_dir: Path, distclean: bool = False):
-    """Clean build outputs.
-
-    By default this removes only build outputs (fast). Use distclean=True to
-    remove downloaded cores/libraries and other cached build dependencies.
-    """
-    if distclean:
-        print_step("Cleaning build artifacts (distclean)")
-    else:
-        print_step("Cleaning build artifacts")
-
-    removed_any = False
-
-    # Always remove the build output directory.
+    print_step("Cleaning build artifacts")
+    
     build_dir = project_dir / "build"
-    if build_dir.exists():
-        print_info(f"Removing {build_dir}...")
-        remove_path_fast(build_dir)
-        removed_any = True
-
-    # These are publish outputs created by the Makefile in the repo root.
-    for pattern in ("*-fw.bin", "*-fs.bin", "*.zip"):
-        for file_path in project_dir.glob(pattern):
+    arduino_dir = project_dir / "arduino"
+    staging_dir = project_dir / "staging"
+    
+    for d in [build_dir, arduino_dir, staging_dir]:
+        if d.exists():
+            print_info(f"Removing {d}...")
             try:
-                print_info(f"Removing {file_path.name}...")
-                file_path.unlink()
-                removed_any = True
-            except OSError as e:
-                print_warning(f"Could not remove {file_path}: {e}")
-
-    if distclean:
-        # Match Makefile's distclean intent.
-        for name in ("arduino", "libraries", "staging"):
-            path = project_dir / name
-            if path.exists():
-                print_info(f"Removing {path}...")
-                remove_path_fast(path)
-                removed_any = True
-
-        cli_cfg = project_dir / "arduino-cli.yaml"
-        if cli_cfg.exists():
-            try:
-                print_info(f"Removing {cli_cfg.name}...")
-                cli_cfg.unlink()
-                removed_any = True
-            except OSError as e:
-                print_warning(f"Could not remove {cli_cfg}: {e}")
-
-    if not removed_any:
-        print_warning("Nothing to clean")
-    else:
-        print_success("Clean complete")
+                shutil.rmtree(d)
+            except Exception as e:
+                print_warning(f"Could not remove {d}: {e}")
+                
+    print_success("Clean complete")
 
 
 def main():
@@ -689,16 +681,6 @@ Examples:
         clean_build_artifacts(project_dir, distclean=True)
         return
     
-    # Check for make
-    if not check_make():
-        print_error("make is required but not found")
-        if system == "Darwin":
-            print_info("Install Xcode Command Line Tools: xcode-select --install")
-        elif system == "Windows":
-            print_info("Install make from: http://gnuwin32.sourceforge.net/packages/make.htm")
-            print_info("Or use Chocolatey: choco install make")
-        sys.exit(1)
-    
     # Install arduino-cli if needed and add to PATH
     if not args.no_install_cli:
         cli_install_dir = install_arduino_cli(system)
@@ -707,6 +689,12 @@ Examples:
             current_path = os.environ.get("PATH", "")
             os.environ["PATH"] = f"{cli_install_dir}{os.pathsep}{current_path}"
             print_info(f"Added {cli_install_dir} to PATH for this build session")
+            
+    # Setup arduino-cli config
+    config_file = setup_arduino_config(project_dir)
+    
+    # Install dependencies
+    install_dependencies(project_dir, config_file)
     
     # Update version
     update_version(project_dir)
@@ -721,14 +709,14 @@ Examples:
     # Build based on arguments
     if args.firmware and not args.filesystem:
         # Firmware only
-        build_firmware(project_dir)
+        build_firmware(project_dir, config_file)
     elif args.filesystem and not args.firmware:
         # Filesystem only
-        build_filesystem(project_dir)
+        build_filesystem(project_dir, config_file)
     else:
         # Full build (default)
-        build_firmware(project_dir)
-        build_filesystem(project_dir)
+        build_firmware(project_dir, config_file)
+        build_filesystem(project_dir, config_file)
     
     # Consolidate build artifacts from subdirectories
     consolidate_build_artifacts(project_dir)
