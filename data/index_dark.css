@@ -21,8 +21,12 @@
     background: rgb(28, 28, 30);
   }
   
+  body {
+    max-width: 1000px;
+  }
+
   table {
-    color: black;
+    color: white;
     border-collapse: collapse;
     width: 90%;
     background: rgb(28, 28, 30);
@@ -45,7 +49,7 @@
   
   tfoot {
     font-size: 12px;
-    color: rgb(44, 44, 46);
+    color: lightblue;
   }
   
   input {
@@ -68,6 +72,14 @@
     */
   }
   
+  #displayMainPage, #displayPICflash, #displayDeviceInfo, #displaySettingsPage {
+    max-width: 1000px;
+  }
+
+  #displayPICflash div#firmwarename {
+    width: 80%;
+  }
+
   .container-card {
     padding: 50;
     margin: 50;
@@ -103,7 +115,7 @@
   }
   
   /*--------------------- N A V - B A R -----------------*/
-  .nav-container {
+  .nav-container, .footer {
     background: rgb(44, 44, 46);
     padding-top: 6px;
     padding-left: 1px;
@@ -121,6 +133,10 @@
     border-bottom-color: rgb(72, 72, 74);
   }
   
+  .footer {
+    background-color: rgb(28, 28, 30);
+  }
+
   .nav-container a:hover {
     color: white;
     background: rgb(44, 44, 46); /* only for FSexplorer - Rest does not work */
@@ -137,6 +153,10 @@
     min-height: 50px;
     font-size: 26px;
     font-weight: bold;
+  }
+
+  .nav-left .hidden {
+    display: none;
   }
 
   .nav-centered {
@@ -168,7 +188,8 @@
     position: absolute;
     top: 121px;
     background-color: rgb(44, 44, 46);
-    
+    z-index: 200;
+    box-shadow: 2px 2px 2px 0px black;
   }
   .nav-right .adv_dropdown.hidden {
     display: none;
@@ -318,17 +339,20 @@
   }
   
   /* PIC firmware page */
-#table {
+.pictable {
   display: table;
+  width: 100%;
+  min-width: 600px;
   padding: 5px;
 }
 .picrow {
   display: table-row;
   padding: 5px;
+  width: 100%;
 }
 .piccolumn1 {
   display: table-cell;
-  width: 150px;
+  width: 170px;
   margin: 5px;
 }
 .piccolumn2 {
@@ -355,8 +379,47 @@
   margin: 5px;
 }
 
+*[data-tooltip] {
+  position: relative;
+}
+
+*[data-tooltip]::after {
+  content: attr(data-tooltip);
+
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  width: auto;
+
+  pointer-events: none;
+  opacity: 0;
+  -webkit-transition: opacity .15s ease-in-out;
+  -moz-transition: opacity .15s ease-in-out;
+  -ms-transition: opacity .15s ease-in-out;
+  -o-transition: opacity .15s ease-in-out;
+  transition: opacity .15s ease-in-out;
+
+  display: block;
+  font-size: 12px;
+  line-height: 16px;
+  background: rgb(72, 72, 74);
+  color: white;
+  padding: 5px 2px;
+  border: 1px solid #c0c0c0;
+  box-shadow: 2px 4px 5px rgba(0, 0, 0, 0.4);
+}
+
+*[data-tooltip]:hover::after {
+    opacity: 1;
+}
+
   
   /* OTmonitor */
+  .otmontable {
+    display: table;
+    width: 100%;
+  }
+
   .otmonrow {
     background: rgb(28, 28, 30);
     display: table-row;
@@ -391,14 +454,14 @@
     float: left;
     width: 160px;
     padding-left: 10px;
-    font-size: 12px;
+    font-size: 14px;
   }
   .devinfocolumn2 {
     display: table-cell;
     float: left;
     width: 160px;
     text-align: left;
-    font-size: 12px;
+    font-size: 14px;
   }
   
   /* Clear floats after the columns */
@@ -423,13 +486,9 @@
   button { width: 100px; }
   
   .settingDiv {
-    text-align: left;
-    margin-left: 10px;
-    margin-right: 10px;
-    width: 850px;
-    border-bottom-style: solid;
-    border-bottom-width: 1px;
-    border-bottom-color: rgb(72, 72, 74);
+    text-align: right;
+    min-width: 850px;
+    border: thick solid rgb(28, 28, 30);
     background: rgb(28, 28, 30);
   }
 
@@ -460,3 +519,223 @@
   * 
   ***************************************************************************
   */
+
+/*
+***************************************************************************
+** OpenTherm Log Viewer Styles
+***************************************************************************
+*/
+
+/* Log Section Container */
+.ot-log-section {
+  margin: 20px 0;
+  padding: 15px;
+  background: rgb(44, 44, 46); /* Dark gray background */
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+/* Log Header */
+.ot-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid rgb(72, 72, 74);
+}
+
+.ot-log-header h3 {
+  margin: 0;
+  color: white;
+  font-size: 18px;
+}
+
+.ot-log-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: white;
+}
+
+/* WebSocket Status Indicator */
+.ws-status {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.ws-connected {
+  background: #4caf50;
+  box-shadow: 0 0 8px #4caf50;
+}
+
+.ws-disconnected {
+  background: #f44336;
+}
+
+/* Log Controls */
+.ot-log-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+.btn-log-control {
+  padding: 6px 12px;
+  background: #0a84ff; /* iOS Blue */
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.btn-log-control:hover {
+  background: #007aff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+}
+
+.btn-log-control:active {
+  transform: translateY(0);
+}
+
+.btn-active {
+  background: #30d158; /* iOS Green */
+}
+
+.btn-active:hover {
+  background: #28cd41;
+}
+
+.log-search {
+  flex: 1;
+  min-width: 200px;
+  padding: 6px 12px;
+  border: 1px solid rgb(72, 72, 74);
+  border-radius: 4px;
+  font-size: 13px;
+  background: rgb(28, 28, 30);
+  color: white;
+}
+
+.log-control-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  color: white;
+}
+
+.log-control-label input[type="checkbox"] {
+  cursor: pointer;
+}
+
+/* Log Container */
+.ot-log-container {
+  background: #1e1e1e;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+  border: 1px solid rgb(72, 72, 74);
+}
+
+.ot-log-container.collapsed {
+  max-height: 200px;
+}
+
+.ot-log-container:not(.collapsed) {
+  max-height: 600px;
+}
+
+/* Log Content */
+.ot-log-content {
+  font-family: 'Courier New', Consolas, monospace;
+  font-size: 12px;
+  color: #d4d4d4;
+  padding: 15px;
+  overflow-y: auto;
+  overflow-x: auto;
+  white-space: pre;
+  line-height: 1.4;
+  max-height: inherit;
+  scrollbar-width: thin;
+  scrollbar-color: #555 #1e1e1e;
+}
+
+.ot-log-content::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.ot-log-content::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.ot-log-content::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 5px;
+}
+
+.ot-log-content::-webkit-scrollbar-thumb:hover {
+  background: #777;
+}
+
+/* Log Footer */
+.ot-log-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgb(44, 44, 46);
+  border-radius: 0 0 4px 4px;
+  font-size: 12px;
+  color: #d4d4d4;
+  border-top: 1px solid rgb(72, 72, 74);
+}
+
+.ot-log-footer span {
+  display: inline-block;
+}
+
+/* Responsive Design */
+@media (max-width: 767px) {
+  #otLogSection {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .ot-log-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .btn-log-control,
+  .log-search,
+  .log-control-label {
+    width: 100%;
+  }
+  
+  .ot-log-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .ot-log-container.collapsed {
+    max-height: 150px;
+  }
+  
+  .ot-log-container:not(.collapsed) {
+    max-height: 400px;
+  }
+}
