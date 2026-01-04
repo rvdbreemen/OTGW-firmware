@@ -46,7 +46,7 @@ static bool wsInitialized = false;
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
   switch(type) {
     case WStype_DISCONNECTED:
-      if (wsClientCount > 0) wsClientCount--;
+      wsClientCount = (wsClientCount > 0) ? (wsClientCount - 1) : 0;
       DebugTf(PSTR("WebSocket[%u] disconnected. Clients: %u\r\n"), num, wsClientCount);
       break;
       
