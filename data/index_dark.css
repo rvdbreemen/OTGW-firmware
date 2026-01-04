@@ -346,6 +346,7 @@
   padding: 5px;
 }
 .picrow {
+  background: rgb(28, 28, 30);
   display: table-row;
   padding: 5px;
   width: 100%;
@@ -444,7 +445,7 @@
   }
   
   /* DevInfo */
-  .devinfonrow {
+  .devinforow {
     background: rgb(28, 28, 30);
     display: table-row;
     font-size: 14px;

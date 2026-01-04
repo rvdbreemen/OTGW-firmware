@@ -428,7 +428,7 @@
 }
 
 /* DevInfo */
-.devinfonrow {
+.devinforow {
   background: lightblue;
   display: table-row;
   font-size: 14px;
