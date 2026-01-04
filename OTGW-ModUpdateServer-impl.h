@@ -349,11 +349,11 @@ template <typename ServerType>
 const char *ESP8266HTTPUpdateServerTemplate<ServerType>::_phaseToString(uint8_t phase)
 {
   switch (static_cast<UpdatePhase>(phase)) {
-    case UPDATE_START: return "start";
-    case UPDATE_WRITE: return "write";
-    case UPDATE_END: return "end";
-    case UPDATE_ERROR: return "error";
-    case UPDATE_ABORT: return "abort";
+    case UPDATE_START: return "start flashing";
+    case UPDATE_WRITE: return "write block to flash";
+    case UPDATE_END: return "end, done flashing";
+    case UPDATE_ERROR: return "error flashing";
+    case UPDATE_ABORT: return "abort flashing";
     case UPDATE_IDLE:
     default: return "idle";
   }

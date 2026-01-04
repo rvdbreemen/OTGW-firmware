@@ -334,7 +334,12 @@ static const char UpdateServerIndex[] PROGMEM =
                lastUploadTotal = total;
                setUploadProgress(ev.loaded, total);
                if (total > 0) {
-                 uploadStateEl.textContent = 'Upload: ' + Math.round((ev.loaded / total) * 100) + '%';
+                 var pct = Math.round((ev.loaded / total) * 100);
+                 if (pct >= 100) {
+                   uploadStateEl.textContent = 'Upload: complete, flashing...';
+                 } else {
+                   uploadStateEl.textContent = 'Upload: ' + pct + '%';
+                 }
                } else {
                  uploadStateEl.textContent = 'Upload: ' + formatBytes(ev.loaded);
                }
