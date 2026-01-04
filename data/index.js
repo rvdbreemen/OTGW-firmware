@@ -357,15 +357,23 @@ function setupOTLogControls() {
   });
   
   // Manual scroll detection (disable auto-scroll if user scrolls up)
+  let manualScrollTimeout = null;
   document.getElementById('otLogContent').addEventListener('scroll', function(e) {
-    const container = e.target;
-    const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
-    
-    if (!isAtBottom && autoScroll) {
-      // User scrolled up, disable auto-scroll
-      autoScroll = false;
-      document.getElementById('btnAutoScroll').classList.remove('btn-active');
+    // Debounce scroll handling to avoid excessive DOM reads/writes
+    if (manualScrollTimeout !== null) {
+      clearTimeout(manualScrollTimeout);
     }
+    
+    const container = e.target;
+    manualScrollTimeout = setTimeout(function() {
+      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
+      
+      if (!isAtBottom && autoScroll) {
+        // User scrolled up, disable auto-scroll
+        autoScroll = false;
+        document.getElementById('btnAutoScroll').classList.remove('btn-active');
+      }
+    }, 100);
   });
   
   // Mark as initialized after all listeners are successfully registered
