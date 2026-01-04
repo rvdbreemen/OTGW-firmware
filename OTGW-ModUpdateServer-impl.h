@@ -226,10 +226,10 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
           if (!Update.begin(maxSketchSpace, U_FLASH)){//start with max available size
             _setUpdaterError();
-            _setStatus(UPDATE_ERROR, "flash", 0, uploadTotal, upload.filename, _updaterError);
+            _setStatus(UPDATE_ERROR, "firmware", 0, uploadTotal, upload.filename, _updaterError);
             _sendStatusEvent();
           } else {
-            _setStatus(UPDATE_START, "flash", 0, uploadTotal, upload.filename, emptyString);
+            _setStatus(UPDATE_START, "firmware", 0, uploadTotal, upload.filename, emptyString);
             _sendStatusEvent();
           }
         }
@@ -243,15 +243,12 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _status.flash_written += written;
         if (written != upload.currentSize) {
           _setUpdaterError();
-          _setStatus(UPDATE_ERROR, _status.target, _status.flash_written, _status.flash_total, _status.filename, _updaterError);
+          _setStatus(UPDATE_ERROR, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, _updaterError);
           _sendStatusEvent();
         } else {
-          _setStatus(UPDATE_WRITE, _status.target, _status.flash_written, _status.flash_total, _status.filename, emptyString);
+          _setStatus(UPDATE_WRITE, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, emptyString);
           _sendStatusEvent();
         }
-        // Add a small delay to allow network stack to process WiFi packets (ACKs)
-        // This prevents starvation when the loop runs too fast (e.g. when Telnet is disconnected)
-        delay(1);
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
         if(Update.end(true)){ //true to set the size to the current progress
           if (_serial_output) Debugf("\r\nUpdate Success: %u\r\nRebooting...\r\n", upload.totalSize);
@@ -265,11 +262,11 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           if (_status.flash_written < upload.totalSize) {
             _status.flash_written = upload.totalSize;
           }
-          _setStatus(UPDATE_END, _status.target, _status.flash_written, _status.flash_total, _status.filename, emptyString);
+          _setStatus(UPDATE_END, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, emptyString);
           _sendStatusEvent();
         } else {
           _setUpdaterError();
-          _setStatus(UPDATE_ERROR, _status.target, _status.flash_written, _status.flash_total, _status.filename, _updaterError);
+          _setStatus(UPDATE_ERROR, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, _updaterError);
           _sendStatusEvent();
         }
         // if (_serial_output) 
@@ -284,10 +281,11 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         if (_status.flash_total == 0 && upload.totalSize > 0) {
           _status.flash_total = upload.totalSize;
         }
-        _setStatus(UPDATE_ABORT, _status.target, _status.flash_written, _status.flash_total, _status.filename, emptyString);
+        _setStatus(UPDATE_ABORT, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, emptyString);
         _sendStatusEvent();
       }
-      delay(0);
+      // Delay of 1ms to prevent network starvation (needed when no Telnet/Debug is active)
+      delay(1);
     });
 }
 
@@ -395,7 +393,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusJson()
     sizeof(buf),
     "{\"state\":\"%s\",\"target\":\"%s\",\"received\":%u,\"total\":%u,\"upload_received\":%u,\"upload_total\":%u,\"flash_written\":%u,\"flash_total\":%u,\"filename\":\"%s\",\"error\":\"%s\"}",
     _phaseToString(_status.phase),
-    _status.target ? _status.target : "unknown",
+    _status.target.length() ? _status.target.c_str() : "unknown",
     static_cast<unsigned>(_status.received),
     static_cast<unsigned>(_status.total),
     static_cast<unsigned>(_status.upload_received),
@@ -448,7 +446,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
     sizeof(buf),
     "{\"state\":\"%s\",\"target\":\"%s\",\"received\":%u,\"total\":%u,\"upload_received\":%u,\"upload_total\":%u,\"flash_written\":%u,\"flash_total\":%u,\"filename\":\"%s\",\"error\":\"%s\"}",
     _phaseToString(_status.phase),
-    _status.target ? _status.target : "unknown",
+    _status.target.length() ? _status.target.c_str() : "unknown",
     static_cast<unsigned>(_status.received),
     static_cast<unsigned>(_status.total),
     static_cast<unsigned>(_status.upload_received),

@@ -79,7 +79,7 @@ class ESP8266HTTPUpdateServerTemplate
 
     struct UpdateStatus {
       UpdatePhase phase;
-      const char *target;
+      String target;
       size_t received;
       size_t total;
       size_t upload_received;
