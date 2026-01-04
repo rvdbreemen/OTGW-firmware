@@ -791,10 +791,12 @@ function refreshOTmonitor() {
       if (needReload) window.location.reload(true);
     })
     .catch(function (error) {
-      var p = document.createElement('p');
-      p.appendChild(
-        document.createTextNode('Error: ' + error.message)
-      );
+      console.error("refreshOTmonitor error:", error);
+      var waiting = document.getElementById('waiting');
+      if (waiting) {
+        waiting.textContent = 'Error: ' + error.message + ' (Retrying...)';
+        waiting.style.color = 'red';
+      }
     });
 
 } // refreshOTmonitor()
