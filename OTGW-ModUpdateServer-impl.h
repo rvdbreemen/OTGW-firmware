@@ -128,8 +128,6 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
               return;
           }
 
-          String key = _server->header("Sec-WebSocket-Key");
-          if (key.length() > 0) {
           String keyHeader = _server->header("Sec-WebSocket-Key");
           // RFC 6455 requires WebSocket key to be exactly 24 base64 characters (16 bytes encoded)
           if (keyHeader.length() == 24) {
