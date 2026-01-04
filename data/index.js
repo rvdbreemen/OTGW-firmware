@@ -229,7 +229,7 @@ function renderLogDisplay() {
   // Build HTML
   let html = '';
   linesToShow.forEach(entry => {
-    const line = showTimestamps ? `[${entry.time}] ${entry.text}` : entry.text;
+    const line = showTimestamps ? `${entry.time} ${entry.text}` : entry.text;
     html += escapeHtml(line) + '\n';
   });
 
@@ -361,7 +361,7 @@ function downloadLog() {
   content += '#' + '='.repeat(70) + '\n\n';
   
   otLogBuffer.forEach(entry => {
-    const line = showTimestamps ? `[${entry.time}] ${entry.text}` : entry.text;
+    const line = showTimestamps ? `${entry.time} ${entry.text}` : entry.text;
     content += line + '\n';
   });
   
