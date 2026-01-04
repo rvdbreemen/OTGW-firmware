@@ -4,6 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">  
     <link rel="stylesheet" type="text/css" href="./index.css" id="theme-style">
+    <script>
+      (function() {
+        try {
+          var storedTheme = localStorage.getItem('theme');
+          if (storedTheme === 'dark') {
+            document.getElementById('theme-style').href = "index_dark.css";
+          }
+        } catch (e) { console.error(e); }
+      })();
+    </script>
     <script src="./index.js"></script>
     <title>OTGW firmware</title>
   </head>
