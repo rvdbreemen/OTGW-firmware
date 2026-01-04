@@ -69,6 +69,7 @@ static const char UpdateServerIndex[] PROGMEM =
          var successCountdownEl = document.getElementById('successCountdown');
          var eventSource = null;
          var pollTimer = null;
+         var reconnectTimer = null;
          var uploadInFlight = false;
          var successTimer = null;
          var successShown = false;
@@ -216,6 +217,7 @@ static const char UpdateServerIndex[] PROGMEM =
          }
 
          function startEvents() {
+           if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
            if (!!window.WebSocket) {
              if (eventSource) return;
              var protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -243,8 +245,8 @@ static const char UpdateServerIndex[] PROGMEM =
              eventSource.onclose = function(e) {
                console.log("WS Disconnected");
                eventSource = null;
-               // Fallback to polling if WS fails
-               if (!pollTimer) pollTimer = setInterval(fetchStatus, 1000);
+               // Try to reconnect after 1s
+               reconnectTimer = setTimeout(startEvents, 1000);
              };
            } else if (!!window.EventSource) {
              if (eventSource) return;
@@ -267,6 +269,10 @@ static const char UpdateServerIndex[] PROGMEM =
          }
 
          function stopEvents() {
+           if (reconnectTimer) {
+             clearTimeout(reconnectTimer);
+             reconnectTimer = null;
+           }
            if (eventSource) {
              // Prevent onclose/onerror from triggering fallback when we intentionally close
              if (eventSource instanceof WebSocket) {

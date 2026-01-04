@@ -428,11 +428,10 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
   }
   unsigned long now = millis();
   // Use int32_t cast to handle millis() overflow correctly (wraps every ~49 days)
-  // Throttle removed as per user request ("network can keep up")
-  // We rely on availableForWrite() to prevent blocking.
-  // if (_status.phase == _lastEventPhase && (int32_t)(now - _lastEventMs) < 100) {
-  //   return;
-  // }
+  // Throttle to 100ms to be responsive but not flood
+  if (_status.phase == _lastEventPhase && (int32_t)(now - _lastEventMs) < 100) {
+    return;
+  }
   // Note: _lastEventMs and _lastEventPhase are updated ONLY after successful send
 
   constexpr size_t JSON_STATUS_BUFFER_SIZE = 512;
