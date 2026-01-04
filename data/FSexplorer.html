@@ -18,80 +18,155 @@
       <title>FSexplorer ESP</title>
       <script>
          document.addEventListener('DOMContentLoaded', () => {
-             let span = document.querySelector('span');
              let main = document.querySelector('main');
              let fileSize = document.querySelector('fileSize');
-             let elem = document.querySelectorAll('input');
-             //fetch('json').then(function (response) {
-             fetch('api/listfiles').then(function (response) {
-                 return response.json();
-             }).then(function (json) {
-               let dir = '<table width=90%>';
-               for (var i = 0; i < json.length - 1; i++) {
-                 dir += "<tr>";
-                 if (json[i].name.indexOf("More files not") > -1)
-                 {
-                   dir += `<td width=20% nowrap>${json[i].name}</td>`;
-                   dir += `<td width=10% nowrap></td>`;
-                   dir += `<td width=10% nowrap></td>`;
-                   dir += `<td width=10% nowrap></td>`;
-                 } 
-                 else
-                 {
-                   dir += `<td width=20% nowrap><a href ="${json[i].name}" target="_blank">${json[i].name}</a></td>`;
-                   dir += `<td width=10% nowrap><small>${json[i].size}</small></td>`;
-                   dir += `<td width=10% nowrap><a href ="${json[i].name}"download="${json[i].name}"> Download </a></td>`;
-                   if (   json[i].name != 'FSexplorer.html' && json[i].name != 'FSexplorer.css' && json[i].name != 'FSexplorer.png'
-                       && json[i].name != 'index.html'      && json[i].name != 'index.js'       && json[i].name != 'index.css'
-                   	  && json[i].name != 'settings.png'
-                 	 ) 
-                   {
-                     dir += `<td width=10% nowrap><a href ="${json[i].name}?delete=/${json[i].name}"> Delete </a></td>`;
-                     if (json[i].name == '!format') 
-                     {
-                 	    document.getElementById('FormatLittleFS').disabled = false;
-                     }
-                   }
-                   else 
-                   {
-                     dir += `<td width=10% nowrap> </td>`;
-                   }
-                 }                 	 
-                 dir += "<td width=50%> </td></tr>";
-               }	// for ..
-               main.insertAdjacentHTML('beforeend', dir);
-               document.querySelectorAll('[href*=delete]').forEach((node) => {
-               		 node.addEventListener('click', () => {
-               		 		 if (!confirm('Are you sure you want to delete this file?')) event.preventDefault();  
-               		 });
-               });
-               main.insertAdjacentHTML('beforeend', '</table>');
-               main.insertAdjacentHTML('beforeend', `<p><b>LittleFS</b> used ${json[i].usedBytes} by ${json[i].totalBytes}`);
-               free = json[i].freeBytes;
-               fileSize.innerHTML = "<b> &nbsp; </b><p>";    // spacer                
+             let fileInput = document.querySelector('input[name="upload"]');
+             let uploadBtn = document.querySelector('input[value="Upload"]');
+             let uploadForm = document.querySelector('form[action="/upload"]');
+             let freeBytes = 0;
 
-             });	// function(json)
-             elem[0].addEventListener('change', () => {
-                 let nBytes = elem[0].files[0].size, output = `${nBytes} Byte`;
+             // Create progress bar
+             let progressBar = document.createElement('progress');
+             progressBar.max = 100;
+             progressBar.value = 0;
+             progressBar.style.display = 'none';
+             progressBar.style.width = '200px';
+             progressBar.style.verticalAlign = 'middle';
+             uploadForm.appendChild(progressBar);
+
+             function loadFileList(highlightFile = null) {
+                 fetch('api/listfiles').then(function (response) {
+                     return response.json();
+                 }).then(function (json) {
+                   main.innerHTML = '';
+                   let dir = '<table width=90%>';
+                   let i = 0;
+                   for (; i < json.length - 1; i++) {
+                     let rowStyle = '';
+                     if (highlightFile && json[i].name === highlightFile) {
+                        rowStyle = 'style="background-color: #d4edda;"'; // Light green highlight
+                     }
+                     
+                     dir += `<tr ${rowStyle}>`;
+                     if (json[i].name.indexOf("More files not") > -1)
+                     {
+                       dir += `<td width=20% nowrap>${json[i].name}</td>`;
+                       dir += `<td width=10% nowrap></td>`;
+                       dir += `<td width=10% nowrap></td>`;
+                       dir += `<td width=10% nowrap></td>`;
+                     } 
+                     else
+                     {
+                       dir += `<td width=20% nowrap><a href ="${json[i].name}" target="_blank">${json[i].name}</a></td>`;
+                       dir += `<td width=10% nowrap><small>${json[i].size}</small></td>`;
+                       dir += `<td width=10% nowrap><a href ="${json[i].name}"download="${json[i].name}"> Download </a></td>`;
+                       if (   json[i].name != 'FSexplorer.html' && json[i].name != 'FSexplorer.css' && json[i].name != 'FSexplorer.png'
+                           && json[i].name != 'index.html'      && json[i].name != 'index.js'       && json[i].name != 'index.css'
+                       	  && json[i].name != 'settings.png'
+                     	 ) 
+                       {
+                         dir += `<td width=10% nowrap><a href ="${json[i].name}?delete=/${json[i].name}" class="delete-link"> Delete </a></td>`;
+                         if (json[i].name == '!format') 
+                         {
+                            let fmtBtn = document.getElementById('FormatLittleFS');
+                            if(fmtBtn) fmtBtn.disabled = false;
+                         }
+                       }
+                       else 
+                       {
+                         dir += `<td width=10% nowrap> </td>`;
+                       }
+                     }                 	 
+                     dir += "<td width=50%> </td></tr>";
+                   }	// for ..
+                   
+                   main.insertAdjacentHTML('beforeend', dir);
+                   
+                   document.querySelectorAll('.delete-link').forEach((node) => {
+                   		 node.addEventListener('click', (event) => {
+                   		 		 if (!confirm('Are you sure you want to delete this file?')) event.preventDefault();  
+                   		 });
+                   });
+                   main.insertAdjacentHTML('beforeend', '</table>');
+                   
+                   if(json[i]) {
+                       main.insertAdjacentHTML('beforeend', `<p><b>LittleFS</b> used ${json[i].usedBytes} by ${json[i].totalBytes}`);
+                       freeBytes = json[i].freeBytes;
+                   }
+                   
+                   fileSize.innerHTML = "<b> &nbsp; </b><p>";    // spacer                
+                 });
+             }
+
+             loadFileList();
+
+             fileInput.addEventListener('change', () => {
+                 if (!fileInput.files.length) return;
+                 let nBytes = fileInput.files[0].size, output = `${nBytes} Byte`;
                  for (var aMultiples = [
                      ' KB',
                      ' MB'
                     ], i = 0, nApprox = nBytes / 1024; nApprox > 1; nApprox /= 1024, i++) {
                       output = nApprox.toFixed(2) + aMultiples[i];
                     }
-                    if (nBytes > free) {
+                    if (nBytes > freeBytes) {
                       fileSize.innerHTML = `<p><small> Filesize : ${output}</small><strong style="color: red;"> not enough space! </strong><p>`;
-                      elem[1].setAttribute('disabled', 'disabled');
+                      uploadBtn.setAttribute('disabled', 'disabled');
                     } 
                     else {
                       fileSize.innerHTML = `<b>Filesize:</b> ${output}<p>`;
-                      elem[1].removeAttribute('disabled');
+                      uploadBtn.removeAttribute('disabled');
                     }
              });
-             //elem[6].addEventListener('click', () => {
-             document.getElementById('FormatLittleFS').addEventListener('click', () => {
-                 if (!confirm(`Are you sure you want to execute this function?\nWhen you continue you have to upload FSexplorer.html and all other system files again!!.`)) event.preventDefault();
-             }); 
+
+             uploadForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                let file = fileInput.files[0];
+                if(!file) return;
+
+                let formData = new FormData();
+                formData.append('upload', file);
+
+                let xhr = new XMLHttpRequest();
+                
+                uploadBtn.style.display = 'none';
+                progressBar.style.display = 'inline-block';
+                progressBar.value = 0;
+                
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        progressBar.value = (e.loaded / e.total) * 100;
+                    }
+                });
+
+                xhr.onload = function() {
+                    if (xhr.status == 200) {
+                        loadFileList(file.name);
+                    } else {
+                        alert('Upload failed!');
+                    }
+                    progressBar.style.display = 'none';
+                    uploadBtn.style.display = 'inline-block';
+                    uploadBtn.disabled = true;
+                    fileInput.value = '';
+                };
+
+                xhr.onerror = function() {
+                    alert('Error during upload');
+                    progressBar.style.display = 'none';
+                    uploadBtn.style.display = 'inline-block';
+                };
+
+                xhr.open('POST', '/upload');
+                xhr.send(formData);
+             });
+
+             let fmtBtn = document.getElementById('FormatLittleFS');
+             if(fmtBtn) {
+                 fmtBtn.addEventListener('click', (event) => {
+                     if (!confirm(`Are you sure you want to execute this function?\nWhen you continue you have to upload FSexplorer.html and all other system files again!!.`)) event.preventDefault();
+                 }); 
+             }
           });
       </script>
    </head>
