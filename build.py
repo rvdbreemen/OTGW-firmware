@@ -675,10 +675,10 @@ Examples:
         print_error("Use only one of --clean or --distclean")
         sys.exit(2)
     if args.clean:
-        clean_build_artifacts(project_dir, distclean=False)
+        clean_build(project_dir)
         return
     if args.distclean:
-        clean_build_artifacts(project_dir, distclean=True)
+        clean_build(project_dir)
         return
     
     # Install arduino-cli if needed and add to PATH
