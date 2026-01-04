@@ -115,7 +115,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
       if (_server->header("Upgrade").equalsIgnoreCase("websocket")) {
           // RFC 6455: Validate Sec-WebSocket-Version header
           String version = _server->header("Sec-WebSocket-Version");
-          if (version.length() == 0) {
+          if (version.isEmpty()) {
               // Missing version header
               _server->sendHeader("Sec-WebSocket-Version", WEBSOCKET_VERSION);
               _server->send(400, "text/plain", "Missing Sec-WebSocket-Version header");
