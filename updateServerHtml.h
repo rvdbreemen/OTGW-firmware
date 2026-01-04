@@ -162,13 +162,15 @@ static const char UpdateServerIndex[] PROGMEM =
           if (successMessageEl) successMessageEl.textContent = 'Update successful. Rebooting device...';
         }
 
-        function updateDeviceStatus(status) {           console.log('Device status:', status);           if (!status) return;
-           var state = status.state || 'idle';
-           if (state !== 'idle') {
-             showProgressPage('Flashing in progress');
-           }
+        function updateDeviceStatus(status) {
+          console.log('Device status:', status);
+          if (!status) return;
+          var state = status.state || 'idle';
+          if (state !== 'idle') {
+            showProgressPage('Flashing in progress');
+          }
            
-           var stateMap = {
+          var stateMap = {
              'start': 'starting flash...',
              'write': 'writing to flash...',
              'end': 'flashing complete',
