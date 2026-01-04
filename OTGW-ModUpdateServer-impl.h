@@ -121,6 +121,14 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
               _server->sendHeader("Sec-WebSocket-Accept", accept);
               _server->send(101);
 
+              // Clean up any previously active event client before assigning a new one
+              if (_eventClientActive) {
+                if (_eventClient.connected()) {
+                  _eventClient.stop();
+                }
+                _eventClientActive = false;
+              }
+
               _eventClient = _server->client();
               _eventClientActive = true;
               _isWebSocket = true;
