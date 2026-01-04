@@ -169,12 +169,12 @@ static const char UpdateServerIndex[] PROGMEM =
            }
            
            var stateMap = {
-             'start': 'Starting flash...',
-             'write': 'Writing to flash...',
-             'end': 'Flashing complete',
-             'error': 'Error flashing',
-             'abort': 'Flashing aborted',
-             'idle': 'Idle'
+             'start': 'starting flash...',
+             'write': 'writing to flash...',
+             'end': 'flashing complete',
+             'error': 'error flashing',
+             'abort': 'flashing aborted',
+             'idle': 'idle'
            };
            deviceStateEl.textContent = 'Device: ' + (stateMap[state] || state);
 
