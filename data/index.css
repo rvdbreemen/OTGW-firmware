@@ -430,6 +430,24 @@
   margin-left: 5px;
 }
 
+.state-on, .state-off {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-radius: 3px;
+  vertical-align: text-bottom;
+  box-sizing: border-box;
+}
+
+.state-on {
+  background-color: currentColor;
+}
+
+.state-off {
+  background-color: transparent;
+}
+
 /* DevInfo */
 .devinforow {
   background: lightblue;

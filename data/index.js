@@ -774,7 +774,9 @@ function refreshOTmonitor() {
           var valDiv = document.createElement("div");
           valDiv.setAttribute("class", "otmoncolumn2");
           valDiv.setAttribute("id", "otmon_" + data[i].name);
-          valDiv.textContent = data[i].value;
+          if (data[i].value === "On") valDiv.innerHTML = "<span class='state-on'></span>";
+          else if (data[i].value === "Off") valDiv.innerHTML = "<span class='state-off'></span>";
+          else valDiv.textContent = data[i].value;
           rowDiv.appendChild(valDiv);
           //--- Unit  ---
           var unitDiv = document.createElement("div");
@@ -795,7 +797,9 @@ function refreshOTmonitor() {
           //   needReload = true;
           // } 
           epoch.value = data[i].epoch;
-          update.textContent = data[i].value;
+          if (data[i].value === "On") update.innerHTML = "<span class='state-on'></span>";
+          else if (data[i].value === "Off") update.innerHTML = "<span class='state-off'></span>";
+          else update.textContent = data[i].value;
           //if (update.style.visibility == 'visible') update.textContent = data[i].value;
 
         }
