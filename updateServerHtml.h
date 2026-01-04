@@ -167,7 +167,17 @@ static const char UpdateServerIndex[] PROGMEM =
            if (state !== 'idle') {
              showProgressPage('Flashing in progress');
            }
-           deviceStateEl.textContent = 'Device: ' + state;
+           
+           var stateMap = {
+             'start': 'Starting flash...',
+             'write': 'Writing to flash...',
+             'end': 'Flashing complete',
+             'error': 'Error flashing',
+             'abort': 'Flashing aborted',
+             'idle': 'Idle'
+           };
+           deviceStateEl.textContent = 'Device: ' + (stateMap[state] || state);
+
            if (status.filename) fileEl.textContent = status.filename;
            if (status.target) targetEl.textContent = status.target;
            if (status.error && status.error.length) {
