@@ -51,6 +51,22 @@ let wsReconnectTimer = null;
 
 //============================================================================
 function initOTLogWebSocket() {
+  // Detect smartphone (iPhone or Android Phone)
+  const isPhone = /iPhone|iPod/.test(navigator.userAgent) || 
+                 (/Android/.test(navigator.userAgent) && /Mobile/.test(navigator.userAgent));
+  
+  // Also check screen width as a fallback (standard breakpoint for tablets is 768px)
+  const isSmallScreen = window.innerWidth < 768;
+
+  if (isPhone || isSmallScreen) {
+    console.log("Smartphone or small screen detected. Disabling OpenTherm Message Log.");
+    const logSection = document.getElementById('otLogSection');
+    if (logSection) {
+      logSection.style.display = 'none';
+    }
+    return; // Do not connect WebSocket
+  }
+
   // Clear any pending reconnect timer
   if (wsReconnectTimer) {
     clearTimeout(wsReconnectTimer);

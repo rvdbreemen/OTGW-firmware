@@ -682,6 +682,12 @@
 }
 
 /* Responsive Design */
+@media (max-width: 767px) {
+  #otLogSection {
+    display: none !important;
+  }
+}
+
 @media (max-width: 768px) {
   .ot-log-controls {
     flex-direction: column;
