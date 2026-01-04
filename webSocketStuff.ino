@@ -60,7 +60,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
         // Send welcome message to newly connected client
         // Buffer sized for message prefix (33) + max hostname (32) + null terminator + margin
         char welcomeMsg[80];
-        snprintf(welcomeMsg, sizeof(welcomeMsg), PSTR("Connected to OTGW Log Stream - %s"), CSTR(settingHostname));
+        snprintf(welcomeMsg, sizeof(welcomeMsg), "Connected to OTGW Log Stream - %s", CSTR(settingHostname));
         webSocket.sendTXT(num, welcomeMsg);
       }
       break;
