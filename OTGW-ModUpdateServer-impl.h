@@ -494,6 +494,20 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
   // to prioritize the file upload process.
   size_t msgLen = msg.length();
   size_t available = _eventClient.availableForWrite();
+
+  // If this is a final state, we really want to send it, so we can afford to wait a bit
+  // This "speed reads" the buffer by yielding to the network stack
+  bool isFinalState = (_status.phase == UPDATE_END || _status.phase == UPDATE_ERROR || _status.phase == UPDATE_ABORT);
+  
+  if (available < msgLen && isFinalState) {
+      // Try to wait for buffer to drain (max 1000ms)
+      unsigned long startWait = millis();
+      while (available < msgLen && (millis() - startWait) < 1000) {
+          yield(); // Allow network stack to process and drain buffer
+          available = _eventClient.availableForWrite();
+      }
+  }
+
   if (available >= msgLen) {
       _eventClient.print(msg);
       _lastEventMs = now;
