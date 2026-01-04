@@ -492,7 +492,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
       
       msgLen = headerLen + payloadLen;
   } else {
-      // SSE Format: "event: status\ndata: " (20 chars) + JSON + "\n\n" (2 chars)
+      // SSE Format: "event: status\n" (14) + "data: " (6) + JSON + "\n\n" (2) = 22 overhead
       msgLen = written + 22;
   }
   
