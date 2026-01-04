@@ -22,7 +22,7 @@
   }
   
   body {
-    max-width: 1000px;
+    max-width: 100%;
   }
 
   table {
@@ -73,7 +73,7 @@
   }
 
   #displayMainPage, #displayPICflash, #displayDeviceInfo, #displaySettingsPage {
-    max-width: 1000px;
+    max-width: 100%;
   }
 
   #displayPICflash div#firmwarename {
@@ -400,31 +400,34 @@
 /* OTmonitor */
 
 .otmontable {
-  display: table;
+  column-width: 350px;
+  column-gap: 0;
   width: 100%;
 }
 
 .otmonrow {
   background: lightblue;
-  display: table-row;
+  display: flex;
+  align-items: center;
+  padding: 2px 0;
+  border: 1px solid white;
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 .otmoncolumn1 {
-  display: table-cell;
-  float: left;
-  width: 270px;
+  flex: 1;
   padding-left: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .otmoncolumn2 {
-  display: table-cell;
-  float: left;
-  width: 40px;
+  width: 60px;
   text-align: right;
 }
 .otmoncolumn3 {
-  display: table-cell;
-  float: left;
-  width: 30px;
-  margin-left: 2px;
+  width: 40px;
+  margin-left: 5px;
 }
 
 /* DevInfo */

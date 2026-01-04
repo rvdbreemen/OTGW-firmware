@@ -757,7 +757,7 @@ function refreshOTmonitor() {
           rowDiv.setAttribute("class", "otmonrow");
           //rowDiv.setAttribute("id", "otmon_"+data[i].name);
           // rowDiv.style.background = "lightblue";
-          rowDiv.style.visibility = ((data[i].epoch == 0) ? "collapse" : "visible");
+          rowDiv.style.display = ((data[i].epoch == 0) ? "none" : "flex");
           // rowDiv.style.display = ((data[i].epoch==0)?"none":"table-row");
           var epoch = document.createElement("INPUT");
           epoch.setAttribute("type", "hidden");
@@ -785,7 +785,9 @@ function refreshOTmonitor() {
         }
         else { //if the element exists, then update the value
           var update = document.getElementById("otmon_" + data[i].name);
-          update.style.visibility = ((data[i].epoch == 0) ? "collapse" : "visible");
+          if (update.parentNode) {
+            update.parentNode.style.display = ((data[i].epoch == 0) ? "none" : "flex");
+          }
           var epoch = document.getElementById("otmon_epoch_" + data[i].name);
           // if ((Number(epoch.value)==0) && (Number(data[i].epoch)>0)) {
           //   //console.log ("unhide based on epoch");
