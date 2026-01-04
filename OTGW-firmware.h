@@ -63,6 +63,7 @@ void sendMQTTData(const char*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const bool = false);
 void addOTWGcmdtoqueue(const char* ,  int , const bool = false, const int16_t = 1000);
+void sendLogToWebSocket(const char* logMessage);
 
 //Global variables
 WiFiClient  wifiClient;
