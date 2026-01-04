@@ -1178,6 +1178,7 @@ var translateFields = [
   , ["uptime", "Uptime Since Boot"]
   , ["bootcount", "Nr. Reboots"]
   , ["ledblink", "Heartbeat LED (on/off)"]
+  , ["darktheme", "Dark Theme (on/off)"]
   , ["gpiosensorsenabled", "GPIO Sensors Enabled"]
   , ["gpiosensorsinterval", "GPIO Publish Interval (sec)"]
   , ["gpiosensorspin", "GPIO pin # (SD3 = GPIO10 => 10)"]
