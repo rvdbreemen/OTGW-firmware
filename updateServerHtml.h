@@ -34,10 +34,10 @@ static const char UpdateServerIndex[] PROGMEM =
        <h1>OTGW firmware Flash utility</h1>
        <h2 id='progressTitle'>Flashing in progress</h2>
        <div id='updatePanel'>
-         <div id='uploadState'>Upload: idle</div>
-         <div id='deviceState'>Device: idle</div>
-         <div class='small'>File: <span id='updateFilename'>-</span></div>
-         <div class='small'>Target: <span id='updateTarget'>-</span></div>
+         <div >File: <span id='updateFilename'>-</span></div>
+         <div id='uploadState'>Upload State: idle</div>
+         <div id='deviceState'>Device State: idle</div>
+         <div >Target: <span id='updateTarget'>-</span></div>
          <progress id='updateProgress' value='0' max='100'></progress>
          <div id='updateProgressText'>Upload: 0% (0 B / 0 B)</div>
          <progress id='flashProgress' value='0' max='100'></progress>
