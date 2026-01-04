@@ -41,6 +41,10 @@
 
 namespace esp8266httpupdateserver {
 using namespace esp8266webserver;
+
+// RFC 6455 WebSocket Protocol - supported version
+static const char WEBSOCKET_VERSION[] = "13";
+
 /**
 static const char serverIndex2[] PROGMEM =
   R"(<html charset="UTF-8">
@@ -111,9 +115,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
       if (_server->header("Upgrade").equalsIgnoreCase("websocket")) {
           // RFC 6455: Validate Sec-WebSocket-Version header
           String version = _server->header("Sec-WebSocket-Version");
-          if (version != "13") {
+          if (version != WEBSOCKET_VERSION) {
               // Return 400 Bad Request with supported version per RFC 6455
-              _server->sendHeader("Sec-WebSocket-Version", "13");
+              _server->sendHeader("Sec-WebSocket-Version", WEBSOCKET_VERSION);
               _server->send(400, "text/plain", "WebSocket version not supported");
               return;
           }
