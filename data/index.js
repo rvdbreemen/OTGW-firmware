@@ -13,6 +13,17 @@ const APIGW = window.location.protocol + '//' + window.location.host + '/api/';
 
 "use strict";
 
+// Attempt to load theme from local storage immediately to prevent flash of light theme
+try {
+  const storedTheme = localStorage.getItem('theme');
+  if (storedTheme === 'dark') {
+    const themeLink = document.getElementById('theme-style');
+    if (themeLink) themeLink.href = "index_dark.css";
+  }
+} catch (e) {
+  console.log("Error loading theme from storage:", e);
+}
+
 let needReload = true;
 refreshDevTime();
 
@@ -974,6 +985,14 @@ function saveSettings() {
       //then it was changes, and needs to be saved
       document.getElementById(field).className = "input-normal";
       console.log("Changes where made in [" + field + "][" + value + "]");
+      
+      // Update theme immediately if darktheme setting changed
+      if (field === "darktheme") {
+        let isDark = document.getElementById(field).checked;
+        document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      }
+
       //processWithTimeout([(data.length -1), 0], 2, data, sendPostReading);
       document.getElementById("settingMessage").innerHTML = "Saving changes...";
       sendPostSetting(field, value);
@@ -1193,6 +1212,7 @@ function applyTheme() {
         if (data[i].name == "darktheme") {
            let isDark = strToBool(data[i].value);
            document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
+           localStorage.setItem('theme', isDark ? 'dark' : 'light');
         }
       }
     })
