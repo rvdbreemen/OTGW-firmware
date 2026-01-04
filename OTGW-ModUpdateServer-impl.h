@@ -477,11 +477,13 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
       // Build frame header directly in a buffer to avoid String heap fragmentation
       size_t payloadLen = written;
       
+      // Note: JSON payload is max 512 bytes (JSON_STATUS_BUFFER_SIZE), so we only need
+      // to handle payloadLen < 65536. Payloads >= 65536 would need 8-byte extended length.
       wsHeader[0] = 0x81;  // FIN + Text opcode
       if (payloadLen < 126) {
           wsHeader[1] = (char)payloadLen;
           headerLen = 2;
-      } else {
+      } else {  // 126 <= payloadLen < 65536
           wsHeader[1] = 126;
           wsHeader[2] = (char)((payloadLen >> 8) & 0xFF);
           wsHeader[3] = (char)(payloadLen & 0xFF);
@@ -490,9 +492,8 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
       
       msgLen = headerLen + payloadLen;
   } else {
-      // SSE Format - still need String for now, but reserve to reduce reallocations
-      // TODO: Could also be optimized to use char buffers if needed
-      msgLen = written + 30;  // Approximate: "event: status\ndata: " + "\n\n"
+      // SSE Format: "event: status\ndata: " (20 chars) + JSON + "\n\n" (2 chars)
+      msgLen = written + 22;
   }
   
   // Robustness: Check if we can write without blocking
@@ -521,7 +522,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
       } else {
           // SSE Format - build and send as String
           String msg;
-          msg.reserve(msgLen + 10);  // Reserve to reduce reallocations
+          msg.reserve(msgLen);  // Already calculated as written + 22
           msg = F("event: status\n");
           msg += F("data: ");
           msg += buf;
