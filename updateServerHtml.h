@@ -374,7 +374,9 @@ static const char UpdateServerIndex[] PROGMEM =
                    successShown = false;
                    if (successPanel) successPanel.style.display = 'none';
                  } else {
-                   uploadStateEl.textContent = 'Upload: complete upload...';                   localUploadDone = true;                   if (lastUploadTotal > 0) {
+                   uploadStateEl.textContent = 'Upload: complete upload...';
+                   localUploadDone = true;
+                   if (lastUploadTotal > 0) {
                      setFlashProgress(lastUploadTotal, lastUploadTotal);
                    } else if (lastUploadLoaded > 0) {
                      setFlashProgressUnknown(lastUploadLoaded);
