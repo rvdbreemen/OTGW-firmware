@@ -13,17 +13,6 @@ const APIGW = window.location.protocol + '//' + window.location.host + '/api/';
 
 "use strict";
 
-// Attempt to load theme from local storage immediately to prevent flash of light theme
-try {
-  const storedTheme = localStorage.getItem('theme');
-  if (storedTheme === 'dark') {
-    const themeLink = document.getElementById('theme-style');
-    if (themeLink) themeLink.href = "index_dark.css";
-  }
-} catch (e) {
-  console.log("Error loading theme from storage:", e);
-}
-
 let needReload = true;
 refreshDevTime();
 
