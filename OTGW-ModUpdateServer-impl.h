@@ -249,6 +249,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           _setStatus(UPDATE_WRITE, _status.target, _status.flash_written, _status.flash_total, _status.filename, emptyString);
           _sendStatusEvent();
         }
+        // Add a small delay to allow network stack to process WiFi packets (ACKs)
+        // This prevents starvation when the loop runs too fast (e.g. when Telnet is disconnected)
+        delay(1);
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
         if(Update.end(true)){ //true to set the size to the current progress
           if (_serial_output) Debugf("\r\nUpdate Success: %u\r\nRebooting...\r\n", upload.totalSize);
