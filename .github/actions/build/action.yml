@@ -45,5 +45,6 @@ runs:
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git add version.h
         git commit -m "CI: update version.h"
-        git push origin "HEAD:${GITHUB_REF_NAME}"
+        git pull --rebase origin "${GITHUB_REF_NAME}"
+        git push origin "HEAD: ${GITHUB_REF_NAME}"
       shell: bash
