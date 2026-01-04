@@ -181,9 +181,14 @@
     display: block;
     position: absolute;
     top: 121px;
-    background-color: rgb(44, 44, 46);
+    right: 10px;
+    background-color: #2c2c2e;
+    min-width: 200px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.5);
     z-index: 200;
-    box-shadow: 2px 2px 2px 0px black;
+    border-radius: 8px;
+    border: 1px solid #444;
+    padding: 5px 0;
   }
   .nav-right .adv_dropdown.hidden {
     display: none;
@@ -191,13 +196,20 @@
 
   .nav-right .adv_dropdown span {
     display: block;
-    height: 2em;
-    line-height: 2em;
-    width: auto;
+    padding: 10px 15px;
+    text-decoration: none;
+    color: #fff;
     cursor: pointer;
+    border-bottom: 1px solid #444;
   }
+  
+  .nav-right .adv_dropdown span:last-child {
+    border-bottom: none;
+  }
+
   .nav-right .adv_dropdown span:hover {
-    background-color: rgb(44, 44, 46);
+    background-color: #3a3a3c;
+  }
   } 
   
   .nav-item {
