@@ -493,11 +493,6 @@ function showMainPage() {
   // Initialize WebSocket for OT log streaming
   initOTLogWebSocket();
 }
-    setTimeout(function () {
-      firmwarePage();
-    }, 150);
-  };
-} // initMainPage()
 
 function firmwarePage() {
   disconnectOTLogWebSocket();
