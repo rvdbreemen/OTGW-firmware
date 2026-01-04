@@ -482,33 +482,38 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
     return;
   }
   
-  String msg;
+  // Build WebSocket frame header or calculate SSE message length
+  char wsHeader[4];  // Max 4 bytes for WebSocket frame header
+  size_t headerLen = 0;
+  size_t msgLen;
+  
   if (_isWebSocket) {
       // WebSocket Frame: FIN + Text (0x81)
-      msg += (char)0x81;
+      // Build frame header directly in a buffer to avoid String heap fragmentation
+      size_t payloadLen = written;
       
-      size_t len = written; // Payload length
-      if (len < 126) {
-          msg += (char)len;
-      } else {
-          msg += (char)126;
-          msg += (char)((len >> 8) & 0xFF);
-          msg += (char)(len & 0xFF);
+      // Note: JSON payload is max 512 bytes (JSON_STATUS_BUFFER_SIZE), so we only need
+      // to handle payloadLen < 65536. Payloads >= 65536 would need 8-byte extended length.
+      wsHeader[0] = 0x81;  // FIN + Text opcode
+      if (payloadLen < 126) {
+          wsHeader[1] = (char)payloadLen;
+          headerLen = 2;
+      } else {  // 126 <= payloadLen < 65536
+          wsHeader[1] = 126;
+          wsHeader[2] = (char)((payloadLen >> 8) & 0xFF);
+          wsHeader[3] = (char)(payloadLen & 0xFF);
+          headerLen = 4;
       }
-      msg += buf;
+      
+      msgLen = headerLen + payloadLen;
   } else {
-      // SSE Format
-      msg.reserve(written + 40);
-      msg = F("event: status\n");
-      msg += F("data: ");
-      msg += buf;
-      msg += F("\n\n");
+      // SSE Format: "event: status\n" (14) + "data: " (6) + JSON + "\n\n" (2) = 22 overhead
+      msgLen = written + 22;
   }
   
   // Robustness: Check if we can write without blocking
   // If the send buffer is full (e.g. network congestion), skip this update
   // to prioritize the file upload process.
-  size_t msgLen = msg.length();
   size_t available = _eventClient.availableForWrite();
 
   // If this is a final state, we really want to send it, so we can afford to wait a bit
@@ -525,7 +530,20 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
   }
 
   if (available >= msgLen) {
-      _eventClient.print(msg);
+      if (_isWebSocket) {
+          // Send WebSocket frame header followed by JSON payload
+          _eventClient.write((const uint8_t*)wsHeader, headerLen);
+          _eventClient.write((const uint8_t*)buf, written);
+      } else {
+          // SSE Format - build and send as String
+          String msg;
+          msg.reserve(msgLen);  // Already calculated as written + 22
+          msg = F("event: status\n");
+          msg += F("data: ");
+          msg += buf;
+          msg += F("\n\n");
+          _eventClient.print(msg);
+      }
       _lastEventMs = now;
       _lastEventPhase = _status.phase;
       yield(); 
