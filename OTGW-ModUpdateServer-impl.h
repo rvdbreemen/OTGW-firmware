@@ -109,11 +109,18 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
 
       // Check for WebSocket Upgrade
       if (_server->header("Upgrade").equalsIgnoreCase("websocket")) {
-          String key = _server->header("Sec-WebSocket-Key");
-          if (key.length() > 0) {
+          String keyHeader = _server->header("Sec-WebSocket-Key");
+          // RFC 6455 requires WebSocket key to be exactly 24 base64 characters (16 bytes encoded)
+          if (keyHeader.length() == 24) {
               // Calculate Sec-WebSocket-Accept
+              // Use char buffer to avoid heap fragmentation from String concatenation
+              // Buffer size: 24 (validated key) + 36 (magic string) + 1 (null) = 61 bytes
+              // Allocated 64 bytes for alignment and safety margin
+              char keyWithMagic[64];
+              snprintf(keyWithMagic, sizeof(keyWithMagic), "%s258EAFA5-E914-47DA-95CA-C5AB0DC85B11", keyHeader.c_str());
+              
               uint8_t hash[20];
-              sha1(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11", &hash[0]);
+              sha1(keyWithMagic, &hash[0]);
               String accept = base64::encode(hash, 20);
 
               _server->sendHeader("Upgrade", "websocket");
