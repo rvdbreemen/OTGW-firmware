@@ -143,7 +143,7 @@ static const char UpdateServerIndex[] PROGMEM =
                if (successMessageEl) {
                  successMessageEl.textContent = 'Update successful. Redirecting...';
                }
-               window.location.assign("/");
+               window.location.href = "/";
                return;
              }
             successCountdownEl.textContent = remaining;
@@ -408,13 +408,13 @@ static const char UpdateServerSuccess[] PROGMEM =
       <br>If nothing happend, then wait for count down to zero and then refresh with <span style='font-size:1.3em;'><b><a href="/">this link here</a></b></span>!
       </body>
       <script>
-         var seconds = document.getElementById("waitSeconds").textContent;
+         var seconds = parseInt(document.getElementById("waitSeconds").textContent);
          var countdown = setInterval(function() {
            seconds--;
            document.getElementById('waitSeconds').textContent = seconds;
            if (seconds <= 0) {
               clearInterval(countdown);
-              window.location.assign("/")
+              window.location.href = "/";
            }
          }, 1000);
      </script>
