@@ -327,10 +327,10 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_resetStatus()
 }
 
 template <typename ServerType>
-void ESP8266HTTPUpdateServerTemplate<ServerType>::_setStatus(uint8_t phase, const char *target, size_t received, size_t total, const String &filename, const String &error)
+void ESP8266HTTPUpdateServerTemplate<ServerType>::_setStatus(uint8_t phase, const String &target, size_t received, size_t total, const String &filename, const String &error)
 {
   _status.phase = static_cast<UpdatePhase>(phase);
-  _status.target = target ? target : "unknown";
+  _status.target = target.length() ? target : "unknown";
   _status.received = received;
   _status.total = total;
   if (_status.flash_total > 0 && _status.flash_written > _status.flash_total) {
