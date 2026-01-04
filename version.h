@@ -2,7 +2,7 @@
 #define _VERSION_MAJOR 0
 #define _VERSION_MINOR 10  
 #define _VERSION_PATCH 4
-#define _VERSION_BUILD 2164
+#define _VERSION_BUILD 2165
 #define _VERSION_GITHASH "7ad37e6"
 #define _VERSION_PRERELEASE beta
 #define _VERSION_DATE "02-01-2026"
