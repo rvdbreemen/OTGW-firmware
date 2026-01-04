@@ -136,6 +136,28 @@ function initOTLogWebSocket() {
 }
 
 //============================================================================
+function disconnectOTLogWebSocket() {
+  // Clear any pending reconnect timer
+  if (wsReconnectTimer) {
+    clearTimeout(wsReconnectTimer);
+    wsReconnectTimer = null;
+  }
+
+  if (otLogWS) {
+    console.log('Disconnecting OT Log WebSocket');
+    // Remove event listeners to prevent auto-reconnect
+    otLogWS.onclose = null;
+    otLogWS.onerror = null;
+    
+    if (otLogWS.readyState === WebSocket.OPEN || otLogWS.readyState === WebSocket.CONNECTING) {
+      otLogWS.close();
+    }
+    otLogWS = null;
+  }
+  updateWSStatus(false);
+}
+
+//============================================================================
 function updateWSStatus(connected) {
   const statusEl = document.getElementById('wsStatus');
   const statusTextEl = document.getElementById('wsStatusText');
@@ -440,25 +462,37 @@ function initMainPage() {
     function (el, idx, arr) {
       el.addEventListener('click', function () {
         console.log("newTab: goBack");
-        location.href = "/";
+        showMainPage();
       });
     }
   );
 
   needReload = false;
-  refreshDevInfo();
-  refreshOTmonitor();
-  tid = setInterval(function () { refreshOTmonitor(); }, 1000); //delay is in milliseconds 
   
-  // Initialize WebSocket for OT log streaming
-  initOTLogWebSocket();
+  if (window.location.hash == "#tabPICflash") {
+    firmwarePage();
+  } else {
+    showMainPage();
+  }
+} // initMainPage()
 
+function showMainPage() {
+  console.log("showMainPage()");
+  clearInterval(tid);
+  refreshDevTime();
+  
   document.getElementById("displayMainPage").style.display = "block";
   document.getElementById("displaySettingsPage").style.display = "none";
   document.getElementById("displayDeviceInfo").style.display = "none";
   document.getElementById("displayPICflash").style.display = "none";
-
-  if (window.location.hash == "#tabPICflash") {
+  
+  refreshDevInfo();
+  refreshOTmonitor();
+  tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+  
+  // Initialize WebSocket for OT log streaming
+  initOTLogWebSocket();
+}
     setTimeout(function () {
       firmwarePage();
     }, 150);
@@ -466,6 +500,7 @@ function initMainPage() {
 } // initMainPage()
 
 function firmwarePage() {
+  disconnectOTLogWebSocket();
   clearInterval(tid);
   refreshDevTime();
   document.getElementById("displayMainPage").style.display = "none";
@@ -477,6 +512,7 @@ function firmwarePage() {
 } // deviceinfoPage()
 
 function deviceinfoPage() {
+  disconnectOTLogWebSocket();
   clearInterval(tid);
   refreshDevTime();
   document.getElementById("displayMainPage").style.display = "none";
@@ -489,6 +525,7 @@ function deviceinfoPage() {
 } // deviceinfoPage()
 
 function settingsPage() {
+  disconnectOTLogWebSocket();
   clearInterval(tid);
   refreshDevTime();
   document.getElementById("displayMainPage").style.display = "none";
