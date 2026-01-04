@@ -13,6 +13,7 @@ Usage:
     python build.py --firmware   # Build firmware only
     python build.py --filesystem # Build filesystem only
     python build.py --clean      # Clean build artifacts
+    python build.py --distclean  # Clean build + cached dependencies
     python build.py --help       # Show help
 """
 
@@ -607,6 +608,7 @@ Examples:
   python build.py --firmware       # Build firmware only
   python build.py --filesystem     # Build filesystem only
   python build.py --clean          # Clean build artifacts
+  python build.py --distclean      # Also remove cores/libraries cache
   python build.py --no-rename      # Build without renaming artifacts
         """
     )
@@ -625,6 +627,11 @@ Examples:
         "--clean",
         action="store_true",
         help="Clean build artifacts"
+    )
+    parser.add_argument(
+        "--distclean",
+        action="store_true",
+        help="Remove build artifacts plus downloaded cores/libraries (slower)"
     )
     parser.add_argument(
         "--no-rename",
@@ -663,9 +670,15 @@ Examples:
     # Check Python version
     check_python_version()
     
-    # Handle clean
+    # Handle cleaning options
+    if args.distclean and args.clean:
+        print_error("Use only one of --clean or --distclean")
+        sys.exit(2)
     if args.clean:
-        clean_build(project_dir)
+        clean_build_artifacts(project_dir, distclean=False)
+        return
+    if args.distclean:
+        clean_build_artifacts(project_dir, distclean=True)
         return
     
     # Install arduino-cli if needed and add to PATH

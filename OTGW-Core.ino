@@ -1731,6 +1731,7 @@ void processOT(const char *buf, int len){
       if (OTdata.skipthis) AddLog(" <ignored> ");
       AddLogln();
       OTGWDebugT(ot_log_buffer);
+      sendLogToWebSocket(ot_log_buffer);  // Send log to WebSocket clients
       OTGWDebugFlush();
       ClrLog();
     } 
