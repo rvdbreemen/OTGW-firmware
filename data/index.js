@@ -482,6 +482,7 @@ function initMainPage() {
       el.addEventListener('click', function () {
         console.log("newTab: goBack");
         showMainPage();
+        toggleHidden('btnSaveSettings', true);
       });
     }
   );
