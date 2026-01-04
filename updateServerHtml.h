@@ -35,9 +35,9 @@ static const char UpdateServerIndex[] PROGMEM =
        <h2 id='progressTitle'>Flashing in progress</h2>
        <div id='updatePanel'>
          <div >File: <span id='updateFilename'>-</span></div>
-         <div id='uploadState'>Upload State: idle</div>
-         <div id='deviceState'>Device State: idle</div>
-         <div >Target: <span id='updateTarget'>-</span></div>
+         <div >Flashing: <span id='updateTarget'>-</span></div>
+         <div id='uploadState'>Flash Status: idle</div>
+         <div id='deviceState'>Action: idle</div>
          <progress id='updateProgress' value='0' max='100'></progress>
          <div id='updateProgressText'>Upload: 0% (0 B / 0 B)</div>
          <progress id='flashProgress' value='0' max='100'></progress>
