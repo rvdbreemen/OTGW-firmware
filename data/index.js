@@ -182,7 +182,7 @@ function renderLogDisplay() {
     html += escapeHtml(line) + '\n';
   });
 
-  container.textContent = html;
+  container.innerHTML = html;
 
   // Auto-scroll to bottom if enabled
   if (autoScroll) {
