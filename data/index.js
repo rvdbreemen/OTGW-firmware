@@ -595,7 +595,7 @@ function refreshFirmware() {
       var rowDiv = document.createElement("div");
       rowDiv.setAttribute("class", "picrow");
       rowDiv.setAttribute("id", "firmwarename");
-      rowDiv.style.background = "lightblue";
+      // rowDiv.style.background = "lightblue";
       rowDiv.style.fontWeight = "bold";
       //--- field Name ---
       var fldDiv = document.createElement("div");
@@ -628,7 +628,7 @@ function refreshFirmware() {
         var rowDiv = document.createElement("div");
         rowDiv.setAttribute("class", "picrow");
         rowDiv.setAttribute("id", "firmware_" + files[i].name);
-        rowDiv.style.background = "lightblue";
+        // rowDiv.style.background = "lightblue";
         //--- field Name ---
         var fldDiv = document.createElement("div");
         fldDiv.setAttribute("class", "piccolumn1");
@@ -744,7 +744,7 @@ function refreshOTmonitor() {
           var rowDiv = document.createElement("div");
           rowDiv.setAttribute("class", "otmonrow");
           //rowDiv.setAttribute("id", "otmon_"+data[i].name);
-          rowDiv.style.background = "lightblue";
+          // rowDiv.style.background = "lightblue";
           rowDiv.style.visibility = ((data[i].epoch == 0) ? "collapse" : "visible");
           // rowDiv.style.display = ((data[i].epoch==0)?"none":"table-row");
           var epoch = document.createElement("INPUT");
@@ -816,7 +816,7 @@ function refreshDeviceInfo() {
           var rowDiv = document.createElement("div");
           rowDiv.setAttribute("class", "devinforow");
           rowDiv.setAttribute("id", "devinfo_" + data[i].name);
-          rowDiv.style.background = "lightblue";
+          // rowDiv.style.background = "lightblue";
           //--- field Name ---
           var fldDiv = document.createElement("div");
           fldDiv.setAttribute("class", "devinfocolumn1");
