@@ -130,15 +130,32 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
 
           String key = _server->header("Sec-WebSocket-Key");
           if (key.length() > 0) {
+          String keyHeader = _server->header("Sec-WebSocket-Key");
+          // RFC 6455 requires WebSocket key to be exactly 24 base64 characters (16 bytes encoded)
+          if (keyHeader.length() == 24) {
               // Calculate Sec-WebSocket-Accept
+              // Use char buffer to avoid heap fragmentation from String concatenation
+              // Buffer size: 24 (validated key) + 36 (magic string) + 1 (null) = 61 bytes
+              // Allocated 64 bytes for alignment and safety margin
+              char keyWithMagic[64];
+              snprintf(keyWithMagic, sizeof(keyWithMagic), "%s258EAFA5-E914-47DA-95CA-C5AB0DC85B11", keyHeader.c_str());
+              
               uint8_t hash[20];
-              sha1(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11", &hash[0]);
+              sha1(keyWithMagic, &hash[0]);
               String accept = base64::encode(hash, 20);
 
               _server->sendHeader("Upgrade", "websocket");
               _server->sendHeader("Connection", "Upgrade");
               _server->sendHeader("Sec-WebSocket-Accept", accept);
               _server->send(101);
+
+              // Clean up any previously active event client before assigning a new one
+              if (_eventClientActive) {
+                if (_eventClient.connected()) {
+                  _eventClient.stop();
+                }
+                _eventClientActive = false;
+              }
 
               _eventClient = _server->client();
               _eventClientActive = true;
@@ -486,33 +503,38 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
     return;
   }
   
-  String msg;
+  // Build WebSocket frame header or calculate SSE message length
+  char wsHeader[4];  // Max 4 bytes for WebSocket frame header
+  size_t headerLen = 0;
+  size_t msgLen;
+  
   if (_isWebSocket) {
       // WebSocket Frame: FIN + Text (0x81)
-      msg += (char)0x81;
+      // Build frame header directly in a buffer to avoid String heap fragmentation
+      size_t payloadLen = written;
       
-      size_t len = written; // Payload length
-      if (len < 126) {
-          msg += (char)len;
-      } else {
-          msg += (char)126;
-          msg += (char)((len >> 8) & 0xFF);
-          msg += (char)(len & 0xFF);
+      // Note: JSON payload is max 512 bytes (JSON_STATUS_BUFFER_SIZE), so we only need
+      // to handle payloadLen < 65536. Payloads >= 65536 would need 8-byte extended length.
+      wsHeader[0] = 0x81;  // FIN + Text opcode
+      if (payloadLen < 126) {
+          wsHeader[1] = (char)payloadLen;
+          headerLen = 2;
+      } else {  // 126 <= payloadLen < 65536
+          wsHeader[1] = 126;
+          wsHeader[2] = (char)((payloadLen >> 8) & 0xFF);
+          wsHeader[3] = (char)(payloadLen & 0xFF);
+          headerLen = 4;
       }
-      msg += buf;
+      
+      msgLen = headerLen + payloadLen;
   } else {
-      // SSE Format
-      msg.reserve(written + 40);
-      msg = F("event: status\n");
-      msg += F("data: ");
-      msg += buf;
-      msg += F("\n\n");
+      // SSE Format: "event: status\n" (14) + "data: " (6) + JSON + "\n\n" (2) = 22 overhead
+      msgLen = written + 22;
   }
   
   // Robustness: Check if we can write without blocking
   // If the send buffer is full (e.g. network congestion), skip this update
   // to prioritize the file upload process.
-  size_t msgLen = msg.length();
   size_t available = _eventClient.availableForWrite();
 
   // If this is a final state, we really want to send it, so we can afford to wait a bit
@@ -529,7 +551,20 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
   }
 
   if (available >= msgLen) {
-      _eventClient.print(msg);
+      if (_isWebSocket) {
+          // Send WebSocket frame header followed by JSON payload
+          _eventClient.write((const uint8_t*)wsHeader, headerLen);
+          _eventClient.write((const uint8_t*)buf, written);
+      } else {
+          // SSE Format - build and send as String
+          String msg;
+          msg.reserve(msgLen);  // Already calculated as written + 22
+          msg = F("event: status\n");
+          msg += F("data: ");
+          msg += buf;
+          msg += F("\n\n");
+          _eventClient.print(msg);
+      }
       _lastEventMs = now;
       _lastEventPhase = _status.phase;
       yield(); 
