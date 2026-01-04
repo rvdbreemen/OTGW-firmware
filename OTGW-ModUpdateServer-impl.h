@@ -41,6 +41,10 @@
 
 namespace esp8266httpupdateserver {
 using namespace esp8266webserver;
+
+// RFC 6455 WebSocket Protocol - supported version
+static const char WEBSOCKET_VERSION[] = "13";
+
 /**
 static const char serverIndex2[] PROGMEM =
   R"(<html charset="UTF-8">
@@ -109,39 +113,58 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
 
       // Check for WebSocket Upgrade
       if (_server->header("Upgrade").equalsIgnoreCase("websocket")) {
-          String keyHeader = _server->header("Sec-WebSocket-Key");
-          // RFC 6455 requires WebSocket key to be exactly 24 base64 characters (16 bytes encoded)
-          if (keyHeader.length() == 24) {
-              // Calculate Sec-WebSocket-Accept
-              // Use char buffer to avoid heap fragmentation from String concatenation
-              // Buffer size: 24 (validated key) + 36 (magic string) + 1 (null) = 61 bytes
-              // Allocated 64 bytes for alignment and safety margin
-              char keyWithMagic[64];
-              snprintf(keyWithMagic, sizeof(keyWithMagic), "%s258EAFA5-E914-47DA-95CA-C5AB0DC85B11", keyHeader.c_str());
-              
-              uint8_t hash[20];
-              sha1(keyWithMagic, &hash[0]);
-              String accept = base64::encode(hash, 20);
-
-              _server->sendHeader("Upgrade", "websocket");
-              _server->sendHeader("Connection", "Upgrade");
-              _server->sendHeader("Sec-WebSocket-Accept", accept);
-              _server->send(101);
-
-              // Clean up any previously active event client before assigning a new one
-              if (_eventClientActive) {
-                if (_eventClient.connected()) {
-                  _eventClient.stop();
-                }
-                _eventClientActive = false;
-              }
-
-              _eventClient = _server->client();
-              _eventClientActive = true;
-              _isWebSocket = true;
-              if (_serial_output) Debugln("WS: Connected");
+          // RFC 6455: Validate Sec-WebSocket-Version header
+          String version = _server->header("Sec-WebSocket-Version");
+          if (version.isEmpty()) {
+              // Missing version header
+              _server->sendHeader("Sec-WebSocket-Version", WEBSOCKET_VERSION);
+              _server->send(400, "text/plain", "Missing Sec-WebSocket-Version header");
               return;
           }
+          if (version != WEBSOCKET_VERSION) {
+              // Unsupported version
+              _server->sendHeader("Sec-WebSocket-Version", WEBSOCKET_VERSION);
+              _server->send(400, "text/plain", "WebSocket version not supported");
+              return;
+          }
+
+          String keyHeader = _server->header("Sec-WebSocket-Key");
+          // RFC 6455 requires WebSocket key to be exactly 24 base64 characters (16 bytes encoded)
+          if (keyHeader.length() != 24) {
+              // Invalid or missing key
+              _server->send(400, "text/plain", "Invalid Sec-WebSocket-Key header");
+              return;
+          }
+          
+          // Calculate Sec-WebSocket-Accept
+          // Use char buffer to avoid heap fragmentation from String concatenation
+          // Buffer size: 24 (validated key) + 36 (magic string) + 1 (null) = 61 bytes
+          // Allocated 64 bytes for alignment and safety margin
+          char keyWithMagic[64];
+          snprintf(keyWithMagic, sizeof(keyWithMagic), "%s258EAFA5-E914-47DA-95CA-C5AB0DC85B11", keyHeader.c_str());
+          
+          uint8_t hash[20];
+          sha1(keyWithMagic, &hash[0]);
+          String accept = base64::encode(hash, 20);
+
+          _server->sendHeader("Upgrade", "websocket");
+          _server->sendHeader("Connection", "Upgrade");
+          _server->sendHeader("Sec-WebSocket-Accept", accept);
+          _server->send(101);
+
+          // Clean up any previously active event client before assigning a new one
+          if (_eventClientActive) {
+            if (_eventClient.connected()) {
+              _eventClient.stop();
+            }
+            _eventClientActive = false;
+          }
+
+          _eventClient = _server->client();
+          _eventClientActive = true;
+          _isWebSocket = true;
+          if (_serial_output) Debugln("WS: Connected");
+          return;
       }
 
       // Fallback to SSE
