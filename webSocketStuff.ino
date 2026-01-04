@@ -117,10 +117,8 @@ void handleWebSocket() {
 // This is called from OTGW-Core.ino when a new log line is ready
 //===========================================================================================
 void sendLogToWebSocket(const char* logMessage) {
-  // Only send if WebSocket is initialized and message is valid
-  // We don't check wsClientCount here because broadcastTXT handles empty client list safely,
-  // and relying on our own counter might be prone to sync issues.
-  if (wsInitialized && logMessage != nullptr) {
+  // Only send if WebSocket is initialized, there are connected clients, and message is valid
+  if (wsInitialized && wsClientCount > 0 && logMessage != nullptr) {
     // DebugTf("Sending to WS: %s\r\n", logMessage); 
     webSocket.broadcastTXT(logMessage);
   }
