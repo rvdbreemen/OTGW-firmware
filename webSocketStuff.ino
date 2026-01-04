@@ -121,6 +121,7 @@ void sendLogToWebSocket(const char* logMessage) {
   // We don't check wsClientCount here because broadcastTXT handles empty client list safely,
   // and relying on our own counter might be prone to sync issues.
   if (wsInitialized && logMessage != nullptr) {
+    DebugTf("Sending to WS: %s\r\n", logMessage); 
     webSocket.broadcastTXT(logMessage);
   }
 }
