@@ -126,6 +126,7 @@ String    settingNTPtimezone = NTP_DEFAULT_TIMEZONE;
 String    settingNTPhostname = NTP_HOST_DEFAULT;
 bool      settingNTPsendtime = false;
 bool      settingLEDblink = true;
+bool      settingDarkTheme = false;
 
 // GPIO Sensor Settings
 bool      settingGPIOSENSORSenabled = false;

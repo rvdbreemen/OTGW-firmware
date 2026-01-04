@@ -45,6 +45,7 @@ void writeSettings(bool show)
   root["NTPhostname"] = settingNTPhostname;
   root["NTPsendtime"] = settingNTPsendtime;
   root["LEDblink"] = settingLEDblink;
+  root["darktheme"] = settingDarkTheme;
   root["GPIOSENSORSenabled"] = settingGPIOSENSORSenabled;
   root["GPIOSENSORSpin"] = settingGPIOSENSORSpin;
   root["GPIOSENSORSinterval"] = settingGPIOSENSORSinterval;
@@ -119,6 +120,7 @@ void readSettings(bool show)
   if (settingNTPhostname=="null")  settingNTPhostname = NTP_HOST_DEFAULT; 
   settingNTPsendtime      = doc["NTPsendtime"]|settingNTPsendtime;
   settingLEDblink         = doc["LEDblink"]|settingLEDblink;
+  settingDarkTheme        = doc["darktheme"]|settingDarkTheme;
   settingGPIOSENSORSenabled = doc["GPIOSENSORSenabled"] | settingGPIOSENSORSenabled;
   settingGPIOSENSORSpin = doc["GPIOSENSORSpin"] | settingGPIOSENSORSpin;
   settingGPIOSENSORSinterval = doc["GPIOSENSORSinterval"] | settingGPIOSENSORSinterval;
@@ -241,6 +243,7 @@ void updateSetting(const char *field, const char *newValue)
   }
   if (strcasecmp(field, "NTPsendtime")==0)    settingNTPsendtime = EVALBOOLEAN(newValue);
   if (strcasecmp(field, "LEDblink")==0)      settingLEDblink = EVALBOOLEAN(newValue);
+  if (strcasecmp(field, "darktheme")==0)     settingDarkTheme = EVALBOOLEAN(newValue);
   if (strcasecmp(field, "GPIOSENSORSenabled") == 0)
   {
     settingGPIOSENSORSenabled = EVALBOOLEAN(newValue);
