@@ -61,7 +61,7 @@ class ESP8266HTTPUpdateServerTemplate
   protected:
     void _setUpdaterError();
     void _resetStatus();
-    void _setStatus(uint8_t phase, const char *target, size_t received, size_t total, const String &filename, const String &error);
+    void _setStatus(uint8_t phase, const String &target, size_t received, size_t total, const String &filename, const String &error);
     void _sendStatusJson();
     void _sendStatusEvent();
     void _jsonEscape(const String &in, char *out, size_t outSize);
