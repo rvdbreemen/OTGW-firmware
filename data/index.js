@@ -13,12 +13,14 @@ const APIGW = window.location.protocol + '//' + window.location.host + '/api/';
 
 "use strict";
 
-let needReload = true;
-refreshDevTime();
+let needReload = false;
 
 console.log("Hash=" + window.location.hash);
 window.onload = initMainPage;
 
+window.onblur = function() {
+  needReload = true;
+};
 
 window.onfocus = function () {
   if (needReload) {
