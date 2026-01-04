@@ -71,6 +71,7 @@ static const char UpdateServerIndex[] PROGMEM =
          var pollTimer = null;
          var reconnectTimer = null;
          var uploadInFlight = false;
+         var localUploadDone = false;
          var successTimer = null;
          var successShown = false;
          var lastUploadLoaded = 0;
@@ -179,7 +180,11 @@ static const char UpdateServerIndex[] PROGMEM =
            var flashWritten = status.flash_written || status.received || 0;
            var flashTotal = status.flash_total || status.total || 0;
            if (!uploadInFlight && uploadReceived && uploadTotal) {
-             setUploadProgress(uploadReceived, uploadTotal);
+             if (localUploadDone) {
+               setUploadProgress(uploadTotal, uploadTotal);
+             } else {
+               setUploadProgress(uploadReceived, uploadTotal);
+             }
            } else if (!uploadInFlight && uploadReceived) {
              setUploadProgressUnknown(uploadReceived);
            }
@@ -194,16 +199,19 @@ static const char UpdateServerIndex[] PROGMEM =
              if (successPanel) successPanel.style.display = 'block';
              startSuccessCountdown();
              stopEvents();
+             localUploadDone = false;
            } else if (state === 'error') {
              progressTitle.textContent = 'Update error';
              successShown = false;
              if (successPanel) successPanel.style.display = 'none';
              stopEvents();
+             localUploadDone = false;
            } else if (state === 'abort') {
              progressTitle.textContent = 'Update aborted';
              successShown = false;
              if (successPanel) successPanel.style.display = 'none';
              stopEvents();
+             localUploadDone = false;
            } else {
              progressTitle.textContent = 'Flashing in progress';
              if (successPanel && !successShown) successPanel.style.display = 'none';
@@ -356,8 +364,7 @@ static const char UpdateServerIndex[] PROGMEM =
                    successShown = false;
                    if (successPanel) successPanel.style.display = 'none';
                  } else {
-                   uploadStateEl.textContent = 'Upload: complete upload...';
-                   if (lastUploadTotal > 0) {
+                   uploadStateEl.textContent = 'Upload: complete upload...';                   localUploadDone = true;                   if (lastUploadTotal > 0) {
                      setFlashProgress(lastUploadTotal, lastUploadTotal);
                    } else if (lastUploadLoaded > 0) {
                      setFlashProgressUnknown(lastUploadLoaded);
