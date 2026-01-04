@@ -100,6 +100,7 @@ function initOTLogWebSocket() {
     };
     
     otLogWS.onmessage = function(event) {
+      // console.log("WS received:", event.data); // Debug
       addLogLine(event.data);
     };
     
@@ -128,9 +129,11 @@ function updateWSStatus(connected) {
   if (connected) {
     statusEl.className = 'ws-status ws-connected';
     statusTextEl.textContent = 'Connected';
+    // statusEl.style.color = 'green'; // Force color - removed, using CSS class
   } else {
     statusEl.className = 'ws-status ws-disconnected';
     statusTextEl.textContent = 'Disconnected';
+    // statusEl.style.color = 'red'; // Force color - removed, using CSS class
   }
 }
 
@@ -138,7 +141,9 @@ function updateWSStatus(connected) {
 function addLogLine(logLine) {
   if (!logLine || logLine.trim() === '') return;
   
-  const timestamp = new Date().toLocaleTimeString();
+  const now = new Date();
+  const timestamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(now.getMilliseconds()).padStart(3, '0')}`;
+  
   const logEntry = {
     time: timestamp,
     // Store a processed version for display, keep original in `raw`
@@ -194,11 +199,16 @@ let logRenderScheduled = false;
 // Internal function that performs the actual DOM update
 function renderLogDisplay() {
   const container = document.getElementById('otLogContent');
-  if (!container) return;
+  if (!container) {
+    console.error("otLogContent element not found!");
+    return;
+  }
 
   const displayCount = logExpanded ? otLogFilteredBuffer.length : Math.min(10, otLogFilteredBuffer.length);
   const startIndex = Math.max(0, otLogFilteredBuffer.length - displayCount);
   const linesToShow = otLogFilteredBuffer.slice(startIndex);
+
+  // console.log("Rendering logs. Total:", otLogFilteredBuffer.length, "Showing:", linesToShow.length); // Debug
 
   // Build HTML
   let html = '';
@@ -293,14 +303,6 @@ function setupOTLogControls() {
   document.getElementById('btnDownloadLog').addEventListener('click', function() {
     downloadLog();
   });
-  
-  // Test log
-  const btnTestLog = document.getElementById('btnTestLog');
-  if (btnTestLog) {
-    btnTestLog.addEventListener('click', function() {
-      addLogLine("Test log message " + new Date().toLocaleTimeString());
-    });
-  }
   
   // Search functionality
   document.getElementById('searchLog').addEventListener('input', function(e) {
