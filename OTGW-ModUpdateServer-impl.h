@@ -503,7 +503,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
   if (available < msgLen && isFinalState) {
       // Try to wait for buffer to drain (max 1000ms)
       unsigned long startWait = millis();
-      while (available < msgLen && (millis() - startWait) < 1000) {
+      while (available < msgLen && (int32_t)(millis() - startWait) < 1000) {
           yield(); // Allow network stack to process and drain buffer
           available = _eventClient.availableForWrite();
       }
