@@ -477,6 +477,8 @@ function initMainPage() {
 
   needReload = false;
   
+  applyTheme();
+
   if (window.location.hash == "#tabPICflash") {
     firmwarePage();
   } else {
@@ -857,12 +859,12 @@ function refreshSettings() {
           rowDiv.setAttribute("class", "settingDiv");
           //----rowDiv.setAttribute("id", "settingR_"+data[i].name);
           rowDiv.setAttribute("id", "D_" + data[i].name);
-          rowDiv.setAttribute("style", "text-align: right;");
+          // rowDiv.setAttribute("style", "text-align: right;");
           // rowDiv.style.marginLeft = "10px";
           // rowDiv.style.marginRight = "10px";
-          rowDiv.style.minWidth = "850px";
-          rowDiv.style.border = "thick solid lightblue";
-          rowDiv.style.background = "lightblue";
+          // rowDiv.style.minWidth = "850px";
+          // rowDiv.style.border = "thick solid lightblue";
+          // rowDiv.style.background = "lightblue";
           //--- field Name ---
           var fldDiv = document.createElement("div");
           fldDiv.setAttribute("style", "margin-right: 10px;");
@@ -907,11 +909,16 @@ function refreshSettings() {
           }
           sInput.setAttribute("value", data[i].value);
           sInput.addEventListener('change',
-            function () { setBackGround(data[i].name, "lightgray"); },
+            function () { 
+              document.getElementById(data[i].name).className = "input-changed"; 
+              if (data[i].name == "darktheme") {
+                 document.getElementById('theme-style').href = this.checked ? "index_dark.css" : "index.css";
+              }
+            },
             false
           );
           sInput.addEventListener('keydown',
-            function () { setBackGround(data[i].name, "lightgray"); },
+            function () { document.getElementById(data[i].name).className = "input-changed"; },
             false
           );
           inputDiv.appendChild(sInput);
@@ -921,7 +928,7 @@ function refreshSettings() {
         }
         else {
           //----document.getElementById("setFld_"+data[i].name).style.background = "white";
-          document.getElementById(data[i].name).style.background = "white";
+          document.getElementById(data[i].name).className = "input-normal";
           //----document.getElementById("setFld_"+data[i].name).value = data[i].value;
           // document.getElementById(data[i].name).value = data[i].value;
           // FIX If checkbox change checked iso value
@@ -963,9 +970,9 @@ function saveSettings() {
     }
     console.log("==> name[" + field + "], value[" + value + "]");
 
-    if (getBackGround(field).includes("lightgray")) {
+    if (document.getElementById(field).className == "input-changed") {
       //then it was changes, and needs to be saved
-      setBackGround(field, "white");
+      document.getElementById(field).className = "input-normal";
       console.log("Changes where made in [" + field + "][" + value + "]");
       //processWithTimeout([(data.length -1), 0], 2, data, sendPostReading);
       document.getElementById("settingMessage").innerHTML = "Saving changes...";
@@ -1175,6 +1182,22 @@ var translateFields = [
   , ["gpiooutputstriggerbit", "Bit X (master/slave) to trigger on (0-15)"]
   
 ];
+
+//============================================================================
+function applyTheme() {
+  fetch(APIGW + "v0/settings")
+    .then(response => response.json())
+    .then(json => {
+      let data = json.settings;
+      for (let i in data) {
+        if (data[i].name == "darktheme") {
+           let isDark = strToBool(data[i].value);
+           document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
+        }
+      }
+    })
+    .catch(error => console.log(error));
+}
 
 /*
 ***************************************************************************

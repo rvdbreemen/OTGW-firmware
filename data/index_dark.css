@@ -17,19 +17,15 @@
     -moz-osx-font-smoothing: grayscale;
     font-family: 'Dosis', sans-serif;
     line-height: 1.6;
-    color: black;
-    background: #e6ffff;
+    color: white;
+    background: rgb(28, 28, 30);
   }
   
-  body {
-    max-width: 1000px;
-  }
-
   table {
     color: black;
     border-collapse: collapse;
     width: 90%;
-    background: lightblue;
+    background: rgb(28, 28, 30);
   }
   
   th {
@@ -49,7 +45,7 @@
   
   tfoot {
     font-size: 12px;
-    color: darkblue;
+    color: rgb(44, 44, 46);
   }
   
   input {
@@ -61,23 +57,15 @@
   .outer-div {
     /*width: 90%; */
     text-align: center;
-    background-color: #e6ffff 
+    background-color: rgb(28, 28, 30) 
   }
   .inner-div {
     display: inline-block; 
     /*
     margin: 0 auto;
     padding: 3px;
-    background-color: lightblue
+    background-color: rgb(28, 28, 30)
     */
-  }
-
-  #displayMainPage, #displayPICflash, #displayDeviceInfo, #displaySettingsPage {
-    max-width: 1000px;
-  }
-
-  #displayPICflash div#firmwarename {
-    width: 80%;
   }
   
   .container-card {
@@ -115,38 +103,53 @@
   }
   
   /*--------------------- N A V - B A R -----------------*/
-.nav-container,.footer {
-    background: #00bffe;
-    padding: 6px;
+  .nav-container {
+    background: rgb(44, 44, 46);
+    padding-top: 6px;
+    padding-left: 1px;
+    padding-right: 1px;
+    padding-bottom: 6px;
     min-height: 50px;
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
+    border-top-style: solid;
+    border-top-width: 1px;
+    border-top-color: rgb(72, 72, 74);
+    border-bottom-style: solid;
+    border-bottom-width: 1px;
+    border-bottom-color: rgb(72, 72, 74);
   }
   
-  .footer {
-    background-color: #e6ffff;
-  }
-
   .nav-container a:hover {
-    color: black;
-    background: skyblue; /* only for FSexplorer - Rest does not work */
+    color: white;
+    background: rgb(44, 44, 46); /* only for FSexplorer - Rest does not work */
   }
 
   .nav-left {
     flex-basis: 10%;
     display: flex;
     flex-grow: 1;
-    gap: 15px;
+    gap: 0px;
     flex: 2 1 0;
     justify-content: left; /* horizonal alignment */
     align-items: center; /* horizonal alignment */
     min-height: 50px;
+    font-size: 26px;
+    font-weight: bold;
   }
 
-
-  .nav-left .hidden {
-    display: none;
+  .nav-centered {
+    flex-basis: 10%;
+    display: flex;
+    flex-grow: 1;
+    gap: 0px;
+    flex: 2 1 0;
+    justify-content: left; /* horizonal alignment */
+    align-items: center; /* horizonal alignment */
+    min-height: 50px;
+    font-size: 26px;
+    font-weight: thin;
   }
 
   .nav-right {
@@ -164,13 +167,9 @@
     display: block;
     position: absolute;
     top: 121px;
-    background-color: white;
-    padding: 10px 20px;
-    background-color: lightblue;
-    box-shadow: 2px 2px 2px 0px grey;
-    z-index: 200;
+    background-color: rgb(44, 44, 46);
+    
   }
-
   .nav-right .adv_dropdown.hidden {
     display: none;
   }
@@ -181,27 +180,21 @@
     line-height: 2em;
     width: auto;
     cursor: pointer;
-
   }
-
   .nav-right .adv_dropdown span:hover {
-    background-color: #bde8f6;
+    background-color: rgb(44, 44, 46);
   } 
   
   .nav-item {
     font-size: 16px;
     height: 40px;
     width: 110px;
-    background-color: lightblue;
+    background-color: rgb(44, 44, 46);
     border: none;
     border-radius: 5px;
-    color: #505050;
+    color: white;
     cursor: pointer;
-    box-shadow: 2px 2px 2px 0px grey;
-  }
-  
-  .nav-item:hover {
-    color: black;
+    box-shadow: none;
   }
 
   .nav-item:active {
@@ -213,21 +206,22 @@
     height: 30px;
     object-fit: cover;
     cursor: pointer;
+    color:rgba(87, 152, 203, 1);
   }
 
   .nav-clock {
     top: 1px;
-    color: black;
+    color: white;
     float: right;
     font-size: small;
     font-weight:bold;
     text-align: right;
-    background: white; 
+    background: rgb(28, 28, 30); 
     width: 200px; 
     padding-right: 10px;
-    background: #e6ffff;
+    background: rgb(28, 28, 30);
   }
-
+  
   /*-------------------------*/
   /***
   @media all and (max-width: 600px) {
@@ -246,7 +240,7 @@
   ***/
   
   .tabButton a:hover {
-    background-color: gray;
+    background-color: rgb(99, 99, 102);
   }
   
   
@@ -272,7 +266,7 @@
     margin-top: 10px;
   }
   .div1 a:link, a:visited { 
-    background-color: deepSkyBlue; 
+    background-color: rgb(28, 28, 30); 
     color: white; 
     padding: 5px 15px; 
     width: 210px; 
@@ -281,7 +275,7 @@
     display: inline-block;
   }
   .div1 a:hover, a:active { 
-    background-color: deepSkyBlue;
+    background-color: rgb(28, 28, 30);
     color: black;
   }
   
@@ -324,20 +318,17 @@
   }
   
   /* PIC firmware page */
-.pictable {
+#table {
   display: table;
-  width: 100%;
-  min-width: 600px;
   padding: 5px;
 }
 .picrow {
   display: table-row;
   padding: 5px;
-  width: 100%;
 }
 .piccolumn1 {
   display: table-cell;
-  width: 170px;
+  width: 150px;
   margin: 5px;
 }
 .piccolumn2 {
@@ -364,128 +355,86 @@
   margin: 5px;
 }
 
-*[data-tooltip] {
-  position: relative;
-}
-
-*[data-tooltip]::after {
-  content: attr(data-tooltip);
-
-  position: absolute;
-  top: -20px;
-  right: -20px;
-  width: auto;
-
-  pointer-events: none;
-  opacity: 0;
-  -webkit-transition: opacity .15s ease-in-out;
-  -moz-transition: opacity .15s ease-in-out;
-  -ms-transition: opacity .15s ease-in-out;
-  -o-transition: opacity .15s ease-in-out;
-  transition: opacity .15s ease-in-out;
-
-  display: block;
-  font-size: 12px;
-  line-height: 16px;
-  background: #fefdcd;
-  padding: 5px 2px;
-  border: 1px solid #c0c0c0;
-  box-shadow: 2px 4px 5px rgba(0, 0, 0, 0.4);
-}
-
-*[data-tooltip]:hover::after {
-    opacity: 1;
-}
-
-/* OTmonitor */
-
-.otmontable {
-  display: table;
-  width: 100%;
-}
-
-.otmonrow {
-  background: lightblue;
-  display: table-row;
-}
-.otmoncolumn1 {
-  display: table-cell;
-  float: left;
-  width: 270px;
-  padding-left: 10px;
-}
-.otmoncolumn2 {
-  display: table-cell;
-  float: left;
-  width: 40px;
-  text-align: right;
-}
-.otmoncolumn3 {
-  display: table-cell;
-  float: left;
-  width: 30px;
-  margin-left: 2px;
-}
-
-/* DevInfo */
-.devinfonrow {
-  background: lightblue;
-  display: table-row;
-  font-size: 14px;
-}
-.devinfocolumn1 {
-  display: table-cell;
-  float: left;
-  width: 160px;
-  padding-left: 10px;
-  font-size: 14px;
-}
-.devinfocolumn2 {
-  display: table-cell;
-  float: left;
-  width: 160px;
-  text-align: left;
-  font-size: 14px;
-}
-
-/* Clear floats after the columns */
-.devinforow:after {
-  content: "";
-  display: table;
-  clear: both;
-  background: lightblue;
-}
-
-/* Clear floats after the columns */
-.devinforow:after {
-  content: "";
-  display: table;
-  clear: both;
-  background: lightblue;
-}
-
-/* SettingsPage */
-#settingMessage {
-  background-color: coral;
-  width: 860px;
-  margin-left: 10px;
-  color: white;
-  text-align: center;
-}
+  
+  /* OTmonitor */
+  .otmonrow {
+    background: rgb(28, 28, 30);
+    display: table-row;
+  }
+  .otmoncolumn1 {
+    display: table-cell;
+    float: left;
+    width: 270px;
+    padding-left: 10px;
+  }
+  .otmoncolumn2 {
+    display: table-cell;
+    float: left;
+    width: 40px;
+    text-align: right;
+  }
+  .otmoncolumn3 {
+    display: table-cell;
+    float: left;
+    width: 30px;
+    margin-left: 2px;
+  }
+  
+  /* DevInfo */
+  .devinfonrow {
+    background: rgb(28, 28, 30);
+    display: table-row;
+    font-size: 14px;
+  }
+  .devinfocolumn1 {
+    display: table-cell;
+    float: left;
+    width: 160px;
+    padding-left: 10px;
+    font-size: 12px;
+  }
+  .devinfocolumn2 {
+    display: table-cell;
+    float: left;
+    width: 160px;
+    text-align: left;
+    font-size: 12px;
+  }
+  
+  /* Clear floats after the columns */
+  .devinforow:after {
+    content: "";
+    display: table;
+    clear: both;
+    background: rgb(28, 28, 30);
+  }
+  
+ /* SettingsPage */
+ #settingMessage {
+   background-color: rgba(87, 152, 203, 1);
+   width: 860px;
+   margin-left: 10px;
+   color: white;
+   text-align: center;
+ }
 
   /* define tag selectors () -------------------------------------------------- */
   
   button { width: 100px; }
   
   .settingDiv {
-    text-align: right;
-    min-width: 850px;
-    border: thick solid lightblue;
-    background: lightblue;
+    text-align: left;
+    margin-left: 10px;
+    margin-right: 10px;
+    width: 850px;
+    border-bottom-style: solid;
+    border-bottom-width: 1px;
+    border-bottom-color: rgb(72, 72, 74);
+    background: rgb(28, 28, 30);
   }
 
-  .input-changed { background: lightgray; }
-  .input-normal { background: white; }
+  .input-changed { background: rgb(72, 72, 74); color: white; }
+  .input-normal { background: rgb(28, 28, 30); color: white; }
 
   /*
   ***************************************************************************
@@ -511,216 +460,3 @@
   * 
   ***************************************************************************
   */
-/*
-***************************************************************************
-** OpenTherm Log Viewer Styles
-***************************************************************************
-*/
-
-/* Log Section Container */
-.ot-log-section {
-  margin: 20px 0;
-  padding: 15px;
-  background: #f5f5f5;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-/* Log Header */
-.ot-log-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-  padding-bottom: 10px;
-  border-bottom: 2px solid #ddd;
-}
-
-.ot-log-header h3 {
-  margin: 0;
-  color: #333;
-  font-size: 18px;
-}
-
-.ot-log-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}
-
-/* WebSocket Status Indicator */
-.ws-status {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  transition: all 0.3s ease;
-}
-
-.ws-connected {
-  background: #4caf50;
-  box-shadow: 0 0 8px #4caf50;
-}
-
-.ws-disconnected {
-  background: #f44336;
-}
-
-/* Log Controls */
-.ot-log-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
-  align-items: center;
-}
-
-.btn-log-control {
-  padding: 6px 12px;
-  background: #2196F3;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: all 0.2s;
-}
-
-.btn-log-control:hover {
-  background: #1976D2;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-
-.btn-log-control:active {
-  transform: translateY(0);
-}
-
-.btn-active {
-  background: #4caf50;
-}
-
-.btn-active:hover {
-  background: #45a049;
-}
-
-.log-search {
-  flex: 1;
-  min-width: 200px;
-  padding: 6px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 13px;
-}
-
-.log-control-label {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 13px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.log-control-label input[type="checkbox"] {
-  cursor: pointer;
-}
-
-/* Log Container */
-.ot-log-container {
-  background: #1e1e1e;
-  border-radius: 4px;
-  overflow: hidden;
-  transition: max-height 0.3s ease;
-}
-
-.ot-log-container.collapsed {
-  max-height: 200px;
-}
-
-.ot-log-container:not(.collapsed) {
-  max-height: 600px;
-}
-
-/* Log Content */
-.ot-log-content {
-  font-family: 'Courier New', Consolas, monospace;
-  font-size: 12px;
-  color: #d4d4d4;
-  padding: 15px;
-  overflow-y: auto;
-  overflow-x: auto;
-  white-space: pre;
-  line-height: 1.4;
-  max-height: inherit;
-  scrollbar-width: thin;
-  scrollbar-color: #555 #1e1e1e;
-}
-
-.ot-log-content::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.ot-log-content::-webkit-scrollbar-track {
-  background: #1e1e1e;
-}
-
-.ot-log-content::-webkit-scrollbar-thumb {
-  background: #555;
-  border-radius: 5px;
-}
-
-.ot-log-content::-webkit-scrollbar-thumb:hover {
-  background: #777;
-}
-
-/* Log Footer */
-.ot-log-footer {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background: #e0e0e0;
-  border-radius: 0 0 4px 4px;
-  font-size: 12px;
-  color: #555;
-}
-
-.ot-log-footer span {
-  display: inline-block;
-}
-
-/* Responsive Design */
-@media (max-width: 767px) {
-  #otLogSection {
-    display: none !important;
-  }
-}
-
-@media (max-width: 767px) {
-  .ot-log-controls {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .btn-log-control,
-  .log-search,
-  .log-control-label {
-    width: 100%;
-  }
-  
-  .ot-log-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  
-  .ot-log-container.collapsed {
-    max-height: 150px;
-  }
-  
-  .ot-log-container:not(.collapsed) {
-    max-height: 400px;
-  }
-}
