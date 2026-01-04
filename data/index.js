@@ -181,8 +181,17 @@ function updateWSStatus(connected) {
 function addLogLine(logLine) {
   if (!logLine || logLine.trim() === '') return;
   
-  const now = new Date();
-  const timestamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(now.getMilliseconds()).padStart(3, '0')}`;
+  let timestamp;
+  if (window.performance && window.performance.timeOrigin) {
+    const nowHighRes = performance.now() + performance.timeOrigin;
+    const now = new Date(nowHighRes);
+    const msPart = Math.floor((nowHighRes % 1000) * 100);
+    const msHighRes = String(msPart).padStart(5, '0');
+    timestamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${msHighRes}`;
+  } else {
+    const now = new Date();
+    timestamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(now.getMilliseconds()).padStart(3, '0')}`;
+  }
   
   const logEntry = {
     time: timestamp,
