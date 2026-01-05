@@ -69,7 +69,7 @@ The Web UI and APIs are designed for use on a trusted local network. Do not expo
 - View a live OpenTherm message log stream and download logs (WebSocket-based).
 - Track firmware upload/flash progress with size validation during updates.
 - Toggle a dark theme with per-browser persistence.
-- Supports reverse proxy deployments with automatic http/https detection.
+- Supports reverse proxy deployments with automatic http/https detection for REST API and basic Web UI access; WebSocket-based features (such as the live OT message log) currently assume plain HTTP and may not work when accessed via an HTTPS reverse proxy.
 
 ### MQTT (including Home Assistant Auto Discovery)
 - Publishes parsed OpenTherm values to MQTT using a configurable topic prefix.
