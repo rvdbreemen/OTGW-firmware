@@ -66,11 +66,16 @@ The Web UI and APIs are designed for use on a trusted local network. Do not expo
 - Configure the gateway via HTTP (default port 80).
 - Manage settings stored on LittleFS.
 - Perform PIC firmware maintenance (see warning below).
+- View a live OpenTherm message log stream and download logs (WebSocket-based).
+- Track firmware upload/flash progress with size validation during updates.
+- Toggle a dark theme with per-browser persistence.
+- Supports reverse proxy deployments with automatic http/https detection.
 
 ### MQTT (including Home Assistant Auto Discovery)
 - Publishes parsed OpenTherm values to MQTT using a configurable topic prefix.
 - Supports Home Assistant MQTT Auto Discovery (Home Assistant Core v2021.2.0+).
 - Accepts OTGW commands via MQTT (topic structure depends on your configured prefix; see the wiki for exact topics and examples).
+- Publishes event topics for command responses/errors and thermostat connection/power state changes.
 
 ### REST API
 - Read OpenTherm values via `/api/v0/` and `/api/v1/` endpoints.
@@ -116,8 +121,7 @@ There are two ways to integrate with Home Assistant:
 ## Roadmap ideas
 
 - InfluxDB client for direct logging
-- Live Web UI updates via websockets
-- Streaming OT message log via websockets
+- Broader live Web UI updates beyond the OT message log (e.g. live sensor/value cards)
 
 ## Release notes
 
@@ -128,7 +132,7 @@ For release artifacts, see https://github.com/rvdbreemen/OTGW-firmware/releases.
 
 | Version | Release notes |
 |-|-|
-| 0.10.4 | Feature: Optional NTP time sync to OTGW (new `NTPsendtime` setting)<br>Feature: Dark theme toggle with persistent selection and responsive UI/layout improvements (dropdowns, on/off indicators, etc.)<br>Feature: Live OpenTherm message log streaming in the Web UI with download support (WebSocket-based log viewer)<br>Feature: Firmware update UI now shows upload/flash progress with WebSocket/SSE status updates and file size validation<br>Feature: New build/flash tooling (`build.py`, interactive `flash_esp.py`) plus automated semver/CI improvements for local and release builds<br>Update: MQTT event reporting for command responses/errors and thermostat connection/power states<br>Update: Bundled PIC16F1847 gateway firmware refreshed; OpenTherm Protocol Specification v4.2 added to docs<br>Fix: WebSocket handshake validation/buffer safety improvements and Wi-Fi/watchdog reliability tweaks. |
+| 0.10.4-beta | Feature: Optional NTP time sync to OTGW (new `NTPsendtime` setting)<br>Feature: Dark theme toggle with persistent selection and responsive UI/layout improvements (dropdowns, on/off indicators, etc.)<br>Feature: Live OpenTherm message log streaming in the Web UI with download support (WebSocket-based log viewer)<br>Feature: Firmware update UI now shows upload/flash progress with WebSocket/SSE status updates and file size validation<br>Feature: New build/flash tooling (`build.py`, interactive `flash_esp.py`) plus automated semver/CI improvements for local and release builds<br>Update: MQTT event reporting for command responses/errors and thermostat connection/power states<br>Update: Bundled PIC16F1847 gateway firmware refreshed; OpenTherm Protocol Specification v4.2 added to docs<br>Fix: WebSocket handshake validation/buffer safety improvements and Wi-Fi/watchdog reliability tweaks. |
 | 0.10.3 | Web UI: Mask MQTT password field and support running behind a reverse proxy (auto-detect http/https)<br>Home Assistant: Improve discovery templates (remove empty unit_of_measurement and add additional sensors/boundary values)<br>Fix: Status functions and REST API status reporting<br>CI: Improved GitHub Actions build/release workflow and release artifacts. |
 | 0.10.2 | Bugfix: issue #213 which caused 0 bytes after update of PIC firwmare (dropped to Adruino core 2.7.4)<br>Update to filesystem to include latest PIC firmware (6.5 and 5.8, released 12 march 2023)<br>Fix: Back to correct hostname to wifi (credits to @hvxl)<br>Fix: Adding a little memory for use with larger settings.|
 | 0.10.1 | Beter build processes to generate consistant quality using aruidno-cli and github actions (Thx to @hvxl and @DaveDavenport)<br>Maintaince to sourcetree, removed cruft, time.h library, submodules<br>Fix: parsing VH Status Master correctly<br>Enhancement: Stopping send time commands on detections of PS=1 mode<br>Fix: Mistake in MQTT configuration of auto discovery template for OEM fault code<br>Added wifi quality indication (so you can understand better)<br>Remove: Boardtype, as it was static in compiletime building|
