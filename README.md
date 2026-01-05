@@ -66,6 +66,9 @@ The Web UI and APIs are designed for use on a trusted local network. Do not expo
 - Configure the gateway via HTTP (default port 80).
 - Manage settings stored on LittleFS.
 - Perform PIC firmware maintenance (see warning below).
+- View a live OpenTherm message log stream and download logs for troubleshooting.
+- Track firmware uploads and flashing progress during updates.
+- Toggle a dark theme with persistent preference storage.
 
 ### MQTT (including Home Assistant Auto Discovery)
 - Publishes parsed OpenTherm values to MQTT using a configurable topic prefix.
@@ -116,8 +119,8 @@ There are two ways to integrate with Home Assistant:
 ## Roadmap ideas
 
 - InfluxDB client for direct logging
-- Live Web UI updates via websockets
-- Streaming OT message log via websockets
+- Long-term trend charts for OpenTherm values in the Web UI
+- Additional theme/layout customization options
 
 ## Release notes
 
@@ -128,7 +131,7 @@ For release artifacts, see https://github.com/rvdbreemen/OTGW-firmware/releases.
 
 | Version | Release notes |
 |-|-|
-| 0.10.4 | Feature: Optional NTP time sync to OTGW (new `NTPsendtime` setting)<br>Feature: PIC firmware update checks are no longer automatic; only run when manually triggered by the user<br>Feature: MQTT password is masked in the Web UI<br>Feature: Add basic CSRF protection for sensitive REST API endpoints (Origin/Referer validation)<br>Feature: Wi-Fi configuration portal improvements (hotspot/AP behavior)<br>Update: Bundled PIC16F1847 gateway firmware updated<br>Docs: Add OpenTherm Protocol Specification v4.2<br>Fix: Improve PIC upgrade command handling/logging and GPIO output validation/initialization<br>Other: Many memory/robustness fixes (reduce heap fragmentation by replacing `String`/unsafe formatting with bounded buffers, fix serial buffer overflow causing data loss, fix multiple buffer overruns/bounds checks, harden REST API parsing/method validation and command queue handling, and improve URL parsing/escaping and redirect sanitization). |
+| 0.10.4 | Feature: Optional NTP time sync to OTGW (new `NTPsendtime` setting)<br>Feature: Dark theme toggle with persistent selection and responsive UI/layout improvements (dropdowns, on/off indicators, etc.)<br>Feature: Live OpenTherm message log streaming in the Web UI with download support (WebSocket-based log viewer)<br>Feature: Firmware update UI now shows upload/flash progress with WebSocket/SSE status updates and file size validation<br>Feature: New build/flash tooling (`build.py`, interactive `flash_esp.py`) plus automated semver/CI improvements for local and release builds<br>Update: MQTT event reporting for command responses/errors and thermostat connection/power states<br>Update: Wi-Fi configuration portal improvements and enhanced connection debug output<br>Update: Bundled PIC16F1847 gateway firmware refreshed; OpenTherm Protocol Specification v4.2 added to docs<br>Fix: WebSocket handshake validation/buffer safety improvements and watchdog/Wi-Fi reliability tweaks. |
 | 0.10.3 | Web UI: Mask MQTT password field and support running behind a reverse proxy (auto-detect http/https)<br>Home Assistant: Improve discovery templates (remove empty unit_of_measurement and add additional sensors/boundary values)<br>Fix: Status functions and REST API status reporting<br>CI: Improved GitHub Actions build/release workflow and release artifacts. |
 | 0.10.2 | Bugfix: issue #213 which caused 0 bytes after update of PIC firwmare (dropped to Adruino core 2.7.4)<br>Update to filesystem to include latest PIC firmware (6.5 and 5.8, released 12 march 2023)<br>Fix: Back to correct hostname to wifi (credits to @hvxl)<br>Fix: Adding a little memory for use with larger settings.|
 | 0.10.1 | Beter build processes to generate consistant quality using aruidno-cli and github actions (Thx to @hvxl and @DaveDavenport)<br>Maintaince to sourcetree, removed cruft, time.h library, submodules<br>Fix: parsing VH Status Master correctly<br>Enhancement: Stopping send time commands on detections of PS=1 mode<br>Fix: Mistake in MQTT configuration of auto discovery template for OEM fault code<br>Added wifi quality indication (so you can understand better)<br>Remove: Boardtype, as it was static in compiletime building|
