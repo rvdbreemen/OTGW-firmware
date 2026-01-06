@@ -34,22 +34,23 @@
   
   th {
     white-space: nowrap;
-    border-right: 1px solid #ddd;
-    border-left: 1px solid #ddd;
+    border-right: 1px solid #444;
+    border-left: 1px solid #444;
     vertical-align: bottom;
+    background-color: #2c2c2e;
   }
   
   td {
     white-space: nowrap;
-    border-bottom: 1px solid #ddd;
-    border-right: 1px solid #ddd;
-    border-left: 1px solid #ddd;
+    border-bottom: 1px solid #444;
+    border-right: 1px solid #444;
+    border-left: 1px solid #444;
     vertical-align: bottom;
   }
   
   tfoot {
     font-size: 12px;
-    color: lightblue;
+    color: #64d2ff;
   }
   
   input {
@@ -117,10 +118,7 @@
   /*--------------------- N A V - B A R -----------------*/
   .nav-container, .footer {
     background: rgb(44, 44, 46);
-    padding-top: 6px;
-    padding-left: 1px;
-    padding-right: 1px;
-    padding-bottom: 6px;
+    padding: 6px;
     min-height: 50px;
     display: flex;
     flex-direction: row;
@@ -140,30 +138,15 @@
     flex-basis: 10%;
     display: flex;
     flex-grow: 1;
-    gap: 0px;
+    gap: 15px;
     flex: 2 1 0;
     justify-content: left; /* horizonal alignment */
     align-items: center; /* horizonal alignment */
     min-height: 50px;
-    font-size: 26px;
-    font-weight: bold;
   }
 
   .nav-left .hidden {
     display: none;
-  }
-
-  .nav-centered {
-    flex-basis: 10%;
-    display: flex;
-    flex-grow: 1;
-    gap: 0px;
-    flex: 2 1 0;
-    justify-content: left; /* horizonal alignment */
-    align-items: center; /* horizonal alignment */
-    min-height: 50px;
-    font-size: 26px;
-    font-weight: thin;
   }
 
   .nav-right {
@@ -210,18 +193,21 @@
   .nav-right .adv_dropdown span:hover {
     background-color: #3a3a3c;
   }
-  } 
   
   .nav-item {
     font-size: 16px;
     height: 40px;
     width: 110px;
-    background-color: rgb(44, 44, 46);
+    background-color: #0A84FF;
     border: none;
     border-radius: 5px;
     color: white;
     cursor: pointer;
-    box-shadow: none;
+    box-shadow: 2px 2px 2px 0px black;
+  }
+
+  .nav-item:hover {
+    background-color: #409CFF;
   }
 
   .nav-item:active {
@@ -293,7 +279,7 @@
     margin-top: 10px;
   }
   .div1 a:link, a:visited { 
-    background-color: rgb(28, 28, 30); 
+    background-color: #0A84FF; 
     color: white; 
     padding: 5px 15px; 
     width: 210px; 
@@ -302,8 +288,8 @@
     display: inline-block;
   }
   .div1 a:hover, a:active { 
-    background-color: rgb(28, 28, 30);
-    color: black;
+    background-color: #409CFF;
+    color: white;
   }
   
   .div2 { 
@@ -459,9 +445,13 @@
 .state-off {
   background-color: transparent;
 }
-    display: table-row;
-    font-size: 14px;
-  }
+
+/* DevInfo */
+.devinforow {
+  background: rgb(28, 28, 30);
+  display: table-row;
+  font-size: 14px;
+}
   .devinfocolumn1 {
     display: table-cell;
     float: left;
