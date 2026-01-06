@@ -256,6 +256,11 @@ function addLogLine(logLine) {
   if (typeof processStatsLine === 'function') {
       processStatsLine(logLine);
   }
+  
+  // Process for Graph
+  if (typeof OTGraph !== 'undefined') {
+      OTGraph.processLine(logLine);
+  }
 
   // Trim buffer if exceeds max
   if (otLogBuffer.length > MAX_LOG_LINES) {
@@ -544,6 +549,10 @@ function initMainPage() {
   needReload = false;
   
   applyTheme();
+
+  if (typeof OTGraph !== 'undefined') {
+      OTGraph.init();
+  }
 
   if (window.location.hash == "#tabPICflash") {
     firmwarePage();
