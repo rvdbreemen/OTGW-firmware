@@ -46,13 +46,15 @@ let logExpanded = false;
 let searchTerm = '';
 let updatePending = false;
 let otLogControlsInitialized = false;
+let isFlashing = false;
+let currentFlashFilename = "";
 
 // WebSocket configuration: must match the WebSocket port used in webSocketStuff.ino (currently hardcoded as 81 in the WebSocketsServer constructor).
 const WEBSOCKET_PORT = 81;
 let wsReconnectTimer = null;
 
 //============================================================================
-function initOTLogWebSocket() {
+function initOTLogWebSocket(force) {
   // Detect smartphone (iPhone or Android Phone)
   const isPhone = /iPhone|iPod/.test(navigator.userAgent) || 
                  (/Android/.test(navigator.userAgent) && /Mobile/.test(navigator.userAgent));
@@ -60,7 +62,7 @@ function initOTLogWebSocket() {
   // Also check screen width as a fallback (standard breakpoint for tablets is 768px)
   const isSmallScreen = window.innerWidth < 768;
 
-  if (isPhone || isSmallScreen) {
+  if ((isPhone || isSmallScreen) && !force && !isFlashing) {
     console.log("Smartphone or small screen detected. Disabling OpenTherm Message Log.");
     const logSection = document.getElementById('otLogSection');
     if (logSection) {
@@ -107,7 +109,8 @@ function initOTLogWebSocket() {
       updateWSStatus(false);
       // Attempt to reconnect after 5 seconds if not already scheduled
       if (!wsReconnectTimer) {
-        wsReconnectTimer = setTimeout(initOTLogWebSocket, 5000);
+        let delay = isFlashing ? 1000 : 5000;
+        wsReconnectTimer = setTimeout(function() { initOTLogWebSocket(force); }, delay);
       }
     };
     
@@ -129,7 +132,8 @@ function initOTLogWebSocket() {
     console.error('Failed to create WebSocket:', e);
     updateWSStatus(false);
     if (!wsReconnectTimer) {
-      wsReconnectTimer = setTimeout(initOTLogWebSocket, 5000);
+      let delay = isFlashing ? 1000 : 5000;
+      wsReconnectTimer = setTimeout(function() { initOTLogWebSocket(force); }, delay);
     }
   }
   
@@ -1266,7 +1270,11 @@ function applyTheme() {
 //============================================================================
 // PIC Flash Functions
 //============================================================================
+// let currentFlashFilename = ""; // Moved to top
+
 function startFlash(filename) {
+    currentFlashFilename = filename;
+    isFlashing = true;
     // Stop polling during upgrade to prevent interference and reduce load
     if (tid) { clearInterval(tid); tid = 0; }
     if (timeupdate) { clearInterval(timeupdate); timeupdate = 0; }
@@ -1283,7 +1291,7 @@ function startFlash(filename) {
     if (pctText) pctText.innerText = "Starting upgrade for " + filename + "...";
     
     // Ensure WebSocket is connected for progress updates
-    initOTLogWebSocket();
+    initOTLogWebSocket(true);
     
     fetch(localURL + '/pic?action=upgrade&name=' + filename)
     .then(response => {
@@ -1295,10 +1303,11 @@ function startFlash(filename) {
     })
     .then(data => {
         console.log("Flash started:", data);
-        if (pctText) pctText.innerText = "Flashing started...";
+        if (pctText) pctText.innerText = "Flashing " + filename + " started...";
     })
     .catch(error => {
         console.error("Flash error:", error);
+        isFlashing = false;
         if (pctText) pctText.innerText = "Error starting flash: " + error.message;
         if (progressBar) progressBar.style.backgroundColor = "red";
         
@@ -1327,15 +1336,16 @@ function handleFlashMessage(data) {
             
             if (msg.hasOwnProperty('percent')) {
                 if (progressBar) progressBar.style.width = msg.percent + "%";
-                if (pctText) pctText.innerText = "Flashing " + msg.percent + "%";
+                if (pctText) pctText.innerText = "Flashing " + currentFlashFilename + " : " + msg.percent + "%";
             }
             
             if (msg.hasOwnProperty('result')) {
                 // Done
                 let resultText = (msg.result === 0) ? "Success!" : "Failed (Error " + msg.result + ")";
+                isFlashing = false;
                 
                 if (pctText) {
-                    pctText.innerText = "Finished: " + resultText;
+                    pctText.innerText = "Finished " + currentFlashFilename + ": " + resultText;
                 }
                 
                 if (msg.result === 0 && progressBar) {
