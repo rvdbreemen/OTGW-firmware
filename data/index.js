@@ -52,6 +52,26 @@ let currentFlashFilename = "";
 // WebSocket configuration: must match the WebSocket port used in webSocketStuff.ino (currently hardcoded as 81 in the WebSocketsServer constructor).
 const WEBSOCKET_PORT = 81;
 let wsReconnectTimer = null;
+let wsWatchdogTimer = null;
+const WS_WATCHDOG_TIMEOUT = 10000; // 10 seconds timeout for silence
+
+//============================================================================
+function resetWSWatchdog() {
+  if (wsWatchdogTimer) clearTimeout(wsWatchdogTimer);
+  wsWatchdogTimer = setTimeout(function() {
+      console.warn("WS Watchdog expired. No data received for " + (WS_WATCHDOG_TIMEOUT/1000) + "s. Forcing reconnect...");
+      // Closing the socket will trigger onclose, which triggers the reconnect logic
+      if (otLogWS) {
+        otLogWS.close();
+      } else {
+        // If socket is somehow null but watchdog fired, force a new connection
+        // We explicitly pass 'false' here to indicate a non-forced reconnect.
+        // If preserving a previous 'force' state ever becomes critical, store it in a global.
+        // For now, attempting a standard connect is safe.
+        initOTLogWebSocket(false);
+      }
+  }, WS_WATCHDOG_TIMEOUT);
+}
 
 //============================================================================
 function initOTLogWebSocket(force) {
@@ -76,6 +96,11 @@ function initOTLogWebSocket(force) {
     clearTimeout(wsReconnectTimer);
     wsReconnectTimer = null;
   }
+  // Clear any pending watchdog
+  if (wsWatchdogTimer) {
+    clearTimeout(wsWatchdogTimer);
+    wsWatchdogTimer = null;
+  }
 
   const wsHost = window.location.hostname;
   const wsPort = WEBSOCKET_PORT;
@@ -83,6 +108,9 @@ function initOTLogWebSocket(force) {
   
   // Close existing connection if it exists
   if (otLogWS) {
+    // Remove listeners to avoid double-triggers during manual cleanup
+    otLogWS.onclose = null; 
+    otLogWS.onerror = null;
     if (otLogWS.readyState === WebSocket.OPEN || otLogWS.readyState === WebSocket.CONNECTING) {
       otLogWS.close();
     }
@@ -102,11 +130,17 @@ function initOTLogWebSocket(force) {
         clearTimeout(wsReconnectTimer);
         wsReconnectTimer = null;
       }
+      resetWSWatchdog();
     };
     
     otLogWS.onclose = function() {
       console.log('OT Log WebSocket disconnected');
       updateWSStatus(false);
+      // Stop watchdog
+      if (wsWatchdogTimer) {
+        clearTimeout(wsWatchdogTimer);
+        wsWatchdogTimer = null;
+      }
       // Attempt to reconnect after 5 seconds if not already scheduled
       if (!wsReconnectTimer) {
         let delay = isFlashing ? 1000 : 5000;
@@ -118,9 +152,11 @@ function initOTLogWebSocket(force) {
       console.error('OT Log WebSocket error:', error);
       updateWSStatus(false);
       // onclose will usually follow, but we ensure cleanup
+      if (otLogWS) otLogWS.close(); 
     };
     
     otLogWS.onmessage = function(event) {
+      resetWSWatchdog();
       if (typeof handleFlashMessage === "function") {
         if (handleFlashMessage(event.data)) return;
       }
@@ -151,12 +187,18 @@ function disconnectOTLogWebSocket() {
     clearTimeout(wsReconnectTimer);
     wsReconnectTimer = null;
   }
+  // Clear watchdog
+  if (wsWatchdogTimer) {
+     clearTimeout(wsWatchdogTimer);
+     wsWatchdogTimer = null;
+  }
 
   if (otLogWS) {
     console.log('Disconnecting OT Log WebSocket');
     // Remove event listeners to prevent auto-reconnect
     otLogWS.onclose = null;
     otLogWS.onerror = null;
+    otLogWS.onmessage = null;
     
     if (otLogWS.readyState === WebSocket.OPEN || otLogWS.readyState === WebSocket.CONNECTING) {
       otLogWS.close();
@@ -210,6 +252,11 @@ function addLogLine(logLine) {
   // Add to buffer
   otLogBuffer.push(logEntry);
   
+  // Process for Statistics
+  if (typeof processStatsLine === 'function') {
+      processStatsLine(logLine);
+  }
+
   // Trim buffer if exceeds max
   if (otLogBuffer.length > MAX_LOG_LINES) {
     otLogBuffer.shift();
@@ -1456,3 +1503,174 @@ function handleFlashMessage(data) {
 * 
 ***************************************************************************
 */
+
+/*
+***************************************************************************
+** Statistics Tab Functions
+***************************************************************************
+*/
+let statsBuffer = {};
+let statsSortCol = 1; // Default sort by Dec ID
+let statsSortAsc = true;
+let currentTab = 'Log';
+
+function openLogTab(evt, tabName) {
+  let i, tabcontent, tablinks;
+  tabcontent = document.getElementsByClassName('tab-content');
+  for (i = 0; i < tabcontent.length; i++) {
+    tabcontent[i].classList.remove('active');
+  }
+  tablinks = document.getElementsByClassName('tab-link');
+  for (i = 0; i < tablinks.length; i++) {
+    tablinks[i].classList.remove('active');
+  }
+  document.getElementById(tabName).classList.add('active');
+  evt.currentTarget.classList.add('active');
+  currentTab = tabName;
+  if (currentTab === 'Statistics') {
+      updateStatisticsDisplay();
+  }
+}
+
+function processStatsLine(line) {
+    if (!line || line.length < 40) return;
+    
+    // Check for validity marker at index 39
+    // 'Sender             ID Type             > Label = Value Unit'
+    //  01234567890123456789012345678901234567890
+    if (line.charAt(39) !== '>') return;
+    
+    // Extract ID
+    var idStr = line.substring(18, 22).trim();
+    if (!idStr) return;
+    var id = parseInt(idStr, 10);
+    if (isNaN(id)) return;
+
+    var type = line.substring(22, 39).trim(); // 'Read-Ack' etc.
+    
+    var dataPart = line.substring(40);
+    var label = '';
+    var value = '';
+    
+    // Find first ' = '
+    var eqIdx = dataPart.indexOf(' = ');
+    if (eqIdx !== -1) {
+        label = dataPart.substring(0, eqIdx).trim();
+        value = dataPart.substring(eqIdx + 3).trim();
+    } else {
+        // Fallback or 'Unknown' lines
+        label = dataPart.trim();
+        if (label === '') label = 'Unknown';
+    }
+
+    var now = Date.now();
+    
+    if (!statsBuffer[id]) {
+        statsBuffer[id] = {
+            id: id,
+            hex: id.toString(16).toUpperCase().padStart(2, '0'),
+            type: type,
+            label: label,
+            value: value,
+            count: 0,
+            lastTime: now, 
+            intervalSum: 0,
+            intervalCount: 0
+        };
+    } else {
+        var entry = statsBuffer[id];
+        var diff = (now - entry.lastTime) / 1000.0; // seconds
+        // Only count interval if it's reasonable (e.g. not milliseconds unless burst)
+        // But for precise avg, we take it.
+        entry.intervalSum += diff;
+        entry.intervalCount++;
+        
+        entry.lastTime = now;
+        entry.value = value;
+        entry.type = type; 
+        if (label && label !== 'Unknown') entry.label = label;
+    }
+    statsBuffer[id].count++;
+    
+    // If stats tab is active, schedule update
+    if (currentTab === 'Statistics') {
+         scheduleStatsUpdate();
+    }
+}
+
+var statsUpdatePending = false;
+function scheduleStatsUpdate() {
+    if (!statsUpdatePending) {
+        statsUpdatePending = true;
+        requestAnimationFrame(function() {
+            statsUpdatePending = false;
+            updateStatisticsDisplay();
+        });
+    }
+}
+
+function updateStatisticsDisplay() {
+    if (currentTab !== 'Statistics') return;
+    
+    var tbody = document.querySelector('#otStatsTable tbody');
+    if (!tbody) return;
+
+    var rows = Object.values(statsBuffer);
+    
+    // Sort
+    rows.sort(function(a, b) {
+        var valA, valB;
+        switch(statsSortCol) {
+            case 0: valA = a.id; valB = b.id; break;
+            case 1: valA = a.id; valB = b.id; break;
+            case 2: valA = a.type; valB = b.type; break;
+            case 3: valA = a.label; valB = b.label; break;
+            case 4: valA = (a.intervalCount > 0 ? a.intervalSum / a.intervalCount : 0); 
+                    valB = (b.intervalCount > 0 ? b.intervalSum / b.intervalCount : 0); break;
+            case 5: valA = a.value; valB = b.value; break;
+            default: valA = a.id; valB = b.id;
+        }
+        
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+        
+        if (valA < valB) return statsSortAsc ? -1 : 1;
+        if (valA > valB) return statsSortAsc ? 1 : -1;
+        return 0;
+    });
+
+    var html = '';
+    rows.forEach(function(r) {
+        var avgInterval = (r.intervalCount > 0) ? (r.intervalSum / r.intervalCount).toFixed(1) : '-';
+        
+        // Direction
+        var dir = 'Unk';
+        if (r.type && (r.type.indexOf('Read') !== -1)) dir = 'Read';
+        else if (r.type && (r.type.indexOf('Write') !== -1)) dir = 'Write';
+
+        html += '<tr>';
+        html += '<td>' + escapeHtml(r.hex) + '</td>';
+        html += '<td>' + escapeHtml(r.id) + '</td>';
+        html += '<td>' + escapeHtml(dir) + '</td>';
+        html += '<td>' + escapeHtml(r.label) + '</td>';
+        html += '<td>' + escapeHtml(avgInterval) + '</td>';
+        html += '<td>' + escapeHtml(r.value) + '</td>';
+        html += '</tr>';
+    });
+    
+    tbody.innerHTML = html;
+    
+    var countEl = document.getElementById('statsCount');
+    if (countEl) countEl.textContent = rows.length;
+}
+
+function sortStats(col) {
+    if (statsSortCol === col) {
+        statsSortAsc = !statsSortAsc;
+    } else {
+        statsSortCol = col;
+        statsSortAsc = true;
+    }
+    updateStatisticsDisplay();
+}
+
