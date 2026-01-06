@@ -798,3 +798,11 @@
     z-index: 2; /* Ensure on top of bar */
   }
 
+
+
+/* Disable interaction during critical operations */
+body.disable-interaction {
+    pointer-events: none;
+    opacity: 0.6;
+    cursor: wait;
+}
