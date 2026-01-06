@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.0.0-beta
+**  Version  : v1.0.0-rc1
 **
 **  Copyright (c) 2021-2024 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -355,26 +355,26 @@ void OpenthermData_t::s16(int16_t value) {
 const char *statusToString(OpenThermResponseStatus status)
 {
 	switch (status) {
-		case OT_NONE:    return "NONE";
-		case OT_SUCCESS: return "SUCCESS";
-		case OT_INVALID: return "INVALID";
-		case OT_TIMEOUT: return "TIMEOUT";
-		default:         return "UNKNOWN";
+		case OT_NONE:    return "None";
+		case OT_SUCCESS: return "Success";
+		case OT_INVALID: return "Invalid";
+		case OT_TIMEOUT: return "Timeout";
+		default:         return "Unknown";
 	}
 }
 
 const char *messageTypeToString(OpenThermMessageType message_type)
 {
 	switch (message_type) {
-		case OT_READ_DATA:        return "READ_DATA";
-		case OT_WRITE_DATA:       return "WRITE_DATA";
-		case OT_INVALID_DATA:     return "INVALID_DATA";
-		case OT_RESERVED:         return "RESERVED";
-		case OT_READ_ACK:         return "READ_ACK";
-		case OT_WRITE_ACK:        return "WRITE_ACK";
-		case OT_DATA_INVALID:     return "DATA_INVALID";
-		case OT_UNKNOWN_DATA_ID:  return "UNKNOWN_DATA_ID";
-		default:                  return "UNKNOWN";
+		case OT_READ_DATA:        return "Read-Data";
+		case OT_WRITE_DATA:       return "Write-Data";
+		case OT_INVALID_DATA:     return "Invalid-Data";
+		case OT_RESERVED:         return "Reserved";
+		case OT_READ_ACK:         return "Read-Ack";
+		case OT_WRITE_ACK:        return "Write-Ack";
+		case OT_DATA_INVALID:     return "Data-Invalid";
+		case OT_UNKNOWN_DATA_ID:  return "Unknown-Data-Id";
+		default:                  return "Unknown";
 	}
 }
 
@@ -1583,7 +1583,7 @@ void processOT(const char *buf, int len){
       }
 
       //print OTmessage to debug
-      AddLogf("%s (%d)", OTdata.buf, OTdata.len);
+      //AddLogf("%s (%d)", OTdata.buf, OTdata.len);
       //OTGWDebugf("[%08x]", OTdata.value);      //print message frame
       //OTGWDebugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
       //print message Type and ID
