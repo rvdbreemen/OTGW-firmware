@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v1.0.0-beta
+**  Version  : v1.0.0-rc1
 **
 **  Copyright (c) 2021-2024 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
