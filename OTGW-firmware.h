@@ -35,6 +35,7 @@
 
 OTGWSerial OTGWSerial(PICRST, LED2);
 void fwupgradestart(const char *hexfile);
+void handlePendingUpgrade();
 
 void blinkLEDnow();
 void blinkLEDnow(uint8_t);

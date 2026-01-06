@@ -2182,6 +2182,17 @@ void refreshpic(String filename, String version) {
   http.end();
 }
 
+// --- Pending Upgrade Logic ---
+String pendingUpgradePath = "";
+
+void handlePendingUpgrade() {
+  if (pendingUpgradePath != "") {
+    DebugTf(PSTR("Executing deferred upgrade for: %s\r\n"), pendingUpgradePath.c_str());
+    upgradepicnow(pendingUpgradePath.c_str());
+    pendingUpgradePath = "";
+  }
+}
+
 void upgradepic() {
   const String action = httpServer.arg("action");
   const String filename = httpServer.arg("name");
@@ -2203,8 +2214,8 @@ void upgradepic() {
     DebugTf(PSTR("Upgrade /%s/%s\r\n"), sPICdeviceid, filename.c_str());
     httpServer.send(200, "application/json", "{\"status\":\"started\"}");
     
-    String fullpath = "/" + String(sPICdeviceid) + "/" + filename;
-    upgradepicnow(fullpath.c_str());
+    // Defer the actual upgrade start to the main loop to ensure HTTP response is sent
+    pendingUpgradePath = "/" + String(sPICdeviceid) + "/" + filename;
     return;
   } else if (action == "refresh") {
     DebugTf(PSTR("Refresh %s/%s\r\n"), sPICdeviceid, filename.c_str());

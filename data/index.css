@@ -751,7 +751,8 @@
   }
 
   #flashStatusText {
-    margin-bottom: 10px;
+    margin-top: 10px;
+    margin-bottom: 5px;
     font-weight: bold;
     font-size: 1.1em;
   }
