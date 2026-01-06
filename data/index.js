@@ -65,9 +65,9 @@ function resetWSWatchdog() {
         otLogWS.close();
       } else {
         // If socket is somehow null but watchdog fired, force a new connection
-        // We reuse the last known 'force' state implicitly by calling without args (undefined is falsy)
-        // or we could store the last 'force' state in a global if critical.
-        // For now, attempting standard connect is safe.
+        // We explicitly pass 'false' here to indicate a non-forced reconnect.
+        // If preserving a previous 'force' state ever becomes critical, store it in a global.
+        // For now, attempting a standard connect is safe.
         initOTLogWebSocket(false);
       }
   }, WS_WATCHDOG_TIMEOUT);
