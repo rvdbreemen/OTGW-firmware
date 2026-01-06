@@ -1509,13 +1509,13 @@ function handleFlashMessage(data) {
 ** Statistics Tab Functions
 ***************************************************************************
 */
-var statsBuffer = {};
-var statsSortCol = 1; // Default sort by Dec ID
-var statsSortAsc = true;
-var currentTab = 'Log';
+let statsBuffer = {};
+let statsSortCol = 1; // Default sort by Dec ID
+let statsSortAsc = true;
+let currentTab = 'Log';
 
 function openLogTab(evt, tabName) {
-  var i, tabcontent, tablinks;
+  let i, tabcontent, tablinks;
   tabcontent = document.getElementsByClassName('tab-content');
   for (i = 0; i < tabcontent.length; i++) {
     tabcontent[i].classList.remove('active');
