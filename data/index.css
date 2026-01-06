@@ -293,10 +293,20 @@
     color: black;
   }
   
-  .div2 { 
-    margin-left: 280px; 
-    margin-top: -52px;
-  }
+/* Graph Tab */
+.ot-graph-container {
+    width: 100%;
+    height: 400px;
+    background-color: white;
+    border: 1px solid #ccc;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+#otGraphCanvas {
+    width: 100%;
+    height: 100%;
+}
   
   /* header */
   .headerrow {

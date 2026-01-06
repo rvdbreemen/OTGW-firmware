@@ -15,6 +15,7 @@
       })();
     </script>
     <script src="./index.js"></script>
+    <script src="./graph.js"></script>
     <title>OTGW firmware</title>
   </head>
   <body>
@@ -58,6 +59,7 @@
         <div class="ot-log-tabs">
           <button class="tab-link active" onclick="openLogTab(event, 'Log')">Log</button>
           <button class="tab-link" onclick="openLogTab(event, 'Statistics')">Statistics</button>
+          <button class="tab-link" onclick="openLogTab(event, 'Graph')">Graph</button>
         </div>
 
         <div id="Log" class="tab-content active">
@@ -103,6 +105,12 @@
              <div class="ot-log-footer">
                 <span>Unique Messages: <span id="statsCount">0</span></span>
              </div>
+        </div>
+
+        <div id="Graph" class="tab-content">
+            <div class="ot-graph-container">
+               <canvas id="otGraphCanvas"></canvas>
+            </div>
         </div>
       </div>
     </div>
