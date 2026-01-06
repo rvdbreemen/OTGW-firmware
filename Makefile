@@ -60,10 +60,13 @@ $(CFGFILE):
 ##
 # Make sure CFG is updated before libraries are called.
 ##
-$(LIBRARIES): | $(CFGFILE)
-
-$(BOARDS): | $(CFGFILE)
+update_indexes: | $(CFGFILE)
 	$(CLICFG) core update-index
+	$(CLICFG) lib update-index
+
+$(LIBRARIES): | update_indexes
+
+$(BOARDS): | update_indexes
 	$(CLICFG) core install $(PLATFORM)
 
 refresh: | $(CFGFILE)
