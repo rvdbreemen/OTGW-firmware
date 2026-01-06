@@ -2201,9 +2201,10 @@ void upgradepic() {
   
   if (action == "upgrade") {
     DebugTf(PSTR("Upgrade /%s/%s\r\n"), sPICdeviceid, filename.c_str());
+    httpServer.send(200, "application/json", "{\"status\":\"started\"}");
+    
     String fullpath = "/" + String(sPICdeviceid) + "/" + filename;
     upgradepicnow(fullpath.c_str());
-    httpServer.send(200, "application/json", "{\"status\":\"started\"}");
     return;
   } else if (action == "refresh") {
     DebugTf(PSTR("Refresh %s/%s\r\n"), sPICdeviceid, filename.c_str());
