@@ -700,13 +700,8 @@ function refreshFirmware() {
       let progressDiv = document.createElement("div");
       progressDiv.id = "flashProgressSection";
       progressDiv.style.display = "block";
-      progressDiv.setAttribute("class", "otmontable"); 
+      // progressDiv.setAttribute("class", "otmontable"); 
       
-      let statusContainer = document.createElement("div");
-      statusContainer.id = "flashStatusText";
-      statusContainer.innerText = "Ready to flash";
-      progressDiv.appendChild(statusContainer);
-
       let barWrapper = document.createElement("div");
       barWrapper.setAttribute("class", "flashProgresBarWrapper");
 
@@ -725,6 +720,11 @@ function refreshFirmware() {
       barWrapper.appendChild(percentageText);
 
       progressDiv.appendChild(barWrapper);
+
+      let statusContainer = document.createElement("div");
+      statusContainer.id = "flashStatusText";
+      statusContainer.innerText = "Ready to flash";
+      progressDiv.appendChild(statusContainer);
       
       displayPICpage.appendChild(progressDiv);
 
@@ -1272,8 +1272,6 @@ function applyTheme() {
 // PIC Flash Functions
 //============================================================================
 function startFlash(filename) {
-    if (!confirm("Are you sure you want to flash " + filename + "? This will stop OpenTherm communication for a while.")) return;
-
     // Stop polling during upgrade to prevent interference and reduce load
     if (tid) { clearInterval(tid); tid = 0; }
     if (timeupdate) { clearInterval(timeupdate); timeupdate = 0; }
