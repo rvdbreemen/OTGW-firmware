@@ -1621,7 +1621,7 @@ function updateStatisticsDisplay() {
     rows.sort(function(a, b) {
         var valA, valB;
         switch(statsSortCol) {
-            case 0: valA = parseInt(a.hex, 16); valB = parseInt(b.hex, 16); break;
+            case 0: valA = a.id; valB = b.id; break;
             case 1: valA = a.id; valB = b.id; break;
             case 2: valA = a.type; valB = b.type; break;
             case 3: valA = a.label; valB = b.label; break;
