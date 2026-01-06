@@ -744,30 +744,25 @@
   /* Firmware Upgrade Progress */
   #flashProgressSection {
     margin-top: 20px;
-    padding: 20px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-  }
-
-  #flashStatusText {
-    margin-top: 10px;
-    margin-bottom: 5px;
-    font-weight: bold;
-    font-size: 1.1em;
+    padding: 0px;
+    border: none;
+    box-shadow: none;
   }
 
   .flashProgresBarWrapper {
-    display: flex;
-    align-items: center;
+    /* remove flex display to allow container to size itself */
+    position: relative;
+    max-width: 400px; /* Limit width */
+    margin: 0; /* Align left */
   }
   
   .flashProgressBarContainer {
-    flex-grow: 1;
+    width: 100%;
     background-color: #e0e0e0;
     height: 30px;
     border-radius: 15px;
     overflow: hidden;
+    position: relative; /* Context for absolute positioning of text */
   }
 
   #flashProgressBar {
@@ -778,7 +773,15 @@
   }
   
   #flashPercentageText {
-    margin-left: 15px;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-weight: bold;
-    min-width: 50px;
+    color: #333; /* Dark text for visibility */
+    z-index: 2; /* Ensure on top of bar */
   }
