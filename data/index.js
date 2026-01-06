@@ -711,20 +711,15 @@ function refreshFirmware() {
       let barFill = document.createElement("div");
       barFill.id = "flashProgressBar";
       
-      barContainer.appendChild(barFill);
-      barWrapper.appendChild(barContainer);
-
       let percentageText = document.createElement("div");
       percentageText.id = "flashPercentageText";
-      percentageText.innerText = "0%";
-      barWrapper.appendChild(percentageText);
+      percentageText.innerText = "Ready to flash";
+      
+      barContainer.appendChild(barFill);
+      barContainer.appendChild(percentageText);
+      barWrapper.appendChild(barContainer);
 
       progressDiv.appendChild(barWrapper);
-
-      let statusContainer = document.createElement("div");
-      statusContainer.id = "flashStatusText";
-      statusContainer.innerText = "Ready to flash";
-      progressDiv.appendChild(statusContainer);
       
       displayPICpage.appendChild(progressDiv);
 
@@ -1278,7 +1273,6 @@ function startFlash(filename) {
 
     let progressSection = document.getElementById("flashProgressSection");
     let progressBar = document.getElementById("flashProgressBar");
-    let statusText = document.getElementById("flashStatusText");
     let pctText = document.getElementById("flashPercentageText");
     
     if (progressSection) progressSection.style.display = "block";
@@ -1286,8 +1280,7 @@ function startFlash(filename) {
         progressBar.style.width = "0%";
         progressBar.style.backgroundColor = "#4CAF50";
     }
-    if (pctText) pctText.innerText = "0%";
-    if (statusText) statusText.innerText = "Starting upgrade for " + filename + "...";
+    if (pctText) pctText.innerText = "Starting upgrade for " + filename + "...";
     
     // Ensure WebSocket is connected for progress updates
     initOTLogWebSocket();
@@ -1302,11 +1295,11 @@ function startFlash(filename) {
     })
     .then(data => {
         console.log("Flash started:", data);
-        if (statusText) statusText.innerText = "Flashing started... Do not turn off power!";
+        if (pctText) pctText.innerText = "Flashing started...";
     })
     .catch(error => {
         console.error("Flash error:", error);
-        if (statusText) statusText.innerText = "Error starting flash: " + error.message;
+        if (pctText) pctText.innerText = "Error starting flash: " + error.message;
         if (progressBar) progressBar.style.backgroundColor = "red";
         
         // Restart polling on start failure
@@ -1325,7 +1318,6 @@ function handleFlashMessage(data) {
         // Check if it looks like a flash message
         if (msg.hasOwnProperty('percent') || msg.hasOwnProperty('result')) {
             let progressBar = document.getElementById("flashProgressBar");
-            let statusText = document.getElementById("flashStatusText");
             let pctText = document.getElementById("flashPercentageText");
             let progressSection = document.getElementById("flashProgressSection");
             
@@ -1335,23 +1327,19 @@ function handleFlashMessage(data) {
             
             if (msg.hasOwnProperty('percent')) {
                 if (progressBar) progressBar.style.width = msg.percent + "%";
-                if (pctText) pctText.innerText = msg.percent + "%";
-                if (statusText) statusText.innerText = "Flashing... " + msg.percent + "%";
+                if (pctText) pctText.innerText = "Flashing " + msg.percent + "%";
             }
             
             if (msg.hasOwnProperty('result')) {
                 // Done
                 let resultText = (msg.result === 0) ? "Success!" : "Failed (Error " + msg.result + ")";
                 
-                if (statusText) {
-                    statusText.innerText = "Finished: " + resultText;
-                    if (msg.result !== 0) statusText.style.color = "red";
-                    else statusText.style.color = "green";
+                if (pctText) {
+                    pctText.innerText = "Finished: " + resultText;
                 }
                 
                 if (msg.result === 0 && progressBar) {
                     progressBar.style.width = "100%";
-                    if (pctText) pctText.innerText = "100%";
                 } else if (progressBar) {
                     progressBar.style.backgroundColor = "red";
                 }
