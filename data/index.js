@@ -475,7 +475,7 @@ function initMainPage() {
       el.addEventListener('click', function () {
         settingsPage();
         toggleHidden('adv_dropdown', true);
-        toggleHidden('btnSaveSettings', false);
+        setVisible('btnSaveSettings', false);
       });
     }
   );
@@ -568,6 +568,18 @@ function toggleHidden(className, hideOnly) {
         el.classList.add("hidden");
       } else if (!hideOnly) {
         el.classList.remove("hidden");
+      }
+    }
+  );
+}
+
+function setVisible(className, visible) {
+  Array.from(document.getElementsByClassName(className)).forEach(
+    function (el) {
+      if (visible) {
+        el.classList.remove("hidden");
+      } else {
+        el.classList.add("hidden");
       }
     }
   );
@@ -1004,11 +1016,15 @@ function refreshSettings() {
               if (data[i].name == "darktheme") {
                  document.getElementById('theme-style').href = this.checked ? "index_dark.css" : "index.css";
               }
+              setVisible('btnSaveSettings', true);
             },
             false
           );
           sInput.addEventListener('keydown',
-            function () { document.getElementById(data[i].name).className = "input-changed"; },
+            function () { 
+              document.getElementById(data[i].name).className = "input-changed"; 
+              setVisible('btnSaveSettings', true);
+            },
             false
           );
           inputDiv.appendChild(sInput);
