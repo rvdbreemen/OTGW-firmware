@@ -1,6 +1,6 @@
 //The version number conforms to semver.org format
 #define _VERSION_MAJOR 0
-#define _VERSION_MINOR 10  
+#define _VERSION_MINOR 1  
 #define _VERSION_PATCH 4
 #define _VERSION_BUILD 2208
 #define _VERSION_GITHASH "9743cb6"

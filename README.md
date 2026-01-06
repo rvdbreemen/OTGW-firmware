@@ -10,6 +10,17 @@ This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gatew
 
 The primary goal is **reliable Home Assistant integration** via MQTT and auto discovery, while keeping the OTGW behaviour compatible with existing OpenTherm tooling.
 
+## Version 1.0.0 - A Major Milestone
+We are proud to announce the release of **version 1.0.0**! 
+
+This release marks a significant "moment in time" for the project. After years of development and testing, the REST API and MQTT interface have proven their stability and reliability. This release embodies the original vision for the firmware, bringing polished features like:
+
+- **Live Data Streaming**: Watch OpenTherm MsgIDs arrive in real-time directly in your browser.
+- **Enhanced Update Experience**: Improved firmware flashing for both the ESP8266 and the PIC controller, featuring live progress monitoring directly from the Web UI.
+
+This release also includes **many small stability improvements** once more, to make this release even more robust than the 0.10.x series already was.
+
+A massive thank you goes out to the entire community—contributors, testers, and users—whose support and feedback made this milestone possible.
 
 ## History and scope
 
@@ -132,7 +143,7 @@ For release artifacts, see https://github.com/rvdbreemen/OTGW-firmware/releases.
 
 | Version | Release notes |
 |-|-|
-| 0.10.4-beta | Feature: Optional NTP time sync to OTGW (new `NTPsendtime` setting)<br>Feature: Dark theme toggle with persistent selection and responsive UI/layout improvements (dropdowns, on/off indicators, etc.)<br>Feature: Live OpenTherm message log streaming in the Web UI with download support (WebSocket-based log viewer)<br>Feature: Firmware update UI now shows upload/flash progress with WebSocket/SSE status updates and file size validation<br>Feature: New build/flash tooling (`build.py`, interactive `flash_esp.py`) plus automated semver/CI improvements for local and release builds<br>Update: MQTT event reporting for command responses/errors and thermostat connection/power states<br>Update: Bundled PIC16F1847 gateway firmware refreshed; OpenTherm Protocol Specification v4.2 added to docs<br>Fix: WebSocket handshake validation/buffer safety improvements and Wi-Fi/watchdog reliability tweaks. |
+| 1.0.0 | **Milestone Release**: This version marks a major milestone, representing the complete vision of the firmware with a stable API and robust MQTT integration.<br>**Features**:<br>- **Live OpenTherm Logging**: Real-time streaming of OpenTherm messages in the Web UI via WebSockets.<br>- **Enhanced Firmware Updates**: Improved UI for flashing ESP and PIC firmware with live progress bars and validation.<br>- **Dark Theme**: Fully integrated dark theme with persistent toggle and responsive UI improvements.<br>- **NTP Control**: New setting `NTPsendtime` to optionally disable time sync to the thermostat.<br>**Stability & Security**:<br>- **Security**: Added CSRF protection to APIs, masked sensitive fields, and improved input sanitization.<br>- **Connectivity**: Rewritten Wi-Fi connection logic with better watchdog handling and reliability.<br>- **Reliability**: Numerous fixes for buffer overflows, memory leaks, and serial communication stability.<br>- **General**: Many small stability improvements to significantly enhance robustness compared to the 0.10.x series.<br>Note: A huge thank you to everyone who helped test, develop, and support this project to reach this moment! |
 | 0.10.3 | Web UI: Mask MQTT password field and support running behind a reverse proxy (auto-detect http/https)<br>Home Assistant: Improve discovery templates (remove empty unit_of_measurement and add additional sensors/boundary values)<br>Fix: Status functions and REST API status reporting<br>CI: Improved GitHub Actions build/release workflow and release artifacts. |
 | 0.10.2 | Bugfix: issue #213 which caused 0 bytes after update of PIC firwmare (dropped to Adruino core 2.7.4)<br>Update to filesystem to include latest PIC firmware (6.5 and 5.8, released 12 march 2023)<br>Fix: Back to correct hostname to wifi (credits to @hvxl)<br>Fix: Adding a little memory for use with larger settings.|
 | 0.10.1 | Beter build processes to generate consistant quality using aruidno-cli and github actions (Thx to @hvxl and @DaveDavenport)<br>Maintaince to sourcetree, removed cruft, time.h library, submodules<br>Fix: parsing VH Status Master correctly<br>Enhancement: Stopping send time commands on detections of PS=1 mode<br>Fix: Mistake in MQTT configuration of auto discovery template for OEM fault code<br>Added wifi quality indication (so you can understand better)<br>Remove: Boardtype, as it was static in compiletime building|
@@ -176,7 +187,7 @@ For release artifacts, see https://github.com/rvdbreemen/OTGW-firmware/releases.
 ## Credits
 Shoutout to early adopters helping me out testing and discussing the firmware in development. For pushing features, testing and living on the edge. 
 
-So shoutout to the following people for the collaboration on development: 
+Reaching version 1.0.0 wouldn't have been possible without the community. So shoutout to the following people for the collaboration on development: 
 * @hvxl           for all his work on the OTGW hardware, PIC firmware and ESP coding. 
 * @sjorsjuhmaniac for improving the MQTT naming convention and HA integration, adding climate entity and otgw device 
 * @vampywiz17     early adopter and tester 
