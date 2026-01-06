@@ -19,7 +19,6 @@
 #define OTGWDebug(...)    ({ if (bDebugOTmsg) Debug(__VA_ARGS__);    })
 #define OTGWDebugFlush()  ({ if (bDebugOTmsg) DebugFlush();    })
 
-
 //define Nodoshop OTGW hardware
 #define OTGW_BUTTON 0   //D3
 #define OTGW_RESET  14  //D5
