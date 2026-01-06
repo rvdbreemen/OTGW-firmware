@@ -753,3 +753,43 @@
     max-height: 400px;
   }
 }
+  /* Firmware Upgrade Progress */
+  #flashProgressSection {
+    margin-top: 20px;
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  }
+
+  #flashStatusText {
+    margin-bottom: 10px;
+    font-weight: bold;
+    font-size: 1.1em;
+  }
+
+  .flashProgresBarWrapper {
+    display: flex;
+    align-items: center;
+  }
+  
+  .flashProgressBarContainer {
+    flex-grow: 1;
+    background-color: #e0e0e0;
+    height: 30px;
+    border-radius: 15px;
+    overflow: hidden;
+  }
+
+  #flashProgressBar {
+    height: 100%;
+    width: 0%;
+    background-color: #4CAF50; /* Green */
+    transition: width 0.3s ease;
+  }
+  
+  #flashPercentageText {
+    margin-left: 15px;
+    font-weight: bold;
+    min-width: 50px;
+  }

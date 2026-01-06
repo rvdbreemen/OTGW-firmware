@@ -446,3 +446,47 @@
   * 
   ***************************************************************************
   */
+
+  /* --- Flash Progress Bar Section --- */
+  #flashProgressSection {
+    margin-top: 20px;
+    padding: 20px;
+    border: 1px solid #555;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(255,255,255,0.1);
+  }
+  
+  #flashStatusText {
+    margin-bottom: 10px;
+    font-weight: bold;
+    font-size: 1.1em;
+    color: #e0e0e0;
+  }
+
+  .flashProgresBarWrapper {
+    display: flex;
+    align-items: center;
+  }
+
+  .flashProgressBarContainer {
+    flex-grow: 1;
+    background-color: #555;
+    height: 30px;
+    border-radius: 15px;
+    overflow: hidden;
+  }
+
+  #flashProgressBar {
+    height: 100%;
+    width: 0%;
+    background-color: #4CAF50;
+    transition: width 0.3s ease;
+  }
+
+  #flashPercentageText {
+    margin-left: 15px;
+    font-weight: bold;
+    min-width: 50px;
+    color: white;
+  }
+

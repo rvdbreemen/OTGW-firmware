@@ -118,6 +118,9 @@ function initOTLogWebSocket() {
     };
     
     otLogWS.onmessage = function(event) {
+      if (typeof handleFlashMessage === "function") {
+        if (handleFlashMessage(event.data)) return;
+      }
       // console.log("WS received:", event.data); // Debug
       addLogLine(event.data);
     };
@@ -517,7 +520,7 @@ function showMainPage() {
 }
 
 function firmwarePage() {
-  disconnectOTLogWebSocket();
+  initOTLogWebSocket();
   clearInterval(tid);
   refreshDevTime();
   document.getElementById("displayMainPage").style.display = "none";
@@ -675,7 +678,11 @@ function refreshFirmware() {
         var btn = document.createElement("div");
         btn.setAttribute("class", "piccolumn5");
         var a = document.createElement('a');
-        a.href = localURL + '/pic?action=upgrade&name=' + files[i].name + '&version=' + files[i].version;
+        // a.href = localURL + '/pic?action=upgrade&name=' + files[i].name + '&version=' + files[i].version;
+        a.href = "#";
+        let fileName = files[i].name; // Capture for closure
+        a.onclick = function(e) { e.preventDefault(); startFlash(fileName); };
+        
         var img = document.createElement('img');
         img.src = localURL + '/system_update.png'
         img.title = "Install firmware onto pic";
@@ -688,6 +695,38 @@ function refreshFirmware() {
         tableDiv.appendChild(rowDiv);
       }
       displayPICpage.appendChild(tableDiv);
+      
+      // --- Flash Progress Bar Section ---
+      let progressDiv = document.createElement("div");
+      progressDiv.id = "flashProgressSection";
+      progressDiv.style.display = "none";
+      progressDiv.setAttribute("class", "otmontable"); 
+      
+      let statusContainer = document.createElement("div");
+      statusContainer.id = "flashStatusText";
+      statusContainer.innerText = "Ready to flash";
+      progressDiv.appendChild(statusContainer);
+
+      let barWrapper = document.createElement("div");
+      barWrapper.setAttribute("class", "flashProgresBarWrapper");
+
+      let barContainer = document.createElement("div");
+      barContainer.setAttribute("class", "flashProgressBarContainer");
+      
+      let barFill = document.createElement("div");
+      barFill.id = "flashProgressBar";
+      
+      barContainer.appendChild(barFill);
+      barWrapper.appendChild(barContainer);
+
+      let percentageText = document.createElement("div");
+      percentageText.id = "flashPercentageText";
+      percentageText.innerText = "0%";
+      barWrapper.appendChild(percentageText);
+
+      progressDiv.appendChild(barWrapper);
+      
+      displayPICpage.appendChild(progressDiv);
 
     })
     .catch(function (error) {
@@ -1227,6 +1266,115 @@ function applyTheme() {
       }
     })
     .catch(error => console.log(error));
+}
+
+//============================================================================
+// PIC Flash Functions
+//============================================================================
+function startFlash(filename) {
+    if (!confirm("Are you sure you want to flash " + filename + "? This will stop OpenTherm communication for a while.")) return;
+
+    // Stop polling during upgrade to prevent interference and reduce load
+    if (tid) { clearInterval(tid); tid = 0; }
+    if (timeupdate) { clearInterval(timeupdate); timeupdate = 0; }
+
+    let progressSection = document.getElementById("flashProgressSection");
+    let progressBar = document.getElementById("flashProgressBar");
+    let statusText = document.getElementById("flashStatusText");
+    let pctText = document.getElementById("flashPercentageText");
+    
+    if (progressSection) progressSection.style.display = "block";
+    if (progressBar) {
+        progressBar.style.width = "0%";
+        progressBar.style.backgroundColor = "#4CAF50";
+    }
+    if (pctText) pctText.innerText = "0%";
+    if (statusText) statusText.innerText = "Starting upgrade for " + filename + "...";
+    
+    // Ensure WebSocket is connected for progress updates
+    initOTLogWebSocket();
+    
+    fetch(localURL + '/pic?action=upgrade&name=' + filename)
+    .then(response => {
+       if (response.headers.get("content-type").indexOf("application/json") !== -1) {
+         return response.json();
+       } else {
+         return {status: "started (legacy)"}; 
+       }
+    })
+    .then(data => {
+        console.log("Flash started:", data);
+        if (statusText) statusText.innerText = "Flashing started... Do not turn off power!";
+    })
+    .catch(error => {
+        console.error("Flash error:", error);
+        if (statusText) statusText.innerText = "Error starting flash: " + error.message;
+        if (progressBar) progressBar.style.backgroundColor = "red";
+        
+        // Restart polling on start failure
+        if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+        if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+    });
+}
+
+function handleFlashMessage(data) {
+    try {
+        if (!data || !data.startsWith('{')) return false; // Not JSON
+        
+        // Try parsing as JSON
+        let msg = JSON.parse(data);
+        
+        // Check if it looks like a flash message
+        if (msg.hasOwnProperty('percent') || msg.hasOwnProperty('result')) {
+            let progressBar = document.getElementById("flashProgressBar");
+            let statusText = document.getElementById("flashStatusText");
+            let pctText = document.getElementById("flashPercentageText");
+            let progressSection = document.getElementById("flashProgressSection");
+            
+            if (progressSection && progressSection.style.display === "none") {
+                 progressSection.style.display = "block";
+            }
+            
+            if (msg.hasOwnProperty('percent')) {
+                if (progressBar) progressBar.style.width = msg.percent + "%";
+                if (pctText) pctText.innerText = msg.percent + "%";
+                if (statusText) statusText.innerText = "Flashing... " + msg.percent + "%";
+            }
+            
+            if (msg.hasOwnProperty('result')) {
+                // Done
+                let resultText = (msg.result === 0) ? "Success!" : "Failed (Error " + msg.result + ")";
+                
+                if (statusText) {
+                    statusText.innerText = "Finished: " + resultText;
+                    if (msg.result !== 0) statusText.style.color = "red";
+                    else statusText.style.color = "green";
+                }
+                
+                if (msg.result === 0 && progressBar) {
+                    progressBar.style.width = "100%";
+                    if (pctText) pctText.innerText = "100%";
+                } else if (progressBar) {
+                    progressBar.style.backgroundColor = "red";
+                }
+                
+                // Restart polling
+                if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+                if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+
+                // Refresh firmware list after success to show new version?
+                if (msg.result === 0) {
+                    setTimeout(refreshFirmware, 3000);
+                }
+            }
+            
+            return true; // It was a flash message
+        }
+    } catch (e) {
+        // Not JSON or error parsing
+        return false;
+    }
+    return false;
 }
 
 /*

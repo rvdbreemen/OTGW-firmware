@@ -2059,16 +2059,7 @@ void upgradepicnow(const char *filename) {
   if (OTGWSerial.busy()) return; // if already in programming mode, never call it twice
   DebugTf(PSTR("Start PIC upgrade now: %s\r\n"), filename);
   fwupgradestart(filename);  
-  while (OTGWSerial.busy()){
-    feedWatchDog();
-    //blink the led during flash...
-    DECLARE_TIMER_MS(timerUpgrade, 500);
-    if (DUE(timerUpgrade)) {
-        blinkLEDnow(LED2);
-    }
-  }
-  // When you are done, then reset the PIC one more time, to capture the actual fwversion of the OTGW
-  resetOTGW();
+  // Upgrade runs in background via OTGWSerial callbacks and upgradeTick called from available()
 }
 
 void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
@@ -2088,10 +2079,21 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
     default:                                  errorupgrade = F("Unknown state"); break;
   }
   OTGWDebugTf(PSTR("Upgrade finished: Errorcode = %d - %s - %d retries, %d errors\r\n"), result, CSTR(errorupgrade), retries, errors);
+  
+  char buffer[128];
+  if (result == OTGWError::OTGW_ERROR_NONE) {
+      snprintf(buffer, sizeof(buffer), "{\"percent\":100,\"result\":%d,\"errors\":%d,\"retries\":%d}", (int)result, errors, retries);
+  } else {
+      snprintf(buffer, sizeof(buffer), "{\"result\":%d,\"errors\":%d,\"retries\":%d}", (int)result, errors, retries);
+  }
+  sendWebSocketJSON(buffer);
 }
 
 void fwupgradestep(int pct) {
   OTGWDebugTf(PSTR("Upgrade: %d%%\n\r"), pct);
+  char buffer[32];
+  snprintf(buffer, sizeof(buffer), "{\"percent\":%d}", pct);
+  sendWebSocketJSON(buffer);
 }
 
 void fwreportinfo(OTGWFirmware fw, const char *version) {
@@ -2200,6 +2202,8 @@ void upgradepic() {
   if (action == "upgrade") {
     DebugTf(PSTR("Upgrade /%s/%s\r\n"), sPICdeviceid, filename.c_str());
     upgradepicnow(filename.c_str());
+    httpServer.send(200, "application/json", "{\"status\":\"started\"}");
+    return;
   } else if (action == "refresh") {
     DebugTf(PSTR("Refresh %s/%s\r\n"), sPICdeviceid, filename.c_str());
     refreshpic(filename, version);
