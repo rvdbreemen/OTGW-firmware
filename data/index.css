@@ -334,42 +334,30 @@
   /* PIC firmware page */
 .pictable {
   display: table;
-  width: 100%;
-  min-width: 600px;
-  padding: 5px;
+  width: auto;
+  border-collapse: collapse;
+  margin: 10px 0;
+  border: 1px solid #ddd;
 }
 .picrow {
   display: table-row;
-  padding: 5px;
-  width: 100%;
+  border-bottom: 1px solid #ddd;
 }
-.piccolumn1 {
-  display: table-cell;
-  width: 170px;
-  margin: 5px;
+.picrow:nth-child(even) {
+  background-color: #f9f9f9;
 }
-.piccolumn2 {
+.piccolumn1, .piccolumn2, .piccolumn3 {
   display: table-cell;
-  width: 75px;
-  margin: 5px;
+  padding: 8px 15px;
+  border: 1px solid #ddd;
+  text-align: left;
 }
-.piccolumn3 {
+.piccolumn4, .piccolumn5 {
   display: table-cell;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  text-align: center;
   width: 30px;
-  margin: 5px;
-}
-.piccolumn4 {
-  display: table-cell;
-  padding-left: 5px;
-  width: 16px;
-  margin: 5px;
-}
-.piccolumn5 {
-  display: table-cell;
-  width: 16px;
-  padding-left: 5px;
-  padding-right: 5px;
-  margin: 5px;
 }
 
 *[data-tooltip] {

@@ -699,7 +699,7 @@ function refreshFirmware() {
       // --- Flash Progress Bar Section ---
       let progressDiv = document.createElement("div");
       progressDiv.id = "flashProgressSection";
-      progressDiv.style.display = "none";
+      progressDiv.style.display = "block";
       progressDiv.setAttribute("class", "otmontable"); 
       
       let statusContainer = document.createElement("div");
