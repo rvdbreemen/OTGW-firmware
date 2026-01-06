@@ -96,6 +96,15 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 }
 
 //===========================================================================================
+// Send JSON message to all connected clients
+//===========================================================================================
+void sendWebSocketJSON(const char *json) {
+  if (wsClientCount > 0) {
+    webSocket.broadcastTXT(json);
+  }
+}
+
+//===========================================================================================
 // Start WebSocket server
 //===========================================================================================
 void startWebSocket() {
