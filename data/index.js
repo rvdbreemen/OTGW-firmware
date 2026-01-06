@@ -65,9 +65,9 @@ function resetWSWatchdog() {
         otLogWS.close();
       } else {
         // If socket is somehow null but watchdog fired, force a new connection
-        // We explicitly pass 'false' here to indicate a non-forced reconnect.
-        // If preserving a previous 'force' state ever becomes critical, store it in a global.
-        // For now, attempting a standard connect is safe.
+        // We reuse the last known 'force' state implicitly by calling without args (undefined is falsy)
+        // or we could store the last 'force' state in a global if critical.
+        // For now, attempting standard connect is safe.
         initOTLogWebSocket(false);
       }
   }, WS_WATCHDOG_TIMEOUT);
@@ -1509,13 +1509,13 @@ function handleFlashMessage(data) {
 ** Statistics Tab Functions
 ***************************************************************************
 */
-let statsBuffer = {};
-let statsSortCol = 1; // Default sort by Dec ID
-let statsSortAsc = true;
-let currentTab = 'Log';
+var statsBuffer = {};
+var statsSortCol = 1; // Default sort by Dec ID
+var statsSortAsc = true;
+var currentTab = 'Log';
 
 function openLogTab(evt, tabName) {
-  let i, tabcontent, tablinks;
+  var i, tabcontent, tablinks;
   tabcontent = document.getElementsByClassName('tab-content');
   for (i = 0; i < tabcontent.length; i++) {
     tabcontent[i].classList.remove('active');
@@ -1547,6 +1547,14 @@ function processStatsLine(line) {
     if (isNaN(id)) return;
 
     var type = line.substring(22, 39).trim(); // 'Read-Ack' etc.
+    var dir = 'Unk';
+    if (type.indexOf('Read') !== -1) dir = 'Read';
+    else if (type.indexOf('Write') !== -1) dir = 'Write';
+    else if (type.indexOf('Reserved') !== -1) dir = 'Reserved';
+    else if (type.indexOf('Data-Invalid') !== -1) dir = 'Data-Invalid';
+    else if (type.indexOf('Unknown-Data-Id') !== -1) dir = 'Unknown-Data-Id';
+    else if (type.indexOf('Invalid-Data') !== -1) dir = 'Invalid-Data';
+    else dir = type;
     
     var dataPart = line.substring(40);
     var label = '';
@@ -1564,12 +1572,14 @@ function processStatsLine(line) {
     }
 
     var now = Date.now();
+    var key = id + '_' + dir;
     
-    if (!statsBuffer[id]) {
-        statsBuffer[id] = {
+    if (!statsBuffer[key]) {
+        statsBuffer[key] = {
             id: id,
             hex: id.toString(16).toUpperCase().padStart(2, '0'),
             type: type,
+            dir: dir,
             label: label,
             value: value,
             count: 0,
@@ -1578,10 +1588,9 @@ function processStatsLine(line) {
             intervalCount: 0
         };
     } else {
-        var entry = statsBuffer[id];
+        var entry = statsBuffer[key];
         var diff = (now - entry.lastTime) / 1000.0; // seconds
-        // Only count interval if it's reasonable (e.g. not milliseconds unless burst)
-        // But for precise avg, we take it.
+        
         entry.intervalSum += diff;
         entry.intervalCount++;
         
@@ -1590,7 +1599,7 @@ function processStatsLine(line) {
         entry.type = type; 
         if (label && label !== 'Unknown') entry.label = label;
     }
-    statsBuffer[id].count++;
+    statsBuffer[key].count++;
     
     // If stats tab is active, schedule update
     if (currentTab === 'Statistics') {
@@ -1621,9 +1630,9 @@ function updateStatisticsDisplay() {
     rows.sort(function(a, b) {
         var valA, valB;
         switch(statsSortCol) {
-            case 0: valA = a.id; valB = b.id; break;
+            case 0: valA = parseInt(a.hex, 16); valB = parseInt(b.hex, 16); break;
             case 1: valA = a.id; valB = b.id; break;
-            case 2: valA = a.type; valB = b.type; break;
+            case 2: valA = a.dir || ''; valB = b.dir || ''; break; // Sort by Direction
             case 3: valA = a.label; valB = b.label; break;
             case 4: valA = (a.intervalCount > 0 ? a.intervalSum / a.intervalCount : 0); 
                     valB = (b.intervalCount > 0 ? b.intervalSum / b.intervalCount : 0); break;
@@ -1643,17 +1652,15 @@ function updateStatisticsDisplay() {
     rows.forEach(function(r) {
         var avgInterval = (r.intervalCount > 0) ? (r.intervalSum / r.intervalCount).toFixed(1) : '-';
         
-        // Direction
-        var dir = 'Unk';
-        if (r.type && (r.type.indexOf('Read') !== -1)) dir = 'Read';
-        else if (r.type && (r.type.indexOf('Write') !== -1)) dir = 'Write';
+        // Direction is now stored in r.dir
+        var dir = r.dir || 'Unk';
 
         html += '<tr>';
-        html += '<td>' + escapeHtml(r.hex) + '</td>';
-        html += '<td>' + escapeHtml(r.id) + '</td>';
-        html += '<td>' + escapeHtml(dir) + '</td>';
-        html += '<td>' + escapeHtml(r.label) + '</td>';
-        html += '<td>' + escapeHtml(avgInterval) + '</td>';
+        html += '<td>' + r.hex + '</td>';
+        html += '<td>' + r.id + '</td>';
+        html += '<td>' + dir + '</td>';
+        html += '<td>' + r.label + '</td>';
+        html += '<td>' + avgInterval + '</td>';
         html += '<td>' + escapeHtml(r.value) + '</td>';
         html += '</tr>';
     });
