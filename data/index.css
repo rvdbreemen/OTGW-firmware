@@ -864,6 +864,7 @@ body.disable-interaction {
   color: #333;
   position: sticky;
   top: 0;
+  z-index: 10;
   cursor: pointer;
 }
 
