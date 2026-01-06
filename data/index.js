@@ -1272,9 +1272,18 @@ function applyTheme() {
 //============================================================================
 // let currentFlashFilename = ""; // Moved to top
 
+function toggleInteraction(enabled) {
+    if (enabled) {
+        document.body.classList.remove('disable-interaction');
+    } else {
+        document.body.classList.add('disable-interaction');
+    }
+}
+
 function startFlash(filename) {
     currentFlashFilename = filename;
     isFlashing = true;
+    toggleInteraction(false);
     // Stop polling during upgrade to prevent interference and reduce load
     if (tid) { clearInterval(tid); tid = 0; }
     if (timeupdate) { clearInterval(timeupdate); timeupdate = 0; }
@@ -1308,6 +1317,7 @@ function startFlash(filename) {
     .catch(error => {
         console.error("Flash error:", error);
         isFlashing = false;
+        toggleInteraction(true);
         if (pctText) pctText.innerText = "Error starting flash: " + error.message;
         if (progressBar) progressBar.style.backgroundColor = "red";
         
@@ -1343,6 +1353,7 @@ function handleFlashMessage(data) {
                 // Done
                 let resultText = (msg.result === 0) ? "Success!" : "Failed (Error " + msg.result + ")";
                 isFlashing = false;
+                toggleInteraction(true);
                 
                 if (pctText) {
                     pctText.innerText = "Finished " + currentFlashFilename + ": " + resultText;
