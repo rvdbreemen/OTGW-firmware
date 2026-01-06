@@ -299,24 +299,27 @@
   
   /* header */
   .headerrow {
-    vertical-align:bottom;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    padding-bottom: 5px;
   }
   
   .headercolumnbig{
     font-size: xx-large;
     font-weight: bold;
-    float: left;
-    width: 350px;
+    flex-grow: 1;
+    white-space: nowrap;
+    margin-right: 15px;
   }
   
   .headercolumn{
     font-size: smaller;
-    float: left;
-    width: 175px;
-    
+    white-space: nowrap;
+    margin-left: 15px;
   }
   
-  /* Clear floats after the columns */
+  /* Clear floats after the columns - keeping for compatibility if any floats remain, but flex ignores this mostly */
   .headerrow:after {
     content: "";
     display: table;
