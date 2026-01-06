@@ -490,3 +490,34 @@
     color: white;
   }
 
+
+/* PIC firmware page */
+.pictable {
+  display: table;
+  width: auto;
+  border-collapse: collapse;
+  margin: 10px 0;
+  border: 1px solid #555;
+}
+.picrow {
+  background: rgb(28, 28, 30);
+  display: table-row;
+  border-bottom: 1px solid #555;
+}
+.picrow:nth-child(even) {
+  background-color: #333333;
+}
+.piccolumn1, .piccolumn2, .piccolumn3 {
+  display: table-cell;
+  padding: 8px 15px;
+  border: 1px solid #555;
+  text-align: left;
+}
+.piccolumn4, .piccolumn5 {
+  display: table-cell;
+  padding: 8px 10px;
+  border: 1px solid #555;
+  text-align: center;
+  width: 30px;
+}
+
