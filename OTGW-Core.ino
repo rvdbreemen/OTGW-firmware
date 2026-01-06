@@ -1587,8 +1587,8 @@ void processOT(const char *buf, int len){
       //OTGWDebugf("[%08x]", OTdata.value);      //print message frame
       //OTGWDebugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
       //print message Type and ID
-      AddLogf("[MsgID=%3d]", OTdata.id);
-      AddLogf("[%-16s]", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
+      AddLogf(" %3d", OTdata.id);
+      AddLogf(" %-16s", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
       //OTGWDebugf("[%-30s]", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
       //OTGWDebugf("[M=%d]",OTdata.master);
 
