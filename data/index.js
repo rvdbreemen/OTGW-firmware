@@ -1649,11 +1649,11 @@ function updateStatisticsDisplay() {
         else if (r.type && (r.type.indexOf('Write') !== -1)) dir = 'Write';
 
         html += '<tr>';
-        html += '<td>' + r.hex + '</td>';
-        html += '<td>' + r.id + '</td>';
-        html += '<td>' + dir + '</td>';
-        html += '<td>' + r.label + '</td>';
-        html += '<td>' + avgInterval + '</td>';
+        html += '<td>' + escapeHtml(r.hex) + '</td>';
+        html += '<td>' + escapeHtml(r.id) + '</td>';
+        html += '<td>' + escapeHtml(dir) + '</td>';
+        html += '<td>' + escapeHtml(r.label) + '</td>';
+        html += '<td>' + escapeHtml(avgInterval) + '</td>';
         html += '<td>' + escapeHtml(r.value) + '</td>';
         html += '</tr>';
     });
