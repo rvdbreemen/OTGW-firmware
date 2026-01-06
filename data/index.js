@@ -599,7 +599,23 @@ function refreshDevTime() {
 //============================================================================      
 function refreshFirmware() {
   console.log("refreshFirmware() .. " + APIGW + "firmwarefilelist");
-  fetch(APIGW + "firmwarefilelist")
+  
+  let picInfo = { type: "Unknown", version: "Unknown", available: "Unknown", device: "Unknown" };
+
+  fetch(APIGW + "v0/devinfo")
+    .then(response => response.json())
+    .then(json => {
+       if (json.devinfo) {
+         const data = json.devinfo;
+         for (let i in data) {
+           if (data[i].name === "picfwtype") picInfo.type = data[i].value;
+           if (data[i].name === "picfwversion") picInfo.version = data[i].value;
+           if (data[i].name === "picavailable") picInfo.available = data[i].value;
+           if (data[i].name === "picdeviceid") picInfo.device = data[i].value;
+         }
+       }
+       return fetch(APIGW + "firmwarefilelist");
+    })
     .then(response => response.json())
     .then(files => {
       console.log("parsed ... data is [" + JSON.stringify(files) + "]");
@@ -608,6 +624,22 @@ function refreshFirmware() {
       while (displayPICpage.lastChild) {
         displayPICpage.lastChild.remove();
       }
+
+      // --- PIC Information Section ---
+      let infoDiv = document.createElement("div");
+      infoDiv.setAttribute("class", "pic-info-header");
+      infoDiv.style.marginBottom = "15px";
+      infoDiv.style.padding = "10px";
+      
+      let infoContent = "";
+      // infoContent += "<b>PIC Status:</b> " + ((picInfo.available == "true" || picInfo.available == true) ? "Available" : "Not Available") + "<br>";
+      infoContent += "<b>PIC Device:</b> " + picInfo.device + "<br>";
+      infoContent += "<b>PIC Type:</b> " + picInfo.type + "<br>";
+      infoContent += "<b>PIC Firmware Version:</b> " + picInfo.version;
+      
+      infoDiv.innerHTML = infoContent;
+      displayPICpage.appendChild(infoDiv);
+
       let tableDiv = document.createElement("div");
       tableDiv.setAttribute("class", "pictable");
 
