@@ -37,7 +37,6 @@
              let fileInput = document.querySelector('input[name="upload"]');
              let uploadBtn = document.querySelector('input[value="Upload"]');
              let uploadForm = document.querySelector('form[action="/upload"]');
-             let pathDisplay = document.getElementById('currentPath');
              let freeBytes = 0;
 
              // Create progress bar
@@ -76,7 +75,6 @@
              }
 
              function loadFileList(highlightFile = null) {
-                 pathDisplay.textContent = currentPath;
                  uploadForm.action = '/upload?path=' + encodeURIComponent(currentPath);
                  
                  fetch('api/listfiles?path=' + encodeURIComponent(currentPath)).then(function (response) {
@@ -84,6 +82,7 @@
                  }).then(function (json) {
                    main.innerHTML = '';
                    let dir = '<table width=90%>';
+                   dir += `<tr><td colspan="6"><b>Current directory: ${currentPath}</b></td></tr>`;
                    
                    // Add parent directory link if not root
                    if (currentPath !== '/') {
@@ -132,11 +131,6 @@
                      	 ) 
                        {
                          dir += `<td width=10% nowrap><a href ="#" data-href="${fullPath}" class="delete-link"> Delete </a></td>`;
-                         if (json[i].name == '!format') 
-                         {
-                            let fmtBtn = document.getElementById('FormatLittleFS');
-                            if(fmtBtn) fmtBtn.disabled = false;
-                         }
                        }
                        else 
                        {
@@ -262,18 +256,11 @@
                 xhr.open('POST', '/upload');
                 xhr.send(formData);
              });
-
-             let fmtBtn = document.getElementById('FormatLittleFS');
-             if(fmtBtn) {
-                 fmtBtn.addEventListener('click', (event) => {
-                     if (!confirm(`Are you sure you want to execute this function?\nWhen you continue you have to upload FSexplorer.html and all other system files again!!.`)) event.preventDefault();
-                 }); 
-             }
           });
       </script>
    </head>
    <body>
-      <h2>FSexplorer ESP &mdash; <span id="currentPath">/</span></h2>
+      <h2>FSexplorer ESP</h2>
       <div>
          <main></main>
       </div>
@@ -307,11 +294,6 @@
                   <input type='button' class='button' value='Exit FSexplorer' onclick="window.location.href='/'">
                 </form>
            </div>
-           <br>
-           <form action='/LittleFSformat' method='POST'>
-              <input id='FormatLittleFS' type='submit' class='button danger' name='SUBMIT' value='Format LittleFS' DISABLED/>
-           </form>
-           <div class='note'>Format LittleFS only when you know what you are doing!</div>
       </div>
       <br>
       <div id="left">
