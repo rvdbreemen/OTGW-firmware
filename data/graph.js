@@ -235,10 +235,11 @@ var OTGraph = {
         if (!this.running || !line || line.length < 5) return; // Need at least ID and some content
         
         // Match ID in the log line
-        // Supports optional Hex string at start, followed by ID
-        // Format: [Hex] [ID] [Type] [Marker] ...
-        // Regex looks for: Start, optional hex, spaces, ID (digits), spaces, Type, spaces, Marker (> or space or P or -)
-        const regex = /^(?:[0-9A-Fa-z]{8,9}\s+)?\s*(\d+)\s+[A-Za-z0-9\-]+\s+[>P\- ]/;
+        // Format: [ResponseType] [Hex] [ID] [Type] [Marker] ...
+        // Example: "Boiler             B40116400  17 Read-Ack        >RelModLevel = 100.00 %"
+        // Hex: 9-char hex string (1 letter + 8 hex)
+        // Use flexible prefix matching to handle response type, then require hex pattern
+        const regex = /^.*?([A-Z][0-9A-Fa-f]{8})\s+(\d+)\s+[A-Za-z0-9\-]+\s+[>P\- ]/;
         const match = line.match(regex);
         
         var id = NaN;

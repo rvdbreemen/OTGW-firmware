@@ -1551,24 +1551,34 @@ function processStatsLine(line) {
     if (!line || line.trim() === '') return;
     
     // Regular expression to parse the log line
-    // Supports both old format and new format with Hex string prepended
-    // Matches: [Hex] [ID] [Type] [Marker] [Data]
-    // Hex: Optional, 8-9 hex chars (e.g. T80190000)
-    // ID: Decimal number
-    // Type: Message type string
+    // Format from firmware: [ResponseType] [Hex] [ID] [MessageType] [Marker] [Data]
+    // Example: "Boiler             B40116400  17 Read-Ack        >RelModLevel = 100.00 %"
+    // ResponseType: Text like "Boiler", "Thermostat", etc.
+    // Hex: 9-char hex string (1 letter + 8 hex: B40116400, T80190000)
+    // ID: Decimal number (1-3 digits)
+    // MessageType: Message type string (e.g., "Read-Ack")
     // Marker: >, P, -, or space
     // Data: Remaining text
     
-    const regex = /^(?:([0-9A-Fa-z]{8,9})\s+)?\s*(\d+)\s+([A-Za-z0-9\-]+)\s+([>P\- ])\s*(.*)$/;
+    // Match: optional prefix, then hex (letter+8hex), spaces, ID, spaces, type, spaces, marker, data
+    const regex = /^.*?([A-Z][0-9A-Fa-f]{8})\s+(\d+)\s+([A-Za-z0-9\-]+)\s+([>P\- ])\s*(.*)$/;
     const match = line.match(regex);
     
-    if (!match) return;
+    if (!match) {
+        console.log('Stats regex failed to match line:', line);
+        return;
+    }
     
     const fullHex = match[1]; 
     const id = parseInt(match[2], 10);
     const type = match[3].trim();
     const marker = match[4];
     const dataPart = match[5];
+    
+    // Debug logging for first few messages
+    if (Object.keys(statsBuffer).length < 3) {
+        console.log('Stats parsing:', {hex: fullHex, id: id, type: type, marker: marker, data: dataPart.substring(0, 30)});
+    }
     
     if (isNaN(id)) return;
     
