@@ -36,7 +36,7 @@ String getOTLogTimestamp() {
   TimeZone myTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
   if (myTz.isError()) {
     // Fallback if generic name failed
-    myTz = TimeZone::forTimeOffset(0); 
+    myTz = TimeZone::forTimeOffset(TimeOffset::forMinutes(0)); 
   }
   
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now.tv_sec, myTz);
