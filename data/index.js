@@ -157,6 +157,10 @@ function initOTLogWebSocket(force) {
     
     otLogWS.onmessage = function(event) {
       resetWSWatchdog();
+
+      // Always log the raw incoming message
+      console.log("OT Log WS received:", event.data);
+
       if (typeof handleFlashMessage === "function") {
         if (handleFlashMessage(event.data)) return;
       }
@@ -165,12 +169,12 @@ function initOTLogWebSocket(force) {
       try {
         if (data && typeof data === 'string' && data.startsWith('{')) {
           data = JSON.parse(data);
+          console.log("OT Log WS parsed:", data);
         }
       } catch(e) {
         // ignore JSON parse error, treat as text
       }
 
-      // console.log("WS received:", data); // Debug
       addLogLine(data);
     };
     
@@ -1573,32 +1577,39 @@ function openLogTab(evt, tabName) {
 }
 
 function processStatsLine(line) {
-    // Only accept JSON objects (new format)
+    // Statistics works purely off JSON objects now.
+    // Backend may or may not include legacy fields like raw/dir/valid.
     if (!line || typeof line !== 'object') return;
 
-    if (line.id === undefined) return;
+    if (line.id === undefined || line.id === null) return;
     const id = parseInt(line.id, 10);
-    
     if (isNaN(id)) return;
-    
-    // Only process valid messages for statistics (marked with >)
-    if ((line.valid || " ") !== '>') return;
-    
-    const type = line.dir || "";
-    const fullHex = line.raw || "";
-    
-    // Determine simplified direction for grouping
-    let dir = 'Unk';
-    if (type.indexOf('Read') !== -1) dir = 'Read';
-    else if (type.indexOf('Write') !== -1) dir = 'Write';
-    else if (type.indexOf('Reserved') !== -1) dir = 'Reserved';
-    else if (type.indexOf('Data-Invalid') !== -1) dir = 'Data-Invalid';
-    else if (type.indexOf('Unknown-Data-Id') !== -1) dir = 'Unknown-Data-Id';
-    else if (type.indexOf('Invalid-Data') !== -1) dir = 'Invalid-Data';
-    else dir = type;
-    
-    let label = line.label && line.label.trim() !== '' ? line.label : 'Unknown';
-    let value = line.value || '';
+
+    // Grouping: prefer legacy direction if present, otherwise use source.
+    const legacyType = (typeof line.dir === 'string') ? line.dir : '';
+    const source = (typeof line.source === 'string') ? line.source : '';
+    const group = legacyType || source || 'Unk';
+
+    // Display: keep the existing column labeled "Direction" but fill it with
+    // legacy direction when available, otherwise the message source.
+    let dir = group;
+    if (legacyType) {
+      if (legacyType.indexOf('Read') !== -1) dir = 'Read';
+      else if (legacyType.indexOf('Write') !== -1) dir = 'Write';
+      else if (legacyType.indexOf('Reserved') !== -1) dir = 'Reserved';
+      else if (legacyType.indexOf('Data-Invalid') !== -1) dir = 'Data-Invalid';
+      else if (legacyType.indexOf('Unknown-Data-Id') !== -1) dir = 'Unknown-Data-Id';
+      else if (legacyType.indexOf('Invalid-Data') !== -1) dir = 'Invalid-Data';
+      else dir = legacyType;
+    }
+
+    let label = (typeof line.label === 'string' && line.label.trim() !== '') ? line.label : 'Unknown';
+    let value = '';
+    if (line.value !== undefined && line.value !== null) {
+      value = String(line.value);
+    } else if (line.val !== undefined && line.val !== null) {
+      value = String(line.val);
+    }
 
     const now = Date.now();
     const key = id + '_' + dir;
@@ -1606,8 +1617,8 @@ function processStatsLine(line) {
     if (!statsBuffer[key]) {
         statsBuffer[key] = {
             id: id,
-            hex: fullHex || id.toString(16).toUpperCase().padStart(2, '0'),
-            type: type,
+        hex: id.toString(16).toUpperCase().padStart(2, '0'),
+        type: legacyType,
             dir: dir,
             label: label,
             value: value,
@@ -1625,8 +1636,7 @@ function processStatsLine(line) {
         
         entry.lastTime = now;
         entry.value = value;
-        entry.type = type; 
-        if (fullHex) entry.hex = fullHex;
+        entry.type = legacyType;
         if (label && label !== 'Unknown') entry.label = label;
     }
     statsBuffer[key].count++;
