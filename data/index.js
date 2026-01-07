@@ -1365,6 +1365,9 @@ function applyTheme() {
            let isDark = strToBool(data[i].value);
            document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+           if (typeof OTGraph !== 'undefined' && OTGraph.setTheme) {
+               OTGraph.setTheme(isDark ? 'dark' : 'light');
+           }
         }
       }
     })
@@ -1538,6 +1541,9 @@ function openLogTab(evt, tabName) {
   currentTab = tabName;
   if (currentTab === 'Statistics') {
       updateStatisticsDisplay();
+  } else if (currentTab === 'Graph' && typeof OTGraph !== 'undefined') {
+      // Ensure the chart resizes when the tab becomes visible
+      if (OTGraph.resize) OTGraph.resize();
   }
 }
 
