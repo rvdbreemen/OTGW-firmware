@@ -12,7 +12,7 @@
 var OTGraph = {
     chart: null,
     data: {},
-    maxPoints: 86400, // Increase buffer to hold 24h of data at 1msg/sec
+    maxPoints: 432000, // Buffer to hold ~24h of data at 5 msgs/sec
     timeWindow: 3600 * 1000, // Default 1 Hour in milliseconds
     running: false,
     updateTimer: null,
