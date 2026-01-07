@@ -162,7 +162,65 @@ typedef struct {
 
 } OTdataStruct;
 
-static OTdataStruct OTcurrentSystemState;   
+static OTdataStruct OTcurrentSystemState;
+
+// Value type enum for OTlogStruct
+enum OTValueType {
+	OT_VALTYPE_NONE = 0,
+	OT_VALTYPE_F88,      // float (f8.8)
+	OT_VALTYPE_S16,      // signed 16-bit
+	OT_VALTYPE_U16,      // unsigned 16-bit
+	OT_VALTYPE_U8U8,     // two unsigned 8-bit values
+	OT_VALTYPE_S8S8,     // two signed 8-bit values
+	OT_VALTYPE_FLAG8,    // 8-bit flags
+	OT_VALTYPE_FLAG8FLAG8, // two 8-bit flags
+	OT_VALTYPE_STATUS,   // status flags (master/slave)
+	OT_VALTYPE_DATETIME, // date or time
+	OT_VALTYPE_SPECIAL   // special formatting
+};
+
+// Struct to hold OpenTherm log message data
+// This represents the structured data that gets logged and sent via WebSocket
+typedef struct {
+	char time[15];          // "HH:MM:SS.mmmmm"
+	char source[16];        // "Boiler", "Thermostat", etc.
+	uint8_t id;             // OpenTherm message ID (0-127)
+	char label[64];         // Human-readable label (e.g., "Status", "Room Setpoint")
+	char value[128];        // Formatted value string for display
+	
+	// Value type indicator
+	OTValueType valType;
+	
+	// Union for different value types - only one is valid at a time
+	union {
+		float val_f88;      // For f8.8 values
+		int16_t val_s16;    // For s16 values
+		uint16_t val_u16;   // For u16 values
+		struct {
+			uint8_t hb;     // High byte
+			uint8_t lb;     // Low byte
+		} val_u8u8;
+		struct {
+			int8_t hb;      // High byte
+			int8_t lb;      // Low byte
+		} val_s8s8;
+	} numval;
+	
+	// Data object for complex messages
+	struct {
+		bool hasData;       // Flag indicating if data is present
+		char master[16];    // Master status flags (for Status messages)
+		char slave[16];     // Slave status flags (for Status messages)
+		char extra[32];     // Extra data for special message types
+	} data;
+	
+} OTlogStruct;
+
+// Global variable for current log message
+// Namespaced to avoid collision with the existing OpenthermData_t OTdata in OTGW-Core.ino
+namespace OTLog {
+	extern OTlogStruct OTlogData;
+}
 
 
 enum OpenThermResponseStatus {
