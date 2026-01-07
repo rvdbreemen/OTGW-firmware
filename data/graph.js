@@ -232,20 +232,11 @@ var OTGraph = {
     },
 
     processLine: function(line) {
-        if (!this.running || !line) return; 
+        if (!this.running || !line || typeof line !== 'object') return; 
         
-        var id = NaN;
-        var now = new Date(); // timestamp
-        var val = 0;
-        
-        // Handle JSON Object
-        if (typeof line === 'object') {
-            id = parseInt(line.id, 10);
-            if (line.time) {
-                 // Try to parse timestamp 'HH:MM:SS.mmmm' into standard date object?
-                 // Or just use current time for graph (simplest and consistent with old behavior which used new Date())
-                 // The old code used `var now = new Date();` ignoring log timestamp.
-            }
+        try {
+            var id = parseInt(line.id, 10);
+            var now = new Date(); 
             
             if (isNaN(id)) return;
 
@@ -264,6 +255,7 @@ var OTGraph = {
                     this.pushData('chMode', now, ch);
                  }
             } else {
+                 var val;
                  if (line.val !== undefined) {
                      val = parseFloat(line.val);
                  } else if (line.value) {
@@ -275,73 +267,6 @@ var OTGraph = {
                  
                  if (isNaN(val)) return;
                  
-                 var key = null;
-                 switch(id) {
-                     case 17: key = 'mod'; break;
-                     case 1:  key = 'ctrlSp'; break;
-                     case 25: key = 'boiler'; break;
-                     case 28: key = 'return'; break;
-                     case 16: key = 'roomSp'; break;
-                     case 24: key = 'room'; break;
-                     case 27: key = 'outside'; break;
-                 }
-                 if (key) this.pushData(key, now, val);
-            }
-            return;
-        }
-
-        // Handle Text String (Legacy/Telnet)
-        if (line.length < 5) return; // Need at least ID and some content
-        
-        // Match ID in the log line
-        // Format: [ResponseType] [Hex] [ID] [Type] [Marker] ...
-        // Example: "Boiler             B40116400  17 Read-Ack        >RelModLevel = 100.00 %"
-        // Hex: 9-char hex string (1 letter + 8 hex)
-        // Use flexible prefix matching to handle response type, then require hex pattern
-        const regex = /^.*?([A-Z][0-9A-Fa-f]{8})\s+(\d+)\s+[A-Za-z0-9\-]+\s+[>P\- ]/;
-        const match = line.match(regex);
-        
-        if (match) {
-            id = parseInt(match[2], 10); // Fix for group index (was 1, which is Hex)
-        }
-        
-        if (isNaN(id)) return;
-        
-        // var now = new Date(); // Already defined above
-            var val = 0;
-            
-            if (id === 0) {
-                // Status MsgID 0 - Slave Information
-                // The binary information should be derived from the id 0 from the slave information.
-                // Encoding from firmware (OTGW-Core.ino):
-                //  0: Fault 'E'
-                //  1: CH mode 'C'
-                //  2: DHW mode 'W'
-                //  3: Flame status 'F'
-                //  4: Cooling status 'C'
-                //  5: CH2 mode '2'
-                //  6: Diagnostic 'D'
-                //  7: Electric 'P'
-                
-                var match = /Slave\s*\[([A-Z\-\.]{8})\]/.exec(line);
-                if (match) {
-                    var chars = match[1]; 
-                    // Map characters to status (1 if char matches active code, 0 otherwise)
-                    var ch    = (chars.charAt(1) === 'C') ? 1 : 0;
-                    var dhw   = (chars.charAt(2) === 'W') ? 1 : 0;
-                    var flame = (chars.charAt(3) === 'F') ? 1 : 0;
-                    
-                    this.pushData('flame', now, flame);
-                    this.pushData('dhwMode', now, dhw);
-                    this.pushData('chMode', now, ch);
-                }
-            } else {
-                 var parts = line.split('=');
-                 if (parts.length < 2) return;
-                 var valPart = parts[parts.length-1].trim(); 
-                 val = parseFloat(valPart);
-                 if (isNaN(val)) return;
-    
                  var key = null;
                  switch(id) {
                      case 17: key = 'mod'; break;

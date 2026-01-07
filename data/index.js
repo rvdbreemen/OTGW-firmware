@@ -237,60 +237,39 @@ function updateWSStatus(connected) {
 }
 
 //============================================================================
+function formatLogLine(logLine) {
+  if (!logLine) return "";
+  
+  // Matches alignment of "Boiler            B004018A  25 Read-Data       > Tboiler = 20.00 C"
+  const pad = (str, len) => (str + "").padEnd(len, ' ');
+  const padStart = (str, len) => (str + "").padStart(len, ' ');
+  
+  let text = pad(logLine.source || "Unknown", 18) + 
+         " " + (logLine.raw || "") + 
+         " " + padStart(logLine.id || "0", 3) + 
+         " " + pad(logLine.dir || "", 16) + 
+         " " + (logLine.valid || " ");
+
+  if (logLine.label) {
+     text += " " + logLine.label;
+     if (logLine.value) {
+         text += " = " + logLine.value;
+     }
+  }
+  return text;
+}
+
 function addLogLine(logLine) {
   if (!logLine) return;
-  if (typeof logLine === 'string' && logLine.trim() === '') return;
+  // Enforce object only (JSON logging)
+  if (typeof logLine !== 'object') return;
   
-  let timestamp;
-  let text = "";
-  let fullRaw = "";
-  
-  if (typeof logLine === 'object') {
-     // Format: {time, source, raw, id, dir, valid, label, value}
-     timestamp = logLine.time;
-     
-     // Construct text for display/stats
-     // Matches alignment of "Boiler            B004018A  25 Read-Data       > Tboiler = 20.00 C"
-     const pad = (str, len) => (str + "").padEnd(len, ' ');
-     const padStart = (str, len) => (str + "").padStart(len, ' ');
-     
-     text = pad(logLine.source || "Unknown", 18) + 
-            " " + (logLine.raw || "") + 
-            " " + padStart(logLine.id || "0", 3) + 
-            " " + pad(logLine.dir || "", 16) + 
-            " " + (logLine.valid || " ");
-
-     if (logLine.label) {
-        text += " " + logLine.label;
-        if (logLine.value) {
-            text += " = " + logLine.value;
-        }
-     }
-     fullRaw = JSON.stringify(logLine);
-  } else {
-     text = logLine.trimEnd();
-     fullRaw = logLine;
-     
-      if (window.performance && window.performance.timeOrigin) {
-        const nowHighRes = performance.now() + performance.timeOrigin;
-        const now = new Date(nowHighRes);
-        const msPart = Math.floor((nowHighRes % 1000) * 100);
-        const msHighRes = String(msPart).padStart(5, '0');
-        timestamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${msHighRes}`;
-      } else {
-        const now = new Date();
-        timestamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(now.getMilliseconds()).padStart(3, '0')}`;
-      }
-  }
-  
-  if (!timestamp) timestamp = "00:00:00.000";
+  // Format: {time, source, raw, id, dir, valid, label, value}
+  let timestamp = logLine.time || "00:00:00.000";
   
   const logEntry = {
     time: timestamp,
-    // Store a processed version for display, keep original in `raw`
-    text: text,
-    raw: fullRaw,
-    data: (typeof logLine === 'object') ? logLine : null
+    data: logLine
   };
   
   // Add to buffer
@@ -298,12 +277,12 @@ function addLogLine(logLine) {
   
   // Process for Statistics
   if (typeof processStatsLine === 'function') {
-      processStatsLine(typeof logLine === 'object' ? logLine : text);
+      processStatsLine(logLine);
   }
   
   // Process for Graph
   if (typeof OTGraph !== 'undefined') {
-      OTGraph.processLine(typeof logLine === 'object' ? logLine : text);
+      OTGraph.processLine(logLine);
   }
 
   // Trim buffer if exceeds max
@@ -339,7 +318,7 @@ function updateFilteredBuffer() {
   } else {
     const term = searchTerm.toLowerCase();
     otLogFilteredBuffer = otLogBuffer.filter(entry => 
-      entry.text.toLowerCase().includes(term)
+      formatLogLine(entry.data).toLowerCase().includes(term)
     );
   }
 }
@@ -365,7 +344,8 @@ function renderLogDisplay() {
   // Build HTML
   let html = '';
   linesToShow.forEach(entry => {
-    const line = showTimestamps ? `${entry.time} ${entry.text}` : entry.text;
+    const text = formatLogLine(entry.data);
+    const line = showTimestamps ? `${entry.time} ${text}` : text;
     html += escapeHtml(line) + '\n';
   });
 
@@ -505,7 +485,8 @@ function downloadLog() {
   content += '#' + '='.repeat(70) + '\n\n';
   
   otLogBuffer.forEach(entry => {
-    const line = showTimestamps ? `${entry.time} ${entry.text}` : entry.text;
+    const text = formatLogLine(entry.data);
+    const line = showTimestamps ? `${entry.time} ${text}` : text;
     content += line + '\n';
   });
   
@@ -1592,64 +1573,22 @@ function openLogTab(evt, tabName) {
 }
 
 function processStatsLine(line) {
-    if (!line) return;
-    
-    let id, type, marker, dataPart, fullHex = "";
+    // Only accept JSON objects (new format)
+    if (!line || typeof line !== 'object') return;
 
-    if (typeof line === 'object') {
-        if (line.id === undefined) return;
-        id = parseInt(line.id, 10);
-        type = line.dir || "";
-        marker = line.valid || " ";
-        // Reconstruct dataPart for existing parsing logic below
-        if (line.label) {
-             dataPart = line.label;
-             if (line.value) {
-                 dataPart += " = " + line.value;
-             }
-        } else {
-             dataPart = "";
-        }
-    } else {
-        if (line.trim() === '') return;
-        
-        // Regular expression to parse the log line
-        // Format from firmware: [ResponseType] [Hex] [ID] [MessageType] [Marker] [Data]
-        // Example: "Boiler             B40116400  17 Read-Ack        >RelModLevel = 100.00 %"
-        // ResponseType: Text like "Boiler", "Thermostat", etc.
-        // Hex: 9-char hex string (1 letter + 8 hex: B40116400, T80190000)
-        // ID: Decimal number (1-3 digits)
-        // MessageType: Message type string (e.g., "Read-Ack")
-        // Marker: >, P, -, or space
-        // Data: Remaining text
-        
-        // Match: optional prefix, then hex (letter+8hex), spaces, ID, spaces, type, spaces, marker, data
-        const regex = /^.*?([A-Z][0-9A-Fa-f]{8})\s+(\d+)\s+([A-Za-z0-9\-]+)\s+([>P\- ])\s*(.*)$/;
-        const match = line.match(regex);
-        
-        if (!match) {
-            console.log('Stats regex failed to match line:', line);
-            return;
-        }
-        
-        fullHex = match[1]; 
-        id = parseInt(match[2], 10);
-        type = match[3].trim();
-        marker = match[4];
-        dataPart = match[5];
-    }
-    
-    // Debug logging for first few messages
-    if (Object.keys(statsBuffer).length < 3) {
-        console.log('Stats parsing:', {hex: fullHex, id: id, type: type, marker: marker, data: dataPart.substring(0, 30)});
-    }
+    if (line.id === undefined) return;
+    const id = parseInt(line.id, 10);
     
     if (isNaN(id)) return;
     
     // Only process valid messages for statistics (marked with >)
-    if (marker !== '>') return;
+    if ((line.valid || " ") !== '>') return;
     
-    var dir = 'Unk';
+    const type = line.dir || "";
+    const fullHex = line.raw || "";
+    
+    // Determine simplified direction for grouping
+    let dir = 'Unk';
     if (type.indexOf('Read') !== -1) dir = 'Read';
     else if (type.indexOf('Write') !== -1) dir = 'Write';
     else if (type.indexOf('Reserved') !== -1) dir = 'Reserved';
@@ -1658,22 +1597,11 @@ function processStatsLine(line) {
     else if (type.indexOf('Invalid-Data') !== -1) dir = 'Invalid-Data';
     else dir = type;
     
-    var label = '';
-    var value = '';
-    
-    // Find first ' = '
-    var eqIdx = dataPart.indexOf(' = ');
-    if (eqIdx !== -1) {
-        label = dataPart.substring(0, eqIdx).trim();
-        value = dataPart.substring(eqIdx + 3).trim();
-    } else {
-        // Fallback or 'Unknown' lines
-        label = dataPart.trim();
-        if (label === '') label = 'Unknown';
-    }
+    let label = line.label && line.label.trim() !== '' ? line.label : 'Unknown';
+    let value = line.value || '';
 
-    var now = Date.now();
-    var key = id + '_' + dir;
+    const now = Date.now();
+    const key = id + '_' + dir;
     
     if (!statsBuffer[key]) {
         statsBuffer[key] = {
@@ -1689,8 +1617,8 @@ function processStatsLine(line) {
             intervalCount: 0
         };
     } else {
-        var entry = statsBuffer[key];
-        var diff = (now - entry.lastTime) / 1000.0; // seconds
+        const entry = statsBuffer[key];
+        const diff = (now - entry.lastTime) / 1000.0; // seconds
         
         entry.intervalSum += diff;
         entry.intervalCount++;
@@ -1698,7 +1626,7 @@ function processStatsLine(line) {
         entry.lastTime = now;
         entry.value = value;
         entry.type = type; 
-        if (fullHex) entry.hex = fullHex; // Update hex if available
+        if (fullHex) entry.hex = fullHex;
         if (label && label !== 'Unknown') entry.label = label;
     }
     statsBuffer[key].count++;
