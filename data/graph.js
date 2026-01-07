@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : graph.js, part of OTGW-firmware project
-**  Version  : v2.0.0 (ECharts version)
+**  Version  : v1.0.0-rc2
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -233,49 +233,22 @@ var OTGraph = {
 
     processLine: function(line) {
         if (!this.running || !line || line.length < 5) return; // Need at least ID and some content
-        // Basic check for log line validity
-        if (line.indexOf('>') === -1) return;
-
-        try {
-            // Firmware log format: "  ID Type       >Label = Value"
-            // Example with timestamp: "12:34:56.789   0 Read-Ack        >Status = Slave  [E-C-W-F...]"
-            // Or raw: "   0 Read-Ack        >Status = Slave  [E-C-W-F...]"
-            
-            // Regex to find ID: look for (digits) (space) (Type) (space) (>)
-            // or simply match the ID before the Type column.
-            // The type seems to be stuck to > for some messages or spaced out.
-            // Let's use a more flexible regex that looks for the decimal ID 
-            // optionally preceded by timestamp/spaces, and followed by text then >
-            
-            // Strategy: Look for the segment "  ID " or " ID " before the ">"
-            // The firmware prints " %3d", so "  0", " 10", "100".
-            
-            var id = NaN;
-            
-            // Try matching ID at start (raw firmware output)
-            var matchStart = /^\s*(\d+)\s/.exec(line);
-            if (matchStart) {
-                id = parseInt(matchStart[1], 10);
-            } else {
-                 // Try finding ID inside the string (if timestamp is present)
-                 // Look for 1-3 digits followed by a known message type or just spaces and text then >
-                 // Example: "... 123456   0 Read-Ack"
-                 // Let's rely on the > separator.
-                 // The ID is usually the first number on the line if we split by space? 
-                 // No, timestamp has numbers.
-                 
-                 // Firmware specific format: "   0 Read-Ack"
-                 // It matches: space(s) digits space(s) known OpenTherm message type, then '>'
-                 var matchInside = /\s+(\d+)\s+(?:Read-Ack|Write-Ack|Read-Data|Write-Data|Inv-Data|Read-Flags|Write-Flags)\s*>/;
-                 var m = line.match(matchInside);
-                 if (m) {
-                     id = parseInt(m[1], 10);
-                 }
-            }
-            
-            if (isNaN(id)) return;
-            
-            var now = new Date();
+        
+        // Match ID in the log line
+        // Supports optional Hex string at start, followed by ID
+        // Format: [Hex] [ID] [Type] [Marker] ...
+        // Regex looks for: Start, optional hex, spaces, ID (digits), spaces, Type, spaces, Marker (> or space or P or -)
+        const regex = /^(?:[0-9A-Fa-z]{8,9}\s+)?\s*(\d+)\s+[A-Za-z0-9\-]+\s+[>P\- ]/;
+        const match = line.match(regex);
+        
+        var id = NaN;
+        if (match) {
+            id = parseInt(match[1], 10);
+        }
+        
+        if (isNaN(id)) return;
+        
+        var now = new Date();
             var val = 0;
             
             if (id === 0) {

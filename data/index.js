@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v1.0.0-rc1
+**  Version  : v1.0.0-rc2
 **
 **  Copyright (c) 2021-2024 Robert van den Breemen
 **
@@ -1548,20 +1548,33 @@ function openLogTab(evt, tabName) {
 }
 
 function processStatsLine(line) {
-    if (!line || line.length < 40) return;
+    if (!line || line.trim() === '') return;
     
-    // Check for validity marker at index 39
-    // 'Sender             ID Type             > Label = Value Unit'
-    //  01234567890123456789012345678901234567890
-    if (line.charAt(39) !== '>') return;
+    // Regular expression to parse the log line
+    // Supports both old format and new format with Hex string prepended
+    // Matches: [Hex] [ID] [Type] [Marker] [Data]
+    // Hex: Optional, 8-9 hex chars (e.g. T80190000)
+    // ID: Decimal number
+    // Type: Message type string
+    // Marker: >, P, -, or space
+    // Data: Remaining text
     
-    // Extract ID
-    var idStr = line.substring(18, 22).trim();
-    if (!idStr) return;
-    var id = parseInt(idStr, 10);
+    const regex = /^(?:([0-9A-Fa-z]{8,9})\s+)?\s*(\d+)\s+([A-Za-z0-9\-]+)\s+([>P\- ])\s*(.*)$/;
+    const match = line.match(regex);
+    
+    if (!match) return;
+    
+    const fullHex = match[1]; 
+    const id = parseInt(match[2], 10);
+    const type = match[3].trim();
+    const marker = match[4];
+    const dataPart = match[5];
+    
     if (isNaN(id)) return;
-
-    var type = line.substring(22, 39).trim(); // 'Read-Ack' etc.
+    
+    // Only process valid messages for statistics (marked with >)
+    if (marker !== '>') return;
+    
     var dir = 'Unk';
     if (type.indexOf('Read') !== -1) dir = 'Read';
     else if (type.indexOf('Write') !== -1) dir = 'Write';
@@ -1571,7 +1584,6 @@ function processStatsLine(line) {
     else if (type.indexOf('Invalid-Data') !== -1) dir = 'Invalid-Data';
     else dir = type;
     
-    var dataPart = line.substring(40);
     var label = '';
     var value = '';
     
@@ -1592,7 +1604,7 @@ function processStatsLine(line) {
     if (!statsBuffer[key]) {
         statsBuffer[key] = {
             id: id,
-            hex: id.toString(16).toUpperCase().padStart(2, '0'),
+            hex: fullHex || id.toString(16).toUpperCase().padStart(2, '0'),
             type: type,
             dir: dir,
             label: label,
@@ -1612,6 +1624,7 @@ function processStatsLine(line) {
         entry.lastTime = now;
         entry.value = value;
         entry.type = type; 
+        if (fullHex) entry.hex = fullHex; // Update hex if available
         if (label && label !== 'Unknown') entry.label = label;
     }
     statsBuffer[key].count++;
