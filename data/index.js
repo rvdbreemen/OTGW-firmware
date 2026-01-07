@@ -244,21 +244,51 @@ function updateWSStatus(connected) {
 function formatLogLine(logLine) {
   if (!logLine) return "";
   
-  // Matches alignment of "Boiler            B004018A  25 Read-Data       > Tboiler = 20.00 C"
+  // Construct display line from the incoming JSON fields.
+  // No parsing of legacy text log lines.
   const pad = (str, len) => (str + "").padEnd(len, ' ');
   const padStart = (str, len) => (str + "").padStart(len, ' ');
-  
-  let text = pad(logLine.source || "Unknown", 18) + 
-         " " + (logLine.raw || "") + 
-         " " + padStart(logLine.id || "0", 3) + 
-         " " + pad(logLine.dir || "", 16) + 
-         " " + (logLine.valid || " ");
 
-  if (logLine.label) {
-     text += " " + logLine.label;
-     if (logLine.value) {
-         text += " = " + logLine.value;
+  const source = (typeof logLine.source === 'string' && logLine.source) ? logLine.source : 'Unknown';
+  const id = (logLine.id !== undefined && logLine.id !== null) ? String(logLine.id) : "0";
+  const label = (typeof logLine.label === 'string' && logLine.label.trim() !== '') ? logLine.label : '';
+
+  let value = '';
+  if (logLine.value !== undefined && logLine.value !== null && String(logLine.value) !== '') {
+    value = String(logLine.value);
+  } else if (typeof logLine.val === 'number') {
+    value = String(logLine.val);
+  }
+
+  // Optional structured extras
+  let extra = '';
+  if (logLine.data && typeof logLine.data === 'object') {
+    const valueHasMaster = value.indexOf('Master [') !== -1;
+    const valueHasSlave = value.indexOf('Slave [') !== -1;
+    if (!valueHasMaster && typeof logLine.data.master === 'string' && logLine.data.master) {
+      extra += (extra ? ' ' : '') + `M[${logLine.data.master}]`;
+    }
+    if (!valueHasSlave && typeof logLine.data.slave === 'string' && logLine.data.slave) {
+      extra += (extra ? ' ' : '') + `S[${logLine.data.slave}]`;
+    }
+    if (typeof logLine.data.extra === 'string' && logLine.data.extra) {
+      extra += (extra ? ' ' : '') + logLine.data.extra;
+    }
+  }
+  
+  let text = pad(source, 18) + " " + padStart(id, 3);
+
+  if (label) {
+     text += " " + label;
+     if (value) {
+       text += " = " + value;
      }
+  } else if (value) {
+     text += " " + value;
+  }
+
+  if (extra) {
+     text += " " + extra;
   }
   return text;
 }
@@ -268,8 +298,8 @@ function addLogLine(logLine) {
   // Enforce object only (JSON logging)
   if (typeof logLine !== 'object') return;
   
-  // Format: {time, source, raw, id, dir, valid, label, value}
-  let timestamp = logLine.time || "00:00:00.000";
+  // JSON format: at minimum {time, source, id, label, value} with optional `val` and `data`.
+  let timestamp = logLine.time || "00:00:00.00000";
   
   const logEntry = {
     time: timestamp,
@@ -1577,31 +1607,16 @@ function openLogTab(evt, tabName) {
 }
 
 function processStatsLine(line) {
-    // Statistics works purely off JSON objects now.
-    // Backend may or may not include legacy fields like raw/dir/valid.
+  // Statistics works purely off JSON objects.
     if (!line || typeof line !== 'object') return;
 
     if (line.id === undefined || line.id === null) return;
     const id = parseInt(line.id, 10);
     if (isNaN(id)) return;
 
-    // Grouping: prefer legacy direction if present, otherwise use source.
-    const legacyType = (typeof line.dir === 'string') ? line.dir : '';
-    const source = (typeof line.source === 'string') ? line.source : '';
-    const group = legacyType || source || 'Unk';
-
-    // Display: keep the existing column labeled "Direction" but fill it with
-    // legacy direction when available, otherwise the message source.
-    let dir = group;
-    if (legacyType) {
-      if (legacyType.indexOf('Read') !== -1) dir = 'Read';
-      else if (legacyType.indexOf('Write') !== -1) dir = 'Write';
-      else if (legacyType.indexOf('Reserved') !== -1) dir = 'Reserved';
-      else if (legacyType.indexOf('Data-Invalid') !== -1) dir = 'Data-Invalid';
-      else if (legacyType.indexOf('Unknown-Data-Id') !== -1) dir = 'Unknown-Data-Id';
-      else if (legacyType.indexOf('Invalid-Data') !== -1) dir = 'Invalid-Data';
-      else dir = legacyType;
-    }
+    // Group by (id + source). This is present in JSON and avoids relying on legacy fields.
+    const source = (typeof line.source === 'string' && line.source) ? line.source : 'Unk';
+    const dir = source;
 
     let label = (typeof line.label === 'string' && line.label.trim() !== '') ? line.label : 'Unknown';
     let value = '';
@@ -1617,8 +1632,8 @@ function processStatsLine(line) {
     if (!statsBuffer[key]) {
         statsBuffer[key] = {
             id: id,
-        hex: id.toString(16).toUpperCase().padStart(2, '0'),
-        type: legacyType,
+      hex: id.toString(16).toUpperCase().padStart(2, '0'),
+      type: source,
             dir: dir,
             label: label,
             value: value,
@@ -1636,7 +1651,7 @@ function processStatsLine(line) {
         
         entry.lastTime = now;
         entry.value = value;
-        entry.type = legacyType;
+        entry.type = source;
         if (label && label !== 'Unknown') entry.label = label;
     }
     statsBuffer[key].count++;
