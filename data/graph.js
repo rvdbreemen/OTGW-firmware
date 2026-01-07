@@ -375,22 +375,22 @@ var OTGraph = {
         if (hasPendingData) {
             // Use incremental update for better performance
             // Process each series and append new data points
-            this.seriesConfig.forEach((c, index) => {
+            this.seriesConfig.forEach(function(c, index) {
                 var pending = this.pendingData[c.id];
                 if (pending && pending.length > 0) {
                     // ECharts appendData expects an array of values
-                    var values = pending.map(p => p.value);
+                    var values = pending.map(function(p) { return p.value; });
                     this.chart.appendData({
                         seriesIndex: index,
                         data: values
                     });
                 }
-            });
+            }.bind(this));
 
             // Clear pending data after appending
-            this.seriesConfig.forEach(c => {
+            this.seriesConfig.forEach(function(c) {
                 this.pendingData[c.id] = [];
-            });
+            }.bind(this));
         }
 
         // Always update xAxis for the sliding window
