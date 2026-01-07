@@ -74,11 +74,6 @@ static JsonDocument* ptrLogDoc = nullptr;
 #define AddLog(logstring)   ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, logstring, OT_LOG_BUFFER_SIZE); } })
 #define AddLogln()          ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, "\r\n", OT_LOG_BUFFER_SIZE); } })
 
-// Macro to Add to JSON log
-#define JSONLog(jvalue) ({ if (ptrLogDoc) { (*ptrLogDoc)["label"] = OTlookupitem.label; (*ptrLogDoc)["value"] = jvalue; } })
-// Macro to Add numeric value to JSON log if valid
-#define JSONLogVal(jval) ({ if (ptrLogDoc && is_value_valid(OTdata, OTlookupitem)) { (*ptrLogDoc)["val"] = jval; } })
-
 /* --- End of LOG marcro's ---*/
 
 
@@ -539,6 +534,42 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OTdata.type==OT_WRITE_DATA));
   _valid = _valid || (OTdata.id==OT_Statusflags) || (OTdata.id==OT_StatusVH) || (OTdata.id==OT_SolarStorageMaster);;
   return _valid;
+}
+
+
+// Helper functions for JSON logging
+// Using overloads instead of templates to avoid Arduino preprocessor issues with template functions in .ino files
+
+static void JSONLog(const String& value) {
+  if (ptrLogDoc) {
+    (*ptrLogDoc)["label"] = OTlookupitem.label;
+    (*ptrLogDoc)["value"] = value;
+  }
+}
+
+static void JSONLog(const char* value) {
+  if (ptrLogDoc) {
+    (*ptrLogDoc)["label"] = OTlookupitem.label;
+    (*ptrLogDoc)["value"] = value;
+  }
+}
+
+static void JSONLogVal(float value) {
+  if (ptrLogDoc && is_value_valid(OTdata, OTlookupitem)) {
+    (*ptrLogDoc)["val"] = value;
+  }
+}
+
+static void JSONLogVal(int value) {
+  if (ptrLogDoc && is_value_valid(OTdata, OTlookupitem)) {
+    (*ptrLogDoc)["val"] = value;
+  }
+}
+
+static void JSONLogVal(unsigned int value) {
+  if (ptrLogDoc && is_value_valid(OTdata, OTlookupitem)) {
+    (*ptrLogDoc)["val"] = value;
+  }
 }
 
 void print_f88(float& value)
