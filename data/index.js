@@ -83,7 +83,7 @@ function initOTLogWebSocket(force) {
   const isSmallScreen = window.innerWidth < 768;
 
   if ((isPhone || isSmallScreen) && !force && !isFlashing) {
-    console.log("Smartphone or small screen detected. Disabling OpenTherm Message Log.");
+    console.log("Smartphone or small screen detected. Disabling OpenTherm Monitor.");
     const logSection = document.getElementById('otLogSection');
     if (logSection) {
       logSection.style.display = 'none';
