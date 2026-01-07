@@ -83,3 +83,40 @@ hr {
 	font-size: 16px;
 	width: 125px;
 }
+
+fieldset.upload-box {
+    border: 1px solid #7aaad6;
+    background-color: #e8f4ff;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    width: 90%;
+}
+legend {
+    font-weight: bold;
+    color: #444;
+}
+.system-actions {
+    width: 90%;
+    text-align: center;
+    background-color: #eaeaea;
+    padding: 10px;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+.button-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.button.danger {
+    background-color: #ffcccc;
+    border: 1px solid #ff0000;
+    color: #b00020;
+}
+.dir-link {
+    text-decoration: none;
+    color: #0000EE;
+}
+

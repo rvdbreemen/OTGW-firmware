@@ -87,3 +87,40 @@ hr {
     width: 125px;
     color: white;
 }
+
+fieldset.upload-box {
+    border: 1px solid #555;
+    background-color: #333;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    width: 90%;
+}
+legend {
+    font-weight: bold;
+    color: #eee;
+}
+.system-actions {
+    width: 90%;
+    text-align: center;
+    background-color: #2c2c2e;
+    padding: 10px;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+.button-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.button.danger {
+    background-color: #800000;
+    border: 1px solid #ff5555;
+    color: white;
+}
+.dir-link {
+    text-decoration: none;
+    color: #4daaf5;
+}
+
