@@ -157,17 +157,17 @@ var OTGraph = {
             },
             grid: [
                 // 5 vertical grids
-                // Margins: left 50px for axes labels. Right 20px.
+                // Margins: use percentages for responsive layout (space for axes labels on the left).
                 // 0: Flame (Top)
-                { left: '50', right: '20', top: '5%', height: '8%', containLabel: false }, 
+                { left: '10%', right: '5%', top: '5%', height: '8%', containLabel: false }, 
                 // 1: DHW Mode
-                { left: '50', right: '20', top: '15%', height: '8%', containLabel: false }, 
+                { left: '10%', right: '5%', top: '15%', height: '8%', containLabel: false }, 
                 // 2: CH Mode
-                { left: '50', right: '20', top: '25%', height: '8%', containLabel: false }, 
+                { left: '10%', right: '5%', top: '25%', height: '8%', containLabel: false }, 
                 // 3: Modulation
-                { left: '50', right: '20', top: '38%', height: '20%', containLabel: false }, 
+                { left: '10%', right: '5%', top: '38%', height: '20%', containLabel: false }, 
                 // 4: Temps (Bottom section, largest)
-                { left: '50', right: '20', top: '63%', bottom: '5%', containLabel: false } 
+                { left: '10%', right: '5%', top: '63%', bottom: '5%', containLabel: false } 
             ],
             axisPointer: {
                 link: { xAxisIndex: 'all' }
