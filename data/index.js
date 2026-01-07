@@ -83,7 +83,7 @@ function initOTLogWebSocket(force) {
   const isSmallScreen = window.innerWidth < 768;
 
   if ((isPhone || isSmallScreen) && !force && !isFlashing) {
-    console.log("Smartphone or small screen detected. Disabling OpenTherm Message Log.");
+    console.log("Smartphone or small screen detected. Disabling OpenTherm Monitor.");
     const logSection = document.getElementById('otLogSection');
     if (logSection) {
       logSection.style.display = 'none';
@@ -255,6 +255,11 @@ function addLogLine(logLine) {
   // Process for Statistics
   if (typeof processStatsLine === 'function') {
       processStatsLine(logLine);
+  }
+  
+  // Process for Graph
+  if (typeof OTGraph !== 'undefined') {
+      OTGraph.processLine(logLine);
   }
 
   // Trim buffer if exceeds max
@@ -544,6 +549,10 @@ function initMainPage() {
   needReload = false;
   
   applyTheme();
+
+  if (typeof OTGraph !== 'undefined') {
+      OTGraph.init();
+  }
 
   if (window.location.hash == "#tabPICflash") {
     firmwarePage();
@@ -1356,6 +1365,9 @@ function applyTheme() {
            let isDark = strToBool(data[i].value);
            document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+           if (typeof OTGraph !== 'undefined' && OTGraph.setTheme) {
+               OTGraph.setTheme(isDark ? 'dark' : 'light');
+           }
         }
       }
     })
@@ -1529,6 +1541,9 @@ function openLogTab(evt, tabName) {
   currentTab = tabName;
   if (currentTab === 'Statistics') {
       updateStatisticsDisplay();
+  } else if (currentTab === 'Graph' && typeof OTGraph !== 'undefined') {
+      // Ensure the chart resizes when the tab becomes visible
+      if (OTGraph.resize) OTGraph.resize();
   }
 }
 

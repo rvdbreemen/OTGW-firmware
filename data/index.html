@@ -14,7 +14,9 @@
         } catch (e) { console.error(e); }
       })();
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <script src="./index.js"></script>
+    <script src="./graph.js"></script>
     <title>OTGW firmware</title>
   </head>
   <body>
@@ -48,7 +50,7 @@
       <!-- OpenTherm Log Viewer Section -->
       <div id="otLogSection" class="ot-log-section">
         <div class="ot-log-header">
-          <h3>OpenTherm Message Log</h3>
+          <h3>OpenTherm Monitor</h3>
           <div class="ot-log-status">
             <span id="wsStatus" class="ws-status ws-disconnected">●</span>
             <span id="wsStatusText">Disconnected</span>
@@ -58,6 +60,7 @@
         <div class="ot-log-tabs">
           <button class="tab-link active" onclick="openLogTab(event, 'Log')">Log</button>
           <button class="tab-link" onclick="openLogTab(event, 'Statistics')">Statistics</button>
+          <button class="tab-link" onclick="openLogTab(event, 'Graph')">Graph</button>
         </div>
 
         <div id="Log" class="tab-content active">
@@ -103,6 +106,25 @@
              <div class="ot-log-footer">
                 <span>Unique Messages: <span id="statsCount">0</span></span>
              </div>
+        </div>
+
+        <div id="Graph" class="tab-content">
+            <div class="ot-graph-container">
+               <div class="ot-graph-controls">
+                   <label for="graphTimeWindow">Time Window: </label>
+                   <select id="graphTimeWindow" class="ot-graph-time-window">
+                       <option value="10">10 Minutes</option>
+                       <option value="30">30 Minutes</option>
+                       <option value="60" selected>1 Hour</option>
+                       <option value="120">2 Hours</option>
+                       <option value="240">4 Hours</option>
+                       <option value="360">6 Hours</option>
+                       <option value="720">12 Hours</option>
+                       <option value="1440">24 Hours</option>
+                   </select>
+               </div>
+               <div id="otGraphCanvas"></div>
+            </div>
         </div>
       </div>
     </div>
