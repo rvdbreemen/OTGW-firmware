@@ -287,19 +287,6 @@ var OTGraph = {
                     this.pushData('flame', now, flame);
                     this.pushData('dhwMode', now, dhw);
                     this.pushData('chMode', now, ch);
-                } else {
-                    // Fallback for potential legacy binary format: LB flag8[xxxxxxxx]
-                    var binMatch = /LB flag8\[([01]{8})\]/.exec(line);
-                    if (binMatch) {
-                        var bits = binMatch[1]; 
-                        var flame = bits.charAt(4) === '1' ? 1 : 0;
-                        var dhw   = bits.charAt(5) === '1' ? 1 : 0;
-                        var ch    = bits.charAt(6) === '1' ? 1 : 0;
-                        
-                        this.pushData('flame', now, flame);
-                        this.pushData('dhwMode', now, dhw);
-                        this.pushData('chMode', now, ch);
-                    }
                 }
             } else {
                  var parts = line.split('=');
