@@ -14,9 +14,23 @@
       <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
-      <link rel="stylesheet" href="FSexplorer.css">
+      <link rel="stylesheet" href="FSexplorer.css" id="theme-style">
+      <script>
+        (function() {
+          try {
+            var storedTheme = localStorage.getItem('theme');
+            if (storedTheme === 'dark') {
+              var el = document.getElementById('theme-style');
+              if(el) el.href = "FSexplorer_dark.css";
+              document.documentElement.className = 'dark';
+            }
+          } catch (e) { console.error(e); }
+        })();
+      </script>
       <title>FSexplorer ESP</title>
       <script>
+         let currentPath = '/';
+
          document.addEventListener('DOMContentLoaded', () => {
              let main = document.querySelector('main');
              let fileSize = document.querySelector('fileSize');
@@ -34,12 +48,53 @@
              progressBar.style.verticalAlign = 'middle';
              uploadForm.appendChild(progressBar);
 
+             function toggleInteraction(disable) {
+                 const elements = document.querySelectorAll('input, button, select, textarea, a');
+                 elements.forEach(el => {
+                     if (disable) {
+                         if (el.tagName === 'A') {
+                             el.style.pointerEvents = 'none';
+                             el.style.opacity = '0.5';
+                         } else {
+                             if (el.disabled) el.setAttribute('data-disabled', 'true');
+                             el.disabled = true;
+                         }
+                     } else {
+                         if (el.tagName === 'A') {
+                             el.style.pointerEvents = 'auto';
+                             el.style.opacity = '1';
+                         } else {
+                             if (el.getAttribute('data-disabled') === 'true') {
+                                 el.removeAttribute('data-disabled');
+                             } else {
+                                 el.disabled = false;
+                             }
+                         }
+                     }
+                 });
+             }
+
              function loadFileList(highlightFile = null) {
-                 fetch('api/listfiles').then(function (response) {
+                 uploadForm.action = '/upload?path=' + encodeURIComponent(currentPath);
+                 
+                 fetch('api/listfiles?path=' + encodeURIComponent(currentPath)).then(function (response) {
                      return response.json();
                  }).then(function (json) {
                    main.innerHTML = '';
                    let dir = '<table width=90%>';
+                   dir += `<tr><td colspan="6"><b>Current directory: ${currentPath}</b></td></tr>`;
+                   
+                   // Add parent directory link if not root
+                   if (currentPath !== '/') {
+                       dir += '<tr>';
+                       dir += `<td width=20% nowrap><b><a href="#" class="dir-link" data-name="..">.. (Parent)</a></b></td>`;
+                       dir += `<td width=10% nowrap>&lt;DIR&gt;</td>`;
+                       dir += `<td width=10% nowrap></td>`;
+                       dir += `<td width=10% nowrap></td>`;
+                       dir += `<td width=10% nowrap></td>`;
+                       dir += `<td width=40% nowrap></td></tr>`;
+                   }
+
                    let i = 0;
                    for (; i < json.length - 1; i++) {
                      let rowStyle = '';
@@ -47,6 +102,9 @@
                         rowStyle = 'style="background-color: #d4edda;"'; // Light green highlight
                      }
                      
+                     let fullPath = currentPath === '/' ? json[i].name : currentPath + '/' + json[i].name;
+                     if (currentPath !== '/' && !fullPath.startsWith('/')) fullPath = '/' + fullPath; // Ensure absolute path
+
                      dir += `<tr ${rowStyle}>`;
                      if (json[i].name.indexOf("More files not") > -1)
                      {
@@ -55,22 +113,24 @@
                        dir += `<td width=10% nowrap></td>`;
                        dir += `<td width=10% nowrap></td>`;
                      } 
+                     else if (json[i].type === 'dir')
+                     {
+                       dir += `<td width=20% nowrap><b><a href="#" class="dir-link" data-name="${json[i].name}">${json[i].name}/</a></b></td>`;
+                       dir += `<td width=10% nowrap>&lt;DIR&gt;</td>`;
+                       dir += `<td width=10% nowrap></td>`;
+                       dir += `<td width=10% nowrap></td>`;
+                     }
                      else
                      {
-                       dir += `<td width=20% nowrap><a href ="${json[i].name}" target="_blank">${json[i].name}</a></td>`;
+                       dir += `<td width=20% nowrap><a href ="${fullPath}" target="_blank">${json[i].name}</a></td>`;
                        dir += `<td width=10% nowrap><small>${json[i].size}</small></td>`;
-                       dir += `<td width=10% nowrap><a href ="${json[i].name}"download="${json[i].name}"> Download </a></td>`;
+                       dir += `<td width=10% nowrap><a href ="${fullPath}" download="${json[i].name}"> Download </a></td>`;
                        if (   json[i].name != 'FSexplorer.html' && json[i].name != 'FSexplorer.css' && json[i].name != 'FSexplorer.png'
                            && json[i].name != 'index.html'      && json[i].name != 'index.js'       && json[i].name != 'index.css'
                        	  && json[i].name != 'settings.png'
                      	 ) 
                        {
-                         dir += `<td width=10% nowrap><a href ="${json[i].name}?delete=/${json[i].name}" class="delete-link"> Delete </a></td>`;
-                         if (json[i].name == '!format') 
-                         {
-                            let fmtBtn = document.getElementById('FormatLittleFS');
-                            if(fmtBtn) fmtBtn.disabled = false;
-                         }
+                         dir += `<td width=10% nowrap><a href ="#" data-href="${fullPath}" class="delete-link"> Delete </a></td>`;
                        }
                        else 
                        {
@@ -82,9 +142,41 @@
                    
                    main.insertAdjacentHTML('beforeend', dir);
                    
+                   document.querySelectorAll('.dir-link').forEach((node) => {
+                       node.addEventListener('click', (event) => {
+                           event.preventDefault();
+                           let name = node.getAttribute('data-name');
+                           if (name === '..') {
+                               let parts = currentPath.split('/');
+                               parts.pop(); // remove last segment
+                               // parts will be empty if root, or ["", "folder"]
+                               if(parts.length <= 1) currentPath = '/';
+                               else currentPath = parts.join('/');
+                               if(currentPath === '') currentPath = '/';
+                           } else {
+                               if (currentPath === '/') currentPath = '/' + name;
+                               else currentPath = currentPath + '/' + name;
+                           }
+                           loadFileList();
+                       });
+                   });
+
                    document.querySelectorAll('.delete-link').forEach((node) => {
                    		 node.addEventListener('click', (event) => {
-                   		 		 if (!confirm('Are you sure you want to delete this file?')) event.preventDefault();  
+                             event.preventDefault();
+                   		 	 if (!confirm('Are you sure you want to delete this file?')) return;
+                             let href = node.getAttribute('data-href');
+                             // Since we use ?delete= param on current page URL in the original code,
+                             // we should keep doing that or call fetch.
+                             // Original code: <a href ="${json[i].name}?delete=/${json[i].name}"
+                             // The backend looks for 'delete' arg on current page.
+                             // We can just reload the page with ?delete= parameter or use fetch.
+                             // Fetch is better to avoid page reload messing up JS state.
+                             
+                             fetch('api/listfiles?delete=' + encodeURIComponent(href))
+                                .then(res => {
+                                    loadFileList();
+                                });
                    		 });
                    });
                    main.insertAdjacentHTML('beforeend', '</table>');
@@ -124,6 +216,8 @@
                 let file = fileInput.files[0];
                 if(!file) return;
 
+                toggleInteraction(true);
+
                 let formData = new FormData();
                 formData.append('upload', file);
 
@@ -140,6 +234,7 @@
                 });
 
                 xhr.onload = function() {
+                    toggleInteraction(false);
                     if (xhr.status == 200) {
                         loadFileList(file.name);
                     } else {
@@ -152,6 +247,7 @@
                 };
 
                 xhr.onerror = function() {
+                    toggleInteraction(false);
                     alert('Error during upload');
                     progressBar.style.display = 'none';
                     uploadBtn.style.display = 'inline-block';
@@ -160,13 +256,6 @@
                 xhr.open('POST', '/upload');
                 xhr.send(formData);
              });
-
-             let fmtBtn = document.getElementById('FormatLittleFS');
-             if(fmtBtn) {
-                 fmtBtn.addEventListener('click', (event) => {
-                     if (!confirm(`Are you sure you want to execute this function?\nWhen you continue you have to upload FSexplorer.html and all other system files again!!.`)) event.preventDefault();
-                 }); 
-             }
           });
       </script>
    </head>
@@ -175,38 +264,41 @@
       <div>
          <main></main>
       </div>
-      <form action="/upload" method="POST" enctype="multipart/form-data"><input type="file" name="upload">
-         <input type="submit" value="Upload" disabled>
-      </form>
+      <br>
+      
+      <fieldset class="upload-box">
+        <legend>Upload File</legend>
+        <form action="/upload" method="POST" enctype="multipart/form-data">
+             <input type="file" name="upload">
+             <input type="submit" value="Upload" disabled>
+        </form>
+        <fileSize></fileSize>
+      </fieldset>
+      
       <span></span>
-      <fileSize></fileSize>
+      
       <hr>
-      <div style='width: 40%'>
-        <span>
-        <form style='float: left;' action='/update' method='GET'>
-          <input type='submit' class='button' name='SUBMIT' value='Update Firmware' ENABLED/>
-        </form>
-        <form style='float: right;' action='/'>
-          <input type='button' class='button' value='Exit FSexplorer' onclick="window.location.href='/'">
-        </form>
-        </span>
+      <div class="system-actions">
+           <h3>System Actions</h3>
+           <div class="button-row">
+                <form action='/update' method='GET'>
+                  <input type='submit' class='button' name='SUBMIT' value='Update Firmware' ENABLED/>
+                </form>
+                <form action='/ReBoot'>
+                  <input type='submit' class='button' name='SUBMIT' value='ReBoot'>
+                </form>
+                <form action='/ResetWireless'>
+                  <input type='submit' class='button' name='SUBMIT' value='Reset Wireless'>
+                </form>
+                <form action='/'>
+                  <input type='button' class='button' value='Exit FSexplorer' onclick="window.location.href='/'">
+                </form>
+           </div>
       </div>
-      <div style='width: 40%'>
-        <span>
-        <form style='float: left;' action='/ReBoot'>
-          <input type='submit' class='button' name='SUBMIT' value='ReBoot'>
-        </form>
-        <form style='float: right;' action='/ResetWireless'>
-          <input type='submit' class='button' name='SUBMIT' value='Reset Wireless'>
-        </form>
-      </div>
-<!--
-      <div style='width: 40%'>
-        <span>
-        <form style='float right;' action="/LittleFSformat" method="POST">
-          <input id='FormatLittleFS' type='submit' class='button' name='SUBMIT' value='Format LittleFS' DISABLED/>
-        </form>
-        </span>
+      <br>
+      <div id="left">
+         <a href="https://fipsok.de/Projekt/Esp8266-LittleFS-Tab" target="_blank">Admin © 2018 Jens Fleischer</a><br>
+         <a href="https://github.com/rvdbreemen/OTGW-firmware" target="_blank">Adaptations © 2021-2026 Robert van den Breemen</a>
       </div>
    </body>
 </html>

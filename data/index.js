@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v1.0.0-rc2
+**  Version  : v1.0.0-rc3
 **
 **  Copyright (c) 2021-2024 Robert van den Breemen
 **
@@ -160,8 +160,18 @@ function initOTLogWebSocket(force) {
       if (typeof handleFlashMessage === "function") {
         if (handleFlashMessage(event.data)) return;
       }
-      // console.log("WS received:", event.data); // Debug
-      addLogLine(event.data);
+      
+      let data = event.data;
+      try {
+        if (data && typeof data === 'string' && data.startsWith('{')) {
+          data = JSON.parse(data);
+        }
+      } catch(e) {
+        // ignore JSON parse error, treat as text
+      }
+
+      // console.log("WS received:", data); // Debug
+      addLogLine(data);
     };
     
   } catch (e) {
@@ -227,26 +237,39 @@ function updateWSStatus(connected) {
 }
 
 //============================================================================
-function addLogLine(logLine) {
-  if (!logLine || logLine.trim() === '') return;
+function formatLogLine(logLine) {
+  if (!logLine) return "";
   
-  let timestamp;
-  if (window.performance && window.performance.timeOrigin) {
-    const nowHighRes = performance.now() + performance.timeOrigin;
-    const now = new Date(nowHighRes);
-    const msPart = Math.floor((nowHighRes % 1000) * 100);
-    const msHighRes = String(msPart).padStart(5, '0');
-    timestamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${msHighRes}`;
-  } else {
-    const now = new Date();
-    timestamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(now.getMilliseconds()).padStart(3, '0')}`;
+  // Matches alignment of "Boiler            B004018A  25 Read-Data       > Tboiler = 20.00 C"
+  const pad = (str, len) => (str + "").padEnd(len, ' ');
+  const padStart = (str, len) => (str + "").padStart(len, ' ');
+  
+  let text = pad(logLine.source || "Unknown", 18) + 
+         " " + (logLine.raw || "") + 
+         " " + padStart(logLine.id || "0", 3) + 
+         " " + pad(logLine.dir || "", 16) + 
+         " " + (logLine.valid || " ");
+
+  if (logLine.label) {
+     text += " " + logLine.label;
+     if (logLine.value) {
+         text += " = " + logLine.value;
+     }
   }
+  return text;
+}
+
+function addLogLine(logLine) {
+  if (!logLine) return;
+  // Enforce object only (JSON logging)
+  if (typeof logLine !== 'object') return;
+  
+  // Format: {time, source, raw, id, dir, valid, label, value}
+  let timestamp = logLine.time || "00:00:00.000";
   
   const logEntry = {
     time: timestamp,
-    // Store a processed version for display, keep original in `raw`
-    text: logLine.trimEnd(),
-    raw: logLine
+    data: logLine
   };
   
   // Add to buffer
@@ -295,7 +318,7 @@ function updateFilteredBuffer() {
   } else {
     const term = searchTerm.toLowerCase();
     otLogFilteredBuffer = otLogBuffer.filter(entry => 
-      entry.text.toLowerCase().includes(term)
+      formatLogLine(entry.data).toLowerCase().includes(term)
     );
   }
 }
@@ -321,7 +344,8 @@ function renderLogDisplay() {
   // Build HTML
   let html = '';
   linesToShow.forEach(entry => {
-    const line = showTimestamps ? `${entry.time} ${entry.text}` : entry.text;
+    const text = formatLogLine(entry.data);
+    const line = showTimestamps ? `${entry.time} ${text}` : text;
     html += escapeHtml(line) + '\n';
   });
 
@@ -461,7 +485,8 @@ function downloadLog() {
   content += '#' + '='.repeat(70) + '\n\n';
   
   otLogBuffer.forEach(entry => {
-    const line = showTimestamps ? `${entry.time} ${entry.text}` : entry.text;
+    const text = formatLogLine(entry.data);
+    const line = showTimestamps ? `${entry.time} ${text}` : text;
     content += line + '\n';
   });
   
@@ -1548,21 +1573,22 @@ function openLogTab(evt, tabName) {
 }
 
 function processStatsLine(line) {
-    if (!line || line.length < 40) return;
-    
-    // Check for validity marker at index 39
-    // 'Sender             ID Type             > Label = Value Unit'
-    //  01234567890123456789012345678901234567890
-    if (line.charAt(39) !== '>') return;
-    
-    // Extract ID
-    var idStr = line.substring(18, 22).trim();
-    if (!idStr) return;
-    var id = parseInt(idStr, 10);
-    if (isNaN(id)) return;
+    // Only accept JSON objects (new format)
+    if (!line || typeof line !== 'object') return;
 
-    var type = line.substring(22, 39).trim(); // 'Read-Ack' etc.
-    var dir = 'Unk';
+    if (line.id === undefined) return;
+    const id = parseInt(line.id, 10);
+    
+    if (isNaN(id)) return;
+    
+    // Only process valid messages for statistics (marked with >)
+    if ((line.valid || " ") !== '>') return;
+    
+    const type = line.dir || "";
+    const fullHex = line.raw || "";
+    
+    // Determine simplified direction for grouping
+    let dir = 'Unk';
     if (type.indexOf('Read') !== -1) dir = 'Read';
     else if (type.indexOf('Write') !== -1) dir = 'Write';
     else if (type.indexOf('Reserved') !== -1) dir = 'Reserved';
@@ -1571,28 +1597,16 @@ function processStatsLine(line) {
     else if (type.indexOf('Invalid-Data') !== -1) dir = 'Invalid-Data';
     else dir = type;
     
-    var dataPart = line.substring(40);
-    var label = '';
-    var value = '';
-    
-    // Find first ' = '
-    var eqIdx = dataPart.indexOf(' = ');
-    if (eqIdx !== -1) {
-        label = dataPart.substring(0, eqIdx).trim();
-        value = dataPart.substring(eqIdx + 3).trim();
-    } else {
-        // Fallback or 'Unknown' lines
-        label = dataPart.trim();
-        if (label === '') label = 'Unknown';
-    }
+    let label = line.label && line.label.trim() !== '' ? line.label : 'Unknown';
+    let value = line.value || '';
 
-    var now = Date.now();
-    var key = id + '_' + dir;
+    const now = Date.now();
+    const key = id + '_' + dir;
     
     if (!statsBuffer[key]) {
         statsBuffer[key] = {
             id: id,
-            hex: id.toString(16).toUpperCase().padStart(2, '0'),
+            hex: fullHex || id.toString(16).toUpperCase().padStart(2, '0'),
             type: type,
             dir: dir,
             label: label,
@@ -1603,8 +1617,8 @@ function processStatsLine(line) {
             intervalCount: 0
         };
     } else {
-        var entry = statsBuffer[key];
-        var diff = (now - entry.lastTime) / 1000.0; // seconds
+        const entry = statsBuffer[key];
+        const diff = (now - entry.lastTime) / 1000.0; // seconds
         
         entry.intervalSum += diff;
         entry.intervalCount++;
@@ -1612,6 +1626,7 @@ function processStatsLine(line) {
         entry.lastTime = now;
         entry.value = value;
         entry.type = type; 
+        if (fullHex) entry.hex = fullHex;
         if (label && label !== 'Unknown') entry.label = label;
     }
     statsBuffer[key].count++;

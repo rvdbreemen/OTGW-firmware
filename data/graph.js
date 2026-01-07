@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : graph.js, part of OTGW-firmware project
-**  Version  : v1.0.0-rc2
+**  Version  : v1.0.0-rc3
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -232,69 +232,20 @@ var OTGraph = {
     },
 
     processLine: function(line) {
-        if (!this.running || !line || line.length < 5) return; // Need at least ID and some content
-        // Basic check for log line validity
-        if (line.indexOf('>') === -1) return;
-
+        if (!this.running || !line || typeof line !== 'object') return; 
+        
         try {
-            // Firmware log format: "  ID Type       >Label = Value"
-            // Example with timestamp: "12:34:56.789   0 Read-Ack        >Status = Slave  [E-C-W-F...]"
-            // Or raw: "   0 Read-Ack        >Status = Slave  [E-C-W-F...]"
-            
-            // Regex to find ID: look for (digits) (space) (Type) (space) (>)
-            // or simply match the ID before the Type column.
-            // The type seems to be stuck to > for some messages or spaced out.
-            // Let's use a more flexible regex that looks for the decimal ID 
-            // optionally preceded by timestamp/spaces, and followed by text then >
-            
-            // Strategy: Look for the segment "  ID " or " ID " before the ">"
-            // The firmware prints " %3d", so "  0", " 10", "100".
-            
-            var id = NaN;
-            
-            // Try matching ID at start (raw firmware output)
-            var matchStart = /^\s*(\d+)\s/.exec(line);
-            if (matchStart) {
-                id = parseInt(matchStart[1], 10);
-            } else {
-                 // Try finding ID inside the string (if timestamp is present)
-                 // Look for 1-3 digits followed by a known message type or just spaces and text then >
-                 // Example: "... 123456   0 Read-Ack"
-                 // Let's rely on the > separator.
-                 // The ID is usually the first number on the line if we split by space? 
-                 // No, timestamp has numbers.
-                 
-                 // Firmware specific format: "   0 Read-Ack"
-                 // It matches: space(s) digits space(s) known OpenTherm message type, then '>'
-                 var matchInside = /\s+(\d+)\s+(?:Read-Ack|Write-Ack|Read-Data|Write-Data|Inv-Data|Read-Flags|Write-Flags)\s*>/;
-                 var m = line.match(matchInside);
-                 if (m) {
-                     id = parseInt(m[1], 10);
-                 }
-            }
+            var id = parseInt(line.id, 10);
+            var now = new Date(); 
             
             if (isNaN(id)) return;
-            
-            var now = new Date();
-            var val = 0;
-            
+
             if (id === 0) {
-                // Status MsgID 0 - Slave Information
-                // The binary information should be derived from the id 0 from the slave information.
-                // Encoding from firmware (OTGW-Core.ino):
-                //  0: Fault 'E'
-                //  1: CH mode 'C'
-                //  2: DHW mode 'W'
-                //  3: Flame status 'F'
-                //  4: Cooling status 'C'
-                //  5: CH2 mode '2'
-                //  6: Diagnostic 'D'
-                //  7: Electric 'P'
-                
-                var match = /Slave\s*\[([A-Z\-\.]{8})\]/.exec(line);
-                if (match) {
+                 // Status bits: inspect 'value' string: "Slave [......]"
+                 var valStr = line.value || "";
+                 var match = /Slave\s*\[([A-Z\-\.]{8})\]/.exec(valStr);
+                 if (match) {
                     var chars = match[1]; 
-                    // Map characters to status (1 if char matches active code, 0 otherwise)
                     var ch    = (chars.charAt(1) === 'C') ? 1 : 0;
                     var dhw   = (chars.charAt(2) === 'W') ? 1 : 0;
                     var flame = (chars.charAt(3) === 'F') ? 1 : 0;
@@ -302,14 +253,20 @@ var OTGraph = {
                     this.pushData('flame', now, flame);
                     this.pushData('dhwMode', now, dhw);
                     this.pushData('chMode', now, ch);
-                }
+                 }
             } else {
-                 var parts = line.split('=');
-                 if (parts.length < 2) return;
-                 var valPart = parts[parts.length-1].trim(); 
-                 val = parseFloat(valPart);
+                 var val;
+                 if (line.val !== undefined) {
+                     val = parseFloat(line.val);
+                 } else if (line.value) {
+                     // Try parsing value string "20.00 C"
+                     val = parseFloat(line.value);
+                 } else {
+                     return;
+                 }
+                 
                  if (isNaN(val)) return;
-    
+                 
                  var key = null;
                  switch(id) {
                      case 17: key = 'mod'; break;
