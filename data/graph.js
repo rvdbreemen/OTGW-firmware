@@ -342,8 +342,11 @@ var OTGraph = {
             this.pendingData[key].push(dataPoint);
         }
         
+        // Trim old data if exceeds maxPoints
         if (this.data[key].length > this.maxPoints) {
             this.data[key].shift();
+            // Note: pendingData only contains recent points (cleared every 2s)
+            // so there's no need to sync the shift operation
         }
     },
 
