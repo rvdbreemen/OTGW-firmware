@@ -241,31 +241,30 @@ var OTGraph = {
             if (isNaN(id)) return;
 
             if (id === 0) {
-                 // Status bits: inspect 'value' string: "Slave [......]"
-                 var valStr = line.value || "";
-                 var match = /Slave\s*\[([A-Z\-\.]{8})\]/.exec(valStr);
-                 if (match) {
-                    var chars = match[1]; 
-                    var ch    = (chars.charAt(1) === 'C') ? 1 : 0;
-                    var dhw   = (chars.charAt(2) === 'W') ? 1 : 0;
-                    var flame = (chars.charAt(3) === 'F') ? 1 : 0;
-                    
-                    this.pushData('flame', now, flame);
-                    this.pushData('dhwMode', now, dhw);
-                    this.pushData('chMode', now, ch);
-                 }
+                      // Status bits: derive Flame/DHW/CH from the slave status flags using F/W/C symbols.
+                      // Prefer structured JSON: line.data.slave is an 8-char flag string like "-CWF-2-D".
+                      // (Fallback to extracting from line.value only if data.slave is missing.)
+                      var slaveFlags = (line.data && typeof line.data === 'object') ? line.data.slave : null;
+                      if ((typeof slaveFlags !== 'string' || slaveFlags.length === 0) && typeof line.value === 'string') {
+                          var m = /Slave\s*\[([^\]]+)\]/.exec(line.value);
+                          if (m && m[1]) slaveFlags = m[1];
+                      }
+
+                      if (typeof slaveFlags === 'string' && slaveFlags.length >= 4) {
+                          // Keep the original bit positions used by the firmware flag string:
+                          // index 1 = CH mode ('C'), index 2 = DHW mode ('W'), index 3 = Flame ('F')
+                          var ch    = (slaveFlags.charAt(1) === 'C') ? 1 : 0;
+                          var dhw   = (slaveFlags.charAt(2) === 'W') ? 1 : 0;
+                          var flame = (slaveFlags.charAt(3) === 'F') ? 1 : 0;
+                          this.pushData('flame', now, flame);
+                          this.pushData('dhwMode', now, dhw);
+                          this.pushData('chMode', now, ch);
+                      }
             } else {
-                 var val;
-                 if (line.val !== undefined) {
-                     val = parseFloat(line.val);
-                 } else if (line.value) {
-                     // Try parsing value string "20.00 C"
-                     val = parseFloat(line.value);
-                 } else {
-                     return;
-                 }
-                 
-                 if (isNaN(val)) return;
+                 // Analog values: use numeric JSON field `val` only
+                 if (line.val === undefined || line.val === null) return;
+                 if (typeof line.val !== 'number') return;
+                 var val = line.val;
                  
                  var key = null;
                  switch(id) {
