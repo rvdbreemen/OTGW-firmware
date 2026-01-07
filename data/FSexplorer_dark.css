@@ -1,0 +1,89 @@
+/* FSexplorer Dark Theme */
+body {
+    font-family: sans-serif;
+    background-color: rgb(28, 28, 30);
+    color: white;
+    display: flex;
+    flex-flow: column;
+    align-items: left;
+}
+tr:nth-child(even) {
+    background: #2c2c2e;
+}
+tr:nth-child(odd) {
+    background: #1c1c1e;
+}
+td:nth-child(n+5) {
+    background: #1c1c1e;
+}
+h1, h2 {
+    color: white;
+    text-shadow: 2px 2px 2px black;
+}
+a:link {
+    text-decoration: none;
+    color: #4daaf5;
+}
+a:visited {
+    color: #4daaf5;
+}
+input {
+    height: 35px;
+    font-size: 13px;
+    background-color: #3a3a3c;
+    color: white;
+    border: 1px solid #555;
+}
+h1+main {
+    display: flex;
+}
+section {
+    display: flex;
+    flex-direction: column;
+    padding: 0.2em;
+}
+hr {
+    border: 0;
+    clear: both;
+    display: block;
+    width: 99%;
+    background-color: #4daaf5;
+    height: 5px;
+}
+#left {
+    align-items: flex-end;
+    text-shadow: 1px 1px 2px black;
+}
+.note {
+    background-color: #b00020;
+    color: white;
+    padding: 0.5em;
+    margin-top: 1em;
+    text-align: center;
+    max-width: 320px;
+    border-radius: 0.5em;
+}
+.button {
+    width: 150px;
+    height: 40px;
+    font-size: 14px;
+    margin-top: 1em;
+    cursor: pointer;
+    background-color: #444;
+    color: white;
+    box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.7);
+    border: 1px solid #666;
+}
+[type=submit] {
+    height: 40px;
+    min-width: 70px;
+}
+[value^=Format] {
+    background-color: #700;
+}
+[title] {
+    background-color: #555;
+    font-size: 16px;
+    width: 125px;
+    color: white;
+}
