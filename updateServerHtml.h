@@ -1,20 +1,38 @@
 
 static const char UpdateServerIndex[] PROGMEM =
   R"(<html charset="UTF-8">
+     <head>
+     <link rel="stylesheet" type="text/css" href="/index.css" id="theme-style">
+     <script>
+      (function() {
+        try {
+          var storedTheme = localStorage.getItem('theme');
+          if (storedTheme === 'dark') {
+            document.getElementById('theme-style').href = "/index_dark.css";
+            document.documentElement.className = 'dark';
+          }
+        } catch (e) { console.error(e); }
+      })();
+     </script>
      <style type='text/css'>
-        body {background-color: lightblue; font-family: sans-serif;}
+        body { font-family: sans-serif; }
         #pageProgress { display: none; }
-        #updatePanel { margin-top: 10px; padding: 10px; background: #e8f4ff; border: 1px solid #7aaad6; max-width: 520px; }
+        #updatePanel { margin-top: 10px; padding: 10px; background: #e8f4ff; border: 1px solid #7aaad6; max-width: 520px; color: black; }
+        html.dark #updatePanel { background: #333; border: 1px solid #555; color: white; }
+        
         #updateProgress, #flashProgress { width: 100%; height: 18px; }
         #updateError { color: #b00020; font-weight: bold; }
+        html.dark #updateError { color: #ff5555; }
         .small { font-size: 0.9em; }
      </style>
+     </head>
      <body>
      <div id='pageForm'>
        <h1>OTGW firmware Flash utility</h1>
        <form id='fwForm' method='POST' action='?cmd=0' enctype='multipart/form-data'>
             Select a "<b>.ino.bin</b>" file to flash<br/>
             <input type='file' accept='.ino.bin' name='firmware' required>
+            <br/>
             <input id='fwSubmit' type='submit' value='Flash Firmware' disabled>
         </form>
         <form id='fsForm' method='POST' action='?cmd=100' enctype='multipart/form-data'> 
@@ -437,9 +455,20 @@ static const char UpdateServerIndex[] PROGMEM =
 
 static const char UpdateServerSuccess[] PROGMEM = 
   R"(<html charset="UTF-8">
+      <head>
+      <link rel="stylesheet" type="text/css" href="/index.css" id="theme-style">
+      <script>
+        try {
+          var storedTheme = localStorage.getItem('theme');
+          if (storedTheme === 'dark') {
+            document.getElementById('theme-style').href = "/index_dark.css";
+          }
+        } catch (e) { console.error(e); }
+      </script>
       <style type='text/css'>
-        body {background-color: lightgray;}
+        body { font-family: sans-serif; }
       </style>
+      </head>
       <body>
       <h1>OTGW firmware Flash utility</h1>
       <br/>
