@@ -80,7 +80,17 @@ var OTGraph = {
 
         if (typeof echarts === 'undefined') {
             console.error("ECharts library not loaded");
-            container.innerHTML = "Error: ECharts library not loaded. Internet connection required for CDN.";
+            container.innerHTML = '' +
+                '<div class="graph-error">' +
+                    '<h3>Graph unavailable</h3>' +
+                    '<p>The ECharts graph library could not be loaded. The graph feature requires access to the ECharts CDN on the internet.</p>' +
+                    '<ul>' +
+                        '<li>Check that this device has internet connectivity and is allowed to access external CDNs.</li>' +
+                        '<li>If you are running in an isolated network, refer to the OTGW-firmware documentation for using a locally hosted copy of ECharts.</li>' +
+                        '<li>For more technical details, open your browser developer console (F12) and look for network or script loading errors.</li>' +
+                    '</ul>' +
+                    '<button type="button" onclick="window.location.reload()">Retry loading graph</button>' +
+                '</div>';
             return;
         }
 
