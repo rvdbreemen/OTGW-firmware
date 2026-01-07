@@ -74,6 +74,11 @@ static JsonDocument* ptrLogDoc = nullptr;
 #define AddLog(logstring)   ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, logstring, OT_LOG_BUFFER_SIZE); } })
 #define AddLogln()          ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, "\r\n", OT_LOG_BUFFER_SIZE); } })
 
+// Macro to Add to JSON log
+#define JSONLog(jvalue) ({ if (ptrLogDoc) { (*ptrLogDoc)["label"] = OTlookupitem.label; (*ptrLogDoc)["value"] = jvalue; } })
+// Macro to Add numeric value to JSON log if valid
+#define JSONLogVal(jval) ({ if (ptrLogDoc && is_value_valid(OTdata, OTlookupitem)) { (*ptrLogDoc)["val"] = jval; } })
+
 /* --- End of LOG marcro's ---*/
 
 
@@ -547,13 +552,8 @@ void print_f88(float& value)
   AddLogf("%s = %s %s", OTlookupitem.label, _msg , OTlookupitem.unit);
   
   // Populate JSON
-  if (ptrLogDoc) {
-    (*ptrLogDoc)["label"] = OTlookupitem.label;
-    (*ptrLogDoc)["value"] = String(_msg) + " " + OTlookupitem.unit;
-    if (is_value_valid(OTdata, OTlookupitem)) {
-      (*ptrLogDoc)["val"] = _value; // numeric value
-    }
-  }
+  JSONLog(String(_msg) + " " + OTlookupitem.unit);
+  JSONLogVal(_value);
 
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
@@ -573,13 +573,8 @@ void print_s16(int16_t& value)
   AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
 
   // Populate JSON
-  if (ptrLogDoc) {
-    (*ptrLogDoc)["label"] = OTlookupitem.label;
-    (*ptrLogDoc)["value"] = String(_msg) + " " + OTlookupitem.unit;
-    if (is_value_valid(OTdata, OTlookupitem)) {
-       (*ptrLogDoc)["val"] = _value;
-    }
-  }
+  JSONLog(String(_msg) + " " + OTlookupitem.unit);
+  JSONLogVal(_value);
 
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
@@ -592,12 +587,10 @@ void print_s8s8(uint16_t& value)
 {  
   AddLogf("%s = %3d / %3d %s", OTlookupitem.label, (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB, OTlookupitem.unit);
   
-  if (ptrLogDoc) {
-    (*ptrLogDoc)["label"] = OTlookupitem.label;
-    char _json_msg[30];
-    snprintf(_json_msg, sizeof(_json_msg), "%d / %d %s", (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB, OTlookupitem.unit);
-    (*ptrLogDoc)["value"] = _json_msg;
-  }
+  // Populate JSON
+  char _json_msg[30];
+  snprintf(_json_msg, sizeof(_json_msg), "%d / %d %s", (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB, OTlookupitem.unit);
+  JSONLog(_json_msg);
 
   //Build string for MQTT
   char _msg[15] {0};
@@ -630,13 +623,8 @@ void print_u16(uint16_t& value)
   AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
   
   // Populate JSON
-  if (ptrLogDoc) {
-    (*ptrLogDoc)["label"] = OTlookupitem.label;
-    (*ptrLogDoc)["value"] = String(_msg) + " " + OTlookupitem.unit;
-    if (is_value_valid(OTdata, OTlookupitem)) {
-       (*ptrLogDoc)["val"] = _value;
-    }
-  }
+  JSONLog(String(_msg) + " " + OTlookupitem.unit);
+  JSONLogVal(_value);
 
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
@@ -674,12 +662,10 @@ void print_status(uint16_t& value)
     
     AddLogf("%s = Master [%s]", OTlookupitem.label, _flag8_master);
 
-    if (ptrLogDoc) {
-      (*ptrLogDoc)["label"] = OTlookupitem.label;
-      char _json_msg[32];
-      snprintf(_json_msg, sizeof(_json_msg), "Master [%s]", _flag8_master);
-      (*ptrLogDoc)["value"] = _json_msg;
-    }
+    // Populate JSON
+    char _json_msg[32];
+    snprintf(_json_msg, sizeof(_json_msg), "Master [%s]", _flag8_master);
+    JSONLog(_json_msg);
 
     //Master Status
     if (is_value_valid(OTdata, OTlookupitem)){
@@ -717,12 +703,10 @@ void print_status(uint16_t& value)
     
     AddLogf("%s = Slave  [%s]", OTlookupitem.label, _flag8_slave);
     
-    if (ptrLogDoc) {
-      (*ptrLogDoc)["label"] = OTlookupitem.label;
-      char _json_msg[32];
-      snprintf(_json_msg, sizeof(_json_msg), "Slave [%s]", _flag8_slave);
-      (*ptrLogDoc)["value"] = _json_msg;
-    }
+    // Populate JSON
+    char _json_msg[32];
+    snprintf(_json_msg, sizeof(_json_msg), "Slave [%s]", _flag8_slave);
+    JSONLog(_json_msg);
 
     //Slave Status
     if (is_value_valid(OTdata, OTlookupitem)){
@@ -1056,12 +1040,10 @@ void print_flag8u8(uint16_t& value)
 {
   AddLogf("%s = M[%s] - [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   
-  if (ptrLogDoc) {
-    (*ptrLogDoc)["label"] = OTlookupitem.label;
+    // Populate JSON
     char _json_msg[30];
     snprintf(_json_msg, sizeof(_json_msg), "M[%s] - [%d]", byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-    (*ptrLogDoc)["value"] = _json_msg;
-  }
+    JSONLog(_json_msg);
 
   if (is_value_valid(OTdata, OTlookupitem)){
     //Build string for MQTT
@@ -1085,12 +1067,10 @@ void print_flag8(uint16_t& value)
   
   AddLogf("%s = flag8 = [%s] - decimal = [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
   
-  if (ptrLogDoc) {
-    (*ptrLogDoc)["label"] = OTlookupitem.label;
+    // Populate JSON
     char _json_msg[50];
     snprintf(_json_msg, sizeof(_json_msg), "flag8=[%s] (%d)", byte_to_binary(OTdata.valueLB), OTdata.valueLB);
-    (*ptrLogDoc)["value"] = _json_msg;
-  }
+    JSONLog(_json_msg);
 
    if (is_value_valid(OTdata, OTlookupitem)){
     //Build string for MQTT
@@ -1111,14 +1091,12 @@ void print_flag8flag8(uint16_t& value)
   //flag8 valueHB
   
   AddLogf("%s = HB flag8[%s] -[%3d] ", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueHB);
-  if (ptrLogDoc) {
-    (*ptrLogDoc)["label"] = OTlookupitem.label;
+    // Populate JSON
     char _json_msg[80];
     snprintf(_json_msg, sizeof(_json_msg), "HB[%s](%d) LB[%s](%d)", 
       byte_to_binary(OTdata.valueHB), OTdata.valueHB,
       byte_to_binary(OTdata.valueLB), OTdata.valueLB);
-    (*ptrLogDoc)["value"] = _json_msg;
-  }
+    JSONLog(_json_msg);
 
   if (is_value_valid(OTdata, OTlookupitem)){
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
@@ -1201,12 +1179,10 @@ void print_u8u8(uint16_t& value)
   
   AddLogf("%s = %3d / %3d %s", OTlookupitem.label, (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, OTlookupitem.unit);
   
-  if (ptrLogDoc) {
-    (*ptrLogDoc)["label"] = OTlookupitem.label;
+    // Populate JSON
     char _json_msg[30];
     snprintf(_json_msg, sizeof(_json_msg), "%d / %d %s", (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, OTlookupitem.unit);
-    (*ptrLogDoc)["value"] = _json_msg;
-  }
+    JSONLog(_json_msg);
 
   if (is_value_valid(OTdata, OTlookupitem)){
     //Build string for MQTT
