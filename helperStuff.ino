@@ -25,6 +25,32 @@ template <typename T> T PROGMEM_getAnything (const T * sce)
 }
 
 //===========================================================================================
+// Get High Resolution Timestamp for Logs
+//===========================================================================================
+String getOTLogTimestamp() {
+  timeval now;
+  gettimeofday(&now, nullptr);
+  // Default to UTC if not initialized, but typically settingNTPtimezone is valid
+  // Recreating the timezone object is what _debugBOL does, so we follow that pattern
+  // assuming timezoneManager is available.
+  TimeZone myTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  if (myTz.isError()) {
+    // Fallback if generic name failed
+    myTz = TimeZone::forTimeOffset(0); 
+  }
+  
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now.tv_sec, myTz);
+  
+  char timestamp[25];
+  // User requested HH:MM:SS.mmmmm (5 digits for sub-second)
+  // tv_usec is 0-999999 (6 digits). integer div by 10 gives 5 digits.
+  snprintf(timestamp, sizeof(timestamp), "%02d:%02d:%02d.%05d", 
+           myTime.hour(), myTime.minute(), myTime.second(), (int)(now.tv_usec / 10));
+           
+  return String(timestamp);
+}
+
+//===========================================================================================
 // Note: This function returns a pointer to a substring of the original string.
 // If the given string was allocated dynamically, the caller must not overwrite
 // that pointer with the returned value, since the original pointer must be

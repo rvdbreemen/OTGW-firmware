@@ -160,8 +160,18 @@ function initOTLogWebSocket(force) {
       if (typeof handleFlashMessage === "function") {
         if (handleFlashMessage(event.data)) return;
       }
-      // console.log("WS received:", event.data); // Debug
-      addLogLine(event.data);
+      
+      let data = event.data;
+      try {
+        if (data && typeof data === 'string' && data.startsWith('{')) {
+          data = JSON.parse(data);
+        }
+      } catch(e) {
+        // ignore JSON parse error, treat as text
+      }
+
+      // console.log("WS received:", data); // Debug
+      addLogLine(data);
     };
     
   } catch (e) {
@@ -228,25 +238,59 @@ function updateWSStatus(connected) {
 
 //============================================================================
 function addLogLine(logLine) {
-  if (!logLine || logLine.trim() === '') return;
+  if (!logLine) return;
+  if (typeof logLine === 'string' && logLine.trim() === '') return;
   
   let timestamp;
-  if (window.performance && window.performance.timeOrigin) {
-    const nowHighRes = performance.now() + performance.timeOrigin;
-    const now = new Date(nowHighRes);
-    const msPart = Math.floor((nowHighRes % 1000) * 100);
-    const msHighRes = String(msPart).padStart(5, '0');
-    timestamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${msHighRes}`;
+  let text = "";
+  let fullRaw = "";
+  
+  if (typeof logLine === 'object') {
+     // Format: {time, source, raw, id, dir, valid, label, value}
+     timestamp = logLine.time;
+     
+     // Construct text for display/stats
+     // Matches alignment of "Boiler            B004018A  25 Read-Data       > Tboiler = 20.00 C"
+     const pad = (str, len) => (str + "").padEnd(len, ' ');
+     const padStart = (str, len) => (str + "").padStart(len, ' ');
+     
+     text = pad(logLine.source || "Unknown", 18) + 
+            " " + (logLine.raw || "") + 
+            " " + padStart(logLine.id || "0", 3) + 
+            " " + pad(logLine.dir || "", 16) + 
+            " " + (logLine.valid || " ");
+
+     if (logLine.label) {
+        text += " " + logLine.label;
+        if (logLine.value) {
+            text += " = " + logLine.value;
+        }
+     }
+     fullRaw = JSON.stringify(logLine);
   } else {
-    const now = new Date();
-    timestamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(now.getMilliseconds()).padStart(3, '0')}`;
+     text = logLine.trimEnd();
+     fullRaw = logLine;
+     
+      if (window.performance && window.performance.timeOrigin) {
+        const nowHighRes = performance.now() + performance.timeOrigin;
+        const now = new Date(nowHighRes);
+        const msPart = Math.floor((nowHighRes % 1000) * 100);
+        const msHighRes = String(msPart).padStart(5, '0');
+        timestamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${msHighRes}`;
+      } else {
+        const now = new Date();
+        timestamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(now.getMilliseconds()).padStart(3, '0')}`;
+      }
   }
+  
+  if (!timestamp) timestamp = "00:00:00.000";
   
   const logEntry = {
     time: timestamp,
     // Store a processed version for display, keep original in `raw`
-    text: logLine.trimEnd(),
-    raw: logLine
+    text: text,
+    raw: fullRaw,
+    data: (typeof logLine === 'object') ? logLine : null
   };
   
   // Add to buffer
@@ -254,12 +298,12 @@ function addLogLine(logLine) {
   
   // Process for Statistics
   if (typeof processStatsLine === 'function') {
-      processStatsLine(logLine);
+      processStatsLine(typeof logLine === 'object' ? logLine : text);
   }
   
   // Process for Graph
   if (typeof OTGraph !== 'undefined') {
-      OTGraph.processLine(logLine);
+      OTGraph.processLine(typeof logLine === 'object' ? logLine : text);
   }
 
   // Trim buffer if exceeds max
@@ -1548,32 +1592,52 @@ function openLogTab(evt, tabName) {
 }
 
 function processStatsLine(line) {
-    if (!line || line.trim() === '') return;
+    if (!line) return;
     
-    // Regular expression to parse the log line
-    // Format from firmware: [ResponseType] [Hex] [ID] [MessageType] [Marker] [Data]
-    // Example: "Boiler             B40116400  17 Read-Ack        >RelModLevel = 100.00 %"
-    // ResponseType: Text like "Boiler", "Thermostat", etc.
-    // Hex: 9-char hex string (1 letter + 8 hex: B40116400, T80190000)
-    // ID: Decimal number (1-3 digits)
-    // MessageType: Message type string (e.g., "Read-Ack")
-    // Marker: >, P, -, or space
-    // Data: Remaining text
-    
-    // Match: optional prefix, then hex (letter+8hex), spaces, ID, spaces, type, spaces, marker, data
-    const regex = /^.*?([A-Z][0-9A-Fa-f]{8})\s+(\d+)\s+([A-Za-z0-9\-]+)\s+([>P\- ])\s*(.*)$/;
-    const match = line.match(regex);
-    
-    if (!match) {
-        console.log('Stats regex failed to match line:', line);
-        return;
+    let id, type, marker, dataPart, fullHex = "";
+
+    if (typeof line === 'object') {
+        if (line.id === undefined) return;
+        id = parseInt(line.id, 10);
+        type = line.dir || "";
+        marker = line.valid || " ";
+        // Reconstruct dataPart for existing parsing logic below
+        if (line.label) {
+             dataPart = line.label;
+             if (line.value) {
+                 dataPart += " = " + line.value;
+             }
+        } else {
+             dataPart = "";
+        }
+    } else {
+        if (line.trim() === '') return;
+        
+        // Regular expression to parse the log line
+        // Format from firmware: [ResponseType] [Hex] [ID] [MessageType] [Marker] [Data]
+        // Example: "Boiler             B40116400  17 Read-Ack        >RelModLevel = 100.00 %"
+        // ResponseType: Text like "Boiler", "Thermostat", etc.
+        // Hex: 9-char hex string (1 letter + 8 hex: B40116400, T80190000)
+        // ID: Decimal number (1-3 digits)
+        // MessageType: Message type string (e.g., "Read-Ack")
+        // Marker: >, P, -, or space
+        // Data: Remaining text
+        
+        // Match: optional prefix, then hex (letter+8hex), spaces, ID, spaces, type, spaces, marker, data
+        const regex = /^.*?([A-Z][0-9A-Fa-f]{8})\s+(\d+)\s+([A-Za-z0-9\-]+)\s+([>P\- ])\s*(.*)$/;
+        const match = line.match(regex);
+        
+        if (!match) {
+            console.log('Stats regex failed to match line:', line);
+            return;
+        }
+        
+        fullHex = match[1]; 
+        id = parseInt(match[2], 10);
+        type = match[3].trim();
+        marker = match[4];
+        dataPart = match[5];
     }
-    
-    const fullHex = match[1]; 
-    const id = parseInt(match[2], 10);
-    const type = match[3].trim();
-    const marker = match[4];
-    const dataPart = match[5];
     
     // Debug logging for first few messages
     if (Object.keys(statsBuffer).length < 3) {
