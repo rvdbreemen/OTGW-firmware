@@ -1,126 +1,298 @@
-/* FSexplorer Dark Theme */
-body {
-    font-family: sans-serif;
-    background-color: rgb(28, 28, 30);
-    color: white;
-    display: flex;
-    flex-flow: column;
-    align-items: left;
-}
-tr:nth-child(even) {
-    background: #2c2c2e;
-}
-tr:nth-child(odd) {
-    background: #1c1c1e;
-}
-td:nth-child(n+5) {
-    background: #1c1c1e;
-}
-h1, h2 {
-    color: white;
-    text-shadow: 2px 2px 2px black;
-}
-a:link {
-    text-decoration: none;
-    color: #4daaf5;
-}
-a:visited {
-    color: #4daaf5;
-}
-input {
-    height: 35px;
-    font-size: 13px;
-    background-color: #3a3a3c;
-    color: white;
-    border: 1px solid #555;
-}
-h1+main {
-    display: flex;
-}
-section {
-    display: flex;
-    flex-direction: column;
-    padding: 0.2em;
-}
-hr {
-    border: 0;
-    clear: both;
-    display: block;
-    width: 99%;
-    background-color: #4daaf5;
-    height: 5px;
-}
-#left {
-    align-items: flex-end;
-    text-shadow: 1px 1px 2px black;
-}
-.note {
-    background-color: #b00020;
-    color: white;
-    padding: 0.5em;
-    margin-top: 1em;
-    text-align: center;
-    max-width: 320px;
-    border-radius: 0.5em;
-}
-.button {
-    width: 150px;
-    height: 40px;
-    font-size: 14px;
-    margin-top: 1em;
-    cursor: pointer;
-    background-color: #444;
-    color: white;
-    box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.7);
-    border: 1px solid #666;
-}
-[type=submit] {
-    height: 40px;
-    min-width: 70px;
-}
-[value^=Format] {
-    background-color: #700;
-}
-[title] {
-    background-color: #555;
-    font-size: 16px;
-    width: 125px;
-    color: white;
+/*
+***************************************************************************  
+**  Program  : FSexplorer_dark.css
+**  Version  : v0.10.4-alpha (Modernized Dark UI)
+***************************************************************************  
+*/
+:root {
+    --primary-color: #4daafc; /* Lighter blue for dark mode */
+    --primary-hover: #6eb9fd;
+    --bg-color: #121212;      /* Very dark background */
+    --card-bg: #1e1e1e;       /* Dark card background */
+    --text-color: #e0e0e0;    /* Light text */
+    --text-muted: #a0a0a0;
+    --border-color: #333333;
+    --border-radius: 8px;
+    --shadow: 0 4px 6px rgba(0,0,0,0.5); /* Stronger shadow for dark mode */
 }
 
-fieldset.upload-box {
-    border: 1px solid #555;
-    background-color: #333;
-    padding: 10px;
-    margin-bottom: 10px;
-    border-radius: 5px;
-    width: 90%;
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0;
+    padding: 20px;
+    box-sizing: border-box;
 }
-legend {
-    font-weight: bold;
-    color: #eee;
-}
-.system-actions {
-    width: 90%;
+
+h2 {
+    color: var(--text-color);
+    text-shadow: none;
+    margin-bottom: 20px;
     text-align: center;
-    background-color: #2c2c2e;
-    padding: 10px;
-    border-radius: 8px;
-    margin-top: 10px;
 }
+
+/* Layout Containers */
+body > div, body > fieldset, body > .system-actions {
+    width: 100%;
+    max-width: 800px;
+}
+
+/* File List Styling */
+main {
+    width: 100%;
+    overflow-x: auto;
+    background: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    padding: 10px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+table {
+    width: 100% !important;
+    border-collapse: collapse;
+    margin: 0;
+}
+
+tr {
+    border-bottom: 1px solid var(--border-color);
+}
+
+tr:last-child {
+    border-bottom: none;
+}
+
+/* Dark mode striped rows */
+tr:nth-child(even) { background: #252525; }
+tr:nth-child(odd) { background: #1e1e1e; }
+
+td {
+    padding: 12px 8px;
+    text-align: left;
+    white-space: nowrap;
+    border: none;
+    width: auto !important;
+    color: var(--text-color);
+}
+
+td:nth-child(n+5) {
+    background: transparent;
+}
+
+/* Links */
+a {
+    color: var(--primary-color);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+a:hover {
+    color: var(--primary-hover);
+    text-decoration: underline;
+}
+
+a.delete-link {
+    color: #ff5252; /* Bright Red for dark mode */
+}
+a.delete-link:hover {
+    color: #ff1744;
+    text-decoration: underline;
+}
+
+/* Upload Section */
+fieldset.upload-box {
+    background-color: var(--card-bg);
+    border: none;
+    border-radius: var(--border-radius);
+    padding: 25px;
+    margin-top: 20px;
+    box-shadow: var(--shadow);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+legend {
+    font-weight: 600;
+    font-size: 1.1em;
+    padding: 0 10px;
+    color: var(--primary-color);
+}
+
+form[action="/upload"] {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* System Actions Section */
+.system-actions {
+    background-color: var(--card-bg);
+    padding: 25px;
+    border-radius: var(--border-radius);
+    margin-top: 20px;
+    box-shadow: var(--shadow);
+    text-align: center;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.system-actions h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: var(--text-color);
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 15px;
+    display: block;
+    width: 100%;
+}
+
+/* Form Elements */
+input[type="file"] {
+    display: block;
+    width: 100%;
+    max-width: 500px;
+    padding: 15px;
+    margin-bottom: 20px;
+    background: #2d2d2d;
+    color: var(--text-color);
+    border: 2px dashed #444; /* Darker dashed border */
+    border-radius: var(--border-radius);
+    box-sizing: border-box;
+    cursor: pointer;
+    text-align: center;
+}
+input[type="file"]:hover {
+    border-color: var(--primary-color);
+    background: #333;
+}
+
+progress {
+    width: 100% !important;
+    max-width: 500px;
+    height: 20px;
+    margin-bottom: 20px;
+    accent-color: var(--primary-color);
+    background-color: #333;
+}
+
+fileSize {
+    display: block;
+    margin-top: 10px;
+    min-height: 1.2em;
+    text-align: center;
+    width: 100%;
+    color: var(--text-color);
+}
+fileSize p {
+    margin: 5px 0;
+}
+
 .button-row {
     display: flex;
     justify-content: center;
-    gap: 10px;
+    gap: 15px;
     flex-wrap: wrap;
+    width: 100%;
 }
-.button.danger {
-    background-color: #800000;
-    border: 1px solid #ff5555;
+
+/* Button Styling System-wide */
+input[type="submit"], input[type="button"], .button {
+    background-color: var(--primary-color);
+    color: #121212; /* Dark text for high contrast on bright blue */
+    border: none;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    height: auto;
+    width: auto;
+    min-width: 140px;
+    margin: 0;
+    -webkit-appearance: none; /* iOS fix */
+}
+
+input[type="submit"]:hover, input[type="button"]:hover, .button:hover {
+    opacity: 0.9;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.5);
     color: white;
 }
-.dir-link {
+
+input[type="submit"]:active, input[type="button"]:active, .button:active {
+    transform: translateY(0);
+}
+
+input[type="submit"]:disabled {
+    background-color: #444;
+    color: #888;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Action Specific Colors */
+form[action='/ReBoot'] input { background-color: #5a5a5a; }
+form[action='/ReBoot'] input:hover { background-color: #6a6a6a; }
+
+form[action='/ResetWireless'] input { background-color: #ffb300; color: #000; }
+form[action='/ResetWireless'] input:hover { background-color: #e09f00; }
+
+form[action='/'] input { background-color: #cf6679; color: #000; } /* Material Error Color */
+form[action='/'] input:hover { background-color: #b00020; color: white; }
+
+/* Hide HR */
+hr {
+    display: none;
+}
+
+/* Footer links */
+#left {
+    margin-top: 40px;
+    text-align: center;
+    font-size: 0.85em;
+    color: var(--text-muted);
+    width: 100%;
+}
+#left a {
+    color: var(--text-muted);
     text-decoration: none;
-    color: #4daaf5;
+    margin: 0 5px;
+}
+#left a:hover {
+    color: var(--primary-color);
+    text-decoration: underline;
+}
+
+/* Note style */
+.note {
+	background-color: #3e2723; /* Dark brown/red for warning */
+    color: #ffccbc;
+	padding: 10px;
+	margin-top: 1em;
+	text-align: center;
+	border-radius: var(--border-radius);
+    max-width: 100%;
+    border: 1px solid #d84315;
+}
+
+/* Highlighting styles from original JS */
+/* In dark mode, light green #d4edda is too bright for text. We need a dark green. */
+tr[style*="background-color"] {
+    background-color: #1b5e20 !important; /* Material Green 900 */
+    color: #e8f5e9;
 }
 
