@@ -29,6 +29,13 @@ window.onfocus = function () {
   }
 };
 
+window.onbeforeunload = function() {
+  // Clean up the graph before the page unloads to prevent memory leaks
+  if (typeof OTGraph !== 'undefined' && OTGraph.cleanup) {
+    OTGraph.cleanup();
+  }
+};
+
 
 var tid = 0;
 var timeupdate = setInterval(function () { refreshDevTime(); }, 1000); //delay is in milliseconds
@@ -1536,13 +1543,28 @@ function openLogTab(evt, tabName) {
   for (i = 0; i < tablinks.length; i++) {
     tablinks[i].classList.remove('active');
   }
+  
+  // Clean up the Graph tab when switching away from it
+  if (currentTab === 'Graph' && tabName !== 'Graph' && typeof OTGraph !== 'undefined') {
+      if (OTGraph.cleanup) OTGraph.cleanup();
+  }
+  
   document.getElementById(tabName).classList.add('active');
   evt.currentTarget.classList.add('active');
   currentTab = tabName;
   if (currentTab === 'Statistics') {
       updateStatisticsDisplay();
   } else if (currentTab === 'Graph' && typeof OTGraph !== 'undefined') {
-      // Ensure the chart resizes when the tab becomes visible
+      // Restart the graph when the tab becomes visible and ensure the chart resizes
+      if (OTGraph.init) {
+          // Re-initialize to restart the update timer
+          OTGraph.running = true;
+          if (!OTGraph.updateTimer) {
+              OTGraph.updateTimer = setInterval(() => {
+                  requestAnimationFrame(() => OTGraph.updateChart());
+              }, OTGraph.updateInterval);
+          }
+      }
       if (OTGraph.resize) OTGraph.resize();
   }
 }

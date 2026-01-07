@@ -127,16 +127,41 @@ var OTGraph = {
         this.updateChart();
     },
 
+    cleanup: function() {
+        // Clear the update timer to prevent memory leaks
+        if (this.updateTimer) {
+            clearInterval(this.updateTimer);
+            this.updateTimer = null;
+        }
+        this.running = false;
+    },
+
+    destroy: function() {
+        // Full cleanup: stop updates and dispose chart
+        this.cleanup();
+        if (this.chart) {
+            this.chart.dispose();
+            this.chart = null;
+        }
+    },
+
     setTheme: function(newTheme) {
         if (this.currentTheme === newTheme) return;
         this.currentTheme = newTheme;
         
         if (this.chart) {
+            // Clean up timer before disposing chart
+            this.cleanup();
             this.chart.dispose();
             var container = document.getElementById('otGraphCanvas');
             this.chart = echarts.init(container, newTheme);
             this.updateOption();
             this.resize();
+            // Restart the update timer after re-initialization
+            this.running = true;
+            this.updateTimer = setInterval(() => {
+                requestAnimationFrame(() => this.updateChart());
+            }, this.updateInterval);
         }
     },
 
