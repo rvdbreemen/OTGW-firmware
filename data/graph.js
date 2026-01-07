@@ -114,10 +114,7 @@ var OTGraph = {
         });
 
         // Throttle updates to chart: use requestAnimationFrame with throttling
-        if (this.updateTimer) clearInterval(this.updateTimer);
-        this.updateTimer = setInterval(() => {
-            requestAnimationFrame(() => this.updateChart());
-        }, this.updateInterval);
+        this.startTimer();
     },
 
     setTimeWindow: function(minutes) {
@@ -134,6 +131,15 @@ var OTGraph = {
             this.updateTimer = null;
         }
         this.running = false;
+    },
+
+    startTimer: function() {
+        // Start the update timer (or restart if already running)
+        if (this.updateTimer) clearInterval(this.updateTimer);
+        this.running = true;
+        this.updateTimer = setInterval(() => {
+            requestAnimationFrame(() => this.updateChart());
+        }, this.updateInterval);
     },
 
     destroy: function() {
@@ -158,10 +164,7 @@ var OTGraph = {
             this.updateOption();
             this.resize();
             // Restart the update timer after re-initialization
-            this.running = true;
-            this.updateTimer = setInterval(() => {
-                requestAnimationFrame(() => this.updateChart());
-            }, this.updateInterval);
+            this.startTimer();
         }
     },
 

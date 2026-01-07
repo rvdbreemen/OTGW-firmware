@@ -1555,15 +1555,9 @@ function openLogTab(evt, tabName) {
   if (currentTab === 'Statistics') {
       updateStatisticsDisplay();
   } else if (currentTab === 'Graph' && typeof OTGraph !== 'undefined') {
-      // Restart the graph when the tab becomes visible and ensure the chart resizes
-      if (OTGraph.init) {
-          // Re-initialize to restart the update timer
-          OTGraph.running = true;
-          if (!OTGraph.updateTimer) {
-              OTGraph.updateTimer = setInterval(() => {
-                  requestAnimationFrame(() => OTGraph.updateChart());
-              }, OTGraph.updateInterval);
-          }
+      // Restart the graph when the tab becomes visible
+      if (OTGraph.chart && OTGraph.startTimer) {
+          OTGraph.startTimer();
       }
       if (OTGraph.resize) OTGraph.resize();
   }
