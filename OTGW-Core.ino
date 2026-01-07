@@ -65,6 +65,10 @@ const char *hexheaders[] = {
 
 #define OT_LOG_BUFFER_SIZE 512
 char ot_log_buffer[OT_LOG_BUFFER_SIZE];
+// Pointer to current JSON log document for structured logging
+// We use JsonDocument from ArduinoJson (usually v6 or v7)
+static JsonDocument* ptrLogDoc = nullptr; 
+
 #define ClrLog()            ({ ot_log_buffer[0] = '\0'; })
 #define AddLogf(...)        ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { snprintf(ot_log_buffer + _len, OT_LOG_BUFFER_SIZE - _len, __VA_ARGS__); } })
 #define AddLog(logstring)   ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, logstring, OT_LOG_BUFFER_SIZE); } })
@@ -541,6 +545,16 @@ void print_f88(float& value)
   dtostrf(_value, 3, 2, _msg);
   
   AddLogf("%s = %s %s", OTlookupitem.label, _msg , OTlookupitem.unit);
+  
+  // Populate JSON
+  if (ptrLogDoc) {
+    (*ptrLogDoc)["label"] = OTlookupitem.label;
+    (*ptrLogDoc)["value"] = String(_msg) + " " + OTlookupitem.unit;
+    if (is_value_valid(OTdata, OTlookupitem)) {
+      (*ptrLogDoc)["val"] = _value; // numeric value
+    }
+  }
+
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
@@ -557,6 +571,16 @@ void print_s16(int16_t& value)
   char _msg[15] {0};
   itoa(_value, _msg, 10);
   AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
+
+  // Populate JSON
+  if (ptrLogDoc) {
+    (*ptrLogDoc)["label"] = OTlookupitem.label;
+    (*ptrLogDoc)["value"] = String(_msg) + " " + OTlookupitem.unit;
+    if (is_value_valid(OTdata, OTlookupitem)) {
+       (*ptrLogDoc)["val"] = _value;
+    }
+  }
+
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
@@ -567,6 +591,14 @@ void print_s16(int16_t& value)
 void print_s8s8(uint16_t& value)
 {  
   AddLogf("%s = %3d / %3d %s", OTlookupitem.label, (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB, OTlookupitem.unit);
+  
+  if (ptrLogDoc) {
+    (*ptrLogDoc)["label"] = OTlookupitem.label;
+    char _json_msg[30];
+    snprintf(_json_msg, sizeof(_json_msg), "%d / %d %s", (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB, OTlookupitem.unit);
+    (*ptrLogDoc)["value"] = _json_msg;
+  }
+
   //Build string for MQTT
   char _msg[15] {0};
   char _topic[50] {0};
@@ -596,6 +628,16 @@ void print_u16(uint16_t& value)
   utoa(_value, _msg, 10);
   
   AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
+  
+  // Populate JSON
+  if (ptrLogDoc) {
+    (*ptrLogDoc)["label"] = OTlookupitem.label;
+    (*ptrLogDoc)["value"] = String(_msg) + " " + OTlookupitem.unit;
+    if (is_value_valid(OTdata, OTlookupitem)) {
+       (*ptrLogDoc)["val"] = _value;
+    }
+  }
+
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
@@ -632,6 +674,13 @@ void print_status(uint16_t& value)
     
     AddLogf("%s = Master [%s]", OTlookupitem.label, _flag8_master);
 
+    if (ptrLogDoc) {
+      (*ptrLogDoc)["label"] = OTlookupitem.label;
+      char _json_msg[32];
+      snprintf(_json_msg, sizeof(_json_msg), "Master [%s]", _flag8_master);
+      (*ptrLogDoc)["value"] = _json_msg;
+    }
+
     //Master Status
     if (is_value_valid(OTdata, OTlookupitem)){
       sendMQTTData("status_master", _flag8_master);
@@ -667,6 +716,13 @@ void print_status(uint16_t& value)
 
     
     AddLogf("%s = Slave  [%s]", OTlookupitem.label, _flag8_slave);
+    
+    if (ptrLogDoc) {
+      (*ptrLogDoc)["label"] = OTlookupitem.label;
+      char _json_msg[32];
+      snprintf(_json_msg, sizeof(_json_msg), "Slave [%s]", _flag8_slave);
+      (*ptrLogDoc)["value"] = _json_msg;
+    }
 
     //Slave Status
     if (is_value_valid(OTdata, OTlookupitem)){
@@ -999,6 +1055,14 @@ void print_remoteoverridefunction(uint16_t& value)
 void print_flag8u8(uint16_t& value)
 {
   AddLogf("%s = M[%s] - [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
+  
+  if (ptrLogDoc) {
+    (*ptrLogDoc)["label"] = OTlookupitem.label;
+    char _json_msg[30];
+    snprintf(_json_msg, sizeof(_json_msg), "M[%s] - [%d]", byte_to_binary(OTdata.valueHB), OTdata.valueLB);
+    (*ptrLogDoc)["value"] = _json_msg;
+  }
+
   if (is_value_valid(OTdata, OTlookupitem)){
     //Build string for MQTT
     char _topic[50] {0};
@@ -1020,6 +1084,14 @@ void print_flag8(uint16_t& value)
 {
   
   AddLogf("%s = flag8 = [%s] - decimal = [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
+  
+  if (ptrLogDoc) {
+    (*ptrLogDoc)["label"] = OTlookupitem.label;
+    char _json_msg[50];
+    snprintf(_json_msg, sizeof(_json_msg), "flag8=[%s] (%d)", byte_to_binary(OTdata.valueLB), OTdata.valueLB);
+    (*ptrLogDoc)["value"] = _json_msg;
+  }
+
    if (is_value_valid(OTdata, OTlookupitem)){
     //Build string for MQTT
     char _topic[50] {0};
@@ -1039,6 +1111,15 @@ void print_flag8flag8(uint16_t& value)
   //flag8 valueHB
   
   AddLogf("%s = HB flag8[%s] -[%3d] ", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueHB);
+  if (ptrLogDoc) {
+    (*ptrLogDoc)["label"] = OTlookupitem.label;
+    char _json_msg[80];
+    snprintf(_json_msg, sizeof(_json_msg), "HB[%s](%d) LB[%s](%d)", 
+      byte_to_binary(OTdata.valueHB), OTdata.valueHB,
+      byte_to_binary(OTdata.valueLB), OTdata.valueLB);
+    (*ptrLogDoc)["value"] = _json_msg;
+  }
+
   if (is_value_valid(OTdata, OTlookupitem)){
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_hb_flag8", sizeof(_topic));
@@ -1119,6 +1200,14 @@ void print_u8u8(uint16_t& value)
 { 
   
   AddLogf("%s = %3d / %3d %s", OTlookupitem.label, (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, OTlookupitem.unit);
+  
+  if (ptrLogDoc) {
+    (*ptrLogDoc)["label"] = OTlookupitem.label;
+    char _json_msg[30];
+    snprintf(_json_msg, sizeof(_json_msg), "%d / %d %s", (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, OTlookupitem.unit);
+    (*ptrLogDoc)["value"] = _json_msg;
+  }
+
   if (is_value_valid(OTdata, OTlookupitem)){
     //Build string for MQTT
     char _topic[50] {0};
@@ -1560,52 +1649,68 @@ void processOT(const char *buf, int len){
         }
       }
 
+      // Prepare JSON for WebSocket
+      StaticJsonDocument<1024> doc;
+      ptrLogDoc = &doc; 
+      doc["time"] = getOTLogTimestamp();
+
       // Decode and print OpenTherm Gateway Message
+      const char* sourceStr = "Unknown";
       switch (OTdata.rsptype){
         case OTGW_BOILER:
           AddLog("Boiler            ");
+          sourceStr = "Boiler";
           break;
         case OTGW_THERMOSTAT:
           AddLog("Thermostat        ");
+          sourceStr = "Thermostat";
           break;
         case OTGW_REQUEST_BOILER:
           AddLog("Request Boiler    ");
+          sourceStr = "Request Boiler";
           break;
         case OTGW_ANSWER_THERMOSTAT:
           AddLog("Answer Thermostat ");
+          sourceStr = "Answer Thermostat";
           break;
         case OTGW_PARITY_ERROR:
           AddLog("Parity Error      ");
+          sourceStr = "Parity Error";
           break;
         default:
           AddLog("Unknown           ");
           break;
       }
+      doc["source"] = sourceStr;
+      doc["raw"] = OTdata.buf;
+      doc["id"] = OTdata.id;
+      doc["dir"] = messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type));
 
-      //print OTmessage to debug
-      //AddLogf("%s (%d)", OTdata.buf, OTdata.len);
-      //OTGWDebugf("[%08x]", OTdata.value);      //print message frame
-      //OTGWDebugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
       //print message Type and ID
       AddLogf(" %s %3d", OTdata.buf, OTdata.id);
       AddLogf(" %-16s", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
       //OTGWDebugf("[%-30s]", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
       //OTGWDebugf("[M=%d]",OTdata.master);
 
+      char valChar = ' ';
       if (OTdata.skipthis){
         if (OTdata.rsptype == OTGW_PARITY_ERROR) {
           AddLog("P"); //skipped due to parity error
+          valChar = 'P';
         } else {
           AddLog("-"); //skipped due to R or A message
+          valChar = '-';
         }
           
       } else {
         if (is_value_valid(OTdata, OTlookupitem)) {
           AddLog(">");
+          valChar = '>';
         } else {
           AddLog(" ");
         }
       }
+      doc["valid"] = String(valChar);
       
       //next step interpret the OT protocol
           
@@ -1730,7 +1835,21 @@ void processOT(const char *buf, int len){
       if (OTdata.skipthis) AddLog(" <ignored> ");
       AddLogln();
       OTGWDebugT(ot_log_buffer);
-      sendLogToWebSocket(ot_log_buffer);  // Send log to WebSocket clients
+      
+      // Send JSON to WebSocket
+      size_t jsonLen = serializeJson(doc, ot_log_buffer, OT_LOG_BUFFER_SIZE); 
+      // reused ot_log_buffer temporarily to store json? NO!
+      // ot_log_buffer contains the text log that we just printed to DebugT.
+      // We should use a separate buffer for JSON or send helper that accepts JsonDocument.
+      // Since memory is tight, and we just printed ot_log_buffer, we can reuse it IF we don't need it anymore.
+      // But sendLogToWebSocket logic might want it.
+      // Let's alloc a char array on stack.
+      char jsonBuf[1024];
+      serializeJson(doc, jsonBuf, sizeof(jsonBuf));
+      sendLogToWebSocket(jsonBuf);  // Send JSON log to WebSocket clients
+
+      ptrLogDoc = nullptr; // Cleanup pointer
+      
       OTGWDebugFlush();
       ClrLog();
     } 

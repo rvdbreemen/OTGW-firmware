@@ -232,7 +232,66 @@ var OTGraph = {
     },
 
     processLine: function(line) {
-        if (!this.running || !line || line.length < 5) return; // Need at least ID and some content
+        if (!this.running || !line) return; 
+        
+        var id = NaN;
+        var now = new Date(); // timestamp
+        var val = 0;
+        
+        // Handle JSON Object
+        if (typeof line === 'object') {
+            id = parseInt(line.id, 10);
+            if (line.time) {
+                 // Try to parse timestamp 'HH:MM:SS.mmmm' into standard date object?
+                 // Or just use current time for graph (simplest and consistent with old behavior which used new Date())
+                 // The old code used `var now = new Date();` ignoring log timestamp.
+            }
+            
+            if (isNaN(id)) return;
+
+            if (id === 0) {
+                 // Status bits: inspect 'value' string: "Slave [......]"
+                 var valStr = line.value || "";
+                 var match = /Slave\s*\[([A-Z\-\.]{8})\]/.exec(valStr);
+                 if (match) {
+                    var chars = match[1]; 
+                    var ch    = (chars.charAt(1) === 'C') ? 1 : 0;
+                    var dhw   = (chars.charAt(2) === 'W') ? 1 : 0;
+                    var flame = (chars.charAt(3) === 'F') ? 1 : 0;
+                    
+                    this.pushData('flame', now, flame);
+                    this.pushData('dhwMode', now, dhw);
+                    this.pushData('chMode', now, ch);
+                 }
+            } else {
+                 if (line.val !== undefined) {
+                     val = parseFloat(line.val);
+                 } else if (line.value) {
+                     // Try parsing value string "20.00 C"
+                     val = parseFloat(line.value);
+                 } else {
+                     return;
+                 }
+                 
+                 if (isNaN(val)) return;
+                 
+                 var key = null;
+                 switch(id) {
+                     case 17: key = 'mod'; break;
+                     case 1:  key = 'ctrlSp'; break;
+                     case 25: key = 'boiler'; break;
+                     case 28: key = 'return'; break;
+                     case 16: key = 'roomSp'; break;
+                     case 24: key = 'room'; break;
+                     case 27: key = 'outside'; break;
+                 }
+                 if (key) this.pushData(key, now, val);
+            }
+            return;
+        }
+
+        // Handle Text String (Legacy/Telnet)
+        if (line.length < 5) return; // Need at least ID and some content
         
         // Match ID in the log line
         // Format: [ResponseType] [Hex] [ID] [Type] [Marker] ...
@@ -242,14 +301,13 @@ var OTGraph = {
         const regex = /^.*?([A-Z][0-9A-Fa-f]{8})\s+(\d+)\s+[A-Za-z0-9\-]+\s+[>P\- ]/;
         const match = line.match(regex);
         
-        var id = NaN;
         if (match) {
-            id = parseInt(match[1], 10);
+            id = parseInt(match[2], 10); // Fix for group index (was 1, which is Hex)
         }
         
         if (isNaN(id)) return;
         
-        var now = new Date();
+        // var now = new Date(); // Already defined above
             var val = 0;
             
             if (id === 0) {
