@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.0.0-rc1
+**  Version  : v1.0.0-rc2
 **
 **  Copyright (c) 2021-2024 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -28,8 +28,8 @@ static char       MQTTbrokerIPchar[20];
 constexpr size_t  MQTT_ID_MAX_LEN = 96;
 constexpr size_t  MQTT_NAMESPACE_MAX_LEN = 192;
 constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
-constexpr size_t  MQTT_MSG_MAX_LEN = 512;
-constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 256;
+constexpr size_t  MQTT_MSG_MAX_LEN = 1100;
+constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 1200;
 
 static            PubSubClient MQTTclient(wifiClient);
 
