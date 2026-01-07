@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v1.0.0-rc2
+**  Version  : v1.0.0-rc3
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -97,7 +97,7 @@ void setupFSexplorer(){
   }
   httpServer.on("/api/firmwarefilelist", apifirmwarefilelist); 
   httpServer.on("/api/listfiles", apilistfiles);
-  httpServer.on("/LittleFSformat", formatLittleFS);
+  // httpServer.on("/LittleFSformat", formatLittleFS);
   httpServer.on("/upload", HTTP_POST, []() {}, handleFileUpload);
   httpServer.on("/ReBoot", reBootESP);
   httpServer.on("/ResetWireless", resetWirelessButton);
@@ -198,22 +198,28 @@ void apifirmwarefilelist() {
 void apilistfiles()             // Senden aller Daten an den Client
 {   
   FSInfo LittleFSinfo;
+  String path = "/";
+  if (httpServer.hasArg("path")) {
+      path = httpServer.arg("path");
+  }
 
   #define LEN_FILENAME 32
   typedef struct _fileMeta {
     char    Name[LEN_FILENAME];     
     int32_t Size;
+    bool    isDir;
   } fileMeta;
 
   _fileMeta dirMap[MAX_FILES_IN_LIST+1];
   int fileNr = 0;
     
-  Dir dir = LittleFS.openDir("/");         // List files on LittleFS
+  Dir dir = LittleFS.openDir(path);         // List files on LittleFS
   while (dir.next() && (fileNr < MAX_FILES_IN_LIST))  
   {
     dirMap[fileNr].Name[0] = '\0';
     strlcat(dirMap[fileNr].Name, dir.fileName().c_str(), LEN_FILENAME); 
     dirMap[fileNr].Size = dir.fileSize();
+    dirMap[fileNr].isDir = dir.isDirectory();
     fileNr++;
   }
   //DebugTf(PSTR("fileNr[%d], Max[%d]\r\n"), fileNr, MAX_FILES_IN_LIST);
@@ -242,6 +248,7 @@ void apilistfiles()             // Senden aller Daten an den Client
     //--- change FSexplorer.html
     strncat(dirMap[fileNr].Name, "More files not listed ..", 29); 
     dirMap[fileNr].Size = 0;
+    dirMap[fileNr].isDir = false;
     fileNr++;
   }
 
@@ -249,7 +256,7 @@ void apilistfiles()             // Senden aller Daten an den Client
   for (int f=0; f < fileNr; f++)  
   {
     DebugTf(PSTR("[%3d] >> [%s]\r\n"), f, dirMap[f].Name);
-    temp += R"({"name":")" + String(dirMap[f].Name) + R"(","size":")" + formatBytes(dirMap[f].Size) + R"("},)";
+    temp += R"({"name":")" + String(dirMap[f].Name) + R"(","size":")" + formatBytes(dirMap[f].Size) + R"(","type":")" + (dirMap[f].isDir ? "dir" : "file") + R"("},)";
   }
 
   LittleFS.info(LittleFSinfo);
@@ -290,8 +297,16 @@ void handleFileUpload()
     {
       upload.filename = upload.filename.substring(upload.filename.length() - 30, upload.filename.length());  // Dateinamen auf 30 Zeichen kürzen
     }
-    Debugln("FileUpload Name: " + upload.filename);
-    fsUploadFile = LittleFS.open("/" + httpServer.urlDecode(upload.filename), "w");
+    String path = "/";
+    if (httpServer.hasArg("path")) {
+        path = httpServer.arg("path");
+        if (!path.endsWith("/")) path += "/";
+    }
+    String filename = path + httpServer.urlDecode(upload.filename);
+    if(filename.startsWith("//")) filename = filename.substring(1);
+    
+    Debugln("FileUpload Name: " + filename);
+    fsUploadFile = LittleFS.open(filename, "w");
   } 
   else if (upload.status == UPLOAD_FILE_WRITE) 
   {

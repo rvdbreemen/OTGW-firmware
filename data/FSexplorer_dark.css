@@ -1,17 +1,19 @@
 /*
 ***************************************************************************  
-**  Program  : FSexplorer.html
-**  Version  : v0.10.4-alpha (Modernized UI)
+**  Program  : FSexplorer_dark.css
+**  Version  : v0.10.4-alpha (Modernized Dark UI)
 ***************************************************************************  
 */
 :root {
-    --primary-color: #0088cc; /* A slightly darker blue than #00bffe for better text contrast */
-    --primary-hover: #0077b3;
-    --bg-color: #e6ffff;      /* Matching index.css background */
-    --card-bg: #ffffff;
-    --text-color: #333;
+    --primary-color: #4daafc; /* Lighter blue for dark mode */
+    --primary-hover: #6eb9fd;
+    --bg-color: #121212;      /* Very dark background */
+    --card-bg: #1e1e1e;       /* Dark card background */
+    --text-color: #e0e0e0;    /* Light text */
+    --text-muted: #a0a0a0;
+    --border-color: #333333;
     --border-radius: 8px;
-    --shadow: 0 4px 6px rgba(0,0,0,0.1);
+    --shadow: 0 4px 6px rgba(0,0,0,0.5); /* Stronger shadow for dark mode */
 }
 
 body {
@@ -27,14 +29,13 @@ body {
 }
 
 h2 {
-    color: #2c3e50;
+    color: var(--text-color);
     text-shadow: none;
     margin-bottom: 20px;
     text-align: center;
 }
 
 /* Layout Containers */
-/* Constrain width of main content area to prevent 100% width on large screens */
 body > div, body > fieldset, body > .system-actions {
     width: 100%;
     max-width: 800px;
@@ -55,31 +56,32 @@ main {
 }
 
 table {
-    width: 100% !important; /* Override inline 90% */
+    width: 100% !important;
     border-collapse: collapse;
     margin: 0;
 }
 
 tr {
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--border-color);
 }
 
 tr:last-child {
     border-bottom: none;
 }
 
-tr:nth-child(even) { background: #f0fbff; } /* Very faint blue */
-tr:nth-child(odd) { background: #ffffff; }
+/* Dark mode striped rows */
+tr:nth-child(even) { background: #252525; }
+tr:nth-child(odd) { background: #1e1e1e; }
 
 td {
     padding: 12px 8px;
     text-align: left;
     white-space: nowrap;
     border: none;
-    width: auto !important; /* Critical: Overrides inline width attributes to fix column sizes */
+    width: auto !important;
+    color: var(--text-color);
 }
 
-/* Override 5th column background from original CSS */
 td:nth-child(n+5) {
     background: transparent;
 }
@@ -96,10 +98,10 @@ a:hover {
 }
 
 a.delete-link {
-    color: #dc3545; /* Danger Red */
+    color: #ff5252; /* Bright Red for dark mode */
 }
 a.delete-link:hover {
-    color: #c82333;
+    color: #ff1744;
     text-decoration: underline;
 }
 
@@ -140,7 +142,6 @@ form[action="/upload"] {
     box-shadow: var(--shadow);
     text-align: center;
     box-sizing: border-box;
-    /* Ensure it behaves like the fieldset */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -149,8 +150,8 @@ form[action="/upload"] {
 .system-actions h3 {
     margin-top: 0;
     margin-bottom: 20px;
-    color: var(--primary-color);
-    border-bottom: 2px solid #e0f7fa; /* Light cyan border to match theme */
+    color: var(--text-color);
+    border-bottom: 2px solid var(--border-color);
     padding-bottom: 15px;
     display: block;
     width: 100%;
@@ -163,8 +164,9 @@ input[type="file"] {
     max-width: 500px;
     padding: 15px;
     margin-bottom: 20px;
-    background: #f8f9fa;
-    border: 2px dashed #ced4da;
+    background: #2d2d2d;
+    color: var(--text-color);
+    border: 2px dashed #444; /* Darker dashed border */
     border-radius: var(--border-radius);
     box-sizing: border-box;
     cursor: pointer;
@@ -172,7 +174,7 @@ input[type="file"] {
 }
 input[type="file"]:hover {
     border-color: var(--primary-color);
-    background: #e9ecef;
+    background: #333;
 }
 
 progress {
@@ -181,6 +183,7 @@ progress {
     height: 20px;
     margin-bottom: 20px;
     accent-color: var(--primary-color);
+    background-color: #333;
 }
 
 fileSize {
@@ -189,6 +192,7 @@ fileSize {
     min-height: 1.2em;
     text-align: center;
     width: 100%;
+    color: var(--text-color);
 }
 fileSize p {
     margin: 5px 0;
@@ -205,26 +209,27 @@ fileSize p {
 /* Button Styling System-wide */
 input[type="submit"], input[type="button"], .button {
     background-color: var(--primary-color);
-    color: white;
+    color: #121212; /* Dark text for high contrast on bright blue */
     border: none;
     padding: 10px 20px;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     height: auto;
     width: auto;
     min-width: 140px;
     margin: 0;
-    -webkit-appearance: none;
+    -webkit-appearance: none; /* iOS fix */
 }
 
 input[type="submit"]:hover, input[type="button"]:hover, .button:hover {
     opacity: 0.9;
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+    color: white;
 }
 
 input[type="submit"]:active, input[type="button"]:active, .button:active {
@@ -232,23 +237,24 @@ input[type="submit"]:active, input[type="button"]:active, .button:active {
 }
 
 input[type="submit"]:disabled {
-    background-color: #ccc;
+    background-color: #444;
+    color: #888;
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
 }
 
 /* Action Specific Colors */
-form[action='/ReBoot'] input { background-color: #6c757d; }
-form[action='/ReBoot'] input:hover { background-color: #5a6268; }
+form[action='/ReBoot'] input { background-color: #5a5a5a; }
+form[action='/ReBoot'] input:hover { background-color: #6a6a6a; }
 
-form[action='/ResetWireless'] input { background-color: #ffc107; color: #000; }
-form[action='/ResetWireless'] input:hover { background-color: #e0a800; }
+form[action='/ResetWireless'] input { background-color: #ffb300; color: #000; }
+form[action='/ResetWireless'] input:hover { background-color: #e09f00; }
 
-form[action='/'] input { background-color: #dc3545; }
-form[action='/'] input:hover { background-color: #c82333; }
+form[action='/'] input { background-color: #cf6679; color: #000; } /* Material Error Color */
+form[action='/'] input:hover { background-color: #b00020; color: white; }
 
-/* Hide HR as we use cards now */
+/* Hide HR */
 hr {
     display: none;
 }
@@ -258,11 +264,11 @@ hr {
     margin-top: 40px;
     text-align: center;
     font-size: 0.85em;
-    color: #888;
+    color: var(--text-muted);
     width: 100%;
 }
 #left a {
-    color: #888;
+    color: var(--text-muted);
     text-decoration: none;
     margin: 0 5px;
 }
@@ -271,19 +277,22 @@ hr {
     text-decoration: underline;
 }
 
-/* Note style if it appears */
+/* Note style */
 .note {
-	background-color: #ffccbc;
-    color: #d84315;
+	background-color: #3e2723; /* Dark brown/red for warning */
+    color: #ffccbc;
 	padding: 10px;
 	margin-top: 1em;
 	text-align: center;
 	border-radius: var(--border-radius);
     max-width: 100%;
+    border: 1px solid #d84315;
 }
 
 /* Highlighting styles from original JS */
+/* In dark mode, light green #d4edda is too bright for text. We need a dark green. */
 tr[style*="background-color"] {
-    background-color: #d4edda !important;
+    background-color: #1b5e20 !important; /* Material Green 900 */
+    color: #e8f5e9;
 }
 

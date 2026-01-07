@@ -249,6 +249,18 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _status.flash_written = 0;
 
         if (upload.name == "filesystem") {
+          // --- Preserve settings logic ---
+          if (_server->hasArg("preserve") && _server->arg("preserve") == "true") {
+            if (LittleFS.exists("/settings.ini")) {
+              File f = LittleFS.open("/settings.ini", "r");
+              if (f) {
+                _savedSettings = f.readString();
+                f.close();
+                if (_serial_output) Debugln("Settings preserved in memory.");
+              }
+            }
+          }
+          // --------------------------------
           size_t fsSize = ((size_t) &_FS_end - (size_t) &_FS_start);
           close_all_fs();
           if (!Update.begin(fsSize, U_FS)){//start with max available size
@@ -289,6 +301,20 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
         if(Update.end(true)){ //true to set the size to the current progress
+          // --- Restore settings logic ---
+          if (upload.name == "filesystem" && _savedSettings.length() > 0) {
+             if (LittleFS.begin()) {
+                 File f = LittleFS.open("/settings.ini", "w");
+                 if (f) {
+                     f.print(_savedSettings);
+                     f.close();
+                     if (_serial_output) Debugln("Settings restored to new filesystem.");
+                 }
+                 LittleFS.end();
+             }
+             _savedSettings = ""; 
+          }
+          // --------------------------------
           if (_serial_output) Debugf("\r\nUpdate Success: %u\r\nRebooting...\r\n", upload.totalSize);
           _status.upload_received = upload.totalSize;
           if (_status.upload_total == 0 && upload.totalSize > 0) {

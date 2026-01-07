@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v1.0.0-rc2
+**  Version  : v1.0.0-rc3
 **
 **  Copyright (c) 2021-2024 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -22,6 +22,32 @@ template <typename T> T PROGMEM_getAnything (const T * sce)
   static T temp;
   memcpy_P (&temp, sce, sizeof (T));
   return temp;
+}
+
+//===========================================================================================
+// Get High Resolution Timestamp for Logs
+//===========================================================================================
+String getOTLogTimestamp() {
+  timeval now;
+  gettimeofday(&now, nullptr);
+  // Default to UTC if not initialized, but typically settingNTPtimezone is valid
+  // Recreating the timezone object is what _debugBOL does, so we follow that pattern
+  // assuming timezoneManager is available.
+  TimeZone myTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  if (myTz.isError()) {
+    // Fallback if generic name failed
+    myTz = TimeZone::forTimeOffset(TimeOffset::forMinutes(0)); 
+  }
+  
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now.tv_sec, myTz);
+  
+  char timestamp[25];
+  // User requested HH:MM:SS.mmmmm (5 digits for sub-second)
+  // tv_usec is 0-999999 (6 digits). integer div by 10 gives 5 digits.
+  snprintf(timestamp, sizeof(timestamp), "%02d:%02d:%02d.%05d", 
+           myTime.hour(), myTime.minute(), myTime.second(), (int)(now.tv_usec / 10));
+           
+  return String(timestamp);
 }
 
 //===========================================================================================
