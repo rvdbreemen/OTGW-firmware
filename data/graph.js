@@ -9,16 +9,20 @@
 ***************************************************************************      
 */
 
+// Configuration constants
+const UPDATE_INTERVAL_MS = 2000; // Update chart every 2 seconds to reduce load
+
 var OTGraph = {
     chart: null,
     data: {},
+    pendingData: {}, // Track new data points since last chart update
     maxPoints: 432000, // Buffer to hold ~24h of data at 5 msgs/sec
     timeWindow: 3600 * 1000, // Default 1 Hour in milliseconds
     running: false,
     updateTimer: null,
     currentTheme: 'light',
     lastUpdate: 0,
-    updateInterval: 2000, // Update every 2 seconds to reduce load
+    updateInterval: UPDATE_INTERVAL_MS,
 
     // Define palettes
     palettes: {
@@ -80,7 +84,17 @@ var OTGraph = {
 
         if (typeof echarts === 'undefined') {
             console.error("ECharts library not loaded");
-            container.innerHTML = "Error: ECharts library not loaded. Internet connection required for CDN.";
+            container.innerHTML = '' +
+                '<div class="graph-error">' +
+                    '<h3>Graph unavailable</h3>' +
+                    '<p>The ECharts graph library could not be loaded. The graph feature requires access to the ECharts CDN on the internet.</p>' +
+                    '<ul>' +
+                        '<li>Check that this device has internet connectivity and is allowed to access external CDNs.</li>' +
+                        '<li>If you are running in an isolated network, refer to the OTGW-firmware documentation for using a locally hosted copy of ECharts.</li>' +
+                        '<li>For more technical details, open your browser developer console (F12) and look for network or script loading errors.</li>' +
+                    '</ul>' +
+                    '<button type="button" onclick="window.location.reload()">Retry loading graph</button>' +
+                '</div>';
             return;
         }
 
@@ -102,6 +116,7 @@ var OTGraph = {
         // Initialize empty data arrays if not present
         this.seriesConfig.forEach(c => {
             if (!this.data[c.id]) this.data[c.id] = [];
+            if (!this.pendingData[c.id]) this.pendingData[c.id] = [];
         });
 
         this.updateOption();
@@ -287,19 +302,6 @@ var OTGraph = {
                     this.pushData('flame', now, flame);
                     this.pushData('dhwMode', now, dhw);
                     this.pushData('chMode', now, ch);
-                } else {
-                    // Fallback for potential legacy binary format: LB flag8[xxxxxxxx]
-                    var binMatch = /LB flag8\[([01]{8})\]/.exec(line);
-                    if (binMatch) {
-                        var bits = binMatch[1]; 
-                        var flame = bits.charAt(4) === '1' ? 1 : 0;
-                        var dhw   = bits.charAt(5) === '1' ? 1 : 0;
-                        var ch    = bits.charAt(6) === '1' ? 1 : 0;
-                        
-                        this.pushData('flame', now, flame);
-                        this.pushData('dhwMode', now, dhw);
-                        this.pushData('chMode', now, ch);
-                    }
                 }
             } else {
                  var parts = line.split('=');
@@ -328,13 +330,23 @@ var OTGraph = {
     pushData: function(key, time, value) {
         if (!this.data[key]) return;
         
-        this.data[key].push({
+        var dataPoint = {
             name: time.toString(),
             value: [time, value]
-        });
+        };
         
+        this.data[key].push(dataPoint);
+        
+        // Track this point as pending for incremental chart update
+        if (this.pendingData[key]) {
+            this.pendingData[key].push(dataPoint);
+        }
+        
+        // Trim old data if exceeds maxPoints
         if (this.data[key].length > this.maxPoints) {
             this.data[key].shift();
+            // Note: pendingData only contains recent points (cleared every 2s)
+            // so there's no need to sync the shift operation
         }
     },
 
@@ -345,24 +357,48 @@ var OTGraph = {
     updateChart: function() {
         if (!this.chart) return;
         
-        // Update xAxis min to ensure scrolling window logic (1 hour scope)
+        // Update xAxis min to ensure scrolling window logic
         var minTime = this.getMinTime();
 
-        var seriesUpdate = this.seriesConfig.map(c => ({
-            name: c.label,
-            data: this.data[c.id]
-        }));
-        
-        // Update all x-axes to have the correct min value for the sliding window
-        // We have 5 x-axes now
+        // Build array of xAxis updates for the sliding window
         var xAxisUpdate = [];
         for(var i=0; i<5; i++) {
             xAxisUpdate.push({ min: minTime });
         }
 
+        // Check if there's any pending data to append
+        var hasPendingData = false;
+        for (var key in this.pendingData) {
+            if (this.pendingData[key] && this.pendingData[key].length > 0) {
+                hasPendingData = true;
+                break;
+            }
+        }
+
+        if (hasPendingData) {
+            // Use incremental update for better performance
+            // Process each series and append new data points
+            this.seriesConfig.forEach(function(c, index) {
+                var pending = this.pendingData[c.id];
+                if (pending && pending.length > 0) {
+                    // ECharts appendData expects an array of values
+                    var values = pending.map(function(p) { return p.value; });
+                    this.chart.appendData({
+                        seriesIndex: index,
+                        data: values
+                    });
+                }
+            }.bind(this));
+
+            // Clear pending data after appending
+            this.seriesConfig.forEach(function(c) {
+                this.pendingData[c.id] = [];
+            }.bind(this));
+        }
+
+        // Always update xAxis for the sliding window
         this.chart.setOption({
-            xAxis: xAxisUpdate,
-            series: seriesUpdate
+            xAxis: xAxisUpdate
         });
     }
 };
