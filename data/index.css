@@ -296,16 +296,19 @@
 /* Graph Tab */
 .ot-graph-container {
     width: 100%;
-    height: 400px;
+    height: 600px;
     background-color: white;
     border: 1px solid #ccc;
     padding: 10px;
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
 }
 
 #otGraphCanvas {
     width: 100%;
-    height: 100%;
+    flex-grow: 1;
+    min-height: 0;
 }
   
   /* header */

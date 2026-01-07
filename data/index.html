@@ -14,6 +14,7 @@
         } catch (e) { console.error(e); }
       })();
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <script src="./index.js"></script>
     <script src="./graph.js"></script>
     <title>OTGW firmware</title>
@@ -109,7 +110,20 @@
 
         <div id="Graph" class="tab-content">
             <div class="ot-graph-container">
-               <canvas id="otGraphCanvas"></canvas>
+               <div class="ot-graph-controls" style="margin-bottom: 5px; text-align: right;">
+                   <label for="graphTimeWindow">Time Window: </label>
+                   <select id="graphTimeWindow" style="padding: 5px; border-radius: 4px;">
+                       <option value="10">10 Minutes</option>
+                       <option value="30">30 Minutes</option>
+                       <option value="60" selected>1 Hour</option>
+                       <option value="120">2 Hours</option>
+                       <option value="240">4 Hours</option>
+                       <option value="360">6 Hours</option>
+                       <option value="720">12 Hours</option>
+                       <option value="1440">24 Hours</option>
+                   </select>
+               </div>
+               <div id="otGraphCanvas"></div>
             </div>
         </div>
       </div>
