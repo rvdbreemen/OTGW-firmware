@@ -309,6 +309,14 @@
     flex-grow: 1;
     min-height: 0;
 }
+
+.ot-graph-select {
+    padding: 5px;
+    border-radius: 4px;
+    border: 1px solid #555;
+    background-color: #2c2c2e;
+    color: white;
+}
   
   /* header */
   .headerrow {
