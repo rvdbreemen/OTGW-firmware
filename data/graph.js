@@ -250,8 +250,8 @@ var OTGraph = {
                  // No, timestamp has numbers.
                  
                  // Firmware specific format: "   0 Read-Ack"
-                 // It matches: space(s) digits space(s) Word
-                 var matchInside = /\s+(\d+)\s+[a-zA-Z\-]+\s*>/;
+                 // It matches: space(s) digits space(s) known OpenTherm message type, then '>'
+                 var matchInside = /\s+(\d+)\s+(?:Read-Ack|Write-Ack|Read-Data|Write-Data|Inv-Data|Read-Flags|Write-Flags)\s*>/;
                  var m = line.match(matchInside);
                  if (m) {
                      id = parseInt(m[1], 10);
