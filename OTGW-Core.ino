@@ -690,8 +690,9 @@ void print_status(uint16_t& value)
     _flag8_master[7] = (((OTdata.valueHB) & 0x80) ? '.' : '-');
     _flag8_master[8] = '\0';
 
-    
-    AddLogf("%s = Master [%s]", OTlookupitem.label, _flag8_master);
+    AddLog(" ");
+    AddLog(OTlookupitem.label);
+    AddLogf(" = Master [%s]", _flag8_master);
 
     // Populate JSON
     char _json_msg[32];
@@ -731,8 +732,9 @@ void print_status(uint16_t& value)
     _flag8_slave[7] = (((OTdata.valueLB) & 0x80) ? 'P' : '-');
     _flag8_slave[8] = '\0';
 
-    
-    AddLogf("%s = Slave  [%s]", OTlookupitem.label, _flag8_slave);
+    AddLog(" ");
+    AddLog(OTlookupitem.label);
+    AddLogf(" = Slave  [%s]", _flag8_slave);
     
     // Populate JSON
     char _json_msg[32];
@@ -1844,18 +1846,22 @@ void processOT(const char *buf, int len){
       OTGWDebugT(ot_log_buffer);
       
       // Send JSON to WebSocket
-      size_t jsonLen = serializeJson(doc, ot_log_buffer, OT_LOG_BUFFER_SIZE); 
-      // reused ot_log_buffer temporarily to store json? NO!
-      // ot_log_buffer contains the text log that we just printed to DebugT.
-      // We should use a separate buffer for JSON or send helper that accepts JsonDocument.
-      // Since memory is tight, and we just printed ot_log_buffer, we can reuse it IF we don't need it anymore.
-      // But sendLogToWebSocket logic might want it.
-      // Let's alloc a char array on stack.
-      char jsonBuf[1024];
-      serializeJson(doc, jsonBuf, sizeof(jsonBuf));
-      sendLogToWebSocket(jsonBuf);  // Send JSON log to WebSocket clients
-
-      ptrLogDoc = nullptr; // Cleanup pointer
+      if (ptrLogDoc) {
+        // WebSocketsServer expects a contiguous payload, so we must serialize.
+        // To avoid an extra 1KB stack buffer per message, reuse ot_log_buffer
+        // (the text log was already printed above).
+        const size_t needed = measureJson(*ptrLogDoc) + 1; // +1 for '\0'
+        if (needed <= OT_LOG_BUFFER_SIZE) {
+          serializeJson(*ptrLogDoc, ot_log_buffer, OT_LOG_BUFFER_SIZE);
+          sendLogToWebSocket(ot_log_buffer);
+        } else {
+          // JSON too large for buffer; send a small error marker instead.
+          snprintf(ot_log_buffer, OT_LOG_BUFFER_SIZE, "{\"error\":\"ws_json_too_large\",\"needed\":%u,\"max\":%u}",
+                   (unsigned)needed, (unsigned)OT_LOG_BUFFER_SIZE);
+          sendLogToWebSocket(ot_log_buffer);
+        }
+        ptrLogDoc = nullptr; // Cleanup pointer
+      }
       
       OTGWDebugFlush();
       ClrLog();

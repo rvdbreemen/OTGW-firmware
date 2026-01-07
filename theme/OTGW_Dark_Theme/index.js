@@ -27,10 +27,36 @@
   
   var tid = 0;
   var timeupdate = 0;
+  var ws = null;
     
+  //============================================================================  
+  function startWebSocket() {
+    // Avoid spawning multiple connections (e.g. if initMainPage is called twice)
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+    try {
+      if (ws) {
+        ws.close();
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    ws = new WebSocket('ws://'+window.location.hostname+':81/');
+    ws.onmessage = function(evt) {
+      console.log(evt.data);
+    };
+    ws.onclose = function() {
+      ws = null;
+      setTimeout(startWebSocket, 3000); // reconnection
+    };
+  }
+
   //============================================================================  
   function initMainPage() {
     console.log("initMainPage()");
+    startWebSocket();
   
     Array.from(document.getElementsByClassName('FSexplorer')).forEach(
       function(el, idx, arr) {
