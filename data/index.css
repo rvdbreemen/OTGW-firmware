@@ -311,6 +311,11 @@
     min-height: 0;
 }
 
+.ot-graph-controls {
+    margin-bottom: 5px;
+    text-align: right;
+}
+
 .ot-graph-select {
     padding: 5px;
     border-radius: 4px;
