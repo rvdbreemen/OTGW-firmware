@@ -9,6 +9,9 @@
 ***************************************************************************      
 */
 
+// Configuration constants
+const UPDATE_INTERVAL_MS = 2000; // Update chart every 2 seconds to reduce load
+
 var OTGraph = {
     chart: null,
     data: {},
@@ -18,7 +21,7 @@ var OTGraph = {
     updateTimer: null,
     currentTheme: 'light',
     lastUpdate: 0,
-    updateInterval: 2000, // Update every 2 seconds to reduce load
+    updateInterval: UPDATE_INTERVAL_MS,
 
     // Define palettes
     palettes: {
