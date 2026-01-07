@@ -98,6 +98,7 @@ class ESP8266HTTPUpdateServerTemplate
     String _updaterError;
     const char *_serverIndex;
     const char *_serverSuccess;
+    String _savedSettings;
     UpdateStatus _status;
     WiFiClient _eventClient;
     bool _eventClientActive;

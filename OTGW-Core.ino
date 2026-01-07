@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.0.0-rc1
+**  Version  : v1.0.0-rc2
 **
 **  Copyright (c) 2021-2024 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1587,7 +1587,7 @@ void processOT(const char *buf, int len){
       //OTGWDebugf("[%08x]", OTdata.value);      //print message frame
       //OTGWDebugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
       //print message Type and ID
-      AddLogf(" %3d", OTdata.id);
+      AddLogf(" %s %3d", OTdata.buf, OTdata.id);
       AddLogf(" %-16s", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
       //OTGWDebugf("[%-30s]", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
       //OTGWDebugf("[M=%d]",OTdata.master);

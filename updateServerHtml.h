@@ -20,6 +20,9 @@ static const char UpdateServerIndex[] PROGMEM =
         <form id='fsForm' method='POST' action='?cmd=100' enctype='multipart/form-data'> 
             Select a "<b>.littlefs.bin</b>" file to flash<br/>
             <input type='file' accept='.littlefs.bin' name='filesystem' required>
+            <br/>
+            <label><input type="checkbox" id="chkPreserve" checked autocomplete="off"> Preserve Settings (settings.ini)</label>
+            <br/>
             <input id='fsSubmit' type='submit' value='Flash LittleFS' disabled>
         </form>
         <div id='formError' class='small' style='color: #b00020; font-weight: bold;'></div>
@@ -309,6 +312,7 @@ static const char UpdateServerIndex[] PROGMEM =
            }
          }
 
+
          function initUploadForm(formId, targetName) {
            var form = document.getElementById(formId);
            if (!form) return;
@@ -329,6 +333,8 @@ static const char UpdateServerIndex[] PROGMEM =
              }
 
              if (formErrorEl) formErrorEl.textContent = '';
+             
+             e.preventDefault();
              resetSuccessPanel();
              showProgressPage('Flashing in progress');
              fileEl.textContent = input.files[0].name || '-';
@@ -338,11 +344,28 @@ static const char UpdateServerIndex[] PROGMEM =
              if (!window.FormData || !window.XMLHttpRequest) {
                return;
              }
-             e.preventDefault();
              uploadInFlight = true;
 
              var xhr = new XMLHttpRequest();
              var action = form.action;
+
+             // --- Custom logic: append preserve param ---
+             if (formId === 'fsForm') {
+                var chk = document.getElementById('chkPreserve');
+                if(chk && chk.checked) {
+                    action += (action.indexOf('?') === -1 ? '?' : '&') + 'preserve=true';
+                    
+                    // Trigger download as backup
+                    var a = document.createElement('a');
+                    a.href = '/settings.ini';
+                    a.download = 'settings.ini';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                }
+             }
+             // ------------------------------------------
+
              if (action.indexOf('size=') === -1) {
                action += (action.indexOf('?') === -1 ? '?' : '&') + 'size=' + encodeURIComponent(input.files[0].size);
              }
