@@ -550,13 +550,7 @@ static void initOTdata() {
   OTLog::OTlogData.valid = ' ';
 }
 
-static void ensureOTlogDataHasLabelValueFromText() {
-  if (OTLog::OTlogData.label[0] == '\0') {
-    strlcpy(OTLog::OTlogData.label, OTlookupitem.label, sizeof(OTLog::OTlogData.label));
-  }
-  // The complex text parsing to extract values is removed to save CPU cycles.
-  // Values should be populated by the print_* functions.
-}
+
 
 void print_f88(float& value)
 {
@@ -1708,6 +1702,16 @@ void processOT(const char *buf, int len){
       //OTGWDebugf("[%-30s]", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
       //OTGWDebugf("[M=%d]",OTdata.master);
 
+      // Ensure we have at least a label/value for JSON output.
+      // copy OTlookupitem move label to OTlogData if not already set
+      if (OTLog::OTlogData.label[0] == '\0') {
+        strlcpy(OTLog::OTlogData.label, OTlookupitem.label, sizeof(OTLog::OTlogData.label));
+      }
+      // copy OTlookupitem move unit to OTlogData if not already set
+      if (OTLog::OTlogData.unit[0] == '\0') {
+        strlcpy(OTLog::OTlogData.unit, OTlookupitem.unit, sizeof(OTLog::OTlogData.unit));
+      }
+
       // Determine and store the validity marker (P, -, >, or space)
       if (OTdata.skipthis) {
         if (OTdata.rsptype == OTGW_PARITY_ERROR) {
@@ -1846,10 +1850,7 @@ void processOT(const char *buf, int len){
       if (OTdata.skipthis) AddLog(" <ignored> ");
       AddLogln();
       OTGWDebugT(ot_log_buffer);
-
-      // Ensure we have at least a label/value for JSON output.
-      ensureOTlogDataHasLabelValueFromText();
-      
+   
       // Convert OTdata struct to JSON and send via WebSocket (queued)
       queueWebSocketLog(OTLog::OTlogData);
       

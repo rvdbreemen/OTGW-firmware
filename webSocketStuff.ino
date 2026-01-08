@@ -207,6 +207,12 @@ void processWebSocketQueue() {
   p += snprintf(p, end - p, "\"value\":\"%s\"", logData->value);
   if (p >= end) goto overflow;
   
+  // Add unit if present
+  if (logData->unit[0] != '\0') {
+    p += snprintf(p, end - p, ",\"unit\":\"%s\"", logData->unit);
+    if (p >= end) goto overflow;
+  }
+  
   // Add numeric value if present
   if (logData->valType == OT_VALTYPE_F88) {
     p += snprintf(p, end - p, ",\"val\":%.2f", logData->numval.val_f88);
