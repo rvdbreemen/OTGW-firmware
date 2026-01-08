@@ -183,7 +183,7 @@ enum OTValueType {
 // This represents the structured data that gets logged and sent via WebSocket
 typedef struct {
         char time[12];          // "HH:MM:SS.mmmmmm" - 11 chars max
-        char source[12];        // "Boiler", "Thermostat", etc. - 10 chars max
+        char source[18];        // "Boiler", "Thermostat", "Answer Thermostat", etc. - 17 chars max (+ null)
         uint8_t id;             // OpenTherm message ID (0-127)
         char raw[10];           // Raw OT message (8 chars + null), e.g. "B004018A"
         char dir[16];           // Direction/type string, e.g. "Read-Data"
