@@ -73,6 +73,15 @@ static const char UpdateServerIndex[] PROGMEM =
      </div>
      <script>
        (function() {
+         // Notify parent window/opener that we're in flash mode
+         try {
+           if (window.opener && typeof window.opener.enterFlashMode === 'function') {
+             window.opener.enterFlashMode();
+           }
+           // Also set sessionStorage flag for cross-page communication
+           sessionStorage.setItem('flashMode', 'true');
+         } catch(e) { console.log('Could not signal flash mode:', e); }
+
          var pageForm = document.getElementById('pageForm');
          var pageProgress = document.getElementById('pageProgress');
          var progressTitle = document.getElementById('progressTitle');
@@ -449,6 +458,16 @@ static const char UpdateServerIndex[] PROGMEM =
          initUploadForm('fsForm', 'filesystem');
          fetchStatus();
          startEvents();
+
+         // Clean up and notify when leaving flash page
+         window.addEventListener('beforeunload', function() {
+           try {
+             sessionStorage.removeItem('flashMode');
+             if (window.opener && typeof window.opener.exitFlashMode === 'function') {
+               window.opener.exitFlashMode();
+             }
+           } catch(e) { console.log('Cleanup error:', e); }
+         });
        })();
      </script>
      </html>)";
