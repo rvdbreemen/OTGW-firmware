@@ -234,6 +234,9 @@ var OTGraph = {
     processLine: function(line) {
         if (!this.running || !line || typeof line !== 'object') return; 
         
+        // Only process valid data (valid field should be '>' for valid messages)
+        if (!line.valid || line.valid !== '>') return;
+        
         try {
             var id = parseInt(line.id, 10);
             var now = new Date(); 
