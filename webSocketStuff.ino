@@ -205,7 +205,7 @@ void processWebSocketQueue() {
   } else {
     // Buffer overflow - serializeJson returns 0 when buffer is insufficient
     // This should never happen with 512 byte buffer (max JSON ~344 bytes)
-    DebugTln(F("WS: JSON buffer overflow - message dropped"));
+    DebugTf(PSTR("WS: JSON buffer overflow - message dropped (buffer: %d bytes, max expected: ~344 bytes)\r\n"), WS_JSON_BUFFER_SIZE);
   }
 
   // Remove from queue
