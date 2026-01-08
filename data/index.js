@@ -249,7 +249,9 @@ function formatLogLine(logLine) {
   const pad = (str, len) => (str + "").padEnd(len, ' ');
   const padStart = (str, len) => (str + "").padStart(len, ' ');
 
-  const raw = (typeof logLine.raw === 'string' && logLine.raw) ? logLine.raw : '00000000';
+  let raw = (typeof logLine.raw === 'string' && logLine.raw) ? logLine.raw.trim() : '';
+  if (!raw) raw = '00000000';
+  if (raw.length > 9) raw = raw.slice(0, 9);
   const valid = (typeof logLine.valid === 'string' && logLine.valid.length) ? logLine.valid[0] : ' ';
   const id = (logLine.id !== undefined && logLine.id !== null) ? String(logLine.id) : "0";
   const label = (typeof logLine.label === 'string' && logLine.label.trim() !== '') ? logLine.label : '';
@@ -265,7 +267,8 @@ function formatLogLine(logLine) {
   // HH:MM:SS.mmmmmm B00000000 msgid Readable name = Value
   // Note: time prefix is handled in renderLogDisplay via entry.time.
   // Place validity marker right after the decimal msgid (before label/value)
-  let text = padStart(raw, 8) + " " + padStart(id, 3) + " " + valid;
+  const rawWidth = (raw.length > 8) ? 9 : 8;
+  let text = padStart(raw, rawWidth) + " " + padStart(id, 3) + " " + valid;
 
   if (label) {
     text += " " + label;
@@ -1572,9 +1575,26 @@ var currentTab = 'Log';
 // OTmonitor-6.6 compatibility helpers
 // OTmonitor derives message uniqueness from (type & 7, msgid) and only shows
 // types {1,4,6,7} as {Write,Read,Invalid,Unk}.
+function otmGetTypeNibbleChar(raw) {
+  if (typeof raw !== 'string' || !raw) return null;
+  const s = raw.trim();
+  if (!s) return null;
+  // OTGW log frames are typically formatted as "<SRC><8-hex>", e.g. "B40000000".
+  // In that case, the message type nibble is the first hex char after the SRC letter.
+  if (s.length >= 2 && !/[0-9A-Fa-f]/.test(s.charAt(0)) && /[0-9A-Fa-f]/.test(s.charAt(1))) {
+    return s.charAt(1);
+  }
+  // If there's no SRC prefix (or it's already hex), the first char should be the nibble.
+  if (/[0-9A-Fa-f]/.test(s.charAt(0))) {
+    return s.charAt(0);
+  }
+  return null;
+}
+
 function otmGetTypeFromRaw(raw) {
-  if (typeof raw !== 'string' || raw.length < 2) return null;
-  const nibble = parseInt(raw.charAt(1), 16);
+  const nibbleChar = otmGetTypeNibbleChar(raw);
+  if (!nibbleChar) return null;
+  const nibble = parseInt(nibbleChar, 16);
   if (isNaN(nibble)) return null;
   return (nibble & 7);
 }
@@ -1594,13 +1614,20 @@ function otmTypeFromDirString(dir) {
   }
 }
 
-function otmDirectionLabel(typeCode) {
+function otmDirectionLabel(typeCode, fallbackDir) {
+  // OTmonitor's TV trace labels only these types.
+  // For our UI Statistics table, keep those labels where applicable, but do
+  // not drop other types (otherwise the table can become empty when the stream
+  // contains mostly requests, e.g. Read-Data type 0).
   switch (typeCode) {
     case 4: return 'Read';
     case 1: return 'Write';
     case 6: return 'Invalid';
     case 7: return 'Unk';
-    default: return null;
+    default:
+      if (typeof fallbackDir === 'string' && fallbackDir) return fallbackDir;
+      if (typeCode === null || typeCode === undefined) return '';
+      return String(typeCode);
   }
 }
 
@@ -1634,15 +1661,17 @@ function processStatsLine(line) {
     if (isNaN(id)) return;
 
     // OTmonitor uniqueness key: (type,msgid)
-    // Prefer deriving type from raw message (raw[1] hex nibble), fallback to dir string.
+    // Prefer deriving type from raw message (first hex nibble after OTGW SRC prefix),
+    // fallback to dir string.
     const raw = (typeof line.raw === 'string' && line.raw) ? line.raw : '';
     let typeCode = otmGetTypeFromRaw(raw);
     if (typeCode === null) {
       const dirStr = (typeof line.dir === 'string' && line.dir) ? line.dir : '';
       typeCode = otmTypeFromDirString(dirStr);
     }
-    const dirLabel = otmDirectionLabel(typeCode);
-    if (!dirLabel) return; // OTmonitor only shows types {1,4,6,7}
+    const dirStr = (typeof line.dir === 'string' && line.dir) ? line.dir : '';
+    const dirLabel = otmDirectionLabel(typeCode, dirStr);
+    if (!dirLabel) return;
 
     let label = (typeof line.label === 'string' && line.label.trim() !== '') ? line.label : 'Unknown';
     let value = '';
