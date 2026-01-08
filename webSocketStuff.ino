@@ -200,10 +200,11 @@ void processWebSocketQueue() {
   size_t len = serializeJson(doc, wsJsonBuffer, WS_JSON_BUFFER_SIZE);
   
   // Broadcast (serializeJson returns 0 if buffer too small)
-  if (len > 0 && len < WS_JSON_BUFFER_SIZE) {
+  if (len > 0) {
     webSocket.broadcastTXT(wsJsonBuffer, len);
-  } else if (len >= WS_JSON_BUFFER_SIZE) {
-    // Buffer overflow - this should never happen with 512 byte buffer (max JSON ~344 bytes)
+  } else {
+    // Buffer overflow - serializeJson returns 0 when buffer is insufficient
+    // This should never happen with 512 byte buffer (max JSON ~344 bytes)
     DebugTln(F("WS: JSON buffer overflow - message dropped"));
   }
 
