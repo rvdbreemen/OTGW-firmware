@@ -190,7 +190,7 @@ typedef struct {
         char valid;             // One of: 'P', '-', '>', ' '
         char label[41];         // Human-readable label - max 36 chars + null + 10% safety margin
         char value[40];         // Formatted value string - max 36 chars + null + 10% safety margin
-	OTValueType valType;    // Type of numeric value (for JSON formatting)
+        OTValueType valType;    // Type of numeric value (for JSON formatting)
 	
 	// Union for different value types - only one is valid at a time
 	union {
