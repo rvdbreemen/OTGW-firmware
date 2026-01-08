@@ -1610,6 +1610,8 @@ void processOT(const char *buf, int len){
       else if (is_value_valid(OTdata, OTlookupitem)) AddLog(">");
       else AddLog(" ");  //placeholder for alignment
       
+      AddLog(" ");  // Space before payload for readability
+      
       //next step interpret the OT protocol
           
       //#define OTprint(data, value, text, format) ({ data= value; OTGWDebugf("[%37s]", text); OTGWDebugf("= [format]", data)})
