@@ -188,17 +188,23 @@ void processWebSocketQueue() {
     doc["val"] = logData->numval.val_u16;
   }
   
-  // Add data object if present
+  // Add data object if present and at least one field has data
   if (logData->data.hasData) {
-    JsonObject dataObj = doc.createNestedObject("data");
-    if (logData->data.master[0] != '\0') {
-      dataObj["master"] = logData->data.master;
-    }
-    if (logData->data.slave[0] != '\0') {
-      dataObj["slave"] = logData->data.slave;
-    }
-    if (logData->data.extra[0] != '\0') {
-      dataObj["extra"] = logData->data.extra;
+    bool hasMaster = (logData->data.master[0] != '\0');
+    bool hasSlave = (logData->data.slave[0] != '\0');
+    bool hasExtra = (logData->data.extra[0] != '\0');
+    
+    if (hasMaster || hasSlave || hasExtra) {
+      JsonObject dataObj = doc.createNestedObject("data");
+      if (hasMaster) {
+        dataObj["master"] = logData->data.master;
+      }
+      if (hasSlave) {
+        dataObj["slave"] = logData->data.slave;
+      }
+      if (hasExtra) {
+        dataObj["extra"] = logData->data.extra;
+      }
     }
   }
 
