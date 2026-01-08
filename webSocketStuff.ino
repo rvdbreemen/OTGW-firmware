@@ -54,8 +54,9 @@ static uint8_t wsLogQueueTail = 0;
 static uint8_t wsLogQueueCount = 0;
 
 // Buffer for JSON serialization - static to avoid stack pressure
-// 1024 bytes is enough for the JSON, keeping it off the stack
-#define WS_JSON_BUFFER_SIZE 1024
+// 512 bytes is sufficient: typical JSON is ~240 bytes, max ~344 bytes with all fields
+// This saves 512 bytes of RAM compared to the original 1024 byte buffer
+#define WS_JSON_BUFFER_SIZE 512
 static char wsJsonBuffer[WS_JSON_BUFFER_SIZE];
 
 //===========================================================================================
@@ -154,7 +155,9 @@ void processWebSocketQueue() {
 
   // Use a static document to avoid stack allocation and re-allocation overhead
   // This lives in global memory (BSS/Data), not stack.
-  static StaticJsonDocument<1024> doc; 
+  // 512 bytes is sufficient: typical JSON is ~240 bytes, max ~344 bytes with all fields
+  // Combined with wsJsonBuffer (also 512 bytes), total RAM usage is 1KB vs 2KB previously
+  static StaticJsonDocument<512> doc; 
   doc.clear();
 
   // Populate JSON fields
@@ -196,9 +199,12 @@ void processWebSocketQueue() {
   // Serialize to static buffer
   size_t len = serializeJson(doc, wsJsonBuffer, WS_JSON_BUFFER_SIZE);
   
-  // Broadcast
-  if (len > 0) {
+  // Broadcast (serializeJson returns 0 if buffer too small)
+  if (len > 0 && len < WS_JSON_BUFFER_SIZE) {
     webSocket.broadcastTXT(wsJsonBuffer, len);
+  } else if (len >= WS_JSON_BUFFER_SIZE) {
+    // Buffer overflow - this should never happen with 512 byte buffer (max JSON ~344 bytes)
+    DebugTln(F("WS: JSON buffer overflow - message dropped"));
   }
 
   // Remove from queue
