@@ -10,13 +10,12 @@
 **  WebSocket handler for streaming OpenTherm log messages to WebUI
 **
 **  This module provides real-time streaming of OT log messages to the WebUI
-**  using WebSockets. It has minimal RAM impact on the ESP8266 as it only
-**  sends messages without buffering them.
+**  using WebSockets. Simplified version with direct text broadcasting.
 **
 **  Features:
 **  - WebSocket server on port 81 (separate from HTTP)
-**  - Broadcasts log messages to all connected clients
-**  - Minimal memory footprint (no server-side buffering)
+**  - Broadcasts log messages directly to all connected clients
+**  - Minimal memory footprint
 **  - Auto-cleanup of disconnected clients
 **
 **  Security:
@@ -31,7 +30,6 @@
 
 #include <WebSocketsServer.h>
 #include <TelnetStream.h>
-#include "OTGW-Core.h"
 #include "Debug.h"
 
 extern String settingHostname;
@@ -44,22 +42,6 @@ static uint8_t wsClientCount = 0;
 
 // Track WebSocket initialization state
 static bool wsInitialized = false;
-
-// Queue for WebSocket log messages to decouple processing from serial loop
-// Sized for 3-4 messages/second with processing time ~9ms/msg = up to 4 seconds of burst buffering
-#define WS_LOG_QUEUE_SIZE 16 
-static OTlogStruct wsLogQueue[WS_LOG_QUEUE_SIZE];
-static uint8_t wsLogQueueHead = 0;
-static uint8_t wsLogQueueTail = 0;
-static uint8_t wsLogQueueCount = 0;
-
-// Buffer for JSON serialization - static to avoid stack pressure
-// NOTE: ArduinoJson requires a separate output buffer for serializeJson() because
-// the WebSocketsServer library's broadcastTXT() API requires the entire message
-// in a contiguous buffer. We cannot stream directly to WebSocket clients.
-// Size: 512 bytes provides margin over max serialized JSON (~344 bytes)
-#define WS_JSON_BUFFER_SIZE 512
-static char wsJsonBuffer[WS_JSON_BUFFER_SIZE];
 
 //===========================================================================================
 // WebSocket event handler
@@ -118,186 +100,12 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 
 //===========================================================================================
 // Send JSON message to all connected clients
+// Used only for firmware upgrade progress notifications
 //===========================================================================================
 void sendWebSocketJSON(const char *json) {
   if (wsClientCount > 0) {
     webSocket.broadcastTXT(json);
   }
-}
-
-//===========================================================================================
-// Add a log message to the WebSocket queue
-//===========================================================================================
-void queueWebSocketLog(const OTlogStruct& data) {
-  // If no clients connected, don't bother queuing
-  if (wsClientCount == 0) return;
-  
-  // Backpressure: if queue is >75% full, drop new messages to prevent overflow
-  // This indicates the client(s) can't keep up (e.g., browser tab in background)
-  if (wsLogQueueCount > (WS_LOG_QUEUE_SIZE * 3 / 4)) {
-    DebugTln(F("WS: Queue >75% full, dropping new message (client too slow)"));
-    return;
-  }
-
-  // Add to circular buffer
-  memcpy(&wsLogQueue[wsLogQueueHead], &data, sizeof(OTlogStruct));
-  wsLogQueueHead = (wsLogQueueHead + 1) % WS_LOG_QUEUE_SIZE;
-  
-  if (wsLogQueueCount < WS_LOG_QUEUE_SIZE) {
-    wsLogQueueCount++;
-  } else {
-    // Buffer full, we overwrote the oldest (Head bumped into Tail)
-    // Advance tail to maintain validity
-    wsLogQueueTail = (wsLogQueueTail + 1) % WS_LOG_QUEUE_SIZE;
-    DebugTln(F("WS Log Queue full - dropped oldest message"));
-  }
-}
-
-//===========================================================================================
-// Helper: Escape JSON string (handles quotes and backslashes)
-// NOTE: OT strings are internally generated and shouldn't contain special chars,
-// but we handle them for safety. This is a simplified escaper - only handles " and \\
-//===========================================================================================
-static size_t escapeJsonString(char* dest, size_t destSize, const char* src) {
-  size_t written = 0;
-  while (*src && written < destSize - 1) {
-    if (*src == '"' || *src == '\\') {
-      if (written < destSize - 2) {
-        dest[written++] = '\\';
-        dest[written++] = *src++;
-      } else break;
-    } else {
-      dest[written++] = *src++;
-    }
-  }
-  dest[written] = '\0';
-  return written;
-}
-
-//===========================================================================================
-// Process one message from the queue and send it
-// Uses manual JSON building with snprintf for ~70% performance improvement over ArduinoJson
-//===========================================================================================
-void processWebSocketQueue() {
-  if (wsLogQueueCount == 0 || wsClientCount == 0) return;
-
-  // Get the oldest message from queue
-  OTlogStruct* logData = &wsLogQueue[wsLogQueueTail];
-
-  // Build JSON manually for maximum performance
-  // Format: {"time":"...","source":"...","raw":"...","dir":"...","valid":"X","id":N,"label":"...","value":"..."[,"val":N][,"data":{...}]}
-  char* p = wsJsonBuffer;
-  char* end = wsJsonBuffer + WS_JSON_BUFFER_SIZE - 1; // Leave room for null terminator
-  size_t len = 0;  // Declare before any goto statements to avoid "crosses initialization" error
-  
-  // Start object
-  p += snprintf(p, end - p, "{\"time\":\"%s\",", logData->time);
-  if (p >= end) goto overflow;
-  
-  p += snprintf(p, end - p, "\"source\":\"%s\",", logData->source);
-  if (p >= end) goto overflow;
-  
-  p += snprintf(p, end - p, "\"raw\":\"%s\",", logData->raw);
-  if (p >= end) goto overflow;
-  
-  p += snprintf(p, end - p, "\"dir\":\"%s\",", logData->dir);
-  if (p >= end) goto overflow;
-  
-  p += snprintf(p, end - p, "\"valid\":\"%c\",", logData->valid);
-  if (p >= end) goto overflow;
-  
-  p += snprintf(p, end - p, "\"id\":%u,", logData->id);
-  if (p >= end) goto overflow;
-  
-  p += snprintf(p, end - p, "\"label\":\"%s\",", logData->label);
-  if (p >= end) goto overflow;
-  
-  p += snprintf(p, end - p, "\"value\":\"%s\"", logData->value);
-  if (p >= end) goto overflow;
-  
-  // Add unit if present
-  if (logData->unit[0] != '\0') {
-    p += snprintf(p, end - p, ",\"unit\":\"%s\"", logData->unit);
-    if (p >= end) goto overflow;
-  }
-  
-  // Add numeric value if present
-  if (logData->valType == OT_VALTYPE_F88) {
-    p += snprintf(p, end - p, ",\"val\":%.2f", logData->numval.val_f88);
-    if (p >= end) goto overflow;
-  } else if (logData->valType == OT_VALTYPE_S16) {
-    p += snprintf(p, end - p, ",\"val\":%d", logData->numval.val_s16);
-    if (p >= end) goto overflow;
-  } else if (logData->valType == OT_VALTYPE_U16) {
-    p += snprintf(p, end - p, ",\"val\":%u", logData->numval.val_u16);
-    if (p >= end) goto overflow;
-  }
-  
-  // Add data object if present
-  if (logData->data.hasData) {
-    bool hasMaster = (logData->data.master[0] != '\0');
-    bool hasSlave = (logData->data.slave[0] != '\0');
-    bool hasExtra = (logData->data.extra[0] != '\0');
-    
-    if (hasMaster || hasSlave || hasExtra) {
-      p += snprintf(p, end - p, ",\"data\":{");
-      if (p >= end) goto overflow;
-      
-      bool needComma = false;
-      if (hasMaster) {
-        p += snprintf(p, end - p, "\"master\":\"%s\"", logData->data.master);
-        if (p >= end) goto overflow;
-        needComma = true;
-      }
-      if (hasSlave) {
-        if (needComma) {
-          p += snprintf(p, end - p, ",");
-          if (p >= end) goto overflow;
-        }
-        p += snprintf(p, end - p, "\"slave\":\"%s\"", logData->data.slave);
-        if (p >= end) goto overflow;
-        needComma = true;
-      }
-      if (hasExtra) {
-        if (needComma) {
-          p += snprintf(p, end - p, ",");
-          if (p >= end) goto overflow;
-        }
-        p += snprintf(p, end - p, "\"extra\":\"%s\"", logData->data.extra);
-        if (p >= end) goto overflow;
-      }
-      
-      p += snprintf(p, end - p, "}");
-      if (p >= end) goto overflow;
-    }
-  }
-  
-  // Close object
-  p += snprintf(p, end - p, "}");
-  if (p >= end) goto overflow;
-  
-  // Null terminate and broadcast
-  *p = '\0';
-  len = p - wsJsonBuffer;  // Now just assign, no initialization
-  
-  if (len > 0 && len < WS_JSON_BUFFER_SIZE) {
-    webSocket.broadcastTXT(wsJsonBuffer, len);
-  } else {
-    goto overflow;
-  }
-  
-  // Remove from queue
-  wsLogQueueTail = (wsLogQueueTail + 1) % WS_LOG_QUEUE_SIZE;
-  wsLogQueueCount--;
-  return;
-  
-overflow:
-  // Buffer overflow - message too large
-  DebugTf(PSTR("WS: JSON buffer overflow - message dropped (buffer: %u bytes)\r\n"), 
-          (unsigned int)WS_JSON_BUFFER_SIZE);
-  // Still remove from queue to prevent infinite loop
-  wsLogQueueTail = (wsLogQueueTail + 1) % WS_LOG_QUEUE_SIZE;
-  wsLogQueueCount--;
 }
 
 //===========================================================================================
@@ -315,22 +123,15 @@ void startWebSocket() {
 //===========================================================================================
 void handleWebSocket() {
   webSocket.loop();
-  
-  // Process up to 8 queued messages per loop to catch up without blocking too long
-  // At 1.2ms/message (manual JSON), this is max 9.6ms - acceptable for main loop
-  for (uint8_t i = 0; i < 8 && wsLogQueueCount > 0; i++) {
-    processWebSocketQueue();
-  }
 }
 
 //===========================================================================================
-// Send log message to all connected WebSocket clients
+// Send log message directly to all connected WebSocket clients
 // This is called from OTGW-Core.ino when a new log line is ready
+// Simplified: no queue, no JSON, just direct text broadcasting
 //===========================================================================================
 void sendLogToWebSocket(const char* logMessage) {
-  // Only send if WebSocket is initialized, there are connected clients, and message is valid
   if (wsInitialized && wsClientCount > 0 && logMessage != nullptr) {
-    // DebugTf("Sending to WS: %s\r\n", logMessage); 
     webSocket.broadcastTXT(logMessage);
   }
 }

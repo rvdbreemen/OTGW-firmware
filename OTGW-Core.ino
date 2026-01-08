@@ -77,11 +77,6 @@ char ot_log_buffer[OT_LOG_BUFFER_SIZE];
 //some variable's
 OpenthermData_t OTdata, delayedOTdata, tmpOTdata;
 
-// Structured log message (sent to Web UI via WebSocket)
-namespace OTLog {
-  OTlogStruct OTlogData;
-}
-
 #define OTGW_BANNER "OpenTherm Gateway"
 
 //===================[ Send useful information to MQWTT ]=====================
@@ -538,22 +533,6 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   return _valid;
 }
 
-
-// Forward declaration
-#ifndef DISABLE_WEBSOCKET
-void queueWebSocketLog(const OTlogStruct& data);
-#endif
-
-// Initialize OTlogData struct for new message
-static void initOTdata() {
-  memset(&OTLog::OTlogData, 0, sizeof(OTLog::OTlogData));
-  OTLog::OTlogData.valType = OT_VALTYPE_NONE;
-  OTLog::OTlogData.data.hasData = false;
-  OTLog::OTlogData.valid = ' ';
-}
-
-
-
 void print_f88(float& value)
 {
   //function to print data
@@ -563,12 +542,6 @@ void print_f88(float& value)
   dtostrf(_value, 3, 2, _msg);
   
   AddLogf("%s = %s %s", OTlookupitem.label, _msg , OTlookupitem.unit);
-  
-  // Populate OTdata struct
-  strlcpy(OTLog::OTlogData.label, OTlookupitem.label, sizeof(OTLog::OTlogData.label));
-  strlcpy(OTLog::OTlogData.value, _msg, sizeof(OTLog::OTlogData.value));
-  OTLog::OTlogData.valType = OT_VALTYPE_F88;
-  OTLog::OTlogData.numval.val_f88 = _value;
 
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
@@ -587,12 +560,6 @@ void print_s16(int16_t& value)
   itoa(_value, _msg, 10);
   AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
 
-  // Populate OTdata struct
-  strlcpy(OTLog::OTlogData.label, OTlookupitem.label, sizeof(OTLog::OTlogData.label));
-  strlcpy(OTLog::OTlogData.value, _msg, sizeof(OTLog::OTlogData.value));
-  OTLog::OTlogData.valType = OT_VALTYPE_S16;
-  OTLog::OTlogData.numval.val_s16 = _value;
-
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
@@ -603,13 +570,6 @@ void print_s16(int16_t& value)
 void print_s8s8(uint16_t& value)
 {  
   AddLogf("%s = %3d / %3d %s", OTlookupitem.label, (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB, OTlookupitem.unit);
-
-  // Populate OTLog struct
-  strlcpy(OTLog::OTlogData.label, OTlookupitem.label, sizeof(OTLog::OTlogData.label));
-  snprintf(OTLog::OTlogData.value, sizeof(OTLog::OTlogData.value), "%d / %d", (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB);
-  OTLog::OTlogData.valType = OT_VALTYPE_S8S8;
-  OTLog::OTlogData.numval.val_s8s8.hb = (int8_t)OTdata.valueHB;
-  OTLog::OTlogData.numval.val_s8s8.lb = (int8_t)OTdata.valueLB;
 
   //Build string for MQTT
   char _msg[15] {0};
@@ -641,12 +601,6 @@ void print_u16(uint16_t& value)
   
   AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
   
-  // Populate OTdata struct
-  strlcpy(OTLog::OTlogData.label, OTlookupitem.label, sizeof(OTLog::OTlogData.label));
-  strlcpy(OTLog::OTlogData.value, _msg, sizeof(OTLog::OTlogData.value));
-  OTLog::OTlogData.valType = OT_VALTYPE_U16;
-  OTLog::OTlogData.numval.val_u16 = _value;
-
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
@@ -683,12 +637,6 @@ void print_status(uint16_t& value)
     AddLog(" ");
     AddLog(OTlookupitem.label);
     AddLogf(" = Master [%s]", _flag8_master);
-
-    // Populate OTdata struct - store master data
-    strlcpy(OTLog::OTlogData.label, OTlookupitem.label, sizeof(OTLog::OTlogData.label));
-    strlcpy(OTLog::OTlogData.data.master, _flag8_master, sizeof(OTLog::OTlogData.data.master));
-    OTLog::OTlogData.valType = OT_VALTYPE_STATUS;
-    OTLog::OTlogData.data.hasData = true;
 
     //Master Status
     if (is_value_valid(OTdata, OTlookupitem)){
@@ -727,12 +675,6 @@ void print_status(uint16_t& value)
     AddLog(OTlookupitem.label);
     AddLogf(" = Slave  [%s]", _flag8_slave);
     
-    // Populate OTdata struct - store slave data and create combined value
-        strlcpy(OTLog::OTlogData.data.slave, _flag8_slave, sizeof(OTLog::OTlogData.data.slave));
-        snprintf(OTLog::OTlogData.value, sizeof(OTLog::OTlogData.value), "Master [%s] / Slave [%s]", 
-          OTLog::OTlogData.data.master, _flag8_slave);
-        OTLog::OTlogData.data.hasData = true;
-
     //Slave Status
     if (is_value_valid(OTdata, OTlookupitem)){
       sendMQTTData("status_slave", _flag8_slave);
@@ -1065,13 +1007,6 @@ void print_flag8u8(uint16_t& value)
 {
   AddLogf("%s = M[%s] - [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
 
-  // Populate OTLog struct
-  strlcpy(OTLog::OTlogData.label, OTlookupitem.label, sizeof(OTLog::OTlogData.label));
-  snprintf(OTLog::OTlogData.value, sizeof(OTLog::OTlogData.value), "M[%s] - [%u]", byte_to_binary(OTdata.valueHB), (unsigned)OTdata.valueLB);
-  OTLog::OTlogData.valType = OT_VALTYPE_SPECIAL;
-  OTLog::OTlogData.data.hasData = true;
-  snprintf(OTLog::OTlogData.data.extra, sizeof(OTLog::OTlogData.data.extra), "flag8=%s", byte_to_binary(OTdata.valueHB));
-
   if (is_value_valid(OTdata, OTlookupitem)){
     //Build string for MQTT
     char _topic[50] {0};
@@ -1094,13 +1029,6 @@ void print_flag8(uint16_t& value)
   
   AddLogf("%s = flag8 = [%s] - decimal = [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
 
-  // Populate OTLog struct
-  strlcpy(OTLog::OTlogData.label, OTlookupitem.label, sizeof(OTLog::OTlogData.label));
-  snprintf(OTLog::OTlogData.value, sizeof(OTLog::OTlogData.value), "flag8=[%s] (%u)", byte_to_binary(OTdata.valueLB), (unsigned)OTdata.valueLB);
-  OTLog::OTlogData.valType = OT_VALTYPE_FLAG8;
-  OTLog::OTlogData.data.hasData = true;
-  strlcpy(OTLog::OTlogData.data.extra, byte_to_binary(OTdata.valueLB), sizeof(OTLog::OTlogData.data.extra));
-
    if (is_value_valid(OTdata, OTlookupitem)){
     //Build string for MQTT
     char _topic[50] {0};
@@ -1120,16 +1048,6 @@ void print_flag8flag8(uint16_t& value)
   //flag8 valueHB
   
   AddLogf("%s = HB flag8[%s] -[%3d] ", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueHB);
-
-  // Populate OTLog struct
-  strlcpy(OTLog::OTlogData.label, OTlookupitem.label, sizeof(OTLog::OTlogData.label));
-  snprintf(OTLog::OTlogData.value, sizeof(OTLog::OTlogData.value), "HB[%s](%u) LB[%s](%u)",
-    byte_to_binary(OTdata.valueHB), (unsigned)OTdata.valueHB,
-    byte_to_binary(OTdata.valueLB), (unsigned)OTdata.valueLB);
-  OTLog::OTlogData.valType = OT_VALTYPE_FLAG8FLAG8;
-  OTLog::OTlogData.data.hasData = true;
-  strlcpy(OTLog::OTlogData.data.master, byte_to_binary(OTdata.valueHB), sizeof(OTLog::OTlogData.data.master));
-  strlcpy(OTLog::OTlogData.data.slave, byte_to_binary(OTdata.valueLB), sizeof(OTLog::OTlogData.data.slave));
 
   if (is_value_valid(OTdata, OTlookupitem)){
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
@@ -1211,13 +1129,6 @@ void print_u8u8(uint16_t& value)
 { 
   
   AddLogf("%s = %3d / %3d %s", OTlookupitem.label, (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, OTlookupitem.unit);
-
-  // Populate OTLog struct
-  strlcpy(OTLog::OTlogData.label, OTlookupitem.label, sizeof(OTLog::OTlogData.label));
-  snprintf(OTLog::OTlogData.value, sizeof(OTLog::OTlogData.value), "%u / %u", (unsigned)OTdata.valueHB, (unsigned)OTdata.valueLB);
-  OTLog::OTlogData.valType = OT_VALTYPE_U8U8;
-  OTLog::OTlogData.numval.val_u8u8.hb = (uint8_t)OTdata.valueHB;
-  OTLog::OTlogData.numval.val_u8u8.lb = (uint8_t)OTdata.valueLB;
 
   if (is_value_valid(OTdata, OTlookupitem)){
     //Build string for MQTT
@@ -1600,6 +1511,10 @@ void processOT(const char *buf, int len){
 
     //clear ot log buffer
     ClrLog();
+    // Start log with timestamp
+    AddLog(getOTLogTimestamp());
+    AddLog(" ");
+    
     //process the OTGW message
     const char *bufval = buf + 1; //skip the first char
     uint32_t value = 0;
@@ -1660,43 +1575,28 @@ void processOT(const char *buf, int len){
         }
       }
 
-      // Initialize OTLog struct for this message
-      initOTdata();
-  strlcpy(OTLog::OTlogData.time, getOTLogTimestamp(), sizeof(OTLog::OTlogData.time));
-  OTLog::OTlogData.id = OTdata.id;
 
       // Decode and print OpenTherm Gateway Message
-      const char* sourceStr = "Unknown";
       switch (OTdata.rsptype){
         case OTGW_BOILER:
           AddLog("Boiler            ");
-          sourceStr = "Boiler";
           break;
         case OTGW_THERMOSTAT:
           AddLog("Thermostat        ");
-          sourceStr = "Thermostat";
           break;
         case OTGW_REQUEST_BOILER:
           AddLog("Request Boiler    ");
-          sourceStr = "Request Boiler";
           break;
         case OTGW_ANSWER_THERMOSTAT:
           AddLog("Answer Thermostat ");
-          sourceStr = "Answer Thermostat";
           break;
         case OTGW_PARITY_ERROR:
           AddLog("Parity Error      ");
-          sourceStr = "Parity Error";
           break;
         default:
           AddLog("Unknown           ");
           break;
       }
-      strlcpy(OTLog::OTlogData.source, sourceStr, sizeof(OTLog::OTlogData.source));
-
-      // Populate raw message and direction/type
-      strlcpy(OTLog::OTlogData.raw, OTdata.buf, sizeof(OTLog::OTlogData.raw));
-      strlcpy(OTLog::OTlogData.dir, messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)), sizeof(OTLog::OTlogData.dir));
 
       //print message Type and ID
       AddLogf(" %s %3d", OTdata.buf, OTdata.id);
@@ -1704,30 +1604,11 @@ void processOT(const char *buf, int len){
       //OTGWDebugf("[%-30s]", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
       //OTGWDebugf("[M=%d]",OTdata.master);
 
-      // Ensure we have at least a label/value for JSON output.
-      // copy OTlookupitem move label to OTlogData if not already set
-      if (OTLog::OTlogData.label[0] == '\0') {
-        strlcpy(OTLog::OTlogData.label, OTlookupitem.label, sizeof(OTLog::OTlogData.label));
-      }
-      // copy OTlookupitem move unit to OTlogData if not already set
-      if (OTLog::OTlogData.unit[0] == '\0') {
-        strlcpy(OTLog::OTlogData.unit, OTlookupitem.unit, sizeof(OTLog::OTlogData.unit));
-      }
-
-      // Determine and store the validity marker (P, -, >, or space)
-      if (OTdata.skipthis) {
-        if (OTdata.rsptype == OTGW_PARITY_ERROR) {
-          OTLog::OTlogData.valid = 'P';
-        } else {
-          OTLog::OTlogData.valid = '-';
-        }
-      } else {
-        OTLog::OTlogData.valid = is_value_valid(OTdata, OTlookupitem) ? '>' : ' ';
-      }
-
-      // Keep the original log output marker too
-      char _validStr[2] = { OTLog::OTlogData.valid, '\0' };
-      AddLog(_validStr);
+      //Add indicators for parity error, skip message or valid value
+      if (OTdata.rsptype == OTGW_PARITY_ERROR) AddLog("P"); 
+      else if (OTdata.skipthis) AddLog("-"); 
+      else if (is_value_valid(OTdata, OTlookupitem)) AddLog(">");
+      else AddLog(" ");  //placeholder for alignment
       
       //next step interpret the OT protocol
           
@@ -1853,10 +1734,8 @@ void processOT(const char *buf, int len){
       AddLogln();
       OTGWDebugT(ot_log_buffer);
    
-      // Convert OTdata struct to JSON and send via WebSocket (queued)
-#ifndef DISABLE_WEBSOCKET
-      queueWebSocketLog(OTLog::OTlogData);
-#endif
+      // Send log buffer directly to WebSocket (no JSON, no queue)
+      sendLogToWebSocket(ot_log_buffer);
       
       OTGWDebugFlush();
       ClrLog();

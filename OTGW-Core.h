@@ -179,52 +179,6 @@ enum OTValueType {
 	OT_VALTYPE_SPECIAL   // special formatting
 };
 
-// Struct to hold OpenTherm log message data
-// This represents the structured data that gets logged and sent via WebSocket
-typedef struct {
-        char time[16];          // "HH:MM:SS.mmmmmm" - 15 chars + null
-        char source[18];        // "Boiler", "Thermostat", "Answer Thermostat", etc. - 17 chars max (+ null)
-        uint8_t id;             // OpenTherm message ID (0-127)
-        char raw[10];           // Raw OT message (8 chars + null), e.g. "B004018A"
-        char dir[16];           // Direction/type string, e.g. "Read-Data"
-        char valid;             // One of: 'P', '-', '>', ' '
-        char label[41];         // Human-readable label - max 36 chars + null + 10% safety margin
-        char value[40];         // Formatted value string - max 36 chars + null + 10% safety margin
-        char unit[8];           // Unit string from OTmap: "°C", "bar", "%", "kW", etc.
-        OTValueType valType;    // Type of numeric value (for JSON formatting)
-	
-	// Union for different value types - only one is valid at a time
-	union {
-		float val_f88;      // For f8.8 values
-		int16_t val_s16;    // For s16 values
-		uint16_t val_u16;   // For u16 values
-		struct {
-			uint8_t hb;     // High byte
-			uint8_t lb;     // Low byte
-		} val_u8u8;
-		struct {
-			int8_t hb;      // High byte
-			int8_t lb;      // Low byte
-		} val_s8s8;
-	} numval;
-	
-	// Data object for complex messages
-	struct {
-		bool hasData;       // Flag indicating if data is present
-		char master[16];    // Master status flags (for Status messages)
-		char slave[16];     // Slave status flags (for Status messages)
-		char extra[32];     // Extra data for special message types
-	} data;
-	
-} OTlogStruct;
-
-// Global variable for current log message
-// Namespaced to avoid collision with the existing OpenthermData_t OTdata in OTGW-Core.ino
-namespace OTLog {
-	extern OTlogStruct OTlogData;
-}
-
-
 enum OpenThermResponseStatus {
 	OT_NONE,
 	OT_SUCCESS,
