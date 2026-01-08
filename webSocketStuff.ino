@@ -204,8 +204,8 @@ void processWebSocketQueue() {
 
   // Check if document capacity was exceeded during population
   if (doc.overflowed()) {
-    DebugTf(PSTR("WS: StaticJsonDocument overflow - message may be incomplete (capacity: %d bytes)\r\n"), 
-            doc.capacity());
+    DebugTf(PSTR("WS: StaticJsonDocument overflow - message may be incomplete (capacity: %u bytes)\r\n"), 
+            (unsigned int)doc.capacity());
     // Continue anyway - partial data is better than nothing
   }
 
@@ -219,8 +219,8 @@ void processWebSocketQueue() {
     // Buffer overflow - serializeJson returns 0 when buffer is insufficient
     // Use measureJson() to get the actual size needed for diagnostics
     size_t needed = measureJson(doc);
-    DebugTf(PSTR("WS: JSON buffer overflow - message dropped (needed: %u bytes, buffer: %d bytes)\r\n"), 
-            needed, WS_JSON_BUFFER_SIZE);
+    DebugTf(PSTR("WS: JSON buffer overflow - message dropped (needed: %u bytes, buffer: %u bytes)\r\n"), 
+            (unsigned int)needed, (unsigned int)WS_JSON_BUFFER_SIZE);
   }
 
   // Remove from queue
