@@ -131,6 +131,13 @@ void sendWebSocketJSON(const char *json) {
 void queueWebSocketLog(const OTlogStruct& data) {
   // If no clients connected, don't bother queuing
   if (wsClientCount == 0) return;
+  
+  // Backpressure: if queue is >75% full, drop new messages to prevent overflow
+  // This indicates the client(s) can't keep up (e.g., browser tab in background)
+  if (wsLogQueueCount > (WS_LOG_QUEUE_SIZE * 3 / 4)) {
+    DebugTln(F("WS: Queue >75% full, dropping new message (client too slow)"));
+    return;
+  }
 
   // Add to circular buffer
   memcpy(&wsLogQueue[wsLogQueueHead], &data, sizeof(OTlogStruct));
@@ -309,9 +316,9 @@ void startWebSocket() {
 void handleWebSocket() {
   webSocket.loop();
   
-  // Process up to 4 queued messages per loop to catch up without blocking too long
-  // At 9ms/message, this is max 36ms - acceptable for main loop
-  for (uint8_t i = 0; i < 4 && wsLogQueueCount > 0; i++) {
+  // Process up to 8 queued messages per loop to catch up without blocking too long
+  // At 1.2ms/message (manual JSON), this is max 9.6ms - acceptable for main loop
+  for (uint8_t i = 0; i < 8 && wsLogQueueCount > 0; i++) {
     processWebSocketQueue();
   }
 }
