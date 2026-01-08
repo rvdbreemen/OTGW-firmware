@@ -318,8 +318,11 @@ function formatLogLine(logLine) {
     value = String(logLine.val);
   }
 
+  // Add unit if present
+  const unit = (typeof logLine.unit === 'string' && logLine.unit.trim() !== '') ? logLine.unit : '';
+
   // Required display format:
-  // HH:MM:SS.mmmmmm B00000000 msgid Readable name = Value
+  // HH:MM:SS.mmmmmm B00000000 msgid Readable name = Value unit
   // Note: time prefix is handled in renderLogDisplay via entry.time.
   // Place validity marker right after the decimal msgid (before label/value)
   const rawWidth = (raw.length > 8) ? 9 : 8;
@@ -327,9 +330,13 @@ function formatLogLine(logLine) {
 
   if (label) {
     text += " " + label;
-    if (value) text += " = " + value;
+    if (value) {
+      text += " = " + value;
+      if (unit) text += " " + unit;
+    }
   } else if (value) {
     text += " " + value;
+    if (unit) text += " " + unit;
   }
 
   return text;
