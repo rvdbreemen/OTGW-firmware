@@ -30,6 +30,12 @@
 */
 
 #include <WebSocketsServer.h>
+#include <ArduinoJson.h>
+#include <TelnetStream.h>
+#include "OTGW-Core.h"
+#include "Debug.h"
+
+extern String settingHostname;
 
 // WebSocket server on port 81 (no built-in authentication; local network use only)
 WebSocketsServer webSocket = WebSocketsServer(81);
@@ -39,6 +45,21 @@ static uint8_t wsClientCount = 0;
 
 // Track WebSocket initialization state
 static bool wsInitialized = false;
+
+// Queue for WebSocket log messages to decouple processing from serial loop
+#define WS_LOG_QUEUE_SIZE 2 
+static OTlogStruct wsLogQueue[WS_LOG_QUEUE_SIZE];
+static uint8_t wsLogQueueHead = 0;
+static uint8_t wsLogQueueTail = 0;
+static uint8_t wsLogQueueCount = 0;
+
+// Buffer for JSON serialization - static to avoid stack pressure
+// NOTE: ArduinoJson requires a separate output buffer for serializeJson() because
+// the WebSocketsServer library's broadcastTXT() API requires the entire message
+// in a contiguous buffer. We cannot stream directly to WebSocket clients.
+// Size: 512 bytes provides margin over max serialized JSON (~344 bytes)
+#define WS_JSON_BUFFER_SIZE 512
+static char wsJsonBuffer[WS_JSON_BUFFER_SIZE];
 
 //===========================================================================================
 // WebSocket event handler
@@ -105,6 +126,115 @@ void sendWebSocketJSON(const char *json) {
 }
 
 //===========================================================================================
+// Add a log message to the WebSocket queue
+//===========================================================================================
+void queueWebSocketLog(const OTlogStruct& data) {
+  // If no clients connected, don't bother queuing
+  if (wsClientCount == 0) return;
+
+  // Add to circular buffer
+  memcpy(&wsLogQueue[wsLogQueueHead], &data, sizeof(OTlogStruct));
+  wsLogQueueHead = (wsLogQueueHead + 1) % WS_LOG_QUEUE_SIZE;
+  
+  if (wsLogQueueCount < WS_LOG_QUEUE_SIZE) {
+    wsLogQueueCount++;
+  } else {
+    // Buffer full, we overwrote the oldest (Head bumped into Tail)
+    // Advance tail to maintain validity
+    wsLogQueueTail = (wsLogQueueTail + 1) % WS_LOG_QUEUE_SIZE;
+    DebugTln(F("WS Log Queue full - dropped oldest message"));
+  }
+}
+
+//===========================================================================================
+// Process one message from the queue and send it
+//===========================================================================================
+void processWebSocketQueue() {
+  if (wsLogQueueCount == 0 || wsClientCount == 0) return;
+
+  // Peek/Get the oldest message
+  OTlogStruct* logData = &wsLogQueue[wsLogQueueTail];
+
+  // Use a static document to avoid stack allocation and re-allocation overhead
+  // This lives in global memory (BSS/Data), not stack.
+  // Capacity calculation (ArduinoJson copies strings into its memory pool):
+  //   - Structure: ~136 bytes (main object + nested object overhead)
+  //   - String storage: ~207 bytes (all string fields copied)
+  //   - Total needed: ~343 bytes, 512 bytes provides 48% safety margin
+  // Note: This is separate from wsJsonBuffer - doc holds the parsed structure,
+  // wsJsonBuffer holds the serialized output string for WebSocket transmission
+  static StaticJsonDocument<512> doc; 
+  doc.clear();
+
+  // Populate JSON fields
+  doc["time"] = logData->time;
+  doc["source"] = logData->source;
+  doc["raw"] = logData->raw;
+  doc["dir"] = logData->dir;
+  
+  char validStr[2] = { logData->valid, '\0' };
+  doc["valid"] = validStr;
+  
+  doc["id"] = logData->id;
+  doc["label"] = logData->label;
+  doc["value"] = logData->value;
+
+  // Add numeric value based on type
+  if (logData->valType == OT_VALTYPE_F88) {
+    doc["val"] = logData->numval.val_f88;
+  } else if (logData->valType == OT_VALTYPE_S16) {
+    doc["val"] = logData->numval.val_s16;
+  } else if (logData->valType == OT_VALTYPE_U16) {
+    doc["val"] = logData->numval.val_u16;
+  }
+  
+  // Add data object if present and at least one field has data
+  if (logData->data.hasData) {
+    bool hasMaster = (logData->data.master[0] != '\0');
+    bool hasSlave = (logData->data.slave[0] != '\0');
+    bool hasExtra = (logData->data.extra[0] != '\0');
+    
+    if (hasMaster || hasSlave || hasExtra) {
+      JsonObject dataObj = doc.createNestedObject("data");
+      if (hasMaster) {
+        dataObj["master"] = logData->data.master;
+      }
+      if (hasSlave) {
+        dataObj["slave"] = logData->data.slave;
+      }
+      if (hasExtra) {
+        dataObj["extra"] = logData->data.extra;
+      }
+    }
+  }
+
+  // Check if document capacity was exceeded during population
+  if (doc.overflowed()) {
+    DebugTf(PSTR("WS: StaticJsonDocument overflow - message may be incomplete (capacity: %u bytes)\r\n"), 
+            (unsigned int)doc.capacity());
+    // Continue anyway - partial data is better than nothing
+  }
+
+  // Serialize to static buffer
+  size_t len = serializeJson(doc, wsJsonBuffer, WS_JSON_BUFFER_SIZE);
+  
+  // Broadcast (serializeJson returns 0 if buffer too small)
+  if (len > 0) {
+    webSocket.broadcastTXT(wsJsonBuffer, len);
+  } else {
+    // Buffer overflow - serializeJson returns 0 when buffer is insufficient
+    // Use measureJson() to get the actual size needed for diagnostics
+    size_t needed = measureJson(doc);
+    DebugTf(PSTR("WS: JSON buffer overflow - message dropped (needed: %u bytes, buffer: %u bytes)\r\n"), 
+            (unsigned int)needed, (unsigned int)WS_JSON_BUFFER_SIZE);
+  }
+
+  // Remove from queue
+  wsLogQueueTail = (wsLogQueueTail + 1) % WS_LOG_QUEUE_SIZE;
+  wsLogQueueCount--;
+}
+
+//===========================================================================================
 // Start WebSocket server
 //===========================================================================================
 void startWebSocket() {
@@ -119,6 +249,12 @@ void startWebSocket() {
 //===========================================================================================
 void handleWebSocket() {
   webSocket.loop();
+  
+  // Process up to 2 queued messages per loop to catch up without blocking too long
+  if (wsLogQueueCount > 0) {
+    processWebSocketQueue();
+    if (wsLogQueueCount > 0) processWebSocketQueue(); 
+  }
 }
 
 //===========================================================================================
