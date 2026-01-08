@@ -1569,6 +1569,41 @@ var statsSortCol = 1; // Default sort by Dec ID
 var statsSortAsc = true;
 var currentTab = 'Log';
 
+// OTmonitor-6.6 compatibility helpers
+// OTmonitor derives message uniqueness from (type & 7, msgid) and only shows
+// types {1,4,6,7} as {Write,Read,Invalid,Unk}.
+function otmGetTypeFromRaw(raw) {
+  if (typeof raw !== 'string' || raw.length < 2) return null;
+  const nibble = parseInt(raw.charAt(1), 16);
+  if (isNaN(nibble)) return null;
+  return (nibble & 7);
+}
+
+function otmTypeFromDirString(dir) {
+  if (typeof dir !== 'string' || !dir) return null;
+  switch (dir) {
+    case 'Read-Data': return 0;
+    case 'Write-Data': return 1;
+    case 'Inv-Data': return 2;
+    case 'Reserved': return 3;
+    case 'Read-Ack': return 4;
+    case 'Write-Ack': return 5;
+    case 'Data-Inv': return 6;
+    case 'Unk-DataId': return 7;
+    default: return null;
+  }
+}
+
+function otmDirectionLabel(typeCode) {
+  switch (typeCode) {
+    case 4: return 'Read';
+    case 1: return 'Write';
+    case 6: return 'Invalid';
+    case 7: return 'Unk';
+    default: return null;
+  }
+}
+
 function openLogTab(evt, tabName) {
   var i, tabcontent, tablinks;
   tabcontent = document.getElementsByClassName('tab-content');
@@ -1598,9 +1633,16 @@ function processStatsLine(line) {
     const id = parseInt(line.id, 10);
     if (isNaN(id)) return;
 
-    // Group by (id + dir). Direction/type is part of the JSON payload.
-    // Fallback to source if dir is missing.
-    const dir = (typeof line.dir === 'string' && line.dir) ? line.dir : ((typeof line.source === 'string' && line.source) ? line.source : 'Unk');
+    // OTmonitor uniqueness key: (type,msgid)
+    // Prefer deriving type from raw message (raw[1] hex nibble), fallback to dir string.
+    const raw = (typeof line.raw === 'string' && line.raw) ? line.raw : '';
+    let typeCode = otmGetTypeFromRaw(raw);
+    if (typeCode === null) {
+      const dirStr = (typeof line.dir === 'string' && line.dir) ? line.dir : '';
+      typeCode = otmTypeFromDirString(dirStr);
+    }
+    const dirLabel = otmDirectionLabel(typeCode);
+    if (!dirLabel) return; // OTmonitor only shows types {1,4,6,7}
 
     let label = (typeof line.label === 'string' && line.label.trim() !== '') ? line.label : 'Unknown';
     let value = '';
@@ -1611,14 +1653,15 @@ function processStatsLine(line) {
     }
 
     const now = Date.now();
-    const key = id + '_' + dir;
+    const key = typeCode + ',' + id;
     
     if (!statsBuffer[key]) {
         statsBuffer[key] = {
             id: id,
       hex: id.toString(16).toUpperCase().padStart(2, '0'),
-      type: dir,
-            dir: dir,
+      typeCode: typeCode,
+      type: dirLabel,
+        dir: dirLabel,
             label: label,
             value: value,
             count: 0,
@@ -1635,7 +1678,7 @@ function processStatsLine(line) {
         
         entry.lastTime = now;
         entry.value = value;
-        entry.type = dir;
+        entry.type = dirLabel;
         if (label && label !== 'Unknown') entry.label = label;
     }
     statsBuffer[key].count++;
