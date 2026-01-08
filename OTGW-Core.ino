@@ -539,6 +539,9 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
 }
 
 
+// Forward declaration
+void queueWebSocketLog(const OTlogStruct& data);
+
 // Initialize OTlogData struct for new message
 static void initOTdata() {
   memset(&OTLog::OTlogData, 0, sizeof(OTLog::OTlogData));
@@ -551,39 +554,8 @@ static void ensureOTlogDataHasLabelValueFromText() {
   if (OTLog::OTlogData.label[0] == '\0') {
     strlcpy(OTLog::OTlogData.label, OTlookupitem.label, sizeof(OTLog::OTlogData.label));
   }
-
-  if (OTLog::OTlogData.value[0] != '\0') {
-    return;
-  }
-
-  const char* labelPos = strstr(ot_log_buffer, OTlookupitem.label);
-  if (!labelPos) {
-    return;
-  }
-  const char* eqPos = strchr(labelPos, '=');
-  if (!eqPos) {
-    return;
-  }
-  eqPos++; // move past '='
-  while (*eqPos == ' ') {
-    eqPos++;
-  }
-
-  strlcpy(OTLog::OTlogData.value, eqPos, sizeof(OTLog::OTlogData.value));
-
-  // Trim trailing markers and newlines.
-  char* ignoredPos = strstr(OTLog::OTlogData.value, " <ignored>");
-  if (ignoredPos) {
-    *ignoredPos = '\0';
-  }
-  char* crPos = strchr(OTLog::OTlogData.value, '\r');
-  if (crPos) {
-    *crPos = '\0';
-  }
-  char* lfPos = strchr(OTLog::OTlogData.value, '\n');
-  if (lfPos) {
-    *lfPos = '\0';
-  }
+  // The complex text parsing to extract values is removed to save CPU cycles.
+  // Values should be populated by the print_* functions.
 }
 
 void print_f88(float& value)
@@ -1878,53 +1850,8 @@ void processOT(const char *buf, int len){
       // Ensure we have at least a label/value for JSON output.
       ensureOTlogDataHasLabelValueFromText();
       
-      // Convert OTdata struct to JSON and send via WebSocket
-      // Reuse ot_log_buffer (text log already printed above)
-      StaticJsonDocument<1024> doc;
-      doc["time"] = OTLog::OTlogData.time;
-      doc["source"] = OTLog::OTlogData.source;
-      doc["raw"] = OTLog::OTlogData.raw;
-      doc["dir"] = OTLog::OTlogData.dir;
-      char validStr[2] = { OTLog::OTlogData.valid, '\0' };
-      doc["valid"] = validStr;
-      doc["id"] = OTLog::OTlogData.id;
-      doc["label"] = OTLog::OTlogData.label;
-      doc["value"] = OTLog::OTlogData.value;
-      
-      // Add numeric value based on type
-      if (OTLog::OTlogData.valType == OT_VALTYPE_F88) {
-        doc["val"] = OTLog::OTlogData.numval.val_f88;
-      } else if (OTLog::OTlogData.valType == OT_VALTYPE_S16) {
-        doc["val"] = OTLog::OTlogData.numval.val_s16;
-      } else if (OTLog::OTlogData.valType == OT_VALTYPE_U16) {
-        doc["val"] = OTLog::OTlogData.numval.val_u16;
-      }
-      
-      // Add data object if present (e.g., status flags)
-      if (OTLog::OTlogData.data.hasData) {
-        if (OTLog::OTlogData.data.master[0] != '\0') {
-          doc["data"]["master"] = OTLog::OTlogData.data.master;
-        }
-        if (OTLog::OTlogData.data.slave[0] != '\0') {
-          doc["data"]["slave"] = OTLog::OTlogData.data.slave;
-        }
-        if (OTLog::OTlogData.data.extra[0] != '\0') {
-          doc["data"]["extra"] = OTLog::OTlogData.data.extra;
-        }
-      }
-      
-      // Serialize and send
-      const size_t needed = measureJson(doc) + 1;
-      if (needed <= OT_LOG_BUFFER_SIZE) {
-        static char ws_json_buffer[OT_LOG_BUFFER_SIZE];
-        serializeJson(doc, ws_json_buffer, OT_LOG_BUFFER_SIZE);
-        sendLogToWebSocket(ws_json_buffer);
-      } else {
-        static char ws_json_buffer[OT_LOG_BUFFER_SIZE];
-        snprintf(ws_json_buffer, OT_LOG_BUFFER_SIZE, "{\"error\":\"ws_json_too_large\",\"needed\":%u,\"max\":%u}",
-                 (unsigned)needed, (unsigned)OT_LOG_BUFFER_SIZE);
-        sendLogToWebSocket(ws_json_buffer);
-      }
+      // Convert OTdata struct to JSON and send via WebSocket (queued)
+      queueWebSocketLog(OTLog::OTlogData);
       
       OTGWDebugFlush();
       ClrLog();
