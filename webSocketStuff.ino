@@ -142,7 +142,7 @@ void queueWebSocketLog(const OTlogStruct& data) {
     // Buffer full, we overwrote the oldest (Head bumped into Tail)
     // Advance tail to maintain validity
     wsLogQueueTail = (wsLogQueueTail + 1) % WS_LOG_QUEUE_SIZE;
-    // DebugTln(F("WS Log Queue full - dropped oldest message")); // Optional debug
+    DebugTln(F("WS Log Queue full - dropped oldest message"));
   }
 }
 
