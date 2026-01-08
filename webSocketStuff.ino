@@ -47,7 +47,8 @@ static uint8_t wsClientCount = 0;
 static bool wsInitialized = false;
 
 // Queue for WebSocket log messages to decouple processing from serial loop
-#define WS_LOG_QUEUE_SIZE 2 
+// Sized for 3-4 messages/second with processing time ~9ms/msg = up to 3 seconds of burst buffering
+#define WS_LOG_QUEUE_SIZE 12 
 static OTlogStruct wsLogQueue[WS_LOG_QUEUE_SIZE];
 static uint8_t wsLogQueueHead = 0;
 static uint8_t wsLogQueueTail = 0;
@@ -250,10 +251,10 @@ void startWebSocket() {
 void handleWebSocket() {
   webSocket.loop();
   
-  // Process up to 2 queued messages per loop to catch up without blocking too long
-  if (wsLogQueueCount > 0) {
+  // Process up to 4 queued messages per loop to catch up without blocking too long
+  // At 9ms/message, this is max 36ms - acceptable for main loop
+  for (uint8_t i = 0; i < 4 && wsLogQueueCount > 0; i++) {
     processWebSocketQueue();
-    if (wsLogQueueCount > 0) processWebSocketQueue(); 
   }
 }
 
