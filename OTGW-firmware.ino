@@ -83,7 +83,9 @@ void setup() {
   startLLMNR(CSTR(settingHostname));
   setupFSexplorer();
   startWebserver();
+#ifndef DISABLE_WEBSOCKET
   startWebSocket();          // start the WebSocket server for OT log streaming
+#endif
   startMQTT();               // start the MQTT after webserver, always.
  
   initWatchDog();            // setup the WatchDog
@@ -145,7 +147,9 @@ void restartWifi(){
     startTelnet();
     startOTGWstream(); 
     startMQTT();
+#ifndef DISABLE_WEBSOCKET
     startWebSocket(); // Restart WebSocket server
+#endif
     iTryRestarts = 0; //reset attempt counter
     return;
   }
@@ -302,7 +306,9 @@ void doBackgroundTasks()
     handleDebug();
     handleMQTT();                 // MQTT transmissions
     handleOTGW();                 // OTGW handling
+#ifndef DISABLE_WEBSOCKET
     handleWebSocket();            // WebSocket handling for OT log streaming
+#endif
     httpServer.handleClient();
     MDNS.update();
     loopNTP();

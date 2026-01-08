@@ -540,7 +540,9 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
 
 
 // Forward declaration
+#ifndef DISABLE_WEBSOCKET
 void queueWebSocketLog(const OTlogStruct& data);
+#endif
 
 // Initialize OTlogData struct for new message
 static void initOTdata() {
@@ -1852,7 +1854,9 @@ void processOT(const char *buf, int len){
       OTGWDebugT(ot_log_buffer);
    
       // Convert OTdata struct to JSON and send via WebSocket (queued)
+#ifndef DISABLE_WEBSOCKET
       queueWebSocketLog(OTLog::OTlogData);
+#endif
       
       OTGWDebugFlush();
       ClrLog();
@@ -2208,14 +2212,18 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   } else {
       snprintf(buffer, sizeof(buffer), "{\"result\":%d,\"errors\":%d,\"retries\":%d}", (int)result, errors, retries);
   }
+#ifndef DISABLE_WEBSOCKET
   sendWebSocketJSON(buffer);
+#endif
 }
 
 void fwupgradestep(int pct) {
   OTGWDebugTf(PSTR("Upgrade: %d%%\n\r"), pct);
   char buffer[32];
   snprintf(buffer, sizeof(buffer), "{\"percent\":%d}", pct);
+#ifndef DISABLE_WEBSOCKET
   sendWebSocketJSON(buffer);
+#endif
 }
 
 void fwreportinfo(OTGWFirmware fw, const char *version) {
