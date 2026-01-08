@@ -249,7 +249,8 @@ function formatLogLine(logLine) {
   const pad = (str, len) => (str + "").padEnd(len, ' ');
   const padStart = (str, len) => (str + "").padStart(len, ' ');
 
-  const source = (typeof logLine.source === 'string' && logLine.source) ? logLine.source : 'Unknown';
+  const raw = (typeof logLine.raw === 'string' && logLine.raw) ? logLine.raw : '00000000';
+  const valid = (typeof logLine.valid === 'string' && logLine.valid.length) ? logLine.valid[0] : ' ';
   const id = (logLine.id !== undefined && logLine.id !== null) ? String(logLine.id) : "0";
   const label = (typeof logLine.label === 'string' && logLine.label.trim() !== '') ? logLine.label : '';
 
@@ -260,36 +261,18 @@ function formatLogLine(logLine) {
     value = String(logLine.val);
   }
 
-  // Optional structured extras
-  let extra = '';
-  if (logLine.data && typeof logLine.data === 'object') {
-    const valueHasMaster = value.indexOf('Master [') !== -1;
-    const valueHasSlave = value.indexOf('Slave [') !== -1;
-    if (!valueHasMaster && typeof logLine.data.master === 'string' && logLine.data.master) {
-      extra += (extra ? ' ' : '') + `M[${logLine.data.master}]`;
-    }
-    if (!valueHasSlave && typeof logLine.data.slave === 'string' && logLine.data.slave) {
-      extra += (extra ? ' ' : '') + `S[${logLine.data.slave}]`;
-    }
-    if (typeof logLine.data.extra === 'string' && logLine.data.extra) {
-      extra += (extra ? ' ' : '') + logLine.data.extra;
-    }
-  }
-  
-  let text = pad(source, 18) + " " + padStart(id, 3);
+  // Required display format:
+  // HH:MM:SS.mmmmmm B00000000 msgid Readable name = Value
+  // Note: time prefix is handled in renderLogDisplay via entry.time.
+  let text = padStart(raw, 8) + " " + padStart(id, 3) + " " + valid;
 
   if (label) {
-     text += " " + label;
-     if (value) {
-       text += " = " + value;
-     }
+    text += " " + label;
+    if (value) text += " = " + value;
   } else if (value) {
-     text += " " + value;
+    text += " " + value;
   }
 
-  if (extra) {
-     text += " " + extra;
-  }
   return text;
 }
 
@@ -299,7 +282,7 @@ function addLogLine(logLine) {
   if (typeof logLine !== 'object') return;
   
   // JSON format: at minimum {time, source, id, label, value} with optional `val` and `data`.
-  let timestamp = logLine.time || "00:00:00.00000";
+  let timestamp = logLine.time || "00:00:00.000000";
   
   const logEntry = {
     time: timestamp,
@@ -1614,9 +1597,9 @@ function processStatsLine(line) {
     const id = parseInt(line.id, 10);
     if (isNaN(id)) return;
 
-    // Group by (id + source). This is present in JSON and avoids relying on legacy fields.
-    const source = (typeof line.source === 'string' && line.source) ? line.source : 'Unk';
-    const dir = source;
+    // Group by (id + dir). Direction/type is part of the JSON payload.
+    // Fallback to source if dir is missing.
+    const dir = (typeof line.dir === 'string' && line.dir) ? line.dir : ((typeof line.source === 'string' && line.source) ? line.source : 'Unk');
 
     let label = (typeof line.label === 'string' && line.label.trim() !== '') ? line.label : 'Unknown';
     let value = '';
@@ -1633,7 +1616,7 @@ function processStatsLine(line) {
         statsBuffer[key] = {
             id: id,
       hex: id.toString(16).toUpperCase().padStart(2, '0'),
-      type: source,
+      type: dir,
             dir: dir,
             label: label,
             value: value,
@@ -1651,7 +1634,7 @@ function processStatsLine(line) {
         
         entry.lastTime = now;
         entry.value = value;
-        entry.type = source;
+        entry.type = dir;
         if (label && label !== 'Unknown') entry.label = label;
     }
     statsBuffer[key].count++;
