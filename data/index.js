@@ -337,11 +337,10 @@ function formatLogLine(logLine) {
   // Build the log line with all components
   let text = pad(source, 18) + " " + padStart(raw, rawWidth) + " " + padStart(id, 3);
   
-  if (dir) {
-    text += " " + pad(dir, 16);
-  }
+  // Direction field (always 16 characters wide, even if empty)
+  text += " " + pad(dir, 16);
   
-  text += valid;
+  text += " " + valid;
 
   if (label) {
     text += " " + label;
@@ -420,7 +419,6 @@ function parseLogLine(line) {
         if (line.length >= oPayload) {
            // Payload
            let payload = line.substring(oPayload).trim();
-           console.log("DEBUG: oPayload=" + oPayload + ", payload='" + payload + "'");
            if (payload.includes('=')) {
               let parts = payload.split('=');
               obj.label = parts[0].trim();
