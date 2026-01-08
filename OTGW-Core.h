@@ -182,17 +182,15 @@ enum OTValueType {
 // Struct to hold OpenTherm log message data
 // This represents the structured data that gets logged and sent via WebSocket
 typedef struct {
-	char time[16];          // "HH:MM:SS.mmmmmm"
-	char source[16];        // "Boiler", "Thermostat", etc.
-	uint8_t id;             // OpenTherm message ID (0-127)
-	char raw[10];           // Raw OT message (8 chars + null), e.g. "B004018A"
-	char dir[16];           // Direction/type string, e.g. "Read-Data"
-	char valid;             // One of: 'P', '-', '>', ' '
-	char label[64];         // Human-readable label (e.g., "Status", "Room Setpoint")
-	char value[128];        // Formatted value string for display
-	
-	// Value type indicator
-	OTValueType valType;
+        char time[12];          // "HH:MM:SS.mmmmmm" - 11 chars max
+        char source[12];        // "Boiler", "Thermostat", etc. - 10 chars max
+        uint8_t id;             // OpenTherm message ID (0-127)
+        char raw[10];           // Raw OT message (8 chars + null), e.g. "B004018A"
+        char dir[16];           // Direction/type string, e.g. "Read-Data"
+        char valid;             // One of: 'P', '-', '>', ' '
+        char label[41];         // Human-readable label - max 36 chars + null + 10% safety margin
+        char value[40];         // Formatted value string - max 36 chars + null + 10% safety margin
+	OTValueType valType;    // Type of numeric value (for JSON formatting)
 	
 	// Union for different value types - only one is valid at a time
 	union {
