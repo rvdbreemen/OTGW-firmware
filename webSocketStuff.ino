@@ -54,8 +54,11 @@ static uint8_t wsLogQueueTail = 0;
 static uint8_t wsLogQueueCount = 0;
 
 // Buffer for JSON serialization - static to avoid stack pressure
-// 1024 bytes is enough for the JSON, keeping it off the stack
-#define WS_JSON_BUFFER_SIZE 1024
+// NOTE: ArduinoJson requires a separate output buffer for serializeJson() because
+// the WebSocketsServer library's broadcastTXT() API requires the entire message
+// in a contiguous buffer. We cannot stream directly to WebSocket clients.
+// Size: 512 bytes provides margin over max serialized JSON (~344 bytes)
+#define WS_JSON_BUFFER_SIZE 512
 static char wsJsonBuffer[WS_JSON_BUFFER_SIZE];
 
 //===========================================================================================
@@ -154,7 +157,13 @@ void processWebSocketQueue() {
 
   // Use a static document to avoid stack allocation and re-allocation overhead
   // This lives in global memory (BSS/Data), not stack.
-  static StaticJsonDocument<1024> doc; 
+  // Capacity calculation (ArduinoJson copies strings into its memory pool):
+  //   - Structure: ~136 bytes (main object + nested object overhead)
+  //   - String storage: ~207 bytes (all string fields copied)
+  //   - Total needed: ~343 bytes, 512 bytes provides 48% safety margin
+  // Note: This is separate from wsJsonBuffer - doc holds the parsed structure,
+  // wsJsonBuffer holds the serialized output string for WebSocket transmission
+  static StaticJsonDocument<512> doc; 
   doc.clear();
 
   // Populate JSON fields
@@ -193,12 +202,25 @@ void processWebSocketQueue() {
     }
   }
 
+  // Check if document capacity was exceeded during population
+  if (doc.overflowed()) {
+    DebugTf(PSTR("WS: StaticJsonDocument overflow - message may be incomplete (capacity: %u bytes)\r\n"), 
+            (unsigned int)doc.capacity());
+    // Continue anyway - partial data is better than nothing
+  }
+
   // Serialize to static buffer
   size_t len = serializeJson(doc, wsJsonBuffer, WS_JSON_BUFFER_SIZE);
   
-  // Broadcast
+  // Broadcast (serializeJson returns 0 if buffer too small)
   if (len > 0) {
     webSocket.broadcastTXT(wsJsonBuffer, len);
+  } else {
+    // Buffer overflow - serializeJson returns 0 when buffer is insufficient
+    // Use measureJson() to get the actual size needed for diagnostics
+    size_t needed = measureJson(doc);
+    DebugTf(PSTR("WS: JSON buffer overflow - message dropped (needed: %u bytes, buffer: %u bytes)\r\n"), 
+            (unsigned int)needed, (unsigned int)WS_JSON_BUFFER_SIZE);
   }
 
   // Remove from queue
