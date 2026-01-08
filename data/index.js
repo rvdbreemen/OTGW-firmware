@@ -221,13 +221,21 @@ function initOTLogWebSocket(force) {
       }
       
       let data = event.data;
+      let isObject = false;
+
       try {
         if (data && typeof data === 'string' && data.startsWith('{')) {
           data = JSON.parse(data);
+          isObject = true;
           console.log("OT Log WS parsed:", data);
         }
       } catch(e) {
         // ignore JSON parse error, treat as text
+      }
+
+      if (!isObject && typeof data === 'string') {
+        const parsed = parseLogLine(data);
+        if (parsed) data = parsed;
       }
 
       addLogLine(data);
@@ -300,7 +308,6 @@ function formatLogLine(logLine) {
   if (!logLine) return "";
   
   // Construct display line from the incoming JSON fields.
-  // No parsing of legacy text log lines.
   const pad = (str, len) => (str + "").padEnd(len, ' ');
   const padStart = (str, len) => (str + "").padStart(len, ' ');
 
@@ -310,6 +317,7 @@ function formatLogLine(logLine) {
   const valid = (typeof logLine.valid === 'string' && logLine.valid.length) ? logLine.valid[0] : ' ';
   const id = (logLine.id !== undefined && logLine.id !== null) ? String(logLine.id) : "0";
   const label = (typeof logLine.label === 'string' && logLine.label.trim() !== '') ? logLine.label : '';
+  const source = (typeof logLine.source === 'string') ? logLine.source : '';
 
   let value = '';
   if (logLine.value !== undefined && logLine.value !== null && String(logLine.value) !== '') {
@@ -322,11 +330,11 @@ function formatLogLine(logLine) {
   const unit = (typeof logLine.unit === 'string' && logLine.unit.trim() !== '') ? logLine.unit : '';
 
   // Required display format:
-  // HH:MM:SS.mmmmmm B00000000 msgid Readable name = Value unit
-  // Note: time prefix is handled in renderLogDisplay via entry.time.
-  // Place validity marker right after the decimal msgid (before label/value)
+  // HH:MM:SS.mmmmmm Source            B00000000 msgid Readable name = Value unit
   const rawWidth = (raw.length > 8) ? 9 : 8;
-  let text = padStart(raw, rawWidth) + " " + padStart(id, 3) + " " + valid;
+  
+  // Source is typically 18 chars in firmware
+  let text = pad(source, 18) + " " + padStart(raw, rawWidth) + " " + padStart(id, 3) + " " + valid;
 
   if (label) {
     text += " " + label;
@@ -340,6 +348,88 @@ function formatLogLine(logLine) {
   }
 
   return text;
+}
+
+function parseLogLine(line) {
+  if (typeof line !== 'string') return null;
+
+  // Expected format (New with high-res timestamp):
+  // HH:MM:SS.mmmmmm Source(18) Raw(9) ID(3) Type(16) Validity(1) Label = Value
+  
+  const obj = {
+    time: "",
+    source: "",
+    raw: "",
+    id: 0,
+    dir: "",
+    valid: " ",
+    label: "",
+    value: "",
+    unit: ""
+  };
+  
+  let offset = 0;
+  
+  // Detect timestamp: HH:MM:SS.mmmmmm (15 chars)
+  // Regex must be robust.
+  const tsMatch = line.match(/^(\d{2}:\d{2}:\d{2}\.\d{6})\s/);
+  if (tsMatch) {
+      obj.time = tsMatch[1];
+      offset = 16; // 15 chars + 1 space
+  } else {
+      // Fallback timestamp
+      obj.time = new Date().toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) + "." + (new Date().getMilliseconds() + "").padStart(3, '0');
+  }
+  
+  // Adjust base offsets based on offset
+  const oSource = 0 + offset;
+  const oRaw    = 19 + offset; // Source(18) + Space(1) = 19
+  const oId     = 29 + offset; // Raw(9) + Space(1) = 10. 19+10=29
+  const oType   = 33 + offset; // ID(3) + Space(1) = 4. 29+4=33
+  const oValid  = 50 + offset; // Type(16) + Space(1) = 17. 33+17=50
+  const oPayload= 51 + offset; 
+
+  try {
+     // Safety check on length (Source + Raw + ID must exist)
+     if (line.length < 32 + offset) return null; 
+     
+     obj.source = line.substring(oSource, oSource + 18).trim();
+     obj.raw = line.substring(oRaw, oRaw + 9).trim(); // 9 chars for Raw
+     obj.id = parseInt(line.substring(oId, oId + 3).trim(), 10);
+     if (isNaN(obj.id)) obj.id = 0;
+     
+     if (line.length >= oType) {
+        obj.dir = line.substring(oType, oType + 16).trim();
+        
+        if (line.length > oValid) {
+           let v = line.substring(oValid, oValid + 1);
+           // Updated validity characters: P=Parity, -=Skipped, " "=Invalid, >=Valid
+           if (['P','-',' ','>'].includes(v)) obj.valid = v;
+        }
+        
+        // Payload starts after the validity character
+        // Firmware does not output a space after the validity character, so payload starts immediately at oValid + 1 (which is oPayload)
+        
+        if (line.length >= oPayload) {
+           // Payload
+           let payload = line.substring(oPayload).trim();
+           if (payload.includes('=')) {
+              let parts = payload.split('=');
+              obj.label = parts[0].trim();
+              
+              let valPart = parts.slice(1).join('=').trim();
+              obj.value = valPart;
+           } else {
+              if (payload.length > 0) obj.label = payload;
+           }
+        }
+     }
+  } catch (e) {
+     console.error("Error parsing log line:", e);
+     return null;
+  }
+  
+  return obj;
 }
 
 function addLogLine(logLine) {
@@ -1752,6 +1842,11 @@ function processStatsLine(line) {
       const dirStr = (typeof line.dir === 'string' && line.dir) ? line.dir : '';
       typeCode = otmTypeFromDirString(dirStr);
     }
+    
+    // OTmonitor filter logic: Only these types carry unique data points to track statistics.
+    // 0 (Read-Data) is request. 5 (Write-Ack) is ack.
+    if (typeCode === null || ![1, 4, 6, 7].includes(typeCode)) return;
+
     const dirStr = (typeof line.dir === 'string' && line.dir) ? line.dir : '';
     const dirLabel = otmDirectionLabel(typeCode, dirStr);
     if (!dirLabel) return;
