@@ -30,6 +30,12 @@
 */
 
 #include <WebSocketsServer.h>
+#include <ArduinoJson.h>
+#include <TelnetStream.h>
+#include "OTGW-Core.h"
+#include "Debug.h"
+
+extern String settingHostname;
 
 // WebSocket server on port 81 (no built-in authentication; local network use only)
 WebSocketsServer webSocket = WebSocketsServer(81);
@@ -39,6 +45,18 @@ static uint8_t wsClientCount = 0;
 
 // Track WebSocket initialization state
 static bool wsInitialized = false;
+
+// Queue for WebSocket log messages to decouple processing from serial loop
+#define WS_LOG_QUEUE_SIZE 2 
+static OTlogStruct wsLogQueue[WS_LOG_QUEUE_SIZE];
+static uint8_t wsLogQueueHead = 0;
+static uint8_t wsLogQueueTail = 0;
+static uint8_t wsLogQueueCount = 0;
+
+// Buffer for JSON serialization - static to avoid stack pressure
+// 1024 bytes is enough for the JSON, keeping it off the stack
+#define WS_JSON_BUFFER_SIZE 1024
+static char wsJsonBuffer[WS_JSON_BUFFER_SIZE];
 
 //===========================================================================================
 // WebSocket event handler
@@ -105,6 +123,90 @@ void sendWebSocketJSON(const char *json) {
 }
 
 //===========================================================================================
+// Add a log message to the WebSocket queue
+//===========================================================================================
+void queueWebSocketLog(const OTlogStruct& data) {
+  // If no clients connected, don't bother queuing
+  if (wsClientCount == 0) return;
+
+  // Add to circular buffer
+  memcpy(&wsLogQueue[wsLogQueueHead], &data, sizeof(OTlogStruct));
+  wsLogQueueHead = (wsLogQueueHead + 1) % WS_LOG_QUEUE_SIZE;
+  
+  if (wsLogQueueCount < WS_LOG_QUEUE_SIZE) {
+    wsLogQueueCount++;
+  } else {
+    // Buffer full, we overwrote the oldest (Head bumped into Tail)
+    // Advance tail to maintain validity
+    wsLogQueueTail = (wsLogQueueTail + 1) % WS_LOG_QUEUE_SIZE;
+    // DebugTln(F("WS Log Queue full - dropped oldest message")); // Optional debug
+  }
+}
+
+//===========================================================================================
+// Process one message from the queue and send it
+//===========================================================================================
+void processWebSocketQueue() {
+  if (wsLogQueueCount == 0 || wsClientCount == 0) return;
+
+  // Peek/Get the oldest message
+  OTlogStruct* logData = &wsLogQueue[wsLogQueueTail];
+
+  // Use a static document to avoid stack allocation and re-allocation overhead
+  // This lives in global memory (BSS/Data), not stack.
+  static StaticJsonDocument<1024> doc; 
+  doc.clear();
+
+  // Populate JSON fields
+  doc["time"] = logData->time;
+  doc["source"] = logData->source;
+  doc["raw"] = logData->raw;
+  doc["dir"] = logData->dir;
+  
+  char validStr[2] = { logData->valid, '\0' };
+  doc["valid"] = validStr;
+  
+  doc["id"] = logData->id;
+  doc["label"] = logData->label;
+  doc["value"] = logData->value;
+
+  // Add numeric value based on type
+  if (logData->valType == OT_VALTYPE_F88) {
+    doc["val"] = logData->numval.val_f88;
+  } else if (logData->valType == OT_VALTYPE_S16) {
+    doc["val"] = logData->numval.val_s16;
+  } else if (logData->valType == OT_VALTYPE_U16) {
+    doc["val"] = logData->numval.val_u16;
+  }
+  
+  // Add data object if present
+  if (logData->data.hasData) {
+    JsonObject dataObj = doc.createNestedObject("data");
+    if (logData->data.master[0] != '\0') {
+      dataObj["master"] = logData->data.master;
+    }
+    if (logData->data.slave[0] != '\0') {
+      dataObj["slave"] = logData->data.slave;
+    }
+    if (logData->data.extra[0] != '\0') {
+      dataObj["extra"] = logData->data.extra;
+    }
+  }
+
+  // Serialize to static buffer
+  size_t len = serializeJson(doc, wsJsonBuffer, WS_JSON_BUFFER_SIZE);
+  
+  // Broadcast
+  if (len > 0) {
+    webSocket.broadcastTXT(wsJsonBuffer, len);
+  }
+
+  // Remove from queue
+  wsLogQueueTail = (wsLogQueueTail + 1) % WS_LOG_QUEUE_SIZE;
+  wsLogQueueCount--;
+}
+
+//===========================================================================================
 // Start WebSocket server
 //===========================================================================================
 void startWebSocket() {
@@ -119,6 +221,12 @@ void startWebSocket() {
 //===========================================================================================
 void handleWebSocket() {
   webSocket.loop();
+  
+  // Process up to 2 queued messages per loop to catch up without blocking too long
+  if (wsLogQueueCount > 0) {
+    processWebSocketQueue();
+    if (wsLogQueueCount > 0) processWebSocketQueue(); 
+  }
 }
 
 //===========================================================================================
