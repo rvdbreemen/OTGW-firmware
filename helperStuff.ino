@@ -28,7 +28,7 @@ template <typename T> T PROGMEM_getAnything (const T * sce)
 // Get High Resolution Timestamp for Logs
 //===========================================================================================
 const char* getOTLogTimestamp() {
-  static char timestamp[15]; // "HH:MM:SS.mmmmm"
+  static char timestamp[16]; // "HH:MM:SS.mmmmmm"
   timeval now;
   gettimeofday(&now, nullptr);
   // Default to UTC if not initialized, but typically settingNTPtimezone is valid
@@ -42,10 +42,10 @@ const char* getOTLogTimestamp() {
   
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now.tv_sec, myTz);
 
-  // 5 digit subsecond resolution from microseconds (0..99999)
-  const unsigned long subSeconds = (unsigned long)(now.tv_usec / 10);
+  // 6 digit subsecond resolution from microseconds (0..999999)
+  const unsigned long subSeconds = (unsigned long)(now.tv_usec);
 
-  snprintf(timestamp, sizeof(timestamp), "%02d:%02d:%02d.%05lu",
+  snprintf(timestamp, sizeof(timestamp), "%02d:%02d:%02d.%06lu",
            myTime.hour(), myTime.minute(), myTime.second(), subSeconds);
 
   return timestamp;

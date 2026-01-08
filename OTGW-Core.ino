@@ -532,9 +532,9 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   if (OT.skipthis) return false;
   bool _valid = false;
   _valid = _valid || (OTlookup.msgcmd==OT_READ && OT.type==OT_READ_ACK);
-  _valid = _valid || (OTlookup.msgcmd==OT_WRITE && OT.type==OT_WRITE_DATA);
-  _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OT.type==OT_WRITE_DATA));
-  _valid = _valid || (OT.id==OT_Statusflags) || (OT.id==OT_StatusVH) || (OT.id==OT_SolarStorageMaster);
+  _valid = _valid || (OTlookup.msgcmd==OT_WRITE && OTdata.type==OT_WRITE_DATA);
+  _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OTdata.type==OT_WRITE_DATA));
+  _valid = _valid || (OTdata.id==OT_Statusflags) || (OTdata.id==OT_StatusVH) || (OTdata.id==OT_SolarStorageMaster);;
   return _valid;
 }
 
@@ -544,6 +544,7 @@ static void initOTdata() {
   memset(&OTLog::OTlogData, 0, sizeof(OTLog::OTlogData));
   OTLog::OTlogData.valType = OT_VALTYPE_NONE;
   OTLog::OTlogData.data.hasData = false;
+  OTLog::OTlogData.valid = ' ';
 }
 
 static void ensureOTlogDataHasLabelValueFromText() {
@@ -1725,26 +1726,30 @@ void processOT(const char *buf, int len){
       }
       strlcpy(OTLog::OTlogData.source, sourceStr, sizeof(OTLog::OTlogData.source));
 
+      // Populate raw message and direction/type
+      strlcpy(OTLog::OTlogData.raw, OTdata.buf, sizeof(OTLog::OTlogData.raw));
+      strlcpy(OTLog::OTlogData.dir, messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)), sizeof(OTLog::OTlogData.dir));
+
       //print message Type and ID
       AddLogf(" %s %3d", OTdata.buf, OTdata.id);
       AddLogf(" %-16s", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
       //OTGWDebugf("[%-30s]", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
       //OTGWDebugf("[M=%d]",OTdata.master);
 
-      if (OTdata.skipthis){
+      // Determine and store the validity marker (P, -, >, or space)
+      if (OTdata.skipthis) {
         if (OTdata.rsptype == OTGW_PARITY_ERROR) {
-          AddLog("P"); //skipped due to parity error
+          OTLog::OTlogData.valid = 'P';
         } else {
-          AddLog("-"); //skipped due to R or A message
+          OTLog::OTlogData.valid = '-';
         }
-          
       } else {
-        if (is_value_valid(OTdata, OTlookupitem)) {
-          AddLog(">");
-        } else {
-          AddLog(" ");
-        }
+        OTLog::OTlogData.valid = is_value_valid(OTdata, OTlookupitem) ? '>' : ' ';
       }
+
+      // Keep the original log output marker too
+      char _validStr[2] = { OTLog::OTlogData.valid, '\0' };
+      AddLog(_validStr);
       
       //next step interpret the OT protocol
           
@@ -1878,10 +1883,10 @@ void processOT(const char *buf, int len){
       StaticJsonDocument<1024> doc;
       doc["time"] = OTLog::OTlogData.time;
       doc["source"] = OTLog::OTlogData.source;
-      // Backward-compatible fields expected by Web UI (Statistics/Graph/log formatter)
-      doc["raw"] = OTdata.buf;
-      doc["dir"] = messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type));
-      doc["valid"] = is_value_valid(OTdata, OTlookupitem) ? ">" : " ";
+      doc["raw"] = OTLog::OTlogData.raw;
+      doc["dir"] = OTLog::OTlogData.dir;
+      char validStr[2] = { OTLog::OTlogData.valid, '\0' };
+      doc["valid"] = validStr;
       doc["id"] = OTLog::OTlogData.id;
       doc["label"] = OTLog::OTlogData.label;
       doc["value"] = OTLog::OTlogData.value;
@@ -1911,12 +1916,14 @@ void processOT(const char *buf, int len){
       // Serialize and send
       const size_t needed = measureJson(doc) + 1;
       if (needed <= OT_LOG_BUFFER_SIZE) {
-        serializeJson(doc, ot_log_buffer, OT_LOG_BUFFER_SIZE);
-        sendLogToWebSocket(ot_log_buffer);
+        static char ws_json_buffer[OT_LOG_BUFFER_SIZE];
+        serializeJson(doc, ws_json_buffer, OT_LOG_BUFFER_SIZE);
+        sendLogToWebSocket(ws_json_buffer);
       } else {
-        snprintf(ot_log_buffer, OT_LOG_BUFFER_SIZE, "{\"error\":\"ws_json_too_large\",\"needed\":%u,\"max\":%u}",
+        static char ws_json_buffer[OT_LOG_BUFFER_SIZE];
+        snprintf(ws_json_buffer, OT_LOG_BUFFER_SIZE, "{\"error\":\"ws_json_too_large\",\"needed\":%u,\"max\":%u}",
                  (unsigned)needed, (unsigned)OT_LOG_BUFFER_SIZE);
-        sendLogToWebSocket(ot_log_buffer);
+        sendLogToWebSocket(ws_json_buffer);
       }
       
       OTGWDebugFlush();
