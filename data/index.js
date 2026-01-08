@@ -264,6 +264,7 @@ function formatLogLine(logLine) {
   // Required display format:
   // HH:MM:SS.mmmmmm B00000000 msgid Readable name = Value
   // Note: time prefix is handled in renderLogDisplay via entry.time.
+  // Place validity marker right after the decimal msgid (before label/value)
   let text = padStart(raw, 8) + " " + padStart(id, 3) + " " + valid;
 
   if (label) {
