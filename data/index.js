@@ -31,7 +31,55 @@ window.onfocus = function () {
 
 
 var tid = 0;
-var timeupdate = setInterval(function () { refreshDevTime(); }, 1000); //delay is in milliseconds
+var timeupdate = null; // Will be started when needed
+
+//============================================================================
+// Flash Mode Management - stops all background activity during flashing
+//============================================================================
+function enterFlashMode() {
+  console.log('Entering flash mode - stopping all background activity');
+  flashModeActive = true;
+  
+  // Stop all timers
+  if (timeupdate) {
+    clearInterval(timeupdate);
+    timeupdate = null;
+  }
+  if (tid) {
+    clearInterval(tid);
+    tid = 0;
+  }
+  
+  // Disconnect WebSocket
+  disconnectOTLogWebSocket();
+  
+  console.log('Flash mode active - all polling and WebSocket activity stopped');
+}
+
+function exitFlashMode() {
+  console.log('Exiting flash mode - restarting background activity');
+  flashModeActive = false;
+  
+  // Restart time update
+  if (!timeupdate) {
+    timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+  }
+  
+  // Restart WebSocket if on main page
+  if (document.getElementById('displayMainPage') && 
+      document.getElementById('displayMainPage').style.display !== 'none') {
+    initOTLogWebSocket();
+    if (!tid) {
+      tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+    }
+  }
+  
+  console.log('Flash mode exited - background activity resumed');
+}
+
+// Make functions globally accessible for cross-window communication
+window.enterFlashMode = enterFlashMode;
+window.exitFlashMode = exitFlashMode;
 
 //============================================================================
 // OpenTherm Log WebSocket Variables and Functions
@@ -48,6 +96,7 @@ let updatePending = false;
 let otLogControlsInitialized = false;
 let isFlashing = false;
 let currentFlashFilename = "";
+let flashModeActive = false; // Track if we're on the flash page
 
 // WebSocket configuration: must match the WebSocket port used in webSocketStuff.ino (currently hardcoded as 81 in the WebSocketsServer constructor).
 const WEBSOCKET_PORT = 81;
@@ -75,6 +124,12 @@ function resetWSWatchdog() {
 
 //============================================================================
 function initOTLogWebSocket(force) {
+  // Don't connect if in flash mode
+  if (flashModeActive) {
+    console.log('Flash mode active - skipping WebSocket connection');
+    return;
+  }
+  
   // Detect smartphone (iPhone or Android Phone)
   const isPhone = /iPhone|iPod/.test(navigator.userAgent) || 
                  (/Android/.test(navigator.userAgent) && /Mobile/.test(navigator.userAgent));
@@ -532,6 +587,14 @@ function escapeHtml(text) {
 //============================================================================  
 function initMainPage() {
   console.log("initMainPage()");
+  
+  // Check if we're in flash mode (from sessionStorage)
+  try {
+    if (sessionStorage.getItem('flashMode') === 'true') {
+      console.log('Flash mode detected from sessionStorage');
+      flashModeActive = true;
+    }
+  } catch(e) { /* ignore */ }
 
   Array.from(document.getElementsByClassName('FSexplorer')).forEach(
     function (el, idx, arr) {
@@ -600,6 +663,11 @@ function initMainPage() {
       OTGraph.init();
   }
 
+  // Start time updates if not in flash mode
+  if (!flashModeActive && !timeupdate) {
+    timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+  }
+
   if (window.location.hash == "#tabPICflash") {
     firmwarePage();
   } else {
@@ -610,6 +678,12 @@ function initMainPage() {
 function showMainPage() {
   console.log("showMainPage()");
   clearInterval(tid);
+  
+  // Exit flash mode if it was active
+  if (flashModeActive) {
+    exitFlashMode();
+  }
+  
   refreshDevTime();
   
   document.getElementById("displayMainPage").style.display = "block";
@@ -619,10 +693,12 @@ function showMainPage() {
   
   refreshDevInfo();
   refreshOTmonitor();
-  tid = setInterval(function () { refreshOTmonitor(); }, 1000);
   
-  // Initialize WebSocket for OT log streaming
-  initOTLogWebSocket();
+  if (!flashModeActive) {
+    tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+    // Initialize WebSocket for OT log streaming
+    initOTLogWebSocket();
+  }
 }
 
 function firmwarePage() {
