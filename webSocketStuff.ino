@@ -47,8 +47,8 @@ static uint8_t wsClientCount = 0;
 static bool wsInitialized = false;
 
 // Queue for WebSocket log messages to decouple processing from serial loop
-// Sized for 3-4 messages/second with processing time ~9ms/msg = up to 3 seconds of burst buffering
-#define WS_LOG_QUEUE_SIZE 12 
+// Sized for 3-4 messages/second with processing time ~9ms/msg = up to 4 seconds of burst buffering
+#define WS_LOG_QUEUE_SIZE 16 
 static OTlogStruct wsLogQueue[WS_LOG_QUEUE_SIZE];
 static uint8_t wsLogQueueHead = 0;
 static uint8_t wsLogQueueTail = 0;
