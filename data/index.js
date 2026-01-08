@@ -318,6 +318,7 @@ function formatLogLine(logLine) {
   const id = (logLine.id !== undefined && logLine.id !== null) ? String(logLine.id) : "0";
   const label = (typeof logLine.label === 'string' && logLine.label.trim() !== '') ? logLine.label : '';
   const source = (typeof logLine.source === 'string') ? logLine.source : '';
+  const dir = (typeof logLine.dir === 'string' && logLine.dir.trim() !== '') ? logLine.dir : '';
 
   let value = '';
   if (logLine.value !== undefined && logLine.value !== null && String(logLine.value) !== '') {
@@ -330,11 +331,17 @@ function formatLogLine(logLine) {
   const unit = (typeof logLine.unit === 'string' && logLine.unit.trim() !== '') ? logLine.unit : '';
 
   // Required display format:
-  // HH:MM:SS.mmmmmm Source            B00000000 msgid Readable name = Value unit
+  // HH:MM:SS.mmmmmm Source(18) Raw(9) ID(3) Direction(16) Valid(1) Label = Value
   const rawWidth = (raw.length > 8) ? 9 : 8;
   
-  // Source is typically 18 chars in firmware
-  let text = pad(source, 18) + " " + padStart(raw, rawWidth) + " " + padStart(id, 3) + " " + valid;
+  // Build the log line with all components
+  let text = pad(source, 18) + " " + padStart(raw, rawWidth) + " " + padStart(id, 3);
+  
+  if (dir) {
+    text += " " + pad(dir, 16);
+  }
+  
+  text += valid;
 
   if (label) {
     text += " " + label;
@@ -387,7 +394,7 @@ function parseLogLine(line) {
   const oId     = 29 + offset; // Raw(9) + Space(1) = 10. 19+10=29
   const oType   = 33 + offset; // ID(3) + Space(1) = 4. 29+4=33
   const oValid  = 50 + offset; // Type(16) + Space(1) = 17. 33+17=50
-  const oPayload= 51 + offset; 
+  const oPayload= 52 + offset; // Valid(1) + Space(1) = 2. 50+2=52 
 
   try {
      // Safety check on length (Source + Raw + ID must exist)
@@ -413,6 +420,7 @@ function parseLogLine(line) {
         if (line.length >= oPayload) {
            // Payload
            let payload = line.substring(oPayload).trim();
+           console.log("DEBUG: oPayload=" + oPayload + ", payload='" + payload + "'");
            if (payload.includes('=')) {
               let parts = payload.split('=');
               obj.label = parts[0].trim();
