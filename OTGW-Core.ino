@@ -564,7 +564,7 @@ void print_f88(float& value)
   
   // Populate OTdata struct
   strlcpy(OTLog::OTlogData.label, OTlookupitem.label, sizeof(OTLog::OTlogData.label));
-  snprintf(OTLog::OTlogData.value, sizeof(OTLog::OTlogData.value), "%s %s", _msg, OTlookupitem.unit);
+  strlcpy(OTLog::OTlogData.value, _msg, sizeof(OTLog::OTlogData.value));
   OTLog::OTlogData.valType = OT_VALTYPE_F88;
   OTLog::OTlogData.numval.val_f88 = _value;
 
@@ -587,7 +587,7 @@ void print_s16(int16_t& value)
 
   // Populate OTdata struct
   strlcpy(OTLog::OTlogData.label, OTlookupitem.label, sizeof(OTLog::OTlogData.label));
-  snprintf(OTLog::OTlogData.value, sizeof(OTLog::OTlogData.value), "%s %s", _msg, OTlookupitem.unit);
+  strlcpy(OTLog::OTlogData.value, _msg, sizeof(OTLog::OTlogData.value));
   OTLog::OTlogData.valType = OT_VALTYPE_S16;
   OTLog::OTlogData.numval.val_s16 = _value;
 
@@ -604,7 +604,7 @@ void print_s8s8(uint16_t& value)
 
   // Populate OTLog struct
   strlcpy(OTLog::OTlogData.label, OTlookupitem.label, sizeof(OTLog::OTlogData.label));
-  snprintf(OTLog::OTlogData.value, sizeof(OTLog::OTlogData.value), "%d / %d %s", (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB, OTlookupitem.unit);
+  snprintf(OTLog::OTlogData.value, sizeof(OTLog::OTlogData.value), "%d / %d", (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB);
   OTLog::OTlogData.valType = OT_VALTYPE_S8S8;
   OTLog::OTlogData.numval.val_s8s8.hb = (int8_t)OTdata.valueHB;
   OTLog::OTlogData.numval.val_s8s8.lb = (int8_t)OTdata.valueLB;
@@ -641,7 +641,7 @@ void print_u16(uint16_t& value)
   
   // Populate OTdata struct
   strlcpy(OTLog::OTlogData.label, OTlookupitem.label, sizeof(OTLog::OTlogData.label));
-  snprintf(OTLog::OTlogData.value, sizeof(OTLog::OTlogData.value), "%s %s", _msg, OTlookupitem.unit);
+  strlcpy(OTLog::OTlogData.value, _msg, sizeof(OTLog::OTlogData.value));
   OTLog::OTlogData.valType = OT_VALTYPE_U16;
   OTLog::OTlogData.numval.val_u16 = _value;
 
@@ -1212,7 +1212,7 @@ void print_u8u8(uint16_t& value)
 
   // Populate OTLog struct
   strlcpy(OTLog::OTlogData.label, OTlookupitem.label, sizeof(OTLog::OTlogData.label));
-  snprintf(OTLog::OTlogData.value, sizeof(OTLog::OTlogData.value), "%u / %u %s", (unsigned)OTdata.valueHB, (unsigned)OTdata.valueLB, OTlookupitem.unit);
+  snprintf(OTLog::OTlogData.value, sizeof(OTLog::OTlogData.value), "%u / %u", (unsigned)OTdata.valueHB, (unsigned)OTdata.valueLB);
   OTLog::OTlogData.valType = OT_VALTYPE_U8U8;
   OTLog::OTlogData.numval.val_u8u8.hb = (uint8_t)OTdata.valueHB;
   OTLog::OTlogData.numval.val_u8u8.lb = (uint8_t)OTdata.valueLB;

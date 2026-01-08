@@ -181,6 +181,7 @@ void processWebSocketQueue() {
   // Format: {"time":"...","source":"...","raw":"...","dir":"...","valid":"X","id":N,"label":"...","value":"..."[,"val":N][,"data":{...}]}
   char* p = wsJsonBuffer;
   char* end = wsJsonBuffer + WS_JSON_BUFFER_SIZE - 1; // Leave room for null terminator
+  size_t len = 0;  // Declare before any goto statements to avoid "crosses initialization" error
   
   // Start object
   p += snprintf(p, end - p, "{\"time\":\"%s\",", logData->time);
@@ -270,7 +271,7 @@ void processWebSocketQueue() {
   
   // Null terminate and broadcast
   *p = '\0';
-  size_t len = p - wsJsonBuffer;
+  len = p - wsJsonBuffer;  // Now just assign, no initialization
   
   if (len > 0 && len < WS_JSON_BUFFER_SIZE) {
     webSocket.broadcastTXT(wsJsonBuffer, len);
