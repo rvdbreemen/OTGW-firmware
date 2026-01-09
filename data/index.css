@@ -473,44 +473,63 @@
   background-color: transparent;
 }
 
-/* DevInfo - Grid Layout */
+/* DevInfo - Table Layout */
+#deviceinfoPage {
+  display: table;
+  width: fit-content;
+  border-collapse: collapse;
+}
+
 .devinforow {
-  display: grid;
-  grid-template-columns: minmax(150px, 1fr) minmax(150px, 2fr);
-  gap: 10px;
-  padding: 10px;
-  margin-bottom: 1px;
+  display: table-row;
   background: lightblue;
-  font-size: 14px;
-  align-items: center;
 }
 
 .devinfocolumn1 {
+  display: table-cell;
   font-weight: 500;
-  word-break: break-word;
+  white-space: nowrap;
+  padding: 2px 5px;
+  border: 1px solid white;
+  width: 1%;
 }
 
 .devinfocolumn2 {
+  display: table-cell;
   text-align: left;
-  word-break: break-word;
+  padding: 2px 5px;
+  border: 1px solid white;
 }
 
 /* Responsive: Stack on small screens */
 @media (max-width: 600px) {
+  #deviceinfoPage {
+    display: block;
+    width: 100%;
+  }
+
   .devinforow {
-    grid-template-columns: 1fr;
-    gap: 5px;
-    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    padding: 5px;
+    border-bottom: 1px solid white;
   }
   
   .devinfocolumn1 {
+    display: block;
+    width: auto;
     font-weight: 600;
     color: #004080;
+    border: none;
+    padding: 0;
   }
   
   .devinfocolumn2 {
+    display: block;
     padding-left: 10px;
     font-size: 13px;
+    border: none;
+    padding: 0 0 0 10px;
   }
 }
 
@@ -944,11 +963,7 @@ body.disable-interaction {
   display: block;
 }
 
-.otmonitor-row {
-  display: flex;
-}
-
-.otmonitor-row.hidden-row {
+.otmonrow.hidden-row {
   display: none !important;
 }
 
