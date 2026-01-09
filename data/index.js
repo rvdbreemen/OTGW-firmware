@@ -67,7 +67,7 @@ function exitFlashMode() {
   
   // Restart WebSocket if on main page
   if (document.getElementById('displayMainPage') && 
-      document.getElementById('displayMainPage').style.display !== 'none') {
+      document.getElementById('displayMainPage').classList.contains('active')) {
     initOTLogWebSocket();
     if (!tid) {
       tid = setInterval(function () { refreshOTmonitor(); }, 1000);
@@ -141,7 +141,7 @@ function initOTLogWebSocket(force) {
     console.log("Smartphone or small screen detected. Disabling OpenTherm Monitor.");
     const logSection = document.getElementById('otLogSection');
     if (logSection) {
-      logSection.style.display = 'none';
+      logSection.classList.add('hidden');
     }
     return; // Do not connect WebSocket
   }
@@ -789,10 +789,10 @@ function showMainPage() {
   
   refreshDevTime();
   
-  document.getElementById("displayMainPage").style.display = "block";
-  document.getElementById("displaySettingsPage").style.display = "none";
-  document.getElementById("displayDeviceInfo").style.display = "none";
-  document.getElementById("displayPICflash").style.display = "none";
+  document.getElementById("displayMainPage").classList.add('active');
+  document.getElementById("displaySettingsPage").classList.remove('active');
+  document.getElementById("displayDeviceInfo").classList.remove('active');
+  document.getElementById("displayPICflash").classList.remove('active');
   
   refreshDevInfo();
   refreshOTmonitor();
@@ -808,24 +808,24 @@ function firmwarePage() {
   initOTLogWebSocket();
   clearInterval(tid);
   refreshDevTime();
-  document.getElementById("displayMainPage").style.display = "none";
-  document.getElementById("displaySettingsPage").style.display = "none";
-  document.getElementById("displayDeviceInfo").style.display = "none";
+  document.getElementById("displayMainPage").classList.remove('active');
+  document.getElementById("displaySettingsPage").classList.remove('active');
+  document.getElementById("displayDeviceInfo").classList.remove('active');
   var firmwarePage = document.getElementById("displayPICflash");
   refreshFirmware();
-  document.getElementById("displayPICflash").style.display = "block";
+  document.getElementById("displayPICflash").classList.add('active');
 } // deviceinfoPage()
 
 function deviceinfoPage() {
   disconnectOTLogWebSocket();
   clearInterval(tid);
   refreshDevTime();
-  document.getElementById("displayMainPage").style.display = "none";
-  document.getElementById("displaySettingsPage").style.display = "none";
-  document.getElementById("displayPICflash").style.display = "none";
+  document.getElementById("displayMainPage").classList.remove('active');
+  document.getElementById("displaySettingsPage").classList.remove('active');
+  document.getElementById("displayPICflash").classList.remove('active');
   var deviceinfoPage = document.getElementById("deviceinfoPage");
   refreshDeviceInfo();
-  document.getElementById("displayDeviceInfo").style.display = "block";
+  document.getElementById("displayDeviceInfo").classList.add('active');
 
 } // deviceinfoPage()
 
@@ -833,12 +833,12 @@ function settingsPage() {
   disconnectOTLogWebSocket();
   clearInterval(tid);
   refreshDevTime();
-  document.getElementById("displayMainPage").style.display = "none";
-  document.getElementById("displayDeviceInfo").style.display = "none";
-  document.getElementById("displayPICflash").style.display = "none";
+  document.getElementById("displayMainPage").classList.remove('active');
+  document.getElementById("displayDeviceInfo").classList.remove('active');
+  document.getElementById("displayPICflash").classList.remove('active');
   var settingsPage = document.getElementById("settingsPage");
   refreshSettings();
-  document.getElementById("displaySettingsPage").style.display = "block";
+  document.getElementById("displaySettingsPage").classList.add('active');
 
 } // settingsPage()
 
@@ -920,9 +920,7 @@ function refreshFirmware() {
 
       // --- PIC Information Section ---
       let infoDiv = document.createElement("div");
-      infoDiv.setAttribute("class", "pic-info-header");
-      infoDiv.style.marginBottom = "15px";
-      infoDiv.style.padding = "10px";
+      infoDiv.setAttribute("class", "pic-info-header firmware-info-div");
       
       let infoContent = "";
       // infoContent += "<b>PIC Status:</b> " + ((picInfo.available == "true" || picInfo.available == true) ? "Available" : "Not Available") + "<br>";
@@ -937,10 +935,8 @@ function refreshFirmware() {
       tableDiv.setAttribute("class", "pictable");
 
       var rowDiv = document.createElement("div");
-      rowDiv.setAttribute("class", "picrow");
+      rowDiv.setAttribute("class", "picrow firmware-row-bold");
       rowDiv.setAttribute("id", "firmwarename");
-      // rowDiv.style.background = "lightblue";
-      rowDiv.style.fontWeight = "bold";
       //--- field Name ---
       var fldDiv = document.createElement("div");
       fldDiv.setAttribute("class", "piccolumn1");
@@ -997,8 +993,7 @@ function refreshFirmware() {
         var img = document.createElement('img');
         img.src = localURL + '/update.png';
         img.title = "Update firmware from web";
-        img.style.width = '16px';
-        img.style.height = 'auto';
+        img.className = 'firmware-icon';
         img.setAttribute = ("alt", "Update");
         a.appendChild(img);
         btn.appendChild(a);
@@ -1015,8 +1010,7 @@ function refreshFirmware() {
         var img = document.createElement('img');
         img.src = localURL + '/system_update.png'
         img.title = "Install firmware onto pic";
-        img.style.width = '16px';
-        img.style.height = 'auto';
+        img.className = 'firmware-icon';
         img.setAttribute = ("alt", "Install");
         a.appendChild(img);
         btn.appendChild(a);
@@ -1028,7 +1022,7 @@ function refreshFirmware() {
       // --- Flash Progress Bar Section ---
       let progressDiv = document.createElement("div");
       progressDiv.id = "flashProgressSection";
-      progressDiv.style.display = "block";
+      progressDiv.className = "firmware-progress";
       // progressDiv.setAttribute("class", "otmontable"); 
       
       let barWrapper = document.createElement("div");
@@ -1120,8 +1114,7 @@ function refreshOTmonitor() {
           rowDiv.setAttribute("class", "otmonrow");
           //rowDiv.setAttribute("id", "otmon_"+data[i].name);
           // rowDiv.style.background = "lightblue";
-          rowDiv.style.display = ((data[i].epoch == 0) ? "none" : "flex");
-          // rowDiv.style.display = ((data[i].epoch==0)?"none":"table-row");
+          if (data[i].epoch == 0) rowDiv.classList.add('hidden-row');
           var epoch = document.createElement("INPUT");
           epoch.setAttribute("type", "hidden");
           epoch.setAttribute("id", "otmon_epoch_" + data[i].name);
@@ -1151,7 +1144,11 @@ function refreshOTmonitor() {
         else { //if the element exists, then update the value
           var update = document.getElementById("otmon_" + data[i].name);
           if (update.parentNode) {
-            update.parentNode.style.display = ((data[i].epoch == 0) ? "none" : "flex");
+            if (data[i].epoch == 0) {
+              update.parentNode.classList.add('hidden-row');
+            } else {
+              update.parentNode.classList.remove('hidden-row');
+            }
           }
           var epoch = document.getElementById("otmon_epoch_" + data[i].name);
           // if ((Number(epoch.value)==0) && (Number(data[i].epoch)>0)) {
@@ -1175,7 +1172,7 @@ function refreshOTmonitor() {
       var waiting = document.getElementById('waiting');
       if (waiting) {
         waiting.textContent = 'Error: ' + error.message + ' (Retrying...)';
-        waiting.style.color = 'red';
+        waiting.className = 'waiting-error';
       }
     });
 
@@ -1250,9 +1247,8 @@ function refreshSettings() {
           // rowDiv.style.background = "lightblue";
           //--- field Name ---
           var fldDiv = document.createElement("div");
+          fldDiv.className = 'settings-field-container';
           fldDiv.setAttribute("style", "margin-right: 10px;");
-          fldDiv.style.width = "320px";
-          fldDiv.style.float = 'left';
           fldDiv.textContent = translateToHuman(data[i].name);
           rowDiv.appendChild(fldDiv);
           //--- input ---
@@ -1426,16 +1422,19 @@ function translateToHuman(longName) {
 //============================================================================  
 function setBackGround(field, newColor) {
   //console.log("setBackground("+field+", "+newColor+")");
-  document.getElementById(field).style.background = newColor;
-
+  const element = document.getElementById(field);
+  if (element) {
+    element.dataset.customBg = newColor;
+    element.style.background = newColor; // Keep for now if used functionally
+  }
 } // setBackGround()
 
 
 //============================================================================  
 function getBackGround(field) {
   //console.log("getBackground("+field+")");
-  return document.getElementById(field).style.background;
-
+  const element = document.getElementById(field);
+  return element ? (element.dataset.customBg || element.style.background) : '';
 } // getBackGround()
 
 
@@ -1624,10 +1623,10 @@ function startFlash(filename) {
     let progressBar = document.getElementById("flashProgressBar");
     let pctText = document.getElementById("flashPercentageText");
     
-    if (progressSection) progressSection.style.display = "block";
+    if (progressSection) progressSection.classList.add('active');
     if (progressBar) {
         progressBar.style.width = "0%";
-        progressBar.style.backgroundColor = "#4CAF50";
+        progressBar.classList.remove('error');
     }
     if (pctText) pctText.innerText = "Starting upgrade for " + filename + "...";
     
@@ -1651,7 +1650,7 @@ function startFlash(filename) {
         isFlashing = false;
         toggleInteraction(true);
         if (pctText) pctText.innerText = "Error starting flash: " + error.message;
-        if (progressBar) progressBar.style.backgroundColor = "red";
+        if (progressBar) progressBar.classList.add('error');
         
         // Restart polling on start failure
         if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
@@ -1672,8 +1671,8 @@ function handleFlashMessage(data) {
             let pctText = document.getElementById("flashPercentageText");
             let progressSection = document.getElementById("flashProgressSection");
             
-            if (progressSection && progressSection.style.display === "none") {
-                 progressSection.style.display = "block";
+            if (progressSection && !progressSection.classList.contains('active')) {
+                 progressSection.classList.add('active');
             }
             
             if (msg.hasOwnProperty('percent')) {
@@ -1694,7 +1693,7 @@ function handleFlashMessage(data) {
                 if (msg.result === 0 && progressBar) {
                     progressBar.style.width = "100%";
                 } else if (progressBar) {
-                    progressBar.style.backgroundColor = "red";
+                    progressBar.classList.add('error');
                 }
                 
                 // Restart polling

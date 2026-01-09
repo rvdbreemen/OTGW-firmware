@@ -28,6 +28,9 @@
 #include "Wire.h"
 #include "OTGW-ModUpdateServer.h"
 #include <Hash.h>
+
+// External flag to track ESP flashing state
+extern bool isESPFlashing;
 #include <base64.h>
 
 #ifndef Debug
@@ -78,6 +81,9 @@ ESP8266HTTPUpdateServerTemplate<ServerType>::ESP8266HTTPUpdateServerTemplate(boo
   _isWebSocket = false;
   _lastEventMs = 0;
   _lastEventPhase = UPDATE_IDLE;
+  _lastDogFeedTime = 0;
+  _lastFeedbackBytes = 0;
+  _lastProgressPerc = 0;
   _resetStatus();
 }
 
@@ -232,8 +238,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         }
 
         // Set global flag to disable background tasks during ESP flash
-        extern bool isESPFlashing;
-        isESPFlashing = true;
+        ::isESPFlashing = true;
         
         WiFiUDP::stopAll();
         if (_serial_output)
@@ -251,6 +256,11 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _status.upload_received = 0;
         _status.flash_total = uploadTotal;
         _status.flash_written = 0;
+
+        // Initialize throttle variables
+        _lastDogFeedTime = millis();
+        _lastFeedbackBytes = 0;
+        _lastProgressPerc = 0;
 
         if (upload.name == "filesystem") {
           // --- Preserve settings logic ---
@@ -288,20 +298,38 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           }
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
-        if (_serial_output) {Debug("."); blinkLEDnow(LED1);}
-        // Feed the dog before it bites!
-        Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
-        // End of feeding hack
+        // Feed the dog occasionally (every 500ms) to avoid I2C blocking overhead
+        if ((unsigned long)(millis() - _lastDogFeedTime) > 500) {
+            Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
+            _lastDogFeedTime = millis();
+        }
+        
         size_t written = Update.write(upload.buf, upload.currentSize);
         _status.upload_received = upload.totalSize;
         _status.flash_written += written;
+        
         if (written != upload.currentSize) {
           _setUpdaterError();
           _setStatus(UPDATE_ERROR, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, _updaterError);
           _sendStatusEvent();
         } else {
-          _setStatus(UPDATE_WRITE, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, emptyString);
-          _sendStatusEvent();
+          // Throttled feedback (every ~2048 bytes)
+          if ((_status.flash_written - _lastFeedbackBytes) >= 2048) {
+              if (_serial_output) {
+                  Debug("."); 
+                  blinkLEDnow(LED1);
+                  if (_status.flash_total > 0) {
+                      int currentPerc = (_status.flash_written * 100) / _status.flash_total;
+                      if (currentPerc >= _lastProgressPerc + 10) {
+                          Debugf(" %d%% ", currentPerc);
+                          _lastProgressPerc = currentPerc;
+                      }
+                  }
+              }
+              _lastFeedbackBytes = _status.flash_written;
+              _setStatus(UPDATE_WRITE, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, emptyString);
+              _sendStatusEvent();
+          }
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
         if(Update.end(true)){ //true to set the size to the current progress
@@ -352,16 +380,14 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           _sendStatusEvent();
           
           // Clear global flag - flash completed successfully
-          extern bool isESPFlashing;
-          isESPFlashing = false;
+          ::isESPFlashing = false;
         } else {
           _setUpdaterError();
           _setStatus(UPDATE_ERROR, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, _updaterError);
           _sendStatusEvent();
           
           // Clear global flag - flash failed
-          extern bool isESPFlashing;
-          isESPFlashing = false;
+          ::isESPFlashing = false;
         }
         // if (_serial_output) 
         //   OTGWSerial.setDebugOutput(false);
@@ -379,8 +405,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _sendStatusEvent();
         
         // Clear global flag - flash aborted
-        extern bool isESPFlashing;
-        isESPFlashing = false;
+        ::isESPFlashing = false;
       }
       // Delay of 1ms to prevent network starvation (needed when no Telnet/Debug is active)
       delay(1);

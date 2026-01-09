@@ -99,6 +99,9 @@ class ESP8266HTTPUpdateServerTemplate
     const char *_serverIndex;
     const char *_serverSuccess;
     String _savedSettings;
+    size_t _lastFeedbackBytes;
+    unsigned long _lastDogFeedTime;
+    int _lastProgressPerc;
     UpdateStatus _status;
     WiFiClient _eventClient;
     bool _eventClientActive;
