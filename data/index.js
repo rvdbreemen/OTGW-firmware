@@ -104,7 +104,9 @@ let flashModeActive = false; // Track if we're on the flash page
 // File Streaming Variables
 let logDirectoryHandle = null;
 let fileStreamHandle = null;
-let fileWritableStream = null;
+let fileWritableStream = null; // Deprecated, kept for cleanup just in case
+let logWriteQueue = [];
+let isLogWriting = false;
 let isStreamingToFile = false;
 let streamBytesWritten = 0;
 let fileRotationTimer = null;
@@ -660,9 +662,15 @@ function setupOTLogControls() {
   const chkStream = document.getElementById('chkStreamToFile');
   if (chkStream) {
     if (!('showDirectoryPicker' in window)) {
-       // Hide if not supported (requires Chrome/Edge/Opera for File System Access API)
-       const lbl = document.getElementById('lblStreamToFile');
-       if (lbl) lbl.style.display = 'none';
+        // API not supported (requires Secure Context: HTTPS or Localhost)
+        // Instead of hiding, disable and explain
+        const lbl = document.getElementById('lblStreamToFile');
+        if (lbl) {
+            lbl.title = "Not Available: Requires HTTPS or Localhost (Browser Security)";
+            lbl.style.opacity = "0.5";
+            lbl.style.cursor = "not-allowed";
+        }
+        chkStream.disabled = true;
     } else {
        chkStream.addEventListener('change', async function(e) {
          if (e.target.checked) {
@@ -791,28 +799,16 @@ async function rotateLogFile() {
     if (!logDirectoryHandle) return false;
 
     const dateStr = getTodayDateString();
-    // If the date hasn't changed and we have a stream, do nothing
-    if (currentLogDateStr === dateStr && fileWritableStream) return true;
+    // If the date hasn't changed and we have a handle, do nothing
+    if (currentLogDateStr === dateStr && fileStreamHandle) return true;
 
     try {
-        // Close existing stream if open
-        if (fileWritableStream) {
-            await fileWritableStream.close();
-        }
-
         currentLogDateStr = dateStr;
         const filename = `otmonitor-${dateStr}.log`;
 
         // Get file handle (create if not exists)
         fileStreamHandle = await logDirectoryHandle.getFileHandle(filename, { create: true });
         
-        // Create writable stream
-        fileWritableStream = await fileStreamHandle.createWritable({ keepExistingData: true });
-        
-        // Seek to end
-        const file = await fileStreamHandle.getFile();
-        await fileWritableStream.write({ type: 'seek', position: file.size });
-
         console.log(`Rotated log file to: ${filename}`);
         
         // Update UI
@@ -821,9 +817,9 @@ async function rotateLogFile() {
         if (displayEl) displayEl.style.display = 'inline';
         if (filenameEl) filenameEl.textContent = filename;
 
-        // Mark session start
+        // Mark session start (Queue it)
         const timestamp = new Date().toLocaleString();
-        await fileWritableStream.write(`\n# Session started: ${timestamp}\n`);
+        enqueueLogLine(`\n# Session started: ${timestamp}`);
         
         return true;
     } catch (e) {
@@ -850,11 +846,8 @@ function stopFileStreaming() {
       fileRotationTimer = null;
   }
   
-  if (fileWritableStream) {
-    fileWritableStream.close();
-    fileWritableStream = null;
-  }
-  fileStreamHandle = null;
+  // Clear any pending queue
+  logWriteQueue = [];
   
   // Hide UI
   const displayEl = document.getElementById('logFileDisplay');
@@ -863,19 +856,69 @@ function stopFileStreaming() {
   console.log("File streaming stopped.");
 }
 
+function enqueueLogLine(text) {
+    if (!text) return;
+    if (!text.endsWith('\n')) text += '\n';
+    logWriteQueue.push(text);
+    processLogQueue();
+}
+
+async function processLogQueue() {
+    if (isLogWriting || logWriteQueue.length === 0 || !fileStreamHandle) return;
+    isLogWriting = true;
+
+    try {
+        // Drain queue
+        const linesToWrite = [...logWriteQueue];
+        logWriteQueue = []; 
+        
+        if (linesToWrite.length === 0) {
+            isLogWriting = false;
+            return;
+        }
+
+        // Open stream (This operation locks the file for the duration)
+        const writable = await fileStreamHandle.createWritable({ keepExistingData: true });
+        
+        // Seek to end to ensure appending
+        const file = await fileStreamHandle.getFile();
+        if (file.size > 0) {
+            await writable.seek(file.size);
+        }
+        
+        // Write the batch of lines
+        const blob = new Blob([linesToWrite.join('')], { type: 'text/plain' });
+        await writable.write(blob);
+        
+        // Close to flush to disk immediately
+        await writable.close();
+
+    } catch (err) {
+        console.error("Error writing log queue:", err);
+        // If error occurs (e.g. permission revoked), stop streaming
+        stopFileStreaming();
+        const chk = document.getElementById('chkStreamToFile');
+        if (chk) chk.checked = false;
+        alert("File stream write failed: " + err.message);
+    } finally {
+        isLogWriting = false;
+        // Check if more lines were added while we were writing
+        if (logWriteQueue.length > 0) {
+            // Process next batch immediately (microtask)
+            processLogQueue();
+        }
+    }
+}
+
 async function writeToStream(entry) {
-  if (!fileWritableStream) return;
+  if (!isStreamingToFile) return;
   try {
     const text = formatLogLine(entry.data);
     const line = showTimestamps ? `${entry.time} ${text}` : text;
-    await fileWritableStream.write(line + '\n');
+    enqueueLogLine(line);
     streamBytesWritten += line.length + 1;
   } catch (err) {
-    console.error("Error writing to stream:", err);
-    // If error occurs (e.g. permission revoked), stop streaming
-    stopFileStreaming();
-    const chk = document.getElementById('chkStreamToFile');
-    if (chk) chk.checked = false;
+    console.error("Error preparing stream write:", err);
   }
 }
 
