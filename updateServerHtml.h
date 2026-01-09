@@ -24,6 +24,8 @@ static const char UpdateServerIndex[] PROGMEM =
         #updateError { color: #b00020; font-weight: bold; }
         html.dark #updateError { color: #ff5555; }
         .small { font-size: 0.9em; }
+        #successLink { color: #0000EE; font-weight: bold; }
+        html.dark #successLink { color: #8ab4f8; }
      </style>
      </head>
      <body>
@@ -64,10 +66,10 @@ static const char UpdateServerIndex[] PROGMEM =
          <progress id='flashProgress' value='0' max='100'></progress>
          <div id='flashProgressText'>Flashing: 0% (0 B / 0 B)</div>
          <div id='updateError'></div>
-       </div>
-       <div id='successPanel' class='small' style='display: none;'>
-         <div id='successMessage'>Update successful. Rebooting device...</div>
-         <div>Wait <span id='successCountdown'>60</span> seconds. <a id='successLink' href='/'>Go back to main page</a></div>
+         <div id='successPanel' class='small' style='display: none; border-top: 1px solid #ccc; margin-top: 10px; padding-top: 5px;'>
+           <div id='successMessage'>Update successful. Rebooting device...</div>
+           <div>Wait <span id='successCountdown'>60</span> seconds. <a id='successLink' href='/'>Go back to main page</a></div>
+         </div>
        </div>
        <div class='small'>If the device reboots, refresh this page after it comes back.</div>
      </div>
@@ -167,6 +169,18 @@ static const char UpdateServerIndex[] PROGMEM =
           successCountdownEl.textContent = remaining;
           successTimer = setInterval(function() {
              remaining -= 1;
+             
+             // Active Polling: Check if device is back online
+             fetch('/', { method: 'GET', cache: 'no-store' })
+              .then(function(res) {
+                if (res.ok) {
+                   clearInterval(successTimer);
+                   successTimer = null;
+                   if (successMessageEl) successMessageEl.textContent = 'Device back online! Redirecting...';
+                   window.location.href = "/"; 
+                }
+              }).catch(function(e){ /* ignore, still rebooting */ });
+
              if (remaining <= 0) {
                clearInterval(successTimer);
                successTimer = null;
@@ -296,8 +310,8 @@ static const char UpdateServerIndex[] PROGMEM =
              eventSource.onclose = function(e) {
                console.log("WS Disconnected");
                eventSource = null;
-               // Try to reconnect after 1s
-               reconnectTimer = setTimeout(startEvents, 1000);
+               // Try to reconnect after 3s
+               reconnectTimer = setTimeout(startEvents, 3000);
              };
            } else if (!!window.EventSource) {
              if (eventSource) return;
