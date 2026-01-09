@@ -546,7 +546,9 @@ def rename_build_artifacts(project_dir, semver):
         if ".ino.littlefs" in file_path.name:
             new_name = file_path.stem.replace(".ino.littlefs", "") + f".{semver}.littlefs.bin"
         else:
-            new_name = file_path.stem + f".{semver}.littlefs.bin"
+            # Remove .littlefs from stem to avoid double extension
+            base_name = file_path.stem.replace(".littlefs", "")
+            new_name = base_name + f".{semver}.littlefs.bin"
         new_path = file_path.parent / new_name
         file_path.rename(new_path)
         renamed.append(new_path)

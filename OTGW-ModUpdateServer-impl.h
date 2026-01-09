@@ -300,9 +300,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           }
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
-        // Feed the dog occasionally (every 1000ms) to avoid I2C blocking overhead
-        // Increased interval to reduce I2C bus contention
-        if ((unsigned long)(millis() - _lastDogFeedTime) > 1000) {
+        // Feed the dog occasionally (every 2000ms) to avoid I2C blocking overhead
+        // Increased interval to reduce I2C bus contention and improve upload stability
+        if ((unsigned long)(millis() - _lastDogFeedTime) > 2000) {
             Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
             _lastDogFeedTime = millis();
         }
@@ -319,8 +319,8 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           _setStatus(UPDATE_ERROR, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, _updaterError);
           _sendStatusEvent();
         } else {
-          // Time-based feedback (every 1000ms) to prevent network congestion
-          if ((unsigned long)(millis() - _lastFeedbackTime) > 1000) {
+          // Time-based feedback (every 2000ms) to prevent network congestion and upload failures
+          if ((unsigned long)(millis() - _lastFeedbackTime) > 2000) {
               if (_serial_output) {
                   Debug("."); 
                   blinkLEDnow(LED1);
@@ -413,8 +413,8 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         // Clear global flag - flash aborted
         ::isESPFlashing = false;
       }
-      // Delay of 1ms to prevent network starvation (needed when no Telnet/Debug is active)
-      delay(1);
+      // Yield to allow network processing without adding unnecessary delay
+      yield();
     });
 }
 
@@ -626,21 +626,26 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
   }
   
   // Robustness: Check if we can write without blocking
-  // If the send buffer is full (e.g. network congestion), skip this update
-  // to prioritize the file upload process.
+  // CRITICAL FIX: During UPLOAD_WRITE, we MUST send status to keep WebSocket alive
+  // If buffer is full, wait for it to drain to prevent client timeout at ~51%
   size_t available = _eventClient.availableForWrite();
 
-  // If this is a final state, we really want to send it, so we can afford to wait a bit
-  // This "speed reads" the buffer by yielding to the network stack
-  bool isFinalState = (_status.phase == UPDATE_END || _status.phase == UPDATE_ERROR || _status.phase == UPDATE_ABORT);
+  // Determine if this is a critical update that MUST be sent
+  // Final states + WRITE phase during upload (to prevent timeout)
+  bool isCriticalUpdate = (_status.phase == UPDATE_END || 
+                          _status.phase == UPDATE_ERROR || 
+                          _status.phase == UPDATE_ABORT ||
+                          _status.phase == UPDATE_WRITE);  // WRITE is critical to keep WebSocket alive
   
-  if (available < msgLen && isFinalState) {
-      // Try to wait for buffer to drain (max 1000ms)
+  if (available < msgLen && isCriticalUpdate) {
+      // Wait for buffer to drain (max 2000ms for uploads, 1000ms for final states)
+      unsigned long maxWait = (_status.phase == UPDATE_WRITE) ? 2000 : 1000;
       unsigned long startWait = millis();
       // Cast the millis() difference to int32_t so the timeout remains correct even when
       // millis() wraps around (standard rollover-safe timing idiom on 32-bit counters).
-      while (available < msgLen && (int32_t)(millis() - startWait) < 1000) {
+      while (available < msgLen && (int32_t)(millis() - startWait) < (int32_t)maxWait) {
           yield(); // Allow network stack to process and drain buffer
+          _eventClient.flush();  // Force flush to drain buffer faster
           available = _eventClient.availableForWrite();
       }
   }
