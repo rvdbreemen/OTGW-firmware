@@ -83,6 +83,7 @@ ESP8266HTTPUpdateServerTemplate<ServerType>::ESP8266HTTPUpdateServerTemplate(boo
   _lastEventPhase = UPDATE_IDLE;
   _lastDogFeedTime = 0;
   _lastFeedbackBytes = 0;
+  _lastFeedbackTime = 0;
   _lastProgressPerc = 0;
   _resetStatus();
 }
@@ -259,6 +260,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
 
         // Initialize throttle variables
         _lastDogFeedTime = millis();
+        _lastFeedbackTime = millis();
         _lastFeedbackBytes = 0;
         _lastProgressPerc = 0;
 
@@ -298,8 +300,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           }
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
-        // Feed the dog occasionally (every 500ms) to avoid I2C blocking overhead
-        if ((unsigned long)(millis() - _lastDogFeedTime) > 500) {
+        // Feed the dog occasionally (every 1000ms) to avoid I2C blocking overhead
+        // Increased interval to reduce I2C bus contention
+        if ((unsigned long)(millis() - _lastDogFeedTime) > 1000) {
             Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
             _lastDogFeedTime = millis();
         }
@@ -308,13 +311,16 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _status.upload_received = upload.totalSize;
         _status.flash_written += written;
         
+        // Yield to SDK to keep WiFi alive
+        yield();
+        
         if (written != upload.currentSize) {
           _setUpdaterError();
           _setStatus(UPDATE_ERROR, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, _updaterError);
           _sendStatusEvent();
         } else {
-          // Throttled feedback (every ~2048 bytes)
-          if ((_status.flash_written - _lastFeedbackBytes) >= 2048) {
+          // Time-based feedback (every 1000ms) to prevent network congestion
+          if ((unsigned long)(millis() - _lastFeedbackTime) > 1000) {
               if (_serial_output) {
                   Debug("."); 
                   blinkLEDnow(LED1);
@@ -326,7 +332,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
                       }
                   }
               }
-              _lastFeedbackBytes = _status.flash_written;
+              _lastFeedbackTime = millis();
               _setStatus(UPDATE_WRITE, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, emptyString);
               _sendStatusEvent();
           }
