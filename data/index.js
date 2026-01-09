@@ -392,8 +392,8 @@ function parseLogLine(line) {
   const oRaw    = 19 + offset; // Source(18) + Space(1) = 19
   const oId     = 29 + offset; // Raw(9) + Space(1) = 10. 19+10=29
   const oType   = 33 + offset; // ID(3) + Space(1) = 4. 29+4=33
-  const oValid  = 50 + offset; // Type(16) + Space(1) = 17. 33+17=50
-  const oPayload= 52 + offset; // Valid(1) + Space(1) = 2. 50+2=52 
+  const oValid  = 49 + offset; // Type(16). 33+16=49
+  const oPayload= 51 + offset; // Valid(1) + Space(1) = 2. 49+2=51 
 
   try {
      // Safety check on length (Source + Raw + ID must exist)
