@@ -301,7 +301,19 @@ void do5minevent(){
 void doBackgroundTasks()
 {
   feedWatchDog();               // Feed the dog before it bites!
+  
   if (WiFi.status() == WL_CONNECTED) {
+    // During ESP firmware flash, keep essential services but skip heavy background tasks
+    // Keep: HTTP server (upload chunks), Telnet (debug), MDNS (network discovery)
+    // Skip: MQTT, OTGW, WebSocket logs, NTP to reduce interference
+    if (isESPFlashing) {
+      handleDebug();              // Keep telnet debug active for monitoring
+      httpServer.handleClient();  // MUST continue - processes upload chunks
+      MDNS.update();              // Keep MDNS active for network discovery
+      delay(1);
+      return;
+    }
+    
     //while connected handle everything that uses network stuff
     handleDebug();
     handleMQTT();                 // MQTT transmissions

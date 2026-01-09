@@ -231,6 +231,10 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           return;
         }
 
+        // Set global flag to disable background tasks during ESP flash
+        extern bool isESPFlashing;
+        isESPFlashing = true;
+        
         WiFiUDP::stopAll();
         if (_serial_output)
           Debugf("Update: %s\r\n", upload.filename.c_str());
@@ -346,10 +350,18 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           }
           _setStatus(UPDATE_END, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, emptyString);
           _sendStatusEvent();
+          
+          // Clear global flag - flash completed successfully
+          extern bool isESPFlashing;
+          isESPFlashing = false;
         } else {
           _setUpdaterError();
           _setStatus(UPDATE_ERROR, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, _updaterError);
           _sendStatusEvent();
+          
+          // Clear global flag - flash failed
+          extern bool isESPFlashing;
+          isESPFlashing = false;
         }
         // if (_serial_output) 
         //   OTGWSerial.setDebugOutput(false);
@@ -365,6 +377,10 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         }
         _setStatus(UPDATE_ABORT, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, emptyString);
         _sendStatusEvent();
+        
+        // Clear global flag - flash aborted
+        extern bool isESPFlashing;
+        isESPFlashing = false;
       }
       // Delay of 1ms to prevent network starvation (needed when no Telnet/Debug is active)
       delay(1);
