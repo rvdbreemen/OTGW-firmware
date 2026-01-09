@@ -78,6 +78,7 @@ uint32_t    upTimeSeconds = 0;
 uint32_t    rebootCount = 0;
 String      sMessage = "";    
 uint32_t    MQTTautoConfigMap[8] = { 0 };
+bool        isESPFlashing = false;  // Flag to disable background tasks during ESP firmware flash
 
 //Use acetime
 using namespace ace_time;
