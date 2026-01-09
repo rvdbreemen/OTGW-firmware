@@ -1757,7 +1757,14 @@ function otmGetTypeNibbleChar(raw) {
   if (typeof raw !== 'string' || !raw) return null;
   const s = raw.trim();
   if (!s) return null;
+  
   // OTGW log frames are typically formatted as "<SRC><8-hex>", e.g. "B40000000".
+  // Standard OT messages are 32-bit (8 hex chars). If length is 9, assume first char is Source prefix.
+  // This handles cases where Source is 'B' (Boiler) or 'A' (Answer) which are also valid hex chars.
+  if (s.length === 9 && /[0-9A-Fa-f]/.test(s.charAt(1))) {
+    return s.charAt(1);
+  }
+
   // In that case, the message type nibble is the first hex char after the SRC letter.
   if (s.length >= 2 && !/[0-9A-Fa-f]/.test(s.charAt(0)) && /[0-9A-Fa-f]/.test(s.charAt(1))) {
     return s.charAt(1);
@@ -1850,10 +1857,21 @@ function processStatsLine(line) {
     
     // OTmonitor filter logic: Only these types carry unique data points to track statistics.
     // 0 (Read-Data) is request. 5 (Write-Ack) is ack.
-    if (typeCode === null || ![1, 4, 6, 7].includes(typeCode)) return;
+    // Exception: ID 0 (Status) carries Master Status in Type 0 (Read-Data) and Slave Status in Type 4 (Read-Ack).
+    // Both are meaningful unique messages for ID 0.
+    const isStatusMsg = (id === 0);
+    const isValidType = [1, 4, 6, 7].includes(typeCode) || (isStatusMsg && typeCode === 0);
+    
+    if (typeCode === null || !isValidType) return;
 
     const dirStr = (typeof line.dir === 'string' && line.dir) ? line.dir : '';
-    const dirLabel = otmDirectionLabel(typeCode, dirStr);
+    let dirLabel = otmDirectionLabel(typeCode, dirStr);
+
+    // If we allowed Type 0 for Status, ensure it has a label (typically it falls back to '0' or dirStr)
+    // Map Type 0 to 'Read' to match OTmonitor style, or 'Read-Data' if preferred. 
+    // OTmonitor maps Type 4 to 'Read'. Type 1 to 'Write'. 
+    if (typeCode === 0 && (!dirLabel || dirLabel === '0')) dirLabel = 'Read';
+
     if (!dirLabel) return;
 
     let label = (typeof line.label === 'string' && line.label.trim() !== '') ? line.label : 'Unknown';
