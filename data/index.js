@@ -758,6 +758,8 @@ function syncCaptureMode() {
 //============================================================================
 // File Streaming Implementation (File System Access API)
 //============================================================================
+let logFlushTimer = null;
+
 async function startFileStreaming() {
   try {
     // Prompt user to select directory
@@ -774,6 +776,10 @@ async function startFileStreaming() {
     // Start the rotation check timer (every minute)
     if (fileRotationTimer) clearInterval(fileRotationTimer);
     fileRotationTimer = setInterval(checkFileRotation, 60000);
+
+    // Start flush timer (10s) to limit disk writes
+    if (logFlushTimer) clearInterval(logFlushTimer);
+    logFlushTimer = setInterval(processLogQueue, 10000);
 
     // Initial file open
     return await rotateLogFile();
@@ -804,7 +810,7 @@ async function rotateLogFile() {
 
     try {
         currentLogDateStr = dateStr;
-        const filename = `otmonitor-${dateStr}.log`;
+        const filename = `ot-monitor-${dateStr}.log`;
 
         // Get file handle (create if not exists)
         fileStreamHandle = await logDirectoryHandle.getFileHandle(filename, { create: true });
@@ -818,8 +824,7 @@ async function rotateLogFile() {
         if (filenameEl) filenameEl.textContent = filename;
 
         // Mark session start (Queue it)
-        const timestamp = new Date().toLocaleString();
-        enqueueLogLine(`\n# Session started: ${timestamp}`);
+        enqueueLogLine(`\n# Start of logging`);
         
         return true;
     } catch (e) {
@@ -830,11 +835,25 @@ async function rotateLogFile() {
     }
 }
 
-function checkFileRotation() {
+async function checkFileRotation() {
     if (!isStreamingToFile) return;
     const dateStr = getTodayDateString();
     if (currentLogDateStr !== dateStr) {
         console.log("Midnight detected, rotating log file...");
+        enqueueLogLine(`# End of log for ${currentLogDateStr}`);
+        
+        // Best effort flush before rotation
+        if (!isLogWriting) {
+           await processLogQueue();
+        } else {
+           let checks = 0;
+           while(isLogWriting && checks < 10) {
+               await new Promise(r => setTimeout(r, 100));
+               checks++;
+           }
+           await processLogQueue();
+        }
+
         rotateLogFile();
     }
 }
@@ -845,9 +864,13 @@ function stopFileStreaming() {
       clearInterval(fileRotationTimer);
       fileRotationTimer = null;
   }
+  if (logFlushTimer) {
+      clearInterval(logFlushTimer);
+      logFlushTimer = null;
+  }
   
-  // Clear any pending queue
-  logWriteQueue = [];
+  // Flush remaining queue
+  processLogQueue();
   
   // Hide UI
   const displayEl = document.getElementById('logFileDisplay');
@@ -860,7 +883,6 @@ function enqueueLogLine(text) {
     if (!text) return;
     if (!text.endsWith('\n')) text += '\n';
     logWriteQueue.push(text);
-    processLogQueue();
 }
 
 async function processLogQueue() {
