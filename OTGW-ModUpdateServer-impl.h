@@ -300,42 +300,22 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           }
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
-        // Feed the dog occasionally (every 2000ms) to avoid I2C blocking overhead
-        // Increased interval to reduce I2C bus contention and improve upload stability
-        if ((unsigned long)(millis() - _lastDogFeedTime) > 2000) {
-            Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
-            _lastDogFeedTime = millis();
-        }
+        if (_serial_output) {Debug("."); blinkLEDnow(LED1);}
+
+        // Feed the dog on every chunk (Main branch behavior)
+        Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
         
         size_t written = Update.write(upload.buf, upload.currentSize);
         _status.upload_received = upload.totalSize;
         _status.flash_written += written;
-        
-        // Yield to SDK to keep WiFi alive
-        yield();
         
         if (written != upload.currentSize) {
           _setUpdaterError();
           _setStatus(UPDATE_ERROR, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, _updaterError);
           _sendStatusEvent();
         } else {
-          // Time-based feedback (every 2000ms) to prevent network congestion and upload failures
-          if ((unsigned long)(millis() - _lastFeedbackTime) > 2000) {
-              if (_serial_output) {
-                  Debug("."); 
-                  blinkLEDnow(LED1);
-                  if (_status.flash_total > 0) {
-                      int currentPerc = (_status.flash_written * 100) / _status.flash_total;
-                      if (currentPerc >= _lastProgressPerc + 10) {
-                          Debugf(" %d%% ", currentPerc);
-                          _lastProgressPerc = currentPerc;
-                      }
-                  }
-              }
-              _lastFeedbackTime = millis();
-              _setStatus(UPDATE_WRITE, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, emptyString);
-              _sendStatusEvent();
-          }
+          _setStatus(UPDATE_WRITE, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, emptyString);
+          _sendStatusEvent();
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
         if(Update.end(true)){ //true to set the size to the current progress
@@ -413,8 +393,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         // Clear global flag - flash aborted
         ::isESPFlashing = false;
       }
-      // Yield to allow network processing without adding unnecessary delay
-      yield();
+      delay(0);
     });
 }
 
@@ -638,13 +617,12 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
                           _status.phase == UPDATE_WRITE);  // WRITE is critical to keep WebSocket alive
   
   if (available < msgLen && isCriticalUpdate) {
-      // Wait for buffer to drain (max 2000ms for uploads, 1000ms for final states)
-      unsigned long maxWait = (_status.phase == UPDATE_WRITE) ? 2000 : 1000;
+      // Wait for buffer to drain (max 1000ms)
+      unsigned long maxWait = 1000;
       unsigned long startWait = millis();
       // Cast the millis() difference to int32_t so the timeout remains correct even when
       // millis() wraps around (standard rollover-safe timing idiom on 32-bit counters).
       while (available < msgLen && (int32_t)(millis() - startWait) < (int32_t)maxWait) {
-          yield(); // Allow network stack to process and drain buffer
           _eventClient.flush();  // Force flush to drain buffer faster
           available = _eventClient.availableForWrite();
       }
@@ -667,7 +645,6 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
       }
       _lastEventMs = now;
       _lastEventPhase = _status.phase;
-      yield(); 
   } else {
       if (_serial_output) {
           Debugf("WS: Buffer full (avail: %u, need: %u). Skipping update.\r\n", available, msgLen);

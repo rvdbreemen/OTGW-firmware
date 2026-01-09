@@ -26,7 +26,8 @@ void sendStartJsonObj(const char *objName)
   }
   httpServer.sendHeader("Access-Control-Allow-Origin", "*");
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  httpServer.send(200, "application/json", sBuff);
+  httpServer.send(200, "application/json", " ");
+  httpServer.sendContent(sBuff);
   iIdentlevel++;
   bFirst = true;
 
@@ -49,7 +50,8 @@ void sendStartJsonArray()
 {
   httpServer.sendHeader("Access-Control-Allow-Origin", "*");
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  httpServer.send(200, "application/json", "[\r\n");
+  httpServer.send(200, "application/json", " ");
+  httpServer.sendContent("[\r\n");
   iIdentlevel++;
   bFirst = true;
 
