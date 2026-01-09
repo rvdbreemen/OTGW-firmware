@@ -63,8 +63,11 @@ void processAPI()
     return;
   }
 
-  if (ESP.getFreeHeap() < 8500) // to prevent firmware from crashing!
+  if (ESP.getFreeHeap() < 4096) // to prevent firmware from crashing!
   {
+    // Lowered from 8500 to 4096 in v1.0.0-rc3.
+    // The new WebSocket server (port 81) consumes significant heap, establishing a new lower normal baseline.
+    // The REST API refactor to C-strings reduces fragmentation, making operation at 4KB safe.
     RESTDebugTf(PSTR("==> Bailout due to low heap (%d bytes))\r\n"), ESP.getFreeHeap() );
     httpServer.send(500, "text/plain", "500: internal server error (low heap)\r\n"); 
     return;
@@ -224,7 +227,6 @@ void sendOTGWvalue(int msgid){
   //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff.c_str());
   //reply with json
   httpServer.sendHeader("Access-Control-Allow-Origin", "*");
-  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send(200, "application/json", sBuff);
 }
 
@@ -258,7 +260,6 @@ void sendOTGWlabel(const char *msglabel){
   //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff.c_str());
   //reply with json
   httpServer.sendHeader("Access-Control-Allow-Origin", "*");
-  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send(200, "application/json", sBuff);
 }
 
