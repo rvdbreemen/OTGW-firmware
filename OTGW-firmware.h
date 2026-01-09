@@ -133,6 +133,13 @@ bool      settingNTPsendtime = false;
 bool      settingLEDblink = true;
 bool      settingDarkTheme = false;
 
+// WebUI Settings (persisted)
+bool      settingUIAutoScroll = true;
+bool      settingUIShowTimestamp = true;
+bool      settingUICaptureMode = false;
+bool      settingUIAutoScreenshot = false;
+int       settingUIGraphTimeWindow = 60; // Default to 1 Hour (60 minutes)
+
 // GPIO Sensor Settings
 bool      settingGPIOSENSORSenabled = false;
 int8_t    settingGPIOSENSORSpin = 13;            // GPIO 13 = D7, GPIO 10 = SDIO 3  
