@@ -100,6 +100,7 @@ class ESP8266HTTPUpdateServerTemplate
     const char *_serverSuccess;
     String _savedSettings;
     size_t _lastFeedbackBytes;
+    unsigned long _lastFeedbackTime;
     unsigned long _lastDogFeedTime;
     int _lastProgressPerc;
     UpdateStatus _status;
