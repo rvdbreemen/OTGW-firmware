@@ -127,6 +127,20 @@ var OTGraph = {
                  this.toggleAutoScreenshot(e.target.checked);
             });
         }
+        
+        var btnExport = document.getElementById('btnGraphExport');
+        if (btnExport) {
+            btnExport.addEventListener('click', () => {
+                this.exportData(false);
+            });
+        }
+
+        var chkAutoExport = document.getElementById('chkAutoExport');
+        if (chkAutoExport) {
+            chkAutoExport.addEventListener('change', (e) => {
+                 this.toggleAutoExport(e.target.checked);
+            });
+        }
 
         // Initialize empty data arrays if not present
         this.seriesConfig.forEach(c => {
@@ -161,36 +175,70 @@ var OTGraph = {
         if (this.captureTimer) clearInterval(this.captureTimer);
         
         if (enabled) {
-            console.log("Auto-Screenshot enabled (hourly)");
+            console.log("Auto-Screenshot enabled (every 15 minutes)");
             this.captureTimer = setInterval(() => {
-                var originalWindow = this.timeWindow;
-                var oneHour = 3600 * 1000;
-                
-                // If we are already close to 1 hour (tolerance 100ms), just snap
-                if (Math.abs(originalWindow - oneHour) < 100) {
-                    this.screenshot(true);
-                } else {
-                    console.log("Auto-switching to 1h for screenshot...");
-                    
-                    // Switch to 1h view
-                    this.timeWindow = oneHour;
-                    this.updateChart();
-                    
-                    // Wait for render to settle (1.5s), then snapshot and restore
-                    setTimeout(() => {
-                        this.screenshot(true);
-                        
-                        console.log("Restoring previous time window...");
-                        this.timeWindow = originalWindow;
-                        this.updateChart();
-                    }, 1500);
-                }
-            }, 3600 * 1000); // 1 hour
+                this.screenshot(true);
+            }, 15 * 60 * 1000); // 15 minutes
         } else {
             console.log("Auto-Screenshot disabled");
         }
     },
     
+    toggleAutoExport: function(enabled) {
+        if (this.exportTimer) clearInterval(this.exportTimer);
+        
+        if (enabled) {
+            console.log("Auto-Export enabled (every 15 minutes)");
+            this.exportTimer = setInterval(() => {
+                this.exportData(true);
+            }, 15 * 60 * 1000); // 15 minutes
+        } else {
+            console.log("Auto-Export disabled");
+        }
+    },
+
+    exportData: function(isAuto) {
+        var now = new Date();
+        var iso = now.toISOString().replace(/[:.]/g, '-').slice(0, -5); 
+        var prefix = isAuto ? 'otgw-data-auto-' : 'otgw-data-';
+        var filename = prefix + iso + '.csv';
+
+        // Header
+        var csv = "Timestamp,Dataset,Value\n";
+        
+        // Collect data in current time window
+        var startTime = now.getTime() - this.timeWindow;
+        
+        // Iterate all active series
+        this.seriesConfig.forEach(c => {
+             if (this.data[c.id]) {
+                 this.data[c.id].forEach(pt => {
+                     // pt is [timestamp, value]
+                     if (pt[0] >= startTime) {
+                         // Format timestamp to ISO
+                         var ts = new Date(pt[0]).toISOString();
+                         csv += `${ts},${c.name},${pt[1]}\n`;
+                     }
+                 });
+             }
+        });
+        
+        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+
+        // Try to save to FileSystem Handle first
+        if (window.saveBlobToLogDir) {
+            window.saveBlobToLogDir(filename, blob).then(success => {
+                if (success) {
+                   if (isAuto) console.log("Auto-captured graph data to disk: " + filename);
+                } else {
+                   this._downloadBlob(blob, filename);
+                }
+            });
+        } else {
+             this._downloadBlob(blob, filename);
+        }
+    },
+
     screenshot: function(isAuto) {
         if (!this.chart) return;
         
@@ -204,15 +252,48 @@ var OTGraph = {
         var iso = now.toISOString().replace(/[:.]/g, '-').slice(0, -5); // format: YYYY-MM-DDTHH-mm-ss
         var prefix = isAuto ? 'otgw-graph-auto-' : 'otgw-graph-';
         var filename = prefix + iso + '.png';
-        
+
+        // Try to safe to FileSystem Handle first (if available via index.js helper)
+        if (window.saveBlobToLogDir) {
+            // Convert DataURL to Blob
+            var arr = url.split(','), mime = arr[0].match(/:(.*?);/)[1],
+                bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+            while(n--) u8arr[n] = bstr.charCodeAt(n);
+            var blob = new Blob([u8arr], {type:mime});
+
+            window.saveBlobToLogDir(filename, blob).then(success => {
+                if (success) {
+                   if (isAuto) console.log("Auto-captured graph screenshot to disk: " + filename);
+                } else {
+                   // Fallback to download if save failed (e.g. handle not set)
+                   this._downloadFile(url, filename);
+                }
+            });
+        } else {
+             this._downloadFile(url, filename);
+        }
+    },
+
+    _downloadFile: function(url, filename) {
         var link = document.createElement('a');
         link.download = filename;
         link.href = url;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
-        if (isAuto) console.log("Auto-captured graph screenshot: " + filename);
+    },
+
+    _downloadBlob: function(blob, filename) {
+        var link = document.createElement('a');
+        if (link.download !== undefined) { 
+            var url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     },
 
     setTheme: function(newTheme) {
