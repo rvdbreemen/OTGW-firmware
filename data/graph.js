@@ -264,10 +264,20 @@ var OTGraph = {
                           this.pushData('chMode', now, ch);
                       }
             } else {
-                 // Analog values: use numeric JSON field `val` only
-                 if (line.val === undefined || line.val === null) return;
-                 if (typeof line.val !== 'number') return;
-                 var val = line.val;
+                 // Analog values: use numeric JSON field `val` only.
+                 // Fallback to parsing numeric value from string `value` if `val` is missing (legacy log lines)
+                 var val = null;
+                 if (line.val !== undefined && line.val !== null && typeof line.val === 'number') {
+                     val = line.val;
+                 } else if (typeof line.value === 'string') {
+                     // Try to parse number from start of string (e.g. "35.70 °C")
+                     var parsed = parseFloat(line.value);
+                     if (!isNaN(parsed)) {
+                         val = parsed;
+                     }
+                 }
+
+                 if (val === null) return;
                  
                  var key = null;
                  switch(id) {
