@@ -475,34 +475,46 @@
   background-color: transparent;
 }
 
-/* DevInfo */
+/* DevInfo - Grid Layout */
 .devinforow {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(150px, 2fr);
+  gap: 10px;
+  padding: 10px;
+  margin-bottom: 1px;
   background: rgb(28, 28, 30);
-  display: table-row;
   font-size: 14px;
+  align-items: center;
 }
-  .devinfocolumn1 {
-    display: table-cell;
-    float: left;
-    width: 160px;
-    padding-left: 10px;
-    font-size: 14px;
-  }
-  .devinfocolumn2 {
-    display: table-cell;
-    float: left;
-    width: 160px;
-    text-align: left;
-    font-size: 14px;
+
+.devinfocolumn1 {
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.devinfocolumn2 {
+  text-align: left;
+  word-break: break-word;
+}
+
+/* Responsive: Stack on small screens */
+@media (max-width: 600px) {
+  .devinforow {
+    grid-template-columns: 1fr;
+    gap: 5px;
+    padding: 8px;
   }
   
-  /* Clear floats after the columns */
-  .devinforow:after {
-    content: "";
-    display: table;
-    clear: both;
-    background: rgb(28, 28, 30);
+  .devinfocolumn1 {
+    font-weight: 600;
+    color: #5398cb;
   }
+  
+  .devinfocolumn2 {
+    padding-left: 10px;
+    font-size: 13px;
+  }
+}
   
  /* SettingsPage */
  #settingMessage {
@@ -913,3 +925,66 @@ body.disable-interaction {
   background-color: #2d2d2d;
 }
 
+/* Utility classes for common inline styles */
+.hidden { display: none !important; }
+.visible { display: block !important; }
+
+.page-section {
+  display: none;
+}
+
+.page-section.active {
+  display: block;
+}
+
+.firmware-info-div {
+  margin-bottom: 15px;
+  padding: 10px;
+}
+
+.firmware-row-bold {
+  font-weight: bold;
+}
+
+.firmware-icon {
+  width: 16px;
+  height: auto;
+}
+
+.firmware-progress {
+  display: block;
+}
+
+.otmonitor-row {
+  display: flex;
+}
+
+.otmonitor-row.hidden-row {
+  display: none !important;
+}
+
+.settings-field-container {
+  width: 320px;
+  float: left;
+}
+
+.flash-progress-bar {
+  width: 0%;
+  background-color: #4CAF50;
+}
+
+.flash-progress-bar.error {
+  background-color: red;
+}
+
+.flash-progress-section {
+  display: none;
+}
+
+.flash-progress-section.active {
+  display: block;
+}
+
+.waiting-error {
+  color: #ff6b6b;
+}
