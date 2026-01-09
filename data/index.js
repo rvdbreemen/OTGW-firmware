@@ -112,6 +112,25 @@ let streamBytesWritten = 0;
 let fileRotationTimer = null;
 let currentLogDateStr = "";
 
+// Expose helper for other modules (graph.js) to save files to the same directory
+window.saveBlobToLogDir = async function(filename, blob) {
+    if (!logDirectoryHandle) {
+        console.warn("saveBlobToLogDir: No log directory handle available.");
+        return false;
+    }
+    try {
+        const fileHandle = await logDirectoryHandle.getFileHandle(filename, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        console.log(`Saved ${filename} to log directory.`);
+        return true;
+    } catch (e) {
+        console.error("Failed to save blob to log directory:", e);
+        return false;
+    }
+};
+
 
 // WebSocket configuration: must match the WebSocket port used in webSocketStuff.ino (currently hardcoded as 81 in the WebSocketsServer constructor).
 const WEBSOCKET_PORT = 81;
@@ -697,8 +716,16 @@ function setupOTLogControls() {
   
   // Download log
   document.getElementById('btnDownloadLog').addEventListener('click', function() {
-    downloadLog();
+    downloadLog(false);
   });
+
+  // Auto Download Log
+  const chkAutoDL = document.getElementById('chkAutoDownloadLog');
+  if (chkAutoDL) {
+      chkAutoDL.addEventListener('change', function(e) {
+          toggleAutoDownloadLog(e.target.checked);
+      });
+  }
   
   // Search functionality
   document.getElementById('searchLog').addEventListener('input', function(e) {
@@ -945,9 +972,11 @@ async function writeToStream(entry) {
 }
 
 //============================================================================
-function downloadLog() {
+function downloadLog(isAuto = false) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-  const filename = `otgw-log-${timestamp}.txt`;
+  // Different prefix for auto
+  const prefix = isAuto ? 'otgw-log-auto-' : 'otgw-log-';
+  const filename = `${prefix}${timestamp}.txt`;
   
   let content = '# OTGW Log Export\n';
   content += `# Exported: ${new Date().toLocaleString()}\n`;
@@ -961,6 +990,23 @@ function downloadLog() {
   });
   
   const blob = new Blob([content], { type: 'text/plain' });
+
+  // Try to save to FileSystem Handle first (if available and function exists)
+  if (isAuto && window.saveBlobToLogDir) {
+        window.saveBlobToLogDir(filename, blob).then(success => {
+            if (success) {
+                console.log("Auto-saved log to disk: " + filename);
+            } else {
+                // Fallback
+                 forceDownloadBlob(blob, filename);
+            }
+        });
+  } else {
+      forceDownloadBlob(blob, filename);
+  }
+}
+
+function forceDownloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -970,6 +1016,26 @@ function downloadLog() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+// Auto Download Log Logic
+let autoDownloadLogTimer = null;
+function toggleAutoDownloadLog(enabled) {
+    if (autoDownloadLogTimer) {
+        clearInterval(autoDownloadLogTimer);
+        autoDownloadLogTimer = null;
+    }
+    
+    if (enabled) {
+        console.log("Auto-Download Log enabled (every 15 minutes)");
+        autoDownloadLogTimer = setInterval(() => {
+            downloadLog(true);
+        }, 15 * 60 * 1000); 
+    }
+    
+    // Save setting
+    if (typeof sendPostSetting === 'function') sendPostSetting('ui_autodownloadlog', enabled);
+}
+
 
 //============================================================================
 function escapeHtml(text) {
@@ -2348,6 +2414,16 @@ function loadPersistentUI() {
           if (chk) {
               chk.checked = (capVal === true || capVal === "true");
               if (typeof syncCaptureMode === 'function') syncCaptureMode();
+          }
+      }
+
+      // Auto Download Log
+      const dlVal = getVal("ui_autodownloadlog");
+      if (dlVal !== null) {
+          const chk = document.getElementById("chkAutoDownloadLog");
+          if (chk) {
+              chk.checked = (dlVal === true || dlVal === "true");
+              if (typeof toggleAutoDownloadLog === 'function') toggleAutoDownloadLog(chk.checked);
           }
       }
 
