@@ -634,6 +634,7 @@ function setupOTLogControls() {
     } else {
       btn.classList.remove('btn-active');
     }
+    if (typeof sendPostSetting === 'function') sendPostSetting('ui_autoscroll', autoScroll);
   });
 
   // Toggle Capture Mode
@@ -651,6 +652,7 @@ function setupOTLogControls() {
         }
       }
       updateLogCounters();
+      if (typeof sendPostSetting === 'function') sendPostSetting('ui_capture', e.target.checked);
     });
   }
 
@@ -702,6 +704,7 @@ function setupOTLogControls() {
   document.getElementById('chkShowTimestamp').addEventListener('change', function(e) {
     showTimestamps = e.target.checked;
     updateLogDisplay();
+    if (typeof sendPostSetting === 'function') sendPostSetting('ui_timestamps', e.target.checked);
   });
   
   // Manual scroll detection (disable auto-scroll if user scrolls up)
@@ -983,6 +986,9 @@ function initMainPage() {
 
   needReload = false;
   
+  setupPersistentUIListeners();
+  loadPersistentUI();
+
   applyTheme();
 
   if (typeof OTGraph !== 'undefined') {
@@ -2214,5 +2220,97 @@ function sortStats(col) {
         statsSortAsc = true;
     }
     updateStatisticsDisplay();
+}
+
+//============================================================================
+function setupPersistentUIListeners() {
+  const chkAutoScreenshot = document.getElementById('chkAutoScreenshot');
+  if (chkAutoScreenshot) {
+    chkAutoScreenshot.addEventListener('change', function(e) {
+      if (typeof sendPostSetting === 'function') sendPostSetting('ui_autoscreenshot', e.target.checked);
+    });
+  }
+  
+  const graphTimeWindow = document.getElementById('graphTimeWindow');
+  if (graphTimeWindow) {
+  graphTimeWindow.addEventListener('change', function(e) {
+      if (typeof sendPostSetting === 'function') sendPostSetting('ui_graphtimewindow', e.target.value);
+    });
+  }
+}
+
+function loadPersistentUI() {
+  console.log("Loading persistent UI settings...");
+  const apiPath = (typeof APIGW !== 'undefined') ? APIGW : (window.location.protocol + '//' + window.location.host + '/api/');
+  
+  fetch(apiPath + "v1/settings")
+    .then(response => response.json())
+    .then(json => {
+      if (!json || !json.settings) return;
+      const settings = json.settings;
+      const getVal = (name) => {
+        const s = settings.find(s => s.name === name);
+        return s ? s.value : null;
+      };
+
+      // Auto Scroll
+      const autoScrollVal = getVal("ui_autoscroll");
+      if (autoScrollVal !== null) {
+         const newVal = (autoScrollVal === true || autoScrollVal === "true");
+         if (typeof autoScroll !== 'undefined') autoScroll = newVal;
+         const btn = document.getElementById('btnAutoScroll');
+         if (btn) {
+           if (newVal) btn.classList.add('btn-active');
+           else btn.classList.remove('btn-active');
+         }
+      }
+
+      // Timestamps
+      const tsVal = getVal("ui_timestamps");
+      if (tsVal !== null) {
+          const chk = document.getElementById("chkShowTimestamp");
+          if (chk) {
+             chk.checked = (tsVal === true || tsVal === "true");
+             if (typeof showTimestamps !== 'undefined') showTimestamps = chk.checked;
+             if (typeof updateLogDisplay === 'function') updateLogDisplay();
+          }
+      }
+
+      // Capture
+      const capVal = getVal("ui_capture");
+      if (capVal !== null) {
+          const chk = document.getElementById("chkCaptureMode");
+          if (chk) {
+              chk.checked = (capVal === true || capVal === "true");
+              if (typeof syncCaptureMode === 'function') syncCaptureMode();
+          }
+      }
+
+      // Auto Screenshot
+      const shotVal = getVal("ui_autoscreenshot");
+      if (shotVal !== null) {
+          const chk = document.getElementById("chkAutoScreenshot");
+          if (chk) {
+             chk.checked = (shotVal === true || shotVal === "true");
+             if (typeof OTGraph !== 'undefined' && OTGraph.toggleAutoScreenshot) {
+                 OTGraph.toggleAutoScreenshot(chk.checked);
+             }
+          }
+      }
+
+      // Time Window
+      const timeVal = getVal("ui_graphtimewindow");
+      if (timeVal !== null && timeVal > 0) {
+          const sel = document.getElementById("graphTimeWindow");
+          if (sel) {
+              sel.value = timeVal;
+               if (typeof OTGraph !== 'undefined' && OTGraph.setTimeWindow) {
+                  OTGraph.setTimeWindow(parseInt(timeVal));
+              }
+          }
+      }
+
+    })
+    .catch(err => console.error("Error loading persistent settings:", err));
 }
 

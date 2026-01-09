@@ -502,6 +502,11 @@ void sendDeviceSettings()
   sendJsonSettingObj("ntpsendtime", settingNTPsendtime, "b");
   sendJsonSettingObj("ledblink", settingLEDblink, "b");
   sendJsonSettingObj("darktheme", settingDarkTheme, "b");
+  sendJsonSettingObj("ui_autoscroll", settingUIAutoScroll, "b");
+  sendJsonSettingObj("ui_timestamps", settingUIShowTimestamp, "b");
+  sendJsonSettingObj("ui_capture", settingUICaptureMode, "b");
+  sendJsonSettingObj("ui_autoscreenshot", settingUIAutoScreenshot, "b");
+  sendJsonSettingObj("ui_graphtimewindow", settingUIGraphTimeWindow, "i", 0, 1440);
   sendJsonSettingObj("gpiosensorsenabled", settingGPIOSENSORSenabled, "b");
   sendJsonSettingObj("gpiosensorspin", settingGPIOSENSORSpin, "i", 0, 16);
   sendJsonSettingObj("gpiosensorsinterval", settingGPIOSENSORSinterval, "i", 5, 65535);
