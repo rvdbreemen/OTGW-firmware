@@ -87,7 +87,10 @@ window.exitFlashMode = exitFlashMode;
 let otLogWS = null;
 let otLogBuffer = [];
 let otLogFilteredBuffer = [];
-const MAX_LOG_LINES = 2000; // limit client-side log buffer to reduce browser memory usage
+const MAX_LOG_LINES_DEFAULT = 2000;
+const MAX_LOG_LINES_CAPTURE = 1000000; 
+const RENDER_LIMIT = 2000;
+let maxLogLines = MAX_LOG_LINES_DEFAULT; 
 let autoScroll = true;
 let showTimestamps = true;
 let logExpanded = false;
@@ -97,6 +100,16 @@ let otLogControlsInitialized = false;
 let isFlashing = false;
 let currentFlashFilename = "";
 let flashModeActive = false; // Track if we're on the flash page
+
+// File Streaming Variables
+let logDirectoryHandle = null;
+let fileStreamHandle = null;
+let fileWritableStream = null;
+let isStreamingToFile = false;
+let streamBytesWritten = 0;
+let fileRotationTimer = null;
+let currentLogDateStr = "";
+
 
 // WebSocket configuration: must match the WebSocket port used in webSocketStuff.ino (currently hardcoded as 81 in the WebSocketsServer constructor).
 const WEBSOCKET_PORT = 81;
@@ -450,6 +463,11 @@ function addLogLine(logLine) {
     time: timestamp,
     data: logLine
   };
+
+  // Write to file stream if enabled
+  if (isStreamingToFile && fileWritableStream) {
+    writeToStream(logEntry);
+  }
   
   // Add to buffer
   otLogBuffer.push(logEntry);
@@ -465,7 +483,7 @@ function addLogLine(logLine) {
   }
 
   // Trim buffer if exceeds max
-  if (otLogBuffer.length > MAX_LOG_LINES) {
+  if (otLogBuffer.length > maxLogLines) {
     otLogBuffer.shift();
   }
   
@@ -493,7 +511,7 @@ function scheduleDisplayUpdate() {
 //============================================================================
 function updateFilteredBuffer() {
   if (!searchTerm || searchTerm.trim() === '') {
-    otLogFilteredBuffer = otLogBuffer.slice();
+    otLogFilteredBuffer = otLogBuffer;
   } else {
     const term = searchTerm.toLowerCase();
     otLogFilteredBuffer = otLogBuffer.filter(entry => 
@@ -514,11 +532,14 @@ function renderLogDisplay() {
     return;
   }
 
-  const displayCount = logExpanded ? otLogFilteredBuffer.length : Math.min(10, otLogFilteredBuffer.length);
+  const displayCount = logExpanded ? Math.min(otLogFilteredBuffer.length, RENDER_LIMIT) : Math.min(10, otLogFilteredBuffer.length);
   const startIndex = Math.max(0, otLogFilteredBuffer.length - displayCount);
   const linesToShow = otLogFilteredBuffer.slice(startIndex);
 
-  // console.log("Rendering logs. Total:", otLogFilteredBuffer.length, "Showing:", linesToShow.length); // Debug
+  if (logExpanded && otLogFilteredBuffer.length > RENDER_LIMIT && startIndex === otLogFilteredBuffer.length - RENDER_LIMIT) {
+     // Optional: Add indicator that logs are truncated in view
+     // We can just rely on the counters in the footer.
+  }
 
   // Build HTML
   let html = '';
@@ -554,13 +575,26 @@ function updateLogDisplay() {
 function updateLogCounters() {
   const logLineCountEl = document.getElementById('logLineCount');
   const logFilteredCountEl = document.getElementById('logFilteredCount');
+  const logLimitDisplayEl = document.getElementById('logLimitDisplay');
+  const memUsageEl = document.getElementById('memUsage');
 
   if (logLineCountEl) {
     logLineCountEl.textContent = otLogBuffer.length;
   }
+  
+  if (logLimitDisplayEl) {
+     logLimitDisplayEl.textContent = ' / ' + maxLogLines;
+  }
 
   if (logFilteredCountEl) {
     logFilteredCountEl.textContent = otLogFilteredBuffer.length;
+  }
+  
+  if (memUsageEl) {
+    // Estimate: 200 bytes per line
+    const bytes = otLogBuffer.length * 200;
+    const mb = bytes / (1024 * 1024);
+    memUsageEl.textContent = mb.toFixed(2);
   }
 }
 
@@ -568,6 +602,8 @@ function updateLogCounters() {
 function setupOTLogControls() {
   // Only setup event listeners once to prevent duplicates
   if (otLogControlsInitialized) {
+    // Even if initialized, check sync of capture mode just in case (e.g. tab switch)
+    syncCaptureMode();
     return;
   }
   
@@ -599,6 +635,45 @@ function setupOTLogControls() {
       btn.classList.remove('btn-active');
     }
   });
+
+  // Toggle Capture Mode
+  const chkCapture = document.getElementById('chkCaptureMode');
+  if (chkCapture) {
+    chkCapture.addEventListener('change', function(e) {
+      if (e.target.checked) {
+        maxLogLines = MAX_LOG_LINES_CAPTURE;
+      } else {
+        maxLogLines = MAX_LOG_LINES_DEFAULT;
+        if (otLogBuffer.length > maxLogLines) {
+           otLogBuffer.splice(0, otLogBuffer.length - maxLogLines);
+           updateFilteredBuffer();
+           updateLogDisplay();
+        }
+      }
+      updateLogCounters();
+    });
+  }
+
+  // Toggle Stream Mode
+  const chkStream = document.getElementById('chkStreamToFile');
+  if (chkStream) {
+    if (!('showDirectoryPicker' in window)) {
+       // Hide if not supported (requires Chrome/Edge/Opera for File System Access API)
+       const lbl = document.getElementById('lblStreamToFile');
+       if (lbl) lbl.style.display = 'none';
+    } else {
+       chkStream.addEventListener('change', async function(e) {
+         if (e.target.checked) {
+           const success = await startFileStreaming();
+           if (!success) {
+             e.target.checked = false; // Revert if cancelled or failed
+           }
+         } else {
+           stopFileStreaming();
+         }
+       });
+    }
+  }
   
   // Clear log
   document.getElementById('btnClearLog').addEventListener('click', function() {
@@ -651,6 +726,154 @@ function setupOTLogControls() {
   
   // Mark as initialized after all listeners are successfully registered
   otLogControlsInitialized = true;
+  
+  // Sync initial state
+  syncCaptureMode();
+  updateLogCounters();
+}
+
+function syncCaptureMode() {
+  const chkCapture = document.getElementById('chkCaptureMode');
+  if (chkCapture) {
+     if (chkCapture.checked) {
+        maxLogLines = MAX_LOG_LINES_CAPTURE;
+     } else {
+        maxLogLines = MAX_LOG_LINES_DEFAULT;
+     }
+  }
+  updateLogCounters();
+}
+
+//============================================================================
+// File Streaming Implementation (File System Access API)
+//============================================================================
+async function startFileStreaming() {
+  try {
+    // Prompt user to select directory
+    if (!logDirectoryHandle) {
+        logDirectoryHandle = await window.showDirectoryPicker({
+            id: 'otmonitor-logs',
+            mode: 'readwrite',
+            startIn: 'documents'
+        });
+    }
+
+    isStreamingToFile = true;
+    
+    // Start the rotation check timer (every minute)
+    if (fileRotationTimer) clearInterval(fileRotationTimer);
+    fileRotationTimer = setInterval(checkFileRotation, 60000);
+
+    // Initial file open
+    return await rotateLogFile();
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+       console.error("Error setting up file stream:", err);
+       alert("Failed to setup file streaming: " + err.message);
+    }
+    stopFileStreaming();
+    return false;
+  }
+}
+
+function getTodayDateString() {
+    const today = new Date();
+    const dd = String(today.getDate()).padStart(2, '0');
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const yyyy = today.getFullYear();
+    return `${dd}-${mm}-${yyyy}`;
+}
+
+async function rotateLogFile() {
+    if (!logDirectoryHandle) return false;
+
+    const dateStr = getTodayDateString();
+    // If the date hasn't changed and we have a stream, do nothing
+    if (currentLogDateStr === dateStr && fileWritableStream) return true;
+
+    try {
+        // Close existing stream if open
+        if (fileWritableStream) {
+            await fileWritableStream.close();
+        }
+
+        currentLogDateStr = dateStr;
+        const filename = `otmonitor-${dateStr}.log`;
+
+        // Get file handle (create if not exists)
+        fileStreamHandle = await logDirectoryHandle.getFileHandle(filename, { create: true });
+        
+        // Create writable stream
+        fileWritableStream = await fileStreamHandle.createWritable({ keepExistingData: true });
+        
+        // Seek to end
+        const file = await fileStreamHandle.getFile();
+        await fileWritableStream.write({ type: 'seek', position: file.size });
+
+        console.log(`Rotated log file to: ${filename}`);
+        
+        // Update UI
+        const displayEl = document.getElementById('logFileDisplay');
+        const filenameEl = document.getElementById('currentLogFile');
+        if (displayEl) displayEl.style.display = 'inline';
+        if (filenameEl) filenameEl.textContent = filename;
+
+        // Mark session start
+        const timestamp = new Date().toLocaleString();
+        await fileWritableStream.write(`\n# Session started: ${timestamp}\n`);
+        
+        return true;
+    } catch (e) {
+        console.error("Error rotating log file:", e);
+        stopFileStreaming();
+        alert("Error creating log file for new day: " + e.message);
+        return false;
+    }
+}
+
+function checkFileRotation() {
+    if (!isStreamingToFile) return;
+    const dateStr = getTodayDateString();
+    if (currentLogDateStr !== dateStr) {
+        console.log("Midnight detected, rotating log file...");
+        rotateLogFile();
+    }
+}
+
+function stopFileStreaming() {
+  isStreamingToFile = false;
+  if (fileRotationTimer) {
+      clearInterval(fileRotationTimer);
+      fileRotationTimer = null;
+  }
+  
+  if (fileWritableStream) {
+    fileWritableStream.close();
+    fileWritableStream = null;
+  }
+  fileStreamHandle = null;
+  
+  // Hide UI
+  const displayEl = document.getElementById('logFileDisplay');
+  if (displayEl) displayEl.style.display = 'none';
+
+  console.log("File streaming stopped.");
+}
+
+async function writeToStream(entry) {
+  if (!fileWritableStream) return;
+  try {
+    const text = formatLogLine(entry.data);
+    const line = showTimestamps ? `${entry.time} ${text}` : text;
+    await fileWritableStream.write(line + '\n');
+    streamBytesWritten += line.length + 1;
+  } catch (err) {
+    console.error("Error writing to stream:", err);
+    // If error occurs (e.g. permission revoked), stop streaming
+    stopFileStreaming();
+    const chk = document.getElementById('chkStreamToFile');
+    if (chk) chk.checked = false;
+  }
 }
 
 //============================================================================

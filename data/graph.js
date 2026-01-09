@@ -16,10 +16,11 @@ var OTGraph = {
     chart: null,
     data: {},
     pendingData: {}, // Track new data points since last chart update
-    maxPoints: 432000, // Buffer to hold ~24h of data at 5 msgs/sec
+    maxPoints: 864000, // Buffer to hold 24h of data at 10 msgs/sec
     timeWindow: 3600 * 1000, // Default 1 Hour in milliseconds
     running: false,
     updateTimer: null,
+    captureTimer: null,
     currentTheme: 'light',
     lastUpdate: 0,
     updateInterval: UPDATE_INTERVAL_MS,
@@ -59,16 +60,16 @@ var OTGraph = {
     // 3: Modulation (Analog 0-100)
     // 4: Temperature (Analog)
     seriesConfig: [
-        { id: 'flame',   label: 'Flame',    gridIndex: 0, type: 'line', step: 'start', areaStyle: { opacity: 0.3 } },
-        { id: 'dhwMode', label: 'DHW Mode', gridIndex: 1, type: 'line', step: 'start', areaStyle: { opacity: 0.3 } },
-        { id: 'chMode',  label: 'CH Mode',  gridIndex: 2, type: 'line', step: 'start', areaStyle: { opacity: 0.3 } },
-        { id: 'mod',     label: 'Modulation (%)',   gridIndex: 3, type: 'line', step: false },
-        { id: 'ctrlSp',  label: 'Control SP',       gridIndex: 4, type: 'line', step: false },
-        { id: 'boiler',  label: 'Boiler Temp',      gridIndex: 4, type: 'line', step: false },
-        { id: 'return',  label: 'Return Temp',      gridIndex: 4, type: 'line', step: false },
-        { id: 'roomSp',  label: 'Room SP',          gridIndex: 4, type: 'line', step: false },
-        { id: 'room',    label: 'Room Temp',        gridIndex: 4, type: 'line', step: false },
-        { id: 'outside', label: 'Outside Temp',     gridIndex: 4, type: 'line', step: false }
+        { id: 'flame',   label: 'Flame',    gridIndex: 0, type: 'line', step: 'start', areaStyle: { opacity: 0.3 }, large: true, sampling: 'lttb' },
+        { id: 'dhwMode', label: 'DHW Mode', gridIndex: 1, type: 'line', step: 'start', areaStyle: { opacity: 0.3 }, large: true, sampling: 'lttb' },
+        { id: 'chMode',  label: 'CH Mode',  gridIndex: 2, type: 'line', step: 'start', areaStyle: { opacity: 0.3 }, large: true, sampling: 'lttb' },
+        { id: 'mod',     label: 'Modulation (%)',   gridIndex: 3, type: 'line', step: false, large: true, sampling: 'lttb' },
+        { id: 'ctrlSp',  label: 'Control SP',       gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
+        { id: 'boiler',  label: 'Boiler Temp',      gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
+        { id: 'return',  label: 'Return Temp',      gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
+        { id: 'roomSp',  label: 'Room SP',          gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
+        { id: 'room',    label: 'Room Temp',        gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
+        { id: 'outside', label: 'Outside Temp',     gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' }
     ],
 
     init: function() {
@@ -112,6 +113,20 @@ var OTGraph = {
                 this.timeWindow = initialMinutes * 60 * 1000;
             }
         }
+        
+        var btnShot = document.getElementById('btnGraphScreenshot');
+        if (btnShot) {
+            btnShot.addEventListener('click', () => {
+                this.screenshot(false);
+            });
+        }
+        
+        var chkAutoShot = document.getElementById('chkAutoScreenshot');
+        if (chkAutoShot) {
+            chkAutoShot.addEventListener('change', (e) => {
+                 this.toggleAutoScreenshot(e.target.checked);
+            });
+        }
 
         // Initialize empty data arrays if not present
         this.seriesConfig.forEach(c => {
@@ -140,6 +155,64 @@ var OTGraph = {
         this.timeWindow = minutes * 60 * 1000;
         // console.log("Graph time window set to (ms):", this.timeWindow);
         this.updateChart();
+    },
+    
+    toggleAutoScreenshot: function(enabled) {
+        if (this.captureTimer) clearInterval(this.captureTimer);
+        
+        if (enabled) {
+            console.log("Auto-Screenshot enabled (hourly)");
+            this.captureTimer = setInterval(() => {
+                var originalWindow = this.timeWindow;
+                var oneHour = 3600 * 1000;
+                
+                // If we are already close to 1 hour (tolerance 100ms), just snap
+                if (Math.abs(originalWindow - oneHour) < 100) {
+                    this.screenshot(true);
+                } else {
+                    console.log("Auto-switching to 1h for screenshot...");
+                    
+                    // Switch to 1h view
+                    this.timeWindow = oneHour;
+                    this.updateChart();
+                    
+                    // Wait for render to settle (1.5s), then snapshot and restore
+                    setTimeout(() => {
+                        this.screenshot(true);
+                        
+                        console.log("Restoring previous time window...");
+                        this.timeWindow = originalWindow;
+                        this.updateChart();
+                    }, 1500);
+                }
+            }, 3600 * 1000); // 1 hour
+        } else {
+            console.log("Auto-Screenshot disabled");
+        }
+    },
+    
+    screenshot: function(isAuto) {
+        if (!this.chart) return;
+        
+        var url = this.chart.getDataURL({
+            type: 'png',
+            pixelRatio: 2,
+            backgroundColor: this.currentTheme === 'dark' ? '#1e1e1e' : '#fff'
+        });
+        
+        var now = new Date();
+        var iso = now.toISOString().replace(/[:.]/g, '-').slice(0, -5); // format: YYYY-MM-DDTHH-mm-ss
+        var prefix = isAuto ? 'otgw-graph-auto-' : 'otgw-graph-';
+        var filename = prefix + iso + '.png';
+        
+        var link = document.createElement('a');
+        link.download = filename;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        if (isAuto) console.log("Auto-captured graph screenshot: " + filename);
     },
 
     setTheme: function(newTheme) {
@@ -214,9 +287,11 @@ var OTGraph = {
                 xAxisIndex: c.gridIndex,
                 yAxisIndex: c.gridIndex,
                 showSymbol: false,
-                lineStyle: { width: 2 },
+                lineStyle: { width: 1.5 }, // Slightly thinner lines for better performance with dense data
                 itemStyle: { color: palette[c.id] }, // Get color from palette
                 areaStyle: c.areaStyle || undefined,
+                large: c.large,        // Enable large dataset optimization
+                sampling: c.sampling,  // Enable downsampling
                 data: this.data[c.id]
             }))
         };

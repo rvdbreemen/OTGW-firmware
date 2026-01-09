@@ -74,6 +74,14 @@
                 <input type="checkbox" id="chkShowTimestamp" checked aria-label="Show timestamps in the OpenTherm log" />
                 Timestamps
               </label>
+              <label class="log-control-label">
+                <input type="checkbox" id="chkCaptureMode" aria-label="Capture large amount of data (up to 1M lines)" />
+                Capture
+              </label>
+              <label class="log-control-label" id="lblStreamToFile" title="Stream logs directly to a local file (Chrome/Edge only)">
+                <input type="checkbox" id="chkStreamToFile" aria-label="Stream log data to a file" />
+                Stream
+              </label>
             </div>
             
             <div id="otLogContainer" class="ot-log-container collapsed">
@@ -81,8 +89,10 @@
             </div>
             
             <div class="ot-log-footer">
-              <span>Lines: <span id="logLineCount">0</span> / 2000</span>
+              <span>Lines: <span id="logLineCount">0</span><span id="logLimitDisplay"> / 2000</span></span>
               <span>Filtered: <span id="logFilteredCount">0</span></span>
+              <span>Mem: <span id="memUsage">0</span> MB</span>
+              <span id="logFileDisplay" style="display:none">Log: <span id="currentLogFile">None</span></span>
             </div>
         </div>
 
@@ -122,6 +132,11 @@
                        <option value="720">12 Hours</option>
                        <option value="1440">24 Hours</option>
                    </select>
+                   <button id="btnGraphScreenshot" class="nav-item" style="height:25px; width:auto; font-size:13px; margin-left:10px;">Screenshot</button>
+                   <label class="log-control-label" style="display:inline-flex; margin-left:10px;">
+                       <input type="checkbox" id="chkAutoScreenshot" />
+                       Auto (1h)
+                   </label>
                </div>
                <div id="otGraphCanvas"></div>
             </div>
