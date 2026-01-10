@@ -89,6 +89,17 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
     _password = password;
     _resetStatus();
 
+    Update.onProgress([this](size_t progress, size_t total) {
+      if (_status.phase == UPDATE_ERROR || _status.phase == UPDATE_ABORT || _status.phase == UPDATE_END) {
+        return;
+      }
+      _status.flash_written = progress;
+      if (total > 0) {
+        _status.flash_total = total;
+      }
+      _setStatus(UPDATE_WRITE, _status.target, _status.flash_written, _status.flash_total, _status.filename, emptyString);
+    });
+
     // Collect headers needed for WebSocket handshake
     const char * headerkeys[] = {"Upgrade", "Sec-WebSocket-Key", "Sec-WebSocket-Version"};
     size_t headerkeyssize = sizeof(headerkeys)/sizeof(char*);
@@ -251,7 +262,11 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         if (upload.name == "filesystem") {
           size_t fsSize = ((size_t) &_FS_end - (size_t) &_FS_start);
           close_all_fs();
-          if (!Update.begin(fsSize, U_FS)){//start with max available size
+          if (uploadTotal > 0 && uploadTotal > fsSize) {
+            _updaterError = F("filesystem image too large");
+            _setStatus(UPDATE_ERROR, "filesystem", 0, uploadTotal, upload.filename, _updaterError);
+            _sendStatusEvent();
+          } else if (!Update.begin(uploadTotal > 0 ? uploadTotal : fsSize, U_FS)){//start with max available size
             if (_serial_output) Update.printError(OTGWSerial);
             _setUpdaterError();
             _setStatus(UPDATE_ERROR, "filesystem", 0, uploadTotal, upload.filename, _updaterError);
@@ -262,7 +277,11 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           }
         } else {
           uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-          if (!Update.begin(maxSketchSpace, U_FLASH)){//start with max available size
+          if (uploadTotal > 0 && uploadTotal > maxSketchSpace) {
+            _updaterError = F("firmware image too large");
+            _setStatus(UPDATE_ERROR, "firmware", 0, uploadTotal, upload.filename, _updaterError);
+            _sendStatusEvent();
+          } else if (!Update.begin(uploadTotal > 0 ? uploadTotal : maxSketchSpace, U_FLASH)){//start with max available size
             _setUpdaterError();
             _setStatus(UPDATE_ERROR, "firmware", 0, uploadTotal, upload.filename, _updaterError);
             _sendStatusEvent();
