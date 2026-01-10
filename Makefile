@@ -144,7 +144,15 @@ upload-fs: $(FILESYS)
 install: $(IMAGE) $(FILESYS)
 	$(ESPTOOL) --port $(PORT) -b $(BAUD) write_flash 0x0 $(IMAGE) 0x200000 $(FILESYS)
 
-.PHONY: binaries platform publish clean upload upload-fs install debug filesystem
+# Run workspace evaluation
+evaluate:
+	python3 evaluate.py --report
+
+# Quick evaluation check
+check:
+	python3 evaluate.py --quick
+
+.PHONY: binaries platform publish clean upload upload-fs install debug filesystem evaluate check
 
 ### Allow customization through a local Makefile: Makefile-local.mk
 
