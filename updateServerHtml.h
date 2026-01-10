@@ -100,7 +100,12 @@ static const char UpdateServerIndex[] PROGMEM =
          var successMessageEl = document.getElementById('successMessage');
          var successCountdownEl = document.getElementById('successCountdown');
          var eventSource = null;
-         var pollTimer = null;
+        var pollTimer = null;
+        var pollIntervalMs = 100;
+        var pollMinMs = 100;
+        var pollMaxMs = 3000;
+        var pollInFlight = false;
+        var pollActive = false;
          var reconnectTimer = null;
          var uploadInFlight = false;
          var localUploadDone = false;
@@ -274,17 +279,75 @@ static const char UpdateServerIndex[] PROGMEM =
            }
          }
 
-         function fetchStatus() {
-           fetch('/status', { cache: 'no-store' })
-             .then(function(response) { return response.json(); })
-             .then(function(json) { updateDeviceStatus(json); })
-             .catch(function(e) { console.log('Fetch status error:', e); });
-         }
+        function fetchStatus(timeoutMs) {
+          var controller = null;
+          var timeoutId = null;
+          var options = { cache: 'no-store' };
+          if (window.AbortController && timeoutMs && timeoutMs > 0) {
+            controller = new AbortController();
+            options.signal = controller.signal;
+            timeoutId = setTimeout(function() { controller.abort(); }, timeoutMs);
+          }
+          return fetch('/status', options)
+            .then(function(response) {
+              if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+              }
+              return response.json();
+            })
+            .then(function(json) { updateDeviceStatus(json); })
+            .catch(function(e) {
+              console.log('Fetch status error:', e);
+              throw e;
+            })
+            .finally(function() {
+              if (timeoutId) clearTimeout(timeoutId);
+            });
+        }
 
-         function startEvents() {
-           if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
-           if (!!window.WebSocket) {
-             if (eventSource) return;
+        function scheduleNextPoll(delayMs) {
+          if (!pollActive) return;
+          if (pollTimer) clearTimeout(pollTimer);
+          pollTimer = setTimeout(runPoll, delayMs);
+        }
+
+        function runPoll() {
+          if (!pollActive || pollInFlight) return;
+          pollTimer = null;
+          pollInFlight = true;
+          var timeoutMs = Math.max(500, pollIntervalMs * 4);
+          fetchStatus(timeoutMs)
+            .then(function() {
+              pollIntervalMs = Math.max(pollMinMs, Math.floor(pollIntervalMs / 2));
+            })
+            .catch(function() {
+              pollIntervalMs = Math.min(pollMaxMs, pollIntervalMs * 2);
+            })
+            .finally(function() {
+              pollInFlight = false;
+              scheduleNextPoll(pollIntervalMs);
+            });
+        }
+
+        function startPolling() {
+          pollActive = true;
+          pollIntervalMs = pollMinMs;
+          scheduleNextPoll(0);
+        }
+
+        function stopPolling() {
+          pollActive = false;
+          if (pollTimer) {
+            clearTimeout(pollTimer);
+            pollTimer = null;
+          }
+        }
+
+        function startEvents() {
+          if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+          if (!!window.WebSocket) {
+            stopPolling();
+            if (eventSource) return;
              var protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
              var wsUrl = protocol + window.location.host + '/events';
              eventSource = new WebSocket(wsUrl);
@@ -307,15 +370,16 @@ static const char UpdateServerIndex[] PROGMEM =
                console.log("WS Error", e);
              };
              
-             eventSource.onclose = function(e) {
-               console.log("WS Disconnected");
-               eventSource = null;
-               // Try to reconnect after 3s
-               reconnectTimer = setTimeout(startEvents, 3000);
-             };
-           } else if (!!window.EventSource) {
-             if (eventSource) return;
-             eventSource = new EventSource('/events');
+            eventSource.onclose = function(e) {
+              console.log("WS Disconnected");
+              eventSource = null;
+              // Try to reconnect after 1s
+              reconnectTimer = setTimeout(startEvents, 1000);
+            };
+          } else if (!!window.EventSource) {
+            stopPolling();
+            if (eventSource) return;
+            eventSource = new EventSource('/events');
              eventSource.addEventListener('open', function(e) {
                console.log("Events Connected");
              }, false);
@@ -328,10 +392,12 @@ static const char UpdateServerIndex[] PROGMEM =
                var json = JSON.parse(e.data);
                updateDeviceStatus(json);
              }, false);
-           } else {
-             if (!pollTimer) pollTimer = setInterval(fetchStatus, 1000);
-           }
-         }
+          } else {
+            if (!pollActive && !pollInFlight) {
+              startPolling();
+            }
+          }
+        }
 
          function stopEvents() {
            if (reconnectTimer) {
@@ -347,11 +413,8 @@ static const char UpdateServerIndex[] PROGMEM =
              eventSource.close();
              eventSource = null;
            }
-           if (pollTimer) {
-             clearInterval(pollTimer);
-             pollTimer = null;
-           }
-         }
+          stopPolling();
+        }
 
 
          function initUploadForm(formId, targetName) {
@@ -470,8 +533,8 @@ static const char UpdateServerIndex[] PROGMEM =
 
          initUploadForm('fwForm', 'flash');
          initUploadForm('fsForm', 'filesystem');
-         fetchStatus();
-         startEvents();
+        fetchStatus().catch(function() {});
+        startEvents();
 
          // Clean up and notify when leaving flash page
          window.addEventListener('beforeunload', function() {
