@@ -13,9 +13,11 @@ Usage:
 
 import argparse
 import glob
+import gzip
 import json
 import os
 import platform
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -206,19 +208,31 @@ def build_firmware():
             print_error("Build directory not found")
             return None
         
+        # Check for merged binary first
+        merged_file = None
+        for pattern in ["*-merged.bin.gz", "*-merged.bin"]:
+            matches = list(build_dir.glob(pattern))
+            if matches:
+                merged_file = matches[0]
+                print_info(f"Found merged binary: {merged_file.name}")
+                break
+        
         # Find firmware file
         firmware_file = None
         for pattern in ["*.ino.bin", "OTGW-firmware.ino.bin"]:
             matches = list(build_dir.glob(pattern))
+            # Filter out merged files
+            matches = [m for m in matches if "merged" not in m.name.lower()]
             if matches:
                 firmware_file = matches[0]
                 break
         
-        if not firmware_file:
+        if not firmware_file and not merged_file:
             print_error("Firmware binary not found in build directory")
             return None
         
-        print_info(f"Found firmware: {firmware_file.name}")
+        if firmware_file:
+            print_info(f"Found firmware: {firmware_file.name}")
         
         # Find filesystem file
         filesystem_file = None
@@ -234,6 +248,7 @@ def build_firmware():
             print_warning("Filesystem binary not found (optional)")
         
         return {
+            'merged': merged_file,
             'firmware': firmware_file,
             'filesystem': filesystem_file
         }
@@ -407,9 +422,14 @@ def find_firmware_files():
     
     firmware_files = []
     filesystem_files = []
+    merged_files = []
     
     for search_path in search_paths:
         if search_path.exists():
+            # Look for merged files first
+            merged_files.extend(search_path.glob("*-merged.bin"))
+            merged_files.extend(search_path.glob("*-merged.bin.gz"))
+            
             # Look for firmware files
             firmware_files.extend(search_path.glob("*.bin"))
             firmware_files.extend(search_path.glob("*-fw.bin"))
@@ -419,11 +439,15 @@ def find_firmware_files():
             filesystem_files.extend(search_path.glob("*-fs.bin"))
             filesystem_files.extend(search_path.glob("*.littlefs.bin"))
     
+    # Filter out merged and littlefs from firmware list
+    firmware_files = [f for f in firmware_files if "merged" not in f.name.lower() and "littlefs" not in f.name.lower()]
+    
     # Remove duplicates and sort
     firmware_files = sorted(set(firmware_files))
     filesystem_files = sorted(set(filesystem_files))
+    merged_files = sorted(set(merged_files))
     
-    return firmware_files, filesystem_files
+    return firmware_files, filesystem_files, merged_files
 
 
 def check_build_artifacts():
@@ -434,10 +458,21 @@ def check_build_artifacts():
     if not build_dir.exists():
         return None
     
+    # Look for merged binary first (preferred)
+    merged_file = None
+    for pattern in ["*-merged.bin.gz", "*-merged.bin"]:
+        matches = list(build_dir.glob(pattern))
+        if matches:
+            # Prefer compressed version if both exist
+            merged_file = matches[0]
+            break
+    
     # Look for firmware file
     firmware_file = None
     for pattern in ["*.ino.bin", "OTGW-firmware.ino.bin"]:
         matches = list(build_dir.glob(pattern))
+        # Filter out merged files
+        matches = [m for m in matches if "merged" not in m.name.lower()]
         if matches:
             firmware_file = matches[0]
             break
@@ -450,8 +485,9 @@ def check_build_artifacts():
             filesystem_file = matches[0]
             break
     
-    if firmware_file:
+    if merged_file or firmware_file:
         return {
+            'merged': merged_file,
             'firmware': firmware_file,
             'filesystem': filesystem_file
         }
@@ -481,9 +517,11 @@ def interactive_mode_selection():
     
     if artifacts:
         print_success("Found existing build artifacts!")
-        if artifacts['firmware']:
+        if artifacts.get('merged'):
+            print(f"  {Colors.OKGREEN}Merged Binary:{Colors.ENDC} {artifacts['merged'].name} (firmware + filesystem in one file)")
+        if artifacts.get('firmware'):
             print(f"  Firmware: {artifacts['firmware'].name}")
-        if artifacts['filesystem']:
+        if artifacts.get('filesystem'):
             print(f"  Filesystem: {artifacts['filesystem'].name}")
         
         print(f"\n{Colors.BOLD}What would you like to do?{Colors.ENDC}")
@@ -566,8 +604,8 @@ def select_file(files, file_type):
         print_error("Invalid selection. Please try again.")
 
 
-def flash_esp8266(port, firmware_file=None, filesystem_file=None, baud=DEFAULT_BAUD, erase_flash=False, mode="manual", version_info=None):
-    """Flash the ESP8266 with firmware and/or filesystem."""
+def flash_esp8266(port, firmware_file=None, filesystem_file=None, merged_file=None, baud=DEFAULT_BAUD, erase_flash=False, mode="manual", version_info=None):
+    """Flash the ESP8266 with firmware and/or filesystem, or a merged binary."""
     
     # Print mode and version information
     print_header("Flash Information")
@@ -576,17 +614,44 @@ def flash_esp8266(port, firmware_file=None, filesystem_file=None, baud=DEFAULT_B
     if version_info:
         print(f"{Colors.BOLD}Version:{Colors.ENDC} {version_info}")
     
-    if firmware_file:
-        print(f"{Colors.BOLD}Firmware:{Colors.ENDC} {firmware_file}")
-        if firmware_file.exists():
-            size_mb = firmware_file.stat().st_size / 1024 / 1024
-            print(f"{Colors.BOLD}Firmware Size:{Colors.ENDC} {size_mb:.2f} MB")
+    # Handle merged binary (decompressed if needed)
+    actual_merged_file = None
+    temp_decompressed = None
     
-    if filesystem_file:
-        print(f"{Colors.BOLD}Filesystem:{Colors.ENDC} {filesystem_file}")
-        if filesystem_file.exists():
-            size_mb = filesystem_file.stat().st_size / 1024 / 1024
-            print(f"{Colors.BOLD}Filesystem Size:{Colors.ENDC} {size_mb:.2f} MB")
+    if merged_file:
+        print(f"{Colors.BOLD}Merged Binary:{Colors.ENDC} {merged_file}")
+        
+        # Check if it's compressed
+        if merged_file.suffix == ".gz":
+            print_info("Decompressing merged binary...")
+            try:
+                temp_decompressed = merged_file.parent / merged_file.stem  # Remove .gz extension
+                with gzip.open(merged_file, 'rb') as f_in:
+                    with open(temp_decompressed, 'wb') as f_out:
+                        shutil.copyfileobj(f_in, f_out)
+                actual_merged_file = temp_decompressed
+                print_success(f"Decompressed to: {actual_merged_file.name}")
+            except Exception as e:
+                print_error(f"Failed to decompress: {e}")
+                return False
+        else:
+            actual_merged_file = merged_file
+        
+        if actual_merged_file.exists():
+            size_mb = actual_merged_file.stat().st_size / 1024 / 1024
+            print(f"{Colors.BOLD}Binary Size:{Colors.ENDC} {size_mb:.2f} MB")
+    else:
+        if firmware_file:
+            print(f"{Colors.BOLD}Firmware:{Colors.ENDC} {firmware_file}")
+            if firmware_file.exists():
+                size_mb = firmware_file.stat().st_size / 1024 / 1024
+                print(f"{Colors.BOLD}Firmware Size:{Colors.ENDC} {size_mb:.2f} MB")
+        
+        if filesystem_file:
+            print(f"{Colors.BOLD}Filesystem:{Colors.ENDC} {filesystem_file}")
+            if filesystem_file.exists():
+                size_mb = filesystem_file.stat().st_size / 1024 / 1024
+                print(f"{Colors.BOLD}Filesystem Size:{Colors.ENDC} {size_mb:.2f} MB")
     
     print(f"{Colors.BOLD}Port:{Colors.ENDC} {port}")
     print(f"{Colors.BOLD}Baud Rate:{Colors.ENDC} {baud}")
@@ -608,11 +673,15 @@ def flash_esp8266(port, firmware_file=None, filesystem_file=None, baud=DEFAULT_B
             print_success("Flash erased successfully")
         except subprocess.CalledProcessError as e:
             print_error(f"Failed to erase flash: {e}")
+            if temp_decompressed and temp_decompressed.exists():
+                temp_decompressed.unlink()
             return False
     
     # Build flash command
-    if not firmware_file and not filesystem_file:
+    if not actual_merged_file and not firmware_file and not filesystem_file:
         print_error("No files to flash!")
+        if temp_decompressed and temp_decompressed.exists():
+            temp_decompressed.unlink()
         return False
     
     print_header("Flashing ESP8266")
@@ -624,13 +693,19 @@ def flash_esp8266(port, firmware_file=None, filesystem_file=None, baud=DEFAULT_B
         "write_flash"
     ]
     
-    if firmware_file:
-        cmd.extend([FIRMWARE_ADDRESS, str(firmware_file)])
-        print_info(f"Firmware: {firmware_file.name} @ {FIRMWARE_ADDRESS}")
-    
-    if filesystem_file:
-        cmd.extend([FILESYSTEM_ADDRESS, str(filesystem_file)])
-        print_info(f"Filesystem: {filesystem_file.name} @ {FILESYSTEM_ADDRESS}")
+    # Use merged binary if available, otherwise use separate files
+    if actual_merged_file:
+        cmd.extend(["0x0", str(actual_merged_file)])
+        print_info(f"Merged binary: {actual_merged_file.name} @ 0x0")
+        print_info("This single file contains both firmware and filesystem")
+    else:
+        if firmware_file:
+            cmd.extend([FIRMWARE_ADDRESS, str(firmware_file)])
+            print_info(f"Firmware: {firmware_file.name} @ {FIRMWARE_ADDRESS}")
+        
+        if filesystem_file:
+            cmd.extend([FILESYSTEM_ADDRESS, str(filesystem_file)])
+            print_info(f"Filesystem: {filesystem_file.name} @ {FILESYSTEM_ADDRESS}")
     
     print_info(f"\nCommand: {' '.join(cmd)}\n")
     
@@ -642,6 +717,11 @@ def flash_esp8266(port, firmware_file=None, filesystem_file=None, baud=DEFAULT_B
         print_info("  2. Reconnect it to the OTGW")
         print_info("  3. Power on the device")
         print_info("  4. Connect to the Web UI or configure WiFi via AP mode")
+        
+        # Clean up temp file
+        if temp_decompressed and temp_decompressed.exists():
+            temp_decompressed.unlink()
+        
         return True
     except subprocess.CalledProcessError as e:
         print_error(f"\nFlashing failed: {e}")
@@ -650,6 +730,11 @@ def flash_esp8266(port, firmware_file=None, filesystem_file=None, baud=DEFAULT_B
         print_info("  - Try a different USB cable")
         print_info("  - Check if drivers are installed (CP210x or CH340)")
         print_info("  - Try reducing baud rate with --baud 115200")
+        
+        # Clean up temp file
+        if temp_decompressed and temp_decompressed.exists():
+            temp_decompressed.unlink()
+        
         return False
 
 
@@ -680,6 +765,9 @@ Examples:
   
   # Build locally and flash (developer mode)
   python3 flash_esp.py --build
+  
+  # Flash merged binary (single file with firmware + filesystem)
+  python3 flash_esp.py --merged build/OTGW-firmware-merged.bin
   
   # Flash specific firmware file (manual mode)
   python3 flash_esp.py --firmware build/OTGW-firmware.ino.bin
@@ -733,6 +821,10 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
         "-s", "--filesystem",
         help="Path to filesystem binary file (.littlefs.bin)"
     )
+    file_group.add_argument(
+        "-m", "--merged",
+        help="Path to merged binary file (.bin or .bin.gz) containing both firmware and filesystem"
+    )
     
     # Additional options
     parser.add_argument(
@@ -743,7 +835,7 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
     parser.add_argument(
         "--no-interactive",
         action="store_true",
-        help="Disable interactive prompts (for automation)"
+        help="Disable interactive prompts (for automation). Auto-selects first detected port and proceeds without confirmation."
     )
     
     args = parser.parse_args()
@@ -768,6 +860,7 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
     # Get firmware files based on mode
     firmware_file = None
     filesystem_file = None
+    merged_file = None
     
     if args.download:
         # Download mode
@@ -807,12 +900,13 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
             print_error("Build failed")
             sys.exit(1)
         
+        merged_file = build_result.get('merged')
         firmware_file = build_result.get('firmware')
         filesystem_file = build_result.get('filesystem')
         version_info = "Local Build"
         
-        if not firmware_file:
-            print_error("Build did not produce firmware file")
+        if not merged_file and not firmware_file:
+            print_error("Build did not produce firmware or merged binary file")
             sys.exit(1)
     
     else:
@@ -829,6 +923,7 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
             if selected_mode == "flash_artifacts":
                 # Flash existing build artifacts
                 mode = "artifacts"
+                merged_file = artifacts.get('merged')
                 firmware_file = artifacts.get('firmware')
                 filesystem_file = artifacts.get('filesystem')
                 version_info = "Existing Build Artifacts"
@@ -844,12 +939,13 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
                     print_error("Build failed")
                     sys.exit(1)
                 
+                merged_file = build_result.get('merged')
                 firmware_file = build_result.get('firmware')
                 filesystem_file = build_result.get('filesystem')
                 version_info = "Local Build"
                 
-                if not firmware_file:
-                    print_error("Build did not produce firmware file")
+                if not merged_file and not firmware_file:
+                    print_error("Build did not produce firmware or merged binary file")
                     sys.exit(1)
                     
             elif selected_mode == "download":
@@ -881,6 +977,12 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
                     sys.exit(1)
         else:
             # Manual mode - use provided files or search for them
+            if args.merged:
+                merged_file = Path(args.merged)
+                if not merged_file.exists():
+                    print_error(f"Merged file not found: {args.merged}")
+                    sys.exit(1)
+            
             if args.firmware:
                 firmware_file = Path(args.firmware)
                 if not firmware_file.exists():
@@ -894,11 +996,19 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
                     sys.exit(1)
             
             # If no files specified and not in no-interactive mode, search for files
-            if not firmware_file and not filesystem_file and not args.no_interactive:
+            if not merged_file and not firmware_file and not filesystem_file and not args.no_interactive:
                 print_header("Manual Mode - Searching for Binary Files")
-                firmware_files, filesystem_files = find_firmware_files()
-                firmware_file = select_file(firmware_files, "firmware")
-                filesystem_file = select_file(filesystem_files, "filesystem")
+                firmware_files, filesystem_files, merged_files = find_firmware_files()
+                
+                # Prioritize merged files if available
+                if merged_files:
+                    print_info("Found merged binaries (firmware + filesystem in one file):")
+                    merged_file = select_file(merged_files, "merged binary")
+                
+                # If no merged file selected, look for separate firmware/filesystem
+                if not merged_file:
+                    firmware_file = select_file(firmware_files, "firmware")
+                    filesystem_file = select_file(filesystem_files, "filesystem")
             
             version_info = "Manual Selection"
     
@@ -912,37 +1022,44 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
                 print_info(f"Auto-selected port: {port}")
             else:
                 print_error("No serial port detected and --no-interactive specified")
+                print_error("Please specify a port explicitly with --port <port>")
                 sys.exit(1)
         else:
             port = select_port(ports, default_port="/dev/ttyUSB0" if platform.system() == "Linux" else None)
     
-    # Confirm before flashing
-    if not args.no_interactive:
-        print("\n" + "=" * 60)
-        print(f"{Colors.BOLD}Ready to flash:{Colors.ENDC}")
-        print(f"  Mode: {mode.upper()}")
-        if version_info:
-            print(f"  Version: {version_info}")
-        print(f"  Port: {port}")
+    # Confirm before flashing (skip in non-interactive mode)
+    print("\n" + "=" * 60)
+    print(f"{Colors.BOLD}Ready to flash:{Colors.ENDC}")
+    print(f"  Mode: {mode.upper()}")
+    if version_info:
+        print(f"  Version: {version_info}")
+    print(f"  Port: {port}")
+    if merged_file:
+        print(f"  {Colors.OKGREEN}Merged Binary:{Colors.ENDC} {merged_file} (firmware + filesystem)")
+    else:
         if firmware_file:
             print(f"  Firmware: {firmware_file}")
         if filesystem_file:
             print(f"  Filesystem: {filesystem_file}")
-        print(f"  Baud rate: {args.baud}")
-        if args.erase:
-            print(f"  {Colors.WARNING}Erase flash: Yes{Colors.ENDC}")
-        print("=" * 60)
-        
+    print(f"  Baud rate: {args.baud}")
+    if args.erase:
+        print(f"  {Colors.WARNING}Erase flash: Yes{Colors.ENDC}")
+    print("=" * 60)
+    
+    if not args.no_interactive:
         confirm = input(f"\n{Colors.BOLD}Proceed with flashing? (y/N): {Colors.ENDC}").strip().lower()
         if confirm != 'y':
             print_info("Flashing cancelled.")
             sys.exit(0)
+    else:
+        print_info("\nProceeding with flash (--no-interactive mode)...")
     
     # Flash the device
     success = flash_esp8266(
         port=port,
         firmware_file=firmware_file,
         filesystem_file=filesystem_file,
+        merged_file=merged_file,
         baud=args.baud,
         erase_flash=args.erase,
         mode=mode,
