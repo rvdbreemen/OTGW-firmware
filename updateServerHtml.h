@@ -67,9 +67,7 @@ static const char UpdateServerIndex[] PROGMEM =
          var successPanel = document.getElementById('successPanel');
          var successMessageEl = document.getElementById('successMessage');
          var successCountdownEl = document.getElementById('successCountdown');
-         var eventSource = null;
          var pollTimer = null;
-         var reconnectTimer = null;
          var uploadInFlight = false;
          var localUploadDone = false;
          var successTimer = null;
@@ -238,71 +236,10 @@ static const char UpdateServerIndex[] PROGMEM =
          }
 
          function startEvents() {
-           if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
-           if (!!window.WebSocket) {
-             if (eventSource) return;
-             var protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-             var wsUrl = protocol + window.location.host + '/events';
-             eventSource = new WebSocket(wsUrl);
-             
-             eventSource.onopen = function(e) {
-               console.log("WS Connected");
-             };
-             
-             eventSource.onmessage = function(e) {
-               // console.log("WS Message", e.data);
-               try {
-                 var json = JSON.parse(e.data);
-                 updateDeviceStatus(json);
-               } catch (err) {
-                 console.log("WS JSON Error", err);
-               }
-             };
-             
-             eventSource.onerror = function(e) {
-               console.log("WS Error", e);
-             };
-             
-             eventSource.onclose = function(e) {
-               console.log("WS Disconnected");
-               eventSource = null;
-               // Try to reconnect after 1s
-               reconnectTimer = setTimeout(startEvents, 1000);
-             };
-           } else if (!!window.EventSource) {
-             if (eventSource) return;
-             eventSource = new EventSource('/events');
-             eventSource.addEventListener('open', function(e) {
-               console.log("Events Connected");
-             }, false);
-             eventSource.addEventListener('error', function(e) {
-               if (e.target.readyState != EventSource.OPEN) {
-                 console.log("Events Disconnected");
-               }
-             }, false);
-             eventSource.addEventListener('status', function(e) {
-               var json = JSON.parse(e.data);
-               updateDeviceStatus(json);
-             }, false);
-           } else {
-             if (!pollTimer) pollTimer = setInterval(fetchStatus, 1000);
-           }
+           if (!pollTimer) pollTimer = setInterval(fetchStatus, 1000);
          }
 
          function stopEvents() {
-           if (reconnectTimer) {
-             clearTimeout(reconnectTimer);
-             reconnectTimer = null;
-           }
-           if (eventSource) {
-             // Prevent onclose/onerror from triggering fallback when we intentionally close
-             if (eventSource instanceof WebSocket) {
-                eventSource.onclose = null;
-                eventSource.onerror = null;
-             }
-             eventSource.close();
-             eventSource = null;
-           }
            if (pollTimer) {
              clearInterval(pollTimer);
              pollTimer = null;
