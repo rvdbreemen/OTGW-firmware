@@ -1,9 +1,9 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v1.0.0-rc1
+**  Version  : v1.0.0-rc3
 **
-**  Copyright (c) 2021-2024 Robert van den Breemen
+**  Copyright (c) 2021-2026 Robert van den Breemen
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
@@ -83,7 +83,9 @@ void setup() {
   startLLMNR(CSTR(settingHostname));
   setupFSexplorer();
   startWebserver();
+#ifndef DISABLE_WEBSOCKET
   startWebSocket();          // start the WebSocket server for OT log streaming
+#endif
   startMQTT();               // start the MQTT after webserver, always.
  
   initWatchDog();            // setup the WatchDog
@@ -145,7 +147,9 @@ void restartWifi(){
     startTelnet();
     startOTGWstream(); 
     startMQTT();
+#ifndef DISABLE_WEBSOCKET
     startWebSocket(); // Restart WebSocket server
+#endif
     iTryRestarts = 0; //reset attempt counter
     return;
   }
@@ -297,12 +301,26 @@ void do5minevent(){
 void doBackgroundTasks()
 {
   feedWatchDog();               // Feed the dog before it bites!
+  
   if (WiFi.status() == WL_CONNECTED) {
+    // During ESP firmware flash, keep essential services but skip heavy background tasks
+    // Keep: HTTP server (upload chunks), Telnet (debug), MDNS (network discovery)
+    // Skip: MQTT, OTGW, WebSocket logs, NTP to reduce interference
+    if (isESPFlashing) {
+      handleDebug();              // Keep telnet debug active for monitoring
+      httpServer.handleClient();  // MUST continue - processes upload chunks
+      MDNS.update();              // Keep MDNS active for network discovery
+      delay(1);
+      return;
+    }
+    
     //while connected handle everything that uses network stuff
     handleDebug();
     handleMQTT();                 // MQTT transmissions
     handleOTGW();                 // OTGW handling
+#ifndef DISABLE_WEBSOCKET
     handleWebSocket();            // WebSocket handling for OT log streaming
+#endif
     httpServer.handleClient();
     MDNS.update();
     loopNTP();

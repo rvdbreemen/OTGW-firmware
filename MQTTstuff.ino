@@ -1,9 +1,9 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.0.0-rc1
+**  Version  : v1.0.0-rc3
 **
-**  Copyright (c) 2021-2024 Robert van den Breemen
+**  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
@@ -28,8 +28,8 @@ static char       MQTTbrokerIPchar[20];
 constexpr size_t  MQTT_ID_MAX_LEN = 96;
 constexpr size_t  MQTT_NAMESPACE_MAX_LEN = 192;
 constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
-constexpr size_t  MQTT_MSG_MAX_LEN = 512;
-constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 256;
+constexpr size_t  MQTT_MSG_MAX_LEN = 1200;
+constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 1200;
 
 static            PubSubClient MQTTclient(wifiClient);
 
@@ -495,7 +495,7 @@ void sendMQTTData(const __FlashStringHelper *topic, const char *json, const bool
 
 void sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *json, const bool retain)
 {
-  char payloadBuf[MQTT_MSG_MAX_LEN];
+  static char payloadBuf[MQTT_MSG_MAX_LEN];
   strncpy_P(payloadBuf, reinterpret_cast<PGM_P>(json), sizeof(payloadBuf) - 1);
   payloadBuf[sizeof(payloadBuf) - 1] = '\0';
   sendMQTTData(topic, payloadBuf, retain);
@@ -611,8 +611,8 @@ bool doAutoConfigureMsgid(byte OTid)
   } 
 
   byte lineID = 39; // 39 is unused in OT protocol so is a safe value
-  char sMsg[MQTT_MSG_MAX_LEN];
-  char sTopic[MQTT_TOPIC_MAX_LEN];
+  static char sMsg[MQTT_MSG_MAX_LEN];
+  static char sTopic[MQTT_TOPIC_MAX_LEN];
 
   //Let's open the MQTT autoconfig file
   File fh; //filehandle
@@ -639,7 +639,7 @@ bool doAutoConfigureMsgid(byte OTid)
     //read file line by line, split and send to MQTT (topic, msg)
     feedWatchDog(); //start with feeding the dog
     
-    char sLine[MQTT_CFG_LINE_MAX_LEN];
+    static char sLine[MQTT_CFG_LINE_MAX_LEN];
     size_t len = fh.readBytesUntil('\n', sLine, sizeof(sLine) - 1);
     sLine[len] = '\0';
     if (!splitLine(sLine, ';', lineID, sTopic, sizeof(sTopic), sMsg, sizeof(sMsg))) {  //splitLine() also filters comments

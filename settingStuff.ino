@@ -1,9 +1,9 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v1.0.0-rc1
+**  Version  : v1.0.0-rc3
 **
-**  Copyright (c) 2021-2024 Robert van den Breemen
+**  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
@@ -27,7 +27,7 @@ void writeSettings(bool show)
   DebugT(F("Start writing setting data "));
 
   //const size_t capacity = JSON_OBJECT_SIZE(6);  // save more setting, grow # of objects accordingly
-  DynamicJsonDocument doc(1280);
+  DynamicJsonDocument doc(1536);
   JsonObject root  = doc.to<JsonObject>();
   root["hostname"] = settingHostname;
   root["MQTTenable"] = settingMQTTenable;
@@ -46,6 +46,12 @@ void writeSettings(bool show)
   root["NTPsendtime"] = settingNTPsendtime;
   root["LEDblink"] = settingLEDblink;
   root["darktheme"] = settingDarkTheme;
+  root["ui_autoscroll"] = settingUIAutoScroll;
+  root["ui_timestamps"] = settingUIShowTimestamp;
+  root["ui_capture"] = settingUICaptureMode;
+  root["ui_autoscreenshot"] = settingUIAutoScreenshot;
+  root["ui_autodownloadlog"] = settingUIAutoDownloadLog;
+  root["ui_graphtimewindow"] = settingUIGraphTimeWindow;
   root["GPIOSENSORSenabled"] = settingGPIOSENSORSenabled;
   root["GPIOSENSORSpin"] = settingGPIOSENSORSpin;
   root["GPIOSENSORSinterval"] = settingGPIOSENSORSinterval;
@@ -84,7 +90,7 @@ void readSettings(bool show)
   }
 
   // Deserialize the JSON document
-  StaticJsonDocument<1280> doc;
+  StaticJsonDocument<1536> doc;
   DeserializationError error = deserializeJson(doc, file);
   if (error)
   {
@@ -121,6 +127,12 @@ void readSettings(bool show)
   settingNTPsendtime      = doc["NTPsendtime"]|settingNTPsendtime;
   settingLEDblink         = doc["LEDblink"]|settingLEDblink;
   settingDarkTheme        = doc["darktheme"]|settingDarkTheme;
+  settingUIAutoScroll      = doc["ui_autoscroll"] | settingUIAutoScroll;
+  settingUIShowTimestamp   = doc["ui_timestamps"] | settingUIShowTimestamp;
+  settingUICaptureMode     = doc["ui_capture"] | settingUICaptureMode;
+  settingUIAutoScreenshot  = doc["ui_autoscreenshot"] | settingUIAutoScreenshot;
+  settingUIAutoDownloadLog = doc["ui_autodownloadlog"] | settingUIAutoDownloadLog;
+  settingUIGraphTimeWindow = doc["ui_graphtimewindow"] | settingUIGraphTimeWindow;
   settingGPIOSENSORSenabled = doc["GPIOSENSORSenabled"] | settingGPIOSENSORSenabled;
   settingGPIOSENSORSpin = doc["GPIOSENSORSpin"] | settingGPIOSENSORSpin;
   settingGPIOSENSORSinterval = doc["GPIOSENSORSinterval"] | settingGPIOSENSORSinterval;
@@ -244,6 +256,14 @@ void updateSetting(const char *field, const char *newValue)
   if (strcasecmp(field, "NTPsendtime")==0)    settingNTPsendtime = EVALBOOLEAN(newValue);
   if (strcasecmp(field, "LEDblink")==0)      settingLEDblink = EVALBOOLEAN(newValue);
   if (strcasecmp(field, "darktheme")==0)     settingDarkTheme = EVALBOOLEAN(newValue);
+  
+  if (strcasecmp(field, "ui_autoscroll")==0)      settingUIAutoScroll = EVALBOOLEAN(newValue);
+  if (strcasecmp(field, "ui_timestamps")==0)      settingUIShowTimestamp = EVALBOOLEAN(newValue);
+  if (strcasecmp(field, "ui_capture")==0)         settingUICaptureMode = EVALBOOLEAN(newValue);
+  if (strcasecmp(field, "ui_autoscreenshot")==0)  settingUIAutoScreenshot = EVALBOOLEAN(newValue);
+  if (strcasecmp(field, "ui_autodownloadlog")==0) settingUIAutoDownloadLog = EVALBOOLEAN(newValue);
+  if (strcasecmp(field, "ui_graphtimewindow")==0) settingUIGraphTimeWindow = atoi(newValue);
+
   if (strcasecmp(field, "GPIOSENSORSenabled") == 0)
   {
     settingGPIOSENSORSenabled = EVALBOOLEAN(newValue);

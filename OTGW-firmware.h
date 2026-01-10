@@ -1,9 +1,9 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.0.0-rc1
+**  Version  : v1.0.0-rc3
 **
-**  Copyright (c) 2021-2024 Robert van den Breemen
+**  Copyright (c) 2021-2026 Robert van den Breemen
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
@@ -12,6 +12,9 @@
 #include <Arduino.h>
 #include <AceTime.h>
 // #include <TimeLib.h>
+
+// DEBUGGING: Uncomment the next line to disable WebSocket functionality
+// #define DISABLE_WEBSOCKET
 
 #include <TelnetStream.h>       // https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
 #include <ArduinoJson.h>        // https://arduinojson.org/
@@ -75,6 +78,7 @@ uint32_t    upTimeSeconds = 0;
 uint32_t    rebootCount = 0;
 String      sMessage = "";    
 uint32_t    MQTTautoConfigMap[8] = { 0 };
+bool        isESPFlashing = false;  // Flag to disable background tasks during ESP firmware flash
 
 //Use acetime
 using namespace ace_time;
@@ -128,6 +132,14 @@ String    settingNTPhostname = NTP_HOST_DEFAULT;
 bool      settingNTPsendtime = false;
 bool      settingLEDblink = true;
 bool      settingDarkTheme = false;
+
+// WebUI Settings (persisted)
+bool      settingUIAutoScroll = true;
+bool      settingUIShowTimestamp = true;
+bool      settingUICaptureMode = false;
+bool      settingUIAutoScreenshot = false;
+bool      settingUIAutoDownloadLog = false;
+int       settingUIGraphTimeWindow = 60; // Default to 1 Hour (60 minutes)
 
 // GPIO Sensor Settings
 bool      settingGPIOSENSORSenabled = false;

@@ -1,9 +1,9 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.0.0-rc1
+**  Version  : v1.0.0-rc3
 **
-**  Copyright (c) 2021-2024 Robert van den Breemen
+**  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
@@ -63,8 +63,11 @@ void processAPI()
     return;
   }
 
-  if (ESP.getFreeHeap() < 8500) // to prevent firmware from crashing!
+  if (ESP.getFreeHeap() < 4096) // to prevent firmware from crashing!
   {
+    // Lowered from 8500 to 4096 in v1.0.0-rc3.
+    // The new WebSocket server (port 81) consumes significant heap, establishing a new lower normal baseline.
+    // The REST API refactor to C-strings reduces fragmentation, making operation at 4KB safe.
     RESTDebugTf(PSTR("==> Bailout due to low heap (%d bytes))\r\n"), ESP.getFreeHeap() );
     httpServer.send(500, "text/plain", "500: internal server error (low heap)\r\n"); 
     return;
@@ -224,7 +227,6 @@ void sendOTGWvalue(int msgid){
   //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff.c_str());
   //reply with json
   httpServer.sendHeader("Access-Control-Allow-Origin", "*");
-  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send(200, "application/json", sBuff);
 }
 
@@ -258,7 +260,6 @@ void sendOTGWlabel(const char *msglabel){
   //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff.c_str());
   //reply with json
   httpServer.sendHeader("Access-Control-Allow-Origin", "*");
-  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send(200, "application/json", sBuff);
 }
 
@@ -502,6 +503,12 @@ void sendDeviceSettings()
   sendJsonSettingObj("ntpsendtime", settingNTPsendtime, "b");
   sendJsonSettingObj("ledblink", settingLEDblink, "b");
   sendJsonSettingObj("darktheme", settingDarkTheme, "b");
+  sendJsonSettingObj("ui_autoscroll", settingUIAutoScroll, "b");
+  sendJsonSettingObj("ui_timestamps", settingUIShowTimestamp, "b");
+  sendJsonSettingObj("ui_capture", settingUICaptureMode, "b");
+  sendJsonSettingObj("ui_autoscreenshot", settingUIAutoScreenshot, "b");
+  sendJsonSettingObj("ui_autodownloadlog", settingUIAutoDownloadLog, "b");
+  sendJsonSettingObj("ui_graphtimewindow", settingUIGraphTimeWindow, "i", 0, 1440);
   sendJsonSettingObj("gpiosensorsenabled", settingGPIOSENSORSenabled, "b");
   sendJsonSettingObj("gpiosensorspin", settingGPIOSENSORSpin, "i", 0, 16);
   sendJsonSettingObj("gpiosensorsinterval", settingGPIOSENSORSinterval, "i", 5, 65535);

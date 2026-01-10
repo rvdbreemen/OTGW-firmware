@@ -14,7 +14,9 @@
         } catch (e) { console.error(e); }
       })();
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <script src="./index.js"></script>
+    <script src="./graph.js"></script>
     <title>OTGW firmware</title>
   </head>
   <body>
@@ -26,7 +28,7 @@
         <div class="headercolumn" id='theTime'>[00:00:00]</div>
     </div>
     </font>
-    <div id="displayMainPage">
+    <div id="displayMainPage" class="page-section active">
       <div class="nav-container">
         <div class='nav-left'>
           <button class='home nav-item tabButton'>Home</button>
@@ -48,36 +50,110 @@
       <!-- OpenTherm Log Viewer Section -->
       <div id="otLogSection" class="ot-log-section">
         <div class="ot-log-header">
-          <h3>OpenTherm Message Log</h3>
+          <h3>OpenTherm Monitor</h3>
           <div class="ot-log-status">
             <span id="wsStatus" class="ws-status ws-disconnected">●</span>
             <span id="wsStatusText">Disconnected</span>
           </div>
         </div>
         
-        <div class="ot-log-controls">
-          <button id="btnToggleLog" class="btn-log-control" title="Expand/Collapse Log" aria-label="Expand or collapse the OpenTherm log view">▲ Show More</button>
-          <button id="btnAutoScroll" class="btn-log-control btn-active" title="Auto-scroll with new messages" aria-label="Toggle auto-scroll with new log messages">Auto-scroll</button>
-          <button id="btnClearLog" class="btn-log-control" title="Clear log buffer" aria-label="Clear the OpenTherm log buffer">Clear</button>
-          <button id="btnDownloadLog" class="btn-log-control" title="Download log to file" aria-label="Download the OpenTherm log to a file">Download</button>
-          <input type="text" id="searchLog" class="log-search" placeholder="Search logs..." aria-label="Search OpenTherm log messages" />
-          <label class="log-control-label">
-            <input type="checkbox" id="chkShowTimestamp" checked aria-label="Show timestamps in the OpenTherm log" />
-            Timestamps
-          </label>
+        <div class="ot-log-tabs">
+          <button class="tab-link active" onclick="openLogTab(event, 'Log')">Log</button>
+          <button class="tab-link" onclick="openLogTab(event, 'Statistics')">Statistics</button>
+          <button class="tab-link" onclick="openLogTab(event, 'Graph')">Graph</button>
         </div>
-        
-        <div id="otLogContainer" class="ot-log-container collapsed">
-          <div id="otLogContent" class="ot-log-content" role="log" aria-live="polite"></div>
+
+        <div id="Log" class="tab-content active">
+            <div class="ot-log-controls">
+              <button id="btnToggleLog" class="btn-log-control" title="Expand/Collapse Log" aria-label="Expand or collapse the OpenTherm log view">▲ Show More</button>
+              <button id="btnAutoScroll" class="btn-log-control btn-active" title="Auto-scroll with new messages" aria-label="Toggle auto-scroll with new log messages">Auto-scroll</button>
+              <button id="btnClearLog" class="btn-log-control" title="Clear log buffer" aria-label="Clear the OpenTherm log buffer">Clear</button>
+              <button id="btnDownloadLog" class="btn-log-control" title="Download log to file" aria-label="Download the OpenTherm log to a file">Download</button>
+              <label class="log-control-label" style="display:inline-flex;">
+                  <input type="checkbox" id="chkAutoDownloadLog" aria-label="Auto download log every 15 minutes" />
+                  Auto
+              </label>
+              <input type="text" id="searchLog" class="log-search" placeholder="Search logs..." aria-label="Search OpenTherm log messages" />
+              <label class="log-control-label">
+                <input type="checkbox" id="chkShowTimestamp" checked aria-label="Show timestamps in the OpenTherm log" />
+                Timestamps
+              </label>
+              <label class="log-control-label">
+                <input type="checkbox" id="chkCaptureMode" aria-label="Capture large amount of data (up to 1M lines)" />
+                Capture
+              </label>
+              <label class="log-control-label" id="lblStreamToFile" title="Stream logs directly to a local file (Chrome/Edge only)">
+                <input type="checkbox" id="chkStreamToFile" aria-label="Stream log data to a file" />
+                Stream
+              </label>
+            </div>
+            
+            <div id="otLogContainer" class="ot-log-container collapsed">
+              <div id="otLogContent" class="ot-log-content" role="log" aria-live="polite"></div>
+            </div>
+            
+            <div class="ot-log-footer">
+              <span>Lines: <span id="logLineCount">0</span><span id="logLimitDisplay"> / 2000</span></span>
+              <span>Filtered: <span id="logFilteredCount">0</span></span>
+              <span>Mem: <span id="memUsage">0</span> MB</span>
+              <span id="logFileDisplay" style="display:none">Log: <span id="currentLogFile">None</span></span>
+            </div>
         </div>
-        
-        <div class="ot-log-footer">
-          <span>Lines: <span id="logLineCount">0</span> / 2000</span>
-          <span>Filtered: <span id="logFilteredCount">0</span></span>
+
+        <div id="Statistics" class="tab-content">
+             <div class="ot-stats-container">
+                <table class="ot-stats-table" id="otStatsTable">
+                    <thead>
+                        <tr>
+                            <th onclick="sortStats(0)">Hex</th>
+                            <th onclick="sortStats(1)">Dec</th>
+                            <th onclick="sortStats(2)">Direction</th>
+                            <th onclick="sortStats(3)">Description</th>
+                            <th onclick="sortStats(4)">Interval (s)</th>
+                            <th onclick="sortStats(5)">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+             </div>
+             <div class="ot-log-footer">
+                <span>Unique Messages: <span id="statsCount">0</span></span>
+             </div>
+        </div>
+
+        <div id="Graph" class="tab-content">
+            <div class="ot-graph-container">
+               <div class="ot-graph-controls">
+                   <label for="graphTimeWindow">Time Window: </label>
+                   <select id="graphTimeWindow" class="ot-graph-time-window">
+                       <option value="10">10 Minutes</option>
+                       <option value="30">30 Minutes</option>
+                       <option value="60" selected>1 Hour</option>
+                       <option value="120">2 Hours</option>
+                       <option value="240">4 Hours</option>
+                       <option value="360">6 Hours</option>
+                       <option value="720">12 Hours</option>
+                       <option value="1440">24 Hours</option>
+                   </select>
+                   <button id="btnGraphScreenshot" class="nav-item" style="height:25px; width:auto; font-size:13px; margin-left:10px;">Screenshot</button>
+                   <label class="log-control-label" style="display:inline-flex; margin-left:10px; margin-right:20px;">
+                       <input type="checkbox" id="chkAutoScreenshot" />
+                       Auto
+                   </label>
+
+                   <button id="btnGraphExport" class="nav-item" style="height:25px; width:auto; font-size:13px;">Data</button>
+                   <label class="log-control-label" style="display:inline-flex; margin-left:10px;">
+                       <input type="checkbox" id="chkAutoExport" />
+                       Auto
+                   </label>
+               </div>
+               <div id="otGraphCanvas"></div>
+            </div>
         </div>
       </div>
     </div>
-    <div id="displayPICflash">
+    <div id="displayPICflash" class="page-section">
       <div class="nav-container">
         <div class='nav-left'>
           <button class='home nav-item tabButton'>Home</button>
@@ -94,7 +170,7 @@
       </div>
       <div id="displayPICpage"></div>
     </div>
-    <div id="displayDeviceInfo">
+    <div id="displayDeviceInfo" class="page-section">
       <div class="nav-container">
         <div class='nav-left'>
           <button class='home nav-item tabButton'>Home</button>
@@ -111,7 +187,7 @@
       </div>
       <div id="deviceinfoPage"></div>
     </div>
-    <div id="displaySettingsPage">
+    <div id="displaySettingsPage" class="page-section">
       <div class="nav-container">
         <div class='nav-left'>
           <button class='home nav-item tabButton'>Home</button>
