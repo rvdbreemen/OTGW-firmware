@@ -18,6 +18,7 @@ Usage:
 """
 
 import argparse
+import gzip
 import multiprocessing
 import os
 import platform
@@ -583,6 +584,164 @@ def list_build_artifacts(project_dir):
     print()
 
 
+def create_merged_binary(project_dir, semver, compress=False):
+    """Create a merged binary containing both firmware and filesystem using esptool merge_bin.
+    
+    Args:
+        project_dir: Project directory path
+        semver: Semantic version string
+        compress: If True, also create a gzip-compressed version
+    
+    Returns:
+        Path to the merged binary (or compressed version if compress=True)
+    """
+    print_step("Creating merged binary")
+    
+    build_dir = project_dir / "build"
+    if not build_dir.exists():
+        print_error("Build directory not found")
+        return None
+    
+    # Find firmware and filesystem files
+    firmware_file = None
+    filesystem_file = None
+    
+    # Look for firmware (try versioned first, then unversioned)
+    for pattern in [f"*{semver}*.ino.bin", "*.ino.bin", "OTGW-firmware*.bin"]:
+        matches = list(build_dir.glob(pattern))
+        # Filter out littlefs and merged files
+        matches = [m for m in matches if "littlefs" not in m.name.lower() and "merged" not in m.name.lower()]
+        if matches:
+            firmware_file = sorted(matches)[0]  # Take the first match
+            break
+    
+    # Look for filesystem (try versioned first, then unversioned)
+    for pattern in [f"*{semver}*.littlefs.bin", "*.littlefs.bin"]:
+        matches = list(build_dir.glob(pattern))
+        if matches:
+            filesystem_file = sorted(matches)[0]
+            break
+    
+    if not firmware_file:
+        print_error("Firmware binary not found in build directory")
+        return None
+    
+    if not filesystem_file:
+        print_warning("Filesystem binary not found - creating firmware-only merged binary")
+    
+    print_info(f"Firmware: {firmware_file.name}")
+    if filesystem_file:
+        print_info(f"Filesystem: {filesystem_file.name}")
+    
+    # Create output filename
+    if semver and semver != "unknown":
+        merged_name = f"OTGW-firmware-{semver}-merged.bin"
+    else:
+        merged_name = "OTGW-firmware-merged.bin"
+    
+    merged_file = build_dir / merged_name
+    
+    # Build esptool merge_bin command
+    # ESP8266 flash layout: firmware at 0x0, filesystem at 0x200000
+    # Flash size: 4MB (0x400000)
+    cmd = [
+        sys.executable, "-m", "esptool",
+        "--chip", "esp8266",
+        "merge_bin",
+        "-o", str(merged_file),
+        "--flash_mode", "dio",
+        "--flash_freq", "40m",
+        "--flash_size", "4MB",
+        "0x0", str(firmware_file)
+    ]
+    
+    # Add filesystem if available
+    if filesystem_file:
+        cmd.extend(["0x200000", str(filesystem_file)])
+    
+    print_info(f"Running: esptool merge_bin...")
+    
+    try:
+        result = run_command(cmd, cwd=project_dir, capture_output=True, show_output=False)
+        
+        if merged_file.exists():
+            size_mb = merged_file.stat().st_size / (1024 * 1024)
+            print_success(f"Created merged binary: {merged_name} ({size_mb:.2f} MB)")
+            
+            # Optionally compress the merged binary
+            if compress:
+                print_info("Compressing merged binary with gzip...")
+                compressed_file = build_dir / f"{merged_name}.gz"
+                
+                try:
+                    with open(merged_file, 'rb') as f_in:
+                        with gzip.open(compressed_file, 'wb', compresslevel=9) as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                    
+                    compressed_size_mb = compressed_file.stat().st_size / (1024 * 1024)
+                    compression_ratio = (1 - compressed_file.stat().st_size / merged_file.stat().st_size) * 100
+                    print_success(f"Created compressed binary: {compressed_file.name} ({compressed_size_mb:.2f} MB, {compression_ratio:.1f}% reduction)")
+                    
+                    return compressed_file
+                    
+                except Exception as e:
+                    print_warning(f"Compression failed: {e}")
+                    return merged_file
+            
+            return merged_file
+        else:
+            print_error("Merged binary was not created")
+            return None
+            
+    except Exception as e:
+        print_error(f"Failed to create merged binary: {e}")
+        print_info("Make sure esptool is installed: pip install esptool")
+        return None
+
+
+def check_esptool():
+    """Check if esptool is installed, and install it if not."""
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "esptool", "version"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        if result.returncode == 0:
+            print_success("esptool is already installed")
+            return True
+    except Exception:
+        pass
+
+    print_info("esptool not found. Installing...")
+    
+    # Try multiple installation strategies
+    install_attempts = [
+        ([sys.executable, "-m", "pip", "install", "--user", "esptool"], "user installation"),
+        ([sys.executable, "-m", "pip", "install", "--break-system-packages", "esptool"], "system installation with override"),
+        ([sys.executable, "-m", "pip", "install", "esptool"], "standard installation"),
+    ]
+    
+    for cmd, description in install_attempts:
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            if result.returncode == 0:
+                print_success(f"esptool installed successfully ({description})")
+                return True
+        except Exception:
+            continue
+    
+    print_error("Failed to install esptool automatically")
+    print_info("Please install esptool manually: pip install esptool")
+    return False
+
+
 def clean_build(project_dir):
     """Clean build artifacts"""
     print_step("Cleaning build artifacts")
@@ -612,6 +771,8 @@ Examples:
   python build.py                  # Full build (firmware + filesystem)
   python build.py --firmware       # Build firmware only
   python build.py --filesystem     # Build filesystem only
+  python build.py --merged         # Build and create merged binary (single flashable file)
+  python build.py --merged --compress  # Build and create compressed merged binary
   python build.py --clean          # Clean build artifacts
   python build.py --distclean      # Also remove cores/libraries cache
   python build.py --no-rename      # Build without renaming artifacts
@@ -644,6 +805,16 @@ Examples:
         help="Skip renaming build artifacts with version"
     )
     parser.add_argument(
+        "--merged",
+        action="store_true",
+        help="Create a single merged binary containing firmware and filesystem (easier flashing)"
+    )
+    parser.add_argument(
+        "--compress",
+        action="store_true",
+        help="Compress the merged binary with gzip (requires --merged)"
+    )
+    parser.add_argument(
         "--no-install-cli",
         action="store_true",
         help="Skip arduino-cli installation check/install"
@@ -659,6 +830,11 @@ Examples:
     # Disable colors if requested or on Windows (unless ANSICON is present)
     if args.no_color or (platform.system() == "Windows" and not os.environ.get("ANSICON")):
         Colors.disable()
+    
+    # Validate arguments
+    if args.compress and not args.merged:
+        print_error("--compress requires --merged flag")
+        sys.exit(2)
     
     # Get project directory (script should be in project root)
     project_dir = Path(__file__).parent.resolve()
@@ -729,6 +905,21 @@ Examples:
     # Rename artifacts with version
     if not args.no_rename:
         rename_build_artifacts(project_dir, semver)
+    
+    # Create merged binary if requested
+    if args.merged:
+        # Check/install esptool first
+        if not check_esptool():
+            print_error("esptool is required for creating merged binaries")
+            sys.exit(1)
+        
+        merged_file = create_merged_binary(project_dir, semver, compress=args.compress)
+        if not merged_file:
+            print_error("Failed to create merged binary")
+            sys.exit(1)
+        
+        print_info(f"Merged binary ready for flashing: {merged_file.name}")
+        print_info("Flash command: esptool.py --port <PORT> -b 460800 write_flash 0x0 " + str(merged_file))
     
     # List build artifacts
     list_build_artifacts(project_dir)
