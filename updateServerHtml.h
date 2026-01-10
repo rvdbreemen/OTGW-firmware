@@ -131,7 +131,7 @@ static const char UpdateServerIndex[] PROGMEM =
                  localStorage.removeItem('otgw_flash_success');
                }
              }
-           } catch(e) { console.log('Error checking pending success:', e); }
+           } catch(e) { console.log('Error checking pending success state from localStorage:', e); }
            return false;
          }
 
@@ -230,7 +230,7 @@ static const char UpdateServerIndex[] PROGMEM =
           // Clear localStorage success state if present
           try {
             localStorage.removeItem('otgw_flash_success');
-          } catch(e) {}
+          } catch(e) { console.log('Error clearing success state from localStorage:', e); }
         }
 
         function updateDeviceStatus(status) {
@@ -451,7 +451,7 @@ static const char UpdateServerIndex[] PROGMEM =
                      };
                      localStorage.setItem('otgw_flash_success', JSON.stringify(successData));
                      console.log('Stored success state in localStorage');
-                   } catch(e) { console.log('Could not store in localStorage:', e); }
+                   } catch(e) { console.log('Error storing success state in localStorage:', e); }
                    
                    // Layer 2: Set up aggressive polling for 'end' state
                    pollIntervalMs = pollMinMs; // Reset to minimum for aggressive polling
