@@ -104,6 +104,32 @@ static const char UpdateServerIndex[] PROGMEM =
          var lastUploadLoaded = 0;
          var lastUploadTotal = 0;
          var formErrorEl = document.getElementById('formError');
+         var uploadCompleteTime = 0;
+         var fallbackSuccessTimer = null;
+
+         // Check for pending success state from localStorage on page load
+         function checkPendingSuccess() {
+           try {
+             var pendingSuccess = localStorage.getItem('otgw_flash_success');
+             if (pendingSuccess) {
+               var data = JSON.parse(pendingSuccess);
+               var now = Date.now();
+               // Only restore if less than 5 minutes old
+               if (data.timestamp && (now - data.timestamp) < 300000) {
+                 console.log('Restoring success state from localStorage');
+                 showProgressPage('Flashing finished');
+                 if (data.filename) fileEl.textContent = data.filename;
+                 if (data.target) targetEl.textContent = data.target;
+                 triggerSuccessUI();
+                 localStorage.removeItem('otgw_flash_success');
+                 return true;
+               } else {
+                 localStorage.removeItem('otgw_flash_success');
+               }
+             }
+           } catch(e) { console.log('Error checking pending success:', e); }
+           return false;
+         }
 
          function showProgressPage(title) {
            pageForm.style.display = 'none';
@@ -175,9 +201,32 @@ static const char UpdateServerIndex[] PROGMEM =
             clearInterval(successTimer);
             successTimer = null;
           }
+          if (fallbackSuccessTimer) {
+            clearTimeout(fallbackSuccessTimer);
+            fallbackSuccessTimer = null;
+          }
           if (successPanel) successPanel.style.display = 'none';
           if (successCountdownEl) successCountdownEl.textContent = '60';
           if (successMessageEl) successMessageEl.textContent = 'Flashing successful. Rebooting device...';
+        }
+
+        function triggerSuccessUI() {
+          if (successShown) return; // Already shown
+          console.log('Triggering success UI');
+          progressTitle.textContent = 'Flashing finished';
+          successShown = true;
+          if (successPanel) successPanel.style.display = 'block';
+          startSuccessCountdown();
+          stopPolling();
+          localUploadDone = false;
+          if (fallbackSuccessTimer) {
+            clearTimeout(fallbackSuccessTimer);
+            fallbackSuccessTimer = null;
+          }
+          // Clear localStorage success state if present
+          try {
+            localStorage.removeItem('otgw_flash_success');
+          } catch(e) {}
         }
 
         function updateDeviceStatus(status) {
@@ -214,12 +263,7 @@ static const char UpdateServerIndex[] PROGMEM =
              if (statusEl) statusEl.textContent = 'Status: idle';
            }
            if (state === 'end') {
-             progressTitle.textContent = 'Flashing finished';
-             successShown = true;
-             if (successPanel) successPanel.style.display = 'block';
-             startSuccessCountdown();
-             stopPolling();
-             localUploadDone = false;
+             triggerSuccessUI();
            } else if (state === 'error') {
              progressTitle.textContent = 'Flashing error';
              successShown = false;
@@ -389,8 +433,33 @@ static const char UpdateServerIndex[] PROGMEM =
                    successShown = false;
                    if (successPanel) successPanel.style.display = 'none';
                  } else {
+                   // Success response received - implement multi-layered robustness
                    if (statusEl) statusEl.textContent = 'Upload complete. Waiting for flash...';
                    localUploadDone = true;
+                   uploadCompleteTime = Date.now();
+                   
+                   // Layer 1: Store success state in localStorage for recovery after reboot
+                   try {
+                     var successData = {
+                       timestamp: uploadCompleteTime,
+                       filename: fileEl.textContent,
+                       target: targetEl.textContent
+                     };
+                     localStorage.setItem('otgw_flash_success', JSON.stringify(successData));
+                     console.log('Stored success state in localStorage');
+                   } catch(e) { console.log('Could not store in localStorage:', e); }
+                   
+                   // Layer 2: Set up aggressive polling for 'end' state
+                   pollIntervalMs = pollMinMs; // Reset to minimum for aggressive polling
+                   
+                   // Layer 3: Fallback timeout - if we don't get 'end' state within 5 seconds, assume success
+                   // This handles the case where device reboots before we can poll the 'end' state
+                   fallbackSuccessTimer = setTimeout(function() {
+                     if (!successShown && localUploadDone) {
+                       console.log('Fallback: Triggering success UI after timeout');
+                       triggerSuccessUI();
+                     }
+                   }, 5000);
                  }
                  uploadInFlight = false;
                } else {
@@ -410,8 +479,13 @@ static const char UpdateServerIndex[] PROGMEM =
 
          initUploadForm('fwForm', 'flash');
          initUploadForm('fsForm', 'filesystem');
-        fetchStatus().catch(function() {});
-        startPolling();
+         
+         // Check for pending success state on page load (handles page refresh/reload scenarios)
+         if (!checkPendingSuccess()) {
+           // No pending success, proceed with normal polling
+           fetchStatus().catch(function() {});
+           startPolling();
+         }
 
          // Clean up and notify when leaving flash page
          window.addEventListener('beforeunload', function() {
