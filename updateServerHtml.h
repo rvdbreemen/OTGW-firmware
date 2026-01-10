@@ -106,6 +106,10 @@ static const char UpdateServerIndex[] PROGMEM =
          var formErrorEl = document.getElementById('formError');
          var uploadCompleteTime = 0;
          var fallbackSuccessTimer = null;
+         
+         // Constants for timeout values
+         var PENDING_SUCCESS_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+         var FALLBACK_SUCCESS_TIMEOUT_MS = 5000; // 5 seconds
 
          // Check for pending success state from localStorage on page load
          function checkPendingSuccess() {
@@ -115,7 +119,7 @@ static const char UpdateServerIndex[] PROGMEM =
                var data = JSON.parse(pendingSuccess);
                var now = Date.now();
                // Only restore if less than 5 minutes old
-               if (data.timestamp && (now - data.timestamp) < 300000) {
+               if (data.timestamp && (now - data.timestamp) < PENDING_SUCCESS_TIMEOUT_MS) {
                  console.log('Restoring success state from localStorage');
                  showProgressPage('Flashing finished');
                  if (data.filename) fileEl.textContent = data.filename;
@@ -459,7 +463,7 @@ static const char UpdateServerIndex[] PROGMEM =
                        console.log('Fallback: Triggering success UI after timeout');
                        triggerSuccessUI();
                      }
-                   }, 5000);
+                   }, FALLBACK_SUCCESS_TIMEOUT_MS);
                  }
                  uploadInFlight = false;
                } else {
