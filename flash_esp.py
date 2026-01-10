@@ -835,7 +835,7 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
     parser.add_argument(
         "--no-interactive",
         action="store_true",
-        help="Disable interactive prompts (for automation)"
+        help="Disable interactive prompts (for automation). Auto-selects first detected port and proceeds without confirmation."
     )
     
     args = parser.parse_args()
@@ -1022,34 +1022,37 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
                 print_info(f"Auto-selected port: {port}")
             else:
                 print_error("No serial port detected and --no-interactive specified")
+                print_error("Please specify a port explicitly with --port <port>")
                 sys.exit(1)
         else:
             port = select_port(ports, default_port="/dev/ttyUSB0" if platform.system() == "Linux" else None)
     
-    # Confirm before flashing
+    # Confirm before flashing (skip in non-interactive mode)
+    print("\n" + "=" * 60)
+    print(f"{Colors.BOLD}Ready to flash:{Colors.ENDC}")
+    print(f"  Mode: {mode.upper()}")
+    if version_info:
+        print(f"  Version: {version_info}")
+    print(f"  Port: {port}")
+    if merged_file:
+        print(f"  {Colors.OKGREEN}Merged Binary:{Colors.ENDC} {merged_file} (firmware + filesystem)")
+    else:
+        if firmware_file:
+            print(f"  Firmware: {firmware_file}")
+        if filesystem_file:
+            print(f"  Filesystem: {filesystem_file}")
+    print(f"  Baud rate: {args.baud}")
+    if args.erase:
+        print(f"  {Colors.WARNING}Erase flash: Yes{Colors.ENDC}")
+    print("=" * 60)
+    
     if not args.no_interactive:
-        print("\n" + "=" * 60)
-        print(f"{Colors.BOLD}Ready to flash:{Colors.ENDC}")
-        print(f"  Mode: {mode.upper()}")
-        if version_info:
-            print(f"  Version: {version_info}")
-        print(f"  Port: {port}")
-        if merged_file:
-            print(f"  {Colors.OKGREEN}Merged Binary:{Colors.ENDC} {merged_file} (firmware + filesystem)")
-        else:
-            if firmware_file:
-                print(f"  Firmware: {firmware_file}")
-            if filesystem_file:
-                print(f"  Filesystem: {filesystem_file}")
-        print(f"  Baud rate: {args.baud}")
-        if args.erase:
-            print(f"  {Colors.WARNING}Erase flash: Yes{Colors.ENDC}")
-        print("=" * 60)
-        
         confirm = input(f"\n{Colors.BOLD}Proceed with flashing? (y/N): {Colors.ENDC}").strip().lower()
         if confirm != 'y':
             print_info("Flashing cancelled.")
             sys.exit(0)
+    else:
+        print_info("\nProceeding with flash (--no-interactive mode)...")
     
     # Flash the device
     success = flash_esp8266(
