@@ -28,6 +28,9 @@
 #include "Wire.h"
 #include "OTGW-ModUpdateServer.h"
 #include <Hash.h>
+
+// External flag to track ESP flashing state
+extern bool isESPFlashing;
 #include <base64.h>
 
 #ifndef Debug
@@ -78,6 +81,10 @@ ESP8266HTTPUpdateServerTemplate<ServerType>::ESP8266HTTPUpdateServerTemplate(boo
   _isWebSocket = false;
   _lastEventMs = 0;
   _lastEventPhase = UPDATE_IDLE;
+  _lastDogFeedTime = 0;
+  _lastFeedbackBytes = 0;
+  _lastFeedbackTime = 0;
+  _lastProgressPerc = 0;
   _resetStatus();
 }
 
@@ -242,6 +249,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           return;
         }
 
+        // Set global flag to disable background tasks during ESP flash
+        ::isESPFlashing = true;
+        
         WiFiUDP::stopAll();
         if (_serial_output)
           Debugf("Update: %s\r\n", upload.filename.c_str());
@@ -259,7 +269,25 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _status.flash_total = uploadTotal;
         _status.flash_written = 0;
 
+        // Initialize throttle variables
+        _lastDogFeedTime = millis();
+        _lastFeedbackTime = millis();
+        _lastFeedbackBytes = 0;
+        _lastProgressPerc = 0;
+
         if (upload.name == "filesystem") {
+          // --- Preserve settings logic ---
+          if (_server->hasArg("preserve") && _server->arg("preserve") == "true") {
+            if (LittleFS.exists("/settings.ini")) {
+              File f = LittleFS.open("/settings.ini", "r");
+              if (f) {
+                _savedSettings = f.readString();
+                f.close();
+                if (_serial_output) Debugln("Settings preserved in memory.");
+              }
+            }
+          }
+          // --------------------------------
           size_t fsSize = ((size_t) &_FS_end - (size_t) &_FS_start);
           close_all_fs();
           if (uploadTotal > 0 && uploadTotal > fsSize) {
@@ -292,12 +320,14 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
         if (_serial_output) {Debug("."); blinkLEDnow(LED1);}
-        // Feed the dog before it bites!
+
+        // Feed the dog on every chunk (Main branch behavior)
         Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
-        // End of feeding hack
+        
         size_t written = Update.write(upload.buf, upload.currentSize);
         _status.upload_received = upload.totalSize;
         _status.flash_written += written;
+        
         if (written != upload.currentSize) {
           _setUpdaterError();
           _setStatus(UPDATE_ERROR, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, _updaterError);
@@ -308,6 +338,38 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
         if(Update.end(true)){ //true to set the size to the current progress
+          // --- Restore settings logic ---
+          if (upload.name == "filesystem" && _savedSettings.length() > 0) {
+             if (_serial_output) Debugln("Filesystem flashed successfully. Waiting 500ms before mounting...");
+             delay(500); // Wait 500ms after flashing before mounting
+             
+             if (_serial_output) Debugln("Mounting newly flashed filesystem...");
+             if (LittleFS.begin()) {
+                 if (_serial_output) Debugln("Filesystem mounted successfully. Restoring settings...");
+                 File f = LittleFS.open("/settings.ini", "w");
+                 if (f) {
+                     f.print(_savedSettings);
+                     f.close();
+                     if (_serial_output) Debugln("Settings restored to new filesystem.");
+                     LittleFS.end();
+                 } else {
+                     LittleFS.end();
+                     if (_serial_output) {
+                         Debugln("ERROR: Failed to write settings.ini to filesystem!");
+                         Debugln("RECOVERY: Download the settings from your browser's download folder");
+                         Debugln("          and upload it via the File Explorer after reboot.");
+                     }
+                 }
+             } else {
+                 if (_serial_output) {
+                     Debugln("ERROR: Failed to mount filesystem after flashing!");
+                     Debugln("RECOVERY: Download the settings from your browser's download folder");
+                     Debugln("          and upload it via the File Explorer after reboot.");
+                 }
+             }
+             _savedSettings = ""; 
+          }
+          // --------------------------------
           if (_serial_output) Debugf("\r\nUpdate Success: %u\r\nRebooting...\r\n", upload.totalSize);
           _status.upload_received = upload.totalSize;
           if (_status.upload_total == 0 && upload.totalSize > 0) {
@@ -321,10 +383,16 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           }
           _setStatus(UPDATE_END, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, emptyString);
           _sendStatusEvent();
+          
+          // Clear global flag - flash completed successfully
+          ::isESPFlashing = false;
         } else {
           _setUpdaterError();
           _setStatus(UPDATE_ERROR, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, _updaterError);
           _sendStatusEvent();
+          
+          // Clear global flag - flash failed
+          ::isESPFlashing = false;
         }
         // if (_serial_output) 
         //   OTGWSerial.setDebugOutput(false);
@@ -340,9 +408,11 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         }
         _setStatus(UPDATE_ABORT, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, emptyString);
         _sendStatusEvent();
+        
+        // Clear global flag - flash aborted
+        ::isESPFlashing = false;
       }
-      // Delay of 1ms to prevent network starvation (needed when no Telnet/Debug is active)
-      delay(1);
+      delay(0);
     });
 }
 
@@ -554,21 +624,25 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
   }
   
   // Robustness: Check if we can write without blocking
-  // If the send buffer is full (e.g. network congestion), skip this update
-  // to prioritize the file upload process.
+  // CRITICAL FIX: During UPLOAD_WRITE, we MUST send status to keep WebSocket alive
+  // If buffer is full, wait for it to drain to prevent client timeout at ~51%
   size_t available = _eventClient.availableForWrite();
 
-  // If this is a final state, we really want to send it, so we can afford to wait a bit
-  // This "speed reads" the buffer by yielding to the network stack
-  bool isFinalState = (_status.phase == UPDATE_END || _status.phase == UPDATE_ERROR || _status.phase == UPDATE_ABORT);
+  // Determine if this is a critical update that MUST be sent
+  // Final states + WRITE phase during upload (to prevent timeout)
+  bool isCriticalUpdate = (_status.phase == UPDATE_END || 
+                          _status.phase == UPDATE_ERROR || 
+                          _status.phase == UPDATE_ABORT ||
+                          _status.phase == UPDATE_WRITE);  // WRITE is critical to keep WebSocket alive
   
-  if (available < msgLen && isFinalState) {
-      // Try to wait for buffer to drain (max 1000ms)
+  if (available < msgLen && isCriticalUpdate) {
+      // Wait for buffer to drain (max 1000ms)
+      unsigned long maxWait = 1000;
       unsigned long startWait = millis();
       // Cast the millis() difference to int32_t so the timeout remains correct even when
       // millis() wraps around (standard rollover-safe timing idiom on 32-bit counters).
-      while (available < msgLen && (int32_t)(millis() - startWait) < 1000) {
-          yield(); // Allow network stack to process and drain buffer
+      while (available < msgLen && (int32_t)(millis() - startWait) < (int32_t)maxWait) {
+          _eventClient.flush();  // Force flush to drain buffer faster
           available = _eventClient.availableForWrite();
       }
   }
@@ -590,7 +664,6 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusEvent()
       }
       _lastEventMs = now;
       _lastEventPhase = _status.phase;
-      yield(); 
   } else {
       if (_serial_output) {
           Debugf("WS: Buffer full (avail: %u, need: %u). Skipping update.\r\n", available, msgLen);

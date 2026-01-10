@@ -1,9 +1,9 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v1.0.0-rc1
+**  Version  : v1.0.0-rc3
 **
-**  Copyright (c) 2021-2024 Robert van den Breemen
+**  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
@@ -26,7 +26,8 @@ void sendStartJsonObj(const char *objName)
   }
   httpServer.sendHeader("Access-Control-Allow-Origin", "*");
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  httpServer.send(200, "application/json", sBuff);
+  httpServer.send(200, "application/json", " ");
+  httpServer.sendContent(sBuff);
   iIdentlevel++;
   bFirst = true;
 
@@ -49,7 +50,8 @@ void sendStartJsonArray()
 {
   httpServer.sendHeader("Access-Control-Allow-Origin", "*");
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  httpServer.send(200, "application/json", "[\r\n");
+  httpServer.send(200, "application/json", " ");
+  httpServer.sendContent("[\r\n");
   iIdentlevel++;
   bFirst = true;
 

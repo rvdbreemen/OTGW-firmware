@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v1.0.0-rc1
+**  Version  : v1.0.0-rc3
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -10,13 +10,12 @@
 **  WebSocket handler for streaming OpenTherm log messages to WebUI
 **
 **  This module provides real-time streaming of OT log messages to the WebUI
-**  using WebSockets. It has minimal RAM impact on the ESP8266 as it only
-**  sends messages without buffering them.
+**  using WebSockets. Simplified version with direct text broadcasting.
 **
 **  Features:
 **  - WebSocket server on port 81 (separate from HTTP)
-**  - Broadcasts log messages to all connected clients
-**  - Minimal memory footprint (no server-side buffering)
+**  - Broadcasts log messages directly to all connected clients
+**  - Minimal memory footprint
 **  - Auto-cleanup of disconnected clients
 **
 **  Security:
@@ -30,6 +29,10 @@
 */
 
 #include <WebSocketsServer.h>
+#include <TelnetStream.h>
+#include "Debug.h"
+
+extern String settingHostname;
 
 // WebSocket server on port 81 (no built-in authentication; local network use only)
 WebSocketsServer webSocket = WebSocketsServer(81);
@@ -56,12 +59,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
         wsClientCount++;
         DebugTf(PSTR("WebSocket[%u] connected from %d.%d.%d.%d. Clients: %u\r\n"), 
                 num, ip[0], ip[1], ip[2], ip[3], wsClientCount);
-        
-        // Send welcome message to newly connected client
-        // Buffer sized for message prefix (33) + max hostname (32) + null terminator (1) + margin (14) = 80
-        char welcomeMsg[80];
-        snprintf(welcomeMsg, sizeof(welcomeMsg), "Connected to OTGW Log Stream - %s", CSTR(settingHostname));
-        webSocket.sendTXT(num, welcomeMsg);
       }
       break;
       
@@ -97,6 +94,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 
 //===========================================================================================
 // Send JSON message to all connected clients
+// Used only for firmware upgrade progress notifications
 //===========================================================================================
 void sendWebSocketJSON(const char *json) {
   if (wsClientCount > 0) {
@@ -122,13 +120,12 @@ void handleWebSocket() {
 }
 
 //===========================================================================================
-// Send log message to all connected WebSocket clients
+// Send log message directly to all connected WebSocket clients
 // This is called from OTGW-Core.ino when a new log line is ready
+// Simplified: no queue, no JSON, just direct text broadcasting
 //===========================================================================================
 void sendLogToWebSocket(const char* logMessage) {
-  // Only send if WebSocket is initialized, there are connected clients, and message is valid
   if (wsInitialized && wsClientCount > 0 && logMessage != nullptr) {
-    // DebugTf("Sending to WS: %s\r\n", logMessage); 
     webSocket.broadcastTXT(logMessage);
   }
 }

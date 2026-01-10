@@ -1,25 +1,48 @@
 
 static const char UpdateServerIndex[] PROGMEM =
   R"(<html charset="UTF-8">
+     <head>
+     <link rel="stylesheet" type="text/css" href="/index.css" id="theme-style">
+     <script>
+      (function() {
+        try {
+          var storedTheme = localStorage.getItem('theme');
+          if (storedTheme === 'dark') {
+            document.getElementById('theme-style').href = "/index_dark.css";
+            document.documentElement.className = 'dark';
+          }
+        } catch (e) { console.error(e); }
+      })();
+     </script>
      <style type='text/css'>
-        body {background-color: lightblue; font-family: sans-serif;}
+        body { font-family: sans-serif; }
         #pageProgress { display: none; }
-        #updatePanel { margin-top: 10px; padding: 10px; background: #e8f4ff; border: 1px solid #7aaad6; max-width: 520px; }
+        #updatePanel { margin-top: 10px; padding: 10px; background: #e8f4ff; border: 1px solid #7aaad6; max-width: 520px; color: black; }
+        html.dark #updatePanel { background: #333; border: 1px solid #555; color: white; }
+        
         #updateProgress, #flashProgress { width: 100%; height: 18px; }
         #updateError { color: #b00020; font-weight: bold; }
+        html.dark #updateError { color: #ff5555; }
         .small { font-size: 0.9em; }
+        #successLink { color: #0000EE; font-weight: bold; }
+        html.dark #successLink { color: #8ab4f8; }
      </style>
+     </head>
      <body>
      <div id='pageForm'>
        <h1>OTGW firmware Flash utility</h1>
        <form id='fwForm' method='POST' action='?cmd=0' enctype='multipart/form-data'>
             Select a "<b>.ino.bin</b>" file to flash<br/>
             <input type='file' accept='.ino.bin' name='firmware' required>
+            <br/>
             <input id='fwSubmit' type='submit' value='Flash Firmware' disabled>
         </form>
         <form id='fsForm' method='POST' action='?cmd=100' enctype='multipart/form-data'> 
             Select a "<b>.littlefs.bin</b>" file to flash<br/>
             <input type='file' accept='.littlefs.bin' name='filesystem' required>
+            <br/>
+            <label><input type="checkbox" id="chkPreserve" checked autocomplete="off"> Preserve Settings (auto-backup and restore)</label>
+            <br/>
             <input id='fsSubmit' type='submit' value='Flash LittleFS' disabled>
         </form>
         <div id='formError' class='small' style='color: #b00020; font-weight: bold;'></div>
@@ -43,15 +66,24 @@ static const char UpdateServerIndex[] PROGMEM =
          <progress id='flashProgress' value='0' max='100'></progress>
          <div id='flashProgressText'>Flashing: 0% (0 B / 0 B)</div>
          <div id='updateError'></div>
-       </div>
-       <div id='successPanel' class='small' style='display: none;'>
-         <div id='successMessage'>Update successful. Rebooting device...</div>
-         <div>Wait <span id='successCountdown'>60</span> seconds. <a id='successLink' href='/'>Go back to main page</a></div>
+         <div id='successPanel' class='small' style='display: none; border-top: 1px solid #ccc; margin-top: 10px; padding-top: 5px;'>
+           <div id='successMessage'>Update successful. Rebooting device...</div>
+           <div>Wait <span id='successCountdown'>60</span> seconds. <a id='successLink' href='/'>Go back to main page</a></div>
+         </div>
        </div>
        <div class='small'>If the device reboots, refresh this page after it comes back.</div>
      </div>
      <script>
        (function() {
+         // Notify parent window/opener that we're in flash mode
+         try {
+           if (window.opener && typeof window.opener.enterFlashMode === 'function') {
+             window.opener.enterFlashMode();
+           }
+           // Also set sessionStorage flag for cross-page communication
+           sessionStorage.setItem('flashMode', 'true');
+         } catch(e) { console.log('Could not signal flash mode:', e); }
+
          var pageForm = document.getElementById('pageForm');
          var pageProgress = document.getElementById('pageProgress');
          var progressTitle = document.getElementById('progressTitle');
@@ -67,7 +99,14 @@ static const char UpdateServerIndex[] PROGMEM =
          var successPanel = document.getElementById('successPanel');
          var successMessageEl = document.getElementById('successMessage');
          var successCountdownEl = document.getElementById('successCountdown');
-         var pollTimer = null;
+         var eventSource = null;
+        var pollTimer = null;
+        var pollIntervalMs = 100;
+        var pollMinMs = 100;
+        var pollMaxMs = 3000;
+        var pollInFlight = false;
+        var pollActive = false;
+         var reconnectTimer = null;
          var uploadInFlight = false;
          var localUploadDone = false;
          var successTimer = null;
@@ -135,6 +174,18 @@ static const char UpdateServerIndex[] PROGMEM =
           successCountdownEl.textContent = remaining;
           successTimer = setInterval(function() {
              remaining -= 1;
+             
+             // Active Polling: Check if device is back online
+             fetch('/', { method: 'GET', cache: 'no-store' })
+              .then(function(res) {
+                if (res.ok) {
+                   clearInterval(successTimer);
+                   successTimer = null;
+                   if (successMessageEl) successMessageEl.textContent = 'Device back online! Redirecting...';
+                   window.location.href = "/"; 
+                }
+              }).catch(function(e){ /* ignore, still rebooting */ });
+
              if (remaining <= 0) {
                clearInterval(successTimer);
                successTimer = null;
@@ -228,23 +279,143 @@ static const char UpdateServerIndex[] PROGMEM =
            }
          }
 
-         function fetchStatus() {
-           fetch('/status', { cache: 'no-store' })
-             .then(function(response) { return response.json(); })
-             .then(function(json) { updateDeviceStatus(json); })
-             .catch(function(e) { console.log('Fetch status error:', e); });
-         }
+        function fetchStatus(timeoutMs) {
+          var controller = null;
+          var timeoutId = null;
+          var options = { cache: 'no-store' };
+          if (window.AbortController && timeoutMs && timeoutMs > 0) {
+            controller = new AbortController();
+            options.signal = controller.signal;
+            timeoutId = setTimeout(function() { controller.abort(); }, timeoutMs);
+          }
+          return fetch('/status', options)
+            .then(function(response) {
+              if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+              }
+              return response.json();
+            })
+            .then(function(json) { updateDeviceStatus(json); })
+            .catch(function(e) {
+              console.log('Fetch status error:', e);
+              throw e;
+            })
+            .finally(function() {
+              if (timeoutId) clearTimeout(timeoutId);
+            });
+        }
 
-         function startEvents() {
-           if (!pollTimer) pollTimer = setInterval(fetchStatus, 1000);
-         }
+        function scheduleNextPoll(delayMs) {
+          if (!pollActive) return;
+          if (pollTimer) clearTimeout(pollTimer);
+          pollTimer = setTimeout(runPoll, delayMs);
+        }
+
+        function runPoll() {
+          if (!pollActive || pollInFlight) return;
+          pollTimer = null;
+          pollInFlight = true;
+          var timeoutMs = Math.max(500, pollIntervalMs * 4);
+          fetchStatus(timeoutMs)
+            .then(function() {
+              pollIntervalMs = Math.max(pollMinMs, Math.floor(pollIntervalMs / 2));
+            })
+            .catch(function() {
+              pollIntervalMs = Math.min(pollMaxMs, pollIntervalMs * 2);
+            })
+            .finally(function() {
+              pollInFlight = false;
+              scheduleNextPoll(pollIntervalMs);
+            });
+        }
+
+        function startPolling() {
+          pollActive = true;
+          pollIntervalMs = pollMinMs;
+          scheduleNextPoll(0);
+        }
+
+        function stopPolling() {
+          pollActive = false;
+          if (pollTimer) {
+            clearTimeout(pollTimer);
+            pollTimer = null;
+          }
+        }
+
+        function startEvents() {
+          if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+          if (!!window.WebSocket) {
+            stopPolling();
+            if (eventSource) return;
+             var protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+             var wsUrl = protocol + window.location.host + '/events';
+             eventSource = new WebSocket(wsUrl);
+             
+             eventSource.onopen = function(e) {
+               console.log("WS Connected");
+             };
+             
+             eventSource.onmessage = function(e) {
+               // console.log("WS Message", e.data);
+               try {
+                 var json = JSON.parse(e.data);
+                 updateDeviceStatus(json);
+               } catch (err) {
+                 console.log("WS JSON Error", err);
+               }
+             };
+             
+             eventSource.onerror = function(e) {
+               console.log("WS Error", e);
+             };
+             
+            eventSource.onclose = function(e) {
+              console.log("WS Disconnected");
+              eventSource = null;
+              // Try to reconnect after 1s
+              reconnectTimer = setTimeout(startEvents, 1000);
+            };
+          } else if (!!window.EventSource) {
+            stopPolling();
+            if (eventSource) return;
+            eventSource = new EventSource('/events');
+             eventSource.addEventListener('open', function(e) {
+               console.log("Events Connected");
+             }, false);
+             eventSource.addEventListener('error', function(e) {
+               if (e.target.readyState != EventSource.OPEN) {
+                 console.log("Events Disconnected");
+               }
+             }, false);
+             eventSource.addEventListener('status', function(e) {
+               var json = JSON.parse(e.data);
+               updateDeviceStatus(json);
+             }, false);
+          } else {
+            if (!pollActive && !pollInFlight) {
+              startPolling();
+            }
+          }
+        }
 
          function stopEvents() {
-           if (pollTimer) {
-             clearInterval(pollTimer);
-             pollTimer = null;
+           if (reconnectTimer) {
+             clearTimeout(reconnectTimer);
+             reconnectTimer = null;
            }
-         }
+           if (eventSource) {
+             // Prevent onclose/onerror from triggering fallback when we intentionally close
+             if (eventSource instanceof WebSocket) {
+                eventSource.onclose = null;
+                eventSource.onerror = null;
+             }
+             eventSource.close();
+             eventSource = null;
+           }
+          stopPolling();
+        }
+
 
          function initUploadForm(formId, targetName) {
            var form = document.getElementById(formId);
@@ -266,6 +437,8 @@ static const char UpdateServerIndex[] PROGMEM =
              }
 
              if (formErrorEl) formErrorEl.textContent = '';
+             
+             e.preventDefault();
              resetSuccessPanel();
              showProgressPage('Flashing in progress');
              fileEl.textContent = input.files[0].name || '-';
@@ -275,11 +448,28 @@ static const char UpdateServerIndex[] PROGMEM =
              if (!window.FormData || !window.XMLHttpRequest) {
                return;
              }
-             e.preventDefault();
              uploadInFlight = true;
 
              var xhr = new XMLHttpRequest();
              var action = form.action;
+
+             // --- Custom logic: append preserve param ---
+             if (formId === 'fsForm') {
+                var chk = document.getElementById('chkPreserve');
+                if(chk && chk.checked) {
+                    action += (action.indexOf('?') === -1 ? '?' : '&') + 'preserve=true';
+                    
+                    // Trigger download as backup
+                    var a = document.createElement('a');
+                    a.href = '/settings.ini';
+                    a.download = 'settings.ini';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                }
+             }
+             // ------------------------------------------
+
              if (action.indexOf('size=') === -1) {
                action += (action.indexOf('?') === -1 ? '?' : '&') + 'size=' + encodeURIComponent(input.files[0].size);
              }
@@ -343,17 +533,38 @@ static const char UpdateServerIndex[] PROGMEM =
 
          initUploadForm('fwForm', 'flash');
          initUploadForm('fsForm', 'filesystem');
-         fetchStatus();
-         startEvents();
+        fetchStatus().catch(function() {});
+        startEvents();
+
+         // Clean up and notify when leaving flash page
+         window.addEventListener('beforeunload', function() {
+           try {
+             sessionStorage.removeItem('flashMode');
+             if (window.opener && typeof window.opener.exitFlashMode === 'function') {
+               window.opener.exitFlashMode();
+             }
+           } catch(e) { console.log('Cleanup error:', e); }
+         });
        })();
      </script>
      </html>)";
 
 static const char UpdateServerSuccess[] PROGMEM = 
   R"(<html charset="UTF-8">
+      <head>
+      <link rel="stylesheet" type="text/css" href="/index.css" id="theme-style">
+      <script>
+        try {
+          var storedTheme = localStorage.getItem('theme');
+          if (storedTheme === 'dark') {
+            document.getElementById('theme-style').href = "/index_dark.css";
+          }
+        } catch (e) { console.error(e); }
+      </script>
       <style type='text/css'>
-        body {background-color: lightgray;}
+        body { font-family: sans-serif; }
       </style>
+      </head>
       <body>
       <h1>OTGW firmware Flash utility</h1>
       <br/>

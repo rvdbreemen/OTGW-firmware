@@ -1,9 +1,9 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v1.0.0-rc1
+**  Version  : v1.0.0-rc3
 **
-**  Copyright (c) 2021-2024 Robert van den Breemen
+**  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
@@ -22,6 +22,33 @@ template <typename T> T PROGMEM_getAnything (const T * sce)
   static T temp;
   memcpy_P (&temp, sce, sizeof (T));
   return temp;
+}
+
+//===========================================================================================
+// Get High Resolution Timestamp for Logs
+//===========================================================================================
+const char* getOTLogTimestamp() {
+  static char timestamp[16]; // "HH:MM:SS.mmmmmm"
+  timeval now;
+  gettimeofday(&now, nullptr);
+  // Default to UTC if not initialized, but typically settingNTPtimezone is valid
+  // Recreating the timezone object is what _debugBOL does, so we follow that pattern
+  // assuming timezoneManager is available.
+  TimeZone myTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  if (myTz.isError()) {
+    // Fallback if generic name failed
+    myTz = TimeZone::forTimeOffset(TimeOffset::forMinutes(0)); 
+  }
+  
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now.tv_sec, myTz);
+
+  // 6 digit subsecond resolution from microseconds (0..999999)
+  const unsigned long subSeconds = (unsigned long)(now.tv_usec);
+
+  snprintf(timestamp, sizeof(timestamp), "%02d:%02d:%02d.%06lu",
+           myTime.hour(), myTime.minute(), myTime.second(), subSeconds);
+
+  return timestamp;
 }
 
 //===========================================================================================

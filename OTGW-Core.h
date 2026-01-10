@@ -1,9 +1,9 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h 
-**  Version  : v1.0.0-rc1
+**  Version  : v1.0.0-rc3
 **
-**  Copyright (c) 2021-2024 Robert van den Breemen
+**  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
 **      https://github.com/jpraus/arduino-opentherm
 **
@@ -162,8 +162,22 @@ typedef struct {
 
 } OTdataStruct;
 
-static OTdataStruct OTcurrentSystemState;   
+static OTdataStruct OTcurrentSystemState;
 
+// Value type enum for OTlogStruct
+enum OTValueType {
+	OT_VALTYPE_NONE = 0,
+	OT_VALTYPE_F88,      // float (f8.8)
+	OT_VALTYPE_S16,      // signed 16-bit
+	OT_VALTYPE_U16,      // unsigned 16-bit
+	OT_VALTYPE_U8U8,     // two unsigned 8-bit values
+	OT_VALTYPE_S8S8,     // two signed 8-bit values
+	OT_VALTYPE_FLAG8,    // 8-bit flags
+	OT_VALTYPE_FLAG8FLAG8, // two 8-bit flags
+	OT_VALTYPE_STATUS,   // status flags (master/slave)
+	OT_VALTYPE_DATETIME, // date or time
+	OT_VALTYPE_SPECIAL   // special formatting
+};
 
 enum OpenThermResponseStatus {
 	OT_NONE,

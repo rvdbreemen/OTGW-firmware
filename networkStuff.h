@@ -2,11 +2,11 @@
 ***************************************************************************  
 **  Program : networkStuff.h
 **
-**  Version  : v1.0.0-rc1
+**  Version  : v1.0.0-rc3
 **
-**  Copyright (c) 2021-2024 Robert van den Breemen
+**  Copyright (c) 2021-2026 Robert van den Breemen
 **
-**  Copyright (c) 2021-2024 Robert van den Breemen
+**  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
@@ -43,6 +43,8 @@
 #include <ESP8266LLMNR.h>
 
 #include <WiFiUdp.h>            // part of ESP8266 Core https://github.com/esp8266/Arduino
+//#include <FS.h>                 // part of ESP8266 Core https://github.com/esp8266/Arduino
+#include <LittleFS.h>
 //#include "ESP8266HTTPUpdateServer.h"
 #include "OTGW-ModUpdateServer.h"   // <<special version for Nodoshop Watchdog needed>>
 #include "updateServerHtml.h"
@@ -84,8 +86,6 @@
  *   the firmware. This header only documents the feature and its intended
  *   local-network-only usage.
  */
-//#include <FS.h>                 // part of ESP8266 Core https://github.com/esp8266/Arduino
-#include <LittleFS.h>
 
 //Use the NTP SDK ESP 8266 
 //#include <time.h>

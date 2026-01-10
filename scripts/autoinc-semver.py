@@ -250,7 +250,7 @@ def should_skip_path(path, base_dir):
         "arduino", "Arduino", "libraries", "staging", "build", 
         "node_modules", ".git", "__pycache__", ".github",
         "scripts", "docs", "hardware", "example-api", "Specification",
-        "specification", "theme", "data"
+        "specification"
     }
     
     # Check if any part of the path is in skip_dirs
@@ -388,7 +388,7 @@ def main(directory, filename, git_enabled, increment, githash_override, githash_
     update_version_hash(os.path.join("data", "version.hash"), githash)
 
     # Check if any project files need updating (have different version than version.h)
-    ext_list = [".h", ".ino", ".cpp", ".c"]
+    ext_list = [".h", ".ino", ".cpp", ".c", ".js", ".css", ".html", ".md", ".txt"]
     needs_update = False
     
     if not update_all:

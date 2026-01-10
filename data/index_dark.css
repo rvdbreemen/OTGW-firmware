@@ -1,9 +1,9 @@
 /*
 ***************************************************************************  
 **  Program  : index.css
-**  Version  : v0.10.4-alpha
+**  Version  : v1.0.0-rc3
 **
-**  Copyright (c) 2021-2024 Robert van den Breemen
+**  Copyright (c) 2021-2026 Robert van den Breemen
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
@@ -292,31 +292,60 @@
     color: white;
   }
   
-  .div2 { 
-    margin-left: 280px; 
-    margin-top: -52px;
-  }
+/* Graph Tab */
+.ot-graph-container {
+    width: 100%;
+    height: 600px;
+    background-color: #1c1c1e;
+    border: 1px solid #444;
+    padding: 10px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+#otGraphCanvas {
+    width: 100%;
+    flex-grow: 1;
+    min-height: 0;
+}
+
+.ot-graph-controls {
+    margin-bottom: 5px;
+    text-align: right;
+}
+
+.ot-graph-select {
+    padding: 5px;
+    border-radius: 4px;
+    border: 1px solid #555;
+    background-color: #2c2c2e;
+    color: white;
+}
   
   /* header */
   .headerrow {
-    vertical-align:bottom;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    padding-bottom: 5px;
   }
   
   .headercolumnbig{
     font-size: xx-large;
     font-weight: bold;
-    float: left;
-    width: 350px;
+    flex-grow: 1;
+    white-space: nowrap;
+    margin-right: 15px;
   }
   
   .headercolumn{
     font-size: smaller;
-    float: left;
-    width: 175px;
-    
+    white-space: nowrap;
+    margin-left: 15px;
   }
   
-  /* Clear floats after the columns */
+  /* Clear floats after the columns - keeping for compatibility if any floats remain, but flex ignores this mostly */
   .headerrow:after {
     content: "";
     display: table;
@@ -446,34 +475,65 @@
   background-color: transparent;
 }
 
-/* DevInfo */
-.devinforow {
-  background: rgb(28, 28, 30);
-  display: table-row;
-  font-size: 14px;
+/* DevInfo - Table Layout */
+#deviceinfoPage {
+  display: table;
+  width: fit-content;
+  border-collapse: collapse;
 }
-  .devinfocolumn1 {
-    display: table-cell;
-    float: left;
-    width: 160px;
-    padding-left: 10px;
-    font-size: 14px;
+
+.devinforow {
+  display: table-row;
+  background: rgb(28, 28, 30);
+}
+
+.devinfocolumn1 {
+  display: table-cell;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 2px 5px;
+  border: 1px solid #444;
+  width: 1%;
+}
+
+.devinfocolumn2 {
+  display: table-cell;
+  text-align: left;
+  padding: 2px 5px;
+  border: 1px solid #444;
+}
+
+/* Responsive: Stack on small screens */
+@media (max-width: 600px) {
+  #deviceinfoPage {
+    display: block;
+    width: 100%;
   }
-  .devinfocolumn2 {
-    display: table-cell;
-    float: left;
-    width: 160px;
-    text-align: left;
-    font-size: 14px;
+
+  .devinforow {
+    display: flex;
+    flex-direction: column;
+    padding: 5px;
+    border-bottom: 1px solid #444;
   }
   
-  /* Clear floats after the columns */
-  .devinforow:after {
-    content: "";
-    display: table;
-    clear: both;
-    background: rgb(28, 28, 30);
+  .devinfocolumn1 {
+    display: block;
+    width: auto;
+    font-weight: 600;
+    color: #5398cb;
+    border: none;
+    padding: 0;
   }
+  
+  .devinfocolumn2 {
+    display: block;
+    padding-left: 10px;
+    font-size: 13px;
+    border: none;
+    padding: 0 0 0 10px;
+  }
+}
   
  /* SettingsPage */
  #settingMessage {
@@ -795,4 +855,151 @@ body.disable-interaction {
     pointer-events: none;
     opacity: 0.6;
     cursor: wait;
+}
+
+/* Tabs support - Dark Mode */
+.ot-log-tabs {
+  margin-bottom: 15px;
+  border-bottom: 1px solid #444;
+}
+
+.tab-link {
+  background-color: inherit;
+  border: none;
+  border-bottom: 3px solid transparent;
+  outline: none;
+  cursor: pointer;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: bold;
+  transition: 0.3s;
+  color: #ccc;
+}
+
+.tab-link:hover {
+  background-color: #333;
+  border-radius: 4px 4px 0 0;
+}
+
+.tab-link.active {
+  color: #2196F3;
+  border-bottom: 3px solid #2196F3;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* Statistics Table - Dark Mode */
+.ot-stats-container {
+  overflow-x: auto;
+  max-height: 600px;
+  overflow-y: auto;
+  background: #1e1e1e;
+  border: 1px solid #444;
+}
+
+.ot-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+  table-layout: fixed;
+}
+
+.ot-stats-table th:nth-child(1) { width: 40px; }  /* Hex */
+.ot-stats-table th:nth-child(2) { width: 40px; }  /* Dec */
+.ot-stats-table th:nth-child(3) { width: 70px; }  /* Direction */
+.ot-stats-table th:nth-child(4) { width: 200px; } /* Description */
+.ot-stats-table th:nth-child(5) { width: 80px; }  /* Interval */
+.ot-stats-table th:nth-child(6) { width: auto; }  /* Value - takes remaining space */
+
+.ot-stats-table th, .ot-stats-table td {
+  text-align: left;
+  padding: 8px;
+  border-bottom: 1px solid #444;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ot-stats-table th {
+  background-color: #2d2d2d;
+  color: #f0f0f0;
+  position: sticky;
+  top: 0;
+  cursor: pointer;
+}
+
+.ot-stats-table th:hover {
+  background-color: #3d3d3d;
+}
+
+.ot-stats-table tr:hover {
+  background-color: #2d2d2d;
+}
+
+/* Utility classes for common inline styles */
+.hidden { display: none !important; }
+.visible { display: block !important; }
+
+.page-section {
+  display: none;
+}
+
+.page-section.active {
+  display: block;
+}
+
+.firmware-info-div {
+  margin-bottom: 15px;
+  padding: 10px;
+}
+
+.firmware-row-bold {
+  font-weight: bold;
+}
+
+.firmware-icon {
+  width: 16px;
+  height: auto;
+}
+
+.firmware-progress {
+  display: block;
+}
+
+.otmonrow.hidden-row {
+  display: none !important;
+}
+
+.settings-field-container {
+  width: 320px;
+  float: left;
+}
+
+.flash-progress-bar {
+  width: 0%;
+  background-color: #4CAF50;
+}
+
+.flash-progress-bar.error {
+  background-color: red;
+}
+
+.flash-progress-section {
+  display: none;
+}
+
+.flash-progress-section.active {
+  display: block;
+}
+
+.waiting-error {
+  color: #ff6b6b;
 }

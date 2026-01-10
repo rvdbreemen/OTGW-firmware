@@ -1,9 +1,9 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.0.0-rc1
+**  Version  : v1.0.0-rc3
 **
-**  Copyright (c) 2021-2024 Robert van den Breemen
+**  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
 **      https://github.com/jpraus/arduino-opentherm
 **
@@ -65,6 +65,7 @@ const char *hexheaders[] = {
 
 #define OT_LOG_BUFFER_SIZE 512
 char ot_log_buffer[OT_LOG_BUFFER_SIZE];
+
 #define ClrLog()            ({ ot_log_buffer[0] = '\0'; })
 #define AddLogf(...)        ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { snprintf(ot_log_buffer + _len, OT_LOG_BUFFER_SIZE - _len, __VA_ARGS__); } })
 #define AddLog(logstring)   ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, logstring, OT_LOG_BUFFER_SIZE); } })
@@ -541,6 +542,7 @@ void print_f88(float& value)
   dtostrf(_value, 3, 2, _msg);
   
   AddLogf("%s = %s %s", OTlookupitem.label, _msg , OTlookupitem.unit);
+
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
@@ -557,6 +559,7 @@ void print_s16(int16_t& value)
   char _msg[15] {0};
   itoa(_value, _msg, 10);
   AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
+
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
@@ -567,6 +570,7 @@ void print_s16(int16_t& value)
 void print_s8s8(uint16_t& value)
 {  
   AddLogf("%s = %3d / %3d %s", OTlookupitem.label, (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB, OTlookupitem.unit);
+
   //Build string for MQTT
   char _msg[15] {0};
   char _topic[50] {0};
@@ -596,6 +600,7 @@ void print_u16(uint16_t& value)
   utoa(_value, _msg, 10);
   
   AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
+  
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
@@ -629,8 +634,9 @@ void print_status(uint16_t& value)
     _flag8_master[7] = (((OTdata.valueHB) & 0x80) ? '.' : '-');
     _flag8_master[8] = '\0';
 
-    
-    AddLogf("%s = Master [%s]", OTlookupitem.label, _flag8_master);
+    AddLog(" ");
+    AddLog(OTlookupitem.label);
+    AddLogf(" = Master [%s]", _flag8_master);
 
     //Master Status
     if (is_value_valid(OTdata, OTlookupitem)){
@@ -665,9 +671,10 @@ void print_status(uint16_t& value)
     _flag8_slave[7] = (((OTdata.valueLB) & 0x80) ? 'P' : '-');
     _flag8_slave[8] = '\0';
 
+    AddLog(" ");
+    AddLog(OTlookupitem.label);
+    AddLogf(" = Slave  [%s]", _flag8_slave);
     
-    AddLogf("%s = Slave  [%s]", OTlookupitem.label, _flag8_slave);
-
     //Slave Status
     if (is_value_valid(OTdata, OTlookupitem)){
       sendMQTTData("status_slave", _flag8_slave);
@@ -999,6 +1006,7 @@ void print_remoteoverridefunction(uint16_t& value)
 void print_flag8u8(uint16_t& value)
 {
   AddLogf("%s = M[%s] - [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
+
   if (is_value_valid(OTdata, OTlookupitem)){
     //Build string for MQTT
     char _topic[50] {0};
@@ -1020,6 +1028,7 @@ void print_flag8(uint16_t& value)
 {
   
   AddLogf("%s = flag8 = [%s] - decimal = [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
+
    if (is_value_valid(OTdata, OTlookupitem)){
     //Build string for MQTT
     char _topic[50] {0};
@@ -1039,6 +1048,7 @@ void print_flag8flag8(uint16_t& value)
   //flag8 valueHB
   
   AddLogf("%s = HB flag8[%s] -[%3d] ", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueHB);
+
   if (is_value_valid(OTdata, OTlookupitem)){
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_hb_flag8", sizeof(_topic));
@@ -1119,6 +1129,7 @@ void print_u8u8(uint16_t& value)
 { 
   
   AddLogf("%s = %3d / %3d %s", OTlookupitem.label, (uint8_t)OTdata.valueHB, (uint8_t)OTdata.valueLB, OTlookupitem.unit);
+
   if (is_value_valid(OTdata, OTlookupitem)){
     //Build string for MQTT
     char _topic[50] {0};
@@ -1500,6 +1511,10 @@ void processOT(const char *buf, int len){
 
     //clear ot log buffer
     ClrLog();
+    // Start log with timestamp
+    AddLog(getOTLogTimestamp());
+    AddLog(" ");
+    
     //process the OTGW message
     const char *bufval = buf + 1; //skip the first char
     uint32_t value = 0;
@@ -1560,6 +1575,7 @@ void processOT(const char *buf, int len){
         }
       }
 
+
       // Decode and print OpenTherm Gateway Message
       switch (OTdata.rsptype){
         case OTGW_BOILER:
@@ -1582,30 +1598,19 @@ void processOT(const char *buf, int len){
           break;
       }
 
-      //print OTmessage to debug
-      //AddLogf("%s (%d)", OTdata.buf, OTdata.len);
-      //OTGWDebugf("[%08x]", OTdata.value);      //print message frame
-      //OTGWDebugf("\ttype[%3d] id[%3d] hb[%3d] lb[%3d]\t", OTdata.type, OTdata.id, OTdata.valueHB, OTdata.valueLB);
       //print message Type and ID
-      AddLogf("[MsgID=%3d]", OTdata.id);
-      AddLogf("[%-16s]", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
+      AddLogf(" %s %3d", OTdata.buf, OTdata.id);
+      AddLogf(" %-16s", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
       //OTGWDebugf("[%-30s]", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
       //OTGWDebugf("[M=%d]",OTdata.master);
 
-      if (OTdata.skipthis){
-        if (OTdata.rsptype == OTGW_PARITY_ERROR) {
-          AddLog("P"); //skipped due to parity error
-        } else {
-          AddLog("-"); //skipped due to R or A message
-        }
-          
-      } else {
-        if (is_value_valid(OTdata, OTlookupitem)) {
-          AddLog(">");
-        } else {
-          AddLog(" ");
-        }
-      }
+      //Add indicators for parity error, skip message or valid value
+      if (OTdata.rsptype == OTGW_PARITY_ERROR) AddLog("P"); 
+      else if (OTdata.skipthis) AddLog("-"); 
+      else if (is_value_valid(OTdata, OTlookupitem)) AddLog(">");
+      else AddLog(" ");  //placeholder for alignment
+      
+      AddLog(" ");  // Space before payload for readability
       
       //next step interpret the OT protocol
           
@@ -1730,7 +1735,10 @@ void processOT(const char *buf, int len){
       if (OTdata.skipthis) AddLog(" <ignored> ");
       AddLogln();
       OTGWDebugT(ot_log_buffer);
-      sendLogToWebSocket(ot_log_buffer);  // Send log to WebSocket clients
+   
+      // Send log buffer directly to WebSocket (no JSON, no queue)
+      sendLogToWebSocket(ot_log_buffer);
+      
       OTGWDebugFlush();
       ClrLog();
     } 
@@ -2085,14 +2093,18 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   } else {
       snprintf(buffer, sizeof(buffer), "{\"result\":%d,\"errors\":%d,\"retries\":%d}", (int)result, errors, retries);
   }
+#ifndef DISABLE_WEBSOCKET
   sendWebSocketJSON(buffer);
+#endif
 }
 
 void fwupgradestep(int pct) {
   OTGWDebugTf(PSTR("Upgrade: %d%%\n\r"), pct);
   char buffer[32];
   snprintf(buffer, sizeof(buffer), "{\"percent\":%d}", pct);
+#ifndef DISABLE_WEBSOCKET
   sendWebSocketJSON(buffer);
+#endif
 }
 
 void fwreportinfo(OTGWFirmware fw, const char *version) {

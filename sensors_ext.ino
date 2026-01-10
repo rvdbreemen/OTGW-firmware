@@ -1,8 +1,8 @@
 /*
 **  Program  : output_ext.ino
-**  Version  : v1.0.0-rc1
+**  Version  : v1.0.0-rc3
 **
-**  Copyright (c) 2021-2024 Robert van den Breemen
+**  Copyright (c) 2021-2026 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
 **  Modified by Rob Roos to enable MQ autoconfigure and cleanup
 **
