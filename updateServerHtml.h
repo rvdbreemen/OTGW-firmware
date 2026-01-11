@@ -131,12 +131,14 @@ static const char UpdateServerIndex[] PROGMEM =
            flashProgressTextEl.textContent = 'Flashing: ? (' + formatBytes(loaded) + ' / ?)';
          }
 
-        function checkDeviceReady(callback) {
+        function checkDeviceReady() {
           var checkInterval = 500;
           var maxAttempts = 120; // 60 seconds max
           var attempts = 0;
+          var deviceReady = false;
           
           function tryPing() {
+            if (deviceReady) return; // Already found
             attempts++;
             fetch('/api/v1/devinfo', { 
               method: 'GET',
@@ -144,34 +146,30 @@ static const char UpdateServerIndex[] PROGMEM =
               headers: { 'Accept': 'application/json' }
             })
             .then(function(response) {
-              if (response.ok) {
+              if (response.ok && !deviceReady) {
+                deviceReady = true;
                 // Device is back!
+                if (successTimer) {
+                  clearInterval(successTimer);
+                  successTimer = null;
+                }
                 if (successMessageEl) {
                   successMessageEl.textContent = 'Device is back online. Redirecting in 2 seconds...';
+                }
+                if (successCountdownEl) {
+                  successCountdownEl.textContent = '2';
                 }
                 setTimeout(function() {
                   window.location.href = "/";
                 }, 2000);
-              } else if (attempts < maxAttempts) {
+              } else if (attempts < maxAttempts && !deviceReady) {
                 setTimeout(tryPing, checkInterval);
-              } else {
-                // Timeout - redirect anyway
-                if (successMessageEl) {
-                  successMessageEl.textContent = 'Redirecting...';
-                }
-                window.location.href = "/";
               }
             })
             .catch(function(err) {
               // Device not ready yet
-              if (attempts < maxAttempts) {
+              if (attempts < maxAttempts && !deviceReady) {
                 setTimeout(tryPing, checkInterval);
-              } else {
-                // Timeout - redirect anyway
-                if (successMessageEl) {
-                  successMessageEl.textContent = 'Redirecting...';
-                }
-                window.location.href = "/";
               }
             });
           }
@@ -182,10 +180,27 @@ static const char UpdateServerIndex[] PROGMEM =
 
         function startSuccessCountdown() {
           if (!successCountdownEl || successTimer) return;
-          if (successMessageEl) {
-            successMessageEl.textContent = 'Update successful. Device rebooting...';
-          }
+          var remaining = 60;
+          successCountdownEl.textContent = remaining;
+          
+          // Start checking for device in parallel
           checkDeviceReady();
+          
+          // Run countdown
+          successTimer = setInterval(function() {
+             remaining -= 1;
+             if (remaining <= 0) {
+               clearInterval(successTimer);
+               successTimer = null;
+               successCountdownEl.textContent = '0';
+               if (successMessageEl) {
+                 successMessageEl.textContent = 'Update successful. Redirecting...';
+               }
+               window.location.href = "/";
+               return;
+             }
+            successCountdownEl.textContent = remaining;
+          }, 1000);
         }
 
         function resetSuccessPanel() {
