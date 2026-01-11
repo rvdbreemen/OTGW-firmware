@@ -79,8 +79,8 @@ void startWebserver(){
 
   httpServer.begin();
   // Set up first message as the IP address
-  OTGWSerial.println("\nHTTP Server started\r");  
-  snprintf(cMsg, sizeof(cMsg), "%03d.%03d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
+  OTGWSerial.println(F("\nHTTP Server started\r"));  
+  snprintf_P(cMsg, sizeof(cMsg), PSTR("%03d.%03d.%d.%d"), WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
   OTGWSerial.printf("\nAssigned IP=%s\r\n", cMsg);
 }
 //=====================================================================================
@@ -112,16 +112,16 @@ void setupFSexplorer(){
     }
     // else if (httpServer.uri() == "/")
     // {
-    //   DebugTln("index requested..");
+    //   DebugTln(F("index requested.."));
     //   sendIndexPage();
     // }
     else
     {
-      if (bDebugRestAPI) DebugTf("next: handleFile(%s)\r\n"
+      if (bDebugRestAPI) DebugTf(PSTR("next: handleFile(%s)\r\n")
                       , String(httpServer.urlDecode(httpServer.uri())).c_str());
       if (!handleFile(httpServer.urlDecode(httpServer.uri())))
       {
-        httpServer.send(404, "text/plain", "FileNotFound\r\n");
+        httpServer.send_P(404, PSTR("text/plain"), PSTR("FileNotFound\r\n"));
       }
     }
   });
@@ -130,7 +130,7 @@ void setupFSexplorer(){
 
 //=====================================================================================
 void apifirmwarefilelist() {
-  DebugTf("API: apifirmwarefilelist()\r\n");
+  DebugTf(PSTR("API: apifirmwarefilelist()\r\n"));
   char buffer[1024];
   char *s = buffer;
   size_t left = sizeof(buffer);
@@ -143,7 +143,7 @@ void apifirmwarefilelist() {
   String dirpath = "/" + String(sPICdeviceid);
   DebugTf(PSTR("dirpath=%s\r\n"), dirpath.c_str());
       
-  len = snprintf(s, left, "[");
+  len = snprintf_P(s, left, PSTR("["));
   s += len; left -= len;
 
   dir = LittleFS.openDir(dirpath);	
@@ -176,7 +176,7 @@ void apifirmwarefilelist() {
       }
       Debugln();
       
-      len = snprintf( s, left, "{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d},", CSTR(dir.fileName()), CSTR(version), dir.fileSize());
+      len = snprintf_P(s, left, PSTR("{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d},"), CSTR(dir.fileName()), CSTR(version), dir.fileSize());
       if (len < 0 || (size_t)len >= left) break;
       s += len; left -= len;
     }
@@ -185,7 +185,7 @@ void apifirmwarefilelist() {
   if (*(s-1) == ',') {
     s--; left++;
   }
-  snprintf(s, left, "]\r\n");
+  snprintf_P(s, left, PSTR("]\r\n"));
 
   DebugTf(PSTR("filelist response: %s\r\n"), buffer);
   httpServer.send(200, "application/json", buffer);
@@ -231,7 +231,7 @@ void apilistfiles()             // Senden aller Daten an den Client
       //DebugTf(PSTR("y[%d], x[%d] => seq[y][%s] / seq[x][%s] "), y, x, dirMap[y].Name, dirMap[x].Name);
       if (strcasecmp(dirMap[x].Name, dirMap[y].Name) <= 0)
       {
-        //Debug(" !switch!");
+        //Debug(F(" !switch!"));
         fileMeta temp = dirMap[y];
         dirMap[y] = dirMap[x];
         dirMap[x] = temp;

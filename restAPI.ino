@@ -59,7 +59,7 @@ void processAPI()
   if (uriLen >= sizeof(URI))
   {
     RESTDebugTln(F("==> Bailout due to oversized URI"));
-    httpServer.send(414, "text/plain", "414: URI too long\r\n");
+    httpServer.send_P(414, PSTR("text/plain"), PSTR("414: URI too long\r\n"));
     return;
   }
 
@@ -69,7 +69,7 @@ void processAPI()
     // The new WebSocket server (port 81) consumes significant heap, establishing a new lower normal baseline.
     // The REST API refactor to C-strings reduces fragmentation, making operation at 4KB safe.
     RESTDebugTf(PSTR("==> Bailout due to low heap (%d bytes))\r\n"), ESP.getFreeHeap() );
-    httpServer.send(500, "text/plain", "500: internal server error (low heap)\r\n"); 
+    httpServer.send_P(500, PSTR("text/plain"), PSTR("500: internal server error (low heap)\r\n")); 
     return;
   }
 
@@ -90,69 +90,69 @@ void processAPI()
   
   if (bDebugRestAPI)
   {
-    DebugT(">>");
+    DebugT(F(">>"));
     for (uint_fast8_t  w=0; w<wc; w++)
     {
-      Debugf("word[%d] => [%s], ", w, words[w]);
+      Debugf(PSTR("word[%d] => [%s], "), w, words[w]);
     }
-    Debugln(" ");
+    Debugln(F(" "));
   }
 
-  if (wc > 1 && strcmp(words[1], "api") == 0) {
+  if (wc > 1 && strcmp_P(words[1], PSTR("api")) == 0) {
 
-    if (wc > 2 && strcmp(words[2], "v1") == 0)
+    if (wc > 2 && strcmp_P(words[2], PSTR("v1")) == 0)
     { //v1 API calls
-      if (wc > 3 && strcmp(words[3], "otgw") == 0) {
-        if (wc > 4 && strcmp(words[4], "telegraf") == 0) {
+      if (wc > 3 && strcmp_P(words[3], PSTR("otgw")) == 0) {
+        if (wc > 4 && strcmp_P(words[4], PSTR("telegraf")) == 0) {
           // GET /api/v1/otgw/telegraf
           // Response: see json response
-          if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
+          if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
           sendTelegraf();
-        } else if (wc > 4 && strcmp(words[4], "otmonitor") == 0) {
+        } else if (wc > 4 && strcmp_P(words[4], PSTR("otmonitor")) == 0) {
           // GET /api/v1/otgw/otmonitor
           // Response: see json response
-          if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
+          if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
           sendOTmonitor();
-        } else if (wc > 4 && strcmp(words[4], "autoconfigure") == 0) {
+        } else if (wc > 4 && strcmp_P(words[4], PSTR("autoconfigure")) == 0) {
           // POST /api/v1/otgw/autoconfigure
           // Response: sends all autodiscovery topics to MQTT for HA integration
-          if (!isPostOrPut) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
-          httpServer.send(200, "text/plain", "OK");
+          if (!isPostOrPut) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+          httpServer.send_P(200, PSTR("text/plain"), PSTR("OK"));
           doAutoConfigure();
-        } else if (wc > 5 && strcmp(words[4], "id") == 0) {
-          if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
+        } else if (wc > 5 && strcmp_P(words[4], PSTR("id")) == 0) {
+          if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
           uint8_t msgId = 0;
           if (parseMsgId(words[5], msgId)) {
             sendOTGWvalue(msgId);
           } else {
-            httpServer.send(400, "text/plain", "400: invalid msgid\r\n");
+            httpServer.send_P(400, PSTR("text/plain"), PSTR("400: invalid msgid\r\n"));
           }
-        } else if (wc > 5 && strcmp(words[4], "label") == 0) {
+        } else if (wc > 5 && strcmp_P(words[4], PSTR("label")) == 0) {
           // GET /api/v1/otgw/label/{msglabel}
-          if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
-          if (words[5][0] == '\0') { httpServer.send(400, "text/plain", "400: missing label\r\n"); return; }
+          if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+          if (words[5][0] == '\0') { httpServer.send_P(400, PSTR("text/plain"), PSTR("400: missing label\r\n")); return; }
           sendOTGWlabel(words[5]);
-        } else if (wc > 5 && strcmp(words[4], "command") == 0) {
-          if (!isPostOrPut) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
+        } else if (wc > 5 && strcmp_P(words[4], PSTR("command")) == 0) {
+          if (!isPostOrPut) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
 
           if (words[5][0] == '\0') {
-            httpServer.send(400, "text/plain", "400: missing command\r\n");
+            httpServer.send_P(400, PSTR("text/plain"), PSTR("400: missing command\r\n"));
             return;
           }
 
           constexpr size_t kMaxCmdLen = sizeof(cmdqueue[0].cmd) - 1; // matches OT_cmd_t::cmd buffer
           const size_t cmdLen = strlen(words[5]);
           if ((cmdLen < 3) || (words[5][2] != '=')) {
-            httpServer.send(400, "text/plain", "400: invalid command format\r\n");
+            httpServer.send_P(400, PSTR("text/plain"), PSTR("400: invalid command format\r\n"));
             return;
           }
           if (cmdLen > kMaxCmdLen) {
-            httpServer.send(413, "text/plain", "413: command too long\r\n");
+            httpServer.send_P(413, PSTR("text/plain"), PSTR("413: command too long\r\n"));
             return;
           }
 
           addOTWGcmdtoqueue(words[5], static_cast<int>(cmdLen));
-          httpServer.send(200, "text/plain", "OK");
+          httpServer.send_P(200, PSTR("text/plain"), PSTR("OK"));
         } else {
           sendApiNotFound(originalURI);
         }
@@ -160,33 +160,33 @@ void processAPI()
         sendApiNotFound(originalURI);
       }
     }
-    else if (wc > 2 && strcmp(words[2], "v0") == 0)
+    else if (wc > 2 && strcmp_P(words[2], PSTR("v0")) == 0)
     { //v0 API calls
-      if (wc > 3 && strcmp(words[3], "otgw") == 0) {
+      if (wc > 3 && strcmp_P(words[3], PSTR("otgw")) == 0) {
         // GET /api/v0/otgw/{msgid}
-        if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
+        if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
         uint8_t msgId = 0;
         if (wc > 4 && parseMsgId(words[4], msgId)) {
           sendOTGWvalue(msgId);
         } else {
-          httpServer.send(400, "text/plain", "400: invalid msgid\r\n");
+          httpServer.send_P(400, PSTR("text/plain"), PSTR("400: invalid msgid\r\n"));
         }
       }
-      else if (wc > 3 && strcmp(words[3], "devinfo") == 0) {
-        if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
+      else if (wc > 3 && strcmp_P(words[3], PSTR("devinfo")) == 0) {
+        if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
         sendDeviceInfo();
       }
-      else if (wc > 3 && strcmp(words[3], "devtime") == 0) {
-        if (!isGet) { httpServer.send(405, "text/plain", "405: method not allowed\r\n"); return; }
+      else if (wc > 3 && strcmp_P(words[3], PSTR("devtime")) == 0) {
+        if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
         sendDeviceTime();
       }
-      else if (wc > 3 && strcmp(words[3], "settings") == 0) {
+      else if (wc > 3 && strcmp_P(words[3], PSTR("settings")) == 0) {
         if (isPostOrPut) {
           postSettings();
         } else if (isGet) {
           sendDeviceSettings();
         } else {
-          httpServer.send(405, "text/plain", "405: method not allowed\r\n");
+          httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n"));
         }
       } else {
         sendApiNotFound(originalURI);
@@ -206,21 +206,21 @@ void sendOTGWvalue(int msgid){
   JsonObject root  = doc.to<JsonObject>();
   PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
   if (OTlookupitem.type==ot_undef) {  //message is undefined, return error
-    root["error"] = "message undefined: reserved for future use";
+    root[F("error")] = "message undefined: reserved for future use";
   } else if (msgid>= 0 && msgid<= OT_MSGID_MAX) 
   { //message id's need to be between 0 and 127
     //Debug print the values first
     RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid).c_str(), OTlookupitem.unit);
     //build the json
-    root["label"] = OTlookupitem.label;
+    root[F("label")] = OTlookupitem.label;
     if (OTlookupitem.type == ot_f88) {
-      root["value"] = getOTGWValue(msgid).toFloat(); 
+      root[F("value")] = getOTGWValue(msgid).toFloat(); 
     } else {// all other message types convert to integer
-      root["value"] = getOTGWValue(msgid).toInt();
+      root[F("value")] = getOTGWValue(msgid).toInt();
     }
-    root["unit"] = OTlookupitem.unit;    
+    root[F("unit")] = OTlookupitem.unit;    
   } else {
-    root["error"] = "message id: reserved for future use";
+    root[F("error")] = "message id: reserved for future use";
   }
   String sBuff;
   serializeJsonPretty(root, sBuff);
@@ -239,21 +239,21 @@ void sendOTGWlabel(const char *msglabel){
     if (strcasecmp(OTlookupitem.label, msglabel)==0) break;
   }
   if (msgid > OT_MSGID_MAX){
-    root["error"] = "message id: reserved for future use";
+    root[F("error")] = "message id: reserved for future use";
   } else if (OTlookupitem.type==ot_undef) {  //message is undefined, return error
-    root["error"] = "message undefined: reserved for future use";
+    root[F("error")] = "message undefined: reserved for future use";
   } else 
   { //message id's need to be between 0 and OT_MSGID_MAX
     //RESTDebug print the values first
     RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid).c_str(), OTlookupitem.unit);
     //build the json
-    root["label"] = OTlookupitem.label;
+    root[F("label")] = OTlookupitem.label;
     if (OTlookupitem.type == ot_f88) {
-      root["value"] = getOTGWValue(msgid).toFloat(); 
+      root[F("value")] = getOTGWValue(msgid).toFloat(); 
     } else {// all other message types convert to integer
-      root["value"] = getOTGWValue(msgid).toInt();
+      root[F("value")] = getOTGWValue(msgid).toInt();
     }
-    root["unit"] = OTlookupitem.unit;    
+    root[F("unit")] = OTlookupitem.unit;    
   } 
   String sBuff;
   serializeJsonPretty(root, sBuff);
@@ -373,7 +373,7 @@ void sendOTmonitor()
     for (int i = 0; i < DallasrealDeviceCount; i++) {
       const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
       char buf[16];
-      snprintf(buf, sizeof(buf), "%.1f", DallasrealDevice[i].tempC);
+      snprintf_P(buf, sizeof(buf), PSTR("%.1f"), DallasrealDevice[i].tempC);
       sendJsonOTmonObj(strDeviceAddress, buf, "°C", DallasrealDevice[i].lasttime);
     }
   }
@@ -393,7 +393,7 @@ void sendDeviceInfo()
   sendNestedJsonObj("picfwversion", sPICfwversion);
   sendNestedJsonObj("picdeviceid", sPICdeviceid);
   sendNestedJsonObj("picfwtype", sPICtype);
-  snprintf(cMsg, sizeof(cMsg), "%s %s", __DATE__, __TIME__);
+  snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
   sendNestedJsonObj("compiled", cMsg);
   sendNestedJsonObj("hostname", CSTR(settingHostname));
   sendNestedJsonObj("ipaddress", CSTR(WiFi.localIP().toString()));
@@ -407,7 +407,7 @@ void sendDeviceInfo()
   sendNestedJsonObj("sketchsize", ESP.getSketchSize() );
   sendNestedJsonObj("freesketchspace",  ESP.getFreeSketchSpace() );
 
-  snprintf(cMsg, sizeof(cMsg), "%08X", ESP.getFlashChipId());
+  snprintf_P(cMsg, sizeof(cMsg), PSTR("%08X"), ESP.getFlashChipId());
   sendNestedJsonObj("flashchipid", cMsg);  // flashChipId
   sendNestedJsonObj("flashchipsize", (ESP.getFlashChipSize() / 1024.0f / 1024.0f));
   sendNestedJsonObj("flashchiprealsize", (ESP.getFlashChipRealSize() / 1024.0f / 1024.0f));
@@ -585,7 +585,7 @@ void sendApiNotFound(const char *URI)
 {
   httpServer.sendHeader("Access-Control-Allow-Origin", "*");
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  httpServer.send ( 404, "text/html", "<!DOCTYPE HTML><html><head>");
+  httpServer.send_P(404, PSTR("text/html"), PSTR("<!DOCTYPE HTML><html><head>"));
 
   strlcpy(cMsg, "<style>body { background-color: lightgray; font-size: 15pt;}", sizeof(cMsg));
   strlcat(cMsg,  "</style></head><body>", sizeof(cMsg));
