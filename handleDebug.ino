@@ -7,6 +7,9 @@ void handleDebug(){
             case 'h':
                 Debugln();
                 Debugln(F("---===[ Debug Help Menu ]===---"));
+                Debugf(PSTR("ESP Firmware: %s\r\n"), _VERSION);
+                Debugf(PSTR("PIC Firmware: %s | Device: %s (%s)\r\n"), sPICfwversion, sPICdeviceid, sPICtype);
+                Debugln();
                 Debugf(PSTR("1) Toggle debuglog - OT message parsing: %s\r\n"), CBOOLEAN(bDebugOTmsg));
                 Debugf(PSTR("2) Toggle debuglog - API handeling: %s\r\n"), CBOOLEAN(bDebugRestAPI));
                 Debugf(PSTR("3) Toggle debuglog - MQTT module: %s\r\n"), CBOOLEAN(bDebugMQTT));

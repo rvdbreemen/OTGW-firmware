@@ -118,12 +118,15 @@ void resetOTGW() {
 */
 void detectPIC(){
   OTGWSerial.registerFirmwareCallback(fwreportinfo); //register the callback to report version, type en device ID
+  DebugTln(F("[PIC] Detecting OTGW PIC controller..."));
   OTGWSerial.resetPic(); // make sure it the firmware is detected
   bPICavailable = OTGWSerial.find(ETX);
   if (bPICavailable) {
-      DebugTln("ETX found after reset: Pic detected!");
+      DebugTln(F("[PIC] ✓ ETX response received - PIC detected and responding!"));
   } else {
-      DebugTln("No ETX found after reset: no Pic detected!");
+      DebugTln(F("[PIC] ✗ No ETX response - PIC NOT detected!"));
+      DebugTln(F("[PIC]   Check: PIC connection, power, firmware"));
+      DebugTln(F("[PIC]   System will continue but OpenTherm functionality unavailable"));
   }
 }
 

@@ -566,9 +566,12 @@ def interactive_mode_selection():
                 print_error("Invalid choice. Please enter 1, 2, or 3.")
 
 
-def select_file(files, file_type):
+def select_file(files, file_type, no_interactive=False):
     """Interactively select a file from the list."""
     if not files:
+        if no_interactive:
+            print_warning(f"No {file_type} files found automatically (skipping in auto mode).")
+            return None
         print_warning(f"No {file_type} files found automatically.")
         manual = input(f"\n{Colors.BOLD}Enter {file_type} file path (or press Enter to skip): {Colors.ENDC}").strip()
         if manual:
@@ -581,6 +584,11 @@ def select_file(files, file_type):
     
     if len(files) == 1:
         print_info(f"Auto-detected {file_type}: {files[0].name}")
+        return files[0]
+    
+    # If no-interactive and multiple files, pick the first one
+    if no_interactive:
+        print_info(f"Auto-selected {file_type}: {files[0].name}")
         return files[0]
     
     print_info(f"Available {file_type} files:")
@@ -760,6 +768,10 @@ Examples:
   # Interactive mode - explains options and guides you (default)
   python3 flash_esp.py
   
+  # Automatic mode - build and flash without prompts (developer workflow)
+  python3 flash_esp.py --yes
+  python3 flash_esp.py -y
+  
   # Explicitly download and flash latest release
   python3 flash_esp.py --download
   
@@ -837,8 +849,18 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
         action="store_true",
         help="Disable interactive prompts (for automation). Auto-selects first detected port and proceeds without confirmation."
     )
+    parser.add_argument(
+        "-y", "--yes",
+        action="store_true",
+        help="Automatic mode: implies --build --no-interactive. Auto-selects build mode, detects files, and proceeds without prompts."
+    )
     
     args = parser.parse_args()
+    
+    # Handle --yes flag (automatic mode)
+    if args.yes:
+        args.build = True
+        args.no_interactive = True
     
     # Determine mode
     mode = "manual"
@@ -1007,8 +1029,8 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
                 
                 # If no merged file selected, look for separate firmware/filesystem
                 if not merged_file:
-                    firmware_file = select_file(firmware_files, "firmware")
-                    filesystem_file = select_file(filesystem_files, "filesystem")
+                    firmware_file = select_file(firmware_files, "firmware", args.no_interactive)
+                    filesystem_file = select_file(filesystem_files, "filesystem", args.no_interactive)
             
             version_info = "Manual Selection"
     
@@ -1046,13 +1068,16 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
         print(f"  {Colors.WARNING}Erase flash: Yes{Colors.ENDC}")
     print("=" * 60)
     
-    if not args.no_interactive:
-        confirm = input(f"\n{Colors.BOLD}Proceed with flashing? (y/N): {Colors.ENDC}").strip().lower()
+    # Only prompt for confirmation if erasing or in explicit interactive mode
+    if args.erase and not args.no_interactive:
+        print_warning("\nYou are about to erase the entire flash. This will delete all data!")
+        confirm = input(f"\n{Colors.BOLD}Proceed with erasing and flashing? (y/N): {Colors.ENDC}").strip().lower()
         if confirm != 'y':
             print_info("Flashing cancelled.")
             sys.exit(0)
-    else:
-        print_info("\nProceeding with flash (--no-interactive mode)...")
+    elif not args.no_interactive:
+        # Auto-proceed for normal flashing
+        print_info("\nProceeding with flash...")
     
     # Flash the device
     success = flash_esp8266(

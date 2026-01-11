@@ -99,7 +99,13 @@ void setup() {
   // After resetting the OTGW PIC never send anything to Serial for debug
   // and switch to telnet port 23 for debug purposed. 
   // Setup the OTGW PIC
+  DebugTln(F("[OTGW] Initializing OpenTherm Gateway PIC..."));
   resetOTGW();          // reset the OTGW pic
+  if (bPICavailable) {
+    DebugTln(F("[OTGW] PIC initialized and ready"));
+  } else {
+    DebugTln(F("[OTGW] WARNING: No PIC detected - OpenTherm features disabled"));
+  }
   startOTGWstream();    // start port 25238 
  // initSensors();        // init DS18B20 (after MQ is up! )
   initOutputs();
@@ -253,6 +259,10 @@ void doTaskEvery1s(){
 void doTaskEvery5s(){
   //== do tasks ==
   
+  // Log if PIC is not available
+  if (!bPICavailable) {
+    DebugTln(F("[WARNING] No PIC detected - OpenTherm functionality unavailable"));
+  }
 }
 
 //===[ Do task every 30s ]===

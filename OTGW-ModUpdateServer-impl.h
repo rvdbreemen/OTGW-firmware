@@ -17,6 +17,12 @@
 ***************************************************************************
 */
 
+// Reduce upload buffer size from default 2048 to 512 bytes for better network responsiveness
+// and more frequent watchdog feeding during firmware updates
+#ifndef HTTP_UPLOAD_BUFLEN
+#define HTTP_UPLOAD_BUFLEN 512
+#endif
+
 #include <Arduino.h>
 #include <WiFiClient.h>
 #include <WiFiServer.h>
@@ -29,12 +35,14 @@
 #include "OTGW-ModUpdateServer.h"
 // External flag to track ESP flashing state
 extern bool isESPFlashing;
+// External background task handler
+extern void doBackgroundTasks();
 
 #ifndef Debug
   //#warning Debug() was not defined!
-	#define Debug(...)		({ OTGWSerial.print(__VA_ARGS__); })  
-	#define Debugln(...)	({ OTGWSerial.println(__VA_ARGS__); })  
-	#define Debugf(...)		({ OTGWSerial.printf(__VA_ARGS__); })  
+	#define Debug(...)		({ TelnetStream.print(__VA_ARGS__); })  
+	#define Debugln(...)	({ TelnetStream.println(__VA_ARGS__); })  
+	#define Debugf(...)		({ TelnetStream.printf(__VA_ARGS__); })  
 //#else
 //  #warning Seems Debug() is already defined!
 #endif
@@ -90,6 +98,16 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
       if (_status.phase == UPDATE_ERROR || _status.phase == UPDATE_ABORT || _status.phase == UPDATE_END) {
         return;
       }
+      
+      // Feed watchdog periodically during flash write (throttled to every 250ms minimum)
+      unsigned long now = millis();
+      if (now - _lastDogFeedTime >= 250) {
+        Wire.beginTransmission(0x26);
+        Wire.write(0xA5);
+        Wire.endTransmission();
+        _lastDogFeedTime = now;
+      }
+      
       _status.flash_written = progress;
       if (total > 0) {
         _status.flash_total = total;
@@ -121,7 +139,18 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _server->client().setNoDelay(true);
         _server->send_P(200, PSTR("text/html"), _serverSuccess);
         _server->client().stop();
-        delay(1000);
+        
+        // Give time for final status poll and client to process before reboot
+        // This allows the client to receive the UPDATE_END status via /status endpoint
+        // Keep background tasks running during the wait (isESPFlashing still true)
+        unsigned long startWait = millis();
+        while (millis() - startWait < 3000) {
+          doBackgroundTasks(); // Process HTTP requests, watchdog, and other tasks
+        }
+        
+        // Clear global flag now - reboot imminent
+        ::isESPFlashing = false;
+        
         ESP.restart();
         delay(3000);
       }
@@ -213,15 +242,37 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
         if (_serial_output) {Debug("."); blinkLEDnow(LED1);}
 
-        // Feed the dog on every chunk (Main branch behavior)
-        Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
-        
+        // **CRITICAL**: Feed watchdog on EVERY chunk during HTTP upload
+        // This is in addition to Update.onProgress callback feeding
+        // RC1 branch does this - essential for preventing watchdog timeout
+        Wire.beginTransmission(0x26);
+        Wire.write(0xA5);
+        Wire.endTransmission();
+
         size_t written = Update.write(upload.buf, upload.currentSize);
         _status.upload_received = upload.totalSize;
+        
+        // Track both upload progress (HTTP) and flash progress (actual write)
+        // This gives client visibility into both phases
+        if (written == upload.currentSize) {
+          // Update flash_written to show actual flash progress
+          // Note: Update.onProgress will also update this, but we track it here
+          // to ensure status updates happen during HTTP upload phase
+          _status.flash_written += written;
+        }
         
         if (written != upload.currentSize) {
           _setUpdaterError();
           _setStatus(UPDATE_ERROR, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, _updaterError);
+        } else {
+          // Add explicit status update during HTTP upload phase for polling clients
+          // This ensures client sees progress even when Update.onProgress hasn't fired yet
+          // Throttle to max 10 updates per second (100ms minimum between updates)
+          unsigned long now = millis();
+          if (now - _lastFeedbackTime >= 100) {
+            _setStatus(UPDATE_WRITE, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, emptyString);
+            _lastFeedbackTime = now;
+          }
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
         if(Update.end(true)){ //true to set the size to the current progress
@@ -270,8 +321,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           }
           _setStatus(UPDATE_END, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, emptyString);
           
-          // Clear global flag - flash completed successfully
-          ::isESPFlashing = false;
+          // Keep isESPFlashing flag set - will be cleared in POST handler after wait
         } else {
           _setUpdaterError();
           _setStatus(UPDATE_ERROR, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, _updaterError);
