@@ -41,7 +41,7 @@ static bool parseMsgId(const char *token, uint8_t &msgId) {
 
 void processAPI() 
 {
-  constexpr uint8_t MAX_WORDS = 10;
+  constexpr uint8_t MAX_WORDS = 8;
   constexpr size_t WORD_LEN = 32;
   char URI[50]   = "";
   char words[MAX_WORDS][WORD_LEN] = {{0}};
@@ -59,7 +59,7 @@ void processAPI()
   if (uriLen >= sizeof(URI))
   {
     RESTDebugTln(F("==> Bailout due to oversized URI"));
-    httpServer.send(414, "text/plain", "414: URI too long\r\n");
+    httpServer.send_P(414, PSTR("text/plain"), PSTR("414: URI too long\r\n"));
     return;
   }
 
@@ -69,7 +69,7 @@ void processAPI()
     // The new WebSocket server (port 81) consumes significant heap, establishing a new lower normal baseline.
     // The REST API refactor to C-strings reduces fragmentation, making operation at 4KB safe.
     RESTDebugTf(PSTR("==> Bailout due to low heap (%d bytes))\r\n"), ESP.getFreeHeap() );
-    httpServer.send(500, "text/plain", "500: internal server error (low heap)\r\n"); 
+    httpServer.send_P(500, PSTR("text/plain"), PSTR("500: internal server error (low heap)\r\n")); 
     return;
   }
 

@@ -51,8 +51,8 @@ void setLed(int8_t, uint8_t);
 #define NTP_HOST_DEFAULT "pool.ntp.org"
 #define NTP_RESYNC_TIME 1800 //seconds = every 30 minutes
 #define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"  // Home Assistant discovery prefix
-#define CMSG_SIZE 512
-#define JSON_BUFF_MAX   1024
+#define CMSG_SIZE 256
+#define JSON_BUFF_MAX   384
 #define CSTR(x) x.c_str()
 #define CONLINEOFFLINE(x) (x?"online":"offline")
 #define CBOOLEAN(x) (x?"true":"false")
@@ -88,7 +88,7 @@ using namespace ace_time;
 //static BasicZoneProcessorCache<CACHE_SIZE> zoneProcessorCache;
 //static BasicZoneManager timezoneManager(zonedb::kZoneAndLinkRegistrySize, zonedb::kZoneAndLinkRegistry, zoneProcessorCache);
 static ExtendedZoneProcessor tzProcessor;
-static const int CACHE_SIZE = 3;
+static const int CACHE_SIZE = 1;
 static ExtendedZoneProcessorCache<CACHE_SIZE> zoneProcessorCache;
 static ExtendedZoneManager timezoneManager(
   zonedbx::kZoneAndLinkRegistrySize,
@@ -147,7 +147,7 @@ int8_t    settingGPIOSENSORSpin = 13;            // GPIO 13 = D7, GPIO 10 = SDIO
 int16_t   settingGPIOSENSORSinterval = 20;       // Interval time to read out temp and send to MQ
 byte      OTGWdallasdataid = 246;                // foney dataid to be used to do autoconfigure for temp sensors
 int       DallasrealDeviceCount = 0;             // Total temperature devices found on the bus
-#define   MAXDALLASDEVICES 16                    // maximum number of devices on the bus
+#define   MAXDALLASDEVICES 8                    // maximum number of devices on the bus
 
 // Define structure to store temperature device addresses found on bus with their latest tempC value
 struct

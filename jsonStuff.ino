@@ -89,7 +89,7 @@ void sendNestedJsonObj(const char *cName, const char *cValue)
   httpServer.sendContent(jsonBuff);
 } // sendNestedJsonObj(*char, *char)
 //=======================================================================
-void sendNestedJsonObj(const char *cName, String sValue)
+void sendNestedJsonObj(const char *cName, const String& sValue)
 {
   char jsonBuff[JSON_BUFF_MAX] = "";
   

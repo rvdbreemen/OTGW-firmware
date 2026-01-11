@@ -63,7 +63,7 @@ const char *hexheaders[] = {
 
 /* --- LOG marcro's ---*/
 
-#define OT_LOG_BUFFER_SIZE 512
+#define OT_LOG_BUFFER_SIZE 256
 char ot_log_buffer[OT_LOG_BUFFER_SIZE];
 
 #define ClrLog()            ({ ot_log_buffer[0] = '\0'; })
@@ -87,13 +87,13 @@ Publish usefull firmware version information to MQTT broker.
 void sendMQTTversioninfo(){
   char rebootCountBuf[12];
   snprintf(rebootCountBuf, sizeof(rebootCountBuf), "%lu", static_cast<unsigned long>(rebootCount));
-  sendMQTTData("otgw-firmware/version", _SEMVER_FULL);
-  sendMQTTData("otgw-firmware/reboot_count", rebootCountBuf);
-  sendMQTTData("otgw-firmware/reboot_reason", lastReset.c_str());
-  sendMQTTData("otgw-pic/version", sPICfwversion);
-  sendMQTTData("otgw-pic/deviceid", sPICdeviceid);
-  sendMQTTData("otgw-pic/firmwaretype", sPICdeviceid);
-  sendMQTTData("otgw-pic/picavailable", CONOFF(bPICavailable));
+  sendMQTTData(F("otgw-firmware/version"), _SEMVER_FULL);
+  sendMQTTData(F("otgw-firmware/reboot_count"), rebootCountBuf);
+  sendMQTTData(F("otgw-firmware/reboot_reason"), lastReset.c_str());
+  sendMQTTData(F("otgw-pic/version"), sPICfwversion);
+  sendMQTTData(F("otgw-pic/deviceid"), sPICdeviceid);
+  sendMQTTData(F("otgw-pic/firmwaretype"), sPICdeviceid);
+  sendMQTTData(F("otgw-pic/picavailable"), CONOFF(bPICavailable));
 }
 
 /*
@@ -189,7 +189,7 @@ void sendOTGWbootcmd(){
 }
 
 //===================[ OTGW Command & Response ]===================
-String executeCommand(const String sCmd){
+String executeCommand(const String& sCmd){
   //send command to OTGW
   OTGWDebugTf(PSTR("OTGW Send Cmd [%s]\r\n"), CSTR(sCmd));
   if (sCmd.length() < 2) {
@@ -640,14 +640,14 @@ void print_status(uint16_t& value)
 
     //Master Status
     if (is_value_valid(OTdata, OTlookupitem)){
-      sendMQTTData("status_master", _flag8_master);
-      sendMQTTData("ch_enable",             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
-      sendMQTTData("dhw_enable",            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  
-      sendMQTTData("cooling_enable",        (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));   
-      sendMQTTData("otc_active",            (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  
-      sendMQTTData("ch2_enable",            (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  
-      sendMQTTData("summerwintertime",      (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  
-      sendMQTTData("dhw_blocking",          (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));  
+      sendMQTTData(F("status_master"), _flag8_master);
+      sendMQTTData(F("ch_enable"),             (((OTdata.valueHB) & 0x01) ? F("ON") : F("OFF")));  
+      sendMQTTData(F("dhw_enable"),            (((OTdata.valueHB) & 0x02) ? F("ON") : F("OFF")));  
+      sendMQTTData(F("cooling_enable"),        (((OTdata.valueHB) & 0x04) ? F("ON") : F("OFF")));   
+      sendMQTTData(F("otc_active"),            (((OTdata.valueHB) & 0x08) ? F("ON") : F("OFF")));  
+      sendMQTTData(F("ch2_enable"),            (((OTdata.valueHB) & 0x10) ? F("ON") : F("OFF")));  
+      sendMQTTData(F("summerwintertime"),      (((OTdata.valueHB) & 0x20) ? F("ON") : F("OFF")));  
+      sendMQTTData(F("dhw_blocking"),          (((OTdata.valueHB) & 0x40) ? F("ON") : F("OFF")));  
 
       OTcurrentSystemState.MasterStatus = OTdata.valueHB;
     }
@@ -677,15 +677,15 @@ void print_status(uint16_t& value)
     
     //Slave Status
     if (is_value_valid(OTdata, OTlookupitem)){
-      sendMQTTData("status_slave", _flag8_slave);
-      sendMQTTData("fault",                 (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  //delayms(5);  
-      sendMQTTData("centralheating",        (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  //delayms(5);  
-      sendMQTTData("domestichotwater",      (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));  //delayms(5);  
-      sendMQTTData("flame",                 (((OTdata.valueLB) & 0x08) ? "ON" : "OFF"));  //delayms(5);
-      sendMQTTData("cooling",               (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  //delayms(5); 
-      sendMQTTData("centralheating2",       (((OTdata.valueLB) & 0x20) ? "ON" : "OFF"));  //delayms(5);
-      sendMQTTData("diagnostic_indicator",  (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));  //delayms(5);
-      sendMQTTData("eletric_production",    (((OTdata.valueLB) & 0x80) ? "ON" : "OFF"));  //delayms(5);
+      sendMQTTData(F("status_slave"), _flag8_slave);
+      sendMQTTData(F("fault"),                 (((OTdata.valueLB) & 0x01) ? F("ON") : F("OFF")));  //delayms(5);  
+      sendMQTTData(F("centralheating"),        (((OTdata.valueLB) & 0x02) ? F("ON") : F("OFF")));  //delayms(5);  
+      sendMQTTData(F("domestichotwater"),      (((OTdata.valueLB) & 0x04) ? F("ON") : F("OFF")));  //delayms(5);  
+      sendMQTTData(F("flame"),                 (((OTdata.valueLB) & 0x08) ? F("ON") : F("OFF")));  //delayms(5);
+      sendMQTTData(F("cooling"),               (((OTdata.valueLB) & 0x10) ? F("ON") : F("OFF")));  //delayms(5); 
+      sendMQTTData(F("centralheating2"),       (((OTdata.valueLB) & 0x20) ? F("ON") : F("OFF")));  //delayms(5);
+      sendMQTTData(F("diagnostic_indicator"),  (((OTdata.valueLB) & 0x40) ? F("ON") : F("OFF")));  //delayms(5);
+      sendMQTTData(F("eletric_production"),    (((OTdata.valueLB) & 0x80) ? F("ON") : F("OFF")));  //delayms(5);
 
       OTcurrentSystemState.SlaveStatus = OTdata.valueLB;
     }
