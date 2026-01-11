@@ -28,8 +28,9 @@ static char       MQTTbrokerIPchar[20];
 constexpr size_t  MQTT_ID_MAX_LEN = 96;
 constexpr size_t  MQTT_NAMESPACE_MAX_LEN = 192;
 constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
-constexpr size_t  MQTT_MSG_MAX_LEN = 1200;
-constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 1200;
+constexpr size_t  MQTT_MSG_MAX_LEN = 512;
+constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 1100;
+constexpr size_t  MQTT_AUTOCONF_MSG_MAX_LEN = 2048;
 
 static            PubSubClient MQTTclient(wifiClient);
 
@@ -611,8 +612,23 @@ bool doAutoConfigureMsgid(byte OTid)
   } 
 
   byte lineID = 39; // 39 is unused in OT protocol so is a safe value
-  static char sMsg[MQTT_MSG_MAX_LEN];
-  static char sTopic[MQTT_TOPIC_MAX_LEN];
+  
+  // Allocate buffers to heap to save static RAM during normal operation
+  struct AutoCtx {
+      char sLine[MQTT_CFG_LINE_MAX_LEN];
+      char sTopic[MQTT_TOPIC_MAX_LEN];
+      char sMsg[MQTT_AUTOCONF_MSG_MAX_LEN];
+  };
+  AutoCtx *ctx = new AutoCtx();
+  if (!ctx) {
+      DebugTln(F("Error: Out of memory for MQTT AutoConfig"));
+      return _result;
+  }
+  
+  // Create references to the buffers so code using sizeof() works as before
+  char (&sLine)[MQTT_CFG_LINE_MAX_LEN] = ctx->sLine;
+  char (&sTopic)[MQTT_TOPIC_MAX_LEN] = ctx->sTopic;
+  char (&sMsg)[MQTT_AUTOCONF_MSG_MAX_LEN] = ctx->sMsg;
 
   //Let's open the MQTT autoconfig file
   File fh; //filehandle
@@ -621,6 +637,7 @@ bool doAutoConfigureMsgid(byte OTid)
 
   if (!LittleFS.exists(cfgFilename)) {
     DebugTln(F("Error: confuration file not found.")); 
+    delete ctx;
     return _result;
   } 
 
@@ -628,6 +645,7 @@ bool doAutoConfigureMsgid(byte OTid)
 
   if (!fh) {
     DebugTln(F("Error: could not open confuration file.")); 
+    delete ctx;
     return _result;
   } 
 
@@ -639,7 +657,7 @@ bool doAutoConfigureMsgid(byte OTid)
     //read file line by line, split and send to MQTT (topic, msg)
     feedWatchDog(); //start with feeding the dog
     
-    static char sLine[MQTT_CFG_LINE_MAX_LEN];
+    // static char sLine[MQTT_CFG_LINE_MAX_LEN];   <-- Moved to AutoCtx
     size_t len = fh.readBytesUntil('\n', sLine, sizeof(sLine) - 1);
     sLine[len] = '\0';
     if (!splitLine(sLine, ';', lineID, sTopic, sizeof(sTopic), sMsg, sizeof(sMsg))) {  //splitLine() also filters comments
@@ -697,6 +715,9 @@ bool doAutoConfigureMsgid(byte OTid)
   } // while available()
   
   fh.close();
+
+  // Free the heap allocated buffers
+  delete ctx;
 
   // HA discovery msg's are rather large, reset the buffer size to release some memory
   resetMQTTBufferSize();

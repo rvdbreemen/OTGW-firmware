@@ -172,7 +172,7 @@ void readSettings(bool show)
     Debugf(PSTR("NPT hostname          : %s\r\n"), CSTR(settingNTPhostname));
     Debugf(PSTR("NPT send time         : %s\r\n"), CBOOLEAN(settingNTPsendtime));
     Debugf(PSTR("Led Blink             : %s\r\n"), CBOOLEAN(settingLEDblink));
-    Debugf("GPIO Sensors          : %s\r\n"), CBOOLEAN(settingGPIOSENSORSenabled));
+    Debugf(PSTR("GPIO Sensors          : %s\r\n"), CBOOLEAN(settingGPIOSENSORSenabled));
     Debugf(PSTR("GPIO Sen. Pin         : %d\r\n"), settingGPIOSENSORSpin);
     Debugf(PSTR("GPIO Interval         : %d\r\n"), settingGPIOSENSORSinterval);
     Debugf(PSTR("S0 Counter            : %s\r\n"), CBOOLEAN(settingS0COUNTERenabled));

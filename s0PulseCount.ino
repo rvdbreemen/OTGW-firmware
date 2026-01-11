@@ -82,22 +82,19 @@
  {
  //Build string for MQTT
  char _msg[15]{0};
- char _topic[50]{0};
- snprintf(_topic, sizeof _topic, "s0pulsecount");
+ // char _topic[50]{0};
+
  snprintf(_msg, sizeof _msg, "%d", OTGWs0pulseCount);
- sendMQTTData(_topic, _msg);
+ sendMQTTData(F("s0pulsecount"), _msg);
 
- snprintf(_topic, sizeof _topic, "s0pulsecounttot");
- snprintf(_msg, sizeof _msg, "%d", OTGWs0pulseCountTot);
- sendMQTTData(_topic, _msg);
+ snprintf(_msg, sizeof _msg, "%u", OTGWs0pulseCountTot);
+ sendMQTTData(F("s0pulsecounttot"), _msg);
 
- snprintf(_topic, sizeof _topic, "s0pulsetime");
- snprintf(_msg, sizeof _msg, "%d", last_pulse_duration);
- sendMQTTData(_topic, _msg);
+ snprintf(_msg, sizeof _msg, "%u", last_pulse_duration);
+ sendMQTTData(F("s0pulsetime"), _msg);
 
- snprintf(_topic, sizeof _topic, "s0powerkw");
  snprintf(_msg, sizeof _msg, "%4.3f", OTGWs0powerkw);
- sendMQTTData(_topic, _msg);
+ sendMQTTData(F("s0powerkw"), _msg);
 
  }
 

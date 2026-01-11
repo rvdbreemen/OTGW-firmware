@@ -66,6 +66,27 @@ void setLed(int8_t, uint8_t);
 void sendMQTTData(const char*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const bool = false);
+// New prototypes for PROGMEM string support in JSON
+void sendJsonOTmonObj(const __FlashStringHelper* cName, bool bValue, const char *cUnit, time_t epoch);
+void sendJsonOTmonObj(const __FlashStringHelper* cName, float fValue, const char *cUnit, time_t epoch);
+void sendJsonOTmonObj(const __FlashStringHelper* cName, const char *cValue, const char *cUnit, time_t epoch);
+void sendJsonOTmonObj(const __FlashStringHelper* cName, int32_t iValue, const char *cUnit, time_t epoch);
+void sendJsonOTmonObj(const __FlashStringHelper* cName, uint32_t uValue, const char *cUnit, time_t epoch);
+
+// Overloads for sendNestedJsonObj with PROGMEM support
+void sendNestedJsonObj(const __FlashStringHelper *cName, const char *cValue);
+void sendNestedJsonObj(const __FlashStringHelper *cName, const String& sValue);
+void sendNestedJsonObj(const __FlashStringHelper *cName, int32_t iValue);
+void sendNestedJsonObj(const __FlashStringHelper *cName, uint32_t uValue);
+void sendNestedJsonObj(const __FlashStringHelper *cName, float fValue);
+
+// Overloads for sendJsonSettingObj with PROGMEM support
+void sendJsonSettingObj(const __FlashStringHelper *cName, float fValue, const char *fType, int minValue, int maxValue);
+void sendJsonSettingObj(const __FlashStringHelper *cName, float fValue, const char *fType, int minValue, int maxValue, int decPlaces);
+void sendJsonSettingObj(const __FlashStringHelper *cName, int iValue, const char *iType, int minValue, int maxValue);
+void sendJsonSettingObj(const __FlashStringHelper *cName, const char *cValue, const char *sType, int maxLen);
+void sendJsonSettingObj(const __FlashStringHelper *cName, bool bValue, const char *sType);
+
 void addOTWGcmdtoqueue(const char* ,  int , const bool = false, const int16_t = 1000);
 void sendLogToWebSocket(const char* logMessage);
 
