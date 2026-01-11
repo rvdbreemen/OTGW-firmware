@@ -160,7 +160,7 @@ static const char UpdateServerIndex[] PROGMEM =
                successTimer = null;
                successCountdownEl.textContent = '0';
                if (successMessageEl) {
-                 successMessageEl.textContent = 'Flashing successful. Redirecting...';
+                successMessageEl.textContent = 'Flashing successful. Redirecting...';
                }
                window.location.href = "/";
                return;
@@ -382,10 +382,10 @@ static const char UpdateServerIndex[] PROGMEM =
                console.log('Upload finished, status:', xhr.status);
                if (xhr.status >= 200 && xhr.status < 300) {
                  var responseText = xhr.responseText || '';
-                 if (responseText.indexOf('Update error') !== -1) {
+                if (responseText.indexOf('Flash error') !== -1) {
                    if (statusEl) statusEl.textContent = 'Upload failed';
                    errorEl.textContent = responseText;
-                   progressTitle.textContent = 'Flashing error';
+                  progressTitle.textContent = 'Flashing error';
                    successShown = false;
                    if (successPanel) successPanel.style.display = 'none';
                  } else {

@@ -116,7 +116,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         return _server->requestAuthentication();
       if (Update.hasError()) {
         _setStatus(UPDATE_ERROR, _status.target, _status.received, _status.total, _status.filename, _updaterError);
-        _server->send(200, F("text/html"), String(F("Update error: ")) + _updaterError);
+        _server->send(200, F("text/html"), String(F("Flash error: ")) + _updaterError);
       } else {
         _server->client().setNoDelay(true);
         _server->send_P(200, PSTR("text/html"), _serverSuccess);
