@@ -131,24 +131,61 @@ static const char UpdateServerIndex[] PROGMEM =
            flashProgressTextEl.textContent = 'Flashing: ? (' + formatBytes(loaded) + ' / ?)';
          }
 
+        function checkDeviceReady(callback) {
+          var checkInterval = 500;
+          var maxAttempts = 120; // 60 seconds max
+          var attempts = 0;
+          
+          function tryPing() {
+            attempts++;
+            fetch('/api/v1/devinfo', { 
+              method: 'GET',
+              cache: 'no-store',
+              headers: { 'Accept': 'application/json' }
+            })
+            .then(function(response) {
+              if (response.ok) {
+                // Device is back!
+                if (successMessageEl) {
+                  successMessageEl.textContent = 'Device is back online. Redirecting in 2 seconds...';
+                }
+                setTimeout(function() {
+                  window.location.href = "/";
+                }, 2000);
+              } else if (attempts < maxAttempts) {
+                setTimeout(tryPing, checkInterval);
+              } else {
+                // Timeout - redirect anyway
+                if (successMessageEl) {
+                  successMessageEl.textContent = 'Redirecting...';
+                }
+                window.location.href = "/";
+              }
+            })
+            .catch(function(err) {
+              // Device not ready yet
+              if (attempts < maxAttempts) {
+                setTimeout(tryPing, checkInterval);
+              } else {
+                // Timeout - redirect anyway
+                if (successMessageEl) {
+                  successMessageEl.textContent = 'Redirecting...';
+                }
+                window.location.href = "/";
+              }
+            });
+          }
+          
+          // Wait 1 second before starting checks
+          setTimeout(tryPing, 1000);
+        }
+
         function startSuccessCountdown() {
           if (!successCountdownEl || successTimer) return;
-          var remaining = 60;
-          successCountdownEl.textContent = remaining;
-          successTimer = setInterval(function() {
-             remaining -= 1;
-             if (remaining <= 0) {
-               clearInterval(successTimer);
-               successTimer = null;
-               successCountdownEl.textContent = '0';
-               if (successMessageEl) {
-                 successMessageEl.textContent = 'Update successful. Redirecting...';
-               }
-               window.location.href = "/";
-               return;
-             }
-            successCountdownEl.textContent = remaining;
-          }, 1000);
+          if (successMessageEl) {
+            successMessageEl.textContent = 'Update successful. Device rebooting...';
+          }
+          checkDeviceReady();
         }
 
         function resetSuccessPanel() {
