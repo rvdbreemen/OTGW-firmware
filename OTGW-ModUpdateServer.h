@@ -63,7 +63,6 @@ class ESP8266HTTPUpdateServerTemplate
     void _resetStatus();
     void _setStatus(uint8_t phase, const String &target, size_t received, size_t total, const String &filename, const String &error);
     void _sendStatusJson();
-    void _sendStatusEvent();
     void _jsonEscape(const String &in, char *out, size_t outSize);
     const char *_phaseToString(uint8_t phase);
 
@@ -104,11 +103,6 @@ class ESP8266HTTPUpdateServerTemplate
     unsigned long _lastDogFeedTime;
     int _lastProgressPerc;
     UpdateStatus _status;
-    WiFiClient _eventClient;
-    bool _eventClientActive;
-    bool _isWebSocket;
-    unsigned long _lastEventMs;
-    UpdatePhase _lastEventPhase;
 };
 
 };
