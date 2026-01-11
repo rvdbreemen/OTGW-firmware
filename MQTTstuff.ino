@@ -192,11 +192,11 @@ bool bHAcycle = false;
 void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 
   if (bDebugMQTT) {
-    DebugT("Message arrived on topic ["); Debug(topic); Debug("] = [");
+    DebugT(F("Message arrived on topic [")); Debug(topic); Debug(F("] = ["));
     for (unsigned int i = 0; i < length; i++) {
       Debug((char)payload[i]);
     }
-    Debug("] ("); Debug(length); Debug(")"); Debugln(); DebugFlush();
+    Debug(F("] (")); Debug(length); Debug(F(")")); Debugln(); DebugFlush();
   }  
 
   //detect home assistant going down...
@@ -244,13 +244,13 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   }
   // naming convention /set/<node id>/<command>
   token = strtok(topic, "/"); 
-  MQTTDebugf("%s/", token);
+  MQTTDebugf(PSTR("%s/"), token);
   if (strcasecmp(token, "set") == 0) {
     token = strtok(NULL, "/");
-    MQTTDebugf("%s/", token); 
+    MQTTDebugf(PSTR("%s/"), token); 
     if (strcasecmp(token, NodeId) == 0) {
       token = strtok(NULL, "/");
-      MQTTDebugf("%s", token);
+      MQTTDebugf(PSTR("%s"), token);
       if (token != NULL){
         //loop thru command list
         int i;
@@ -259,13 +259,13 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
             //found a match
             if (strcasecmp(setcmds[i].ottype, "raw") == 0){
               //raw command
-              snprintf(otgwcmd, sizeof(otgwcmd), "%s", msgPayload);
-              MQTTDebugf(" found command, sending payload [%s]\r\n", otgwcmd);
+              snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s"), msgPayload);
+              MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
               addOTWGcmdtoqueue((char *)otgwcmd, strlen(otgwcmd), true);
             } else {
               //all other commands are <otgwcmd>=<payload message> 
-              snprintf(otgwcmd, sizeof(otgwcmd), "%s=%s", setcmds[i].otgwcmd, msgPayload);
-              MQTTDebugf(" found command, sending payload [%s]\r\n", otgwcmd);
+              snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s=%s"), setcmds[i].otgwcmd, msgPayload);
+              MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
               addOTWGcmdtoqueue((char *)otgwcmd, strlen(otgwcmd), true);
             }
             break; //exit loop
@@ -301,7 +301,7 @@ void handleMQTT()
     case MQTT_STATE_INIT:  
       MQTTDebugTln(F("MQTT State: MQTT Initializing")); 
       WiFi.hostByName(CSTR(settingMQTTbroker), MQTTbrokerIP);  // lookup the MQTTbroker convert to IP
-      snprintf(MQTTbrokerIPchar, sizeof(MQTTbrokerIPchar), "%d.%d.%d.%d", MQTTbrokerIP[0], MQTTbrokerIP[1], MQTTbrokerIP[2], MQTTbrokerIP[3]);
+      snprintf_P(MQTTbrokerIPchar, sizeof(MQTTbrokerIPchar), PSTR("%d.%d.%d.%d"), MQTTbrokerIP[0], MQTTbrokerIP[1], MQTTbrokerIP[2], MQTTbrokerIP[3]);
       if (isValidIP(MQTTbrokerIP))  
       {
         MQTTDebugTf(PSTR("[%s] => setServer(%s, %d)\r\n"), CSTR(settingMQTTbroker), MQTTbrokerIPchar, settingMQTTbrokerPort);
@@ -311,7 +311,7 @@ void handleMQTT()
         MQTTclient.setSocketTimeout(4); 
         uint8_t mac[6]{0};
         WiFi.macAddress(mac);
-        snprintf(MQTTclientId, sizeof(MQTTclientId), "%s%02X%02X%02X%02X%02X%02X", _HOSTNAME, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        snprintf_P(MQTTclientId, sizeof(MQTTclientId), PSTR("%s%02X%02X%02X%02X%02X%02X"), _HOSTNAME, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
         //skip try to connect
         reconnectAttempts =0;
         stateMQTT = MQTT_STATE_TRY_TO_CONNECT;
@@ -340,7 +340,7 @@ void handleMQTT()
       } 
       else 
       {
-        MQTTDebugf("Username [%s] ", CSTR(settingMQTTuser));
+        MQTTDebugf(PSTR("Username [%s] "), CSTR(settingMQTTuser));
         if(!MQTTclient.connect(MQTTclientId, CSTR(settingMQTTuser), CSTR(settingMQTTpasswd), MQTTPubNamespace, 0, true, "offline")) PrintMQTTError();
       }
 
@@ -478,7 +478,7 @@ void sendMQTTData(const char* topic, const char *json, const bool retain)
   if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
   if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
   char full_topic[MQTT_TOPIC_MAX_LEN];
-  snprintf(full_topic, sizeof(full_topic), "%s/", MQTTPubNamespace);
+  snprintf_P(full_topic, sizeof(full_topic), PSTR("%s/"), MQTTPubNamespace);
   strlcat(full_topic, topic, sizeof(full_topic));
   MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settingMQTTbroker.c_str(), settingMQTTbrokerPort, full_topic, json);
   if (!MQTTclient.publish(full_topic, json, retain)) PrintMQTTError();
@@ -661,7 +661,7 @@ bool doAutoConfigureMsgid(byte OTid)
     /// SensorId
     if (!replaceAll(sTopic, sizeof(sTopic), "%sensor_id%", sensorId)) { MQTTDebugTln(F("MQTT: sensor_id replacement overflow")); continue; }
 
-    MQTTDebugf("[%s]\r\n", sTopic); 
+    MQTTDebugf(PSTR("[%s]\r\n"), sTopic); 
     /// ----------------------
 
     MQTTDebugTf(PSTR("sMsg[%s]==>"), sMsg); 
@@ -684,7 +684,7 @@ bool doAutoConfigureMsgid(byte OTid)
     // sub topics
     if (!replaceAll(sMsg, sizeof(sMsg), "%mqtt_sub_topic%", MQTTSubNamespace)) { MQTTDebugTln(F("MQTT: mqtt_sub_topic replacement overflow")); continue; }
 
-    MQTTDebugf("[%s]\r\n", sMsg); 
+    MQTTDebugf(PSTR("[%s]\r\n"), sMsg); 
     DebugFlush();
 
     sendMQTT(sTopic, sMsg, strlen(sMsg));
@@ -720,7 +720,7 @@ void sensorAutoConfigure(byte dataid, bool finishflag , const char *cfgSensorId 
        MQTTDebugTf(PSTR("Not able to complete MQTT configuration for sensor id(%d)\r\n"),dataid);
      }
    } else {
-   // MQTTDebugTf("No need to set MQTT config for sensor id(%d)\r\n",dataid);
+   // MQTTDebugTf(PSTR("No need to set MQTT config for sensor id(%d)\r\n"),dataid);
    }
  }
 
