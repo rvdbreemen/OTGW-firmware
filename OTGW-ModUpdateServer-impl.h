@@ -263,6 +263,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
             _setStatus(UPDATE_ERROR, "filesystem", 0, uploadTotal, upload.filename, _updaterError);
             _sendStatusEvent();
           } else {
+            TelnetStream.print("Flashing");
             _setStatus(UPDATE_START, "filesystem", 0, uploadTotal, upload.filename, emptyString);
             _sendStatusEvent();
           }
@@ -273,12 +274,14 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
             _setStatus(UPDATE_ERROR, "firmware", 0, uploadTotal, upload.filename, _updaterError);
             _sendStatusEvent();
           } else {
+            TelnetStream.print("Flashing");
             _setStatus(UPDATE_START, "firmware", 0, uploadTotal, upload.filename, emptyString);
             _sendStatusEvent();
           }
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
         if (_serial_output) {Debug("."); blinkLEDnow(LED1);}
+        TelnetStream.print(".");
         // Feed the dog before it bites!
         Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
         // End of feeding hack
@@ -295,6 +298,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
         if(Update.end(true)){ //true to set the size to the current progress
+          TelnetStream.println(" done");
           if (_serial_output) Debugf("\r\nUpdate Success: %u\r\nRebooting...\r\n", upload.totalSize);
           _status.upload_received = upload.totalSize;
           if (_status.upload_total == 0 && upload.totalSize > 0) {
