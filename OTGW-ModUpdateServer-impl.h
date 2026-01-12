@@ -377,10 +377,10 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_setStatus(uint8_t phase, cons
   char errorEsc[96];
   _jsonEscape(_status.filename, filenameEsc, sizeof(filenameEsc));
   _jsonEscape(_status.error, errorEsc, sizeof(errorEsc));
-  int written = snprintf(
+  int written = snprintf_P(
     buf,
     sizeof(buf),
-    "{\"state\":\"%s\",\"target\":\"%s\",\"received\":%u,\"total\":%u,\"upload_received\":%u,\"upload_total\":%u,\"flash_written\":%u,\"flash_total\":%u,\"filename\":\"%s\",\"error\":\"%s\"}",
+    PSTR("{\"state\":\"%s\",\"target\":\"%s\",\"received\":%u,\"total\":%u,\"upload_received\":%u,\"upload_total\":%u,\"flash_written\":%u,\"flash_total\":%u,\"filename\":\"%s\",\"error\":\"%s\"}"),
     _phaseToString(_status.phase),
     _status.target.length() ? _status.target.c_str() : "unknown",
     static_cast<unsigned>(_status.received),
@@ -441,10 +441,10 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusJson()
   char errorEsc[96];
   _jsonEscape(_status.filename, filenameEsc, sizeof(filenameEsc));
   _jsonEscape(_status.error, errorEsc, sizeof(errorEsc));
-  int written = snprintf(
+  int written = snprintf_P(
     buf,
     sizeof(buf),
-    "{\"state\":\"%s\",\"target\":\"%s\",\"received\":%u,\"total\":%u,\"upload_received\":%u,\"upload_total\":%u,\"flash_written\":%u,\"flash_total\":%u,\"filename\":\"%s\",\"error\":\"%s\"}",
+    PSTR("{\"state\":\"%s\",\"target\":\"%s\",\"received\":%u,\"total\":%u,\"upload_received\":%u,\"upload_total\":%u,\"flash_written\":%u,\"flash_total\":%u,\"filename\":\"%s\",\"error\":\"%s\"}"),
     _phaseToString(_status.phase),
     _status.target.length() ? _status.target.c_str() : "unknown",
     static_cast<unsigned>(_status.received),
