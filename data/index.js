@@ -789,6 +789,20 @@ function syncCaptureMode() {
 let logFlushTimer = null;
 
 async function startFileStreaming() {
+  // Browser Support Check
+  if (!('showDirectoryPicker' in window)) {
+    let msg = "File streaming is not supported by your browser.\n\n";
+    if (!window.isSecureContext) {
+      msg += "REASON: This feature requires a Secure Context (HTTPS).\n";
+      msg += "Since OTGW uses HTTP, you must enable the 'Insecure origins treated as secure' flag in your browser for this IP address.";
+    } else {
+      msg += "Please use Google Chrome, Microsoft Edge, or Opera on Desktop.";
+    }
+    alert(msg);
+    stopFileStreaming();
+    return false;
+  }
+
   try {
     // Prompt user to select directory
     if (!logDirectoryHandle) {
