@@ -6,6 +6,8 @@ This directory contains three complete implementations for integrating code eval
 
 ```
 workflow-options/
+├── GETTING_STARTED.md    # 🚀 START HERE - 5-minute quick start
+├── EXECUTIVE_SUMMARY.md  # Visual overview with diagrams
 ├── COMPARISON.md          # Detailed comparison and selection guide
 ├── README.md             # This file
 ├── option1/              # Multi-Job Workflow with PR
@@ -22,13 +24,14 @@ workflow-options/
 
 ## 🚀 Quick Start
 
+**New here?** Start with **[GETTING_STARTED.md](GETTING_STARTED.md)** for a 5-minute quick start guide!
+
 ### 1. Choose Your Option
 
-Not sure which to pick? Read **[COMPARISON.md](COMPARISON.md)** for:
-- Decision matrix
-- Use case scenarios
-- Side-by-side feature comparison
-- Implementation difficulty ratings
+Not sure which to pick? Read:
+- **Quick Start**: [GETTING_STARTED.md](GETTING_STARTED.md) - 5-minute guide
+- **Executive Summary**: [EXECUTIVE_SUMMARY.md](EXECUTIVE_SUMMARY.md) - Visual overview with diagrams
+- **Detailed Comparison**: [COMPARISON.md](COMPARISON.md) - Complete feature comparison
 
 ### 2. Review the Implementation
 

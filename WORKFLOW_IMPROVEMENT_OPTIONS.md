@@ -1,5 +1,9 @@
 # CI/CD Workflow Improvement Options
 
+**🚀 Quick Start**: Jump straight to [`docs/workflow-options/GETTING_STARTED.md`](docs/workflow-options/GETTING_STARTED.md) for a 5-minute installation guide!
+
+---
+
 ## Problem Statement
 After a push, we want to:
 1. Build the firmware
