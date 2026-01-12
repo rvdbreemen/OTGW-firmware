@@ -94,7 +94,6 @@ static const char UpdateServerIndex[] PROGMEM =
          var flashProgressEl = document.getElementById('flashProgress');
          var uploadInfoEl = document.getElementById('uploadInfo');
          var flashInfoEl = document.getElementById('flashInfo');
-ion
            sessionStorage.setItem('flashMode', 'true');
          } catch(e) { console.log('Could not signal flash mode:', e); }
 
