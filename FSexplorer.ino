@@ -79,9 +79,9 @@ void startWebserver(){
 
   httpServer.begin();
   // Set up first message as the IP address
-  OTGWSerial.println(F("\nHTTP Server started\r"));  
+  DebugTln(F("\nHTTP Server started\r"));  
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%03d.%03d.%d.%d"), WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
-  OTGWSerial.printf(PSTR("\nAssigned IP=%s\r\n"), cMsg);
+  DebugTf(PSTR("\nAssigned IP=%s\r\n"), cMsg);
 }
 //=====================================================================================
 void setupFSexplorer(){    
