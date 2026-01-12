@@ -296,11 +296,11 @@ void startLLMNR(const char *hostname)
 void startNTP(){
   // Initialisation ezTime
   if (!settingNTPenable) return;
-  if (settingNTPtimezone.length()==0) settingNTPtimezone = NTP_DEFAULT_TIMEZONE; //set back to default timezone
-  if (settingNTPhostname.length()==0) settingNTPhostname = NTP_HOST_DEFAULT; //set back to default timezone
+  if (strlen(settingNTPtimezone)==0) strlcpy(settingNTPtimezone, NTP_DEFAULT_TIMEZONE, sizeof(settingNTPtimezone));
+  if (strlen(settingNTPhostname)==0) strlcpy(settingNTPhostname, NTP_HOST_DEFAULT, sizeof(settingNTPhostname));
 
   //void configTime(int timezone_sec, int daylightOffset_sec, const char* server1, const char* server2, const char* server3)
-  configTime(0, 0, CSTR(settingNTPhostname), nullptr, nullptr);
+  configTime(0, 0, settingNTPhostname, nullptr, nullptr);
   // Configure NTP before WiFi, so DHCP can override the NTP server(s)
   
   NtpStatus = TIME_WAITFORSYNC;

@@ -61,23 +61,8 @@ static void trimInPlace(char *buffer) {
 }
 
 // Replace all occurrences of token with replacement, guarding buffer size
-static bool replaceAll(char *buffer, const size_t bufSize, const char *token, const char *replacement) {
-  if (!buffer || !token || !replacement) return false;
-  const size_t tokenLen = strlen(token);
-  const size_t replLen = strlen(replacement);
-  if (tokenLen == 0) return true;
-
-  char *pos = strstr(buffer, token);
-  while (pos) {
-    const size_t tailLen = strlen(pos + tokenLen);
-    const size_t required = (pos - buffer) + replLen + tailLen + 1;
-    if (required > bufSize) return false;
-    memmove(pos + replLen, pos + tokenLen, tailLen + 1);
-    memcpy(pos, replacement, replLen);
-    pos = strstr(pos + replLen, token);
-  }
-  return true;
-}
+// MOVED TO helperStuff.ino
+// static bool replaceAll ...
 
 static bool splitLine(char *sIn, char del, byte &cID, char *cKey, size_t keySize, char *cVal, size_t valSize) {
   if (!sIn || !cKey || !cVal) return false;
@@ -327,13 +312,13 @@ void handleMQTT()
 
     case MQTT_STATE_TRY_TO_CONNECT:
       MQTTDebugTln(F("MQTT State: MQTT try to connect"));
-      MQTTDebugTf(PSTR("MQTT server is [%s], IP[%s]\r\n"), settingMQTTbroker.c_str(), MQTTbrokerIPchar);
+      MQTTDebugTf(PSTR("MQTT server is [%s], IP[%s]\r\n"), settingMQTTbroker, MQTTbrokerIPchar);
       
       MQTTDebugT(F("Attempting MQTT connection .. "));
       reconnectAttempts++;
 
       //If no username, then anonymous connection to broker, otherwise assume username/password.
-      if (settingMQTTuser.length() == 0) 
+      if (strlen(settingMQTTuser) == 0) 
       {
         MQTTDebug(F("without a Username/Password "));
         if(!MQTTclient.connect(MQTTclientId, MQTTPubNamespace, 0, true, "offline")) PrintMQTTError();
@@ -480,7 +465,7 @@ void sendMQTTData(const char* topic, const char *json, const bool retain)
   char full_topic[MQTT_TOPIC_MAX_LEN];
   snprintf_P(full_topic, sizeof(full_topic), PSTR("%s/"), MQTTPubNamespace);
   strlcat(full_topic, topic, sizeof(full_topic));
-  MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settingMQTTbroker.c_str(), settingMQTTbrokerPort, full_topic, json);
+  MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settingMQTTbroker, settingMQTTbrokerPort, full_topic, json);
   if (!MQTTclient.publish(full_topic, json, retain)) PrintMQTTError();
   feedWatchDog();//feed the dog
 } // sendMQTTData()
@@ -515,7 +500,7 @@ void sendMQTT(const char* topic, const char *json, const size_t len)
   if (!settingMQTTenable) return;
   if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
   if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
-  MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settingMQTTbroker.c_str(), settingMQTTbrokerPort, topic, json);
+  MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settingMQTTbroker, settingMQTTbrokerPort, topic, json);
 
   if (MQTTclient.beginPublish(topic, len, true)){
     for (size_t i = 0; i<len; i++) {

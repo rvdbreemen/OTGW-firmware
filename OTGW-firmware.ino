@@ -89,7 +89,7 @@ void setup() {
   startMQTT();               // start the MQTT after webserver, always.
  
   initWatchDog();            // setup the WatchDog
-  lastReset = ESP.getResetReason();
+  strlcpy(lastReset, ESP.getResetReason().c_str(), sizeof(lastReset));
   SetupDebugf("Last reset reason: [%s]\r\n", CSTR(lastReset));
   rebootCount = updateRebootCount();
   updateRebootLog(lastReset);

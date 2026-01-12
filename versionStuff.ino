@@ -7,13 +7,16 @@
 
 static const char banner[] PROGMEM = "OpenTherm Gateway ";
 
-String GetVersion(const String hexfile){
+void GetVersion(const char* hexfile, char* version, size_t destSize){
+  if (!version || destSize == 0) return;
+  version[0] = '\0';
+  
   char hexbuf[48]={0};
   int len, addr, tag, data, offs, linecnt = 0;
   char datamem[256]={0}; // prevent buffer overrun
   unsigned short ptr;
   File f;
-  DebugTf(PSTR("GetVersion opening %s\r\n"),hexfile.c_str());
+  DebugTf(PSTR("GetVersion opening %s\r\n"),hexfile);
   f = LittleFS.open(hexfile, "r");
   if (f)  // only proceed if file exists
   {
@@ -90,9 +93,9 @@ String GetVersion(const String hexfile){
       } else {
         //DebugTf(PSTR("hit the banner! returning version string %s\r\n"),s);
         s += sizeof(banner) - 1;
-        return String(s);
+        strlcpy(version, s, destSize);
+        return;
       }
     }
   }
-  return ("");
 }

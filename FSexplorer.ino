@@ -161,8 +161,11 @@ void apifirmwarefilelist() {
         version.trim();
         f.close();
       } 
-      DebugTf(PSTR("version=%s\r\n"), version.c_str());	
-      fwversion = GetVersion(hexfile); // only check if gateway firmware
+      // DebugTf(PSTR("version=%s\r\n"), version.c_str());	
+      char fwversionBuf[32] = {0};
+      GetVersion(hexfile.c_str(), fwversionBuf, sizeof(fwversionBuf));
+      fwversion = fwversionBuf; // Keep using String for fwversion locally for now to minimize changes in this file
+
       // String hexversion = OTGWSerial.readHexFileVersion(hexfile.c_str());
       // DebugTf(PSTR("File version on hexfile: %s\r\n"), hexversion.c_str());
       DebugTf(PSTR("GetVersion(%s) returned [%s]\r\n"), hexfile.c_str(), fwversion.c_str());  

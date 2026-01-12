@@ -150,16 +150,16 @@ String getpicfwversion(){
 //===================[ checkOTWGpicforupdate ]=====================
 void checkOTWGpicforupdate(){
   if (sPICfwversion[0] == '\0') {
-    sMessage = ""; //no firmware version found for some reason
+    sMessage[0] = '\0'; //no firmware version found for some reason
   } else {
     OTGWDebugTf(PSTR("OTGW PIC firmware version = [%s]\r\n"), sPICfwversion);
     String latest = checkforupdatepic("gateway.hex");
     if (!bOTGWonline) {
-      sMessage = String(sPICfwversion); 
+      strlcpy(sMessage, sPICfwversion, sizeof(sMessage)); 
     } else if (latest.isEmpty()) {
-      sMessage = ""; //two options: no internet connection OR no firmware version
+      sMessage[0] = '\0'; //two options: no internet connection OR no firmware version
     } else if (latest != String(sPICfwversion)) {
-      sMessage = "New PIC version " + latest + " available!";
+      snprintf(sMessage, sizeof(sMessage), "New PIC version %s available!", latest.c_str());
     }
   }
   //check if the esp8266 and the littlefs versions match
@@ -172,12 +172,9 @@ void sendOTGWbootcmd(){
   OTGWDebugTf(PSTR("OTGW boot message = [%s]\r\n"), CSTR(settingOTGWcommands));
 
   // parse and execute commands
-  char bootcmds[128];
-  size_t cmdLen = settingOTGWcommands.length();
-  if (cmdLen >= sizeof(bootcmds)) {
-    cmdLen = sizeof(bootcmds) - 1;
-  }
-  settingOTGWcommands.substring(0, cmdLen).toCharArray(bootcmds, sizeof(bootcmds));
+  char bootcmds[129];
+  strlcpy(bootcmds, settingOTGWcommands, sizeof(bootcmds));
+  
   char* cmd;
   int i = 0;
   cmd = strtok(bootcmds, ";");
@@ -507,7 +504,7 @@ const char *byte_to_binary(int x)
 
     int z;
     for (z = 128; z > 0; z >>= 1) {
-        strcat(b, ((x & z) == z) ? "1" : "0");
+        strlcat(b, ((x & z) == z) ? "1" : "0", sizeof(b));
     }
 
     return b;
@@ -1919,11 +1916,11 @@ void handleOTGW()
         for(int i = 0; i <= OT_MSGID_MAX; i++){
           msglastupdated[i] = 0; //clear epoch values
         }
-        sMessage = "PS=1 mode; No UI updates.";
+        strlcpy(sMessage, "PS=1 mode; No UI updates.", sizeof(sMessage));
       } else if (strcasecmp(sWrite, "PS=0")==0) {
         //detected [PS=0], then PrintSummary mode = OFF --> Raw mode is turned on again.
         bPSmode = false;
-        sMessage = "";
+        sMessage[0] = '\0';
       }
       bytes_write = 0; //start next line
     } else if  (outByte == '\n')
@@ -2238,7 +2235,7 @@ void upgradepic() {
     LittleFS.remove(path);
     char *ext = strstr(path, ".hex");
     if (ext) {
-      strcpy(ext, ".ver");
+      strlcpy(ext, ".ver", sizeof(path) - (ext - path));
       LittleFS.remove(path);
     }
   }

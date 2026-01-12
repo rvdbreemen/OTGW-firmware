@@ -100,30 +100,38 @@ void readSettings(bool show)
   }
 
   // Copy values from the JsonDocument to the Config 
-  settingHostname         = doc[F("hostname")].as<String>();
-  if (settingHostname.length()==0) settingHostname = _HOSTNAME;
+  strlcpy(settingHostname, doc[F("hostname")] | "", sizeof(settingHostname));
+  if (strlen(settingHostname)==0) strlcpy(settingHostname, _HOSTNAME, sizeof(settingHostname));
+
   settingMQTTenable       = doc[F("MQTTenable")]|settingMQTTenable;
-  settingMQTTbroker       = doc[F("MQTTbroker")].as<String>();
+  strlcpy(settingMQTTbroker, doc[F("MQTTbroker")] | "", sizeof(settingMQTTbroker));
+  
   settingMQTTbrokerPort   = doc[F("MQTTbrokerPort")]; //default port
-  settingMQTTuser         = doc[F("MQTTuser")].as<String>();
-  settingMQTTpasswd       = doc[F("MQTTpasswd")].as<String>();
-  settingMQTTtopTopic     = doc[F("MQTTtoptopic")].as<String>();
-  if (settingMQTTtopTopic==F("null")) {
-    settingMQTTtopTopic = _HOSTNAME;
-    settingMQTTtopTopic.toLowerCase();
+  strlcpy(settingMQTTuser, doc[F("MQTTuser")] | "", sizeof(settingMQTTuser));
+  strlcpy(settingMQTTpasswd, doc[F("MQTTpasswd")] | "", sizeof(settingMQTTpasswd));
+  
+  strlcpy(settingMQTTtopTopic, doc[F("MQTTtoptopic")] | "", sizeof(settingMQTTtopTopic));
+  if (strlen(settingMQTTtopTopic)==0 || strcmp(settingMQTTtopTopic, "null")==0) {
+    strlcpy(settingMQTTtopTopic, _HOSTNAME, sizeof(settingMQTTtopTopic));
+    for(int i=0; settingMQTTtopTopic[i]; i++) settingMQTTtopTopic[i] = tolower(settingMQTTtopTopic[i]);
   }
-  settingMQTThaprefix     = doc[F("MQTThaprefix")].as<String>();
-  if (settingMQTThaprefix==F("null")) settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
+  
+  strlcpy(settingMQTThaprefix, doc[F("MQTThaprefix")] | "", sizeof(settingMQTThaprefix));
+  if (strlen(settingMQTThaprefix)==0 || strcmp(settingMQTThaprefix, "null")==0) strlcpy(settingMQTThaprefix, HOME_ASSISTANT_DISCOVERY_PREFIX, sizeof(settingMQTThaprefix));
+  
   settingMQTTharebootdetection = doc[F("MQTTharebootdetection")]|settingMQTTharebootdetection;	  
-  settingMQTTuniqueid     = doc[F("MQTTuniqueid")].as<String>();
-  if (settingMQTTuniqueid==F("null")) settingMQTTuniqueid = getUniqueId();
+  
+  strlcpy(settingMQTTuniqueid, doc[F("MQTTuniqueid")] | "", sizeof(settingMQTTuniqueid));
+  if (strlen(settingMQTTuniqueid)==0 || strcmp(settingMQTTuniqueid, "null")==0) strlcpy(settingMQTTuniqueid, getUniqueId().c_str(), sizeof(settingMQTTuniqueid));
 
   settingMQTTOTmessage    = doc[F("MQTTOTmessage")]|settingMQTTOTmessage;
   settingNTPenable        = doc[F("NTPenable")]; 
-  settingNTPtimezone      = doc[F("NTPtimezone")].as<String>();
-  if (settingNTPtimezone==F("null"))  settingNTPtimezone = F("Europe/Amsterdam"); //default to amsterdam timezone
-  settingNTPhostname      = doc[F("NTPhostname")].as<String>();
-  if (settingNTPhostname==F("null"))  settingNTPhostname = NTP_HOST_DEFAULT;  
+  
+  strlcpy(settingNTPtimezone, doc[F("NTPtimezone")] | "", sizeof(settingNTPtimezone));
+  if (strlen(settingNTPtimezone)==0 || strcmp(settingNTPtimezone, "null")==0)  strlcpy(settingNTPtimezone, "Europe/Amsterdam", sizeof(settingNTPtimezone)); //default to amsterdam timezone
+  
+  strlcpy(settingNTPhostname, doc[F("NTPhostname")] | "", sizeof(settingNTPhostname));
+  if (strlen(settingNTPhostname)==0 || strcmp(settingNTPhostname, "null")==0)  strlcpy(settingNTPhostname, NTP_HOST_DEFAULT, sizeof(settingNTPhostname));  
   settingNTPsendtime      = doc[F("NTPsendtime")]|settingNTPsendtime;
   settingLEDblink         = doc[F("LEDblink")]|settingLEDblink;
   settingDarkTheme        = doc[F("darktheme")]|settingDarkTheme;
@@ -144,8 +152,8 @@ void readSettings(bool show)
   settingS0COUNTERinterval = doc[F("S0COUNTERinterval")] | settingS0COUNTERinterval;
   CHANGE_INTERVAL_SEC(timers0counter, settingS0COUNTERinterval, CATCH_UP_MISSED_TICKS); 
   settingOTGWcommandenable = doc[F("OTGWcommandenable")] | settingOTGWcommandenable;
-  settingOTGWcommands     = doc[F("OTGWcommands")].as<String>();
-  if (settingOTGWcommands==F("null")) settingOTGWcommands = "";
+  strlcpy(settingOTGWcommands, doc[F("OTGWcommands")] | "", sizeof(settingOTGWcommands));
+  if (strcmp(settingOTGWcommands, "null")==0) settingOTGWcommands[0] = 0;
   settingGPIOOUTPUTSenabled = doc[F("GPIOOUTPUTSenabled")] | settingGPIOOUTPUTSenabled;
   settingGPIOOUTPUTSpin = doc[F("GPIOOUTPUTSpin")] | settingGPIOOUTPUTSpin;
   settingGPIOOUTPUTStriggerBit = doc[F("GPIOOUTPUTStriggerBit")] | settingGPIOOUTPUTStriggerBit;
@@ -199,58 +207,60 @@ void updateSetting(const char *field, const char *newValue)
 
   if (strcasecmp(field, "hostname")==0) 
   { //make sure we have a valid hostname here...
-    settingHostname = String(newValue);
-    if (settingHostname.length()==0) settingHostname=_HOSTNAME; 
-    int pos = settingMQTTtopTopic.indexOf("."); //strip away anything beyond the dot
-    if (pos){
-      settingMQTTtopTopic = settingMQTTtopTopic.substring(0, pos-1);
-    }
+    strlcpy(settingHostname, newValue, sizeof(settingHostname));
+    if (strlen(settingHostname)==0) snprintf(settingHostname, sizeof(settingHostname), "OTGW-%06x", (unsigned int)ESP.getChipId());
+    
+    //strip away anything beyond the dot
+    char *dot = strchr(settingMQTTtopTopic, '.');
+    if (dot) *dot = '\0';
     
     //Update some settings right now 
-    startMDNS(CSTR(settingHostname));
-    startLLMNR(CSTR(settingHostname));
+    startMDNS(settingHostname);
+    startLLMNR(settingHostname);
   
     //Restart MQTT connection every "save settings"
     startMQTT();
 
     Debugln();
-    DebugTf(PSTR("Need reboot before new %s.local will be available!\r\n\n"), CSTR(settingHostname));
+    DebugTf(PSTR("Need reboot before new %s.local will be available!\r\n\n"), settingHostname);
   }
+  if (strcasecmp(field, "AdminPassword")==0)   strlcpy(settingAdminPassword, newValue, sizeof(settingAdminPassword));
+  
   if (strcasecmp(field, "MQTTenable")==0)      settingMQTTenable = EVALBOOLEAN(newValue);
-  if (strcasecmp(field, "MQTTbroker")==0)      settingMQTTbroker = String(newValue);
+  if (strcasecmp(field, "MQTTbroker") == 0)    strlcpy(settingMQTTbroker, newValue, sizeof(settingMQTTbroker));
   if (strcasecmp(field, "MQTTbrokerPort")==0)  settingMQTTbrokerPort = atoi(newValue);
-  if (strcasecmp(field, "MQTTuser")==0)        settingMQTTuser = String(newValue);
+  if (strcasecmp(field, "MQTTuser")==0)        strlcpy(settingMQTTuser, newValue, sizeof(settingMQTTuser));
   if (strcasecmp(field, "MQTTpasswd")==0){
     if ( newValue && strcasecmp(newValue, "notthepassword") != 0 ){
-      settingMQTTpasswd = String(newValue);
+      strlcpy(settingMQTTpasswd, newValue, sizeof(settingMQTTpasswd));
     }
   }
   if (strcasecmp(field, "MQTTtoptopic")==0)    {
-    settingMQTTtopTopic = String(newValue);
-    if (settingMQTTtopTopic.length()==0)    {
-      settingMQTTtopTopic = _HOSTNAME;
-      settingMQTTtopTopic.toLowerCase();
+    strlcpy(settingMQTTtopTopic, newValue, sizeof(settingMQTTtopTopic));
+    if (strlen(settingMQTTtopTopic)==0)    {
+      strlcpy(settingMQTTtopTopic, _HOSTNAME, sizeof(settingMQTTtopTopic));
+      for(int i = 0; settingMQTTtopTopic[i]; i++) settingMQTTtopTopic[i] = tolower(settingMQTTtopTopic[i]);
     }
   }
   if (strcasecmp(field, "MQTThaprefix")==0)    {
-    settingMQTThaprefix = String(newValue);
-    if (settingMQTThaprefix.length()==0)    settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
+    strlcpy(settingMQTThaprefix, newValue, sizeof(settingMQTThaprefix));
+    if (strlen(settingMQTThaprefix)==0)    strlcpy(settingMQTThaprefix, HOME_ASSISTANT_DISCOVERY_PREFIX, sizeof(settingMQTThaprefix));
   }
   if (strcasecmp(field, "MQTTharebootdetection")==0)      settingMQTTharebootdetection = EVALBOOLEAN(newValue);
   if (strcasecmp(field, "MQTTuniqueid") == 0)  {
-    settingMQTTuniqueid = String(newValue);     
-    if (settingMQTTuniqueid.length() == 0)   settingMQTTuniqueid = getUniqueId();
+    strlcpy(settingMQTTuniqueid, newValue, sizeof(settingMQTTuniqueid));     
+    if (strlen(settingMQTTuniqueid) == 0)   strlcpy(settingMQTTuniqueid, getUniqueId().c_str(), sizeof(settingMQTTuniqueid));
   }
   if (strcasecmp(field, "MQTTOTmessage")==0)   settingMQTTOTmessage = EVALBOOLEAN(newValue);
   if (strstr(field, "mqtt") != NULL)        startMQTT();//restart MQTT on change of any setting
   
   if (strcasecmp(field, "NTPenable")==0)      settingNTPenable = EVALBOOLEAN(newValue);
   if (strcasecmp(field, "NTPhostname")==0)    {
-    settingNTPhostname = String(newValue); 
+    strlcpy(settingNTPhostname, newValue, sizeof(settingNTPhostname)); 
     startNTP();
   }
   if (strcasecmp(field, "NTPtimezone")==0)    {
-    settingNTPtimezone = String(newValue);
+    strlcpy(settingNTPtimezone, newValue, sizeof(settingNTPtimezone));
     startNTP();  // update timezone if changed
   }
   if (strcasecmp(field, "NTPsendtime")==0)    settingNTPsendtime = EVALBOOLEAN(newValue);
@@ -300,7 +310,7 @@ void updateSetting(const char *field, const char *newValue)
     CHANGE_INTERVAL_SEC(timers0counter, settingS0COUNTERinterval, CATCH_UP_MISSED_TICKS); 
   }
   if (strcasecmp(field, "OTGWcommandenable")==0)    settingOTGWcommandenable = EVALBOOLEAN(newValue);
-  if (strcasecmp(field, "OTGWcommands")==0)         settingOTGWcommands = String(newValue);
+  if (strcasecmp(field, "OTGWcommands")==0)         strlcpy(settingOTGWcommands, newValue, sizeof(settingOTGWcommands));
   if (strcasecmp(field, "GPIOOUTPUTSenabled") == 0)
   {
     settingGPIOOUTPUTSenabled = EVALBOOLEAN(newValue);
@@ -325,11 +335,6 @@ void updateSetting(const char *field, const char *newValue)
 
   //Restart MQTT connection every "save settings" (this seems to be save to do, but is called for each changed field now )
   if (settingMQTTenable)   startMQTT();
-
-  // if (strstr(field, "hostname")!= NULL) {
-  //   //restart wifi
-  //   startWIFI( CSTR(settingHostname), 240)
-  // } 
 
 } // updateSetting()
 

@@ -222,9 +222,9 @@ void sendOTGWvalue(int msgid){
   } else {
     root[F("error")] = "message id: reserved for future use";
   }
-  String sBuff;
-  serializeJsonPretty(root, sBuff);
-  //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff.c_str());
+  char sBuff[JSON_BUFF_MAX];
+  serializeJsonPretty(root, sBuff, sizeof(sBuff));
+  //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff);
   //reply with json
   httpServer.sendHeader("Access-Control-Allow-Origin", "*");
   httpServer.send(200, "application/json", sBuff);
@@ -255,9 +255,9 @@ void sendOTGWlabel(const char *msglabel){
     }
     root[F("unit")] = OTlookupitem.unit;    
   } 
-  String sBuff;
-  serializeJsonPretty(root, sBuff);
-  //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff.c_str());
+  char sBuff[JSON_BUFF_MAX];
+  serializeJsonPretty(root, sBuff, sizeof(sBuff));
+  //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff);
   //reply with json
   httpServer.sendHeader("Access-Control-Allow-Origin", "*");
   httpServer.send(200, "application/json", sBuff);
@@ -595,15 +595,19 @@ void postSettings()
   // so, why not use ArduinoJSON library?
   // I say: try it yourself ;-) It won't be easy
       char* wPair[5];
-      String jsonInStr  = CSTR(httpServer.arg(0));
+      // String jsonInStr  = CSTR(httpServer.arg(0));
       char field[25] = {0,};
       char newValue[101]={0,};
-      jsonInStr.replace("{", "");
-      jsonInStr.replace("}", "");
-      jsonInStr.replace("\"", "");
       
-      char jsonIn[jsonInStr.length() + 1];
-      strcpy(jsonIn, jsonInStr.c_str());
+      // Use buffer to process input to avoid String class
+      // Assume max input matches our temp buffer size
+      char jsonIn[256];
+      strlcpy(jsonIn, httpServer.arg(0).c_str(), sizeof(jsonIn));
+
+      // Remove braces and quotes in place
+      replaceAll(jsonIn, sizeof(jsonIn), "{", "");
+      replaceAll(jsonIn, sizeof(jsonIn), "}", "");
+      replaceAll(jsonIn, sizeof(jsonIn), "\"", "");
 
       uint_fast8_t wp = splitString(jsonIn, ',',  wPair, 5) ;
 	      for (uint_fast8_t i=0; i<wp; i++)
