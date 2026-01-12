@@ -45,7 +45,7 @@ const char* getOTLogTimestamp() {
   // 6 digit subsecond resolution from microseconds (0..999999)
   const unsigned long subSeconds = (unsigned long)(now.tv_usec);
 
-  snprintf(timestamp, sizeof(timestamp), "%02d:%02d:%02d.%06lu",
+  snprintf_P(timestamp, sizeof(timestamp), PSTR("%02d:%02d:%02d.%06lu"),
            myTime.hour(), myTime.minute(), myTime.second(), subSeconds);
 
   return timestamp;
@@ -165,7 +165,7 @@ boolean isValidIP(IPAddress ip)
   _isValidIP &= !(ip[0]==127 && ip[1]==0 && ip[2]==0 && ip[3]==1);                 // if not 127.0.0.0 then it might be valid
   _isValidIP &= !(ip[0]>=224);                                                     // if ip[0] >=224 then reserved space  
   
-  // DebugTf( "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+  // DebugTf( PSTR("%d.%d.%d.%d"), ip[0], ip[1], ip[2], ip[3]);
   // if (_isValidIP) 
   //   Debugln(F(" = Valid IP")); 
   // else 
@@ -243,13 +243,13 @@ bool updateRebootLog(String text)
     if	(rtc_info->reason	==	REASON_WDT_RST	|| rtc_info->reason	==	REASON_EXCEPTION_RST	|| rtc_info->reason	==	REASON_SOFT_WDT_RST)	{
 
       //The	address	of	the	last	crash	is	printed,	which	is	used	to	debug	garbled	output
-      snprintf(log_line_regs, LOG_LINE_LENGTH,"ESP register contents: epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x, depc=0x%08x\r\n", rtc_info->epc1, rtc_info->epc2, rtc_info->epc3, rtc_info->excvaddr, rtc_info->depc);
+      snprintf_P(log_line_regs, LOG_LINE_LENGTH, PSTR("ESP register contents: epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x, depc=0x%08x\r\n"), rtc_info->epc1, rtc_info->epc2, rtc_info->epc3, rtc_info->excvaddr, rtc_info->depc);
       Debugf(log_line_regs);
     }
 
     if (rtc_info->reason == REASON_EXT_SYS_RST) {
       //external reset, so try to fetch the reset reason from the tiny watchdog and print that
-      snprintf(log_line_regs, LOG_LINE_LENGTH,"External Reason: External Watchdog reason: %s\r\n", CSTR(initWatchDog()));
+      snprintf_P(log_line_regs, LOG_LINE_LENGTH, PSTR("External Reason: External Watchdog reason: %s\r\n"), CSTR(initWatchDog()));
       Debugf(log_line_regs);      
     }
 
@@ -271,21 +271,21 @@ bool updateRebootLog(String text)
       // more reasons can be found in the "corebits.h" file of the Extensa SDK
 
       switch(rtc_info->exccause) {
-        case 0:   snprintf(log_line_excpt, LOG_LINE_LENGTH, "- Invalid command (0)"); break;
-        case 6:   snprintf(log_line_excpt, LOG_LINE_LENGTH, "- Division by zero (6)"); break;
-        case 9:   snprintf(log_line_excpt, LOG_LINE_LENGTH, "- Unaligned read/write operation addresses (9)"); break;
-        case 28:  snprintf(log_line_excpt, LOG_LINE_LENGTH, "- Access to invalid address (28)"); break;
-        case 29:  snprintf(log_line_excpt, LOG_LINE_LENGTH, "- Access to invalid address (29)"); break;
-        default:  snprintf(log_line_excpt, LOG_LINE_LENGTH, "- Other (not specified) (%d)", rtc_info->exccause); break;
+        case 0:   snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Invalid command (0)")); break;
+        case 6:   snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Division by zero (6)")); break;
+        case 9:   snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Unaligned read/write operation addresses (9)")); break;
+        case 28:  snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Access to invalid address (28)")); break;
+        case 29:  snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Access to invalid address (29)")); break;
+        default:  snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Other (not specified) (%d)"), rtc_info->exccause); break;
       }
 
-      Debugf("Fatal exception (%d): %s\r\n",	rtc_info->exccause, log_line_excpt);
+      Debugf(PSTR("Fatal exception (%d): %s\r\n"),	rtc_info->exccause, log_line_excpt);
     }
   }
 
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
-  snprintf(log_line, LOG_LINE_LENGTH, "%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n", myTime.year(),  myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second(), CSTR(text), errorCode, log_line_excpt);
+  snprintf_P(log_line, LOG_LINE_LENGTH, PSTR("%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n"), myTime.year(),  myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second(), CSTR(text), errorCode, log_line_excpt);
 
   if (LittleFS.begin()) {
     //start with opening the file
@@ -341,7 +341,7 @@ String upTime()
 {
   char    calcUptime[20];
 
-  snprintf(calcUptime, sizeof(calcUptime), "%d(d)-%02d:%02d(H:m)"
+  snprintf_P(calcUptime, sizeof(calcUptime), PSTR("%d(d)-%02d:%02d(H:m)")
                                           , int((upTimeSeconds / (60 * 60 * 24)) % 365)
                                           , int((upTimeSeconds / (60 * 60)) % 24)
                                           , int((upTimeSeconds / (60)) % 60));
@@ -444,7 +444,7 @@ void chr_cstrlit(unsigned char u, char *buffer, size_t buflen)
     if (buflen < 2)
         *buffer = '\0';
     else if (isprint(u) && u != '\'' && u != '\"' && u != '\\' && u != '\?')
-        snprintf(buffer, buflen, "%c", u);
+        snprintf_P(buffer, buflen, PSTR("%c"), u);
     else if (buflen < 3)
         *buffer = '\0';
     else
@@ -466,7 +466,7 @@ void chr_cstrlit(unsigned char u, char *buffer, size_t buflen)
             if (buflen < 5)
                 *buffer = '\0';
             else
-                snprintf(buffer, buflen, "\\%03o", u);
+                snprintf_P(buffer, buflen, PSTR("\\%03o"), u);
             break;
         }
     }

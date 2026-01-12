@@ -139,8 +139,8 @@ if (settingMQTTenable) {
       // ref MQTTPubNamespace = settingMQTTtopTopic + "/value/" + strDeviceAddress ;
       char _msg[15]{0};
       char _topic[50]{0};
-      snprintf(_topic, sizeof _topic, "%s", strDeviceAddress);
-      snprintf(_msg, sizeof _msg, "%4.1f", DallasrealDevice[i].tempC);
+      snprintf_P(_topic, sizeof _topic, PSTR("%s"), strDeviceAddress);
+      snprintf_P(_msg, sizeof _msg, PSTR("%4.1f"), DallasrealDevice[i].tempC);
 
       // DebugTf(PSTR("Topic: %s -- Payload: %s\r\n"), _topic, _msg);
       if (bDebugSensors) DebugFlush();
@@ -149,7 +149,7 @@ if (settingMQTTenable) {
       // Serial.println(DallasTemperature::toFahrenheit(tempC)); // Converts tempC to Fahrenheit
     }
   }
-  // DebugTln("end polling sensors");
+  // DebugTln(F("end polling sensors"));
   DebugFlush();
 }
 
@@ -160,7 +160,7 @@ char* getDallasAddress(DeviceAddress deviceAddress)
   
   for (uint8_t i = 0; i < 8; i++)
   {
-    snprintf(dest + (i * 2), 3, "%02X", deviceAddress[i]);
+    snprintf_P(dest + (i * 2), 3, PSTR("%02X"), deviceAddress[i]);
   }
   return dest;
 }

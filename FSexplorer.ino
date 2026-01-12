@@ -305,12 +305,12 @@ void handleFileUpload()
     String filename = path + httpServer.urlDecode(upload.filename);
     if(filename.startsWith("//")) filename = filename.substring(1);
     
-    Debugln("FileUpload Name: " + filename);
+    DebugT(F("FileUpload Name: ")); Debugln(filename);
     fsUploadFile = LittleFS.open(filename, "w");
   } 
   else if (upload.status == UPLOAD_FILE_WRITE) 
   {
-    Debugln("FileUpload Data: " + (String)upload.currentSize);
+    DebugT(F("FileUpload Data: ")); Debugln((String)upload.currentSize);
     if (fsUploadFile)
       fsUploadFile.write(upload.buf, upload.currentSize);
   } 
@@ -318,7 +318,7 @@ void handleFileUpload()
   {
     if (fsUploadFile)
       fsUploadFile.close();
-    Debugln("FileUpload Size: " + (String)upload.totalSize);
+    DebugT(F("FileUpload Size: ")); Debugln((String)upload.totalSize);
     httpServer.sendContent(Header);
   }
   

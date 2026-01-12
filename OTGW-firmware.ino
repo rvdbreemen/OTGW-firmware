@@ -161,7 +161,7 @@ void restartWifi(){
 void sendMQTTuptime(){
   DebugTf(PSTR("Uptime seconds: %lu\r\n"), (unsigned long)upTimeSeconds);
   char uptimeBuf[11] = {0};
-  snprintf(uptimeBuf, sizeof(uptimeBuf), "%lu", (unsigned long)upTimeSeconds);
+  snprintf_P(uptimeBuf, sizeof(uptimeBuf), PSTR("%lu"), (unsigned long)upTimeSeconds);
   sendMQTTData(F("otgw-firmware/uptime"), uptimeBuf, false);
 }
 
@@ -183,19 +183,19 @@ void sendtimecommand(){
   char msg[15]={0};
   //Send msg id xx: hour:minute/day of week
   int day_of_week = (myTime.dayOfWeek()+6)%7+1;
-  snprintf(msg, sizeof(msg), "SC=%d:%02d/%d", myTime.hour(), myTime.minute(), day_of_week);
+  snprintf_P(msg, sizeof(msg), PSTR("SC=%d:%02d/%d"), myTime.hour(), myTime.minute(), day_of_week);
   sendOTGW(msg, strlen(msg)); //bypass command queue, no delays
   
   if (dayChanged()){
     //Send msg id 21: month, day
-    snprintf(msg, sizeof(msg), "SR=21:%d,%d", myTime.month(), myTime.day());
+    snprintf_P(msg, sizeof(msg), PSTR("SR=21:%d,%d"), myTime.month(), myTime.day());
     addOTWGcmdtoqueue(msg, strlen(msg), true, 0); 
     handleOTGWqueue(); //send command right away
   }
   
   if (yearChanged()){
     //Send msg id 22: HB of Year, LB of Year 
-    snprintf(msg, sizeof(msg), "SR=22:%d,%d", (myTime.year() >> 8) & 0xFF, myTime.year() & 0xFF);
+    snprintf_P(msg, sizeof(msg), PSTR("SR=22:%d,%d"), (myTime.year() >> 8) & 0xFF, myTime.year() & 0xFF);
     addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
     handleOTGWqueue(); //send command right away
   }
@@ -266,7 +266,7 @@ void doTaskEvery60s(){
   //== do tasks ==
   if (strcmp(sPICdeviceid, "unknown") == 0){
     //keep trying to figure out which pic is used!
-    DebugTln("PIC is unknown, probe pic using PR=A");
+    DebugTln(F("PIC is unknown, probe pic using PR=A"));
     //Force banner fetch
     getpicfwversion();
     //This should retreive the information here
@@ -286,7 +286,7 @@ void doTaskMinuteChanged(){
   if (WiFi.status() != WL_CONNECTED) {
     restartWifi();
   }
-  DebugTln("Minute changed, sending time command to OTGW");
+  DebugTln(F("Minute changed, sending time command to OTGW"));
   sendtimecommand();
 }
 

@@ -68,16 +68,16 @@ String GetVersion(const String hexfile){
           }
         }
         //if (len) {
-        //DebugTf("len>0\n");
+        //DebugTf(PSTR("len>0\n"));
         //break;
         //}
       } else if (tag == 1) {
-        //DebugTf("tag==1\n");
+        //DebugTf(PSTR("tag==1\n"));
         break;
       }
     }
     f.close();
-    //DebugTf("closing file and hunting for banner\n");
+    //DebugTf(PSTR("closing file and hunting for banner\n"));
     ptr = 0; 
     while (ptr < 256)
     {
@@ -85,7 +85,7 @@ String GetVersion(const String hexfile){
       char *s = strstr((char *)datamem + ptr, banner);
       if (!s)
       {
-        //DebugTf("did not find the banner\r\n");
+        //DebugTf(PSTR("did not find the banner\r\n"));
         ptr += strnlen((char *)datamem + ptr, 256 - ptr) + 1;
       } else {
         //DebugTf(PSTR("hit the banner! returning version string %s\r\n"),s);
