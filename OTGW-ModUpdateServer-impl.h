@@ -173,7 +173,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _lastFeedbackBytes = 0;
         _lastProgressPerc = 0;
 
-        if (upload.name == "filesystem") {
+        if (upload.name == F("filesystem")) {
           // --- Preserve settings logic ---
           if (_server->hasArg("preserve") && _server->arg("preserve") == "true") {
             if (LittleFS.exists("/settings.ini")) {
@@ -226,7 +226,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
         if(Update.end(true)){ //true to set the size to the current progress
           // --- Restore settings logic ---
-          if (upload.name == "filesystem" && _savedSettings.length() > 0) {
+          if (upload.name == F("filesystem") && _savedSettings.length() > 0) {
              if (_serial_output) Debugln("Filesystem flashed successfully. Waiting 500ms before mounting...");
              delay(500); // Wait 500ms after flashing before mounting
              

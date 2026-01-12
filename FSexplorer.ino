@@ -54,7 +54,7 @@ const char Helper[] =
   "<form action='/update' method='GET'>\n"
   "  <input type='submit' name='SUBMIT' value='Flash Utility'/>\n"
   "</form>\n";
-const char Header[] = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCache-Control: no-cache\r\n";
+const char Header[] PROGMEM = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCache-Control: no-cache\r\n";
 
 
 
@@ -81,7 +81,7 @@ void startWebserver(){
   // Set up first message as the IP address
   OTGWSerial.println(F("\nHTTP Server started\r"));  
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%03d.%03d.%d.%d"), WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
-  OTGWSerial.printf("\nAssigned IP=%s\r\n", cMsg);
+  OTGWSerial.printf(PSTR("\nAssigned IP=%s\r\n"), cMsg);
 }
 //=====================================================================================
 void setupFSexplorer(){    
@@ -280,7 +280,7 @@ bool handleFile(String&& path)
     return true;
   }
   if (!LittleFS.exists("/FSexplorer.html")) httpServer.send(200, "text/html", Helper); //Upload the FSexplorer.html
-  if (path.endsWith("/")) path += "index.html";
+  if (path.endsWith("/")) path += F("index.html");
   return LittleFS.exists(path) ? ({File f = LittleFS.open(path, "r"); httpServer.streamFile(f, contentType(path)); f.close(); true;}) : false;
 
 } // handleFile()
@@ -300,7 +300,7 @@ void handleFileUpload()
     String path = "/";
     if (httpServer.hasArg("path")) {
         path = httpServer.arg("path");
-        if (!path.endsWith("/")) path += "/";
+        if (!path.endsWith("/")) path += F("/");
     }
     String filename = path + httpServer.urlDecode(upload.filename);
     if(filename.startsWith("//")) filename = filename.substring(1);

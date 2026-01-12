@@ -589,7 +589,7 @@ bool doAutoConfigureMsgid(byte OTid)
     configSensors() ;
     return true;
   }  
-  return doAutoConfigureMsgid(OTid, "");
+  return doAutoConfigureMsgid(OTid, nullptr);
 }
 
  bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
@@ -615,15 +615,15 @@ bool doAutoConfigureMsgid(byte OTid)
 
   //Let's open the MQTT autoconfig file
   File fh; //filehandle
-  const char *cfgFilename = "/mqttha.cfg";
+  // const char *cfgFilename = "/mqttha.cfg"; // moved to usage
   LittleFS.begin();
 
-  if (!LittleFS.exists(cfgFilename)) {
+  if (!LittleFS.exists(F("/mqttha.cfg"))) {
     DebugTln(F("Error: confuration file not found.")); 
     return _result;
   } 
 
-  fh = LittleFS.open(cfgFilename, "r");
+  fh = LittleFS.open(F("/mqttha.cfg"), "r");
 
   if (!fh) {
     DebugTln(F("Error: could not open confuration file.")); 
@@ -703,7 +703,7 @@ bool doAutoConfigureMsgid(byte OTid)
   return _result;
 }
 
-void sensorAutoConfigure(byte dataid, bool finishflag , const char *cfgSensorId = "") {
+void sensorAutoConfigure(byte dataid, bool finishflag , const char *cfgSensorId = nullptr) {
  // Special version of Autoconfigure for sensors
  // dataid is a foney id, not used by OT 
  // check wheter MQTT topic needs to be configured

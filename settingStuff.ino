@@ -108,22 +108,22 @@ void readSettings(bool show)
   settingMQTTuser         = doc[F("MQTTuser")].as<String>();
   settingMQTTpasswd       = doc[F("MQTTpasswd")].as<String>();
   settingMQTTtopTopic     = doc[F("MQTTtoptopic")].as<String>();
-  if (settingMQTTtopTopic=="null") {
+  if (settingMQTTtopTopic==F("null")) {
     settingMQTTtopTopic = _HOSTNAME;
     settingMQTTtopTopic.toLowerCase();
   }
   settingMQTThaprefix     = doc[F("MQTThaprefix")].as<String>();
-  if (settingMQTThaprefix=="null") settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
+  if (settingMQTThaprefix==F("null")) settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
   settingMQTTharebootdetection = doc[F("MQTTharebootdetection")]|settingMQTTharebootdetection;	  
   settingMQTTuniqueid     = doc[F("MQTTuniqueid")].as<String>();
-  if (settingMQTTuniqueid=="null") settingMQTTuniqueid = getUniqueId();
+  if (settingMQTTuniqueid==F("null")) settingMQTTuniqueid = getUniqueId();
 
   settingMQTTOTmessage    = doc[F("MQTTOTmessage")]|settingMQTTOTmessage;
   settingNTPenable        = doc[F("NTPenable")]; 
   settingNTPtimezone      = doc[F("NTPtimezone")].as<String>();
-  if (settingNTPtimezone=="null")  settingNTPtimezone = "Europe/Amsterdam"; //default to amsterdam timezone
+  if (settingNTPtimezone==F("null"))  settingNTPtimezone = F("Europe/Amsterdam"); //default to amsterdam timezone
   settingNTPhostname      = doc[F("NTPhostname")].as<String>();
-  if (settingNTPhostname=="null")  settingNTPhostname = NTP_HOST_DEFAULT; 
+  if (settingNTPhostname==F("null"))  settingNTPhostname = NTP_HOST_DEFAULT;  
   settingNTPsendtime      = doc[F("NTPsendtime")]|settingNTPsendtime;
   settingLEDblink         = doc[F("LEDblink")]|settingLEDblink;
   settingDarkTheme        = doc[F("darktheme")]|settingDarkTheme;
@@ -145,7 +145,7 @@ void readSettings(bool show)
   CHANGE_INTERVAL_SEC(timers0counter, settingS0COUNTERinterval, CATCH_UP_MISSED_TICKS); 
   settingOTGWcommandenable = doc[F("OTGWcommandenable")] | settingOTGWcommandenable;
   settingOTGWcommands     = doc[F("OTGWcommands")].as<String>();
-  if (settingOTGWcommands=="null") settingOTGWcommands = "";
+  if (settingOTGWcommands==F("null")) settingOTGWcommands = "";
   settingGPIOOUTPUTSenabled = doc[F("GPIOOUTPUTSenabled")] | settingGPIOOUTPUTSenabled;
   settingGPIOOUTPUTSpin = doc[F("GPIOOUTPUTSpin")] | settingGPIOOUTPUTSpin;
   settingGPIOOUTPUTStriggerBit = doc[F("GPIOOUTPUTStriggerBit")] | settingGPIOOUTPUTStriggerBit;

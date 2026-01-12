@@ -1427,10 +1427,10 @@ void sendOTGW(const char* buf, int len)
   Message is not an OTmessage if length is not 9 long OR 3th char is ':' (= OTGW command response)
 */
 bool isvalidotmsg(const char *buf, int len){
-  const char *chk = "TBARE";
   bool _ret =  (len==9);    //check 9 chars long
   _ret &= (buf[2]!=':');    //not a otgw command response 
-  _ret &= (strchr(chk, buf[0])!=NULL); //1 char matches any of 'B', 'T', 'A', 'R' or 'E'
+  char c = buf[0];
+  _ret &= (c=='T' || c=='B' || c=='A' || c=='R' || c=='E'); //1 char matches any of 'B', 'T', 'A', 'R' or 'E'
   return _ret;
 }
 
@@ -2197,7 +2197,7 @@ void refreshpic(String filename, String version) {
 String pendingUpgradePath = "";
 
 void handlePendingUpgrade() {
-  if (pendingUpgradePath != "") {
+  if (pendingUpgradePath != F("")) {
     DebugTf(PSTR("Executing deferred upgrade for: %s\r\n"), pendingUpgradePath.c_str());
     upgradepicnow(pendingUpgradePath.c_str());
     pendingUpgradePath = "";
@@ -2221,17 +2221,17 @@ void upgradepic() {
     return; // no pic version found, don't upgrade
   }
   
-  if (action == "upgrade") {
+  if (action == F("upgrade")) {
     DebugTf(PSTR("Upgrade /%s/%s\r\n"), sPICdeviceid, filename.c_str());
-    httpServer.send(200, "application/json", "{\"status\":\"started\"}");
+    httpServer.send_P(200, PSTR("application/json"), PSTR("{\"status\":\"started\"}"));
     
     // Defer the actual upgrade start to the main loop to ensure HTTP response is sent
     pendingUpgradePath = "/" + String(sPICdeviceid) + "/" + filename;
     return;
-  } else if (action == "refresh") {
+  } else if (action == F("refresh")) {
     DebugTf(PSTR("Refresh %s/%s\r\n"), sPICdeviceid, filename.c_str());
     refreshpic(filename, version);
-  } else if (action == "delete") {
+  } else if (action == F("delete")) {
     DebugTf(PSTR("Delete %s/%s\r\n"), sPICdeviceid, filename.c_str());
     char path[64];
     snprintf_P(path, sizeof(path), PSTR("/%s/%s"), sPICdeviceid, filename.c_str());
