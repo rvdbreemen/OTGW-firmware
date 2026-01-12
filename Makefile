@@ -76,7 +76,7 @@ flush: | $(CFGFILE)
 	$(CLICFG) cache clean
 
 libraries/WiFiManager: | $(BOARDS)
-	$(CLICFG) lib install WiFiManager@2.0.15-rc.1
+	$(CLICFG) lib install WiFiManager@2.0.17
 
 libraries/ArduinoJson:
 	$(CLICFG) lib install ArduinoJson@6.17.2

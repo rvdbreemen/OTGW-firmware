@@ -50,7 +50,7 @@
 //#include "ESP8266HTTPUpdateServer.h"
 #include "OTGW-ModUpdateServer.h"   // <<special version for Nodoshop Watchdog needed>>
 #include "updateServerHtml.h"
-#include <WiFiManager.h>        // version 2.0.4-beta - use latest development branch  - https://github.com/tzapu/WiFiManager
+#include <WiFiManager.h>        // version 2.0.17 - stable release - https://github.com/tzapu/WiFiManager
 // included in main program: #include <TelnetStream.h>       // Version 0.0.1 - https://github.com/jandrassy/TelnetStream
 #include <WebSocketsServer.h>   // WebSocket server for streaming OT log messages to WebUI
 
