@@ -25,7 +25,7 @@ void handleDebug(){
             case 'a':
                 DebugTln(F("Send PR=A command, to ID the chip"));
                 getpicfwversion();
-                DebugTln("Debug --> PR=A report firmware version, type");
+                DebugTln(F("Debug --> PR=A report firmware version, type"));
                 strlcpy(sPICfwversion, OTGWSerial.firmwareVersion(), sizeof(sPICfwversion));
                 OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), sPICfwversion);
                 strlcpy(sPICdeviceid, OTGWSerial.processorToString().c_str(), sizeof(sPICdeviceid));
@@ -93,11 +93,11 @@ void handleDebug(){
                 readSettings(true);
                 break;
             case 'o':
-                DebugTln("gpio output off");
+                DebugTln(F("gpio output off"));
                 digitalWrite(settingGPIOOUTPUTSpin, OFF);
                 break;
             case 'l':
-                DebugTln("MyDEBUG =true");
+                DebugTln(F("MyDEBUG =true"));
                 settingMyDEBUG = true;
                 break;
             case 'f':

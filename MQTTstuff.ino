@@ -516,7 +516,6 @@ void sendMQTT(const char* topic, const char *json, const size_t len)
   if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
   if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
   MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settingMQTTbroker.c_str(), settingMQTTbrokerPort, topic, json);
-  if (MQTTclient.getBufferSize() < len) MQTTclient.setBufferSize(len); //resize buffer when needed
 
   if (MQTTclient.beginPublish(topic, len, true)){
     for (size_t i = 0; i<len; i++) {

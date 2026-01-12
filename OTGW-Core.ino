@@ -86,7 +86,7 @@ Publish usefull firmware version information to MQTT broker.
 */
 void sendMQTTversioninfo(){
   char rebootCountBuf[12];
-  snprintf(rebootCountBuf, sizeof(rebootCountBuf), "%lu", static_cast<unsigned long>(rebootCount));
+  snprintf_P(rebootCountBuf, sizeof(rebootCountBuf), PSTR("%lu"), static_cast<unsigned long>(rebootCount));
   sendMQTTData("otgw-firmware/version", _SEMVER_FULL);
   sendMQTTData("otgw-firmware/reboot_count", rebootCountBuf);
   sendMQTTData("otgw-firmware/reboot_reason", lastReset.c_str());
@@ -121,9 +121,9 @@ void detectPIC(){
   OTGWSerial.resetPic(); // make sure it the firmware is detected
   bPICavailable = OTGWSerial.find(ETX);
   if (bPICavailable) {
-      DebugTln("ETX found after reset: Pic detected!");
+      DebugTln(F("ETX found after reset: Pic detected!"));
   } else {
-      DebugTln("No ETX found after reset: no Pic detected!");
+      DebugTln(F("No ETX found after reset: no Pic detected!"));
   }
 }
 
@@ -1786,25 +1786,25 @@ void processOT(const char *buf, int len){
     char errorBuf[12];
     OTcurrentSystemState.error01++;
     OTGWDebugTf(PSTR("\r\nError 01 = %d\r\n"),OTcurrentSystemState.error01);
-    snprintf(errorBuf, sizeof(errorBuf), "%u", OTcurrentSystemState.error01);
+    snprintf_P(errorBuf, sizeof(errorBuf), PSTR("%u"), OTcurrentSystemState.error01);
     sendMQTTData(F("Error 01"), errorBuf);
   } else if (strstr(buf, "Error 02")!= NULL) {
     char errorBuf[12];
     OTcurrentSystemState.error02++;
     OTGWDebugTf(PSTR("\r\nError 02 = %d\r\n"),OTcurrentSystemState.error02);
-    snprintf(errorBuf, sizeof(errorBuf), "%u", OTcurrentSystemState.error02);
+    snprintf_P(errorBuf, sizeof(errorBuf), PSTR("%u"), OTcurrentSystemState.error02);
     sendMQTTData(F("Error 02"), errorBuf);
   } else if (strstr(buf, "Error 03")!= NULL) {
     char errorBuf[12];
     OTcurrentSystemState.error03++;
     OTGWDebugTf(PSTR("\r\nError 03 = %d\r\n"),OTcurrentSystemState.error03);
-    snprintf(errorBuf, sizeof(errorBuf), "%u", OTcurrentSystemState.error03);
+    snprintf_P(errorBuf, sizeof(errorBuf), PSTR("%u"), OTcurrentSystemState.error03);
     sendMQTTData(F("Error 03"), errorBuf);
   } else if (strstr(buf, "Error 04")!= NULL){
     char errorBuf[12];
     OTcurrentSystemState.error04++;
     OTGWDebugTf(PSTR("\r\nError 04 = %d\r\n"),OTcurrentSystemState.error04);
-    snprintf(errorBuf, sizeof(errorBuf), "%u", OTcurrentSystemState.error04);
+    snprintf_P(errorBuf, sizeof(errorBuf), PSTR("%u"), OTcurrentSystemState.error04);
     sendMQTTData(F("Error 04"), errorBuf);
   } else if (strstr(buf, OTGW_BANNER)!=NULL){
     //found a banner, so get the version of PIC
@@ -2089,9 +2089,9 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   
   char buffer[128];
   if (result == OTGWError::OTGW_ERROR_NONE) {
-      snprintf(buffer, sizeof(buffer), "{\"percent\":100,\"result\":%d,\"errors\":%d,\"retries\":%d}", (int)result, errors, retries);
+      snprintf_P(buffer, sizeof(buffer), PSTR("{\")percent\":100,\"result\":%d,\"errors\":%d,\"retries\":%d}"), (int)result, errors, retries);
   } else {
-      snprintf(buffer, sizeof(buffer), "{\"result\":%d,\"errors\":%d,\"retries\":%d}", (int)result, errors, retries);
+      snprintf_P(buffer, sizeof(buffer), PSTR("{\")result\":%d,\"errors\":%d,\"retries\":%d}"), (int)result, errors, retries);
   }
 #ifndef DISABLE_WEBSOCKET
   sendWebSocketJSON(buffer);
@@ -2101,7 +2101,7 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
 void fwupgradestep(int pct) {
   OTGWDebugTf(PSTR("Upgrade: %d%%\n\r"), pct);
   char buffer[32];
-  snprintf(buffer, sizeof(buffer), "{\"percent\":%d}", pct);
+  snprintf_P(buffer, sizeof(buffer), PSTR("{\")percent\":%d}"), pct);
 #ifndef DISABLE_WEBSOCKET
   sendWebSocketJSON(buffer);
 #endif
@@ -2212,7 +2212,7 @@ void upgradepic() {
   DebugTf(PSTR("Action: %s %s %s\r\n"), action.c_str(), filename.c_str(), version.c_str());
   
   if (action.isEmpty() || filename.isEmpty()) {
-    httpServer.send(400, "text/plain", "Missing action or name");
+    httpServer.send_P(400, PSTR("text/plain"), PSTR("Missing action or name"));
     return;
   }
 
@@ -2234,7 +2234,7 @@ void upgradepic() {
   } else if (action == "delete") {
     DebugTf(PSTR("Delete %s/%s\r\n"), sPICdeviceid, filename.c_str());
     char path[64];
-    snprintf(path, sizeof(path), "/%s/%s", sPICdeviceid, filename.c_str());
+    snprintf_P(path, sizeof(path), PSTR("/%s/%s"), sPICdeviceid, filename.c_str());
     LittleFS.remove(path);
     char *ext = strstr(path, ".hex");
     if (ext) {
@@ -2243,7 +2243,7 @@ void upgradepic() {
     }
   }
   httpServer.sendHeader("Location", "index.html#tabPICflash", true);
-  httpServer.send(303, "text/html", "<a href='index.html#tabPICflash'>Return</a>");
+  httpServer.send_P(303, PSTR("text/html"), PSTR("<a href='index.html#tabPICflash'>Return</a>"));
 }
 
 /***************************************************************************
