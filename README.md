@@ -110,9 +110,12 @@ This firmware provides multiple ways to connect and interact with your OpenTherm
 | Port | Protocol | Purpose | Usage |
 |------|----------|---------|-------|
 | 80 | HTTP | Web Interface & REST API | Access the configuration interface at `http://<ip>` |
+| 81 | WebSocket | Live OpenTherm Log Streaming | Real-time OT message viewer in Web UI (internal use) |
 | 23 | Telnet | Debug & Logging | Connect for real-time debugging: `telnet <ip>` |
 | 25238 | Serial over TCP | OTGW Serial Interface | For OTmonitor app or Home Assistant OpenTherm Gateway integration: `socket://<ip>:25238` |
 | MQTT | MQTT | Home Automation Integration | Recommended for Home Assistant (auto-discovery enabled) |
+
+**Note:** WebSocket port 81 is unauthenticated and intended for local network use only. Do not expose it to the internet.
 
 The firmware also exposes a Wi-Fi configuration portal (AP mode) when it cannot connect to a saved network.
 Use it to set up Wi-Fi credentials and reboot into normal STA mode.
