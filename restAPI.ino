@@ -618,12 +618,12 @@ void postSettings()
 	        uint8_t wc = splitString(wPair[i], ':',  wOut, 5) ;
 	        //RESTDebugTf(PSTR("==> [%s] -> field[%s]->val[%s]\r\n"), wPair[i], wOut[0], wOut[1]);
 	        if (wc>1) {
-	            if (wOut[0] && strcasecmp(wOut[0], "name") == 0) {
+	            if (wOut[0] && strcasecmp_P(wOut[0], PSTR("name")) == 0) {
 	              if (wOut[1] && (strlen(wOut[1]) < (sizeof(field) - 1))) {
 	                strlcpy(field, wOut[1], sizeof(field));
 	              }
 	            }
-	            else if (wOut[0] && strcasecmp(wOut[0], "value") == 0) {
+	            else if (wOut[0] && strcasecmp_P(wOut[0], PSTR("value")) == 0) {
 	              if (wOut[1] && (strlen(wOut[1]) < (sizeof(newValue) - 1))) {
 	                strlcpy(newValue, wOut[1], sizeof(newValue));
 	              }

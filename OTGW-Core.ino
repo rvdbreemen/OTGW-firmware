@@ -1743,61 +1743,61 @@ void processOT(const char *buf, int len){
     checkOTGWcmdqueue(buf, len);
     Debugln(buf);
     sendMQTTData(F("event_report"), buf);
-  } else if (strcmp(buf, "NG") == 0) {
+  } else if (strcmp_P(buf, PSTR("NG")) == 0) {
     Debugln(F("NG - No Good. The command code is unknown."));
     sendMQTTData(F("event_report"), F("NG - No Good. The command code is unknown."));
-  } else if (strcmp(buf, "SE") == 0) {
+  } else if (strcmp_P(buf, PSTR("SE")) == 0) {
     Debugln(F("SE - Syntax Error. The command contained an unexpected character or was incomplete."));
     sendMQTTData(F("event_report"), F("SE - Syntax Error. The command contained an unexpected character or was incomplete."));
-  } else if (strcmp(buf, "BV") == 0) {
+  } else if (strcmp_P(buf, PSTR("BV")) == 0) {
     Debugln(F("BV - Bad Value. The command contained a data value that is not allowed."));
     sendMQTTData(F("event_report"), F("BV - Bad Value. The command contained a data value that is not allowed."));
-  } else if (strcmp(buf, "OR") == 0) {
+  } else if (strcmp_P(buf, PSTR("OR")) == 0) {
     Debugln(F("OR - Out of Range. A number was specified outside of the allowed range."));
     sendMQTTData(F("event_report"), F("OR - Out of Range. A number was specified outside of the allowed range."));
-  } else if (strcmp(buf, "NS") == 0) {
+  } else if (strcmp_P(buf, PSTR("NS")) == 0) {
     Debugln(F("NS - No Space. The alternative Data-ID could not be added because the table is full."));
     sendMQTTData(F("event_report"), F("NS - No Space. The alternative Data-ID could not be added because the table is full."));
-  } else if (strcmp(buf, "NF") == 0) {
+  } else if (strcmp_P(buf, PSTR("NF")) == 0) {
     Debugln(F("NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table."));
     sendMQTTData(F("event_report"), F("NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table."));
-  } else if (strcmp(buf, "OE") == 0) {
+  } else if (strcmp_P(buf, PSTR("OE")) == 0) {
     Debugln(F("OE - Overrun Error. The processor was busy and failed to process all received characters."));
     sendMQTTData(F("event_report"), F("OE - Overrun Error. The processor was busy and failed to process all received characters."));
-  } else if (strcmp(buf, "Thermostat disconnected") == 0) {
+  } else if (strcmp_P(buf, PSTR("Thermostat disconnected")) == 0) {
     Debugln(F("Thermostat disconnected"));
     sendMQTTData(F("event_report"), F("Thermostat disconnected"));
-  } else if (strcmp(buf, "Thermostat connected") == 0) {
+  } else if (strcmp_P(buf, PSTR("Thermostat connected")) == 0) {
     Debugln(F("Thermostat connected"));
     sendMQTTData(F("event_report"), F("Thermostat connected"));
-  } else if (strcmp(buf, "Low power") == 0) {
+  } else if (strcmp_P(buf, PSTR("Low power")) == 0) {
     Debugln(F("Low power"));
     sendMQTTData(F("event_report"), F("Low power"));
-  } else if (strcmp(buf, "Medium power") == 0) {
+  } else if (strcmp_P(buf, PSTR("Medium power")) == 0) {
     Debugln(F("Medium power"));
     sendMQTTData(F("event_report"), F("Medium power"));
-  } else if (strcmp(buf, "High power") == 0) {
+  } else if (strcmp_P(buf, PSTR("High power")) == 0) {
     Debugln(F("High power"));
     sendMQTTData(F("event_report"), F("High power"));
-  } else if (strstr(buf, "\r\nError 01")!= NULL) {
+  } else if (strstr_P(buf, PSTR("\r\nError 01"))!= NULL) {
     char errorBuf[12];
     OTcurrentSystemState.error01++;
     OTGWDebugTf(PSTR("\r\nError 01 = %d\r\n"),OTcurrentSystemState.error01);
     snprintf_P(errorBuf, sizeof(errorBuf), PSTR("%u"), OTcurrentSystemState.error01);
     sendMQTTData(F("Error 01"), errorBuf);
-  } else if (strstr(buf, "Error 02")!= NULL) {
+  } else if (strstr_P(buf, PSTR("Error 02"))!= NULL) {
     char errorBuf[12];
     OTcurrentSystemState.error02++;
     OTGWDebugTf(PSTR("\r\nError 02 = %d\r\n"),OTcurrentSystemState.error02);
     snprintf_P(errorBuf, sizeof(errorBuf), PSTR("%u"), OTcurrentSystemState.error02);
     sendMQTTData(F("Error 02"), errorBuf);
-  } else if (strstr(buf, "Error 03")!= NULL) {
+  } else if (strstr_P(buf, PSTR("Error 03"))!= NULL) {
     char errorBuf[12];
     OTcurrentSystemState.error03++;
     OTGWDebugTf(PSTR("\r\nError 03 = %d\r\n"),OTcurrentSystemState.error03);
     snprintf_P(errorBuf, sizeof(errorBuf), PSTR("%u"), OTcurrentSystemState.error03);
     sendMQTTData(F("Error 03"), errorBuf);
-  } else if (strstr(buf, "Error 04")!= NULL){
+  } else if (strstr_P(buf, PSTR("Error 04"))!= NULL){
     char errorBuf[12];
     OTcurrentSystemState.error04++;
     OTGWDebugTf(PSTR("\r\nError 04 = %d\r\n"),OTcurrentSystemState.error04);
@@ -1905,11 +1905,11 @@ void handleOTGW()
       sWrite[bytes_write] = 0;
       OTGWDebugTf(PSTR("Net2Ser: Sending to OTGW: [%s] (%d)\r\n"), sWrite, bytes_write);
       //check for reset command
-      if (strcmp(sWrite, "GW=R")==0){
+      if (strcmp_P(sWrite, PSTR("GW=R"))==0){
         //detected [GW=R], then reset the gateway the gpio way
         OTGWDebugTln(F("Detected: GW=R. Reset gateway command executed."));
         resetOTGW();
-      } else if (strcasecmp(sWrite, "PS=1")==0) {
+      } else if (strcasecmp_P(sWrite, PSTR("PS=1"))==0) {
         //detected [PS=1], then PrintSummary mode = true --> From this point on you need to ask for summary.
         bPSmode = true;
         //reset all msglastupdated in webui
@@ -1917,7 +1917,7 @@ void handleOTGW()
           msglastupdated[i] = 0; //clear epoch values
         }
         strlcpy(sMessage, "PS=1 mode; No UI updates.", sizeof(sMessage));
-      } else if (strcasecmp(sWrite, "PS=0")==0) {
+      } else if (strcasecmp_P(sWrite, PSTR("PS=0"))==0) {
         //detected [PS=0], then PrintSummary mode = OFF --> Raw mode is turned on again.
         bPSmode = false;
         sMessage[0] = '\0';
