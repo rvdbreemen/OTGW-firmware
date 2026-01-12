@@ -340,7 +340,7 @@ if (!settingNTPenable) return;
         TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
         if (myTz.isError()){
           DebugTf(PSTR("Error: Timezone Invalid/Not Found: [%s]\r\n"), CSTR(settingNTPtimezone));
-          settingNTPtimezone = NTP_DEFAULT_TIMEZONE;
+          strlcpy(settingNTPtimezone, NTP_DEFAULT_TIMEZONE, sizeof(settingNTPtimezone));
           myTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone)); //try with default Timezone instead
         } else {
           //found the timezone, now set the time 
