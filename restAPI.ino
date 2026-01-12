@@ -441,40 +441,40 @@ void sendOTmonitor()
 //=======================================================================
 void sendDeviceInfo() 
 {
-  sendStartJsonObj("devinfo");
+  sendStartJsonObj(F("devinfo"));
 
-  sendNestedJsonObj("author", "Robert van den Breemen");
-  sendNestedJsonObj("fwversion", _SEMVER_FULL);
-  sendNestedJsonObj("picavailable", CBOOLEAN(bPICavailable));
-  sendNestedJsonObj("picfwversion", sPICfwversion);
-  sendNestedJsonObj("picdeviceid", sPICdeviceid);
-  sendNestedJsonObj("picfwtype", sPICtype);
+  sendNestedJsonObj(F("author"), F("Robert van den Breemen"));
+  sendNestedJsonObj(F("fwversion"), _SEMVER_FULL);
+  sendNestedJsonObj(F("picavailable"), CBOOLEAN(bPICavailable));
+  sendNestedJsonObj(F("picfwversion"), sPICfwversion);
+  sendNestedJsonObj(F("picdeviceid"), sPICdeviceid);
+  sendNestedJsonObj(F("picfwtype"), sPICtype);
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
-  sendNestedJsonObj("compiled", cMsg);
-  sendNestedJsonObj("hostname", CSTR(settingHostname));
-  sendNestedJsonObj("ipaddress", CSTR(WiFi.localIP().toString()));
-  sendNestedJsonObj("macaddress", CSTR(WiFi.macAddress()));
-  sendNestedJsonObj("freeheap", ESP.getFreeHeap());
-  sendNestedJsonObj("maxfreeblock", ESP.getMaxFreeBlockSize());
-  sendNestedJsonObj("chipid", CSTR(String( ESP.getChipId(), HEX )));
-  sendNestedJsonObj("coreversion", CSTR(ESP.getCoreVersion()) );
-  sendNestedJsonObj("sdkversion",  ESP.getSdkVersion());
-  sendNestedJsonObj("cpufreq", ESP.getCpuFreqMHz());
-  sendNestedJsonObj("sketchsize", ESP.getSketchSize() );
-  sendNestedJsonObj("freesketchspace",  ESP.getFreeSketchSpace() );
+  sendNestedJsonObj(F("compiled"), cMsg);
+  sendNestedJsonObj(F("hostname"), CSTR(settingHostname));
+  sendNestedJsonObj(F("ipaddress"), CSTR(WiFi.localIP().toString()));
+  sendNestedJsonObj(F("macaddress"), CSTR(WiFi.macAddress()));
+  sendNestedJsonObj(F("freeheap"), ESP.getFreeHeap());
+  sendNestedJsonObj(F("maxfreeblock"), ESP.getMaxFreeBlockSize());
+  sendNestedJsonObj(F("chipid"), CSTR(String( ESP.getChipId(), HEX )));
+  sendNestedJsonObj(F("coreversion"), CSTR(ESP.getCoreVersion()) );
+  sendNestedJsonObj(F("sdkversion"),  ESP.getSdkVersion());
+  sendNestedJsonObj(F("cpufreq"), ESP.getCpuFreqMHz());
+  sendNestedJsonObj(F("sketchsize"), ESP.getSketchSize() );
+  sendNestedJsonObj(F("freesketchspace"),  ESP.getFreeSketchSpace() );
 
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%08X"), ESP.getFlashChipId());
-  sendNestedJsonObj("flashchipid", cMsg);  // flashChipId
-  sendNestedJsonObj("flashchipsize", (ESP.getFlashChipSize() / 1024.0f / 1024.0f));
-  sendNestedJsonObj("flashchiprealsize", (ESP.getFlashChipRealSize() / 1024.0f / 1024.0f));
+  sendNestedJsonObj(F("flashchipid"), cMsg);  // flashChipId
+  sendNestedJsonObj(F("flashchipsize"), (ESP.getFlashChipSize() / 1024.0f / 1024.0f));
+  sendNestedJsonObj(F("flashchiprealsize"), (ESP.getFlashChipRealSize() / 1024.0f / 1024.0f));
 
   LittleFS.info(LittleFSinfo);
-  sendNestedJsonObj("LittleFSsize", floorf((LittleFSinfo.totalBytes / (1024.0f * 1024.0f))));
+  sendNestedJsonObj(F("LittleFSsize"), floorf((LittleFSinfo.totalBytes / (1024.0f * 1024.0f))));
 
-  sendNestedJsonObj("flashchipspeed", floorf((ESP.getFlashChipSpeed() / 1000.0f / 1000.0f)));
+  sendNestedJsonObj(F("flashchipspeed"), floorf((ESP.getFlashChipSpeed() / 1000.0f / 1000.0f)));
 
   FlashMode_t ideMode = ESP.getFlashChipMode();
-  sendNestedJsonObj("flashchipmode", flashMode[ideMode]);
+  sendNestedJsonObj(F("flashchipmode"), flashMode[ideMode]);
 //   sendNestedJsonObj("boardtype",
 // #if defined(ARDUINO_ESP8266_NODEMCU)
 //      "ESP8266_NODEMCU"
@@ -491,24 +491,25 @@ void sendDeviceInfo()
 // #endif
 
 //   );
-  sendNestedJsonObj("ssid", CSTR(WiFi.SSID()));
-  sendNestedJsonObj("wifirssi", WiFi.RSSI());
-  sendNestedJsonObj("wifiquality", signal_quality_perc_quad(WiFi.RSSI()));
-  sendNestedJsonObj("wifiqualitytldr", dBmtoQuality(WiFi.RSSI()));
-  sendNestedJsonObj("ntpenable", String(CBOOLEAN(settingNTPenable)));
-  sendNestedJsonObj("ntptimezone", CSTR(settingNTPtimezone));
-  sendNestedJsonObj("uptime", upTime());
-  sendNestedJsonObj("lastreset", lastReset);
-  sendNestedJsonObj("bootcount", rebootCount);
-  sendNestedJsonObj("mqttconnected", String(CBOOLEAN(statusMQTTconnection)));
-  sendNestedJsonObj("thermostatconnected", CBOOLEAN(bOTGWthermostatstate));
-  sendNestedJsonObj("boilerconnected", CBOOLEAN(bOTGWboilerstate));      
-  sendNestedJsonObj("gatewaymode", CBOOLEAN(bOTGWgatewaystate));      
-  sendNestedJsonObj("otgwconnected", CBOOLEAN(bOTGWonline));
+  sendNestedJsonObj(F("ssid"), CSTR(WiFi.SSID()));
+  sendNestedJsonObj(F("wifirssi"), WiFi.RSSI());
+  sendNestedJsonObj(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
+  sendNestedJsonObj(F("wifiqualitytldr"), dBmtoQuality(WiFi.RSSI()));
+  sendNestedJsonObj(F("ntpenable"), String(CBOOLEAN(settingNTPenable)));
+  sendNestedJsonObj(F("ntptimezone"), CSTR(settingNTPtimezone));
+  sendNestedJsonObj(F("uptime"), upTime());
+  sendNestedJsonObj(F("lastreset"), lastReset);
+  sendNestedJsonObj(F("bootcount"), rebootCount);
+  sendNestedJsonObj(F("mqttconnected"), String(CBOOLEAN(statusMQTTconnection)));
+  sendNestedJsonObj(F("thermostatconnected"), CBOOLEAN(bOTGWthermostatstate));
+  sendNestedJsonObj(F("boilerconnected"), CBOOLEAN(bOTGWboilerstate));      
+  sendNestedJsonObj(F("gatewaymode"), CBOOLEAN(bOTGWgatewaystate));      
+  sendNestedJsonObj(F("otgwconnected"), CBOOLEAN(bOTGWonline));
   
-  sendEndJsonObj("devinfo");
+  sendEndJsonObj(F("devinfo"));
 
 } // sendDeviceInfo()
+
 
 
 //=======================================================================
@@ -516,17 +517,17 @@ void sendDeviceTime()
 {
   char buf[50];
   
-  sendStartJsonObj("devtime");
+  sendStartJsonObj(F("devtime"));
   time_t now = time(nullptr);
   //Timezone based devtime
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
   snprintf(buf, 49, PSTR("%04d-%02d-%02d %02d:%02d:%02d"), myTime.year(), myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second());
-  sendNestedJsonObj("dateTime", buf); 
-  sendNestedJsonObj("epoch", (int)now);
-  sendNestedJsonObj("message", sMessage);
+  sendNestedJsonObj(F("dateTime"), buf); 
+  sendNestedJsonObj(F("epoch"), (int)now);
+  sendNestedJsonObj(F("message"), sMessage);
 
-  sendEndJsonObj("devtime");
+  sendEndJsonObj(F("devtime"));
 
 } // sendDeviceTime()
 
@@ -535,51 +536,51 @@ void sendDeviceSettings()
 {
   RESTDebugTln(F("sending device settings ...\r"));
 
-  sendStartJsonObj("settings");
+  sendStartJsonObj(F("settings"));
 
   //sendJsonSettingObj("string",   settingString,   "p", sizeof(settingString)-1);  
   //sendJsonSettingObj("string",   settingString,   "s", sizeof(settingString)-1);
   //sendJsonSettingObj("float",    settingFloat,    "f", 0, 10,  5);
   //sendJsonSettingObj("intager",  settingInteger , "i", 2, 60);
 
-  sendJsonSettingObj("hostname", CSTR(settingHostname), "s", 32);
-  sendJsonSettingObj("mqttenable", settingMQTTenable, "b");
-  sendJsonSettingObj("mqttbroker", CSTR(settingMQTTbroker), "s", 32);
-  sendJsonSettingObj("mqttbrokerport", settingMQTTbrokerPort, "i", 0, 65535);
-  sendJsonSettingObj("mqttuser", CSTR(settingMQTTuser), "s", 32);
-  sendJsonSettingObj("mqttpasswd", "notthepassword", "p", 100);
-  sendJsonSettingObj("mqtttoptopic", CSTR(settingMQTTtopTopic), "s", 15);
-  sendJsonSettingObj("mqtthaprefix", CSTR(settingMQTThaprefix), "s", 20);
-  sendJsonSettingObj("mqttharebootdetection", settingMQTTharebootdetection, "b");
-  sendJsonSettingObj("mqttuniqueid", CSTR(settingMQTTuniqueid), "s", 20);
-  sendJsonSettingObj("mqttotmessage", settingMQTTOTmessage, "b");
-  sendJsonSettingObj("ntpenable", settingNTPenable, "b");
-  sendJsonSettingObj("ntptimezone", CSTR(settingNTPtimezone), "s", 50);
-  sendJsonSettingObj("ntphostname", CSTR(settingNTPhostname), "s", 50);
-  sendJsonSettingObj("ntpsendtime", settingNTPsendtime, "b");
-  sendJsonSettingObj("ledblink", settingLEDblink, "b");
-  sendJsonSettingObj("darktheme", settingDarkTheme, "b");
-  sendJsonSettingObj("ui_autoscroll", settingUIAutoScroll, "b");
-  sendJsonSettingObj("ui_timestamps", settingUIShowTimestamp, "b");
-  sendJsonSettingObj("ui_capture", settingUICaptureMode, "b");
-  sendJsonSettingObj("ui_autoscreenshot", settingUIAutoScreenshot, "b");
-  sendJsonSettingObj("ui_autodownloadlog", settingUIAutoDownloadLog, "b");
-  sendJsonSettingObj("ui_graphtimewindow", settingUIGraphTimeWindow, "i", 0, 1440);
-  sendJsonSettingObj("gpiosensorsenabled", settingGPIOSENSORSenabled, "b");
-  sendJsonSettingObj("gpiosensorspin", settingGPIOSENSORSpin, "i", 0, 16);
-  sendJsonSettingObj("gpiosensorsinterval", settingGPIOSENSORSinterval, "i", 5, 65535);
-  sendJsonSettingObj("s0counterenabled", settingS0COUNTERenabled, "b");
-  sendJsonSettingObj("s0counterpin", settingS0COUNTERpin, "i", 1, 16);
-  sendJsonSettingObj("s0counterdebouncetime", settingS0COUNTERdebouncetime, "i", 0, 1000);
-  sendJsonSettingObj("s0counterpulsekw", settingS0COUNTERpulsekw, "i", 1, 5000);
-  sendJsonSettingObj("s0counterinterval", settingS0COUNTERinterval, "i", 5, 65535);
-  sendJsonSettingObj("gpiooutputsenabled", settingGPIOOUTPUTSenabled, "b");
-  sendJsonSettingObj("gpiooutputspin", settingGPIOOUTPUTSpin, "i", 0, 16);
-  sendJsonSettingObj("gpiooutputstriggerbit", settingGPIOOUTPUTStriggerBit, "i", 0,16);
-  sendJsonSettingObj("otgwcommandenable", settingOTGWcommandenable, "b");
-  sendJsonSettingObj("otgwcommands", CSTR(settingOTGWcommands), "s", 128);
+  sendJsonSettingObj(F("hostname"), CSTR(settingHostname), "s", 32);
+  sendJsonSettingObj(F("mqttenable"), settingMQTTenable, "b");
+  sendJsonSettingObj(F("mqttbroker"), CSTR(settingMQTTbroker), "s", 32);
+  sendJsonSettingObj(F("mqttbrokerport"), settingMQTTbrokerPort, "i", 0, 65535);
+  sendJsonSettingObj(F("mqttuser"), CSTR(settingMQTTuser), "s", 32);
+  sendJsonSettingObj(F("mqttpasswd"), "notthepassword", "p", 100);
+  sendJsonSettingObj(F("mqtttoptopic"), CSTR(settingMQTTtopTopic), "s", 15);
+  sendJsonSettingObj(F("mqtthaprefix"), CSTR(settingMQTThaprefix), "s", 20);
+  sendJsonSettingObj(F("mqttharebootdetection"), settingMQTTharebootdetection, "b");
+  sendJsonSettingObj(F("mqttuniqueid"), CSTR(settingMQTTuniqueid), "s", 20);
+  sendJsonSettingObj(F("mqttotmessage"), settingMQTTOTmessage, "b");
+  sendJsonSettingObj(F("ntpenable"), settingNTPenable, "b");
+  sendJsonSettingObj(F("ntptimezone"), CSTR(settingNTPtimezone), "s", 50);
+  sendJsonSettingObj(F("ntphostname"), CSTR(settingNTPhostname), "s", 50);
+  sendJsonSettingObj(F("ntpsendtime"), settingNTPsendtime, "b");
+  sendJsonSettingObj(F("ledblink"), settingLEDblink, "b");
+  sendJsonSettingObj(F("darktheme"), settingDarkTheme, "b");
+  sendJsonSettingObj(F("ui_autoscroll"), settingUIAutoScroll, "b");
+  sendJsonSettingObj(F("ui_timestamps"), settingUIShowTimestamp, "b");
+  sendJsonSettingObj(F("ui_capture"), settingUICaptureMode, "b");
+  sendJsonSettingObj(F("ui_autoscreenshot"), settingUIAutoScreenshot, "b");
+  sendJsonSettingObj(F("ui_autodownloadlog"), settingUIAutoDownloadLog, "b");
+  sendJsonSettingObj(F("ui_graphtimewindow"), settingUIGraphTimeWindow, "i", 0, 1440);
+  sendJsonSettingObj(F("gpiosensorsenabled"), settingGPIOSENSORSenabled, "b");
+  sendJsonSettingObj(F("gpiosensorspin"), settingGPIOSENSORSpin, "i", 0, 16);
+  sendJsonSettingObj(F("gpiosensorsinterval"), settingGPIOSENSORSinterval, "i", 5, 65535);
+  sendJsonSettingObj(F("s0counterenabled"), settingS0COUNTERenabled, "b");
+  sendJsonSettingObj(F("s0counterpin"), settingS0COUNTERpin, "i", 1, 16);
+  sendJsonSettingObj(F("s0counterdebouncetime"), settingS0COUNTERdebouncetime, "i", 0, 1000);
+  sendJsonSettingObj(F("s0counterpulsekw"), settingS0COUNTERpulsekw, "i", 1, 5000);
+  sendJsonSettingObj(F("s0counterinterval"), settingS0COUNTERinterval, "i", 5, 65535);
+  sendJsonSettingObj(F("gpiooutputsenabled"), settingGPIOOUTPUTSenabled, "b");
+  sendJsonSettingObj(F("gpiooutputspin"), settingGPIOOUTPUTSpin, "i", 0, 16);
+  sendJsonSettingObj(F("gpiooutputstriggerbit"), settingGPIOOUTPUTStriggerBit, "i", 0, 16);
+  sendJsonSettingObj(F("otgwcommandenable"), settingOTGWcommandenable, "b");
+  sendJsonSettingObj(F("otgwcommands"), CSTR(settingOTGWcommands), "s", 128);
 
-  sendEndJsonObj("settings");
+  sendEndJsonObj(F("settings"));
 
 } // sendDeviceSettings()
 
