@@ -80,8 +80,8 @@ This approach balances real-time logging with system performance, ensuring your 
 The system automatically creates a new log file each day:
 
 *   **Naming Convention:** Files are named `ot-monitor-DD-MM-YYYY.log` (e.g., `ot-monitor-12-01-2026.log`)
-*   **Midnight Check:** Every minute, the system checks if the date has changed
-*   **Graceful Transition:** When midnight is detected, the current queue is flushed, the old file is closed, and a new file is opened
+*   **Date Change Check:** Every minute, the system checks if the date has changed since the last check
+*   **Graceful Transition:** When a date change is detected (typically at midnight), the current queue is flushed, the old file is closed, and a new file is opened
 *   **Session Markers:** Each new file starts with a "Start of logging" marker for easy identification
 
 #### Memory vs. Streaming
@@ -104,8 +104,8 @@ The File System Access API is a modern web standard with growing but not univers
 | Chrome  | ✅ Yes (v86+)  | ❌ No          | Full support |
 | Edge    | ✅ Yes (v86+)  | ❌ No          | Full support (Chromium-based) |
 | Opera   | ✅ Yes         | ❌ No          | Full support (Chromium-based) |
-| Safari  | 🔶 Partial (v15.2+) | ❌ No     | Basic support, may have limitations |
-| Firefox | ⏳ In Development | ❌ No      | Not yet available (as of Jan 2026) |
+| Safari  | 🔶 Limited (v15.2+) | ❌ No     | Experimental support - may require enabling feature flags |
+| Firefox | ⏳ In Development | ❌ No      | Not yet available in current versions |
 
 **For unsupported browsers:** The "Stream to File" checkbox will be disabled, and you'll see a tooltip explaining why. You can still use the **Download** button to save logs manually.
 
