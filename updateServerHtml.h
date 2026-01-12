@@ -20,7 +20,9 @@ static const char UpdateServerIndex[] PROGMEM =
         #updatePanel { margin-top: 10px; padding: 10px; background: #e8f4ff; border: 1px solid #7aaad6; max-width: 520px; color: black; }
         html.dark #updatePanel { background: #333; border: 1px solid #555; color: white; }
         
-        #updateProgress { width: 100%; height: 18px; }
+        progress { width: 100%; height: 18px; }
+        .progress-section { margin-bottom: 8px; }
+        
         #updateError { color: #b00020; font-weight: bold; }
         html.dark #updateError { color: #ff5555; }
         .small { font-size: 0.9em; }
@@ -58,10 +60,21 @@ static const char UpdateServerIndex[] PROGMEM =
        <h2 id='progressTitle'>Flashing in progress</h2>
        <div id='updatePanel'>
          <div >File: <span id='updateFilename'>-</span></div>
-         <div >Flashing: <span id='updateTarget'>-</span></div>
-         <div id='updateStatus'>Status: idle</div>
-         <progress id='updateProgress' value='0' max='100'></progress>
+         <div >Target: <span id='updateTarget'>-</span></div>
+         
+         <div class="progress-section">
+            <div>Uploading: <span id='uploadInfo'>Waiting...</span></div>
+            <progress id='uploadProgress' value='0' max='100'></progress>
+         </div>
+         
+         <div class="progress-section">
+            <div>Flashing: <span id='flashInfo'>Waiting...</span></div>
+            <progress id='flashProgress' value='0' max='100'></progress>
+         </div>
+
+         <div id='updateStatus' style='display:none'>Status: idle</div>
          <div id='updateError'></div>
+         <button id='retryButton' onclick='retryFlash()' style='display:none; margin-top: 10px; background-color: #d32f2f; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-weight: bold;'>Try Again</button>
          <div id='successPanel' class='small' style='display: none; border-top: 1px solid #ccc; margin-top: 10px; padding-top: 5px;'>
            <div id='successMessage'>Flashing successful. Rebooting device...</div>
            <div>Wait <span id='successCountdown'>60</span> seconds. <a id='successLink' href='/'>Go back to main page</a></div>
@@ -76,7 +89,12 @@ static const char UpdateServerIndex[] PROGMEM =
            if (window.opener && typeof window.opener.enterFlashMode === 'function') {
              window.opener.enterFlashMode();
            }
-           // Also set sessionStorage flag for cross-page communication
+         
+         var uploadProgressEl = document.getElementById('uploadProgress');
+         var flashProgressEl = document.getElementById('flashProgress');
+         var uploadInfoEl = document.getElementById('uploadInfo');
+         var flashInfoEl = document.getElementById('flashInfo');
+ion
            sessionStorage.setItem('flashMode', 'true');
          } catch(e) { console.log('Could not signal flash mode:', e); }
 
@@ -91,9 +109,10 @@ static const char UpdateServerIndex[] PROGMEM =
          var successPanel = document.getElementById('successPanel');
          var successMessageEl = document.getElementById('successMessage');
          var successCountdownEl = document.getElementById('successCountdown');
+         var retryBtn = document.getElementById('retryButton');
         var pollTimer = null;
-        var pollIntervalMs = 100;
-        var pollMinMs = 100;
+        var pollIntervalMs = 500;
+        var pollMinMs = 500;
         var pollMaxMs = 3000;
         var pollInFlight = false;
         var pollActive = false;
@@ -108,8 +127,20 @@ static const char UpdateServerIndex[] PROGMEM =
          function showProgressPage(title) {
            pageForm.style.display = 'none';
            pageProgress.style.display = 'block';
+           if (retryBtn) retryBtn.style.display = 'none';
            if (title) progressTitle.textContent = title;
          }
+
+         window.retryFlash = function() {
+            pageProgress.style.display = 'none';
+            pageForm.style.display = 'block';
+            if (retryBtn) retryBtn.style.display = 'none';
+            if (errorEl) errorEl.textContent = '';
+            if (formErrorEl) formErrorEl.textContent = '';
+            uploadInFlight = false;
+            localUploadDone = false;
+            startPolling(); // Restart polling in case status is waiting
+         };
 
          function formatBytes(bytes) {
            if (!bytes || bytes < 0) return '0 B';
@@ -118,24 +149,36 @@ static const char UpdateServerIndex[] PROGMEM =
            return (bytes / 1024 / 1024).toFixed(2) + ' MB';
          }
 
-         function setProgress(loaded, total, label) {
+         function setUploadProgress(loaded, total) {
            var pct = 0;
+           if (total > 0) pct = Math.round((loaded / total) * 100);
+           if (pct > 100) pct = 100;
+           
            if (total > 0) {
-             pct = Math.round((loaded / total) * 100);
-             if (pct > 100) pct = 100;
-             if (!progressEl.hasAttribute('value')) {
-               progressEl.setAttribute('value', '0');
-             }
-             progressEl.value = pct;
+              uploadProgressEl.value = pct;
+              if (uploadInfoEl) {
+                 uploadInfoEl.textContent = pct + '% (' + formatBytes(loaded) + ' / ' + formatBytes(total) + ')';
+              }
            } else {
-             if (progressEl.hasAttribute('value')) {
-               progressEl.removeAttribute('value');
-             }
-           }
-           if (statusEl) {
-             statusEl.textContent = label + ' ' + (total > 0 ? (pct + '%') : '?') + ' (' + formatBytes(loaded) + ' / ' + (total > 0 ? formatBytes(total) : '?') + ')';
+              if (uploadInfoEl) uploadInfoEl.textContent = formatBytes(loaded);
            }
          }
+
+         function setFlashProgress(loaded, total) {
+           var pct = 0;
+           if (total > 0) pct = Math.round((loaded / total) * 100);
+           if (pct > 100) pct = 100;
+           
+           if (total > 0) {
+              flashProgressEl.value = pct;
+              if (flashInfoEl) {
+                 flashInfoEl.textContent = pct + '% (' + formatBytes(loaded) + ' / ' + formatBytes(total) + ')';
+              }
+           } else {
+              if (flashInfoEl) flashInfoEl.textContent = 'Waiting...';
+           }
+         }
+
 
         function startSuccessCountdown() {
           if (!successCountdownEl || successTimer) return;
@@ -206,35 +249,51 @@ static const char UpdateServerIndex[] PROGMEM =
            }
            var flashWritten = status.flash_written || status.received || 0;
            var flashTotal = status.flash_total || status.total || 0;
-           if (!uploadInFlight && flashWritten) {
-             setProgress(flashWritten, flashTotal, stateMap[state] || 'Flashing');
-           } else if (!uploadInFlight && state !== 'idle') {
+           
+           // Handle Flash Progress
+           if (state !== 'idle' && flashTotal > 0) {
+             localUploadDone = (state === 'end'); 
+             setFlashProgress(flashWritten, flashTotal);
+           }
+           
+           if (!uploadInFlight && state !== 'idle') {
              if (statusEl) statusEl.textContent = stateMap[state] || 'Flashing';
            } else if (!uploadInFlight && state === 'idle') {
              if (statusEl) statusEl.textContent = 'Status: idle';
            }
+
+           // Handle specific states
            if (state === 'end') {
-             progressTitle.textContent = 'Flashing finished';
-             successShown = true;
-             if (successPanel) successPanel.style.display = 'block';
-             startSuccessCountdown();
+             progressTitle.textContent = 'Flashing complete';
+             if (!successShown) {
+               successShown = true;
+               if (successPanel) successPanel.style.display = 'block';
+               if (successMessageEl) successMessageEl.textContent = 'Flashing successful. Rebooting device...';
+               startSuccessCountdown();
+             }
              stopPolling();
-             localUploadDone = false;
+             
            } else if (state === 'error') {
              progressTitle.textContent = 'Flashing error';
              successShown = false;
              if (successPanel) successPanel.style.display = 'none';
+             if (retryBtn) retryBtn.style.display = 'block';
              stopPolling();
              localUploadDone = false;
+             
            } else if (state === 'abort') {
              progressTitle.textContent = 'Flashing aborted';
              successShown = false;
              if (successPanel) successPanel.style.display = 'none';
+             if (retryBtn) retryBtn.style.display = 'block';
              stopPolling();
              localUploadDone = false;
+             
            } else {
+             // In progress (start, write)
              progressTitle.textContent = 'Flashing in progress';
              if (successPanel && !successShown) successPanel.style.display = 'none';
+             if (retryBtn) retryBtn.style.display = 'none';
            }
          }
 
@@ -302,6 +361,46 @@ static const char UpdateServerIndex[] PROGMEM =
           }
         }
 
+        // WebSocket Support for Real-time Progress
+        function setupWebSocket() {
+            var wsUrl = 'ws://' + window.location.hostname + ':81/';
+            console.log('Connecting to WebSocket:', wsUrl);
+            var ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function() {
+                console.log('WS Connected');
+            };
+            
+            ws.onmessage = function(e) {
+                try {
+                    // Try to parse JSON message 
+                    // (Log messages are plain text and will throw, which is fine)
+                    var msg = JSON.parse(e.data);
+                    // Check if it's an update status message
+                    if (msg && typeof msg.state !== 'undefined') {
+                        // Optimization: Stop HTTP polling if we are getting live updates via WS
+                        stopPolling();
+                        updateDeviceStatus(msg);
+                    }
+                } catch(err) {
+                    // Ignore non-JSON messages (like raw logs)
+                }
+            };
+            
+            ws.onerror = function(e) {
+                console.log('WS Error:', e);
+            };
+            
+            ws.onclose = function() {
+                // simple reconnect logic
+                if (window.location.hash !== '#done') { // Don't reconnect if we are done/navigating away
+                   console.log('WS Closed, retrying in 2s');
+                   setTimeout(setupWebSocket, 2000);
+                }
+            };
+        }
+        setupWebSocket();
+
 
          function initUploadForm(formId, targetName) {
            var form = document.getElementById(formId);
@@ -329,7 +428,13 @@ static const char UpdateServerIndex[] PROGMEM =
              showProgressPage('Flashing in progress');
              fileEl.textContent = input.files[0].name || '-';
              targetEl.textContent = targetName;
-             if (statusEl) statusEl.textContent = 'Uploading...';
+             
+             // Reset UI elements
+             uploadProgressEl.value = 0;
+             uploadInfoEl.textContent = 'Waiting...';
+             flashProgressEl.value = 0;
+             flashInfoEl.textContent = 'Waiting...';
+             
              errorEl.textContent = '';
              if (!window.FormData || !window.XMLHttpRequest) {
                return;
@@ -366,43 +471,33 @@ static const char UpdateServerIndex[] PROGMEM =
                var total = ev.lengthComputable ? ev.total : 0;
                lastUploadLoaded = ev.loaded;
                lastUploadTotal = total;
-               setProgress(ev.loaded, total, 'Uploading');
-               if (total > 0) {
-                 var pct = Math.round((ev.loaded / total) * 100);
-                 if (pct >= 100) {
-                   if (statusEl) statusEl.textContent = 'Upload complete. Waiting for flash...';
-                 } else {
-                   if (statusEl) statusEl.textContent = 'Uploading ' + pct + '% (' + formatBytes(ev.loaded) + ' / ' + formatBytes(total) + ')';
-                 }
-               } else {
-                 if (statusEl) statusEl.textContent = 'Uploading ' + formatBytes(ev.loaded);
-               }
+               setUploadProgress(ev.loaded, total);
              };
              xhr.onload = function() {
                console.log('Upload finished, status:', xhr.status);
                if (xhr.status >= 200 && xhr.status < 300) {
                  var responseText = xhr.responseText || '';
                 if (responseText.indexOf('Flash error') !== -1) {
-                   if (statusEl) statusEl.textContent = 'Upload failed';
+                   // Status line remains hidden or used for error text
                    errorEl.textContent = responseText;
-                  progressTitle.textContent = 'Flashing error';
+                   progressTitle.textContent = 'Flashing error';
                    successShown = false;
                    if (successPanel) successPanel.style.display = 'none';
+                   if (retryBtn) retryBtn.style.display = 'block';
                  } else {
-                   if (statusEl) statusEl.textContent = 'Upload complete. Waiting for flash...';
+                   setUploadProgress(lastUploadTotal, lastUploadTotal); // Ensure 100%
                    localUploadDone = true;
                  }
                  uploadInFlight = false;
                } else {
-                 if (statusEl) statusEl.textContent = 'Upload failed';
                  errorEl.textContent = 'Upload failed: ' + xhr.status;
                  uploadInFlight = false;
                }
              };
              xhr.onerror = function() {
-               if (statusEl) statusEl.textContent = 'Upload error';
                errorEl.textContent = 'Upload error';
                uploadInFlight = false;
+               if (retryBtn) retryBtn.style.display = 'block';
              };
              xhr.send(new FormData(form));
            });

@@ -29,6 +29,7 @@
 #include "OTGW-ModUpdateServer.h"
 // External flag to track ESP flashing state
 extern bool isESPFlashing;
+extern void sendWebSocketJSON(const char *json);
 
 #ifndef Debug
   //#warning Debug() was not defined!
@@ -132,8 +133,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
 
       if(upload.status == UPLOAD_FILE_START){
         _updaterError.clear();
-        // if (_serial_output)
-        //   OTGWSerial.setDebugOutput(true);
+        if (_serial_output) Debugf("Upload Start: %s (size: %s)\r\n", upload.filename.c_str(), _server->arg("size").c_str());
 
         _authenticated = (_username == emptyString || _password == emptyString || _server->authenticate(_username.c_str(), _password.c_str()));
         if(!_authenticated){
@@ -219,6 +219,17 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         size_t written = Update.write(upload.buf, upload.currentSize);
         _status.upload_received = upload.totalSize;
         
+        // Manual Status Update for WebSockets/Progress
+        // Throttle updates to percentage changes to avoid flooding WebSockets
+        if (_status.flash_total > 0) {
+           _status.flash_written = _status.upload_received; // approximation based on upload
+           int currentPerc = (_status.flash_written * 100) / _status.flash_total;
+           if (currentPerc != _lastProgressPerc) {
+             _lastProgressPerc = currentPerc;
+             _setStatus(UPDATE_WRITE, _status.target, _status.flash_written, _status.flash_total, _status.filename, emptyString);
+           }
+        }
+
         if (written != upload.currentSize) {
           _setUpdaterError();
           _setStatus(UPDATE_ERROR, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, _updaterError);
@@ -339,6 +350,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_resetStatus()
 template <typename ServerType>
 void ESP8266HTTPUpdateServerTemplate<ServerType>::_setStatus(uint8_t phase, const String &target, size_t received, size_t total, const String &filename, const String &error)
 {
+  if (_serial_output) {
+      Debugf("Update Status: %s (recv: %u, total: %u)\r\n", _phaseToString(phase), received, total);
+  }
   _status.phase = static_cast<UpdatePhase>(phase);
   _status.target = target.length() ? target : "unknown";
   _status.received = received;
@@ -353,6 +367,35 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_setStatus(uint8_t phase, cons
   }
   _status.filename = filename;
   _status.error = error;
+
+  // Broadcast via WebSocket
+  // Use a static buffer to avoid stack overflow, but protect with interrupt disable? 
+  // No, we are in non-interrupt context usually. But strictly speaking static is not thread safe.
+  // Stack is better if size is reasonable. 512 bytes is okay for ESP8266 stack (4KB).
+  char buf[512];
+  char filenameEsc[64];
+  char errorEsc[96];
+  _jsonEscape(_status.filename, filenameEsc, sizeof(filenameEsc));
+  _jsonEscape(_status.error, errorEsc, sizeof(errorEsc));
+  int written = snprintf(
+    buf,
+    sizeof(buf),
+    "{\"state\":\"%s\",\"target\":\"%s\",\"received\":%u,\"total\":%u,\"upload_received\":%u,\"upload_total\":%u,\"flash_written\":%u,\"flash_total\":%u,\"filename\":\"%s\",\"error\":\"%s\"}",
+    _phaseToString(_status.phase),
+    _status.target.length() ? _status.target.c_str() : "unknown",
+    static_cast<unsigned>(_status.received),
+    static_cast<unsigned>(_status.total),
+    static_cast<unsigned>(_status.upload_received),
+    static_cast<unsigned>(_status.upload_total),
+    static_cast<unsigned>(_status.flash_written),
+    static_cast<unsigned>(_status.flash_total),
+    filenameEsc,
+    errorEsc
+  );
+  
+  if (written > 0 && written < (int)sizeof(buf)) {
+      sendWebSocketJSON(buf);
+  }
 }
 
 template <typename ServerType>
