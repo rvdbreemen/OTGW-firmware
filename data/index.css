@@ -312,8 +312,30 @@
 }
 
 .ot-graph-controls {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
     margin-bottom: 5px;
-    text-align: right;
+}
+
+.ot-graph-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Specific button style for graph controls */
+.ot-graph-controls .nav-item {
+    height: 25px;
+    width: auto;
+    font-size: 13px;
+    margin: 0;
+    line-height: 1; /* Ensure text is vertically centered */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .ot-graph-select {
