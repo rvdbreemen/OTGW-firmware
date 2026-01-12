@@ -486,7 +486,7 @@ function addLogLine(logLine) {
   };
 
   // Write to file stream if enabled
-  if (isStreamingToFile && fileWritableStream) {
+  if (isStreamingToFile) {
     writeToStream(logEntry);
   }
   
