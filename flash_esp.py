@@ -678,8 +678,15 @@ Examples:
   # Explicitly download and flash latest release
   python3 flash_esp.py --download
   
+  # Download and flash without prompts (automation)
+  python3 flash_esp.py --download --yes
+  python3 flash_esp.py --download -y
+  
   # Build locally and flash (developer mode)
   python3 flash_esp.py --build
+  
+  # Build and flash without prompts
+  python3 flash_esp.py --build --no-interactive
   
   # Flash specific firmware file (manual mode)
   python3 flash_esp.py --firmware build/OTGW-firmware.ino.bin
@@ -692,6 +699,9 @@ Examples:
   
   # Erase flash before flashing (recommended for first install)
   python3 flash_esp.py --erase
+  
+  # Full automation example
+  python3 flash_esp.py --download --port COM5 --erase --yes
   
 For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
 """
@@ -744,6 +754,12 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
         "--no-interactive",
         action="store_true",
         help="Disable interactive prompts (for automation)"
+    )
+    parser.add_argument(
+        "-y", "--yes",
+        action="store_true",
+        dest="no_interactive",
+        help="Same as --no-interactive, assume yes to all prompts"
     )
     
     args = parser.parse_args()
@@ -916,27 +932,30 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
         else:
             port = select_port(ports, default_port="/dev/ttyUSB0" if platform.system() == "Linux" else None)
     
-    # Confirm before flashing
+    # Show flash summary and confirm (unless --no-interactive)
+    print("\n" + "=" * 60)
+    print(f"{Colors.BOLD}Ready to flash:{Colors.ENDC}")
+    print(f"  Mode: {mode.upper()}")
+    if version_info:
+        print(f"  Version: {version_info}")
+    print(f"  Port: {port}")
+    if firmware_file:
+        print(f"  Firmware: {firmware_file}")
+    if filesystem_file:
+        print(f"  Filesystem: {filesystem_file}")
+    print(f"  Baud rate: {args.baud}")
+    if args.erase:
+        print(f"  {Colors.WARNING}Erase flash: Yes{Colors.ENDC}")
+    print("=" * 60)
+    
+    # Only ask for confirmation in interactive mode
     if not args.no_interactive:
-        print("\n" + "=" * 60)
-        print(f"{Colors.BOLD}Ready to flash:{Colors.ENDC}")
-        print(f"  Mode: {mode.upper()}")
-        if version_info:
-            print(f"  Version: {version_info}")
-        print(f"  Port: {port}")
-        if firmware_file:
-            print(f"  Firmware: {firmware_file}")
-        if filesystem_file:
-            print(f"  Filesystem: {filesystem_file}")
-        print(f"  Baud rate: {args.baud}")
-        if args.erase:
-            print(f"  {Colors.WARNING}Erase flash: Yes{Colors.ENDC}")
-        print("=" * 60)
-        
         confirm = input(f"\n{Colors.BOLD}Proceed with flashing? (y/N): {Colors.ENDC}").strip().lower()
         if confirm != 'y':
             print_info("Flashing cancelled.")
             sys.exit(0)
+    else:
+        print_info("\nStarting flash process (--no-interactive mode)...")
     
     # Flash the device
     success = flash_esp8266(
