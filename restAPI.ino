@@ -495,12 +495,12 @@ void sendDeviceInfo()
   sendNestedJsonObj(F("wifirssi"), WiFi.RSSI());
   sendNestedJsonObj(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
   sendNestedJsonObj(F("wifiqualitytldr"), dBmtoQuality(WiFi.RSSI()));
-  sendNestedJsonObj(F("ntpenable"), String(CBOOLEAN(settingNTPenable)));
+  sendNestedJsonObj(F("ntpenable"), CBOOLEAN(settingNTPenable));
   sendNestedJsonObj(F("ntptimezone"), CSTR(settingNTPtimezone));
   sendNestedJsonObj(F("uptime"), upTime());
   sendNestedJsonObj(F("lastreset"), lastReset);
   sendNestedJsonObj(F("bootcount"), rebootCount);
-  sendNestedJsonObj(F("mqttconnected"), String(CBOOLEAN(statusMQTTconnection)));
+  sendNestedJsonObj(F("mqttconnected"), CBOOLEAN(statusMQTTconnection));
   sendNestedJsonObj(F("thermostatconnected"), CBOOLEAN(bOTGWthermostatstate));
   sendNestedJsonObj(F("boilerconnected"), CBOOLEAN(bOTGWboilerstate));      
   sendNestedJsonObj(F("gatewaymode"), CBOOLEAN(bOTGWgatewaystate));      
