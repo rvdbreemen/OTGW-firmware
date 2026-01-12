@@ -50,6 +50,54 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
 - Be mindful of heap fragmentation - this is an ESP8266 with limited RAM
 - Prefer stack allocation for small, temporary buffers
 
+#### PROGMEM Usage (CRITICAL - ESP8266 Has Limited RAM)
+
+**MANDATORY**: All string literals MUST use `PROGMEM` to keep them in flash memory instead of RAM.
+
+- **Always use `F()` macro** for string literals passed to functions that support it:
+  ```cpp
+  DebugTln(F("Message"));           // GOOD
+  httpServer.send(200, F("text/html"), content);  // GOOD
+  ```
+
+- **Always use `PSTR()` macro** for string literals with printf-style functions:
+  ```cpp
+  DebugTf(PSTR("Value: %d\r\n"), value);  // GOOD
+  snprintf_P(buffer, size, PSTR("Format: %s"), str);  // GOOD
+  ```
+
+- **Always use `PROGMEM` keyword** for string constants and arrays:
+  ```cpp
+  const char myString[] PROGMEM = "Long string";  // GOOD
+  const char* const table[] PROGMEM = {str1, str2};  // GOOD
+  
+  // BAD - wastes RAM:
+  const char myString[] = "Long string";
+  const char Header[] = "HTTP/1.1 303 OK\r\n...";
+  ```
+
+- **Create function overloads** when existing functions don't support PROGMEM types:
+  - If a function only accepts `const char*`, create an overload accepting `const __FlashStringHelper*` or `PGM_P`
+  - Use `pgm_read_byte()` and related functions to read from PROGMEM
+  - **Never** copy PROGMEM strings to RAM buffers just to call a function - create the overload instead
+  
+  Example:
+  ```cpp
+  // Original function
+  void sendData(const char* data) { /* ... */ }
+  
+  // Add PROGMEM overload
+  void sendData(const __FlashStringHelper* data) {
+    PGM_P p = reinterpret_cast<PGM_P>(data);
+    // Read from PROGMEM and process
+  }
+  ```
+
+- **Refactor existing code** to use PROGMEM when you encounter RAM-based string literals
+- The ESP8266 has only ~80KB of RAM total, with ~40KB typically available after core libraries
+- Every byte of string literal in RAM is a byte unavailable for runtime operations
+- This is **non-negotiable** - PROGMEM usage is critical for firmware stability
+
 ### Security Practices
 
 - Validate all user inputs (REST API, MQTT commands, Web UI)
@@ -62,7 +110,9 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
 - Use the Debug macros for telnet output: `DebugTln()`, `DebugTf()`, `Debugln()`, `Debugf()`
 - **Never** write to Serial after OTGW initialization (Serial is for PIC communication only)
 - Setup phase can use `SetupDebugTln()` family of macros
-- Use `F()` macro for string literals to save RAM: `DebugTln(F("Message"))`
+- **MANDATORY**: Always use `F()` macro for string literals: `DebugTln(F("Message"))`
+- **MANDATORY**: Always use `PSTR()` macro for formatted strings: `DebugTf(PSTR("Value: %d"), val)`
+- Never use plain string literals without `F()` or `PSTR()` - see Memory Management section
 
 ### OpenTherm Protocol
 
@@ -155,6 +205,7 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
 - **Never** flash PIC firmware over WiFi using OTmonitor (can brick the PIC)
 - **Always** use the command queue for OTGW commands
 - **Always** validate buffer sizes before string operations
+- **Always** use `PROGMEM` (`F()` or `PSTR()`) for string literals - ESP8266 RAM is severely limited
 - **Always** test MQTT and Home Assistant integration for relevant changes
 - **Always** consider backwards compatibility with existing configurations
 - Target audience: Local network use only (not internet-exposed)
