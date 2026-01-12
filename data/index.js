@@ -933,7 +933,8 @@ async function checkFileRotation() {
         try {
             await waitForQueueFlush(5000); // Wait up to 5 seconds
         } catch (err) {
-            console.warn("Timeout waiting for queue flush before rotation:", err);
+            console.warn("Timeout waiting for queue flush before rotation. Proceeding with rotation anyway:", err);
+            // Any queued data will be written to the new file after rotation
         }
 
         rotateLogFile();
@@ -1035,6 +1036,9 @@ async function processLogQueue() {
     try {
         // Drain queue in batches to avoid excessive memory use
         // Take up to 5000 lines at a time
+        // Note: Using splice modifies the original array in-place, which is acceptable
+        // for this use case as we're consuming the queue. For very large queues,
+        // a circular buffer would be more efficient, but this keeps the code simple.
         const batchSize = Math.min(5000, logWriteQueue.length);
         const linesToWrite = logWriteQueue.splice(0, batchSize);
         
@@ -1067,6 +1071,8 @@ async function processLogQueue() {
         // Note: streamBytesWritten now tracks actual bytes successfully written to disk,
         // not estimated bytes queued. This is more accurate as it only counts data 
         // that was successfully persisted to the file system.
+        // This value is displayed in the console when streaming stops but is not
+        // shown in the UI to avoid clutter. The queue status is shown instead.
         streamBytesWritten += blob.size;
 
     } catch (err) {
@@ -1097,7 +1103,12 @@ async function processLogQueue() {
         // Use queueMicrotask for better event loop performance
         if (logWriteQueue.length > 0) {
             queueMicrotask(() => {
-                // Double-check the flag hasn't been set by another call
+                // Double-check the flag hasn't been set by another call.
+                // Note: There's still a theoretical race condition here if another
+                // microtask sets isLogWriting between our check and the call.
+                // However, this is acceptable because processLogQueue() itself
+                // checks isLogWriting at entry and will exit immediately if already writing.
+                // This pattern provides good-enough protection for this use case.
                 if (!isLogWriting) {
                     processLogQueue();
                 }
@@ -1112,8 +1123,9 @@ async function writeToStream(entry) {
     const text = formatLogLine(entry.data);
     const line = showTimestamps ? `${entry.time} ${text}` : text;
     enqueueLogLine(line);
-    // Note: Queue status is now updated by a timer (queueStatusUpdateTimer) 
-    // every 2 seconds to reduce overhead instead of checking on every message
+    // Note: Queue status UI is updated by a timer (queueStatusUpdateTimer) 
+    // that runs every 2 seconds (initialized at line 843-844 in startFileStreaming).
+    // This approach is more efficient than updating on every message.
   } catch (err) {
     console.error("Error preparing stream write:", err);
   }
