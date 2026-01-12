@@ -942,6 +942,8 @@ async function checkFileRotation() {
 
 // Helper function to wait for the write queue to be flushed
 // Returns a Promise that resolves when the queue is empty or rejects on timeout
+// @param {number} timeoutMs - Maximum time to wait in milliseconds (default: 5000ms)
+// @returns {Promise<void>} Resolves when queue is empty, rejects on timeout
 function waitForQueueFlush(timeoutMs = 5000) {
     return new Promise((resolve, reject) => {
         const startTime = Date.now();
@@ -1041,7 +1043,10 @@ async function processLogQueue() {
             return;
         }
 
-        console.log(`Writing ${linesToWrite.length} lines to file (${logWriteQueue.length} remaining in queue)`);
+        // Only log when queue is getting large or when debugging is needed
+        if (logWriteQueue.length > 100 || linesToWrite.length > 1000) {
+            console.log(`Writing ${linesToWrite.length} lines to file (${logWriteQueue.length} remaining in queue)`);
+        }
 
         // Open stream (This operation locks the file for the duration)
         const writable = await fileStreamHandle.createWritable({ keepExistingData: true });
@@ -1123,17 +1128,20 @@ function updateStreamQueueStatus() {
   const filename = currentLogDateStr ? `ot-monitor-${currentLogDateStr}.log` : 'None';
   
   if (queueSize > QUEUE_WARNING_THRESHOLD) {
-    // Warning state
-    filenameEl.textContent = `${filename} (Queue: ${queueSize}/${MAX_QUEUE_SIZE} ⚠️)`;
+    // Warning state - use both color and text for accessibility
+    filenameEl.textContent = `${filename} (Queue: ${queueSize}/${MAX_QUEUE_SIZE} ⚠️ WARNING)`;
     filenameEl.style.color = '#ff9800'; // Orange warning
+    filenameEl.setAttribute('aria-label', `Log file ${filename}. Queue is at ${queueSize} lines out of ${MAX_QUEUE_SIZE} maximum. Warning: queue is getting full.`);
   } else if (queueSize > 1000) {
-    // Info state
+    // Info state - queue growing but not critical
     filenameEl.textContent = `${filename} (Queue: ${queueSize})`;
     filenameEl.style.color = ''; // Reset to default
+    filenameEl.setAttribute('aria-label', `Log file ${filename}. Queue has ${queueSize} lines waiting to be written.`);
   } else {
     // Normal state
     filenameEl.textContent = filename;
     filenameEl.style.color = ''; // Reset to default
+    filenameEl.setAttribute('aria-label', `Log file ${filename}. Streaming active.`);
   }
 }
 
