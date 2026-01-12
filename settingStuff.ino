@@ -51,6 +51,7 @@ void writeSettings(bool show)
   root[F("ui_capture")] = settingUICaptureMode;
   root[F("ui_autoscreenshot")] = settingUIAutoScreenshot;
   root[F("ui_autodownloadlog")] = settingUIAutoDownloadLog;
+  root[F("ui_autoexport")] = settingUIAutoExport;
   root[F("ui_graphtimewindow")] = settingUIGraphTimeWindow;
   root[F("GPIOSENSORSenabled")] = settingGPIOSENSORSenabled;
   root[F("GPIOSENSORSpin")] = settingGPIOSENSORSpin;
@@ -140,6 +141,7 @@ void readSettings(bool show)
   settingUICaptureMode     = doc[F("ui_capture")] | settingUICaptureMode;
   settingUIAutoScreenshot  = doc[F("ui_autoscreenshot")] | settingUIAutoScreenshot;
   settingUIAutoDownloadLog = doc[F("ui_autodownloadlog")] | settingUIAutoDownloadLog;
+  settingUIAutoExport      = doc[F("ui_autoexport")] | settingUIAutoExport;
   settingUIGraphTimeWindow = doc[F("ui_graphtimewindow")] | settingUIGraphTimeWindow;
   settingGPIOSENSORSenabled = doc[F("GPIOSENSORSenabled")] | settingGPIOSENSORSenabled;
   settingGPIOSENSORSpin = doc[F("GPIOSENSORSpin")] | settingGPIOSENSORSpin;
@@ -272,6 +274,7 @@ void updateSetting(const char *field, const char *newValue)
   if (strcasecmp(field, "ui_capture")==0)         settingUICaptureMode = EVALBOOLEAN(newValue);
   if (strcasecmp(field, "ui_autoscreenshot")==0)  settingUIAutoScreenshot = EVALBOOLEAN(newValue);
   if (strcasecmp(field, "ui_autodownloadlog")==0) settingUIAutoDownloadLog = EVALBOOLEAN(newValue);
+  if (strcasecmp(field, "ui_autoexport")==0)      settingUIAutoExport = EVALBOOLEAN(newValue);
   if (strcasecmp(field, "ui_graphtimewindow")==0) settingUIGraphTimeWindow = atoi(newValue);
 
   if (strcasecmp(field, "GPIOSENSORSenabled") == 0)

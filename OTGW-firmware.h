@@ -147,6 +147,7 @@ bool      settingUIShowTimestamp = true;
 bool      settingUICaptureMode = false;
 bool      settingUIAutoScreenshot = false;
 bool      settingUIAutoDownloadLog = false;
+bool      settingUIAutoExport = false; 
 int       settingUIGraphTimeWindow = 60; // Default to 1 Hour (60 minutes)
 
 // GPIO Sensor Settings

@@ -565,6 +565,7 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("ui_capture"), settingUICaptureMode, "b");
   sendJsonSettingObj(F("ui_autoscreenshot"), settingUIAutoScreenshot, "b");
   sendJsonSettingObj(F("ui_autodownloadlog"), settingUIAutoDownloadLog, "b");
+  sendJsonSettingObj(F("ui_autoexport"), settingUIAutoExport, "b");
   sendJsonSettingObj(F("ui_graphtimewindow"), settingUIGraphTimeWindow, "i", 0, 1440);
   sendJsonSettingObj(F("gpiosensorsenabled"), settingGPIOSENSORSenabled, "b");
   sendJsonSettingObj(F("gpiosensorspin"), settingGPIOSENSORSpin, "i", 0, 16);
