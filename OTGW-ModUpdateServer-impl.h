@@ -138,7 +138,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _authenticated = (_username == emptyString || _password == emptyString || _server->authenticate(_username.c_str(), _password.c_str()));
         if(!_authenticated){
           if (_serial_output)
-            Debugln("Unauthenticated Update\n");
+            Debugln(F("Unauthenticated Update\n"));
           _status.upload_received = 0;
           _status.upload_total = 0;
           _status.flash_written = 0;
@@ -181,7 +181,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
               if (f) {
                 _savedSettings = f.readString();
                 f.close();
-                if (_serial_output) Debugln("Settings preserved in memory.");
+                if (_serial_output) Debugln(F("Settings preserved in memory."));
               }
             }
           }
@@ -238,31 +238,31 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         if(Update.end(true)){ //true to set the size to the current progress
           // --- Restore settings logic ---
           if (upload.name == F("filesystem") && _savedSettings.length() > 0) {
-             if (_serial_output) Debugln("Filesystem flashed successfully. Waiting 500ms before mounting...");
+             if (_serial_output) Debugln(F("Filesystem flashed successfully. Waiting 500ms before mounting..."));
              delay(500); // Wait 500ms after flashing before mounting
              
-             if (_serial_output) Debugln("Mounting newly flashed filesystem...");
+             if (_serial_output) Debugln(F("Mounting newly flashed filesystem..."));
              if (LittleFS.begin()) {
-                 if (_serial_output) Debugln("Filesystem mounted successfully. Restoring settings...");
+                 if (_serial_output) Debugln(F("Filesystem mounted successfully. Restoring settings..."));
                  File f = LittleFS.open("/settings.ini", "w");
                  if (f) {
                      f.print(_savedSettings);
                      f.close();
-                     if (_serial_output) Debugln("Settings restored to new filesystem.");
+                     if (_serial_output) Debugln(F("Settings restored to new filesystem."));
                      LittleFS.end();
                  } else {
                      LittleFS.end();
                      if (_serial_output) {
-                         Debugln("ERROR: Failed to write settings.ini to filesystem!");
-                         Debugln("RECOVERY: Download the settings from your browser's download folder");
-                         Debugln("          and upload it via the File Explorer after reboot.");
+                         Debugln(F("ERROR: Failed to write settings.ini to filesystem!"));
+                         Debugln(F("RECOVERY: Download the settings from your browser's download folder"));
+                         Debugln(F("          and upload it via the File Explorer after reboot."));
                      }
                  }
              } else {
                  if (_serial_output) {
-                     Debugln("ERROR: Failed to mount filesystem after flashing!");
-                     Debugln("RECOVERY: Download the settings from your browser's download folder");
-                     Debugln("          and upload it via the File Explorer after reboot.");
+                     Debugln(F("ERROR: Failed to mount filesystem after flashing!"));
+                     Debugln(F("RECOVERY: Download the settings from your browser's download folder"));
+                     Debugln(F("          and upload it via the File Explorer after reboot."));
                  }
              }
              _savedSettings = ""; 
@@ -294,7 +294,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         //   OTGWSerial.setDebugOutput(false);
       } else if(_authenticated && upload.status == UPLOAD_FILE_ABORTED){
         Update.end();
-        if (_serial_output) Debugln("Update was aborted");
+        if (_serial_output) Debugln(F("Update was aborted"));
         _status.upload_received = upload.totalSize;
         if (_status.upload_total == 0 && upload.totalSize > 0) {
           _status.upload_total = upload.totalSize;
