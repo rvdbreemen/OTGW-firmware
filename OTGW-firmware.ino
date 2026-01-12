@@ -264,7 +264,7 @@ void doTaskEvery30s(){
 void doTaskEvery60s(){
 
   //== do tasks ==
-  if (strcmp(sPICdeviceid, "unknown") == 0){
+  if (strcmp_P(sPICdeviceid, PSTR("unknown")) == 0){
     //keep trying to figure out which pic is used!
     DebugTln(F("PIC is unknown, probe pic using PR=A"));
     //Force banner fetch
