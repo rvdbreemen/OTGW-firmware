@@ -112,6 +112,12 @@ let streamBytesWritten = 0;
 let fileRotationTimer = null;
 let currentLogDateStr = "";
 
+// Backpressure control constants
+const MAX_QUEUE_SIZE = 10000; // Maximum lines to queue before applying backpressure
+const QUEUE_WARNING_THRESHOLD = 5000; // Warn when queue reaches this size
+let queueOverflowCount = 0; // Track how many messages were dropped due to overflow
+let lastQueueWarning = 0; // Timestamp of last warning to avoid spam
+
 // Expose helper for other modules (graph.js) to save files to the same directory
 window.saveBlobToLogDir = async function(filename, blob) {
     if (!logDirectoryHandle) {
@@ -793,10 +799,15 @@ async function startFileStreaming() {
   if (!('showDirectoryPicker' in window)) {
     let msg = "File streaming is not supported by your browser.\n\n";
     if (!window.isSecureContext) {
-      msg += "REASON: This feature requires a Secure Context (HTTPS).\n";
-      msg += "Since OTGW uses HTTP, you must enable the 'Insecure origins treated as secure' flag in your browser for this IP address.";
+      msg += "REASON: This feature requires a Secure Context (HTTPS or localhost).\n\n";
+      msg += "Since OTGW uses HTTP on a local network, you must enable the\n";
+      msg += "'Insecure origins treated as secure' flag in your browser:\n\n";
+      msg += "Chrome: chrome://flags/#unsafely-treat-insecure-origin-as-secure\n";
+      msg += "Edge: edge://flags/#unsafely-treat-insecure-origin-as-secure\n\n";
+      msg += "Add your OTGW's IP address (e.g., http://192.168.1.50) and restart the browser.";
     } else {
-      msg += "Please use Google Chrome, Microsoft Edge, or Opera on Desktop.";
+      msg += "Please use Google Chrome, Microsoft Edge, or Opera on Desktop.\n";
+      msg += "Firefox and Safari do not yet support the File System Access API.";
     }
     alert(msg);
     stopFileStreaming();
@@ -813,20 +824,38 @@ async function startFileStreaming() {
         });
     }
 
+    // Reset queue and counters
+    logWriteQueue = [];
+    queueOverflowCount = 0;
+    streamBytesWritten = 0;
     isStreamingToFile = true;
     
     // Start the rotation check timer (every minute)
     if (fileRotationTimer) clearInterval(fileRotationTimer);
     fileRotationTimer = setInterval(checkFileRotation, 60000);
 
-    // Start flush timer (10s) to limit disk writes
+    // Start flush timer (10s) to limit disk writes and manage backpressure
     if (logFlushTimer) clearInterval(logFlushTimer);
     logFlushTimer = setInterval(processLogQueue, 10000);
 
     // Initial file open
-    return await rotateLogFile();
+    const success = await rotateLogFile();
+    if (success) {
+      console.log("File streaming started successfully. Queue limit: " + MAX_QUEUE_SIZE + " lines");
+    }
+    return success;
   } catch (err) {
-    if (err.name !== 'AbortError') {
+    // Handle specific DOMException types
+    if (err.name === 'AbortError') {
+      // User cancelled the directory picker - this is normal
+      console.log("File streaming cancelled by user");
+    } else if (err.name === 'NotAllowedError') {
+      console.error("Permission denied for file system access:", err);
+      alert("Permission denied: You must allow file system access to use streaming.\n\nPlease try again and click 'Allow' when prompted.");
+    } else if (err.name === 'SecurityError') {
+      console.error("Security error accessing file system:", err);
+      alert("Security error: This feature requires a secure context (HTTPS or localhost).\n\n" + err.message);
+    } else {
        console.error("Error setting up file stream:", err);
        alert("Failed to setup file streaming: " + err.message);
     }
@@ -866,13 +895,23 @@ async function rotateLogFile() {
         if (filenameEl) filenameEl.textContent = filename;
 
         // Mark session start (Queue it)
-        enqueueLogLine(`\n# Start of logging`);
+        const timestamp = new Date().toISOString();
+        enqueueLogLine(`\n# === Streaming session started: ${timestamp} ===`);
         
         return true;
     } catch (e) {
         console.error("Error rotating log file:", e);
+        
+        // Provide specific error messages
+        if (e.name === 'NotAllowedError') {
+          alert("Permission denied: Cannot create log file.\n\nThe directory may be read-only or permissions were revoked.");
+        } else if (e.name === 'QuotaExceededError') {
+          alert("Disk quota exceeded: Cannot create log file.\n\nPlease free up disk space and try again.");
+        } else {
+          alert("Error creating log file for new day: " + e.message);
+        }
+        
         stopFileStreaming();
-        alert("Error creating log file for new day: " + e.message);
         return false;
     }
 }
@@ -911,19 +950,48 @@ function stopFileStreaming() {
       logFlushTimer = null;
   }
   
-  // Flush remaining queue
+  // Flush remaining queue before stopping
   processLogQueue();
+  
+  // Log statistics if there were any overflows
+  if (queueOverflowCount > 0) {
+    console.warn(`File streaming stopped. ${queueOverflowCount} messages were dropped due to queue overflow.`);
+  }
   
   // Hide UI
   const displayEl = document.getElementById('logFileDisplay');
   if (displayEl) displayEl.style.display = 'none';
 
-  console.log("File streaming stopped.");
+  console.log("File streaming stopped. Total bytes written: " + streamBytesWritten);
 }
 
 function enqueueLogLine(text) {
     if (!text) return;
     if (!text.endsWith('\n')) text += '\n';
+    
+    // Backpressure control: Check queue size before adding
+    if (logWriteQueue.length >= MAX_QUEUE_SIZE) {
+      queueOverflowCount++;
+      
+      // Warn periodically (once per 5 seconds max) to avoid console spam
+      const now = Date.now();
+      if (now - lastQueueWarning > 5000) {
+        console.warn(`File stream queue full (${MAX_QUEUE_SIZE} lines). Dropping messages. Total dropped: ${queueOverflowCount}`);
+        lastQueueWarning = now;
+        
+        // Try to flush immediately if not already writing
+        if (!isLogWriting) {
+          processLogQueue();
+        }
+      }
+      return; // Drop this message
+    }
+    
+    // Warn when approaching limit
+    if (logWriteQueue.length >= QUEUE_WARNING_THRESHOLD && logWriteQueue.length % 1000 === 0) {
+      console.warn(`File stream queue growing: ${logWriteQueue.length} lines queued (limit: ${MAX_QUEUE_SIZE})`);
+    }
+    
     logWriteQueue.push(text);
 }
 
@@ -932,14 +1000,17 @@ async function processLogQueue() {
     isLogWriting = true;
 
     try {
-        // Drain queue
-        const linesToWrite = [...logWriteQueue];
-        logWriteQueue = []; 
+        // Drain queue in batches to avoid excessive memory use
+        // Take up to 5000 lines at a time
+        const batchSize = Math.min(5000, logWriteQueue.length);
+        const linesToWrite = logWriteQueue.splice(0, batchSize);
         
         if (linesToWrite.length === 0) {
             isLogWriting = false;
             return;
         }
+
+        console.log(`Writing ${linesToWrite.length} lines to file (${logWriteQueue.length} remaining in queue)`);
 
         // Open stream (This operation locks the file for the duration)
         const writable = await fileStreamHandle.createWritable({ keepExistingData: true });
@@ -956,20 +1027,37 @@ async function processLogQueue() {
         
         // Close to flush to disk immediately
         await writable.close();
+        
+        streamBytesWritten += blob.size;
 
     } catch (err) {
         console.error("Error writing log queue:", err);
+        
+        // Provide specific error messages based on DOMException type
+        let errorMsg = "File stream write failed: ";
+        if (err.name === 'NotAllowedError') {
+          errorMsg += "Permission denied. The file or directory may have been moved or deleted.";
+        } else if (err.name === 'QuotaExceededError') {
+          errorMsg += "Disk quota exceeded. Please free up disk space.";
+        } else if (err.name === 'NoModificationAllowedError') {
+          errorMsg += "File is read-only or locked by another application.";
+        } else if (err.name === 'InvalidStateError') {
+          errorMsg += "File handle is in an invalid state. Try stopping and restarting the stream.";
+        } else {
+          errorMsg += err.message;
+        }
+        
         // If error occurs (e.g. permission revoked), stop streaming
         stopFileStreaming();
         const chk = document.getElementById('chkStreamToFile');
         if (chk) chk.checked = false;
-        alert("File stream write failed: " + err.message);
+        alert(errorMsg);
     } finally {
         isLogWriting = false;
         // Check if more lines were added while we were writing
+        // Use setTimeout to avoid stack overflow with rapid recursive calls
         if (logWriteQueue.length > 0) {
-            // Process next batch immediately (microtask)
-            processLogQueue();
+            setTimeout(() => processLogQueue(), 0);
         }
     }
 }
@@ -980,9 +1068,36 @@ async function writeToStream(entry) {
     const text = formatLogLine(entry.data);
     const line = showTimestamps ? `${entry.time} ${text}` : text;
     enqueueLogLine(line);
-    streamBytesWritten += line.length + 1;
+    
+    // Update UI with queue status every 100 messages
+    if (logWriteQueue.length % 100 === 0 && logWriteQueue.length > 0) {
+      updateStreamQueueStatus();
+    }
   } catch (err) {
     console.error("Error preparing stream write:", err);
+  }
+}
+
+// Update the UI to show queue status
+function updateStreamQueueStatus() {
+  const filenameEl = document.getElementById('currentLogFile');
+  if (!filenameEl) return;
+  
+  const queueSize = logWriteQueue.length;
+  const filename = currentLogDateStr ? `ot-monitor-${currentLogDateStr}.log` : 'None';
+  
+  if (queueSize > QUEUE_WARNING_THRESHOLD) {
+    // Warning state
+    filenameEl.textContent = `${filename} (Queue: ${queueSize}/${MAX_QUEUE_SIZE} ⚠️)`;
+    filenameEl.style.color = '#ff9800'; // Orange warning
+  } else if (queueSize > 1000) {
+    // Info state
+    filenameEl.textContent = `${filename} (Queue: ${queueSize})`;
+    filenameEl.style.color = ''; // Reset to default
+  } else {
+    // Normal state
+    filenameEl.textContent = filename;
+    filenameEl.style.color = ''; // Reset to default
   }
 }
 
