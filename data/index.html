@@ -69,16 +69,16 @@
               <button id="btnAutoScroll" class="btn-log-control btn-active" title="Auto-scroll with new messages" aria-label="Toggle auto-scroll with new log messages">Auto-scroll</button>
               <button id="btnClearLog" class="btn-log-control" title="Clear log buffer" aria-label="Clear the OpenTherm log buffer">Clear</button>
               <button id="btnDownloadLog" class="btn-log-control" title="Download log to file" aria-label="Download the OpenTherm log to a file">Download</button>
-              <label class="log-control-label" style="display:inline-flex;">
+              <label class="log-control-label" style="display:inline-flex;" title="Automatically save log every 15 minutes">
                   <input type="checkbox" id="chkAutoDownloadLog" aria-label="Auto download log every 15 minutes" />
                   Auto
               </label>
               <input type="text" id="searchLog" class="log-search" placeholder="Search logs..." aria-label="Search OpenTherm log messages" />
-              <label class="log-control-label">
+              <label class="log-control-label" title="Show timestamps in log view">
                 <input type="checkbox" id="chkShowTimestamp" checked aria-label="Show timestamps in the OpenTherm log" />
                 Timestamps
               </label>
-              <label class="log-control-label">
+              <label class="log-control-label" title="Capture up to 1M lines in memory">
                 <input type="checkbox" id="chkCaptureMode" aria-label="Capture large amount of data (up to 1M lines)" />
                 Capture
               </label>
@@ -137,15 +137,15 @@
                        <option value="1440">24 Hours</option>
                    </select>
                    <button id="btnGraphScreenshot" class="nav-item" style="height:25px; width:auto; font-size:13px; margin-left:10px;">Screenshot</button>
-                   <label class="log-control-label" style="display:inline-flex; margin-left:10px; margin-right:20px;">
+                   <label class="log-control-label" style="display:inline-flex; margin-left:10px; margin-right:20px;" title="Automatically save screenshot every 15 minutes">
                        <input type="checkbox" id="chkAutoScreenshot" />
-                       Auto
+                       Auto-save PNG
                    </label>
 
-                   <button id="btnGraphExport" class="nav-item" style="height:25px; width:auto; font-size:13px;">Data</button>
-                   <label class="log-control-label" style="display:inline-flex; margin-left:10px;">
+                   <button id="btnGraphExport" class="nav-item" style="height:25px; width:auto; font-size:13px;">Export Data</button>
+                   <label class="log-control-label" style="display:inline-flex; margin-left:10px;" title="Automatically export CSV data every 15 minutes">
                        <input type="checkbox" id="chkAutoExport" />
-                       Auto
+                       Auto-save CSV
                    </label>
                </div>
                <div id="otGraphCanvas"></div>
