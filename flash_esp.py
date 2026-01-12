@@ -948,14 +948,7 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
         print(f"  {Colors.WARNING}Erase flash: Yes{Colors.ENDC}")
     print("=" * 60)
     
-    # Only ask for confirmation in interactive mode
-    if not args.no_interactive:
-        confirm = input(f"\n{Colors.BOLD}Proceed with flashing? (y/N): {Colors.ENDC}").strip().lower()
-        if confirm != 'y':
-            print_info("Flashing cancelled.")
-            sys.exit(0)
-    else:
-        print_info("\nStarting flash process (--no-interactive mode)...")
+    print_info("\nStarting flash process...")
     
     # Flash the device
     success = flash_esp8266(
