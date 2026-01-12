@@ -56,7 +56,11 @@ void setLed(int8_t, uint8_t);
 #define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"  // Home Assistant discovery prefix
 #define CMSG_SIZE 512
 #define JSON_BUFF_MAX   1024
-#define CSTR(x) x.c_str()
+// Replace CSTR macro with overloads to handle both String and char*
+inline const char* CSTR(const String& x) { return x.c_str(); }
+inline const char* CSTR(const char* x) { return x; }
+inline const char* CSTR(char* x) { return x; }
+
 #define CONLINEOFFLINE(x) (x?"online":"offline")
 #define CBOOLEAN(x) (x?"true":"false")
 #define CONOFF(x) (x?"On":"Off")
@@ -76,10 +80,10 @@ void sendLogToWebSocket(const char* logMessage);
 WiFiClient  wifiClient;
 char        cMsg[CMSG_SIZE];
 char        fChar[10];
-String      lastReset = "";
+char        lastReset[129] = "";
 uint32_t    upTimeSeconds = 0;
 uint32_t    rebootCount = 0;
-String      sMessage = "";    
+char        sMessage[257] = "";    
 uint32_t    MQTTautoConfigMap[8] = { 0 };
 bool        isESPFlashing = false;  // Flag to disable background tasks during ESP firmware flash
 
@@ -106,7 +110,7 @@ char      sPICfwversion[32] = "no pic found";
 char      sPICdeviceid[32] = "no pic found";
 char      sPICtype[32] = "no pic found";
 bool      bPICavailable = false;
-String    errorupgrade = ""; 
+char      errorupgrade[129] = ""; 
 bool      bOTGWonline = true;
 bool      bOTGWboilerstate = false;
 bool      bOTGWthermostatstate = false;
@@ -114,24 +118,24 @@ bool      bOTGWgatewaystate = false;
 bool      bPSmode = false;  //default to PS=0 mode
 
 //All things that are settings 
-String    settingHostname = _HOSTNAME;
+char      settingHostname[41] = _HOSTNAME;
 
 //MQTT settings
 bool      statusMQTTconnection = false; 
 bool      settingMQTTenable = true;
 bool      settingMQTTsecure = false; 
-String    settingMQTTbroker= "homeassistant.local";
+char      settingMQTTbroker[65] = "homeassistant.local";
 int16_t   settingMQTTbrokerPort = 1883; 
-String    settingMQTTuser = "";
-String    settingMQTTpasswd = "";
-String    settingMQTThaprefix = HOME_ASSISTANT_DISCOVERY_PREFIX;
+char      settingMQTTuser[41] = "";
+char      settingMQTTpasswd[41] = "";
+char      settingMQTThaprefix[41] = HOME_ASSISTANT_DISCOVERY_PREFIX;
 bool      settingMQTTharebootdetection = true;
-String    settingMQTTtopTopic = "OTGW";
-String    settingMQTTuniqueid = ""; // Intialized in readsettings
+char      settingMQTTtopTopic[41] = "OTGW";
+char      settingMQTTuniqueid[41] = ""; // Intialized in readsettings
 bool      settingMQTTOTmessage = false;
 bool      settingNTPenable = true;
-String    settingNTPtimezone = NTP_DEFAULT_TIMEZONE;
-String    settingNTPhostname = NTP_HOST_DEFAULT;
+char      settingNTPtimezone[65] = NTP_DEFAULT_TIMEZONE;
+char      settingNTPhostname[65] = NTP_HOST_DEFAULT;
 bool      settingNTPsendtime = false;
 bool      settingLEDblink = true;
 bool      settingDarkTheme = false;
@@ -179,10 +183,10 @@ byte      OTGWs0dataid = 245;                     // foney dataid to be used to 
 
 //boot commands
 bool      settingOTGWcommandenable = false;
-String    settingOTGWcommands = "";
+char      settingOTGWcommands[129] = "";
 
 //debug flags 
-bool      bDebugOTmsg = true;    
+bool      bDebugOTmsg = true;
 bool      bDebugRestAPI = false;
 bool      bDebugMQTT = false;
 bool      bDebugSensors = false;

@@ -451,17 +451,17 @@ void chr_cstrlit(unsigned char u, char *buffer, size_t buflen)
     {
         switch (u)
         {
-        case '\a':  strcpy(buffer, "\\a"); break;
-        case '\b':  strcpy(buffer, "\\b"); break;
-        case '\f':  strcpy(buffer, "\\f"); break;
-        case '\n':  strcpy(buffer, "\\n"); break;
-        case '\r':  strcpy(buffer, "\\r"); break;
-        case '\t':  strcpy(buffer, "\\t"); break;
-        case '\v':  strcpy(buffer, "\\v"); break;
-        case '\\':  strcpy(buffer, "\\\\"); break;
-        case '\'':  strcpy(buffer, "\\'"); break;
-        case '\"':  strcpy(buffer, "\\\""); break;
-        case '\?':  strcpy(buffer, "\\\?"); break;
+        case '\a':  strlcpy(buffer, "\\a", buflen); break;
+        case '\b':  strlcpy(buffer, "\\b", buflen); break;
+        case '\f':  strlcpy(buffer, "\\f", buflen); break;
+        case '\n':  strlcpy(buffer, "\\n", buflen); break;
+        case '\r':  strlcpy(buffer, "\\r", buflen); break;
+        case '\t':  strlcpy(buffer, "\\t", buflen); break;
+        case '\v':  strlcpy(buffer, "\\v", buflen); break;
+        case '\\':  strlcpy(buffer, "\\\\", buflen); break;
+        case '\'':  strlcpy(buffer, "\\'", buflen); break;
+        case '\"':  strlcpy(buffer, "\\\"", buflen); break;
+        case '\?':  strlcpy(buffer, "\\\?", buflen); break;
         default:
             if (buflen < 5)
                 *buffer = '\0';
@@ -574,6 +574,25 @@ String dBmtoQuality(int dBm)
 
   return (_ret);
 }//dBmtoPercentage 
+
+// Replace all occurrences of token with replacement, guarding buffer size
+bool replaceAll(char *buffer, const size_t bufSize, const char *token, const char *replacement) {
+  if (!buffer || !token || !replacement) return false;
+  const size_t tokenLen = strlen(token);
+  const size_t replLen = strlen(replacement);
+  if (tokenLen == 0) return true;
+
+  char *pos = strstr(buffer, token);
+  while (pos) {
+    const size_t tailLen = strlen(pos + tokenLen);
+    const size_t required = (pos - buffer) + replLen + tailLen + 1;
+    if (required > bufSize) return false;
+    memmove(pos + replLen, pos + tokenLen, tailLen + 1);
+    memcpy(pos, replacement, replLen);
+    pos = strstr(pos + replLen, token);
+  }
+  return true;
+}
 
 /***************************************************************************
 *
