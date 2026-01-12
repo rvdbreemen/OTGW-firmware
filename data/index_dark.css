@@ -921,7 +921,7 @@ body.disable-interaction {
 
 .ot-stats-table th, .ot-stats-table td {
   text-align: left;
-  padding: 8px;
+  padding: 2px 8px;
   border-bottom: 1px solid #444;
   overflow: hidden;
   text-overflow: ellipsis;
