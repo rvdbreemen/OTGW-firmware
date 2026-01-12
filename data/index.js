@@ -655,10 +655,7 @@ function setupOTLogControls() {
     } else {
       btn.classList.remove('btn-active');
     }
-    // Note: Auto-scroll is per session usually? Or should we save it?
-    // User asked for checkboxes, this is a button. But let's save it if it was being saved.
-    // Previous key was 'ui_autoscroll', let's use '#uiAutoScroll'
-    if (typeof saveUISetting === 'function') saveUISetting('#uiAutoScroll', autoScroll);
+    if (typeof saveUISetting === 'function') saveUISetting('ui_autoscroll', autoScroll);
   });
 
   // Toggle Capture Mode
@@ -676,7 +673,7 @@ function setupOTLogControls() {
         }
       }
       updateLogCounters();
-      if (typeof saveUISetting === 'function') saveUISetting('#uiCaptureMode', e.target.checked);
+      if (typeof saveUISetting === 'function') saveUISetting('ui_capture', e.target.checked);
     });
   }
 
@@ -727,7 +724,7 @@ function setupOTLogControls() {
   if (chkAutoDL) {
       chkAutoDL.addEventListener('change', function(e) {
           toggleAutoDownloadLog(e.target.checked);
-          if (typeof saveUISetting === 'function') saveUISetting('#uiAutoDownloadLog', e.target.checked);
+          if (typeof saveUISetting === 'function') saveUISetting('ui_autodownloadlog', e.target.checked);
       });
   }
   
@@ -743,7 +740,7 @@ function setupOTLogControls() {
   document.getElementById('chkShowTimestamp').addEventListener('change', function(e) {
     showTimestamps = e.target.checked;
     updateLogDisplay();
-    if (typeof saveUISetting === 'function') saveUISetting('#uiShowTimestamp', e.target.checked);
+    if (typeof saveUISetting === 'function') saveUISetting('ui_timestamps', e.target.checked);
   });
   
   // Manual scroll detection (disable auto-scroll if user scrolls up)
@@ -1661,6 +1658,16 @@ function refreshDeviceInfo() {
 } // refreshDeviceInfo()
 
 //============================================================================  
+const hiddenSettings = [
+  "ui_autoscroll",
+  "ui_timestamps",
+  "ui_capture",
+  "ui_autoscreenshot", 
+  "ui_autodownloadlog",
+  "ui_autoexport",
+  "ui_graphtimewindow"
+];
+
 function refreshSettings() {
   console.log("refreshSettings() ..");
   data = {};
@@ -1673,8 +1680,8 @@ function refreshSettings() {
       document.getElementById("settingMessage").innerHTML = "";
       for (let i in data) {
         console.log("[" + data[i].name + "]=>[" + data[i].value + "]");
-        // Skip hidden settings starting with #
-        if (data[i].name.startsWith('#')) continue;
+        // Skip hidden settings
+        if (data[i].name.startsWith('#') || hiddenSettings.includes(data[i].name)) continue;
 
         var settings = document.getElementById('settingsPage');
         if ((document.getElementById("D_" + data[i].name)) == null) {
@@ -2437,18 +2444,36 @@ function sortStats(col) {
 }
 
 //============================================================================
+function saveUISetting(field, value) {
+  // UI element settings should be hidden settings, marked by "#" in the API call
+  // Only checkboxes and dropdowns trigger this
+  const apiField = field.startsWith('#') ? field : '#' + field;
+  sendPostSetting(apiField, value);
+}
+window.saveUISetting = saveUISetting;
+
 function setupPersistentUIListeners() {
+  // Graph Tab - Auto Screenshot
   const chkAutoScreenshot = document.getElementById('chkAutoScreenshot');
   if (chkAutoScreenshot) {
     chkAutoScreenshot.addEventListener('change', function(e) {
-      if (typeof sendPostSetting === 'function') sendPostSetting('ui_autoscreenshot', e.target.checked);
+      saveUISetting('ui_autoscreenshot', e.target.checked);
+    });
+  }
+
+  // Graph Tab - Auto Export
+  const chkAutoExport = document.getElementById('chkAutoExport');
+  if (chkAutoExport) {
+    chkAutoExport.addEventListener('change', function(e) {
+      saveUISetting('ui_autoexport', e.target.checked);
     });
   }
   
+  // Graph Tab - Time Window
   const graphTimeWindow = document.getElementById('graphTimeWindow');
   if (graphTimeWindow) {
-  graphTimeWindow.addEventListener('change', function(e) {
-      if (typeof sendPostSetting === 'function') sendPostSetting('ui_graphtimewindow', e.target.value);
+    graphTimeWindow.addEventListener('change', function(e) {
+      saveUISetting('ui_graphtimewindow', e.target.value);
     });
   }
 }
@@ -2507,6 +2532,18 @@ function loadPersistentUI() {
           if (chk) {
               chk.checked = (dlVal === true || dlVal === "true");
               if (typeof toggleAutoDownloadLog === 'function') toggleAutoDownloadLog(chk.checked);
+          }
+      }
+
+      // Auto Export (Graph Tab)
+      const exportVal = getVal("ui_autoexport");
+      if (exportVal !== null) {
+          const chk = document.getElementById("chkAutoExport");
+          if (chk) {
+              chk.checked = (exportVal === true || exportVal === "true");
+              if (typeof OTGraph !== 'undefined' && OTGraph.toggleAutoExport) {
+                  OTGraph.toggleAutoExport(chk.checked);
+              }
           }
       }
 

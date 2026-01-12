@@ -125,7 +125,7 @@ var OTGraph = {
         if (chkAutoShot) {
             chkAutoShot.addEventListener('change', (e) => {
                  this.toggleAutoScreenshot(e.target.checked);
-                 if (typeof saveUISetting === 'function') saveUISetting('#uiAutoScreenshot', e.target.checked);
+                 if (typeof saveUISetting === 'function') saveUISetting('ui_autoscreenshot', e.target.checked);
             });
         }
         
@@ -140,7 +140,7 @@ var OTGraph = {
         if (chkAutoExport) {
             chkAutoExport.addEventListener('change', (e) => {
                  this.toggleAutoExport(e.target.checked);
-                 if (typeof saveUISetting === 'function') saveUISetting('#uiAutoExport', e.target.checked);
+                 if (typeof saveUISetting === 'function') saveUISetting('ui_autoexport', e.target.checked);
             });
         }
 
