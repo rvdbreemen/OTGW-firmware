@@ -5,7 +5,7 @@
 
 #define byteswap(val) ((val << 8) | (val >> 8))
 
-static const char banner[] = "OpenTherm Gateway ";
+static const char banner[] PROGMEM = "OpenTherm Gateway ";
 
 String GetVersion(const String hexfile){
   char hexbuf[48]={0};
