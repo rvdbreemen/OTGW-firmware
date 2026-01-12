@@ -29,6 +29,7 @@
 #include "OTGW-ModUpdateServer.h"
 // External flag to track ESP flashing state
 extern bool isESPFlashing;
+extern void sendWebSocketJSON(const char *json);
 
 #ifndef Debug
   //#warning Debug() was not defined!
@@ -132,13 +133,12 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
 
       if(upload.status == UPLOAD_FILE_START){
         _updaterError.clear();
-        // if (_serial_output)
-        //   OTGWSerial.setDebugOutput(true);
+        if (_serial_output) Debugf(PSTR("Upload Start: %s (size: %s)\r\n"), upload.filename.c_str(), _server->arg("size").c_str());
 
         _authenticated = (_username == emptyString || _password == emptyString || _server->authenticate(_username.c_str(), _password.c_str()));
         if(!_authenticated){
           if (_serial_output)
-            Debugln("Unauthenticated Update\n");
+            Debugln(F("Unauthenticated Update\n"));
           _status.upload_received = 0;
           _status.upload_total = 0;
           _status.flash_written = 0;
@@ -152,7 +152,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         
         WiFiUDP::stopAll();
         if (_serial_output)
-          Debugf("Update: %s\r\n", upload.filename.c_str());
+          Debugf(PSTR("Update: %s\r\n"), upload.filename.c_str());
 
         size_t uploadTotal = 0;
         String sizeArg = _server->arg("size");
@@ -181,7 +181,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
               if (f) {
                 _savedSettings = f.readString();
                 f.close();
-                if (_serial_output) Debugln("Settings preserved in memory.");
+                if (_serial_output) Debugln(F("Settings preserved in memory."));
               }
             }
           }
@@ -219,6 +219,17 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         size_t written = Update.write(upload.buf, upload.currentSize);
         _status.upload_received = upload.totalSize;
         
+        // Manual Status Update for WebSockets/Progress
+        // Throttle updates to percentage changes to avoid flooding WebSockets
+        if (_status.flash_total > 0) {
+           _status.flash_written = _status.upload_received; // approximation based on upload
+           int currentPerc = (_status.flash_written * 100) / _status.flash_total;
+           if (currentPerc != _lastProgressPerc) {
+             _lastProgressPerc = currentPerc;
+             _setStatus(UPDATE_WRITE, _status.target, _status.flash_written, _status.flash_total, _status.filename, emptyString);
+           }
+        }
+
         if (written != upload.currentSize) {
           _setUpdaterError();
           _setStatus(UPDATE_ERROR, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, _updaterError);
@@ -227,37 +238,37 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         if(Update.end(true)){ //true to set the size to the current progress
           // --- Restore settings logic ---
           if (upload.name == F("filesystem") && _savedSettings.length() > 0) {
-             if (_serial_output) Debugln("Filesystem flashed successfully. Waiting 500ms before mounting...");
+             if (_serial_output) Debugln(F("Filesystem flashed successfully. Waiting 500ms before mounting..."));
              delay(500); // Wait 500ms after flashing before mounting
              
-             if (_serial_output) Debugln("Mounting newly flashed filesystem...");
+             if (_serial_output) Debugln(F("Mounting newly flashed filesystem..."));
              if (LittleFS.begin()) {
-                 if (_serial_output) Debugln("Filesystem mounted successfully. Restoring settings...");
+                 if (_serial_output) Debugln(F("Filesystem mounted successfully. Restoring settings..."));
                  File f = LittleFS.open("/settings.ini", "w");
                  if (f) {
                      f.print(_savedSettings);
                      f.close();
-                     if (_serial_output) Debugln("Settings restored to new filesystem.");
+                     if (_serial_output) Debugln(F("Settings restored to new filesystem."));
                      LittleFS.end();
                  } else {
                      LittleFS.end();
                      if (_serial_output) {
-                         Debugln("ERROR: Failed to write settings.ini to filesystem!");
-                         Debugln("RECOVERY: Download the settings from your browser's download folder");
-                         Debugln("          and upload it via the File Explorer after reboot.");
+                         Debugln(F("ERROR: Failed to write settings.ini to filesystem!"));
+                         Debugln(F("RECOVERY: Download the settings from your browser's download folder"));
+                         Debugln(F("          and upload it via the File Explorer after reboot."));
                      }
                  }
              } else {
                  if (_serial_output) {
-                     Debugln("ERROR: Failed to mount filesystem after flashing!");
-                     Debugln("RECOVERY: Download the settings from your browser's download folder");
-                     Debugln("          and upload it via the File Explorer after reboot.");
+                     Debugln(F("ERROR: Failed to mount filesystem after flashing!"));
+                     Debugln(F("RECOVERY: Download the settings from your browser's download folder"));
+                     Debugln(F("          and upload it via the File Explorer after reboot."));
                  }
              }
              _savedSettings = ""; 
           }
           // --------------------------------
-          if (_serial_output) Debugf("\r\nUpdate Success: %u\r\nRebooting...\r\n", upload.totalSize);
+          if (_serial_output) Debugf(PSTR("\r\nUpdate Success: %u\r\nRebooting...\r\n"), upload.totalSize);
           _status.upload_received = upload.totalSize;
           if (_status.upload_total == 0 && upload.totalSize > 0) {
             _status.upload_total = upload.totalSize;
@@ -283,7 +294,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         //   OTGWSerial.setDebugOutput(false);
       } else if(_authenticated && upload.status == UPLOAD_FILE_ABORTED){
         Update.end();
-        if (_serial_output) Debugln("Update was aborted");
+        if (_serial_output) Debugln(F("Update was aborted"));
         _status.upload_received = upload.totalSize;
         if (_status.upload_total == 0 && upload.totalSize > 0) {
           _status.upload_total = upload.totalSize;
@@ -339,13 +350,16 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_resetStatus()
 template <typename ServerType>
 void ESP8266HTTPUpdateServerTemplate<ServerType>::_setStatus(uint8_t phase, const String &target, size_t received, size_t total, const String &filename, const String &error)
 {
+  if (_serial_output) {
+      Debugf(PSTR("Update Status: %s (recv: %u, total: %u)\r\n"), _phaseToString(phase), received, total);
+  }
   _status.phase = static_cast<UpdatePhase>(phase);
   _status.target = target.length() ? target : "unknown";
   _status.received = received;
   _status.total = total;
   if (_status.flash_total > 0 && _status.flash_written > _status.flash_total) {
     if (_serial_output) {
-      Debugf("Update warning: flash_written (%u) > flash_total (%u)\r\n",
+      Debugf(PSTR("Update warning: flash_written (%u) > flash_total (%u)\r\n"),
              static_cast<unsigned>(_status.flash_written),
              static_cast<unsigned>(_status.flash_total));
     }
@@ -353,6 +367,35 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_setStatus(uint8_t phase, cons
   }
   _status.filename = filename;
   _status.error = error;
+
+  // Broadcast via WebSocket
+  // Use a static buffer to avoid stack overflow, but protect with interrupt disable? 
+  // No, we are in non-interrupt context usually. But strictly speaking static is not thread safe.
+  // Stack is better if size is reasonable. 512 bytes is okay for ESP8266 stack (4KB).
+  char buf[512];
+  char filenameEsc[64];
+  char errorEsc[96];
+  _jsonEscape(_status.filename, filenameEsc, sizeof(filenameEsc));
+  _jsonEscape(_status.error, errorEsc, sizeof(errorEsc));
+  int written = snprintf_P(
+    buf,
+    sizeof(buf),
+    PSTR("{\"state\":\"%s\",\"target\":\"%s\",\"received\":%u,\"total\":%u,\"upload_received\":%u,\"upload_total\":%u,\"flash_written\":%u,\"flash_total\":%u,\"filename\":\"%s\",\"error\":\"%s\"}"),
+    _phaseToString(_status.phase),
+    _status.target.length() ? _status.target.c_str() : "unknown",
+    static_cast<unsigned>(_status.received),
+    static_cast<unsigned>(_status.total),
+    static_cast<unsigned>(_status.upload_received),
+    static_cast<unsigned>(_status.upload_total),
+    static_cast<unsigned>(_status.flash_written),
+    static_cast<unsigned>(_status.flash_total),
+    filenameEsc,
+    errorEsc
+  );
+  
+  if (written > 0 && written < (int)sizeof(buf)) {
+      sendWebSocketJSON(buf);
+  }
 }
 
 template <typename ServerType>
@@ -398,10 +441,10 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusJson()
   char errorEsc[96];
   _jsonEscape(_status.filename, filenameEsc, sizeof(filenameEsc));
   _jsonEscape(_status.error, errorEsc, sizeof(errorEsc));
-  int written = snprintf(
+  int written = snprintf_P(
     buf,
     sizeof(buf),
-    "{\"state\":\"%s\",\"target\":\"%s\",\"received\":%u,\"total\":%u,\"upload_received\":%u,\"upload_total\":%u,\"flash_written\":%u,\"flash_total\":%u,\"filename\":\"%s\",\"error\":\"%s\"}",
+    PSTR("{\"state\":\"%s\",\"target\":\"%s\",\"received\":%u,\"total\":%u,\"upload_received\":%u,\"upload_total\":%u,\"flash_written\":%u,\"flash_total\":%u,\"filename\":\"%s\",\"error\":\"%s\"}"),
     _phaseToString(_status.phase),
     _status.target.length() ? _status.target.c_str() : "unknown",
     static_cast<unsigned>(_status.received),
@@ -417,7 +460,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusJson()
   // Check if the output was truncated
   if (written >= (int)sizeof(buf)) {
     if (_serial_output) {
-      Debugf("Warning: status JSON truncated (%d chars needed, %d available)\r\n", 
+      Debugf(PSTR("Warning: status JSON truncated (%d chars needed, %d available)\r\n"), 
              written, (int)sizeof(buf));
     }
     // Send error response instead of truncated JSON
