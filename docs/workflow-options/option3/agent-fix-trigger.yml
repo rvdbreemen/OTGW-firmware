@@ -1,0 +1,317 @@
+name: Agent Auto-Fix Trigger
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  trigger-agent-fix:
+    if: github.event.label.name == 'agent-fix-needed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add processing comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: '🤖 Agent fix workflow triggered. Processing evaluation findings...'
+            });
+      
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Parse evaluation report from issue
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueBody = context.payload.issue.body;
+            
+            // Extract JSON report from issue body
+            const reportMatch = issueBody.match(/```json\n([\s\S]*?)\n```/);
+            
+            if (!reportMatch) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                body: '❌ Could not find evaluation report in issue. Please ensure the issue was created by the evaluation workflow.'
+              });
+              core.setFailed('No evaluation report found');
+              return;
+            }
+            
+            const report = JSON.parse(reportMatch[1]);
+            const fs = require('fs');
+            fs.writeFileSync('evaluation-report.json', reportMatch[1]);
+            
+            // Extract commit SHA from issue
+            const shaMatch = issueBody.match(/\*\*Commit\*\*:.*?`([a-f0-9]{7,40})`/);
+            const sha = shaMatch ? shaMatch[1] : '';
+            
+            core.setOutput('has-report', 'true');
+            core.setOutput('failure-count', report.summary.failed);
+            core.setOutput('source-sha', sha);
+            
+            console.log(`Parsed report: ${report.summary.failed} failures`);
+      
+      - name: Checkout source commit
+        if: steps.parse.outputs.source-sha != ''
+        run: |
+          # Try to checkout the source commit
+          git fetch origin ${{ steps.parse.outputs.source-sha }} || true
+          git checkout ${{ steps.parse.outputs.source-sha }} || git checkout main
+      
+      - name: Create fix branch
+        id: branch
+        run: |
+          BRANCH_NAME="auto-fix/issue-${{ github.event.issue.number }}-$(date +%Y%m%d-%H%M%S)"
+          echo "branch-name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          git checkout -b "$BRANCH_NAME"
+      
+      - name: Generate agent instructions
+        id: instructions
+        run: |
+          cat > agent-instructions.md <<'EOF'
+          # Auto-Fix Agent Instructions
+          
+          You are fixing code quality issues found by the OTGW-firmware evaluation framework.
+          
+          ## Context
+          - **Issue**: #${{ github.event.issue.number }}
+          - **Failures**: ${{ steps.parse.outputs.failure-count }}
+          - **Source**: Automated code evaluation
+          
+          ## Your Task
+          Fix the issues listed in `evaluation-report.json` following these rules:
+          
+          ### Code Style Rules
+          1. **PROGMEM Usage**: ALL string literals must use F() or PSTR() macros
+             - Use `F("string")` for functions that accept __FlashStringHelper*
+             - Use `PSTR("string")` for printf-style functions
+             - Use `_P` variants for string comparisons (strcmp_P, etc.)
+          
+          2. **Memory Management**:
+             - Avoid `String` class - use char buffers instead
+             - Check buffer bounds before strcpy/sprintf
+             - Use `snprintf_P()` instead of `sprintf()`
+          
+          3. **Debug Output**:
+             - NEVER use Serial.print after setup (use Debug macros)
+             - Use DebugTln(F("msg")) or DebugTf(PSTR("fmt"), args)
+          
+          4. **Security**:
+             - Validate all user inputs
+             - Check array bounds
+             - Sanitize URL parameters
+          
+          ### Categories to Fix
+          EOF
+          
+          # Parse the evaluation report and add specific findings
+          python3 - <<'PYEOF'
+          import json
+          
+          with open('evaluation-report.json') as f:
+              report = json.load(f)
+          
+          failures = [r for r in report['results'] if r['status'] == 'FAIL']
+          
+          # Group by category
+          by_cat = {}
+          for f in failures:
+              cat = f['category']
+              if cat not in by_cat:
+                  by_cat[cat] = []
+              by_cat[cat].append(f)
+          
+          with open('agent-instructions.md', 'a') as out:
+              out.write('\n')
+              for cat, items in by_cat.items():
+                  out.write(f'\n#### {cat} ({len(items)} issues)\n\n')
+                  for item in items:
+                      out.write(f'- **{item["name"]}**: {item["message"]}\n')
+                      if item.get('details'):
+                          out.write(f'  - Details: {item["details"]}\n')
+          
+          print(f"Generated instructions for {len(failures)} failures in {len(by_cat)} categories")
+          PYEOF
+          
+          cat >> agent-instructions.md <<'EOF'
+          
+          ## Implementation Steps
+          
+          1. **Review** each failure in evaluation-report.json
+          2. **Fix** issues one category at a time
+          3. **Test** after each change: `make -j$(nproc)`
+          4. **Verify** with: `python evaluate.py --quick`
+          
+          ## Success Criteria
+          
+          - [ ] All FAIL items resolved
+          - [ ] Build succeeds: `make -j$(nproc)`
+          - [ ] Evaluation passes: `python evaluate.py --quick`
+          - [ ] No new issues introduced
+          
+          ## Important Constraints
+          
+          - Make MINIMAL changes - only fix identified issues
+          - Do NOT refactor working code
+          - Follow existing patterns in the codebase
+          - Test thoroughly before committing
+          
+          ---
+          
+          **Start by running `python evaluate.py --verbose` to see all findings.**
+          EOF
+          
+          echo "Agent instructions generated"
+      
+      - name: Comment with agent instructions
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const instructions = fs.readFileSync('agent-instructions.md', 'utf8');
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: \`## 🤖 Agent Instructions Generated
+              
+              A fix branch has been created: \`${{ steps.branch.outputs.branch-name }}\`
+              
+              ### Next Steps for Agent
+              
+              An agent (GitHub Copilot Workspace or similar) should now:
+              
+              1. Checkout branch: \`${{ steps.branch.outputs.branch-name }}\`
+              2. Read the instructions below
+              3. Apply fixes systematically
+              4. Create a PR when complete
+              
+              <details>
+              <summary>📋 Agent Instructions</summary>
+              
+              \`\`\`markdown
+              \${instructions}
+              \`\`\`
+              
+              </details>
+              
+              ### Manual Trigger
+              
+              If you want to fix this manually:
+              \`\`\`bash
+              git fetch origin
+              git checkout ${{ steps.branch.outputs.branch-name }}
+              python evaluate.py --verbose
+              # Fix the issues
+              make -j\$(nproc)
+              python evaluate.py --quick
+              git add .
+              git commit -m "Fix evaluation findings"
+              git push origin ${{ steps.branch.outputs.branch-name }}
+              # Then create a PR
+              \`\`\`
+              \`
+            });
+      
+      - name: Push fix branch
+        run: |
+          # Push the branch with instructions
+          git add agent-instructions.md evaluation-report.json
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "Add agent fix instructions for issue #${{ github.event.issue.number }}" || true
+          git push origin ${{ steps.branch.outputs.branch-name }}
+      
+      - name: Create placeholder PR
+        id: pr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ steps.branch.outputs.branch-name }}
+          title: "🤖 Auto-fix: Evaluation findings from issue #${{ github.event.issue.number }}"
+          body: |
+            ## Automated Fix PR
+            
+            This PR was created in response to issue #${{ github.event.issue.number }}
+            
+            **Status**: ⏳ Waiting for agent to apply fixes
+            
+            ### What to do
+            
+            An agent (GitHub Copilot Workspace or developer) should:
+            
+            1. Check out this branch
+            2. Read `agent-instructions.md` for detailed fix instructions
+            3. Apply fixes following the guidelines
+            4. Update this PR with the fixes
+            
+            ### Evaluation Report
+            
+            - **Failures**: ${{ steps.parse.outputs.failure-count }}
+            - **Source Issue**: #${{ github.event.issue.number }}
+            
+            See `evaluation-report.json` in this branch for full details.
+            
+            ### Testing
+            
+            Before merging:
+            ```bash
+            make -j$(nproc)
+            python evaluate.py --quick
+            ```
+            
+            ---
+            
+            *This PR is a placeholder. An agent or developer should apply the actual fixes.*
+            
+            Closes #${{ github.event.issue.number }}
+          labels: |
+            auto-fix
+            bot
+            agent-ready
+          draft: true
+      
+      - name: Update issue with PR link
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: \`✅ Fix branch and PR created!
+              
+              **Branch**: \`${{ steps.branch.outputs.branch-name }}\`
+              **PR**: Ready for agent to apply fixes
+              
+              The PR is in draft mode. Once fixes are applied and verified, it can be marked ready for review.
+              \`
+            });
+            
+            // Add label to indicate processing is complete
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              labels: ['agent-branch-ready']
+            });

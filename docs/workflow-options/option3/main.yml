@@ -1,0 +1,202 @@
+name: CI Build with Evaluation
+
+on:
+  push:
+    branches:
+      - dev
+      - 'dev-*'
+      - main
+      - actions
+      - make-tweaks
+      - tarball-naming
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/build
+
+  evaluate:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Run evaluation
+        id: eval
+        run: |
+          python evaluate.py --report --no-color
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
+      
+      - name: Parse evaluation results
+        id: check
+        run: |
+          if [ -f evaluation-report.json ]; then
+            FAILURES=$(jq '.summary.failed' evaluation-report.json)
+            WARNINGS=$(jq '.summary.warnings' evaluation-report.json)
+            PASSED=$(jq '.summary.passed' evaluation-report.json)
+            INFO=$(jq '.summary.info' evaluation-report.json)
+            
+            echo "failures=$FAILURES" >> $GITHUB_OUTPUT
+            echo "warnings=$WARNINGS" >> $GITHUB_OUTPUT
+            echo "passed=$PASSED" >> $GITHUB_OUTPUT
+            echo "info=$INFO" >> $GITHUB_OUTPUT
+            
+            if [ "$FAILURES" -gt 0 ]; then
+              echo "needs_fix=true" >> $GITHUB_OUTPUT
+            else
+              echo "needs_fix=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+      
+      - name: Upload evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-report
+          path: evaluation-report.json
+          retention-days: 30
+      
+      - name: Create issue for failures
+        if: steps.check.outputs.needs_fix == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('evaluation-report.json', 'utf8'));
+            
+            const failures = report.results.filter(r => r.status === 'FAIL');
+            const warnings = report.results.filter(r => r.status === 'WARN');
+            
+            // Group failures by category
+            const byCategory = {};
+            failures.forEach(f => {
+              if (!byCategory[f.category]) byCategory[f.category] = [];
+              byCategory[f.category].push(f);
+            });
+            
+            // Build issue body
+            let issueBody = `## 🔍 Code Evaluation Failed
+            
+            **Commit**: [\`${context.sha.substring(0, 7)}\`](https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${context.sha})
+            **Branch**: \`${context.ref.replace('refs/heads/', '')}\`
+            **Workflow Run**: [#${context.runNumber}](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+            
+            ### 📊 Summary
+            - ✓ **Passed**: ${report.summary.passed}
+            - ⚠ **Warnings**: ${report.summary.warnings}
+            - ✗ **Failed**: ${report.summary.failed}
+            - ℹ **Info**: ${report.summary.info}
+            
+            ---
+            
+            ### ❌ Failures by Category
+            
+            `;
+            
+            // Add failures grouped by category
+            Object.keys(byCategory).forEach(category => {
+              issueBody += `#### ${category}\n\n`;
+              byCategory[category].forEach(f => {
+                issueBody += `- **${f.name}**: ${f.message}\n`;
+                if (f.details) {
+                  issueBody += `  <details><summary>Details</summary>\n\n  ${f.details}\n\n  </details>\n`;
+                }
+              });
+              issueBody += '\n';
+            });
+            
+            // Add top warnings
+            if (warnings.length > 0) {
+              issueBody += `### ⚠️ Top Warnings\n\n`;
+              warnings.slice(0, 5).forEach(w => {
+                issueBody += `- **[${w.category}] ${w.name}**: ${w.message}\n`;
+              });
+              if (warnings.length > 5) {
+                issueBody += `\n*...and ${warnings.length - 5} more warnings*\n`;
+              }
+              issueBody += '\n';
+            }
+            
+            // Add agent instructions
+            issueBody += `---
+            
+            ### 🤖 Agent Fix Instructions
+            
+            To trigger an automated fix:
+            1. Add the label \`agent-fix-needed\` to this issue
+            2. The agent will analyze the findings and create a PR with fixes
+            3. Review and merge the PR if the fixes are appropriate
+            
+            <details>
+            <summary>Agent Context (Full Evaluation Report)</summary>
+            
+            \`\`\`json
+            ${JSON.stringify(report, null, 2)}
+            \`\`\`
+            
+            </details>
+            
+            ---
+            
+            **Action Required**: Review the failures and either:
+            - Apply the \`agent-fix-needed\` label to trigger automated fixes
+            - Manually fix the issues and close this issue
+            - If issues are false positives, close this issue with a comment
+            `;
+            
+            // Check for existing open issues about evaluation
+            const existingIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'auto-fix,evaluation',
+              state: 'open',
+              per_page: 5
+            });
+            
+            // If there are recent open issues, add a comment instead of creating new
+            if (existingIssues.data.length > 0) {
+              const latestIssue = existingIssues.data[0];
+              
+              // Check if it's recent (within last hour)
+              const issueDate = new Date(latestIssue.created_at);
+              const now = new Date();
+              const hourAgo = new Date(now - 60 * 60 * 1000);
+              
+              if (issueDate > hourAgo) {
+                // Add comment to existing issue instead of creating new one
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: latestIssue.number,
+                  body: `## 🔄 New Evaluation Failure\n\n${issueBody}`
+                });
+                
+                console.log(`Added comment to existing issue #${latestIssue.number}`);
+                return;
+              }
+            }
+            
+            // Create new issue
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Code Evaluation Failed: ${context.sha.substring(0, 7)} (${report.summary.failed} failures)`,
+              body: issueBody,
+              labels: ['auto-fix', 'evaluation', 'bot']
+            });
+            
+            console.log(`Created issue #${issue.data.number}`);
