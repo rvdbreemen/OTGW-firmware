@@ -89,7 +89,7 @@ void sendMQTTversioninfo(){
   snprintf_P(rebootCountBuf, sizeof(rebootCountBuf), PSTR("%lu"), static_cast<unsigned long>(rebootCount));
   sendMQTTData("otgw-firmware/version", _SEMVER_FULL);
   sendMQTTData("otgw-firmware/reboot_count", rebootCountBuf);
-  sendMQTTData("otgw-firmware/reboot_reason", lastReset.c_str());
+  sendMQTTData("otgw-firmware/reboot_reason", lastReset);
   sendMQTTData("otgw-pic/version", sPICfwversion);
   sendMQTTData("otgw-pic/deviceid", sPICdeviceid);
   sendMQTTData("otgw-pic/firmwaretype", sPICdeviceid);
@@ -2068,19 +2068,19 @@ void upgradepicnow(const char *filename) {
 
 void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   switch (result) {
-    case OTGWError::OTGW_ERROR_NONE:          errorupgrade = F("PIC upgrade was succesful"); break;
-    case OTGWError::OTGW_ERROR_MEMORY:        errorupgrade = F("Not enough memory available"); break;
-    case OTGWError::OTGW_ERROR_INPROG:        errorupgrade = F("Firmware upgrade in progress"); break;
-    case OTGWError::OTGW_ERROR_HEX_ACCESS:    errorupgrade = F("Could not open hex file"); break;
-    case OTGWError::OTGW_ERROR_HEX_FORMAT:    errorupgrade = F("Invalid format of hex file"); break;
-    case OTGWError::OTGW_ERROR_HEX_DATASIZE:  errorupgrade = F("Wrong data size in hex file"); break;
-    case OTGWError::OTGW_ERROR_HEX_CHECKSUM:  errorupgrade = F("Bad checksum in hex file"); break;
-    case OTGWError::OTGW_ERROR_MAGIC:         errorupgrade = F("Hex file does not contain expected data"); break;
-    case OTGWError::OTGW_ERROR_RESET:         errorupgrade = F("PIC reset failed"); break;
-    case OTGWError::OTGW_ERROR_RETRIES:       errorupgrade = F("Too many retries"); break;
-    case OTGWError::OTGW_ERROR_MISMATCHES:    errorupgrade = F("Too many mismatches"); break;
-    case OTGWError::OTGW_ERROR_DEVICE:        errorupgrade = F("Wrong PIC (16F88 <=> 16F1847)"); break;
-    default:                                  errorupgrade = F("Unknown state"); break;
+    case OTGWError::OTGW_ERROR_NONE:          snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("PIC upgrade was succesful")); break;
+    case OTGWError::OTGW_ERROR_MEMORY:        snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Not enough memory available")); break;
+    case OTGWError::OTGW_ERROR_INPROG:        snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Firmware upgrade in progress")); break;
+    case OTGWError::OTGW_ERROR_HEX_ACCESS:    snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Could not open hex file")); break;
+    case OTGWError::OTGW_ERROR_HEX_FORMAT:    snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Invalid format of hex file")); break;
+    case OTGWError::OTGW_ERROR_HEX_DATASIZE:  snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Wrong data size in hex file")); break;
+    case OTGWError::OTGW_ERROR_HEX_CHECKSUM:  snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Bad checksum in hex file")); break;
+    case OTGWError::OTGW_ERROR_MAGIC:         snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Hex file does not contain expected data")); break;
+    case OTGWError::OTGW_ERROR_RESET:         snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("PIC reset failed")); break;
+    case OTGWError::OTGW_ERROR_RETRIES:       snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Too many retries")); break;
+    case OTGWError::OTGW_ERROR_MISMATCHES:    snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Too many mismatches")); break;
+    case OTGWError::OTGW_ERROR_DEVICE:        snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Wrong PIC (16F88 <=> 16F1847)")); break;
+    default:                                  snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Unknown state")); break;
   }
   OTGWDebugTf(PSTR("Upgrade finished: Errorcode = %d - %s - %d retries, %d errors\r\n"), result, CSTR(errorupgrade), retries, errors);
   
