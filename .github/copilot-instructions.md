@@ -76,6 +76,20 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
   const char Header[] = "HTTP/1.1 303 OK\r\n...";
   ```
 
+- **Use `_P` variants for string comparisons**:
+  - Use `strcmp_P()`, `strcasecmp_P()`, `strstr_P()` instead of standard functions when comparing with literals.
+  - Wrap the distinct string literal in `PSTR()`.
+  
+  Example:
+  ```cpp
+  // GOOD:
+  if (strcmp_P(str, PSTR("value")) == 0) { ... }
+  if (strcasecmp_P(field, PSTR("Hostname")) == 0) { ... }
+  
+  // BAD - loads literal into RAM:
+  if (strcmp(str, "value") == 0) { ... }
+  ```
+
 - **Create function overloads** when existing functions don't support PROGMEM types:
   - If a function only accepts `const char*`, create an overload accepting `const __FlashStringHelper*` or `PGM_P`
   - Use `pgm_read_byte()` and related functions to read from PROGMEM
