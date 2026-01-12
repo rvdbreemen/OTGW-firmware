@@ -309,6 +309,72 @@ void sendJsonSettingObj(const char *cName, bool bValue, const char *sType)
   httpServer.sendContent(jsonBuff);
  
 } // sendJsonSettingObj(*char, bool, *char)    
+
+//=======================================================================
+// Helper Overloads for PROGMEM support
+//=======================================================================
+
+// sendNestedJsonObj helpers
+template <typename T>
+void sendNestedJsonObj(const __FlashStringHelper* cName, T value) {
+  char nameBuf[35]; 
+  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf)-1] = 0;
+  sendNestedJsonObj(nameBuf, value);
+}
+
+void sendNestedJsonObj(const __FlashStringHelper* cName, const __FlashStringHelper* cValue) {
+  char nameBuf[35];
+  char valBuf[101]; 
+  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf)-1] = 0;
+  strncpy_P(valBuf, (PGM_P)cValue, sizeof(valBuf));
+  valBuf[sizeof(valBuf)-1] = 0;
+  sendNestedJsonObj(nameBuf, (const char*)valBuf);
+}
+
+// sendJsonSettingObj helpers
+
+// For: void sendJsonSettingObj(const char *cName, float fValue, const char *fType, int minValue, int maxValue)
+void sendJsonSettingObj(const __FlashStringHelper* cName, float fValue, const char *fType, int minValue, int maxValue) {
+  char nameBuf[35];
+  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf)-1] = 0;
+  sendJsonSettingObj(nameBuf, fValue, fType, minValue, maxValue);
+}
+
+// For: void sendJsonSettingObj(const char *cName, float fValue, const char *fType, int minValue, int maxValue, int decPlaces)
+void sendJsonSettingObj(const __FlashStringHelper* cName, float fValue, const char *fType, int minValue, int maxValue, int decPlaces) {
+  char nameBuf[35];
+  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf)-1] = 0;
+  sendJsonSettingObj(nameBuf, fValue, fType, minValue, maxValue, decPlaces);
+}
+
+// For: void sendJsonSettingObj(const char *cName, int iValue, const char *iType, int minValue, int maxValue)
+void sendJsonSettingObj(const __FlashStringHelper* cName, int iValue, const char *iType, int minValue, int maxValue) {
+  char nameBuf[35];
+  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf)-1] = 0;
+  sendJsonSettingObj(nameBuf, iValue, iType, minValue, maxValue);
+}
+
+// For: void sendJsonSettingObj(const char *cName, const char *cValue, const char *sType, int maxLen)
+void sendJsonSettingObj(const __FlashStringHelper* cName, const char *cValue, const char *sType, int maxLen) {
+  char nameBuf[35];
+  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf)-1] = 0;
+  sendJsonSettingObj(nameBuf, cValue, sType, maxLen);
+}
+
+// For: void sendJsonSettingObj(const char *cName, bool bValue, const char *sType)
+void sendJsonSettingObj(const __FlashStringHelper* cName, bool bValue, const char *sType) {
+  char nameBuf[35];
+  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf)-1] = 0;
+  sendJsonSettingObj(nameBuf, bValue, sType);
+}
+
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a
