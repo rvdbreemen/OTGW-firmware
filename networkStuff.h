@@ -35,6 +35,8 @@
 **      }
 */
 
+#ifndef NETWORKSTUFF_H
+#define NETWORKSTUFF_H
 
 #include <ESP8266WiFi.h>        // ESP8266 Core WiFi Library         
 #include <ESP8266WebServer.h>   // Version 1.0.0 - part of ESP8266 Core https://github.com/esp8266/Arduino
@@ -109,7 +111,7 @@ static      FSInfo LittleFSinfo;
 bool        LittleFSmounted; 
 bool        isConnected = false;
 
-#define WM_DEBUG_PORT OTGWSerial
+#define WM_DEBUG_PORT TelnetStream
 
 void feedWatchDog();
 
@@ -117,9 +119,9 @@ void feedWatchDog();
 //===========================================================================================
 void configModeCallback (WiFiManager *myWiFiManager) 
 {
-  OTGWSerial.println("\nEntered config mode");
-  OTGWSerial.printf("SSID: %s\r\n", myWiFiManager->getConfigPortalSSID().c_str());
-  OTGWSerial.printf("IP address: %s\r\n", WiFi.softAPIP().toString().c_str());
+  DebugTln("\nEntered config mode");
+  DebugTf("SSID: %s\r\n", myWiFiManager->getConfigPortalSSID().c_str());
+  DebugTf("IP address: %s\r\n", WiFi.softAPIP().toString().c_str());
   DebugTln(F("Entered config mode\r"));
   DebugTln(WiFi.softAPIP().toString());
   //if you used auto generated SSID, print it
@@ -144,7 +146,7 @@ void startWiFi(const char* hostname, int timeOut)
   uint32_t lTime = millis();
   String thisAP = String(hostname) + "-" + WiFi.macAddress();
 
-  OTGWSerial.println("\nStart Wifi ...");
+  DebugTln("\nStart Wifi ...");
   manageWiFi.setDebugOutput(true);
 
   //--- next line in release needs to be commented out!
@@ -174,20 +176,20 @@ void startWiFi(const char* hostname, int timeOut)
   bool wifiSaved = manageWiFi.getWiFiIsSaved();
   bool wifiConnected = (WiFi.status() == WL_CONNECTED);
 
-  OTGWSerial.printf("Wifi status: %s\r\n", wifiConnected ? "Connected" : "Not connected");
-  OTGWSerial.printf("Wifi AP stored: %s\r\n", wifiSaved ? "Yes" : "No");
-  OTGWSerial.printf("Config portal SSID: %s\r\n", thisAP.c_str());
+  DebugTf("Wifi status: %s\r\n", wifiConnected ? "Connected" : "Not connected");
+  DebugTf("Wifi AP stored: %s\r\n", wifiSaved ? "Yes" : "No");
+  DebugTf("Config portal SSID: %s\r\n", thisAP.c_str());
 
   if (wifiConnected)
   {
-    OTGWSerial.println("Wifi already connected, skipping connect.");
+    DebugTln("Wifi already connected, skipping connect.");
   }
   else if (wifiSaved)
   {
-    OTGWSerial.println("Saved WiFi found, attempting direct connect...");
+    DebugTln("Saved WiFi found, attempting direct connect...");
     int directConnectTimeout = timeOut / 2;
     if (directConnectTimeout < 5) directConnectTimeout = 5;
-    OTGWSerial.printf("Direct connect timeout: %d sec\r\n", directConnectTimeout);
+    DebugTf("Direct connect timeout: %d sec\r\n", directConnectTimeout);
     WiFi.begin(); // use stored credentials
     DECLARE_TIMER_SEC(timeoutWifiConnectInitial, directConnectTimeout, CATCH_UP_MISSED_TICKS);
     while (WiFi.status() != WL_CONNECTED)
@@ -197,16 +199,16 @@ void startWiFi(const char* hostname, int timeOut)
       if DUE(timeoutWifiConnectInitial) break;
     }
     wifiConnected = (WiFi.status() == WL_CONNECTED);
-    OTGWSerial.printf("Direct connect result: %s\r\n", wifiConnected ? "Connected" : "Failed");
+    DebugTf("Direct connect result: %s\r\n", wifiConnected ? "Connected" : "Failed");
   }
   else
   {
-    OTGWSerial.println("No saved WiFi, starting config portal.");
+    DebugTln("No saved WiFi, starting config portal.");
   }
 
   if (!wifiConnected)
   {
-    OTGWSerial.println("Starting config portal...");
+    DebugTln("Starting config portal...");
     if (!manageWiFi.startConfigPortal(thisAP.c_str()))
     {
       //-- fail to connect? Have you tried turning it off and on again?
@@ -216,14 +218,14 @@ void startWiFi(const char* hostname, int timeOut)
       delay(5000);  // Enough time to ensure we don't return.
     }
   }
-  OTGWSerial.printf("Wifi status: %s\r\n", WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
-  OTGWSerial.printf("Connected to: %s\r\n", WiFi.localIP().toString().c_str());
+  DebugTf("Wifi status: %s\r\n", WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
+  DebugTf("Connected to: %s\r\n", WiFi.localIP().toString().c_str());
   // WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
 
   // Wait for connection to wifi  
-  OTGWSerial.printf("Wifi status: %s\r\n", WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
+  DebugTf("Wifi status: %s\r\n", WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
   if (WiFi.status() != WL_CONNECTED)
   {
     DECLARE_TIMER_SEC(timeoutWifiConnectFinal, timeOut, CATCH_UP_MISSED_TICKS);
@@ -251,9 +253,9 @@ void startWiFi(const char* hostname, int timeOut)
 //===========================================================================================
 void startTelnet() 
 {
-  OTGWSerial.print(F("\r\nUse  'telnet "));
-  OTGWSerial.print(WiFi.localIP());
-  OTGWSerial.println(F("' for debugging"));
+  DebugT(F("\r\nUse  'telnet "));
+  DebugT(WiFi.localIP());
+  DebugTln(F("' for debugging"));
   TelnetStream.begin();
   DebugTln(F("\nTelnet server started .."));
   TelnetStream.flush();
@@ -460,3 +462,5 @@ String getUniqueId() {
 * 
 ****************************************************************************
 */
+
+#endif // NETWORKSTUFF_H

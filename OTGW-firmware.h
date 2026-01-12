@@ -9,6 +9,9 @@
 ***************************************************************************      
 */
 
+#ifndef OTGW_FIRMWARE_H
+#define OTGW_FIRMWARE_H
+
 #include <Arduino.h>
 #include <AceTime.h>
 // #include <TimeLib.h>
@@ -220,3 +223,5 @@ int8_t    settingGPIOOUTPUTStriggerBit = 0;
 * 
 ****************************************************************************
 */
+
+#endif // OTGW_FIRMWARE_H
