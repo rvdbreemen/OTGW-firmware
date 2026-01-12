@@ -133,7 +133,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
 
       if(upload.status == UPLOAD_FILE_START){
         _updaterError.clear();
-        if (_serial_output) Debugf("Upload Start: %s (size: %s)\r\n", upload.filename.c_str(), _server->arg("size").c_str());
+        if (_serial_output) Debugf(PSTR("Upload Start: %s (size: %s)\r\n"), upload.filename.c_str(), _server->arg("size").c_str());
 
         _authenticated = (_username == emptyString || _password == emptyString || _server->authenticate(_username.c_str(), _password.c_str()));
         if(!_authenticated){
@@ -152,7 +152,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         
         WiFiUDP::stopAll();
         if (_serial_output)
-          Debugf("Update: %s\r\n", upload.filename.c_str());
+          Debugf(PSTR("Update: %s\r\n"), upload.filename.c_str());
 
         size_t uploadTotal = 0;
         String sizeArg = _server->arg("size");
@@ -268,7 +268,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
              _savedSettings = ""; 
           }
           // --------------------------------
-          if (_serial_output) Debugf("\r\nUpdate Success: %u\r\nRebooting...\r\n", upload.totalSize);
+          if (_serial_output) Debugf(PSTR("\r\nUpdate Success: %u\r\nRebooting...\r\n"), upload.totalSize);
           _status.upload_received = upload.totalSize;
           if (_status.upload_total == 0 && upload.totalSize > 0) {
             _status.upload_total = upload.totalSize;
@@ -351,7 +351,7 @@ template <typename ServerType>
 void ESP8266HTTPUpdateServerTemplate<ServerType>::_setStatus(uint8_t phase, const String &target, size_t received, size_t total, const String &filename, const String &error)
 {
   if (_serial_output) {
-      Debugf("Update Status: %s (recv: %u, total: %u)\r\n", _phaseToString(phase), received, total);
+      Debugf(PSTR("Update Status: %s (recv: %u, total: %u)\r\n"), _phaseToString(phase), received, total);
   }
   _status.phase = static_cast<UpdatePhase>(phase);
   _status.target = target.length() ? target : "unknown";
@@ -359,7 +359,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_setStatus(uint8_t phase, cons
   _status.total = total;
   if (_status.flash_total > 0 && _status.flash_written > _status.flash_total) {
     if (_serial_output) {
-      Debugf("Update warning: flash_written (%u) > flash_total (%u)\r\n",
+      Debugf(PSTR("Update warning: flash_written (%u) > flash_total (%u)\r\n"),
              static_cast<unsigned>(_status.flash_written),
              static_cast<unsigned>(_status.flash_total));
     }
@@ -460,7 +460,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusJson()
   // Check if the output was truncated
   if (written >= (int)sizeof(buf)) {
     if (_serial_output) {
-      Debugf("Warning: status JSON truncated (%d chars needed, %d available)\r\n", 
+      Debugf(PSTR("Warning: status JSON truncated (%d chars needed, %d available)\r\n"), 
              written, (int)sizeof(buf));
     }
     // Send error response instead of truncated JSON
