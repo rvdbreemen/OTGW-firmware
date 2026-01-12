@@ -2,15 +2,15 @@
 #define _VERSION_MAJOR 1
 #define _VERSION_MINOR 0
 #define _VERSION_PATCH 0
-#define _VERSION_BUILD 2344
-#define _VERSION_GITHASH "f9c284d"
+#define _VERSION_BUILD 2345
+#define _VERSION_GITHASH "11c0a23"
 #define _VERSION_PRERELEASE rc3
 #define _VERSION_DATE "12-01-2026"
-#define _VERSION_TIME "07:54:22"
+#define _VERSION_TIME "08:04:56"
 #define _SEMVER_CORE "1.0.0"
-#define _SEMVER_BUILD "1.0.0+2344"
-#define _SEMVER_GITHASH "1.0.0+f9c284d"
-#define _SEMVER_FULL "1.0.0-rc3+f9c284d"
+#define _SEMVER_BUILD "1.0.0+2345"
+#define _SEMVER_GITHASH "1.0.0+11c0a23"
+#define _SEMVER_FULL "1.0.0-rc3+11c0a23"
 #define _SEMVER_NOBUILD "1.0.0-rc3 (12-01-2026)"
-#define _VERSION "1.0.0-rc3+f9c284d (12-01-2026)"
+#define _VERSION "1.0.0-rc3+11c0a23 (12-01-2026)"
 //The version information is created automatically, more information here: https://github.com/rvdbreemen/autoinc-semver
