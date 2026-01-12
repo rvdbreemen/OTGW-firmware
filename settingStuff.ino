@@ -112,27 +112,27 @@ void readSettings(bool show)
   strlcpy(settingMQTTpasswd, doc[F("MQTTpasswd")] | "", sizeof(settingMQTTpasswd));
   
   strlcpy(settingMQTTtopTopic, doc[F("MQTTtoptopic")] | "", sizeof(settingMQTTtopTopic));
-  if (strlen(settingMQTTtopTopic)==0 || strcmp(settingMQTTtopTopic, "null")==0) {
+  if (strlen(settingMQTTtopTopic)==0 || strcmp_P(settingMQTTtopTopic, PSTR("null"))==0) {
     strlcpy(settingMQTTtopTopic, _HOSTNAME, sizeof(settingMQTTtopTopic));
     for(int i=0; settingMQTTtopTopic[i]; i++) settingMQTTtopTopic[i] = tolower(settingMQTTtopTopic[i]);
   }
   
   strlcpy(settingMQTThaprefix, doc[F("MQTThaprefix")] | "", sizeof(settingMQTThaprefix));
-  if (strlen(settingMQTThaprefix)==0 || strcmp(settingMQTThaprefix, "null")==0) strlcpy(settingMQTThaprefix, HOME_ASSISTANT_DISCOVERY_PREFIX, sizeof(settingMQTThaprefix));
+  if (strlen(settingMQTThaprefix)==0 || strcmp_P(settingMQTThaprefix, PSTR("null"))==0) strlcpy(settingMQTThaprefix, HOME_ASSISTANT_DISCOVERY_PREFIX, sizeof(settingMQTThaprefix));
   
   settingMQTTharebootdetection = doc[F("MQTTharebootdetection")]|settingMQTTharebootdetection;	  
   
   strlcpy(settingMQTTuniqueid, doc[F("MQTTuniqueid")] | "", sizeof(settingMQTTuniqueid));
-  if (strlen(settingMQTTuniqueid)==0 || strcmp(settingMQTTuniqueid, "null")==0) strlcpy(settingMQTTuniqueid, getUniqueId().c_str(), sizeof(settingMQTTuniqueid));
+  if (strlen(settingMQTTuniqueid)==0 || strcmp_P(settingMQTTuniqueid, PSTR("null"))==0) strlcpy(settingMQTTuniqueid, getUniqueId().c_str(), sizeof(settingMQTTuniqueid));
 
   settingMQTTOTmessage    = doc[F("MQTTOTmessage")]|settingMQTTOTmessage;
   settingNTPenable        = doc[F("NTPenable")]; 
   
   strlcpy(settingNTPtimezone, doc[F("NTPtimezone")] | "", sizeof(settingNTPtimezone));
-  if (strlen(settingNTPtimezone)==0 || strcmp(settingNTPtimezone, "null")==0)  strlcpy(settingNTPtimezone, "Europe/Amsterdam", sizeof(settingNTPtimezone)); //default to amsterdam timezone
+  if (strlen(settingNTPtimezone)==0 || strcmp_P(settingNTPtimezone, PSTR("null"))==0)  strlcpy(settingNTPtimezone, "Europe/Amsterdam", sizeof(settingNTPtimezone)); //default to amsterdam timezone
   
   strlcpy(settingNTPhostname, doc[F("NTPhostname")] | "", sizeof(settingNTPhostname));
-  if (strlen(settingNTPhostname)==0 || strcmp(settingNTPhostname, "null")==0)  strlcpy(settingNTPhostname, NTP_HOST_DEFAULT, sizeof(settingNTPhostname));  
+  if (strlen(settingNTPhostname)==0 || strcmp_P(settingNTPhostname, PSTR("null"))==0)  strlcpy(settingNTPhostname, NTP_HOST_DEFAULT, sizeof(settingNTPhostname));  
   settingNTPsendtime      = doc[F("NTPsendtime")]|settingNTPsendtime;
   settingLEDblink         = doc[F("LEDblink")]|settingLEDblink;
   settingDarkTheme        = doc[F("darktheme")]|settingDarkTheme;
@@ -155,7 +155,7 @@ void readSettings(bool show)
   CHANGE_INTERVAL_SEC(timers0counter, settingS0COUNTERinterval, CATCH_UP_MISSED_TICKS); 
   settingOTGWcommandenable = doc[F("OTGWcommandenable")] | settingOTGWcommandenable;
   strlcpy(settingOTGWcommands, doc[F("OTGWcommands")] | "", sizeof(settingOTGWcommands));
-  if (strcmp(settingOTGWcommands, "null")==0) settingOTGWcommands[0] = 0;
+  if (strcmp_P(settingOTGWcommands, PSTR("null"))==0) settingOTGWcommands[0] = 0;
   settingGPIOOUTPUTSenabled = doc[F("GPIOOUTPUTSenabled")] | settingGPIOOUTPUTSenabled;
   settingGPIOOUTPUTSpin = doc[F("GPIOOUTPUTSpin")] | settingGPIOOUTPUTSpin;
   settingGPIOOUTPUTStriggerBit = doc[F("GPIOOUTPUTStriggerBit")] | settingGPIOOUTPUTStriggerBit;
@@ -207,7 +207,7 @@ void updateSetting(const char *field, const char *newValue)
 { //do not just trust the caller to do the right thing, server side validation is here!
   DebugTf(PSTR("-> field[%s], newValue[%s]\r\n"), field, newValue);
 
-  if (strcasecmp(field, "hostname")==0) 
+  if (strcasecmp_P(field, PSTR("hostname"))==0) 
   { //make sure we have a valid hostname here...
     strlcpy(settingHostname, newValue, sizeof(settingHostname));
     if (strlen(settingHostname)==0) snprintf(settingHostname, sizeof(settingHostname), "OTGW-%06x", (unsigned int)ESP.getChipId());
@@ -226,107 +226,107 @@ void updateSetting(const char *field, const char *newValue)
     Debugln();
     DebugTf(PSTR("Need reboot before new %s.local will be available!\r\n\n"), settingHostname);
   }
-  if (strcasecmp(field, "AdminPassword")==0)   strlcpy(settingAdminPassword, newValue, sizeof(settingAdminPassword));
+  if (strcasecmp_P(field, PSTR("AdminPassword"))==0)   strlcpy(settingAdminPassword, newValue, sizeof(settingAdminPassword));
   
-  if (strcasecmp(field, "MQTTenable")==0)      settingMQTTenable = EVALBOOLEAN(newValue);
-  if (strcasecmp(field, "MQTTbroker") == 0)    strlcpy(settingMQTTbroker, newValue, sizeof(settingMQTTbroker));
-  if (strcasecmp(field, "MQTTbrokerPort")==0)  settingMQTTbrokerPort = atoi(newValue);
-  if (strcasecmp(field, "MQTTuser")==0)        strlcpy(settingMQTTuser, newValue, sizeof(settingMQTTuser));
-  if (strcasecmp(field, "MQTTpasswd")==0){
-    if ( newValue && strcasecmp(newValue, "notthepassword") != 0 ){
+  if (strcasecmp_P(field, PSTR("MQTTenable"))==0)      settingMQTTenable = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("MQTTbroker")) == 0)    strlcpy(settingMQTTbroker, newValue, sizeof(settingMQTTbroker));
+  if (strcasecmp_P(field, PSTR("MQTTbrokerPort"))==0)  settingMQTTbrokerPort = atoi(newValue);
+  if (strcasecmp_P(field, PSTR("MQTTuser"))==0)        strlcpy(settingMQTTuser, newValue, sizeof(settingMQTTuser));
+  if (strcasecmp_P(field, PSTR("MQTTpasswd"))==0){
+    if ( newValue && strcasecmp_P(newValue, PSTR("notthepassword")) != 0 ){
       strlcpy(settingMQTTpasswd, newValue, sizeof(settingMQTTpasswd));
     }
   }
-  if (strcasecmp(field, "MQTTtoptopic")==0)    {
+  if (strcasecmp_P(field, PSTR("MQTTtoptopic"))==0)    {
     strlcpy(settingMQTTtopTopic, newValue, sizeof(settingMQTTtopTopic));
     if (strlen(settingMQTTtopTopic)==0)    {
       strlcpy(settingMQTTtopTopic, _HOSTNAME, sizeof(settingMQTTtopTopic));
       for(int i = 0; settingMQTTtopTopic[i]; i++) settingMQTTtopTopic[i] = tolower(settingMQTTtopTopic[i]);
     }
   }
-  if (strcasecmp(field, "MQTThaprefix")==0)    {
+  if (strcasecmp_P(field, PSTR("MQTThaprefix"))==0)    {
     strlcpy(settingMQTThaprefix, newValue, sizeof(settingMQTThaprefix));
     if (strlen(settingMQTThaprefix)==0)    strlcpy(settingMQTThaprefix, HOME_ASSISTANT_DISCOVERY_PREFIX, sizeof(settingMQTThaprefix));
   }
-  if (strcasecmp(field, "MQTTharebootdetection")==0)      settingMQTTharebootdetection = EVALBOOLEAN(newValue);
-  if (strcasecmp(field, "MQTTuniqueid") == 0)  {
+  if (strcasecmp_P(field, PSTR("MQTTharebootdetection"))==0)      settingMQTTharebootdetection = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("MQTTuniqueid")) == 0)  {
     strlcpy(settingMQTTuniqueid, newValue, sizeof(settingMQTTuniqueid));     
     if (strlen(settingMQTTuniqueid) == 0)   strlcpy(settingMQTTuniqueid, getUniqueId().c_str(), sizeof(settingMQTTuniqueid));
   }
-  if (strcasecmp(field, "MQTTOTmessage")==0)   settingMQTTOTmessage = EVALBOOLEAN(newValue);
-  if (strstr(field, "mqtt") != NULL)        startMQTT();//restart MQTT on change of any setting
+  if (strcasecmp_P(field, PSTR("MQTTOTmessage"))==0)   settingMQTTOTmessage = EVALBOOLEAN(newValue);
+  if (strstr_P(field, PSTR("mqtt")) != NULL)        startMQTT();//restart MQTT on change of any setting
   
-  if (strcasecmp(field, "NTPenable")==0)      settingNTPenable = EVALBOOLEAN(newValue);
-  if (strcasecmp(field, "NTPhostname")==0)    {
+  if (strcasecmp_P(field, PSTR("NTPenable"))==0)      settingNTPenable = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("NTPhostname"))==0)    {
     strlcpy(settingNTPhostname, newValue, sizeof(settingNTPhostname)); 
     startNTP();
   }
-  if (strcasecmp(field, "NTPtimezone")==0)    {
+  if (strcasecmp_P(field, PSTR("NTPtimezone"))==0)    {
     strlcpy(settingNTPtimezone, newValue, sizeof(settingNTPtimezone));
     startNTP();  // update timezone if changed
   }
-  if (strcasecmp(field, "NTPsendtime")==0)    settingNTPsendtime = EVALBOOLEAN(newValue);
-  if (strcasecmp(field, "LEDblink")==0)      settingLEDblink = EVALBOOLEAN(newValue);
-  if (strcasecmp(field, "darktheme")==0)     settingDarkTheme = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("NTPsendtime"))==0)    settingNTPsendtime = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("LEDblink"))==0)      settingLEDblink = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("darktheme"))==0)     settingDarkTheme = EVALBOOLEAN(newValue);
   
-  if (strcasecmp(field, "ui_autoscroll")==0)      settingUIAutoScroll = EVALBOOLEAN(newValue);
-  if (strcasecmp(field, "ui_timestamps")==0)      settingUIShowTimestamp = EVALBOOLEAN(newValue);
-  if (strcasecmp(field, "ui_capture")==0)         settingUICaptureMode = EVALBOOLEAN(newValue);
-  if (strcasecmp(field, "ui_autoscreenshot")==0)  settingUIAutoScreenshot = EVALBOOLEAN(newValue);
-  if (strcasecmp(field, "ui_autodownloadlog")==0) settingUIAutoDownloadLog = EVALBOOLEAN(newValue);
-  if (strcasecmp(field, "ui_autoexport")==0)      settingUIAutoExport = EVALBOOLEAN(newValue);
-  if (strcasecmp(field, "ui_graphtimewindow")==0) settingUIGraphTimeWindow = atoi(newValue);
+  if (strcasecmp_P(field, PSTR("ui_autoscroll"))==0)      settingUIAutoScroll = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("ui_timestamps"))==0)      settingUIShowTimestamp = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("ui_capture"))==0)         settingUICaptureMode = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("ui_autoscreenshot"))==0)  settingUIAutoScreenshot = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("ui_autodownloadlog"))==0) settingUIAutoDownloadLog = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("ui_autoexport"))==0)      settingUIAutoExport = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("ui_graphtimewindow"))==0) settingUIGraphTimeWindow = atoi(newValue);
 
-  if (strcasecmp(field, "GPIOSENSORSenabled") == 0)
+  if (strcasecmp_P(field, PSTR("GPIOSENSORSenabled")) == 0)
   {
     settingGPIOSENSORSenabled = EVALBOOLEAN(newValue);
     Debugln();
     DebugTf(PSTR("Need reboot before GPIO SENSORS will search for sensors on pin GPIO%d!\r\n\n"), settingGPIOSENSORSpin);
   }
-  if (strcasecmp(field, "GPIOSENSORSpin") == 0)    
+  if (strcasecmp_P(field, PSTR("GPIOSENSORSpin")) == 0)    
   {
     settingGPIOSENSORSpin = atoi(newValue);
     Debugln();
     DebugTf(PSTR("Need reboot before GPIO SENSORS will use new pin GPIO%d!\r\n\n"), settingGPIOSENSORSpin);
   }
-  if (strcasecmp(field, "GPIOSENSORSinterval") == 0) {
+  if (strcasecmp_P(field, PSTR("GPIOSENSORSinterval")) == 0) {
     settingGPIOSENSORSinterval = atoi(newValue);
     CHANGE_INTERVAL_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS); 
   }
-  if (strcasecmp(field, "S0COUNTERenabled") == 0)
+  if (strcasecmp_P(field, PSTR("S0COUNTERenabled")) == 0)
   {
     settingS0COUNTERenabled = EVALBOOLEAN(newValue);
     Debugln();
     DebugTf(PSTR("Need reboot before S0 Counter starts counting on pin GPIO%d!\r\n\n"), settingS0COUNTERpin);
   }
-  if (strcasecmp(field, "S0COUNTERpin") == 0)    
+  if (strcasecmp_P(field, PSTR("S0COUNTERpin")) == 0)    
   {
     settingS0COUNTERpin = atoi(newValue);
     Debugln();
     DebugTf(PSTR("Need reboot before S0 Counter will use new pin GPIO%d!\r\n\n"), settingS0COUNTERpin);
   }
-  if (strcasecmp(field, "S0COUNTERdebouncetime") == 0) settingS0COUNTERdebouncetime = atoi(newValue);
-  if (strcasecmp(field, "S0COUNTERpulsekw") == 0)      settingS0COUNTERpulsekw = atoi(newValue);
+  if (strcasecmp_P(field, PSTR("S0COUNTERdebouncetime")) == 0) settingS0COUNTERdebouncetime = atoi(newValue);
+  if (strcasecmp_P(field, PSTR("S0COUNTERpulsekw")) == 0)      settingS0COUNTERpulsekw = atoi(newValue);
 
-  if (strcasecmp(field, "S0COUNTERinterval") == 0) {
+  if (strcasecmp_P(field, PSTR("S0COUNTERinterval")) == 0) {
     settingS0COUNTERinterval = atoi(newValue);
     CHANGE_INTERVAL_SEC(timers0counter, settingS0COUNTERinterval, CATCH_UP_MISSED_TICKS); 
   }
-  if (strcasecmp(field, "OTGWcommandenable")==0)    settingOTGWcommandenable = EVALBOOLEAN(newValue);
-  if (strcasecmp(field, "OTGWcommands")==0)         strlcpy(settingOTGWcommands, newValue, sizeof(settingOTGWcommands));
-  if (strcasecmp(field, "GPIOOUTPUTSenabled") == 0)
+  if (strcasecmp_P(field, PSTR("OTGWcommandenable"))==0)    settingOTGWcommandenable = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("OTGWcommands"))==0)         strlcpy(settingOTGWcommands, newValue, sizeof(settingOTGWcommands));
+  if (strcasecmp_P(field, PSTR("GPIOOUTPUTSenabled")) == 0)
   {
     settingGPIOOUTPUTSenabled = EVALBOOLEAN(newValue);
     Debugln();
     DebugTf(PSTR("Need reboot before GPIO OUTPUTS will be enabled on pin GPIO%d!\r\n\n"), settingGPIOOUTPUTSenabled);
   }
-  if (strcasecmp(field, "GPIOOUTPUTSpin") == 0)
+  if (strcasecmp_P(field, PSTR("GPIOOUTPUTSpin")) == 0)
   {
     settingGPIOOUTPUTSpin = atoi(newValue);
     Debugln();
     DebugTf(PSTR("Need reboot before GPIO OUTPUTS will use new pin GPIO%d!\r\n\n"), settingGPIOOUTPUTSpin);
   }
-  if (strcasecmp(field, "GPIOOUTPUTStriggerBit") == 0)
+  if (strcasecmp_P(field, PSTR("GPIOOUTPUTStriggerBit")) == 0)
   {
     settingGPIOOUTPUTStriggerBit = atoi(newValue);
     Debugln();
