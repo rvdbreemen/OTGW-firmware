@@ -117,6 +117,7 @@ const MAX_QUEUE_SIZE = 10000; // Maximum lines to queue before applying backpres
 const QUEUE_WARNING_THRESHOLD = 5000; // Warn when queue reaches this size
 let queueOverflowCount = 0; // Track how many messages were dropped due to overflow
 let lastQueueWarning = 0; // Timestamp of last warning to avoid spam
+let queueStatusUpdateTimer = null; // Timer for periodic UI updates
 
 // Expose helper for other modules (graph.js) to save files to the same directory
 window.saveBlobToLogDir = async function(filename, blob) {
@@ -838,6 +839,10 @@ async function startFileStreaming() {
     if (logFlushTimer) clearInterval(logFlushTimer);
     logFlushTimer = setInterval(processLogQueue, 10000);
 
+    // Start queue status update timer (every 2 seconds for UI responsiveness)
+    if (queueStatusUpdateTimer) clearInterval(queueStatusUpdateTimer);
+    queueStatusUpdateTimer = setInterval(updateStreamQueueStatus, 2000);
+
     // Initial file open
     const success = await rotateLogFile();
     if (success) {
@@ -949,6 +954,10 @@ function stopFileStreaming() {
       clearInterval(logFlushTimer);
       logFlushTimer = null;
   }
+  if (queueStatusUpdateTimer) {
+      clearInterval(queueStatusUpdateTimer);
+      queueStatusUpdateTimer = null;
+  }
   
   // Flush remaining queue before stopping
   processLogQueue();
@@ -996,6 +1005,7 @@ function enqueueLogLine(text) {
 }
 
 async function processLogQueue() {
+    // Early exit if already writing or nothing to write
     if (isLogWriting || logWriteQueue.length === 0 || !fileStreamHandle) return;
     isLogWriting = true;
 
@@ -1055,9 +1065,14 @@ async function processLogQueue() {
     } finally {
         isLogWriting = false;
         // Check if more lines were added while we were writing
-        // Use setTimeout to avoid stack overflow with rapid recursive calls
+        // Use queueMicrotask for better event loop performance
         if (logWriteQueue.length > 0) {
-            setTimeout(() => processLogQueue(), 0);
+            queueMicrotask(() => {
+                // Double-check the flag hasn't been set by another call
+                if (!isLogWriting) {
+                    processLogQueue();
+                }
+            });
         }
     }
 }
@@ -1068,11 +1083,8 @@ async function writeToStream(entry) {
     const text = formatLogLine(entry.data);
     const line = showTimestamps ? `${entry.time} ${text}` : text;
     enqueueLogLine(line);
-    
-    // Update UI with queue status every 100 messages
-    if (logWriteQueue.length % 100 === 0 && logWriteQueue.length > 0) {
-      updateStreamQueueStatus();
-    }
+    // Note: Queue status is now updated by a timer (queueStatusUpdateTimer) 
+    // every 2 seconds to reduce overhead instead of checking on every message
   } catch (err) {
     console.error("Error preparing stream write:", err);
   }
