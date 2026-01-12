@@ -125,28 +125,35 @@
         <div id="Graph" class="tab-content">
             <div class="ot-graph-container">
                <div class="ot-graph-controls">
-                   <label for="graphTimeWindow">Time Window: </label>
-                   <select id="graphTimeWindow" class="ot-graph-time-window">
-                       <option value="10">10 Minutes</option>
-                       <option value="30">30 Minutes</option>
-                       <option value="60" selected>1 Hour</option>
-                       <option value="120">2 Hours</option>
-                       <option value="240">4 Hours</option>
-                       <option value="360">6 Hours</option>
-                       <option value="720">12 Hours</option>
-                       <option value="1440">24 Hours</option>
-                   </select>
-                   <button id="btnGraphScreenshot" class="nav-item" style="height:25px; width:auto; font-size:13px; margin-left:10px;">Screenshot</button>
-                   <label class="log-control-label" style="display:inline-flex; margin-left:10px; margin-right:20px;" title="Automatically save screenshot every 15 minutes">
-                       <input type="checkbox" id="chkAutoScreenshot" />
-                       Auto-save PNG
-                   </label>
+                   <div class="ot-graph-group">
+                       <label for="graphTimeWindow">Time Window: </label>
+                       <select id="graphTimeWindow" class="ot-graph-time-window">
+                           <option value="10">10 Minutes</option>
+                           <option value="30">30 Minutes</option>
+                           <option value="60" selected>1 Hour</option>
+                           <option value="120">2 Hours</option>
+                           <option value="240">4 Hours</option>
+                           <option value="360">6 Hours</option>
+                           <option value="720">12 Hours</option>
+                           <option value="1440">24 Hours</option>
+                       </select>
+                   </div>
 
-                   <button id="btnGraphExport" class="nav-item" style="height:25px; width:auto; font-size:13px;">Export Data</button>
-                   <label class="log-control-label" style="display:inline-flex; margin-left:10px;" title="Automatically export CSV data every 15 minutes">
-                       <input type="checkbox" id="chkAutoExport" />
-                       Auto-save CSV
-                   </label>
+                   <div class="ot-graph-group">
+                       <button id="btnGraphScreenshot" class="nav-item">Screenshot</button>
+                       <label class="log-control-label" title="Automatically save screenshot every 15 minutes">
+                           <input type="checkbox" id="chkAutoScreenshot" />
+                           Auto-save PNG
+                       </label>
+                   </div>
+
+                   <div class="ot-graph-group">
+                       <button id="btnGraphExport" class="nav-item">Export Data</button>
+                       <label class="log-control-label" title="Automatically export CSV data every 15 minutes">
+                           <input type="checkbox" id="chkAutoExport" />
+                           Auto-save CSV
+                       </label>
+                   </div>
                </div>
                <div id="otGraphCanvas"></div>
             </div>
