@@ -928,20 +928,41 @@ async function checkFileRotation() {
         console.log("Midnight detected, rotating log file...");
         enqueueLogLine(`# End of log for ${currentLogDateStr}`);
         
-        // Best effort flush before rotation
-        if (!isLogWriting) {
-           await processLogQueue();
-        } else {
-           let checks = 0;
-           while(isLogWriting && checks < 10) {
-               await new Promise(r => setTimeout(r, 100));
-               checks++;
-           }
-           await processLogQueue();
+        // Wait for current write to complete before rotation
+        // Use a Promise-based approach with proper timeout
+        try {
+            await waitForQueueFlush(5000); // Wait up to 5 seconds
+        } catch (err) {
+            console.warn("Timeout waiting for queue flush before rotation:", err);
         }
 
         rotateLogFile();
     }
+}
+
+// Helper function to wait for the write queue to be flushed
+// Returns a Promise that resolves when the queue is empty or rejects on timeout
+function waitForQueueFlush(timeoutMs = 5000) {
+    return new Promise((resolve, reject) => {
+        const startTime = Date.now();
+        
+        const checkQueue = () => {
+            if (!isLogWriting && logWriteQueue.length === 0) {
+                resolve();
+                return;
+            }
+            
+            if (Date.now() - startTime > timeoutMs) {
+                reject(new Error(`Timeout after ${timeoutMs}ms`));
+                return;
+            }
+            
+            // Check again after a short delay
+            setTimeout(checkQueue, 100);
+        };
+        
+        checkQueue();
+    });
 }
 
 function stopFileStreaming() {
@@ -1038,6 +1059,9 @@ async function processLogQueue() {
         // Close to flush to disk immediately
         await writable.close();
         
+        // Note: streamBytesWritten now tracks actual bytes successfully written to disk,
+        // not estimated bytes queued. This is more accurate as it only counts data 
+        // that was successfully persisted to the file system.
         streamBytesWritten += blob.size;
 
     } catch (err) {
