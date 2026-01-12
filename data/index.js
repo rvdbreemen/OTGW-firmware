@@ -655,7 +655,10 @@ function setupOTLogControls() {
     } else {
       btn.classList.remove('btn-active');
     }
-    if (typeof sendPostSetting === 'function') sendPostSetting('ui_autoscroll', autoScroll);
+    // Note: Auto-scroll is per session usually? Or should we save it?
+    // User asked for checkboxes, this is a button. But let's save it if it was being saved.
+    // Previous key was 'ui_autoscroll', let's use '#uiAutoScroll'
+    if (typeof saveUISetting === 'function') saveUISetting('#uiAutoScroll', autoScroll);
   });
 
   // Toggle Capture Mode
@@ -673,7 +676,7 @@ function setupOTLogControls() {
         }
       }
       updateLogCounters();
-      if (typeof sendPostSetting === 'function') sendPostSetting('ui_capture', e.target.checked);
+      if (typeof saveUISetting === 'function') saveUISetting('#uiCaptureMode', e.target.checked);
     });
   }
 
@@ -724,6 +727,7 @@ function setupOTLogControls() {
   if (chkAutoDL) {
       chkAutoDL.addEventListener('change', function(e) {
           toggleAutoDownloadLog(e.target.checked);
+          if (typeof saveUISetting === 'function') saveUISetting('#uiAutoDownloadLog', e.target.checked);
       });
   }
   
@@ -739,7 +743,7 @@ function setupOTLogControls() {
   document.getElementById('chkShowTimestamp').addEventListener('change', function(e) {
     showTimestamps = e.target.checked;
     updateLogDisplay();
-    if (typeof sendPostSetting === 'function') sendPostSetting('ui_timestamps', e.target.checked);
+    if (typeof saveUISetting === 'function') saveUISetting('#uiShowTimestamp', e.target.checked);
   });
   
   // Manual scroll detection (disable auto-scroll if user scrolls up)
@@ -1031,9 +1035,6 @@ function toggleAutoDownloadLog(enabled) {
             downloadLog(true);
         }, 15 * 60 * 1000); 
     }
-    
-    // Save setting
-    if (typeof sendPostSetting === 'function') sendPostSetting('ui_autodownloadlog', enabled);
 }
 
 
@@ -1045,8 +1046,87 @@ function escapeHtml(text) {
 }
 
 //============================================================================  
+function loadUISettings() {
+  console.log("loadUISettings() ..");
+  fetch(APIGW + "v0/settings")
+    .then(response => response.json())
+    .then(json => {
+      let data = json.settings;
+      for (let i in data) {
+        let name = data[i].name;
+        let val = data[i].value;
+        
+        // Map backend settings to UI elements
+        if (name === "#uiAutoScroll") {
+           // AutoScroll isn't a checkbox but a button state and global var
+           let newVal = strToBool(val);
+           autoScroll = newVal;
+           const btn = document.getElementById('btnAutoScroll');
+           if (btn) {
+             if (autoScroll) btn.classList.add('btn-active');
+             else btn.classList.remove('btn-active');
+           }
+        } else if (name === "#uiAutoDownloadLog") {
+           let el = document.getElementById("chkAutoDownloadLog");
+           if(el) {
+             let isChecked = strToBool(val);
+             el.checked = isChecked;
+             toggleAutoDownloadLog(isChecked);
+           }
+        } else if (name === "#uiShowTimestamp") {
+           let el = document.getElementById("chkShowTimestamp");
+           // For this one, we also need to update global variable if needed, 
+           // but the event listener handles it on change. 
+           // Ideally we should trigger the logic.
+           if(el) {
+             el.checked = strToBool(val);
+             showTimestamps = el.checked;
+             updateLogDisplay(); 
+           }
+        } else if (name === "#uiCaptureMode") {
+           let el = document.getElementById("chkCaptureMode");
+           if(el) {
+             el.checked = strToBool(val);
+             if (el.checked) maxLogLines = MAX_LOG_LINES_CAPTURE;
+             else maxLogLines = MAX_LOG_LINES_DEFAULT;
+           }
+        } else if (name === "#uiStreamToFile") {
+           // We generally default this to false on reload as we lose the file handle
+           // But if we wanted to persist it we'd need to re-prompt user.
+           // For now, let's just leave it unchecked or respect it? 
+           // Browser security prevents auto-reopen without user gesture usually.
+           // So we skip restoring this one to true.
+        } else if (name === "#uiAutoScreenshot") {
+           let el = document.getElementById("chkAutoScreenshot");
+           if(el) {
+             el.checked = strToBool(val);
+             // Graph might not be loaded yet or needs to be notified
+             if (window.OTGraph) window.OTGraph.toggleAutoScreenshot(el.checked);
+           }
+        } else if (name === "#uiAutoExport") {
+           let el = document.getElementById("chkAutoExport");
+           if(el) {
+             el.checked = strToBool(val);
+             if (window.OTGraph) window.OTGraph.toggleAutoExport(el.checked);
+           }
+        }
+      }
+    })
+    .catch(error => console.error("Error loading UI settings:", error));
+}
+
+function saveUISetting(field, value) {
+  // Wrapper to ensure we use the backend API
+  // field should start with # if it's a hidden setting
+  console.log("Saving UI Setting [" + field + "] = " + value);
+  sendPostSetting(field, value);
+}
+
+//============================================================================  
 function initMainPage() {
   console.log("initMainPage()");
+  
+  loadUISettings();
   
   // Check if we're in flash mode (from sessionStorage)
   try {
@@ -1593,6 +1673,9 @@ function refreshSettings() {
       document.getElementById("settingMessage").innerHTML = "";
       for (let i in data) {
         console.log("[" + data[i].name + "]=>[" + data[i].value + "]");
+        // Skip hidden settings starting with #
+        if (data[i].name.startsWith('#')) continue;
+
         var settings = document.getElementById('settingsPage');
         if ((document.getElementById("D_" + data[i].name)) == null) {
           var rowDiv = document.createElement("div");
