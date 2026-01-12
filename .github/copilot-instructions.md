@@ -86,11 +86,21 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
 
 ### Build and Test
 
-- Build locally: `python build.py` or `make -j$(nproc)`
-- Filesystem build: `make filesystem`
-- Clean: `make clean` or `python build.py --clean`
-- CI/CD uses GitHub Actions with the same Makefile
-- Always test on actual hardware when possible (ESP8266 behavior can differ from simulation)
+- **Build locally**: `python build.py` or `make -j$(nproc)`
+  - Build firmware only: `python build.py --firmware`
+  - Build filesystem only: `python build.py --filesystem`
+  - Clean build: `python build.py --clean`
+  - Build script auto-installs arduino-cli if missing
+- **Flash firmware**: `python flash_esp.py` (downloads and flashes latest release)
+  - Flash from local build: `python flash_esp.py --build`
+  - See [FLASH_GUIDE.md](FLASH_GUIDE.md) for detailed instructions
+- **Evaluate code quality**: `python evaluate.py`
+  - Quick check: `python evaluate.py --quick`
+  - Generate report: `python evaluate.py --report`
+  - See [EVALUATION.md](EVALUATION.md) for evaluation framework details
+- **Build artifacts**: Located in `build/` directory with versioned filenames
+- **CI/CD**: Uses GitHub Actions with the same Makefile
+- **Always test on actual hardware when possible** (ESP8266 behavior can differ from simulation)
 
 ## Common Patterns
 
@@ -178,5 +188,44 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
 - Follow existing code organization (modular .ino files)
 - Add version bumps to `version.h` for releases
 - Update release notes in README.md for user-facing changes
-- Test builds with `python build.py` before submitting
+- **Run evaluation before submitting**: `python evaluate.py` to check code quality
+- **Test builds**: `python build.py` before submitting
 - Ensure changes work with the NodoShop OTGW hardware
+
+## Development Tools
+
+### Build System (`build.py`)
+
+The Python build script automates the entire build process:
+- Auto-installs arduino-cli if not present
+- Updates version information from git
+- Builds firmware and filesystem
+- Creates versioned artifacts in `build/` directory
+- Options: `--firmware`, `--filesystem`, `--clean`, `--no-rename`
+
+### Flash Tool (`flash_esp.py`)
+
+Automated firmware flashing for ESP8266:
+- Default: Downloads and flashes latest GitHub release
+- `--build`: Builds from source and flashes
+- Handles both firmware and filesystem images
+- Platform-independent (Windows, Mac, Linux)
+
+### Evaluation Framework (`evaluate.py`)
+
+Comprehensive code quality analysis tool:
+- **Categories**: Code structure, coding standards, memory patterns, build system, dependencies, documentation, security, git health, filesystem data
+- **Usage patterns**:
+  - Full evaluation: `python evaluate.py`
+  - Quick check: `python evaluate.py --quick` (essentials only)
+  - Generate JSON report: `python evaluate.py --report`
+  - Verbose output: `python evaluate.py --verbose`
+- **Key checks**:
+  - Detects improper `Serial.print()` usage (should use Debug macros)
+  - Flags excessive `String` class usage (heap fragmentation risk)
+  - Validates OpenTherm command format in MQTT mappings
+  - Checks for buffer overflow vulnerabilities
+  - Verifies header guards in .h files
+  - Validates build system health
+- **Exit codes**: Non-zero if any FAIL results (CI/CD integration)
+- See [EVALUATION.md](EVALUATION.md) for detailed documentation
