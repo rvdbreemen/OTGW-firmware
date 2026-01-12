@@ -17,7 +17,7 @@ CLICFG := $(CLI) --config-file $(CFGFILE)
 # bug in http stream, fallback to 2.7.4
 # ESP8266URL := https://github.com/esp8266/Arduino/releases/download/3.0.2/package_esp8266com_index.json
 ESP8266URL := https://github.com/esp8266/Arduino/releases/download/2.7.4/package_esp8266com_index.json
-LIBRARIES := libraries/WiFiManager libraries/ArduinoJson libraries/PubSubClient libraries/TelnetStream libraries/AceCommon libraries/AceSorting libraries/AceTime libraries/OneWire libraries/DallasTemperature libraries/WebSockets
+LIBRARIES := libraries/WiFiManager libraries/ArduinoJson libraries/PubSubClient libraries/TelnetStream libraries/AceCommon libraries/AceSorting libraries/AceTime libraries/OneWire libraries/DallasTemperature libraries/WebSockets libraries/Time
 BOARDS := arduino/package_esp8266com_index.json
 # PORT can be overridden by the environment or on the command line. E.g.:
 # export PORT=/dev/ttyUSB2; make upload, or: make upload PORT=/dev/ttyUSB2
@@ -96,9 +96,8 @@ libraries/AceSorting:
 libraries/AceTime:
 	$(CLICFG) lib install AceTime@2.0.1
 
-# libraries/Time:
-# 	$(CLI) lib install --git-url https://github.com/PaulStoffregen/Time
-# 	# https://github.com/PaulStoffregen/Time/archive/refs/tags/v1.6.1.zip
+libraries/Time:
+	$(CLICFG) lib install Time@1.6.1
 
 libraries/OneWire:
 	$(CLICFG) lib install OneWire@2.3.8
