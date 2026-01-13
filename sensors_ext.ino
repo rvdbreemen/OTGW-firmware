@@ -135,17 +135,16 @@ if (settingMQTTenable) {
     if (bDebugSensors) DebugTf(PSTR("Sensor device no[%d] addr[%s] TempC: %f\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
 
     if (settingMQTTenable ) {
-      //Build string for MQTT, rse sendMQTTData for this
+      //Build string for MQTT, use sendMQTTData for this
       // ref MQTTPubNamespace = settingMQTTtopTopic + "/value/" + strDeviceAddress ;
       char _msg[15]{0};
-      char _topic[50]{0};
-      snprintf_P(_topic, sizeof _topic, PSTR("%s"), strDeviceAddress);
+      // strDeviceAddress is already a const char* from getDallasAddress()
+      // Just format the temperature value
       snprintf_P(_msg, sizeof _msg, PSTR("%4.1f"), DallasrealDevice[i].tempC);
 
-      // DebugTf(PSTR("Topic: %s -- Payload: %s\r\n"), _topic, _msg);
+      // DebugTf(PSTR("Topic: %s -- Payload: %s\r\n"), strDeviceAddress, _msg);
       if (bDebugSensors) DebugFlush();
-      // sendMQTTData(_topic, _msg);
-      sendMQTTData(_topic, _msg);
+      sendMQTTData(strDeviceAddress, _msg);
       // Serial.println(DallasTemperature::toFahrenheit(tempC)); // Converts tempC to Fahrenheit
     }
   }
@@ -157,11 +156,15 @@ if (settingMQTTenable) {
 char* getDallasAddress(DeviceAddress deviceAddress)
 {
   static char dest[17]; // 8 bytes * 2 chars + 1 null
+  static const char hexchars[] PROGMEM = "0123456789ABCDEF";
   
   for (uint8_t i = 0; i < 8; i++)
   {
-    snprintf_P(dest + (i * 2), 3, PSTR("%02X"), deviceAddress[i]);
+    uint8_t b = deviceAddress[i];
+    dest[i*2]   = pgm_read_byte(&hexchars[b >> 4]);
+    dest[i*2+1] = pgm_read_byte(&hexchars[b & 0x0F]);
   }
+  dest[16] = '\0';
   return dest;
 }
 
