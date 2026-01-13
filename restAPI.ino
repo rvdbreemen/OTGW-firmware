@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.0.0-rc3
+**  Version  : v1.0.0-rc4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -568,6 +568,7 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("ui_autoexport"), settingUIAutoExport, "b");
   sendJsonSettingObj(F("ui_graphtimewindow"), settingUIGraphTimeWindow, "i", 0, 1440);
   sendJsonSettingObj(F("gpiosensorsenabled"), settingGPIOSENSORSenabled, "b");
+  sendJsonSettingObj(F("gpiosensorslegacyformat"), settingGPIOSENSORSlegacyformat, "b");
   sendJsonSettingObj(F("gpiosensorspin"), settingGPIOSENSORSpin, "i", 0, 16);
   sendJsonSettingObj(F("gpiosensorsinterval"), settingGPIOSENSORSinterval, "i", 5, 65535);
   sendJsonSettingObj(F("s0counterenabled"), settingS0COUNTERenabled, "b");

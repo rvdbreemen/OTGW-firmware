@@ -1,6 +1,6 @@
 /*
 **  Program  : output_ext.ino
-**  Version  : v1.0.0-rc3
+**  Version  : v1.0.0-rc4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
@@ -158,6 +158,37 @@ char* getDallasAddress(DeviceAddress deviceAddress)
   static char dest[17]; // 8 bytes * 2 chars + 1 null
   static const char hexchars[] PROGMEM = "0123456789ABCDEF";
   
+  if (settingGPIOSENSORSlegacyformat) {
+    // Replicate the "buggy" behavior of previous versions (~v0.10.x)
+    // which produced a compressed/corrupted ID (approx 9-10 chars)
+    // This provides backward compatibility for Home Assistant automations.
+    memset(dest, 0, sizeof(dest));
+    
+    for (uint8_t i = 0; i < 8; i++) {
+        uint8_t val = deviceAddress[i];
+        if (val < 16) {
+           strlcat(dest, "0", sizeof(dest));
+        }
+        // Emulate: sprintf(dest+i, "%X", val);
+        char hexBuffer[4];
+        snprintf(hexBuffer, sizeof(hexBuffer), "%X", val);
+        size_t len = strlen(hexBuffer);
+        
+        // Write at offset i, overwriting existing chars
+        for(size_t k=0; k<len; k++) {
+            if (i+k < sizeof(dest)-1) {
+                dest[i+k] = hexBuffer[k];
+            }
+        }
+        // Ensure null termination at the end of what we just wrote
+        if (i+len < sizeof(dest)) {
+            dest[i+len] = '\0';
+        }
+    }
+    return dest;
+  }
+
+  // Standard Correct Format (16 hex chars)
   for (uint8_t i = 0; i < 8; i++)
   {
     uint8_t b = deviceAddress[i];
