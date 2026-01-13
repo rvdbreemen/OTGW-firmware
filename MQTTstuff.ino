@@ -341,7 +341,7 @@ void handleMQTT()
         sendMQTT(MQTTPubNamespace, "online");
 
         // First do AutoConfiguration for Homeassistant
-        // doAutoConfigure();
+        doAutoConfigure();
 
         //Subscribe to topics
         char topic[100];
