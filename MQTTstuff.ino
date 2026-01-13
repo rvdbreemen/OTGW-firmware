@@ -554,16 +554,107 @@ void clearMQTTConfigDone()
   memset(MQTTautoConfigMap, 0, sizeof(MQTTautoConfigMap));
 }
 //===========================================================================================
-void doAutoConfigure(bool bForcaAll = false){
-  //force all sensors to be sent to auto configuration
-  for (int i=0; i<255; i++){
-    if ((getMQTTConfigDone((byte)i)==true) || bForcaAll) {
-      MQTTDebugTf(PSTR("Sending auto configuration for sensor %d\r\n"), i);
-      doAutoConfigureMsgid((byte)i);
-      doBackgroundTasks();
+void doAutoConfigure(bool bForceAll = false){
+  // Refactored for Single-Pass Efficiency and Dynamic Buffer Resizing
+  
+  if (!settingMQTTenable) return;
+
+  // 1. Allocate buffers on HEAP to save STATIC RAM during normal operation
+  char* sLine = new char[MQTT_CFG_LINE_MAX_LEN];
+  char* sTopic = new char[MQTT_TOPIC_MAX_LEN];
+  char* sMsg = new char[MQTT_MSG_MAX_LEN];
+  
+  // Check allocation success
+  if (!sLine || !sTopic || !sMsg) {
+     DebugTln(F("Error: Out of memory for AutoConfigure"));
+     if(sLine) delete[] sLine; 
+     if(sTopic) delete[] sTopic; 
+     if(sMsg) delete[] sMsg;
+     return;
+  }
+
+  // 2. Open File ONCE
+  LittleFS.begin();
+  if (!LittleFS.exists(F("/mqttha.cfg"))) {
+    DebugTln(F("Error: configuration file not found.")); 
+    delete[] sLine; delete[] sTopic; delete[] sMsg;
+    return;
+  } 
+
+  File fh = LittleFS.open(F("/mqttha.cfg"), "r");
+  if (!fh) {
+    DebugTln(F("Error: could not open configuration file.")); 
+    delete[] sLine; delete[] sTopic; delete[] sMsg;
+    return;
+  } 
+
+  byte lineID = 0;
+  
+  // 3. Loop through file once
+  while (fh.available()) {
+    feedWatchDog(); // Keep the dog happy during IO
+    
+    // Read line
+    size_t len = fh.readBytesUntil('\n', sLine, MQTT_CFG_LINE_MAX_LEN - 1);
+    sLine[len] = '\0';
+    
+    // Parse Line
+    if (!splitLine(sLine, ';', lineID, sTopic, MQTT_TOPIC_MAX_LEN, sMsg, MQTT_MSG_MAX_LEN)) continue;
+
+    // 4. Decision: Do we send this line?
+    if (bForceAll || getMQTTConfigDone(lineID) || (lineID == OTGWdallasdataid)) {
+       
+       bool isDallas = (lineID == OTGWdallasdataid);
+       
+       // Special handling: Dallas sensors are managed by configSensors() which calls the worker function.
+       // We can skip them here to avoid duplication or complex logic, or handle them if desired.
+       // Current implementation delegates Dallas to configSensors(), so for bulk update, we should check if we need to trigger that.
+       if (isDallas) {
+          // For Dallas, we can't easily bulk-process because we need the sensor address which isn't in the config file
+          // So we skip it here and handle it strictly via the worker logic which configSensors calls.
+          continue; 
+       }
+
+       MQTTDebugTf(PSTR("Processing AutoConfig for ID %d\r\n"), lineID);
+
+       // --- Perform Replacements (Topic & Msg) ---
+       if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settingMQTThaprefix))) continue;
+       if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%node_id%", NodeId)) continue;
+       if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%sensor_id%", "")) continue; 
+
+       if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%node_id%", NodeId)) continue;
+       if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%sensor_id%", "")) continue;
+       if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%hostname%", CSTR(settingHostname))) continue;
+       if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%version%", _VERSION)) continue;
+       if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_pub_topic%", MQTTPubNamespace)) continue;
+       if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_sub_topic%", MQTTSubNamespace)) continue;
+
+       // 5. CRITICAL FIX: Dynamic Buffer Resizing
+       size_t msgLen = strlen(sMsg);
+       uint16_t currentSize = MQTTclient.getBufferSize();
+       // Add some overhead for topic + protocol bytes
+       if (currentSize < (msgLen + 128)) {
+          MQTTDebugTf(PSTR("Resizing MQTT buffer from %d to %d\r\n"), currentSize, msgLen + 128);
+          MQTTclient.setBufferSize(msgLen + 128); 
+       }
+
+       // Send retained message
+       sendMQTT(sTopic, sMsg, msgLen);
+       
+       doBackgroundTasks(); // Yield to network stack
     }
   }
-//  bool success = doAutoConfigure("config"); // the string "config" should match every line non-comment in mqttha.cfg
+
+  fh.close();
+  
+  // Cleanup
+  resetMQTTBufferSize(); // Shrink buffer back to save RAM
+  delete[] sLine; delete[] sTopic; delete[] sMsg;
+  
+  // Trigger Dallas configuration separately as it requires specific sensor addresses
+  if (settingMQTTenable && (bForceAll || getMQTTConfigDone(OTGWdallasdataid))) {
+      configSensors();
+  }
 }
 //===========================================================================================
 bool doAutoConfigureMsgid(byte OTid)
@@ -577,7 +668,7 @@ bool doAutoConfigureMsgid(byte OTid)
   return doAutoConfigureMsgid(OTid, nullptr);
 }
 
- bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
+bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
 {
   bool _result = false;
   const char *sensorId = (cfgSensorId != nullptr) ? cfgSensorId : "";
@@ -594,9 +685,22 @@ bool doAutoConfigureMsgid(byte OTid)
     return _result;
   } 
 
+  // Allocate buffers dynamically to save stack/static RAM
+  char* sMsg = new char[MQTT_MSG_MAX_LEN];
+  char* sTopic = new char[MQTT_TOPIC_MAX_LEN];
+  // We can reuse sMsg for sLine read since we process it immediately
+  // But safer to have separate buffer for line reading
+  char* sLine = new char[MQTT_CFG_LINE_MAX_LEN];
+  
+  if (!sMsg || !sTopic || !sLine) {
+     DebugTln(F("Error: Out of memory in doAutoConfigureMsgid"));
+     if(sMsg) delete[] sMsg;
+     if(sTopic) delete[] sTopic;
+     if(sLine) delete[] sLine;
+     return _result;
+  }
+
   byte lineID = 39; // 39 is unused in OT protocol so is a safe value
-  static char sMsg[MQTT_MSG_MAX_LEN];
-  static char sTopic[MQTT_TOPIC_MAX_LEN];
 
   //Let's open the MQTT autoconfig file
   File fh; //filehandle
@@ -605,6 +709,7 @@ bool doAutoConfigureMsgid(byte OTid)
 
   if (!LittleFS.exists(F("/mqttha.cfg"))) {
     DebugTln(F("Error: confuration file not found.")); 
+    delete[] sMsg; delete[] sTopic; delete[] sLine;
     return _result;
   } 
 
@@ -612,21 +717,21 @@ bool doAutoConfigureMsgid(byte OTid)
 
   if (!fh) {
     DebugTln(F("Error: could not open confuration file.")); 
+    delete[] sMsg; delete[] sTopic; delete[] sLine;
     return _result;
   } 
 
   //Lets go read the config and send it out to MQTT line by line
   while (fh.available())
   {
-    memset(sTopic, 0, sizeof(sTopic));
-    memset(sMsg, 0, sizeof(sMsg));
+    memset(sTopic, 0, MQTT_TOPIC_MAX_LEN);
+    memset(sMsg, 0, MQTT_MSG_MAX_LEN);
     //read file line by line, split and send to MQTT (topic, msg)
     feedWatchDog(); //start with feeding the dog
     
-    static char sLine[MQTT_CFG_LINE_MAX_LEN];
-    size_t len = fh.readBytesUntil('\n', sLine, sizeof(sLine) - 1);
+    size_t len = fh.readBytesUntil('\n', sLine, MQTT_CFG_LINE_MAX_LEN - 1);
     sLine[len] = '\0';
-    if (!splitLine(sLine, ';', lineID, sTopic, sizeof(sTopic), sMsg, sizeof(sMsg))) {  //splitLine() also filters comments
+    if (!splitLine(sLine, ';', lineID, sTopic, MQTT_TOPIC_MAX_LEN, sMsg, MQTT_MSG_MAX_LEN)) {  //splitLine() also filters comments
       continue;
     }
 
@@ -637,13 +742,13 @@ bool doAutoConfigureMsgid(byte OTid)
 
     // discovery topic prefix
     MQTTDebugTf(PSTR("sTopic[%s]==>"), sTopic); 
-    if (!replaceAll(sTopic, sizeof(sTopic), "%homeassistant%", CSTR(settingMQTThaprefix))) { MQTTDebugTln(F("MQTT: topic replacement overflow")); continue; }
+    if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settingMQTThaprefix))) { MQTTDebugTln(F("MQTT: topic replacement overflow")); continue; }
 
     /// node
-    if (!replaceAll(sTopic, sizeof(sTopic), "%node_id%", NodeId)) { MQTTDebugTln(F("MQTT: node_id replacement overflow")); continue; }
+    if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%node_id%", NodeId)) { MQTTDebugTln(F("MQTT: node_id replacement overflow")); continue; }
 
     /// SensorId
-    if (!replaceAll(sTopic, sizeof(sTopic), "%sensor_id%", sensorId)) { MQTTDebugTln(F("MQTT: sensor_id replacement overflow")); continue; }
+    if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%sensor_id%", sensorId)) { MQTTDebugTln(F("MQTT: sensor_id replacement overflow")); continue; }
 
     MQTTDebugf(PSTR("[%s]\r\n"), sTopic); 
     /// ----------------------
@@ -651,25 +756,33 @@ bool doAutoConfigureMsgid(byte OTid)
     MQTTDebugTf(PSTR("sMsg[%s]==>"), sMsg); 
 
     /// node
-    if (!replaceAll(sMsg, sizeof(sMsg), "%node_id%", NodeId)) { MQTTDebugTln(F("MQTT: node_id replacement overflow")); continue; }
+    if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%node_id%", NodeId)) { MQTTDebugTln(F("MQTT: node_id replacement overflow")); continue; }
 
     /// SensorId
-    if (!replaceAll(sMsg, sizeof(sMsg), "%sensor_id%", sensorId)) { MQTTDebugTln(F("MQTT: sensor_id replacement overflow")); continue; }
+    if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%sensor_id%", sensorId)) { MQTTDebugTln(F("MQTT: sensor_id replacement overflow")); continue; }
 
     /// hostname
-    if (!replaceAll(sMsg, sizeof(sMsg), "%hostname%", CSTR(settingHostname))) { MQTTDebugTln(F("MQTT: hostname replacement overflow")); continue; }
+    if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%hostname%", CSTR(settingHostname))) { MQTTDebugTln(F("MQTT: hostname replacement overflow")); continue; }
 
     /// version
-    if (!replaceAll(sMsg, sizeof(sMsg), "%version%", _VERSION)) { MQTTDebugTln(F("MQTT: version replacement overflow")); continue; }
+    if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%version%", _VERSION)) { MQTTDebugTln(F("MQTT: version replacement overflow")); continue; }
 
     // pub topics prefix
-    if (!replaceAll(sMsg, sizeof(sMsg), "%mqtt_pub_topic%", MQTTPubNamespace)) { MQTTDebugTln(F("MQTT: mqtt_pub_topic replacement overflow")); continue; }
+    if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_pub_topic%", MQTTPubNamespace)) { MQTTDebugTln(F("MQTT: mqtt_pub_topic replacement overflow")); continue; }
 
     // sub topics
-    if (!replaceAll(sMsg, sizeof(sMsg), "%mqtt_sub_topic%", MQTTSubNamespace)) { MQTTDebugTln(F("MQTT: mqtt_sub_topic replacement overflow")); continue; }
+    if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_sub_topic%", MQTTSubNamespace)) { MQTTDebugTln(F("MQTT: mqtt_sub_topic replacement overflow")); continue; }
 
     MQTTDebugf(PSTR("[%s]\r\n"), sMsg); 
     DebugFlush();
+    
+    // CRITICAL FIX: Dynamic Buffer Resizing
+    size_t msgLen = strlen(sMsg);
+    uint16_t currentSize = MQTTclient.getBufferSize();
+    if (currentSize < (msgLen + 128)) {
+        MQTTDebugTf(PSTR("Resizing MQTT buffer from %d to %d\r\n"), currentSize, msgLen + 128);
+        MQTTclient.setBufferSize(msgLen + 128); 
+    }
 
     sendMQTT(sTopic, sMsg, strlen(sMsg));
     resetMQTTBufferSize();
@@ -681,11 +794,13 @@ bool doAutoConfigureMsgid(byte OTid)
   } // while available()
   
   fh.close();
+  delete[] sMsg; delete[] sTopic; delete[] sLine;
 
   // HA discovery msg's are rather large, reset the buffer size to release some memory
   resetMQTTBufferSize();
 
   return _result;
+
 }
 
 void sensorAutoConfigure(byte dataid, bool finishflag , const char *cfgSensorId = nullptr) {
