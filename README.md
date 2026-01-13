@@ -99,6 +99,16 @@ The Web UI and APIs are designed for use on a trusted local network. Do not expo
 - Dallas temperature sensors (e.g. DS18B20) with Home Assistant discovery support.
 - S0 pulse counter for kWh meters on a configurable GPIO.
 
+#### **Important Note for Dallas Sensors (v1.0.0)**
+**Breaking Change**: In previous versions (< v1.0), a bug in the code generated Dallas DS18B20 sensor IDs that were shorter than the standard format (e.g., `2FE7983B8` instead of `28F0E979970803B8`).
+
+Version 1.0.0 fixes this bug, ensuring that all sensors now report their correct, unique 16-character hexadecimal address.
+
+**However**, this change breaks existing Home Assistant automations that rely on the old, truncated IDs. To support users upgrading from older versions without forcing a reconfiguration, we have added a **Legacy Format** setting:
+
+- **Standard (Default)**: Use the correct 16-character IDs. Recommended for new installations.
+- **Legacy Mode**: Check **"GPIO Sensors Legacy Format"** in Settings. This safely emulates the old truncated ID format, restoring compatibility with existing Home Assistant entities from older firmware versions.
+
 ## Connectivity options
 
 This firmware provides multiple ways to connect and interact with your OpenTherm Gateway:
