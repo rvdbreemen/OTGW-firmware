@@ -633,11 +633,13 @@ void doAutoConfigure(bool bForceAll){
 
        // 5. CRITICAL FIX: Dynamic Buffer Resizing
        size_t msgLen = strlen(sMsg);
+       size_t topicLen = strlen(sTopic);
        uint16_t currentSize = MQTTclient.getBufferSize();
        // Add some overhead for topic + protocol bytes
-       if (currentSize < (msgLen + 128)) {
-          MQTTDebugTf(PSTR("Resizing MQTT buffer from %d to %d\r\n"), currentSize, msgLen + 128);
-          MQTTclient.setBufferSize(msgLen + 128); 
+       size_t requiredSize = msgLen + topicLen + 128;
+       if (currentSize < requiredSize) {
+          MQTTDebugTf(PSTR("Resizing MQTT buffer from %d to %d\r\n"), currentSize, requiredSize);
+          MQTTclient.setBufferSize(requiredSize);
        }
 
        // Send retained message
