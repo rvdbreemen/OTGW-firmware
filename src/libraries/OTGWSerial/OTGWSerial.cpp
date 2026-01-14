@@ -308,8 +308,7 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
                      (strncmp_P((char *)datamem + ptr, banner1, bannerLen) == 0);
 
         if (match) {
-            char *s = (char *)datamem + ptr; 
-            s += bannerLen;
+            char *s = (char *)datamem + ptr + bannerLen;
             version = s;
             Dprintf("Version: %s\n", version);
             if (firmware == FIRMWARE_OTGW && *fwversion) {
