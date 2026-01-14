@@ -76,6 +76,7 @@ bool canSendWebSocket();
 bool canPublishMQTT();
 void logHeapStats();
 void emergencyHeapRecovery();
+void resetMQTTBufferSize();
 
 //prototype
 void sendMQTTData(const char*, const char*, const bool = false);
