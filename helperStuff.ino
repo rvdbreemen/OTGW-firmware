@@ -599,6 +599,11 @@ bool replaceAll(char *buffer, const size_t bufSize, const char *token, const cha
 //===========================================================================================
 
 // Heap thresholds for different severity levels
+// Rationale: ESP8266 typically has ~40KB RAM after core libraries
+// - CRITICAL (3KB): Minimum to prevent crash, emergency only
+// - WARNING (5KB): Below this, aggressive throttling needed
+// - LOW (8KB): Below this, start reducing message frequency
+// - HEALTHY (>8KB): Sufficient for normal operation with WebSocket server (~4KB baseline)
 #define HEAP_CRITICAL_THRESHOLD   3072   // Critical: Stop all non-essential operations
 #define HEAP_WARNING_THRESHOLD    5120   // Warning: Start throttling messages
 #define HEAP_LOW_THRESHOLD        8192   // Low: Begin reducing message frequency
@@ -652,7 +657,7 @@ bool canSendWebSocket() {
     webSocketDropCount++;
     // Log warning every 10 seconds
     if (now - lastWebSocketWarningMs > 10000) {
-      DebugTf(PSTR("CRITICAL HEAP: Blocking WebSocket (dropped %u msgs, heap=%u bytes)\r\n"), 
+      DebugTf(PSTR("HEAP-CRITICAL: Blocking WebSocket (dropped %u msgs, heap=%u bytes)\r\n"), 
               webSocketDropCount, ESP.getFreeHeap());
       lastWebSocketWarningMs = now;
     }
@@ -701,7 +706,7 @@ bool canPublishMQTT() {
     mqttDropCount++;
     // Log warning every 10 seconds
     if (now - lastMQTTWarningMs > 10000) {
-      DebugTf(PSTR("CRITICAL HEAP: Blocking MQTT (dropped %u msgs, heap=%u bytes)\r\n"), 
+      DebugTf(PSTR("HEAP-CRITICAL: Blocking MQTT (dropped %u msgs, heap=%u bytes)\r\n"), 
               mqttDropCount, ESP.getFreeHeap());
       lastMQTTWarningMs = now;
     }
@@ -783,8 +788,10 @@ void emergencyHeapRecovery() {
   delay(10);
   
   uint32_t heapAfter = ESP.getFreeHeap();
+  // Calculate recovered bytes safely (handle case where heap decreased)
+  int recovered = (heapAfter > heapBefore) ? (int)(heapAfter - heapBefore) : -(int)(heapBefore - heapAfter);
   DebugTf(PSTR("Emergency heap recovery complete (heap=%u bytes, recovered=%d bytes)\r\n"), 
-          heapAfter, (int)(heapAfter - heapBefore));
+          heapAfter, recovered);
 }
 
 /***************************************************************************
