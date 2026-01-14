@@ -121,9 +121,12 @@ void GetVersion(const char* hexfile, char* version, size_t destSize){
         
         // Original logic: ptr += strnlen((char *)datamem + ptr, 256 - ptr) + 1;
         // This logic mimics strstr skipping behavior if we assume list of strings.
-        // Use bounded strnlen
+        // Use bounded strnlen and ensure we don't advance past end of buffer
         size_t len = strnlen((char *)datamem + ptr, 256 - ptr);
-        ptr += len + 1;
+        ptr += len;
+        if (ptr < 256) {
+          ptr++;
+        }
       }
     }
   }
