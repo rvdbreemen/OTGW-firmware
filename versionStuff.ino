@@ -107,7 +107,15 @@ void GetVersion(const char* hexfile, char* version, size_t destSize){
          // We'll use strnlen to find length within bounds first.
          size_t verLen = strnlen(s, maxLen);
          
-         if (verLen >= destSize) verLen = destSize - 1;
+         // Clamp verLen so it never exceeds either the remaining datamem space (maxLen)
+         // or the destination buffer size minus one for the terminator.
+         size_t maxCopy = maxLen;
+         if (destSize > 0 && (destSize - 1) < maxCopy) {
+           maxCopy = destSize - 1;
+         }
+         if (verLen > maxCopy) {
+           verLen = maxCopy;
+         }
          
          memcpy(version, s, verLen);
          version[verLen] = '\0';
