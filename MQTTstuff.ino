@@ -688,20 +688,21 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
   } 
 
   // Allocate buffers dynamically to save stack/static RAM
-  char* sMsg = new char[MQTT_MSG_MAX_LEN];
-  char* sTopic = new char[MQTT_TOPIC_MAX_LEN];
-  // We can reuse sMsg for sLine read since we process it immediately
-  // But safer to have separate buffer for line reading
-  char* sLine = new char[MQTT_CFG_LINE_MAX_LEN];
-  
-  if (!sMsg || !sTopic || !sLine) {
-     DebugTln(F("Error: Out of memory in doAutoConfigureMsgid"));
-     if(sMsg) delete[] sMsg;
-     if(sTopic) delete[] sTopic;
-     if(sLine) delete[] sLine;
-     return _result;
+  const size_t totalBufferSize = MQTT_MSG_MAX_LEN + MQTT_TOPIC_MAX_LEN + MQTT_CFG_LINE_MAX_LEN;
+  char* buffer = new char[totalBufferSize];
+  char* sMsg   = nullptr;
+  char* sTopic = nullptr;
+  char* sLine  = nullptr;
+
+  if (!buffer) {
+    DebugTln(F("Error: Out of memory in doAutoConfigureMsgid"));
+    return _result;
   }
 
+  // Partition the single buffer into separate logical regions
+  sMsg   = buffer;
+  sTopic = sMsg + MQTT_MSG_MAX_LEN;
+  sLine  = sTopic + MQTT_TOPIC_MAX_LEN;
   byte lineID = 39; // 39 is unused in OT protocol so is a safe value
 
   //Let's open the MQTT autoconfig file
