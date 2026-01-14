@@ -326,7 +326,9 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
              while (ptr < info.datasize && datamem[ptr] != 0) {
                  ptr++;
              }
-             ptr++; 
+             if (ptr < info.datasize) {
+                 ptr++;
+             }
         }
     }
 
