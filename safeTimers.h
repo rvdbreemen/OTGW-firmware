@@ -163,7 +163,7 @@ uint32_t __Due__(uint32_t &timer_due, uint32_t timer_interval, byte timerType)
     // Reset the timer to now + interval to allow the main loop to recover.
     if ((int32_t)(now - timer_due) > (int32_t)(10 * timer_interval)) {
        timer_due = now + timer_interval;
-       return timer_due;
+       return 0;
     }
 
     switch (timerType) {
