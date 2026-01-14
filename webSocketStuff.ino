@@ -39,8 +39,11 @@ WebSocketsServer webSocket = WebSocketsServer(81);
 
 // Track number of connected WebSocket clients
 static uint8_t wsClientCount = 0;
-#define MAX_WS_CLIENTS 2              // Limit number of clients to prevent out of memory
-#define MIN_HEAP_FOR_BROADCAST 4096   // Don't broadcast if heap is too low
+
+// Maximum number of simultaneous WebSocket clients
+// Rationale: Each client uses ~700 bytes (256 byte buffer + overhead)
+// Limiting to 3 clients prevents heap exhaustion (3 × 700 = 2100 bytes max)
+#define MAX_WEBSOCKET_CLIENTS 3
 
 // Track WebSocket initialization state
 static bool wsInitialized = false;
@@ -57,6 +60,23 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
       
     case WStype_CONNECTED:
       {
+        // Check client limit before accepting connection
+        if (wsClientCount >= MAX_WEBSOCKET_CLIENTS) {
+          DebugTf(PSTR("WebSocket[%u]: Max clients (%u) reached, rejecting connection\r\n"), 
+                  num, MAX_WEBSOCKET_CLIENTS);
+          webSocket.disconnect(num);
+          return;
+        }
+        
+        // Check heap health before accepting connection
+        // Use WARNING threshold to be conservative
+        if (ESP.getFreeHeap() < HEAP_WARNING_THRESHOLD) {
+          DebugTf(PSTR("WebSocket[%u]: Low heap (%u bytes), rejecting connection\r\n"), 
+                  num, ESP.getFreeHeap());
+          webSocket.disconnect(num);
+          return;
+        }
+        
         if (wsClientCount >= MAX_WS_CLIENTS) {
           DebugTf(PSTR("WebSocket[%u] connection rejected: Max clients (%d) reached\r\n"), num, MAX_WS_CLIENTS);
           webSocket.disconnect(num);

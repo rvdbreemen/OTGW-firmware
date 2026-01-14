@@ -52,6 +52,12 @@
 #include "updateServerHtml.h"
 #include <WiFiManager.h>        // version 2.0.4-beta - use latest development branch  - https://github.com/tzapu/WiFiManager
 // included in main program: #include <TelnetStream.h>       // Version 0.0.1 - https://github.com/jandrassy/TelnetStream
+
+// Optimize WebSocket memory usage: reduce per-client buffer from 512 to 256 bytes
+// This must be defined BEFORE including WebSocketsServer.h
+// Saves ~256 bytes per client (768 bytes with 3 clients)
+#define WEBSOCKETS_MAX_DATA_SIZE 256
+
 #include <WebSocketsServer.h>   // WebSocket server for streaming OT log messages to WebUI
 
 /*
