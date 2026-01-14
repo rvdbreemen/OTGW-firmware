@@ -119,16 +119,12 @@ void GetVersion(const char* hexfile, char* version, size_t destSize){
          
          return;
       } else {
-        // Move to next string (skip until null or end) or just increment
-        // OTGWSerial implementation uses strnlen to skip current string.
-        // But datamem might not be null terminated correctly everywhere.
-        // Safer to just increment or scan for 0.
-        
-        // Original logic: ptr += strnlen((char *)datamem + ptr, 256 - ptr) + 1;
-        // This logic mimics strstr skipping behavior if we assume list of strings.
-        // Use bounded strnlen and ensure we don't advance past end of buffer
-        size_t len = strnlen((char *)datamem + ptr, 256 - ptr);
-        ptr += len;
+        // Move to next string (skip until null or end), consistent with OTGWSerial.cpp
+        // Scan forward byte-by-byte until we find a null terminator or reach the end
+        while (ptr < 256 && datamem[ptr] != 0) {
+          ptr++;
+        }
+        // If still within bounds, advance past the null terminator to the next candidate
         if (ptr < 256) {
           ptr++;
         }
