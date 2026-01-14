@@ -82,19 +82,48 @@ void GetVersion(const char* hexfile, char* version, size_t destSize){
     f.close();
     //DebugTf(PSTR("closing file and hunting for banner\n"));
     ptr = 0; 
+    size_t bannerLen = sizeof(banner) - 1;
     while (ptr < 256)
     {
-      //DebugTf(PSTR("checking for %s at char pos %d\r\n"),banner,ptr);
-      char *s = strstr((char *)datamem + ptr, banner);
-      if (!s)
+      // Fixed safe search for PROGMEM string in buffer
+      bool match = false;
+      if (ptr + bannerLen <= 256) {
+           if (strncmp_P((char *)datamem + ptr, banner, bannerLen) == 0) {
+               match = true;
+           }
+      }
+      
+      if (match)
       {
-        //DebugTf(PSTR("did not find the banner\r\n"));
-        ptr += strnlen((char *)datamem + ptr, 256 - ptr) + 1;
+         // Found banner
+         char *s = (char *)datamem + ptr + bannerLen;
+         
+         // Safely copy version string, ensuring we don't read past end of datamem
+         // Calculate max possible length of version string in datamem
+         size_t maxLen = 256 - (ptr + bannerLen);
+         
+         // We can't rely on strlcpy finding a null terminator quickly in non-string binary data
+         // But GetVersion expects a string. The hex file data for version IS usually null-terminated in the EEPROM image.
+         // We'll use strnlen to find length within bounds first.
+         size_t verLen = strnlen(s, maxLen);
+         
+         if (verLen >= destSize) verLen = destSize - 1;
+         
+         memcpy(version, s, verLen);
+         version[verLen] = '\0';
+         
+         return;
       } else {
-        //DebugTf(PSTR("hit the banner! returning version string %s\r\n"),s);
-        s += sizeof(banner) - 1;
-        strlcpy(version, s, destSize);
-        return;
+        // Move to next string (skip until null or end) or just increment
+        // OTGWSerial implementation uses strnlen to skip current string.
+        // But datamem might not be null terminated correctly everywhere.
+        // Safer to just increment or scan for 0.
+        
+        // Original logic: ptr += strnlen((char *)datamem + ptr, 256 - ptr) + 1;
+        // This logic mimics strstr skipping behavior if we assume list of strings.
+        // Use bounded strnlen
+        size_t len = strnlen((char *)datamem + ptr, 256 - ptr);
+        ptr += len + 1;
       }
     }
   }
