@@ -711,7 +711,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
   LittleFS.begin();
 
   if (!LittleFS.exists(F("/mqttha.cfg"))) {
-    DebugTln(F("Error: confuration file not found.")); 
+    DebugTln(F("Error: configuration file not found.")); 
     delete[] sMsg; delete[] sTopic; delete[] sLine;
     return _result;
   } 
@@ -719,7 +719,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
   fh = LittleFS.open(F("/mqttha.cfg"), "r");
 
   if (!fh) {
-    DebugTln(F("Error: could not open confuration file.")); 
+    DebugTln(F("Error: could not open configuration file.")); 
     delete[] sMsg; delete[] sTopic; delete[] sLine;
     return _result;
   } 
