@@ -606,7 +606,8 @@ bool replaceAll(char *buffer, const size_t bufSize, const char *token, const cha
 // Throttling state
 static uint32_t lastWebSocketSendMs = 0;
 static uint32_t lastMQTTPublishMs = 0;
-static uint32_t lastHeapWarningMs = 0;
+static uint32_t lastWebSocketWarningMs = 0;
+static uint32_t lastMQTTWarningMs = 0;
 static uint32_t webSocketDropCount = 0;
 static uint32_t mqttDropCount = 0;
 
@@ -650,10 +651,10 @@ bool canSendWebSocket() {
   if (heapLevel == HEAP_CRITICAL) {
     webSocketDropCount++;
     // Log warning every 10 seconds
-    if (now - lastHeapWarningMs > 10000) {
+    if (now - lastWebSocketWarningMs > 10000) {
       DebugTf(PSTR("CRITICAL HEAP: Blocking WebSocket (dropped %u msgs, heap=%u bytes)\r\n"), 
               webSocketDropCount, ESP.getFreeHeap());
-      lastHeapWarningMs = now;
+      lastWebSocketWarningMs = now;
     }
     return false;
   }
@@ -678,10 +679,10 @@ bool canSendWebSocket() {
   lastWebSocketSendMs = now;
   
   // Log warning if we're dropping messages
-  if (webSocketDropCount > 0 && now - lastHeapWarningMs > 10000) {
+  if (webSocketDropCount > 0 && now - lastWebSocketWarningMs > 10000) {
     DebugTf(PSTR("WebSocket throttled: dropped %u msgs (heap=%u bytes)\r\n"), 
             webSocketDropCount, ESP.getFreeHeap());
-    lastHeapWarningMs = now;
+    lastWebSocketWarningMs = now;
     webSocketDropCount = 0; // reset counter after reporting
   }
   
@@ -699,10 +700,10 @@ bool canPublishMQTT() {
   if (heapLevel == HEAP_CRITICAL) {
     mqttDropCount++;
     // Log warning every 10 seconds
-    if (now - lastHeapWarningMs > 10000) {
+    if (now - lastMQTTWarningMs > 10000) {
       DebugTf(PSTR("CRITICAL HEAP: Blocking MQTT (dropped %u msgs, heap=%u bytes)\r\n"), 
               mqttDropCount, ESP.getFreeHeap());
-      lastHeapWarningMs = now;
+      lastMQTTWarningMs = now;
     }
     return false;
   }
@@ -727,10 +728,10 @@ bool canPublishMQTT() {
   lastMQTTPublishMs = now;
   
   // Log warning if we're dropping messages
-  if (mqttDropCount > 0 && now - lastHeapWarningMs > 10000) {
+  if (mqttDropCount > 0 && now - lastMQTTWarningMs > 10000) {
     DebugTf(PSTR("MQTT throttled: dropped %u msgs (heap=%u bytes)\r\n"), 
             mqttDropCount, ESP.getFreeHeap());
-    lastHeapWarningMs = now;
+    lastMQTTWarningMs = now;
     mqttDropCount = 0; // reset counter after reporting
   }
   
