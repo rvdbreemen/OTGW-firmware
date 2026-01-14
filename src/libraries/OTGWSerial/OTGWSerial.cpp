@@ -304,12 +304,8 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
 
     while (ptr < info.datasize) {
         // Safe check for banner presence
-        bool match = false;
-        if (ptr + bannerLen <= info.datasize) {
-             if (strncmp_P((char *)datamem + ptr, banner1, bannerLen) == 0) {
-                 match = true;
-             }
-        }
+        bool match = (ptr + bannerLen <= info.datasize) &&
+                     (strncmp_P((char *)datamem + ptr, banner1, bannerLen) == 0);
 
         if (match) {
             char *s = (char *)datamem + ptr; 
