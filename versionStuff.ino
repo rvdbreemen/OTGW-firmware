@@ -102,20 +102,17 @@ void GetVersion(const char* hexfile, char* version, size_t destSize){
          // Calculate max possible length of version string in datamem
          size_t maxLen = 256 - (ptr + bannerLen);
          
-         // We can't rely on strlcpy finding a null terminator quickly in non-string binary data
-         // But GetVersion expects a string. The hex file data for version IS usually null-terminated in the EEPROM image.
-         // We'll use strnlen to find length within bounds first.
-         size_t verLen = strnlen(s, maxLen);
-         
-         // Clamp verLen so it never exceeds either the remaining datamem space (maxLen)
-         // or the destination buffer size minus one for the terminator.
+         // Determine maximum number of bytes we are allowed to copy:
+         // limited by remaining datamem space (maxLen) and destination buffer size minus one.
          size_t maxCopy = maxLen;
          if (destSize > 0 && (destSize - 1) < maxCopy) {
            maxCopy = destSize - 1;
          }
-         if (verLen > maxCopy) {
-           verLen = maxCopy;
-         }
+         
+         // We can't rely on strlcpy finding a null terminator quickly in non-string binary data
+         // But GetVersion expects a string. The hex file data for version IS usually null-terminated in the EEPROM image.
+         // Use strnlen to find length within the copy bounds.
+         size_t verLen = strnlen(s, maxCopy);
          
          memcpy(version, s, verLen);
          version[verLen] = '\0';
