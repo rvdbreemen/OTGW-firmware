@@ -833,7 +833,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
 
   if (!LittleFS.exists(F("/mqttha.cfg"))) {
     DebugTln(F("Error: configuration file not found.")); 
-    delete[] buffer;  // Fix: delete the single allocated buffer, not the partitions
+    delete[] sMsg; delete[] sTopic; delete[] sLine;
     return _result;
   } 
 
@@ -841,7 +841,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
 
   if (!fh) {
     DebugTln(F("Error: could not open configuration file.")); 
-    delete[] buffer;  // Fix: delete the single allocated buffer, not the partitions
+    delete[] sMsg; delete[] sTopic; delete[] sLine;
     return _result;
   } 
 
