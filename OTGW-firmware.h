@@ -69,6 +69,14 @@ inline const char* CSTR(char* x) { return x; }
 #define EVALBOOLEAN(x) (strcasecmp(x,"true")==0||strcasecmp(x,"on")==0||strcasecmp(x,"1")==0)
 #define ETX ((uint8_t)0x04)
 
+// Forward declarations for heap monitoring (defined in helperStuff.ino)
+enum HeapHealthLevel;
+HeapHealthLevel getHeapHealth();
+bool canSendWebSocket();
+bool canPublishMQTT();
+void logHeapStats();
+void emergencyHeapRecovery();
+
 //prototype
 void sendMQTTData(const char*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const char*, const bool = false);

@@ -131,20 +131,11 @@ void handleWebSocket() {
 // Send log message directly to all connected WebSocket clients
 // This is called from OTGW-Core.ino when a new log line is ready
 // Simplified: no queue, no JSON, just direct text broadcasting
-// Added: Heap protection/Backpressure + Rate Limiting
 //===========================================================================================
 DECLARE_TIMER_MS(timerWSThrottle, 50, SKIP_MISSED_TICKS); // Max ~20 msgs/sec
 
 void sendLogToWebSocket(const char* logMessage) {
   if (wsInitialized && wsClientCount > 0 && logMessage != nullptr) {
-    // BACKPRESSURE: Stop sending if heap is critical to prevent crash
-    if (ESP.getFreeHeap() < MIN_HEAP_FOR_BROADCAST) return; 
-
-    // RATE LIMITING: Throttle bursts if heap is not abundant (>15KB)
-    // If heap is plentiful, we allow full speed. 
-    // Otherwise, we cap at ~20 messages/sec to let network stack breathe.
-    if (!DUE(timerWSThrottle) && ESP.getFreeHeap() < 15000) return;
-
     webSocket.broadcastTXT(logMessage);
   }
 }
