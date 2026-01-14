@@ -123,9 +123,15 @@ void handleWebSocket() {
 // Send log message directly to all connected WebSocket clients
 // This is called from OTGW-Core.ino when a new log line is ready
 // Simplified: no queue, no JSON, just direct text broadcasting
+// Now includes heap-based backpressure to prevent memory exhaustion
 //===========================================================================================
 void sendLogToWebSocket(const char* logMessage) {
   if (wsInitialized && wsClientCount > 0 && logMessage != nullptr) {
+    // Check heap health before broadcasting
+    if (!canSendWebSocket()) {
+      // Message dropped due to low heap - canSendWebSocket() handles logging
+      return;
+    }
     webSocket.broadcastTXT(logMessage);
   }
 }

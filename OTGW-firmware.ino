@@ -277,6 +277,9 @@ void doTaskEvery60s(){
     strlcpy(sPICtype, OTGWSerial.firmwareToString().c_str(), sizeof(sPICtype));
     DebugTf(PSTR("Current firmware type: %s\r\n"), sPICtype);
   }
+  
+  // Log heap statistics every minute for monitoring
+  logHeapStats();
 }
 
 //===[ Do task exactly on the minute ]===
@@ -301,6 +304,11 @@ void do5minevent(){
 void doBackgroundTasks()
 {
   feedWatchDog();               // Feed the dog before it bites!
+  
+  // Check for critically low heap and attempt recovery if needed
+  if (getHeapHealth() == HEAP_CRITICAL) {
+    emergencyHeapRecovery();
+  }
   
   if (WiFi.status() == WL_CONNECTED) {
     // During ESP firmware flash, keep essential services but skip heavy background tasks
