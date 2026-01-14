@@ -469,6 +469,13 @@ void sendMQTTData(const char* topic, const char *json, const bool retain)
   if (!settingMQTTenable) return;
   if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
   if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
+  
+  // Check heap health before publishing
+  if (!canPublishMQTT()) {
+    // Message dropped due to low heap - canPublishMQTT() handles logging
+    return;
+  }
+  
   char full_topic[MQTT_TOPIC_MAX_LEN];
   snprintf_P(full_topic, sizeof(full_topic), PSTR("%s/"), MQTTPubNamespace);
   strlcat(full_topic, topic, sizeof(full_topic));
@@ -520,6 +527,13 @@ void sendMQTT(const char* topic, const char *json, const size_t len)
   if (!settingMQTTenable) return;
   if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
   if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
+  
+  // Check heap health before publishing
+  if (!canPublishMQTT()) {
+    // Message dropped due to low heap - canPublishMQTT() handles logging
+    return;
+  }
+  
   MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settingMQTTbroker, settingMQTTbrokerPort, topic, json);
 
   // Stream the message byte-by-byte to minimize buffer usage
