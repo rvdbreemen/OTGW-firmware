@@ -105,7 +105,7 @@ void GetVersion(const char* hexfile, char* version, size_t destSize){
          // Determine maximum number of bytes we are allowed to copy:
          // limited by remaining datamem space (maxLen) and destination buffer size minus one.
          size_t maxCopy = maxLen;
-         if (destSize > 0 && (destSize - 1) < maxCopy) {
+         if ((destSize - 1) < maxCopy) {
            maxCopy = destSize - 1;
          }
          
