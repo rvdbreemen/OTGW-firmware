@@ -21,6 +21,8 @@
 #define MQTTDebugT(...)   ({ if (bDebugMQTT) DebugT(__VA_ARGS__);    })
 #define MQTTDebug(...)    ({ if (bDebugMQTT) Debug(__VA_ARGS__);    })
 
+void doAutoConfigure(bool bForceAll = false);
+
 // Declare some variables within global scope
 
 static IPAddress  MQTTbrokerIP;
@@ -554,7 +556,7 @@ void clearMQTTConfigDone()
   memset(MQTTautoConfigMap, 0, sizeof(MQTTautoConfigMap));
 }
 //===========================================================================================
-void doAutoConfigure(bool bForceAll = false){
+void doAutoConfigure(bool bForceAll){
   // Refactored for Single-Pass Efficiency and Dynamic Buffer Resizing
   
   if (!settingMQTTenable) return;
