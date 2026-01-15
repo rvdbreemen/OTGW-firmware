@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v1.0.0-rc3
+**  Version  : v1.0.0-rc4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -2031,6 +2031,7 @@ var translateFields = [
   , ["ledblink", "Heartbeat LED (on/off)"]
   , ["darktheme", "Dark Theme (on/off)"]
   , ["gpiosensorsenabled", "GPIO Sensors Enabled"]
+  , ["gpiosensorslegacyformat", "GPIO Sensors Legacy Format"]
   , ["gpiosensorsinterval", "GPIO Publish Interval (sec)"]
   , ["gpiosensorspin", "GPIO pin # (SD3 = GPIO10 => 10)"]
   , ["numberofsensors", "Number of temperature sensors"]

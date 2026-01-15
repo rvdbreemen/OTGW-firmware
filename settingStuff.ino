@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v1.0.0-rc3
+**  Version  : v1.0.0-rc4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -54,6 +54,7 @@ void writeSettings(bool show)
   root[F("ui_autoexport")] = settingUIAutoExport;
   root[F("ui_graphtimewindow")] = settingUIGraphTimeWindow;
   root[F("GPIOSENSORSenabled")] = settingGPIOSENSORSenabled;
+  root[F("GPIOSENSORSlegacyformat")] = settingGPIOSENSORSlegacyformat;
   root[F("GPIOSENSORSpin")] = settingGPIOSENSORSpin;
   root[F("GPIOSENSORSinterval")] = settingGPIOSENSORSinterval;
   root[F("S0COUNTERenabled")] = settingS0COUNTERenabled;
@@ -144,6 +145,7 @@ void readSettings(bool show)
   settingUIAutoExport      = doc[F("ui_autoexport")] | settingUIAutoExport;
   settingUIGraphTimeWindow = doc[F("ui_graphtimewindow")] | settingUIGraphTimeWindow;
   settingGPIOSENSORSenabled = doc[F("GPIOSENSORSenabled")] | settingGPIOSENSORSenabled;
+  settingGPIOSENSORSlegacyformat = doc[F("GPIOSENSORSlegacyformat")] | settingGPIOSENSORSlegacyformat;
   settingGPIOSENSORSpin = doc[F("GPIOSENSORSpin")] | settingGPIOSENSORSpin;
   settingGPIOSENSORSinterval = doc[F("GPIOSENSORSinterval")] | settingGPIOSENSORSinterval;
   CHANGE_INTERVAL_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS); 
@@ -183,6 +185,7 @@ void readSettings(bool show)
     Debugf(PSTR("NPT send time         : %s\r\n"), CBOOLEAN(settingNTPsendtime));
     Debugf(PSTR("Led Blink             : %s\r\n"), CBOOLEAN(settingLEDblink));
     Debugf(PSTR("GPIO Sensors          : %s\r\n"), CBOOLEAN(settingGPIOSENSORSenabled));
+    Debugf(PSTR("GPIO Sen. Legacy      : %s\r\n"), CBOOLEAN(settingGPIOSENSORSlegacyformat));
     Debugf(PSTR("GPIO Sen. Pin         : %d\r\n"), settingGPIOSENSORSpin);
     Debugf(PSTR("GPIO Interval         : %d\r\n"), settingGPIOSENSORSinterval);
     Debugf(PSTR("S0 Counter            : %s\r\n"), CBOOLEAN(settingS0COUNTERenabled));
@@ -282,6 +285,12 @@ void updateSetting(const char *field, const char *newValue)
     settingGPIOSENSORSenabled = EVALBOOLEAN(newValue);
     Debugln();
     DebugTf(PSTR("Need reboot before GPIO SENSORS will search for sensors on pin GPIO%d!\r\n\n"), settingGPIOSENSORSpin);
+  }
+  if (strcasecmp_P(field, PSTR("GPIOSENSORSlegacyformat")) == 0)
+  {
+    settingGPIOSENSORSlegacyformat = EVALBOOLEAN(newValue);
+    Debugln();
+    DebugTf(PSTR("Updated GPIO Sensors Legacy Format to %s\r\n\n"), CBOOLEAN(settingGPIOSENSORSlegacyformat));
   }
   if (strcasecmp_P(field, PSTR("GPIOSENSORSpin")) == 0)    
   {
