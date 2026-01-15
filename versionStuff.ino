@@ -83,48 +83,34 @@ void GetVersion(const char* hexfile, char* version, size_t destSize){
     //DebugTf(PSTR("closing file and hunting for banner\n"));
     ptr = 0; 
     size_t bannerLen = sizeof(banner) - 1;
-    while (ptr < 256)
-    {
-      // Fixed safe search for PROGMEM string in buffer
-      bool match = false;
-      if (ptr + bannerLen <= 256) {
-           if (strncmp_P((char *)datamem + ptr, banner, bannerLen) == 0) {
-               match = true;
-           }
-      }
-      
-      if (match)
-      {
-         // Found banner
-         char *s = (char *)datamem + ptr + bannerLen;
-         
-         // Safely copy version string, ensuring we don't read past end of datamem
-         // Calculate max possible length of version string in datamem
-         size_t maxLen = 256 - (ptr + bannerLen);
-         
-         // We can't rely on strlcpy finding a null terminator quickly in non-string binary data
-         // But GetVersion expects a string. The hex file data for version IS usually null-terminated in the EEPROM image.
-         // We'll use strnlen to find length within bounds first.
-         size_t verLen = strnlen(s, maxLen);
-         
-         if (verLen >= destSize) verLen = destSize - 1;
-         
-         memcpy(version, s, verLen);
-         version[verLen] = '\0';
-         
-         return;
-      } else {
-        // Move to next string (skip until null or end) or just increment
-        // OTGWSerial implementation uses strnlen to skip current string.
-        // But datamem might not be null terminated correctly everywhere.
-        // Safer to just increment or scan for 0.
-        
-        // Original logic: ptr += strnlen((char *)datamem + ptr, 256 - ptr) + 1;
-        // This logic mimics strstr skipping behavior if we assume list of strings.
-        // Use bounded strnlen
-        size_t len = strnlen((char *)datamem + ptr, 256 - ptr);
-        ptr += len + 1;
-      }
+    
+    // Safer sliding window search:
+    // 1. Iterate byte-by-byte (ptr++) instead of skipping over strings, so we can't miss a banner inside a block.
+    // 2. Ensure reading stays strictly within bounds (256 - bannerLen).
+    for (ptr = 0; ptr <= (256 - bannerLen); ptr++) {
+        // Safe comparison with PROGMEM string
+        if (strncmp_P((char *)datamem + ptr, banner, bannerLen) == 0) {
+             // Match found!
+             char * content = (char *)datamem + ptr + bannerLen;
+             size_t maxContentLen = 256 - (ptr + bannerLen);
+             
+             // Extract version string safely
+             // Stop at:
+             // 1. End of datamem buffer (maxContentLen)
+             // 2. Destination buffer full (destSize - 1)
+             // 3. Null terminator
+             // 4. Non-printable character (garbage) 
+             size_t vLen = 0;
+             while(vLen < maxContentLen && vLen < (destSize - 1)) {
+                 char c = content[vLen];
+                 if (c == '\0' || !isprint(c)) break; // Stop at end of valid string
+                 vLen++;
+             }
+             
+             memcpy(version, content, vLen);
+             version[vLen] = '\0';
+             return;
+        }
     }
   }
 }
