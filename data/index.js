@@ -1547,7 +1547,7 @@ function refreshOTmonitor() {
   console.log("refreshOTmonitor() ..");
 
   data = {};
-  fetch(APIGW + "v1/otgw/otmonitor")  //api/v1/otgw/otmonitor
+  fetch(APIGW + "v2/otgw/otmonitor")  //api/v2/otgw/otmonitor
     .then(response => response.json())
     .then(json => {
       console.log("then(json => ..)");
@@ -1556,13 +1556,22 @@ function refreshOTmonitor() {
       data = json.otmonitor;
 
       let otMonPage = document.getElementById('mainPage');
-      while (otMonPage.lastChild) {
-        otMonPage.lastChild.remove();
+      let otMonTable = document.querySelector(".otmontable");
+      
+      // If table doesn't exist, create it (and clear waiting/existing content)
+      if (!otMonTable) {
+        otMonPage.innerHTML = ""; 
+        otMonTable = document.createElement("div");
+        otMonTable.setAttribute("class", "otmontable");
+        otMonPage.appendChild(otMonTable);
       }
-      let otMonTable = document.createElement("div");
-      otMonTable.setAttribute("class", "otmontable");
 
       for (let i in data) {
+        // Support for new Map-based JSON (less redundant):
+        // If data is an object map, 'i' is the key (name).
+        // If data is an array, 'i' is the index, and data[i] has a 'name' property.
+        if (!data[i].name) data[i].name = i;
+
         //console.log("["+data[i].name+"]=>["+data[i].value+"]");
 
         if ((document.getElementById("otmon_" + data[i].name)) == null) { // if element does not exists yet, then build page
@@ -1620,7 +1629,6 @@ function refreshOTmonitor() {
 
         }
       }
-      otMonPage.appendChild(otMonTable);
       if (needReload) window.location.reload(true);
     })
     .catch(function (error) {
@@ -2081,81 +2089,11 @@ function toggleInteraction(enabled) {
 }
 
 function startFlash(filename) {
-    if (!confirm("The ESP will reboot to ensure a clean state before flashing " + filename + ". Continue?")) {
-        return;
-    }
-
-    currentFlashFilename = filename;
-    isFlashing = true;
-    toggleInteraction(false);
-    
-    // Stop polling during upgrade to prevent interference and reduce load
-    if (tid) { clearInterval(tid); tid = 0; }
-    if (timeupdate) { clearInterval(timeupdate); timeupdate = 0; }
-
-    let progressSection = document.getElementById("flashProgressSection");
-    let progressBar = document.getElementById("flashProgressBar");
-    let pctText = document.getElementById("flashPercentageText");
-    
-    if (progressSection) progressSection.classList.add('active');
-    if (progressBar) {
-        progressBar.style.width = "0%";
-        progressBar.classList.remove('error');
-    }
-
-    if (pctText) pctText.innerText = "Rebooting ESP for clean state...";
-
-    // 1. Reboot ESP
-    fetch(localURL + '/ReBoot')
-    .then(() => {
-        console.log("Reboot command sent.");
-        if (pctText) pctText.innerText = "ESP Rebooting. Waiting for connection...";
-        setTimeout(pollForReboot, 5000);
-    })
-    .catch(e => {
-        console.log("Reboot fetch result: " + e);
-        if (pctText) pctText.innerText = "ESP Rebooting... Waiting...";
-        setTimeout(pollForReboot, 5000);
-    });
+    performFlash(filename);
 }
 
-function pollForReboot() {
-    let pctText = document.getElementById("flashPercentageText");
-    
-    // Check if back online using a lightweight API call
-    fetch(localURL + '/api/firmwarefilelist', {method: 'GET'}) 
-    .then(response => {
-        if (response.ok) {
-            console.log("ESP is back online!");
-            if (pctText) pctText.innerText = "ESP Online! Preparing to flash...";
-            startFlashCountdown();
-        } else {
-            throw new Error("Not ready");
-        }
-    })
-    .catch(e => {
-        console.log("Waiting for ESP...");
-        setTimeout(pollForReboot, 1000);
-    });
-}
-
-function startFlashCountdown() {
-    let count = 3;
-    let pctText = document.getElementById("flashPercentageText");
-    
-    // Initial display
-    if (pctText) pctText.innerText = "Flashing in " + count + "...";
-
-    let timer = setInterval(() => {
-        count--;
-        if (count > 0) {
-            if (pctText) pctText.innerText = "Flashing in " + count + "...";
-        } else {
-            clearInterval(timer);
-            performFlash(currentFlashFilename);
-        }
-    }, 1000);
-}
+// function pollForReboot() - Removed
+// function startFlashCountdown() - Removed
 
 function performFlash(filename) {
     currentFlashFilename = filename;

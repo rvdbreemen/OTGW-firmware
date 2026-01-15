@@ -144,9 +144,12 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
 
 ### REST API
 
-- API versioning: `/api/v0/` (legacy) and `/api/v1/` (current)
+- API versioning: `/api/v0/` (legacy), `/api/v1/` (standard), and `/api/v2/` (optimized)
 - OTGW commands: POST/PUT to `/api/v1/otgw/command/{command}`
+- Check system health: `/api/v1/health` (Returns `status: UP` and system vital signs)
 - Commands use the same queue as MQTT commands
+- **Reboot Verification**: WebUI must check `/api/v1/health` to confirm the device is back online.
+  - Expected response includes `status: UP` and `picavailable: true`.
 
 ### Build and Test
 
