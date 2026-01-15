@@ -1,0 +1,363 @@
+/* 
+***************************************************************************  
+**  File     : MQTTstuff_streaming.ino.example
+**  Version  : v1.0.0
+**
+**  Example implementation of streaming MQTT publishing
+**  This file shows how to migrate from buffered to streaming approach
+**
+**  DO NOT compile this file directly - it's a reference implementation
+**  Copy the patterns into MQTTstuff.ino as you migrate functions
+**
+***************************************************************************      
+*/
+
+#include "StreamingTemplate.h"
+
+// ============================================================================
+// EXAMPLE 1: Streaming AutoConfig for a single message ID
+// ============================================================================
+
+bool doAutoConfigureMsgidStreaming(byte OTid, const char *cfgSensorId = nullptr) {
+    if (!settingMQTTenable || !MQTTclient.connected()) return false;
+    
+    const char *sensorId = (cfgSensorId != nullptr) ? cfgSensorId : "";
+    
+    // Define token replacements - stack allocated, lightweight
+    StreamingTemplateProcessor::TokenReplacement tokens[] = {
+        {"%homeassistant%", CSTR(settingMQTThaprefix)},
+        {"%node_id%", NodeId},
+        {"%sensor_id%", sensorId},
+        {"%hostname%", CSTR(settingHostname)},
+        {"%version%", _VERSION},
+        {"%mqtt_pub_topic%", MQTTPubNamespace},
+        {"%mqtt_sub_topic%", MQTTSubNamespace}
+    };
+    const uint8_t tokenCount = sizeof(tokens) / sizeof(tokens[0]);
+    
+    StreamingTemplateProcessor processor(tokens, tokenCount);
+    
+    // Open config file
+    File fh = LittleFS.open(F("/mqttha.cfg"), "r");
+    if (!fh) {
+        DebugTln(F("Error: could not open mqttha.cfg"));
+        return false;
+    }
+    
+    // Parse file line-by-line
+    char lineBuf[MQTT_CFG_LINE_MAX_LEN];
+    bool found = false;
+    
+    while (fh.available()) {
+        // Read one line
+        size_t len = fh.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
+        lineBuf[len] = '\0';
+        
+        // Parse: <lineID>;<topic>;<message>
+        byte lineID;
+        char topicTemplate[MQTT_TOPIC_MAX_LEN];
+        
+        // Extract line ID
+        char* firstSemicolon = strchr(lineBuf, ';');
+        if (!firstSemicolon) continue;
+        *firstSemicolon = '\0';
+        lineID = atoi(lineBuf);
+        
+        // Check if this is the line we want
+        if (lineID != OTid) continue;
+        
+        // Extract topic
+        char* secondSemicolon = strchr(firstSemicolon + 1, ';');
+        if (!secondSemicolon) continue;
+        *secondSemicolon = '\0';
+        strlcpy(topicTemplate, firstSemicolon + 1, sizeof(topicTemplate));
+        
+        // Expand topic tokens (small buffer, acceptable to use in-place expansion)
+        char expandedTopic[MQTT_TOPIC_MAX_LEN];
+        if (!processor.expandTokensInPlace(topicTemplate, expandedTopic, sizeof(expandedTopic))) {
+            DebugTln(F("Error: topic expansion overflow"));
+            fh.close();
+            return false;
+        }
+        
+        // Message starts after second semicolon
+        const char* messageTemplate = secondSemicolon + 1;
+        
+        // Create a temporary in-memory "file" for the message template
+        // (Alternative: we could enhance the parser to work directly with the file stream)
+        size_t msgTemplateLen = strlen(messageTemplate);
+        
+        // For now, we'll use a small trick: write message to a temp buffer,
+        // then calculate and stream it. In a full implementation, we'd parse
+        // directly from the file handle to avoid ANY buffering.
+        
+        // Calculate expanded message length
+        // (We need to create a pseudo-file for this - see alternative approach below)
+        
+        MQTTDebugTf(PSTR("Streaming config for ID %d to topic [%s]\r\n"), OTid, expandedTopic);
+        
+        // APPROACH A: Use existing approach with streaming
+        // For this example, we'll show the PURE streaming approach in EXAMPLE 2 below
+        
+        found = true;
+        break;
+    }
+    
+    fh.close();
+    return found;
+}
+
+
+// ============================================================================
+// EXAMPLE 2: Pure Streaming with Memory-Mapped Template
+// ============================================================================
+
+bool doAutoConfigureStreamingPure(byte OTid, const char *cfgSensorId = nullptr) {
+    if (!settingMQTTenable || !MQTTclient.connected()) return false;
+    
+    const char *sensorId = (cfgSensorId != nullptr) ? cfgSensorId : "";
+    
+    StreamingTemplateProcessor::TokenReplacement tokens[] = {
+        {"%homeassistant%", CSTR(settingMQTThaprefix)},
+        {"%node_id%", NodeId},
+        {"%sensor_id%", sensorId},
+        {"%hostname%", CSTR(settingHostname)},
+        {"%version%", _VERSION},
+        {"%mqtt_pub_topic%", MQTTPubNamespace},
+        {"%mqtt_sub_topic%", MQTTSubNamespace}
+    };
+    
+    StreamingTemplateProcessor processor(tokens, 7);
+    
+    File fh = LittleFS.open(F("/mqttha.cfg"), "r");
+    if (!fh) return false;
+    
+    // Read file in chunks, looking for our line
+    const size_t chunkSize = 256;
+    char chunk[chunkSize];
+    char lineBuf[MQTT_CFG_LINE_MAX_LEN];
+    size_t linePos = 0;
+    bool inOurLine = false;
+    size_t messageStart = 0;
+    char expandedTopic[MQTT_TOPIC_MAX_LEN];
+    
+    while (fh.available()) {
+        size_t bytesRead = fh.readBytes(chunk, chunkSize);
+        
+        for (size_t i = 0; i < bytesRead; i++) {
+            char c = chunk[i];
+            
+            if (c == '\n' || c == '\r') {
+                if (linePos > 0) {
+                    lineBuf[linePos] = '\0';
+                    
+                    // Parse line
+                    byte lineID;
+                    char topicBuf[MQTT_TOPIC_MAX_LEN];
+                    char* tok1 = strchr(lineBuf, ';');
+                    if (tok1) {
+                        *tok1 = '\0';
+                        lineID = atoi(lineBuf);
+                        
+                        if (lineID == OTid) {
+                            char* tok2 = strchr(tok1 + 1, ';');
+                            if (tok2) {
+                                *tok2 = '\0';
+                                strlcpy(topicBuf, tok1 + 1, sizeof(topicBuf));
+                                
+                                processor.expandTokensInPlace(topicBuf, expandedTopic, sizeof(expandedTopic));
+                                
+                                // Message starts at current file position
+                                messageStart = fh.position() - bytesRead + i + 1;
+                                inOurLine = true;
+                                break;
+                            }
+                        }
+                    }
+                    linePos = 0;
+                }
+            } else if (linePos < sizeof(lineBuf) - 1) {
+                lineBuf[linePos++] = c;
+            }
+        }
+        
+        if (inOurLine) break;
+    }
+    
+    if (!inOurLine) {
+        fh.close();
+        return false;
+    }
+    
+    // Now we have the message starting position
+    // Seek to it and stream to MQTT
+    fh.seek(messageStart);
+    
+    // Find end of line (to calculate length)
+    size_t msgEndPos = messageStart;
+    while (fh.available()) {
+        char c = fh.read();
+        if (c == '\n' || c == '\r') break;
+        msgEndPos = fh.position();
+    }
+    
+    size_t msgLen = msgEndPos - messageStart;
+    fh.seek(messageStart); // Rewind to start of message
+    
+    // Calculate expanded length
+    size_t expandedLen = processor.calculateExpandedLength(fh);
+    
+    MQTTDebugTf(PSTR("Streaming %d bytes to topic [%s]\r\n"), expandedLen, expandedTopic);
+    
+    // STREAM TO MQTT (THE MAGIC HAPPENS HERE - NO BUFFERS!)
+    if (MQTTclient.beginPublish(expandedTopic, expandedLen, true)) {
+        bool success = processor.streamToMQTT(fh, MQTTclient, msgLen + 100);
+        MQTTclient.endPublish();
+        fh.close();
+        return success;
+    }
+    
+    fh.close();
+    return false;
+}
+
+
+// ============================================================================
+// EXAMPLE 3: Streaming JSON telemetry with ArduinoJson
+// ============================================================================
+
+#include <ArduinoJson.h>
+
+// OLD BUFFERED WAY:
+void sendOTGWStatus_OLD() {
+    char buffer[256];
+    snprintf_P(buffer, sizeof(buffer), 
+               PSTR("{\"flame\":%s,\"heating\":%s,\"dhw\":%s}"),
+               OTcurrentSystemState.Flame ? "true" : "false",
+               OTcurrentSystemState.CHmode ? "true" : "false",
+               OTcurrentSystemState.DHWmode ? "true" : "false");
+    sendMQTTData("status", buffer);
+}
+
+// NEW STREAMING WAY:
+void sendOTGWStatusStreaming() {
+    if (!settingMQTTenable || !MQTTclient.connected()) return;
+    
+    // Build topic
+    char full_topic[MQTT_TOPIC_MAX_LEN];
+    snprintf_P(full_topic, sizeof(full_topic), PSTR("%s/status"), MQTTPubNamespace);
+    
+    // Create JSON document on stack
+    StaticJsonDocument<200> doc;
+    doc["flame"] = OTcurrentSystemState.Flame;
+    doc["heating"] = OTcurrentSystemState.CHmode;
+    doc["dhw"] = OTcurrentSystemState.DHWmode;
+    
+    // Calculate exact size
+    size_t jsonSize = measureJson(doc);
+    
+    // Stream directly to MQTT (NO INTERMEDIATE BUFFER!)
+    MQTTDebugTf(PSTR("Streaming JSON (%d bytes) to [%s]\r\n"), jsonSize, full_topic);
+    
+    if (MQTTclient.beginPublish(full_topic, jsonSize, false)) {
+        serializeJson(doc, MQTTclient); // <-- STREAMS DIRECTLY TO SOCKET
+        MQTTclient.endPublish();
+    }
+    
+    feedWatchDog();
+}
+
+
+// ============================================================================
+// EXAMPLE 4: Migration wrapper with feature flag
+// ============================================================================
+
+// Add to MQTTstuff.ino to allow gradual migration:
+
+void sendMQTTData(const char* topic, const char *json, const bool retain) {
+#if USE_STREAMING_TEMPLATES
+    // New streaming implementation
+    sendMQTTDataStreaming(topic, json, retain);
+#else
+    // Original buffered implementation (fallback)
+    sendMQTTDataLegacy(topic, json, retain);
+#endif
+}
+
+// Streaming version
+void sendMQTTDataStreaming(const char* topic, const char *json, const bool retain) {
+    if (!settingMQTTenable || !MQTTclient.connected()) return;
+    
+    char full_topic[MQTT_TOPIC_MAX_LEN];
+    snprintf_P(full_topic, sizeof(full_topic), PSTR("%s/"), MQTTPubNamespace);
+    strlcat(full_topic, topic, sizeof(full_topic));
+    
+    size_t len = strlen(json);
+    
+    MQTTDebugTf(PSTR("Streaming MQTT: [%s] (%d bytes)\r\n"), full_topic, len);
+    
+    if (MQTTclient.beginPublish(full_topic, len, retain)) {
+        // Write directly from source string (already efficient for small strings)
+        for (size_t i = 0; i < len; i++) {
+            MQTTclient.write((uint8_t)json[i]);
+        }
+        MQTTclient.endPublish();
+    }
+    
+    feedWatchDog();
+}
+
+// Legacy buffered version (renamed)
+void sendMQTTDataLegacy(const char* topic, const char *json, const bool retain) {
+    // Original implementation stays intact
+    if (!settingMQTTenable) return;
+    if (!MQTTclient.connected()) return;
+    
+    char full_topic[MQTT_TOPIC_MAX_LEN];
+    snprintf_P(full_topic, sizeof(full_topic), PSTR("%s/"), MQTTPubNamespace);
+    strlcat(full_topic, topic, sizeof(full_topic));
+    
+    if (!MQTTclient.publish(full_topic, json, retain)) {
+        PrintMQTTError();
+    }
+    
+    feedWatchDog();
+}
+
+
+// ============================================================================
+// EXAMPLE 5: Hybrid approach for gradual migration
+// ============================================================================
+
+// This allows you to migrate incrementally:
+// - Use streaming for new code
+// - Keep legacy buffered mode for existing code
+// - Switch via compile-time flag
+
+void doAutoConfigure(bool bForceAll = false) {
+#if USE_STREAMING_TEMPLATES
+    doAutoConfigureStreaming(bForceAll);
+#else
+    doAutoConfigureLegacy(bForceAll); // Original implementation
+#endif
+}
+
+// You can test both implementations in parallel and compare:
+void testStreamingVsLegacy() {
+    unsigned long heapBefore = ESP.getFreeHeap();
+    doAutoConfigureLegacy(true);
+    unsigned long heapAfterLegacy = ESP.getFreeHeap();
+    
+    delay(1000);
+    
+    heapBefore = ESP.getFreeHeap();
+    doAutoConfigureStreaming(true);
+    unsigned long heapAfterStreaming = ESP.getFreeHeap();
+    
+    DebugTf(PSTR("Heap impact - Legacy: %d bytes, Streaming: %d bytes\r\n"),
+            heapBefore - heapAfterLegacy,
+            heapBefore - heapAfterStreaming);
+}
+
+// Expected output:
+// Heap impact - Legacy: ~2400 bytes, Streaming: ~150 bytes

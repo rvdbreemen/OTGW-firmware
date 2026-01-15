@@ -94,6 +94,16 @@ void setup() {
   rebootCount = updateRebootCount();
   updateRebootLog(lastReset);
   
+#ifdef USE_STREAMING_TEMPLATES
+  // Validate streaming template functionality
+  SetupDebugln(F("Validating streaming templates..."));
+  if (validateStreamingTemplates()) {
+    SetupDebugln(F("✓ Streaming templates validated successfully"));
+  } else {
+    SetupDebugln(F("✗ WARNING: Streaming template validation failed!"));
+  }
+#endif
+  
   SetupDebugln(F("Setup finished!\r\n"));
 
   // After resetting the OTGW PIC never send anything to Serial for debug
@@ -253,6 +263,39 @@ void doTaskEvery1s(){
 void doTaskEvery5s(){
   //== do tasks ==
   
+  // Heap monitoring for memory analysis
+  static uint32_t minHeap = 0xFFFFFFFF;
+  static uint32_t minFreeBlock = 0xFFFFFFFF;
+  
+  uint32_t freeHeap = ESP.getFreeHeap();
+  uint32_t maxFreeBlock = ESP.getMaxFreeBlockSize();
+  
+  // Track minimums
+  if (freeHeap < minHeap) minHeap = freeHeap;
+  if (maxFreeBlock < minFreeBlock) minFreeBlock = maxFreeBlock;
+  
+  // Calculate fragmentation percentage
+  uint8_t fragmentation = 0;
+  if (freeHeap > 0) {
+    fragmentation = 100 - ((maxFreeBlock * 100) / freeHeap);
+  }
+  
+  // Log every 5 seconds during development, or when heap drops below threshold
+  static uint8_t logCounter = 0;
+  logCounter++;
+  
+  if (freeHeap < 10000 || (logCounter % 12 == 0)) { // Log when low or every minute
+    DebugTf(PSTR("Heap: %d bytes free (min: %d) | MaxBlock: %d (min: %d) | Frag: %d%%\r\n"),
+            freeHeap, minHeap, maxFreeBlock, minFreeBlock, fragmentation);
+  }
+  
+  // Send MQTT telemetry every 5 minutes (60 calls @ 5s intervals)
+  if (settingMQTTenable && (logCounter % 60 == 0)) {
+    char heapMsg[64];
+    snprintf_P(heapMsg, sizeof(heapMsg), PSTR("{\"free\":%d,\"block\":%d,\"frag\":%d}"),
+               freeHeap, maxFreeBlock, fragmentation);
+    sendMQTTData(F("heap"), heapMsg, false);
+  }
 }
 
 //===[ Do task every 30s ]===

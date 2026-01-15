@@ -1560,7 +1560,11 @@ void processOT(const char *buf, int len){
       if (is_value_valid(OTdata, OTlookupitem) && settingMQTTenable ) {
         if(getMQTTConfigDone(OTdata.id)==false) {
           MQTTDebugTf(PSTR("Need to set MQTT config for message %s (%d)\r\n"), OTlookupitem.label, OTdata.id);
+#ifdef USE_STREAMING_TEMPLATES
+          bool success = doAutoConfigureMsgid_Streaming(OTdata.id, NodeId);
+#else
           bool success = doAutoConfigureMsgid(OTdata.id, NodeId);
+#endif
           if(success) {
             MQTTDebugTf(PSTR("Successfully sent MQTT config for message %s (%d)\r\n"), OTlookupitem.label, OTdata.id);
             setMQTTConfigDone(OTdata.id);

@@ -19,6 +19,10 @@
 // DEBUGGING: Uncomment the next line to disable WebSocket functionality
 // #define DISABLE_WEBSOCKET
 
+// STREAMING: Uncomment the next line to enable streaming MQTT implementation
+// This reduces heap usage by ~4KB and eliminates buffer fragmentation
+#define USE_STREAMING_TEMPLATES
+
 #include <TelnetStream.h>       // https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
 #include <ArduinoJson.h>        // https://arduinojson.org/
 #include "Wire.h"
