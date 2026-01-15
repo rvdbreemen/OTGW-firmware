@@ -2076,6 +2076,83 @@ function toggleInteraction(enabled) {
 }
 
 function startFlash(filename) {
+    if (!confirm("The ESP will reboot to ensure a clean state before flashing " + filename + ". Continue?")) {
+        return;
+    }
+
+    currentFlashFilename = filename;
+    isFlashing = true;
+    toggleInteraction(false);
+    
+    // Stop polling during upgrade to prevent interference and reduce load
+    if (tid) { clearInterval(tid); tid = 0; }
+    if (timeupdate) { clearInterval(timeupdate); timeupdate = 0; }
+
+    let progressSection = document.getElementById("flashProgressSection");
+    let progressBar = document.getElementById("flashProgressBar");
+    let pctText = document.getElementById("flashPercentageText");
+    
+    if (progressSection) progressSection.classList.add('active');
+    if (progressBar) {
+        progressBar.style.width = "0%";
+        progressBar.classList.remove('error');
+    }
+
+    if (pctText) pctText.innerText = "Rebooting ESP for clean state...";
+
+    // 1. Reboot ESP
+    fetch(localURL + '/ReBoot')
+    .then(() => {
+        console.log("Reboot command sent.");
+        if (pctText) pctText.innerText = "ESP Rebooting. Waiting for connection...";
+        setTimeout(pollForReboot, 5000);
+    })
+    .catch(e => {
+        console.log("Reboot fetch result: " + e);
+        if (pctText) pctText.innerText = "ESP Rebooting... Waiting...";
+        setTimeout(pollForReboot, 5000);
+    });
+}
+
+function pollForReboot() {
+    let pctText = document.getElementById("flashPercentageText");
+    
+    // Check if back online using a lightweight API call
+    fetch(localURL + '/api/firmwarefilelist', {method: 'GET'}) 
+    .then(response => {
+        if (response.ok) {
+            console.log("ESP is back online!");
+            if (pctText) pctText.innerText = "ESP Online! Preparing to flash...";
+            startFlashCountdown();
+        } else {
+            throw new Error("Not ready");
+        }
+    })
+    .catch(e => {
+        console.log("Waiting for ESP...");
+        setTimeout(pollForReboot, 1000);
+    });
+}
+
+function startFlashCountdown() {
+    let count = 3;
+    let pctText = document.getElementById("flashPercentageText");
+    
+    // Initial display
+    if (pctText) pctText.innerText = "Flashing in " + count + "...";
+
+    let timer = setInterval(() => {
+        count--;
+        if (count > 0) {
+            if (pctText) pctText.innerText = "Flashing in " + count + "...";
+        } else {
+            clearInterval(timer);
+            performFlash(currentFlashFilename);
+        }
+    }, 1000);
+}
+
+function performFlash(filename) {
     currentFlashFilename = filename;
     isFlashing = true;
     toggleInteraction(false);
@@ -2092,34 +2169,47 @@ function startFlash(filename) {
         progressBar.style.width = "0%";
         progressBar.classList.remove('error');
     }
-    if (pctText) pctText.innerText = "Starting upgrade for " + filename + "...";
+    
+    if (pctText) pctText.innerText = "Connecting to event stream...";
     
     // Ensure WebSocket is connected for progress updates
     initOTLogWebSocket(true);
-    
-    fetch(localURL + '/pic?action=upgrade&name=' + filename)
-    .then(response => {
-       if (response.headers.get("content-type").indexOf("application/json") !== -1) {
-         return response.json();
-       } else {
-         return {status: "started (legacy)"}; 
-       }
-    })
-    .then(data => {
-        console.log("Flash started:", data);
-        if (pctText) pctText.innerText = "Flashing " + filename + " started...";
-    })
-    .catch(error => {
-        console.error("Flash error:", error);
-        isFlashing = false;
-        toggleInteraction(true);
-        if (pctText) pctText.innerText = "Error starting flash: " + error.message;
-        if (progressBar) progressBar.classList.add('error');
-        
-        // Restart polling on start failure
-        if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-        if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
-    });
+
+    // Wait for WebSocket to be OPEN before sending flash command
+    let attempts = 0;
+    const waitForWS = setInterval(() => {
+        attempts++;
+        // ReadyState 1 is OPEN
+        if ((otLogWS && otLogWS.readyState === 1) || attempts > 50) { // 5s timeout
+             clearInterval(waitForWS);
+             
+             if (pctText) pctText.innerText = "Starting upgrade for " + filename + "...";
+             
+             fetch(localURL + '/pic?action=upgrade&name=' + filename)
+                .then(response => {
+                   if (response.headers.get("content-type").indexOf("application/json") !== -1) {
+                     return response.json();
+                   } else {
+                     return {status: "started (legacy)"}; 
+                   }
+                })
+                .then(data => {
+                    console.log("Flash started:", data);
+                    if (pctText) pctText.innerText = "Flashing " + filename + " started...";
+                })
+                .catch(error => {
+                    console.error("Flash error:", error);
+                    isFlashing = false;
+                    toggleInteraction(true);
+                    if (pctText) pctText.innerText = "Error starting flash: " + error.message;
+                    if (progressBar) progressBar.classList.add('error');
+                    
+                    // Restart polling on start failure
+                    if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+                    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+                });
+        }
+    }, 100);
 }
 
 function handleFlashMessage(data) {
