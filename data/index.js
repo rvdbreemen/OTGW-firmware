@@ -2200,13 +2200,7 @@ function handleFlashMessage(data) {
                         if (f && f.version) flashedVer = f.version;
                     }
 
-                    // Infer Type from version or filename roughly if needed, or just say Gateway (most common)
-                    // But 'flashedVer' usually contains the full banner e.g. "OpenTherm Gateway 4.3"
-                    // If it is just version "4.3", we might want to say "Gateway 4.3"
-                    // The backend scanner puts just the version number in .version usually (e.g. "4.3") or "OpenTherm Gateway 4.3"??
-                    // apifirmwarefilelist: version = f.readStringUntil('\n'); or GetVersion extracts it.
-                    // GetVersion extracts string after "OpenTherm Gateway " offset. So it returns "4.3" or similar.
-                    // Let's assume Type is "Gateway" (or Diagnostic) based on filename or just display the version.
+                    // Determine firmware type from filename for immediate UI feedback
 
                     let displayType = "Gateway"; 
                     if (currentFlashFilename.toLowerCase().includes("diag")) displayType = "Diagnostic";
