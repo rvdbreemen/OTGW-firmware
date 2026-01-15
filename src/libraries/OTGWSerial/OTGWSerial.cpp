@@ -288,9 +288,6 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
     }
     if (rc != OTGW_ERROR_NONE) return finishUpgrade(rc);
 
-    // Fix: Rewind the file just in case we need to read it again
-    if (hexfd) hexfd.seek(0);
-
     Dprintf("model: %d\n", model);
 
     // The self-programming code will be skipped (assume 256 program words)
@@ -299,35 +296,20 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
     // Look for the new firmware version
     version = nullptr;
     unsigned short ptr = 0;
-    
-    // Fix: Use a safe sliding window search. 
-    // The previous implementation attempted to "skip" strings (read until null), 
-    // which fails if the banner starts inside a block of non-null binary data.
-    size_t bannerLen = sizeof(banner1) - 1;
-
     while (ptr < info.datasize) {
-        // Safe check for banner presence
-        bool match = (ptr + bannerLen <= info.datasize) &&
-                     (strncmp_P((char *)datamem + ptr, banner1, bannerLen) == 0);
-
-        if (match) {
-            char *s = (char *)datamem + ptr + bannerLen;
+        char *s = strstr_P((char *)datamem + ptr, banner1);
+        if (s == nullptr) {
+            ptr += strnlen((char *)datamem + ptr,
+              info.datasize - ptr) + 1;
+        } else {
+            s += sizeof(banner1) - 1;   // Drop the terminating '\0'
             version = s;
             Dprintf("Version: %s\n", version);
-            
             if (firmware == FIRMWARE_OTGW && *fwversion) {
                 // Reading out the EEPROM settings takes 4 reads of 64 bytes
                 weight += 4 * WEIGHT_DATAREAD;
             }
             break;
-        } else {
-             // Move to next string (skip until null or end)
-             while (ptr < info.datasize && datamem[ptr] != 0) {
-                 ptr++;
-             }
-             if (ptr < info.datasize) {
-                 ptr++;
-             }
         }
     }
 
