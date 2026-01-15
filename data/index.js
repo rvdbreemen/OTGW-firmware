@@ -2126,7 +2126,19 @@ function performFlash(filename) {
         // ReadyState 1 is OPEN
         if ((otLogWS && otLogWS.readyState === 1) || attempts > 50) { // 5s timeout
              clearInterval(waitForWS);
-             
+
+             if (!otLogWS || otLogWS.readyState !== 1) {
+                console.error("Flash aborted: WebSocket timeout");
+                if (pctText) pctText.innerText = "Error: Connection timed out. Cannot track progress.";
+                if (progressBar) progressBar.classList.add('error');
+                isFlashing = false;
+                toggleInteraction(true);
+                // Restart polling
+                if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+                if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+                return;
+             }
+
              if (pctText) pctText.innerText = "Starting upgrade for " + filename + "...";
              
              fetch(localURL + '/pic?action=upgrade&name=' + filename)
