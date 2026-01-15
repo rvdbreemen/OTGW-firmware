@@ -125,6 +125,7 @@ There are two ways to integrate with Home Assistant:
 
 ## Important warnings / breaking changes
 
+- **New API endpoint (v1.0.0):** A new optimized `/api/v2/otgw/otmonitor` endpoint uses a map-based JSON format. The original v1 endpoint remains available for compatibility. See [API_CHANGES_v1.0.0.md](example-api/API_CHANGES_v1.0.0.md) for details.
 - **Do not flash OTGW PIC firmware over Wi-Fi using OTmonitor.** You can brick the PIC. Use the built-in PIC firmware upgrade feature instead (based on code by Schelte Bron).
 - **Breaking change (v0.8.0):** MQTT topic naming conventions changed; MQTT-based integrations may need updates.
 - **Breaking change (v0.7.2+):** LittleFS is used; switching required a full reflash via USB and settings are not preserved.
