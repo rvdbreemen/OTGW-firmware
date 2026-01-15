@@ -1341,6 +1341,9 @@ function refreshDevTime() {
 
 } // refreshDevTime()
 //============================================================================      
+// Global variable to store available firmware files info
+let availableFirmwareFiles = [];
+
 function refreshFirmware() {
   console.log("refreshFirmware() .. " + APIGW + "firmwarefilelist");
   
@@ -1363,8 +1366,10 @@ function refreshFirmware() {
     .then(response => response.json())
     .then(files => {
       console.log("parsed ... data is [" + JSON.stringify(files) + "]");
+      availableFirmwareFiles = files; // Store for later use in flash success message
 
       let displayPICpage = document.getElementById('displayPICpage');
+
       while (displayPICpage.lastChild) {
         displayPICpage.lastChild.remove();
       }
@@ -1376,8 +1381,8 @@ function refreshFirmware() {
       let infoContent = "";
       // infoContent += "<b>PIC Status:</b> " + ((picInfo.available == "true" || picInfo.available == true) ? "Available" : "Not Available") + "<br>";
       infoContent += "<b>PIC Device:</b> " + picInfo.device + "<br>";
-      infoContent += "<b>PIC Type:</b> " + picInfo.type + "<br>";
-      infoContent += "<b>PIC Firmware Version:</b> " + picInfo.version;
+      infoContent += "<b>PIC Type:</b> <span id='pic_type_display'>" + picInfo.type + "</span><br>";
+      infoContent += "<b>PIC Firmware Version:</b> <span id='pic_version_display'>" + picInfo.version + "</span>";
       
       infoDiv.innerHTML = infoContent;
       displayPICpage.appendChild(infoDiv);
@@ -1542,7 +1547,7 @@ function refreshOTmonitor() {
   console.log("refreshOTmonitor() ..");
 
   data = {};
-  fetch(APIGW + "v1/otgw/otmonitor")  //api/v1/otgw/otmonitor
+  fetch(APIGW + "v2/otgw/otmonitor")  //api/v2/otgw/otmonitor
     .then(response => response.json())
     .then(json => {
       console.log("then(json => ..)");
@@ -1551,13 +1556,22 @@ function refreshOTmonitor() {
       data = json.otmonitor;
 
       let otMonPage = document.getElementById('mainPage');
-      while (otMonPage.lastChild) {
-        otMonPage.lastChild.remove();
+      let otMonTable = document.querySelector(".otmontable");
+      
+      // If table doesn't exist, create it (and clear waiting/existing content)
+      if (!otMonTable) {
+        otMonPage.innerHTML = ""; 
+        otMonTable = document.createElement("div");
+        otMonTable.setAttribute("class", "otmontable");
+        otMonPage.appendChild(otMonTable);
       }
-      let otMonTable = document.createElement("div");
-      otMonTable.setAttribute("class", "otmontable");
 
       for (let i in data) {
+        // Support for new Map-based JSON (less redundant):
+        // If data is an object map, 'i' is the key (name).
+        // If data is an array, 'i' is the index, and data[i] has a 'name' property.
+        if (!data[i].name) data[i].name = i;
+
         //console.log("["+data[i].name+"]=>["+data[i].value+"]");
 
         if ((document.getElementById("otmon_" + data[i].name)) == null) { // if element does not exists yet, then build page
@@ -1615,7 +1629,6 @@ function refreshOTmonitor() {
 
         }
       }
-      otMonPage.appendChild(otMonTable);
       if (needReload) window.location.reload(true);
     })
     .catch(function (error) {
@@ -2077,6 +2090,13 @@ function toggleInteraction(enabled) {
 }
 
 function startFlash(filename) {
+    performFlash(filename);
+}
+
+// function pollForReboot() - Removed
+// function startFlashCountdown() - Removed
+
+function performFlash(filename) {
     currentFlashFilename = filename;
     isFlashing = true;
     toggleInteraction(false);
@@ -2093,34 +2113,47 @@ function startFlash(filename) {
         progressBar.style.width = "0%";
         progressBar.classList.remove('error');
     }
-    if (pctText) pctText.innerText = "Starting upgrade for " + filename + "...";
+    
+    if (pctText) pctText.innerText = "Connecting to event stream...";
     
     // Ensure WebSocket is connected for progress updates
     initOTLogWebSocket(true);
-    
-    fetch(localURL + '/pic?action=upgrade&name=' + filename)
-    .then(response => {
-       if (response.headers.get("content-type").indexOf("application/json") !== -1) {
-         return response.json();
-       } else {
-         return {status: "started (legacy)"}; 
-       }
-    })
-    .then(data => {
-        console.log("Flash started:", data);
-        if (pctText) pctText.innerText = "Flashing " + filename + " started...";
-    })
-    .catch(error => {
-        console.error("Flash error:", error);
-        isFlashing = false;
-        toggleInteraction(true);
-        if (pctText) pctText.innerText = "Error starting flash: " + error.message;
-        if (progressBar) progressBar.classList.add('error');
-        
-        // Restart polling on start failure
-        if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-        if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
-    });
+
+    // Wait for WebSocket to be OPEN before sending flash command
+    let attempts = 0;
+    const waitForWS = setInterval(() => {
+        attempts++;
+        // ReadyState 1 is OPEN
+        if ((otLogWS && otLogWS.readyState === 1) || attempts > 50) { // 5s timeout
+             clearInterval(waitForWS);
+             
+             if (pctText) pctText.innerText = "Starting upgrade for " + filename + "...";
+             
+             fetch(localURL + '/pic?action=upgrade&name=' + filename)
+                .then(response => {
+                   if (response.headers.get("content-type").indexOf("application/json") !== -1) {
+                     return response.json();
+                   } else {
+                     return {status: "started (legacy)"}; 
+                   }
+                })
+                .then(data => {
+                    console.log("Flash started:", data);
+                    if (pctText) pctText.innerText = "Flashing " + filename + " started...";
+                })
+                .catch(error => {
+                    console.error("Flash error:", error);
+                    isFlashing = false;
+                    toggleInteraction(true);
+                    if (pctText) pctText.innerText = "Error starting flash: " + error.message;
+                    if (progressBar) progressBar.classList.add('error');
+                    
+                    // Restart polling on start failure
+                    if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+                    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+                });
+        }
+    }, 100);
 }
 
 function handleFlashMessage(data) {
@@ -2157,6 +2190,46 @@ function handleFlashMessage(data) {
                 
                 if (msg.result === 0 && progressBar) {
                     progressBar.style.width = "100%";
+                    if (progressBar.classList.contains('error')) progressBar.classList.remove('error');
+
+                    // Look up version for immediate feedback
+                    let flashedVer = "Unknown";
+                    // Attempt to find version from available global list
+                    if (typeof availableFirmwareFiles !== 'undefined') {
+                        let f = availableFirmwareFiles.find(x => x.name === currentFlashFilename);
+                        if (f && f.version) flashedVer = f.version;
+                    }
+
+                    // Infer Type from version or filename roughly if needed, or just say Gateway (most common)
+                    // But 'flashedVer' usually contains the full banner e.g. "OpenTherm Gateway 4.3"
+                    // If it is just version "4.3", we might want to say "Gateway 4.3"
+                    // The backend scanner puts just the version number in .version usually (e.g. "4.3") or "OpenTherm Gateway 4.3"??
+                    // apifirmwarefilelist: version = f.readStringUntil('\n'); or GetVersion extracts it.
+                    // GetVersion extracts string after "OpenTherm Gateway " offset. So it returns "4.3" or similar.
+                    // Let's assume Type is "Gateway" (or Diagnostic) based on filename or just display the version.
+
+                    let displayType = "Gateway"; 
+                    if (currentFlashFilename.toLowerCase().includes("diag")) displayType = "Diagnostic";
+                    if (currentFlashFilename.toLowerCase().includes("inter")) displayType = "Interface";
+
+                    // Update UI immediately with TARGET version (optimistic)
+                    let elType = document.getElementById('pic_type_display');
+                    let elVer = document.getElementById('pic_version_display');
+                    if (elType) elType.innerText = displayType;
+                    if (elVer) elVer.innerText = flashedVer;
+                    
+                    if (pctText) pctText.innerText = "Successfully flashed to " + displayType + " " + flashedVer;
+                    
+                    // Trigger actual hardware refresh in background
+                    setTimeout(() => refreshFirmware(), 2000); // Give PIC 2s to boot
+
+                    // Reset progress bar after 10 seconds
+                    setTimeout(function() {
+                        if (progressSection) progressSection.classList.remove('active');
+                        if (progressBar) progressBar.style.width = "0%";
+                        if (pctText) pctText.innerText = "Ready to flash";
+                    }, 10000);
+
                 } else if (progressBar) {
                     progressBar.classList.add('error');
                 }
