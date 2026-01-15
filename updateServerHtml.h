@@ -125,6 +125,8 @@ static const char UpdateServerIndex[] PROGMEM =
          var lastUploadLoaded = 0;
          var lastUploadTotal = 0;
          var formErrorEl = document.getElementById('formError');
+         var onRebootCallback = null;
+         var waitingForReboot = false;
 
          function showProgressPage(title) {
            pageForm.style.display = 'none';
@@ -371,6 +373,17 @@ static const char UpdateServerIndex[] PROGMEM =
             
             ws.onopen = function() {
                 console.log('WS Connected');
+                // Failsafe: if we are waiting for reboot, and WS connects, device is UP
+                if (waitingForReboot) {
+                     console.log("WS connected during poll -> Device UP");
+                     waitingForReboot = false;
+                     // Prevent double-fire if pollHealth also succeeds at same time
+                     if (onRebootCallback) {
+                        var cb = onRebootCallback;
+                        onRebootCallback = null; // Clear it so pollHealth cannot use it
+                        startCountDown(cb);
+                     }
+                }
             };
             
             ws.onmessage = function(e) {
@@ -402,6 +415,64 @@ static const char UpdateServerIndex[] PROGMEM =
             };
         }
         setupWebSocket();
+
+        function rebootAndStart(callback) {
+            if (uploadInfoEl) uploadInfoEl.textContent = 'Rebooting...';
+            if (progressTitle) progressTitle.textContent = 'Rebooting ESP...';
+            
+            // Store callback for WS failsafe
+            onRebootCallback = callback;
+            waitingForReboot = true;
+
+            // 1. Reboot
+            fetch('/ReBoot', { method: 'GET' })
+               .catch(function(e) { console.log('Reboot fetch error (expected):', e); });
+            
+            // 2. Poll
+            setTimeout(function() { pollHealth(callback); }, 3000);
+        }
+        
+        function pollHealth(callback) {
+            // Check if we were stopped by WebSocket failsafe
+            if (!waitingForReboot) return;
+
+            if (uploadInfoEl) uploadInfoEl.textContent = 'Waiting for reboot...';
+            
+            fetch('/api/v1/health?t=' + Date.now())
+               .then(function(res) { 
+                   if (!res.ok) throw new Error(res.status);
+                   return res.json(); 
+               })
+               .then(function(json) {
+                   var data = json.health || json;
+                   // Re-check flag in case WS connected while we were fetching
+                   if (waitingForReboot && data.status === 'UP') {
+                       waitingForReboot = false;
+                       onRebootCallback = null; // Clear shared callback
+                       startCountDown(callback);
+                   } else if (waitingForReboot) {
+                       setTimeout(function() { pollHealth(callback); }, 1000);
+                   }
+               })
+               .catch(function(e) {
+                   console.log("Poll error:", e);
+                   if(waitingForReboot) setTimeout(function() { pollHealth(callback); }, 1000);
+               });
+        }
+        
+        function startCountDown(callback) {
+            var count = 3;
+            var timer = setInterval(function() {
+                if (progressTitle) progressTitle.textContent = 'Flashing in ' + count + '...';
+                if (uploadInfoEl) uploadInfoEl.textContent = 'ESP Online. Starting in ' + count + '...';
+                count--;
+                if (count < 0) {
+                    clearInterval(timer);
+                    if (progressTitle) progressTitle.textContent = 'Flashing in progress';
+                    callback();
+                }
+            }, 1000);
+        }
 
 
          function initUploadForm(formId, targetName) {
@@ -441,67 +512,112 @@ static const char UpdateServerIndex[] PROGMEM =
              if (!window.FormData || !window.XMLHttpRequest) {
                return;
              }
-             uploadInFlight = true;
+             // uploadInFlight = true; // Moved inside callback
 
-             var xhr = new XMLHttpRequest();
              var action = form.action;
+             var preFlight = Promise.resolve();
 
              // --- Custom logic: append preserve param ---
              if (formId === 'fsForm') {
                 var chk = document.getElementById('chkPreserve');
                 if(chk && chk.checked) {
-                    action += (action.indexOf('?') === -1 ? '?' : '&') + 'preserve=true';
+                    // Do not add param to action here, handled in frontend only now
+                    // logic for preserve in backend removed
                     
-                    // Trigger download as backup
-                    var a = document.createElement('a');
-                    a.href = '/settings.ini';
-                    a.download = 'settings.ini';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
+                    // Trigger download as backup and save to localStorage
+                    preFlight = fetch('/settings.ini')
+                        .then(function(resp) { return resp.blob(); })
+                        .then(function(blob) {
+                             // 1. Save to Local Storage
+                             var reader = new FileReader();
+                             reader.onload = function() {
+                                 // Remove any previous saved settings
+                                 localStorage.removeItem('saved_settings_ini');
+                                 try {
+                                    localStorage.setItem('saved_settings_ini', reader.result);
+                                    console.log("Settings saved to localStorage");
+                                 } catch(e) {
+                                     console.log("LocalStorage error:", e);
+                                     alert("Warning: Could not save settings to browser storage. Only download backup will be available.");
+                                 }
+                             };
+                             reader.readAsText(blob);
+
+                             // 2. Trigger Download
+                             var url = window.URL.createObjectURL(blob);
+                             var a = document.createElement('a');
+                             a.style.display = 'none';
+                             a.href = url;
+                             a.download = 'settings.ini';
+                             document.body.appendChild(a);
+                             a.click();
+                             window.URL.revokeObjectURL(url);
+                             document.body.removeChild(a);
+                             
+                             // Wait briefly for download to start
+                             return new Promise(function(resolve) { setTimeout(resolve, 1000); });
+                        })
+                        .catch(function(e) {
+                             console.log('Backup error', e);
+                             if(!confirm("Could not backup settings.ini. Continue anyway?")) {
+                                 throw e;
+                             }
+                        });
                 }
              }
              // ------------------------------------------
 
-             if (action.indexOf('size=') === -1) {
-               action += (action.indexOf('?') === -1 ? '?' : '&') + 'size=' + encodeURIComponent(input.files[0].size);
-             }
-             xhr.open('POST', action, true);
-             xhr.setRequestHeader('X-File-Size', input.files[0].size);
-             xhr.upload.onprogress = function(ev) {
-               console.log('Upload progress:', ev.loaded, ev.total);
-               var total = ev.lengthComputable ? ev.total : 0;
-               lastUploadLoaded = ev.loaded;
-               lastUploadTotal = total;
-               setUploadProgress(ev.loaded, total);
-             };
-             xhr.onload = function() {
-               console.log('Upload finished, status:', xhr.status);
-               if (xhr.status >= 200 && xhr.status < 300) {
-                 var responseText = xhr.responseText || '';
-                if (responseText.indexOf('Flash error') !== -1) {
-                   // Status line remains hidden or used for error text
-                   errorEl.textContent = responseText;
-                   progressTitle.textContent = 'Flashing error';
-                   successShown = false;
-                   if (successPanel) successPanel.style.display = 'none';
-                   if (retryBtn) retryBtn.style.display = 'block';
-                 } else {
-                   setUploadProgress(lastUploadTotal, lastUploadTotal); // Ensure 100%
-                   localUploadDone = true;
+             preFlight.then(function() {
+                 if (action.indexOf('size=') === -1) {
+                   action += (action.indexOf('?') === -1 ? '?' : '&') + 'size=' + encodeURIComponent(input.files[0].size);
                  }
-                 uploadInFlight = false;
-               } else {
-                 errorEl.textContent = 'Upload failed: ' + xhr.status;
-                 uploadInFlight = false;
-               }
-             };
-             xhr.onerror = function() {
-               errorEl.textContent = 'Upload error';
-               uploadInFlight = false;
-               if (retryBtn) retryBtn.style.display = 'block';
-             };
-             xhr.send(new FormData(form));
+
+                 var performUpload = function() {
+                     uploadInFlight = true;
+                     var xhr = new XMLHttpRequest();
+                     xhr.open('POST', action, true);
+                     xhr.setRequestHeader('X-File-Size', input.files[0].size);
+                     xhr.upload.onprogress = function(ev) {
+                       console.log('Upload progress:', ev.loaded, ev.total);
+                       var total = ev.lengthComputable ? ev.total : 0;
+                       lastUploadLoaded = ev.loaded;
+                       lastUploadTotal = total;
+                       setUploadProgress(ev.loaded, total);
+                     };
+                     xhr.onload = function() {
+                       console.log('Upload finished, status:', xhr.status);
+                       if (xhr.status >= 200 && xhr.status < 300) {
+                         var responseText = xhr.responseText || '';
+                        if (responseText.indexOf('Flash error') !== -1) {
+                           // Status line remains hidden or used for error text
+                           errorEl.textContent = responseText;
+                           progressTitle.textContent = 'Flashing error';
+                           successShown = false;
+                           if (successPanel) successPanel.style.display = 'none';
+                           if (retryBtn) retryBtn.style.display = 'block';
+                         } else {
+                           setUploadProgress(lastUploadTotal, lastUploadTotal); // Ensure 100%
+                           localUploadDone = true;
+                         }
+                         uploadInFlight = false;
+                       } else {
+                         errorEl.textContent = 'Upload failed: ' + xhr.status;
+                         uploadInFlight = false;
+                       }
+                     };
+                     xhr.onerror = function() {
+                       errorEl.textContent = 'Upload error';
+                       uploadInFlight = false;
+                       if (retryBtn) retryBtn.style.display = 'block';
+                     };
+                     xhr.send(new FormData(form));
+                 };
+
+                 rebootAndStart(performUpload);
+             }).catch(function(e) {
+                 errorEl.textContent = 'Cancelled';
+                 if (retryBtn) retryBtn.style.display = 'block';
+             });
            });
          }
 
@@ -543,18 +659,75 @@ static const char UpdateServerSuccess[] PROGMEM =
       <h1>OTGW firmware Flash utility</h1>
       <br/>
       <h2>Flashing successful!</h2>
+      %SETTINGS_MSG%
       <br/>
       <br/>Wait for the OTGW firmware to reboot and start the HTTP server
       <br/>
-      <br>
+      <br/><span id="status" style="font-weight:bold; color: #666;">Waiting for device...</span>
+      <br/>
       <br/>Wait <span style='font-size: 1.3em;' id="waitSeconds">60</span> seconds ..
       <br>If nothing happend, then wait for count down to zero and then refresh with <span style='font-size:1.3em;'><b><a href="/">this link here</a></b></span>!
       </body>
       <script>
-         var seconds = parseInt(document.getElementById("waitSeconds").textContent);
+         var seconds = 60;
+         var statusEl = document.getElementById("status");
+         
+         function checkHealth() {
+            fetch('/api/v1/health?t=' + Date.now())
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    var s = d.status || (d.health && d.health.status);
+                    if (s === 'UP') {
+                        statusEl.textContent = "Device is UP! Checking for settings restore...";
+                        statusEl.style.color = "blue";
+                        restoreSettingsAndRedirect();
+                    }
+                })
+                .catch(function(e) {
+                   // console.log("Waiting...", e);
+                });
+         }
+         
+         function restoreSettingsAndRedirect() {
+             var saved = localStorage.getItem('saved_settings_ini');
+             if (saved) {
+                 statusEl.textContent = "Restoring settings...";
+                 var formData = new FormData();
+                 var blob = new Blob([saved], { type: "text/plain"});
+                 formData.append("file", blob, "settings.ini");
+                 
+                 fetch('/upload', {
+                     method: 'POST',
+                     body: formData
+                 })
+                 .then(function(response) {
+                     if (response.ok || response.status === 303) {
+                         console.log("Settings restored.");
+                         localStorage.removeItem('saved_settings_ini');
+                         statusEl.textContent = "Settings restored! Redirecting...";
+                         statusEl.style.color = "green";
+                         setTimeout(function() { window.location.href = "/"; }, 1000);
+                     } else {
+                         throw new Error("Upload failed");
+                     }
+                 })
+                 .catch(function(err) {
+                     console.error("Restore failed", err);
+                     statusEl.textContent = "Settings restore failed! Redirecting...";
+                     statusEl.style.color = "orange";
+                     setTimeout(function() { window.location.href = "/"; }, 2000);
+                 });
+             } else {
+                 statusEl.textContent = "Device is UP! Redirecting...";
+                 statusEl.style.color = "green";
+                 window.location.href = "/";
+             }
+         }
+
          var countdown = setInterval(function() {
            seconds--;
            document.getElementById('waitSeconds').textContent = seconds;
+           checkHealth();
            if (seconds <= 0) {
               clearInterval(countdown);
               window.location.href = "/";

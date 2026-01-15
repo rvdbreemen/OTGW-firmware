@@ -300,18 +300,13 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
     version = nullptr;
     unsigned short ptr = 0;
     
-    // Fix: Use a safe sliding window search. 
-    // The previous implementation attempted to "skip" strings (read until null), 
-    // which fails if the banner starts inside a block of non-null binary data.
-    size_t bannerLen = sizeof(banner1) - 1;
-
     while (ptr < info.datasize) {
-        // Safe check for banner presence
-        bool match = (ptr + bannerLen <= info.datasize) &&
-                     (strncmp_P((char *)datamem + ptr, banner1, bannerLen) == 0);
-
-        if (match) {
-            char *s = (char *)datamem + ptr + bannerLen;
+        char *s = strstr_P((char *)datamem + ptr, banner1);
+        if (s == nullptr) {
+            ptr += strnlen((char *)datamem + ptr,
+              info.datasize - ptr) + 1;
+        } else {
+            s += sizeof(banner1) - 1;   // Drop the terminating '\0'
             version = s;
             Dprintf("Version: %s\n", version);
             
@@ -320,14 +315,6 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
                 weight += 4 * WEIGHT_DATAREAD;
             }
             break;
-        } else {
-             // Move to next string (skip until null or end)
-             while (ptr < info.datasize && datamem[ptr] != 0) {
-                 ptr++;
-             }
-             if (ptr < info.datasize) {
-                 ptr++;
-             }
         }
     }
 
