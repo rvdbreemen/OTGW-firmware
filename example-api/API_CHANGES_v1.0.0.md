@@ -44,32 +44,6 @@ The V2 format uses a key-value map where the key is the property name. This redu
     }
   ]
 }
-```      "unit": "°C",
-      "epoch": 1736899200
-    }
-  ]
-}
-```
-
-### New Format (Map/Object) - >= v1.0.0
-
-The `name` property has been removed from the individual objects and is now used as the key for the object.
-
-```json
-{
-  "otmonitor": {
-    "flamestatus": {
-      "value": "Off",
-      "unit": "",
-      "epoch": 1736899200
-    },
-    "roomtemperature": {
-      "value": 20.500,
-      "unit": "°C",
-      "epoch": 1736899200
-    }
-  }
-}
 ```
 
 ### Migration Guide for Clients
