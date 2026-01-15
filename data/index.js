@@ -2238,10 +2238,7 @@ function handleFlashMessage(data) {
                 if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
                 if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
 
-                // Refresh firmware list after success to show new version?
-                if (msg.result === 0) {
-                    setTimeout(refreshFirmware, 3000);
-                }
+
             }
             
             return true; // It was a flash message
