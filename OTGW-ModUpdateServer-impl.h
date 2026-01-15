@@ -174,18 +174,6 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _lastProgressPerc = 0;
 
         if (upload.name == F("filesystem")) {
-          // --- Preserve settings logic ---
-          if (_server->hasArg("preserve") && _server->arg("preserve") == "true") {
-            if (LittleFS.exists("/settings.ini")) {
-              File f = LittleFS.open("/settings.ini", "r");
-              if (f) {
-                _savedSettings = f.readString();
-                f.close();
-                if (_serial_output) Debugln(F("Settings preserved in memory."));
-              }
-            }
-          }
-          // --------------------------------
           size_t fsSize = ((size_t) &_FS_end - (size_t) &_FS_start);
           close_all_fs();
           if (uploadTotal > 0 && uploadTotal > fsSize) {
@@ -236,38 +224,6 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
         if(Update.end(true)){ //true to set the size to the current progress
-          // --- Restore settings logic ---
-          if (upload.name == F("filesystem") && _savedSettings.length() > 0) {
-             if (_serial_output) Debugln(F("Filesystem flashed successfully. Waiting 500ms before mounting..."));
-             delay(500); // Wait 500ms after flashing before mounting
-             
-             if (_serial_output) Debugln(F("Mounting newly flashed filesystem..."));
-             if (LittleFS.begin()) {
-                 if (_serial_output) Debugln(F("Filesystem mounted successfully. Restoring settings..."));
-                 File f = LittleFS.open("/settings.ini", "w");
-                 if (f) {
-                     f.print(_savedSettings);
-                     f.close();
-                     if (_serial_output) Debugln(F("Settings restored to new filesystem."));
-                     LittleFS.end();
-                 } else {
-                     LittleFS.end();
-                     if (_serial_output) {
-                         Debugln(F("ERROR: Failed to write settings.ini to filesystem!"));
-                         Debugln(F("RECOVERY: Download the settings from your browser's download folder"));
-                         Debugln(F("          and upload it via the File Explorer after reboot."));
-                     }
-                 }
-             } else {
-                 if (_serial_output) {
-                     Debugln(F("ERROR: Failed to mount filesystem after flashing!"));
-                     Debugln(F("RECOVERY: Download the settings from your browser's download folder"));
-                     Debugln(F("          and upload it via the File Explorer after reboot."));
-                 }
-             }
-             _savedSettings = ""; 
-          }
-          // --------------------------------
           if (_serial_output) Debugf(PSTR("\r\nUpdate Success: %u\r\nRebooting...\r\n"), upload.totalSize);
           _status.upload_received = upload.totalSize;
           if (_status.upload_total == 0 && upload.totalSize > 0) {
