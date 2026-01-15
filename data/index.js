@@ -1341,6 +1341,9 @@ function refreshDevTime() {
 
 } // refreshDevTime()
 //============================================================================      
+// Global variable to store available firmware files info
+let availableFirmwareFiles = [];
+
 function refreshFirmware() {
   console.log("refreshFirmware() .. " + APIGW + "firmwarefilelist");
   
@@ -1363,8 +1366,10 @@ function refreshFirmware() {
     .then(response => response.json())
     .then(files => {
       console.log("parsed ... data is [" + JSON.stringify(files) + "]");
+      availableFirmwareFiles = files; // Store for later use in flash success message
 
       let displayPICpage = document.getElementById('displayPICpage');
+
       while (displayPICpage.lastChild) {
         displayPICpage.lastChild.remove();
       }
@@ -1376,8 +1381,8 @@ function refreshFirmware() {
       let infoContent = "";
       // infoContent += "<b>PIC Status:</b> " + ((picInfo.available == "true" || picInfo.available == true) ? "Available" : "Not Available") + "<br>";
       infoContent += "<b>PIC Device:</b> " + picInfo.device + "<br>";
-      infoContent += "<b>PIC Type:</b> " + picInfo.type + "<br>";
-      infoContent += "<b>PIC Firmware Version:</b> " + picInfo.version;
+      infoContent += "<b>PIC Type:</b> <span id='pic_type_display'>" + picInfo.type + "</span><br>";
+      infoContent += "<b>PIC Firmware Version:</b> <span id='pic_version_display'>" + picInfo.version + "</span>";
       
       infoDiv.innerHTML = infoContent;
       displayPICpage.appendChild(infoDiv);
@@ -2246,6 +2251,46 @@ function handleFlashMessage(data) {
                 
                 if (msg.result === 0 && progressBar) {
                     progressBar.style.width = "100%";
+                    if (progressBar.classList.contains('error')) progressBar.classList.remove('error');
+
+                    // Look up version for immediate feedback
+                    let flashedVer = "Unknown";
+                    // Attempt to find version from available global list
+                    if (typeof availableFirmwareFiles !== 'undefined') {
+                        let f = availableFirmwareFiles.find(x => x.name === currentFlashFilename);
+                        if (f && f.version) flashedVer = f.version;
+                    }
+
+                    // Infer Type from version or filename roughly if needed, or just say Gateway (most common)
+                    // But 'flashedVer' usually contains the full banner e.g. "OpenTherm Gateway 4.3"
+                    // If it is just version "4.3", we might want to say "Gateway 4.3"
+                    // The backend scanner puts just the version number in .version usually (e.g. "4.3") or "OpenTherm Gateway 4.3"??
+                    // apifirmwarefilelist: version = f.readStringUntil('\n'); or GetVersion extracts it.
+                    // GetVersion extracts string after "OpenTherm Gateway " offset. So it returns "4.3" or similar.
+                    // Let's assume Type is "Gateway" (or Diagnostic) based on filename or just display the version.
+
+                    let displayType = "Gateway"; 
+                    if (currentFlashFilename.toLowerCase().includes("diag")) displayType = "Diagnostic";
+                    if (currentFlashFilename.toLowerCase().includes("inter")) displayType = "Interface";
+
+                    // Update UI immediately with TARGET version (optimistic)
+                    let elType = document.getElementById('pic_type_display');
+                    let elVer = document.getElementById('pic_version_display');
+                    if (elType) elType.innerText = displayType;
+                    if (elVer) elVer.innerText = flashedVer;
+                    
+                    if (pctText) pctText.innerText = "Successfully flashed to " + displayType + " " + flashedVer;
+                    
+                    // Trigger actual hardware refresh in background
+                    setTimeout(() => refreshFirmware(), 2000); // Give PIC 2s to boot
+
+                    // Reset progress bar after 10 seconds
+                    setTimeout(function() {
+                        if (progressSection) progressSection.classList.remove('active');
+                        if (progressBar) progressBar.style.width = "0%";
+                        if (pctText) pctText.innerText = "Ready to flash";
+                    }, 10000);
+
                 } else if (progressBar) {
                     progressBar.classList.add('error');
                 }
