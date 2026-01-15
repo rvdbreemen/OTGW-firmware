@@ -1,9 +1,10 @@
 /* 
 ***************************************************************************  
 **  Filename  : safeTimers.h
-**  Version : 0.3.0
+**  Version : 1.0.0
 **
 **  Copyright (c) 2020 Willem Aandewiel
+**  Copyright (c) 2026 Robert van den Breemen (improvements v1.0.0)
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
@@ -17,6 +18,12 @@
  * Willem Aandewiel and Robert van den Breemen made some changes due 
  * to the "how can I handle the millis() rollover" by Edgar Bonet and added 
  * CHANGE_INTERVAL() and RESTART_TIMER() macro's
+ *
+ * v1.0.0 Improvements (Robert van den Breemen):
+ * 1. Fixed __TimeLeft__ logic using standard integer overflow arithmetic.
+ * 2. Added "Spiral of Death" protection in __Due__ to prevent blocking loops.
+ * 3. Optimize sync logic in SKIP_MISSED_TICKS_WITH_SYNC to O(1).
+ * 4. Removed unseeded random() offset from DECLARE_TIMER macros.
  *
  * see: https://arduino.stackexchange.com/questions/12587/how-can-i-handle-the-millis-rollover
  * 
@@ -91,22 +98,19 @@
 #define DECLARE_TIMER_MIN(timerName, ...) \
                       static uint32_t timerName##_interval = (getParam(0, __VA_ARGS__, 0) * 60 * 1000),\
                                       timerName##_due  = millis()                           \
-                                                        +timerName##_interval               \
-                                                        +random(timerName##_interval / 3);  \
+                                                        +timerName##_interval;              \
                       static byte     timerName##_type = getParam(1, __VA_ARGS__, 0);
 
 #define DECLARE_TIMER_SEC(timerName, ...) \
                       static uint32_t timerName##_interval = (getParam(0, __VA_ARGS__, 0) * 1000),\
                                       timerName##_due  = millis()                           \
-                                                        +timerName##_interval               \
-                                                        +random(timerName##_interval / 3);  \
+                                                        +timerName##_interval;              \
                       static byte     timerName##_type = getParam(1, __VA_ARGS__, 0);
 
 #define DECLARE_TIMER_MS(timerName, ...)  \
                       static uint32_t timerName##_interval = (getParam(0, __VA_ARGS__, 0)), \
                                       timerName##_due  = millis()                           \
-                                                        +timerName##_interval               \
-                                                        +random(timerName##_interval / 3);  \
+                                                        +timerName##_interval;              \
                       static byte     timerName##_type = getParam(1, __VA_ARGS__, 0);
 
 #define DECLARE_TIMER   DECLARE_TIMER_MS
@@ -115,20 +119,17 @@
 #define CHANGE_INTERVAL_MIN(timerName, ...) \
                                       timerName##_interval = (getParam(0, __VA_ARGS__, 0) *60*1000),\
                                       timerName##_due  = millis()                                   \
-                                                       +timerName##_interval                        \
-                                                       +random(timerName##_interval / 3);           \
+                                                       +timerName##_interval;                       \
                                       timerName##_type = getParam(1, __VA_ARGS__, 0);
 #define CHANGE_INTERVAL_SEC(timerName, ...) \
                                       timerName##_interval = (getParam(0, __VA_ARGS__, 0) *1000),   \
                                       timerName##_due  = millis()                                   \
-                                                       +timerName##_interval                        \
-                                                       +random(timerName##_interval / 3);           \
+                                                       +timerName##_interval;                       \
                                       timerName##_type = getParam(1, __VA_ARGS__, 0);
 #define CHANGE_INTERVAL_MS(timerName, ...)  \
                                       timerName##_interval = (getParam(0, __VA_ARGS__, 0) ),        \
                                       timerName##_due  = millis()                                   \
-                                                       +timerName##_interval                        \
-                                                       +random(timerName##_interval / 3);           \
+                                                       +timerName##_interval;                       \
                                       timerName##_type = getParam(1, __VA_ARGS__, 0);
 
 #define CHANGE_INTERVAL CHANGE_INTERVAL_MS
@@ -154,8 +155,17 @@
 
 uint32_t __Due__(uint32_t &timer_due, uint32_t timer_interval, byte timerType)
 {
-  if ((int32_t)(millis() - timer_due) >= 0) 
+  uint32_t now = millis();
+  if ((int32_t)(now - timer_due) >= 0) 
   {
+    // --- SPIRAL OF DEATH PROTECTION ---
+    // If we are significantly behind (e.g. > 10 intervals), don't try to catch up or execute.
+    // Reset the timer to now + interval to allow the main loop to recover.
+    if ((int32_t)(now - timer_due) > (int32_t)(10 * timer_interval)) {
+       timer_due = now + timer_interval;
+       return 0;
+    }
+
     switch (timerType) {
         case CATCH_UP_MISSED_TICKS:   
                   timer_due += timer_interval;
@@ -163,25 +173,28 @@ uint32_t __Due__(uint32_t &timer_due, uint32_t timer_interval, byte timerType)
         case SKIP_MISSED_TICKS_WITH_SYNC:
                   // this will calculate the next due, and skips passed due events 
                   // (missing due events)
-                  // timer_due +=  (((uint32_t)(( timer_due - millis()) / timer_interval)+1) *timer_interval);
-                  while ((int32_t)(millis() - timer_due) >= 0) 
+                  // Use O(1) math instead of while loop to prevent blocking
                   {
-                    timer_due  += timer_interval;
+                    uint32_t intervals_passed = (now - timer_due) / timer_interval;
+                    timer_due += (intervals_passed + 1) * timer_interval;
                   }
                   break;
         case TIMER_TYPE_4:
-                  if ((millis() - timer_due) >= (uint32_t)(timer_interval * 0.05))
+                  if ((now - timer_due) >= (uint32_t)(timer_interval * 0.05))
                   {
-                    timer_due  += timer_interval;
+                    // Too late - skip execution, align to next future slot
+                    uint32_t intervals_passed = (now - timer_due) / timer_interval;
+                    timer_due += (intervals_passed + 1) * timer_interval;
                     return 0;
                   }
-                  while ((int32_t)(millis() - timer_due) >= 0) 
+                  // On time - execute, and schedule next aligned slot
                   {
-                    timer_due  += timer_interval;
+                     uint32_t intervals_passed = (now - timer_due) / timer_interval;
+                     timer_due += (intervals_passed + 1) * timer_interval;
                   }
                   break;
         // SKIP_MISSED_TICKS is default
-        default:  timer_due = millis() + timer_interval;
+        default:  timer_due = now + timer_interval;
                   break;
     }
     return timer_due;  
@@ -193,36 +206,11 @@ uint32_t __Due__(uint32_t &timer_due, uint32_t timer_interval, byte timerType)
 
 uint32_t __TimeLeft__(uint32_t timer_due)
 {
-  uint32_t tmp;
-  byte state = 0;
-  
-  // timeline 0-------------------------SIGNED-MAX-------------------------UMAX
-  // state=0  0---------------------------T-|---D--------------------------UMAX
-  // state=0  0---------------------------d-|---t--------------------------UMAX
-  // state=0  0-----------------------------|---------------T-------D------UMAX
-  // state=0  0-----------------------------|---------------d--t-----------UMAX
-  // state=0  0-------T-D-------------------|------------------------------UMAX
-  // state=0  0---------d--t----------------|------------------------------UMAX
-    
-  // state=1  0---T-------------------------|--------------------------D---UMAX
-  if ( (timer_due >= INT32_MAX) && (millis() < INT32_MAX) ) state = 1;  // millis() rolled-over
-  
-  // state=2  0--------D--------------------|---------------------T--------UMAX
-  if ( (timer_due <= INT32_MAX) && (millis() > INT32_MAX) ) state = 2;  // _due rolled-over
-
-  switch(state) {
-        case 1:     //--- millis() rolled-over
-        case 2:     //--- _due rolled-over
-                    if ( (int32_t)((timer_due + UINT32_MAX) - millis()) >= 0 )
-                          tmp = (timer_due + UINT32_MAX) - millis();
-                    else  tmp = 0;
-                    break;
-        default:    if ( (int32_t)(timer_due - millis()) >= 0 )
-                          tmp = timer_due - millis();
-                    else  tmp = 0;
-  }
-
-  return tmp;
+  // Simple subtraction casts to signed int handles rollover correctly 
+  // as long as the interval is < ~24.8 days.
+  int32_t remain = (int32_t)(timer_due - millis());
+  if (remain >= 0) return (uint32_t)remain;
+  return 0;
   
 } // __TimeLeft__()
 
