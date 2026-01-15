@@ -493,9 +493,7 @@ void sendOTmonitorV2()
     sendJsonOTmonMapEntry(F("numberofsensors"), DallasrealDeviceCount , F(""), now );
     for (int i = 0; i < DallasrealDeviceCount; i++) {
       const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
-      char buf[16];
-      snprintf_P(buf, sizeof(buf), PSTR("%.1f"), DallasrealDevice[i].tempC);
-      sendJsonOTmonMapEntry(strDeviceAddress, buf, F("°C"), DallasrealDevice[i].lasttime);
+      sendJsonOTmonMapEntry(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
     }
   }
 
