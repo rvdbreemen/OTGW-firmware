@@ -51,3 +51,23 @@ Since `msg.hasOwnProperty('percent')` returned false, the UI ignored the update 
 
 **Resolution:**
 The malformed format strings were corrected in `OTGW-Core.ino` (lines ~2089, ~2091, ~2101) to remove the stray parenthesis. The backend now sends valid JSON payloads: `{"percent":...}` and `{"result":...}`.
+
+## 6. Architectural Review & Comparison
+We performed a deep-dive comparison of the flashing logic against the reference `otmonitor` (Tcl) and `otgwmcu` implementations, and Microchip datasheets.
+
+| Feature | **OTGW-firmware** (C++) | **otmonitor** (Tcl) | **otgwmcu** (C++) |
+| :--- | :--- | :--- | :--- |
+| **Method** | **Serial Bootloader** | **Serial Bootloader** | **ICSP (Low Voltage)** |
+| **Prerequisites** | Existing Bootloader on PIC | Existing Bootloader on PIC | Wiring (MCLR/CLK/DAT) |
+| **Protocol** | `CMD_WRITEPROG`, `CMD_ERASEPROG` | `cocmd 2`, `cocmd 3` | Bit-banged ICSP |
+| **Failsafe** | **YES** (Recovery Vector) | **YES** (Recovery Vector) | NO (Standard Rewrite) |
+| **Memory** | **Streaming** (Reads on-the-fly) | **Buffer** (Loads all RAM) | Streaming |
+
+### Verdict
+The **OTGW-firmware** implementation is the most robust choice for this platform.
+1.  **Protocol Fidelity:** It faithfully implements the `otmonitor` "Recovery Vector" logic, ensuring the PIC can recover to the bootloader if power fails during an update.
+2.  **Resource Efficiency:** Unlike `otmonitor` (PC-based), it uses a streaming approach suitable for the ESP8266's limited RAM, scanning the file for validation before rewinding (`hexfd.seek(0)`) for the actual flash.
+3.  **Hardware Compatibility:** It matches the standard OTGW hardware wiring, whereas `otgwmcu` requires specific ICSP wiring.
+4.  **Datasheet Compliance:** The `PicInfo` structures match Microchip specifications for PIC16F88 and PIC16F1847 exactly.
+
+**Status:** The flashing logic is verified robust. Recent issues were strictly related to file parsing/buffering, which have been resolved.

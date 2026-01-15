@@ -112,5 +112,6 @@ void GetVersion(const char* hexfile, char* version, size_t destSize){
              return;
         }
     }
+    DebugTf(PSTR("GetVersion: banner not found in %s\r\n"), hexfile);
   }
 }
