@@ -163,10 +163,9 @@ void startMQTT()
 {
   if (!settingMQTTenable) return;
   
-  // FIXED BUFFER STRATEGY (The Pre-Allocated Obelisk)
-  // Allocate a large static buffer immediately and never change it.
-  // This consumes ~1.3KB RAM permanently but prevents heap fragmentation from constant reallocs.
-  MQTTclient.setBufferSize(1350); 
+  // Static buffer allocation to prevent heap fragmentation on ESP8266
+  // Allocates 1350 bytes permanently but avoids dynamic reallocation issues
+  MQTTclient.setBufferSize(1350);
   
   stateMQTT = MQTT_STATE_INIT;
   //setup for mqtt discovery
@@ -522,16 +521,11 @@ void sendMQTT(const char* topic, const char *json, const size_t len)
 
 
 //===========================================================================================
-// void resetMQTTBufferSize() - REMOVED: Static Buffer Strategy
-// {
-//   if (!settingMQTTenable) return;
-//   // Optimization: Reduce heap fragmentation by avoiding excessive reallocs.
-//   // Only shrink if buffer is significantly larger than our standard working size (512).
-//   // Standard 256 was too small, causing reallocs on medium messages.
-//   if (MQTTclient.getBufferSize() > 768) { 
-//     MQTTclient.setBufferSize(512);
-//   }
-// }
+void resetMQTTBufferSize()
+{
+  if (!settingMQTTenable) return;
+  MQTTclient.setBufferSize(256);
+}
 //===========================================================================================
 bool getMQTTConfigDone(const uint8_t MSGid)
 {
@@ -642,8 +636,19 @@ void doAutoConfigure(bool bForceAll){
        if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_pub_topic%", MQTTPubNamespace)) continue;
        if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_sub_topic%", MQTTSubNamespace)) continue;
 
+       // 5. CRITICAL FIX: Dynamic Buffer Resizing
+       size_t msgLen = strlen(sMsg);
+       size_t topicLen = strlen(sTopic);
+       uint16_t currentSize = MQTTclient.getBufferSize();
+       // Add some overhead for topic + protocol bytes
+       size_t requiredSize = msgLen + topicLen + 128;
+       if (currentSize < requiredSize) {
+          MQTTDebugTf(PSTR("Resizing MQTT buffer from %d to %d\r\n"), currentSize, requiredSize);
+          MQTTclient.setBufferSize(requiredSize);
+       }
+
        // Send retained message
-       sendMQTT(sTopic, sMsg, strlen(sMsg));
+       sendMQTT(sTopic, sMsg, msgLen);
        
        doBackgroundTasks(); // Yield to network stack
     }
@@ -652,7 +657,7 @@ void doAutoConfigure(bool bForceAll){
   fh.close();
   
   // Cleanup
-  // resetMQTTBufferSize(); // REMOVED: Static buffer strategy
+  resetMQTTBufferSize(); // Shrink buffer back to save RAM
   delete[] sLine; delete[] sTopic; delete[] sMsg;
   
   // Trigger Dallas configuration separately as it requires specific sensor addresses
@@ -781,8 +786,16 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
     MQTTDebugf(PSTR("[%s]\r\n"), sMsg); 
     DebugFlush();
     
+    // CRITICAL FIX: Dynamic Buffer Resizing
+    size_t msgLen = strlen(sMsg);
+    uint16_t currentSize = MQTTclient.getBufferSize();
+    if (currentSize < (msgLen + 128)) {
+        MQTTDebugTf(PSTR("Resizing MQTT buffer from %d to %d\r\n"), currentSize, msgLen + 128);
+        MQTTclient.setBufferSize(msgLen + 128); 
+    }
+
     sendMQTT(sTopic, sMsg, strlen(sMsg));
-    // resetMQTTBufferSize(); // REMOVED: Static buffer strategy
+    resetMQTTBufferSize();
     _result = true;
 
     // TODO: enable this break if we are sure the old config dump method is no longer needed
@@ -794,7 +807,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
   delete[] sMsg; delete[] sTopic; delete[] sLine;
 
   // HA discovery msg's are rather large, reset the buffer size to release some memory
-  // resetMQTTBufferSize(); // REMOVED: Static buffer strategy
+  resetMQTTBufferSize();
 
   return _result;
 
