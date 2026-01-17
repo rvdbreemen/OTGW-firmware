@@ -719,7 +719,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
 
   if (!LittleFS.exists(F("/mqttha.cfg"))) {
     DebugTln(F("Error: configuration file not found.")); 
-    delete[] sMsg; delete[] sTopic; delete[] sLine;
+    delete[] buffer;  // Fix: delete the single allocated buffer, not the partitions
     return _result;
   } 
 
@@ -727,7 +727,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
 
   if (!fh) {
     DebugTln(F("Error: could not open configuration file.")); 
-    delete[] sMsg; delete[] sTopic; delete[] sLine;
+    delete[] buffer;  // Fix: delete the single allocated buffer, not the partitions
     return _result;
   } 
 
@@ -804,7 +804,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
   } // while available()
   
   fh.close();
-  delete[] sMsg; delete[] sTopic; delete[] sLine;
+  delete[] buffer;  // Fix: delete the single allocated buffer, not the partitions
 
   // HA discovery msg's are rather large, reset the buffer size to release some memory
   resetMQTTBufferSize();
