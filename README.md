@@ -45,12 +45,16 @@ ESP8266 devices have limited RAM (~40KB available), and efficient memory managem
 - **MQTT chunk streaming** (`USE_MQTT_STREAMING_AUTODISCOVERY`): Sends large messages in 128-byte chunks to avoid buffer resizing, eliminates heap fragmentation
 - **Full JSON streaming** (`USE_FULL_JSON_STREAMING`): Streams MQTT auto-discovery messages directly without 1,200-byte buffer, saves additional 1,504 bytes (52% stack reduction)
 
+**HTTP API Streaming:**
+- **FSexplorer optimization**: Streams firmware file list API responses using HTTP chunked encoding, eliminates 1,024-byte buffer, saves 768 bytes (63% stack reduction)
+
 ### Memory Benefits
 
-**Total heap savings**: 2,400-4,500 bytes (6-11% of available RAM)
+**Total heap savings**: 3,168-5,268 bytes (7.9-13.2% of available RAM)
 - Base optimizations: 2,362-2,962 bytes
-- With MQTT chunk streaming: +400 bytes
-- With full JSON streaming: +1,504 bytes
+- FSexplorer streaming: +768 bytes (always active)
+- With MQTT chunk streaming: +400 bytes (optional)
+- With full JSON streaming: +1,504 bytes (optional)
 
 **Heap fragmentation**: Nearly eliminated
 - MQTT buffer resize cycles: 100 → 0 (100% eliminated)
@@ -66,7 +70,7 @@ ESP8266 devices have limited RAM (~40KB available), and efficient memory managem
 ✅ **Comprehensive diagnostics** for monitoring  
 ✅ **100% backward compatible** - all optimizations are transparent
 
-For technical details, see the documentation files: `HEAP_OPTIMIZATION_SUMMARY.md`, `LIBRARY_ANALYSIS.md`, `MQTT_STREAMING_AUTODISCOVERY.md`, and `JSON_STREAMING_ANALYSIS.md`.
+For technical details, see the documentation files: `HEAP_OPTIMIZATION_SUMMARY.md`, `LIBRARY_ANALYSIS.md`, `MQTT_STREAMING_AUTODISCOVERY.md`, and `LARGE_BUFFER_ANALYSIS.md`.
 
 ## History and scope
 
