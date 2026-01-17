@@ -57,9 +57,13 @@ void setLed(int8_t, uint8_t);
 #define CMSG_SIZE 512
 #define JSON_BUFF_MAX   1024
 // Replace CSTR macro with overloads to handle both String and char*
-inline const char* CSTR(const String& x) { return x.c_str(); }
-inline const char* CSTR(const char* x) { return x; }
-inline const char* CSTR(char* x) { return x; }
+// Includes null pointer protection to prevent crashes
+inline const char* CSTR(const String& x) { 
+  const char* ptr = x.c_str(); 
+  return ptr ? ptr : ""; 
+}
+inline const char* CSTR(const char* x) { return x ? x : ""; }
+inline const char* CSTR(char* x) { return x ? x : ""; }
 
 #define CONLINEOFFLINE(x) (x?"online":"offline")
 #define CBOOLEAN(x) (x?"true":"false")
