@@ -6,6 +6,8 @@
 **Version:** 1.0.0-rc4  
 **Scope:** 38 files changed, +996/-1249 lines
 
+**UPDATE (2026-01-17):** Developer feedback received - Legacy sensor format support (Issue #4) will be **KEPT** as-is for backward compatibility. Only Issue #3 (PROGMEM violations) will be addressed.
+
 ## Executive Summary
 
 The dev-RC4-branch introduces significant changes across MQTT handling, sensor integration, timer logic, and version parsing. While some changes are improvements, **there are critical issues that need immediate attention**:
@@ -13,7 +15,7 @@ The dev-RC4-branch introduces significant changes across MQTT handling, sensor i
 - **CRITICAL:** Binary data parsing reverted to unsafe methods (versionStuff.ino, OTGWSerial.cpp)
 - **HIGH:** MQTT buffer management strategy completely reversed without justification
 - **HIGH:** Multiple PROGMEM violations and RAM waste
-- **MEDIUM:** Legacy format complexity adds maintenance burden
+- **MEDIUM:** Legacy format complexity adds maintenance burden *(Developer decision: KEEP for backward compatibility)*
 - **MEDIUM:** Removed code without deprecation warnings
 
 **Overall Assessment:** **6/10** - Contains good fixes but also introduces serious regressions
