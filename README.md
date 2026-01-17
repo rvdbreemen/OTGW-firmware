@@ -1,5 +1,11 @@
 # OTGW-firmware (ESP8266) for NodoShop OpenTherm Gateway
 
+> **⚠️ DEVELOPMENT BRANCH WARNING**  
+> **This is a development branch and should be considered unstable for production use.**  
+> This branch (`dev`) contains work-in-progress features and fixes that are being tested before release. While we strive for quality, this code may contain bugs or incomplete features.
+> 
+> **For production/stable use, please use the [main branch](https://github.com/rvdbreemen/OTGW-firmware/tree/main) or download official releases from the [releases page](https://github.com/rvdbreemen/OTGW-firmware/releases).**
+
 [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 “devkit” that is part of the NodoShop OTGW and turns the gateway into a standalone network device with:
@@ -10,15 +16,29 @@ This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gatew
 
 The primary goal is **reliable Home Assistant integration** via MQTT and auto discovery, while keeping the OTGW behaviour compatible with existing OpenTherm tooling.
 
-## Version 1.0.0 - A Major Milestone
-We are proud to announce the release of **version 1.0.0**! 
+## Version 1.0.0-rc4 - Development Release Candidate
 
-This release marks a significant "moment in time" for the project. After years of development and testing, the REST API and MQTT interface have proven their stability and reliability. This release embodies the original vision for the firmware, bringing polished features like:
+> **Note:** This is a **Release Candidate (RC4)** under active development. While we're confident in the improvements, we recommend production users stick with the stable [v0.10.x releases](https://github.com/rvdbreemen/OTGW-firmware/releases) or wait for the final v1.0.0 release.
 
-- **Live Data Streaming**: Watch OpenTherm MsgIDs arrive in real-time directly in your browser.
-- **Enhanced Update Experience**: Improved firmware flashing for both the ESP8266 and the PIC controller, featuring live progress monitoring directly from the Web UI.
+This release candidate builds upon RC3 with critical bug fixes and enhanced stability:
 
-This release also includes **many small stability improvements** once more, to make this release even more robust than the 0.10.x series already was.
+**Critical Fixes in RC4:**
+- **Binary Data Parsing Safety**: Fixed buffer overrun vulnerability in PIC firmware flashing that could cause Exception (2) crashes
+- **MQTT Buffer Management**: Prevents ESP8266 heap fragmentation with static buffer allocation
+- **Memory Management**: Fixed incorrect memory cleanup that could cause corruption
+
+**Breaking Changes in RC4:**
+- Default GPIO pin for Dallas temperature sensors changed from GPIO 13 (D7) to GPIO 10 (SD3) to align with OTGW hardware defaults
+- Users upgrading with sensors on GPIO 13 should either reconnect to GPIO 10 or update the setting
+
+**What's Coming in v1.0.0 Final:**
+
+The final v1.0.0 release will mark a major milestone for the project. After years of development and testing, the REST API and MQTT interface have proven their stability and reliability. The final release will embody the original vision for the firmware, bringing polished features like:
+
+- **Live Data Streaming**: Watch OpenTherm MsgIDs arrive in real-time directly in your browser
+- **Enhanced Update Experience**: Improved firmware flashing for both the ESP8266 and the PIC controller, featuring live progress monitoring directly from the Web UI
+- **Dark Theme**: Fully integrated with persistent toggle
+- **Many small stability improvements**: To make this release even more robust than the 0.10.x series
 
 A massive thank you goes out to the entire community—contributors, testers, and users—whose support and feedback made this milestone possible.
 
@@ -157,7 +177,8 @@ For release artifacts, see https://github.com/rvdbreemen/OTGW-firmware/releases.
 
 | Version | Release notes |
 |-|-|
-| 1.0.0 | **Milestone Release**: This version marks a major milestone, representing the complete vision of the firmware with a stable API and robust MQTT integration.<br>**Features**:<br>- **Live OpenTherm Logging**: Real-time streaming of OpenTherm messages in the Web UI via WebSockets.<br>- **Enhanced Firmware Updates**: Improved UI for flashing ESP and PIC firmware with live progress bars and validation.<br>- **Dark Theme**: Fully integrated dark theme with persistent toggle and responsive UI improvements.<br>- **NTP Control**: New setting `NTPsendtime` to optionally disable time sync to the thermostat.<br>**Stability & Security**:<br>- **Security**: Added CSRF protection to APIs, masked sensitive fields, and improved input sanitization.<br>- **Connectivity**: Rewritten Wi-Fi connection logic with better watchdog handling and reliability.<br>- **Reliability**: Numerous fixes for buffer overflows, memory leaks, and serial communication stability.<br>- **General**: Many small stability improvements to significantly enhance robustness compared to the 0.10.x series.<br>Note: A huge thank you to everyone who helped test, develop, and support this project to reach this moment! |
+| 1.0.0 | **Milestone Release** (Coming Soon): This version will mark a major milestone, representing the complete vision of the firmware with a stable API and robust MQTT integration.<br>**Planned Features**:<br>- **Live OpenTherm Logging**: Real-time streaming of OpenTherm messages in the Web UI via WebSockets.<br>- **Enhanced Firmware Updates**: Improved UI for flashing ESP and PIC firmware with live progress bars and validation.<br>- **Dark Theme**: Fully integrated dark theme with persistent toggle and responsive UI improvements.<br>- **NTP Control**: New setting `NTPsendtime` to optionally disable time sync to the thermostat.<br>**Stability & Security**:<br>- **Security**: Added CSRF protection to APIs, masked sensitive fields, and improved input sanitization.<br>- **Connectivity**: Rewritten Wi-Fi connection logic with better watchdog handling and reliability.<br>- **Reliability**: Numerous fixes for buffer overflows, memory leaks, and serial communication stability.<br>- **General**: Many small stability improvements to significantly enhance robustness compared to the 0.10.x series.<br>Note: A huge thank you to everyone who helped test, develop, and support this project to reach this moment! |
+| 1.0.0-rc4 | **Release Candidate 4 - Critical Fixes & Stability** (DEVELOPMENT BRANCH)<br>This RC addresses critical security and stability issues identified in RC3.<br>**Critical Fixes**:<br>- **Binary Data Parsing Safety**: Fixed buffer overrun vulnerability using `memcmp_P()` instead of `strncmp_P()` for hex file parsing. Prevents Exception (2) crashes during PIC firmware flashing.<br>- **MQTT Buffer Management**: Added static 1350-byte buffer allocation at startup to prevent ESP8266 heap fragmentation and crashes.<br>- **Memory Management**: Fixed incorrect memory cleanup in error paths (deleting partition pointers instead of allocated buffer).<br>**Breaking Changes**:<br>- Default GPIO pin for Dallas temperature sensors changed from GPIO 13 (D7) to GPIO 10 (SD3) to align with OTGW hardware defaults. Users can reconnect sensors or change the setting.<br>**Documentation**:<br>- Added comprehensive breaking change warnings in README<br>- Documented SafeTimers design decisions<br>- Created archive for removed documentation files<br>**Code Quality**: Minimal-impact fixes (+48 net lines across 6 files), all changes follow project coding standards.<br>Note: This is a development branch. For production use, please use v0.10.x stable releases. |
 | 1.0.0-rc3 | **Release Candidate 3 - Final Stability Polish**<br>This RC continues the refinement toward 1.0.0 with critical improvements to the Web UI and logging infrastructure.<br>**UI & UX Enhancements**:<br>- Add comprehensive UI settings for log viewing: auto-scroll toggle, timestamp display, capture mode, and auto-screenshot functionality<br>- Refactor DevInfo layout from grid to table format for improved readability and responsiveness<br>- Enhance graph functionality with extended data buffer support for higher message rates and time window controls<br>- Integrated dark theme with persistent toggle<br>**Live Logging & Performance**:<br>- Refactor WebSocket logging architecture: remove JSON queue serialization for direct broadcasting to improve performance<br>- Implement backpressure handling in WebSocket queue and increase message processing capacity<br>- Add conditional WebSocket support and fallback for numeric value parsing<br>- Enhance log line formatting with direction field for improved trace readability<br>**Data Processing & Validation**:<br>- Allow Type 0 messages (Master/Slave Status) in Web UI with appropriate labeling<br>- Validate incoming data in processLine function with improved error handling<br>- Implement flash mode management and enhanced filesystem flashing with detailed debug messages<br>**Firmware Updates & Build System**:<br>- Enhance ESP firmware flashing with global state management and improved UI feedback throttling<br>- Add time-based feedback mechanism during updates with better responsiveness<br>- Update success message display during firmware updates<br>- New build system (`build.py`) for improved developer experience<br>- New flash script (`flash_esp.py`) for automated firmware flashing<br>**Documentation**:<br>- Added comprehensive BUILD.md guide for local development<br>- Added comprehensive FLASH_GUIDE.md for firmware flashing instructions<br>- Added Copilot instructions for AI-assisted development<br>**Stability**:<br>- Continued refinement of real-time logging pipeline<br>- Improved reliability of WebSocket communication under high message rates<br>Note: This RC addresses extensive community feedback and testing results, bringing us very close to a stable 1.0.0 release. |
 | 0.10.3 | Web UI: Mask MQTT password field and support running behind a reverse proxy (auto-detect http/https)<br>Home Assistant: Improve discovery templates (remove empty unit_of_measurement and add additional sensors/boundary values)<br>Fix: Status functions and REST API status reporting<br>CI: Improved GitHub Actions build/release workflow and release artifacts. |
 | 0.10.2 | Bugfix: issue #213 which caused 0 bytes after update of PIC firwmare (dropped to Adruino core 2.7.4)<br>Update to filesystem to include latest PIC firmware (6.5 and 5.8, released 12 march 2023)<br>Fix: Back to correct hostname to wifi (credits to @hvxl)<br>Fix: Adding a little memory for use with larger settings.|
