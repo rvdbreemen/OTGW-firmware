@@ -190,15 +190,10 @@ void apifirmwarefilelist() {
       firstEntry = false;
       
       // Stream this entry directly (fits in 256-byte buffer)
-      // Defensive null checks: use empty strings if conversion fails
-      const char* fileName = CSTR(dir.fileName());
-      const char* versionStr = CSTR(version);
-      if (fileName == nullptr) fileName = "";
-      if (versionStr == nullptr) versionStr = "";
-      
+      // CSTR() macro handles null safety globally - returns "" if null
       snprintf_P(entryBuffer, sizeof(entryBuffer), 
                  PSTR("{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d}"), 
-                 fileName, versionStr, dir.fileSize());
+                 CSTR(dir.fileName()), CSTR(version), dir.fileSize());
       httpServer.sendContent(entryBuffer);
       
       // Also stream entry to debug telnet
