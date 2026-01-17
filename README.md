@@ -135,6 +135,9 @@ There are two ways to integrate with Home Assistant:
 
 ## Important warnings / breaking changes
 
+- **Breaking change (v1.0.0):** Default GPIO pin for Dallas temperature sensors changed from **GPIO 13 (D7)** to **GPIO 10 (SD3)**. This aligns with the OTGW hardware default. If you're upgrading from a previous version and have sensors connected to GPIO 13, you'll need to either:
+  - Reconnect your sensors to GPIO 10, OR
+  - Change the GPIO pin setting back to 13 in the Settings page
 - **New API endpoint (v1.0.0):** A new optimized `/api/v2/otgw/otmonitor` endpoint uses a map-based JSON format. The original v1 endpoint remains available for compatibility. See [API_CHANGES_v1.0.0.md](example-api/API_CHANGES_v1.0.0.md) for details.
 - **Do not flash OTGW PIC firmware over Wi-Fi using OTmonitor.** You can brick the PIC. Use the built-in PIC firmware upgrade feature instead (based on code by Schelte Bron).
 - **Breaking change (v0.8.0):** MQTT topic naming conventions changed; MQTT-based integrations may need updates.
