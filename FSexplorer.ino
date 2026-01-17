@@ -147,6 +147,10 @@ void apifirmwarefilelist() {
   httpServer.send(200, F("application/json"), F(""));
   httpServer.sendContent(F("["));
   
+  // Also stream to debug telnet
+  DebugTln(F("--- Firmware File List (streamed) ---"));
+  DebugTln(F("["));
+  
   dir = LittleFS.openDir(dirpath);	
   while (dir.next()) {
     DebugTf(PSTR("dir.fileName()=%s\r\n"), dir.fileName().c_str());
@@ -181,6 +185,7 @@ void apifirmwarefilelist() {
       // Add comma separator after first entry
       if (!firstEntry) {
         httpServer.sendContent(F(","));
+        DebugTln(F(",")); // Also to debug telnet
       }
       firstEntry = false;
       
@@ -196,6 +201,9 @@ void apifirmwarefilelist() {
                  fileName, versionStr, dir.fileSize());
       httpServer.sendContent(entryBuffer);
       
+      // Also stream entry to debug telnet
+      DebugTf(PSTR("  %s\r\n"), entryBuffer);
+      
       feedWatchDog(); // Feed watchdog during potentially long operation
     }
   }
@@ -204,7 +212,9 @@ void apifirmwarefilelist() {
   httpServer.sendContent(F("]\r\n"));
   httpServer.sendContent(F("")); // End chunked response
   
-  DebugTln(F("Firmware file list sent via streaming"));
+  // Also close JSON array in debug telnet
+  DebugTln(F("]"));
+  DebugTln(F("--- End of Firmware File List ---"));
 }
 
 
