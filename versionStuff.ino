@@ -88,8 +88,8 @@ void GetVersion(const char* hexfile, char* version, size_t destSize){
     // 1. Iterate byte-by-byte (ptr++) instead of skipping over strings, so we can't miss a banner inside a block.
     // 2. Ensure reading stays strictly within bounds (256 - bannerLen).
     for (ptr = 0; ptr <= (256 - bannerLen); ptr++) {
-        // Safe comparison with PROGMEM string
-        if (strncmp_P((char *)datamem + ptr, banner, bannerLen) == 0) {
+        // Safe comparison with PROGMEM string using memcmp_P for binary data
+        if (memcmp_P((char *)datamem + ptr, banner, bannerLen) == 0) {
              // Match found!
              char * content = (char *)datamem + ptr + bannerLen;
              size_t maxContentLen = 256 - (ptr + bannerLen);
