@@ -622,6 +622,10 @@ static uint32_t mqttDropCount = 0;
 #define MQTT_THROTTLE_MS_WARNING       100  // 100ms = max 10 msg/sec when heap is low
 #define MQTT_THROTTLE_MS_CRITICAL      500  // 500ms = max 2 msg/sec when heap is critical
 
+// Diagnostic logging intervals (milliseconds)
+#define WARNING_LOG_INTERVAL_MS        10000  // Log warnings every 10 seconds
+#define EMERGENCY_RECOVERY_INTERVAL_MS 30000  // Attempt recovery max once per 30 seconds
+
 enum HeapHealthLevel {
   HEAP_HEALTHY,       // > 8192 bytes: Normal operation
   HEAP_LOW,           // 5120-8192 bytes: Start throttling
@@ -655,8 +659,8 @@ bool canSendWebSocket() {
   // Critical: block WebSocket messages completely
   if (heapLevel == HEAP_CRITICAL) {
     webSocketDropCount++;
-    // Log warning every 10 seconds (use unsigned arithmetic for rollover safety)
-    if ((uint32_t)(now - lastWebSocketWarningMs) > 10000) {
+    // Log warning periodically (use unsigned arithmetic for rollover safety)
+    if ((uint32_t)(now - lastWebSocketWarningMs) > WARNING_LOG_INTERVAL_MS) {
       DebugTf(PSTR("HEAP-CRITICAL: Blocking WebSocket (dropped %u msgs, heap=%u bytes)\r\n"), 
               webSocketDropCount, ESP.getFreeHeap());
       lastWebSocketWarningMs = now;
@@ -686,7 +690,7 @@ bool canSendWebSocket() {
   lastWebSocketSendMs = now;
   
   // Log warning if we're dropping messages (use unsigned arithmetic for rollover safety)
-  if (webSocketDropCount > 0 && (uint32_t)(now - lastWebSocketWarningMs) > 10000) {
+  if (webSocketDropCount > 0 && (uint32_t)(now - lastWebSocketWarningMs) > WARNING_LOG_INTERVAL_MS) {
     DebugTf(PSTR("WebSocket throttled: dropped %u msgs (heap=%u bytes)\r\n"), 
             webSocketDropCount, ESP.getFreeHeap());
     lastWebSocketWarningMs = now;
@@ -706,8 +710,8 @@ bool canPublishMQTT() {
   // Critical: block MQTT messages completely
   if (heapLevel == HEAP_CRITICAL) {
     mqttDropCount++;
-    // Log warning every 10 seconds (use unsigned arithmetic for rollover safety)
-    if ((uint32_t)(now - lastMQTTWarningMs) > 10000) {
+    // Log warning periodically (use unsigned arithmetic for rollover safety)
+    if ((uint32_t)(now - lastMQTTWarningMs) > WARNING_LOG_INTERVAL_MS) {
       DebugTf(PSTR("HEAP-CRITICAL: Blocking MQTT (dropped %u msgs, heap=%u bytes)\r\n"), 
               mqttDropCount, ESP.getFreeHeap());
       lastMQTTWarningMs = now;
@@ -737,7 +741,7 @@ bool canPublishMQTT() {
   lastMQTTPublishMs = now;
   
   // Log warning if we're dropping messages (use unsigned arithmetic for rollover safety)
-  if (mqttDropCount > 0 && (uint32_t)(now - lastMQTTWarningMs) > 10000) {
+  if (mqttDropCount > 0 && (uint32_t)(now - lastMQTTWarningMs) > WARNING_LOG_INTERVAL_MS) {
     DebugTf(PSTR("MQTT throttled: dropped %u msgs (heap=%u bytes)\r\n"), 
             mqttDropCount, ESP.getFreeHeap());
     lastMQTTWarningMs = now;
@@ -775,8 +779,9 @@ void emergencyHeapRecovery() {
   static uint32_t lastRecoveryMs = 0;
   uint32_t now = millis();
   
-  // Only attempt recovery once every 30 seconds to avoid thrashing
-  if (now - lastRecoveryMs < 30000) {
+  // Only attempt recovery once per interval to avoid thrashing
+  // Use unsigned arithmetic to handle millis() rollover correctly
+  if ((uint32_t)(now - lastRecoveryMs) < EMERGENCY_RECOVERY_INTERVAL_MS) {
     return;
   }
   lastRecoveryMs = now;
