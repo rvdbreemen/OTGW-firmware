@@ -14,6 +14,12 @@
 #include <ctype.h>
 #include <pgmspace.h>
 
+// Enable MQTT streaming mode for auto-discovery to reduce heap fragmentation
+// When enabled, large auto-discovery messages are sent in chunks instead of
+// requiring a large buffer resize. This prevents the 256→1200→256 buffer
+// resize cycle that causes heap fragmentation.
+// #define USE_MQTT_STREAMING_AUTODISCOVERY
+
 #define MQTTDebugTln(...) ({ if (bDebugMQTT) DebugTln(__VA_ARGS__);    })
 #define MQTTDebugln(...)  ({ if (bDebugMQTT) Debugln(__VA_ARGS__);    })
 #define MQTTDebugTf(...)  ({ if (bDebugMQTT) DebugTf(__VA_ARGS__);    })
@@ -267,6 +273,74 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 }
 
 //===========================================================================================
+// sendMQTT - streaming version for large messages (auto-discovery)
+// Sends the message in small chunks to avoid buffer reallocation
+// This prevents the 256→1200→256 buffer resize cycle that causes heap fragmentation
+//===========================================================================================
+#ifdef USE_MQTT_STREAMING_AUTODISCOVERY
+
+void sendMQTT(const char* topic, const char *json) {
+  sendMQTTStreaming(topic, json, strlen(json));
+}
+
+void sendMQTTStreaming(const char* topic, const char *json, const size_t len) 
+{
+  if (!settingMQTTenable) return;
+  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
+  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
+  
+  // Check heap health before publishing
+  if (!canPublishMQTT()) {
+    // Message dropped due to low heap - canPublishMQTT() handles logging
+    return;
+  }
+  
+  MQTTDebugTf(PSTR("Sending MQTT (streaming): server %s:%d => TopicId [%s] (len=%d bytes)\r\n"), 
+              settingMQTTbroker, settingMQTTbrokerPort, topic, len);
+
+  // Use beginPublish which tells PubSubClient the total length upfront
+  // This allows it to use its buffer efficiently without reallocation
+  if (!MQTTclient.beginPublish(topic, len, true)) {
+    PrintMQTTError();
+    return;
+  }
+
+  // Write message in small chunks to avoid buffer overflow
+  // PubSubClient's write() method handles buffering internally
+  const size_t CHUNK_SIZE = 128; // Small chunks fit comfortably in 256-byte buffer
+  size_t pos = 0;
+  
+  while (pos < len) {
+    size_t chunkLen = (len - pos) > CHUNK_SIZE ? CHUNK_SIZE : (len - pos);
+    
+    // Write chunk
+    for (size_t i = 0; i < chunkLen; i++) {
+      if (!MQTTclient.write(json[pos + i])) {
+        PrintMQTTError();
+        MQTTclient.endPublish(); // Clean up even on error
+        return;
+      }
+    }
+    
+    pos += chunkLen;
+    feedWatchDog(); // Feed watchdog during long write operations
+  }
+  
+  if (!MQTTclient.endPublish()) {
+    PrintMQTTError();
+  }
+
+  feedWatchDog();
+} // sendMQTTStreaming()
+
+#else
+
+//===========================================================================================
+// sendMQTT - original version (uses full buffer)
+//===========================================================================================
+void sendMQTT(const char* topic, const char *json) {
+  sendMQTT(topic, json, strlen(json));
+}
 void handleMQTT() 
 {  
   if (!settingMQTTenable) return;
@@ -499,6 +573,67 @@ void sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
 * json:   <string> , payload to send
 */
 //===========================================================================================
+#ifdef USE_MQTT_STREAMING_AUTODISCOVERY
+
+// Streaming version - sends message in chunks to avoid buffer reallocation
+// This prevents the 256→1200→256 buffer resize cycle that causes heap fragmentation
+void sendMQTT(const char* topic, const char *json) {
+  sendMQTTStreaming(topic, json, strlen(json));
+}
+
+void sendMQTTStreaming(const char* topic, const char *json, const size_t len) 
+{
+  if (!settingMQTTenable) return;
+  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
+  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
+  
+  // Check heap health before publishing
+  if (!canPublishMQTT()) {
+    // Message dropped due to low heap - canPublishMQTT() handles logging
+    return;
+  }
+  
+  MQTTDebugTf(PSTR("Sending MQTT (streaming): server %s:%d => TopicId [%s] (len=%d bytes)\r\n"), 
+              settingMQTTbroker, settingMQTTbrokerPort, topic, len);
+
+  // Use beginPublish which tells PubSubClient the total length upfront
+  // This allows it to use its buffer efficiently without reallocation
+  if (!MQTTclient.beginPublish(topic, len, true)) {
+    PrintMQTTError();
+    return;
+  }
+
+  // Write message in small chunks to avoid buffer overflow
+  // PubSubClient's write() method handles buffering internally
+  const size_t CHUNK_SIZE = 128; // Small chunks fit comfortably in 256-byte buffer
+  size_t pos = 0;
+  
+  while (pos < len) {
+    size_t chunkLen = (len - pos) > CHUNK_SIZE ? CHUNK_SIZE : (len - pos);
+    
+    // Write chunk
+    for (size_t i = 0; i < chunkLen; i++) {
+      if (!MQTTclient.write(json[pos + i])) {
+        PrintMQTTError();
+        MQTTclient.endPublish(); // Clean up even on error
+        return;
+      }
+    }
+    
+    pos += chunkLen;
+    feedWatchDog(); // Feed watchdog during long write operations
+  }
+  
+  if (!MQTTclient.endPublish()) {
+    PrintMQTTError();
+  }
+
+  feedWatchDog();
+} // sendMQTTStreaming()
+
+#else
+
+// Original version - uses full buffer (may cause buffer reallocation)
 void sendMQTT(const char* topic, const char *json) {
   sendMQTT(topic, json, strlen(json));
 }
@@ -525,7 +660,9 @@ void sendMQTT(const char* topic, const char *json, const size_t len)
   } else PrintMQTTError();
 
   feedWatchDog();
-} // sendMQTTData()
+} // sendMQTT()
+
+#endif
 
 
 //===========================================================================================
