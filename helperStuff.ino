@@ -655,8 +655,8 @@ bool canSendWebSocket() {
   // Critical: block WebSocket messages completely
   if (heapLevel == HEAP_CRITICAL) {
     webSocketDropCount++;
-    // Log warning every 10 seconds
-    if (now - lastWebSocketWarningMs > 10000) {
+    // Log warning every 10 seconds (use unsigned arithmetic for rollover safety)
+    if ((uint32_t)(now - lastWebSocketWarningMs) > 10000) {
       DebugTf(PSTR("HEAP-CRITICAL: Blocking WebSocket (dropped %u msgs, heap=%u bytes)\r\n"), 
               webSocketDropCount, ESP.getFreeHeap());
       lastWebSocketWarningMs = now;
@@ -666,7 +666,8 @@ bool canSendWebSocket() {
   
   // Warning: aggressive throttling
   if (heapLevel == HEAP_WARNING) {
-    if (now - lastWebSocketSendMs < WEBSOCKET_THROTTLE_MS_CRITICAL) {
+    // Use unsigned arithmetic to handle millis() rollover correctly
+    if ((uint32_t)(now - lastWebSocketSendMs) < WEBSOCKET_THROTTLE_MS_CRITICAL) {
       webSocketDropCount++;
       return false;
     }
@@ -674,7 +675,8 @@ bool canSendWebSocket() {
   
   // Low: moderate throttling
   if (heapLevel == HEAP_LOW) {
-    if (now - lastWebSocketSendMs < WEBSOCKET_THROTTLE_MS_WARNING) {
+    // Use unsigned arithmetic to handle millis() rollover correctly
+    if ((uint32_t)(now - lastWebSocketSendMs) < WEBSOCKET_THROTTLE_MS_WARNING) {
       webSocketDropCount++;
       return false;
     }
@@ -683,8 +685,8 @@ bool canSendWebSocket() {
   // Update last send time
   lastWebSocketSendMs = now;
   
-  // Log warning if we're dropping messages
-  if (webSocketDropCount > 0 && now - lastWebSocketWarningMs > 10000) {
+  // Log warning if we're dropping messages (use unsigned arithmetic for rollover safety)
+  if (webSocketDropCount > 0 && (uint32_t)(now - lastWebSocketWarningMs) > 10000) {
     DebugTf(PSTR("WebSocket throttled: dropped %u msgs (heap=%u bytes)\r\n"), 
             webSocketDropCount, ESP.getFreeHeap());
     lastWebSocketWarningMs = now;
@@ -704,8 +706,8 @@ bool canPublishMQTT() {
   // Critical: block MQTT messages completely
   if (heapLevel == HEAP_CRITICAL) {
     mqttDropCount++;
-    // Log warning every 10 seconds
-    if (now - lastMQTTWarningMs > 10000) {
+    // Log warning every 10 seconds (use unsigned arithmetic for rollover safety)
+    if ((uint32_t)(now - lastMQTTWarningMs) > 10000) {
       DebugTf(PSTR("HEAP-CRITICAL: Blocking MQTT (dropped %u msgs, heap=%u bytes)\r\n"), 
               mqttDropCount, ESP.getFreeHeap());
       lastMQTTWarningMs = now;
@@ -715,7 +717,8 @@ bool canPublishMQTT() {
   
   // Warning: aggressive throttling
   if (heapLevel == HEAP_WARNING) {
-    if (now - lastMQTTPublishMs < MQTT_THROTTLE_MS_CRITICAL) {
+    // Use unsigned arithmetic to handle millis() rollover correctly
+    if ((uint32_t)(now - lastMQTTPublishMs) < MQTT_THROTTLE_MS_CRITICAL) {
       mqttDropCount++;
       return false;
     }
@@ -723,7 +726,8 @@ bool canPublishMQTT() {
   
   // Low: moderate throttling
   if (heapLevel == HEAP_LOW) {
-    if (now - lastMQTTPublishMs < MQTT_THROTTLE_MS_WARNING) {
+    // Use unsigned arithmetic to handle millis() rollover correctly
+    if ((uint32_t)(now - lastMQTTPublishMs) < MQTT_THROTTLE_MS_WARNING) {
       mqttDropCount++;
       return false;
     }
@@ -732,8 +736,8 @@ bool canPublishMQTT() {
   // Update last publish time
   lastMQTTPublishMs = now;
   
-  // Log warning if we're dropping messages
-  if (mqttDropCount > 0 && now - lastMQTTWarningMs > 10000) {
+  // Log warning if we're dropping messages (use unsigned arithmetic for rollover safety)
+  if (mqttDropCount > 0 && (uint32_t)(now - lastMQTTWarningMs) > 10000) {
     DebugTf(PSTR("MQTT throttled: dropped %u msgs (heap=%u bytes)\r\n"), 
             mqttDropCount, ESP.getFreeHeap());
     lastMQTTWarningMs = now;
@@ -789,9 +793,10 @@ void emergencyHeapRecovery() {
   
   uint32_t heapAfter = ESP.getFreeHeap();
   // Calculate recovered bytes safely (handle case where heap decreased)
-  int recovered = (heapAfter > heapBefore) ? (int)(heapAfter - heapBefore) : -(int)(heapBefore - heapAfter);
-  DebugTf(PSTR("Emergency heap recovery complete (heap=%u bytes, recovered=%d bytes)\r\n"), 
-          heapAfter, recovered);
+  // Use int32_t to avoid overflow and allow negative values
+  int32_t recovered = (int32_t)heapAfter - (int32_t)heapBefore;
+  DebugTf(PSTR("Emergency heap recovery complete (heap=%u bytes, recovered=%ld bytes)\r\n"), 
+          heapAfter, (long)recovered);
 }
 
 /***************************************************************************

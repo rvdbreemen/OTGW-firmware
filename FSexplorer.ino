@@ -185,9 +185,15 @@ void apifirmwarefilelist() {
       firstEntry = false;
       
       // Stream this entry directly (fits in 256-byte buffer)
+      // Defensive null checks: use empty strings if conversion fails
+      const char* fileName = CSTR(dir.fileName());
+      const char* versionStr = CSTR(version);
+      if (fileName == nullptr) fileName = "";
+      if (versionStr == nullptr) versionStr = "";
+      
       snprintf_P(entryBuffer, sizeof(entryBuffer), 
                  PSTR("{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d}"), 
-                 CSTR(dir.fileName()), CSTR(version), dir.fileSize());
+                 fileName, versionStr, dir.fileSize());
       httpServer.sendContent(entryBuffer);
       
       feedWatchDog(); // Feed watchdog during potentially long operation
