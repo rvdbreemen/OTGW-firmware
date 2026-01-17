@@ -24,6 +24,10 @@
  * 2. Added "Spiral of Death" protection in __Due__ to prevent blocking loops.
  * 3. Optimize sync logic in SKIP_MISSED_TICKS_WITH_SYNC to O(1).
  * 4. Removed unseeded random() offset from DECLARE_TIMER macros.
+ *    Rationale: random() was called before randomSeed(), producing predictable
+ *    "random" values. This defeated the purpose of timer desynchronization.
+ *    Timers now start synchronized, but the Spiral of Death protection (#2)
+ *    prevents blocking if multiple timers fire simultaneously.
  *
  * see: https://arduino.stackexchange.com/questions/12587/how-can-i-handle-the-millis-rollover
  * 
