@@ -279,9 +279,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 //===========================================================================================
 #ifdef USE_MQTT_STREAMING_AUTODISCOVERY
 
-void sendMQTT(const char* topic, const char *json) {
-  sendMQTTStreaming(topic, json, strlen(json));
-}
+void sendMQTT(const char* topic, const char *json);
 
 // Forward declaration; implementation is provided later in this file
 void sendMQTTStreaming(const char* topic, const char *json, const size_t len);
