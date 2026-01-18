@@ -50,7 +50,7 @@
 //#include "ESP8266HTTPUpdateServer.h"
 #include "OTGW-ModUpdateServer.h"   // <<special version for Nodoshop Watchdog needed>>
 #include "updateServerHtml.h"
-#include <WiFiManager.h>        // version 2.0.4-beta - use latest development branch  - https://github.com/tzapu/WiFiManager
+#include <WiFiManager.h>        // version 2.0.17 - stable release - https://github.com/tzapu/WiFiManager
 // included in main program: #include <TelnetStream.h>       // Version 0.0.1 - https://github.com/jandrassy/TelnetStream
 #include <WebSocketsServer.h>   // WebSocket server for streaming OT log messages to WebUI
 
@@ -146,7 +146,7 @@ void startWiFi(const char* hostname, int timeOut)
   uint32_t lTime = millis();
   String thisAP = String(hostname) + "-" + WiFi.macAddress();
 
-  DebugTln("\nStart Wifi ...");
+  DebugTln(F("\nStart Wifi ..."));
   manageWiFi.setDebugOutput(true);
 
   //--- next line in release needs to be commented out!
@@ -157,8 +157,7 @@ void startWiFi(const char* hostname, int timeOut)
 
   //--- sets timeout until configuration portal gets turned off
   //--- useful to make it all retry or go to sleep in seconds
-  //manageWiFi.setTimeout(240);  // 4 minuten
-  manageWiFi.setTimeout(timeOut);  // in seconden ...
+  manageWiFi.setConfigPortalTimeout(timeOut);  // timeout in seconds
 
   //--- remove Info and Update buttons from Configuration Portal (security improvement 20230102)
   std::vector<const char *> wm_menu  = {"wifi", "exit"};
@@ -167,80 +166,32 @@ void startWiFi(const char* hostname, int timeOut)
   manageWiFi.setMenu(wm_menu);
   manageWiFi.setHostname(hostname);
   
-  //--- fetches ssid and pass and tries to connect
-  //--- if it does not connect it starts an access point with the specified name
-  //--- here  "<HOSTNAME>-<MAC>"
-  //--- and goes into a blocking loop awaiting configuration
-  // Check if we need to start the config portal
- 
-  bool wifiSaved = manageWiFi.getWiFiIsSaved();
-  bool wifiConnected = (WiFi.status() == WL_CONNECTED);
-
-  DebugTf("Wifi status: %s\r\n", wifiConnected ? "Connected" : "Not connected");
-  DebugTf("Wifi AP stored: %s\r\n", wifiSaved ? "Yes" : "No");
-  DebugTf("Config portal SSID: %s\r\n", thisAP.c_str());
-
-  if (wifiConnected)
+  //--- Use autoConnect as recommended by WiFiManager library
+  //--- This automatically handles:
+  //--- 1. Checking if already connected
+  //--- 2. Trying saved credentials
+  //--- 3. Starting config portal only if needed
+  //--- 4. Retrying connection logic
+  DebugTf(PSTR("Config portal SSID: %s\r\n"), thisAP.c_str());
+  
+  if (!manageWiFi.autoConnect(thisAP.c_str()))
   {
-    DebugTln("Wifi already connected, skipping connect.");
-  }
-  else if (wifiSaved)
-  {
-    DebugTln("Saved WiFi found, attempting direct connect...");
-    int directConnectTimeout = timeOut / 2;
-    if (directConnectTimeout < 5) directConnectTimeout = 5;
-    DebugTf("Direct connect timeout: %d sec\r\n", directConnectTimeout);
-    WiFi.begin(); // use stored credentials
-    DECLARE_TIMER_SEC(timeoutWifiConnectInitial, directConnectTimeout, CATCH_UP_MISSED_TICKS);
-    while (WiFi.status() != WL_CONNECTED)
-    {
-      delay(100);
-      feedWatchDog();
-      if DUE(timeoutWifiConnectInitial) break;
-    }
-    wifiConnected = (WiFi.status() == WL_CONNECTED);
-    DebugTf("Direct connect result: %s\r\n", wifiConnected ? "Connected" : "Failed");
-  }
-  else
-  {
-    DebugTln("No saved WiFi, starting config portal.");
+    //-- autoConnect failed (timeout reached without successful connection)
+    DebugTln(F("Failed to connect and hit timeout"));
+    delay(2000);  // Enough time for messages to be sent.
+    ESP.restart();
+    delay(5000);  // Enough time to ensure we don't return.
   }
 
-  if (!wifiConnected)
-  {
-    DebugTln("Starting config portal...");
-    if (!manageWiFi.startConfigPortal(thisAP.c_str()))
-    {
-      //-- fail to connect? Have you tried turning it off and on again?
-      DebugTln(F("failed to connect and hit timeout"));
-      delay(2000);  // Enough time for messages to be sent.
-      ESP.restart();
-      delay(5000);  // Enough time to ensure we don't return.
-    }
-  }
-  DebugTf("Wifi status: %s\r\n", WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
-  DebugTf("Connected to: %s\r\n", WiFi.localIP().toString().c_str());
-  // WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+  //--- Successfully connected to WiFi
+  DebugTln(F("WiFi connected!"));
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
 
-  // Wait for connection to wifi  
-  DebugTf("Wifi status: %s\r\n", WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
-  if (WiFi.status() != WL_CONNECTED)
-  {
-    DECLARE_TIMER_SEC(timeoutWifiConnectFinal, timeOut, CATCH_UP_MISSED_TICKS);
-    while ((WiFi.status() != WL_CONNECTED))
-    {
-      delay(100);
-      feedWatchDog();
-      if DUE(timeoutWifiConnectFinal) break;
-    }
-  }
-
   Debugln();
-  DebugT(F("Connected to " )); Debugln(WiFi.SSID());
-  DebugT(F("IP address: " ));  Debugln(WiFi.localIP());
-  DebugT(F("IP gateway: " ));  Debugln(WiFi.gatewayIP());
+  DebugT(F("Connected to ")); Debugln(WiFi.SSID());
+  DebugT(F("IP address: "));  Debugln(WiFi.localIP());
+  DebugT(F("IP gateway: "));  Debugln(WiFi.gatewayIP());
   Debugln();
 
   httpUpdater.setup(&httpServer);
