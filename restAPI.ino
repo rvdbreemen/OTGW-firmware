@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.0.0-rc3
+**  Version  : v1.0.0-rc4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -102,7 +102,10 @@ void processAPI()
 
     if (wc > 2 && strcmp_P(words[2], PSTR("v1")) == 0)
     { //v1 API calls
-      if (wc > 3 && strcmp_P(words[3], PSTR("otgw")) == 0) {
+      if (wc > 3 && strcmp_P(words[3], PSTR("health")) == 0) {
+        if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+        sendHealth();
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("otgw")) == 0) {
         if (wc > 4 && strcmp_P(words[4], PSTR("telegraf")) == 0) {
           // GET /api/v1/otgw/telegraf
           // Response: see json response
@@ -158,6 +161,16 @@ void processAPI()
         }
       } else {
         sendApiNotFound(originalURI);
+      }
+    }
+    else if (wc > 2 && strcmp_P(words[2], PSTR("v2")) == 0)
+    { //v2 API calls
+      if (wc > 3 && strcmp_P(words[3], PSTR("otgw")) == 0 && wc > 4 && strcmp_P(words[4], PSTR("otmonitor")) == 0) {
+          // GET /api/v2/otgw/otmonitor
+          if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+          sendOTmonitorV2();
+      } else {
+          sendApiNotFound(originalURI);
       }
     }
     else if (wc > 2 && strcmp_P(words[2], PSTR("v0")) == 0)
@@ -319,6 +332,58 @@ void sendJsonOTmonObj(const char* label, T value, const __FlashStringHelper* uni
   sendJsonOTmonObj(label, value, unitBuf, lastupdated);
 }
 
+//=======================================================================
+// Helpers for NEW Map-based JSON functions (sendJsonOTmonMapEntry)
+//=======================================================================
+
+template <typename T>
+void sendJsonOTmonMapEntry(const __FlashStringHelper* label, T value, const __FlashStringHelper* unit, unsigned long lastupdated) {
+  char labelBuf[35]; 
+  char unitBuf[10];
+  
+  strncpy_P(labelBuf, (PGM_P)label, sizeof(labelBuf));
+  labelBuf[sizeof(labelBuf)-1] = 0;
+  
+  strncpy_P(unitBuf, (PGM_P)unit, sizeof(unitBuf));
+  unitBuf[sizeof(unitBuf)-1] = 0;
+  
+  sendJsonOTmonMapEntry(labelBuf, value, unitBuf, lastupdated);
+}
+
+template <typename T>
+void sendJsonOTmonMapEntry(const __FlashStringHelper* label, T value, const char* unit, unsigned long lastupdated) {
+  char labelBuf[35];
+  strncpy_P(labelBuf, (PGM_P)label, sizeof(labelBuf));
+  labelBuf[sizeof(labelBuf)-1] = 0;
+  
+  sendJsonOTmonMapEntry(labelBuf, value, unit, lastupdated);
+}
+
+template <typename T>
+void sendJsonOTmonMapEntry(const char* label, T value, const __FlashStringHelper* unit, unsigned long lastupdated) {
+  char unitBuf[10];
+  strncpy_P(unitBuf, (PGM_P)unit, sizeof(unitBuf));
+  unitBuf[sizeof(unitBuf)-1] = 0;
+  
+  sendJsonOTmonMapEntry(label, value, unitBuf, lastupdated);
+}
+
+// Helpers for start/end map
+void sendStartJsonMap(const __FlashStringHelper* objName) {
+  char buf[33];
+  strncpy_P(buf, (PGM_P)objName, sizeof(buf));
+  buf[sizeof(buf)-1] = 0;
+  sendStartJsonMap(buf);
+}
+
+void sendEndJsonMap(const __FlashStringHelper* objName) {
+  char buf[33];
+  strncpy_P(buf, (PGM_P)objName, sizeof(buf));
+  buf[sizeof(buf)-1] = 0;
+  sendEndJsonMap(buf);
+}
+//=======================================================================
+
 void sendTelegraf() 
 {
   RESTDebugTln(F("sending OT monitor values to Telegraf...\r"));
@@ -368,15 +433,79 @@ void sendTelegraf()
 } // sendTelegraf()
 //=======================================================================
 
-void sendOTmonitor() 
+void sendOTmonitorV2() 
 {
   time_t now = time(nullptr); // needed for Dallas sensor display
-  RESTDebugTln(F("sending OT monitor values ...\r"));
+  RESTDebugTln(F("sending OT monitor values (V2)...\r"));
 
-  sendStartJsonObj(F("otmonitor"));
+  sendStartJsonMap(F("otmonitor"));
 
   // sendJsonOTmonObj(F("status hb"), byte_to_binary((OTcurrentSystemState.Statusflags>>8) & 0xFF),F(""), msglastupdated[OT_Statusflags]);
   // sendJsonOTmonObj(F("status lb"), byte_to_binary(OTcurrentSystemState.Statusflags & 0xFF),F(""), msglastupdated[OT_Statusflags]);
+
+  sendJsonOTmonMapEntry(F("flamestatus"), CONOFF(isFlameStatus()),F(""), msglastupdated[OT_Statusflags]);
+  sendJsonOTmonMapEntry(F("chmodus"), CONOFF(isCentralHeatingActive()),F(""), msglastupdated[OT_Statusflags]);
+  sendJsonOTmonMapEntry(F("chenable"), CONOFF(isCentralHeatingEnabled()),F(""), msglastupdated[OT_Statusflags]);
+  sendJsonOTmonMapEntry(F("ch2modus"), CONOFF(isCentralHeating2Active()),F(""), msglastupdated[OT_Statusflags]);
+  sendJsonOTmonMapEntry(F("ch2enable"), CONOFF(isCentralHeating2enabled()),F(""), msglastupdated[OT_Statusflags]);
+  sendJsonOTmonMapEntry(F("dhwmode"), CONOFF(isDomesticHotWaterActive()),F(""), msglastupdated[OT_Statusflags]);
+  sendJsonOTmonMapEntry(F("dhwenable"), CONOFF(isDomesticHotWaterEnabled()),F(""), msglastupdated[OT_Statusflags]);
+  sendJsonOTmonMapEntry(F("diagnosticindicator"), CONOFF(isDiagnosticIndicator()),F(""), msglastupdated[OT_Statusflags]);
+  sendJsonOTmonMapEntry(F("faultindicator"), CONOFF(isFaultIndicator()),F(""), msglastupdated[OT_Statusflags]);
+  
+  sendJsonOTmonMapEntry(F("coolingmodus"), CONOFF(isCoolingEnabled()),F(""), msglastupdated[OT_Statusflags]);
+  sendJsonOTmonMapEntry(F("coolingactive"), CONOFF(isCoolingActive()),F(""), msglastupdated[OT_Statusflags]);  
+  sendJsonOTmonMapEntry(F("otcactive"), CONOFF(isOutsideTemperatureCompensationActive()),F(""), msglastupdated[OT_Statusflags]);
+
+  sendJsonOTmonMapEntry(F("servicerequest"), CONOFF(isServiceRequest()),F(""), msglastupdated[OT_ASFflags]);
+  sendJsonOTmonMapEntry(F("lockoutreset"), CONOFF(isLockoutReset()),F(""), msglastupdated[OT_ASFflags]);
+  sendJsonOTmonMapEntry(F("lowwaterpressure"), CONOFF(isLowWaterPressure()),F(""), msglastupdated[OT_ASFflags]);
+  sendJsonOTmonMapEntry(F("gasflamefault"), CONOFF(isGasFlameFault()),F(""), msglastupdated[OT_ASFflags]);
+  sendJsonOTmonMapEntry(F("airtemp"), CONOFF(isAirTemperature()),F(""), msglastupdated[OT_ASFflags]);
+  sendJsonOTmonMapEntry(F("waterovertemperature"), CONOFF(isWaterOverTemperature()),F(""), msglastupdated[OT_ASFflags]);
+  
+
+  sendJsonOTmonMapEntry(F("outsidetemperature"), OTcurrentSystemState.Toutside, F("°C"), msglastupdated[OT_Toutside]);
+  sendJsonOTmonMapEntry(F("roomtemperature"), OTcurrentSystemState.Tr, F("°C"), msglastupdated[OT_Tr]);
+  sendJsonOTmonMapEntry(F("roomsetpoint"), OTcurrentSystemState.TrSet, F("°C"), msglastupdated[OT_TrSet]);
+  sendJsonOTmonMapEntry(F("remoteroomsetpoint"), OTcurrentSystemState.TrOverride, F("°C"), msglastupdated[OT_TrOverride]);
+  sendJsonOTmonMapEntry(F("controlsetpoint"), OTcurrentSystemState.TSet,F("°C"), msglastupdated[OT_TSet]);
+  sendJsonOTmonMapEntry(F("relmodlvl"), OTcurrentSystemState.RelModLevel,F("%"), msglastupdated[OT_RelModLevel]);
+  sendJsonOTmonMapEntry(F("maxrelmodlvl"), OTcurrentSystemState.MaxRelModLevelSetting, F("%"), msglastupdated[OT_MaxRelModLevelSetting]);
+ 
+  sendJsonOTmonMapEntry(F("boilertemperature"), OTcurrentSystemState.Tboiler, F("°C"), msglastupdated[OT_Tboiler]);
+  sendJsonOTmonMapEntry(F("returnwatertemperature"), OTcurrentSystemState.Tret,F("°C"), msglastupdated[OT_Tret]);
+  sendJsonOTmonMapEntry(F("dhwtemperature"), OTcurrentSystemState.Tdhw,F("°C"), msglastupdated[OT_Tdhw]);
+  sendJsonOTmonMapEntry(F("dhwsetpoint"), OTcurrentSystemState.TdhwSet,F("°C"), msglastupdated[OT_TdhwSet]);
+  sendJsonOTmonMapEntry(F("maxchwatersetpoint"), OTcurrentSystemState.MaxTSet,F("°C"), msglastupdated[OT_MaxTSet]);
+  sendJsonOTmonMapEntry(F("chwaterpressure"), OTcurrentSystemState.CHPressure, F("bar"), msglastupdated[OT_CHPressure]);
+  sendJsonOTmonMapEntry(F("oemdiagnosticcode"), OTcurrentSystemState.OEMDiagnosticCode, F(""), msglastupdated[OT_OEMDiagnosticCode]);
+  sendJsonOTmonMapEntry(F("oemfaultcode"), OTcurrentSystemState.ASFflags & 0xFF, F(""), msglastupdated[OT_ASFflags]);
+
+  if (settingS0COUNTERenabled) 
+  {
+    sendJsonOTmonMapEntry(F("s0powerkw"), OTGWs0powerkw , F("kW"), OTGWs0lasttime);
+    sendJsonOTmonMapEntry(F("s0intervalcount"), OTGWs0pulseCount , F(""), OTGWs0lasttime);
+    sendJsonOTmonMapEntry(F("s0totalcount"), OTGWs0pulseCountTot , F(""), OTGWs0lasttime);
+  }
+  if (settingGPIOSENSORSenabled) 
+  {
+    sendJsonOTmonMapEntry(F("numberofsensors"), DallasrealDeviceCount , F(""), now );
+    for (int i = 0; i < DallasrealDeviceCount; i++) {
+      const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
+      sendJsonOTmonMapEntry(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
+    }
+  }
+
+  sendEndJsonMap(F("otmonitor"));
+}
+
+void sendOTmonitor() 
+{
+  time_t now = time(nullptr); // needed for Dallas sensor display
+  RESTDebugTln(F("sending OT monitor values (V1)...\r"));
+
+  sendStartJsonObj(F("otmonitor"));
 
   sendJsonOTmonObj(F("flamestatus"), CONOFF(isFlameStatus()),F(""), msglastupdated[OT_Statusflags]);
   sendJsonOTmonObj(F("chmodus"), CONOFF(isCentralHeatingActive()),F(""), msglastupdated[OT_Statusflags]);
@@ -427,14 +556,13 @@ void sendOTmonitor()
   {
     sendJsonOTmonObj(F("numberofsensors"), DallasrealDeviceCount , F(""), now );
     for (int i = 0; i < DallasrealDeviceCount; i++) {
-      const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
-      char buf[16];
-      snprintf_P(buf, sizeof(buf), PSTR("%.1f"), DallasrealDevice[i].tempC);
-      sendJsonOTmonObj(strDeviceAddress, buf, F("°C"), DallasrealDevice[i].lasttime);
+        const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
+        sendJsonOTmonObj(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
     }
   }
 
   sendEndJsonObj(F("otmonitor"));
+
 
 } // sendOTmonitor()
 
@@ -510,6 +638,23 @@ void sendDeviceInfo()
 
 } // sendDeviceInfo()
 
+//=======================================================================
+void sendHealth() 
+{
+  sendStartJsonObj(F("health"));
+
+  sendNestedJsonObj(F("status"), F("UP"));
+  sendNestedJsonObj(F("uptime"), upTime());
+  sendNestedJsonObj(F("heap"), ESP.getFreeHeap());
+  sendNestedJsonObj(F("wifirssi"), WiFi.RSSI());
+  sendNestedJsonObj(F("mqttconnected"), CBOOLEAN(statusMQTTconnection));
+  sendNestedJsonObj(F("otgwconnected"), CBOOLEAN(bOTGWonline));
+  sendNestedJsonObj(F("picavailable"), CBOOLEAN(bPICavailable));
+  
+  sendEndJsonObj(F("health"));
+
+} // sendHealth()
+
 
 
 //=======================================================================
@@ -568,6 +713,7 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("ui_autoexport"), settingUIAutoExport, "b");
   sendJsonSettingObj(F("ui_graphtimewindow"), settingUIGraphTimeWindow, "i", 0, 1440);
   sendJsonSettingObj(F("gpiosensorsenabled"), settingGPIOSENSORSenabled, "b");
+  sendJsonSettingObj(F("gpiosensorslegacyformat"), settingGPIOSENSORSlegacyformat, "b");
   sendJsonSettingObj(F("gpiosensorspin"), settingGPIOSENSORSpin, "i", 0, 16);
   sendJsonSettingObj(F("gpiosensorsinterval"), settingGPIOSENSORSinterval, "i", 5, 65535);
   sendJsonSettingObj(F("s0counterenabled"), settingS0COUNTERenabled, "b");

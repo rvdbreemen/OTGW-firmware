@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v1.0.0-rc3
+**  Version  : v1.0.0-rc4
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -39,6 +39,8 @@ WebSocketsServer webSocket = WebSocketsServer(81);
 
 // Track number of connected WebSocket clients
 static uint8_t wsClientCount = 0;
+#define MAX_WS_CLIENTS 2              // Limit number of clients to prevent out of memory
+#define MIN_HEAP_FOR_BROADCAST 4096   // Don't broadcast if heap is too low
 
 // Maximum number of simultaneous WebSocket clients
 // Rationale: Each client uses ~700 bytes (256 byte buffer + overhead)
@@ -147,6 +149,8 @@ void handleWebSocket() {
 // Simplified: no queue, no JSON, just direct text broadcasting
 // Now includes heap-based backpressure to prevent memory exhaustion
 //===========================================================================================
+DECLARE_TIMER_MS(timerWSThrottle, 50, SKIP_MISSED_TICKS); // Max ~20 msgs/sec
+
 void sendLogToWebSocket(const char* logMessage) {
   if (wsInitialized && wsClientCount > 0 && logMessage != nullptr) {
     // Check heap health before broadcasting

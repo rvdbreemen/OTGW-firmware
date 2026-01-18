@@ -97,7 +97,6 @@ class ESP8266HTTPUpdateServerTemplate
     String _updaterError;
     const char *_serverIndex;
     const char *_serverSuccess;
-    String _savedSettings;
     size_t _lastFeedbackBytes;
     unsigned long _lastFeedbackTime;
     unsigned long _lastDogFeedTime;

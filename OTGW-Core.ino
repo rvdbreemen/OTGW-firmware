@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.0.0-rc3
+**  Version  : v1.0.0-rc4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -2086,9 +2086,9 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   
   char buffer[128];
   if (result == OTGWError::OTGW_ERROR_NONE) {
-      snprintf_P(buffer, sizeof(buffer), PSTR("{\")percent\":100,\"result\":%d,\"errors\":%d,\"retries\":%d}"), (int)result, errors, retries);
+      snprintf_P(buffer, sizeof(buffer), PSTR("{\"percent\":100,\"result\":%d,\"errors\":%d,\"retries\":%d}"), (int)result, errors, retries);
   } else {
-      snprintf_P(buffer, sizeof(buffer), PSTR("{\")result\":%d,\"errors\":%d,\"retries\":%d}"), (int)result, errors, retries);
+      snprintf_P(buffer, sizeof(buffer), PSTR("{\"result\":%d,\"errors\":%d,\"retries\":%d}"), (int)result, errors, retries);
   }
 #ifndef DISABLE_WEBSOCKET
   sendWebSocketJSON(buffer);
@@ -2098,7 +2098,7 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
 void fwupgradestep(int pct) {
   OTGWDebugTf(PSTR("Upgrade: %d%%\n\r"), pct);
   char buffer[32];
-  snprintf_P(buffer, sizeof(buffer), PSTR("{\")percent\":%d}"), pct);
+  snprintf_P(buffer, sizeof(buffer), PSTR("{\"percent\":%d}"), pct);
 #ifndef DISABLE_WEBSOCKET
   sendWebSocketJSON(buffer);
 #endif

@@ -288,6 +288,9 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
     }
     if (rc != OTGW_ERROR_NONE) return finishUpgrade(rc);
 
+    // Fix: Rewind the file just in case we need to read it again
+    if (hexfd) hexfd.seek(0);
+
     Dprintf("model: %d\n", model);
 
     // The self-programming code will be skipped (assume 256 program words)
@@ -296,20 +299,26 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
     // Look for the new firmware version
     version = nullptr;
     unsigned short ptr = 0;
-    while (ptr < info.datasize) {
-        char *s = strstr_P((char *)datamem + ptr, banner1);
-        if (s == nullptr) {
-            ptr += strnlen((char *)datamem + ptr,
-              info.datasize - ptr) + 1;
-        } else {
-            s += sizeof(banner1) - 1;   // Drop the terminating '\0'
-            version = s;
-            Dprintf("Version: %s\n", version);
-            if (firmware == FIRMWARE_OTGW && *fwversion) {
-                // Reading out the EEPROM settings takes 4 reads of 64 bytes
-                weight += 4 * WEIGHT_DATAREAD;
+    size_t bannerLen = sizeof(banner1) - 1;
+    
+    // Safer sliding window search:
+    // 1. Iterate byte-by-byte (ptr++) instead of skipping over strings, so we can't miss a banner inside a block.
+    // 2. Ensure reading stays strictly within bounds (datasize - bannerLen).
+    // 3. Use memcmp_P for binary data comparison (datamem is not a null-terminated string)
+    if (info.datasize >= bannerLen) {
+        for (ptr = 0; ptr <= (info.datasize - bannerLen); ptr++) {
+            // Safe comparison with PROGMEM string using memcmp_P for binary data
+            if (memcmp_P((char *)datamem + ptr, banner1, bannerLen) == 0) {
+                // Match found!
+                version = (char *)datamem + ptr + bannerLen;
+                Dprintf("Version: %s\n", version);
+                
+                if (firmware == FIRMWARE_OTGW && *fwversion) {
+                    // Reading out the EEPROM settings takes 4 reads of 64 bytes
+                    weight += 4 * WEIGHT_DATAREAD;
+                }
+                break;
             }
-            break;
         }
     }
 

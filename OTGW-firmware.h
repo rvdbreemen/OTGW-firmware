@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.0.0-rc3
+**  Version  : v1.0.0-rc4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -165,7 +165,8 @@ int       settingUIGraphTimeWindow = 60; // Default to 1 Hour (60 minutes)
 
 // GPIO Sensor Settings
 bool      settingGPIOSENSORSenabled = false;
-int8_t    settingGPIOSENSORSpin = 13;            // GPIO 13 = D7, GPIO 10 = SDIO 3  
+bool      settingGPIOSENSORSlegacyformat = false; // Default to false (new standard format)
+int8_t    settingGPIOSENSORSpin = 10;            // GPIO 13 = D7, GPIO 10 = SDIO 3  
 int16_t   settingGPIOSENSORSinterval = 20;       // Interval time to read out temp and send to MQ
 byte      OTGWdallasdataid = 246;                // foney dataid to be used to do autoconfigure for temp sensors
 int       DallasrealDeviceCount = 0;             // Total temperature devices found on the bus

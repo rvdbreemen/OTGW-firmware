@@ -77,17 +77,25 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
   ```
 
 - **Use `_P` variants for string comparisons**:
-  - Use `strcmp_P()`, `strcasecmp_P()`, `strstr_P()` instead of standard functions when comparing with literals.
+  - Use `strcmp_P()`, `strcasecmp_P()` for comparing null-terminated strings with PROGMEM literals.
+  - **CRITICAL**: Use `memcmp_P()` for comparing binary data (not `strncmp_P()` or `strstr_P()`).
   - Wrap the distinct string literal in `PSTR()`.
   
   Example:
   ```cpp
-  // GOOD:
+  // GOOD - for null-terminated strings:
   if (strcmp_P(str, PSTR("value")) == 0) { ... }
   if (strcasecmp_P(field, PSTR("Hostname")) == 0) { ... }
   
+  // GOOD - for binary data (hex files, raw buffers):
+  if (memcmp_P(datamem + ptr, banner, bannerLen) == 0) { ... }
+  
   // BAD - loads literal into RAM:
   if (strcmp(str, "value") == 0) { ... }
+  
+  // BAD - strncmp_P/strstr_P on binary data causes crashes:
+  if (strncmp_P(datamem + ptr, banner, len) == 0) { ... }  // DANGEROUS!
+  if (strstr_P(datamem + ptr, banner) != NULL) { ... }      // DANGEROUS!
   ```
 
 - **Create function overloads** when existing functions don't support PROGMEM types:
@@ -112,12 +120,59 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
 - Every byte of string literal in RAM is a byte unavailable for runtime operations
 - This is **non-negotiable** - PROGMEM usage is critical for firmware stability
 
+### Binary Data Handling (CRITICAL - Prevents Exception Crashes)
+
+**MANDATORY**: When working with binary data (hex files, raw buffers), use proper comparison functions.
+
+- **Never use `strncmp_P()`, `strstr_P()`, or `strnlen()` on binary data**
+  - These functions expect null-terminated strings and may read beyond buffer boundaries
+  - Binary data from hex files does NOT have null terminators
+  - This causes Exception (2) crashes when reading protected memory
+
+- **Always use `memcmp_P()` for binary data comparison with PROGMEM**:
+  ```cpp
+  // CORRECT - sliding window search in binary data:
+  size_t bannerLen = sizeof(banner) - 1;
+  if (datasize >= bannerLen) {
+      for (ptr = 0; ptr <= (datasize - bannerLen); ptr++) {
+          if (memcmp_P(datamem + ptr, banner, bannerLen) == 0) {
+              // Found banner in binary data
+              break;
+          }
+      }
+  }
+  
+  // WRONG - causes buffer overruns and crashes:
+  while (ptr < datasize) {
+      char *s = strstr_P(datamem + ptr, banner);  // DANGEROUS!
+      if (s == nullptr) {
+          ptr += strnlen(datamem + ptr, datasize - ptr) + 1;  // DANGEROUS!
+      }
+  }
+  ```
+
+- **Key files with binary data handling**:
+  - `versionStuff.ino` - GetVersion() parses hex files
+  - `src/libraries/OTGWSerial/OTGWSerial.cpp` - readHexFile() parses hex files
+  - Both must use `memcmp_P()` for banner searching, not `strncmp_P()` or `strstr_P()`
+
+- **Always add underflow protection**:
+  ```cpp
+  // Check buffer is large enough before loop
+  if (datasize >= bannerLen) {
+      for (ptr = 0; ptr <= (datasize - bannerLen); ptr++) {
+          // Safe: ptr + bannerLen will never exceed datasize
+      }
+  }
+  ```
+
 ### Security Practices
 
 - Validate all user inputs (REST API, MQTT commands, Web UI)
 - Check buffer bounds before copying data
 - Sanitize URL parameters and redirects
 - Never expose passwords in plain text (use masking in Web UI)
+- **Use `memcmp_P()` for binary data** (see Binary Data Handling section above)
 
 ### Debug Output
 
@@ -144,9 +199,12 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
 
 ### REST API
 
-- API versioning: `/api/v0/` (legacy) and `/api/v1/` (current)
+- API versioning: `/api/v0/` (legacy), `/api/v1/` (standard), and `/api/v2/` (optimized)
 - OTGW commands: POST/PUT to `/api/v1/otgw/command/{command}`
+- Check system health: `/api/v1/health` (Returns `status: UP` and system vital signs)
 - Commands use the same queue as MQTT commands
+- **Reboot Verification**: WebUI must check `/api/v1/health` to confirm the device is back online.
+  - Expected response includes `status: UP` and `picavailable: true`.
 
 ### Build and Test
 
