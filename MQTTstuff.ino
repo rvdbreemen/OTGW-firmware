@@ -14,11 +14,10 @@
 #include <ctype.h>
 #include <pgmspace.h>
 
-// Enable MQTT streaming mode for auto-discovery to reduce heap fragmentation
-// When enabled, large auto-discovery messages are sent in chunks instead of
-// requiring a large buffer resize. This prevents the 256→1200→256 buffer
-// resize cycle that causes heap fragmentation.
-// #define USE_MQTT_STREAMING_AUTODISCOVERY
+// MQTT Streaming Mode - ALWAYS ENABLED
+// Large auto-discovery messages are sent in 128-byte chunks instead of
+// requiring a large buffer resize. This prevents heap fragmentation on ESP8266.
+// Similar to ESPHome's chunked MQTT publishing strategy.
 
 #define MQTTDebugTln(...) ({ if (bDebugMQTT) DebugTln(__VA_ARGS__);    })
 #define MQTTDebugln(...)  ({ if (bDebugMQTT) Debugln(__VA_ARGS__);    })
@@ -281,23 +280,16 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 
 //===========================================================================================
 // sendMQTT - streaming version for large messages (auto-discovery)
-// Sends the message in small chunks to avoid buffer reallocation
-// This prevents the 256→1200→256 buffer resize cycle that causes heap fragmentation
 //===========================================================================================
-#ifdef USE_MQTT_STREAMING_AUTODISCOVERY
-
+// sendMQTT - streaming version for large messages (auto-discovery)
+// Sends the message in small chunks to avoid buffer reallocation
+// This prevents heap fragmentation on ESP8266
+//===========================================================================================
 void sendMQTT(const char* topic, const char *json);
 
 // Forward declaration; implementation is provided later in this file
 void sendMQTTStreaming(const char* topic, const char *json, const size_t len);
-#else
 
-//===========================================================================================
-// sendMQTT - original version (uses full buffer)
-//===========================================================================================
-void sendMQTT(const char* topic, const char *json) {
-  sendMQTT(topic, json, strlen(json));
-}
 void handleMQTT() 
 {  
   if (!settingMQTTenable) return;
@@ -530,10 +522,8 @@ void sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
 * json:   <string> , payload to send
 */
 //===========================================================================================
-#ifdef USE_MQTT_STREAMING_AUTODISCOVERY
-
-// Streaming version - sends message in chunks to avoid buffer reallocation
-// This prevents the 256→1200→256 buffer resize cycle that causes heap fragmentation
+// Streaming version - sends message in 128-byte chunks to avoid buffer reallocation
+// This prevents heap fragmentation on ESP8266 (similar to ESPHome's approach)
 void sendMQTT(const char* topic, const char *json) {
   sendMQTTStreaming(topic, json, strlen(json));
 }
@@ -587,40 +577,6 @@ void sendMQTTStreaming(const char* topic, const char *json, const size_t len)
 
   feedWatchDog();
 } // sendMQTTStreaming()
-
-#else
-
-// Original version - uses full buffer (may cause buffer reallocation)
-void sendMQTT(const char* topic, const char *json) {
-  sendMQTT(topic, json, strlen(json));
-}
-
-void sendMQTT(const char* topic, const char *json, const size_t len) 
-{
-  if (!settingMQTTenable) return;
-  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
-  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
-  
-  // Check heap health before publishing
-  if (!canPublishMQTT()) {
-    // Message dropped due to low heap - canPublishMQTT() handles logging
-    return;
-  }
-  
-  MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settingMQTTbroker, settingMQTTbrokerPort, topic, json);
-
-  // Stream the message byte-by-byte to minimize buffer usage
-  if (MQTTclient.beginPublish(topic, len, true)){
-    for (size_t i = 0; i<len; i++) {
-      if(!MQTTclient.write(json[i])) PrintMQTTError();
-    }  
-    MQTTclient.endPublish();
-  } else PrintMQTTError();
-
-  feedWatchDog();
-} // sendMQTT()
-
-#endif
 
 
 //===========================================================================================
@@ -772,7 +728,9 @@ void doAutoConfigure(bool bForceAll){
   
   // Cleanup - note: resetMQTTBufferSize() is now a no-op for static buffer strategy
   resetMQTTBufferSize();
-  delete[] buffer;  // Delete the single allocated buffer, not the partitions
+  delete[] sLine;   // Delete the individual allocated buffers
+  delete[] sTopic;
+  delete[] sMsg;
   
   // Trigger Dallas configuration separately as it requires specific sensor addresses
   if (settingMQTTenable && (bForceAll || getMQTTConfigDone(OTGWdallasdataid))) {
