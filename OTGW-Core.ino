@@ -1742,7 +1742,10 @@ void processOT(const char *buf, int len){
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
     checkOTGWcmdqueue(buf, len);
     Debugln(buf);
-    sendMQTTData(F("event_report"), buf);
+    // Filter out PR: responses (internal version queries) from MQTT broadcast
+    if (buf[0] != 'P' || buf[1] != 'R') {
+      sendMQTTData(F("event_report"), buf);
+    }
   } else if (strcmp_P(buf, PSTR("NG")) == 0) {
     Debugln(F("NG - No Good. The command code is unknown."));
     sendMQTTData(F("event_report"), F("NG - No Good. The command code is unknown."));
