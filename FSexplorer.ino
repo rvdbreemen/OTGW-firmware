@@ -131,21 +131,26 @@ void setupFSexplorer(){
 //=====================================================================================
 void apifirmwarefilelist() {
   DebugTf(PSTR("API: apifirmwarefilelist()\r\n"));
-  char buffer[1024];
-  char *s = buffer;
-  size_t left = sizeof(buffer);
-  int len;
-
+  
+  // Use small 256-byte buffer for streaming individual entries
+  char entryBuffer[256];
   String version, fwversion;
   Dir dir;
   File f;
+  bool firstEntry = true;
 
   String dirpath = "/" + String(sPICdeviceid);
   DebugTf(PSTR("dirpath=%s\r\n"), dirpath.c_str());
-      
-  len = snprintf_P(s, left, PSTR("["));
-  s += len; left -= len;
-
+  
+  // Start chunked response with JSON array opening
+  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  httpServer.send(200, F("application/json"), F(""));
+  httpServer.sendContent(F("["));
+  
+  // Also stream to debug telnet
+  DebugTln(F("--- Firmware File List (streamed) ---"));
+  DebugTln(F("["));
+  
   dir = LittleFS.openDir(dirpath);	
   while (dir.next()) {
     DebugTf(PSTR("dir.fileName()=%s\r\n"), dir.fileName().c_str());
@@ -161,17 +166,15 @@ void apifirmwarefilelist() {
         version.trim();
         f.close();
       } 
-      // DebugTf(PSTR("version=%s\r\n"), version.c_str());	
+      
       char fwversionBuf[32] = {0};
       GetVersion(hexfile.c_str(), fwversionBuf, sizeof(fwversionBuf));
-      fwversion = fwversionBuf; // Keep using String for fwversion locally for now to minimize changes in this file
+      fwversion = fwversionBuf;
 
-      // String hexversion = OTGWSerial.readHexFileVersion(hexfile.c_str());
-      // DebugTf(PSTR("File version on hexfile: %s\r\n"), hexversion.c_str());
       DebugTf(PSTR("GetVersion(%s) returned [%s]\r\n"), hexfile.c_str(), fwversion.c_str());  
-      if (fwversion.length() && strcmp(fwversion.c_str(),version.c_str())) { // versions do not match
-        version=fwversion; // assign hex file version to version
-        if (f = LittleFS.open(verfile, "w")) { // write to .ver file
+      if (fwversion.length() && strcmp(fwversion.c_str(),version.c_str())) {
+        version=fwversion;
+        if (f = LittleFS.open(verfile, "w")) {
           DebugTf(PSTR("writing %s to %s\r\n"),version.c_str(),verfile.c_str());
           f.print(version + "\n");
           f.close();
@@ -179,19 +182,34 @@ void apifirmwarefilelist() {
       }
       Debugln();
       
-      len = snprintf_P(s, left, PSTR("{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d},"), CSTR(dir.fileName()), CSTR(version), dir.fileSize());
-      if (len < 0 || (size_t)len >= left) break;
-      s += len; left -= len;
+      // Add comma separator after first entry
+      if (!firstEntry) {
+        httpServer.sendContent(F(","));
+        DebugTln(F(",")); // Also to debug telnet
+      }
+      firstEntry = false;
+      
+      // Stream this entry directly (fits in 256-byte buffer)
+      // CSTR() macro handles null safety globally - returns "" if null
+      snprintf_P(entryBuffer, sizeof(entryBuffer), 
+                 PSTR("{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d}"), 
+                 CSTR(dir.fileName()), CSTR(version), dir.fileSize());
+      httpServer.sendContent(entryBuffer);
+      
+      // Also stream entry to debug telnet
+      DebugTf(PSTR("  %s\r\n"), entryBuffer);
+      
+      feedWatchDog(); // Feed watchdog during potentially long operation
     }
   }
   
-  if (*(s-1) == ',') {
-    s--; left++;
-  }
-  snprintf_P(s, left, PSTR("]\r\n"));
-
-  DebugTf(PSTR("filelist response: %s\r\n"), buffer);
-  httpServer.send(200, "application/json", buffer);
+  // Close JSON array
+  httpServer.sendContent(F("]\r\n"));
+  httpServer.sendContent(F("")); // End chunked response
+  
+  // Also close JSON array in debug telnet
+  DebugTln(F("]"));
+  DebugTln(F("--- End of Firmware File List ---"));
 }
 
 
