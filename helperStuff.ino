@@ -594,6 +594,216 @@ bool replaceAll(char *buffer, const size_t bufSize, const char *token, const cha
   return true;
 }
 
+//===========================================================================================
+// Heap Monitoring and Backpressure Management
+//===========================================================================================
+
+// Heap thresholds for different severity levels
+// Rationale: ESP8266 typically has ~40KB RAM after core libraries
+// - CRITICAL (3KB): Minimum to prevent crash, emergency only
+// - WARNING (5KB): Below this, aggressive throttling needed
+// - LOW (8KB): Below this, start reducing message frequency
+// - HEALTHY (>8KB): Sufficient for normal operation with WebSocket server (~4KB baseline)
+#define HEAP_CRITICAL_THRESHOLD   3072   // Critical: Stop all non-essential operations
+#define HEAP_WARNING_THRESHOLD    5120   // Warning: Start throttling messages
+#define HEAP_LOW_THRESHOLD        8192   // Low: Begin reducing message frequency
+
+// Throttling state
+static uint32_t lastWebSocketSendMs = 0;
+static uint32_t lastMQTTPublishMs = 0;
+static uint32_t lastWebSocketWarningMs = 0;
+static uint32_t lastMQTTWarningMs = 0;
+static uint32_t webSocketDropCount = 0;
+static uint32_t mqttDropCount = 0;
+
+// Minimum intervals when heap is under pressure (milliseconds)
+#define WEBSOCKET_THROTTLE_MS_WARNING  50   // 50ms = max 20 msg/sec when heap is low
+#define WEBSOCKET_THROTTLE_MS_CRITICAL 200  // 200ms = max 5 msg/sec when heap is critical
+#define MQTT_THROTTLE_MS_WARNING       100  // 100ms = max 10 msg/sec when heap is low
+#define MQTT_THROTTLE_MS_CRITICAL      500  // 500ms = max 2 msg/sec when heap is critical
+
+// Diagnostic logging intervals (milliseconds)
+#define WARNING_LOG_INTERVAL_MS        10000  // Log warnings every 10 seconds
+#define EMERGENCY_RECOVERY_INTERVAL_MS 30000  // Attempt recovery max once per 30 seconds
+
+enum HeapHealthLevel {
+  HEAP_HEALTHY,       // > 8192 bytes: Normal operation
+  HEAP_LOW,           // 5120-8192 bytes: Start throttling
+  HEAP_WARNING,       // 3072-5120 bytes: Aggressive throttling
+  HEAP_CRITICAL       // < 3072 bytes: Stop non-essential operations
+};
+
+//===========================================================================================
+// Check current heap health level
+//===========================================================================================
+HeapHealthLevel getHeapHealth() {
+  uint32_t freeHeap = ESP.getFreeHeap();
+  
+  if (freeHeap < HEAP_CRITICAL_THRESHOLD) {
+    return HEAP_CRITICAL;
+  } else if (freeHeap < HEAP_WARNING_THRESHOLD) {
+    return HEAP_WARNING;
+  } else if (freeHeap < HEAP_LOW_THRESHOLD) {
+    return HEAP_LOW;
+  }
+  return HEAP_HEALTHY;
+}
+
+//===========================================================================================
+// Check if we can send a WebSocket message (with backpressure)
+//===========================================================================================
+bool canSendWebSocket() {
+  HeapHealthLevel heapLevel = getHeapHealth();
+  uint32_t now = millis();
+  
+  // Critical: block WebSocket messages completely
+  if (heapLevel == HEAP_CRITICAL) {
+    webSocketDropCount++;
+    // Log warning periodically (use unsigned arithmetic for rollover safety)
+    if ((uint32_t)(now - lastWebSocketWarningMs) > WARNING_LOG_INTERVAL_MS) {
+      DebugTf(PSTR("HEAP-CRITICAL: Blocking WebSocket (dropped %u msgs, heap=%u bytes)\r\n"), 
+              webSocketDropCount, ESP.getFreeHeap());
+      lastWebSocketWarningMs = now;
+    }
+    return false;
+  }
+  
+  // Warning: aggressive throttling
+  if (heapLevel == HEAP_WARNING) {
+    // Use unsigned arithmetic to handle millis() rollover correctly
+    if ((uint32_t)(now - lastWebSocketSendMs) < WEBSOCKET_THROTTLE_MS_CRITICAL) {
+      webSocketDropCount++;
+      return false;
+    }
+  }
+  
+  // Low: moderate throttling
+  if (heapLevel == HEAP_LOW) {
+    // Use unsigned arithmetic to handle millis() rollover correctly
+    if ((uint32_t)(now - lastWebSocketSendMs) < WEBSOCKET_THROTTLE_MS_WARNING) {
+      webSocketDropCount++;
+      return false;
+    }
+  }
+  
+  // Update last send time
+  lastWebSocketSendMs = now;
+  
+  // Log warning if we're dropping messages (use unsigned arithmetic for rollover safety)
+  if (webSocketDropCount > 0 && (uint32_t)(now - lastWebSocketWarningMs) > WARNING_LOG_INTERVAL_MS) {
+    DebugTf(PSTR("WebSocket throttled: dropped %u msgs (heap=%u bytes)\r\n"), 
+            webSocketDropCount, ESP.getFreeHeap());
+    lastWebSocketWarningMs = now;
+    webSocketDropCount = 0; // reset counter after reporting
+  }
+  
+  return true;
+}
+
+//===========================================================================================
+// Check if we can publish an MQTT message (with backpressure)
+//===========================================================================================
+bool canPublishMQTT() {
+  HeapHealthLevel heapLevel = getHeapHealth();
+  uint32_t now = millis();
+  
+  // Critical: block MQTT messages completely
+  if (heapLevel == HEAP_CRITICAL) {
+    mqttDropCount++;
+    // Log warning periodically (use unsigned arithmetic for rollover safety)
+    if ((uint32_t)(now - lastMQTTWarningMs) > WARNING_LOG_INTERVAL_MS) {
+      DebugTf(PSTR("HEAP-CRITICAL: Blocking MQTT (dropped %u msgs, heap=%u bytes)\r\n"), 
+              mqttDropCount, ESP.getFreeHeap());
+      lastMQTTWarningMs = now;
+    }
+    return false;
+  }
+  
+  // Warning: aggressive throttling
+  if (heapLevel == HEAP_WARNING) {
+    // Use unsigned arithmetic to handle millis() rollover correctly
+    if ((uint32_t)(now - lastMQTTPublishMs) < MQTT_THROTTLE_MS_CRITICAL) {
+      mqttDropCount++;
+      return false;
+    }
+  }
+  
+  // Low: moderate throttling
+  if (heapLevel == HEAP_LOW) {
+    // Use unsigned arithmetic to handle millis() rollover correctly
+    if ((uint32_t)(now - lastMQTTPublishMs) < MQTT_THROTTLE_MS_WARNING) {
+      mqttDropCount++;
+      return false;
+    }
+  }
+  
+  // Update last publish time
+  lastMQTTPublishMs = now;
+  
+  // Log warning if we're dropping messages (use unsigned arithmetic for rollover safety)
+  if (mqttDropCount > 0 && (uint32_t)(now - lastMQTTWarningMs) > WARNING_LOG_INTERVAL_MS) {
+    DebugTf(PSTR("MQTT throttled: dropped %u msgs (heap=%u bytes)\r\n"), 
+            mqttDropCount, ESP.getFreeHeap());
+    lastMQTTWarningMs = now;
+    mqttDropCount = 0; // reset counter after reporting
+  }
+  
+  return true;
+}
+
+//===========================================================================================
+// Get heap statistics for debugging
+//===========================================================================================
+void logHeapStats() {
+  uint32_t freeHeap = ESP.getFreeHeap();
+  uint32_t maxBlock = ESP.getMaxFreeBlockSize();
+  HeapHealthLevel level = getHeapHealth();
+  
+  const char* levelStr = "UNKNOWN";
+  switch (level) {
+    case HEAP_HEALTHY:  levelStr = "HEALTHY"; break;
+    case HEAP_LOW:      levelStr = "LOW"; break;
+    case HEAP_WARNING:  levelStr = "WARNING"; break;
+    case HEAP_CRITICAL: levelStr = "CRITICAL"; break;
+  }
+  
+  DebugTf(PSTR("Heap: %u bytes free, %u max block, level=%s, WS_drops=%u, MQTT_drops=%u\r\n"),
+          freeHeap, maxBlock, levelStr, webSocketDropCount, mqttDropCount);
+}
+
+//===========================================================================================
+// Emergency heap recovery - called when heap is critically low
+// This function tries to free up memory by clearing non-essential buffers
+//===========================================================================================
+void emergencyHeapRecovery() {
+  static uint32_t lastRecoveryMs = 0;
+  uint32_t now = millis();
+  
+  // Only attempt recovery once per interval to avoid thrashing
+  // Use unsigned arithmetic to handle millis() rollover correctly
+  if ((uint32_t)(now - lastRecoveryMs) < EMERGENCY_RECOVERY_INTERVAL_MS) {
+    return;
+  }
+  lastRecoveryMs = now;
+  
+  uint32_t heapBefore = ESP.getFreeHeap();
+  DebugTf(PSTR("Emergency heap recovery starting (heap=%u bytes)\r\n"), heapBefore);
+  
+  // Force MQTT buffer to minimum size
+  resetMQTTBufferSize();
+  
+  // Yield to allow ESP8266 to do housekeeping
+  yield();
+  delay(10);
+  
+  uint32_t heapAfter = ESP.getFreeHeap();
+  // Calculate recovered bytes safely (handle case where heap decreased)
+  // Use int32_t to avoid overflow and allow negative values
+  int32_t recovered = (int32_t)heapAfter - (int32_t)heapBefore;
+  DebugTf(PSTR("Emergency heap recovery complete (heap=%u bytes, recovered=%ld bytes)\r\n"), 
+          heapAfter, (long)recovered);
+}
+
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a

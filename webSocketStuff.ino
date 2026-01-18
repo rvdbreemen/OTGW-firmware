@@ -42,6 +42,11 @@ static uint8_t wsClientCount = 0;
 #define MAX_WS_CLIENTS 2              // Limit number of clients to prevent out of memory
 #define MIN_HEAP_FOR_BROADCAST 4096   // Don't broadcast if heap is too low
 
+// Maximum number of simultaneous WebSocket clients
+// Rationale: Each client uses ~700 bytes (256 byte buffer + overhead)
+// Limiting to 3 clients prevents heap exhaustion (3 × 700 = 2100 bytes max)
+#define MAX_WEBSOCKET_CLIENTS 3
+
 // Track WebSocket initialization state
 static bool wsInitialized = false;
 
@@ -57,12 +62,23 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
       
     case WStype_CONNECTED:
       {
-        if (wsClientCount >= MAX_WS_CLIENTS) {
-          DebugTf(PSTR("WebSocket[%u] connection rejected: Max clients (%d) reached\r\n"), num, MAX_WS_CLIENTS);
+        // Check client limit before accepting connection
+        if (wsClientCount >= MAX_WEBSOCKET_CLIENTS) {
+          DebugTf(PSTR("WebSocket[%u]: Max clients (%u) reached, rejecting connection\r\n"), 
+                  num, MAX_WEBSOCKET_CLIENTS);
           webSocket.disconnect(num);
           return;
         }
-
+        
+        // Check heap health before accepting connection
+        // Use WARNING threshold to be conservative
+        if (ESP.getFreeHeap() < HEAP_WARNING_THRESHOLD) {
+          DebugTf(PSTR("WebSocket[%u]: Low heap (%u bytes), rejecting connection\r\n"), 
+                  num, ESP.getFreeHeap());
+          webSocket.disconnect(num);
+          return;
+        }
+        
         IPAddress ip = webSocket.remoteIP(num);
         wsClientCount++;
         DebugTf(PSTR("WebSocket[%u] connected from %d.%d.%d.%d. Clients: %u\r\n"), 
@@ -131,20 +147,17 @@ void handleWebSocket() {
 // Send log message directly to all connected WebSocket clients
 // This is called from OTGW-Core.ino when a new log line is ready
 // Simplified: no queue, no JSON, just direct text broadcasting
-// Added: Heap protection/Backpressure + Rate Limiting
+// Now includes heap-based backpressure to prevent memory exhaustion
 //===========================================================================================
 DECLARE_TIMER_MS(timerWSThrottle, 50, SKIP_MISSED_TICKS); // Max ~20 msgs/sec
 
 void sendLogToWebSocket(const char* logMessage) {
   if (wsInitialized && wsClientCount > 0 && logMessage != nullptr) {
-    // BACKPRESSURE: Stop sending if heap is critical to prevent crash
-    if (ESP.getFreeHeap() < MIN_HEAP_FOR_BROADCAST) return; 
-
-    // RATE LIMITING: Throttle bursts if heap is not abundant (>15KB)
-    // If heap is plentiful, we allow full speed. 
-    // Otherwise, we cap at ~20 messages/sec to let network stack breathe.
-    if (!DUE(timerWSThrottle) && ESP.getFreeHeap() < 15000) return;
-
+    // Check heap health before broadcasting
+    if (!canSendWebSocket()) {
+      // Message dropped due to low heap - canSendWebSocket() handles logging
+      return;
+    }
     webSocket.broadcastTXT(logMessage);
   }
 }
