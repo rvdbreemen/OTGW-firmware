@@ -1,0 +1,269 @@
+name: CI Build with Inline Evaluation and Fix
+
+on:
+  push:
+    branches:
+      - dev
+      - 'dev-*'
+      - main
+      - actions
+      - make-tweaks
+      - tarball-naming
+
+permissions:
+  contents: write
+
+jobs:
+  build-evaluate-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      
+      - name: Setup environment
+        uses: ./.github/actions/setup
+      
+      - name: Build firmware
+        uses: ./.github/actions/build
+      
+      - name: Run code evaluation
+        id: eval
+        run: |
+          echo "::group::Code Evaluation"
+          python evaluate.py --report --no-color
+          EXIT_CODE=$?
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+          
+          # Don't fail the workflow yet - we'll try to fix
+          exit 0
+        continue-on-error: true
+      
+      - name: Check if fixes needed
+        id: check
+        run: |
+          if [ -f evaluation-report.json ]; then
+            FAILURES=$(jq '.summary.failed' evaluation-report.json)
+            WARNINGS=$(jq '.summary.warnings' evaluation-report.json)
+            
+            echo "failures=$FAILURES" >> $GITHUB_OUTPUT
+            echo "warnings=$WARNINGS" >> $GITHUB_OUTPUT
+            
+            if [ "$FAILURES" -gt 0 ]; then
+              echo "needs_fix=true" >> $GITHUB_OUTPUT
+            else
+              echo "needs_fix=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "needs_fix=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Apply automated fixes
+        if: steps.check.outputs.needs_fix == 'true'
+        id: fix
+        run: |
+          echo "::group::Applying Automated Fixes"
+          
+          # Create a Python script to apply safe, automated fixes
+          cat > /tmp/auto-fix.py <<'EOFIX'
+          #!/usr/bin/env python3
+          """
+          Automated code fixes for OTGW-firmware
+          
+          This script applies safe, mechanical fixes based on evaluation findings.
+          Only low-risk, well-understood fixes are applied automatically.
+          """
+          
+          import json
+          import re
+          import os
+          import sys
+          from pathlib import Path
+          
+          class AutoFixer:
+              def __init__(self, report_path, project_dir):
+                  self.report_path = report_path
+                  self.project_dir = Path(project_dir)
+                  self.changes_made = 0
+                  self.fixes_applied = []
+                  
+                  with open(report_path, 'r') as f:
+                      self.report = json.load(f)
+              
+              def apply_fixes(self):
+                  """Apply automated fixes based on evaluation findings"""
+                  failures = [r for r in self.report['results'] if r['status'] == 'FAIL']
+                  
+                  for failure in failures:
+                      # Only apply fixes for specific, safe categories
+                      if failure['category'] == 'Memory Patterns':
+                          if 'PROGMEM' in failure['message']:
+                              self.fix_progmem_usage(failure)
+                      
+                      elif failure['category'] == 'Coding Standards':
+                          if 'Serial.print' in failure['message']:
+                              self.fix_serial_print(failure)
+                  
+                  return self.changes_made > 0
+              
+              def fix_progmem_usage(self, finding):
+                  """Fix missing PROGMEM usage - example, not fully implemented"""
+                  # This would need detailed implementation
+                  # For now, just log what we would fix
+                  print(f"Would fix PROGMEM issue: {finding['message']}")
+                  # self.changes_made += 1
+                  # self.fixes_applied.append(f"PROGMEM: {finding['name']}")
+              
+              def fix_serial_print(self, finding):
+                  """Fix Serial.print usage - example, not fully implemented"""
+                  # This would need detailed implementation
+                  print(f"Would fix Serial.print issue: {finding['message']}")
+                  # self.changes_made += 1
+                  # self.fixes_applied.append(f"Serial.print: {finding['name']}")
+              
+              def summary(self):
+                  """Print summary of fixes"""
+                  if self.changes_made > 0:
+                      print(f"\nApplied {self.changes_made} automated fixes:")
+                      for fix in self.fixes_applied:
+                          print(f"  - {fix}")
+                      return True
+                  else:
+                      print("\nNo automated fixes applied.")
+                      print("Issues require manual review or agent intervention.")
+                      return False
+          
+          if __name__ == '__main__':
+              fixer = AutoFixer('evaluation-report.json', '.')
+              has_fixes = fixer.apply_fixes()
+              fixer.summary()
+              
+              # Exit 0 if fixes were applied, 1 if manual intervention needed
+              sys.exit(0 if has_fixes else 1)
+          EOFIX
+          
+          chmod +x /tmp/auto-fix.py
+          python /tmp/auto-fix.py
+          FIX_RESULT=$?
+          
+          echo "fix_result=$FIX_RESULT" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+          
+          # Check if any files were modified
+          if [[ -n $(git status -s) ]]; then
+            echo "changes_made=true" >> $GITHUB_OUTPUT
+          else
+            echo "changes_made=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Verify fixes with build
+        if: steps.fix.outputs.changes_made == 'true'
+        run: |
+          echo "::group::Rebuilding after fixes"
+          make clean
+          make -j$(nproc)
+          echo "::endgroup::"
+      
+      - name: Re-evaluate after fixes
+        if: steps.fix.outputs.changes_made == 'true'
+        id: reeval
+        run: |
+          echo "::group::Re-evaluating code"
+          python evaluate.py --report --no-color
+          EXIT_CODE=$?
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+          
+          if [ -f evaluation-report.json ]; then
+            FAILURES=$(jq '.summary.failed' evaluation-report.json)
+            echo "remaining_failures=$FAILURES" >> $GITHUB_OUTPUT
+          fi
+          
+          exit 0
+        continue-on-error: true
+      
+      - name: Commit fixes
+        if: steps.fix.outputs.changes_made == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add .
+          
+          # Create detailed commit message
+          cat > /tmp/commit-msg.txt <<'EOMSG'
+          Auto-fix: Apply code quality fixes
+          
+          Applied automated fixes for code evaluation findings:
+          EOMSG
+          
+          # Add details from evaluation
+          if [ -f evaluation-report.json ]; then
+            echo "" >> /tmp/commit-msg.txt
+            echo "Fixed issues:" >> /tmp/commit-msg.txt
+            jq -r '.results[] | select(.status=="FAIL") | "- [\(.category)] \(.name)"' evaluation-report.json | head -10 >> /tmp/commit-msg.txt
+          fi
+          
+          git commit -F /tmp/commit-msg.txt
+          
+          # Push changes back to the same branch
+          git push origin HEAD:${{ github.ref_name }}
+      
+      - name: Add evaluation comment to commit
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (!fs.existsSync('evaluation-report.json')) return;
+            
+            const report = JSON.parse(fs.readFileSync('evaluation-report.json', 'utf8'));
+            const summary = report.summary;
+            
+            const fixesMade = '${{ steps.fix.outputs.changes_made }}' === 'true';
+            const remainingFailures = '${{ steps.reeval.outputs.remaining_failures }}' || '0';
+            
+            let status = '✅ PASSED';
+            if (summary.failed > 0) status = '❌ FAILED';
+            else if (summary.warnings > 5) status = '⚠️ WARNINGS';
+            
+            const comment = \`## \${status} Code Evaluation
+            
+            **Commit**: \${context.sha.substring(0, 7)}
+            **Branch**: \${context.ref.replace('refs/heads/', '')}
+            
+            ### Summary
+            - ✓ Passed: \${summary.passed}
+            - ⚠ Warnings: \${summary.warnings}
+            - ✗ Failed: \${summary.failed}
+            - ℹ Info: \${summary.info}
+            
+            \${fixesMade ? \`
+            ### 🤖 Automated Fixes Applied
+            - Changes were committed automatically
+            - Remaining failures: \${remainingFailures}
+            \${remainingFailures > 0 ? '- Some issues require manual intervention' : '- All issues resolved!'}
+            \` : ''}
+            
+            \${summary.failed > 0 && !fixesMade ? '### ⚠️ Manual Review Required\n- Issues found that cannot be auto-fixed\n- Review the evaluation report' : ''}
+            \`;
+            
+            console.log(comment);
+      
+      - name: Upload evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-report-${{ github.sha }}
+          path: evaluation-report.json
+          retention-days: 30
+      
+      - name: Fail if critical issues remain
+        if: steps.reeval.outputs.exit_code != '0' || (steps.check.outputs.needs_fix == 'true' && steps.fix.outputs.changes_made != 'true')
+        run: |
+          echo "::error::Code evaluation failed and issues could not be auto-fixed"
+          echo "::error::Manual intervention required"
+          exit 1

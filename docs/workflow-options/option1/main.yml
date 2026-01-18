@@ -1,0 +1,310 @@
+name: CI Build with Evaluation and Auto-Fix
+
+on:
+  push:
+    branches:
+      - dev
+      - 'dev-*'
+      - main
+      - actions
+      - make-tweaks
+      - tarball-naming
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/build
+
+  evaluate:
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      has-failures: ${{ steps.check.outputs.has-failures }}
+      failure-count: ${{ steps.check.outputs.failure-count }}
+      warning-count: ${{ steps.check.outputs.warning-count }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Run evaluation
+        id: eval
+        run: |
+          python evaluate.py --report --no-color
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
+      
+      - name: Parse evaluation results
+        id: check
+        run: |
+          if [ -f evaluation-report.json ]; then
+            FAILURES=$(jq '.summary.failed' evaluation-report.json)
+            WARNINGS=$(jq '.summary.warnings' evaluation-report.json)
+            echo "failure-count=$FAILURES" >> $GITHUB_OUTPUT
+            echo "warning-count=$WARNINGS" >> $GITHUB_OUTPUT
+            
+            if [ "$FAILURES" -gt 0 ]; then
+              echo "has-failures=true" >> $GITHUB_OUTPUT
+            else
+              echo "has-failures=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "has-failures=false" >> $GITHUB_OUTPUT
+            echo "failure-count=0" >> $GITHUB_OUTPUT
+            echo "warning-count=0" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Upload evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-report
+          path: evaluation-report.json
+          retention-days: 30
+      
+      - name: Comment evaluation summary on commit
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (!fs.existsSync('evaluation-report.json')) {
+              console.log('No evaluation report found');
+              return;
+            }
+            
+            const report = JSON.parse(fs.readFileSync('evaluation-report.json', 'utf8'));
+            const summary = report.summary;
+            
+            const emoji = summary.failed > 0 ? '❌' : summary.warnings > 5 ? '⚠️' : '✅';
+            const status = summary.failed > 0 ? 'FAILED' : summary.warnings > 5 ? 'WARNINGS' : 'PASSED';
+            
+            const comment = \`## \${emoji} Code Evaluation \${status}
+            
+            **Commit**: \${context.sha.substring(0, 7)}
+            **Branch**: \${context.ref.replace('refs/heads/', '')}
+            
+            ### Summary
+            - ✓ Passed: \${summary.passed}
+            - ⚠ Warnings: \${summary.warnings}
+            - ✗ Failed: \${summary.failed}
+            - ℹ Info: \${summary.info}
+            
+            \${summary.failed > 0 ? '**Action**: Auto-fix workflow will be triggered.' : ''}
+            
+            [View full report in artifacts](https://github.com/\${context.repo.owner}/\${context.repo.repo}/actions/runs/\${context.runId})
+            \`;
+            
+            // Note: For commit comments, we'd use commits API
+            // For now, this is a placeholder showing the structure
+            console.log(comment);
+
+  auto-fix:
+    needs: evaluate
+    if: needs.evaluate.outputs.has-failures == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Download evaluation report
+        uses: actions/download-artifact@v4
+        with:
+          name: evaluation-report
+      
+      - name: Create fix branch
+        id: branch
+        run: |
+          BRANCH_NAME="auto-fix/eval-$(date +%Y%m%d-%H%M%S)-${{ github.sha }}"
+          echo "branch-name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          git checkout -b "$BRANCH_NAME"
+      
+      - name: Generate fix instructions
+        id: instructions
+        run: |
+          # Parse evaluation report and generate instructions for agent
+          python - <<'EOF'
+          import json
+          import sys
+          
+          with open('evaluation-report.json', 'r') as f:
+              report = json.load(f)
+          
+          failures = [r for r in report['results'] if r['status'] == 'FAIL']
+          warnings = [r for r in report['results'] if r['status'] == 'WARN']
+          
+          instructions = "# Code Evaluation Findings to Fix\n\n"
+          instructions += f"Total failures: {len(failures)}\n"
+          instructions += f"Total warnings: {len(warnings)}\n\n"
+          
+          instructions += "## Critical Failures (MUST FIX)\n\n"
+          for item in failures:
+              instructions += f"### [{item['category']}] {item['name']}\n"
+              instructions += f"**Issue**: {item['message']}\n"
+              if item.get('details'):
+                  instructions += f"**Details**: {item['details']}\n"
+              instructions += "\n"
+          
+          instructions += "## Warnings (SHOULD FIX if low-risk)\n\n"
+          for item in warnings[:5]:  # Limit to top 5 warnings
+              instructions += f"### [{item['category']}] {item['name']}\n"
+              instructions += f"**Issue**: {item['message']}\n\n"
+          
+          with open('fix-instructions.md', 'w') as f:
+              f.write(instructions)
+          
+          print("Fix instructions generated")
+          EOF
+      
+      - name: Create agent prompt
+        run: |
+          cat > agent-prompt.md <<'EOF'
+          # Auto-Fix Task: Resolve Code Evaluation Findings
+          
+          You are a code quality agent for the OTGW-firmware ESP8266 project.
+          
+          ## Your Task
+          Review the evaluation findings in `fix-instructions.md` and fix the issues found.
+          
+          ## Important Constraints
+          - Make MINIMAL changes - only fix the specific issues identified
+          - Do NOT refactor working code unless it's directly related to a finding
+          - Follow existing code style and conventions
+          - Use PROGMEM (F() and PSTR() macros) for all string literals
+          - Avoid the String class - use char buffers
+          - Test changes do not break the build
+          
+          ## Evaluation Categories to Fix
+          1. **Code Structure**: Function size, complexity issues
+          2. **Memory Patterns**: String class usage, missing PROGMEM
+          3. **Security**: Buffer overflows, input validation
+          4. **Build System**: Missing dependencies, configuration issues
+          
+          ## Steps
+          1. Read `fix-instructions.md` for specific issues
+          2. Read `evaluation-report.json` for full context
+          3. Fix issues one category at a time
+          4. Test build after each fix: `make -j$(nproc)`
+          5. Run evaluation to verify: `python evaluate.py --quick`
+          
+          ## Success Criteria
+          - Evaluation failures reduced to 0
+          - Build still succeeds
+          - No new issues introduced
+          EOF
+          
+          cat fix-instructions.md >> agent-prompt.md
+      
+      - name: Apply automated fixes (simple cases)
+        id: auto-fixes
+        run: |
+          # Apply simple automated fixes that don't require complex logic
+          
+          CHANGES_MADE=0
+          
+          # Example: Fix missing PROGMEM usage in Serial.print (convert to Debug macros)
+          # This is a safe, mechanical fix
+          if grep -r 'Serial\.print' --include="*.ino" .; then
+            echo "WARNING: Found Serial.print usage - should use Debug macros"
+            echo "This requires manual agent review - not auto-fixing"
+          fi
+          
+          # Example: Other mechanical fixes could go here
+          # - Fix spacing/formatting issues
+          # - Fix simple string literal issues
+          # - etc.
+          
+          echo "changes-made=$CHANGES_MADE" >> $GITHUB_OUTPUT
+      
+      - name: Commit auto-fixes if any
+        if: steps.auto-fixes.outputs.changes-made != '0'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Auto-fix: Apply automated code quality fixes"
+      
+      - name: Create Pull Request
+        id: pr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ steps.branch.outputs.branch-name }}
+          title: "🤖 Auto-fix: Code evaluation findings (${{ github.sha }})"
+          body: |
+            ## Automated Code Quality Fixes
+            
+            This PR was automatically generated to address code evaluation findings.
+            
+            **Source Commit**: ${{ github.sha }}
+            **Failures Found**: ${{ needs.evaluate.outputs.failure-count }}
+            **Warnings Found**: ${{ needs.evaluate.outputs.warning-count }}
+            
+            ### What to Review
+            
+            1. **Review the evaluation report** in the artifacts of the [source workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            2. **Review each change** carefully - automated fixes may need adjustment
+            3. **Test the build** locally before merging
+            4. **Verify functionality** - especially for memory and security fixes
+            
+            ### Agent Instructions
+            
+            An agent can be triggered to apply fixes by:
+            1. Adding the label `agent-fix-needed` to this PR
+            2. The agent will use the instructions in this PR to apply fixes
+            
+            <details>
+            <summary>Agent Prompt</summary>
+            
+            ```markdown
+            $(cat agent-prompt.md)
+            ```
+            </details>
+            
+            ### Evaluation Report Summary
+            
+            <details>
+            <summary>View Report</summary>
+            
+            ```json
+            $(cat evaluation-report.json | jq '.')
+            ```
+            </details>
+            
+            ---
+            
+            *Note: This PR provides the context for an agent to fix the issues. The agent should be triggered manually by adding the appropriate label.*
+          labels: |
+            auto-fix
+            bot
+            code-quality
+          draft: false
+      
+      - name: Upload agent files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-instructions
+          path: |
+            agent-prompt.md
+            fix-instructions.md
+            evaluation-report.json
