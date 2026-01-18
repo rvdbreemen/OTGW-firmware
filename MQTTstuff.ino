@@ -524,7 +524,8 @@ void sendMQTT(const char* topic, const char *json, const size_t len)
 void resetMQTTBufferSize()
 {
   if (!settingMQTTenable) return;
-  MQTTclient.setBufferSize(256);
+  // Intentionally left as a no-op to maintain a static MQTT buffer size and
+  // avoid heap fragmentation from repeated buffer resizing.
 }
 //===========================================================================================
 bool getMQTTConfigDone(const uint8_t MSGid)
