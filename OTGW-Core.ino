@@ -1743,7 +1743,7 @@ void processOT(const char *buf, int len){
     checkOTGWcmdqueue(buf, len);
     Debugln(buf);
     // Filter out PR: responses (internal version queries) from MQTT broadcast
-    if (buf[0] != 'P' || buf[1] != 'R') {
+    if (!(buf[0] == 'P' && buf[1] == 'R' && buf[2] == ':')) {
       sendMQTTData(F("event_report"), buf);
     }
   } else if (strcmp_P(buf, PSTR("NG")) == 0) {
