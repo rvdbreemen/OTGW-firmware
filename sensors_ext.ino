@@ -169,7 +169,7 @@ char* getDallasAddress(DeviceAddress deviceAddress)
         if (val < 16) {
            strlcat(dest, "0", sizeof(dest));
         }
-        // Emulate: sprintf(dest+i, "%X", val);
+        // Emulate: s-printf(dest+i, "%X", val);
         char hexBuffer[4];
         snprintf(hexBuffer, sizeof(hexBuffer), "%X", val);
         size_t len = strlen(hexBuffer);

@@ -14,11 +14,10 @@
 #include <ctype.h>
 #include <pgmspace.h>
 
-// Enable MQTT streaming mode for auto-discovery to reduce heap fragmentation
-// When enabled, large auto-discovery messages are sent in chunks instead of
-// requiring a large buffer resize. This prevents the 256→1200→256 buffer
-// resize cycle that causes heap fragmentation.
-// #define USE_MQTT_STREAMING_AUTODISCOVERY
+// MQTT Streaming Mode - ALWAYS ENABLED
+// Large auto-discovery messages are sent in 128-byte chunks instead of
+// requiring a large buffer resize. This prevents heap fragmentation on ESP8266.
+// Similar to ESPHome's chunked MQTT publishing strategy.
 
 #define MQTTDebugTln(...) ({ if (bDebugMQTT) DebugTln(__VA_ARGS__);    })
 #define MQTTDebugln(...)  ({ if (bDebugMQTT) Debugln(__VA_ARGS__);    })
@@ -169,10 +168,9 @@ void startMQTT()
 {
   if (!settingMQTTenable) return;
   
-  // FIXED BUFFER STRATEGY (The Pre-Allocated Obelisk)
-  // Allocate a large static buffer immediately and never change it.
-  // This consumes ~1.3KB RAM permanently but prevents heap fragmentation from constant reallocs.
-  MQTTclient.setBufferSize(1350); 
+  // Static buffer allocation to prevent heap fragmentation on ESP8266
+  // Allocates 1350 bytes permanently but avoids dynamic reallocation issues
+  MQTTclient.setBufferSize(1350);
   
   stateMQTT = MQTT_STATE_INIT;
   //setup for mqtt discovery
@@ -282,23 +280,16 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 
 //===========================================================================================
 // sendMQTT - streaming version for large messages (auto-discovery)
-// Sends the message in small chunks to avoid buffer reallocation
-// This prevents the 256→1200→256 buffer resize cycle that causes heap fragmentation
 //===========================================================================================
-#ifdef USE_MQTT_STREAMING_AUTODISCOVERY
-
+// sendMQTT - streaming version for large messages (auto-discovery)
+// Sends the message in small chunks to avoid buffer reallocation
+// This prevents heap fragmentation on ESP8266
+//===========================================================================================
 void sendMQTT(const char* topic, const char *json);
 
 // Forward declaration; implementation is provided later in this file
 void sendMQTTStreaming(const char* topic, const char *json, const size_t len);
-#else
 
-//===========================================================================================
-// sendMQTT - original version (uses full buffer)
-//===========================================================================================
-void sendMQTT(const char* topic, const char *json) {
-  sendMQTT(topic, json, strlen(json));
-}
 void handleMQTT() 
 {  
   if (!settingMQTTenable) return;
@@ -531,10 +522,8 @@ void sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
 * json:   <string> , payload to send
 */
 //===========================================================================================
-#ifdef USE_MQTT_STREAMING_AUTODISCOVERY
-
-// Streaming version - sends message in chunks to avoid buffer reallocation
-// This prevents the 256→1200→256 buffer resize cycle that causes heap fragmentation
+// Streaming version - sends message in 128-byte chunks to avoid buffer reallocation
+// This prevents heap fragmentation on ESP8266 (similar to ESPHome's approach)
 void sendMQTT(const char* topic, const char *json) {
   sendMQTTStreaming(topic, json, strlen(json));
 }
@@ -589,51 +578,31 @@ void sendMQTTStreaming(const char* topic, const char *json, const size_t len)
   feedWatchDog();
 } // sendMQTTStreaming()
 
-#else
-
-// Original version - uses full buffer (may cause buffer reallocation)
-void sendMQTT(const char* topic, const char *json) {
-  sendMQTT(topic, json, strlen(json));
-}
-
-void sendMQTT(const char* topic, const char *json, const size_t len) 
-{
-  if (!settingMQTTenable) return;
-  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
-  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
-  
-  // Check heap health before publishing
-  if (!canPublishMQTT()) {
-    // Message dropped due to low heap - canPublishMQTT() handles logging
-    return;
-  }
-  
-  MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settingMQTTbroker, settingMQTTbrokerPort, topic, json);
-
-  if (MQTTclient.beginPublish(topic, len, true)){
-    for (size_t i = 0; i<len; i++) {
-      if(!MQTTclient.write(json[i])) PrintMQTTError();
-    }  
-    MQTTclient.endPublish();
-  } else PrintMQTTError();
-
-  feedWatchDog();
-} // sendMQTT()
-
-#endif
-
 
 //===========================================================================================
-// void resetMQTTBufferSize() - REMOVED: Static Buffer Strategy
-// {
-//   if (!settingMQTTenable) return;
-//   // Optimization: Reduce heap fragmentation by avoiding excessive reallocs.
-//   // Only shrink if buffer is significantly larger than our standard working size (512).
-//   // Standard 256 was too small, causing reallocs on medium messages.
-//   if (MQTTclient.getBufferSize() > 768) { 
-//     MQTTclient.setBufferSize(512);
-//   }
-// }
+// resetMQTTBufferSize() - Static Buffer Strategy
+//
+// INTENTIONALLY A NO-OP to maintain static 1350-byte MQTT buffer allocation.
+//
+// Historical context:
+// - Originally shrunk buffer to 256 bytes after auto-discovery to "save RAM"
+// - This caused heap fragmentation through repeated realloc() calls on ESP8266
+// - Bot reviewer identified this as defeating the static buffer fix
+//
+// Current strategy:
+// - Buffer allocated once at startup (1350 bytes)
+// - NEVER resized during runtime = zero fragmentation
+// - MQTT streaming handles all message sizes efficiently
+// - Function kept as no-op for API compatibility with existing code
+//
+// Memory impact: 1350 bytes permanently allocated (acceptable trade-off for stability)
+//===========================================================================================
+void resetMQTTBufferSize()
+{
+  if (!settingMQTTenable) return;
+  // Intentionally empty - maintains static buffer, prevents heap fragmentation
+  // See function comment above for rationale
+}
 //===========================================================================================
 bool getMQTTConfigDone(const uint8_t MSGid)
 {
@@ -670,36 +639,27 @@ void clearMQTTConfigDone()
 }
 //===========================================================================================
 void doAutoConfigure(bool bForceAll){
-  // Refactored for Single-Pass Efficiency and Dynamic Buffer Resizing
+  // Option B: Function-Local Static Buffers (Zero Heap Allocation)
+  // Eliminates 2600 bytes transient heap allocation, adds 2600 bytes permanent static
+  // No mutex needed - function naturally non-reentrant
   
   if (!settingMQTTenable) return;
 
-  // 1. Allocate buffers on HEAP to save STATIC RAM during normal operation
-  char* sLine = new char[MQTT_CFG_LINE_MAX_LEN];
-  char* sTopic = new char[MQTT_TOPIC_MAX_LEN];
-  char* sMsg = new char[MQTT_MSG_MAX_LEN];
-  
-  // Check allocation success
-  if (!sLine || !sTopic || !sMsg) {
-     DebugTln(F("Error: Out of memory for AutoConfigure"));
-     if(sLine) delete[] sLine; 
-     if(sTopic) delete[] sTopic; 
-     if(sMsg) delete[] sMsg;
-     return;
-  }
+  // Function-local static buffers - allocated once, reused across calls
+  static char sLine[MQTT_CFG_LINE_MAX_LEN];
+  static char sTopic[MQTT_TOPIC_MAX_LEN];
+  static char sMsg[MQTT_MSG_MAX_LEN];
 
   // 2. Open File ONCE
   LittleFS.begin();
   if (!LittleFS.exists(F("/mqttha.cfg"))) {
     DebugTln(F("Error: configuration file not found.")); 
-    delete[] sLine; delete[] sTopic; delete[] sMsg;
     return;
   } 
 
   File fh = LittleFS.open(F("/mqttha.cfg"), "r");
   if (!fh) {
     DebugTln(F("Error: could not open configuration file.")); 
-    delete[] sLine; delete[] sTopic; delete[] sMsg;
     return;
   } 
 
@@ -744,8 +704,12 @@ void doAutoConfigure(bool bForceAll){
        if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_pub_topic%", MQTTPubNamespace)) continue;
        if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_sub_topic%", MQTTSubNamespace)) continue;
 
-       // Send retained message
-       sendMQTT(sTopic, sMsg, strlen(sMsg));
+       // Static buffer strategy: use MQTT streaming with fixed 1350-byte buffer
+       // No dynamic resizing - streaming handles arbitrarily large messages efficiently
+       size_t msgLen = strlen(sMsg);
+
+       // Send retained message (uses beginPublish/write/endPublish streaming)
+       sendMQTTStreaming(sTopic, sMsg, msgLen);
        
        doBackgroundTasks(); // Yield to network stack
     }
@@ -753,9 +717,9 @@ void doAutoConfigure(bool bForceAll){
 
   fh.close();
   
-  // Cleanup
-  // resetMQTTBufferSize(); // REMOVED: Static buffer strategy
-  delete[] sLine; delete[] sTopic; delete[] sMsg;
+  // Note: No buffer cleanup needed - static buffers persist across calls
+  // resetMQTTBufferSize() is a no-op for static buffer strategy
+  resetMQTTBufferSize();
   
   // Trigger Dallas configuration separately as it requires specific sensor addresses
   if (settingMQTTenable && (bForceAll || getMQTTConfigDone(OTGWdallasdataid))) {
@@ -791,22 +755,12 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
     return _result;
   } 
 
-  // Allocate buffers dynamically to save stack/static RAM
-  const size_t totalBufferSize = MQTT_MSG_MAX_LEN + MQTT_TOPIC_MAX_LEN + MQTT_CFG_LINE_MAX_LEN;
-  char* buffer = new char[totalBufferSize];
-  char* sMsg   = nullptr;
-  char* sTopic = nullptr;
-  char* sLine  = nullptr;
-
-  if (!buffer) {
-    DebugTln(F("Error: Out of memory in doAutoConfigureMsgid"));
-    return _result;
-  }
-
-  // Partition the single buffer into separate logical regions
-  sMsg   = buffer;
-  sTopic = sMsg + MQTT_MSG_MAX_LEN;
-  sLine  = sTopic + MQTT_TOPIC_MAX_LEN;
+  // Option B: Function-Local Static Buffers (Zero Heap Allocation)
+  // Single static buffer partitioned into 3 regions - allocated once, reused across calls
+  static char buffer[MQTT_MSG_MAX_LEN + MQTT_TOPIC_MAX_LEN + MQTT_CFG_LINE_MAX_LEN];
+  char* sMsg   = buffer;
+  char* sTopic = sMsg + MQTT_MSG_MAX_LEN;
+  char* sLine  = sTopic + MQTT_TOPIC_MAX_LEN;
   byte lineID = 39; // 39 is unused in OT protocol so is a safe value
 
   //Let's open the MQTT autoconfig file
@@ -816,7 +770,6 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
 
   if (!LittleFS.exists(F("/mqttha.cfg"))) {
     DebugTln(F("Error: configuration file not found.")); 
-    delete[] sMsg; delete[] sTopic; delete[] sLine;
     return _result;
   } 
 
@@ -824,7 +777,6 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
 
   if (!fh) {
     DebugTln(F("Error: could not open configuration file.")); 
-    delete[] sMsg; delete[] sTopic; delete[] sLine;
     return _result;
   } 
 
@@ -883,8 +835,10 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
     MQTTDebugf(PSTR("[%s]\r\n"), sMsg); 
     DebugFlush();
     
-    sendMQTT(sTopic, sMsg, strlen(sMsg));
-    // resetMQTTBufferSize(); // REMOVED: Static buffer strategy
+    // Static buffer strategy: use MQTT streaming with fixed 1350-byte buffer
+    // No dynamic resizing - streaming handles arbitrarily large messages efficiently
+    sendMQTTStreaming(sTopic, sMsg, strlen(sMsg));
+    resetMQTTBufferSize();  // No-op, kept for API compatibility
     _result = true;
 
     // TODO: enable this break if we are sure the old config dump method is no longer needed
@@ -893,10 +847,10 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
   } // while available()
   
   fh.close();
-  delete[] sMsg; delete[] sTopic; delete[] sLine;
-
-  // HA discovery msg's are rather large, reset the buffer size to release some memory
-  // resetMQTTBufferSize(); // REMOVED: Static buffer strategy
+  
+  // Note: No buffer cleanup needed - static buffer persists across calls
+  // resetMQTTBufferSize() is a no-op for static buffer strategy
+  resetMQTTBufferSize();
 
   return _result;
 

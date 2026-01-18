@@ -271,6 +271,134 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
   - **Critical source** for PIC firmware behavior and serial port communication documentation.
   - Consult this for any issues related to the PIC controller.
 
+## Code Review and Analysis Documentation
+
+When performing code reviews or analysis work, always preserve the documentation for historical reference.
+
+### Review Documentation Structure
+
+Store all review and analysis documentation in:
+```
+docs/reviews/YYYY-MM-DD_<review-name>/
+```
+
+Example: `docs/reviews/2026-01-17_dev-rc4-analysis/`
+
+### Required Metadata Header
+
+**MANDATORY**: All review documents MUST include a metadata header at the top:
+
+```markdown
+---
+# METADATA
+Document Title: [Descriptive title]
+Review Date: YYYY-MM-DD HH:MM:SS UTC
+Branch Reviewed: [source] → [target] (merge commit [hash])
+Target Version: [version number]
+Reviewer: [GitHub Copilot Advanced Agent / other]
+Document Type: [type]
+PR Branch: [branch name]
+Commit: [commit hash]
+Status: [COMPLETE/IN PROGRESS/etc.]
+---
+```
+
+### Document Types to Create
+
+1. **Main Review Document** (`*_REVIEW.md`)
+   - Complete technical analysis
+   - Issue-by-issue breakdown
+   - Code examples and explanations
+   - Security and memory safety assessment
+   - Testing recommendations
+
+2. **Executive Summary** (`REVIEW_SUMMARY.md`)
+   - High-level overview for decision-makers
+   - Priority matrix
+   - Risk assessment
+   - Quality metrics
+   - Merge recommendations
+
+3. **Action Checklist** (`ACTION_CHECKLIST.md`)
+   - Step-by-step implementation guide
+   - Copy/paste code snippets
+   - Verification commands
+   - Success criteria
+
+4. **Fix Documentation** (e.g., `HIGH_PRIORITY_FIXES.md`)
+   - Detailed fix suggestions
+   - Before/after code examples
+   - Implementation options
+
+5. **Review Index** (`REVIEW_INDEX.md`)
+   - Navigation hub
+   - Document selector by audience
+   - Quick reference guide
+
+6. **Archive README** (`README.md`)
+   - Overview of the review
+   - Summary of issues found and fixed
+   - Timeline of events
+   - How to use the archive
+
+### Workflow for Code Reviews
+
+1. **Perform Analysis**
+   - Analyze code changes thoroughly
+   - Identify issues by priority (Critical, High, Medium, Low)
+   - Document findings in structured format
+
+2. **Create Documentation**
+   - Create review directory: `docs/reviews/YYYY-MM-DD_<review-name>/`
+   - Generate all required documents with metadata headers
+   - Include version, branch, date/time in all documents
+
+3. **Apply Fixes** (if applicable)
+   - Implement fixes with minimal code changes
+   - Document each fix with rationale
+   - Update review documents to reflect fixes applied
+
+4. **Archive Documentation**
+   - Move all review documents to the archive directory
+   - Remove temporary/working documents from repository root
+   - Create comprehensive README.md for the archive
+   - Update main README.md if needed
+
+5. **Preservation**
+   - Never delete review archives
+   - Archives serve as historical reference
+   - Future reviews should reference previous ones when relevant
+
+### Example Structure
+
+```
+docs/reviews/
+├── 2026-01-17_dev-rc4-analysis/
+│   ├── README.md                    # Archive overview
+│   ├── DEV_RC4_BRANCH_REVIEW.md    # Complete analysis
+│   ├── REVIEW_SUMMARY.md           # Executive summary
+│   ├── ACTION_CHECKLIST.md         # Implementation steps
+│   ├── HIGH_PRIORITY_FIXES.md      # Detailed fixes
+│   └── REVIEW_INDEX.md             # Navigation
+└── YYYY-MM-DD_<next-review>/
+    └── ...
+```
+
+### Benefits
+
+- **Historical Context**: Future developers can understand past decisions
+- **Reproducibility**: Review methodology can be replicated
+- **Learning**: Patterns of issues can be identified over time
+- **Accountability**: Clear record of what was reviewed and fixed
+- **Knowledge Transfer**: New team members can learn from past reviews
+
+### Tools and References
+
+- Use evaluation framework: `python evaluate.py` (see EVALUATION.md)
+- Follow coding standards documented in this file
+- Reference previous reviews for consistency
+- Link to related PRs and commits in documentation
+
 ## Important Constraints
 
 - **Never** send debug output to Serial after OTGW initialization
