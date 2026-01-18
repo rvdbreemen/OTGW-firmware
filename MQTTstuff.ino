@@ -709,7 +709,7 @@ void doAutoConfigure(bool bForceAll){
        size_t msgLen = strlen(sMsg);
 
        // Send retained message (uses beginPublish/write/endPublish streaming)
-       sendMQTT(sTopic, sMsg, msgLen);
+       sendMQTTStreaming(sTopic, sMsg, msgLen);
        
        doBackgroundTasks(); // Yield to network stack
     }
@@ -837,7 +837,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
     
     // Static buffer strategy: use MQTT streaming with fixed 1350-byte buffer
     // No dynamic resizing - streaming handles arbitrarily large messages efficiently
-    sendMQTT(sTopic, sMsg, strlen(sMsg));
+    sendMQTTStreaming(sTopic, sMsg, strlen(sMsg));
     resetMQTTBufferSize();  // No-op, kept for API compatibility
     _result = true;
 

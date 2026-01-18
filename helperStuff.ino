@@ -626,12 +626,7 @@ static uint32_t mqttDropCount = 0;
 #define WARNING_LOG_INTERVAL_MS        10000  // Log warnings every 10 seconds
 #define EMERGENCY_RECOVERY_INTERVAL_MS 30000  // Attempt recovery max once per 30 seconds
 
-enum HeapHealthLevel {
-  HEAP_HEALTHY,       // > 8192 bytes: Normal operation
-  HEAP_LOW,           // 5120-8192 bytes: Start throttling
-  HEAP_WARNING,       // 3072-5120 bytes: Aggressive throttling
-  HEAP_CRITICAL       // < 3072 bytes: Stop non-essential operations
-};
+// HeapHealthLevel enum defined in OTGW-firmware.h
 
 //===========================================================================================
 // Check current heap health level
