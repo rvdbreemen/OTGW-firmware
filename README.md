@@ -78,6 +78,7 @@ The Web UI and APIs are designed for use on a trusted local network. Do not expo
 - Manage settings stored on LittleFS.
 - Perform PIC firmware maintenance (see warning below).
 - View a live OpenTherm message log stream and download logs (WebSocket-based).
+- **Stream logs directly to local files** using the File System Access API (Chrome/Edge/Opera desktop only) - see [Stream Logging.md](Stream%20Logging.md) for setup and technical details.
 - Track firmware upload/flash progress with size validation during updates.
 - Toggle a dark theme with per-browser persistence.
 - Supports reverse proxy deployments with automatic http/https detection for REST API and basic Web UI access; WebSocket-based features (such as the live OT message log) currently assume plain HTTP and may not work when accessed via an HTTPS reverse proxy.
