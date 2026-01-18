@@ -639,36 +639,27 @@ void clearMQTTConfigDone()
 }
 //===========================================================================================
 void doAutoConfigure(bool bForceAll){
-  // Refactored for Single-Pass Efficiency and Dynamic Buffer Resizing
+  // Option B: Function-Local Static Buffers (Zero Heap Allocation)
+  // Eliminates 2600 bytes transient heap allocation, adds 2600 bytes permanent static
+  // No mutex needed - function naturally non-reentrant
   
   if (!settingMQTTenable) return;
 
-  // 1. Allocate buffers on HEAP to save STATIC RAM during normal operation
-  char* sLine = new char[MQTT_CFG_LINE_MAX_LEN];
-  char* sTopic = new char[MQTT_TOPIC_MAX_LEN];
-  char* sMsg = new char[MQTT_MSG_MAX_LEN];
-  
-  // Check allocation success
-  if (!sLine || !sTopic || !sMsg) {
-     DebugTln(F("Error: Out of memory for AutoConfigure"));
-     if(sLine) delete[] sLine; 
-     if(sTopic) delete[] sTopic; 
-     if(sMsg) delete[] sMsg;
-     return;
-  }
+  // Function-local static buffers - allocated once, reused across calls
+  static char sLine[MQTT_CFG_LINE_MAX_LEN];
+  static char sTopic[MQTT_TOPIC_MAX_LEN];
+  static char sMsg[MQTT_MSG_MAX_LEN];
 
   // 2. Open File ONCE
   LittleFS.begin();
   if (!LittleFS.exists(F("/mqttha.cfg"))) {
     DebugTln(F("Error: configuration file not found.")); 
-    delete[] sLine; delete[] sTopic; delete[] sMsg;
     return;
   } 
 
   File fh = LittleFS.open(F("/mqttha.cfg"), "r");
   if (!fh) {
     DebugTln(F("Error: could not open configuration file.")); 
-    delete[] sLine; delete[] sTopic; delete[] sMsg;
     return;
   } 
 
@@ -726,11 +717,9 @@ void doAutoConfigure(bool bForceAll){
 
   fh.close();
   
-  // Cleanup - note: resetMQTTBufferSize() is now a no-op for static buffer strategy
+  // Note: No buffer cleanup needed - static buffers persist across calls
+  // resetMQTTBufferSize() is a no-op for static buffer strategy
   resetMQTTBufferSize();
-  delete[] sLine;   // Delete the individual allocated buffers
-  delete[] sTopic;
-  delete[] sMsg;
   
   // Trigger Dallas configuration separately as it requires specific sensor addresses
   if (settingMQTTenable && (bForceAll || getMQTTConfigDone(OTGWdallasdataid))) {
@@ -766,22 +755,12 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
     return _result;
   } 
 
-  // Allocate buffers dynamically to save stack/static RAM
-  const size_t totalBufferSize = MQTT_MSG_MAX_LEN + MQTT_TOPIC_MAX_LEN + MQTT_CFG_LINE_MAX_LEN;
-  char* buffer = new char[totalBufferSize];
-  char* sMsg   = nullptr;
-  char* sTopic = nullptr;
-  char* sLine  = nullptr;
-
-  if (!buffer) {
-    DebugTln(F("Error: Out of memory in doAutoConfigureMsgid"));
-    return _result;
-  }
-
-  // Partition the single buffer into separate logical regions
-  sMsg   = buffer;
-  sTopic = sMsg + MQTT_MSG_MAX_LEN;
-  sLine  = sTopic + MQTT_TOPIC_MAX_LEN;
+  // Option B: Function-Local Static Buffers (Zero Heap Allocation)
+  // Single static buffer partitioned into 3 regions - allocated once, reused across calls
+  static char buffer[MQTT_MSG_MAX_LEN + MQTT_TOPIC_MAX_LEN + MQTT_CFG_LINE_MAX_LEN];
+  char* sMsg   = buffer;
+  char* sTopic = sMsg + MQTT_MSG_MAX_LEN;
+  char* sLine  = sTopic + MQTT_TOPIC_MAX_LEN;
   byte lineID = 39; // 39 is unused in OT protocol so is a safe value
 
   //Let's open the MQTT autoconfig file
@@ -791,7 +770,6 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
 
   if (!LittleFS.exists(F("/mqttha.cfg"))) {
     DebugTln(F("Error: configuration file not found.")); 
-    delete[] buffer;  // Fix: delete the single allocated buffer, not the partitions
     return _result;
   } 
 
@@ -799,7 +777,6 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
 
   if (!fh) {
     DebugTln(F("Error: could not open configuration file.")); 
-    delete[] buffer;  // Fix: delete the single allocated buffer, not the partitions
     return _result;
   } 
 
@@ -870,9 +847,9 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
   } // while available()
   
   fh.close();
-  delete[] buffer;  // Fix: delete the single allocated buffer, not the partitions
-
-  // HA discovery msg's are rather large, reset the buffer size to release some memory
+  
+  // Note: No buffer cleanup needed - static buffer persists across calls
+  // resetMQTTBufferSize() is a no-op for static buffer strategy
   resetMQTTBufferSize();
 
   return _result;
