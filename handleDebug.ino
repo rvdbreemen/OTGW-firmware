@@ -7,15 +7,42 @@ void handleDebug(){
             case 'h':
                 Debugln();
                 Debugln(F("---===[ Debug Help Menu ]===---"));
+                Debugf(PSTR("ESP Firmware: %s\r\n"), _VERSION);
+                Debugf(PSTR("PIC: %s | Type: %s | Version: %s\r\n"), sPICdeviceid, sPICtype, sPICfwversion);
+                Debugln();
+                Debugln(F("--- Status ---"));
+                Debugf(PSTR("WiFi: %s | MQTT: %s | OTGW: %s\r\n"), 
+                    (WiFi.status() == WL_CONNECTED) ? "Connected" : "Disconnected",
+                    CBOOLEAN(statusMQTTconnection),
+                    CBOOLEAN(bOTGWonline));
+                Debugf(PSTR("Thermostat: %s | Boiler: %s | Gateway: %s\r\n"), 
+                    CBOOLEAN(bOTGWthermostatstate),
+                    CBOOLEAN(bOTGWboilerstate),
+                    CBOOLEAN(bOTGWgatewaystate));
+                Debugf(PSTR("CH Temp: %.1f°C | Room Temp: %.1f°C | Setpoint: %.1f°C\r\n"),
+                    OTcurrentSystemState.Tboiler,
+                    OTcurrentSystemState.Tr,
+                    OTcurrentSystemState.TrSet);
+                Debugln();
                 Debugf(PSTR("1) Toggle debuglog - OT message parsing: %s\r\n"), CBOOLEAN(bDebugOTmsg));
                 Debugf(PSTR("2) Toggle debuglog - API handeling: %s\r\n"), CBOOLEAN(bDebugRestAPI));
                 Debugf(PSTR("3) Toggle debuglog - MQTT module: %s\r\n"), CBOOLEAN(bDebugMQTT));
                 Debugf(PSTR("4) Toggle debuglog - Sensor modules: %s\r\n"), CBOOLEAN(bDebugSensors));
-                Debugln(F("q) Force read settings"));
-                Debugln(F("m) Force MQTT discovery"));
+                Debugln(F("--- Commands ---"));
+                Debugln(F("q/k) Force read settings"));
+                Debugln(F("m) Force MQTT discovery (seen messages only)"));
+                Debugln(F("F) Force MQTT discovery for ALL message IDs"));
                 Debugln(F("r) Reconnect wifi, telnet, otgwstream and mqtt"));
                 Debugln(F("p) Reset PIC manually"));
                 Debugln(F("a) Send PR=A command to ID PIC firmware version and type"));
+                Debugln(F("--- GPIO/Debug ---"));
+                Debugln(F("b) Blink LED 1 (5 times)"));
+                Debugln(F("i) Initialize relay outputs"));
+                Debugln(F("u) GPIO output ON"));
+                Debugln(F("o) GPIO output OFF"));
+                Debugln(F("j) Read GPIO output state"));
+                Debugln(F("l) Set MyDEBUG = true"));
+                Debugln(F("f) Show MyDEBUG status"));
                 Debugln();
                 break;
             case 'p':
@@ -41,6 +68,11 @@ void handleDebug(){
                 DebugTln(F("Configure MQTT Discovery"));
                 DebugTf(PSTR("Enable MQTT: %s\r\n"), CBOOLEAN(settingMQTTenable));
                 doAutoConfigure();
+                break;
+            case 'F':
+                DebugTln(F("Force MQTT Discovery for ALL message IDs"));
+                DebugTf(PSTR("Enable MQTT: %s\r\n"), CBOOLEAN(settingMQTTenable));
+                doAutoConfigure(true);
                 break;
             case 'r':   
                 if (WiFi.status() != WL_CONNECTED)
