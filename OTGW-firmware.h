@@ -74,7 +74,12 @@ inline const char* CSTR(char* x) { return x ? x : ""; }
 #define ETX ((uint8_t)0x04)
 
 // Forward declarations for heap monitoring (defined in helperStuff.ino)
-enum HeapHealthLevel;
+enum HeapHealthLevel {
+  HEAP_HEALTHY,
+  HEAP_LOW,
+  HEAP_WARNING,
+  HEAP_CRITICAL
+};
 HeapHealthLevel getHeapHealth();
 bool canSendWebSocket();
 bool canPublishMQTT();

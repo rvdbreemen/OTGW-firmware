@@ -147,7 +147,7 @@ Useful for CI/CD environments or when piping output.
 
 **Checks:**
 - README.md completeness
-- Build documentation (BUILD.md, FLASH_GUIDE.md)
+- Build documentation (BUILD.md)
 - Inline code comment ratio
 - Key sections present (Installation, Features, License)
 

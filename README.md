@@ -106,11 +106,11 @@ ESP8266 devices have limited RAM (~40KB available). Under heavy load (multiple W
 
 ### Documentation
 
-Technical guides included (42KB total):
-- `HEAP_OPTIMIZATION_SUMMARY.md` - Implementation details and testing
-- `LIBRARY_ANALYSIS.md` - Library internals and solutions
-- `MQTT_STREAMING_AUTODISCOVERY.md` - Optional streaming guide
-- `LARGE_BUFFER_ANALYSIS.md` - Buffer optimization analysis
+Technical guides archived:
+- [HEAP_OPTIMIZATION_SUMMARY.md](docs/reviews/2026-01-17_dev-rc4-analysis/HEAP_OPTIMIZATION_SUMMARY.md) - Implementation details and testing
+- [LIBRARY_ANALYSIS.md](docs/reviews/2026-01-17_dev-rc4-analysis/LIBRARY_ANALYSIS.md) - Library internals and solutions
+- [MQTT_STREAMING_AUTODISCOVERY.md](docs/reviews/2026-01-17_dev-rc4-analysis/MQTT_STREAMING_AUTODISCOVERY.md) - Optional streaming guide
+- [LARGE_BUFFER_ANALYSIS.md](docs/reviews/2026-01-17_dev-rc4-analysis/LARGE_BUFFER_ANALYSIS.md) - Buffer optimization analysis
 
 ## History and scope
 
@@ -130,7 +130,7 @@ Starting with hardware version 2.3, the included ESP8266 devkit changed from Nod
 ## Documentation and links
 
 - Wiki / documentation (recommended starting point): https://github.com/rvdbreemen/OTGW-firmware/wiki
-- **Flash guide** (platform-independent Python script): [FLASH_GUIDE.md](FLASH_GUIDE.md)
+- **Flash guide** (platform-independent Python script): [FLASH_GUIDE.md](docs/reviews/2026-01-17_dev-rc4-analysis/FLASH_GUIDE.md)
 - **Local build guide** (Windows/Mac): [BUILD.md](BUILD.md)
 - NodoShop OTGW product page: https://www.nodo-shop.nl/nl/opentherm-gateway/211-opentherm-gateway.html
 - Original OTGW project site (Schelte Bron): http://otgw.tclcode.com/
@@ -145,7 +145,7 @@ The exact steps and screenshots live in the wiki, but the general flow is:
    - **Easy method (recommended)**: Use the included `flash_esp.py` script:
      - `python3 flash_esp.py` - Downloads and flashes the latest release (default)
      - `python3 flash_esp.py --build` - Builds from source and flashes (for developers)
-     - See [FLASH_GUIDE.md](FLASH_GUIDE.md) for detailed instructions
+     - See [FLASH_GUIDE.md](docs/reviews/2026-01-17_dev-rc4-analysis/FLASH_GUIDE.md) for detailed instructions
    - **Manual method**: Follow the wiki instructions
 2. Connect the OTGW to your network and open the Web UI via `http://<device-ip>/`.
    If the device cannot connect, it starts a Wi-Fi configuration portal using an AP named `<hostname>-<mac>`.
