@@ -498,6 +498,19 @@ void sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
 * json:   <string> , payload to send
 */
 //===========================================================================================
+// MQTT Streaming Implementation
+// 
+// Uses PubSubClient's streaming API to minimize memory usage:
+// - beginPublish() allocates space for topic + protocol overhead only
+// - write() sends data byte-by-byte without additional buffering
+// - endPublish() finalizes the transmission
+//
+// Benefits:
+// - Static 1350-byte buffer is sufficient for all messages
+// - No dynamic reallocation = zero heap fragmentation
+// - Can handle arbitrarily large payloads by streaming
+// - Minimal RAM usage regardless of message size
+//===========================================================================================
 void sendMQTT(const char* topic, const char *json) {
   sendMQTT(topic, json, strlen(json));
 }
@@ -509,6 +522,7 @@ void sendMQTT(const char* topic, const char *json, const size_t len)
   if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
   MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settingMQTTbroker, settingMQTTbrokerPort, topic, json);
 
+  // Stream the message byte-by-byte to minimize buffer usage
   if (MQTTclient.beginPublish(topic, len, true)){
     for (size_t i = 0; i<len; i++) {
       if(!MQTTclient.write(json[i])) PrintMQTTError();
@@ -521,11 +535,28 @@ void sendMQTT(const char* topic, const char *json, const size_t len)
 
 
 //===========================================================================================
+// resetMQTTBufferSize() - Static Buffer Strategy
+//
+// INTENTIONALLY A NO-OP to maintain static 1350-byte MQTT buffer allocation.
+//
+// Historical context:
+// - Originally shrunk buffer to 256 bytes after auto-discovery to "save RAM"
+// - This caused heap fragmentation through repeated realloc() calls on ESP8266
+// - Bot reviewer identified this as defeating the static buffer fix
+//
+// Current strategy:
+// - Buffer allocated once at startup (1350 bytes)
+// - NEVER resized during runtime = zero fragmentation
+// - MQTT streaming handles all message sizes efficiently
+// - Function kept as no-op for API compatibility with existing code
+//
+// Memory impact: 1350 bytes permanently allocated (acceptable trade-off for stability)
+//===========================================================================================
 void resetMQTTBufferSize()
 {
   if (!settingMQTTenable) return;
-  // Intentionally left as a no-op to maintain a static MQTT buffer size and
-  // avoid heap fragmentation from repeated buffer resizing.
+  // Intentionally empty - maintains static buffer, prevents heap fragmentation
+  // See function comment above for rationale
 }
 //===========================================================================================
 bool getMQTTConfigDone(const uint8_t MSGid)
@@ -637,18 +668,11 @@ void doAutoConfigure(bool bForceAll){
        if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_pub_topic%", MQTTPubNamespace)) continue;
        if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_sub_topic%", MQTTSubNamespace)) continue;
 
-       // 5. CRITICAL FIX: Dynamic Buffer Resizing
+       // Static buffer strategy: use MQTT streaming with fixed 1350-byte buffer
+       // No dynamic resizing - streaming handles arbitrarily large messages efficiently
        size_t msgLen = strlen(sMsg);
-       size_t topicLen = strlen(sTopic);
-       uint16_t currentSize = MQTTclient.getBufferSize();
-       // Add some overhead for topic + protocol bytes
-       size_t requiredSize = msgLen + topicLen + 128;
-       if (currentSize < requiredSize) {
-          MQTTDebugTf(PSTR("Resizing MQTT buffer from %d to %d\r\n"), currentSize, requiredSize);
-          MQTTclient.setBufferSize(requiredSize);
-       }
 
-       // Send retained message
+       // Send retained message (uses beginPublish/write/endPublish streaming)
        sendMQTT(sTopic, sMsg, msgLen);
        
        doBackgroundTasks(); // Yield to network stack
@@ -657,9 +681,9 @@ void doAutoConfigure(bool bForceAll){
 
   fh.close();
   
-  // Cleanup
-  resetMQTTBufferSize(); // Shrink buffer back to save RAM
-  delete[] sLine; delete[] sTopic; delete[] sMsg;
+  // Cleanup - note: resetMQTTBufferSize() is now a no-op for static buffer strategy
+  resetMQTTBufferSize();
+  delete[] buffer;  // Delete the single allocated buffer, not the partitions
   
   // Trigger Dallas configuration separately as it requires specific sensor addresses
   if (settingMQTTenable && (bForceAll || getMQTTConfigDone(OTGWdallasdataid))) {
@@ -787,16 +811,10 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
     MQTTDebugf(PSTR("[%s]\r\n"), sMsg); 
     DebugFlush();
     
-    // CRITICAL FIX: Dynamic Buffer Resizing
-    size_t msgLen = strlen(sMsg);
-    uint16_t currentSize = MQTTclient.getBufferSize();
-    if (currentSize < (msgLen + 128)) {
-        MQTTDebugTf(PSTR("Resizing MQTT buffer from %d to %d\r\n"), currentSize, msgLen + 128);
-        MQTTclient.setBufferSize(msgLen + 128); 
-    }
-
+    // Static buffer strategy: use MQTT streaming with fixed 1350-byte buffer
+    // No dynamic resizing - streaming handles arbitrarily large messages efficiently
     sendMQTT(sTopic, sMsg, strlen(sMsg));
-    resetMQTTBufferSize();
+    resetMQTTBufferSize();  // No-op, kept for API compatibility
     _result = true;
 
     // TODO: enable this break if we are sure the old config dump method is no longer needed
