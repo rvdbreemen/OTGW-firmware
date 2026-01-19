@@ -125,8 +125,6 @@ static const char UpdateServerIndex[] PROGMEM =
          var lastUploadLoaded = 0;
          var lastUploadTotal = 0;
          var formErrorEl = document.getElementById('formError');
-         var onRebootCallback = null;
-         var waitingForReboot = false;
 
          function showProgressPage(title) {
            pageForm.style.display = 'none';
@@ -461,17 +459,6 @@ static const char UpdateServerIndex[] PROGMEM =
             
             ws.onopen = function() {
                 console.log('WS Connected');
-                // Failsafe: if we are waiting for reboot, and WS connects, device is UP
-                if (waitingForReboot) {
-                     console.log("WS connected during poll -> Device UP");
-                     waitingForReboot = false;
-                     // Prevent double-fire if pollHealth also succeeds at same time
-                     if (onRebootCallback) {
-                        var cb = onRebootCallback;
-                        onRebootCallback = null; // Clear it so pollHealth cannot use it
-                        startCountDown(cb);
-                     }
-                }
             };
             
             ws.onmessage = function(e) {
@@ -503,65 +490,6 @@ static const char UpdateServerIndex[] PROGMEM =
             };
         }
         setupWebSocket();
-
-        function rebootAndStart(callback) {
-            if (uploadInfoEl) uploadInfoEl.textContent = 'Rebooting...';
-            if (progressTitle) progressTitle.textContent = 'Rebooting ESP...';
-            
-            // Store callback for WS failsafe
-            onRebootCallback = callback;
-            waitingForReboot = true;
-
-            // 1. Reboot
-            fetch('/ReBoot', { method: 'GET' })
-               .catch(function(e) { console.log('Reboot fetch error (expected):', e); });
-            
-            // 2. Poll
-            setTimeout(function() { pollHealth(callback); }, 3000);
-        }
-        
-        function pollHealth(callback) {
-            // Check if we were stopped by WebSocket failsafe
-            if (!waitingForReboot) return;
-
-            if (uploadInfoEl) uploadInfoEl.textContent = 'Waiting for reboot...';
-            
-            fetch('/api/v1/health?t=' + Date.now())
-               .then(function(res) { 
-                   if (!res.ok) throw new Error(res.status);
-                   return res.json(); 
-               })
-               .then(function(json) {
-                   var data = json.health || json;
-                   // Re-check flag in case WS connected while we were fetching
-                   if (waitingForReboot && data.status === 'UP') {
-                       waitingForReboot = false;
-                       onRebootCallback = null; // Clear shared callback
-                       startCountDown(callback);
-                   } else if (waitingForReboot) {
-                       setTimeout(function() { pollHealth(callback); }, 1000);
-                   }
-               })
-               .catch(function(e) {
-                   console.log("Poll error:", e);
-                   if(waitingForReboot) setTimeout(function() { pollHealth(callback); }, 1000);
-               });
-        }
-        
-        function startCountDown(callback) {
-            var count = 3;
-            var timer = setInterval(function() {
-                if (progressTitle) progressTitle.textContent = 'Flashing in ' + count + '...';
-                if (uploadInfoEl) uploadInfoEl.textContent = 'ESP Online. Starting in ' + count + '...';
-                count--;
-                if (count < 0) {
-                    clearInterval(timer);
-                    if (progressTitle) progressTitle.textContent = 'Flashing in progress';
-                    callback();
-                }
-            }, 1000);
-        }
-
 
          function initUploadForm(formId, targetName) {
            var form = document.getElementById(formId);
