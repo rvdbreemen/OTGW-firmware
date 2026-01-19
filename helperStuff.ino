@@ -214,7 +214,7 @@ bool updateLittleFSStatus(const char *probePath)
   if (!LittleFSmounted) {
     return false;
   }
-  File probe = LittleFS.open(path, "a");
+  File probe = LittleFS.open(path, "w");
   if (probe) {
     probe.println(F("ok"));
     probe.flush();
