@@ -651,7 +651,7 @@ void sendHealth()
   sendNestedJsonObj(F("mqttconnected"), CBOOLEAN(statusMQTTconnection));
   sendNestedJsonObj(F("otgwconnected"), CBOOLEAN(bOTGWonline));
   sendNestedJsonObj(F("picavailable"), CBOOLEAN(bPICavailable));
-  sendNestedJsonObj(F("littlefsmounted"), CBOOLEAN(LittleFSmounted));
+  sendNestedJsonObj(F("littlefsMounted"), CBOOLEAN(LittleFSmounted));
   
   sendEndJsonObj(F("health"));
 
