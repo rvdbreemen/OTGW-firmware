@@ -225,10 +225,11 @@ static const char UpdateServerIndex[] PROGMEM =
           if (successMessageEl) successMessageEl.textContent = 'Flashing successful. Rebooting device...';
         }
 
-        function updateDeviceStatus(status) {
+         function updateDeviceStatus(status) {
           console.log('Device status:', status);
           if (!status) return;
           var state = status.state || 'idle';
+          var target = status.target || '';
           if (state !== 'idle') {
             showProgressPage('Flashing in progress');
           }
@@ -270,8 +271,13 @@ static const char UpdateServerIndex[] PROGMEM =
              if (!successShown) {
                successShown = true;
                if (successPanel) successPanel.style.display = 'block';
-               if (successMessageEl) successMessageEl.textContent = 'Flashing successful. Rebooting device...';
-               startSuccessCountdown();
+               if (target === 'filesystem') {
+                 if (successMessageEl) successMessageEl.textContent = 'Flashing successful. Preparing filesystem...';
+                 handleFilesystemFlashComplete();
+               } else {
+                 if (successMessageEl) successMessageEl.textContent = 'Flashing successful. Rebooting device...';
+                 startSuccessCountdown();
+               }
              }
              stopPolling();
              
@@ -299,7 +305,7 @@ static const char UpdateServerIndex[] PROGMEM =
            }
          }
 
-        function fetchStatus(timeoutMs) {
+         function fetchStatus(timeoutMs) {
           var controller = null;
           var timeoutId = null;
           var options = { cache: 'no-store' };
@@ -323,6 +329,88 @@ static const char UpdateServerIndex[] PROGMEM =
             .finally(function() {
               if (timeoutId) clearTimeout(timeoutId);
             });
+        }
+
+        function handleFilesystemFlashComplete() {
+          setTimeout(function() {
+            pollHealthForFilesystem()
+              .then(function() {
+                return restoreSettingsFromStorage();
+              })
+              .then(function() {
+                if (successMessageEl) successMessageEl.textContent = 'Settings restored. Rebooting device...';
+                return rebootDevice();
+              })
+              .catch(function(err) {
+                console.log('Filesystem restore flow error:', err);
+                if (successMessageEl) successMessageEl.textContent = 'Restore failed. Rebooting device...';
+                rebootDevice();
+                // Fallback: reload page after 5 seconds if reboot doesn't happen
+                setTimeout(function() {
+                  window.location.reload();
+                }, 5000);
+              });
+          }, 500);
+        }
+
+        function pollHealthForFilesystem() {
+          var maxAttempts = 60;  // 60 attempts * 500ms = 30 seconds timeout
+          var attempt = 0;
+          return new Promise(function(resolve, reject) {
+            var poll = function() {
+              attempt += 1;
+              fetch('/api/v1/health?t=' + Date.now(), { cache: 'no-store' })
+                .then(function(res) { return res.json(); })
+                .then(function(json) {
+                  var data = json.health || json;
+                  var fsMounted = data.littlefsmounted || data.littlefsMounted || data.filesystemmounted;
+                  if (data.status === 'UP' && fsMounted) {
+                    if (successMessageEl) successMessageEl.textContent = 'Filesystem mounted. Restoring settings...';
+                    resolve();
+                    return;
+                  }
+                  if (attempt >= maxAttempts) {
+                    reject(new Error('Filesystem not mounted'));
+                    return;
+                  }
+                  setTimeout(poll, 500);
+                })
+                .catch(function(err) {
+                  if (attempt >= maxAttempts) {
+                    reject(err);
+                    return;
+                  }
+                  setTimeout(poll, 500);
+                });
+            };
+            poll();
+          });
+        }
+
+        function restoreSettingsFromStorage() {
+          var saved = localStorage.getItem('saved_settings_ini');
+          if (!saved) {
+            if (successMessageEl) successMessageEl.textContent = 'No saved settings found. Rebooting...';
+            return Promise.resolve();
+          }
+          var formData = new FormData();
+          var blob = new Blob([saved], { type: 'text/plain' });
+          formData.append('file', blob, 'settings.ini');
+          return fetch('/upload', {
+            method: 'POST',
+            body: formData
+          }).then(function(response) {
+            if (response.ok || response.status === 303) {
+              localStorage.removeItem('saved_settings_ini');
+              return;
+            }
+            throw new Error('Settings upload failed: ' + response.status);
+          });
+        }
+
+        function rebootDevice() {
+          return fetch('/ReBoot', { method: 'GET' })
+            .catch(function(e) { console.log('Reboot fetch error (expected):', e); });
         }
 
         function scheduleNextPoll(delayMs) {
@@ -471,12 +559,15 @@ static const char UpdateServerIndex[] PROGMEM =
                              };
                              reader.readAsText(blob);
 
-                             // 2. Trigger Download
+                             // 2. Trigger Download with unique filename
+                             var now = new Date();
+                             var stamp = now.toISOString().replace(/[:.]/g, '-');
+                             var filename = 'settings-' + stamp + '.ini';
                              var url = window.URL.createObjectURL(blob);
                              var a = document.createElement('a');
                              a.style.display = 'none';
                              a.href = url;
-                             a.download = 'settings.ini';
+                             a.download = filename;
                              document.body.appendChild(a);
                              a.click();
                              window.URL.revokeObjectURL(url);
@@ -541,8 +632,11 @@ static const char UpdateServerIndex[] PROGMEM =
                      xhr.send(new FormData(form));
                  };
 
-                 // Start upload immediately without rebooting first
-                 performUpload();
+                 if (formId === 'fsForm') {
+                     performUpload();
+                 } else {
+                     rebootAndStart(performUpload);
+                 }
              }).catch(function(e) {
                  errorEl.textContent = 'Cancelled';
                  if (retryBtn) retryBtn.style.display = 'block';

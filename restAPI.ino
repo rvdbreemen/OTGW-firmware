@@ -643,13 +643,15 @@ void sendHealth()
 {
   sendStartJsonObj(F("health"));
 
-  sendNestedJsonObj(F("status"), F("UP"));
+  updateLittleFSStatus(F("/.health"));
+  sendNestedJsonObj(F("status"), LittleFSmounted ? F("UP") : F("DEGRADED"));
   sendNestedJsonObj(F("uptime"), upTime());
   sendNestedJsonObj(F("heap"), ESP.getFreeHeap());
   sendNestedJsonObj(F("wifirssi"), WiFi.RSSI());
   sendNestedJsonObj(F("mqttconnected"), CBOOLEAN(statusMQTTconnection));
   sendNestedJsonObj(F("otgwconnected"), CBOOLEAN(bOTGWonline));
   sendNestedJsonObj(F("picavailable"), CBOOLEAN(bPICavailable));
+  sendNestedJsonObj(F("littlefsMounted"), CBOOLEAN(LittleFSmounted));
   
   sendEndJsonObj(F("health"));
 
