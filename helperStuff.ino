@@ -209,11 +209,22 @@ uint32_t updateRebootCount()
 
 bool updateLittleFSStatus(const char *probePath)
 {
-  const char *path = probePath ? probePath : "/.health";
+  // Default probe path stored in PROGMEM
+  static const char defaultPath[] PROGMEM = "/.health";
+  const char *path = probePath ? probePath : defaultPath;
+  
   LittleFSmounted = LittleFS.info(LittleFSinfo);
   if (!LittleFSmounted) {
     return false;
   }
+  
+  // Need to handle PROGMEM string for LittleFS.open
+  char pathBuffer[32];
+  if (path == defaultPath) {
+    strcpy_P(pathBuffer, defaultPath);
+    path = pathBuffer;
+  }
+  
   File probe = LittleFS.open(path, "w");
   if (probe) {
     size_t written = probe.println(F("ok"));
@@ -228,6 +239,16 @@ bool updateLittleFSStatus(const char *probePath)
     LittleFSmounted = false;
   }
   return LittleFSmounted;
+}
+
+// PROGMEM overload for updateLittleFSStatus
+bool updateLittleFSStatus(const __FlashStringHelper *probePath)
+{
+  char pathBuffer[32];
+  PGM_P p = reinterpret_cast<PGM_P>(probePath);
+  strncpy_P(pathBuffer, p, sizeof(pathBuffer) - 1);
+  pathBuffer[sizeof(pathBuffer) - 1] = '\0';
+  return updateLittleFSStatus(pathBuffer);
 }
 
 bool updateRebootLog(String text)

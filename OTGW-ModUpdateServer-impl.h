@@ -28,12 +28,14 @@
 #include "StreamString.h"
 #include "Wire.h"
 #include "OTGW-ModUpdateServer.h"
-// External flag to track ESP flashing state
-extern bool isESPFlashing;
-extern bool LittleFSmounted;
+
+// External declarations
+extern bool isESPFlashing;          // ESP flashing state flag
+extern bool LittleFSmounted;        // LittleFS mount status (also declared above)
 extern void sendWebSocketJSON(const char *json);
-extern FSInfo LittleFSinfo;
+extern FSInfo LittleFSinfo;         // LittleFS filesystem information
 extern bool updateLittleFSStatus(const char *probePath);
+extern bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 
 #ifndef Debug
   //#warning Debug() was not defined!
@@ -131,6 +133,8 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           ESP.restart();
           delay(3000);
         } else {
+          // Ensure HTTP response is fully sent before unmounting filesystem
+          delay(100);
           LittleFS.end();
         }
       }
@@ -249,7 +253,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           if (_status.target == "filesystem") {
             LittleFSmounted = LittleFS.begin();
             if (LittleFSmounted) {
-              updateLittleFSStatus("/.ota_post");
+              updateLittleFSStatus(F("/.ota_post"));
             } else {
               // Ensure state is explicitly false and log failure for diagnostics
               LittleFSmounted = false;

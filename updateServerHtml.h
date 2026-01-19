@@ -347,12 +347,16 @@ static const char UpdateServerIndex[] PROGMEM =
                 console.log('Filesystem restore flow error:', err);
                 if (successMessageEl) successMessageEl.textContent = 'Restore failed. Rebooting device...';
                 rebootDevice();
+                // Fallback: reload page after 5 seconds if reboot doesn't happen
+                setTimeout(function() {
+                  window.location.reload();
+                }, 5000);
               });
           }, 500);
         }
 
         function pollHealthForFilesystem() {
-          var maxAttempts = 30;
+          var maxAttempts = 60;  // 60 attempts * 500ms = 30 seconds timeout
           var attempt = 0;
           return new Promise(function(resolve, reject) {
             var poll = function() {
