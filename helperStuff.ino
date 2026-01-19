@@ -207,6 +207,9 @@ uint32_t updateRebootCount()
   return _reboot;
 }
 
+// Maximum length for filesystem probe paths
+#define FS_PROBE_PATH_MAX 32
+
 bool updateLittleFSStatus(const char *probePath)
 {
   // Default probe path stored in PROGMEM
@@ -219,7 +222,7 @@ bool updateLittleFSStatus(const char *probePath)
   }
   
   // Need to handle PROGMEM string for LittleFS.open
-  char pathBuffer[32];
+  char pathBuffer[FS_PROBE_PATH_MAX];
   if (path == defaultPath) {
     strncpy_P(pathBuffer, defaultPath, sizeof(pathBuffer) - 1);
     pathBuffer[sizeof(pathBuffer) - 1] = '\0';
@@ -245,7 +248,7 @@ bool updateLittleFSStatus(const char *probePath)
 // PROGMEM overload for updateLittleFSStatus
 bool updateLittleFSStatus(const __FlashStringHelper *probePath)
 {
-  char pathBuffer[32];
+  char pathBuffer[FS_PROBE_PATH_MAX];
   PGM_P p = reinterpret_cast<PGM_P>(probePath);
   strncpy_P(pathBuffer, p, sizeof(pathBuffer) - 1);
   pathBuffer[sizeof(pathBuffer) - 1] = '\0';
