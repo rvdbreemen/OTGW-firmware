@@ -643,7 +643,7 @@ void sendHealth()
 {
   sendStartJsonObj(F("health"));
 
-  updateLittleFSStatus("/.health");
+  updateLittleFSStatus(F("/.health"));
   sendNestedJsonObj(F("status"), LittleFSmounted ? F("UP") : F("DEGRADED"));
   sendNestedJsonObj(F("uptime"), upTime());
   sendNestedJsonObj(F("heap"), ESP.getFreeHeap());
