@@ -106,6 +106,9 @@ uint32_t    rebootCount = 0;
 char        sMessage[257] = "";    
 uint32_t    MQTTautoConfigMap[8] = { 0 };
 bool        isESPFlashing = false;  // Flag to disable background tasks during ESP firmware flash
+bool        isSettingsUploadPending = false;  // Wait for settings.ini restore after filesystem flash
+uint32_t    settingsUploadWaitStartMs = 0;
+const uint32_t SETTINGS_UPLOAD_WAIT_MS = 120000; // 2 minutes max wait for settings.ini upload
 
 //Use acetime
 using namespace ace_time;

@@ -632,11 +632,7 @@ static const char UpdateServerIndex[] PROGMEM =
                      xhr.send(new FormData(form));
                  };
 
-                 if (formId === 'fsForm') {
-                     performUpload();
-                 } else {
-                     rebootAndStart(performUpload);
-                 }
+                 performUpload();
              }).catch(function(e) {
                  errorEl.textContent = 'Cancelled';
                  if (retryBtn) retryBtn.style.display = 'block';
