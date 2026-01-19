@@ -24,12 +24,16 @@
 #include <WiFiUdp.h>
 #include <flash_hal.h>
 #include <FS.h>
+#include <LittleFS.h>
 #include "StreamString.h"
 #include "Wire.h"
 #include "OTGW-ModUpdateServer.h"
 // External flag to track ESP flashing state
 extern bool isESPFlashing;
+extern bool LittleFSmounted;
 extern void sendWebSocketJSON(const char *json);
+extern FSInfo LittleFSinfo;
+extern bool updateLittleFSStatus(const char *probePath);
 
 #ifndef Debug
   //#warning Debug() was not defined!
@@ -122,9 +126,13 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _server->client().setNoDelay(true);
         _server->send_P(200, PSTR("text/html"), _serverSuccess);
         _server->client().stop();
-        delay(1000);
-        ESP.restart();
-        delay(3000);
+        if (_status.target != "filesystem") {
+          delay(1000);
+          ESP.restart();
+          delay(3000);
+        } else {
+          LittleFS.end();
+        }
       }
     },[&](){
       // handler for the file upload, get's the sketch bytes, and writes
@@ -176,6 +184,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         if (upload.name == F("filesystem")) {
           size_t fsSize = ((size_t) &_FS_end - (size_t) &_FS_start);
           close_all_fs();
+          LittleFS.end();
           if (uploadTotal > 0 && uploadTotal > fsSize) {
             _updaterError = F("filesystem image too large");
             _setStatus(UPDATE_ERROR, "filesystem", 0, uploadTotal, upload.filename, _updaterError);
@@ -237,6 +246,13 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           }
           _setStatus(UPDATE_END, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, emptyString);
           
+          if (_status.target == "filesystem") {
+            LittleFSmounted = LittleFS.begin();
+            if (LittleFSmounted) {
+              updateLittleFSStatus("/.ota_post");
+            }
+          }
+
           // Clear global flag - flash completed successfully
           ::isESPFlashing = false;
         } else {

@@ -207,6 +207,24 @@ uint32_t updateRebootCount()
   return _reboot;
 }
 
+bool updateLittleFSStatus(const char *probePath)
+{
+  const char *path = probePath ? probePath : "/.health";
+  LittleFSmounted = LittleFS.info(LittleFSinfo);
+  if (!LittleFSmounted) {
+    return false;
+  }
+  File probe = LittleFS.open(path, "a");
+  if (probe) {
+    probe.println(F("ok"));
+    probe.flush();
+    probe.close();
+  } else {
+    LittleFSmounted = false;
+  }
+  return LittleFSmounted;
+}
+
 bool updateRebootLog(String text)
 {
   #define REBOOTLOG_FILE "/reboot_log.txt"
