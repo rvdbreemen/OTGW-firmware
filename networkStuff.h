@@ -113,7 +113,7 @@ time_t NtpLastSync = 0; //last sync moment in EPOCH seconds
 ESP8266WebServer        httpServer (80);
 ESP8266HTTPUpdateServer httpUpdater(true);
 
-static      FSInfo LittleFSinfo;
+FSInfo LittleFSinfo;
 bool        LittleFSmounted; 
 bool        isConnected = false;
 

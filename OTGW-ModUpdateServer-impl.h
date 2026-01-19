@@ -31,6 +31,9 @@
 
 // External declarations
 extern bool isESPFlashing;          // ESP flashing state flag
+extern bool isSettingsUploadPending; // settings.ini upload wait flag
+extern uint32_t settingsUploadWaitStartMs;
+extern const uint32_t SETTINGS_UPLOAD_WAIT_MS;
 extern bool LittleFSmounted;        // LittleFS mount status flag
 extern void sendWebSocketJSON(const char *json);
 extern FSInfo LittleFSinfo;         // LittleFS filesystem information
@@ -48,27 +51,6 @@ extern bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 
 namespace esp8266httpupdateserver {
 using namespace esp8266webserver;
-
-/**
-static const char serverIndex2[] PROGMEM =
-  R"(<html charset="UTF-8">
-     <body>
-     <h1>ESP8266 Flash utility</h1>
-     <form method='POST' action='?cmd=0' enctype='multipart/form-data'>
-        <input type='hidden' name='cmd' value='0'>
-                  <input type='file' accept='ino.bin' name='update'>
-                  <input type='submit' value='Flash Firmware'>
-      </form>
-      <form method='POST' action='?cmd=100' enctype='multipart/form-data'> 
-        <input type='hidden' name='cmd' value='100'>
-                  <input type='file' accept='LittleFS.bin' name='update'>
-                  <input type='submit' value='Flash LittleFS'>
-      </form>
-     </html>)";
-
-static const char successResponse[] PROGMEM = 
-  "<META http-equiv=\"refresh\" content=\"15;URL=/\">Update <b>Success</b>!<br>Wait for DSMR-logger to reboot...";
-**/
 
 template <typename ServerType>
 ESP8266HTTPUpdateServerTemplate<ServerType>::ESP8266HTTPUpdateServerTemplate(bool serial_debug)
@@ -259,6 +241,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
               LittleFSmounted = false;
               Debugln(F("LittleFS mount failed after filesystem OTA update"));
             }
+            isSettingsUploadPending = true;
+            settingsUploadWaitStartMs = millis();
+            Debugln(F("Filesystem update complete; waiting for settings.ini upload"));
           }
 
           // Clear global flag - flash completed successfully

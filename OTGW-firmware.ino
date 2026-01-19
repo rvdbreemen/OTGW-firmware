@@ -314,10 +314,16 @@ void doBackgroundTasks()
     // During ESP firmware flash, keep essential services but skip heavy background tasks
     // Keep: HTTP server (upload chunks), Telnet (debug), MDNS (network discovery)
     // Skip: MQTT, OTGW, WebSocket logs, NTP to reduce interference
-    if (isESPFlashing) {
+    if (isESPFlashing || isSettingsUploadPending) {
       handleDebug();              // Keep telnet debug active for monitoring
       httpServer.handleClient();  // MUST continue - processes upload chunks
       MDNS.update();              // Keep MDNS active for network discovery
+      if (isSettingsUploadPending) {
+        if ((millis() - settingsUploadWaitStartMs) >= SETTINGS_UPLOAD_WAIT_MS) {
+          isSettingsUploadPending = false;
+          DebugTln(F("Settings.ini upload wait timed out"));
+        }
+      }
       delay(1);
       return;
     }

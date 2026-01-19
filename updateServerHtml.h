@@ -632,7 +632,6 @@ static const char UpdateServerIndex[] PROGMEM =
                      xhr.send(new FormData(form));
                  };
 
-                 // Start upload immediately without rebooting first
                  performUpload();
              }).catch(function(e) {
                  errorEl.textContent = 'Cancelled';
