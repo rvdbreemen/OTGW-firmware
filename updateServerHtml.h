@@ -402,7 +402,7 @@ static const char UpdateServerIndex[] PROGMEM =
               localStorage.removeItem('saved_settings_ini');
               return;
             }
-            throw new Error('Settings upload failed');
+            throw new Error('Settings upload failed: ' + response.status);
           });
         }
 
