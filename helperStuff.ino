@@ -214,19 +214,22 @@ bool updateLittleFSStatus(const char *probePath)
 {
   // Default probe path stored in PROGMEM
   static const char defaultPath[] PROGMEM = "/.health";
-  const char *path = probePath ? probePath : defaultPath;
+  bool useDefault = (probePath == nullptr);
   
   LittleFSmounted = LittleFS.info(LittleFSinfo);
   if (!LittleFSmounted) {
     return false;
   }
   
-  // Need to handle PROGMEM string for LittleFS.open
+  // Handle PROGMEM string for default path or use provided path
   char pathBuffer[FS_PROBE_PATH_MAX];
-  if (path == defaultPath) {
+  const char *path;
+  if (useDefault) {
     strncpy_P(pathBuffer, defaultPath, sizeof(pathBuffer) - 1);
     pathBuffer[sizeof(pathBuffer) - 1] = '\0';
     path = pathBuffer;
+  } else {
+    path = probePath;
   }
   
   File probe = LittleFS.open(path, "w");
