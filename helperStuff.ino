@@ -221,7 +221,8 @@ bool updateLittleFSStatus(const char *probePath)
   // Need to handle PROGMEM string for LittleFS.open
   char pathBuffer[32];
   if (path == defaultPath) {
-    strcpy_P(pathBuffer, defaultPath);
+    strncpy_P(pathBuffer, defaultPath, sizeof(pathBuffer) - 1);
+    pathBuffer[sizeof(pathBuffer) - 1] = '\0';
     path = pathBuffer;
   }
   

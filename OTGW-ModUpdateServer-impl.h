@@ -31,7 +31,7 @@
 
 // External declarations
 extern bool isESPFlashing;          // ESP flashing state flag
-extern bool LittleFSmounted;        // LittleFS mount status (also declared above)
+extern bool LittleFSmounted;        // LittleFS mount status flag
 extern void sendWebSocketJSON(const char *json);
 extern FSInfo LittleFSinfo;         // LittleFS filesystem information
 extern bool updateLittleFSStatus(const char *probePath);
