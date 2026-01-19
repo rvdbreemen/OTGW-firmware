@@ -250,6 +250,10 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
             LittleFSmounted = LittleFS.begin();
             if (LittleFSmounted) {
               updateLittleFSStatus("/.ota_post");
+            } else {
+              // Ensure state is explicitly false and log failure for diagnostics
+              LittleFSmounted = false;
+              Debugln(F("LittleFS mount failed after filesystem OTA update"));
             }
           }
 
