@@ -216,8 +216,13 @@ bool updateLittleFSStatus(const char *probePath)
   }
   File probe = LittleFS.open(path, "w");
   if (probe) {
-    probe.println(F("ok"));
-    probe.flush();
+    size_t written = probe.println(F("ok"));
+    if (written == 0) {
+      // Write failed (e.g. disk full or filesystem error)
+      LittleFSmounted = false;
+    } else {
+      probe.flush();
+    }
     probe.close();
   } else {
     LittleFSmounted = false;
