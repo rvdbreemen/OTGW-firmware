@@ -207,13 +207,31 @@ uint32_t updateRebootCount()
   return _reboot;
 }
 
+// Maximum length for filesystem probe paths
+#define FS_PROBE_PATH_MAX 32
+
 bool updateLittleFSStatus(const char *probePath)
 {
-  const char *path = probePath ? probePath : "/.health";
+  // Default probe path stored in PROGMEM
+  static const char defaultPath[] PROGMEM = "/.health";
+  bool useDefault = (probePath == nullptr);
+  
   LittleFSmounted = LittleFS.info(LittleFSinfo);
   if (!LittleFSmounted) {
     return false;
   }
+  
+  // Handle PROGMEM string for default path or use provided path
+  char pathBuffer[FS_PROBE_PATH_MAX];
+  const char *path;
+  if (useDefault) {
+    strncpy_P(pathBuffer, defaultPath, sizeof(pathBuffer) - 1);
+    pathBuffer[sizeof(pathBuffer) - 1] = '\0';
+    path = pathBuffer;
+  } else {
+    path = probePath;
+  }
+  
   File probe = LittleFS.open(path, "w");
   if (probe) {
     size_t written = probe.println(F("ok"));
@@ -228,6 +246,16 @@ bool updateLittleFSStatus(const char *probePath)
     LittleFSmounted = false;
   }
   return LittleFSmounted;
+}
+
+// PROGMEM overload for updateLittleFSStatus
+bool updateLittleFSStatus(const __FlashStringHelper *probePath)
+{
+  char pathBuffer[FS_PROBE_PATH_MAX];
+  PGM_P p = reinterpret_cast<PGM_P>(probePath);
+  strncpy_P(pathBuffer, p, sizeof(pathBuffer) - 1);
+  pathBuffer[sizeof(pathBuffer) - 1] = '\0';
+  return updateLittleFSStatus(pathBuffer);
 }
 
 bool updateRebootLog(String text)
