@@ -87,6 +87,7 @@ void logHeapStats();
 void emergencyHeapRecovery();
 void resetMQTTBufferSize();
 bool updateLittleFSStatus(const char *probePath = nullptr);
+bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 
 //prototype
 void sendMQTTData(const char*, const char*, const bool = false);
