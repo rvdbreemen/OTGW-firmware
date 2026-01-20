@@ -393,19 +393,37 @@ static const char UpdateServerIndex[] PROGMEM =
             if (successMessageEl) successMessageEl.textContent = 'No saved settings found. Rebooting...';
             return Promise.resolve();
           }
-          var formData = new FormData();
-          var blob = new Blob([saved], { type: 'text/plain' });
-          formData.append('file', blob, 'settings.ini');
-          return fetch('/upload', {
-            method: 'POST',
-            body: formData
-          }).then(function(response) {
-            if (response.ok || response.status === 303) {
-              localStorage.removeItem('saved_settings_ini');
-              return;
+          
+          // Parse settings JSON and restore via API
+          try {
+            var settings = JSON.parse(saved);
+            var promises = [];
+            
+            // Iterate through all settings and call API for each
+            for (var key in settings) {
+              if (settings.hasOwnProperty(key)) {
+                var value = settings[key];
+                var payload = JSON.stringify({name: key, value: String(value)});
+                
+                var p = fetch('/api/v0/settings', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: payload
+                }).catch(function(err) {
+                  console.log('Setting restore error for ' + key + ':', err);
+                });
+                
+                promises.push(p);
+              }
             }
-            throw new Error('Settings upload failed: ' + response.status);
-          });
+            
+            return Promise.all(promises).then(function() {
+              localStorage.removeItem('saved_settings_ini');
+            });
+          } catch (err) {
+            console.log('Settings parse error:', err);
+            throw new Error('Settings parse failed');
+          }
         }
 
         function rebootDevice() {
@@ -711,31 +729,49 @@ static const char UpdateServerSuccess[] PROGMEM =
              var saved = localStorage.getItem('saved_settings_ini');
              if (saved) {
                  statusEl.textContent = "Restoring settings...";
-                 var formData = new FormData();
-                 var blob = new Blob([saved], { type: "text/plain"});
-                 formData.append("file", blob, "settings.ini");
                  
-                 fetch('/upload', {
-                     method: 'POST',
-                     body: formData
-                 })
-                 .then(function(response) {
-                     if (response.ok || response.status === 303) {
-                         console.log("Settings restored.");
-                         localStorage.removeItem('saved_settings_ini');
-                         statusEl.textContent = "Settings restored! Redirecting...";
-                         statusEl.style.color = "green";
-                         setTimeout(function() { window.location.href = "/"; }, 1000);
-                     } else {
-                         throw new Error("Upload failed");
+                 // Parse settings JSON and restore via API
+                 try {
+                     var settings = JSON.parse(saved);
+                     var promises = [];
+                     
+                     for (var key in settings) {
+                         if (settings.hasOwnProperty(key)) {
+                             var value = settings[key];
+                             var payload = JSON.stringify({name: key, value: String(value)});
+                             
+                             var p = fetch('/api/v0/settings', {
+                                 method: 'POST',
+                                 headers: { 'Content-Type': 'application/json' },
+                                 body: payload
+                             }).catch(function(err) {
+                                 console.log('Setting restore error:', err);
+                             });
+                             
+                             promises.push(p);
+                         }
                      }
-                 })
-                 .catch(function(err) {
-                     console.error("Restore failed", err);
-                     statusEl.textContent = "Settings restore failed! Redirecting...";
+                     
+                     Promise.all(promises)
+                         .then(function() {
+                             console.log("Settings restored.");
+                             localStorage.removeItem('saved_settings_ini');
+                             statusEl.textContent = "Settings restored! Redirecting...";
+                             statusEl.style.color = "green";
+                             setTimeout(function() { window.location.href = "/"; }, 1000);
+                         })
+                         .catch(function(err) {
+                             console.error("Restore failed", err);
+                             statusEl.textContent = "Settings restore failed! Redirecting...";
+                             statusEl.style.color = "orange";
+                             setTimeout(function() { window.location.href = "/"; }, 2000);
+                         });
+                 } catch (err) {
+                     console.error("Parse error", err);
+                     statusEl.textContent = "Settings parse failed! Redirecting...";
                      statusEl.style.color = "orange";
                      setTimeout(function() { window.location.href = "/"; }, 2000);
-                 });
+                 }
              } else {
                  statusEl.textContent = "Device is UP! Redirecting...";
                  statusEl.style.color = "green";

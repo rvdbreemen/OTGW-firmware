@@ -31,9 +31,6 @@
 
 // External declarations
 extern bool isESPFlashing;          // ESP flashing state flag
-extern bool isSettingsUploadPending; // settings.ini upload wait flag
-extern uint32_t settingsUploadWaitStartMs;
-extern const uint32_t SETTINGS_UPLOAD_WAIT_MS;
 extern bool LittleFSmounted;        // LittleFS mount status flag
 extern void sendWebSocketJSON(const char *json);
 extern FSInfo LittleFSinfo;         // LittleFS filesystem information
@@ -241,9 +238,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
               LittleFSmounted = false;
               Debugln(F("LittleFS mount failed after filesystem OTA update"));
             }
-            isSettingsUploadPending = true;
-            settingsUploadWaitStartMs = millis();
-            Debugln(F("Filesystem update complete; waiting for settings.ini upload"));
+            Debugln(F("Filesystem update complete"));
           }
 
           // Clear global flag - flash completed successfully
