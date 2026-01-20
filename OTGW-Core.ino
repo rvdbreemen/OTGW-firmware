@@ -93,7 +93,7 @@ void sendMQTTversioninfo(){
   sendMQTTData("otgw-pic/version", sPICfwversion);
   sendMQTTData("otgw-pic/deviceid", sPICdeviceid);
   sendMQTTData("otgw-pic/firmwaretype", sPICdeviceid);
-  sendMQTTData("otgw-pic/picavailable", CONOFF(bPICavailable));
+  sendMQTTData("otgw-pic/picavailable", CCONOFF(bPICavailable));
 }
 
 /*
@@ -2239,7 +2239,7 @@ void upgradepic() {
       LittleFS.remove(path);
     }
   }
-  httpServer.sendHeader("Location", "index.html#tabPICflash", true);
+  httpServer.sendHeader(F("Location"), F("index.html#tabPICflash"), true);
   httpServer.send_P(303, PSTR("text/html"), PSTR("<a href='index.html#tabPICflash'>Return</a>"));
 }
 

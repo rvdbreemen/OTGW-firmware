@@ -239,7 +239,7 @@ void sendOTGWvalue(int msgid){
   serializeJsonPretty(root, sBuff, sizeof(sBuff));
   //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff);
   //reply with json
-  httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   httpServer.send(200, F("application/json"), sBuff);
 }
 
@@ -272,7 +272,7 @@ void sendOTGWlabel(const char *msglabel){
   serializeJsonPretty(root, sBuff, sizeof(sBuff));
   //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff);
   //reply with json
-  httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   httpServer.send(200, F("application/json"), sBuff);
 }
 
@@ -793,24 +793,16 @@ void postSettings()
 //====================================================
 void sendApiNotFound(const char *URI)
 {
-  httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send_P(404, PSTR("text/html"), PSTR("<!DOCTYPE HTML><html><head>"));
 
-  strlcpy_P(cMsg, PSTR("<style>body { background-color: lightgray; font-size: 15pt;}"), sizeof(cMsg));
-  strlcat_P(cMsg, PSTR("</style></head><body>"), sizeof(cMsg));
-  httpServer.sendContent(cMsg);
-
-  strlcpy_P(cMsg, PSTR("<h1>OTGW firmware</h1><b1>"), sizeof(cMsg));
-  httpServer.sendContent(cMsg);
-
-  strlcpy_P(cMsg, PSTR("<br>[<b>"), sizeof(cMsg));
-  strlcat(cMsg, URI, sizeof(cMsg));
-  strlcat_P(cMsg, PSTR("</b>] is not a valid "), sizeof(cMsg));
-  httpServer.sendContent(cMsg);
-  
-  strlcpy_P(cMsg, PSTR("</body></html>\r\n"), sizeof(cMsg));
-  httpServer.sendContent(cMsg);
+  httpServer.sendContent_P(PSTR("<style>body { background-color: lightgray; font-size: 15pt;}</style></head><body>"));
+  httpServer.sendContent_P(PSTR("<h1>OTGW firmware</h1><b1>"));
+  httpServer.sendContent_P(PSTR("<br>[<b>"));
+  httpServer.sendContent(URI);
+  httpServer.sendContent_P(PSTR("</b>] is not a valid "));
+  httpServer.sendContent_P(PSTR("</body></html>\r\n"));
 
 } // sendApiNotFound()
 
