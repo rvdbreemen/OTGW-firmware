@@ -669,7 +669,7 @@ void sendDeviceTime()
   //Timezone based devtime
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
-  snprintf(buf, sizeof(buf), PSTR("%04d-%02d-%02d %02d:%02d:%02d"), myTime.year(), myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second());
+  snprintf_P(buf, sizeof(buf), PSTR("%04d-%02d-%02d %02d:%02d:%02d"), myTime.year(), myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second());
   sendNestedJsonObj(F("dateTime"), buf); 
   sendNestedJsonObj(F("epoch"), (int)now);
   sendNestedJsonObj(F("message"), sMessage);
