@@ -118,44 +118,111 @@ static void buildNamespace(char *dest, size_t destSize, const char *base, const 
 }
 
 //set command list
+// Move strings to PROGMEM to save RAM
+const char s_raw[] PROGMEM = "raw";
+const char s_temp[] PROGMEM = "temp";
+const char s_on[] PROGMEM = "on";
+const char s_level[] PROGMEM = "level";
+const char s_function[] PROGMEM = "function";
+const char s_empty[] PROGMEM = "";
+
+const char s_cmd_command[] PROGMEM = "command";
+const char s_cmd_setpoint[] PROGMEM = "setpoint";
+const char s_cmd_constant[] PROGMEM = "constant";
+const char s_cmd_outside[] PROGMEM = "outside";
+const char s_cmd_hotwater[] PROGMEM = "hotwater";
+const char s_cmd_gatewaymode[] PROGMEM = "gatewaymode";
+const char s_cmd_setback[] PROGMEM = "setback";
+const char s_cmd_maxchsetpt[] PROGMEM = "maxchsetpt";
+const char s_cmd_maxdhwsetpt[] PROGMEM = "maxdhwsetpt";
+const char s_cmd_maxmodulation[] PROGMEM = "maxmodulation";
+const char s_cmd_ctrlsetpt[] PROGMEM = "ctrlsetpt";
+const char s_cmd_ctrlsetpt2[] PROGMEM = "ctrlsetpt2";
+const char s_cmd_chenable[] PROGMEM = "chenable";
+const char s_cmd_chenable2[] PROGMEM = "chenable2";
+const char s_cmd_ventsetpt[] PROGMEM = "ventsetpt";
+const char s_cmd_temperaturesensor[] PROGMEM = "temperaturesensor";
+const char s_cmd_addalternative[] PROGMEM = "addalternative";
+const char s_cmd_delalternative[] PROGMEM = "delalternative";
+const char s_cmd_unknownid[] PROGMEM = "unknownid";
+const char s_cmd_knownid[] PROGMEM = "knownid";
+const char s_cmd_priomsg[] PROGMEM = "priomsg";
+const char s_cmd_setresponse[] PROGMEM = "setresponse";
+const char s_cmd_clearrespons[] PROGMEM = "clearrespons";
+const char s_cmd_resetcounter[] PROGMEM = "resetcounter";
+const char s_cmd_ignoretransitations[] PROGMEM = "ignoretransitations";
+const char s_cmd_overridehb[] PROGMEM = "overridehb";
+const char s_cmd_forcethermostat[] PROGMEM = "forcethermostat";
+const char s_cmd_voltageref[] PROGMEM = "voltageref";
+const char s_cmd_debugptr[] PROGMEM = "debugptr";
+
+const char s_otgw_TT[] PROGMEM = "TT";
+const char s_otgw_TC[] PROGMEM = "TC";
+const char s_otgw_OT[] PROGMEM = "OT";
+const char s_otgw_HW[] PROGMEM = "HW";
+const char s_otgw_GW[] PROGMEM = "GW";
+const char s_otgw_SB[] PROGMEM = "SB";
+const char s_otgw_SH[] PROGMEM = "SH";
+const char s_otgw_SW[] PROGMEM = "SW";
+const char s_otgw_MM[] PROGMEM = "MM";
+const char s_otgw_CS[] PROGMEM = "CS";
+const char s_otgw_C2[] PROGMEM = "C2";
+const char s_otgw_CH[] PROGMEM = "CH";
+const char s_otgw_H2[] PROGMEM = "H2";
+const char s_otgw_VS[] PROGMEM = "VS";
+const char s_otgw_TS[] PROGMEM = "TS";
+const char s_otgw_AA[] PROGMEM = "AA";
+const char s_otgw_DA[] PROGMEM = "DA";
+const char s_otgw_UI[] PROGMEM = "UI";
+const char s_otgw_KI[] PROGMEM = "KI";
+const char s_otgw_PM[] PROGMEM = "PM";
+const char s_otgw_SR[] PROGMEM = "SR";
+const char s_otgw_CR[] PROGMEM = "CR";
+const char s_otgw_RS[] PROGMEM = "RS";
+const char s_otgw_IT[] PROGMEM = "IT";
+const char s_otgw_OH[] PROGMEM = "OH";
+const char s_otgw_FT[] PROGMEM = "FT";
+const char s_otgw_VR[] PROGMEM = "VR";
+const char s_otgw_DP[] PROGMEM = "DP";
+
 struct MQTT_set_cmd_t
 {
-    const char* setcmd;
-    const char* otgwcmd;
-    const char* ottype;
+    PGM_P setcmd;
+    PGM_P otgwcmd;
+    PGM_P ottype;
 };
 
 
-const MQTT_set_cmd_t setcmds[] {
-  {   "command", "", "raw" },
-  {   "setpoint", "TT", "temp" },
-  {   "constant", "TC", "temp" },
-  {   "outside", "OT", "temp" },
-  {   "hotwater", "HW", "on" },
-  {   "gatewaymode", "GW", "on" },
-  {   "setback", "SB", "temp" },
-  {   "maxchsetpt", "SH", "temp" },
-  {   "maxdhwsetpt", "SW", "temp" },
-  {   "maxmodulation", "MM", "level" },        
-  {   "ctrlsetpt", "CS", "temp" },        
-  {   "ctrlsetpt2", "C2", "temp" },        
-  {   "chenable", "CH", "on" },        
-  {   "chenable2", "H2", "on" },        
-  {   "ventsetpt", "VS", "level" },
-  {   "temperaturesensor", "TS", "function" },
-  {   "addalternative", "AA", "function" },
-  {   "delalternative", "DA", "function" },
-  {   "unknownid", "UI", "function" },
-  {   "knownid", "KI", "function" },
-  {   "priomsg", "PM", "function" },
-  {   "setresponse", "SR", "function" },
-  {   "clearrespons", "CR", "function" },
-  {   "resetcounter", "RS", "function" },
-  {   "ignoretransitations", "IT", "function" },
-  {   "overridehb", "OH", "function" },
-  {   "forcethermostat", "FT", "function" },
-  {   "voltageref", "VR", "function" },
-  {   "debugptr", "DP", "function" },
+const MQTT_set_cmd_t setcmds[] PROGMEM = {
+  {   s_cmd_command, s_empty, s_raw },
+  {   s_cmd_setpoint, s_otgw_TT, s_temp },
+  {   s_cmd_constant, s_otgw_TC, s_temp },
+  {   s_cmd_outside, s_otgw_OT, s_temp },
+  {   s_cmd_hotwater, s_otgw_HW, s_on },
+  {   s_cmd_gatewaymode, s_otgw_GW, s_on },
+  {   s_cmd_setback, s_otgw_SB, s_temp },
+  {   s_cmd_maxchsetpt, s_otgw_SH, s_temp },
+  {   s_cmd_maxdhwsetpt, s_otgw_SW, s_temp },
+  {   s_cmd_maxmodulation, s_otgw_MM, s_level },        
+  {   s_cmd_ctrlsetpt, s_otgw_CS, s_temp },        
+  {   s_cmd_ctrlsetpt2, s_otgw_C2, s_temp },        
+  {   s_cmd_chenable, s_otgw_CH, s_on },        
+  {   s_cmd_chenable2, s_otgw_H2, s_on },        
+  {   s_cmd_ventsetpt, s_otgw_VS, s_level },
+  {   s_cmd_temperaturesensor, s_otgw_TS, s_function },
+  {   s_cmd_addalternative, s_otgw_AA, s_function },
+  {   s_cmd_delalternative, s_otgw_DA, s_function },
+  {   s_cmd_unknownid, s_otgw_UI, s_function },
+  {   s_cmd_knownid, s_otgw_KI, s_function },
+  {   s_cmd_priomsg, s_otgw_PM, s_function },
+  {   s_cmd_setresponse, s_otgw_SR, s_function },
+  {   s_cmd_clearrespons, s_otgw_CR, s_function },
+  {   s_cmd_resetcounter, s_otgw_RS, s_function },
+  {   s_cmd_ignoretransitations, s_otgw_IT, s_function },
+  {   s_cmd_overridehb, s_otgw_OH, s_function },
+  {   s_cmd_forcethermostat, s_otgw_FT, s_function },
+  {   s_cmd_voltageref, s_otgw_VR, s_function },
+  {   s_cmd_debugptr, s_otgw_DP, s_function },
 } ;
 
 const int nrcmds = sizeof(setcmds) / sizeof(setcmds[0]);
@@ -200,18 +267,18 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   char msgPayload[50];
   int msglen = min((int)(length)+1, (int)sizeof(msgPayload));
   strlcpy(msgPayload, (char *)payload, msglen);
-  if (strcasecmp(topic, "homeassistant/status") == 0) {
+  if (strcasecmp_P(topic, PSTR("homeassistant/status")) == 0) {
     //incoming message on status, detect going down
     if (!settingMQTTharebootdetection) {
       //So if the HA reboot detection is turned of, we will just look for HA going online.
       //This means everytime there is "online" message, we will restart MQTT configuration, including the HA Auto Discovery. 
       bHAcycle = true; 
     }
-    if (strcasecmp(msgPayload, "offline") == 0){
+    if (strcasecmp_P(msgPayload, PSTR("offline")) == 0){
       //home assistant went down
       DebugTln(F("Home Assistant went offline!"));
       bHAcycle = true; //set flag, so it triggers when it goes back online
-    } else if ((strcasecmp(msgPayload, "online") == 0) && bHAcycle){
+    } else if ((strcasecmp_P(msgPayload, PSTR("online")) == 0) && bHAcycle){
       DebugTln(F("Home Assistant went online!"));
       bHAcycle = false; //clear flag, so it does not trigger again
       //restart stuff, to make sure it works correctly again
@@ -252,16 +319,27 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
         //loop thru command list
         int i;
         for (i=0; i<nrcmds; i++){
-          if (strcasecmp(token, setcmds[i].setcmd) == 0){
+          // Read setcmd pointer from Flash
+          PGM_P pSetCmd = (PGM_P)pgm_read_ptr(&setcmds[i].setcmd);
+          if (strcasecmp_P(token, pSetCmd) == 0){
             //found a match
-            if (strcasecmp(setcmds[i].ottype, "raw") == 0){
+            // Read ottype and otgwcmd from Flash
+            PGM_P pOtType = (PGM_P)pgm_read_ptr(&setcmds[i].ottype);
+            PGM_P pOtgwCmd = (PGM_P)pgm_read_ptr(&setcmds[i].otgwcmd);
+            
+            if (strcasecmp_P("raw", pOtType) == 0){
               //raw command
               snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s"), msgPayload);
               MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
               addOTWGcmdtoqueue((char *)otgwcmd, strlen(otgwcmd), true);
             } else {
               //all other commands are <otgwcmd>=<payload message> 
-              snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s=%s"), setcmds[i].otgwcmd, msgPayload);
+              // Copy command string from Flash to temp buffer for snprintf
+              char cmdBuf[10];
+              strncpy_P(cmdBuf, pOtgwCmd, sizeof(cmdBuf));
+              cmdBuf[sizeof(cmdBuf)-1] = 0; // Ensure null termination
+              
+              snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s=%s"), cmdBuf, msgPayload);
               MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
               addOTWGcmdtoqueue((char *)otgwcmd, strlen(otgwcmd), true);
             }

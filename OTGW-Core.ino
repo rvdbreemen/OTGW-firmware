@@ -159,7 +159,7 @@ void checkOTWGpicforupdate(){
     } else if (latest.isEmpty()) {
       sMessage[0] = '\0'; //two options: no internet connection OR no firmware version
     } else if (latest != String(sPICfwversion)) {
-      snprintf(sMessage, sizeof(sMessage), "New PIC version %s available!", latest.c_str());
+      snprintf_P(sMessage, sizeof(sMessage), PSTR("New PIC version %s available!"), latest.c_str());
     }
   }
   //check if the esp8266 and the littlefs versions match
@@ -1174,9 +1174,20 @@ void print_date(uint16_t& value)
 void print_daytime(uint16_t& value)
 {
   //function to print data
-  const char *dayOfWeekName[]  { "Unknown", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Unknown" };
+  static const char str_unknown[] PROGMEM = "Unknown";
+  static const char str_monday[] PROGMEM = "Monday";
+  static const char str_tuesday[] PROGMEM = "Tuesday";
+  static const char str_wednesday[] PROGMEM = "Wednesday";
+  static const char str_thursday[] PROGMEM = "Thursday";
+  static const char str_friday[] PROGMEM = "Friday";
+  static const char str_saturday[] PROGMEM = "Saturday";
+  static const char str_sunday[] PROGMEM = "Sunday";
+  static const char* const dayOfWeekName[] PROGMEM = { str_unknown, str_monday, str_tuesday, str_wednesday, str_thursday, str_friday, str_saturday, str_sunday, str_unknown };
   
-  AddLogf("%s = %s - %.2d:%.2d", OTlookupitem.label, dayOfWeekName[(OTdata.valueHB >> 5) & 0x7], (OTdata.valueHB & 0x1F), OTdata.valueLB); 
+  uint8_t dayIdx = (OTdata.valueHB >> 5) & 0x7;
+  char dayName[15];
+  strcpy_P(dayName, (PGM_P)pgm_read_ptr(&dayOfWeekName[dayIdx]));
+  AddLogf("%s = %s - %.2d:%.2d", OTlookupitem.label, dayName, (OTdata.valueHB & 0x1F), OTdata.valueLB); 
   if (is_value_valid(OTdata, OTlookupitem)){
     //Build string for MQTT
     char _topic[50] {0};
@@ -1184,7 +1195,7 @@ void print_daytime(uint16_t& value)
     //dayofweek
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_dayofweek", sizeof(_topic));
-    sendMQTTData(_topic, dayOfWeekName[(OTdata.valueHB >> 5) & 0x7]); 
+    sendMQTTData(_topic, dayName); 
     //hour
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_hour", sizeof(_topic));

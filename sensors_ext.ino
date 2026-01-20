@@ -91,7 +91,7 @@ void initSensors() {
 
   if (numberOfDevices < 1 or DallasrealDeviceCount < 1)
   {
-    DebugTln(PSTR("***ERR No Sensors Found, disabled GPIO Sensors! Reboot node to search again."));
+    DebugTln(F("***ERR No Sensors Found, disabled GPIO Sensors! Reboot node to search again."));
     settingGPIOSENSORSenabled = false;
     return;
   }
@@ -171,7 +171,7 @@ char* getDallasAddress(DeviceAddress deviceAddress)
         }
         // Emulate: s-printf(dest+i, "%X", val);
         char hexBuffer[4];
-        snprintf(hexBuffer, sizeof(hexBuffer), "%X", val);
+        snprintf_P(hexBuffer, sizeof(hexBuffer), PSTR("%X"), val);
         size_t len = strlen(hexBuffer);
         
         // Write at offset i, overwriting existing chars
