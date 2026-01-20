@@ -42,7 +42,7 @@ extern void writeSettings(bool show); // Write settings from ESP memory to files
   //#warning Debug() was not defined!
 	#define Debug(...)		({ OTGWSerial.print(__VA_ARGS__); })  
 	#define Debugln(...)	({ OTGWSerial.println(__VA_ARGS__); })  
-	#define Debugf(...)		({ OTGWSerial.printf(__VA_ARGS__); })  
+  #define Debugf(...)		({ OTGWSerial.printf_P(__VA_ARGS__); })  
 //#else
 //  #warning Seems Debug() is already defined!
 #endif

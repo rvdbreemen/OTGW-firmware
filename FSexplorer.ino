@@ -275,19 +275,38 @@ void apilistfiles()             // Senden aller Daten an den Client
     fileNr++;
   }
 
-  String temp = "[";
-  for (int f=0; f < fileNr; f++)  
+  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  httpServer.send(200, F("application/json"), F(""));
+  httpServer.sendContent(F("["));
+
+  bool firstEntry = true;
+  char entryBuffer[256];
+  for (int f = 0; f < fileNr; f++)
   {
     DebugTf(PSTR("[%3d] >> [%s]\r\n"), f, dirMap[f].Name);
-    temp += R"({"name":")" + String(dirMap[f].Name) + R"(","size":")" + formatBytes(dirMap[f].Size) + R"(","type":")" + (dirMap[f].isDir ? "dir" : "file") + R"("},)";
+    if (!firstEntry) httpServer.sendContent(F(","));
+    firstEntry = false;
+
+    String sizeStr = formatBytes(dirMap[f].Size);
+    const char* typeStr = dirMap[f].isDir ? "dir" : "file";
+    snprintf_P(entryBuffer, sizeof(entryBuffer),
+               PSTR("{\"name\":\"%s\",\"size\":\"%s\",\"type\":\"%s\"}"),
+               dirMap[f].Name, sizeStr.c_str(), typeStr);
+    httpServer.sendContent(entryBuffer);
   }
 
   LittleFS.info(LittleFSinfo);
-  temp += R"({"usedBytes":")" + formatBytes(LittleFSinfo.usedBytes * 1.05) + R"(",)" +       // Berechnet den verwendeten Speicherplatz + 5% Sicherheitsaufschlag
-          R"("totalBytes":")" + formatBytes(LittleFSinfo.totalBytes) + R"(","freeBytes":")" + // Zeigt die Größe des Speichers
-          (LittleFSinfo.totalBytes - (LittleFSinfo.usedBytes * 1.05)) + R"("}])";               // Berechnet den freien Speicherplatz + 5% Sicherheitsaufschlag
+  if (!firstEntry) httpServer.sendContent(F(","));
+  String usedStr = formatBytes(LittleFSinfo.usedBytes * 1.05);  // +5% safety
+  String totalStr = formatBytes(LittleFSinfo.totalBytes);
+  unsigned long freeBytes = (unsigned long)(LittleFSinfo.totalBytes - (LittleFSinfo.usedBytes * 1.05));
+  snprintf_P(entryBuffer, sizeof(entryBuffer),
+             PSTR("{\"usedBytes\":\"%s\",\"totalBytes\":\"%s\",\"freeBytes\":\"%lu\"}"),
+             usedStr.c_str(), totalStr.c_str(), freeBytes);
+  httpServer.sendContent(entryBuffer);
 
-  httpServer.send(200, F("application/json"), temp);
+  httpServer.sendContent(F("]\r\n"));
+  httpServer.sendContent(F(""));
   
 } // apilistfiles()
 
@@ -426,41 +445,31 @@ void doRedirect(String msg, int wait, const char* URL, bool reboot)
   safeURL.replace("'", "%27");
   safeURL.replace("\"", "%22");
 
-  String redirectHTML = 
-  "<!DOCTYPE HTML><html lang='en-US'>"
-  "<head>"
-  "<meta charset='UTF-8'>"
-  "<style type='text/css'>"
-  "body {background-color: lightblue;}"
-  "</style>"
-  "<title>Redirect to ...</title>"
-  "</head>"
-  "<body><h1>FSexplorer</h1>"
-  "<h3>"+safeMsg+"</h3>"
-  "<br><div style='width: 500px; position: relative; font-size: 25px;'>"
-  "  <div style='float: left;'>Redirect in &nbsp;</div>"
-  "  <div style='float: left;' id='counter'>"+String(safeWait)+"</div>"
-  "  <div style='float: left;'>&nbsp; seconds ...</div>"
-  "  <div style='float: right;'>&nbsp;</div>"
-  "</div>"
-  "<!-- Note: don't tell people to `click` the link, just tell them that it is a link. -->"
-  "<br><br><hr>Wait for the redirect. In case you are not redirected automatically, then click this <a href='"+safeURL+"'>link to continue</a>."
-  "  <script>"
-  "      setInterval(function() {"
-  "          var div = document.querySelector('#counter');"
-  "          var count = div.textContent * 1 - 1;"
-  "          div.textContent = count;"
-  "          if (count <= 0) {"
-  "              window.location.replace('"+safeURL+"'); "
-  "          } "
-  "      }, 1000); "
-  "  </script> "
-  "</body></html>\r\n";
   
   DebugTln(msg);
   // add non-JS fallback for redirect
   httpServer.sendHeader("Refresh", String(safeWait) + ";url=" + safeURL);
-  httpServer.send(200, F("text/html"), redirectHTML);
+  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  httpServer.send(200, F("text/html"), F(""));
+
+  char waitBuf[12];
+  snprintf_P(waitBuf, sizeof(waitBuf), PSTR("%d"), safeWait);
+
+  httpServer.sendContent_P(PSTR("<!DOCTYPE HTML><html lang='en-US'><head><meta charset='UTF-8'>"));
+  httpServer.sendContent_P(PSTR("<style type='text/css'>body {background-color: lightblue;}</style>"));
+  httpServer.sendContent_P(PSTR("<title>Redirect to ...</title></head><body><h1>FSexplorer</h1><h3>"));
+  httpServer.sendContent(safeMsg);
+  httpServer.sendContent_P(PSTR("</h3><br><div style='width: 500px; position: relative; font-size: 25px;'>"));
+  httpServer.sendContent_P(PSTR("<div style='float: left;'>Redirect in &nbsp;</div><div style='float: left;' id='counter'>"));
+  httpServer.sendContent(waitBuf);
+  httpServer.sendContent_P(PSTR("</div><div style='float: left;'>&nbsp; seconds ...</div><div style='float: right;'>&nbsp;</div></div>"));
+  httpServer.sendContent_P(PSTR("<br><br><hr>Wait for the redirect. In case you are not redirected automatically, then click this <a href='"));
+  httpServer.sendContent(safeURL);
+  httpServer.sendContent_P(PSTR("'>link to continue</a>."));
+  httpServer.sendContent_P(PSTR("<script>setInterval(function(){var div=document.querySelector('#counter');var count=div.textContent*1-1;div.textContent=count;if(count<=0){window.location.replace('"));
+  httpServer.sendContent(safeURL);
+  httpServer.sendContent_P(PSTR("');}},1000);</script></body></html>\r\n"));
+  httpServer.sendContent(F(""));
   if (reboot) doRestart("Reboot after upgrade");
   
 } // doRedirect()
