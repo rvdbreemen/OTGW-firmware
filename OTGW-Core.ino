@@ -1219,11 +1219,11 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
   }
   if ((len < 3) || (buf[2] != '=')){ 
     // Not a valid command
-    OTGWDebugT("CmdQueue: Error: Not a valid command=[");
+    OTGWDebugT(F("CmdQueue: Error: Not a valid command=["));
     for (int i = 0; i < len; i++) {
       OTGWDebug((char)buf[i]);
     }
-    OTGWDebugf("] (%d)\r\n", len);
+    OTGWDebugf(PSTR("] (%d)\r\n"), len);
     return;
   }
   if (len > kMaxCmdLen) {
@@ -1264,11 +1264,11 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
 
   //insert to the queue
   OTGWDebugTf(PSTR("CmdQueue: Insert queue in slot[%d]:"), insertptr);
-  OTGWDebug("cmd[");
+  OTGWDebug(F("cmd["));
   for (int i = 0; i < len; i++) {
     OTGWDebug((char)buf[i]);
   }
-  OTGWDebugf("] (%d)\r\n", len); 
+  OTGWDebugf(PSTR("] (%d)\r\n"), len); 
 
   //copy the command into the queue
   int cmdlen = min((int)len , (int)(sizeof(cmdqueue[insertptr].cmd)-1));
@@ -1341,19 +1341,19 @@ void handleOTGWqueue(){
 */
 void checkOTGWcmdqueue(const char *buf, unsigned int len){
   if ((len<3) || (buf[2]!=':')) {
-    OTGWDebugT("CmdQueue: Error: Not a command response [");
+    OTGWDebugT(F("CmdQueue: Error: Not a command response ["));
     for (unsigned int i = 0; i < len; i++) {
       OTGWDebug((char)buf[i]);
     }
-    OTGWDebugf("] (%d)\r\n", len); 
+    OTGWDebugf(PSTR("] (%d)\r\n"), len); 
     return; //not a valid command response
   }
 
-  OTGWDebugT("CmdQueue: Checking if command is in in queue [");
+  OTGWDebugT(F("CmdQueue: Checking if command is in in queue ["));
   for (unsigned int i = 0; i < len; i++) {
     OTGWDebug((char)buf[i]);
   }
-  OTGWDebugf("] (%d)\r\n", len); 
+  OTGWDebugf(PSTR("] (%d)\r\n"), len); 
 
   char cmd[3]; memset( cmd, 0, sizeof(cmd));
   char value[11]; memset( value, 0, sizeof(value));
@@ -1404,18 +1404,18 @@ void sendOTGW(const char* buf, int len)
   if (OTGWSerial.availableForWrite()>=len+2) {
     //check the write buffer
     //OTGWDebugf("Serial Write Buffer space = [%d] - needed [%d]\r\n",OTGWSerial.availableForWrite(), (len+2));
-    OTGWDebugT("Sending to Serial [");
+    OTGWDebugT(F("Sending to Serial ["));
     for (int i = 0; i < len; i++) {
       OTGWDebug((char)buf[i]);
     }
-    OTGWDebug("] ("); OTGWDebug(len); OTGWDebug(")"); OTGWDebugln();
+    OTGWDebug(F("] (")); OTGWDebug(len); OTGWDebug(F(")")); OTGWDebugln();
         
     //write buffer to serial
     OTGWSerial.write(buf, len);         
     OTGWSerial.write('\r');
     OTGWSerial.write('\n');            
     OTGWSerial.flush(); 
-  } else OTGWDebugln("Error: Write buffer not big enough!");
+  } else OTGWDebugln(F("Error: Write buffer not big enough!"));
 }
 
 /*
@@ -1532,7 +1532,7 @@ void processOT(const char *buf, int len){
     if (cntOTmessagesprocessed == 1) {       //first message needs to be put in the buffer
       //just store current message and delay processing
       delayedOTdata = OTdata;       //store current msg
-      OTGWDebugln("delaying first message!");
+      OTGWDebugln(F("delaying first message!"));
     } else {                              //any other message will be processed
       //when the gateway overrides the boiler or thermostat, then do not use the results for decoding anywhere (skip this)
       //if B --> A, then gateway tells the thermostat what it needs to hear, then use current A message, and skip B value.

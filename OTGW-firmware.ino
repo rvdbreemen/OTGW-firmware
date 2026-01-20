@@ -52,7 +52,7 @@ void setup() {
   WatchDogEnabled(0); // turn off watchdog
   
   SetupDebugln(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
-  SetupDebugf("Booting....[%s]\r\n\r\n", _VERSION);
+  SetupDebugf(PSTR("Booting....[%s]\r\n\r\n"), _VERSION);
   
   detectPIC();
 
@@ -90,7 +90,7 @@ void setup() {
  
   initWatchDog();            // setup the WatchDog
   strlcpy(lastReset, ESP.getResetReason().c_str(), sizeof(lastReset));
-  SetupDebugf("Last reset reason: [%s]\r\n", CSTR(lastReset));
+  SetupDebugf(PSTR("Last reset reason: [%s]\r\n"), CSTR(lastReset));
   rebootCount = updateRebootCount();
   updateRebootLog(lastReset);
   

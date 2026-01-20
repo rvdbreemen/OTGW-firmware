@@ -42,7 +42,7 @@
 */
 #define MAX_FILES_IN_LIST   40
 
-const char Helper[] =
+const char Helper[] PROGMEM =
   "<br>You first need to upload these two files:\n"
   "<ul>\n"
   "  <li>FSexplorer.html</li>\n"
@@ -95,7 +95,7 @@ void setupFSexplorer(){
   }
   else 
   {
-    httpServer.send(200, "text/html", Helper); //Upload the FSexplorer.html
+    httpServer.send_P(200, PSTR("text/html"), Helper); //Upload the FSexplorer.html
   }
   httpServer.on("/api/firmwarefilelist", apifirmwarefilelist); 
   httpServer.on("/api/listfiles", apilistfiles);
@@ -287,7 +287,7 @@ void apilistfiles()             // Senden aller Daten an den Client
           R"("totalBytes":")" + formatBytes(LittleFSinfo.totalBytes) + R"(","freeBytes":")" + // Zeigt die Größe des Speichers
           (LittleFSinfo.totalBytes - (LittleFSinfo.usedBytes * 1.05)) + R"("}])";               // Berechnet den freien Speicherplatz + 5% Sicherheitsaufschlag
 
-  httpServer.send(200, "application/json", temp);
+  httpServer.send(200, F("application/json"), temp);
   
 } // apilistfiles()
 
@@ -302,7 +302,7 @@ bool handleFile(String&& path)
     httpServer.sendContent(Header);
     return true;
   }
-  if (!LittleFS.exists("/FSexplorer.html")) httpServer.send(200, "text/html", Helper); //Upload the FSexplorer.html
+  if (!LittleFS.exists("/FSexplorer.html")) httpServer.send_P(200, PSTR("text/html"), Helper); //Upload the FSexplorer.html
   if (path.endsWith("/")) path += F("index.html");
   return LittleFS.exists(path) ? ({File f = LittleFS.open(path, "r"); httpServer.streamFile(f, contentType(path)); f.close(); true;}) : false;
 
@@ -460,7 +460,7 @@ void doRedirect(String msg, int wait, const char* URL, bool reboot)
   DebugTln(msg);
   // add non-JS fallback for redirect
   httpServer.sendHeader("Refresh", String(safeWait) + ";url=" + safeURL);
-  httpServer.send(200, "text/html", redirectHTML);
+  httpServer.send(200, F("text/html"), redirectHTML);
   if (reboot) doRestart("Reboot after upgrade");
   
 } // doRedirect()
