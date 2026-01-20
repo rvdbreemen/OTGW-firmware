@@ -386,9 +386,8 @@ static const char UpdateServerIndex[] PROGMEM =
                     var msg = JSON.parse(e.data);
                     // Check if it's an update status message
                     if (msg && typeof msg.state !== 'undefined') {
-                        // Optimization: Stop HTTP polling if we are getting live updates via WS
-                        stopPolling();
-                        updateDeviceStatus(msg);
+                      // Keep HTTP polling active as a fallback in case WS updates pause
+                      updateDeviceStatus(msg);
                     }
                 } catch(err) {
                     // Ignore non-JSON messages (like raw logs)
