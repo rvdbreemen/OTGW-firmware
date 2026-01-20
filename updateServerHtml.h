@@ -46,7 +46,7 @@ static const char UpdateServerIndex[] PROGMEM =
             Select a "<b>.littlefs.bin</b>" file to flash<br/>
             <input type='file' accept='.littlefs.bin' name='filesystem' required>
             <br/>
-            <label><input type="checkbox" id="chkPreserve" checked autocomplete="off"> Preserve Settings (auto-restored from memory + backup download)</label>
+            <label><input type="checkbox" id="chkPreserve" checked autocomplete="off"> Download settings backup (settings auto-restore from memory)</label>
             <br/>
             <input id='fsSubmit' type='submit' value='Flash LittleFS' disabled>
         </form>
