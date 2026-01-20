@@ -220,6 +220,10 @@ void apifirmwarefilelist() {
 
 void apilistfiles()             // Senden aller Daten an den Client
 {   
+  static const char kMoreFilesMsg[] PROGMEM = "More files not listed ..";
+  static const char kTypeDir[] PROGMEM = "dir";
+  static const char kTypeFile[] PROGMEM = "file";
+
   FSInfo LittleFSinfo;
   String path = "/";
   if (httpServer.hasArg("path")) {
@@ -269,7 +273,10 @@ void apilistfiles()             // Senden aller Daten an den Client
     dirMap[fileNr].Name[0] = '\0';
     //--- if you change this message you also have to 
     //--- change FSexplorer.html
-    strncat(dirMap[fileNr].Name, "More files not listed ..", 29); 
+    size_t msgLen = strlen_P(kMoreFilesMsg);
+    size_t copyLen = min((size_t)29, msgLen);
+    memcpy_P(dirMap[fileNr].Name, kMoreFilesMsg, copyLen);
+    dirMap[fileNr].Name[copyLen] = '\0';
     dirMap[fileNr].Size = 0;
     dirMap[fileNr].isDir = false;
     fileNr++;
@@ -281,6 +288,7 @@ void apilistfiles()             // Senden aller Daten an den Client
 
   bool firstEntry = true;
   char entryBuffer[256];
+  char typeBuf[5];
   for (int f = 0; f < fileNr; f++)
   {
     DebugTf(PSTR("[%3d] >> [%s]\r\n"), f, dirMap[f].Name);
@@ -288,10 +296,12 @@ void apilistfiles()             // Senden aller Daten an den Client
     firstEntry = false;
 
     String sizeStr = formatBytes(dirMap[f].Size);
-    const char* typeStr = dirMap[f].isDir ? "dir" : "file";
+    PGM_P typePgm = dirMap[f].isDir ? kTypeDir : kTypeFile;
+    strncpy_P(typeBuf, typePgm, sizeof(typeBuf));
+    typeBuf[sizeof(typeBuf) - 1] = '\0';
     snprintf_P(entryBuffer, sizeof(entryBuffer),
                PSTR("{\"name\":\"%s\",\"size\":\"%s\",\"type\":\"%s\"}"),
-               dirMap[f].Name, sizeStr.c_str(), typeStr);
+               dirMap[f].Name, sizeStr.c_str(), typeBuf);
     httpServer.sendContent(entryBuffer);
   }
 
@@ -387,19 +397,19 @@ const String formatBytes(size_t const& bytes)
 //=====================================================================================
 const String &contentType(String& filename) 
 {       
-  if (filename.endsWith(".htm") || filename.endsWith(".html")) filename = "text/html";
-  else if (filename.endsWith(".css")) filename = "text/css";
-  else if (filename.endsWith(".js")) filename = "application/javascript";
-  else if (filename.endsWith(".json")) filename = "application/json";
-  else if (filename.endsWith(".png")) filename = "image/png";
-  else if (filename.endsWith(".gif")) filename = "image/gif";
-  else if (filename.endsWith(".jpg")) filename = "image/jpeg";
-  else if (filename.endsWith(".ico")) filename = "image/x-icon";
-  else if (filename.endsWith(".xml")) filename = "text/xml";
-  else if (filename.endsWith(".pdf")) filename = "application/x-pdf";
-  else if (filename.endsWith(".zip")) filename = "application/x-zip";
-  else if (filename.endsWith(".gz")) filename = "application/x-gzip";
-  else filename = "text/plain";
+  if (filename.endsWith(".htm") || filename.endsWith(".html")) filename = F("text/html");
+  else if (filename.endsWith(".css")) filename = F("text/css");
+  else if (filename.endsWith(".js")) filename = F("application/javascript");
+  else if (filename.endsWith(".json")) filename = F("application/json");
+  else if (filename.endsWith(".png")) filename = F("image/png");
+  else if (filename.endsWith(".gif")) filename = F("image/gif");
+  else if (filename.endsWith(".jpg")) filename = F("image/jpeg");
+  else if (filename.endsWith(".ico")) filename = F("image/x-icon");
+  else if (filename.endsWith(".xml")) filename = F("text/xml");
+  else if (filename.endsWith(".pdf")) filename = F("application/x-pdf");
+  else if (filename.endsWith(".zip")) filename = F("application/x-zip");
+  else if (filename.endsWith(".gz")) filename = F("application/x-gzip");
+  else filename = F("text/plain");
   return filename;
   
 } // &contentType()
@@ -448,7 +458,7 @@ void doRedirect(String msg, int wait, const char* URL, bool reboot)
   
   DebugTln(msg);
   // add non-JS fallback for redirect
-  httpServer.sendHeader("Refresh", String(safeWait) + ";url=" + safeURL);
+  httpServer.sendHeader(F("Refresh"), String(safeWait) + F(";url=") + safeURL);
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send(200, F("text/html"), F(""));
 
