@@ -9,7 +9,9 @@
 **
 ***************************************************************************      
   Copyright (c) 2018 Jens Fleischer. All rights reserved.
-
+  Copyright (c) 2026 Robert van den Breemen. All rights reserved.
+    Extended the code with functions to upgrade OTGW firmware and PIC firmware and include directory support.
+  
   This file is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
   License as published by the Free Software Foundation; either
