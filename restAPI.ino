@@ -240,7 +240,7 @@ void sendOTGWvalue(int msgid){
   //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff);
   //reply with json
   httpServer.sendHeader("Access-Control-Allow-Origin", "*");
-  httpServer.send(200, "application/json", sBuff);
+  httpServer.send(200, F("application/json"), sBuff);
 }
 
 void sendOTGWlabel(const char *msglabel){
@@ -273,7 +273,7 @@ void sendOTGWlabel(const char *msglabel){
   //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff);
   //reply with json
   httpServer.sendHeader("Access-Control-Allow-Origin", "*");
-  httpServer.send(200, "application/json", sBuff);
+  httpServer.send(200, F("application/json"), sBuff);
 }
 
 //=======================================================================
@@ -781,10 +781,10 @@ void postSettings()
       if ( field[0] != 0 && newValue[0] != 0 ) {
         RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
         updateSetting(field, newValue);
-        httpServer.send(200, "application/json", httpServer.arg(0));
+        httpServer.send(200, F("application/json"), httpServer.arg(0));
       } else {
         // Internal client error? It could not proess the client request.
-        httpServer.send(400, "application/json", httpServer.arg(0));
+        httpServer.send(400, F("application/json"), httpServer.arg(0));
       }
 
 } // postSettings()
@@ -797,19 +797,19 @@ void sendApiNotFound(const char *URI)
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send_P(404, PSTR("text/html"), PSTR("<!DOCTYPE HTML><html><head>"));
 
-  strlcpy(cMsg, "<style>body { background-color: lightgray; font-size: 15pt;}", sizeof(cMsg));
-  strlcat(cMsg,  "</style></head><body>", sizeof(cMsg));
+  strlcpy_P(cMsg, PSTR("<style>body { background-color: lightgray; font-size: 15pt;}"), sizeof(cMsg));
+  strlcat_P(cMsg, PSTR("</style></head><body>"), sizeof(cMsg));
   httpServer.sendContent(cMsg);
 
-  strlcpy(cMsg, "<h1>OTGW firmware</h1><b1>", sizeof(cMsg));
+  strlcpy_P(cMsg, PSTR("<h1>OTGW firmware</h1><b1>"), sizeof(cMsg));
   httpServer.sendContent(cMsg);
 
-  strlcpy(cMsg, "<br>[<b>", sizeof(cMsg));
+  strlcpy_P(cMsg, PSTR("<br>[<b>"), sizeof(cMsg));
   strlcat(cMsg, URI, sizeof(cMsg));
-  strlcat(cMsg, "</b>] is not a valid ", sizeof(cMsg));
+  strlcat_P(cMsg, PSTR("</b>] is not a valid "), sizeof(cMsg));
   httpServer.sendContent(cMsg);
   
-  strlcpy(cMsg, "</body></html>\r\n", sizeof(cMsg));
+  strlcpy_P(cMsg, PSTR("</body></html>\r\n"), sizeof(cMsg));
   httpServer.sendContent(cMsg);
 
 } // sendApiNotFound()
