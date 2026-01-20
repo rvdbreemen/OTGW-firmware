@@ -24,7 +24,7 @@ void sendStartJsonObj(const char *objName)
   }else {
     snprintf_P(sBuff, sizeof(sBuff), PSTR("{\"%s\":[\r\n"), objName);
   }
-  httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send_P(200, PSTR("application/json"), PSTR(" "));
   httpServer.sendContent(sBuff);
@@ -48,7 +48,7 @@ void sendEndJsonObj(const char *objName)
 //=======================================================================
 void sendStartJsonArray()
 {
-  httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send_P(200, PSTR("application/json"), PSTR(" "));
   httpServer.sendContent_P(PSTR("[\r\n"));
@@ -232,7 +232,7 @@ void sendStartJsonMap(const char *objName)
   }else {
     snprintf_P(sBuff, sizeof(sBuff), PSTR("{\"%s\":{\r\n"), objName);
   }
-  httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send_P(200, PSTR("application/json"), PSTR(" "));
   httpServer.sendContent(sBuff);
