@@ -36,6 +36,7 @@ extern void sendWebSocketJSON(const char *json);
 extern FSInfo LittleFSinfo;         // LittleFS filesystem information
 extern bool updateLittleFSStatus(const char *probePath);
 extern bool updateLittleFSStatus(const __FlashStringHelper *probePath);
+extern void writeSettings(bool show); // Write settings from ESP memory to filesystem
 
 #ifndef Debug
   //#warning Debug() was not defined!
@@ -233,12 +234,15 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
             LittleFSmounted = LittleFS.begin();
             if (LittleFSmounted) {
               updateLittleFSStatus(F("/.ota_post"));
+              // Restore settings from ESP memory to new filesystem
+              // Settings are still in RAM, just write them back to the new filesystem
+              writeSettings(true);
+              Debugln(F("Filesystem update complete; settings restored from memory"));
             } else {
               // Ensure state is explicitly false and log failure for diagnostics
               LittleFSmounted = false;
               Debugln(F("LittleFS mount failed after filesystem OTA update"));
             }
-            Debugln(F("Filesystem update complete"));
           }
 
           // Clear global flag - flash completed successfully

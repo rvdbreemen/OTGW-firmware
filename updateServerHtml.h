@@ -46,7 +46,7 @@ static const char UpdateServerIndex[] PROGMEM =
             Select a "<b>.littlefs.bin</b>" file to flash<br/>
             <input type='file' accept='.littlefs.bin' name='filesystem' required>
             <br/>
-            <label><input type="checkbox" id="chkPreserve" checked autocomplete="off"> Preserve Settings (auto-backup and restore)</label>
+            <label><input type="checkbox" id="chkPreserve" checked autocomplete="off"> Preserve Settings (auto-restored from memory + backup download)</label>
             <br/>
             <input id='fsSubmit' type='submit' value='Flash LittleFS' disabled>
         </form>
@@ -272,8 +272,8 @@ static const char UpdateServerIndex[] PROGMEM =
                successShown = true;
                if (successPanel) successPanel.style.display = 'block';
                if (target === 'filesystem') {
-                 if (successMessageEl) successMessageEl.textContent = 'Flashing successful. Preparing filesystem...';
-                 handleFilesystemFlashComplete();
+                 if (successMessageEl) successMessageEl.textContent = 'Flashing successful. Settings restored. Rebooting...';
+                 startSuccessCountdown();
                } else {
                  if (successMessageEl) successMessageEl.textContent = 'Flashing successful. Rebooting device...';
                  startSuccessCountdown();
@@ -329,106 +329,6 @@ static const char UpdateServerIndex[] PROGMEM =
             .finally(function() {
               if (timeoutId) clearTimeout(timeoutId);
             });
-        }
-
-        function handleFilesystemFlashComplete() {
-          setTimeout(function() {
-            pollHealthForFilesystem()
-              .then(function() {
-                return restoreSettingsFromStorage();
-              })
-              .then(function() {
-                if (successMessageEl) successMessageEl.textContent = 'Settings restored. Rebooting device...';
-                return rebootDevice();
-              })
-              .catch(function(err) {
-                console.log('Filesystem restore flow error:', err);
-                if (successMessageEl) successMessageEl.textContent = 'Restore failed. Rebooting device...';
-                rebootDevice();
-                // Fallback: reload page after 5 seconds if reboot doesn't happen
-                setTimeout(function() {
-                  window.location.reload();
-                }, 5000);
-              });
-          }, 500);
-        }
-
-        function pollHealthForFilesystem() {
-          var maxAttempts = 60;  // 60 attempts * 500ms = 30 seconds timeout
-          var attempt = 0;
-          return new Promise(function(resolve, reject) {
-            var poll = function() {
-              attempt += 1;
-              fetch('/api/v1/health?t=' + Date.now(), { cache: 'no-store' })
-                .then(function(res) { return res.json(); })
-                .then(function(json) {
-                  var data = json.health || json;
-                  var fsMounted = data.littlefsmounted || data.littlefsMounted || data.filesystemmounted;
-                  if (data.status === 'UP' && fsMounted) {
-                    if (successMessageEl) successMessageEl.textContent = 'Filesystem mounted. Restoring settings...';
-                    resolve();
-                    return;
-                  }
-                  if (attempt >= maxAttempts) {
-                    reject(new Error('Filesystem not mounted'));
-                    return;
-                  }
-                  setTimeout(poll, 500);
-                })
-                .catch(function(err) {
-                  if (attempt >= maxAttempts) {
-                    reject(err);
-                    return;
-                  }
-                  setTimeout(poll, 500);
-                });
-            };
-            poll();
-          });
-        }
-
-        function restoreSettingsFromStorage() {
-          var saved = localStorage.getItem('saved_settings_ini');
-          if (!saved) {
-            if (successMessageEl) successMessageEl.textContent = 'No saved settings found. Rebooting...';
-            return Promise.resolve();
-          }
-          
-          // Parse settings JSON and restore via API
-          try {
-            var settings = JSON.parse(saved);
-            var promises = [];
-            
-            // Iterate through all settings and call API for each
-            for (var key in settings) {
-              if (settings.hasOwnProperty(key)) {
-                var value = settings[key];
-                var payload = JSON.stringify({name: key, value: String(value)});
-                
-                var p = fetch('/api/v0/settings', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: payload
-                }).catch(function(err) {
-                  console.log('Setting restore error for ' + key + ':', err);
-                });
-                
-                promises.push(p);
-              }
-            }
-            
-            return Promise.all(promises).then(function() {
-              localStorage.removeItem('saved_settings_ini');
-            });
-          } catch (err) {
-            console.log('Settings parse error:', err);
-            throw new Error('Settings parse failed');
-          }
-        }
-
-        function rebootDevice() {
-          return fetch('/ReBoot', { method: 'GET' })
-            .catch(function(e) { console.log('Reboot fetch error (expected):', e); });
         }
 
         function scheduleNextPoll(delayMs) {
@@ -551,33 +451,15 @@ static const char UpdateServerIndex[] PROGMEM =
              var action = form.action;
              var preFlight = Promise.resolve();
 
-             // --- Custom logic: append preserve param ---
+             // --- Custom logic: backup settings before filesystem flash ---
              if (formId === 'fsForm') {
                 var chk = document.getElementById('chkPreserve');
                 if(chk && chk.checked) {
-                    // Do not add param to action here, handled in frontend only now
-                    // logic for preserve in backend removed
-                    
-                    // Trigger download as backup and save to localStorage
+                    // Trigger download as backup (settings will be auto-restored from ESP memory)
                     preFlight = fetch('/settings.ini')
                         .then(function(resp) { return resp.blob(); })
                         .then(function(blob) {
-                             // 1. Save to Local Storage
-                             var reader = new FileReader();
-                             reader.onload = function() {
-                                 // Remove any previous saved settings
-                                 localStorage.removeItem('saved_settings_ini');
-                                 try {
-                                    localStorage.setItem('saved_settings_ini', reader.result);
-                                    console.log("Settings saved to localStorage");
-                                 } catch(e) {
-                                     console.log("LocalStorage error:", e);
-                                     alert("Warning: Could not save settings to browser storage. Only download backup will be available.");
-                                 }
-                             };
-                             reader.readAsText(blob);
-
-                             // 2. Trigger Download with unique filename
+                             // Trigger Download with unique filename
                              var now = new Date();
                              var stamp = now.toISOString().replace(/[:.]/g, '-');
                              var filename = 'settings-' + stamp + '.ini';
@@ -715,68 +597,14 @@ static const char UpdateServerSuccess[] PROGMEM =
                 .then(function(d) {
                     var s = d.status || (d.health && d.health.status);
                     if (s === 'UP') {
-                        statusEl.textContent = "Device is UP! Checking for settings restore...";
-                        statusEl.style.color = "blue";
-                        restoreSettingsAndRedirect();
+                        statusEl.textContent = "Device is UP! Redirecting...";
+                        statusEl.style.color = "green";
+                        window.location.href = "/";
                     }
                 })
                 .catch(function(e) {
                    // console.log("Waiting...", e);
                 });
-         }
-         
-         function restoreSettingsAndRedirect() {
-             var saved = localStorage.getItem('saved_settings_ini');
-             if (saved) {
-                 statusEl.textContent = "Restoring settings...";
-                 
-                 // Parse settings JSON and restore via API
-                 try {
-                     var settings = JSON.parse(saved);
-                     var promises = [];
-                     
-                     for (var key in settings) {
-                         if (settings.hasOwnProperty(key)) {
-                             var value = settings[key];
-                             var payload = JSON.stringify({name: key, value: String(value)});
-                             
-                             var p = fetch('/api/v0/settings', {
-                                 method: 'POST',
-                                 headers: { 'Content-Type': 'application/json' },
-                                 body: payload
-                             }).catch(function(err) {
-                                 console.log('Setting restore error:', err);
-                             });
-                             
-                             promises.push(p);
-                         }
-                     }
-                     
-                     Promise.all(promises)
-                         .then(function() {
-                             console.log("Settings restored.");
-                             localStorage.removeItem('saved_settings_ini');
-                             statusEl.textContent = "Settings restored! Redirecting...";
-                             statusEl.style.color = "green";
-                             setTimeout(function() { window.location.href = "/"; }, 1000);
-                         })
-                         .catch(function(err) {
-                             console.error("Restore failed", err);
-                             statusEl.textContent = "Settings restore failed! Redirecting...";
-                             statusEl.style.color = "orange";
-                             setTimeout(function() { window.location.href = "/"; }, 2000);
-                         });
-                 } catch (err) {
-                     console.error("Parse error", err);
-                     statusEl.textContent = "Settings parse failed! Redirecting...";
-                     statusEl.style.color = "orange";
-                     setTimeout(function() { window.location.href = "/"; }, 2000);
-                 }
-             } else {
-                 statusEl.textContent = "Device is UP! Redirecting...";
-                 statusEl.style.color = "green";
-                 window.location.href = "/";
-             }
          }
 
          var countdown = setInterval(function() {
