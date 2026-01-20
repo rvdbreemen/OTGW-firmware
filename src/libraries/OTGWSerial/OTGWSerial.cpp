@@ -53,8 +53,8 @@ OTGWDebugFunction *debugfunc = nullptr;
 static OTGWFirmware firmware = FIRMWARE_UNKNOWN;
 static char fwversion[16];
 
-const char hexbytefmt[] = "%02x";
-const char hexwordfmt[] = "%04x";
+const char hexbytefmt[] PROGMEM = "%02x";
+const char hexwordfmt[] PROGMEM = "%04x";
 
 enum {
     FWSTATE_IDLE,
