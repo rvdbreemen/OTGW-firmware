@@ -31,14 +31,12 @@
 
 // External declarations
 extern bool isESPFlashing;          // ESP flashing state flag
-extern bool isSettingsUploadPending; // settings.ini upload wait flag
-extern uint32_t settingsUploadWaitStartMs;
-extern const uint32_t SETTINGS_UPLOAD_WAIT_MS;
 extern bool LittleFSmounted;        // LittleFS mount status flag
 extern void sendWebSocketJSON(const char *json);
 extern FSInfo LittleFSinfo;         // LittleFS filesystem information
 extern bool updateLittleFSStatus(const char *probePath);
 extern bool updateLittleFSStatus(const __FlashStringHelper *probePath);
+extern void writeSettings(bool show); // Write settings from ESP memory to filesystem
 
 #ifndef Debug
   //#warning Debug() was not defined!
@@ -236,14 +234,18 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
             LittleFSmounted = LittleFS.begin();
             if (LittleFSmounted) {
               updateLittleFSStatus(F("/.ota_post"));
+              // Restore settings from ESP memory to new filesystem
+              // During filesystem-only OTA, only the LittleFS partition is erased/written.
+              // The ESP8266 continues running the current firmware and RAM remains intact.
+              // All settings loaded at boot (global variables like settingHostname, etc.)
+              // are still valid in RAM, so we write them back to the fresh filesystem.
+              writeSettings(true);
+              Debugln(F("Filesystem update complete; settings restored from memory"));
             } else {
               // Ensure state is explicitly false and log failure for diagnostics
               LittleFSmounted = false;
               Debugln(F("LittleFS mount failed after filesystem OTA update"));
             }
-            isSettingsUploadPending = true;
-            settingsUploadWaitStartMs = millis();
-            Debugln(F("Filesystem update complete; waiting for settings.ini upload"));
           }
 
           // Clear global flag - flash completed successfully
