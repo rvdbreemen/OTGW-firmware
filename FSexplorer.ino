@@ -63,13 +63,37 @@ const char Header[] PROGMEM = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCa
 //=====================================================================================
 void startWebserver(){
   if (!LittleFS.exists("/index.html")) {
-    httpServer.serveStatic("/",           LittleFS, "/FSexplorer.html");
-    httpServer.serveStatic("/index",      LittleFS, "/FSexplorer.html");
-    httpServer.serveStatic("/index.html", LittleFS, "/FSexplorer.html");
+    httpServer.on("/", []() {
+      File f = LittleFS.open("/FSexplorer.html", "r");
+      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
+      f.close();
+    });
+    httpServer.on("/index", []() {
+      File f = LittleFS.open("/FSexplorer.html", "r");
+      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
+      f.close();
+    });
+    httpServer.on("/index.html", []() {
+      File f = LittleFS.open("/FSexplorer.html", "r");
+      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
+      f.close();
+    });
   } else{
-    httpServer.serveStatic("/",           LittleFS, "/index.html");
-    httpServer.serveStatic("/index",      LittleFS, "/index.html");
-    httpServer.serveStatic("/index.html", LittleFS, "/index.html");
+    httpServer.on("/", []() {
+      File f = LittleFS.open("/index.html", "r");
+      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
+      f.close();
+    });
+    httpServer.on("/index", []() {
+      File f = LittleFS.open("/index.html", "r");
+      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
+      f.close();
+    });
+    httpServer.on("/index.html", []() {
+      File f = LittleFS.open("/index.html", "r");
+      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
+      f.close();
+    });
   } 
   httpServer.serveStatic("/FSexplorer.png",   LittleFS, "/FSexplorer.png");
   httpServer.serveStatic("/index.css", LittleFS, "/index.css");
@@ -90,12 +114,20 @@ void setupFSexplorer(){
   LittleFS.begin();
   if (LittleFS.exists("/FSexplorer.html")) 
   {
-    httpServer.serveStatic("/FSexplorer.html", LittleFS, "/FSexplorer.html");
-    httpServer.serveStatic("/FSexplorer",      LittleFS, "/FSexplorer.html");
+    httpServer.on("/FSexplorer.html", []() {
+      File f = LittleFS.open("/FSexplorer.html", "r");
+      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
+      f.close();
+    });
+    httpServer.on("/FSexplorer", []() {
+      File f = LittleFS.open("/FSexplorer.html", "r");
+      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
+      f.close();
+    });
   }
   else 
   {
-    httpServer.send_P(200, PSTR("text/html"), Helper); //Upload the FSexplorer.html
+    httpServer.send_P(200, PSTR("text/html; charset=UTF-8"), Helper); //Upload the FSexplorer.html
   }
   httpServer.on("/api/firmwarefilelist", apifirmwarefilelist); 
   httpServer.on("/api/listfiles", apilistfiles);
@@ -145,6 +177,7 @@ void apifirmwarefilelist() {
   DebugTf(PSTR("dirpath=%s\r\n"), dirpath.c_str());
   
   // Start chunked response with JSON array opening
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send(200, F("application/json"), F(""));
   httpServer.sendContent(F("["));
@@ -282,6 +315,7 @@ void apilistfiles()             // Senden aller Daten an den Client
     fileNr++;
   }
 
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send(200, F("application/json"), F(""));
   httpServer.sendContent(F("["));
@@ -331,7 +365,7 @@ bool handleFile(String&& path)
     httpServer.sendContent(Header);
     return true;
   }
-  if (!LittleFS.exists("/FSexplorer.html")) httpServer.send_P(200, PSTR("text/html"), Helper); //Upload the FSexplorer.html
+  if (!LittleFS.exists("/FSexplorer.html")) httpServer.send_P(200, PSTR("text/html; charset=UTF-8"), Helper); //Upload the FSexplorer.html
   if (path.endsWith("/")) path += F("index.html");
   return LittleFS.exists(path) ? ({File f = LittleFS.open(path, "r"); httpServer.streamFile(f, contentType(path)); f.close(); true;}) : false;
 
@@ -397,7 +431,7 @@ const String formatBytes(size_t const& bytes)
 //=====================================================================================
 const String &contentType(String& filename) 
 {       
-  if (filename.endsWith(".htm") || filename.endsWith(".html")) filename = F("text/html");
+  if (filename.endsWith(".htm") || filename.endsWith(".html")) filename = F("text/html; charset=UTF-8");
   else if (filename.endsWith(".css")) filename = F("text/css");
   else if (filename.endsWith(".js")) filename = F("application/javascript");
   else if (filename.endsWith(".json")) filename = F("application/json");
@@ -460,7 +494,7 @@ void doRedirect(String msg, int wait, const char* URL, bool reboot)
   // add non-JS fallback for redirect
   httpServer.sendHeader(F("Refresh"), String(safeWait) + F(";url=") + safeURL);
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  httpServer.send(200, F("text/html"), F(""));
+  httpServer.send(200, F("text/html; charset=UTF-8"), F(""));
 
   char waitBuf[12];
   snprintf_P(waitBuf, sizeof(waitBuf), PSTR("%d"), safeWait);
