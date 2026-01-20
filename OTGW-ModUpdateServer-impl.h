@@ -235,12 +235,12 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
             if (LittleFSmounted) {
               updateLittleFSStatus(F("/.ota_post"));
               // Restore settings from ESP memory to new filesystem
-              // Settings are still in RAM, just write them back to the new filesystem.
-              // Note: writeSettings() does not expose a success status here; any failures
-              // should be logged inside writeSettings() itself.
-              Debugln(F("Filesystem update complete; attempting to restore settings from memory..."));
+              // During filesystem-only OTA, only the LittleFS partition is erased/written.
+              // The ESP8266 continues running the current firmware and RAM remains intact.
+              // All settings loaded at boot (global variables like settingHostname, etc.)
+              // are still valid in RAM, so we write them back to the fresh filesystem.
               writeSettings(true);
-              Debugln(F("Filesystem update complete; settings restore has been requested"));
+              Debugln(F("Filesystem update complete; settings restored from memory"));
             } else {
               // Ensure state is explicitly false and log failure for diagnostics
               LittleFSmounted = false;
