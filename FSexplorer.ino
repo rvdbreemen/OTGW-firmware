@@ -40,8 +40,6 @@
 */
 #define MAX_FILES_IN_LIST   40
 
-extern bool isSettingsUploadPending;
-
 const char Helper[] =
   "<br>You first need to upload these two files:\n"
   "<ul>\n"
@@ -342,12 +340,6 @@ void handleFileUpload()
     if (fsUploadFile)
       fsUploadFile.close();
     DebugT(F("FileUpload Size: ")); Debugln((String)upload.totalSize);
-    if (isSettingsUploadPending) {
-      if (strcasecmp_P(upload.filename.c_str(), PSTR("settings.ini")) == 0) {
-        isSettingsUploadPending = false;
-        DebugTln(F("Settings.ini upload detected, clearing wait flag"));
-      }
-    }
     httpServer.sendContent(Header);
   }
   
