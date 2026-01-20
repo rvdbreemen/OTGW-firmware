@@ -213,7 +213,7 @@ void updateSetting(const char *field, const char *newValue)
   if (strcasecmp_P(field, PSTR("hostname"))==0) 
   { //make sure we have a valid hostname here...
     strlcpy(settingHostname, newValue, sizeof(settingHostname));
-    if (strlen(settingHostname)==0) snprintf(settingHostname, sizeof(settingHostname), "OTGW-%06x", (unsigned int)ESP.getChipId());
+    if (strlen(settingHostname)==0) snprintf_P(settingHostname, sizeof(settingHostname), PSTR("OTGW-%06x"), (unsigned int)ESP.getChipId());
     
     //strip away anything beyond the dot
     char *dot = strchr(settingMQTTtopTopic, '.');
