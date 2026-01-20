@@ -2251,7 +2251,7 @@ void upgradepic() {
     }
   }
   httpServer.sendHeader(F("Location"), F("index.html#tabPICflash"), true);
-  httpServer.send_P(303, PSTR("text/html"), PSTR("<a href='index.html#tabPICflash'>Return</a>"));
+  httpServer.send_P(303, PSTR("text/html; charset=UTF-8"), PSTR("<a href='index.html#tabPICflash'>Return</a>"));
 }
 
 /***************************************************************************

@@ -795,7 +795,7 @@ void sendApiNotFound(const char *URI)
 {
   httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  httpServer.send_P(404, PSTR("text/html"), PSTR("<!DOCTYPE HTML><html><head>"));
+  httpServer.send_P(404, PSTR("text/html; charset=UTF-8"), PSTR("<!DOCTYPE HTML><html><head>"));
 
   httpServer.sendContent_P(PSTR("<style>body { background-color: lightgray; font-size: 15pt;}</style></head><body>"));
   httpServer.sendContent_P(PSTR("<h1>OTGW firmware</h1><b1>"));
