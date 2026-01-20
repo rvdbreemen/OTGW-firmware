@@ -272,7 +272,7 @@ static const char UpdateServerIndex[] PROGMEM =
                successShown = true;
                if (successPanel) successPanel.style.display = 'block';
                if (target === 'filesystem') {
-                 if (successMessageEl) successMessageEl.textContent = 'Flashing successful. Settings restored. Rebooting...';
+                 if (successMessageEl) successMessageEl.textContent = 'Flashing successful. Rebooting filesystem...';
                  startSuccessCountdown();
                } else {
                  if (successMessageEl) successMessageEl.textContent = 'Flashing successful. Rebooting device...';
