@@ -77,12 +77,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
           return;
         }
         
-        if (wsClientCount >= MAX_WS_CLIENTS) {
-          DebugTf(PSTR("WebSocket[%u] connection rejected: Max clients (%d) reached\r\n"), num, MAX_WS_CLIENTS);
-          webSocket.disconnect(num);
-          return;
-        }
-
         IPAddress ip = webSocket.remoteIP(num);
         wsClientCount++;
         DebugTf(PSTR("WebSocket[%u] connected from %d.%d.%d.%d. Clients: %u\r\n"), 
