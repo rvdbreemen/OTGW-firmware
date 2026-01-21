@@ -3,7 +3,8 @@
 #define UPDATESERVERHTML_H
 
 static const char UpdateServerIndex[] PROGMEM =
-  R"(<html charset="UTF-8">
+  R"(<!DOCTYPE html>
+<html charset="UTF-8">
      <head>
      <link rel="stylesheet" type="text/css" href="/index.css" id="theme-style">
      <script>
