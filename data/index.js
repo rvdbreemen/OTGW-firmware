@@ -136,7 +136,7 @@ window.saveBlobToLogDir = async function(filename, blob) {
 const WEBSOCKET_PORT = 81;
 let wsReconnectTimer = null;
 let wsWatchdogTimer = null;
-const WS_WATCHDOG_TIMEOUT = 10000; // 10 seconds timeout for silence
+const WS_WATCHDOG_TIMEOUT = 45000; // 45 seconds timeout (allows for 30s keepalive + 15s margin)
 
 //============================================================================
 function resetWSWatchdog() {
@@ -246,6 +246,12 @@ function initOTLogWebSocket(force) {
     
     otLogWS.onmessage = function(event) {
       resetWSWatchdog();
+
+      // Handle keepalive messages (don't log or add to buffer)
+      if (typeof event.data === 'string' && event.data.includes('"type":"keepalive"')) {
+        console.log("OT Log WS keepalive received");
+        return;
+      }
 
       // Always log the raw incoming message
       console.log("OT Log WS received:", event.data);

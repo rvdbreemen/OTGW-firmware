@@ -48,6 +48,10 @@ static uint8_t wsClientCount = 0;
 // Track WebSocket initialization state
 static bool wsInitialized = false;
 
+// Application-level keepalive tracking
+static unsigned long lastKeepaliveMs = 0;
+const unsigned long KEEPALIVE_INTERVAL_MS = 30000; // 30 seconds
+
 //===========================================================================================
 // WebSocket event handler
 //===========================================================================================
@@ -130,8 +134,14 @@ void sendWebSocketJSON(const char *json) {
 void startWebSocket() {
   webSocket.begin();
   webSocket.onEvent(webSocketEvent);
+  
+  // Enable heartbeat to keep connections alive and detect dead connections
+  // Ping every 15 seconds, expect pong within 3 seconds, disconnect after 2 missed pongs
+  // This prevents NAT/firewall timeout and detects stale connections
+  webSocket.enableHeartbeat(15000, 3000, 2);
+  
   wsInitialized = true;
-  DebugTln(F("WebSocket server started on port 81"));
+  DebugTln(F("WebSocket server started on port 81 with heartbeat enabled"));
 }
 
 //===========================================================================================
@@ -139,6 +149,16 @@ void startWebSocket() {
 //===========================================================================================
 void handleWebSocket() {
   webSocket.loop();
+  
+  // Send application-level keepalive every 30 seconds
+  // This ensures watchdog timers stay alive even when no OTGW log messages flow
+  // Also works around Safari WebSocket ping/pong quirks
+  unsigned long now = millis();
+  if (wsInitialized && wsClientCount > 0 && 
+      (now - lastKeepaliveMs) >= KEEPALIVE_INTERVAL_MS) {
+    webSocket.broadcastTXT("{\"type\":\"keepalive\"}");
+    lastKeepaliveMs = now;
+  }
 }
 
 //===========================================================================================
@@ -146,8 +166,6 @@ void handleWebSocket() {
 // This is called from OTGW-Core.ino when a new log line is ready
 // Simplified: no queue, no JSON, just direct text broadcasting
 //===========================================================================================
-DECLARE_TIMER_MS(timerWSThrottle, 50, SKIP_MISSED_TICKS); // Max ~20 msgs/sec
-
 void sendLogToWebSocket(const char* logMessage) {
   if (wsInitialized && wsClientCount > 0 && logMessage != nullptr) {
     webSocket.broadcastTXT(logMessage);

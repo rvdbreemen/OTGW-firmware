@@ -27,6 +27,7 @@
 #include <LittleFS.h>
 #include "StreamString.h"
 #include "Wire.h"
+#include "safeTimers.h"
 #include "OTGW-ModUpdateServer.h"
 
 // External declarations
@@ -108,15 +109,10 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _server->client().setNoDelay(true);
         _server->send_P(200, PSTR("text/html"), _serverSuccess);
         _server->client().stop();
-        if (_status.target != "filesystem") {
-          delay(1000);
-          ESP.restart();
-          delay(3000);
-        } else {
-          // Ensure HTTP response is fully sent before unmounting filesystem
-          delay(100);
-          LittleFS.end();
-        }
+        // Reboot for BOTH firmware and filesystem
+        delay(1000);
+        ESP.restart();
+        delay(3000);
       }
     },[&](){
       // handler for the file upload, get's the sketch bytes, and writes
@@ -361,7 +357,13 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_setStatus(uint8_t phase, cons
   );
   
   if (written > 0 && written < (int)sizeof(buf)) {
-      sendWebSocketJSON(buf);
+      // Throttle WebSocket broadcasts during flash to prevent network stack interference
+      // Send updates max twice per second (500ms) to avoid overwhelming ESP8266's limited buffers
+      // EXCEPT for final/error states - always send those immediately
+      DECLARE_TIMER_MS(timerWSJSONThrottle, 500, SKIP_MISSED_TICKS);
+      if (_status.phase == UPDATE_END || _status.phase == UPDATE_ERROR || _status.phase == UPDATE_ABORT || DUE(timerWSJSONThrottle)) {
+        sendWebSocketJSON(buf);
+      }
   }
 }
 

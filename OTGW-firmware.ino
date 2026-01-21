@@ -83,9 +83,7 @@ void setup() {
   startLLMNR(CSTR(settingHostname));
   setupFSexplorer();
   startWebserver();
-#ifndef DISABLE_WEBSOCKET
   startWebSocket();          // start the WebSocket server for OT log streaming
-#endif
   startMQTT();               // start the MQTT after webserver, always.
  
   initWatchDog();            // setup the WatchDog
@@ -147,9 +145,7 @@ void restartWifi(){
     startTelnet();
     startOTGWstream(); 
     startMQTT();
-#ifndef DISABLE_WEBSOCKET
     startWebSocket(); // Restart WebSocket server
-#endif
     iTryRestarts = 0; //reset attempt counter
     return;
   }
@@ -318,22 +314,20 @@ void doBackgroundTasks()
       handleDebug();              // Keep telnet debug active for monitoring
       httpServer.handleClient();  // MUST continue - processes upload chunks
       MDNS.update();              // Keep MDNS active for network discovery
-      delay(1);
-      return;
+      handleWebSocket();        // Process WebSocket events during flash
+    } else {
+      //while connected handle everything that uses network stuff
+      handleDebug();
+      handleMQTT();                 // MQTT transmissions
+      handleOTGW();                 // OTGW handling
+      handleWebSocket();            // WebSocket handling for OT log streaming
+      httpServer.handleClient();
+      MDNS.update();
+      loopNTP();
     }
-    
-    //while connected handle everything that uses network stuff
-    handleDebug();
-    handleMQTT();                 // MQTT transmissions
-    handleOTGW();                 // OTGW handling
-#ifndef DISABLE_WEBSOCKET
-    handleWebSocket();            // WebSocket handling for OT log streaming
-#endif
-    httpServer.handleClient();
-    MDNS.update();
-    loopNTP();
   } //otherwise, just wait until reconnected gracefully
   delay(1);
+  return;
 }
 
 void loop()
@@ -344,17 +338,21 @@ void loop()
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS);
   
-  if (DUE(timerpollsensor))         pollSensors();    // poll the temperature sensors connected to 2wire gpio pin 
-  if (DUE(timers0counter))          sendS0Counters(); // poll the s0 counter connected to gpio pin when due
-  if (DUE(timer5min))               do5minevent();
-  if (DUE(timer60s))                doTaskEvery60s();
-  if (DUE(timer30s))                doTaskEvery30s();
-  if (DUE(timer5s))                 doTaskEvery5s();
-  if (DUE(timer1s))                 doTaskEvery1s();
-  if (minuteChanged())              doTaskMinuteChanged(); //exactly on the minute
-  evalOutputs();                    // when the bits change, the output gpio bit will follow
-  doBackgroundTasks();
-  handlePendingUpgrade();          // Check if we need to start an upgrade
+  if (!isESPFlashing) {
+    // Only run these tasks when NOT flashing ESP firmware
+      if (DUE(timerpollsensor))         pollSensors();    // poll the temperature sensors connected to 2wire gpio pin 
+      if (DUE(timers0counter))          sendS0Counters(); // poll the s0 counter connected to gpio pin when due
+      if (DUE(timer5min))               do5minevent();  
+      if (DUE(timer60s))                doTaskEvery60s();
+      if (DUE(timer30s))                doTaskEvery30s();
+      if (DUE(timer5s))                 doTaskEvery5s();
+      if (DUE(timer1s))                 doTaskEvery1s();
+      if (minuteChanged())              doTaskMinuteChanged(); //exactly on the minute
+      evalOutputs();                    // when the bits change, the output gpio bit will follow
+      handlePendingUpgrade();           // Check if we need to start an upgrade
+    } 
+
+  doBackgroundTasks();              // run background tasks
 }
 
 
