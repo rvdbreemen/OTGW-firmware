@@ -125,6 +125,9 @@ static const char UpdateServerIndex[] PROGMEM =
          var lastUploadLoaded = 0;
          var lastUploadTotal = 0;
          var formErrorEl = document.getElementById('formError');
+         var lastWsMessageTime = 0;
+         var wsWatchdogTimer = null;
+         var wsActive = false;
 
          function showProgressPage(title) {
            pageForm.style.display = 'none';
@@ -341,7 +344,10 @@ static const char UpdateServerIndex[] PROGMEM =
           if (!pollActive || pollInFlight) return;
           pollTimer = null;
           pollInFlight = true;
-          var timeoutMs = Math.max(500, pollIntervalMs * 4);
+          // During flash operations, ESP is busy writing - use longer timeout to prevent aborts
+          // When upload is in flight or device is actively flashing, allow up to 5 seconds
+          var baseTimeout = (uploadInFlight || (lastUploadTotal > 0 && !localUploadDone)) ? 5000 : pollIntervalMs * 4;
+          var timeoutMs = Math.max(500, baseTimeout);
           fetchStatus(timeoutMs)
             .then(function() {
               pollIntervalMs = Math.max(pollMinMs, Math.floor(pollIntervalMs / 2));
@@ -369,6 +375,18 @@ static const char UpdateServerIndex[] PROGMEM =
           }
         }
 
+        function startWsWatchdog() {
+          if (wsWatchdogTimer) clearTimeout(wsWatchdogTimer);
+          wsWatchdogTimer = setTimeout(function() {
+            // WebSocket has been silent for 15 seconds - restart polling as fallback
+            if (!pollActive) {
+              console.log('WebSocket silent for 15s, restarting polling as fallback');
+              wsActive = false;
+              startPolling();
+            }
+          }, 15000);
+        }
+
         // WebSocket Support for Real-time Progress
         function setupWebSocket() {
             var wsUrl = 'ws://' + window.location.hostname + ':81/';
@@ -386,7 +404,15 @@ static const char UpdateServerIndex[] PROGMEM =
                     var msg = JSON.parse(e.data);
                     // Check if it's an update status message
                     if (msg && typeof msg.state !== 'undefined') {
-                      // Keep HTTP polling active as a fallback in case WS updates pause
+                      lastWsMessageTime = Date.now();
+                      // First WebSocket message received - stop polling, WebSocket takes over
+                      if (!wsActive) {
+                        wsActive = true;
+                        stopPolling();
+                        console.log('WebSocket active, polling stopped');
+                      }
+                      // Reset watchdog - if WS goes silent for 15s, polling will restart
+                      startWsWatchdog();
                       updateDeviceStatus(msg);
                     }
                 } catch(err) {
@@ -399,6 +425,16 @@ static const char UpdateServerIndex[] PROGMEM =
             };
             
             ws.onclose = function() {
+                // WebSocket closed - restart polling immediately as fallback
+                wsActive = false;
+                if (wsWatchdogTimer) {
+                  clearTimeout(wsWatchdogTimer);
+                  wsWatchdogTimer = null;
+                }
+                if (!pollActive) {
+                  console.log('WS Closed, restarting polling');
+                  startPolling();
+                }
                 // simple reconnect logic
                 if (window.location.hash !== '#done') { // Don't reconnect if we are done/navigating away
                    console.log('WS Closed, retrying in 2s');
