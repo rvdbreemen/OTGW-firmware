@@ -215,11 +215,11 @@ var OTGraph = {
         this.seriesConfig.forEach(c => {
              if (this.data[c.id]) {
                  this.data[c.id].forEach(pt => {
-                     // pt is [timestamp, value]
-                     if (pt[0] >= startTime) {
+                     // pt is {name: time, value: [timestamp, value]}
+                     if (pt.value[0] >= startTime) {
                          // Format timestamp to ISO
-                         var ts = new Date(pt[0]).toISOString();
-                         csv += `${ts},${c.name},${pt[1]}\n`;
+                         var ts = new Date(pt.value[0]).toISOString();
+                         csv += `${ts},${c.label},${pt.value[1]}\n`;
                      }
                  });
              }
