@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OTGW Memory Monitoring Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #e6ffff;
+        }
+        .demo-section {
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+        }
+        .ot-log-footer {
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #495057;
+        }
+        .ot-log-footer span {
+            margin-right: 15px;
+        }
+        .mem-status {
+            font-family: monospace;
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        .mem-status.mem-green {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .mem-status.mem-yellow {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .mem-status.mem-red {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .storage-status {
+            font-size: 11px;
+            color: #666;
+        }
+        .warning-banner, .recovery-banner {
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-size: 13px;
+        }
+        .warning-banner.warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+        }
+        .warning-banner.critical {
+            background-color: #f8d7da;
+            border: 1px solid #dc3545;
+            color: #721c24;
+        }
+        .recovery-banner {
+            background-color: #d1ecf1;
+            border: 1px solid #17a2b8;
+            color: #0c5460;
+        }
+        .btn-inline {
+            padding: 4px 8px;
+            margin: 0 4px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .btn-inline:hover {
+            background-color: #0056b3;
+        }
+        .btn-close {
+            float: right;
+            background: transparent;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 0 5px;
+            color: inherit;
+        }
+        .code-block {
+            background: #f4f4f4;
+            border-left: 3px solid #007bff;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .scenario {
+            background: #f8f9fa;
+            border-left: 4px solid #28a745;
+            padding: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 OTGW Firmware - Memory Monitoring & Data Persistence Demo</h1>
+    
+    <div class="demo-section">
+        <h2>📊 Normal Operation (Green Status)</h2>
+        <p>Memory usage is healthy, all systems normal.</p>
+        
+        <div class="ot-log-footer">
+            <span>Lines: <span id="logLineCount">15,234</span><span id="logLimitDisplay"> / 1000000</span></span>
+            <span>Filtered: <span id="logFilteredCount">15,234</span></span>
+            <span>Mem: <span id="memUsage">45.2</span> MB</span>
+            <span class="mem-status mem-green">Buffer: 45.1 MB | Heap: 180.5 / 2048 MB (8.8%) 🟢</span>
+            <span class="storage-status">Storage: 245.3 MB / 5.2 GB (4.7%) 🟢</span>
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>⚠️ Warning Status (Yellow - 80% Memory)</h2>
+        <p>Memory usage is approaching limits. User is warned to take action.</p>
+        
+        <div class="warning-banner warning">
+            ⚠️ Memory usage is high. 
+            <button class="btn-inline">Enable Capture Mode</button> or 
+            <button class="btn-inline">Stream to File</button>
+            <button class="btn-close">✖</button>
+        </div>
+        
+        <div class="ot-log-footer">
+            <span>Lines: <span>85,432</span> / 1000000</span>
+            <span>Filtered: <span>85,432</span></span>
+            <span>Mem: <span>412.5</span> MB</span>
+            <span class="mem-status mem-yellow">Buffer: 412.1 MB | Heap: 1680.3 / 2048 MB (82.0%) 🟡</span>
+            <span class="storage-status">Storage: 1.2 GB / 5.2 GB (23.1%) 🟢</span>
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>🔴 Critical Status (Red - 95% Memory)</h2>
+        <p>Memory is critical! System automatically trimmed oldest logs to prevent crash.</p>
+        
+        <div class="warning-banner critical">
+            🔴 Memory critical! Oldest logs were removed to prevent crash. 
+            <button class="btn-inline">Enable File Streaming</button>
+            <button class="btn-close">✖</button>
+        </div>
+        
+        <div class="ot-log-footer">
+            <span>Lines: <span>95,000</span> / 1000000</span>
+            <span>Filtered: <span>95,000</span></span>
+            <span>Mem: <span>476.8</span> MB</span>
+            <span class="mem-status mem-red">Buffer: 476.3 MB | Heap: 1946.2 / 2048 MB (95.0%) 🔴</span>
+            <span class="storage-status">Storage: 1.8 GB / 5.2 GB (34.6%) 🟢</span>
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>💾 Session Recovery Available</h2>
+        <p>User returns to page and finds a previous session that can be recovered.</p>
+        
+        <div class="recovery-banner">
+            ℹ️ Found previous session from 23:45 with 15,234 log lines. 
+            <button class="btn-inline">Recover</button>
+            <button class="btn-inline">Ignore</button>
+        </div>
+        
+        <div class="ot-log-footer">
+            <span>Lines: <span>0</span> / 2000</span>
+            <span>Filtered: <span>0</span></span>
+            <span>Mem: <span>0.0</span> MB</span>
+            <span class="mem-status mem-green">Buffer: 0.0 MB | Heap: 45.2 / 2048 MB (2.2%) 🟢</span>
+            <span class="storage-status">Storage: 245.3 MB / 5.2 GB (4.7%) 🟢</span>
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>📈 Usage Scenarios</h2>
+        
+        <div class="scenario">
+            <h3>Scenario 1: Small Dataset (< 1,000 lines)</h3>
+            <div class="code-block">
+Storage Mode: In-memory only<br>
+Memory: ~5 MB<br>
+IndexedDB: Not used<br>
+localStorage: UI state only<br>
+Behavior: Fast, no persistence needed
+            </div>
+        </div>
+        
+        <div class="scenario">
+            <h3>Scenario 2: Medium Dataset (1,000 - 10,000 lines)</h3>
+            <div class="code-block">
+Storage Mode: localStorage backup<br>
+Memory: ~50 MB<br>
+IndexedDB: Not used<br>
+localStorage: UI state + last 1000 lines<br>
+Behavior: Fast recovery on reload (< 5 min)
+            </div>
+        </div>
+        
+        <div class="scenario">
+            <h3>Scenario 3: Large Dataset (> 10,000 lines)</h3>
+            <div class="code-block">
+Storage Mode: IndexedDB<br>
+Memory: ~500 MB (or more in capture mode)<br>
+IndexedDB: All logs saved<br>
+localStorage: UI state only<br>
+Behavior: Full recovery after tab close (< 1 hour)
+            </div>
+        </div>
+        
+        <div class="scenario">
+            <h3>Scenario 4: Very Large Dataset (> 100,000 lines)</h3>
+            <div class="code-block">
+Storage Mode: File Streaming + IndexedDB<br>
+Memory: Bounded to ~400 MB (auto-offload)<br>
+File: Unlimited (local disk)<br>
+IndexedDB: Recent logs only<br>
+Behavior: Unlimited storage, memory-safe
+            </div>
+        </div>
+        
+        <div class="scenario">
+            <h3>Scenario 5: Memory Critical</h3>
+            <div class="code-block">
+Storage Mode: Any<br>
+Memory: > 475 MB (95% of 500 MB limit)<br>
+Action: Auto-trim 25% of oldest logs<br>
+Warning: Critical banner displayed<br>
+Behavior: Prevents browser crash
+            </div>
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>🔧 Implementation Details</h2>
+        
+        <h3>Memory Monitoring</h3>
+        <div class="code-block">
+Interval: Every 5 seconds<br>
+API: performance.memory (Chrome/Edge) or estimation (Firefox/Safari)<br>
+Thresholds:<br>
+  - Green: < 400 MB (< 80%)<br>
+  - Yellow: 400-475 MB (80-95%)<br>
+  - Red: > 475 MB (> 95%)<br>
+Auto-trim: Removes 25% of oldest logs when red
+        </div>
+        
+        <h3>Auto-Save Strategy</h3>
+        <div class="code-block">
+Interval: Every 10 seconds (batched)<br>
+Storage: IndexedDB for large datasets, localStorage for small<br>
+On Unload: Save current state to localStorage + IndexedDB<br>
+Recovery: Check for sessions < 1 hour old on page load
+        </div>
+        
+        <h3>Storage Quotas</h3>
+        <div class="code-block">
+IndexedDB: Typically > 1 GB (browser-dependent)<br>
+localStorage: 5-10 MB (browser-dependent)<br>
+Monitoring: navigator.storage.estimate()<br>
+Display: Color-coded usage indicator in footer
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>✅ Browser Compatibility</h2>
+        <table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse: collapse;">
+            <tr style="background: #007bff; color: white;">
+                <th>Feature</th>
+                <th>Chrome/Edge</th>
+                <th>Firefox</th>
+                <th>Safari</th>
+            </tr>
+            <tr>
+                <td>Memory Monitoring</td>
+                <td style="background: #d4edda;">✅ Full (API)</td>
+                <td style="background: #fff3cd;">⚠️ Estimated</td>
+                <td style="background: #fff3cd;">⚠️ Estimated</td>
+            </tr>
+            <tr>
+                <td>IndexedDB</td>
+                <td style="background: #d4edda;">✅ Yes</td>
+                <td style="background: #d4edda;">✅ Yes</td>
+                <td style="background: #d4edda;">✅ Yes</td>
+            </tr>
+            <tr>
+                <td>localStorage</td>
+                <td style="background: #d4edda;">✅ Yes</td>
+                <td style="background: #d4edda;">✅ Yes</td>
+                <td style="background: #d4edda;">✅ Yes</td>
+            </tr>
+            <tr>
+                <td>Storage Quota API</td>
+                <td style="background: #d4edda;">✅ Yes</td>
+                <td style="background: #d4edda;">✅ Yes</td>
+                <td style="background: #d4edda;">✅ Yes</td>
+            </tr>
+            <tr>
+                <td>Session Recovery</td>
+                <td style="background: #d4edda;">✅ Yes</td>
+                <td style="background: #d4edda;">✅ Yes</td>
+                <td style="background: #d4edda;">✅ Yes</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="demo-section">
+        <h2>📚 Documentation</h2>
+        <p>For complete documentation, see:</p>
+        <ul>
+            <li><strong>BROWSER_MEMORY_SCENARIOS.md</strong> - Detailed analysis of 5 implementation scenarios</li>
+            <li><strong>MEMORY_MONITORING_DEMO.md</strong> - Feature overview and usage guide</li>
+            <li><strong>index.js</strong> - Complete implementation code</li>
+        </ul>
+    </div>
+
+    <div class="demo-section">
+        <h2>🎯 Summary</h2>
+        <p><strong>3-5 Scenarios Delivered:</strong></p>
+        <ol>
+            <li>✅ <strong>Enhanced Memory Monitoring</strong> - Real-time tracking with auto-protection</li>
+            <li>✅ <strong>IndexedDB Persistent Storage</strong> - Unlimited data, survives tab close</li>
+            <li>✅ <strong>localStorage Quick State</strong> - Fast UI preferences and backup</li>
+            <li>✅ <strong>Hybrid Smart Mode</strong> - Auto-selects best storage (RECOMMENDED)</li>
+            <li>⏳ <strong>Enhanced File Streaming</strong> - Existing feature, future enhancement</li>
+        </ol>
+        
+        <p><strong>Key Benefits:</strong></p>
+        <ul>
+            <li>🛡️ Prevents browser crashes with automatic memory management</li>
+            <li>💾 Recovers data after page reload or tab close</li>
+            <li>⚡ Smart storage selection based on data size</li>
+            <li>🌐 Works on all modern browsers with graceful fallback</li>
+            <li>📊 Real-time monitoring with visual indicators</li>
+            <li>🔄 Automatic background saves every 10 seconds</li>
+            <li>🧹 Automatic cleanup of old sessions (7-day retention)</li>
+        </ul>
+    </div>
+</body>
+</html>
