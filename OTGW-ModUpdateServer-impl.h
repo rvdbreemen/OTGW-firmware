@@ -193,11 +193,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         // Feed the dog on every chunk (Main branch behavior)
         Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
         
-        size_t written = Update.write(upload.buf, upload.currentSize);
+        // Update status and send WebSocket BEFORE the blocking flash write
+        // This ensures progress updates reach the browser even if the write blocks for 10+ seconds
         _status.upload_received = upload.totalSize;
-        
-        // Manual Status Update for WebSockets/Progress
-        // Throttle updates to percentage changes to avoid flooding WebSockets
         if (_status.flash_total > 0) {
            _status.flash_written = _status.upload_received; // approximation based on upload
            int currentPerc = (_status.flash_written * 100) / _status.flash_total;
@@ -206,6 +204,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
              _setStatus(UPDATE_WRITE, _status.target, _status.flash_written, _status.flash_total, _status.filename, emptyString);
            }
         }
+        
+        // Now perform the blocking flash write
+        size_t written = Update.write(upload.buf, upload.currentSize);
 
         if (written != upload.currentSize) {
           _setUpdaterError();
@@ -213,7 +214,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
         if(Update.end(true)){ //true to set the size to the current progress
-          if (_serial_output) Debugf(PSTR("\r\nUpdate Success: %u\r\nRebooting...\r\n"), upload.totalSize);
+          if (_serial_output) Debugf(PSTR("\r\nUpdate Success: %u\r\n"), upload.totalSize);
           _status.upload_received = upload.totalSize;
           if (_status.upload_total == 0 && upload.totalSize > 0) {
             _status.upload_total = upload.totalSize;
@@ -236,12 +237,17 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
               // All settings loaded at boot (global variables like settingHostname, etc.)
               // are still valid in RAM, so we write them back to the fresh filesystem.
               writeSettings(true);
-              Debugln(F("Filesystem update complete; settings restored from memory"));
+              if (_serial_output) Debugln(F("Filesystem update complete; settings restored from memory"));
             } else {
               // Ensure state is explicitly false and log failure for diagnostics
               LittleFSmounted = false;
-              Debugln(F("LittleFS mount failed after filesystem OTA update"));
+              if (_serial_output) Debugln(F("LittleFS mount failed after filesystem OTA update"));
             }
+          }
+          
+          if (_serial_output) {
+            Debugln(F("Rebooting..."));
+            DebugFlush();  // Ensure debug output is sent before reboot
           }
 
           // Clear global flag - flash completed successfully

@@ -531,6 +531,11 @@ static const char UpdateServerIndex[] PROGMEM =
                      uploadInFlight = true;
                      var xhr = new XMLHttpRequest();
                      xhr.open('POST', action, true);
+                     
+                     // Set long timeout for firmware flash operations (5 minutes)
+                     // Firmware writes can block for 10-20 seconds per chunk
+                     xhr.timeout = 300000;
+                     
                      xhr.setRequestHeader('X-File-Size', input.files[0].size);
                      xhr.upload.onprogress = function(ev) {
                        console.log('Upload progress:', ev.loaded, ev.total);
@@ -560,10 +565,22 @@ static const char UpdateServerIndex[] PROGMEM =
                          uploadInFlight = false;
                        }
                      };
-                     xhr.onerror = function() {
-                       errorEl.textContent = 'Upload error';
+                     xhr.ontimeout = function() {
+                       console.log('Upload timeout - flash may still be in progress, check WebSocket status');
+                       // Don't show error yet - WebSocket might show completion
+                       // Just mark upload as done and let WebSocket status take over
                        uploadInFlight = false;
-                       if (retryBtn) retryBtn.style.display = 'block';
+                       localUploadDone = true;
+                       errorEl.textContent = 'Connection timeout - monitoring flash progress via WebSocket...';
+                     };
+                     xhr.onerror = function() {
+                       console.log('Upload XHR error - checking if flash is proceeding via WebSocket');
+                       // Upload may have succeeded but response timed out
+                       // WebSocket will show actual flash status
+                       uploadInFlight = false;
+                       localUploadDone = true;
+                       errorEl.textContent = 'Upload connection lost - monitoring flash status...';
+                       // Don't show retry button yet - wait for WebSocket status
                      };
                      xhr.send(new FormData(form));
                  };
