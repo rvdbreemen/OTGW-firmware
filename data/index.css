@@ -1014,3 +1014,88 @@ body.disable-interaction {
 .waiting-error {
   color: red;
 }
+
+/* Memory and Storage Status Styling */
+.mem-status {
+  font-family: monospace;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.mem-status.mem-green {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.mem-status.mem-yellow {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.mem-status.mem-red {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.storage-status {
+  font-size: 11px;
+  color: #666;
+}
+
+/* Warning and Recovery Banners */
+.warning-banner, .recovery-banner {
+  padding: 10px 15px;
+  margin: 10px 0;
+  border-radius: 5px;
+  font-size: 13px;
+  display: none;
+}
+
+.warning-banner.warning {
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  color: #856404;
+}
+
+.warning-banner.critical {
+  background-color: #f8d7da;
+  border: 1px solid #dc3545;
+  color: #721c24;
+}
+
+.recovery-banner {
+  background-color: #d1ecf1;
+  border: 1px solid #17a2b8;
+  color: #0c5460;
+}
+
+.btn-inline {
+  padding: 4px 8px;
+  margin: 0 4px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.btn-inline:hover {
+  background-color: #0056b3;
+}
+
+.btn-close {
+  float: right;
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 5px;
+  color: inherit;
+}
+
+.btn-close:hover {
+  color: #000;
+}

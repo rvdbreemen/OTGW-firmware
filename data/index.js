@@ -112,6 +112,30 @@ let streamBytesWritten = 0;
 let fileRotationTimer = null;
 let currentLogDateStr = "";
 
+//============================================================================
+// Memory Monitoring and Storage Management
+//============================================================================
+const MEMORY_SAFE_LIMIT = 500 * 1024 * 1024; // 500MB safe limit
+const MEMORY_WARNING_THRESHOLD = 0.8; // 80%
+const MEMORY_CRITICAL_THRESHOLD = 0.95; // 95%
+let memoryMonitorTimer = null;
+let currentMemoryStatus = 'green'; // green, yellow, red
+
+// Storage Mode
+let storageMode = 'smart'; // 'disabled', 'smart', 'indexeddb', 'localstorage'
+let logDatabase = null;
+let currentSessionId = null;
+let autoSaveTimer = null;
+const AUTO_SAVE_INTERVAL = 10000; // 10 seconds
+
+// Storage configuration
+const STORAGE_CONFIG = {
+  retentionDays: 7,
+  maxIndexedDBSize: 1024 * 1024 * 1024, // 1GB
+  maxLocalStorageLines: 1000,
+  autoSaveEnabled: true
+};
+
 // Expose helper for other modules (graph.js) to save files to the same directory
 window.saveBlobToLogDir = async function(filename, blob) {
     if (!logDirectoryHandle) {
@@ -612,10 +636,879 @@ function updateLogCounters() {
   }
   
   if (memUsageEl) {
-    // Estimate: 200 bytes per line
-    const bytes = otLogBuffer.length * 200;
-    const mb = bytes / (1024 * 1024);
+    const memInfo = getMemoryUsage();
+    const mb = memInfo.bufferSize / (1024 * 1024);
     memUsageEl.textContent = mb.toFixed(2);
+  }
+  
+  // Update detailed memory display if exists
+  updateMemoryDisplay();
+}
+
+//============================================================================
+// Enhanced Memory Monitoring Functions
+//============================================================================
+
+/**
+ * Get actual memory usage with browser API support detection
+ */
+function getMemoryUsage() {
+  let result = {
+    bufferSize: 0,
+    heapUsed: 0,
+    heapTotal: 0,
+    heapLimit: 0,
+    supported: false
+  };
+  
+  // Calculate actual buffer size
+  try {
+    result.bufferSize = JSON.stringify(otLogBuffer).length;
+  } catch (e) {
+    // Fallback to estimation if stringify fails
+    result.bufferSize = otLogBuffer.length * 200;
+  }
+  
+  // Use performance.memory API if available (Chrome/Edge)
+  if (performance.memory) {
+    result.heapUsed = performance.memory.usedJSHeapSize;
+    result.heapTotal = performance.memory.totalJSHeapSize;
+    result.heapLimit = performance.memory.jsHeapSizeLimit;
+    result.supported = true;
+  } else {
+    // Fallback estimation for other browsers
+    result.heapUsed = result.bufferSize;
+    result.heapTotal = result.bufferSize * 2;
+    result.heapLimit = MEMORY_SAFE_LIMIT;
+    result.supported = false;
+  }
+  
+  return result;
+}
+
+/**
+ * Update memory display in the UI
+ */
+function updateMemoryDisplay() {
+  const memDetailedEl = document.getElementById('memUsageDetailed');
+  if (!memDetailedEl) return;
+  
+  const mem = getMemoryUsage();
+  const bufferMB = mem.bufferSize / (1024 * 1024);
+  const heapMB = mem.heapUsed / (1024 * 1024);
+  const limitMB = mem.heapLimit / (1024 * 1024);
+  const percent = (mem.heapUsed / mem.heapLimit) * 100;
+  
+  // Determine status indicator
+  let indicator = '🟢';
+  let status = 'green';
+  if (percent >= MEMORY_CRITICAL_THRESHOLD * 100) {
+    indicator = '🔴';
+    status = 'red';
+  } else if (percent >= MEMORY_WARNING_THRESHOLD * 100) {
+    indicator = '🟡';
+    status = 'yellow';
+  }
+  
+  // Update status if changed
+  if (status !== currentMemoryStatus) {
+    currentMemoryStatus = status;
+    handleMemoryStatusChange(status, percent);
+  }
+  
+  // Build display text
+  if (mem.supported) {
+    memDetailedEl.innerHTML = `Buffer: ${bufferMB.toFixed(1)} MB | ` +
+                               `Heap: ${heapMB.toFixed(1)} / ${limitMB.toFixed(0)} MB ` +
+                               `(${percent.toFixed(1)}%) ${indicator}`;
+  } else {
+    memDetailedEl.innerHTML = `Buffer: ${bufferMB.toFixed(1)} MB ${indicator}`;
+  }
+  
+  // Update CSS class for styling
+  memDetailedEl.className = 'mem-status mem-' + status;
+}
+
+/**
+ * Handle memory status changes (warnings, auto-trim)
+ */
+function handleMemoryStatusChange(status, percent) {
+  console.log(`Memory status changed to ${status} (${percent.toFixed(1)}%)`);
+  
+  if (status === 'yellow') {
+    // Warning: approaching limit
+    console.warn('Memory usage is high. Consider enabling capture mode or file streaming.');
+    showMemoryWarning('warning');
+  } else if (status === 'red') {
+    // Critical: auto-trim to prevent crash
+    console.error('Memory usage critical! Auto-trimming buffer...');
+    showMemoryWarning('critical');
+    
+    if (!isStreamingToFile) {
+      // Remove oldest 25% of buffer
+      const toRemove = Math.floor(otLogBuffer.length * 0.25);
+      otLogBuffer.splice(0, toRemove);
+      updateFilteredBuffer();
+      updateLogDisplay();
+      updateLogCounters();
+      console.warn(`Removed ${toRemove} oldest log lines to prevent crash`);
+    }
+  }
+}
+
+/**
+ * Show memory warning banner
+ */
+function showMemoryWarning(level) {
+  const bannerId = 'memoryWarningBanner';
+  let banner = document.getElementById(bannerId);
+  
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = bannerId;
+    banner.className = 'warning-banner';
+    
+    const logSection = document.getElementById('otLogSection');
+    if (logSection) {
+      logSection.insertBefore(banner, logSection.firstChild);
+    }
+  }
+  
+  if (level === 'warning') {
+    banner.className = 'warning-banner warning';
+    banner.innerHTML = `
+      ⚠️ Memory usage is high. 
+      <button onclick="enableCaptureMode()" class="btn-inline">Enable Capture Mode</button> or 
+      <button onclick="startFileStreamingPrompt()" class="btn-inline">Stream to File</button>
+      <button onclick="dismissMemoryWarning()" class="btn-close">✖</button>
+    `;
+  } else if (level === 'critical') {
+    banner.className = 'warning-banner critical';
+    banner.innerHTML = `
+      🔴 Memory critical! Oldest logs were removed to prevent crash. 
+      <button onclick="startFileStreamingPrompt()" class="btn-inline">Enable File Streaming</button>
+      <button onclick="dismissMemoryWarning()" class="btn-close">✖</button>
+    `;
+  }
+  
+  banner.style.display = 'block';
+}
+
+/**
+ * Dismiss memory warning banner
+ */
+function dismissMemoryWarning() {
+  const banner = document.getElementById('memoryWarningBanner');
+  if (banner) {
+    banner.style.display = 'none';
+  }
+}
+
+/**
+ * Enable capture mode programmatically
+ */
+function enableCaptureMode() {
+  const chk = document.getElementById('chkCaptureMode');
+  if (chk && !chk.checked) {
+    chk.checked = true;
+    chk.dispatchEvent(new Event('change'));
+  }
+  dismissMemoryWarning();
+}
+
+/**
+ * Prompt to start file streaming
+ */
+function startFileStreamingPrompt() {
+  const chk = document.getElementById('chkStreamToFile');
+  if (chk && !chk.checked) {
+    chk.checked = true;
+    chk.dispatchEvent(new Event('change'));
+  }
+  dismissMemoryWarning();
+}
+
+/**
+ * Start memory monitoring
+ */
+function startMemoryMonitoring() {
+  if (memoryMonitorTimer) {
+    clearInterval(memoryMonitorTimer);
+  }
+  
+  // Update every 5 seconds
+  memoryMonitorTimer = setInterval(() => {
+    updateMemoryDisplay();
+  }, 5000);
+  
+  // Initial update
+  updateMemoryDisplay();
+}
+
+/**
+ * Stop memory monitoring
+ */
+function stopMemoryMonitoring() {
+  if (memoryMonitorTimer) {
+    clearInterval(memoryMonitorTimer);
+    memoryMonitorTimer = null;
+  }
+}
+
+//============================================================================
+// Storage Management - IndexedDB
+//============================================================================
+
+/**
+ * IndexedDB wrapper for log storage
+ */
+class LogDatabase {
+  constructor() {
+    this.db = null;
+    this.dbName = 'OTGW-Logs';
+    this.version = 1;
+  }
+  
+  async init() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, this.version);
+      
+      request.onerror = () => {
+        console.error('IndexedDB error:', request.error);
+        reject(request.error);
+      };
+      
+      request.onsuccess = () => {
+        this.db = request.result;
+        console.log('IndexedDB initialized');
+        resolve(this.db);
+      };
+      
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        
+        // Create logs object store
+        if (!db.objectStoreNames.contains('logs')) {
+          const logsStore = db.createObjectStore('logs', { autoIncrement: true });
+          logsStore.createIndex('timestamp', 'time', { unique: false });
+          logsStore.createIndex('sessionId', 'sessionId', { unique: false });
+        }
+        
+        // Create sessions object store
+        if (!db.objectStoreNames.contains('sessions')) {
+          const sessionsStore = db.createObjectStore('sessions', { keyPath: 'id' });
+          sessionsStore.createIndex('timestamp', 'timestamp', { unique: false });
+        }
+        
+        // Create metadata object store
+        if (!db.objectStoreNames.contains('metadata')) {
+          db.createObjectStore('metadata', { keyPath: 'key' });
+        }
+      };
+    });
+  }
+  
+  async saveLogs(logs, sessionId) {
+    if (!this.db) {
+      console.warn('Database not initialized');
+      return false;
+    }
+    
+    try {
+      const tx = this.db.transaction(['logs'], 'readwrite');
+      const store = tx.objectStore('logs');
+      
+      for (const log of logs) {
+        store.add({ ...log, sessionId });
+      }
+      
+      return new Promise((resolve, reject) => {
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (e) {
+      console.error('Error saving logs:', e);
+      return false;
+    }
+  }
+  
+  async saveSession(session) {
+    if (!this.db) return false;
+    
+    try {
+      const tx = this.db.transaction(['sessions'], 'readwrite');
+      const store = tx.objectStore('sessions');
+      store.put(session);
+      
+      return new Promise((resolve, reject) => {
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (e) {
+      console.error('Error saving session:', e);
+      return false;
+    }
+  }
+  
+  async getRecentSession(maxAgeMs = 3600000) {
+    if (!this.db) return null;
+    
+    try {
+      const tx = this.db.transaction(['sessions'], 'readonly');
+      const store = tx.objectStore('sessions');
+      const index = store.index('timestamp');
+      const cutoff = Date.now() - maxAgeMs;
+      const range = IDBKeyRange.lowerBound(cutoff);
+      
+      return new Promise((resolve, reject) => {
+        const request = index.openCursor(range, 'prev');
+        request.onsuccess = (event) => {
+          const cursor = event.target.result;
+          resolve(cursor ? cursor.value : null);
+        };
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.error('Error getting recent session:', e);
+      return null;
+    }
+  }
+  
+  async loadLogsForSession(sessionId, limit = null) {
+    if (!this.db) return [];
+    
+    try {
+      const tx = this.db.transaction(['logs'], 'readonly');
+      const store = tx.objectStore('logs');
+      const index = store.index('sessionId');
+      const range = IDBKeyRange.only(sessionId);
+      
+      return new Promise((resolve, reject) => {
+        const request = index.getAll(range, limit);
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.error('Error loading logs:', e);
+      return [];
+    }
+  }
+  
+  async cleanOldSessions(retentionDays = 7) {
+    if (!this.db) return false;
+    
+    try {
+      const cutoff = Date.now() - (retentionDays * 24 * 60 * 60 * 1000);
+      
+      const tx = this.db.transaction(['sessions', 'logs'], 'readwrite');
+      const sessionsStore = tx.objectStore('sessions');
+      const logsStore = tx.objectStore('logs');
+      
+      // Find old sessions
+      const sessionsIndex = sessionsStore.index('timestamp');
+      const range = IDBKeyRange.upperBound(cutoff);
+      
+      return new Promise((resolve, reject) => {
+        const sessionIds = [];
+        const sessionRequest = sessionsIndex.openCursor(range);
+        
+        sessionRequest.onsuccess = (event) => {
+          const cursor = event.target.result;
+          if (cursor) {
+            sessionIds.push(cursor.value.id);
+            cursor.delete(); // Delete old session
+            cursor.continue();
+          } else {
+            // Now delete logs for these sessions
+            const logsIndex = logsStore.index('sessionId');
+            sessionIds.forEach(id => {
+              const logRange = IDBKeyRange.only(id);
+              const logRequest = logsIndex.openCursor(logRange);
+              logRequest.onsuccess = (e) => {
+                const logCursor = e.target.result;
+                if (logCursor) {
+                  logCursor.delete();
+                  logCursor.continue();
+                }
+              };
+            });
+          }
+        };
+        
+        tx.oncomplete = () => {
+          console.log(`Cleaned up ${sessionIds.length} old sessions`);
+          resolve(true);
+        };
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (e) {
+      console.error('Error cleaning old sessions:', e);
+      return false;
+    }
+  }
+  
+  async getStorageSize() {
+    if (!this.db) return 0;
+    
+    try {
+      const tx = this.db.transaction(['logs', 'sessions'], 'readonly');
+      const logsStore = tx.objectStore('logs');
+      const sessionsStore = tx.objectStore('sessions');
+      
+      return new Promise((resolve, reject) => {
+        let totalSize = 0;
+        
+        const logsRequest = logsStore.count();
+        logsRequest.onsuccess = () => {
+          totalSize += logsRequest.result * 500; // Estimate 500 bytes per log
+          
+          const sessionsRequest = sessionsStore.count();
+          sessionsRequest.onsuccess = () => {
+            totalSize += sessionsRequest.result * 200; // Estimate 200 bytes per session
+            resolve(totalSize);
+          };
+          sessionsRequest.onerror = () => reject(sessionsRequest.error);
+        };
+        logsRequest.onerror = () => reject(logsRequest.error);
+      });
+    } catch (e) {
+      console.error('Error getting storage size:', e);
+      return 0;
+    }
+  }
+}
+
+//============================================================================
+// Storage Management - localStorage
+//============================================================================
+
+/**
+ * Save UI state to localStorage
+ */
+function saveUIStateToLocalStorage() {
+  const state = {
+    autoScroll,
+    showTimestamps,
+    logExpanded,
+    searchTerm,
+    captureMode: maxLogLines === MAX_LOG_LINES_CAPTURE,
+    storageMode,
+    timestamp: Date.now()
+  };
+  
+  try {
+    localStorage.setItem('otgw_ui_state', JSON.stringify(state));
+  } catch (e) {
+    if (e.name === 'QuotaExceededError') {
+      console.warn('localStorage quota exceeded for UI state');
+    } else {
+      console.error('Error saving UI state:', e);
+    }
+  }
+}
+
+/**
+ * Restore UI state from localStorage
+ */
+function restoreUIStateFromLocalStorage() {
+  try {
+    const json = localStorage.getItem('otgw_ui_state');
+    if (!json) return false;
+    
+    const state = JSON.parse(json);
+    
+    // Restore state variables
+    autoScroll = state.autoScroll ?? true;
+    showTimestamps = state.showTimestamps ?? true;
+    logExpanded = state.logExpanded ?? false;
+    searchTerm = state.searchTerm ?? '';
+    storageMode = state.storageMode ?? 'smart';
+    
+    // Update UI elements
+    const btnAutoScroll = document.getElementById('btnAutoScroll');
+    if (btnAutoScroll) {
+      if (autoScroll) {
+        btnAutoScroll.classList.add('btn-active');
+      } else {
+        btnAutoScroll.classList.remove('btn-active');
+      }
+    }
+    
+    const chkTimestamp = document.getElementById('chkShowTimestamp');
+    if (chkTimestamp) {
+      chkTimestamp.checked = showTimestamps;
+    }
+    
+    const chkCapture = document.getElementById('chkCaptureMode');
+    if (chkCapture && state.captureMode) {
+      chkCapture.checked = true;
+      maxLogLines = MAX_LOG_LINES_CAPTURE;
+    }
+    
+    const searchInput = document.getElementById('searchLog');
+    if (searchInput && searchTerm) {
+      searchInput.value = searchTerm;
+    }
+    
+    console.log('UI state restored from localStorage');
+    return true;
+  } catch (e) {
+    console.error('Error restoring UI state:', e);
+    return false;
+  }
+}
+
+/**
+ * Save recent logs backup to localStorage
+ */
+function saveRecentLogsToLocalStorage() {
+  const backup = {
+    timestamp: Date.now(),
+    device: window.location.hostname,
+    logs: otLogBuffer.slice(-STORAGE_CONFIG.maxLocalStorageLines)
+  };
+  
+  try {
+    localStorage.setItem('otgw_logs_backup', JSON.stringify(backup));
+    return true;
+  } catch (e) {
+    if (e.name === 'QuotaExceededError') {
+      // Try with fewer lines
+      backup.logs = otLogBuffer.slice(-500);
+      try {
+        localStorage.setItem('otgw_logs_backup', JSON.stringify(backup));
+        console.warn('Saved reduced backup due to quota');
+        return true;
+      } catch (e2) {
+        console.warn('Cannot save logs backup: quota exceeded');
+        return false;
+      }
+    } else {
+      console.error('Error saving logs backup:', e);
+      return false;
+    }
+  }
+}
+
+/**
+ * Load recent logs backup from localStorage
+ */
+function loadRecentLogsFromLocalStorage(maxAge = 300000) {
+  try {
+    const json = localStorage.getItem('otgw_logs_backup');
+    if (!json) return null;
+    
+    const backup = JSON.parse(json);
+    
+    // Check if backup is recent enough (default 5 minutes)
+    if (Date.now() - backup.timestamp > maxAge) {
+      console.log('Backup too old, ignoring');
+      return null;
+    }
+    
+    // Check if same device
+    if (backup.device !== window.location.hostname) {
+      console.log('Backup from different device, ignoring');
+      return null;
+    }
+    
+    return backup.logs || [];
+  } catch (e) {
+    console.error('Error loading logs backup:', e);
+    return null;
+  }
+}
+
+//============================================================================
+// Storage Auto-Save and Recovery
+//============================================================================
+
+/**
+ * Initialize storage system
+ */
+async function initStorageSystem() {
+  console.log('Initializing storage system...');
+  
+  // Generate session ID
+  currentSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  
+  // Restore UI state from localStorage
+  restoreUIStateFromLocalStorage();
+  
+  // Check if IndexedDB is supported
+  if ('indexedDB' in window) {
+    try {
+      logDatabase = new LogDatabase();
+      await logDatabase.init();
+      console.log('IndexedDB ready');
+      
+      // Check for recent session to recover
+      if (storageMode !== 'disabled') {
+        await checkForRecoverableSession();
+      }
+    } catch (e) {
+      console.warn('IndexedDB initialization failed:', e);
+      logDatabase = null;
+    }
+  }
+  
+  // Start auto-save if enabled
+  if (STORAGE_CONFIG.autoSaveEnabled && storageMode !== 'disabled') {
+    startAutoSave();
+  }
+  
+  // Save state on page unload
+  window.addEventListener('beforeunload', handlePageUnload);
+  
+  console.log('Storage system initialized');
+}
+
+/**
+ * Check for recoverable session
+ */
+async function checkForRecoverableSession() {
+  if (!logDatabase) return;
+  
+  try {
+    const recentSession = await logDatabase.getRecentSession(3600000); // 1 hour
+    
+    if (recentSession && recentSession.lineCount > 0) {
+      showRecoveryBanner(recentSession);
+    }
+  } catch (e) {
+    console.error('Error checking for recoverable session:', e);
+  }
+}
+
+/**
+ * Show recovery banner
+ */
+function showRecoveryBanner(session) {
+  const bannerId = 'recoveryBanner';
+  let banner = document.getElementById(bannerId);
+  
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = bannerId;
+    banner.className = 'recovery-banner';
+    
+    const logSection = document.getElementById('otLogSection');
+    if (logSection) {
+      logSection.insertBefore(banner, logSection.firstChild);
+    }
+  }
+  
+  const date = new Date(session.timestamp);
+  const timeStr = date.toLocaleTimeString();
+  
+  banner.innerHTML = `
+    ℹ️ Found previous session from ${timeStr} with ${session.lineCount.toLocaleString()} log lines. 
+    <button onclick="recoverSession('${session.id}')" class="btn-inline">Recover</button>
+    <button onclick="dismissRecoveryBanner()" class="btn-inline">Ignore</button>
+  `;
+  
+  banner.style.display = 'block';
+}
+
+/**
+ * Recover session from IndexedDB
+ */
+async function recoverSession(sessionId) {
+  if (!logDatabase) {
+    alert('Cannot recover: IndexedDB not available');
+    return;
+  }
+  
+  try {
+    dismissRecoveryBanner();
+    
+    // Show progress
+    const progressEl = document.getElementById('recoveryProgress');
+    if (progressEl) {
+      progressEl.style.display = 'block';
+      progressEl.textContent = 'Loading logs...';
+    }
+    
+    const logs = await logDatabase.loadLogsForSession(sessionId);
+    
+    if (logs && logs.length > 0) {
+      // Clear current buffer
+      otLogBuffer = [];
+      
+      // Add recovered logs
+      logs.forEach(log => {
+        otLogBuffer.push(log);
+      });
+      
+      // Update display
+      updateFilteredBuffer();
+      updateLogDisplay();
+      updateLogCounters();
+      
+      console.log(`Recovered ${logs.length} logs from session ${sessionId}`);
+      
+      if (progressEl) {
+        progressEl.textContent = `Recovered ${logs.length.toLocaleString()} logs`;
+        setTimeout(() => {
+          progressEl.style.display = 'none';
+        }, 3000);
+      }
+    }
+  } catch (e) {
+    console.error('Error recovering session:', e);
+    alert('Failed to recover session: ' + e.message);
+  }
+}
+
+/**
+ * Dismiss recovery banner
+ */
+function dismissRecoveryBanner() {
+  const banner = document.getElementById('recoveryBanner');
+  if (banner) {
+    banner.style.display = 'none';
+  }
+}
+
+/**
+ * Start auto-save timer
+ */
+function startAutoSave() {
+  if (autoSaveTimer) {
+    clearInterval(autoSaveTimer);
+  }
+  
+  autoSaveTimer = setInterval(async () => {
+    await saveCurrentState();
+  }, AUTO_SAVE_INTERVAL);
+  
+  console.log('Auto-save enabled');
+}
+
+/**
+ * Stop auto-save timer
+ */
+function stopAutoSave() {
+  if (autoSaveTimer) {
+    clearInterval(autoSaveTimer);
+    autoSaveTimer = null;
+  }
+  console.log('Auto-save disabled');
+}
+
+/**
+ * Save current state based on storage mode
+ */
+async function saveCurrentState() {
+  // Always save UI state to localStorage
+  saveUIStateToLocalStorage();
+  
+  if (storageMode === 'disabled' || otLogBuffer.length === 0) {
+    return;
+  }
+  
+  // Determine storage mode
+  const mode = determineStorageMode();
+  
+  if (mode === 'indexeddb' && logDatabase) {
+    // Save to IndexedDB for large datasets
+    try {
+      // Only save new logs since last save (simplified here: save all)
+      await logDatabase.saveLogs(otLogBuffer, currentSessionId);
+      
+      // Update session info
+      await logDatabase.saveSession({
+        id: currentSessionId,
+        timestamp: Date.now(),
+        lineCount: otLogBuffer.length,
+        device: window.location.hostname
+      });
+      
+      console.log(`Auto-saved ${otLogBuffer.length} logs to IndexedDB`);
+    } catch (e) {
+      console.error('Error auto-saving to IndexedDB:', e);
+    }
+  } else if (mode === 'localstorage') {
+    // Save to localStorage for small datasets
+    saveRecentLogsToLocalStorage();
+  }
+}
+
+/**
+ * Determine which storage mode to use based on data size
+ */
+function determineStorageMode() {
+  if (storageMode !== 'smart') {
+    return storageMode;
+  }
+  
+  // Smart mode logic
+  if (otLogBuffer.length > 10000) {
+    return 'indexeddb';
+  } else if (otLogBuffer.length > 1000) {
+    return 'localstorage';
+  } else {
+    return 'none';
+  }
+}
+
+/**
+ * Handle page unload - save state
+ */
+function handlePageUnload(event) {
+  // Save UI state
+  saveUIStateToLocalStorage();
+  
+  // Save recent logs to localStorage for quick recovery
+  if (otLogBuffer.length > 0) {
+    saveRecentLogsToLocalStorage();
+  }
+  
+  // Note: Can't use async operations here reliably
+}
+
+/**
+ * Check storage quota
+ */
+async function checkStorageQuota() {
+  if ('storage' in navigator && 'estimate' in navigator.storage) {
+    try {
+      const estimate = await navigator.storage.estimate();
+      return {
+        usage: estimate.usage || 0,
+        quota: estimate.quota || 0,
+        percent: estimate.quota > 0 ? (estimate.usage / estimate.quota) * 100 : 0,
+        available: (estimate.quota || 0) - (estimate.usage || 0)
+      };
+    } catch (e) {
+      console.error('Error checking storage quota:', e);
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Update storage display in UI
+ */
+async function updateStorageDisplay() {
+  const storageEl = document.getElementById('storageStatus');
+  if (!storageEl) return;
+  
+  const quota = await checkStorageQuota();
+  
+  if (quota) {
+    const usedMB = quota.usage / (1024 * 1024);
+    const totalGB = quota.quota / (1024 * 1024 * 1024);
+    const percent = quota.percent;
+    
+    let indicator = '🟢';
+    if (percent > 90) indicator = '🔴';
+    else if (percent > 75) indicator = '🟡';
+    
+    storageEl.innerHTML = `Storage: ${usedMB.toFixed(1)} MB / ${totalGB.toFixed(1)} GB (${percent.toFixed(1)}%) ${indicator}`;
+  } else {
+    storageEl.innerHTML = 'Storage: Not available';
   }
 }
 
@@ -1252,6 +2145,9 @@ function showMainPage() {
     tid = setInterval(function () { refreshOTmonitor(); }, 1000);
     // Initialize WebSocket for OT log streaming
     initOTLogWebSocket();
+    // Initialize storage system and memory monitoring
+    initStorageSystem().catch(e => console.error('Storage init error:', e));
+    startMemoryMonitoring();
   }
 }
 
