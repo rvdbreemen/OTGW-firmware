@@ -100,6 +100,7 @@ let otLogControlsInitialized = false;
 let isFlashing = false;
 let currentFlashFilename = "";
 let flashModeActive = false; // Track if we're on the flash page
+let picFlashPollTimer = null; // Timer for polling PIC flash status as failsafe
 
 // File Streaming Variables
 let logDirectoryHandle = null;
@@ -2099,6 +2100,74 @@ function startFlash(filename) {
     performFlash(filename);
 }
 
+// Failsafe polling mechanism for PIC flash status
+function startPICFlashPolling() {
+    console.log("Starting PIC flash status polling (every 5s)");
+    if (picFlashPollTimer) {
+        clearInterval(picFlashPollTimer);
+    }
+    picFlashPollTimer = setInterval(pollPICFlashStatus, 5000);
+}
+
+function stopPICFlashPolling() {
+    console.log("Stopping PIC flash status polling");
+    if (picFlashPollTimer) {
+        clearInterval(picFlashPollTimer);
+        picFlashPollTimer = null;
+    }
+}
+
+function pollPICFlashStatus() {
+    fetch(APIGW + 'v1/pic/flashstatus')
+        .then(response => response.json())
+        .then(json => {
+            if (!json.flashstatus) return;
+            
+            const status = json.flashstatus;
+            console.log("PIC flash status poll:", status);
+            
+            let progressBar = document.getElementById("flashProgressBar");
+            let pctText = document.getElementById("flashPercentageText");
+            
+            // Update progress if flashing
+            if (status.flashing && status.progress >= 0 && status.progress <= 100) {
+                if (progressBar) progressBar.style.width = status.progress + "%";
+                if (pctText) pctText.innerText = "Flashing " + (status.filename || currentFlashFilename) + " : " + status.progress + "%";
+            }
+            
+            // Handle completion
+            if (!status.flashing) {
+                stopPICFlashPolling();
+                isFlashing = false;
+                toggleInteraction(true);
+                
+                if (status.progress === 100) {
+                    // Success
+                    if (progressBar) {
+                        progressBar.style.width = "100%";
+                        if (progressBar.classList.contains('error')) progressBar.classList.remove('error');
+                    }
+                    if (pctText) pctText.innerText = "Successfully flashed " + (status.filename || currentFlashFilename);
+                    
+                    // Refresh firmware info
+                    setTimeout(() => refreshFirmware(), 2000);
+                } else {
+                    // Error
+                    if (progressBar) progressBar.classList.add('error');
+                    if (pctText) pctText.innerText = "Flash failed: " + (status.error || "Unknown error");
+                }
+                
+                // Restart polling
+                if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+                if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+            }
+        })
+        .catch(error => {
+            console.error("PIC flash status poll error:", error);
+            // Keep polling - might be temporary network issue
+        });
+}
+
 // function pollForReboot() - Removed
 // function startFlashCountdown() - Removed
 
@@ -2124,6 +2193,9 @@ function performFlash(filename) {
     
     // Ensure WebSocket is connected for progress updates
     initOTLogWebSocket(true);
+    
+    // Start failsafe polling every 5 seconds
+    startPICFlashPolling();
 
     // Wait for WebSocket to be OPEN before sending flash command
     let attempts = 0;
@@ -2166,6 +2238,9 @@ function performFlash(filename) {
                     if (pctText) pctText.innerText = "Error starting flash: " + error.message;
                     if (progressBar) progressBar.classList.add('error');
                     
+                    // Stop failsafe polling
+                    stopPICFlashPolling();
+                    
                     // Restart polling on start failure
                     if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
                     if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
@@ -2205,6 +2280,7 @@ function handleFlashMessage(data) {
             // Handle completion states
             if (msg.state === 'end') {
                 // Success
+                stopPICFlashPolling(); // Stop failsafe polling
                 isFlashing = false;
                 toggleInteraction(true);
                 
@@ -2250,6 +2326,7 @@ function handleFlashMessage(data) {
                 if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
             } else if (msg.state === 'error' || msg.state === 'abort') {
                 // Error or abort
+                stopPICFlashPolling(); // Stop failsafe polling
                 isFlashing = false;
                 toggleInteraction(true);
                 
