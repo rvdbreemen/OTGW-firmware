@@ -248,7 +248,8 @@ function initOTLogWebSocket(force) {
       resetWSWatchdog();
 
       // Handle keepalive messages (don't log or add to buffer)
-      if (typeof event.data === 'string' && event.data.includes('"type":"keepalive"')) {
+      // Optimized format: {"t":"k"} instead of {"type":"keepalive"} (60% smaller)
+      if (typeof event.data === 'string' && event.data.includes('"t":"k"')) {
         console.log("OT Log WS keepalive received");
         return;
       }
