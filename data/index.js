@@ -2200,7 +2200,7 @@ function handleFlashMessage(data) {
             // Handle new format with 'state' property
             if (msg.hasOwnProperty('state')) {
                 // Calculate percentage from flash_written and flash_total
-                if (msg.flash_total > 0 && msg.hasOwnProperty('flash_written')) {
+                if (msg.flash_total > 0 && msg.flash_written != null) {
                     let percent = Math.round((msg.flash_written * 100) / msg.flash_total);
                     if (progressBar) progressBar.style.width = percent + "%";
                     
