@@ -10,14 +10,12 @@
 ***************************************************************************      
 */
 static int iIdentlevel = 0;
-char sBeforenext[10] ="";
 bool bFirst = true; 
 
 //=======================================================================
 void sendStartJsonObj(const char *objName)
 {
   char sBuff[50] = "";
-  sBeforenext[0]='\0';
 
   if (strlen(objName)==0){  
     snprintf_P(sBuff, sizeof(sBuff), PSTR("{\r\n"));
@@ -225,7 +223,6 @@ void sendJsonOTmonObj(const char *cName, bool bValue, const char *cUnit, time_t 
 void sendStartJsonMap(const char *objName)
 {
   char sBuff[50] = "";
-  sBeforenext[0]='\0';
 
   if (strlen(objName)==0){  
     snprintf_P(sBuff, sizeof(sBuff), PSTR("{\r\n"));
