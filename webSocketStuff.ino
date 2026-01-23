@@ -151,11 +151,10 @@ void handleWebSocket() {
   // Send application-level keepalive every 30 seconds
   // This ensures watchdog timers stay alive even when no OTGW log messages flow
   // Also works around Safari WebSocket ping/pong quirks
-  // Optimized to 9 bytes (was 20): 55% reduction in keepalive traffic
   unsigned long now = millis();
   if (wsInitialized && wsClientCount > 0 && 
       (now - lastKeepaliveMs) >= KEEPALIVE_INTERVAL_MS) {
-    webSocket.broadcastTXT("{\"t\":\"k\"}");
+    webSocket.broadcastTXT("{\"type\":\"keepalive\"}");
     lastKeepaliveMs = now;
   }
 }
