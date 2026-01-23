@@ -675,27 +675,27 @@ void sendHealth()
 void sendPICFlashStatus()
 {
   // Minimal PIC flash status endpoint for polling during flash
-  // Returns: {"flashing":true|false,"progress":0-100,"filename":"...","error":"..."}
-  sendStartJsonObj(F("flashstatus"));
+  // Returns: {"flashstatus":{"flashing":true|false,"progress":0-100,"filename":"...","error":"..."}}
+  sendStartJsonMap(F("flashstatus"));
   sendNestedJsonObj(F("flashing"), CBOOLEAN(isPICFlashing));
   sendNestedJsonObj(F("progress"), currentPICFlashProgress);
   sendNestedJsonObj(F("filename"), currentPICFlashFile);
   sendNestedJsonObj(F("error"), errorupgrade);
-  sendEndJsonObj(F("flashstatus"));
+  sendEndJsonMap(F("flashstatus"));
 } // sendPICFlashStatus()
 
 //=======================================================================
 void sendFlashStatus()
 {
   // Unified flash status endpoint - minimal response with only fields used by frontend
-  // Returns: {"flashing":bool,"pic_flashing":bool,"pic_progress":0-100,"pic_filename":"...","pic_error":"..."}
-  sendStartJsonObj(F("flashstatus"));
+  // Returns: {"flashstatus":{"flashing":bool,"pic_flashing":bool,"pic_progress":0-100,"pic_filename":"...","pic_error":"..."}}
+  sendStartJsonMap(F("flashstatus"));
   sendNestedJsonObj(F("flashing"), CBOOLEAN(isFlashing()));
   sendNestedJsonObj(F("pic_flashing"), CBOOLEAN(isPICFlashing));
   sendNestedJsonObj(F("pic_progress"), currentPICFlashProgress);
   sendNestedJsonObj(F("pic_filename"), currentPICFlashFile);
   sendNestedJsonObj(F("pic_error"), errorupgrade);
-  sendEndJsonObj(F("flashstatus"));
+  sendEndJsonMap(F("flashstatus"));
 } // sendFlashStatus()
 
 
