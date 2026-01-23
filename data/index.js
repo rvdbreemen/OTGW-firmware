@@ -2148,9 +2148,17 @@ function pollFlashStatus() {
     fetch(APIGW + 'v1/flashstatus')
         .then(response => response.json())
         .then(json => {
-            if (!json.flashstatus) return;
+            if (!json.flashstatus || !Array.isArray(json.flashstatus)) return;
             
-            const status = json.flashstatus;
+            // Parse array format: [{"name":"flashing","value":true}, ...]
+            const status = {};
+            for (let i in json.flashstatus) {
+                const item = json.flashstatus[i];
+                if (item.name) {
+                    status[item.name] = item.value;
+                }
+            }
+            
             console.log("Flash status poll:", status);
             
             // If not flashing at all, stop polling
