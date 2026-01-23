@@ -2181,8 +2181,8 @@ function handleFlashMessage(data) {
         // Try parsing as JSON
         let msg = JSON.parse(data);
         
-        // Check if it looks like a flash message
-        if (msg.hasOwnProperty('percent') || msg.hasOwnProperty('result')) {
+        // Check if it looks like a flash message (new format with 'state' or legacy format with 'percent'/'result')
+        if (msg.hasOwnProperty('state') || msg.hasOwnProperty('percent') || msg.hasOwnProperty('result')) {
             let progressBar = document.getElementById("flashProgressBar");
             let pctText = document.getElementById("flashPercentageText");
             let progressSection = document.getElementById("flashProgressSection");
@@ -2191,11 +2191,88 @@ function handleFlashMessage(data) {
                  progressSection.classList.add('active');
             }
             
+            // Handle legacy format with 'percent' property
             if (msg.hasOwnProperty('percent')) {
                 if (progressBar) progressBar.style.width = msg.percent + "%";
                 if (pctText) pctText.innerText = "Flashing " + currentFlashFilename + " : " + msg.percent + "%";
             }
             
+            // Handle new format with 'state' property
+            if (msg.hasOwnProperty('state')) {
+                // Calculate percentage from flash_written and flash_total
+                if (msg.flash_total > 0 && msg.hasOwnProperty('flash_written')) {
+                    let percent = Math.round((msg.flash_written * 100) / msg.flash_total);
+                    if (progressBar) progressBar.style.width = percent + "%";
+                    
+                    // Update text based on state
+                    if (msg.state === 'write' || msg.state === 'start') {
+                        if (pctText) pctText.innerText = "Flashing " + (msg.filename || currentFlashFilename) + " : " + percent + "%";
+                    }
+                }
+                
+                // Handle completion states
+                if (msg.state === 'end') {
+                    // Success
+                    isFlashing = false;
+                    toggleInteraction(true);
+                    
+                    if (progressBar) {
+                        progressBar.style.width = "100%";
+                        if (progressBar.classList.contains('error')) progressBar.classList.remove('error');
+                    }
+
+                    // Look up version for immediate feedback
+                    let flashedVer = "Unknown";
+                    // Attempt to find version from available global list
+                    if (typeof availableFirmwareFiles !== 'undefined') {
+                        let f = availableFirmwareFiles.find(x => x.name === (msg.filename || currentFlashFilename));
+                        if (f && f.version) flashedVer = f.version;
+                    }
+
+                    // Determine firmware type from filename for immediate UI feedback
+                    let fname = (msg.filename || currentFlashFilename).toLowerCase();
+                    let displayType = "Gateway"; 
+                    if (fname.includes("diag")) displayType = "Diagnostic";
+                    if (fname.includes("inter")) displayType = "Interface";
+
+                    // Update UI immediately with TARGET version (optimistic)
+                    let elType = document.getElementById('pic_type_display');
+                    let elVer = document.getElementById('pic_version_display');
+                    if (elType) elType.innerText = displayType;
+                    if (elVer) elVer.innerText = flashedVer;
+                    
+                    if (pctText) pctText.innerText = "Successfully flashed to " + displayType + " " + flashedVer;
+                    
+                    // Trigger actual hardware refresh in background
+                    setTimeout(() => refreshFirmware(), 2000); // Give PIC 2s to boot
+
+                    // Reset progress bar after 10 seconds
+                    setTimeout(function() {
+                        if (progressSection) progressSection.classList.remove('active');
+                        if (progressBar) progressBar.style.width = "0%";
+                        if (pctText) pctText.innerText = "Ready to flash";
+                    }, 10000);
+                    
+                    // Restart polling
+                    if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+                    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+                } else if (msg.state === 'error' || msg.state === 'abort') {
+                    // Error or abort
+                    isFlashing = false;
+                    toggleInteraction(true);
+                    
+                    let errorMsg = msg.error || "Flash failed";
+                    if (pctText) pctText.innerText = "Finished " + (msg.filename || currentFlashFilename) + ": " + errorMsg;
+                    
+                    if (progressBar) progressBar.classList.add('error');
+                    
+                    // Restart polling
+                    if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+                    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+                }
+            }
+            
+            // Handle legacy format with 'result' property
             if (msg.hasOwnProperty('result')) {
                 // Done
                 let resultText = (msg.result === 0) ? "Success!" : "Failed (Error " + msg.result + ")";
