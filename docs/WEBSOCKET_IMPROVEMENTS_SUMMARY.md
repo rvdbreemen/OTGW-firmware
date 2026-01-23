@@ -52,20 +52,22 @@ webSocket.enableHeartbeat(15000, 3000, 2);
 
 **What**: Added application-layer keepalive messages to work around Safari issues
 
-**Server-side code added**:
+**Server-side code added** (optimized 2026-01-23):
 ```cpp
 // In handleWebSocket() function:
+// Optimized to 9 bytes (was 20): 55% reduction in keepalive traffic
 if (wsInitialized && wsClientCount > 0 && 
     (now - lastKeepaliveMs) >= KEEPALIVE_INTERVAL_MS) {
-  webSocket.broadcastTXT("{\"type\":\"keepalive\"}");
+  webSocket.broadcastTXT("{\"t\":\"k\"}");
   lastKeepaliveMs = now;
 }
 ```
 
-**Client-side code added**:
+**Client-side code added** (optimized 2026-01-23):
 ```javascript
 // In onmessage handler:
-if (typeof event.data === 'string' && event.data.includes('"type":"keepalive"')) {
+// Optimized format: {"t":"k"} (9 bytes) vs {"type":"keepalive"} (20 bytes) = 55% smaller
+if (typeof event.data === 'string' && event.data.includes('"t":"k"')) {
   console.log("OT Log WS keepalive received");
   return; // Don't add to log buffer
 }
