@@ -2079,6 +2079,7 @@ void upgradepicnow(const char *filename) {
 
 // Helper function to escape JSON strings for WebSocket messages
 // Escapes quotes, backslashes, and control characters
+// Note: Input is assumed to be null-terminated; embedded nulls are replaced with spaces
 static void jsonEscape(const char *in, char *out, size_t outSize) {
   size_t j = 0;
   for (size_t i = 0; in[i] != '\0' && j + 1 < outSize; ++i) {
@@ -2099,7 +2100,7 @@ static void jsonEscape(const char *in, char *out, size_t outSize) {
 
 void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   switch (result) {
-    case OTGWError::OTGW_ERROR_NONE:          snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("PIC upgrade was succesful")); break;
+    case OTGWError::OTGW_ERROR_NONE:          snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("PIC upgrade was successful")); break;
     case OTGWError::OTGW_ERROR_MEMORY:        snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Not enough memory available")); break;
     case OTGWError::OTGW_ERROR_INPROG:        snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Firmware upgrade in progress")); break;
     case OTGWError::OTGW_ERROR_HEX_ACCESS:    snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Could not open hex file")); break;
@@ -2118,9 +2119,9 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
 #ifndef DISABLE_WEBSOCKET
   // Send completion message in format frontend expects
   // Escape strings to prevent JSON injection
-  char buf[320]; // Large enough for escaped filename (128) + error (256) + JSON overhead
-  char filenameEsc[129]; // currentPICFlashFile is 65, allow for escaping
-  char errorEsc[257]; // errorupgrade is 129, allow for escaping
+  char buf[320]; // Sized for escaped filename (129) + error (257) + JSON overhead (~70)
+  char filenameEsc[129]; // currentPICFlashFile is 65 chars, doubled for worst-case escaping
+  char errorEsc[257]; // errorupgrade is 129 chars, doubled for worst-case escaping
   jsonEscape(currentPICFlashFile, filenameEsc, sizeof(filenameEsc));
   jsonEscape(errorupgrade, errorEsc, sizeof(errorEsc));
   
@@ -2144,8 +2145,8 @@ void fwupgradestep(int pct) {
 #ifndef DISABLE_WEBSOCKET
   // Send progress message in format frontend expects
   // Use percentage as flash_written for progress display
-  char buf[256]; // Large enough for escaped filename (128) + JSON overhead
-  char filenameEsc[129]; // currentPICFlashFile is 65, allow for escaping
+  char buf[256]; // Sized for escaped filename (129) + JSON overhead (~90)
+  char filenameEsc[129]; // currentPICFlashFile is 65 chars, doubled for worst-case escaping
   jsonEscape(currentPICFlashFile, filenameEsc, sizeof(filenameEsc));
   
   const char *state = (pct == 0) ? "start" : "write";
