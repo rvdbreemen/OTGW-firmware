@@ -2095,15 +2095,33 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   }
   OTGWDebugTf(PSTR("Upgrade finished: Errorcode = %d - %s - %d retries, %d errors\r\n"), result, CSTR(errorupgrade), retries, errors);
   
-  // Note: WebSocket JSON notifications removed - WebUI only handles ESP firmware flash messages with 'state' property
-  // PIC firmware upgrade progress is tracked via OTGWSerial library internal state, not WebSocket
+#ifndef DISABLE_WEBSOCKET
+  // Send completion message in format frontend expects
+  char buffer[256];
+  const char *state = (result == OTGWError::OTGW_ERROR_NONE) ? "end" : "error";
+  snprintf_P(buffer, sizeof(buffer), 
+    PSTR("{\"state\":\"%s\",\"flash_written\":100,\"flash_total\":100,\"filename\":\"%s\",\"error\":\"%s\"}"),
+    state, currentPICFlashFile, errorupgrade);
+  sendWebSocketJSON(buffer);
+#endif
+  
+  // Clear filename after flash completes
+  currentPICFlashFile[0] = '\0';
 }
 
 void fwupgradestep(int pct) {
   OTGWDebugTf(PSTR("Upgrade: %d%%\n\r"), pct);
   
-  // Note: WebSocket JSON notifications removed - WebUI only handles ESP firmware flash messages with 'state' property
-  // PIC firmware upgrade progress is tracked via OTGWSerial library internal state, not WebSocket
+#ifndef DISABLE_WEBSOCKET
+  // Send progress message in format frontend expects
+  // Use percentage as both flash_written and flash_total for simplicity
+  char buffer[192];
+  const char *state = (pct == 0) ? "start" : "write";
+  snprintf_P(buffer, sizeof(buffer), 
+    PSTR("{\"state\":\"%s\",\"flash_written\":%d,\"flash_total\":100,\"filename\":\"%s\",\"error\":\"\"}"),
+    state, pct, currentPICFlashFile);
+  sendWebSocketJSON(buffer);
+#endif
 }
 
 void fwreportinfo(OTGWFirmware fw, const char *version) {
@@ -2121,6 +2139,16 @@ void fwreportinfo(OTGWFirmware fw, const char *version) {
 void fwupgradestart(const char *hexfile) {
   DebugTf(PSTR("Start PIC upgrade with hexfile: %s\n\r"), hexfile);
   OTGWError result;
+  
+  // Store filename for WebSocket progress messages
+  // Extract just the filename from the path
+  const char *filename = strrchr(hexfile, '/');
+  if (filename) {
+    filename++; // Skip the '/'
+  } else {
+    filename = hexfile; // No path, use as-is
+  }
+  strlcpy(currentPICFlashFile, filename, sizeof(currentPICFlashFile));
   
   digitalWrite(LED1, LOW);
   result = OTGWSerial.startUpgrade(hexfile);
