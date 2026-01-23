@@ -105,6 +105,10 @@ void processAPI()
       if (wc > 3 && strcmp_P(words[3], PSTR("health")) == 0) {
         if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
         sendHealth();
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("flashstatus")) == 0) {
+        // GET /api/v1/flashstatus - Unified flash status for both ESP and PIC
+        if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+        sendFlashStatus();
       } else if (wc > 3 && strcmp_P(words[3], PSTR("pic")) == 0) {
         if (wc > 4 && strcmp_P(words[4], PSTR("flashstatus")) == 0) {
           // GET /api/v1/pic/flashstatus
@@ -679,6 +683,32 @@ void sendPICFlashStatus()
   sendNestedJsonObj(F("error"), errorupgrade);
   sendEndJsonObj(F("flashstatus"));
 } // sendPICFlashStatus()
+
+//=======================================================================
+void sendFlashStatus()
+{
+  // Unified flash status endpoint for both ESP and PIC flash
+  // Returns: {"flashing":true|false,"type":"esp|pic|none","esp":{...},"pic":{...}}
+  sendStartJsonObj(F("flashstatus"));
+  sendNestedJsonObj(F("flashing"), CBOOLEAN(isFlashing()));
+  
+  // Determine flash type
+  const char *flashType = "none";
+  if (isESPFlashing) flashType = "esp";
+  else if (isPICFlashing) flashType = "pic";
+  sendNestedJsonObj(F("type"), flashType);
+  
+  // ESP flash details (if available)
+  sendNestedJsonObj(F("esp_flashing"), CBOOLEAN(isESPFlashing));
+  
+  // PIC flash details
+  sendNestedJsonObj(F("pic_flashing"), CBOOLEAN(isPICFlashing));
+  sendNestedJsonObj(F("pic_progress"), currentPICFlashProgress);
+  sendNestedJsonObj(F("pic_filename"), currentPICFlashFile);
+  sendNestedJsonObj(F("pic_error"), errorupgrade);
+  
+  sendEndJsonObj(F("flashstatus"));
+} // sendFlashStatus()
 
 
 //=======================================================================

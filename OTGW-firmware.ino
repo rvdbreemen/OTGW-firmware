@@ -307,14 +307,14 @@ void doBackgroundTasks()
   }
   
   if (WiFi.status() == WL_CONNECTED) {
-    // During ESP firmware flash, keep essential services but skip heavy background tasks
-    // Keep: HTTP server (upload chunks), Telnet (debug), MDNS (network discovery)
-    // Skip: MQTT, OTGW, WebSocket logs, NTP to reduce interference
-    if (isESPFlashing) {
+    // During firmware flash (ESP or PIC), keep essential services but skip heavy background tasks
+    // Keep: HTTP server (upload chunks), Telnet (debug), MDNS (network discovery), WebSocket (for flash progress)
+    // Skip: MQTT, OTGW, NTP to reduce interference and ensure stable flash
+    if (isFlashing()) {
       handleDebug();              // Keep telnet debug active for monitoring
       httpServer.handleClient();  // MUST continue - processes upload chunks
       MDNS.update();              // Keep MDNS active for network discovery
-      handleWebSocket();        // Process WebSocket events during flash
+      handleWebSocket();          // Process WebSocket events for flash progress updates
     } else {
       //while connected handle everything that uses network stuff
       handleDebug();
@@ -338,8 +338,8 @@ void loop()
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS);
   
-  if (!isESPFlashing) {
-    // Only run these tasks when NOT flashing ESP firmware
+  if (!isFlashing()) {
+    // Only run these tasks when NOT flashing firmware (ESP or PIC)
       if (DUE(timerpollsensor))         pollSensors();    // poll the temperature sensors connected to 2wire gpio pin 
       if (DUE(timers0counter))          sendS0Counters(); // poll the s0 counter connected to gpio pin when due
       if (DUE(timer5min))               do5minevent();  

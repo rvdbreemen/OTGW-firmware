@@ -106,7 +106,12 @@ uint32_t    rebootCount = 0;
 char        sMessage[257] = "";    
 uint32_t    MQTTautoConfigMap[8] = { 0 };
 bool        isESPFlashing = false;  // Flag to disable background tasks during ESP firmware flash
-bool        isPICFlashing = false;  // Flag to track PIC firmware flash state (for polling API)
+bool        isPICFlashing = false;  // Flag to disable background tasks during PIC firmware flash
+
+// Helper inline function to check if any firmware flash is in progress
+inline bool isFlashing() {
+  return isESPFlashing || isPICFlashing;
+}
 
 //Use acetime
 using namespace ace_time;
