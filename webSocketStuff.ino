@@ -32,8 +32,6 @@
 #include <TelnetStream.h>
 #include "Debug.h"
 
-extern char settingHostname[];
-
 // WebSocket server on port 81 (no built-in authentication; local network use only)
 WebSocketsServer webSocket = WebSocketsServer(81);
 
@@ -172,12 +170,7 @@ void sendLogToWebSocket(const char* logMessage) {
   }
 }
 
-//===========================================================================================
-// Get WebSocket client count (for diagnostics)
-//===========================================================================================
-uint8_t getWebSocketClientCount() {
-  return wsClientCount;
-}
+
 
 /***************************************************************************
 *
