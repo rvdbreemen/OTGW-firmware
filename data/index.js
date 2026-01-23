@@ -2100,6 +2100,27 @@ function startFlash(filename) {
     performFlash(filename);
 }
 
+// Helper function to determine firmware type and version from filename
+function parseFirmwareInfo(filename) {
+    let displayType = "Gateway";
+    let version = "Unknown";
+    
+    // Determine type from filename
+    if (filename) {
+        let fname = filename.toLowerCase();
+        if (fname.includes("diag")) displayType = "Diagnostic";
+        else if (fname.includes("inter")) displayType = "Interface";
+    }
+    
+    // Look up version from available firmware files list
+    if (typeof availableFirmwareFiles !== 'undefined' && filename) {
+        let f = availableFirmwareFiles.find(x => x.name === filename);
+        if (f && f.version) version = f.version;
+    }
+    
+    return { type: displayType, version: version };
+}
+
 // Failsafe polling mechanism for PIC flash status
 function startPICFlashPolling() {
     console.log("Starting PIC flash status polling (every 5s)");
@@ -2147,7 +2168,17 @@ function pollPICFlashStatus() {
                         progressBar.style.width = "100%";
                         if (progressBar.classList.contains('error')) progressBar.classList.remove('error');
                     }
-                    if (pctText) pctText.innerText = "Successfully flashed " + (status.filename || currentFlashFilename);
+                    
+                    // Parse firmware info from filename
+                    const fwInfo = parseFirmwareInfo(status.filename || currentFlashFilename);
+                    
+                    // Update UI with TARGET version
+                    let elType = document.getElementById('pic_type_display');
+                    let elVer = document.getElementById('pic_version_display');
+                    if (elType) elType.innerText = fwInfo.type;
+                    if (elVer) elVer.innerText = fwInfo.version;
+                    
+                    if (pctText) pctText.innerText = "Successfully flashed to " + fwInfo.type + " " + fwInfo.version;
                     
                     // Refresh firmware info
                     setTimeout(() => refreshFirmware(), 2000);
@@ -2289,27 +2320,16 @@ function handleFlashMessage(data) {
                     if (progressBar.classList.contains('error')) progressBar.classList.remove('error');
                 }
 
-                // Look up version for immediate feedback
-                let flashedVer = "Unknown";
-                // Attempt to find version from available global list
-                if (typeof availableFirmwareFiles !== 'undefined') {
-                    let f = availableFirmwareFiles.find(x => x.name === (msg.filename || currentFlashFilename));
-                    if (f && f.version) flashedVer = f.version;
-                }
-
-                // Determine firmware type from filename for immediate UI feedback
-                let fname = (msg.filename || currentFlashFilename).toLowerCase();
-                let displayType = "Gateway"; 
-                if (fname.includes("diag")) displayType = "Diagnostic";
-                if (fname.includes("inter")) displayType = "Interface";
+                // Parse firmware info from filename
+                const fwInfo = parseFirmwareInfo(msg.filename || currentFlashFilename);
 
                 // Update UI immediately with TARGET version (optimistic)
                 let elType = document.getElementById('pic_type_display');
                 let elVer = document.getElementById('pic_version_display');
-                if (elType) elType.innerText = displayType;
-                if (elVer) elVer.innerText = flashedVer;
+                if (elType) elType.innerText = fwInfo.type;
+                if (elVer) elVer.innerText = fwInfo.version;
                 
-                if (pctText) pctText.innerText = "Successfully flashed to " + displayType + " " + flashedVer;
+                if (pctText) pctText.innerText = "Successfully flashed to " + fwInfo.type + " " + fwInfo.version;
                 
                 // Trigger actual hardware refresh in background
                 setTimeout(() => refreshFirmware(), 2000); // Give PIC 2s to boot

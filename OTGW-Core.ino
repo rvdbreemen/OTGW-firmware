@@ -2157,7 +2157,7 @@ void fwupgradestep(int pct) {
   
   const char *state = (pct == 0) ? "start" : "write";
   int written = snprintf_P(buf, sizeof(buf), 
-    PSTR("{\"state\":\"%s\",\"flash_written\":%d,\"flash_total\":100,\"filename\":\"%s\",\"error\":\"\"}"),
+    PSTR("{\"state\":\"%s\",\"flash_written\":%d,\"flash_total\":100,\"filename\":\"%s\"}"),
     state, pct, filenameEsc);
   
   if (written > 0 && written < (int)sizeof(buf)) {
