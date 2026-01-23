@@ -105,6 +105,15 @@ void processAPI()
       if (wc > 3 && strcmp_P(words[3], PSTR("health")) == 0) {
         if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
         sendHealth();
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("pic")) == 0) {
+        if (wc > 4 && strcmp_P(words[4], PSTR("flashstatus")) == 0) {
+          // GET /api/v1/pic/flashstatus
+          // Minimal endpoint for polling PIC flash state during upgrade
+          if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+          sendPICFlashStatus();
+        } else {
+          sendApiNotFound(originalURI);
+        }
       } else if (wc > 3 && strcmp_P(words[3], PSTR("otgw")) == 0) {
         if (wc > 4 && strcmp_P(words[4], PSTR("telegraf")) == 0) {
           // GET /api/v1/otgw/telegraf
@@ -657,6 +666,19 @@ void sendHealth()
 
 } // sendHealth()
 
+
+//=======================================================================
+void sendPICFlashStatus()
+{
+  // Minimal PIC flash status endpoint for polling during flash
+  // Returns: {"flashing":true|false,"progress":0-100,"filename":"...","error":"..."}
+  sendStartJsonObj(F("flashstatus"));
+  sendNestedJsonObj(F("flashing"), CBOOLEAN(isPICFlashing));
+  sendNestedJsonObj(F("progress"), currentPICFlashProgress);
+  sendNestedJsonObj(F("filename"), currentPICFlashFile);
+  sendNestedJsonObj(F("error"), errorupgrade);
+  sendEndJsonObj(F("flashstatus"));
+} // sendPICFlashStatus()
 
 
 //=======================================================================

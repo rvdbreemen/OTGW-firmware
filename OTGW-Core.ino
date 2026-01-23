@@ -2116,6 +2116,10 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   }
   OTGWDebugTf(PSTR("Upgrade finished: Errorcode = %d - %s - %d retries, %d errors\r\n"), result, CSTR(errorupgrade), retries, errors);
   
+  // Mark flash as complete
+  isPICFlashing = false;
+  currentPICFlashProgress = (result == OTGWError::OTGW_ERROR_NONE) ? 100 : -1; // -1 indicates error
+  
 #ifndef DISABLE_WEBSOCKET
   // Send completion message in format frontend expects
   // Escape strings to prevent JSON injection
@@ -2135,12 +2139,14 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   }
 #endif
   
-  // Clear filename after flash completes
-  currentPICFlashFile[0] = '\0';
+  // Note: Keep filename and progress for polling API until next flash starts
 }
 
 void fwupgradestep(int pct) {
   OTGWDebugTf(PSTR("Upgrade: %d%%\n\r"), pct);
+  
+  // Update progress for polling API
+  currentPICFlashProgress = pct;
   
 #ifndef DISABLE_WEBSOCKET
   // Send progress message in format frontend expects
@@ -2176,7 +2182,7 @@ void fwupgradestart(const char *hexfile) {
   DebugTf(PSTR("Start PIC upgrade with hexfile: %s\n\r"), hexfile);
   OTGWError result;
   
-  // Store filename for WebSocket progress messages
+  // Store filename for WebSocket progress messages and polling API
   // Extract just the filename from the path
   const char *filename = strrchr(hexfile, '/');
   if (filename) {
@@ -2185,6 +2191,11 @@ void fwupgradestart(const char *hexfile) {
     filename = hexfile; // No path, use as-is
   }
   strlcpy(currentPICFlashFile, filename, sizeof(currentPICFlashFile));
+  
+  // Mark flash as started
+  isPICFlashing = true;
+  currentPICFlashProgress = 0;
+  errorupgrade[0] = '\0'; // Clear previous error
   
   digitalWrite(LED1, LOW);
   result = OTGWSerial.startUpgrade(hexfile);
