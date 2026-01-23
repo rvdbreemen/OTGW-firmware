@@ -2105,11 +2105,16 @@ function parseFirmwareInfo(filename) {
     let displayType = "Gateway";
     let version = "Unknown";
     
-    // Determine type from filename
+    // Determine type from filename (check in specific order to avoid false positives)
     if (filename) {
         let fname = filename.toLowerCase();
-        if (fname.includes("diag")) displayType = "Diagnostic";
-        else if (fname.includes("inter")) displayType = "Interface";
+        // Check diagnostic first, then interface, default to gateway
+        if (fname.includes("diagnostic") || fname.includes("diag.hex")) {
+            displayType = "Diagnostic";
+        } else if (fname.includes("interface") || fname.includes("inter.hex")) {
+            displayType = "Interface";
+        }
+        // else remains "Gateway"
     }
     
     // Look up version from available firmware files list
