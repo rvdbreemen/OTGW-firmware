@@ -2095,24 +2095,15 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   }
   OTGWDebugTf(PSTR("Upgrade finished: Errorcode = %d - %s - %d retries, %d errors\r\n"), result, CSTR(errorupgrade), retries, errors);
   
-  char buffer[128];
-  if (result == OTGWError::OTGW_ERROR_NONE) {
-      snprintf_P(buffer, sizeof(buffer), PSTR("{\"percent\":100,\"result\":%d,\"errors\":%d,\"retries\":%d}"), (int)result, errors, retries);
-  } else {
-      snprintf_P(buffer, sizeof(buffer), PSTR("{\"result\":%d,\"errors\":%d,\"retries\":%d}"), (int)result, errors, retries);
-  }
-#ifndef DISABLE_WEBSOCKET
-  sendWebSocketJSON(buffer);
-#endif
+  // Note: WebSocket JSON notifications removed - WebUI only handles ESP firmware flash messages with 'state' property
+  // PIC firmware upgrade progress is tracked via OTGWSerial library internal state, not WebSocket
 }
 
 void fwupgradestep(int pct) {
   OTGWDebugTf(PSTR("Upgrade: %d%%\n\r"), pct);
-  char buffer[32];
-  snprintf_P(buffer, sizeof(buffer), PSTR("{\"percent\":%d}"), pct);
-#ifndef DISABLE_WEBSOCKET
-  sendWebSocketJSON(buffer);
-#endif
+  
+  // Note: WebSocket JSON notifications removed - WebUI only handles ESP firmware flash messages with 'state' property
+  // PIC firmware upgrade progress is tracked via OTGWSerial library internal state, not WebSocket
 }
 
 void fwreportinfo(OTGWFirmware fw, const char *version) {
