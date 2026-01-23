@@ -687,26 +687,14 @@ void sendPICFlashStatus()
 //=======================================================================
 void sendFlashStatus()
 {
-  // Unified flash status endpoint for both ESP and PIC flash
-  // Returns: {"flashing":true|false,"type":"esp|pic|none","esp":{...},"pic":{...}}
+  // Unified flash status endpoint - minimal response with only fields used by frontend
+  // Returns: {"flashing":bool,"pic_flashing":bool,"pic_progress":0-100,"pic_filename":"...","pic_error":"..."}
   sendStartJsonObj(F("flashstatus"));
   sendNestedJsonObj(F("flashing"), CBOOLEAN(isFlashing()));
-  
-  // Determine flash type
-  const char *flashType = "none";
-  if (isESPFlashing) flashType = "esp";
-  else if (isPICFlashing) flashType = "pic";
-  sendNestedJsonObj(F("type"), flashType);
-  
-  // ESP flash details (if available)
-  sendNestedJsonObj(F("esp_flashing"), CBOOLEAN(isESPFlashing));
-  
-  // PIC flash details
   sendNestedJsonObj(F("pic_flashing"), CBOOLEAN(isPICFlashing));
   sendNestedJsonObj(F("pic_progress"), currentPICFlashProgress);
   sendNestedJsonObj(F("pic_filename"), currentPICFlashFile);
   sendNestedJsonObj(F("pic_error"), errorupgrade);
-  
   sendEndJsonObj(F("flashstatus"));
 } // sendFlashStatus()
 
