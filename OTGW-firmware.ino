@@ -307,13 +307,21 @@ void doBackgroundTasks()
   }
   
   if (WiFi.status() == WL_CONNECTED) {
-    // During firmware flash (ESP or PIC), keep essential services but skip heavy background tasks
-    // Keep: HTTP server (upload chunks), Telnet (debug), MDNS (network discovery), WebSocket (for flash progress)
-    // Skip: MQTT, OTGW, NTP to reduce interference and ensure stable flash
-    if (isFlashing()) {
+    // During firmware flash, keep essential services but skip heavy background tasks
+    // ESP flash: Skip MQTT, OTGW, NTP to reduce interference
+    // PIC flash: Skip MQTT, NTP but KEEP OTGW (needed for serial communication during upgrade)
+    if (isESPFlashing) {
+      // ESP flash: minimal services only
       handleDebug();              // Keep telnet debug active for monitoring
       httpServer.handleClient();  // MUST continue - processes upload chunks
       MDNS.update();              // Keep MDNS active for network discovery
+      handleWebSocket();          // Process WebSocket events for flash progress updates
+    } else if (isPICFlashing) {
+      // PIC flash: same as ESP but MUST call handleOTGW for serial communication
+      handleDebug();              // Keep telnet debug active for monitoring
+      httpServer.handleClient();  // Keep HTTP active
+      MDNS.update();              // Keep MDNS active for network discovery
+      handleOTGW();               // REQUIRED for PIC flash - processes serial communication
       handleWebSocket();          // Process WebSocket events for flash progress updates
     } else {
       //while connected handle everything that uses network stuff
