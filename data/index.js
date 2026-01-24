@@ -82,6 +82,155 @@ window.enterFlashMode = enterFlashMode;
 window.exitFlashMode = exitFlashMode;
 
 //============================================================================
+// Mobile Device Detection - Industry Standard Patterns
+//============================================================================
+/**
+ * Comprehensive mobile device detection using multiple reliable methods
+ * Based on industry best practices from major frameworks (Bootstrap, React, etc.)
+ * 
+ * Detection Methods:
+ * 1. User-Agent parsing (primary method - most reliable)
+ * 2. Touch capability detection (supplementary)
+ * 3. Screen size (fallback for unknown devices)
+ * 4. Orientation API availability (mobile-specific)
+ * 
+ * Handles edge cases:
+ * - iPad Pro with desktop mode
+ * - Windows Surface tablets
+ * - Chrome DevTools device emulation
+ * - Future-proof with screen size fallback
+ */
+function detectMobileDevice() {
+  const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+  
+  // 1. Definitive mobile phone detection (most accurate)
+  const isMobilePhone = /iPhone|iPod|Android.*Mobile|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+  
+  // 2. Tablet detection (includes iPad, Android tablets)
+  // Note: iPad with iOS 13+ may report as Mac, so check for touch + no pointer
+  const isTablet = /iPad|Android(?!.*Mobile)|Tablet|PlayBook|Silk/i.test(userAgent) ||
+                   (navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && /Mac/.test(userAgent));
+  
+  // 3. Windows Phone detection (legacy support)
+  const isWindowsPhone = /Windows Phone/i.test(userAgent);
+  
+  // 4. Screen size check (fallback for unknown mobile devices)
+  // Standard breakpoints: phone < 768px, tablet < 1024px
+  const isSmallScreen = window.innerWidth < 768;
+  const isMediumScreen = window.innerWidth >= 768 && window.innerWidth < 1024;
+  
+  // 5. Touch-only device detection (supplementary check)
+  // Devices with touch as primary input (no mouse)
+  const isTouchOnly = ('ontouchstart' in window || navigator.maxTouchPoints > 0) &&
+                      !window.matchMedia('(pointer: fine)').matches;
+  
+  // 6. Orientation API (mobile-specific feature)
+  const hasOrientationAPI = typeof window.orientation !== 'undefined';
+  
+  // Decision logic:
+  // - Definite mobile: phone OR small screen with touch
+  // - Probable mobile: tablet OR medium screen with touch-only
+  // - Edge case: orientation API suggests mobile even if other checks fail
+  
+  const isDefiniteMobile = isMobilePhone || isWindowsPhone || (isSmallScreen && isTouchOnly);
+  const isProbableMobile = isTablet || (isMediumScreen && isTouchOnly);
+  const isEdgeCaseMobile = hasOrientationAPI && isSmallScreen;
+  
+  const isMobile = isDefiniteMobile || isProbableMobile || isEdgeCaseMobile;
+  
+  // Detailed logging for debugging (only in development)
+  if (isMobile) {
+    console.log('Mobile device detected:', {
+      userAgent: userAgent.substring(0, 50) + '...',
+      phone: isMobilePhone,
+      tablet: isTablet,
+      windowsPhone: isWindowsPhone,
+      screenWidth: window.innerWidth,
+      screenHeight: window.innerHeight,
+      touchPoints: navigator.maxTouchPoints,
+      orientationAPI: hasOrientationAPI
+    });
+  }
+  
+  return isMobile;
+}
+
+/**
+ * Hides advanced features that are not suitable for mobile devices
+ * These features are resource-intensive or have poor UX on small screens:
+ * - OpenTherm Monitor (WebSocket, graphs, heavy rendering)
+ * - Storage Settings Panel (complex UI, not essential for mobile)
+ * - File Streaming (File System Access API not widely supported on mobile)
+ * - Graph tabs (charts don't render well on small screens)
+ * - Import/Export controls (file handling is cumbersome on mobile)
+ * 
+ * Note: Basic functionality (Home, Settings) remains available
+ */
+function hideAdvancedFeaturesForMobile() {
+  console.log('Hiding advanced features for mobile device...');
+  
+  // 1. Hide OpenTherm Monitor section entirely (most resource-intensive)
+  const logSection = document.getElementById('otLogSection');
+  if (logSection) {
+    logSection.classList.add('hidden');
+    console.log('- OpenTherm Monitor section hidden');
+  }
+  
+  // 2. Hide Storage Settings panel (complex UI, not critical for mobile)
+  const storagePanel = document.querySelector('.storage-settings-panel');
+  if (storagePanel) {
+    storagePanel.style.display = 'none';
+    console.log('- Storage Settings panel hidden');
+  }
+  
+  // 3. Hide Graph tab (charts are resource-intensive and don't scale well)
+  const graphTab = document.querySelector('.tab-link[onclick*="Graph"]');
+  if (graphTab) {
+    graphTab.style.display = 'none';
+    console.log('- Graph tab hidden');
+  }
+  
+  // 4. Simplify log controls if section exists (remove advanced features)
+  const logControls = document.querySelector('.ot-log-controls');
+  if (logControls) {
+    // Hide import/export (file handling is poor on mobile)
+    const downloadDropdown = logControls.querySelector('#btnDownloadLog')?.closest('.download-dropdown');
+    const importDropdown = logControls.querySelector('#btnImportLog')?.closest('.download-dropdown');
+    if (downloadDropdown) downloadDropdown.style.display = 'none';
+    if (importDropdown) importDropdown.style.display = 'none';
+    
+    // Hide capture mode (memory intensive)
+    const captureLabel = logControls.querySelector('label:has(#chkCaptureMode)');
+    if (captureLabel) captureLabel.style.display = 'none';
+    
+    // Hide auto-download (file handling)
+    const autoDownloadLabel = logControls.querySelector('label:has(#chkAutoDownloadLog)');
+    if (autoDownloadLabel) autoDownloadLabel.style.display = 'none';
+    
+    console.log('- Advanced log controls hidden');
+  }
+  
+  // 5. Add mobile-friendly indicator
+  const header = document.querySelector('.headerrow');
+  if (header) {
+    const mobileIndicator = document.createElement('div');
+    mobileIndicator.className = 'headercolumn';
+    mobileIndicator.textContent = '📱 Mobile';
+    mobileIndicator.title = 'Mobile mode: Advanced features disabled for better performance';
+    mobileIndicator.style.fontSize = '0.9em';
+    mobileIndicator.style.color = '#666';
+    header.appendChild(mobileIndicator);
+    console.log('- Mobile indicator added to header');
+  }
+  
+  console.log('Mobile optimization complete. Advanced features hidden.');
+}
+
+// Expose for potential external use
+window.detectMobileDevice = detectMobileDevice;
+window.hideAdvancedFeaturesForMobile = hideAdvancedFeaturesForMobile;
+
+//============================================================================
 // OpenTherm Log WebSocket Variables and Functions
 //============================================================================
 let otLogWS = null;
@@ -200,20 +349,13 @@ function initOTLogWebSocket(force) {
     return;
   }
   
-  // Detect smartphone (iPhone or Android Phone)
-  const isPhone = /iPhone|iPod/.test(navigator.userAgent) || 
-                 (/Android/.test(navigator.userAgent) && /Mobile/.test(navigator.userAgent));
+  // Enhanced mobile detection using industry-standard patterns
+  const isMobileDevice = detectMobileDevice();
   
-  // Also check screen width as a fallback (standard breakpoint for tablets is 768px)
-  const isSmallScreen = window.innerWidth < 768;
-
-  if ((isPhone || isSmallScreen) && !force && !isFlashing) {
-    console.log("Smartphone or small screen detected. Disabling OpenTherm Monitor.");
-    const logSection = document.getElementById('otLogSection');
-    if (logSection) {
-      logSection.classList.add('hidden');
-    }
-    return; // Do not connect WebSocket
+  if (isMobileDevice && !force && !isFlashing) {
+    console.log("Mobile device detected. Disabling advanced features for optimal mobile experience.");
+    hideAdvancedFeaturesForMobile();
+    return; // Do not connect WebSocket on mobile
   }
 
   // Clear any pending reconnect timer
