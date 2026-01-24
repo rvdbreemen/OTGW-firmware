@@ -100,6 +100,7 @@ let otLogControlsInitialized = false;
 let isFlashing = false;
 let currentFlashFilename = "";
 let flashModeActive = false; // Track if we're on the flash page
+let flashPollTimer = null; // Timer for polling flash status as failsafe (both ESP and PIC)
 
 // File Streaming Variables
 let logDirectoryHandle = null;
@@ -2099,6 +2100,145 @@ function startFlash(filename) {
     performFlash(filename);
 }
 
+// Helper function to determine firmware type and version from filename
+function parseFirmwareInfo(filename) {
+    let displayType = "Gateway";
+    let version = "Unknown";
+    
+    // Determine type from filename (check in specific order to avoid false positives)
+    if (filename) {
+        let fname = filename.toLowerCase();
+        // Check diagnostic first, then interface, default to gateway
+        if (fname.includes("diagnostic") || fname.includes("diag.hex")) {
+            displayType = "Diagnostic";
+        } else if (fname.includes("interface") || fname.includes("inter.hex")) {
+            displayType = "Interface";
+        }
+        // else remains "Gateway"
+    }
+    
+    // Look up version from available firmware files list
+    if (typeof availableFirmwareFiles !== 'undefined' && filename) {
+        let f = availableFirmwareFiles.find(x => x.name === filename);
+        if (f && f.version) version = f.version;
+    }
+    
+    return { type: displayType, version: version };
+}
+
+// Failsafe polling mechanism for flash status (both ESP and PIC)
+function startFlashPolling() {
+    console.log("Starting flash status polling (every 5s)");
+    if (flashPollTimer) {
+        clearInterval(flashPollTimer);
+    }
+    flashPollTimer = setInterval(pollFlashStatus, 5000);
+}
+
+function stopFlashPolling() {
+    console.log("Stopping flash status polling");
+    if (flashPollTimer) {
+        clearInterval(flashPollTimer);
+        flashPollTimer = null;
+    }
+}
+
+function pollFlashStatus() {
+    // Use unified endpoint that works for both ESP and PIC flash
+    fetch(APIGW + 'v1/flashstatus')
+        .then(response => response.json())
+        .then(json => {
+            if (!json.flashstatus) return;
+            
+            const status = json.flashstatus;
+            console.log("Flash status poll:", status);
+            
+            // If not flashing at all, stop polling
+            if (!status.flashing) {
+                stopFlashPolling();
+                return;
+            }
+            
+            let progressBar = document.getElementById("flashProgressBar");
+            let pctText = document.getElementById("flashPercentageText");
+            
+            // Handle PIC flash progress
+            if (status.pic_flashing && status.pic_progress >= 0 && status.pic_progress <= 100) {
+                if (progressBar) progressBar.style.width = status.pic_progress + "%";
+                if (pctText) pctText.innerText = "Flashing " + (status.pic_filename || currentFlashFilename) + " : " + status.pic_progress + "%";
+                
+                // Check for completion
+                if (status.pic_progress === 100) {
+                    handleFlashCompletion(status.pic_filename, status.pic_error);
+                } else if (status.pic_progress === -1) {
+                    handleFlashError(status.pic_filename, status.pic_error);
+                }
+            }
+            // ESP flash doesn't provide detailed progress in this API
+            // It relies on WebSocket messages from ModUpdateServer
+        })
+        .catch(error => {
+            console.error("Flash status poll error:", error);
+            // Keep polling - might be temporary network issue
+        });
+}
+
+function handleFlashCompletion(filename, error) {
+    stopFlashPolling();
+    isFlashing = false;
+    toggleInteraction(true);
+    
+    let progressBar = document.getElementById("flashProgressBar");
+    let pctText = document.getElementById("flashPercentageText");
+    let progressSection = document.getElementById("flashProgressSection");
+    
+    if (progressBar) {
+        progressBar.style.width = "100%";
+        if (progressBar.classList.contains('error')) progressBar.classList.remove('error');
+    }
+    
+    // Parse firmware info from filename
+    const fwInfo = parseFirmwareInfo(filename || currentFlashFilename);
+    
+    // Update UI with TARGET version
+    let elType = document.getElementById('pic_type_display');
+    let elVer = document.getElementById('pic_version_display');
+    if (elType) elType.innerText = fwInfo.type;
+    if (elVer) elVer.innerText = fwInfo.version;
+    
+    if (pctText) pctText.innerText = "Successfully flashed to " + fwInfo.type + " " + fwInfo.version;
+    
+    // Refresh firmware info
+    setTimeout(() => refreshFirmware(), 2000);
+    
+    // Reset progress bar after 10 seconds
+    setTimeout(function() {
+        if (progressSection) progressSection.classList.remove('active');
+        if (progressBar) progressBar.style.width = "0%";
+        if (pctText) pctText.innerText = "Ready to flash";
+    }, 10000);
+    
+    // Restart polling
+    if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+}
+
+function handleFlashError(filename, error) {
+    stopFlashPolling();
+    isFlashing = false;
+    toggleInteraction(true);
+    
+    let progressBar = document.getElementById("flashProgressBar");
+    let pctText = document.getElementById("flashPercentageText");
+    
+    if (progressBar) progressBar.classList.add('error');
+    if (pctText) pctText.innerText = "Flash failed: " + (error || "Unknown error");
+    
+    // Restart polling
+    if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+}
+
 // function pollForReboot() - Removed
 // function startFlashCountdown() - Removed
 
@@ -2124,6 +2264,9 @@ function performFlash(filename) {
     
     // Ensure WebSocket is connected for progress updates
     initOTLogWebSocket(true);
+    
+    // Start failsafe polling every 5 seconds
+    startFlashPolling();
 
     // Wait for WebSocket to be OPEN before sending flash command
     let attempts = 0;
@@ -2166,6 +2309,9 @@ function performFlash(filename) {
                     if (pctText) pctText.innerText = "Error starting flash: " + error.message;
                     if (progressBar) progressBar.classList.add('error');
                     
+                    // Stop failsafe polling
+                    stopFlashPolling();
+                    
                     // Restart polling on start failure
                     if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
                     if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
@@ -2205,6 +2351,7 @@ function handleFlashMessage(data) {
             // Handle completion states
             if (msg.state === 'end') {
                 // Success
+                stopFlashPolling(); // Stop failsafe polling
                 isFlashing = false;
                 toggleInteraction(true);
                 
@@ -2213,27 +2360,16 @@ function handleFlashMessage(data) {
                     if (progressBar.classList.contains('error')) progressBar.classList.remove('error');
                 }
 
-                // Look up version for immediate feedback
-                let flashedVer = "Unknown";
-                // Attempt to find version from available global list
-                if (typeof availableFirmwareFiles !== 'undefined') {
-                    let f = availableFirmwareFiles.find(x => x.name === (msg.filename || currentFlashFilename));
-                    if (f && f.version) flashedVer = f.version;
-                }
-
-                // Determine firmware type from filename for immediate UI feedback
-                let fname = (msg.filename || currentFlashFilename).toLowerCase();
-                let displayType = "Gateway"; 
-                if (fname.includes("diag")) displayType = "Diagnostic";
-                if (fname.includes("inter")) displayType = "Interface";
+                // Parse firmware info from filename
+                const fwInfo = parseFirmwareInfo(msg.filename || currentFlashFilename);
 
                 // Update UI immediately with TARGET version (optimistic)
                 let elType = document.getElementById('pic_type_display');
                 let elVer = document.getElementById('pic_version_display');
-                if (elType) elType.innerText = displayType;
-                if (elVer) elVer.innerText = flashedVer;
+                if (elType) elType.innerText = fwInfo.type;
+                if (elVer) elVer.innerText = fwInfo.version;
                 
-                if (pctText) pctText.innerText = "Successfully flashed to " + displayType + " " + flashedVer;
+                if (pctText) pctText.innerText = "Successfully flashed to " + fwInfo.type + " " + fwInfo.version;
                 
                 // Trigger actual hardware refresh in background
                 setTimeout(() => refreshFirmware(), 2000); // Give PIC 2s to boot
@@ -2250,6 +2386,7 @@ function handleFlashMessage(data) {
                 if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
             } else if (msg.state === 'error' || msg.state === 'abort') {
                 // Error or abort
+                stopFlashPolling(); // Stop failsafe polling
                 isFlashing = false;
                 toggleInteraction(true);
                 

@@ -105,6 +105,19 @@ void processAPI()
       if (wc > 3 && strcmp_P(words[3], PSTR("health")) == 0) {
         if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
         sendHealth();
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("flashstatus")) == 0) {
+        // GET /api/v1/flashstatus - Unified flash status for both ESP and PIC
+        if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+        sendFlashStatus();
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("pic")) == 0) {
+        if (wc > 4 && strcmp_P(words[4], PSTR("flashstatus")) == 0) {
+          // GET /api/v1/pic/flashstatus
+          // Minimal endpoint for polling PIC flash state during upgrade
+          if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+          sendPICFlashStatus();
+        } else {
+          sendApiNotFound(originalURI);
+        }
       } else if (wc > 3 && strcmp_P(words[3], PSTR("otgw")) == 0) {
         if (wc > 4 && strcmp_P(words[4], PSTR("telegraf")) == 0) {
           // GET /api/v1/otgw/telegraf
@@ -657,6 +670,33 @@ void sendHealth()
 
 } // sendHealth()
 
+
+//=======================================================================
+void sendPICFlashStatus()
+{
+  // Minimal PIC flash status endpoint for polling during flash
+  // Returns: {"flashstatus":{"flashing":true|false,"progress":0-100,"filename":"...","error":"..."}}
+  sendStartJsonMap(F("flashstatus"));
+  sendNestedJsonObj(F("flashing"), CBOOLEAN(isPICFlashing));
+  sendNestedJsonObj(F("progress"), currentPICFlashProgress);
+  sendNestedJsonObj(F("filename"), currentPICFlashFile);
+  sendNestedJsonObj(F("error"), errorupgrade);
+  sendEndJsonMap(F("flashstatus"));
+} // sendPICFlashStatus()
+
+//=======================================================================
+void sendFlashStatus()
+{
+  // Unified flash status endpoint - minimal response with only fields used by frontend
+  // Returns: {"flashstatus":{"flashing":bool,"pic_flashing":bool,"pic_progress":0-100,"pic_filename":"...","pic_error":"..."}}
+  sendStartJsonMap(F("flashstatus"));
+  sendNestedJsonObj(F("flashing"), CBOOLEAN(isFlashing()));
+  sendNestedJsonObj(F("pic_flashing"), CBOOLEAN(isPICFlashing));
+  sendNestedJsonObj(F("pic_progress"), currentPICFlashProgress);
+  sendNestedJsonObj(F("pic_filename"), currentPICFlashFile);
+  sendNestedJsonObj(F("pic_error"), errorupgrade);
+  sendEndJsonMap(F("flashstatus"));
+} // sendFlashStatus()
 
 
 //=======================================================================

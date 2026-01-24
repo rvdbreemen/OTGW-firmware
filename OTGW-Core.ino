@@ -2077,9 +2077,30 @@ void upgradepicnow(const char *filename) {
   // Upgrade runs in background via OTGWSerial callbacks and upgradeTick called from available()
 }
 
+// Helper function to escape JSON strings for WebSocket messages
+// Escapes quotes, backslashes, and control characters
+// Note: Input is assumed to be null-terminated; embedded nulls are replaced with spaces
+static void jsonEscape(const char *in, char *out, size_t outSize) {
+  size_t j = 0;
+  for (size_t i = 0; in[i] != '\0' && j + 1 < outSize; ++i) {
+    char c = in[i];
+    if (c == '"' || c == '\\') {
+      if (j + 2 >= outSize) break;
+      out[j++] = '\\';
+      out[j++] = c;
+    } else if (static_cast<unsigned char>(c) < 0x20) {
+      if (j + 1 >= outSize) break;
+      out[j++] = ' '; // Replace control characters with space
+    } else {
+      out[j++] = c;
+    }
+  }
+  out[j] = '\0';
+}
+
 void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   switch (result) {
-    case OTGWError::OTGW_ERROR_NONE:          snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("PIC upgrade was succesful")); break;
+    case OTGWError::OTGW_ERROR_NONE:          snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("PIC upgrade was successful")); break;
     case OTGWError::OTGW_ERROR_MEMORY:        snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Not enough memory available")); break;
     case OTGWError::OTGW_ERROR_INPROG:        snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Firmware upgrade in progress")); break;
     case OTGWError::OTGW_ERROR_HEX_ACCESS:    snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Could not open hex file")); break;
@@ -2095,23 +2116,53 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   }
   OTGWDebugTf(PSTR("Upgrade finished: Errorcode = %d - %s - %d retries, %d errors\r\n"), result, CSTR(errorupgrade), retries, errors);
   
-  char buffer[128];
-  if (result == OTGWError::OTGW_ERROR_NONE) {
-      snprintf_P(buffer, sizeof(buffer), PSTR("{\"percent\":100,\"result\":%d,\"errors\":%d,\"retries\":%d}"), (int)result, errors, retries);
-  } else {
-      snprintf_P(buffer, sizeof(buffer), PSTR("{\"result\":%d,\"errors\":%d,\"retries\":%d}"), (int)result, errors, retries);
-  }
+  // Mark flash as complete
+  isPICFlashing = false;
+  currentPICFlashProgress = (result == OTGWError::OTGW_ERROR_NONE) ? 100 : -1; // -1 indicates error
+  
 #ifndef DISABLE_WEBSOCKET
-  sendWebSocketJSON(buffer);
+  // Send completion message in format frontend expects
+  // Escape strings to prevent JSON injection
+  char buf[320]; // Sized for escaped filename (129) + error (257) + JSON overhead (~70)
+  char filenameEsc[129]; // currentPICFlashFile is 65 chars, doubled for worst-case escaping
+  char errorEsc[257]; // errorupgrade is 129 chars, doubled for worst-case escaping
+  jsonEscape(currentPICFlashFile, filenameEsc, sizeof(filenameEsc));
+  jsonEscape(errorupgrade, errorEsc, sizeof(errorEsc));
+  
+  const char *state = (result == OTGWError::OTGW_ERROR_NONE) ? "end" : "error";
+  int written = snprintf_P(buf, sizeof(buf), 
+    PSTR("{\"state\":\"%s\",\"flash_written\":100,\"flash_total\":100,\"filename\":\"%s\",\"error\":\"%s\"}"),
+    state, filenameEsc, errorEsc);
+  
+  if (written > 0 && written < (int)sizeof(buf)) {
+    sendWebSocketJSON(buf);
+  }
 #endif
+  
+  // Note: Keep filename and progress for polling API until next flash starts
 }
 
 void fwupgradestep(int pct) {
   OTGWDebugTf(PSTR("Upgrade: %d%%\n\r"), pct);
-  char buffer[32];
-  snprintf_P(buffer, sizeof(buffer), PSTR("{\"percent\":%d}"), pct);
+  
+  // Update progress for polling API
+  currentPICFlashProgress = pct;
+  
 #ifndef DISABLE_WEBSOCKET
-  sendWebSocketJSON(buffer);
+  // Send progress message in format frontend expects
+  // Use percentage as flash_written for progress display
+  char buf[256]; // Sized for escaped filename (129) + JSON overhead (~90)
+  char filenameEsc[129]; // currentPICFlashFile is 65 chars, doubled for worst-case escaping
+  jsonEscape(currentPICFlashFile, filenameEsc, sizeof(filenameEsc));
+  
+  const char *state = (pct == 0) ? "start" : "write";
+  int written = snprintf_P(buf, sizeof(buf), 
+    PSTR("{\"state\":\"%s\",\"flash_written\":%d,\"flash_total\":100,\"filename\":\"%s\"}"),
+    state, pct, filenameEsc);
+  
+  if (written > 0 && written < (int)sizeof(buf)) {
+    sendWebSocketJSON(buf);
+  }
 #endif
 }
 
@@ -2130,6 +2181,21 @@ void fwreportinfo(OTGWFirmware fw, const char *version) {
 void fwupgradestart(const char *hexfile) {
   DebugTf(PSTR("Start PIC upgrade with hexfile: %s\n\r"), hexfile);
   OTGWError result;
+  
+  // Store filename for WebSocket progress messages and polling API
+  // Extract just the filename from the path
+  const char *filename = strrchr(hexfile, '/');
+  if (filename) {
+    filename++; // Skip the '/'
+  } else {
+    filename = hexfile; // No path, use as-is
+  }
+  strlcpy(currentPICFlashFile, filename, sizeof(currentPICFlashFile));
+  
+  // Mark flash as started
+  isPICFlashing = true;
+  currentPICFlashProgress = 0;
+  errorupgrade[0] = '\0'; // Clear previous error
   
   digitalWrite(LED1, LOW);
   result = OTGWSerial.startUpgrade(hexfile);
