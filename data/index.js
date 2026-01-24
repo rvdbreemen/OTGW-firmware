@@ -122,8 +122,10 @@ let currentLogDateStr = "";
 const MEMORY_SAFE_LIMIT = 500 * 1024 * 1024; // 500MB safe limit
 const MEMORY_WARNING_THRESHOLD = 0.8; // 80% - warn user
 const MEMORY_CRITICAL_THRESHOLD = 0.95; // 95% - auto-trim to prevent crash
+const MEMORY_OFFLOAD_THRESHOLD = 0.7; // 70% - Phase 6: suggest file streaming
 let memoryMonitorTimer = null;
 let currentMemoryStatus = 'green'; // green, yellow, red
+let autoOffloadPrompted = false; // Phase 6: Track if we already prompted for auto-offload
 
 // Storage Mode
 let storageMode = 'smart'; // 'disabled', 'smart', 'indexeddb', 'localstorage'
@@ -140,6 +142,10 @@ const STORAGE_CONFIG = {
   maxLocalStorageLines: 1000,
   autoSaveEnabled: true
 };
+
+// Phase 6: Enhanced File Streaming state
+let directoryHandleSaved = false; // Track if we have a saved directory handle
+let pendingFileLoadSession = null; // Session data from file to be loaded
 
 // Expose helper for other modules (graph.js) to save files to the same directory
 window.saveBlobToLogDir = async function(filename, blob) {
@@ -717,6 +723,11 @@ function updateMemoryDisplay() {
     status = 'yellow';
   }
   
+  // Phase 6: Check for auto-offload opportunity (70% threshold)
+  if (percent >= MEMORY_OFFLOAD_THRESHOLD * 100 && !isStreamingToFile && !autoOffloadPrompted) {
+    checkMemoryAndPromptOffload(percent);
+  }
+  
   // Update status if changed
   if (status !== currentMemoryStatus) {
     currentMemoryStatus = status;
@@ -835,6 +846,78 @@ function startFileStreamingPrompt() {
   dismissMemoryWarning();
 }
 
+//============================================================================
+// Phase 6: Enhanced File Streaming Integration
+//============================================================================
+
+/**
+ * Check memory and prompt for auto-offload to file (Phase 6)
+ * Called when memory reaches 70% threshold
+ */
+function checkMemoryAndPromptOffload(percent) {
+  // Only prompt once per session
+  if (autoOffloadPrompted) return;
+  
+  // Check if File System Access API is available
+  if (!('showDirectoryPicker' in window)) {
+    // Browser doesn't support file streaming, skip
+    return;
+  }
+  
+  autoOffloadPrompted = true;
+  
+  console.info(`Phase 6: Memory usage reached ${percent.toFixed(1)}% - prompting for file streaming`);
+  
+  // Show friendly notification banner
+  const bannerId = 'autoOffloadBanner';
+  let banner = document.getElementById(bannerId);
+  
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = bannerId;
+    banner.className = 'warning-banner info';
+    
+    const logSection = document.getElementById('otLogSection');
+    if (logSection) {
+      logSection.insertBefore(banner, logSection.firstChild);
+    }
+  }
+  
+  banner.innerHTML = `
+    💡 Memory usage is getting high (${percent.toFixed(0)}%). 
+    Would you like to enable file streaming to save logs to disk?
+    <button onclick="acceptAutoOffload()" class="btn-inline">Yes, Enable File Streaming</button>
+    <button onclick="dismissAutoOffload()" class="btn-inline">No Thanks</button>
+  `;
+  banner.style.display = 'block';
+}
+
+/**
+ * User accepted auto-offload suggestion
+ */
+async function acceptAutoOffload() {
+  dismissAutoOffload();
+  
+  // Trigger file streaming
+  await startFileStreamingPrompt();
+  
+  console.log('Phase 6: File streaming enabled via auto-offload');
+}
+
+/**
+ * User dismissed auto-offload suggestion
+ */
+function dismissAutoOffload() {
+  const banner = document.getElementById('autoOffloadBanner');
+  if (banner) {
+    banner.style.display = 'none';
+  }
+}
+
+// Expose Phase 6 functions to window for onclick handlers
+window.acceptAutoOffload = acceptAutoOffload;
+window.dismissAutoOffload = dismissAutoOffload;
+
 /**
  * Start memory monitoring
  */
@@ -861,6 +944,167 @@ function stopMemoryMonitoring() {
     memoryMonitorTimer = null;
   }
 }
+
+/**
+ * Phase 6: Try to restore directory handle from previous session
+ * Uses IndexedDB to persist the directory handle across page reloads
+ */
+async function tryRestoreDirectoryHandle() {
+  // Check browser support
+  if (!('showDirectoryPicker' in window) || !('indexedDB' in window)) {
+    return; // Not supported
+  }
+  
+  try {
+    // Try to get persisted directory handle from IndexedDB
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('OTGWFileHandles', 1);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains('handles')) {
+          db.createObjectStore('handles');
+        }
+      };
+    });
+    
+    const tx = db.transaction('handles', 'readonly');
+    const store = tx.objectStore('handles');
+    const request = store.get('logDirectory');
+    
+    const handle = await new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    
+    db.close();
+    
+    if (handle) {
+      // Verify we still have permission
+      const permission = await handle.queryPermission({ mode: 'readwrite' });
+      
+      if (permission === 'granted') {
+        logDirectoryHandle = handle;
+        directoryHandleSaved = true;
+        console.log('Phase 6: Restored directory handle from previous session');
+        
+        // Show option to resume file streaming
+        showFileStreamingRecoveryOption();
+      } else if (permission === 'prompt') {
+        // Request permission again
+        const newPermission = await handle.requestPermission({ mode: 'readwrite' });
+        if (newPermission === 'granted') {
+          logDirectoryHandle = handle;
+          directoryHandleSaved = true;
+          console.log('Phase 6: Directory handle permission re-granted');
+          showFileStreamingRecoveryOption();
+        }
+      }
+    }
+  } catch (e) {
+    console.log('Phase 6: Could not restore directory handle:', e.message);
+    // Silent fail - user can re-select directory if needed
+  }
+}
+
+/**
+ * Phase 6: Save directory handle to IndexedDB for persistence
+ */
+async function saveDirectoryHandle(handle) {
+  if (!('indexedDB' in window)) return;
+  
+  try {
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('OTGWFileHandles', 1);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains('handles')) {
+          db.createObjectStore('handles');
+        }
+      };
+    });
+    
+    const tx = db.transaction('handles', 'readwrite');
+    const store = tx.objectStore('handles');
+    store.put(handle, 'logDirectory');
+    
+    await new Promise((resolve, reject) => {
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    
+    db.close();
+    directoryHandleSaved = true;
+    console.log('Phase 6: Directory handle saved for future sessions');
+  } catch (e) {
+    console.warn('Phase 6: Could not save directory handle:', e.message);
+  }
+}
+
+/**
+ * Phase 6: Show option to resume file streaming from saved directory
+ */
+function showFileStreamingRecoveryOption() {
+  // Add to existing recovery banner or create new one
+  const bannerId = 'fileRecoveryBanner';
+  let banner = document.getElementById(bannerId);
+  
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = bannerId;
+    banner.className = 'warning-banner info';
+    
+    const logSection = document.getElementById('otLogSection');
+    if (logSection) {
+      logSection.insertBefore(banner, logSection.firstChild);
+    }
+  }
+  
+  banner.innerHTML = `
+    📁 Previous file streaming directory is available. 
+    <button onclick="resumeFileStreaming()" class="btn-inline">Resume File Streaming</button>
+    <button onclick="dismissFileRecovery()" class="btn-inline">Not Now</button>
+  `;
+  banner.style.display = 'block';
+}
+
+/**
+ * Phase 6: Resume file streaming with saved directory
+ */
+async function resumeFileStreaming() {
+  dismissFileRecovery();
+  
+  if (!logDirectoryHandle) {
+    console.error('No directory handle available');
+    return;
+  }
+  
+  // Enable file streaming checkbox
+  const chk = document.getElementById('chkStreamToFile');
+  if (chk && !chk.checked) {
+    chk.checked = true;
+    chk.dispatchEvent(new Event('change'));
+  }
+  
+  console.log('Phase 6: Resumed file streaming with saved directory');
+}
+
+/**
+ * Phase 6: Dismiss file recovery banner
+ */
+function dismissFileRecovery() {
+  const banner = document.getElementById('fileRecoveryBanner');
+  if (banner) {
+    banner.style.display = 'none';
+  }
+}
+
+// Expose Phase 6 file recovery functions
+window.resumeFileStreaming = resumeFileStreaming;
+window.dismissFileRecovery = dismissFileRecovery;
 
 //============================================================================
 // Storage Management - IndexedDB
@@ -1398,6 +1642,9 @@ async function initStorageSystem() {
   
   // Restore UI state from localStorage
   restoreUIStateFromLocalStorage();
+  
+  // Phase 6: Try to restore directory handle for file streaming
+  await tryRestoreDirectoryHandle();
   
   // Check if IndexedDB is supported and available (Safari Private Browsing disables it)
   if ('indexedDB' in window) {
@@ -2375,6 +2622,9 @@ async function startFileStreaming() {
             mode: 'readwrite',
             startIn: 'documents'
         });
+        
+        // Phase 6: Save directory handle for future sessions
+        await saveDirectoryHandle(logDirectoryHandle);
     }
 
     isStreamingToFile = true;

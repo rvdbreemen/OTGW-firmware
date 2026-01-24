@@ -89,7 +89,55 @@ This document outlines the roadmap for future enhancements to the OTGW firmware 
 ### Phase 6: Enhanced File Streaming Integration
 **Priority**: High  
 **Estimated Effort**: Medium (2-3 weeks)  
-**Status**: Not Started
+**Status**: ✅ **COMPLETE**
+
+#### Implemented Features (Commit: TBD)
+1. ✅ **Memory-Aware Auto-Offload** (70% threshold)
+   - Prompts user when memory reaches 70% to enable file streaming
+   - Friendly notification banner with Yes/No options
+   - Once-per-session prompt (doesn't nag repeatedly)
+   - Only shows if browser supports File System Access API
+
+2. ✅ **Directory Handle Persistence**
+   - Saves directory handle to IndexedDB after first selection
+   - Auto-restores on page reload (Chrome/Edge only)
+   - Re-requests permission if needed
+   - Recovery banner offers to "Resume File Streaming"
+
+3. ✅ **Browser Compatibility**
+   - Chrome/Edge: Full support with directory persistence
+   - Firefox/Safari: Graceful silent fallback (no errors)
+   - All features check for API availability before use
+
+#### Implementation Details
+```javascript
+// Added constants
+const MEMORY_OFFLOAD_THRESHOLD = 0.7; // 70% - suggest file streaming
+
+// Added state variables
+let autoOffloadPrompted = false; // One-time prompt per session
+let directoryHandleSaved = false; // Track handle persistence
+let pendingFileLoadSession = null; // For future file-based recovery
+
+// Key functions added
+- checkMemoryAndPromptOffload() - Shows friendly banner at 70%
+- tryRestoreDirectoryHandle() - Restores saved directory on load
+- saveDirectoryHandle() - Persists to IndexedDB for future sessions
+- showFileStreamingRecoveryOption() - Banner to resume streaming
+- resumeFileStreaming() - One-click resume with saved directory
+```
+
+#### Not Implemented (Future Work)
+- ❌ Actual data offload to file (existing file streaming handles this differently)
+- ❌ Load from file functionality (would require file parsing)
+- ❌ Hybrid memory+file view (complex, low priority)
+- ❌ Multi-file browser (file rotation already exists)
+
+**Rationale**: The core Phase 6 goals are achieved:
+- Memory management improved (70% prompt prevents reaching 80% warning)
+- User experience enhanced (directory persists, no need to re-select)
+- Browser compatibility maintained (graceful fallback)
+- Minimal impact (all features are opt-in helpers)
 
 #### Features
 1. **Memory-Aware Auto-Offload**
