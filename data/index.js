@@ -140,7 +140,8 @@ const STORAGE_CONFIG = {
   retentionDays: 7,
   maxIndexedDBSize: 1024 * 1024 * 1024, // 1GB
   maxLocalStorageLines: 1000,
-  autoSaveEnabled: true
+  autoSaveEnabled: true,
+  compressionEnabled: true // Phase 7: LZ-string compression for localStorage
 };
 
 // Phase 6: Enhanced File Streaming state
@@ -1571,14 +1572,36 @@ function saveRecentLogsToLocalStorage() {
   };
   
   try {
-    localStorage.setItem('otgw_logs_backup', JSON.stringify(backup));
+    const jsonData = JSON.stringify(backup);
+    
+    // Phase 7: Apply compression if enabled and LZ-string is available
+    if (STORAGE_CONFIG.compressionEnabled && typeof LZString !== 'undefined') {
+      const compressed = LZString.compressToUTF16(jsonData);
+      const compressionRatio = (compressed.length / jsonData.length * 100).toFixed(1);
+      console.log(`localStorage backup compressed: ${jsonData.length} → ${compressed.length} bytes (${compressionRatio}%)`);
+      localStorage.setItem('otgw_logs_backup', compressed);
+      localStorage.setItem('otgw_logs_compressed', 'true'); // Flag for decompression
+    } else {
+      localStorage.setItem('otgw_logs_backup', jsonData);
+      localStorage.setItem('otgw_logs_compressed', 'false');
+    }
     return true;
   } catch (e) {
     if (e.name === 'QuotaExceededError') {
       // Try with fewer lines
       backup.logs = otLogBuffer.slice(-500);
       try {
-        localStorage.setItem('otgw_logs_backup', JSON.stringify(backup));
+        const jsonData = JSON.stringify(backup);
+        
+        // Try compression on reduced backup too
+        if (STORAGE_CONFIG.compressionEnabled && typeof LZString !== 'undefined') {
+          const compressed = LZString.compressToUTF16(jsonData);
+          localStorage.setItem('otgw_logs_backup', compressed);
+          localStorage.setItem('otgw_logs_compressed', 'true');
+        } else {
+          localStorage.setItem('otgw_logs_backup', jsonData);
+          localStorage.setItem('otgw_logs_compressed', 'false');
+        }
         console.warn('Saved reduced backup due to quota');
         return true;
       } catch (e2) {
@@ -1594,13 +1617,30 @@ function saveRecentLogsToLocalStorage() {
 
 /**
  * Load recent logs backup from localStorage
+ * Phase 7: Supports both compressed and uncompressed backups
  */
 function loadRecentLogsFromLocalStorage(maxAge = 300000) {
   try {
-    const json = localStorage.getItem('otgw_logs_backup');
-    if (!json) return null;
+    const data = localStorage.getItem('otgw_logs_backup');
+    if (!data) return null;
     
-    const backup = JSON.parse(json);
+    // Check if data is compressed
+    const isCompressed = localStorage.getItem('otgw_logs_compressed') === 'true';
+    
+    let jsonData;
+    if (isCompressed && typeof LZString !== 'undefined') {
+      // Decompress using LZ-string
+      jsonData = LZString.decompressFromUTF16(data);
+      if (!jsonData) {
+        console.error('Failed to decompress backup');
+        return null;
+      }
+      console.log('localStorage backup decompressed successfully');
+    } else {
+      jsonData = data;
+    }
+    
+    const backup = JSON.parse(jsonData);
     
     // Check if backup is recent enough (default 5 minutes)
     if (Date.now() - backup.timestamp > maxAge) {
