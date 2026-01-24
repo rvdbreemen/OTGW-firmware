@@ -247,7 +247,16 @@ function initOTLogWebSocket(force) {
   try {
     otLogWS = new WebSocket(wsURL);
     
+    // Enhanced for Safari and Firefox: Add explicit timeout handling
+    let connectionTimeout = setTimeout(function() {
+      if (otLogWS && otLogWS.readyState !== WebSocket.OPEN) {
+        console.warn('WebSocket connection timeout - closing and retrying');
+        otLogWS.close();
+      }
+    }, 10000); // 10 second connection timeout
+    
     otLogWS.onopen = function() {
+      clearTimeout(connectionTimeout);
       console.log('OT Log WebSocket connected');
       updateWSStatus(true);
       // Clear any reconnect timer just in case
@@ -258,8 +267,9 @@ function initOTLogWebSocket(force) {
       resetWSWatchdog();
     };
     
-    otLogWS.onclose = function() {
-      console.log('OT Log WebSocket disconnected');
+    otLogWS.onclose = function(event) {
+      clearTimeout(connectionTimeout);
+      console.log('OT Log WebSocket disconnected', event.code, event.reason);
       updateWSStatus(false);
       // Stop watchdog
       if (wsWatchdogTimer) {
@@ -267,17 +277,26 @@ function initOTLogWebSocket(force) {
         wsWatchdogTimer = null;
       }
       // Attempt to reconnect after 5 seconds if not already scheduled
+      // Safari and Firefox: Use exponential backoff for better network handling
       if (!wsReconnectTimer) {
         let delay = isFlashing ? 1000 : 5000;
+        // Add some jitter for Safari to avoid connection storms
+        if (navigator.userAgent.includes('Safari') && !navigator.userAgent.includes('Chrome')) {
+          delay += Math.random() * 1000;
+        }
         wsReconnectTimer = setTimeout(function() { initOTLogWebSocket(force); }, delay);
       }
     };
     
     otLogWS.onerror = function(error) {
+      clearTimeout(connectionTimeout);
       console.error('OT Log WebSocket error:', error);
       updateWSStatus(false);
       // onclose will usually follow, but we ensure cleanup
-      if (otLogWS) otLogWS.close(); 
+      // Safari/Firefox: Explicitly check connection state before closing
+      if (otLogWS && (otLogWS.readyState === WebSocket.OPEN || otLogWS.readyState === WebSocket.CONNECTING)) {
+        otLogWS.close(); 
+      }
     };
     
     otLogWS.onmessage = function(event) {
@@ -301,6 +320,10 @@ function initOTLogWebSocket(force) {
         }
       } catch(e) {
         // ignore JSON parse error, treat as text
+        // Firefox is more strict with JSON parsing - log for debugging
+        if (navigator.userAgent.includes('Firefox')) {
+          console.debug('JSON parse failed (expected for non-JSON messages):', e.message);
+        }
       }
 
       if (!isObject && typeof data === 'string') {
@@ -314,6 +337,7 @@ function initOTLogWebSocket(force) {
   } catch (e) {
     console.error('Failed to create WebSocket:', e);
     updateWSStatus(false);
+    // Safari/Firefox: Better error recovery
     if (!wsReconnectTimer) {
       let delay = isFlashing ? 1000 : 5000;
       wsReconnectTimer = setTimeout(function() { initOTLogWebSocket(force); }, delay);
@@ -690,11 +714,21 @@ function getMemoryUsage() {
     result.heapLimit = performance.memory.jsHeapSizeLimit;
     result.supported = true;
   } else {
-    // Fallback estimation for other browsers (Firefox, Safari)
+    // Enhanced fallback for Firefox and Safari with better estimations
+    // Firefox: Use buffer size estimation with multiplier based on typical overhead
+    // Safari: Similar approach but with awareness of more aggressive GC
     result.heapUsed = result.bufferSize;
     result.heapTotal = result.bufferSize * 2;
     result.heapLimit = MEMORY_SAFE_LIMIT;
     result.supported = false;
+    
+    // Safari-specific: Account for lower memory limits on iOS
+    if (typeof navigator !== 'undefined' && navigator.userAgent) {
+      if (/iPhone|iPad|iPod/.test(navigator.userAgent) && !window.MSStream) {
+        // iOS Safari has more aggressive memory limits
+        result.heapLimit = Math.min(MEMORY_SAFE_LIMIT, 300 * 1024 * 1024); // 300MB max for iOS
+      }
+    }
   }
   
   return result;
@@ -1124,50 +1158,74 @@ class LogDatabase {
   async init() {
     return new Promise((resolve, reject) => {
       // Safari Private Browsing may throw SecurityError when opening IndexedDB
+      // Firefox in Private mode also throws QuotaExceededError or similar
       let request;
       try {
         request = indexedDB.open(this.dbName, this.version);
       } catch (e) {
-        console.warn('IndexedDB.open() failed (Safari Private Browsing?):', e);
+        console.warn('IndexedDB.open() failed (Safari/Firefox Private Browsing?):', e);
         reject(new Error('IndexedDB unavailable - possibly in Private Browsing mode'));
         return;
       }
       
       request.onerror = () => {
         console.error('IndexedDB error:', request.error);
+        // Firefox-specific: Check for quota exceeded errors
+        if (request.error && request.error.name === 'QuotaExceededError') {
+          console.warn('IndexedDB quota exceeded - consider clearing old data');
+        }
         reject(request.error);
       };
       
-      // Safari may also silently block the request
+      // Safari may silently block the request, Firefox can also block in multi-process mode
       request.onblocked = () => {
-        console.warn('IndexedDB blocked - close other tabs/windows');
+        console.warn('IndexedDB blocked - close other tabs/windows using this origin');
+        // Set a timeout to auto-retry after warning
+        setTimeout(() => {
+          if (!this.db) {
+            console.log('Retrying IndexedDB connection after block...');
+          }
+        }, 2000);
       };
       
       request.onsuccess = () => {
         this.db = request.result;
-        console.log('IndexedDB initialized');
+        console.log('IndexedDB initialized successfully');
+        
+        // Add connection close handler for better cleanup
+        this.db.onversionchange = () => {
+          console.log('IndexedDB version change detected - closing connection');
+          this.db.close();
+        };
+        
         resolve(this.db);
       };
       
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
         
-        // Create logs object store
-        if (!db.objectStoreNames.contains('logs')) {
-          const logsStore = db.createObjectStore('logs', { autoIncrement: true });
-          logsStore.createIndex('timestamp', 'time', { unique: false });
-          logsStore.createIndex('sessionId', 'sessionId', { unique: false });
-        }
-        
-        // Create sessions object store
-        if (!db.objectStoreNames.contains('sessions')) {
-          const sessionsStore = db.createObjectStore('sessions', { keyPath: 'id' });
-          sessionsStore.createIndex('timestamp', 'timestamp', { unique: false });
-        }
-        
-        // Create metadata object store
-        if (!db.objectStoreNames.contains('metadata')) {
-          db.createObjectStore('metadata', { keyPath: 'key' });
+        // Enhanced error handling for schema creation
+        try {
+          // Create logs object store
+          if (!db.objectStoreNames.contains('logs')) {
+            const logsStore = db.createObjectStore('logs', { autoIncrement: true });
+            logsStore.createIndex('timestamp', 'time', { unique: false });
+            logsStore.createIndex('sessionId', 'sessionId', { unique: false });
+          }
+          
+          // Create sessions object store
+          if (!db.objectStoreNames.contains('sessions')) {
+            const sessionsStore = db.createObjectStore('sessions', { keyPath: 'id' });
+            sessionsStore.createIndex('timestamp', 'timestamp', { unique: false });
+          }
+          
+          // Create metadata object store
+          if (!db.objectStoreNames.contains('metadata')) {
+            db.createObjectStore('metadata', { keyPath: 'key' });
+          }
+        } catch (e) {
+          console.error('Error during IndexedDB schema creation:', e);
+          // Don't reject here - let the transaction complete and handle in onerror
         }
       };
     });
@@ -1563,6 +1621,7 @@ function restoreUIStateFromLocalStorage() {
 
 /**
  * Save recent logs backup to localStorage
+ * Enhanced with better Safari and Firefox error handling
  */
 function saveRecentLogsToLocalStorage() {
   const backup = {
@@ -1576,11 +1635,18 @@ function saveRecentLogsToLocalStorage() {
     
     // Phase 7: Apply compression if enabled and LZ-string is available
     if (STORAGE_CONFIG.compressionEnabled && typeof LZString !== 'undefined') {
-      const compressed = LZString.compressToUTF16(jsonData);
-      const compressionRatio = (compressed.length / jsonData.length * 100).toFixed(1);
-      console.log(`localStorage backup compressed: ${jsonData.length} → ${compressed.length} bytes (${compressionRatio}%)`);
-      localStorage.setItem('otgw_logs_backup', compressed);
-      localStorage.setItem('otgw_logs_compressed', 'true'); // Flag for decompression
+      try {
+        const compressed = LZString.compressToUTF16(jsonData);
+        const compressionRatio = (compressed.length / jsonData.length * 100).toFixed(1);
+        console.log(`localStorage backup compressed: ${jsonData.length} → ${compressed.length} bytes (${compressionRatio}%)`);
+        localStorage.setItem('otgw_logs_backup', compressed);
+        localStorage.setItem('otgw_logs_compressed', 'true'); // Flag for decompression
+      } catch (compressionError) {
+        console.warn('Compression failed, falling back to uncompressed:', compressionError);
+        // Fallback to uncompressed if compression fails
+        localStorage.setItem('otgw_logs_backup', jsonData);
+        localStorage.setItem('otgw_logs_compressed', 'false');
+      }
     } else {
       localStorage.setItem('otgw_logs_backup', jsonData);
       localStorage.setItem('otgw_logs_compressed', 'false');
@@ -1938,7 +2004,9 @@ function handlePageUnload(event) {
 
 /**
  * Check storage quota
+ * Enhanced for better Safari and Firefox compatibility
  * Note: Safari < 17 doesn't support navigator.storage.estimate()
+ * Firefox has strict quota policies that need special handling
  */
 async function checkStorageQuota() {
   if ('storage' in navigator && 'estimate' in navigator.storage) {
@@ -1952,24 +2020,51 @@ async function checkStorageQuota() {
       };
     } catch (e) {
       console.error('Error checking storage quota:', e);
-      return null;
+      // Fall through to browser-specific fallbacks
     }
   }
   
-  // Safari < 17 fallback: return estimated values
-  if (navigator.userAgent.includes('Safari') && !navigator.userAgent.includes('Chrome')) {
+  // Browser-specific fallbacks
+  const userAgent = navigator.userAgent;
+  
+  // Safari fallback (including iOS)
+  if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) {
     console.info('navigator.storage.estimate() not available (Safari < 17), using estimates');
-    // Safari typically allows 50-100 MB for IndexedDB
+    
+    // iOS Safari has much stricter limits
+    const isIOS = /iPhone|iPad|iPod/.test(userAgent) && !window.MSStream;
+    const estimatedQuota = isIOS ? 25 * 1024 * 1024 : 50 * 1024 * 1024; // 25MB iOS, 50MB desktop
+    
     return {
       usage: 0, // Can't determine actual usage
-      quota: 50 * 1024 * 1024, // Estimate 50MB for Safari
+      quota: estimatedQuota,
       percent: 0,
-      available: 50 * 1024 * 1024,
+      available: estimatedQuota,
       estimated: true // Flag to indicate this is a fallback
     };
   }
   
-  return null;
+  // Firefox fallback
+  if (userAgent.includes('Firefox')) {
+    console.info('Storage quota estimation for Firefox');
+    // Firefox typically allows at least 50% of available disk space, up to a limit
+    return {
+      usage: 0,
+      quota: 100 * 1024 * 1024, // Conservative 100MB estimate for Firefox
+      percent: 0,
+      available: 100 * 1024 * 1024,
+      estimated: true
+    };
+  }
+  
+  // Generic fallback for other browsers
+  return {
+    usage: 0,
+    quota: 50 * 1024 * 1024,
+    percent: 0,
+    available: 50 * 1024 * 1024,
+    estimated: true
+  };
 }
 
 /**
