@@ -876,11 +876,24 @@ class LogDatabase {
   
   async init() {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.dbName, this.version);
+      // Safari Private Browsing may throw SecurityError when opening IndexedDB
+      let request;
+      try {
+        request = indexedDB.open(this.dbName, this.version);
+      } catch (e) {
+        console.warn('IndexedDB.open() failed (Safari Private Browsing?):', e);
+        reject(new Error('IndexedDB unavailable - possibly in Private Browsing mode'));
+        return;
+      }
       
       request.onerror = () => {
         console.error('IndexedDB error:', request.error);
         reject(request.error);
+      };
+      
+      // Safari may also silently block the request
+      request.onblocked = () => {
+        console.warn('IndexedDB blocked - close other tabs/windows');
       };
       
       request.onsuccess = () => {
@@ -1089,8 +1102,20 @@ class LogDatabase {
 
 /**
  * Save UI state to localStorage
+ * Safari limits: 5 MB, Chrome/Firefox: 10 MB
  */
 function saveUIStateToLocalStorage() {
+  // Check if localStorage is available (Safari Private Browsing may disable it)
+  try {
+    if (!window.localStorage) {
+      console.warn('localStorage not available');
+      return false;
+    }
+  } catch (e) {
+    console.warn('localStorage access denied:', e);
+    return false;
+  }
+  
   const state = {
     autoScroll,
     showTimestamps,
@@ -1103,12 +1128,14 @@ function saveUIStateToLocalStorage() {
   
   try {
     localStorage.setItem('otgw_ui_state', JSON.stringify(state));
+    return true;
   } catch (e) {
     if (e.name === 'QuotaExceededError') {
       console.warn('localStorage quota exceeded for UI state');
     } else {
       console.error('Error saving UI state:', e);
     }
+    return false;
   }
 }
 
@@ -1116,6 +1143,17 @@ function saveUIStateToLocalStorage() {
  * Restore UI state from localStorage
  */
 function restoreUIStateFromLocalStorage() {
+  // Check if localStorage is available
+  try {
+    if (!window.localStorage) {
+      console.warn('localStorage not available');
+      return false;
+    }
+  } catch (e) {
+    console.warn('localStorage access denied:', e);
+    return false;
+  }
+  
   try {
     const json = localStorage.getItem('otgw_ui_state');
     if (!json) return false;
@@ -1246,12 +1284,17 @@ async function initStorageSystem() {
   // Restore UI state from localStorage
   restoreUIStateFromLocalStorage();
   
-  // Check if IndexedDB is supported
+  // Check if IndexedDB is supported and available (Safari Private Browsing disables it)
   if ('indexedDB' in window) {
     try {
       logDatabase = new LogDatabase();
       await logDatabase.init();
       console.log('IndexedDB ready');
+      
+      // Safari ITP may clear data after 7 days - log warning
+      if (navigator.userAgent.includes('Safari') && !navigator.userAgent.includes('Chrome')) {
+        console.info('Note: Safari may clear stored data after 7 days of inactivity (ITP policy)');
+      }
       
       // Check for recent session to recover
       if (storageMode !== 'disabled') {
@@ -1259,6 +1302,10 @@ async function initStorageSystem() {
       }
     } catch (e) {
       console.warn('IndexedDB initialization failed:', e);
+      // Check if this is Safari Private Browsing
+      if (e.message && e.message.includes('Private Browsing')) {
+        console.warn('IndexedDB unavailable in Private Browsing mode - using localStorage only');
+      }
       logDatabase = null;
     }
   }
@@ -1489,6 +1536,7 @@ function handlePageUnload(event) {
 
 /**
  * Check storage quota
+ * Note: Safari < 17 doesn't support navigator.storage.estimate()
  */
 async function checkStorageQuota() {
   if ('storage' in navigator && 'estimate' in navigator.storage) {
@@ -1505,6 +1553,20 @@ async function checkStorageQuota() {
       return null;
     }
   }
+  
+  // Safari < 17 fallback: return estimated values
+  if (navigator.userAgent.includes('Safari') && !navigator.userAgent.includes('Chrome')) {
+    console.info('navigator.storage.estimate() not available (Safari < 17), using estimates');
+    // Safari typically allows 50-100 MB for IndexedDB
+    return {
+      usage: 0, // Can't determine actual usage
+      quota: 50 * 1024 * 1024, // Estimate 50MB for Safari
+      percent: 0,
+      available: 50 * 1024 * 1024,
+      estimated: true // Flag to indicate this is a fallback
+    };
+  }
+  
   return null;
 }
 
@@ -1526,7 +1588,10 @@ async function updateStorageDisplay() {
     if (percent > 90) indicator = '🔴';
     else if (percent > 75) indicator = '🟡';
     
-    storageEl.innerHTML = `Storage: ${usedMB.toFixed(1)} MB / ${totalGB.toFixed(1)} GB (${percent.toFixed(1)}%) ${indicator}`;
+    // Add '~' prefix for Safari < 17 estimates
+    const prefix = quota.estimated ? '~' : '';
+    
+    storageEl.innerHTML = `Storage: ${prefix}${usedMB.toFixed(1)} MB / ${totalGB.toFixed(1)} GB (${percent.toFixed(1)}%) ${indicator}`;
   } else {
     storageEl.innerHTML = 'Storage: Not available';
   }
