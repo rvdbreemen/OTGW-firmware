@@ -115,9 +115,13 @@ let currentLogDateStr = "";
 //============================================================================
 // Memory Monitoring and Storage Management
 //============================================================================
+// 500MB limit chosen as safe threshold for most browsers:
+// - Allows ~2.5M log lines (avg 200 bytes each)
+// - Leaves headroom for other page resources
+// - Well below typical browser memory limits (2-4GB)
 const MEMORY_SAFE_LIMIT = 500 * 1024 * 1024; // 500MB safe limit
-const MEMORY_WARNING_THRESHOLD = 0.8; // 80%
-const MEMORY_CRITICAL_THRESHOLD = 0.95; // 95%
+const MEMORY_WARNING_THRESHOLD = 0.8; // 80% - warn user
+const MEMORY_CRITICAL_THRESHOLD = 0.95; // 95% - auto-trim to prevent crash
 let memoryMonitorTimer = null;
 let currentMemoryStatus = 'green'; // green, yellow, red
 
@@ -127,6 +131,7 @@ let logDatabase = null;
 let currentSessionId = null;
 let autoSaveTimer = null;
 const AUTO_SAVE_INTERVAL = 10000; // 10 seconds
+let storageSystemInitialized = false; // Guard against multiple initializations
 
 // Storage configuration
 const STORAGE_CONFIG = {
@@ -669,14 +674,14 @@ function getMemoryUsage() {
     result.bufferSize = otLogBuffer.length * 200;
   }
   
-  // Use performance.memory API if available (Chrome/Edge)
-  if (performance.memory) {
+  // Use performance.memory API if available (Chrome/Edge only, non-standard)
+  if (typeof performance !== 'undefined' && performance.memory) {
     result.heapUsed = performance.memory.usedJSHeapSize;
     result.heapTotal = performance.memory.totalJSHeapSize;
     result.heapLimit = performance.memory.jsHeapSizeLimit;
     result.supported = true;
   } else {
-    // Fallback estimation for other browsers
+    // Fallback estimation for other browsers (Firefox, Safari)
     result.heapUsed = result.bufferSize;
     result.heapTotal = result.bufferSize * 2;
     result.heapLimit = MEMORY_SAFE_LIMIT;
@@ -1227,6 +1232,12 @@ function loadRecentLogsFromLocalStorage(maxAge = 300000) {
  * Initialize storage system
  */
 async function initStorageSystem() {
+  // Guard against multiple initializations
+  if (storageSystemInitialized) {
+    console.log('Storage system already initialized');
+    return;
+  }
+  
   console.log('Initializing storage system...');
   
   // Generate session ID
@@ -1257,9 +1268,10 @@ async function initStorageSystem() {
     startAutoSave();
   }
   
-  // Save state on page unload
+  // Save state on page unload (only add listener once)
   window.addEventListener('beforeunload', handlePageUnload);
   
+  storageSystemInitialized = true;
   console.log('Storage system initialized');
 }
 
@@ -1369,6 +1381,14 @@ function dismissRecoveryBanner() {
     banner.style.display = 'none';
   }
 }
+
+// Expose memory/storage functions globally for onclick handlers
+// (functions are already global but this makes intent explicit)
+window.enableCaptureMode = enableCaptureMode;
+window.startFileStreamingPrompt = startFileStreamingPrompt;
+window.dismissMemoryWarning = dismissMemoryWarning;
+window.recoverSession = recoverSession;
+window.dismissRecoveryBanner = dismissRecoveryBanner;
 
 /**
  * Start auto-save timer
