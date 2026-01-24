@@ -2530,6 +2530,48 @@ function setupOTLogControls() {
   }
 
 
+  // Import button with dropdown menu
+  const btnImportLog = document.getElementById('btnImportLog');
+  const importMenus = document.querySelectorAll('.download-dropdown');
+  const importMenu = importMenus.length > 1 ? importMenus[1].querySelector('.download-menu') : null;
+  
+  if (btnImportLog && importMenu) {
+    // Toggle dropdown
+    btnImportLog.addEventListener('click', function(e) {
+      e.stopPropagation();
+      importMenu.classList.toggle('hidden');
+      // Close download menu if open
+      if (downloadMenu && !downloadMenu.classList.contains('hidden')) {
+        downloadMenu.classList.add('hidden');
+      }
+    });
+    
+    // Close import dropdown when clicking outside
+    document.addEventListener('click', function() {
+      if (importMenu && !importMenu.classList.contains('hidden')) {
+        importMenu.classList.add('hidden');
+      }
+    });
+    
+    // Handle format selection
+    const importMenuItems = importMenu.querySelectorAll('.download-menu-item');
+    importMenuItems.forEach(item => {
+      item.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const format = this.getAttribute('data-format');
+        importMenu.classList.add('hidden');
+        importLogs(format);
+      });
+    });
+  }
+  
+  // File input for import
+  const fileImportInput = document.getElementById('fileImportInput');
+  if (fileImportInput) {
+    fileImportInput.addEventListener('change', handleImportFileSelected);
+  }
+
+
   // Auto Download Log
   const chkAutoDL = document.getElementById('chkAutoDownloadLog');
   if (chkAutoDL) {
@@ -2925,6 +2967,276 @@ function forceDownloadBlob(blob, filename) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+// ============================================================================
+// Phase 8: Import Functionality
+// ============================================================================
+
+/**
+ * Import logs from file
+ * @param {string} format - File format ('json', 'csv', or 'txt')
+ */
+function importLogs(format) {
+  const fileInput = document.getElementById('fileImportInput');
+  if (!fileInput) {
+    console.error('File input element not found');
+    return;
+  }
+  
+  // Set the accepted file type
+  if (format === 'json') {
+    fileInput.accept = '.json,application/json';
+  } else if (format === 'csv') {
+    fileInput.accept = '.csv,text/csv';
+  } else {
+    fileInput.accept = '.txt,text/plain';
+  }
+  
+  // Store the format for the change handler
+  fileInput.dataset.importFormat = format;
+  
+  // Trigger file selection
+  fileInput.click();
+}
+
+/**
+ * Handle file selection for import
+ */
+function handleImportFileSelected(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const format = event.target.dataset.importFormat || 'txt';
+  const reader = new FileReader();
+  
+  reader.onload = function(e) {
+    try {
+      const content = e.target.result;
+      let importedLogs = [];
+      
+      if (format === 'json') {
+        importedLogs = parseImportedJSON(content);
+      } else if (format === 'csv') {
+        importedLogs = parseImportedCSV(content);
+      } else {
+        importedLogs = parseImportedText(content);
+      }
+      
+      if (importedLogs.length === 0) {
+        alert('No valid log entries found in the file.');
+        return;
+      }
+      
+      // Ask user if they want to append or replace
+      const append = confirm(`Import ${importedLogs.length} log entries?\n\nOK = Append to current logs\nCancel = Replace current logs`);
+      
+      if (!append) {
+        // Replace - clear current logs
+        otLogBuffer = [];
+      }
+      
+      // Add imported logs
+      importedLogs.forEach(entry => {
+        otLogBuffer.push(entry);
+      });
+      
+      // Trim if needed
+      if (otLogBuffer.length > maxLogLines) {
+        const toRemove = otLogBuffer.length - maxLogLines;
+        otLogBuffer.splice(0, toRemove);
+        console.warn(`Trimmed ${toRemove} oldest entries to fit maxLogLines`);
+      }
+      
+      // Update display
+      updateLogDisplay();
+      updateLogCounters();
+      
+      alert(`Successfully imported ${importedLogs.length} log entries!`);
+      
+      // Save to storage if enabled
+      if (STORAGE_CONFIG.autoSaveEnabled && storageMode !== 'disabled') {
+        saveCurrentState();
+      }
+      
+    } catch (error) {
+      console.error('Import error:', error);
+      alert(`Failed to import logs: ${error.message}\n\nPlease check the file format.`);
+    } finally {
+      // Clear the file input so the same file can be imported again
+      event.target.value = '';
+    }
+  };
+  
+  reader.onerror = function() {
+    alert('Failed to read file. Please try again.');
+    event.target.value = '';
+  };
+  
+  reader.readAsText(file);
+}
+
+/**
+ * Parse imported JSON file
+ */
+function parseImportedJSON(content) {
+  const data = JSON.parse(content);
+  
+  // Validate structure
+  if (!data.logs || !Array.isArray(data.logs)) {
+    throw new Error('Invalid JSON format: missing "logs" array');
+  }
+  
+  const logs = [];
+  data.logs.forEach((entry, index) => {
+    try {
+      // Required fields: timestamp and raw data
+      if (!entry.raw && !entry.data) {
+        console.warn(`Skipping entry ${index}: missing raw data`);
+        return;
+      }
+      
+      const raw = entry.raw || entry.data;
+      let timestamp = entry.timestamp || entry.time;
+      
+      // Parse timestamp if it's ISO format
+      if (entry.timestampISO) {
+        timestamp = new Date(entry.timestampISO).toLocaleTimeString();
+      } else if (!timestamp) {
+        timestamp = new Date().toLocaleTimeString();
+      }
+      
+      logs.push({
+        time: timestamp,
+        data: raw
+      });
+    } catch (e) {
+      console.warn(`Error parsing entry ${index}:`, e);
+    }
+  });
+  
+  return logs;
+}
+
+/**
+ * Parse imported CSV file
+ */
+function parseImportedCSV(content) {
+  const lines = content.split('\n');
+  const logs = [];
+  
+  // Skip header line (assume first line is header)
+  let startIndex = 0;
+  if (lines[0] && (lines[0].toLowerCase().includes('timestamp') || lines[0].toLowerCase().includes('raw'))) {
+    startIndex = 1;
+  }
+  
+  for (let i = startIndex; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    
+    try {
+      // Parse CSV line (handle quoted fields)
+      const fields = parseCSVLine(line);
+      if (fields.length < 2) continue;
+      
+      // Expected format: Timestamp,TimestampISO,MessageType,DataID,Value,Raw,Formatted
+      // Or minimal: Timestamp,Raw
+      const timestamp = fields[0] || new Date().toLocaleTimeString();
+      const raw = fields.length >= 7 ? fields[5] : fields[fields.length - 1]; // Raw is either field 5 or last field
+      
+      if (raw) {
+        logs.push({
+          time: timestamp,
+          data: raw
+        });
+      }
+    } catch (e) {
+      console.warn(`Error parsing CSV line ${i}:`, e);
+    }
+  }
+  
+  return logs;
+}
+
+/**
+ * Parse imported text file
+ */
+function parseImportedText(content) {
+  const lines = content.split('\n');
+  const logs = [];
+  
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    
+    // Skip empty lines and comment lines
+    if (!trimmed || trimmed.startsWith('#')) {
+      return;
+    }
+    
+    try {
+      // Try to extract timestamp and data
+      // Format could be: "HH:MM:SS data" or just "data"
+      const timestampMatch = trimmed.match(/^(\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)\s+(.+)$/);
+      
+      let timestamp, data;
+      if (timestampMatch) {
+        timestamp = timestampMatch[1];
+        data = timestampMatch[2];
+      } else {
+        timestamp = new Date().toLocaleTimeString();
+        data = trimmed;
+      }
+      
+      logs.push({
+        time: timestamp,
+        data: data
+      });
+    } catch (e) {
+      console.warn(`Error parsing text line ${index}:`, e);
+    }
+  });
+  
+  return logs;
+}
+
+/**
+ * Parse a CSV line respecting quoted fields
+ */
+function parseCSVLine(line) {
+  const fields = [];
+  let currentField = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const nextChar = line[i + 1];
+    
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        // Escaped quote
+        currentField += '"';
+        i++; // Skip next quote
+      } else {
+        // Toggle quote state
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      // Field separator
+      fields.push(currentField);
+      currentField = '';
+    } else {
+      currentField += char;
+    }
+  }
+  
+  // Add last field
+  fields.push(currentField);
+  
+  return fields;
+}
+
+// Expose import function to window for onclick handlers
+window.importLogs = importLogs;
 
 // Auto Download Log Logic
 let autoDownloadLogTimer = null;

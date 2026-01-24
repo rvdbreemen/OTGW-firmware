@@ -76,6 +76,15 @@
                   <div class="download-menu-item" data-format="csv">CSV (.csv)</div>
                 </div>
               </div>
+              <div class="download-dropdown">
+                <button id="btnImportLog" class="btn-log-control" title="Import log from file" aria-label="Import OpenTherm log from a file">Import ▼</button>
+                <div class="download-menu hidden">
+                  <div class="download-menu-item" data-format="json">JSON (.json)</div>
+                  <div class="download-menu-item" data-format="csv">CSV (.csv)</div>
+                  <div class="download-menu-item" data-format="txt">Text (.txt)</div>
+                </div>
+              </div>
+              <input type="file" id="fileImportInput" style="display:none" accept=".json,.csv,.txt" />
               <label class="log-control-label" style="display:inline-flex;" title="Automatically save log every 15 minutes">
                   <input type="checkbox" id="chkAutoDownloadLog" aria-label="Auto download log every 15 minutes" />
                   Auto
