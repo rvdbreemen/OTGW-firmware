@@ -17,7 +17,7 @@ This document outlines the roadmap for future enhancements to the OTGW firmware 
 ### Phase 5: Advanced User Controls
 **Priority**: High  
 **Estimated Effort**: Medium (2-3 weeks)  
-**Status**: Not Started
+**Status**: ✅ **COMPLETE**
 
 #### Features
 1. **Storage Mode Selector**

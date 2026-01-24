@@ -316,6 +316,8 @@ function initOTLogWebSocket(force) {
   // Setup UI event handlers only once
   if (!otLogControlsInitialized) {
     setupOTLogControls();
+    initStorageSettingsPanel(); // Phase 5: Initialize storage settings UI
+    restoreStoragePreferences(); // Phase 5: Restore saved preferences
     otLogControlsInitialized = true;
   }
 }
@@ -1012,8 +1014,19 @@ class LogDatabase {
     }
   }
   
-  async cleanOldSessions(retentionDays = 7) {
-    if (!this.db) return false;
+  async cleanOldSessions(retentionDays = null) {
+    if (!this.db) return 0;
+    
+    // Use configured retention if not specified
+    if (retentionDays === null) {
+      retentionDays = STORAGE_CONFIG.retentionDays;
+    }
+    
+    // If retention is 0 (forever), don't clean anything
+    if (retentionDays === 0) {
+      console.log('Retention set to forever - skipping cleanup');
+      return 0;
+    }
     
     try {
       const cutoff = Date.now() - (retentionDays * 24 * 60 * 60 * 1000);
@@ -1054,14 +1067,14 @@ class LogDatabase {
         };
         
         tx.oncomplete = () => {
-          console.log(`Cleaned up ${sessionIds.length} old sessions`);
-          resolve(true);
+          console.log(`Cleaned up ${sessionIds.length} old sessions (retention: ${retentionDays} days)`);
+          resolve(sessionIds.length); // Return count of deleted sessions
         };
         tx.onerror = () => reject(tx.error);
       });
     } catch (e) {
       console.error('Error cleaning old sessions:', e);
-      return false;
+      return 0;
     }
   }
   
@@ -1092,6 +1105,108 @@ class LogDatabase {
     } catch (e) {
       console.error('Error getting storage size:', e);
       return 0;
+    }
+  }
+  
+  /**
+   * Get all sessions for the sessions browser (Phase 5)
+   * Returns array of session metadata sorted by timestamp descending
+   */
+  async getAllSessions() {
+    if (!this.db) return [];
+    
+    try {
+      const tx = this.db.transaction(['sessions'], 'readonly');
+      const store = tx.objectStore('sessions');
+      const index = store.index('timestamp');
+      
+      return new Promise((resolve, reject) => {
+        const sessions = [];
+        const request = index.openCursor(null, 'prev'); // Descending order
+        
+        request.onsuccess = (event) => {
+          const cursor = event.target.result;
+          if (cursor) {
+            sessions.push(cursor.value);
+            cursor.continue();
+          } else {
+            resolve(sessions);
+          }
+        };
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.error('Error getting all sessions:', e);
+      return [];
+    }
+  }
+  
+  /**
+   * Delete a specific session and its logs (Phase 5)
+   */
+  async deleteSession(sessionId) {
+    if (!this.db) return false;
+    
+    try {
+      const tx = this.db.transaction(['sessions', 'logs'], 'readwrite');
+      const sessionsStore = tx.objectStore('sessions');
+      const logsStore = tx.objectStore('logs');
+      
+      // Delete session
+      sessionsStore.delete(sessionId);
+      
+      // Delete logs for this session
+      const logsIndex = logsStore.index('sessionId');
+      const range = IDBKeyRange.only(sessionId);
+      
+      return new Promise((resolve, reject) => {
+        const logRequest = logsIndex.openCursor(range);
+        logRequest.onsuccess = (event) => {
+          const cursor = event.target.result;
+          if (cursor) {
+            cursor.delete();
+            cursor.continue();
+          }
+        };
+        
+        tx.oncomplete = () => {
+          console.log(`Deleted session: ${sessionId}`);
+          resolve(true);
+        };
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (e) {
+      console.error('Error deleting session:', e);
+      return false;
+    }
+  }
+  
+  /**
+   * Clear all data from IndexedDB (Phase 5 - nuclear option)
+   */
+  async clearAll() {
+    if (!this.db) return false;
+    
+    try {
+      const tx = this.db.transaction(['sessions', 'logs', 'metadata'], 'readwrite');
+      const sessionsStore = tx.objectStore('sessions');
+      const logsStore = tx.objectStore('logs');
+      const metadataStore = tx.objectStore('metadata');
+      
+      return new Promise((resolve, reject) => {
+        sessionsStore.clear();
+        logsStore.clear();
+        metadataStore.clear();
+        
+        tx.oncomplete = () => {
+          console.log('All IndexedDB data cleared');
+          resolve(true);
+        };
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (e) {
+      console.error('Error clearing all data:', e);
+      return false;
     }
   }
 }
@@ -1594,6 +1709,451 @@ async function updateStorageDisplay() {
     storageEl.innerHTML = `Storage: ${prefix}${usedMB.toFixed(1)} MB / ${totalGB.toFixed(1)} GB (${percent.toFixed(1)}%) ${indicator}`;
   } else {
     storageEl.innerHTML = 'Storage: Not available';
+  }
+}
+
+//============================================================================
+// Phase 5: Storage Settings UI Functions
+//============================================================================
+
+/**
+ * Initialize storage settings panel
+ */
+function initStorageSettingsPanel() {
+  const toggleBtn = document.getElementById('btnToggleStorageSettings');
+  const settingsContent = document.getElementById('storageSettingsContent');
+  const storageModeSelect = document.getElementById('selectStorageMode');
+  const retentionSelect = document.getElementById('selectRetentionPeriod');
+  const btnViewSessions = document.getElementById('btnViewSessions');
+  const btnCleanupNow = document.getElementById('btnCleanupNow');
+  const btnClearAllStorage = document.getElementById('btnClearAllStorage');
+  
+  if (!toggleBtn || !settingsContent) {
+    console.warn('Storage settings panel elements not found');
+    return;
+  }
+  
+  // Toggle panel visibility
+  toggleBtn.addEventListener('click', () => {
+    settingsContent.classList.toggle('hidden');
+    updateStorageUsageDashboard(); // Refresh when opened
+  });
+  
+  // Storage mode selector
+  if (storageModeSelect) {
+    // Restore saved mode
+    storageModeSelect.value = storageMode;
+    updateStorageModeInfo(storageMode);
+    
+    storageModeSelect.addEventListener('change', (e) => {
+      const newMode = e.target.value;
+      storageMode = newMode;
+      updateStorageModeInfo(newMode);
+      console.log(`Storage mode changed to: ${newMode}`);
+      
+      // Save to localStorage
+      try {
+        localStorage.setItem('otgw_storage_mode', newMode);
+      } catch (err) {
+        console.warn('Could not save storage mode preference:', err);
+      }
+    });
+  }
+  
+  // Retention period selector
+  if (retentionSelect) {
+    // Restore saved retention
+    retentionSelect.value = STORAGE_CONFIG.retentionDays.toString();
+    updateRetentionInfo(STORAGE_CONFIG.retentionDays);
+    
+    retentionSelect.addEventListener('change', (e) => {
+      const newRetention = parseInt(e.target.value);
+      STORAGE_CONFIG.retentionDays = newRetention;
+      updateRetentionInfo(newRetention);
+      console.log(`Retention period changed to: ${newRetention === 0 ? 'Forever' : newRetention + ' days'}`);
+      
+      // Save to localStorage
+      try {
+        localStorage.setItem('otgw_retention_days', newRetention.toString());
+      } catch (err) {
+        console.warn('Could not save retention preference:', err);
+      }
+    });
+  }
+  
+  // View sessions button
+  if (btnViewSessions) {
+    btnViewSessions.addEventListener('click', async () => {
+      await showSessionsBrowser();
+    });
+  }
+  
+  // Cleanup now button
+  if (btnCleanupNow) {
+    btnCleanupNow.addEventListener('click', async () => {
+      const confirm = window.confirm(
+        `This will delete all log sessions older than ${STORAGE_CONFIG.retentionDays === 0 ? 'never (keeping all)' : STORAGE_CONFIG.retentionDays + ' days'}.\n\nContinue?`
+      );
+      
+      if (confirm) {
+        await performCleanup();
+      }
+    });
+  }
+  
+  // Clear all storage button
+  if (btnClearAllStorage) {
+    btnClearAllStorage.addEventListener('click', async () => {
+      const confirm = window.confirm(
+        '⚠️ WARNING: This will delete ALL stored log data!\n\nThis action cannot be undone.\n\nDo you want to export your data first?'
+      );
+      
+      if (confirm) {
+        const exportFirst = window.confirm('Export data before clearing?');
+        if (exportFirst) {
+          downloadLog('json'); // Export to JSON before clearing
+          await new Promise(resolve => setTimeout(resolve, 500)); // Give time for download
+        }
+        
+        const finalConfirm = window.confirm('Are you absolutely sure you want to clear ALL storage?');
+        if (finalConfirm) {
+          await clearAllStorage();
+        }
+      }
+    });
+  }
+  
+  // Initial dashboard update
+  updateStorageUsageDashboard();
+  
+  // Update dashboard periodically (every 30 seconds if panel is visible)
+  setInterval(() => {
+    if (!settingsContent.classList.contains('hidden')) {
+      updateStorageUsageDashboard();
+    }
+  }, 30000);
+}
+
+/**
+ * Update storage mode info text
+ */
+function updateStorageModeInfo(mode) {
+  const infoEl = document.getElementById('storageModeInfo');
+  if (!infoEl) return;
+  
+  const descriptions = {
+    'disabled': 'No persistent storage - data lost on page reload',
+    'smart': 'Auto-selects best storage based on data size',
+    'indexeddb': 'Always use IndexedDB (requires browser support)',
+    'localstorage': 'Always use localStorage (5-10 MB limit)'
+  };
+  
+  infoEl.textContent = descriptions[mode] || '';
+}
+
+/**
+ * Update retention period info
+ */
+function updateRetentionInfo(days) {
+  const infoEl = document.getElementById('retentionInfo');
+  const nextCleanupEl = document.getElementById('nextCleanupDate');
+  if (!infoEl || !nextCleanupEl) return;
+  
+  if (days === 0) {
+    nextCleanupEl.textContent = 'Never (keeping all data)';
+  } else {
+    // Calculate next cleanup date (approximately)
+    const nextCleanup = new Date();
+    nextCleanup.setDate(nextCleanup.getDate() + days);
+    nextCleanupEl.textContent = nextCleanup.toLocaleDateString();
+  }
+}
+
+/**
+ * Update storage usage dashboard
+ */
+async function updateStorageUsageDashboard() {
+  try {
+    // Get quota information
+    const quota = await checkStorageQuota();
+    
+    // Update IndexedDB usage
+    let indexedDBSize = 0;
+    if (logDatabase) {
+      indexedDBSize = await logDatabase.getStorageSize();
+    }
+    updateUsageBar('indexeddb', indexedDBSize, quota ? quota.quota : 100 * 1024 * 1024);
+    
+    // Update localStorage usage (estimate)
+    let localStorageSize = 0;
+    try {
+      for (let key in localStorage) {
+        if (key.startsWith('otgw_')) {
+          localStorageSize += (localStorage[key].length + key.length) * 2; // UTF-16 encoding
+        }
+      }
+    } catch (e) {
+      console.warn('Could not estimate localStorage size:', e);
+    }
+    updateUsageBar('localstorage', localStorageSize, 5 * 1024 * 1024); // 5MB typical limit
+    
+    // Update total quota
+    if (quota) {
+      const totalUsageEl = document.getElementById('totalQuotaText');
+      const totalBarEl = document.getElementById('totalQuotaBar');
+      
+      if (totalUsageEl && totalBarEl) {
+        const usedMB = quota.usage / (1024 * 1024);
+        const totalGB = quota.quota / (1024 * 1024 * 1024);
+        const prefix = quota.estimated ? '~' : '';
+        
+        totalUsageEl.textContent = `${prefix}${usedMB.toFixed(1)} MB / ${totalGB.toFixed(1)} GB`;
+        totalBarEl.style.width = `${quota.percent}%`;
+        
+        // Color coding
+        totalBarEl.classList.remove('warning', 'danger');
+        if (quota.percent > 90) totalBarEl.classList.add('danger');
+        else if (quota.percent > 75) totalBarEl.classList.add('warning');
+      }
+    }
+    
+    // Update sessions list
+    await updateSessionsList();
+    
+  } catch (e) {
+    console.error('Error updating storage dashboard:', e);
+  }
+}
+
+/**
+ * Update a single usage bar
+ */
+function updateUsageBar(type, used, limit) {
+  const textEl = document.getElementById(`${type}UsageText`);
+  const barEl = document.getElementById(`${type}UsageBar`);
+  
+  if (!textEl || !barEl) return;
+  
+  const percent = (used / limit) * 100;
+  const isKB = used < 1024 * 1024; // Show KB if less than 1MB
+  
+  if (isKB) {
+    textEl.textContent = `${(used / 1024).toFixed(1)} KB`;
+  } else {
+    textEl.textContent = `${(used / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  
+  barEl.style.width = `${Math.min(percent, 100)}%`;
+  
+  // Color coding
+  barEl.classList.remove('warning', 'danger');
+  if (percent > 90) barEl.classList.add('danger');
+  else if (percent > 75) barEl.classList.add('warning');
+}
+
+/**
+ * Update sessions list in dashboard
+ */
+async function updateSessionsList() {
+  const listEl = document.getElementById('sessionsList');
+  if (!listEl) return;
+  
+  if (!logDatabase) {
+    listEl.innerHTML = '<p style="font-size: 12px; color: #666; font-style: italic;">IndexedDB not available</p>';
+    return;
+  }
+  
+  try {
+    // Get all sessions sorted by timestamp descending
+    const sessions = await logDatabase.getAllSessions();
+    
+    if (sessions.length === 0) {
+      listEl.innerHTML = '<p style="font-size: 12px; color: #666; font-style: italic;">No stored sessions</p>';
+      return;
+    }
+    
+    listEl.innerHTML = '<h5 style="margin: 10px 0 8px 0; font-size: 13px;">Saved Sessions:</h5>';
+    
+    for (const session of sessions) {
+      const sessionEl = document.createElement('div');
+      sessionEl.className = 'session-item';
+      
+      const date = new Date(session.timestamp);
+      const age = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24)); // days
+      
+      sessionEl.innerHTML = `
+        <div class="session-info">
+          <div class="session-info-row">
+            <span class="session-info-label">Date:</span>${date.toLocaleString()}
+          </div>
+          <div class="session-info-row">
+            <span class="session-info-label">Size:</span>${session.lineCount} lines, ${(session.size / 1024).toFixed(1)} KB
+          </div>
+          <div class="session-info-row">
+            <span class="session-info-label">Age:</span>${age} day${age !== 1 ? 's' : ''} ago
+          </div>
+        </div>
+        <div class="session-actions">
+          <button class="btn-session-action" onclick="loadSession('${session.id}')">Load</button>
+          <button class="btn-session-action btn-delete" onclick="deleteSession('${session.id}')">Delete</button>
+        </div>
+      `;
+      
+      listEl.appendChild(sessionEl);
+    }
+  } catch (e) {
+    console.error('Error listing sessions:', e);
+    listEl.innerHTML = '<p style="font-size: 12px; color: #c82333;">Error loading sessions</p>';
+  }
+}
+
+/**
+ * Show sessions browser (future enhancement - for now just opens the panel)
+ */
+async function showSessionsBrowser() {
+  const settingsContent = document.getElementById('storageSettingsContent');
+  if (settingsContent) {
+    settingsContent.classList.remove('hidden');
+    await updateStorageUsageDashboard();
+  }
+}
+
+/**
+ * Perform cleanup of old sessions
+ */
+async function performCleanup() {
+  if (!logDatabase) {
+    alert('IndexedDB not available - nothing to clean up');
+    return;
+  }
+  
+  try {
+    const deletedCount = await logDatabase.cleanOldSessions();
+    alert(`Cleanup complete! Deleted ${deletedCount} old session(s).`);
+    await updateStorageUsageDashboard();
+  } catch (e) {
+    console.error('Cleanup error:', e);
+    alert('Error during cleanup: ' + e.message);
+  }
+}
+
+/**
+ * Clear all storage (nuclear option)
+ */
+async function clearAllStorage() {
+  try {
+    // Clear IndexedDB
+    if (logDatabase) {
+      await logDatabase.clearAll();
+      console.log('IndexedDB cleared');
+    }
+    
+    // Clear localStorage (only OTGW items)
+    try {
+      const keysToRemove = [];
+      for (let key in localStorage) {
+        if (key.startsWith('otgw_')) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      console.log(`localStorage cleared (${keysToRemove.length} items)`);
+    } catch (e) {
+      console.warn('Could not clear localStorage:', e);
+    }
+    
+    alert('All storage cleared successfully!');
+    await updateStorageUsageDashboard();
+    
+  } catch (e) {
+    console.error('Error clearing storage:', e);
+    alert('Error clearing storage: ' + e.message);
+  }
+}
+
+/**
+ * Load a specific session (exposed to window for onclick)
+ */
+window.loadSession = async function(sessionId) {
+  if (!logDatabase) {
+    alert('IndexedDB not available');
+    return;
+  }
+  
+  try {
+    const logs = await logDatabase.loadLogsForSession(sessionId);
+    
+    if (logs && logs.length > 0) {
+      // Clear current buffer
+      otLogBuffer.length = 0;
+      
+      // Load session logs
+      otLogBuffer.push(...logs);
+      
+      // Update display
+      filterAndDisplayLogs();
+      updateLogCounters();
+      
+      alert(`Loaded ${logs.length} log lines from session`);
+      
+      // Scroll to top
+      const container = document.getElementById('otLogContainer');
+      const content = document.getElementById('otLogContent');
+      if (container && content) {
+        container.scrollTop = 0;
+      }
+    } else {
+      alert('Session is empty or could not be loaded');
+    }
+  } catch (e) {
+    console.error('Error loading session:', e);
+    alert('Error loading session: ' + e.message);
+  }
+};
+
+/**
+ * Delete a specific session (exposed to window for onclick)
+ */
+window.deleteSession = async function(sessionId) {
+  if (!logDatabase) {
+    alert('IndexedDB not available');
+    return;
+  }
+  
+  const confirm = window.confirm('Delete this session? This cannot be undone.');
+  if (!confirm) return;
+  
+  try {
+    await logDatabase.deleteSession(sessionId);
+    alert('Session deleted successfully');
+    await updateStorageUsageDashboard();
+  } catch (e) {
+    console.error('Error deleting session:', e);
+    alert('Error deleting session: ' + e.message);
+  }
+};
+
+/**
+ * Restore storage preferences from localStorage
+ */
+function restoreStoragePreferences() {
+  try {
+    // Restore storage mode
+    const savedMode = localStorage.getItem('otgw_storage_mode');
+    if (savedMode && ['disabled', 'smart', 'indexeddb', 'localstorage'].includes(savedMode)) {
+      storageMode = savedMode;
+    }
+    
+    // Restore retention period
+    const savedRetention = localStorage.getItem('otgw_retention_days');
+    if (savedRetention !== null) {
+      const retention = parseInt(savedRetention);
+      if (!isNaN(retention) && retention >= 0) {
+        STORAGE_CONFIG.retentionDays = retention;
+      }
+    }
+  } catch (e) {
+    console.warn('Could not restore storage preferences:', e);
   }
 }
 

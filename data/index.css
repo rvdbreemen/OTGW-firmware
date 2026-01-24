@@ -1137,3 +1137,212 @@ body.disable-interaction {
 .download-menu-item:hover {
   background-color: #f5f5f5;
 }
+
+/* Phase 5: Storage Settings Panel */
+.storage-settings-panel {
+  margin-top: 15px;
+  border-top: 1px solid #ddd;
+  padding-top: 10px;
+}
+
+.btn-storage-toggle {
+  background-color: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  transition: background-color 0.2s;
+}
+
+.btn-storage-toggle:hover {
+  background-color: #e9ecef;
+}
+
+.storage-settings-content {
+  margin-top: 15px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.storage-settings-content.hidden {
+  display: none;
+}
+
+.storage-settings-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 15px;
+}
+
+.storage-settings-row label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.storage-select {
+  padding: 5px 8px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 13px;
+  background-color: white;
+  cursor: pointer;
+}
+
+.storage-info {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+}
+
+.btn-storage-action {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background-color 0.2s;
+  margin-right: 8px;
+}
+
+.btn-storage-action:hover {
+  background-color: #0056b3;
+}
+
+.btn-storage-action.btn-danger {
+  background-color: #dc3545;
+}
+
+.btn-storage-action.btn-danger:hover {
+  background-color: #c82333;
+}
+
+.storage-usage-dashboard {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #ddd;
+}
+
+.storage-usage-dashboard h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.storage-usage-bars {
+  margin-bottom: 15px;
+}
+
+.storage-usage-item {
+  margin-bottom: 10px;
+}
+
+.storage-usage-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 4px;
+  color: #555;
+}
+
+.storage-usage-bar {
+  height: 20px;
+  background-color: #e9ecef;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid #ddd;
+}
+
+.storage-usage-fill {
+  height: 100%;
+  background-color: #28a745;
+  transition: width 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: white;
+  font-weight: 500;
+}
+
+.storage-usage-fill.warning {
+  background-color: #ffc107;
+}
+
+.storage-usage-fill.danger {
+  background-color: #dc3545;
+}
+
+.sessions-list {
+  margin-top: 15px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.session-item {
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.session-item:hover {
+  background-color: #f8f9fa;
+}
+
+.session-info {
+  flex: 1;
+}
+
+.session-info-row {
+  margin-bottom: 3px;
+}
+
+.session-info-label {
+  font-weight: 600;
+  margin-right: 5px;
+  color: #555;
+}
+
+.session-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.btn-session-action {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background-color 0.2s;
+}
+
+.btn-session-action:hover {
+  background-color: #5a6268;
+}
+
+.btn-session-action.btn-delete {
+  background-color: #dc3545;
+}
+
+.btn-session-action.btn-delete:hover {
+  background-color: #c82333;
+}

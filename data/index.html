@@ -108,6 +108,88 @@
               <span id="logFileDisplay" style="display:none">Log: <span id="currentLogFile">None</span></span>
               <div id="recoveryProgress" style="display:none; margin-top: 5px; font-style: italic;"></div>
             </div>
+            
+            <!-- Storage Settings Panel (Phase 5) -->
+            <div class="storage-settings-panel">
+              <button id="btnToggleStorageSettings" class="btn-storage-toggle" title="Show/hide storage settings">
+                ⚙ Storage Settings
+              </button>
+              <div id="storageSettingsContent" class="storage-settings-content hidden">
+                <div class="storage-settings-row">
+                  <label for="selectStorageMode">
+                    <strong>Storage Mode:</strong>
+                    <select id="selectStorageMode" class="storage-select">
+                      <option value="disabled">Disabled (Memory Only)</option>
+                      <option value="smart" selected>Smart (Recommended)</option>
+                      <option value="indexeddb">Always IndexedDB</option>
+                      <option value="localstorage">Always localStorage</option>
+                    </select>
+                  </label>
+                  <span id="storageModeInfo" class="storage-info">Auto-selects best storage based on data size</span>
+                </div>
+                
+                <div class="storage-settings-row">
+                  <label for="selectRetentionPeriod">
+                    <strong>Retention Period:</strong>
+                    <select id="selectRetentionPeriod" class="storage-select">
+                      <option value="1">1 Day</option>
+                      <option value="7" selected>7 Days</option>
+                      <option value="14">14 Days</option>
+                      <option value="30">30 Days</option>
+                      <option value="90">90 Days</option>
+                      <option value="0">Forever (Until Full)</option>
+                    </select>
+                  </label>
+                  <span id="retentionInfo" class="storage-info">Next cleanup: <span id="nextCleanupDate">-</span></span>
+                </div>
+                
+                <div class="storage-settings-row">
+                  <button id="btnViewSessions" class="btn-storage-action" title="Browse saved log sessions">
+                    📋 Browse Sessions
+                  </button>
+                  <button id="btnCleanupNow" class="btn-storage-action" title="Clean up old sessions now">
+                    🧹 Clean Up Old Sessions
+                  </button>
+                  <button id="btnClearAllStorage" class="btn-storage-action btn-danger" title="Clear all stored data (cannot be undone)">
+                    🗑 Clear All Storage
+                  </button>
+                </div>
+                
+                <div class="storage-usage-dashboard" id="storageUsageDashboard">
+                  <h4>Storage Usage</h4>
+                  <div class="storage-usage-bars">
+                    <div class="storage-usage-item">
+                      <div class="storage-usage-label">
+                        <span>IndexedDB:</span>
+                        <span id="indexeddbUsageText">0 MB</span>
+                      </div>
+                      <div class="storage-usage-bar">
+                        <div id="indexeddbUsageBar" class="storage-usage-fill" style="width: 0%"></div>
+                      </div>
+                    </div>
+                    <div class="storage-usage-item">
+                      <div class="storage-usage-label">
+                        <span>localStorage:</span>
+                        <span id="localstorageUsageText">0 KB</span>
+                      </div>
+                      <div class="storage-usage-bar">
+                        <div id="localstorageUsageBar" class="storage-usage-fill" style="width: 0%"></div>
+                      </div>
+                    </div>
+                    <div class="storage-usage-item">
+                      <div class="storage-usage-label">
+                        <span>Total Quota:</span>
+                        <span id="totalQuotaText">0 MB / 0 MB</span>
+                      </div>
+                      <div class="storage-usage-bar">
+                        <div id="totalQuotaBar" class="storage-usage-fill" style="width: 0%"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div id="sessionsList" class="sessions-list"></div>
+                </div>
+              </div>
+            </div>
         </div>
 
         <div id="Statistics" class="tab-content">
