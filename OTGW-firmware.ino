@@ -307,14 +307,22 @@ void doBackgroundTasks()
   }
   
   if (WiFi.status() == WL_CONNECTED) {
-    // During ESP firmware flash, keep essential services but skip heavy background tasks
-    // Keep: HTTP server (upload chunks), Telnet (debug), MDNS (network discovery)
-    // Skip: MQTT, OTGW, WebSocket logs, NTP to reduce interference
+    // During firmware flash, keep essential services but skip heavy background tasks
+    // ESP flash: Skip MQTT, OTGW, NTP to reduce interference
+    // PIC flash: Skip MQTT, NTP but KEEP OTGW (needed for serial communication during upgrade)
     if (isESPFlashing) {
+      // ESP flash: minimal services only
       handleDebug();              // Keep telnet debug active for monitoring
       httpServer.handleClient();  // MUST continue - processes upload chunks
       MDNS.update();              // Keep MDNS active for network discovery
-      handleWebSocket();        // Process WebSocket events during flash
+      handleWebSocket();          // Process WebSocket events for flash progress updates
+    } else if (isPICFlashing) {
+      // PIC flash: same as ESP but MUST call handleOTGW for serial communication
+      handleDebug();              // Keep telnet debug active for monitoring
+      httpServer.handleClient();  // Keep HTTP active
+      MDNS.update();              // Keep MDNS active for network discovery
+      handleOTGW();               // REQUIRED for PIC flash - processes serial communication
+      handleWebSocket();          // Process WebSocket events for flash progress updates
     } else {
       //while connected handle everything that uses network stuff
       handleDebug();
@@ -338,8 +346,8 @@ void loop()
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS);
   
-  if (!isESPFlashing) {
-    // Only run these tasks when NOT flashing ESP firmware
+  if (!isFlashing()) {
+    // Only run these tasks when NOT flashing firmware (ESP or PIC)
       if (DUE(timerpollsensor))         pollSensors();    // poll the temperature sensors connected to 2wire gpio pin 
       if (DUE(timers0counter))          sendS0Counters(); // poll the s0 counter connected to gpio pin when due
       if (DUE(timer5min))               do5minevent();  

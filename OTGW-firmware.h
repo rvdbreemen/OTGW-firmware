@@ -106,6 +106,12 @@ uint32_t    rebootCount = 0;
 char        sMessage[257] = "";    
 uint32_t    MQTTautoConfigMap[8] = { 0 };
 bool        isESPFlashing = false;  // Flag to disable background tasks during ESP firmware flash
+bool        isPICFlashing = false;  // Flag to disable background tasks during PIC firmware flash
+
+// Helper inline function to check if any firmware flash is in progress
+inline bool isFlashing() {
+  return isESPFlashing || isPICFlashing;
+}
 
 //Use acetime
 using namespace ace_time;
@@ -130,7 +136,9 @@ char      sPICfwversion[32] = "no pic found";
 char      sPICdeviceid[32] = "no pic found";
 char      sPICtype[32] = "no pic found";
 bool      bPICavailable = false;
-char      errorupgrade[129] = ""; 
+char      errorupgrade[129] = "";
+char      currentPICFlashFile[65] = ""; // Track current PIC flash filename for WebSocket progress
+int       currentPICFlashProgress = 0;  // Track current PIC flash progress percentage (0-100) 
 bool      bOTGWonline = true;
 bool      bOTGWboilerstate = false;
 bool      bOTGWthermostatstate = false;
