@@ -183,6 +183,153 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
 - **MANDATORY**: Always use `PSTR()` macro for formatted strings: `DebugTf(PSTR("Value: %d"), val)`
 - Never use plain string literals without `F()` or `PSTR()` - see Memory Management section
 
+### Browser Compatibility (MANDATORY for Frontend Code)
+
+**CRITICAL**: All frontend JavaScript MUST be compatible with Chrome, Firefox, and Safari (latest versions and 2 versions back).
+
+#### Required Compatibility Checks
+
+Before implementing or modifying frontend features, verify browser support:
+
+1. **WebSocket API**
+   - ✅ Fully supported: Chrome 16+, Firefox 11+, Safari 6+
+   - Always check `readyState` before sending (OPEN = 1, CONNECTING = 0)
+   - Handle connection/disconnection gracefully
+
+2. **Fetch API**
+   - ✅ Fully supported: Chrome 42+, Firefox 39+, Safari 10.1+
+   - **MANDATORY**: Always include error handling with `.catch()`
+   - **MANDATORY**: Check `response.ok` before processing (HTTP errors don't throw)
+   - **MANDATORY**: Validate content-type before calling `response.json()`
+
+3. **JSON APIs**
+   - ✅ Fully supported: Chrome 3+, Firefox 3.5+, Safari 4+
+   - **MANDATORY**: Wrap `JSON.parse()` in try-catch blocks
+   - **MANDATORY**: Validate input is JSON before parsing
+   - Example:
+     ```javascript
+     try {
+       if (data && data.startsWith('{')) {
+         const json = JSON.parse(data);
+         // Process json
+       }
+     } catch (e) {
+       console.error('JSON parse error:', e);
+     }
+     ```
+
+4. **DOM Manipulation**
+   - **MANDATORY**: Check element exists before accessing properties
+   - Use `querySelector()` / `querySelectorAll()` (modern, well-supported)
+   - Example:
+     ```javascript
+     const element = document.getElementById('myId');
+     if (element) {
+       element.innerText = 'Hello';
+     }
+     ```
+
+#### Forbidden Patterns (Browser-Specific or Incompatible)
+
+**NEVER** use these patterns:
+
+- ❌ Browser-specific prefixes (`-webkit-`, `-moz-`, etc.) without fallbacks
+- ❌ Relying on fetch to throw on HTTP errors (it doesn't - check `response.ok`)
+- ❌ Assuming JSON without validation (always check content-type and format)
+- ❌ Missing error handlers on async operations (always add `.catch()`)
+- ❌ Using experimental APIs without checking support
+- ❌ Vendor-specific JavaScript extensions
+- ❌ Missing null/undefined checks on DOM elements
+
+#### Best Practices (MANDATORY)
+
+1. **Error Handling**
+   ```javascript
+   // GOOD - Complete error handling
+   fetch('/api/v1/data')
+     .then(response => {
+       if (!response.ok) {
+         throw new Error(`HTTP ${response.status}`);
+       }
+       return response.json();
+     })
+     .then(data => {
+       // Process data
+     })
+     .catch(error => {
+       console.error('Fetch error:', error);
+       // Handle error gracefully
+     });
+   
+   // BAD - Missing error handling
+   fetch('/api/v1/data')
+     .then(response => response.json())
+     .then(data => {
+       // Process data
+     });
+   ```
+
+2. **WebSocket State Management**
+   ```javascript
+   // GOOD - Check state before sending
+   if (webSocket && webSocket.readyState === WebSocket.OPEN) {
+     webSocket.send(message);
+   }
+   
+   // BAD - No state check
+   webSocket.send(message);
+   ```
+
+3. **JSON Parsing Safety**
+   ```javascript
+   // GOOD - Validated parsing
+   function parseJSON(data) {
+     if (!data || typeof data !== 'string') return null;
+     if (!data.startsWith('{') && !data.startsWith('[')) return null;
+     
+     try {
+       return JSON.parse(data);
+     } catch (e) {
+       console.error('JSON parse error:', e);
+       return null;
+     }
+   }
+   
+   // BAD - Unprotected parsing
+   const json = JSON.parse(data);
+   ```
+
+4. **DOM Safety**
+   ```javascript
+   // GOOD - Existence check
+   const element = document.getElementById('myId');
+   if (element) {
+     element.innerText = 'Value';
+   }
+   
+   // BAD - Assuming element exists
+   document.getElementById('myId').innerText = 'Value';  // May throw
+   ```
+
+#### Testing Requirements
+
+- **MANDATORY**: Test all frontend changes in Chrome, Firefox, and Safari
+- **MANDATORY**: Check browser console for errors during testing
+- **MANDATORY**: Verify WebSocket connections work in all browsers
+- **MANDATORY**: Test error scenarios (network failures, invalid responses)
+- Use browser DevTools to verify:
+  - No JavaScript errors in console
+  - Network requests complete successfully
+  - WebSocket connections establish and maintain
+  - JSON parsing succeeds
+
+#### Reference Resources
+
+- **MDN Web Docs**: Authoritative source for browser compatibility
+- **Can I Use**: https://caniuse.com for feature support tables
+- Follow ECMAScript 5 (ES5) or later standards
+- Avoid bleeding-edge features without checking support
+
 ### OpenTherm Protocol
 
 - Message IDs are defined in `OTGW-Core.h`
