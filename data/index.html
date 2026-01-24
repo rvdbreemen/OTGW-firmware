@@ -68,7 +68,14 @@
               <button id="btnToggleLog" class="btn-log-control" title="Expand/Collapse Log" aria-label="Expand or collapse the OpenTherm log view">▲ Show More</button>
               <button id="btnAutoScroll" class="btn-log-control btn-active" title="Auto-scroll with new messages" aria-label="Toggle auto-scroll with new log messages">Auto-scroll</button>
               <button id="btnClearLog" class="btn-log-control" title="Clear log buffer" aria-label="Clear the OpenTherm log buffer">Clear</button>
-              <button id="btnDownloadLog" class="btn-log-control" title="Download log to file" aria-label="Download the OpenTherm log to a file">Download</button>
+              <div class="download-dropdown">
+                <button id="btnDownloadLog" class="btn-log-control" title="Download log to file" aria-label="Download the OpenTherm log to a file">Download ▼</button>
+                <div class="download-menu hidden">
+                  <div class="download-menu-item" data-format="txt">Text (.txt)</div>
+                  <div class="download-menu-item" data-format="json">JSON (.json)</div>
+                  <div class="download-menu-item" data-format="csv">CSV (.csv)</div>
+                </div>
+              </div>
               <label class="log-control-label" style="display:inline-flex;" title="Automatically save log every 15 minutes">
                   <input type="checkbox" id="chkAutoDownloadLog" aria-label="Auto download log every 15 minutes" />
                   Auto

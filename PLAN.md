@@ -230,31 +230,37 @@ function loadRecentLogsFromLocalStorage() {
 ### Phase 8: Export/Import Functionality
 **Priority**: Medium  
 **Estimated Effort**: Medium (1-2 weeks)  
-**Status**: Not Started
+**Status**: ✅ Partially Complete (JSON/CSV Export Implemented)
 
 #### Features
 1. **Multiple Export Formats**
-   - JSON (structured, full fidelity)
-   - CSV (tabular, for Excel/analysis)
-   - Plain text (human-readable)
-   - SQLite database (advanced users)
-   - OpenTherm Monitor compatible format
+   - ✅ JSON (structured, full fidelity) - COMPLETE
+     - Includes metadata (device, timestamp, version)
+     - Parsed OpenTherm fields (msgType, dataId, value)
+     - ISO and local timestamps
+   - ✅ CSV (tabular, for Excel/analysis) - COMPLETE
+     - Headers: Timestamp, TimestampISO, MessageType, DataID, Value, Raw, Formatted
+     - Proper CSV escaping for special characters
+   - ✅ Plain text (human-readable) - COMPLETE (existing)
+   - ⏳ SQLite database (advanced users) - TODO
+   - ⏳ OpenTherm Monitor compatible format - TODO
 
-2. **Export Options**
-   - Export current buffer
-   - Export specific session from IndexedDB
-   - Export date range
-   - Export filtered logs only
-   - Export with or without metadata
+2. **Export Options** ✅ Basic Complete
+   - ✅ Export current buffer (all formats)
+   - ✅ Dropdown menu for format selection in UI
+   - ⏳ Export specific session from IndexedDB - TODO
+   - ⏳ Export date range - TODO
+   - ⏳ Export filtered logs only - TODO
+   - ⏳ Export with or without metadata - TODO
 
-3. **Import Functionality**
+3. **Import Functionality** ⏳ TODO
    - Import JSON/CSV files
    - Append or replace current buffer
    - Validate format before import
    - Preview before final import
    - Merge with existing data
 
-4. **Batch Operations**
+4. **Batch Operations** ⏳ TODO
    - Export all sessions at once
    - Import multiple files
    - Automated backups (daily/weekly)

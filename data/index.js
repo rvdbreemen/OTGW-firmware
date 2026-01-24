@@ -1693,9 +1693,35 @@ function setupOTLogControls() {
   });
   
   // Download log
-  document.getElementById('btnDownloadLog').addEventListener('click', function() {
-    downloadLog(false);
-  });
+  // Download button with dropdown menu
+  const btnDownloadLog = document.getElementById('btnDownloadLog');
+  const downloadMenu = document.querySelector('.download-menu');
+  
+  if (btnDownloadLog && downloadMenu) {
+    // Toggle dropdown
+    btnDownloadLog.addEventListener('click', function(e) {
+      e.stopPropagation();
+      downloadMenu.classList.toggle('hidden');
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function() {
+      if (downloadMenu && !downloadMenu.classList.contains('hidden')) {
+        downloadMenu.classList.add('hidden');
+      }
+    });
+    
+    // Handle format selection
+    document.querySelectorAll('.download-menu-item').forEach(item => {
+      item.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const format = this.getAttribute('data-format');
+        downloadMenu.classList.add('hidden');
+        downloadLog(false, format);
+      });
+    });
+  }
+
 
   // Auto Download Log
   const chkAutoDL = document.getElementById('chkAutoDownloadLog');
@@ -1965,12 +1991,49 @@ async function writeToStream(entry) {
 }
 
 //============================================================================
-function downloadLog(isAuto = false) {
+/**
+ * Download log in specified format (txt, json, or csv)
+ */
+function downloadLog(isAuto = false, format = 'txt') {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-  // Different prefix for auto
   const prefix = isAuto ? 'otgw-log-auto-' : 'otgw-log-';
-  const filename = `${prefix}${timestamp}.txt`;
+  const filename = `${prefix}${timestamp}.${format}`;
   
+  let content, mimeType;
+  
+  if (format === 'json') {
+    content = exportLogsAsJSON();
+    mimeType = 'application/json';
+  } else if (format === 'csv') {
+    content = exportLogsAsCSV();
+    mimeType = 'text/csv';
+  } else {
+    // Default text format
+    content = exportLogsAsText();
+    mimeType = 'text/plain';
+  }
+  
+  const blob = new Blob([content], { type: mimeType });
+
+  // Try to save to FileSystem Handle first (if available and function exists)
+  if (isAuto && window.saveBlobToLogDir) {
+    window.saveBlobToLogDir(filename, blob).then(success => {
+      if (success) {
+        console.log("Auto-saved log to disk: " + filename);
+      } else {
+        // Fallback
+        forceDownloadBlob(blob, filename);
+      }
+    });
+  } else {
+    forceDownloadBlob(blob, filename);
+  }
+}
+
+/**
+ * Export logs as plain text
+ */
+function exportLogsAsText() {
   let content = '# OTGW Log Export\n';
   content += `# Exported: ${new Date().toLocaleString()}\n`;
   content += `# Total Lines: ${otLogBuffer.length}\n`;
@@ -1982,21 +2045,64 @@ function downloadLog(isAuto = false) {
     content += line + '\n';
   });
   
-  const blob = new Blob([content], { type: 'text/plain' });
+  return content;
+}
 
-  // Try to save to FileSystem Handle first (if available and function exists)
-  if (isAuto && window.saveBlobToLogDir) {
-        window.saveBlobToLogDir(filename, blob).then(success => {
-            if (success) {
-                console.log("Auto-saved log to disk: " + filename);
-            } else {
-                // Fallback
-                 forceDownloadBlob(blob, filename);
-            }
-        });
-  } else {
-      forceDownloadBlob(blob, filename);
-  }
+/**
+ * Export logs as JSON
+ */
+function exportLogsAsJSON() {
+  const exportData = {
+    metadata: {
+      exported: new Date().toISOString(),
+      exportedLocal: new Date().toLocaleString(),
+      totalLines: otLogBuffer.length,
+      device: window.location.hostname || 'unknown',
+      version: document.getElementById('devVersion')?.textContent || 'unknown'
+    },
+    logs: otLogBuffer.map(entry => ({
+      timestamp: entry.time,
+      timestampISO: new Date(entry.time).toISOString(),
+      raw: entry.data,
+      formatted: formatLogLine(entry.data),
+      // Parse OpenTherm message if possible
+      msgType: entry.data.length >= 1 ? entry.data[0] : null,
+      dataId: entry.data.length >= 2 ? entry.data.slice(1, 3) : null,
+      value: entry.data.length >= 4 ? entry.data.slice(3) : null
+    }))
+  };
+  
+  return JSON.stringify(exportData, null, 2);
+}
+
+/**
+ * Export logs as CSV
+ */
+function exportLogsAsCSV() {
+  // CSV header
+  let csv = 'Timestamp,TimestampISO,MessageType,DataID,Value,Raw,Formatted\n';
+  
+  // Add each log entry
+  otLogBuffer.forEach(entry => {
+    const formatted = formatLogLine(entry.data);
+    const timestampISO = new Date(entry.time).toISOString();
+    const msgType = entry.data.length >= 1 ? entry.data[0] : '';
+    const dataId = entry.data.length >= 2 ? entry.data.slice(1, 3) : '';
+    const value = entry.data.length >= 4 ? entry.data.slice(3) : '';
+    
+    // Escape quotes in fields and wrap in quotes if needed
+    const escapeCsvField = (field) => {
+      field = String(field);
+      if (field.includes(',') || field.includes('"') || field.includes('\n')) {
+        return '"' + field.replace(/"/g, '""') + '"';
+      }
+      return field;
+    };
+    
+    csv += `${escapeCsvField(entry.time)},${escapeCsvField(timestampISO)},${escapeCsvField(msgType)},${escapeCsvField(dataId)},${escapeCsvField(value)},${escapeCsvField(entry.data)},${escapeCsvField(formatted)}\n`;
+  });
+  
+  return csv;
 }
 
 function forceDownloadBlob(blob, filename) {

@@ -1110,3 +1110,42 @@ body.disable-interaction {
 .btn-close:hover {
   color: #fff;
 }
+
+/* Download dropdown menu */
+.download-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.download-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background-color: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+  min-width: 140px;
+  z-index: 1000;
+  margin-top: 2px;
+}
+
+.download-menu.hidden {
+  display: none;
+}
+
+.download-menu-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  border-bottom: 1px solid #444;
+  color: #e0e0e0;
+}
+
+.download-menu-item:last-child {
+  border-bottom: none;
+}
+
+.download-menu-item:hover {
+  background-color: #3a3a3a;
+}
