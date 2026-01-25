@@ -109,6 +109,14 @@ void processAPI()
         // GET /api/v1/flashstatus - Unified flash status for both ESP and PIC
         if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
         sendFlashStatus();
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("settings")) == 0) {
+        if (isPostOrPut) {
+          postSettings();
+        } else if (isGet) {
+          sendDeviceSettings();
+        } else {
+          httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n"));
+        }
       } else if (wc > 3 && strcmp_P(words[3], PSTR("pic")) == 0) {
         if (wc > 4 && strcmp_P(words[4], PSTR("flashstatus")) == 0) {
           // GET /api/v1/pic/flashstatus
