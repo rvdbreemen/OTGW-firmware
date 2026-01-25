@@ -2071,9 +2071,13 @@ void startOTGWstream()
 //---------[ Upgrade PIC stuff taken from Schelte Bron's NodeMCU Firmware ]---------
 
 void upgradepicnow(const char *filename) {
-  if (OTGWSerial.busy()) return; // if already in programming mode, never call it twice
+  if (OTGWSerial.busy()) {
+    DebugTln(F("PIC upgrade already in progress, ignoring request"));
+    return; // if already in programming mode, never call it twice
+  }
   DebugTf(PSTR("Start PIC upgrade now: %s\r\n"), filename);
   fwupgradestart(filename);  
+  DebugTln(F("PIC upgrade started, now running in background"));
   // Upgrade runs in background via OTGWSerial callbacks and upgradeTick called from available()
 }
 
@@ -2271,10 +2275,20 @@ void refreshpic(String filename, String version) {
 String pendingUpgradePath = "";
 
 void handlePendingUpgrade() {
+  static bool debugOnce = true;
+  if (debugOnce && pendingUpgradePath == F("")) {
+    // Only log once to avoid spam
+    DebugTln(F("handlePendingUpgrade: No pending upgrade"));
+    debugOnce = false;
+  }
+  
   if (pendingUpgradePath != F("")) {
+    debugOnce = true; // Reset for next time
     DebugTf(PSTR("Executing deferred upgrade for: %s\r\n"), pendingUpgradePath.c_str());
+    DebugTf(PSTR("Flash flags before start: isESPFlashing=%d, isPICFlashing=%d\r\n"), isESPFlashing, isPICFlashing);
     upgradepicnow(pendingUpgradePath.c_str());
     pendingUpgradePath = "";
+    DebugTln(F("Deferred upgrade initiated"));
   }
 }
 
@@ -2297,10 +2311,14 @@ void upgradepic() {
   
   if (action == F("upgrade")) {
     DebugTf(PSTR("Upgrade /%s/%s\r\n"), sPICdeviceid, filename.c_str());
+    
+    // Send response and flush to ensure it's transmitted before deferred upgrade starts
     httpServer.send_P(200, PSTR("application/json"), PSTR("{\"status\":\"started\"}"));
+    httpServer.client().flush();  // Ensure response buffer is sent to client
     
     // Defer the actual upgrade start to the main loop to ensure HTTP response is sent
     pendingUpgradePath = "/" + String(sPICdeviceid) + "/" + filename;
+    DebugTf(PSTR("Pending upgrade queued: [%s]\r\n"), pendingUpgradePath.c_str());
     return;
   } else if (action == F("refresh")) {
     DebugTf(PSTR("Refresh %s/%s\r\n"), sPICdeviceid, filename.c_str());
