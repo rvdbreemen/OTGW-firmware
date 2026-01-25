@@ -318,6 +318,11 @@ void doBackgroundTasks()
       handleWebSocket();          // Process WebSocket events for flash progress updates
     } else if (isPICFlashing) {
       // PIC flash: same as ESP but MUST call handleOTGW for serial communication
+      static bool picFlashLogged = false;
+      if (!picFlashLogged) {
+        DebugTln(F("doBackgroundTasks: PIC flash mode active, calling handleOTGW"));
+        picFlashLogged = true;
+      }
       handleDebug();              // Keep telnet debug active for monitoring
       httpServer.handleClient();  // Keep HTTP active
       MDNS.update();              // Keep MDNS active for network discovery

@@ -2275,8 +2275,17 @@ void refreshpic(String filename, String version) {
 String pendingUpgradePath = "";
 
 void handlePendingUpgrade() {
+  static bool debugOnce = true;
+  if (debugOnce && pendingUpgradePath == F("")) {
+    // Only log once to avoid spam
+    DebugTln(F("handlePendingUpgrade: No pending upgrade"));
+    debugOnce = false;
+  }
+  
   if (pendingUpgradePath != F("")) {
+    debugOnce = true; // Reset for next time
     DebugTf(PSTR("Executing deferred upgrade for: %s\r\n"), pendingUpgradePath.c_str());
+    DebugTf(PSTR("Flash flags before start: isESPFlashing=%d, isPICFlashing=%d\r\n"), isESPFlashing, isPICFlashing);
     upgradepicnow(pendingUpgradePath.c_str());
     pendingUpgradePath = "";
     DebugTln(F("Deferred upgrade initiated"));
@@ -2303,14 +2312,13 @@ void upgradepic() {
   if (action == F("upgrade")) {
     DebugTf(PSTR("Upgrade /%s/%s\r\n"), sPICdeviceid, filename.c_str());
     
-    // Send response immediately and ensure it's flushed before starting upgrade
-    httpServer.sendHeader(F("Connection"), F("close"));
+    // Send response and flush to ensure it's transmitted before deferred upgrade starts
     httpServer.send_P(200, PSTR("application/json"), PSTR("{\"status\":\"started\"}"));
-    httpServer.client().flush();  // Ensure response is sent before proceeding
-    httpServer.client().stop();   // Close connection to prevent timeout during upgrade
+    httpServer.client().flush();  // Ensure response buffer is sent to client
     
     // Defer the actual upgrade start to the main loop to ensure HTTP response is sent
     pendingUpgradePath = "/" + String(sPICdeviceid) + "/" + filename;
+    DebugTf(PSTR("Pending upgrade queued: [%s]\r\n"), pendingUpgradePath.c_str());
     return;
   } else if (action == F("refresh")) {
     DebugTf(PSTR("Refresh %s/%s\r\n"), sPICdeviceid, filename.c_str());
