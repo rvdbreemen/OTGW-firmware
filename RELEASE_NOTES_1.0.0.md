@@ -336,18 +336,23 @@ This milestone wouldn't have been possible without the incredible support and co
 - **@proditaki**: Domoticz plugin development for OTGW-firmware
 
 ### The Entire Community
-A massive thank you to everyone who has:
+A massive thank you to **everyone** who has contributed throughout the years:
 - Reported issues and provided detailed feedback
 - Tested release candidates and beta features
 - Helped others in Discord and GitHub discussions
 - Shared their use cases and suggestions
 - Supported the project's growth
+- Participated in testing and troubleshooting
+- Provided encouragement and motivation
+
+**This project wouldn't exist without you.** Every bug report, every test, every question asked and answered, every word of encouragement - it all contributed to reaching this milestone. Thank you for being part of this journey and for helping build something that benefits the entire community.
 
 ### Special Recognition
 - **Copilot-SWE-Agent**: For systematic code quality improvements and documentation enhancements
 - **GitHub Actions**: For reliable CI/CD automation
 - **Home Assistant Community**: For integration testing and feedback
-- **Discord Community**: For daily support and collaboration
+- **Discord Community**: For daily support, collaboration, and camaraderie
+- **Everyone who believed in this project**: For your patience, support, and trust throughout the development process
 
 ---
 

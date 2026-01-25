@@ -50,7 +50,16 @@ The primary goal is **reliable Home Assistant integration** via MQTT and auto di
 - **Dallas Temperature Sensors**: Default GPIO changed from GPIO 13 (D7) to GPIO 10 (SD3). Either reconnect sensors or update the setting.
 
 ### 🙏 Thank You!
-A massive thank you to the entire community—especially **Schelte Bron**, **tjfsteele**, **Qball**, and **RobR**—for their invaluable contributions. This milestone wouldn't have been possible without your support, testing, and feedback over the years!
+A massive thank you to the **entire community** for making this milestone possible! Your contributions, testing, bug reports, feature suggestions, and ongoing support throughout the years have been invaluable.
+
+**Special thanks to:**
+- **Schelte Bron**, **tjfsteele**, **Qball**, and **RobR** for their exceptional contributions
+- Everyone who tested release candidates and provided feedback
+- All community members who help others on Discord and GitHub
+- Contributors who reported issues, suggested improvements, and shared their use cases
+- The Home Assistant community for integration testing and support
+
+This project is what it is because of **all of you**. Thank you for being part of this journey!
 
 ---
 
