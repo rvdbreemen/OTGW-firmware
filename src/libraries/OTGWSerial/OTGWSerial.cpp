@@ -128,19 +128,31 @@ OTGWUpgrade::~OTGWUpgrade() {
 }
 
 OTGWError OTGWUpgrade::start(const char *hexfile) {
+    Dprintf("OTGWUpgrade::start() called\n");
+    Dprintf("Hex file: %s\n", hexfile);
+    Dprintf("File type: %s\n", hexfile[0] == '/' ? "absolute path" : "relative path");
+    
     if (hexfile[0] == '/') {
         // Absolute file name specifies the exact file to load
+        Dprintf("Reading hex file from filesystem...\n");
         OTGWError rc = readHexFile(hexfile);
-        if (rc != OTGW_ERROR_NONE) return rc;
+        if (rc != OTGW_ERROR_NONE) {
+            Dprintf("ERROR: readHexFile() failed with code %d\n", (int)rc);
+            return rc;
+        }
+        Dprintf("Hex file read successfully\n");
     } else {
         // A relative file name takes the file from the directory for the
         // current PIC, which is determined based on the bootloader version
+        Dprintf("Using relative path - will probe PIC first\n");
         model = PICPROBE;
         // Copy the file name, in case it points to some temporary storage
         strncpy(filename, hexfile, sizeof(filename));
         total = WEIGHT_MAXIMUM;
     }
+    Dprintf("Starting state machine...\n");
     stateMachine();
+    Dprintf("OTGWUpgrade::start() complete\n");
     return OTGW_ERROR_NONE;
 }
 
@@ -215,8 +227,13 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
     byte datamap = 0;
     OTGWError rc = OTGW_ERROR_NONE;
 
+    Dprintf("readHexFile: Opening %s\n", hexfile);
     hexfd = LittleFS.open(hexfile, "r");
-    if (!hexfd) return finishUpgrade(OTGW_ERROR_HEX_ACCESS);
+    if (!hexfd) {
+        Dprintf("ERROR: Failed to open hex file\n");
+        return finishUpgrade(OTGW_ERROR_HEX_ACCESS);
+    }
+    Dprintf("Hex file opened successfully\n");
     hexfd.setTimeout(0);
 
     model = PICUNKNOWN;
@@ -227,18 +244,25 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
     hexseg = 0;
     hexaddr = 0;
     hexpos = 0;
+    
+    Dprintf("Parsing hex file...\n");
     while (rc == OTGW_ERROR_NONE) {
         rc = readHexRecord();
         if (hexlen == 0) break;
         linecnt++;
-        if (rc != OTGW_ERROR_NONE) break;
+        if (rc != OTGW_ERROR_NONE) {
+            Dprintf("ERROR: readHexRecord() failed at line %d with code %d\n", linecnt, (int)rc);
+            break;
+        }
         if (hexaddr < addr) {
+            Dprintf("ERROR: Address out of order at line %d\n", linecnt);
             rc = OTGW_ERROR_HEX_FORMAT;
             break;
         }
         if (hexaddr == 0) {
             // Determine the target PIC
             int i, data;
+            Dprintf("Determining PIC model from hex file...\n");
             for (i = 0; i < PICCOUNT; i++) {
                 data = hexdata[0] & pgm_read_word(&PicInfo[i].magic[0]);
                 if (data != pgm_read_word(&PicInfo[i].magic[1])) continue;
@@ -247,17 +271,20 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
                 break;
             }
             if (i == PICCOUNT) {
+                Dprintf("ERROR: Could not identify PIC model from hex file magic bytes\n");
                 rc = OTGW_ERROR_MAGIC;
                 break;
             }
             model = i;
             memcpy_P(&info, PicInfo + i, sizeof(struct PicInfo));
             rowsize = info.erasesize;
+            Dprintf("PIC model detected: %d\n", model);
         }
         if (hexaddr < info.codesize) {
             // Program memory
             // The PIC model must be known at this point
             if (model == PICUNKNOWN) {
+                Dprintf("ERROR: PIC model unknown when parsing code memory\n");
                 rc = OTGW_ERROR_HEX_FORMAT;
                 break;
             }
@@ -288,8 +315,13 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
         }
         addr = hexaddr + hexlen;
     }
-    if (rc != OTGW_ERROR_NONE) return finishUpgrade(rc);
+    if (rc != OTGW_ERROR_NONE) {
+        Dprintf("ERROR: Hex file parsing failed\n");
+        return finishUpgrade(rc);
+    }
 
+    Dprintf("Hex file parsed successfully: %d lines\n", linecnt);
+    
     // Fix: Rewind the file just in case we need to read it again
     if (hexfd) hexfd.seek(0);
 
@@ -785,13 +817,20 @@ void OTGWUpgrade::stateMachine(const unsigned char *packet, int len) {
 }
 
 OTGWError OTGWUpgrade::finishUpgrade(OTGWError result) {
+    Dprintf("finishUpgrade called with result code: %d\n", (int)result);
+    
     if (stage != FWSTATE_IDLE) {
         byte fwcommand[] = {CMD_RESET, 0};
+        Dprintf("Sending PIC reset command...\n");
         fwCommand(fwcommand, sizeof(fwcommand));
         stage = FWSTATE_IDLE;
     }
-    if (hexfd) hexfd.close();
+    if (hexfd) {
+        Dprintf("Closing hex file\n");
+        hexfd.close();
+    }
 
+    Dprintf("Calling serial->finishUpgrade() with errors=%d, retries=%d\n", errcnt, retries);
     serial->finishUpgrade(result, errcnt, retries);
     return result;
 }
@@ -1025,27 +1064,42 @@ void OTGWSerial::matchBanner(char ch) {
 }
 
 OTGWError OTGWSerial::startUpgrade(const char *hexfile) {
+    Dprintf("OTGWSerial::startUpgrade() called\n");
+    Dprintf("Hex file: %s\n", hexfile);
+    
     if (_upgrade != nullptr) {
+        Dprintf("ERROR: Upgrade already in progress\n");
         return OTGW_ERROR_INPROG;
     }
 
+    Dprintf("Creating OTGWUpgrade object...\n");
     _upgrade = new OTGWUpgrade(this);
 
     if (_upgrade == nullptr) {
+        Dprintf("ERROR: Failed to allocate memory for upgrade object\n");
         return OTGW_ERROR_MEMORY;
     }
 
-    return _upgrade->start(hexfile);
+    Dprintf("Calling _upgrade->start()...\n");
+    OTGWError result = _upgrade->start(hexfile);
+    Dprintf("_upgrade->start() returned: %d\n", (int)result);
+    return result;
 }
 
 OTGWError OTGWSerial::finishUpgrade(OTGWError result, short errors, short retries) {
+    Dprintf("OTGWSerial::finishUpgrade() called\n");
+    Dprintf("Result: %d, Errors: %d, Retries: %d\n", (int)result, errors, retries);
+    
     if (_finishedFunc) {
+        Dprintf("Calling finished callback...\n");
         _finishedFunc(result, errors, retries);
     }
     // Destroy the upgrade object to free the used memory and be ready
     // for a next upgrade
+    Dprintf("Deleting upgrade object...\n");
     delete _upgrade;
     _upgrade = nullptr;
+    Dprintf("Upgrade object deleted\n");
 
     return result;
 }
