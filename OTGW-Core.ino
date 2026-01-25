@@ -2071,9 +2071,13 @@ void startOTGWstream()
 //---------[ Upgrade PIC stuff taken from Schelte Bron's NodeMCU Firmware ]---------
 
 void upgradepicnow(const char *filename) {
-  if (OTGWSerial.busy()) return; // if already in programming mode, never call it twice
+  if (OTGWSerial.busy()) {
+    DebugTln(F("PIC upgrade already in progress, ignoring request"));
+    return; // if already in programming mode, never call it twice
+  }
   DebugTf(PSTR("Start PIC upgrade now: %s\r\n"), filename);
   fwupgradestart(filename);  
+  DebugTln(F("PIC upgrade started, now running in background"));
   // Upgrade runs in background via OTGWSerial callbacks and upgradeTick called from available()
 }
 
@@ -2275,6 +2279,7 @@ void handlePendingUpgrade() {
     DebugTf(PSTR("Executing deferred upgrade for: %s\r\n"), pendingUpgradePath.c_str());
     upgradepicnow(pendingUpgradePath.c_str());
     pendingUpgradePath = "";
+    DebugTln(F("Deferred upgrade initiated"));
   }
 }
 
@@ -2297,7 +2302,12 @@ void upgradepic() {
   
   if (action == F("upgrade")) {
     DebugTf(PSTR("Upgrade /%s/%s\r\n"), sPICdeviceid, filename.c_str());
+    
+    // Send response immediately and ensure it's flushed before starting upgrade
+    httpServer.sendHeader(F("Connection"), F("close"));
     httpServer.send_P(200, PSTR("application/json"), PSTR("{\"status\":\"started\"}"));
+    httpServer.client().flush();  // Ensure response is sent before proceeding
+    httpServer.client().stop();   // Close connection to prevent timeout during upgrade
     
     // Defer the actual upgrade start to the main loop to ensure HTTP response is sent
     pendingUpgradePath = "/" + String(sPICdeviceid) + "/" + filename;
