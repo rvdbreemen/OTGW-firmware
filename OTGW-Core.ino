@@ -2124,7 +2124,6 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   isPICFlashing = false;
   currentPICFlashProgress = (result == OTGWError::OTGW_ERROR_NONE) ? 100 : -1; // -1 indicates error
   
-#ifndef DISABLE_WEBSOCKET
   // Send completion message in format frontend expects
   // Escape strings to prevent JSON injection
   char buf[320]; // Sized for escaped filename (129) + error (257) + JSON overhead (~70)
@@ -2141,7 +2140,6 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   if (written > 0 && written < (int)sizeof(buf)) {
     sendWebSocketJSON(buf);
   }
-#endif
   
   // Note: Keep filename and progress for polling API until next flash starts
 }
@@ -2152,7 +2150,6 @@ void fwupgradestep(int pct) {
   // Update progress for polling API
   currentPICFlashProgress = pct;
   
-#ifndef DISABLE_WEBSOCKET
   // Send progress message in format frontend expects
   // Use percentage as flash_written for progress display
   char buf[256]; // Sized for escaped filename (129) + JSON overhead (~90)
@@ -2167,7 +2164,6 @@ void fwupgradestep(int pct) {
   if (written > 0 && written < (int)sizeof(buf)) {
     sendWebSocketJSON(buf);
   }
-#endif
 }
 
 void fwreportinfo(OTGWFirmware fw, const char *version) {
@@ -2314,7 +2310,6 @@ void upgradepic() {
     
     // Send response and flush to ensure it's transmitted before deferred upgrade starts
     httpServer.send_P(200, PSTR("application/json"), PSTR("{\"status\":\"started\"}"));
-    httpServer.client().flush();  // Ensure response buffer is sent to client
     
     // Defer the actual upgrade start to the main loop to ensure HTTP response is sent
     pendingUpgradePath = "/" + String(sPICdeviceid) + "/" + filename;

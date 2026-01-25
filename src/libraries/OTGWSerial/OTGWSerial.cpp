@@ -229,10 +229,6 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
         rc = readHexRecord();
         if (hexlen == 0) break;
         linecnt++;
-        // Yield every 10 lines to prevent blocking and allow background tasks
-        if (linecnt % 10 == 0) {
-            yield();  // Allow WiFi and other background tasks to run
-        }
         if (rc != OTGW_ERROR_NONE) break;
         if (hexaddr < addr) {
             rc = OTGW_ERROR_HEX_FORMAT;
