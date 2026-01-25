@@ -1,15 +1,17 @@
-# Release Readiness Assessment - OTGW-firmware v1.0.0
+# Release Readiness Assessment - OTGW-firmware v1.0.0-rc4
 
 **Assessment Date:** January 25, 2026  
-**Assessed Version:** 1.0.0 (dev branch commit 3ea1d59)  
+**Assessed Version:** 1.0.0-rc4 (dev branch commit 699d64a / 3db8b75)  
 **Previous Stable Version:** 0.10.3 (April 2024)  
-**Assessment Status:** ✅ **APPROVED FOR PRODUCTION RELEASE**
+**Assessment Status:** ✅ **APPROVED FOR RC4 RELEASE (FINAL 1.0.0 PENDING)**
 
 ---
 
 ## Executive Summary
 
-After comprehensive analysis of 21 months of development (April 2024 → January 2026) and 100+ commits, **OTGW-firmware v1.0.0 is ready for production release**. The codebase has undergone extensive testing through 4 release candidates, critical security hardening, and systematic memory safety improvements.
+**This assessment covers Release Candidate 4 (RC4), not the final 1.0.0 release.**
+
+After comprehensive analysis of 21 months of development (April 2024 → January 2026) and 100+ commits, **OTGW-firmware v1.0.0-rc4 is ready for release candidate deployment**. The codebase has undergone extensive testing through 4 release candidates, critical security hardening, and systematic memory safety improvements.
 
 **Key Confidence Factors:**
 - ✅ All critical security vulnerabilities resolved (5 issues fixed)
@@ -20,7 +22,7 @@ After comprehensive analysis of 21 months of development (April 2024 → January
 - ✅ Backward compatibility maintained (except documented GPIO change)
 - ✅ Clean build and test results
 
-**Recommendation:** **PROCEED WITH RELEASE**
+**Recommendation:** **PROCEED WITH RC4 RELEASE - FINAL 1.0.0 AFTER VALIDATION**
 
 ---
 
@@ -464,7 +466,7 @@ This thorough assessment was made possible by:
 
 ## Conclusion
 
-**OTGW-firmware v1.0.0 is ready for production release.** After 21 months of development, 4 release candidates, extensive community testing, and comprehensive security hardening, this version represents a mature, stable, and well-documented upgrade from v0.10.3.
+**OTGW-firmware v1.0.0-rc4 is ready for release candidate deployment.** After 21 months of development, 4 release candidates, extensive community testing, and comprehensive security hardening, this version represents a mature, stable, and well-documented upgrade from v0.10.3.
 
 The risk profile is acceptable, documentation is excellent, and community confidence is high. The project has achieved its goal of reliable Home Assistant integration with production-grade stability.
 
