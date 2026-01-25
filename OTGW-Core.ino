@@ -2310,6 +2310,7 @@ void upgradepic() {
     
     // Send response and flush to ensure it's transmitted before deferred upgrade starts
     httpServer.send_P(200, PSTR("application/json"), PSTR("{\"status\":\"started\"}"));
+    httpServer.client().flush();  // Ensure response buffer is sent to client
     
     // Defer the actual upgrade start to the main loop to ensure HTTP response is sent
     pendingUpgradePath = "/" + String(sPICdeviceid) + "/" + filename;
