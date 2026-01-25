@@ -53,8 +53,8 @@ OTGWDebugFunction *debugfunc = nullptr;
 static OTGWFirmware firmware = FIRMWARE_UNKNOWN;
 static char fwversion[16];
 
-const char hexbytefmt[] PROGMEM = "%02x";
-const char hexwordfmt[] PROGMEM = "%04x";
+const char hexbytefmt[] = "%02x";
+const char hexwordfmt[] = "%04x";
 
 enum {
     FWSTATE_IDLE,
@@ -81,7 +81,7 @@ enum {
 unsigned short p16f88recover(unsigned short, unsigned short *);
 unsigned short p16f1847recover(unsigned short, unsigned short *);
 
-const struct PicInfo PicInfo[] PROGMEM = {
+const struct PicInfo PicInfo[] = {
     {
         256, 4096, 9, 0x2000, 0x2100, 32, 4, true,
         {0x3fff, 0x158a, 0x3e00, 0x2600},
@@ -93,10 +93,10 @@ const struct PicInfo PicInfo[] PROGMEM = {
     }
 };
 
-const char banner1[] PROGMEM = "OpenTherm Gateway ";
-const char banner2[] PROGMEM = "Opentherm gateway diagnostics - Version ";
-const char banner3[] PROGMEM = "OpenTherm Interface ";
-const char* const banners[] PROGMEM = {banner1, banner2, banner3};
+const char banner1[] = "OpenTherm Gateway ";
+const char banner2[] = "Opentherm gateway diagnostics - Version ";
+const char banner3[] = "OpenTherm Interface ";
+const char* const banners[] = {banner1, banner2, banner3};
 const byte newpic[] = {6, 2, 2};
 
 unsigned short p16f88recover(unsigned short addr, unsigned short *code) {
@@ -238,10 +238,10 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
             // Determine the target PIC
             int i, data;
             for (i = 0; i < PICCOUNT; i++) {
-                data = hexdata[0] & pgm_read_word(&PicInfo[i].magic[0]);
-                if (data != pgm_read_word(&PicInfo[i].magic[1])) continue;
-                data = hexdata[1] & pgm_read_word(&PicInfo[i].magic[2]);
-                if (data != pgm_read_word(&PicInfo[i].magic[3])) continue;
+                data = hexdata[0] & PicInfo[i].magic[0];
+                if (data != PicInfo[i].magic[1]) continue;
+                data = hexdata[1] & PicInfo[i].magic[2];
+                if (data != PicInfo[i].magic[3]) continue;
                 break;
             }
             if (i == PICCOUNT) {
@@ -249,7 +249,7 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
                 break;
             }
             model = i;
-            memcpy_P(&info, PicInfo + i, sizeof(struct PicInfo));
+            memcpy(&info, PicInfo + i, sizeof(struct PicInfo));
             rowsize = info.erasesize;
         }
         if (hexaddr < info.codesize) {
@@ -308,7 +308,7 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
     while (ptr < info.datasize) {
         // Safe check for banner presence using memcmp_P for binary data
         bool match = (ptr + bannerLen <= info.datasize) &&
-                     (memcmp_P((char *)datamem + ptr, banner1, bannerLen) == 0);
+                 (memcmp((char *)datamem + ptr, banner1, bannerLen) == 0);
 
         if (match) {
             char *s = (char *)datamem + ptr + bannerLen;
@@ -999,7 +999,7 @@ void OTGWSerial::progress(int pct) {
 void OTGWSerial::matchBanner(char ch) {
     for (int i = 0; i < FIRMWARE_COUNT; i++) {
         const char *banner = banners[i];
-        char c = pgm_read_byte(banner + _banner_matched[i]);
+        char c = banner[_banner_matched[i]];
         if (c == '\0') {
             if (isspace(ch)) {
                 fwversion[_version_pos] = '\0';
@@ -1016,7 +1016,7 @@ void OTGWSerial::matchBanner(char ch) {
             _banner_matched[i]++;
         } else {
             _banner_matched[i] = 0;
-            c = pgm_read_byte(banner + _banner_matched[i]);
+            c = banner[_banner_matched[i]];
             if (ch == c) _banner_matched[i]++;
         }
     }
