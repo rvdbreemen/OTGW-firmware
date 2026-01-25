@@ -998,7 +998,7 @@ void OTGWSerial::progress(int pct) {
 // Look for banners in the incoming data and extract the version number
 void OTGWSerial::matchBanner(char ch) {
     for (int i = 0; i < FIRMWARE_COUNT; i++) {
-        const char *banner = banners[i];
+        const char *banner = (const char *)pgm_read_ptr(&banners[i]);
         char c = pgm_read_byte(banner + _banner_matched[i]);
         if (c == '\0') {
             if (isspace(ch)) {
