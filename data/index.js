@@ -110,6 +110,234 @@ window.enterFlashMode = enterFlashMode;
 window.exitFlashMode = exitFlashMode;
 
 //============================================================================
+// Browser Console Debug Helper
+//============================================================================
+window.otgwDebug = {
+  // Display help menu
+  help: function() {
+    console.log('%c╔═══════════════════════════════════════════════════════════╗', 'color: #00ff00; font-weight: bold;');
+    console.log('%c║         OTGW Firmware - Browser Debug Helper             ║', 'color: #00ff00; font-weight: bold;');
+    console.log('%c╚═══════════════════════════════════════════════════════════╝', 'color: #00ff00; font-weight: bold;');
+    console.log('');
+    console.log('%c📊 Status Information:', 'color: #00aaff; font-weight: bold;');
+    console.log('  otgwDebug.status()        - Show current system status');
+    console.log('  otgwDebug.info()          - Show device information');
+    console.log('  otgwDebug.settings()      - Show current settings');
+    console.log('');
+    console.log('%c🔌 WebSocket & Connections:', 'color: #00aaff; font-weight: bold;');
+    console.log('  otgwDebug.wsStatus()      - Show WebSocket connection status');
+    console.log('  otgwDebug.wsReconnect()   - Reconnect WebSocket');
+    console.log('  otgwDebug.wsDisconnect()  - Disconnect WebSocket');
+    console.log('');
+    console.log('%c🔍 Data Inspection:', 'color: #00aaff; font-weight: bold;');
+    console.log('  otgwDebug.otmonitor()     - Show current OT monitor data');
+    console.log('  otgwDebug.logs()          - Show buffered log lines');
+    console.log('  otgwDebug.clearLogs()     - Clear log buffer');
+    console.log('');
+    console.log('%c⚙️  API Testing:', 'color: #00aaff; font-weight: bold;');
+    console.log('  otgwDebug.api(endpoint)   - Test API endpoint (e.g., "v1/devinfo")');
+    console.log('  otgwDebug.health()        - Check system health API');
+    console.log('  otgwDebug.sendCmd(cmd)    - Send OTGW command (e.g., "PS=1")');
+    console.log('');
+    console.log('%c🐛 Debug Toggles:', 'color: #00aaff; font-weight: bold;');
+    console.log('  otgwDebug.verbose = true  - Enable verbose console logging');
+    console.log('  otgwDebug.verbose = false - Disable verbose logging');
+    console.log('');
+    console.log('%c💾 Data Export:', 'color: #00aaff; font-weight: bold;');
+    console.log('  otgwDebug.exportLogs()    - Download current logs as file');
+    console.log('  otgwDebug.exportData()    - Download current OT data as JSON');
+    console.log('');
+    console.log('%cType otgwDebug.help() to see this menu again', 'color: #ffaa00;');
+  },
+
+  // Verbose mode toggle
+  verbose: false,
+
+  // Show current status
+  status: function() {
+    console.group('📊 OTGW System Status');
+    console.log('Flash Mode Active:', flashModeActive);
+    console.log('Page Visible:', isPageVisible());
+    console.log('Auto Refresh Timer:', tid ? 'Running' : 'Stopped');
+    console.log('Time Update Timer:', timeupdate ? 'Running' : 'Stopped');
+    console.log('WebSocket Status:', otLogWS ? otLogWS.readyState : 'Not initialized');
+    console.groupEnd();
+  },
+
+  // Show device information
+  info: async function() {
+    try {
+      const response = await fetch(APIGW + 'v1/devinfo');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      console.group('📱 Device Information');
+      console.table(data.devinfo || data);
+      console.groupEnd();
+    } catch (error) {
+      console.error('Failed to fetch device info:', error);
+    }
+  },
+
+  // Show current settings
+  settings: async function() {
+    try {
+      const response = await fetch(APIGW + 'v0/settings');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      console.group('⚙️  Current Settings');
+      console.table(data.settings || data);
+      console.groupEnd();
+    } catch (error) {
+      console.error('Failed to fetch settings:', error);
+    }
+  },
+
+  // Show WebSocket status
+  wsStatus: function() {
+    console.group('🔌 WebSocket Status');
+    if (otLogWS) {
+      const states = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'];
+      console.log('State:', states[otLogWS.readyState] || 'UNKNOWN');
+      console.log('URL:', otLogWS.url);
+      console.log('Buffered Lines:', otLogBuffer.length);
+      console.log('Auto Scroll:', autoScroll);
+      console.log('Max Log Lines:', maxLogLines);
+    } else {
+      console.log('WebSocket: Not initialized');
+    }
+    console.groupEnd();
+  },
+
+  // Reconnect WebSocket
+  wsReconnect: function() {
+    console.log('🔄 Reconnecting WebSocket...');
+    disconnectOTLogWebSocket();
+    setTimeout(() => initOTLogWebSocket(), 1000);
+  },
+
+  // Disconnect WebSocket
+  wsDisconnect: function() {
+    console.log('🔌 Disconnecting WebSocket...');
+    disconnectOTLogWebSocket();
+  },
+
+  // Show current OT monitor data
+  otmonitor: function() {
+    console.group('📊 OT Monitor Data');
+    if (typeof data !== 'undefined' && data) {
+      console.table(data);
+    } else {
+      console.log('No OT monitor data available');
+    }
+    console.groupEnd();
+  },
+
+  // Show buffered logs
+  logs: function(lines = 50) {
+    console.group(`📜 Last ${lines} Log Lines`);
+    const recentLogs = otLogBuffer.slice(-lines);
+    recentLogs.forEach((line, idx) => {
+      console.log(`${otLogBuffer.length - lines + idx + 1}: ${line}`);
+    });
+    console.groupEnd();
+  },
+
+  // Clear log buffer
+  clearLogs: function() {
+    otLogBuffer = [];
+    otLogFilteredBuffer = [];
+    console.log('✅ Log buffers cleared');
+  },
+
+  // Test API endpoint
+  api: async function(endpoint) {
+    const url = APIGW + endpoint;
+    console.log(`🌐 Fetching: ${url}`);
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const contentType = response.headers.get('content-type');
+      let data;
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+        console.group(`✅ Response from ${endpoint}`);
+        console.log('Status:', response.status);
+        console.log('Data:', data);
+        console.groupEnd();
+      } else {
+        data = await response.text();
+        console.group(`✅ Response from ${endpoint}`);
+        console.log('Status:', response.status);
+        console.log('Data:', data);
+        console.groupEnd();
+      }
+      return data;
+    } catch (error) {
+      console.error('❌ API Error:', error);
+    }
+  },
+
+  // Check system health
+  health: async function() {
+    return await this.api('v1/health');
+  },
+
+  // Send OTGW command
+  sendCmd: async function(cmd) {
+    console.log(`📤 Sending command: ${cmd}`);
+    try {
+      const response = await fetch(APIGW + `v1/otgw/command/${cmd}`, {
+        method: 'POST'
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      console.log('✅ Command response:', data);
+      return data;
+    } catch (error) {
+      console.error('❌ Command failed:', error);
+    }
+  },
+
+  // Export logs to file
+  exportLogs: function() {
+    if (otLogBuffer.length === 0) {
+      console.warn('⚠️  No logs to export');
+      return;
+    }
+    const content = otLogBuffer.join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `otgw-logs-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    console.log(`✅ Exported ${otLogBuffer.length} log lines`);
+  },
+
+  // Export current data to JSON
+  exportData: function() {
+    if (typeof data === 'undefined' || !data) {
+      console.warn('⚠️  No data to export');
+      return;
+    }
+    const content = JSON.stringify(data, null, 2);
+    const blob = new Blob([content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `otgw-data-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    console.log('✅ Data exported as JSON');
+  }
+};
+
+// Show welcome message on load
+console.log('%c🔧 OTGW Debug Helper Loaded', 'color: #00ff00; font-weight: bold; font-size: 14px;');
+console.log('%cType otgwDebug.help() for available commands', 'color: #ffaa00;');
+
+//============================================================================
 // OpenTherm Log WebSocket Variables and Functions
 //============================================================================
 let otLogWS = null;
@@ -1580,7 +1808,6 @@ function refreshDevInfo() {
 //============================================================================  
 function refreshOTmonitor() {
   if (flashModeActive || !isPageVisible()) return;
-  console.log("refreshOTmonitor() ..");
 
   data = {};
   fetch(APIGW + "v2/otgw/otmonitor")  //api/v2/otgw/otmonitor
@@ -1591,7 +1818,6 @@ function refreshOTmonitor() {
       return response.json();
     })
     .then(json => {
-      console.log("then(json => ..)");
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
       needReload = false;
       data = json.otmonitor;
@@ -1697,7 +1923,6 @@ function refreshDeviceInfo() {
   fetch(APIGW + "v0/devinfo")
     .then(response => response.json())
     .then(json => {
-      console.log("then(json => ..)");
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
       data = json.devinfo;
       for (let i in data) {
@@ -1748,7 +1973,6 @@ function refreshSettings() {
   fetch(APIGW + "v0/settings")
     .then(response => response.json())
     .then(json => {
-      console.log("then(json => ..)");
       console.log("parsed .., data is [" + JSON.stringify(json) + "]");
       data = json.settings;
       document.getElementById("settingMessage").innerHTML = "";
