@@ -385,9 +385,10 @@
   /* PIC firmware page */
 .pictable {
   display: table;
-  width: auto;
+  width: 100%;
+  max-width: 720px;
   border-collapse: collapse;
-  margin: 10px 0;
+  margin: 10px 0 12px 0;
   border: 1px solid #ddd;
 }
 .picrow {
@@ -817,7 +818,8 @@
 }
   /* Firmware Upgrade Progress */
   #flashProgressSection {
-    margin-top: 20px;
+    margin-top: 12px;
+    margin-bottom: 8px;
     padding: 0px;
     border: none;
     box-shadow: none;
@@ -826,7 +828,7 @@
   .flashProgresBarWrapper {
     /* remove flex display to allow container to size itself */
     position: relative;
-    max-width: 400px; /* Limit width */
+    max-width: 480px; /* Limit width */
     margin: 0; /* Align left */
   }
   
@@ -974,8 +976,9 @@ body.disable-interaction {
 }
 
 .firmware-info-div {
-  margin-bottom: 15px;
+  margin-bottom: 12px;
   padding: 10px;
+  max-width: 720px;
 }
 
 .firmware-row-bold {
@@ -1021,50 +1024,3 @@ body.disable-interaction {
   color: red;
 }
 
-/* Flash debug panel (Safari-friendly) */
-.flash-debug-section {
-  margin-top: 16px;
-  padding: 10px;
-  border: 1px solid #d0d0d0;
-  border-radius: 6px;
-  background: #fafafa;
-}
-
-.flash-debug-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-weight: bold;
-}
-
-.flash-debug-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.flash-debug-toggle {
-  font-weight: normal;
-}
-
-.flash-debug-btn {
-  padding: 4px 8px;
-  font-size: 12px;
-  border: 1px solid #c0c0c0;
-  border-radius: 4px;
-  background: #ffffff;
-  cursor: pointer;
-}
-
-.flash-debug-log {
-  height: 140px;
-  overflow: auto;
-  padding: 8px;
-  border: 1px solid #d8d8d8;
-  border-radius: 4px;
-  background: #ffffff;
-  font-family: Consolas, "Courier New", monospace;
-  font-size: 12px;
-  white-space: pre-wrap;
-}

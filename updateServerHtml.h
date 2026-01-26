@@ -130,6 +130,70 @@ static const char UpdateServerIndex[] PROGMEM =
          var wsWatchdogTimer = null;
          var wsActive = false;
 
+         function hasJsonContentType(response, contentType) {
+           var ct = contentType || '';
+           if (!ct && response && response.headers) {
+             try { ct = response.headers.get('content-type') || ''; } catch (e) { ct = ''; }
+           }
+           return ct.indexOf('application/json') !== -1;
+         }
+
+         function parseJsonSafe(text) {
+           if (!text) return null;
+           var t = ('' + text).trim();
+           if (!t.length) return null;
+           if (t[0] !== '{' && t[0] !== '[') return null;
+           try { return JSON.parse(t); } catch (e) { return null; }
+         }
+
+         function fetchText(url, timeoutMs) {
+           return new Promise(function(resolve, reject) {
+             if (window.fetch) {
+               var controller = null;
+               var timeoutId = null;
+               var options = { cache: 'no-store' };
+               if (window.AbortController && timeoutMs && timeoutMs > 0) {
+                 controller = new AbortController();
+                 options.signal = controller.signal;
+                 timeoutId = setTimeout(function() { controller.abort(); }, timeoutMs);
+               }
+               fetch(url, options)
+                 .then(function(response) {
+                   return response.text().then(function(text) {
+                     resolve({
+                       ok: response.ok,
+                       status: response.status,
+                       text: text,
+                       contentType: (response.headers && response.headers.get) ? (response.headers.get('content-type') || '') : ''
+                     });
+                   });
+                 })
+                 .catch(function(err) { reject(err); })
+                 .finally(function() {
+                   if (timeoutId) clearTimeout(timeoutId);
+                 });
+             } else {
+               var xhr = new XMLHttpRequest();
+               xhr.open('GET', url, true);
+               xhr.timeout = timeoutMs || 5000;
+               try { xhr.setRequestHeader('Cache-Control', 'no-store'); } catch (e) {}
+               xhr.onreadystatechange = function() {
+                 if (xhr.readyState === 4) {
+                   resolve({
+                     ok: (xhr.status >= 200 && xhr.status < 300),
+                     status: xhr.status,
+                     text: xhr.responseText || '',
+                     contentType: xhr.getResponseHeader('content-type') || ''
+                   });
+                 }
+               };
+               xhr.onerror = function() { reject(new Error('XHR error')); };
+               xhr.ontimeout = function() { reject(new Error('XHR timeout')); };
+               xhr.send();
+             }
+           });
+         }
+
          function showProgressPage(title) {
            pageForm.style.display = 'none';
            pageProgress.style.display = 'block';
@@ -310,28 +374,24 @@ static const char UpdateServerIndex[] PROGMEM =
          }
 
          function fetchStatus(timeoutMs) {
-          var controller = null;
-          var timeoutId = null;
-          var options = { cache: 'no-store' };
-          if (window.AbortController && timeoutMs && timeoutMs > 0) {
-            controller = new AbortController();
-            options.signal = controller.signal;
-            timeoutId = setTimeout(function() { controller.abort(); }, timeoutMs);
-          }
-          return fetch('/status', options)
-            .then(function(response) {
-              if (!response.ok) {
-                throw new Error('HTTP ' + response.status);
+          return fetchText('/status', timeoutMs)
+            .then(function(res) {
+              if (!res.ok) {
+                throw new Error('HTTP ' + res.status);
               }
-              return response.json();
+              if (!hasJsonContentType(null, res.contentType)) {
+                throw new Error('Unexpected content-type');
+              }
+              var parsed = parseJsonSafe(res.text);
+              if (!parsed) {
+                throw new Error('Invalid JSON');
+              }
+              return parsed;
             })
             .then(function(json) { updateDeviceStatus(json); })
             .catch(function(e) {
               console.log('Fetch status error:', e);
               throw e;
-            })
-            .finally(function() {
-              if (timeoutId) clearTimeout(timeoutId);
             });
         }
 
@@ -390,39 +450,49 @@ static const char UpdateServerIndex[] PROGMEM =
 
         // WebSocket Support for Real-time Progress
         function setupWebSocket() {
-            var wsUrl = 'ws://' + window.location.hostname + ':81/';
+            if (!window.WebSocket) {
+              console.log('WebSocket not supported, using polling');
+              if (!pollActive) startPolling();
+              return;
+            }
+            var wsScheme = (window.location.protocol === 'https:') ? 'wss://' : 'ws://';
+            var wsUrl = wsScheme + window.location.hostname + ':81/';
             console.log('Connecting to WebSocket:', wsUrl);
-            var ws = new WebSocket(wsUrl);
+            var ws;
+            try {
+              ws = new WebSocket(wsUrl);
+            } catch (e) {
+              console.log('WebSocket create failed:', e);
+              if (!pollActive) startPolling();
+              setTimeout(setupWebSocket, 2000);
+              return;
+            }
             
             ws.onopen = function() {
                 console.log('WS Connected');
             };
             
             ws.onmessage = function(e) {
-                try {
-                    // Try to parse JSON message 
-                    // (Log messages are plain text and will throw, which is fine)
-                    var msg = JSON.parse(e.data);
-                    // Check if it's an update status message
-                    if (msg && typeof msg.state !== 'undefined') {
-                      lastWsMessageTime = Date.now();
-                      // First WebSocket message received - stop polling, WebSocket takes over
-                      if (!wsActive) {
-                        wsActive = true;
-                        stopPolling();
-                        console.log('WebSocket active, polling stopped');
-                      }
-                      // Reset watchdog - if WS goes silent for 15s, polling will restart
-                      startWsWatchdog();
-                      updateDeviceStatus(msg);
-                    }
-                } catch(err) {
-                    // Ignore non-JSON messages (like raw logs)
+                if (!e || typeof e.data !== 'string') return;
+                var msg = parseJsonSafe(e.data);
+                // Ignore non-JSON messages (like raw logs)
+                if (!msg || typeof msg.state === 'undefined') return;
+                lastWsMessageTime = Date.now();
+                // First WebSocket message received - stop polling, WebSocket takes over
+                if (!wsActive) {
+                  wsActive = true;
+                  stopPolling();
+                  console.log('WebSocket active, polling stopped');
                 }
+                // Reset watchdog - if WS goes silent for 15s, polling will restart
+                startWsWatchdog();
+                updateDeviceStatus(msg);
             };
             
             ws.onerror = function(e) {
                 console.log('WS Error:', e);
+                wsActive = false;
+                if (!pollActive) startPolling();
             };
             
             ws.onclose = function() {
@@ -645,8 +715,17 @@ static const char UpdateServerSuccess[] PROGMEM =
          var statusEl = document.getElementById("status");
          
          function checkHealth() {
-            fetch('/api/v1/health?t=' + Date.now())
-                .then(function(r) { return r.json(); })
+            fetchText('/api/v1/health?t=' + Date.now(), 5000)
+                .then(function(res) {
+                    if (!res.ok) {
+                      throw new Error('HTTP ' + res.status);
+                    }
+                    var parsed = parseJsonSafe(res.text);
+                    if (!parsed) {
+                      throw new Error('Invalid JSON');
+                    }
+                    return parsed;
+                })
                 .then(function(d) {
                     var s = d.status || (d.health && d.health.status);
                     if (s === 'UP') {
