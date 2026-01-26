@@ -1,4 +1,15 @@
-> **Archived**: Moved to [reviews/2026-01-26_browser-compatibility-review/WEBSOCKET_IMPROVEMENTS_SUMMARY.md](reviews/2026-01-26_browser-compatibility-review/WEBSOCKET_IMPROVEMENTS_SUMMARY.md).
+---
+# METADATA
+Document Title: WebSocket Robustness Improvements - Implementation Summary
+Review Date: 2026-01-22 00:00:00 UTC
+Branch Reviewed: dev → dev (merge commit N/A)
+Target Version: v1.0.0-rc4+
+Reviewer: GitHub Copilot
+Document Type: Implementation Summary
+PR Branch: dev
+Commit: N/A
+Status: COMPLETE
+---
 
 # WebSocket Robustness Improvements - Implementation Summary
 
@@ -27,7 +38,7 @@ The WebUI would stall after approximately 20 minutes without reloading the page.
 
 ### Phase 1: Server-Side Heartbeat ✅
 
-**File**: [webSocketStuff.ino](../webSocketStuff.ino)
+**File**: [webSocketStuff.ino](../../../webSocketStuff.ino)
 
 **What**: Enabled the WebSocket library's built-in heartbeat mechanism
 
@@ -50,7 +61,7 @@ webSocket.enableHeartbeat(15000, 3000, 2);
 
 ### Phase 2: Application-Level Keepalive ✅
 
-**Files**: [webSocketStuff.ino](../webSocketStuff.ino), [data/index.js](../data/index.js)
+**Files**: [webSocketStuff.ino](../../../webSocketStuff.ino), [data/index.js](../../../data/index.js)
 
 **What**: Added application-layer keepalive messages to work around Safari issues
 
@@ -355,12 +366,12 @@ If no message for 45s:
 
 ## Files Modified
 
-1. [webSocketStuff.ino](../webSocketStuff.ino)
+1. [webSocketStuff.ino](../../../webSocketStuff.ino)
    - Added heartbeat enable call
    - Added keepalive broadcast logic
    - Updated debug message
 
-2. [data/index.js](../data/index.js)
+2. [data/index.js](../../../data/index.js)
    - Increased watchdog timeout from 10s to 45s
    - Added keepalive message handler
    - Added keepalive logging

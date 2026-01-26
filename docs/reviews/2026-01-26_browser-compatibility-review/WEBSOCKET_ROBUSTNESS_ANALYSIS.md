@@ -1,4 +1,15 @@
-> **Archived**: Moved to [reviews/2026-01-26_browser-compatibility-review/WEBSOCKET_ROBUSTNESS_ANALYSIS.md](reviews/2026-01-26_browser-compatibility-review/WEBSOCKET_ROBUSTNESS_ANALYSIS.md).
+---
+# METADATA
+Document Title: WebSocket Robustness Analysis and Improvements
+Review Date: 2026-01-22 00:00:00 UTC
+Branch Reviewed: dev → dev (merge commit N/A)
+Target Version: v1.0.0-rc4+
+Reviewer: GitHub Copilot
+Document Type: Analysis
+PR Branch: dev
+Commit: N/A
+Status: COMPLETE
+---
 
 # WebSocket Robustness Analysis and Improvements
 
@@ -78,7 +89,7 @@ Safari has known WebSocket quirks:
 
 **Implementation**: Use the library's built-in heartbeat mechanism
 
-**File**: [webSocketStuff.ino](../webSocketStuff.ino)
+**File**: [webSocketStuff.ino](../../../webSocketStuff.ino)
 
 Add after `webSocket.begin()`:
 
@@ -120,7 +131,7 @@ For Safari compatibility and defense-in-depth, add application-level keepalive.
 
 #### Server Side Changes
 
-**File**: [webSocketStuff.ino](../webSocketStuff.ino)
+**File**: [webSocketStuff.ino](../../../webSocketStuff.ino)
 
 Add a periodic keepalive broadcast:
 
@@ -145,7 +156,7 @@ void handleWebSocket() {
 
 #### Client Side Changes
 
-**File**: [data/index.js](../data/index.js)
+**File**: [data/index.js](../../../data/index.js)
 
 Modify the `onmessage` handler to recognize keepalive and extend watchdog:
 
@@ -182,7 +193,7 @@ otLogWS.onmessage = function(event) {
 
 Send periodic pings from client to server to validate bidirectional communication.
 
-**File**: [data/index.js](../data/index.js)
+**File**: [data/index.js](../../../data/index.js)
 
 ```javascript
 // Add global variable
@@ -243,7 +254,7 @@ case WStype_TEXT:
 
 **Problem**: Current watchdog fires even if connection is idle but healthy
 
-**File**: [data/index.js](../data/index.js)
+**File**: [data/index.js](../../../data/index.js)
 
 **Current code**:
 ```javascript
@@ -267,7 +278,7 @@ const WS_WATCHDOG_TIMEOUT = 45000; // 45 seconds (allows for 30s keepalive + mar
 
 Safari has unique WebSocket behavior. Detect and adjust:
 
-**File**: [data/index.js](../data/index.js)
+**File**: [data/index.js](../../../data/index.js)
 
 ```javascript
 // Add to initOTLogWebSocket()
