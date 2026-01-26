@@ -1811,10 +1811,14 @@ function refreshSettings() {
             sInput.step = 1;
           }
           sInput.setAttribute("value", data[i].value);
+          const fieldName = data[i].name;
           sInput.addEventListener('change',
             function () { 
-              document.getElementById(data[i].name).className = "input-changed"; 
-              if (data[i].name == "darktheme") {
+              var inputEl = document.getElementById(fieldName);
+              if (inputEl) {
+                inputEl.className = "input-changed";
+              }
+              if (fieldName == "darktheme") {
                  document.getElementById('theme-style').href = this.checked ? "index_dark.css" : "index.css";
               }
               setVisible('btnSaveSettings', true);
@@ -1823,7 +1827,10 @@ function refreshSettings() {
           );
           sInput.addEventListener('keydown',
             function () { 
-              document.getElementById(data[i].name).className = "input-changed"; 
+              var inputEl = document.getElementById(fieldName);
+              if (inputEl) {
+                inputEl.className = "input-changed";
+              }
               setVisible('btnSaveSettings', true);
             },
             false
