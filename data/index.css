@@ -846,7 +846,9 @@
     height: 100%;
     width: 0%;
     background-color: #4CAF50; /* Green */
+    -webkit-transition: width 0.3s ease;
     transition: width 0.3s ease;
+    will-change: width;
     z-index: 1;
   }
   
