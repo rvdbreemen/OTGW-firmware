@@ -37,7 +37,7 @@ Following the initial Safari compatibility fixes, a comprehensive web search-val
 - `innerText` has Safari-specific whitespace quirks
 - `innerText` considers CSS (slower, can cause layout thrashing)
 
-**Recommendation**: ✅ **ALREADY FIXED** - textContent correctly used throughout
+**Recommendation**: Prefer `textContent` for all dynamic text updates; most usages have been migrated, but some `innerText` assignments (e.g., in `data/index.js` for `pic_type_display` / `pic_version_display`) remain and should be reviewed/migrated where safe.
 
 ---
 
