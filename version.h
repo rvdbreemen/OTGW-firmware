@@ -5,13 +5,13 @@
 #define _VERSION_MAJOR 1
 #define _VERSION_MINOR 0
 #define _VERSION_PATCH 0
-#define _VERSION_BUILD 2431
+#define _VERSION_BUILD 2428
 #define _VERSION_GITHASH "0862a6c"
 #define _VERSION_PRERELEASE rc6
 #define _VERSION_DATE "26-01-2026"
-#define _VERSION_TIME "21:26:04"
+#define _VERSION_TIME "21:11:08"
 #define _SEMVER_CORE "1.0.0"
-#define _SEMVER_BUILD "1.0.0+2431"
+#define _SEMVER_BUILD "1.0.0+2428"
 #define _SEMVER_GITHASH "1.0.0+0862a6c"
 #define _SEMVER_FULL "1.0.0-rc6+0862a6c"
 #define _SEMVER_NOBUILD "1.0.0-rc6 (26-01-2026)"
