@@ -29,6 +29,34 @@ window.onfocus = function () {
   }
 };
 
+function isPageVisible() {
+  return !(document.hidden || document.visibilityState === 'hidden');
+}
+
+document.addEventListener('visibilitychange', function () {
+  if (!isPageVisible()) {
+    if (timeupdate) {
+      clearInterval(timeupdate);
+      timeupdate = null;
+    }
+    if (tid) {
+      clearInterval(tid);
+      tid = 0;
+    }
+    disconnectOTLogWebSocket();
+    return;
+  }
+  if (!flashModeActive) {
+    if (!timeupdate) {
+      timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+    }
+    initOTLogWebSocket();
+    if (!tid) {
+      tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+    }
+  }
+});
+
 
 var tid = 0;
 var timeupdate = null; // Will be started when needed
@@ -208,9 +236,6 @@ function initOTLogWebSocket(force) {
   }
 
   console.log('Connecting to WebSocket: ' + wsURL);
-  if (isFlashing || flashModeActive) {
-    appendFlashDebug("WebSocket connecting: " + wsURL);
-  }
   
   try {
     otLogWS = new WebSocket(wsURL);
@@ -218,9 +243,6 @@ function initOTLogWebSocket(force) {
     otLogWS.onopen = function() {
       console.log('OT Log WebSocket connected');
       updateWSStatus(true);
-      if (isFlashing || flashModeActive) {
-        appendFlashDebug("WebSocket connected");
-      }
       // Clear any reconnect timer just in case
       if (wsReconnectTimer) {
         clearTimeout(wsReconnectTimer);
@@ -232,9 +254,6 @@ function initOTLogWebSocket(force) {
     otLogWS.onclose = function() {
       console.log('OT Log WebSocket disconnected');
       updateWSStatus(false);
-      if (isFlashing || flashModeActive) {
-        appendFlashDebug("WebSocket disconnected");
-      }
       // Stop watchdog
       if (wsWatchdogTimer) {
         clearTimeout(wsWatchdogTimer);
@@ -250,9 +269,6 @@ function initOTLogWebSocket(force) {
     otLogWS.onerror = function(error) {
       console.error('OT Log WebSocket error:', error);
       updateWSStatus(false);
-      if (isFlashing || flashModeActive) {
-        appendFlashDebug("WebSocket error");
-      }
       // onclose will usually follow, but we ensure cleanup
       if (otLogWS) otLogWS.close(); 
     };
@@ -1362,57 +1378,9 @@ function refreshDevTime() {
 //============================================================================      
 // Global variable to store available firmware files info
 let availableFirmwareFiles = [];
-let flashDebugLines = [];
-let flashDebugEnabled = false;
-const FLASH_DEBUG_MAX_LINES = 200;
-
-function getFlashDebugEnabled() {
-  try {
-    return localStorage.getItem('flashDebugEnabled') === 'true';
-  } catch (e) {
-    return false;
-  }
-}
-
-function setFlashDebugEnabled(enabled) {
-  flashDebugEnabled = enabled === true;
-  try {
-    localStorage.setItem('flashDebugEnabled', flashDebugEnabled ? 'true' : 'false');
-  } catch (e) { /* ignore */ }
-}
-
-function renderFlashDebug() {
-  const logEl = document.getElementById('flashDebugLog');
-  if (!logEl) return;
-  if (!flashDebugEnabled) {
-    logEl.textContent = "";
-    return;
-  }
-  logEl.textContent = flashDebugLines.join("\n");
-  logEl.scrollTop = logEl.scrollHeight;
-}
-
-function appendFlashDebug(message) {
-  if (!message) return;
-  const time = new Date().toTimeString().split(' ')[0];
-  flashDebugLines.push(time + " " + message);
-  if (flashDebugLines.length > FLASH_DEBUG_MAX_LINES) {
-    flashDebugLines.shift();
-  }
-  if (flashDebugEnabled) {
-    renderFlashDebug();
-  }
-}
-
-function clearFlashDebug() {
-  flashDebugLines = [];
-  renderFlashDebug();
-}
 
 function refreshFirmware() {
   console.log("refreshFirmware() .. " + APIGW + "firmwarefilelist");
-
-  flashDebugEnabled = getFlashDebugEnabled();
   
   let picInfo = { type: "Unknown", version: "Unknown", available: "Unknown", device: "Unknown" };
 
@@ -1569,58 +1537,6 @@ function refreshFirmware() {
       
       displayPICpage.appendChild(progressDiv);
 
-      // --- Flash Debug Section ---
-      let debugSection = document.createElement("div");
-      debugSection.id = "flashDebugSection";
-      debugSection.className = "flash-debug-section";
-
-      let debugHeader = document.createElement("div");
-      debugHeader.className = "flash-debug-header";
-
-      let debugTitle = document.createElement("div");
-      debugTitle.textContent = "Flash Debug Log";
-      debugHeader.appendChild(debugTitle);
-
-      let debugControls = document.createElement("div");
-      debugControls.className = "flash-debug-controls";
-
-      let debugToggleLabel = document.createElement("label");
-      debugToggleLabel.className = "flash-debug-toggle";
-      let debugToggle = document.createElement("input");
-      debugToggle.type = "checkbox";
-      debugToggle.id = "flashDebugToggle";
-      debugToggle.checked = flashDebugEnabled;
-      debugToggle.addEventListener("change", function() {
-        setFlashDebugEnabled(debugToggle.checked);
-        renderFlashDebug();
-      });
-      debugToggleLabel.appendChild(debugToggle);
-      debugToggleLabel.appendChild(document.createTextNode(" Enable"));
-      debugControls.appendChild(debugToggleLabel);
-
-      let clearBtn = document.createElement("button");
-      clearBtn.type = "button";
-      clearBtn.className = "flash-debug-btn";
-      clearBtn.textContent = "Clear";
-      clearBtn.addEventListener("click", function() {
-        clearFlashDebug();
-      });
-      debugControls.appendChild(clearBtn);
-
-      debugHeader.appendChild(debugControls);
-
-      let debugLog = document.createElement("div");
-      debugLog.id = "flashDebugLog";
-      debugLog.className = "flash-debug-log";
-      debugLog.setAttribute("role", "log");
-      debugLog.setAttribute("aria-live", "polite");
-
-      debugSection.appendChild(debugHeader);
-      debugSection.appendChild(debugLog);
-
-      displayPICpage.appendChild(debugSection);
-      renderFlashDebug();
-
     })
     .catch(function (error) {
       var p = document.createElement('p');
@@ -1663,6 +1579,7 @@ function refreshDevInfo() {
 
 //============================================================================  
 function refreshOTmonitor() {
+  if (flashModeActive || !isPageVisible()) return;
   console.log("refreshOTmonitor() ..");
 
   data = {};
@@ -1756,10 +1673,16 @@ function refreshOTmonitor() {
       if (needReload) window.location.reload(true);
     })
     .catch(function (error) {
-      console.error("refreshOTmonitor error:", error);
+      if (flashModeActive || !isPageVisible()) return;
+      var msg = (error && error.message) ? error.message : 'Load failed';
+      if (msg.indexOf('Load failed') !== -1 || msg.indexOf('Failed to fetch') !== -1 || msg.indexOf('NetworkError') !== -1) {
+        console.warn("refreshOTmonitor warning:", error);
+      } else {
+        console.error("refreshOTmonitor error:", error);
+      }
       var waiting = document.getElementById('waiting');
       if (waiting) {
-        waiting.textContent = 'Error: ' + error.message + ' (Retrying...)';
+        waiting.textContent = 'Error: ' + msg + ' (Retrying...)';
         waiting.className = 'waiting-error';
       }
     });
@@ -2214,7 +2137,6 @@ function toggleInteraction(enabled) {
 }
 
 function startFlash(filename) {
-  appendFlashDebug("Flash requested: " + filename);
     performFlash(filename);
 }
 
@@ -2247,7 +2169,6 @@ function parseFirmwareInfo(filename) {
 // Failsafe polling mechanism for flash status (both ESP and PIC)
 function startFlashPolling() {
     console.log("Starting flash status polling (every 5s)");
-  appendFlashDebug("Flash status polling started (5s interval)");
     if (flashPollTimer) {
         clearInterval(flashPollTimer);
     }
@@ -2256,7 +2177,6 @@ function startFlashPolling() {
 
 function stopFlashPolling() {
     console.log("Stopping flash status polling");
-  appendFlashDebug("Flash status polling stopped");
     if (flashPollTimer) {
         clearInterval(flashPollTimer);
         flashPollTimer = null;
@@ -2276,13 +2196,6 @@ function pollFlashStatus() {
             if (!json.flashstatus) return;
             
             const status = json.flashstatus;
-            if (status.flashing) {
-              if (status.pic_flashing) {
-                appendFlashDebug("Flash status: pic=" + status.pic_progress + "% (" + (status.pic_filename || "unknown") + ")");
-              } else {
-                appendFlashDebug("Flash status: flashing=true (ESP)");
-              }
-            }
             console.log("Flash status poll:", status);
             
             // If not flashing at all, stop polling
@@ -2311,7 +2224,6 @@ function pollFlashStatus() {
         })
         .catch(error => {
             console.error("Flash status poll error:", error);
-          appendFlashDebug("Flash status poll error: " + error.message);
             // Keep polling - might be temporary network issue
         });
 }
@@ -2320,7 +2232,6 @@ function handleFlashCompletion(filename, error) {
     stopFlashPolling();
     isFlashing = false;
     toggleInteraction(true);
-  appendFlashDebug("Flash completed: " + (filename || currentFlashFilename || "unknown"));
     
     let progressBar = document.getElementById("flashProgressBar");
     let pctText = document.getElementById("flashPercentageText");
@@ -2361,7 +2272,6 @@ function handleFlashError(filename, error) {
     stopFlashPolling();
     isFlashing = false;
     toggleInteraction(true);
-  appendFlashDebug("Flash failed: " + (error || "Unknown error"));
     
     let progressBar = document.getElementById("flashProgressBar");
     let pctText = document.getElementById("flashPercentageText");
@@ -2380,7 +2290,6 @@ function handleFlashError(filename, error) {
 function performFlash(filename) {
     currentFlashFilename = filename;
     isFlashing = true;
-  appendFlashDebug("Starting flash for " + filename);
     toggleInteraction(false);
     // Stop polling during upgrade to prevent interference and reduce load
     if (tid) { clearInterval(tid); tid = 0; }
@@ -2397,7 +2306,6 @@ function performFlash(filename) {
     }
     
     if (pctText) pctText.textContent = "Connecting to event stream...";
-    appendFlashDebug("Connecting WebSocket for progress...");
     
     // Ensure WebSocket is connected for progress updates
     initOTLogWebSocket(true);
@@ -2415,7 +2323,6 @@ function performFlash(filename) {
 
              if (!otLogWS || otLogWS.readyState !== 1) {
                 console.error("Flash aborted: WebSocket timeout");
-               appendFlashDebug("Flash aborted: WebSocket timeout");
                 if (pctText) pctText.textContent = "Error: Connection timed out. Cannot track progress.";
                 if (progressBar) progressBar.classList.add('error');
                 isFlashing = false;
@@ -2427,7 +2334,6 @@ function performFlash(filename) {
              }
 
              if (pctText) pctText.textContent = "Starting upgrade for " + filename + "...";
-             appendFlashDebug("Requesting upgrade for " + filename);
              
              fetch(localURL + '/pic?action=upgrade&name=' + filename)
                 .then(response => {
@@ -2443,12 +2349,10 @@ function performFlash(filename) {
                 })
                 .then(data => {
                     console.log("Flash started:", data);
-                  appendFlashDebug("Flash started: " + filename);
                     if (pctText) pctText.textContent = "Flashing " + filename + " started...";
                 })
                 .catch(error => {
                     console.error("Flash error:", error);
-                  appendFlashDebug("Flash start error: " + error.message);
                     isFlashing = false;
                     toggleInteraction(true);
                     if (pctText) pctText.textContent = "Error starting flash: " + error.message;
@@ -2486,7 +2390,6 @@ function handleFlashMessage(data) {
             if (msg.flash_total > 0 && msg.flash_written != null) {
                 let percent = Math.round((msg.flash_written * 100) / msg.flash_total);
                 if (progressBar) progressBar.style.width = percent + "%";
-              appendFlashDebug("WS progress: " + percent + "% (state=" + msg.state + ")");
                 
                 // Update text based on state
                 if (msg.state === 'write' || msg.state === 'start') {
@@ -2500,7 +2403,6 @@ function handleFlashMessage(data) {
                 stopFlashPolling(); // Stop failsafe polling
                 isFlashing = false;
                 toggleInteraction(true);
-              appendFlashDebug("WS completion received");
                 
                 if (progressBar) {
                     progressBar.style.width = "100%";
@@ -2536,7 +2438,6 @@ function handleFlashMessage(data) {
                 stopFlashPolling(); // Stop failsafe polling
                 isFlashing = false;
                 toggleInteraction(true);
-              appendFlashDebug("WS error: " + (msg.error || "Flash failed"));
                 
                 let errorMsg = msg.error || "Flash failed";
                 if (pctText) pctText.textContent = "Finished " + (msg.filename || currentFlashFilename) + ": " + errorMsg;

@@ -9,21 +9,23 @@
 ***************************************************************************      
 */
 * {
-    font-family: Arial, Helvetica, sans-serif;
-  }
-  
-  html {
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+  display: table;
+  width: 100%;
+  max-width: 720px;
+  border-collapse: collapse;
+  margin: 10px 0 12px 0;
+  border: 1px solid #555;
     font-family: 'Dosis', sans-serif;
     line-height: 1.6;
     color: white;
-    background: rgb(28, 28, 30);
-  }
+  margin-bottom: 12px;
+  padding: 10px;
+  max-width: 720px;
   
   body {
     max-width: 100%;
-  }
+    margin-top: 12px;
+    margin-bottom: 8px;
 
   table {
     color: white;
@@ -32,7 +34,7 @@
     background: rgb(28, 28, 30);
   }
   
-  th {
+    max-width: 480px; /* Limit width */
     white-space: nowrap;
     border-right: 1px solid #444;
     border-left: 1px solid #444;
@@ -384,9 +386,10 @@
   /* PIC firmware page */
 .pictable {
   display: table;
-  width: auto;
+  width: 100%;
+  max-width: 720px;
   border-collapse: collapse;
-  margin: 10px 0;
+  margin: 10px 0 12px 0;
   border: 1px solid #555;
 }
 .picrow {
@@ -827,7 +830,8 @@
 
   /* --- Flash Progress Bar Section --- */
   #flashProgressSection {
-    margin-top: 20px;
+    margin-top: 12px;
+    margin-bottom: 8px;
     padding: 0px;
     border: none;
     box-shadow: none;
@@ -836,7 +840,7 @@
   .flashProgresBarWrapper {
     /* remove flex display to allow container to size itself */
     position: relative;
-    max-width: 400px; /* Limit width */
+    max-width: 480px; /* Limit width */
     margin: 0; /* Align left */
   }
 
@@ -985,8 +989,9 @@ body.disable-interaction {
 }
 
 .firmware-info-div {
-  margin-bottom: 15px;
+  margin-bottom: 12px;
   padding: 10px;
+  max-width: 720px;
 }
 
 .firmware-row-bold {
@@ -1032,54 +1037,3 @@ body.disable-interaction {
   color: #ff6b6b;
 }
 
-/* Flash debug panel (Safari-friendly) */
-.flash-debug-section {
-  margin-top: 16px;
-  padding: 10px;
-  border: 1px solid #3a3a3a;
-  border-radius: 6px;
-  background: #1e1e1e;
-}
-
-.flash-debug-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-weight: bold;
-  color: #f0f0f0;
-}
-
-.flash-debug-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.flash-debug-toggle {
-  font-weight: normal;
-  color: #d0d0d0;
-}
-
-.flash-debug-btn {
-  padding: 4px 8px;
-  font-size: 12px;
-  border: 1px solid #555;
-  border-radius: 4px;
-  background: #2a2a2a;
-  color: #e0e0e0;
-  cursor: pointer;
-}
-
-.flash-debug-log {
-  height: 140px;
-  overflow: auto;
-  padding: 8px;
-  border: 1px solid #3a3a3a;
-  border-radius: 4px;
-  background: #141414;
-  color: #e0e0e0;
-  font-family: Consolas, "Courier New", monospace;
-  font-size: 12px;
-  white-space: pre-wrap;
-}
