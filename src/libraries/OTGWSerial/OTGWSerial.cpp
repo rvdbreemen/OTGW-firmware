@@ -81,7 +81,7 @@ enum {
 unsigned short p16f88recover(unsigned short, unsigned short *);
 unsigned short p16f1847recover(unsigned short, unsigned short *);
 
-const struct PicInfo PicInfo[] = {
+const struct PicInfo PicInfo[] PROGMEM = {
     {
         256, 4096, 9, 0x2000, 0x2100, 32, 4, true,
         {0x3fff, 0x158a, 0x3e00, 0x2600},
@@ -93,10 +93,10 @@ const struct PicInfo PicInfo[] = {
     }
 };
 
-const char banner1[] = "OpenTherm Gateway ";
-const char banner2[] = "Opentherm gateway diagnostics - Version ";
-const char banner3[] = "OpenTherm Interface ";
-const char* const banners[] = {banner1, banner2, banner3};
+const char banner1[] PROGMEM = "OpenTherm Gateway ";
+const char banner2[] PROGMEM = "Opentherm gateway diagnostics - Version ";
+const char banner3[] PROGMEM = "OpenTherm Interface ";
+const char* const banners[] PROGMEM = {banner1, banner2, banner3};
 const byte newpic[] = {6, 2, 2};
 
 unsigned short p16f88recover(unsigned short addr, unsigned short *code) {
@@ -238,10 +238,10 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
             // Determine the target PIC
             int i, data;
             for (i = 0; i < PICCOUNT; i++) {
-                data = hexdata[0] & PicInfo[i].magic[0];
-                if (data != PicInfo[i].magic[1]) continue;
-                data = hexdata[1] & PicInfo[i].magic[2];
-                if (data != PicInfo[i].magic[3]) continue;
+                data = hexdata[0] & pgm_read_word(&PicInfo[i].magic[0]);
+                if (data != pgm_read_word(&PicInfo[i].magic[1])) continue;
+                data = hexdata[1] & pgm_read_word(&PicInfo[i].magic[2]);
+                if (data != pgm_read_word(&PicInfo[i].magic[3])) continue;
                 break;
             }
             if (i == PICCOUNT) {
@@ -249,7 +249,7 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
                 break;
             }
             model = i;
-            memcpy(&info, PicInfo + i, sizeof(struct PicInfo));
+            memcpy_P(&info, PicInfo + i, sizeof(struct PicInfo));
             rowsize = info.erasesize;
         }
         if (hexaddr < info.codesize) {
@@ -300,34 +300,20 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
     version = nullptr;
     unsigned short ptr = 0;
     
-    // Fix: Use a safe sliding window search. 
-    // The previous implementation attempted to "skip" strings (read until null), 
-    // which fails if the banner starts inside a block of non-null binary data.
-    size_t bannerLen = sizeof(banner1) - 1;
-
     while (ptr < info.datasize) {
-        // Safe check for banner presence using memcmp_P for binary data
-        bool match = (ptr + bannerLen <= info.datasize) &&
-                 (memcmp((char *)datamem + ptr, banner1, bannerLen) == 0);
-
-        if (match) {
-            char *s = (char *)datamem + ptr + bannerLen;
+        char *s = strstr_P((char *)datamem + ptr, banner1);
+        if (s == nullptr) {
+            ptr += strnlen((char *)datamem + ptr,
+              info.datasize - ptr) + 1;
+        } else {
+            s += sizeof(banner1) - 1;   // Drop the terminating '\0'
             version = s;
             Dprintf("Version: %s\n", version);
-            
             if (firmware == FIRMWARE_OTGW && *fwversion) {
                 // Reading out the EEPROM settings takes 4 reads of 64 bytes
                 weight += 4 * WEIGHT_DATAREAD;
             }
             break;
-        } else {
-             // Move to next string (skip until null or end)
-             while (ptr < info.datasize && datamem[ptr] != 0) {
-                 ptr++;
-             }
-             if (ptr < info.datasize) {
-                 ptr++;
-             }
         }
     }
 
@@ -999,7 +985,7 @@ void OTGWSerial::progress(int pct) {
 void OTGWSerial::matchBanner(char ch) {
     for (int i = 0; i < FIRMWARE_COUNT; i++) {
         const char *banner = banners[i];
-        char c = banner[_banner_matched[i]];
+        char c = pgm_read_byte(banner + _banner_matched[i]);
         if (c == '\0') {
             if (isspace(ch)) {
                 fwversion[_version_pos] = '\0';
@@ -1016,7 +1002,7 @@ void OTGWSerial::matchBanner(char ch) {
             _banner_matched[i]++;
         } else {
             _banner_matched[i] = 0;
-            c = banner[_banner_matched[i]];
+            c = pgm_read_byte(banner + _banner_matched[i]);
             if (ch == c) _banner_matched[i]++;
         }
     }

@@ -237,6 +237,42 @@ void sendStartJsonMap(const char *objName)
   bFirst = true;
 }
 
+//=======================================================================
+// Map entry helpers for compact JSON objects
+//=======================================================================
+void sendJsonMapEntry(const char *cName, bool bValue)
+{
+  char jsonBuff[120] = "";
+
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": %s"), cName, CBOOLEAN(bValue));
+
+  sendBeforenext();
+  sendIdent();
+  httpServer.sendContent(jsonBuff);
+}
+
+void sendJsonMapEntry(const char *cName, int32_t iValue)
+{
+  char jsonBuff[120] = "";
+
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": %d"), cName, iValue);
+
+  sendBeforenext();
+  sendIdent();
+  httpServer.sendContent(jsonBuff);
+}
+
+void sendJsonMapEntry(const char *cName, const char *cValue)
+{
+  char jsonBuff[JSON_BUFF_MAX] = "";
+
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": \"%s\""), cName, cValue);
+
+  sendBeforenext();
+  sendIdent();
+  httpServer.sendContent(jsonBuff);
+}
+
 void sendEndJsonMap(const char *objName)
 {
   iIdentlevel--;
@@ -422,6 +458,28 @@ void sendNestedJsonObj(const __FlashStringHelper* cName, const __FlashStringHelp
   strncpy_P(valBuf, (PGM_P)cValue, sizeof(valBuf));
   valBuf[sizeof(valBuf)-1] = 0;
   sendNestedJsonObj(nameBuf, (const char*)valBuf);
+}
+
+// sendJsonMapEntry helpers
+void sendJsonMapEntry(const __FlashStringHelper* cName, bool bValue) {
+  char nameBuf[35];
+  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf)-1] = 0;
+  sendJsonMapEntry(nameBuf, bValue);
+}
+
+void sendJsonMapEntry(const __FlashStringHelper* cName, int32_t iValue) {
+  char nameBuf[35];
+  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf)-1] = 0;
+  sendJsonMapEntry(nameBuf, iValue);
+}
+
+void sendJsonMapEntry(const __FlashStringHelper* cName, const char *cValue) {
+  char nameBuf[35];
+  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf)-1] = 0;
+  sendJsonMapEntry(nameBuf, cValue);
 }
 
 // sendJsonSettingObj helpers
