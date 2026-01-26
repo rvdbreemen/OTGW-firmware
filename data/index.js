@@ -1499,7 +1499,7 @@ function refreshFirmware() {
       
       let percentageText = document.createElement("div");
       percentageText.id = "flashPercentageText";
-      percentageText.innerText = "Ready to flash";
+      percentageText.textContent = "Ready to flash";
       
       barContainer.appendChild(barFill);
       barContainer.appendChild(percentageText);
@@ -1555,7 +1555,12 @@ function refreshOTmonitor() {
 
   data = {};
   fetch(APIGW + "v2/otgw/otmonitor")  //api/v2/otgw/otmonitor
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    })
     .then(json => {
       console.log("then(json => ..)");
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
@@ -2146,7 +2151,12 @@ function stopFlashPolling() {
 function pollFlashStatus() {
     // Use unified endpoint that works for both ESP and PIC flash
     fetch(APIGW + 'v1/flashstatus')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
         .then(json => {
             if (!json.flashstatus) return;
             
@@ -2165,7 +2175,7 @@ function pollFlashStatus() {
             // Handle PIC flash progress
             if (status.pic_flashing && status.pic_progress >= 0 && status.pic_progress <= 100) {
                 if (progressBar) progressBar.style.width = status.pic_progress + "%";
-                if (pctText) pctText.innerText = "Flashing " + (status.pic_filename || currentFlashFilename) + " : " + status.pic_progress + "%";
+                if (pctText) pctText.textContent = "Flashing " + (status.pic_filename || currentFlashFilename) + " : " + status.pic_progress + "%";
                 
                 // Check for completion
                 if (status.pic_progress === 100) {
@@ -2203,10 +2213,10 @@ function handleFlashCompletion(filename, error) {
     // Update UI with TARGET version
     let elType = document.getElementById('pic_type_display');
     let elVer = document.getElementById('pic_version_display');
-    if (elType) elType.innerText = fwInfo.type;
-    if (elVer) elVer.innerText = fwInfo.version;
+    if (elType) elType.textContent = fwInfo.type;
+    if (elVer) elVer.textContent = fwInfo.version;
     
-    if (pctText) pctText.innerText = "Successfully flashed to " + fwInfo.type + " " + fwInfo.version;
+    if (pctText) pctText.textContent = "Successfully flashed to " + fwInfo.type + " " + fwInfo.version;
     
     // Refresh firmware info
     setTimeout(() => refreshFirmware(), 2000);
@@ -2215,7 +2225,7 @@ function handleFlashCompletion(filename, error) {
     setTimeout(function() {
         if (progressSection) progressSection.classList.remove('active');
         if (progressBar) progressBar.style.width = "0%";
-        if (pctText) pctText.innerText = "Ready to flash";
+        if (pctText) pctText.textContent = "Ready to flash";
     }, 10000);
     
     // Restart polling
@@ -2232,7 +2242,7 @@ function handleFlashError(filename, error) {
     let pctText = document.getElementById("flashPercentageText");
     
     if (progressBar) progressBar.classList.add('error');
-    if (pctText) pctText.innerText = "Flash failed: " + (error || "Unknown error");
+    if (pctText) pctText.textContent = "Flash failed: " + (error || "Unknown error");
     
     // Restart polling
     if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
@@ -2260,7 +2270,7 @@ function performFlash(filename) {
         progressBar.classList.remove('error');
     }
     
-    if (pctText) pctText.innerText = "Connecting to event stream...";
+    if (pctText) pctText.textContent = "Connecting to event stream...";
     
     // Ensure WebSocket is connected for progress updates
     initOTLogWebSocket(true);
@@ -2278,7 +2288,7 @@ function performFlash(filename) {
 
              if (!otLogWS || otLogWS.readyState !== 1) {
                 console.error("Flash aborted: WebSocket timeout");
-                if (pctText) pctText.innerText = "Error: Connection timed out. Cannot track progress.";
+                if (pctText) pctText.textContent = "Error: Connection timed out. Cannot track progress.";
                 if (progressBar) progressBar.classList.add('error');
                 isFlashing = false;
                 toggleInteraction(true);
@@ -2288,11 +2298,15 @@ function performFlash(filename) {
                 return;
              }
 
-             if (pctText) pctText.innerText = "Starting upgrade for " + filename + "...";
+             if (pctText) pctText.textContent = "Starting upgrade for " + filename + "...";
              
              fetch(localURL + '/pic?action=upgrade&name=' + filename)
                 .then(response => {
-                   if (response.headers.get("content-type").indexOf("application/json") !== -1) {
+                   if (!response.ok) {
+                      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                   }
+                   const contentType = response.headers.get("content-type");
+                   if (contentType && contentType.indexOf("application/json") !== -1) {
                      return response.json();
                    } else {
                      return {status: "started (legacy)"}; 
@@ -2300,13 +2314,13 @@ function performFlash(filename) {
                 })
                 .then(data => {
                     console.log("Flash started:", data);
-                    if (pctText) pctText.innerText = "Flashing " + filename + " started...";
+                    if (pctText) pctText.textContent = "Flashing " + filename + " started...";
                 })
                 .catch(error => {
                     console.error("Flash error:", error);
                     isFlashing = false;
                     toggleInteraction(true);
-                    if (pctText) pctText.innerText = "Error starting flash: " + error.message;
+                    if (pctText) pctText.textContent = "Error starting flash: " + error.message;
                     if (progressBar) progressBar.classList.add('error');
                     
                     // Stop failsafe polling
@@ -2344,7 +2358,7 @@ function handleFlashMessage(data) {
                 
                 // Update text based on state
                 if (msg.state === 'write' || msg.state === 'start') {
-                    if (pctText) pctText.innerText = "Flashing " + (msg.filename || currentFlashFilename) + " : " + percent + "%";
+                    if (pctText) pctText.textContent = "Flashing " + (msg.filename || currentFlashFilename) + " : " + percent + "%";
                 }
             }
             
@@ -2366,10 +2380,10 @@ function handleFlashMessage(data) {
                 // Update UI immediately with TARGET version (optimistic)
                 let elType = document.getElementById('pic_type_display');
                 let elVer = document.getElementById('pic_version_display');
-                if (elType) elType.innerText = fwInfo.type;
-                if (elVer) elVer.innerText = fwInfo.version;
+                if (elType) elType.textContent = fwInfo.type;
+                if (elVer) elVer.textContent = fwInfo.version;
                 
-                if (pctText) pctText.innerText = "Successfully flashed to " + fwInfo.type + " " + fwInfo.version;
+                if (pctText) pctText.textContent = "Successfully flashed to " + fwInfo.type + " " + fwInfo.version;
                 
                 // Trigger actual hardware refresh in background
                 setTimeout(() => refreshFirmware(), 2000); // Give PIC 2s to boot
@@ -2378,7 +2392,7 @@ function handleFlashMessage(data) {
                 setTimeout(function() {
                     if (progressSection) progressSection.classList.remove('active');
                     if (progressBar) progressBar.style.width = "0%";
-                    if (pctText) pctText.innerText = "Ready to flash";
+                    if (pctText) pctText.textContent = "Ready to flash";
                 }, 10000);
                 
                 // Restart polling
@@ -2391,7 +2405,7 @@ function handleFlashMessage(data) {
                 toggleInteraction(true);
                 
                 let errorMsg = msg.error || "Flash failed";
-                if (pctText) pctText.innerText = "Finished " + (msg.filename || currentFlashFilename) + ": " + errorMsg;
+                if (pctText) pctText.textContent = "Finished " + (msg.filename || currentFlashFilename) + ": " + errorMsg;
                 
                 if (progressBar) progressBar.classList.add('error');
                 
