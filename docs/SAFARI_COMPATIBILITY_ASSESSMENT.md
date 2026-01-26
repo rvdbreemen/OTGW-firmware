@@ -44,7 +44,7 @@ if (contentType && contentType.indexOf("application/json") !== -1) {
 
 ### 2. HIGH: Inconsistent DOM Text Updates
 
-**File**: `data/index.js` (14 instances)
+**File**: `data/index.js` (16 instances)
 
 **Issue**: Mixed use of `innerText` (non-standard) instead of `textContent` (standard)
 
@@ -53,7 +53,9 @@ if (contentType && contentType.indexOf("application/json") !== -1) {
 - Safari may not trigger proper reflows when using `innerText`
 - `textContent` is faster, more predictable, and fully standardized
 
-**Lines Fixed**: 1502, 2168, 2209, 2218, 2235, 2263, 2281, 2291, 2304, 2310, 2348, 2373, 2382, 2395
+**Lines Fixed**: 1502, 2168, 2209, 2216, 2217, 2218, 2235, 2263, 2281, 2291, 2304, 2310, 2348, 2373, 2382, 2383, 2384, 2395
+
+**Note**: Initial commit fixed 14 instances. Two additional instances (lines 2216-2217 and 2383-2384 for `pic_type_display` and `pic_version_display`) were subsequently fixed to ensure complete consistency across all DOM text updates.
 
 **Example**:
 ```javascript
