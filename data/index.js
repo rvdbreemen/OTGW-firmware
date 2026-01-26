@@ -1555,7 +1555,12 @@ function refreshOTmonitor() {
 
   data = {};
   fetch(APIGW + "v2/otgw/otmonitor")  //api/v2/otgw/otmonitor
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    })
     .then(json => {
       console.log("then(json => ..)");
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
@@ -2146,7 +2151,12 @@ function stopFlashPolling() {
 function pollFlashStatus() {
     // Use unified endpoint that works for both ESP and PIC flash
     fetch(APIGW + 'v1/flashstatus')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
         .then(json => {
             if (!json.flashstatus) return;
             
@@ -2292,6 +2302,9 @@ function performFlash(filename) {
              
              fetch(localURL + '/pic?action=upgrade&name=' + filename)
                 .then(response => {
+                   if (!response.ok) {
+                      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                   }
                    const contentType = response.headers.get("content-type");
                    if (contentType && contentType.indexOf("application/json") !== -1) {
                      return response.json();
