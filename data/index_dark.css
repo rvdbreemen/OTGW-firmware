@@ -9,82 +9,78 @@
 ***************************************************************************      
 */
 * {
-  font-family: Arial, Helvetica, sans-serif;
-}
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-family: 'Dosis', sans-serif;
+    line-height: 1.6;
+    color: #e0e0e0;
+    background: #1a1a1a;
+  }
+  
+  body {
+    max-width: 100%;
+  }
 
-html {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  font-family: 'Dosis', sans-serif;
-  line-height: 1.6;
-  color: #ffffff;
-  background: rgb(28, 28, 30);
-}
+  table {
+    color: #e0e0e0;
+    border-collapse: collapse;
+    width: 90%;
+    background: #2c2c2e;
+  }
+  
+  th {
+    white-space: nowrap;
+    border-right: 1px solid #444;
+    border-left: 1px solid #444;
+    vertical-align: bottom;
+  }
+  
+  td {
+    white-space: nowrap;
+    border-bottom: 1px solid #444;
+    border-right: 1px solid #444;
+    border-left: 1px solid #444;
+    vertical-align: bottom;
+  }
+  
+  tfoot {
+    font-size: 12px;
+    color: #6ab0ff;
+  }
+  
+  input {
+     padding-top: 3px;
+     padding-bottom: 2px;
+     font-size: 12pt;
+  }
+  
+  .outer-div {
+    /*width: 90%; */
+    text-align: center;
+    background-color: #1a1a1a 
+  }
+  .inner-div {
+    display: inline-block; 
+    /*
+    margin: 0 auto;
+    padding: 3px;
+    background-color: #2c2c2e
+    */
+  }
 
-body {
-  max-width: 100%;
-  margin-top: 12px;
-  margin-bottom: 8px;
-}
+  #displayMainPage, #displayPICflash, #displayDeviceInfo, #displaySettingsPage {
+    max-width: 100%;
+  }
 
-table {
-  color: #ffffff;
-  border-collapse: collapse;
-  width: 90%;
-  background: rgb(28, 28, 30);
-}
-
-th {
-  white-space: nowrap;
-  border-right: 1px solid #444;
-  border-left: 1px solid #444;
-  vertical-align: bottom;
-  background-color: #2c2c2e;
-}
-
-td {
-  white-space: nowrap;
-  border-bottom: 1px solid #444;
-  border-right: 1px solid #444;
-  border-left: 1px solid #444;
-  vertical-align: bottom;
-}
-
-tfoot {
-  font-size: 12px;
-  color: #64d2ff;
-}
-
-input {
-  padding-top: 3px;
-  padding-bottom: 2px;
-  font-size: 12pt;
-}
-
-.outer-div {
-  /*width: 90%; */
-  text-align: center;
-  background-color: rgb(28, 28, 30)
-}
-
-.inner-div {
-  display: inline-block; 
-  /*
-  margin: 0 auto;
-  padding: 3px;
-  background-color: rgb(28, 28, 30)
-  */
-}
-
-#displayMainPage, #displayPICflash, #displayDeviceInfo, #displaySettingsPage {
-  max-width: 100%;
-}
-
-#displayPICflash div#firmwarename {
-  width: 80%;
-}
-
-.container-card {
+  #displayPICflash div#firmwarename {
+    width: 80%;
+  }
+  
+  .container-card {
     padding: 50;
     margin: 50;
     list-style: none;
@@ -119,8 +115,8 @@ input {
   }
   
   /*--------------------- N A V - B A R -----------------*/
-  .nav-container, .footer {
-    background: rgb(44, 44, 46);
+.nav-container,.footer {
+    background: #0d7ea8;
     padding: 6px;
     min-height: 50px;
     display: flex;
@@ -129,12 +125,12 @@ input {
   }
   
   .footer {
-    background-color: rgb(28, 28, 30);
+    background-color: #1a1a1a;
   }
 
   .nav-container a:hover {
-    color: white;
-    background: rgb(44, 44, 46); /* only for FSexplorer - Rest does not work */
+    color: #e0e0e0;
+    background: #1a5a7a; /* only for FSexplorer - Rest does not work */
   }
 
   .nav-left {
@@ -147,6 +143,7 @@ input {
     align-items: center; /* horizonal alignment */
     min-height: 50px;
   }
+
 
   .nav-left .hidden {
     display: none;
@@ -176,6 +173,7 @@ input {
     border: 1px solid #444;
     padding: 5px 0;
   }
+
   .nav-right .adv_dropdown.hidden {
     display: none;
   }
@@ -184,7 +182,7 @@ input {
     display: block;
     padding: 10px 15px;
     text-decoration: none;
-    color: #fff;
+    color: #e0e0e0;
     cursor: pointer;
     border-bottom: 1px solid #444;
   }
@@ -195,22 +193,23 @@ input {
 
   .nav-right .adv_dropdown span:hover {
     background-color: #3a3a3c;
-  }
+    color: #fff;
+  } 
   
   .nav-item {
     font-size: 16px;
     height: 40px;
     width: 110px;
-    background-color: #0A84FF;
+    background-color: #2c2c2e;
     border: none;
     border-radius: 5px;
-    color: white;
+    color: #b0b0b0;
     cursor: pointer;
-    box-shadow: 2px 2px 2px 0px black;
+    box-shadow: 2px 2px 2px 0px #000;
   }
-
+  
   .nav-item:hover {
-    background-color: #409CFF;
+    color: #e0e0e0;
   }
 
   .nav-item:active {
@@ -222,22 +221,20 @@ input {
     height: 30px;
     object-fit: cover;
     cursor: pointer;
-    color:rgba(87, 152, 203, 1);
   }
 
   .nav-clock {
     top: 1px;
-    color: white;
+    color: #e0e0e0;
     float: right;
     font-size: small;
     font-weight:bold;
     text-align: right;
-    background: rgb(28, 28, 30); 
+    background: #1a1a1a; 
     width: 200px; 
     padding-right: 10px;
-    background: rgb(28, 28, 30);
   }
-  
+
   /*-------------------------*/
   /***
   @media all and (max-width: 600px) {
@@ -256,7 +253,7 @@ input {
   ***/
   
   .tabButton a:hover {
-    background-color: rgb(99, 99, 102);
+    background-color: #555;
   }
   
   
@@ -269,7 +266,7 @@ input {
   .bottom { 
     position: fixed;
     font-size: small;
-    color: gray;
+    color: #888;
     bottom:0;
   } 
   .right-0  {right: 0; padding-right: 10px; }
@@ -282,8 +279,8 @@ input {
     margin-top: 10px;
   }
   .div1 a:link, a:visited { 
-    background-color: #0A84FF; 
-    color: white; 
+    background-color: #0d7ea8; 
+    color: #e0e0e0; 
     padding: 5px 15px; 
     width: 210px; 
     text-align: right; 
@@ -291,15 +288,15 @@ input {
     display: inline-block;
   }
   .div1 a:hover, a:active { 
-    background-color: #409CFF;
-    color: white;
+    background-color: #1a5a7a;
+    color: #fff;
   }
   
 /* Graph Tab */
 .ot-graph-container {
     width: 100%;
     height: 600px;
-    background-color: #1c1c1e;
+    background-color: #2c2c2e;
     border: 1px solid #444;
     padding: 10px;
     box-sizing: border-box;
@@ -334,7 +331,7 @@ input {
     width: auto;
     font-size: 13px;
     margin: 0;
-    line-height: 1;
+    line-height: 1; /* Ensure text is vertically centered */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -343,9 +340,9 @@ input {
 .ot-graph-select {
     padding: 5px;
     border-radius: 4px;
-    border: 1px solid #555;
+    border: 1px solid #444;
     background-color: #2c2c2e;
-    color: white;
+    color: #e0e0e0;
 }
   
   /* header */
@@ -391,27 +388,25 @@ input {
   max-width: 720px;
   border-collapse: collapse;
   margin: 10px 0 12px 0;
-  border: 1px solid #555;
+  border: 1px solid #444;
 }
 .picrow {
-  background: rgb(28, 28, 30);
   display: table-row;
-  border-bottom: 1px solid #555;
+  border-bottom: 1px solid #444;
 }
-/* Alternate row background */
 .picrow:nth-child(even) {
-  background-color: #333333;
+  background-color: #3a3a3c;
 }
 .piccolumn1, .piccolumn2, .piccolumn3 {
   display: table-cell;
   padding: 8px 15px;
-  border: 1px solid #555;
+  border: 1px solid #444;
   text-align: left;
 }
 .piccolumn4, .piccolumn5 {
   display: table-cell;
   padding: 8px 10px;
-  border: 1px solid #555;
+  border: 1px solid #444;
   text-align: center;
   width: 30px;
 }
@@ -439,49 +434,49 @@ input {
   display: block;
   font-size: 12px;
   line-height: 16px;
-  background: rgb(72, 72, 74);
-  color: white;
+  background: #3a3a3c;
   padding: 5px 2px;
-  border: 1px solid #c0c0c0;
-  box-shadow: 2px 4px 5px rgba(0, 0, 0, 0.4);
+  border: 1px solid #555;
+  box-shadow: 2px 4px 5px rgba(0, 0, 0, 0.6);
+  color: #e0e0e0;
 }
 
 *[data-tooltip]:hover::after {
     opacity: 1;
 }
 
-  
-  /* OTmonitor */
-  .otmontable {
-    column-width: 350px;
-    column-gap: 0;
-    width: 100%;
-  }
+/* OTmonitor */
 
-  .otmonrow {
-    background: rgb(28, 28, 30);
-    display: flex;
-    align-items: center;
-    padding: 2px 0;
-    border: 1px solid #444;
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-  .otmoncolumn1 {
-    flex: 1;
-    padding-left: 10px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .otmoncolumn2 {
-    width: 60px;
-    text-align: right;
-  }
-  .otmoncolumn3 {
-    width: 40px;
-    margin-left: 5px;
-  }
+.otmontable {
+  column-width: 350px;
+  column-gap: 0;
+  width: 100%;
+}
+
+.otmonrow {
+  background: #2c2c2e;
+  display: flex;
+  align-items: center;
+  padding: 2px 0;
+  border: 1px solid #1a1a1a;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.otmoncolumn1 {
+  flex: 1;
+  padding-left: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.otmoncolumn2 {
+  width: 60px;
+  text-align: right;
+}
+.otmoncolumn3 {
+  width: 40px;
+  margin-left: 5px;
+}
 
 .state-on, .state-off {
   display: inline-block;
@@ -510,7 +505,7 @@ input {
 
 .devinforow {
   display: table-row;
-  background: rgb(28, 28, 30);
+  background: #2c2c2e;
 }
 
 .devinfocolumn1 {
@@ -518,7 +513,7 @@ input {
   font-weight: 500;
   white-space: nowrap;
   padding: 2px 5px;
-  border: 1px solid #444;
+  border: 1px solid #1a1a1a;
   width: 1%;
 }
 
@@ -526,7 +521,7 @@ input {
   display: table-cell;
   text-align: left;
   padding: 2px 5px;
-  border: 1px solid #444;
+  border: 1px solid #1a1a1a;
 }
 
 /* Responsive: Stack on small screens */
@@ -540,14 +535,14 @@ input {
     display: flex;
     flex-direction: column;
     padding: 5px;
-    border-bottom: 1px solid #444;
+    border-bottom: 1px solid #1a1a1a;
   }
   
   .devinfocolumn1 {
     display: block;
     width: auto;
     font-weight: 600;
-    color: #5398cb;
+    color: #6ab0ff;
     border: none;
     padding: 0;
   }
@@ -560,15 +555,15 @@ input {
     padding: 0 0 0 10px;
   }
 }
-  
- /* SettingsPage */
- #settingMessage {
-   background-color: rgba(87, 152, 203, 1);
-   width: 860px;
-   margin-left: 10px;
-   color: white;
-   text-align: center;
- }
+
+/* SettingsPage */
+#settingMessage {
+  background-color: #d35400;
+  width: 860px;
+  margin-left: 10px;
+  color: white;
+  text-align: center;
+}
 
   /* define tag selectors () -------------------------------------------------- */
   
@@ -577,12 +572,12 @@ input {
   .settingDiv {
     text-align: right;
     min-width: 850px;
-    border: thick solid rgb(28, 28, 30);
-    background: rgb(28, 28, 30);
+    border: thick solid #2c2c2e;
+    background: #2c2c2e;
   }
 
-  .input-changed { background: rgb(72, 72, 74); color: white; }
-  .input-normal { background: rgb(28, 28, 30); color: white; }
+  .input-changed { background: #3a3a3c; }
+  .input-normal { background: #2c2c2e; color: #e0e0e0; }
 
   /*
   ***************************************************************************
@@ -608,7 +603,6 @@ input {
   * 
   ***************************************************************************
   */
-
 /*
 ***************************************************************************
 ** OpenTherm Log Viewer Styles
@@ -619,7 +613,7 @@ input {
 .ot-log-section {
   margin: 20px 0;
   padding: 15px;
-  background: rgb(44, 44, 46); /* Dark gray background */
+  background: #2c2c2e;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
@@ -631,12 +625,12 @@ input {
   align-items: center;
   margin-bottom: 10px;
   padding-bottom: 10px;
-  border-bottom: 2px solid rgb(72, 72, 74);
+  border-bottom: 2px solid #444;
 }
 
 .ot-log-header h3 {
   margin: 0;
-  color: white;
+  color: #e0e0e0;
   font-size: 18px;
 }
 
@@ -645,7 +639,6 @@ input {
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: white;
 }
 
 /* WebSocket Status Indicator */
@@ -677,7 +670,7 @@ input {
 
 .btn-log-control {
   padding: 6px 12px;
-  background: #0a84ff; /* iOS Blue */
+  background: #0d7ea8;
   color: white;
   border: none;
   border-radius: 4px;
@@ -687,9 +680,9 @@ input {
 }
 
 .btn-log-control:hover {
-  background: #007aff;
+  background: #0a5f7e;
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
 .btn-log-control:active {
@@ -697,22 +690,22 @@ input {
 }
 
 .btn-active {
-  background: #30d158; /* iOS Green */
+  background: #4caf50;
 }
 
 .btn-active:hover {
-  background: #28cd41;
+  background: #45a049;
 }
 
 .log-search {
   flex: 1;
   min-width: 200px;
   padding: 6px 12px;
-  border: 1px solid rgb(72, 72, 74);
+  border: 1px solid #444;
   border-radius: 4px;
   font-size: 13px;
-  background: rgb(28, 28, 30);
-  color: white;
+  background-color: #2c2c2e;
+  color: #e0e0e0;
 }
 
 .log-control-label {
@@ -722,7 +715,6 @@ input {
   font-size: 13px;
   cursor: pointer;
   user-select: none;
-  color: white;
 }
 
 .log-control-label input[type="checkbox"] {
@@ -735,7 +727,6 @@ input {
   border-radius: 4px;
   overflow: hidden;
   transition: max-height 0.3s ease;
-  border: 1px solid rgb(72, 72, 74);
 }
 
 .ot-log-container.collapsed {
@@ -784,11 +775,10 @@ input {
   display: flex;
   justify-content: space-between;
   padding: 8px 12px;
-  background: rgb(44, 44, 46);
+  background: #3a3a3c;
   border-radius: 0 0 4px 4px;
   font-size: 12px;
-  color: #d4d4d4;
-  border-top: 1px solid rgb(72, 72, 74);
+  color: #b0b0b0;
 }
 
 .ot-log-footer span {
@@ -828,8 +818,7 @@ input {
     max-height: 400px;
   }
 }
-
-  /* --- Flash Progress Bar Section --- */
+  /* Firmware Upgrade Progress */
   #flashProgressSection {
     margin-top: 12px;
     margin-bottom: 8px;
@@ -844,10 +833,10 @@ input {
     max-width: 480px; /* Limit width */
     margin: 0; /* Align left */
   }
-
+  
   .flashProgressBarContainer {
     width: 100%;
-    background-color: #555;
+    background-color: #3a3a3c;
     height: 30px;
     border-radius: 15px;
     overflow: hidden;
@@ -860,13 +849,13 @@ input {
     left: 0;
     height: 100%;
     width: 0%;
-    background-color: #4CAF50;
+    background-color: #4CAF50; /* Green */
     -webkit-transition: width 0.3s ease;
     transition: width 0.3s ease;
     will-change: width;
     z-index: 1;
   }
-
+  
   #flashPercentageText {
     position: absolute;
     width: 100%;
@@ -877,10 +866,9 @@ input {
     align-items: center;
     justify-content: center;
     font-weight: bold;
-    color: white; /* White text for visibility on dark/green */
+    color: #e0e0e0; /* Light text for visibility */
     z-index: 2; /* Ensure on top of bar */
   }
-
 
 
 /* Disable interaction during critical operations */
@@ -890,7 +878,7 @@ body.disable-interaction {
     cursor: wait;
 }
 
-/* Tabs support - Dark Mode */
+/* Tabs support */
 .ot-log-tabs {
   margin-bottom: 15px;
   border-bottom: 1px solid #444;
@@ -906,17 +894,17 @@ body.disable-interaction {
   font-size: 14px;
   font-weight: bold;
   transition: 0.3s;
-  color: #ccc;
+  color: #b0b0b0;
 }
 
 .tab-link:hover {
-  background-color: #333;
+  background-color: #3a3a3c;
   border-radius: 4px 4px 0 0;
 }
 
 .tab-link.active {
-  color: #2196F3;
-  border-bottom: 3px solid #2196F3;
+  color: #6ab0ff;
+  border-bottom: 3px solid #0d7ea8;
 }
 
 .tab-content {
@@ -927,21 +915,12 @@ body.disable-interaction {
   display: block;
 }
 
-/* Statistics Table - Dark Mode */
-.ot-stats-container {
-  overflow-x: auto;
-  max-height: 600px;
-  overflow-y: auto;
-  background: #1e1e1e;
-  border: 1px solid #444;
-}
-
+/* Statistics Table */
 .ot-stats-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
-  background-color: #1e1e1e;
-  color: #d4d4d4;
+  background-color: #2c2c2e;
   table-layout: fixed;
 }
 
@@ -962,19 +941,28 @@ body.disable-interaction {
 }
 
 .ot-stats-table th {
-  background-color: #2d2d2d;
-  color: #f0f0f0;
+  background-color: #3a3a3c;
+  color: #e0e0e0;
   position: sticky;
   top: 0;
+  z-index: 10;
   cursor: pointer;
 }
 
 .ot-stats-table th:hover {
-  background-color: #3d3d3d;
+  background-color: #4a4a4c;
 }
 
 .ot-stats-table tr:hover {
-  background-color: #2d2d2d;
+  background-color: #3a3a3c;
+}
+
+.ot-stats-container {
+  overflow-x: auto;
+  max-height: 600px;
+  overflow-y: auto;
+  background: #2c2c2e;
+  border: 1px solid #444;
 }
 
 /* Utility classes for common inline styles */
@@ -1035,6 +1023,6 @@ body.disable-interaction {
 }
 
 .waiting-error {
-  color: #ff6b6b;
+  color: red;
 }
 
