@@ -48,7 +48,7 @@ This document summarizes the aggressive browser compatibility review conducted u
 | textContent | Faster      | W3C DOM   | ✅ Consistent   |
 | innerText   | Slower      | HTML5     | ⚠️ Quirky       |
 
-**Verdict**: textContent is the correct choice (already implemented ✅)
+**Verdict**: textContent is the correct choice and is being adopted across the codebase ✅
 
 ---
 
