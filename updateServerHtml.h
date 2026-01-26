@@ -129,6 +129,15 @@ static const char UpdateServerIndex[] PROGMEM =
          var lastWsMessageTime = 0;
          var wsWatchdogTimer = null;
          var wsActive = false;
+         var lastDeviceStatus = null;
+         var lastDeviceStatusTime = 0;
+         var uploadRetryTimer = null;
+         var uploadRetryPending = false;
+         var uploadRetryAttempts = 0;
+         var uploadRetryMax = 0;
+         var uploadRetryIsFilesystem = false;
+         var uploadRetryBaseMs = 2000;
+         var uploadRetryMaxDelayMs = 15000;
 
          function hasJsonContentType(response, contentType) {
            var ct = contentType || '';
@@ -201,6 +210,14 @@ static const char UpdateServerIndex[] PROGMEM =
            if (title) progressTitle.textContent = title;
          }
 
+         function cancelUploadRetry() {
+           if (uploadRetryTimer) {
+             clearTimeout(uploadRetryTimer);
+             uploadRetryTimer = null;
+           }
+           uploadRetryPending = false;
+         }
+
          window.retryFlash = function() {
             pageProgress.style.display = 'none';
             pageForm.style.display = 'block';
@@ -209,6 +226,7 @@ static const char UpdateServerIndex[] PROGMEM =
             if (formErrorEl) formErrorEl.textContent = '';
             uploadInFlight = false;
             localUploadDone = false;
+            cancelUploadRetry();
             startPolling(); // Restart polling in case status is waiting
          };
 
@@ -296,6 +314,8 @@ static const char UpdateServerIndex[] PROGMEM =
          function updateDeviceStatus(status) {
           console.log('Device status:', status);
           if (!status) return;
+          lastDeviceStatus = status;
+          lastDeviceStatusTime = Date.now();
           var state = status.state || 'idle';
           var target = status.target || '';
           if (state !== 'idle') {
@@ -556,6 +576,10 @@ static const char UpdateServerIndex[] PROGMEM =
 
              var action = form.action;
              var preFlight = Promise.resolve();
+             cancelUploadRetry();
+             uploadRetryAttempts = 0;
+             uploadRetryMax = (targetName === 'filesystem') ? 3 : 0;
+             uploadRetryIsFilesystem = (targetName === 'filesystem');
 
              // --- Custom logic: backup settings before filesystem flash ---
              if (formId === 'fsForm') {
@@ -597,7 +621,30 @@ static const char UpdateServerIndex[] PROGMEM =
                    action += (action.indexOf('?') === -1 ? '?' : '&') + 'size=' + encodeURIComponent(input.files[0].size);
                  }
 
+                 var scheduleUploadRetry = function(reason) {
+                     if (!uploadRetryIsFilesystem || uploadRetryMax <= 0) return false;
+                     if (uploadRetryAttempts >= uploadRetryMax) return false;
+                     if (uploadRetryPending) return true;
+                     if (lastDeviceStatus && lastDeviceStatus.state && lastDeviceStatus.state !== 'idle') {
+                       console.log('Auto-retry skipped: device is flashing');
+                       return false;
+                     }
+                     var delayMs = Math.min(uploadRetryMaxDelayMs, uploadRetryBaseMs * Math.pow(2, uploadRetryAttempts));
+                     var attempt = uploadRetryAttempts + 1;
+                     uploadRetryPending = true;
+                     if (retryBtn) retryBtn.style.display = 'none';
+                     errorEl.textContent = (reason || 'Upload failed') + ' Retrying in ' + Math.round(delayMs / 1000) + 's (' + attempt + '/' + uploadRetryMax + ')...';
+                     if (!pollActive) startPolling();
+                     uploadRetryTimer = setTimeout(function() {
+                       uploadRetryPending = false;
+                       uploadRetryAttempts += 1;
+                       performUpload();
+                     }, delayMs);
+                     return true;
+                 };
+
                  var performUpload = function() {
+                     cancelUploadRetry();
                      uploadInFlight = true;
                      var xhr = new XMLHttpRequest();
                      xhr.open('POST', action, true);
@@ -628,11 +675,15 @@ static const char UpdateServerIndex[] PROGMEM =
                          } else {
                            setUploadProgress(lastUploadTotal, lastUploadTotal); // Ensure 100%
                            localUploadDone = true;
+                           cancelUploadRetry();
                          }
                          uploadInFlight = false;
                        } else {
-                         errorEl.textContent = 'Upload failed: ' + xhr.status;
                          uploadInFlight = false;
+                         if (!scheduleUploadRetry('Upload failed: ' + xhr.status + '.')) {
+                           errorEl.textContent = 'Upload failed: ' + xhr.status;
+                           if (retryBtn) retryBtn.style.display = 'block';
+                         }
                        }
                      };
                      xhr.ontimeout = function() {
@@ -640,17 +691,21 @@ static const char UpdateServerIndex[] PROGMEM =
                        // Don't show error yet - WebSocket might show completion
                        // Just mark upload as done and let WebSocket status take over
                        uploadInFlight = false;
-                       localUploadDone = true;
-                       errorEl.textContent = 'Connection timeout - monitoring flash progress via WebSocket...';
+                       if (!scheduleUploadRetry('Connection timeout.')) {
+                         localUploadDone = true;
+                         errorEl.textContent = 'Connection timeout - monitoring flash progress via WebSocket...';
+                       }
                      };
                      xhr.onerror = function() {
                        console.log('Upload XHR error - checking if flash is proceeding via WebSocket');
                        // Upload may have succeeded but response timed out
                        // WebSocket will show actual flash status
                        uploadInFlight = false;
-                       localUploadDone = true;
-                       errorEl.textContent = 'Upload connection lost - monitoring flash status...';
-                       // Don't show retry button yet - wait for WebSocket status
+                       if (!scheduleUploadRetry('Upload connection lost.')) {
+                         localUploadDone = true;
+                         errorEl.textContent = 'Upload connection lost - monitoring flash status...';
+                         // Don't show retry button yet - wait for WebSocket status
+                       }
                      };
                      xhr.send(new FormData(form));
                  };
