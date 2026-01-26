@@ -1,4 +1,15 @@
-> **Archived**: Moved to [reviews/2026-01-26_browser-compatibility-review/BROWSER_COMPATIBILITY_AUDIT_2026.md](reviews/2026-01-26_browser-compatibility-review/BROWSER_COMPATIBILITY_AUDIT_2026.md).
+---
+# METADATA
+Document Title: Browser Compatibility Audit Report 2026
+Review Date: 2026-01-26 00:00:00 UTC
+Branch Reviewed: dev → dev (merge commit N/A)
+Target Version: v1.0.0-rc4+
+Reviewer: GitHub Copilot
+Document Type: Review Report
+PR Branch: dev
+Commit: N/A
+Status: COMPLETE
+---
 
 # Browser Compatibility Audit Report 2026
 

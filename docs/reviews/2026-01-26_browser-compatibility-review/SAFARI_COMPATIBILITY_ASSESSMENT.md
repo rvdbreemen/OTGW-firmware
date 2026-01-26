@@ -1,4 +1,15 @@
-> **Archived**: Moved to [reviews/2026-01-26_browser-compatibility-review/SAFARI_COMPATIBILITY_ASSESSMENT.md](reviews/2026-01-26_browser-compatibility-review/SAFARI_COMPATIBILITY_ASSESSMENT.md).
+---
+# METADATA
+Document Title: macOS/Safari Compatibility Assessment - Progress Bar Implementation
+Review Date: 2026-01-26 00:00:00 UTC
+Branch Reviewed: dev → dev (merge commit N/A)
+Target Version: v1.0.0-rc4+
+Reviewer: GitHub Copilot
+Document Type: Assessment
+PR Branch: dev
+Commit: N/A
+Status: COMPLETE
+---
 
 # macOS/Safari Compatibility Assessment - Progress Bar Implementation
 
@@ -229,7 +240,7 @@ The recent WebSocket keepalive fix addressed the **primary** macOS/Safari issue 
 3. [MDN: CSS transition](https://developer.mozilla.org/en-US/docs/Web/CSS/transition)
 4. [MDN: will-change](https://developer.mozilla.org/en-US/docs/Web/CSS/will-change)
 5. [Safari WebSocket Known Issues](https://developer.apple.com/documentation/safari-release-notes)
-6. [WebSocket Robustness Analysis](./WEBSOCKET_ROBUSTNESS_ANALYSIS.md) - Original macOS/Safari fix
+6. [WebSocket Robustness Analysis](WEBSOCKET_ROBUSTNESS_ANALYSIS.md) - Original macOS/Safari fix
 
 ---
 

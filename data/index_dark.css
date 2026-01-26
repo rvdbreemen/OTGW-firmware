@@ -1,6 +1,6 @@
 /*
 ***************************************************************************  
-**  Program  : index.css
+**  Program  : index_dark.css
 **  Version  : v1.0.0-rc6
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
@@ -9,81 +9,82 @@
 ***************************************************************************      
 */
 * {
-  display: table;
-  width: 100%;
-  max-width: 720px;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: 'Dosis', sans-serif;
+  line-height: 1.6;
+  color: #ffffff;
+  background: rgb(28, 28, 30);
+}
+
+body {
+  max-width: 100%;
+  margin-top: 12px;
+  margin-bottom: 8px;
+}
+
+table {
+  color: #ffffff;
   border-collapse: collapse;
-  margin: 10px 0 12px 0;
-  border: 1px solid #555;
-    font-family: 'Dosis', sans-serif;
-    line-height: 1.6;
-    color: white;
-  margin-bottom: 12px;
-  padding: 10px;
-  max-width: 720px;
-  
-  body {
-    max-width: 100%;
-    margin-top: 12px;
-    margin-bottom: 8px;
+  width: 90%;
+  background: rgb(28, 28, 30);
+}
 
-  table {
-    color: white;
-    border-collapse: collapse;
-    width: 90%;
-    background: rgb(28, 28, 30);
-  }
-  
-    max-width: 480px; /* Limit width */
-    white-space: nowrap;
-    border-right: 1px solid #444;
-    border-left: 1px solid #444;
-    vertical-align: bottom;
-    background-color: #2c2c2e;
-  }
-  
-  td {
-    white-space: nowrap;
-    border-bottom: 1px solid #444;
-    border-right: 1px solid #444;
-    border-left: 1px solid #444;
-    vertical-align: bottom;
-  }
-  
-  tfoot {
-    font-size: 12px;
-    color: #64d2ff;
-  }
-  
-  input {
-     padding-top: 3px;
-     padding-bottom: 2px;
-     font-size: 12pt;
-  }
-  
-  .outer-div {
-    /*width: 90%; */
-    text-align: center;
-    background-color: rgb(28, 28, 30) 
-  }
-  .inner-div {
-    display: inline-block; 
-    /*
-    margin: 0 auto;
-    padding: 3px;
-    background-color: rgb(28, 28, 30)
-    */
-  }
-  
-  #displayMainPage, #displayPICflash, #displayDeviceInfo, #displaySettingsPage {
-    max-width: 100%;
-  }
+th {
+  white-space: nowrap;
+  border-right: 1px solid #444;
+  border-left: 1px solid #444;
+  vertical-align: bottom;
+  background-color: #2c2c2e;
+}
 
-  #displayPICflash div#firmwarename {
-    width: 80%;
-  }
+td {
+  white-space: nowrap;
+  border-bottom: 1px solid #444;
+  border-right: 1px solid #444;
+  border-left: 1px solid #444;
+  vertical-align: bottom;
+}
 
-  .container-card {
+tfoot {
+  font-size: 12px;
+  color: #64d2ff;
+}
+
+input {
+  padding-top: 3px;
+  padding-bottom: 2px;
+  font-size: 12pt;
+}
+
+.outer-div {
+  /*width: 90%; */
+  text-align: center;
+  background-color: rgb(28, 28, 30)
+}
+
+.inner-div {
+  display: inline-block; 
+  /*
+  margin: 0 auto;
+  padding: 3px;
+  background-color: rgb(28, 28, 30)
+  */
+}
+
+#displayMainPage, #displayPICflash, #displayDeviceInfo, #displaySettingsPage {
+  max-width: 100%;
+}
+
+#displayPICflash div#firmwarename {
+  width: 80%;
+}
+
+.container-card {
     padding: 50;
     margin: 50;
     list-style: none;

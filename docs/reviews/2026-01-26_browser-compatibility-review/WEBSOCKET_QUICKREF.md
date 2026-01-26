@@ -1,4 +1,15 @@
-> **Archived**: Moved to [reviews/2026-01-26_browser-compatibility-review/WEBSOCKET_QUICKREF.md](reviews/2026-01-26_browser-compatibility-review/WEBSOCKET_QUICKREF.md).
+---
+# METADATA
+Document Title: WebSocket Robustness - Quick Reference
+Review Date: 2026-01-22 00:00:00 UTC
+Branch Reviewed: dev → dev (merge commit N/A)
+Target Version: v1.0.0-rc4+
+Reviewer: GitHub Copilot
+Document Type: Quick Reference
+PR Branch: dev
+Commit: N/A
+Status: COMPLETE
+---
 
 # WebSocket Robustness - Quick Reference
 
@@ -137,9 +148,9 @@ const WS_WATCHDOG_TIMEOUT = 10000;
 
 ## Documentation
 
-- Full analysis: `docs/WEBSOCKET_ROBUSTNESS_ANALYSIS.md`
-- Implementation details: `docs/WEBSOCKET_IMPROVEMENTS_SUMMARY.md`
-- This guide: `docs/WEBSOCKET_QUICKREF.md`
+- Full analysis: [WEBSOCKET_ROBUSTNESS_ANALYSIS.md](WEBSOCKET_ROBUSTNESS_ANALYSIS.md)
+- Implementation details: [WEBSOCKET_IMPROVEMENTS_SUMMARY.md](WEBSOCKET_IMPROVEMENTS_SUMMARY.md)
+- This guide: [WEBSOCKET_QUICKREF.md](WEBSOCKET_QUICKREF.md)
 
 ## Success Criteria
 

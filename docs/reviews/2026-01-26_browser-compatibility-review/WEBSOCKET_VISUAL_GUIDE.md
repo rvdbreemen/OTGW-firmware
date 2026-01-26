@@ -1,4 +1,15 @@
-> **Archived**: Moved to [reviews/2026-01-26_browser-compatibility-review/WEBSOCKET_VISUAL_GUIDE.md](reviews/2026-01-26_browser-compatibility-review/WEBSOCKET_VISUAL_GUIDE.md).
+---
+# METADATA
+Document Title: WebSocket Robustness - Visual Guide
+Review Date: 2026-01-22 00:00:00 UTC
+Branch Reviewed: dev → dev (merge commit N/A)
+Target Version: v1.0.0-rc4+
+Reviewer: GitHub Copilot
+Document Type: Visual Guide
+PR Branch: dev
+Commit: N/A
+Status: COMPLETE
+---
 
 # WebSocket Robustness - Visual Guide
 
@@ -10,20 +21,20 @@
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐ │
 │  │               WebSocket Client (port 81)                    │ │
-│  │                                                             │ │
+│  │                                                             │
 │  │  ┌──────────────────────────────────────────────────────┐  │ │
 │  │  │  Watchdog Timer: 45 seconds                          │  │ │
 │  │  │  ✓ Resets on any message received                    │  │ │
 │  │  │  ✓ Fires if no data for 45s → triggers reconnect     │  │ │
 │  │  └──────────────────────────────────────────────────────┘  │ │
-│  │                                                             │ │
+│  │                                                             │
 │  │  ┌──────────────────────────────────────────────────────┐  │ │
 │  │  │  Keepalive Handler                                    │  │ │
 │  │  │  ✓ Receives {"type":"keepalive"} every 30s           │  │ │
 │  │  │  ✓ Resets watchdog timer                             │  │ │
 │  │  │  ✓ Doesn't add to log buffer                         │  │ │
 │  │  └──────────────────────────────────────────────────────┘  │ │
-│  │                                                             │ │
+│  │                                                             │
 │  │  ┌──────────────────────────────────────────────────────┐  │ │
 │  │  │  Auto-Reconnect Logic                                 │  │ │
 │  │  │  ✓ Triggers on disconnect or watchdog timeout        │  │ │
@@ -41,21 +52,21 @@
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐ │
 │  │          WebSocketsServer (port 81)                         │ │
-│  │                                                             │ │
+│  │                                                             │
 │  │  ┌──────────────────────────────────────────────────────┐  │ │
 │  │  │  Heartbeat (Protocol Level)                          │  │ │
 │  │  │  ✓ Sends PING every 15 seconds                       │  │ │
 │  │  │  ✓ Expects PONG within 3 seconds                     │  │ │
 │  │  │  ✓ Disconnects after 2 missed PONGs (30s total)      │  │ │
 │  │  └──────────────────────────────────────────────────────┘  │ │
-│  │                                                             │ │
+│  │                                                             │
 │  │  ┌──────────────────────────────────────────────────────┐  │ │
 │  │  │  Application Keepalive                                │  │ │
 │  │  │  ✓ Broadcasts {"type":"keepalive"} every 30s         │  │ │
 │  │  │  ✓ Sent to all connected clients                     │  │ │
 │  │  │  ✓ Minimal overhead (~20 bytes)                      │  │ │
 │  │  └──────────────────────────────────────────────────────┘  │ │
-│  │                                                             │ │
+│  │                                                             │
 │  │  ┌──────────────────────────────────────────────────────┐  │ │
 │  │  │  Connection Management                                │  │ │
 │  │  │  ✓ Max 3 simultaneous clients                        │  │ │
