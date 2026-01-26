@@ -15,7 +15,7 @@ const APIGW = window.location.protocol + '//' + window.location.host + '/api/';
 
 let needReload = false;
 
-console.log("Hash=" + window.location.hash);
+console.log(`Hash=${window.location.hash}`);
 window.onload = initMainPage;
 
 window.onblur = function() {
