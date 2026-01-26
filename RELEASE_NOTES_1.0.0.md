@@ -1,10 +1,10 @@
-# Release Notes - Version 1.0.0-rc4 (Release Candidate 4)
+# Release Notes - Version 1.0.0-rc6 (Release Candidate 6)
 
-**Release Candidate Date:** January 25, 2026  
+**Release Candidate Date:** January 26, 2026  
 
 > **📋 Note:** This document describes **Release Candidate 4 (RC4)** for version 1.0.0.  
 > This is NOT the final 1.0.0 release - it's an advanced release candidate undergoing final testing.  
-> The final 1.0.0 release will be published after successful RC4 validation.
+> The final 1.0.0 release will be published after successful RC6 validation.
 
 
 **Previous Version:** 0.10.3 (April 2024)  
@@ -14,11 +14,11 @@
 
 ## A Major Milestone
 
-After years of development and extensive community testing, we're thrilled to announce **OTGW-firmware version 1.0.0-rc4** — release candidate 4, approaching the production-ready 1.0.0 release of the ESP8266 firmware for the NodoShop OpenTherm Gateway!
+After years of development and extensive community testing, we're thrilled to announce **OTGW-firmware version 1.0.0-rc6** — release candidate 4, approaching the production-ready 1.0.0 release of the ESP8266 firmware for the NodoShop OpenTherm Gateway!
 
 This release represents the complete realization of the project's vision: a **reliable, feature-rich network interface** for the OpenTherm Gateway hardware with first-class **Home Assistant integration**, comprehensive **MQTT support**, and a polished **Web UI experience**.
 
-Version 1.0.0-rc4 is built on the foundation of extensive testing through multiple release candidates (RC1-RC4), with critical stability improvements, security hardening, and memory optimizations that make it significantly more robust than the 0.10.x series.
+Version 1.0.0-rc6 is built on the foundation of extensive testing through multiple release candidates (RC1-RC6), with critical stability improvements, security hardening, and memory optimizations that make it significantly more robust than the 0.10.x series.
 
 ---
 
@@ -296,7 +296,7 @@ Version 1.0.0-rc4 is built on the foundation of extensive testing through multip
 - ✅ Binary data handling robust and crash-free
 - ✅ Backward compatibility maintained
 - ✅ Comprehensive documentation provided
-- ✅ Extensive community testing (RC1-RC4)
+- ✅ Extensive community testing (RC1-RC6)
 - ✅ Long-term stability verified (weeks/months uptime)
 
 **Known Limitations:**

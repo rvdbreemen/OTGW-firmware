@@ -12,11 +12,11 @@ The primary goal is **reliable Home Assistant integration** via MQTT and auto di
 
 ---
 
-## 🎉 Version 1.0.0-rc4 - Release Candidate 4!
+## 🎉 Version 1.0.0-rc6 - Release Candidate 6!
 
-**We're approaching the major 1.0.0 milestone!** After years of development and 21 months of intensive work since version 0.10.3, Release Candidate 4 represents the near-final version with extensive testing and refinement.
+**We're approaching the major 1.0.0 milestone!** After years of development and 21 months of intensive work since version 0.10.3, Release Candidate 6 represents the near-final version with extensive testing and refinement.
 
-**What's New in RC4 (approaching 1.0.0):**
+**What's New in RC6 (approaching 1.0.0):**
 
 ### ✨ User Experience
 - **Live OpenTherm Logging**: Real-time streaming of OpenTherm messages in the Web UI via WebSockets
@@ -42,9 +42,9 @@ The primary goal is **reliable Home Assistant integration** via MQTT and auto di
 - **Quality Tools**: `evaluate.py` for automated code quality checks
 - **Comprehensive Docs**: BUILD.md, FLASH_GUIDE.md, EVALUATION.md guides
 
-📖 **[Read the complete RC4 release notes →](RELEASE_NOTES_1.0.0.md)**
+📖 **[Read the complete RC6 release notes →](RELEASE_NOTES_1.0.0.md)**
 
-> **Note:** This is Release Candidate 4. The final 1.0.0 release will follow after successful community testing and validation.
+> **Note:** This is Release Candidate 6. The final 1.0.0 release will follow after successful community testing and validation.
 
 ### ⚠️ Breaking Changes
 - **Dallas Temperature Sensors**: Default GPIO changed from GPIO 13 (D7) to GPIO 10 (SD3). Either reconnect sensors or update the setting.
