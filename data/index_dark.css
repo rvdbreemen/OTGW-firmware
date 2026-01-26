@@ -116,7 +116,7 @@
   
   /*--------------------- N A V - B A R -----------------*/
 .nav-container,.footer {
-    background: #0d7ea8;
+    background: #2c2c2e;
     padding: 6px;
     min-height: 50px;
     display: flex;
@@ -130,7 +130,7 @@
 
   .nav-container a:hover {
     color: #e0e0e0;
-    background: #1a5a7a; /* only for FSexplorer - Rest does not work */
+    background: #3a3a3c; /* only for FSexplorer - Rest does not work */
   }
 
   .nav-left {
@@ -200,7 +200,7 @@
     font-size: 16px;
     height: 40px;
     width: 110px;
-    background-color: #2c2c2e;
+    background-color: #3a3a3c;
     border: none;
     border-radius: 5px;
     color: #b0b0b0;
@@ -279,7 +279,7 @@
     margin-top: 10px;
   }
   .div1 a:link, a:visited { 
-    background-color: #0d7ea8; 
+    background-color: #2c2c2e; 
     color: #e0e0e0; 
     padding: 5px 15px; 
     width: 210px; 
@@ -288,7 +288,7 @@
     display: inline-block;
   }
   .div1 a:hover, a:active { 
-    background-color: #1a5a7a;
+    background-color: #3a3a3c;
     color: #fff;
   }
   
@@ -670,7 +670,7 @@
 
 .btn-log-control {
   padding: 6px 12px;
-  background: #0d7ea8;
+  background: #3a3a3c;
   color: white;
   border: none;
   border-radius: 4px;
@@ -680,7 +680,7 @@
 }
 
 .btn-log-control:hover {
-  background: #0a5f7e;
+  background: #4a4a4c;
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
@@ -903,8 +903,8 @@ body.disable-interaction {
 }
 
 .tab-link.active {
-  color: #6ab0ff;
-  border-bottom: 3px solid #0d7ea8;
+  color: #b0b0b0;
+  border-bottom: 3px solid #5a5a5c;
 }
 
 .tab-content {
