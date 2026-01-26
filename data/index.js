@@ -2380,8 +2380,8 @@ function handleFlashMessage(data) {
                 // Update UI immediately with TARGET version (optimistic)
                 let elType = document.getElementById('pic_type_display');
                 let elVer = document.getElementById('pic_version_display');
-                if (elType) elType.innerText = fwInfo.type;
-                if (elVer) elVer.innerText = fwInfo.version;
+                if (elType) elType.textContent = fwInfo.type;
+                if (elVer) elVer.textContent = fwInfo.version;
                 
                 if (pctText) pctText.textContent = "Successfully flashed to " + fwInfo.type + " " + fwInfo.version;
                 
