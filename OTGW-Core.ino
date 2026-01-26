@@ -2071,10 +2071,22 @@ void startOTGWstream()
 //---------[ Upgrade PIC stuff taken from Schelte Bron's NodeMCU Firmware ]---------
 
 void upgradepicnow(const char *filename) {
-  if (OTGWSerial.busy()) return; // if already in programming mode, never call it twice
-  DebugTf(PSTR("Start PIC upgrade now: %s\r\n"), filename);
-  fwupgradestart(filename);  
+  if (OTGWSerial.busy()) {
+    DebugTln(F("ERROR: PIC upgrade already in progress, ignoring request"));
+    return; // if already in programming mode, never call it twice
+  }
+  DebugTln(F(""));
+  DebugTln(F(">>> Initiating PIC Upgrade <<<"));
+  DebugTf(PSTR("Hex file: %s\r\n"), filename);
+  fwupgradestart(filename);
   // Upgrade runs in background via OTGWSerial callbacks and upgradeTick called from available()
+  DebugTln(F("PIC upgrade object created and started"));
+  DebugTln(F("Upgrade runs in background via:"));
+  DebugTln(F("  - handleOTGW() processes serial data"));
+  DebugTln(F("  - OTGWSerial.available() calls upgradeTick()"));
+  DebugTln(F("  - Progress callbacks update WebUI"));
+  DebugTln(F(">>> Background upgrade active <<<"));
+  DebugTln(F(""));
 }
 
 // Helper function to escape JSON strings for WebSocket messages
@@ -2099,6 +2111,10 @@ static void jsonEscape(const char *in, char *out, size_t outSize) {
 }
 
 void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
+  DebugTln(F(""));
+  DebugTln(F("=== PIC Upgrade Complete ==="));
+  DebugTf(PSTR("Result code: %d\r\n"), (int)result);
+  DebugTf(PSTR("Errors: %d, Retries: %d\r\n"), errors, retries);
   switch (result) {
     case OTGWError::OTGW_ERROR_NONE:          snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("PIC upgrade was successful")); break;
     case OTGWError::OTGW_ERROR_MEMORY:        snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Not enough memory available")); break;
@@ -2114,12 +2130,19 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
     case OTGWError::OTGW_ERROR_DEVICE:        snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Wrong PIC (16F88 <=> 16F1847)")); break;
     default:                                  snprintf_P(errorupgrade, sizeof(errorupgrade), PSTR("Unknown state")); break;
   }
+  DebugTf(PSTR("Message: %s\r\n"), CSTR(errorupgrade));
+  DebugTf(PSTR("File: %s\r\n"), currentPICFlashFile);
   OTGWDebugTf(PSTR("Upgrade finished: Errorcode = %d - %s - %d retries, %d errors\r\n"), result, CSTR(errorupgrade), retries, errors);
   
   // Mark flash as complete
   isPICFlashing = false;
   currentPICFlashProgress = (result == OTGWError::OTGW_ERROR_NONE) ? 100 : -1; // -1 indicates error
-  
+  if (result == OTGWError::OTGW_ERROR_NONE) {
+    DebugTln(F("*** UPGRADE SUCCESSFUL ***"));
+  } else {
+    DebugTln(F("*** UPGRADE FAILED ***"));
+  }
+
 #ifndef DISABLE_WEBSOCKET
   // Send completion message in format frontend expects
   // Escape strings to prevent JSON injection
@@ -2135,15 +2158,27 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
     state, filenameEsc, errorEsc);
   
   if (written > 0 && written < (int)sizeof(buf)) {
+    DebugTln(F("Sending WebSocket completion message..."));
     sendWebSocketJSON(buf);
+  } else {
+    DebugTln(F("ERROR: WebSocket message too large, not sent"));
   }
 #endif
-  
+
+  DebugTln(F("============================"));
+  DebugTln(F(""));
+
   // Note: Keep filename and progress for polling API until next flash starts
 }
 
 void fwupgradestep(int pct) {
-  OTGWDebugTf(PSTR("Upgrade: %d%%\n\r"), pct);
+  // Only log every 10% to avoid spam, plus always log 0% and 100%
+  static int lastReportedPct = -1;
+  bool shouldLog = (pct == 0) || (pct == 100) || (pct % 10 == 0 && pct != lastReportedPct);
+  if (shouldLog) {
+    DebugTf(PSTR("Upgrade progress: %d%%\r\n"), pct);
+    lastReportedPct = pct;
+  }
   
   // Update progress for polling API
   currentPICFlashProgress = pct;
@@ -2179,7 +2214,8 @@ void fwreportinfo(OTGWFirmware fw, const char *version) {
 }
 
 void fwupgradestart(const char *hexfile) {
-  DebugTf(PSTR("Start PIC upgrade with hexfile: %s\n\r"), hexfile);
+  DebugTln(F("--- fwupgradestart() ---"));
+  DebugTf(PSTR("Hex file path: %s\r\n"), hexfile);
   OTGWError result;
   
   // Store filename for WebSocket progress messages and polling API
@@ -2191,20 +2227,31 @@ void fwupgradestart(const char *hexfile) {
     filename = hexfile; // No path, use as-is
   }
   strlcpy(currentPICFlashFile, filename, sizeof(currentPICFlashFile));
+  DebugTf(PSTR("Extracted filename: %s\r\n"), currentPICFlashFile);
   
   // Mark flash as started
   isPICFlashing = true;
   currentPICFlashProgress = 0;
   errorupgrade[0] = '\0'; // Clear previous error
-  
+  DebugTln(F("Flash state set: isPICFlashing=true, progress=0"));
+
+  // Turn on LED to indicate flashing
   digitalWrite(LED1, LOW);
+  DebugTln(F("LED1 activated (LOW=ON)"));
+  DebugTln(F("Calling OTGWSerial.startUpgrade()..."));
   result = OTGWSerial.startUpgrade(hexfile);
   if (result!= OTGWError::OTGW_ERROR_NONE) {
+    DebugTf(PSTR("ERROR: startUpgrade() failed immediately with error code %d\r\n"), (int)result);
     fwupgradedone(result);
   } else {
+    DebugTln(F("SUCCESS: startUpgrade() returned OTGW_ERROR_NONE"));
+    DebugTln(F("Registering callbacks..."));
     OTGWSerial.registerFinishedCallback(fwupgradedone);
     OTGWSerial.registerProgressCallback(fwupgradestep);
+    DebugTln(F("Callbacks registered: fwupgradedone, fwupgradestep"));
+    DebugTln(F("Upgrade is now running in background"));
   }
+  DebugTln(F("--- fwupgradestart() complete ---"));
 }
 
 String checkforupdatepic(String filename){
@@ -2272,9 +2319,16 @@ String pendingUpgradePath = "";
 
 void handlePendingUpgrade() {
   if (pendingUpgradePath != F("")) {
-    DebugTf(PSTR("Executing deferred upgrade for: %s\r\n"), pendingUpgradePath.c_str());
+    DebugTln(F(""));
+    DebugTln(F("=== Starting Deferred PIC Upgrade ==="));
+    DebugTf(PSTR("Hex file path: %s\r\n"), pendingUpgradePath.c_str());
+    DebugTf(PSTR("Flash state: isESPFlashing=%d, isPICFlashing=%d\r\n"), isESPFlashing, isPICFlashing);
+    DebugTf(PSTR("Free heap: %d bytes\r\n"), ESP.getFreeHeap());
     upgradepicnow(pendingUpgradePath.c_str());
     pendingUpgradePath = "";
+    DebugTln(F("Deferred upgrade initiated, upgrade now runs in background"));
+    DebugTln(F("Monitor progress via telnet or WebUI"));
+    DebugTln(F("======================================="));
   }
 }
 
@@ -2282,25 +2336,34 @@ void upgradepic() {
   const String action = httpServer.arg("action");
   const String filename = httpServer.arg("name");
   const String version = httpServer.arg("version");
-  
-  DebugTf(PSTR("Action: %s %s %s\r\n"), action.c_str(), filename.c_str(), version.c_str());
+
+  DebugTln(F("=== PIC Flash HTTP Request Received ==="));
+  DebugTf(PSTR("Action: %s, File: %s, Version: %s\r\n"), action.c_str(), filename.c_str(), version.c_str());
+  DebugTf(PSTR("PIC Device ID: %s\r\n"), sPICdeviceid);
+  DebugTf(PSTR("Current state: isPICFlashing=%d, isESPFlashing=%d\r\n"), isPICFlashing, isESPFlashing);
   
   if (action.isEmpty() || filename.isEmpty()) {
+    DebugTln(F("ERROR: Missing action or filename parameter"));
     httpServer.send_P(400, PSTR("text/plain"), PSTR("Missing action or name"));
     return;
   }
 
   if (strcmp(sPICdeviceid, "unknown") == 0) {
-    DebugTln(F("No PIC device id is unknown, don't upgrade"));
+    DebugTln(F("ERROR: PIC device id is unknown, cannot upgrade"));
+    httpServer.send_P(400, PSTR("text/plain"), PSTR("PIC device not detected"));
     return; // no pic version found, don't upgrade
   }
   
   if (action == F("upgrade")) {
-    DebugTf(PSTR("Upgrade /%s/%s\r\n"), sPICdeviceid, filename.c_str());
+    DebugTf(PSTR("Upgrade requested for /%s/%s\r\n"), sPICdeviceid, filename.c_str());
     httpServer.send_P(200, PSTR("application/json"), PSTR("{\"status\":\"started\"}"));
+    httpServer.client().flush();  // Ensure response buffer is sent to client
+    DebugTln(F("HTTP response sent and flushed"));
     
     // Defer the actual upgrade start to the main loop to ensure HTTP response is sent
     pendingUpgradePath = "/" + String(sPICdeviceid) + "/" + filename;
+    DebugTf(PSTR("Pending upgrade queued: [%s]\r\n"), pendingUpgradePath.c_str());
+    DebugTln(F("=== HTTP handler complete, upgrade will start in main loop ==="));
     return;
   } else if (action == F("refresh")) {
     DebugTf(PSTR("Refresh %s/%s\r\n"), sPICdeviceid, filename.c_str());

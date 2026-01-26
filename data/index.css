@@ -1020,3 +1020,51 @@ body.disable-interaction {
 .waiting-error {
   color: red;
 }
+
+/* Flash debug panel (Safari-friendly) */
+.flash-debug-section {
+  margin-top: 16px;
+  padding: 10px;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  background: #fafafa;
+}
+
+.flash-debug-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.flash-debug-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flash-debug-toggle {
+  font-weight: normal;
+}
+
+.flash-debug-btn {
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 1px solid #c0c0c0;
+  border-radius: 4px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.flash-debug-log {
+  height: 140px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid #d8d8d8;
+  border-radius: 4px;
+  background: #ffffff;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+}

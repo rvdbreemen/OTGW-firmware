@@ -1031,3 +1031,55 @@ body.disable-interaction {
 .waiting-error {
   color: #ff6b6b;
 }
+
+/* Flash debug panel (Safari-friendly) */
+.flash-debug-section {
+  margin-top: 16px;
+  padding: 10px;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  background: #1e1e1e;
+}
+
+.flash-debug-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: #f0f0f0;
+}
+
+.flash-debug-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flash-debug-toggle {
+  font-weight: normal;
+  color: #d0d0d0;
+}
+
+.flash-debug-btn {
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #2a2a2a;
+  color: #e0e0e0;
+  cursor: pointer;
+}
+
+.flash-debug-log {
+  height: 140px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  background: #141414;
+  color: #e0e0e0;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
