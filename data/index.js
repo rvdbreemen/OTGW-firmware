@@ -458,8 +458,7 @@ function initOTLogWebSocket(force) {
 
   const wsHost = window.location.hostname;
   const wsPort = WEBSOCKET_PORT;
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsURL = protocol + '//' + wsHost + ':' + wsPort + '/';
+  const wsURL = 'ws://' + wsHost + ':' + wsPort + '/';
   
   // Close existing connection if it exists
   if (otLogWS) {
