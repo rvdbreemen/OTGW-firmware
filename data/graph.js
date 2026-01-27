@@ -259,8 +259,14 @@ var OTGraph = {
         // Try to safe to FileSystem Handle first (if available via index.js helper)
         if (window.saveBlobToLogDir) {
             // Convert DataURL to Blob
-            var arr = url.split(','), mime = arr[0].match(/:(.*?);/)[1],
-                bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+            var arr = url.split(',');
+            var mimeMatch = arr[0].match(/:(.*?);/);
+            if (!mimeMatch || !mimeMatch[1]) {
+                console.error('Failed to extract MIME type from data URL');
+                return;
+            }
+            var mime = mimeMatch[1];
+            var bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
             while(n--) u8arr[n] = bstr.charCodeAt(n);
             var blob = new Blob([u8arr], {type:mime});
 
@@ -574,17 +580,40 @@ var OTGraph = {
                      }
                  }
 
-                 if (val === null) return;
+                 if (val === null || !isFinite(val)) return;
                  
                  var key = null;
                  switch(id) {
-                     case 17: key = 'mod'; break;
-                     case 1:  key = 'ctrlSp'; break;
-                     case 25: key = 'boiler'; break;
-                     case 28: key = 'return'; break;
-                     case 16: key = 'roomSp'; break;
-                     case 24: key = 'room'; break;
-                     case 27: key = 'outside'; break;
+                     case 17: 
+                         key = 'mod';
+                         // Modulation should be 0-100%
+                         if (val < 0 || val > 100) return;
+                         break;
+                     case 1:  
+                         key = 'ctrlSp';
+                         // Temperature bounds check (reasonable range -50°C to 150°C)
+                         if (val < -50 || val > 150) return;
+                         break;
+                     case 25: 
+                         key = 'boiler';
+                         if (val < -50 || val > 150) return;
+                         break;
+                     case 28: 
+                         key = 'return';
+                         if (val < -50 || val > 150) return;
+                         break;
+                     case 16: 
+                         key = 'roomSp';
+                         if (val < -50 || val > 150) return;
+                         break;
+                     case 24: 
+                         key = 'room';
+                         if (val < -50 || val > 150) return;
+                         break;
+                     case 27: 
+                         key = 'outside';
+                         if (val < -50 || val > 150) return;
+                         break;
                  }
                  if (key) this.pushData(key, now, val);
             }
