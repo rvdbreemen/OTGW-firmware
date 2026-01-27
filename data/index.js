@@ -35,6 +35,7 @@ function isPageVisible() {
 
 document.addEventListener('visibilitychange', function () {
   if (!isPageVisible()) {
+    // When tab is hidden, stop UI updates to save resources but KEEP WebSocket connected
     if (timeupdate) {
       clearInterval(timeupdate);
       timeupdate = null;
@@ -43,13 +44,16 @@ document.addEventListener('visibilitychange', function () {
       clearInterval(tid);
       tid = 0;
     }
-    disconnectOTLogWebSocket();
+    // WebSocket stays connected to continue gathering data in background
+    // The watchdog timer will keep it alive and reconnect if needed
     return;
   }
+  // When tab becomes visible again, resume UI updates
   if (!flashModeActive) {
     if (!timeupdate) {
       timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
     }
+    // Ensure WebSocket is connected (will reconnect if needed)
     initOTLogWebSocket();
     if (!tid) {
       tid = setInterval(function () { refreshOTmonitor(); }, 1000);
@@ -477,11 +481,22 @@ function initOTLogWebSocket(force) {
         wsReconnectTimer = null;
       }
       resetWSWatchdog();
+      
+      // Record reconnect event in graph
+      if (typeof OTGraph !== 'undefined' && OTGraph.recordReconnect) {
+        OTGraph.recordReconnect();
+      }
     };
     
     otLogWS.onclose = function() {
       console.log('OT Log WebSocket disconnected');
       updateWSStatus(false);
+      
+      // Record disconnect event in graph
+      if (typeof OTGraph !== 'undefined' && OTGraph.recordDisconnect) {
+        OTGraph.recordDisconnect();
+      }
+      
       // Stop watchdog
       if (wsWatchdogTimer) {
         clearTimeout(wsWatchdogTimer);
@@ -2877,8 +2892,12 @@ function processStatsLine(line) {
         const entry = statsBuffer[key];
         const diff = (now - entry.lastTime) / 1000.0; // seconds
         
-        entry.intervalSum += diff;
-        entry.intervalCount++;
+        // Only accumulate interval if this is not the first message (entry.count > 0)
+        // This prevents counting the buffer-creation-to-first-message interval
+        if (entry.count > 0) {
+            entry.intervalSum += diff;
+            entry.intervalCount++;
+        }
         
         entry.lastTime = now;
         entry.value = value;

@@ -24,6 +24,7 @@ var OTGraph = {
     currentTheme: 'light',
     lastUpdate: 0,
     updateInterval: UPDATE_INTERVAL_MS,
+    disconnectMarkers: [], // Track disconnect/reconnect events: [{time: timestamp, type: 'disconnect'|'reconnect'}]
 
     // Define palettes
     palettes: {
@@ -64,10 +65,10 @@ var OTGraph = {
         { id: 'dhwMode', label: 'DHW Mode', gridIndex: 1, type: 'line', step: 'start', areaStyle: { opacity: 0.3 }, large: true, sampling: 'lttb' },
         { id: 'chMode',  label: 'CH Mode',  gridIndex: 2, type: 'line', step: 'start', areaStyle: { opacity: 0.3 }, large: true, sampling: 'lttb' },
         { id: 'mod',     label: 'Modulation (%)',   gridIndex: 3, type: 'line', step: false, large: true, sampling: 'lttb' },
-        { id: 'ctrlSp',  label: 'Control SP',       gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
+        { id: 'ctrlSp',  label: 'Control SetPoint',       gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
         { id: 'boiler',  label: 'Boiler Temp',      gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
         { id: 'return',  label: 'Return Temp',      gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
-        { id: 'roomSp',  label: 'Room SP',          gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
+        { id: 'roomSp',  label: 'Room SetPoint',          gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
         { id: 'room',    label: 'Room Temp',        gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
         { id: 'outside', label: 'Outside Temp',     gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' }
     ],
@@ -321,24 +322,35 @@ var OTGraph = {
                 trigger: 'axis',
                 axisPointer: { type: 'cross' }
             },
+            // Panel titles for each sub-graph
+            title: [
+                { text: 'Flame Status', left: '1%', top: '6%', textStyle: { fontSize: 12, fontWeight: 'bold' } },
+                { text: 'DHW Mode', left: '1%', top: '16%', textStyle: { fontSize: 12, fontWeight: 'bold' } },
+                { text: 'CH Mode', left: '1%', top: '26%', textStyle: { fontSize: 12, fontWeight: 'bold' } },
+                { text: 'Modulation', left: '1%', top: '39%', textStyle: { fontSize: 12, fontWeight: 'bold' } },
+                { text: 'Temperatures', left: '1%', top: '64%', textStyle: { fontSize: 12, fontWeight: 'bold' } }
+            ],
+            // Legend specifically for temperature panel (shows all temp series with colors)
             legend: {
-                data: this.seriesConfig.map(c => c.label),
-                top: 0,
-                type: 'scroll'
+                data: ['Control SetPoint', 'Boiler Temp', 'Return Temp', 'Room SetPoint', 'Room Temp', 'Outside Temp'],
+                top: '62%',
+                left: '15%',
+                orient: 'horizontal',
+                type: 'scroll',
+                textStyle: { fontSize: 11 }
             },
             grid: [
-                // 5 vertical grids
-                // Margins: use percentages for responsive layout (space for axes labels on the left).
+                // 5 vertical grids - adjusted left margin to accommodate Y-axis labels
                 // 0: Flame (Top)
-                { left: '10%', right: '5%', top: '5%', height: '8%', containLabel: false }, 
+                { left: '12%', right: '5%', top: '5%', height: '8%', containLabel: true }, 
                 // 1: DHW Mode
-                { left: '10%', right: '5%', top: '15%', height: '8%', containLabel: false }, 
+                { left: '12%', right: '5%', top: '15%', height: '8%', containLabel: true }, 
                 // 2: CH Mode
-                { left: '10%', right: '5%', top: '25%', height: '8%', containLabel: false }, 
+                { left: '12%', right: '5%', top: '25%', height: '8%', containLabel: true }, 
                 // 3: Modulation
-                { left: '10%', right: '5%', top: '38%', height: '20%', containLabel: false }, 
+                { left: '12%', right: '5%', top: '38%', height: '20%', containLabel: true }, 
                 // 4: Temps (Bottom section, largest)
-                { left: '10%', right: '5%', top: '63%', bottom: '5%', containLabel: false } 
+                { left: '12%', right: '5%', top: '67%', bottom: '5%', containLabel: true } 
             ],
             axisPointer: {
                 link: { xAxisIndex: 'all' }
@@ -352,31 +364,130 @@ var OTGraph = {
                 { type: 'time', gridIndex: 4, axisLabel: { show: true },  splitLine: { show: true }, min: this.getMinTime() }
             ],
             yAxis: [
-                // 0: Flame (0-1)
-                { type: 'value', gridIndex: 0, min: 0, max: 1.2, interval: 1, splitLine: { show: false }, axisLabel: { show: false } },
-                // 1: DHW (0-1)
-                { type: 'value', gridIndex: 1, min: 0, max: 1.2, interval: 1, splitLine: { show: false }, axisLabel: { show: false } },
-                // 2: CH (0-1)
-                { type: 'value', gridIndex: 2, min: 0, max: 1.2, interval: 1, splitLine: { show: false }, axisLabel: { show: false } },
-                // 3: Mod (0-100)
-                { type: 'value', gridIndex: 3, min: 0, max: 100, splitLine: { show: true } },
-                // 4: Temps
-                { type: 'value', gridIndex: 4, splitLine: { show: true } }
+                // 0: Flame (0-1) with On/Off labels
+                { 
+                    type: 'value', 
+                    gridIndex: 0, 
+                    min: 0, 
+                    max: 1.2, 
+                    interval: 1, 
+                    splitLine: { show: false }, 
+                    axisLabel: { 
+                        show: true,
+                        formatter: function(value) {
+                            if (value === 0) return 'Off';
+                            if (value === 1) return 'On';
+                            return '';
+                        }
+                    }
+                },
+                // 1: DHW (0-1) with On/Off labels
+                { 
+                    type: 'value', 
+                    gridIndex: 1, 
+                    min: 0, 
+                    max: 1.2, 
+                    interval: 1, 
+                    splitLine: { show: false }, 
+                    axisLabel: { 
+                        show: true,
+                        formatter: function(value) {
+                            if (value === 0) return 'Off';
+                            if (value === 1) return 'On';
+                            return '';
+                        }
+                    }
+                },
+                // 2: CH (0-1) with On/Off labels
+                { 
+                    type: 'value', 
+                    gridIndex: 2, 
+                    min: 0, 
+                    max: 1.2, 
+                    interval: 1, 
+                    splitLine: { show: false }, 
+                    axisLabel: { 
+                        show: true,
+                        formatter: function(value) {
+                            if (value === 0) return 'Off';
+                            if (value === 1) return 'On';
+                            return '';
+                        }
+                    }
+                },
+                // 3: Mod (0-100) with percentage labels
+                { 
+                    type: 'value', 
+                    gridIndex: 3, 
+                    min: 0, 
+                    max: 100, 
+                    splitLine: { show: true },
+                    axisLabel: { 
+                        show: true,
+                        formatter: '{value}%'
+                    }
+                },
+                // 4: Temps with degree Celsius labels
+                { 
+                    type: 'value', 
+                    gridIndex: 4, 
+                    splitLine: { show: true },
+                    axisLabel: { 
+                        show: true,
+                        formatter: '{value}°C'
+                    }
+                }
             ],
-            series: this.seriesConfig.map(c => ({
-                name: c.label,
-                type: c.type,
-                step: c.step,
-                xAxisIndex: c.gridIndex,
-                yAxisIndex: c.gridIndex,
-                showSymbol: false,
-                lineStyle: { width: 1.5 }, // Slightly thinner lines for better performance with dense data
-                itemStyle: { color: palette[c.id] }, // Get color from palette
-                areaStyle: c.areaStyle || undefined,
-                large: c.large,        // Enable large dataset optimization
-                sampling: c.sampling,  // Enable downsampling
-                data: this.data[c.id]
-            }))
+            series: this.seriesConfig.map((c, idx) => {
+                var seriesConfig = {
+                    name: c.label,
+                    type: c.type,
+                    step: c.step,
+                    xAxisIndex: c.gridIndex,
+                    yAxisIndex: c.gridIndex,
+                    showSymbol: false,
+                    lineStyle: { width: 1.5 }, // Slightly thinner lines for better performance with dense data
+                    itemStyle: { color: palette[c.id] }, // Get color from palette
+                    areaStyle: c.areaStyle || undefined,
+                    large: c.large,        // Enable large dataset optimization
+                    sampling: c.sampling,  // Enable downsampling
+                    data: this.data[c.id]
+                };
+                
+                // Add disconnect/reconnect markers to the first series of each grid to avoid duplicates
+                // Only add to first series in each grid: flame(0), dhwMode(1), chMode(2), mod(3), ctrlSp(4)
+                if (idx === 0 || idx === 1 || idx === 2 || idx === 3 || idx === 4) {
+                    var markLineData = [];
+                    this.disconnectMarkers.forEach(function(marker) {
+                        var isDisconnect = marker.type === 'disconnect';
+                        markLineData.push({
+                            xAxis: marker.time,
+                            lineStyle: {
+                                color: isDisconnect ? '#ff4444' : '#44ff44',
+                                type: 'dashed',
+                                width: 2
+                            },
+                            label: {
+                                show: true,
+                                position: 'end',
+                                formatter: isDisconnect ? 'Disconnected' : 'Connected',
+                                color: isDisconnect ? '#ff4444' : '#44ff44',
+                                fontSize: 10
+                            }
+                        });
+                    });
+                    
+                    if (markLineData.length > 0) {
+                        seriesConfig.markLine = {
+                            silent: true,
+                            symbol: 'none',
+                            data: markLineData
+                        };
+                    }
+                }
+                
+                return seriesConfig;
+            })
         };
 
         this.chart.setOption(option);
@@ -386,6 +497,34 @@ var OTGraph = {
     resize: function() {
         if (this.chart) {
             this.chart.resize();
+        }
+    },
+
+    recordDisconnect: function() {
+        var now = new Date().getTime();
+        this.disconnectMarkers.push({ time: now, type: 'disconnect' });
+        console.log('Graph: Disconnect marker added at', new Date(now).toISOString());
+        // Trim old markers outside current max time window (24h)
+        var cutoff = now - (24 * 3600 * 1000);
+        this.disconnectMarkers = this.disconnectMarkers.filter(function(m) { return m.time > cutoff; });
+        
+        // Update chart to display the marker immediately
+        if (this.chart) {
+            this.updateOption();
+        }
+    },
+
+    recordReconnect: function() {
+        var now = new Date().getTime();
+        this.disconnectMarkers.push({ time: now, type: 'reconnect' });
+        console.log('Graph: Connected marker added at', new Date(now).toISOString());
+        // Trim old markers outside current max time window (24h)
+        var cutoff = now - (24 * 3600 * 1000);
+        this.disconnectMarkers = this.disconnectMarkers.filter(function(m) { return m.time > cutoff; });
+        
+        // Update chart to display the marker immediately
+        if (this.chart) {
+            this.updateOption();
         }
     },
 
