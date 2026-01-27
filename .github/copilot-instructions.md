@@ -26,6 +26,17 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
 - **Communication**: Serial interface to OpenTherm Gateway PIC controller
 - **Integration**: MQTT for Home Assistant Auto Discovery, REST API, TCP socket for OTmonitor
 
+## Network Architecture and Security
+
+- **Target Environment**: Local network use only (not internet-exposed)
+- **HTTP Only**: This codebase uses HTTP only, never HTTPS
+- **WebSocket Protocol**: Always uses `ws://` protocol, never `wss://`
+- **No TLS/SSL**: The ESP8266 firmware does not implement TLS/SSL encryption
+- **Reverse Proxy**: While the REST API and basic Web UI can work behind a reverse proxy with HTTPS, WebSocket-based features (live OT message log) assume plain HTTP and may not function correctly via HTTPS reverse proxy
+- **Security Model**: Device should be accessed only on trusted local networks; use VPN for remote access if needed
+
+**CRITICAL**: Never add HTTPS or WSS (WebSocket Secure) protocol detection or support to this codebase. All network communication uses unencrypted HTTP and WS protocols.
+
 ## Coding Conventions
 
 ### General Guidelines
