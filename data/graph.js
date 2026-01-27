@@ -322,24 +322,35 @@ var OTGraph = {
                 trigger: 'axis',
                 axisPointer: { type: 'cross' }
             },
+            // Panel titles for each sub-graph
+            title: [
+                { text: 'Flame Status', left: '1%', top: '6%', textStyle: { fontSize: 12, fontWeight: 'bold' } },
+                { text: 'DHW Mode', left: '1%', top: '16%', textStyle: { fontSize: 12, fontWeight: 'bold' } },
+                { text: 'CH Mode', left: '1%', top: '26%', textStyle: { fontSize: 12, fontWeight: 'bold' } },
+                { text: 'Modulation', left: '1%', top: '39%', textStyle: { fontSize: 12, fontWeight: 'bold' } },
+                { text: 'Temperatures', left: '1%', top: '64%', textStyle: { fontSize: 12, fontWeight: 'bold' } }
+            ],
+            // Legend specifically for temperature panel (shows all temp series with colors)
             legend: {
-                data: this.seriesConfig.map(c => c.label),
-                top: 0,
-                type: 'scroll'
+                data: ['Control SP', 'Boiler Temp', 'Return Temp', 'Room SP', 'Room Temp', 'Outside Temp'],
+                top: '62%',
+                left: '15%',
+                orient: 'horizontal',
+                type: 'scroll',
+                textStyle: { fontSize: 11 }
             },
             grid: [
-                // 5 vertical grids
-                // Margins: use percentages for responsive layout (space for axes labels on the left).
+                // 5 vertical grids - adjusted left margin to accommodate Y-axis labels
                 // 0: Flame (Top)
-                { left: '10%', right: '5%', top: '5%', height: '8%', containLabel: false }, 
+                { left: '12%', right: '5%', top: '5%', height: '8%', containLabel: true }, 
                 // 1: DHW Mode
-                { left: '10%', right: '5%', top: '15%', height: '8%', containLabel: false }, 
+                { left: '12%', right: '5%', top: '15%', height: '8%', containLabel: true }, 
                 // 2: CH Mode
-                { left: '10%', right: '5%', top: '25%', height: '8%', containLabel: false }, 
+                { left: '12%', right: '5%', top: '25%', height: '8%', containLabel: true }, 
                 // 3: Modulation
-                { left: '10%', right: '5%', top: '38%', height: '20%', containLabel: false }, 
+                { left: '12%', right: '5%', top: '38%', height: '20%', containLabel: true }, 
                 // 4: Temps (Bottom section, largest)
-                { left: '10%', right: '5%', top: '63%', bottom: '5%', containLabel: false } 
+                { left: '12%', right: '5%', top: '67%', bottom: '5%', containLabel: true } 
             ],
             axisPointer: {
                 link: { xAxisIndex: 'all' }
@@ -353,16 +364,79 @@ var OTGraph = {
                 { type: 'time', gridIndex: 4, axisLabel: { show: true },  splitLine: { show: true }, min: this.getMinTime() }
             ],
             yAxis: [
-                // 0: Flame (0-1)
-                { type: 'value', gridIndex: 0, min: 0, max: 1.2, interval: 1, splitLine: { show: false }, axisLabel: { show: false } },
-                // 1: DHW (0-1)
-                { type: 'value', gridIndex: 1, min: 0, max: 1.2, interval: 1, splitLine: { show: false }, axisLabel: { show: false } },
-                // 2: CH (0-1)
-                { type: 'value', gridIndex: 2, min: 0, max: 1.2, interval: 1, splitLine: { show: false }, axisLabel: { show: false } },
-                // 3: Mod (0-100)
-                { type: 'value', gridIndex: 3, min: 0, max: 100, splitLine: { show: true } },
-                // 4: Temps
-                { type: 'value', gridIndex: 4, splitLine: { show: true } }
+                // 0: Flame (0-1) with On/Off labels
+                { 
+                    type: 'value', 
+                    gridIndex: 0, 
+                    min: 0, 
+                    max: 1.2, 
+                    interval: 1, 
+                    splitLine: { show: false }, 
+                    axisLabel: { 
+                        show: true,
+                        formatter: function(value) {
+                            if (value === 0) return 'Off';
+                            if (value === 1) return 'On';
+                            return '';
+                        }
+                    }
+                },
+                // 1: DHW (0-1) with On/Off labels
+                { 
+                    type: 'value', 
+                    gridIndex: 1, 
+                    min: 0, 
+                    max: 1.2, 
+                    interval: 1, 
+                    splitLine: { show: false }, 
+                    axisLabel: { 
+                        show: true,
+                        formatter: function(value) {
+                            if (value === 0) return 'Off';
+                            if (value === 1) return 'On';
+                            return '';
+                        }
+                    }
+                },
+                // 2: CH (0-1) with On/Off labels
+                { 
+                    type: 'value', 
+                    gridIndex: 2, 
+                    min: 0, 
+                    max: 1.2, 
+                    interval: 1, 
+                    splitLine: { show: false }, 
+                    axisLabel: { 
+                        show: true,
+                        formatter: function(value) {
+                            if (value === 0) return 'Off';
+                            if (value === 1) return 'On';
+                            return '';
+                        }
+                    }
+                },
+                // 3: Mod (0-100) with percentage labels
+                { 
+                    type: 'value', 
+                    gridIndex: 3, 
+                    min: 0, 
+                    max: 100, 
+                    splitLine: { show: true },
+                    axisLabel: { 
+                        show: true,
+                        formatter: '{value}%'
+                    }
+                },
+                // 4: Temps with degree Celsius labels
+                { 
+                    type: 'value', 
+                    gridIndex: 4, 
+                    splitLine: { show: true },
+                    axisLabel: { 
+                        show: true,
+                        formatter: '{value}°C'
+                    }
+                }
             ],
             series: this.seriesConfig.map((c, idx) => {
                 var seriesConfig = {
