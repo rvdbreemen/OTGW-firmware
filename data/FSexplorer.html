@@ -14,17 +14,17 @@
       <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
-      <link rel="stylesheet" href="FSexplorer.css" id="theme-style">
       <script>
         (function() {
+          var css = "FSexplorer.css";
           try {
             var storedTheme = localStorage.getItem('theme');
             if (storedTheme === 'dark') {
-              var el = document.getElementById('theme-style');
-              if(el) el.href = "FSexplorer_dark.css";
+              css = "FSexplorer_dark.css";
               document.documentElement.className = 'dark';
             }
           } catch (e) { console.error(e); }
+          document.write('<link rel="stylesheet" href="' + css + '" id="theme-style">');
         })();
       </script>
       <title>FSexplorer ESP</title>
