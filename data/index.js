@@ -137,6 +137,7 @@ window.otgwDebug = {
     console.log('  otgwDebug.otmonitor()     - Show current OT monitor data');
     console.log('  otgwDebug.logs()          - Show buffered log lines');
     console.log('  otgwDebug.clearLogs()     - Clear log buffer');
+    console.log('  otgwDebug.persistence()   - Show localStorage persistence info');
     console.log('');
     console.log('%c⚙️  API Testing:', 'color: #00aaff; font-weight: bold;');
     console.log('  otgwDebug.api(endpoint)   - Test API endpoint (e.g., "v1/devinfo")');
@@ -234,6 +235,17 @@ window.otgwDebug = {
       console.log('No OT monitor data available');
     }
     console.groupEnd();
+  },
+  
+  // Show persistence info
+  persistence: function() {
+    if (window.otgwPersistence) {
+      console.group('💾 LocalStorage Persistence Info');
+      window.otgwPersistence.info();
+      console.groupEnd();
+    } else {
+      console.log('Persistence not initialized');
+    }
   },
 
   // Show buffered logs
@@ -347,13 +359,18 @@ console.log('%cType otgwDebug.help() for available commands', 'color: #ffaa00;')
 let otLogWS = null;
 let otLogBuffer = [];
 let otLogFilteredBuffer = [];
-const MAX_LOG_LINES_DEFAULT = 2000;
-const MAX_LOG_LINES_CAPTURE = 1000000; 
-const RENDER_LIMIT = 2000;
-let maxLogLines = MAX_LOG_LINES_DEFAULT; 
+
+// Dynamic memory management - no fixed limits, monitor actual usage
+const RENDER_LIMIT = 2000; // Still limit display rendering for performance
+let maxLogLines = null; // Dynamic - calculated based on available memory
+let captureMode = false; // User-requested unlimited mode
+const TARGET_MEMORY_MB = 100; // Target max memory for log buffer (reasonable for modern browsers)
+const STORAGE_SAFETY_MARGIN = 0.8; // Use 80% of available localStorage to leave room for other data
+let currentMemoryUsageMB = 0;
+let storageQuotaMB = 10; // Default, will be detected
+
 let autoScroll = true;
 let showTimestamps = true;
-let logExpanded = false;
 let searchTerm = '';
 let updatePending = false;
 let otLogControlsInitialized = false;
@@ -398,6 +415,408 @@ const WEBSOCKET_PORT = 81;
 let wsReconnectTimer = null;
 let wsWatchdogTimer = null;
 const WS_WATCHDOG_TIMEOUT = 45000; // 45 seconds timeout (allows for 30s keepalive + 15s margin)
+
+// LocalStorage persistence for data continuity across page reloads
+let persistenceTimer = null;
+let debouncedSaveTimer = null;
+const PERSISTENCE_INTERVAL_MS = 30000; // Fallback save every 30 seconds
+const DEBOUNCE_SAVE_MS = 2000; // Save 2 seconds after last data update
+const PERSISTENCE_KEY_LOGS = 'otgw_log_buffer';
+const PERSISTENCE_KEY_PREFS = 'otgw_log_prefs';
+let lastSaveTimestamp = 0;
+
+//============================================================================
+// Memory and Storage Monitoring
+//============================================================================
+
+function detectStorageQuota() {
+  if (!navigator.storage || !navigator.storage.estimate) {
+    console.warn('Storage quota API not available, using default 10MB');
+    return Promise.resolve(10 * 1024 * 1024);
+  }
+  
+  return navigator.storage.estimate().then(estimate => {
+    const quotaBytes = estimate.quota || (10 * 1024 * 1024);
+    const usageBytes = estimate.usage || 0;
+    const availableBytes = quotaBytes - usageBytes;
+    
+    console.log(`Storage quota: ${(quotaBytes / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`Storage used: ${(usageBytes / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`Storage available: ${(availableBytes / 1024 / 1024).toFixed(2)} MB`);
+    
+    storageQuotaMB = quotaBytes / 1024 / 1024;
+    return availableBytes;
+  }).catch(err => {
+    console.warn('Error detecting storage quota:', err);
+    return 10 * 1024 * 1024;
+  });
+}
+
+function estimateMemoryUsage() {
+  // Estimate memory usage of log buffer
+  if (otLogBuffer.length === 0) {
+    currentMemoryUsageMB = 0;
+    return 0;
+  }
+  
+  // Sample first entries for consistent, faster estimation (no random() overhead)
+  const sampleSize = Math.min(50, otLogBuffer.length);
+  let totalSize = 0;
+  
+  for (let i = 0; i < sampleSize; i++) {
+    const entry = otLogBuffer[i];
+    // Rough JSON size estimate
+    totalSize += JSON.stringify(entry).length;
+  }
+  
+  const avgSize = totalSize / sampleSize;
+  const estimatedBytes = avgSize * otLogBuffer.length;
+  currentMemoryUsageMB = estimatedBytes / 1024 / 1024;
+  
+  return currentMemoryUsageMB;
+}
+
+function getActualMemoryUsage() {
+  // Use performance.memory API if available (Chrome/Edge)
+  if (performance.memory) {
+    const usedMB = performance.memory.usedJSHeapSize / 1024 / 1024;
+    const totalMB = performance.memory.totalJSHeapSize / 1024 / 1024;
+    const limitMB = performance.memory.jsHeapSizeLimit / 1024 / 1024;
+    
+    return {
+      used: usedMB,
+      total: totalMB,
+      limit: limitMB,
+      available: limitMB - usedMB
+    };
+  }
+  
+  // Fallback: estimate from buffer
+  return {
+    used: currentMemoryUsageMB,
+    total: TARGET_MEMORY_MB,
+    limit: TARGET_MEMORY_MB,
+    available: TARGET_MEMORY_MB - currentMemoryUsageMB
+  };
+}
+
+function calculateOptimalMaxLines() {
+  if (captureMode) {
+    // In capture mode, use memory limit
+    const memInfo = getActualMemoryUsage();
+    const availableMB = Math.min(memInfo.available, TARGET_MEMORY_MB);
+    
+    // Assume ~500 bytes per log entry average (conservative)
+    const estimatedLines = Math.floor((availableMB * 1024 * 1024) / 500);
+    
+    console.log(`Capture mode: calculated max ${estimatedLines.toLocaleString()} lines (${availableMB.toFixed(1)} MB available)`);
+    return Math.max(10000, estimatedLines); // At least 10k lines
+  }
+  
+  // Normal mode: balance between memory and storage
+  const memInfo = getActualMemoryUsage();
+  const availableMemoryLines = Math.floor((memInfo.available * 1024 * 1024) / 500);
+  
+  // Also consider localStorage limit
+  const availableStorageBytes = storageQuotaMB * 1024 * 1024 * STORAGE_SAFETY_MARGIN;
+  const availableStorageLines = Math.floor(availableStorageBytes / 500);
+  
+  // Use the smaller of the two
+  const calculated = Math.min(availableMemoryLines, availableStorageLines);
+  const reasonable = Math.max(5000, Math.min(calculated, 200000)); // 5k to 200k range
+  
+  console.log(`Normal mode: max ${reasonable.toLocaleString()} lines (mem: ${availableMemoryLines.toLocaleString()}, storage: ${availableStorageLines.toLocaleString()})`);
+  return reasonable;
+}
+
+function updateDynamicLimits() {
+  maxLogLines = calculateOptimalMaxLines();
+  
+  // Update UI display
+  const limitDisplay = document.getElementById('logLimitDisplay');
+  if (limitDisplay) {
+    if (captureMode) {
+      limitDisplay.textContent = ` / ${(maxLogLines / 1000).toFixed(0)}k (capture)`;
+    } else {
+      limitDisplay.textContent = ` / ${(maxLogLines / 1000).toFixed(0)}k (auto)`;
+    }
+  }
+  
+  // Update memory display
+  updateMemoryDisplay();
+}
+
+function updateMemoryDisplay() {
+  const memUsage = document.getElementById('memUsage');
+  if (!memUsage) return;
+  
+  estimateMemoryUsage();
+  const memInfo = getActualMemoryUsage();
+  
+  // Always show buffer size (more relevant than total heap)
+  const bufferMB = currentMemoryUsageMB.toFixed(1);
+  const linesK = (otLogBuffer.length / 1000).toFixed(1);
+  
+  if (performance.memory) {
+    // Show buffer size with actual heap info in tooltip
+    memUsage.textContent = `${bufferMB} MB (${linesK}k lines)`;
+    memUsage.title = `Log Buffer: ~${bufferMB} MB (${otLogBuffer.length.toLocaleString()} lines)\nTotal Heap: ${memInfo.used.toFixed(1)} MB used / ${memInfo.limit.toFixed(0)} MB limit`;
+  } else {
+    memUsage.textContent = `~${bufferMB} MB (${linesK}k lines)`;
+    memUsage.title = `Estimated log buffer size: ${bufferMB} MB (${otLogBuffer.length.toLocaleString()} lines)`;
+  }
+}
+
+// Initialize storage quota detection
+detectStorageQuota().then(() => {
+  updateDynamicLimits();
+});
+
+//============================================================================
+// LocalStorage Persistence Functions
+//============================================================================
+
+function saveDataToLocalStorage() {
+  if (!window.localStorage) {
+    console.warn('localStorage not available');
+    return false;
+  }
+
+  try {
+    // Check available storage
+    const availableBytes = storageQuotaMB * 1024 * 1024 * STORAGE_SAFETY_MARGIN;
+    let logsToSave = otLogBuffer;
+    
+    // Estimate actual size by sampling
+    let estimatedSize = 0;
+    if (logsToSave.length > 0) {
+      const sampleSize = Math.min(50, logsToSave.length);
+      let sampleBytes = 0;
+      for (let i = 0; i < sampleSize; i++) {
+        const idx = Math.floor(Math.random() * logsToSave.length);
+        sampleBytes += JSON.stringify(logsToSave[idx]).length;
+      }
+      const avgSize = sampleBytes / sampleSize;
+      estimatedSize = avgSize * logsToSave.length;
+    }
+    
+    // If too large, keep only the most recent entries that fit
+    if (estimatedSize > availableBytes) {
+      const avgSize = estimatedSize / logsToSave.length;
+      const maxEntries = Math.floor(availableBytes / avgSize);
+      logsToSave = otLogBuffer.slice(-maxEntries);
+      console.log(`Truncating saved logs from ${otLogBuffer.length} to ${maxEntries} entries to fit storage (${(estimatedSize/1024/1024).toFixed(2)} MB → ${(availableBytes/1024/1024).toFixed(2)} MB)`);
+    }
+    
+    const logData = JSON.stringify(logsToSave);
+    localStorage.setItem(PERSISTENCE_KEY_LOGS, logData);
+    
+    // Save user preferences
+    const prefs = {
+      autoScroll: autoScroll,
+      showTimestamps: showTimestamps,
+      captureMode: captureMode,
+      searchTerm: searchTerm,
+      savedAt: new Date().toISOString()
+    };
+    localStorage.setItem(PERSISTENCE_KEY_PREFS, JSON.stringify(prefs));
+    
+    console.log(`Saved ${logsToSave.length} log entries to localStorage`);
+    return true;
+    
+  } catch (e) {
+    // Handle quota exceeded or other errors
+    console.error('Failed to save to localStorage:', e);
+    
+    // If quota exceeded, try with fewer entries
+    if (e.name === 'QuotaExceededError' || e.code === 22) {
+      console.warn('Storage quota exceeded, attempting to save fewer entries...');
+      try {
+        // Try with half the entries
+        const halfEntries = otLogBuffer.slice(-Math.floor(otLogBuffer.length / 2));
+        const logData = JSON.stringify(halfEntries);
+        localStorage.setItem(PERSISTENCE_KEY_LOGS, logData);
+        console.log(`Saved ${halfEntries.length} log entries (reduced) to localStorage`);
+        return true;
+      } catch (e2) {
+        console.error('Even reduced save failed:', e2);
+        return false;
+      }
+    }
+    return false;
+  }
+}
+
+function restoreDataFromLocalStorage() {
+  if (!window.localStorage) {
+    console.warn('localStorage not available');
+    return false;
+  }
+
+  try {
+    // Restore log buffer
+    const savedLogs = localStorage.getItem(PERSISTENCE_KEY_LOGS);
+    if (savedLogs) {
+      const logs = JSON.parse(savedLogs);
+      if (Array.isArray(logs) && logs.length > 0) {
+        otLogBuffer = logs;
+        updateFilteredBuffer();
+        scheduleDisplayUpdate();
+        console.log(`Restored ${logs.length} log entries from localStorage`);
+      }
+    }
+    
+    // Restore preferences
+    const savedPrefs = localStorage.getItem(PERSISTENCE_KEY_PREFS);
+    if (savedPrefs) {
+      const prefs = JSON.parse(savedPrefs);
+      if (prefs) {
+        autoScroll = prefs.autoScroll !== undefined ? prefs.autoScroll : true;
+        showTimestamps = prefs.showTimestamps !== undefined ? prefs.showTimestamps : true;
+        captureMode = prefs.captureMode !== undefined ? prefs.captureMode : false;
+        searchTerm = prefs.searchTerm || '';
+        
+        // Recalculate dynamic limits based on current system
+        updateDynamicLimits();
+        
+        console.log(`Restored preferences from localStorage (saved at ${prefs.savedAt || 'unknown'})`);
+        
+        // Update UI to match restored preferences (will be applied when controls initialize)
+        setTimeout(() => {
+          const chkAutoScroll = document.getElementById('chkAutoScroll');
+          if (chkAutoScroll) chkAutoScroll.checked = autoScroll;
+          
+          const chkShowTimestamp = document.getElementById('chkShowTimestamp');
+          if (chkShowTimestamp) chkShowTimestamp.checked = showTimestamps;
+          
+          const searchLog = document.getElementById('searchLog');
+          if (searchLog && searchTerm) searchLog.value = searchTerm;
+        }, 100);
+      }
+    }
+    
+    return true;
+    
+  } catch (e) {
+    console.error('Failed to restore from localStorage:', e);
+    // Clear corrupted data
+    try {
+      localStorage.removeItem(PERSISTENCE_KEY_LOGS);
+      localStorage.removeItem(PERSISTENCE_KEY_PREFS);
+    } catch (e2) {}
+    return false;
+  }
+}
+
+function clearStoredData() {
+  if (!window.localStorage) return;
+  try {
+    localStorage.removeItem(PERSISTENCE_KEY_LOGS);
+    localStorage.removeItem(PERSISTENCE_KEY_PREFS);
+    console.log('Cleared stored log data from localStorage');
+  } catch (e) {
+    console.error('Failed to clear localStorage:', e);
+  }
+}
+
+function debouncedSave() {
+  // Clear existing timer
+  if (debouncedSaveTimer) {
+    clearTimeout(debouncedSaveTimer);
+  }
+  
+  // Set new timer - save after 2 seconds of no new data
+  debouncedSaveTimer = setTimeout(() => {
+    const now = Date.now();
+    // Only save if it's been at least 1 second since last save (rate limiting)
+    if (now - lastSaveTimestamp >= 1000) {
+      saveDataToLocalStorage();
+      lastSaveTimestamp = now;
+    }
+  }, DEBOUNCE_SAVE_MS);
+}
+
+function startPersistenceTimer() {
+  if (persistenceTimer) return; // Already running
+  
+  // Fallback save every 30 seconds (in case debounced saves don't trigger)
+  persistenceTimer = setInterval(() => {
+    if (otLogBuffer.length > 0) {
+      const now = Date.now();
+      // Only save if no recent save happened
+      if (now - lastSaveTimestamp >= PERSISTENCE_INTERVAL_MS) {
+        saveDataToLocalStorage();
+        lastSaveTimestamp = now;
+      }
+    }
+  }, PERSISTENCE_INTERVAL_MS);
+  
+  console.log('Started localStorage persistence (debounced saves + 30s fallback)');
+}
+
+function stopPersistenceTimer() {
+  if (persistenceTimer) {
+    clearInterval(persistenceTimer);
+    persistenceTimer = null;
+    console.log('Stopped localStorage persistence timer');
+  }
+}
+
+// Save data when page is about to unload
+window.addEventListener('beforeunload', function() {
+  if (otLogBuffer.length > 0) {
+    saveDataToLocalStorage();
+  }
+});
+
+// Expose for debug console
+window.otgwPersistence = {
+  save: saveDataToLocalStorage,
+  restore: restoreDataFromLocalStorage,
+  clear: clearStoredData,
+  info: function() {
+    console.log('═══════════════════════════════════════');
+    console.log('Log Buffer Info');
+    console.log('═══════════════════════════════════════');
+    console.log('Entries in buffer:', otLogBuffer.length.toLocaleString());
+    console.log('Current limit:', maxLogLines ? maxLogLines.toLocaleString() : 'calculating...');
+    console.log('Capture mode:', captureMode ? 'ON (memory-limited)' : 'OFF (balanced)');
+    console.log('');
+    
+    const memInfo = getActualMemoryUsage();
+    estimateMemoryUsage();
+    console.log('Memory Usage');
+    console.log('═══════════════════════════════════════');
+    if (performance.memory) {
+      console.log('JS Heap used:', memInfo.used.toFixed(1), 'MB');
+      console.log('JS Heap total:', memInfo.total.toFixed(1), 'MB');
+      console.log('JS Heap limit:', memInfo.limit.toFixed(1), 'MB');
+      console.log('Available:', memInfo.available.toFixed(1), 'MB');
+    }
+    console.log('Buffer estimate:', currentMemoryUsageMB.toFixed(2), 'MB');
+    console.log('');
+    
+    console.log('LocalStorage');
+    console.log('═══════════════════════════════════════');
+    console.log('Storage quota:', storageQuotaMB.toFixed(1), 'MB');
+    console.log('Safety margin:', (STORAGE_SAFETY_MARGIN * 100) + '%');
+    
+    try {
+      const logs = localStorage.getItem(PERSISTENCE_KEY_LOGS);
+      const prefs = localStorage.getItem(PERSISTENCE_KEY_PREFS);
+      console.log('Stored logs:', logs ? (logs.length / 1024).toFixed(2) + ' KB' : '0 KB');
+      console.log('Stored prefs:', prefs ? (prefs.length / 1024).toFixed(2) + ' KB' : '0 KB');
+      console.log('');
+      
+      if (prefs) {
+        console.log('Preferences:', JSON.parse(prefs));
+      }
+    } catch (e) {
+      console.error('Error reading storage:', e);
+    }
+    console.log('═══════════════════════════════════════');
+  }
+};
 
 //============================================================================
 function resetWSWatchdog() {
@@ -482,6 +901,9 @@ function initOTLogWebSocket(force) {
       }
       resetWSWatchdog();
       
+      // Start auto-save timer for data persistence
+      startPersistenceTimer();
+      
       // Record reconnect event in graph
       if (typeof OTGraph !== 'undefined' && OTGraph.recordReconnect) {
         OTGraph.recordReconnect();
@@ -565,7 +987,6 @@ function initOTLogWebSocket(force) {
   // Setup UI event handlers only once
   if (!otLogControlsInitialized) {
     setupOTLogControls();
-    otLogControlsInitialized = true;
   }
 }
 
@@ -781,10 +1202,20 @@ function addLogLine(logLine) {
       OTGraph.processLine(logLine);
   }
 
-  // Trim buffer if exceeds max
-  if (otLogBuffer.length > maxLogLines) {
-    otLogBuffer.shift();
+  // Check and update dynamic limits periodically (every 1000 lines)
+  if (maxLogLines === null || otLogBuffer.length % 1000 === 0) {
+    updateDynamicLimits();
   }
+
+  // Trim buffer if exceeds calculated max
+  if (maxLogLines !== null && otLogBuffer.length > maxLogLines) {
+    const toRemove = otLogBuffer.length - maxLogLines;
+    otLogBuffer.splice(0, toRemove);
+    console.log(`Trimmed ${toRemove} old log entries (limit: ${maxLogLines.toLocaleString()})`);
+  }
+  
+  // Trigger debounced save (progressive storage)
+  debouncedSave();
   
   // Update filtered buffer
   updateFilteredBuffer();
@@ -831,14 +1262,10 @@ function renderLogDisplay() {
     return;
   }
 
-  const displayCount = logExpanded ? Math.min(otLogFilteredBuffer.length, RENDER_LIMIT) : Math.min(10, otLogFilteredBuffer.length);
+  // Always show up to RENDER_LIMIT lines
+  const displayCount = Math.min(otLogFilteredBuffer.length, RENDER_LIMIT);
   const startIndex = Math.max(0, otLogFilteredBuffer.length - displayCount);
   const linesToShow = otLogFilteredBuffer.slice(startIndex);
-
-  if (logExpanded && otLogFilteredBuffer.length > RENDER_LIMIT && startIndex === otLogFilteredBuffer.length - RENDER_LIMIT) {
-     // Optional: Add indicator that logs are truncated in view
-     // We can just rely on the counters in the footer.
-  }
 
   // Build HTML
   let html = '';
@@ -889,69 +1316,40 @@ function updateLogCounters() {
     logFilteredCountEl.textContent = otLogFilteredBuffer.length;
   }
   
-  if (memUsageEl) {
-    // Estimate: 200 bytes per line
-    const bytes = otLogBuffer.length * 200;
-    const mb = bytes / (1024 * 1024);
-    memUsageEl.textContent = mb.toFixed(2);
-  }
+  // Update memory display
+  updateMemoryDisplay();
 }
 
 //============================================================================
 function setupOTLogControls() {
   // Only setup event listeners once to prevent duplicates
   if (otLogControlsInitialized) {
-    // Even if initialized, check sync of capture mode just in case (e.g. tab switch)
-    syncCaptureMode();
     return;
   }
   
-  // Toggle expand/collapse
-  document.getElementById('btnToggleLog').addEventListener('click', function() {
-    logExpanded = !logExpanded;
-    const container = document.getElementById('otLogContainer');
-    const btn = document.getElementById('btnToggleLog');
-    
-    if (logExpanded) {
-      container.classList.remove('collapsed');
-      btn.textContent = '▼ Show Less';
-    } else {
-      container.classList.add('collapsed');
-      btn.textContent = '▲ Show More';
-    }
-    
-    updateLogDisplay();
-  });
-  
-  // Toggle auto-scroll
-  document.getElementById('btnAutoScroll').addEventListener('click', function() {
-    autoScroll = !autoScroll;
-    const btn = document.getElementById('btnAutoScroll');
-    
-    if (autoScroll) {
-      btn.classList.add('btn-active');
-    } else {
-      btn.classList.remove('btn-active');
-    }
-    if (typeof saveUISetting === 'function') saveUISetting('ui_autoscroll', autoScroll);
+  // Auto-scroll checkbox
+  document.getElementById('chkAutoScroll').addEventListener('change', function() {
+    autoScroll = this.checked;
+    if (typeof saveUISetting === 'function') saveUISetting('#uiAutoScroll', autoScroll);
   });
 
   // Toggle Capture Mode
   const chkCapture = document.getElementById('chkCaptureMode');
   if (chkCapture) {
     chkCapture.addEventListener('change', function(e) {
-      if (e.target.checked) {
-        maxLogLines = MAX_LOG_LINES_CAPTURE;
-      } else {
-        maxLogLines = MAX_LOG_LINES_DEFAULT;
-        if (otLogBuffer.length > maxLogLines) {
-           otLogBuffer.splice(0, otLogBuffer.length - maxLogLines);
-           updateFilteredBuffer();
-           updateLogDisplay();
-        }
+      captureMode = e.target.checked;
+      updateDynamicLimits();
+      
+      if (!captureMode && otLogBuffer.length > maxLogLines) {
+        // Trim buffer when disabling capture mode
+        otLogBuffer.splice(0, otLogBuffer.length - maxLogLines);
+        updateFilteredBuffer();
+        updateLogDisplay();
       }
+      
       updateLogCounters();
-      if (typeof saveUISetting === 'function') saveUISetting('ui_capture', e.target.checked);
+      if (typeof saveUISetting === 'function') saveUISetting('#uiCaptureMode', e.target.checked);
+      console.log(`Capture mode ${captureMode ? 'enabled' : 'disabled'}, max lines: ${maxLogLines.toLocaleString()}`);
     });
   }
 
@@ -982,28 +1380,37 @@ function setupOTLogControls() {
     }
   }
   
-  // Clear log
-  document.getElementById('btnClearLog').addEventListener('click', function() {
-    if (confirm('Clear all log messages from buffer?')) {
+  // Clear log button
+  document.getElementById('btnClearLog').addEventListener('click', function(e) {
+    e.preventDefault();
+    const count = otLogBuffer.length.toLocaleString();
+    if (confirm(`Clear ${count} log entries from memory and browser storage?\n\nThis cannot be undone.`)) {
       otLogBuffer = [];
       otLogFilteredBuffer = [];
       updateLogDisplay();
       updateLogCounters();
+      // Clear localStorage as well
+      clearStoredData();
     }
   });
   
   // Download log
-  document.getElementById('btnDownloadLog').addEventListener('click', function() {
-    downloadLog(false);
+  document.getElementById('btnDownloadLog').addEventListener('click', function(e) {
+    e.preventDefault();
+    try {
+      downloadLog(false);
+    } catch (err) {
+      console.error('Failed to download log:', err);
+    }
   });
 
   // Auto Download Log
   const chkAutoDL = document.getElementById('chkAutoDownloadLog');
   if (chkAutoDL) {
-      chkAutoDL.addEventListener('change', function(e) {
-          toggleAutoDownloadLog(e.target.checked);
-          if (typeof saveUISetting === 'function') saveUISetting('ui_autodownloadlog', e.target.checked);
-      });
+    chkAutoDL.addEventListener('change', function(e) {
+      toggleAutoDownloadLog(e.target.checked);
+      if (typeof saveUISetting === 'function') saveUISetting('ui_autodownloadlog', e.target.checked);
+    });
   }
   
   // Search functionality
@@ -1021,7 +1428,7 @@ function setupOTLogControls() {
     if (typeof saveUISetting === 'function') saveUISetting('ui_timestamps', e.target.checked);
   });
   
-  // Manual scroll detection (disable auto-scroll if user scrolls up)
+  // Manual scroll detection (disable auto-scroll checkbox if user scrolls up)
   let manualScrollTimeout = null;
   document.getElementById('otLogContent').addEventListener('scroll', function(e) {
     // Debounce scroll handling to avoid excessive DOM reads/writes
@@ -1036,28 +1443,14 @@ function setupOTLogControls() {
       if (!isAtBottom && autoScroll) {
         // User scrolled up, disable auto-scroll
         autoScroll = false;
-        document.getElementById('btnAutoScroll').classList.remove('btn-active');
+        const chk = document.getElementById('chkAutoScroll');
+        if (chk) chk.checked = false;
       }
     }, 100);
   });
   
   // Mark as initialized after all listeners are successfully registered
   otLogControlsInitialized = true;
-  
-  // Sync initial state
-  syncCaptureMode();
-  updateLogCounters();
-}
-
-function syncCaptureMode() {
-  const chkCapture = document.getElementById('chkCaptureMode');
-  if (chkCapture) {
-     if (chkCapture.checked) {
-        maxLogLines = MAX_LOG_LINES_CAPTURE;
-     } else {
-        maxLogLines = MAX_LOG_LINES_DEFAULT;
-     }
-  }
   updateLogCounters();
 }
 
@@ -1328,11 +1721,22 @@ function toggleAutoDownloadLog(enabled) {
 
 
 //============================================================================
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
+// Optimize HTML escaping with static map (faster than DOM element creation)
+const escapeHtml = (function() {
+  const escapeMap = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  };
+  const escapeRegex = /[&<>"']/g;
+  
+  return function(text) {
+    if (!text) return '';
+    return String(text).replace(escapeRegex, char => escapeMap[char]);
+  };
+})();
 
 //============================================================================  
 function loadUISettings() {
@@ -1347,14 +1751,10 @@ function loadUISettings() {
         
         // Map backend settings to UI elements
         if (name === "#uiAutoScroll") {
-           // AutoScroll isn't a checkbox but a button state and global var
            let newVal = strToBool(val);
            autoScroll = newVal;
-           const btn = document.getElementById('btnAutoScroll');
-           if (btn) {
-             if (autoScroll) btn.classList.add('btn-active');
-             else btn.classList.remove('btn-active');
-           }
+           const chk = document.getElementById('chkAutoScroll');
+           if (chk) chk.checked = autoScroll;
         } else if (name === "#uiAutoDownloadLog") {
            let el = document.getElementById("chkAutoDownloadLog");
            if(el) {
@@ -1376,8 +1776,8 @@ function loadUISettings() {
            let el = document.getElementById("chkCaptureMode");
            if(el) {
              el.checked = strToBool(val);
-             if (el.checked) maxLogLines = MAX_LOG_LINES_CAPTURE;
-             else maxLogLines = MAX_LOG_LINES_DEFAULT;
+             captureMode = el.checked;
+             updateDynamicLimits();
            }
         } else if (name === "#uiStreamToFile") {
            // We generally default this to false on reload as we lose the file handle
@@ -1485,6 +1885,9 @@ function initMainPage() {
   );
 
   needReload = false;
+  
+  // Restore data from localStorage to prevent loss on page reload
+  restoreDataFromLocalStorage();
   
   setupPersistentUIListeners();
   loadPersistentUI();
@@ -3040,11 +3443,8 @@ function loadPersistentUI() {
       if (autoScrollVal !== null) {
          const newVal = (autoScrollVal === true || autoScrollVal === "true");
          if (typeof autoScroll !== 'undefined') autoScroll = newVal;
-         const btn = document.getElementById('btnAutoScroll');
-         if (btn) {
-           if (newVal) btn.classList.add('btn-active');
-           else btn.classList.remove('btn-active');
-         }
+         const chk = document.getElementById('chkAutoScroll');
+         if (chk) chk.checked = newVal;
       }
 
       // Timestamps
@@ -3064,7 +3464,8 @@ function loadPersistentUI() {
           const chk = document.getElementById("chkCaptureMode");
           if (chk) {
               chk.checked = (capVal === true || capVal === "true");
-              if (typeof syncCaptureMode === 'function') syncCaptureMode();
+              captureMode = chk.checked;
+              if (typeof updateDynamicLimits === 'function') updateDynamicLimits();
           }
       }
 
