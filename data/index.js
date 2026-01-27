@@ -429,6 +429,10 @@ function initOTLogWebSocket(force) {
     return;
   }
   
+  // Detect if accessed via HTTPS reverse proxy
+  // WebSocket (ws://) won't work when page is served over HTTPS due to mixed content blocking
+  const isProxied = window.location.protocol === 'https:';
+  
   // Detect smartphone (iPhone or Android Phone)
   const isPhone = /iPhone|iPod/.test(navigator.userAgent) || 
                  (/Android/.test(navigator.userAgent) && /Mobile/.test(navigator.userAgent));
@@ -436,8 +440,12 @@ function initOTLogWebSocket(force) {
   // Also check screen width as a fallback (standard breakpoint for tablets is 768px)
   const isSmallScreen = window.innerWidth < 768;
 
-  if ((isPhone || isSmallScreen) && !force && !isFlashing) {
-    console.log("Smartphone or small screen detected. Disabling OpenTherm Monitor.");
+  if ((isPhone || isSmallScreen || isProxied) && !force && !isFlashing) {
+    if (isProxied) {
+      console.log("HTTPS reverse proxy detected. WebSocket connections not supported. Disabling OpenTherm Monitor.");
+    } else {
+      console.log("Smartphone or small screen detected. Disabling OpenTherm Monitor.");
+    }
     const logSection = document.getElementById('otLogSection');
     if (logSection) {
       logSection.classList.add('hidden');
