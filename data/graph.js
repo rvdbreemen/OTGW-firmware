@@ -470,7 +470,7 @@ var OTGraph = {
                             label: {
                                 show: true,
                                 position: 'end',
-                                formatter: isDisconnect ? 'Disconnected' : 'Reconnected',
+                                formatter: isDisconnect ? 'Disconnected' : 'Connected',
                                 color: isDisconnect ? '#ff4444' : '#44ff44',
                                 fontSize: 10
                             }
@@ -507,15 +507,25 @@ var OTGraph = {
         // Trim old markers outside current max time window (24h)
         var cutoff = now - (24 * 3600 * 1000);
         this.disconnectMarkers = this.disconnectMarkers.filter(function(m) { return m.time > cutoff; });
+        
+        // Update chart to display the marker immediately
+        if (this.chart) {
+            this.updateOption();
+        }
     },
 
     recordReconnect: function() {
         var now = new Date().getTime();
         this.disconnectMarkers.push({ time: now, type: 'reconnect' });
-        console.log('Graph: Reconnect marker added at', new Date(now).toISOString());
+        console.log('Graph: Connected marker added at', new Date(now).toISOString());
         // Trim old markers outside current max time window (24h)
         var cutoff = now - (24 * 3600 * 1000);
         this.disconnectMarkers = this.disconnectMarkers.filter(function(m) { return m.time > cutoff; });
+        
+        // Update chart to display the marker immediately
+        if (this.chart) {
+            this.updateOption();
+        }
     },
 
     processLine: function(line) {
