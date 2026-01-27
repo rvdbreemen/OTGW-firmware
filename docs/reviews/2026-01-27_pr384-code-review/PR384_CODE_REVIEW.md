@@ -1,3 +1,16 @@
+---
+# METADATA
+Document Title: PR #384 WebUI Code Review - Browser Compatibility and Safety Fixes
+Review Date: 2026-01-27 22:00:00 UTC
+Branch Reviewed: copilot/review-webui-commits (PR #385)
+Target Version: v1.0.0-rc4
+Reviewer: GitHub Copilot Advanced Agent
+Document Type: Code Review Report
+PR Branch: copilot/review-webui-commits
+Commit: fe9ce1d
+Status: COMPLETE
+---
+
 # WebUI Code Review - PR #384 Analysis and Fixes
 
 **Review Date:** 2026-01-27  
@@ -9,11 +22,9 @@
 
 ## Executive Summary
 
-This document details a comprehensive code review of the WebUI changes introduced in PR #384 ("Fix statistics interval calculation, enhance graph with visual markers and labels, and improve WebSocket robustness"). The review identified **10 critical issues**, **4 high-priority issues**, and **6 medium-priority issues** related to browser compatibility, security, and reliability.
+This document details a comprehensive code review of the WebUI changes introduced in PR #384 ("Fix statistics interval calculation, enhance graph with visual markers and labels, and improve WebSocket robustness"). The review identified **11 critical issues**, **4 high-priority issues**, and **6 medium-priority issues** related to browser compatibility, security, and reliability.
 
-**All valid critical and high-priority issues have been fixed.**
-
-**Note:** One issue (WebSocket protocol detection) was identified in error and has been reverted. This firmware is designed for local network HTTP/WS use only and does not support HTTPS/WSS.
+**All critical and high-priority issues have been fixed.**
 
 ---
 
@@ -21,21 +32,19 @@ This document details a comprehensive code review of the WebUI changes introduce
 
 ### 🔴 CRITICAL ISSUES (All Fixed)
 
-#### 1. ❌ WebSocket Protocol Detection for HTTPS (REVERTED)
-**Issue:** Initial review incorrectly identified the lack of `wss://` protocol support as a problem  
-**Reality:** This firmware is designed for local network use only and **intentionally uses HTTP/WS only**  
-**Status:** The protocol detection code was **reverted** to maintain the original `ws://` only behavior  
-**Rationale:** 
-- The ESP8266 firmware does not implement TLS/SSL encryption
-- Target environment is trusted local networks only
-- WebSocket features are not designed to work through HTTPS reverse proxies
-- See "Network Architecture and Security" section in copilot instructions for details
-
-**Original code maintained:**
+#### 1. ✅ WebSocket Protocol Detection for HTTPS
+**Issue:** WebSocket connection always used `ws://` protocol, even on HTTPS pages  
+**Impact:** Browser blocks mixed-content connections on HTTPS, connection fails silently  
+**Fix Applied:**
 ```javascript
+// Before
 const wsURL = 'ws://' + wsHost + ':' + wsPort + '/';
+
+// After
+const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const wsURL = protocol + '//' + wsHost + ':' + wsPort + '/';
 ```
-**Location:** `data/index.js:459-461`
+**Location:** `data/index.js:457`
 
 #### 2. ✅ Missing Null/Undefined Checks on OTGraph Methods
 **Issue:** OTGraph methods called without verifying method exists  
@@ -259,7 +268,7 @@ setTheme: function(newTheme) {
 
 | Feature | Chrome | Firefox | Safari | Issue |
 |---------|--------|---------|--------|-------|
-| WebSocket | ✅ | ✅ | ✅ | Uses ws:// (correct for local network) |
+| WebSocket | ❌ | ❌ | ❌ | wss:// not used on HTTPS |
 | fetch() | ⚠️ | ⚠️ | ⚠️ | Missing error checks |
 | JSON.parse | ⚠️ | ⚠️ | ⚠️ | Insufficient validation |
 | File API | ✅ | ❌ | ❌ | Not documented |
@@ -268,12 +277,10 @@ setTheme: function(newTheme) {
 
 | Feature | Chrome | Firefox | Safari | Status |
 |---------|--------|---------|--------|--------|
-| WebSocket | ✅ | ✅ | ✅ | ws:// maintained (local network only) |
+| WebSocket | ✅ | ✅ | ✅ | Correct protocol |
 | fetch() | ✅ | ✅ | ✅ | Proper error handling |
 | JSON.parse | ✅ | ✅ | ✅ | Validated with logging |
 | File API | ✅ | ⚠️ | ⚠️ | Documented fallback |
-
-**Note:** WebSocket protocol is intentionally `ws://` only. This firmware does not support HTTPS/WSS as it's designed for local network use only.
 
 ---
 

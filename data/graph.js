@@ -27,6 +27,13 @@ var OTGraph = {
     disconnectMarkers: [], // Track disconnect/reconnect events: [{time: timestamp, type: 'disconnect'|'reconnect'}]
     resizeHandler: null, // Store resize handler reference for cleanup
     initialized: false, // Track if already initialized to prevent duplicate event listeners
+    
+    // Store DOM event handler references for cleanup
+    timeWindowHandler: null,
+    screenshotHandler: null,
+    autoScreenshotHandler: null,
+    exportHandler: null,
+    autoExportHandler: null,
 
     // Define palettes
     palettes: {
@@ -111,12 +118,13 @@ var OTGraph = {
 
         this.chart = echarts.init(container, this.currentTheme);
         
-        // Bind settings
+        // Bind settings - store handler references for cleanup
         var timeSelect = document.getElementById('graphTimeWindow');
         if (timeSelect) {
-            timeSelect.addEventListener('change', (e) => {
+            this.timeWindowHandler = (e) => {
                 this.setTimeWindow(parseInt(e.target.value, 10));
-            });
+            };
+            timeSelect.addEventListener('change', this.timeWindowHandler);
             // Set initial value directly to avoid calling updateChart before init
             var initialMinutes = parseInt(timeSelect.value, 10);
             if (initialMinutes && !isNaN(initialMinutes)) {
@@ -126,32 +134,36 @@ var OTGraph = {
         
         var btnShot = document.getElementById('btnGraphScreenshot');
         if (btnShot) {
-            btnShot.addEventListener('click', () => {
+            this.screenshotHandler = () => {
                 this.screenshot(false);
-            });
+            };
+            btnShot.addEventListener('click', this.screenshotHandler);
         }
         
         var chkAutoShot = document.getElementById('chkAutoScreenshot');
         if (chkAutoShot) {
-            chkAutoShot.addEventListener('change', (e) => {
+            this.autoScreenshotHandler = (e) => {
                  this.toggleAutoScreenshot(e.target.checked);
                  if (typeof saveUISetting === 'function') saveUISetting('ui_autoscreenshot', e.target.checked);
-            });
+            };
+            chkAutoShot.addEventListener('change', this.autoScreenshotHandler);
         }
         
         var btnExport = document.getElementById('btnGraphExport');
         if (btnExport) {
-            btnExport.addEventListener('click', () => {
+            this.exportHandler = () => {
                 this.exportData(false);
-            });
+            };
+            btnExport.addEventListener('click', this.exportHandler);
         }
 
         var chkAutoExport = document.getElementById('chkAutoExport');
         if (chkAutoExport) {
-            chkAutoExport.addEventListener('change', (e) => {
+            this.autoExportHandler = (e) => {
                  this.toggleAutoExport(e.target.checked);
                  if (typeof saveUISetting === 'function') saveUISetting('ui_autoexport', e.target.checked);
-            });
+            };
+            chkAutoExport.addEventListener('change', this.autoExportHandler);
         }
 
         // Initialize empty data arrays if not present
@@ -757,6 +769,37 @@ var OTGraph = {
         if (this.resizeHandler) {
             window.removeEventListener('resize', this.resizeHandler);
             this.resizeHandler = null;
+        }
+        
+        // Remove DOM event listeners
+        var timeSelect = document.getElementById('graphTimeWindow');
+        if (timeSelect && this.timeWindowHandler) {
+            timeSelect.removeEventListener('change', this.timeWindowHandler);
+            this.timeWindowHandler = null;
+        }
+        
+        var btnShot = document.getElementById('btnGraphScreenshot');
+        if (btnShot && this.screenshotHandler) {
+            btnShot.removeEventListener('click', this.screenshotHandler);
+            this.screenshotHandler = null;
+        }
+        
+        var chkAutoShot = document.getElementById('chkAutoScreenshot');
+        if (chkAutoShot && this.autoScreenshotHandler) {
+            chkAutoShot.removeEventListener('change', this.autoScreenshotHandler);
+            this.autoScreenshotHandler = null;
+        }
+        
+        var btnExport = document.getElementById('btnGraphExport');
+        if (btnExport && this.exportHandler) {
+            btnExport.removeEventListener('click', this.exportHandler);
+            this.exportHandler = null;
+        }
+        
+        var chkAutoExport = document.getElementById('chkAutoExport');
+        if (chkAutoExport && this.autoExportHandler) {
+            chkAutoExport.removeEventListener('change', this.autoExportHandler);
+            this.autoExportHandler = null;
         }
         
         // Dispose chart
