@@ -25,6 +25,15 @@ var OTGraph = {
     lastUpdate: 0,
     updateInterval: UPDATE_INTERVAL_MS,
     disconnectMarkers: [], // Track disconnect/reconnect events: [{time: timestamp, type: 'disconnect'|'reconnect'}]
+    resizeHandler: null, // Store resize handler reference for cleanup
+    initialized: false, // Track if already initialized to prevent duplicate event listeners
+    
+    // Store DOM event handler references for cleanup
+    timeWindowHandler: null,
+    screenshotHandler: null,
+    autoScreenshotHandler: null,
+    exportHandler: null,
+    autoExportHandler: null,
 
     // Define palettes
     palettes: {
@@ -75,6 +84,13 @@ var OTGraph = {
 
     init: function() {
         console.log("OTGraph init (ECharts)");
+        
+        // Prevent duplicate initialization
+        if (this.initialized) {
+            console.log("OTGraph already initialized, skipping");
+            return;
+        }
+        
         var container = document.getElementById('otGraphCanvas');
         if (!container) return; // Wait for DOM
 
@@ -102,12 +118,13 @@ var OTGraph = {
 
         this.chart = echarts.init(container, this.currentTheme);
         
-        // Bind settings
+        // Bind settings - store handler references for cleanup
         var timeSelect = document.getElementById('graphTimeWindow');
         if (timeSelect) {
-            timeSelect.addEventListener('change', (e) => {
+            this.timeWindowHandler = (e) => {
                 this.setTimeWindow(parseInt(e.target.value, 10));
-            });
+            };
+            timeSelect.addEventListener('change', this.timeWindowHandler);
             // Set initial value directly to avoid calling updateChart before init
             var initialMinutes = parseInt(timeSelect.value, 10);
             if (initialMinutes && !isNaN(initialMinutes)) {
@@ -117,32 +134,36 @@ var OTGraph = {
         
         var btnShot = document.getElementById('btnGraphScreenshot');
         if (btnShot) {
-            btnShot.addEventListener('click', () => {
+            this.screenshotHandler = () => {
                 this.screenshot(false);
-            });
+            };
+            btnShot.addEventListener('click', this.screenshotHandler);
         }
         
         var chkAutoShot = document.getElementById('chkAutoScreenshot');
         if (chkAutoShot) {
-            chkAutoShot.addEventListener('change', (e) => {
+            this.autoScreenshotHandler = (e) => {
                  this.toggleAutoScreenshot(e.target.checked);
                  if (typeof saveUISetting === 'function') saveUISetting('ui_autoscreenshot', e.target.checked);
-            });
+            };
+            chkAutoShot.addEventListener('change', this.autoScreenshotHandler);
         }
         
         var btnExport = document.getElementById('btnGraphExport');
         if (btnExport) {
-            btnExport.addEventListener('click', () => {
+            this.exportHandler = () => {
                 this.exportData(false);
-            });
+            };
+            btnExport.addEventListener('click', this.exportHandler);
         }
 
         var chkAutoExport = document.getElementById('chkAutoExport');
         if (chkAutoExport) {
-            chkAutoExport.addEventListener('change', (e) => {
+            this.autoExportHandler = (e) => {
                  this.toggleAutoExport(e.target.checked);
                  if (typeof saveUISetting === 'function') saveUISetting('ui_autoexport', e.target.checked);
-            });
+            };
+            chkAutoExport.addEventListener('change', this.autoExportHandler);
         }
 
         // Initialize empty data arrays if not present
@@ -155,16 +176,19 @@ var OTGraph = {
         
         this.running = true;
         
-        // Handle resize
-        window.addEventListener('resize', () => {
+        // Handle resize - store handler reference for potential cleanup
+        this.resizeHandler = () => {
             if (this.chart) this.chart.resize();
-        });
+        };
+        window.addEventListener('resize', this.resizeHandler);
 
         // Throttle updates to chart: use requestAnimationFrame with throttling
         if (this.updateTimer) clearInterval(this.updateTimer);
         this.updateTimer = setInterval(() => {
             requestAnimationFrame(() => this.updateChart());
         }, this.updateInterval);
+        
+        this.initialized = true;
     },
 
     setTimeWindow: function(minutes) {
@@ -259,8 +283,14 @@ var OTGraph = {
         // Try to safe to FileSystem Handle first (if available via index.js helper)
         if (window.saveBlobToLogDir) {
             // Convert DataURL to Blob
-            var arr = url.split(','), mime = arr[0].match(/:(.*?);/)[1],
-                bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+            var arr = url.split(',');
+            var mimeMatch = arr[0].match(/:(.*?);/);
+            if (!mimeMatch || !mimeMatch[1]) {
+                console.error('Failed to extract MIME type from data URL');
+                return;
+            }
+            var mime = mimeMatch[1];
+            var bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
             while(n--) u8arr[n] = bstr.charCodeAt(n);
             var blob = new Blob([u8arr], {type:mime});
 
@@ -304,11 +334,35 @@ var OTGraph = {
         this.currentTheme = newTheme;
         
         if (this.chart) {
-            this.chart.dispose();
+            // Preserve old chart instance locally and clear reference to prevent
+            // keeping a disposed-but-non-null chart in this.chart
+            var oldChart = this.chart;
+            this.chart = null;
+
+            try {
+                // Dispose the previous chart instance
+                oldChart.dispose();
+            } catch (e) {
+                console.error('Error disposing existing chart:', e);
+            }
+
             var container = document.getElementById('otGraphCanvas');
-            this.chart = echarts.init(container, newTheme);
-            this.updateOption();
-            this.resize();
+            if (!container) {
+                console.error('Graph container not found');
+                return;
+            }
+
+            try {
+                var newChart = echarts.init(container, newTheme);
+                this.chart = newChart;
+                this.updateOption();
+                this.resize();
+            } catch (e) {
+                // On any error during re-initialization, ensure chart reference
+                // remains in a consistent state (null)
+                this.chart = null;
+                console.error('Error changing theme:', e);
+            }
         }
     },
 
@@ -574,17 +628,40 @@ var OTGraph = {
                      }
                  }
 
-                 if (val === null) return;
+                 if (val === null || !isFinite(val)) return;
                  
                  var key = null;
                  switch(id) {
-                     case 17: key = 'mod'; break;
-                     case 1:  key = 'ctrlSp'; break;
-                     case 25: key = 'boiler'; break;
-                     case 28: key = 'return'; break;
-                     case 16: key = 'roomSp'; break;
-                     case 24: key = 'room'; break;
-                     case 27: key = 'outside'; break;
+                     case 17: 
+                         key = 'mod';
+                         // Modulation should be 0-100%
+                         if (val < 0 || val > 100) return;
+                         break;
+                     case 1:  
+                         key = 'ctrlSp';
+                         // Temperature bounds check (reasonable range -50°C to 150°C)
+                         if (val < -50 || val > 150) return;
+                         break;
+                     case 25: 
+                         key = 'boiler';
+                         if (val < -50 || val > 150) return;
+                         break;
+                     case 28: 
+                         key = 'return';
+                         if (val < -50 || val > 150) return;
+                         break;
+                     case 16: 
+                         key = 'roomSp';
+                         if (val < -50 || val > 150) return;
+                         break;
+                     case 24: 
+                         key = 'room';
+                         if (val < -50 || val > 150) return;
+                         break;
+                     case 27: 
+                         key = 'outside';
+                         if (val < -50 || val > 150) return;
+                         break;
                  }
                  if (key) this.pushData(key, now, val);
             }
@@ -666,6 +743,76 @@ var OTGraph = {
         this.chart.setOption({
             xAxis: xAxisUpdate
         });
+    },
+    
+    dispose: function() {
+        console.log("OTGraph dispose");
+        
+        // Stop running
+        this.running = false;
+        
+        // Clear timers
+        if (this.updateTimer) {
+            clearInterval(this.updateTimer);
+            this.updateTimer = null;
+        }
+        if (this.captureTimer) {
+            clearInterval(this.captureTimer);
+            this.captureTimer = null;
+        }
+        if (this.exportTimer) {
+            clearInterval(this.exportTimer);
+            this.exportTimer = null;
+        }
+        
+        // Remove resize handler
+        if (this.resizeHandler) {
+            window.removeEventListener('resize', this.resizeHandler);
+            this.resizeHandler = null;
+        }
+        
+        // Remove DOM event listeners
+        var timeSelect = document.getElementById('graphTimeWindow');
+        if (timeSelect && this.timeWindowHandler) {
+            timeSelect.removeEventListener('change', this.timeWindowHandler);
+            this.timeWindowHandler = null;
+        }
+        
+        var btnShot = document.getElementById('btnGraphScreenshot');
+        if (btnShot && this.screenshotHandler) {
+            btnShot.removeEventListener('click', this.screenshotHandler);
+            this.screenshotHandler = null;
+        }
+        
+        var chkAutoShot = document.getElementById('chkAutoScreenshot');
+        if (chkAutoShot && this.autoScreenshotHandler) {
+            chkAutoShot.removeEventListener('change', this.autoScreenshotHandler);
+            this.autoScreenshotHandler = null;
+        }
+        
+        var btnExport = document.getElementById('btnGraphExport');
+        if (btnExport && this.exportHandler) {
+            btnExport.removeEventListener('click', this.exportHandler);
+            this.exportHandler = null;
+        }
+        
+        var chkAutoExport = document.getElementById('chkAutoExport');
+        if (chkAutoExport && this.autoExportHandler) {
+            chkAutoExport.removeEventListener('change', this.autoExportHandler);
+            this.autoExportHandler = null;
+        }
+        
+        // Dispose chart
+        if (this.chart) {
+            try {
+                this.chart.dispose();
+            } catch(e) {
+                console.warn('Error disposing chart:', e);
+            }
+            this.chart = null;
+        }
+        
+        this.initialized = false;
     }
 };
 
