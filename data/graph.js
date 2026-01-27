@@ -25,6 +25,8 @@ var OTGraph = {
     lastUpdate: 0,
     updateInterval: UPDATE_INTERVAL_MS,
     disconnectMarkers: [], // Track disconnect/reconnect events: [{time: timestamp, type: 'disconnect'|'reconnect'}]
+    resizeHandler: null, // Store resize handler reference for cleanup
+    initialized: false, // Track if already initialized to prevent duplicate event listeners
 
     // Define palettes
     palettes: {
@@ -75,6 +77,13 @@ var OTGraph = {
 
     init: function() {
         console.log("OTGraph init (ECharts)");
+        
+        // Prevent duplicate initialization
+        if (this.initialized) {
+            console.log("OTGraph already initialized, skipping");
+            return;
+        }
+        
         var container = document.getElementById('otGraphCanvas');
         if (!container) return; // Wait for DOM
 
@@ -155,16 +164,19 @@ var OTGraph = {
         
         this.running = true;
         
-        // Handle resize
-        window.addEventListener('resize', () => {
+        // Handle resize - store handler reference for potential cleanup
+        this.resizeHandler = () => {
             if (this.chart) this.chart.resize();
-        });
+        };
+        window.addEventListener('resize', this.resizeHandler);
 
         // Throttle updates to chart: use requestAnimationFrame with throttling
         if (this.updateTimer) clearInterval(this.updateTimer);
         this.updateTimer = setInterval(() => {
             requestAnimationFrame(() => this.updateChart());
         }, this.updateInterval);
+        
+        this.initialized = true;
     },
 
     setTimeWindow: function(minutes) {
@@ -310,11 +322,19 @@ var OTGraph = {
         this.currentTheme = newTheme;
         
         if (this.chart) {
-            this.chart.dispose();
-            var container = document.getElementById('otGraphCanvas');
-            this.chart = echarts.init(container, newTheme);
-            this.updateOption();
-            this.resize();
+            try {
+                this.chart.dispose();
+                var container = document.getElementById('otGraphCanvas');
+                if (!container) {
+                    console.error('Graph container not found');
+                    return;
+                }
+                this.chart = echarts.init(container, newTheme);
+                this.updateOption();
+                this.resize();
+            } catch(e) {
+                console.error('Error changing theme:', e);
+            }
         }
     },
 
@@ -695,6 +715,45 @@ var OTGraph = {
         this.chart.setOption({
             xAxis: xAxisUpdate
         });
+    },
+    
+    dispose: function() {
+        console.log("OTGraph dispose");
+        
+        // Stop running
+        this.running = false;
+        
+        // Clear timers
+        if (this.updateTimer) {
+            clearInterval(this.updateTimer);
+            this.updateTimer = null;
+        }
+        if (this.captureTimer) {
+            clearInterval(this.captureTimer);
+            this.captureTimer = null;
+        }
+        if (this.exportTimer) {
+            clearInterval(this.exportTimer);
+            this.exportTimer = null;
+        }
+        
+        // Remove resize handler
+        if (this.resizeHandler) {
+            window.removeEventListener('resize', this.resizeHandler);
+            this.resizeHandler = null;
+        }
+        
+        // Dispose chart
+        if (this.chart) {
+            try {
+                this.chart.dispose();
+            } catch(e) {
+                console.warn('Error disposing chart:', e);
+            }
+            this.chart = null;
+        }
+        
+        this.initialized = false;
     }
 };
 
