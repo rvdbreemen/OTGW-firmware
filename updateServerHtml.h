@@ -6,16 +6,19 @@ static const char UpdateServerIndex[] PROGMEM =
   R"(<!DOCTYPE html>
 <html charset="UTF-8">
      <head>
-     <link rel="stylesheet" type="text/css" href="/index.css" id="theme-style">
      <script>
       (function() {
+        var css = "/index.css";
+        var isDark = false;
         try {
           var storedTheme = localStorage.getItem('theme');
           if (storedTheme === 'dark') {
-            document.getElementById('theme-style').href = "/index_dark.css";
+            css = "/index_dark.css";
+            isDark = true;
             document.documentElement.className = 'dark';
           }
         } catch (e) { console.error(e); }
+        document.write('<link rel="stylesheet" type="text/css" href="' + css + '" id="theme-style">');
       })();
      </script>
      <style type='text/css'>
@@ -739,14 +742,18 @@ static const char UpdateServerIndex[] PROGMEM =
 static const char UpdateServerSuccess[] PROGMEM = 
   R"(<html charset="UTF-8">
       <head>
-      <link rel="stylesheet" type="text/css" href="/index.css" id="theme-style">
       <script>
-        try {
-          var storedTheme = localStorage.getItem('theme');
-          if (storedTheme === 'dark') {
-            document.getElementById('theme-style').href = "/index_dark.css";
-          }
-        } catch (e) { console.error(e); }
+        (function() {
+          var css = "/index.css";
+          try {
+            var storedTheme = localStorage.getItem('theme');
+            if (storedTheme === 'dark') {
+              css = "/index_dark.css";
+              document.documentElement.className = 'dark';
+            }
+          } catch (e) { console.error(e); }
+          document.write('<link rel="stylesheet" type="text/css" href="' + css + '" id="theme-style">');
+        })();
       </script>
       <style type='text/css'>
         body { font-family: sans-serif; }

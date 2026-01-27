@@ -13,21 +13,9 @@ const APIGW = window.location.protocol + '//' + window.location.host + '/api/';
 
 "use strict";
 
-let needReload = false;
 
 console.log(`Hash=${window.location.hash}`);
 window.onload = initMainPage;
-
-window.onblur = function() {
-  needReload = true;
-};
-
-window.onfocus = function () {
-  if (needReload) {
-    needReload = false;
-    window.location.reload(true);
-  }
-};
 
 function isPageVisible() {
   return !(document.hidden || document.visibilityState === 'hidden');
@@ -1132,12 +1120,12 @@ function parseLogLine(line) {
   
   let offset = 0;
   
-  // Detect timestamp: HH:MM:SS.mmmmmm (15 chars)
+  // Detect timestamp: HH:MM:SS.mmmmmm (15 chars) or short HH:MM:SS.mmm (12 chars)
   // Regex must be robust.
-  const tsMatch = line.match(/^(\d{2}:\d{2}:\d{2}\.\d{6})\s/);
+  const tsMatch = line.match(/^(\d{2}:\d{2}:\d{2}\.\d{3,6})\s/);
   if (tsMatch) {
       obj.time = tsMatch[1];
-      offset = 16; // 15 chars + 1 space
+      offset = tsMatch[0].length; // Use actual length of match
   } else {
       // Fallback timestamp
       obj.time = new Date().toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) + "." + (new Date().getMilliseconds() + "").padStart(3, '0');
@@ -1912,8 +1900,7 @@ function initMainPage() {
     }
   );
 
-  needReload = false;
-  
+
   // Restore data from localStorage to prevent loss on page reload
   restoreDataFromLocalStorage();
   
@@ -2285,7 +2272,6 @@ function refreshOTmonitor() {
     })
     .then(json => {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
-      needReload = false;
       data = json.otmonitor;
 
       let otMonPage = document.getElementById('mainPage');
@@ -2362,7 +2348,6 @@ function refreshOTmonitor() {
 
         }
       }
-      if (needReload) window.location.reload(true);
     })
     .catch(function (error) {
       if (flashModeActive || !isPageVisible()) return;

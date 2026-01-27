@@ -3,15 +3,16 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">  
-    <link rel="stylesheet" type="text/css" href="./index.css" id="theme-style">
     <script>
       (function() {
+        var css = "./index.css";
         try {
           var storedTheme = localStorage.getItem('theme');
           if (storedTheme === 'dark') {
-            document.getElementById('theme-style').href = "index_dark.css";
+            css = "index_dark.css";
           }
         } catch (e) { console.error(e); }
+        document.write('<link rel="stylesheet" type="text/css" href="' + css + '" id="theme-style">');
       })();
     </script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
