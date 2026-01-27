@@ -35,6 +35,7 @@ function isPageVisible() {
 
 document.addEventListener('visibilitychange', function () {
   if (!isPageVisible()) {
+    // When tab is hidden, stop UI updates to save resources but KEEP WebSocket connected
     if (timeupdate) {
       clearInterval(timeupdate);
       timeupdate = null;
@@ -43,13 +44,16 @@ document.addEventListener('visibilitychange', function () {
       clearInterval(tid);
       tid = 0;
     }
-    disconnectOTLogWebSocket();
+    // WebSocket stays connected to continue gathering data in background
+    // The watchdog timer will keep it alive and reconnect if needed
     return;
   }
+  // When tab becomes visible again, resume UI updates
   if (!flashModeActive) {
     if (!timeupdate) {
       timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
     }
+    // Ensure WebSocket is connected (will reconnect if needed)
     initOTLogWebSocket();
     if (!tid) {
       tid = setInterval(function () { refreshOTmonitor(); }, 1000);
