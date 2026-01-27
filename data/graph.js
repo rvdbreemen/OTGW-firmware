@@ -322,17 +322,33 @@ var OTGraph = {
         this.currentTheme = newTheme;
         
         if (this.chart) {
+            // Preserve old chart instance locally and clear reference to prevent
+            // keeping a disposed-but-non-null chart in this.chart
+            var oldChart = this.chart;
+            this.chart = null;
+
             try {
-                this.chart.dispose();
-                var container = document.getElementById('otGraphCanvas');
-                if (!container) {
-                    console.error('Graph container not found');
-                    return;
-                }
-                this.chart = echarts.init(container, newTheme);
+                // Dispose the previous chart instance
+                oldChart.dispose();
+            } catch (e) {
+                console.error('Error disposing existing chart:', e);
+            }
+
+            var container = document.getElementById('otGraphCanvas');
+            if (!container) {
+                console.error('Graph container not found');
+                return;
+            }
+
+            try {
+                var newChart = echarts.init(container, newTheme);
+                this.chart = newChart;
                 this.updateOption();
                 this.resize();
-            } catch(e) {
+            } catch (e) {
+                // On any error during re-initialization, ensure chart reference
+                // remains in a consistent state (null)
+                this.chart = null;
                 console.error('Error changing theme:', e);
             }
         }
