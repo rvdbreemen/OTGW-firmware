@@ -477,11 +477,22 @@ function initOTLogWebSocket(force) {
         wsReconnectTimer = null;
       }
       resetWSWatchdog();
+      
+      // Record reconnect event in graph
+      if (typeof OTGraph !== 'undefined' && OTGraph.recordReconnect) {
+        OTGraph.recordReconnect();
+      }
     };
     
     otLogWS.onclose = function() {
       console.log('OT Log WebSocket disconnected');
       updateWSStatus(false);
+      
+      // Record disconnect event in graph
+      if (typeof OTGraph !== 'undefined' && OTGraph.recordDisconnect) {
+        OTGraph.recordDisconnect();
+      }
+      
       // Stop watchdog
       if (wsWatchdogTimer) {
         clearTimeout(wsWatchdogTimer);
@@ -2877,8 +2888,12 @@ function processStatsLine(line) {
         const entry = statsBuffer[key];
         const diff = (now - entry.lastTime) / 1000.0; // seconds
         
-        entry.intervalSum += diff;
-        entry.intervalCount++;
+        // Only accumulate interval if this is not the first message (entry.count > 0)
+        // This prevents counting the buffer-creation-to-first-message interval
+        if (entry.count > 0) {
+            entry.intervalSum += diff;
+            entry.intervalCount++;
+        }
         
         entry.lastTime = now;
         entry.value = value;

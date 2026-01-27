@@ -24,6 +24,7 @@ var OTGraph = {
     currentTheme: 'light',
     lastUpdate: 0,
     updateInterval: UPDATE_INTERVAL_MS,
+    disconnectMarkers: [], // Track disconnect/reconnect events: [{time: timestamp, type: 'disconnect'|'reconnect'}]
 
     // Define palettes
     palettes: {
@@ -363,20 +364,56 @@ var OTGraph = {
                 // 4: Temps
                 { type: 'value', gridIndex: 4, splitLine: { show: true } }
             ],
-            series: this.seriesConfig.map(c => ({
-                name: c.label,
-                type: c.type,
-                step: c.step,
-                xAxisIndex: c.gridIndex,
-                yAxisIndex: c.gridIndex,
-                showSymbol: false,
-                lineStyle: { width: 1.5 }, // Slightly thinner lines for better performance with dense data
-                itemStyle: { color: palette[c.id] }, // Get color from palette
-                areaStyle: c.areaStyle || undefined,
-                large: c.large,        // Enable large dataset optimization
-                sampling: c.sampling,  // Enable downsampling
-                data: this.data[c.id]
-            }))
+            series: this.seriesConfig.map((c, idx) => {
+                var seriesConfig = {
+                    name: c.label,
+                    type: c.type,
+                    step: c.step,
+                    xAxisIndex: c.gridIndex,
+                    yAxisIndex: c.gridIndex,
+                    showSymbol: false,
+                    lineStyle: { width: 1.5 }, // Slightly thinner lines for better performance with dense data
+                    itemStyle: { color: palette[c.id] }, // Get color from palette
+                    areaStyle: c.areaStyle || undefined,
+                    large: c.large,        // Enable large dataset optimization
+                    sampling: c.sampling,  // Enable downsampling
+                    data: this.data[c.id]
+                };
+                
+                // Add disconnect/reconnect markers to the first series of each grid to avoid duplicates
+                // Only add to first series in each grid: flame(0), dhwMode(1), chMode(2), mod(3), ctrlSp(4)
+                if (idx === 0 || idx === 1 || idx === 2 || idx === 3 || idx === 4) {
+                    var markLineData = [];
+                    this.disconnectMarkers.forEach(function(marker) {
+                        var isDisconnect = marker.type === 'disconnect';
+                        markLineData.push({
+                            xAxis: marker.time,
+                            lineStyle: {
+                                color: isDisconnect ? '#ff4444' : '#44ff44',
+                                type: 'dashed',
+                                width: 2
+                            },
+                            label: {
+                                show: true,
+                                position: 'end',
+                                formatter: isDisconnect ? 'Disconnected' : 'Reconnected',
+                                color: isDisconnect ? '#ff4444' : '#44ff44',
+                                fontSize: 10
+                            }
+                        });
+                    });
+                    
+                    if (markLineData.length > 0) {
+                        seriesConfig.markLine = {
+                            silent: true,
+                            symbol: 'none',
+                            data: markLineData
+                        };
+                    }
+                }
+                
+                return seriesConfig;
+            })
         };
 
         this.chart.setOption(option);
@@ -387,6 +424,24 @@ var OTGraph = {
         if (this.chart) {
             this.chart.resize();
         }
+    },
+
+    recordDisconnect: function() {
+        var now = new Date().getTime();
+        this.disconnectMarkers.push({ time: now, type: 'disconnect' });
+        console.log('Graph: Disconnect marker added at', new Date(now).toISOString());
+        // Trim old markers outside current max time window (24h)
+        var cutoff = now - (24 * 3600 * 1000);
+        this.disconnectMarkers = this.disconnectMarkers.filter(function(m) { return m.time > cutoff; });
+    },
+
+    recordReconnect: function() {
+        var now = new Date().getTime();
+        this.disconnectMarkers.push({ time: now, type: 'reconnect' });
+        console.log('Graph: Reconnect marker added at', new Date(now).toISOString());
+        // Trim old markers outside current max time window (24h)
+        var cutoff = now - (24 * 3600 * 1000);
+        this.disconnectMarkers = this.disconnectMarkers.filter(function(m) { return m.time > cutoff; });
     },
 
     processLine: function(line) {
