@@ -380,6 +380,10 @@ let flashModeActive = false; // Track if we're on the flash page
 let flashPollTimer = null; // Timer for polling flash status as failsafe (both ESP and PIC)
 
 // File Streaming Variables
+// NOTE: File System Access API (showDirectoryPicker, getFileHandle, etc.) is only supported
+// in Chrome, Edge, and Opera. Firefox and Safari do not support this API as of 2026.
+// The code gracefully degrades to regular download functionality when the API is unavailable.
+// See: https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API
 let logDirectoryHandle = null;
 let fileStreamHandle = null;
 let fileWritableStream = null; // Deprecated, kept for cleanup just in case
@@ -844,6 +848,10 @@ function initOTLogWebSocket(force) {
     return;
   }
   
+  // Detect if accessed via HTTPS reverse proxy
+  // WebSocket (ws://) won't work when page is served over HTTPS due to mixed content blocking
+  const isProxied = window.location.protocol === 'https:';
+  
   // Detect smartphone (iPhone or Android Phone)
   const isPhone = /iPhone|iPod/.test(navigator.userAgent) || 
                  (/Android/.test(navigator.userAgent) && /Mobile/.test(navigator.userAgent));
@@ -851,8 +859,12 @@ function initOTLogWebSocket(force) {
   // Also check screen width as a fallback (standard breakpoint for tablets is 768px)
   const isSmallScreen = window.innerWidth < 768;
 
-  if ((isPhone || isSmallScreen) && !force && !isFlashing) {
-    console.log("Smartphone or small screen detected. Disabling OpenTherm Monitor.");
+  if ((isPhone || isSmallScreen || isProxied) && !force && !isFlashing) {
+    if (isProxied) {
+      console.log("HTTPS reverse proxy detected. WebSocket connections not supported. Disabling OpenTherm Monitor.");
+    } else {
+      console.log("Smartphone or small screen detected. Disabling OpenTherm Monitor.");
+    }
     const logSection = document.getElementById('otLogSection');
     if (logSection) {
       logSection.classList.add('hidden');
@@ -880,8 +892,12 @@ function initOTLogWebSocket(force) {
     // Remove listeners to avoid double-triggers during manual cleanup
     otLogWS.onclose = null; 
     otLogWS.onerror = null;
-    if (otLogWS.readyState === WebSocket.OPEN || otLogWS.readyState === WebSocket.CONNECTING) {
-      otLogWS.close();
+    try {
+      if (otLogWS.readyState === WebSocket.OPEN || otLogWS.readyState === WebSocket.CONNECTING) {
+        otLogWS.close();
+      }
+    } catch(e) {
+      console.warn('Error closing existing WebSocket:', e);
     }
     otLogWS = null;
   }
@@ -905,7 +921,7 @@ function initOTLogWebSocket(force) {
       startPersistenceTimer();
       
       // Record reconnect event in graph
-      if (typeof OTGraph !== 'undefined' && OTGraph.recordReconnect) {
+      if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.recordReconnect === 'function') {
         OTGraph.recordReconnect();
       }
     };
@@ -915,7 +931,7 @@ function initOTLogWebSocket(force) {
       updateWSStatus(false);
       
       // Record disconnect event in graph
-      if (typeof OTGraph !== 'undefined' && OTGraph.recordDisconnect) {
+      if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.recordDisconnect === 'function') {
         OTGraph.recordDisconnect();
       }
       
@@ -935,7 +951,13 @@ function initOTLogWebSocket(force) {
       console.error('OT Log WebSocket error:', error);
       updateWSStatus(false);
       // onclose will usually follow, but we ensure cleanup
-      if (otLogWS) otLogWS.close(); 
+      try {
+        if (otLogWS && otLogWS.readyState !== WebSocket.CLOSED) {
+          otLogWS.close();
+        }
+      } catch(e) {
+        console.warn('Error closing WebSocket after error:', e);
+      }
     };
     
     otLogWS.onmessage = function(event) {
@@ -958,12 +980,13 @@ function initOTLogWebSocket(force) {
       let isObject = false;
 
       try {
-        if (data && typeof data === 'string' && data.startsWith('{')) {
+        if (data && typeof data === 'string' && (data.startsWith('{') || data.startsWith('['))) {
           data = JSON.parse(data);
           isObject = true;
           console.log("OT Log WS parsed:", data);
         }
       } catch(e) {
+        console.warn('JSON parse error in WebSocket message:', e);
         // ignore JSON parse error, treat as text
       }
 
@@ -1198,7 +1221,7 @@ function addLogLine(logLine) {
   }
   
   // Process for Graph
-  if (typeof OTGraph !== 'undefined') {
+  if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.processLine === 'function') {
       OTGraph.processLine(logLine);
   }
 
@@ -1742,7 +1765,12 @@ const escapeHtml = (function() {
 function loadUISettings() {
   console.log("loadUISettings() ..");
   fetch(APIGW + "v0/settings")
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    })
     .then(json => {
       let data = json.settings;
       for (let i in data) {
@@ -2002,7 +2030,12 @@ function setVisible(className, visible) {
 function refreshDevTime() {
   //console.log("Refresh api/v0/devtime ..");
   fetch(APIGW + "v0/devtime")
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    })
     .then(json => {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
       for (let i in json.devtime) {
@@ -2031,7 +2064,12 @@ function refreshFirmware() {
   let picInfo = { type: "Unknown", version: "Unknown", available: "Unknown", device: "Unknown" };
 
   fetch(APIGW + "v0/devinfo")
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    })
     .then(json => {
        if (json.devinfo) {
          const data = json.devinfo;
@@ -2044,7 +2082,12 @@ function refreshFirmware() {
        }
        return fetch(APIGW + "firmwarefilelist");
     })
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    })
     .then(files => {
       console.log("parsed ... data is [" + JSON.stringify(files) + "]");
       availableFirmwareFiles = files; // Store for later use in flash success message
@@ -2199,7 +2242,12 @@ function refreshFirmware() {
 function refreshDevInfo() {
   document.getElementById('devName').innerHTML = "";
   fetch(APIGW + "v0/devinfo")
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    })
     .then(json => {
       console.log("parsed .., data is [" + JSON.stringify(json) + "]");
       data = json.devinfo;
@@ -2339,7 +2387,12 @@ function refreshDeviceInfo() {
 
   data = {};
   fetch(APIGW + "v0/devinfo")
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    })
     .then(json => {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
       data = json.devinfo;
@@ -2755,7 +2808,12 @@ var translateFields = [
 //============================================================================
 function applyTheme() {
   fetch(APIGW + "v0/settings")
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    })
     .then(json => {
       let data = json.settings;
       for (let i in data) {
@@ -2763,7 +2821,7 @@ function applyTheme() {
            let isDark = strToBool(data[i].value);
            document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
            localStorage.setItem('theme', isDark ? 'dark' : 'light');
-           if (typeof OTGraph !== 'undefined' && OTGraph.setTheme) {
+           if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.setTheme === 'function') {
                OTGraph.setTheme(isDark ? 'dark' : 'light');
            }
         }
@@ -3297,7 +3355,8 @@ function processStatsLine(line) {
         
         // Only accumulate interval if this is not the first message (entry.count > 0)
         // This prevents counting the buffer-creation-to-first-message interval
-        if (entry.count > 0) {
+        // Also validate diff is reasonable (> 0 and < 1 hour) to handle clock skew
+        if (entry.count > 0 && diff > 0 && diff < 3600) {
             entry.intervalSum += diff;
             entry.intervalCount++;
         }
@@ -3429,7 +3488,12 @@ function loadPersistentUI() {
   const apiPath = (typeof APIGW !== 'undefined') ? APIGW : (window.location.protocol + '//' + window.location.host + '/api/');
   
   fetch(apiPath + "v1/settings")
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    })
     .then(json => {
       if (!json || !json.settings) return;
       const settings = json.settings;
@@ -3485,7 +3549,7 @@ function loadPersistentUI() {
           const chk = document.getElementById("chkAutoExport");
           if (chk) {
               chk.checked = (exportVal === true || exportVal === "true");
-              if (typeof OTGraph !== 'undefined' && OTGraph.toggleAutoExport) {
+              if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.toggleAutoExport === 'function') {
                   OTGraph.toggleAutoExport(chk.checked);
               }
           }
@@ -3497,7 +3561,7 @@ function loadPersistentUI() {
           const chk = document.getElementById("chkAutoScreenshot");
           if (chk) {
              chk.checked = (shotVal === true || shotVal === "true");
-             if (typeof OTGraph !== 'undefined' && OTGraph.toggleAutoScreenshot) {
+             if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.toggleAutoScreenshot === 'function') {
                  OTGraph.toggleAutoScreenshot(chk.checked);
              }
           }
@@ -3509,7 +3573,7 @@ function loadPersistentUI() {
           const sel = document.getElementById("graphTimeWindow");
           if (sel) {
               sel.value = timeVal;
-               if (typeof OTGraph !== 'undefined' && OTGraph.setTimeWindow) {
+               if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.setTimeWindow === 'function') {
                   OTGraph.setTimeWindow(parseInt(timeVal));
               }
           }
