@@ -363,6 +363,10 @@ let flashModeActive = false; // Track if we're on the flash page
 let flashPollTimer = null; // Timer for polling flash status as failsafe (both ESP and PIC)
 
 // File Streaming Variables
+// NOTE: File System Access API (showDirectoryPicker, getFileHandle, etc.) is only supported
+// in Chrome, Edge, and Opera. Firefox and Safari do not support this API as of 2026.
+// The code gracefully degrades to regular download functionality when the API is unavailable.
+// See: https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API
 let logDirectoryHandle = null;
 let fileStreamHandle = null;
 let fileWritableStream = null; // Deprecated, kept for cleanup just in case
@@ -2941,7 +2945,8 @@ function processStatsLine(line) {
         
         // Only accumulate interval if this is not the first message (entry.count > 0)
         // This prevents counting the buffer-creation-to-first-message interval
-        if (entry.count > 0) {
+        // Also validate diff is reasonable (> 0 and < 1 hour) to handle clock skew
+        if (entry.count > 0 && diff > 0 && diff < 3600) {
             entry.intervalSum += diff;
             entry.intervalCount++;
         }
