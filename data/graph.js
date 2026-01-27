@@ -65,10 +65,10 @@ var OTGraph = {
         { id: 'dhwMode', label: 'DHW Mode', gridIndex: 1, type: 'line', step: 'start', areaStyle: { opacity: 0.3 }, large: true, sampling: 'lttb' },
         { id: 'chMode',  label: 'CH Mode',  gridIndex: 2, type: 'line', step: 'start', areaStyle: { opacity: 0.3 }, large: true, sampling: 'lttb' },
         { id: 'mod',     label: 'Modulation (%)',   gridIndex: 3, type: 'line', step: false, large: true, sampling: 'lttb' },
-        { id: 'ctrlSp',  label: 'Control SP',       gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
+        { id: 'ctrlSp',  label: 'Control SetPoint',       gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
         { id: 'boiler',  label: 'Boiler Temp',      gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
         { id: 'return',  label: 'Return Temp',      gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
-        { id: 'roomSp',  label: 'Room SP',          gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
+        { id: 'roomSp',  label: 'Room SetPoint',          gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
         { id: 'room',    label: 'Room Temp',        gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' },
         { id: 'outside', label: 'Outside Temp',     gridIndex: 4, type: 'line', step: false, large: true, sampling: 'lttb' }
     ],
@@ -332,7 +332,7 @@ var OTGraph = {
             ],
             // Legend specifically for temperature panel (shows all temp series with colors)
             legend: {
-                data: ['Control SP', 'Boiler Temp', 'Return Temp', 'Room SP', 'Room Temp', 'Outside Temp'],
+                data: ['Control SetPoint', 'Boiler Temp', 'Return Temp', 'Room SetPoint', 'Room Temp', 'Outside Temp'],
                 top: '62%',
                 left: '15%',
                 orient: 'horizontal',
