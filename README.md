@@ -143,6 +143,8 @@ This allows the OTGW to use external temperature data for OpenTherm communicatio
 - The built-in sensor is affected by sun/wind exposure
 - You want to use a more accurate or better-positioned sensor
 
+**For more detailed examples and use cases, see:** [Outside Temperature Override Examples](example-api/outside_temperature_override_examples.md)
+
 ### REST API
 - Read OpenTherm values via `/api/v0/` and `/api/v1/` endpoints.
 - Send OTGW commands via `/api/v1/otgw/command/...` (POST/PUT).
