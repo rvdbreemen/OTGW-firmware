@@ -133,8 +133,11 @@ The OTGW-firmware uses LittleFS for storing configuration files, web UI assets, 
 - **Fallback UI:** Auto-serves file explorer if main UI missing
 
 ### Negative
-- **No authentication:** Anyone on network can access files
-  - Accepted: Local network trust model (see ADR-003)
+- **No authentication by default:** Anyone on network can access files, upload firmware, and modify configuration
+  - **Security Risk:** Local attackers or malicious web pages can exfiltrate MQTT credentials, modify settings, or flash malicious firmware
+  - **Accepted for development:** Local network trust model (see ADR-003)
+  - **Production recommendation:** Add authentication layer (password/token), restrict access via network segmentation, or disable in production builds
+  - **CSRF risk:** Browser-based attacks possible without authentication
 - **Path length limit:** 30 characters (LittleFS limitation)
   - Accepted: Sufficient for /data/* structure
 - **No directories:** LittleFS is flat, all files in root
@@ -145,6 +148,11 @@ The OTGW-firmware uses LittleFS for storing configuration files, web UI assets, 
   - Accepted: Files are small, bandwidth not constrained
 
 ### Risks & Mitigation
+- **Unauthenticated access:** Any network client can list, upload, download, and delete files
+  - **Security Risk:** Configuration exfiltration (MQTT credentials), unauthorized firmware updates, service disruption
+  - **Accepted for development:** Local network trust model
+  - **Production mitigation:** Implement authentication (password/token protection), enable only in debug builds, or use network ACLs to restrict access
+  - **CSRF mitigation:** Add CSRF tokens for state-changing operations when authentication is enabled
 - **Directory traversal:** Malicious paths like `../../../etc/passwd`
   - **Mitigation:** Validate paths, restrict to LittleFS root
   - **Mitigation:** 30-char limit prevents long traversal paths

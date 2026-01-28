@@ -329,31 +329,24 @@ void publishSensorDiscovery(int sensorIndex) {
 
 ## Breaking Changes (Planned for v1.0.0 Final Release)
 
-**Status:** As of v1.0.0-rc6 (January 2026), these breaking changes are planned but NOT YET in a stable release.
+**Status:** As of v1.0.0-rc6 (January 2026), these breaking changes are **PLANNED** but NOT YET in a stable release. The changes below describe what **will happen** when v1.0.0 final is released.
 
-**1. GPIO pin default changed:**
-- **Old:** GPIO 13 (D7)
-- **New:** GPIO 10 (SD3)
-- **Impact:** Users upgrading with sensors on GPIO 13 must either:
+**1. GPIO pin default will change:**
+- **Current (rc6):** GPIO 13 (D7)
+- **Future (v1.0.0):** GPIO 10 (SD3)
+- **Impact:** Users upgrading with sensors on GPIO 13 will need to either:
   - Reconnect sensors to GPIO 10 (recommended), OR
   - Update the GPIO setting via Web UI to continue using GPIO 13
 
-**2. Address format fixed:**
+**2. Address format will be fixed:**
+- **Current (rc6):** 9-character compressed hex (buggy)
+- **Future (v1.0.0):** 16-character standard hex
+- **Impact:** Home Assistant automations using old addresses will break
+- **Migration:** Re-scan sensors after upgrade, update HA automations with new addresses
 
-**1. GPIO pin default changed:**
-- **Old:** GPIO 13 (D7)
-- **New:** GPIO 10 (SD3)
-- **Impact:** Users with sensors on GPIO 13 must update setting or reconnect
-
-**2. Address format fixed:**
-- **Old:** 9-character compressed hex (buggy)
-- **New:** 16-character standard hex
-- **Impact:** Home Assistant automations using old addresses break
-- **Migration:** Re-scan sensors, update HA automations
-
-**3. Discovery message ID:**
-- **Old:** Not documented
-- **New:** Message ID 246 + sensor index
+**3. Discovery message ID will change:**
+- **Current (rc6):** Not documented
+- **Future (v1.0.0):** Message ID 246 + sensor index
 
 ## Hardware Wiring
 

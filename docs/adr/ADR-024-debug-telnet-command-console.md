@@ -447,25 +447,44 @@ Published: homeassistant/sensor/otgw_123456_return_temp/config
 
 ## Security Model
 
-**Assumptions:**
+**Assumptions (development/debug builds):**
 - Device on trusted local network
 - No malicious users on network
 - Physical security of network
 
-**Not protected against:**
+**Not protected against (when telnet debug console is enabled):**
 - Eavesdropping (telnet is plain text)
-- Unauthorized access (no authentication)
-- Command injection (all commands predefined)
+- Unauthorized access (no authentication on raw TelnetStream)
+- Command abuse within predefined command set (no per-command authorization)
+- Heating disruption via relay control, MQTT commands, or device reboot
+- Service disruption via reconnect commands or PIC command injection
 
-**Accepted risks:**
+**Security Risks:**
+- **Powerful commands exposed:** `showStatus()`, service reconnects, MQTT discovery, GPIO/relay control, PIC command injection (`addOTWGcmdtoqueue("PR=A")`), device reboot
+- **Network-wide access:** Any host on local network can connect on port 23
+- **Browser exploitation:** Malicious web pages could potentially connect via telnet-capable clients
+- **No audit logging:** Command execution not logged or tracked
+
+**Accepted risks (development/debug builds only):**
 - Debug output may contain sensitive info (WiFi password not shown)
 - Commands can disrupt operation (reboot, reconnect)
-- Anyone on network can execute commands
+- Anyone on the same network segment can execute debug commands
+- Potential for heating control disruption or integration pivoting
 
-**Why acceptable:**
-- Consistent with local network trust model (ADR-003)
-- Debug console is developer tool, not end-user feature
-- Can be disabled in production builds
+**Production requirements:**
+- **RECOMMENDED:** Default production firmware should disable the debug telnet console entirely, **OR**
+- **ALTERNATIVE:** If enabled in production, it **MUST** be:
+  - Gated behind strong authentication (password/token)
+  - Configurable to use non-standard port (not port 23)
+  - Clearly documented as a security risk in user documentation
+  - Disabled by default with explicit opt-in required
+- **CRITICAL:** Production builds **MUST NOT** ship with an unauthenticated, always-on telnet console on port 23
+
+**Why acceptable for development:**
+- Consistent with local network trust model (ADR-003) for development environments
+- Debug console is a developer/diagnostic tool
+- Clear separation between development/debug behavior and production security posture
+- Can be disabled via compile-time flag or runtime configuration
 
 ## Related Decisions
 - ADR-003: HTTP-Only Network Architecture (local network trust model)

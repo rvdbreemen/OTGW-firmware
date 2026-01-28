@@ -149,9 +149,16 @@ The ESP8266's limited RAM (~40KB usable) drives many architectural decisions:
 ### Local Network Only
 The firmware is designed for trusted local network deployment:
 - HTTP only, no HTTPS (ADR-003)
-- No authentication on endpoints
+- **No authentication by default** on management endpoints (Web UI, REST API, filesystem, firmware upload)
 - WebSocket uses ws:// not wss://
-- Security via network isolation
+- **Security via network isolation** (primary security control)
+
+**Security Recommendations:**
+- Deploy only on trusted, isolated local networks
+- Use VPN for remote access (never expose directly to internet)
+- Consider adding authentication layer for production deployments
+- Implement network segmentation to limit device access
+- Regularly review network access controls
 
 ### Home Assistant Focus
 Primary integration target is Home Assistant:
@@ -195,8 +202,9 @@ ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
 1. 2016: ADR-001 (ESP8266), ADR-013 (Arduino)
 2. 2018: ADR-002 (Modular), ADR-003 (HTTP-only), ADR-007 (Timers)
 3. 2019: ADR-005 (WebSocket), ADR-012 (PIC upgrade), ADR-020 (Sensors)
-4. 2020: ADR-004 (Static buffers), ADR-008 (LittleFS migration), ADR-015 (NTP)
-5. 2024: ADR-019 (API v2)
+4. 2020: ADR-004 (Static buffers), ADR-008 (LittleFS migration)
+5. 2021: ADR-015 (NTP + AceTime - verified: commit 45b51f2)
+6. 2024: ADR-019 (API v2)
 
 ## When to Create an ADR
 
