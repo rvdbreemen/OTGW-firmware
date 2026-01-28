@@ -42,8 +42,8 @@ Example: 14:23:45.123456 >> T80200000
 
 **Adaptive throttling (v1.0.0):**
 - Normal: 20 messages/second max
-- Low heap: 5 messages/second
-- Critical heap: Block new messages
+- HEAP_LOW: 5 messages/second
+- HEAP_CRITICAL: Block new messages
 
 ## Alternatives Considered
 
@@ -134,9 +134,9 @@ Example: 14:23:45.123456 >> T80200000
 ### Risks & Mitigation
 - **Memory exhaustion:** Too many clients could exhaust heap
   - **Mitigation:** Hard limit of 3 clients, heap-aware connection rejection
-  - **Mitigation:** Adaptive throttling reduces message rate when heap low
+  - **Mitigation:** Adaptive throttling reduces message rate when HEAP_LOW
 - **Message flood:** High OT traffic could overwhelm clients
-  - **Mitigation:** Rate limiting (20 msg/s normal, 5 msg/s low heap)
+  - **Mitigation:** Rate limiting (20 msg/s normal, 5 msg/s HEAP_LOW)
   - **Mitigation:** Drop counter tracks throttled messages
 - **Connection leaks:** Clients disconnect without cleanup
   - **Mitigation:** Timeout detection, automatic cleanup

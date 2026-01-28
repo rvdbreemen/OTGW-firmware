@@ -293,6 +293,7 @@ Required ports (outgoing):
 - ADR-005: WebSocket for Real-Time Streaming (port 81 rationale)
 - ADR-006: MQTT Integration Pattern (MQTT client)
 - ADR-003: HTTP-Only Network Architecture (port 80 only, no 443)
+- ADR-019: REST API Versioning Strategy (version routing for multiple HTTP endpoints)
 
 ## References
 - Server implementations: `OTGW-firmware.ino` (setup), `restAPI.ino`, `webSocketStuff.ino`

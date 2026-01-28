@@ -266,6 +266,7 @@ void loop() {
 ## Related Decisions
 - ADR-001: ESP8266 Platform Selection (single-core constraint)
 - ADR-002: Modular .ino File Architecture (timer declarations per module)
+- ADR-006: MQTT Integration Pattern (30-second publish interval using timers)
 
 ## References
 - Timer implementation: `safeTimers.h`

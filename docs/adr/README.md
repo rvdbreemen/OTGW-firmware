@@ -6,6 +6,21 @@ This directory contains Architecture Decision Records (ADRs) that document signi
 
 Architecture Decision Records capture important architectural decisions along with their context, alternatives considered, and consequences. They serve as historical documentation to help current and future developers understand why the system is built the way it is.
 
+## Quick Navigation
+
+**By Topic:**
+- [Platform & Build](#platform-and-build-system) (4 ADRs)
+- [Memory Management](#memory-management) (3 ADRs)
+- [Network & Security](#network-and-security) (3 ADRs)
+- [Integration](#integration-and-communication) (2 ADRs)
+- [Core Systems](#system-architecture) (6 ADRs)
+- [Features & Extensions](#features-and-extensions) (6 ADRs)
+
+**Foundational ADRs** (most referenced by other ADRs):
+- **ADR-001:** ESP8266 Platform Selection (establishes hardware constraints)
+- **ADR-004:** Static Buffer Allocation (referenced by 8 other ADRs)
+- **ADR-007:** Timer-Based Task Scheduling (enables non-blocking architecture)
+
 ## ADR Index
 
 ### Platform and Build System
@@ -154,10 +169,34 @@ Single-core ESP8266 requires careful task management:
 
 ### Arduino Ecosystem
 Maintaining Arduino compatibility for community contributions:
-- Arduino framework (ADR-001)
+- Arduino framework (ADR-001, ADR-013)
 - Modular .ino files (ADR-002)
 - Arduino IDE support
 - Standard Arduino libraries where possible
+
+## Architectural Dependencies
+
+**Foundation Layer** (all other ADRs depend on these):
+```
+ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
+                     │
+                     ├──> ADR-004 (Static Buffers) ──> Referenced by 8 ADRs
+                     ├──> ADR-007 (Timers) ──────────> Referenced by 6 ADRs
+                     └──> ADR-013 (Arduino) ─────────> Foundation for all
+```
+
+**Most Referenced ADRs:**
+- **ADR-004:** Static Buffer Allocation (8 references)
+- **ADR-001:** ESP8266 Platform (7 references)
+- **ADR-007:** Timer-Based Scheduling (6 references)
+- **ADR-008:** LittleFS Persistence (5 references)
+
+**Decision Timeline** (earliest to latest):
+1. 2016: ADR-001 (ESP8266), ADR-013 (Arduino)
+2. 2018: ADR-002 (Modular), ADR-003 (HTTP-only), ADR-007 (Timers)
+3. 2019: ADR-005 (WebSocket), ADR-012 (PIC upgrade), ADR-020 (Sensors)
+4. 2020: ADR-004 (Static buffers), ADR-008 (LittleFS migration), ADR-015 (NTP)
+5. 2024: ADR-019 (API v2)
 
 ## When to Create an ADR
 
@@ -177,6 +216,38 @@ Don't create ADRs for:
 - Configuration changes
 - Documentation updates
 - Minor feature additions within existing patterns
+
+## Implementation Notes
+
+**Memory Measurements:**
+The claimed memory savings in ADR-004 (3,130-3,730 bytes or 7.8-9.3% of RAM) are estimates based on:
+- Static buffer conversions: ~1,500 bytes
+- PROGMEM strings: ~2,000 bytes (see ADR-009)
+- Optimized libraries: ~400-500 bytes
+
+To verify these measurements:
+```bash
+# Build and check binary size
+python build.py --firmware
+size build/OTGW-firmware.elf
+
+# Monitor heap at runtime via telnet (port 23)
+> s  # Show status including free heap
+```
+
+**Heap Levels (Standardized):**
+Throughout the codebase, use these constant names:
+- `HEAP_CRITICAL` - Less than 3KB (emergency mode)
+- `HEAP_WARNING` - 3-5KB (throttle aggressively)
+- `HEAP_LOW` - 5-8KB (reduce message rates)
+- Normal operation: Greater than 8KB
+
+**Version Numbering:**
+- Release versions: `v1.0.0`, `v1.0.1`, `v2.0.0`
+- Release candidates: `v1.0.0-rc1`, `v1.0.0-rc4`
+- Development builds: `v1.0.0-dev+gitSHA`
+
+Refer to specific RC numbers when documenting pre-release features.
 
 ## Superseding ADRs
 

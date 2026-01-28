@@ -2,7 +2,8 @@
 
 **Status:** Accepted  
 **Date:** 2019-06-01 (Estimated)  
-**Updated:** 2026-01-28 (Documentation)
+**Updated:** 2026-01-28 (Documentation)  
+**Critical Fix:** Release Candidate v1.0.0-rc4 (Binary data parsing safety)
 
 ## Context
 
@@ -139,6 +140,10 @@ The PIC firmware (written by Schelte Bron) receives updates to fix bugs and add 
   - **Mitigation:** Retry logic, timeout detection
 
 ## Implementation Details
+
+## Breaking Changes (Release Candidate v1.0.0-rc4)
+
+**Critical buffer overrun fix that prevents Exception (2) crashes:**
 
 **Critical fix (v1.0.0-rc4):**
 ```cpp

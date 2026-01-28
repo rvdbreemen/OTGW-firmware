@@ -205,6 +205,8 @@ if (freeHeap < HEAP_CRITICAL) {
 - ADR-001: ESP8266 Platform Selection (memory constraints)
 - ADR-009: PROGMEM Usage for String Literals (RAM savings)
 - ADR-003: HTTP-Only Network Architecture (memory for TLS not available)
+- ADR-006: MQTT Integration Pattern (uses static buffers and chunked streaming)
+- ADR-012: PIC Firmware Upgrade via Web UI (binary data parsing with bounded buffers)
 
 ## References
 - Heap protection implementation: `OTGW-firmware.h` (CSTR macro, heap levels)
