@@ -20,7 +20,22 @@ This directory contains the complete analysis and solution plan for the Wemos D1
 
 ## Documents in This Archive
 
-### 1. BOOTLOOP_ANALYSIS.md
+### 1. README.md (This File)
+**Purpose**: Navigation and overview  
+**Audience**: All stakeholders
+
+### 2. EXECUTIVE_SUMMARY.md
+**Purpose**: High-level overview for decision makers  
+**Audience**: Management, product owners, non-technical stakeholders  
+**Contents**:
+- What happened (technical and non-technical)
+- Impact and severity
+- Solution summary
+- Risk assessment
+- Recommendations
+- Success criteria
+
+### 3. BOOTLOOP_ANALYSIS.md
 **Purpose**: Complete technical root cause analysis  
 **Audience**: Developers, technical reviewers  
 **Contents**:
@@ -31,7 +46,7 @@ This directory contains the complete analysis and solution plan for the Wemos D1
 - Testing recommendations
 - Prevention measures
 
-### 2. SOLUTION_PLAN.md
+### 4. SOLUTION_PLAN.md
 **Purpose**: Step-by-step fix implementation guide  
 **Audience**: Developers implementing the fix  
 **Contents**:
@@ -42,13 +57,21 @@ This directory contains the complete analysis and solution plan for the Wemos D1
 - Risk assessment
 - Additional benefits
 
-### 3. README.md (This File)
-**Purpose**: Navigation and overview  
-**Audience**: All stakeholders  
+### 5. CODE_COMPARISON.md
+**Purpose**: Visual side-by-side comparison of vulnerable vs safe code  
+**Audience**: Developers, code reviewers  
+**Contents**:
+- Vulnerable vs safe code patterns
+- Buffer access visualizations
+- Function comparison table
+- Memory safety guarantees
+- Test cases
+- Reference implementation  
 
 ## Quick Reference
 
 ### For Decision Makers
+👉 **Start here**: Read `EXECUTIVE_SUMMARY.md`
 - **What happened?** Buffer overrun in hex file parsing causes device crashes
 - **Impact?** Complete device failure - unusable until fixed
 - **Fix complexity?** Low - single function, proven pattern
@@ -56,6 +79,7 @@ This directory contains the complete analysis and solution plan for the Wemos D1
 - **Recommendation?** Implement immediately
 
 ### For Developers
+👉 **Start here**: Read `CODE_COMPARISON.md` then `SOLUTION_PLAN.md`
 - **File to fix**: `src/libraries/OTGWSerial/OTGWSerial.cpp`
 - **Function**: `OTGWUpgrade::readHexFile()`
 - **Lines**: 303-318
@@ -117,6 +141,37 @@ for (ptr = 0; ptr <= (info.datasize - bannerLen); ptr++) {
 - Coding standards expanded to include explicit warnings
 
 ## How to Use This Archive
+
+### Documentation Structure
+```
+docs/reviews/2026-01-28_bootloop-analysis/
+├── README.md              - This file (navigation and overview)
+├── EXECUTIVE_SUMMARY.md   - High-level summary for decision makers
+├── BOOTLOOP_ANALYSIS.md   - Complete technical root cause analysis
+├── SOLUTION_PLAN.md       - Step-by-step implementation guide
+└── CODE_COMPARISON.md     - Visual vulnerable vs safe code comparison
+```
+
+### Reading Order by Role
+
+**Decision Maker** (5 minutes):
+1. README.md (this file) - Quick overview
+2. EXECUTIVE_SUMMARY.md - Impact and recommendations
+
+**Developer - Quick Fix** (10 minutes):
+1. CODE_COMPARISON.md - Visual understanding
+2. SOLUTION_PLAN.md - Implementation steps
+
+**Developer - Deep Understanding** (30 minutes):
+1. README.md (this file) - Overview
+2. BOOTLOOP_ANALYSIS.md - Root cause details
+3. CODE_COMPARISON.md - Pattern comparison
+4. SOLUTION_PLAN.md - Implementation
+
+**Code Reviewer** (20 minutes):
+1. EXECUTIVE_SUMMARY.md - Context
+2. CODE_COMPARISON.md - What changed and why
+3. BOOTLOOP_ANALYSIS.md (Root Cause section)
 
 ### If you're investigating the issue:
 1. Start with this README for overview
