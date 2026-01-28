@@ -1,116 +1,33 @@
 # OTGW-firmware (ESP8266) for NodoShop OpenTherm Gateway
 
 > **⚠️ DEVELOPMENT BRANCH WARNING**  
-> **This is a development branch and should be considered unstable for production use.**  
-> This branch (`dev`) contains work-in-progress features and fixes that are being tested before release. While we strive for quality, this code may contain bugs or incomplete features.
+> **This is a development branch (`dev`) and contains the latest work-in-progress features.**  
+> For the latest stable release, please check the [releases page](https://github.com/rvdbreemen/OTGW-firmware/releases) (latest: **v1.0.0**).
 > 
-> **For production/stable use, please use the [main branch](https://github.com/rvdbreemen/OTGW-firmware/tree/main) or download official releases from the [releases page](https://github.com/rvdbreemen/OTGW-firmware/releases).**
+> **For production use, we recommend using the stable releases.**
 
 [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
 
-This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 “devkit” that is part of the NodoShop OTGW and turns the gateway into a standalone network device with:
-- a Web UI
-- MQTT (including Home Assistant MQTT Auto Discovery)
-- a REST API
-- a TCP serial socket compatible with OTmonitor
+This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 “devkit” that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-The primary goal is **reliable Home Assistant integration** via MQTT and auto discovery, while keeping the OTGW behaviour compatible with existing OpenTherm tooling.
+## 🚀 What's New in v1.0.0
 
-## Version 1.0.0-rc4 - Development Release Candidate
+Version 1.0.0 is a major milestone delivering improved stability, a modern user interface, and robust integration.
 
-> **Note:** This is a **Release Candidate (RC4)** under active development. While we're confident in the improvements, we recommend production users stick with the stable [v0.10.x releases](https://github.com/rvdbreemen/OTGW-firmware/releases) or wait for the final v1.0.0 release.
+### Major Features
+- **Real-Time Graphs & Statistics**: Visualize boiler data (temperatures, setpoints) in real-time with responsive graphs and view long-term statistics in a dedicated dashboard.
+- **Modern Web UI**: Features a fully integrated **Dark Mode**, responsive design for mobile devices, and a redesigned **File System Explorer**.
+- **Live Data Streaming**: Replaced legacy polling with **WebSockets** for instant log viewing, status updates, and firmware flash progress.
+- **Improved Flashing**: New interactive `flash_esp.py` tool and a safer, more reliable web-based PIC firmware flasher.
+- **Stream Logging**: Stream OpenTherm logs directly to local files for troubleshooting.
 
-This release candidate builds upon RC3 with critical bug fixes and enhanced stability:
+### Performance & Stability
+- **Memory Safety**: Extensive optimizations using `PROGMEM` to drastically reduce RAM usage and heap fragmentation.
+- **Heap Protection**: Active monitoring and adaptive throttling to prevent memory exhaustion under load.
+- **Reliability**: Enhanced Watchdog integration and safe timer handling.
+- **MQTT Auto Discovery**: improved Home Assistant integration stability.
 
-**Critical Fixes in RC4:**
-- **Binary Data Parsing Safety**: Fixed buffer overrun vulnerability in PIC firmware flashing that could cause Exception (2) crashes
-- **MQTT Buffer Management**: Prevents ESP8266 heap fragmentation with static buffer allocation
-- **Memory Management**: Fixed incorrect memory cleanup that could cause corruption
-
-**Breaking Changes in RC4:**
-- Default GPIO pin for Dallas temperature sensors changed from GPIO 13 (D7) to GPIO 10 (SD3) to align with OTGW hardware defaults
-- Users upgrading with sensors on GPIO 13 should either reconnect to GPIO 10 or update the setting
-
-**What's Coming in v1.0.0 Final:**
-
-The final v1.0.0 release will mark a major milestone for the project. After years of development and testing, the REST API and MQTT interface have proven their stability and reliability. The final release will embody the original vision for the firmware, bringing polished features like:
-
-- **Live Data Streaming**: Watch OpenTherm MsgIDs arrive in real-time directly in your browser
-- **Enhanced Update Experience**: Improved firmware flashing for both the ESP8266 and the PIC controller, featuring live progress monitoring directly from the Web UI
-- **Dark Theme**: Fully integrated with persistent toggle
-- **Many small stability improvements**: To make this release even more robust than the 0.10.x series
-
-A massive thank you goes out to the entire community—contributors, testers, and users—whose support and feedback made this milestone possible.
-
-## What's New in This Branch
-
-This development branch delivers **comprehensive heap protection and security hardening** to prevent crashes and improve long-term stability. It builds on the stable 1.0.0 release with systematic memory management improvements.
-
-### Problem Solved
-
-ESP8266 devices have limited RAM (~40KB available). Under heavy load (multiple WebSocket clients, frequent MQTT messages), the original firmware could exhaust heap memory, leading to crashes and instability. This branch systematically addresses these issues.
-
-### Key Improvements
-
-#### 1. **Heap Protection System** (Always Active)
-- **4-level monitoring**: HEALTHY (>8KB), LOW (5-8KB), WARNING (3-5KB), CRITICAL (<3KB)
-- **Adaptive throttling**: Message rates adjust automatically based on available heap
-  - WebSocket: 20 msg/s → 5 msg/s → blocked when heap is low
-  - MQTT: 10 msg/s → 2 msg/s → blocked when heap is low
-- **Emergency recovery**: Automatic cleanup at critical heap levels
-- **Saves**: 2,400-3,000 bytes of RAM through library optimizations and backpressure
-
-#### 2. **Memory Optimizations** (Always Active)
-- **WebSocket buffers**: 512 → 256 bytes per client (-768 bytes total)
-- **HTTP API streaming**: 1,024 → 256 bytes buffer (-768 bytes)
-- **MQTT timeouts**: Longer intervals reduce reconnections by 75%
-- **Client limits**: Max 3 WebSocket connections with heap-aware rejection
-
-#### 3. **Security Fixes** (5 Vulnerabilities Resolved)
-- **Null pointer protection**: Global CSTR() macro protection across 75+ locations
-- **Integer overflow**: Safe arithmetic in heap calculations
-- **Time rollover**: Correct handling for 49+ day uptime (7 locations fixed)
-- **Magic numbers**: Named constants for maintainability
-
-#### 4. **Optional Advanced Features** (Compile-Time Flags)
-- **MQTT chunk streaming**: Eliminates buffer resize cycles, saves 200-400 bytes
-- **JSON streaming**: Eliminates 1,200-byte buffer, saves 1,504 bytes total
-
-#### 5. **Developer Tools**
-- Real-time heap statistics every 60 seconds (telnet port 23)
-- Firmware file list streaming visible on telnet
-- Drop counters for throttled messages
-- 42KB of technical documentation
-
-### Memory Impact
-
-**Without optional features**: 3,130-3,730 bytes saved (7.8-9.3% of RAM)  
-**With optional features**: Up to 5,234 bytes saved (13.1% of RAM)
-
-**Stability improvement**: Days → Weeks/Months of continuous operation
-
-### Backward Compatibility
-
-✅ **100% compatible** - No breaking changes  
-✅ **Drop-in replacement** - Works with existing configurations  
-✅ **Transparent optimizations** - No user action required  
-✅ **Optional enhancements** - Advanced features disabled by default
-
-### Quality Assurance
-
-✅ All code compiles without errors or warnings  
-✅ 100% PROGMEM compliance (efficient flash usage)  
-✅ Bounded buffers throughout (no memory leaks)  
-✅ Security hardened (5 vulnerabilities fixed)  
-✅ Comprehensive testing and documentation
-
-### Documentation
-
-Technical guides archived:
-- [HEAP_OPTIMIZATION_SUMMARY.md](docs/reviews/2026-01-17_dev-rc4-analysis/HEAP_OPTIMIZATION_SUMMARY.md) - Implementation details and testing
-- [LIBRARY_ANALYSIS.md](docs/reviews/2026-01-17_dev-rc4-analysis/LIBRARY_ANALYSIS.md) - Library internals and solutions
-- [MQTT_STREAMING_AUTODISCOVERY.md](docs/reviews/2026-01-17_dev-rc4-analysis/MQTT_STREAMING_AUTODISCOVERY.md) - Optional streaming guide
-- [LARGE_BUFFER_ANALYSIS.md](docs/reviews/2026-01-17_dev-rc4-analysis/LARGE_BUFFER_ANALYSIS.md) - Buffer optimization analysis
+---
 
 ## History and scope
 
