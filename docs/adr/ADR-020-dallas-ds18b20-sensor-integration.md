@@ -1,9 +1,11 @@
 # ADR-020: Dallas DS18B20 Temperature Sensor Integration
 
 **Status:** Accepted  
-**Date:** 2019-01-01 (Initial implementation)  
+**Date:** 2019-01-01 (Estimated - Pre-GitHub)  
 **Updated:** 2026-01-28 (Documentation)  
-**Breaking Change:** 2025-12-15 (v1.0.0 - GPIO default changed, address format fixed)
+**Breaking Changes:** Planned for v1.0.0 final release (not yet released as of v1.0.0-rc6)
+
+**Note on Dates:** This project's git history was truncated on April 23, 2021. Dates before 2021-04-23 are estimates. Git evidence shows sensor work in commits 9199e43 (2023-01-23) and fcd31a9 (2021-12-20).
 
 ## Context
 
@@ -325,7 +327,18 @@ void publishSensorDiscovery(int sensorIndex) {
 }
 ```
 
-## Breaking Changes (v1.0.0)
+## Breaking Changes (Planned for v1.0.0 Final Release)
+
+**Status:** As of v1.0.0-rc6 (January 2026), these breaking changes are planned but NOT YET in a stable release.
+
+**1. GPIO pin default changed:**
+- **Old:** GPIO 13 (D7)
+- **New:** GPIO 10 (SD3)
+- **Impact:** Users upgrading with sensors on GPIO 13 must either:
+  - Reconnect sensors to GPIO 10 (recommended), OR
+  - Update the GPIO setting via Web UI to continue using GPIO 13
+
+**2. Address format fixed:**
 
 **1. GPIO pin default changed:**
 - **Old:** GPIO 13 (D7)

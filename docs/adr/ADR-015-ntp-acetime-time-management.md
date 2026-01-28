@@ -1,8 +1,11 @@
 # ADR-015: NTP and AceTime for Time Management
 
 **Status:** Accepted  
-**Date:** 2020-01-01 (AceTime adoption)  
+**Date:** 2021-10-16 (AceTime adopted, replaced ezTime)  
+**Git Evidence:** Commit 45b51f2 (October 16, 2021)  
 **Updated:** 2026-01-28 (Documentation)
+
+**Note on Dates:** This project's git history was truncated on April 23, 2021 when the repository was migrated. The AceTime adoption date is verified with git evidence.
 
 ## Context
 
