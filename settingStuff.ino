@@ -69,8 +69,8 @@ void writeSettings(bool show)
   root[F("GPIOOUTPUTStriggerBit")] = settingGPIOOUTPUTStriggerBit;
 
   serializeJsonPretty(root, file);
-  Debugln(F("... done!"));
   if (show)  serializeJsonPretty(root, TelnetStream); //Debug stream ;-)
+  Debugln(F("\r\n... done!"));
   file.close();  
 
 } // writeSettings()

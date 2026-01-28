@@ -237,7 +237,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
               // All settings loaded at boot (global variables like settingHostname, etc.)
               // are still valid in RAM, so we write them back to the fresh filesystem.
               writeSettings(true);
-              if (_serial_output) Debugln(F("Filesystem update complete; settings restored from memory"));
+              if (_serial_output) Debugln(F("\r\nFilesystem update complete; settings restored from memory"));
             } else {
               // Ensure state is explicitly false and log failure for diagnostics
               LittleFSmounted = false;
