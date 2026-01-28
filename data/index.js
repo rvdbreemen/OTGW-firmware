@@ -302,13 +302,64 @@ window.otgwDebug = {
     }
   },
 
-  // Export logs to file
+  // Export logs to file - Compatible with otmonitor
   exportLogs: function() {
-    if (otLogBuffer.length === 0) {
+    if (!otLogBuffer || otLogBuffer.length === 0) {
       console.warn('⚠️  No logs to export');
       return;
     }
-    const content = otLogBuffer.join('\n');
+
+    // Helper to pad strings with spaces
+    // Ensures alignment for otmonitor compatibility
+    const pad = (str, len) => {
+      str = String(str || '');
+      // If string is longer than len, don't truncate, just append space if needed? 
+      // standard padEnd behavior is fine
+      return str.padEnd(len, ' ');
+    };
+
+    const lines = otLogBuffer.map(entry => {
+      const d = entry.data || {};
+      
+      // 1. Timestamp (15 chars: HH:MM:SS.mmmmmm)
+      // entry.time is typically "HH:MM:SS.mmmmmm" from parsing or generation
+      let line = (entry.time || "00:00:00.000000").substring(0, 15);
+      
+      // Align to col 17 (otmonitor fileanal/untab format: 15 chars + 2 spaces)
+      line = pad(line, 17);
+      
+      // 2. Raw Message (at col 17)
+      // d.raw is the hex string e.g. "B4001500"
+      const raw = (d.raw || "").trim();
+      line += raw;
+      
+      // Align to col 28
+      line = pad(line, 28);
+      
+      // 3. Type / Direction (at col 28)
+      // d.dir corresponds to the message type string (e.g., Read-Ack)
+      // or we can use d.source if d.dir is empty
+      const type = (d.dir || d.source || "").trim();
+      line += type;
+      
+      // Align to col 40
+      line = pad(line, 40);
+      
+      // 4. Description and Value (Human readability)
+      // This part is likely ignored by otmonitor import (which re-decodes raw)
+      // but good for reading by humans.
+      let desc = (d.label || "").trim();
+      if (d.value !== undefined && d.value !== null && String(d.value).trim() !== "") {
+        if (desc) desc += ": ";
+        desc += d.value;
+        if (d.unit) desc += " " + d.unit;
+      }
+      line += desc;
+      
+      return line;
+    });
+
+    const content = lines.join('\n');
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -316,7 +367,7 @@ window.otgwDebug = {
     a.download = `otgw-logs-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
     a.click();
     URL.revokeObjectURL(url);
-    console.log(`✅ Exported ${otLogBuffer.length} log lines`);
+    console.log(`✅ Exported ${otLogBuffer.length} log lines (Compatible Format)`);
   },
 
   // Export current data to JSON
