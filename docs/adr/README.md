@@ -70,6 +70,25 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-018: ArduinoJson for Data Interchange](ADR-018-arduinojson-data-interchange.md)**  
   Standardized JSON handling for settings persistence, REST API, MQTT, and WebSocket communication.
 
+### Features and Extensions
+- **[ADR-019: REST API Versioning Strategy](ADR-019-rest-api-versioning-strategy.md)**  
+  URL path-based API versioning (v0/v1/v2) with indefinite backward compatibility.
+
+- **[ADR-020: Dallas DS18B20 Temperature Sensor Integration](ADR-020-dallas-ds18b20-sensor-integration.md)**  
+  OneWire-based multi-sensor temperature monitoring with MQTT integration and auto-discovery.
+
+- **[ADR-021: S0 Pulse Counter Hardware Interrupt Architecture](ADR-021-s0-pulse-counter-interrupt-architecture.md)**  
+  ISR-driven energy meter pulse counting with debounce logic and real-time power calculation.
+
+- **[ADR-022: GPIO Output Control (Bit-Flag Triggered Relays)](ADR-022-gpio-output-bit-flag-control.md)**  
+  Stateless relay control based on OpenTherm status bit flags for external device activation.
+
+- **[ADR-023: File System Explorer HTTP Architecture](ADR-023-filesystem-explorer-http-api.md)**  
+  Browser-based LittleFS file management with streaming upload/download and OTA firmware updates.
+
+- **[ADR-024: Debug Telnet Command Console](ADR-024-debug-telnet-command-console.md)**  
+  Interactive telnet-based debug console for real-time diagnostics and hardware testing.
+
 ## ADR Template
 
 When creating new ADRs, use this structure:
