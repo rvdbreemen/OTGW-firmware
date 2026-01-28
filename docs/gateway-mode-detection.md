@@ -36,24 +36,40 @@ Located in `OTGW-Core.ino`:
 ```cpp
 bool queryOTGWgatewaymode(){
   if (!bPICavailable) {
+    OTGWDebugTln(F("queryOTGWgatewaymode: PIC not available"));
     return false;
   }
   
   String response = executeCommand("PR=M");
   response.trim();
   
+  OTGWDebugTf(PSTR("queryOTGWgatewaymode: PR=M response=[%s]\r\n"), CSTR(response));
+  
+  // Response should be "G" for Gateway mode or "M" for Monitor mode
+  // executeCommand() strips the "PR: " prefix, so we just get the value
+  bool isGatewayMode = false;
+  
   if (response.length() > 0) {
     char mode = response.charAt(0);
     if (mode == 'G' || mode == 'g') {
-      return true;  // Gateway mode
+      isGatewayMode = true;
+      OTGWDebugTln(F("queryOTGWgatewaymode: Gateway mode (G) detected"));
     } else if (mode == 'M' || mode == 'm') {
-      return false; // Monitor mode
+      isGatewayMode = false;
+      OTGWDebugTln(F("queryOTGWgatewaymode: Monitor mode (M) detected"));
+    } else {
+      OTGWDebugTf(PSTR("queryOTGWgatewaymode: Unexpected response [%s], defaulting to false\r\n"), CSTR(response));
+      isGatewayMode = false;
     }
+  } else {
+    OTGWDebugTln(F("queryOTGWgatewaymode: Empty response, defaulting to false"));
   }
   
-  return false; // Default to Monitor mode on error
+  return isGatewayMode;
 }
 ```
+
+This function includes comprehensive error handling and debug logging to aid troubleshooting.
 
 #### Periodic Polling
 
@@ -61,13 +77,16 @@ Gateway mode is queried every 30 seconds in `doTaskEvery30s()`:
 
 ```cpp
 void doTaskEvery30s(){
+  // Query the actual gateway mode setting from PIC using PR=M command
+  // This provides reliable detection of Gateway vs Monitor mode
+  static bool bOTGWgatewaypreviousstate = false;
+  static bool firstRun = true;
+  
   if (bPICavailable && bOTGWonline) {
-    static bool bOTGWgatewaypreviousstate = false;
     bool newGatewayState = queryOTGWgatewaymode();
     
     bOTGWgatewaystate = newGatewayState;
     
-    static bool firstRun = true;
     if ((bOTGWgatewaystate != bOTGWgatewaypreviousstate) || firstRun) {
       sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(bOTGWgatewaystate));
       bOTGWgatewaypreviousstate = bOTGWgatewaystate;
@@ -76,6 +95,8 @@ void doTaskEvery30s(){
   }
 }
 ```
+
+Note: Static variables are declared outside the conditional block to ensure proper initialization even when the system starts with PIC unavailable or OTGW offline.
 
 #### Message Processing Changes
 

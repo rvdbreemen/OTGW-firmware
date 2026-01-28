@@ -1498,7 +1498,6 @@ void processOT(const char *buf, int len){
   static time_t epochGatewaylastseen = 0;
   static bool bOTGWboilerpreviousstate = false;
   static bool bOTGWthermostatpreviousstate = false;
-  static bool bOTGWgatewaypreviousstate = false;
   static bool bOTGWpreviousstate = false;
   time_t now = time(nullptr);
 
