@@ -198,7 +198,7 @@ const MQTT_set_cmd_t setcmds[] PROGMEM = {
   {   s_cmd_setpoint, s_otgw_TT, s_temp },
   {   s_cmd_constant, s_otgw_TC, s_temp },
   {   s_cmd_outside, s_otgw_OT, s_temp },
-  {   s_cmd_hotwater, s_otgw_HW, s_on },
+  {   s_cmd_hotwater, s_otgw_HW, s_on },  // HW=0 (off), HW=1 (on), HW=P (DHW push), HW=<other> (auto)
   {   s_cmd_gatewaymode, s_otgw_GW, s_on },
   {   s_cmd_setback, s_otgw_SB, s_temp },
   {   s_cmd_maxchsetpt, s_otgw_SH, s_temp },
