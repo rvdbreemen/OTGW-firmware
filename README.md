@@ -96,6 +96,55 @@ The Web UI and APIs are designed for use on a trusted local network. Do not expo
 - Accepts OTGW commands via MQTT (topic structure depends on your configured prefix; see the wiki for exact topics and examples).
 - Publishes event topics for command responses/errors and thermostat connection/power state changes.
 
+#### MQTT Commands
+
+The firmware accepts commands via MQTT to control various OTGW functions. Commands are published to the topic:
+```
+<mqtt-prefix>/set/<node-id>/<command>
+```
+
+**Available commands include:**
+- `setpoint` - Temporary temperature override (maps to OTGW `TT` command)
+- `constant` - Constant temperature override (maps to OTGW `TC` command)
+- **`outside`** - **Override outside temperature sensor** (maps to OTGW `OT` command)
+- `hotwater` - Enable/disable hot water (maps to OTGW `HW` command)
+- `maxchsetpt` - Set maximum central heating water setpoint (maps to OTGW `SH` command)
+- `maxdhwsetpt` - Set maximum DHW setpoint (maps to OTGW `SW` command)
+- And many more (see MQTTstuff.ino for complete list)
+
+**Example: Override Outside Temperature**
+
+If your boiler's built-in outside temperature sensor is malfunctioning or not present, you can override it with a value from another sensor (e.g., a weather station or Home Assistant sensor):
+
+```bash
+# Using mosquitto_pub (replace with your MQTT prefix and node ID)
+mosquitto_pub -h <broker-ip> -t "OTGW/set/otgw/outside" -m "15.5"
+```
+
+**Home Assistant Example:**
+
+Create an automation to sync your preferred outside temperature sensor:
+
+```yaml
+automation:
+  - alias: "Sync Outside Temperature to OTGW"
+    trigger:
+      - platform: state
+        entity_id: sensor.outdoor_temperature  # Your actual outdoor sensor
+    action:
+      - service: mqtt.publish
+        data:
+          topic: "OTGW/set/otgw/outside"  # Adjust to your MQTT prefix and node ID
+          payload: "{{ states('sensor.outdoor_temperature') }}"
+```
+
+This allows the OTGW to use external temperature data for OpenTherm communication with your boiler, which is particularly useful when:
+- Your boiler doesn't have an outside temperature sensor
+- The built-in sensor is affected by sun/wind exposure
+- You want to use a more accurate or better-positioned sensor
+
+**For more detailed examples and use cases, see:** [Outside Temperature Override Examples](example-api/outside_temperature_override_examples.md)
+
 ### REST API
 - Read OpenTherm values via `/api/v0/` and `/api/v1/` endpoints.
 - Send OTGW commands via `/api/v1/otgw/command/...` (POST/PUT).
