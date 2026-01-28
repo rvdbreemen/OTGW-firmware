@@ -107,7 +107,8 @@ The firmware accepts commands via MQTT to control various OTGW functions. Comman
 - `setpoint` - Temporary temperature override (maps to OTGW `TT` command)
 - `constant` - Constant temperature override (maps to OTGW `TC` command)
 - **`outside`** - **Override outside temperature sensor** (maps to OTGW `OT` command)
-- `hotwater` - Enable/disable hot water (maps to OTGW `HW` command)
+- `hotwater` - Control domestic hot water enable option (maps to OTGW `HW` command)
+  - Valid values: `0` (off), `1` (on), `P` (DHW push - heat tank once), any other character (e.g., `A`) for auto/thermostat control
 - `maxchsetpt` - Set maximum central heating water setpoint (maps to OTGW `SH` command)
 - `maxdhwsetpt` - Set maximum DHW setpoint (maps to OTGW `SW` command)
 - And many more (see MQTTstuff.ino for complete list)
@@ -144,6 +145,8 @@ This allows the OTGW to use external temperature data for OpenTherm communicatio
 - You want to use a more accurate or better-positioned sensor
 
 **For more detailed examples and use cases, see:** [Outside Temperature Override Examples](example-api/outside_temperature_override_examples.md)
+
+**For hot water control examples and automation ideas, see:** [Hot Water Control Examples](example-api/hotwater_examples.md)
 
 ### REST API
 - Read OpenTherm values via `/api/v0/` and `/api/v1/` endpoints.
