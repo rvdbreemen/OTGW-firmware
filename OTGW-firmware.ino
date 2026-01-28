@@ -254,6 +254,25 @@ void doTaskEvery5s(){
 //===[ Do task every 30s ]===
 void doTaskEvery30s(){
   //== do tasks ==
+  
+  // Query the actual gateway mode setting from PIC using PR=M command
+  // This provides reliable detection of Gateway vs Monitor mode
+  if (bPICavailable && bOTGWonline) {
+    static bool bOTGWgatewaypreviousstate = false;
+    bool newGatewayState = queryOTGWgatewaymode();
+    
+    // Update the global state
+    bOTGWgatewaystate = newGatewayState;
+    
+    // Send MQTT update if state changed or first time
+    static bool firstRun = true;
+    if ((bOTGWgatewaystate != bOTGWgatewaypreviousstate) || firstRun) {
+      sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(bOTGWgatewaystate));
+      bOTGWgatewaypreviousstate = bOTGWgatewaystate;
+      firstRun = false;
+      DebugTf(PSTR("Gateway mode updated via PR=M: %s\r\n"), CCONOFF(bOTGWgatewaystate));
+    }
+  }
 }
 
 //===[ Do task every 60s ]===

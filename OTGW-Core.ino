@@ -147,6 +147,49 @@ String getpicfwversion(){
   _ret.trim();
   return _ret;
 }
+//===================[ queryOTGWgatewaymode ]======================
+/*
+Query the actual gateway mode setting from the PIC firmware using PR=M command.
+According to OTGW documentation:
+- PR=M returns "PR: G" for Gateway mode (GW=1)
+- PR=M returns "PR: M" for Monitor/Standalone mode (GW=0)
+This provides a reliable way to detect the actual configured mode,
+rather than inferring it from message traffic.
+*/
+bool queryOTGWgatewaymode(){
+  if (!bPICavailable) {
+    OTGWDebugTln(F("queryOTGWgatewaymode: PIC not available"));
+    return false;
+  }
+  
+  String response = executeCommand("PR=M");
+  response.trim();
+  
+  OTGWDebugTf(PSTR("queryOTGWgatewaymode: PR=M response=[%s]\r\n"), CSTR(response));
+  
+  // Response should be "G" for Gateway mode or "M" for Monitor mode
+  // executeCommand() strips the "PR: " prefix, so we just get the value
+  bool isGatewayMode = false;
+  
+  if (response.length() > 0) {
+    char mode = response.charAt(0);
+    if (mode == 'G' || mode == 'g') {
+      isGatewayMode = true;
+      OTGWDebugTln(F("queryOTGWgatewaymode: Gateway mode (G) detected"));
+    } else if (mode == 'M' || mode == 'm') {
+      isGatewayMode = false;
+      OTGWDebugTln(F("queryOTGWgatewaymode: Monitor mode (M) detected"));
+    } else {
+      OTGWDebugTf(PSTR("queryOTGWgatewaymode: Unexpected response [%s], defaulting to false\r\n"), CSTR(response));
+      isGatewayMode = false;
+    }
+  } else {
+    OTGWDebugTln(F("queryOTGWgatewaymode: Empty response, defaulting to false"));
+  }
+  
+  return isGatewayMode;
+}
+
 //===================[ checkOTWGpicforupdate ]=====================
 void checkOTWGpicforupdate(){
   if (sPICfwversion[0] == '\0') {
@@ -1500,16 +1543,13 @@ void processOT(const char *buf, int len){
       bOTGWthermostatpreviousstate = bOTGWthermostatstate;
     }
     
-    //If the Gateway (A or R) messages have not been seen for 30 seconds, then set the state to false. 
-    //If the Thermostat is NOT connected (so false), then the Gateway will be continuously sending R messages to the boiler, in face the Gateway the acts as the Thermostat
-    bOTGWgatewaystate = (now < (epochGatewaylastseen+30));
-    if ((bOTGWgatewaystate != bOTGWgatewaypreviousstate) || (cntOTmessagesprocessed==1)){      
-      sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(bOTGWgatewaystate));
-      bOTGWgatewaypreviousstate = bOTGWgatewaystate;
-    }
+    // Gateway mode is now detected via PR=M command in doTaskEvery30s()
+    // We still track gateway message activity (R/A messages) for online status detection
+    // but don't use it to determine gateway mode anymore
+    bool bOTGWgatewayactive = (now < (epochGatewaylastseen+30));
 
     //If both (Boiler and Thermostat and Gateway) are offline, then the OTGW is considered offline as a whole.
-    bOTGWonline = (bOTGWboilerstate && bOTGWthermostatstate) || (bOTGWboilerstate && bOTGWgatewaystate);
+    bOTGWonline = (bOTGWboilerstate && bOTGWthermostatstate) || (bOTGWboilerstate && bOTGWgatewayactive);
     if ((bOTGWonline != bOTGWpreviousstate) || (cntOTmessagesprocessed==1)){
       sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(bOTGWonline));
       sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(bOTGWonline));
