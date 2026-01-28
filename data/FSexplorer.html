@@ -30,6 +30,14 @@
       <title>FSexplorer ESP</title>
       <script>
          let currentPath = '/';
+         
+         // HTML escape function for security
+         function escapeHtml(text) {
+             if (!text) return '';
+             const div = document.createElement('div');
+             div.textContent = text;
+             return div.innerHTML;
+         }
 
          document.addEventListener('DOMContentLoaded', () => {
              let main = document.querySelector('main');
@@ -77,70 +85,143 @@
              function loadFileList(highlightFile = null) {
                  uploadForm.action = '/upload?path=' + encodeURIComponent(currentPath);
                  
-                 fetch('api/listfiles?path=' + encodeURIComponent(currentPath)).then(function (response) {
-                     return response.json();
-                 }).then(function (json) {
+                 fetch('api/listfiles?path=' + encodeURIComponent(currentPath))
+                     .then(function (response) {
+                         if (!response.ok) {
+                             throw new Error('HTTP ' + response.status);
+                         }
+                         return response.json();
+                     })
+                     .then(function (json) {
+                   // Clear and rebuild table using DOM methods for security
                    main.innerHTML = '';
-                   let dir = '<table width=90%>';
-                   dir += `<tr><td colspan="6"><b>Current directory: ${currentPath}</b></td></tr>`;
+                   
+                   const table = document.createElement('table');
+                   table.style.width = '90%';
+                   
+                   // Header row with current directory
+                   const headerRow = table.insertRow();
+                   const headerCell = headerRow.insertCell();
+                   headerCell.colSpan = 6;
+                   const headerBold = document.createElement('b');
+                   headerBold.textContent = 'Current directory: ' + currentPath;
+                   headerCell.appendChild(headerBold);
                    
                    // Add parent directory link if not root
                    if (currentPath !== '/') {
-                       dir += '<tr>';
-                       dir += `<td width=20% nowrap><b><a href="#" class="dir-link" data-name="..">.. (Parent)</a></b></td>`;
-                       dir += `<td width=10% nowrap>&lt;DIR&gt;</td>`;
-                       dir += `<td width=10% nowrap></td>`;
-                       dir += `<td width=10% nowrap></td>`;
-                       dir += `<td width=10% nowrap></td>`;
-                       dir += `<td width=40% nowrap></td></tr>`;
+                       const parentRow = table.insertRow();
+                       const nameCell = parentRow.insertCell();
+                       nameCell.width = '20%';
+                       nameCell.setAttribute('nowrap', '');
+                       const parentBold = document.createElement('b');
+                       const parentLink = document.createElement('a');
+                       parentLink.href = '#';
+                       parentLink.className = 'dir-link';
+                       parentLink.setAttribute('data-name', '..');
+                       parentLink.textContent = '.. (Parent)';
+                       parentBold.appendChild(parentLink);
+                       nameCell.appendChild(parentBold);
+                       
+                       for (let j = 0; j < 5; j++) {
+                           const cell = parentRow.insertCell();
+                           cell.width = (j === 4) ? '40%' : '10%';
+                           cell.setAttribute('nowrap', '');
+                           if (j === 0) cell.innerHTML = '&lt;DIR&gt;';
+                       }
                    }
 
                    let i = 0;
                    for (; i < json.length - 1; i++) {
-                     let rowStyle = '';
-                     if (highlightFile && json[i].name === highlightFile) {
-                        rowStyle = 'style="background-color: #d4edda;"'; // Light green highlight
-                     }
-                     
-                     let fullPath = currentPath === '/' ? json[i].name : currentPath + '/' + json[i].name;
-                     if (currentPath !== '/' && !fullPath.startsWith('/')) fullPath = '/' + fullPath; // Ensure absolute path
+                       const row = table.insertRow();
+                       if (highlightFile && json[i].name === highlightFile) {
+                           row.style.backgroundColor = '#d4edda';
+                       }
+                       
+                       let fullPath = currentPath === '/' ? json[i].name : currentPath + '/' + json[i].name;
+                       if (currentPath !== '/' && !fullPath.startsWith('/')) fullPath = '/' + fullPath;
 
-                     dir += `<tr ${rowStyle}>`;
-                     if (json[i].name.indexOf("More files not") > -1)
-                     {
-                       dir += `<td width=20% nowrap>${json[i].name}</td>`;
-                       dir += `<td width=10% nowrap></td>`;
-                       dir += `<td width=10% nowrap></td>`;
-                       dir += `<td width=10% nowrap></td>`;
-                     } 
-                     else if (json[i].type === 'dir')
-                     {
-                       dir += `<td width=20% nowrap><b><a href="#" class="dir-link" data-name="${json[i].name}">${json[i].name}/</a></b></td>`;
-                       dir += `<td width=10% nowrap>&lt;DIR&gt;</td>`;
-                       dir += `<td width=10% nowrap></td>`;
-                       dir += `<td width=10% nowrap></td>`;
-                     }
-                     else
-                     {
-                       dir += `<td width=20% nowrap><a href ="${fullPath}" target="_blank">${json[i].name}</a></td>`;
-                       dir += `<td width=10% nowrap><small>${json[i].size}</small></td>`;
-                       dir += `<td width=10% nowrap><a href ="${fullPath}" download="${json[i].name}"> Download </a></td>`;
-                       if (   json[i].name != 'FSexplorer.html' && json[i].name != 'FSexplorer.css' && json[i].name != 'FSexplorer.png'
-                           && json[i].name != 'index.html'      && json[i].name != 'index.js'       && json[i].name != 'index.css'
-                       	  && json[i].name != 'settings.png'
-                     	 ) 
-                       {
-                         dir += `<td width=10% nowrap><a href ="#" data-href="${fullPath}" class="delete-link"> Delete </a></td>`;
+                       if (json[i].name.indexOf("More files not") > -1) {
+                           const nameCell = row.insertCell();
+                           nameCell.width = '20%';
+                           nameCell.setAttribute('nowrap', '');
+                           nameCell.textContent = json[i].name;
+                           for (let j = 0; j < 4; j++) {
+                               const cell = row.insertCell();
+                               cell.width = (j === 3) ? '40%' : '10%';
+                               cell.setAttribute('nowrap', '');
+                           }
+                       } else if (json[i].type === 'dir') {
+                           const nameCell = row.insertCell();
+                           nameCell.width = '20%';
+                           nameCell.setAttribute('nowrap', '');
+                           const dirBold = document.createElement('b');
+                           const dirLink = document.createElement('a');
+                           dirLink.href = '#';
+                           dirLink.className = 'dir-link';
+                           dirLink.setAttribute('data-name', json[i].name);
+                           dirLink.textContent = json[i].name + '/';
+                           dirBold.appendChild(dirLink);
+                           nameCell.appendChild(dirBold);
+                           
+                           const typeCell = row.insertCell();
+                           typeCell.width = '10%';
+                           typeCell.setAttribute('nowrap', '');
+                           typeCell.innerHTML = '&lt;DIR&gt;';
+                           
+                           for (let j = 0; j < 3; j++) {
+                               const cell = row.insertCell();
+                               cell.width = (j === 2) ? '40%' : '10%';
+                               cell.setAttribute('nowrap', '');
+                           }
+                       } else {
+                           // File entry
+                           const nameCell = row.insertCell();
+                           nameCell.width = '20%';
+                           nameCell.setAttribute('nowrap', '');
+                           const fileLink = document.createElement('a');
+                           fileLink.href = fullPath;
+                           fileLink.target = '_blank';
+                           fileLink.textContent = json[i].name;
+                           nameCell.appendChild(fileLink);
+                           
+                           const sizeCell = row.insertCell();
+                           sizeCell.width = '10%';
+                           sizeCell.setAttribute('nowrap', '');
+                           const sizeSmall = document.createElement('small');
+                           sizeSmall.textContent = json[i].size;
+                           sizeCell.appendChild(sizeSmall);
+                           
+                           const downloadCell = row.insertCell();
+                           downloadCell.width = '10%';
+                           downloadCell.setAttribute('nowrap', '');
+                           const downloadLink = document.createElement('a');
+                           downloadLink.href = fullPath;
+                           downloadLink.download = json[i].name;
+                           downloadLink.textContent = ' Download ';
+                           downloadCell.appendChild(downloadLink);
+                           
+                           const deleteCell = row.insertCell();
+                           deleteCell.width = '10%';
+                           deleteCell.setAttribute('nowrap', '');
+                           
+                           const protectedFiles = ['FSexplorer.html', 'FSexplorer.css', 'FSexplorer.png',
+                                                   'index.html', 'index.js', 'index.css', 'settings.png'];
+                           if (!protectedFiles.includes(json[i].name)) {
+                               const deleteLink = document.createElement('a');
+                               deleteLink.href = '#';
+                               deleteLink.setAttribute('data-href', fullPath);
+                               deleteLink.className = 'delete-link';
+                               deleteLink.textContent = ' Delete ';
+                               deleteCell.appendChild(deleteLink);
+                           }
+                           
+                           const spacerCell = row.insertCell();
+                           spacerCell.width = '40%';
+                           spacerCell.setAttribute('nowrap', '');
                        }
-                       else 
-                       {
-                         dir += `<td width=10% nowrap> </td>`;
-                       }
-                     }                 	 
-                     dir += "<td width=50%> </td></tr>";
-                   }	// for ..
+                   }
                    
-                   main.insertAdjacentHTML('beforeend', dir);
+                   main.appendChild(table);
                    
                    document.querySelectorAll('.dir-link').forEach((node) => {
                        node.addEventListener('click', (event) => {
@@ -166,27 +247,37 @@
                              event.preventDefault();
                    		 	 if (!confirm('Are you sure you want to delete this file?')) return;
                              let href = node.getAttribute('data-href');
-                             // Since we use ?delete= param on current page URL in the original code,
-                             // we should keep doing that or call fetch.
-                             // Original code: <a href ="${json[i].name}?delete=/${json[i].name}"
-                             // The backend looks for 'delete' arg on current page.
-                             // We can just reload the page with ?delete= parameter or use fetch.
-                             // Fetch is better to avoid page reload messing up JS state.
                              
                              fetch('api/listfiles?delete=' + encodeURIComponent(href))
                                 .then(res => {
+                                    if (!res.ok) {
+                                        throw new Error('HTTP ' + res.status);
+                                    }
                                     loadFileList();
+                                })
+                                .catch(error => {
+                                    console.error('Delete failed:', error);
+                                    alert('Failed to delete file');
                                 });
                    		 });
                    });
-                   main.insertAdjacentHTML('beforeend', '</table>');
                    
+                   // Display storage info using DOM methods
                    if(json[i]) {
-                       main.insertAdjacentHTML('beforeend', `<p><b>LittleFS</b> used ${json[i].usedBytes} by ${json[i].totalBytes}`);
+                       const storageInfo = document.createElement('p');
+                       const boldTag = document.createElement('b');
+                       boldTag.textContent = 'LittleFS';
+                       storageInfo.appendChild(boldTag);
+                       storageInfo.appendChild(document.createTextNode(' used ' + json[i].usedBytes + ' by ' + json[i].totalBytes));
+                       main.appendChild(storageInfo);
                        freeBytes = json[i].freeBytes;
                    }
                    
                    fileSize.innerHTML = "<b> &nbsp; </b><p>";    // spacer                
+                 })
+                 .catch(function(error) {
+                     console.error('Error loading file list:', error);
+                     main.innerHTML = '<p style="color:red;">Error loading file list. Please try again.</p>';
                  });
              }
 

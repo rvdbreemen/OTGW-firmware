@@ -2028,9 +2028,13 @@ function refreshDevTime() {
       for (let i in json.devtime) {
         if (json.devtime[i].name == "dateTime") {
           //console.log("Got new time ["+json.devtime[i].value+"]");
-          document.getElementById('theTime').innerHTML = json.devtime[i].value;
+          const timeEl = document.getElementById('theTime');
+          if (timeEl) timeEl.textContent = json.devtime[i].value;
         }
-        if (json.devtime[i].name == "message") document.getElementById('message').innerHTML = json.devtime[i].value;
+        if (json.devtime[i].name == "message") {
+          const msgEl = document.getElementById('message');
+          if (msgEl) msgEl.textContent = json.devtime[i].value;
+        }
       }
     })
     .catch(function (error) {
@@ -2089,13 +2093,32 @@ function refreshFirmware() {
       let infoDiv = document.createElement("div");
       infoDiv.setAttribute("class", "pic-info-header firmware-info-div");
       
-      let infoContent = "";
-      // infoContent += "<b>PIC Status:</b> " + ((picInfo.available == "true" || picInfo.available == true) ? "Available" : "Not Available") + "<br>";
-      infoContent += "<b>PIC Device:</b> " + picInfo.device + "<br>";
-      infoContent += "<b>PIC Type:</b> <span id='pic_type_display'>" + picInfo.type + "</span><br>";
-      infoContent += "<b>PIC Firmware Version:</b> <span id='pic_version_display'>" + picInfo.version + "</span>";
+      // Build info section using DOM methods for safety
+      const deviceLabel = document.createElement("b");
+      deviceLabel.textContent = "PIC Device:";
+      infoDiv.appendChild(deviceLabel);
+      infoDiv.appendChild(document.createTextNode(" " + picInfo.device));
+      infoDiv.appendChild(document.createElement("br"));
       
-      infoDiv.innerHTML = infoContent;
+      const typeLabel = document.createElement("b");
+      typeLabel.textContent = "PIC Type:";
+      infoDiv.appendChild(typeLabel);
+      infoDiv.appendChild(document.createTextNode(" "));
+      const typeSpan = document.createElement("span");
+      typeSpan.id = "pic_type_display";
+      typeSpan.textContent = picInfo.type;
+      infoDiv.appendChild(typeSpan);
+      infoDiv.appendChild(document.createElement("br"));
+      
+      const versionLabel = document.createElement("b");
+      versionLabel.textContent = "PIC Firmware Version:";
+      infoDiv.appendChild(versionLabel);
+      infoDiv.appendChild(document.createTextNode(" "));
+      const versionSpan = document.createElement("span");
+      versionSpan.id = "pic_version_display";
+      versionSpan.textContent = picInfo.version;
+      infoDiv.appendChild(versionSpan);
+      
       displayPICpage.appendChild(infoDiv);
 
       let tableDiv = document.createElement("div");
@@ -2227,7 +2250,9 @@ function refreshFirmware() {
 
 //============================================================================  
 function refreshDevInfo() {
-  document.getElementById('devName').innerHTML = "";
+  const devNameEl = document.getElementById('devName');
+  if (devNameEl) devNameEl.textContent = "";
+  
   fetch(APIGW + "v0/devinfo")
     .then(response => {
       if (!response.ok) {
@@ -2238,16 +2263,28 @@ function refreshDevInfo() {
     .then(json => {
       console.log("parsed .., data is [" + JSON.stringify(json) + "]");
       data = json.devinfo;
+      
+      let hostname = "";
+      let ipaddress = "";
+      let version = "";
+      
       for (let i in data) {
         if (data[i].name == "fwversion") {
-          document.getElementById('devVersion').innerHTML = json.devinfo[i].value;
-
+          version = data[i].value;
         } else if (data[i].name == 'hostname') {
-          document.getElementById('devName').innerHTML += data[i].value + " ";
-
+          hostname = data[i].value;
         } else if (data[i].name == 'ipaddress') {
-          document.getElementById('devName').innerHTML += " (" + data[i].value + ") ";
+          ipaddress = data[i].value;
         }
+      }
+      
+      // Update UI with sanitized text content
+      const versionEl = document.getElementById('devVersion');
+      if (versionEl) versionEl.textContent = version;
+      
+      const devNameEl = document.getElementById('devName');
+      if (devNameEl) {
+        devNameEl.textContent = hostname + (ipaddress ? " (" + ipaddress + ")" : "");
       }
     })
     .catch(function (error) {
@@ -2427,11 +2464,17 @@ function refreshSettings() {
   console.log("refreshSettings() ..");
   data = {};
   fetch(APIGW + "v0/settings")
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    })
     .then(json => {
       console.log("parsed .., data is [" + JSON.stringify(json) + "]");
       data = json.settings;
-      document.getElementById("settingMessage").innerHTML = "";
+      const msgEl = document.getElementById("settingMessage");
+      if (msgEl) msgEl.textContent = "";
       for (let i in data) {
         console.log("[" + data[i].name + "]=>[" + data[i].value + "]");
         // Skip hidden settings
@@ -2577,7 +2620,8 @@ function saveSettings() {
       }
 
       //processWithTimeout([(data.length -1), 0], 2, data, sendPostReading);
-      document.getElementById("settingMessage").innerHTML = "Saving changes...";
+      const msgEl = document.getElementById("settingMessage");
+      if (msgEl) msgEl.textContent = "Saving changes...";
       sendPostSetting(field, value);
     }
   }
@@ -2603,11 +2647,15 @@ function sendPostSetting(field, value) {
       //console.log(response.url);        //=> String
       //console.log(response.text());
       //return response.text()
+      const msgEl = document.getElementById("settingMessage");
       if (response.ok) {
-        document.getElementById("settingMessage").innerHTML = "Saving changes... SUCCESS";
-        setTimeout(function () { document.getElementById("settingMessage").innerHTML = ""; }, 2000); //and clear the message
+        if (msgEl) msgEl.textContent = "Saving changes... SUCCESS";
+        setTimeout(function () { 
+          const msgEl = document.getElementById("settingMessage");
+          if (msgEl) msgEl.textContent = ""; 
+        }, 2000); //and clear the message
       } else {
-        document.getElementById("settingMessage").innerHTML = "Saving changes... FAILED";
+        if (msgEl) msgEl.textContent = "Saving changes... FAILED";
       }
     }, (error) => {
       console.log("Error[" + error.message + "]"); //=> String
