@@ -522,11 +522,7 @@ var OTGraph = {
                                 width: 2
                             },
                             label: {
-                                show: true,
-                                position: 'end',
-                                formatter: isDisconnect ? 'Disconnected' : 'Connected',
-                                color: isDisconnect ? '#ff4444' : '#44ff44',
-                                fontSize: 10
+                                show: false
                             }
                         });
                     });
