@@ -2565,14 +2565,16 @@ function refreshSettings() {
         }
         else {
           //----document.getElementById("setFld_"+data[i].name).style.background = "white";
-          document.getElementById(data[i].name).className = "input-normal";
-          //----document.getElementById("setFld_"+data[i].name).value = data[i].value;
-          // document.getElementById(data[i].name).value = data[i].value;
-          // FIX If checkbox change checked iso value
-          if (data[i].type == "b")
-            document.getElementById(data[i].name).checked = strToBool(data[i].value);
-          else document.getElementById(data[i].name).value = data[i].value;
-
+          const inputEl = document.getElementById(data[i].name);
+          if (inputEl) {
+            inputEl.className = "input-normal";
+            //----document.getElementById("setFld_"+data[i].name).value = data[i].value;
+            // document.getElementById(data[i].name).value = data[i].value;
+            // FIX If checkbox change checked iso value
+            if (data[i].type == "b")
+              inputEl.checked = strToBool(data[i].value);
+            else inputEl.value = data[i].value;
+          }
         }
       }
       //console.log("-->done..");
@@ -2600,16 +2602,20 @@ function saveSettings() {
     //do something to each div like
     var field = inputs[i].getAttribute("id");
     console.log("InputNr[" + i + "], InputId[" + field + "]");
+    
+    const fieldEl = document.getElementById(field);
+    if (!fieldEl) continue; // Skip if element doesn't exist
+    
     if (inputs[i].type == "checkbox") {
-      value = document.getElementById(field).checked;
+      value = fieldEl.checked;
     } else {
-      value = document.getElementById(field).value;
+      value = fieldEl.value;
     }
     console.log("==> name[" + field + "], value[" + value + "]");
 
-    if (document.getElementById(field).className == "input-changed") {
+    if (fieldEl.className == "input-changed") {
       //then it was changes, and needs to be saved
-      document.getElementById(field).className = "input-normal";
+      fieldEl.className = "input-normal";
       console.log("Changes where made in [" + field + "][" + value + "]");
       
       // Update theme immediately if darktheme setting changed
