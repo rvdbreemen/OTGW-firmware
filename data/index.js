@@ -366,6 +366,8 @@ let isFlashing = false;
 let currentFlashFilename = "";
 let flashModeActive = false; // Track if we're on the flash page
 let flashPollTimer = null; // Timer for polling flash status as failsafe (both ESP and PIC)
+let otLogResponsiveInitialized = false;
+let otLogResizeTimer = null;
 
 // File Streaming Variables
 // NOTE: File System Access API (showDirectoryPicker, getFileHandle, etc.) is only supported
@@ -829,26 +831,72 @@ function resetWSWatchdog() {
 }
 
 //============================================================================
+function getOTLogDisplayState() {
+  // Detect if accessed via HTTPS reverse proxy
+  // WebSocket (ws://) won't work when page is served over HTTPS due to mixed content blocking
+  const isProxied = window.location.protocol === 'https:';
+
+  // Detect smartphone (iPhone or Android Phone)
+  const isPhone = /iPhone|iPod/.test(navigator.userAgent) ||
+                 (/Android/.test(navigator.userAgent) && /Mobile/.test(navigator.userAgent));
+
+  // Also check screen width as a fallback (standard breakpoint for tablets is 768px)
+  const isSmallScreen = window.innerWidth < 768;
+
+  return {
+    isProxied: isProxied,
+    isPhone: isPhone,
+    isSmallScreen: isSmallScreen,
+    disabled: (isProxied || isPhone || isSmallScreen)
+  };
+}
+
+//============================================================================
+function updateOTLogResponsiveState() {
+  if (flashModeActive) return;
+
+  const logSection = document.getElementById('otLogSection');
+  if (!logSection) return;
+
+  const displayState = getOTLogDisplayState();
+
+  if (displayState.disabled) {
+    logSection.classList.add('hidden');
+    disconnectOTLogWebSocket();
+    return;
+  }
+
+  if (logSection.classList.contains('hidden')) {
+    logSection.classList.remove('hidden');
+  }
+
+  if (!otLogWS || otLogWS.readyState === WebSocket.CLOSED) {
+    initOTLogWebSocket();
+  }
+}
+
+//============================================================================
+function handleOTLogResize() {
+  if (otLogResizeTimer) {
+    clearTimeout(otLogResizeTimer);
+  }
+  otLogResizeTimer = setTimeout(function() {
+    updateOTLogResponsiveState();
+  }, 200);
+}
+
+//============================================================================
 function initOTLogWebSocket(force) {
   // Don't connect if in flash mode
   if (flashModeActive) {
     console.log('Flash mode active - skipping WebSocket connection');
     return;
   }
-  
-  // Detect if accessed via HTTPS reverse proxy
-  // WebSocket (ws://) won't work when page is served over HTTPS due to mixed content blocking
-  const isProxied = window.location.protocol === 'https:';
-  
-  // Detect smartphone (iPhone or Android Phone)
-  const isPhone = /iPhone|iPod/.test(navigator.userAgent) || 
-                 (/Android/.test(navigator.userAgent) && /Mobile/.test(navigator.userAgent));
-  
-  // Also check screen width as a fallback (standard breakpoint for tablets is 768px)
-  const isSmallScreen = window.innerWidth < 768;
 
-  if ((isPhone || isSmallScreen || isProxied) && !force && !isFlashing) {
-    if (isProxied) {
+  const displayState = getOTLogDisplayState();
+
+  if (displayState.disabled && !force && !isFlashing) {
+    if (displayState.isProxied) {
       console.log("HTTPS reverse proxy detected. WebSocket connections not supported. Disabling OpenTherm Monitor.");
     } else {
       console.log("Smartphone or small screen detected. Disabling OpenTherm Monitor.");
@@ -1908,6 +1956,13 @@ function initMainPage() {
   loadPersistentUI();
 
   applyTheme();
+
+  if (!otLogResponsiveInitialized) {
+    window.addEventListener('resize', handleOTLogResize);
+    otLogResponsiveInitialized = true;
+  }
+
+  updateOTLogResponsiveState();
 
   if (typeof OTGraph !== 'undefined') {
       OTGraph.init();

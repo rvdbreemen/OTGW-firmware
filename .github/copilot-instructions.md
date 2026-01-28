@@ -26,6 +26,49 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
 - **Communication**: Serial interface to OpenTherm Gateway PIC controller
 - **Integration**: MQTT for Home Assistant Auto Discovery, REST API, TCP socket for OTmonitor
 
+## Architecture Decision Records (ADRs)
+
+When making decisions for refactors, feature additions, or bug fixes, always review existing ADRs first so you understand prior context and constraints.
+
+### ADR Location
+
+- Store ADRs under `docs/adr/`.
+- If the folder does not exist yet, create it when adding the first ADR.
+
+### ADR Format (MANDATORY)
+
+Use this template for new decisions and updates to existing ones:
+
+```
+# ADR-YYYYMMDD-Short-Title
+
+## Status
+Proposed | Accepted | Deprecated | Superseded
+
+## Context
+- What problem are we solving?
+- What constraints apply (hardware, memory, security, compatibility)?
+- What alternatives were considered?
+
+## Decision
+- The chosen approach and rationale.
+- Why alternatives were not chosen.
+
+## Consequences
+- Expected benefits.
+- Trade-offs, risks, or migration notes.
+
+## Related
+- Links to relevant code paths, issues, or PRs.
+- Links to prior ADRs if this supersedes or depends on them.
+```
+
+### ADR Workflow (MANDATORY)
+
+- **Before** implementing: read relevant ADRs to align with existing decisions.
+- **During** planning: if a change materially alters architecture, protocols, data flow, or external behavior, write a new ADR.
+- **After** implementation: ensure ADR status is updated (e.g., Proposed → Accepted) and reference the change.
+
 ## Network Architecture and Security
 
 - **Target Environment**: Local network use only (not internet-exposed)
