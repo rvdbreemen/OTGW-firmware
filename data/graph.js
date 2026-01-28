@@ -230,24 +230,71 @@ var OTGraph = {
         var prefix = isAuto ? 'otgw-data-auto-' : 'otgw-data-';
         var filename = prefix + iso + '.csv';
 
-        // Header
-        var csv = "Timestamp,Dataset,Value\n";
-        
-        // Collect data in current time window
+        // Prepare CSV headers
+        var headers = ["Timestamp"];
+        var keys = [];
+        this.seriesConfig.forEach(c => {
+            headers.push(c.label);
+            keys.push(c.id);
+        });
+
+        // Collect data grouping by timestamp
         var startTime = now.getTime() - this.timeWindow;
-        
-        // Iterate all active series
+        var dataMap = new Map();
+
         this.seriesConfig.forEach(c => {
              if (this.data[c.id]) {
                  this.data[c.id].forEach(pt => {
-                     // pt is {name: time, value: [timestamp, value]}
-                     if (pt.value[0] >= startTime) {
-                         // Format timestamp to ISO
-                         var ts = new Date(pt.value[0]).toISOString();
-                         csv += `${ts},${c.label},${pt.value[1]}\n`;
+                     // pt.value[0] can be Date object or timestamp number
+                     var t = (pt.value[0] instanceof Date) ? pt.value[0].getTime() : pt.value[0];
+                     if (t >= startTime) {
+                         if (!dataMap.has(t)) dataMap.set(t, {});
+                         dataMap.get(t)[c.id] = pt.value[1];
                      }
                  });
              }
+        });
+
+        // Initialize last known values with the most recent data point before startTime
+        var lastValues = {};
+        this.seriesConfig.forEach(c => {
+             if (this.data[c.id] && this.data[c.id].length > 0) {
+                 var seriesData = this.data[c.id];
+                 for (var i = seriesData.length - 1; i >= 0; i--) {
+                     var pt = seriesData[i];
+                     var t = (pt.value[0] instanceof Date) ? pt.value[0].getTime() : pt.value[0];
+                     if (t < startTime) {
+                         lastValues[c.id] = pt.value[1];
+                         break; 
+                     }
+                 }
+             }
+        });
+
+        // Build CSV content
+        var csv = headers.join(",") + "\n";
+        
+        // Sort timestamps and generate rows
+        var sortedTimestamps = Array.from(dataMap.keys()).sort((a,b) => a - b);
+        
+        sortedTimestamps.forEach(ts => {
+            var row = dataMap.get(ts);
+            
+            // Update lastValues with current row's data
+            keys.forEach(key => {
+                if (row[key] !== undefined && row[key] !== null) {
+                    lastValues[key] = row[key];
+                }
+            });
+            
+            var dateStr = new Date(ts).toISOString();
+            var line = [dateStr];
+            
+            keys.forEach(key => {
+                var val = lastValues[key]; 
+                line.push((val !== undefined && val !== null) ? val : "");
+            });
+            csv += line.join(",") + "\n";
         });
         
         var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
