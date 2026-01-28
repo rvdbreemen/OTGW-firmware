@@ -214,7 +214,6 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
         if(Update.end(true)){ //true to set the size to the current progress
-          if (_serial_output) Debugf(PSTR("\r\nUpdate Success: %u\r\n"), upload.totalSize);
           _status.upload_received = upload.totalSize;
           if (_status.upload_total == 0 && upload.totalSize > 0) {
             _status.upload_total = upload.totalSize;
@@ -226,6 +225,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
             _status.flash_written = upload.totalSize;
           }
           _setStatus(UPDATE_END, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, emptyString);
+          if (_serial_output) Debugf(PSTR("\r\nUpdate Success: %u\r\n"), upload.totalSize);
           
           if (_status.target == "filesystem") {
             LittleFSmounted = LittleFS.begin();
