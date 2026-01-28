@@ -4,6 +4,22 @@
 
 This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provides network connectivity (Web UI, MQTT, REST API, and TCP serial socket) for the OpenTherm Gateway hardware, with a focus on reliable Home Assistant integration.
 
+## Architecture Decision Records (ADRs)
+
+**IMPORTANT:** This project maintains Architecture Decision Records (ADRs) that document key architectural choices. Before making changes that affect architecture, consult the relevant ADRs:
+
+- **Platform & Architecture:** See `docs/adr/` directory for complete ADR index
+- **Key decisions documented:** ESP8266 platform, modular .ino files, HTTP-only (no HTTPS), static buffers, PROGMEM strings, WebSocket streaming, MQTT integration, timer-based scheduling, LittleFS persistence, hardware watchdog, PIC firmware upgrade, Arduino framework, build system, NTP/timezone, command queue, WiFiManager, ArduinoJson
+- **ADR Index:** `docs/adr/README.md` provides navigation and decision summaries
+- **When to create ADRs:** For decisions with long-term architectural impact
+- **Reference ADRs:** Link from code comments to relevant ADRs for context
+
+**ADR Compliance:**
+- Follow patterns established in ADRs (e.g., static buffers, PROGMEM, no HTTPS)
+- Don't violate architectural decisions without discussing alternatives
+- Update ADRs if architectural decisions change (create new ADR, don't modify existing)
+- Reference ADR numbers in code reviews and pull requests
+
 ## Technology Stack
 
 - **Platform**: ESP8266 (NodeMCU / Wemos D1 mini)
