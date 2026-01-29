@@ -532,7 +532,6 @@ static const char UpdateServerIndex[] PROGMEM =
           
           wsWatchdogTimer = setTimeout(function() {
             var now = Date.now();
-            var timeSinceFlashStart = flashingInProgress ? (now - flashStartTime) : 0;
             
             // If flashing and WebSocket is silent, activate polling fallback immediately
             if (flashingInProgress && !pollActive) {
