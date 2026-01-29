@@ -38,8 +38,8 @@ This document describes the comprehensive fix for flash progress bar issues in S
 │ Layer 2: WebSocket Auto-Reconnect (Exponential backoff)    │
 │ ↓ (If silent during flash for 5s)                          │
 │ Layer 3: Adaptive Watchdog Fallback (Activate polling)     │
-│ ↓ (If upload XHR fails/times out)                          │
-│ Layer 4: Upload Error Fallback (Immediate polling)         │
+│ ↓ (Before upload starts - Safari fix)                      │
+│ Layer 4: Proactive Polling Activation (Prevent WS drop)    │
 │ ↓ (During active flash)                                     │
 │ Layer 5: Dual-Mode Operation (Both WS + Polling active)    │
 └─────────────────────────────────────────────────────────────┘
@@ -226,68 +226,52 @@ ws.onmessage = function(e) {
 - **Don't spam console**: Only log meaningful errors
 - **Context-aware**: Different handling during flash vs idle
 
-### 6. Immediate Progress Initialization
+### 6. Flash State Tracking
 
-**Form Submit Handler**
+**Function**: `updateDeviceStatus(status)`
 
-```javascript
-// Reset UI elements
-uploadProgressEl.value = 0;
-uploadInfoEl.textContent = 'Starting upload...';
-flashProgressEl.value = 0;
-flashInfoEl.textContent = 'Waiting for upload...';
-
-// Mark that we're starting a flash operation
-flashingInProgress = true;
-flashStartTime = Date.now();
-flashPollingActivated = false;
-```
-
-**Purpose**: 
-- Provide immediate visual feedback
-- User sees progress bar immediately
-- State machine activated before any network activity
-
-### 7. Upload Error Fallback
-
-**XHR Timeout Handler**
+The `flashingInProgress` flag is set automatically when status messages indicate flash has started:
 
 ```javascript
-xhr.ontimeout = function() {
-  console.log('Upload timeout - flash may still be in progress, activating polling');
-  uploadInFlight = false;
-  
-  // Safari: Activate polling immediately on timeout during flash
-  if (flashingInProgress && !pollActive) {
-    console.log('Activating polling fallback due to upload timeout');
-    flashPollingActivated = true;
-    startPolling();
+if (status.state === 'start' || status.state === 'write') {
+  if (!flashingInProgress) {
+    flashingInProgress = true;
+    flashStartTime = Date.now();
   }
-  
-  if (!scheduleUploadRetry('Connection timeout.')) {
-    localUploadDone = true;
-    errorEl.textContent = 'Upload timeout - monitoring flash via polling...';
-  }
-};
+} else if (status.state === 'done' || status.state === 'error' || status.state === 'abort') {
+  flashingInProgress = false;
+}
 ```
 
-**XHR Error Handler**
+**Purpose**:
+- Tracks flash lifecycle based on server status
+- Enables adaptive watchdog timing (5s during flash vs 15s normally)
+- Controls dual-mode operation (keeps polling active during flash)
+
+**Note**: The flag is set reactively based on status messages, not proactively in the form submit handler. This means special "during flash" handling activates only after the first status message arrives.
+
+### 7. Form Submit Handler - Safari WebSocket Fix
+
+**Location**: Flash/Filesystem form submit handlers
 
 ```javascript
-xhr.onerror = function() {
-  console.log('Upload XHR error - activating polling fallback');
-  uploadInFlight = false;
-  
-  // Safari: Activate polling immediately on error during flash
-  if (flashingInProgress && !pollActive) {
-    console.log('Activating polling fallback due to upload error');
-    flashPollingActivated = true;
-    startPolling();
-  }
-};
+// Safari: Close WebSocket before upload to avoid resource contention
+closeWebSocketForUpload();
+
+// Start polling immediately - don't rely on WebSocket during upload
+if (!pollActive) {
+  console.log('Safari: Activating polling before upload (avoiding WebSocket resource contention)');
+  flashPollingActivated = true;
+  startPolling();
+}
 ```
 
-**Why**: If upload fails or times out (common in Safari during flash), we immediately activate polling to track progress.
+**Purpose**:
+- Prevents Safari from silently dropping WebSocket during large XHR upload
+- Activates polling fallback before upload starts
+- Ensures progress tracking works regardless of WebSocket state
+
+**Why**: Safari has ~3 persistent connection limit. Large XHR uploads compete with WebSocket for connection slots, causing WebSocket to be dropped without firing proper events.
 
 ### 8. Visual Feedback
 
