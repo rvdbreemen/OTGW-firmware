@@ -59,7 +59,7 @@ ws.close();
 
 **What Happens**:
 1. User starts flash
-2. WebSocket attempts to connect to `ws://device:81/`
+2. WebSocket attempts to connect to the device's plaintext management endpoint `ws://device:81/` (only `ws://` is supported; `wss://` is not available, so this traffic is always unencrypted on the LAN)
 3. Connection attempt hangs (firewall, port blocked, network issue)
 4. Safari hangs on WebSocket connection indefinitely
 5. Upload completes, flash starts
