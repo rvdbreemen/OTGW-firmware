@@ -23,6 +23,7 @@ import multiprocessing
 import os
 import platform
 import shutil
+import ssl
 import stat
 import subprocess
 import sys
@@ -279,7 +280,15 @@ def install_arduino_cli(system):
         # Download arduino-cli
         print_info(f"Downloading from {url}...")
         download_path = temp_dir / filename
-        urllib.request.urlretrieve(url, download_path)
+        
+        # Use unverified SSL context to avoid certificate errors on macOS
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        
+        with urllib.request.urlopen(url, context=ctx) as response, open(download_path, 'wb') as out_file:
+            shutil.copyfileobj(response, out_file)
+            
         print_success("Download complete")
         
         # Extract
@@ -775,7 +784,6 @@ Examples:
   python build.py --merged --compress  # Build and create compressed merged binary
   python build.py --clean          # Clean build artifacts
   python build.py --distclean      # Also remove cores/libraries cache
-  python build.py --no-rename      # Build without renaming artifacts
         """
     )
     
@@ -798,11 +806,6 @@ Examples:
         "--distclean",
         action="store_true",
         help="Remove build artifacts plus downloaded cores/libraries (slower)"
-    )
-    parser.add_argument(
-        "--no-rename",
-        action="store_true",
-        help="Skip renaming build artifacts with version"
     )
     parser.add_argument(
         "--merged",
@@ -903,8 +906,7 @@ Examples:
     consolidate_build_artifacts(project_dir)
     
     # Rename artifacts with version
-    if not args.no_rename:
-        rename_build_artifacts(project_dir, semver)
+    rename_build_artifacts(project_dir, semver)
     
     # Create merged binary if requested
     if args.merged:
