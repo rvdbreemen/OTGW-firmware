@@ -146,6 +146,7 @@ static const char UpdateServerIndex[] PROGMEM =
          var flashingInProgress = false;
          var flashStartTime = 0;
          var flashPollingActivated = false;
+         var wsInstance = null; // Track WebSocket instance for resource management
 
          function hasJsonContentType(response, contentType) {
            var ct = contentType || '';
@@ -163,12 +164,15 @@ static const char UpdateServerIndex[] PROGMEM =
            try { return JSON.parse(t); } catch (e) { return null; }
          }
 
-         function fetchText(url, timeoutMs) {
+         function fetchText(url, timeoutMs, customHeaders) {
            return new Promise(function(resolve, reject) {
              if (window.fetch) {
                var controller = null;
                var timeoutId = null;
-               var options = { cache: 'no-store' };
+               var options = { 
+                 cache: 'no-store',
+                 headers: customHeaders || {}
+               };
                if (window.AbortController && timeoutMs && timeoutMs > 0) {
                  controller = new AbortController();
                  options.signal = controller.signal;
@@ -204,7 +208,17 @@ static const char UpdateServerIndex[] PROGMEM =
                var xhr = new XMLHttpRequest();
                xhr.open('GET', url, true);
                xhr.timeout = timeoutMs || 5000;
-               try { xhr.setRequestHeader('Cache-Control', 'no-store'); } catch (e) {}
+               try { 
+                 xhr.setRequestHeader('Cache-Control', 'no-store');
+                 // Add custom headers if provided
+                 if (customHeaders) {
+                   for (var key in customHeaders) {
+                     if (customHeaders.hasOwnProperty(key)) {
+                       xhr.setRequestHeader(key, customHeaders[key]);
+                     }
+                   }
+                 }
+               } catch (e) {}
                xhr.onreadystatechange = function() {
                  if (xhr.readyState === 4) {
                    resolve({
@@ -428,7 +442,25 @@ static const char UpdateServerIndex[] PROGMEM =
          }
 
          function fetchStatus(timeoutMs) {
-           return fetchText('/status', timeoutMs)
+           // Add custom headers to help server identify context and for debugging
+           var headers = {
+             'X-Polling-Active': pollActive ? 'true' : 'false'
+           };
+           
+           if (flashingInProgress) {
+             headers['X-Flash-In-Progress'] = 'true';
+             headers['X-Flash-Duration'] = Math.floor((Date.now() - flashStartTime) / 1000).toString() + 's';
+             headers['X-Flash-Polling-Mode'] = flashPollingActivated ? 'true' : 'false';
+           }
+           
+           if (uploadInFlight) {
+             headers['X-Upload-In-Flight'] = 'true';
+             if (lastUploadTotal > 0) {
+               headers['X-Upload-Progress'] = Math.floor((lastUploadLoaded / lastUploadTotal) * 100).toString() + '%';
+             }
+           }
+           
+           return fetchText('/status', timeoutMs, headers)
              .then(function(res) {
                if (!res.ok) {
                  throw new Error('HTTP ' + res.status);
@@ -536,6 +568,22 @@ static const char UpdateServerIndex[] PROGMEM =
           }, watchdogDelay);
         }
 
+
+        // Close WebSocket connection (Safari resource management)
+        // Safari has strict concurrent connection limits - close WS before large uploads
+        function closeWebSocketForUpload() {
+          if (wsInstance && wsInstance.readyState !== WebSocket.CLOSED && wsInstance.readyState !== WebSocket.CLOSING) {
+            console.log('Safari: Closing WebSocket before upload to avoid resource contention');
+            try {
+              wsInstance.close();
+            } catch (e) {
+              console.log('Error closing WebSocket:', e);
+            }
+            wsInstance = null;
+            wsActive = false;
+          }
+        }
+
         // WebSocket Support for Real-time Progress
         function setupWebSocket() {
             if (!window.WebSocket) {
@@ -552,6 +600,7 @@ static const char UpdateServerIndex[] PROGMEM =
             
             try {
               ws = new WebSocket(wsUrl);
+              wsInstance = ws; // Store instance for resource management
             } catch (e) {
               console.log('WebSocket create failed:', e);
               wsReconnectAttempts++;
@@ -619,6 +668,7 @@ static const char UpdateServerIndex[] PROGMEM =
             ws.onerror = function(e) {
                 console.log('WebSocket error:', e);
                 clearTimeout(wsConnectionTimer);
+                wsInstance = null; // Clear instance reference
                 wsActive = false;
                 wsReconnectAttempts++;
                 if (!pollActive) startPolling();
@@ -627,6 +677,7 @@ static const char UpdateServerIndex[] PROGMEM =
             ws.onclose = function() {
                 console.log('WebSocket closed');
                 clearTimeout(wsConnectionTimer);
+                wsInstance = null; // Clear instance reference
                 
                 // WebSocket closed - restart polling immediately as fallback
                 wsActive = false;
@@ -688,6 +739,19 @@ static const char UpdateServerIndex[] PROGMEM =
                return;
              }
              // uploadInFlight = true; // Moved inside callback
+
+              // Safari: Close WebSocket before upload to avoid resource contention
+              // Safari has strict concurrent connection limits (~6 per domain, effective ~3 for persistent connections)
+              // WebSocket + large XHR upload compete for same connection pool
+              // Closing WebSocket prevents it from being dropped mid-upload
+              closeWebSocketForUpload();
+              
+              // Start polling immediately - don't rely on WebSocket during upload
+              if (!pollActive) {
+                console.log('Safari: Activating polling before upload (avoiding WebSocket resource contention)');
+                flashPollingActivated = true;
+                startPolling();
+              }
 
              var action = form.action;
              var preFlight = Promise.resolve();
@@ -768,7 +832,12 @@ static const char UpdateServerIndex[] PROGMEM =
                      // Firmware writes can block for 10-20 seconds per chunk
                      xhr.timeout = 300000;
                      
+                     // Enhanced headers for flash operation tracking and debugging
                      xhr.setRequestHeader('X-File-Size', input.files[0].size);
+                     xhr.setRequestHeader('X-Flash-Target', targetName); // 'flash' or 'filesystem'
+                     xhr.setRequestHeader('X-Flash-Filename', input.files[0].name);
+                     xhr.setRequestHeader('X-Flash-Operation', 'upload'); // Operation type
+                     xhr.setRequestHeader('X-Client-Timestamp', Date.now().toString()); // Client timestamp for correlation
                      xhr.upload.onprogress = function(ev) {
                        console.log('Upload progress:', ev.loaded, ev.total);
                        var total = ev.lengthComputable ? ev.total : 0;
