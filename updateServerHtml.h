@@ -171,6 +171,12 @@ static const char UpdateServerIndex[] PROGMEM =
                }
                fetch(url, options)
                  .then(function(response) {
+                   // Clear timeout immediately after response headers received
+                   // This prevents Safari from aborting while reading response body
+                   if (timeoutId) {
+                     clearTimeout(timeoutId);
+                     timeoutId = null;
+                   }
                    return response.text().then(function(text) {
                      resolve({
                        ok: response.ok,
@@ -180,9 +186,12 @@ static const char UpdateServerIndex[] PROGMEM =
                      });
                    });
                  })
-                 .catch(function(err) { reject(err); })
-                 .finally(function() {
-                   if (timeoutId) clearTimeout(timeoutId);
+                 .catch(function(err) { 
+                   if (timeoutId) {
+                     clearTimeout(timeoutId);
+                     timeoutId = null;
+                   }
+                   reject(err); 
                  });
              } else {
                var xhr = new XMLHttpRequest();
@@ -413,7 +422,10 @@ static const char UpdateServerIndex[] PROGMEM =
             })
             .then(function(json) { updateDeviceStatus(json); })
             .catch(function(e) {
-              console.log('Fetch status error:', e);
+              // Only log unexpected errors, not timeouts during normal operation
+              if (e && e.name !== 'AbortError') {
+                console.log('Fetch status error:', e);
+              }
               throw e;
             });
         }
