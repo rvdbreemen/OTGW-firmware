@@ -141,6 +141,11 @@ static const char UpdateServerIndex[] PROGMEM =
          var uploadRetryIsFilesystem = false;
          var uploadRetryBaseMs = 2000;
          var uploadRetryMaxDelayMs = 15000;
+         var wsReconnectAttempts = 0;
+         var wsReconnectMaxDelay = 10000;
+         var flashingInProgress = false;
+         var flashStartTime = 0;
+         var flashPollingActivated = false;
 
          function hasJsonContentType(response, contentType) {
            var ct = contentType || '';
@@ -172,6 +177,8 @@ static const char UpdateServerIndex[] PROGMEM =
                fetch(url, options)
                  .then(function(response) {
                    // Clear timeout immediately after response headers received
+                    // Safari-specific: Clearing timeout here prevents AbortError during response.text()
+                    // Safari can abort the fetch if timeout expires while reading response body
                    // This prevents Safari from aborting while reading response body
                    if (timeoutId) {
                      clearTimeout(timeoutId);
@@ -330,6 +337,18 @@ static const char UpdateServerIndex[] PROGMEM =
           lastDeviceStatusTime = Date.now();
           var state = status.state || 'idle';
           var target = status.target || '';
+
+           // Track flashing state for fallback logic
+           if (state === 'start' || state === 'write') {
+             if (!flashingInProgress) {
+               flashingInProgress = true;
+               flashStartTime = Date.now();
+               console.log('Flash operation started, activating enhanced monitoring');
+             }
+           } else if (state === 'end' || state === 'error' || state === 'abort') {
+             flashingInProgress = false;
+             flashPollingActivated = false;
+           }
           if (state !== 'idle') {
             showProgressPage('Flashing in progress');
           }
@@ -380,6 +399,7 @@ static const char UpdateServerIndex[] PROGMEM =
                }
              }
              stopPolling();
+              flashingInProgress = false;
              
            } else if (state === 'error') {
              progressTitle.textContent = 'Flashing error';
@@ -388,6 +408,7 @@ static const char UpdateServerIndex[] PROGMEM =
              if (retryBtn) retryBtn.style.display = 'block';
              stopPolling();
              localUploadDone = false;
+              flashingInProgress = false;
              
            } else if (state === 'abort') {
              progressTitle.textContent = 'Flashing aborted';
@@ -396,6 +417,7 @@ static const char UpdateServerIndex[] PROGMEM =
              if (retryBtn) retryBtn.style.display = 'block';
              stopPolling();
              localUploadDone = false;
+              flashingInProgress = false;
              
            } else {
              // In progress (start, write)
@@ -406,29 +428,46 @@ static const char UpdateServerIndex[] PROGMEM =
          }
 
          function fetchStatus(timeoutMs) {
-          return fetchText('/status', timeoutMs)
-            .then(function(res) {
-              if (!res.ok) {
-                throw new Error('HTTP ' + res.status);
-              }
-              if (!hasJsonContentType(null, res.contentType)) {
-                throw new Error('Unexpected content-type');
-              }
-              var parsed = parseJsonSafe(res.text);
-              if (!parsed) {
-                throw new Error('Invalid JSON');
-              }
-              return parsed;
-            })
-            .then(function(json) { updateDeviceStatus(json); })
-            .catch(function(e) {
-              // Only log unexpected errors, not timeouts during normal operation
-              if (e && e.name !== 'AbortError') {
-                console.log('Fetch status error:', e);
-              }
-              throw e;
-            });
-        }
+           return fetchText('/status', timeoutMs)
+             .then(function(res) {
+               if (!res.ok) {
+                 throw new Error('HTTP ' + res.status);
+               }
+               if (!hasJsonContentType(null, res.contentType)) {
+                 throw new Error('Unexpected content-type');
+               }
+               var parsed = parseJsonSafe(res.text);
+               if (!parsed) {
+                 throw new Error('Invalid JSON');
+               }
+               return parsed;
+             })
+             .then(function(json) { updateDeviceStatus(json); })
+             .catch(function(e) {
+               // Safari-specific: AbortError handling
+               // AbortError occurs when fetch is aborted due to timeout
+               // This is normal during flash operations when device is busy
+               if (e && e.name === 'AbortError') {
+                 // During flash, AbortError is expected - device is busy writing
+                 if (flashingInProgress) {
+                   console.log('Fetch aborted during flash (expected) - device is busy');
+                   return; // Don't treat as error
+                 }
+                 console.log('Fetch aborted - may indicate timeout');
+               } else if (e && e.message && e.message.indexOf('NetworkError') !== -1) {
+                 // Network errors can occur during flash when device is overloaded
+                 if (flashingInProgress) {
+                   console.log('Network error during flash (expected) - device is busy');
+                   return;
+                 }
+                 console.log('Network error:', e.message);
+               } else if (e) {
+                 // Log other errors only if not routine
+                 console.log('Fetch status error:', e.name || 'Unknown', e.message || '');
+               }
+               throw e;
+             });
+         }
 
         function scheduleNextPoll(delayMs) {
           if (!pollActive) return;
@@ -473,14 +512,28 @@ static const char UpdateServerIndex[] PROGMEM =
 
         function startWsWatchdog() {
           if (wsWatchdogTimer) clearTimeout(wsWatchdogTimer);
+          
+          // Shorter timeout during active flash operations (5s vs 15s)
+          var watchdogDelay = flashingInProgress ? 5000 : 15000;
+          
           wsWatchdogTimer = setTimeout(function() {
-            // WebSocket has been silent for 15 seconds - restart polling as fallback
-            if (!pollActive) {
-              console.log('WebSocket silent for 15s, restarting polling as fallback');
+            var now = Date.now();
+            var timeSinceFlashStart = flashingInProgress ? (now - flashStartTime) : 0;
+            
+            // If flashing and WebSocket is silent, activate polling fallback immediately
+            if (flashingInProgress && !pollActive) {
+              console.log('WebSocket silent during flash operation, activating polling fallback');
+              wsActive = false;
+              flashPollingActivated = true;
+              startPolling();
+            }
+            // WebSocket has been silent for timeout period - restart polling as fallback
+            else if (!pollActive) {
+              console.log('WebSocket silent for ' + (watchdogDelay/1000) + 's, restarting polling as fallback');
               wsActive = false;
               startPolling();
             }
-          }, 15000);
+          }, watchdogDelay);
         }
 
         // WebSocket Support for Real-time Progress
@@ -490,21 +543,51 @@ static const char UpdateServerIndex[] PROGMEM =
               if (!pollActive) startPolling();
               return;
             }
-            var wsScheme = (window.location.protocol === 'https:') ? 'wss://' : 'ws://';
+            
+            // Use ws:// protocol (never wss:// - this firmware uses HTTP only)
+            var wsScheme = 'ws://';
             var wsUrl = wsScheme + window.location.hostname + ':81/';
             console.log('Connecting to WebSocket:', wsUrl);
             var ws;
+            
             try {
               ws = new WebSocket(wsUrl);
             } catch (e) {
               console.log('WebSocket create failed:', e);
+              wsReconnectAttempts++;
               if (!pollActive) startPolling();
-              setTimeout(setupWebSocket, 2000);
+              
+              // Exponential backoff for reconnection
+              var reconnectDelay = Math.min(wsReconnectMaxDelay, 1000 * Math.pow(2, wsReconnectAttempts - 1));
+              console.log('Will retry WebSocket in ' + (reconnectDelay/1000) + 's (attempt ' + wsReconnectAttempts + ')');
+              setTimeout(setupWebSocket, reconnectDelay);
               return;
             }
             
+            // Safari: Set a connection timeout
+            // Safari can hang indefinitely on WebSocket connections
+            var wsConnectionTimer = setTimeout(function() {
+              if (ws.readyState === WebSocket.CONNECTING) {
+                console.log('WebSocket connection timeout (Safari workaround), closing and using polling');
+                try {
+                  ws.close();
+                } catch (e) {
+                  console.log('Error closing timed-out WebSocket:', e);
+                }
+                if (!pollActive) startPolling();
+              }
+            }, 10000); // 10 second timeout for connection
+            
             ws.onopen = function() {
-                console.log('WS Connected');
+                console.log('WebSocket connected successfully');
+                clearTimeout(wsConnectionTimer);
+                wsReconnectAttempts = 0; // Reset backoff counter on successful connection
+                
+                // If we're in the middle of flashing and polling was activated, keep both running
+                // This ensures we don't miss updates if WS drops again
+                if (flashingInProgress && flashPollingActivated) {
+                  console.log('Flash in progress - keeping both WebSocket and polling active');
+                }
             };
             
             ws.onmessage = function(e) {
@@ -512,25 +595,39 @@ static const char UpdateServerIndex[] PROGMEM =
                 var msg = parseJsonSafe(e.data);
                 // Ignore non-JSON messages (like raw logs)
                 if (!msg || typeof msg.state === 'undefined') return;
+                
                 lastWsMessageTime = Date.now();
-                // First WebSocket message received - stop polling, WebSocket takes over
+                
+                // First WebSocket message received - stop polling if not flashing
                 if (!wsActive) {
                   wsActive = true;
-                  stopPolling();
-                  console.log('WebSocket active, polling stopped');
+                  // Only stop polling if we're not in the middle of a flash operation
+                  // During flash, keep polling as backup in case WS drops
+                  if (!flashingInProgress && pollActive) {
+                    stopPolling();
+                    console.log('WebSocket active, polling stopped');
+                  } else if (flashingInProgress) {
+                    console.log('WebSocket active during flash - keeping polling as backup');
+                  }
                 }
-                // Reset watchdog - if WS goes silent for 15s, polling will restart
+                
+                // Reset watchdog - if WS goes silent, polling will restart
                 startWsWatchdog();
                 updateDeviceStatus(msg);
             };
             
             ws.onerror = function(e) {
-                console.log('WS Error:', e);
+                console.log('WebSocket error:', e);
+                clearTimeout(wsConnectionTimer);
                 wsActive = false;
+                wsReconnectAttempts++;
                 if (!pollActive) startPolling();
             };
             
             ws.onclose = function() {
+                console.log('WebSocket closed');
+                clearTimeout(wsConnectionTimer);
+                
                 // WebSocket closed - restart polling immediately as fallback
                 wsActive = false;
                 if (wsWatchdogTimer) {
@@ -538,13 +635,16 @@ static const char UpdateServerIndex[] PROGMEM =
                   wsWatchdogTimer = null;
                 }
                 if (!pollActive) {
-                  console.log('WS Closed, restarting polling');
+                  console.log('WebSocket closed, starting polling fallback');
                   startPolling();
                 }
-                // simple reconnect logic
-                if (window.location.hash !== '#done') { // Don't reconnect if we are done/navigating away
-                   console.log('WS Closed, retrying in 2s');
-                   setTimeout(setupWebSocket, 2000);
+                
+                // Reconnect with exponential backoff
+                if (window.location.hash !== '#done') {
+                  wsReconnectAttempts++;
+                  var reconnectDelay = Math.min(wsReconnectMaxDelay, 1000 * Math.pow(2, wsReconnectAttempts - 1));
+                  console.log('WebSocket will retry in ' + (reconnectDelay/1000) + 's (attempt ' + wsReconnectAttempts + ')');
+                  setTimeout(setupWebSocket, reconnectDelay);
                 }
             };
         }
