@@ -472,14 +472,15 @@ static const char UpdateServerIndex[] PROGMEM =
                  // Network errors can occur during flash when device is overloaded
                  if (flashingInProgress) {
                    console.log('Network error during flash (expected) - device is busy');
-                   return;
+                   return; // Don't treat as error
                  }
                  console.log('Network error:', e.message);
                } else if (e) {
                  // Log other errors only if not routine
                  console.log('Fetch status error:', e.name || 'Unknown', e.message || '');
+                 // Propagate non-routine errors so polling logic can react
+                 throw e;
                }
-               throw e;
              });
          }
 
