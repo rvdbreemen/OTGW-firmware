@@ -63,6 +63,8 @@ ESP8266HTTPUpdateServerTemplate<ServerType>::ESP8266HTTPUpdateServerTemplate(boo
   _lastFeedbackBytes = 0;
   _lastFeedbackTime = 0;
   _lastProgressPerc = 0;
+  _progressClient = NULL;
+  _streamingProgress = false;
   _resetStatus();
 }
 
@@ -83,6 +85,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _status.flash_total = total;
       }
       _setStatus(UPDATE_WRITE, _status.target, _status.flash_written, _status.flash_total, _status.filename, emptyString);
+      
+      // XHR chunked progress: Send progress chunk to client if streaming
+      _sendProgressChunk();
     });
 
     // handler for the /update form page
@@ -102,13 +107,50 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
     _server->on(path.c_str(), HTTP_POST, [&](){
       if(!_authenticated)
         return _server->requestAuthentication();
+      
+      // XHR CHUNKED PROGRESS: Instead of simple response, send chunked updates
+      // This allows the client XHR to receive progress as flash proceeds
+      
       if (Update.hasError()) {
+        // Error case - send standard response
         _setStatus(UPDATE_ERROR, _status.target, _status.received, _status.total, _status.filename, _updaterError);
         _server->send(200, F("text/html"), String(F("Flash error: ")) + _updaterError);
       } else {
-        _server->client().setNoDelay(true);
-        _server->send_P(200, PSTR("text/html"), _serverSuccess);
-        _server->client().stop();
+        // Success path - send chunked response with flash progress
+        WiFiClient client = _server->client();
+        _progressClient = &client; // Store client pointer for chunk sending
+        _streamingProgress = true;
+        
+        // Send HTTP headers for chunked transfer encoding
+        client.println(F("HTTP/1.1 200 OK"));
+        client.println(F("Content-Type: text/plain"));
+        client.println(F("Transfer-Encoding: chunked"));
+        client.println(F("Cache-Control: no-cache"));
+        client.println(F("Connection: close"));
+        client.println(); // End headers
+        
+        if (_serial_output) {
+          DebugTln(F("[XHR-TELNET] Starting chunked response for flash progress"));
+        }
+        
+        // Send initial chunk
+        _setStatus(UPDATE_END, _status.target, _status.flash_written, _status.flash_total, _status.filename, emptyString);
+        _sendProgressChunk();
+        
+        // Send final chunk (empty chunk signals end of chunked encoding)
+        client.print(F("0\r\n\r\n"));
+        client.flush();
+        
+        if (_serial_output) {
+          DebugTln(F("[XHR-TELNET] Chunked response complete, closing connection"));
+        }
+        
+        _streamingProgress = false;
+        _progressClient = NULL;
+        
+        client.setNoDelay(true);
+        client.stop();
+        
         // Reboot for BOTH firmware and filesystem
         delay(1000);
         ESP.restart();
@@ -435,6 +477,57 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusJson()
   }
   
   _server->send(200, F("application/json"), buf);
+}
+
+template <typename ServerType>
+void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendProgressChunk()
+{
+  // Send chunked progress update to client if streaming is enabled
+  if (!_streamingProgress || !_progressClient || !_progressClient->connected()) {
+    return;
+  }
+  
+  // Build JSON progress message
+  constexpr size_t JSON_BUFFER_SIZE = 256;
+  char jsonBuf[JSON_BUFFER_SIZE];
+  char filenameEsc[64];
+  char errorEsc[96];
+  _jsonEscape(_status.filename, filenameEsc, sizeof(filenameEsc));
+  _jsonEscape(_status.error, errorEsc, sizeof(errorEsc));
+  
+  int written = snprintf_P(
+    jsonBuf,
+    sizeof(jsonBuf),
+    PSTR("{\"state\":\"%s\",\"flash_written\":%u,\"flash_total\":%u,\"filename\":\"%s\",\"error\":\"%s\"}\n"),
+    _phaseToString(_status.phase),
+    static_cast<unsigned>(_status.flash_written),
+    static_cast<unsigned>(_status.flash_total),
+    filenameEsc,
+    errorEsc
+  );
+  
+  if (written <= 0 || written >= (int)sizeof(jsonBuf)) {
+    if (_serial_output) {
+      DebugTf(PSTR("[XHR] JSON buffer overflow, written=%d\r\n"), written);
+    }
+    return;
+  }
+  
+  size_t jsonLen = strlen(jsonBuf);
+  
+  // Send chunk in HTTP chunked encoding format: {hex-length}\r\n{data}\r\n
+  char chunkHeader[16];
+  snprintf_P(chunkHeader, sizeof(chunkHeader), PSTR("%x\r\n"), jsonLen);
+  
+  // Write chunk header, data, and trailing CRLF
+  _progressClient->print(chunkHeader);
+  _progressClient->write((const uint8_t*)jsonBuf, jsonLen);
+  _progressClient->print(F("\r\n"));
+  _progressClient->flush(); // Ensure data is sent immediately
+  
+  if (_serial_output) {
+    DebugTf(PSTR("[XHR-TELNET] Sent chunk (%u bytes): %s"), jsonLen, jsonBuf);
+  }
 }
 
 };
