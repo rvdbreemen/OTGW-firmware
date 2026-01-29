@@ -632,10 +632,10 @@ static const char UpdateServerIndex[] PROGMEM =
                 clearTimeout(wsConnectionTimer);
                 wsReconnectAttempts = 0; // Reset backoff counter on successful connection
                 
-                // If we're in the middle of flashing and polling was activated, keep both running
-                // This ensures we don't miss updates if WS drops again
-                if (flashingInProgress && flashPollingActivated) {
-                  console.log('Flash in progress - keeping both WebSocket and polling active');
+                // If we're in the middle of flashing and polling was activated and is currently active,
+                // we expect to keep both running (see ws.onmessage for the actual decision logic)
+                if (flashingInProgress && flashPollingActivated && pollActive) {
+                  console.log('Flash in progress with active polling - keeping both WebSocket and polling active');
                 }
             };
             
