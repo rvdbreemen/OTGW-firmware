@@ -442,25 +442,7 @@ static const char UpdateServerIndex[] PROGMEM =
          }
 
          function fetchStatus(timeoutMs) {
-           // Add custom headers to help server identify context and for debugging
-           var headers = {
-             'X-Polling-Active': pollActive ? 'true' : 'false'
-           };
-           
-           if (flashingInProgress) {
-             headers['X-Flash-In-Progress'] = 'true';
-             headers['X-Flash-Duration'] = Math.floor((Date.now() - flashStartTime) / 1000).toString() + 's';
-             headers['X-Flash-Polling-Mode'] = flashPollingActivated ? 'true' : 'false';
-           }
-           
-           if (uploadInFlight) {
-             headers['X-Upload-In-Flight'] = 'true';
-             if (lastUploadTotal > 0) {
-               headers['X-Upload-Progress'] = Math.floor((lastUploadLoaded / lastUploadTotal) * 100).toString() + '%';
-             }
-           }
-           
-           return fetchText('/status', timeoutMs, headers)
+            return fetchText('/status', timeoutMs)
              .then(function(res) {
                if (!res.ok) {
                  throw new Error('HTTP ' + res.status);
@@ -832,12 +814,6 @@ static const char UpdateServerIndex[] PROGMEM =
                      // Firmware writes can block for 10-20 seconds per chunk
                      xhr.timeout = 300000;
                      
-                     // Enhanced headers for flash operation tracking and debugging
-                     xhr.setRequestHeader('X-File-Size', input.files[0].size);
-                     xhr.setRequestHeader('X-Flash-Target', targetName); // 'flash' or 'filesystem'
-                     xhr.setRequestHeader('X-Flash-Filename', input.files[0].name);
-                     xhr.setRequestHeader('X-Flash-Operation', 'upload'); // Operation type
-                     xhr.setRequestHeader('X-Client-Timestamp', Date.now().toString()); // Client timestamp for correlation
                      xhr.upload.onprogress = function(ev) {
                        console.log('Upload progress:', ev.loaded, ev.total);
                        var total = ev.lengthComputable ? ev.total : 0;
