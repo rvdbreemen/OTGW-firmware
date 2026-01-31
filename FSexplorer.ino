@@ -79,25 +79,126 @@ void startWebserver(){
       f.close();
     });
   } else{
+    // Serve index.html with version-aware caching
     httpServer.on("/", []() {
       File f = LittleFS.open("/index.html", "r");
-      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
+      String html = f.readString();
       f.close();
+      
+      // Check if firmware and filesystem versions match
+      String fsHash = getFilesystemHash();
+      bool versionMismatch = (fsHash.length() > 0 && strcasecmp(fsHash.c_str(), _VERSION_GITHASH) != 0);
+      
+      if (versionMismatch) {
+        // Version mismatch: disable caching and inject version hash for cache-busting
+        httpServer.sendHeader(F("Cache-Control"), F("no-store, no-cache, must-revalidate"));
+        httpServer.sendHeader(F("Pragma"), F("no-cache"));
+        
+        // Replace script src="/index.js" with src="/index.js?v=hash"
+        html.replace(F("src=\"./index.js\""), "src=\"./index.js?v=" + fsHash + "\"");
+        html.replace(F("src=\"./graph.js\""), "src=\"./graph.js?v=" + fsHash + "\"");
+      } else {
+        // Versions match: allow normal caching (1 hour)
+        httpServer.sendHeader(F("Cache-Control"), F("public, max-age=3600"));
+      }
+      
+      httpServer.send(200, F("text/html; charset=UTF-8"), html);
     });
     httpServer.on("/index", []() {
       File f = LittleFS.open("/index.html", "r");
-      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
+      String html = f.readString();
       f.close();
+      
+      // Check if firmware and filesystem versions match
+      String fsHash = getFilesystemHash();
+      bool versionMismatch = (fsHash.length() > 0 && strcasecmp(fsHash.c_str(), _VERSION_GITHASH) != 0);
+      
+      if (versionMismatch) {
+        // Version mismatch: disable caching and inject version hash for cache-busting
+        httpServer.sendHeader(F("Cache-Control"), F("no-store, no-cache, must-revalidate"));
+        httpServer.sendHeader(F("Pragma"), F("no-cache"));
+        
+        // Replace script src="/index.js" with src="/index.js?v=hash"
+        html.replace(F("src=\"./index.js\""), "src=\"./index.js?v=" + fsHash + "\"");
+        html.replace(F("src=\"./graph.js\""), "src=\"./graph.js?v=" + fsHash + "\"");
+      } else {
+        // Versions match: allow normal caching (1 hour)
+        httpServer.sendHeader(F("Cache-Control"), F("public, max-age=3600"));
+      }
+      
+      httpServer.send(200, F("text/html; charset=UTF-8"), html);
     });
     httpServer.on("/index.html", []() {
       File f = LittleFS.open("/index.html", "r");
-      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
+      String html = f.readString();
       f.close();
+      
+      // Check if firmware and filesystem versions match
+      String fsHash = getFilesystemHash();
+      bool versionMismatch = (fsHash.length() > 0 && strcasecmp(fsHash.c_str(), _VERSION_GITHASH) != 0);
+      
+      if (versionMismatch) {
+        // Version mismatch: disable caching and inject version hash for cache-busting
+        httpServer.sendHeader(F("Cache-Control"), F("no-store, no-cache, must-revalidate"));
+        httpServer.sendHeader(F("Pragma"), F("no-cache"));
+        
+        // Replace script src="/index.js" with src="/index.js?v=hash"
+        html.replace(F("src=\"./index.js\""), "src=\"./index.js?v=" + fsHash + "\"");
+        html.replace(F("src=\"./graph.js\""), "src=\"./graph.js?v=" + fsHash + "\"");
+      } else {
+        // Versions match: allow normal caching (1 hour)
+        httpServer.sendHeader(F("Cache-Control"), F("public, max-age=3600"));
+      }
+      
+      httpServer.send(200, F("text/html; charset=UTF-8"), html);
     });
   } 
   httpServer.serveStatic("/FSexplorer.png",   LittleFS, "/FSexplorer.png");
-  httpServer.serveStatic("/index.css", LittleFS, "/index.css");
-  httpServer.serveStatic("/index.js",  LittleFS, "/index.js");
+  
+  // Serve CSS and JS files with appropriate caching headers
+  httpServer.on("/index.css", []() {
+    // CSS can be cached for longer periods (1 day)
+    httpServer.sendHeader(F("Cache-Control"), F("public, max-age=86400"));
+    File f = LittleFS.open("/index.css", "r");
+    httpServer.streamFile(f, F("text/css"));
+    f.close();
+  });
+  
+  httpServer.on("/index.js", []() {
+    // JavaScript caching depends on version match
+    String fsHash = getFilesystemHash();
+    bool versionMismatch = (fsHash.length() > 0 && strcasecmp(fsHash.c_str(), _VERSION_GITHASH) != 0);
+    
+    if (versionMismatch) {
+      // Version mismatch: short cache to ensure fresh load after filesystem update
+      httpServer.sendHeader(F("Cache-Control"), F("public, max-age=60"));
+    } else {
+      // Versions match: normal caching (1 day)
+      httpServer.sendHeader(F("Cache-Control"), F("public, max-age=86400"));
+    }
+    
+    File f = LittleFS.open("/index.js", "r");
+    httpServer.streamFile(f, F("application/javascript"));
+    f.close();
+  });
+  
+  httpServer.on("/graph.js", []() {
+    // JavaScript caching depends on version match
+    String fsHash = getFilesystemHash();
+    bool versionMismatch = (fsHash.length() > 0 && strcasecmp(fsHash.c_str(), _VERSION_GITHASH) != 0);
+    
+    if (versionMismatch) {
+      // Version mismatch: short cache to ensure fresh load after filesystem update
+      httpServer.sendHeader(F("Cache-Control"), F("public, max-age=60"));
+    } else {
+      // Versions match: normal caching (1 day)
+      httpServer.sendHeader(F("Cache-Control"), F("public, max-age=86400"));
+    }
+    
+    File f = LittleFS.open("/graph.js", "r");
+    httpServer.streamFile(f, F("application/javascript"));
+    f.close();
+  });
   //otgw pic functions
   httpServer.on("/pic", upgradepic);
   // all other api calls are catched in FSexplorer onNotFounD!
