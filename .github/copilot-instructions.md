@@ -488,6 +488,60 @@ Before implementing or modifying frontend features, verify browser support:
   - **Critical source** for PIC firmware behavior and serial port communication documentation.
   - Consult this for any issues related to the PIC controller.
 
+### API & Feature Documentation Structure (MANDATORY)
+
+**Do NOT overload README.md with all API documentation.** Instead, follow this structure:
+
+#### Quick Reference in README
+- Brief overview of the feature
+- Links to detailed documentation
+- 1-2 quick examples
+
+#### Detailed Documentation in `/docs/`
+Create separate markdown files in `docs/` for comprehensive documentation:
+- `/docs/<FEATURE>_API_REFERENCE.md` - Complete API/command reference with all options
+- `/docs/<FEATURE>_IMPLEMENTATION.md` - Technical details, integration examples, troubleshooting
+
+**Current Examples:**
+- `docs/MQTT_API_REFERENCE.md` - All 52 MQTT commands with parameter values
+- `docs/MQTT_IMPLEMENTATION.md` - Technical details and Home Assistant integration
+
+**Guidelines:**
+1. **README**: Keep MQTT Commands section to ~50 lines
+   - Feature description
+   - Quick examples (2-3 most common)
+   - Links to detailed docs
+   
+2. **docs/MQTT_API_REFERENCE.md**: Complete reference (~300+ lines)
+   - All 52 commands organized by category
+   - Parameter values and formats
+   - Examples for each command type
+   - Command-to-code mapping
+   
+3. **docs/MQTT_IMPLEMENTATION.md**: Technical guide (~200+ lines)
+   - Architecture and data flow
+   - Home Assistant integration
+   - Adding new commands (step-by-step)
+   - Troubleshooting and debugging
+
+4. **example-api/** folder: Practical examples
+   - Real-world use cases
+   - Common integrations
+   - Copy-paste ready code
+
+**When to Create Separate Documentation:**
+- API grows beyond 10 commands
+- Integration with external systems (HA, etc.)
+- Complex parameter types or validation
+- Troubleshooting or debugging needed
+
+**Benefits:**
+- README stays clean and focused
+- Detailed docs easier to maintain
+- Users can find what they need quickly
+- Technical and user documentation separated
+- Better for CI/CD and wiki generation
+
 ## Code Review and Analysis Documentation
 
 When performing code reviews or analysis work, always preserve the documentation for historical reference.

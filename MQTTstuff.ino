@@ -185,47 +185,146 @@ const char s_otgw_FT[] PROGMEM = "FT";
 const char s_otgw_VR[] PROGMEM = "VR";
 const char s_otgw_DP[] PROGMEM = "DP";
 
+// NEW STANDARD COMMAND STRINGS (Phase 1)
+const char s_cmd_setclock[] PROGMEM = "setclock";
+const char s_cmd_ledA[] PROGMEM = "ledA";
+const char s_cmd_ledB[] PROGMEM = "ledB";
+const char s_cmd_ledC[] PROGMEM = "ledC";
+const char s_cmd_ledD[] PROGMEM = "ledD";
+const char s_cmd_ledE[] PROGMEM = "ledE";
+const char s_cmd_ledF[] PROGMEM = "ledF";
+const char s_cmd_gpioA[] PROGMEM = "gpioA";
+const char s_cmd_gpioB[] PROGMEM = "gpioB";
+const char s_cmd_printsummary[] PROGMEM = "printsummary";
+
+// NEW STANDARD OTGW COMMAND CODES (Phase 1)
+const char s_otgw_SC[] PROGMEM = "SC";
+const char s_otgw_LA[] PROGMEM = "LA";
+const char s_otgw_LB[] PROGMEM = "LB";
+const char s_otgw_LC[] PROGMEM = "LC";
+const char s_otgw_LD[] PROGMEM = "LD";
+const char s_otgw_LE[] PROGMEM = "LE";
+const char s_otgw_LF[] PROGMEM = "LF";
+const char s_otgw_GA[] PROGMEM = "GA";
+const char s_otgw_GB[] PROGMEM = "GB";
+const char s_otgw_PS[] PROGMEM = "PS";
+
+// NEW ADVANCED COMMAND STRINGS (Phase 2)
+const char s_cmd_coolinglevel[] PROGMEM = "coolinglevel";
+const char s_cmd_coolingenable[] PROGMEM = "coolingenable";
+const char s_cmd_modeheating[] PROGMEM = "modeheating";
+const char s_cmd_mode2ndcircuit[] PROGMEM = "mode2ndcircuit";
+const char s_cmd_modewater[] PROGMEM = "modewater";
+const char s_cmd_remoterequest[] PROGMEM = "remoterequest";
+const char s_cmd_transparentparam[] PROGMEM = "transparentparam";
+const char s_cmd_summermode[] PROGMEM = "summermode";
+const char s_cmd_dhwblocking[] PROGMEM = "dhwblocking";
+const char s_cmd_boilersetpoint[] PROGMEM = "boilersetpoint";
+const char s_cmd_messageinterval[] PROGMEM = "messageinterval";
+const char s_cmd_failsafe[] PROGMEM = "failsafe";
+
+// NEW ADVANCED OTGW COMMAND CODES (Phase 2)
+const char s_otgw_CL[] PROGMEM = "CL";
+const char s_otgw_CE[] PROGMEM = "CE";
+const char s_otgw_MH[] PROGMEM = "MH";
+const char s_otgw_M2[] PROGMEM = "M2";
+const char s_otgw_MW[] PROGMEM = "MW";
+const char s_otgw_RR[] PROGMEM = "RR";
+const char s_otgw_TP[] PROGMEM = "TP";
+const char s_otgw_SM[] PROGMEM = "SM";
+const char s_otgw_BW[] PROGMEM = "BW";
+const char s_otgw_BS[] PROGMEM = "BS";
+const char s_otgw_MI[] PROGMEM = "MI";
+const char s_otgw_FS[] PROGMEM = "FS";
+
+// PIC firmware version identifiers
+enum PIC_VERSION {
+  PIC_ALL = 0,          // Available on all PIC versions
+  PIC_16F1847_ONLY = 1  // Only on PIC16F1847
+};
+
 struct MQTT_set_cmd_t
 {
     PGM_P setcmd;
     PGM_P otgwcmd;
     PGM_P ottype;
+    PIC_VERSION minPicVersion;  // Minimum PIC version required
 };
 
 
+//===========================================================================================
+// isCmdSupportedOnPIC - Check if command is supported on current PIC version
+//===========================================================================================
+bool isCmdSupportedOnPIC(PIC_VERSION minVersion) {
+  // Check if command requires PIC16F1847
+  if (minVersion == PIC_16F1847_ONLY) {
+    // Check if current PIC is PIC16F1847
+    if (strcasecmp_P(sPICtype, PSTR("PIC16F1847")) != 0) {
+      return false;  // Not supported on this PIC
+    }
+  }
+  return true;  // Supported
+}
+
 const MQTT_set_cmd_t setcmds[] PROGMEM = {
-  {   s_cmd_command, s_empty, s_raw },
-  {   s_cmd_setpoint, s_otgw_TT, s_temp },
-  {   s_cmd_constant, s_otgw_TC, s_temp },
-  {   s_cmd_outside, s_otgw_OT, s_temp },
-  {   s_cmd_hotwater, s_otgw_HW, s_on },  // HW=0 (off), HW=1 (on), HW=P (DHW push), HW=<other> (auto)
-  {   s_cmd_gatewaymode, s_otgw_GW, s_on },
-  {   s_cmd_setback, s_otgw_SB, s_temp },
-  {   s_cmd_maxchsetpt, s_otgw_SH, s_temp },
-  {   s_cmd_maxdhwsetpt, s_otgw_SW, s_temp },
-  {   s_cmd_maxmodulation, s_otgw_MM, s_level },        
-  {   s_cmd_ctrlsetpt, s_otgw_CS, s_temp },        
-  {   s_cmd_ctrlsetpt2, s_otgw_C2, s_temp },        
-  {   s_cmd_chenable, s_otgw_CH, s_on },        
-  {   s_cmd_chenable2, s_otgw_H2, s_on },        
-  {   s_cmd_ventsetpt, s_otgw_VS, s_level },
-  {   s_cmd_temperaturesensor, s_otgw_TS, s_function },
-  {   s_cmd_addalternative, s_otgw_AA, s_function },
-  {   s_cmd_delalternative, s_otgw_DA, s_function },
-  {   s_cmd_unknownid, s_otgw_UI, s_function },
-  {   s_cmd_knownid, s_otgw_KI, s_function },
-  {   s_cmd_priomsg, s_otgw_PM, s_function },
-  {   s_cmd_setresponse, s_otgw_SR, s_function },
-  {   s_cmd_clearrespons, s_otgw_CR, s_function },
-  {   s_cmd_resetcounter, s_otgw_RS, s_function },
-  {   s_cmd_ignoretransitations, s_otgw_IT, s_function },
-  {   s_cmd_overridehb, s_otgw_OH, s_function },
-  {   s_cmd_forcethermostat, s_otgw_FT, s_function },
-  {   s_cmd_voltageref, s_otgw_VR, s_function },
-  {   s_cmd_debugptr, s_otgw_DP, s_function },
+  {   s_cmd_command, s_empty, s_raw, PIC_ALL },
+  {   s_cmd_setpoint, s_otgw_TT, s_temp, PIC_ALL },
+  {   s_cmd_constant, s_otgw_TC, s_temp, PIC_ALL },
+  {   s_cmd_outside, s_otgw_OT, s_temp, PIC_ALL },
+  {   s_cmd_hotwater, s_otgw_HW, s_on, PIC_ALL },  // HW=0 (off), HW=1 (on), HW=P (DHW push), HW=<other> (auto)
+  {   s_cmd_gatewaymode, s_otgw_GW, s_on, PIC_ALL },
+  {   s_cmd_setback, s_otgw_SB, s_temp, PIC_ALL },
+  {   s_cmd_maxchsetpt, s_otgw_SH, s_temp, PIC_ALL },
+  {   s_cmd_maxdhwsetpt, s_otgw_SW, s_temp, PIC_ALL },
+  {   s_cmd_maxmodulation, s_otgw_MM, s_level, PIC_ALL },        
+  {   s_cmd_ctrlsetpt, s_otgw_CS, s_temp, PIC_ALL },        
+  {   s_cmd_ctrlsetpt2, s_otgw_C2, s_temp, PIC_ALL },        
+  {   s_cmd_chenable, s_otgw_CH, s_on, PIC_ALL },        
+  {   s_cmd_chenable2, s_otgw_H2, s_on, PIC_ALL },        
+  {   s_cmd_ventsetpt, s_otgw_VS, s_level, PIC_ALL },
+  {   s_cmd_temperaturesensor, s_otgw_TS, s_function, PIC_ALL },
+  {   s_cmd_addalternative, s_otgw_AA, s_function, PIC_ALL },
+  {   s_cmd_delalternative, s_otgw_DA, s_function, PIC_ALL },
+  {   s_cmd_unknownid, s_otgw_UI, s_function, PIC_ALL },
+  {   s_cmd_knownid, s_otgw_KI, s_function, PIC_ALL },
+  {   s_cmd_priomsg, s_otgw_PM, s_function, PIC_ALL },
+  {   s_cmd_setresponse, s_otgw_SR, s_function, PIC_ALL },
+  {   s_cmd_clearrespons, s_otgw_CR, s_function, PIC_ALL },
+  {   s_cmd_resetcounter, s_otgw_RS, s_function, PIC_ALL },
+  {   s_cmd_ignoretransitations, s_otgw_IT, s_function, PIC_ALL },
+  {   s_cmd_overridehb, s_otgw_OH, s_function, PIC_ALL },
+  {   s_cmd_forcethermostat, s_otgw_FT, s_function, PIC_ALL },
+  {   s_cmd_voltageref, s_otgw_VR, s_function, PIC_ALL },
+  {   s_cmd_debugptr, s_otgw_DP, s_function, PIC_ALL },
+  
+  // NEW STANDARD COMMANDS (Phase 1) - 10 new commands
+  {   s_cmd_setclock, s_otgw_SC, s_function, PIC_ALL },       // Time format: HH:MM/N
+  {   s_cmd_ledA, s_otgw_LA, s_function, PIC_ALL },          // LED A function
+  {   s_cmd_ledB, s_otgw_LB, s_function, PIC_ALL },          // LED B function
+  {   s_cmd_ledC, s_otgw_LC, s_function, PIC_ALL },          // LED C function
+  {   s_cmd_ledD, s_otgw_LD, s_function, PIC_ALL },          // LED D function
+  {   s_cmd_ledE, s_otgw_LE, s_function, PIC_ALL },          // LED E function
+  {   s_cmd_ledF, s_otgw_LF, s_function, PIC_ALL },          // LED F function
+  {   s_cmd_gpioA, s_otgw_GA, s_function, PIC_ALL },         // GPIO A function
+  {   s_cmd_gpioB, s_otgw_GB, s_function, PIC_ALL },         // GPIO B function
+  {   s_cmd_printsummary, s_otgw_PS, s_on, PIC_ALL },        // Print summary toggle
+  
+  // NEW ADVANCED COMMANDS (Phase 2) - 12 new commands (PIC16F1847 ONLY)
+  {   s_cmd_coolinglevel, s_otgw_CL, s_level, PIC_16F1847_ONLY },     // Cooling level %
+  {   s_cmd_coolingenable, s_otgw_CE, s_on, PIC_16F1847_ONLY },       // Cooling enable
+  {   s_cmd_modeheating, s_otgw_MH, s_function, PIC_16F1847_ONLY },   // Mode heating (0-6)
+  {   s_cmd_mode2ndcircuit, s_otgw_M2, s_function, PIC_16F1847_ONLY }, // Mode 2nd circuit (0-6)
+  {   s_cmd_modewater, s_otgw_MW, s_function, PIC_16F1847_ONLY },     // Mode water (0-6)
+  {   s_cmd_remoterequest, s_otgw_RR, s_function, PIC_16F1847_ONLY }, // Remote request (0-12)
+  {   s_cmd_transparentparam, s_otgw_TP, s_function, PIC_16F1847_ONLY }, // TSP/FHB read/write
+  {   s_cmd_summermode, s_otgw_SM, s_on, PIC_16F1847_ONLY },          // Summer mode
+  {   s_cmd_dhwblocking, s_otgw_BW, s_on, PIC_16F1847_ONLY },         // DHW blocking
+  {   s_cmd_boilersetpoint, s_otgw_BS, s_temp, PIC_16F1847_ONLY },    // Boiler setpoint
+  {   s_cmd_messageinterval, s_otgw_MI, s_function, PIC_16F1847_ONLY }, // Message interval (ms)
+  {   s_cmd_failsafe, s_otgw_FS, s_on, PIC_16F1847_ONLY },            // Fail safe enable
 } ;
 
-const int nrcmds = sizeof(setcmds) / sizeof(setcmds[0]);
+const int nrcmds = sizeof(setcmds) / sizeof(setcmds[0]);  // 52 commands (29 + 23 new)
 
 // const char learnmsg[] { "LA", "PR=L", "LB", "PR=L", "LC", "PR=L", "LD", "PR=L", "LE", "PR=L", "LF", "PR=L", "GA", "PR=G", "GB", "PR=G", "VR", "PR=V", "GW", "PR=M", "IT", "PR=T", "SB", "PR=S", "HW", "PR=W" } ;
 // const int nrlearnmsg = sizeof(learnmsg) / sizeof(learnmsg[0]);
@@ -323,9 +422,17 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
           PGM_P pSetCmd = (PGM_P)pgm_read_ptr(&setcmds[i].setcmd);
           if (strcasecmp_P(token, pSetCmd) == 0){
             //found a match
-            // Read ottype and otgwcmd from Flash
+            // Read ottype, otgwcmd, and minPicVersion from Flash
             PGM_P pOtType = (PGM_P)pgm_read_ptr(&setcmds[i].ottype);
             PGM_P pOtgwCmd = (PGM_P)pgm_read_ptr(&setcmds[i].otgwcmd);
+            PIC_VERSION minVersion = (PIC_VERSION)pgm_read_byte(&setcmds[i].minPicVersion);
+            
+            // Check if command is supported on current PIC version
+            if (!isCmdSupportedOnPIC(minVersion)) {
+              MQTTDebugf(PSTR(" ERROR: Command '%s' not supported on %s (PIC16F1847 only)\r\n"), token, sPICtype);
+              DebugTf(PSTR("MQTT: Unsupported command '%s' on %s - Command requires PIC16F1847\r\n"), token, sPICtype);
+              break;  // Command not supported, skip
+            }
             
             if (strcasecmp_P("raw", pOtType) == 0){
               //raw command

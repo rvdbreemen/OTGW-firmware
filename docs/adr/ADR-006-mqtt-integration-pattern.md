@@ -2,7 +2,7 @@
 
 **Status:** Accepted  
 **Date:** 2018-06-01 (Estimated)  
-**Updated:** 2026-01-28 (Documentation)
+**Updated:** 2026-01-31 (52 commands, PIC16F1847 advanced features)
 
 ## Context
 
@@ -250,6 +250,7 @@ binary_sensor.otgw_heating_active
 ## Related Decisions
 - ADR-004: Static Buffer Allocation Strategy (buffer sizing, chunked streaming)
 - ADR-007: Timer-Based Task Scheduling (periodic MQTT publishes)
+- ADR-025: PIC Version-Aware Command Validation (validates commands against PIC hardware before sending)
 
 ## References
 - PubSubClient library: https://github.com/knolleary/pubsubclient

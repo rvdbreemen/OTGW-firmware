@@ -12,7 +12,7 @@ Architecture Decision Records capture important architectural decisions along wi
 - [Platform & Build](#platform-and-build-system) (4 ADRs)
 - [Memory Management](#memory-management) (3 ADRs)
 - [Network & Security](#network-and-security) (3 ADRs)
-- [Integration](#integration-and-communication) (2 ADRs)
+- [Integration](#integration-and-communication) (3 ADRs)
 - [Core Systems](#system-architecture) (6 ADRs)
 - [Features & Extensions](#features-and-extensions) (6 ADRs)
 
@@ -50,6 +50,9 @@ Architecture Decision Records capture important architectural decisions along wi
 
 - **[ADR-006: MQTT Integration Pattern](ADR-006-mqtt-integration-pattern.md)**  
   MQTT client implementation with Home Assistant Auto-Discovery for zero-configuration integration.
+
+- **[ADR-025: PIC Version-Aware Command Validation](ADR-025-pic-version-aware-command-validation.md)**  
+  Preventing unsupported commands from being sent to incompatible PIC hardware versions (PIC16F88 vs PIC16F1847).
 
 ### System Architecture
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  

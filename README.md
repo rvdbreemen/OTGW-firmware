@@ -100,49 +100,32 @@ The Web UI and APIs are designed for use on a trusted local network. Do not expo
 
 The firmware accepts commands via MQTT to control various OTGW functions. Commands are published to the topic:
 ```
-<mqtt-prefix>/set/<node-id>/<command>
+<mqtt-prefix>/set/<node-id>/<command>=<payload>
 ```
 
-**Available commands include:**
-- `setpoint` - Temporary temperature override (maps to OTGW `TT` command)
-- `constant` - Constant temperature override (maps to OTGW `TC` command)
-- **`outside`** - **Override outside temperature sensor** (maps to OTGW `OT` command)
-- `hotwater` - Control domestic hot water enable option (maps to OTGW `HW` command)
-  - Valid values: `0` (off), `1` (on), `P` (DHW push - heat tank once), any other character (e.g., `A`) for auto/thermostat control
-- `maxchsetpt` - Set maximum central heating water setpoint (maps to OTGW `SH` command)
-- `maxdhwsetpt` - Set maximum DHW setpoint (maps to OTGW `SW` command)
-- And many more (see MQTTstuff.ino for complete list)
+**Total: 52 commands** (29 standard + 10 new + 12 PIC16F1847 advanced)
 
-**Example: Override Outside Temperature**
+**⚠️ Important:** Some commands are only available on PIC16F1847. See [PIC Version Compatibility](docs/PIC_VERSION_COMPATIBILITY.md) for details on which commands work on your hardware.
 
-If your boiler's built-in outside temperature sensor is malfunctioning or not present, you can override it with a value from another sensor (e.g., a weather station or Home Assistant sensor):
-
+**Quick Examples:**
 ```bash
-# Using mosquitto_pub (replace with your MQTT prefix and node ID)
-mosquitto_pub -h <broker-ip> -t "OTGW/set/otgw/outside" -m "15.5"
+# Set temperature setpoint to 18.5°C
+mosquitto_pub -h <broker-ip> -t "OTGW/set/otgw/setpoint" -m "18.5"
+
+# Configure LED A to show flame status
+mosquitto_pub -h <broker-ip> -t "OTGW/set/otgw/ledA" -m "F"
+
+# Set heating mode to comfort (PIC16F1847 only)
+mosquitto_pub -h <broker-ip> -t "OTGW/set/otgw/modeheating" -m "2"
 ```
 
-**Home Assistant Example:**
+**Complete Documentation:**
+- [MQTT API Reference](docs/MQTT_API_REFERENCE.md) - Complete command reference with all 52 commands
+- [MQTT Implementation Details](docs/MQTT_IMPLEMENTATION.md) - Technical details and Home Assistant integration
+- [DHW Control Examples](example-api/hotwater_examples.md) - Hot water configuration examples
+- [Temperature Override Examples](example-api/outside_temperature_override_examples.md) - Temperature sensor integration
 
-Create an automation to sync your preferred outside temperature sensor:
-
-```yaml
-automation:
-  - alias: "Sync Outside Temperature to OTGW"
-    trigger:
-      - platform: state
-        entity_id: sensor.outdoor_temperature  # Your actual outdoor sensor
-    action:
-      - service: mqtt.publish
-        data:
-          topic: "OTGW/set/otgw/outside"  # Adjust to your MQTT prefix and node ID
-          payload: "{{ states('sensor.outdoor_temperature') }}"
-```
-
-This allows the OTGW to use external temperature data for OpenTherm communication with your boiler, which is particularly useful when:
-- Your boiler doesn't have an outside temperature sensor
-- The built-in sensor is affected by sun/wind exposure
-- You want to use a more accurate or better-positioned sensor
+For more examples and integration guides, see the documentation links above.
 
 **For more detailed examples and use cases, see:** [Outside Temperature Override Examples](example-api/outside_temperature_override_examples.md)
 
