@@ -524,6 +524,150 @@ void sendJsonSettingObj(const __FlashStringHelper* cName, bool bValue, const cha
   sendJsonSettingObj(nameBuf, bValue, sType);
 }
 
+//=======================================================================
+// REST API v3 Error Response Helpers (ADR-025)
+// See: docs/api/v3/ERROR_RESPONSES.md
+//=======================================================================
+
+/**
+ * Send JSON error response with standard format
+ * @param httpStatus HTTP status code (e.g., 400, 404, 500)
+ * @param errorCode Machine-readable error code (RAM string)
+ * @param message Human-readable error message (RAM string)
+ * @param path Request path that caused the error (optional)
+ * @param details Additional error details (optional)
+ */
+void sendJsonError(int httpStatus, const char *errorCode, const char *message, 
+                   const char *path = nullptr, const char *details = nullptr) {
+  StaticJsonDocument<512> doc;
+  JsonObject root = doc.to<JsonObject>();
+  
+  root[F("error")] = errorCode;
+  root[F("message")] = message;
+  root[F("status")] = httpStatus;
+  
+  // Add timestamp
+  time_t now = time(nullptr);
+  root[F("timestamp")] = now;
+  
+  // Add path if provided
+  if (path != nullptr && path[0] != '\0') {
+    root[F("path")] = path;
+  }
+  
+  // Add details if provided
+  if (details != nullptr && details[0] != '\0') {
+    root[F("details")] = details;
+  }
+  
+  String output;
+  serializeJson(doc, output);
+  
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+  httpServer.sendHeader(F("Cache-Control"), F("no-cache, no-store, must-revalidate"));
+  httpServer.send(httpStatus, F("application/json"), output);
+}
+
+/**
+ * Send JSON error response with PROGMEM strings (memory efficient)
+ * @param httpStatus HTTP status code (e.g., 400, 404, 500)
+ * @param errorCode Machine-readable error code (PROGMEM string)
+ * @param message Human-readable error message (PROGMEM string)
+ * @param path Request path that caused the error (optional, RAM string)
+ * @param details Additional error details (optional, PROGMEM string)
+ */
+void sendJsonError_P(int httpStatus, PGM_P errorCode, PGM_P message, 
+                     const char *path = nullptr, PGM_P details = nullptr) {
+  StaticJsonDocument<512> doc;
+  JsonObject root = doc.to<JsonObject>();
+  
+  // Read PROGMEM strings into JSON (ArduinoJson handles this efficiently)
+  char errorCodeBuf[32];
+  strncpy_P(errorCodeBuf, errorCode, sizeof(errorCodeBuf));
+  errorCodeBuf[sizeof(errorCodeBuf)-1] = '\0';
+  
+  char messageBuf[128];
+  strncpy_P(messageBuf, message, sizeof(messageBuf));
+  messageBuf[sizeof(messageBuf)-1] = '\0';
+  
+  root[F("error")] = errorCodeBuf;
+  root[F("message")] = messageBuf;
+  root[F("status")] = httpStatus;
+  
+  // Add timestamp
+  time_t now = time(nullptr);
+  root[F("timestamp")] = now;
+  
+  // Add path if provided
+  if (path != nullptr && path[0] != '\0') {
+    root[F("path")] = path;
+  }
+  
+  // Add details if provided
+  if (details != nullptr) {
+    char detailsBuf[128];
+    strncpy_P(detailsBuf, details, sizeof(detailsBuf));
+    detailsBuf[sizeof(detailsBuf)-1] = '\0';
+    root[F("details")] = detailsBuf;
+  }
+  
+  String output;
+  serializeJson(doc, output);
+  
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+  httpServer.sendHeader(F("Cache-Control"), F("no-cache, no-store, must-revalidate"));
+  httpServer.send(httpStatus, F("application/json"), output);
+}
+
+/**
+ * Send JSON error response with validation errors array
+ * @param httpStatus HTTP status code (typically 400 for validation errors)
+ * @param errorCode Machine-readable error code (PROGMEM string)
+ * @param message Human-readable error message (PROGMEM string)
+ * @param path Request path
+ * @param validationErrors Array of validation error objects (field, message pairs)
+ * @param errorCount Number of validation errors
+ */
+void sendJsonValidationError_P(int httpStatus, PGM_P errorCode, PGM_P message,
+                                const char *path, JsonArray &validationErrors) {
+  StaticJsonDocument<768> doc;
+  JsonObject root = doc.to<JsonObject>();
+  
+  char errorCodeBuf[32];
+  strncpy_P(errorCodeBuf, errorCode, sizeof(errorCodeBuf));
+  errorCodeBuf[sizeof(errorCodeBuf)-1] = '\0';
+  
+  char messageBuf[128];
+  strncpy_P(messageBuf, message, sizeof(messageBuf));
+  messageBuf[sizeof(messageBuf)-1] = '\0';
+  
+  root[F("error")] = errorCodeBuf;
+  root[F("message")] = messageBuf;
+  root[F("status")] = httpStatus;
+  
+  time_t now = time(nullptr);
+  root[F("timestamp")] = now;
+  
+  if (path != nullptr && path[0] != '\0') {
+    root[F("path")] = path;
+  }
+  
+  // Copy validation errors to response
+  if (!validationErrors.isNull() && validationErrors.size() > 0) {
+    JsonArray errors = root.createNestedArray(F("validation_errors"));
+    for (JsonVariant v : validationErrors) {
+      errors.add(v);
+    }
+  }
+  
+  String output;
+  serializeJson(doc, output);
+  
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+  httpServer.sendHeader(F("Cache-Control"), F("no-cache, no-store, must-revalidate"));
+  httpServer.send(httpStatus, F("application/json"), output);
+}
+
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a

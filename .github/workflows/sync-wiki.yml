@@ -1,0 +1,133 @@
+name: Sync Wiki Documentation
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - 'docs/wiki/**'
+      - '.github/workflows/sync-wiki.yml'
+
+jobs:
+  sync-wiki:
+    runs-on: ubuntu-latest
+    name: Sync wiki to GitHub Pages
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup git config
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+      - name: Clone wiki repository
+        run: |
+          git clone https://github.com/${{ github.repository }}.wiki.git wiki-repo
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Copy wiki files
+        run: |
+          # Copy all markdown files from docs/wiki to wiki-repo
+          # This preserves existing wiki content and adds new v3 documentation
+          cp -v docs/wiki/*.md wiki-repo/ || true
+          
+          echo "Wiki files copied to wiki-repo"
+
+      - name: Create wiki navigation helpers
+        run: |
+          cd wiki-repo
+          
+          # Create or update _Sidebar.md (navigation sidebar)
+          # Only add if it doesn't exist or update with v3 docs section
+          if [ ! -f _Sidebar.md ] || ! grep -q "API-v3-Overview" _Sidebar.md; then
+            cat > _Sidebar.md << 'EOF'
+## Quick Navigation
+
+### REST API Documentation
+
+#### API v3 (Recommended)
+- [[1-API-v3-Overview]]
+- [[2-Quick-Start-Guide]]
+- [[3-Complete-API-Reference]]
+- [[4-Migration-Guide]]
+- [[6-Error-Handling-Guide]]
+- [[7-HATEOAS-Navigation-Guide]]
+
+#### Reference
+- [[5-Changelog]]
+- [[8-Troubleshooting]]
+
+### Installation & Setup
+- [[How to install firmware on your ESP]]
+- [[Configure WiFi settings using the Web UI]]
+- [[How to compile the OTGW firmware]]
+
+### Usage Guides
+- [[How to use with OTmonitor]]
+- [[How to use it with Home Assistant, Homey or Domoticz or others]]
+- [[How to send commands to the OTGW with MQTT or REST or Net2Ser]]
+- [[Using the MQTT set commands]]
+
+### Advanced Topics
+- [[How to debug the OTGW firmware]]
+- [[How to upload files to LittleFS]]
+- [[Using DS18B20 sensor with ESP firmware]]
+- [[The meaning of the blue LEDs]]
+- [[Upgrade to new release using Over The Air flashing]]
+
+---
+
+**Repository**: [GitHub](https://github.com/${{ github.repository }})
+EOF
+          fi
+          
+          cd ..
+          echo "Navigation sidebar updated"
+
+      - name: Check for changes
+        id: check-changes
+        run: |
+          cd wiki-repo
+          git add -A
+          
+          if git diff --cached --quiet; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No changes detected in wiki"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Changes detected, proceeding with sync"
+          fi
+
+      - name: Commit and push wiki changes
+        if: steps.check-changes.outputs.changed == 'true'
+        run: |
+          cd wiki-repo
+          
+          # Set commit message
+          git commit -m "docs: Sync wiki from main repo
+
+Branch: ${{ github.ref }}
+Commit: ${{ github.sha }}
+Triggered by: ${{ github.event.head_commit.message }}"
+          
+          # Push to wiki repository
+          git push origin master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Report sync status
+        run: |
+          echo "Wiki sync completed!"
+          echo ""
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Status: ${{ job.status }}"
+          echo ""
+          echo "Wiki will be available at: https://github.com/${{ github.repository }}/wiki"

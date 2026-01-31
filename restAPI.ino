@@ -184,6 +184,11 @@ void processAPI()
         sendApiNotFound(originalURI);
       }
     }
+    else if (wc > 2 && strcmp_P(words[2], PSTR("v3")) == 0)
+    { //v3 API calls - REST API v3 with HATEOAS (ADR-025)
+      // Delegate all v3 routing to processAPIv3() in restAPI_v3.ino
+      processAPIv3(words, wc, originalURI);
+    }
     else if (wc > 2 && strcmp_P(words[2], PSTR("v2")) == 0)
     { //v2 API calls
       if (wc > 3 && strcmp_P(words[3], PSTR("otgw")) == 0 && wc > 4 && strcmp_P(words[4], PSTR("otmonitor")) == 0) {

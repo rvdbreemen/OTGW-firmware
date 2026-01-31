@@ -85,6 +85,56 @@ Proposed | Accepted | Deprecated | Superseded
 - **During** planning: if a change materially alters architecture, protocols, data flow, or external behavior, write a new ADR.
 - **After** implementation: ensure ADR status is updated (e.g., Proposed → Accepted) and reference the change.
 
+## Implementation Planning (MANDATORY)
+
+**IMPORTANT:** This project maintains implementation plans in the `docs/planning/` directory for major features and refactoring efforts.
+
+### Planning Folder Structure
+
+- **Location:** `docs/planning/`
+- **Purpose:** Track detailed implementation plans with incremental progress
+- **Plans include:** Task breakdown, acceptance criteria, progress tracking, quality metrics
+
+### Planning Workflow (MANDATORY)
+
+**Before starting any major feature or refactoring:**
+
+1. **Check for existing plan:** Review `docs/planning/` for relevant implementation plans
+2. **Read the plan:** Understand the phases, tasks, and acceptance criteria
+3. **Check progress:** Review the progress tracking section to see what's been completed
+4. **Update status:** When starting a task, update its status from 🔴 NOT STARTED to 🟡 IN PROGRESS
+5. **Complete tasks:** When finishing a task, update status to 🟢 COMPLETED and check all acceptance criteria
+6. **Track blockers:** If blocked, update status to ⏸️ BLOCKED and document the blocker
+7. **Update timestamps:** Add entries to the "Recent Updates" section with dates and descriptions
+
+**Status Indicators:**
+- 🔴 NOT STARTED - Task not yet begun
+- 🟡 IN PROGRESS - Currently working on this task
+- 🟢 COMPLETED - Task finished, all acceptance criteria met
+- ⏸️ BLOCKED - Cannot proceed due to blocker (document reason)
+- ⏭️ SKIPPED - Task intentionally skipped (document reason)
+
+**Progress Updates:**
+- Update progress tracking tables after completing each task
+- Update percentage complete for each phase
+- Update overall progress metrics
+- Document decisions and learnings in the Notes section
+- Keep the "Recent Updates" section current
+
+**Creating New Plans:**
+- Use existing plans as templates
+- Include: Overview, phases, tasks, acceptance criteria, progress tracking, quality metrics
+- Store in `docs/planning/` with descriptive filename
+- Reference related ADRs and documentation
+- Update this section if planning workflow changes
+
+### Active Plans
+
+- **REST API v3 Modernization:** `docs/planning/REST_API_V3_MODERNIZATION_PLAN.md`
+  - Status: 🔴 NOT STARTED
+  - Target Version: v1.1.0
+  - 26 tasks across 5 phases
+
 ## Network Architecture and Security
 
 - **Target Environment**: Local network use only (not internet-exposed)
