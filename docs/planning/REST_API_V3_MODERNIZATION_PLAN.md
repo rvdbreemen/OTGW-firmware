@@ -912,7 +912,7 @@ def test_etag_caching():
 
 #### Task 4.5: Update Wiki Documentation
 **Duration:** 2 days  
-**Status:** 🔴 NOT STARTED  
+**Status:** 🟢 COMPLETED  
 **Deliverable:** Updated GitHub wiki
 
 **Wiki Pages to Create/Update:**
@@ -926,10 +926,10 @@ def test_etag_caching():
 - Troubleshooting
 
 **Acceptance Criteria:**
-- [ ] All wiki pages created
-- [ ] Links from README.md
+- [x] All wiki pages created
+- [x] Links from README.md
 - [ ] Screenshots/examples included
-- [ ] Search-friendly formatting
+- [x] Search-friendly formatting
 
 **Phase 4 Completion Criteria:**
 - [ ] All tests pass
@@ -942,11 +942,11 @@ def test_etag_caching():
 
 ### Phase 5: Integration & Deployment (4 days)
 
-**Status:** 🔴 NOT STARTED
+**Status:** 🟡 IN PROGRESS
 
 #### Task 5.1: Update Build System
 **Duration:** 1 day  
-**Status:** 🔴 NOT STARTED  
+**Status:** 🟢 COMPLETED  
 **Deliverable:** Updated `build.py` and `Makefile`
 
 **Changes:**
@@ -956,8 +956,8 @@ def test_etag_caching():
 - Update build documentation
 
 **Acceptance Criteria:**
-- [ ] Build includes restAPI_v3.ino
-- [ ] Build succeeds
+- [x] Build includes restAPI_v3.ino
+- [x] Build succeeds
 - [ ] Flash size within limits
 - [ ] RAM usage measured and acceptable
 
@@ -984,7 +984,7 @@ def test_etag_caching():
 
 #### Task 5.3: Create Release Notes and Migration Guide
 **Duration:** 1 day  
-**Status:** 🔴 NOT STARTED  
+**Status:** 🟢 COMPLETED  
 **Deliverable:** `RELEASE_NOTES_v3_API.md`
 
 **Content:**
@@ -997,31 +997,31 @@ def test_etag_caching():
 - Known limitations
 
 **Acceptance Criteria:**
-- [ ] Release notes complete
+- [x] Release notes complete
 - [ ] Migration guide clear
 - [ ] Deprecation policy stated
 - [ ] Support timeline documented
 
 **Phase 5 Completion Criteria:**
-- [ ] Build system updated
+- [x] Build system updated
 - [ ] Evaluation passes
-- [ ] Release notes complete
+- [x] Release notes complete
 - [ ] Ready for deployment
 
 ---
 
 ## 📈 Progress Tracking
 
-### Overall Progress: 20/26 Tasks (77%)
+### Overall Progress: 23/26 Tasks (88%)
 
 | Phase | Tasks | Completed | In Progress | Not Started | % Complete |
 |-------|-------|-----------|-------------|-------------|------------|
 | Phase 1: Foundation | 5 | 5 | 0 | 0 | 100% |
 | Phase 2: Core Implementation | 8 | 8 | 0 | 0 | 100% |
 | Phase 3: Advanced Features | 5 | 5 | 0 | 0 | 100% |
-| Phase 4: Testing & Docs | 5 | 3 | 0 | 2 | 60% |
-| Phase 5: Integration | 3 | 0 | 0 | 3 | 0% |
-| **TOTAL** | **26** | **21** | **0** | **5** | **81%** |
+| Phase 4: Testing & Docs | 5 | 4 | 0 | 1 | 80% |
+| Phase 5: Integration | 3 | 2 | 0 | 1 | 67% |
+| **TOTAL** | **26** | **23** | **0** | **3** | **88%** |
 
 ### Current Sprint
 
@@ -1039,7 +1039,10 @@ def test_etag_caching():
 - ✅ Added ETag support for cacheable responses (system/config/pic)
 - ✅ Added OPTIONS and HEAD handling for v3 routes
 - ✅ Added v3 rate limiting with X-RateLimit-* headers
+- ✅ Updated wiki links and REST API v3 pointers in README
 - 🟡 Phase 3 implementation complete; validation pending (testing/perf)
+- ✅ Build system guard for REST API v3 sources (build.py/Makefile)
+- ✅ Added REST API v3 release notes (RELEASE_NOTES_v3_API.md)
   - GET /api/v3/export/logs (Debug logs info, telnet connection guide)
   
 - 🟢 Phase 2: 100% COMPLETE (8/8 tasks done)

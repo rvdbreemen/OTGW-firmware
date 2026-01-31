@@ -151,6 +151,10 @@ This allows the OTGW to use external temperature data for OpenTherm communicatio
 ### REST API
 - Read OpenTherm values via `/api/v0/` and `/api/v1/` endpoints.
 - Send OTGW commands via `/api/v1/otgw/command/...` (POST/PUT).
+- Use the modern REST API v3 for new integrations: `/api/v3/`.
+  - Overview: [docs/wiki/1-API-v3-Overview.md](docs/wiki/1-API-v3-Overview.md)
+  - Quick start: [docs/wiki/2-Quick-Start-Guide.md](docs/wiki/2-Quick-Start-Guide.md)
+  - Full reference: [docs/wiki/3-Complete-API-Reference.md](docs/wiki/3-Complete-API-Reference.md)
 
 ### TCP serial socket (OTmonitor compatible)
 - Exposes a TCP socket on port `25238` for OTmonitor and other tools that speak the OTGW serial protocol.
