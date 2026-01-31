@@ -208,7 +208,7 @@ void checkOTWGpicforupdate(){
   //check if the esp8266 and the littlefs versions match
   if (!checklittlefshash()) {
     DebugTln(F("WARNING: Firmware and filesystem version mismatch detected!"));
-    sMessage = "Flash your littleFS with matching version!";
+    snprintf_P(sMessage, sizeof(sMessage), PSTR("Flash your littleFS with matching version!"));
   }
 }
 
