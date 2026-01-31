@@ -28,6 +28,17 @@ static void addHATEOASLinks(JsonObject &links, const char *selfPath) {
   apiRoot[F("href")] = F("/api/v3");
 }
 
+// Overload for PROGMEM strings (F() macro)
+static void addHATEOASLinks(JsonObject &links, const __FlashStringHelper *selfPath) {
+  // Self link
+  JsonObject self = links.createNestedObject(F("self"));
+  self[F("href")] = selfPath;
+  
+  // API root link
+  JsonObject apiRoot = links.createNestedObject(F("api_root"));
+  apiRoot[F("href")] = F("/api/v3");
+}
+
 //=======================================================================
 // Helper: Send JSON error response with proper HTTP status
 //=======================================================================
