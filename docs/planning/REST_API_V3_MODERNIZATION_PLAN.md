@@ -116,7 +116,7 @@ This plan outlines the complete modernization of the OTGW-firmware REST API to a
 
 ### Phase 1: Foundation & Standards (6 days)
 
-**Status:** � COMPLETED
+**Status:** 🟢 COMPLETED
 
 #### Task 1.1: Create ADR for REST API v3 Design
 **Duration:** 1 day  
@@ -143,7 +143,7 @@ This plan outlines the complete modernization of the OTGW-firmware REST API to a
 
 #### Task 1.2: Define Resource Model and URI Structure
 **Duration:** 2 days  
-**Status:** � COMPLETED  
+**Status:** 🟢 COMPLETED  
 **Deliverable:** `docs/api/v3/RESOURCE_MODEL.md`
 
 **New Resource-Oriented URIs:**
@@ -640,10 +640,10 @@ void sendWithETag(const char* content) {
 ```
 
 **Acceptance Criteria:**
-- [ ] ETag generation implemented
-- [ ] If-None-Match header checking works
-- [ ] 304 Not Modified returned when appropriate
-- [ ] ETag included in 200 responses
+- [x] ETag generation implemented
+- [x] If-None-Match header checking works
+- [x] 304 Not Modified returned when appropriate
+- [x] ETag included in 200 responses
 - [ ] Cache-Control headers set properly
 - [ ] Works with all GET endpoints
 
@@ -676,12 +676,12 @@ void sendWithETag(const char* content) {
 ```
 
 **Acceptance Criteria:**
-- [ ] Pagination query parameters supported (page, per_page)
+- [x] Pagination query parameters supported (page, per_page)
 - [ ] Default page size configurable
-- [ ] Maximum page size enforced
+- [x] Maximum page size enforced
 - [ ] Navigation links included (_links)
-- [ ] Total count included in response
-- [ ] Page out of range handled gracefully
+- [x] Total count included in response
+- [x] Page out of range handled gracefully
 
 ---
 
@@ -698,12 +698,12 @@ GET /api/v3/sensors/dallas?connected=true
 ```
 
 **Acceptance Criteria:**
-- [ ] Query parameter parser implemented
-- [ ] Filtering by category works
-- [ ] Filtering by timestamp works
-- [ ] Filtering by boolean flags works
-- [ ] Invalid filters return 400 error
-- [ ] Multiple filters can combine (AND logic)
+- [x] Query parameter parser implemented
+- [x] Filtering by category works
+- [x] Filtering by timestamp works
+- [x] Filtering by boolean flags works
+- [x] Invalid filters return 400 error
+- [x] Multiple filters can combine (AND logic)
 
 ---
 
@@ -726,11 +726,11 @@ bool checkRateLimit(IPAddress clientIP) {
 ```
 
 **Acceptance Criteria:**
-- [ ] Rate limit enforced per IP address
-- [ ] 429 Too Many Requests returned when exceeded
-- [ ] X-RateLimit-* headers included
+- [x] Rate limit enforced per IP address
+- [x] 429 Too Many Requests returned when exceeded
+- [x] X-RateLimit-* headers included
 - [ ] Configurable limits
-- [ ] Minimal memory overhead
+- [x] Minimal memory overhead
 
 ---
 
@@ -760,11 +760,11 @@ GET /api/v3
 ```
 
 **Acceptance Criteria:**
-- [ ] GET /api/v3 returns API overview
-- [ ] Version information included
-- [ ] Links to all major resources
+- [x] GET /api/v3 returns API overview
+- [x] Version information included
+- [x] Links to all major resources
 - [ ] Documentation link included
-- [ ] Links to legacy APIs included
+- [x] Links to legacy APIs included
 
 **Phase 3 Completion Criteria:**
 - [ ] All Task 3.1-3.5 acceptance criteria met
@@ -776,7 +776,7 @@ GET /api/v3
 
 ### Phase 4: Testing & Documentation (17 days)
 
-**Status:** 🔴 NOT STARTED
+**Status:** 🟡 IN PROGRESS
 
 #### Task 4.1: Create Automated API Tests
 **Duration:** 5 days  
@@ -957,7 +957,7 @@ def test_etag_caching():
 
 **Acceptance Criteria:**
 - [x] Build includes restAPI_v3.ino
-- [x] Build succeeds
+- [ ] Build succeeds
 - [ ] Flash size within limits
 - [ ] RAM usage measured and acceptable
 
@@ -1043,7 +1043,6 @@ def test_etag_caching():
 - 🟡 Phase 3 implementation complete; validation pending (testing/perf)
 - ✅ Build system guard for REST API v3 sources (build.py/Makefile)
 - ✅ Added REST API v3 release notes (RELEASE_NOTES_v3_API.md)
-  - GET /api/v3/export/logs (Debug logs info, telnet connection guide)
   
 - 🟢 Phase 2: 100% COMPLETE (8/8 tasks done)
 
