@@ -79,20 +79,55 @@ void startWebserver(){
       f.close();
     });
   } else{
+    // Serve index.html with cache-control headers and version injection
     httpServer.on("/", []() {
+      httpServer.sendHeader(F("Cache-Control"), F("no-store, no-cache, must-revalidate"));
+      httpServer.sendHeader(F("Pragma"), F("no-cache"));
       File f = LittleFS.open("/index.html", "r");
-      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
+      String html = f.readString();
       f.close();
+      
+      // Inject filesystem version hash for cache-busting
+      String fsHash = getFilesystemHash();
+      if (fsHash.length() > 0) {
+        // Replace script src="/index.js" with src="/index.js?v=hash"
+        html.replace(F("src=\"./index.js\""), "src=\"./index.js?v=" + fsHash + "\"");
+        html.replace(F("src=\"./graph.js\""), "src=\"./graph.js?v=" + fsHash + "\"");
+      }
+      
+      httpServer.send(200, F("text/html; charset=UTF-8"), html);
     });
     httpServer.on("/index", []() {
+      httpServer.sendHeader(F("Cache-Control"), F("no-store, no-cache, must-revalidate"));
+      httpServer.sendHeader(F("Pragma"), F("no-cache"));
       File f = LittleFS.open("/index.html", "r");
-      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
+      String html = f.readString();
       f.close();
+      
+      // Inject filesystem version hash for cache-busting
+      String fsHash = getFilesystemHash();
+      if (fsHash.length() > 0) {
+        html.replace(F("src=\"./index.js\""), "src=\"./index.js?v=" + fsHash + "\"");
+        html.replace(F("src=\"./graph.js\""), "src=\"./graph.js?v=" + fsHash + "\"");
+      }
+      
+      httpServer.send(200, F("text/html; charset=UTF-8"), html);
     });
     httpServer.on("/index.html", []() {
+      httpServer.sendHeader(F("Cache-Control"), F("no-store, no-cache, must-revalidate"));
+      httpServer.sendHeader(F("Pragma"), F("no-cache"));
       File f = LittleFS.open("/index.html", "r");
-      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
+      String html = f.readString();
       f.close();
+      
+      // Inject filesystem version hash for cache-busting
+      String fsHash = getFilesystemHash();
+      if (fsHash.length() > 0) {
+        html.replace(F("src=\"./index.js\""), "src=\"./index.js?v=" + fsHash + "\"");
+        html.replace(F("src=\"./graph.js\""), "src=\"./graph.js?v=" + fsHash + "\"");
+      }
+      
+      httpServer.send(200, F("text/html; charset=UTF-8"), html);
     });
   } 
   httpServer.serveStatic("/FSexplorer.png",   LittleFS, "/FSexplorer.png");

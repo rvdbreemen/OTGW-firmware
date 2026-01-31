@@ -476,9 +476,35 @@ bool checklittlefshash(){
       }
     }
     DebugTf(PSTR("Check githash = [%s]\r\n"), CSTR(_githash));
-    return (strcasecmp(CSTR(_githash), _VERSION_GITHASH)==0);
+    bool match = (strcasecmp(CSTR(_githash), _VERSION_GITHASH)==0);
+    if (!match) {
+      DebugTf(PSTR("WARNING: Firmware version (%s) does not match filesystem version (%s)\r\n"), 
+              _VERSION_GITHASH, CSTR(_githash));
+      DebugTln(F("This may cause compatibility issues. Flash matching filesystem version."));
+    }
+    return match;
   }
   return false;
+}
+
+/*
+  Get filesystem version hash from /version.hash file
+  Returns empty string if file not found or error
+*/
+String getFilesystemHash(){
+  #define GITHASH_FILE "/version.hash"
+  String _githash="";
+  if (LittleFS.begin()) {
+    File fh = LittleFS.open(GITHASH_FILE, "r");
+    if (fh) {
+      if (fh.available()){
+        _githash = fh.readStringUntil('\n');
+        _githash.trim(); // Remove any whitespace/newlines
+      }
+      fh.close();
+    }
+  }
+  return _githash;
 }
 
 
