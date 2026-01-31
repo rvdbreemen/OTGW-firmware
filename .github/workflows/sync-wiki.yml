@@ -26,65 +26,56 @@ jobs:
           git config --global user.email "github-actions@github.com"
 
       - name: Clone wiki repository
-        run: |
-          git clone https://github.com/${{ github.repository }}.wiki.git wiki-repo
+        run: git clone https://github.com/${{ github.repository }}.wiki.git wiki-repo
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Copy wiki files
         run: |
-          # Copy all markdown files from docs/wiki to wiki-repo
-          # This preserves existing wiki content and adds new v3 documentation
           cp -v docs/wiki/*.md wiki-repo/ || true
-          
           echo "Wiki files copied to wiki-repo"
 
-      - name: Create wiki navigation helpers
+      - name: Update wiki navigation sidebar
         run: |
           cd wiki-repo
           
-          # Create or update _Sidebar.md (navigation sidebar)
-          # Only add if it doesn't exist or update with v3 docs section
+          # Update _Sidebar.md if it doesn't have v3 section
           if [ ! -f _Sidebar.md ] || ! grep -q "API-v3-Overview" _Sidebar.md; then
-            cat > _Sidebar.md << 'EOF'
-## Quick Navigation
-
-### REST API Documentation
-
-#### API v3 (Recommended)
-- [[1-API-v3-Overview]]
-- [[2-Quick-Start-Guide]]
-- [[3-Complete-API-Reference]]
-- [[4-Migration-Guide]]
-- [[6-Error-Handling-Guide]]
-- [[7-HATEOAS-Navigation-Guide]]
-
-#### Reference
-- [[5-Changelog]]
-- [[8-Troubleshooting]]
-
-### Installation & Setup
-- [[How to install firmware on your ESP]]
-- [[Configure WiFi settings using the Web UI]]
-- [[How to compile the OTGW firmware]]
-
-### Usage Guides
-- [[How to use with OTmonitor]]
-- [[How to use it with Home Assistant, Homey or Domoticz or others]]
-- [[How to send commands to the OTGW with MQTT or REST or Net2Ser]]
-- [[Using the MQTT set commands]]
-
-### Advanced Topics
-- [[How to debug the OTGW firmware]]
-- [[How to upload files to LittleFS]]
-- [[Using DS18B20 sensor with ESP firmware]]
-- [[The meaning of the blue LEDs]]
-- [[Upgrade to new release using Over The Air flashing]]
-
----
-
-**Repository**: [GitHub](https://github.com/${{ github.repository }})
-EOF
+            {
+              echo "## Quick Navigation"
+              echo ""
+              echo "### REST API Documentation"
+              echo ""
+              echo "#### API v3 (Recommended)"
+              echo "- [[1-API-v3-Overview]]"
+              echo "- [[2-Quick-Start-Guide]]"
+              echo "- [[3-Complete-API-Reference]]"
+              echo "- [[4-Migration-Guide]]"
+              echo "- [[6-Error-Handling-Guide]]"
+              echo "- [[7-HATEOAS-Navigation-Guide]]"
+              echo ""
+              echo "#### Reference"
+              echo "- [[5-Changelog]]"
+              echo "- [[8-Troubleshooting]]"
+              echo ""
+              echo "### Installation & Setup"
+              echo "- [[How to install firmware on your ESP]]"
+              echo "- [[Configure WiFi settings using the Web UI]]"
+              echo "- [[How to compile the OTGW firmware]]"
+              echo ""
+              echo "### Usage Guides"
+              echo "- [[How to use with OTmonitor]]"
+              echo "- [[How to use it with Home Assistant, Homey or Domoticz or others]]"
+              echo "- [[How to send commands to the OTGW with MQTT or REST or Net2Ser]]"
+              echo "- [[Using the MQTT set commands]]"
+              echo ""
+              echo "### Advanced Topics"
+              echo "- [[How to debug the OTGW firmware]]"
+              echo "- [[How to upload files to LittleFS]]"
+              echo "- [[Using DS18B20 sensor with ESP firmware]]"
+              echo "- [[The meaning of the blue LEDs]]"
+              echo "- [[Upgrade to new release using Over The Air flashing]]"
+            } > _Sidebar.md
           fi
           
           cd ..
@@ -98,7 +89,7 @@ EOF
           
           if git diff --cached --quiet; then
             echo "changed=false" >> $GITHUB_OUTPUT
-            echo "No changes detected in wiki"
+            echo "No changes detected"
           else
             echo "changed=true" >> $GITHUB_OUTPUT
             echo "Changes detected, proceeding with sync"
@@ -108,26 +99,13 @@ EOF
         if: steps.check-changes.outputs.changed == 'true'
         run: |
           cd wiki-repo
-          
-          # Set commit message
-          git commit -m "docs: Sync wiki from main repo
-
-Branch: ${{ github.ref }}
-Commit: ${{ github.sha }}
-Triggered by: ${{ github.event.head_commit.message }}"
-          
-          # Push to wiki repository
+          git commit -m "docs: Sync wiki from main repo (commit: ${{ github.sha }})"
           git push origin master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Report sync status
         run: |
-          echo "Wiki sync completed!"
-          echo ""
+          echo "Wiki sync completed"
           echo "Repository: ${{ github.repository }}"
-          echo "Branch: ${{ github.ref }}"
-          echo "Commit: ${{ github.sha }}"
-          echo "Status: ${{ job.status }}"
-          echo ""
-          echo "Wiki will be available at: https://github.com/${{ github.repository }}/wiki"
+          echo "Wiki available at: https://github.com/${{ github.repository }}/wiki"

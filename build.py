@@ -69,22 +69,22 @@ def print_step(message):
 
 def print_success(message):
     """Print a success message"""
-    print(f"{Colors.OKGREEN}✓ {message}{Colors.ENDC}")
+    print(f"{Colors.OKGREEN}[OK] {message}{Colors.ENDC}")
 
 
 def print_error(message):
     """Print an error message"""
-    print(f"{Colors.FAIL}✗ ERROR: {message}{Colors.ENDC}", file=sys.stderr)
+    print(f"{Colors.FAIL}[FAIL] ERROR: {message}{Colors.ENDC}", file=sys.stderr)
 
 
 def print_warning(message):
     """Print a warning message"""
-    print(f"{Colors.WARNING}⚠ WARNING: {message}{Colors.ENDC}")
+    print(f"{Colors.WARNING}[WARN] WARNING: {message}{Colors.ENDC}")
 
 
 def print_info(message):
     """Print an info message"""
-    print(f"{Colors.OKCYAN}ℹ {message}{Colors.ENDC}")
+    print(f"{Colors.OKCYAN}[*] {message}{Colors.ENDC}")
 
 
 def run_command(cmd, cwd=None, env=None, check=True, capture_output=False, show_output=True):
