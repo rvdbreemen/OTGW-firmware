@@ -155,6 +155,7 @@ This allows the OTGW to use external temperature data for OpenTherm communicatio
   - Overview: [docs/wiki/1-API-v3-Overview.md](docs/wiki/1-API-v3-Overview.md)
   - Quick start: [docs/wiki/2-Quick-Start-Guide.md](docs/wiki/2-Quick-Start-Guide.md)
   - Full reference: [docs/wiki/3-Complete-API-Reference.md](docs/wiki/3-Complete-API-Reference.md)
+  - Exports: `/api/v3/export/telegraf` (Influx line protocol), `/api/v3/export/prometheus` (Prometheus text)
 
 ### TCP serial socket (OTmonitor compatible)
 - Exposes a TCP socket on port `25238` for OTmonitor and other tools that speak the OTGW serial protocol.

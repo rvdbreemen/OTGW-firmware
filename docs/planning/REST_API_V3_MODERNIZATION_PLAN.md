@@ -1034,6 +1034,8 @@ def test_etag_caching():
 
 **2026-01-31:**
 - ✅ Implemented remaining v3 endpoints in restAPI_v3.ino (system, config, OTGW, sensors, export, PIC)
+- ✅ Added Prometheus export (v3) with text exposition format
+- ✅ Updated Telegraf export to InfluxDB line protocol
 - ✅ Added v3 pagination support for /api/v3/otgw/messages
 - ✅ Added filtering (label/category/updated_after) for /api/v3/otgw/messages
 - ✅ Added ETag support for cacheable responses (system/config/pic)
@@ -1181,7 +1183,7 @@ def test_etag_caching():
 
 - [ ] Rate limiting
 - [ ] OpenAPI/Swagger spec
-- [ ] Prometheus export format
+- [x] Prometheus export format
 - [ ] GraphQL endpoint (future)
 
 ### Success Metrics

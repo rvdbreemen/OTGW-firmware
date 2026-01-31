@@ -888,6 +888,11 @@ curl -X GET http://otgw.local/api/v3/export
       "title": "Telegraf metric format",
       "media_type": "text/plain"
     },
+    "prometheus": {
+      "href": "/api/v3/export/prometheus",
+      "title": "Prometheus text format",
+      "media_type": "text/plain"
+    },
     "otmonitor": {
       "href": "/api/v3/export/otmonitor",
       "title": "OTmonitor format",
@@ -919,6 +924,23 @@ curl -X GET http://otgw.local/api/v3/export/telegraf
 **Response (200 OK, text/plain):**
 ```
 otgw,host=otgw,location=kitchen room_temp=20.3,boiler_temp=65.2,dhw_temp=52.1 1706730000000000000
+```
+
+### GET /api/v3/export/prometheus
+
+Get data in Prometheus text exposition format.
+
+**Request:**
+```bash
+curl -X GET http://otgw.local/api/v3/export/prometheus
+```
+
+**Response (200 OK, text/plain; version=0.0.4):**
+```
+otgw_room_temperature_celsius 20.5
+otgw_boiler_temperature_celsius 65.2
+otgw_flamestatus 1
+...
 ```
 
 ### GET /api/v3/export/settings

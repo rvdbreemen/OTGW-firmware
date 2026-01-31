@@ -45,7 +45,8 @@ The complete reference includes:
 - `POST /api/v3/sensors/s0/reset` - Reset counter
 
 ### Export Endpoints
-- `GET /api/v3/export/telegraf` - Telegraf format
+- `GET /api/v3/export/telegraf` - InfluxDB line protocol (Telegraf)
+- `GET /api/v3/export/prometheus` - Prometheus text format
 - `GET /api/v3/export/otmonitor` - OTmonitor format
 - `GET /api/v3/export/settings` - Settings JSON
 - `GET /api/v3/export/logs` - Device logs

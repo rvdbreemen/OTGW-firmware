@@ -111,7 +111,8 @@ External sensor data
 Data export in various formats
 
 **Endpoints:**
-- `GET /export/telegraf` - InfluxDB Telegraf format
+- `GET /export/telegraf` - InfluxDB line protocol (Telegraf)
+- `GET /export/prometheus` - Prometheus text format
 - `GET /export/otmonitor` - OTmonitor format
 - `GET /export/settings` - All settings as JSON
 - `GET /export/logs` - Device logs
