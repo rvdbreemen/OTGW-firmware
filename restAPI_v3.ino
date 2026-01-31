@@ -1010,10 +1010,11 @@ static bool applySettingUpdate(const char *key, const JsonVariant &value) {
     strlcpy(valueBuf, value.as<const char*>(), sizeof(valueBuf));
   } else if (value.is<bool>()) {
     if (value.as<bool>()) {
-      strlcpy_P(valueBuf, PSTR("true"), sizeof(valueBuf));
+      strncpy_P(valueBuf, PSTR("true"), sizeof(valueBuf));
     } else {
-      strlcpy_P(valueBuf, PSTR("false"), sizeof(valueBuf));
+      strncpy_P(valueBuf, PSTR("false"), sizeof(valueBuf));
     }
+    valueBuf[sizeof(valueBuf) - 1] = '\0';
   } else if (value.is<int>() || value.is<long>()) {
     snprintf_P(valueBuf, sizeof(valueBuf), PSTR("%ld"), (long)value.as<long>());
   } else if (value.is<float>() || value.is<double>()) {
@@ -1419,8 +1420,108 @@ static void sendV3ExportOTmonitor() {
 //=======================================================================
 // Export Prometheus - GET /api/v3/export/prometheus
 //=======================================================================
+static void sendPrometheusMetricInt(PGM_P name, long value) {
+  char nameBuf[48];
+  char line[96];
+
+  strncpy_P(nameBuf, name, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf) - 1] = '\0';
+  snprintf_P(line, sizeof(line), PSTR("%s %ld\n"), nameBuf, value);
+  httpServer.sendContent(line);
+}
+
+static void sendPrometheusMetricFloat(PGM_P name, float value) {
+  char nameBuf[48];
+  char valueBuf[24];
+  char line[112];
+
+  dtostrf(value, 0, 3, valueBuf);
+  strncpy_P(nameBuf, name, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf) - 1] = '\0';
+  snprintf_P(line, sizeof(line), PSTR("%s %s\n"), nameBuf, valueBuf);
+  httpServer.sendContent(line);
+}
+
+static void sendPrometheusMetricFloatLabel(PGM_P name, PGM_P labelName, const char *labelValue, float value) {
+  char nameBuf[48];
+  char labelBuf[24];
+  char valueBuf[24];
+  char line[160];
+
+  if (!labelValue) {
+    return;
+  }
+
+  dtostrf(value, 0, 3, valueBuf);
+  strncpy_P(nameBuf, name, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf) - 1] = '\0';
+  strncpy_P(labelBuf, labelName, sizeof(labelBuf));
+  labelBuf[sizeof(labelBuf) - 1] = '\0';
+  snprintf_P(line, sizeof(line), PSTR("%s{%s=\"%s\"} %s\n"), nameBuf, labelBuf, labelValue, valueBuf);
+  httpServer.sendContent(line);
+}
+
 static void sendV3ExportPrometheus() {
-  sendV3Error(501, "Not implemented", "Prometheus export is planned");
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+  httpServer.sendHeader(F("Cache-Control"), F("no-cache, no-store, must-revalidate"));
+  httpServer.send(200, F("text/plain; version=0.0.4"), F(""));
+
+  // Status flags (0/1)
+  sendPrometheusMetricInt(PSTR("otgw_flamestatus"), isFlameStatus() ? 1 : 0);
+  sendPrometheusMetricInt(PSTR("otgw_ch_modus"), isCentralHeatingActive() ? 1 : 0);
+  sendPrometheusMetricInt(PSTR("otgw_ch_enable"), isCentralHeatingEnabled() ? 1 : 0);
+  sendPrometheusMetricInt(PSTR("otgw_ch2_modus"), isCentralHeating2Active() ? 1 : 0);
+  sendPrometheusMetricInt(PSTR("otgw_ch2_enable"), isCentralHeating2enabled() ? 1 : 0);
+  sendPrometheusMetricInt(PSTR("otgw_dhw_mode"), isDomesticHotWaterActive() ? 1 : 0);
+  sendPrometheusMetricInt(PSTR("otgw_dhw_enable"), isDomesticHotWaterEnabled() ? 1 : 0);
+  sendPrometheusMetricInt(PSTR("otgw_diagnostic_indicator"), isDiagnosticIndicator() ? 1 : 0);
+  sendPrometheusMetricInt(PSTR("otgw_fault_indicator"), isFaultIndicator() ? 1 : 0);
+  sendPrometheusMetricInt(PSTR("otgw_cooling_modus"), isCoolingEnabled() ? 1 : 0);
+  sendPrometheusMetricInt(PSTR("otgw_cooling_active"), isCoolingActive() ? 1 : 0);
+  sendPrometheusMetricInt(PSTR("otgw_otc_active"), isOutsideTemperatureCompensationActive() ? 1 : 0);
+  sendPrometheusMetricInt(PSTR("otgw_service_request"), isServiceRequest() ? 1 : 0);
+  sendPrometheusMetricInt(PSTR("otgw_lockout_reset"), isLockoutReset() ? 1 : 0);
+  sendPrometheusMetricInt(PSTR("otgw_low_water_pressure"), isLowWaterPressure() ? 1 : 0);
+  sendPrometheusMetricInt(PSTR("otgw_gas_flame_fault"), isGasFlameFault() ? 1 : 0);
+  sendPrometheusMetricInt(PSTR("otgw_airtemp_fault"), isAirTemperature() ? 1 : 0);
+  sendPrometheusMetricInt(PSTR("otgw_water_overtemperature"), isWaterOverTemperature() ? 1 : 0);
+
+  // Temperature and modulation values
+  sendPrometheusMetricFloat(PSTR("otgw_outside_temperature_celsius"), OTcurrentSystemState.Toutside);
+  sendPrometheusMetricFloat(PSTR("otgw_room_temperature_celsius"), OTcurrentSystemState.Tr);
+  sendPrometheusMetricFloat(PSTR("otgw_room_setpoint_celsius"), OTcurrentSystemState.TrSet);
+  sendPrometheusMetricFloat(PSTR("otgw_remote_room_setpoint_celsius"), OTcurrentSystemState.TrOverride);
+  sendPrometheusMetricFloat(PSTR("otgw_control_setpoint_celsius"), OTcurrentSystemState.TSet);
+  sendPrometheusMetricFloat(PSTR("otgw_rel_mod_lvl_percent"), OTcurrentSystemState.RelModLevel);
+  sendPrometheusMetricFloat(PSTR("otgw_max_rel_mod_lvl_percent"), OTcurrentSystemState.MaxRelModLevelSetting);
+  sendPrometheusMetricFloat(PSTR("otgw_boiler_temperature_celsius"), OTcurrentSystemState.Tboiler);
+  sendPrometheusMetricFloat(PSTR("otgw_return_water_temperature_celsius"), OTcurrentSystemState.Tret);
+  sendPrometheusMetricFloat(PSTR("otgw_dhw_temperature_celsius"), OTcurrentSystemState.Tdhw);
+  sendPrometheusMetricFloat(PSTR("otgw_dhw_setpoint_celsius"), OTcurrentSystemState.TdhwSet);
+  sendPrometheusMetricFloat(PSTR("otgw_max_ch_water_setpoint_celsius"), OTcurrentSystemState.MaxTSet);
+  sendPrometheusMetricFloat(PSTR("otgw_ch_water_pressure_bar"), OTcurrentSystemState.CHPressure);
+
+  // OEM codes
+  sendPrometheusMetricInt(PSTR("otgw_oem_diagnostic_code"), (long)OTcurrentSystemState.OEMDiagnosticCode);
+  sendPrometheusMetricInt(PSTR("otgw_oem_fault_code"), (long)(OTcurrentSystemState.ASFflags & 0xFF));
+
+  // S0 counter metrics
+  if (settingS0COUNTERenabled) {
+    sendPrometheusMetricFloat(PSTR("otgw_s0_power_kw"), OTGWs0powerkw);
+    sendPrometheusMetricInt(PSTR("otgw_s0_interval_count"), (long)OTGWs0pulseCount);
+    sendPrometheusMetricInt(PSTR("otgw_s0_total_count"), (long)OTGWs0pulseCountTot);
+  }
+
+  // Dallas sensors
+  if (settingGPIOSENSORSenabled) {
+    sendPrometheusMetricInt(PSTR("otgw_dallas_sensor_count"), (long)DallasrealDeviceCount);
+    for (int i = 0; i < DallasrealDeviceCount; i++) {
+      const char *strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
+      sendPrometheusMetricFloatLabel(PSTR("otgw_dallas_temperature_celsius"), PSTR("address"), strDeviceAddress, DallasrealDevice[i].tempC);
+    }
+  }
+
+  httpServer.sendContent(F(""));
 }
 
 //=======================================================================

@@ -19,7 +19,7 @@ The API v1 adds a little more than this:
 Returns a JSON key value pair array, with all relevant OTGW monitor values.
 
 ## GET /api/v1/otgw/telegraf/
-Returns a JSON key value pair array, compatible with telegraf, with all relevant OTGW monitor values.
+Returns InfluxDB/Telegraf line protocol with all relevant OTGW monitor values.
 
 ## GET /api/v1/otgw/id/{msgid}
 Returns the value of the {msgid} requested. 

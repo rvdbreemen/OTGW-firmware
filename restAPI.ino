@@ -410,51 +410,100 @@ void sendEndJsonMap(const __FlashStringHelper* objName) {
 }
 //=======================================================================
 
+static void buildTelegrafHostTag(char *dest, size_t destSize) {
+  const char *src = CSTR(settingHostname);
+  size_t i = 0;
+
+  if (!dest || destSize == 0) return;
+  dest[0] = '\0';
+
+  if (!src || src[0] == '\0') return;
+
+  for (size_t s = 0; src[s] != '\0' && i + 1 < destSize; s++) {
+    char c = src[s];
+    if ((c == ' ') || (c == ',') || (c == '=')) {
+      if (i + 1 >= destSize) break;
+      dest[i++] = '\\';
+    }
+    if (i + 1 >= destSize) break;
+    dest[i++] = c;
+  }
+  dest[i] = '\0';
+}
+
+static void sendTelegrafLineInt(PGM_P field, long value, unsigned long epoch, const char *hostTag) {
+  char fieldBuf[32];
+  char line[160];
+  unsigned long long ts = (unsigned long long)epoch * 1000000000ULL;
+
+  strncpy_P(fieldBuf, field, sizeof(fieldBuf));
+  fieldBuf[sizeof(fieldBuf) - 1] = '\0';
+
+  snprintf_P(line, sizeof(line), PSTR("otgw,host=%s %s=%ldi %llu\n"), hostTag, fieldBuf, value, ts);
+  httpServer.sendContent(line);
+}
+
+static void sendTelegrafLineFloat(PGM_P field, float value, unsigned long epoch, const char *hostTag) {
+  char fieldBuf[32];
+  char valueBuf[24];
+  char line[160];
+  unsigned long long ts = (unsigned long long)epoch * 1000000000ULL;
+
+  dtostrf(value, 0, 3, valueBuf);
+  strncpy_P(fieldBuf, field, sizeof(fieldBuf));
+  fieldBuf[sizeof(fieldBuf) - 1] = '\0';
+
+  snprintf_P(line, sizeof(line), PSTR("otgw,host=%s %s=%s %llu\n"), hostTag, fieldBuf, valueBuf, ts);
+  httpServer.sendContent(line);
+}
+
 void sendTelegraf() 
 {
+  char hostTag[64];
   RESTDebugTln(F("sending OT monitor values to Telegraf...\r"));
 
-  sendStartJsonArray();
-  
-  sendJsonOTmonObj(F("flamestatus"), isFlameStatus(), F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("chmodus"), isCentralHeatingActive(),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("chenable"), isCentralHeatingEnabled(),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("ch2modus"), isCentralHeating2Active(),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("ch2enable"), isCentralHeating2enabled(),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("dhwmode"), isDomesticHotWaterActive(),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("dhwenable"), isDomesticHotWaterEnabled(),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("diagnosticindicator"), isDiagnosticIndicator(),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("faultindicator"), isFaultIndicator(),F(""), msglastupdated[OT_Statusflags]);
-  
-  sendJsonOTmonObj(F("coolingmodus"), isCoolingEnabled(),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("coolingactive"), isCoolingActive(),F(""), msglastupdated[OT_Statusflags]);  
-  sendJsonOTmonObj(F("otcactive"), isOutsideTemperatureCompensationActive(),F(""), msglastupdated[OT_Statusflags]);
+  buildTelegrafHostTag(hostTag, sizeof(hostTag));
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+  httpServer.send(200, F("text/plain"), F(""));
 
-  sendJsonOTmonObj(F("servicerequest"), isServiceRequest(),F(""), msglastupdated[OT_ASFflags]);
-  sendJsonOTmonObj(F("lockoutreset"), isLockoutReset(),F(""), msglastupdated[OT_ASFflags]);
-  sendJsonOTmonObj(F("lowwaterpressure"), isLowWaterPressure(),F(""), msglastupdated[OT_ASFflags]);
-  sendJsonOTmonObj(F("gasflamefault"), isGasFlameFault(),F(""), msglastupdated[OT_ASFflags]);
-  sendJsonOTmonObj(F("airtemp"), isAirTemperature(),F(""), msglastupdated[OT_ASFflags]);
-  sendJsonOTmonObj(F("waterovertemperature"), isWaterOverTemperature(),F(""), msglastupdated[OT_ASFflags]);
+  sendTelegrafLineInt(PSTR("flamestatus"), isFlameStatus() ? 1 : 0, msglastupdated[OT_Statusflags], hostTag);
+  sendTelegrafLineInt(PSTR("chmodus"), isCentralHeatingActive() ? 1 : 0, msglastupdated[OT_Statusflags], hostTag);
+  sendTelegrafLineInt(PSTR("chenable"), isCentralHeatingEnabled() ? 1 : 0, msglastupdated[OT_Statusflags], hostTag);
+  sendTelegrafLineInt(PSTR("ch2modus"), isCentralHeating2Active() ? 1 : 0, msglastupdated[OT_Statusflags], hostTag);
+  sendTelegrafLineInt(PSTR("ch2enable"), isCentralHeating2enabled() ? 1 : 0, msglastupdated[OT_Statusflags], hostTag);
+  sendTelegrafLineInt(PSTR("dhwmode"), isDomesticHotWaterActive() ? 1 : 0, msglastupdated[OT_Statusflags], hostTag);
+  sendTelegrafLineInt(PSTR("dhwenable"), isDomesticHotWaterEnabled() ? 1 : 0, msglastupdated[OT_Statusflags], hostTag);
+  sendTelegrafLineInt(PSTR("diagnosticindicator"), isDiagnosticIndicator() ? 1 : 0, msglastupdated[OT_Statusflags], hostTag);
+  sendTelegrafLineInt(PSTR("faultindicator"), isFaultIndicator() ? 1 : 0, msglastupdated[OT_Statusflags], hostTag);
   
+  sendTelegrafLineInt(PSTR("coolingmodus"), isCoolingEnabled() ? 1 : 0, msglastupdated[OT_Statusflags], hostTag);
+  sendTelegrafLineInt(PSTR("coolingactive"), isCoolingActive() ? 1 : 0, msglastupdated[OT_Statusflags], hostTag);
+  sendTelegrafLineInt(PSTR("otcactive"), isOutsideTemperatureCompensationActive() ? 1 : 0, msglastupdated[OT_Statusflags], hostTag);
 
-  sendJsonOTmonObj(F("outsidetemperature"), OTcurrentSystemState.Toutside, F("°C"), msglastupdated[OT_Toutside]);
-  sendJsonOTmonObj(F("roomtemperature"), OTcurrentSystemState.Tr, F("°C"), msglastupdated[OT_Tr]);
-  sendJsonOTmonObj(F("roomsetpoint"), OTcurrentSystemState.TrSet, F("°C"), msglastupdated[OT_TrSet]);
-  sendJsonOTmonObj(F("remoteroomsetpoint"), OTcurrentSystemState.TrOverride, F("°C"), msglastupdated[OT_TrOverride]);
-  sendJsonOTmonObj(F("controlsetpoint"), OTcurrentSystemState.TSet,F("°C"), msglastupdated[OT_TSet]);
-  sendJsonOTmonObj(F("relmodlvl"), OTcurrentSystemState.RelModLevel,F("%"), msglastupdated[OT_RelModLevel]);
-  sendJsonOTmonObj(F("maxrelmodlvl"), OTcurrentSystemState.MaxRelModLevelSetting, F("%"), msglastupdated[OT_MaxRelModLevelSetting]);
+  sendTelegrafLineInt(PSTR("servicerequest"), isServiceRequest() ? 1 : 0, msglastupdated[OT_ASFflags], hostTag);
+  sendTelegrafLineInt(PSTR("lockoutreset"), isLockoutReset() ? 1 : 0, msglastupdated[OT_ASFflags], hostTag);
+  sendTelegrafLineInt(PSTR("lowwaterpressure"), isLowWaterPressure() ? 1 : 0, msglastupdated[OT_ASFflags], hostTag);
+  sendTelegrafLineInt(PSTR("gasflamefault"), isGasFlameFault() ? 1 : 0, msglastupdated[OT_ASFflags], hostTag);
+  sendTelegrafLineInt(PSTR("airtemp"), isAirTemperature() ? 1 : 0, msglastupdated[OT_ASFflags], hostTag);
+  sendTelegrafLineInt(PSTR("waterovertemperature"), isWaterOverTemperature() ? 1 : 0, msglastupdated[OT_ASFflags], hostTag);
+
+  sendTelegrafLineFloat(PSTR("outsidetemperature"), OTcurrentSystemState.Toutside, msglastupdated[OT_Toutside], hostTag);
+  sendTelegrafLineFloat(PSTR("roomtemperature"), OTcurrentSystemState.Tr, msglastupdated[OT_Tr], hostTag);
+  sendTelegrafLineFloat(PSTR("roomsetpoint"), OTcurrentSystemState.TrSet, msglastupdated[OT_TrSet], hostTag);
+  sendTelegrafLineFloat(PSTR("remoteroomsetpoint"), OTcurrentSystemState.TrOverride, msglastupdated[OT_TrOverride], hostTag);
+  sendTelegrafLineFloat(PSTR("controlsetpoint"), OTcurrentSystemState.TSet, msglastupdated[OT_TSet], hostTag);
+  sendTelegrafLineFloat(PSTR("relmodlvl"), OTcurrentSystemState.RelModLevel, msglastupdated[OT_RelModLevel], hostTag);
+  sendTelegrafLineFloat(PSTR("maxrelmodlvl"), OTcurrentSystemState.MaxRelModLevelSetting, msglastupdated[OT_MaxRelModLevelSetting], hostTag);
  
-  sendJsonOTmonObj(F("boilertemperature"), OTcurrentSystemState.Tboiler, F("°C"), msglastupdated[OT_Tboiler]);
-  sendJsonOTmonObj(F("returnwatertemperature"), OTcurrentSystemState.Tret,F("°C"), msglastupdated[OT_Tret]);
-  sendJsonOTmonObj(F("dhwtemperature"), OTcurrentSystemState.Tdhw,F("°C"), msglastupdated[OT_Tdhw]);
-  sendJsonOTmonObj(F("dhwsetpoint"), OTcurrentSystemState.TdhwSet,F("°C"), msglastupdated[OT_TdhwSet]);
-  sendJsonOTmonObj(F("maxchwatersetpoint"), OTcurrentSystemState.MaxTSet,F("°C"), msglastupdated[OT_MaxTSet]);
-  sendJsonOTmonObj(F("chwaterpressure"), OTcurrentSystemState.CHPressure, F("bar"), msglastupdated[OT_CHPressure]);
-  sendJsonOTmonObj(F("oemfaultcode"), OTcurrentSystemState.OEMDiagnosticCode, F(""), msglastupdated[OT_OEMDiagnosticCode]);
+  sendTelegrafLineFloat(PSTR("boilertemperature"), OTcurrentSystemState.Tboiler, msglastupdated[OT_Tboiler], hostTag);
+  sendTelegrafLineFloat(PSTR("returnwatertemperature"), OTcurrentSystemState.Tret, msglastupdated[OT_Tret], hostTag);
+  sendTelegrafLineFloat(PSTR("dhwtemperature"), OTcurrentSystemState.Tdhw, msglastupdated[OT_Tdhw], hostTag);
+  sendTelegrafLineFloat(PSTR("dhwsetpoint"), OTcurrentSystemState.TdhwSet, msglastupdated[OT_TdhwSet], hostTag);
+  sendTelegrafLineFloat(PSTR("maxchwatersetpoint"), OTcurrentSystemState.MaxTSet, msglastupdated[OT_MaxTSet], hostTag);
+  sendTelegrafLineFloat(PSTR("chwaterpressure"), OTcurrentSystemState.CHPressure, msglastupdated[OT_CHPressure], hostTag);
+  sendTelegrafLineInt(PSTR("oemfaultcode"), (long)OTcurrentSystemState.OEMDiagnosticCode, msglastupdated[OT_OEMDiagnosticCode], hostTag);
 
-  sendEndJsonArray();
+  httpServer.sendContent(F(""));
 
 } // sendTelegraf()
 //=======================================================================

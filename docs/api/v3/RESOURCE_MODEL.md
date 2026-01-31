@@ -830,25 +830,13 @@ The v3 API follows a **resource-oriented architecture** where every endpoint rep
 
 ### GET /api/v3/export/telegraf
 
-**Purpose:** Telegraf-compatible format (array of metrics)
+**Purpose:** Telegraf/InfluxDB line protocol
 
-**Response:**
-```json
-[
-  {
-    "name": "flamestatus",
-    "value": 1,
-    "unit": "",
-    "epoch": 1738324245
-  },
-  {
-    "name": "roomtemperature",
-    "value": 20.5,
-    "unit": "°C",
-    "epoch": 1738324245
-  },
-  ...
-]
+**Response:** (text/plain)
+```
+otgw,host=otgw flamestatus=1i 1738324245000000000
+otgw,host=otgw roomtemperature=20.5 1738324245000000000
+...
 ```
 
 ---
