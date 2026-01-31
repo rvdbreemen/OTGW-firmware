@@ -2,7 +2,7 @@
 
 **Status:** Accepted  
 **Date:** 2020-06-01 (v1 introduced), 2024-01-01 (v2 introduced)  
-**Updated:** 2026-01-28 (Documentation)
+**Updated:** 2026-01-31 (v3 documented)
 
 ## Context
 
@@ -18,12 +18,14 @@ As the OTGW-firmware evolved, the REST API needed to provide new functionality a
 - **v0 (original):** Legacy endpoints, basic JSON responses
 - **v1 (2020):** Standardized structure, array-based responses `[{name, value}]`
 - **v2 (2024):** Optimized format with units, map-based responses `{key: {value, unit}}`
+- **v3 (2026):** Modernized, discoverable API with hypermedia (HATEOAS), pagination, and conditional requests
 
 **Example evolution:**
 ```
 v0: /api/otmonitor (mixed format)
 v1: /api/v1/otgw/data (array format)
 v2: /api/v2/otgw/data (map format with metadata)
+v3: /api/v3/otgw (resource model with links)
 ```
 
 ## Decision
