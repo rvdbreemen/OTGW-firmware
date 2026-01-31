@@ -92,7 +92,7 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-019: REST API Versioning Strategy](ADR-019-rest-api-versioning-strategy.md)**  
   URL path-based API versioning (v0/v1/v2) with indefinite backward compatibility.
 
-- **[ADR-20260131: REST API v3 Modernization](ADR-20260131-rest-api-v3-modernization.md)**  
+- **[ADR-026: REST API v3 Modernization](ADR-026-rest-api-v3-modernization.md)**  
   Modernized v3 API with HATEOAS, pagination, conditional requests, and standardized export formats.
 
 - **[ADR-020: Dallas DS18B20 Temperature Sensor Integration](ADR-020-dallas-ds18b20-sensor-integration.md)**  
