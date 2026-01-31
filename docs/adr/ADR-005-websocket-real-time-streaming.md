@@ -203,6 +203,7 @@ void onWebSocketEvent(...) {
 - ADR-003: HTTP-Only Network Architecture (explains ws:// vs wss://)
 - ADR-004: Static Buffer Allocation Strategy (buffer sizing)
 - ADR-010: Multiple Concurrent Network Services (port allocation)
+- ADR-025: Safari WebSocket Connection Management (Safari-specific connection pool handling during uploads)
 
 ## References
 - WebSocket library: https://github.com/Links2004/arduinoWebSockets

@@ -206,7 +206,10 @@ void checkOTWGpicforupdate(){
     }
   }
   //check if the esp8266 and the littlefs versions match
-  //if (!checklittlefshash()) sMessage = "Flash your littleFS with matching version!";
+  if (!checklittlefshash()) {
+    DebugTln(F("WARNING: Firmware and filesystem version mismatch detected!"));
+    sMessage = "Flash your littleFS with matching version!";
+  }
 }
 
 //===================[ sendOTGWbootcmd ]=====================

@@ -2139,7 +2139,26 @@ function refreshDevTime() {
         }
         if (json.devtime[i].name == "message") {
           const msgEl = document.getElementById('message');
-          if (msgEl) msgEl.textContent = json.devtime[i].value;
+          if (msgEl) {
+            const msgText = json.devtime[i].value || '';
+            msgEl.textContent = msgText;
+            
+            // Add warning class if message contains version mismatch warning
+            if (msgText.toLowerCase().includes('littlefs') || 
+                msgText.toLowerCase().includes('version') ||
+                msgText.toLowerCase().includes('flash your')) {
+              msgEl.classList.add('version-warning');
+            } else {
+              msgEl.classList.remove('version-warning');
+            }
+            
+            // Hide element if no message
+            if (msgText === '') {
+              msgEl.style.display = 'none';
+            } else {
+              msgEl.style.display = 'block';
+            }
+          }
         }
       }
     })

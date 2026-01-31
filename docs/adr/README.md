@@ -15,6 +15,7 @@ Architecture Decision Records capture important architectural decisions along wi
 - [Integration](#integration-and-communication) (2 ADRs)
 - [Core Systems](#system-architecture) (6 ADRs)
 - [Features & Extensions](#features-and-extensions) (6 ADRs)
+- [Browser & Client](#browser-and-client-compatibility) (3 ADRs) **NEW**
 
 **Foundational ADRs** (most referenced by other ADRs):
 - **ADR-001:** ESP8266 Platform Selection (establishes hardware constraints)
@@ -103,6 +104,16 @@ Architecture Decision Records capture important architectural decisions along wi
 
 - **[ADR-024: Debug Telnet Command Console](ADR-024-debug-telnet-command-console.md)**  
   Interactive telnet-based debug console for real-time diagnostics and hardware testing.
+
+### Browser and Client Compatibility
+- **[ADR-025: Safari WebSocket Connection Management During Firmware Upload](ADR-025-safari-websocket-connection-management.md)**  
+  Proactively closing WebSocket before firmware upload to prevent Safari's connection pool exhaustion from dropping it mid-transfer.
+
+- **[ADR-026: Conditional JavaScript Cache-Busting for Firmware/Filesystem Version Mismatches](ADR-026-conditional-javascript-cache-busting.md)**  
+  Smart cache management that enables normal browser caching when versions match but forces JavaScript reload during firmware/filesystem version transitions.
+
+- **[ADR-027: Version Mismatch Warning System in Web UI](ADR-027-version-mismatch-warning-system.md)**  
+  Prominent visual warning banner that automatically appears when firmware and filesystem versions don't match to prevent user confusion.
 
 ## ADR Template
 
@@ -205,6 +216,7 @@ ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
 4. 2020: ADR-004 (Static buffers), ADR-008 (LittleFS migration)
 5. 2021: ADR-015 (NTP + AceTime - verified: commit 45b51f2)
 6. 2024: ADR-019 (API v2)
+7. 2026: ADR-025 (Safari WebSocket fix), ADR-026 (Cache-busting), ADR-027 (Version warnings)
 
 ## When to Create an ADR
 
