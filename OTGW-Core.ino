@@ -256,6 +256,14 @@ String executeCommand(const String sCmd){
   OTGWDebugTf(PSTR("Send command: [%s]\r\n"), CSTR(_cmd));
   //fetch a line
   String line = OTGWSerial.readStringUntil('\n');
+  
+  // Safety check: Prevent memory exhaustion from malformed serial data
+  // OTGW responses should be <100 bytes typically, CMSG_SIZE (512) is generous limit
+  if (line.length() > CMSG_SIZE) {
+    OTGWDebugTf(PSTR("WARNING: OTGW response too long (%d bytes), truncating to %d\r\n"), line.length(), CMSG_SIZE);
+    line = line.substring(0, CMSG_SIZE);
+  }
+  
   line.trim();
   String _ret ="";
   if (line.length() >= 3 && line.startsWith(_cmd) && line.charAt(2) == ':'){
