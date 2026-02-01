@@ -65,6 +65,7 @@ void setup() {
 
   LittleFSmounted = LittleFS.begin();
   readSettings(true);
+  checklittlefshash();
 
   // Connect to and initialise WiFi network
   setLed(LED1, ON);

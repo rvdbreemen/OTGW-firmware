@@ -38,6 +38,7 @@ document.addEventListener('visibilitychange', function () {
   }
   // When tab becomes visible again, resume UI updates
   if (!flashModeActive) {
+    refreshDevTime();
     if (!timeupdate) {
       timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
     }
@@ -2021,6 +2022,7 @@ function initMainPage() {
 
   // Start time updates if not in flash mode
   if (!flashModeActive && !timeupdate) {
+    refreshDevTime();
     timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
   }
 
