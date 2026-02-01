@@ -10,7 +10,7 @@ Architecture Decision Records capture important architectural decisions along wi
 
 **By Topic:**
 - [Platform & Build](#platform-and-build-system) (4 ADRs)
-- [Memory Management](#memory-management) (3 ADRs)
+- [Memory Management](#memory-management) (4 ADRs) **UPDATED**
 - [Network & Security](#network-and-security) (3 ADRs)
 - [Integration](#integration-and-communication) (2 ADRs)
 - [Core Systems](#system-architecture) (6 ADRs)
@@ -44,6 +44,9 @@ Architecture Decision Records capture important architectural decisions along wi
 
 - **[ADR-009: PROGMEM Usage for String Literals](ADR-009-progmem-string-literals.md)**  
   Mandatory use of PROGMEM (F() and PSTR() macros) to move string literals from RAM to flash memory.
+
+- **[ADR-028: File Streaming Over Loading for Memory Safety](ADR-028-file-streaming-over-loading.md)** 🆕  
+  Never load files >2KB into RAM; use streaming patterns to prevent memory exhaustion crashes.
 
 ### Integration and Communication
 - **[ADR-005: WebSocket for Real-Time Streaming](ADR-005-websocket-real-time-streaming.md)**  
