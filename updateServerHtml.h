@@ -147,6 +147,9 @@ static const char UpdateServerIndex[] PROGMEM =
          var flashStartTime = 0;
          var flashPollingActivated = false;
          var wsInstance = null; // Track WebSocket instance for resource management
+        var wsReconnectTimer = null;
+        var wsReconnectBaseDelay = 500;
+        var wsReconnectDelayMs = 0;
 
          function hasJsonContentType(response, contentType) {
            var ct = contentType || '';
@@ -551,20 +554,7 @@ static const char UpdateServerIndex[] PROGMEM =
         }
 
 
-        // Close WebSocket connection (Safari resource management)
-        // Safari has strict concurrent connection limits - close WS before large uploads
-        function closeWebSocketForUpload() {
-          if (wsInstance && wsInstance.readyState !== WebSocket.CLOSED && wsInstance.readyState !== WebSocket.CLOSING) {
-            console.log('Safari: Closing WebSocket before upload to avoid resource contention');
-            try {
-              wsInstance.close();
-            } catch (e) {
-              console.log('Error closing WebSocket:', e);
-            }
-            wsInstance = null;
-            wsActive = false;
-          }
-        }
+        // Keep WebSocket open during uploads to preserve flash progress updates
 
         // WebSocket Support for Real-time Progress
         function setupWebSocket() {
@@ -588,10 +578,10 @@ static const char UpdateServerIndex[] PROGMEM =
               wsReconnectAttempts++;
               if (!pollActive) startPolling();
               
-              // Exponential backoff for reconnection
-              var reconnectDelay = Math.min(wsReconnectMaxDelay, 1000 * Math.pow(2, wsReconnectAttempts - 1));
+              // Dynamic backoff with jitter for reconnection
+              var reconnectDelay = getWsReconnectDelay();
               console.log('Will retry WebSocket in ' + (reconnectDelay/1000) + 's (attempt ' + wsReconnectAttempts + ')');
-              setTimeout(setupWebSocket, reconnectDelay);
+              scheduleWsReconnect(reconnectDelay);
               return;
             }
             
@@ -613,6 +603,11 @@ static const char UpdateServerIndex[] PROGMEM =
                 console.log('WebSocket connected successfully');
                 clearTimeout(wsConnectionTimer);
                 wsReconnectAttempts = 0; // Reset backoff counter on successful connection
+                wsReconnectDelayMs = 0;
+                if (wsReconnectTimer) {
+                  clearTimeout(wsReconnectTimer);
+                  wsReconnectTimer = null;
+                }
                 
                 // If we're in the middle of flashing and polling was activated and is currently active,
                 // we expect to keep both running (see ws.onmessage for the actual decision logic)
@@ -654,6 +649,9 @@ static const char UpdateServerIndex[] PROGMEM =
                 wsActive = false;
                 wsReconnectAttempts++;
                 if (!pollActive) startPolling();
+              var reconnectDelay = getWsReconnectDelay();
+              console.log('WebSocket error, retrying in ' + (reconnectDelay/1000) + 's (attempt ' + wsReconnectAttempts + ')');
+              scheduleWsReconnect(reconnectDelay);
             };
             
             ws.onclose = function() {
@@ -672,16 +670,33 @@ static const char UpdateServerIndex[] PROGMEM =
                   startPolling();
                 }
                 
-                // Reconnect with exponential backoff
-                if (window.location.hash !== '#done') {
-                  wsReconnectAttempts++;
-                  var reconnectDelay = Math.min(wsReconnectMaxDelay, 1000 * Math.pow(2, wsReconnectAttempts - 1));
-                  console.log('WebSocket will retry in ' + (reconnectDelay/1000) + 's (attempt ' + wsReconnectAttempts + ')');
-                  setTimeout(setupWebSocket, reconnectDelay);
-                }
+                // Reconnect with dynamic backoff
+                wsReconnectAttempts++;
+                var reconnectDelay = getWsReconnectDelay();
+                console.log('WebSocket will retry in ' + (reconnectDelay/1000) + 's (attempt ' + wsReconnectAttempts + ')');
+                scheduleWsReconnect(reconnectDelay);
             };
         }
         setupWebSocket();
+
+        function getWsReconnectDelay() {
+          // Decorrelated jitter backoff (AWS-style): sleep = min(cap, random(base, sleep*3))
+          // Spreads reconnects across clients and avoids thundering herd.
+          var minDelay = wsReconnectBaseDelay;
+          var maxDelay = wsReconnectMaxDelay;
+          var prev = wsReconnectDelayMs > 0 ? wsReconnectDelayMs : minDelay;
+          var next = Math.min(maxDelay, Math.floor(minDelay + Math.random() * (prev * 3 - minDelay)));
+          wsReconnectDelayMs = next;
+          return next;
+        }
+
+        function scheduleWsReconnect(delayMs) {
+          if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+          wsReconnectTimer = setTimeout(function() {
+            wsReconnectTimer = null;
+            setupWebSocket();
+          }, delayMs);
+        }
 
          function initUploadForm(formId, targetName) {
            var form = document.getElementById(formId);
@@ -722,11 +737,7 @@ static const char UpdateServerIndex[] PROGMEM =
              }
              // uploadInFlight = true; // Moved inside callback
 
-              // Safari: Close WebSocket before upload to avoid resource contention
-              // Safari has strict concurrent connection limits (~6 per domain, effective ~3 for persistent connections)
-              // WebSocket + large XHR upload compete for same connection pool
-              // Closing WebSocket prevents it from being dropped mid-upload
-              closeWebSocketForUpload();
+              // Keep WebSocket open during upload to preserve flash progress updates
               
               // Start polling immediately - don't rely on WebSocket during upload
               if (!pollActive) {
