@@ -8,6 +8,7 @@ void handleDebug(){
                 Debugln();
                 Debugln(F("---===[ Debug Help Menu ]===---"));
                 Debugf(PSTR("ESP Firmware: %s\r\n"), _VERSION);
+                Debugf(PSTR("FS Hash match: %s\r\n"), CBOOLEAN(checklittlefshash()));
                 Debugf(PSTR("PIC: %s | Type: %s | Version: %s\r\n"), sPICdeviceid, sPICtype, sPICfwversion);
                 Debugln();
                 Debugln(F("--- Status ---"));

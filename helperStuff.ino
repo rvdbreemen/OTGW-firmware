@@ -464,6 +464,7 @@ bool minuteChanged(){
 */
 bool checklittlefshash(){
   #define GITHASH_FILE "/version.hash"
+  static const char fsMismatchMsg[] PROGMEM = "Flash your littleFS with matching version!";
   String _githash="";
   if (LittleFS.begin()) {
     //start with opening the file
@@ -473,14 +474,21 @@ bool checklittlefshash(){
       if (fh.available()){
         //read the first line 
          _githash = fh.readStringUntil('\n');
+         _githash.trim(); // Remove CR/LF and any extra whitespace
       }
+      fh.close();
     }
     DebugTf(PSTR("Check githash = [%s]\r\n"), CSTR(_githash));
+    DebugTf(PSTR("FS githash = [%s] | FW githash = [%s]\r\n"), CSTR(_githash), _VERSION_GITHASH);
     bool match = (strcasecmp(CSTR(_githash), _VERSION_GITHASH)==0);
     if (!match) {
       DebugTf(PSTR("WARNING: Firmware version (%s) does not match filesystem version (%s)\r\n"), 
               _VERSION_GITHASH, CSTR(_githash));
       DebugTln(F("This may cause compatibility issues. Flash matching filesystem version."));
+      strncpy_P(sMessage, fsMismatchMsg, sizeof(sMessage) - 1);
+      sMessage[sizeof(sMessage) - 1] = '\0';
+    } else if (strcmp_P(sMessage, fsMismatchMsg) == 0) {
+      sMessage[0] = '\0';
     }
     return match;
   }
