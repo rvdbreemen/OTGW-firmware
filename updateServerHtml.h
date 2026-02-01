@@ -587,17 +587,25 @@ static const char UpdateServerIndex[] PROGMEM =
             
             // Safari: Set a connection timeout
             // Safari can hang indefinitely on WebSocket connections
-            var wsConnectionTimer = setTimeout(function() {
-              if (ws.readyState === WebSocket.CONNECTING) {
-                console.log('WebSocket connection timeout (Safari workaround), closing and using polling');
-                try {
-                  ws.close();
-                } catch (e) {
-                  console.log('Error closing timed-out WebSocket:', e);
+            var wsConnectionTimer = null;
+            var isSafari = false;
+            if (typeof navigator !== 'undefined' && navigator.userAgent) {
+              var ua = navigator.userAgent;
+              isSafari = (ua.indexOf('Safari') >= 0 && ua.indexOf('Chrome') < 0 && ua.indexOf('Chromium') < 0 && ua.indexOf('Android') < 0);
+            }
+            if (isSafari && !flashingInProgress && !uploadInFlight) {
+              wsConnectionTimer = setTimeout(function() {
+                if (ws.readyState === WebSocket.CONNECTING) {
+                  console.log('WebSocket connection timeout (Safari workaround), closing and using polling');
+                  try {
+                    ws.close();
+                  } catch (e) {
+                    console.log('Error closing timed-out WebSocket:', e);
+                  }
+                  if (!pollActive) startPolling();
                 }
-                if (!pollActive) startPolling();
-              }
-            }, 10000); // 10 second timeout for connection
+              }, 10000); // 10 second timeout for connection
+            }
             
             ws.onopen = function() {
                 console.log('WebSocket connected successfully');
