@@ -73,6 +73,32 @@ char ot_log_buffer[OT_LOG_BUFFER_SIZE];
 
 /* --- End of LOG marcro's ---*/
 
+static const char* skipOTLogTimestamp(const char* logLine)
+{
+  if (!logLine) return logLine;
+  if (strlen(logLine) < 16) return logLine;
+
+  const bool hasTimestamp =
+      (logLine[0] >= '0' && logLine[0] <= '9') &&
+      (logLine[1] >= '0' && logLine[1] <= '9') &&
+      (logLine[2] == ':') &&
+      (logLine[3] >= '0' && logLine[3] <= '9') &&
+      (logLine[4] >= '0' && logLine[4] <= '9') &&
+      (logLine[5] == ':') &&
+      (logLine[6] >= '0' && logLine[6] <= '9') &&
+      (logLine[7] >= '0' && logLine[7] <= '9') &&
+      (logLine[8] == '.') &&
+      (logLine[9] >= '0' && logLine[9] <= '9') &&
+      (logLine[10] >= '0' && logLine[10] <= '9') &&
+      (logLine[11] >= '0' && logLine[11] <= '9') &&
+      (logLine[12] >= '0' && logLine[12] <= '9') &&
+      (logLine[13] >= '0' && logLine[13] <= '9') &&
+      (logLine[14] >= '0' && logLine[14] <= '9') &&
+      (logLine[15] == ' ');
+
+  return hasTimestamp ? (logLine + 16) : logLine;
+}
+
 
 //some variable's
 OpenthermData_t OTdata, delayedOTdata, tmpOTdata;
@@ -1785,7 +1811,7 @@ void processOT(const char *buf, int len){
       }
       if (OTdata.skipthis) AddLog(" <ignored> ");
       AddLogln();
-      OTGWDebugT(ot_log_buffer);
+      OTGWDebugT(skipOTLogTimestamp(ot_log_buffer));
    
       // Send log buffer directly to WebSocket (no JSON, no queue)
       sendLogToWebSocket(ot_log_buffer);
