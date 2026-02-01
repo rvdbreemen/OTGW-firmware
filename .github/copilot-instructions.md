@@ -190,6 +190,135 @@ Proposed | Accepted | Deprecated | Superseded
 - Every byte of string literal in RAM is a byte unavailable for runtime operations
 - This is **non-negotiable** - PROGMEM usage is critical for firmware stability
 
+#### File Serving and Streaming (CRITICAL - Prevents Memory Exhaustion)
+
+**MANDATORY**: Never load large files entirely into RAM. Use streaming for files >2KB.
+
+**Critical Rules**:
+
+1. **NEVER use `File.readString()` for files >2KB**
+   - `index.html` is ~11KB - loading it causes memory exhaustion
+   - Each String allocation fragments the heap
+   - Multiple concurrent requests can crash the device
+
+2. **ALWAYS use streaming for unmodified files**:
+   ```cpp
+   // GOOD - Direct streaming (minimal memory)
+   File f = LittleFS.open("/index.html", "r");
+   if (!f) {
+     httpServer.send(404, F("text/plain"), F("File not found"));
+     return;
+   }
+   httpServer.streamFile(f, F("text/html; charset=UTF-8"));
+   f.close();
+   ```
+
+3. **Use chunked transfer encoding for files requiring modification**:
+   ```cpp
+   // GOOD - Stream with line-by-line modifications
+   File f = LittleFS.open("/index.html", "r");
+   if (!f) {
+     httpServer.send(404, F("text/plain"), F("File not found"));
+     return;
+   }
+   
+   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+   httpServer.send(200, F("text/html; charset=UTF-8"), F(""));
+   
+   while (f.available()) {
+     String line = f.readStringUntil('\n');
+     
+     // Modify line if needed (use indexOf() before replace() for efficiency)
+     if (line.indexOf(F("src=\"./index.js\"")) >= 0) {
+       line.replace(F("src=\"./index.js\""), "src=\"./index.js?v=" + version);
+     }
+     
+     httpServer.sendContent(line);
+     if (f.available() || line.length() > 0) {
+       httpServer.sendContent(F("\n"));
+     }
+   }
+   httpServer.sendContent(F("")); // End chunked stream
+   f.close();
+   ```
+
+4. **Eliminate code duplication with lambdas**:
+   ```cpp
+   // GOOD - Single handler for multiple routes
+   auto sendIndex = []() {
+     // Implementation here
+   };
+   
+   httpServer.on("/", sendIndex);
+   httpServer.on("/index", sendIndex);
+   httpServer.on("/index.html", sendIndex);
+   
+   // BAD - Duplicate code for each route
+   httpServer.on("/", []() { /* duplicate code */ });
+   httpServer.on("/index", []() { /* duplicate code */ });
+   httpServer.on("/index.html", []() { /* duplicate code */ });
+   ```
+
+5. **Cache expensive operations**:
+   ```cpp
+   // GOOD - Static caching for read-once data
+   String getFilesystemHash() {
+     static String _githash = ""; // Cached value
+     
+     if (_githash.length() > 0) return _githash; // Return cached
+     
+     // Read from file only on first call
+     File f = LittleFS.open("/version.hash", "r");
+     if (f && f.available()) {
+       _githash = f.readStringUntil('\n');
+       _githash.trim();
+       f.close();
+     }
+     return _githash;
+   }
+   
+   // BAD - Reading file on every call
+   String getFilesystemHash() {
+     File f = LittleFS.open("/version.hash", "r");
+     String hash = f.readStringUntil('\n');
+     f.close();
+     return hash;
+   }
+   ```
+
+6. **Memory impact guidelines**:
+   - **<1KB files**: Can use `readString()` if absolutely necessary
+   - **1-5KB files**: Use streaming if possible; `readString()` only if no alternative
+   - **>5KB files**: MUST use streaming, NEVER load into memory
+   - **>10KB files**: CRITICAL - Always stream, can cause crash if loaded
+
+7. **Check for String operations that increase memory**:
+   ```cpp
+   // BAD - Multiple allocations and reallocations
+   String html = f.readString();  // Allocation 1: 11KB
+   html.replace("old", "new");    // Allocation 2: 11KB + growth
+   html.replace("foo", "bar");    // Allocation 3: 11KB + growth
+   httpServer.send(200, type, html); // All in memory at once
+   
+   // GOOD - Minimal allocations via streaming
+   while (f.available()) {
+     String line = f.readStringUntil('\n'); // Allocation: ~100-500 bytes
+     if (line.indexOf(F("old")) >= 0) {
+       line.replace(F("old"), "new");
+     }
+     httpServer.sendContent(line + "\n");   // Line sent and freed
+   }
+   ```
+
+**Why This Matters**:
+- ESP8266 has ~40KB available RAM after core libraries
+- Loading 11KB file + modifications = >22KB peak memory usage (>50% of available RAM)
+- Multiple concurrent requests can easily exhaust memory
+- String operations cause heap fragmentation
+- Memory exhaustion leads to crashes and watchdog resets
+
+**Reference**: See `docs/reviews/2026-02-01_memory-management-bug-fix/BUG_FIX_ASSESSMENT.md` for detailed analysis of a real bug caused by violating these rules.
+
 ### Binary Data Handling (CRITICAL - Prevents Exception Crashes)
 
 **MANDATORY**: When working with binary data (hex files, raw buffers), use proper comparison functions.
