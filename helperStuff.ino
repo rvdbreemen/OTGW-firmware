@@ -493,15 +493,21 @@ bool checklittlefshash(){
 */
 String getFilesystemHash(){
   #define GITHASH_FILE "/version.hash"
-  String _githash="";
+  static String _githash = ""; // Cache the hash
+  
+  // Return cached value if available
+  if (_githash.length() > 0) return _githash;
+
   if (LittleFS.begin()) {
-    File fh = LittleFS.open(GITHASH_FILE, "r");
-    if (fh) {
-      if (fh.available()){
-        _githash = fh.readStringUntil('\n');
-        _githash.trim(); // Remove any whitespace/newlines
+    if (LittleFS.exists(GITHASH_FILE)) {
+      File fh = LittleFS.open(GITHASH_FILE, "r");
+      if (fh) {
+        if (fh.available()){
+          _githash = fh.readStringUntil('\n');
+          _githash.trim(); // Remove any whitespace/newlines
+        }
+        fh.close();
       }
-      fh.close();
     }
   }
   return _githash;
