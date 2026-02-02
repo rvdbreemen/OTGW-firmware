@@ -124,6 +124,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 //===========================================================================================
 void sendWebSocketJSON(const char *json) {
   if (wsClientCount > 0) {
+    Debugf(PSTR("WebSocket broadcast JSON (%u bytes)\r\n"), static_cast<unsigned>(strlen(json)));
     webSocket.broadcastTXT(json);
   }
 }
