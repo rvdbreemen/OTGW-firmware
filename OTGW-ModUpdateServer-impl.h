@@ -95,6 +95,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
     _server->on("/status", HTTP_GET, [&](){
       if(_username != emptyString && _password != emptyString && !_server->authenticate(_username.c_str(), _password.c_str()))
         return _server->requestAuthentication();
+      if (_serial_output) {
+        DebugTln(F("Update status requested"));
+      }
       _sendStatusJson();
     });
 
@@ -103,9 +106,15 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
       if(!_authenticated)
         return _server->requestAuthentication();
       if (Update.hasError()) {
+        if (_serial_output) {
+          DebugTln(F("Update POST complete: Update.hasError() true"));
+        }
         _setStatus(UPDATE_ERROR, _status.target, _status.received, _status.total, _status.filename, _updaterError);
         _server->send(200, F("text/html"), String(F("Flash error: ")) + _updaterError);
       } else {
+        if (_serial_output) {
+          DebugTln(F("Update POST complete: success response sent"));
+        }
         _server->client().setNoDelay(true);
         _server->send_P(200, PSTR("text/html"), _serverSuccess);
         _server->client().stop();
@@ -135,6 +144,11 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           return;
         }
 
+        if (_serial_output) {
+          DebugTln(F("Update authenticated; starting flash session"));
+          Debugf(PSTR("Update heap at start: %u bytes\r\n"), static_cast<unsigned>(ESP.getFreeHeap()));
+        }
+
         // Set global flag to disable background tasks during ESP flash
         ::isESPFlashing = true;
         
@@ -162,28 +176,50 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _lastProgressPerc = 0;
 
         if (upload.name == F("filesystem")) {
+          if (_serial_output) {
+            DebugTln(F("Update target: filesystem"));
+          }
           size_t fsSize = ((size_t) &_FS_end - (size_t) &_FS_start);
+          if (_serial_output) {
+            Debugf(PSTR("Filesystem size: %u bytes\r\n"), static_cast<unsigned>(fsSize));
+          }
           close_all_fs();
           LittleFS.end();
           if (uploadTotal > 0 && uploadTotal > fsSize) {
             _updaterError = F("filesystem image too large");
+            if (_serial_output) {
+              Debugf(PSTR("Filesystem image too large: %u > %u\r\n"), static_cast<unsigned>(uploadTotal), static_cast<unsigned>(fsSize));
+            }
             _setStatus(UPDATE_ERROR, "filesystem", 0, uploadTotal, upload.filename, _updaterError);
           } else if (!Update.begin(uploadTotal > 0 ? uploadTotal : fsSize, U_FS)){//start with max available size
             if (_serial_output) Update.printError(OTGWSerial);
             _setUpdaterError();
             _setStatus(UPDATE_ERROR, "filesystem", 0, uploadTotal, upload.filename, _updaterError);
           } else {
+            if (_serial_output) {
+              Debugf(PSTR("Filesystem update begin OK (size: %u)\r\n"), static_cast<unsigned>(uploadTotal > 0 ? uploadTotal : fsSize));
+            }
             _setStatus(UPDATE_START, "filesystem", 0, uploadTotal, upload.filename, emptyString);
           }
         } else {
           uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+          if (_serial_output) {
+            DebugTln(F("Update target: firmware"));
+            Debugf(PSTR("Max sketch space: %u bytes\r\n"), static_cast<unsigned>(maxSketchSpace));
+          }
           if (uploadTotal > 0 && uploadTotal > maxSketchSpace) {
             _updaterError = F("firmware image too large");
+            if (_serial_output) {
+              Debugf(PSTR("Firmware image too large: %u > %u\r\n"), static_cast<unsigned>(uploadTotal), static_cast<unsigned>(maxSketchSpace));
+            }
             _setStatus(UPDATE_ERROR, "firmware", 0, uploadTotal, upload.filename, _updaterError);
           } else if (!Update.begin(uploadTotal > 0 ? uploadTotal : maxSketchSpace, U_FLASH)){//start with max available size
             _setUpdaterError();
             _setStatus(UPDATE_ERROR, "firmware", 0, uploadTotal, upload.filename, _updaterError);
           } else {
+            if (_serial_output) {
+              Debugf(PSTR("Firmware update begin OK (size: %u)\r\n"), static_cast<unsigned>(uploadTotal > 0 ? uploadTotal : maxSketchSpace));
+            }
             _setStatus(UPDATE_START, "firmware", 0, uploadTotal, upload.filename, emptyString);
           }
         }
@@ -192,6 +228,17 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
 
         // Feed the dog on every chunk (Main branch behavior)
         Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
+        if (_serial_output) {
+          static unsigned long lastDogLogMs = 0;
+          unsigned long nowMs = millis();
+          if (lastDogLogMs == 0) {
+            lastDogLogMs = nowMs;
+          } else if (nowMs - lastDogLogMs >= 1000) {
+            Debugf(PSTR("Watchdog feed OK (chunk: %u bytes)\r\n"),
+                   static_cast<unsigned>(upload.currentSize));
+            lastDogLogMs = nowMs;
+          }
+        }
         
         // Update status and send WebSocket BEFORE the blocking flash write
         // This ensures progress updates reach the browser even if the write blocks for 10+ seconds
@@ -201,12 +248,47 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
            int currentPerc = (_status.flash_written * 100) / _status.flash_total;
            if (currentPerc != _lastProgressPerc) {
              _lastProgressPerc = currentPerc;
+             if (_serial_output) {
+               Debugf(PSTR("Update progress: %d%% (upload %u/%u)\r\n"), currentPerc,
+                      static_cast<unsigned>(_status.upload_received),
+                      static_cast<unsigned>(_status.flash_total));
+             }
              _setStatus(UPDATE_WRITE, _status.target, _status.flash_written, _status.flash_total, _status.filename, emptyString);
            }
         }
         
         // Now perform the blocking flash write
+        unsigned long writeStartMs = millis();
         size_t written = Update.write(upload.buf, upload.currentSize);
+        unsigned long writeEndMs = millis();
+        if (_serial_output) {
+          unsigned long writeMs = (writeEndMs >= writeStartMs) ? (writeEndMs - writeStartMs) : 0;
+          static unsigned long lastWriteLogMs = 0;
+          if (lastWriteLogMs == 0 || writeMs > 200 || (writeEndMs - lastWriteLogMs) >= 1000) {
+            Debugf(PSTR("Update write duration: %u ms (chunk %u bytes)\r\n"),
+                   static_cast<unsigned>(writeMs),
+                   static_cast<unsigned>(upload.currentSize));
+            lastWriteLogMs = writeEndMs;
+          }
+        }
+
+        if (_serial_output) {
+          static unsigned long lastRateLogMs = 0;
+          static size_t lastRateBytes = 0;
+          unsigned long nowMs = millis();
+          if (lastRateLogMs == 0) {
+            lastRateLogMs = nowMs;
+            lastRateBytes = _status.upload_received;
+          } else if (nowMs - lastRateLogMs >= 1000) {
+            size_t delta = _status.upload_received - lastRateBytes;
+            Debugf(PSTR("Update throughput: %u bytes/s (uploaded %u/%u)\r\n"),
+                   static_cast<unsigned>(delta),
+                   static_cast<unsigned>(_status.upload_received),
+                   static_cast<unsigned>(_status.flash_total));
+            lastRateLogMs = nowMs;
+            lastRateBytes = _status.upload_received;
+          }
+        }
 
         if (written != upload.currentSize) {
           _setUpdaterError();
@@ -321,6 +403,8 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_setStatus(uint8_t phase, cons
 {
   if (_serial_output) {
       Debugf(PSTR("Update Status: %s (recv: %u, total: %u)\r\n"), _phaseToString(phase), received, total);
+      Debugf(PSTR("Update Status detail: target=%s filename=%s error=%s\r\n"),
+             target.c_str(), filename.c_str(), error.c_str());
   }
   _status.phase = static_cast<UpdatePhase>(phase);
   _status.target = target.length() ? target : "unknown";
@@ -432,6 +516,10 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusJson()
     // Send error response instead of truncated JSON
     _server->send(500, F("text/plain"), F("Status buffer overflow"));
     return;
+  }
+
+  if (_serial_output) {
+    Debugf(PSTR("Status JSON sent: %s\r\n"), buf);
   }
   
   _server->send(200, F("application/json"), buf);

@@ -150,6 +150,15 @@ static const char UpdateServerIndex[] PROGMEM =
         var wsReconnectTimer = null;
         var wsReconnectBaseDelay = 500;
         var wsReconnectDelayMs = 0;
+        var lastStatusState = null;
+        var lastFlashPct = -1;
+        var lastUploadLogPct = -1;
+        var lastLoggedPollDelayMs = 0;
+        var uploadStartMs = 0;
+        var uploadLastRateMs = 0;
+        var uploadLastRateBytes = 0;
+
+        logFlash('Flash UI initialized');
 
          function hasJsonContentType(response, contentType) {
            var ct = contentType || '';
@@ -165,6 +174,16 @@ static const char UpdateServerIndex[] PROGMEM =
            if (!t.length) return null;
            if (t[0] !== '{' && t[0] !== '[') return null;
            try { return JSON.parse(t); } catch (e) { return null; }
+         }
+
+         function logFlash(message, detail) {
+           try {
+             if (typeof detail !== 'undefined') {
+               console.log('[Flash]', message, detail);
+             } else {
+               console.log('[Flash]', message);
+             }
+           } catch (e) {}
          }
 
          function fetchText(url, timeoutMs, customHeaders) {
@@ -255,6 +274,7 @@ static const char UpdateServerIndex[] PROGMEM =
          }
 
          window.retryFlash = function() {
+          logFlash('User requested retry');
             pageProgress.style.display = 'none';
             pageForm.style.display = 'block';
             if (retryBtn) retryBtn.style.display = 'none';
@@ -306,6 +326,7 @@ static const char UpdateServerIndex[] PROGMEM =
 
         function startSuccessCountdown() {
           if (!successCountdownEl || successTimer) return;
+          logFlash('Reboot countdown started');
           var remaining = 60;
           successCountdownEl.textContent = remaining;
           successTimer = setInterval(function() {
@@ -318,6 +339,7 @@ static const char UpdateServerIndex[] PROGMEM =
                    clearInterval(successTimer);
                    successTimer = null;
                    if (successMessageEl) successMessageEl.textContent = 'Device back online! Redirecting...';
+                   logFlash('Device back online during countdown');
                    window.location.href = "/"; 
                 }
               }).catch(function(e){ /* ignore, still rebooting */ });
@@ -355,6 +377,11 @@ static const char UpdateServerIndex[] PROGMEM =
           var state = status.state || 'idle';
           var target = status.target || '';
 
+          if (state !== lastStatusState) {
+            logFlash('Status state changed: ' + state + (target ? (' (target: ' + target + ')') : ''));
+            lastStatusState = state;
+          }
+
            // Track flashing state for fallback logic
            if (state === 'start' || state === 'write') {
              if (!flashingInProgress) {
@@ -388,6 +415,15 @@ static const char UpdateServerIndex[] PROGMEM =
            }
            var flashWritten = status.flash_written || status.received || 0;
            var flashTotal = status.flash_total || status.total || 0;
+
+           if (flashTotal > 0) {
+             var pct = Math.round((flashWritten / flashTotal) * 100);
+             if (pct > 100) pct = 100;
+             if (pct !== lastFlashPct) {
+               lastFlashPct = pct;
+               logFlash('Flash progress: ' + pct + '% (' + flashWritten + ' / ' + flashTotal + ')');
+             }
+           }
            
            // Handle Flash Progress
            if (state !== 'idle' && flashTotal > 0) {
@@ -404,6 +440,7 @@ static const char UpdateServerIndex[] PROGMEM =
            // Handle specific states
            if (state === 'end') {
              progressTitle.textContent = 'Flashing complete';
+             logFlash('Flash completed successfully');
              if (!successShown) {
                successShown = true;
                if (successPanel) successPanel.style.display = 'block';
@@ -420,6 +457,7 @@ static const char UpdateServerIndex[] PROGMEM =
              
            } else if (state === 'error') {
              progressTitle.textContent = 'Flashing error';
+             logFlash('Flash error: ' + (status.error || 'unknown'));
              successShown = false;
              if (successPanel) successPanel.style.display = 'none';
              if (retryBtn) retryBtn.style.display = 'block';
@@ -429,6 +467,7 @@ static const char UpdateServerIndex[] PROGMEM =
              
            } else if (state === 'abort') {
              progressTitle.textContent = 'Flashing aborted';
+             logFlash('Flash aborted');
              successShown = false;
              if (successPanel) successPanel.style.display = 'none';
              if (retryBtn) retryBtn.style.display = 'block';
@@ -445,6 +484,7 @@ static const char UpdateServerIndex[] PROGMEM =
          }
 
          function fetchStatus(timeoutMs) {
+           logFlash('Status fetch start (timeout ' + timeoutMs + 'ms)');
             return fetchText('/status', timeoutMs)
              .then(function(res) {
                if (!res.ok) {
@@ -459,7 +499,11 @@ static const char UpdateServerIndex[] PROGMEM =
                }
                return parsed;
              })
-             .then(function(json) { updateDeviceStatus(json); })
+             .then(function(json) {
+               logFlash('Status fetch OK: ' + (json.state || 'n/a') + (json.target ? (' target=' + json.target) : '') +
+                        ' flash=' + (json.flash_written || 0) + '/' + (json.flash_total || 0));
+               updateDeviceStatus(json);
+             })
              .catch(function(e) {
                // Safari-specific: AbortError handling
                // AbortError occurs when fetch is aborted due to timeout
@@ -468,19 +512,24 @@ static const char UpdateServerIndex[] PROGMEM =
                  // During flash, AbortError is expected - device is busy writing
                  if (flashingInProgress) {
                    console.log('Fetch aborted during flash (expected) - device is busy');
+                   logFlash('Status fetch aborted during flash (expected)');
                    return; // Don't treat as error
                  }
                  console.log('Fetch aborted - may indicate timeout');
+                 logFlash('Status fetch aborted');
                } else if (e && e.message && e.message.indexOf('NetworkError') !== -1) {
                  // Network errors can occur during flash when device is overloaded
                  if (flashingInProgress) {
                    console.log('Network error during flash (expected) - device is busy');
+                   logFlash('Status fetch network error during flash (expected)');
                    return; // Don't treat as error
                  }
                  console.log('Network error:', e.message);
+                 logFlash('Status fetch network error: ' + e.message);
                } else if (e) {
                  // Log other errors only if not routine
                  console.log('Fetch status error:', e.name || 'Unknown', e.message || '');
+                 logFlash('Status fetch error: ' + (e.name || 'Unknown') + ' ' + (e.message || ''));
                  // Propagate non-routine errors so polling logic can react
                  throw e;
                }
@@ -490,6 +539,10 @@ static const char UpdateServerIndex[] PROGMEM =
         function scheduleNextPoll(delayMs) {
           if (!pollActive) return;
           if (pollTimer) clearTimeout(pollTimer);
+          if (delayMs !== lastLoggedPollDelayMs) {
+            lastLoggedPollDelayMs = delayMs;
+            logFlash('Polling scheduled in ' + delayMs + 'ms');
+          }
           pollTimer = setTimeout(runPoll, delayMs);
         }
 
@@ -503,10 +556,18 @@ static const char UpdateServerIndex[] PROGMEM =
           var timeoutMs = Math.max(500, baseTimeout);
           fetchStatus(timeoutMs)
             .then(function() {
-              pollIntervalMs = Math.max(pollMinMs, Math.floor(pollIntervalMs / 2));
+              var next = Math.max(pollMinMs, Math.floor(pollIntervalMs / 2));
+              if (next !== pollIntervalMs) {
+                logFlash('Polling interval decreased to ' + next + 'ms');
+              }
+              pollIntervalMs = next;
             })
             .catch(function() {
-              pollIntervalMs = Math.min(pollMaxMs, pollIntervalMs * 2);
+              var next = Math.min(pollMaxMs, pollIntervalMs * 2);
+              if (next !== pollIntervalMs) {
+                logFlash('Polling interval increased to ' + next + 'ms');
+              }
+              pollIntervalMs = next;
             })
             .finally(function() {
               pollInFlight = false;
@@ -517,11 +578,13 @@ static const char UpdateServerIndex[] PROGMEM =
         function startPolling() {
           pollActive = true;
           pollIntervalMs = pollMinMs;
+          logFlash('Polling started');
           scheduleNextPoll(0);
         }
 
         function stopPolling() {
           pollActive = false;
+          logFlash('Polling stopped');
           if (pollTimer) {
             clearTimeout(pollTimer);
             pollTimer = null;
@@ -533,6 +596,7 @@ static const char UpdateServerIndex[] PROGMEM =
           
           // Shorter timeout during active flash operations (5s vs 15s)
           var watchdogDelay = flashingInProgress ? 5000 : 15000;
+          logFlash('WebSocket watchdog armed (' + watchdogDelay + 'ms)');
           
           wsWatchdogTimer = setTimeout(function() {
             var now = Date.now();
@@ -540,6 +604,7 @@ static const char UpdateServerIndex[] PROGMEM =
             // If flashing and WebSocket is silent, activate polling fallback immediately
             if (flashingInProgress && !pollActive) {
               console.log('WebSocket silent during flash operation, activating polling fallback');
+              logFlash('WebSocket silent during flash, enabling polling fallback');
               wsActive = false;
               flashPollingActivated = true;
               startPolling();
@@ -547,6 +612,7 @@ static const char UpdateServerIndex[] PROGMEM =
             // WebSocket has been silent for timeout period - restart polling as fallback
             else if (!pollActive) {
               console.log('WebSocket silent for ' + (watchdogDelay/1000) + 's, restarting polling as fallback');
+              logFlash('WebSocket silent, enabling polling fallback');
               wsActive = false;
               startPolling();
             }
@@ -558,7 +624,9 @@ static const char UpdateServerIndex[] PROGMEM =
 
         // WebSocket Support for Real-time Progress
         function setupWebSocket() {
+            logFlash('WebSocket setup start');
             if (!window.WebSocket) {
+              logFlash('WebSocket not supported, switching to polling');
               console.log('WebSocket not supported, using polling');
               if (!pollActive) startPolling();
               return;
@@ -567,13 +635,16 @@ static const char UpdateServerIndex[] PROGMEM =
             // Use ws:// protocol (never wss:// - this firmware uses HTTP only)
             var wsScheme = 'ws://';
             var wsUrl = wsScheme + window.location.hostname + ':81/';
+            logFlash('WebSocket URL: ' + wsUrl);
             console.log('Connecting to WebSocket:', wsUrl);
             var ws;
             
             try {
               ws = new WebSocket(wsUrl);
               wsInstance = ws; // Store instance for resource management
+              logFlash('WebSocket created');
             } catch (e) {
+              logFlash('WebSocket create failed');
               console.log('WebSocket create failed:', e);
               wsReconnectAttempts++;
               if (!pollActive) startPolling();
@@ -608,6 +679,7 @@ static const char UpdateServerIndex[] PROGMEM =
             }
             
             ws.onopen = function() {
+              logFlash('WebSocket connected');
                 console.log('WebSocket connected successfully');
                 clearTimeout(wsConnectionTimer);
                 wsReconnectAttempts = 0; // Reset backoff counter on successful connection
@@ -629,6 +701,9 @@ static const char UpdateServerIndex[] PROGMEM =
                 var msg = parseJsonSafe(e.data);
                 // Ignore non-JSON messages (like raw logs)
                 if (!msg || typeof msg.state === 'undefined') return;
+
+              logFlash('WebSocket status: ' + msg.state + (msg.target ? (' target=' + msg.target) : '') +
+                   ' flash=' + (msg.flash_written || 0) + '/' + (msg.flash_total || 0));
                 
                 lastWsMessageTime = Date.now();
                 
@@ -651,6 +726,7 @@ static const char UpdateServerIndex[] PROGMEM =
             };
             
             ws.onerror = function(e) {
+              logFlash('WebSocket error');
                 console.log('WebSocket error:', e);
                 clearTimeout(wsConnectionTimer);
                 wsInstance = null; // Clear instance reference
@@ -663,6 +739,7 @@ static const char UpdateServerIndex[] PROGMEM =
             };
             
             ws.onclose = function() {
+              logFlash('WebSocket closed');
                 console.log('WebSocket closed');
                 clearTimeout(wsConnectionTimer);
                 wsInstance = null; // Clear instance reference
@@ -716,6 +793,9 @@ static const char UpdateServerIndex[] PROGMEM =
              input.addEventListener('change', function() {
                submit.disabled = !input.files || input.files.length === 0;
                if (formErrorEl) formErrorEl.textContent = '';
+               if (input.files && input.files.length > 0) {
+                 logFlash('File selected for ' + targetName + ': ' + (input.files[0].name || '-') + ' size=' + input.files[0].size);
+               }
              });
            }
            form.addEventListener('submit', function(e) {
@@ -728,6 +808,7 @@ static const char UpdateServerIndex[] PROGMEM =
              if (formErrorEl) formErrorEl.textContent = '';
              
              e.preventDefault();
+             logFlash('Upload submit: target=' + targetName + ' file=' + (input.files[0].name || '-') + ' size=' + input.files[0].size);
              resetSuccessPanel();
              showProgressPage('Flashing in progress');
              fileEl.textContent = input.files[0].name || '-';
@@ -750,6 +831,7 @@ static const char UpdateServerIndex[] PROGMEM =
               // Start polling immediately - don't rely on WebSocket during upload
               if (!pollActive) {
                 console.log('Safari: Activating polling before upload (avoiding WebSocket resource contention)');
+                 logFlash('Polling activated before upload');
                 flashPollingActivated = true;
                 startPolling();
               }
@@ -765,6 +847,7 @@ static const char UpdateServerIndex[] PROGMEM =
              if (formId === 'fsForm') {
                 var chk = document.getElementById('chkPreserve');
                 if(chk && chk.checked) {
+                logFlash('Filesystem flash: starting settings backup download');
                     // Trigger download as backup (settings will be auto-restored from ESP memory)
                     preFlight = fetch('/settings.ini')
                         .then(function(resp) { return resp.blob(); })
@@ -784,9 +867,11 @@ static const char UpdateServerIndex[] PROGMEM =
                              document.body.removeChild(a);
                              
                              // Wait briefly for download to start
+                                logFlash('Settings backup download started');
                              return new Promise(function(resolve) { setTimeout(resolve, 1000); });
                         })
                         .catch(function(e) {
+                                logFlash('Settings backup failed');
                              console.log('Backup error', e);
                              if(!confirm("Could not backup settings.ini. Continue anyway?")) {
                                  throw e;
@@ -797,6 +882,7 @@ static const char UpdateServerIndex[] PROGMEM =
              // ------------------------------------------
 
              preFlight.then(function() {
+                 logFlash('Preflight complete, preparing upload');
                  if (action.indexOf('size=') === -1) {
                    action += (action.indexOf('?') === -1 ? '?' : '&') + 'size=' + encodeURIComponent(input.files[0].size);
                  }
@@ -807,12 +893,14 @@ static const char UpdateServerIndex[] PROGMEM =
                      if (uploadRetryPending) return true;
                      if (lastDeviceStatus && lastDeviceStatus.state && lastDeviceStatus.state !== 'idle') {
                        console.log('Auto-retry skipped: device is flashing');
+                       logFlash('Upload retry skipped: device is flashing');
                        return false;
                      }
                      var delayMs = Math.min(uploadRetryMaxDelayMs, uploadRetryBaseMs * Math.pow(2, uploadRetryAttempts));
                      var attempt = uploadRetryAttempts + 1;
                      uploadRetryPending = true;
                      if (retryBtn) retryBtn.style.display = 'none';
+                     logFlash('Scheduling upload retry in ' + Math.round(delayMs / 1000) + 's (attempt ' + attempt + '/' + uploadRetryMax + ')');
                      errorEl.textContent = (reason || 'Upload failed') + ' Retrying in ' + Math.round(delayMs / 1000) + 's (' + attempt + '/' + uploadRetryMax + ')...';
                      if (!pollActive) startPolling();
                      uploadRetryTimer = setTimeout(function() {
@@ -826,6 +914,11 @@ static const char UpdateServerIndex[] PROGMEM =
                  var performUpload = function() {
                      cancelUploadRetry();
                      uploadInFlight = true;
+                   lastUploadLogPct = -1;
+                   uploadStartMs = Date.now();
+                   uploadLastRateMs = uploadStartMs;
+                   uploadLastRateBytes = 0;
+                   logFlash('Upload started: ' + action);
                      var xhr = new XMLHttpRequest();
                      xhr.open('POST', action, true);
                      
@@ -834,17 +927,39 @@ static const char UpdateServerIndex[] PROGMEM =
                      xhr.timeout = 300000;
                      
                      xhr.upload.onprogress = function(ev) {
-                       console.log('Upload progress:', ev.loaded, ev.total);
                        var total = ev.lengthComputable ? ev.total : 0;
+                       var pct = total > 0 ? Math.round((ev.loaded / total) * 100) : 0;
+                       if (pct > 100) pct = 100;
+                       if (pct !== lastUploadLogPct) {
+                         lastUploadLogPct = pct;
+                         logFlash('Upload progress: ' + pct + '% (' + ev.loaded + ' / ' + total + ')');
+                       }
+                       var nowMs = Date.now();
+                       if (nowMs - uploadLastRateMs >= 1000) {
+                         var deltaBytes = ev.loaded - uploadLastRateBytes;
+                         var deltaMs = nowMs - uploadLastRateMs;
+                         if (deltaMs > 0) {
+                           var rate = Math.round((deltaBytes * 1000) / deltaMs);
+                           logFlash('Upload rate: ' + rate + ' bytes/s');
+                         }
+                         uploadLastRateMs = nowMs;
+                         uploadLastRateBytes = ev.loaded;
+                       }
                        lastUploadLoaded = ev.loaded;
                        lastUploadTotal = total;
                        setUploadProgress(ev.loaded, total);
                      };
                      xhr.onload = function() {
                        console.log('Upload finished, status:', xhr.status);
+                       logFlash('Upload finished with status ' + xhr.status);
+                       if (uploadStartMs > 0) {
+                         logFlash('Upload duration: ' + Math.round((Date.now() - uploadStartMs) / 1000) + 's');
+                       }
                        if (xhr.status >= 200 && xhr.status < 300) {
                          var responseText = xhr.responseText || '';
+                         logFlash('Upload response length: ' + responseText.length);
                         if (responseText.indexOf('Flash error') !== -1) {
+                           logFlash('Upload response indicates flash error');
                            // Status line remains hidden or used for error text
                            errorEl.textContent = responseText;
                            progressTitle.textContent = 'Flashing error';
@@ -852,6 +967,7 @@ static const char UpdateServerIndex[] PROGMEM =
                            if (successPanel) successPanel.style.display = 'none';
                            if (retryBtn) retryBtn.style.display = 'block';
                          } else {
+                           logFlash('Upload response OK, waiting for flash completion');
                            setUploadProgress(lastUploadTotal, lastUploadTotal); // Ensure 100%
                            localUploadDone = true;
                            cancelUploadRetry();
@@ -867,6 +983,7 @@ static const char UpdateServerIndex[] PROGMEM =
                      };
                      xhr.ontimeout = function() {
                        console.log('Upload timeout - flash may still be in progress, check WebSocket status');
+                       logFlash('Upload timeout: monitoring flash status');
                        // Don't show error yet - WebSocket might show completion
                        // Just mark upload as done and let WebSocket status take over
                        uploadInFlight = false;
@@ -877,6 +994,7 @@ static const char UpdateServerIndex[] PROGMEM =
                      };
                      xhr.onerror = function() {
                        console.log('Upload XHR error - checking if flash is proceeding via WebSocket');
+                       logFlash('Upload error: monitoring flash status');
                        // Upload may have succeeded but response timed out
                        // WebSocket will show actual flash status
                        uploadInFlight = false;
@@ -905,6 +1023,7 @@ static const char UpdateServerIndex[] PROGMEM =
          // Clean up and notify when leaving flash page
          window.addEventListener('beforeunload', function() {
            try {
+             logFlash('Leaving flash page');
              sessionStorage.removeItem('flashMode');
              if (window.opener && typeof window.opener.exitFlashMode === 'function') {
                window.opener.exitFlashMode();
