@@ -66,15 +66,15 @@ Disconnects the WebSocket without reconnecting.
 [WebSocket] ═══════════════════════════════════════
 [WebSocket] initOTLogWebSocket called (force: false, flashMode: false)
 [WebSocket] Connection stats - Attempts: 0, Successful: 0, Reconnects: 0
-[WebSocket] 🔄 Connection attempt #1
-[WebSocket] 🔌 CONNECTING to: ws://192.168.1.100:81/
+[WebSocket] Connection attempt #1
+[WebSocket] CONNECTING to: ws://192.168.1.100:81/
 [WebSocket] WebSocket object created, waiting for connection...
 ```
 
 **Successful Connection:**
 ```
 [WebSocket] ═══════════════════════════════════════
-[WebSocket] ✅ CONNECTION ESTABLISHED
+[WebSocket] CONNECTION ESTABLISHED
 [WebSocket] Total successful connections: 1
 [WebSocket] Connection time: 2026-02-02T09:22:15.123Z
 [WebSocket] ReadyState: 1 (OPEN)
@@ -84,7 +84,7 @@ Disconnects the WebSocket without reconnecting.
 **Disconnection:**
 ```
 [WebSocket] ═══════════════════════════════════════
-[WebSocket] ❌ CONNECTION CLOSED
+[WebSocket] CONNECTION CLOSED
 [WebSocket] Close event code: 1006
 [WebSocket] Close reason: No reason provided
 [WebSocket] Clean close: false
@@ -96,10 +96,10 @@ Disconnects the WebSocket without reconnecting.
 
 **Reconnection:**
 ```
-[WebSocket] 🔄 Scheduling reconnect attempt #1 in 5 seconds...
+[WebSocket] Scheduling reconnect attempt #1 in 5 seconds...
 [WebSocket] initOTLogWebSocket called (force: false, flashMode: false)
 [WebSocket] Connection stats - Attempts: 1, Successful: 1, Reconnects: 1
-[WebSocket] 🔄 Connection attempt #2
+[WebSocket] Connection attempt #2
 ```
 
 ### Watchdog Timer
@@ -112,7 +112,7 @@ Disconnects the WebSocket without reconnecting.
 
 **Timeout:**
 ```
-[WebSocket] ⚠️ WATCHDOG TIMEOUT - No data received for 45s
+[WebSocket] WATCHDOG TIMEOUT - No data received for 45s
 [WebSocket] Forcing reconnect due to watchdog timeout
 [WebSocket] Closing existing connection (readyState: 1)
 ```
@@ -127,7 +127,7 @@ Disconnects the WebSocket without reconnecting.
   disabled: true,
   reason: "HTTPS proxy (mixed content)"
 }
-[WebSocket] ⚠️ FALLBACK: HTTPS reverse proxy detected. WebSocket connections not supported.
+[WebSocket] FALLBACK: HTTPS reverse proxy detected. WebSocket connections not supported.
 ```
 
 **Mobile Device:**
@@ -137,7 +137,7 @@ Disconnects the WebSocket without reconnecting.
   disabled: true,
   reason: "Phone detected"
 }
-[WebSocket] ⚠️ FALLBACK: Smartphone detected. Disabling OpenTherm Monitor to save resources.
+[WebSocket] FALLBACK: Smartphone detected. Disabling OpenTherm Monitor to save resources.
 ```
 
 **Small Screen:**
@@ -148,27 +148,27 @@ Disconnects the WebSocket without reconnecting.
   disabled: true,
   reason: "Small screen"
 }
-[WebSocket] ⚠️ FALLBACK: Small screen detected (width: 640px). Disabling OpenTherm Monitor.
+[WebSocket] FALLBACK: Small screen detected (width: 640px). Disabling OpenTherm Monitor.
 ```
 
 ### Message Handling
 
 **Keepalive Messages:**
 ```
-[WebSocket] 💓 Keepalive message received
+[WebSocket] Keepalive message received
 [WebSocket] Watchdog timer reset (timeout: 45s)
 ```
 
 **Data Messages:**
 ```
-[WebSocket] 📨 Message received (size: 45 bytes)
+[WebSocket] Message received (size: 45 bytes)
 [WebSocket] Data: T80120100 / R80120100
 [WebSocket] Adding message to log buffer
 ```
 
 **JSON Messages:**
 ```
-[WebSocket] 📨 Message received (size: 123 bytes)
+[WebSocket] Message received (size: 123 bytes)
 [WebSocket] Data: {"type":"upgrade","progress":45}
 [WebSocket] Message parsed as JSON object
 ```
@@ -179,7 +179,7 @@ Disconnects the WebSocket without reconnecting.
 
 Look for:
 ```
-[WebSocket] ❌ CONNECTION CLOSED
+[WebSocket] CONNECTION CLOSED
 [WebSocket] Close event code: 1006
 [WebSocket] Clean close: false
 ```
@@ -190,7 +190,7 @@ Code 1006 indicates an abnormal closure (network issue, server crash, etc.)
 
 Look for:
 ```
-[WebSocket] ⚠️ WATCHDOG TIMEOUT - No data received for 45s
+[WebSocket] WATCHDOG TIMEOUT - No data received for 45s
 ```
 
 This indicates the server isn't sending data (OTGW may be unresponsive)
@@ -199,8 +199,8 @@ This indicates the server isn't sending data (OTGW may be unresponsive)
 
 Look for:
 ```
-[WebSocket] 🔄 Connection attempt #5
-[WebSocket] ❌ FAILED TO CREATE WEBSOCKET
+[WebSocket] Connection attempt #5
+[WebSocket] FAILED TO CREATE WEBSOCKET
 ```
 
 Multiple failed attempts indicate server is unreachable or port 81 is blocked.
@@ -209,7 +209,7 @@ Multiple failed attempts indicate server is unreachable or port 81 is blocked.
 
 Look for:
 ```
-[WebSocket] ⚠️ FALLBACK: HTTPS reverse proxy detected.
+[WebSocket] FALLBACK: HTTPS reverse proxy detected.
 ```
 
 WebSocket (ws://) won't work over HTTPS due to mixed content blocking.
