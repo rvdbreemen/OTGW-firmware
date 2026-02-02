@@ -903,14 +903,19 @@ window.otgwPersistence = {
 
 //============================================================================
 function resetWSWatchdog() {
+  console.log('[WebSocket] Watchdog reset (' + (WS_WATCHDOG_TIMEOUT/1000) + 's)');
   if (wsWatchdogTimer) {
     clearTimeout(wsWatchdogTimer);
+    console.log('[WebSocket] Watchdog timer cleared');
   }
   wsWatchdogTimer = setTimeout(function() {
+      console.warn('[WebSocket] WATCHDOG TIMEOUT - no data received');
       // Closing the socket will trigger onclose, which triggers the reconnect logic
       if (otLogWS) {
+        console.warn('[WebSocket] Watchdog closing connection (readyState: ' + otLogWS.readyState + ')');
         otLogWS.close();
       } else {
+        console.warn('[WebSocket] Watchdog fired with no active socket; reconnecting');
         // If socket is somehow null but watchdog fired, force a new connection
         // We reuse the last known 'force' state implicitly by calling without args (undefined is falsy)
         // or we could store the last 'force' state in a global if critical.
@@ -981,14 +986,17 @@ function handleOTLogResize() {
 
 //============================================================================
 function initOTLogWebSocket(force) {
+  console.log('[WebSocket] initOTLogWebSocket(force=' + force + ', flashMode=' + flashModeActive + ')');
   // Don't connect if in flash mode
   if (flashModeActive) {
+    console.log('[WebSocket] Skipping connect: flash mode active');
     return;
   }
 
   const displayState = getOTLogDisplayState();
 
   if (displayState.disabled && !force && !isFlashing) {
+    console.log('[WebSocket] Skipping connect: display disabled');
     if (displayState.isProxied) {
       console.log("[WebSocket] FALLBACK: HTTPS reverse proxy detected. WebSocket connections not supported. Disabling OpenTherm Monitor.");
     } else if (displayState.isPhone) {
@@ -1017,6 +1025,7 @@ function initOTLogWebSocket(force) {
   const wsHost = window.location.hostname;
   const wsPort = WEBSOCKET_PORT;
   const wsURL = 'ws://' + wsHost + ':' + wsPort + '/';
+  console.log('[WebSocket] Connecting to ' + wsURL);
   
   // Increment connection attempt counter
   wsConnectionAttempts++;
@@ -1037,10 +1046,13 @@ function initOTLogWebSocket(force) {
   
   try {
     otLogWS = new WebSocket(wsURL);
+    console.log('[WebSocket] WebSocket created');
     
     otLogWS.onopen = function() {
+      console.log('[WebSocket] OPEN');
       wsSuccessfulConnections++;
       wsLastConnectTime = new Date();
+      console.log('[WebSocket] Connect count: ' + wsSuccessfulConnections);
       
       updateWSStatus(true);
       // Clear any reconnect timer just in case
@@ -1063,6 +1075,7 @@ function initOTLogWebSocket(force) {
     };
     
     otLogWS.onclose = function(event) {
+      console.log('[WebSocket] CLOSE code=' + event.code + ' clean=' + event.wasClean + ' reason=' + (event.reason || ''));
       wsLastDisconnectTime = new Date();
       
       // Calculate connection duration if we had a successful connection
@@ -1087,11 +1100,13 @@ function initOTLogWebSocket(force) {
       if (!wsReconnectTimer) {
         wsReconnectAttempts++;
         let delay = isFlashing ? 1000 : 5000;
+        console.log('[WebSocket] Reconnect attempt #' + wsReconnectAttempts + ' in ' + delay + 'ms');
         wsReconnectTimer = setTimeout(function() { initOTLogWebSocket(force); }, delay);
       }
     };
     
     otLogWS.onerror = function(error) {
+      console.log('[WebSocket] ERROR', error);
       updateWSStatus(false);
       // onclose will usually follow, but we ensure cleanup
       try {
@@ -1103,10 +1118,12 @@ function initOTLogWebSocket(force) {
     };
     
     otLogWS.onmessage = function(event) {
+      console.log('[WebSocket] MESSAGE bytes=' + (event.data ? event.data.length : 0));
       resetWSWatchdog();
 
       // Handle keepalive messages (don't log or add to buffer)
       if (typeof event.data === 'string' && event.data.includes('"type":"keepalive"')) {
+        console.log('[WebSocket] KEEPALIVE');
         return;
       }
 
@@ -1138,10 +1155,12 @@ function initOTLogWebSocket(force) {
     };
     
   } catch (e) {
+    console.log('[WebSocket] CREATE FAILED', e);
     updateWSStatus(false);
     if (!wsReconnectTimer) {
       wsReconnectAttempts++;
       let delay = isFlashing ? 1000 : 5000;
+      console.log('[WebSocket] Reconnect attempt #' + wsReconnectAttempts + ' in ' + delay + 'ms (create failed)');
       wsReconnectTimer = setTimeout(function() { initOTLogWebSocket(force); }, delay);
     }
   }

@@ -82,13 +82,13 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
         IPAddress ip = webSocket.remoteIP(num);
         wsClientCount++;
         DebugTf(PSTR("WebSocket[%u] connected from %d.%d.%d.%d. Clients: %u\r\n"), 
-                num, ip[0], ip[1], ip[2], ip[3], wsClientCount);
+          num, ip[0], ip[1], ip[2], ip[3], wsClientCount);
       }
       break;
       
     case WStype_TEXT:
       // Handle incoming text from client (currently not used, but available for future commands)
-      DebugTf(PSTR("WebSocket[%u] received text: %s\r\n"), num, payload);
+      DebugTf(PSTR("WebSocket[%u] received text (%u bytes)\r\n"), num, static_cast<unsigned>(length));
       break;
       
     case WStype_BIN:
@@ -108,10 +108,12 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
       
     case WStype_PING:
       // Ping/pong handled automatically by library
+      DebugTf(PSTR("WebSocket[%u] ping\r\n"), num);
       break;
       
     case WStype_PONG:
       // Ping/pong handled automatically by library
+      DebugTf(PSTR("WebSocket[%u] pong\r\n"), num);
       break;
   }
 }

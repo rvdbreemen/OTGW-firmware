@@ -96,7 +96,10 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
       if(_username != emptyString && _password != emptyString && !_server->authenticate(_username.c_str(), _password.c_str()))
         return _server->requestAuthentication();
       if (_serial_output) {
-        DebugTln(F("Update status requested"));
+
+        if (::isESPFlashing) {
+          DebugTln(F("Update status requested during flash (polling active)"));
+        }
       }
       _sendStatusJson();
     });
