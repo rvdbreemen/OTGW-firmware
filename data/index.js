@@ -903,20 +903,14 @@ window.otgwPersistence = {
 
 //============================================================================
 function resetWSWatchdog() {
-  console.log('[WebSocket] Watchdog timer reset (timeout: ' + (WS_WATCHDOG_TIMEOUT/1000) + 's)');
   if (wsWatchdogTimer) {
     clearTimeout(wsWatchdogTimer);
-    console.log('[WebSocket] Previous watchdog timer cleared');
   }
   wsWatchdogTimer = setTimeout(function() {
-      console.warn('[WebSocket] WATCHDOG TIMEOUT - No data received for ' + (WS_WATCHDOG_TIMEOUT/1000) + 's');
-      console.warn('[WebSocket] Forcing reconnect due to watchdog timeout');
       // Closing the socket will trigger onclose, which triggers the reconnect logic
       if (otLogWS) {
-        console.log('[WebSocket] Closing existing connection (readyState: ' + otLogWS.readyState + ')');
         otLogWS.close();
       } else {
-        console.warn('[WebSocket] No active connection to close, initiating new connection');
         // If socket is somehow null but watchdog fired, force a new connection
         // We reuse the last known 'force' state implicitly by calling without args (undefined is falsy)
         // or we could store the last 'force' state in a global if critical.
@@ -946,53 +940,32 @@ function getOTLogDisplayState() {
     disabled: (isProxied || isPhone || isSmallScreen)
   };
   
-  console.log('[WebSocket] Display state check:', {
-    protocol: window.location.protocol,
-    isProxied: state.isProxied,
-    userAgent: navigator.userAgent.substring(0, 50) + '...',
-    isPhone: state.isPhone,
-    screenWidth: window.innerWidth,
-    isSmallScreen: state.isSmallScreen,
-    disabled: state.disabled,
-    reason: state.isProxied ? 'HTTPS proxy (mixed content)' : 
-            state.isPhone ? 'Phone detected' :
-            state.isSmallScreen ? 'Small screen' : 'None'
-  });
-  
   return state;
 }
 
 //============================================================================
 function updateOTLogResponsiveState() {
-  console.log('[WebSocket] Updating responsive state (flashMode: ' + flashModeActive + ')');
   if (flashModeActive) return;
 
   const logSection = document.getElementById('otLogSection');
   if (!logSection) {
-    console.log('[WebSocket] Log section element not found');
     return;
   }
 
   const displayState = getOTLogDisplayState();
 
   if (displayState.disabled) {
-    console.log('[WebSocket] Display disabled - hiding log section and disconnecting');
     logSection.classList.add('hidden');
     disconnectOTLogWebSocket();
     return;
   }
 
   if (logSection.classList.contains('hidden')) {
-    console.log('[WebSocket] Display enabled - showing log section');
     logSection.classList.remove('hidden');
   }
 
   if (!otLogWS || otLogWS.readyState === WebSocket.CLOSED) {
-    console.log('[WebSocket] No active connection - initiating connection (current state: ' + 
-                (otLogWS ? otLogWS.readyState : 'null') + ')');
     initOTLogWebSocket();
-  } else {
-    console.log('[WebSocket] Connection already active (state: ' + otLogWS.readyState + ')');
   }
 }
 
@@ -1008,15 +981,8 @@ function handleOTLogResize() {
 
 //============================================================================
 function initOTLogWebSocket(force) {
-  console.log('[WebSocket] ═══════════════════════════════════════');
-  console.log('[WebSocket] initOTLogWebSocket called (force: ' + force + ', flashMode: ' + flashModeActive + ')');
-  console.log('[WebSocket] Connection stats - Attempts: ' + wsConnectionAttempts + 
-              ', Successful: ' + wsSuccessfulConnections + 
-              ', Reconnects: ' + wsReconnectAttempts);
-  
   // Don't connect if in flash mode
   if (flashModeActive) {
-    console.log('[WebSocket] Flash mode active - skipping WebSocket connection');
     return;
   }
 
@@ -1039,13 +1005,11 @@ function initOTLogWebSocket(force) {
 
   // Clear any pending reconnect timer
   if (wsReconnectTimer) {
-    console.log('[WebSocket] Clearing pending reconnect timer');
     clearTimeout(wsReconnectTimer);
     wsReconnectTimer = null;
   }
   // Clear any pending watchdog
   if (wsWatchdogTimer) {
-    console.log('[WebSocket] Clearing pending watchdog timer');
     clearTimeout(wsWatchdogTimer);
     wsWatchdogTimer = null;
   }
@@ -1056,11 +1020,9 @@ function initOTLogWebSocket(force) {
   
   // Increment connection attempt counter
   wsConnectionAttempts++;
-  console.log('[WebSocket] Connection attempt #' + wsConnectionAttempts);
   
   // Close existing connection if it exists
   if (otLogWS) {
-    console.log('[WebSocket] Closing existing connection (readyState: ' + otLogWS.readyState + ')');
     // Remove listeners to avoid double-triggers during manual cleanup
     otLogWS.onclose = null; 
     otLogWS.onerror = null;
@@ -1069,38 +1031,26 @@ function initOTLogWebSocket(force) {
         otLogWS.close();
       }
     } catch(e) {
-      console.warn('[WebSocket] Error closing existing WebSocket:', e);
     }
     otLogWS = null;
   }
-
-  console.log('[WebSocket] CONNECTING to: ' + wsURL);
   
   try {
     otLogWS = new WebSocket(wsURL);
-    console.log('[WebSocket] WebSocket object created, waiting for connection...');
     
     otLogWS.onopen = function() {
       wsSuccessfulConnections++;
       wsLastConnectTime = new Date();
-      console.log('[WebSocket] ═══════════════════════════════════════');
-      console.log('[WebSocket] CONNECTION ESTABLISHED');
-      console.log('[WebSocket] Total successful connections: ' + wsSuccessfulConnections);
-      console.log('[WebSocket] Connection time: ' + wsLastConnectTime.toISOString());
-      console.log('[WebSocket] ReadyState: ' + otLogWS.readyState + ' (OPEN)');
-      console.log('[WebSocket] ═══════════════════════════════════════');
       
       updateWSStatus(true);
       // Clear any reconnect timer just in case
       if (wsReconnectTimer) {
-        console.log('[WebSocket] Clearing reconnect timer after successful connection');
         clearTimeout(wsReconnectTimer);
         wsReconnectTimer = null;
       }
       // Reset reconnect attempt counter on successful connection
       wsReconnectAttempts = 0;
       
-      console.log('[WebSocket] Starting watchdog timer');
       resetWSWatchdog();
       
       // Start auto-save timer for data persistence
@@ -1120,17 +1070,6 @@ function initOTLogWebSocket(force) {
         wsConnectionDuration = (wsLastDisconnectTime - wsLastConnectTime) / 1000;
       }
       
-      console.log('[WebSocket] ═══════════════════════════════════════');
-      console.log('[WebSocket] CONNECTION CLOSED');
-      console.log('[WebSocket] Close event code: ' + event.code);
-      console.log('[WebSocket] Close reason: ' + (event.reason || 'No reason provided'));
-      console.log('[WebSocket] Clean close: ' + event.wasClean);
-      console.log('[WebSocket] Disconnect time: ' + wsLastDisconnectTime.toISOString());
-      if (wsConnectionDuration > 0) {
-        console.log('[WebSocket] Connection duration: ' + wsConnectionDuration.toFixed(2) + ' seconds');
-      }
-      console.log('[WebSocket] ReadyState: ' + (otLogWS ? otLogWS.readyState : 'null') + ' (CLOSED)');
-      console.log('[WebSocket] ═══════════════════════════════════════');
       
       updateWSStatus(false);
       
@@ -1141,7 +1080,6 @@ function initOTLogWebSocket(force) {
       
       // Stop watchdog
       if (wsWatchdogTimer) {
-        console.log('[WebSocket] Stopping watchdog timer');
         clearTimeout(wsWatchdogTimer);
         wsWatchdogTimer = null;
       }
@@ -1149,55 +1087,31 @@ function initOTLogWebSocket(force) {
       if (!wsReconnectTimer) {
         wsReconnectAttempts++;
         let delay = isFlashing ? 1000 : 5000;
-        console.log('[WebSocket] Scheduling reconnect attempt #' + wsReconnectAttempts + 
-                    ' in ' + (delay/1000) + ' seconds...');
         wsReconnectTimer = setTimeout(function() { initOTLogWebSocket(force); }, delay);
-      } else {
-        console.log('[WebSocket] Reconnect already scheduled, skipping');
       }
     };
     
     otLogWS.onerror = function(error) {
-      console.log('[WebSocket] ═══════════════════════════════════════');
-      console.error('[WebSocket] ERROR OCCURRED');
-      console.error('[WebSocket] Error event:', error);
-      console.error('[WebSocket] Error time: ' + new Date().toISOString());
-      console.error('[WebSocket] ReadyState: ' + (otLogWS ? otLogWS.readyState : 'null'));
-      console.log('[WebSocket] ═══════════════════════════════════════');
-      
       updateWSStatus(false);
       // onclose will usually follow, but we ensure cleanup
       try {
         if (otLogWS && otLogWS.readyState !== WebSocket.CLOSED) {
-          console.log('[WebSocket] Closing connection after error');
           otLogWS.close();
         }
       } catch(e) {
-        console.warn('Error closing WebSocket after error:', e);
       }
     };
     
     otLogWS.onmessage = function(event) {
-      console.log('[WebSocket] Message received (size: ' + 
-                  (event.data ? event.data.length : 0) + ' bytes)');
       resetWSWatchdog();
 
       // Handle keepalive messages (don't log or add to buffer)
       if (typeof event.data === 'string' && event.data.includes('"type":"keepalive"')) {
-        console.log("[WebSocket] Keepalive message received");
         return;
-      }
-
-      // Log the raw incoming message (truncate if very long)
-      if (event.data.length > 200) {
-        console.log("[WebSocket] Data (truncated): " + event.data.substring(0, 200) + "...");
-      } else {
-        console.log("[WebSocket] Data: " + event.data);
       }
 
       if (typeof handleFlashMessage === "function") {
         if (handleFlashMessage(event.data)) {
-          console.log("[WebSocket] Message handled by flash handler");
           return;
         }
       }
@@ -1209,50 +1123,33 @@ function initOTLogWebSocket(force) {
         if (data && typeof data === 'string' && (data.startsWith('{') || data.startsWith('['))) {
           data = JSON.parse(data);
           isObject = true;
-          console.log("[WebSocket] Message parsed as JSON object");
         }
       } catch(e) {
-        console.warn('[WebSocket] JSON parse error:', e);
         // ignore JSON parse error, treat as text
       }
 
       if (!isObject && typeof data === 'string') {
-        console.log("[WebSocket] Parsing as log line");
         const parsed = parseLogLine(data);
         if (parsed) {
-          console.log("[WebSocket] Log line parsed successfully");
           data = parsed;
         }
       }
-
-      console.log("[WebSocket] Adding message to log buffer");
       addLogLine(data);
     };
     
   } catch (e) {
-    console.log('[WebSocket] ═══════════════════════════════════════');
-    console.error('[WebSocket] FAILED TO CREATE WEBSOCKET');
-    console.error('[WebSocket] Exception:', e);
-    console.error('[WebSocket] Exception time: ' + new Date().toISOString());
-    console.log('[WebSocket] ═══════════════════════════════════════');
-    
     updateWSStatus(false);
     if (!wsReconnectTimer) {
       wsReconnectAttempts++;
       let delay = isFlashing ? 1000 : 5000;
-      console.log('[WebSocket] Scheduling reconnect attempt #' + wsReconnectAttempts + 
-                  ' in ' + (delay/1000) + ' seconds after creation failure');
       wsReconnectTimer = setTimeout(function() { initOTLogWebSocket(force); }, delay);
     }
   }
   
   // Setup UI event handlers only once
   if (!otLogControlsInitialized) {
-    console.log('[WebSocket] Setting up OT Log controls (first time)');
     setupOTLogControls();
   }
-  
-  console.log('[WebSocket] initOTLogWebSocket completed');
 }
 
 //============================================================================
