@@ -143,6 +143,8 @@ static const char UpdateServerIndex[] PROGMEM =
          var uploadRetryMaxDelayMs = 15000;
          var wsReconnectAttempts = 0;
          var wsReconnectMaxDelay = 10000;
+        var wsConnectCount = 0;
+        var wsDisconnectCount = 0;
          var flashingInProgress = false;
          var flashStartTime = 0;
          var flashPollingActivated = false;
@@ -680,6 +682,8 @@ static const char UpdateServerIndex[] PROGMEM =
             
             ws.onopen = function() {
               logFlash('WebSocket connected');
+              wsConnectCount += 1;
+              logFlash('WebSocket connect count: ' + wsConnectCount);
                 console.log('WebSocket connected successfully');
                 clearTimeout(wsConnectionTimer);
                 wsReconnectAttempts = 0; // Reset backoff counter on successful connection
@@ -739,6 +743,8 @@ static const char UpdateServerIndex[] PROGMEM =
             };
             
             ws.onclose = function() {
+              wsDisconnectCount += 1;
+              logFlash('WebSocket disconnect count: ' + wsDisconnectCount);
               logFlash('WebSocket closed');
                 console.log('WebSocket closed');
                 clearTimeout(wsConnectionTimer);
@@ -759,6 +765,7 @@ static const char UpdateServerIndex[] PROGMEM =
                 wsReconnectAttempts++;
                 var reconnectDelay = getWsReconnectDelay();
                 console.log('WebSocket will retry in ' + (reconnectDelay/1000) + 's (attempt ' + wsReconnectAttempts + ')');
+                logFlash('WebSocket reconnect scheduled in ' + reconnectDelay + 'ms (attempt ' + wsReconnectAttempts + ')');
                 scheduleWsReconnect(reconnectDelay);
             };
         }

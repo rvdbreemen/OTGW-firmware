@@ -1029,6 +1029,7 @@ function initOTLogWebSocket(force) {
   
   // Increment connection attempt counter
   wsConnectionAttempts++;
+  console.log('[WebSocket] Connection attempt #' + wsConnectionAttempts);
   
   // Close existing connection if it exists
   if (otLogWS) {
@@ -1102,6 +1103,8 @@ function initOTLogWebSocket(force) {
         let delay = isFlashing ? 1000 : 5000;
         console.log('[WebSocket] Reconnect attempt #' + wsReconnectAttempts + ' in ' + delay + 'ms');
         wsReconnectTimer = setTimeout(function() { initOTLogWebSocket(force); }, delay);
+      } else {
+        console.log('[WebSocket] Reconnect already scheduled');
       }
     };
     
@@ -1120,6 +1123,14 @@ function initOTLogWebSocket(force) {
     otLogWS.onmessage = function(event) {
       console.log('[WebSocket] MESSAGE bytes=' + (event.data ? event.data.length : 0));
       resetWSWatchdog();
+
+      if (typeof event.data === 'string') {
+        if (event.data.length > 200) {
+          console.log('[WebSocket] MESSAGE data (truncated): ' + event.data.substring(0, 200) + '...');
+        } else {
+          console.log('[WebSocket] MESSAGE data: ' + event.data);
+        }
+      }
 
       // Handle keepalive messages (don't log or add to buffer)
       if (typeof event.data === 'string' && event.data.includes('"type":"keepalive"')) {
@@ -1162,6 +1173,8 @@ function initOTLogWebSocket(force) {
       let delay = isFlashing ? 1000 : 5000;
       console.log('[WebSocket] Reconnect attempt #' + wsReconnectAttempts + ' in ' + delay + 'ms (create failed)');
       wsReconnectTimer = setTimeout(function() { initOTLogWebSocket(force); }, delay);
+    } else {
+      console.log('[WebSocket] Reconnect already scheduled (create failed)');
     }
   }
   
