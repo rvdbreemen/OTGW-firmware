@@ -122,16 +122,34 @@ static const char UpdateServerIndex[] PROGMEM =
            var checkInterval = setInterval(function() {
              remaining--;
              
-             // Poll root page to check if device is back online
-             fetch('/', { method: 'GET', cache: 'no-store' })
+             // Check health endpoint to verify device is fully booted
+             console.log('[OTA] Health check: GET /api/v1/health?t=' + Date.now());
+             fetch('/api/v1/health?t=' + Date.now(), { 
+               method: 'GET', 
+               cache: 'no-store',
+               headers: { 'Accept': 'application/json' }
+             })
                .then(function(res) {
                  if (res.ok) {
-                   clearInterval(checkInterval);
-                   console.log('[OTA] State: Device is back online, redirecting');
-                   progressText.textContent = 'Device is back online! Redirecting...';
-                   setTimeout(function() {
-                     window.location.href = '/';
-                   }, 1000);
+                   return res.json();
+                 }
+                 throw new Error('HTTP ' + res.status);
+               })
+               .then(function(data) {
+                 console.log('[OTA] Health response: ', JSON.stringify(data, null, 2));
+                 
+                 // Validate health response - just check if status is UP
+                 if (data && data.health && Array.isArray(data.health)) {
+                   var status = data.health.find(function(item) { return item.name === 'status'; });
+                   
+                   if (status && status.value === 'UP') {
+                     clearInterval(checkInterval);
+                     console.log('[OTA] State: Device is healthy, redirecting');
+                     progressText.textContent = 'Device is back online! Redirecting...';
+                     setTimeout(function() {
+                       window.location.href = '/';
+                     }, 1000);
+                   }
                  }
                })
                .catch(function(e) {
@@ -346,16 +364,31 @@ static const char UpdateServerSuccess[] PROGMEM =
          var poller = setInterval(function() {
            remainingSeconds--;
            
-           // Poll root page to check if device is back online
-           fetch('/', { method: 'GET', cache: 'no-store' })
+           // Check health endpoint to verify device is fully booted
+           fetch('/api/v1/health?t=' + Date.now(), { 
+             method: 'GET', 
+             cache: 'no-store',
+             headers: { 'Accept': 'application/json' }
+           })
              .then(function(res) {
                if (res.ok) {
-                 clearInterval(poller);
-                 statusEl.textContent = "Device is back online! Redirecting...";
-                 statusEl.style.color = "green";
-                 setTimeout(function() {
-                   window.location.href = "/";
-                 }, 1000);
+                 return res.json();
+               }
+               throw new Error('HTTP ' + res.status);
+             })
+             .then(function(data) {
+               // Validate health response - just check if status is UP
+               if (data && data.health && Array.isArray(data.health)) {
+                 var status = data.health.find(function(item) { return item.name === 'status'; });
+                 
+                 if (status && status.value === 'UP') {
+                   clearInterval(poller);
+                   statusEl.textContent = "Device is back online! Redirecting...";
+                   statusEl.style.color = "green";
+                   setTimeout(function() {
+                     window.location.href = "/";
+                   }, 1000);
+                 }
                }
              })
              .catch(function(e) {
