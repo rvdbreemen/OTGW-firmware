@@ -148,12 +148,15 @@ static const char UpdateServerIndex[] PROGMEM =
              }
              
              // Try to reach health endpoint
+             var healthUrl = '/api/v1/health?t=' + Date.now();
+             console.log('[OTA] Health check: GET ' + healthUrl);
              var xhr = new XMLHttpRequest();
-             xhr.open('GET', '/api/v1/health?t=' + Date.now(), true);
+             xhr.open('GET', healthUrl, true);
              xhr.timeout = 3000;
              xhr.onload = function() {
                if (xhr.status === 200) {
                  try {
+                   console.log('[OTA] Health response: ' + xhr.responseText);
                    var data = JSON.parse(xhr.responseText);
                    if (data.health && data.health.status === 'UP') {
                      console.log('[OTA] State: Device is UP (after ' + (maxWaitSeconds - remainingSeconds) + ' seconds)');
@@ -334,7 +337,7 @@ static const char UpdateServerIndex[] PROGMEM =
      </html>)";
 
 static const char UpdateServerSuccess[] PROGMEM = 
-  R"(<html charset="UTF-8">
+  R"SUCCESS(<html charset="UTF-8">
       <head>
       <script>
         (function() {
@@ -388,17 +391,22 @@ static const char UpdateServerSuccess[] PROGMEM =
          }
          
          function checkHealth() {
-            fetch('/api/v1/health?t=' + Date.now(), { 
+            var healthUrl = '/api/v1/health?t=' + Date.now();
+            console.log('[OTA] Health check: GET ' + healthUrl);
+            fetch(healthUrl, { 
               method: 'GET', 
               cache: 'no-store',
               timeout: 5000
             })
             .then(function(res) {
               if (!res.ok) throw new Error('HTTP ' + res.status);
-              return res.json();
+              return res.text();
             })
-            .then(function(d) {
-              var s = d.status || (d.health && d.health.status);
+            .then(function(text) {
+              console.log('[OTA] Health response: ' + text);
+              var d = null;
+              try { d = JSON.parse(text); } catch (e) { d = null; }
+              var s = d && (d.status || (d.health && d.health.status));
               if (s === 'UP') {
                 startRedirectCountdown();
               }
@@ -421,8 +429,8 @@ static const char UpdateServerSuccess[] PROGMEM =
              window.location.href = "/";
            }
          }, 1000);
-     </script>
-     </html>)";
+    </script>
+    </html>)SUCCESS";
      
 
 #endif // UPDATESERVERHTML_H
