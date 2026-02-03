@@ -159,6 +159,14 @@ static const char UpdateServerIndex[] PROGMEM =
         var uploadStartMs = 0;
         var uploadLastRateMs = 0;
         var uploadLastRateBytes = 0;
+        var flashLogStartMs = Date.now();
+        var flashOfflineGraceMs = 60000;
+        var flashAssumeSuccessMinMs = 5000;
+        var lastFlashStateTime = 0;
+        var offlineCountdownStart = 0;
+        var offlineCountdownTimer = null;
+        var offlineCountdownDurationMs = 60000;
+        var offlineCountdownStartDelayMs = 5000;
 
         logFlash('Flash UI initialized');
 
@@ -180,10 +188,13 @@ static const char UpdateServerIndex[] PROGMEM =
 
          function logFlash(message, detail) {
            try {
+            var nowMs = Date.now();
+            var relMs = nowMs - flashLogStartMs;
+            var prefix = '[+' + relMs + 'ms]';
              if (typeof detail !== 'undefined') {
-               console.log('[Flash]', message, detail);
+              console.log('[Flash]', prefix, message, detail);
              } else {
-               console.log('[Flash]', message);
+              console.log('[Flash]', prefix, message);
              }
            } catch (e) {}
          }
@@ -391,10 +402,16 @@ static const char UpdateServerIndex[] PROGMEM =
                flashStartTime = Date.now();
                console.log('Flash operation started, activating enhanced monitoring');
              }
+             lastFlashStateTime = Date.now();
            } else if (state === 'end' || state === 'error' || state === 'abort') {
              flashingInProgress = false;
              flashPollingActivated = false;
            }
+           if (offlineCountdownTimer) {
+             clearInterval(offlineCountdownTimer);
+             offlineCountdownTimer = null;
+           }
+           offlineCountdownStart = 0;
           if (state !== 'idle') {
             showProgressPage('Flashing in progress');
           }
@@ -483,6 +500,21 @@ static const char UpdateServerIndex[] PROGMEM =
              if (successPanel && !successShown) successPanel.style.display = 'none';
              if (retryBtn) retryBtn.style.display = 'none';
            }
+
+           // If device rebooted and status resets to idle, assume success when upload finished
+           if (state === 'idle' && localUploadDone && !successShown && flashStartTime > 0) {
+             var elapsed = Date.now() - flashStartTime;
+             if (elapsed >= flashAssumeSuccessMinMs) {
+               logFlash('Device returned with idle status after flash; assuming success');
+               progressTitle.textContent = 'Flashing complete';
+               successShown = true;
+               if (successPanel) successPanel.style.display = 'block';
+               if (successMessageEl) successMessageEl.textContent = 'Flashing successful. Rebooting device...';
+               startSuccessCountdown();
+               stopPolling();
+               flashingInProgress = false;
+             }
+           }
          }
 
          function fetchStatus(timeoutMs) {
@@ -505,6 +537,7 @@ static const char UpdateServerIndex[] PROGMEM =
                logFlash('Status fetch OK: ' + (json.state || 'n/a') + (json.target ? (' target=' + json.target) : '') +
                         ' flash=' + (json.flash_written || 0) + '/' + (json.flash_total || 0));
                updateDeviceStatus(json);
+               return true;
              })
              .catch(function(e) {
                // Safari-specific: AbortError handling
@@ -512,19 +545,25 @@ static const char UpdateServerIndex[] PROGMEM =
                // This is normal during flash operations when device is busy
                if (e && e.name === 'AbortError') {
                  // During flash, AbortError is expected - device is busy writing
-                 if (flashingInProgress) {
+                 if (flashingInProgress || localUploadDone) {
                    console.log('Fetch aborted during flash (expected) - device is busy');
                    logFlash('Status fetch aborted during flash (expected)');
-                   return; // Don't treat as error
+                   if (flashInfoEl && localUploadDone) {
+                     flashInfoEl.textContent = 'Device busy writing flash... waiting for reboot';
+                   }
+                   return false; // Don't treat as error
                  }
                  console.log('Fetch aborted - may indicate timeout');
                  logFlash('Status fetch aborted');
                } else if (e && e.message && e.message.indexOf('NetworkError') !== -1) {
                  // Network errors can occur during flash when device is overloaded
-                 if (flashingInProgress) {
+                 if (flashingInProgress || localUploadDone) {
                    console.log('Network error during flash (expected) - device is busy');
                    logFlash('Status fetch network error during flash (expected)');
-                   return; // Don't treat as error
+                   if (flashInfoEl && localUploadDone) {
+                     flashInfoEl.textContent = 'Device busy writing flash... waiting for reboot';
+                   }
+                   return false; // Don't treat as error
                  }
                  console.log('Network error:', e.message);
                  logFlash('Status fetch network error: ' + e.message);
@@ -535,6 +574,7 @@ static const char UpdateServerIndex[] PROGMEM =
                  // Propagate non-routine errors so polling logic can react
                  throw e;
                }
+               return false;
              });
          }
 
@@ -548,21 +588,56 @@ static const char UpdateServerIndex[] PROGMEM =
           pollTimer = setTimeout(runPoll, delayMs);
         }
 
+        function updateOfflineCountdown(nowMs) {
+          if (!flashingInProgress && !localUploadDone) return;
+          if (lastDeviceStatusTime > 0 && (nowMs - lastDeviceStatusTime) < offlineCountdownStartDelayMs) {
+            return;
+          }
+          if (offlineCountdownStart === 0) {
+            offlineCountdownStart = nowMs;
+            logFlash('No status received, starting offline countdown');
+          }
+          if (!offlineCountdownTimer) {
+            offlineCountdownTimer = setInterval(function() {
+              var now = Date.now();
+              var elapsed = now - offlineCountdownStart;
+              var remainingMs = Math.max(0, offlineCountdownDurationMs - elapsed);
+              var remainingSec = Math.ceil(remainingMs / 1000);
+              if (flashInfoEl) {
+                flashInfoEl.textContent = 'No response from device. Waiting up to ' + remainingSec + 's...';
+              }
+              if (remainingMs <= 0) {
+                clearInterval(offlineCountdownTimer);
+                offlineCountdownTimer = null;
+              }
+            }, 1000);
+          }
+        }
+
         function runPoll() {
           if (!pollActive || pollInFlight) return;
           pollTimer = null;
           pollInFlight = true;
           // During flash operations, ESP is busy writing - use longer timeout to prevent aborts
-          // When upload is in flight or device is actively flashing, allow up to 5 seconds
-          var baseTimeout = (uploadInFlight || (lastUploadTotal > 0 && !localUploadDone)) ? 5000 : pollIntervalMs * 4;
+          // When upload is in flight or device is actively flashing, allow up to 60 seconds
+          var isFlashWait = uploadInFlight || flashingInProgress || localUploadDone || (lastUploadTotal > 0 && !localUploadDone);
+          var baseTimeout = isFlashWait ? 60000 : pollIntervalMs * 4;
           var timeoutMs = Math.max(500, baseTimeout);
           fetchStatus(timeoutMs)
-            .then(function() {
-              var next = Math.max(pollMinMs, Math.floor(pollIntervalMs / 2));
-              if (next !== pollIntervalMs) {
-                logFlash('Polling interval decreased to ' + next + 'ms');
+            .then(function(ok) {
+              if (ok) {
+                var next = Math.max(pollMinMs, Math.floor(pollIntervalMs / 2));
+                if (next !== pollIntervalMs) {
+                  logFlash('Polling interval decreased to ' + next + 'ms');
+                }
+                pollIntervalMs = next;
+              } else {
+                var nextWait = Math.min(pollMaxMs, Math.max(pollIntervalMs, 2000));
+                if (nextWait !== pollIntervalMs) {
+                  logFlash('Polling interval held at ' + nextWait + 'ms (device busy)');
+                }
+                pollIntervalMs = nextWait;
               }
-              pollIntervalMs = next;
             })
             .catch(function() {
               var next = Math.min(pollMaxMs, pollIntervalMs * 2);
@@ -572,6 +647,7 @@ static const char UpdateServerIndex[] PROGMEM =
               pollIntervalMs = next;
             })
             .finally(function() {
+              updateOfflineCountdown(Date.now());
               pollInFlight = false;
               scheduleNextPoll(pollIntervalMs);
             });

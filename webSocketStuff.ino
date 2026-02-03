@@ -57,15 +57,15 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
   switch(type) {
     case WStype_DISCONNECTED:
       wsClientCount = (wsClientCount > 0) ? (wsClientCount - 1) : 0;
-      DebugTf(PSTR("WebSocket[%u] disconnected. Clients: %u\r\n"), num, wsClientCount);
+      DebugTf(PSTR("[%lu] WebSocket[%u] disconnected. Clients: %u\r\n"), millis(), num, wsClientCount);
       break;
       
     case WStype_CONNECTED:
       {
         // Check client limit before accepting connection
         if (wsClientCount >= MAX_WEBSOCKET_CLIENTS) {
-          DebugTf(PSTR("WebSocket[%u]: Max clients (%u) reached, rejecting connection\r\n"), 
-                  num, MAX_WEBSOCKET_CLIENTS);
+          DebugTf(PSTR("[%lu] WebSocket[%u]: Max clients (%u) reached, rejecting connection\r\n"), 
+            millis(), num, MAX_WEBSOCKET_CLIENTS);
           webSocket.disconnect(num);
           return;
         }
@@ -73,22 +73,23 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
         // Check heap health before accepting connection
         // Use WARNING threshold to be conservative
         if (ESP.getFreeHeap() < HEAP_WARNING_THRESHOLD) {
-          DebugTf(PSTR("WebSocket[%u]: Low heap (%u bytes), rejecting connection\r\n"), 
-                  num, ESP.getFreeHeap());
+          DebugTf(PSTR("[%lu] WebSocket[%u]: Low heap (%u bytes), rejecting connection\r\n"), 
+            millis(), num, ESP.getFreeHeap());
           webSocket.disconnect(num);
           return;
         }
         
         IPAddress ip = webSocket.remoteIP(num);
         wsClientCount++;
-        DebugTf(PSTR("WebSocket[%u] connected from %d.%d.%d.%d. Clients: %u\r\n"), 
-          num, ip[0], ip[1], ip[2], ip[3], wsClientCount);
+        DebugTf(PSTR("[%lu] WebSocket[%u] connected from %d.%d.%d.%d. Clients: %u\r\n"), 
+          millis(), num, ip[0], ip[1], ip[2], ip[3], wsClientCount);
       }
       break;
       
     case WStype_TEXT:
       // Handle incoming text from client (currently not used, but available for future commands)
-      DebugTf(PSTR("WebSocket[%u] received text (%u bytes)\r\n"), num, static_cast<unsigned>(length));
+      DebugTf(PSTR("[%lu] WebSocket[%u] received text (%u bytes)\r\n"),
+              millis(), num, static_cast<unsigned>(length));
       break;
       
     case WStype_BIN:
@@ -96,7 +97,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
       break;
       
     case WStype_ERROR:
-      DebugTf(PSTR("WebSocket[%u] error\r\n"), num);
+      DebugTf(PSTR("[%lu] WebSocket[%u] error\r\n"), millis(), num);
       break;
       
     case WStype_FRAGMENT_TEXT_START:
@@ -108,12 +109,12 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
       
     case WStype_PING:
       // Ping/pong handled automatically by library
-      DebugTf(PSTR("WebSocket[%u] ping\r\n"), num);
+      DebugTf(PSTR("[%lu] WebSocket[%u] ping\r\n"), millis(), num);
       break;
       
     case WStype_PONG:
       // Ping/pong handled automatically by library
-      DebugTf(PSTR("WebSocket[%u] pong\r\n"), num);
+      DebugTf(PSTR("[%lu] WebSocket[%u] pong\r\n"), millis(), num);
       break;
   }
 }
@@ -124,7 +125,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 //===========================================================================================
 void sendWebSocketJSON(const char *json) {
   if (wsClientCount > 0) {
-    Debugf(PSTR("WebSocket broadcast JSON (%u bytes)\r\n"), static_cast<unsigned>(strlen(json)));
+    Debugf(PSTR("[%lu] WebSocket broadcast JSON (%u bytes)\r\n"),
+           millis(), static_cast<unsigned>(strlen(json)));
     webSocket.broadcastTXT(json);
   }
 }
@@ -142,7 +144,7 @@ void startWebSocket() {
   webSocket.enableHeartbeat(15000, 3000, 2);
   
   wsInitialized = true;
-  DebugTln(F("WebSocket server started on port 81 with heartbeat enabled"));
+  Debugf(PSTR("[%lu] WebSocket server started on port 81 with heartbeat enabled\r\n"), millis());
 }
 
 //===========================================================================================

@@ -96,10 +96,16 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
       if(_username != emptyString && _password != emptyString && !_server->authenticate(_username.c_str(), _password.c_str()))
         return _server->requestAuthentication();
       if (_serial_output) {
-
+        unsigned long statusStartMs = millis();
+        Debugf(PSTR("[%lu] Status request start heap=%u bytes\r\n"),
+               statusStartMs, static_cast<unsigned>(ESP.getFreeHeap()));
         if (::isESPFlashing) {
           DebugTln(F("Update status requested during flash (polling active)"));
         }
+        _sendStatusJson();
+        Debugf(PSTR("[%lu] Status request end duration=%lu ms\r\n"),
+               millis(), static_cast<unsigned long>(millis() - statusStartMs));
+        return;
       }
       _sendStatusJson();
     });
@@ -122,6 +128,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _server->send_P(200, PSTR("text/html"), _serverSuccess);
         _server->client().stop();
         // Reboot for BOTH firmware and filesystem
+        if (_serial_output) {
+          Debugf(PSTR("[%lu] OTA POST complete, rebooting...\r\n"), millis());
+        }
         delay(1000);
         ESP.restart();
         delay(3000);
@@ -298,7 +307,18 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           _setStatus(UPDATE_ERROR, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, _updaterError);
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
-        if(Update.end(true)){ //true to set the size to the current progress
+        if (_serial_output) {
+          Debugf(PSTR("[%lu] Update end begin\r\n"), millis());
+        }
+        bool updateOk = Update.end(true); //true to set the size to the current progress
+        if (_serial_output) {
+          if (updateOk) {
+            Debugf(PSTR("[%lu] Update end OK\r\n"), millis());
+          } else {
+            Debugf(PSTR("[%lu] Update end FAILED\r\n"), millis());
+          }
+        }
+        if(updateOk){
           _status.upload_received = upload.totalSize;
           if (_status.upload_total == 0 && upload.totalSize > 0) {
             _status.upload_total = upload.totalSize;
