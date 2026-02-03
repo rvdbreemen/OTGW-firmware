@@ -189,6 +189,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
 
         if (upload.name == F("filesystem")) {
           if (_serial_output) {
+            DebugTln(F("[OTA] State: UPLOAD_FILE_START for filesystem"));
             DebugTln(F("Update target: filesystem"));
           }
           size_t fsSize = ((size_t) &_FS_end - (size_t) &_FS_start);
@@ -216,6 +217,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         } else {
           uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
           if (_serial_output) {
+            DebugTln(F("[OTA] State: UPLOAD_FILE_START for firmware"));
             DebugTln(F("Update target: firmware"));
             Debugf(PSTR("Max sketch space: %u bytes\r\n"), static_cast<unsigned>(maxSketchSpace));
           }
@@ -236,7 +238,15 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           }
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
-        if (_serial_output) {Debug("."); blinkLEDnow(LED1);}
+        if (_serial_output) {
+          Debug("."); 
+          blinkLEDnow(LED1);
+          static bool firstChunk = true;
+          if (firstChunk) {
+            DebugTln(F("\r\n[OTA] State: UPLOAD_FILE_WRITE - receiving data chunks"));
+            firstChunk = false;
+          }
+        }
 
         // Feed the dog on every chunk (Main branch behavior)
         Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
@@ -308,6 +318,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
         if (_serial_output) {
+          Debugf(PSTR("\r\n[%lu] [OTA] State: UPLOAD_FILE_END - finalizing flash\r\n"), millis());
           Debugf(PSTR("[%lu] Update end begin\r\n"), millis());
         }
         bool updateOk = Update.end(true); //true to set the size to the current progress
@@ -341,17 +352,19 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
               // The ESP8266 continues running the current firmware and RAM remains intact.
               // All settings loaded at boot (global variables like settingHostname, etc.)
               // are still valid in RAM, so we write them back to the fresh filesystem.
+              if (_serial_output) Debugln(F("\r\n[OTA] State: LittleFS mounted successfully, restoring settings from RAM"));
               writeSettings(true);
-              if (_serial_output) Debugln(F("\r\nFilesystem update complete; settings restored from memory"));
+              if (_serial_output) Debugln(F("[OTA] State: Settings write complete; filesystem update successful"));
             } else {
               // Ensure state is explicitly false and log failure for diagnostics
               LittleFSmounted = false;
-              if (_serial_output) Debugln(F("LittleFS mount failed after filesystem OTA update"));
+              if (_serial_output) Debugln(F("[OTA] Error: LittleFS mount failed after filesystem flash - settings NOT restored"));
             }
           }
           
           if (_serial_output) {
-            Debugln(F("Rebooting..."));
+            Debugln(F("[OTA] State: Flash successful, preparing to reboot"));
+            Debugf(PSTR("[OTA] Final heap: %u bytes\r\n"), static_cast<unsigned>(ESP.getFreeHeap()));
             DebugFlush();  // Ensure debug output is sent before reboot
           }
 
@@ -368,7 +381,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         //   OTGWSerial.setDebugOutput(false);
       } else if(_authenticated && upload.status == UPLOAD_FILE_ABORTED){
         Update.end();
-        if (_serial_output) Debugln(F("Update was aborted"));
+        if (_serial_output) Debugln(F("[OTA] State: UPLOAD_FILE_ABORTED - update cancelled"));
         _status.upload_received = upload.totalSize;
         if (_status.upload_total == 0 && upload.totalSize > 0) {
           _status.upload_total = upload.totalSize;
