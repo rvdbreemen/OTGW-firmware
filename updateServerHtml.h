@@ -114,19 +114,36 @@ static const char UpdateServerIndex[] PROGMEM =
          };
          
          function waitForDeviceReboot() {
-           var maxAttempts = 60; // 60 seconds
-           var remainingSeconds = maxAttempts;
-           var redirectCountdown = 5;
+           var maxWaitSeconds = 60;
+           var remainingSeconds = maxWaitSeconds;
+           var isRedirecting = false;
            
            console.log('[OTA] State: Waiting for device reboot');
            progressText.textContent = 'Waiting for device restart... (' + remainingSeconds + 's)';
            progressBar.style.width = '100%';
            
+           function startRedirectCountdown() {
+             if (isRedirecting) return;
+             isRedirecting = true;
+             console.log('[OTA] State: Starting redirect countdown (5 seconds)');
+             var remaining = 5;
+             progressText.textContent = 'Device is online! Redirecting in ' + remaining + ' seconds...';
+             var countdownInterval = setInterval(function() {
+               remaining--;
+               if (remaining <= 0) {
+                 console.log('[OTA] State: Redirecting to /');
+                 clearInterval(countdownInterval);
+                 window.location.href = '/';
+                 return;
+               }
+               progressText.textContent = 'Device is online! Redirecting in ' + remaining + ' seconds...';
+             }, 1000);
+           }
+           
            var checkInterval = setInterval(function() {
              remainingSeconds--;
-             
-             // Update countdown display
-             if (remainingSeconds > 0) {
+             if (!isRedirecting) {
+               if (remainingSeconds < 0) remainingSeconds = 0;
                progressText.textContent = 'Waiting for device restart... (' + remainingSeconds + 's)';
              }
              
@@ -138,21 +155,10 @@ static const char UpdateServerIndex[] PROGMEM =
                if (xhr.status === 200) {
                  try {
                    var data = JSON.parse(xhr.responseText);
-                   if (data.status === 'UP') {
-                     console.log('[OTA] State: Device is UP (after ' + (maxAttempts - remainingSeconds) + ' seconds)');
+                   if (data.health && data.health.status === 'UP') {
+                     console.log('[OTA] State: Device is UP (after ' + (maxWaitSeconds - remainingSeconds) + ' seconds)');
                      clearInterval(checkInterval);
-                     
-                     // Start 5-second countdown before redirect
-                     console.log('[OTA] State: Starting redirect countdown (5 seconds)');
-                     var countdownInterval = setInterval(function() {
-                       progressText.textContent = 'Device is online! Redirecting in ' + redirectCountdown + ' seconds...';
-                       redirectCountdown--;
-                       if (redirectCountdown < 0) {
-                         console.log('[OTA] State: Redirecting to /');
-                         clearInterval(countdownInterval);
-                         window.location.href = '/';
-                       }
-                     }, 1000);
+                     startRedirectCountdown();
                    }
                  } catch (e) {}
                }
@@ -161,8 +167,7 @@ static const char UpdateServerIndex[] PROGMEM =
              xhr.ontimeout = function() {};
              xhr.send();
              
-             // Countdown reached 0 - redirect anyway
-             if (remainingSeconds <= 0) {
+             if (remainingSeconds <= 0 && !isRedirecting) {
                console.log('[OTA] State: Countdown reached 0, redirecting to /');
                clearInterval(checkInterval);
                progressText.textContent = 'Redirecting...';
@@ -264,6 +269,7 @@ static const char UpdateServerIndex[] PROGMEM =
                  if (ev.lengthComputable) {
                    var pct = Math.round((ev.loaded / ev.total) * 100);
                    if (pct > 100) pct = 100;
+                   console.log('[OTA] Progress: ' + pct + '% (' + ev.loaded + '/' + ev.total + ')');
                    progressBar.style.width = pct + '%';
                    progressText.textContent = 'Uploading: ' + pct + '% (' + formatBytes(ev.loaded) + ' / ' + formatBytes(ev.total) + ')';
                  }
@@ -355,14 +361,31 @@ static const char UpdateServerSuccess[] PROGMEM =
       <br/>
       <br/>Wait for the OTGW firmware to reboot and start the HTTP server
       <br/>
-      <br/><span id="status" style="font-weight:bold; color: #666;">Waiting for device...</span>
+      <br/><span id="status" style="font-weight:bold; color: #666;">Waiting for device... (60s)</span>
       <br/>
-      <br/>Wait <span style='font-size: 1.3em;' id="waitSeconds">60</span> seconds ..
-      <br>If nothing happend, then wait for count down to zero and then refresh with <span style='font-size:1.3em;'><b><a href="/">this link here</a></b></span>!
+      <br/>If nothing happens, refresh with <span style='font-size:1.3em;'><b><a href="/">this link here</a></b></span>.
       </body>
       <script>
-         var seconds = 60;
+         var remainingSeconds = 60;
+         var isRedirecting = false;
          var statusEl = document.getElementById("status");
+         
+         function startRedirectCountdown() {
+            if (isRedirecting) return;
+            isRedirecting = true;
+            var remaining = 5;
+            statusEl.textContent = "Device is UP! Redirecting in " + remaining + " seconds...";
+            statusEl.style.color = "green";
+            var redirectTimer = setInterval(function() {
+              remaining--;
+              if (remaining <= 0) {
+                clearInterval(redirectTimer);
+                window.location.href = "/";
+                return;
+              }
+              statusEl.textContent = "Device is UP! Redirecting in " + remaining + " seconds...";
+            }, 1000);
+         }
          
          function checkHealth() {
             fetch('/api/v1/health?t=' + Date.now(), { 
@@ -377,9 +400,7 @@ static const char UpdateServerSuccess[] PROGMEM =
             .then(function(d) {
               var s = d.status || (d.health && d.health.status);
               if (s === 'UP') {
-                statusEl.textContent = "Device is UP! Redirecting...";
-                statusEl.style.color = "green";
-                window.location.href = "/";
+                startRedirectCountdown();
               }
             })
             .catch(function(e) {
@@ -387,13 +408,17 @@ static const char UpdateServerSuccess[] PROGMEM =
             });
          }
 
-         var countdown = setInterval(function() {
-           seconds--;
-           document.getElementById('waitSeconds').textContent = seconds;
+         var poller = setInterval(function() {
+           remainingSeconds--;
+           if (!isRedirecting && statusEl) {
+             if (remainingSeconds < 0) remainingSeconds = 0;
+             statusEl.textContent = "Waiting for device... (" + remainingSeconds + "s)";
+             statusEl.style.color = "#666";
+           }
            checkHealth();
-           if (seconds <= 0) {
-              clearInterval(countdown);
-              window.location.href = "/";
+           if (remainingSeconds <= 0 && !isRedirecting) {
+             clearInterval(poller);
+             window.location.href = "/";
            }
          }, 1000);
      </script>
