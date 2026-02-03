@@ -27,8 +27,16 @@ static const char UpdateServerIndex[] PROGMEM =
         #updatePanel { margin-top: 10px; padding: 15px; background: #e8f4ff; border: 1px solid #7aaad6; color: black; }
         html.dark #updatePanel { background: #333; border: 1px solid #555; color: white; }
         
-        progress { width: 100%; height: 24px; margin: 8px 0; }
-        .status-text { font-size: 1.1em; font-weight: bold; margin: 12px 0; }
+        /* Progress bar container */
+        #progressContainer { position: relative; width: 100%; height: 40px; background-color: #e0e0e0; border: 1px solid #999; border-radius: 4px; margin: 12px 0; overflow: hidden; }
+        html.dark #progressContainer { background-color: #444; border-color: #666; }
+        
+        /* Progress bar fill */
+        #progressBar { height: 100%; background-color: #2196F3; transition: width 0.3s ease; width: 0%; }
+        
+        /* Progress text overlay */
+        #progressText { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: #000; text-shadow: 0 0 3px rgba(255,255,255,0.8); }
+        html.dark #progressText { color: #fff; text-shadow: 0 0 3px rgba(0,0,0,0.8); }
         
         #updateError { color: #b00020; font-weight: bold; margin: 12px 0; }
         html.dark #updateError { color: #ff5555; }
@@ -66,8 +74,10 @@ static const char UpdateServerIndex[] PROGMEM =
        <div id='updatePanel'>
          <div>File: <strong><span id='updateFilename'>-</span></strong></div>
          <div>Target: <strong><span id='updateTarget'>-</span></strong></div>
-         <div class="status-text" id='statusText'>Preparing...</div>
-         <progress id='mainProgress' value='0' max='100'></progress>
+         <div id='progressContainer'>
+           <div id='progressBar'></div>
+           <div id='progressText'>Preparing...</div>
+         </div>
          <div id='updateError'></div>
          <button id='retryButton' onclick='retryFlash()' style='display:none;'>Try Again</button>
        </div>
@@ -81,8 +91,8 @@ static const char UpdateServerIndex[] PROGMEM =
          var pageProgress = document.getElementById('pageProgress');
          var fileEl = document.getElementById('updateFilename');
          var targetEl = document.getElementById('updateTarget');
-         var statusText = document.getElementById('statusText');
-         var progressBar = document.getElementById('mainProgress');
+         var progressBar = document.getElementById('progressBar');
+         var progressText = document.getElementById('progressText');
          var errorEl = document.getElementById('updateError');
          var retryBtn = document.getElementById('retryButton');
          var formErrorEl = document.getElementById('formError');
@@ -109,15 +119,15 @@ static const char UpdateServerIndex[] PROGMEM =
            var redirectCountdown = 5;
            
            console.log('[OTA] State: Waiting for device reboot');
-           statusText.textContent = 'Waiting for device restart... (' + remainingSeconds + 's)';
-           progressBar.value = 100;
+           progressText.textContent = 'Waiting for device restart... (' + remainingSeconds + 's)';
+           progressBar.style.width = '100%';
            
            var checkInterval = setInterval(function() {
              remainingSeconds--;
              
              // Update countdown display
              if (remainingSeconds > 0) {
-               statusText.textContent = 'Waiting for device restart... (' + remainingSeconds + 's)';
+               progressText.textContent = 'Waiting for device restart... (' + remainingSeconds + 's)';
              }
              
              // Try to reach health endpoint
@@ -135,7 +145,7 @@ static const char UpdateServerIndex[] PROGMEM =
                      // Start 5-second countdown before redirect
                      console.log('[OTA] State: Starting redirect countdown (5 seconds)');
                      var countdownInterval = setInterval(function() {
-                       statusText.textContent = 'Device is online! Redirecting in ' + redirectCountdown + ' seconds...';
+                       progressText.textContent = 'Device is online! Redirecting in ' + redirectCountdown + ' seconds...';
                        redirectCountdown--;
                        if (redirectCountdown < 0) {
                          console.log('[OTA] State: Redirecting to /');
@@ -155,7 +165,7 @@ static const char UpdateServerIndex[] PROGMEM =
              if (remainingSeconds <= 0) {
                console.log('[OTA] State: Countdown reached 0, redirecting to /');
                clearInterval(checkInterval);
-               statusText.textContent = 'Redirecting...';
+               progressText.textContent = 'Redirecting...';
                window.location.href = '/';
              }
            }, 1000);
@@ -195,8 +205,8 @@ static const char UpdateServerIndex[] PROGMEM =
              showProgressPage();
              fileEl.textContent = input.files[0].name || '-';
              targetEl.textContent = targetName;
-             progressBar.value = 0;
-             statusText.textContent = 'Preparing upload...';
+             progressBar.style.width = '0%';
+             progressText.textContent = 'Preparing upload...';
              errorEl.textContent = '';
              
              if (!window.FormData || !window.XMLHttpRequest) {
@@ -212,7 +222,7 @@ static const char UpdateServerIndex[] PROGMEM =
                var chk = document.getElementById('chkPreserve');
                if (chk && chk.checked) {
                  console.log('[OTA] State: Downloading settings backup before filesystem flash');
-                 statusText.textContent = 'Downloading settings backup...';
+                 progressText.textContent = 'Downloading settings backup...';
                  preFlight = fetch('/settings.ini')
                    .then(function(resp) { return resp.blob(); })
                    .then(function(blob) {
@@ -254,8 +264,8 @@ static const char UpdateServerIndex[] PROGMEM =
                  if (ev.lengthComputable) {
                    var pct = Math.round((ev.loaded / ev.total) * 100);
                    if (pct > 100) pct = 100;
-                   progressBar.value = pct;
-                   statusText.textContent = 'Uploading: ' + pct + '% (' + formatBytes(ev.loaded) + ' / ' + formatBytes(ev.total) + ')';
+                   progressBar.style.width = pct + '%';
+                   progressText.textContent = 'Uploading: ' + pct + '% (' + formatBytes(ev.loaded) + ' / ' + formatBytes(ev.total) + ')';
                  }
                };
                
@@ -263,24 +273,24 @@ static const char UpdateServerIndex[] PROGMEM =
                  if (xhr.status >= 200 && xhr.status < 300) {
                    var responseText = xhr.responseText || '';
                    if (responseText.indexOf('Flash error') !== -1) {
-                     statusText.textContent = 'Flash error';
+                     progressText.textContent = 'Flash error';
                      errorEl.textContent = responseText;
                      retryBtn.style.display = 'block';
                    } else {
                      // Upload complete at 100%
                      console.log('[OTA] State: Upload complete at 100%, backend is flashing');
-                     progressBar.value = 100;
-                     statusText.textContent = 'Flashing...';
+                     progressBar.style.width = '100%';
+                     progressText.textContent = 'Flashing...';
                      
                      // Wait a moment for flash to complete
                      setTimeout(function() {
                        console.log('[OTA] State: Flash complete, device rebooting');
-                       statusText.textContent = 'Done! Device rebooting...';
+                       progressText.textContent = 'Done! Device rebooting...';
                        waitForDeviceReboot();
                      }, 2000);
                    }
                  } else {
-                   statusText.textContent = 'Upload failed';
+                   progressText.textContent = 'Upload failed';
                    errorEl.textContent = 'Upload failed: HTTP ' + xhr.status;
                    retryBtn.style.display = 'block';
                  }
@@ -288,14 +298,14 @@ static const char UpdateServerIndex[] PROGMEM =
                
                xhr.ontimeout = function() {
                  console.error('[OTA] Error: Upload timeout after 5 minutes');
-                 statusText.textContent = 'Upload timeout';
+                 progressText.textContent = 'Upload timeout';
                  errorEl.textContent = 'Connection timeout - flash may still be in progress. Wait 60 seconds and check device manually.';
                  retryBtn.style.display = 'block';
                };
                
                xhr.onerror = function() {
                  console.error('[OTA] Error: Upload connection lost');
-                 statusText.textContent = 'Upload error';
+                 progressText.textContent = 'Upload error';
                  errorEl.textContent = 'Upload connection lost - flash may still be in progress. Wait 60 seconds and check device manually.';
                  retryBtn.style.display = 'block';
                };
@@ -304,7 +314,7 @@ static const char UpdateServerIndex[] PROGMEM =
                xhr.send(new FormData(form));
              }).catch(function(e) {
                console.error('[OTA] Error: Upload cancelled or pre-flight failed', e);
-               statusText.textContent = 'Cancelled';
+               progressText.textContent = 'Cancelled';
                errorEl.textContent = 'Cancelled';
                retryBtn.style.display = 'block';
              });
