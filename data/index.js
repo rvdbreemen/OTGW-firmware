@@ -3869,10 +3869,14 @@ function loadPersistentUI() {
 }
 
 //============================================================================
-// Edit sensor label functionality
+// Edit sensor label functionality - Non-blocking modal dialog
 //============================================================================
+var currentSensorAddress = null; // Track which sensor is being edited
+
 function editSensorLabel(address) {
   if (!address || address.length !== 16) return;
+  
+  currentSensorAddress = address;
   
   // Get current label
   var currentLabel = address; // Default to hex address
@@ -3883,17 +3887,82 @@ function editSensorLabel(address) {
     currentLabel = data[labelKey].value;
   }
   
-  var newLabel = prompt('Enter custom label for sensor (max 16 characters):\nAddress: ' + address, currentLabel);
+  // Populate modal
+  var modal = document.getElementById('sensorLabelModal');
+  var addressSpan = document.getElementById('modalSensorAddress');
+  var labelInput = document.getElementById('modalSensorLabel');
+  var errorDiv = document.getElementById('modalError');
   
-  if (newLabel === null) return; // User cancelled
-  
-  // Trim and validate
-  newLabel = newLabel.trim().substring(0, 16);
-  
-  if (newLabel.length === 0) {
-    alert('Label cannot be empty');
+  if (!modal || !addressSpan || !labelInput || !errorDiv) {
+    console.error('Modal elements not found');
     return;
   }
+  
+  addressSpan.textContent = address;
+  labelInput.value = currentLabel;
+  errorDiv.style.display = 'none';
+  
+  // Show modal
+  modal.style.display = 'flex';
+  
+  // Focus input field
+  setTimeout(function() {
+    labelInput.focus();
+    labelInput.select();
+  }, 100);
+  
+  // Handle Enter key to save
+  labelInput.onkeydown = function(e) {
+    if (e.key === 'Enter') {
+      saveSensorLabelFromModal();
+    } else if (e.key === 'Escape') {
+      closeSensorLabelModal();
+    }
+  };
+}
+
+function closeSensorLabelModal() {
+  var modal = document.getElementById('sensorLabelModal');
+  var errorDiv = document.getElementById('modalError');
+  
+  if (modal) {
+    modal.style.display = 'none';
+  }
+  
+  if (errorDiv) {
+    errorDiv.style.display = 'none';
+  }
+  
+  currentSensorAddress = null;
+}
+
+function saveSensorLabelFromModal() {
+  if (!currentSensorAddress) return;
+  
+  var labelInput = document.getElementById('modalSensorLabel');
+  var errorDiv = document.getElementById('modalError');
+  
+  if (!labelInput || !errorDiv) return;
+  
+  var newLabel = labelInput.value.trim();
+  
+  // Validate
+  if (newLabel.length === 0) {
+    errorDiv.textContent = 'Label cannot be empty';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  if (newLabel.length > 16) {
+    newLabel = newLabel.substring(0, 16);
+  }
+  
+  // Disable buttons during save
+  var saveBtn = document.querySelector('.btn-save');
+  var cancelBtn = document.querySelector('.btn-cancel');
+  
+  if (saveBtn) saveBtn.disabled = true;
+  if (cancelBtn) cancelBtn.disabled = true;
   
   // Send update to server
   fetch(APIGW + 'v1/sensors/label', {
@@ -3902,7 +3971,7 @@ function editSensorLabel(address) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      address: address,
+      address: currentSensorAddress,
       label: newLabel
     })
   })
@@ -3915,15 +3984,26 @@ function editSensorLabel(address) {
   .then(function(json) {
     if (json.success) {
       console.log('Sensor label updated:', newLabel);
+      // Close modal
+      closeSensorLabelModal();
       // Refresh the display to show new label
       refreshOTmonitor();
     } else {
-      alert('Failed to update label: ' + (json.error || 'Unknown error'));
+      errorDiv.textContent = 'Failed to update label: ' + (json.error || 'Unknown error');
+      errorDiv.style.display = 'block';
+      // Re-enable buttons
+      if (saveBtn) saveBtn.disabled = false;
+      if (cancelBtn) cancelBtn.disabled = false;
     }
   })
   .catch(function(error) {
     console.error('Error updating sensor label:', error);
-    alert('Failed to update label: ' + error.message);
+    errorDiv.textContent = 'Failed to update label: ' + error.message;
+    errorDiv.style.display = 'block';
+    // Re-enable buttons
+    if (saveBtn) saveBtn.disabled = false;
+    if (cancelBtn) cancelBtn.disabled = false;
   });
 }
+
 
