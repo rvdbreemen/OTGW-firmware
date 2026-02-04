@@ -67,13 +67,16 @@ def parse_version_file(path):
             "_VERSION_MINOR",
             "_VERSION_PATCH",
             "_VERSION_BUILD",
-            "_VERSION_PRERELEASE",
         )
         if key not in version_info
     ]
     if missing:
         logging.error("Missing version keys in %s: %s", path, ", ".join(missing))
         sys.exit(1)
+    
+    # _VERSION_PRERELEASE is optional; default to empty string if missing
+    if "_VERSION_PRERELEASE" not in version_info:
+        version_info["_VERSION_PRERELEASE"] = ""
 
     logging.info("Version info: %s", version_info)
     return version_info

@@ -1,0 +1,168 @@
+Config file written to: D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml
+
+Downloading index: package_index.tar.bz2 0 B / 94.38 KiB    0.00%
+Downloading index: package_index.tar.bz2 downloaded
+
+Downloading index: package_esp8266com_index.json 0 B / 115.24 KiB    0.00%
+Downloading index: package_esp8266com_index.json downloaded
+Platform esp8266:esp8266@2.7.4 already installed
+
+Downloading index: library_index.tar.bz2 0 B / 3.73 MiB    0.00%
+Downloading index: library_index.tar.bz2 downloaded
+Already installed WiFiManager@2.0.15-rc.1
+Already installed ArduinoJson@6.17.2
+Already installed PubSubClient@2.8.0
+Already installed TelnetStream@1.2.4
+Already installed AceCommon@1.6.2
+Already installed AceSorting@1.0.0
+Already installed AceSorting@1.0.0
+Already installed AceTime@2.0.1
+Already installed AceCommon@1.6.2
+Already installed OneWire@2.3.8
+Already installed OneWire@2.3.8
+Already installed DallasTemperature@3.9.0
+Already installed WebSockets@2.3.5
+INFO: Parsing version file: src/OTGW-firmware/version.h
+INFO: Version info: {'_VERSION_MAJOR': '1', '_VERSION_MINOR': '0', '_VERSION_PATCH': '0', '_VERSION_BUILD': '2519', '_VERSION_PRERELEASE': 'rc7'}
+FQBN: esp8266:esp8266:d1_mini:xtal=160
+Using board 'd1_mini' from platform in folder: D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4
+Using core 'esp8266' from platform in folder: D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4
+
+Detecting libraries used...
+D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\tools\xtensa-lx106-elf-gcc\2.5.0-4-b40a506/bin/xtensa-lx106-elf-g++ -D__ets__ -DICACHE_FLASH -U__STRICT_ANSI__ -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/include -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/lwip2/include -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/libc/xtensa-lx106-elf/include -IC:\Users\rvdbr\AppData\Local\arduino\sketches\18A90143A65D92A1423036B2F6677E16/core -c -w -Os -g -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++11 -ffunction-sections -fdata-sections -fno-exceptions -w -x c++ -E -CC -DNONOSDK22x_190703=1 -DF_CPU=160000000L -DLWIP_OPEN_SRC -DTCP_MSS=536 -DLWIP_FEATURES=1 -DLWIP_IPV6=0 -DARDUINO=10607 -DARDUINO_ESP8266_WEMOS_D1MINI -DARDUINO_ARCH_ESP8266 -DARDUINO_BOARD="ESP8266_WEMOS_D1MINI" -DFLASHMODE_DIO -DNO_GLOBAL_HTTPUPDATE -DESP8266 -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\cores\esp8266 -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\variants\d1_mini C:\Users\rvdbr\AppData\Local\arduino\sketches\18A90143A65D92A1423036B2F6677E16\sketch\OTGW-firmware.ino.cpp -o nul
+Alternatives for AceTime.h: [AceTime@2.0.1]
+ResolveLibrary(AceTime.h)
+  -> candidates: [AceTime@2.0.1]
+D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\tools\xtensa-lx106-elf-gcc\2.5.0-4-b40a506/bin/xtensa-lx106-elf-g++ -D__ets__ -DICACHE_FLASH -U__STRICT_ANSI__ -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/include -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/lwip2/include -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/libc/xtensa-lx106-elf/include -IC:\Users\rvdbr\AppData\Local\arduino\sketches\18A90143A65D92A1423036B2F6677E16/core -c -w -Os -g -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++11 -ffunction-sections -fdata-sections -fno-exceptions -w -x c++ -E -CC -DNONOSDK22x_190703=1 -DF_CPU=160000000L -DLWIP_OPEN_SRC -DTCP_MSS=536 -DLWIP_FEATURES=1 -DLWIP_IPV6=0 -DARDUINO=10607 -DARDUINO_ESP8266_WEMOS_D1MINI -DARDUINO_ARCH_ESP8266 -DARDUINO_BOARD="ESP8266_WEMOS_D1MINI" -DFLASHMODE_DIO -DNO_GLOBAL_HTTPUPDATE -DESP8266 -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\cores\esp8266 -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\variants\d1_mini -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceTime\src C:\Users\rvdbr\AppData\Local\arduino\sketches\18A90143A65D92A1423036B2F6677E16\sketch\OTGW-firmware.ino.cpp -o nul
+Alternatives for AceCommon.h: [AceCommon@1.6.2]
+ResolveLibrary(AceCommon.h)
+  -> candidates: [AceCommon@1.6.2]
+D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\tools\xtensa-lx106-elf-gcc\2.5.0-4-b40a506/bin/xtensa-lx106-elf-g++ -D__ets__ -DICACHE_FLASH -U__STRICT_ANSI__ -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/include -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/lwip2/include -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/libc/xtensa-lx106-elf/include -IC:\Users\rvdbr\AppData\Local\arduino\sketches\18A90143A65D92A1423036B2F6677E16/core -c -w -Os -g -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++11 -ffunction-sections -fdata-sections -fno-exceptions -w -x c++ -E -CC -DNONOSDK22x_190703=1 -DF_CPU=160000000L -DLWIP_OPEN_SRC -DTCP_MSS=536 -DLWIP_FEATURES=1 -DLWIP_IPV6=0 -DARDUINO=10607 -DARDUINO_ESP8266_WEMOS_D1MINI -DARDUINO_ARCH_ESP8266 -DARDUINO_BOARD="ESP8266_WEMOS_D1MINI" -DFLASHMODE_DIO -DNO_GLOBAL_HTTPUPDATE -DESP8266 -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\cores\esp8266 -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\variants\d1_mini -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceTime\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceCommon\src C:\Users\rvdbr\AppData\Local\arduino\sketches\18A90143A65D92A1423036B2F6677E16\sketch\OTGW-firmware.ino.cpp -o nul
+Alternatives for AceSorting.h: [AceSorting@1.0.0]
+ResolveLibrary(AceSorting.h)
+  -> candidates: [AceSorting@1.0.0]
+D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\tools\xtensa-lx106-elf-gcc\2.5.0-4-b40a506/bin/xtensa-lx106-elf-g++ -D__ets__ -DICACHE_FLASH -U__STRICT_ANSI__ -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/include -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/lwip2/include -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/libc/xtensa-lx106-elf/include -IC:\Users\rvdbr\AppData\Local\arduino\sketches\18A90143A65D92A1423036B2F6677E16/core -c -w -Os -g -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++11 -ffunction-sections -fdata-sections -fno-exceptions -w -x c++ -E -CC -DNONOSDK22x_190703=1 -DF_CPU=160000000L -DLWIP_OPEN_SRC -DTCP_MSS=536 -DLWIP_FEATURES=1 -DLWIP_IPV6=0 -DARDUINO=10607 -DARDUINO_ESP8266_WEMOS_D1MINI -DARDUINO_ARCH_ESP8266 -DARDUINO_BOARD="ESP8266_WEMOS_D1MINI" -DFLASHMODE_DIO -DNO_GLOBAL_HTTPUPDATE -DESP8266 -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\cores\esp8266 -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\variants\d1_mini -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceTime\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceCommon\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceSorting\src C:\Users\rvdbr\AppData\Local\arduino\sketches\18A90143A65D92A1423036B2F6677E16\sketch\OTGW-firmware.ino.cpp -o nul
+Alternatives for TelnetStream.h: [TelnetStream@1.2.4]
+ResolveLibrary(TelnetStream.h)
+  -> candidates: [TelnetStream@1.2.4]
+D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\tools\xtensa-lx106-elf-gcc\2.5.0-4-b40a506/bin/xtensa-lx106-elf-g++ -D__ets__ -DICACHE_FLASH -U__STRICT_ANSI__ -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/include -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/lwip2/include -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/libc/xtensa-lx106-elf/include -IC:\Users\rvdbr\AppData\Local\arduino\sketches\18A90143A65D92A1423036B2F6677E16/core -c -w -Os -g -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++11 -ffunction-sections -fdata-sections -fno-exceptions -w -x c++ -E -CC -DNONOSDK22x_190703=1 -DF_CPU=160000000L -DLWIP_OPEN_SRC -DTCP_MSS=536 -DLWIP_FEATURES=1 -DLWIP_IPV6=0 -DARDUINO=10607 -DARDUINO_ESP8266_WEMOS_D1MINI -DARDUINO_ARCH_ESP8266 -DARDUINO_BOARD="ESP8266_WEMOS_D1MINI" -DFLASHMODE_DIO -DNO_GLOBAL_HTTPUPDATE -DESP8266 -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\cores\esp8266 -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\variants\d1_mini -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceTime\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceCommon\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceSorting\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\TelnetStream\src C:\Users\rvdbr\AppData\Local\arduino\sketches\18A90143A65D92A1423036B2F6677E16\sketch\OTGW-firmware.ino.cpp -o nul
+Alternatives for ESP8266WiFi.h: [ESP8266WiFi@1.0]
+ResolveLibrary(ESP8266WiFi.h)
+  -> candidates: [ESP8266WiFi@1.0]
+D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\tools\xtensa-lx106-elf-gcc\2.5.0-4-b40a506/bin/xtensa-lx106-elf-g++ -D__ets__ -DICACHE_FLASH -U__STRICT_ANSI__ -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/include -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/lwip2/include -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/libc/xtensa-lx106-elf/include -IC:\Users\rvdbr\AppData\Local\arduino\sketches\18A90143A65D92A1423036B2F6677E16/core -c -w -Os -g -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++11 -ffunction-sections -fdata-sections -fno-exceptions -w -x c++ -E -CC -DNONOSDK22x_190703=1 -DF_CPU=160000000L -DLWIP_OPEN_SRC -DTCP_MSS=536 -DLWIP_FEATURES=1 -DLWIP_IPV6=0 -DARDUINO=10607 -DARDUINO_ESP8266_WEMOS_D1MINI -DARDUINO_ARCH_ESP8266 -DARDUINO_BOARD="ESP8266_WEMOS_D1MINI" -DFLASHMODE_DIO -DNO_GLOBAL_HTTPUPDATE -DESP8266 -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\cores\esp8266 -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\variants\d1_mini -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceTime\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceCommon\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceSorting\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\TelnetStream\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\libraries\ESP8266WiFi\src C:\Users\rvdbr\AppData\Local\arduino\sketches\18A90143A65D92A1423036B2F6677E16\sketch\OTGW-firmware.ino.cpp -o nul
+Alternatives for ArduinoJson.h: [ArduinoJson@6.17.2]
+ResolveLibrary(ArduinoJson.h)
+  -> candidates: [ArduinoJson@6.17.2]
+D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\tools\xtensa-lx106-elf-gcc\2.5.0-4-b40a506/bin/xtensa-lx106-elf-g++ -D__ets__ -DICACHE_FLASH -U__STRICT_ANSI__ -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/include -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/lwip2/include -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/libc/xtensa-lx106-elf/include -IC:\Users\rvdbr\AppData\Local\arduino\sketches\18A90143A65D92A1423036B2F6677E16/core -c -w -Os -g -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++11 -ffunction-sections -fdata-sections -fno-exceptions -w -x c++ -E -CC -DNONOSDK22x_190703=1 -DF_CPU=160000000L -DLWIP_OPEN_SRC -DTCP_MSS=536 -DLWIP_FEATURES=1 -DLWIP_IPV6=0 -DARDUINO=10607 -DARDUINO_ESP8266_WEMOS_D1MINI -DARDUINO_ARCH_ESP8266 -DARDUINO_BOARD="ESP8266_WEMOS_D1MINI" -DFLASHMODE_DIO -DNO_GLOBAL_HTTPUPDATE -DESP8266 -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\cores\esp8266 -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\variants\d1_mini -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceTime\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceCommon\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceSorting\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\TelnetStream\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\libraries\ESP8266WiFi\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\ArduinoJson\src C:\Users\rvdbr\AppData\Local\arduino\sketches\18A90143A65D92A1423036B2F6677E16\sketch\OTGW-firmware.ino.cpp -o nul
+Alternatives for Wire.h: [Wire@1.0]
+ResolveLibrary(Wire.h)
+  -> candidates: [Wire@1.0]
+In file included from D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\src\OTGW-firmware\OTGW-firmware.ino:29:0:
+D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\src\OTGW-firmware\OTGW-firmware.h:26:97: fatal error: OTGWSerial/OTGWSerial.h: No such file or directory
+ #include <OTGWSerial/OTGWSerial.h>         // Bron Schelte's Serial class - it upgrades and more
+                                                                                                 ^
+compilation terminated.
+D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\tools\xtensa-lx106-elf-gcc\2.5.0-4-b40a506/bin/xtensa-lx106-elf-g++ -D__ets__ -DICACHE_FLASH -U__STRICT_ANSI__ -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/include -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/lwip2/include -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4/tools/sdk/libc/xtensa-lx106-elf/include -IC:\Users\rvdbr\AppData\Local\arduino\sketches\18A90143A65D92A1423036B2F6677E16/core -c -w -Os -g -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++11 -ffunction-sections -fdata-sections -fno-exceptions -w -x c++ -E -CC -DNONOSDK22x_190703=1 -DF_CPU=160000000L -DLWIP_OPEN_SRC -DTCP_MSS=536 -DLWIP_FEATURES=1 -DLWIP_IPV6=0 -DARDUINO=10607 -DARDUINO_ESP8266_WEMOS_D1MINI -DARDUINO_ARCH_ESP8266 -DARDUINO_BOARD="ESP8266_WEMOS_D1MINI" -DFLASHMODE_DIO -DNO_GLOBAL_HTTPUPDATE -DESP8266 -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\cores\esp8266 -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\variants\d1_mini -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceTime\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceCommon\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceSorting\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\TelnetStream\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\libraries\ESP8266WiFi\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\ArduinoJson\src -ID:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\libraries\Wire C:\Users\rvdbr\AppData\Local\arduino\sketches\18A90143A65D92A1423036B2F6677E16\sketch\OTGW-firmware.ino.cpp -o nul
+Alternatives for OTGWSerial/OTGWSerial.h: []
+ResolveLibrary(OTGWSerial/OTGWSerial.h)
+  -> candidates: []
+Error during build: exit status 1
+
+[92mUsed library[0m [92mVersion[0m [90mPath[0m
+[93mAceTime[0m      2.0.1   [90mD:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceTime[0m
+[93mAceCommon[0m    1.6.2   [90mD:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceCommon[0m
+[93mAceSorting[0m   1.0.0   [90mD:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\AceSorting[0m
+[93mTelnetStream[0m 1.2.4   [90mD:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\TelnetStream[0m
+[93mESP8266WiFi[0m  1.0     [90mD:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\libraries\ESP8266WiFi[0m
+[93mArduinoJson[0m  6.17.2  [90mD:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\libraries\ArduinoJson[0m
+[93mWire[0m         1.0     [90mD:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4\libraries\Wire[0m
+
+[92mUsed platform[0m   [92mVersion[0m [90mPath[0m
+[93mesp8266:esp8266[0m 2.7.4   [90mD:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\packages\esp8266\hardware\esp8266\2.7.4[0m
+Γ£ù ERROR: Command failed: arduino-cli compile --fqbn esp8266:esp8266:d1_mini:eesz=4M2M,xtal=160 --warnings default --verbose --build-property compiler.cpp.extra_flags="-DNO_GLOBAL_HTTPUPDATE" --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml --output-dir D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\build D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\src\OTGW-firmware
+
+============================================================
+  OTGW-firmware Local Build Script
+============================================================
+
+Γä╣ Detected system: Windows (AMD64)
+
+============================================================
+[STEP] Checking Python version
+============================================================
+
+Γ£ô Python 3.14.2
+
+============================================================
+[STEP] Checking for arduino-cli
+============================================================
+
+Γä╣ Running: arduino-cli version
+Γ£ô arduino-cli found at C:\Users\rvdbr\AppData\Local\Arduino15\bin\arduino-cli.exe
+Γä╣ Added C:\Users\rvdbr\AppData\Local\Arduino15\bin to PATH for this build session
+
+============================================================
+[STEP] Configuring arduino-cli
+============================================================
+
+Γä╣ Running: arduino-cli config init --dest-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml --overwrite
+Γä╣ Running: arduino-cli config set directories.data D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml
+Γä╣ Running: arduino-cli config set board_manager.additional_urls https://github.com/esp8266/Arduino/releases/download/2.7.4/package_esp8266com_index.json --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml
+Γä╣ Running: arduino-cli config set directories.downloads D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\staging --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml
+Γä╣ Running: arduino-cli config set directories.user D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml
+Γä╣ Running: arduino-cli config set sketch.always_export_binaries true --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml
+Γä╣ Running: arduino-cli config set library.enable_unsafe_install true --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml
+
+============================================================
+[STEP] Installing dependencies
+============================================================
+
+Γä╣ Updating core index...
+Γä╣ Running: arduino-cli --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml core update-index
+Γä╣ Installing ESP8266 core...
+Γä╣ Running: arduino-cli --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml core install esp8266:esp8266
+Γä╣ Updating library index...
+Γä╣ Running: arduino-cli --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml lib update-index
+Γä╣ Installing WiFiManager@2.0.15-rc.1...
+Γä╣ Running: arduino-cli --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml lib install WiFiManager@2.0.15-rc.1
+Γä╣ Installing ArduinoJson@6.17.2...
+Γä╣ Running: arduino-cli --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml lib install ArduinoJson@6.17.2
+Γä╣ Installing pubsubclient@2.8.0...
+Γä╣ Running: arduino-cli --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml lib install pubsubclient@2.8.0
+Γä╣ Installing TelnetStream@1.2.4...
+Γä╣ Running: arduino-cli --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml lib install TelnetStream@1.2.4
+Γä╣ Installing AceCommon@1.6.2...
+Γä╣ Running: arduino-cli --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml lib install AceCommon@1.6.2
+Γä╣ Installing AceSorting@1.0.0...
+Γä╣ Running: arduino-cli --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml lib install AceSorting@1.0.0
+Γä╣ Installing AceTime@2.0.1...
+Γä╣ Running: arduino-cli --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml lib install AceTime@2.0.1
+Γä╣ Installing OneWire@2.3.8...
+Γä╣ Running: arduino-cli --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml lib install OneWire@2.3.8
+Γä╣ Installing DallasTemperature@3.9.0...
+Γä╣ Running: arduino-cli --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml lib install DallasTemperature@3.9.0
+Γä╣ Installing WebSockets@2.3.5...
+Γä╣ Running: arduino-cli --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml lib install WebSockets@2.3.5
+
+============================================================
+[STEP] Updating version information
+============================================================
+
+Γä╣ Running: git rev-parse --short=7 HEAD
+Γä╣ Running: C:\Users\rvdbr\AppData\Local\Programs\Python\Python314\python.exe D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\scripts\autoinc-semver.py D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware --filename src/OTGW-firmware/version.h --githash bfc17a4
+Γ£ô Version information updated
+Γä╣ Building version: 1.0.0-rc7+bfc17a4
+
+============================================================
+[STEP] Preparing build directory
+============================================================
+
+Γä╣ Cleaning existing build directory...
+Γ£ô Build directory cleaned
+Γ£ô Build directory ready: D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\build
+
+============================================================
+[STEP] Building firmware
+============================================================
+
+Γä╣ Running: arduino-cli compile --fqbn esp8266:esp8266:d1_mini:eesz=4M2M,xtal=160 --warnings default --verbose --build-property compiler.cpp.extra_flags="-DNO_GLOBAL_HTTPUPDATE" --config-file D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\arduino\arduino-cli.yaml --output-dir D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\build D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware\src\OTGW-firmware
