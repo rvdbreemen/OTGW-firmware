@@ -241,6 +241,8 @@ var OTGraph = {
                 if (!this.sensorAddressToId[key]) {
                     var sensorIndex = this.detectedSensors.length;
                     var sensorId = 'sensor_' + sensorIndex;
+                    // User-facing labels are 1-based for readability (Sensor 1, 2, 3...)
+                    // Internal IDs remain 0-based for array indexing (sensor_0, sensor_1, sensor_2...)
                     var sensorLabel = 'Sensor ' + (sensorIndex + 1) + ' (' + key.substring(0, 8) + ')';
                     
                     // Register the sensor
