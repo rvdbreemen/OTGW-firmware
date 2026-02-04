@@ -271,17 +271,11 @@ static const char UpdateServerIndex[] PROGMEM =
                      errorEl.textContent = responseText;
                      retryBtn.style.display = 'block';
                    } else {
-                     // Upload complete at 100%
-                     console.log('[OTA] State: Upload complete at 100%, backend is flashing');
+                     // Backend returns 200 only after flash is complete
+                     console.log('[OTA] State: Flash complete (backend confirmed), device rebooting');
                      progressBar.style.width = '100%';
-                     progressText.textContent = 'Flashing...';
-                     
-                     // Wait a moment for flash to complete
-                     setTimeout(function() {
-                       console.log('[OTA] State: Flash complete, device rebooting');
-                       progressText.textContent = 'Done! Device rebooting...';
-                       waitForDeviceReboot();
-                     }, 2000);
+                     progressText.textContent = 'Flash complete! Device rebooting...';
+                     waitForDeviceReboot();
                    }
                  } else {
                    progressText.textContent = 'Upload failed';
