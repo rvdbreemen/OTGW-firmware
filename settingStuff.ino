@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v1.0.0-rc6
+**  Version  : v1.0.0-rc7
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -15,16 +15,17 @@ void writeSettings(bool show)
 {
 
   //let's use JSON to write the setting file
-  DebugTf(PSTR("Writing to [%s] ..\r\n"), SETTINGS_FILE);
+  DebugTf(PSTR("[Settings] State: writeSettings called (show=%s)\r\n"), show ? "true" : "false");
+  DebugTf(PSTR("[Settings] Writing to [%s] ..\r\n"), SETTINGS_FILE);
   File file = LittleFS.open(SETTINGS_FILE, "w"); // open for reading and writing
   if (!file) 
   {
-    DebugTf(PSTR("open(%s, 'w') FAILED!!! --> Bailout\r\n"), SETTINGS_FILE);
+    DebugTf(PSTR("[Settings] Error: open(%s, 'w') FAILED!!! --> Bailout\r\n"), SETTINGS_FILE);
     return;
   }
   yield();
 
-  DebugT(F("Start writing setting data "));
+  DebugT(F("[Settings] State: Serializing settings to JSON... "));
 
   //const size_t capacity = JSON_OBJECT_SIZE(6);  // save more setting, grow # of objects accordingly
   DynamicJsonDocument doc(1536);
@@ -69,9 +70,13 @@ void writeSettings(bool show)
   root[F("GPIOOUTPUTStriggerBit")] = settingGPIOOUTPUTStriggerBit;
 
   serializeJsonPretty(root, file);
-  if (show)  serializeJsonPretty(root, TelnetStream); //Debug stream ;-)
-  Debugln(F("\r\n... done!"));
-  file.close();  
+  if (show) {
+    DebugTln(F("\r\n[Settings] JSON content:"));
+    serializeJsonPretty(root, TelnetStream); //Debug stream ;-)
+  }
+  Debugln(F("\r\n[Settings] State: File write complete, closing file"));
+  file.close();
+  DebugTf(PSTR("[Settings] State: Settings saved successfully to %s\r\n"), SETTINGS_FILE);  
 
 } // writeSettings()
 

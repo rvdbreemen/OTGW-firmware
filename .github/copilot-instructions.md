@@ -9,7 +9,7 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
 **IMPORTANT:** This project maintains Architecture Decision Records (ADRs) that document key architectural choices. Before making changes that affect architecture, consult the relevant ADRs:
 
 - **Platform & Architecture:** See `docs/adr/` directory for complete ADR index
-- **Key decisions documented:** ESP8266 platform, modular .ino files, HTTP-only (no HTTPS), static buffers, PROGMEM strings, WebSocket streaming, MQTT integration, timer-based scheduling, LittleFS persistence, hardware watchdog, PIC firmware upgrade, Arduino framework, build system, NTP/timezone, command queue, WiFiManager, ArduinoJson
+- **Key decisions documented:** ESP8266 platform, modular .ino files, HTTP-only (no HTTPS), static buffers, PROGMEM strings, WebSocket streaming (OpenTherm messages only), MQTT integration, timer-based scheduling, LittleFS persistence, hardware watchdog, PIC firmware upgrade, Arduino framework, build system, NTP/timezone, command queue, WiFiManager, ArduinoJson, simplified OTA flash (XHR-based, see ADR-029)
 - **ADR Index:** `docs/adr/README.md` provides navigation and decision summaries
 - **When to create ADRs:** For decisions with long-term architectural impact
 - **Reference ADRs:** Link from code comments to relevant ADRs for context
@@ -547,10 +547,16 @@ Before implementing or modifying frontend features, verify browser support:
 
 - API versioning: `/api/v0/` (legacy), `/api/v1/` (standard), and `/api/v2/` (optimized)
 - OTGW commands: POST/PUT to `/api/v1/otgw/command/{command}`
-- Check system health: `/api/v1/health` (Returns `status: UP` and system vital signs)
+- Check system health: `/api/v1/health` (Returns JSON map with health metrics)
+  - Response format: `{"health": {"status": "UP", "uptime": "...", "heap": 12345, ...}}`
+  - Access values via map: `data.health.status`, `data.health.heap`, etc.
+  - **Map format** - use simple object property access
+- Device time: `/api/v0/devtime` (Returns JSON array with time data)
+  - Response format: `{"devtime": [{"name": "dateTime", "value": "..."}, {"name": "epoch", "value": 123}, ...]}`
+  - **Array format** - use `.find()` or array iteration
 - Commands use the same queue as MQTT commands
 - **Reboot Verification**: WebUI must check `/api/v1/health` to confirm the device is back online.
-  - Expected response includes `status: UP` and `picavailable: true`.
+  - Validate with: `data.health && data.health.status === 'UP'`
 
 ### Build and Test
 
@@ -561,11 +567,11 @@ Before implementing or modifying frontend features, verify browser support:
   - Build script auto-installs arduino-cli if missing
 - **Flash firmware**: `python flash_esp.py` (downloads and flashes latest release)
   - Flash from local build: `python flash_esp.py --build`
-  - See [FLASH_GUIDE.md](FLASH_GUIDE.md) for detailed instructions
+  - See [FLASH_GUIDE.md](../docs/FLASH_GUIDE.md) for detailed instructions
 - **Evaluate code quality**: `python evaluate.py`
   - Quick check: `python evaluate.py --quick`
   - Generate report: `python evaluate.py --report`
-  - See [EVALUATION.md](EVALUATION.md) for evaluation framework details
+  - See [EVALUATION.md](../docs/EVALUATION.md) for evaluation framework details
 - **Build artifacts**: Located in `build/` directory with versioned filenames
 - **CI/CD**: Uses GitHub Actions with the same Makefile
 - **Always test on actual hardware when possible** (ESP8266 behavior can differ from simulation)
@@ -601,8 +607,8 @@ Before implementing or modifying frontend features, verify browser support:
 ## Documentation
 
 - User-facing documentation lives in the wiki: https://github.com/rvdbreemen/OTGW-firmware/wiki
-- Build instructions: `BUILD.md`
-- Flash instructions: `FLASH_GUIDE.md`
+- Build instructions: `docs/BUILD.md`
+- Flash instructions: `docs/FLASH_GUIDE.md`
 - Update README.md for significant feature changes
 - Keep release notes format consistent (see README.md)
 - **OpenTherm Protocol**:
@@ -740,7 +746,7 @@ docs/reviews/
 
 ### Tools and References
 
-- Use evaluation framework: `python evaluate.py` (see EVALUATION.md)
+- Use evaluation framework: `python evaluate.py` (see docs/EVALUATION.md)
 - Follow coding standards documented in this file
 - Reference previous reviews for consistency
 - Link to related PRs and commits in documentation
@@ -825,4 +831,4 @@ Comprehensive code quality analysis tool:
   - Verifies header guards in .h files
   - Validates build system health
 - **Exit codes**: Non-zero if any FAIL results (CI/CD integration)
-- See [EVALUATION.md](EVALUATION.md) for detailed documentation
+- See [docs/EVALUATION.md](../docs/EVALUATION.md) for detailed documentation

@@ -2,7 +2,9 @@
 
 **Status:** Accepted  
 **Date:** 2019-06-01 (Estimated)  
-**Updated:** 2026-01-28 (Documentation)
+**Updated:** 2026-02-04 (OTA Flash Note)
+
+**Note:** As of ADR-029 (2026-02-04), OTA firmware flash no longer uses WebSocket for progress updates. WebSocket is now used exclusively for OpenTherm message streaming.
 
 ## Context
 
