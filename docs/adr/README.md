@@ -15,7 +15,8 @@ Architecture Decision Records capture important architectural decisions along wi
 - [Integration](#integration-and-communication) (2 ADRs)
 - [Core Systems](#system-architecture) (6 ADRs)
 - [Features & Extensions](#features-and-extensions) (6 ADRs)
-- [Browser & Client](#browser-and-client-compatibility) (3 ADRs) **NEW**
+- [Browser & Client](#browser-and-client-compatibility) (3 ADRs)
+- [OTA & Updates](#ota-and-firmware-updates) (1 ADR) **NEW**
 
 **Foundational ADRs** (most referenced by other ADRs):
 - **ADR-001:** ESP8266 Platform Selection (establishes hardware constraints)
@@ -117,6 +118,9 @@ Architecture Decision Records capture important architectural decisions along wi
 
 - **[ADR-027: Version Mismatch Warning System in Web UI](ADR-027-version-mismatch-warning-system.md)**  
   Prominent visual warning banner that automatically appears when firmware and filesystem versions don't match to prevent user confusion.
+
+- **[ADR-029: Simple XHR-Based OTA Flash (KISS Principle)](ADR-029-simple-xhr-ota-flash.md)** 🆕  
+  Simplified firmware flash mechanism using XHR with backend confirmation, eliminating WebSocket complexity and Safari bugs. Reduces code by 68.5% while improving reliability.
 
 ## ADR Template
 
