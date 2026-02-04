@@ -63,12 +63,33 @@ var OTGraph = {
         }
     },
 
+    // Color palettes for Dallas temperature sensors (up to 16 sensors)
+    sensorColorPalettes: {
+        light: [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+            '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B195', '#C06C84',
+            '#6C5B7B', '#355C7D', '#2A9D8F', '#E76F51', '#F4A261',
+            '#E9C46A'
+        ],
+        dark: [
+            '#FF8787', '#5FE3D9', '#5BC8E8', '#FFB59A', '#ADE8D8',
+            '#FFE66D', '#D1A5E6', '#A0D6F2', '#FFD1B5', '#D688A4',
+            '#8677A1', '#4A7BA7', '#3EBFB0', '#FF8C71', '#FFB881',
+            '#FFD78A'
+        ]
+    },
+    
+    // Track discovered temperature sensors
+    detectedSensors: [],
+    sensorAddressToId: {}, // Map sensor hex address to internal ID
+
     // 5 separate grids/graphs
     // 0: Flame (Digital)
     // 1: DHW Mode (Digital)
     // 2: CH Mode (Digital)
     // 3: Modulation (Analog 0-100)
     // 4: Temperature (Analog)
+    // Base series configuration (sensors are added dynamically)
     seriesConfig: [
         { id: 'flame',   label: 'Flame',    gridIndex: 0, type: 'line', step: 'start', areaStyle: { opacity: 0.3 }, large: true, sampling: 'lttb' },
         { id: 'dhwMode', label: 'DHW Mode', gridIndex: 1, type: 'line', step: 'start', areaStyle: { opacity: 0.3 }, large: true, sampling: 'lttb' },
@@ -189,6 +210,100 @@ var OTGraph = {
         }, this.updateInterval);
         
         this.initialized = true;
+    },
+
+    // Detect and register Dallas temperature sensors from API data
+    detectAndRegisterSensors: function(apiData) {
+        if (!apiData || typeof apiData !== 'object') return;
+        
+        var newSensors = [];
+        var sensorCount = 0;
+        
+        // Check if numberofsensors field exists
+        if (apiData.numberofsensors && apiData.numberofsensors.value) {
+            sensorCount = parseInt(apiData.numberofsensors.value, 10);
+        }
+        
+        if (sensorCount === 0 || isNaN(sensorCount)) return;
+        
+        // Find all sensor entries (hex addresses starting with typical Dallas patterns)
+        for (var key in apiData) {
+            if (!apiData.hasOwnProperty(key)) continue;
+            
+            // Dallas sensor addresses are 16-char hex strings (8 bytes in hex)
+            // They typically start with 28 (DS18B20), 10 (DS18S20), or 22 (DS1822)
+            if (typeof key === 'string' && 
+                key.length === 16 && 
+                /^[0-9A-Fa-f]{16}$/.test(key) &&
+                (key.startsWith('28') || key.startsWith('10') || key.startsWith('22'))) {
+                
+                // Check if this sensor is already registered
+                if (!this.sensorAddressToId[key]) {
+                    var sensorIndex = this.detectedSensors.length;
+                    var sensorId = 'sensor_' + sensorIndex;
+                    var sensorLabel = 'Sensor ' + (sensorIndex + 1) + ' (' + key.substring(0, 8) + ')';
+                    
+                    // Register the sensor
+                    this.sensorAddressToId[key] = sensorId;
+                    this.detectedSensors.push({
+                        address: key,
+                        id: sensorId,
+                        index: sensorIndex,
+                        label: sensorLabel
+                    });
+                    
+                    // Add to series config
+                    this.seriesConfig.push({
+                        id: sensorId,
+                        label: sensorLabel,
+                        gridIndex: 4, // Add to temperature grid
+                        type: 'line',
+                        step: false,
+                        large: true,
+                        sampling: 'lttb'
+                    });
+                    
+                    // Initialize data arrays
+                    this.data[sensorId] = [];
+                    this.pendingData[sensorId] = [];
+                    
+                    // Add color to palettes
+                    var colorIndex = sensorIndex % 16; // Cycle through 16 colors
+                    this.palettes.light[sensorId] = this.sensorColorPalettes.light[colorIndex];
+                    this.palettes.dark[sensorId] = this.sensorColorPalettes.dark[colorIndex];
+                    
+                    newSensors.push(sensorLabel);
+                    
+                    console.log('Graph: Registered temperature sensor:', sensorLabel, 'Address:', key);
+                }
+            }
+        }
+        
+        // If new sensors were added, update the chart
+        if (newSensors.length > 0) {
+            console.log('Graph: Added', newSensors.length, 'new temperature sensor(s) to graph');
+            this.updateOption();
+        }
+    },
+
+    // Process sensor data from API response
+    processSensorData: function(apiData, timestamp) {
+        if (!apiData || typeof apiData !== 'object') return;
+        
+        for (var key in apiData) {
+            if (!apiData.hasOwnProperty(key)) continue;
+            
+            // Check if this is a registered sensor
+            var sensorId = this.sensorAddressToId[key];
+            if (sensorId && apiData[key] && typeof apiData[key].value === 'number') {
+                var temp = apiData[key].value;
+                
+                // Temperature bounds check (reasonable range -50°C to 150°C)
+                if (temp >= -50 && temp <= 150) {
+                    this.pushData(sensorId, timestamp, temp);
+                }
+            }
+        }
     },
 
     setTimeWindow: function(minutes) {

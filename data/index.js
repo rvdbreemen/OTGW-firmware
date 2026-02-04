@@ -2533,6 +2533,13 @@ function refreshOTmonitor() {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
       data = json.otmonitor;
 
+      // Detect and register temperature sensors for the graph
+      if (typeof OTGraph !== 'undefined' && OTGraph.running) {
+        OTGraph.detectAndRegisterSensors(data);
+        // Process sensor data with current timestamp
+        OTGraph.processSensorData(data, new Date());
+      }
+
       let otMonPage = document.getElementById('mainPage');
       let otMonTable = document.querySelector(".otmontable");
       
