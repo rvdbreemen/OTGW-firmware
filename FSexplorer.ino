@@ -96,26 +96,56 @@ void startWebserver(){
         httpServer.sendHeader(F("Cache-Control"), F("no-store, no-cache, must-revalidate"));
         httpServer.sendHeader(F("Pragma"), F("no-cache"));
         
-        // Stream file line-by-line to avoid loading entire file into RAM (11KB+)
-        // This prevents memory exhaustion when version mismatch occurs
+        // Stream file line-by-line using fixed buffers to avoid String allocations
+        // This prevents memory exhaustion when version mismatch occurs (11KB+ file)
         httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
         httpServer.send(200, F("text/html; charset=UTF-8"), F(""));
         
+        // Use fixed buffers to avoid heap fragmentation
+        char lineBuf[512];  // Buffer for reading lines
+        char outputBuf[600]; // Buffer for output with version injection
+        const char* fsHashCStr = fsHash.c_str();
+        
         while (f.available()) {
-          String line = f.readStringUntil('\n');
-          // Important: readStringUntil consumes the terminator, so we must add it back usually.
-          // However, for string replacement check, we do it on the content.
+          size_t len = 0;
           
-          if (line.indexOf(F("src=\"./index.js\"")) >= 0) {
-            line.replace(F("src=\"./index.js\""), "src=\"./index.js?v=" + fsHash + "\"");
+          // Read line into fixed buffer (char-by-char to avoid String allocation)
+          while (f.available() && len < (sizeof(lineBuf) - 1)) {
+            char c = f.read();
+            if (c == '\n') break;
+            lineBuf[len++] = c;
           }
-          if (line.indexOf(F("src=\"./graph.js\"")) >= 0) {
-             line.replace(F("src=\"./graph.js\""), "src=\"./graph.js?v=" + fsHash + "\"");
+          lineBuf[len] = '\0';
+          
+          // Check for script tags that need version injection
+          const char* jsPattern = "src=\"./index.js\"";
+          const char* graphPattern = "src=\"./graph.js\"";
+          char* found;
+          
+          if ((found = strstr(lineBuf, jsPattern)) != nullptr) {
+            // Build output with index.js version injection
+            size_t prefixLen = found - lineBuf;
+            snprintf_P(outputBuf, sizeof(outputBuf), 
+                       PSTR("%.*ssrc=\"./index.js?v=%s\"%s"),
+                       (int)prefixLen, lineBuf, fsHashCStr, 
+                       found + strlen(jsPattern));
+            httpServer.sendContent(outputBuf);
+          } else if ((found = strstr(lineBuf, graphPattern)) != nullptr) {
+            // Build output with graph.js version injection
+            size_t prefixLen = found - lineBuf;
+            snprintf_P(outputBuf, sizeof(outputBuf),
+                       PSTR("%.*ssrc=\"./graph.js?v=%s\"%s"),
+                       (int)prefixLen, lineBuf, fsHashCStr,
+                       found + strlen(graphPattern));
+            httpServer.sendContent(outputBuf);
+          } else {
+            // No replacement needed, send line as-is
+            httpServer.sendContent(lineBuf);
           }
           
-          httpServer.sendContent(line);
-          if (f.available() || line.length() > 0) {
-             httpServer.sendContent(F("\n")); // Restore the newline
+          // Add newline back (readStringUntil consumed it)
+          if (f.available() || len > 0) {
+            httpServer.sendContent_P(PSTR("\n"));
           }
         }
         httpServer.sendContent(F("")); // End of chunked stream
@@ -590,9 +620,13 @@ void doRedirect(String msg, int wait, const char* URL, bool reboot)
   httpServer.sendContent_P(PSTR("<br><br><hr>Wait for the redirect. In case you are not redirected automatically, then click this <a href='"));
   httpServer.sendContent(safeURL);
   httpServer.sendContent_P(PSTR("'>link to continue</a>."));
-  httpServer.sendContent_P(PSTR("<script>setInterval(function(){var div=document.querySelector('#counter');var count=div.textContent*1-1;div.textContent=count;if(count<=0){window.location.replace('"));
+  // Use data attribute to avoid JavaScript context injection
+  httpServer.sendContent_P(PSTR("<div id='redirect-data' data-url='"));
   httpServer.sendContent(safeURL);
-  httpServer.sendContent_P(PSTR("');}},1000);</script></body></html>\r\n"));
+  httpServer.sendContent_P(PSTR("' style='display:none;'></div>"));
+  httpServer.sendContent_P(PSTR("<script>setInterval(function(){var div=document.querySelector('#counter');var count=div.textContent*1-1;div.textContent=count;if(count<=0){"));
+  httpServer.sendContent_P(PSTR("var url=document.getElementById('redirect-data').getAttribute('data-url');window.location.replace(url);"));
+  httpServer.sendContent_P(PSTR("}},1000);</script></body></html>\r\n"));
   httpServer.sendContent(F(""));
   if (reboot) doRestart("Reboot after upgrade");
   

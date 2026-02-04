@@ -150,7 +150,10 @@ void startWiFi(const char* hostname, int timeOut)
 
   WiFiManager manageWiFi;
   uint32_t lTime = millis();
-  String thisAP = String(hostname) + "-" + WiFi.macAddress();
+  // Use fixed buffer instead of String concatenation to avoid heap fragmentation
+  char thisAP[64];
+  snprintf_P(thisAP, sizeof(thisAP), PSTR("%s-%s"), 
+             hostname, WiFi.macAddress().c_str());
 
   DebugTln(F("\nStart Wifi ..."));
   manageWiFi.setDebugOutput(true);
@@ -440,7 +443,9 @@ String getMacAddress() {
 }
 
 String getUniqueId() {
-  String uniqueId = "otgw-"+(String)getMacAddress();
+  // Use fixed buffer to avoid String concatenation and heap fragmentation
+  static char uniqueId[32];
+  snprintf_P(uniqueId, sizeof(uniqueId), PSTR("otgw-%s"), getMacAddress().c_str());
   return String(uniqueId);
 }
 

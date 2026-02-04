@@ -298,22 +298,21 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
 
     // Look for the new firmware version
     version = nullptr;
-    unsigned short ptr = 0;
+    size_t banner1_len = strlen_P(banner1);
     
-    while (ptr < info.datasize) {
-        char *s = strstr_P((char *)datamem + ptr, banner1);
-        if (s == nullptr) {
-            ptr += strnlen((char *)datamem + ptr,
-              info.datasize - ptr) + 1;
-        } else {
-            s += sizeof(banner1) - 1;   // Drop the terminating '\0'
-            version = s;
-            Dprintf("Version: %s\n", version);
-            if (firmware == FIRMWARE_OTGW && *fwversion) {
-                // Reading out the EEPROM settings takes 4 reads of 64 bytes
-                weight += 4 * WEIGHT_DATAREAD;
+    // Safe binary search using memcmp_P (matches versionStuff.ino pattern)
+    // Binary data may not be null-terminated, so we use bounded search
+    if (info.datasize >= banner1_len) {
+        for (unsigned short ptr = 0; ptr <= (info.datasize - banner1_len); ptr++) {
+            if (memcmp_P((char *)datamem + ptr, banner1, banner1_len) == 0) {
+                version = (char *)datamem + ptr + banner1_len;
+                Dprintf("Version: %s\n", version);
+                if (firmware == FIRMWARE_OTGW && *fwversion) {
+                    // Reading out the EEPROM settings takes 4 reads of 64 bytes
+                    weight += 4 * WEIGHT_DATAREAD;
+                }
+                break;
             }
-            break;
         }
     }
 

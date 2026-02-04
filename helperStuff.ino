@@ -511,8 +511,34 @@ String getFilesystemHash(){
       File fh = LittleFS.open(GITHASH_FILE, "r");
       if (fh) {
         if (fh.available()){
-          _githash = fh.readStringUntil('\n');
-          _githash.trim(); // Remove any whitespace/newlines
+          String raw = fh.readStringUntil('\n');
+          raw.trim(); // Remove any whitespace/newlines
+          
+          // SECURITY: Validate hash is hexadecimal (git short hash format)
+          // Expected format: 7-40 characters, 0-9 and a-f only
+          // This prevents XSS attacks via malicious version.hash content
+          if (raw.length() >= 7 && raw.length() <= 40) {
+            bool valid = true;
+            for (size_t i = 0; i < raw.length(); i++) {
+              char c = raw.charAt(i);
+              if (!((c >= '0' && c <= '9') || 
+                    (c >= 'a' && c <= 'f') || 
+                    (c >= 'A' && c <= 'F'))) {
+                valid = false;
+                break;
+              }
+            }
+            
+            if (valid) {
+              _githash = raw;
+              DebugTf(PSTR("Filesystem hash validated: %s\r\n"), _githash.c_str());
+            } else {
+              DebugTln(F("WARNING: Invalid version.hash format (non-hex characters) - ignoring"));
+            }
+          } else {
+            DebugTf(PSTR("WARNING: Invalid version.hash length (%d chars, expected 7-40) - ignoring\r\n"), 
+                    raw.length());
+          }
         }
         fh.close();
       }
