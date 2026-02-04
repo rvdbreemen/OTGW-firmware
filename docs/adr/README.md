@@ -10,7 +10,7 @@ Architecture Decision Records capture important architectural decisions along wi
 
 **By Topic:**
 - [Platform & Build](#platform-and-build-system) (4 ADRs)
-- [Memory Management](#memory-management) (4 ADRs) **UPDATED**
+- [Memory Management](#memory-management) (3 ADRs) **UPDATED**
 - [Network & Security](#network-and-security) (3 ADRs)
 - [Integration](#integration-and-communication) (2 ADRs)
 - [Core Systems](#system-architecture) (6 ADRs)
@@ -119,6 +119,8 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-027: Version Mismatch Warning System in Web UI](ADR-027-version-mismatch-warning-system.md)**  
   Prominent visual warning banner that automatically appears when firmware and filesystem versions don't match to prevent user confusion.
 
+
+### OTA and Firmware Updates
 - **[ADR-029: Simple XHR-Based OTA Flash (KISS Principle)](ADR-029-simple-xhr-ota-flash.md)** 🆕  
   Simplified firmware flash mechanism using XHR with backend confirmation, eliminating WebSocket complexity and Safari bugs. Reduces code by 68.5% while improving reliability.
 
