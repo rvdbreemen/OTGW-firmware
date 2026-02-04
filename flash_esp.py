@@ -187,9 +187,9 @@ def build_firmware():
     print_info("The build script will automatically install arduino-cli if needed...")
     
     try:
-        # Run build.py script with --no-rename to keep simple filenames
+        # Run build.py script (will rename artifacts with version info)
         result = subprocess.run(
-            [sys.executable, str(build_script), "--no-rename"],
+            [sys.executable, str(build_script)],
             cwd=script_dir,
             check=False
         )

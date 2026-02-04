@@ -547,10 +547,16 @@ Before implementing or modifying frontend features, verify browser support:
 
 - API versioning: `/api/v0/` (legacy), `/api/v1/` (standard), and `/api/v2/` (optimized)
 - OTGW commands: POST/PUT to `/api/v1/otgw/command/{command}`
-- Check system health: `/api/v1/health` (Returns `status: UP` and system vital signs)
+- Check system health: `/api/v1/health` (Returns JSON map with health metrics)
+  - Response format: `{"health": {"status": "UP", "uptime": "...", "heap": 12345, ...}}`
+  - Access values via map: `data.health.status`, `data.health.heap`, etc.
+  - **Map format** - use simple object property access
+- Device time: `/api/v0/devtime` (Returns JSON array with time data)
+  - Response format: `{"devtime": [{"name": "dateTime", "value": "..."}, {"name": "epoch", "value": 123}, ...]}`
+  - **Array format** - use `.find()` or array iteration
 - Commands use the same queue as MQTT commands
 - **Reboot Verification**: WebUI must check `/api/v1/health` to confirm the device is back online.
-  - Expected response includes `status: UP` and `picavailable: true`.
+  - Validate with: `data.health && data.health.status === 'UP'`
 
 ### Build and Test
 

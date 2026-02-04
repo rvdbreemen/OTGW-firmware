@@ -35,7 +35,7 @@ static const char UpdateServerIndex[] PROGMEM =
         #progressBar { height: 100%; background-color: #2196F3; transition: width 0.3s ease; width: 0%; }
         
         /* Progress text overlay */
-        #progressText { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: #000; text-shadow: 0 0 3px rgba(255,255,255,0.8); }
+        #progressText { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: #fff; text-shadow: 0 0 4px rgba(0,0,0,0.9); }
         html.dark #progressText { color: #fff; text-shadow: 0 0 3px rgba(0,0,0,0.8); }
         
         #updateError { color: #b00020; font-weight: bold; margin: 12px 0; }
@@ -138,18 +138,14 @@ static const char UpdateServerIndex[] PROGMEM =
                .then(function(data) {
                  console.log('[OTA] Health response: ', JSON.stringify(data, null, 2));
                  
-                 // Validate health response - just check if status is UP
-                 if (data && data.health && Array.isArray(data.health)) {
-                   var status = data.health.find(function(item) { return item.name === 'status'; });
-                   
-                   if (status && status.value === 'UP') {
-                     clearInterval(checkInterval);
-                     console.log('[OTA] State: Device is healthy, redirecting');
-                     progressText.textContent = 'Device is back online! Redirecting...';
-                     setTimeout(function() {
-                       window.location.href = '/';
-                     }, 1000);
-                   }
+                 // Validate health response - simple object access
+                 if (data && data.health && data.health.status === 'UP') {
+                   clearInterval(checkInterval);
+                   console.log('[OTA] State: Device is healthy, redirecting');
+                   progressText.textContent = 'Device is back online! Redirecting...';
+                   setTimeout(function() {
+                     window.location.href = '/';
+                   }, 1000);
                  }
                })
                .catch(function(e) {
@@ -377,18 +373,14 @@ static const char UpdateServerSuccess[] PROGMEM =
                throw new Error('HTTP ' + res.status);
              })
              .then(function(data) {
-               // Validate health response - just check if status is UP
-               if (data && data.health && Array.isArray(data.health)) {
-                 var status = data.health.find(function(item) { return item.name === 'status'; });
-                 
-                 if (status && status.value === 'UP') {
-                   clearInterval(poller);
-                   statusEl.textContent = "Device is back online! Redirecting...";
-                   statusEl.style.color = "green";
-                   setTimeout(function() {
-                     window.location.href = "/";
-                   }, 1000);
-                 }
+               // Validate health response - simple object access
+               if (data && data.health && data.health.status === 'UP') {
+                 clearInterval(poller);
+                 statusEl.textContent = "Device is back online! Redirecting...";
+                 statusEl.style.color = "green";
+                 setTimeout(function() {
+                   window.location.href = "/";
+                 }, 1000);
                }
              })
              .catch(function(e) {
