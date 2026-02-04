@@ -81,6 +81,14 @@ void initSensors() {
     DallasrealDevice[i].id = DallasrealDeviceCount ;
     DallasrealDevice[i].tempC = 0 ;
     DallasrealDevice[i].lasttime = 0 ;
+    
+    // Initialize label with hex address (can be changed by user)
+    const char* hexAddr = getDallasAddress(DallasrealDevice[i].addr);
+    strlcpy(DallasrealDevice[i].label, hexAddr, sizeof(DallasrealDevice[i].label));
+    
+    // Try to load custom label from settings
+    loadSensorLabel(hexAddr, DallasrealDevice[i].label, sizeof(DallasrealDevice[i].label));
+    
     DallasrealDeviceCount++;
     }
     else
@@ -197,6 +205,56 @@ char* getDallasAddress(DeviceAddress deviceAddress)
   }
   dest[16] = '\0';
   return dest;
+}
+
+// Load custom label for a sensor from settings
+void loadSensorLabel(const char* hexAddress, char* label, size_t labelSize) {
+  if (!hexAddress || !label || labelSize == 0) return;
+  
+  // Parse settingDallasLabels JSON to find this address
+  if (strlen(settingDallasLabels) > 0) {
+    StaticJsonDocument<512> doc;
+    DeserializationError error = deserializeJson(doc, settingDallasLabels);
+    
+    if (!error && doc.containsKey(hexAddress)) {
+      const char* customLabel = doc[hexAddress];
+      if (customLabel && strlen(customLabel) > 0) {
+        strlcpy(label, customLabel, labelSize);
+        return;
+      }
+    }
+  }
+  
+  // If no custom label found, label already contains hex address (default)
+}
+
+// Save custom label for a sensor to settings
+void saveSensorLabel(const char* hexAddress, const char* newLabel) {
+  if (!hexAddress || !newLabel) return;
+  
+  // Parse existing labels
+  StaticJsonDocument<512> doc;
+  if (strlen(settingDallasLabels) > 0) {
+    deserializeJson(doc, settingDallasLabels);
+  }
+  
+  // Update or add the label
+  doc[hexAddress] = newLabel;
+  
+  // Serialize back to string
+  serializeJson(doc, settingDallasLabels, sizeof(settingDallasLabels));
+  
+  // Update the sensor structure if it's currently loaded
+  for (int i = 0; i < DallasrealDeviceCount; i++) {
+    const char* addr = getDallasAddress(DallasrealDevice[i].addr);
+    if (strcmp(addr, hexAddress) == 0) {
+      strlcpy(DallasrealDevice[i].label, newLabel, sizeof(DallasrealDevice[i].label));
+      break;
+    }
+  }
+  
+  // Save settings to file
+  writeSettings(false);
 }
 
 /***************************************************************************

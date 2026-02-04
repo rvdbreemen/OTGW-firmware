@@ -2574,7 +2574,26 @@ function refreshOTmonitor() {
           //--- field Name ---
           var fldDiv = document.createElement("div");
           fldDiv.setAttribute("class", "otmoncolumn1");
-          fldDiv.textContent = translateToHuman(data[i].name);
+          
+          // Check if this is a Dallas sensor (16 hex chars) and has a custom label
+          var displayName = translateToHuman(data[i].name);
+          if (data[i].name && typeof data[i].name === 'string' && 
+              data[i].name.length === 16 && /^[0-9A-Fa-f]{16}$/.test(data[i].name)) {
+            // This is a Dallas sensor hex address
+            var labelKey = data[i].name + '_label';
+            if (data[labelKey] && data[labelKey].value) {
+              displayName = data[labelKey].value;
+            }
+            
+            // Add click handler to allow editing label
+            fldDiv.style.cursor = 'pointer';
+            fldDiv.title = 'Click to edit label (Address: ' + data[i].name + ')';
+            fldDiv.onclick = (function(addr) {
+              return function() { editSensorLabel(addr); };
+            })(data[i].name);
+          }
+          
+          fldDiv.textContent = displayName;
           rowDiv.appendChild(fldDiv);
           //--- Value ---
           var valDiv = document.createElement("div");
@@ -3847,5 +3866,64 @@ function loadPersistentUI() {
 
     })
     .catch(err => console.error("Error loading persistent settings:", err));
+}
+
+//============================================================================
+// Edit sensor label functionality
+//============================================================================
+function editSensorLabel(address) {
+  if (!address || address.length !== 16) return;
+  
+  // Get current label
+  var currentLabel = address; // Default to hex address
+  var labelKey = address + '_label';
+  
+  // Try to get current label from last API response (stored in global data)
+  if (typeof data !== 'undefined' && data[labelKey] && data[labelKey].value) {
+    currentLabel = data[labelKey].value;
+  }
+  
+  var newLabel = prompt('Enter custom label for sensor (max 16 characters):\nAddress: ' + address, currentLabel);
+  
+  if (newLabel === null) return; // User cancelled
+  
+  // Trim and validate
+  newLabel = newLabel.trim().substring(0, 16);
+  
+  if (newLabel.length === 0) {
+    alert('Label cannot be empty');
+    return;
+  }
+  
+  // Send update to server
+  fetch(APIGW + 'v1/sensors/label', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      address: address,
+      label: newLabel
+    })
+  })
+  .then(function(response) {
+    if (!response.ok) {
+      throw new Error('HTTP ' + response.status);
+    }
+    return response.json();
+  })
+  .then(function(json) {
+    if (json.success) {
+      console.log('Sensor label updated:', newLabel);
+      // Refresh the display to show new label
+      refreshOTmonitor();
+    } else {
+      alert('Failed to update label: ' + (json.error || 'Unknown error'));
+    }
+  })
+  .catch(function(error) {
+    console.error('Error updating sensor label:', error);
+    alert('Failed to update label: ' + error.message);
+  });
 }
 

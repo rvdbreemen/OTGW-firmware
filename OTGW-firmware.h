@@ -193,10 +193,14 @@ struct
   int id;
   DeviceAddress addr;
   float tempC;
-  time_t lasttime;  
+  time_t lasttime;
+  char label[17];  // Custom label (max 16 chars + null terminator)
 } DallasrealDevice[MAXDALLASDEVICES];
 // prototype to allow use in restAPI.ino
 char* getDallasAddress(DeviceAddress deviceAddress);
+
+// Dallas sensor label settings storage (JSON string containing address:label pairs)
+char settingDallasLabels[512] = "";  // Stores sensor labels as JSON
 
 
 // S0 Counter Settings and variables with global scope

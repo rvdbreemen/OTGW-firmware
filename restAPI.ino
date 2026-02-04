@@ -180,6 +180,18 @@ void processAPI()
         } else {
           sendApiNotFound(originalURI);
         }
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("sensors")) == 0) {
+        // POST/PUT /api/v1/sensors/label
+        // Request body: {"address": "hexaddress", "label": "customlabel"}
+        if (wc > 4 && strcmp_P(words[4], PSTR("label")) == 0) {
+          if (!isPostOrPut) { 
+            httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); 
+            return; 
+          }
+          updateSensorLabel();
+        } else {
+          sendApiNotFound(originalURI);
+        }
       } else {
         sendApiNotFound(originalURI);
       }
@@ -515,6 +527,10 @@ void sendOTmonitorV2()
     for (int i = 0; i < DallasrealDeviceCount; i++) {
       const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
       sendJsonOTmonMapEntry(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
+      // Also send the label as a separate entry
+      char labelKey[32];
+      snprintf_P(labelKey, sizeof(labelKey), PSTR("%s_label"), strDeviceAddress);
+      sendJsonOTmonMapEntry(labelKey, DallasrealDevice[i].label, F(""), now);
     }
   }
 
@@ -579,6 +595,10 @@ void sendOTmonitor()
     for (int i = 0; i < DallasrealDeviceCount; i++) {
         const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
         sendJsonOTmonObj(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
+        // Also send the label as a separate entry
+        char labelKey[32];
+        snprintf_P(labelKey, sizeof(labelKey), PSTR("%s_label"), strDeviceAddress);
+        sendJsonOTmonObj(labelKey, DallasrealDevice[i].label, F(""), now);
     }
   }
 
@@ -836,6 +856,47 @@ void postSettings()
       }
 
 } // postSettings()
+
+
+//====[ Update sensor label ]====
+void updateSensorLabel() {
+  // Parse JSON body: {"address": "hexaddress", "label": "customlabel"}
+  StaticJsonDocument<256> doc;
+  DeserializationError error = deserializeJson(doc, httpServer.arg(F("plain")));
+  
+  if (error) {
+    httpServer.send_P(400, PSTR("application/json"), PSTR("{\"error\":\"Invalid JSON\"}"));
+    return;
+  }
+  
+  const char* address = doc[F("address")];
+  const char* label = doc[F("label")];
+  
+  if (!address || !label) {
+    httpServer.send_P(400, PSTR("application/json"), PSTR("{\"error\":\"Missing address or label\"}"));
+    return;
+  }
+  
+  // Validate address format (16 hex characters)
+  if (strlen(address) != 16) {
+    httpServer.send_P(400, PSTR("application/json"), PSTR("{\"error\":\"Invalid address format\"}"));
+    return;
+  }
+  
+  // Validate label length (max 16 characters)
+  if (strlen(label) > 16) {
+    httpServer.send_P(400, PSTR("application/json"), PSTR("{\"error\":\"Label too long (max 16 chars)\"}"));
+    return;
+  }
+  
+  // Save the label
+  saveSensorLabel(address, label);
+  
+  // Return success
+  char response[128];
+  snprintf_P(response, sizeof(response), PSTR("{\"success\":true,\"address\":\"%s\",\"label\":\"%s\"}"), address, label);
+  httpServer.send(200, F("application/json"), response);
+} // updateSensorLabel()
 
 
 //====================================================

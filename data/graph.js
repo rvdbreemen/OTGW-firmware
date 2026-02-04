@@ -241,9 +241,21 @@ var OTGraph = {
                 if (!this.sensorAddressToId[key]) {
                     var sensorIndex = this.detectedSensors.length;
                     var sensorId = 'sensor_' + sensorIndex;
-                    // User-facing labels are 1-based for readability (Sensor 1, 2, 3...)
-                    // Internal IDs remain 0-based for array indexing (sensor_0, sensor_1, sensor_2...)
-                    var sensorLabel = 'Sensor ' + (sensorIndex + 1) + ' (' + key.substring(0, 8) + ')';
+                    
+                    // Try to get custom label from API data (key_label field)
+                    var labelKey = key + '_label';
+                    var sensorLabel = null;
+                    
+                    if (apiData[labelKey] && apiData[labelKey].value) {
+                        sensorLabel = apiData[labelKey].value;
+                    }
+                    
+                    // If no custom label, use hex address as fallback
+                    if (!sensorLabel || sensorLabel === key) {
+                        // User-facing labels are 1-based for readability (Sensor 1, 2, 3...)
+                        // Internal IDs remain 0-based for array indexing (sensor_0, sensor_1, sensor_2...)
+                        sensorLabel = 'Sensor ' + (sensorIndex + 1) + ' (' + key.substring(0, 8) + ')';
+                    }
                     
                     // Register the sensor
                     this.sensorAddressToId[key] = sensorId;
@@ -277,6 +289,34 @@ var OTGraph = {
                     newSensors.push(sensorLabel);
                     
                     console.log('Graph: Registered temperature sensor:', sensorLabel, 'Address:', key);
+                } else {
+                    // Sensor already registered, but check if label has changed
+                    var labelKey = key + '_label';
+                    if (apiData[labelKey] && apiData[labelKey].value) {
+                        var newLabel = apiData[labelKey].value;
+                        var sensorId = this.sensorAddressToId[key];
+                        
+                        // Find the sensor in detectedSensors and update label
+                        for (var i = 0; i < this.detectedSensors.length; i++) {
+                            if (this.detectedSensors[i].address === key) {
+                                if (this.detectedSensors[i].label !== newLabel) {
+                                    this.detectedSensors[i].label = newLabel;
+                                    
+                                    // Update seriesConfig label
+                                    for (var j = 0; j < this.seriesConfig.length; j++) {
+                                        if (this.seriesConfig[j].id === sensorId) {
+                                            this.seriesConfig[j].label = newLabel;
+                                            console.log('Graph: Updated sensor label:', newLabel, 'Address:', key);
+                                            // Trigger chart update
+                                            this.updateOption();
+                                            break;
+                                        }
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
                 }
             }
         }
