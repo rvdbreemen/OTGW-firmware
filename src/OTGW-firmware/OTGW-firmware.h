@@ -23,7 +23,7 @@
 #include <ArduinoJson.h>        // https://arduinojson.org/
 #include "Wire.h"
 #include "safeTimers.h"
-#include "src/libraries/OTGWSerial/OTGWSerial.h"         // Bron Schelte's Serial class - it upgrades and more
+#include <OTGWSerial.h>         // Bron Schelte's Serial class - it upgrades and more
 #include "OTGW-Core.h"          // Core code for this firmware 
 #include <OneWire.h>            // required for Dallas sensor library
 #include <DallasTemperature.h>  // Miles Burton's - Arduino Dallas library

@@ -367,7 +367,7 @@ def update_version(project_dir):
         sys.executable,
         str(script_path),
         str(project_dir),
-        "--filename", "version.h",
+        "--filename", "src/OTGW-firmware/version.h",
         "--githash", githash
     ]
     run_command(cmd)
@@ -376,7 +376,7 @@ def update_version(project_dir):
 
 def get_semver(project_dir):
     """Extract semantic version from version.h"""
-    version_file = project_dir / "version.h"
+    version_file = project_dir / "src" / "OTGW-firmware" / "version.h"
     if not version_file.exists():
         return "unknown"
     
@@ -421,6 +421,8 @@ def build_firmware(project_dir, config_file):
     fqbn = "esp8266:esp8266:d1_mini:eesz=4M2M,xtal=160"
     cflags = "-DNO_GLOBAL_HTTPUPDATE"
     
+    sketch_dir = project_dir / "src" / "OTGW-firmware"
+    output_dir = project_dir / "build"
     cmd = [
         "arduino-cli",
         "compile",
@@ -429,7 +431,8 @@ def build_firmware(project_dir, config_file):
         "--verbose",
         "--build-property", f"compiler.cpp.extra_flags=\"{cflags}\"",
         "--config-file", str(config_file),
-        str(project_dir)
+        "--output-dir", str(output_dir),
+        str(sketch_dir)
     ]
     
     run_command(cmd, cwd=project_dir, show_output=True)
