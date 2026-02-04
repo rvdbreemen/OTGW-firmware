@@ -13,6 +13,8 @@ Architecture Decision Records capture important architectural decisions along wi
 - [Memory Management](#memory-management) (4 ADRs) 🆕
 - [Network & Security](#network-and-security) (4 ADRs) 🆕
 - [Integration](#integration-and-communication) (3 ADRs) 🆕
+- [Network & Security](#network-and-security) (3 ADRs) 🆕
+- [Integration](#integration-and-communication) (3 ADRs) 🆕
 - [Core Systems](#system-architecture) (6 ADRs)
 - [Features & Extensions](#features-and-extensions) (6 ADRs)
 - [Browser & Client](#browser-and-client-compatibility) (3 ADRs)
