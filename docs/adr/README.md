@@ -118,6 +118,12 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-027: Version Mismatch Warning System in Web UI](ADR-027-version-mismatch-warning-system.md)**  
   Prominent visual warning banner that automatically appears when firmware and filesystem versions don't match to prevent user confusion.
 
+- **[ADR-028: File Streaming Over Loading for Memory Safety](ADR-028-file-streaming-over-loading.md)** 🆕  
+  Never load files >2KB into RAM; use streaming patterns to prevent memory exhaustion crashes.
+
+- **[ADR-029: Non-Blocking Modal Dialogs for User Input](ADR-029-non-blocking-modal-dialogs.md)** 🆕  
+  Custom HTML/CSS modal dialogs instead of blocking prompt() to maintain real-time data flow.
+
 ## ADR Template
 
 When creating new ADRs, use this structure:

@@ -2,10 +2,10 @@
 
 **Status:** Accepted  
 **Date:** 2019-01-01 (Estimated - Pre-GitHub)  
-**Updated:** 2026-01-28 (Documentation)  
+**Updated:** 2026-02-04 (Custom labels and graph integration)  
 **Breaking Changes:** Planned for v1.0.0 final release (not yet released as of v1.0.0-rc6)
 
-**Note on Dates:** This project's git history was truncated on April 23, 2021. Dates before 2021-04-23 are estimates. Git evidence shows sensor work in commits 9199e43 (2023-01-23) and fcd31a9 (2021-12-20).
+**Note on Dates:** This project's git history was truncated on April 23, 2021. Dates before 2021-04-23 are estimates. Git evidence shows sensor work in commits 9199e43 (2023-01-23) and fcd31a9 (2021-12-20). Custom labels added in 2026-02-04 (commits b2acbd7, 7c3a711).
 
 ## Context
 
@@ -370,12 +370,122 @@ ESP8266 GPIO 10 (SD3) ────┬──── VCC (3.3V)
 - Pin 3 (Green): VCC (3.3V)
 - Twisted pairs reduce noise
 
+## Custom Labels Feature (Added 2026-02-04)
+
+**Context:** Sensor hex addresses (e.g., `28FF64D1841703F1`) are not user-friendly. Users want to assign custom names like "Living Room" or "Outdoor".
+
+**Implementation:**
+- **Label storage:** JSON in `settingDallasLabels[512]` field
+- **Label structure:** Key-value pairs (hex address → custom label)
+- **Max label length:** 16 characters
+- **Default label:** Hex address until user customizes
+- **Persistence:** Stored in LittleFS via settings.json
+- **API endpoint:** `POST /api/v1/sensors/label` for updates
+- **UI:** Non-blocking modal dialog for editing (see ADR-029)
+
+**Label storage format:**
+```json
+{
+  "28FF64D1841703F1": "Living Room",
+  "28AB34CD561289EF": "Outdoor",
+  "2801234567890ABC": "Boiler Room"
+}
+```
+
+**Structure update:**
+```cpp
+struct {
+  int id;
+  DeviceAddress addr;
+  float tempC;
+  time_t lasttime;
+  char label[17];  // Custom label (16 chars + null)
+} DallasrealDevice[MAXDALLASDEVICES];
+```
+
+**Label management functions:**
+```cpp
+// Load custom label from settings during sensor init
+void loadSensorLabel(const char* hexAddress, char* label, size_t labelSize);
+
+// Save custom label to settings and update structure
+void saveSensorLabel(const char* hexAddress, const char* newLabel);
+```
+
+**REST API:**
+```
+POST /api/v1/sensors/label
+{
+  "address": "28FF64D1841703F1",
+  "label": "Living Room"
+}
+
+Response:
+{
+  "success": true,
+  "address": "28FF64D1841703F1",
+  "label": "Living Room"
+}
+```
+
+**API data exposure:**
+- Labels exposed as `{address}_label` fields in `/api/v1/otgw/otmonitor` and `/api/v2/otgw/otmonitor`
+- Example: `28FF64D1841703F1_label: {"value": "Living Room", "unit": ""}`
+
+**Frontend integration:**
+- Graph displays custom labels instead of "Sensor 1 (28FF64D1)"
+- Main page displays custom labels in sensor name column
+- Click sensor name to edit label via modal dialog
+- Labels update dynamically without page refresh
+
+## Graph Visualization Feature (Added 2026-02-04)
+
+**Context:** Sensors were only visible via MQTT and REST API. Users wanted real-time graphing in the Web UI.
+
+**Implementation:**
+- **Auto-detection:** JavaScript scans API data for 16-char hex addresses starting with 28/10/22
+- **Color palette:** 16 unique colors per theme (light/dark)
+- **Real-time updates:** Integrated with existing 1-second API polling
+- **Temperature grid:** Sensors added to gridIndex 4 (temperature chart)
+- **Data validation:** Temperature range -50°C to 150°C
+- **Dynamic registration:** New sensors appear automatically without page refresh
+
+**Detection logic:**
+```javascript
+// Scan API data for Dallas sensor addresses
+if (key.length === 16 && 
+    /^[0-9A-Fa-f]{16}$/.test(key) &&
+    (key.startsWith('28') || key.startsWith('10') || key.startsWith('22'))) {
+  // Register sensor for graphing
+  registerSensor(key, label);
+}
+```
+
+**Graph series config:**
+```javascript
+{
+  id: 'sensor_0',
+  label: 'Living Room',  // Uses custom label if available
+  gridIndex: 4,          // Temperature grid
+  type: 'line',
+  color: '#FF6B6B'       // Unique color from palette
+}
+```
+
+**See also:** ADR-029 for non-blocking modal dialog pattern used for label editing.
+
 ## Related Decisions
 - ADR-006: MQTT Integration Pattern (sensor publishing)
-- ADR-008: LittleFS for Configuration Persistence (sensors.json storage)
+- ADR-008: LittleFS for Configuration Persistence (sensors.json and label storage)
+- ADR-018: ArduinoJson for Data Interchange (label JSON storage)
+- ADR-019: REST API Versioning Strategy (new endpoint in v1 API)
+- ADR-029: Non-Blocking Modal Dialogs (label editing UI)
 
 ## References
-- Implementation: `sensors_ext.ino`
+- Implementation: `sensors_ext.ino` (sensor reading and label management)
+- Label API: `restAPI.ino` (POST /api/v1/sensors/label endpoint)
+- Graph integration: `data/graph.js` (dynamic sensor detection and graphing)
+- UI integration: `data/index.js` (label editing modal)
 - OneWire library: https://github.com/PaulStoffregen/OneWire
 - DallasTemperature library: https://github.com/milesburton/Arduino-Temperature-Control-Library
 - DS18B20 datasheet: https://datasheets.maximintegrated.com/en/ds/DS18B20.pdf
