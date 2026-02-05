@@ -202,7 +202,7 @@ void processAPI()
             sendCustomLabels();
           } else if (isPostOrPut) {
             updateCustomLabel();
-          } else if (strcmp_P(httpServer.method().c_str(), PSTR("DELETE")) == 0) {
+          } else if (method == HTTP_DELETE) {
             deleteCustomLabelAPI();
           } else {
             httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n"));
