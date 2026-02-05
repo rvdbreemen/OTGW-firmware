@@ -2591,9 +2591,21 @@ function refreshOTmonitor() {
             fldDiv.onclick = (function(addr) {
               return function() { editSensorLabel(addr); };
             })(data[i].name);
+            
+            // Create label text and edit icon
+            var labelText = document.createElement('span');
+            labelText.textContent = displayName;
+            fldDiv.appendChild(labelText);
+            
+            var editIcon = document.createElement('span');
+            editIcon.setAttribute('class', 'sensor-edit-icon');
+            editIcon.textContent = ' ✏️';
+            fldDiv.appendChild(editIcon);
+          } else {
+            // Not a Dallas sensor, just display as text
+            fldDiv.textContent = displayName;
           }
           
-          fldDiv.textContent = displayName;
           rowDiv.appendChild(fldDiv);
           //--- Value ---
           var valDiv = document.createElement("div");

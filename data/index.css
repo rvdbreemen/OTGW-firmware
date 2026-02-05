@@ -1166,3 +1166,15 @@ body.disable-interaction {
   background-color: #0056b3;
 }
 
+/* Dallas Sensor Label Edit Icon */
+.sensor-edit-icon {
+  font-size: 0.85em;
+  margin-left: 4px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.otmoncolumn1:hover .sensor-edit-icon {
+  opacity: 1;
+}
+
