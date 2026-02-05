@@ -228,26 +228,6 @@
     <!-- Pin to bottom left corner -->
     <div id="message" class="bottom left-0"></div>
   
-    <!-- Sensor Label Edit Modal -->
-    <div id="sensorLabelModal" class="modal-overlay" style="display: none;">
-      <div class="modal-dialog">
-        <div class="modal-header">
-          <h3>Edit Sensor Label</h3>
-          <button type="button" class="modal-close" onclick="closeSensorLabelModal()">&times;</button>
-        </div>
-        <div class="modal-body">
-          <p><strong>Sensor Address:</strong> <span id="modalSensorAddress"></span></p>
-          <label for="modalSensorLabel">Custom Label (max 16 characters):</label>
-          <input type="text" id="modalSensorLabel" maxlength="16" />
-          <div id="modalError" class="modal-error" style="display: none;"></div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn-cancel" onclick="closeSensorLabelModal()">Cancel</button>
-          <button type="button" class="btn-save" onclick="saveSensorLabelFromModal()">Save</button>
-        </div>
-      </div>
-    </div>
-  
     <script>
        window.onload=initMainPage;
     </script>

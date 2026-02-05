@@ -2586,17 +2586,18 @@ function refreshOTmonitor() {
             }
             
             // Add click handler to allow editing label
-            fldDiv.style.cursor = 'pointer';
+            fldDiv.classList.add('editable-label');
             fldDiv.title = 'Click to edit label (Address: ' + data[i].name + ')';
-            fldDiv.onclick = (function(addr) {
-              return function() { editSensorLabel(addr); };
-            })(data[i].name);
-            
+            fldDiv.onclick = (function(addr, node) {
+              return function(evt) { openInlineSensorLabelEditor(addr, node, evt); };
+            })(data[i].name, fldDiv);
+
             // Create label text and edit icon
             var labelText = document.createElement('span');
+            labelText.setAttribute('class', 'sensor-label-text');
             labelText.textContent = displayName;
             fldDiv.appendChild(labelText);
-            
+
             var editIcon = document.createElement('span');
             editIcon.setAttribute('class', 'sensor-edit-icon');
             editIcon.textContent = ' ✏️';
@@ -3881,109 +3882,114 @@ function loadPersistentUI() {
 }
 
 //============================================================================
-// Edit sensor label functionality - Non-blocking modal dialog
+// Edit sensor label functionality - inline non-blocking editor
 //============================================================================
-var currentSensorAddress = null; // Track which sensor is being edited
+var activeSensorLabelEditor = null;
 
-function editSensorLabel(address) {
-  if (!address || address.length !== 16) return;
-  
-  currentSensorAddress = address;
-  
-  // Get current label
-  var currentLabel = address; // Default to hex address
+function openInlineSensorLabelEditor(address, targetNode, evt) {
+  if (!address || address.length !== 16 || !targetNode) return;
+  if (evt) {
+    evt.preventDefault();
+    evt.stopPropagation();
+  }
+
+  closeInlineSensorLabelEditor();
+
+  var labelTextNode = targetNode.querySelector('.sensor-label-text');
+  var currentLabel = address;
   var labelKey = address + '_label';
-  
-  // Try to get current label from last API response (stored in global data)
   if (typeof data !== 'undefined' && data[labelKey] && data[labelKey].value) {
     currentLabel = data[labelKey].value;
   }
-  
-  // Populate modal
-  var modal = document.getElementById('sensorLabelModal');
-  var addressSpan = document.getElementById('modalSensorAddress');
-  var labelInput = document.getElementById('modalSensorLabel');
-  var errorDiv = document.getElementById('modalError');
-  
-  if (!modal || !addressSpan || !labelInput || !errorDiv) {
-    console.error('Modal elements not found');
-    return;
+
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.maxLength = 16;
+  input.className = 'sensor-label-inline-editor';
+  input.value = currentLabel;
+  input.title = 'Enter new label and press Enter to save';
+
+  if (labelTextNode) {
+    targetNode.replaceChild(input, labelTextNode);
+  } else {
+    targetNode.insertBefore(input, targetNode.firstChild);
   }
-  
-  addressSpan.textContent = address;
-  labelInput.value = currentLabel;
-  errorDiv.style.display = 'none';
-  
-  // Show modal
-  modal.style.display = 'flex';
-  
-  // Focus input field
-  setTimeout(function() {
-    labelInput.focus();
-    labelInput.select();
-  }, 100);
-  
-  // Handle Enter key to save
-  labelInput.onkeydown = function(e) {
-    if (e.key === 'Enter') {
-      saveSensorLabelFromModal();
-    } else if (e.key === 'Escape') {
-      closeSensorLabelModal();
-    }
+
+  activeSensorLabelEditor = {
+    address: address,
+    container: targetNode,
+    input: input,
+    originalText: currentLabel
   };
+
+  input.focus();
+  input.select();
+
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveInlineSensorLabel();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeInlineSensorLabelEditor(true);
+    }
+  });
+
+  input.addEventListener('blur', function() {
+    if (activeSensorLabelEditor && activeSensorLabelEditor.input === input) {
+      saveInlineSensorLabel();
+    }
+  });
 }
 
-function closeSensorLabelModal() {
-  var modal = document.getElementById('sensorLabelModal');
-  var errorDiv = document.getElementById('modalError');
-  
-  if (modal) {
-    modal.style.display = 'none';
+function closeInlineSensorLabelEditor(cancelOnly) {
+  if (!activeSensorLabelEditor) return;
+
+  var editor = activeSensorLabelEditor;
+  var container = editor.container;
+  var input = editor.input;
+  var text = cancelOnly ? editor.originalText : (input ? input.value.trim() : editor.originalText);
+  if (!text) text = editor.address;
+
+  var labelText = document.createElement('span');
+  labelText.setAttribute('class', 'sensor-label-text');
+  labelText.textContent = text;
+
+  if (container && input && input.parentNode === container) {
+    container.replaceChild(labelText, input);
   }
-  
-  if (errorDiv) {
-    errorDiv.style.display = 'none';
-  }
-  
-  currentSensorAddress = null;
+
+  activeSensorLabelEditor = null;
 }
 
-function saveSensorLabelFromModal() {
-  if (!currentSensorAddress) return;
-  
-  var labelInput = document.getElementById('modalSensorLabel');
-  var errorDiv = document.getElementById('modalError');
-  
-  if (!labelInput || !errorDiv) return;
-  
-  var newLabel = labelInput.value.trim();
-  
-  // Validate
-  if (newLabel.length === 0) {
-    errorDiv.textContent = 'Label cannot be empty';
-    errorDiv.style.display = 'block';
+function saveInlineSensorLabel() {
+  if (!activeSensorLabelEditor) return;
+
+  var editor = activeSensorLabelEditor;
+  var input = editor.input;
+  if (!input) {
+    closeInlineSensorLabelEditor(true);
     return;
   }
-  
+
+  var newLabel = input.value.trim();
+  if (newLabel.length === 0) {
+    newLabel = editor.address;
+  }
+
   if (newLabel.length > 16) {
     newLabel = newLabel.substring(0, 16);
   }
-  
-  // Disable buttons during save
-  var saveBtn = document.querySelector('.btn-save');
-  var cancelBtn = document.querySelector('.btn-cancel');
-  
-  if (saveBtn) saveBtn.disabled = true;
-  if (cancelBtn) cancelBtn.disabled = true;
-  
-  // Send update to server
+
+  input.disabled = true;
+
   fetch(APIGW + 'v1/sensors/label', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      address: currentSensorAddress,
+      address: editor.address,
       label: newLabel
     })
   })
@@ -3994,28 +4000,27 @@ function saveSensorLabelFromModal() {
     return response.json();
   })
   .then(function(json) {
-    if (json.success) {
-      console.log('Sensor label updated:', newLabel);
-      // Close modal
-      closeSensorLabelModal();
-      // Refresh the display to show new label
-      refreshOTmonitor();
-    } else {
-      errorDiv.textContent = 'Failed to update label: ' + (json.error || 'Unknown error');
-      errorDiv.style.display = 'block';
-      // Re-enable buttons
-      if (saveBtn) saveBtn.disabled = false;
-      if (cancelBtn) cancelBtn.disabled = false;
+    if (!json.success) {
+      throw new Error(json.error || 'Unknown error');
     }
+
+    if (typeof data !== 'undefined') {
+      var labelKey = editor.address + '_label';
+      if (!data[labelKey]) {
+        data[labelKey] = { name: labelKey, unit: '', epoch: 1 };
+      }
+      data[labelKey].value = newLabel;
+    }
+
+    closeInlineSensorLabelEditor();
+    refreshOTmonitor();
   })
   .catch(function(error) {
     console.error('Error updating sensor label:', error);
-    errorDiv.textContent = 'Failed to update label: ' + error.message;
-    errorDiv.style.display = 'block';
-    // Re-enable buttons
-    if (saveBtn) saveBtn.disabled = false;
-    if (cancelBtn) cancelBtn.disabled = false;
+    if (input) {
+      input.disabled = false;
+      input.focus();
+      input.select();
+    }
   });
 }
-
-
