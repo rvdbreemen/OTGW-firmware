@@ -2551,6 +2551,20 @@ function refreshOTmonitor() {
         otMonPage.appendChild(otMonTable);
       }
 
+      // Helper function to format Dallas sensor temperature values
+      function formatDallasSensorValue(name, value) {
+        // Check if this is a Dallas sensor (16 hex chars)
+        if (name && typeof name === 'string' && 
+            name.length === 16 && /^[0-9A-Fa-f]{16}$/.test(name)) {
+          // Check if value is numeric (temperature)
+          var numValue = parseFloat(value);
+          if (!isNaN(numValue)) {
+            return numValue.toFixed(1);
+          }
+        }
+        return value;
+      }
+
       for (let i in data) {
         // Support for new Map-based JSON (less redundant):
         // If data is an object map, 'i' is the key (name).
@@ -2614,7 +2628,7 @@ function refreshOTmonitor() {
           valDiv.setAttribute("id", "otmon_" + data[i].name);
           if (data[i].value === "On") valDiv.innerHTML = "<span class='state-on'></span>";
           else if (data[i].value === "Off") valDiv.innerHTML = "<span class='state-off'></span>";
-          else valDiv.textContent = data[i].value;
+          else valDiv.textContent = formatDallasSensorValue(data[i].name, data[i].value);
           rowDiv.appendChild(valDiv);
           //--- Unit  ---
           var unitDiv = document.createElement("div");
@@ -2641,7 +2655,7 @@ function refreshOTmonitor() {
           epoch.value = data[i].epoch;
           if (data[i].value === "On") update.innerHTML = "<span class='state-on'></span>";
           else if (data[i].value === "Off") update.innerHTML = "<span class='state-off'></span>";
-          else update.textContent = data[i].value;
+          else update.textContent = formatDallasSensorValue(data[i].name, data[i].value);
           //if (update.style.visibility == 'visible') update.textContent = data[i].value;
 
         }
