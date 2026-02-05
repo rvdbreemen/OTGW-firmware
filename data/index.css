@@ -481,6 +481,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.otmoncolumn1.editable-label:hover {
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-decoration-color: #007bff;
+}
+
 .otmoncolumn2 {
   width: 60px;
   text-align: right;
@@ -1155,6 +1162,15 @@ body.disable-interaction {
 
 .btn-cancel:hover {
   background-color: #5a6268;
+}
+
+.btn-reset {
+  background-color: #ffc107;
+  color: #333;
+}
+
+.btn-reset:hover {
+  background-color: #e0a800;
 }
 
 .btn-save {

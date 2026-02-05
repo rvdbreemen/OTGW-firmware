@@ -890,6 +890,84 @@ void emergencyHeapRecovery() {
           heapAfter, (long)recovered);
 }
 
+//===========================================================================================
+// Custom Field Label Management
+//===========================================================================================
+
+// Load custom label for a field from settings
+// Returns true if custom label found, false otherwise
+bool loadCustomLabel(const char* fieldName, char* label, size_t labelSize) {
+  if (!fieldName || !label || labelSize == 0) return false;
+  
+  // Parse settingCustomLabels JSON to find this field
+  if (strlen(settingCustomLabels) > 0) {
+    StaticJsonDocument<1024> doc;
+    DeserializationError error = deserializeJson(doc, settingCustomLabels);
+    
+    if (!error && doc.containsKey(fieldName)) {
+      const char* customLabel = doc[fieldName];
+      if (customLabel && strlen(customLabel) > 0) {
+        strlcpy(label, customLabel, labelSize);
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
+
+// Save custom label for a field to settings
+void saveCustomLabel(const char* fieldName, const char* newLabel) {
+  if (!fieldName || !newLabel) return;
+  
+  // Parse existing labels
+  StaticJsonDocument<1024> doc;
+  if (strlen(settingCustomLabels) > 0) {
+    deserializeJson(doc, settingCustomLabels);
+  }
+  
+  // Update or add the label
+  doc[fieldName] = newLabel;
+  
+  // Serialize back to string
+  serializeJson(doc, settingCustomLabels, sizeof(settingCustomLabels));
+  
+  // Save settings to file
+  writeSettings(false);
+}
+
+// Delete custom label for a field (reset to default)
+void deleteCustomLabel(const char* fieldName) {
+  if (!fieldName) return;
+  
+  // Parse existing labels
+  StaticJsonDocument<1024> doc;
+  if (strlen(settingCustomLabels) > 0) {
+    deserializeJson(doc, settingCustomLabels);
+  }
+  
+  // Remove the label
+  doc.remove(fieldName);
+  
+  // Serialize back to string
+  serializeJson(doc, settingCustomLabels, sizeof(settingCustomLabels));
+  
+  // Save settings to file
+  writeSettings(false);
+}
+
+// Get all custom labels as JSON string for API response
+// Returns JSON object with fieldname:label pairs
+void getCustomLabelsJson(char* buffer, size_t bufferSize) {
+  if (!buffer || bufferSize == 0) return;
+  
+  if (strlen(settingCustomLabels) > 0) {
+    strlcpy(buffer, settingCustomLabels, bufferSize);
+  } else {
+    strlcpy(buffer, "{}", bufferSize);
+  }
+}
+
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a

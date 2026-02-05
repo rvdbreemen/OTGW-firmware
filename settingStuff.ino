@@ -68,6 +68,7 @@ void writeSettings(bool show)
   root[F("GPIOOUTPUTSpin")] = settingGPIOOUTPUTSpin;
   root[F("GPIOOUTPUTStriggerBit")] = settingGPIOOUTPUTStriggerBit;
   root[F("DallasLabels")] = settingDallasLabels;
+  root[F("CustomLabels")] = settingCustomLabels;
 
   serializeJsonPretty(root, file);
   if (show)  serializeJsonPretty(root, TelnetStream); //Debug stream ;-)
@@ -165,6 +166,9 @@ void readSettings(bool show)
   
   strlcpy(settingDallasLabels, doc[F("DallasLabels")] | "", sizeof(settingDallasLabels));
   if (strcmp_P(settingDallasLabels, PSTR("null"))==0) settingDallasLabels[0] = 0;
+  
+  strlcpy(settingCustomLabels, doc[F("CustomLabels")] | "", sizeof(settingCustomLabels));
+  if (strcmp_P(settingCustomLabels, PSTR("null"))==0) settingCustomLabels[0] = 0;
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();

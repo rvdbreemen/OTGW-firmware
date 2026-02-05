@@ -202,6 +202,9 @@ char* getDallasAddress(DeviceAddress deviceAddress);
 // Dallas sensor label settings storage (JSON string containing address:label pairs)
 char settingDallasLabels[512] = "";  // Stores sensor labels as JSON
 
+// Custom field label settings storage (JSON string containing fieldname:label pairs)
+char settingCustomLabels[1024] = "";  // Stores custom field labels as JSON
+
 
 // S0 Counter Settings and variables with global scope
 bool      settingS0COUNTERenabled = false;      

@@ -2108,6 +2108,9 @@ function initMainPage() {
   loadPersistentUI();
 
   applyTheme();
+  
+  // Load custom field labels
+  loadCustomLabels();
 
   if (!otLogResponsiveInitialized) {
     window.addEventListener('resize', handleOTLogResize);
@@ -2577,20 +2580,42 @@ function refreshOTmonitor() {
           
           // Check if this is a Dallas sensor (16 hex chars) and has a custom label
           var displayName = translateToHuman(data[i].name);
+          var isDallasSensor = false;
+          
           if (data[i].name && typeof data[i].name === 'string' && 
               data[i].name.length === 16 && /^[0-9A-Fa-f]{16}$/.test(data[i].name)) {
             // This is a Dallas sensor hex address
+            isDallasSensor = true;
             var labelKey = data[i].name + '_label';
             if (data[labelKey] && data[labelKey].value) {
               displayName = data[labelKey].value;
             }
             
-            // Add click handler to allow editing label
+            // Add click handler to allow editing Dallas sensor label
             fldDiv.style.cursor = 'pointer';
             fldDiv.title = 'Click to edit label (Address: ' + data[i].name + ')';
             fldDiv.onclick = (function(addr) {
               return function() { editSensorLabel(addr); };
             })(data[i].name);
+          } else {
+            // Check if this field has a translation (meaning it's a known OT field)
+            var hasTranslation = false;
+            for (var j = 0; j < translateFields.length; j++) {
+              if (translateFields[j][0] === data[i].name) {
+                hasTranslation = true;
+                break;
+              }
+            }
+            
+            // Make editable if it has a translation or custom label
+            if (hasTranslation || customLabels[data[i].name]) {
+              fldDiv.style.cursor = 'pointer';
+              fldDiv.title = 'Click to edit label';
+              fldDiv.className = 'otmoncolumn1 editable-label';
+              fldDiv.onclick = (function(fieldName) {
+                return function() { editFieldLabel(fieldName); };
+              })(data[i].name);
+            }
           }
           
           fldDiv.textContent = displayName;
@@ -2917,7 +2942,16 @@ function sendPostSetting(field, value) {
 
 
 //============================================================================  
+// Global storage for custom labels (loaded from API)
+var customLabels = {};
+
 function translateToHuman(longName) {
+  // First check if there's a custom label for this field
+  if (customLabels && customLabels[longName]) {
+    return customLabels[longName];
+  }
+  
+  // Otherwise use the default translation
   //for(var index = 0; index < (translateFields.length -1); index++) 
   for (var index = 0; index < translateFields.length; index++) {
     if (translateFields[index][0] == longName) {
@@ -2928,6 +2962,244 @@ function translateToHuman(longName) {
 
 } // translateToHuman()
 
+
+//============================================================================
+// Custom Field Labels Management
+//============================================================================
+
+// Load custom labels from API
+function loadCustomLabels() {
+  fetch(APIGW + 'v1/labels/custom')
+    .then(function(response) {
+      if (!response.ok) {
+        throw new Error('HTTP ' + response.status);
+      }
+      return response.json();
+    })
+    .then(function(labels) {
+      customLabels = labels;
+      console.log('Custom labels loaded:', customLabels);
+    })
+    .catch(function(error) {
+      console.error('Failed to load custom labels:', error);
+      customLabels = {};
+    });
+}
+
+// Edit custom field label
+function editFieldLabel(fieldName) {
+  if (!fieldName) return;
+  
+  // Get current label (translated or custom)
+  var currentLabel = translateToHuman(fieldName);
+  
+  // Get default label from translateFields
+  var defaultLabel = fieldName; // fallback
+  for (var i = 0; i < translateFields.length; i++) {
+    if (translateFields[i][0] === fieldName) {
+      defaultLabel = translateFields[i][1];
+      break;
+    }
+  }
+  
+  // Populate modal
+  var modal = document.getElementById('fieldLabelModal');
+  var fieldNameSpan = document.getElementById('modalFieldName');
+  var defaultLabelSpan = document.getElementById('modalDefaultLabel');
+  var labelInput = document.getElementById('modalFieldLabel');
+  var errorDiv = document.getElementById('modalFieldError');
+  
+  if (!modal || !fieldNameSpan || !defaultLabelSpan || !labelInput || !errorDiv) {
+    console.error('Field label modal elements not found');
+    return;
+  }
+  
+  fieldNameSpan.textContent = fieldName;
+  defaultLabelSpan.textContent = defaultLabel;
+  labelInput.value = currentLabel;
+  labelInput.dataset.fieldName = fieldName;
+  errorDiv.style.display = 'none';
+  
+  // Show modal
+  modal.style.display = 'flex';
+  
+  // Focus input field
+  setTimeout(function() {
+    labelInput.focus();
+    labelInput.select();
+  }, 100);
+  
+  // Handle Enter key to save
+  labelInput.onkeydown = function(e) {
+    if (e.key === 'Enter') {
+      saveFieldLabelFromModal();
+    } else if (e.key === 'Escape') {
+      closeFieldLabelModal();
+    }
+  };
+}
+
+function closeFieldLabelModal() {
+  var modal = document.getElementById('fieldLabelModal');
+  var errorDiv = document.getElementById('modalFieldError');
+  
+  if (modal) {
+    modal.style.display = 'none';
+  }
+  
+  if (errorDiv) {
+    errorDiv.style.display = 'none';
+  }
+}
+
+function saveFieldLabelFromModal() {
+  var labelInput = document.getElementById('modalFieldLabel');
+  var errorDiv = document.getElementById('modalFieldError');
+  
+  if (!labelInput || !errorDiv) return;
+  
+  var fieldName = labelInput.dataset.fieldName;
+  var newLabel = labelInput.value.trim();
+  
+  if (!fieldName) {
+    errorDiv.textContent = 'Invalid field name';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  // Validate
+  if (newLabel.length === 0) {
+    errorDiv.textContent = 'Label cannot be empty';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  if (newLabel.length > 50) {
+    newLabel = newLabel.substring(0, 50);
+  }
+  
+  // Disable buttons during save
+  var saveBtn = document.querySelector('#fieldLabelModal .btn-save');
+  var cancelBtn = document.querySelector('#fieldLabelModal .btn-cancel');
+  var resetBtn = document.querySelector('#fieldLabelModal .btn-reset');
+  
+  if (saveBtn) saveBtn.disabled = true;
+  if (cancelBtn) cancelBtn.disabled = true;
+  if (resetBtn) resetBtn.disabled = true;
+  
+  // Send update to server
+  fetch(APIGW + 'v1/labels/custom', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      field: fieldName,
+      label: newLabel
+    })
+  })
+  .then(function(response) {
+    if (!response.ok) {
+      throw new Error('HTTP ' + response.status);
+    }
+    return response.json();
+  })
+  .then(function(json) {
+    if (json.success) {
+      console.log('Field label updated:', fieldName, '=', newLabel);
+      // Update local cache
+      customLabels[fieldName] = newLabel;
+      // Close modal
+      closeFieldLabelModal();
+      // Refresh displays to show new label
+      refreshOTmonitor();
+    } else {
+      errorDiv.textContent = 'Failed to update label: ' + (json.error || 'Unknown error');
+      errorDiv.style.display = 'block';
+      // Re-enable buttons
+      if (saveBtn) saveBtn.disabled = false;
+      if (cancelBtn) cancelBtn.disabled = false;
+      if (resetBtn) resetBtn.disabled = false;
+    }
+  })
+  .catch(function(error) {
+    console.error('Error updating field label:', error);
+    errorDiv.textContent = 'Failed to update label: ' + error.message;
+    errorDiv.style.display = 'block';
+    // Re-enable buttons
+    if (saveBtn) saveBtn.disabled = false;
+    if (cancelBtn) cancelBtn.disabled = false;
+    if (resetBtn) resetBtn.disabled = false;
+  });
+}
+
+function resetFieldLabelToDefault() {
+  var labelInput = document.getElementById('modalFieldLabel');
+  var errorDiv = document.getElementById('modalFieldError');
+  
+  if (!labelInput || !errorDiv) return;
+  
+  var fieldName = labelInput.dataset.fieldName;
+  
+  if (!fieldName) {
+    errorDiv.textContent = 'Invalid field name';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  // Disable buttons during reset
+  var saveBtn = document.querySelector('#fieldLabelModal .btn-save');
+  var cancelBtn = document.querySelector('#fieldLabelModal .btn-cancel');
+  var resetBtn = document.querySelector('#fieldLabelModal .btn-reset');
+  
+  if (saveBtn) saveBtn.disabled = true;
+  if (cancelBtn) cancelBtn.disabled = true;
+  if (resetBtn) resetBtn.disabled = true;
+  
+  // Send delete request to server
+  fetch(APIGW + 'v1/labels/custom', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      field: fieldName
+    })
+  })
+  .then(function(response) {
+    if (!response.ok) {
+      throw new Error('HTTP ' + response.status);
+    }
+    return response.json();
+  })
+  .then(function(json) {
+    if (json.success) {
+      console.log('Field label reset to default:', fieldName);
+      // Remove from local cache
+      delete customLabels[fieldName];
+      // Close modal
+      closeFieldLabelModal();
+      // Refresh displays to show default label
+      refreshOTmonitor();
+    } else {
+      errorDiv.textContent = 'Failed to reset label: ' + (json.error || 'Unknown error');
+      errorDiv.style.display = 'block';
+      // Re-enable buttons
+      if (saveBtn) saveBtn.disabled = false;
+      if (cancelBtn) cancelBtn.disabled = false;
+      if (resetBtn) resetBtn.disabled = false;
+    }
+  })
+  .catch(function(error) {
+    console.error('Error resetting field label:', error);
+    errorDiv.textContent = 'Failed to reset label: ' + error.message;
+    errorDiv.style.display = 'block';
+    // Re-enable buttons
+    if (saveBtn) saveBtn.disabled = false;
+    if (cancelBtn) cancelBtn.disabled = false;
+    if (resetBtn) resetBtn.disabled = false;
+  });
+}
 
 
 //============================================================================  

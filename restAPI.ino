@@ -192,6 +192,24 @@ void processAPI()
         } else {
           sendApiNotFound(originalURI);
         }
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("labels")) == 0) {
+        // Custom field label management
+        if (wc > 4 && strcmp_P(words[4], PSTR("custom")) == 0) {
+          // GET /api/v1/labels/custom - Get all custom labels
+          // POST/PUT /api/v1/labels/custom - Set custom label {"field": "fieldname", "label": "customlabel"}
+          // DELETE /api/v1/labels/custom - Delete custom label (requires "field" in body)
+          if (isGet) {
+            sendCustomLabels();
+          } else if (isPostOrPut) {
+            updateCustomLabel();
+          } else if (strcmp_P(httpServer.method().c_str(), PSTR("DELETE")) == 0) {
+            deleteCustomLabelAPI();
+          } else {
+            httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n"));
+          }
+        } else {
+          sendApiNotFound(originalURI);
+        }
       } else {
         sendApiNotFound(originalURI);
       }
@@ -897,6 +915,85 @@ void updateSensorLabel() {
   snprintf_P(response, sizeof(response), PSTR("{\"success\":true,\"address\":\"%s\",\"label\":\"%s\"}"), address, label);
   httpServer.send(200, F("application/json"), response);
 } // updateSensorLabel()
+
+
+//====[ Get all custom field labels ]====
+void sendCustomLabels() {
+  char jsonBuffer[1024];
+  getCustomLabelsJson(jsonBuffer, sizeof(jsonBuffer));
+  
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+  httpServer.send(200, F("application/json"), jsonBuffer);
+} // sendCustomLabels()
+
+
+//====[ Update custom field label ]====
+void updateCustomLabel() {
+  // Parse JSON body: {"field": "fieldname", "label": "customlabel"}
+  StaticJsonDocument<256> doc;
+  DeserializationError error = deserializeJson(doc, httpServer.arg(F("plain")));
+  
+  if (error) {
+    httpServer.send_P(400, PSTR("application/json"), PSTR("{\"error\":\"Invalid JSON\"}"));
+    return;
+  }
+  
+  const char* fieldName = doc[F("field")];
+  const char* label = doc[F("label")];
+  
+  if (!fieldName || !label) {
+    httpServer.send_P(400, PSTR("application/json"), PSTR("{\"error\":\"Missing field or label\"}"));
+    return;
+  }
+  
+  // Validate field name length (max 50 characters)
+  if (strlen(fieldName) > 50) {
+    httpServer.send_P(400, PSTR("application/json"), PSTR("{\"error\":\"Field name too long (max 50 chars)\"}"));
+    return;
+  }
+  
+  // Validate label length (max 50 characters)
+  if (strlen(label) > 50) {
+    httpServer.send_P(400, PSTR("application/json"), PSTR("{\"error\":\"Label too long (max 50 chars)\"}"));
+    return;
+  }
+  
+  // Save the label
+  saveCustomLabel(fieldName, label);
+  
+  // Return success
+  char response[128];
+  snprintf_P(response, sizeof(response), PSTR("{\"success\":true,\"field\":\"%s\",\"label\":\"%s\"}"), fieldName, label);
+  httpServer.send(200, F("application/json"), response);
+} // updateCustomLabel()
+
+
+//====[ Delete custom field label ]====
+void deleteCustomLabelAPI() {
+  // Parse JSON body: {"field": "fieldname"}
+  StaticJsonDocument<128> doc;
+  DeserializationError error = deserializeJson(doc, httpServer.arg(F("plain")));
+  
+  if (error) {
+    httpServer.send_P(400, PSTR("application/json"), PSTR("{\"error\":\"Invalid JSON\"}"));
+    return;
+  }
+  
+  const char* fieldName = doc[F("field")];
+  
+  if (!fieldName) {
+    httpServer.send_P(400, PSTR("application/json"), PSTR("{\"error\":\"Missing field name\"}"));
+    return;
+  }
+  
+  // Delete the label (reset to default)
+  deleteCustomLabel(fieldName);
+  
+  // Return success
+  char response[128];
+  snprintf_P(response, sizeof(response), PSTR("{\"success\":true,\"field\":\"%s\",\"message\":\"Label reset to default\"}"), fieldName);
+  httpServer.send(200, F("application/json"), response);
+} // deleteCustomLabelAPI()
 
 
 //====================================================
