@@ -377,8 +377,8 @@ GitHub Actions → Copilot Review → ADR Skill Invoked → Comments on PR
 
 **Before major refactor:**
 ```
-User: "I want to refactor the MQTT module to use async/await"
-Copilot: [Checks ADR-006 (MQTT Integration Pattern), flags potential violation]
+User: "I want to refactor the MQTT reconnection logic to use a different backoff strategy"
+Copilot: [Checks ADR-006 (MQTT Integration Pattern), validates approach against existing design]
 ```
 
 ### 4. When Answering "Why" Questions
