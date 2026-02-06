@@ -39,37 +39,37 @@ Ask Copilot: "Use the ADR skill to create ADR-030 for implementing Redis caching
 
 ### Essential Files (Read These)
 
-1. **[SKILL.md](.github/skills/adr/SKILL.md)** (26KB)
+1. **[SKILL.md](SKILL.md)** (26KB)
    - Complete ADR management skill
    - Full template with all sections
    - Workflow guidance
    - Integration with Copilot instructions
    - **Start here** to understand the skill
 
-2. **[ALWAYS_USE_SKILL.md](.github/skills/adr/ALWAYS_USE_SKILL.md)** (10KB)
+2. **[ALWAYS_USE_SKILL.md](ALWAYS_USE_SKILL.md)** (10KB)
    - Step-by-step setup guide
    - How to ensure Copilot always uses the skill
    - **Read this** for configuration
 
-3. **[IMPLEMENTATION_SUMMARY.md](.github/skills/adr/IMPLEMENTATION_SUMMARY.md)** (12KB)
+3. **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** (12KB)
    - Complete overview of what was created
    - All requirements met
    - **Read this** for the big picture
 
 ### Copilot Integration (NEW)
 
-4. **[.github/copilot-instructions.md](../.github/copilot-instructions.md)** - Enhanced with ADR workflow
+4. **[.github/copilot-instructions.md](/.github/copilot-instructions.md)** - Enhanced with ADR workflow
    - Repository-wide ADR governance
    - Lifecycle management (Proposed → Accepted → Superseded)
    - When to create ADRs
    - Immutability enforcement
 
-5. **[.github/instructions/adr.coding-agent.instructions.md](../.github/instructions/adr.coding-agent.instructions.md)** - NEW
+5. **[.github/instructions/adr.coding-agent.instructions.md](/.github/instructions/adr.coding-agent.instructions.md)** - NEW
    - Coding agent-specific ADR requirements
    - Before/during implementation checklist
    - ADR creation and supersession workflow
 
-6. **[.github/instructions/adr.code-review.instructions.md](../.github/instructions/adr.code-review.instructions.md)** - NEW
+6. **[.github/instructions/adr.code-review.instructions.md](/.github/instructions/adr.code-review.instructions.md)** - NEW
    - Code review-specific ADR checks
    - Compliance verification checklist
    - Review comment examples
