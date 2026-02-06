@@ -67,10 +67,6 @@ void initSimulatedDallasSensors()
     strlcpy(DallasrealDevice[i].label, hexAddr, sizeof(DallasrealDevice[i].label));
     loadSensorLabel(hexAddr, DallasrealDevice[i].label, sizeof(DallasrealDevice[i].label));
 
-    // Always mark simulated labels clearly without persisting setting changes
-    char simulatedLabel[sizeof(DallasrealDevice[i].label)]{0};
-    snprintf_P(simulatedLabel, sizeof(simulatedLabel), PSTR("SIM:%s"), DallasrealDevice[i].label);
-    strlcpy(DallasrealDevice[i].label, simulatedLabel, sizeof(DallasrealDevice[i].label));
   }
 
   if (bDebugSensors)
@@ -92,7 +88,12 @@ DallasTemperature sensors(&oneWire);
 
 // Initialise the oneWire bus on the GPIO pin 
 void initSensors() {
-  if (!settingGPIOSENSORSenabled && !bDebugSensorSimulation) return;
+  if (!settingGPIOSENSORSenabled && !bDebugSensorSimulation)
+  {
+    DallasrealDeviceCount = 0;
+    numberOfDevices = 0;
+    return;
+  }
 
   if (bDebugSensorSimulation)
   {
@@ -207,7 +208,14 @@ if (settingMQTTenable) {
     }
     DallasrealDevice[i].lasttime = now ;
     
-    if (bDebugSensors) DebugTf(PSTR("Sensor device no[%d] addr[%s] TempC: %f\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
+    if (bDebugSensorSimulation)
+    {
+      DebugTf(PSTR("[SIM] Sensor device no[%d] addr[%s] TempC: %4.1f\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
+    }
+    else if (bDebugSensors)
+    {
+      DebugTf(PSTR("Sensor device no[%d] addr[%s] TempC: %f\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
+    }
 
     if (settingMQTTenable ) {
       //Build string for MQTT, use sendMQTTData for this
@@ -221,12 +229,6 @@ if (settingMQTTenable) {
       if (bDebugSensors) DebugFlush();
       sendMQTTData(strDeviceAddress, _msg);
 
-      if (bDebugSensorSimulation)
-      {
-        char simulatedKey[32]{0};
-        snprintf_P(simulatedKey, sizeof(simulatedKey), PSTR("%s_simulated"), strDeviceAddress);
-        sendMQTTData(simulatedKey, "true");
-      }
       // Serial.println(DallasTemperature::toFahrenheit(tempC)); // Converts tempC to Fahrenheit
     }
   }
