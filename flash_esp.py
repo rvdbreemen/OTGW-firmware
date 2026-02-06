@@ -21,7 +21,9 @@ import sys
 import tempfile
 import urllib.request
 import zipfile
+import shutil
 from pathlib import Path
+import config
 
 # Flash addresses for ESP8266
 FIRMWARE_ADDRESS = "0x0"
@@ -201,14 +203,14 @@ def build_firmware():
         print_success("Build completed successfully")
         
         # Look for the build artifacts
-        build_dir = script_dir / "build"
+        build_dir = config.BUILD_DIR
         if not build_dir.exists():
             print_error("Build directory not found")
             return None
         
         # Find firmware file
         firmware_file = None
-        for pattern in ["*.ino.bin", "OTGW-firmware.ino.bin"]:
+        for pattern in ["*.ino.bin", f"{config.PROJECT_NAME}.ino.bin"]:
             matches = list(build_dir.glob(pattern))
             if matches:
                 firmware_file = matches[0]
@@ -222,7 +224,7 @@ def build_firmware():
         
         # Find filesystem file
         filesystem_file = None
-        for pattern in ["*.littlefs.bin", "OTGW-firmware.ino.littlefs.bin"]:
+        for pattern in ["*.littlefs.bin", f"{config.PROJECT_NAME}.ino.littlefs.bin"]:
             matches = list(build_dir.glob(pattern))
             if matches:
                 filesystem_file = matches[0]
@@ -656,7 +658,7 @@ def flash_esp8266(port, firmware_file=None, filesystem_file=None, baud=DEFAULT_B
 def main():
     """Main entry point."""
     check_python_version()
-    
+
     # Disable colors on Windows if not supported
     if platform.system() == "Windows" and not os.environ.get("ANSICON"):
         Colors.disable()

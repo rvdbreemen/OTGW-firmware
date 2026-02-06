@@ -67,7 +67,6 @@ def parse_version_file(path):
             "_VERSION_MINOR",
             "_VERSION_PATCH",
             "_VERSION_BUILD",
-            "_VERSION_PRERELEASE",
         )
         if key not in version_info
     ]
@@ -109,7 +108,7 @@ def update_version_header(path, version_info, githash, date_str, time_str, incre
     minor = parse_int(version_info["_VERSION_MINOR"], "minor")
     patch = parse_int(version_info["_VERSION_PATCH"], "patch")
     build = parse_int(version_info["_VERSION_BUILD"], "build") + increment
-    prerelease_raw = version_info["_VERSION_PRERELEASE"]
+    prerelease_raw = version_info.get("_VERSION_PRERELEASE", "")
     prerelease_value = (
         prerelease_override
         if prerelease_override is not None
