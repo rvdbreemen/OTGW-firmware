@@ -1,9 +1,7 @@
 # -*- make -*-
 
 PROJ = $(notdir $(PWD))
-SRCDIR = src/OTGW-firmware
-BUILD_DIR = $(PWD)/build
-SOURCES = $(wildcard $(SRCDIR)/*.ino $(SRCDIR)/*.cpp $(SRCDIR)/*.h)
+SOURCES = $(wildcard *.ino *.cpp *.h)
 FSDIR = data
 FILES = $(wildcard $(FSDIR)/*)
 
@@ -32,8 +30,8 @@ TOOLS = $(wildcard arduino/packages/esp8266/hardware/esp8266/*/tools)
 ESPTOOL = python3 $(TOOLS)/esptool/esptool.py
 BOARD = $(PLATFORM):d1_mini
 FQBN = $(BOARD):eesz=4M2M,xtal=160
-IMAGE = $(BUILD_DIR)/$(INO).bin
-FILESYS = $(BUILD_DIR)/$(PROJ).littlefs.bin
+IMAGE = build/$(INO).bin
+FILESYS = build/$(INO).littlefs.bin
 
 export PYTHONPATH = $(TOOLS)/pyserial
 
@@ -112,17 +110,14 @@ libraries/WebSockets:
 
 $(IMAGE): $(BOARDS) $(LIBRARIES) $(SOURCES)
 	$(info Build code)
-	$(CLICFG) compile --fqbn=$(FQBN) --warnings default --verbose --build-property compiler.cpp.extra_flags="$(CFLAGS)" --output-dir $(BUILD_DIR) $(SRCDIR)
+	$(CLICFG) compile --fqbn=$(FQBN) --warnings default --verbose --build-property compiler.cpp.extra_flags="$(CFLAGS)"
 
 filesystem: $(FILESYS)
 
 $(FILESYS): $(FILES) $(CONF) | $(BOARDS) clean
-	@mkdir -p $(BUILD_DIR)
 	$(MKFS) -p 256 -b 8192 -s 1024000 -c $(FSDIR) $@
 
-	@mkdir -p $(BUILD_DIR)
 $(PROJ)-fs.bin: $(FILES) $(CONF) | $(BOARDS) clean
-	@mkdir -p $(BUILD_DIR)
 	$(MKFS) -p 256 -b 8192 -s 1024000 -c $(FSDIR) $@
 
 $(PROJ)-fw.bin: $(IMAGE)

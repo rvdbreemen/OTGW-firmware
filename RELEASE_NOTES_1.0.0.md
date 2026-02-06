@@ -2,68 +2,72 @@
 
 **The "Finally 1.0" Release**
 
-Version 1.0.0 marks a major milestone for the OTGW-firmware, bringing a modern web experience, major stability work, and a long list of integration improvements. This release focuses on reliability, memory safety, and a smooth day-to-day user experience.
+Version 1.0.0 marks a major milestone for the OTGW-firmware, bringing enterprise-grade stability, a completely overhauled user interface, and robust integration features that have been in development and testing for months. This release focuses on reliability, memory safety, and user experience.
 
 ## 🚀 Major Features
 
 ### 📊 Real-Time Graphing & Statistics
-- **Interactive graphs**: Real-time ECharts visualizations with time windows, extended history buffers, and auto-screenshot support.
-- **Statistics dashboard**: Dedicated tab for session and long-term statistics.
-- **Responsive layout**: Graphs and controls scale for both desktop and mobile.
+- **Interactive Graphs**: Visualize OpenTherm data in real-time directly in the Web UI. Monitor boiler temperatures, setpoints, and pressure with adjustable time windows.
+- **Statistics Dashboard**: New dedicated tab showing session and long-term statistics for your heating system.
+- **Responsive Design**: Graphs and charts adapt seamlessly to mobile and desktop screens.
 
 ### 🎨 Modern Web Interface
-- **Dark Mode**: Fully integrated dark theme with persistence and improved accessibility.
-- **Live OT Monitor**: Real-time OpenTherm log streaming via WebSockets (port 81), including OTmonitor-compatible export.
-- **File System Explorer**: Major UI refresh with better upload, download, directory navigation, and error handling.
-- **Settings UX**: Cleaner layout, responsive controls, and improved tab navigation.
-
-### 🧾 Stream Logging & Export
-- **Stream to File**: Direct-to-disk logging using the File System Access API (Chrome/Edge/Opera desktop).
-- **Auto-download**: Timed log downloads for browsers without filesystem access.
-- **CSV export reliability**: Fixes for empty exports and formatting alignment.
-
-### 🛠️ Firmware & Flashing
-- **XHR-based OTA**: Simplified firmware/filesystem flashing with `/api/v1/health` reboot verification (no WebSocket progress).
-- **Filesystem flashing robustness**: Improved safeguards and clearer status handling.
-- **PIC firmware flashing**: Safer binary parsing and crash prevention during upgrades.
-- **flash_esp.py**: Interactive flashing tool for download/build/flash workflows.
+- **Dark Mode**: Fully integrated dark theme that respects your system preferences or can be toggled manually (saves state).
+- **Live Log Viewer**: Re-engineered using WebSockets for true real-time streaming (no more polling!). Includes better filtering, pausing, and raw message decoding.
+- **File System Explorer**: Completely redesigned file manager with better upload/download/delete capabilities.
+- **Responsive Layouts**: Improved settings pages and controls that work better on smartphones.
 
 ### 🔌 Connectivity & Integration
-- **REST API v2**: Optimized `/api/v2/otgw/otmonitor` endpoint (map-based JSON format).
-- **Health endpoint**: `/api/v1/health` for uptime/heap/status checks; used for OTA verification.
-- **Device time endpoint**: `/api/v0/devtime` for timezone-aware time reporting.
-- **MQTT improvements**: Streaming auto-discovery, outside temperature override, hot water command clarifications, and event topics.
-- **Gateway mode detection**: Reliable `PR=M` polling for explicit gateway mode.
+- **WebSocket Architecture**: Moved from HTTP polling to WebSockets for live data (logs, status, updates), significantly reducing network overhead and latency.
+- **MQTT Auto Discovery**: Enhanced Home Assistant integration with improved stability, reliable reconnections, and cleaner entity naming.
+- **Stream Logging**: Ability to stream OpenTherm logs directly to files on the file system for troubleshooting.
 
-## 🛡️ Performance, Reliability & Safety
+### 🛠️ Firmware & Flashing
+- **Interactive Flashing Tool**: Improved `flash_esp.py` script for easy firmware updates (download release or build from source).
+- **PIC Firmware Upgrade**: Safer and more reliable flashing of the PIC controller directly from the Web UI, with binary data validation preventing crashes.
+- **Live Update Progress**: Real-time progress bars and status messages during firmware updates via WebSocket.
+- **Settings Preservation**: Smart preservation of configuration during firmware upgrades.
 
-- **PROGMEM enforcement**: Extensive migration to `F()` and `PSTR()` to reduce heap pressure.
-- **Static buffers**: Reduced heap fragmentation and crash risk under load.
-- **Heap backpressure**: Adaptive throttling for WebSocket/MQTT to prevent memory exhaustion.
-- **WebSocket robustness**: Queue limits, backpressure, Safari fixes, and improved reconnection logic.
-- **Binary safety**: `memcmp_P()` for hex/banner parsing to prevent Exception (2) crashes.
-- **Watchdog & Wi-Fi**: Improved watchdog feeding and clearer Wi-Fi connection diagnostics.
+### 🛡️ Stability & Security
+- **Memory Safety**: Extensive refactoring to use `PROGMEM` for strings, saving significant RAM (heap) and preventing fragmentation.
+- **Heap Protection**: Active monitoring of available memory with adaptive throttling to prevent crashes under load.
+- **Watchdog Improvements**: More reliable hardware watchdog integration to recover from hangs.
+- **Binary Data Handling**: Fixes for buffer manipulation ensuring safe handling of binary firmware files.
 
-## 🧰 Tooling & CI/CD
+## 📋 Full Changelog
 
-- **build.py**: Local build workflow using `arduino-cli` (no `make` requirement).
-- **evaluate.py**: Automated code-quality analysis and memory checks.
-- **autoinc-semver.py**: Version bump automation, hash updates, and CI integration.
-- **Release workflow**: Streamlined asset publishing and verification steps.
+### Added
+- **Graphs**: Added ECharts-based real-time graphing feature (`dev-feature-graphs`).
+- **Statistics**: Added comprehensive statistics page (`dev-stats-in-browser`).
+- **WebSockets**: Implemented WebSocket server for real-time logs and status (`dev-webui-live-log-lines`).
+- **Dark Theme**: Integrated dark mode CSS and toggle (`dev-integrated-dark-theme`).
+- **Flash Tool**: Added `flash_esp.py` for automated flashing and building.
+- **Evaluation**: Added `evaluate.py` for code quality checks (`fc63a60`).
+- **ADRs**: Added Architecture Decision Records to `docs/adr/`.
+- **Auto Config**: Added auto-configuration capabilities (`13826d7`).
+- **Legacy Support**: Added setting for legacy Dallas sensor ID format.
 
-## 📚 Documentation
+### Changed
+- **Dependencies**: Removed dependency on `make` for building; fully integrated `arduino-cli`.
+- **Logging**: Switched log viewer to use WebSockets.
+- **Memory**: Aggressive optimization of string literals using `F()` and `PSTR()`.
+- **Formatting**: Improved log line formatting and decoding.
+- **Docs**: Comprehensive updates to README and documentation.
 
-- **ADR library**: 29 ADRs documenting architectural decisions.
-- **Guides**: Build, flash, WebSocket, Safari, and stream logging documentation.
-- **API references**: v1/v2 API change summaries and MQTT command examples.
+### Fixed
+- **PIC Flashing**: Fixed critical crashes during PIC firmware updates due to binary data handling (`835d897`, `2634804`).
+- **MQTT**: Fixed buffer fragmentation improvements and reconnection logic.
+- **Timezone**: Fixed timezone initialization issues.
+- **Security**: Added CSRF protection and better input sanitization.
+- **Crashes**: Fixed multiple Exception (2) and Exception (28) causes related to memory access.
 
-## ⚠️ Breaking Changes & Behavioral Changes
+### Removed
+- **Polling**: Removed legacy HTTP polling for logs in favor of WebSockets.
+- **Unused Code**: Cleanup of legacy commented-out code and unused libraries.
 
-- **Dallas sensors**: Default GPIO changed from GPIO 13 (D7) to **GPIO 10 (SD3)** and sensor IDs now use the full 16-char format (legacy mode available).
-- **OTA flow**: WebSocket flash progress removed in favor of XHR + health-check verification.
-- **PIC firmware checks**: Automatic periodic checks disabled; manual checks only.
-- **FS Explorer**: LittleFS format endpoint removed from the UI.
+## ⚠️ Breaking Changes
+- **GPIO Defaults**: Default GPIO for Dallas sensors changed to GPIO 10 to match standard hardware behavior.
+- **Configuration**: Some settings might need re-verification due to the new preservation logic (though auto-migration is attempted).
 
 ## Acknowledgements
-
-Thank you to all contributors, testers, and the OpenTherm Gateway community for the feedback, bug reports, and release candidate testing that made 1.0.0 possible.
+Thank you to all contributors, testers, and the OpenTherm Gateway community for their feedback and support during the release candidate phase.

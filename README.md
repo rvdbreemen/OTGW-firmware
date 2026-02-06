@@ -1,7 +1,10 @@
 # OTGW-firmware (ESP8266) for NodoShop OpenTherm Gateway
 
-> **Latest stable release:** **v1.0.0**  
-> Grab release builds from the [releases page](https://github.com/rvdbreemen/OTGW-firmware/releases).
+> **⚠️ DEVELOPMENT BRANCH WARNING**  
+> **This is a development branch (`dev`) and contains the latest work-in-progress features.**  
+> For the latest stable release, please check the [releases page](https://github.com/rvdbreemen/OTGW-firmware/releases) (latest: **v1.0.0**).
+> 
+> **For production use, we recommend using the stable releases.**
 
 [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
 
@@ -15,7 +18,7 @@ Version 1.0.0 is a major milestone delivering improved stability, a modern user 
 - **Real-Time Graphs & Statistics**: Visualize boiler data (temperatures, setpoints) in real-time with responsive graphs and view long-term statistics in a dedicated dashboard.
 - **Modern Web UI**: Features a fully integrated **Dark Mode**, responsive design for mobile devices, and a redesigned **File System Explorer**.
 - **Live OpenTherm Message Streaming**: Real-time OpenTherm message log viewing using **WebSocket** on port 81 for instant visibility into gateway-boiler communication.
-- **Improved Flashing**: Simplified and more reliable **XHR-based firmware and filesystem flashing** with explicit reboot verification via health checks.
+- **Improved Flashing**: Simplified and more reliable **web-based firmware and filesystem flashing** with explicit reboot verification via health checks. Removed complex progress polling for stability.
 - **Stream Logging**: Stream OpenTherm logs directly to local files for troubleshooting.
 - **Device Health Monitoring**: `/api/v1/health` endpoint for operational status, uptime, and heap usage monitoring.
 
@@ -50,7 +53,6 @@ Starting with hardware version 2.3, the included ESP8266 devkit changed from Nod
 - **Evaluation framework**: [EVALUATION.md](docs/EVALUATION.md) - Code quality and standards checker
 - **WebSocket architecture**: [WEBSOCKET_FLOW.md](docs/WEBSOCKET_FLOW.md) - Complete WebSocket flow explanation
 - **WebSocket quick reference**: [WEBSOCKET_QUICK_REFERENCE.md](docs/WEBSOCKET_QUICK_REFERENCE.md) - Short WebSocket overview
-- **Stream logging guide**: [docs/guides/stream-logging.md](docs/guides/stream-logging.md) - Stream OT logs to local files
 - NodoShop OTGW product page: https://www.nodo-shop.nl/nl/opentherm-gateway/211-opentherm-gateway.html
 - Original OTGW project site (Schelte Bron): http://otgw.tclcode.com/
 - OTGW PIC firmware downloads: http://otgw.tclcode.com/download.html
@@ -87,7 +89,7 @@ The Web UI and APIs are designed for use on a trusted local network. Do not expo
 - Manage settings stored on LittleFS.
 - Perform PIC firmware maintenance (see warning below).
 - View a live OpenTherm message log stream and download logs (WebSocket-based on port 81).
-- **Stream logs directly to local files** using the File System Access API (Chrome/Edge/Opera desktop only) - see [docs/guides/stream-logging.md](docs/guides/stream-logging.md) for setup and technical details.
+- **Stream logs directly to local files** using the File System Access API (Chrome/Edge/Opera desktop only) - see [Stream Logging.md](Stream%20Logging.md) for setup and technical details.
 - Perform firmware and filesystem updates with automatic health verification after reboot (simplified XHR-based flow, no real-time progress polling).
 - Toggle a dark theme with per-browser persistence.
 - Supports reverse proxy deployments with automatic http/https detection for REST API and basic Web UI access; WebSocket-based features (such as the live OT message log) assume plain HTTP and may not work when accessed via an HTTPS reverse proxy.
@@ -153,9 +155,9 @@ This allows the OTGW to use external temperature data for OpenTherm communicatio
 ### REST API
 - Read OpenTherm values via `/api/v0/` and `/api/v1/` endpoints.
 - Send OTGW commands via `/api/v1/otgw/command/...` (POST/PUT).
-- **Health check endpoint:** `/api/v1/health` (GET) - Returns device status including uptime, heap usage, and operational status. **New in v1.0.0:** Used by OTA flash verification to confirm device is fully operational after reboot.
+- **Health check endpoint:** `/api/v1/health` (GET) - Returns device status including uptime, heap usage, and operational status. **New in v1.0.0-rc7:** Used by OTA flash verification to confirm device is fully operational after reboot.
 
-**OTA Flash Improvements (v1.0.0):**
+**OTA Flash Improvements (v1.0.0-rc7):**
 The firmware flash mechanism has been simplified for improved reliability:
 - **Firmware upload** (`/update?cmd=0`) and **filesystem upload** (`/update?cmd=100`) endpoints now block until flash operations complete
 - Backend returns HTTP 200 only after flash write succeeds, preventing false-success detection
@@ -228,7 +230,7 @@ For release artifacts, see https://github.com/rvdbreemen/OTGW-firmware/releases.
 
 | Version | Release notes |
 |-|-|
-| 1.0.0 | **Milestone Release**: The complete vision of the firmware with a stable API, modern UI, and robust integration.<br>**New Features**:<br>- **Live Logging**: Real-time WebSocket streaming with backpressure handling. UI controls for auto-scroll, timestamps, capture, and OTmonitor-compatible export.<br>- **Interactive Graphs**: Real-time data visualization with extended history buffers, time window controls, and auto-screenshot support.<br>- **Modern Web UI**: Responsive design with fully integrated **Dark Theme** (persistent). Refactored DevInfo page and improved FSexplorer.<br>- **Improved Tools**: New build system (`build.py`) and automated flashing tool (`flash_esp.py`). OTA uses XHR + health checks for reliable reboot verification.<br>- **Gateway Mode**: Reliable detection using `PR=M` command (checks every 30s).<br>- **NTP Control**: New `NTPsendtime` setting.<br>**Integration (MQTT & HA)**:<br>- **Auto Discovery**: Added support for Outside Temperature override (`outside`).<br>- **Documentation**: Clarified `hotwater` command values/examples.<br>- **Stability**: Static MQTT buffers to prevent heap fragmentation and improved rate limiting.<br>**Core Stability & Reliability**:<br>- **Binary Safety**: Critical fix for Exception (2) crashes during PIC flashing (replaced `strncmp_P` with `memcmp_P`).<br>- **Connectivity**: Rewritten Wi-Fi logic with improved watchdog handling and clearer diagnostics.<br>- **Data Parsing**: Better validation in `processLine`, support for Type 0 messages.<br>**Breaking Changes**:<br>- **Dallas Sensors**: Default pin changed from GPIO 13 (D7) to **GPIO 10 (SD3)** to match hardware defaults.<br>**Documentation**: Added `FLASH_GUIDE.md`, `BUILD.md`, and the ADR library. |
+| 1.0.0 | **Milestone Release**: The complete vision of the firmware with a stable API, modern UI, and robust integration.<br>**New Features**:<br>- **Live Logging**: Real-time WebSocket streaming with backpressure handling. UI controls for auto-scroll, timestamps, and capture.<br>- **Interactive Graphs**: Real-time data visualization with extended history buffers and time window controls.<br>- **Modern Web UI**: Responsive design with fully integrated **Dark Theme** (persistent). Refactored DevInfo page.<br>- **Improved Tools**: New build system (`build.py`) and automated flashing tool (`flash_esp.py`). Enhanced firmware update UI with live progress.<br>- **Gateway Mode**: Reliable detection using `PR=M` command (checks every 30s).<br>- **NTP Control**: New `NTPsendtime` setting.<br>**Integration (MQTT & HA)**:<br>- **Auto Discovery**: Added support for Outside Temperature override (`outside`).<br>- **Documentation**: Clarified `hotwater` command values/examples.<br>- **Stability**: Static 1350-byte MQTT buffer to prevent heap fragmentation.<br>**Core Stability & Security**:<br>- **Binary Safety**: Critical fix for Exception (2) crashes during PIC flashing (replaced `strncmp_P` with `memcmp_P`).<br>- **Connectivity**: Rewritten Wi-Fi logic with improved watchdog handling.<br>- **Security**: CSRF protection on APIs, masked password fields, input sanitization.<br>- **Data Parsing**: Better validation in `processLine`, support for Type 0 messages.<br>**Breaking Changes**:<br>- **Dallas Sensors**: Default pin changed from GPIO 13 (D7) to **GPIO 10 (SD3)** to match hardware defaults.<br>**Documentation**: Added `FLASH_GUIDE.md`, `BUILD.md`. |
 | 0.10.3 | Web UI: Mask MQTT password field and support running behind a reverse proxy (auto-detect http/https)<br>Home Assistant: Improve discovery templates (remove empty unit_of_measurement and add additional sensors/boundary values)<br>Fix: Status functions and REST API status reporting<br>CI: Improved GitHub Actions build/release workflow and release artifacts. |
 | 0.10.2 | Bugfix: issue #213 which caused 0 bytes after update of PIC firwmare (dropped to Adruino core 2.7.4)<br>Update to filesystem to include latest PIC firmware (6.5 and 5.8, released 12 march 2023)<br>Fix: Back to correct hostname to wifi (credits to @hvxl)<br>Fix: Adding a little memory for use with larger settings.|
 | 0.10.1 | Beter build processes to generate consistant quality using aruidno-cli and github actions (Thx to @hvxl and @DaveDavenport)<br>Maintaince to sourcetree, removed cruft, time.h library, submodules<br>Fix: parsing VH Status Master correctly<br>Enhancement: Stopping send time commands on detections of PS=1 mode<br>Fix: Mistake in MQTT configuration of auto discovery template for OEM fault code<br>Added wifi quality indication (so you can understand better)<br>Remove: Boardtype, as it was static in compiletime building|
