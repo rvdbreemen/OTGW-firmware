@@ -23,8 +23,8 @@ runs:
       run: |
         make -j$(nproc)
         find build -type f
-        for file in build/**/*.ino.bin; do mv "$file" "build/$(basename -s .ino.bin ${file})-${{steps.semver.outputs.semver}}.ino.bin"; done
-        for file in build/**/*.ino.elf; do mv "$file" "build/$(basename -s .ino.elf ${file})-${{steps.semver.outputs.semver}}.ino.elf"; done
+        for file in build/*.ino.bin; do mv "$file" "build/$(basename -s .ino.bin ${file})-${{steps.semver.outputs.semver}}.ino.bin"; done
+        for file in build/*.ino.elf; do mv "$file" "build/$(basename -s .ino.elf ${file})-${{steps.semver.outputs.semver}}.ino.elf"; done
       shell: bash
     - id: filesys
       run: |
