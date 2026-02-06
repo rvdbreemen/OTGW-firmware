@@ -71,7 +71,7 @@ Read **[ALWAYS_USE_SKILL.md](ALWAYS_USE_SKILL.md)** for:
 - **Full skill documentation:** [SKILL.md](SKILL.md)
 - **Usage and configuration:** [USAGE_GUIDE.md](USAGE_GUIDE.md)
 - **How to ensure consistent use:** [ALWAYS_USE_SKILL.md](ALWAYS_USE_SKILL.md) ⭐
-- **Existing ADRs:** [../../docs/adr/README.md](../../docs/adr/README.md)
+- **Existing ADRs:** [../../../docs/adr/README.md](../../../docs/adr/README.md)
 
 ## Key Features
 
