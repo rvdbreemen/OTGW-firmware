@@ -531,6 +531,14 @@ void sendOTmonitorV2()
       char labelKey[32];
       snprintf_P(labelKey, sizeof(labelKey), PSTR("%s_label"), strDeviceAddress);
       sendJsonOTmonMapEntry(labelKey, DallasrealDevice[i].label, F(""), now);
+
+      // Explicitly mark simulated Dallas values during debug simulation
+      if (bDebugSensorSimulation)
+      {
+        char simulatedKey[32];
+        snprintf_P(simulatedKey, sizeof(simulatedKey), PSTR("%s_simulated"), strDeviceAddress);
+        sendJsonOTmonMapEntry(simulatedKey, F("true"), F(""), now);
+      }
     }
   }
 
@@ -599,6 +607,14 @@ void sendOTmonitor()
         char labelKey[32];
         snprintf_P(labelKey, sizeof(labelKey), PSTR("%s_label"), strDeviceAddress);
         sendJsonOTmonObj(labelKey, DallasrealDevice[i].label, F(""), now);
+
+        // Explicitly mark simulated Dallas values during debug simulation
+        if (bDebugSensorSimulation)
+        {
+          char simulatedKey[32];
+          snprintf_P(simulatedKey, sizeof(simulatedKey), PSTR("%s_simulated"), strDeviceAddress);
+          sendJsonOTmonObj(simulatedKey, F("true"), F(""), now);
+        }
     }
   }
 

@@ -66,6 +66,11 @@ void initSimulatedDallasSensors()
     const char* hexAddr = getDallasAddress(DallasrealDevice[i].addr);
     strlcpy(DallasrealDevice[i].label, hexAddr, sizeof(DallasrealDevice[i].label));
     loadSensorLabel(hexAddr, DallasrealDevice[i].label, sizeof(DallasrealDevice[i].label));
+
+    // Always mark simulated labels clearly without persisting setting changes
+    char simulatedLabel[sizeof(DallasrealDevice[i].label)]{0};
+    snprintf_P(simulatedLabel, sizeof(simulatedLabel), PSTR("SIM:%s"), DallasrealDevice[i].label);
+    strlcpy(DallasrealDevice[i].label, simulatedLabel, sizeof(DallasrealDevice[i].label));
   }
 
   if (bDebugSensors)
@@ -215,6 +220,13 @@ if (settingMQTTenable) {
       // DebugTf(PSTR("Topic: %s -- Payload: %s\r\n"), strDeviceAddress, _msg);
       if (bDebugSensors) DebugFlush();
       sendMQTTData(strDeviceAddress, _msg);
+
+      if (bDebugSensorSimulation)
+      {
+        char simulatedKey[32]{0};
+        snprintf_P(simulatedKey, sizeof(simulatedKey), PSTR("%s_simulated"), strDeviceAddress);
+        sendMQTTData(simulatedKey, "true");
+      }
       // Serial.println(DallasTemperature::toFahrenheit(tempC)); // Converts tempC to Fahrenheit
     }
   }
