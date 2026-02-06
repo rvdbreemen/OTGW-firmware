@@ -32,10 +32,11 @@ import traceback
 import urllib.request
 import zipfile
 from pathlib import Path
-
+import config
 
 class Colors:
     """ANSI color codes for terminal output"""
+
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKCYAN = '\033[96m'
@@ -366,7 +367,7 @@ def update_version(project_dir):
     cmd = [
         sys.executable,
         str(script_path),
-        str(project_dir),
+        str(project_dir / "src" / "OTGW-firmware"),
         "--filename", "version.h",
         "--githash", githash
     ]
@@ -376,7 +377,7 @@ def update_version(project_dir):
 
 def get_semver(project_dir):
     """Extract semantic version from version.h"""
-    version_file = project_dir / "version.h"
+    version_file = project_dir / "src" / "OTGW-firmware" / "version.h"
     if not version_file.exists():
         return "unknown"
     
@@ -397,7 +398,7 @@ def create_build_directory(project_dir):
     """Create and clean build directory"""
     print_step("Preparing build directory")
     
-    build_dir = project_dir / "build"
+    build_dir = config.BUILD_DIR
     
     # Clean existing build directory if it exists
     if build_dir.exists():
@@ -429,7 +430,7 @@ def build_firmware(project_dir, config_file):
         "--verbose",
         "--build-property", f"compiler.cpp.extra_flags=\"{cflags}\"",
         "--config-file", str(config_file),
-        str(project_dir)
+        str(config.FIRMWARE_ROOT)
     ]
     
     run_command(cmd, cwd=project_dir, show_output=True)
@@ -457,8 +458,8 @@ def build_filesystem(project_dir, config_file):
         
     print_info(f"Using mklittlefs: {mklittlefs_path}")
     
-    fs_dir = project_dir / "data"
-    output_file = project_dir / "build" / "OTGW-firmware.littlefs.bin"
+    fs_dir = config.DATA_DIR
+    output_file = config.BUILD_DIR / f"{config.PROJECT_NAME}.littlefs.bin"
     
     # Ensure build dir exists
     output_file.parent.mkdir(exist_ok=True)
@@ -480,14 +481,52 @@ def consolidate_build_artifacts(project_dir):
     """Move all build artifacts from subdirectories to build root and clean up"""
     print_step("Consolidating build artifacts")
     
-    build_dir = project_dir / "build"
-    if not build_dir.exists():
-        print_warning("Build directory not found, skipping consolidation")
-        return
+    build_dir = config.BUILD_DIR
+    # Ensure build dir exists
+    build_dir.mkdir(exist_ok=True)
+    
+    # Source build directory (where arduino-cli outputs)
+    src_build_dir = config.FIRMWARE_ROOT / "build"
     
     moved = []
     
-    # Find and move all binary artifacts to build root
+    # Helper to move artifact
+    def process_artifact(source_path, dest_dir, action="copy"):
+        if not source_path.exists():
+            return False
+            
+        dest_path = dest_dir / source_path.name
+        
+        # Handle name conflicts
+        if dest_path.exists() and dest_path != source_path:
+            # Check if it is the same file
+            try:
+                if source_path.resolve() == dest_path.resolve():
+                    return False
+            except OSError:
+                pass
+            print_warning(f"File {dest_path.name} already exists, overwriting")
+            dest_path.unlink()
+        
+        if source_path != dest_path:
+            if action == "move":
+                shutil.move(str(source_path), str(dest_path))
+                print_info(f"Moved: {source_path.name}")
+            else:
+                shutil.copy2(str(source_path), str(dest_path))
+                print_info(f"Copied: {source_path.name}")
+            moved.append(dest_path)
+            return True
+        return False
+
+    # 1. Copy artifacts from src/OTGW-firmware/build (arduino-cli output)
+    if src_build_dir.exists():
+        patterns = ["**/*.ino.bin", "**/*.ino.elf", "**/*.ino.map"]
+        for pattern in patterns:
+            for file_path in src_build_dir.glob(pattern):
+                process_artifact(file_path, build_dir, action="copy")
+
+    # 2. Move artifacts from subdirectories in build/ (if any)
     patterns = ["**/*.ino.bin", "**/*.ino.elf", "**/*.littlefs.bin"]
     for pattern in patterns:
         for file_path in build_dir.glob(pattern):
@@ -495,22 +534,12 @@ def consolidate_build_artifacts(project_dir):
             if file_path.parent == build_dir:
                 continue
             
-            # Move to build root
-            dest_path = build_dir / file_path.name
+            process_artifact(file_path, build_dir, action="move")
             
-            # Handle name conflicts
-            if dest_path.exists():
-                print_warning(f"File {dest_path.name} already exists, overwriting")
-                dest_path.unlink()
-            
-            shutil.move(str(file_path), str(dest_path))
-            moved.append(dest_path)
-            print_info(f"Moved: {file_path.relative_to(build_dir)} -> {file_path.name}")
-    
     if moved:
-        print_success(f"Moved {len(moved)} artifact(s) to build root")
+        print_success(f"Consolidated {len(moved)} artifact(s) to build root")
     
-    # Remove empty subdirectories and any remaining files
+    # Remove empty subdirectories and any remaining files in build/
     for item in build_dir.iterdir():
         if item.is_dir():
             try:
@@ -519,7 +548,7 @@ def consolidate_build_artifacts(project_dir):
                 print_info(f"Removed directory: {item.name}")
             except Exception as e:
                 print_warning(f"Could not remove {item.name}: {e}")
-    
+
     print_success("Build directory cleaned")
 
 
@@ -527,7 +556,7 @@ def rename_build_artifacts(project_dir, semver):
     """Rename build artifacts with version number"""
     print_step("Renaming build artifacts")
     
-    build_dir = project_dir / "build"
+    build_dir = config.BUILD_DIR
     if not build_dir.exists():
         print_warning("Build directory not found, skipping rename")
         return
@@ -755,7 +784,7 @@ def clean_build(project_dir):
     """Clean build artifacts"""
     print_step("Cleaning build artifacts")
     
-    build_dir = project_dir / "build"
+    build_dir = config.BUILD_DIR
     arduino_dir = project_dir / "arduino"
     staging_dir = project_dir / "staging"
     

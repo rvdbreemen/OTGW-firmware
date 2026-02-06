@@ -1,8 +1,9 @@
 # -*- make -*-
 
-PROJ = $(notdir $(PWD))
-SOURCES = $(wildcard *.ino *.cpp *.h)
-FSDIR = data
+PROJ = OTGW-firmware
+SRCDIR = src/$(PROJ)
+SOURCES = $(wildcard $(SRCDIR)/*.ino $(SRCDIR)/*.cpp $(SRCDIR)/*.h)
+FSDIR = $(SRCDIR)/data
 FILES = $(wildcard $(FSDIR)/*)
 
 # Don't use -DATOMIC_FS_UPDATE
@@ -24,14 +25,15 @@ BOARDS := arduino/package_esp8266com_index.json
 PORT ?= /dev/ttyUSB0
 BAUD ?= 460800
 
-INO = $(PROJ).ino
+INO = $(SRCDIR)/$(PROJ).ino
 MKFS = $(wildcard arduino/packages/esp8266/tools/mklittlefs/*/mklittlefs)
 TOOLS = $(wildcard arduino/packages/esp8266/hardware/esp8266/*/tools)
 ESPTOOL = python3 $(TOOLS)/esptool/esptool.py
 BOARD = $(PLATFORM):d1_mini
 FQBN = $(BOARD):eesz=4M2M,xtal=160
-IMAGE = build/$(INO).bin
-FILESYS = build/$(INO).littlefs.bin
+# Arduino-cli output path logic is complex, simplified here for 'build' target if CLI puts it in build/ relative to sketch
+IMAGE = build/$(PROJ).ino.bin
+FILESYS = build/$(PROJ).littlefs.bin
 
 export PYTHONPATH = $(TOOLS)/pyserial
 
@@ -110,7 +112,7 @@ libraries/WebSockets:
 
 $(IMAGE): $(BOARDS) $(LIBRARIES) $(SOURCES)
 	$(info Build code)
-	$(CLICFG) compile --fqbn=$(FQBN) --warnings default --verbose --build-property compiler.cpp.extra_flags="$(CFLAGS)"
+	$(CLICFG) compile --fqbn=$(FQBN) --warnings default --verbose --build-property compiler.cpp.extra_flags="$(CFLAGS)" $(SRCDIR)
 
 filesystem: $(FILESYS)
 

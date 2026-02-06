@@ -1,0 +1,406 @@
+<!--
+***************************************************************************  
+**  Program  : FSexplorer.html
+**  Version  : v1.0.0
+**
+**  Copyright (c) 2021-2026 Robert van den Breemen
+**
+**  TERMS OF USE: MIT License. See bottom of file.                                                            
+***************************************************************************      
+-->
+<!DOCTYPE HTML>
+<html lang="en">
+   <head>
+      <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+      <script>
+        (function() {
+          var css = "FSexplorer.css";
+          try {
+            var storedTheme = localStorage.getItem('theme');
+            if (storedTheme === 'dark') {
+              css = "FSexplorer_dark.css";
+              document.documentElement.className = 'dark';
+            }
+          } catch (e) { console.error(e); }
+          document.write('<link rel="stylesheet" href="' + css + '" id="theme-style">');
+        })();
+      </script>
+      <title>FSexplorer ESP</title>
+      <script>
+         let currentPath = '/';
+
+         document.addEventListener('DOMContentLoaded', () => {
+             let main = document.querySelector('main');
+             let fileSize = document.querySelector('fileSize');
+             let fileInput = document.querySelector('input[name="upload"]');
+             let uploadBtn = document.querySelector('input[value="Upload"]');
+             let uploadForm = document.querySelector('form[action="/upload"]');
+             let freeBytes = 0;
+
+             // Create progress bar
+             let progressBar = document.createElement('progress');
+             progressBar.max = 100;
+             progressBar.value = 0;
+             progressBar.style.display = 'none';
+             progressBar.style.width = '200px';
+             progressBar.style.verticalAlign = 'middle';
+             uploadForm.appendChild(progressBar);
+
+             function toggleInteraction(disable) {
+                 const elements = document.querySelectorAll('input, button, select, textarea, a');
+                 elements.forEach(el => {
+                     if (disable) {
+                         if (el.tagName === 'A') {
+                             el.style.pointerEvents = 'none';
+                             el.style.opacity = '0.5';
+                         } else {
+                             if (el.disabled) el.setAttribute('data-disabled', 'true');
+                             el.disabled = true;
+                         }
+                     } else {
+                         if (el.tagName === 'A') {
+                             el.style.pointerEvents = 'auto';
+                             el.style.opacity = '1';
+                         } else {
+                             if (el.getAttribute('data-disabled') === 'true') {
+                                 el.removeAttribute('data-disabled');
+                             } else {
+                                 el.disabled = false;
+                             }
+                         }
+                     }
+                 });
+             }
+
+             function loadFileList(highlightFile = null) {
+                 uploadForm.action = '/upload?path=' + encodeURIComponent(currentPath);
+                 
+                 fetch('api/listfiles?path=' + encodeURIComponent(currentPath))
+                   .then(function (response) {
+                     if (!response.ok) {
+                       throw new Error('HTTP ' + response.status);
+                     }
+                     return response.json();
+                   })
+                   .then(function (json) {
+                     main.innerHTML = '';
+
+                     const table = document.createElement('table');
+                     table.style.width = '90%';
+
+                     const headerRow = table.insertRow();
+                     const headerCell = headerRow.insertCell();
+                     headerCell.colSpan = 6;
+                     const headerBold = document.createElement('b');
+                     headerBold.textContent = 'Current directory: ' + currentPath;
+                     headerCell.appendChild(headerBold);
+
+                     if (currentPath !== '/') {
+                       const parentRow = table.insertRow();
+                       const nameCell = parentRow.insertCell();
+                       nameCell.width = '20%';
+                       nameCell.setAttribute('nowrap', '');
+                       const parentBold = document.createElement('b');
+                       const parentLink = document.createElement('a');
+                       parentLink.href = '#';
+                       parentLink.className = 'dir-link';
+                       parentLink.setAttribute('data-name', '..');
+                       parentLink.textContent = '.. (Parent)';
+                       parentBold.appendChild(parentLink);
+                       nameCell.appendChild(parentBold);
+
+                       const typeCell = parentRow.insertCell();
+                       typeCell.width = '10%';
+                       typeCell.setAttribute('nowrap', '');
+                       typeCell.textContent = '<DIR>';
+                       for (let j = 0; j < 4; j++) {
+                         const cell = parentRow.insertCell();
+                         cell.width = (j === 3) ? '40%' : '10%';
+                         cell.setAttribute('nowrap', '');
+                       }
+                     }
+
+                     let i = 0;
+                     for (; i < json.length - 1; i++) {
+                       const row = table.insertRow();
+                       if (highlightFile && json[i].name === highlightFile) {
+                         row.style.backgroundColor = '#d4edda';
+                       }
+
+                       let fullPath = currentPath === '/' ? json[i].name : currentPath + '/' + json[i].name;
+                       if (currentPath !== '/' && !fullPath.startsWith('/')) fullPath = '/' + fullPath;
+
+                       if (json[i].name.indexOf("More files not") > -1) {
+                         const nameCell = row.insertCell();
+                         nameCell.width = '20%';
+                         nameCell.setAttribute('nowrap', '');
+                         nameCell.textContent = json[i].name;
+                         for (let j = 0; j < 3; j++) {
+                           const cell = row.insertCell();
+                           cell.width = '10%';
+                           cell.setAttribute('nowrap', '');
+                         }
+                       } else if (json[i].type === 'dir') {
+                         const nameCell = row.insertCell();
+                         nameCell.width = '20%';
+                         nameCell.setAttribute('nowrap', '');
+                         const dirBold = document.createElement('b');
+                         const dirLink = document.createElement('a');
+                         dirLink.href = '#';
+                         dirLink.className = 'dir-link';
+                         dirLink.setAttribute('data-name', json[i].name);
+                         dirLink.textContent = json[i].name + '/';
+                         dirBold.appendChild(dirLink);
+                         nameCell.appendChild(dirBold);
+
+                         const typeCell = row.insertCell();
+                         typeCell.width = '10%';
+                         typeCell.setAttribute('nowrap', '');
+                         typeCell.textContent = '<DIR>';
+                         for (let j = 0; j < 2; j++) {
+                           const cell = row.insertCell();
+                           cell.width = '10%';
+                           cell.setAttribute('nowrap', '');
+                         }
+                       } else {
+                         const nameCell = row.insertCell();
+                         nameCell.width = '20%';
+                         nameCell.setAttribute('nowrap', '');
+                         const fileLink = document.createElement('a');
+                         fileLink.href = fullPath;
+                         fileLink.target = '_blank';
+                         fileLink.textContent = json[i].name;
+                         nameCell.appendChild(fileLink);
+
+                         const sizeCell = row.insertCell();
+                         sizeCell.width = '10%';
+                         sizeCell.setAttribute('nowrap', '');
+                         const sizeSmall = document.createElement('small');
+                         sizeSmall.textContent = json[i].size;
+                         sizeCell.appendChild(sizeSmall);
+
+                         const downloadCell = row.insertCell();
+                         downloadCell.width = '10%';
+                         downloadCell.setAttribute('nowrap', '');
+                         const downloadLink = document.createElement('a');
+                         downloadLink.href = fullPath;
+                         downloadLink.download = json[i].name;
+                         downloadLink.textContent = ' Download ';
+                         downloadCell.appendChild(downloadLink);
+
+                         const deleteCell = row.insertCell();
+                         deleteCell.width = '10%';
+                         deleteCell.setAttribute('nowrap', '');
+
+                         const protectedFiles = ['FSexplorer.html', 'FSexplorer.css', 'FSexplorer.png',
+                                                 'index.html', 'index.js', 'index.css', 'settings.png'];
+                         if (!protectedFiles.includes(json[i].name)) {
+                           const deleteLink = document.createElement('a');
+                           deleteLink.href = '#';
+                           deleteLink.setAttribute('data-href', fullPath);
+                           deleteLink.className = 'delete-link';
+                           deleteLink.textContent = ' Delete ';
+                           deleteCell.appendChild(deleteLink);
+                         }
+                       }
+
+                       const spacerCell = row.insertCell();
+                       spacerCell.width = '40%';
+                       spacerCell.setAttribute('nowrap', '');
+                     }
+
+                     main.appendChild(table);
+
+                     document.querySelectorAll('.dir-link').forEach((node) => {
+                       node.addEventListener('click', (event) => {
+                         event.preventDefault();
+                         let name = node.getAttribute('data-name');
+                         if (name === '..') {
+                           let parts = currentPath.split('/');
+                           parts.pop();
+                           if (parts.length <= 1) currentPath = '/';
+                           else currentPath = parts.join('/');
+                           if (currentPath === '') currentPath = '/';
+                         } else {
+                           if (currentPath === '/') currentPath = '/' + name;
+                           else currentPath = currentPath + '/' + name;
+                         }
+                         loadFileList();
+                       });
+                     });
+
+                     document.querySelectorAll('.delete-link').forEach((node) => {
+                       node.addEventListener('click', (event) => {
+                         event.preventDefault();
+                         if (!confirm('Are you sure you want to delete this file?')) return;
+                         let href = node.getAttribute('data-href');
+
+                         fetch('api/listfiles?delete=' + encodeURIComponent(href))
+                           .then(res => {
+                             if (!res.ok) {
+                               throw new Error('HTTP ' + res.status);
+                             }
+                             loadFileList();
+                           })
+                           .catch(error => {
+                             console.error('Delete failed:', error);
+                             alert('Failed to delete file');
+                           });
+                       });
+                     });
+
+                     if (json[i]) {
+                       const storageInfo = document.createElement('p');
+                       const boldTag = document.createElement('b');
+                       boldTag.textContent = 'LittleFS';
+                       storageInfo.appendChild(boldTag);
+                       storageInfo.appendChild(document.createTextNode(' used ' + json[i].usedBytes + ' by ' + json[i].totalBytes));
+                       main.appendChild(storageInfo);
+                       freeBytes = json[i].freeBytes;
+                     }
+
+                     if (fileSize) fileSize.textContent = ' ';
+                   })
+                   .catch(function(error) {
+                     console.error('Error loading file list:', error);
+                     main.innerHTML = '';
+                     const errorMsg = document.createElement('p');
+                     errorMsg.style.color = 'red';
+                     errorMsg.textContent = 'Error loading file list. Please try again.';
+                     main.appendChild(errorMsg);
+                   });
+             }
+
+             loadFileList();
+
+             fileInput.addEventListener('change', () => {
+                 if (!fileInput.files.length) return;
+                 let nBytes = fileInput.files[0].size, output = `${nBytes} Byte`;
+                 for (var aMultiples = [
+                     ' KB',
+                     ' MB'
+                    ], i = 0, nApprox = nBytes / 1024; nApprox > 1; nApprox /= 1024, i++) {
+                      output = nApprox.toFixed(2) + aMultiples[i];
+                    }
+                    if (nBytes > freeBytes) {
+                      if (fileSize) {
+                        fileSize.innerHTML = '';
+                        const small = document.createElement('small');
+                        small.textContent = ' Filesize : ' + output;
+                        const strong = document.createElement('strong');
+                        strong.style.color = 'red';
+                        strong.textContent = ' not enough space! ';
+                        const p = document.createElement('p');
+                        p.appendChild(small);
+                        p.appendChild(strong);
+                        fileSize.appendChild(p);
+                      }
+                      uploadBtn.setAttribute('disabled', 'disabled');
+                    } 
+                    else {
+                      if (fileSize) {
+                        fileSize.innerHTML = '';
+                        const p = document.createElement('p');
+                        const bold = document.createElement('b');
+                        bold.textContent = 'Filesize:';
+                        p.appendChild(bold);
+                        p.appendChild(document.createTextNode(' ' + output));
+                        fileSize.appendChild(p);
+                      }
+                      uploadBtn.removeAttribute('disabled');
+                    }
+             });
+
+             uploadForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                let file = fileInput.files[0];
+                if(!file) return;
+
+                toggleInteraction(true);
+
+                let formData = new FormData();
+                formData.append('upload', file);
+
+                let xhr = new XMLHttpRequest();
+                
+                uploadBtn.style.display = 'none';
+                progressBar.style.display = 'inline-block';
+                progressBar.value = 0;
+                
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        progressBar.value = (e.loaded / e.total) * 100;
+                    }
+                });
+
+                xhr.onload = function() {
+                    toggleInteraction(false);
+                    if (xhr.status == 200) {
+                        loadFileList(file.name);
+                    } else {
+                        alert('Upload failed!');
+                    }
+                    progressBar.style.display = 'none';
+                    uploadBtn.style.display = 'inline-block';
+                    uploadBtn.disabled = true;
+                    fileInput.value = '';
+                };
+
+                xhr.onerror = function() {
+                    toggleInteraction(false);
+                    alert('Error during upload');
+                    progressBar.style.display = 'none';
+                    uploadBtn.style.display = 'inline-block';
+                };
+
+                xhr.open('POST', '/upload');
+                xhr.send(formData);
+             });
+          });
+      </script>
+   </head>
+   <body>
+      <h2>FSexplorer ESP</h2>
+      <div>
+         <main></main>
+      </div>
+      <br>
+      
+      <fieldset class="upload-box">
+        <legend>Upload File</legend>
+        <form action="/upload" method="POST" enctype="multipart/form-data">
+             <input type="file" name="upload">
+             <input type="submit" value="Upload" disabled>
+        </form>
+        <fileSize></fileSize>
+      </fieldset>
+      
+      <span></span>
+      
+      <hr>
+      <div class="system-actions">
+           <h3>System Actions</h3>
+           <div class="button-row">
+                <form action='/update' method='GET'>
+                  <input type='submit' class='button' name='SUBMIT' value='Update Firmware' ENABLED/>
+                </form>
+                <form action='/ReBoot'>
+                  <input type='submit' class='button' name='SUBMIT' value='ReBoot'>
+                </form>
+                <form action='/ResetWireless'>
+                  <input type='submit' class='button' name='SUBMIT' value='Reset Wireless'>
+                </form>
+                <form action='/'>
+                  <input type='button' class='button' value='Exit FSexplorer' onclick="window.location.href='/'">
+                </form>
+           </div>
+      </div>
+      <br>
+      <div id="left">
+         <a href="https://fipsok.de/Projekt/Esp8266-LittleFS-Tab" target="_blank">Admin © 2018 Jens Fleischer</a><br>
+         <a href="https://github.com/rvdbreemen/OTGW-firmware" target="_blank">Adaptations © 2021-2026 Robert van den Breemen</a>
+      </div>
+   </body>
+</html>

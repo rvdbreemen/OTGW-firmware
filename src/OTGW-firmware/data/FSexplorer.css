@@ -1,0 +1,289 @@
+/*
+***************************************************************************  
+**  Program  : FSexplorer.html
+**  Version  : v1.0.0
+***************************************************************************  
+*/
+:root {
+    --primary-color: #0088cc; /* A slightly darker blue than #00bffe for better text contrast */
+    --primary-hover: #0077b3;
+    --bg-color: #e6ffff;      /* Matching index.css background */
+    --card-bg: #ffffff;
+    --text-color: #333;
+    --border-radius: 8px;
+    --shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+h2 {
+    color: #2c3e50;
+    text-shadow: none;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* Layout Containers */
+/* Constrain width of main content area to prevent 100% width on large screens */
+body > div, body > fieldset, body > .system-actions {
+    width: 100%;
+    max-width: 800px;
+}
+
+/* File List Styling */
+main {
+    width: 100%;
+    overflow-x: auto;
+    background: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    padding: 10px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+table {
+    width: 100% !important; /* Override inline 90% */
+    border-collapse: collapse;
+    margin: 0;
+}
+
+tr {
+    border-bottom: 1px solid #eee;
+}
+
+tr:last-child {
+    border-bottom: none;
+}
+
+tr:nth-child(even) { background: #f0fbff; } /* Very faint blue */
+tr:nth-child(odd) { background: #ffffff; }
+
+td {
+    padding: 12px 8px;
+    text-align: left;
+    white-space: nowrap;
+    border: none;
+    width: auto !important; /* Critical: Overrides inline width attributes to fix column sizes */
+}
+
+/* Override 5th column background from original CSS */
+td:nth-child(n+5) {
+    background: transparent;
+}
+
+/* Links */
+a {
+    color: var(--primary-color);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+a:hover {
+    color: var(--primary-hover);
+    text-decoration: underline;
+}
+
+a.delete-link {
+    color: #dc3545; /* Danger Red */
+}
+a.delete-link:hover {
+    color: #c82333;
+    text-decoration: underline;
+}
+
+/* Upload Section */
+fieldset.upload-box {
+    background-color: var(--card-bg);
+    border: none;
+    border-radius: var(--border-radius);
+    padding: 25px;
+    margin-top: 20px;
+    box-shadow: var(--shadow);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+legend {
+    font-weight: 600;
+    font-size: 1.1em;
+    padding: 0 10px;
+    color: var(--primary-color);
+}
+
+form[action="/upload"] {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* System Actions Section */
+.system-actions {
+    background-color: var(--card-bg);
+    padding: 25px;
+    border-radius: var(--border-radius);
+    margin-top: 20px;
+    box-shadow: var(--shadow);
+    text-align: center;
+    box-sizing: border-box;
+    /* Ensure it behaves like the fieldset */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.system-actions h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: var(--primary-color);
+    border-bottom: 2px solid #e0f7fa; /* Light cyan border to match theme */
+    padding-bottom: 15px;
+    display: block;
+    width: 100%;
+}
+
+/* Form Elements */
+input[type="file"] {
+    display: block;
+    width: 100%;
+    max-width: 500px;
+    padding: 15px;
+    margin-bottom: 20px;
+    background: #f8f9fa;
+    border: 2px dashed #ced4da;
+    border-radius: var(--border-radius);
+    box-sizing: border-box;
+    cursor: pointer;
+    text-align: center;
+}
+input[type="file"]:hover {
+    border-color: var(--primary-color);
+    background: #e9ecef;
+}
+
+progress {
+    width: 100% !important;
+    max-width: 500px;
+    height: 20px;
+    margin-bottom: 20px;
+    accent-color: var(--primary-color);
+}
+
+fileSize {
+    display: block;
+    margin-top: 10px;
+    min-height: 1.2em;
+    text-align: center;
+    width: 100%;
+}
+fileSize p {
+    margin: 5px 0;
+}
+
+.button-row {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+/* Button Styling System-wide */
+input[type="submit"], input[type="button"], .button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    height: auto;
+    width: auto;
+    min-width: 140px;
+    margin: 0;
+    -webkit-appearance: none;
+}
+
+input[type="submit"]:hover, input[type="button"]:hover, .button:hover {
+    opacity: 0.9;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+input[type="submit"]:active, input[type="button"]:active, .button:active {
+    transform: translateY(0);
+}
+
+input[type="submit"]:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Action Specific Colors */
+form[action='/ReBoot'] input { background-color: #6c757d; }
+form[action='/ReBoot'] input:hover { background-color: #5a6268; }
+
+form[action='/ResetWireless'] input { background-color: #ffc107; color: #000; }
+form[action='/ResetWireless'] input:hover { background-color: #e0a800; }
+
+form[action='/'] input { background-color: #dc3545; }
+form[action='/'] input:hover { background-color: #c82333; }
+
+/* Hide HR as we use cards now */
+hr {
+    display: none;
+}
+
+/* Footer links */
+#left {
+    margin-top: 40px;
+    text-align: center;
+    font-size: 0.85em;
+    color: #888;
+    width: 100%;
+}
+#left a {
+    color: #888;
+    text-decoration: none;
+    margin: 0 5px;
+}
+#left a:hover {
+    color: var(--primary-color);
+    text-decoration: underline;
+}
+
+/* Note style if it appears */
+.note {
+	background-color: #ffccbc;
+    color: #d84315;
+	padding: 10px;
+	margin-top: 1em;
+	text-align: center;
+	border-radius: var(--border-radius);
+    max-width: 100%;
+}
+
+/* Highlighting styles from original JS */
+tr[style*="background-color"] {
+    background-color: #d4edda !important;
+}
+

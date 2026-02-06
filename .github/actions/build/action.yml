@@ -1,15 +1,20 @@
-name: arduino-cli build
-description: Build using arduino-cli and makefile
+name: 'Arduino CLI Build'
+description: 'Build firmware using arduino-cli and makefile'
+
+outputs:
+  semver:
+    description: 'Semantic version from version.h'
+    value: ${{ steps.semver.outputs.semver }}
 
 runs:
   using: composite
   steps:
     - id: autoinc-semver
       run: |
-        python scripts/autoinc-semver.py . --filename version.h --githash "$GITHUB_SHA"
+        python scripts/autoinc-semver.py src/OTGW-firmware --filename version.h --githash "$GITHUB_SHA"
       shell: bash
     - id: semver
-      run: cat version.h  | sed  -n  '/^#define _SEMVER_FULL.*$/s/^#.*"\(.*\)"$/semver=\1/p' >> $GITHUB_OUTPUT
+      run: cat src/OTGW-firmware/version.h  | sed  -n  '/^#define _SEMVER_FULL.*$/s/^#.*"\(.*\)"$/semver=\1/p' >> $GITHUB_OUTPUT
       shell: bash
     - id: create-build-dir
       run: mkdir -p build

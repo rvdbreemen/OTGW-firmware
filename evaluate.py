@@ -20,15 +20,14 @@ Usage:
 
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple
-
+from typing import Dict, List, Tuple, Any
+import config
 
 class Colors:
     """ANSI color codes"""
@@ -43,8 +42,9 @@ class Colors:
 
     @staticmethod
     def disable():
-        Colors.HEADER = Colors.OKBLUE = Colors.OKCYAN = ''
-        Colors.OKGREEN = Colors.WARNING = Colors.FAIL = Colors.ENDC = Colors.BOLD = ''
+        # Suppress type checker warnings for intentional constant reassignment
+        Colors.HEADER = Colors.OKBLUE = Colors.OKCYAN = ''  # type: ignore
+        Colors.OKGREEN = Colors.WARNING = Colors.FAIL = Colors.ENDC = Colors.BOLD = ''  # type: ignore
 
 
 class EvaluationResult:
@@ -70,7 +70,7 @@ class WorkspaceEvaluator:
         self.project_dir = project_dir
         self.verbose = verbose
         self.results: List[EvaluationResult] = []
-        self.stats = defaultdict(int)
+        self.stats: Dict[str, int] = defaultdict(int)
         
     def add_result(self, result: EvaluationResult):
         """Add evaluation result and update stats"""
@@ -102,12 +102,12 @@ class WorkspaceEvaluator:
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Code Structure Analysis ==={Colors.ENDC}")
         
         # Check for required files
-        required_files = [
-            "OTGW-firmware.ino",
-            "OTGW-firmware.h",
-            "version.h",
-            "README.md",
-            "LICENSE"
+        required_files: List[Path] = [
+            config.FIRMWARE_ROOT / "OTGW-firmware.ino",
+            config.FIRMWARE_ROOT / "OTGW-firmware.h",
+            config.FIRMWARE_ROOT / "version.h",
+            Path("README.md"),
+            Path("LICENSE")
         ]
         
         for file in required_files:
@@ -124,7 +124,8 @@ class WorkspaceEvaluator:
                 ))
 
         # Check .ino file organization
-        ino_files = list(self.project_dir.glob("*.ino"))
+        src_dir = config.FIRMWARE_ROOT
+        ino_files = list(src_dir.glob("*.ino"))
         self.add_result(EvaluationResult(
             "Structure", "INO modules", "INFO",
             f"Found {len(ino_files)} Arduino modules",
@@ -132,7 +133,7 @@ class WorkspaceEvaluator:
         ))
 
         # Check for proper header guards in .h files
-        h_files = list(self.project_dir.glob("*.h"))
+        h_files = list(src_dir.glob("*.h"))
         for h_file in h_files:
             with open(h_file, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
@@ -158,7 +159,8 @@ class WorkspaceEvaluator:
             'magic_numbers': 0
         }
         
-        ino_cpp_files = list(self.project_dir.glob("*.ino")) + list(self.project_dir.glob("*.cpp"))
+        src_dir = config.FIRMWARE_ROOT
+        ino_cpp_files = list(src_dir.glob("*.ino")) + list(src_dir.glob("*.cpp"))
         
         for file in ino_cpp_files:
             with open(file, 'r', encoding='utf-8', errors='ignore') as f:
@@ -203,8 +205,9 @@ class WorkspaceEvaluator:
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Memory Analysis ==={Colors.ENDC}")
         
         # Check for large buffers
-        large_buffers = []
-        ino_cpp_files = list(self.project_dir.glob("*.ino")) + list(self.project_dir.glob("*.cpp")) + list(self.project_dir.glob("*.h"))
+        large_buffers: List[Tuple[str, int]] = []
+        src_dir = config.FIRMWARE_ROOT
+        ino_cpp_files = list(src_dir.glob("*.ino")) + list(src_dir.glob("*.cpp")) + list(src_dir.glob("*.h"))
         
         for file in ino_cpp_files:
             with open(file, 'r', encoding='utf-8', errors='ignore') as f:
@@ -277,6 +280,7 @@ class WorkspaceEvaluator:
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Dependencies ==={Colors.ENDC}")
         
         # Parse dependencies from Makefile
+        lib_matches: List[str] = []
         makefile = self.project_dir / "Makefile"
         if makefile.exists():
             with open(makefile, 'r') as f:
@@ -318,7 +322,7 @@ class WorkspaceEvaluator:
                 size = len(content)
                 
                 sections = ['Installation', 'Build', 'Features', 'License']
-                found_sections = []
+                found_sections: List[str] = []
                 for section in sections:
                     if section.lower() in content.lower():
                         found_sections.append(section)
@@ -352,7 +356,8 @@ class WorkspaceEvaluator:
         # Check inline documentation (comments ratio)
         total_lines = 0
         comment_lines = 0
-        ino_files = list(self.project_dir.glob("*.ino"))
+        src_dir = config.FIRMWARE_ROOT
+        ino_files = list(src_dir.glob("*.ino"))
         
         for file in ino_files:
             with open(file, 'r', encoding='utf-8', errors='ignore') as f:
@@ -376,15 +381,16 @@ class WorkspaceEvaluator:
         """Check for common security issues"""
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Security Analysis ==={Colors.ENDC}")
         
-        security_issues = {
+        security_issues: Dict[str, List[str]] = {
             'hardcoded_creds': [],
             'unsafe_string_ops': [],
             'buffer_overflow_risk': []
         }
         
-        all_code_files = (list(self.project_dir.glob("*.ino")) + 
-                         list(self.project_dir.glob("*.cpp")) + 
-                         list(self.project_dir.glob("*.h")))
+        src_dir = config.FIRMWARE_ROOT
+        all_code_files = (list(src_dir.glob("*.ino")) + 
+                         list(src_dir.glob("*.cpp")) + 
+                         list(src_dir.glob("*.h")))
         
         for file in all_code_files:
             with open(file, 'r', encoding='utf-8', errors='ignore') as f:
@@ -439,7 +445,7 @@ class WorkspaceEvaluator:
             return
 
         # Check current branch
-        rc, stdout, stderr = self.run_command(["git", "branch", "--show-current"])
+        rc, stdout, _ = self.run_command(["git", "branch", "--show-current"])
         if rc == 0:
             branch = stdout.strip()
             self.add_result(EvaluationResult(
@@ -448,7 +454,7 @@ class WorkspaceEvaluator:
             ))
 
         # Check for uncommitted changes
-        rc, stdout, stderr = self.run_command(["git", "status", "--porcelain"])
+        rc, stdout, _ = self.run_command(["git", "status", "--porcelain"])
         if rc == 0:
             if stdout.strip():
                 changed_files = len(stdout.strip().split('\n'))
@@ -483,7 +489,7 @@ class WorkspaceEvaluator:
         """Check data directory for LittleFS"""
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Filesystem Data ==={Colors.ENDC}")
         
-        data_dir = self.project_dir / "data"
+        data_dir = config.DATA_DIR
         if not data_dir.exists():
             self.add_result(EvaluationResult(
                 "Filesystem", "data/ directory", "FAIL",
@@ -517,7 +523,7 @@ class WorkspaceEvaluator:
         """Check version information"""
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Version Information ==={Colors.ENDC}")
         
-        version_file = self.project_dir / "version.h"
+        version_file = config.FIRMWARE_ROOT / "version.h"
         if version_file.exists():
             with open(version_file, 'r') as f:
                 content = f.read()
@@ -602,7 +608,7 @@ class WorkspaceEvaluator:
 
     def generate_report(self, output_file: Path):
         """Generate detailed JSON report"""
-        report = {
+        report: Dict[str, Any] = {
             "timestamp": datetime.now().isoformat(),
             "project_dir": str(self.project_dir),
             "summary": {

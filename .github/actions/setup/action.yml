@@ -1,5 +1,5 @@
-name: CI Build Setup
-description: Sets up build dependencies
+name: 'CI Build Setup'
+description: 'Sets up build dependencies for Arduino CLI'
 
 runs:
   using: composite

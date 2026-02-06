@@ -53,7 +53,6 @@ jobs:
           body: ${{ github.event.release.body }}
           draft: false
           prerelease: ${{ github.event.release.prerelease }}
-          allow_updates: true
           files: |
             build/*.elf
             build/*.bin
