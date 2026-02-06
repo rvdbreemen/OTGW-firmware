@@ -414,10 +414,10 @@ cp .github/PULL_REQUEST_TEMPLATE.md.example .github/PULL_REQUEST_TEMPLATE.md
 
 ## Additional Resources
 
-- **ADR Skill Documentation:** [.github/skills/adr/SKILL.md](.github/skills/adr/SKILL.md)
-- **Usage Guide:** [.github/skills/adr/USAGE_GUIDE.md](.github/skills/adr/USAGE_GUIDE.md)
-- **ADR Index:** [docs/adr/README.md](../../docs/adr/README.md)
-- **Copilot Instructions:** [.github/copilot-instructions.md](../copilot-instructions.md)
+- **ADR Skill Documentation:** [SKILL.md](SKILL.md)
+- **Usage Guide:** [USAGE_GUIDE.md](USAGE_GUIDE.md)
+- **ADR Index:** [docs/adr/README.md](../../../docs/adr/README.md)
+- **Copilot Instructions:** [.github/copilot-instructions.md](../../copilot-instructions.md)
 - **ADR Best Practices:** https://adr.github.io/
 
 ---
