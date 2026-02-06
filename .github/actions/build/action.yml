@@ -42,13 +42,13 @@ runs:
     - id: push-version
       if: github.event_name == 'push' && github.ref_type == 'branch'
       run: |
-        if git diff --quiet -- version.h; then
+        if git diff --quiet -- src/OTGW-firmware/version.h; then
           echo "version.h unchanged; skipping commit."
           exit 0
         fi
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add version.h
+        git add src/OTGW-firmware/version.h
         git commit -m "CI: update version.h"
         git push origin "HEAD:${GITHUB_REF_NAME}"
       shell: bash
