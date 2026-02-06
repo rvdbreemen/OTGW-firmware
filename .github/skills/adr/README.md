@@ -107,14 +107,14 @@ The skill includes detailed examples from this repository:
 
 ### Enable CI/CD Checks
 ```bash
-# Copy example workflow
-cp ../../.github/workflows/adr-compliance.yml.example ../../.github/workflows/adr-compliance.yml
+# From repo root, copy example workflow
+cp .github/workflows/adr-compliance.yml.example .github/workflows/adr-compliance.yml
 ```
 
 ### Enable PR Template
 ```bash
-# Copy example PR template
-cp ../../.github/PULL_REQUEST_TEMPLATE.md.example ../../.github/PULL_REQUEST_TEMPLATE.md
+# From repo root, copy example PR template
+cp .github/PULL_REQUEST_TEMPLATE.md.example .github/PULL_REQUEST_TEMPLATE.md
 ```
 
 See [ALWAYS_USE_SKILL.md](ALWAYS_USE_SKILL.md) for detailed setup instructions.
