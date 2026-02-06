@@ -103,9 +103,9 @@ class WorkspaceEvaluator:
         
         # Check for required files
         required_files = [
-            "src/OTGW-firmware/OTGW-firmware.ino",
-            "src/OTGW-firmware/OTGW-firmware.h",
-            "src/OTGW-firmware/version.h",
+            "OTGW-firmware.ino",
+            "OTGW-firmware.h",
+            "version.h",
             "README.md",
             "LICENSE"
         ]
@@ -124,7 +124,7 @@ class WorkspaceEvaluator:
                 ))
 
         # Check .ino file organization
-        ino_files = list((self.project_dir / "src" / "OTGW-firmware").glob("*.ino"))
+        ino_files = list(self.project_dir.glob("*.ino"))
         self.add_result(EvaluationResult(
             "Structure", "INO modules", "INFO",
             f"Found {len(ino_files)} Arduino modules",
@@ -132,7 +132,7 @@ class WorkspaceEvaluator:
         ))
 
         # Check for proper header guards in .h files
-        h_files = list((self.project_dir / "src" / "OTGW-firmware").glob("*.h"))
+        h_files = list(self.project_dir.glob("*.h"))
         for h_file in h_files:
             with open(h_file, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
@@ -158,8 +158,7 @@ class WorkspaceEvaluator:
             'magic_numbers': 0
         }
         
-        source_dir = self.project_dir / "src" / "OTGW-firmware"
-        ino_cpp_files = list(source_dir.glob("*.ino")) + list(source_dir.glob("*.cpp"))
+        ino_cpp_files = list(self.project_dir.glob("*.ino")) + list(self.project_dir.glob("*.cpp"))
         
         for file in ino_cpp_files:
             with open(file, 'r', encoding='utf-8', errors='ignore') as f:
@@ -205,8 +204,7 @@ class WorkspaceEvaluator:
         
         # Check for large buffers
         large_buffers = []
-        source_dir = self.project_dir / "src" / "OTGW-firmware"
-        ino_cpp_files = list(source_dir.glob("*.ino")) + list(source_dir.glob("*.cpp")) + list(source_dir.glob("*.h"))
+        ino_cpp_files = list(self.project_dir.glob("*.ino")) + list(self.project_dir.glob("*.cpp")) + list(self.project_dir.glob("*.h"))
         
         for file in ino_cpp_files:
             with open(file, 'r', encoding='utf-8', errors='ignore') as f:
@@ -354,7 +352,7 @@ class WorkspaceEvaluator:
         # Check inline documentation (comments ratio)
         total_lines = 0
         comment_lines = 0
-        ino_files = list((self.project_dir / "src" / "OTGW-firmware").glob("*.ino"))
+        ino_files = list(self.project_dir.glob("*.ino"))
         
         for file in ino_files:
             with open(file, 'r', encoding='utf-8', errors='ignore') as f:
@@ -384,10 +382,9 @@ class WorkspaceEvaluator:
             'buffer_overflow_risk': []
         }
         
-        source_dir = self.project_dir / "src" / "OTGW-firmware"
-        all_code_files = (list(source_dir.glob("*.ino")) + 
-                         list(source_dir.glob("*.cpp")) + 
-                         list(source_dir.glob("*.h")))
+        all_code_files = (list(self.project_dir.glob("*.ino")) + 
+                         list(self.project_dir.glob("*.cpp")) + 
+                         list(self.project_dir.glob("*.h")))
         
         for file in all_code_files:
             with open(file, 'r', encoding='utf-8', errors='ignore') as f:
@@ -520,7 +517,7 @@ class WorkspaceEvaluator:
         """Check version information"""
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Version Information ==={Colors.ENDC}")
         
-        version_file = self.project_dir / "src" / "OTGW-firmware" / "version.h"
+        version_file = self.project_dir / "version.h"
         if version_file.exists():
             with open(version_file, 'r') as f:
                 content = f.read()
@@ -543,8 +540,8 @@ class WorkspaceEvaluator:
                     ))
         else:
             self.add_result(EvaluationResult(
-                "Version", "src/OTGW-firmware/version.h", "WARN",
-                "src/OTGW-firmware/version.h not found"
+                "Version", "version.h", "WARN",
+                "version.h not found"
             ))
 
     # ===== MAIN EVALUATION =====
