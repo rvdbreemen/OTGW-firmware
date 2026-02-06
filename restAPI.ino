@@ -521,7 +521,7 @@ void sendOTmonitorV2()
     sendJsonOTmonMapEntry(F("s0intervalcount"), OTGWs0pulseCount , F(""), OTGWs0lasttime);
     sendJsonOTmonMapEntry(F("s0totalcount"), OTGWs0pulseCountTot , F(""), OTGWs0lasttime);
   }
-  if (settingGPIOSENSORSenabled) 
+  if (settingGPIOSENSORSenabled || bDebugSensorSimulation) 
   {
     sendJsonOTmonMapEntry(F("numberofsensors"), DallasrealDeviceCount , F(""), now );
     for (int i = 0; i < DallasrealDeviceCount; i++) {
@@ -589,7 +589,7 @@ void sendOTmonitor()
     sendJsonOTmonObj(F("s0intervalcount"), OTGWs0pulseCount , F(""), OTGWs0lasttime);
     sendJsonOTmonObj(F("s0totalcount"), OTGWs0pulseCountTot , F(""), OTGWs0lasttime);
   }
-  if (settingGPIOSENSORSenabled) 
+  if (settingGPIOSENSORSenabled || bDebugSensorSimulation) 
   {
     sendJsonOTmonObj(F("numberofsensors"), DallasrealDeviceCount , F(""), now );
     for (int i = 0; i < DallasrealDeviceCount; i++) {

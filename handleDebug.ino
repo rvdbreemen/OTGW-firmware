@@ -1,7 +1,4 @@
 void handleDebug(){
-    static bool debugSimOriginalSensorsEnabled = false;
-    static bool debugSimForcedSensorsEnabled = false;
-
     if (TelnetStream.available()>0){
         //read the next 
         char c;
@@ -114,21 +111,6 @@ void handleDebug(){
             case 'd':
                 bDebugSensorSimulation = !bDebugSensorSimulation;
                 DebugTf(PSTR("\r\nDebug Dallas sensor simulation: %s\r\n"), CBOOLEAN(bDebugSensorSimulation));
-                if (bDebugSensorSimulation)
-                {
-                    debugSimOriginalSensorsEnabled = settingGPIOSENSORSenabled;
-                    debugSimForcedSensorsEnabled = false;
-                    if (!settingGPIOSENSORSenabled)
-                    {
-                        settingGPIOSENSORSenabled = true;
-                        debugSimForcedSensorsEnabled = true;
-                    }
-                }
-                else if (debugSimForcedSensorsEnabled)
-                {
-                    settingGPIOSENSORSenabled = debugSimOriginalSensorsEnabled;
-                    debugSimForcedSensorsEnabled = false;
-                }
                 initSensors();
                 break;
             case 'b':

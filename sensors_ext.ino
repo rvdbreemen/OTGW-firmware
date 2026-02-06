@@ -40,6 +40,9 @@ int numberOfDevices;
 const float SIM_SENSOR_MIN = 20.0f;
 const float SIM_SENSOR_MAX = 60.0f;
 const int SIM_SENSOR_COUNT = 3;
+const uint32_t SIM_SENSOR_UPDATE_INTERVAL_SECONDS = 10;
+
+static time_t simLastUpdateTime = 0;
 
 const uint8_t DallasSimDeviceAddresses[SIM_SENSOR_COUNT][8] = {
   {0x28, 0xD0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
@@ -51,6 +54,7 @@ void initSimulatedDallasSensors()
 {
   DallasrealDeviceCount = SIM_SENSOR_COUNT;
   numberOfDevices = SIM_SENSOR_COUNT;
+  simLastUpdateTime = 0;
 
   for (int i = 0; i < SIM_SENSOR_COUNT; i++)
   {
@@ -171,6 +175,10 @@ if (settingMQTTenable) {
   {
     sensors.requestTemperatures(); // Send the command to get temperatures
   }
+  else if (simLastUpdateTime != 0 && (now - simLastUpdateTime) < SIM_SENSOR_UPDATE_INTERVAL_SECONDS)
+  {
+    return;
+  }
 
   // check if HA Autoconfigure must be performed (initial or as repeat for HA reboot)
   if (settingMQTTenable && getMQTTConfigDone(OTGWdallasdataid)==false) configSensors() ;
@@ -210,6 +218,11 @@ if (settingMQTTenable) {
       // Serial.println(DallasTemperature::toFahrenheit(tempC)); // Converts tempC to Fahrenheit
     }
   }
+  if (bDebugSensorSimulation)
+  {
+    simLastUpdateTime = now;
+  }
+
   // DebugTln(F("end polling sensors"));
   DebugFlush();
 }
