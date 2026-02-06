@@ -286,8 +286,33 @@ When an architectural decision changes:
 3. Update the old ADR's status to "Superseded by ADR-XXX"
 4. Reference the original ADR in the new one
 
+## ADR Skill
+
+**NEW:** This repository includes a GitHub Copilot skill for ADR management!
+
+- **Location:** `.github/skills/adr/SKILL.md`
+- **Purpose:** Automated ADR creation, compliance checking, and enforcement
+- **Usage Guide:** `.github/skills/adr/USAGE_GUIDE.md`
+
+The ADR skill helps you:
+- Create well-structured ADRs using best practices
+- Check code changes against existing ADRs
+- Document architectural decisions with proper alternatives
+- Maintain ADR compliance in PRs and CI/CD
+
+**To use the skill:**
+```
+Ask Copilot: "Use the ADR skill to create ADR-XXX for [decision]"
+Ask Copilot: "Check my changes against existing ADRs"
+Ask Copilot: "Does this require a new ADR?"
+```
+
+See `.github/skills/adr/USAGE_GUIDE.md` for comprehensive usage instructions and CI/CD integration examples.
+
 ## Resources
 
+- **ADR Skill (Copilot):** `.github/skills/adr/SKILL.md` 🆕
+- **ADR Skill Usage Guide:** `.github/skills/adr/USAGE_GUIDE.md` 🆕
 - **ADR Best Practices:** https://adr.github.io/
 - **Michael Nygard's ADR Template:** https://github.com/joelparkerhenderson/architecture-decision-record
 - **Copilot Instructions:** `.github/copilot-instructions.md` (references ADRs)
