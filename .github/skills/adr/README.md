@@ -130,7 +130,7 @@ When updating the ADR skill:
 ## Related Documentation
 
 - [Architecture Decision Records Index](../../docs/adr/README.md)
-- [Copilot Instructions](../copilot-instructions.md)
+- [Copilot Instructions](../../copilot-instructions.md)
 - [Refactor Skill](../refactor/SKILL.md)
 
 ## License
