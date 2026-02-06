@@ -49,7 +49,7 @@ Starting with hardware version 2.3, the included ESP8266 devkit changed from Nod
 - **Local build guide** (Windows/Mac): [BUILD.md](docs/BUILD.md)
 - **Evaluation framework**: [EVALUATION.md](docs/EVALUATION.md) - Code quality and standards checker
 - **Architecture Decision Records (ADRs)**: [docs/adr/README.md](docs/adr/README.md) - Documented architectural decisions
-- **ADR Skill for Copilot**: [.github/skills/adr/](..github/skills/adr/) - Automated ADR management and compliance
+- **ADR Skill for Copilot**: [.github/skills/adr/](.github/skills/adr/) - Automated ADR management and compliance
 - **WebSocket architecture**: [WEBSOCKET_FLOW.md](docs/WEBSOCKET_FLOW.md) - Complete WebSocket flow explanation
 - **WebSocket quick reference**: [WEBSOCKET_QUICK_REFERENCE.md](docs/WEBSOCKET_QUICK_REFERENCE.md) - Short WebSocket overview
 - **Stream logging guide**: [docs/guides/stream-logging.md](docs/guides/stream-logging.md) - Stream OT logs to local files
