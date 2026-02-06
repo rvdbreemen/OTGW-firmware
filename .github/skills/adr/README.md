@@ -6,6 +6,7 @@ This directory contains the Architecture Decision Record (ADR) management skill 
 
 - **SKILL.md** - The main skill file containing comprehensive ADR guidance, templates, and best practices
 - **USAGE_GUIDE.md** - Instructions for ensuring Copilot always uses this skill, including CI/CD integration
+- **ALWAYS_USE_SKILL.md** - Step-by-step guide to ensure Copilot consistently invokes the ADR skill
 - **README.md** - This file
 
 ## What is the ADR Skill?
@@ -44,10 +45,22 @@ The skill is automatically available to all Copilot agents in this repository. I
 - When users mention "architecture decision" or "ADR"
 - During planning and design discussions
 
+## Ensuring Consistent Use
+
+**Want to make sure Copilot always uses this skill?**
+
+Read **[ALWAYS_USE_SKILL.md](ALWAYS_USE_SKILL.md)** for:
+- Automatic invocation configuration
+- CI/CD integration examples
+- Verification steps
+- Troubleshooting guide
+- Best practices
+
 ## Documentation
 
 - **Full skill documentation:** [SKILL.md](SKILL.md)
 - **Usage and configuration:** [USAGE_GUIDE.md](USAGE_GUIDE.md)
+- **How to ensure consistent use:** [ALWAYS_USE_SKILL.md](ALWAYS_USE_SKILL.md) ⭐
 - **Existing ADRs:** [../../docs/adr/README.md](../../docs/adr/README.md)
 
 ## Key Features
@@ -79,6 +92,22 @@ The skill includes detailed examples from this repository:
 - ADR-004: Static Buffer Allocation
 - ADR-009: PROGMEM String Literals
 - ADR-029: Simple XHR-Based OTA Flash
+
+## Optional Enhancements
+
+### Enable CI/CD Checks
+```bash
+# Copy example workflow
+cp ../../.github/workflows/adr-compliance.yml.example ../../.github/workflows/adr-compliance.yml
+```
+
+### Enable PR Template
+```bash
+# Copy example PR template
+cp ../../.github/PULL_REQUEST_TEMPLATE.md.example ../../.github/PULL_REQUEST_TEMPLATE.md
+```
+
+See [ALWAYS_USE_SKILL.md](ALWAYS_USE_SKILL.md) for detailed setup instructions.
 
 ## Contributing
 

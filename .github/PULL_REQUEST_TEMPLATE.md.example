@@ -1,0 +1,101 @@
+## Description
+
+<!-- Provide a clear and concise description of your changes -->
+
+
+
+## Type of Change
+
+Please select the relevant option(s):
+
+- [ ] 🐛 Bug fix (non-breaking change which fixes an issue)
+- [ ] ✨ New feature (non-breaking change which adds functionality)
+- [ ] 💥 Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] 📚 Documentation update
+- [ ] 🏗️  Architectural change (requires ADR documentation)
+- [ ] ♻️  Code refactoring (no functional changes)
+- [ ] ⚡ Performance improvement
+- [ ] 🔒 Security fix
+
+## ADR Compliance Checklist
+
+**Architecture Decision Records (ADRs) document important architectural choices.**  
+See [docs/adr/README.md](../docs/adr/README.md) and [.github/skills/adr/](../.github/skills/adr/) for guidance.
+
+- [ ] I have reviewed existing ADRs in `docs/adr/README.md`
+- [ ] My changes do **not** violate any existing architectural decisions
+- [ ] I have verified my changes against relevant ADRs:
+  - [ ] ADR-003: HTTP-Only (no HTTPS/WSS)
+  - [ ] ADR-004: Static Buffer Allocation (no String class in critical paths)
+  - [ ] ADR-009: PROGMEM String Literals (F() and PSTR() macros used)
+  - [ ] Other relevant ADRs: <!-- List ADR numbers -->
+- [ ] If this introduces an **architectural change**, I have created a new ADR with Status: Proposed
+- [ ] If implementing an existing ADR, I have updated its status (e.g., Proposed → Accepted)
+- [ ] I have added code comments referencing relevant ADRs where appropriate
+- [ ] If I created a new ADR, I have updated `docs/adr/README.md` index
+
+## Related ADRs
+
+<!-- List any ADRs related to this change. Delete section if not applicable. -->
+
+- **ADR-XXX:** [Title] - [How this PR relates to the ADR]
+
+## Testing Performed
+
+- [ ] I have tested my changes locally on actual hardware
+- [ ] I have run the evaluation framework: `python evaluate.py`
+- [ ] I have verified no ADR pattern violations
+- [ ] I have tested on ESP8266 (NodeMCU or Wemos D1 mini)
+- [ ] Changes work with Home Assistant integration (if applicable)
+- [ ] MQTT functionality verified (if applicable)
+- [ ] Web UI tested in Chrome, Firefox, and Safari (if applicable)
+
+### Test Results
+
+<!-- Describe what you tested and the results -->
+
+
+
+## Breaking Changes
+
+<!-- If this is a breaking change, describe the impact and migration path. Delete section if not applicable. -->
+
+**Impact:**
+
+**Migration Steps:**
+
+## Screenshots (if applicable)
+
+<!-- Add screenshots showing UI changes, new features, or before/after comparisons -->
+
+
+
+## Checklist
+
+- [ ] My code follows the style guidelines of this project (see `.github/copilot-instructions.md`)
+- [ ] I have performed a self-review of my code
+- [ ] I have commented my code, particularly in hard-to-understand areas
+- [ ] I have updated documentation to reflect my changes
+- [ ] My changes generate no new warnings or errors
+- [ ] I have checked my code for memory leaks and buffer overflows
+- [ ] I have used PROGMEM for string literals (ESP8266 RAM is limited)
+- [ ] I have avoided using the String class where possible (heap fragmentation)
+- [ ] I have checked for proper error handling
+
+## Additional Context
+
+<!-- Add any other context about the pull request here -->
+
+
+
+---
+
+**For Reviewers:**
+
+Please verify:
+- ADR compliance (no violations of existing decisions)
+- Code follows established patterns
+- Proper PROGMEM usage (ADR-009)
+- Static buffer allocation where appropriate (ADR-004)
+- HTTP-only protocol usage (ADR-003)
+- New ADR properly formatted if created
