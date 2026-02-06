@@ -112,7 +112,7 @@ libraries/WebSockets:
 
 $(IMAGE): $(BOARDS) $(LIBRARIES) $(SOURCES)
 	$(info Build code)
-	$(CLICFG) compile --fqbn=$(FQBN) --warnings default --verbose --build-property compiler.cpp.extra_flags="$(CFLAGS)" $(SRCDIR)
+	$(CLICFG) compile --fqbn=$(FQBN) --warnings default --verbose --libraries src/libraries --build-property compiler.cpp.extra_flags="$(CFLAGS)" $(SRCDIR)
 
 filesystem: $(FILESYS)
 
