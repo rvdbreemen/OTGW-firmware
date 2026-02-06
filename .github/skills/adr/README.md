@@ -12,13 +12,23 @@ This directory contains the Architecture Decision Record (ADR) management skill 
 ## What is the ADR Skill?
 
 The ADR skill enables GitHub Copilot to:
-- **Create** well-structured Architecture Decision Records
+- **Analyze** existing codebases to discover undocumented architectural decisions (first-time use)
+- **Create** well-structured Architecture Decision Records with critical analysis
 - **Enforce** architectural compliance during code reviews
 - **Validate** changes against existing architectural decisions
-- **Document** alternatives considered and rejected
+- **Document** alternatives considered and rejected with honest assessment
 - **Guide** developers in making and recording architectural choices
+- **Write** in clear, understandable language avoiding unexplained jargon
 
 ## Quick Start
+
+### For First-Time Use
+
+**Analyze existing codebase to generate ADRs:**
+```
+Ask Copilot: "Analyze this codebase to identify undocumented architectural decisions"
+Ask Copilot: "Generate ADRs for existing architectural patterns"
+```
 
 ### For Developers
 
@@ -27,7 +37,7 @@ The ADR skill enables GitHub Copilot to:
 Ask Copilot: "Does this change require an ADR?"
 ```
 
-**Create a new ADR:**
+**Create a new ADR (with critical analysis):**
 ```
 Ask Copilot: "Use the ADR skill to create an ADR for [your decision]"
 ```

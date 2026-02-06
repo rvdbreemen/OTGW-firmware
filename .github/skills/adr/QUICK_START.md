@@ -16,17 +16,24 @@ Ask Copilot: "What is the ADR skill?"
 ```
 **Expected:** Copilot explains the ADR skill and its capabilities.
 
-### Test 2: Check a Change
+### Test 2: Analyze Existing Codebase (First-Time Use)
+```
+Ask Copilot: "Analyze this codebase to identify undocumented architectural decisions"
+Ask Copilot: "Generate ADRs for existing architectural patterns in this codebase"
+```
+**Expected:** Copilot performs critical analysis of the codebase and generates ADRs for major architectural decisions that aren't yet documented.
+
+### Test 3: Check a Change
 ```
 Ask Copilot: "Does my current change require an ADR?"
 ```
 **Expected:** Copilot analyzes your changes and advises if an ADR is needed.
 
-### Test 3: Create an ADR
+### Test 4: Create an ADR
 ```
 Ask Copilot: "Use the ADR skill to create ADR-030 for implementing Redis caching"
 ```
-**Expected:** Copilot generates a complete ADR using the template.
+**Expected:** Copilot generates a complete ADR using the template with critical analysis and understandable language.
 
 ## 📚 What Was Created
 
@@ -71,6 +78,25 @@ Ask Copilot: "Use the ADR skill to create ADR-030 for implementing Redis caching
    - Copy to enable: `cp .github/PULL_REQUEST_TEMPLATE.md.example .github/PULL_REQUEST_TEMPLATE.md`
 
 ## 🎓 How to Use the Skill
+
+### First-Time Use: Analyze Existing Codebase
+
+**For projects with undocumented architectural decisions:**
+```
+Ask Copilot: "Analyze this codebase to identify undocumented architectural decisions"
+Ask Copilot: "Generate ADRs for existing architectural patterns"
+Ask Copilot: "What architectural decisions in this codebase should be documented?"
+```
+
+**Expected behavior:**
+- Copilot performs comprehensive codebase analysis
+- Identifies major architectural patterns (platform, memory, network, etc.)
+- Generates critical, well-reasoned ADRs with:
+  - Clear context and constraints
+  - Multiple alternatives considered
+  - Honest assessment of consequences
+  - Code examples from the codebase
+  - Understandable language (no unexplained jargon)
 
 ### Basic Usage (No Setup Required)
 

@@ -54,6 +54,89 @@ Create a new ADR when making a decision that:
 
 ---
 
+## Initial Codebase Analysis
+
+### First-Time Use: Discovering Undocumented Decisions
+
+**IMPORTANT:** On first use or when introducing this skill to an existing codebase, perform a comprehensive architectural analysis to identify and document existing but undocumented decisions.
+
+#### Analysis Workflow
+
+**Step 1: Identify Architectural Patterns**
+```bash
+# Areas to analyze:
+1. Platform choices (ESP8266, Arduino, frameworks)
+2. Memory management patterns (static buffers, PROGMEM)
+3. Network architecture (protocols, security models)
+4. Integration patterns (MQTT, APIs, WebSocket)
+5. Core system design (timers, scheduling, persistence)
+6. Hardware interfaces (sensors, watchdog, GPIO)
+7. Build and development tools
+```
+
+**Step 2: Ask Critical Questions**
+```
+For each pattern discovered:
+- WHY was this approach chosen? (context, constraints)
+- WHAT alternatives exist? (at least 2-3 viable options)
+- WHY were alternatives rejected? (specific technical reasons)
+- WHAT are the consequences? (benefits, costs, risks)
+- HOW is this implemented? (code examples, key files)
+- WHEN was this decided? (estimate if unknown)
+```
+
+**Step 3: Generate ADRs Systematically**
+```
+For each undocumented architectural decision:
+1. Use the explore agent to understand the pattern
+2. Review code, comments, git history for context
+3. Identify constraints (memory, performance, compatibility)
+4. Research alternatives (even if obvious)
+5. Document consequences (positive AND negative)
+6. Create ADR with Status: Accepted (since implemented)
+7. Link to actual implementation (files, commits)
+```
+
+**Step 4: Prioritize Documentation**
+```
+Start with foundational decisions that:
+- Affect multiple components
+- Constrain future choices
+- Are non-obvious or counterintuitive
+- Have significant trade-offs
+- Are frequently questioned
+```
+
+#### Initial Analysis Prompts
+
+**Trigger codebase analysis:**
+```
+"Analyze this codebase to identify undocumented architectural decisions"
+"Generate ADRs for existing architectural patterns in this codebase"
+"What architectural decisions should be documented in this project?"
+```
+
+**For specific areas:**
+```
+"Identify and document memory management architectural decisions"
+"What network architecture decisions are undocumented?"
+"Analyze platform choices and create ADRs"
+```
+
+#### Example: Discovering ADR-009 (PROGMEM)
+
+**Pattern discovered:** String literals use F() and PSTR() macros throughout codebase
+
+**Critical questions:**
+- WHY? → ESP8266 has only 40KB RAM; string literals waste 5-8KB
+- Alternatives? → Keep in RAM, external RAM, compressed strings, string table
+- Why rejected? → RAM too limited, hardware changes, complexity, doesn't solve problem
+- Consequences? → +5-8KB heap (positive), verbose code (negative), flash slower than RAM (accepted)
+
+**Result:** ADR-009 documents mandatory PROGMEM usage with clear rationale
+
+---
+
 ## ADR Principles
 
 ### The Golden Rules
@@ -63,6 +146,8 @@ Create a new ADR when making a decision that:
 3. **Context is King** - Explain WHY the decision was made, not just WHAT
 4. **Alternatives Matter** - Document what was considered but rejected
 5. **Human Decisions Marked** - Clearly indicate when decision came from user/stakeholder
+6. **Critical Analysis** - Be thorough, question assumptions, document trade-offs honestly
+7. **Understandable Language** - Write for developers unfamiliar with the decision; avoid unexplained jargon
 
 ### ADR Best Practices
 
@@ -74,12 +159,18 @@ Create a new ADR when making a decision that:
 ✓ Document constraints that drove the decision
 ✓ Explain consequences (positive and negative)
 ✓ Link to implementation (files, PRs, commits)
+✓ Be critical - question the decision, document risks
+✓ Provide specific evidence (measurements, benchmarks)
+✓ Explain technical terms on first use
 
 ✗ Don't use jargon without explanation
 ✗ Don't assume reader knows the context
 ✗ Don't skip alternatives (even obvious ones)
 ✗ Don't make assumptions unstated
 ✗ Don't forget to update status when superseding
+✗ Don't be vague ("it's better", "improves performance")
+✗ Don't skip negative consequences
+✗ Don't write marketing copy - be honest about trade-offs
 ```
 
 ---
@@ -770,6 +861,59 @@ Creating a new ADR? Check these:
 ❌ Missing constraints that drove the decision
 ❌ Modifying accepted ADRs instead of superseding
 ❌ Not updating README.md index
+❌ Using jargon without defining it (e.g., "TLS handshake" without explaining)
+❌ Being superficial - not digging into the "why" behind constraints
+❌ Hiding negative consequences or pretending there are none
+❌ Writing marketing copy instead of honest technical analysis
+❌ Skipping measurements ("faster" vs "68.5% code reduction")
+❌ Not explaining technical trade-offs in understandable terms
+```
+
+### Critical Analysis Guidelines
+
+**Be thorough and questioning:**
+```
+✓ Challenge assumptions - "Why is this constraint real?"
+✓ Quantify impacts - "Saves 5-8KB RAM" not "saves memory"
+✓ Be honest about negatives - "Code is more verbose (accepted trade-off)"
+✓ Question the decision - "Is this still the right choice?"
+✓ Document risks explicitly - "Risk: X. Mitigation: Y."
+✓ Use real measurements - "Requires 20-30KB RAM (50-75% of heap)"
+✓ Explain technical concepts - "TLS/SSL = encrypted network protocol"
+```
+
+**Write in understandable language:**
+```
+✓ Define acronyms on first use: "PROGMEM (Program Memory)"
+✓ Explain technical terms: "heap fragmentation = memory becoming unusable"
+✓ Use analogies for complex concepts: "like trying to park a bus in scattered car spaces"
+✓ Provide context: "ESP8266 has 40KB RAM total, after libraries ~20-25KB available"
+✓ Show concrete examples: Include code snippets showing the pattern
+✓ Break down complex ideas: Use bullet points and clear structure
+✓ Avoid assumed knowledge: Don't assume reader knows ESP8266 specifics
+```
+
+**Example of critical, understandable writing:**
+```markdown
+## Consequences
+
+### Positive
+- **Stability:** Eliminates most out-of-memory crashes
+  - Measured: Heap available increased from ~15KB to ~20KB
+  - Evidence: No OOM crashes in 30-day stress test after implementation
+
+### Negative
+- **Code verbosity:** Every string needs F() macro wrapper
+  - Impact: ~10-15% more characters per debug statement
+  - Accepted because: Stability more important than typing convenience
+  - Example: `DebugTln(F("Message"))` vs `DebugTln("Message")`
+
+### Risks & Mitigation
+- **Risk:** Developers forget to use F() macro
+  - **Impact:** RAM gradually consumed, eventual crashes
+  - **Mitigation 1:** Evaluation framework catches violations (evaluate.py)
+  - **Mitigation 2:** Code review checklist includes PROGMEM check
+  - **Mitigation 3:** Copilot instructions enforce pattern
 ```
 
 ### When in Doubt
@@ -780,6 +924,9 @@ Creating a new ADR? Check these:
 3. **Could this ADR help someone avoid making a wrong decision?**
 4. **Have I included enough code examples?**
 5. **Is the decision maker clearly identified?**
+6. **Can someone unfamiliar with this technology understand the core trade-offs?**
+7. **Have I been honest about negative consequences?**
+8. **Have I quantified impacts with actual measurements?**
 
 If you answered "No" to any of these, improve the ADR.
 
