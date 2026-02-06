@@ -6,19 +6,77 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
 
 ## Architecture Decision Records (ADRs)
 
-**IMPORTANT:** This project maintains Architecture Decision Records (ADRs) that document key architectural choices. Before making changes that affect architecture, consult the relevant ADRs:
+**IMPORTANT:** This project maintains Architecture Decision Records (ADRs) as docs-as-code that document key architectural choices. Before making changes that affect architecture, consult the relevant ADRs:
 
 - **Platform & Architecture:** See `docs/adr/` directory for complete ADR index
 - **Key decisions documented:** ESP8266 platform, modular .ino files, HTTP-only (no HTTPS), static buffers, PROGMEM strings, WebSocket streaming (OpenTherm messages only), MQTT integration, timer-based scheduling, LittleFS persistence, hardware watchdog, PIC firmware upgrade, Arduino framework, build system, NTP/timezone, command queue, WiFiManager, ArduinoJson, simplified OTA flash (XHR-based, see ADR-029)
 - **ADR Index:** `docs/adr/README.md` provides navigation and decision summaries
-- **When to create ADRs:** For decisions with long-term architectural impact
-- **Reference ADRs:** Link from code comments to relevant ADRs for context
+- **ADR Skill:** `.github/skills/adr/SKILL.md` provides comprehensive ADR creation guidance
 
-**ADR Compliance:**
+### When to Create ADRs
+
+Create an ADR when a change affects:
+- **Architecture**: Service/module structure, deployment topology, integration patterns, platform choices
+- **NFRs (Non-Functional Requirements)**: Security, availability, performance, privacy/compliance, resilience
+- **Interfaces/Contracts**: API contracts, breaking changes, major coupling/decoupling decisions
+- **Dependencies**: New or replaced frameworks/libraries/tooling with broad impact
+- **Build/Tooling**: Build system, CI/CD, development processes with architectural impact
+
+Do NOT create ADRs for:
+- Pure refactors without architectural impact
+- Small dependency bumps without impact on architecture/NFRs
+- Bug fixes that don't change architecture
+- Minor feature additions within existing patterns
+
+### ADR Lifecycle and Immutability
+
+**Critical:** Accepted ADRs are **immutable**. Never edit an accepted ADR to change its meaning.
+
+- **Proposed** → Draft, reviewable, can be revised
+- **Accepted** → Decision stands, implementation follows/runs
+- **Rejected** → Not chosen (with rationale to prevent re-discussion)
+- **Superseded** → Replaced by newer decision (mark old ADR with "Superseded by ADR-XXX")
+
+**If you need to reverse a decision:**
+1. Create a NEW ADR that supersedes the old one
+2. Mark the old ADR status as "Superseded by ADR-XXX"
+3. In the new ADR, explicitly state "Supersedes: ADR-XXX"
+
+### ADR Content: Focus on "Why"
+
+ADRs must focus on **rationale and trade-offs** ("why"), not just implementation ("how"):
+- Context (problem statement/forces/constraints)
+- Decision (chosen approach with rationale)
+- Alternatives Considered (2-3 options with pros/cons and rejection reasons)
+- Consequences (positive impacts, negative impacts, risks with mitigation)
+- References (link to relevant code, issues, PRs, documentation)
+
+**Keep ADRs short** (1-2 screens); link to detailed design docs when needed.
+
+### PR and Code Review Integration
+
+**For all PRs:**
+- If a PR changes architecture/NFRs/interfaces/dependencies/tooling, **link to the relevant ADR** in the PR description
+- If no ADR exists and the change is architecturally significant, **create a new ADR as part of the same PR**
+- If the code would reverse an existing ADR, **create a new superseding ADR** (don't rewrite history)
+
+**During code review:**
+- Verify architecturally significant changes have linked ADRs
+- If ADR is missing, request one and explain which decision should be captured
+- If code violates an accepted ADR, request alignment or a superseding ADR
+
+**Legacy non-compliance:**
+- Existing code may not comply with newer ADRs
+- Call it out and propose remediation (incremental cleanup or tech-debt tasks)
+- Don't let legacy non-compliance block new ADR adoption
+
+### ADR Compliance
+
 - Follow patterns established in ADRs (e.g., static buffers, PROGMEM, no HTTPS)
 - Don't violate architectural decisions without discussing alternatives
-- Update ADRs if architectural decisions change (create new ADR, don't modify existing)
-- Reference ADR numbers in code reviews and pull requests
+- If architectural decisions change, create new ADR that supersedes the old one (immutability)
+- Reference ADR numbers in code comments, reviews, and pull requests
+- Use ADR skill (`.github/skills/adr/SKILL.md`) for creating comprehensive ADRs
 
 ## Technology Stack
 

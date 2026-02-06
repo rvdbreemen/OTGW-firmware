@@ -957,20 +957,59 @@ If you answered "No" to any of these, improve the ADR.
 6. Stores facts for future sessions
 ```
 
+### Integration with Copilot Instructions
+
+This skill is integrated with GitHub Copilot through multiple instruction layers:
+
+**Repository-wide instructions** (`.github/copilot-instructions.md`):
+- Defines ADR workflow for all Copilot interactions
+- Establishes ADR lifecycle (Proposed → Accepted → Superseded)
+- Specifies when ADRs are required
+- Enforces immutability of accepted ADRs
+
+**Path-specific instructions** (`.github/instructions/`):
+- `adr.coding-agent.instructions.md` - Specific guidance for coding agent
+  - Before/during implementation ADR requirements
+  - Creating new ADRs checklist
+  - Supersession workflow
+- `adr.code-review.instructions.md` - Specific guidance for code review
+  - ADR compliance checks
+  - Review checklist for architectural changes
+  - Review comment examples
+
+**How it works:**
+1. Copilot reads repository-wide instructions for all operations
+2. Path-specific instructions apply based on context (coding vs review)
+3. This skill provides the comprehensive ADR template and best practices
+4. Together, they ensure consistent ADR governance across all Copilot interactions
+
+**Verification:**
+You can verify custom instructions are being used by checking the "References" section in Copilot Chat responses, where the instruction files will appear as references.
+
 ---
 
 ## Resources
 
+### Official ADR Resources
 - **ADR Best Practices:** https://adr.github.io/
 - **Michael Nygard's Original Post:** https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions
 - **MADR Template:** https://github.com/adr/madr
 - **Joel Parker Henderson Collection:** https://github.com/joelparkerhenderson/architecture-decision-record
 - **Microsoft Azure ADR Guide:** https://learn.microsoft.com/en-us/azure/well-architected/architect-role/architecture-decision-record
 - **ThoughtWorks Technology Radar:** ADR mentioned as "Adopt"
+
+### ADR Tooling Ecosystem
+- **adr-tools** (npryce) - CLI for creating and managing ADRs: https://github.com/npryce/adr-tools
+- **Log4brains** - ADR management with static site generation: https://github.com/thomvaill/log4brains
+- **ADR Tools Catalog** - Comprehensive tooling list: https://adr.github.io/#tooling
+
+### Project-Specific Resources
 - **OTGW-Firmware ADR Index:** `/docs/adr/README.md`
 - **Copilot Instructions:** `/.github/copilot-instructions.md`
+- **Coding Agent Instructions:** `/.github/instructions/adr.coding-agent.instructions.md`
+- **Code Review Instructions:** `/.github/instructions/adr.code-review.instructions.md`
 - **Evaluation Framework:** `/evaluate.py` (enforces ADR decisions)
 
 ---
 
-**Remember:** ADRs are **living documentation**. They should be consulted during development, referenced in code reviews, and updated when decisions change. Good ADRs make good architecture decisions visible, understandable, and enforceable.
+**Remember:** ADRs are **living documentation** stored as docs-as-code in the same repository as the implementation. They should be consulted during development, referenced in code reviews, and evolved through supersession (not modification). Good ADRs make architectural decisions visible, understandable, and enforceable.
