@@ -676,6 +676,13 @@ console.log('[OTA] State: Device is healthy, redirecting');
    - Complementary: Simple XHR reduces memory overhead during flash
    - No WebSocket connection = more memory available for flash operations
 
+4. **ADR-011: External Hardware Watchdog**
+   - **Critical integration:** Watchdog must be managed during OTA flash
+   - **Implementation:** Watchdog disabled at start, fed on every chunk, re-enabled after completion
+   - **Rationale:** Flash operations can block for 10-20 seconds (exceeds 3-second watchdog timeout)
+   - **Code:** FEEDWATCHDOGNOW macro called in upload handler (OTGW-ModUpdateServer-impl.h:206)
+   - **Safety:** Feeding on chunks provides protection during upload phase while preventing timeout during flash writes
+
 ### Future Considerations
 
 1. **Real-time flash progress (optional future enhancement)**
