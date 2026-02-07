@@ -50,7 +50,7 @@ static const char UpdateServerIndex[] PROGMEM =
             Select a "<b>.littlefs.bin</b>" file to flash<br/>
             <input type='file' accept='.littlefs.bin' name='filesystem' required>
             <br/>
-            <label><input type="checkbox" id="chkPreserve" checked autocomplete="off"> Download settings backup (settings auto-restore from memory)</label>
+            <label><input type="checkbox" id="chkPreserve" checked autocomplete="off"> Download backups (settings.ini + dallas_labels.ini if exists)</label>
             <br/>
             <input id='fsSubmit' type='submit' value='Flash LittleFS' disabled>
         </form>
@@ -930,9 +930,9 @@ static const char UpdateServerIndex[] PROGMEM =
              if (formId === 'fsForm') {
                 var chk = document.getElementById('chkPreserve');
                 if(chk && chk.checked) {
-                logFlash('Filesystem flash: starting settings backup download');
-                    // Trigger download as backup (settings will be auto-restored from ESP memory)
-                    preFlight = fetch('/settings.ini')
+                logFlash('Filesystem flash: starting backup downloads');
+                    // Backup settings.ini (auto-restored from ESP memory)
+                    var settingsBackup = fetch('/settings.ini')
                         .then(function(resp) { return resp.blob(); })
                         .then(function(blob) {
                              // Trigger Download with unique filename
@@ -951,7 +951,7 @@ static const char UpdateServerIndex[] PROGMEM =
                              
                              // Wait briefly for download to start
                                 logFlash('Settings backup download started');
-                             return new Promise(function(resolve) { setTimeout(resolve, 1000); });
+                             return new Promise(function(resolve) { setTimeout(resolve, 500); });
                         })
                         .catch(function(e) {
                                 logFlash('Settings backup failed');
@@ -959,6 +959,48 @@ static const char UpdateServerIndex[] PROGMEM =
                              if(!confirm("Could not backup settings.ini. Continue anyway?")) {
                                  throw e;
                              }
+                        });
+                    
+                    // Backup dallas_labels.ini if it exists (NOT auto-restored - user must re-upload)
+                    var labelsBackup = fetch('/dallas_labels.ini')
+                        .then(function(resp) { 
+                            if (!resp.ok && resp.status === 404) {
+                                logFlash('No dallas_labels.ini found, skipping backup');
+                                return null; // File doesn't exist, that's OK
+                            }
+                            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                            return resp.blob(); 
+                        })
+                        .then(function(blob) {
+                            if (!blob) return; // No file to backup
+                            // Trigger Download with unique filename
+                            var now = new Date();
+                            var stamp = now.toISOString().replace(/[:.]/g, '-');
+                            var filename = 'dallas_labels-' + stamp + '.ini';
+                            var url = window.URL.createObjectURL(blob);
+                            var a = document.createElement('a');
+                            a.style.display = 'none';
+                            a.href = url;
+                            a.download = filename;
+                            document.body.appendChild(a);
+                            a.click();
+                            window.URL.revokeObjectURL(url);
+                            document.body.removeChild(a);
+                            
+                            logFlash('Dallas labels backup download started');
+                            return new Promise(function(resolve) { setTimeout(resolve, 500); });
+                        })
+                        .catch(function(e) {
+                            logFlash('Dallas labels backup failed (non-fatal)');
+                            console.log('Dallas labels backup error (non-fatal)', e);
+                            // Don't fail the whole operation if labels backup fails
+                        });
+                    
+                    // Wait for both backups to complete
+                    preFlight = Promise.all([settingsBackup, labelsBackup])
+                        .then(function() {
+                            logFlash('All backups complete');
+                            return new Promise(function(resolve) { setTimeout(resolve, 500); });
                         });
                 }
              }
