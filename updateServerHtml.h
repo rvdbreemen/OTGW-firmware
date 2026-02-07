@@ -1210,9 +1210,8 @@ static const char UpdateServerSuccess[] PROGMEM =
                 })
                 .then(function(d) {
                     var s = d.status || (d.health && d.health.status);
-                    var picAvailable = d.picavailable || (d.health && d.health.picavailable);
                     
-                    if (s === 'UP' && picAvailable === true) {
+                    if (s === 'UP') {
                         statusEl.textContent = "Device is UP! Waiting for stability...";
                         statusEl.style.color = "green";
                         
