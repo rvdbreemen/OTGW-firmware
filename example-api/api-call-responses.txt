@@ -197,11 +197,35 @@ otgw,metric=chsetpoint value=70.00
 }
 ```
 
-**Response (Error - Invalid Address):**
+**Response (Error - Invalid JSON):**
 ```json
 {
   "success": false,
-  "error": "Invalid address format"
+  "error": "Invalid JSON"
+}
+```
+
+**Response (Error - Missing Parameters):**
+```json
+{
+  "success": false,
+  "error": "Missing address or label"
+}
+```
+
+**Response (Error - Invalid Address Format):**
+```json
+{
+  "success": false,
+  "error": "Invalid address format (must be 16 hex characters)"
+}
+```
+
+**Response (Error - Non-Hex Characters):**
+```json
+{
+  "success": false,
+  "error": "Address must contain only hex characters (0-9, A-F)"
 }
 ```
 
@@ -213,12 +237,23 @@ otgw,metric=chsetpoint value=70.00
 }
 ```
 
+**Response (Error - Sensor Not Found):**
+```json
+{
+  "success": false,
+  "error": "Sensor address not found"
+}
+```
+
 **Notes:**
 - Labels are stored in settings and persist across reboots
 - Labels appear in `/api/v1/otgw/otmonitor` and `/api/v2/otgw/otmonitor` as `{address}_label` fields
 - Example: `28FF64D1841703F1_label: {"value": "Living Room", "unit": ""}`
 - Default label is the sensor's hex address until customized
 - Changes take effect immediately in both the Web UI and graph
+- **Security**: All label values are properly escaped in JSON output to prevent injection attacks
+- **Validation**: Address must be exactly 16 hexadecimal characters and match an existing sensor
+- **Buffer limits**: Supports up to 16 sensors with 16-character labels each
 
 ---
 
