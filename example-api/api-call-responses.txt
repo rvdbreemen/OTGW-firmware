@@ -174,26 +174,67 @@ otgw,metric=chsetpoint value=70.00
 }
 ```
 
-### Update Dallas Sensor Label
-**Endpoint:** `POST /api/v1/sensors/label`
-**Description:** Updates the custom label for a Dallas DS18B20 temperature sensor. Labels are stored persistently and displayed in the Web UI and graph.
+### Dallas Sensor Labels (Bulk Operations)
+
+#### Get All Dallas Sensor Labels
+**Endpoint:** `GET /api/v1/sensors/labels`
+**Description:** Retrieves all Dallas DS18B20/DS18S20/DS1822 temperature sensor labels from `/dallas_labels.json` file. Returns empty object if no labels exist.
+
+**Response (Success - With Labels):**
+```json
+{
+  "28FF64D1841703F1": "Living Room",
+  "28FF64D1841703F2": "Kitchen",
+  "28FF64D1841703F3": "Bedroom"
+}
+```
+
+**Response (Success - No Labels):**
+```json
+{}
+```
+
+**Response (Error - File Read Failed):**
+```json
+{
+  "success": false,
+  "error": "Failed to read labels file"
+}
+```
+
+**Notes:**
+- Returns JSON object mapping sensor addresses (16 hex chars) to labels
+- Empty object `{}` indicates no labels are set (use hex address as default)
+- Labels stored in `/dallas_labels.json` file on LittleFS filesystem
+- **Zero backend RAM usage** - labels never loaded into backend memory
+- File created automatically on first label write
+
+---
+
+#### Update All Dallas Sensor Labels
+**Endpoint:** `POST /api/v1/sensors/labels`
+**Description:** Writes all Dallas temperature sensor labels to `/dallas_labels.json` file. Replaces entire file contents.
+
 **Request Body:**
 ```json
 {
-  "address": "28FF64D1841703F1",
-  "label": "Living Room"
+  "28FF64D1841703F1": "Living Room",
+  "28FF64D1841703F2": "Kitchen",
+  "28FF64D1841703F3": "Bedroom"
 }
 ```
+
 **Parameters:**
-- `address` (required): 16-character hex address of the Dallas sensor (e.g., "28FF64D1841703F1")
-- `label` (required): Custom label for the sensor (max 16 characters)
+- Request body is JSON object mapping sensor addresses to labels
+- **Keys**: 16-character hex sensor address (e.g., "28FF64D1841703F1")
+- **Values**: Custom label string (max 16 characters recommended)
+- Empty object `{}` to clear all labels
 
 **Response (Success):**
 ```json
 {
   "success": true,
-  "address": "28FF64D1841703F1",
-  "label": "Living Room"
+  "message": "Labels updated successfully"
 }
 ```
 
@@ -205,55 +246,32 @@ otgw,metric=chsetpoint value=70.00
 }
 ```
 
-**Response (Error - Missing Parameters):**
+**Response (Error - File Write Failed):**
 ```json
 {
   "success": false,
-  "error": "Missing address or label"
-}
-```
-
-**Response (Error - Invalid Address Format):**
-```json
-{
-  "success": false,
-  "error": "Invalid address format (must be 16 hex characters)"
-}
-```
-
-**Response (Error - Non-Hex Characters):**
-```json
-{
-  "success": false,
-  "error": "Address must contain only hex characters (0-9, A-F)"
-}
-```
-
-**Response (Error - Invalid Label):**
-```json
-{
-  "success": false,
-  "error": "Label too long (max 16 characters)"
-}
-```
-
-**Response (Error - Sensor Not Found):**
-```json
-{
-  "success": false,
-  "error": "Sensor address not found"
+  "error": "Failed to write labels file"
 }
 ```
 
 **Notes:**
-- Labels are stored in settings and persist across reboots
-- Labels appear in `/api/v1/otgw/otmonitor` and `/api/v2/otgw/otmonitor` as `{address}_label` fields
-- Example: `28FF64D1841703F1_label: {"value": "Living Room", "unit": ""}`
-- Default label is the sensor's hex address until customized
-- Changes take effect immediately in both the Web UI and graph
-- **Security**: All label values are properly escaped in JSON output to prevent injection attacks
-- **Validation**: Address must be exactly 16 hexadecimal characters and match an existing sensor
-- **Buffer limits**: Supports up to 16 sensors with 16-character labels each
+- **Bulk operation only** - no single sensor endpoints available
+- **File-based storage** - labels stored in `/dallas_labels.json`, not in settings or backend RAM
+- **Zero backend memory** - labels never loaded into backend, only accessed on API calls
+- **Not exposed in OTmonitor APIs** - labels must be fetched separately via this endpoint
+- Frontend uses **read-modify-write pattern** for single label updates:
+  1. GET `/api/v1/sensors/labels` to fetch all labels
+  2. Modify one entry in JavaScript object
+  3. POST entire object back to `/api/v1/sensors/labels`
+- Default label is hex address if not found in labels file
+- Changes take effect immediately in Web UI and graph (after frontend refresh)
+- **Security**: Uses ArduinoJson for safe JSON handling
+- **Validation**: Accepts any valid JSON object (does not validate sensor existence)
+- **Use cases**: 
+  - Initial bulk label configuration
+  - Label import/export
+  - Single label update (via read-modify-write)
+  - Clear all labels (POST empty object `{}`)
 
 ---
 

@@ -1,19 +1,51 @@
 # API Changes in v1.0.0
 
-## New Endpoint: `/api/v1/sensors/label` (v1.0.0-rc7+)
+## New Endpoints: Dallas Sensor Labels (v1.0.0+)
 
-A new endpoint for managing custom labels for Dallas DS18B20 temperature sensors has been added to the V1 API.
+New endpoints for managing custom labels for Dallas DS18B20/DS18S20/DS1822 temperature sensors have been added to the V1 API.
 
-### Update Sensor Label
-**Endpoint:** `POST /api/v1/sensors/label`
+### Architecture
 
-Allows you to assign custom names to Dallas temperature sensors instead of using hex addresses. Labels are limited to 16 characters and are stored persistently in settings.
+**File-Based Storage:**
+- Labels stored in `/dallas_labels.json` file on LittleFS filesystem
+- **Zero backend RAM usage** - labels never loaded into backend memory
+- Labels fetched on-demand by Web UI via REST API
+- Not exposed in `/api/v1/otgw/otmonitor` or `/api/v2/otgw/otmonitor` responses
+
+**API Design:**
+- **Bulk operations only** (no single sensor endpoints)
+- Frontend manages label lookup and modification
+- Uses read-modify-write pattern for single label updates
+
+### Get All Labels
+**Endpoint:** `GET /api/v1/sensors/labels`
+
+Retrieves all Dallas temperature sensor labels from `/dallas_labels.json` file.
+
+**Response (with labels):**
+```json
+{
+  "28FF64D1841703F1": "Living Room",
+  "28FF64D1841703F2": "Kitchen",
+  "28FF64D1841703F3": "Bedroom"
+}
+```
+
+**Response (no labels):**
+```json
+{}
+```
+
+### Update All Labels
+**Endpoint:** `POST /api/v1/sensors/labels`
+
+Writes all Dallas temperature sensor labels to `/dallas_labels.json` file. Replaces entire file contents.
 
 **Request:**
 ```json
 {
-  "address": "28FF64D1841703F1",
-  "label": "Living Room"
+  "28FF64D1841703F1": "Living Room",
+  "28FF64D1841703F2": "Kitchen"
 }
 ```
 
@@ -21,57 +53,40 @@ Allows you to assign custom names to Dallas temperature sensors instead of using
 ```json
 {
   "success": true,
-  "address": "28FF64D1841703F1",
-  "label": "Living Room"
+  "message": "Labels updated successfully"
 }
 ```
 
-### Sensor Labels in OTmonitor Data
+### Usage Patterns
 
-When custom labels are set, they appear as additional fields in the OTmonitor endpoints:
-
-**V1 Format:**
-```json
-{
-  "otmonitor": [
-    {
-      "name": "28FF64D1841703F1",
-      "value": 21.5,
-      "unit": "°C",
-      "epoch": 1736899200
-    },
-    {
-      "name": "28FF64D1841703F1_label",
-      "value": "Living Room",
-      "unit": "",
-      "epoch": 1736899200
-    }
-  ]
-}
+**Fetch labels on page load:**
+```javascript
+const labels = await fetch('/api/v1/sensors/labels').then(r => r.json());
+const label = labels[sensorAddress] || sensorAddress; // Default to hex address
 ```
 
-**V2 Format:**
-```json
-{
-  "otmonitor": {
-    "28FF64D1841703F1": {
-      "value": 21.5,
-      "unit": "°C",
-      "epoch": 1736899200
-    },
-    "28FF64D1841703F1_label": {
-      "value": "Living Room",
-      "unit": "",
-      "epoch": 1736899200
-    }
-  }
-}
+**Update single label (read-modify-write):**
+```javascript
+// 1. Fetch all labels
+const labels = await fetch('/api/v1/sensors/labels').then(r => r.json());
+
+// 2. Modify one label
+labels['28FF64D1841703F1'] = "New Label";
+
+// 3. Write all labels back
+await fetch('/api/v1/sensors/labels', {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify(labels)
+});
 ```
 
 **Notes:**
 - Labels default to the sensor's hex address until customized
 - Labels are displayed in the Web UI graph and main page
 - Click a sensor name in the Web UI to edit its label via a non-blocking modal dialog
+- Maximum 16 characters per label (recommended)
+- Labels persist across reboots (stored in file)
 
 ---
 
