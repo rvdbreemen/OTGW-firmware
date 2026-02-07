@@ -183,12 +183,20 @@ jobs:
             if (suggestion) {
               body += `\n💡 **Suggestion:** ${suggestion}\n`;
             }
+
+            // Build absolute GitHub URLs so links in the PR comment work correctly
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const sha = (context.payload.pull_request && context.payload.pull_request.head && context.payload.pull_request.head.sha)
+              ? context.payload.pull_request.head.sha
+              : context.sha;
+            const baseUrl = `https://github.com/${owner}/${repo}/blob/${sha}`;
             
             body += '\n---\n\n';
             body += '### Resources\n';
-            body += '- **ADR Skill:** [.github/skills/adr/SKILL.md](.github/skills/adr/SKILL.md)\n';
-            body += '- **ADR Index:** [docs/adr/README.md](docs/adr/README.md)\n';
-            body += '- **Usage Guide:** [.github/skills/adr/USAGE_GUIDE.md](.github/skills/adr/USAGE_GUIDE.md)\n';
+            body += `- **ADR Skill:** [.github/skills/adr/SKILL.md](${baseUrl}/.github/skills/adr/SKILL.md)\n`;
+            body += `- **ADR Index:** [docs/adr/README.md](${baseUrl}/docs/adr/README.md)\n`;
+            body += `- **Usage Guide:** [.github/skills/adr/USAGE_GUIDE.md](${baseUrl}/.github/skills/adr/USAGE_GUIDE.md)\n`;
             
             // Only comment if there are issues or suggestions
             if (evaluate_status !== '0' || check_status !== '0' || suggestion) {
