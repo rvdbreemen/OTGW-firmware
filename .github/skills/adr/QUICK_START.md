@@ -302,10 +302,10 @@ All should work immediately with no additional setup!
 
 ### Quick Answers
 
-- **What is the ADR skill?** → Read [SKILL.md](.github/skills/adr/SKILL.md)
-- **How do I ensure it's always used?** → Read [ALWAYS_USE_SKILL.md](.github/skills/adr/ALWAYS_USE_SKILL.md)
-- **What was implemented?** → Read [IMPLEMENTATION_SUMMARY.md](.github/skills/adr/IMPLEMENTATION_SUMMARY.md)
-- **How do I set up CI/CD?** → Read [USAGE_GUIDE.md](.github/skills/adr/USAGE_GUIDE.md)
+- **What is the ADR skill?** → Read [SKILL.md](SKILL.md)
+- **How do I ensure it's always used?** → Read [ALWAYS_USE_SKILL.md](ALWAYS_USE_SKILL.md)
+- **What was implemented?** → Read [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)
+- **How do I set up CI/CD?** → Read [USAGE_GUIDE.md](USAGE_GUIDE.md)
 
 ### Ask Copilot
 
