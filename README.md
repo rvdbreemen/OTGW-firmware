@@ -305,6 +305,7 @@ Reaching version 1.0.0 wouldn't have been possible without the community. So sho
 - @DaveDavenport for fixing all known and unknown issues with the codebase, it's stable with you
 - @DutchessNicole for fixing the Web UI over time
 - @RobR for his work in the s0 counter implementation
+- @GeorgeZ83 for improving Home Assistant MQTT integration and climate entity support
 
 And for all those people that keep reporting issue, pushing for more and helping other in the community all the time.
 
