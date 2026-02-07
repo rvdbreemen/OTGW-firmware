@@ -165,13 +165,12 @@ Sensors must meet these criteria to be detected:
 
 ## Browser Compatibility
 
-All code follows ES5+ standards for maximum compatibility:
-- ✅ Uses `for...in` loops (not `for...of`)
-- ✅ Uses `var` declarations
-- ✅ Uses function expressions
-- ✅ No arrow functions in critical paths (except event handlers in init)
-- ✅ Uses `Array.prototype` methods with proper polyfills available
-- ✅ No modern ES6+ features that aren't widely supported
+The implementation uses modern JavaScript (ES6) features for cleaner, more maintainable code:
+- **ES6 Features Used**: `const`, `let`, arrow functions, `Array.from()`, `Map`, `forEach()`, `startsWith()`
+- **Target Browsers**: Modern stable versions of Chrome, Firefox, and Safari (last 2-3 years)
+- **Browser Support**: All ES6 features used are widely supported in current browsers (>95% global coverage)
+- **Trade-off**: Chose code maintainability and modern patterns over legacy browser support (IE11, very old mobile browsers)
+- **Testing**: Manual testing recommended on Chrome, Firefox, and Safari latest stable versions
 
 ## Performance Considerations
 

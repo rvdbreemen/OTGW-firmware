@@ -124,6 +124,9 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-029: Non-Blocking Modal Dialogs for User Input](ADR-029-non-blocking-modal-dialogs.md)** 🆕  
   Custom HTML/CSS modal dialogs instead of blocking prompt() to maintain real-time data flow.
 
+- **[ADR-033: Dallas Sensor Custom Labels and Graph Visualization](ADR-033-dallas-sensor-custom-labels-graph-visualization.md)** 🆕  
+  Persistent custom sensor labels (16 chars max) with REST API endpoint, dynamic graph visualization with 16-color palette, and non-blocking inline editor.
+
 ## ADR Template
 
 When creating new ADRs, use this structure:
