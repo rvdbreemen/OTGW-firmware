@@ -194,15 +194,12 @@ struct
   DeviceAddress addr;
   float tempC;
   time_t lasttime;
-  char label[17];  // Custom label (max 16 chars + null terminator)
 } DallasrealDevice[MAXDALLASDEVICES];
 // prototype to allow use in restAPI.ino
 char* getDallasAddress(DeviceAddress deviceAddress);
 
-// Dallas sensor label settings storage (JSON string containing address:label pairs)
-// Sized to accommodate 16 sensors with 16-char hex addresses and 16-char labels:
-// Worst-case JSON: {"28FF...":  "16-char-label", ...} × 16 sensors ≈ 900 bytes + overhead
-char settingDallasLabels[JSON_BUFF_MAX] = "";  // Stores sensor labels as JSON
+// Dallas sensor labels are now stored in /dallas_labels.json file (not in RAM)
+// This saves 1024 bytes of persistent RAM
 
 
 // S0 Counter Settings and variables with global scope

@@ -26,8 +26,8 @@ void writeSettings(bool show)
 
   DebugT(F("Start writing setting data "));
 
-  // Increased capacity to accommodate Dallas sensor labels (up to 16 sensors × ~60 bytes each)
-  DynamicJsonDocument doc(2560);
+  // Capacity reduced back to 1536 bytes (Dallas labels now in separate file)
+  DynamicJsonDocument doc(1536);
   JsonObject root  = doc.to<JsonObject>();
   root[F("hostname")] = settingHostname;
   root[F("MQTTenable")] = settingMQTTenable;
@@ -67,7 +67,7 @@ void writeSettings(bool show)
   root[F("GPIOOUTPUTSenabled")] = settingGPIOOUTPUTSenabled;
   root[F("GPIOOUTPUTSpin")] = settingGPIOOUTPUTSpin;
   root[F("GPIOOUTPUTStriggerBit")] = settingGPIOOUTPUTStriggerBit;
-  root[F("DallasLabels")] = settingDallasLabels;
+  // Dallas sensor labels now stored in /dallas_labels.json (not in settings.json)
 
   serializeJsonPretty(root, file);
   if (show)  serializeJsonPretty(root, TelnetStream); //Debug stream ;-)
@@ -94,8 +94,8 @@ void readSettings(bool show)
 
   // Deserialize the JSON document
   // Use DynamicJsonDocument to eliminate stack overflow risk (moved from stack to heap)
-  // Capacity: Accommodates Dallas sensor labels (up to 16 sensors × ~60 bytes each)
-  DynamicJsonDocument doc(2560);
+  // Capacity reduced back to 1536 bytes (Dallas labels now in separate file)
+  DynamicJsonDocument doc(1536);
   DeserializationError error = deserializeJson(doc, file);
   if (error)
   {
@@ -165,8 +165,7 @@ void readSettings(bool show)
   settingGPIOOUTPUTSpin = doc[F("GPIOOUTPUTSpin")] | settingGPIOOUTPUTSpin;
   settingGPIOOUTPUTStriggerBit = doc[F("GPIOOUTPUTStriggerBit")] | settingGPIOOUTPUTStriggerBit;
   
-  strlcpy(settingDallasLabels, doc[F("DallasLabels")] | "", sizeof(settingDallasLabels));
-  if (strcmp_P(settingDallasLabels, PSTR("null"))==0) settingDallasLabels[0] = 0;
+  // Dallas sensor labels now stored in /dallas_labels.json (not in settings.json)
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();

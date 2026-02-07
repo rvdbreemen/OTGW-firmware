@@ -181,14 +181,25 @@ void processAPI()
           sendApiNotFound(originalURI);
         }
       } else if (wc > 3 && strcmp_P(words[3], PSTR("sensors")) == 0) {
-        // POST/PUT /api/v1/sensors/label
-        // Request body: {"address": "hexaddress", "label": "customlabel"}
+        // Sensor label operations
         if (wc > 4 && strcmp_P(words[4], PSTR("label")) == 0) {
+          // POST/PUT /api/v1/sensors/label (single label update)
+          // Request body: {"address": "hexaddress", "label": "customlabel"}
           if (!isPostOrPut) { 
             httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); 
             return; 
           }
           updateSensorLabel();
+        } else if (wc > 4 && strcmp_P(words[4], PSTR("labels")) == 0) {
+          // GET /api/v1/sensors/labels (get all labels from file)
+          // POST/PUT /api/v1/sensors/labels (update all labels in file)
+          if (isGet) {
+            getDallasLabels();
+          } else if (isPostOrPut) {
+            updateAllDallasLabels();
+          } else {
+            httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); 
+          }
         } else {
           sendApiNotFound(originalURI);
         }
@@ -527,12 +538,7 @@ void sendOTmonitorV2()
     for (int i = 0; i < DallasrealDeviceCount; i++) {
       const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
       sendJsonOTmonMapEntryDallasTemp(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
-      // Also send the label as a separate entry (safely escaped)
-      char labelKey[32];
-      snprintf_P(labelKey, sizeof(labelKey), PSTR("%s_label"), strDeviceAddress);
-      String escapedLabel = escapeJsonString(DallasrealDevice[i].label);
-      sendJsonOTmonMapEntry(labelKey, escapedLabel.c_str(), F(""), now);
-
+      // Labels now managed by Web UI via /dallas_labels.json file (not sent in API)
     }
   }
 
@@ -597,12 +603,7 @@ void sendOTmonitor()
     for (int i = 0; i < DallasrealDeviceCount; i++) {
         const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
         sendJsonOTmonObjDallasTemp(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
-        // Also send the label as a separate entry (safely escaped)
-        char labelKey[32];
-        snprintf_P(labelKey, sizeof(labelKey), PSTR("%s_label"), strDeviceAddress);
-        String escapedLabel = escapeJsonString(DallasrealDevice[i].label);
-        sendJsonOTmonObj(labelKey, escapedLabel.c_str(), F(""), now);
-
+        // Labels now managed by Web UI via /dallas_labels.json file (not sent in API)
     }
   }
 
@@ -862,7 +863,76 @@ void postSettings()
 } // postSettings()
 
 
-//====[ Update sensor label ]====
+//====[ Dallas sensor label file operations ]====
+
+// Get all Dallas sensor labels from file
+void getDallasLabels() {
+  File labelsFile = LittleFS.open(F("/dallas_labels.json"), "r");
+  
+  if (!labelsFile) {
+    // No file exists - return empty JSON object
+    httpServer.send(200, F("application/json"), F("{}"));
+    return;
+  }
+  
+  // Stream the file content directly to response
+  httpServer.streamFile(labelsFile, F("application/json"));
+  labelsFile.close();
+}
+
+// Update all Dallas sensor labels in file (bulk operation)
+void updateAllDallasLabels() {
+  // Parse JSON body from request
+  const String& body = httpServer.arg(F("plain"));
+  
+  if (body.length() == 0) {
+    StaticJsonDocument<128> errorDoc;
+    errorDoc[F("success")] = false;
+    errorDoc[F("error")] = F("Empty request body");
+    String response;
+    serializeJson(errorDoc, response);
+    httpServer.send_P(400, PSTR("application/json"), response.c_str());
+    return;
+  }
+  
+  // Validate JSON format (parse to check validity)
+  DynamicJsonDocument doc(JSON_BUFF_MAX);
+  DeserializationError error = deserializeJson(doc, body);
+  
+  if (error) {
+    StaticJsonDocument<128> errorDoc;
+    errorDoc[F("success")] = false;
+    errorDoc[F("error")] = F("Invalid JSON format");
+    String response;
+    serializeJson(errorDoc, response);
+    httpServer.send_P(400, PSTR("application/json"), response.c_str());
+    return;
+  }
+  
+  // Write directly to file
+  File labelsFile = LittleFS.open(F("/dallas_labels.json"), "w");
+  if (!labelsFile) {
+    StaticJsonDocument<128> errorDoc;
+    errorDoc[F("success")] = false;
+    errorDoc[F("error")] = F("Failed to open file for writing");
+    String response;
+    serializeJson(errorDoc, response);
+    httpServer.send_P(500, PSTR("application/json"), response.c_str());
+    return;
+  }
+  
+  labelsFile.print(body);
+  labelsFile.close();
+  
+  // Success response
+  StaticJsonDocument<64> responseDoc;
+  responseDoc[F("success")] = true;
+  String response;
+  serializeJson(responseDoc, response);
+  httpServer.send(200, F("application/json"), response);
+}
+
+//====[ Update single sensor label ]====
 void updateSensorLabel() {
   // Parse JSON body: {"address": "hexaddress", "label": "customlabel"}
   StaticJsonDocument<256> doc;
@@ -947,8 +1017,31 @@ void updateSensorLabel() {
     return;
   }
   
-  // Save the label
-  saveSensorLabel(address, label);
+  // Read existing labels from file
+  DynamicJsonDocument labelsDoc(JSON_BUFF_MAX);
+  File labelsFile = LittleFS.open(F("/dallas_labels.json"), "r");
+  if (labelsFile) {
+    deserializeJson(labelsDoc, labelsFile);
+    labelsFile.close();
+  }
+  
+  // Update the label for this address
+  labelsDoc[address] = label;
+  
+  // Write back to file
+  labelsFile = LittleFS.open(F("/dallas_labels.json"), "w");
+  if (!labelsFile) {
+    StaticJsonDocument<128> errorDoc;
+    errorDoc[F("success")] = false;
+    errorDoc[F("error")] = F("Failed to write label file");
+    String response;
+    serializeJson(errorDoc, response);
+    httpServer.send_P(500, PSTR("application/json"), response.c_str());
+    return;
+  }
+  
+  serializeJson(labelsDoc, labelsFile);
+  labelsFile.close();
   
   // Return success using ArduinoJson for safe JSON serialization
   StaticJsonDocument<256> responseDoc;
