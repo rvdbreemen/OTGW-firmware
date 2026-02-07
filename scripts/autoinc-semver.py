@@ -387,7 +387,7 @@ def main(directory, filename, git_enabled, increment, githash_override, githash_
     update_version_hash(os.path.join("data", "version.hash"), githash)
 
     # Check if any project files need updating (have different version than version.h)
-    ext_list = [".h", ".ino", ".cpp", ".c", ".js", ".css", ".html", ".md", ".txt"]
+    ext_list = [".h", ".ino", ".cpp", ".c", ".js", ".css", ".html", ".md", ".txt", ".cfg"]
     needs_update = False
     
     if not update_all:
