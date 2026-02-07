@@ -93,8 +93,9 @@ void readSettings(bool show)
   }
 
   // Deserialize the JSON document
-  // Increased capacity to accommodate Dallas sensor labels (up to 16 sensors × ~60 bytes each)
-  StaticJsonDocument<2560> doc;
+  // Use DynamicJsonDocument to eliminate stack overflow risk (moved from stack to heap)
+  // Capacity: Accommodates Dallas sensor labels (up to 16 sensors × ~60 bytes each)
+  DynamicJsonDocument doc(2560);
   DeserializationError error = deserializeJson(doc, file);
   if (error)
   {
