@@ -32,8 +32,15 @@ jobs:
         continue-on-error: true
         run: |
           echo "Running evaluation framework to check ADR compliance..."
+          # Disable 'set -e' so we can capture the exit code even on failure
+          set +e
           python evaluate.py
-          echo "evaluate_status=$?" >> $GITHUB_OUTPUT
+          eval_status=$?
+          # Restore 'set -e' for any subsequent commands in this step (if added later)
+          set -e
+          echo "evaluate_status=$eval_status" >> $GITHUB_OUTPUT
+          # Always exit 0 so the step completes and output is available
+          exit 0
       
       - name: Check ADR references
         id: check_refs
