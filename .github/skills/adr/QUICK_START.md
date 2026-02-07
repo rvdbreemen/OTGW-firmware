@@ -58,41 +58,41 @@ Ask Copilot: "Use the ADR skill to create ADR-030 for implementing Redis caching
 
 ### Copilot Integration (NEW)
 
-4. **[.github/copilot-instructions.md](/.github/copilot-instructions.md)** - Enhanced with ADR workflow
+4. **[.github/copilot-instructions.md](../../copilot-instructions.md)** - Enhanced with ADR workflow
    - Repository-wide ADR governance
    - Lifecycle management (Proposed → Accepted → Superseded)
    - When to create ADRs
    - Immutability enforcement
 
-5. **[.github/instructions/adr.coding-agent.instructions.md](/.github/instructions/adr.coding-agent.instructions.md)** - NEW
+5. **[.github/instructions/adr.coding-agent.instructions.md](../../instructions/adr.coding-agent.instructions.md)** - NEW
    - Coding agent-specific ADR requirements
    - Before/during implementation checklist
    - ADR creation and supersession workflow
 
-6. **[.github/instructions/adr.code-review.instructions.md](/.github/instructions/adr.code-review.instructions.md)** - NEW
+6. **[.github/instructions/adr.code-review.instructions.md](../../instructions/adr.code-review.instructions.md)** - NEW
    - Code review-specific ADR checks
    - Compliance verification checklist
    - Review comment examples
 
 ### Reference Documents
 
-7. **[USAGE_GUIDE.md](.github/skills/adr/USAGE_GUIDE.md)** (15KB)
+7. **[USAGE_GUIDE.md](USAGE_GUIDE.md)** (15KB)
    - CI/CD integration examples
    - Troubleshooting guide
    - **Reference** when setting up automation
 
-8. **[README.md](.github/skills/adr/README.md)** (4KB)
+8. **[README.md](README.md)** (4KB)
    - Quick overview
    - File descriptions
    - **Start here** for a quick introduction
 
 ### Example Templates (Optional)
 
-9. **[adr-compliance.yml.example](.github/workflows/adr-compliance.yml.example)** (8KB)
+9. **[adr-compliance.yml.example](../../workflows/adr-compliance.yml.example)** (8KB)
    - GitHub Actions workflow for automatic ADR checking
    - Copy to enable: `cp .github/workflows/adr-compliance.yml.example .github/workflows/adr-compliance.yml`
 
-10. **[PULL_REQUEST_TEMPLATE.md.example](.github/PULL_REQUEST_TEMPLATE.md.example)** (4KB)
+10. **[PULL_REQUEST_TEMPLATE.md.example](../../PULL_REQUEST_TEMPLATE.md.example)** (4KB)
     - PR template with ADR compliance checklist
     - Copy to enable: `cp .github/PULL_REQUEST_TEMPLATE.md.example .github/PULL_REQUEST_TEMPLATE.md`
 
