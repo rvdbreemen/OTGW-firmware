@@ -13,6 +13,35 @@ const APIGW = window.location.protocol + '//' + window.location.host + '/api/';
 
 "use strict";
 
+// Global cache for Dallas sensor labels (loaded from /dallas_labels.ini)
+var dallasLabelsCache = {};
+
+// Function to fetch Dallas sensor labels from backend
+function fetchDallasLabels() {
+  return fetch(APIGW + 'v1/sensors/labels')
+    .then(function(response) {
+      if (!response.ok) {
+        console.warn('Failed to fetch Dallas labels:', response.status);
+        return {};
+      }
+      var contentType = response.headers.get('content-type') || '';
+      if (contentType.indexOf('application/json') === -1) {
+        return {};
+      }
+      return response.json();
+    })
+    .then(function(labels) {
+      dallasLabelsCache = labels || {};
+      console.log('Dallas labels loaded:', Object.keys(dallasLabelsCache).length, 'labels');
+      return dallasLabelsCache;
+    })
+    .catch(function(error) {
+      console.warn('Error fetching Dallas labels:', error);
+      dallasLabelsCache = {};
+      return dallasLabelsCache;
+    });
+}
+
 
 console.log(`Hash=${window.location.hash}`);
 window.onload = initMainPage;
@@ -2202,6 +2231,11 @@ function initMainPage() {
       OTGraph.init();
   }
 
+  // Fetch Dallas sensor labels on page load
+  fetchDallasLabels().then(function() {
+    console.log('Dallas labels cache initialized');
+  });
+
   // Start time updates if not in flash mode
   if (!flashModeActive && !timeupdate) {
     refreshDevTime();
@@ -2617,6 +2651,13 @@ function refreshOTmonitor() {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
       data = json.otmonitor;
 
+      // Detect and register temperature sensors for the graph
+      if (typeof OTGraph !== 'undefined' && OTGraph.running) {
+        OTGraph.detectAndRegisterSensors(data);
+        // Process sensor data with current timestamp
+        OTGraph.processSensorData(data, new Date());
+      }
+
       let otMonPage = document.getElementById('mainPage');
       let otMonTable = document.querySelector(".otmontable");
       
@@ -2626,6 +2667,20 @@ function refreshOTmonitor() {
         otMonTable = document.createElement("div");
         otMonTable.setAttribute("class", "otmontable");
         otMonPage.appendChild(otMonTable);
+      }
+
+      // Helper function to format Dallas sensor temperature values
+      function formatDallasSensorValue(name, value) {
+        // Check if this is a Dallas sensor (16 hex chars)
+        if (name && typeof name === 'string' && 
+            name.length === 16 && /^[0-9A-Fa-f]{16}$/.test(name)) {
+          // Check if value is numeric (temperature)
+          var numValue = parseFloat(value);
+          if (!isNaN(numValue)) {
+            return numValue.toFixed(1);
+          }
+        }
+        return value;
       }
 
       for (let i in data) {
@@ -2651,7 +2706,38 @@ function refreshOTmonitor() {
           //--- field Name ---
           var fldDiv = document.createElement("div");
           fldDiv.setAttribute("class", "otmoncolumn1");
-          fldDiv.textContent = translateToHuman(data[i].name);
+          
+          // Check if this is a Dallas sensor (16 hex chars) and has a custom label
+          var displayName = translateToHuman(data[i].name);
+          if (data[i].name && typeof data[i].name === 'string' && 
+              data[i].name.length === 16 && /^[0-9A-Fa-f]{16}$/.test(data[i].name)) {
+            // This is a Dallas sensor hex address - check for custom label in cache
+            if (dallasLabelsCache[data[i].name]) {
+              displayName = dallasLabelsCache[data[i].name];
+            }
+            
+            // Add click handler to allow editing label
+            fldDiv.classList.add('editable-label');
+            fldDiv.title = 'Click to edit label (Address: ' + data[i].name + ')';
+            fldDiv.onclick = (function(addr, node) {
+              return function(evt) { openInlineSensorLabelEditor(addr, node, evt); };
+            })(data[i].name, fldDiv);
+
+            // Create label text and edit icon
+            var labelText = document.createElement('span');
+            labelText.setAttribute('class', 'sensor-label-text');
+            labelText.textContent = displayName;
+            fldDiv.appendChild(labelText);
+
+            var editIcon = document.createElement('span');
+            editIcon.setAttribute('class', 'sensor-edit-icon');
+            editIcon.textContent = ' ✏️';
+            fldDiv.appendChild(editIcon);
+          } else {
+            // Not a Dallas sensor, just display as text
+            fldDiv.textContent = displayName;
+          }
+          
           rowDiv.appendChild(fldDiv);
           //--- Value ---
           var valDiv = document.createElement("div");
@@ -2659,7 +2745,7 @@ function refreshOTmonitor() {
           valDiv.setAttribute("id", "otmon_" + data[i].name);
           if (data[i].value === "On") valDiv.innerHTML = "<span class='state-on'></span>";
           else if (data[i].value === "Off") valDiv.innerHTML = "<span class='state-off'></span>";
-          else valDiv.textContent = data[i].value;
+          else valDiv.textContent = formatDallasSensorValue(data[i].name, data[i].value);
           rowDiv.appendChild(valDiv);
           //--- Unit  ---
           var unitDiv = document.createElement("div");
@@ -2686,7 +2772,7 @@ function refreshOTmonitor() {
           epoch.value = data[i].epoch;
           if (data[i].value === "On") update.innerHTML = "<span class='state-on'></span>";
           else if (data[i].value === "Off") update.innerHTML = "<span class='state-off'></span>";
-          else update.textContent = data[i].value;
+          else update.textContent = formatDallasSensorValue(data[i].name, data[i].value);
           //if (update.style.visibility == 'visible') update.textContent = data[i].value;
 
         }
@@ -3926,3 +4012,166 @@ function loadPersistentUI() {
     .catch(err => console.error("Error loading persistent settings:", err));
 }
 
+//============================================================================
+// Edit sensor label functionality - inline non-blocking editor
+//============================================================================
+var activeSensorLabelEditor = null;
+
+function openInlineSensorLabelEditor(address, targetNode, evt) {
+  if (!address || address.length !== 16 || !targetNode) return;
+  if (evt) {
+    evt.preventDefault();
+    evt.stopPropagation();
+  }
+
+  closeInlineSensorLabelEditor();
+
+  var labelTextNode = targetNode.querySelector('.sensor-label-text');
+  var currentLabel = address;
+  var labelKey = address + '_label';
+  if (typeof data !== 'undefined' && data[labelKey] && data[labelKey].value) {
+    currentLabel = data[labelKey].value;
+  }
+
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.maxLength = 16;
+  input.className = 'sensor-label-inline-editor';
+  input.value = currentLabel;
+  input.title = 'Enter new label and press Enter to save';
+
+  if (labelTextNode) {
+    targetNode.replaceChild(input, labelTextNode);
+  } else {
+    targetNode.insertBefore(input, targetNode.firstChild);
+  }
+
+  activeSensorLabelEditor = {
+    address: address,
+    container: targetNode,
+    input: input,
+    originalText: currentLabel,
+    saving: false  // Guard flag to prevent duplicate saves
+  };
+
+  input.focus();
+  input.select();
+
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveInlineSensorLabel();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeInlineSensorLabelEditor(true);
+    }
+  });
+
+  input.addEventListener('blur', function() {
+    if (activeSensorLabelEditor && activeSensorLabelEditor.input === input) {
+      // Only save if label changed to avoid unnecessary flash writes
+      var newLabel = input.value.trim() || address;
+      if (newLabel !== activeSensorLabelEditor.originalText) {
+        saveInlineSensorLabel();
+      } else {
+        // Label unchanged, just close the editor
+        closeInlineSensorLabelEditor(true);
+      }
+    }
+  });
+}
+
+function closeInlineSensorLabelEditor(cancelOnly) {
+  if (!activeSensorLabelEditor) return;
+
+  var editor = activeSensorLabelEditor;
+  var container = editor.container;
+  var input = editor.input;
+  var text = cancelOnly ? editor.originalText : (input ? input.value.trim() : editor.originalText);
+  if (!text) text = editor.address;
+
+  var labelText = document.createElement('span');
+  labelText.setAttribute('class', 'sensor-label-text');
+  labelText.textContent = text;
+
+  if (container && input && input.parentNode === container) {
+    container.replaceChild(labelText, input);
+  }
+
+  activeSensorLabelEditor = null;
+}
+
+function saveInlineSensorLabel() {
+  if (!activeSensorLabelEditor) return;
+  
+  var editor = activeSensorLabelEditor;
+  
+  // Guard against duplicate saves (e.g., blur triggered during save)
+  if (editor.saving) return;
+  
+  var input = editor.input;
+  if (!input) {
+    closeInlineSensorLabelEditor(true);
+    return;
+  }
+
+  var newLabel = input.value.trim();
+  if (newLabel.length === 0) {
+    newLabel = editor.address;
+  }
+
+  if (newLabel.length > 16) {
+    newLabel = newLabel.substring(0, 16);
+  }
+
+  // Set saving flag before disabling input
+  editor.saving = true;
+  input.disabled = true;
+
+  // Use bulk labels endpoint with read-modify-write flow
+  var labelsUrl = APIGW + 'v1/sensors/labels';
+
+  fetch(labelsUrl)
+    .then(function (response) {
+      if (!response.ok) {
+        throw new Error('HTTP ' + response.status);
+      }
+      var contentType = response.headers.get('content-type') || '';
+      if (contentType.indexOf('application/json') === -1) {
+        // No JSON body; start from empty labels map
+        return {};
+      }
+      return response.json();
+    })
+    .then(function (labels) {
+      // Modify the label for the current address
+      labels[editor.address] = newLabel;
+
+      // Write all labels back
+      return fetch(labelsUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(labels)
+      });
+    })
+    .then(function(response) {
+      if (!response.ok) {
+        throw new Error('HTTP ' + response.status);
+      }
+      // Success! Update cache and close editor
+      dallasLabelsCache[editor.address] = newLabel;
+      closeInlineSensorLabelEditor();
+      refreshOTmonitor();
+    })
+    .catch(function(error) {
+      console.error('Error updating sensor label:', error);
+      if (input) {
+        input.disabled = false;
+        input.focus();
+        input.select();
+      }
+      editor.saving = false;
+    });
+}

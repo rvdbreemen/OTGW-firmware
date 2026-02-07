@@ -27,7 +27,7 @@ void writeSettings(bool show)
 
   DebugT(F("[Settings] State: Serializing settings to JSON... "));
 
-  //const size_t capacity = JSON_OBJECT_SIZE(6);  // save more setting, grow # of objects accordingly
+  // Capacity reduced back to 1536 bytes (Dallas labels now in separate file)
   DynamicJsonDocument doc(1536);
   JsonObject root  = doc.to<JsonObject>();
   root[F("hostname")] = settingHostname;
@@ -68,6 +68,7 @@ void writeSettings(bool show)
   root[F("GPIOOUTPUTSenabled")] = settingGPIOOUTPUTSenabled;
   root[F("GPIOOUTPUTSpin")] = settingGPIOOUTPUTSpin;
   root[F("GPIOOUTPUTStriggerBit")] = settingGPIOOUTPUTStriggerBit;
+  // Dallas sensor labels now stored in /dallas_labels.json (not in settings.json)
 
   serializeJsonPretty(root, file);
   if (show) {
@@ -97,7 +98,9 @@ void readSettings(bool show)
   }
 
   // Deserialize the JSON document
-  StaticJsonDocument<1536> doc;
+  // Use DynamicJsonDocument to eliminate stack overflow risk (moved from stack to heap)
+  // Capacity reduced back to 1536 bytes (Dallas labels now in separate file)
+  DynamicJsonDocument doc(1536);
   DeserializationError error = deserializeJson(doc, file);
   if (error)
   {
@@ -166,6 +169,8 @@ void readSettings(bool show)
   settingGPIOOUTPUTSenabled = doc[F("GPIOOUTPUTSenabled")] | settingGPIOOUTPUTSenabled;
   settingGPIOOUTPUTSpin = doc[F("GPIOOUTPUTSpin")] | settingGPIOOUTPUTSpin;
   settingGPIOOUTPUTStriggerBit = doc[F("GPIOOUTPUTStriggerBit")] | settingGPIOOUTPUTStriggerBit;
+  
+  // Dallas sensor labels now stored in /dallas_labels.json (not in settings.json)
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
