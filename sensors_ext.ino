@@ -314,8 +314,8 @@ void loadSensorLabel(const char* hexAddress, char* label, size_t labelSize) {
 void saveSensorLabel(const char* hexAddress, const char* newLabel) {
   if (!hexAddress || !newLabel) return;
   
-  // Parse existing labels
-  StaticJsonDocument<512> doc;
+  // Parse existing labels (use larger buffer to match settingDallasLabels size)
+  DynamicJsonDocument doc(JSON_BUFF_MAX);
   if (strlen(settingDallasLabels) > 0) {
     deserializeJson(doc, settingDallasLabels);
   }
@@ -323,8 +323,22 @@ void saveSensorLabel(const char* hexAddress, const char* newLabel) {
   // Update or add the label
   doc[hexAddress] = newLabel;
   
-  // Serialize back to string
-  serializeJson(doc, settingDallasLabels, sizeof(settingDallasLabels));
+  // Measure required JSON size and ensure it fits in settingDallasLabels
+  const size_t requiredSize = measureJson(doc) + 1; // +1 for null terminator
+  if (requiredSize > sizeof(settingDallasLabels)) {
+    // Not enough space to store labels JSON safely; do not write truncated data
+    DebugTf(PSTR("ERROR: Dallas labels JSON exceeds buffer size (%d > %d)\r\n"), 
+            requiredSize, sizeof(settingDallasLabels));
+    return;
+  }
+  
+  // Serialize back to string and verify it was not truncated
+  const size_t bytesWritten = serializeJson(doc, settingDallasLabels, sizeof(settingDallasLabels));
+  if (bytesWritten == 0 || bytesWritten >= sizeof(settingDallasLabels)) {
+    // Serialization failed or was truncated; avoid persisting invalid JSON
+    DebugTln(F("ERROR: Dallas labels JSON serialization failed or truncated"));
+    return;
+  }
   
   // Update the sensor structure if it's currently loaded
   for (int i = 0; i < DallasrealDeviceCount; i++) {

@@ -200,7 +200,9 @@ struct
 char* getDallasAddress(DeviceAddress deviceAddress);
 
 // Dallas sensor label settings storage (JSON string containing address:label pairs)
-char settingDallasLabels[512] = "";  // Stores sensor labels as JSON
+// Sized to accommodate 16 sensors with 16-char hex addresses and 16-char labels:
+// Worst-case JSON: {"28FF...":  "16-char-label", ...} × 16 sensors ≈ 900 bytes + overhead
+char settingDallasLabels[JSON_BUFF_MAX] = "";  // Stores sensor labels as JSON
 
 
 // S0 Counter Settings and variables with global scope

@@ -26,8 +26,8 @@ void writeSettings(bool show)
 
   DebugT(F("Start writing setting data "));
 
-  //const size_t capacity = JSON_OBJECT_SIZE(6);  // save more setting, grow # of objects accordingly
-  DynamicJsonDocument doc(1536);
+  // Increased capacity to accommodate Dallas sensor labels (up to 16 sensors × ~60 bytes each)
+  DynamicJsonDocument doc(2560);
   JsonObject root  = doc.to<JsonObject>();
   root[F("hostname")] = settingHostname;
   root[F("MQTTenable")] = settingMQTTenable;
@@ -93,7 +93,8 @@ void readSettings(bool show)
   }
 
   // Deserialize the JSON document
-  StaticJsonDocument<1536> doc;
+  // Increased capacity to accommodate Dallas sensor labels (up to 16 sensors × ~60 bytes each)
+  StaticJsonDocument<2560> doc;
   DeserializationError error = deserializeJson(doc, file);
   if (error)
   {

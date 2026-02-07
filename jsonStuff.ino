@@ -9,6 +9,38 @@
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
 */
+
+// Helper function to escape JSON string values
+// Replaces: " with \", \ with \\, control chars with \uXXXX
+String escapeJsonString(const char* str) {
+  if (!str) return String("");
+  
+  String result;
+  result.reserve(strlen(str) + 10); // Reserve some extra space for escapes
+  
+  for (const char* p = str; *p; p++) {
+    switch (*p) {
+      case '"':  result += "\\\""; break;
+      case '\\': result += "\\\\"; break;
+      case '\b': result += "\\b";  break;
+      case '\f': result += "\\f";  break;
+      case '\n': result += "\\n";  break;
+      case '\r': result += "\\r";  break;
+      case '\t': result += "\\t";  break;
+      default:
+        if (*p < 0x20) {
+          // Control character - use \uXXXX notation
+          char buf[7];
+          snprintf(buf, sizeof(buf), "\\u%04X", (unsigned char)*p);
+          result += buf;
+        } else {
+          result += *p;
+        }
+    }
+  }
+  return result;
+}
+
 static int iIdentlevel = 0;
 bool bFirst = true; 
 

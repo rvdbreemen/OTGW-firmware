@@ -527,10 +527,11 @@ void sendOTmonitorV2()
     for (int i = 0; i < DallasrealDeviceCount; i++) {
       const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
       sendJsonOTmonMapEntryDallasTemp(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
-      // Also send the label as a separate entry
+      // Also send the label as a separate entry (safely escaped)
       char labelKey[32];
       snprintf_P(labelKey, sizeof(labelKey), PSTR("%s_label"), strDeviceAddress);
-      sendJsonOTmonMapEntry(labelKey, DallasrealDevice[i].label, F(""), now);
+      String escapedLabel = escapeJsonString(DallasrealDevice[i].label);
+      sendJsonOTmonMapEntry(labelKey, escapedLabel.c_str(), F(""), now);
 
     }
   }
@@ -596,10 +597,11 @@ void sendOTmonitor()
     for (int i = 0; i < DallasrealDeviceCount; i++) {
         const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
         sendJsonOTmonObjDallasTemp(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
-        // Also send the label as a separate entry
+        // Also send the label as a separate entry (safely escaped)
         char labelKey[32];
         snprintf_P(labelKey, sizeof(labelKey), PSTR("%s_label"), strDeviceAddress);
-        sendJsonOTmonObj(labelKey, DallasrealDevice[i].label, F(""), now);
+        String escapedLabel = escapeJsonString(DallasrealDevice[i].label);
+        sendJsonOTmonObj(labelKey, escapedLabel.c_str(), F(""), now);
 
     }
   }
@@ -867,7 +869,12 @@ void updateSensorLabel() {
   DeserializationError error = deserializeJson(doc, httpServer.arg(F("plain")));
   
   if (error) {
-    httpServer.send_P(400, PSTR("application/json"), PSTR("{\"error\":\"Invalid JSON\"}"));
+    StaticJsonDocument<128> errorDoc;
+    errorDoc[F("success")] = false;
+    errorDoc[F("error")] = F("Invalid JSON");
+    String response;
+    serializeJson(errorDoc, response);
+    httpServer.send_P(400, PSTR("application/json"), response.c_str());
     return;
   }
   
@@ -875,28 +882,81 @@ void updateSensorLabel() {
   const char* label = doc[F("label")];
   
   if (!address || !label) {
-    httpServer.send_P(400, PSTR("application/json"), PSTR("{\"error\":\"Missing address or label\"}"));
+    StaticJsonDocument<128> errorDoc;
+    errorDoc[F("success")] = false;
+    errorDoc[F("error")] = F("Missing address or label");
+    String response;
+    serializeJson(errorDoc, response);
+    httpServer.send_P(400, PSTR("application/json"), response.c_str());
     return;
   }
   
   // Validate address format (16 hex characters)
   if (strlen(address) != 16) {
-    httpServer.send_P(400, PSTR("application/json"), PSTR("{\"error\":\"Invalid address format\"}"));
+    StaticJsonDocument<128> errorDoc;
+    errorDoc[F("success")] = false;
+    errorDoc[F("error")] = F("Invalid address format (must be 16 hex characters)");
+    String response;
+    serializeJson(errorDoc, response);
+    httpServer.send_P(400, PSTR("application/json"), response.c_str());
     return;
+  }
+  
+  // Validate address is actually hexadecimal
+  for (int i = 0; i < 16; i++) {
+    char c = address[i];
+    if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'))) {
+      StaticJsonDocument<128> errorDoc;
+      errorDoc[F("success")] = false;
+      errorDoc[F("error")] = F("Address must contain only hex characters (0-9, A-F)");
+      String response;
+      serializeJson(errorDoc, response);
+      httpServer.send_P(400, PSTR("application/json"), response.c_str());
+      return;
+    }
   }
   
   // Validate label length (max 16 characters)
   if (strlen(label) > 16) {
-    httpServer.send_P(400, PSTR("application/json"), PSTR("{\"error\":\"Label too long (max 16 chars)\"}"));
+    StaticJsonDocument<128> errorDoc;
+    errorDoc[F("success")] = false;
+    errorDoc[F("error")] = F("Label too long (max 16 characters)");
+    String response;
+    serializeJson(errorDoc, response);
+    httpServer.send_P(400, PSTR("application/json"), response.c_str());
+    return;
+  }
+  
+  // Optional: Validate that the address corresponds to an actual sensor
+  bool sensorFound = false;
+  for (int i = 0; i < DallasrealDeviceCount; i++) {
+    const char* addr = getDallasAddress(DallasrealDevice[i].addr);
+    if (strcasecmp(addr, address) == 0) {
+      sensorFound = true;
+      break;
+    }
+  }
+  
+  if (!sensorFound) {
+    StaticJsonDocument<128> errorDoc;
+    errorDoc[F("success")] = false;
+    errorDoc[F("error")] = F("Sensor address not found");
+    String response;
+    serializeJson(errorDoc, response);
+    httpServer.send_P(404, PSTR("application/json"), response.c_str());
     return;
   }
   
   // Save the label
   saveSensorLabel(address, label);
   
-  // Return success
-  char response[128];
-  snprintf_P(response, sizeof(response), PSTR("{\"success\":true,\"address\":\"%s\",\"label\":\"%s\"}"), address, label);
+  // Return success using ArduinoJson for safe JSON serialization
+  StaticJsonDocument<256> responseDoc;
+  responseDoc[F("success")] = true;
+  responseDoc[F("address")] = address;
+  responseDoc[F("label")] = label;
+  String response;
+  serializeJson(responseDoc, response);
   httpServer.send(200, F("application/json"), response);
 } // updateSensorLabel()
 
