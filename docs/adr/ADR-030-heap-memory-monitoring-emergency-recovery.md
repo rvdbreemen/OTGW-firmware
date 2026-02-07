@@ -359,6 +359,7 @@ HEAP-CRITICAL: Blocking WebSocket (dropped 50 msgs, heap=2800 bytes)
 - **ADR-009:** PROGMEM String Literals (reduces RAM usage)
 - **ADR-005:** WebSocket Real-Time Streaming (throttled by this system)
 - **ADR-006:** MQTT Integration Pattern (throttled by this system)
+- **ADR-011:** External Hardware Watchdog (hardware-level recovery complements software-level throttling - two-layer defense: graceful degradation → forceful reset)
 
 ## References
 
