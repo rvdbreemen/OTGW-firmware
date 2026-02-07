@@ -225,6 +225,7 @@ bool      bDebugOTmsg = true;
 bool      bDebugRestAPI = false;
 bool      bDebugMQTT = false;
 bool      bDebugSensors = false;
+bool      bDebugSensorSimulation = false;
 
 //GPIO Output Settings
 bool      settingMyDEBUG = false;

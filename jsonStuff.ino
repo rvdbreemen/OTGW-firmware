@@ -217,6 +217,22 @@ void sendJsonOTmonObj(const char *cName, bool bValue, const char *cUnit, time_t 
 } // sendJsonOTmonObj(*char, bool, *char, time_t)
 
 //=======================================================================
+// Dallas temperature-specific helper (1 decimal precision)
+//=======================================================================
+void sendJsonOTmonObjDallasTemp(const char *cName, float fValue, const char *cUnit, time_t epoch)
+{
+  char jsonBuff[200] = "";
+  
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.1f, \"unit\": \"%s\", \"epoch\": %d}")
+                                      , cName, fValue, cUnit, (uint32_t)epoch);
+
+  sendBeforenext();
+  sendIdent();
+  httpServer.sendContent(jsonBuff);
+
+} // sendJsonOTmonObjDallasTemp(*char, float, *char, time_t)
+
+//=======================================================================
 // New Map-based output functions for less redundant JSON
 //=======================================================================
 
@@ -343,6 +359,21 @@ void sendJsonOTmonMapEntry(const char *cName, bool bValue, const char *cUnit, ti
   sendIdent();
   httpServer.sendContent(jsonBuff);
 }
+
+//=======================================================================
+// Dallas temperature-specific helper for Map API (1 decimal precision)
+//=======================================================================
+void sendJsonOTmonMapEntryDallasTemp(const char *cName, float fValue, const char *cUnit, time_t epoch)
+{
+  char jsonBuff[200] = "";
+  
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %.1f, \"unit\": \"%s\", \"epoch\": %d}")
+                                      , cName, fValue, cUnit, (uint32_t)epoch);
+
+  sendBeforenext();
+  sendIdent();
+  httpServer.sendContent(jsonBuff);
+} // sendJsonOTmonMapEntryDallasTemp(*char, float, *char, time_t)
 
 //=======================================================================
 // ************ function to build Json Settings string ******************

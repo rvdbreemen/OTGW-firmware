@@ -37,6 +37,44 @@
 // Number of temperature devices found
 int numberOfDevices;
 
+const float SIM_SENSOR_MIN = 20.0f;
+const float SIM_SENSOR_MAX = 60.0f;
+const int SIM_SENSOR_COUNT = 3;
+const uint32_t SIM_SENSOR_UPDATE_INTERVAL_SECONDS = 10;
+
+static time_t simLastUpdateTime = 0;
+
+const uint8_t DallasSimDeviceAddresses[SIM_SENSOR_COUNT][8] = {
+  {0x28, 0xD0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
+  {0x28, 0xD0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02},
+  {0x28, 0xD0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03}
+};
+
+void initSimulatedDallasSensors()
+{
+  DallasrealDeviceCount = SIM_SENSOR_COUNT;
+  numberOfDevices = SIM_SENSOR_COUNT;
+  simLastUpdateTime = 0;
+
+  for (int i = 0; i < SIM_SENSOR_COUNT; i++)
+  {
+    DallasrealDevice[i].id = i;
+    memcpy(DallasrealDevice[i].addr, DallasSimDeviceAddresses[i], sizeof(DeviceAddress));
+    DallasrealDevice[i].tempC = 30.0f + (i * 5.0f);
+    DallasrealDevice[i].lasttime = 0;
+
+    const char* hexAddr = getDallasAddress(DallasrealDevice[i].addr);
+    strlcpy(DallasrealDevice[i].label, hexAddr, sizeof(DallasrealDevice[i].label));
+    loadSensorLabel(hexAddr, DallasrealDevice[i].label, sizeof(DallasrealDevice[i].label));
+
+  }
+
+  if (bDebugSensors)
+  {
+    DebugTf(PSTR("Sensor simulation enabled: %d virtual sensors initialized\r\n"), SIM_SENSOR_COUNT);
+  }
+}
+
 // Setup a oneWire instance to communicate with any OneWire devices
 // needs a PIN to init correctly, pin is changed when we initSensors()
 // this still may cause problems though because we this configures the pin already
@@ -50,7 +88,18 @@ DallasTemperature sensors(&oneWire);
 
 // Initialise the oneWire bus on the GPIO pin 
 void initSensors() {
-  if (!settingGPIOSENSORSenabled) return;
+  if (!settingGPIOSENSORSenabled && !bDebugSensorSimulation)
+  {
+    DallasrealDeviceCount = 0;
+    numberOfDevices = 0;
+    return;
+  }
+
+  if (bDebugSensorSimulation)
+  {
+    initSimulatedDallasSensors();
+    return;
+  }
 
   if (bDebugSensors)DebugTf(PSTR("init GPIO Temperature sensors on GPIO%d...\r\n"), settingGPIOSENSORSpin);
 
@@ -126,8 +175,16 @@ if (settingMQTTenable) {
  void pollSensors()
  {
   time_t now = time(nullptr);
-  if (!settingGPIOSENSORSenabled) return;
-  sensors.requestTemperatures(); // Send the command to get temperatures
+  if (!settingGPIOSENSORSenabled && !bDebugSensorSimulation) return;
+
+  if (!bDebugSensorSimulation)
+  {
+    sensors.requestTemperatures(); // Send the command to get temperatures
+  }
+  else if (simLastUpdateTime != 0 && (now - simLastUpdateTime) < SIM_SENSOR_UPDATE_INTERVAL_SECONDS)
+  {
+    return;
+  }
 
   // check if HA Autoconfigure must be performed (initial or as repeat for HA reboot)
   if (settingMQTTenable && getMQTTConfigDone(OTGWdallasdataid)==false) configSensors() ;
@@ -137,10 +194,29 @@ if (settingMQTTenable) {
     // Convert device address to string
     const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
     // Store the C temp in struc to allow it to be shown on Homepage through restAPI.ino
-    DallasrealDevice[i].tempC = sensors.getTempC(DallasrealDevice[i].addr);
+    if (bDebugSensorSimulation)
+    {
+      float delta = (random(0, 21) - 10) / 20.0f; // -0.5 to +0.5
+      float nextTemp = DallasrealDevice[i].tempC + delta;
+      if (nextTemp < SIM_SENSOR_MIN) nextTemp = SIM_SENSOR_MIN;
+      if (nextTemp > SIM_SENSOR_MAX) nextTemp = SIM_SENSOR_MAX;
+      DallasrealDevice[i].tempC = nextTemp;
+    }
+    else
+    {
+      DallasrealDevice[i].tempC = sensors.getTempC(DallasrealDevice[i].addr);
+    }
     DallasrealDevice[i].lasttime = now ;
     
-    if (bDebugSensors) DebugTf(PSTR("Sensor device no[%d] addr[%s] TempC: %f\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
+    // Debug logging: gate simulation logs behind bDebugSensors to reduce telnet output
+    if (bDebugSensorSimulation && bDebugSensors)
+    {
+      DebugTf(PSTR("[SIM] Sensor device no[%d] addr[%s] TempC: %4.1f\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
+    }
+    else if (bDebugSensors && !bDebugSensorSimulation)
+    {
+      DebugTf(PSTR("Sensor device no[%d] addr[%s] TempC: %f\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
+    }
 
     if (settingMQTTenable ) {
       //Build string for MQTT, use sendMQTTData for this
@@ -153,9 +229,15 @@ if (settingMQTTenable) {
       // DebugTf(PSTR("Topic: %s -- Payload: %s\r\n"), strDeviceAddress, _msg);
       if (bDebugSensors) DebugFlush();
       sendMQTTData(strDeviceAddress, _msg);
+
       // Serial.println(DallasTemperature::toFahrenheit(tempC)); // Converts tempC to Fahrenheit
     }
   }
+  if (bDebugSensorSimulation)
+  {
+    simLastUpdateTime = now;
+  }
+
   // DebugTln(F("end polling sensors"));
   DebugFlush();
 }

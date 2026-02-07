@@ -589,8 +589,11 @@ var OTGraph = {
                 { text: 'Temperatures', left: '1%', top: '64%', textStyle: { fontSize: 12, fontWeight: 'bold' } }
             ],
             // Legend specifically for temperature panel (shows all temp series with colors)
+            // Dynamically build legend data to include Dallas sensors
             legend: {
-                data: ['Control SetPoint', 'Boiler Temp', 'Return Temp', 'Room SetPoint', 'Room Temp', 'Outside Temp'],
+                data: this.seriesConfig
+                    .filter(function(c) { return c.gridIndex === 4; }) // Only temperature grid series
+                    .map(function(c) { return c.label; }),
                 top: '62%',
                 left: '15%',
                 orient: 'horizontal',
