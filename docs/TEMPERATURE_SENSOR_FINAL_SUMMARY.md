@@ -92,11 +92,11 @@ Successfully implemented dynamic Dallas DS18B20 temperature sensor detection and
 - **Resolution**: Comment added for clarity
 - **Quality**: Intended for production use, pending repository code review
 
-### Security Scan ✅
-- **Tool**: CodeQL
-- **Language**: JavaScript
-- **Alerts**: 0
-- **Status**: CLEAN
+### Security Scan (Recommended) ✅
+- **Recommended Tool**: GitHub CodeQL
+- **Language Coverage**: JavaScript
+- **Guidance**: Run CodeQL in CI for this module and review any reported alerts before release.
+- **Note**: Refer to your repository's security scan workflow or CodeQL run results for the actual findings.
 
 ### Browser Compatibility ✅
 - **Standard**: Modern JavaScript (ES6) with focus on compatibility with current stable browser versions
