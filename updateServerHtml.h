@@ -1197,21 +1197,22 @@ static const char UpdateServerSuccess[] PROGMEM =
          var statusEl = document.getElementById("status");
          
          function checkHealth() {
-            fetchText('/api/v1/health?t=' + Date.now(), 5000)
+            fetch('/api/v1/health?t=' + Date.now(), { 
+              method: 'GET', 
+              cache: 'no-store',
+              headers: { 'Accept': 'application/json' }
+            })
                 .then(function(res) {
                     if (!res.ok) {
                       throw new Error('HTTP ' + res.status);
                     }
-                    var parsed = parseJsonSafe(res.text);
-                    if (!parsed) {
-                      throw new Error('Invalid JSON');
-                    }
-                    return parsed;
+                    return res.json();
                 })
                 .then(function(d) {
                     var s = d.status || (d.health && d.health.status);
                     
                     if (s === 'UP') {
+                        console.log('[OTA] State: Device is back online');
                         statusEl.textContent = "Device is UP! Waiting for stability...";
                         statusEl.style.color = "green";
                         
@@ -1219,7 +1220,7 @@ static const char UpdateServerSuccess[] PROGMEM =
                         setTimeout(function() {
                             // Explicit check for window.opener before accessing properties
                             if (!window.opener) {
-                                console.warn('No parent window - skipping label restore');
+                                console.warn('[Labels] No parent window - skipping label restore');
                                 statusEl.textContent = "No labels to restore. Redirecting...";
                                 setTimeout(function() { window.location.href = "/"; }, 2000);
                                 return;
@@ -1227,6 +1228,7 @@ static const char UpdateServerSuccess[] PROGMEM =
                             
                             var labels = window.opener.dallasLabelsCache;
                             if (labels && typeof labels === 'object' && Object.keys(labels).length > 0) {
+                                console.log('[Labels] Restoring Dallas labels from memory cache');
                                 statusEl.textContent = "Restoring Dallas labels...";
                                 
                                 fetch('/api/v1/sensors/labels', {
@@ -1248,6 +1250,7 @@ static const char UpdateServerSuccess[] PROGMEM =
                                 .then(function(data) {
                                     // Validate response body has success: true
                                     if (data && data.success === true) {
+                                        console.log('[Labels] Dallas labels restored successfully');
                                         statusEl.textContent = "Labels restored! Redirecting...";
                                         setTimeout(function() { window.location.href = "/"; }, 2000);
                                     } else {
@@ -1255,11 +1258,12 @@ static const char UpdateServerSuccess[] PROGMEM =
                                     }
                                 })
                                 .catch(function(err) {
-                                    console.error('Label restore error:', err);
+                                    console.error('[Labels] Label restore error:', err);
                                     statusEl.textContent = "Label restore failed. Redirecting...";
                                     setTimeout(function() { window.location.href = "/"; }, 2000);
                                 });
                             } else {
+                                console.log('[Labels] No labels in cache to restore');
                                 statusEl.textContent = "No labels to restore. Redirecting...";
                                 setTimeout(function() { window.location.href = "/"; }, 2000);
                             }
@@ -1267,7 +1271,7 @@ static const char UpdateServerSuccess[] PROGMEM =
                     }
                 })
                 .catch(function(e) {
-                   // console.log("Waiting...", e);
+                   // Ignore - device still rebooting
                 });
          }
 

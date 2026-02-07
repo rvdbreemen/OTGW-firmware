@@ -121,7 +121,10 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-028: File Streaming Over Loading for Memory Safety](ADR-028-file-streaming-over-loading.md)** 🆕  
   Never load files >2KB into RAM; use streaming patterns to prevent memory exhaustion crashes.
 
-- **[ADR-029: Non-Blocking Modal Dialogs for User Input](ADR-029-non-blocking-modal-dialogs.md)** 🆕  
+- **[ADR-029: Simple XHR-Based OTA Flash (KISS Principle)](ADR-029-simple-xhr-ota-flash.md)** 🆕  
+  Simplified firmware flash mechanism using XHR with backend confirmation, eliminating WebSocket complexity and Safari bugs. Reduces code by 68.5% while improving reliability.
+
+- **[ADR-030: Non-Blocking Modal Dialogs for User Input](ADR-030-non-blocking-modal-dialogs.md)** 🆕  
   Custom HTML/CSS modal dialogs instead of blocking prompt() to maintain real-time data flow.
 
 - **[ADR-033: Dallas Sensor Custom Labels and Graph Visualization](ADR-033-dallas-sensor-custom-labels-graph-visualization.md)** 🆕  

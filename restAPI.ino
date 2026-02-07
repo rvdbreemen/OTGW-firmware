@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.0.0-rc6
+**  Version  : v1.0.0-rc7
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -105,6 +105,10 @@ void processAPI()
       if (wc > 3 && strcmp_P(words[3], PSTR("health")) == 0) {
         if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
         sendHealth();
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("devtime")) == 0) {
+        // GET /api/v1/devtime - Map format version
+        if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+        sendDeviceTimeV2();
       } else if (wc > 3 && strcmp_P(words[3], PSTR("flashstatus")) == 0) {
         // GET /api/v1/flashstatus - Unified flash status for both ESP and PIC
         if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
@@ -677,21 +681,23 @@ void sendDeviceInfo()
 } // sendDeviceInfo()
 
 //=======================================================================
+// Sends health status as JSON object (map format)
+// Returns: {"health": {"status": "UP", "uptime": "...", ...}}
 void sendHealth() 
 {
-  sendStartJsonObj(F("health"));
+  sendStartJsonMap(F("health"));
 
   updateLittleFSStatus(F("/.health"));
-  sendNestedJsonObj(F("status"), LittleFSmounted ? F("UP") : F("DEGRADED"));
-  sendNestedJsonObj(F("uptime"), upTime());
-  sendNestedJsonObj(F("heap"), ESP.getFreeHeap());
-  sendNestedJsonObj(F("wifirssi"), WiFi.RSSI());
-  sendNestedJsonObj(F("mqttconnected"), CBOOLEAN(statusMQTTconnection));
-  sendNestedJsonObj(F("otgwconnected"), CBOOLEAN(bOTGWonline));
-  sendNestedJsonObj(F("picavailable"), CBOOLEAN(bPICavailable));
-  sendNestedJsonObj(F("littlefsMounted"), CBOOLEAN(LittleFSmounted));
+  sendJsonMapEntry(F("status"), LittleFSmounted ? F("UP") : F("DEGRADED"));
+  sendJsonMapEntry(F("uptime"), upTime());
+  sendJsonMapEntry(F("heap"), ESP.getFreeHeap());
+  sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());
+  sendJsonMapEntry(F("mqttconnected"), CBOOLEAN(statusMQTTconnection));
+  sendJsonMapEntry(F("otgwconnected"), CBOOLEAN(bOTGWonline));
+  sendJsonMapEntry(F("picavailable"), CBOOLEAN(bPICavailable));
+  sendJsonMapEntry(F("littlefsMounted"), CBOOLEAN(LittleFSmounted));
   
-  sendEndJsonObj(F("health"));
+  sendEndJsonMap(F("health"));
 
 } // sendHealth()
 
@@ -742,6 +748,25 @@ void sendDeviceTime()
   sendEndJsonObj(F("devtime"));
 
 } // sendDeviceTime()
+
+//=======================================================================
+void sendDeviceTimeV2() 
+{
+  char buf[50];
+  
+  sendStartJsonMap(F("devtime"));
+  time_t now = time(nullptr);
+  //Timezone based devtime
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
+  snprintf_P(buf, sizeof(buf), PSTR("%04d-%02d-%02d %02d:%02d:%02d"), myTime.year(), myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second());
+  sendJsonMapEntry(F("dateTime"), buf); 
+  sendJsonMapEntry(F("epoch"), (int)now);
+  sendJsonMapEntry(F("message"), sMessage);
+
+  sendEndJsonMap(F("devtime"));
+
+} // sendDeviceTimeV2()
 
 //=======================================================================
 void sendDeviceSettings() 

@@ -17,9 +17,10 @@ Version 1.0.0 is a major milestone delivering improved stability, a modern user 
 ### Major Features
 - **Real-Time Graphs & Statistics**: Visualize boiler data (temperatures, setpoints) in real-time with responsive graphs and view long-term statistics in a dedicated dashboard.
 - **Modern Web UI**: Features a fully integrated **Dark Mode**, responsive design for mobile devices, and a redesigned **File System Explorer**.
-- **Live Data Streaming**: Replaced legacy polling with **WebSockets** for instant log viewing, status updates, and firmware flash progress.
-- **Improved Flashing**: New interactive `flash_esp.py` tool and a safer, more reliable web-based PIC firmware flasher.
+- **Live OpenTherm Message Streaming**: Real-time OpenTherm message log viewing using **WebSocket** on port 81 for instant visibility into gateway-boiler communication.
+- **Improved Flashing**: Simplified and more reliable **web-based firmware and filesystem flashing** with explicit reboot verification via health checks. Removed complex progress polling for stability.
 - **Stream Logging**: Stream OpenTherm logs directly to local files for troubleshooting.
+- **Device Health Monitoring**: `/api/v1/health` endpoint for operational status, uptime, and heap usage monitoring.
 
 ### Performance & Stability
 - **Memory Safety**: Extensive optimizations using `PROGMEM` to drastically reduce RAM usage and heap fragmentation.
@@ -47,8 +48,9 @@ Starting with hardware version 2.3, the included ESP8266 devkit changed from Nod
 ## Documentation and links
 
 - Wiki / documentation (recommended starting point): https://github.com/rvdbreemen/OTGW-firmware/wiki
-- **Flash guide** (platform-independent Python script): [FLASH_GUIDE.md](docs/reviews/2026-01-17_dev-rc4-analysis/FLASH_GUIDE.md)
-- **Local build guide** (Windows/Mac): [BUILD.md](BUILD.md)
+- **Flash guide** (platform-independent Python script): [FLASH_GUIDE.md](docs/FLASH_GUIDE.md)
+- **Local build guide** (Windows/Mac): [BUILD.md](docs/BUILD.md)
+- **Evaluation framework**: [EVALUATION.md](docs/EVALUATION.md) - Code quality and standards checker
 - **WebSocket architecture**: [WEBSOCKET_FLOW.md](docs/WEBSOCKET_FLOW.md) - Complete WebSocket flow explanation
 - **WebSocket quick reference**: [WEBSOCKET_QUICK_REFERENCE.md](docs/WEBSOCKET_QUICK_REFERENCE.md) - Short WebSocket overview
 - NodoShop OTGW product page: https://www.nodo-shop.nl/nl/opentherm-gateway/211-opentherm-gateway.html
@@ -64,7 +66,7 @@ The exact steps and screenshots live in the wiki, but the general flow is:
    - **Easy method (recommended)**: Use the included `flash_esp.py` script:
      - `python3 flash_esp.py` - Downloads and flashes the latest release (default)
      - `python3 flash_esp.py --build` - Builds from source and flashes (for developers)
-     - See [FLASH_GUIDE.md](docs/reviews/2026-01-17_dev-rc4-analysis/FLASH_GUIDE.md) for detailed instructions
+     - See [FLASH_GUIDE.md](docs/FLASH_GUIDE.md) for detailed instructions
    - **Manual method**: Follow the wiki instructions
 2. Connect the OTGW to your network and open the Web UI via `http://<device-ip>/`.
    If the device cannot connect, it starts a Wi-Fi configuration portal using an AP named `<hostname>-<mac>`.
@@ -86,11 +88,11 @@ The Web UI and APIs are designed for use on a trusted local network. Do not expo
 - Configure the gateway via HTTP (default port 80).
 - Manage settings stored on LittleFS.
 - Perform PIC firmware maintenance (see warning below).
-- View a live OpenTherm message log stream and download logs (WebSocket-based).
+- View a live OpenTherm message log stream and download logs (WebSocket-based on port 81).
 - **Stream logs directly to local files** using the File System Access API (Chrome/Edge/Opera desktop only) - see [Stream Logging.md](Stream%20Logging.md) for setup and technical details.
-- Track firmware upload/flash progress with size validation during updates.
+- Perform firmware and filesystem updates with automatic health verification after reboot (simplified XHR-based flow, no real-time progress polling).
 - Toggle a dark theme with per-browser persistence.
-- Supports reverse proxy deployments with automatic http/https detection for REST API and basic Web UI access; WebSocket-based features (such as the live OT message log) currently assume plain HTTP and may not work when accessed via an HTTPS reverse proxy.
+- Supports reverse proxy deployments with automatic http/https detection for REST API and basic Web UI access; WebSocket-based features (such as the live OT message log) assume plain HTTP and may not work when accessed via an HTTPS reverse proxy.
 
 ### MQTT (including Home Assistant Auto Discovery)
 - Publishes parsed OpenTherm values to MQTT using a configurable topic prefix.
@@ -157,6 +159,15 @@ This allows the OTGW to use external temperature data for OpenTherm communicatio
   - **Bulk operations only**: Frontend manages label lookup and modification using read-modify-write pattern.
   - **File-based storage**: Labels stored in `/dallas_labels.ini` with zero backend RAM usage.
 - Full API documentation available in `example-api/api-call-responses.txt` and OpenAPI specification in `docs/openapi-dallas-sensors.yaml`.
+- **Health check endpoint:** `/api/v1/health` (GET) - Returns device status including uptime, heap usage, and operational status. **New in v1.0.0-rc7:** Used by OTA flash verification to confirm device is fully operational after reboot.
+
+**OTA Flash Improvements (v1.0.0-rc7):**
+The firmware flash mechanism has been simplified for improved reliability:
+- **Firmware upload** (`/update?cmd=0`) and **filesystem upload** (`/update?cmd=100`) endpoints now block until flash operations complete
+- Backend returns HTTP 200 only after flash write succeeds, preventing false-success detection
+- Frontend uses `/api/v1/health` health check polling to verify device is fully operational (status: "UP")
+- **Removed:** Real-time WebSocket flash progress updates (simplified for reliability; flash operations complete in 10-30 seconds)
+- See [ADR-029](docs/adr/ADR-029-simple-xhr-ota-flash.md) for architectural rationale
 
 ### TCP serial socket (OTmonitor compatible)
 - Exposes a TCP socket on port `25238` for OTmonitor and other tools that speak the OTGW serial protocol.
@@ -167,6 +178,7 @@ This allows the OTGW to use external temperature data for OpenTherm communicatio
   - **Graph visualization**: Sensors appear automatically in the real-time graph with 16 unique colors per theme.
   - **File-based storage**: Labels stored in `/dallas_labels.ini` file with zero backend RAM usage.
   - **Bulk API**: GET/POST `/api/v1/sensors/labels` for fetching and updating all labels at once.
+  - **Automatic backup & restore**: Labels automatically backed up before filesystem flash and restored after reboot.
 - S0 pulse counter for kWh meters on a configurable GPIO.
 
 #### **Important Note for Dallas Sensors (v1.0.0)**

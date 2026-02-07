@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v1.0.0-rc6
+**  Version  : v1.0.0-rc7
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -310,11 +310,49 @@ void sendJsonMapEntry(const char *cName, int32_t iValue)
   httpServer.sendContent(jsonBuff);
 }
 
+void sendJsonMapEntry(const char *cName, uint32_t uValue)
+{
+  char jsonBuff[120] = "";
+
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": %u"), cName, uValue);
+
+  sendBeforenext();
+  sendIdent();
+  httpServer.sendContent(jsonBuff);
+}
+
+void sendJsonMapEntry(const char *cName, float fValue)
+{
+  char jsonBuff[120] = "";
+
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": %.3f"), cName, fValue);
+
+  sendBeforenext();
+  sendIdent();
+  httpServer.sendContent(jsonBuff);
+}
+
 void sendJsonMapEntry(const char *cName, const char *cValue)
 {
   char jsonBuff[JSON_BUFF_MAX] = "";
 
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": \"%s\""), cName, cValue);
+
+  sendBeforenext();
+  sendIdent();
+  httpServer.sendContent(jsonBuff);
+}
+
+void sendJsonMapEntry(const char *cName, String sValue)
+{
+  char jsonBuff[JSON_BUFF_MAX] = "";
+  
+  if (sValue.length() > (JSON_BUFF_MAX - 65) )
+  {
+    DebugTf(PSTR("[2] sValue.length() [%d]\r\n"), sValue.length());
+  }
+  
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": \"%s\""), cName, sValue.c_str());
 
   sendBeforenext();
   sendIdent();
@@ -538,11 +576,42 @@ void sendJsonMapEntry(const __FlashStringHelper* cName, int32_t iValue) {
   sendJsonMapEntry(nameBuf, iValue);
 }
 
+void sendJsonMapEntry(const __FlashStringHelper* cName, uint32_t uValue) {
+  char nameBuf[35];
+  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf)-1] = 0;
+  sendJsonMapEntry(nameBuf, uValue);
+}
+
+void sendJsonMapEntry(const __FlashStringHelper* cName, float fValue) {
+  char nameBuf[35];
+  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf)-1] = 0;
+  sendJsonMapEntry(nameBuf, fValue);
+}
+
 void sendJsonMapEntry(const __FlashStringHelper* cName, const char *cValue) {
   char nameBuf[35];
   strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
   nameBuf[sizeof(nameBuf)-1] = 0;
   sendJsonMapEntry(nameBuf, cValue);
+}
+
+void sendJsonMapEntry(const __FlashStringHelper* cName, String sValue) {
+  char nameBuf[35];
+  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf)-1] = 0;
+  sendJsonMapEntry(nameBuf, sValue);
+}
+
+void sendJsonMapEntry(const __FlashStringHelper* cName, const __FlashStringHelper* cValue) {
+  char nameBuf[35];
+  char valBuf[101];
+  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf)-1] = 0;
+  strncpy_P(valBuf, (PGM_P)cValue, sizeof(valBuf));
+  valBuf[sizeof(valBuf)-1] = 0;
+  sendJsonMapEntry(nameBuf, (const char*)valBuf);
 }
 
 // sendJsonSettingObj helpers

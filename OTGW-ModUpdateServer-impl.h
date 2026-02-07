@@ -95,18 +95,6 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
     _server->on("/status", HTTP_GET, [&](){
       if(_username != emptyString && _password != emptyString && !_server->authenticate(_username.c_str(), _password.c_str()))
         return _server->requestAuthentication();
-      if (_serial_output) {
-        unsigned long statusStartMs = millis();
-        Debugf(PSTR("[%lu] Status request start heap=%u bytes\r\n"),
-               statusStartMs, static_cast<unsigned>(ESP.getFreeHeap()));
-        if (::isESPFlashing) {
-          DebugTln(F("Update status requested during flash (polling active)"));
-        }
-        _sendStatusJson();
-        Debugf(PSTR("[%lu] Status request end duration=%lu ms\r\n"),
-               millis(), static_cast<unsigned long>(millis() - statusStartMs));
-        return;
-      }
       _sendStatusJson();
     });
 
@@ -115,21 +103,15 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
       if(!_authenticated)
         return _server->requestAuthentication();
       if (Update.hasError()) {
-        if (_serial_output) {
-          DebugTln(F("Update POST complete: Update.hasError() true"));
-        }
         _setStatus(UPDATE_ERROR, _status.target, _status.received, _status.total, _status.filename, _updaterError);
         _server->send(200, F("text/html"), String(F("Flash error: ")) + _updaterError);
       } else {
-        if (_serial_output) {
-          DebugTln(F("Update POST complete: success response sent"));
-        }
         _server->client().setNoDelay(true);
         _server->send_P(200, PSTR("text/html"), _serverSuccess);
         _server->client().stop();
         // Reboot for BOTH firmware and filesystem
         if (_serial_output) {
-          Debugf(PSTR("[%lu] OTA POST complete, rebooting...\r\n"), millis());
+          DebugTln(F("[OTA] Rebooting..."));
         }
         delay(1000);
         ESP.restart();
@@ -142,7 +124,6 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
 
       if(upload.status == UPLOAD_FILE_START){
         _updaterError.clear();
-        if (_serial_output) Debugf(PSTR("Upload Start: %s (size: %s)\r\n"), upload.filename.c_str(), _server->arg("size").c_str());
 
         _authenticated = (_username == emptyString || _password == emptyString || _server->authenticate(_username.c_str(), _password.c_str()));
         if(!_authenticated){
@@ -157,16 +138,13 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         }
 
         if (_serial_output) {
-          DebugTln(F("Update authenticated; starting flash session"));
-          Debugf(PSTR("Update heap at start: %u bytes\r\n"), static_cast<unsigned>(ESP.getFreeHeap()));
+          Debugf(PSTR("[OTA] Flash start: %s (size: %s)\r\n"), upload.filename.c_str(), _server->arg("size").c_str());
         }
 
         // Set global flag to disable background tasks during ESP flash
         ::isESPFlashing = true;
         
         WiFiUDP::stopAll();
-        if (_serial_output)
-          Debugf(PSTR("Update: %s\r\n"), upload.filename.c_str());
 
         size_t uploadTotal = 0;
         String sizeArg = _server->arg("size");
@@ -188,69 +166,44 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _lastProgressPerc = 0;
 
         if (upload.name == F("filesystem")) {
-          if (_serial_output) {
-            DebugTln(F("Update target: filesystem"));
-          }
           size_t fsSize = ((size_t) &_FS_end - (size_t) &_FS_start);
           if (_serial_output) {
-            Debugf(PSTR("Filesystem size: %u bytes\r\n"), static_cast<unsigned>(fsSize));
+            Debugf(PSTR("[OTA] Target: filesystem (%u bytes)\r\n"), static_cast<unsigned>(fsSize));
           }
           close_all_fs();
           LittleFS.end();
           if (uploadTotal > 0 && uploadTotal > fsSize) {
             _updaterError = F("filesystem image too large");
-            if (_serial_output) {
-              Debugf(PSTR("Filesystem image too large: %u > %u\r\n"), static_cast<unsigned>(uploadTotal), static_cast<unsigned>(fsSize));
-            }
             _setStatus(UPDATE_ERROR, "filesystem", 0, uploadTotal, upload.filename, _updaterError);
           } else if (!Update.begin(uploadTotal > 0 ? uploadTotal : fsSize, U_FS)){//start with max available size
             if (_serial_output) Update.printError(OTGWSerial);
             _setUpdaterError();
             _setStatus(UPDATE_ERROR, "filesystem", 0, uploadTotal, upload.filename, _updaterError);
           } else {
-            if (_serial_output) {
-              Debugf(PSTR("Filesystem update begin OK (size: %u)\r\n"), static_cast<unsigned>(uploadTotal > 0 ? uploadTotal : fsSize));
-            }
             _setStatus(UPDATE_START, "filesystem", 0, uploadTotal, upload.filename, emptyString);
           }
         } else {
           uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
           if (_serial_output) {
-            DebugTln(F("Update target: firmware"));
-            Debugf(PSTR("Max sketch space: %u bytes\r\n"), static_cast<unsigned>(maxSketchSpace));
+            Debugf(PSTR("[OTA] Target: firmware (%u bytes)\r\n"), static_cast<unsigned>(maxSketchSpace));
           }
           if (uploadTotal > 0 && uploadTotal > maxSketchSpace) {
             _updaterError = F("firmware image too large");
-            if (_serial_output) {
-              Debugf(PSTR("Firmware image too large: %u > %u\r\n"), static_cast<unsigned>(uploadTotal), static_cast<unsigned>(maxSketchSpace));
-            }
             _setStatus(UPDATE_ERROR, "firmware", 0, uploadTotal, upload.filename, _updaterError);
           } else if (!Update.begin(uploadTotal > 0 ? uploadTotal : maxSketchSpace, U_FLASH)){//start with max available size
             _setUpdaterError();
             _setStatus(UPDATE_ERROR, "firmware", 0, uploadTotal, upload.filename, _updaterError);
           } else {
-            if (_serial_output) {
-              Debugf(PSTR("Firmware update begin OK (size: %u)\r\n"), static_cast<unsigned>(uploadTotal > 0 ? uploadTotal : maxSketchSpace));
-            }
             _setStatus(UPDATE_START, "firmware", 0, uploadTotal, upload.filename, emptyString);
           }
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
-        if (_serial_output) {Debug("."); blinkLEDnow(LED1);}
+        if (_serial_output) {
+          blinkLEDnow(LED1);
+        }
 
         // Feed the dog on every chunk (Main branch behavior)
         Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
-        if (_serial_output) {
-          static unsigned long lastDogLogMs = 0;
-          unsigned long nowMs = millis();
-          if (lastDogLogMs == 0) {
-            lastDogLogMs = nowMs;
-          } else if (nowMs - lastDogLogMs >= 1000) {
-            Debugf(PSTR("Watchdog feed OK (chunk: %u bytes)\r\n"),
-                   static_cast<unsigned>(upload.currentSize));
-            lastDogLogMs = nowMs;
-          }
-        }
         
         // Update status and send WebSocket BEFORE the blocking flash write
         // This ensures progress updates reach the browser even if the write blocks for 10+ seconds
@@ -261,8 +214,8 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
            if (currentPerc != _lastProgressPerc) {
              _lastProgressPerc = currentPerc;
              if (_serial_output) {
-               Debugf(PSTR("Update progress: %d%% (upload %u/%u)\r\n"), currentPerc,
-                      static_cast<unsigned>(_status.upload_received),
+               Debugf(PSTR("[OTA] Write: %d%% (%u/%u bytes)\r\n"), currentPerc,
+                      static_cast<unsigned>(_status.flash_written),
                       static_cast<unsigned>(_status.flash_total));
              }
              _setStatus(UPDATE_WRITE, _status.target, _status.flash_written, _status.flash_total, _status.filename, emptyString);
@@ -270,37 +223,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         }
         
         // Now perform the blocking flash write
-        unsigned long writeStartMs = millis();
         size_t written = Update.write(upload.buf, upload.currentSize);
-        unsigned long writeEndMs = millis();
-        if (_serial_output) {
-          unsigned long writeMs = (writeEndMs >= writeStartMs) ? (writeEndMs - writeStartMs) : 0;
-          static unsigned long lastWriteLogMs = 0;
-          if (lastWriteLogMs == 0 || writeMs > 200 || (writeEndMs - lastWriteLogMs) >= 1000) {
-            Debugf(PSTR("Update write duration: %u ms (chunk %u bytes)\r\n"),
-                   static_cast<unsigned>(writeMs),
-                   static_cast<unsigned>(upload.currentSize));
-            lastWriteLogMs = writeEndMs;
-          }
-        }
-
-        if (_serial_output) {
-          static unsigned long lastRateLogMs = 0;
-          static size_t lastRateBytes = 0;
-          unsigned long nowMs = millis();
-          if (lastRateLogMs == 0) {
-            lastRateLogMs = nowMs;
-            lastRateBytes = _status.upload_received;
-          } else if (nowMs - lastRateLogMs >= 1000) {
-            size_t delta = _status.upload_received - lastRateBytes;
-            Debugf(PSTR("Update throughput: %u bytes/s (uploaded %u/%u)\r\n"),
-                   static_cast<unsigned>(delta),
-                   static_cast<unsigned>(_status.upload_received),
-                   static_cast<unsigned>(_status.flash_total));
-            lastRateLogMs = nowMs;
-            lastRateBytes = _status.upload_received;
-          }
-        }
 
         if (written != upload.currentSize) {
           _setUpdaterError();
@@ -308,16 +231,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
         if (_serial_output) {
-          Debugf(PSTR("[%lu] Update end begin\r\n"), millis());
+          DebugTln(F("[OTA] End: finalizing flash..."));
         }
         bool updateOk = Update.end(true); //true to set the size to the current progress
-        if (_serial_output) {
-          if (updateOk) {
-            Debugf(PSTR("[%lu] Update end OK\r\n"), millis());
-          } else {
-            Debugf(PSTR("[%lu] Update end FAILED\r\n"), millis());
-          }
-        }
         if(updateOk){
           _status.upload_received = upload.totalSize;
           if (_status.upload_total == 0 && upload.totalSize > 0) {
@@ -330,7 +246,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
             _status.flash_written = upload.totalSize;
           }
           _setStatus(UPDATE_END, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, emptyString);
-          if (_serial_output) Debugf(PSTR("\r\nUpdate Success: %u\r\n"), upload.totalSize);
+          if (_serial_output) Debugf(PSTR("[OTA] End: success (%u bytes)\r\n"), upload.totalSize);
           
           if (_status.target == "filesystem") {
             LittleFSmounted = LittleFS.begin();
@@ -341,17 +257,17 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
               // The ESP8266 continues running the current firmware and RAM remains intact.
               // All settings loaded at boot (global variables like settingHostname, etc.)
               // are still valid in RAM, so we write them back to the fresh filesystem.
+              if (_serial_output) Debugln(F("[OTA] Restoring settings to filesystem"));
               writeSettings(true);
-              if (_serial_output) Debugln(F("\r\nFilesystem update complete; settings restored from memory"));
             } else {
               // Ensure state is explicitly false and log failure for diagnostics
               LittleFSmounted = false;
-              if (_serial_output) Debugln(F("LittleFS mount failed after filesystem OTA update"));
+              if (_serial_output) Debugln(F("[OTA] Error: LittleFS mount failed"));
             }
           }
           
           if (_serial_output) {
-            Debugln(F("Rebooting..."));
+            DebugTln(F("[OTA] Preparing to reboot..."));
             DebugFlush();  // Ensure debug output is sent before reboot
           }
 
@@ -368,7 +284,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         //   OTGWSerial.setDebugOutput(false);
       } else if(_authenticated && upload.status == UPLOAD_FILE_ABORTED){
         Update.end();
-        if (_serial_output) Debugln(F("Update was aborted"));
+        if (_serial_output) Debugln(F("[OTA] Abort: update cancelled"));
         _status.upload_received = upload.totalSize;
         if (_status.upload_total == 0 && upload.totalSize > 0) {
           _status.upload_total = upload.totalSize;
@@ -424,11 +340,6 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_resetStatus()
 template <typename ServerType>
 void ESP8266HTTPUpdateServerTemplate<ServerType>::_setStatus(uint8_t phase, const String &target, size_t received, size_t total, const String &filename, const String &error)
 {
-  if (_serial_output) {
-      Debugf(PSTR("Update Status: %s (recv: %u, total: %u)\r\n"), _phaseToString(phase), received, total);
-      Debugf(PSTR("Update Status detail: target=%s filename=%s error=%s\r\n"),
-             target.c_str(), filename.c_str(), error.c_str());
-  }
   _status.phase = static_cast<UpdatePhase>(phase);
   _status.target = target.length() ? target : "unknown";
   _status.received = received;
@@ -533,16 +444,11 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusJson()
   // Check if the output was truncated
   if (written >= (int)sizeof(buf)) {
     if (_serial_output) {
-      Debugf(PSTR("Warning: status JSON truncated (%d chars needed, %d available)\r\n"), 
-             written, (int)sizeof(buf));
+      Debugf(PSTR("[OTA] Error: status JSON truncated (%d chars)\r\n"), written);
     }
     // Send error response instead of truncated JSON
     _server->send(500, F("text/plain"), F("Status buffer overflow"));
     return;
-  }
-
-  if (_serial_output) {
-    Debugf(PSTR("Status JSON sent: %s\r\n"), buf);
   }
   
   _server->send(200, F("application/json"), buf);
