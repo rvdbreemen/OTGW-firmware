@@ -184,6 +184,21 @@ void processAPI()
         } else {
           sendApiNotFound(originalURI);
         }
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("sensors")) == 0) {
+        // Sensor label operations (bulk only)
+        if (wc > 4 && strcmp_P(words[4], PSTR("labels")) == 0) {
+          // GET /api/v1/sensors/labels (get all labels from file)
+          // POST/PUT /api/v1/sensors/labels (update all labels in file)
+          if (isGet) {
+            getDallasLabels();
+          } else if (isPostOrPut) {
+            updateAllDallasLabels();
+          } else {
+            httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); 
+          }
+        } else {
+          sendApiNotFound(originalURI);
+        }
       } else {
         sendApiNotFound(originalURI);
       }
@@ -513,12 +528,13 @@ void sendOTmonitorV2()
     sendJsonOTmonMapEntry(F("s0intervalcount"), OTGWs0pulseCount , F(""), OTGWs0lasttime);
     sendJsonOTmonMapEntry(F("s0totalcount"), OTGWs0pulseCountTot , F(""), OTGWs0lasttime);
   }
-  if (settingGPIOSENSORSenabled) 
+  if (settingGPIOSENSORSenabled || bDebugSensorSimulation) 
   {
     sendJsonOTmonMapEntry(F("numberofsensors"), DallasrealDeviceCount , F(""), now );
     for (int i = 0; i < DallasrealDeviceCount; i++) {
       const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
-      sendJsonOTmonMapEntry(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
+      sendJsonOTmonMapEntryDallasTemp(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
+      // Labels now managed by Web UI via /dallas_labels.ini file (not sent in API)
     }
   }
 
@@ -577,12 +593,13 @@ void sendOTmonitor()
     sendJsonOTmonObj(F("s0intervalcount"), OTGWs0pulseCount , F(""), OTGWs0lasttime);
     sendJsonOTmonObj(F("s0totalcount"), OTGWs0pulseCountTot , F(""), OTGWs0lasttime);
   }
-  if (settingGPIOSENSORSenabled) 
+  if (settingGPIOSENSORSenabled || bDebugSensorSimulation) 
   {
     sendJsonOTmonObj(F("numberofsensors"), DallasrealDeviceCount , F(""), now );
     for (int i = 0; i < DallasrealDeviceCount; i++) {
         const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
-        sendJsonOTmonObj(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
+        sendJsonOTmonObjDallasTemp(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
+        // Labels now managed by Web UI via /dallas_labels.ini file (not sent in API)
     }
   }
 
@@ -862,6 +879,77 @@ void postSettings()
 
 } // postSettings()
 
+
+//====[ Dallas sensor label file operations ]====
+
+// Get single Dallas sensor label from file by address
+// GET /api/v1/sensors/label?address=28FF64D1841703F1
+// Get all Dallas sensor labels from file (bulk read)
+void getDallasLabels() {
+  File labelsFile = LittleFS.open(F("/dallas_labels.ini"), "r");
+  
+  if (!labelsFile) {
+    // No file exists - return empty JSON object
+    httpServer.send(200, F("application/json"), F("{}"));
+    return;
+  }
+  
+  // Stream the file content directly to response
+  httpServer.streamFile(labelsFile, F("application/json"));
+  labelsFile.close();
+}
+
+// Update all Dallas sensor labels in file (bulk operation)
+void updateAllDallasLabels() {
+  // Parse JSON body from request
+  const String& body = httpServer.arg(F("plain"));
+  
+  if (body.length() == 0) {
+    StaticJsonDocument<128> errorDoc;
+    errorDoc[F("success")] = false;
+    errorDoc[F("error")] = F("Empty request body");
+    String response;
+    serializeJson(errorDoc, response);
+    httpServer.send(400, F("application/json"), response);
+    return;
+  }
+  
+  // Validate JSON format (parse to check validity)
+  DynamicJsonDocument doc(JSON_BUFF_MAX);
+  DeserializationError error = deserializeJson(doc, body);
+  
+  if (error) {
+    StaticJsonDocument<128> errorDoc;
+    errorDoc[F("success")] = false;
+    errorDoc[F("error")] = F("Invalid JSON format");
+    String response;
+    serializeJson(errorDoc, response);
+    httpServer.send(400, F("application/json"), response);
+    return;
+  }
+  
+  // Write directly to file
+  File labelsFile = LittleFS.open(F("/dallas_labels.ini"), "w");
+  if (!labelsFile) {
+    StaticJsonDocument<128> errorDoc;
+    errorDoc[F("success")] = false;
+    errorDoc[F("error")] = F("Failed to open file for writing");
+    String response;
+    serializeJson(errorDoc, response);
+    httpServer.send_P(500, PSTR("application/json"), response.c_str());
+    return;
+  }
+  
+  labelsFile.print(body);
+  labelsFile.close();
+  
+  // Success response
+  StaticJsonDocument<64> responseDoc;
+  responseDoc[F("success")] = true;
+  String response;
+  serializeJson(responseDoc, response);
+  httpServer.send(200, F("application/json"), response);
+}
 
 //====================================================
 void sendApiNotFound(const char *URI)

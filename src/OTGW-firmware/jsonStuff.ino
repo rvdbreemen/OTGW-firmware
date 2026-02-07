@@ -9,6 +9,38 @@
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
 */
+
+// Helper function to escape JSON string values
+// Replaces: " with \", \ with \\, control chars with \uXXXX
+String escapeJsonString(const char* str) {
+  if (!str) return String("");
+  
+  String result;
+  result.reserve(strlen(str) + 10); // Reserve some extra space for escapes
+  
+  for (const char* p = str; *p; p++) {
+    switch (*p) {
+      case '"':  result += "\\\""; break;
+      case '\\': result += "\\\\"; break;
+      case '\b': result += "\\b";  break;
+      case '\f': result += "\\f";  break;
+      case '\n': result += "\\n";  break;
+      case '\r': result += "\\r";  break;
+      case '\t': result += "\\t";  break;
+      default:
+        if (*p < 0x20) {
+          // Control character - use \uXXXX notation
+          char buf[7];
+          snprintf(buf, sizeof(buf), "\\u%04X", (unsigned char)*p);
+          result += buf;
+        } else {
+          result += *p;
+        }
+    }
+  }
+  return result;
+}
+
 static int iIdentlevel = 0;
 bool bFirst = true; 
 
@@ -217,6 +249,22 @@ void sendJsonOTmonObj(const char *cName, bool bValue, const char *cUnit, time_t 
 } // sendJsonOTmonObj(*char, bool, *char, time_t)
 
 //=======================================================================
+// Dallas temperature-specific helper (1 decimal precision)
+//=======================================================================
+void sendJsonOTmonObjDallasTemp(const char *cName, float fValue, const char *cUnit, time_t epoch)
+{
+  char jsonBuff[200] = "";
+  
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.1f, \"unit\": \"%s\", \"epoch\": %d}")
+                                      , cName, fValue, cUnit, (uint32_t)epoch);
+
+  sendBeforenext();
+  sendIdent();
+  httpServer.sendContent(jsonBuff);
+
+} // sendJsonOTmonObjDallasTemp(*char, float, *char, time_t)
+
+//=======================================================================
 // New Map-based output functions for less redundant JSON
 //=======================================================================
 
@@ -381,6 +429,21 @@ void sendJsonOTmonMapEntry(const char *cName, bool bValue, const char *cUnit, ti
   sendIdent();
   httpServer.sendContent(jsonBuff);
 }
+
+//=======================================================================
+// Dallas temperature-specific helper for Map API (1 decimal precision)
+//=======================================================================
+void sendJsonOTmonMapEntryDallasTemp(const char *cName, float fValue, const char *cUnit, time_t epoch)
+{
+  char jsonBuff[200] = "";
+  
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %.1f, \"unit\": \"%s\", \"epoch\": %d}")
+                                      , cName, fValue, cUnit, (uint32_t)epoch);
+
+  sendBeforenext();
+  sendIdent();
+  httpServer.sendContent(jsonBuff);
+} // sendJsonOTmonMapEntryDallasTemp(*char, float, *char, time_t)
 
 //=======================================================================
 // ************ function to build Json Settings string ******************

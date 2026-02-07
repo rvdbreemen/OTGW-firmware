@@ -174,6 +174,105 @@ otgw,metric=chsetpoint value=70.00
 }
 ```
 
+### Dallas Sensor Labels (Bulk Operations)
+
+#### Get All Dallas Sensor Labels
+**Endpoint:** `GET /api/v1/sensors/labels`
+**Description:** Retrieves all Dallas DS18B20/DS18S20/DS1822 temperature sensor labels from `/dallas_labels.ini` file. Returns empty object if no labels exist.
+
+**Response (Success - With Labels):**
+```json
+{
+  "28FF64D1841703F1": "Living Room",
+  "28FF64D1841703F2": "Kitchen",
+  "28FF64D1841703F3": "Bedroom"
+}
+```
+
+**Response (Success - No Labels):**
+```json
+{}
+```
+
+**Response (Error - File Read Failed):**
+```json
+{
+  "success": false,
+  "error": "Failed to read labels file"
+}
+```
+
+**Notes:**
+- Returns JSON object mapping sensor addresses (16 hex chars) to labels
+- Empty object `{}` indicates no labels are set (use hex address as default)
+- Labels stored in `/dallas_labels.ini` file on LittleFS filesystem
+- **Zero backend RAM usage** - labels never loaded into backend memory
+- File created automatically on first label write
+
+---
+
+#### Update All Dallas Sensor Labels
+**Endpoint:** `POST /api/v1/sensors/labels`
+**Description:** Writes all Dallas temperature sensor labels to `/dallas_labels.ini` file. Replaces entire file contents.
+
+**Request Body:**
+```json
+{
+  "28FF64D1841703F1": "Living Room",
+  "28FF64D1841703F2": "Kitchen",
+  "28FF64D1841703F3": "Bedroom"
+}
+```
+
+**Parameters:**
+- Request body is JSON object mapping sensor addresses to labels
+- **Keys**: 16-character hex sensor address (e.g., "28FF64D1841703F1")
+- **Values**: Custom label string (max 16 characters recommended)
+- Empty object `{}` to clear all labels
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "message": "Labels updated successfully"
+}
+```
+
+**Response (Error - Invalid JSON):**
+```json
+{
+  "success": false,
+  "error": "Invalid JSON"
+}
+```
+
+**Response (Error - File Write Failed):**
+```json
+{
+  "success": false,
+  "error": "Failed to write labels file"
+}
+```
+
+**Notes:**
+- **Bulk operation only** - no single sensor endpoints available
+- **File-based storage** - labels stored in `/dallas_labels.ini`, not in settings or backend RAM
+- **Zero backend memory** - labels never loaded into backend, only accessed on API calls
+- **Not exposed in OTmonitor APIs** - labels must be fetched separately via this endpoint
+- Frontend uses **read-modify-write pattern** for single label updates:
+  1. GET `/api/v1/sensors/labels` to fetch all labels
+  2. Modify one entry in JavaScript object
+  3. POST entire object back to `/api/v1/sensors/labels`
+- Default label is hex address if not found in labels file
+- Changes take effect immediately in Web UI and graph (after frontend refresh)
+- **Security**: Uses ArduinoJson for safe JSON handling
+- **Validation**: Accepts any valid JSON object (does not validate sensor existence)
+- **Use cases**: 
+  - Initial bulk label configuration
+  - Label import/export
+  - Single label update (via read-modify-write)
+  - Clear all labels (POST empty object `{}`)
+
 ---
 
 ## V2 API (Optimized Interface)
