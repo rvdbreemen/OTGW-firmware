@@ -34,7 +34,7 @@ Do NOT create ADRs for:
 
 - **Proposed** → Draft, reviewable, can be revised
 - **Accepted** → Decision stands, implementation follows/runs
-- **Rejected** → Not chosen (with rationale to prevent re-discussion)
+- **Deprecated** → Decision is no longer recommended; kept for historical context until fully superseded
 - **Superseded** → Replaced by newer decision (mark old ADR with "Superseded by ADR-XXX")
 
 **If you need to reverse a decision:**
