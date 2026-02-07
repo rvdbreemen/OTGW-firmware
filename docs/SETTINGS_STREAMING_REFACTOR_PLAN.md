@@ -5,9 +5,10 @@
 This document outlines a plan to refactor the settings management system in OTGW-firmware to use streaming JSON serialization/deserialization. This will reduce memory usage and improve reliability, especially as settings grow larger with features like Dallas sensor labels.
 
 **Created:** 2026-02-07  
+**Updated:** 2026-02-07 (added streaming read analysis)  
 **Status:** Proposed  
 **Related Issue:** Code review feedback on settings JSON memory usage  
-**Estimated Impact:** ~1-2KB RAM savings, improved flash write reliability
+**Estimated Impact:** ~4.5KB RAM savings (70% reduction), improved flash write reliability
 
 ---
 
@@ -19,26 +20,32 @@ This document outlines a plan to refactor the settings management system in OTGW
 ```cpp
 DynamicJsonDocument doc(2560);  // Allocates 2560 bytes on heap
 JsonObject root = doc.to<JsonObject>();
-// ... populate 30+ fields ...
+// ... populate 35+ fields ...
 serializeJsonPretty(root, file);  // Writes to file
 ```
+**Peak memory: 2560 bytes heap**
 
 **readSettings() - Current:**
 ```cpp
-StaticJsonDocument<2560> doc;  // Allocates 2560 bytes on stack
+StaticJsonDocument<2560> doc;  // Allocates 2560 bytes on stack (DANGEROUS!)
 DeserializationError error = deserializeJson(doc, file);
-// ... read 30+ fields ...
+// ... read 35+ fields ...
 ```
+**Peak memory: 2560 bytes stack + Dallas labels 1024 bytes RAM = ~3.5KB**
 
-**Total peak memory:** ~5KB (2560 × 2) during settings operations
+**Total peak memory during settings operations: ~6KB**
+- Write: 2560 bytes heap allocation
+- Read: 2560 bytes stack allocation (RISK: Stack overflow on ~4KB stack)
+- Dallas labels: 1024 bytes global RAM (always allocated)
 
 ### Issues Identified
 
-1. **Large heap allocation** in writeSettings() - 2560 bytes can fragment limited ESP8266 heap (~40KB available)
-2. **Large stack allocation** in readSettings() - 2560 bytes on stack (stack is only ~4KB typically)
+1. **CRITICAL: Stack overflow risk** - readSettings() allocates 2560 bytes on stack, which is ~60% of typical ESP8266 stack (4KB). This is dangerous and can cause crashes.
+2. **Large heap allocation** in writeSettings() - 2560 bytes can fragment limited ESP8266 heap (~40KB available)
 3. **No streaming** - entire JSON document loaded into RAM before processing
-4. **Scaling problem** - adding more settings requires increasing buffer size
+4. **Scaling problem** - adding more settings requires increasing buffer size further
 5. **Dallas labels** recently added ~1KB to JSON document, necessitating buffer increase from 1536 to 2560
+6. **Inefficient memory use** - Typical settings file is only ~500-800 bytes, but we allocate 2560 bytes
 
 ---
 
@@ -250,34 +257,93 @@ void readSettings(bool show) {
 
 **Issue:** Still loads entire JSON into memory.
 
-#### Alternative: Incremental parsing
+#### Recommended Approach: Dynamic Sizing with DynamicJsonDocument
 
-Since ArduinoJson doesn't support true streaming deserialization for objects, **keep current approach** but optimize:
+Since ArduinoJson v6 doesn't support true incremental/streaming deserialization for JSON objects, the best practical approach is to size the document dynamically based on actual file size:
 
 ```cpp
 void readSettings(bool show) {
   File file = LittleFS.open(SETTINGS_FILE, "r");
   if (!file) return;
   
-  // Calculate required size dynamically
+  // Get actual file size
   const size_t fileSize = file.size();
-  const size_t capacity = JSON_OBJECT_SIZE(30) + fileSize;  // 30 fields estimate
   
-  if (capacity > 3072) {  // Safety limit
-    DebugTln(F("Settings file too large!"));
+  // Calculate required capacity:
+  // fileSize for JSON text + JSON_OBJECT_SIZE(fieldCount) for structure overhead
+  // Typical: 500-800 bytes file + ~200 bytes overhead = ~700-1000 bytes
+  const size_t capacity = fileSize + JSON_OBJECT_SIZE(35) + 100;  // 35 fields + margin
+  
+  // Safety check to prevent excessive allocation
+  if (capacity > 3072) {  // Maximum reasonable size
+    DebugTf(PSTR("Settings file too large: %d bytes\r\n"), fileSize);
+    file.close();
     return;
   }
   
   DynamicJsonDocument doc(capacity);  // Heap allocation sized to actual need
   DeserializationError error = deserializeJson(doc, file);
   
-  // ... rest of function unchanged ...
+  if (error) {
+    DebugTf(PSTR("Settings deserialization error: %s\r\n"), error.c_str());
+    file.close();
+    return;
+  }
+  
+  // ... extract all fields (unchanged) ...
   
   file.close();
 }
 ```
 
-**This is more realistic for ESP8266.**
+**Benefits:**
+- Reduces typical read memory from 2560 bytes to ~700-1000 bytes (60-70% savings)
+- No code complexity increase
+- Still uses proven ArduinoJson deserializer
+- Heap allocation instead of stack (safer)
+- Adapts to actual file size automatically
+
+**Memory comparison:**
+- Current: Fixed 2560 bytes on stack
+- Proposed: Dynamic ~700-1000 bytes on heap (typical), up to 3072 max
+
+#### Alternative: Manual Streaming Parser (Not Recommended)
+
+For completeness, true zero-memory streaming would require manual character-by-character parsing:
+
+```cpp
+// Pseudo-code (NOT RECOMMENDED for production)
+void readSettings(bool show) {
+  File file = LittleFS.open(SETTINGS_FILE, "r");
+  
+  char key[64];
+  char value[256];
+  
+  while (file.available()) {
+    // Read next key-value pair manually
+    if (parseNextKeyValue(file, key, value)) {
+      // Apply to appropriate setting variable
+      if (strcmp_P(key, PSTR("hostname")) == 0) {
+        strlcpy(settingHostname, value, sizeof(settingHostname));
+      } else if (strcmp_P(key, PSTR("MQTTenable")) == 0) {
+        settingMQTTenable = (strcmp_P(value, PSTR("true")) == 0);
+      }
+      // ... repeat for all 35+ settings ...
+    }
+  }
+  
+  file.close();
+}
+```
+
+**Why not recommended:**
+- 500+ lines of error-prone parsing code
+- Must handle: escaping, nested objects, arrays, numbers, booleans
+- High risk of bugs (JSON parsing is complex)
+- No practical benefit over dynamic sizing
+- Violates KISS principle (ADR-029)
+
+**Decision:** Use dynamic sizing approach (DynamicJsonDocument with file.size()). Provides excellent memory savings with minimal risk and code complexity.
 
 ---
 
@@ -326,6 +392,47 @@ void loadDallasLabels() {
 
 ---
 
+## Memory Impact Summary
+
+### Current vs Proposed Memory Usage
+
+| Component | Current | Proposed | Savings |
+|-----------|---------|----------|---------|
+| **Write Operation** | | | |
+| - JSON document (heap) | 2560 bytes | 0 bytes | 2560 bytes |
+| - Field-by-field writes | N/A | 0 bytes | N/A |
+| **Read Operation** | | | |
+| - JSON document (stack) | 2560 bytes | 0 bytes | 2560 bytes |
+| - JSON document (heap) | 0 bytes | ~800 bytes | -800 bytes |
+| **Dallas Labels Storage** | | | |
+| - In RAM (global) | 1024 bytes | 0 bytes | 1024 bytes |
+| - Separate file | N/A | 0 bytes RAM | N/A |
+| **Total Peak Memory** | ~6KB | ~1.6KB | **~4.5KB (70%)** |
+
+### Breakdown of Savings
+
+**Write Operation:**
+- Current: 2560 bytes heap allocation
+- Proposed: Field-by-field streaming (zero heap for JSON document)
+- **Savings: 2560 bytes**
+
+**Read Operation:**
+- Current: 2560 bytes stack allocation (dangerous!)
+- Proposed: Dynamic heap sizing (~600-900 bytes typical, max 3072)
+- **Savings: ~1700-1960 bytes + eliminates stack overflow risk**
+
+**Dallas Labels:**
+- Current: 1024 bytes always in RAM
+- Proposed: Load on-demand from separate file, zero persistent RAM
+- **Savings: 1024 bytes**
+
+**Net Result:**
+- Total savings: ~4.5KB (~11% of ESP8266's 40KB available RAM)
+- Eliminates critical stack overflow risk
+- Improves scalability for future features
+
+---
+
 ## Detailed Task Breakdown
 
 ### Task 1: Measure Current State (30 min)
@@ -348,6 +455,15 @@ void loadDallasLabels() {
 - [ ] Verify JSON output format matches original
 
 ### Task 4: Optimize Read Function (2 hours)
+- [ ] Measure actual settings file size on device
+- [ ] Replace StaticJsonDocument with DynamicJsonDocument
+- [ ] Calculate capacity as `file.size() + JSON_OBJECT_SIZE(35) + 100`
+- [ ] Add safety check for maximum file size (3072 bytes)
+- [ ] Move allocation from stack to heap (safer)
+- [ ] Add error handling for out-of-memory
+- [ ] Test read functionality with various file sizes
+- [ ] Verify all settings load correctly
+- [ ] Measure heap usage during read operation
 - [ ] Implement dynamic capacity calculation
 - [ ] Add file size validation
 - [ ] Test with various file sizes
