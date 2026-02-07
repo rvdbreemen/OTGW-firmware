@@ -3933,7 +3933,8 @@ function openInlineSensorLabelEditor(address, targetNode, evt) {
     address: address,
     container: targetNode,
     input: input,
-    originalText: currentLabel
+    originalText: currentLabel,
+    saving: false  // Guard flag to prevent duplicate saves
   };
 
   input.focus();
@@ -3951,7 +3952,14 @@ function openInlineSensorLabelEditor(address, targetNode, evt) {
 
   input.addEventListener('blur', function() {
     if (activeSensorLabelEditor && activeSensorLabelEditor.input === input) {
-      saveInlineSensorLabel();
+      // Only save if label changed to avoid unnecessary flash writes
+      var newLabel = input.value.trim() || address;
+      if (newLabel !== activeSensorLabelEditor.originalText) {
+        saveInlineSensorLabel();
+      } else {
+        // Label unchanged, just close the editor
+        closeInlineSensorLabelEditor(true);
+      }
     }
   });
 }
@@ -3978,8 +3986,12 @@ function closeInlineSensorLabelEditor(cancelOnly) {
 
 function saveInlineSensorLabel() {
   if (!activeSensorLabelEditor) return;
-
+  
   var editor = activeSensorLabelEditor;
+  
+  // Guard against duplicate saves (e.g., blur triggered during save)
+  if (editor.saving) return;
+  
   var input = editor.input;
   if (!input) {
     closeInlineSensorLabelEditor(true);
@@ -3995,6 +4007,8 @@ function saveInlineSensorLabel() {
     newLabel = newLabel.substring(0, 16);
   }
 
+  // Set saving flag before disabling input
+  editor.saving = true;
   input.disabled = true;
 
   fetch(APIGW + 'v1/sensors/label', {

@@ -208,11 +208,12 @@ if (settingMQTTenable) {
     }
     DallasrealDevice[i].lasttime = now ;
     
-    if (bDebugSensorSimulation)
+    // Debug logging: gate simulation logs behind bDebugSensors to reduce telnet output
+    if (bDebugSensorSimulation && bDebugSensors)
     {
       DebugTf(PSTR("[SIM] Sensor device no[%d] addr[%s] TempC: %4.1f\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
     }
-    else if (bDebugSensors)
+    else if (bDebugSensors && !bDebugSensorSimulation)
     {
       DebugTf(PSTR("Sensor device no[%d] addr[%s] TempC: %f\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
     }

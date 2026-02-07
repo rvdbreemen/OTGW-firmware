@@ -137,7 +137,7 @@ void sendNestedJsonObj(const char *cName, float fValue)
 {
   char jsonBuff[200] = "";
   
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.1f}"), cName, fValue);
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.3f}"), cName, fValue);
 
   sendBeforenext();
   sendIdent();
@@ -194,7 +194,7 @@ void sendJsonOTmonObj(const char *cName, float fValue, const char *cUnit, time_t
 {
   char jsonBuff[200] = "";
   
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.1f, \"unit\": \"%s\", \"epoch\": %d}")
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.3f, \"unit\": \"%s\", \"epoch\": %d}")
                                       , cName, fValue, cUnit, (uint32_t)epoch);
 
   sendBeforenext();
