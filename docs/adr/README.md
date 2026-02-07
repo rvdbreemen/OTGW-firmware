@@ -10,13 +10,13 @@ Architecture Decision Records capture important architectural decisions along wi
 
 **By Topic:**
 - [Platform & Build](#platform-and-build-system) (4 ADRs)
-- [Memory Management](#memory-management) (3 ADRs) **UPDATED**
-- [Network & Security](#network-and-security) (3 ADRs)
-- [Integration](#integration-and-communication) (2 ADRs)
+- [Memory Management](#memory-management) (4 ADRs) 🆕
+- [Network & Security](#network-and-security) (4 ADRs) 🆕
+- [Integration](#integration-and-communication) (3 ADRs) 🆕
 - [Core Systems](#system-architecture) (6 ADRs)
 - [Features & Extensions](#features-and-extensions) (6 ADRs)
 - [Browser & Client](#browser-and-client-compatibility) (3 ADRs)
-- [OTA & Updates](#ota-and-firmware-updates) (1 ADR) **NEW**
+- [OTA & Updates](#ota-and-firmware-updates) (1 ADR)
 
 **Foundational ADRs** (most referenced by other ADRs):
 - **ADR-001:** ESP8266 Platform Selection (establishes hardware constraints)
@@ -39,6 +39,9 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-010: Multiple Concurrent Network Services](ADR-010-multiple-concurrent-network-services.md)**  
   Running HTTP, WebSocket, Telnet, and MQTT services simultaneously on different ports.
 
+- **[ADR-032: No Authentication Pattern (Local Network Security Model)](ADR-032-no-authentication-local-network-security.md)** 🆕  
+  Explicit decision to omit authentication in favor of network-level security (WiFi encryption, network segmentation, VPN for remote access).
+
 ### Memory Management
 - **[ADR-004: Static Buffer Allocation Strategy](ADR-004-static-buffer-allocation.md)**  
   How static buffer allocation prevents heap fragmentation and crashes on the memory-constrained ESP8266.
@@ -46,8 +49,11 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-009: PROGMEM Usage for String Literals](ADR-009-progmem-string-literals.md)**  
   Mandatory use of PROGMEM (F() and PSTR() macros) to move string literals from RAM to flash memory.
 
-- **[ADR-028: File Streaming Over Loading for Memory Safety](ADR-028-file-streaming-over-loading.md)** 🆕  
+- **[ADR-028: File Streaming Over Loading for Memory Safety](ADR-028-file-streaming-over-loading.md)**  
   Never load files >2KB into RAM; use streaming patterns to prevent memory exhaustion crashes.
+
+- **[ADR-030: Heap Memory Monitoring and Emergency Recovery](ADR-030-heap-memory-monitoring-emergency-recovery.md)** 🆕  
+  Proactive heap monitoring with 4-level health system and adaptive throttling to prevent crashes (CRITICAL <3KB, WARNING 3-5KB, LOW 5-8KB, HEALTHY >8KB).
 
 ### Integration and Communication
 - **[ADR-005: WebSocket for Real-Time Streaming](ADR-005-websocket-real-time-streaming.md)**  
@@ -55,6 +61,9 @@ Architecture Decision Records capture important architectural decisions along wi
 
 - **[ADR-006: MQTT Integration Pattern](ADR-006-mqtt-integration-pattern.md)**  
   MQTT client implementation with Home Assistant Auto-Discovery for zero-configuration integration.
+
+- **[ADR-031: Two-Microcontroller Coordination Architecture](ADR-031-two-microcontroller-coordination-architecture.md)** 🆕  
+  Master/Slave architecture with ESP8266 as network controller and PIC microcontroller for OpenTherm protocol (serial communication, GPIO reset control, firmware upgrade capability).
 
 ### System Architecture
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  

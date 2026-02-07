@@ -18,7 +18,7 @@ If no ADR exists and the change is architecturally significant:
 1. **Create new ADR** under `docs/adr/` following the naming convention `ADR-XXX-short-title.md`
 2. **Use the ADR template** from `.github/skills/adr/SKILL.md`
 3. **Include required sections**:
-   - Status (Proposed/Accepted/Rejected/Superseded)
+   - Status (Proposed/Accepted/Deprecated/Superseded)
    - Context (problem statement, constraints, stakeholders)
    - Decision (choice made, rationale)
    - Alternatives Considered (2-3 options with pros/cons, rejection reasons)
