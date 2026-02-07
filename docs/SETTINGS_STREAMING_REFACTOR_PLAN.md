@@ -53,6 +53,59 @@ DeserializationError error = deserializeJson(doc, file);
 
 ArduinoJson v6+ supports streaming serialization/deserialization that avoids loading entire JSON into memory.
 
+### Memory & Complexity Comparison Table
+
+| Approach | Peak Heap | Peak Stack | Code Lines | Complexity | Risk | Recommended |
+|----------|-----------|------------|------------|------------|------|-------------|
+| **Current** | 2560 bytes | 2560 bytes | Baseline | Low | HIGH (stack overflow) | ❌ |
+| **Option 1: Dynamic Sizing** | ~800 bytes | 0 bytes | +10 lines | Very Low | Very Low | ✅ **BEST** |
+| **Option 2: Manual Parser** | 0 bytes | ~200 bytes | +500 lines | Very High | High | ❌ |
+| **Option 3: Multi-pass Filter** | ~300 bytes | 0 bytes | +150 lines | High | Medium | ❌ |
+| **Hybrid (Write+Read)** | ~800 bytes | 0 bytes | +110 lines | Low | Very Low | ✅ **RECOMMENDED** |
+
+### Detailed Memory Estimates
+
+#### Write Operations
+
+| Method | Peak Memory | Location | Notes |
+|--------|-------------|----------|-------|
+| Current (DynamicJsonDocument) | 2560 bytes | Heap | Full document in memory |
+| Field-by-field streaming | 0 bytes | N/A | Direct file writes, ~50 bytes print buffer |
+| **Savings** | **2560 bytes** | **Heap freed** | **100% reduction** |
+
+#### Read Operations
+
+| Method | Peak Memory | Location | Notes |
+|--------|-------------|----------|-------|
+| Current (StaticJsonDocument) | 2560 bytes | Stack | **DANGEROUS: Stack overflow risk** |
+| Dynamic sizing | file.size() + ~200 bytes | Heap | Typical: ~800 bytes (500-800 byte files) |
+| Manual parser | ~200 bytes | Stack | Parser state machine + temporary buffers |
+| Multi-pass filter | ~300 bytes per pass | Heap | Small filtered documents, 35 passes |
+| **Savings (Dynamic)** | **~1700 bytes** | **Stack→Heap** | **67% reduction + eliminates crash risk** |
+
+#### Overall System Impact
+
+| Component | Current | Proposed | Savings | Notes |
+|-----------|---------|----------|---------|-------|
+| Write heap | 2560 bytes | 0 bytes | 2560 bytes | Field-by-field streaming |
+| Read stack | 2560 bytes | 0 bytes | 2560 bytes | **Eliminates crash risk** |
+| Read heap | 0 bytes | ~800 bytes | -800 bytes | Dynamic sizing (safer than stack) |
+| Dallas labels RAM | 1024 bytes | 0 bytes | 1024 bytes | Move to separate file |
+| **Total** | **~6KB** | **~1.6KB** | **~4.5KB (73%)** | **Massive improvement** |
+
+### Complexity Scores (1-10, lower is better)
+
+| Aspect | Current | Dynamic Sizing | Manual Parser | Multi-pass Filter |
+|--------|---------|----------------|---------------|-------------------|
+| Implementation | 1 | 2 | 9 | 7 |
+| Testing | 2 | 3 | 10 | 8 |
+| Maintenance | 1 | 2 | 9 | 6 |
+| Debugging | 2 | 3 | 10 | 7 |
+| Risk of bugs | 2 | 2 | 10 | 6 |
+| **Overall** | **8/50** | **12/50** | **48/50** | **34/50** |
+
+**Conclusion:** Dynamic sizing is only slightly more complex (+4 points) but provides 73% memory savings. Manual parser is too risky (+40 points complexity) for the same benefit.
+
 ### Benefits
 
 1. **Reduced heap allocation:** Only temporary objects, not entire document
@@ -60,12 +113,13 @@ ArduinoJson v6+ supports streaming serialization/deserialization that avoids loa
 3. **Scalable:** Can handle arbitrarily large settings files
 4. **Better flash writes:** Streaming reduces chance of out-of-memory during write
 5. **Consistent with ADR-004:** Static buffer allocation (no unbounded growth)
+6. **Eliminates crash risk:** 2560 bytes on 4KB stack = 64% stack usage (CRITICAL)
 
 ### Trade-offs
 
 1. **Slightly more complex code:** Need to handle streaming properly
-2. **Multiple file passes:** May need to read file multiple times for complex operations
-3. **Limited random access:** Can't easily jump to arbitrary setting
+2. **Multiple file passes:** May need to read file multiple times for complex operations (only for multi-pass filter approach)
+3. **Limited random access:** Can't easily jump to arbitrary setting (not an issue in practice)
 4. **Testing overhead:** Need to verify streaming works correctly
 
 ---
@@ -430,6 +484,272 @@ void loadDallasLabels() {
 - Total savings: ~4.5KB (~11% of ESP8266's 40KB available RAM)
 - Eliminates critical stack overflow risk
 - Improves scalability for future features
+
+---
+
+## Implementation Complexity Analysis
+
+### Code Size Estimates (Lines of Code)
+
+| Component | Current | Option 1: Dynamic | Option 2: Manual | Option 3: Multi-pass | Hybrid |
+|-----------|---------|-------------------|------------------|---------------------|--------|
+| **Write Function** | 70 lines | 80 lines (+10) | 120 lines (+50) | 90 lines (+20) | 80 lines (+10) |
+| **Read Function** | 60 lines | 70 lines (+10) | 350 lines (+290) | 150 lines (+90) | 70 lines (+10) |
+| **Helper Functions** | 0 lines | 0 lines | 200 lines (+200) | 50 lines (+50) | 40 lines (+40) |
+| **Dallas Labels** | 30 lines | 40 lines (+10) | 40 lines (+10) | 40 lines (+10) | 40 lines (+10) |
+| **Total New Code** | **0** | **+30 lines** | **+550 lines** | **+170 lines** | **+70 lines** |
+
+### Effort Estimates (Person-Hours)
+
+| Phase | Current | Option 1 | Option 2 | Option 3 | Hybrid |
+|-------|---------|----------|----------|----------|--------|
+| Planning & Analysis | N/A | 1h | 2h | 1.5h | 1h |
+| Implementation | N/A | 2h | 12h | 6h | 4h |
+| Testing | N/A | 2h | 8h | 5h | 3h |
+| Debugging | N/A | 1h | 6h | 3h | 1.5h |
+| Documentation | N/A | 0.5h | 2h | 1h | 0.5h |
+| **Total Effort** | **0h** | **6.5h** | **30h** | **16.5h** | **10h** |
+
+### Risk Assessment
+
+| Risk Factor | Current | Option 1 | Option 2 | Option 3 | Hybrid |
+|-------------|---------|----------|----------|----------|--------|
+| **Stack Overflow** | 🔴 CRITICAL | 🟢 None | 🟢 None | 🟢 None | 🟢 None |
+| **Memory Leak** | 🟡 Low | 🟢 Very Low | 🟡 Low | 🟡 Low | 🟢 Very Low |
+| **Parsing Bugs** | 🟢 None | 🟢 Very Low | 🔴 HIGH | 🟡 Medium | 🟢 Very Low |
+| **Flash Corruption** | 🟡 Low | 🟢 Very Low | 🟡 Low | 🟡 Low | 🟢 Very Low |
+| **Backward Compat** | N/A | 🟢 Easy | 🟡 Medium | 🟡 Medium | 🟢 Easy |
+| **Maintenance** | 🟢 Simple | 🟢 Simple | 🔴 Complex | 🟡 Medium | 🟢 Simple |
+
+### Detailed Option Comparison
+
+#### Option 1: Dynamic Sizing (DynamicJsonDocument)
+
+**Implementation Complexity: ⭐⭐ (Very Low)**
+
+```cpp
+// BEFORE (60 lines)
+StaticJsonDocument<2560> doc;
+deserializeJson(doc, file);
+
+// AFTER (70 lines, +10)
+const size_t capacity = file.size() + JSON_OBJECT_SIZE(35) + 100;
+if (capacity > 3072) { /* error */ }
+DynamicJsonDocument doc(capacity);
+deserializeJson(doc, file);
+```
+
+**Changes Required:**
+- Replace `StaticJsonDocument<2560>` with `DynamicJsonDocument(calculated_size)` (**1 line change**)
+- Add file size calculation (**3 lines**)
+- Add safety check (**3 lines**)
+- Add error logging (**3 lines**)
+- **Total: ~10 new lines**
+
+**Testing Complexity: Low**
+- Same ArduinoJson API
+- Only need to test capacity calculation
+- Easy to verify with different file sizes
+
+#### Option 2: Manual Character-by-Character Parser
+
+**Implementation Complexity: ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ (Very High)**
+
+```cpp
+// Pseudocode only - NOT RECOMMENDED
+enum ParseState { EXPECT_KEY, IN_KEY, EXPECT_COLON, EXPECT_VALUE, IN_STRING_VALUE, IN_NUMBER_VALUE, ... };
+
+void readSettings(bool show) {
+  File file = LittleFS.open(SETTINGS_FILE, "r");
+  
+  ParseState state = EXPECT_KEY;
+  char key[64];
+  char value[256];
+  int keyPos = 0, valuePos = 0;
+  bool inEscape = false;
+  int braceDepth = 0;
+  
+  while (file.available()) {
+    char c = file.read();
+    
+    switch (state) {
+      case EXPECT_KEY:
+        if (c == '"') {
+          state = IN_KEY;
+          keyPos = 0;
+        } else if (c == '}' && braceDepth == 0) {
+          // End of JSON
+          break;
+        }
+        // ... handle whitespace, commas ...
+        break;
+        
+      case IN_KEY:
+        if (inEscape) {
+          // Handle \", \\, \n, etc.
+          inEscape = false;
+          key[keyPos++] = handleEscape(c);
+        } else if (c == '\\') {
+          inEscape = true;
+        } else if (c == '"') {
+          key[keyPos] = '\0';
+          state = EXPECT_COLON;
+        } else {
+          key[keyPos++] = c;
+        }
+        break;
+        
+      // ... 10+ more states for: colon, value types, nested objects, arrays ...
+      
+      case IN_STRING_VALUE:
+        // Similar escape handling
+        // ... 50+ lines ...
+        break;
+        
+      case IN_NUMBER_VALUE:
+        // Parse integers, floats
+        // ... 30+ lines ...
+        break;
+        
+      // ... and so on ...
+    }
+  }
+  
+  file.close();
+}
+
+// Plus helper functions:
+char handleEscape(char c) { /* 20 lines */ }
+bool parseNumber(const char* str, int* intVal, float* floatVal) { /* 40 lines */ }
+bool parseBool(const char* str) { /* 10 lines */ }
+void applySettingValue(const char* key, const char* value) { /* 100 lines - big if/else chain */ }
+```
+
+**Changes Required:**
+- Implement full JSON parser from scratch (**350+ lines**)
+- Handle all JSON types: string, number, boolean, null, object, array (**100+ lines**)
+- Implement escape sequence handling (**20+ lines**)
+- Implement nested object support (**50+ lines**)
+- Create state machine with 15+ states (**200+ lines**)
+- Map 35+ settings to variables (**100+ lines**)
+- Error handling for malformed JSON (**50+ lines**)
+- **Total: ~550+ new lines**
+
+**Testing Complexity: Very High**
+- Must test all JSON constructs
+- Edge cases: escaped quotes, nested objects, Unicode, malformed JSON
+- Regression testing for each of 35+ settings
+- **Estimated 100+ test cases needed**
+
+**Maintenance Burden: Very High**
+- Complex state machine hard to debug
+- Easy to introduce bugs when adding new settings
+- Difficult for other developers to understand
+- High risk of security vulnerabilities (buffer overflows)
+
+#### Option 3: Multi-pass Filtered Reads
+
+**Implementation Complexity: ⭐⭐⭐⭐⭐⭐⭐ (High)**
+
+```cpp
+void readSettings(bool show) {
+  File file = LittleFS.open(SETTINGS_FILE, "r");
+  if (!file) return;
+  
+  // Pass 1: Read hostname
+  {
+    StaticJsonDocument<128> doc;
+    StaticJsonDocument<64> filter;
+    filter["hostname"] = true;
+    
+    file.seek(0);
+    deserializeJson(doc, file, DeserializationOption::Filter(filter));
+    strlcpy(settingHostname, doc["hostname"] | "", sizeof(settingHostname));
+  }
+  
+  // Pass 2: Read MQTTenable
+  {
+    StaticJsonDocument<64> doc;
+    StaticJsonDocument<64> filter;
+    filter["MQTTenable"] = true;
+    
+    file.seek(0);
+    deserializeJson(doc, file, DeserializationOption::Filter(filter));
+    settingMQTTenable = doc["MQTTenable"] | settingMQTTenable;
+  }
+  
+  // ... Repeat for all 35 settings (35 file seeks + deserializations!) ...
+  
+  file.close();
+}
+```
+
+**Changes Required:**
+- Create filtered read for each setting (**~90 lines**, repetitive)
+- 35 file seeks (slow on flash) (**35 × 4 lines = 140 lines**)
+- 35 small JsonDocuments (**35 allocations**)
+- **Total: ~150+ new lines** (very repetitive)
+
+**Performance Impact:**
+- 35 file seeks on flash (SLOW - flash seek is expensive)
+- 35 JSON parse operations
+- Estimated **10-20x slower** than current implementation
+- LittleFS flash seeks: ~5-20ms each × 35 = **175-700ms total read time**
+
+**Testing Complexity: Medium**
+- Need to verify each filtered read works
+- Check for file seek failures
+- Test performance impact
+
+#### Hybrid Approach (Recommended)
+
+**Implementation Complexity: ⭐⭐⭐ (Low)**
+
+Combines best of multiple approaches:
+
+```cpp
+// Write: Field-by-field streaming (+40 lines)
+void writeSettings(bool show) {
+  File file = LittleFS.open(SETTINGS_FILE, "w");
+  file.print(F("{"));
+  writeJsonField(file, F("hostname"), settingHostname, false);
+  writeJsonField(file, F("MQTTenable"), settingMQTTenable, true);
+  // ... etc (simple helpers, easy to maintain)
+  file.print(F("}"));
+  file.close();
+}
+
+// Helper (20 lines total for string/int/bool versions)
+void writeJsonField(File& file, const __FlashStringHelper* key, 
+                    const char* value, bool addComma);
+
+// Read: Dynamic sizing (+10 lines)
+void readSettings(bool show) {
+  File file = LittleFS.open(SETTINGS_FILE, "r");
+  const size_t capacity = file.size() + JSON_OBJECT_SIZE(35) + 100;
+  DynamicJsonDocument doc(capacity);
+  deserializeJson(doc, file);
+  // ... existing field extraction (unchanged)
+  file.close();
+}
+
+// Dallas labels: Separate file (+40 lines)
+void saveDallasLabels() { /* 20 lines */ }
+void loadDallasLabels() { /* 20 lines */ }
+```
+
+**Changes Required:**
+- Write helpers: 3 functions × ~15 lines each = **40 lines**
+- Read optimization: **10 lines**
+- Dallas labels file: **40 lines**
+- **Total: ~90 new lines** (clean, maintainable)
+
+**Benefits:**
+- All the memory savings (4.5KB)
+- Minimal code complexity
+- Easy to review and test
+- Easy to maintain
+- Uses proven ArduinoJson library
 
 ---
 
