@@ -178,7 +178,7 @@ otgw,metric=chsetpoint value=70.00
 
 #### Get All Dallas Sensor Labels
 **Endpoint:** `GET /api/v1/sensors/labels`
-**Description:** Retrieves all Dallas DS18B20/DS18S20/DS1822 temperature sensor labels from `/dallas_labels.json` file. Returns empty object if no labels exist.
+**Description:** Retrieves all Dallas DS18B20/DS18S20/DS1822 temperature sensor labels from `/dallas_labels.ini` file. Returns empty object if no labels exist.
 
 **Response (Success - With Labels):**
 ```json
@@ -205,7 +205,7 @@ otgw,metric=chsetpoint value=70.00
 **Notes:**
 - Returns JSON object mapping sensor addresses (16 hex chars) to labels
 - Empty object `{}` indicates no labels are set (use hex address as default)
-- Labels stored in `/dallas_labels.json` file on LittleFS filesystem
+- Labels stored in `/dallas_labels.ini` file on LittleFS filesystem
 - **Zero backend RAM usage** - labels never loaded into backend memory
 - File created automatically on first label write
 
@@ -213,7 +213,7 @@ otgw,metric=chsetpoint value=70.00
 
 #### Update All Dallas Sensor Labels
 **Endpoint:** `POST /api/v1/sensors/labels`
-**Description:** Writes all Dallas temperature sensor labels to `/dallas_labels.json` file. Replaces entire file contents.
+**Description:** Writes all Dallas temperature sensor labels to `/dallas_labels.ini` file. Replaces entire file contents.
 
 **Request Body:**
 ```json
@@ -256,7 +256,7 @@ otgw,metric=chsetpoint value=70.00
 
 **Notes:**
 - **Bulk operation only** - no single sensor endpoints available
-- **File-based storage** - labels stored in `/dallas_labels.json`, not in settings or backend RAM
+- **File-based storage** - labels stored in `/dallas_labels.ini`, not in settings or backend RAM
 - **Zero backend memory** - labels never loaded into backend, only accessed on API calls
 - **Not exposed in OTmonitor APIs** - labels must be fetched separately via this endpoint
 - Frontend uses **read-modify-write pattern** for single label updates:

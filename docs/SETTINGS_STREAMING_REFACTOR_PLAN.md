@@ -410,7 +410,7 @@ Dallas sensor labels are the largest contributor to settings size growth. Consid
 char settingDallasLabels[JSON_BUFF_MAX] = "";  // 1024 bytes in RAM
 
 // Store in separate file:
-#define DALLAS_LABELS_FILE "/dallas_labels.json"
+#define DALLAS_LABELS_FILE "/dallas_labels.ini"
 
 void saveDallasLabels() {
   File file = LittleFS.open(DALLAS_LABELS_FILE, "w");

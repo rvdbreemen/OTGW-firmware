@@ -530,7 +530,7 @@ void sendOTmonitorV2()
     for (int i = 0; i < DallasrealDeviceCount; i++) {
       const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
       sendJsonOTmonMapEntryDallasTemp(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
-      // Labels now managed by Web UI via /dallas_labels.json file (not sent in API)
+      // Labels now managed by Web UI via /dallas_labels.ini file (not sent in API)
     }
   }
 
@@ -595,7 +595,7 @@ void sendOTmonitor()
     for (int i = 0; i < DallasrealDeviceCount; i++) {
         const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
         sendJsonOTmonObjDallasTemp(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
-        // Labels now managed by Web UI via /dallas_labels.json file (not sent in API)
+        // Labels now managed by Web UI via /dallas_labels.ini file (not sent in API)
     }
   }
 
@@ -861,7 +861,7 @@ void postSettings()
 // GET /api/v1/sensors/label?address=28FF64D1841703F1
 // Get all Dallas sensor labels from file (bulk read)
 void getDallasLabels() {
-  File labelsFile = LittleFS.open(F("/dallas_labels.json"), "r");
+  File labelsFile = LittleFS.open(F("/dallas_labels.ini"), "r");
   
   if (!labelsFile) {
     // No file exists - return empty JSON object
@@ -885,7 +885,7 @@ void updateAllDallasLabels() {
     errorDoc[F("error")] = F("Empty request body");
     String response;
     serializeJson(errorDoc, response);
-    httpServer.send_P(400, PSTR("application/json"), response.c_str());
+    httpServer.send(400, F("application/json"), response);
     return;
   }
   
@@ -899,12 +899,12 @@ void updateAllDallasLabels() {
     errorDoc[F("error")] = F("Invalid JSON format");
     String response;
     serializeJson(errorDoc, response);
-    httpServer.send_P(400, PSTR("application/json"), response.c_str());
+    httpServer.send(400, F("application/json"), response);
     return;
   }
   
   // Write directly to file
-  File labelsFile = LittleFS.open(F("/dallas_labels.json"), "w");
+  File labelsFile = LittleFS.open(F("/dallas_labels.ini"), "w");
   if (!labelsFile) {
     StaticJsonDocument<128> errorDoc;
     errorDoc[F("success")] = false;

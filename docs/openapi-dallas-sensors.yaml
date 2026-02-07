@@ -4,11 +4,11 @@ info:
   description: |
     REST API for managing Dallas DS18B20/DS18S20/DS1822 temperature sensor custom labels.
     
-    Labels are stored in `/dallas_labels.json` file on LittleFS filesystem with zero backend RAM usage.
+    Labels are stored in `/dallas_labels.ini` file on LittleFS filesystem with zero backend RAM usage.
     The Web UI fetches labels on-demand and manages all label operations via bulk read/write operations.
     
     ## Architecture
-    - **Storage**: Labels stored in `/dallas_labels.json` as JSON key-value pairs
+    - **Storage**: Labels stored in `/dallas_labels.ini` as JSON key-value pairs
     - **Format**: `{"28FF64D1841703F1": "Living Room", "28FF64D1841703F2": "Kitchen"}`
     - **Memory**: Zero persistent RAM usage (file-based only)
     - **Operations**: Bulk read/write only (no single sensor operations)
@@ -46,7 +46,7 @@ paths:
         - Dallas Sensor Labels
       summary: Get all sensor labels
       description: |
-        Retrieves all Dallas temperature sensor labels from `/dallas_labels.json` file.
+        Retrieves all Dallas temperature sensor labels from `/dallas_labels.ini` file.
         
         Returns empty object `{}` if:
         - File does not exist
@@ -89,7 +89,7 @@ paths:
         - Dallas Sensor Labels
       summary: Update all sensor labels
       description: |
-        Writes all Dallas temperature sensor labels to `/dallas_labels.json` file.
+        Writes all Dallas temperature sensor labels to `/dallas_labels.ini` file.
         
         This endpoint:
         - Replaces the entire labels file with provided data

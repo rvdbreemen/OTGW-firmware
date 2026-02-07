@@ -63,9 +63,8 @@ void initSimulatedDallasSensors()
     DallasrealDevice[i].tempC = 30.0f + (i * 5.0f);
     DallasrealDevice[i].lasttime = 0;
 
-    const char* hexAddr = getDallasAddress(DallasrealDevice[i].addr);
-    strlcpy(DallasrealDevice[i].label, hexAddr, sizeof(DallasrealDevice[i].label));
-    loadSensorLabel(hexAddr, DallasrealDevice[i].label, sizeof(DallasrealDevice[i].label));
+    // Labels are stored in /dallas_labels.ini file (not in RAM)
+    // Web UI fetches labels via GET /api/v1/sensors/labels
 
   }
 

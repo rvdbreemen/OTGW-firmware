@@ -155,7 +155,7 @@ This allows the OTGW to use external temperature data for OpenTherm communicatio
 - Send OTGW commands via `/api/v1/otgw/command/...` (POST/PUT).
 - **Manage Dallas sensor labels** via `/api/v1/sensors/labels` (GET/POST) - fetch and update custom names for temperature sensors.
   - **Bulk operations only**: Frontend manages label lookup and modification using read-modify-write pattern.
-  - **File-based storage**: Labels stored in `/dallas_labels.json` with zero backend RAM usage.
+  - **File-based storage**: Labels stored in `/dallas_labels.ini` with zero backend RAM usage.
 - Full API documentation available in `example-api/api-call-responses.txt` and OpenAPI specification in `docs/openapi-dallas-sensors.yaml`.
 
 ### TCP serial socket (OTmonitor compatible)
@@ -165,7 +165,7 @@ This allows the OTGW to use external temperature data for OpenTherm communicatio
 - Dallas temperature sensors (e.g. DS18B20/DS18S20/DS1822) with Home Assistant discovery support.
   - **Custom labels**: Click sensor names in the Web UI to assign friendly labels (max 16 characters).
   - **Graph visualization**: Sensors appear automatically in the real-time graph with 16 unique colors per theme.
-  - **File-based storage**: Labels stored in `/dallas_labels.json` file with zero backend RAM usage.
+  - **File-based storage**: Labels stored in `/dallas_labels.ini` file with zero backend RAM usage.
   - **Bulk API**: GET/POST `/api/v1/sensors/labels` for fetching and updating all labels at once.
 - S0 pulse counter for kWh meters on a configurable GPIO.
 

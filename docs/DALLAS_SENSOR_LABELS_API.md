@@ -6,7 +6,7 @@ The Dallas Temperature Sensor Labels feature provides custom labeling for Dallas
 
 ### Key Features
 
-- **File-Based Storage**: Labels stored in `/dallas_labels.json` on LittleFS filesystem
+- **File-Based Storage**: Labels stored in `/dallas_labels.ini` on LittleFS filesystem
 - **Zero Backend RAM**: Labels never loaded into backend memory
 - **Bulk Operations**: Simple GET/POST API for fetching and updating all labels
 - **Web UI Integration**: Non-blocking modal dialog for inline label editing
@@ -48,7 +48,7 @@ The Dallas Temperature Sensor Labels feature provides custom labeling for Dallas
 
 ### GET /api/v1/sensors/labels
 
-Retrieves all Dallas temperature sensor labels from `/dallas_labels.json` file.
+Retrieves all Dallas temperature sensor labels from `/dallas_labels.ini` file.
 
 **URL:** `http://{device-ip}/api/v1/sensors/labels`
 
@@ -92,7 +92,7 @@ Retrieves all Dallas temperature sensor labels from `/dallas_labels.json` file.
 
 ### POST /api/v1/sensors/labels
 
-Writes all Dallas temperature sensor labels to `/dallas_labels.json` file.
+Writes all Dallas temperature sensor labels to `/dallas_labels.ini` file.
 
 **URL:** `http://{device-ip}/api/v1/sensors/labels`
 
@@ -265,7 +265,7 @@ async function clearAllLabels() {
 ## File Format
 
 ### Location
-`/dallas_labels.json` on LittleFS filesystem
+`/dallas_labels.ini` on LittleFS filesystem
 
 ### Structure
 
@@ -481,7 +481,7 @@ fetch('/api/v1/sensors/labels')
 ```bash
 # Via serial console or telnet
 # Delete corrupted file
-LittleFS.remove("/dallas_labels.json");
+LittleFS.remove("/dallas_labels.ini");
 
 # Or via Web UI
 # POST empty object to recreate file

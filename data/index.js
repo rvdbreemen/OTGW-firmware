@@ -13,6 +13,35 @@ const APIGW = window.location.protocol + '//' + window.location.host + '/api/';
 
 "use strict";
 
+// Global cache for Dallas sensor labels (loaded from /dallas_labels.ini)
+var dallasLabelsCache = {};
+
+// Function to fetch Dallas sensor labels from backend
+function fetchDallasLabels() {
+  return fetch(APIGW + 'v1/sensors/labels')
+    .then(function(response) {
+      if (!response.ok) {
+        console.warn('Failed to fetch Dallas labels:', response.status);
+        return {};
+      }
+      var contentType = response.headers.get('content-type') || '';
+      if (contentType.indexOf('application/json') === -1) {
+        return {};
+      }
+      return response.json();
+    })
+    .then(function(labels) {
+      dallasLabelsCache = labels || {};
+      console.log('Dallas labels loaded:', Object.keys(dallasLabelsCache).length, 'labels');
+      return dallasLabelsCache;
+    })
+    .catch(function(error) {
+      console.warn('Error fetching Dallas labels:', error);
+      dallasLabelsCache = {};
+      return dallasLabelsCache;
+    });
+}
+
 
 console.log(`Hash=${window.location.hash}`);
 window.onload = initMainPage;
@@ -2120,6 +2149,11 @@ function initMainPage() {
       OTGraph.init();
   }
 
+  // Fetch Dallas sensor labels on page load
+  fetchDallasLabels().then(function() {
+    console.log('Dallas labels cache initialized');
+  });
+
   // Start time updates if not in flash mode
   if (!flashModeActive && !timeupdate) {
     refreshDevTime();
@@ -2593,10 +2627,9 @@ function refreshOTmonitor() {
           var displayName = translateToHuman(data[i].name);
           if (data[i].name && typeof data[i].name === 'string' && 
               data[i].name.length === 16 && /^[0-9A-Fa-f]{16}$/.test(data[i].name)) {
-            // This is a Dallas sensor hex address
-            var labelKey = data[i].name + '_label';
-            if (data[labelKey] && data[labelKey].value) {
-              displayName = data[labelKey].value;
+            // This is a Dallas sensor hex address - check for custom label in cache
+            if (dallasLabelsCache[data[i].name]) {
+              displayName = dallasLabelsCache[data[i].name];
             }
             
             // Add click handler to allow editing label
@@ -4011,44 +4044,50 @@ function saveInlineSensorLabel() {
   editor.saving = true;
   input.disabled = true;
 
-  fetch(APIGW + 'v1/sensors/label', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      address: editor.address,
-      label: newLabel
-    })
-  })
-  .then(function(response) {
-    if (!response.ok) {
-      throw new Error('HTTP ' + response.status);
-    }
-    return response.json();
-  })
-  .then(function(json) {
-    if (!json.success) {
-      throw new Error(json.error || 'Unknown error');
-    }
+  // Use bulk labels endpoint with read-modify-write flow
+  var labelsUrl = APIGW + 'v1/sensors/labels';
 
-    if (typeof data !== 'undefined') {
-      var labelKey = editor.address + '_label';
-      if (!data[labelKey]) {
-        data[labelKey] = { name: labelKey, unit: '', epoch: 1 };
+  fetch(labelsUrl)
+    .then(function (response) {
+      if (!response.ok) {
+        throw new Error('HTTP ' + response.status);
       }
-      data[labelKey].value = newLabel;
-    }
+      var contentType = response.headers.get('content-type') || '';
+      if (contentType.indexOf('application/json') === -1) {
+        // No JSON body; start from empty labels map
+        return {};
+      }
+      return response.json();
+    })
+    .then(function (labels) {
+      // Modify the label for the current address
+      labels[editor.address] = newLabel;
 
-    closeInlineSensorLabelEditor();
-    refreshOTmonitor();
-  })
-  .catch(function(error) {
-    console.error('Error updating sensor label:', error);
-    if (input) {
-      input.disabled = false;
-      input.focus();
-      input.select();
-    }
-  });
+      // Write all labels back
+      return fetch(labelsUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(labels)
+      });
+    })
+    .then(function(response) {
+      if (!response.ok) {
+        throw new Error('HTTP ' + response.status);
+      }
+      // Success! Update cache and close editor
+      dallasLabelsCache[editor.address] = newLabel;
+      closeInlineSensorLabelEditor();
+      refreshOTmonitor();
+    })
+    .catch(function(error) {
+      console.error('Error updating sensor label:', error);
+      if (input) {
+        input.disabled = false;
+        input.focus();
+        input.select();
+      }
+      editor.saving = false;
+    });
 }

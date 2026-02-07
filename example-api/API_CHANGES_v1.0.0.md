@@ -7,7 +7,7 @@ New endpoints for managing custom labels for Dallas DS18B20/DS18S20/DS1822 tempe
 ### Architecture
 
 **File-Based Storage:**
-- Labels stored in `/dallas_labels.json` file on LittleFS filesystem
+- Labels stored in `/dallas_labels.ini` file on LittleFS filesystem
 - **Zero backend RAM usage** - labels never loaded into backend memory
 - Labels fetched on-demand by Web UI via REST API
 - Not exposed in `/api/v1/otgw/otmonitor` or `/api/v2/otgw/otmonitor` responses
@@ -20,7 +20,7 @@ New endpoints for managing custom labels for Dallas DS18B20/DS18S20/DS1822 tempe
 ### Get All Labels
 **Endpoint:** `GET /api/v1/sensors/labels`
 
-Retrieves all Dallas temperature sensor labels from `/dallas_labels.json` file.
+Retrieves all Dallas temperature sensor labels from `/dallas_labels.ini` file.
 
 **Response (with labels):**
 ```json
@@ -39,7 +39,7 @@ Retrieves all Dallas temperature sensor labels from `/dallas_labels.json` file.
 ### Update All Labels
 **Endpoint:** `POST /api/v1/sensors/labels`
 
-Writes all Dallas temperature sensor labels to `/dallas_labels.json` file. Replaces entire file contents.
+Writes all Dallas temperature sensor labels to `/dallas_labels.ini` file. Replaces entire file contents.
 
 **Request:**
 ```json
