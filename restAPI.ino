@@ -526,7 +526,7 @@ void sendOTmonitorV2()
     sendJsonOTmonMapEntry(F("numberofsensors"), DallasrealDeviceCount , F(""), now );
     for (int i = 0; i < DallasrealDeviceCount; i++) {
       const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
-      sendJsonOTmonMapEntry(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
+      sendJsonOTmonMapEntryDallasTemp(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
       // Also send the label as a separate entry
       char labelKey[32];
       snprintf_P(labelKey, sizeof(labelKey), PSTR("%s_label"), strDeviceAddress);
@@ -595,7 +595,7 @@ void sendOTmonitor()
     sendJsonOTmonObj(F("numberofsensors"), DallasrealDeviceCount , F(""), now );
     for (int i = 0; i < DallasrealDeviceCount; i++) {
         const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
-        sendJsonOTmonObj(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
+        sendJsonOTmonObjDallasTemp(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
         // Also send the label as a separate entry
         char labelKey[32];
         snprintf_P(labelKey, sizeof(labelKey), PSTR("%s_label"), strDeviceAddress);
