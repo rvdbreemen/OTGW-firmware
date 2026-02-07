@@ -193,10 +193,13 @@ struct
   int id;
   DeviceAddress addr;
   float tempC;
-  time_t lasttime;  
+  time_t lasttime;
 } DallasrealDevice[MAXDALLASDEVICES];
 // prototype to allow use in restAPI.ino
 char* getDallasAddress(DeviceAddress deviceAddress);
+
+// Dallas sensor labels are now stored in /dallas_labels.json file (not in RAM)
+// This saves 1024 bytes of persistent RAM
 
 
 // S0 Counter Settings and variables with global scope
@@ -221,6 +224,7 @@ bool      bDebugOTmsg = true;
 bool      bDebugRestAPI = false;
 bool      bDebugMQTT = false;
 bool      bDebugSensors = false;
+bool      bDebugSensorSimulation = false;
 
 //GPIO Output Settings
 bool      settingMyDEBUG = false;

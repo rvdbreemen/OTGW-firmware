@@ -63,12 +63,33 @@ var OTGraph = {
         }
     },
 
+    // Color palettes for Dallas temperature sensors (up to 16 sensors)
+    sensorColorPalettes: {
+        light: [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+            '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B195', '#C06C84',
+            '#6C5B7B', '#355C7D', '#2A9D8F', '#E76F51', '#F4A261',
+            '#E9C46A'
+        ],
+        dark: [
+            '#FF8787', '#5FE3D9', '#5BC8E8', '#FFB59A', '#ADE8D8',
+            '#FFE66D', '#D1A5E6', '#A0D6F2', '#FFD1B5', '#D688A4',
+            '#8677A1', '#4A7BA7', '#3EBFB0', '#FF8C71', '#FFB881',
+            '#FFD78A'
+        ]
+    },
+    
+    // Track discovered temperature sensors
+    detectedSensors: [],
+    sensorAddressToId: {}, // Map sensor hex address to internal ID
+
     // 5 separate grids/graphs
     // 0: Flame (Digital)
     // 1: DHW Mode (Digital)
     // 2: CH Mode (Digital)
     // 3: Modulation (Analog 0-100)
     // 4: Temperature (Analog)
+    // Base series configuration (sensors are added dynamically)
     seriesConfig: [
         { id: 'flame',   label: 'Flame',    gridIndex: 0, type: 'line', step: 'start', areaStyle: { opacity: 0.3 }, large: true, sampling: 'lttb' },
         { id: 'dhwMode', label: 'DHW Mode', gridIndex: 1, type: 'line', step: 'start', areaStyle: { opacity: 0.3 }, large: true, sampling: 'lttb' },
@@ -189,6 +210,142 @@ var OTGraph = {
         }, this.updateInterval);
         
         this.initialized = true;
+    },
+
+    // Detect and register Dallas temperature sensors from API data
+    detectAndRegisterSensors: function(apiData) {
+        if (!apiData || typeof apiData !== 'object') return;
+        
+        var newSensors = [];
+        var sensorCount = 0;
+        
+        // Check if numberofsensors field exists
+        if (apiData.numberofsensors && apiData.numberofsensors.value) {
+            sensorCount = parseInt(apiData.numberofsensors.value, 10);
+        }
+        
+        if (sensorCount === 0 || isNaN(sensorCount)) return;
+        
+        // Find all sensor entries (hex addresses starting with typical Dallas patterns)
+        for (var key in apiData) {
+            if (!apiData.hasOwnProperty(key)) continue;
+            
+            // Dallas sensor addresses are 16-char hex strings (8 bytes in hex)
+            // They typically start with 28 (DS18B20), 10 (DS18S20), or 22 (DS1822)
+            if (typeof key === 'string' && 
+                key.length === 16 && 
+                /^[0-9A-Fa-f]{16}$/.test(key) &&
+                (key.startsWith('28') || key.startsWith('10') || key.startsWith('22'))) {
+                
+                // Check if this sensor is already registered
+                if (!this.sensorAddressToId[key]) {
+                    var sensorIndex = this.detectedSensors.length;
+                    var sensorId = 'sensor_' + sensorIndex;
+                    
+                    // Try to get custom label from API data (key_label field)
+                    var labelKey = key + '_label';
+                    var sensorLabel = null;
+                    
+                    if (apiData[labelKey] && apiData[labelKey].value) {
+                        sensorLabel = apiData[labelKey].value;
+                    }
+                    
+                    // If no custom label, use hex address as fallback
+                    if (!sensorLabel || sensorLabel === key) {
+                        // User-facing labels are 1-based for readability (Sensor 1, 2, 3...)
+                        // Internal IDs remain 0-based for array indexing (sensor_0, sensor_1, sensor_2...)
+                        sensorLabel = 'Sensor ' + (sensorIndex + 1) + ' (' + key.substring(0, 8) + ')';
+                    }
+                    
+                    // Register the sensor
+                    this.sensorAddressToId[key] = sensorId;
+                    this.detectedSensors.push({
+                        address: key,
+                        id: sensorId,
+                        index: sensorIndex,
+                        label: sensorLabel
+                    });
+                    
+                    // Add to series config
+                    this.seriesConfig.push({
+                        id: sensorId,
+                        label: sensorLabel,
+                        gridIndex: 4, // Add to temperature grid
+                        type: 'line',
+                        step: false,
+                        large: true,
+                        sampling: 'lttb'
+                    });
+                    
+                    // Initialize data arrays
+                    this.data[sensorId] = [];
+                    this.pendingData[sensorId] = [];
+                    
+                    // Add color to palettes
+                    var colorIndex = sensorIndex % 16; // Cycle through 16 colors
+                    this.palettes.light[sensorId] = this.sensorColorPalettes.light[colorIndex];
+                    this.palettes.dark[sensorId] = this.sensorColorPalettes.dark[colorIndex];
+                    
+                    newSensors.push(sensorLabel);
+                    
+                    console.log('Graph: Registered temperature sensor:', sensorLabel, 'Address:', key);
+                } else {
+                    // Sensor already registered, but check if label has changed
+                    var labelKey = key + '_label';
+                    if (apiData[labelKey] && apiData[labelKey].value) {
+                        var newLabel = apiData[labelKey].value;
+                        var sensorId = this.sensorAddressToId[key];
+                        
+                        // Find the sensor in detectedSensors and update label
+                        for (var i = 0; i < this.detectedSensors.length; i++) {
+                            if (this.detectedSensors[i].address === key) {
+                                if (this.detectedSensors[i].label !== newLabel) {
+                                    this.detectedSensors[i].label = newLabel;
+                                    
+                                    // Update seriesConfig label
+                                    for (var j = 0; j < this.seriesConfig.length; j++) {
+                                        if (this.seriesConfig[j].id === sensorId) {
+                                            this.seriesConfig[j].label = newLabel;
+                                            console.log('Graph: Updated sensor label:', newLabel, 'Address:', key);
+                                            // Trigger chart update
+                                            this.updateOption();
+                                            break;
+                                        }
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // If new sensors were added, update the chart
+        if (newSensors.length > 0) {
+            console.log('Graph: Added', newSensors.length, 'new temperature sensor(s) to graph');
+            this.updateOption();
+        }
+    },
+
+    // Process sensor data from API response
+    processSensorData: function(apiData, timestamp) {
+        if (!apiData || typeof apiData !== 'object') return;
+        
+        for (var key in apiData) {
+            if (!apiData.hasOwnProperty(key)) continue;
+            
+            // Check if this is a registered sensor
+            var sensorId = this.sensorAddressToId[key];
+            if (sensorId && apiData[key] && typeof apiData[key].value === 'number') {
+                var temp = apiData[key].value;
+                
+                // Temperature bounds check (reasonable range -50°C to 150°C)
+                if (temp >= -50 && temp <= 150) {
+                    this.pushData(sensorId, timestamp, temp);
+                }
+            }
+        }
     },
 
     setTimeWindow: function(minutes) {
@@ -432,8 +589,11 @@ var OTGraph = {
                 { text: 'Temperatures', left: '1%', top: '64%', textStyle: { fontSize: 12, fontWeight: 'bold' } }
             ],
             // Legend specifically for temperature panel (shows all temp series with colors)
+            // Dynamically build legend data to include Dallas sensors
             legend: {
-                data: ['Control SetPoint', 'Boiler Temp', 'Return Temp', 'Room SetPoint', 'Room Temp', 'Outside Temp'],
+                data: this.seriesConfig
+                    .filter(function(c) { return c.gridIndex === 4; }) // Only temperature grid series
+                    .map(function(c) { return c.label; }),
                 top: '62%',
                 left: '15%',
                 orient: 'horizontal',
