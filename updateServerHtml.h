@@ -1211,9 +1211,37 @@ static const char UpdateServerSuccess[] PROGMEM =
                 .then(function(d) {
                     var s = d.status || (d.health && d.health.status);
                     if (s === 'UP') {
-                        statusEl.textContent = "Device is UP! Redirecting...";
+                        statusEl.textContent = "Device is UP! Restoring labels...";
                         statusEl.style.color = "green";
-                        window.location.href = "/";
+                        
+                        // Wait 3 seconds, then restore Dallas labels if they exist
+                        setTimeout(function() {
+                            var labels = window.opener && window.opener.dallasLabelsCache;
+                            if (labels && typeof labels === 'object' && Object.keys(labels).length > 0) {
+                                statusEl.textContent = "Restoring Dallas labels...";
+                                fetch('/api/v1/sensors/labels', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(labels)
+                                })
+                                .then(function(res) {
+                                    if (res.ok) {
+                                        statusEl.textContent = "Labels restored! Redirecting...";
+                                    } else {
+                                        statusEl.textContent = "Label restore failed. Redirecting...";
+                                    }
+                                    setTimeout(function() { window.location.href = "/"; }, 1000);
+                                })
+                                .catch(function(err) {
+                                    console.error('Label restore error:', err);
+                                    statusEl.textContent = "Label restore failed. Redirecting...";
+                                    setTimeout(function() { window.location.href = "/"; }, 1000);
+                                });
+                            } else {
+                                statusEl.textContent = "No labels to restore. Redirecting...";
+                                setTimeout(function() { window.location.href = "/"; }, 1000);
+                            }
+                        }, 3000);
                     }
                 })
                 .catch(function(e) {
