@@ -2,10 +2,22 @@ node_modules/*
 package-lock.json
 *.log
 *.bin
+*.elf
 .vscode/*
 .DS_Store
 **/.DS_Store
 Arduino/**
+arduino/**
+Arduino 2/**
 libraries/**
 staging/**
+build/**
 arduino-cli.yaml
+_codeql_detected_source_root
+__pycache__/
+otgwmcu/**
+otgwmcu
+otmonitor-6.6/**
+otmonitor-6.6
+evaluation-report.json
+

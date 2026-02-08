@@ -1,25 +1,60 @@
 name: release-workflow
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
+  release:
+    types:
+      - published
 
 jobs:
-  build:
+  verify-tag:
     runs-on: ubuntu-latest
+    outputs:
+      tag_exists: ${{ steps.check_tag.outputs.tag_exists }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify release tag exists
+        id: check_tag
+        run: |
+          git fetch --tags
+          if git rev-parse --verify "refs/tags/${{ github.event.release.tag_name }}" >/dev/null 2>&1; then
+            echo "tag_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "tag_exists=false" >> $GITHUB_OUTPUT
+            echo "Release tag ${{ github.event.release.tag_name }} is missing; skipping release workflow."
+          fi
+        shell: bash
+
+  publish:
+    needs: verify-tag
+    if: needs.verify-tag.outputs.tag_exists == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+
       - name: Setup environment
         uses: ./.github/actions/setup
-      - name: Build
+
+      - name: Build release artifacts
         uses: ./.github/actions/build
-      - name: Release
+
+      - name: Publish release assets
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
         with:
+          tag_name: ${{ github.event.release.tag_name }}
+          name: ${{ github.event.release.name }}
+          body: ${{ github.event.release.body }}
+          draft: false
+          prerelease: ${{ github.event.release.prerelease }}
           files: |
             build/*.elf
             build/*.bin
+            build/*.littlefs.bin
             LICENSE

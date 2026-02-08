@@ -1,0 +1,915 @@
+/* 
+***************************************************************************  
+**  Program  : helperStuff
+**  Version  : v1.0.0
+**
+**  Copyright (c) 2021-2026 Robert van den Breemen
+**     based on Framework ESP8266 from Willem Aandewiel
+**
+**  TERMS OF USE: MIT License. See bottom of file.                                                            
+***************************************************************************      
+*/
+
+#include <Arduino.h>  // for type definitions
+
+template <typename T> void PROGMEM_readAnything (const T * sce, T& dest)
+{
+  memcpy_P (&dest, sce, sizeof (T));
+}
+
+template <typename T> T PROGMEM_getAnything (const T * sce)
+{
+  static T temp;
+  memcpy_P (&temp, sce, sizeof (T));
+  return temp;
+}
+
+//===========================================================================================
+// Get High Resolution Timestamp for Logs
+//===========================================================================================
+const char* getOTLogTimestamp() {
+  static char timestamp[16]; // "HH:MM:SS.mmmmmm"
+  timeval now;
+  gettimeofday(&now, nullptr);
+  // Default to UTC if not initialized, but typically settingNTPtimezone is valid
+  // Recreating the timezone object is what _debugBOL does, so we follow that pattern
+  // assuming timezoneManager is available.
+  TimeZone myTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  if (myTz.isError()) {
+    // Fallback if generic name failed
+    myTz = TimeZone::forTimeOffset(TimeOffset::forMinutes(0)); 
+  }
+  
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now.tv_sec, myTz);
+
+  // 6 digit subsecond resolution from microseconds (0..999999)
+  const unsigned long subSeconds = (unsigned long)(now.tv_usec);
+
+  snprintf_P(timestamp, sizeof(timestamp), PSTR("%02d:%02d:%02d.%06lu"),
+           myTime.hour(), myTime.minute(), myTime.second(), subSeconds);
+
+  return timestamp;
+}
+
+//===========================================================================================
+// Note: This function returns a pointer to a substring of the original string.
+// If the given string was allocated dynamically, the caller must not overwrite
+// that pointer with the returned value, since the original pointer must be
+// deallocated using the same allocator with which it was allocated.  The return
+// value must NOT be deallocated using free() etc.
+char *trimwhitespace(char *str)
+{
+  char *end;
+
+  // Trim leading space
+  while(isspace((unsigned char)*str)) str++;
+
+  if(*str == 0)  // All spaces?
+    return str;
+
+  // Trim trailing space
+  end = str + strlen(str) - 1;
+  while(end > str && isspace((unsigned char)*end)) end--;
+
+  // Write new null terminator character
+  end[1] = '\0';
+
+  return str;
+}
+
+
+//===========================================================================================
+uint8_t splitString(char* inStrng, char delimiter, char* wOut[], uint8_t maxWords) 
+{
+    uint8_t wordCount = 0;
+    char* next = trimwhitespace(inStrng);
+    
+    while(next && *next && wordCount < maxWords) 
+    {
+      char* found = strchr(next, delimiter);
+      if (found) {
+        *found = '\0'; // terminate token
+        wOut[wordCount] = trimwhitespace(next);
+        next = found + 1;
+      } else {
+        // Last word
+        wOut[wordCount] = trimwhitespace(next);
+        next = NULL;
+      }
+      wordCount++;
+    }
+    // zero rest of the words
+    for(int i=wordCount; i< maxWords; i++)
+    {
+      wOut[i] = NULL;
+    }
+
+    return wordCount;
+    
+} // splitString()
+
+
+//===========================================================================================
+boolean isValidIP(IPAddress ip)
+{
+ /* Works as follows:
+   *  example: 
+   *  127.0.0.1 
+   *   1 => 127||0||0||1 = 128>0 = true 
+   *   2 => !(false || false) = true
+   *   3 => !(false || false || false || false ) = true
+   *   4 => !(true && true && true && true) = false
+   *   5 => !(false) = true
+   *   true && true & true && false && true = false ==> correct, this is an invalid addres
+   *   
+   *   0.0.0.0
+   *   1 => 0||0||0||0 = 0>0 = false 
+   *   2 => !(true || true) = false
+   *   3 => !(false || false || false || false) = true
+   *   4 => !(true && true && true && tfalse) = true
+   *   5 => !(false) = true
+   *   false && false && true && true && true = false ==> correct, this is an invalid addres
+   *   
+   *   192.168.0.1 
+   *   1 => 192||168||0||1 =233>0 = true 
+   *   2 => !(false || false) = true
+   *   3 +> !(false || false || false || false) = true
+   *   4 => !(false && false && true && true) = true
+   *   5 => !(false) = true
+   *   true & true & true && true && true = true ==> correct, this is a valid address
+   *   
+   *   255.255.255.255
+   *   1 => 255||255||255||255 =255>0 = true 
+   *   2 => !(false || false ) = true
+   *   3 +> !(true || true || true || true) = false
+   *   4 => !(false && false && false && false) = true
+   *   5 => !(true) = false
+   *   true && true && false && true && false = false ==> correct, this is an invalid address
+   *   
+   *   0.123.12.1       => true && false && true && true && true = false  ==> correct, this is an invalid address 
+   *   10.0.0.0         => true && false && true && true && true = false  ==> correct, this is an invalid address 
+   *   10.255.0.1       => true && true && false && true && true = false  ==> correct, this is an invalid address 
+   *   150.150.255.150  => true && true && false && true && true = false  ==> correct, this is an invalid address 
+   *   
+   *   123.21.1.99      => true && true && true && true && true = true    ==> correct, this is annvalid address 
+   *   1.1.1.1          => true && true && true && true && true = true    ==> correct, this is annvalid address 
+   *   
+   *   Some references on valid ip addresses: 
+   *   - https://www.quora.com/How-do-you-identify-an-invalid-IP-address
+   *   
+   */
+  boolean _isValidIP = false;
+  _isValidIP = ((ip[0] || ip[1] || ip[2] || ip[3])>0);                             // if any bits are set, then it is not 0.0.0.0
+  _isValidIP &= !((ip[0]==0) || (ip[3]==0));                                       // if either the first or last is a 0, then it is invalid
+  _isValidIP &= !((ip[0]==255) || (ip[1]==255) || (ip[2]==255) || (ip[3]==255)) ;  // if any of the octets is 255, then it is invalid  
+  _isValidIP &= !(ip[0]==127 && ip[1]==0 && ip[2]==0 && ip[3]==1);                 // if not 127.0.0.0 then it might be valid
+  _isValidIP &= !(ip[0]>=224);                                                     // if ip[0] >=224 then reserved space  
+  
+  // DebugTf( PSTR("%d.%d.%d.%d"), ip[0], ip[1], ip[2], ip[3]);
+  // if (_isValidIP) 
+  //   Debugln(F(" = Valid IP")); 
+  // else 
+  //   Debugln(F(" = Invalid IP!"));
+    
+  return _isValidIP;
+  
+} //  isValidIP()
+
+
+uint32_t updateRebootCount()
+{
+  //simple function to keep track of the number of reboots 
+  //return: number of reboots (if it goes as planned)
+  uint32_t _reboot = 0;
+  #define REBOOTCNT_FILE "/reboot_count.txt"
+  if (LittleFS.begin()) {
+    //start with opening the file
+    File fh = LittleFS.open(REBOOTCNT_FILE, "r");
+    if (fh) {
+      //read from file
+      if (fh.available()){
+        //read the first line 
+        _reboot  = fh.readStringUntil('\n').toInt();
+      }
+    }
+    fh.close();
+    //increment reboot counter
+    _reboot++;
+    //write back the reboot counter
+    fh = LittleFS.open(REBOOTCNT_FILE, "w");
+    if (fh) {
+      //write to _reboot to file
+      fh.println(_reboot);
+    }
+    fh.close();
+  }
+  DebugTf(PSTR("Reboot count = [%d]\r\n"), rebootCount);
+  return _reboot;
+}
+
+// Maximum length for filesystem probe paths
+#define FS_PROBE_PATH_MAX 32
+
+bool updateLittleFSStatus(const char *probePath)
+{
+  // Default probe path stored in PROGMEM
+  static const char defaultPath[] PROGMEM = "/.health";
+  bool useDefault = (probePath == nullptr);
+  
+  LittleFSmounted = LittleFS.info(LittleFSinfo);
+  if (!LittleFSmounted) {
+    return false;
+  }
+  
+  // Handle PROGMEM string for default path or use provided path
+  char pathBuffer[FS_PROBE_PATH_MAX];
+  const char *path;
+  if (useDefault) {
+    strncpy_P(pathBuffer, defaultPath, sizeof(pathBuffer) - 1);
+    pathBuffer[sizeof(pathBuffer) - 1] = '\0';
+    path = pathBuffer;
+  } else {
+    path = probePath;
+  }
+  
+  File probe = LittleFS.open(path, "w");
+  if (probe) {
+    size_t written = probe.println(F("ok"));
+    if (written == 0) {
+      // Write failed (e.g. disk full or filesystem error)
+      LittleFSmounted = false;
+    } else {
+      probe.flush();
+    }
+    probe.close();
+  } else {
+    LittleFSmounted = false;
+  }
+  return LittleFSmounted;
+}
+
+// PROGMEM overload for updateLittleFSStatus
+bool updateLittleFSStatus(const __FlashStringHelper *probePath)
+{
+  char pathBuffer[FS_PROBE_PATH_MAX];
+  PGM_P p = reinterpret_cast<PGM_P>(probePath);
+  strncpy_P(pathBuffer, p, sizeof(pathBuffer) - 1);
+  pathBuffer[sizeof(pathBuffer) - 1] = '\0';
+  return updateLittleFSStatus(pathBuffer);
+}
+
+bool updateRebootLog(String text)
+{
+  #define REBOOTLOG_FILE "/reboot_log.txt"
+  #define TEMPLOG_FILE "/reboot_log.t.txt"
+  #define LOG_LINES 20
+  #define LOG_LINE_LENGTH 140
+
+  char log_line[LOG_LINE_LENGTH] = {0};
+  char log_line_regs[LOG_LINE_LENGTH] = {0};
+  char log_line_excpt[LOG_LINE_LENGTH] = {0};
+  uint32_t errorCode = -1;
+
+  //waitforNTPsync();
+  loopNTP(); // make sure time is up to date (improved error logging)
+
+  struct	rst_info	*rtc_info	=	system_get_rst_info();
+  
+  if (rtc_info == NULL) {
+    DebugTf(PSTR("no reset info available:	%x\r\n"),	errorCode);
+  } else {
+
+    DebugTf(PSTR("reset reason:	%x\r\n"),	rtc_info->reason);
+    errorCode = rtc_info->reason;
+    // Rst cause No.    Cause                     GPIO state
+    //--------------    -------------------       -------------
+    // 0                Power reboot              Changed
+    // 1                Hardware WDT reset        Changed
+    // 2                Fatal exception           Unchanged
+    // 3                Software watchdog reset   Unchanged
+    // 4                Software reset            Unchanged
+    // 5                Deep-sleep                Changed
+    // 6                Hardware reset            Changed
+
+    if	(rtc_info->reason	==	REASON_WDT_RST	|| rtc_info->reason	==	REASON_EXCEPTION_RST	|| rtc_info->reason	==	REASON_SOFT_WDT_RST)	{
+
+      //The	address	of	the	last	crash	is	printed,	which	is	used	to	debug	garbled	output
+      snprintf_P(log_line_regs, LOG_LINE_LENGTH, PSTR("ESP register contents: epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x, depc=0x%08x\r\n"), rtc_info->epc1, rtc_info->epc2, rtc_info->epc3, rtc_info->excvaddr, rtc_info->depc);
+      Debugf(log_line_regs);
+    }
+
+    if (rtc_info->reason == REASON_EXT_SYS_RST) {
+      //external reset, so try to fetch the reset reason from the tiny watchdog and print that
+      snprintf_P(log_line_regs, LOG_LINE_LENGTH, PSTR("External Reason: External Watchdog reason: %s\r\n"), CSTR(initWatchDog()));
+      Debugf(log_line_regs);      
+    }
+
+    if	(rtc_info->reason	==	REASON_EXCEPTION_RST)	{
+
+      // Fatal exception No.    Description             Possible Causes
+      // -------------------    --------------          -------------------
+      //  0                     Invalid command         1. Damaged BIN binaries
+      //                                                2. Wild pointers
+      //
+      //  6                     Division by zero        Division by zero
+      //
+      //  9                     Unaligned read/write    1. Unaligned read/write Cache addresses
+      //                        operation addresses     2. Wild pointers
+      //
+      //  28/29                 Access to invalid       1. Access to Cache after it is turned off
+      //                        address                 2. Wild pointers
+      //
+      // more reasons can be found in the "corebits.h" file of the Extensa SDK
+
+      switch(rtc_info->exccause) {
+        case 0:   snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Invalid command (0)")); break;
+        case 6:   snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Division by zero (6)")); break;
+        case 9:   snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Unaligned read/write operation addresses (9)")); break;
+        case 28:  snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Access to invalid address (28)")); break;
+        case 29:  snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Access to invalid address (29)")); break;
+        default:  snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Other (not specified) (%d)"), rtc_info->exccause); break;
+      }
+
+      Debugf(PSTR("Fatal exception (%d): %s\r\n"),	rtc_info->exccause, log_line_excpt);
+    }
+  }
+
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
+  snprintf_P(log_line, LOG_LINE_LENGTH, PSTR("%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n"), myTime.year(),  myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second(), CSTR(text), errorCode, log_line_excpt);
+
+  if (LittleFS.begin()) {
+    //start with opening the file
+    File outfh = LittleFS.open(TEMPLOG_FILE, "w");
+
+    if (outfh) {
+      //write to _reboot to file
+      outfh.print(log_line);
+
+      if (strlen(log_line_regs)>2) {
+        outfh.print(log_line_regs);
+      }
+
+      File infh = LittleFS.open(REBOOTLOG_FILE, "r");
+      
+      int i = 1;
+      if (infh) {
+        //read from file
+        while (infh.available() && (i < LOG_LINES)){
+          //read the first line 
+          String line = infh.readStringUntil('\n');
+          if (line.length() > 3) { //TODO: check is no longer needed?
+            outfh.print(line);
+          }
+          i++;
+        }
+        infh.close();
+      }
+      outfh.close();
+      
+      if (LittleFS.exists(REBOOTLOG_FILE)) {
+        LittleFS.remove(REBOOTLOG_FILE);
+      }
+      
+      LittleFS.rename(TEMPLOG_FILE, REBOOTLOG_FILE);
+
+      return true; // succesfully logged
+    }
+  }
+  
+  return false; // logging unsuccesfull
+}
+
+
+void doRestart(const char* str) {
+  DebugTln(str);
+  delay(2000);  // Enough time for messages to be sent.
+  ESP.restart();
+  delay(5000);  // Enough time to ensure we don't return.
+}
+
+String upTime() 
+{
+  char    calcUptime[20];
+
+  snprintf_P(calcUptime, sizeof(calcUptime), PSTR("%d(d)-%02d:%02d(H:m)")
+                                          , int((upTimeSeconds / (60 * 60 * 24)) % 365)
+                                          , int((upTimeSeconds / (60 * 60)) % 24)
+                                          , int((upTimeSeconds / (60)) % 60));
+
+  return calcUptime;
+
+} // upTime()
+
+bool prefix(const char *pre, const char *str)
+{
+    return strncmp(pre, str, strlen(pre)) == 0;
+}
+
+bool yearChanged(){
+  static int16_t lastyear = -1;
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
+  int8_t thisyear = myTime.year();
+  bool _ret = (lastyear != thisyear); //year changed
+  if (_ret) {
+    //year changed
+    lastyear = thisyear;
+  }
+  return _ret;
+}
+
+bool dayChanged(){
+  static int8_t lastday = -1;
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
+  int8_t thisday = myTime.day();
+  bool _ret = (lastday != thisday);
+  if (_ret) {
+    //day changed
+    lastday = thisday;
+  }
+  return _ret;
+}
+
+bool hourChanged(){
+  static int8_t lasthour = -1;
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
+  int8_t thishour = myTime.hour();
+  bool _ret = (lasthour != thishour);
+  if (_ret){
+    //hour changed
+    lasthour = thishour;
+  }
+  return _ret;
+}
+
+bool minuteChanged(){
+  static int8_t lastminute = -1;
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
+  int8_t thisminute = myTime.minute();
+  bool _ret = (lastminute != thisminute);
+  if (_ret){
+    //minute changed
+    lastminute = thisminute;
+  }
+  return _ret;
+}
+
+/*
+  check if the version githash is in the littlefs as version.hash
+
+*/
+bool checklittlefshash(){
+  #define GITHASH_FILE "/version.hash"
+  static const char fsMismatchMsg[] PROGMEM = "Flash your littleFS with matching version!";
+  String _githash="";
+  if (LittleFS.begin()) {
+    //start with opening the file
+    File fh = LittleFS.open(GITHASH_FILE, "r");
+    if (fh) {
+      //read from file
+      if (fh.available()){
+        //read the first line 
+         _githash = fh.readStringUntil('\n');
+         _githash.trim(); // Remove CR/LF and any extra whitespace
+      }
+      fh.close();
+    }
+    DebugTf(PSTR("Check githash = [%s]\r\n"), CSTR(_githash));
+    DebugTf(PSTR("FS githash = [%s] | FW githash = [%s]\r\n"), CSTR(_githash), _VERSION_GITHASH);
+    bool match = (strcasecmp(CSTR(_githash), _VERSION_GITHASH)==0);
+    if (!match) {
+      DebugTf(PSTR("WARNING: Firmware version (%s) does not match filesystem version (%s)\r\n"), 
+              _VERSION_GITHASH, CSTR(_githash));
+      DebugTln(F("This may cause compatibility issues. Flash matching filesystem version."));
+      strncpy_P(sMessage, fsMismatchMsg, sizeof(sMessage) - 1);
+      sMessage[sizeof(sMessage) - 1] = '\0';
+    } else if (strcmp_P(sMessage, fsMismatchMsg) == 0) {
+      sMessage[0] = '\0';
+    }
+    return match;
+  }
+  return false;
+}
+
+/*
+  Get filesystem version hash from /version.hash file
+  Returns empty string if file not found or error
+*/
+String getFilesystemHash(){
+  #define GITHASH_FILE "/version.hash"
+  static String _githash = ""; // Cache the hash
+  
+  // Return cached value if available
+  if (_githash.length() > 0) return _githash;
+
+  if (LittleFS.begin()) {
+    if (LittleFS.exists(GITHASH_FILE)) {
+      File fh = LittleFS.open(GITHASH_FILE, "r");
+      if (fh) {
+        if (fh.available()){
+          _githash = fh.readStringUntil('\n');
+          _githash.trim(); // Remove any whitespace/newlines
+        }
+        fh.close();
+      }
+    }
+  }
+  return _githash;
+}
+
+
+/*
+** Does not generate hex character constants.
+** Always generates triple-digit octal constants.
+** Always generates escapes in preference to octal.
+** Escape question mark to ensure no trigraphs are generated by repetitive use.
+** Handling of 0x80..0xFF is locale-dependent (might be octal, might be literal).
+*/
+
+void chr_cstrlit(unsigned char u, char *buffer, size_t buflen)
+{
+    if (buflen < 2)
+        *buffer = '\0';
+    else if (isprint(u) && u != '\'' && u != '\"' && u != '\\' && u != '\?')
+        snprintf_P(buffer, buflen, PSTR("%c"), u);
+    else if (buflen < 3)
+        *buffer = '\0';
+    else
+    {
+        switch (u)
+        {
+        case '\a':  strlcpy(buffer, "\\a", buflen); break;
+        case '\b':  strlcpy(buffer, "\\b", buflen); break;
+        case '\f':  strlcpy(buffer, "\\f", buflen); break;
+        case '\n':  strlcpy(buffer, "\\n", buflen); break;
+        case '\r':  strlcpy(buffer, "\\r", buflen); break;
+        case '\t':  strlcpy(buffer, "\\t", buflen); break;
+        case '\v':  strlcpy(buffer, "\\v", buflen); break;
+        case '\\':  strlcpy(buffer, "\\\\", buflen); break;
+        case '\'':  strlcpy(buffer, "\\'", buflen); break;
+        case '\"':  strlcpy(buffer, "\\\"", buflen); break;
+        case '\?':  strlcpy(buffer, "\\\?", buflen); break;
+        default:
+            if (buflen < 5)
+                *buffer = '\0';
+            else
+                snprintf_P(buffer, buflen, PSTR("\\%03o"), u);
+            break;
+        }
+    }
+}
+
+void str_cstrlit(const char *str, char *buffer, size_t buflen)
+{
+    unsigned char u;
+    size_t len;
+
+    while ((u = (unsigned char)*str++) != '\0')
+    {
+        chr_cstrlit(u, buffer, buflen);
+        if ((len = strlen(buffer)) == 0)
+            return;
+        buffer += len;
+        buflen -= len;
+    }
+    *buffer = '\0';
+}
+
+String strHTTPmethod(HTTPMethod method)
+{
+  switch (method)
+  {
+    case HTTPMethod::HTTP_GET:
+      return "GET";
+    case HTTPMethod::HTTP_POST:
+      return "POST";
+    case HTTPMethod::HTTP_PUT:
+      return "PUT";
+    case HTTPMethod::HTTP_PATCH:
+      return "PATCH";
+    case HTTPMethod::HTTP_DELETE:
+      return "DELETE";
+    case HTTPMethod::HTTP_OPTIONS:
+      return "OPTIONS";
+    case HTTPMethod::HTTP_HEAD:
+      return "HEAD";
+    default:
+      return "";
+  }
+}
+
+/*
+ * Written by Ahmad Shamshiri
+  * with lots of research, this sources was used:
+ * https://support.randomsolutions.nl/827069-Best-dBm-Values-for-Wifi 
+ * This is approximate percentage calculation of RSSI
+ * WiFi Signal Strength Calculation
+ * Written Aug 08, 2019 at 21:45 in Ajax, Ontario, Canada
+ */
+
+int dBmtoPercentage(int dBm)
+{
+  const int RSSI_MAX =-50;// define maximum strength of signal in dBm
+  const int RSSI_MIN =-100;// define minimum strength of signal in dBm
+  int quality;
+    if(dBm <= RSSI_MIN){
+      quality = 0;
+    } else if(dBm >= RSSI_MAX) {  
+      quality = 100;
+    } else {
+      quality = 2 * (dBm + 100);
+    }
+
+  return quality;
+}//dBmtoPercentage 
+
+/*
+  RSSI signal quality to percentage quad function
+  https://www.intuitibits.com/2016/03/23/dbm-to-percent-conversion/#comment-9
+  https://gist.github.com/senseisimple/002cdba344de92748695a371cef0176a
+*/
+
+int signal_quality_perc_quad(int rssi) {
+  const int perfect_rssi = -50;
+  const int worst_rssi = -85;
+  int nominal_rssi = perfect_rssi - worst_rssi;
+  int signal_quality = ceil(100 * nominal_rssi * nominal_rssi - (perfect_rssi - rssi) * (15 * nominal_rssi + 62 * (perfect_rssi - rssi))) / (nominal_rssi * nominal_rssi);
+  if (signal_quality > 100) {
+      signal_quality = 100;
+  } else if (signal_quality < 1) {
+      signal_quality = 0;
+  }
+  return signal_quality;
+}
+
+
+
+/*
+  dBm to Quality statement TL:DR 
+  --> https://support.randomsolutions.nl/827069-Best-dBm-Values-for-Wifi
+  --> https://www.metageek.com/training/resources/wifi-signal-strength-basics/
+  TL;DR strings on quality is based on this
+*/
+String dBmtoQuality(int dBm)
+{
+  String _ret="Amazing";
+  if (dBm<=-67) { _ret = "Very good";}
+  if (dBm<=-70) { _ret = "Okay";}
+  if (dBm<=-80) { _ret = "Not good enough";}
+  if (dBm<=-90) { _ret = "Unusable";}
+  //if (dBm<=-30) { _ret = "Amazing";}
+
+  return (_ret);
+}//dBmtoPercentage 
+
+// Replace all occurrences of token with replacement, guarding buffer size
+bool replaceAll(char *buffer, const size_t bufSize, const char *token, const char *replacement) {
+  if (!buffer || !token || !replacement) return false;
+  const size_t tokenLen = strlen(token);
+  const size_t replLen = strlen(replacement);
+  if (tokenLen == 0) return true;
+
+  char *pos = strstr(buffer, token);
+  while (pos) {
+    const size_t tailLen = strlen(pos + tokenLen);
+    const size_t required = (pos - buffer) + replLen + tailLen + 1;
+    if (required > bufSize) return false;
+    memmove(pos + replLen, pos + tokenLen, tailLen + 1);
+    memcpy(pos, replacement, replLen);
+    pos = strstr(pos + replLen, token);
+  }
+  return true;
+}
+
+//===========================================================================================
+// Heap Monitoring and Backpressure Management
+//===========================================================================================
+
+// Heap thresholds for different severity levels
+// Rationale: ESP8266 typically has ~40KB RAM after core libraries
+// - CRITICAL (3KB): Minimum to prevent crash, emergency only
+// - WARNING (5KB): Below this, aggressive throttling needed
+// - LOW (8KB): Below this, start reducing message frequency
+// - HEALTHY (>8KB): Sufficient for normal operation with WebSocket server (~4KB baseline)
+#define HEAP_CRITICAL_THRESHOLD   3072   // Critical: Stop all non-essential operations
+#define HEAP_WARNING_THRESHOLD    5120   // Warning: Start throttling messages
+#define HEAP_LOW_THRESHOLD        8192   // Low: Begin reducing message frequency
+
+// Throttling state
+static uint32_t lastWebSocketSendMs = 0;
+static uint32_t lastMQTTPublishMs = 0;
+static uint32_t lastWebSocketWarningMs = 0;
+static uint32_t lastMQTTWarningMs = 0;
+static uint32_t webSocketDropCount = 0;
+static uint32_t mqttDropCount = 0;
+
+// Minimum intervals when heap is under pressure (milliseconds)
+#define WEBSOCKET_THROTTLE_MS_WARNING  50   // 50ms = max 20 msg/sec when heap is low
+#define WEBSOCKET_THROTTLE_MS_CRITICAL 200  // 200ms = max 5 msg/sec when heap is critical
+#define MQTT_THROTTLE_MS_WARNING       100  // 100ms = max 10 msg/sec when heap is low
+#define MQTT_THROTTLE_MS_CRITICAL      500  // 500ms = max 2 msg/sec when heap is critical
+
+// Diagnostic logging intervals (milliseconds)
+#define WARNING_LOG_INTERVAL_MS        10000  // Log warnings every 10 seconds
+#define EMERGENCY_RECOVERY_INTERVAL_MS 30000  // Attempt recovery max once per 30 seconds
+
+// HeapHealthLevel enum defined in OTGW-firmware.h
+
+//===========================================================================================
+// Check current heap health level
+//===========================================================================================
+HeapHealthLevel getHeapHealth() {
+  uint32_t freeHeap = ESP.getFreeHeap();
+  
+  if (freeHeap < HEAP_CRITICAL_THRESHOLD) {
+    return HEAP_CRITICAL;
+  } else if (freeHeap < HEAP_WARNING_THRESHOLD) {
+    return HEAP_WARNING;
+  } else if (freeHeap < HEAP_LOW_THRESHOLD) {
+    return HEAP_LOW;
+  }
+  return HEAP_HEALTHY;
+}
+
+//===========================================================================================
+// Check if we can send a WebSocket message (with backpressure)
+//===========================================================================================
+bool canSendWebSocket() {
+  HeapHealthLevel heapLevel = getHeapHealth();
+  uint32_t now = millis();
+  
+  // Critical: block WebSocket messages completely
+  if (heapLevel == HEAP_CRITICAL) {
+    webSocketDropCount++;
+    // Log warning periodically (use unsigned arithmetic for rollover safety)
+    if ((uint32_t)(now - lastWebSocketWarningMs) > WARNING_LOG_INTERVAL_MS) {
+      DebugTf(PSTR("HEAP-CRITICAL: Blocking WebSocket (dropped %u msgs, heap=%u bytes)\r\n"), 
+              webSocketDropCount, ESP.getFreeHeap());
+      lastWebSocketWarningMs = now;
+    }
+    return false;
+  }
+  
+  // Warning: aggressive throttling
+  if (heapLevel == HEAP_WARNING) {
+    // Use unsigned arithmetic to handle millis() rollover correctly
+    if ((uint32_t)(now - lastWebSocketSendMs) < WEBSOCKET_THROTTLE_MS_CRITICAL) {
+      webSocketDropCount++;
+      return false;
+    }
+  }
+  
+  // Low: moderate throttling
+  if (heapLevel == HEAP_LOW) {
+    // Use unsigned arithmetic to handle millis() rollover correctly
+    if ((uint32_t)(now - lastWebSocketSendMs) < WEBSOCKET_THROTTLE_MS_WARNING) {
+      webSocketDropCount++;
+      return false;
+    }
+  }
+  
+  // Update last send time
+  lastWebSocketSendMs = now;
+  
+  // Log warning if we're dropping messages (use unsigned arithmetic for rollover safety)
+  if (webSocketDropCount > 0 && (uint32_t)(now - lastWebSocketWarningMs) > WARNING_LOG_INTERVAL_MS) {
+    DebugTf(PSTR("WebSocket throttled: dropped %u msgs (heap=%u bytes)\r\n"), 
+            webSocketDropCount, ESP.getFreeHeap());
+    lastWebSocketWarningMs = now;
+    webSocketDropCount = 0; // reset counter after reporting
+  }
+  
+  return true;
+}
+
+//===========================================================================================
+// Check if we can publish an MQTT message (with backpressure)
+//===========================================================================================
+bool canPublishMQTT() {
+  HeapHealthLevel heapLevel = getHeapHealth();
+  uint32_t now = millis();
+  
+  // Critical: block MQTT messages completely
+  if (heapLevel == HEAP_CRITICAL) {
+    mqttDropCount++;
+    // Log warning periodically (use unsigned arithmetic for rollover safety)
+    if ((uint32_t)(now - lastMQTTWarningMs) > WARNING_LOG_INTERVAL_MS) {
+      DebugTf(PSTR("HEAP-CRITICAL: Blocking MQTT (dropped %u msgs, heap=%u bytes)\r\n"), 
+              mqttDropCount, ESP.getFreeHeap());
+      lastMQTTWarningMs = now;
+    }
+    return false;
+  }
+  
+  // Warning: aggressive throttling
+  if (heapLevel == HEAP_WARNING) {
+    // Use unsigned arithmetic to handle millis() rollover correctly
+    if ((uint32_t)(now - lastMQTTPublishMs) < MQTT_THROTTLE_MS_CRITICAL) {
+      mqttDropCount++;
+      return false;
+    }
+  }
+  
+  // Low: moderate throttling
+  if (heapLevel == HEAP_LOW) {
+    // Use unsigned arithmetic to handle millis() rollover correctly
+    if ((uint32_t)(now - lastMQTTPublishMs) < MQTT_THROTTLE_MS_WARNING) {
+      mqttDropCount++;
+      return false;
+    }
+  }
+  
+  // Update last publish time
+  lastMQTTPublishMs = now;
+  
+  // Log warning if we're dropping messages (use unsigned arithmetic for rollover safety)
+  if (mqttDropCount > 0 && (uint32_t)(now - lastMQTTWarningMs) > WARNING_LOG_INTERVAL_MS) {
+    DebugTf(PSTR("MQTT throttled: dropped %u msgs (heap=%u bytes)\r\n"), 
+            mqttDropCount, ESP.getFreeHeap());
+    lastMQTTWarningMs = now;
+    mqttDropCount = 0; // reset counter after reporting
+  }
+  
+  return true;
+}
+
+//===========================================================================================
+// Get heap statistics for debugging
+//===========================================================================================
+void logHeapStats() {
+  uint32_t freeHeap = ESP.getFreeHeap();
+  uint32_t maxBlock = ESP.getMaxFreeBlockSize();
+  HeapHealthLevel level = getHeapHealth();
+  
+  const char* levelStr = "UNKNOWN";
+  switch (level) {
+    case HEAP_HEALTHY:  levelStr = "HEALTHY"; break;
+    case HEAP_LOW:      levelStr = "LOW"; break;
+    case HEAP_WARNING:  levelStr = "WARNING"; break;
+    case HEAP_CRITICAL: levelStr = "CRITICAL"; break;
+  }
+  
+  DebugTf(PSTR("Heap: %u bytes free, %u max block, level=%s, WS_drops=%u, MQTT_drops=%u\r\n"),
+          freeHeap, maxBlock, levelStr, webSocketDropCount, mqttDropCount);
+}
+
+//===========================================================================================
+// Emergency heap recovery - called when heap is critically low
+// This function tries to free up memory by clearing non-essential buffers
+//===========================================================================================
+void emergencyHeapRecovery() {
+  static uint32_t lastRecoveryMs = 0;
+  uint32_t now = millis();
+  
+  // Only attempt recovery once per interval to avoid thrashing
+  // Use unsigned arithmetic to handle millis() rollover correctly
+  if ((uint32_t)(now - lastRecoveryMs) < EMERGENCY_RECOVERY_INTERVAL_MS) {
+    return;
+  }
+  lastRecoveryMs = now;
+  
+  uint32_t heapBefore = ESP.getFreeHeap();
+  DebugTf(PSTR("Emergency heap recovery starting (heap=%u bytes)\r\n"), heapBefore);
+  
+  // Force MQTT buffer to minimum size
+  resetMQTTBufferSize();
+  
+  // Yield to allow ESP8266 to do housekeeping
+  yield();
+  delay(10);
+  
+  uint32_t heapAfter = ESP.getFreeHeap();
+  // Calculate recovered bytes safely (handle case where heap decreased)
+  // Use int32_t to avoid overflow and allow negative values
+  int32_t recovered = (int32_t)heapAfter - (int32_t)heapBefore;
+  DebugTf(PSTR("Emergency heap recovery complete (heap=%u bytes, recovered=%ld bytes)\r\n"), 
+          heapAfter, (long)recovered);
+}
+
+/***************************************************************************
+*
+* Permission is hereby granted, free of charge, to any person obtaining a
+* copy of this software and associated documentation files (the
+* "Software"), to deal in the Software without restriction, including
+* without limitation the rights to use, copy, modify, merge, publish,
+* distribute, sublicense, and/or sell copies of the Software, and to permit
+* persons to whom the Software is furnished to do so, subject to the
+* following conditions:
+*
+* The above copyright notice and this permission notice shall be included
+* in all copies or substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+* OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT
+* OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+* THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+* 
+****************************************************************************
+*/

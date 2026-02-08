@@ -1,11 +1,20 @@
-name: arduino-cli build
-description: Build using arduino-cli and makefile
+name: 'Arduino CLI Build'
+description: 'Build firmware using arduino-cli and makefile'
+
+outputs:
+  semver:
+    description: 'Semantic version from version.h'
+    value: ${{ steps.semver.outputs.semver }}
 
 runs:
   using: composite
   steps:
+    - id: autoinc-semver
+      run: |
+        python scripts/autoinc-semver.py src/OTGW-firmware --filename version.h --githash "$GITHUB_SHA"
+      shell: bash
     - id: semver
-      run: cat version.h  | sed  -n  '/^#define _SEMVER_FULL.*$/s/^#.*"\(.*\)"$/semver=\1/p' >> $GITHUB_OUTPUT
+      run: cat src/OTGW-firmware/version.h  | sed  -n  '/^#define _SEMVER_FULL.*$/s/^#.*"\(.*\)"$/semver=\1/p' >> $GITHUB_OUTPUT
       shell: bash
     - id: create-build-dir
       run: mkdir -p build
@@ -14,13 +23,13 @@ runs:
       run: |
         make -j$(nproc)
         find build -type f
-        for file in build/**/*.ino.bin; do mv "$file" "build/$(basename -s .ino.bin ${file})-${{steps.semver.outputs.semver}}.ino.bin"; done
-        for file in build/**/*.ino.elf; do mv "$file" "build/$(basename -s .ino.elf ${file})-${{steps.semver.outputs.semver}}.ino.elf"; done
+        for file in build/*.ino.bin; do mv "$file" "build/$(basename -s .ino.bin ${file})-${{steps.semver.outputs.semver}}.ino.bin"; done
+        for file in build/*.ino.elf; do mv "$file" "build/$(basename -s .ino.elf ${file})-${{steps.semver.outputs.semver}}.ino.elf"; done
       shell: bash
     - id: filesys
       run: |
         make filesystem
-        for file in build/*.ino.littlefs.bin; do mv "$file" "build/$(basename -s .ino.littlefs.bin $file).${{steps.semver.outputs.semver}}.littlefs.bin"; done
+        for file in build/*.littlefs.bin; do mv "$file" "build/$(basename -s .littlefs.bin $file).${{steps.semver.outputs.semver}}.littlefs.bin"; done
       shell: bash
 
     - id: upload
@@ -30,3 +39,16 @@ runs:
         path: |
           build/*.elf
           build/*.bin
+    - id: push-version
+      if: github.event_name == 'push' && github.ref_type == 'branch'
+      run: |
+        if git diff --quiet -- src/OTGW-firmware/version.h; then
+          echo "version.h unchanged; skipping commit."
+          exit 0
+        fi
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add src/OTGW-firmware/version.h
+        git commit -m "CI: update version.h"
+        git push origin "HEAD:${GITHUB_REF_NAME}"
+      shell: bash

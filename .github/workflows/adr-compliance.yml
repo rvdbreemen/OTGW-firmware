@@ -1,0 +1,222 @@
+name: ADR Compliance Check
+
+# This workflow checks pull requests for Architecture Decision Record (ADR) compliance
+# It verifies that code changes align with documented architectural decisions
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+      - dev
+      - 'release/**'
+
+jobs:
+  adr-compliance:
+    runs-on: ubuntu-latest
+    name: Check ADR Compliance
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Need full history to compare against base branch
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      
+      - name: Run evaluation framework
+        id: evaluate
+        continue-on-error: true
+        run: |
+          echo "Running evaluation framework to check ADR compliance..."
+          # Disable 'set -e' so we can capture the exit code even on failure
+          set +e
+          python evaluate.py
+          eval_status=$?
+          # Restore 'set -e' for any subsequent commands in this step (if added later)
+          set -e
+          echo "evaluate_status=$eval_status" >> $GITHUB_OUTPUT
+          # Always exit 0 so the step completes and output is available
+          exit 0
+      
+      - name: Check ADR references
+        id: check_refs
+        continue-on-error: true
+        run: |
+          echo "Checking ADR references in changed files..."
+          
+          # Get list of changed files
+          changed_files=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          
+          invalid_refs=0
+          
+          # Check each changed file for ADR references
+          for file in $changed_files; do
+            if [ -f "$file" ]; then
+              # Extract ADR references (format: ADR-XXX)
+              adr_refs=$(grep -oE "ADR-[0-9]{3}" "$file" 2>/dev/null || true)
+              
+              for adr in $adr_refs; do
+                # Check if ADR file exists
+                adr_pattern="docs/adr/${adr}-*.md"
+                if ! ls $adr_pattern 1> /dev/null 2>&1; then
+                  echo "❌ ERROR: $file references $adr but no matching file found in docs/adr/"
+                  invalid_refs=$((invalid_refs + 1))
+                fi
+              done
+            fi
+          done
+          
+          if [ $invalid_refs -gt 0 ]; then
+            echo "Found $invalid_refs invalid ADR reference(s)"
+            echo "check_status=1" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "✅ All ADR references are valid"
+            echo "check_status=0" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Check for new ADRs
+        id: new_adrs
+        run: |
+          echo "Checking for new ADRs in this PR..."
+          
+          # Check if new ADR files were added
+          new_adrs=$(git diff --name-only --diff-filter=A origin/${{ github.base_ref }}...HEAD | grep "^docs/adr/ADR-[0-9]" || true)
+          
+          if [ -n "$new_adrs" ]; then
+            echo "new_adr_count=$(echo "$new_adrs" | wc -l)" >> $GITHUB_OUTPUT
+            echo "📝 Found new ADR(s):"
+            echo "$new_adrs"
+            
+            # Verify each new ADR is properly formatted
+            for adr_file in $new_adrs; do
+              if [ -f "$adr_file" ]; then
+                # Check for required sections
+                if ! grep -q "^## Context" "$adr_file"; then
+                  echo "⚠️  WARNING: $adr_file missing 'Context' section"
+                fi
+                if ! grep -q "^## Decision" "$adr_file"; then
+                  echo "⚠️  WARNING: $adr_file missing 'Decision' section"
+                fi
+                if ! grep -q "^## Alternatives Considered" "$adr_file"; then
+                  echo "⚠️  WARNING: $adr_file missing 'Alternatives Considered' section"
+                fi
+                if ! grep -q "^## Consequences" "$adr_file"; then
+                  echo "⚠️  WARNING: $adr_file missing 'Consequences' section"
+                fi
+              fi
+            done
+          else
+            echo "new_adr_count=0" >> $GITHUB_OUTPUT
+            echo "No new ADRs in this PR"
+          fi
+      
+      - name: Detect architectural changes
+        id: detect_arch
+        run: |
+          echo "Detecting potential architectural changes..."
+          
+          # Files that likely indicate architectural changes
+          arch_patterns=(
+            "src/OTGW-firmware/OTGW-firmware.ino"
+            "src/OTGW-firmware/*API*.ino"
+            "src/OTGW-firmware/*MQTT*.ino"
+            "src/OTGW-firmware/webSocket*.ino"
+            "src/libraries/*"
+            ".github/workflows/*"
+          )
+          
+          changed_files=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          arch_changes=0
+          
+          for file in $changed_files; do
+            for pattern in "${arch_patterns[@]}"; do
+              if [[ "$file" == $pattern ]]; then
+                echo "Architectural file changed: $file (matched pattern: $pattern)"
+                arch_changes=$((arch_changes + 1))
+                break
+              fi
+            done
+          done
+          
+          echo "arch_change_count=$arch_changes" >> $GITHUB_OUTPUT
+          
+          if [ $arch_changes -gt 0 ] && [ "${{ steps.new_adrs.outputs.new_adr_count }}" -eq 0 ]; then
+            echo "suggestion=This PR modifies architectural files but doesn't include a new ADR. Consider if an ADR is needed." >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Comment on PR
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const evaluate_status = '${{ steps.evaluate.outputs.evaluate_status }}';
+            const check_status = '${{ steps.check_refs.outputs.check_status }}';
+            const new_adr_count = '${{ steps.new_adrs.outputs.new_adr_count }}';
+            const arch_change_count = '${{ steps.detect_arch.outputs.arch_change_count }}';
+            const suggestion = '${{ steps.detect_arch.outputs.suggestion }}';
+            
+            let body = '## 🔍 ADR Compliance Check\n\n';
+            
+            // Evaluation framework results
+            if (evaluate_status === '0') {
+              body += '✅ **Evaluation Framework:** PASSED\n';
+            } else {
+              body += '❌ **Evaluation Framework:** FAILED - See logs for details\n';
+            }
+            
+            // ADR reference check results
+            if (check_status === '0' || check_status === '') {
+              body += '✅ **ADR References:** All references are valid\n';
+            } else {
+              body += '❌ **ADR References:** Invalid references found\n';
+            }
+            
+            // New ADRs
+            if (new_adr_count > 0) {
+              body += `📝 **New ADRs:** ${new_adr_count} new ADR(s) added\n`;
+            }
+            
+            // Architectural changes
+            if (arch_change_count > 0) {
+              body += `🏗️  **Architectural Changes:** ${arch_change_count} architectural file(s) modified\n`;
+            }
+            
+            // Suggestions
+            if (suggestion) {
+              body += `\n💡 **Suggestion:** ${suggestion}\n`;
+            }
+
+            // Build absolute GitHub URLs so links in the PR comment work correctly
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const sha = (context.payload.pull_request && context.payload.pull_request.head && context.payload.pull_request.head.sha)
+              ? context.payload.pull_request.head.sha
+              : context.sha;
+            const baseUrl = `https://github.com/${owner}/${repo}/blob/${sha}`;
+            
+            body += '\n---\n\n';
+            body += '### Resources\n';
+            body += `- **ADR Skill:** [.github/skills/adr/SKILL.md](${baseUrl}/.github/skills/adr/SKILL.md)\n`;
+            body += `- **ADR Index:** [docs/adr/README.md](${baseUrl}/docs/adr/README.md)\n`;
+            body += `- **Usage Guide:** [.github/skills/adr/USAGE_GUIDE.md](${baseUrl}/.github/skills/adr/USAGE_GUIDE.md)\n`;
+            
+            // Only comment if there are issues or suggestions
+            if (evaluate_status !== '0' || check_status !== '0' || suggestion) {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            }
+      
+      - name: Fail if compliance check failed
+        if: steps.evaluate.outputs.evaluate_status != '0' || steps.check_refs.outputs.check_status != '0'
+        run: |
+          echo "ADR compliance check failed"
+          exit 1
