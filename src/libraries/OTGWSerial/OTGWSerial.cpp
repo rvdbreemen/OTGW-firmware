@@ -53,8 +53,8 @@ OTGWDebugFunction *debugfunc = nullptr;
 static OTGWFirmware firmware = FIRMWARE_UNKNOWN;
 static char fwversion[16];
 
-const char hexbytefmt[] = "%02x";
-const char hexwordfmt[] = "%04x";
+const char hexbytefmt[] PROGMEM = "%02x";
+const char hexwordfmt[] PROGMEM = "%04x";
 
 enum {
     FWSTATE_IDLE,
@@ -153,9 +153,11 @@ void OTGWUpgrade::progress(int weight) {
 unsigned char OTGWUpgrade::hexChecksum(char *hex, int len) {
     unsigned char sum = 0;
     int val;
+    char fmt[8];
+    strcpy_P(fmt, hexbytefmt);
 
     while (len-- > 0) {
-        sscanf(hex, hexbytefmt, &val);
+        sscanf(hex, fmt, &val);
         sum -= val;
         hex += 2;
     }
@@ -164,6 +166,8 @@ unsigned char OTGWUpgrade::hexChecksum(char *hex, int len) {
 
 OTGWError OTGWUpgrade::readHexRecord() {
     char hexbuf[48];
+    char fmt[8];
+    strcpy_P(fmt, hexwordfmt);
     int len, addr, tag, data, offs, i;
     while (hexfd.readBytesUntil('\n', hexbuf, sizeof(hexbuf)) != 0) {
         if (sscanf(hexbuf, ":%2x%4x%2x", &len, &addr, &tag) != 3) break;
@@ -182,7 +186,7 @@ OTGWError OTGWUpgrade::readHexRecord() {
             len >>= 1;
             hexlen = len;
             for (i = 0; i < len; i++) {
-                if (sscanf(hexbuf + offs, hexwordfmt, &data) != 1) {
+                if (sscanf(hexbuf + offs, fmt, &data) != 1) {
                     // Didn't find hex data
                     break;
                 }
@@ -197,11 +201,11 @@ OTGWError OTGWUpgrade::readHexRecord() {
             return OTGW_ERROR_NONE;
         } else if (tag == 2) {
             // Extended segment address record
-            if (sscanf(hexbuf + offs, hexwordfmt, &data) != 1) break;
+            if (sscanf(hexbuf + offs, fmt, &data) != 1) break;
             hexseg = data;
         } else if (tag == 4) {
             // Extended linear address record
-            if (sscanf(hexbuf + offs, hexwordfmt, &data) != 1) break;
+            if (sscanf(hexbuf + offs, fmt, &data) != 1) break;
             hexseg = data << 12;
         }
     }
@@ -288,28 +292,26 @@ OTGWError OTGWUpgrade::readHexFile(const char *hexfile) {
     }
     if (rc != OTGW_ERROR_NONE) return finishUpgrade(rc);
 
-    Dprintf("model: %d\n", model);
+    Dprintf(PSTR("model: %d\n"), model);
 
     // The self-programming code will be skipped (assume 256 program words)
     weight -= 8 * WEIGHT_CODEPROG;
 
     // Look for the new firmware version
+    // Use sliding window search with memcmp_P to safely handle binary data
     version = nullptr;
-    unsigned short ptr = 0;
-    while (ptr < info.datasize) {
-        char *s = strstr_P((char *)datamem + ptr, banner1);
-        if (s == nullptr) {
-            ptr += strnlen((char *)datamem + ptr,
-              info.datasize - ptr) + 1;
-        } else {
-            s += sizeof(banner1) - 1;   // Drop the terminating '\0'
-            version = s;
-            Dprintf("Version: %s\n", version);
-            if (firmware == FIRMWARE_OTGW && *fwversion) {
-                // Reading out the EEPROM settings takes 4 reads of 64 bytes
-                weight += 4 * WEIGHT_DATAREAD;
+    size_t bannerLen = sizeof(banner1) - 1;
+    if (info.datasize >= bannerLen) {
+        for (unsigned short ptr = 0; ptr <= (info.datasize - bannerLen); ptr++) {
+            if (memcmp_P(datamem + ptr, banner1, bannerLen) == 0) {
+                version = (char *)datamem + ptr + bannerLen;
+                Dprintf(PSTR("Version: %s\n"), version);
+                if (firmware == FIRMWARE_OTGW && *fwversion) {
+                    // Reading out the EEPROM settings takes 4 reads of 64 bytes
+                    weight += 4 * WEIGHT_DATAREAD;
+                }
+                break;
             }
-            break;
         }
     }
 
@@ -442,7 +444,7 @@ void OTGWUpgrade::fwCommand(const unsigned char *cmd, int len) {
 
 void OTGWUpgrade::eraseCode(short addr) {
     byte fwcommand[] = {CMD_ERASEPROG, 1, 0, 0};
-    Dprintf("Erase Program Memory %d blocks @0x%04x\n", 1, addr);
+    Dprintf(PSTR("Erase Program Memory %d blocks @0x%04x\n"), 1, addr);
     fwcommand[2] = addr & 0xff;
     fwcommand[3] = addr >> 8;
     fwCommand(fwcommand, sizeof(fwcommand));
@@ -453,7 +455,7 @@ short OTGWUpgrade::loadCode(short addr, const unsigned short *code, short len) {
     unsigned short *data = (unsigned short *)fwcommand + 2;
     short size = 0;
 
-    Dprintf("Write Program Memory %d words @0x%04x\n", len, addr);
+    Dprintf(PSTR("Write Program Memory %d words @0x%04x\n"), len, addr);
     for (i = 0; i < len; i++) {
         data[i] = code[i] & 0x3fff;
         if (data[i] != 0x3fff) size = i + 1;
@@ -475,7 +477,7 @@ short OTGWUpgrade::loadCode(short addr, const unsigned short *code, short len) {
 
 void OTGWUpgrade::readCode(short addr, short len) {
     byte fwcommand[] = {CMD_READPROG, 32, 0, 0};
-    Dprintf("Read Program Memory %d words @0x%04x\n", len, addr);
+    Dprintf(PSTR("Read Program Memory %d words @0x%04x\n"), len, addr);
     fwcommand[1] = len;
     fwcommand[2] = addr & 0xff;
     fwcommand[3] = addr >> 8;
@@ -488,7 +490,7 @@ bool OTGWUpgrade::verifyCode(const unsigned short *code, const unsigned short *d
 
     for (i = 0; i < len; i++) {
         if (data[i] != (code[i] & 0x3fff)) {
-            Dprintf("Verify Program 0x%04x: 0x%04x <> 0x%04x\n",
+            Dprintf(PSTR("Verify Program 0x%04x: 0x%04x <> 0x%04x\n"),
               pc + i, data[i], code[i] & 0x3fff);
             errcnt++;
             rc = false;
@@ -510,7 +512,7 @@ short OTGWUpgrade::loadData(short addr) {
         fwcommand[ptr++] = datamem[pc];
     }
     if (first < 0) return 0;
-    Dprintf("Write EEDATA Memory %d bytes @0x%04x\n", last - first + 1, first);
+    Dprintf(PSTR("Write EEDATA Memory %d bytes @0x%04x\n"), last - first + 1, first);
     fwcommand[1] = last - first + 1;
     fwcommand[2] = first & 0xff;
     fwcommand[3] = first >> 8;
@@ -520,7 +522,7 @@ short OTGWUpgrade::loadData(short addr) {
 
 void OTGWUpgrade::readData(short addr, short len) {
     byte fwcommand[] = {CMD_READDATA, (byte)len, 0, 0};
-    Dprintf("Read EEDATA Memory %d bytes @0x%04x\n", len, addr);
+    Dprintf(PSTR("Read EEDATA Memory %d bytes @0x%04x\n"), len, addr);
     fwcommand[2] = addr & 0xff;
     fwCommand(fwcommand, sizeof(fwcommand));
 }
@@ -531,7 +533,7 @@ bool OTGWUpgrade::verifyData(short addr, const byte *data, short len) {
     for (short i = 0, pc = addr; i < len; i++, pc++) {
         if (datamem[pc] != eedata[pc]) {
             if (data[i] != datamem[pc]) {
-                Dprintf("Verify EEDATA 0x%04x: 0x%02x <> 0x%02x\n",
+                Dprintf(PSTR("Verify EEDATA 0x%04x: 0x%02x <> 0x%02x\n"),
                   pc, data[i], datamem[pc]);
                 errcnt++;
                 rc = false;
@@ -553,7 +555,7 @@ void OTGWUpgrade::stateMachine(const unsigned char *packet, int len) {
             finishUpgrade(OTGW_ERROR_RETRIES);
             return;
         }
-        Dprintf("Retry (%d): stage = %d, pc = 0x%04x, cmd = %d\n",
+        Dprintf(PSTR("Retry (%d): stage = %d, pc = 0x%04x, cmd = %d\n"),
           retries, stage, pc, cmdcode);
     } else {
         // Determine the (most likely) next command
@@ -596,7 +598,7 @@ void OTGWUpgrade::stateMachine(const unsigned char *packet, int len) {
         break;
      case FWSTATE_VERSION:
         if (data != nullptr) {
-            Dprintf("Bootloader version %d.%d\n", packet[3], packet[4]);
+            Dprintf(PSTR("Bootloader version %d.%d\n"), packet[3], packet[4]);
             OTGWProcessor pic;
             switch (packet[3]) {
              case 1: pic = PIC16F88; break;
@@ -651,7 +653,7 @@ void OTGWUpgrade::stateMachine(const unsigned char *packet, int len) {
         if (packet != nullptr) {
             progress(WEIGHT_DATAREAD);
             const unsigned char *bytes = packet + 4;
-            Dprintf("Dump EEPROM: 0x%04x\n", pc);
+            Dprintf(PSTR("Dump EEPROM: 0x%04x\n"), pc);
             for (int i = 0; i < 64; i++, pc++) {
                 if (datamem[pc] == eedata[pc]) {
                     // The new firmware doesn't use this EEPROM address
@@ -684,7 +686,7 @@ void OTGWUpgrade::stateMachine(const unsigned char *packet, int len) {
             readCode(info.erasesize, 4);
         } else {
             if (packet != nullptr && packet[1] == 4 && data[1] == info.erasesize && verifyCode(failsafe, data + 2, 4)) {
-                Dprintf("Fail safe code installed\n");
+                Dprintf(PSTR("Fail safe code installed\n"));
                 // The fail safe is in place, programming can start
                 progress(WEIGHT_CODEPROG);
                 // Return to the start of the file
@@ -750,7 +752,7 @@ void OTGWUpgrade::stateMachine(const unsigned char *packet, int len) {
                 }
                 while (loadData(pc) == 0);
             } else {
-                Dprintf("Data block failed: 0x%04x\n", pc);
+                Dprintf(PSTR("Data block failed: 0x%04x\n"), pc);
                 // Data is incorrect, try again
                 // digitalWrite(LED2, LOW);
                 loadData(pc);
@@ -792,7 +794,7 @@ void OTGWUpgrade::upgradeEvent(int ch) {
             stateMachine(buffer, bufpos);
         } else {
             // Checksum mismatch
-            Dprintf("Invalid checksum: 0x%02x\n", checksum);
+            Dprintf(PSTR("Invalid checksum: 0x%02x\n"), checksum);
             stateMachine();
         }
     } else if (bufpos >= sizeof(buffer)) {
@@ -813,12 +815,12 @@ bool OTGWUpgrade::upgradeTick() {
 
     if (millis() - lastaction > 1000) {
         // Too much time has passed since the last action
-        Dprintf("Timeout:");
+        Dprintf(PSTR("Timeout:"));
         if (bufpos) {
             for (int i = 0; i < bufpos; i++) {
-                Dprintf(" %02x", buffer[i]);
+                Dprintf(PSTR(" %02x"), buffer[i]);
             }
-            Dprintf("\n");
+            Dprintf(PSTR("\n"));
             bufpos = 0;
         }
         // Send a non-DLE byte in case the PIC is waiting for a byte following
@@ -875,7 +877,7 @@ bool OTGWSerial::busy() {
 }
 
 void OTGWSerial::resetPic() {
-    Dprintf("resetPic()\n");
+    Dprintf(PSTR("resetPic()\n"));
     if (_reset >= 0) {
         pinMode(_reset, OUTPUT);
         digitalWrite(_reset, LOW);

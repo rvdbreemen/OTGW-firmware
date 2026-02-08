@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - dev
+      - 'dev-*'
       - main
       - actions
       - make-tweaks
       - tarball-naming
+      - 'copilot/*'
 
 jobs:
   build:

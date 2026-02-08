@@ -1,5 +1,5 @@
-name: CI Build Setup
-description: Sets up build dependencies
+name: 'CI Build Setup'
+description: 'Sets up build dependencies for Arduino CLI'
 
 runs:
   using: composite
@@ -18,4 +18,12 @@ runs:
       run: |
         curl -fsSL \
         https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh
+      shell: bash
+    - id: clean-arduino-cache
+      run: |
+        rm -rf ~/.arduino15/packages/ ~/.arduino15/staging
+      shell: bash
+    - id: update-arduino-index
+      run: |
+        arduino-cli core update-index
       shell: bash

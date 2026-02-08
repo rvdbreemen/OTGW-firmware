@@ -1,8 +1,9 @@
 # -*- make -*-
 
-PROJ = $(notdir $(PWD))
-SOURCES = $(wildcard *.ino *.cpp *.h)
-FSDIR = data
+PROJ = OTGW-firmware
+SRCDIR = src/$(PROJ)
+SOURCES = $(wildcard $(SRCDIR)/*.ino $(SRCDIR)/*.cpp $(SRCDIR)/*.h)
+FSDIR = $(SRCDIR)/data
 FILES = $(wildcard $(FSDIR)/*)
 
 # Don't use -DATOMIC_FS_UPDATE
@@ -17,21 +18,22 @@ CLICFG := $(CLI) --config-file $(CFGFILE)
 # bug in http stream, fallback to 2.7.4
 # ESP8266URL := https://github.com/esp8266/Arduino/releases/download/3.0.2/package_esp8266com_index.json
 ESP8266URL := https://github.com/esp8266/Arduino/releases/download/2.7.4/package_esp8266com_index.json
-LIBRARIES := libraries/WiFiManager libraries/ArduinoJson libraries/PubSubClient libraries/TelnetStream libraries/AceTime libraries/OneWire libraries/DallasTemperature
+LIBRARIES := libraries/WiFiManager libraries/ArduinoJson libraries/PubSubClient libraries/TelnetStream libraries/AceCommon libraries/AceSorting libraries/AceTime libraries/OneWire libraries/DallasTemperature libraries/WebSockets libraries/Time
 BOARDS := arduino/package_esp8266com_index.json
 # PORT can be overridden by the environment or on the command line. E.g.:
 # export PORT=/dev/ttyUSB2; make upload, or: make upload PORT=/dev/ttyUSB2
 PORT ?= /dev/ttyUSB0
 BAUD ?= 460800
 
-INO = $(PROJ).ino
+INO = $(SRCDIR)/$(PROJ).ino
 MKFS = $(wildcard arduino/packages/esp8266/tools/mklittlefs/*/mklittlefs)
 TOOLS = $(wildcard arduino/packages/esp8266/hardware/esp8266/*/tools)
 ESPTOOL = python3 $(TOOLS)/esptool/esptool.py
 BOARD = $(PLATFORM):d1_mini
 FQBN = $(BOARD):eesz=4M2M,xtal=160
-IMAGE = build/$(INO).bin
-FILESYS = build/$(INO).littlefs.bin
+# Arduino-cli output path logic is complex, simplified here for 'build' target if CLI puts it in build/ relative to sketch
+IMAGE = build/$(PROJ).ino.bin
+FILESYS = build/$(PROJ).littlefs.bin
 
 export PYTHONPATH = $(TOOLS)/pyserial
 
@@ -60,10 +62,13 @@ $(CFGFILE):
 ##
 # Make sure CFG is updated before libraries are called.
 ##
-$(LIBRARIES): | $(CFGFILE)
-
-$(BOARDS): | $(CFGFILE)
+update_indexes: | $(CFGFILE)
 	$(CLICFG) core update-index
+	$(CLICFG) lib update-index
+
+$(LIBRARIES): | update_indexes
+
+$(BOARDS): | update_indexes
 	$(CLICFG) core install $(PLATFORM)
 
 refresh: | $(CFGFILE)
@@ -84,22 +89,30 @@ libraries/PubSubClient:
 libraries/TelnetStream:
 	$(CLICFG) lib install TelnetStream@1.2.4
 
-libraries/AceTime:
-	$(CLICFG) lib install Acetime@2.0.1
+libraries/AceCommon:
+	$(CLICFG) lib install AceCommon@1.6.2
 
-# libraries/Time:
-# 	$(CLI) lib install --git-url https://github.com/PaulStoffregen/Time
-# 	# https://github.com/PaulStoffregen/Time/archive/refs/tags/v1.6.1.zip
+libraries/AceSorting:
+	$(CLICFG) lib install AceSorting@1.0.0
+
+libraries/AceTime:
+	$(CLICFG) lib install AceTime@2.0.1
+
+libraries/Time:
+	$(CLICFG) lib install Time@1.6.1
 
 libraries/OneWire:
-	$(CLICFG) lib install OneWire@2.3.6
+	$(CLICFG) lib install OneWire@2.3.8
 
 libraries/DallasTemperature: | libraries/OneWire
 	$(CLICFG) lib install DallasTemperature@3.9.0
 
+libraries/WebSockets:
+	$(CLICFG) lib install WebSockets@2.3.5
+
 $(IMAGE): $(BOARDS) $(LIBRARIES) $(SOURCES)
 	$(info Build code)
-	$(CLICFG) compile --fqbn=$(FQBN) --warnings default --verbose --build-property compiler.cpp.extra_flags="$(CFLAGS)"
+	$(CLICFG) compile --fqbn=$(FQBN) --warnings default --verbose --libraries src/libraries --build-path build --build-property compiler.cpp.extra_flags="$(CFLAGS)" $(SRCDIR)
 
 filesystem: $(FILESYS)
 
@@ -132,7 +145,15 @@ upload-fs: $(FILESYS)
 install: $(IMAGE) $(FILESYS)
 	$(ESPTOOL) --port $(PORT) -b $(BAUD) write_flash 0x0 $(IMAGE) 0x200000 $(FILESYS)
 
-.PHONY: binaries platform publish clean upload upload-fs install debug filesystem
+# Run workspace evaluation
+evaluate:
+	python3 evaluate.py --report
+
+# Quick evaluation check
+check:
+	python3 evaluate.py --quick
+
+.PHONY: binaries platform publish clean upload upload-fs install debug filesystem evaluate check
 
 ### Allow customization through a local Makefile: Makefile-local.mk
 
