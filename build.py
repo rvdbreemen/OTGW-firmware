@@ -428,6 +428,7 @@ def build_firmware(project_dir, config_file):
         "--fqbn", fqbn,
         "--warnings", "default",
         "--verbose",
+        "--libraries", str(project_dir / "src" / "libraries"),
         "--build-property", f"compiler.cpp.extra_flags=\"{cflags}\"",
         "--config-file", str(config_file),
         str(config.FIRMWARE_ROOT)
