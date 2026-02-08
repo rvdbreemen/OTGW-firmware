@@ -1,10 +1,9 @@
 # OTGW-firmware (ESP8266) for NodoShop OpenTherm Gateway
 
-> **⚠️ DEVELOPMENT BRANCH WARNING**  
-> **This is a development branch (`dev`) and contains the latest work-in-progress features.**  
-> For the latest stable release, please check the [releases page](https://github.com/rvdbreemen/OTGW-firmware/releases) (latest: **v1.0.0**).
->
-> **For production use, we recommend using the stable releases.**
+> **✅ Stable Release — v1.0.0**  
+> This is the **production branch (`main`)** containing the latest stable release.  
+> For development and upcoming features, see the [`dev` branch](https://github.com/rvdbreemen/OTGW-firmware/tree/dev).  
+> Download prebuilt binaries from the [releases page](https://github.com/rvdbreemen/OTGW-firmware/releases).
 
 [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
 
