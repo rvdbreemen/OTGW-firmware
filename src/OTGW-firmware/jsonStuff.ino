@@ -264,6 +264,19 @@ void sendJsonOTmonObjDallasTemp(const char *cName, float fValue, const char *cUn
 
 } // sendJsonOTmonObjDallasTemp(*char, float, *char, time_t)
 
+void sendJsonOTmonObjDallasTemp(const char *cName, float fValue, const __FlashStringHelper *cUnit, time_t epoch)
+{
+  char jsonBuff[200] = "";
+
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.1f, \"unit\": \"%S\", \"epoch\": %d}")
+                                      , cName, fValue, reinterpret_cast<PGM_P>(cUnit), (uint32_t)epoch);
+
+  sendBeforenext();
+  sendIdent();
+  httpServer.sendContent(jsonBuff);
+
+} // sendJsonOTmonObjDallasTemp(*char, float, *FlashStringHelper, time_t)
+
 //=======================================================================
 // New Map-based output functions for less redundant JSON
 //=======================================================================
@@ -444,6 +457,18 @@ void sendJsonOTmonMapEntryDallasTemp(const char *cName, float fValue, const char
   sendIdent();
   httpServer.sendContent(jsonBuff);
 } // sendJsonOTmonMapEntryDallasTemp(*char, float, *char, time_t)
+
+void sendJsonOTmonMapEntryDallasTemp(const char *cName, float fValue, const __FlashStringHelper *cUnit, time_t epoch)
+{
+  char jsonBuff[200] = "";
+
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %.1f, \"unit\": \"%S\", \"epoch\": %d}")
+                                      , cName, fValue, reinterpret_cast<PGM_P>(cUnit), (uint32_t)epoch);
+
+  sendBeforenext();
+  sendIdent();
+  httpServer.sendContent(jsonBuff);
+} // sendJsonOTmonMapEntryDallasTemp(*char, float, *FlashStringHelper, time_t)
 
 //=======================================================================
 // ************ function to build Json Settings string ******************
