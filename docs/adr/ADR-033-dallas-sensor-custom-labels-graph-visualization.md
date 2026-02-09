@@ -67,7 +67,7 @@ Implement a comprehensive sensor labeling and graphing system with three main co
 ### 3. Non-Blocking Label Editor
 
 **UI Pattern:**
-- Replace blocking `prompt()` with custom modal dialog (ADR-029)
+- Replace blocking `prompt()` with custom modal dialog (ADR-034)
 - Click sensor name on main page to edit label
 - Modal features: keyboard shortcuts (Enter/Escape), inline validation, theme-aware styling
 - WebSocket traffic and screen updates continue during editing
@@ -198,7 +198,7 @@ Settings capacity: 2560 bytes (previously 1536, +1024)
 - **ADR-008 (LittleFS Configuration Persistence):** Labels stored in settings.json using existing persistence pattern
 - **ADR-018 (ArduinoJson Data Interchange):** JSON serialization for label storage and API responses
 - **ADR-019 (REST API Versioning Strategy):** New endpoint in v1 API maintains backward compatibility
-- **ADR-029 (Non-Blocking Modal Dialogs):** Modal pattern used for label editing to preserve WebSocket flow
+- **ADR-034 (Non-Blocking Modal Dialogs):** Modal pattern used for label editing to preserve WebSocket flow
 - **ADR-020 (Dallas DS18B20 Sensor Integration):** This ADR extends ADR-020 with custom labels and graph visualization
 
 ## Evidence

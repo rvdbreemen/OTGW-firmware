@@ -123,6 +123,7 @@ Browser-specific code: Yes (Safari)
 - **Browser compatibility:** Works identically on all browsers
 - **Explicit verification:** Health check confirms device is fully operational
 - **Resource efficiency:** No WebSocket, no polling during flash
+- **Watchdog-safe:** OTA workflow coordinates with external watchdog (ADR-011)
 
 **Cons:**
 - No real-time flash write progress (user sees "Uploading: 100%" then waits)
@@ -133,6 +134,7 @@ Browser-specific code: Yes (Safari)
 - **Reliability:** No browser-specific bugs or workarounds
 - **Acceptable trade-offs:** Flash completes in 10-30 seconds (acceptable wait)
 - **Better UX:** Health check provides explicit success confirmation
+- **Operational safety:** Watchdog handling prevents mid-flash resets
 
 ## Decision
 
@@ -233,6 +235,16 @@ function initUploadForm(formId, targetName) {
 initUploadForm('fwForm', 'flash');
 initUploadForm('fsForm', 'filesystem');
 ```
+
+### Watchdog Coordination (ADR-011)
+
+OTA flash temporarily relaxes watchdog constraints while still preventing lockups:
+
+1. **Disable watchdog during long flash writes** using `WatchDogEnabled(0)`.
+2. **Feed watchdog on every flash chunk** via `FEEDWATCHDOGNOW` inside the upload handler.
+3. **Re-enable watchdog** after flashing completes and reboot is initiated.
+
+This prevents spurious resets during long flash writes while keeping recovery protection for the rest of the lifecycle.
 
 ### State Management
 
