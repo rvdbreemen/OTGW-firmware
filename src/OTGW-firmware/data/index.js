@@ -56,6 +56,7 @@ var tid = 0;
 var timeupdate = null; // Will be started when needed
 
 let gatewayModeRefreshCounter = 0;
+let gatewayModeRefreshInFlight = false; // Prevents double-triggering even when force=true
 const GATEWAY_MODE_REFRESH_INTERVAL = 60; // 60s max polling interval (at most once a minute)
 
 function updateGatewayModeIndicator(value) {
@@ -102,6 +103,9 @@ function updateGatewayModeFromDevInfoEntries(entries) {
 }
 
 function refreshGatewayMode(force) {
+  // In-flight check MUST occur before force check to ensure throttle has priority
+  if (gatewayModeRefreshInFlight) return;
+  
   if (flashModeActive || !isPageVisible()) return;
   if (!force && gatewayModeRefreshCounter < GATEWAY_MODE_REFRESH_INTERVAL) {
     gatewayModeRefreshCounter++;
@@ -109,6 +113,7 @@ function refreshGatewayMode(force) {
   }
 
   gatewayModeRefreshCounter = 0;
+  gatewayModeRefreshInFlight = true;
 
   fetch(APIGW + 'v0/devinfo')
     .then(response => {
@@ -124,6 +129,9 @@ function refreshGatewayMode(force) {
     .catch(error => {
       console.warn('refreshGatewayMode warning:', error);
       updateGatewayModeIndicator(null);
+    })
+    .finally(() => {
+      gatewayModeRefreshInFlight = false;
     });
 }
 
