@@ -107,6 +107,10 @@ function refreshGatewayMode(force) {
   if (gatewayModeRefreshInFlight) return;
   
   if (flashModeActive || !isPageVisible()) return;
+  
+  // Throttle has priority: prevent double-triggering even with force=true
+  if (gatewayModeRefreshInFlight) return;
+  
   if (!force && gatewayModeRefreshCounter < GATEWAY_MODE_REFRESH_INTERVAL) {
     gatewayModeRefreshCounter++;
     return;
