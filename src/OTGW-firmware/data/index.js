@@ -39,8 +39,9 @@ document.addEventListener('visibilitychange', function () {
   // When tab becomes visible again, resume UI updates
   if (!flashModeActive) {
     refreshDevTime();
+    refreshGatewayMode(true);
     if (!timeupdate) {
-      timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+      timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
     }
     // Ensure WebSocket is connected (will reconnect if needed)
     initOTLogWebSocket();
@@ -53,6 +54,84 @@ document.addEventListener('visibilitychange', function () {
 
 var tid = 0;
 var timeupdate = null; // Will be started when needed
+
+let gatewayModeLastFetchMs = 0;
+let gatewayModeFetchInFlight = false;
+const GATEWAY_MODE_REFRESH_INTERVAL_MS = 60000; // hard throttle: max one fetch per minute
+
+function updateGatewayModeIndicator(value) {
+  const statusEl = document.getElementById('gatewayModeStatus');
+  const textEl = document.getElementById('gatewayModeText');
+  if (!statusEl || !textEl) return;
+
+  if (value === true) {
+    statusEl.className = 'mode-status mode-gateway';
+    textEl.textContent = 'Mode: Gateway';
+  } else if (value === false) {
+    statusEl.className = 'mode-status mode-monitor';
+    textEl.textContent = 'Mode: Monitor';
+  } else {
+    statusEl.className = 'mode-status mode-unknown';
+    textEl.textContent = 'Mode: Unknown';
+  }
+}
+
+function parseGatewayModeValue(gatewayModeValue) {
+  if (typeof gatewayModeValue !== 'string') return null;
+
+  const normalized = gatewayModeValue.trim().toLowerCase();
+  if (normalized === 'on' || normalized === '1' || normalized === 'true' || normalized === 'gateway') {
+    return true;
+  }
+  if (normalized === 'off' || normalized === '0' || normalized === 'false' || normalized === 'monitor' || normalized === 'standalone') {
+    return false;
+  }
+  return null;
+}
+
+function updateGatewayModeFromDevInfoEntries(entries) {
+  let gatewayModeValue = null;
+
+  for (let i = 0; i < entries.length; i++) {
+    if (entries[i].name === 'gatewaymode') {
+      gatewayModeValue = entries[i].value;
+      break;
+    }
+  }
+
+  updateGatewayModeIndicator(parseGatewayModeValue(gatewayModeValue));
+}
+
+function refreshGatewayMode(_force) {
+  if (flashModeActive || !isPageVisible()) return;
+
+  const now = Date.now();
+  if (gatewayModeFetchInFlight) return;
+  if ((now - gatewayModeLastFetchMs) < GATEWAY_MODE_REFRESH_INTERVAL_MS) return;
+
+  gatewayModeFetchInFlight = true;
+
+  fetch(APIGW + 'v0/devinfo')
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    })
+    .then(json => {
+      const entries = (json && json.devinfo) ? json.devinfo : [];
+      updateGatewayModeFromDevInfoEntries(entries);
+      gatewayModeLastFetchMs = Date.now();
+    })
+    .catch(error => {
+      console.warn('refreshGatewayMode warning:', error);
+      updateGatewayModeIndicator(null);
+      gatewayModeLastFetchMs = Date.now();
+    })
+    .finally(() => {
+      gatewayModeFetchInFlight = false;
+    });
+}
 
 //============================================================================
 // Flash Mode Management - stops all background activity during flashing
@@ -83,7 +162,7 @@ function exitFlashMode() {
   
   // Restart time update
   if (!timeupdate) {
-    timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+    timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
   }
   
   // Restart WebSocket if on main page
@@ -2123,7 +2202,8 @@ function initMainPage() {
   // Start time updates if not in flash mode
   if (!flashModeActive && !timeupdate) {
     refreshDevTime();
-    timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+    refreshGatewayMode(true);
+    timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
   }
 
   if (window.location.hash == "#tabPICflash") {
@@ -2143,6 +2223,7 @@ function showMainPage() {
   }
   
   refreshDevTime();
+  refreshGatewayMode(true);
   
   document.getElementById("displayMainPage").classList.add('active');
   document.getElementById("displaySettingsPage").classList.remove('active');
@@ -2500,6 +2581,9 @@ function refreshDevInfo() {
           ipaddress = data[i].value;
         }
       }
+
+      updateGatewayModeFromDevInfoEntries(data);
+      gatewayModeLastFetchMs = Date.now();
 
       const versionEl = document.getElementById('devVersion');
       if (versionEl) versionEl.textContent = version;
@@ -3231,7 +3315,7 @@ function handleFlashCompletion(filename, error) {
     
     // Restart polling
     if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
 }
 
 function handleFlashError(filename, error) {
@@ -3247,7 +3331,7 @@ function handleFlashError(filename, error) {
     
     // Restart polling
     if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
 }
 
 // function pollForReboot() - Removed
@@ -3295,7 +3379,7 @@ function performFlash(filename) {
                 toggleInteraction(true);
                 // Restart polling
                 if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-                if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+                if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
                 return;
              }
 
@@ -3329,7 +3413,7 @@ function performFlash(filename) {
                     
                     // Restart polling on start failure
                     if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-                    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+                    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
                 });
         }
     }, 100);
@@ -3398,7 +3482,7 @@ function handleFlashMessage(data) {
                 
                 // Restart polling
                 if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-                if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+                if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
             } else if (msg.state === 'error' || msg.state === 'abort') {
                 // Error or abort
                 stopFlashPolling(); // Stop failsafe polling
@@ -3412,7 +3496,7 @@ function handleFlashMessage(data) {
                 
                 // Restart polling
                 if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-                if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+                if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
             }
             
             return true; // It was a flash message
