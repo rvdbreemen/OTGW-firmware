@@ -671,6 +671,32 @@
   background: #f44336;
 }
 
+.status-separator {
+  opacity: 0.6;
+}
+
+.mode-status {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.mode-gateway {
+  background: #ff9800;
+  box-shadow: 0 0 8px #ff9800;
+}
+
+.mode-monitor {
+  background: #2196f3;
+  box-shadow: 0 0 8px #2196f3;
+}
+
+.mode-unknown {
+  background: #9e9e9e;
+}
+
 /* Log Controls */
 .ot-log-controls {
   display: flex;
