@@ -2222,7 +2222,6 @@ function showMainPage() {
   }
   
   refreshDevTime();
-  refreshGatewayMode(true);
   
   document.getElementById("displayMainPage").classList.add('active');
   document.getElementById("displaySettingsPage").classList.remove('active');
