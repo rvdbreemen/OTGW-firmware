@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.0.0
+**  Version  : v1.1.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -183,9 +183,20 @@ This provides a reliable way to detect the actual configured mode,
 rather than inferring it from message traffic.
 */
 bool queryOTGWgatewaymode(){
+  static uint32_t lastGatewayModeQueryMs = 0;
+  static bool cachedGatewayMode = false;
+  static bool hasCachedGatewayMode = false;
+  constexpr uint32_t GATEWAY_MODE_QUERY_MIN_INTERVAL_MS = 60000; // hard throttle: max one PR=M per minute
+
   if (!bPICavailable) {
     OTGWDebugTln(F("queryOTGWgatewaymode: PIC not available"));
     return false;
+  }
+
+  const uint32_t now = millis();
+  if (hasCachedGatewayMode && ((uint32_t)(now - lastGatewayModeQueryMs) < GATEWAY_MODE_QUERY_MIN_INTERVAL_MS)) {
+    OTGWDebugTf(PSTR("queryOTGWgatewaymode: throttled, using cached value [%s]\r\n"), CCONOFF(cachedGatewayMode));
+    return cachedGatewayMode;
   }
   
   String response = executeCommand("PR=M");
@@ -212,6 +223,10 @@ bool queryOTGWgatewaymode(){
   } else {
     OTGWDebugTln(F("queryOTGWgatewaymode: Empty response, defaulting to false"));
   }
+
+  cachedGatewayMode = isGatewayMode;
+  hasCachedGatewayMode = true;
+  lastGatewayModeQueryMs = now;
   
   return isGatewayMode;
 }
