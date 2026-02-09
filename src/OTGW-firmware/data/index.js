@@ -102,12 +102,12 @@ function updateGatewayModeFromDevInfoEntries(entries) {
   updateGatewayModeIndicator(parseGatewayModeValue(gatewayModeValue));
 }
 
-function refreshGatewayMode(_force) {
+function refreshGatewayMode(force) {
   if (flashModeActive || !isPageVisible()) return;
 
   const now = Date.now();
   if (gatewayModeFetchInFlight) return;
-  if ((now - gatewayModeLastFetchMs) < GATEWAY_MODE_REFRESH_INTERVAL_MS) return;
+  if (!force && (now - gatewayModeLastFetchMs) < GATEWAY_MODE_REFRESH_INTERVAL_MS) return;
 
   gatewayModeFetchInFlight = true;
 
