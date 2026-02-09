@@ -1,4 +1,4 @@
-# ADR-029: Non-Blocking Modal Dialogs for User Input
+# ADR-034: Non-Blocking Modal Dialogs for User Input
 
 **Status:** Accepted  
 **Date:** 2026-02-04  

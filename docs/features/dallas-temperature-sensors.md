@@ -271,4 +271,4 @@ Pressing `d` toggles `bDebugSensorSimulation` and calls `initSensors()` to immed
 
 - **ADR-020**: Dallas DS18B20 Sensor Integration
 - **ADR-033**: Dallas Sensor Custom Labels & Graph Visualization
-- **ADR-029**: Non-Blocking Modal Dialogs (inline label editor pattern)
+- **ADR-034**: Non-Blocking Modal Dialogs (inline label editor pattern)

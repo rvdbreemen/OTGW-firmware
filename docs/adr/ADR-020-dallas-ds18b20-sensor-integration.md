@@ -381,7 +381,7 @@ ESP8266 GPIO 10 (SD3) ────┬──── VCC (3.3V)
 - **Default label:** Hex address until user customizes
 - **Persistence:** Stored in LittleFS via settings.json
 - **API endpoint:** `POST /api/v1/sensors/label` for updates
-- **UI:** Non-blocking modal dialog for editing (see ADR-029)
+- **UI:** Non-blocking modal dialog for editing (see ADR-034)
 
 **Label storage format:**
 ```json
@@ -472,14 +472,14 @@ if (key.length === 16 &&
 }
 ```
 
-**See also:** ADR-029 for non-blocking modal dialog pattern used for label editing.
+**See also:** ADR-034 for non-blocking modal dialog pattern used for label editing.
 
 ## Related Decisions
 - ADR-006: MQTT Integration Pattern (sensor publishing)
 - ADR-008: LittleFS for Configuration Persistence (sensors.json and label storage)
 - ADR-018: ArduinoJson for Data Interchange (label JSON storage)
 - ADR-019: REST API Versioning Strategy (new endpoint in v1 API)
-- ADR-029: Non-Blocking Modal Dialogs (label editing UI)
+- ADR-034: Non-Blocking Modal Dialogs (label editing UI)
 
 ## References
 - Implementation: `sensors_ext.ino` (sensor reading and label management)
