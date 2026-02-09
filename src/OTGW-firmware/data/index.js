@@ -55,9 +55,9 @@ document.addEventListener('visibilitychange', function () {
 var tid = 0;
 var timeupdate = null; // Will be started when needed
 
-let gatewayModeLastFetchMs = 0;
-let gatewayModeFetchInFlight = false;
-const GATEWAY_MODE_REFRESH_INTERVAL_MS = 60000; // hard throttle: max one fetch per minute
+let gatewayModeRefreshCounter = 0;
+let gatewayModeRefreshInFlight = false; // Prevents double-triggering even when force=true
+const GATEWAY_MODE_REFRESH_INTERVAL = 60; // 60s max polling interval (at most once a minute)
 
 function updateGatewayModeIndicator(value) {
   const statusEl = document.getElementById('gatewayModeStatus');
@@ -102,14 +102,19 @@ function updateGatewayModeFromDevInfoEntries(entries) {
   updateGatewayModeIndicator(parseGatewayModeValue(gatewayModeValue));
 }
 
-function refreshGatewayMode(_force) {
+function refreshGatewayMode(force) {
+  // In-flight check MUST occur before force check to ensure throttle has priority
+  if (gatewayModeRefreshInFlight) return;
+  
   if (flashModeActive || !isPageVisible()) return;
+  
+  if (!force && gatewayModeRefreshCounter < GATEWAY_MODE_REFRESH_INTERVAL) {
+    gatewayModeRefreshCounter++;
+    return;
+  }
 
-  const now = Date.now();
-  if (gatewayModeFetchInFlight) return;
-  if ((now - gatewayModeLastFetchMs) < GATEWAY_MODE_REFRESH_INTERVAL_MS) return;
-
-  gatewayModeFetchInFlight = true;
+  gatewayModeRefreshCounter = 0;
+  gatewayModeRefreshInFlight = true;
 
   fetch(APIGW + 'v0/devinfo')
     .then(response => {
@@ -121,15 +126,13 @@ function refreshGatewayMode(_force) {
     .then(json => {
       const entries = (json && json.devinfo) ? json.devinfo : [];
       updateGatewayModeFromDevInfoEntries(entries);
-      gatewayModeLastFetchMs = Date.now();
     })
     .catch(error => {
       console.warn('refreshGatewayMode warning:', error);
       updateGatewayModeIndicator(null);
-      gatewayModeLastFetchMs = Date.now();
     })
     .finally(() => {
-      gatewayModeFetchInFlight = false;
+      gatewayModeRefreshInFlight = false;
     });
 }
 
@@ -2202,7 +2205,6 @@ function initMainPage() {
   // Start time updates if not in flash mode
   if (!flashModeActive && !timeupdate) {
     refreshDevTime();
-    refreshGatewayMode(true);
     timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
   }
 
@@ -2223,7 +2225,6 @@ function showMainPage() {
   }
   
   refreshDevTime();
-  refreshGatewayMode(true);
   
   document.getElementById("displayMainPage").classList.add('active');
   document.getElementById("displaySettingsPage").classList.remove('active');
@@ -2583,7 +2584,6 @@ function refreshDevInfo() {
       }
 
       updateGatewayModeFromDevInfoEntries(data);
-      gatewayModeLastFetchMs = Date.now();
 
       const versionEl = document.getElementById('devVersion');
       if (versionEl) versionEl.textContent = version;
