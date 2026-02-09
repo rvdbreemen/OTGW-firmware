@@ -195,7 +195,6 @@ bool queryOTGWgatewaymode(){
 
   const uint32_t now = millis();
   if (hasCachedGatewayMode && ((uint32_t)(now - lastGatewayModeQueryMs) < GATEWAY_MODE_QUERY_MIN_INTERVAL_MS)) {
-    OTGWDebugTf(PSTR("queryOTGWgatewaymode: throttled, using cached value [%s]\r\n"), CCONOFF(cachedGatewayMode));
     return cachedGatewayMode;
   }
   
