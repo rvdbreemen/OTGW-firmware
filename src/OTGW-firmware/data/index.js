@@ -108,9 +108,6 @@ function refreshGatewayMode(force) {
   
   if (flashModeActive || !isPageVisible()) return;
   
-  // Throttle has priority: prevent double-triggering even with force=true
-  if (gatewayModeRefreshInFlight) return;
-  
   if (!force && gatewayModeRefreshCounter < GATEWAY_MODE_REFRESH_INTERVAL) {
     gatewayModeRefreshCounter++;
     return;
@@ -2228,7 +2225,6 @@ function showMainPage() {
   }
   
   refreshDevTime();
-  refreshGatewayMode(true);
   
   document.getElementById("displayMainPage").classList.add('active');
   document.getElementById("displaySettingsPage").classList.remove('active');
