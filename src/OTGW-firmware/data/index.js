@@ -56,7 +56,7 @@ var tid = 0;
 var timeupdate = null; // Will be started when needed
 
 let gatewayModeRefreshCounter = 0;
-let gatewayModeRefreshInFlight = false;
+let gatewayModeRefreshInFlight = false; // Prevents double-triggering even when force=true
 const GATEWAY_MODE_REFRESH_INTERVAL = 60; // 60s max polling interval (at most once a minute)
 
 function updateGatewayModeIndicator(value) {
@@ -103,6 +103,9 @@ function updateGatewayModeFromDevInfoEntries(entries) {
 }
 
 function refreshGatewayMode(force) {
+  // In-flight check MUST occur before force check to ensure throttle has priority
+  if (gatewayModeRefreshInFlight) return;
+  
   if (flashModeActive || !isPageVisible()) return;
   
   // Throttle has priority: prevent double-triggering even with force=true
@@ -2205,7 +2208,6 @@ function initMainPage() {
   // Start time updates if not in flash mode
   if (!flashModeActive && !timeupdate) {
     refreshDevTime();
-    refreshGatewayMode(true);
     timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
   }
 
@@ -2226,7 +2228,6 @@ function showMainPage() {
   }
   
   refreshDevTime();
-  refreshGatewayMode(true);
   
   document.getElementById("displayMainPage").classList.add('active');
   document.getElementById("displaySettingsPage").classList.remove('active');
