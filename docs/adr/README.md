@@ -11,12 +11,12 @@ Architecture Decision Records capture important architectural decisions along wi
 **By Topic:**
 - [Platform & Build](#platform-and-build-system) (4 ADRs)
 - [Memory Management](#memory-management) (4 ADRs) 🆕
-- [Network & Security](#network-and-security) (4 ADRs) 🆕
+- [Network & Security](#network-and-security) (3 ADRs) 🆕
 - [Integration](#integration-and-communication) (3 ADRs) 🆕
 - [Core Systems](#system-architecture) (6 ADRs)
-- [Features & Extensions](#features-and-extensions) (6 ADRs)
-- [Browser & Client](#browser-and-client-compatibility) (3 ADRs)
-- [OTA & Updates](#ota-and-firmware-updates) (1 ADR)
+- [Features & Extensions](#features-and-extensions) (7 ADRs)
+- [Browser & Client](#browser-and-client-compatibility) (4 ADRs)
+- [OTA & Updates](#ota-and-firmware-updates) (2 ADRs)
 
 **Foundational ADRs** (most referenced by other ADRs):
 - **ADR-001:** ESP8266 Platform Selection (establishes hardware constraints)
@@ -118,6 +118,9 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-024: Debug Telnet Command Console](ADR-024-debug-telnet-command-console.md)**  
   Interactive telnet-based debug console for real-time diagnostics and hardware testing.
 
+- **[ADR-033: Dallas Sensor Custom Labels and Graph Visualization](ADR-033-dallas-sensor-custom-labels-graph-visualization.md)** 🆕  
+  Persistent custom sensor labels (16 chars max) with REST API endpoint, dynamic graph visualization with 16-color palette, and non-blocking inline editor.
+
 ### Browser and Client Compatibility
 - **[ADR-025: Safari WebSocket Connection Management During Firmware Upload](ADR-025-safari-websocket-connection-management.md)**  
   Proactively closing WebSocket before firmware upload to prevent Safari's connection pool exhaustion from dropping it mid-transfer.
@@ -128,6 +131,9 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-027: Version Mismatch Warning System in Web UI](ADR-027-version-mismatch-warning-system.md)**  
   Prominent visual warning banner that automatically appears when firmware and filesystem versions don't match to prevent user confusion.
 
+- **[ADR-034: Non-Blocking Modal Dialogs for User Input](ADR-034-non-blocking-modal-dialogs.md)** 🆕  
+  Custom HTML/CSS modal dialogs instead of blocking prompt() to maintain real-time data flow.
+
 
 ### OTA and Firmware Updates
 - **[ADR-028: File Streaming Over Loading for Memory Safety](ADR-028-file-streaming-over-loading.md)** 🆕  
@@ -135,12 +141,6 @@ Architecture Decision Records capture important architectural decisions along wi
 
 - **[ADR-029: Simple XHR-Based OTA Flash (KISS Principle)](ADR-029-simple-xhr-ota-flash.md)** 🆕  
   Simplified firmware flash mechanism using XHR with backend confirmation, eliminating WebSocket complexity and Safari bugs. Reduces code by 68.5% while improving reliability.
-
-- **[ADR-030: Non-Blocking Modal Dialogs for User Input](ADR-030-non-blocking-modal-dialogs.md)** 🆕  
-  Custom HTML/CSS modal dialogs instead of blocking prompt() to maintain real-time data flow.
-
-- **[ADR-033: Dallas Sensor Custom Labels and Graph Visualization](ADR-033-dallas-sensor-custom-labels-graph-visualization.md)** 🆕  
-  Persistent custom sensor labels (16 chars max) with REST API endpoint, dynamic graph visualization with 16-color palette, and non-blocking inline editor.
 
 ## ADR Template
 
