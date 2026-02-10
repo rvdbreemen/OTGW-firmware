@@ -115,7 +115,17 @@ void readSettings(bool show)
   
   settingMQTTbrokerPort   = doc[F("MQTTbrokerPort")]; //default port
   strlcpy(settingMQTTuser, doc[F("MQTTuser")] | "", sizeof(settingMQTTuser));
+  // Trim leading/trailing whitespace from username
+  char* trimmedUser = trimwhitespace(settingMQTTuser);
+  if (trimmedUser != settingMQTTuser) {
+    memmove(settingMQTTuser, trimmedUser, strlen(trimmedUser) + 1);
+  }
   strlcpy(settingMQTTpasswd, doc[F("MQTTpasswd")] | "", sizeof(settingMQTTpasswd));
+  // Trim leading/trailing whitespace from password
+  char* trimmedPasswd = trimwhitespace(settingMQTTpasswd);
+  if (trimmedPasswd != settingMQTTpasswd) {
+    memmove(settingMQTTpasswd, trimmedPasswd, strlen(trimmedPasswd) + 1);
+  }
   
   strlcpy(settingMQTTtopTopic, doc[F("MQTTtoptopic")] | "", sizeof(settingMQTTtopTopic));
   if (strlen(settingMQTTtopTopic)==0 || strcmp_P(settingMQTTtopTopic, PSTR("null"))==0) {
@@ -239,10 +249,22 @@ void updateSetting(const char *field, const char *newValue)
   if (strcasecmp_P(field, PSTR("MQTTenable"))==0)      settingMQTTenable = EVALBOOLEAN(newValue);
   if (strcasecmp_P(field, PSTR("MQTTbroker")) == 0)    strlcpy(settingMQTTbroker, newValue, sizeof(settingMQTTbroker));
   if (strcasecmp_P(field, PSTR("MQTTbrokerPort"))==0)  settingMQTTbrokerPort = atoi(newValue);
-  if (strcasecmp_P(field, PSTR("MQTTuser"))==0)        strlcpy(settingMQTTuser, newValue, sizeof(settingMQTTuser));
+  if (strcasecmp_P(field, PSTR("MQTTuser"))==0) {
+    strlcpy(settingMQTTuser, newValue, sizeof(settingMQTTuser));
+    // Trim leading/trailing whitespace from username
+    char* trimmedUser = trimwhitespace(settingMQTTuser);
+    if (trimmedUser != settingMQTTuser) {
+      memmove(settingMQTTuser, trimmedUser, strlen(trimmedUser) + 1);
+    }
+  }
   if (strcasecmp_P(field, PSTR("MQTTpasswd"))==0){
     if ( newValue && strcasecmp_P(newValue, PSTR("notthepassword")) != 0 ){
       strlcpy(settingMQTTpasswd, newValue, sizeof(settingMQTTpasswd));
+      // Trim leading/trailing whitespace from password
+      char* trimmedPasswd = trimwhitespace(settingMQTTpasswd);
+      if (trimmedPasswd != settingMQTTpasswd) {
+        memmove(settingMQTTpasswd, trimmedPasswd, strlen(trimmedPasswd) + 1);
+      }
     }
   }
   if (strcasecmp_P(field, PSTR("MQTTtoptopic"))==0)    {
