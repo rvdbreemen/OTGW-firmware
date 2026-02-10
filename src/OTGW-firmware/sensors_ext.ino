@@ -50,6 +50,56 @@ const uint8_t DallasSimDeviceAddresses[SIM_SENSOR_COUNT][8] = {
   {0x28, 0xD0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03}
 };
 
+// Ensure all discovered sensors have default labels in /dallas_labels.ini
+// Works for both real and simulated sensors
+void ensureSensorDefaultLabels()
+{
+  if (DallasrealDeviceCount < 1) return;
+
+  DynamicJsonDocument doc(JSON_BUFF_MAX);
+
+  // Read existing labels from file
+  File labelsFile = LittleFS.open(F("/dallas_labels.ini"), "r");
+  if (labelsFile)
+  {
+    DeserializationError err = deserializeJson(doc, labelsFile);
+    labelsFile.close();
+    if (err)
+    {
+      DebugTf(PSTR("Error reading labels file: %s, creating new\r\n"), err.c_str());
+      doc.clear();
+    }
+  }
+
+  bool changed = false;
+  const char* prefix = bDebugSensorSimulation ? "Sim Sensor" : "Sensor";
+
+  for (int i = 0; i < DallasrealDeviceCount; i++)
+  {
+    // Use String to ensure ArduinoJson copies the key (getDallasAddress returns static buffer)
+    String addr = String(getDallasAddress(DallasrealDevice[i].addr));
+    if (!doc.containsKey(addr))
+    {
+      char label[24];
+      snprintf_P(label, sizeof(label), PSTR("%s %d"), prefix, i + 1);
+      doc[addr] = label;
+      changed = true;
+      DebugTf(PSTR("Created default label '%s' for sensor %s\r\n"), label, addr.c_str());
+    }
+  }
+
+  if (changed)
+  {
+    File outFile = LittleFS.open(F("/dallas_labels.ini"), "w");
+    if (outFile)
+    {
+      serializeJson(doc, outFile);
+      outFile.close();
+      DebugTf(PSTR("Saved %d sensor label(s) to dallas_labels.ini\r\n"), DallasrealDeviceCount);
+    }
+  }
+}
+
 void initSimulatedDallasSensors()
 {
   DallasrealDeviceCount = SIM_SENSOR_COUNT;
@@ -62,10 +112,6 @@ void initSimulatedDallasSensors()
     memcpy(DallasrealDevice[i].addr, DallasSimDeviceAddresses[i], sizeof(DeviceAddress));
     DallasrealDevice[i].tempC = 30.0f + (i * 5.0f);
     DallasrealDevice[i].lasttime = 0;
-
-    // Labels are stored in /dallas_labels.ini file (not in RAM)
-    // Web UI fetches labels via GET /api/v1/sensors/labels
-
   }
 
   if (bDebugSensors)
@@ -97,6 +143,7 @@ void initSensors() {
   if (bDebugSensorSimulation)
   {
     initSimulatedDallasSensors();
+    ensureSensorDefaultLabels();
     return;
   }
 
@@ -147,6 +194,9 @@ void initSensors() {
     settingGPIOSENSORSenabled = false;
     return;
   }
+
+  // Create default labels for discovered sensors if they don't exist yet
+  ensureSensorDefaultLabels();
 }
 
 // Send the sensor device address to MQ for Autoconfigure
@@ -176,9 +226,10 @@ if (settingMQTTenable) {
   {
     sensors.requestTemperatures(); // Send the command to get temperatures
   }
-  else if (simLastUpdateTime != 0 && (now - simLastUpdateTime) < SIM_SENSOR_UPDATE_INTERVAL_SECONDS)
+  bool simUpdateDue = true;
+  if (bDebugSensorSimulation && simLastUpdateTime != 0 && (now - simLastUpdateTime) < SIM_SENSOR_UPDATE_INTERVAL_SECONDS)
   {
-    return;
+    simUpdateDue = false;
   }
 
   // check if HA Autoconfigure must be performed (initial or as repeat for HA reboot)
@@ -191,11 +242,14 @@ if (settingMQTTenable) {
     // Store the C temp in struc to allow it to be shown on Homepage through restAPI.ino
     if (bDebugSensorSimulation)
     {
-      float delta = (random(0, 21) - 10) / 20.0f; // -0.5 to +0.5
-      float nextTemp = DallasrealDevice[i].tempC + delta;
-      if (nextTemp < SIM_SENSOR_MIN) nextTemp = SIM_SENSOR_MIN;
-      if (nextTemp > SIM_SENSOR_MAX) nextTemp = SIM_SENSOR_MAX;
-      DallasrealDevice[i].tempC = nextTemp;
+      if (simUpdateDue)
+      {
+        float delta = (random(0, 21) - 10) / 20.0f; // -0.5 to +0.5
+        float nextTemp = DallasrealDevice[i].tempC + delta;
+        if (nextTemp < SIM_SENSOR_MIN) nextTemp = SIM_SENSOR_MIN;
+        if (nextTemp > SIM_SENSOR_MAX) nextTemp = SIM_SENSOR_MAX;
+        DallasrealDevice[i].tempC = nextTemp;
+      }
     }
     else
     {
@@ -203,12 +257,15 @@ if (settingMQTTenable) {
     }
     DallasrealDevice[i].lasttime = now ;
     
-    // Debug logging: gate simulation logs behind bDebugSensors to reduce telnet output
-    if (bDebugSensorSimulation && bDebugSensors)
+    // Debug logging: always show simulated values in telnet for visibility
+    if (bDebugSensorSimulation)
     {
-      DebugTf(PSTR("[SIM] Sensor device no[%d] addr[%s] TempC: %4.1f\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
+      if (simUpdateDue)
+      {
+        DebugTf(PSTR("[SIM] Sensor device no[%d] addr[%s] TempC: %4.1f\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
+      }
     }
-    else if (bDebugSensors && !bDebugSensorSimulation)
+    else if (bDebugSensors)
     {
       DebugTf(PSTR("Sensor device no[%d] addr[%s] TempC: %f\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
     }
@@ -228,7 +285,7 @@ if (settingMQTTenable) {
       // Serial.println(DallasTemperature::toFahrenheit(tempC)); // Converts tempC to Fahrenheit
     }
   }
-  if (bDebugSensorSimulation)
+  if (bDebugSensorSimulation && simUpdateDue)
   {
     simLastUpdateTime = now;
   }
