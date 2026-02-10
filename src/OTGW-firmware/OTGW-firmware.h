@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.1.0-beta
+**  Version  : v1.0.1
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
