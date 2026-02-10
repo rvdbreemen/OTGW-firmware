@@ -13,6 +13,18 @@ const APIGW = window.location.protocol + '//' + window.location.host + '/api/';
 
 "use strict";
 
+// Helper to detect Dallas sensor addresses in both standard (16-char) and
+// legacy (8-9 char) hex format.  The legacy format is produced by the v0.10.x
+// sprintf overlap bug (writing at offset i instead of i*2), yielding 9 chars
+// when the last byte >= 0x10, or 8 chars when < 0x10.  No Dallas family-byte
+// prefix is checked; only the length + hex-character pattern is used.
+function isDallasAddress(name) {
+  if (typeof name !== 'string') return false;
+  var len = name.length;
+  return (len === 8 || len === 9 || len === 16) &&
+         /^[0-9A-Fa-f]+$/.test(name);
+}
+
 // Global cache for Dallas sensor labels (loaded from /dallas_labels.ini)
 var dallasLabelsCache = {};
 
@@ -2746,9 +2758,8 @@ function refreshOTmonitor() {
 
       // Helper function to format Dallas sensor temperature values
       function formatDallasSensorValue(name, value) {
-        // Check if this is a Dallas sensor (16 hex chars)
-        if (name && typeof name === 'string' && 
-            name.length === 16 && /^[0-9A-Fa-f]{16}$/.test(name)) {
+        // Check if this is a Dallas sensor (standard 16-char or legacy ~9-10 char hex address)
+        if (isDallasAddress(name)) {
           // Check if value is numeric (temperature)
           var numValue = parseFloat(value);
           if (!isNaN(numValue)) {
@@ -2786,10 +2797,9 @@ function refreshOTmonitor() {
           var fldDiv = document.createElement("div");
           fldDiv.setAttribute("class", "otmoncolumn1");
           
-          // Check if this is a Dallas sensor (16 hex chars) and has a custom label
+          // Check if this is a Dallas sensor (standard 16-char or legacy ~9-10 char hex address)
           var displayName = translateToHuman(data[i].name);
-          if (data[i].name && typeof data[i].name === 'string' && 
-              data[i].name.length === 16 && /^[0-9A-Fa-f]{16}$/.test(data[i].name)) {
+          if (isDallasAddress(data[i].name)) {
             // This is a Dallas sensor hex address - check for custom label in cache
             if (dallasLabelsCache[data[i].name]) {
               displayName = dallasLabelsCache[data[i].name];
@@ -4097,7 +4107,7 @@ function loadPersistentUI() {
 var activeSensorLabelEditor = null;
 
 function openInlineSensorLabelEditor(address, targetNode, evt) {
-  if (!address || address.length !== 16 || !targetNode) return;
+  if (!isDallasAddress(address) || !targetNode) return;
   if (evt) {
     evt.preventDefault();
     evt.stopPropagation();
