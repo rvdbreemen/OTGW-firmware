@@ -57,7 +57,7 @@ static const char UpdateServerIndex[] PROGMEM =
             Select a "<b>.littlefs.bin</b>" file to flash<br/>
             <input type='file' accept='.littlefs.bin' name='filesystem' required>
             <br/>
-            <label><input type="checkbox" id="chkPreserve" checked autocomplete="off"> Download settings backup (settings auto-restore from memory)</label>
+            <label><input type="checkbox" id="chkPreserve" checked autocomplete="off"> Download backups (settings.ini + dallas_labels.ini if exists)</label>
             <br/>
             <input id='fsSubmit' type='submit' value='Flash LittleFS' disabled>
         </form>
@@ -141,11 +141,42 @@ static const char UpdateServerIndex[] PROGMEM =
                  // Validate health response - simple object access
                  if (data && data.health && data.health.status === 'UP') {
                    clearInterval(checkInterval);
-                   console.log('[OTA] State: Device is healthy, redirecting');
-                   progressText.textContent = 'Device is back online! Redirecting...';
-                   setTimeout(function() {
-                     window.location.href = '/';
-                   }, 1000);
+                   console.log('[OTA] State: Device is healthy');
+                   progressText.textContent = 'Device is back online!';
+                   
+                   // Try to restore dallas labels from parent window cache
+                   var labelsRestored = Promise.resolve();
+                   try {
+                     if (window.opener && window.opener.dallasLabelsCache) {
+                       var labels = window.opener.dallasLabelsCache;
+                       if (labels && typeof labels === 'object' && Object.keys(labels).length > 0) {
+                         console.log('[OTA] Restoring Dallas labels from memory cache');
+                         progressText.textContent = 'Restoring Dallas labels...';
+                         labelsRestored = fetch('/api/v1/sensors/labels', {
+                           method: 'POST',
+                           headers: { 'Content-Type': 'application/json' },
+                           body: JSON.stringify(labels)
+                         })
+                         .then(function(res) {
+                           if (res.ok) {
+                             console.log('[OTA] Dallas labels restored successfully');
+                           } else {
+                             console.error('[OTA] Label restore failed: HTTP ' + res.status);
+                           }
+                         })
+                         .catch(function(err) {
+                           console.error('[OTA] Label restore error:', err);
+                         });
+                       }
+                     }
+                   } catch(e) { console.log('[OTA] Label restore skipped:', e); }
+                   
+                   labelsRestored.then(function() {
+                     progressText.textContent = 'Redirecting...';
+                     setTimeout(function() {
+                       window.location.href = '/';
+                     }, 1000);
+                   });
                  }
                })
                .catch(function(e) {
@@ -210,34 +241,56 @@ static const char UpdateServerIndex[] PROGMEM =
              
              var preFlight = Promise.resolve();
              
-             // Backup settings before filesystem flash
+             // Backup settings and dallas labels before filesystem flash
              if (formId === 'fsForm') {
                var chk = document.getElementById('chkPreserve');
                if (chk && chk.checked) {
-                 console.log('[OTA] State: Downloading settings backup before filesystem flash');
-                 progressText.textContent = 'Downloading settings backup...';
-                 preFlight = fetch('/settings.ini')
-                   .then(function(resp) { return resp.blob(); })
-                   .then(function(blob) {
-                     var now = new Date();
-                     var stamp = now.toISOString().replace(/[:.]/g, '-');
-                     var filename = 'settings-' + stamp + '.ini';
-                     var url = window.URL.createObjectURL(blob);
-                     var a = document.createElement('a');
-                     a.style.display = 'none';
-                     a.href = url;
-                     a.download = filename;
-                     document.body.appendChild(a);
-                     a.click();
-                     window.URL.revokeObjectURL(url);
-                     document.body.removeChild(a);
-                     console.log('[OTA] State: Settings backup downloaded as ' + filename);
-                     return new Promise(function(resolve) { setTimeout(resolve, 1000); });
-                   })
+                 console.log('[OTA] State: Downloading backups before filesystem flash');
+                 progressText.textContent = 'Downloading backups...';
+                 
+                 // Helper to download a file as backup
+                 function downloadBackup(url, prefix) {
+                   return fetch(url)
+                     .then(function(resp) {
+                       if (!resp.ok && resp.status === 404) return null;
+                       if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                       return resp.blob();
+                     })
+                     .then(function(blob) {
+                       if (!blob) return; // File doesn't exist
+                       var now = new Date();
+                       var stamp = now.toISOString().replace(/[:.]/g, '-');
+                       var filename = prefix + '-' + stamp + '.ini';
+                       var objUrl = window.URL.createObjectURL(blob);
+                       var a = document.createElement('a');
+                       a.style.display = 'none';
+                       a.href = objUrl;
+                       a.download = filename;
+                       document.body.appendChild(a);
+                       a.click();
+                       window.URL.revokeObjectURL(objUrl);
+                       document.body.removeChild(a);
+                       console.log('[OTA] State: Backup downloaded as ' + filename);
+                       return new Promise(function(resolve) { setTimeout(resolve, 500); });
+                     });
+                 }
+                 
+                 var settingsBackup = downloadBackup('/settings.ini', 'settings')
                    .catch(function(e) {
                      if (!confirm('Could not backup settings.ini. Continue anyway?')) {
                        throw e;
                      }
+                   });
+                 
+                 var labelsBackup = downloadBackup('/dallas_labels.ini', 'dallas_labels')
+                   .catch(function(e) {
+                     console.log('[OTA] Dallas labels backup skipped (non-fatal)', e);
+                   });
+                 
+                 preFlight = Promise.all([settingsBackup, labelsBackup])
+                   .then(function() {
+                     console.log('[OTA] State: All backups complete');
+                     return new Promise(function(resolve) { setTimeout(resolve, 500); });
                    });
                }
              }
@@ -370,11 +423,39 @@ static const char UpdateServerSuccess[] PROGMEM =
                // Validate health response - simple object access
                if (data && data.health && data.health.status === 'UP') {
                  clearInterval(poller);
-                 statusEl.textContent = "Device is back online! Redirecting...";
+                 statusEl.textContent = "Device is back online!";
                  statusEl.style.color = "green";
-                 setTimeout(function() {
-                   window.location.href = "/";
-                 }, 1000);
+                 
+                 // Try to restore dallas labels from parent window cache
+                 var labelsRestored = Promise.resolve();
+                 try {
+                   if (window.opener && window.opener.dallasLabelsCache) {
+                     var labels = window.opener.dallasLabelsCache;
+                     if (labels && typeof labels === 'object' && Object.keys(labels).length > 0) {
+                       statusEl.textContent = "Restoring Dallas labels...";
+                       labelsRestored = fetch('/api/v1/sensors/labels', {
+                         method: 'POST',
+                         headers: { 'Content-Type': 'application/json' },
+                         body: JSON.stringify(labels)
+                       })
+                       .then(function(res) {
+                         if (res.ok) {
+                           console.log('[OTA] Dallas labels restored');
+                         }
+                       })
+                       .catch(function(err) {
+                         console.error('[OTA] Label restore error:', err);
+                       });
+                     }
+                   }
+                 } catch(e) {}
+                 
+                 labelsRestored.then(function() {
+                   statusEl.textContent = "Redirecting...";
+                   setTimeout(function() {
+                     window.location.href = "/";
+                   }, 1000);
+                 });
                }
              })
              .catch(function(e) {

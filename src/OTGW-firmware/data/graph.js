@@ -12,15 +12,10 @@
 // Configuration constants
 const UPDATE_INTERVAL_MS = 2000; // Update chart every 2 seconds to reduce load
 
-// Helper to detect Dallas sensor addresses in both standard (16-char) and
-// legacy (8-9 char) hex format.  The legacy v0.10.x sprintf overlap bug
-// produces 9 chars (last byte >= 0x10) or 8 chars (last byte < 0x10).
-// No Dallas family-byte prefix is checked.
-function isDallasAddress(name) {
-  if (typeof name !== 'string') return false;
-  var len = name.length;
-  return (len === 8 || len === 9 || len === 16) &&
-         /^[0-9A-Fa-f]+$/.test(name);
+// Helper to detect Dallas sensor entries via the explicit "type":"dallas"
+// field added by the firmware API.  Accepts an API entry object.
+function isDallasAddress(entry) {
+  return entry != null && entry.type === 'dallas';
 }
 
 var OTGraph = {
@@ -272,14 +267,12 @@ var OTGraph = {
         
         if (sensorCount === 0 || isNaN(sensorCount)) return;
         
-        // Find all sensor entries (hex addresses starting with typical Dallas patterns)
+        // Find all Dallas sensor entries (identified by type field in API response)
         for (var key in apiData) {
             if (!apiData.hasOwnProperty(key)) continue;
             
-            // Dallas sensor addresses are 16-char hex strings (8 bytes in hex)
-            // They typically start with 28 (DS18B20), 10 (DS18S20), or 22 (DS1822)
-            // Legacy format may produce shorter (~9-10 char) hex strings
-            if (isDallasAddress(key)) {
+            // Dallas sensors have type:"dallas" in the API response
+            if (isDallasAddress(apiData[key])) {
                 
                 // Check if this sensor is already registered
                 if (!this.sensorAddressToId[key]) {

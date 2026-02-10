@@ -57,13 +57,15 @@ function safeGetElementById(id, warnIfMissing = false) {
 }
 
 // ============================================================================
-// Helper to detect Dallas sensor addresses in both standard (16-char) and
-// legacy (8-9 char) hex format.  The legacy format is produced by the v0.10.x
-// sprintf overlap bug (writing at offset i instead of i*2), yielding 9 chars
-// when the last byte >= 0x10, or 8 chars when < 0x10.  No Dallas family-byte
-// prefix is checked; only the length + hex-character pattern is used.
-function isDallasAddress(name) {
+// Helper to detect Dallas sensor entries via explicit type or legacy address format.
+function isDallasAddress(entry) {
+  if (entry == null) return false;
+  if (entry.type === 'dallas') return true;
+
+  var name = (typeof entry === 'string') ? entry : entry.name;
   if (typeof name !== 'string') return false;
+
+  // Legacy and standard hex address formats (8/9/16 chars).
   var len = name.length;
   return (len === 8 || len === 9 || len === 16) &&
          /^[0-9A-Fa-f]+$/.test(name);
@@ -2753,13 +2755,6 @@ function refreshOTmonitor() {
       var simState = null;
       if (data && data.sensorsimulation && typeof data.sensorsimulation.value !== 'undefined') {
         simState = data.sensorsimulation.value;
-      } else if (Array.isArray(data)) {
-        for (var s = 0; s < data.length; s++) {
-          if (data[s].name === 'sensorsimulation') {
-            simState = data[s].value;
-            break;
-          }
-        }
       }
 
       if (typeof simState === 'string') {
@@ -2815,26 +2810,11 @@ function refreshOTmonitor() {
         otMonPage.appendChild(otMonTable);
       }
 
-      // Helper function to format Dallas sensor temperature values
-      function formatDallasSensorValue(name, value) {
-        // Check if this is a Dallas sensor (standard 16-char or legacy ~9-10 char hex address)
-        if (isDallasAddress(name)) {
-          // Check if value is numeric (temperature)
-          var numValue = parseFloat(value);
-          if (!isNaN(numValue)) {
-            return numValue.toFixed(1);
-          }
-        }
-        return value;
-      }
-
       for (let i in data) {
-        // Support for new Map-based JSON (less redundant):
-        // If data is an object map, 'i' is the key (name).
-        // If data is an array, 'i' is the index, and data[i] has a 'name' property.
+        // Map-based JSON: 'i' is the key (name), data[i] is the entry object
         if (!data[i].name) data[i].name = i;
 
-        if (data[i].name === 'sensorsimulation') {
+        if (i === 'sensorsimulation') {
           continue;
         }
 
@@ -2856,10 +2836,10 @@ function refreshOTmonitor() {
           var fldDiv = document.createElement("div");
           fldDiv.setAttribute("class", "otmoncolumn1");
           
-          // Check if this is a Dallas sensor (standard 16-char or legacy ~9-10 char hex address)
-          var displayName = translateToHuman(data[i].name);
-          if (isDallasAddress(data[i].name)) {
-            // This is a Dallas sensor hex address - check for custom label in cache
+          var displayName;
+          if (isDallasAddress(data[i])) {
+            displayName = data[i].name;
+            // Check for custom label in cache
             if (dallasLabelsCache[data[i].name]) {
               displayName = dallasLabelsCache[data[i].name];
             }
@@ -2882,7 +2862,7 @@ function refreshOTmonitor() {
             editIcon.textContent = ' ✏️';
             fldDiv.appendChild(editIcon);
           } else {
-            // Not a Dallas sensor, just display as text
+            displayName = translateToHuman(data[i].name);
             fldDiv.textContent = displayName;
           }
           
@@ -2893,7 +2873,7 @@ function refreshOTmonitor() {
           valDiv.setAttribute("id", "otmon_" + data[i].name);
           if (data[i].value === "On") valDiv.innerHTML = "<span class='state-on'></span>";
           else if (data[i].value === "Off") valDiv.innerHTML = "<span class='state-off'></span>";
-          else valDiv.textContent = formatDallasSensorValue(data[i].name, data[i].value);
+          else valDiv.textContent = data[i].value;
           rowDiv.appendChild(valDiv);
           //--- Unit  ---
           var unitDiv = document.createElement("div");
@@ -2920,7 +2900,7 @@ function refreshOTmonitor() {
           epoch.value = data[i].epoch;
           if (data[i].value === "On") update.innerHTML = "<span class='state-on'></span>";
           else if (data[i].value === "Off") update.innerHTML = "<span class='state-off'></span>";
-          else update.textContent = formatDallasSensorValue(data[i].name, data[i].value);
+          else update.textContent = data[i].value;
           //if (update.style.visibility == 'visible') update.textContent = data[i].value;
 
         }
@@ -4166,7 +4146,7 @@ function loadPersistentUI() {
 var activeSensorLabelEditor = null;
 
 function openInlineSensorLabelEditor(address, targetNode, evt) {
-  if (!isDallasAddress(address) || !targetNode) return;
+  if (!address || !targetNode) return;
   if (evt) {
     evt.preventDefault();
     evt.stopPropagation();
