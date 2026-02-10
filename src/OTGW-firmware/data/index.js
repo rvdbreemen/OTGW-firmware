@@ -77,6 +77,20 @@ function fetchDallasLabels() {
     .then(function(labels) {
       dallasLabelsCache = labels || {};
       console.log('Dallas labels loaded:', Object.keys(dallasLabelsCache).length, 'labels');
+      if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.refreshSensorLabels === 'function') {
+        OTGraph.refreshSensorLabels(dallasLabelsCache);
+      }
+      // Update existing panel labels for sensor addresses already rendered
+      for (var addr in dallasLabelsCache) {
+        if (!dallasLabelsCache.hasOwnProperty(addr)) continue;
+        var el = document.getElementById('otmon_' + addr);
+        if (el && el.parentNode) {
+          var labelSpan = el.parentNode.querySelector('.sensor-label-text');
+          if (labelSpan && labelSpan.textContent !== dallasLabelsCache[addr]) {
+            labelSpan.textContent = dallasLabelsCache[addr];
+          }
+        }
+      }
       return dallasLabelsCache;
     })
     .catch(function(error) {
@@ -126,6 +140,8 @@ document.addEventListener('visibilitychange', function () {
 
 var tid = 0;
 var timeupdate = null; // Will be started when needed
+var lastSensorSimulationState = null;
+var graphRedrawTimer = null;
 
 let gatewayModeRefreshCounter = 0;
 let gatewayModeRefreshInFlight = false; // Prevents double-triggering even when force=true
@@ -2291,10 +2307,25 @@ function initMainPage() {
       OTGraph.init();
   }
 
-  // Fetch Dallas sensor labels on page load
-  fetchDallasLabels().then(function() {
-    console.log('Dallas labels cache initialized');
-  });
+  function startMainPage() {
+    if (window.location.hash == "#tabPICflash") {
+      firmwarePage();
+    } else {
+      showMainPage();
+    }
+  }
+
+  // Fetch Dallas sensor labels on page load before initial render
+  fetchDallasLabels()
+    .then(function() {
+      console.log('Dallas labels cache initialized');
+    })
+    .catch(function() {
+      console.warn('Dallas labels cache init failed, continuing');
+    })
+    .then(function() {
+      startMainPage();
+    });
 
   // Start time updates if not in flash mode
   if (!flashModeActive && !timeupdate) {
@@ -2302,11 +2333,7 @@ function initMainPage() {
     timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
   }
 
-  if (window.location.hash == "#tabPICflash") {
-    firmwarePage();
-  } else {
-    showMainPage();
-  }
+  // startMainPage() is called after labels are loaded (or failed)
 } // initMainPage()
 
 function showMainPage() {
@@ -2711,9 +2738,57 @@ function refreshOTmonitor() {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
       data = json.otmonitor;
 
+      // React to Dallas sensor simulation toggle to refresh labels on demand
+      var simState = null;
+      if (data && data.sensorsimulation && typeof data.sensorsimulation.value !== 'undefined') {
+        simState = data.sensorsimulation.value;
+      } else if (Array.isArray(data)) {
+        for (var s = 0; s < data.length; s++) {
+          if (data[s].name === 'sensorsimulation') {
+            simState = data[s].value;
+            break;
+          }
+        }
+      }
+
+      if (typeof simState === 'string') {
+        simState = (simState.toLowerCase() === 'true' || simState.toLowerCase() === 'on');
+      }
+
+      if (simState === true && lastSensorSimulationState !== true) {
+        fetchDallasLabels()
+          .then(function() {
+            if (typeof OTGraph !== 'undefined' && OTGraph) {
+              if (typeof OTGraph.refreshSensorLabels === 'function') {
+                OTGraph.refreshSensorLabels(dallasLabelsCache);
+              }
+              if (typeof OTGraph.detectAndRegisterSensors === 'function') {
+                OTGraph.detectAndRegisterSensors(data);
+              }
+              if (typeof OTGraph.updateChart === 'function') {
+                if (graphRedrawTimer) {
+                  clearTimeout(graphRedrawTimer);
+                }
+                graphRedrawTimer = setTimeout(function() {
+                  OTGraph.updateChart();
+                  graphRedrawTimer = null;
+                }, 250);
+              }
+            }
+          });
+      }
+
+      if (typeof simState === 'boolean') {
+        lastSensorSimulationState = simState;
+      }
+
       // Detect and register temperature sensors for the graph
       if (typeof OTGraph !== 'undefined' && OTGraph.running) {
         OTGraph.detectAndRegisterSensors(data);
+        if (dallasLabelsCache && Object.keys(dallasLabelsCache).length > 0 &&
+            typeof OTGraph.refreshSensorLabels === 'function') {
+          OTGraph.refreshSensorLabels(dallasLabelsCache);
+        }
         // Process sensor data with current timestamp
         OTGraph.processSensorData(data, new Date());
       }
@@ -2748,6 +2823,10 @@ function refreshOTmonitor() {
         // If data is an object map, 'i' is the key (name).
         // If data is an array, 'i' is the index, and data[i] has a 'name' property.
         if (!data[i].name) data[i].name = i;
+
+        if (data[i].name === 'sensorsimulation') {
+          continue;
+        }
 
         //console.log("["+data[i].name+"]=>["+data[i].value+"]");
 
@@ -4089,7 +4168,9 @@ function openInlineSensorLabelEditor(address, targetNode, evt) {
   var labelTextNode = targetNode.querySelector('.sensor-label-text');
   var currentLabel = address;
   var labelKey = address + '_label';
-  if (typeof data !== 'undefined' && data[labelKey] && data[labelKey].value) {
+  if (dallasLabelsCache && typeof dallasLabelsCache[address] === 'string' && dallasLabelsCache[address].trim() !== '') {
+    currentLabel = dallasLabelsCache[address].trim();
+  } else if (typeof data !== 'undefined' && data[labelKey] && data[labelKey].value) {
     currentLabel = data[labelKey].value;
   }
 
@@ -4222,6 +4303,9 @@ function saveInlineSensorLabel() {
       }
       // Success! Update cache and close editor
       dallasLabelsCache[editor.address] = newLabel;
+      if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.refreshSensorLabels === 'function') {
+        OTGraph.refreshSensorLabels(dallasLabelsCache);
+      }
       closeInlineSensorLabelEditor();
       refreshOTmonitor();
     })

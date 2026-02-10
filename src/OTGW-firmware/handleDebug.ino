@@ -112,6 +112,10 @@ void handleDebug(){
                 bDebugSensorSimulation = !bDebugSensorSimulation;
                 DebugTf(PSTR("\r\nDebug Dallas sensor simulation: %s\r\n"), CBOOLEAN(bDebugSensorSimulation));
                 initSensors();
+                if (bDebugSensorSimulation)
+                {
+                  pollSensors();  // Force immediate sensor data so panel/graph update right away
+                }
                 break;
             case 'b':
                 DebugTln(F("Blink led 1"));

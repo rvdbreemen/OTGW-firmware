@@ -212,6 +212,41 @@ var OTGraph = {
         this.initialized = true;
     },
 
+    getCachedSensorLabel: function(address, labelMap) {
+        var cache = labelMap;
+        if (!cache && typeof window !== 'undefined') {
+            cache = window.dallasLabelsCache;
+        }
+        if (!cache || !address) return null;
+        if (typeof cache[address] !== 'string') return null;
+        var label = cache[address].trim();
+        return label.length > 0 ? label : null;
+    },
+
+    getApiSensorLabel: function(address, apiData) {
+        if (!apiData || typeof apiData !== 'object') return null;
+        var labelKey = address + '_label';
+        if (apiData[labelKey] && apiData[labelKey].value) {
+            return apiData[labelKey].value;
+        }
+        return null;
+    },
+
+    getDefaultSensorLabel: function(address, sensorIndex) {
+        return 'Sensor ' + (sensorIndex + 1) + ' (' + address + ')';
+    },
+
+    resolveSensorLabel: function(address, apiData, sensorIndex, labelMap) {
+        var label = this.getCachedSensorLabel(address, labelMap);
+        if (!label) {
+            label = this.getApiSensorLabel(address, apiData);
+        }
+        if (!label) {
+            label = this.getDefaultSensorLabel(address, sensorIndex);
+        }
+        return label;
+    },
+
     // Detect and register Dallas temperature sensors from API data
     detectAndRegisterSensors: function(apiData) {
         if (!apiData || typeof apiData !== 'object') return;
@@ -241,21 +276,8 @@ var OTGraph = {
                 if (!this.sensorAddressToId[key]) {
                     var sensorIndex = this.detectedSensors.length;
                     var sensorId = 'sensor_' + sensorIndex;
-                    
-                    // Try to get custom label from API data (key_label field)
-                    var labelKey = key + '_label';
-                    var sensorLabel = null;
-                    
-                    if (apiData[labelKey] && apiData[labelKey].value) {
-                        sensorLabel = apiData[labelKey].value;
-                    }
-                    
-                    // If no custom label, use hex address as fallback
-                    if (!sensorLabel || sensorLabel === key) {
-                        // User-facing labels are 1-based for readability (Sensor 1, 2, 3...)
-                        // Internal IDs remain 0-based for array indexing (sensor_0, sensor_1, sensor_2...)
-                        sensorLabel = 'Sensor ' + (sensorIndex + 1) + ' (' + key.substring(0, 8) + ')';
-                    }
+
+                    var sensorLabel = this.resolveSensorLabel(key, apiData, sensorIndex, typeof dallasLabelsCache !== 'undefined' ? dallasLabelsCache : null);
                     
                     // Register the sensor
                     this.sensorAddressToId[key] = sensorId;
@@ -291,30 +313,27 @@ var OTGraph = {
                     console.log('Graph: Registered temperature sensor:', sensorLabel, 'Address:', key);
                 } else {
                     // Sensor already registered, but check if label has changed
-                    var labelKey = key + '_label';
-                    if (apiData[labelKey] && apiData[labelKey].value) {
-                        var newLabel = apiData[labelKey].value;
-                        var sensorId = this.sensorAddressToId[key];
-                        
-                        // Find the sensor in detectedSensors and update label
-                        for (var i = 0; i < this.detectedSensors.length; i++) {
-                            if (this.detectedSensors[i].address === key) {
-                                if (this.detectedSensors[i].label !== newLabel) {
-                                    this.detectedSensors[i].label = newLabel;
-                                    
-                                    // Update seriesConfig label
-                                    for (var j = 0; j < this.seriesConfig.length; j++) {
-                                        if (this.seriesConfig[j].id === sensorId) {
-                                            this.seriesConfig[j].label = newLabel;
-                                            console.log('Graph: Updated sensor label:', newLabel, 'Address:', key);
-                                            // Trigger chart update
-                                            this.updateOption();
-                                            break;
-                                        }
+                    var sensorId = this.sensorAddressToId[key];
+
+                    // Find the sensor in detectedSensors and update label
+                    for (var i = 0; i < this.detectedSensors.length; i++) {
+                        if (this.detectedSensors[i].address === key) {
+                            var updatedLabel = this.resolveSensorLabel(key, apiData, this.detectedSensors[i].index, typeof dallasLabelsCache !== 'undefined' ? dallasLabelsCache : null);
+                            if (this.detectedSensors[i].label !== updatedLabel) {
+                                this.detectedSensors[i].label = updatedLabel;
+
+                                // Update seriesConfig label
+                                for (var j = 0; j < this.seriesConfig.length; j++) {
+                                    if (this.seriesConfig[j].id === sensorId) {
+                                        this.seriesConfig[j].label = updatedLabel;
+                                        console.log('Graph: Updated sensor label:', updatedLabel, 'Address:', key);
+                                        // Trigger chart update
+                                        this.updateOption();
+                                        break;
                                     }
                                 }
-                                break;
                             }
+                            break;
                         }
                     }
                 }
@@ -324,6 +343,33 @@ var OTGraph = {
         // If new sensors were added, update the chart
         if (newSensors.length > 0) {
             console.log('Graph: Added', newSensors.length, 'new temperature sensor(s) to graph');
+            this.updateOption();
+        }
+    },
+
+    refreshSensorLabels: function(labelMap) {
+        if (!this.detectedSensors || this.detectedSensors.length === 0) return;
+        var changed = false;
+
+        for (var i = 0; i < this.detectedSensors.length; i++) {
+            var sensor = this.detectedSensors[i];
+            var cachedLabel = this.getCachedSensorLabel(sensor.address, labelMap);
+            if (cachedLabel && sensor.label !== cachedLabel) {
+                sensor.label = cachedLabel;
+                var sensorId = this.sensorAddressToId[sensor.address];
+
+                for (var j = 0; j < this.seriesConfig.length; j++) {
+                    if (this.seriesConfig[j].id === sensorId) {
+                        this.seriesConfig[j].label = cachedLabel;
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (changed) {
+            console.log('Graph: Refreshed sensor labels from cache');
             this.updateOption();
         }
     },
