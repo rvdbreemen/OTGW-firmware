@@ -1,0 +1,622 @@
+openapi: 3.0.3
+info:
+  title: OTGW-firmware REST API
+  description: |
+    REST API for the OpenTherm Gateway (OTGW) firmware running on ESP8266.
+    
+    This API provides access to OpenTherm data, device information, settings,
+    and control commands for the OpenTherm Gateway hardware.
+    
+    **Base URL**: `http://{device-ip}/api`
+    
+    **API Versions**:
+    - **v0** - Legacy API (deprecated but maintained for backward compatibility)
+    - **v1** - Current stable API with improved structure
+    - **v2** - Optimized API with reduced payload sizes
+    
+    **Authentication**: None (device should be on trusted local network only)
+    
+    **Content-Type**: All responses are `application/json`
+  version: 1.1.0
+  contact:
+    name: Robert van den Breemen
+    url: https://github.com/rvdbreemen/OTGW-firmware
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://{device-ip}/api
+    description: Local OTGW device
+    variables:
+      device-ip:
+        default: otgw.local
+        description: IP address or hostname of the OTGW device
+
+tags:
+  - name: Health
+    description: Device health and status checks
+  - name: Device Info
+    description: Device information and system status
+  - name: Settings
+    description: Device configuration and settings
+  - name: OpenTherm Data
+    description: Access OpenTherm message data
+  - name: OTGW Commands
+    description: Send commands to the OpenTherm Gateway
+  - name: Flash/Upgrade
+    description: Firmware upgrade status and operations
+
+paths:
+  /v1/health:
+    get:
+      tags:
+        - Health
+      summary: Get device health status
+      description: |
+        Returns the current health status of the device including uptime,
+        heap memory, connectivity status, and filesystem status.
+        
+        Use this endpoint for monitoring and health checks.
+      operationId: getHealth
+      responses:
+        '200':
+          description: Health status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  health:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum: [UP, DEGRADED]
+                        description: Overall health status
+                      uptime:
+                        type: string
+                        description: System uptime (formatted string)
+                        example: "2d 3h 45m"
+                      heap:
+                        type: integer
+                        description: Free heap memory in bytes
+                        example: 25600
+                      wifirssi:
+                        type: integer
+                        description: WiFi signal strength in dBm
+                        example: -65
+                      mqttconnected:
+                        type: string
+                        enum: ["true", "false"]
+                        description: MQTT connection status
+                      otgwconnected:
+                        type: string
+                        enum: ["true", "false"]
+                        description: OpenTherm Gateway connection status
+                      picavailable:
+                        type: string
+                        enum: ["true", "false"]
+                        description: PIC controller availability
+                      littlefsMounted:
+                        type: string
+                        enum: ["true", "false"]
+                        description: Filesystem mount status
+              examples:
+                healthy:
+                  value:
+                    health:
+                      status: "UP"
+                      uptime: "2d 3h 45m"
+                      heap: 25600
+                      wifirssi: -65
+                      mqttconnected: "true"
+                      otgwconnected: "true"
+                      picavailable: "true"
+                      littlefsMounted: "true"
+
+  /v1/devtime:
+    get:
+      tags:
+        - Device Info
+      summary: Get device date/time (map format)
+      description: |
+        Returns the current device date and time in map format (v1 API).
+        Includes both formatted datetime string and Unix epoch timestamp.
+      operationId: getDeviceTimeV1
+      responses:
+        '200':
+          description: Device time retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  devtime:
+                    type: object
+                    properties:
+                      dateTime:
+                        type: string
+                        description: Formatted date/time string
+                        example: "2026-02-11 20:30:00"
+                      epoch:
+                        type: integer
+                        description: Unix epoch timestamp
+                        example: 1739302200
+
+  /v0/devinfo:
+    get:
+      tags:
+        - Device Info
+      summary: Get comprehensive device information (legacy)
+      description: |
+        Returns comprehensive device information including firmware version,
+        hardware details, network info, memory stats, and connectivity status.
+        
+        **Note**: This is the v0 (legacy) endpoint. Values are returned as strings.
+      operationId: getDeviceInfo
+      responses:
+        '200':
+          description: Device information retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  devinfo:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        value:
+                          type: string
+              examples:
+                example:
+                  value:
+                    devinfo:
+                      - name: "author"
+                        value: "Robert van den Breemen"
+                      - name: "fwversion"
+                        value: "1.1.0"
+                      - name: "hostname"
+                        value: "OTGW"
+                      - name: "ipaddress"
+                        value: "192.168.1.100"
+                      - name: "freeheap"
+                        value: "25600"
+                      - name: "gatewaymode"
+                        value: "true"
+
+  /v1/flashstatus:
+    get:
+      tags:
+        - Flash/Upgrade
+      summary: Get unified flash status
+      description: |
+        Returns flash status for both ESP8266 and PIC firmware upgrades.
+        Use this endpoint to monitor upgrade progress.
+      operationId: getFlashStatus
+      responses:
+        '200':
+          description: Flash status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  flashstatus:
+                    type: object
+                    properties:
+                      flashing:
+                        type: boolean
+                        description: Whether a flash operation is in progress
+                      progress:
+                        type: integer
+                        minimum: 0
+                        maximum: 100
+                        description: Flash progress percentage
+                      filename:
+                        type: string
+                        description: Name of file being flashed
+                      error:
+                        type: string
+                        description: Error message if flash failed
+
+  /v1/pic/flashstatus:
+    get:
+      tags:
+        - Flash/Upgrade
+      summary: Get PIC flash status (minimal)
+      description: |
+        Minimal endpoint for polling PIC flash state during upgrade.
+        Optimized for frequent polling with reduced payload.
+      operationId: getPICFlashStatus
+      responses:
+        '200':
+          description: PIC flash status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  flashstatus:
+                    type: object
+                    properties:
+                      flashing:
+                        type: boolean
+                      progress:
+                        type: integer
+                        minimum: 0
+                        maximum: 100
+                      filename:
+                        type: string
+                      error:
+                        type: string
+
+  /v1/settings:
+    get:
+      tags:
+        - Settings
+      summary: Get device settings
+      description: Retrieve all device configuration settings
+      operationId: getSettings
+      responses:
+        '200':
+          description: Settings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settings:
+                    type: object
+                    description: All device settings as key-value pairs
+
+    post:
+      tags:
+        - Settings
+      summary: Update device settings
+      description: |
+        Update one or more device settings. Settings are provided as
+        form-encoded or JSON data.
+      operationId: updateSettings
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: true
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Settings updated successfully
+        '400':
+          description: Invalid settings data
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "400: invalid settings\r\n"
+
+  /v1/otgw/id/{msgid}:
+    get:
+      tags:
+        - OpenTherm Data
+      summary: Get OpenTherm message value by ID
+      description: |
+        Retrieve the current value for a specific OpenTherm message ID.
+        
+        Message IDs range from 0-127. See OpenTherm specification for
+        message ID definitions.
+      operationId: getOTGWValue
+      parameters:
+        - name: msgid
+          in: path
+          required: true
+          description: OpenTherm message ID (0-127)
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 127
+          example: 25
+      responses:
+        '200':
+          description: Message value retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  value:
+                    type: string
+                    description: Current value for the message
+                  msgid:
+                    type: integer
+                  label:
+                    type: string
+                    description: Human-readable label for the message
+              examples:
+                temperature:
+                  value:
+                    value: "65.50"
+                    msgid: 25
+                    label: "Boiler water temperature"
+        '400':
+          description: Invalid message ID
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "400: invalid msgid\r\n"
+
+  /v1/otgw/label/{msglabel}:
+    get:
+      tags:
+        - OpenTherm Data
+      summary: Get OpenTherm message value by label
+      description: |
+        Retrieve the current value for an OpenTherm message using its
+        human-readable label instead of numeric ID.
+      operationId: getOTGWLabel
+      parameters:
+        - name: msglabel
+          in: path
+          required: true
+          description: OpenTherm message label
+          schema:
+            type: string
+          example: "boilertemperature"
+      responses:
+        '200':
+          description: Message value retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  value:
+                    type: string
+                  label:
+                    type: string
+        '400':
+          description: Missing or invalid label
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /v1/otgw/command/{command}:
+    post:
+      tags:
+        - OTGW Commands
+      summary: Send command to OpenTherm Gateway
+      description: |
+        Send a two-letter command to the OpenTherm Gateway PIC controller.
+        
+        Commands must be in the format: `XX=value` where XX is a two-letter
+        command code.
+        
+        **Common commands**:
+        - `TT=temperature` - Set temporary temperature override
+        - `SW=setpoint` - Set DHW setpoint
+        - `GW=0/1` - Set gateway mode
+        
+        See OTGW firmware documentation for full command reference.
+      operationId: sendOTGWCommand
+      parameters:
+        - name: command
+          in: path
+          required: true
+          description: Command string in format XX=value
+          schema:
+            type: string
+            pattern: '^[A-Z]{2}=.+$'
+          example: "TT=20.5"
+      responses:
+        '200':
+          description: Command queued successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "OK"
+        '400':
+          description: Invalid command format or missing command
+          content:
+            text/plain:
+              schema:
+                type: string
+                examples:
+                  missing:
+                    value: "400: missing command\r\n"
+                  invalid:
+                    value: "400: invalid command format\r\n"
+        '413':
+          description: Command too long
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "413: command too long\r\n"
+        '405':
+          description: Method not allowed (only POST/PUT supported)
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "405: method not allowed\r\n"
+
+  /v1/otgw/telegraf:
+    get:
+      tags:
+        - OpenTherm Data
+      summary: Get OpenTherm data in Telegraf format
+      description: |
+        Returns all OpenTherm data in a format optimized for Telegraf
+        monitoring system integration.
+      operationId: getTelegraf
+      responses:
+        '200':
+          description: Telegraf data retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                description: OpenTherm data in Telegraf format
+
+  /v1/otgw/otmonitor:
+    get:
+      tags:
+        - OpenTherm Data
+      summary: Get comprehensive OpenTherm data (OTmonitor format)
+      description: |
+        Returns all available OpenTherm data in the format compatible
+        with OTmonitor application.
+        
+        Includes temperatures, status flags, pressures, and sensor data.
+      operationId: getOTmonitor
+      responses:
+        '200':
+          description: OTmonitor data retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  otmonitor:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        value:
+                          type: string
+                        unit:
+                          type: string
+                        lastupdated:
+                          type: integer
+
+  /v2/otgw/otmonitor:
+    get:
+      tags:
+        - OpenTherm Data
+      summary: Get OpenTherm data (optimized v2 format)
+      description: |
+        Returns OpenTherm data in optimized v2 format with reduced
+        payload size. Suitable for frequent polling and constrained networks.
+      operationId: getOTmonitorV2
+      responses:
+        '200':
+          description: OTmonitor data retrieved successfully (v2)
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Optimized OpenTherm data structure
+
+  /v1/otgw/autoconfigure:
+    post:
+      tags:
+        - OTGW Commands
+      summary: Trigger MQTT autodiscovery
+      description: |
+        Sends all MQTT autodiscovery topics for Home Assistant integration.
+        Use this to register or re-register all entities with Home Assistant.
+      operationId: autoConfigureMQTT
+      responses:
+        '200':
+          description: Autodiscovery messages sent successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "OK"
+        '405':
+          description: Method not allowed (only POST/PUT supported)
+          content:
+            text/plain:
+              schema:
+                type: string
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+      required:
+        - error
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid parameters
+      content:
+        text/plain:
+          schema:
+            type: string
+    
+    MethodNotAllowed:
+      description: HTTP method not allowed for this endpoint
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: "405: method not allowed\r\n"
+    
+    NotFound:
+      description: API endpoint not found
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: "404: not found\r\n"
+    
+    URITooLong:
+      description: Request URI exceeds maximum length
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: "414: URI too long\r\n"
+    
+    InternalServerError:
+      description: Internal server error (typically low heap memory)
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: "500: internal server error (low heap)\r\n"
+
+x-api-design-notes: |
+  **Memory Constraints**:
+  - ESP8266 has limited RAM (~40KB available after core libraries)
+  - API enforces minimum 4KB free heap before processing requests
+  - Use v2 endpoints for reduced payload sizes when possible
+  
+  **Boolean Values**:
+  - v0/v1 APIs return booleans as strings: "true" or "false"
+  - This is intentional for consistency with legacy implementations
+  
+  **Error Handling**:
+  - All errors return plain text responses
+  - HTTP status codes follow standard conventions
+  - Low heap conditions return 500 to prevent crashes
+  
+  **Polling Recommendations**:
+  - Health endpoint: Poll every 30-60 seconds
+  - Flash status: Poll every 1-2 seconds during upgrades
+  - OpenTherm data: Poll every 5-10 seconds
+  
+  **Home Assistant Integration**:
+  - Use /v1/otgw/autoconfigure to register entities
+  - MQTT is the primary integration method
+  - REST API provides fallback and manual control
