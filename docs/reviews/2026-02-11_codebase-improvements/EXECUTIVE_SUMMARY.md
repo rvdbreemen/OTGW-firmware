@@ -65,7 +65,6 @@ Status: COMPLETE
 1. Convert `getOTGWValue()` to use static char buffer
 2. Fix String concatenation in WiFi setup
 3. Refactor `getMacAddress()` and `getUniqueId()`
-4. Add PROGMEM to string arrays
 
 **ROI**: Highest - Directly addresses ESP8266 memory constraints
 
@@ -191,7 +190,7 @@ Status: COMPLETE
 
 - **Full Review**: `CODEBASE_REVIEW.md` (detailed technical analysis)
 - **Action Items**: `ACTION_CHECKLIST.md` (step-by-step tasks)
-- **Evaluation**: `../../evaluation-report.json` (automated checks)
+- **Evaluation**: Generated via `python evaluate.py --report` (outputs `evaluation-report.json`)
 
 ---
 
