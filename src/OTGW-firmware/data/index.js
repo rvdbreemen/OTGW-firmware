@@ -13,6 +13,53 @@ const APIGW = window.location.protocol + '//' + window.location.host + '/api/';
 
 "use strict";
 
+// ============================================================================
+// Utility Functions for Safe Operations
+// ============================================================================
+
+/**
+ * Safely parse JSON with validation and error handling
+ * @param {string} text - The JSON string to parse
+ * @returns {object|null} Parsed object or null on error
+ */
+function safeJSONParse(text) {
+  if (!text || typeof text !== 'string') {
+    console.warn('safeJSONParse: Invalid input (not a string)');
+    return null;
+  }
+  
+  // Quick validation - JSON should start with { or [
+  const trimmed = text.trim();
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+    console.warn('safeJSONParse: Input does not look like JSON');
+    return null;
+  }
+  
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error('safeJSONParse: Parse error:', e.message);
+    return null;
+  }
+}
+
+/**
+ * Safely get element by ID with optional warning
+ * @param {string} id - Element ID
+ * @param {boolean} warnIfMissing - Whether to log warning if not found
+ * @returns {Element|null} The element or null
+ */
+function safeGetElementById(id, warnIfMissing = false) {
+  const element = document.getElementById(id);
+  if (!element && warnIfMissing) {
+    console.warn(`Element not found: #${id}`);
+  }
+  return element;
+}
+
+// ============================================================================
+
+
 
 console.log(`Hash=${window.location.hash}`);
 window.onload = initMainPage;
@@ -822,7 +869,7 @@ function restoreDataFromLocalStorage() {
     // Restore log buffer
     const savedLogs = localStorage.getItem(PERSISTENCE_KEY_LOGS);
     if (savedLogs) {
-      const logs = JSON.parse(savedLogs);
+      const logs = safeJSONParse(savedLogs);
       if (Array.isArray(logs) && logs.length > 0) {
         otLogBuffer = logs;
         updateFilteredBuffer();
@@ -834,7 +881,7 @@ function restoreDataFromLocalStorage() {
     // Restore preferences
     const savedPrefs = localStorage.getItem(PERSISTENCE_KEY_PREFS);
     if (savedPrefs) {
-      const prefs = JSON.parse(savedPrefs);
+      const prefs = safeJSONParse(savedPrefs);
       if (prefs) {
         autoScroll = prefs.autoScroll !== undefined ? prefs.autoScroll : true;
         showTimestamps = prefs.showTimestamps !== undefined ? prefs.showTimestamps : true;
