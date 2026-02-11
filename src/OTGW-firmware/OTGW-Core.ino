@@ -2153,9 +2153,11 @@ const char* getOTGWValue(int msgid)
     case OT_SolarStorageFHBsize:               dtostrf(OTcurrentSystemState.SolarStorageFHBsize, 0, 2, buffer); return buffer;
     case OT_SolarStorageFHBindexFHBvalue:      dtostrf(OTcurrentSystemState.SolarStorageFHBindexFHBvalue, 0, 2, buffer); return buffer;
     default: 
-      strlcpy_P(buffer, PSTR("Error: not implemented yet!\r\n"), sizeof(buffer));
+      strncpy_P(buffer, PSTR("Error: not implemented yet!\r\n"), sizeof(buffer) - 1);
+      buffer[sizeof(buffer) - 1] = '\0';
       return buffer;
-}
+  } // switch
+} // getOTGWValue
 
 void startOTGWstream()
 {

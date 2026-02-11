@@ -19,6 +19,7 @@ Usage:
 
 import argparse
 import gzip
+import io
 import multiprocessing
 import os
 import platform
@@ -28,6 +29,15 @@ import stat
 import subprocess
 import sys
 import tarfile
+
+# Ensure stdout/stderr can handle Unicode on Windows
+if sys.platform == 'win32':
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    elif not isinstance(sys.stdout, io.TextIOWrapper) or sys.stdout.encoding != 'utf-8':
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 import traceback
 import urllib.request
 import zipfile
