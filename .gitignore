@@ -21,3 +21,4 @@ otmonitor-6.6/**
 otmonitor-6.6
 evaluation-report.json
 
+/src/OTGW-firmware/build
