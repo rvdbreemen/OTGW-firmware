@@ -733,13 +733,13 @@ void print_status(uint16_t& value)
     //Master Status
     if (is_value_valid(OTdata, OTlookupitem)){
       sendMQTTData("status_master", _flag8_master);
-      sendMQTTData("ch_enable",             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
-      sendMQTTData("dhw_enable",            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  
-      sendMQTTData("cooling_enable",        (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));   
-      sendMQTTData("otc_active",            (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  
-      sendMQTTData("ch2_enable",            (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  
-      sendMQTTData("summerwintertime",      (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  
-      sendMQTTData("dhw_blocking",          (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));  
+      publishMQTTOnOff("ch_enable",        ((OTdata.valueHB) & 0x01));
+      publishMQTTOnOff("dhw_enable",       ((OTdata.valueHB) & 0x02));
+      publishMQTTOnOff("cooling_enable",   ((OTdata.valueHB) & 0x04));
+      publishMQTTOnOff("otc_active",       ((OTdata.valueHB) & 0x08));
+      publishMQTTOnOff("ch2_enable",       ((OTdata.valueHB) & 0x10));
+      publishMQTTOnOff("summerwintertime", ((OTdata.valueHB) & 0x20));
+      publishMQTTOnOff("dhw_blocking",     ((OTdata.valueHB) & 0x40));
 
       OTcurrentSystemState.MasterStatus = OTdata.valueHB;
     }
@@ -770,14 +770,14 @@ void print_status(uint16_t& value)
     //Slave Status
     if (is_value_valid(OTdata, OTlookupitem)){
       sendMQTTData("status_slave", _flag8_slave);
-      sendMQTTData("fault",                 (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  //delayms(5);  
-      sendMQTTData("centralheating",        (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  //delayms(5);  
-      sendMQTTData("domestichotwater",      (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));  //delayms(5);  
-      sendMQTTData("flame",                 (((OTdata.valueLB) & 0x08) ? "ON" : "OFF"));  //delayms(5);
-      sendMQTTData("cooling",               (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  //delayms(5); 
-      sendMQTTData("centralheating2",       (((OTdata.valueLB) & 0x20) ? "ON" : "OFF"));  //delayms(5);
-      sendMQTTData("diagnostic_indicator",  (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));  //delayms(5);
-      sendMQTTData("eletric_production",    (((OTdata.valueLB) & 0x80) ? "ON" : "OFF"));  //delayms(5);
+      publishMQTTOnOff("fault",                ((OTdata.valueLB) & 0x01));
+      publishMQTTOnOff("centralheating",       ((OTdata.valueLB) & 0x02));
+      publishMQTTOnOff("domestichotwater",     ((OTdata.valueLB) & 0x04));
+      publishMQTTOnOff("flame",                ((OTdata.valueLB) & 0x08));
+      publishMQTTOnOff("cooling",              ((OTdata.valueLB) & 0x10));
+      publishMQTTOnOff("centralheating2",      ((OTdata.valueLB) & 0x20));
+      publishMQTTOnOff("diagnostic_indicator", ((OTdata.valueLB) & 0x40));
+      publishMQTTOnOff("eletric_production",   ((OTdata.valueLB) & 0x80));
 
       OTcurrentSystemState.SlaveStatus = OTdata.valueLB;
     }
@@ -858,10 +858,10 @@ void print_statusVH(uint16_t& value)
     //Master Status
     if (is_value_valid(OTdata, OTlookupitem)){
       sendMQTTData(F("status_vh_master"), _flag8_master);
-      sendMQTTData(F("vh_ventilation_enabled"),        (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
-      sendMQTTData(F("vh_bypass_position"),            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  
-      sendMQTTData(F("vh_bypass_mode"),                (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));   
-      sendMQTTData(F("vh_free_ventlation_mode"),       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  
+      publishMQTTOnOff(F("vh_ventilation_enabled"),   ((OTdata.valueHB) & 0x01));
+      publishMQTTOnOff(F("vh_bypass_position"),       ((OTdata.valueHB) & 0x02));
+      publishMQTTOnOff(F("vh_bypass_mode"),           ((OTdata.valueHB) & 0x04));
+      publishMQTTOnOff(F("vh_free_ventlation_mode"),  ((OTdata.valueHB) & 0x08));
 
       OTcurrentSystemState.MasterStatusVH = OTdata.valueHB;
     }
@@ -889,12 +889,12 @@ void print_statusVH(uint16_t& value)
     //Slave Status
     if (is_value_valid(OTdata, OTlookupitem)){
       sendMQTTData(F("status_vh_slave"), _flag8_slave);
-      sendMQTTData(F("vh_fault"),                   (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));    
-      sendMQTTData(F("vh_ventlation_mode"),         (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));    
-      sendMQTTData(F("vh_bypass_status"),           (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));    
-      sendMQTTData(F("vh_bypass_automatic_status"), (((OTdata.valueLB) & 0x08) ? "ON" : "OFF"));  
-      sendMQTTData(F("vh_free_ventliation_status"), (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));    
-      sendMQTTData(F("vh_diagnostic_indicator"),    (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));  
+      publishMQTTOnOff(F("vh_fault"),                   ((OTdata.valueLB) & 0x01));
+      publishMQTTOnOff(F("vh_ventlation_mode"),         ((OTdata.valueLB) & 0x02));
+      publishMQTTOnOff(F("vh_bypass_status"),           ((OTdata.valueLB) & 0x04));
+      publishMQTTOnOff(F("vh_bypass_automatic_status"), ((OTdata.valueLB) & 0x08));
+      publishMQTTOnOff(F("vh_free_ventliation_status"), ((OTdata.valueLB) & 0x10));
+      publishMQTTOnOff(F("vh_diagnostic_indicator"),    ((OTdata.valueLB) & 0x40));
 
       OTcurrentSystemState.SlaveStatusVH = OTdata.valueLB;
     }
@@ -929,12 +929,12 @@ void print_ASFflags(uint16_t& value)
     //5: Water over-temp[ no OvT fault, over-temperat. Fault]
     //6: reserved
     //7: reserved
-    sendMQTTData(F("service_request"),       (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));    
-    sendMQTTData(F("lockout_reset"),         (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));    
-    sendMQTTData(F("low_water_pressure"),    (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));    
-    sendMQTTData(F("gas_flame_fault"),       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  
-    sendMQTTData(F("air_pressure_fault"),    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));    
-    sendMQTTData(F("water_over_temperature"),(((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  
+    publishMQTTOnOff(F("service_request"),       ((OTdata.valueHB) & 0x01));
+    publishMQTTOnOff(F("lockout_reset"),         ((OTdata.valueHB) & 0x02));
+    publishMQTTOnOff(F("low_water_pressure"),    ((OTdata.valueHB) & 0x04));
+    publishMQTTOnOff(F("gas_flame_fault"),       ((OTdata.valueHB) & 0x08));
+    publishMQTTOnOff(F("air_pressure_fault"),    ((OTdata.valueHB) & 0x10));
+    publishMQTTOnOff(F("water_over_temperature"), ((OTdata.valueHB) & 0x20));
     value = OTdata.u16();
   }
 }

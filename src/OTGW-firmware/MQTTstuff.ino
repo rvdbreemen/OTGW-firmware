@@ -656,6 +656,52 @@ void sendMQTTStreaming(const char* topic, const char *json, const size_t len)
   feedWatchDog();
 } // sendMQTTStreaming()
 
+//===========================================================================================
+// Helper functions to reduce duplicated MQTT topic building patterns
+//===========================================================================================
+
+/**
+ * Publish ON/OFF value to MQTT topic
+ * Reduces duplicate pattern of boolean-to-string conversion
+ */
+void publishMQTTOnOff(const char* topic, bool value) {
+  sendMQTTData(topic, value ? "ON" : "OFF");
+}
+
+void publishMQTTOnOff(const __FlashStringHelper* topic, bool value) {
+  sendMQTTData(topic, value ? "ON" : "OFF");
+}
+
+/**
+ * Publish numeric value as string to MQTT topic
+ * Reduces duplicate pattern of number-to-string conversion with static buffer
+ */
+void publishMQTTNumeric(const char* topic, float value, uint8_t decimals = 2) {
+  static char buffer[16];
+  dtostrf(value, 1, decimals, buffer);
+  sendMQTTData(topic, buffer);
+}
+
+void publishMQTTNumeric(const __FlashStringHelper* topic, float value, uint8_t decimals = 2) {
+  static char buffer[16];
+  dtostrf(value, 1, decimals, buffer);
+  sendMQTTData(topic, buffer);
+}
+
+/**
+ * Publish integer value as string to MQTT topic
+ */
+void publishMQTTInt(const char* topic, int value) {
+  static char buffer[12];
+  snprintf(buffer, sizeof(buffer), "%d", value);
+  sendMQTTData(topic, buffer);
+}
+
+void publishMQTTInt(const __FlashStringHelper* topic, int value) {
+  static char buffer[12];
+  snprintf(buffer, sizeof(buffer), "%d", value);
+  sendMQTTData(topic, buffer);
+}
 
 //===========================================================================================
 // resetMQTTBufferSize() - Static Buffer Strategy
