@@ -13,9 +13,9 @@ Status: COMPLETE
 
 ## Executive Summary
 
-This comprehensive review of the OTGW-firmware codebase identifies **28 improvement opportunities** across 6 categories:
+This comprehensive review of the OTGW-firmware codebase identifies **27 improvement opportunities** across 6 categories:
 
-- **Memory Optimization**: 9 critical improvements (String class elimination, PROGMEM optimization)
+- **Memory Optimization**: 8 improvements (String class elimination, verified PROGMEM usage)
 - **Code Quality**: 7 improvements (refactoring, consistency, maintainability)
 - **Security**: 3 improvements (input validation, buffer safety)
 - **Frontend**: 5 improvements (error handling, browser compatibility)
@@ -98,10 +98,11 @@ const char* getUniqueId() {
 **Current Pattern**:
 ```cpp
 String getOTGWValue(int msgid) {
-    switch(msgid) {
-        case 0: return String(OTdata.MasterStatus, BIN);
-        case 1: return String(OTdata.TSet, 2);
-        // ... 50+ cases
+    switch(static_cast<OpenThermMessageID>(msgid)) {
+        case OT_TSet: return String(OTcurrentSystemState.TSet);
+        case OT_CoolingControl: return String(OTcurrentSystemState.CoolingControl);
+        case OT_TsetCH2: return String(OTcurrentSystemState.TsetCH2);
+        // ... 50+ more cases returning String(OTcurrentSystemState.<field>)
     }
 }
 ```
@@ -111,14 +112,17 @@ String getOTGWValue(int msgid) {
 const char* getOTGWValue(int msgid) {
     static char buffer[32];
     
-    switch(msgid) {
-        case 0: 
-            itoa(OTdata.MasterStatus, buffer, 2);
+    switch(static_cast<OpenThermMessageID>(msgid)) {
+        case OT_TSet:
+            dtostrf(OTcurrentSystemState.TSet, 0, 2, buffer);
             return buffer;
-        case 1:
-            dtostrf(OTdata.TSet, 0, 2, buffer);
+        case OT_CoolingControl:
+            dtostrf(OTcurrentSystemState.CoolingControl, 0, 2, buffer);
             return buffer;
-        // ... convert all cases
+        case OT_TsetCH2:
+            dtostrf(OTcurrentSystemState.TsetCH2, 0, 2, buffer);
+            return buffer;
+        // ... convert all cases to use dtostrf/itoa as appropriate
     }
 }
 ```
@@ -153,37 +157,32 @@ bool executeCommand(const char* sCmd, char* result, size_t resultSize) {
 
 ### Issue 1.2: String Constants Without PROGMEM 🔴
 
-**Priority**: HIGH
-**Files**: `src/OTGW-firmware/OTGW-Core.ino:34`, `src/OTGW-firmware/MQTTstuff.ino:230`
+**Priority**: LOW (Revised - see analysis below)
+**Files**: `src/OTGW-firmware/MQTTstuff.ino:230`
 
-#### Found Instances
+#### Analysis
+Upon review, the `hexheaders` array at `OTGW-Core.ino:34` is actually an array of HTTP header names used with `http.collectHeaders()`:
+
 ```cpp
-// OTGW-Core.ino:34 - BAD
+// OTGW-Core.ino:34 - Actually HTTP headers, not Intel HEX
 const char *hexheaders[] = {
-    ":020000040000FA",
-    ":020000040001F9",
-    // ... array items
+    "Last-Modified",
+    "X-Version"
 };
 
-// MQTTstuff.ino:230 - BAD (commented out but still an example)
+// Used as:
+http.collectHeaders(hexheaders, 2);
+```
+
+**Decision**: The `collectHeaders()` method expects a RAM-based `const char*` array and does not support PROGMEM-backed pointer tables. Therefore, **no change is recommended** for this array. The memory impact is minimal (2 pointers + 2 short strings).
+
+#### Remaining Instance
+```cpp
+// MQTTstuff.ino:230 - Commented out example
 // const char learnmsg[] { "LA", "PR=L", ... };
 ```
 
-**Fix**:
-```cpp
-// GOOD - Use PROGMEM
-const char hexheader0[] PROGMEM = ":020000040000FA";
-const char hexheader1[] PROGMEM = ":020000040001F9";
-const char* const hexheaders[] PROGMEM = {
-    hexheader0,
-    hexheader1,
-    // ...
-};
-
-// Access with:
-char buffer[32];
-strcpy_P(buffer, (PGM_P)pgm_read_ptr(&hexheaders[index]));
-```
+**Action**: This is already commented out, so no action needed.
 
 ---
 
@@ -577,13 +576,12 @@ TEST_CASE("trimwhitespace removes leading/trailing spaces") {
 | 🔴 1 | Memory | String class in getOTGWValue() | High | Critical |
 | 🔴 2 | Memory | String in WiFi setup (networkStuff.h) | Low | High |
 | 🔴 3 | Memory | String in getMacAddress/getUniqueId | Low | Medium |
-| 🔴 4 | Memory | PROGMEM for hexheaders array | Low | Medium |
-| 🟡 5 | Security | Input validation in REST API | Medium | High |
-| 🟡 6 | Frontend | Add missing .catch() handlers | Low | Medium |
-| 🟡 7 | Code Quality | Resolve TODO/FIXME comments | Low | Low |
-| 🟡 8 | Code Quality | Extract magic numbers to constants | Medium | Medium |
-| 🟢 9 | Testing | Add unit tests for helpers | High | Medium |
-| 🟢 10 | Documentation | Create OpenAPI spec | Medium | Low |
+| 🟡 4 | Security | Input validation in REST API | Medium | High |
+| 🟡 5 | Frontend | Add missing .catch() handlers | Low | Medium |
+| 🟡 6 | Code Quality | Resolve TODO/FIXME comments | Low | Low |
+| 🟡 7 | Code Quality | Extract magic numbers to constants | Medium | Medium |
+| 🟢 8 | Testing | Add unit tests for helpers | High | Medium |
+| 🟢 9 | Documentation | Create OpenAPI spec | Medium | Low |
 
 **Legend**: 🔴 Critical/High Priority | 🟡 Medium Priority | 🟢 Low Priority / Nice-to-Have
 
@@ -595,7 +593,6 @@ TEST_CASE("trimwhitespace removes leading/trailing spaces") {
 1. Convert `getOTGWValue()` to return `const char*` from static buffer
 2. Fix String concatenations in `networkStuff.h`
 3. Convert `getMacAddress()` and `getUniqueId()` to char buffers
-4. Add PROGMEM to `hexheaders` array
 
 **Expected Outcome**: ~5-10KB heap savings, improved stability
 

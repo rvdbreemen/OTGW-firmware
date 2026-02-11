@@ -1,3 +1,16 @@
+---
+# METADATA
+Document Title: Action Checklist - OTGW-firmware Improvements
+Review Date: 2026-02-11 05:48:00 UTC
+Branch Reviewed: copilot/review-codebase-improvements
+Target Version: 1.1.0-beta
+Reviewer: GitHub Copilot Advanced Agent
+Document Type: Implementation Checklist
+PR Branch: copilot/review-codebase-improvements
+Commit: 7fe226f
+Status: READY FOR IMPLEMENTATION
+---
+
 # Action Checklist - OTGW-firmware Improvements
 
 This checklist provides step-by-step implementation guidance for the improvements identified in the codebase review.
@@ -12,13 +25,16 @@ This checklist provides step-by-step implementation guidance for the improvement
 **Effort**: 3-4 hours
 
 #### Steps:
-- [ ] Locate `String getOTGWValue(int msgid)` function
+- [ ] Locate `String getOTGWValue(int msgid)` function (around line 2042)
 - [ ] Change return type to `const char*`
 - [ ] Add static char buffer: `static char buffer[32];`
-- [ ] Convert all ~50 return statements:
-  - [ ] Binary conversions: `String(value, BIN)` → `itoa(value, buffer, 2)`
-  - [ ] Float conversions: `String(value, 2)` → `dtostrf(value, 0, 2, buffer)`
-  - [ ] Integer conversions: `String(value)` → `itoa(value, buffer, 10)`
+- [ ] Convert all ~50+ return statements from:
+  - `return String(OTcurrentSystemState.<field>);`
+- [ ] To use dtostrf for float values:
+  - `dtostrf(OTcurrentSystemState.<field>, 0, 2, buffer); return buffer;`
+- [ ] For integer values, use itoa:
+  - `itoa(OTcurrentSystemState.<field>, buffer, 10); return buffer;`
+- [ ] Update all callers to use `const char*` instead of `String`
 - [ ] Test: Verify MQTT publishing and REST API still work
 - [ ] Test: Check OTmonitor compatibility
 
@@ -100,46 +116,25 @@ const char* getUniqueId() {
 ### Task 1.4: Add PROGMEM to hexheaders Array
 **File**: `src/OTGW-firmware/OTGW-Core.ino:34`
 **Priority**: MEDIUM
-**Effort**: 20 minutes
+---
 
-#### Current Code:
+### Task 1.4: ~~Add PROGMEM to hexheaders Array~~ (CANCELLED)
+**File**: `src/OTGW-firmware/OTGW-Core.ino:34`
+**Priority**: N/A
+**Status**: CANCELLED - Not applicable
+
+#### Analysis
+Upon review, `hexheaders` is an array of HTTP header names (not Intel HEX data) used with `http.collectHeaders()`:
 ```cpp
 const char *hexheaders[] = {
-    ":020000040000FA",
-    ":020000040001F9",
-    // ... more items
+  "Last-Modified",
+  "X-Version"
 };
 ```
 
-#### Steps:
-- [ ] Locate hexheaders array definition
-- [ ] Create individual PROGMEM strings:
-```cpp
-const char hexheader0[] PROGMEM = ":020000040000FA";
-const char hexheader1[] PROGMEM = ":020000040001F9";
-// ... for each item
-```
-- [ ] Create PROGMEM array:
-```cpp
-const char* const hexheaders[] PROGMEM = {
-    hexheader0,
-    hexheader1,
-    // ...
-};
-```
-- [ ] Find all code that accesses hexheaders
-- [ ] Update to use:
-```cpp
-char buffer[32];
-strcpy_P(buffer, (PGM_P)pgm_read_ptr(&hexheaders[index]));
-```
-- [ ] Test: Verify PIC firmware upgrade still works
+The `collectHeaders()` method expects a RAM-based `const char*` array and does not support PROGMEM-backed pointer tables. Moving this to PROGMEM would break functionality. The memory impact is minimal (2 pointers + 2 short strings).
 
-**Verification**:
-```bash
-# Test PIC firmware upgrade process
-# Monitor for memory errors
-```
+**Decision**: No action required. This task has been removed from Phase 1.
 
 ---
 
@@ -367,9 +362,11 @@ int main() {
   - [ ] trimwhitespace()
   - [ ] CSTR() overloads
   - [ ] Input validation functions
-- [ ] Run tests:
+- [ ] Run evaluation:
 ```bash
-python build.py --test
+python evaluate.py --quick
+# or full evaluation:
+python evaluate.py
 ```
 
 ---
