@@ -129,7 +129,7 @@ void readSettings(bool show)
   settingMQTTharebootdetection = doc[F("MQTTharebootdetection")]|settingMQTTharebootdetection;	  
   
   strlcpy(settingMQTTuniqueid, doc[F("MQTTuniqueid")] | "", sizeof(settingMQTTuniqueid));
-  if (strlen(settingMQTTuniqueid)==0 || strcmp_P(settingMQTTuniqueid, PSTR("null"))==0) strlcpy(settingMQTTuniqueid, getUniqueId().c_str(), sizeof(settingMQTTuniqueid));
+  if (strlen(settingMQTTuniqueid)==0 || strcmp_P(settingMQTTuniqueid, PSTR("null"))==0) strlcpy(settingMQTTuniqueid, getUniqueId(), sizeof(settingMQTTuniqueid));
 
   settingMQTTOTmessage    = doc[F("MQTTOTmessage")]|settingMQTTOTmessage;
   settingNTPenable        = doc[F("NTPenable")]; 
@@ -259,7 +259,7 @@ void updateSetting(const char *field, const char *newValue)
   if (strcasecmp_P(field, PSTR("MQTTharebootdetection"))==0)      settingMQTTharebootdetection = EVALBOOLEAN(newValue);
   if (strcasecmp_P(field, PSTR("MQTTuniqueid")) == 0)  {
     strlcpy(settingMQTTuniqueid, newValue, sizeof(settingMQTTuniqueid));     
-    if (strlen(settingMQTTuniqueid) == 0)   strlcpy(settingMQTTuniqueid, getUniqueId().c_str(), sizeof(settingMQTTuniqueid));
+    if (strlen(settingMQTTuniqueid) == 0)   strlcpy(settingMQTTuniqueid, getUniqueId(), sizeof(settingMQTTuniqueid));
   }
   if (strcasecmp_P(field, PSTR("MQTTOTmessage"))==0)   settingMQTTOTmessage = EVALBOOLEAN(newValue);
   if (strstr_P(field, PSTR("mqtt")) != NULL)        startMQTT();//restart MQTT on change of any setting
