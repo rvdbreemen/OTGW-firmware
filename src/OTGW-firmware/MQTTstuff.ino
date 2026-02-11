@@ -227,9 +227,6 @@ const MQTT_set_cmd_t setcmds[] PROGMEM = {
 
 const int nrcmds = sizeof(setcmds) / sizeof(setcmds[0]);
 
-// const char learnmsg[] { "LA", "PR=L", "LB", "PR=L", "LC", "PR=L", "LD", "PR=L", "LE", "PR=L", "LF", "PR=L", "GA", "PR=G", "GB", "PR=G", "VR", "PR=V", "GW", "PR=M", "IT", "PR=T", "SB", "PR=S", "HW", "PR=W" } ;
-// const int nrlearnmsg = sizeof(learnmsg) / sizeof(learnmsg[0]);
-
 //===========================================================================================
 void startMQTT() 
 {
@@ -919,6 +916,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
     }
 
     // check if this is the specific line we are looking for
+    // Old config dump method (dumping all lines) is no longer used - we now fetch specific lines by ID
     if (lineID != OTid) continue;
 
     MQTTDebugTf(PSTR("Found line in config file for %d: [%d][%s] \r\n"), OTid, lineID, sTopic);
