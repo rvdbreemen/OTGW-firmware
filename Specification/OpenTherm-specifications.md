@@ -9,6 +9,7 @@ Deze markdown is een omzetting van de tekstbestanden in deze map.
 - `OT protocol version information.txt`
 - `Integration homeassistant.txt`
 - `OpenTherm-Protocol-Specification-v4.2.pdf`
+- `OpenTherm-Protocol-Specification-v4.2.md`
 - `Opentherm Protocol v2.2.pdf`
 
 ## Data-ID map (uit `OT spec 2.3b.txt`)
