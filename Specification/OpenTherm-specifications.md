@@ -10,7 +10,16 @@ Deze markdown is een omzetting van de tekstbestanden in deze map.
 - `Integration homeassistant.txt`
 - `OpenTherm-Protocol-Specification-v4.2.pdf`
 - `OpenTherm-Protocol-Specification-v4.2.md`
+- `OpenTherm-Protocol-Specification-v4.2-message-id-reference.md`
 - `Opentherm Protocol v2.2.pdf`
+
+## v4.2 Message-ID tabellen (uitgebreid)
+
+Voor de OpenTherm v4.2 specificatie is een aparte, uitgebreide Message-ID referentie toegevoegd:
+
+- `OpenTherm-Protocol-Specification-v4.2-message-id-reference.md`
+
+Deze referentie bevat een losse tabel met alle geëxtraheerde Message-ID regels uit de v4.2 Data-Id Overview Map (pagina 47-49), inclusief uitgebreide attribuutuitleg per ID.
 
 ## Data-ID map (uit `OT spec 2.3b.txt`)
 
