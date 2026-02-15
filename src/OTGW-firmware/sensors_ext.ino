@@ -283,7 +283,7 @@ if (settingMQTTenable) {
       sendMQTTData(strDeviceAddress, _msg);
     }
   }
-  if (bDebugSensorSimulation && simUpdateDue)
+  if (bDebugSensorSimulation)
   {
     simLastUpdateTime = now;
   }
