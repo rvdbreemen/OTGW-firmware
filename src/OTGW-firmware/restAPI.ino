@@ -965,7 +965,14 @@ void sendApiNotFound(const char *URI)
   httpServer.sendContent_P(PSTR("<style>body { background-color: lightgray; font-size: 15pt;}</style></head><body>"));
   httpServer.sendContent_P(PSTR("<h1>OTGW firmware</h1><b1>"));
   httpServer.sendContent_P(PSTR("<br>[<b>"));
-  httpServer.sendContent(URI);
+  // HTML-escape URI to prevent reflected XSS
+  String escapedURI = String(URI);
+  escapedURI.replace(F("&"), F("&amp;"));
+  escapedURI.replace(F("<"), F("&lt;"));
+  escapedURI.replace(F(">"), F("&gt;"));
+  escapedURI.replace(F("\""), F("&quot;"));
+  escapedURI.replace(F("'"), F("&#39;"));
+  httpServer.sendContent(escapedURI);
   httpServer.sendContent_P(PSTR("</b>] is not a valid "));
   httpServer.sendContent_P(PSTR("</body></html>\r\n"));
 
