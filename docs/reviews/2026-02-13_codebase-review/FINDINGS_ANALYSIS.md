@@ -135,12 +135,19 @@ Additionally, `pulseCount` is `uint8_t` (max 255) but can overflow at high power
 
 ---
 
-### ⚠️ Finding #16: `ETX` constant has wrong value
-**Impact: UNKNOWN - Need to verify usage**
-**Verified:** YES - Defined as `0x04` but ASCII ETX is `0x03`
-**Explanation:** Constant is defined but need to check if/how it's actually used. If it's for protocol detection and nothing uses ETX character, this may be dead code.
-**Action needed:** Search codebase for ETX usage before concluding impact
-**KEEP for now - needs usage verification**
+### ✅ Finding #16: `ETX` constant value - RETRACTED (NOT A BUG)
+**Impact:** NONE - Correct value for OTGW bootloader protocol
+**Verified:** YES - Value 0x04 is CORRECT for OTGW custom bootloader protocol
+**Explanation:** The ETX value of 0x04 is **correct**. This is NOT standard ASCII ETX (0x03), but the custom OTGW bootloader protocol value defined by Schelte Bron (OTGW creator). The OTGWSerial library (src/libraries/OTGWSerial/OTGWSerial.cpp:31, written by Schelte Bron) defines:
+- STX = 0x0F (not standard ASCII 0x02)
+- ETX = 0x04 (not standard ASCII 0x03)  
+- DLE = 0x05 (not standard ASCII 0x10)
+
+These are custom protocol-specific values for the OTGW bootloader, verified against the authoritative otgwmcu/otmonitor source code.
+
+**Real-world impact:** None - code is correct as-is
+**Recommendation:** **RETRACT THIS FINDING** - not a bug
+**REMOVE THIS FINDING - Verified as correct implementation**
 
 ---
 
@@ -371,10 +378,10 @@ Additionally, `pulseCount` is `uint8_t` (max 255) but can overflow at high power
 **MEDIUM (Nice to Fix):** 7 findings
 - #24, #26, #27, #28, #29, #39, #40
 
-**LOW/REMOVE:** 20 findings
-- #15, #16*, #17, #19, #25, #30-38 (various - mostly style/architectural non-issues)
+**LOW/REMOVE:** 21 findings
+- #15, #16 (RETRACTED - not a bug, correct protocol value), #17, #19, #25, #30-38 (various - mostly style/architectural non-issues)
 
-**NEEDS VERIFICATION:** 5 findings marked with ⚠️
-- #5, #16, #24, #36, #38
+**NEEDS VERIFICATION:** 4 findings marked with ⚠️
+- #5, #24, #36, #38
 
-**Total to KEEP:** ~20 findings (removing 20 non-impactful ones)
+**Total to KEEP:** ~19 findings (removing 21 non-impactful/incorrect ones, including #16 retraction)
