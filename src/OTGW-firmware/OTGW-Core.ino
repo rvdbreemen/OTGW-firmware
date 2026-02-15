@@ -619,9 +619,9 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   if (OT.skipthis) return false;
   bool _valid = false;
   _valid = _valid || (OTlookup.msgcmd==OT_READ && OT.type==OT_READ_ACK);
-  _valid = _valid || (OTlookup.msgcmd==OT_WRITE && OTdata.type==OT_WRITE_DATA);
-  _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OTdata.type==OT_WRITE_DATA));
-  _valid = _valid || (OTdata.id==OT_Statusflags) || (OTdata.id==OT_StatusVH) || (OTdata.id==OT_SolarStorageMaster);;
+  _valid = _valid || (OTlookup.msgcmd==OT_WRITE && OT.type==OT_WRITE_DATA);
+  _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OT.type==OT_WRITE_DATA));
+  _valid = _valid || (OT.id==OT_Statusflags) || (OT.id==OT_StatusVH) || (OT.id==OT_SolarStorageMaster);
   return _valid;
 }
 
@@ -1805,7 +1805,7 @@ void processOT(const char *buf, int len){
         case OT_TSPEntryVH:                             print_u8u8(OTcurrentSystemState.TSPEntryVH); break;
         case OT_FaultBufferSizeVH:                      print_u8u8(OTcurrentSystemState.FaultBufferSizeVH); break;
         case OT_FaultBufferEntryVH:                     print_u8u8(OTcurrentSystemState.FaultBufferEntryVH); break;
-        case OT_FanSpeed:                               print_u16(OTcurrentSystemState.FanSpeed); break;
+        case OT_FanSpeed:                               print_u8u8(OTcurrentSystemState.FanSpeed); break;
         case OT_ElectricalCurrentBurnerFlame:           print_f88(OTcurrentSystemState.ElectricalCurrentBurnerFlame); break;
         case OT_TRoomCH2:                               print_f88(OTcurrentSystemState.TRoomCH2); break;
         case OT_RelativeHumidity:                       print_u8u8(OTcurrentSystemState.RelativeHumidity); break;
