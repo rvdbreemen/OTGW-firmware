@@ -164,7 +164,7 @@ String getpicfwversion(){
   String line = executeCommand("PR=A");
   int p = line.indexOf(OTGW_BANNER);
   if (p >= 0) {
-    p += sizeof(OTGW_BANNER);
+    p += sizeof(OTGW_BANNER)-1;
     _ret = line.substring(p);
   } else {
     _ret ="No version found";
@@ -619,9 +619,9 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   if (OT.skipthis) return false;
   bool _valid = false;
   _valid = _valid || (OTlookup.msgcmd==OT_READ && OT.type==OT_READ_ACK);
-  _valid = _valid || (OTlookup.msgcmd==OT_WRITE && OTdata.type==OT_WRITE_DATA);
-  _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OTdata.type==OT_WRITE_DATA));
-  _valid = _valid || (OTdata.id==OT_Statusflags) || (OTdata.id==OT_StatusVH) || (OTdata.id==OT_SolarStorageMaster);;
+  _valid = _valid || (OTlookup.msgcmd==OT_WRITE && OT.type==OT_WRITE_DATA);
+  _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OT.type==OT_WRITE_DATA));
+  _valid = _valid || (OT.id==OT_Statusflags) || (OT.id==OT_StatusVH) || (OT.id==OT_SolarStorageMaster);;
   return _valid;
 }
 
@@ -2368,8 +2368,8 @@ String checkforupdatepic(String filename){
     }
     latest = http.header(1);
     DebugTf(PSTR("Update %s -> [%s]\r\n"), filename.c_str(), latest.c_str());
-    http.end();
   } else OTGWDebugln(F("Failed to fetch version from Schelte Bron website"));
+  http.end(); // Always close connection, even on failure (Finding #24)
 
   return latest; 
 }
@@ -2406,8 +2406,8 @@ void refreshpic(String filename, String version) {
         }
       }
     }
+    http.end();
   }
-  http.end();
 }
 
 // --- Pending Upgrade Logic ---

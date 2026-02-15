@@ -25,7 +25,7 @@
  */
  #include <Arduino.h>
  //-----------------------------------------------------------------------------------------------------------
- volatile uint8_t pulseCount = 0;                  // Number of pulses, used to measure energy.
+ volatile uint16_t pulseCount = 0;                 // Number of pulses, used to measure energy.
  volatile uint32_t last_pulse_duration = 0;     // Duration of the time between last pulses
 
  //-----------------------------------------------------------------------------------------------------------
@@ -35,7 +35,7 @@
 
  interrupt_time = millis() ;
   // If interrupts come faster than debouncetime, assume it's a bounce and ignore
-  if (interrupt_time - last_interrupt_time > settingS0COUNTERdebouncetime)
+  if (interrupt_time - last_interrupt_time > (volatile uint16_t)settingS0COUNTERdebouncetime)
   {
     pulseCount++;
     last_pulse_duration = interrupt_time - last_interrupt_time ;
@@ -60,14 +60,18 @@
    time_t now = time(nullptr);
    if (!settingS0COUNTERenabled) return;
 
-   if (pulseCount != 0 ) {
-     noInterrupts();
-     OTGWs0pulseCount = pulseCount; 
-     OTGWs0pulseCountTot = OTGWs0pulseCountTot + pulseCount; 
-     pulseCount=0; 
-     interrupts();
+   noInterrupts();
+   uint16_t localPulseCount = pulseCount;
+   uint32_t localPulseDuration = last_pulse_duration;
+   if (localPulseCount != 0) {
+     OTGWs0pulseCount = localPulseCount; 
+     OTGWs0pulseCountTot = OTGWs0pulseCountTot + localPulseCount; 
+     pulseCount = 0; 
+   }
+   interrupts();
 
-     OTGWs0powerkw =  (float) 3600000 / (float)settingS0COUNTERpulsekw  / (float)last_pulse_duration ;
+   if (localPulseCount != 0) {
+     OTGWs0powerkw = (float)3600000 / (float)settingS0COUNTERpulsekw / (float)localPulseDuration;
      if (bDebugSensors) DebugTf(PSTR("*** S0PulseCount(%d) S0PulseCountTot(%d)\r\n"), OTGWs0pulseCount, OTGWs0pulseCountTot) ;
      if (bDebugSensors) DebugTf(PSTR("*** S0LastPulsetime(%d) S0Pulsekw:(%4.3f) \r\n"), last_pulse_duration, OTGWs0powerkw) ;
      OTGWs0lasttime = now ;

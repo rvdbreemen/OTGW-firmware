@@ -82,17 +82,16 @@ void evalOutputs(){
   //  5: CH2 mode [CH2 not active, CH2 active]
   //  6: diagnostic indication [no diagnostics, diagnostic event]
   //  7: reserved
-  if (!settingMyDEBUG) return;
-  settingMyDEBUG = false;
-  DebugTf(PSTR("current gpio output state: %d \r\n"), digitalRead(settingGPIOOUTPUTSpin));
-  DebugFlush();
-
   bool bitState = (OTcurrentSystemState.Statusflags & (1U << settingGPIOOUTPUTStriggerBit)) != 0;
-  DebugTf(PSTR("bitState: bit: %d , state %d \r\n"), settingGPIOOUTPUTStriggerBit, bitState);
+
+  if (settingMyDEBUG) {
+    settingMyDEBUG = false;
+    DebugTf(PSTR("current gpio output state: %d \r\n"), digitalRead(settingGPIOOUTPUTSpin));
+    DebugTf(PSTR("bitState: bit: %d , state %d \r\n"), settingGPIOOUTPUTStriggerBit, bitState);
+    DebugFlush();
+  }
 
   setOutputState(bitState);
-
-  DebugTf(PSTR("end void: current gpio output state: %d \r\n"), digitalRead(settingGPIOOUTPUTSpin));
 }
 
 /***************************************************************************

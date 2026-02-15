@@ -153,6 +153,7 @@ void initSensors() {
 
   // Start the DS18B20 sensor
   sensors.begin();
+  sensors.setWaitForConversion(false);  // Use async mode to avoid blocking main loop for ~750ms
 
   // Grab a count of devices on the wire
   numberOfDevices = sensors.getDeviceCount();
@@ -224,7 +225,7 @@ if (settingMQTTenable) {
 
   if (!bDebugSensorSimulation)
   {
-    sensors.requestTemperatures(); // Send the command to get temperatures
+    sensors.requestTemperatures(); // Non-blocking: setWaitForConversion(false) in initSensors()
   }
   bool simUpdateDue = true;
   if (bDebugSensorSimulation && simLastUpdateTime != 0 && (now - simLastUpdateTime) < SIM_SENSOR_UPDATE_INTERVAL_SECONDS)
@@ -253,7 +254,13 @@ if (settingMQTTenable) {
     }
     else
     {
-      DallasrealDevice[i].tempC = sensors.getTempC(DallasrealDevice[i].addr);
+      float tempC = sensors.getTempC(DallasrealDevice[i].addr);
+      if (tempC == DEVICE_DISCONNECTED_C) {
+        // Sensor disconnected or read error — skip, keep previous value (Finding #29)
+        if (bDebugSensors) DebugTf(PSTR("Sensor [%s] disconnected or read error, skipping\r\n"), strDeviceAddress);
+        continue;
+      }
+      DallasrealDevice[i].tempC = tempC;
     }
     DallasrealDevice[i].lasttime = now ;
     

@@ -411,7 +411,7 @@ bool yearChanged(){
   static int16_t lastyear = -1;
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
-  int8_t thisyear = myTime.year();
+  int16_t thisyear = myTime.year();
   bool _ret = (lastyear != thisyear); //year changed
   if (_ret) {
     //year changed
