@@ -150,7 +150,10 @@ void startWiFi(const char* hostname, int timeOut)
 
   WiFiManager manageWiFi;
   uint32_t lTime = millis();
-  String thisAP = String(hostname) + "-" + WiFi.macAddress();
+  char thisAP[64];
+  strlcpy(thisAP, hostname, sizeof(thisAP));
+  strlcat(thisAP, "-", sizeof(thisAP));
+  strlcat(thisAP, WiFi.macAddress().c_str(), sizeof(thisAP));
 
   DebugTln(F("\nStart Wifi ..."));
   manageWiFi.setDebugOutput(true);
@@ -184,7 +187,7 @@ void startWiFi(const char* hostname, int timeOut)
 
   DebugTf(PSTR("Wifi status: %s\r\n"), wifiConnected ? "Connected" : "Not connected");
   DebugTf(PSTR("Wifi AP stored: %s\r\n"), wifiSaved ? "Yes" : "No");
-  DebugTf(PSTR("Config portal SSID: %s\r\n"), thisAP.c_str());
+  DebugTf(PSTR("Config portal SSID: %s\r\n"), thisAP);
 
   if (wifiConnected)
   {
@@ -215,7 +218,7 @@ void startWiFi(const char* hostname, int timeOut)
   if (!wifiConnected)
   {
     DebugTln(F("Starting config portal..."));
-    if (!manageWiFi.startConfigPortal(thisAP.c_str()))
+    if (!manageWiFi.startConfigPortal(thisAP))
     {
       //-- fail to connect? Have you tried turning it off and on again?
       DebugTln(F("failed to connect and hit timeout"));
@@ -424,9 +427,9 @@ bool isNTPtimeSet(){
 
 //==[ end of NTP stuff ]=======================================================
 
-String getMacAddress() {
+const char* getMacAddress() {
+  static char baseMacChr[13] = {0};
   uint8_t baseMac[6];
-  char baseMacChr[13] = {0};
 #  if defined(ESP8266)
   WiFi.macAddress(baseMac);
   snprintf_P(baseMacChr, sizeof(baseMacChr), PSTR("%02X%02X%02X%02X%02X%02X"), baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
@@ -436,12 +439,13 @@ String getMacAddress() {
 #  else
   snprintf_P(baseMacChr, sizeof(baseMacChr), PSTR("%02X%02X%02X%02X%02X%02X"), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 #  endif
-  return String(baseMacChr);
+  return baseMacChr;
 }
 
-String getUniqueId() {
-  String uniqueId = "otgw-"+(String)getMacAddress();
-  return String(uniqueId);
+const char* getUniqueId() {
+  static char uniqueId[32];
+  snprintf_P(uniqueId, sizeof(uniqueId), PSTR("otgw-%s"), getMacAddress());
+  return uniqueId;
 }
 
 
