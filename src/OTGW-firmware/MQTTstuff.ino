@@ -227,9 +227,6 @@ const MQTT_set_cmd_t setcmds[] PROGMEM = {
 
 const int nrcmds = sizeof(setcmds) / sizeof(setcmds[0]);
 
-// const char learnmsg[] { "LA", "PR=L", "LB", "PR=L", "LC", "PR=L", "LD", "PR=L", "LE", "PR=L", "LF", "PR=L", "GA", "PR=G", "GB", "PR=G", "VR", "PR=V", "GW", "PR=M", "IT", "PR=T", "SB", "PR=S", "HW", "PR=W" } ;
-// const int nrlearnmsg = sizeof(learnmsg) / sizeof(learnmsg[0]);
-
 //===========================================================================================
 void startMQTT() 
 {
@@ -656,6 +653,52 @@ void sendMQTTStreaming(const char* topic, const char *json, const size_t len)
   feedWatchDog();
 } // sendMQTTStreaming()
 
+//===========================================================================================
+// Helper functions to reduce duplicated MQTT topic building patterns
+//===========================================================================================
+
+/**
+ * Publish ON/OFF value to MQTT topic
+ * Reduces duplicate pattern of boolean-to-string conversion
+ */
+void publishMQTTOnOff(const char* topic, bool value) {
+  sendMQTTData(topic, value ? "ON" : "OFF");
+}
+
+void publishMQTTOnOff(const __FlashStringHelper* topic, bool value) {
+  sendMQTTData(topic, value ? "ON" : "OFF");
+}
+
+/**
+ * Publish numeric value as string to MQTT topic
+ * Reduces duplicate pattern of number-to-string conversion with static buffer
+ */
+void publishMQTTNumeric(const char* topic, float value, uint8_t decimals = 2) {
+  static char buffer[16];
+  dtostrf(value, 1, decimals, buffer);
+  sendMQTTData(topic, buffer);
+}
+
+void publishMQTTNumeric(const __FlashStringHelper* topic, float value, uint8_t decimals = 2) {
+  static char buffer[16];
+  dtostrf(value, 1, decimals, buffer);
+  sendMQTTData(topic, buffer);
+}
+
+/**
+ * Publish integer value as string to MQTT topic
+ */
+void publishMQTTInt(const char* topic, int value) {
+  static char buffer[12];
+  snprintf(buffer, sizeof(buffer), "%d", value);
+  sendMQTTData(topic, buffer);
+}
+
+void publishMQTTInt(const __FlashStringHelper* topic, int value) {
+  static char buffer[12];
+  snprintf(buffer, sizeof(buffer), "%d", value);
+  sendMQTTData(topic, buffer);
+}
 
 //===========================================================================================
 // resetMQTTBufferSize() - Static Buffer Strategy
@@ -873,6 +916,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
     }
 
     // check if this is the specific line we are looking for
+    // Old config dump method (dumping all lines) is no longer used - we now fetch specific lines by ID
     if (lineID != OTid) continue;
 
     MQTTDebugTf(PSTR("Found line in config file for %d: [%d][%s] \r\n"), OTid, lineID, sTopic);

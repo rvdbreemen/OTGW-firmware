@@ -13,6 +13,53 @@ const APIGW = window.location.protocol + '//' + window.location.host + '/api/';
 
 "use strict";
 
+// ============================================================================
+// Utility Functions for Safe Operations
+// ============================================================================
+
+/**
+ * Safely parse JSON with validation and error handling
+ * @param {string} text - The JSON string to parse
+ * @returns {object|null} Parsed object or null on error
+ */
+function safeJSONParse(text) {
+  if (!text || typeof text !== 'string') {
+    console.warn('safeJSONParse: Invalid input (not a string)');
+    return null;
+  }
+  
+  // Quick validation - JSON should start with { or [
+  const trimmed = text.trim();
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+    console.warn('safeJSONParse: Input does not look like JSON');
+    return null;
+  }
+  
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error('safeJSONParse: Parse error:', e.message);
+    return null;
+  }
+}
+
+/**
+ * Safely get element by ID with optional warning
+ * @param {string} id - Element ID
+ * @param {boolean} warnIfMissing - Whether to log warning if not found
+ * @returns {Element|null} The element or null
+ */
+function safeGetElementById(id, warnIfMissing = false) {
+  const element = document.getElementById(id);
+  if (!element && warnIfMissing) {
+    console.warn(`Element not found: #${id}`);
+  }
+  return element;
+}
+
+// ============================================================================
+
+
 
 console.log(`Hash=${window.location.hash}`);
 window.onload = initMainPage;
@@ -822,7 +869,7 @@ function restoreDataFromLocalStorage() {
     // Restore log buffer
     const savedLogs = localStorage.getItem(PERSISTENCE_KEY_LOGS);
     if (savedLogs) {
-      const logs = JSON.parse(savedLogs);
+      const logs = safeJSONParse(savedLogs);
       if (Array.isArray(logs) && logs.length > 0) {
         otLogBuffer = logs;
         updateFilteredBuffer();
@@ -834,7 +881,7 @@ function restoreDataFromLocalStorage() {
     // Restore preferences
     const savedPrefs = localStorage.getItem(PERSISTENCE_KEY_PREFS);
     if (savedPrefs) {
-      const prefs = JSON.parse(savedPrefs);
+      const prefs = safeJSONParse(savedPrefs);
       if (prefs) {
         autoScroll = prefs.autoScroll !== undefined ? prefs.autoScroll : true;
         showTimestamps = prefs.showTimestamps !== undefined ? prefs.showTimestamps : true;
@@ -1621,10 +1668,13 @@ function setupOTLogControls() {
   }
   
   // Auto-scroll checkbox
-  document.getElementById('chkAutoScroll').addEventListener('change', function() {
-    autoScroll = this.checked;
-    if (typeof saveUISetting === 'function') saveUISetting('#uiAutoScroll', autoScroll);
-  });
+  const chkAutoScroll = document.getElementById('chkAutoScroll');
+  if (chkAutoScroll) {
+    chkAutoScroll.addEventListener('change', function() {
+      autoScroll = this.checked;
+      if (typeof saveUISetting === 'function') saveUISetting('#uiAutoScroll', autoScroll);
+    });
+  }
 
   // Toggle Capture Mode
   const chkCapture = document.getElementById('chkCaptureMode');
@@ -1674,28 +1724,34 @@ function setupOTLogControls() {
   }
   
   // Clear log button
-  document.getElementById('btnClearLog').addEventListener('click', function(e) {
-    e.preventDefault();
-    const count = otLogBuffer.length.toLocaleString();
-    if (confirm(`Clear ${count} log entries from memory and browser storage?\n\nThis cannot be undone.`)) {
-      otLogBuffer = [];
-      otLogFilteredBuffer = [];
-      updateLogDisplay();
-      updateLogCounters();
-      // Clear localStorage as well
-      clearStoredData();
-    }
-  });
+  const btnClearLog = document.getElementById('btnClearLog');
+  if (btnClearLog) {
+    btnClearLog.addEventListener('click', function(e) {
+      e.preventDefault();
+      const count = otLogBuffer.length.toLocaleString();
+      if (confirm(`Clear ${count} log entries from memory and browser storage?\n\nThis cannot be undone.`)) {
+        otLogBuffer = [];
+        otLogFilteredBuffer = [];
+        updateLogDisplay();
+        updateLogCounters();
+        // Clear localStorage as well
+        clearStoredData();
+      }
+    });
+  }
   
   // Download log
-  document.getElementById('btnDownloadLog').addEventListener('click', function(e) {
-    e.preventDefault();
-    try {
-      downloadLog(false);
-    } catch (err) {
-      console.error('Failed to download log:', err);
-    }
-  });
+  const btnDownloadLog = document.getElementById('btnDownloadLog');
+  if (btnDownloadLog) {
+    btnDownloadLog.addEventListener('click', function(e) {
+      e.preventDefault();
+      try {
+        downloadLog(false);
+      } catch (err) {
+        console.error('Failed to download log:', err);
+      }
+    });
+  }
 
   // Auto Download Log
   const chkAutoDL = document.getElementById('chkAutoDownloadLog');
@@ -1707,30 +1763,38 @@ function setupOTLogControls() {
   }
   
   // Search functionality
-  document.getElementById('searchLog').addEventListener('input', function(e) {
-    searchTerm = e.target.value;
-    updateFilteredBuffer();
-    updateLogDisplay();
-    updateLogCounters();
-  });
+  const searchLog = document.getElementById('searchLog');
+  if (searchLog) {
+    searchLog.addEventListener('input', function(e) {
+      searchTerm = e.target.value;
+      updateFilteredBuffer();
+      updateLogDisplay();
+      updateLogCounters();
+    });
+  }
   
   // Toggle timestamps
-  document.getElementById('chkShowTimestamp').addEventListener('change', function(e) {
-    showTimestamps = e.target.checked;
-    updateLogDisplay();
-    if (typeof saveUISetting === 'function') saveUISetting('ui_timestamps', e.target.checked);
-  });
+  const chkShowTimestamp = document.getElementById('chkShowTimestamp');
+  if (chkShowTimestamp) {
+    chkShowTimestamp.addEventListener('change', function(e) {
+      showTimestamps = e.target.checked;
+      updateLogDisplay();
+      if (typeof saveUISetting === 'function') saveUISetting('ui_timestamps', e.target.checked);
+    });
+  }
   
   // Manual scroll detection (disable auto-scroll checkbox if user scrolls up)
   let manualScrollTimeout = null;
-  document.getElementById('otLogContent').addEventListener('scroll', function(e) {
-    // Debounce scroll handling to avoid excessive DOM reads/writes
-    if (manualScrollTimeout !== null) {
-      clearTimeout(manualScrollTimeout);
-    }
-    
-    const container = e.target;
-    manualScrollTimeout = setTimeout(function() {
+  const otLogContent = document.getElementById('otLogContent');
+  if (otLogContent) {
+    otLogContent.addEventListener('scroll', function(e) {
+      // Debounce scroll handling to avoid excessive DOM reads/writes
+      if (manualScrollTimeout !== null) {
+        clearTimeout(manualScrollTimeout);
+      }
+      
+      const container = e.target;
+      manualScrollTimeout = setTimeout(function() {
       const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
       
       if (!isAtBottom && autoScroll) {
