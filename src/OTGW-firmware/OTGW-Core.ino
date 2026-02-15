@@ -777,7 +777,7 @@ void print_status(uint16_t& value)
       sendMQTTData("cooling",               (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  //delayms(5); 
       sendMQTTData("centralheating2",       (((OTdata.valueLB) & 0x20) ? "ON" : "OFF"));  //delayms(5);
       sendMQTTData("diagnostic_indicator",  (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));  //delayms(5);
-      sendMQTTData("eletric_production",    (((OTdata.valueLB) & 0x80) ? "ON" : "OFF"));  //delayms(5);
+      sendMQTTData("electric_production",   (((OTdata.valueLB) & 0x80) ? "ON" : "OFF"));  //delayms(5);
 
       OTcurrentSystemState.SlaveStatus = OTdata.valueLB;
     }
@@ -814,7 +814,7 @@ void print_solar_storage_status(uint16_t& value)
     AddLogf("\r\n%s = Slave Solar Mode Status [%d] ", OTlookupitem.label, SlaveSolarModeStatus);
     AddLogf("\r\n%s = Slave Solar Status [%d] ", OTlookupitem.label, SlaveSolarStatus);
     if (is_value_valid(OTdata, OTlookupitem)){
-      sendMQTTData(F("solar_storage_slave_fault_incidator"),  ((SlaveSolarFaultIndicator) ? "ON" : "OFF"));   
+      sendMQTTData(F("solar_storage_slave_fault_indicator"),  ((SlaveSolarFaultIndicator) ? "ON" : "OFF"));   
       sendMQTTData(F("solar_storage_mode_status"), itoa(SlaveSolarModeStatus, _msg, 10));  
       sendMQTTData(F("solar_storage_slave_status"), itoa(SlaveSolarStatus, _msg, 10));  
       OTcurrentSystemState.SolarSlaveStatus = OTdata.valueLB;

@@ -85,7 +85,6 @@ typedef struct {
 	//RF
 	uint16_t	RFstrengthbatterylevel = 0; // u8/ u8 RF strength and battery level
 	uint16_t 	OperatingMode_HC1_HC2_DHW = 0; // u8 / u8 Operating Mode HC1, HC2/ DHW
-	uint16_t	RoomRemoteOverrideFunction = 0; // Function of manual and program changes in master and remote room setpoint
 
 	//Brand identification (mandatory since v4.1)
 	uint16_t	Brand = 0; // u8 / u8 Brand name index / character
