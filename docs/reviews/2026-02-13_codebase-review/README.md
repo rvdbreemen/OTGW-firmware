@@ -74,21 +74,24 @@ Items #15, #17, #19, #25, #30-38 were removed as they are:
 ## Documents in This Archive
 
 ### Main Review Documents
-- **[CODEBASE_REVIEW_REVISED.md](CODEBASE_REVIEW_REVISED.md)** - **RECOMMENDED** - Streamlined review with 20 impactful findings only (removed non-issues)
+- **[CODEBASE_REVIEW_UPDATED_DEV.md](CODEBASE_REVIEW_UPDATED_DEV.md)** - **LATEST** - Updated review verified against dev branch (bd87103, 2026-02-15) - All 20 findings remain unfixed
+- **[CODEBASE_REVIEW_REVISED.md](CODEBASE_REVIEW_REVISED.md)** - Streamlined review with 20 impactful findings only (removed non-issues)
 - **[CODEBASE_REVIEW.md](CODEBASE_REVIEW.md)** - Original complete review with all 40 findings (includes 20 non-issues)
 - **[FINDINGS_ANALYSIS.md](FINDINGS_ANALYSIS.md)** - Critical analysis explaining which findings are real bugs vs. non-issues, with detailed impact assessment
 
 ## How to Use This Archive
 
 ### For Developers
-- **Start with [CODEBASE_REVIEW_REVISED.md](CODEBASE_REVIEW_REVISED.md)** for actionable findings only
+- **Start with [CODEBASE_REVIEW_UPDATED_DEV.md](CODEBASE_REVIEW_UPDATED_DEV.md)** for latest status against dev branch
+- Use [CODEBASE_REVIEW_REVISED.md](CODEBASE_REVIEW_REVISED.md) for detailed explanations of each finding
 - Use [FINDINGS_ANALYSIS.md](FINDINGS_ANALYSIS.md) to understand why each finding matters (or doesn't)
 - Reference [CODEBASE_REVIEW.md](CODEBASE_REVIEW.md) for the complete original analysis
 - Prioritize fixes: Critical → High → Medium
 - Reference ADR-032 and ADR-003 when evaluating security findings (#9-#14)
 
 ### For Project Maintainers
-- Focus on **Critical & High Priority** (13 findings): Real bugs affecting correctness, safety, reliability
+- **URGENT:** All 20 impactful findings remain unfixed in dev branch (verified 2026-02-15)
+- Focus on **Critical & High Priority** (13 findings): Real bugs affecting memory safety, data integrity, security
 - **Medium Priority** (7 findings): Code quality improvements and edge case fixes
 - Evaluate whether documented trade-offs (ADR-032, ADR-003) still align with project goals
 - 20 findings were removed as non-issues (Arduino architecture quirks, style, unfixable API issues)
@@ -96,7 +99,7 @@ Items #15, #17, #19, #25, #30-38 were removed as they are:
 ### For Security Reviewers
 - Note that security findings (#9-#14) are documented architectural decisions, not oversights
 - Any changes to security posture should be accompanied by superseding ADRs
-- Critical bugs (#1, #5, #7) have direct security implications and should be fixed
+- Critical bugs (#1, #5, #7) have direct security implications and should be fixed urgently
 
 ## ADR Context
 
@@ -114,6 +117,7 @@ These ADRs represent accepted architectural trade-offs. Security findings in thi
 - **2026-02-13 06:22:00 UTC** - Security section updated to reference ADRs and reframe as documented trade-offs
 - **2026-02-13 06:30:00 UTC** - Critical analysis completed: categorized all findings by impact, verified against source code
 - **2026-02-13 06:35:00 UTC** - Revised review created: removed 20 non-issues, kept 20 impactful findings
+- **2026-02-15 22:00:00 UTC** - **Updated review against dev branch (bd87103)**: All 20 impactful findings remain UNFIXED
 
 ## Analysis Results
 
