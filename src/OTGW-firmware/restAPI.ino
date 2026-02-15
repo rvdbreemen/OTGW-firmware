@@ -746,6 +746,7 @@ void sendDeviceTime()
   sendNestedJsonObj(F("dateTime"), buf); 
   sendNestedJsonObj(F("epoch"), (int)now);
   sendNestedJsonObj(F("message"), sMessage);
+  sendNestedJsonObj(F("psmode"), CBOOLEAN(bPSmode));
 
   sendEndJsonObj(F("devtime"));
 
@@ -765,6 +766,7 @@ void sendDeviceTimeV2()
   sendJsonMapEntry(F("dateTime"), buf); 
   sendJsonMapEntry(F("epoch"), (int)now);
   sendJsonMapEntry(F("message"), sMessage);
+  sendJsonMapEntry(F("psmode"), bPSmode);
 
   sendEndJsonMap(F("devtime"));
 
