@@ -22,11 +22,13 @@ Status: COMPLETE - Verified against dev branch bd87103
 This is an updated review of the OTGW-firmware codebase, re-validated against the current `dev` branch (commit bd87103, dated 2026-02-15). The original review was conducted on 2026-02-13 and identified 20 impactful findings.
 
 **Key Status:**
-- **13 Critical & High Priority findings:** All remain **UNFIXED** in dev branch
+- **12 Critical & High Priority findings:** All remain **UNFIXED** in dev branch (Finding #16 retracted as not a bug)
 - **7 Medium Priority findings:** All remain **UNFIXED** in dev branch  
 - **6 ADR-documented security trade-offs:** Unchanged (intentional architectural decisions)
 
 The dev branch has received numerous commits since the original review (version bumps, PS mode functionality, sensor enhancements), but **NONE of the critical bugs identified in the review have been fixed**.
+
+**Update 2026-02-15:** Finding #16 (ETX constant) has been retracted - the value 0x04 is correct for the OTGW bootloader protocol (verified against otgwmcu/otmonitor source by Schelte Bron).
 
 ---
 
@@ -280,13 +282,13 @@ void evalOutputs() {
 
 ---
 
-### ✅ Finding #16: `ETX` constant has wrong value
+### ❌ Finding #16: `ETX` constant value - RETRACTED
 **File:** `OTGW-firmware.h:74`  
-**Status in dev (bd87103):** ❌ **VERIFIED AS BUG**
+**Status in dev (bd87103):** ✅ **NOT A BUG - CORRECT VALUE**
 
 **Current code (dev branch):**
 ```cpp
-#define ETX ((uint8_t)0x04)  // BUG: ASCII ETX is 0x03, not 0x04
+#define ETX ((uint8_t)0x04)
 ```
 
 **Used in OTGW-Core.ino:148:**
@@ -294,15 +296,17 @@ void evalOutputs() {
 bPICavailable = OTGWSerial.find(ETX);
 ```
 
-**Why it's a bug:**
-- ASCII ETX (End of Text) is `0x03`
-- ASCII EOT (End of Transmission) is `0x04`
-- Code is looking for wrong character when detecting PIC bootloader
+**Why this is CORRECT:**
+The value `0x04` is the **correct ETX value for the OTGW bootloader protocol**. This is NOT standard ASCII ETX (0x03), but a custom protocol-specific value defined by Schelte Bron (the OTGW creator).
 
-**Required fix:**
-```cpp
-#define ETX ((uint8_t)0x03)  // Correct ASCII ETX value
-```
+**Evidence:**
+- `src/libraries/OTGWSerial/OTGWSerial.cpp:31` (written by Schelte Bron): `#define ETX ((uint8_t)0x04)`
+- The OTGW bootloader protocol uses custom values:
+  - `STX = 0x0F` (not standard ASCII 0x02)
+  - `ETX = 0x04` (not standard ASCII 0x03)
+  - `DLE = 0x05` (not standard ASCII 0x10)
+
+**Conclusion:** This finding is **RETRACTED**. The code is correct as-is.
 
 ---
 
@@ -433,19 +437,19 @@ These findings remain as documented trade-offs in the architecture. They are not
 | 6 | ISR race conditions | ❌ UNFIXED | Data races |
 | 7 | Reflected XSS | ❌ UNFIXED | Security |
 | 8 | GPIO outputs broken | ❌ UNFIXED | Feature failure |
-| 16 | ETX wrong value (0x04→0x03) | ❌ UNFIXED | PIC detection |
+| 16 | ETX value 0x04 | ✅ RETRACTED | **Not a bug - correct protocol value** |
 | 18 | Null pointer in MQTT callback | ❌ UNFIXED | Crash risk |
 | 20 | File descriptor leak | ❌ UNFIXED | Resource leak |
 | 21 | Year truncated to int8_t | ❌ UNFIXED | Data overflow |
 | 22 | requestTemperatures() blocks 750ms | ❌ UNFIXED | Watchdog risk |
 
-**Result:** 13 out of 13 critical/high findings remain UNFIXED in dev branch
+**Result:** 12 out of 13 critical/high findings remain UNFIXED in dev branch (Finding #16 retracted - not a bug)
 
 ### Recommendations
 
 1. **URGENT:** Fix critical bugs (#1, #2, #5, #7, #8) - These affect memory safety, data integrity, and security
-2. **HIGH:** Fix high priority bugs (#3, #4, #6, #16) - These affect correctness and reliability  
-3. **MEDIUM:** Address remaining findings (#18-40) as time permits
+2. **HIGH:** Fix high priority bugs (#3, #4, #6, #18, #20, #21, #22) - These affect correctness and reliability  
+3. **MEDIUM:** Address remaining findings (#23-40) as time permits
 
 ### Next Steps
 
@@ -460,10 +464,11 @@ These findings remain as documented trade-offs in the architecture. They are not
 
 - **Dev branch commit:** bd87103 (CI: update version.h)
 - **Review date:** 2026-02-15 22:00 UTC
-- **Verified findings:** All 13 critical/high (#1-8, #16, #18, #20-22)
+- **Verified findings:** All 12 critical/high (#1-8, #18, #20-22) remain unfixed
+- **Retracted findings:** #16 (ETX value 0x04 is correct for OTGW bootloader protocol)
 - **Medium findings:** All 7 (#23, #24, #26-29, #39, #40) confirmed unfixed
-- **Total:** 20 impactful findings all remain UNFIXED in dev branch
+- **Total:** 19 impactful findings remain UNFIXED in dev branch (1 retracted)
 - **ADR trade-offs:** 6 security findings (#9-14) unchanged (intentional)
 
 **Conclusion:**
-Despite 20+ commits to dev branch since original review (2026-02-13), NONE of the 20 impactful bugs have been fixed. The dev branch requires urgent attention to address critical memory safety, data integrity, and security issues identified in this review.
+Despite 20+ commits to dev branch since original review (2026-02-13), NONE of the 19 remaining impactful bugs have been fixed. Finding #16 was retracted after verifying against the authoritative OTGWSerial library source (written by Schelte Bron) - the ETX value of 0x04 is correct for the OTGW bootloader protocol, not standard ASCII. The dev branch requires urgent attention to address critical memory safety, data integrity, and security issues identified in this review.
