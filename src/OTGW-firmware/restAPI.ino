@@ -834,52 +834,44 @@ void postSettings()
   //------------------------------------------------------------ 
   // json string: {"name":"settingInterval","value":9}  
   // json string: {"name":"settingHostname","value":"abc"}  
+  // json string: {"name":"darktheme","value":true}
   //------------------------------------------------------------ 
-  // so, why not use ArduinoJSON library?
-  // I say: try it yourself ;-) It won't be easy
-      char* wPair[5];
-      // String jsonInStr  = CSTR(httpServer.arg(0));
-      char field[25] = {0,};
-      char newValue[101]={0,};
-      
-      // Use buffer to process input to avoid String class
-      // Assume max input matches our temp buffer size
-      char jsonIn[256];
-      strlcpy(jsonIn, httpServer.arg(0).c_str(), sizeof(jsonIn));
+  // Replaced manual string parsing with ArduinoJson (Finding #40)
+  // The old approach stripped braces/quotes and split on , and : which broke
+  // on values containing special characters ({, }, ", comma, colon).
+  StaticJsonDocument<256> doc;
+  DeserializationError error = deserializeJson(doc, httpServer.arg(0));
+  if (error) {
+    RESTDebugTf(PSTR("postSettings JSON parse error: %s\r\n"), error.c_str());
+    httpServer.send(400, F("application/json"), F("{\"error\":\"Invalid JSON\"}"));
+    return;
+  }
 
-      // Remove braces and quotes in place
-      replaceAll(jsonIn, sizeof(jsonIn), "{", "");
-      replaceAll(jsonIn, sizeof(jsonIn), "}", "");
-      replaceAll(jsonIn, sizeof(jsonIn), "\"", "");
+  const char* field = doc[F("name")];
+  if (!field || field[0] == '\0') {
+    httpServer.send(400, F("application/json"), F("{\"error\":\"Missing name\"}"));
+    return;
+  }
 
-      uint_fast8_t wp = splitString(jsonIn, ',',  wPair, 5) ;
-	      for (uint_fast8_t i=0; i<wp; i++)
-	      {
-	        char* wOut[5];
-	        //RESTDebugTf(PSTR("[%d] -> pair[%s]\r\n"), i, wPair[i]);
-	        uint8_t wc = splitString(wPair[i], ':',  wOut, 5) ;
-	        //RESTDebugTf(PSTR("==> [%s] -> field[%s]->val[%s]\r\n"), wPair[i], wOut[0], wOut[1]);
-	        if (wc>1) {
-	            if (wOut[0] && strcasecmp_P(wOut[0], PSTR("name")) == 0) {
-	              if (wOut[1] && (strlen(wOut[1]) < (sizeof(field) - 1))) {
-	                strlcpy(field, wOut[1], sizeof(field));
-	              }
-	            }
-	            else if (wOut[0] && strcasecmp_P(wOut[0], PSTR("value")) == 0) {
-	              if (wOut[1] && (strlen(wOut[1]) < (sizeof(newValue) - 1))) {
-	                strlcpy(newValue, wOut[1], sizeof(newValue));
-	              }
-	            }
-	        }
-	      }
-      if ( field[0] != 0 && newValue[0] != 0 ) {
-        RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
-        updateSetting(field, newValue);
-        httpServer.send(200, F("application/json"), httpServer.arg(0));
-      } else {
-        // Internal client error? It could not proess the client request.
-        httpServer.send(400, F("application/json"), httpServer.arg(0));
-      }
+  // Extract value as string — handles both string and boolean/numeric JSON values
+  char newValue[101] = {0};
+  JsonVariant val = doc[F("value")];
+  if (val.is<const char*>()) {
+    strlcpy(newValue, val.as<const char*>(), sizeof(newValue));
+  } else if (val.is<bool>()) {
+    strlcpy(newValue, val.as<bool>() ? "true" : "false", sizeof(newValue));
+  } else if (!val.isNull()) {
+    // Numeric or other type — serialize to string
+    serializeJson(val, newValue, sizeof(newValue));
+  }
+
+  if (newValue[0] != '\0') {
+    RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
+    updateSetting(field, newValue);
+    httpServer.send(200, F("application/json"), httpServer.arg(0));
+  } else {
+    httpServer.send(400, F("application/json"), F("{\"error\":\"Missing value\"}"));
+  }
 
 } // postSettings()
 
@@ -965,7 +957,14 @@ void sendApiNotFound(const char *URI)
   httpServer.sendContent_P(PSTR("<style>body { background-color: lightgray; font-size: 15pt;}</style></head><body>"));
   httpServer.sendContent_P(PSTR("<h1>OTGW firmware</h1><b1>"));
   httpServer.sendContent_P(PSTR("<br>[<b>"));
-  httpServer.sendContent(URI);
+  // HTML-escape URI to prevent reflected XSS
+  String escapedURI = String(URI);
+  escapedURI.replace(F("&"), F("&amp;"));
+  escapedURI.replace(F("<"), F("&lt;"));
+  escapedURI.replace(F(">"), F("&gt;"));
+  escapedURI.replace(F("\""), F("&quot;"));
+  escapedURI.replace(F("'"), F("&#39;"));
+  httpServer.sendContent(escapedURI);
   httpServer.sendContent_P(PSTR("</b>] is not a valid "));
   httpServer.sendContent_P(PSTR("</body></html>\r\n"));
 

@@ -368,6 +368,7 @@ void loop()
   
   if (!isFlashing()) {
     // Only run these tasks when NOT flashing firmware (ESP or PIC)
+      if (DUE(timerFlushSettings))      flushSettings();  // coalesced settings write + service restarts
       if (DUE(timerpollsensor))         pollSensors();    // poll the temperature sensors connected to 2wire gpio pin 
       if (DUE(timers0counter))          sendS0Counters(); // poll the s0 counter connected to gpio pin when due
       if (DUE(timer5min))               do5minevent();  

@@ -305,9 +305,11 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   }
   // naming convention /set/<node id>/<command>
   token = strtok(topic, "/"); 
+  if (token == NULL) { MQTTDebugln(F("MQTT: missing 'set' token")); return; }
   MQTTDebugf(PSTR("%s/"), token);
   if (strcasecmp(token, "set") == 0) {
     token = strtok(NULL, "/");
+    if (token == NULL) { MQTTDebugln(F("MQTT: missing node-id token")); return; }
     MQTTDebugf(PSTR("%s/"), token); 
     if (strcasecmp(token, NodeId) == 0) {
       token = strtok(NULL, "/");
