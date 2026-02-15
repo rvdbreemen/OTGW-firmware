@@ -2,12 +2,13 @@
 # METADATA
 Document Title: OpenTherm v4.2 Protocol Compliance Analysis & Improvement Plan
 Review Date: 2026-02-15 14:33:00 UTC
+Implementation Date: 2026-02-15 15:47:00 UTC
 Branch Reviewed: main (current codebase)
 Target Version: v1.1.0-beta
 Reviewer: GitHub Copilot Advanced Agent
 Document Type: Compliance Analysis & Task Breakdown
 Reference Spec: Specification/OpenTherm-Protocol-Specification-v4.2-message-id-reference.md
-Status: COMPLETE
+Status: IMPLEMENTED
 ---
 
 # OpenTherm v4.2 Protocol Compliance Analysis & Improvement Plan
@@ -448,15 +449,16 @@ Als `OTdata.id > 133` (OT_MSGID_MAX), leest dit buiten de array bounds. Hoewel O
 
 ## 4. Gedetailleerde Taken Breakdown
 
-### Fase 1: Kritieke Bug Fix (Prioriteit: URGENT)
+### Fase 1: Kritieke Bug Fix (Prioriteit: URGENT) ✅ GEÏMPLEMENTEERD
 
-#### Taak 1.1: Fix uurmasker DayTime MQTT (ID 20)
+#### Taak 1.1: Fix uurmasker DayTime MQTT (ID 20) ✅
 - **Bestand**: `src/OTGW-firmware/OTGW-Core.ino`
 - **Regel**: 1297
 - **Wijziging**: `0x0F` → `0x1F`
 - **Geschatte tijd**: 5 minuten
 - **Risico**: Geen — pure bugfix, backwards compatible
 - **Test**: Verifieer MQTT DayTime_hour output voor uren 16-23
+- **Status**: ✅ Geïmplementeerd in commit 893c73e
 
 ```cpp
 // Huidige code (FOUT):
@@ -468,10 +470,11 @@ sendMQTTData(_topic, itoa((OTdata.valueHB & 0x1F), _msg, 10));
 
 ---
 
-### Fase 2: Richting (R/W) Correcties (Prioriteit: HOOG)
+### Fase 2: Richting (R/W) Correcties (Prioriteit: HOOG) ✅ GEÏMPLEMENTEERD
 
-#### Taak 2.1: Fix richtingen in OTmap array
+#### Taak 2.1: Fix richtingen in OTmap array ✅
 - **Bestand**: `src/OTGW-firmware/OTGW-Core.h`
+- **Status**: ✅ Geïmplementeerd in commit 893c73e
 - **Wijzigingen** (10 regels in OTmap):
 
 | Regel | ID | Oud | Nieuw |
@@ -494,9 +497,11 @@ sendMQTTData(_topic, itoa((OTdata.valueHB & 0x1F), _msg, 10));
 
 ---
 
-### Fase 3: Ontbrekende Message IDs Toevoegen (Prioriteit: MEDIUM)
+### Fase 3: Ontbrekende Message IDs Toevoegen (Prioriteit: MEDIUM) ✅ GEÏMPLEMENTEERD
 
-#### Taak 3.1: Voeg ID 39 (TrOverride2) toe
+#### Taak 3.1: Voeg ID 39 (TrOverride2) toe ✅
+
+**Status**: ✅ Geïmplementeerd in commit 14e865d
 
 **Stap 1** — Struct veld toevoegen in `OTGW-Core.h`:
 ```cpp
@@ -529,7 +534,9 @@ case 39: return String(OTcurrentSystemState.TrOverride2); break;
 
 ---
 
-#### Taak 3.2: Voeg IDs 93-95 (Brand info) toe
+#### Taak 3.2: Voeg IDs 93-95 (Brand info) toe ✅
+
+**Status**: ✅ Geïmplementeerd in commit 14e865d
 
 **Stap 1** — Struct velden toevoegen in `OTGW-Core.h`:
 ```cpp
@@ -564,7 +571,9 @@ case 95: return String(OTcurrentSystemState.BrandSerialIndex); break;
 
 ---
 
-#### Taak 3.3: Voeg IDs 96-97 (Counters) toe
+#### Taak 3.3: Voeg IDs 96-97 (Counters) toe ✅
+
+**Status**: ✅ Geïmplementeerd in commit 14e865d
 
 **Stap 1** — Struct velden toevoegen:
 ```cpp
@@ -583,9 +592,11 @@ uint16_t PowerCycles = 0;           // u16 Power cycles
 
 ---
 
-### Fase 4: Datatype Correcties (Prioriteit: MEDIUM)
+### Fase 4: Datatype Correcties (Prioriteit: MEDIUM) ✅ GEÏMPLEMENTEERD
 
-#### Taak 4.1: Fix FanSpeed (ID 35) print functie
+#### Taak 4.1: Fix FanSpeed (ID 35) print functie ✅
+
+**Status**: ✅ Geïmplementeerd in commit 53973e9 (Optie A: print_u16 → print_u8u8)
 
 **Optie A** (minimaal): Vervang `print_u16` door `print_u8u8` in de switch:
 ```cpp
@@ -612,24 +623,28 @@ void print_fanspeed(uint16_t& value) {
 
 ---
 
-### Fase 5: Eenheid/Label Correcties (Prioriteit: LAAG)
+### Fase 5: Eenheid/Label Correcties (Prioriteit: LAAG) ⚠️ DEELS GEÏMPLEMENTEERD
 
-#### Taak 5.1: Fix eenheid FanSpeed
+#### Taak 5.1: Fix eenheid FanSpeed ✅
 - **Bestand**: `OTGW-Core.h:365`
 - **Wijziging**: `"rpm"` → `"Hz"`
+- **Status**: ✅ Geïmplementeerd in commit 53973e9
 
-#### Taak 5.2: Fix eenheid DHWFlowRate
+#### Taak 5.2: Fix eenheid DHWFlowRate ✅
 - **Bestand**: `OTGW-Core.h:349`
 - **Wijziging**: `"l/m"` → `"l/min"`
+- **Status**: ✅ Geïmplementeerd in commit 53973e9
 
-#### Taak 5.3: Fix typo "eletric_production" (BREAKING CHANGE)
+#### Taak 5.3: Fix typo "eletric_production" (BREAKING CHANGE) ⏭️ OVERGESLAGEN
+- **Reden**: Breaking change voor bestaande Home Assistant automations
 - **Bestand**: `OTGW-Core.ino:780`
 - **Huidige waarde**: `"eletric_production"`
 - **Correcte waarde**: `"electric_production"`
 - **⚠️ BREAKING**: Bestaande Home Assistant automations die dit MQTT topic gebruiken zullen breken!
 - **Advies**: Documenteer als bekende typo, overweeg backwards-compatible aanpak (publiceer op beide topics tijdelijk)
 
-#### Taak 5.4: Fix typo "solar_storage_slave_fault_incidator" (BREAKING CHANGE)
+#### Taak 5.4: Fix typo "solar_storage_slave_fault_incidator" (BREAKING CHANGE) ⏭️ OVERGESLAGEN
+- **Reden**: Breaking change voor bestaande Home Assistant automations
 - **Bestand**: `OTGW-Core.ino:817`
 - **Huidige waarde**: `"solar_storage_slave_fault_incidator"`
 - **Correcte waarde**: `"solar_storage_slave_fault_indicator"`
@@ -637,16 +652,19 @@ void print_fanspeed(uint16_t& value) {
 
 ---
 
-### Fase 6: Code Quality Verbeteringen (Prioriteit: LAAG)
+### Fase 6: Code Quality Verbeteringen (Prioriteit: LAAG) ⚠️ DEELS GEÏMPLEMENTEERD
 
-#### Taak 6.1: Fix `is_value_valid()` parameter consistentie
+#### Taak 6.1: Fix `is_value_valid()` parameter consistentie ✅
 - Vervang alle `OTdata.type` en `OTdata.id` door `OT.type` en `OT.id` in de functie.
+- **Status**: ✅ Geïmplementeerd in commit 53973e9
 
-#### Taak 6.2: Verwijder ongebruikt struct veld `RoomRemoteOverrideFunction`
+#### Taak 6.2: Verwijder ongebruikt struct veld `RoomRemoteOverrideFunction` ⏭️ OVERGESLAGEN
+- **Reden**: Veld wordt mogelijk door externe code/tools gerefereerd; vereist bredere impactanalyse
 - Verifieer eerst of het veld nergens anders gebruikt wordt.
 - Verwijder het veld als het inderdaad ongebruikt is.
 
-#### Taak 6.3: Array bounds check toevoegen voor OTmap
+#### Taak 6.3: Array bounds check toevoegen voor OTmap ⏭️ OVERGESLAGEN
+- **Reden**: Reeds geïdentificeerd in eerdere codebase review; apart issue voor tracking
 - Voeg een check toe voordat `OTmap[OTdata.id]` wordt benaderd:
 ```cpp
 if (OTdata.id <= OT_MSGID_MAX) {
@@ -662,14 +680,14 @@ if (OTdata.id <= OT_MSGID_MAX) {
 
 ### Prioriteitsmatrix
 
-| Prioriteit | Fase | Beschrijving | Impact | Risico | Geschatte Tijd |
-|:----------:|:----:|-------------|--------|--------|:-------------:|
-| 🔴 URGENT | 1 | Bug fix uurmasker ID 20 | Hoog | Geen | 5 min |
-| 🟠 HOOG | 2 | R/W richting correcties (10 IDs) | Hoog | Laag | 15 min |
-| 🟡 MEDIUM | 3 | Ontbrekende IDs toevoegen (6 IDs) | Medium | Laag | 45 min |
-| 🟡 MEDIUM | 4 | Datatype correctie FanSpeed | Medium | Laag | 20 min |
-| 🟢 LAAG | 5 | Eenheid/label fixes | Laag | ⚠️ Breaking | 15 min |
-| 🟢 LAAG | 6 | Code quality | Laag | Laag | 20 min |
+| Prioriteit | Fase | Beschrijving | Impact | Risico | Status |
+|:----------:|:----:|-------------|--------|--------|:------:|
+| 🔴 URGENT | 1 | Bug fix uurmasker ID 20 | Hoog | Geen | ✅ |
+| 🟠 HOOG | 2 | R/W richting correcties (10 IDs) | Hoog | Laag | ✅ |
+| 🟡 MEDIUM | 3 | Ontbrekende IDs toevoegen (6 IDs) | Medium | Laag | ✅ |
+| 🟡 MEDIUM | 4 | Datatype correctie FanSpeed | Medium | Laag | ✅ |
+| 🟢 LAAG | 5 | Eenheid/label fixes | Laag | ⚠️ Breaking | ⚠️ Deels |
+| 🟢 LAAG | 6 | Code quality | Laag | Laag | ⚠️ Deels |
 
 ### Aanbevolen Volgorde
 

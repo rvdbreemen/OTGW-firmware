@@ -2,10 +2,11 @@
 # METADATA
 Document Title: OpenTherm v4.2 Compliance Review - Archive Overview
 Review Date: 2026-02-15 14:33:00 UTC
+Implementation Date: 2026-02-15 15:47:00 UTC
 Branch Reviewed: main (current codebase)
 Target Version: v1.1.0-beta
 Reviewer: GitHub Copilot Advanced Agent
-Status: COMPLETE
+Status: IMPLEMENTED
 ---
 
 # OpenTherm v4.2 Protocol Compliance Review
@@ -14,16 +15,28 @@ Status: COMPLETE
 
 This review compares the OTGW-firmware implementation against the OpenTherm Protocol Specification v4.2 (10 November 2020) to identify missing, incorrectly handled, or improvable message handling.
 
-## Summary of Findings
+**Status: All priority items implemented.** See implementation summary below.
 
-| Category | Count | Severity |
-|----------|-------|----------|
-| Missing Message IDs (39, 93-97) | 6 | Medium |
-| R/W Direction Mismatches | 10 | Medium-High |
-| Data Type Inconsistencies | 2 | Medium |
-| Critical Bug (ID 20 hour bitmask) | 1 | **Critical** |
-| Label/Unit Issues | 4 | Low |
-| Code Quality Issues | 3 | Low |
+## Summary of Findings & Implementation
+
+| Category | Count | Severity | Status |
+|----------|-------|----------|--------|
+| Critical Bug (ID 20 hour bitmask) | 1 | **Critical** | ✅ Fixed |
+| R/W Direction Mismatches | 10 | Medium-High | ✅ Fixed |
+| Missing Message IDs (39, 93-97) | 6 | Medium | ✅ Added |
+| Data Type Inconsistencies (FanSpeed) | 1 | Medium | ✅ Fixed |
+| Label/Unit Issues (non-breaking) | 2 | Low | ✅ Fixed |
+| Label/Unit Issues (breaking MQTT) | 2 | Low | ⏭️ Skipped |
+| Code Quality (is_value_valid) | 1 | Low | ✅ Fixed |
+| Code Quality (unused field, bounds) | 2 | Low | ⏭️ Skipped |
+
+## Implementation Commits
+
+| Commit | Phase | Description |
+|--------|-------|-------------|
+| 893c73e | 1+2 | Fix DayTime hour bitmask + R/W direction mismatches (10 IDs) |
+| 14e865d | 3 | Add 6 missing message IDs (39, 93-97) |
+| 53973e9 | 4+5+6 | Fix FanSpeed datatype, units, is_value_valid consistency |
 
 ## Documents
 
@@ -31,20 +44,11 @@ This review compares the OTGW-firmware implementation against the OpenTherm Prot
 |----------|-------------|----------|
 | [OPENTHERM_V42_COMPLIANCE_PLAN.md](OPENTHERM_V42_COMPLIANCE_PLAN.md) | Complete analysis with detailed task breakdown | Developers |
 
-## Key Actions Required
+## Items Intentionally Not Changed
 
-### Urgent (Sprint 1)
-1. **Fix ID 20 hour bitmask bug** — `0x0F` → `0x1F` at OTGW-Core.ino:1297
-2. **Correct R/W directions** for 10 IDs in OTmap (OTGW-Core.h)
-
-### Important (Sprint 2) 
-3. **Add missing IDs** 39, 93-95, 96-97
-4. **Fix FanSpeed** print function inconsistency (ID 35)
-
-### Nice-to-have (Sprint 3)
-5. **Fix unit labels** (FanSpeed rpm→Hz, DHWFlowRate l/m→l/min)
-6. **Fix MQTT typos** (breaking changes - needs migration strategy)
-7. **Code quality** improvements
+- **MQTT topic typos** (`eletric_production`, `solar_storage_slave_fault_incidator`): Breaking change for existing Home Assistant automations — requires migration strategy
+- **Unused struct field** `RoomRemoteOverrideFunction`: May be referenced by external tools — needs broader impact analysis
+- **OTmap array bounds check**: Already identified in prior codebase review — tracked separately
 
 ## Reference Specification
 
