@@ -85,6 +85,9 @@ void writeSettings(bool show)
 //=======================================================================
 void readSettings(bool show) 
 {
+  // Open file for reading
+  File file =  LittleFS.open(SETTINGS_FILE, "r");
+
   DebugTf(PSTR(" %s ..\r\n"), SETTINGS_FILE);
   if (!LittleFS.exists(SETTINGS_FILE)) 
   {  //create settings file if it does not exist yet.
@@ -93,9 +96,6 @@ void readSettings(bool show)
     readSettings(false); //now it should work...
     return;
   }
-
-  // Open file for reading (after existence check to prevent file descriptor leak)
-  File file = LittleFS.open(SETTINGS_FILE, "r");
 
   // Deserialize the JSON document
   // Use DynamicJsonDocument to eliminate stack overflow risk (moved from stack to heap)
@@ -249,7 +249,6 @@ void updateSetting(const char *field, const char *newValue)
     Debugln();
     DebugTf(PSTR("Need reboot before new %s.local will be available!\r\n\n"), settingHostname);
   }
-  if (strcasecmp_P(field, PSTR("AdminPassword"))==0)   strlcpy(settingAdminPassword, newValue, sizeof(settingAdminPassword));
   
   if (strcasecmp_P(field, PSTR("MQTTenable"))==0)      settingMQTTenable = EVALBOOLEAN(newValue);
   if (strcasecmp_P(field, PSTR("MQTTbroker")) == 0)    strlcpy(settingMQTTbroker, newValue, sizeof(settingMQTTbroker));

@@ -147,7 +147,6 @@ bool      bPSmode = false;  //default to PS=0 mode
 
 //All things that are settings 
 char      settingHostname[41] = _HOSTNAME;
-char      settingAdminPassword[41] = "";
 
 //MQTT settings
 bool      statusMQTTconnection = false; 
