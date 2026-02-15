@@ -254,7 +254,13 @@ if (settingMQTTenable) {
     }
     else
     {
-      DallasrealDevice[i].tempC = sensors.getTempC(DallasrealDevice[i].addr);
+      float tempC = sensors.getTempC(DallasrealDevice[i].addr);
+      if (tempC == DEVICE_DISCONNECTED_C) {
+        // Sensor disconnected or read error — skip, keep previous value (Finding #29)
+        if (bDebugSensors) DebugTf(PSTR("Sensor [%s] disconnected or read error, skipping\r\n"), strDeviceAddress);
+        continue;
+      }
+      DallasrealDevice[i].tempC = tempC;
     }
     DallasrealDevice[i].lasttime = now ;
     

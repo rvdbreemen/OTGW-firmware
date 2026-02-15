@@ -164,7 +164,7 @@ String getpicfwversion(){
   String line = executeCommand("PR=A");
   int p = line.indexOf(OTGW_BANNER);
   if (p >= 0) {
-    p += sizeof(OTGW_BANNER);
+    p += sizeof(OTGW_BANNER)-1;
     _ret = line.substring(p);
   } else {
     _ret ="No version found";
@@ -2368,8 +2368,8 @@ String checkforupdatepic(String filename){
     }
     latest = http.header(1);
     DebugTf(PSTR("Update %s -> [%s]\r\n"), filename.c_str(), latest.c_str());
-    http.end();
   } else OTGWDebugln(F("Failed to fetch version from Schelte Bron website"));
+  http.end(); // Always close connection, even on failure (Finding #24)
 
   return latest; 
 }
@@ -2406,8 +2406,8 @@ void refreshpic(String filename, String version) {
         }
       }
     }
+    http.end();
   }
-  http.end();
 }
 
 // --- Pending Upgrade Logic ---

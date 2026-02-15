@@ -3,7 +3,7 @@
 //
 // -tjfs
 
-#define byteswap(val) ((val << 8) | (val >> 8))
+#define byteswap(val) (((val) << 8) | ((val) >> 8))
 
 static const char banner[] PROGMEM = "OpenTherm Gateway ";
 

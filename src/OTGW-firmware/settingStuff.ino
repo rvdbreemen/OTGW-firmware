@@ -46,6 +46,31 @@ void flushSettings()
 }
 
 //=======================================================================
+// GPIO conflict detection (Finding #27)
+// Returns true if the requested pin is already used by another feature.
+// 'caller' identifies which feature is requesting the pin (e.g. "sensor", "s0", "output")
+bool checkGPIOConflict(int pin, PGM_P caller)
+{
+  if (pin < 0) return false; // disabled / not set
+
+  bool conflict = false;
+  // Check against each configurable GPIO (excluding 'caller' itself)
+  if (strcasecmp_P(caller, PSTR("sensor")) != 0 && pin == settingGPIOSENSORSpin && settingGPIOSENSORSpin >= 0) {
+    DebugTf(PSTR("GPIO conflict: pin %d already used by SENSORS\r\n"), pin);
+    conflict = true;
+  }
+  if (strcasecmp_P(caller, PSTR("s0")) != 0 && pin == settingS0COUNTERpin && settingS0COUNTERpin >= 0) {
+    DebugTf(PSTR("GPIO conflict: pin %d already used by S0 Counter\r\n"), pin);
+    conflict = true;
+  }
+  if (strcasecmp_P(caller, PSTR("output")) != 0 && pin == settingGPIOOUTPUTSpin && settingGPIOOUTPUTSpin >= 0) {
+    DebugTf(PSTR("GPIO conflict: pin %d already used by GPIO OUTPUTS\r\n"), pin);
+    conflict = true;
+  }
+  return conflict;
+}
+
+//=======================================================================
 void writeSettings(bool show) 
 {
 
@@ -356,7 +381,11 @@ void updateSetting(const char *field, const char *newValue)
   }
   if (strcasecmp_P(field, PSTR("GPIOSENSORSpin")) == 0)    
   {
-    settingGPIOSENSORSpin = atoi(newValue);
+    int newPin = atoi(newValue);
+    if (checkGPIOConflict(newPin, PSTR("sensor"))) {
+      DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
+    }
+    settingGPIOSENSORSpin = newPin;
     Debugln();
     DebugTf(PSTR("Need reboot before GPIO SENSORS will use new pin GPIO%d!\r\n\n"), settingGPIOSENSORSpin);
   }
@@ -372,7 +401,11 @@ void updateSetting(const char *field, const char *newValue)
   }
   if (strcasecmp_P(field, PSTR("S0COUNTERpin")) == 0)    
   {
-    settingS0COUNTERpin = atoi(newValue);
+    int newPin = atoi(newValue);
+    if (checkGPIOConflict(newPin, PSTR("s0"))) {
+      DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
+    }
+    settingS0COUNTERpin = newPin;
     Debugln();
     DebugTf(PSTR("Need reboot before S0 Counter will use new pin GPIO%d!\r\n\n"), settingS0COUNTERpin);
   }
@@ -393,7 +426,11 @@ void updateSetting(const char *field, const char *newValue)
   }
   if (strcasecmp_P(field, PSTR("GPIOOUTPUTSpin")) == 0)
   {
-    settingGPIOOUTPUTSpin = atoi(newValue);
+    int newPin = atoi(newValue);
+    if (checkGPIOConflict(newPin, PSTR("output"))) {
+      DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
+    }
+    settingGPIOOUTPUTSpin = newPin;
     Debugln();
     DebugTf(PSTR("Need reboot before GPIO OUTPUTS will use new pin GPIO%d!\r\n\n"), settingGPIOOUTPUTSpin);
   }

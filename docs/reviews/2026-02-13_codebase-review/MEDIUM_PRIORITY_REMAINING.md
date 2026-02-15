@@ -4,14 +4,13 @@ Document Title: Medium Priority Issues - Remaining Work
 Review Date: 2026-02-15
 Branch: claude/review-codebase-w3Q6N
 Source Review: CODEBASE_REVIEW_UPDATED_DEV.md + FINDINGS_ANALYSIS.md
-Status: OPEN - 5 findings to address (2 resolved)
+Status: COMPLETE - All 7 findings resolved
 ---
 
 # Medium Priority Issues - Remaining Work
 
 All 12 critical/high priority findings from the codebase review have been resolved.
-The following 7 medium priority issues remain unfixed and are documented here with
-current code references, impact analysis, and suggested fixes.
+All 7 medium priority issues have been resolved as documented below.
 
 ---
 
@@ -45,11 +44,12 @@ Refactored `updateSetting()` to defer both flash writes and service restarts:
 
 ---
 
-## Finding #24: `http.end()` called on uninitialized HTTPClient
+## Finding #24: ~~`http.end()` called on uninitialized HTTPClient~~ FIXED
 
-**File:** [OTGW-Core.ino](../../../src/OTGW-firmware/OTGW-Core.ino) — `downloadFile()` (line ~2410)  
+**File:** [OTGW-Core.ino](../../../src/OTGW-firmware/OTGW-Core.ino) — `checkforupdatepic()`  
 **Priority:** LOW-MEDIUM  
-**Impact:** Potential crash when no update is available
+**Status:** FIXED — Moved `http.end()` unconditionally after the if/else block so it always
+matches `http.begin()`, preventing connection leaks on HTTP failure.
 
 ### Problem
 
@@ -84,11 +84,11 @@ Trivial — Move one line.
 
 ---
 
-## Finding #26: `settingMQTTbrokerPort` missing default fallback
+## Finding #26: ~~`settingMQTTbrokerPort` missing default fallback~~ FIXED
 
-**File:** [settingStuff.ino](../../../src/OTGW-firmware/settingStuff.ino) — `readSettings()` (line ~119)  
+**File:** [settingStuff.ino](../../../src/OTGW-firmware/settingStuff.ino) — `readSettings()`  
 **Priority:** LOW-MEDIUM  
-**Impact:** MQTT broken after config file corruption
+**Status:** FIXED — Added `| settingMQTTbrokerPort` fallback (resolved in commit `0d4b102`).
 
 ### Problem
 
@@ -121,11 +121,14 @@ Trivial — Add `| settingMQTTbrokerPort` to one line.
 
 ---
 
-## Finding #27: No GPIO conflict detection
+## Finding #27: ~~No GPIO conflict detection~~ FIXED
 
-**Files:** [outputs_ext.ino](../../../src/OTGW-firmware/outputs_ext.ino), [sensors_ext.ino](../../../src/OTGW-firmware/sensors_ext.ino), [s0PulseCount.ino](../../../src/OTGW-firmware/s0PulseCount.ino)  
+**Files:** [settingStuff.ino](../../../src/OTGW-firmware/settingStuff.ino) — `checkGPIOConflict()` + `updateSetting()`  
 **Priority:** MEDIUM  
-**Impact:** Features malfunction when configured to same pin
+**Status:** FIXED — Added `checkGPIOConflict()` helper that checks all three configurable
+GPIO features (sensor, S0 counter, output) against each other. Logs a warning via
+`DebugTf()` when a conflict is detected. The setting is still applied (warn policy)
+since rejection would require frontend changes.
 
 ### Problem
 
@@ -164,11 +167,11 @@ Medium — Requires adding validation logic and deciding conflict policy (warn v
 
 ---
 
-## Finding #28: `byteswap` macro lacks parameter parentheses
+## Finding #28: ~~`byteswap` macro lacks parameter parentheses~~ FIXED
 
 **File:** [versionStuff.ino](../../../src/OTGW-firmware/versionStuff.ino) — line 6  
 **Priority:** LOW  
-**Impact:** None currently, but wrong results if called with expressions
+**Status:** FIXED — Added parentheses: `((val) << 8) | ((val) >> 8)`.
 
 ### Problem
 
@@ -194,11 +197,13 @@ Trivial — Add parentheses around `val`.
 
 ---
 
-## Finding #29: Dallas temperature -127°C not filtered
+## Finding #29: ~~Dallas temperature -127°C not filtered~~ FIXED
 
-**File:** [sensors_ext.ino](../../../src/OTGW-firmware/sensors_ext.ino) — `pollSensors()` (line ~258)  
+**File:** [sensors_ext.ino](../../../src/OTGW-firmware/sensors_ext.ino) — `pollSensors()`  
 **Priority:** LOW-MEDIUM  
-**Impact:** Invalid temperature data published to MQTT/Home Assistant
+**Status:** FIXED — Added `DEVICE_DISCONNECTED_C` check before storing temperature.
+Disconnected sensors now skip the update and retain their previous reading, with a
+debug log message when `bDebugSensors` is enabled.
 
 ### Problem
 
@@ -244,11 +249,13 @@ and never checked for authentication. Removing it eliminates the finding entirel
 
 ---
 
-## Finding #40: `postSettings()` uses manual string parsing instead of ArduinoJson
+## Finding #40: ~~`postSettings()` uses manual string parsing instead of ArduinoJson~~ FIXED
 
-**File:** [restAPI.ino](../../../src/OTGW-firmware/restAPI.ino) — `postSettings()` (line ~831)  
+**File:** [restAPI.ino](../../../src/OTGW-firmware/restAPI.ino) — `postSettings()`  
 **Priority:** LOW  
-**Impact:** Settings update may fail with special characters in values
+**Status:** FIXED — Replaced manual brace/quote stripping + `splitString()` with
+`StaticJsonDocument<256>` + `deserializeJson()`. Handles string, boolean, and numeric
+value types from the frontend. Returns proper HTTP 400 with error JSON on parse failure.
 
 ### Problem
 
@@ -309,26 +316,12 @@ Low-Medium — Simple replacement, but needs testing with all setting types. The
 | # | Finding | Priority | Complexity | Status |
 |---|---------|----------|------------|--------|
 | 23 | ~~Settings flash wear (write per field)~~ | MEDIUM | Medium | **FIXED** — deferred writes + bitmask |
-| 24 | `http.end()` on uninitialized client | LOW | Trivial | Open |
-| 26 | MQTT port missing default fallback | LOW | Trivial | Open |
-| 27 | No GPIO conflict detection | MEDIUM | Medium | Open |
-| 28 | `byteswap` macro unparenthesized | LOW | Trivial | Open |
-| 29 | Dallas -127°C not filtered | LOW-MEDIUM | Low | Open |
+| 24 | ~~`http.end()` scope in checkforupdatepic~~ | LOW | Trivial | **FIXED** — unconditional http.end() |
+| 26 | ~~MQTT port missing default fallback~~ | LOW | Trivial | **FIXED** — `\| settingMQTTbrokerPort` |
+| 27 | ~~No GPIO conflict detection~~ | MEDIUM | Medium | **FIXED** — checkGPIOConflict() |
+| 28 | ~~`byteswap` macro unparenthesized~~ | LOW | Trivial | **FIXED** — added `(val)` parens |
+| 29 | ~~Dallas -127°C not filtered~~ | LOW-MEDIUM | Low | **FIXED** — DEVICE_DISCONNECTED_C check |
 | 39 | ~~Admin password not persisted~~ | MEDIUM | Trivial | **REMOVED** — dead code deleted |
-| 40 | Manual JSON parsing in postSettings | LOW | Low-Medium | Open |
+| 40 | ~~Manual JSON parsing in postSettings~~ | LOW | Low-Medium | **FIXED** — ArduinoJson replacement |
 
-### Quick Wins (trivial fixes)
-
-These can be fixed in minutes with minimal risk:
-
-1. **#26** — Add `| settingMQTTbrokerPort` (1 line)
-2. **#28** — Add parentheses to macro (1 line)
-3. **#24** — Move `http.end()` inside `if` block (move 1 line)
-
-### Larger Efforts
-
-These require more design consideration:
-
-4. **#29** — Filter -127°C sensor readings (small but needs testing)
-5. **#40** — Replace manual parsing with ArduinoJson (moderate refactor)
-6. **#27** — GPIO conflict detection (needs policy decision: warn vs. reject)
+All findings have been resolved. No remaining work items.
