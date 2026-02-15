@@ -629,6 +629,7 @@ let otLogControlsInitialized = false;
 let isFlashing = false;
 let currentFlashFilename = "";
 let flashModeActive = false; // Track if we're on the flash page
+let isPSmode = false; // Track PS=1 (Print Summary) mode from OTGW PIC
 let flashPollTimer = null; // Timer for polling flash status as failsafe (both ESP and PIC)
 let otLogResponsiveInitialized = false;
 let otLogResizeTimer = null;
@@ -1125,7 +1126,8 @@ function getOTLogDisplayState() {
     isProxied: isProxied,
     isPhone: isPhone,
     isSmallScreen: isSmallScreen,
-    disabled: (isProxied || isPhone || isSmallScreen)
+    isPSmode: isPSmode,
+    disabled: (isProxied || isPhone || isSmallScreen || isPSmode)
   };
   
   return state;
@@ -1186,6 +1188,8 @@ function initOTLogWebSocket(force) {
       console.log("[WebSocket] FALLBACK: Smartphone detected. Disabling OpenTherm Monitor to save resources.");
     } else if (displayState.isSmallScreen) {
       console.log("[WebSocket] FALLBACK: Small screen detected (width: " + window.innerWidth + "px). Disabling OpenTherm Monitor.");
+    } else if (displayState.isPSmode) {
+      console.log("[WebSocket] FALLBACK: PS=1 mode detected. Disabling OpenTherm Monitor to reduce device load.");
     }
     const logSection = document.getElementById('otLogSection');
     if (logSection) {
@@ -2478,6 +2482,14 @@ function refreshDevTime() {
             }
           }
         }
+        if (json.devtime[i].name == "psmode") {
+          var newPSmode = (json.devtime[i].value === 'true' || json.devtime[i].value === true);
+          if (newPSmode !== isPSmode) {
+            isPSmode = newPSmode;
+            console.log('[PS mode] PS=1 mode changed to: ' + isPSmode);
+            applyPSmodeState();
+          }
+        }
       }
     })
     .catch(function (error) {
@@ -2488,6 +2500,40 @@ function refreshDevTime() {
     });
 
 } // refreshDevTime()
+
+//============================================================================
+// Apply PS=1 mode state to the UI
+// When PS=1 is active: hide the OT log section (like smartphone mode),
+// disconnect the WebSocket, and stop OT monitor polling to reduce device load.
+function applyPSmodeState() {
+  if (isPSmode) {
+    console.log('[PS mode] Entering PS=1 mode - disabling OT monitor and WebSocket');
+    // Hide the OT log section (same as smartphone mode)
+    var logSection = document.getElementById('otLogSection');
+    if (logSection) {
+      logSection.classList.add('hidden');
+    }
+    // Disconnect WebSocket
+    disconnectOTLogWebSocket();
+    // Stop OT monitor polling
+    if (tid) {
+      clearInterval(tid);
+      tid = 0;
+    }
+  } else {
+    console.log('[PS mode] Exiting PS=1 mode - re-enabling OT monitor and WebSocket');
+    // Re-evaluate display state (may still be disabled by smartphone/proxy/screen size)
+    updateOTLogResponsiveState();
+    // Restart OT monitor polling if on main page
+    if (document.getElementById('displayMainPage') &&
+        document.getElementById('displayMainPage').classList.contains('active')) {
+      if (!tid) {
+        tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+      }
+    }
+  }
+} // applyPSmodeState()
+
 //============================================================================      
 // Global variable to store available firmware files info
 let availableFirmwareFiles = [];
@@ -2737,7 +2783,7 @@ function refreshDevInfo() {
 
 //============================================================================  
 function refreshOTmonitor() {
-  if (flashModeActive || !isPageVisible()) return;
+  if (flashModeActive || !isPageVisible() || isPSmode) return;
 
   data = {};
   fetch(APIGW + "v2/otgw/otmonitor")  //api/v2/otgw/otmonitor
