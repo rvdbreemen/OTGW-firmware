@@ -2,7 +2,7 @@
 # METADATA
 Document Title: Executive Summary - OTGW-firmware Codebase Review
 Review Date: 2026-02-11 05:48:00 UTC
-Branch Reviewed: copilot/review-codebase-improvements
+Branch Reviewed: dev-fixing-stuff
 Target Version: 1.1.0-beta
 Reviewer: GitHub Copilot Advanced Agent
 Document Type: Executive Summary
