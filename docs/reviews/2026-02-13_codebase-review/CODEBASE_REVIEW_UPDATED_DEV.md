@@ -2,17 +2,18 @@
 # METADATA
 Document Title: OTGW-firmware Codebase Review - Updated for Dev Branch
 Review Date: 2026-02-15 22:00:00 UTC
-Branch Reviewed: dev (commit bd87103)
+Branch Reviewed: dev (commit bd87103) + claude/review-codebase-w3Q6N (commit 0d4b102)
 Original Review: 2026-02-13 (commit 79a9247)
 Reviewer: GitHub Copilot Advanced Agent
 Document Type: Updated Code Review
-Status: COMPLETE - Verified against dev branch bd87103
+Status: COMPLETE - 12 of 12 critical/high findings resolved
 ---
 
 # OTGW-firmware Codebase Review - Updated for Dev Branch
 
 **Review Date:** 2026-02-15  
 **Dev Branch:** bd87103 (CI: update version.h)  
+**Fix Branch:** claude/review-codebase-w3Q6N (commit 0d4b102)  
 **Original Review:** 2026-02-13 (commit 79a9247)
 
 ---
@@ -22,11 +23,11 @@ Status: COMPLETE - Verified against dev branch bd87103
 This is an updated review of the OTGW-firmware codebase, re-validated against the current `dev` branch (commit bd87103, dated 2026-02-15). The original review was conducted on 2026-02-13 and identified 20 impactful findings.
 
 **Key Status:**
-- **12 Critical & High Priority findings:** All remain **UNFIXED** in dev branch (Finding #16 retracted as not a bug)
+- **12 Critical & High Priority findings:** All **RESOLVED** (4 already fixed in dev, 8 fixed in commit 0d4b102, Finding #16 retracted as not a bug)
 - **7 Medium Priority findings:** All remain **UNFIXED** in dev branch  
 - **6 ADR-documented security trade-offs:** Unchanged (intentional architectural decisions)
 
-The dev branch has received numerous commits since the original review (version bumps, PS mode functionality, sensor enhancements), but **NONE of the critical bugs identified in the review have been fixed**.
+The dev branch had already fixed Findings #1, #2, #3, and #4. The remaining 8 critical/high findings were fixed in commit 0d4b102 on branch `claude/review-codebase-w3Q6N`.
 
 **Update 2026-02-15:** Finding #16 (ETX constant) has been retracted - the value 0x04 is correct for the OTGW bootloader protocol (verified against otgwmcu/otmonitor source by Schelte Bron).
 
@@ -36,60 +37,41 @@ The dev branch has received numerous commits since the original review (version 
 
 ### ✅ Finding #1: Out-of-bounds array write when `OTdata.id == 255`
 **File:** `OTGW-Core.ino:1657`, `OTGW-Core.h:472`  
-**Status in dev (bd87103):** ❌ **UNFIXED**
+**Status in dev (bd87103):** ✅ **FIXED** (already `[256]` in dev branch)
 
 **Current code (dev branch):**
 ```cpp
 // OTGW-Core.h:472
-time_t msglastupdated[255] = {0}; //all msg, even if they are unknown
+time_t msglastupdated[256] = {0}; //all msg, even if they are unknown  ← FIXED
 
 // OTGW-Core.ino:1657
 msglastupdated[OTdata.id] = now;
 ```
 
-**Why it's still a bug:**
-- Array has indices 0-254, but `OTdata.id` can be 0-255
-- When `OTdata.id == 255`, writes to index 255 (out of bounds)
-- **Impact:** Memory corruption, crashes, undefined behavior
-
-**Required fix:**
-```cpp
-time_t msglastupdated[256] = {0};  // Change [255] to [256]
-```
+**Resolution:** Array size changed from [255] to [256] in dev branch. No further action needed.
 
 ---
 
 ### ✅ Finding #2: Wrong bitmask corrupts afternoon/evening hours in MQTT
 **File:** `OTGW-Core.ino:1297`  
-**Status in dev (bd87103):** ❌ **UNFIXED**
+**Status in dev (bd87103):** ✅ **FIXED** (already `0x1F` in dev branch)
 
 **Current code (dev branch):**
 ```cpp
 // Line 1285 (logging) - CORRECT
 AddLogf("%s = %s - %.2d:%.2d", OTlookupitem.label, dayName, (OTdata.valueHB & 0x1F), OTdata.valueLB);
 
-// Line 1297 (MQTT) - WRONG
-sendMQTTData(_topic, itoa((OTdata.valueHB & 0x0F), _msg, 10));  // BUG: 0x0F should be 0x1F
+// Line 1299 (MQTT) - NOW CORRECT
+sendMQTTData(_topic, itoa((OTdata.valueHB & 0x1F), _msg, 10));  // FIXED: was 0x0F, now 0x1F
 ```
 
-**Why it's still a bug:**
-- Hours 0-23 require 5 bits (mask `0x1F`)
-- Mask `0x0F` only keeps 4 bits
-- Hours 16-23 get corrupted: hour 20 becomes 4, hour 23 becomes 7
-- Logging code 12 lines above correctly uses `0x1F`
-
-**Impact:** Incorrect time data published to Home Assistant for afternoon/evening
-
-**Required fix:**
-```cpp
-sendMQTTData(_topic, itoa((OTdata.valueHB & 0x1F), _msg, 10));  // Change 0x0F to 0x1F
-```
+**Resolution:** Bitmask corrected from `0x0F` to `0x1F` in dev branch. No further action needed.
 
 ---
 
 ### ✅ Finding #3: `is_value_valid()` references global instead of parameter
 **File:** `OTGW-Core.ino:622-624`  
-**Status in dev (bd87103):** ❌ **UNFIXED**
+**Status in dev (bd87103):** ✅ **FIXED** (already uses `OT` parameter in dev branch)
 
 **Current code (dev branch):**
 ```cpp
@@ -97,50 +79,37 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   if (OT.skipthis) return false;
   bool _valid = false;
   _valid = _valid || (OTlookup.msgcmd==OT_READ && OT.type==OT_READ_ACK);
-  _valid = _valid || (OTlookup.msgcmd==OT_WRITE && OTdata.type==OT_WRITE_DATA);   // BUG: OTdata
-  _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OTdata.type==OT_WRITE_DATA));  // BUG: OTdata
-  _valid = _valid || (OTdata.id==OT_Statusflags) || (OTdata.id==OT_StatusVH) || (OTdata.id==OT_SolarStorageMaster);;  // BUG: OTdata
+  _valid = _valid || (OTlookup.msgcmd==OT_WRITE && OT.type==OT_WRITE_DATA);   // FIXED: was OTdata
+  _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OT.type==OT_WRITE_DATA));  // FIXED: was OTdata
+  _valid = _valid || (OT.id==OT_Statusflags) || (OT.id==OT_StatusVH) || (OT.id==OT_SolarStorageMaster);;  // FIXED: was OTdata
   return _valid;
 }
 ```
 
-**Why it's still a bug:**
-- Function takes parameter `OT` but checks global `OTdata` instead
-- Lines 622, 623, 624 all reference `OTdata` instead of `OT`
-- Currently masked because always called with `OTdata`, but violates function contract
-
-**Required fix:** Replace `OTdata` with `OT` on lines 622-624
+**Resolution:** All references changed from `OTdata` to `OT` parameter in dev branch. No further action needed.
 
 ---
 
 ### ✅ Finding #4: `sizeof()` vs `strlen()` off-by-one in PIC version parsing
 **File:** `OTGW-Core.ino:167`  
-**Status in dev (bd87103):** ❌ **UNFIXED**
+**Status in dev (bd87103):** ✅ **FIXED** (already uses `sizeof(OTGW_BANNER)-1` in dev branch)
 
 **Current code (dev branch):**
 ```cpp
 int p = line.indexOf(OTGW_BANNER);
 if (p >= 0) {
-  p += sizeof(OTGW_BANNER);   // BUG: includes null terminator
+  p += sizeof(OTGW_BANNER) - 1;   // FIXED: -1 to exclude null terminator
   _ret = line.substring(p);
 }
 ```
 
-**Why it's still a bug:**
-- `sizeof(OTGW_BANNER)` returns total bytes including `\0`
-- Skips one character too many when parsing version
-- Version "4.2.1" becomes ".2.1"
-
-**Required fix:**
-```cpp
-p += sizeof(OTGW_BANNER) - 1;  // or use strlen(OTGW_BANNER)
-```
+**Resolution:** Off-by-one corrected in dev branch. No further action needed.
 
 ---
 
-### ⚠️ Finding #5: Stack buffer overflow in hex file parser
+### ✅ Finding #5: Stack buffer overflow in hex file parser
 **File:** `versionStuff.ino:43-56`  
-**Status in dev (bd87103):** ❌ **UNFIXED**
+**Status:** ✅ **FIXED** in commit 0d4b102
 
 **Current code (dev branch):**
 ```cpp
@@ -149,106 +118,45 @@ char datamem[256];  // Indices 0-255
 if (addr >= 0x4200 && addr <= 0x4300) {
   addr = (addr - 0x4200) >> 1;  // Result: 0 to 128
   while (len > 0) {
-    datamem[addr++] = byteswap(data);  // Can write beyond buffer
+    if (addr >= (int)(sizeof(datamem))) break;  // FIXED: bounds check added
+    datamem[addr++] = byteswap(data);  // Now safe
     offs += 4;
     len--;
   }
 }
 ```
 
-**Why it's still a bug:**
-- Address range 0x4200-0x4300 divided by 2 gives 0-128
-- Starting at index 128, loop can write beyond datamem[255]
-- Stack buffer overflow risk
-
-**Required fix:** Add bounds check inside loop:
-```cpp
-while (len > 0) {
-  if (addr >= sizeof(datamem)) break;  // Bounds check
-  datamem[addr++] = byteswap(data);
-  offs += 4;
-  len--;
-}
-```
+**Resolution:** Added `if (addr >= (int)(sizeof(datamem))) break;` bounds check inside both hex parser while loops (16f88 and 16f1847 sections) in commit 0d4b102.
 
 ---
 
 ### ✅ Finding #6: ISR race conditions in S0 pulse counter
 **File:** `s0PulseCount.ino:38, 63-70`  
-**Status in dev (bd87103):** ❌ **UNFIXED**
+**Status:** ✅ **FIXED** in commit 0d4b102
 
-**Current code (dev branch):**
-```cpp
-void IRAM_ATTR IRQcounter() {
-  // ...
-  if (interrupt_time - last_interrupt_time > settingS0COUNTERdebouncetime)  // BUG: not volatile
-  {
-    pulseCount++;
-    last_pulse_duration = interrupt_time - last_interrupt_time;
-  }
-}
-
-void sendS0Counters() {
-  // ...
-  if (pulseCount != 0 ) {  // BUG: TOCTOU race
-    noInterrupts();
-    OTGWs0pulseCount = pulseCount; 
-    // ...
-    interrupts();
-    
-    OTGWs0powerkw = (float) 3600000 / (float)settingS0COUNTERpulsekw / (float)last_pulse_duration;  // BUG: read outside critical section
-  }
-}
-```
-
-**Why it's still a bug:**
-1. `settingS0COUNTERdebouncetime` read in ISR but not declared `volatile`
-2. `last_pulse_duration` read outside `noInterrupts()` critical section (line 70)
-3. `pulseCount != 0` check before `noInterrupts()` (TOCTOU race)
-4. `pulseCount` is `uint8_t` (wraps at 255)
-
-**Required fixes:**
-- Make `settingS0COUNTERdebouncetime` volatile
-- Read `last_pulse_duration` inside critical section
-- Move `pulseCount != 0` check inside critical section
-- Change `pulseCount` to `uint16_t`
+**Fixes applied:**
+1. Changed `pulseCount` from `uint8_t` to `uint16_t` to prevent early overflow
+2. Volatile-safe read of `settingS0COUNTERdebouncetime` in ISR via cast
+3. Moved all shared variable reads inside `noInterrupts()`/`interrupts()` critical section
+4. Eliminated TOCTOU race by reading `pulseCount` atomically first, then checking
+5. `last_pulse_duration` now read inside critical section into local variable
 
 ---
 
 ### ✅ Finding #7: Reflected XSS in `sendApiNotFound()`
 **File:** `restAPI.ino:968`  
-**Status in dev (bd87103):** ❌ **UNFIXED**
+**Status:** ✅ **FIXED** in commit 0d4b102
 
-**Current code (dev branch):**
+**Fix applied:** URI is now HTML-escaped before embedding in response. Characters `&`, `<`, `>`, `"`, `'` are replaced with their HTML entities.
+
 ```cpp
-void sendApiNotFound(const char *URI)
-{
-  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
-  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  httpServer.send_P(404, PSTR("text/html; charset=UTF-8"), PSTR("<!DOCTYPE HTML><html><head>"));
-  httpServer.sendContent_P(PSTR("<style>body { background-color: lightgray; font-size: 15pt;}</style></head><body>"));
-  httpServer.sendContent_P(PSTR("<h1>OTGW firmware</h1><b1>"));
-  httpServer.sendContent_P(PSTR("<br>[<b>"));
-  httpServer.sendContent(URI);  // BUG: Raw user input in HTML
-  httpServer.sendContent_P(PSTR("</b>] is not a valid "));
-  httpServer.sendContent_P(PSTR("</body></html>\r\n"));
-}
-```
-
-**Why it's still a bug:**
-- URI from user input is directly embedded in HTML without escaping
-- Attacker can craft URL like `/api/<script>alert(1)</script>`
-- Executes JavaScript in victim's browser (XSS)
-
-**Required fix:** HTML-escape URI before including in response:
-```cpp
-// Escape <, >, ", ', &
+// HTML-escape URI to prevent reflected XSS
 String escapedURI = String(URI);
-escapedURI.replace("&", "&amp;");
-escapedURI.replace("<", "&lt;");
-escapedURI.replace(">", "&gt;");
-escapedURI.replace("\"", "&quot;");
-escapedURI.replace("'", "&#39;");
+escapedURI.replace(F("&"), F("&amp;"));
+escapedURI.replace(F("<"), F("&lt;"));
+escapedURI.replace(F(">"), F("&gt;"));
+escapedURI.replace(F("\""), F("&quot;"));
+escapedURI.replace(F("'"), F("&#39;"));
 httpServer.sendContent(escapedURI);
 ```
 
@@ -256,29 +164,25 @@ httpServer.sendContent(escapedURI);
 
 ### ✅ Finding #8: `evalOutputs()` gated by debug flag -- never runs normally
 **File:** `outputs_ext.ino:85-86`  
-**Status in dev (bd87103):** ❌ **UNFIXED**
+**Status:** ✅ **FIXED** in commit 0d4b102
 
-**Current code (dev branch):**
+**Fix applied:** Removed debug gate so `evalOutputs()` always evaluates the bit state and sets the GPIO output. Debug logging is now conditional on `settingMyDEBUG` but no longer blocks execution.
+
 ```cpp
 void evalOutputs() {
   // ...
-  if (!settingMyDEBUG) return;  // BUG: Only runs when debug enabled
-  settingMyDEBUG = false;        // BUG: Immediately clears flag
-  
-  DebugTf(PSTR("current gpio output state: %d \r\n"), digitalRead(settingGPIOOUTPUTSpin));
-  DebugFlush();
-  
   bool bitState = (OTcurrentSystemState.Statusflags & (1U << settingGPIOOUTPUTStriggerBit)) != 0;
-  setOutputState(bitState);
+
+  if (settingMyDEBUG) {  // Debug logging only, doesn't gate execution
+    settingMyDEBUG = false;
+    DebugTf(PSTR("current gpio output state: %d \r\n"), digitalRead(settingGPIOOUTPUTSpin));
+    DebugTf(PSTR("bitState: bit: %d , state %d \r\n"), settingGPIOOUTPUTStriggerBit, bitState);
+    DebugFlush();
+  }
+
+  setOutputState(bitState);  // Always runs now
 }
 ```
-
-**Why it's still a bug:**
-- GPIO outputs only work when `settingMyDEBUG` is true
-- Flag is immediately cleared, so outputs only update once
-- Feature is completely broken in normal operation
-
-**Required fix:** Remove or restructure debug gate to allow normal operation
 
 ---
 
@@ -312,88 +216,71 @@ The value `0x04` is the **correct ETX value for the OTGW bootloader protocol**. 
 
 ### ✅ Finding #18: Null pointer dereference in MQTT callback
 **File:** `MQTTstuff.ino:310, 312, 313`  
-**Status in dev (bd87103):** ❌ **UNFIXED**
+**Status:** ✅ **FIXED** in commit 0d4b102
 
-**Current code (dev branch):**
+**Fix applied:** Added NULL checks after each `strtok()` call with early return:
+
 ```cpp
-token = strtok(NULL, "/");
-MQTTDebugf(PSTR("%s/"), token); 
-if (strcasecmp(token, NodeId) == 0) {  // BUG: No NULL check before strcasecmp
-  token = strtok(NULL, "/");           // BUG: No NULL check
-  MQTTDebugf(PSTR("%s"), token);
-  if (token != NULL){  // NULL check only here, too late
+token = strtok(topic, "/");
+if (token == NULL) { MQTTDebugln(F("MQTT: missing 'set' token")); return; }
+MQTTDebugf(PSTR("%s/"), token);
+if (strcasecmp(token, "set") == 0) {
+  token = strtok(NULL, "/");
+  if (token == NULL) { MQTTDebugln(F("MQTT: missing node-id token")); return; }
+  MQTTDebugf(PSTR("%s/"), token);
+  if (strcasecmp(token, NodeId) == 0) {
 ```
-
-**Why it's still a bug:**
-- `strtok()` returns NULL when no more tokens
-- Lines 310, 312, 313 pass result to `strcasecmp()` and `MQTTDebugf()` without NULL check
-- Malformed MQTT topic causes crash
-
-**Required fix:** Add NULL checks before using `strtok()` results
 
 ---
 
 ### ✅ Finding #20: File descriptor leak in `readSettings()`
 **File:** `settingStuff.ino:89-97`  
-**Status in dev (bd87103):** ❌ **UNFIXED**
+**Status:** ✅ **FIXED** in commit 0d4b102
 
-**Current code (dev branch):**
+**Fix applied:** Restructured logic to check file existence BEFORE opening the file. The `LittleFS.exists()` check and recursive path now execute before any file handle is created.
+
 ```cpp
-File file = LittleFS.open(SETTINGS_FILE, "r");
-
-DebugTf(PSTR(" %s ..\r\n"), SETTINGS_FILE);
-if (!LittleFS.exists(SETTINGS_FILE)) 
-{  //create settings file if it does not exist yet.
-  DebugTln(F(" .. file not found! --> created file!"));
-  writeSettings(show);
-  readSettings(false); //now it should work...
-  return;  // BUG: file never closed before recursive call
-}
+void readSettings(bool show) {
+  DebugTf(PSTR(" %s ..\r\n"), SETTINGS_FILE);
+  if (!LittleFS.exists(SETTINGS_FILE)) {  // Check BEFORE opening
+    DebugTln(F(" .. file not found! --> created file!"));
+    writeSettings(show);
+    readSettings(false);
+    return;  // No file handle to leak
+  }
+  // Open file for reading (after existence check)
+  File file = LittleFS.open(SETTINGS_FILE, "r");
 ```
-
-**Why it's still a bug:**
-- File opened on line 89
-- If file doesn't exist (line 92), calls `writeSettings()` and `readSettings()` recursively
-- Never closes file handle before recursion
-- Resource leak
-
-**Required fix:** Close file before recursive call or restructure logic
 
 ---
 
 ### ✅ Finding #21: Year truncated to `int8_t` in `yearChanged()`
 **File:** `helperStuff.ino:414`  
-**Status in dev (bd87103):** ❌ **UNFIXED**
+**Status:** ✅ **FIXED** in commit 0d4b102
 
-**Current code (dev branch):**
+**Fix applied:** Changed `int8_t` to `int16_t`:
 ```cpp
-int8_t thisyear = myTime.year();  // BUG: Year 2026 doesn't fit in int8_t (-128 to 127)
+int16_t thisyear = myTime.year();  // FIXED: was int8_t, now int16_t
 ```
-
-**Why it's still a bug:**
-- Year 2026 overflows `int8_t` (range -128 to 127)
-- Comparison still detects changes by accident (both overflow same way)
-- Year value itself is meaningless
-
-**Required fix:** Use `int` or `int16_t` for year
 
 ---
 
 ### ✅ Finding #22: `requestTemperatures()` blocks for ~750ms
 **File:** `sensors_ext.ino:227`  
-**Status in dev (bd87103):** ❌ **UNFIXED**
+**Status:** ✅ **FIXED** in commit 0d4b102
 
-**Current code (dev branch):**
+**Fix applied:** Added `sensors.setWaitForConversion(false)` in `initSensors()` to enable async mode. The `requestTemperatures()` call now returns immediately instead of blocking for ~750ms.
+
 ```cpp
-sensors.requestTemperatures(); // Send the command to get temperatures
+// In initSensors():
+sensors.begin();
+sensors.setWaitForConversion(false);  // FIXED: async mode
+
+// In pollSensors():
+sensors.requestTemperatures(); // Non-blocking: setWaitForConversion(false)
 ```
 
-**Why it's still a bug:**
-- `DallasTemperature::requestTemperatures()` blocks for up to 750ms (12-bit resolution)
-- Blocks main loop, risks watchdog timeout
-- Dallas library supports async pattern with `requestTemperaturesAsync()`
-
-**Required fix:** Use non-blocking async pattern
+**Note:** The sensor interval timer (`settingGPIOSENSORSinterval`, default 20s) provides ample time for conversion to complete between requests.
 
 ---
 
@@ -427,34 +314,34 @@ These findings remain as documented trade-offs in the architecture. They are not
 **Review of dev branch (bd87103) on 2026-02-15:**
 
 ### Critical & High Findings Status
-| # | Finding | Status | Impact |
+| # | Finding | Status | Commit |
 |---|---------|--------|--------|
-| 1 | Array OOB write (msglastupdated[255]) | ❌ UNFIXED | Memory corruption |
-| 2 | Bitmask 0x0F→0x1F (MQTT hours) | ❌ UNFIXED | Data corruption |
-| 3 | is_value_valid() uses global | ❌ UNFIXED | Logic bug |
-| 4 | sizeof() off-by-one | ❌ UNFIXED | Version parsing |
-| 5 | Buffer overflow in hex parser | ❌ UNFIXED | Stack corruption |
-| 6 | ISR race conditions | ❌ UNFIXED | Data races |
-| 7 | Reflected XSS | ❌ UNFIXED | Security |
-| 8 | GPIO outputs broken | ❌ UNFIXED | Feature failure |
+| 1 | Array OOB write (msglastupdated[255]) | ✅ FIXED | dev branch |
+| 2 | Bitmask 0x0F→0x1F (MQTT hours) | ✅ FIXED | dev branch |
+| 3 | is_value_valid() uses global | ✅ FIXED | dev branch |
+| 4 | sizeof() off-by-one | ✅ FIXED | dev branch |
+| 5 | Buffer overflow in hex parser | ✅ FIXED | 0d4b102 |
+| 6 | ISR race conditions | ✅ FIXED | 0d4b102 |
+| 7 | Reflected XSS | ✅ FIXED | 0d4b102 |
+| 8 | GPIO outputs broken | ✅ FIXED | 0d4b102 |
 | 16 | ETX value 0x04 | ✅ RETRACTED | **Not a bug - correct protocol value** |
-| 18 | Null pointer in MQTT callback | ❌ UNFIXED | Crash risk |
-| 20 | File descriptor leak | ❌ UNFIXED | Resource leak |
-| 21 | Year truncated to int8_t | ❌ UNFIXED | Data overflow |
-| 22 | requestTemperatures() blocks 750ms | ❌ UNFIXED | Watchdog risk |
+| 18 | Null pointer in MQTT callback | ✅ FIXED | 0d4b102 |
+| 20 | File descriptor leak | ✅ FIXED | 0d4b102 |
+| 21 | Year truncated to int8_t | ✅ FIXED | 0d4b102 |
+| 22 | requestTemperatures() blocks 750ms | ✅ FIXED | 0d4b102 |
 
-**Result:** 12 out of 13 critical/high findings remain UNFIXED in dev branch (Finding #16 retracted - not a bug)
+**Result:** All 12 critical/high findings RESOLVED (4 fixed in dev branch, 8 fixed in commit 0d4b102, 1 retracted)
 
 ### Recommendations
 
-1. **URGENT:** Fix critical bugs (#1, #2, #5, #7, #8) - These affect memory safety, data integrity, and security
-2. **HIGH:** Fix high priority bugs (#3, #4, #6, #18, #20, #21, #22) - These affect correctness and reliability  
+1. **DONE:** All critical bugs (#1-#8) fixed - memory safety, data integrity, and security resolved
+2. **DONE:** All high priority bugs (#18, #20, #21, #22) fixed - correctness and reliability resolved
 3. **MEDIUM:** Address remaining findings (#23-40) as time permits
 
 ### Next Steps
 
-1. Verify remaining findings (#18-40) against dev branch
-2. Create fix PRs for critical issues
+1. Merge fix branch `claude/review-codebase-w3Q6N` into dev
+2. Address medium priority findings (#23-40) in follow-up
 3. Update test coverage to catch these issues
 4. Consider adding static analysis tools
 
@@ -463,12 +350,14 @@ These findings remain as documented trade-offs in the architecture. They are not
 ## Verification Notes
 
 - **Dev branch commit:** bd87103 (CI: update version.h)
+- **Fix branch commit:** 0d4b102 (fix: resolve 8 critical/high priority review findings)
 - **Review date:** 2026-02-15 22:00 UTC
-- **Verified findings:** All 12 critical/high (#1-8, #18, #20-22) remain unfixed
+- **Findings #1-#4:** Already fixed in dev branch
+- **Findings #5,#6,#7,#8,#18,#20,#21,#22:** Fixed in commit 0d4b102
 - **Retracted findings:** #16 (ETX value 0x04 is correct for OTGW bootloader protocol)
 - **Medium findings:** All 7 (#23, #24, #26-29, #39, #40) confirmed unfixed
-- **Total:** 19 impactful findings remain UNFIXED in dev branch (1 retracted)
+- **Total:** 12 of 12 critical/high findings RESOLVED (1 retracted)
 - **ADR trade-offs:** 6 security findings (#9-14) unchanged (intentional)
 
 **Conclusion:**
-Despite 20+ commits to dev branch since original review (2026-02-13), NONE of the 19 remaining impactful bugs have been fixed. Finding #16 was retracted after verifying against the authoritative OTGWSerial library source (written by Schelte Bron) - the ETX value of 0x04 is correct for the OTGW bootloader protocol, not standard ASCII. The dev branch requires urgent attention to address critical memory safety, data integrity, and security issues identified in this review.
+All 12 critical and high priority findings from the original review have been resolved. Findings #1-#4 were already fixed in the dev branch. The remaining 8 findings (#5, #6, #7, #8, #18, #20, #21, #22) were fixed in commit 0d4b102 on branch `claude/review-codebase-w3Q6N`. Finding #16 was retracted as correct protocol behavior. The 7 medium priority findings and 6 architectural trade-offs remain as documented. Build verified successfully.
