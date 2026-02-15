@@ -69,6 +69,36 @@ Version 1.1.0-beta builds on the stable v1.0.0 foundation with new Dallas temper
 - Commit: `2e93554` (2026-02-01)
 - See: [docs/reviews/2026-02-01_memory-management-bug-fix/](docs/reviews/2026-02-01_memory-management-bug-fix/)
 
+### Codebase Review Fixes (20 findings resolved)
+
+A comprehensive review of all `.ino`, `.h`, and `.cpp` files identified and resolved 20 bugs across multiple categories.
+Full details: [docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md](docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md)
+
+**Critical & High Priority (13 findings):**
+- **Out-of-bounds array write** (`OTGW-Core.h`): `msglastupdated[255]` only indexed 0–254; message ID 255 caused memory corruption — fixed to `[256]`
+- **Wrong MQTT hour bitmask** (`OTGW-Core.ino`): Mask `0x0F` truncated hours 16–23 — fixed to `0x1F`
+- **Global vs parameter reference** (`OTGW-Core.ino`): `is_value_valid()` used global `OTdata` instead of parameter — fixed
+- **PIC version off-by-one** (`OTGW-Core.ino`): `sizeof()` included null — fixed with `sizeof()-1`
+- **Stack buffer overflow** (`versionStuff.ino`): Hex parser could write beyond 256-byte buffer — added bounds check
+- **ISR race conditions** (`s0PulseCount.ino`): Pulse counter had TOCTOU races, missing volatile, and `uint8_t` overflow — fixed with critical sections + `uint16_t`
+- **Reflected XSS** (`restAPI.ino`): URI injected into HTML without escaping — added HTML entity escaping
+- **GPIO outputs broken** (`outputs_ext.ino`): Feature gated by debug flag — restructured to always run
+- **Null pointer crash** (`MQTTstuff.ino`): Missing `strtok()` null checks in callback — added null guards
+- **File descriptor leak** (`settingStuff.ino`): File opened before existence check — reordered
+- **Year overflow** (`helperStuff.ino`): Year 2026 in `int8_t` — changed to `int16_t`
+- **Blocking sensor read** (`sensors_ext.ino`): 750ms blocking call — switched to async mode
+- Finding #16 retracted: OTGW protocol correctly uses non-standard `ETX=0x04`
+
+**Medium Priority (7 findings):**
+- **Settings flash wear** (`settingStuff.ino`): 20 flash writes per save — deferred to 1 write with 2s debounce + bitmask side effects (commit `86fc6d0`)
+- **HTTP client leak** (`OTGW-Core.ino`): `http.end()` only on success — made unconditional
+- **MQTT port default** (`settingStuff.ino`): Missing fallback for port setting — added `| default`
+- **GPIO conflict detection** (`settingStuff.ino`): No validation — added `checkGPIOConflict()` warn-on-conflict
+- **Macro safety** (`versionStuff.ino`): `byteswap` lacked parameter parentheses — added
+- **Disconnected sensor** (`sensors_ext.ino`): -127°C published to MQTT — added `DEVICE_DISCONNECTED_C` filter
+- **Dead admin password** (`settingStuff.ino`): Never persisted or checked — removed entirely
+- **Manual JSON parsing** (`restAPI.ino`): String-split parsing — replaced with `ArduinoJson`
+
 ---
 
 ## Improvements
@@ -92,6 +122,7 @@ Version 1.1.0-beta builds on the stable v1.0.0 foundation with new Dallas temper
 
 ### Documentation
 - 5 new Architecture Decision Records (ADR-030 through ADR-034)
+- Comprehensive codebase review archive: [docs/reviews/2026-02-13_codebase-review/](docs/reviews/2026-02-13_codebase-review/)
 - New feature docs: Dallas sensors, data persistence
 - New guides: browser debug console, release workflow
 - 6 code review archives in `docs/reviews/`
