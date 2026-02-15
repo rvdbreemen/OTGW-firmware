@@ -9,6 +9,8 @@ on:
     branches:
       - main
       - dev
+      - 'dev-*'
+      - 'copilot-*'
       - 'release/**'
 
 jobs:
