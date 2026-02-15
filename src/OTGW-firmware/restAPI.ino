@@ -248,13 +248,13 @@ void sendOTGWvalue(int msgid){
   } else if (msgid>= 0 && msgid<= OT_MSGID_MAX) 
   { //message id's need to be between 0 and 127
     //Debug print the values first
-    RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid).c_str(), OTlookupitem.unit);
+    RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
     //build the json
     root[F("label")] = OTlookupitem.label;
     if (OTlookupitem.type == ot_f88) {
-      root[F("value")] = getOTGWValue(msgid).toFloat(); 
+      root[F("value")] = atof(getOTGWValue(msgid)); 
     } else {// all other message types convert to integer
-      root[F("value")] = getOTGWValue(msgid).toInt();
+      root[F("value")] = atoi(getOTGWValue(msgid));
     }
     root[F("unit")] = OTlookupitem.unit;    
   } else {
@@ -283,13 +283,13 @@ void sendOTGWlabel(const char *msglabel){
   } else 
   { //message id's need to be between 0 and OT_MSGID_MAX
     //RESTDebug print the values first
-    RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid).c_str(), OTlookupitem.unit);
+    RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
     //build the json
     root[F("label")] = OTlookupitem.label;
     if (OTlookupitem.type == ot_f88) {
-      root[F("value")] = getOTGWValue(msgid).toFloat(); 
+      root[F("value")] = atof(getOTGWValue(msgid)); 
     } else {// all other message types convert to integer
-      root[F("value")] = getOTGWValue(msgid).toInt();
+      root[F("value")] = atoi(getOTGWValue(msgid));
     }
     root[F("unit")] = OTlookupitem.unit;    
   } 

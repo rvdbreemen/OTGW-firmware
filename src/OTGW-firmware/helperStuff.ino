@@ -358,7 +358,8 @@ bool updateRebootLog(String text)
         while (infh.available() && (i < LOG_LINES)){
           //read the first line 
           String line = infh.readStringUntil('\n');
-          if (line.length() > 3) { //TODO: check is no longer needed?
+          // Filter out empty or very short lines (< 3 chars) to keep log file clean
+          if (line.length() > 3) {
             outfh.print(line);
           }
           i++;

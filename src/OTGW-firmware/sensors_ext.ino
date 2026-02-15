@@ -145,7 +145,6 @@ if (settingMQTTenable) {
       // DebugTf(PSTR("Topic: %s -- Payload: %s\r\n"), strDeviceAddress, _msg);
       if (bDebugSensors) DebugFlush();
       sendMQTTData(strDeviceAddress, _msg);
-      // Serial.println(DallasTemperature::toFahrenheit(tempC)); // Converts tempC to Fahrenheit
     }
   }
   // DebugTln(F("end polling sensors"));
