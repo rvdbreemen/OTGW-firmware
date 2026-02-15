@@ -619,9 +619,9 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   if (OT.skipthis) return false;
   bool _valid = false;
   _valid = _valid || (OTlookup.msgcmd==OT_READ && OT.type==OT_READ_ACK);
-  _valid = _valid || (OTlookup.msgcmd==OT_WRITE && OTdata.type==OT_WRITE_DATA);
-  _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OTdata.type==OT_WRITE_DATA));
-  _valid = _valid || (OTdata.id==OT_Statusflags) || (OTdata.id==OT_StatusVH) || (OTdata.id==OT_SolarStorageMaster);;
+  _valid = _valid || (OTlookup.msgcmd==OT_WRITE && OT.type==OT_WRITE_DATA);
+  _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OT.type==OT_WRITE_DATA));
+  _valid = _valid || (OT.id==OT_Statusflags) || (OT.id==OT_StatusVH) || (OT.id==OT_SolarStorageMaster);
   return _valid;
 }
 
@@ -777,7 +777,7 @@ void print_status(uint16_t& value)
       sendMQTTData("cooling",               (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  //delayms(5); 
       sendMQTTData("centralheating2",       (((OTdata.valueLB) & 0x20) ? "ON" : "OFF"));  //delayms(5);
       sendMQTTData("diagnostic_indicator",  (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));  //delayms(5);
-      sendMQTTData("eletric_production",    (((OTdata.valueLB) & 0x80) ? "ON" : "OFF"));  //delayms(5);
+      sendMQTTData("electric_production",   (((OTdata.valueLB) & 0x80) ? "ON" : "OFF"));  //delayms(5);
 
       OTcurrentSystemState.SlaveStatus = OTdata.valueLB;
     }
@@ -814,7 +814,7 @@ void print_solar_storage_status(uint16_t& value)
     AddLogf("\r\n%s = Slave Solar Mode Status [%d] ", OTlookupitem.label, SlaveSolarModeStatus);
     AddLogf("\r\n%s = Slave Solar Status [%d] ", OTlookupitem.label, SlaveSolarStatus);
     if (is_value_valid(OTdata, OTlookupitem)){
-      sendMQTTData(F("solar_storage_slave_fault_incidator"),  ((SlaveSolarFaultIndicator) ? "ON" : "OFF"));   
+      sendMQTTData(F("solar_storage_slave_fault_indicator"),  ((SlaveSolarFaultIndicator) ? "ON" : "OFF"));   
       sendMQTTData(F("solar_storage_mode_status"), itoa(SlaveSolarModeStatus, _msg, 10));  
       sendMQTTData(F("solar_storage_slave_status"), itoa(SlaveSolarStatus, _msg, 10));  
       OTcurrentSystemState.SolarSlaveStatus = OTdata.valueLB;
@@ -1294,7 +1294,7 @@ void print_daytime(uint16_t& value)
     //hour
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_hour", sizeof(_topic));
-    sendMQTTData(_topic, itoa((OTdata.valueHB & 0x0F), _msg, 10)); 
+    sendMQTTData(_topic, itoa((OTdata.valueHB & 0x1F), _msg, 10)); 
     //min
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_minutes", sizeof(_topic));
@@ -1657,7 +1657,17 @@ void processOT(const char *buf, int len){
       msglastupdated[OTdata.id] = now;
       
       //Read information from this OT message ready for use...
-      PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
+      if (OTdata.id <= OT_MSGID_MAX) {
+        PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
+      } else {
+        //unknown message id, set safe defaults to prevent OTmap OOB read
+        OTlookupitem.id = OTdata.id;
+        OTlookupitem.msgcmd = OT_UNDEF;
+        OTlookupitem.type = ot_undef;
+        OTlookupitem.label = "Unknown";
+        OTlookupitem.friendlyname = "Unknown";
+        OTlookupitem.unit = "";
+      }
 
       // check wheter MQTT topic needs to be configuered
       if (is_value_valid(OTdata, OTlookupitem) && settingMQTTenable ) {
@@ -1805,10 +1815,16 @@ void processOT(const char *buf, int len){
         case OT_TSPEntryVH:                             print_u8u8(OTcurrentSystemState.TSPEntryVH); break;
         case OT_FaultBufferSizeVH:                      print_u8u8(OTcurrentSystemState.FaultBufferSizeVH); break;
         case OT_FaultBufferEntryVH:                     print_u8u8(OTcurrentSystemState.FaultBufferEntryVH); break;
-        case OT_FanSpeed:                               print_u16(OTcurrentSystemState.FanSpeed); break;
+        case OT_FanSpeed:                               print_u8u8(OTcurrentSystemState.FanSpeed); break;
         case OT_ElectricalCurrentBurnerFlame:           print_f88(OTcurrentSystemState.ElectricalCurrentBurnerFlame); break;
         case OT_TRoomCH2:                               print_f88(OTcurrentSystemState.TRoomCH2); break;
         case OT_RelativeHumidity:                       print_u8u8(OTcurrentSystemState.RelativeHumidity); break;
+        case OT_TrOverride2:                            print_f88(OTcurrentSystemState.TrOverride2); break;
+        case OT_Brand:                                  print_u8u8(OTcurrentSystemState.Brand); break;
+        case OT_BrandVersion:                           print_u8u8(OTcurrentSystemState.BrandVersion); break;
+        case OT_BrandSerialNumber:                      print_u8u8(OTcurrentSystemState.BrandSerialNumber); break;
+        case OT_CoolingOperationHours:                  print_u16(OTcurrentSystemState.CoolingOperationHours); break;
+        case OT_PowerCycles:                            print_u16(OTcurrentSystemState.PowerCycles); break;
         case OT_RFstrengthbatterylevel:                 print_u8u8(OTcurrentSystemState.RFstrengthbatterylevel); break;
         case OT_OperatingMode_HC1_HC2_DHW:              print_u8u8(OTcurrentSystemState.OperatingMode_HC1_HC2_DHW ); break; 
         case OT_ElectricityProducerStarts:              print_u16(OTcurrentSystemState.ElectricityProducerStarts); break;
@@ -2096,6 +2112,8 @@ String getOTGWValue(int msgid)
     case OT_Remoteparameter7boundaries:        return String(OTcurrentSystemState.Remoteparameter7boundaries); break;
     case OT_Remoteparameter8boundaries:        return String(OTcurrentSystemState.Remoteparameter8boundaries); break;     
     case OT_RemoteOverrideFunction:            return String(OTcurrentSystemState.RemoteOverrideFunction); break;
+    case OT_BurnerUnsuccessfulStarts:          return String(OTcurrentSystemState.BurnerUnsuccessfulStarts); break;
+    case OT_FlameSignalTooLow:                 return String(OTcurrentSystemState.FlameSignalTooLow); break;
     case OT_OEMDiagnosticCode:                 return String(OTcurrentSystemState.OEMDiagnosticCode);  break;
     case OT_BurnerStarts:                      return String(OTcurrentSystemState.BurnerStarts);  break; 
     case OT_CHPumpStarts:                      return String(OTcurrentSystemState.CHPumpStarts);  break; 
@@ -2133,6 +2151,12 @@ String getOTGWValue(int msgid)
     case OT_ElectricalCurrentBurnerFlame:      return String(OTcurrentSystemState.ElectricalCurrentBurnerFlame); break;
     case OT_TRoomCH2:                          return String(OTcurrentSystemState.TRoomCH2); break;
     case OT_RelativeHumidity:                  return String(OTcurrentSystemState.RelativeHumidity); break;
+    case OT_TrOverride2:                       return String(OTcurrentSystemState.TrOverride2); break;
+    case OT_Brand:                             return String(OTcurrentSystemState.Brand); break;
+    case OT_BrandVersion:                      return String(OTcurrentSystemState.BrandVersion); break;
+    case OT_BrandSerialNumber:                 return String(OTcurrentSystemState.BrandSerialNumber); break;
+    case OT_CoolingOperationHours:             return String(OTcurrentSystemState.CoolingOperationHours); break;
+    case OT_PowerCycles:                       return String(OTcurrentSystemState.PowerCycles); break;
     case OT_RFstrengthbatterylevel:            return String(OTcurrentSystemState.RFstrengthbatterylevel); break;
     case OT_OperatingMode_HC1_HC2_DHW:         return String(OTcurrentSystemState.OperatingMode_HC1_HC2_DHW); break;
     case OT_ElectricityProducerStarts:         return String(OTcurrentSystemState.ElectricityProducerStarts); break;
