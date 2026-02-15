@@ -45,6 +45,7 @@ void GetVersion(const char* hexfile, char* version, size_t destSize){
           addr = (addr - 0x4200) >> 1;
           while (len > 0)
           {
+            if (addr >= (int)(sizeof(datamem))) break;  // Bounds check to prevent buffer overflow
             if (sscanf(hexbuf + offs, "%04x", &data) != 1)
               break;
             // if (!bitRead(datamap, addr / 64)) weight += WEIGHT_DATAPROG;
@@ -60,6 +61,7 @@ void GetVersion(const char* hexfile, char* version, size_t destSize){
           addr = (addr - 0xe000) >> 1;
           while (len > 0)
           {
+            if (addr >= (int)(sizeof(datamem))) break;  // Bounds check to prevent buffer overflow
             if (sscanf(hexbuf + offs, "%04x", &data) != 1)
               break;
             // if (!bitRead(datamap, addr / 64)) weight += WEIGHT_DATAPROG;
