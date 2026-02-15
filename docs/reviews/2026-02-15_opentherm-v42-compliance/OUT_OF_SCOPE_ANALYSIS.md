@@ -235,19 +235,37 @@ if (OTdata.id > OT_MSGID_MAX) {
 
 ## Summary & Decision Matrix
 
-| Issue | Severity | Risk of Fix | Recommended Solution | Breaking? |
-|-------|----------|-------------|---------------------|-----------|
-| 1. `eletric_production` typo | Low | Very Low | Option A: Fix + add HA discovery | Minimal (no auto-discovery existed) |
-| 2. `fault_incidator` typo | Low | Low | Option A: Fix both code + config | Yes (entity rename, niche feature) |
-| 3. Unused `RoomRemoteOverrideFunction` | Very Low | None | Option A: Remove dead field | No |
-| 4. Array bounds bugs | **High** | Very Low | Option A: Fix size + add check | No |
+| Issue | Severity | Risk of Fix | Recommended Solution | Breaking? | Status |
+|-------|----------|-------------|---------------------|-----------|--------|
+| 1. `eletric_production` typo | Low | Very Low | Option A: Fix + add HA discovery | Minimal (no auto-discovery existed) | ✅ Implemented |
+| 2. `fault_incidator` typo | Low | Low | Option A: Fix both code + config | Yes (entity rename, niche feature) | ✅ Implemented |
+| 3. Unused `RoomRemoteOverrideFunction` | Very Low | None | Option A: Remove dead field | No | ✅ Implemented |
+| 4. Array bounds bugs | **High** | Very Low | Option A: Fix size + add check | No | ✅ Implemented |
 
-### Suggested Implementation Order
+### Implementation Commits
 
-1. **Issue 4 first** (array bounds) — this is a memory safety bug, highest priority
-2. **Issue 3** (unused field) — trivial one-line fix, zero risk
-3. **Issue 1** (`eletric_production`) — low risk since no auto-discovery exists
-4. **Issue 2** (`fault_incidator`) — slightly higher risk due to HA entity rename
+| Commit | Issues | Description |
+|--------|--------|-------------|
+| `722916d` | 4a+4b+4c | `msglastupdated[256]`, OTmap bounds check in processOT + restAPI |
+| `cd685e8` | 1+2+3 | MQTT typos fixed, HA discovery added, dead field removed |
+
+### Changes Summary
+
+**Issue 4** (memory safety):
+- `OTGW-Core.h`: `msglastupdated[255]` → `msglastupdated[256]`
+- `OTGW-Core.ino`: Added `if (OTdata.id <= OT_MSGID_MAX)` guard before `OTmap[OTdata.id]` access in `processOT()`. Unknown IDs get safe default `OTlookupitem` values.
+- `restAPI.ino`: Moved bounds check in `sendOTGWvalue()` to BEFORE `PROGMEM_readAnything` (was after).
+
+**Issue 3** (dead code):
+- `OTGW-Core.h`: Removed `uint16_t RoomRemoteOverrideFunction` struct field. The OTmap label string `"RoomRemoteOverrideFunction"` (MQTT topic) is unchanged.
+
+**Issue 1** (`eletric_production`):
+- `OTGW-Core.ino`: `"eletric_production"` → `"electric_production"`
+- `mqttha.cfg`: Added new HA auto-discovery entry for `electric_production` (binary_sensor, msg ID 0)
+
+**Issue 2** (`fault_incidator`):
+- `OTGW-Core.ino`: `"solar_storage_slave_fault_incidator"` → `"solar_storage_slave_fault_indicator"`
+- `mqttha.cfg`: Updated HA auto-discovery entry (topic, uniq_id, name, stat_t all corrected)
 
 ### Breaking Change Strategy
 
