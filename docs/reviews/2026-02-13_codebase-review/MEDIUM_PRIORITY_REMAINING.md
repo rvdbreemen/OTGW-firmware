@@ -4,7 +4,7 @@ Document Title: Medium Priority Issues - Remaining Work
 Review Date: 2026-02-15
 Branch: claude/review-codebase-w3Q6N
 Source Review: CODEBASE_REVIEW_UPDATED_DEV.md + FINDINGS_ANALYSIS.md
-Status: OPEN - 7 findings to address
+Status: OPEN - 5 findings to address (2 resolved)
 ---
 
 # Medium Priority Issues - Remaining Work
@@ -15,61 +15,33 @@ current code references, impact analysis, and suggested fixes.
 
 ---
 
-## Finding #23: Settings written to flash on every individual field update
+## Finding #23: ~~Settings written to flash on every individual field update~~ FIXED
 
-**File:** [settingStuff.ino](../../../src/OTGW-firmware/settingStuff.ino) — `updateSetting()` (line ~378)  
+**File:** [settingStuff.ino](../../../src/OTGW-firmware/settingStuff.ino) — `updateSetting()` / `flushSettings()`  
 **Priority:** MEDIUM  
-**Impact:** Excessive flash wear, unnecessary MQTT reconnections
+**Status:** FIXED — Implemented Option 3 (deferred writes + bitmask side effects)
 
-### Problem
+### Solution Applied
 
-Every call to `updateSetting()` ends with:
+Refactored `updateSetting()` to defer both flash writes and service restarts:
 
-```cpp
-//finally update write settings
-writeSettings(false);
+1. **Dirty flag + debounce timer**: `updateSetting()` sets `settingsDirty = true` and
+   restarts a 2-second `timerFlushSettings`. The actual `writeSettings()` call is removed
+   from `updateSetting()`.
 
-//Restart MQTT connection every "save settings"
-if (settingMQTTenable)   startMQTT();
-```
+2. **Side-effect bitmask**: Instead of calling `startMQTT()`, `startNTP()`, `startMDNS()`
+   inline, each field sets a bitmask flag (`SIDE_EFFECT_MQTT`, `SIDE_EFFECT_NTP`,
+   `SIDE_EFFECT_MDNS`). This tracks *which* services need restarting.
 
-When the Web UI saves settings, it sends one HTTP POST per field. Each POST triggers
-`postSettings()` → `updateSetting()` → `writeSettings()` → full JSON serialize to
-LittleFS. A settings page with 20 fields causes 20 flash writes and 20 MQTT
-reconnections.
+3. **`flushSettings()`**: A new function called from `loop()` when `DUE(timerFlushSettings)`.
+   It performs exactly one `writeSettings()` call and at most one restart per service —
+   regardless of how many fields were changed.
 
-LittleFS on ESP8266 flash has a limited write cycle lifetime (~10K-100K cycles
-depending on the flash chip). Heavy users who frequently adjust settings could
-degrade the flash over time.
-
-### Suggested Fix
-
-Implement write coalescing with a timer-based approach:
-
-1. In `updateSetting()`, set a "dirty" flag and start/reset a debounce timer (e.g. 2 seconds)
-2. When the timer fires, call `writeSettings()` once
-3. Move `startMQTT()` to after the coalesced write
-
-```cpp
-// In updateSetting():
-settingsDirty = true;
-RESTART_TIMER(timerWriteSettings);  // Resets 2-second debounce timer
-// Remove: writeSettings(false);
-// Remove: if (settingMQTTenable) startMQTT();
-
-// Timer callback:
-void writeSettingsCallback() {
-  if (settingsDirty) {
-    writeSettings(false);
-    settingsDirty = false;
-    if (settingMQTTenable) startMQTT();
-  }
-}
-```
-
-### Complexity
-
-Medium — Requires adding a new timer and restructuring updateSetting().
+**Result for 20-field save (3 MQTT fields, 1 NTP field)**:
+- Flash writes: 20 → **1**
+- `startMQTT()` calls: 23 → **1**  
+- `startNTP()` calls: 1 → **1** (deferred)
+- Heap alloc/free cycles: 20 → **1**
 
 ---
 
@@ -263,46 +235,12 @@ Low — Add a single `if` check before storing the temperature.
 
 ---
 
-## Finding #39: Admin password not persisted
+## Finding #39: ~~Admin password not persisted~~ REMOVED
 
-**File:** [settingStuff.ino](../../../src/OTGW-firmware/settingStuff.ino) — `writeSettings()` and `readSettings()`  
-**Priority:** MEDIUM  
-**Impact:** Admin password feature doesn't work across reboots
-
-### Problem
-
-`settingAdminPassword` can be set via the Web UI through `updateSetting()`:
-
-```cpp
-if (strcasecmp_P(field, PSTR("AdminPassword"))==0)
-    strlcpy(settingAdminPassword, newValue, sizeof(settingAdminPassword));
-```
-
-However, it is **never written** to the settings JSON file in `writeSettings()` and
-**never read** back in `readSettings()`. The password resets to empty on every reboot.
-
-Looking at `writeSettings()`, the AdminPassword field is completely absent from
-the JSON serialization (verified: not present in any `root[F(...)]` line).
-
-### Suggested Fix
-
-Add to `writeSettings()`:
-```cpp
-root[F("AdminPassword")] = settingAdminPassword;
-```
-
-Add to `readSettings()`:
-```cpp
-strlcpy(settingAdminPassword, doc[F("AdminPassword")] | "", sizeof(settingAdminPassword));
-```
-
-**Security note:** The password is stored in plaintext in the JSON file on
-LittleFS. This is consistent with how `settingMQTTpasswd` is handled. For a
-local-network-only device (per ADR-032), this is an acceptable trade-off.
-
-### Complexity
-
-Trivial — Add two lines (one in write, one in read).
+**Status:** RESOLVED — `settingAdminPassword` was entirely removed from the codebase
+as dead code (commit `cdc1827`). The feature was never implemented: the variable
+could be set via `updateSetting()` but was never persisted to JSON, never read back,
+and never checked for authentication. Removing it eliminates the finding entirely.
 
 ---
 
@@ -368,16 +306,16 @@ Low-Medium — Simple replacement, but needs testing with all setting types. The
 
 ## Summary
 
-| # | Finding | Priority | Complexity | Impact |
+| # | Finding | Priority | Complexity | Status |
 |---|---------|----------|------------|--------|
-| 23 | Settings flash wear (write per field) | MEDIUM | Medium | Premature flash degradation |
-| 24 | `http.end()` on uninitialized client | LOW | Trivial | Potential crash on version check |
-| 26 | MQTT port missing default fallback | LOW | Trivial | Broken MQTT after config corruption |
-| 27 | No GPIO conflict detection | MEDIUM | Medium | Features interfere on same pin |
-| 28 | `byteswap` macro unparenthesized | LOW | Trivial | Future maintenance risk |
-| 29 | Dallas -127°C not filtered | LOW-MEDIUM | Low | Invalid data to Home Assistant |
-| 39 | Admin password not persisted | MEDIUM | Trivial | Feature doesn't survive reboot |
-| 40 | Manual JSON parsing in postSettings | LOW | Low-Medium | Special chars break settings |
+| 23 | ~~Settings flash wear (write per field)~~ | MEDIUM | Medium | **FIXED** — deferred writes + bitmask |
+| 24 | `http.end()` on uninitialized client | LOW | Trivial | Open |
+| 26 | MQTT port missing default fallback | LOW | Trivial | Open |
+| 27 | No GPIO conflict detection | MEDIUM | Medium | Open |
+| 28 | `byteswap` macro unparenthesized | LOW | Trivial | Open |
+| 29 | Dallas -127°C not filtered | LOW-MEDIUM | Low | Open |
+| 39 | ~~Admin password not persisted~~ | MEDIUM | Trivial | **REMOVED** — dead code deleted |
+| 40 | Manual JSON parsing in postSettings | LOW | Low-Medium | Open |
 
 ### Quick Wins (trivial fixes)
 
@@ -385,14 +323,12 @@ These can be fixed in minutes with minimal risk:
 
 1. **#26** — Add `| settingMQTTbrokerPort` (1 line)
 2. **#28** — Add parentheses to macro (1 line)
-3. **#39** — Add AdminPassword to write/read settings (2 lines)
-4. **#24** — Move `http.end()` inside `if` block (move 1 line)
+3. **#24** — Move `http.end()` inside `if` block (move 1 line)
 
 ### Larger Efforts
 
 These require more design consideration:
 
-5. **#29** — Filter -127°C sensor readings (small but needs testing)
-6. **#40** — Replace manual parsing with ArduinoJson (moderate refactor)
-7. **#23** — Implement write coalescing with timer (architectural change)
-8. **#27** — GPIO conflict detection (needs policy decision: warn vs. reject)
+4. **#29** — Filter -127°C sensor readings (small but needs testing)
+5. **#40** — Replace manual parsing with ArduinoJson (moderate refactor)
+6. **#27** — GPIO conflict detection (needs policy decision: warn vs. reject)

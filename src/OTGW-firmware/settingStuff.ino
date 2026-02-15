@@ -11,6 +11,41 @@
 */
 
 //=======================================================================
+// Deferred settings write support (Finding #23: reduce flash wear + service restarts)
+// Side-effect bitmask flags
+#define SIDE_EFFECT_MQTT   0x01
+#define SIDE_EFFECT_NTP    0x02
+#define SIDE_EFFECT_MDNS   0x04
+static bool    settingsDirty = false;
+static uint8_t pendingSideEffects = 0;
+
+//=======================================================================
+void flushSettings()
+{
+  if (!settingsDirty) return;
+
+  DebugTln(F("[Settings] Flushing deferred settings write..."));
+  writeSettings(false);
+  settingsDirty = false;
+
+  // Apply deferred side effects — exactly once per service per save batch
+  if (pendingSideEffects & SIDE_EFFECT_MDNS) {
+    DebugTln(F("[Settings] Restarting MDNS/LLMNR (deferred)"));
+    startMDNS(settingHostname);
+    startLLMNR(settingHostname);
+  }
+  if ((pendingSideEffects & SIDE_EFFECT_MQTT) && settingMQTTenable) {
+    DebugTln(F("[Settings] Restarting MQTT (deferred)"));
+    startMQTT();
+  }
+  if (pendingSideEffects & SIDE_EFFECT_NTP) {
+    DebugTln(F("[Settings] Restarting NTP (deferred)"));
+    startNTP();
+  }
+  pendingSideEffects = 0;
+}
+
+//=======================================================================
 void writeSettings(bool show) 
 {
 
@@ -116,7 +151,7 @@ void readSettings(bool show)
   settingMQTTenable       = doc[F("MQTTenable")]|settingMQTTenable;
   strlcpy(settingMQTTbroker, doc[F("MQTTbroker")] | "", sizeof(settingMQTTbroker));
   
-  settingMQTTbrokerPort   = doc[F("MQTTbrokerPort")]; //default port
+  settingMQTTbrokerPort   = doc[F("MQTTbrokerPort")] | settingMQTTbrokerPort; //default port
   strlcpy(settingMQTTuser, doc[F("MQTTuser")] | "", sizeof(settingMQTTuser));
   // Trim leading/trailing whitespace from username
   char* trimmedUser = trimwhitespace(settingMQTTuser);
@@ -239,12 +274,8 @@ void updateSetting(const char *field, const char *newValue)
     char *dot = strchr(settingMQTTtopTopic, '.');
     if (dot) *dot = '\0';
     
-    //Update some settings right now 
-    startMDNS(settingHostname);
-    startLLMNR(settingHostname);
-  
-    //Restart MQTT connection every "save settings"
-    startMQTT();
+    // Defer MDNS/LLMNR and MQTT restart to flushSettings()
+    pendingSideEffects |= SIDE_EFFECT_MDNS | SIDE_EFFECT_MQTT;
 
     Debugln();
     DebugTf(PSTR("Need reboot before new %s.local will be available!\r\n\n"), settingHostname);
@@ -288,16 +319,16 @@ void updateSetting(const char *field, const char *newValue)
     if (strlen(settingMQTTuniqueid) == 0)   strlcpy(settingMQTTuniqueid, getUniqueId(), sizeof(settingMQTTuniqueid));
   }
   if (strcasecmp_P(field, PSTR("MQTTOTmessage"))==0)   settingMQTTOTmessage = EVALBOOLEAN(newValue);
-  if (strstr_P(field, PSTR("mqtt")) != NULL)        startMQTT();//restart MQTT on change of any setting
+  if (strstr_P(field, PSTR("mqtt")) != NULL)        pendingSideEffects |= SIDE_EFFECT_MQTT; // defer MQTT restart to flushSettings()
   
   if (strcasecmp_P(field, PSTR("NTPenable"))==0)      settingNTPenable = EVALBOOLEAN(newValue);
   if (strcasecmp_P(field, PSTR("NTPhostname"))==0)    {
     strlcpy(settingNTPhostname, newValue, sizeof(settingNTPhostname)); 
-    startNTP();
+    pendingSideEffects |= SIDE_EFFECT_NTP; // defer NTP restart to flushSettings()
   }
   if (strcasecmp_P(field, PSTR("NTPtimezone"))==0)    {
     strlcpy(settingNTPtimezone, newValue, sizeof(settingNTPtimezone));
-    startNTP();  // update timezone if changed
+    pendingSideEffects |= SIDE_EFFECT_NTP; // defer NTP restart to flushSettings()
   }
   if (strcasecmp_P(field, PSTR("NTPsendtime"))==0)    settingNTPsendtime = EVALBOOLEAN(newValue);
   if (strcasecmp_P(field, PSTR("LEDblink"))==0)      settingLEDblink = EVALBOOLEAN(newValue);
@@ -373,11 +404,12 @@ void updateSetting(const char *field, const char *newValue)
     DebugTf(PSTR("Need reboot before GPIO OUTPUTS will use new trigger bit %d!\r\n\n"), settingGPIOOUTPUTStriggerBit);
   }
 
-  //finally update write settings
-  writeSettings(false);
-
-  //Restart MQTT connection every "save settings" (this seems to be save to do, but is called for each changed field now )
-  if (settingMQTTenable)   startMQTT();
+  // Mark settings dirty and restart debounce timer — actual write + service
+  // restarts are deferred to flushSettings() which runs from loop() timer.
+  // This coalesces multiple field updates into a single flash write and at most
+  // one restart per service (Finding #23: reduce flash wear + MQTT churn).
+  settingsDirty = true;
+  RESTART_TIMER(timerFlushSettings);
 
 } // updateSetting()
 
