@@ -1294,7 +1294,7 @@ void print_daytime(uint16_t& value)
     //hour
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_hour", sizeof(_topic));
-    sendMQTTData(_topic, itoa((OTdata.valueHB & 0x0F), _msg, 10)); 
+    sendMQTTData(_topic, itoa((OTdata.valueHB & 0x1F), _msg, 10)); 
     //min
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_minutes", sizeof(_topic));

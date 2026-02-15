@@ -469,7 +469,7 @@ enum OpenThermMessageID {
 
 #define OT_MSGID_MAX 133
 
-time_t msglastupdated[255] = {0}; //all msg, even if they are unknown
+time_t msglastupdated[256] = {0}; //all msg, even if they are unknown
 
 struct OT_cmd_t { // see all possible commands for PIC here: https://otgw.tclcode.com/firmware.html
 	char cmd[15];
