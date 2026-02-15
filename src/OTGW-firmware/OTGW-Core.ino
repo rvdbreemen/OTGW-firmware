@@ -2102,6 +2102,8 @@ String getOTGWValue(int msgid)
     case OT_Remoteparameter7boundaries:        return String(OTcurrentSystemState.Remoteparameter7boundaries); break;
     case OT_Remoteparameter8boundaries:        return String(OTcurrentSystemState.Remoteparameter8boundaries); break;     
     case OT_RemoteOverrideFunction:            return String(OTcurrentSystemState.RemoteOverrideFunction); break;
+    case OT_BurnerUnsuccessfulStarts:          return String(OTcurrentSystemState.BurnerUnsuccessfulStarts); break;
+    case OT_FlameSignalTooLow:                 return String(OTcurrentSystemState.FlameSignalTooLow); break;
     case OT_OEMDiagnosticCode:                 return String(OTcurrentSystemState.OEMDiagnosticCode);  break;
     case OT_BurnerStarts:                      return String(OTcurrentSystemState.BurnerStarts);  break; 
     case OT_CHPumpStarts:                      return String(OTcurrentSystemState.CHPumpStarts);  break; 

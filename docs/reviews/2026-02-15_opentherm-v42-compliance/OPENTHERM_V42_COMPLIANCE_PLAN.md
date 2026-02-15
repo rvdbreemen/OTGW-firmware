@@ -674,6 +674,16 @@ if (OTdata.id <= OT_MSGID_MAX) {
 }
 ```
 
+#### Taak 6.4: Fix FanSpeed comments in struct en enum ✅ (gevonden bij self-review)
+- **Bestand**: `OTGW-Core.h`
+- **Wijziging**: Comments bij `FanSpeed` struct field en enum value zeiden `u16 Fan Speed (rpm)` maar moeten `u8 / u8 Fan Speed setpoint / actual (Hz)` zijn
+- **Status**: ✅ Geïmplementeerd
+
+#### Taak 6.5: Voeg ontbrekende `getOTGWValue` cases toe ✅ (gevonden bij self-review)
+- **Bestand**: `OTGW-Core.ino`
+- **Wijziging**: `OT_BurnerUnsuccessfulStarts` en `OT_FlameSignalTooLow` (IDs 113-114) waren aanwezig in `processOT` maar ontbraken in `getOTGWValue` — pre-existing gap, nu gefixt
+- **Status**: ✅ Geïmplementeerd
+
 ---
 
 ## 5. Implementatie Planning
