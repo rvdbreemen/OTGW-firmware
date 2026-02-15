@@ -1657,7 +1657,17 @@ void processOT(const char *buf, int len){
       msglastupdated[OTdata.id] = now;
       
       //Read information from this OT message ready for use...
-      PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
+      if (OTdata.id <= OT_MSGID_MAX) {
+        PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
+      } else {
+        //unknown message id, set safe defaults to prevent OTmap OOB read
+        OTlookupitem.id = OTdata.id;
+        OTlookupitem.msgcmd = OT_UNDEF;
+        OTlookupitem.type = ot_undef;
+        OTlookupitem.label = "Unknown";
+        OTlookupitem.friendlyname = "Unknown";
+        OTlookupitem.unit = "";
+      }
 
       // check wheter MQTT topic needs to be configuered
       if (is_value_valid(OTdata, OTlookupitem) && settingMQTTenable ) {
