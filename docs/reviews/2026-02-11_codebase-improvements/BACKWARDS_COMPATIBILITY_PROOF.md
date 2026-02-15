@@ -45,93 +45,30 @@ void publishMQTTOnOff(const char* topic, bool value) {
 - Topic names are identical
 - String literals are identical pointers (compiler optimization)
 
-### 2. Numeric Float Values
-
-#### Before (Original Code):
-```cpp
-char buffer[16];
-dtostrf(OTcurrentSystemState.Tdhw, 1, 2, buffer);
-sendMQTTData("dhw_temperature", buffer);
-```
-
-#### After (Refactored Code):
-```cpp
-publishMQTTNumeric("dhw_temperature", OTcurrentSystemState.Tdhw, 2);
-```
-
-#### Helper Function Implementation:
-```cpp
-void publishMQTTNumeric(const char* topic, float value, uint8_t decimals = 2) {
-  static char buffer[16];
-  dtostrf(value, 1, decimals, buffer);
-  sendMQTTData(topic, buffer);
-}
-```
-
-#### Proof:
-- **Function Used**: `dtostrf()` - IDENTICAL in both versions
-- **Buffer Size**: 16 bytes - IDENTICAL
-- **Parameters**: `(value, 1, decimals, buffer)` - IDENTICAL
-- **Default Decimals**: 2 - IDENTICAL to original usage
-- **Result**: **IDENTICAL** - Same formatting, same output
-
-**Verification**:
-- Same `dtostrf()` call with same parameters
-- Same buffer size (16 bytes)
-- Same precision (2 decimals by default)
-- Example: `23.45` → `"23.45"` (both versions)
-
-### 3. Integer Values
-
-#### Before (Original Code):
-```cpp
-char buffer[12];
-snprintf(buffer, sizeof(buffer), "%d", OTcurrentSystemState.SomeIntValue);
-sendMQTTData("some_topic", buffer);
-```
-
-#### After (Refactored Code):
-```cpp
-publishMQTTInt("some_topic", OTcurrentSystemState.SomeIntValue);
-```
-
-#### Helper Function Implementation:
-```cpp
-void publishMQTTInt(const char* topic, int value) {
-  static char buffer[12];
-  snprintf(buffer, sizeof(buffer), "%d", value);
-  sendMQTTData(topic, buffer);
-}
-```
-
-#### Proof:
-- **Function Used**: `snprintf()` - IDENTICAL
-- **Format String**: `"%d"` - IDENTICAL
-- **Buffer Size**: 12 bytes - IDENTICAL
-- **Result**: **IDENTICAL** - Same integer-to-string conversion
-
-### 4. PROGMEM String Support
+### 2. PROGMEM String Support
 
 Both original code and refactored code support PROGMEM strings via the `F()` macro:
 
 #### Original Pattern:
 ```cpp
-sendMQTTData(F("some_topic"), value);
+sendMQTTData(F("some_topic"), (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
 ```
 
 #### Refactored Pattern:
 ```cpp
-publishMQTTOnOff(F("some_topic"), boolValue);
+publishMQTTOnOff(F("some_topic"), ((OTdata.valueHB) & 0x01));
 ```
 
-#### Helper Overloads:
+#### Helper Overload:
 ```cpp
 void publishMQTTOnOff(const __FlashStringHelper* topic, bool value) {
   sendMQTTData(topic, value ? "ON" : "OFF");
 }
 ```
 
-**All helpers have PROGMEM overloads** - Full backwards compatibility with `F()` macro usage.
+**`publishMQTTOnOff` has a PROGMEM overload** - Full backwards compatibility with `F()` macro usage.
+
+> **Note**: `publishMQTTNumeric` and `publishMQTTInt` helper functions were also created but are not yet called in the codebase. They are available for future use when numeric MQTT publishing patterns are refactored.
 
 ## Complete List of Refactored Calls
 

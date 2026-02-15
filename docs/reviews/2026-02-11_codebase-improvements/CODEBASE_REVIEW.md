@@ -2,7 +2,7 @@
 # METADATA
 Document Title: OTGW-firmware Codebase Review - Improvement Opportunities
 Review Date: 2026-02-11 05:48:00 UTC
-Branch Reviewed: copilot/review-codebase-improvements
+Branch Reviewed: dev-fixing-stuff
 Target Version: 1.1.0-beta
 Reviewer: GitHub Copilot Advanced Agent
 Document Type: Code Review
@@ -382,9 +382,12 @@ bool isValidCommand(const char* cmd) {
 strcpy_P(dayName, (PGM_P)pgm_read_ptr(&dayOfWeekName[dayIdx]));
 ```
 
-**Analysis**: Appears safe (fixed-size source arrays) but could be more explicit:
+**Analysis**: Appears safe (fixed-size source arrays) but could be more explicit.
+
+**Note**: `strlcpy_P()` is NOT available in ESP8266 Arduino Core 2.7.4. Use `strncpy_P()` + explicit null termination instead:
 ```cpp
-strlcpy_P(dayName, (PGM_P)pgm_read_ptr(&dayOfWeekName[dayIdx]), sizeof(dayName));
+strncpy_P(dayName, (PGM_P)pgm_read_ptr(&dayOfWeekName[dayIdx]), sizeof(dayName) - 1);
+dayName[sizeof(dayName) - 1] = '\0';
 ```
 
 ---
