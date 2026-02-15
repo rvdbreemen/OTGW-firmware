@@ -1809,6 +1809,12 @@ void processOT(const char *buf, int len){
         case OT_ElectricalCurrentBurnerFlame:           print_f88(OTcurrentSystemState.ElectricalCurrentBurnerFlame); break;
         case OT_TRoomCH2:                               print_f88(OTcurrentSystemState.TRoomCH2); break;
         case OT_RelativeHumidity:                       print_u8u8(OTcurrentSystemState.RelativeHumidity); break;
+        case OT_TrOverride2:                            print_f88(OTcurrentSystemState.TrOverride2); break;
+        case OT_Brand:                                  print_u8u8(OTcurrentSystemState.Brand); break;
+        case OT_BrandVersion:                           print_u8u8(OTcurrentSystemState.BrandVersion); break;
+        case OT_BrandSerialNumber:                      print_u8u8(OTcurrentSystemState.BrandSerialNumber); break;
+        case OT_CoolingOperationHours:                  print_u16(OTcurrentSystemState.CoolingOperationHours); break;
+        case OT_PowerCycles:                            print_u16(OTcurrentSystemState.PowerCycles); break;
         case OT_RFstrengthbatterylevel:                 print_u8u8(OTcurrentSystemState.RFstrengthbatterylevel); break;
         case OT_OperatingMode_HC1_HC2_DHW:              print_u8u8(OTcurrentSystemState.OperatingMode_HC1_HC2_DHW ); break; 
         case OT_ElectricityProducerStarts:              print_u16(OTcurrentSystemState.ElectricityProducerStarts); break;
@@ -2133,6 +2139,12 @@ String getOTGWValue(int msgid)
     case OT_ElectricalCurrentBurnerFlame:      return String(OTcurrentSystemState.ElectricalCurrentBurnerFlame); break;
     case OT_TRoomCH2:                          return String(OTcurrentSystemState.TRoomCH2); break;
     case OT_RelativeHumidity:                  return String(OTcurrentSystemState.RelativeHumidity); break;
+    case OT_TrOverride2:                       return String(OTcurrentSystemState.TrOverride2); break;
+    case OT_Brand:                             return String(OTcurrentSystemState.Brand); break;
+    case OT_BrandVersion:                      return String(OTcurrentSystemState.BrandVersion); break;
+    case OT_BrandSerialNumber:                 return String(OTcurrentSystemState.BrandSerialNumber); break;
+    case OT_CoolingOperationHours:             return String(OTcurrentSystemState.CoolingOperationHours); break;
+    case OT_PowerCycles:                       return String(OTcurrentSystemState.PowerCycles); break;
     case OT_RFstrengthbatterylevel:            return String(OTcurrentSystemState.RFstrengthbatterylevel); break;
     case OT_OperatingMode_HC1_HC2_DHW:         return String(OTcurrentSystemState.OperatingMode_HC1_HC2_DHW); break;
     case OT_ElectricityProducerStarts:         return String(OTcurrentSystemState.ElectricityProducerStarts); break;

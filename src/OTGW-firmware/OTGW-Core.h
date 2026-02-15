@@ -35,6 +35,7 @@ typedef struct {
 	float 		CoolingControl = 0.0f; // f8.8  Cooling control signal (%) 
 	float 		TsetCH2 = 0.0f; // f8.8  Control setpoint for 2e CH circuit (°C)
 	float 		TrOverride = 0.0f; // f8.8  Remote override room setpoint 
+	float 		TrOverride2 = 0.0f; // f8.8  Remote override room setpoint 2 (°C)
 	uint16_t 	TSP = 0; // u8 / u8  Number of Transparent-Slave-Parameters supported by slave 
 	uint16_t 	TSPindexTSPvalue = 0; // u8 / u8  Index number / Value of referred-to transparent slave parameter. 
 	uint16_t 	FHBsize = 0; // u8 / u8  Size of Fault-History-Buffer supported by slave 
@@ -85,6 +86,15 @@ typedef struct {
 	uint16_t	RFstrengthbatterylevel = 0; // u8/ u8 RF strength and battery level
 	uint16_t 	OperatingMode_HC1_HC2_DHW = 0; // u8 / u8 Operating Mode HC1, HC2/ DHW
 	uint16_t	RoomRemoteOverrideFunction = 0; // Function of manual and program changes in master and remote room setpoint
+
+	//Brand identification (mandatory since v4.1)
+	uint16_t	Brand = 0; // u8 / u8 Brand name index / character
+	uint16_t	BrandVersion = 0; // u8 / u8 Brand version index / character
+	uint16_t	BrandSerialNumber = 0; // u8 / u8 Brand serial number index / character
+
+	//Counters
+	uint16_t	CoolingOperationHours = 0; // u16 Cooling operation hours
+	uint16_t	PowerCycles = 0; // u16 Power cycles
 
 	//Electric Producer
 	uint16_t 	ElectricityProducerStarts = 0; // u16 Electricity producer starts 
@@ -239,6 +249,7 @@ enum OpenThermMessageID {
 	OT_ElectricalCurrentBurnerFlame, // f88 Electrical current through burner flame (µA)
 	OT_TRoomCH2, // f88  Room Temperature for 2nd CH circuit ("°C)
 	OT_RelativeHumidity, // u8 / u8 Relative Humidity (%)
+	OT_TrOverride2 = 39, // f8.8  Remote override room setpoint 2 (°C)
 	OT_TdhwSetUBTdhwSetLB = 48, // s8 / s8  DHW setpoint upper & lower bounds for adjustment  (°C)
 	OT_MaxTSetUBMaxTSetLB, // s8 / s8  Max CH water setpoint upper & lower bounds for adjustment  (°C)
 	OT_HcratioUBHcratioLB, // s8 / s8  OTC heat curve ratio upper & lower bounds for adjustment  
@@ -277,6 +288,11 @@ enum OpenThermMessageID {
 	OT_TSPEntryVH,	// u8 / u8 TSP Entry V/H
 	OT_FaultBufferSizeVH, // u8 / u8 Fault Buffer Size V/H
 	OT_FaultBufferEntryVH,	// u8 / u8 Fault Buffer Entry V/H
+	OT_Brand = 93, // u8 / u8 Brand name (index/char)
+	OT_BrandVersion, // u8 / u8 Brand version (index/char)
+	OT_BrandSerialNumber, // u8 / u8 Brand serial number (index/char)
+	OT_CoolingOperationHours, // u16 Cooling operation hours
+	OT_PowerCycles, // u16 Power cycles
 	OT_RFstrengthbatterylevel=98, // u8 / u8  RF strength and battery level
 	OT_OperatingMode_HC1_HC2_DHW, // u8 / u8 Operating Mode HC1, HC2/ DHW
 	OT_RemoteOverrideFunction, // flag8 / -  Function of manual and program changes in master and remote room setpoint. 
@@ -366,7 +382,7 @@ enum OpenThermMessageID {
 		{  36, OT_READ  , ot_f88, 			"ElectricalCurrentBurnerFlame", "Electrical current through burner flame", "µA" },
 		{  37, OT_WRITE , ot_f88, 			"TRoomCH2", "Room temperature for 2nd CH circuit", "°C" },
 		{  38, OT_RW    , ot_u8u8, 			"RelativeHumidity", "Relative Humidity", "%" },
-		{  39, OT_UNDEF , ot_undef, 		"", "", "" },
+		{  39, OT_READ  , ot_f88, 			"TrOverride2", "Remote override room setpoint 2", "°C" },
 		{  40, OT_UNDEF , ot_undef, 		"", "", "" },
 		{  41, OT_UNDEF , ot_undef, 		"", "", "" },
 		{  42, OT_UNDEF , ot_undef, 		"", "", "" },
@@ -420,11 +436,11 @@ enum OpenThermMessageID {
 		{  90, OT_READ  , ot_u8u8, 			"FaultBufferSizeVH", "Fault Buffer Size V/H", "" },
 		{  91, OT_READ  , ot_u8u8, 			"FaultBufferEntryVH", "Fault Buffer Entry V/H", "" },
 		{  92, OT_UNDEF , ot_undef, 		"", "", "" },
-		{  93, OT_UNDEF , ot_undef, 		"", "", "" },
-		{  94, OT_UNDEF , ot_undef, 		"", "", "" },
-		{  95, OT_UNDEF , ot_undef, 		"", "", "" },
-		{  96, OT_UNDEF , ot_undef, 		"", "", "" },
-		{  97, OT_UNDEF , ot_undef, 		"", "", "" },
+		{  93, OT_READ  , ot_u8u8, 			"Brand", "Boiler brand name (index/char)", "" },
+		{  94, OT_READ  , ot_u8u8, 			"BrandVersion", "Boiler brand version (index/char)", "" },
+		{  95, OT_READ  , ot_u8u8, 			"BrandSerialNumber", "Boiler brand serial number (index/char)", "" },
+		{  96, OT_RW    , ot_u16, 			"CoolingOperationHours", "Cooling operation hours", "hrs" },
+		{  97, OT_RW    , ot_u16, 			"PowerCycles", "Power cycles", "" },
 		{  98, OT_WRITE , ot_u8u8, 			"RFstrengthbatterylevel", "RF strength and battery level", "" },
 		{  99, OT_RW    , ot_u8u8, 			"OperatingMode_HC1_HC2_DHW", "Operating Mode HC1, HC2/ DHW", "" },
 		{ 100, OT_READ  , ot_flag8,       	"RoomRemoteOverrideFunction", "Function of manual and program changes in master and remote room setpoint.", "" },
