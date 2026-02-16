@@ -217,7 +217,7 @@ function refreshGatewayMode(force) {
   gatewayModeRefreshCounter = 0;
   gatewayModeRefreshInFlight = true;
 
-  fetch(APIGW + 'v0/devinfo')
+  fetch(APIGW + 'v2/device/info')
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -225,8 +225,9 @@ function refreshGatewayMode(force) {
       return response.json();
     })
     .then(json => {
-      const entries = (json && json.devinfo) ? json.devinfo : [];
-      updateGatewayModeFromDevInfoEntries(entries);
+      const device = (json && json.device) ? json.device : {};
+      const gatewayModeValue = (device.gatewaymode !== undefined) ? device.gatewaymode : null;
+      updateGatewayModeIndicator(parseGatewayModeValue(gatewayModeValue));
     })
     .catch(error => {
       console.warn('refreshGatewayMode warning:', error);
@@ -344,11 +345,11 @@ window.otgwDebug = {
   // Show device information
   info: async function() {
     try {
-      const response = await fetch(APIGW + 'v1/devinfo');
+      const response = await fetch(APIGW + 'v2/device/info');
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       console.group('📱 Device Information');
-      console.table(data.devinfo || data);
+      console.table(data.device || data);
       console.groupEnd();
     } catch (error) {
       console.error('Failed to fetch device info:', error);
@@ -358,7 +359,7 @@ window.otgwDebug = {
   // Show current settings
   settings: async function() {
     try {
-      const response = await fetch(APIGW + 'v0/settings');
+      const response = await fetch(APIGW + 'v2/settings');
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       console.group('⚙️  Current Settings');
@@ -2157,7 +2158,7 @@ const escapeHtml = (function() {
 //============================================================================  
 function loadUISettings() {
   console.log("loadUISettings() ..");
-  fetch(APIGW + "v0/settings")
+  fetch(APIGW + "v2/settings")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2374,7 +2375,7 @@ function showMainPage() {
   refreshOTmonitor();
   
   if (!flashModeActive) {
-    tid = setInterval(function () { refreshOTmonitor(); }, 5000);
+    tid = setInterval(function () { refreshOTmonitor(); }, 1000);
     // Initialize WebSocket for OT log streaming
     initOTLogWebSocket();
   }
@@ -2444,8 +2445,8 @@ function setVisible(className, visible) {
 
 //============================================================================  
 function refreshDevTime() {
-  //console.log("Refresh api/v0/devtime ..");
-  fetch(APIGW + "v0/devtime")
+  //console.log("Refresh api/v2/device/time ..");
+  fetch(APIGW + "v2/device/time")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2454,42 +2455,41 @@ function refreshDevTime() {
     })
     .then(json => {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
-      for (let i in json.devtime) {
-        if (json.devtime[i].name == "dateTime") {
-          //console.log("Got new time ["+json.devtime[i].value+"]");
-          const timeEl = document.getElementById('theTime');
-          if (timeEl) timeEl.textContent = json.devtime[i].value;
+      const devtime = json.devtime || {};
+      
+      if (devtime.dateTime) {
+        const timeEl = document.getElementById('theTime');
+        if (timeEl) timeEl.textContent = devtime.dateTime;
+      }
+      
+      const msgText = devtime.message || '';
+      const msgEl = document.getElementById('message');
+      if (msgEl) {
+        msgEl.textContent = msgText;
+        
+        // Add warning class if message contains version mismatch warning
+        if (msgText.toLowerCase().includes('littlefs') || 
+            msgText.toLowerCase().includes('version') ||
+            msgText.toLowerCase().includes('flash your')) {
+          msgEl.classList.add('version-warning');
+        } else {
+          msgEl.classList.remove('version-warning');
         }
-        if (json.devtime[i].name == "message") {
-          const msgEl = document.getElementById('message');
-          if (msgEl) {
-            const msgText = json.devtime[i].value || '';
-            msgEl.textContent = msgText;
-            
-            // Add warning class if message contains version mismatch warning
-            if (msgText.toLowerCase().includes('littlefs') || 
-                msgText.toLowerCase().includes('version') ||
-                msgText.toLowerCase().includes('flash your')) {
-              msgEl.classList.add('version-warning');
-            } else {
-              msgEl.classList.remove('version-warning');
-            }
-            
-            // Hide element if no message
-            if (msgText === '') {
-              msgEl.style.display = 'none';
-            } else {
-              msgEl.style.display = 'block';
-            }
-          }
+        
+        // Hide element if no message
+        if (msgText === '') {
+          msgEl.style.display = 'none';
+        } else {
+          msgEl.style.display = 'block';
         }
-        if (json.devtime[i].name == "psmode") {
-          var newPSmode = (json.devtime[i].value === 'true' || json.devtime[i].value === true);
-          if (newPSmode !== isPSmode) {
-            isPSmode = newPSmode;
-            console.log('[PS mode] PS=1 mode changed to: ' + isPSmode);
-            applyPSmodeState();
-          }
+      }
+      
+      if (devtime.psmode !== undefined) {
+        var newPSmode = (devtime.psmode === true || devtime.psmode === 'true');
+        if (newPSmode !== isPSmode) {
+          isPSmode = newPSmode;
+          console.log('[PS mode] PS=1 mode changed to: ' + isPSmode);
+          applyPSmodeState();
         }
       }
     })
@@ -2540,11 +2540,11 @@ function applyPSmodeState() {
 let availableFirmwareFiles = [];
 
 function refreshFirmware() {
-  console.log("refreshFirmware() .. " + APIGW + "firmwarefilelist");
+  console.log("refreshFirmware() .. " + APIGW + "v2/firmware/files");
   
   let picInfo = { type: "Unknown", version: "Unknown", available: "Unknown", device: "Unknown" };
 
-  fetch(APIGW + "v0/devinfo")
+  fetch(APIGW + "v2/device/info")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2552,16 +2552,14 @@ function refreshFirmware() {
       return response.json();
     })
     .then(json => {
-       if (json.devinfo) {
-         const data = json.devinfo;
-         for (let i in data) {
-           if (data[i].name === "picfwtype") picInfo.type = data[i].value;
-           if (data[i].name === "picfwversion") picInfo.version = data[i].value;
-           if (data[i].name === "picavailable") picInfo.available = data[i].value;
-           if (data[i].name === "picdeviceid") picInfo.device = data[i].value;
-         }
+       if (json.device) {
+         const d = json.device;
+         if (d.picfwtype) picInfo.type = d.picfwtype;
+         if (d.picfwversion) picInfo.version = d.picfwversion;
+         if (d.picavailable !== undefined) picInfo.available = String(d.picavailable);
+         if (d.picdeviceid) picInfo.device = d.picdeviceid;
        }
-       return fetch(APIGW + "firmwarefilelist");
+       return fetch(APIGW + "v2/firmware/files");
     })
     .then(response => {
       if (!response.ok) {
@@ -2741,7 +2739,7 @@ function refreshFirmware() {
 function refreshDevInfo() {
   const devNameEl = document.getElementById('devName');
   if (devNameEl) devNameEl.textContent = "";
-  fetch(APIGW + "v0/devinfo")
+  fetch(APIGW + "v2/device/info")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2750,21 +2748,13 @@ function refreshDevInfo() {
     })
     .then(json => {
       console.log("parsed .., data is [" + JSON.stringify(json) + "]");
-      data = json.devinfo;
-      let hostname = "";
-      let ipaddress = "";
-      let version = "";
-      for (let i in data) {
-        if (data[i].name == "fwversion") {
-          version = data[i].value;
-        } else if (data[i].name == 'hostname') {
-          hostname = data[i].value;
-        } else if (data[i].name == 'ipaddress') {
-          ipaddress = data[i].value;
-        }
-      }
+      const device = json.device || {};
+      const hostname = device.hostname || "";
+      const ipaddress = device.ipaddress || "";
+      const version = device.fwversion || "";
 
-      updateGatewayModeFromDevInfoEntries(data);
+      const gatewayModeValue = (device.gatewaymode !== undefined) ? device.gatewaymode : null;
+      updateGatewayModeIndicator(parseGatewayModeValue(gatewayModeValue));
 
       const versionEl = document.getElementById('devVersion');
       if (versionEl) versionEl.textContent = version;
@@ -2836,18 +2826,14 @@ function refreshOTmonitor() {
       }
 
       // Detect and register temperature sensors for the graph
-      // Only process graph data when the graph container is actually visible
       if (typeof OTGraph !== 'undefined' && OTGraph.running) {
-        var graphEl = document.getElementById('temperatureChart');
-        if (graphEl && graphEl.offsetParent !== null) {
-          OTGraph.detectAndRegisterSensors(data);
-          if (dallasLabelsCache && Object.keys(dallasLabelsCache).length > 0 &&
-              typeof OTGraph.refreshSensorLabels === 'function') {
-            OTGraph.refreshSensorLabels(dallasLabelsCache);
-          }
-          // Process sensor data with current timestamp
-          OTGraph.processSensorData(data, new Date());
+        OTGraph.detectAndRegisterSensors(data);
+        if (dallasLabelsCache && Object.keys(dallasLabelsCache).length > 0 &&
+            typeof OTGraph.refreshSensorLabels === 'function') {
+          OTGraph.refreshSensorLabels(dallasLabelsCache);
         }
+        // Process sensor data with current timestamp
+        OTGraph.processSensorData(data, new Date());
       }
 
       let otMonPage = document.getElementById('mainPage');
@@ -2979,7 +2965,7 @@ function refreshDeviceInfo() {
   console.log("refreshDeviceInfo() ..");
 
   data = {};
-  fetch(APIGW + "v0/devinfo")
+  fetch(APIGW + "v2/device/info")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2988,24 +2974,23 @@ function refreshDeviceInfo() {
     })
     .then(json => {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
-      data = json.devinfo;
-      for (let i in data) {
-        console.log("[" + data[i].name + "]=>[" + data[i].value + "]");
+      const device = json.device || {};
+      for (let key in device) {
+        console.log("[" + key + "]=>[" + device[key] + "]");
         var deviceinfoPage = document.getElementById('deviceinfoPage');
-        if ((document.getElementById("devinfo_" + data[i].name)) == null) { // if element does not exists yet, then build page
+        if ((document.getElementById("devinfo_" + key)) == null) { // if element does not exists yet, then build page
           var rowDiv = document.createElement("div");
           rowDiv.setAttribute("class", "devinforow");
-          rowDiv.setAttribute("id", "devinfo_" + data[i].name);
-          // rowDiv.style.background = "lightblue";
+          rowDiv.setAttribute("id", "devinfo_" + key);
           //--- field Name ---
           var fldDiv = document.createElement("div");
           fldDiv.setAttribute("class", "devinfocolumn1");
-          fldDiv.textContent = translateToHuman(data[i].name);
+          fldDiv.textContent = translateToHuman(key);
           rowDiv.appendChild(fldDiv);
           //--- value on screen ---
           var valDiv = document.createElement("div");
           valDiv.setAttribute("class", "devinfocolumn2");
-          valDiv.textContent = data[i].value;
+          valDiv.textContent = device[key];
           rowDiv.appendChild(valDiv);
           deviceinfoPage.appendChild(rowDiv);
         }
@@ -3034,7 +3019,7 @@ const hiddenSettings = [
 function refreshSettings() {
   console.log("refreshSettings() ..");
   data = {};
-  fetch(APIGW + "v0/settings")
+  fetch(APIGW + "v2/settings")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -3163,69 +3148,43 @@ function refreshSettings() {
 //============================================================================  
 function saveSettings() {
   console.log("saveSettings() ...");
+  let changes = false;
 
-  // Collect all changed fields into a single batch
+  //--- has anything changed?
   var page = document.getElementById("settingsPage");
   var inputs = page.getElementsByTagName("input");
-  var batch = [];
-
+  //var mRow = document.getElementById("mainPage").getElementsByTagName('div');
   for (var i = 0; i < inputs.length; i++) {
+    //do something to each div like
     var field = inputs[i].getAttribute("id");
+    console.log("InputNr[" + i + "], InputId[" + field + "]");
     const fieldEl = document.getElementById(field);
     if (!fieldEl) continue;
-
-    if (fieldEl.className !== "input-changed") continue;
-
-    var value;
     if (inputs[i].type == "checkbox") {
       value = fieldEl.checked;
     } else {
       value = fieldEl.value;
     }
+    console.log("==> name[" + field + "], value[" + value + "]");
 
-    fieldEl.className = "input-normal";
-    console.log("Changed: [" + field + "] = [" + value + "]");
+    if (fieldEl.className == "input-changed") {
+      //then it was changes, and needs to be saved
+      fieldEl.className = "input-normal";
+      console.log("Changes where made in [" + field + "][" + value + "]");
+      
+      // Update theme immediately if darktheme setting changed
+      if (field === "darktheme") {
+        let isDark = fieldEl.checked;
+        document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      }
 
-    // Update theme immediately if darktheme setting changed
-    if (field === "darktheme") {
-      let isDark = fieldEl.checked;
-      document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
-      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      //processWithTimeout([(data.length -1), 0], 2, data, sendPostReading);
+      const msgEl = document.getElementById("settingMessage");
+      if (msgEl) msgEl.textContent = "Saving changes...";
+      sendPostSetting(field, value);
     }
-
-    batch.push({ name: field, value: value });
   }
-
-  if (batch.length === 0) return;
-
-  const msgEl = document.getElementById("settingMessage");
-  if (msgEl) msgEl.textContent = "Saving changes...";
-
-  // Send settings sequentially to avoid overwhelming the ESP8266,
-  // but chain them as promises so we get one final status.
-  var chain = Promise.resolve();
-  var failed = false;
-
-  batch.forEach(function(item) {
-    chain = chain.then(function() {
-      return sendPostSetting(item.name, item.value);
-    }).then(function(ok) {
-      if (!ok) failed = true;
-    });
-  });
-
-  chain.then(function() {
-    const msgEl = document.getElementById("settingMessage");
-    if (failed) {
-      if (msgEl) msgEl.textContent = "Saving changes... FAILED";
-    } else {
-      if (msgEl) msgEl.textContent = "Saving changes... SUCCESS";
-      setTimeout(function () {
-        const msgEl = document.getElementById("settingMessage");
-        if (msgEl) msgEl.textContent = "";
-      }, 2000);
-    }
-  });
 } // saveSettings()
 
 
@@ -3240,18 +3199,26 @@ function sendPostSetting(field, value) {
     mode: "cors"
   };
 
-  return fetch(APIGW + "v0/settings", other_params)
-    .then(function(response) {
+  fetch(APIGW + "v2/settings", other_params)
+    .then((response) => {
+      //console.log(response.status );    //=> number 100–599
+      //console.log(response.statusText); //=> String
+      //console.log(response.headers);    //=> Headers
+      //console.log(response.url);        //=> String
+      //console.log(response.text());
+      //return response.text()
+      const msgEl = document.getElementById("settingMessage");
       if (response.ok) {
-        console.log("Setting saved: " + field);
-        return true;
+        if (msgEl) msgEl.textContent = "Saving changes... SUCCESS";
+        setTimeout(function () {
+          const msgEl = document.getElementById("settingMessage");
+          if (msgEl) msgEl.textContent = "";
+        }, 2000); //and clear the message
       } else {
-        console.error("Setting save failed: " + field + " HTTP " + response.status);
-        return false;
+        if (msgEl) msgEl.textContent = "Saving changes... FAILED";
       }
-    })
-    .catch(function(error) {
-      console.error("Setting save error: " + field + " - " + error.message);
+    }, (error) => {
+      console.log("Error[" + error.message + "]"); //=> String
       return false;
     });
 } // sendPostSetting()
@@ -3433,7 +3400,7 @@ var translateFields = [
 
 //============================================================================
 function applyTheme() {
-  fetch(APIGW + "v0/settings")
+  fetch(APIGW + "v2/settings")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
