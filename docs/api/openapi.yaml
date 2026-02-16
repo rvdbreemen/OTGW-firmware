@@ -741,6 +741,219 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
+  /v2/device/info:
+    get:
+      tags:
+        - Device Info
+      summary: Get comprehensive device information (v2 map format)
+      description: |
+        Returns device information as a flat JSON object (map format).
+        Replaces v0/devinfo which returned name/value arrays.
+        
+        Includes firmware version, PIC details, network info, memory,
+        connectivity status, and gateway mode.
+      operationId: getDeviceInfoV2
+      responses:
+        '200':
+          description: Device information retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  device:
+                    type: object
+                    properties:
+                      author:
+                        type: string
+                      fwversion:
+                        type: string
+                      picavailable:
+                        type: boolean
+                      picfwversion:
+                        type: string
+                      picdeviceid:
+                        type: string
+                      picfwtype:
+                        type: string
+                      hostname:
+                        type: string
+                      ipaddress:
+                        type: string
+                      freeheap:
+                        type: integer
+                      gatewaymode:
+                        type: boolean
+                      mqttconnected:
+                        type: boolean
+                      otgwconnected:
+                        type: boolean
+              examples:
+                example:
+                  value:
+                    device:
+                      author: "Robert van den Breemen"
+                      fwversion: "1.1.0"
+                      picavailable: true
+                      hostname: "OTGW"
+                      ipaddress: "192.168.1.100"
+                      freeheap: 25600
+                      gatewaymode: true
+                      mqttconnected: true
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/device/time:
+    get:
+      tags:
+        - Device Info
+      summary: Get device date/time (v2 RESTful name)
+      description: |
+        Returns the current device date and time in map format.
+        RESTful resource naming replaces v1's /devtime path.
+      operationId: getDeviceTimeV2
+      responses:
+        '200':
+          description: Device time retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  devtime:
+                    type: object
+                    properties:
+                      dateTime:
+                        type: string
+                        example: "2026-02-16 10:30:00"
+                      epoch:
+                        type: integer
+                        example: 1739702200
+                      message:
+                        type: string
+                      psmode:
+                        type: boolean
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/flash/status:
+    get:
+      tags:
+        - Flash/Upgrade
+      summary: Get unified flash status (v2 RESTful name)
+      description: |
+        Returns flash status for both ESP8266 and PIC firmware upgrades.
+        RESTful resource naming replaces v1's /flashstatus path.
+      operationId: getFlashStatusV2
+      responses:
+        '200':
+          description: Flash status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  flashstatus:
+                    type: object
+                    properties:
+                      flashing:
+                        type: boolean
+                      pic_flashing:
+                        type: boolean
+                      pic_progress:
+                        type: integer
+                        minimum: 0
+                        maximum: 100
+                      pic_filename:
+                        type: string
+                      pic_error:
+                        type: string
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/pic/flash-status:
+    get:
+      tags:
+        - Flash/Upgrade
+      summary: Get PIC flash status (v2 RESTful name)
+      description: |
+        Minimal endpoint for polling PIC flash state during upgrade.
+        RESTful resource naming with hyphen replaces v1's /pic/flashstatus.
+      operationId: getPICFlashStatusV2
+      responses:
+        '200':
+          description: PIC flash status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  flashstatus:
+                    type: object
+                    properties:
+                      flashing:
+                        type: boolean
+                      progress:
+                        type: integer
+                      filename:
+                        type: string
+                      error:
+                        type: string
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/firmware/files:
+    get:
+      tags:
+        - Flash/Upgrade
+      summary: List PIC firmware files (v2 versioned)
+      description: |
+        Returns list of available PIC firmware files on the filesystem.
+        Versioned replacement for unversioned /api/firmwarefilelist endpoint.
+      operationId: getFirmwareFilesV2
+      responses:
+        '200':
+          description: Firmware file list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    size:
+                      type: integer
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/filesystem/files:
+    get:
+      tags:
+        - Flash/Upgrade
+      summary: List filesystem files (v2 versioned)
+      description: |
+        Returns list of files on the LittleFS filesystem.
+        Versioned replacement for unversioned /api/listfiles endpoint.
+      operationId: getFilesystemFilesV2
+      responses:
+        '200':
+          description: File list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    size:
+                      type: integer
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
   /v1/otgw/autoconfigure:
     post:
       tags:
