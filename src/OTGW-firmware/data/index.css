@@ -1062,3 +1062,33 @@ body.disable-interaction {
   color: red;
 }
 
+/* Dallas Sensor Label Edit Icon */
+.sensor-edit-icon {
+  font-size: 0.85em;
+  margin-left: 4px;
+  opacity: 0.8;
+}
+
+.otmoncolumn1.editable-label {
+  cursor: pointer;
+}
+
+.sensor-label-inline-editor {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 100%;
+  max-width: 220px;
+  font: inherit;
+  line-height: normal;
+  padding: 0 6px;
+  margin: 0;
+  border-radius: 3px;
+  box-sizing: border-box;
+  color: #212529;
+  background: #fff;
+  outline: 1px solid #007bff;
+  outline-offset: -1px;
+  border: none;
+}
+

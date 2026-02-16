@@ -11,6 +11,66 @@
 */
 
 //=======================================================================
+// Deferred settings write support (Finding #23: reduce flash wear + service restarts)
+// Side-effect bitmask flags
+#define SIDE_EFFECT_MQTT   0x01
+#define SIDE_EFFECT_NTP    0x02
+#define SIDE_EFFECT_MDNS   0x04
+static bool    settingsDirty = false;
+static uint8_t pendingSideEffects = 0;
+
+//=======================================================================
+void flushSettings()
+{
+  if (!settingsDirty) return;
+
+  DebugTln(F("[Settings] Flushing deferred settings write..."));
+  writeSettings(false);
+  settingsDirty = false;
+
+  // Apply deferred side effects — exactly once per service per save batch
+  if (pendingSideEffects & SIDE_EFFECT_MDNS) {
+    DebugTln(F("[Settings] Restarting MDNS/LLMNR (deferred)"));
+    startMDNS(settingHostname);
+    startLLMNR(settingHostname);
+  }
+  if ((pendingSideEffects & SIDE_EFFECT_MQTT) && settingMQTTenable) {
+    DebugTln(F("[Settings] Restarting MQTT (deferred)"));
+    startMQTT();
+  }
+  if (pendingSideEffects & SIDE_EFFECT_NTP) {
+    DebugTln(F("[Settings] Restarting NTP (deferred)"));
+    startNTP();
+  }
+  pendingSideEffects = 0;
+}
+
+//=======================================================================
+// GPIO conflict detection (Finding #27)
+// Returns true if the requested pin is already used by another feature.
+// 'caller' identifies which feature is requesting the pin (e.g. "sensor", "s0", "output")
+bool checkGPIOConflict(int pin, PGM_P caller)
+{
+  if (pin < 0) return false; // disabled / not set
+
+  bool conflict = false;
+  // Check against each configurable GPIO (excluding 'caller' itself)
+  if (strcasecmp_P(caller, PSTR("sensor")) != 0 && pin == settingGPIOSENSORSpin && settingGPIOSENSORSpin >= 0) {
+    DebugTf(PSTR("GPIO conflict: pin %d already used by SENSORS\r\n"), pin);
+    conflict = true;
+  }
+  if (strcasecmp_P(caller, PSTR("s0")) != 0 && pin == settingS0COUNTERpin && settingS0COUNTERpin >= 0) {
+    DebugTf(PSTR("GPIO conflict: pin %d already used by S0 Counter\r\n"), pin);
+    conflict = true;
+  }
+  if (strcasecmp_P(caller, PSTR("output")) != 0 && pin == settingGPIOOUTPUTSpin && settingGPIOOUTPUTSpin >= 0) {
+    DebugTf(PSTR("GPIO conflict: pin %d already used by GPIO OUTPUTS\r\n"), pin);
+    conflict = true;
+  }
+  return conflict;
+}
+
+//=======================================================================
 void writeSettings(bool show) 
 {
 
@@ -27,7 +87,7 @@ void writeSettings(bool show)
 
   DebugT(F("[Settings] State: Serializing settings to JSON... "));
 
-  //const size_t capacity = JSON_OBJECT_SIZE(6);  // save more setting, grow # of objects accordingly
+  // Capacity reduced back to 1536 bytes (Dallas labels now in separate file)
   DynamicJsonDocument doc(1536);
   JsonObject root  = doc.to<JsonObject>();
   root[F("hostname")] = settingHostname;
@@ -68,6 +128,7 @@ void writeSettings(bool show)
   root[F("GPIOOUTPUTSenabled")] = settingGPIOOUTPUTSenabled;
   root[F("GPIOOUTPUTSpin")] = settingGPIOOUTPUTSpin;
   root[F("GPIOOUTPUTStriggerBit")] = settingGPIOOUTPUTStriggerBit;
+  // Dallas sensor labels now stored in /dallas_labels.json (not in settings.json)
 
   serializeJsonPretty(root, file);
   if (show) {
@@ -97,7 +158,9 @@ void readSettings(bool show)
   }
 
   // Deserialize the JSON document
-  StaticJsonDocument<1536> doc;
+  // Use DynamicJsonDocument to eliminate stack overflow risk (moved from stack to heap)
+  // Capacity reduced back to 1536 bytes (Dallas labels now in separate file)
+  DynamicJsonDocument doc(1536);
   DeserializationError error = deserializeJson(doc, file);
   if (error)
   {
@@ -113,9 +176,19 @@ void readSettings(bool show)
   settingMQTTenable       = doc[F("MQTTenable")]|settingMQTTenable;
   strlcpy(settingMQTTbroker, doc[F("MQTTbroker")] | "", sizeof(settingMQTTbroker));
   
-  settingMQTTbrokerPort   = doc[F("MQTTbrokerPort")]; //default port
+  settingMQTTbrokerPort   = doc[F("MQTTbrokerPort")] | settingMQTTbrokerPort; //default port
   strlcpy(settingMQTTuser, doc[F("MQTTuser")] | "", sizeof(settingMQTTuser));
+  // Trim leading/trailing whitespace from username
+  char* trimmedUser = trimwhitespace(settingMQTTuser);
+  if (trimmedUser != settingMQTTuser) {
+    memmove(settingMQTTuser, trimmedUser, strlen(trimmedUser) + 1);
+  }
   strlcpy(settingMQTTpasswd, doc[F("MQTTpasswd")] | "", sizeof(settingMQTTpasswd));
+  // Trim leading/trailing whitespace from password
+  char* trimmedPasswd = trimwhitespace(settingMQTTpasswd);
+  if (trimmedPasswd != settingMQTTpasswd) {
+    memmove(settingMQTTpasswd, trimmedPasswd, strlen(trimmedPasswd) + 1);
+  }
   
   strlcpy(settingMQTTtopTopic, doc[F("MQTTtoptopic")] | "", sizeof(settingMQTTtopTopic));
   if (strlen(settingMQTTtopTopic)==0 || strcmp_P(settingMQTTtopTopic, PSTR("null"))==0) {
@@ -129,7 +202,7 @@ void readSettings(bool show)
   settingMQTTharebootdetection = doc[F("MQTTharebootdetection")]|settingMQTTharebootdetection;	  
   
   strlcpy(settingMQTTuniqueid, doc[F("MQTTuniqueid")] | "", sizeof(settingMQTTuniqueid));
-  if (strlen(settingMQTTuniqueid)==0 || strcmp_P(settingMQTTuniqueid, PSTR("null"))==0) strlcpy(settingMQTTuniqueid, getUniqueId().c_str(), sizeof(settingMQTTuniqueid));
+  if (strlen(settingMQTTuniqueid)==0 || strcmp_P(settingMQTTuniqueid, PSTR("null"))==0) strlcpy(settingMQTTuniqueid, getUniqueId(), sizeof(settingMQTTuniqueid));
 
   settingMQTTOTmessage    = doc[F("MQTTOTmessage")]|settingMQTTOTmessage;
   settingNTPenable        = doc[F("NTPenable")]; 
@@ -166,6 +239,8 @@ void readSettings(bool show)
   settingGPIOOUTPUTSenabled = doc[F("GPIOOUTPUTSenabled")] | settingGPIOOUTPUTSenabled;
   settingGPIOOUTPUTSpin = doc[F("GPIOOUTPUTSpin")] | settingGPIOOUTPUTSpin;
   settingGPIOOUTPUTStriggerBit = doc[F("GPIOOUTPUTStriggerBit")] | settingGPIOOUTPUTStriggerBit;
+  
+  // Dallas sensor labels now stored in /dallas_labels.json (not in settings.json)
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
@@ -224,25 +299,32 @@ void updateSetting(const char *field, const char *newValue)
     char *dot = strchr(settingMQTTtopTopic, '.');
     if (dot) *dot = '\0';
     
-    //Update some settings right now 
-    startMDNS(settingHostname);
-    startLLMNR(settingHostname);
-  
-    //Restart MQTT connection every "save settings"
-    startMQTT();
+    // Defer MDNS/LLMNR and MQTT restart to flushSettings()
+    pendingSideEffects |= SIDE_EFFECT_MDNS | SIDE_EFFECT_MQTT;
 
     Debugln();
     DebugTf(PSTR("Need reboot before new %s.local will be available!\r\n\n"), settingHostname);
   }
-  if (strcasecmp_P(field, PSTR("AdminPassword"))==0)   strlcpy(settingAdminPassword, newValue, sizeof(settingAdminPassword));
   
   if (strcasecmp_P(field, PSTR("MQTTenable"))==0)      settingMQTTenable = EVALBOOLEAN(newValue);
   if (strcasecmp_P(field, PSTR("MQTTbroker")) == 0)    strlcpy(settingMQTTbroker, newValue, sizeof(settingMQTTbroker));
   if (strcasecmp_P(field, PSTR("MQTTbrokerPort"))==0)  settingMQTTbrokerPort = atoi(newValue);
-  if (strcasecmp_P(field, PSTR("MQTTuser"))==0)        strlcpy(settingMQTTuser, newValue, sizeof(settingMQTTuser));
+  if (strcasecmp_P(field, PSTR("MQTTuser"))==0) {
+    strlcpy(settingMQTTuser, newValue, sizeof(settingMQTTuser));
+    // Trim leading/trailing whitespace from username
+    char* trimmedUser = trimwhitespace(settingMQTTuser);
+    if (trimmedUser != settingMQTTuser) {
+      memmove(settingMQTTuser, trimmedUser, strlen(trimmedUser) + 1);
+    }
+  }
   if (strcasecmp_P(field, PSTR("MQTTpasswd"))==0){
     if ( newValue && strcasecmp_P(newValue, PSTR("notthepassword")) != 0 ){
       strlcpy(settingMQTTpasswd, newValue, sizeof(settingMQTTpasswd));
+      // Trim leading/trailing whitespace from password
+      char* trimmedPasswd = trimwhitespace(settingMQTTpasswd);
+      if (trimmedPasswd != settingMQTTpasswd) {
+        memmove(settingMQTTpasswd, trimmedPasswd, strlen(trimmedPasswd) + 1);
+      }
     }
   }
   if (strcasecmp_P(field, PSTR("MQTTtoptopic"))==0)    {
@@ -259,19 +341,19 @@ void updateSetting(const char *field, const char *newValue)
   if (strcasecmp_P(field, PSTR("MQTTharebootdetection"))==0)      settingMQTTharebootdetection = EVALBOOLEAN(newValue);
   if (strcasecmp_P(field, PSTR("MQTTuniqueid")) == 0)  {
     strlcpy(settingMQTTuniqueid, newValue, sizeof(settingMQTTuniqueid));     
-    if (strlen(settingMQTTuniqueid) == 0)   strlcpy(settingMQTTuniqueid, getUniqueId().c_str(), sizeof(settingMQTTuniqueid));
+    if (strlen(settingMQTTuniqueid) == 0)   strlcpy(settingMQTTuniqueid, getUniqueId(), sizeof(settingMQTTuniqueid));
   }
   if (strcasecmp_P(field, PSTR("MQTTOTmessage"))==0)   settingMQTTOTmessage = EVALBOOLEAN(newValue);
-  if (strstr_P(field, PSTR("mqtt")) != NULL)        startMQTT();//restart MQTT on change of any setting
+  if (strstr_P(field, PSTR("mqtt")) != NULL)        pendingSideEffects |= SIDE_EFFECT_MQTT; // defer MQTT restart to flushSettings()
   
   if (strcasecmp_P(field, PSTR("NTPenable"))==0)      settingNTPenable = EVALBOOLEAN(newValue);
   if (strcasecmp_P(field, PSTR("NTPhostname"))==0)    {
     strlcpy(settingNTPhostname, newValue, sizeof(settingNTPhostname)); 
-    startNTP();
+    pendingSideEffects |= SIDE_EFFECT_NTP; // defer NTP restart to flushSettings()
   }
   if (strcasecmp_P(field, PSTR("NTPtimezone"))==0)    {
     strlcpy(settingNTPtimezone, newValue, sizeof(settingNTPtimezone));
-    startNTP();  // update timezone if changed
+    pendingSideEffects |= SIDE_EFFECT_NTP; // defer NTP restart to flushSettings()
   }
   if (strcasecmp_P(field, PSTR("NTPsendtime"))==0)    settingNTPsendtime = EVALBOOLEAN(newValue);
   if (strcasecmp_P(field, PSTR("LEDblink"))==0)      settingLEDblink = EVALBOOLEAN(newValue);
@@ -299,7 +381,11 @@ void updateSetting(const char *field, const char *newValue)
   }
   if (strcasecmp_P(field, PSTR("GPIOSENSORSpin")) == 0)    
   {
-    settingGPIOSENSORSpin = atoi(newValue);
+    int newPin = atoi(newValue);
+    if (checkGPIOConflict(newPin, PSTR("sensor"))) {
+      DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
+    }
+    settingGPIOSENSORSpin = newPin;
     Debugln();
     DebugTf(PSTR("Need reboot before GPIO SENSORS will use new pin GPIO%d!\r\n\n"), settingGPIOSENSORSpin);
   }
@@ -315,7 +401,11 @@ void updateSetting(const char *field, const char *newValue)
   }
   if (strcasecmp_P(field, PSTR("S0COUNTERpin")) == 0)    
   {
-    settingS0COUNTERpin = atoi(newValue);
+    int newPin = atoi(newValue);
+    if (checkGPIOConflict(newPin, PSTR("s0"))) {
+      DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
+    }
+    settingS0COUNTERpin = newPin;
     Debugln();
     DebugTf(PSTR("Need reboot before S0 Counter will use new pin GPIO%d!\r\n\n"), settingS0COUNTERpin);
   }
@@ -336,7 +426,11 @@ void updateSetting(const char *field, const char *newValue)
   }
   if (strcasecmp_P(field, PSTR("GPIOOUTPUTSpin")) == 0)
   {
-    settingGPIOOUTPUTSpin = atoi(newValue);
+    int newPin = atoi(newValue);
+    if (checkGPIOConflict(newPin, PSTR("output"))) {
+      DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
+    }
+    settingGPIOOUTPUTSpin = newPin;
     Debugln();
     DebugTf(PSTR("Need reboot before GPIO OUTPUTS will use new pin GPIO%d!\r\n\n"), settingGPIOOUTPUTSpin);
   }
@@ -347,11 +441,12 @@ void updateSetting(const char *field, const char *newValue)
     DebugTf(PSTR("Need reboot before GPIO OUTPUTS will use new trigger bit %d!\r\n\n"), settingGPIOOUTPUTStriggerBit);
   }
 
-  //finally update write settings
-  writeSettings(false);
-
-  //Restart MQTT connection every "save settings" (this seems to be save to do, but is called for each changed field now )
-  if (settingMQTTenable)   startMQTT();
+  // Mark settings dirty and restart debounce timer — actual write + service
+  // restarts are deferred to flushSettings() which runs from loop() timer.
+  // This coalesces multiple field updates into a single flash write and at most
+  // one restart per service (Finding #23: reduce flash wear + MQTT churn).
+  settingsDirty = true;
+  RESTART_TIMER(timerFlushSettings);
 
 } // updateSetting()
 

@@ -2,7 +2,7 @@
 
 **Status:** Accepted  
 **Date:** 2020-06-01 (Migration from SPIFFS)  
-**Updated:** 2026-01-28 (Documentation)
+**Updated:** 2026-02-16 (Added deferred side-effects bitmask documentation)
 
 ## Context
 
@@ -224,23 +224,55 @@ void writeSettings() {
 }
 ```
 
-**Auto-save throttling:**
-```cpp
-bool settingsDirty = false;
-DECLARE_TIMER_MIN(autoSaveTimer, 5);
+**Auto-save with deferred side-effects (v1.0.0+):**
 
-// In loop()
-if (DUE(autoSaveTimer) && settingsDirty) {
-  writeSettings();
-  settingsDirty = false;
+Settings changes from the Web UI or REST API often require service restarts (MQTT, NTP, mDNS). To prevent multiple restarts during a single save batch, the firmware uses a **deferred side-effects bitmask** pattern:
+
+```cpp
+// Side-effect bitmask flags
+#define SIDE_EFFECT_MQTT   0x01
+#define SIDE_EFFECT_NTP    0x02
+#define SIDE_EFFECT_MDNS   0x04
+
+static bool    settingsDirty = false;
+static uint8_t pendingSideEffects = 0;
+
+void updateSetting(const char* field, const char* value) {
+  // Update the setting value
+  settingsDirty = true;
+  
+  // Accumulate side effects based on which setting changed
+  if (strcasecmp_P(field, PSTR("MQTTbroker")) == 0)
+    pendingSideEffects |= SIDE_EFFECT_MQTT;
+  if (strcasecmp_P(field, PSTR("NTPtimezone")) == 0)
+    pendingSideEffects |= SIDE_EFFECT_NTP;
+  if (strcasecmp_P(field, PSTR("Hostname")) == 0)
+    pendingSideEffects |= SIDE_EFFECT_MDNS;
 }
 
-// When settings changed via web UI
-void updateSetting() {
-  settingHostname = newValue;
-  settingsDirty = true;  // Will save in <5 minutes
+void flushSettings() {
+  if (!settingsDirty) return;
+  
+  writeSettings(false);  // Write once
+  settingsDirty = false;
+  
+  // Apply all accumulated side effects exactly once per service
+  if (pendingSideEffects & SIDE_EFFECT_MDNS) {
+    startMDNS(settingHostname);
+    startLLMNR(settingHostname);
+  }
+  if (pendingSideEffects & SIDE_EFFECT_MQTT) startMQTT();
+  if (pendingSideEffects & SIDE_EFFECT_NTP)  startNTP();
+  
+  pendingSideEffects = 0;  // Clear all flags
 }
 ```
+
+**Key benefits of this pattern:**
+- Changing hostname + MQTT broker + NTP in one save → one write, three restarts (not six)
+- The 2-second debounce timer in `loop()` coalesces rapid consecutive changes
+- Side effects are idempotent — restarting a service twice is safe but wasteful
+- Bitmask is O(1) to check, set, and clear
 
 **Backup before OTA update:**
 ```cpp
@@ -290,7 +322,9 @@ void migrateFromSPIFFS() {
 
 ## Related Decisions
 - ADR-002: Modular .ino File Architecture (settingStuff.ino handles persistence)
-- ADR-007: Timer-Based Task Scheduling (auto-save timer)
+- ADR-007: Timer-Based Task Scheduling (auto-save timer, flush timer)
+- ADR-006: MQTT Integration Pattern (MQTT restart as a deferred side effect)
+- ADR-015: NTP and AceTime for Time Management (NTP restart as a deferred side effect)
 
 ## References
 - LittleFS documentation: https://arduino-esp8266.readthedocs.io/en/latest/filesystem.html

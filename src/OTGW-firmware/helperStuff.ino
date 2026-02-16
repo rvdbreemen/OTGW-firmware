@@ -358,7 +358,8 @@ bool updateRebootLog(String text)
         while (infh.available() && (i < LOG_LINES)){
           //read the first line 
           String line = infh.readStringUntil('\n');
-          if (line.length() > 3) { //TODO: check is no longer needed?
+          // Filter out empty or very short lines (< 3 chars) to keep log file clean
+          if (line.length() > 3) {
             outfh.print(line);
           }
           i++;
@@ -383,6 +384,7 @@ bool updateRebootLog(String text)
 
 void doRestart(const char* str) {
   DebugTln(str);
+  flushSettings();  // Persist any pending settings before reboot
   delay(2000);  // Enough time for messages to be sent.
   ESP.restart();
   delay(5000);  // Enough time to ensure we don't return.
@@ -410,7 +412,7 @@ bool yearChanged(){
   static int16_t lastyear = -1;
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
-  int8_t thisyear = myTime.year();
+  int16_t thisyear = myTime.year();
   bool _ret = (lastyear != thisyear); //year changed
   if (_ret) {
     //year changed
