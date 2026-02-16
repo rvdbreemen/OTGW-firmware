@@ -10,13 +10,11 @@ Architecture Decision Records capture important architectural decisions along wi
 
 **By Topic:**
 - [Platform & Build](#platform-and-build-system) (4 ADRs)
-- [Memory Management](#memory-management) (4 ADRs) 🆕
-- [Network & Security](#network-and-security) (3 ADRs) 🆕
-- [Integration](#integration-and-communication) (3 ADRs) 🆕
-- [Network & Security](#network-and-security) (3 ADRs) 🆕
-- [Integration](#integration-and-communication) (3 ADRs) 🆕
-- [Core Systems](#system-architecture) (6 ADRs)
-- [Features & Extensions](#features-and-extensions) (7 ADRs)
+- [Memory Management](#memory-management) (4 ADRs)
+- [Network & Security](#network-and-security) (3 ADRs)
+- [Integration](#integration-and-communication) (4 ADRs) 🆕
+- [Core Systems](#system-architecture) (4 ADRs) 🆕
+- [Features & Extensions](#features-and-extensions) (8 ADRs) 🆕
 - [Browser & Client](#browser-and-client-compatibility) (4 ADRs)
 - [OTA & Updates](#ota-and-firmware-updates) (2 ADRs)
 
@@ -67,12 +65,21 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-031: Two-Microcontroller Coordination Architecture](ADR-031-two-microcontroller-coordination-architecture.md)** 🆕  
   Master/Slave architecture with ESP8266 as network controller and PIC microcontroller for OpenTherm protocol (serial communication, GPIO reset control, firmware upgrade capability).
 
+- **[ADR-037: Gateway Mode Detection via PR=M Polling](ADR-037-gateway-mode-detection.md)** 🆕  
+  Periodic polling (PR=M command, 30s interval with 60s cache) to detect gateway vs. monitor mode, with PS=1 impact on time sync suppression.
+
 ### System Architecture
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  
   Non-blocking timer-based task scheduling with 49-day rollover protection for cooperative multitasking.
 
 - **[ADR-008: LittleFS for Configuration Persistence](ADR-008-littlefs-configuration-persistence.md)**  
   Using LittleFS filesystem with JSON files for configuration storage that survives firmware updates.
+
+- **[ADR-036: Boot Sequence Initialization Ordering](ADR-036-boot-sequence-ordering.md)** 🆕  
+  Deterministic 5-phase boot sequence (Hardware → Filesystem → Network → Application → OTGW) with critical dependency ordering (NTP before WiFi DHCP, webserver before MQTT).
+
+- **[ADR-038: OpenTherm Message Data Flow Pipeline](ADR-038-opentherm-data-flow-pipeline.md)** 🆕  
+  Synchronous fan-out architecture for OpenTherm messages (PIC Serial → processOT → MQTT + WebSocket + REST + Telnet) with per-consumer availability checks and bidirectional command flow.
 
 ### Hardware and Reliability
 - **[ADR-011: External Hardware Watchdog for Reliability](ADR-011-external-hardware-watchdog.md)**  
@@ -125,6 +132,9 @@ Architecture Decision Records capture important architectural decisions along wi
 
 - **[ADR-033: Dallas Sensor Custom Labels and Graph Visualization](ADR-033-dallas-sensor-custom-labels-graph-visualization.md)** 🆕  
   Persistent custom sensor labels (16 chars max) with REST API endpoint, dynamic graph visualization with 16-color palette, and non-blocking inline editor.
+
+- **[ADR-039: Real-Time OTGraph Charting Architecture](ADR-039-otgraph-real-time-charting.md)** 🆕  
+  5-grid ECharts-based charting module with dynamic Dallas sensor registration, dual-theme palettes, LTTB sampling, and 24h data buffer for real-time OpenTherm monitoring.
 
 ### Browser and Client Compatibility
 - **[ADR-025: Safari WebSocket Connection Management During Firmware Upload](ADR-025-safari-websocket-connection-management.md)**  
@@ -249,6 +259,7 @@ ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
 5. 2021: ADR-015 (NTP + AceTime - verified: commit 45b51f2)
 6. 2024: ADR-019 (API v2)
 7. 2026: ADR-025 (Safari WebSocket fix), ADR-026 (Cache-busting), ADR-027 (Version warnings)
+8. 2026: ADR-036 (Boot sequence), ADR-037 (Gateway mode), ADR-038 (Data flow), ADR-039 (OTGraph)
 
 ## When to Create an ADR
 

@@ -2,7 +2,7 @@
 
 **Status:** Accepted  
 **Date:** 2018-06-01 (Estimated)  
-**Updated:** 2026-01-28 (Documentation)
+**Updated:** 2026-02-16 (Added complete state machine, heap-aware backpressure)
 
 ## Context
 
@@ -39,18 +39,29 @@ The primary goal of OTGW-firmware is **reliable Home Assistant integration**. Ho
 - **Buffer:** 1200 bytes maximum message size
 - **Reconnection:** Automatic with exponential backoff
 
-**State management:**
+**State management (6 states):**
 ```cpp
-enum MQTTStates {
-  MQTT_STATE_INIT,
-  TRY_TO_CONNECT,
-  IS_CONNECTED,
-  WAIT_FOR_RECONNECT
+enum states_of_MQTT {
+  MQTT_STATE_INIT,                    // Initial state, configure MQTT client
+  MQTT_STATE_TRY_TO_CONNECT,          // Attempt connection to broker
+  MQTT_STATE_IS_CONNECTED,            // Connected, normal operation
+  MQTT_STATE_WAIT_CONNECTION_ATTEMPT,  // Brief wait between rapid connect retries
+  MQTT_STATE_WAIT_FOR_RECONNECT,      // Extended wait after 5+ failures (10 min backoff)
+  MQTT_STATE_ERROR                    // Fatal error state (e.g., DNS resolution failure)
 };
 ```
 
+**Heap-aware MQTT backpressure (v1.0.0+):**
+- `canPublishMQTT()` checks heap health before every publish
+- **HEAP_CRITICAL (<3KB):** All MQTT publishing blocked completely
+- **HEAP_WARNING (3-5KB):** Aggressive time-based throttling between publishes  
+- **HEAP_LOW (5-8KB):** Moderate throttling to reduce publish rate
+- **HEAP_HEALTHY (>8KB):** Normal publishing, no throttling
+- Dropped message counter with periodic telnet logging for diagnostics
+- Prevents MQTT from consuming remaining heap during memory pressure
+
 **Chunked streaming (v1.0.0):**
-- Splits large messages into 128-byte chunks
+- Splits large messages into 128-byte chunks via `beginPublish()`/`write()`/`endPublish()`
 - Eliminates buffer resize cycles
 - Saves 200-400 bytes of heap
 
@@ -250,6 +261,8 @@ binary_sensor.otgw_heating_active
 ## Related Decisions
 - ADR-004: Static Buffer Allocation Strategy (buffer sizing, chunked streaming)
 - ADR-007: Timer-Based Task Scheduling (periodic MQTT publishes)
+- ADR-030: Heap Memory Monitoring and Emergency Recovery (heap health levels used by `canPublishMQTT()`)
+- ADR-016: OpenTherm Command Queue (MQTT commands routed through same queue)
 
 ## References
 - PubSubClient library: https://github.com/knolleary/pubsubclient
