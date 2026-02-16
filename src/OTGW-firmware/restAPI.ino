@@ -360,9 +360,9 @@ void processAPI()
       }
     }
     else if (wc > 2 && strcmp_P(words[2], PSTR("v0")) == 0)
-    { //v0 API calls
+    { //v0 API calls — DEPRECATED: will be removed in v1.3.0 (see ADR-035)
       if (wc > 3 && strcmp_P(words[3], PSTR("otgw")) == 0) {
-        // GET /api/v0/otgw/{msgid}
+        // GET /api/v0/otgw/{msgid} — DEPRECATED: use /api/v1/otgw/id/{msgid} or /api/v2/otgw/messages/{msgid}
         if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
         uint8_t msgId = 0;
         if (wc > 4 && parseMsgId(words[4], msgId)) {
@@ -372,14 +372,17 @@ void processAPI()
         }
       }
       else if (wc > 3 && strcmp_P(words[3], PSTR("devinfo")) == 0) {
+        // GET /api/v0/devinfo — DEPRECATED: v2 equivalent planned as /api/v2/device/info
         if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
         sendDeviceInfo();
       }
       else if (wc > 3 && strcmp_P(words[3], PSTR("devtime")) == 0) {
+        // GET /api/v0/devtime — DEPRECATED: use /api/v1/devtime
         if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
         sendDeviceTime();
       }
       else if (wc > 3 && strcmp_P(words[3], PSTR("settings")) == 0) {
+        // GET/POST /api/v0/settings — DEPRECATED: use /api/v1/settings or /api/v2/settings
         if (isPostOrPut) {
           postSettings();
         } else if (isGet) {
