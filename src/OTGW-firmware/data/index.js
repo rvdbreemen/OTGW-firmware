@@ -3388,6 +3388,7 @@ var translateFields = [
   , ["s0intervalcount", "S0 interval pulses"]
   , ["s0totalcount", "S0 total pulses"]
   , ["mqttotmessage", "MQTT OT msg Enable"]
+  , ["mqttseparatesources", "MQTT Separate Sources (thermostat/boiler/gateway)"]
   , ["otgwcommandenable", "Boot Command Enabled"]
   , ["otgwcommands", "Boot Command"]
   , ["thermostatconnected", "Thermostat Connected"]
