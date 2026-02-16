@@ -47,6 +47,27 @@ Full details: [Codebase Review](docs/reviews/2026-02-13_codebase-review/CODEBASE
 - **Reliability**: Enhanced Watchdog integration and safe timer handling.
 - **MQTT Auto Discovery**: Improved Home Assistant integration stability.
 
+### ⚠️ API Deprecation Notice
+
+The following REST API versions and endpoints are **deprecated** and will be **removed in the next minor release** (v1.3.0):
+
+- **`/api/v0/*`** — All v0 endpoints (`/api/v0/devinfo`, `/api/v0/devtime`, `/api/v0/settings`, `/api/v0/otgw/{msgid}`). Use the equivalent v1 or v2 endpoints instead.
+- **`/api/firmwarefilelist`** — Unversioned endpoint. A versioned replacement will be provided under `/api/v2/`.
+- **`/api/listfiles`** — Unversioned endpoint. A versioned replacement will be provided under `/api/v2/`.
+
+**Migration guide:**
+
+| Deprecated endpoint | Replacement |
+|---------------------|-------------|
+| `GET /api/v0/devinfo` | `GET /api/v0/devinfo` (remains available until v1.3.0; v2 equivalent planned) |
+| `GET /api/v0/devtime` | `GET /api/v1/devtime` or `GET /api/v2/device/time` (planned) |
+| `GET/POST /api/v0/settings` | `GET/POST /api/v1/settings` or `GET/POST /api/v2/settings` |
+| `GET /api/v0/otgw/{msgid}` | `GET /api/v1/otgw/id/{msgid}` or `GET /api/v2/otgw/messages/{msgid}` |
+| `GET /api/firmwarefilelist` | `GET /api/v2/firmware/files` (planned) |
+| `GET /api/listfiles` | `GET /api/v2/filesystem/files` (planned) |
+
+New v2 API endpoints follow RESTful best practices (JSON errors, proper HTTP status codes, resource naming). See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md) for details.
+
 ## 🏁 Introduced in v1.0.0
 
 Version 1.0.0 was a major milestone delivering improved stability, a modern user interface, and robust integration.
