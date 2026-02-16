@@ -37,6 +37,12 @@ static void sendApiError(int httpCode, const __FlashStringHelper* message) {
   httpServer.send(httpCode, F("application/json"), jsonBuff);
 }
 
+// T44: 405 responses with RFC 7231 §6.5.5 Allow header
+static void sendApiMethodNotAllowed(const __FlashStringHelper* allowedMethods) {
+  httpServer.sendHeader(F("Allow"), allowedMethods);
+  sendApiError(405, F("Method not allowed"));
+}
+
 //=======================================================================
 
 static bool isDigitStr(const char *s) {
@@ -122,15 +128,15 @@ void processAPI()
     if (wc > 2 && strcmp_P(words[2], PSTR("v1")) == 0)
     { //v1 API calls
       if (wc > 3 && strcmp_P(words[3], PSTR("health")) == 0) {
-        if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+        if (!isGet) { httpServer.sendHeader(F("Allow"), F("GET")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
         sendHealth();
       } else if (wc > 3 && strcmp_P(words[3], PSTR("devtime")) == 0) {
         // GET /api/v1/devtime - Map format version
-        if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+        if (!isGet) { httpServer.sendHeader(F("Allow"), F("GET")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
         sendDeviceTimeV2();
       } else if (wc > 3 && strcmp_P(words[3], PSTR("flashstatus")) == 0) {
         // GET /api/v1/flashstatus - Unified flash status for both ESP and PIC
-        if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+        if (!isGet) { httpServer.sendHeader(F("Allow"), F("GET")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
         sendFlashStatus();
       } else if (wc > 3 && strcmp_P(words[3], PSTR("settings")) == 0) {
         if (isPostOrPut) {
@@ -138,13 +144,14 @@ void processAPI()
         } else if (isGet) {
           sendDeviceSettings();
         } else {
+          httpServer.sendHeader(F("Allow"), F("GET, POST, PUT"));
           httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n"));
         }
       } else if (wc > 3 && strcmp_P(words[3], PSTR("pic")) == 0) {
         if (wc > 4 && strcmp_P(words[4], PSTR("flashstatus")) == 0) {
           // GET /api/v1/pic/flashstatus
           // Minimal endpoint for polling PIC flash state during upgrade
-          if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+          if (!isGet) { httpServer.sendHeader(F("Allow"), F("GET")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
           sendPICFlashStatus();
         } else {
           sendApiNotFound(originalURI);
@@ -153,21 +160,21 @@ void processAPI()
         if (wc > 4 && strcmp_P(words[4], PSTR("telegraf")) == 0) {
           // GET /api/v1/otgw/telegraf
           // Response: see json response
-          if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+          if (!isGet) { httpServer.sendHeader(F("Allow"), F("GET")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
           sendTelegraf();
         } else if (wc > 4 && strcmp_P(words[4], PSTR("otmonitor")) == 0) {
           // GET /api/v1/otgw/otmonitor
           // Response: see json response
-          if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+          if (!isGet) { httpServer.sendHeader(F("Allow"), F("GET")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
           sendOTmonitor();
         } else if (wc > 4 && strcmp_P(words[4], PSTR("autoconfigure")) == 0) {
           // POST /api/v1/otgw/autoconfigure
           // Response: sends all autodiscovery topics to MQTT for HA integration
-          if (!isPostOrPut) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+          if (!isPostOrPut) { httpServer.sendHeader(F("Allow"), F("POST, PUT")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
           httpServer.send_P(200, PSTR("text/plain"), PSTR("OK"));
           doAutoConfigure();
         } else if (wc > 5 && strcmp_P(words[4], PSTR("id")) == 0) {
-          if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+          if (!isGet) { httpServer.sendHeader(F("Allow"), F("GET")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
           uint8_t msgId = 0;
           if (parseMsgId(words[5], msgId)) {
             sendOTGWvalue(msgId);
@@ -176,11 +183,11 @@ void processAPI()
           }
         } else if (wc > 5 && strcmp_P(words[4], PSTR("label")) == 0) {
           // GET /api/v1/otgw/label/{msglabel}
-          if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+          if (!isGet) { httpServer.sendHeader(F("Allow"), F("GET")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
           if (words[5][0] == '\0') { httpServer.send_P(400, PSTR("text/plain"), PSTR("400: missing label\r\n")); return; }
           sendOTGWlabel(words[5]);
         } else if (wc > 5 && strcmp_P(words[4], PSTR("command")) == 0) {
-          if (!isPostOrPut) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
+          if (!isPostOrPut) { httpServer.sendHeader(F("Allow"), F("POST, PUT")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
 
           if (words[5][0] == '\0') {
             httpServer.send_P(400, PSTR("text/plain"), PSTR("400: missing command\r\n"));
@@ -213,6 +220,7 @@ void processAPI()
           } else if (isPostOrPut) {
             updateAllDallasLabels();
           } else {
+            httpServer.sendHeader(F("Allow"), F("GET, POST, PUT"));
             httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); 
           }
         } else {
@@ -224,9 +232,18 @@ void processAPI()
     }
     else if (wc > 2 && strcmp_P(words[2], PSTR("v2")) == 0)
     { //v2 API calls — RESTful compliant (ADR-035)
+      // T45: OPTIONS preflight for all v2 endpoints (CORS support)
+      if (method == HTTP_OPTIONS) {
+        httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+        httpServer.sendHeader(F("Access-Control-Allow-Methods"), F("GET, POST, PUT, OPTIONS"));
+        httpServer.sendHeader(F("Access-Control-Allow-Headers"), F("Content-Type"));
+        httpServer.sendHeader(F("Access-Control-Max-Age"), F("86400"));
+        httpServer.send(204);
+        return;
+      }
       if (wc > 3 && strcmp_P(words[3], PSTR("health")) == 0) {
         // GET /api/v2/health
-        if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+        if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
         sendHealth();
       } else if (wc > 3 && strcmp_P(words[3], PSTR("settings")) == 0) {
         // GET/POST /api/v2/settings
@@ -235,7 +252,7 @@ void processAPI()
         } else if (isGet) {
           sendDeviceSettings();
         } else {
-          sendApiError(405, F("Method not allowed"));
+          sendApiMethodNotAllowed(F("GET, POST, PUT"));
         }
       } else if (wc > 3 && strcmp_P(words[3], PSTR("sensors")) == 0) {
         if (wc > 4 && strcmp_P(words[4], PSTR("labels")) == 0) {
@@ -245,7 +262,7 @@ void processAPI()
           } else if (isPostOrPut) {
             updateAllDallasLabels();
           } else {
-            sendApiError(405, F("Method not allowed"));
+            sendApiMethodNotAllowed(F("GET, POST, PUT"));
           }
         } else {
           sendApiNotFound(originalURI);
@@ -253,11 +270,11 @@ void processAPI()
       } else if (wc > 3 && strcmp_P(words[3], PSTR("device")) == 0) {
         if (wc > 4 && strcmp_P(words[4], PSTR("info")) == 0) {
           // GET /api/v2/device/info — v2 equivalent of v0/devinfo (map format)
-          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
           sendDeviceInfoV2();
         } else if (wc > 4 && strcmp_P(words[4], PSTR("time")) == 0) {
           // GET /api/v2/device/time — RESTful name for devtime (map format)
-          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
           sendDeviceTimeV2();
         } else {
           sendApiNotFound(originalURI);
@@ -265,7 +282,7 @@ void processAPI()
       } else if (wc > 3 && strcmp_P(words[3], PSTR("flash")) == 0) {
         if (wc > 4 && strcmp_P(words[4], PSTR("status")) == 0) {
           // GET /api/v2/flash/status — RESTful name for flashstatus
-          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
           sendFlashStatus();
         } else {
           sendApiNotFound(originalURI);
@@ -273,7 +290,7 @@ void processAPI()
       } else if (wc > 3 && strcmp_P(words[3], PSTR("pic")) == 0) {
         if (wc > 4 && strcmp_P(words[4], PSTR("flash-status")) == 0) {
           // GET /api/v2/pic/flash-status — RESTful name for pic/flashstatus
-          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
           sendPICFlashStatus();
         } else {
           sendApiNotFound(originalURI);
@@ -281,7 +298,7 @@ void processAPI()
       } else if (wc > 3 && strcmp_P(words[3], PSTR("firmware")) == 0) {
         if (wc > 4 && strcmp_P(words[4], PSTR("files")) == 0) {
           // GET /api/v2/firmware/files — versioned replacement for /api/firmwarefilelist
-          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
           apifirmwarefilelist();
         } else {
           sendApiNotFound(originalURI);
@@ -289,7 +306,7 @@ void processAPI()
       } else if (wc > 3 && strcmp_P(words[3], PSTR("filesystem")) == 0) {
         if (wc > 4 && strcmp_P(words[4], PSTR("files")) == 0) {
           // GET /api/v2/filesystem/files — versioned replacement for /api/listfiles
-          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
           apilistfiles();
         } else {
           sendApiNotFound(originalURI);
@@ -297,15 +314,15 @@ void processAPI()
       } else if (wc > 3 && strcmp_P(words[3], PSTR("otgw")) == 0) {
         if (wc > 4 && strcmp_P(words[4], PSTR("otmonitor")) == 0) {
           // GET /api/v2/otgw/otmonitor
-          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
           sendOTmonitorV2();
         } else if (wc > 4 && strcmp_P(words[4], PSTR("telegraf")) == 0) {
           // GET /api/v2/otgw/telegraf
-          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
           sendTelegraf();
         } else if (wc > 4 && strcmp_P(words[4], PSTR("messages")) == 0) {
           // GET /api/v2/otgw/messages/{id} — RESTful resource name for OT message by ID
-          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
           uint8_t msgId = 0;
           if (wc > 5 && parseMsgId(words[5], msgId)) {
             sendOTGWvalue(msgId);
@@ -314,7 +331,7 @@ void processAPI()
           }
         } else if (wc > 4 && strcmp_P(words[4], PSTR("commands")) == 0) {
           // POST /api/v2/otgw/commands — RESTful: command in body, 202 Accepted
-          if (!isPostOrPut) { sendApiError(405, F("Method not allowed")); return; }
+          if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
 
           // Read command from request body (JSON: {"command":"TT=20.5"} or plain text)
           const String& body = httpServer.arg(0);
@@ -351,14 +368,14 @@ void processAPI()
           httpServer.send(202, F("application/json"), F("{\"status\":\"queued\"}"));
         } else if (wc > 4 && strcmp_P(words[4], PSTR("discovery")) == 0) {
           // POST /api/v2/otgw/discovery — RESTful name for MQTT autodiscovery trigger
-          if (!isPostOrPut) { sendApiError(405, F("Method not allowed")); return; }
+          if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
           // 202 Accepted — discovery messages sent asynchronously
           httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
           httpServer.send(202, F("application/json"), F("{\"status\":\"accepted\"}"));
           doAutoConfigure();
         } else if (wc > 4 && strcmp_P(words[4], PSTR("id")) == 0) {
           // GET /api/v2/otgw/id/{msgid} — backward compat alias for messages/{id}
-          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
           uint8_t msgId = 0;
           if (wc > 5 && parseMsgId(words[5], msgId)) {
             sendOTGWvalue(msgId);
@@ -367,12 +384,12 @@ void processAPI()
           }
         } else if (wc > 4 && strcmp_P(words[4], PSTR("label")) == 0) {
           // GET /api/v2/otgw/label/{msglabel}
-          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
           if (wc <= 5 || words[5][0] == '\0') { sendApiError(400, F("Missing label")); return; }
           sendOTGWlabel(words[5]);
         } else if (wc > 4 && strcmp_P(words[4], PSTR("command")) == 0) {
           // POST /api/v2/otgw/command/{cmd} — backward compat alias (prefer /commands)
-          if (!isPostOrPut) { sendApiError(405, F("Method not allowed")); return; }
+          if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
           if (wc <= 5 || words[5][0] == '\0') {
             sendApiError(400, F("Missing command"));
             return;
@@ -392,7 +409,7 @@ void processAPI()
           httpServer.send(202, F("application/json"), F("{\"status\":\"queued\"}"));
         } else if (wc > 4 && strcmp_P(words[4], PSTR("autoconfigure")) == 0) {
           // POST /api/v2/otgw/autoconfigure — backward compat alias (prefer /discovery)
-          if (!isPostOrPut) { sendApiError(405, F("Method not allowed")); return; }
+          if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
           httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
           httpServer.send(202, F("application/json"), F("{\"status\":\"accepted\"}"));
           doAutoConfigure();
