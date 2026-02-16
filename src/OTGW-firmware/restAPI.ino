@@ -433,7 +433,7 @@ void processAPI()
         }
       }
       else if (wc > 3 && strcmp_P(words[3], PSTR("devinfo")) == 0) {
-        // GET /api/v0/devinfo — DEPRECATED: v2 equivalent planned as /api/v2/device/info
+        // GET /api/v0/devinfo — DEPRECATED: use /api/v2/device/info
         if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
         sendDeviceInfo();
       }
