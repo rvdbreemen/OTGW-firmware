@@ -217,7 +217,7 @@ function refreshGatewayMode(force) {
   gatewayModeRefreshCounter = 0;
   gatewayModeRefreshInFlight = true;
 
-  fetch(APIGW + 'v0/devinfo')
+  fetch(APIGW + 'v2/device/info')
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -225,8 +225,9 @@ function refreshGatewayMode(force) {
       return response.json();
     })
     .then(json => {
-      const entries = (json && json.devinfo) ? json.devinfo : [];
-      updateGatewayModeFromDevInfoEntries(entries);
+      const device = (json && json.device) ? json.device : {};
+      const gatewayModeValue = (device.gatewaymode !== undefined) ? device.gatewaymode : null;
+      updateGatewayModeIndicator(parseGatewayModeValue(gatewayModeValue));
     })
     .catch(error => {
       console.warn('refreshGatewayMode warning:', error);
@@ -344,11 +345,11 @@ window.otgwDebug = {
   // Show device information
   info: async function() {
     try {
-      const response = await fetch(APIGW + 'v1/devinfo');
+      const response = await fetch(APIGW + 'v2/device/info');
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       console.group('📱 Device Information');
-      console.table(data.devinfo || data);
+      console.table(data.device || data);
       console.groupEnd();
     } catch (error) {
       console.error('Failed to fetch device info:', error);
@@ -358,7 +359,7 @@ window.otgwDebug = {
   // Show current settings
   settings: async function() {
     try {
-      const response = await fetch(APIGW + 'v0/settings');
+      const response = await fetch(APIGW + 'v2/settings');
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       console.group('⚙️  Current Settings');
@@ -2157,7 +2158,7 @@ const escapeHtml = (function() {
 //============================================================================  
 function loadUISettings() {
   console.log("loadUISettings() ..");
-  fetch(APIGW + "v0/settings")
+  fetch(APIGW + "v2/settings")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2444,8 +2445,8 @@ function setVisible(className, visible) {
 
 //============================================================================  
 function refreshDevTime() {
-  //console.log("Refresh api/v0/devtime ..");
-  fetch(APIGW + "v0/devtime")
+  //console.log("Refresh api/v2/device/time ..");
+  fetch(APIGW + "v2/device/time")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2454,42 +2455,41 @@ function refreshDevTime() {
     })
     .then(json => {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
-      for (let i in json.devtime) {
-        if (json.devtime[i].name == "dateTime") {
-          //console.log("Got new time ["+json.devtime[i].value+"]");
-          const timeEl = document.getElementById('theTime');
-          if (timeEl) timeEl.textContent = json.devtime[i].value;
+      const devtime = json.devtime || {};
+      
+      if (devtime.dateTime) {
+        const timeEl = document.getElementById('theTime');
+        if (timeEl) timeEl.textContent = devtime.dateTime;
+      }
+      
+      const msgText = devtime.message || '';
+      const msgEl = document.getElementById('message');
+      if (msgEl) {
+        msgEl.textContent = msgText;
+        
+        // Add warning class if message contains version mismatch warning
+        if (msgText.toLowerCase().includes('littlefs') || 
+            msgText.toLowerCase().includes('version') ||
+            msgText.toLowerCase().includes('flash your')) {
+          msgEl.classList.add('version-warning');
+        } else {
+          msgEl.classList.remove('version-warning');
         }
-        if (json.devtime[i].name == "message") {
-          const msgEl = document.getElementById('message');
-          if (msgEl) {
-            const msgText = json.devtime[i].value || '';
-            msgEl.textContent = msgText;
-            
-            // Add warning class if message contains version mismatch warning
-            if (msgText.toLowerCase().includes('littlefs') || 
-                msgText.toLowerCase().includes('version') ||
-                msgText.toLowerCase().includes('flash your')) {
-              msgEl.classList.add('version-warning');
-            } else {
-              msgEl.classList.remove('version-warning');
-            }
-            
-            // Hide element if no message
-            if (msgText === '') {
-              msgEl.style.display = 'none';
-            } else {
-              msgEl.style.display = 'block';
-            }
-          }
+        
+        // Hide element if no message
+        if (msgText === '') {
+          msgEl.style.display = 'none';
+        } else {
+          msgEl.style.display = 'block';
         }
-        if (json.devtime[i].name == "psmode") {
-          var newPSmode = (json.devtime[i].value === 'true' || json.devtime[i].value === true);
-          if (newPSmode !== isPSmode) {
-            isPSmode = newPSmode;
-            console.log('[PS mode] PS=1 mode changed to: ' + isPSmode);
-            applyPSmodeState();
-          }
+      }
+      
+      if (devtime.psmode !== undefined) {
+        var newPSmode = (devtime.psmode === true || devtime.psmode === 'true');
+        if (newPSmode !== isPSmode) {
+          isPSmode = newPSmode;
+          console.log('[PS mode] PS=1 mode changed to: ' + isPSmode);
+          applyPSmodeState();
         }
       }
     })
@@ -2540,11 +2540,11 @@ function applyPSmodeState() {
 let availableFirmwareFiles = [];
 
 function refreshFirmware() {
-  console.log("refreshFirmware() .. " + APIGW + "firmwarefilelist");
+  console.log("refreshFirmware() .. " + APIGW + "v2/firmware/files");
   
   let picInfo = { type: "Unknown", version: "Unknown", available: "Unknown", device: "Unknown" };
 
-  fetch(APIGW + "v0/devinfo")
+  fetch(APIGW + "v2/device/info")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2552,16 +2552,14 @@ function refreshFirmware() {
       return response.json();
     })
     .then(json => {
-       if (json.devinfo) {
-         const data = json.devinfo;
-         for (let i in data) {
-           if (data[i].name === "picfwtype") picInfo.type = data[i].value;
-           if (data[i].name === "picfwversion") picInfo.version = data[i].value;
-           if (data[i].name === "picavailable") picInfo.available = data[i].value;
-           if (data[i].name === "picdeviceid") picInfo.device = data[i].value;
-         }
+       if (json.device) {
+         const d = json.device;
+         if (d.picfwtype) picInfo.type = d.picfwtype;
+         if (d.picfwversion) picInfo.version = d.picfwversion;
+         if (d.picavailable !== undefined) picInfo.available = String(d.picavailable);
+         if (d.picdeviceid) picInfo.device = d.picdeviceid;
        }
-       return fetch(APIGW + "firmwarefilelist");
+       return fetch(APIGW + "v2/firmware/files");
     })
     .then(response => {
       if (!response.ok) {
@@ -2741,7 +2739,7 @@ function refreshFirmware() {
 function refreshDevInfo() {
   const devNameEl = document.getElementById('devName');
   if (devNameEl) devNameEl.textContent = "";
-  fetch(APIGW + "v0/devinfo")
+  fetch(APIGW + "v2/device/info")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2750,21 +2748,13 @@ function refreshDevInfo() {
     })
     .then(json => {
       console.log("parsed .., data is [" + JSON.stringify(json) + "]");
-      data = json.devinfo;
-      let hostname = "";
-      let ipaddress = "";
-      let version = "";
-      for (let i in data) {
-        if (data[i].name == "fwversion") {
-          version = data[i].value;
-        } else if (data[i].name == 'hostname') {
-          hostname = data[i].value;
-        } else if (data[i].name == 'ipaddress') {
-          ipaddress = data[i].value;
-        }
-      }
+      const device = json.device || {};
+      const hostname = device.hostname || "";
+      const ipaddress = device.ipaddress || "";
+      const version = device.fwversion || "";
 
-      updateGatewayModeFromDevInfoEntries(data);
+      const gatewayModeValue = (device.gatewaymode !== undefined) ? device.gatewaymode : null;
+      updateGatewayModeIndicator(parseGatewayModeValue(gatewayModeValue));
 
       const versionEl = document.getElementById('devVersion');
       if (versionEl) versionEl.textContent = version;
@@ -2975,7 +2965,7 @@ function refreshDeviceInfo() {
   console.log("refreshDeviceInfo() ..");
 
   data = {};
-  fetch(APIGW + "v0/devinfo")
+  fetch(APIGW + "v2/device/info")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2984,24 +2974,23 @@ function refreshDeviceInfo() {
     })
     .then(json => {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
-      data = json.devinfo;
-      for (let i in data) {
-        console.log("[" + data[i].name + "]=>[" + data[i].value + "]");
+      const device = json.device || {};
+      for (let key in device) {
+        console.log("[" + key + "]=>[" + device[key] + "]");
         var deviceinfoPage = document.getElementById('deviceinfoPage');
-        if ((document.getElementById("devinfo_" + data[i].name)) == null) { // if element does not exists yet, then build page
+        if ((document.getElementById("devinfo_" + key)) == null) { // if element does not exists yet, then build page
           var rowDiv = document.createElement("div");
           rowDiv.setAttribute("class", "devinforow");
-          rowDiv.setAttribute("id", "devinfo_" + data[i].name);
-          // rowDiv.style.background = "lightblue";
+          rowDiv.setAttribute("id", "devinfo_" + key);
           //--- field Name ---
           var fldDiv = document.createElement("div");
           fldDiv.setAttribute("class", "devinfocolumn1");
-          fldDiv.textContent = translateToHuman(data[i].name);
+          fldDiv.textContent = translateToHuman(key);
           rowDiv.appendChild(fldDiv);
           //--- value on screen ---
           var valDiv = document.createElement("div");
           valDiv.setAttribute("class", "devinfocolumn2");
-          valDiv.textContent = data[i].value;
+          valDiv.textContent = device[key];
           rowDiv.appendChild(valDiv);
           deviceinfoPage.appendChild(rowDiv);
         }
@@ -3030,7 +3019,7 @@ const hiddenSettings = [
 function refreshSettings() {
   console.log("refreshSettings() ..");
   data = {};
-  fetch(APIGW + "v0/settings")
+  fetch(APIGW + "v2/settings")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -3210,7 +3199,7 @@ function sendPostSetting(field, value) {
     mode: "cors"
   };
 
-  fetch(APIGW + "v0/settings", other_params)
+  fetch(APIGW + "v2/settings", other_params)
     .then((response) => {
       //console.log(response.status );    //=> number 100–599
       //console.log(response.statusText); //=> String
@@ -3411,7 +3400,7 @@ var translateFields = [
 
 //============================================================================
 function applyTheme() {
-  fetch(APIGW + "v0/settings")
+  fetch(APIGW + "v2/settings")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);

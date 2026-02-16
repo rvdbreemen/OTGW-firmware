@@ -24,50 +24,43 @@ Tracks all tasks from the [REST API Evaluation](docs/reviews/2026-02-16_restful-
 - [x] **T16** OpenAPI spec updated for v2 endpoints
 - [x] **T17** ADR-035 created
 
-## Phase 1B: Complete v2 Backend Endpoints ⬅️ THIS PR
+## Phase 1B: Complete v2 Backend Endpoints ✅ DONE
 
 > Missing v2 endpoints from the evaluation that have no v2 equivalent yet.
 
-- [ ] **T18** `GET /api/v2/device/info` — v2 equivalent for `v0/devinfo` (Finding 14: missing endpoint)
-  - Uses `sendStartJsonMap`/`sendJsonMapEntry` (map format, not array)
-  - Same data as `sendDeviceInfo()` but map format
-  - Fixes frontend bug: `index.js:347` calls `v1/devinfo` which doesn't exist
-- [ ] **T19** `GET /api/v2/device/time` — RESTful name for `v1/devtime` (Finding 8)
+- [x] **T18** `GET /api/v2/device/info` — v2 equivalent for `v0/devinfo` (Finding 14: missing endpoint)
+  - New `sendDeviceInfoV2()` function using map format
+  - Fixes frontend bug: `index.js:347` called `v1/devinfo` which didn't exist
+- [x] **T19** `GET /api/v2/device/time` — RESTful name for `v1/devtime` (Finding 8)
   - Routes to existing `sendDeviceTimeV2()` (already map format)
-- [ ] **T20** `GET /api/v2/flash/status` — RESTful name for `v1/flashstatus` (Finding 8)
+- [x] **T20** `GET /api/v2/flash/status` — RESTful name for `v1/flashstatus` (Finding 8)
   - Routes to existing `sendFlashStatus()`
-- [ ] **T21** `GET /api/v2/pic/flash-status` — RESTful name for `v1/pic/flashstatus` (Finding 8)
+- [x] **T21** `GET /api/v2/pic/flash-status` — RESTful name for `v1/pic/flashstatus` (Finding 8)
   - Routes to existing `sendPICFlashStatus()`
-- [ ] **T22** `GET /api/v2/firmware/files` — versioned replacement for `/api/firmwarefilelist` (Finding 11)
+- [x] **T22** `GET /api/v2/firmware/files` — versioned replacement for `/api/firmwarefilelist` (Finding 11)
   - Routes to existing `apifirmwarefilelist()`
-- [ ] **T23** `GET /api/v2/filesystem/files` — versioned replacement for `/api/listfiles` (Finding 11)
+- [x] **T23** `GET /api/v2/filesystem/files` — versioned replacement for `/api/listfiles` (Finding 11)
   - Routes to existing `apilistfiles()`
 - [ ] **T24** Update OpenAPI spec with new v2 endpoints (T18–T23)
 
-## Phase 1C: Frontend Migration (`index.js`)
+## Phase 1C: Frontend Migration (`index.js`) ✅ DONE
 
-> Migrate all frontend calls from deprecated v0/unversioned to v1 or v2.
-> Prerequisites: T18 (device/info), T22 (firmware/files) must be done first.
+> All frontend calls migrated from deprecated v0/unversioned to v2.
+> Remaining v1 calls (sensors/labels, flashstatus, debug helpers) kept — v1 is stable.
 
-- [ ] **T25** Fix bug: `index.js:347` — change `v1/devinfo` to `v0/devinfo` (interim fix for Finding 14)
-- [ ] **T26** Migrate `index.js:220` `refreshGatewayMode()` — `v0/devinfo` → `v2/device/info`
-  - Update response parsing from array format to map format
-- [ ] **T27** Migrate `index.js:2547` `refreshFirmware()` — `v0/devinfo` → `v2/device/info`
-  - Update response parsing from array format to map format
-- [ ] **T28** Migrate `index.js:2744` `refreshDevInfo()` — `v0/devinfo` → `v2/device/info`
-  - Update response parsing from array format to map format
-- [ ] **T29** Migrate `index.js:2978` `refreshDeviceInfo()` — `v0/devinfo` → `v2/device/info`
-  - Update response parsing from array format to map format
-- [ ] **T30** Migrate `index.js:2160` `loadUISettings()` — `v0/settings` → `v2/settings`
-  - Response format is same (array) — no parsing change needed
-- [ ] **T31** Migrate `index.js:3033` `refreshSettings()` — `v0/settings` → `v2/settings`
-- [ ] **T32** Migrate `index.js:3213` `saveSettings()` — `v0/settings` POST → `v2/settings` POST
-- [ ] **T33** Migrate `index.js:3414` `applyTheme()` — `v0/settings` → `v2/settings`
-- [ ] **T34** Migrate `index.js:2448` `refreshDevTime()` — `v0/devtime` → `v1/devtime`
-  - v1 uses map format; update parsing logic
-- [ ] **T35** Migrate `index.js:2564` `refreshFirmware()` — `firmwarefilelist` → `v2/firmware/files`
-- [ ] **T36** Migrate `index.js:361` `otgwDebug.settings()` — `v0/settings` → `v2/settings`
-- [ ] **T37** Migrate `index.js:347` `otgwDebug.info()` — `v0/devinfo` → `v2/device/info` (replaces T25 interim fix)
+- [x] **T25** ~~Fix bug: `index.js:347`~~ → directly migrated to v2/device/info (T37)
+- [x] **T26** Migrate `refreshGatewayMode()` — `v0/devinfo` → `v2/device/info` (map format parsing)
+- [x] **T27** Migrate `refreshFirmware()` — `v0/devinfo` → `v2/device/info` (map format parsing)
+- [x] **T28** Migrate `refreshDevInfo()` — `v0/devinfo` → `v2/device/info` (map format parsing)
+- [x] **T29** Migrate `refreshDeviceInfo()` — `v0/devinfo` → `v2/device/info` (map format parsing)
+- [x] **T30** Migrate `loadUISettings()` — `v0/settings` → `v2/settings`
+- [x] **T31** Migrate `refreshSettings()` — `v0/settings` → `v2/settings`
+- [x] **T32** Migrate `saveSettings()` — `v0/settings` POST → `v2/settings` POST
+- [x] **T33** Migrate `applyTheme()` — `v0/settings` → `v2/settings`
+- [x] **T34** Migrate `refreshDevTime()` — `v0/devtime` → `v2/device/time` (map format parsing)
+- [x] **T35** Migrate `refreshFirmware()` — `firmwarefilelist` → `v2/firmware/files`
+- [x] **T36** Migrate `otgwDebug.settings()` — `v0/settings` → `v2/settings`
+- [x] **T37** Migrate `otgwDebug.info()` — `v1/devinfo` → `v2/device/info`
 
 ## Phase 2: Non-API Endpoint Migration (Future — v1.3.0)
 

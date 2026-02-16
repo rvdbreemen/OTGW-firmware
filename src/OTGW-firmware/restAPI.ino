@@ -250,6 +250,50 @@ void processAPI()
         } else {
           sendApiNotFound(originalURI);
         }
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("device")) == 0) {
+        if (wc > 4 && strcmp_P(words[4], PSTR("info")) == 0) {
+          // GET /api/v2/device/info — v2 equivalent of v0/devinfo (map format)
+          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          sendDeviceInfoV2();
+        } else if (wc > 4 && strcmp_P(words[4], PSTR("time")) == 0) {
+          // GET /api/v2/device/time — RESTful name for devtime (map format)
+          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          sendDeviceTimeV2();
+        } else {
+          sendApiNotFound(originalURI);
+        }
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("flash")) == 0) {
+        if (wc > 4 && strcmp_P(words[4], PSTR("status")) == 0) {
+          // GET /api/v2/flash/status — RESTful name for flashstatus
+          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          sendFlashStatus();
+        } else {
+          sendApiNotFound(originalURI);
+        }
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("pic")) == 0) {
+        if (wc > 4 && strcmp_P(words[4], PSTR("flash-status")) == 0) {
+          // GET /api/v2/pic/flash-status — RESTful name for pic/flashstatus
+          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          sendPICFlashStatus();
+        } else {
+          sendApiNotFound(originalURI);
+        }
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("firmware")) == 0) {
+        if (wc > 4 && strcmp_P(words[4], PSTR("files")) == 0) {
+          // GET /api/v2/firmware/files — versioned replacement for /api/firmwarefilelist
+          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          apifirmwarefilelist();
+        } else {
+          sendApiNotFound(originalURI);
+        }
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("filesystem")) == 0) {
+        if (wc > 4 && strcmp_P(words[4], PSTR("files")) == 0) {
+          // GET /api/v2/filesystem/files — versioned replacement for /api/listfiles
+          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          apilistfiles();
+        } else {
+          sendApiNotFound(originalURI);
+        }
       } else if (wc > 3 && strcmp_P(words[3], PSTR("otgw")) == 0) {
         if (wc > 4 && strcmp_P(words[4], PSTR("otmonitor")) == 0) {
           // GET /api/v2/otgw/otmonitor
@@ -830,6 +874,64 @@ void sendDeviceInfo()
   sendEndJsonObj(F("devinfo"));
 
 } // sendDeviceInfo()
+
+//=======================================================================
+// Sends device info as JSON map (v2 format)
+// Returns: {"device":{"author":"...","fwversion":"...",...}}
+void sendDeviceInfoV2() 
+{
+  sendStartJsonMap(F("device"));
+
+  sendJsonMapEntry(F("author"), F("Robert van den Breemen"));
+  sendJsonMapEntry(F("fwversion"), _SEMVER_FULL);
+  sendJsonMapEntry(F("picavailable"), bPICavailable);
+  sendJsonMapEntry(F("picfwversion"), sPICfwversion);
+  sendJsonMapEntry(F("picdeviceid"), sPICdeviceid);
+  sendJsonMapEntry(F("picfwtype"), sPICtype);
+  snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
+  sendJsonMapEntry(F("compiled"), cMsg);
+  sendJsonMapEntry(F("hostname"), CSTR(settingHostname));
+  sendJsonMapEntry(F("ipaddress"), CSTR(WiFi.localIP().toString()));
+  sendJsonMapEntry(F("macaddress"), CSTR(WiFi.macAddress()));
+  sendJsonMapEntry(F("freeheap"), ESP.getFreeHeap());
+  sendJsonMapEntry(F("maxfreeblock"), ESP.getMaxFreeBlockSize());
+  sendJsonMapEntry(F("chipid"), CSTR(String( ESP.getChipId(), HEX )));
+  sendJsonMapEntry(F("coreversion"), CSTR(ESP.getCoreVersion()) );
+  sendJsonMapEntry(F("sdkversion"),  ESP.getSdkVersion());
+  sendJsonMapEntry(F("cpufreq"), ESP.getCpuFreqMHz());
+  sendJsonMapEntry(F("sketchsize"), ESP.getSketchSize() );
+  sendJsonMapEntry(F("freesketchspace"),  ESP.getFreeSketchSpace() );
+
+  snprintf_P(cMsg, sizeof(cMsg), PSTR("%08X"), ESP.getFlashChipId());
+  sendJsonMapEntry(F("flashchipid"), cMsg);
+  sendJsonMapEntry(F("flashchipsize"), (ESP.getFlashChipSize() / 1024.0f / 1024.0f));
+  sendJsonMapEntry(F("flashchiprealsize"), (ESP.getFlashChipRealSize() / 1024.0f / 1024.0f));
+
+  LittleFS.info(LittleFSinfo);
+  sendJsonMapEntry(F("LittleFSsize"), floorf((LittleFSinfo.totalBytes / (1024.0f * 1024.0f))));
+
+  sendJsonMapEntry(F("flashchipspeed"), floorf((ESP.getFlashChipSpeed() / 1000.0f / 1000.0f)));
+
+  FlashMode_t ideMode = ESP.getFlashChipMode();
+  sendJsonMapEntry(F("flashchipmode"), flashMode[ideMode]);
+  sendJsonMapEntry(F("ssid"), CSTR(WiFi.SSID()));
+  sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());
+  sendJsonMapEntry(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
+  sendJsonMapEntry(F("wifiquality_text"), dBmtoQuality(WiFi.RSSI()));
+  sendJsonMapEntry(F("ntpenable"), settingNTPenable);
+  sendJsonMapEntry(F("ntptimezone"), CSTR(settingNTPtimezone));
+  sendJsonMapEntry(F("uptime"), upTime());
+  sendJsonMapEntry(F("lastreset"), lastReset);
+  sendJsonMapEntry(F("bootcount"), rebootCount);
+  sendJsonMapEntry(F("mqttconnected"), statusMQTTconnection);
+  sendJsonMapEntry(F("thermostatconnected"), bOTGWthermostatstate);
+  sendJsonMapEntry(F("boilerconnected"), bOTGWboilerstate);      
+  sendJsonMapEntry(F("gatewaymode"), bOTGWgatewaystate);      
+  sendJsonMapEntry(F("otgwconnected"), bOTGWonline);
+  
+  sendEndJsonMap(F("device"));
+
+} // sendDeviceInfoV2()
 
 //=======================================================================
 // Sends health status as JSON object (map format)
