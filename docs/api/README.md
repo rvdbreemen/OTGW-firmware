@@ -121,6 +121,32 @@ None. The device is designed for local network use only.
 400: invalid msgid\r\n
 ```
 
+### 405 Method Not Allowed
+
+All 405 responses include an `Allow` header listing valid HTTP methods (RFC 7231 §6.5.5):
+```
+HTTP/1.1 405 Method Not Allowed
+Allow: GET
+Content-Type: application/json
+
+{"error":{"status":405,"message":"Method not allowed"}}
+```
+
+### CORS Support
+
+All v2 responses include `Access-Control-Allow-Origin: *`.
+
+v2 endpoints support **OPTIONS preflight** for cross-origin requests:
+```
+OPTIONS /api/v2/health HTTP/1.1
+
+HTTP/1.1 204 No Content
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS
+Access-Control-Allow-Headers: Content-Type
+Access-Control-Max-Age: 86400
+```
+
 ### v2 Queued Operations
 Commands and discovery return **202 Accepted**:
 ```json
