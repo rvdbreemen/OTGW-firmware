@@ -75,7 +75,7 @@ var dallasLabelsCache = {};
 
 // Function to fetch Dallas sensor labels from backend
 function fetchDallasLabels() {
-  return fetch(APIGW + 'v1/sensors/labels')
+  return fetch(APIGW + 'v2/sensors/labels')
     .then(function(response) {
       if (!response.ok) {
         console.warn('Failed to fetch Dallas labels:', response.status);
@@ -313,7 +313,7 @@ window.otgwDebug = {
     console.log('  otgwDebug.persistence()   - Show localStorage persistence info');
     console.log('');
     console.log('%c⚙️  API Testing:', 'color: #00aaff; font-weight: bold;');
-    console.log('  otgwDebug.api(endpoint)   - Test API endpoint (e.g., "v1/devinfo")');
+    console.log('  otgwDebug.api(endpoint)   - Test API endpoint (e.g., "v2/device/info")');
     console.log('  otgwDebug.health()        - Check system health API');
     console.log('  otgwDebug.sendCmd(cmd)    - Send OTGW command (e.g., "PS=1")');
     console.log('');
@@ -497,14 +497,14 @@ window.otgwDebug = {
 
   // Check system health
   health: async function() {
-    return await this.api('v1/health');
+    return await this.api('v2/health');
   },
 
   // Send OTGW command
   sendCmd: async function(cmd) {
     console.log(`📤 Sending command: ${cmd}`);
     try {
-      const response = await fetch(APIGW + `v1/otgw/command/${cmd}`, {
+      const response = await fetch(APIGW + `v2/otgw/command/${cmd}`, {
         method: 'POST'
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -3485,7 +3485,7 @@ function stopFlashPolling() {
 
 function pollFlashStatus() {
     // Use unified endpoint that works for both ESP and PIC flash
-    fetch(APIGW + 'v1/flashstatus')
+    fetch(APIGW + 'v2/flash/status')
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -4080,7 +4080,7 @@ function loadPersistentUI() {
   console.log("Loading persistent UI settings...");
   const apiPath = (typeof APIGW !== 'undefined') ? APIGW : (window.location.protocol + '//' + window.location.host + '/api/');
   
-  fetch(apiPath + "v1/settings")
+  fetch(apiPath + "v2/settings")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -4295,7 +4295,7 @@ function saveInlineSensorLabel() {
   input.disabled = true;
 
   // Use bulk labels endpoint with read-modify-write flow
-  var labelsUrl = APIGW + 'v1/sensors/labels';
+  var labelsUrl = APIGW + 'v2/sensors/labels';
 
   fetch(labelsUrl)
     .then(function (response) {

@@ -342,8 +342,8 @@ These are registered directly on the httpServer and do not go through `processAP
 | CORS | 6/10 | 8/10 | v2 consistent CORS on all responses including errors |
 | Documentation | 7/10 | 8/10 | OpenAPI spec covers all v2 endpoints |
 | Versioning | 7/10 | 9/10 | All endpoints now have v2 equivalents; unversioned have v2 replacements |
-| Completeness | 5/10 | 8/10 | v2 covers all API resources; frontend fully migrated to v2 |
-| **Overall** | **5.4/10** | **7.6/10** | Significant improvement; remaining gaps are legacy v0/v1 and non-API endpoints |
+| Completeness | 5/10 | 9/10 | v2 covers all API resources; frontend fully migrated to v2 (zero v0/v1 calls) |
+| **Overall** | **5.4/10** | **7.8/10** | Significant improvement; remaining gaps are legacy actions and RFC 7231 Allow header |
 
 ## Recommendations
 
