@@ -235,7 +235,7 @@ void processAPI()
       // T45: OPTIONS preflight for all v2 endpoints (CORS support)
       if (method == HTTP_OPTIONS) {
         httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
-        httpServer.sendHeader(F("Access-Control-Allow-Methods"), F("GET, POST, PUT, OPTIONS"));
+        httpServer.sendHeader(F("Access-Control-Allow-Methods"), F("GET, OPTIONS"));
         httpServer.sendHeader(F("Access-Control-Allow-Headers"), F("Content-Type"));
         httpServer.sendHeader(F("Access-Control-Max-Age"), F("86400"));
         httpServer.send(204);
