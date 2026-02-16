@@ -2554,10 +2554,10 @@ function refreshFirmware() {
     .then(json => {
        if (json.device) {
          const d = json.device;
-         if (d.picfwtype) picInfo.type = d.picfwtype;
-         if (d.picfwversion) picInfo.version = d.picfwversion;
+         if (d.picfwtype !== undefined) picInfo.type = d.picfwtype;
+         if (d.picfwversion !== undefined) picInfo.version = d.picfwversion;
          if (d.picavailable !== undefined) picInfo.available = String(d.picavailable);
-         if (d.picdeviceid) picInfo.device = d.picdeviceid;
+         if (d.picdeviceid !== undefined) picInfo.device = d.picdeviceid;
        }
        return fetch(APIGW + "v2/firmware/files");
     })
