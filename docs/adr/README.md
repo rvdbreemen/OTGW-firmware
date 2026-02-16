@@ -105,6 +105,9 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-019: REST API Versioning Strategy](ADR-019-rest-api-versioning-strategy.md)**  
   URL path-based API versioning (v0/v1/v2) with indefinite backward compatibility.
 
+- **[ADR-035: RESTful API Compliance Strategy](ADR-035-restful-api-compliance-strategy.md)** 🆕  
+  Expand v2 API with RESTful-compliant endpoints: consistent JSON errors, proper status codes, resource naming, and CORS headers.
+
 - **[ADR-020: Dallas DS18B20 Temperature Sensor Integration](ADR-020-dallas-ds18b20-sensor-integration.md)**  
   OneWire-based multi-sensor temperature monitoring with MQTT integration and auto-discovery.
 
