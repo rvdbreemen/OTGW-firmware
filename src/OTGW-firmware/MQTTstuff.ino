@@ -563,19 +563,24 @@ void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype
   if (!baseTopic || !value) return;          // Null safety
   
   char sourceTopic[MQTT_TOPIC_MAX_LEN];
+  char sensorId[64];
   const char* suffix;
+  const char* sourceName;
   
-  // Determine suffix based on message source (ADR-038: OpenTherm Data Flow Pipeline)
+  // Determine suffix and friendly name based on message source (ADR-038: OpenTherm Data Flow Pipeline)
   switch(rsptype) {
     case OTGW_THERMOSTAT:        // T message - master request
       suffix = "_thermostat";
+      sourceName = "Thermostat";
       break;
     case OTGW_BOILER:            // B message - slave response
       suffix = "_boiler";
+      sourceName = "Boiler";
       break;
     case OTGW_REQUEST_BOILER:    // R message - gateway override to boiler
     case OTGW_ANSWER_THERMOSTAT: // A message - gateway override to thermostat
       suffix = "_gateway";
+      sourceName = "Gateway";
       break;
     default:
       // Don't publish for parity errors or unknown types
@@ -588,9 +593,52 @@ void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype
   // Publish to source-specific topic (not retained to save MQTT broker memory)
   sendMQTTData(sourceTopic, value, false);
   
-  // Note: Auto-discovery configs for source topics are sent by doAutoConfigureMsgid()
-  // when settingMQTTSeparateSources is enabled
+  // ADR-040: Send Home Assistant auto-discovery for source-specific sensor
+  // Build sensor ID with suffix for unique discovery config
+  snprintf_P(sensorId, sizeof(sensorId), PSTR("%s%s"), baseTopic, suffix);
+  
+  // Check if we need to send auto-discovery config for this source-specific sensor
+  // Use a hash of the sensor ID to track if config has been sent
+  // Note: This uses the same config line as the base sensor, but with modified topic/name
+  static uint32_t discoveredSensors = 0;  // Bitmap for first 32 source sensors
+  uint32_t sensorHash = 0;
+  for (const char* p = sensorId; *p; p++) {
+    sensorHash = ((sensorHash << 5) + sensorHash) + *p;  // DJB2 hash
+  }
+  uint8_t bit = sensorHash % 32;
+  
+  if (!(discoveredSensors & (1 << bit))) {
+    // Build discovery topic manually for source-specific sensor
+    // Format: homeassistant/sensor/<node_id>_<sensor_id>/config
+    char discoveryTopic[MQTT_TOPIC_MAX_LEN];
+    snprintf_P(discoveryTopic, sizeof(discoveryTopic), 
+               PSTR("%s/sensor/%s_%s/config"), 
+               settingMQTThaprefix, settingMQTTuniqueid, sensorId);
+    
+    // Build discovery message with source in friendly name
+    // Format: {"name":"<Sensor> (<Source>)","state_topic":"...","unique_id":"...","device":{...}}
+    char discoveryMsg[MQTT_MSG_MAX_LEN];
+    snprintf_P(discoveryMsg, sizeof(discoveryMsg),
+               PSTR("{\"name\":\"%s (%s)\","
+                    "\"state_topic\":\"%s/%s\","
+                    "\"unique_id\":\"%s_%s\","
+                    "\"device\":{\"identifiers\":[\"%s\"],\"name\":\"%s\",\"model\":\"OTGW\",\"manufacturer\":\"Schelte Bron\"}}"),
+               baseTopic, sourceName,           // Friendly name with source
+               MQTTPubNamespace, sourceTopic,   // State topic
+               settingMQTTuniqueid, sensorId,   // Unique ID
+               settingMQTTuniqueid,             // Device identifier
+               settingHostname);                // Device name
+    
+    // Send discovery config
+    sendMQTTStreaming(discoveryTopic, discoveryMsg, strlen(discoveryMsg));
+    
+    // Mark as discovered
+    discoveredSensors |= (1 << bit);
+    
+    MQTTDebugTf(PSTR("Sent auto-discovery for source-specific sensor: %s\r\n"), sensorId);
+  }
 }
+
 
 /* 
   topic:  <string> , sensor topic, will be automatically prefixed with <mqtt topic>/value/<node_id>
