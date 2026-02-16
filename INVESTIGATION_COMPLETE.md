@@ -54,9 +54,9 @@
 
 ### Option 4: Feature Flag with Opt-In
 
-**Default Behavior:** Disabled - works exactly as today (no changes)
+**Default Behavior:** Enabled by default (backward compatible - publishes to both original AND source-specific topics)
 
-**When Enabled:**
+**When Enabled (default):**
 ```
 Original topic (backward compat):
   otgw-firmware/value/otgw/TSet → "20.0"
@@ -68,10 +68,10 @@ New source-specific topics:
 ```
 
 **Why This Approach?**
-- ✅ No breaking changes (disabled by default)
-- ✅ User controlled (opt-in via Web UI)
-- ✅ Backward compatible (original topics still work)
-- ✅ Memory efficient (0 bytes when disabled, ~10KB when enabled)
+- ✅ No breaking changes (original topics always published)
+- ✅ User controlled (can disable via Web UI if not needed)
+- ✅ Backward compatible (existing integrations continue working)
+- ✅ Memory efficient (~10KB when enabled, 0 bytes when disabled)
 - ✅ Future-proof (can extend with per-message control)
 
 ---

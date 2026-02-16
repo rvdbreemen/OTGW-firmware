@@ -588,52 +588,79 @@ void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype
   }
   
   // Build source-specific topic: <baseTopic><suffix>
-  snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s%s"), baseTopic, suffix);
+  // Critical review finding #2814343508: Check for buffer overflow
+  int written = snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s%S"), baseTopic, suffix);
+  if (written < 0 || written >= (int)sizeof(sourceTopic)) {
+    MQTTDebugTf(PSTR("ERROR: Source topic buffer overflow for %s\r\n"), baseTopic);
+    return;
+  }
   
   // Publish to source-specific topic (not retained to save MQTT broker memory)
   sendMQTTData(sourceTopic, value, false);
   
   // ADR-040: Send Home Assistant auto-discovery for source-specific sensor
   // Build sensor ID with suffix for unique discovery config
-  snprintf_P(sensorId, sizeof(sensorId), PSTR("%s%s"), baseTopic, suffix);
+  written = snprintf_P(sensorId, sizeof(sensorId), PSTR("%s%S"), baseTopic, suffix);
+  if (written < 0 || written >= (int)sizeof(sensorId)) {
+    MQTTDebugTf(PSTR("ERROR: Sensor ID buffer overflow for %s\r\n"), baseTopic);
+    return;
+  }
   
   // Check if we need to send auto-discovery config for this source-specific sensor
-  // Use a hash of the sensor ID to track if config has been sent
-  // Note: This uses the same config line as the base sensor, but with modified topic/name
-  static uint32_t discoveredSensors = 0;  // Bitmap for first 32 source sensors
-  uint32_t sensorHash = 0;
-  for (const char* p = sensorId; *p; p++) {
-    sensorHash = ((sensorHash << 5) + sensorHash) + *p;  // DJB2 hash
-  }
-  uint8_t bit = sensorHash % 32;
+  // Critical review finding #2814343458: Use collision-free tracking
+  // Use a simple array to track up to 30 discovered sensors (covers all WRITE/RW message IDs)
+  static char discoveredSensors[30][64];  // Track sensor IDs explicitly
+  static uint8_t discoveredCount = 0;
   
-  if (!(discoveredSensors & (1 << bit))) {
+  bool alreadyDiscovered = false;
+  for (uint8_t i = 0; i < discoveredCount; i++) {
+    if (strcmp(discoveredSensors[i], sensorId) == 0) {
+      alreadyDiscovered = true;
+      break;
+    }
+  }
+  
+  if (!alreadyDiscovered && discoveredCount < 30) {
     // Build discovery topic manually for source-specific sensor
     // Format: homeassistant/sensor/<node_id>_<sensor_id>/config
     char discoveryTopic[MQTT_TOPIC_MAX_LEN];
-    snprintf_P(discoveryTopic, sizeof(discoveryTopic), 
-               PSTR("%s/sensor/%s_%s/config"), 
-               settingMQTThaprefix, settingMQTTuniqueid, sensorId);
+    written = snprintf_P(discoveryTopic, sizeof(discoveryTopic), 
+                         PSTR("%s/sensor/%s_%s/config"), 
+                         settingMQTThaprefix, settingMQTTuniqueid, sensorId);
+    
+    // Critical review finding #2814343508: Check for buffer overflow
+    if (written < 0 || written >= (int)sizeof(discoveryTopic)) {
+      MQTTDebugTf(PSTR("ERROR: Discovery topic buffer overflow for %s\r\n"), sensorId);
+      return;
+    }
     
     // Build discovery message with source in friendly name
     // Format: {"name":"<Sensor> (<Source>)","state_topic":"...","unique_id":"...","device":{...}}
     char discoveryMsg[MQTT_MSG_MAX_LEN];
-    snprintf_P(discoveryMsg, sizeof(discoveryMsg),
-               PSTR("{\"name\":\"%s (%s)\","
-                    "\"state_topic\":\"%s/%s\","
-                    "\"unique_id\":\"%s_%s\","
-                    "\"device\":{\"identifiers\":[\"%s\"],\"name\":\"%s\",\"model\":\"OTGW\",\"manufacturer\":\"Schelte Bron\"}}"),
-               baseTopic, sourceName,           // Friendly name with source
-               MQTTPubNamespace, sourceTopic,   // State topic
-               settingMQTTuniqueid, sensorId,   // Unique ID
-               settingMQTTuniqueid,             // Device identifier
-               settingHostname);                // Device name
+    written = snprintf_P(discoveryMsg, sizeof(discoveryMsg),
+                         PSTR("{\"name\":\"%s (%S)\","
+                              "\"state_topic\":\"%s/%s\","
+                              "\"unique_id\":\"%s_%s\","
+                              "\"device\":{\"identifiers\":[\"%s\"],\"name\":\"%s\",\"model\":\"OTGW\",\"manufacturer\":\"Schelte Bron\"}}"),
+                         baseTopic, sourceName,           // Friendly name with source (sourceName is PROGMEM)
+                         MQTTPubNamespace, sourceTopic,   // State topic
+                         settingMQTTuniqueid, sensorId,   // Unique ID
+                         settingMQTTuniqueid,             // Device identifier
+                         settingHostname);                // Device name
+    
+    // Critical review finding #2814343508: Check for buffer overflow
+    if (written < 0 || written >= (int)sizeof(discoveryMsg)) {
+      MQTTDebugTf(PSTR("ERROR: Discovery message buffer overflow for %s\r\n"), sensorId);
+      return;
+    }
     
     // Send discovery config
     sendMQTTStreaming(discoveryTopic, discoveryMsg, strlen(discoveryMsg));
     
-    // Mark as discovered
-    discoveredSensors |= (1 << bit);
+    // Mark as discovered (collision-free tracking)
+    strncpy(discoveredSensors[discoveredCount], sensorId, sizeof(discoveredSensors[0]) - 1);
+    discoveredSensors[discoveredCount][sizeof(discoveredSensors[0]) - 1] = '\0';
+    discoveredCount++;
     
     MQTTDebugTf(PSTR("Sent auto-discovery for source-specific sensor: %s\r\n"), sensorId);
   }
