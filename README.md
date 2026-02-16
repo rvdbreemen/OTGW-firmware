@@ -1,15 +1,61 @@
 # OTGW-firmware (ESP8266) for NodoShop OpenTherm Gateway
 
-> **🚧 Development Release — v1.1.0-beta**  
-> This is the **development branch (`dev`)** containing the upcoming release.  
-> For the latest stable release, see the [`main` branch](https://github.com/rvdbreemen/OTGW-firmware/tree/main).  
-> Download prebuilt binaries from the [releases page](https://github.com/rvdbreemen/OTGW-firmware/releases).
+> **🔧 Development Release — v1.2.0-beta**  
+> This build contains OpenTherm v4.2 protocol compliance fixes, memory safety improvements, and MQTT corrections.  
+> For the latest stable release, see the [releases page](https://github.com/rvdbreemen/OTGW-firmware/releases).
 
 [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 “devkit” that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-## 🚀 What's New in v1.1.0-beta
+## 🚀 What's New in v1.2.0-beta
+
+Version 1.2.0 brings full OpenTherm Protocol v4.2 compliance, critical bug fixes, memory safety improvements, and MQTT topic corrections with updated Home Assistant auto-discovery.
+
+### Critical Bug Fixes
+
+- **DayTime hour bitmask (ID 20)**: MQTT hour value was masked with `0x0F` (4-bit) instead of `0x1F` (5-bit), corrupting hours 16–23 (e.g. 17:00 was published as 1:00). Now fixed.
+- **Array out-of-bounds write**: `msglastupdated[255]` only had 255 elements but was indexed by `uint8_t` (0–255). Index 255 wrote past the array, corrupting adjacent memory. Fixed to `[256]`.
+- **OTmap out-of-bounds read**: `OTmap[OTdata.id]` in `processOT()` and `restAPI.ino` had no bounds check. OTmap has 134 entries but message IDs can be 0–255. Unknown IDs now get safe default values instead of reading garbage from PROGMEM.
+
+### OpenTherm v4.2 Protocol Compliance
+
+- **R/W direction corrections**: Fixed direction mismatches for 10 message IDs (27, 37, 38, 98, 99, 109, 110, 112, 124, 126). Previously, `is_value_valid()` silently rejected valid WRITE-DATA messages for these IDs.
+- **New message IDs**: Added 6 missing IDs per v4.2 spec:
+  - ID 39: Remote Override Room Setpoint 2 (f8.8)
+  - ID 93–95: Brand name, version, and serial number (mandatory since v4.1)
+  - ID 96–97: Cooling operation hours and power cycles (u16)
+- **FanSpeed (ID 35)**: Fixed data type from `print_u16` to `print_u8u8` (HB=setpoint Hz, LB=actual Hz). Unit corrected from "rpm" to "Hz".
+- **DHWFlowRate (ID 19)**: Unit corrected from "l/m" to "l/min".
+- **`is_value_valid()` consistency**: Fixed function to use its parameter instead of the global `OTdata`.
+- **`getOTGWValue()` completeness**: Added missing entries for BurnerUnsuccessfulStarts (ID 113) and FlameSignalTooLow (ID 114). All `processOT` cases now have matching `getOTGWValue` entries.
+
+### MQTT & Home Assistant Improvements
+
+- **Fixed MQTT topic typo**: `eletric_production` → `electric_production`. Added new HA auto-discovery entry (was missing entirely).
+- **Fixed MQTT topic typo**: `solar_storage_slave_fault_incidator` → `solar_storage_slave_fault_indicator`. Fixed in both code and `mqttha.cfg`.
+- **Fixed HA display name typo**: `Diagonostic_Indicator` → `Diagnostic_Indicator` in HA auto-discovery config.
+
+### Code Quality
+
+- **Removed dead code**: Deleted unused `RoomRemoteOverrideFunction` struct field (duplicate of actively-used `RemoteOverrideFunction`).
+
+### ⚠️ Breaking Changes
+
+The following MQTT topic renames may require updates to existing Home Assistant automations or manual MQTT configurations:
+
+| Old Topic | New Topic | Impact |
+|-----------|-----------|--------|
+| `eletric_production` | `electric_production` | Low — no HA auto-discovery existed before |
+| `solar_storage_slave_fault_incidator` | `solar_storage_slave_fault_indicator` | Low — niche solar storage feature |
+
+**HA entity display name change**: `Diagonostic_Indicator` → `Diagnostic_Indicator` (entity ID unchanged).
+
+**Migration**: After upgrading, delete any stale entities in Home Assistant (old misspelled topics will show as “unavailable”) and update any manual MQTT sensors or automations that reference the old topic names.
+
+---
+
+## What was new in v1.0.0
 
 Version 1.1.0-beta builds on the stable v1.0.0 foundation with new Dallas temperature sensor features, improved memory safety, WebUI data persistence, a complete RESTful API v2, and 20 bug fixes from a comprehensive codebase review.
 
