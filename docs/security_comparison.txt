@@ -1,0 +1,156 @@
+SECURITY IMPROVEMENT COMPARISON CHART
+======================================
+
+Implementation Effort vs Security Gain
+---------------------------------------
+
+High Security
+    │
+    │  ┌─────────────┐
+    │  │  WiFi AP    │ ← RECOMMENDED
+    │  │  Password   │   (30 min, 0 bytes)
+    │  └─────────────┘
+    │        
+    │  ┌─────────────┐
+    │  │ Disable     │ ← RECOMMENDED
+    │  │ OTmonitor   │   (2-3 hrs, -256 bytes)
+Med │  └─────────────┘
+    │        
+    │  ┌─────────────┐
+    │  │ Disable     │ ← RECOMMENDED
+    │  │ Telnet      │   (2-3 hrs, -512 bytes)
+    │  └─────────────┘
+    │        
+    │         ┌─────────────┐
+    │         │  Web UI     │ ⚠️ CONDITIONAL
+Low │         │  Auth       │   (6-8 hrs, +500 bytes)
+    │         └─────────────┘   (breaks integrations)
+    │                      
+    │                            ┌─────────────┐
+    │                            │   HTTPS     │ ❌ REJECTED
+    │                            └─────────────┘   (ADR-003)
+    └─────────────────────────────────────────────►
+     Low        Medium         High         Very High
+                  Implementation Effort
+
+
+Memory Impact Chart
+-------------------
+
+ESP8266 Available RAM: ~40KB
+Current Usage: ~25-30KB
+Critical Threshold: <10KB
+
+Option                  RAM Impact
+═════════════════════   ═══════════
+WiFi AP Password        0 bytes
+Disable Telnet          -512 bytes  (saves RAM)
+Disable OTmonitor       -256 bytes  (saves RAM)
+Web UI Auth (optional)  +500 bytes  (uses RAM)
+HTTPS (rejected)        +10-30KB    (not viable)
+
+
+Integration Compatibility Matrix
+---------------------------------
+
+                        Home        HA          MQTT   OTmonitor
+Option                  Assistant   OpenTherm   Auto   App
+                        MQTT        Gateway     Disc   
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WiFi AP Password        ✅ Works    ✅ Works   ✅ Works  ✅ Works
+Disable Telnet          ✅ Works    ✅ Works   ✅ Works  ✅ Works
+Disable OTmonitor       ✅ Works    ❌ Breaks  ✅ Works  ❌ Breaks
+Web UI Auth (enabled)   ❌ Breaks   ❌ Breaks  ❌ Breaks ❌ Breaks
+HTTPS                   N/A (rejected)
+
+
+Security Risk Reduction
+------------------------
+
+Current Attack Vectors:
+
+1. Open WiFi AP (initial setup)
+   Risk Level: 🔴 HIGH
+   → Fixed by: WiFi AP Password
+   → New Risk Level: 🟢 LOW
+
+2. Unauthorized telnet access
+   Risk Level: 🟡 MEDIUM
+   → Mitigated by: Disable Telnet (optional)
+   → New Risk Level: 🟢 NONE (when disabled)
+
+3. Unauthorized OTGW commands (port 25238)
+   Risk Level: 🔴 HIGH
+   → Mitigated by: Disable OTmonitor (optional)
+   → New Risk Level: 🟢 NONE (when disabled)
+
+4. Web UI access
+   Risk Level: 🟡 MEDIUM
+   → Mitigated by: Web UI Auth (optional)
+   → New Risk Level: 🟢 LOW (when enabled)
+
+5. Unencrypted traffic
+   Risk Level: 🟡 MEDIUM
+   → Mitigation: VPN or network segmentation
+   → Not solvable on-device (ESP8266 RAM constraint)
+
+
+Implementation Timeline
+-----------------------
+
+Week 1: WiFi AP Password
+  Day 1: Implement unique password generation
+  Day 2: Test and document
+  Day 3: Buffer for issues
+
+Week 2-3: Optional Service Disabling
+  Days 1-2: Implement telnet toggle
+  Days 3-4: Implement OTmonitor toggle
+  Days 5-6: Web UI settings page updates
+  Days 7-8: Testing and documentation
+
+Future (if requested): Web UI Authentication
+  Week 1: Implement optional Basic Auth
+  Week 2: Testing and integration docs
+
+
+Recommended Defaults
+--------------------
+
+Setting                 Default     Rationale
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WiFi AP Password        ENABLED     Always on (security)
+Telnet                  ENABLED     Backward compatibility
+OTmonitor               ENABLED     Backward compatibility
+Web UI Auth             DISABLED    Avoid breaking integrations
+
+
+User Personas & Recommendations
+--------------------------------
+
+Persona 1: "Maximum Security User"
+- Doesn't use OTmonitor or HA OpenTherm integration
+- Willing to use MQTT only
+→ Disable: Telnet + OTmonitor
+→ Enable: Web UI Auth (optional)
+→ Security: 🔒🔒🔒🔒🔒 Excellent
+
+Persona 2: "Home Assistant User"
+- Uses HA MQTT Auto-Discovery
+- May use HA OpenTherm Gateway integration
+→ Keep: OTmonitor enabled
+→ Disable: Telnet (if not debugging)
+→ Security: 🔒🔒🔒🔒 Very Good
+
+Persona 3: "OTmonitor User"
+- Uses OTmonitor desktop app
+- Doesn't use Home Assistant
+→ Keep: OTmonitor enabled
+→ Disable: Telnet (if not debugging)
+→ Security: 🔒🔒🔒 Good
+
+Persona 4: "Default User"
+- Wants everything to work
+- Minimal configuration
+→ Keep: All services enabled
+→ Security: 🔒🔒 Acceptable (local network)
