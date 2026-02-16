@@ -1,6 +1,6 @@
 # Release Notes — v1.1.0-beta
 
-**Release date:** 2026-02-15  
+**Release date:** 2026-02-16  
 **Branch:** `dev`  
 **Base:** v1.0.0
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-Version 1.1.0-beta builds on the stable v1.0.0 foundation with new Dallas temperature sensor features, improved memory safety, WebUI data persistence, and enhanced developer tooling.
+Version 1.1.0-beta builds on the stable v1.0.0 foundation with new Dallas temperature sensor features, PS mode detection, improved memory safety, WebUI data persistence, a complete RESTful API v2, and 20 bug fixes from a comprehensive codebase review.
 
 ---
 
@@ -49,6 +49,18 @@ Version 1.1.0-beta builds on the stable v1.0.0 foundation with new Dallas temper
 - Maintains real-time WebSocket data flow during user input
 - Used for Dallas sensor label editing
 
+### PS Mode (Print Summary) Detection
+- Automatic detection of `PS=1` mode from the OTGW PIC controller
+- When PS=1 is active: hides OT log section, disables WebSocket streaming, suppresses time-sync commands
+- Improves compatibility with legacy integrations (e.g. Domoticz) that require PS=1 mode
+- UI shows notification when PS=1 mode is active
+- Clean exit: re-enables OT monitor and WebSocket when PS=0 is detected
+
+### Gateway Mode Polling Throttle
+- Gateway mode query (`PR=M`) now limited to once per minute maximum
+- Prevents excessive serial traffic to the PIC controller
+- Enforced in both firmware and UI
+
 ### RESTful API v2 — Complete Implementation
 - **13 new v2 endpoints** with full RESTful compliance (score improved from 5.4/10 → 8.5/10)
 - Consistent JSON error responses: `{"error":{"status":N,"message":"..."}}`
@@ -88,13 +100,32 @@ Version 1.1.0-beta builds on the stable v1.0.0 foundation with new Dallas temper
 - See: [docs/fixes/mqtt-whitespace-auth-fix.md](docs/fixes/mqtt-whitespace-auth-fix.md)
 
 ### Streaming File Serving (Memory Management Fix)
-- **Problem:** Loading entire `index.html` (11KB+) into RAM with `readString()` caused memory exhaustion
+- **Problem:** Loading entire `index.html` (11KB+) into RAM with `readString()` caused memory exhaustion and slow UI
 - **Fix:** Replaced with streaming file serving using chunked transfer encoding
 - Unified handler using lambda (eliminates code duplication across 3 routes)
+- Version-aware caching with proper `Cache-Control` headers
 - Static caching of filesystem hash
-- **Result:** 95% memory reduction for file serving
+- **Result:** 95% memory reduction for file serving; UI is fast and responsive
 - Commit: `2e93554` (2026-02-01)
 - See: [docs/reviews/2026-02-01_memory-management-bug-fix/](docs/reviews/2026-02-01_memory-management-bug-fix/)
+
+### Settings Persistence Fix
+- **Problem:** Settings appeared editable in the Web UI but reverted to default values after saving
+- **Root cause:** Manual string-split parsing broke on special characters; deferred timer meant flash write could be lost on reboot
+- **Fix:** Replaced manual parsing with proper `ArduinoJson` deserialization; added synchronous `flushSettings()` before sending HTTP 200 response
+- Case-insensitive field matching via `strcasecmp_P()` ensures frontend field names map correctly to backend variables
+
+### Dark Mode PIC Firmware Icons
+- **Problem:** Black PNG icons (update.png, system_update.png) invisible against dark background in dark mode
+- **Fix:** Added `filter: invert(1)` to `.firmware-icon` class in dark mode CSS, turning icons white
+- Consistent with existing dark mode treatment of navigation icons (`.nav-img`)
+
+### UI Refinements
+- Refined editor styles for settings fields
+- Fixed log auto-scroll behavior
+- OTmonitor refresh interval improved from 5s to 1s for more responsive UI
+- Temperature graph processing simplified (removed unnecessary visibility check)
+- Gateway mode detection improved (handles boolean values)
 
 ### Codebase Review Fixes (20 findings resolved)
 
@@ -164,11 +195,12 @@ Full details: [docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md](docs/
 When upgrading from v1.0.0:
 
 1. **Filesystem flash recommended** alongside firmware flash — new Web UI files and Dallas sensor label support require updated LittleFS partition
-2. **Hard browser refresh (Ctrl+F5)** recommended to pick up new JavaScript (WebUI persistence, debug console)
+2. **Hard browser refresh (Ctrl+F5)** recommended to pick up new JavaScript (WebUI persistence, debug console, PS mode)
 3. **MQTT credentials** — whitespace trimming is now automatic on boot; no user action needed
-4. **No breaking API changes** — all existing REST API endpoints (`/api/v0/`, `/api/v1/`, `/api/v2/`) remain unchanged
-5. **v0 and unversioned endpoints deprecated** — still functional but scheduled for removal in v1.3.0; migrate to v2 endpoints (see migration table in README)
-6. **No breaking MQTT changes** — all topics remain the same
+4. **Settings** — settings persistence is now reliable; saved settings are written to flash before HTTP confirmation
+5. **No breaking API changes** — all existing REST API endpoints (`/api/v0/`, `/api/v1/`, `/api/v2/`) remain unchanged
+6. **v0 and unversioned endpoints deprecated** — still functional but scheduled for removal in v1.3.0; migrate to v2 endpoints (see migration table in README)
+7. **No breaking MQTT changes** — all topics remain the same
 
 ---
 
