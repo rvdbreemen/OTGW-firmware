@@ -752,7 +752,7 @@ void print_status(uint16_t& value)
     //  4: Cooling status [ cooling mode not active, cooling mode active ]
     //  5: CH2 mode [CH2 not active, CH2 active]
     //  6: diagnostic indication [no diagnostics, diagnostic event]
-    //  7: Electricity production [no eletric production, eletric production]
+    //  7: Electricity production [no electric production, electric production]
     _flag8_slave[0] = (((OTdata.valueLB) & 0x01) ? 'E' : '-');
     _flag8_slave[1] = (((OTdata.valueLB) & 0x02) ? 'C' : '-'); 
     _flag8_slave[2] = (((OTdata.valueLB) & 0x04) ? 'W' : '-'); 
@@ -777,7 +777,7 @@ void print_status(uint16_t& value)
       publishMQTTOnOff("cooling",              ((OTdata.valueLB) & 0x10));
       publishMQTTOnOff("centralheating2",      ((OTdata.valueLB) & 0x20));
       publishMQTTOnOff("diagnostic_indicator", ((OTdata.valueLB) & 0x40));
-      publishMQTTOnOff("eletric_production",   ((OTdata.valueLB) & 0x80));
+      publishMQTTOnOff("electric_production",   ((OTdata.valueLB) & 0x80));
 
       OTcurrentSystemState.SlaveStatus = OTdata.valueLB;
     }
@@ -814,7 +814,7 @@ void print_solar_storage_status(uint16_t& value)
     AddLogf("\r\n%s = Slave Solar Mode Status [%d] ", OTlookupitem.label, SlaveSolarModeStatus);
     AddLogf("\r\n%s = Slave Solar Status [%d] ", OTlookupitem.label, SlaveSolarStatus);
     if (is_value_valid(OTdata, OTlookupitem)){
-      sendMQTTData(F("solar_storage_slave_fault_incidator"),  ((SlaveSolarFaultIndicator) ? "ON" : "OFF"));   
+      sendMQTTData(F("solar_storage_slave_fault_indicator"),  ((SlaveSolarFaultIndicator) ? "ON" : "OFF"));   
       sendMQTTData(F("solar_storage_mode_status"), itoa(SlaveSolarModeStatus, _msg, 10));  
       sendMQTTData(F("solar_storage_slave_status"), itoa(SlaveSolarStatus, _msg, 10));  
       OTcurrentSystemState.SolarSlaveStatus = OTdata.valueLB;
@@ -1657,7 +1657,17 @@ void processOT(const char *buf, int len){
       msglastupdated[OTdata.id] = now;
       
       //Read information from this OT message ready for use...
-      PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
+      if (OTdata.id <= OT_MSGID_MAX) {
+        PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
+      } else {
+        //unknown message id, set safe defaults to prevent OTmap OOB read
+        OTlookupitem.id = OTdata.id;
+        OTlookupitem.msgcmd = OT_UNDEF;
+        OTlookupitem.type = ot_undef;
+        OTlookupitem.label = "Unknown";
+        OTlookupitem.friendlyname = "Unknown";
+        OTlookupitem.unit = "";
+      }
 
       // check wheter MQTT topic needs to be configuered
       if (is_value_valid(OTdata, OTlookupitem) && settingMQTTenable ) {
@@ -1805,10 +1815,16 @@ void processOT(const char *buf, int len){
         case OT_TSPEntryVH:                             print_u8u8(OTcurrentSystemState.TSPEntryVH); break;
         case OT_FaultBufferSizeVH:                      print_u8u8(OTcurrentSystemState.FaultBufferSizeVH); break;
         case OT_FaultBufferEntryVH:                     print_u8u8(OTcurrentSystemState.FaultBufferEntryVH); break;
-        case OT_FanSpeed:                               print_u16(OTcurrentSystemState.FanSpeed); break;
+        case OT_FanSpeed:                               print_u8u8(OTcurrentSystemState.FanSpeed); break;
         case OT_ElectricalCurrentBurnerFlame:           print_f88(OTcurrentSystemState.ElectricalCurrentBurnerFlame); break;
         case OT_TRoomCH2:                               print_f88(OTcurrentSystemState.TRoomCH2); break;
         case OT_RelativeHumidity:                       print_u8u8(OTcurrentSystemState.RelativeHumidity); break;
+        case OT_TrOverride2:                            print_f88(OTcurrentSystemState.TrOverride2); break;
+        case OT_Brand:                                  print_u8u8(OTcurrentSystemState.Brand); break;
+        case OT_BrandVersion:                           print_u8u8(OTcurrentSystemState.BrandVersion); break;
+        case OT_BrandSerialNumber:                      print_u8u8(OTcurrentSystemState.BrandSerialNumber); break;
+        case OT_CoolingOperationHours:                  print_u16(OTcurrentSystemState.CoolingOperationHours); break;
+        case OT_PowerCycles:                            print_u16(OTcurrentSystemState.PowerCycles); break;
         case OT_RFstrengthbatterylevel:                 print_u8u8(OTcurrentSystemState.RFstrengthbatterylevel); break;
         case OT_OperatingMode_HC1_HC2_DHW:              print_u8u8(OTcurrentSystemState.OperatingMode_HC1_HC2_DHW ); break; 
         case OT_ElectricityProducerStarts:              print_u16(OTcurrentSystemState.ElectricityProducerStarts); break;
@@ -2048,6 +2064,7 @@ const char* getOTGWValue(int msgid)
     case OT_CoolingControl:                    dtostrf(OTcurrentSystemState.CoolingControl, 0, 2, buffer); return buffer;
     case OT_TsetCH2:                           dtostrf(OTcurrentSystemState.TsetCH2, 0, 2, buffer); return buffer;
     case OT_TrOverride:                        dtostrf(OTcurrentSystemState.TrOverride, 0, 2, buffer); return buffer;
+    case OT_TrOverride2:                       dtostrf(OTcurrentSystemState.TrOverride2, 0, 2, buffer); return buffer;
     case OT_MaxRelModLevelSetting:             dtostrf(OTcurrentSystemState.MaxRelModLevelSetting, 0, 2, buffer); return buffer;
     case OT_TrSet:                             dtostrf(OTcurrentSystemState.TrSet, 0, 2, buffer); return buffer;
     case OT_TrSetCH2:                          dtostrf(OTcurrentSystemState.TrSetCH2, 0, 2, buffer); return buffer;
@@ -2107,6 +2124,11 @@ const char* getOTGWValue(int msgid)
     case OT_CHPumpOperationHours:              dtostrf(OTcurrentSystemState.CHPumpOperationHours, 0, 2, buffer); return buffer;
     case OT_DHWPumpValveOperationHours:        dtostrf(OTcurrentSystemState.DHWPumpValveOperationHours, 0, 2, buffer); return buffer;
     case OT_DHWBurnerOperationHours:           dtostrf(OTcurrentSystemState.DHWBurnerOperationHours, 0, 2, buffer); return buffer;
+    case OT_Brand:                             dtostrf(OTcurrentSystemState.Brand, 0, 2, buffer); return buffer;
+    case OT_BrandVersion:                      dtostrf(OTcurrentSystemState.BrandVersion, 0, 2, buffer); return buffer;
+    case OT_BrandSerialNumber:                 dtostrf(OTcurrentSystemState.BrandSerialNumber, 0, 2, buffer); return buffer;
+    case OT_CoolingOperationHours:             dtostrf(OTcurrentSystemState.CoolingOperationHours, 0, 2, buffer); return buffer;
+    case OT_PowerCycles:                       dtostrf(OTcurrentSystemState.PowerCycles, 0, 2, buffer); return buffer;
     case OT_MasterVersion:                     dtostrf(OTcurrentSystemState.MasterVersion, 0, 2, buffer); return buffer;
     case OT_SlaveVersion:                      dtostrf(OTcurrentSystemState.SlaveVersion, 0, 2, buffer); return buffer;
     case OT_StatusVH:                          dtostrf(OTcurrentSystemState.StatusVH, 0, 2, buffer); return buffer;
@@ -2141,6 +2163,8 @@ const char* getOTGWValue(int msgid)
     case OT_ElectricityProducerHours:          dtostrf(OTcurrentSystemState.ElectricityProducerHours, 0, 2, buffer); return buffer;
     case OT_ElectricityProduction:             dtostrf(OTcurrentSystemState.ElectricityProduction, 0, 2, buffer); return buffer;
     case OT_CumulativElectricityProduction:    dtostrf(OTcurrentSystemState.CumulativElectricityProduction, 0, 2, buffer); return buffer;
+    case OT_BurnerUnsuccessfulStarts:          dtostrf(OTcurrentSystemState.BurnerUnsuccessfulStarts, 0, 2, buffer); return buffer;
+    case OT_FlameSignalTooLow:                 dtostrf(OTcurrentSystemState.FlameSignalTooLow, 0, 2, buffer); return buffer;
     case OT_RemehadFdUcodes:                   dtostrf(OTcurrentSystemState.RemehadFdUcodes, 0, 2, buffer); return buffer;
     case OT_RemehaServicemessage:              dtostrf(OTcurrentSystemState.RemehaServicemessage, 0, 2, buffer); return buffer;
     case OT_RemehaDetectionConnectedSCU:       dtostrf(OTcurrentSystemState.RemehaDetectionConnectedSCU, 0, 2, buffer); return buffer;
