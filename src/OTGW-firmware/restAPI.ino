@@ -20,6 +20,25 @@
 #define RESTDebugT(...)   ({ if (bDebugRestAPI) DebugT(__VA_ARGS__);    })
 #define RESTDebug(...)    ({ if (bDebugRestAPI) Debug(__VA_ARGS__);    })
 
+//=======================================================================
+// RESTful v2 API: Consistent JSON error response helper (ADR-035)
+// Returns: {"error":{"status":N,"message":"..."}}
+//=======================================================================
+static void sendApiError(int httpCode, const __FlashStringHelper* message) {
+  char msgBuf[80];
+  strncpy_P(msgBuf, (PGM_P)message, sizeof(msgBuf));
+  msgBuf[sizeof(msgBuf)-1] = 0;
+  
+  char jsonBuff[200];
+  snprintf_P(jsonBuff, sizeof(jsonBuff),
+    PSTR("{\"error\":{\"status\":%d,\"message\":\"%s\"}}"),
+    httpCode, msgBuf);
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+  httpServer.send(httpCode, F("application/json"), jsonBuff);
+}
+
+//=======================================================================
+
 static bool isDigitStr(const char *s) {
   if (s == nullptr || *s == '\0') return false;
   while (*s) {
@@ -204,13 +223,140 @@ void processAPI()
       }
     }
     else if (wc > 2 && strcmp_P(words[2], PSTR("v2")) == 0)
-    { //v2 API calls
-      if (wc > 3 && strcmp_P(words[3], PSTR("otgw")) == 0 && wc > 4 && strcmp_P(words[4], PSTR("otmonitor")) == 0) {
-          // GET /api/v2/otgw/otmonitor
-          if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
-          sendOTmonitorV2();
-      } else {
+    { //v2 API calls — RESTful compliant (ADR-035)
+      if (wc > 3 && strcmp_P(words[3], PSTR("health")) == 0) {
+        // GET /api/v2/health
+        if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+        sendHealth();
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("settings")) == 0) {
+        // GET/POST /api/v2/settings
+        if (isPostOrPut) {
+          postSettings();
+        } else if (isGet) {
+          sendDeviceSettings();
+        } else {
+          sendApiError(405, F("Method not allowed"));
+        }
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("sensors")) == 0) {
+        if (wc > 4 && strcmp_P(words[4], PSTR("labels")) == 0) {
+          // GET/POST /api/v2/sensors/labels
+          if (isGet) {
+            getDallasLabels();
+          } else if (isPostOrPut) {
+            updateAllDallasLabels();
+          } else {
+            sendApiError(405, F("Method not allowed"));
+          }
+        } else {
           sendApiNotFound(originalURI);
+        }
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("otgw")) == 0) {
+        if (wc > 4 && strcmp_P(words[4], PSTR("otmonitor")) == 0) {
+          // GET /api/v2/otgw/otmonitor
+          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          sendOTmonitorV2();
+        } else if (wc > 4 && strcmp_P(words[4], PSTR("telegraf")) == 0) {
+          // GET /api/v2/otgw/telegraf
+          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          sendTelegraf();
+        } else if (wc > 4 && strcmp_P(words[4], PSTR("messages")) == 0) {
+          // GET /api/v2/otgw/messages/{id} — RESTful resource name for OT message by ID
+          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          uint8_t msgId = 0;
+          if (wc > 5 && parseMsgId(words[5], msgId)) {
+            sendOTGWvalue(msgId);
+          } else {
+            sendApiError(400, F("Invalid or missing message ID"));
+          }
+        } else if (wc > 4 && strcmp_P(words[4], PSTR("commands")) == 0) {
+          // POST /api/v2/otgw/commands — RESTful: command in body, 202 Accepted
+          if (!isPostOrPut) { sendApiError(405, F("Method not allowed")); return; }
+
+          // Read command from request body (JSON: {"command":"TT=20.5"} or plain text)
+          const String& body = httpServer.arg(0);
+          StaticJsonDocument<128> cmdDoc;
+          DeserializationError err = deserializeJson(cmdDoc, body);
+          const char* cmdStr = nullptr;
+          if (!err) {
+            cmdStr = cmdDoc[F("command")];
+          }
+          // Fallback: accept plain text body (e.g., "TT=20.5")
+          if (!cmdStr || cmdStr[0] == '\0') {
+            cmdStr = body.c_str();
+          }
+
+          if (!cmdStr || cmdStr[0] == '\0') {
+            sendApiError(400, F("Missing command"));
+            return;
+          }
+
+          constexpr size_t kMaxCmdLen = sizeof(cmdqueue[0].cmd) - 1;
+          const size_t cmdLen = strlen(cmdStr);
+          if ((cmdLen < 3) || (cmdStr[2] != '=')) {
+            sendApiError(400, F("Invalid command format (expected XX=value)"));
+            return;
+          }
+          if (cmdLen > kMaxCmdLen) {
+            sendApiError(413, F("Command too long"));
+            return;
+          }
+
+          addOTWGcmdtoqueue(cmdStr, static_cast<int>(cmdLen));
+          // 202 Accepted — command queued for async processing
+          httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+          httpServer.send(202, F("application/json"), F("{\"status\":\"queued\"}"));
+        } else if (wc > 4 && strcmp_P(words[4], PSTR("discovery")) == 0) {
+          // POST /api/v2/otgw/discovery — RESTful name for MQTT autodiscovery trigger
+          if (!isPostOrPut) { sendApiError(405, F("Method not allowed")); return; }
+          // 202 Accepted — discovery messages sent asynchronously
+          httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+          httpServer.send(202, F("application/json"), F("{\"status\":\"accepted\"}"));
+          doAutoConfigure();
+        } else if (wc > 4 && strcmp_P(words[4], PSTR("id")) == 0) {
+          // GET /api/v2/otgw/id/{msgid} — backward compat alias for messages/{id}
+          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          uint8_t msgId = 0;
+          if (wc > 5 && parseMsgId(words[5], msgId)) {
+            sendOTGWvalue(msgId);
+          } else {
+            sendApiError(400, F("Invalid or missing message ID"));
+          }
+        } else if (wc > 4 && strcmp_P(words[4], PSTR("label")) == 0) {
+          // GET /api/v2/otgw/label/{msglabel}
+          if (!isGet) { sendApiError(405, F("Method not allowed")); return; }
+          if (wc <= 5 || words[5][0] == '\0') { sendApiError(400, F("Missing label")); return; }
+          sendOTGWlabel(words[5]);
+        } else if (wc > 4 && strcmp_P(words[4], PSTR("command")) == 0) {
+          // POST /api/v2/otgw/command/{cmd} — backward compat alias (prefer /commands)
+          if (!isPostOrPut) { sendApiError(405, F("Method not allowed")); return; }
+          if (wc <= 5 || words[5][0] == '\0') {
+            sendApiError(400, F("Missing command"));
+            return;
+          }
+          constexpr size_t kMaxCmdLen2 = sizeof(cmdqueue[0].cmd) - 1;
+          const size_t cmdLen2 = strlen(words[5]);
+          if ((cmdLen2 < 3) || (words[5][2] != '=')) {
+            sendApiError(400, F("Invalid command format (expected XX=value)"));
+            return;
+          }
+          if (cmdLen2 > kMaxCmdLen2) {
+            sendApiError(413, F("Command too long"));
+            return;
+          }
+          addOTWGcmdtoqueue(words[5], static_cast<int>(cmdLen2));
+          httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+          httpServer.send(202, F("application/json"), F("{\"status\":\"queued\"}"));
+        } else if (wc > 4 && strcmp_P(words[4], PSTR("autoconfigure")) == 0) {
+          // POST /api/v2/otgw/autoconfigure — backward compat alias (prefer /discovery)
+          if (!isPostOrPut) { sendApiError(405, F("Method not allowed")); return; }
+          httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+          httpServer.send(202, F("application/json"), F("{\"status\":\"accepted\"}"));
+          doAutoConfigure();
+        } else {
+          sendApiNotFound(originalURI);
+        }
+      } else {
+        sendApiNotFound(originalURI);
       }
     }
     else if (wc > 2 && strcmp_P(words[2], PSTR("v0")) == 0)
@@ -954,6 +1100,13 @@ void updateAllDallasLabels() {
 //====================================================
 void sendApiNotFound(const char *URI)
 {
+  // For API routes, return JSON 404 (ADR-035: RESTful compliance)
+  if (strncmp_P(URI, PSTR("/api/"), 5) == 0) {
+    sendApiError(404, F("Endpoint not found"));
+    return;
+  }
+
+  // For non-API routes, return HTML 404 (legacy behavior)
   httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send_P(404, PSTR("text/html; charset=UTF-8"), PSTR("<!DOCTYPE HTML><html><head>"));
