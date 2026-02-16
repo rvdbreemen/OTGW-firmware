@@ -102,7 +102,22 @@ $(BOARDS): | update_indexes
 	$(CLICFG) core install $(PLATFORM)
 
 refresh: | $(CFGFILE)
-	$(CLICFG) lib update-index
+	@echo "Refreshing library index..."
+	@for i in 1 2 3; do \
+		if $(CLICFG) lib update-index; then \
+			echo "✓ Library index updated successfully"; \
+			break; \
+		else \
+			if [ $$i -lt 3 ]; then \
+				wait_time=$$((2 ** $$i)); \
+				echo "⚠ Library index update failed (attempt $$i/3), retrying in $${wait_time}s..."; \
+				sleep $$wait_time; \
+			else \
+				echo "✗ Library index update failed after 3 attempts"; \
+				exit 1; \
+			fi; \
+		fi; \
+	done
 
 flush: | $(CFGFILE)
 	$(CLICFG) cache clean
