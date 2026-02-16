@@ -15,9 +15,9 @@ Tracks all tasks from the [REST API Evaluation](docs/reviews/2026-02-16_restful-
 | JSON 404 for API routes | ✅ Compliant | `sendApiNotFound()` returns JSON for `/api/*`, HTML for non-API |
 | Frontend uses latest API | ✅ Compliant | Zero v0/v1/unversioned calls remain in `index.js` |
 | OpenAPI documentation | ✅ Compliant | All v2 endpoints documented in `docs/api/openapi.yaml` |
-| POST for state-changing actions | ⚠️ Partial | v2 commands/discovery use POST; legacy `/ReBoot`, `/pic` still use GET (Phase 2) |
-| `Allow` header on 405 | ⚠️ Not done | RFC 7231 requires it; would need per-endpoint tracking (Phase 2) |
-| OPTIONS/CORS preflight | ⚠️ Not done | Low impact for local-network device (Phase 3) |
+| POST for state-changing actions | ✅ Compliant | v2 commands/discovery use POST; non-API endpoints (`/ReBoot`, `/pic`) are out of scope |
+| `Allow` header on 405 | ⚠️ Not done | RFC 7231 requires it; would need per-endpoint tracking (Future) |
+| OPTIONS/CORS preflight | ⚠️ Not done | Low impact for local-network device (Future) |
 | Content negotiation (`Accept`) | ⚠️ Not done | JSON-only is acceptable for embedded IoT (documented decision) |
 | HATEOAS / hypermedia links | ❌ Won't do | Too heavy for ESP8266; documented in ADR-035 |
 | Pagination | ❌ Won't do | Collections are small and bounded (documented in ADR-035) |
@@ -27,8 +27,9 @@ Tracks all tasks from the [REST API Evaluation](docs/reviews/2026-02-16_restful-
 ### Remaining gaps (acceptable for embedded IoT):
 1. **`Allow` header on 405** — RFC 7231 §6.5.5 requires listing valid methods. Needs per-endpoint method tracking. Low client impact since v2 errors include descriptive JSON messages.
 2. **OPTIONS method** — Needed for CORS preflight from cross-origin web apps. Low impact since this is a local-network device.
-3. **POST for legacy actions** — `/ReBoot`, `/ResetWireless`, `/pic` still use GET for state changes. v2 replacements planned (Phase 2).
-4. **Response envelope inconsistency** — Some v2 endpoints return array format (settings, sensors/labels) while others return map format. Array format is kept intentionally for settings since the frontend depends on the type/maxlen metadata in each array entry.
+3. **Response envelope inconsistency** — Some v2 endpoints return array format (settings, sensors/labels) while others return map format. Array format is kept intentionally for settings since the frontend depends on the type/maxlen metadata in each array entry.
+
+> **Note:** Non-API endpoints (`/ReBoot`, `/ResetWireless`, `/pic`, `/upload`, `/update`, `/status`) are **excluded** from this improvement scope. They serve specific hardware/OTA functions and will remain as-is.
 
 ---
 
@@ -98,25 +99,13 @@ Tracks all tasks from the [REST API Evaluation](docs/reviews/2026-02-16_restful-
 - [x] **T42** Migrate `loadPersistentUI()` — `v1/settings` → `v2/settings`
 - [x] **T43** Migrate `saveDallasLabel()` — `v1/sensors/labels` → `v2/sensors/labels`
 
-## Phase 2: Non-API Endpoint Migration (Future — v1.3.0)
+## Future Improvements (if needed)
 
-> These endpoints live outside `/api/` and use GET for state-changing actions.
-> Lower priority — tracked here for completeness.
+> Non-API endpoints (`/ReBoot`, `/ResetWireless`, `/pic`, `/upload`, `/update`, `/status`) are **excluded** from this improvement scope per project owner decision. They serve specific hardware/OTA functions and will remain as-is.
 
-- [ ] **T44** `POST /api/v2/device/reboot` — replaces `GET /ReBoot` (Finding 12)
-- [ ] **T45** `POST /api/v2/device/reset-wireless` — replaces `GET /ResetWireless` (Finding 12)
-- [ ] **T46** `POST /api/v2/pic/upgrade` — replaces `GET/POST /pic?action=upgrade` (Finding 12)
-- [ ] **T47** `POST /api/v2/pic/refresh` — replaces `GET/POST /pic?action=refresh` (Finding 12)
-- [ ] **T48** `DELETE /api/v2/pic/firmware/{name}` — replaces `GET/POST /pic?action=delete` (Finding 12)
-- [ ] **T49** `POST /api/v2/filesystem/upload` — replaces `POST /upload` (Finding 12)
-- [ ] **T50** Add `Allow` header to 405 responses per RFC 7231 §6.5.5
-
-## Phase 3: OTA & Advanced (Future — v2.0.0)
-
-- [ ] **T51** `POST /api/v2/firmware/upload` — wraps `POST /update` (Finding 13)
-- [ ] **T52** `GET /api/v2/firmware/status` — wraps `GET /status` (Finding 13)
-- [ ] **T53** OPTIONS method support for CORS preflight (Finding 9)
-- [ ] **T54** Response metadata (`_meta` object) (Low priority)
+- [ ] **T44** Add `Allow` header to 405 responses per RFC 7231 §6.5.5
+- [ ] **T45** OPTIONS method support for CORS preflight
+- [ ] **T46** Response metadata (`_meta` object) (Low priority)
 
 ---
 
@@ -124,6 +113,4 @@ Tracks all tasks from the [REST API Evaluation](docs/reviews/2026-02-16_restful-
 
 **Phase 1 (this PR):** 43 tasks completed. All v2 endpoints implemented with RESTful patterns. All frontend calls migrated to v2. Score improved from 5.4 → 7.7/10.
 
-**Phase 2 (v1.3.0):** 7 tasks remaining. Migrate non-API endpoints (`/ReBoot`, `/pic`, `/upload`) to proper v2 POST endpoints. Add `Allow` header to 405 responses.
-
-**Phase 3 (v2.0.0):** 4 tasks remaining. OTA wrappers, OPTIONS/CORS preflight, response metadata.
+**Future:** 3 optional tasks for `Allow` header, OPTIONS/CORS preflight, and response metadata — if needed.

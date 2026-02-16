@@ -296,14 +296,11 @@ These are registered directly on the httpServer and do not go through `processAP
 3. `/pic` mixes query parameters for action routing (should be distinct endpoints or POST body)
 4. None of these return JSON responses — they return HTML redirects
 
-**Recommendation (future phases):** Add v2 API equivalents:
-- `POST /api/v2/device/reboot` — reboot (POST for action)
-- `POST /api/v2/pic/upgrade` — PIC firmware upgrade
-- `POST /api/v2/filesystem/upload` — file upload
+**Recommendation:** These non-API endpoints are **excluded from the RESTful improvement scope** per project owner decision. They serve specific hardware functions and will remain as-is.
 
 ---
 
-### Finding 13: OTA Update Endpoints Outside `/api/` Namespace (LOW)
+### Finding 13: OTA Update Endpoints Outside `/api/` Namespace (LOW — EXCLUDED)
 
 **Standard:** Firmware update endpoints should follow the same patterns as other API endpoints.
 
@@ -312,9 +309,7 @@ These are registered directly on the httpServer and do not go through `processAP
 - `POST /update` — OTA firmware upload binary (`OTGW-ModUpdateServer-impl.h:102`)
 - `GET /status` — OTA flash progress (JSON) (`OTGW-ModUpdateServer-impl.h:95`)
 
-**Assessment:** These come from a modified ESP8266 library and are tightly coupled to the HTML update workflow. Low priority for RESTful migration since the update process has specific browser requirements.
-
-**Recommendation (future):** Consider `POST /api/v2/firmware/upload` and `GET /api/v2/firmware/status` as RESTful wrappers.
+**Assessment:** These come from a modified ESP8266 library and are tightly coupled to the HTML update workflow. **Excluded from improvement scope** per project owner decision.
 
 ---
 
@@ -373,16 +368,11 @@ Add versioned equivalents for `/api/firmwarefilelist` and `/api/listfiles`:
 ### Priority 8: Frontend Migration ✅ DONE
 All frontend API calls migrated from deprecated v0/unversioned to v2 endpoints.
 
-### Priority 9: RESTful Action Endpoints (Phase 2 — Future)
-Add proper POST-based action endpoints to replace GET-based actions:
-- `POST /api/v2/device/reboot` — replaces `GET /ReBoot`
-- `POST /api/v2/pic/upgrade` — replaces `GET/POST /pic?action=upgrade`
-- `POST /api/v2/filesystem/upload` — replaces `POST /upload`
+### ~~Priority 9: RESTful Action Endpoints~~ — EXCLUDED
+Non-API endpoints (`/ReBoot`, `/pic`, `/upload`) are excluded from the RESTful improvement scope per project owner decision. They serve specific hardware/OTA functions and will remain as-is.
 
-### Priority 9: OTA Update Wrappers (Phase 3)
-Consider RESTful wrappers for the OTA update endpoints:
-- `POST /api/v2/firmware/upload` — wraps `POST /update`
-- `GET /api/v2/firmware/status` — wraps `GET /status`
+### ~~Priority 9: OTA Update Wrappers~~ — EXCLUDED
+OTA endpoints (`/update`, `/status`) are excluded from the RESTful improvement scope per project owner decision.
 
 ## Constraints
 
