@@ -10,13 +10,19 @@ info:
     **Base URL**: `http://{device-ip}/api`
     
     **API Versions**:
-    - **v0** - Legacy API (deprecated but maintained for backward compatibility)
-    - **v1** - Current stable API with improved structure
-    - **v2** - Optimized API with reduced payload sizes
+    - **v0** - Legacy API (maintained for backward compatibility)
+    - **v1** - Stable API with array-based responses
+    - **v2** - RESTful-compliant API with consistent JSON errors, proper status codes, and resource naming (ADR-035)
     
     **Authentication**: None (device should be on trusted local network only)
     
     **Content-Type**: All responses are `application/json`
+    
+    **v2 API Improvements** (ADR-035):
+    - All error responses return structured JSON: `{"error":{"status":N,"message":"..."}}`
+    - Queued operations return 202 Accepted instead of 200 OK
+    - New RESTful resource endpoints: `/otgw/messages/{id}`, `/otgw/commands`, `/otgw/discovery`
+    - Consistent CORS headers on all responses
   version: 1.1.0
   contact:
     name: Robert van den Breemen
@@ -520,6 +526,220 @@ paths:
               schema:
                 type: object
                 description: Optimized OpenTherm data structure
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/health:
+    get:
+      tags:
+        - Health
+      summary: Get device health status (v2)
+      description: |
+        Returns the current health status of the device.
+        Same data as v1, but with consistent JSON error responses.
+      operationId: getHealthV2
+      responses:
+        '200':
+          description: Health status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  health:
+                    type: object
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/settings:
+    get:
+      tags:
+        - Settings
+      summary: Get device settings (v2)
+      description: Retrieve all device configuration settings with JSON error responses.
+      operationId: getSettingsV2
+      responses:
+        '200':
+          description: Settings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    post:
+      tags:
+        - Settings
+      summary: Update device settings (v2)
+      operationId: updateSettingsV2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                value: {}
+      responses:
+        '200':
+          description: Settings updated successfully
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+
+  /v2/otgw/messages/{msgid}:
+    get:
+      tags:
+        - OpenTherm Data
+      summary: Get OpenTherm message by ID (v2 RESTful)
+      description: |
+        RESTful endpoint for retrieving OpenTherm message values.
+        Uses resource naming (messages) instead of v1's /id/ path.
+      operationId: getOTGWMessageV2
+      parameters:
+        - name: msgid
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 127
+      responses:
+        '200':
+          description: Message value retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  label:
+                    type: string
+                  value: {}
+                  unit:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/otgw/commands:
+    post:
+      tags:
+        - OTGW Commands
+      summary: Send command to OpenTherm Gateway (v2 RESTful)
+      description: |
+        RESTful endpoint for sending commands. Command is provided in the
+        JSON request body instead of the URL path. Returns 202 Accepted
+        because the command is queued for asynchronous processing.
+        
+        **v2 Improvements over v1:**
+        - Command in request body (not URL path)
+        - Returns 202 Accepted (not 200 OK)
+        - JSON error responses
+      operationId: sendOTGWCommandV2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - command
+              properties:
+                command:
+                  type: string
+                  pattern: '^[A-Z]{2}=.+$'
+                  description: OTGW command in format XX=value
+            example:
+              command: "TT=20.5"
+      responses:
+        '202':
+          description: Command queued for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [queued]
+              example:
+                status: "queued"
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+        '413':
+          description: Command too long
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /v2/otgw/discovery:
+    post:
+      tags:
+        - OTGW Commands
+      summary: Trigger MQTT autodiscovery (v2 RESTful)
+      description: |
+        RESTful endpoint for triggering MQTT autodiscovery.
+        Uses resource naming (discovery) instead of v1's autoconfigure verb.
+        Returns 202 Accepted because discovery messages are sent asynchronously.
+      operationId: triggerDiscoveryV2
+      responses:
+        '202':
+          description: Discovery accepted for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [accepted]
+              example:
+                status: "accepted"
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sensors/labels:
+    get:
+      tags:
+        - Dallas Sensor Labels
+      summary: Get all sensor labels (v2)
+      operationId: getAllDallasLabelsV2
+      responses:
+        '200':
+          description: Labels retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    post:
+      tags:
+        - Dallas Sensor Labels
+      summary: Update all sensor labels (v2)
+      operationId: updateAllDallasLabelsV2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: string
+      responses:
+        '200':
+          description: Labels updated successfully
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
 
   /v1/otgw/autoconfigure:
     post:
@@ -556,29 +776,75 @@ components:
       required:
         - error
 
+    ApiError:
+      type: object
+      description: Standard v2 API error response (ADR-035)
+      properties:
+        error:
+          type: object
+          properties:
+            status:
+              type: integer
+              description: HTTP status code
+            message:
+              type: string
+              description: Human-readable error message
+          required:
+            - status
+            - message
+      example:
+        error:
+          status: 400
+          message: "Invalid message ID"
+
   responses:
     BadRequest:
-      description: Bad request - invalid parameters
+      description: Bad request - invalid parameters (v0/v1 text format)
       content:
         text/plain:
           schema:
             type: string
     
+    BadRequestJson:
+      description: Bad request - invalid parameters (v2 JSON format)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            error:
+              status: 400
+              message: "Invalid or missing message ID"
+
     MethodNotAllowed:
-      description: HTTP method not allowed for this endpoint
+      description: HTTP method not allowed (v0/v1 text format)
       content:
         text/plain:
           schema:
             type: string
             example: "405: method not allowed\r\n"
+
+    MethodNotAllowedJson:
+      description: HTTP method not allowed (v2 JSON format)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            error:
+              status: 405
+              message: "Method not allowed"
     
     NotFound:
-      description: API endpoint not found
+      description: API endpoint not found (v2 returns JSON)
       content:
-        text/plain:
+        application/json:
           schema:
-            type: string
-            example: "404: not found\r\n"
+            $ref: '#/components/schemas/ApiError'
+          example:
+            error:
+              status: 404
+              message: "Endpoint not found"
     
     URITooLong:
       description: Request URI exceeds maximum length
