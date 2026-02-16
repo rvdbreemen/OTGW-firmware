@@ -868,6 +868,10 @@ void postSettings()
   if (newValue[0] != '\0') {
     RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
     updateSetting(field, newValue);
+    // Synchronous flush: persist to flash NOW so the 200 OK is truthful.
+    // The deferred timer still handles MQTT/NTP command updates, but HTTP
+    // saves must be durable before we confirm success to the browser.
+    flushSettings();
     httpServer.send(200, F("application/json"), httpServer.arg(0));
   } else {
     httpServer.send(400, F("application/json"), F("{\"error\":\"Missing value\"}"));

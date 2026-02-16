@@ -2374,7 +2374,7 @@ function showMainPage() {
   refreshOTmonitor();
   
   if (!flashModeActive) {
-    tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+    tid = setInterval(function () { refreshOTmonitor(); }, 5000);
     // Initialize WebSocket for OT log streaming
     initOTLogWebSocket();
   }
@@ -2836,14 +2836,18 @@ function refreshOTmonitor() {
       }
 
       // Detect and register temperature sensors for the graph
+      // Only process graph data when the graph container is actually visible
       if (typeof OTGraph !== 'undefined' && OTGraph.running) {
-        OTGraph.detectAndRegisterSensors(data);
-        if (dallasLabelsCache && Object.keys(dallasLabelsCache).length > 0 &&
-            typeof OTGraph.refreshSensorLabels === 'function') {
-          OTGraph.refreshSensorLabels(dallasLabelsCache);
+        var graphEl = document.getElementById('temperatureChart');
+        if (graphEl && graphEl.offsetParent !== null) {
+          OTGraph.detectAndRegisterSensors(data);
+          if (dallasLabelsCache && Object.keys(dallasLabelsCache).length > 0 &&
+              typeof OTGraph.refreshSensorLabels === 'function') {
+            OTGraph.refreshSensorLabels(dallasLabelsCache);
+          }
+          // Process sensor data with current timestamp
+          OTGraph.processSensorData(data, new Date());
         }
-        // Process sensor data with current timestamp
-        OTGraph.processSensorData(data, new Date());
       }
 
       let otMonPage = document.getElementById('mainPage');
@@ -3159,43 +3163,69 @@ function refreshSettings() {
 //============================================================================  
 function saveSettings() {
   console.log("saveSettings() ...");
-  let changes = false;
 
-  //--- has anything changed?
+  // Collect all changed fields into a single batch
   var page = document.getElementById("settingsPage");
   var inputs = page.getElementsByTagName("input");
-  //var mRow = document.getElementById("mainPage").getElementsByTagName('div');
+  var batch = [];
+
   for (var i = 0; i < inputs.length; i++) {
-    //do something to each div like
     var field = inputs[i].getAttribute("id");
-    console.log("InputNr[" + i + "], InputId[" + field + "]");
     const fieldEl = document.getElementById(field);
     if (!fieldEl) continue;
+
+    if (fieldEl.className !== "input-changed") continue;
+
+    var value;
     if (inputs[i].type == "checkbox") {
       value = fieldEl.checked;
     } else {
       value = fieldEl.value;
     }
-    console.log("==> name[" + field + "], value[" + value + "]");
 
-    if (fieldEl.className == "input-changed") {
-      //then it was changes, and needs to be saved
-      fieldEl.className = "input-normal";
-      console.log("Changes where made in [" + field + "][" + value + "]");
-      
-      // Update theme immediately if darktheme setting changed
-      if (field === "darktheme") {
-        let isDark = fieldEl.checked;
-        document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
-        localStorage.setItem('theme', isDark ? 'dark' : 'light');
-      }
+    fieldEl.className = "input-normal";
+    console.log("Changed: [" + field + "] = [" + value + "]");
 
-      //processWithTimeout([(data.length -1), 0], 2, data, sendPostReading);
-      const msgEl = document.getElementById("settingMessage");
-      if (msgEl) msgEl.textContent = "Saving changes...";
-      sendPostSetting(field, value);
+    // Update theme immediately if darktheme setting changed
+    if (field === "darktheme") {
+      let isDark = fieldEl.checked;
+      document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
     }
+
+    batch.push({ name: field, value: value });
   }
+
+  if (batch.length === 0) return;
+
+  const msgEl = document.getElementById("settingMessage");
+  if (msgEl) msgEl.textContent = "Saving changes...";
+
+  // Send settings sequentially to avoid overwhelming the ESP8266,
+  // but chain them as promises so we get one final status.
+  var chain = Promise.resolve();
+  var failed = false;
+
+  batch.forEach(function(item) {
+    chain = chain.then(function() {
+      return sendPostSetting(item.name, item.value);
+    }).then(function(ok) {
+      if (!ok) failed = true;
+    });
+  });
+
+  chain.then(function() {
+    const msgEl = document.getElementById("settingMessage");
+    if (failed) {
+      if (msgEl) msgEl.textContent = "Saving changes... FAILED";
+    } else {
+      if (msgEl) msgEl.textContent = "Saving changes... SUCCESS";
+      setTimeout(function () {
+        const msgEl = document.getElementById("settingMessage");
+        if (msgEl) msgEl.textContent = "";
+      }, 2000);
+    }
+  });
 } // saveSettings()
 
 
@@ -3210,26 +3240,18 @@ function sendPostSetting(field, value) {
     mode: "cors"
   };
 
-  fetch(APIGW + "v0/settings", other_params)
-    .then((response) => {
-      //console.log(response.status );    //=> number 100–599
-      //console.log(response.statusText); //=> String
-      //console.log(response.headers);    //=> Headers
-      //console.log(response.url);        //=> String
-      //console.log(response.text());
-      //return response.text()
-      const msgEl = document.getElementById("settingMessage");
+  return fetch(APIGW + "v0/settings", other_params)
+    .then(function(response) {
       if (response.ok) {
-        if (msgEl) msgEl.textContent = "Saving changes... SUCCESS";
-        setTimeout(function () {
-          const msgEl = document.getElementById("settingMessage");
-          if (msgEl) msgEl.textContent = "";
-        }, 2000); //and clear the message
+        console.log("Setting saved: " + field);
+        return true;
       } else {
-        if (msgEl) msgEl.textContent = "Saving changes... FAILED";
+        console.error("Setting save failed: " + field + " HTTP " + response.status);
+        return false;
       }
-    }, (error) => {
-      console.log("Error[" + error.message + "]"); //=> String
+    })
+    .catch(function(error) {
+      console.error("Setting save error: " + field + " - " + error.message);
       return false;
     });
 } // sendPostSetting()
