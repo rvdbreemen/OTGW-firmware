@@ -1,7 +1,7 @@
 # Investigation: Separation of Thermostat and Boiler Values in MQTT
 
 **Date:** 2026-02-16  
-**Issue:** [#XXX] separation of values from thermostat and boiler  
+**Issue:** [#143](https://github.com/rvdbreemen/OTGW-firmware/issues/143) separation of values from thermostat and boiler  
 **Status:** Investigation Complete - Awaiting Maintainer Feedback
 
 ## Executive Summary
