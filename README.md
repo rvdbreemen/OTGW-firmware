@@ -11,30 +11,36 @@ This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gatew
 
 ## 🚀 What's New in v1.1.0-beta
 
-Version 1.1.0-beta builds on the stable v1.0.0 foundation with new Dallas temperature sensor features, improved memory safety, WebUI data persistence, and enhanced developer tooling.
+Version 1.1.0-beta builds on the stable v1.0.0 foundation with new Dallas temperature sensor features, improved memory safety, WebUI data persistence, a complete RESTful API v2, and 20 bug fixes from a comprehensive codebase review.
+
+> 📝 Full release notes: [RELEASE_NOTES_1.1.0.md](RELEASE_NOTES_1.1.0.md)
 
 ### New Features
 
-- **Dallas Sensor Custom Labels & Graphs**: DS18x20 sensors now support custom labels (inline editing in Web UI), auto-discovery, MQTT/HA publishing, and real-time graph visualization with 16-color palette. Labels stored in `/dallas_labels.ini` with zero backend RAM usage. New bulk REST API: `GET/POST /api/v1/sensors/labels`. Label backup/restore during filesystem flash.
-- **WebUI Data Persistence**: Automatic log persistence to `localStorage` with debounced saves, dynamic memory management (adapts to browser resources), normal/capture modes, and auto-restoration on page load.
-- **Browser Debug Console (`otgwDebug`)**: Full diagnostic toolkit in browser console — `status()`, `info()`, `settings()`, `wsStatus()`, `logs()`, `api()`, `health()`, `exportLogs()`, and more.
+- **Dallas Sensor Custom Labels & Graphs**: DS18x20 sensors now support custom labels (inline editing in Web UI), auto-discovery, MQTT/HA publishing, and real-time graph visualization with 16-color palette. Labels stored in `/dallas_labels.ini` with zero backend RAM usage. New bulk REST API: `GET/POST /api/v2/sensors/labels`. Automatic label backup/restore during filesystem flash.
+- **WebUI Data Persistence**: Automatic log data persistence to `localStorage` with debounced 2-second saves, dynamic memory management (adapts to browser resources), normal/capture modes, and auto-restoration on page load.
+- **Browser Debug Console (`otgwDebug`)**: Full diagnostic toolkit in browser console — `status()`, `info()`, `settings()`, `wsStatus()`, `logs()`, `api()`, `health()`, `sendCmd()`, `exportLogs()`, and more.
 - **Non-Blocking Modal Dialogs**: Custom HTML/CSS modals replace blocking `prompt()`/`alert()`, maintaining real-time WebSocket data flow during user input.
-- **RESTful API v2**: Complete v2 API with 13 new endpoints — consistent JSON errors, proper HTTP status codes (202 for async), CORS support, RESTful resource naming (`messages/{id}`, `commands`, `device/info`). API compliance score improved from 5.4 → 8.5/10. Frontend fully migrated to v2 with zero legacy calls remaining. See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md).
+- **PS Mode (Print Summary) Detection**: Automatic detection of `PS=1` mode from the OTGW PIC. When active, the UI hides the OT log section, disables WebSocket streaming, and suppresses time-sync commands — improving compatibility with legacy integrations (e.g. Domoticz).
+- **RESTful API v2**: 13 new v2 endpoints with consistent JSON errors, proper HTTP status codes (202 for async), CORS/OPTIONS support, RESTful resource naming (`messages/{id}`, `commands`, `device/info`). API compliance score improved from 5.4 → 8.5/10. Frontend fully migrated to v2 with zero legacy calls remaining. See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md).
 
 ### Bug Fixes
 
 - **MQTT Whitespace Auth Fix**: Automatic trimming of whitespace in MQTT credentials, fixing authentication failures when upgrading from v0.10.x.
-- **Streaming File Serving**: Replaced full-file-to-RAM loading with chunked streaming — 95% memory reduction for serving Web UI files.
+- **Streaming File Serving**: Replaced full-file-to-RAM loading with chunked streaming — 95% memory reduction for serving Web UI files. This resolves the slow UI reported on v1.0.0.
+- **Settings Persistence**: Fixed settings appearing editable but reverting to defaults. Replaced manual string parsing with ArduinoJson and added synchronous flash write before HTTP 200 response.
+- **Dark Mode PIC Firmware Icons**: Icons in the PIC firmware tab are now white in dark mode via CSS `filter: invert(1)`.
+- **Gateway Mode Throttling**: Gateway mode polling now limited to once per minute, preventing excessive serial traffic.
 
-### Codebase Review & Bug Fixes
+### Codebase Review (20 findings resolved)
 
-A comprehensive code review identified and resolved 20 bugs across memory safety, data integrity, concurrency, security, and reliability:
+A comprehensive review identified and resolved 20 bugs across memory safety, data integrity, concurrency, security, and reliability:
 
-- **Memory safety**: Out-of-bounds array write on OT message ID 255 (crash/corruption), stack buffer overflow in hex file parser, year overflow truncation
-- **Data integrity**: Wrong bitmask corrupting afternoon/evening hours in MQTT time data, disconnected sensor (-127°C) published to MQTT
+- **Memory safety**: Out-of-bounds array write on OT message ID 255, stack buffer overflow in hex parser, year overflow
+- **Data integrity**: Wrong bitmask corrupting MQTT hours 16–23, disconnected sensor (-127°C) published to MQTT
 - **Concurrency**: ISR race conditions in S0 pulse counter causing incorrect energy readings
 - **Security**: Reflected XSS in REST API error pages, dead admin password code removed
-- **Reliability**: File descriptor leak in settings, null pointer crash on malformed MQTT topics, 750ms blocking sensor read (watchdog risk), HTTP client leak on PIC update failure
+- **Reliability**: File descriptor leak, null pointer crash on malformed MQTT topics, 750ms blocking sensor read, HTTP client leak
 - **Feature fix**: GPIO outputs gated by debug flag — feature was completely non-functional
 - **Flash wear**: Settings save reduced from 20 flash writes to 1 via deferred flush with 2s debounce
 - **Code quality**: Proper JSON parsing for settings POST, GPIO conflict detection, macro safety
@@ -43,31 +49,25 @@ Full details: [Codebase Review](docs/reviews/2026-02-13_codebase-review/CODEBASE
 
 ### Performance & Stability
 
-- **Heap Memory Monitoring**: 4-level health system (CRITICAL/WARNING/LOW/HEALTHY) with adaptive throttling and WebSocket backpressure control.
-- **Memory Safety**: Extensive optimizations using `PROGMEM` to drastically reduce RAM usage and heap fragmentation.
-- **Reliability**: Enhanced Watchdog integration and safe timer handling.
+- **Heap Memory Monitoring**: 4-level health system (CRITICAL/WARNING/LOW/HEALTHY) with adaptive throttling and WebSocket backpressure control ([ADR-030](docs/adr/ADR-030-heap-memory-monitoring.md)).
+- **Memory Safety**: Extensive optimizations using `PROGMEM` to reduce RAM usage and heap fragmentation.
+- **UI Improvements**: Refined editor styles, improved log auto-scroll behavior, better OTmonitor refresh (5s → 1s).
 - **MQTT Auto Discovery**: Improved Home Assistant integration stability.
 
 ### ⚠️ API Deprecation Notice
 
-The following REST API versions and endpoints are **deprecated** and will be **removed in the next minor release** (v1.3.0):
-
-- **`/api/v0/*`** — All v0 endpoints (`/api/v0/devinfo`, `/api/v0/devtime`, `/api/v0/settings`, `/api/v0/otgw/{msgid}`). Use the equivalent v1 or v2 endpoints instead.
-- **`/api/firmwarefilelist`** — Unversioned endpoint. A versioned replacement will be provided under `/api/v2/`.
-- **`/api/listfiles`** — Unversioned endpoint. A versioned replacement will be provided under `/api/v2/`.
-
-**Migration guide:**
+The following REST API versions and endpoints are **deprecated** and will be **removed in v1.3.0**:
 
 | Deprecated endpoint | Replacement |
 |---------------------|-------------|
 | `GET /api/v0/devinfo` | `GET /api/v2/device/info` |
-| `GET /api/v0/devtime` | `GET /api/v1/devtime` or `GET /api/v2/device/time` |
-| `GET/POST /api/v0/settings` | `GET/POST /api/v1/settings` or `GET/POST /api/v2/settings` |
-| `GET /api/v0/otgw/{msgid}` | `GET /api/v1/otgw/id/{msgid}` or `GET /api/v2/otgw/messages/{msgid}` |
+| `GET /api/v0/devtime` | `GET /api/v2/device/time` |
+| `GET/POST /api/v0/settings` | `GET/POST /api/v2/settings` |
+| `GET /api/v0/otgw/{msgid}` | `GET /api/v2/otgw/messages/{msgid}` |
 | `GET /api/firmwarefilelist` | `GET /api/v2/firmware/files` |
 | `GET /api/listfiles` | `GET /api/v2/filesystem/files` |
 
-New v2 API endpoints follow RESTful best practices (JSON errors, proper HTTP status codes, resource naming). See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md) for details.
+See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md) for details.
 
 ## 🏁 Introduced in v1.0.0
 
@@ -329,7 +329,7 @@ For release artifacts, see <https://github.com/rvdbreemen/OTGW-firmware/releases
 
 | Version | Release notes |
 | --- | --- |
-| 1.1.0-beta | **New Features**:<br>• Dallas Sensor Custom Labels — inline editing in Web UI, labels stored in `/dallas_labels.ini`, zero backend RAM, label backup/restore during filesystem flash<br>• Dallas Sensor Graph Visualization — sensors auto-appear in real-time graph with 16-color palette (light/dark themes)<br>• Dallas Sensor REST API — bulk `GET/POST /api/v2/sensors/labels`<br>• WebUI Data Persistence — automatic `localStorage` persistence with debounced saves, dynamic memory management, normal/capture modes, auto-restoration on page load<br>• Browser Debug Console (`otgwDebug`) — full diagnostic toolkit in browser console<br>• Non-Blocking Modal Dialogs — custom HTML/CSS modals replace blocking `prompt()`/`alert()`<br>• **RESTful API v2** — 13 new v2 endpoints with consistent JSON errors, proper HTTP status codes (202 for async), CORS support, RESTful resource naming; API compliance score 5.4→8.5/10; all frontend calls migrated to v2; v0/unversioned endpoints deprecated (ADR-035)<br>**Bug Fixes**:<br>• MQTT Whitespace Auth Fix — automatic trimming of credentials whitespace, fixing auth failures upgrading from v0.10.x<br>• Streaming File Serving — replaced full-file-to-RAM with chunked streaming (95% memory reduction)<br>• 20 bugs resolved from comprehensive codebase review: memory safety (OOB write, stack overflow), data integrity (MQTT hour bitmask, -127°C sensor), concurrency (ISR race), security (XSS), reliability (file descriptor leak, null pointer crash, blocking sensor read), GPIO output feature fix, flash wear reduction (20→1 writes), proper JSON settings parsing<br>**Improvements**:<br>• Heap Memory Monitoring — 4-level health system with adaptive throttling and WebSocket backpressure<br>• Settings flash wear reduction — deferred writes with 2s debounce (20 writes → 1)<br>• GPIO conflict detection for sensor/S0/output pin assignments<br>• ADR Compliance CI workflow for pull requests<br>• Build system: `version.hash` always generated, centralized `config.py`<br>• Reusable GitHub Actions composite actions for CI/CD<br>• Full OpenAPI spec updated for all v2 endpoints<br>**Migration Notes**:<br>• Filesystem flash recommended alongside firmware flash<br>• Hard browser refresh (Ctrl+F5) recommended<br>• v0/unversioned API endpoints deprecated (removal in v1.3.0); migrate to v2<br>• No breaking API or MQTT changes |
+| 1.1.0-beta | **New Features**: Dallas Sensor Custom Labels & Graphs (inline editing, 16-color graph, bulk REST API, label backup/restore), WebUI Data Persistence (localStorage, normal/capture modes), Browser Debug Console (`otgwDebug`), Non-Blocking Modal Dialogs, PS Mode Detection (PS=1 compatibility for Domoticz), RESTful API v2 (13 new endpoints, CORS, JSON errors, compliance 5.4→8.5/10; all frontend migrated to v2).<br>**Bug Fixes**: MQTT whitespace auth fix (v0.10.x upgrade), Streaming file serving (95% memory reduction, fixes slow UI), Settings persistence (ArduinoJson + synchronous flush), Dark mode PIC firmware icons, Gateway mode polling throttle (once/min). Plus 20 bugs from codebase review: OOB array write, stack overflow, MQTT hour bitmask, ISR race conditions, reflected XSS, GPIO outputs broken, flash wear (20→1 writes), and more.<br>**Improvements**: Heap memory monitoring (4-level health + WebSocket backpressure), UI refinements (editor styles, log auto-scroll, OTmonitor 1s refresh), GPIO conflict detection, ADR Compliance CI, build system (`version.hash`, `config.py`), 6 new ADRs (030–035), full OpenAPI spec.<br>**Migration**: Filesystem flash + hard browser refresh recommended. v0/unversioned API deprecated (removal in v1.3.0). No breaking changes.<br>Full notes: [RELEASE_NOTES_1.1.0.md](RELEASE_NOTES_1.1.0.md) |
 | 1.0.0 | **Milestone Release**: The complete vision of the firmware with a stable API, modern UI, and robust integration.<br>**New Features**:<br>• Live Logging (real-time WebSocket streaming with backpressure handling, UI controls for auto-scroll, timestamps, and capture)<br>• Interactive Graphs (real-time data visualization with extended history buffers and time window controls)<br>• Modern Web UI (responsive design with fully integrated Dark Theme - persistent, refactored DevInfo page)<br>• Improved Tools (new build system `build.py` and automated flashing tool `flash_esp.py`, enhanced firmware update UI with live progress)<br>• Gateway Mode (reliable detection using `PR=M` command, checks every 30s)<br>• NTP Control (new `NTPsendtime` setting).<br>**Integration (MQTT & HA)**:<br>• Auto Discovery (added support for Outside Temperature override `outside`)<br>• Documentation (clarified `hotwater` command values/examples)<br>• Stability (static 1350-byte MQTT buffer to prevent heap fragmentation).<br>**Core Stability & Security**:<br>• Binary Safety (critical fix for Exception (2) crashes during PIC flashing, replaced `strncmp_P` with `memcmp_P`)<br>• Connectivity (rewritten Wi-Fi logic with improved watchdog handling)<br>• Security (CSRF protection on APIs, masked password fields, input sanitization)<br>• Data Parsing (better validation in `processLine`, support for Type 0 messages).<br>**Breaking Changes**:<br>• Dallas Sensors (default pin changed from GPIO 13/D7 to GPIO 10/SD3 to match hardware defaults).<br>**Documentation**: Added `FLASH_GUIDE.md`, `BUILD.md`. |
 | 0.10.3 | Web UI: Mask MQTT password field and support running behind a reverse proxy (auto-detect http/https)<br>Home Assistant: Improve discovery templates (remove empty unit_of_measurement and add additional sensors/boundary values)<br>Fix: Status functions and REST API status reporting<br>CI: Improved GitHub Actions build/release workflow and release artifacts. |
 | 0.10.2 | Bugfix: issue #213 which caused 0 bytes after update of PIC firwmare (dropped to Adruino core 2.7.4)<br>Update to filesystem to include latest PIC firmware (6.5 and 5.8, released 12 march 2023)<br>Fix: Back to correct hostname to wifi (credits to @hvxl)<br>Fix: Adding a little memory for use with larger settings. |
