@@ -333,17 +333,17 @@ void processAPI()
             sendApiError(400, F("Missing command"));
             return;
           }
-          constexpr size_t kMaxCmdLen2 = sizeof(cmdqueue[0].cmd) - 1;
-          const size_t cmdLen2 = strlen(words[5]);
-          if ((cmdLen2 < 3) || (words[5][2] != '=')) {
+          constexpr size_t kMaxCmdLen = sizeof(cmdqueue[0].cmd) - 1;
+          const size_t cmdLen = strlen(words[5]);
+          if ((cmdLen < 3) || (words[5][2] != '=')) {
             sendApiError(400, F("Invalid command format (expected XX=value)"));
             return;
           }
-          if (cmdLen2 > kMaxCmdLen2) {
+          if (cmdLen > kMaxCmdLen) {
             sendApiError(413, F("Command too long"));
             return;
           }
-          addOTWGcmdtoqueue(words[5], static_cast<int>(cmdLen2));
+          addOTWGcmdtoqueue(words[5], static_cast<int>(cmdLen));
           httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
           httpServer.send(202, F("application/json"), F("{\"status\":\"queued\"}"));
         } else if (wc > 4 && strcmp_P(words[4], PSTR("autoconfigure")) == 0) {
