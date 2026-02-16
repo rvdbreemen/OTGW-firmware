@@ -43,7 +43,7 @@ Desired Behavior:
 - ❌ **Breaking change**, migration complexity
 
 ### Option 4: Feature Flag (Recommended)
-- Default: Current behavior (disabled)
+- Default: Enabled (backward compatible)
 - When enabled: Option 1 (separate topics)
 - ✅ **Backward compatible**, user choice
 - ❌ Two code paths to maintain
@@ -55,14 +55,14 @@ Desired Behavior:
 **Why:** Best balance of compatibility, functionality, and user control.
 
 **Implementation:**
-1. Add setting: `settingMQTTSeparateSources` (default: false)
-2. When disabled: Works exactly as today (no changes)
-3. When enabled: Publishes to both original + source-specific topics
+1. Add setting: `settingMQTTSeparateSources` (default: true - enabled)
+2. Original topics always published (backward compatibility)
+3. When enabled (default): Also publishes to source-specific topics
 4. Auto-discovery: Creates separate Home Assistant sensors
 
 **Memory Impact:**
 - When disabled: 0 bytes
-- When enabled: ~10KB for 30 messages (manageable)
+- When enabled (default): ~10KB for 30 messages (manageable)
 - ESP8266 has ~45KB available, leaves ~35KB
 
 ---
@@ -71,7 +71,7 @@ Desired Behavior:
 
 ```cpp
 // Settings
-bool settingMQTTSeparateSources = false;  // User toggles in Web UI
+bool settingMQTTSeparateSources = true;  // Default enabled, user can toggle in Web UI
 
 // Publishing
 void print_f88(float& value) {
