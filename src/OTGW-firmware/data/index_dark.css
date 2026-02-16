@@ -221,6 +221,7 @@
     height: 30px;
     object-fit: cover;
     cursor: pointer;
+    filter: invert(1);
   }
 
   .nav-clock {
@@ -1028,6 +1029,7 @@ body.disable-interaction {
 .firmware-icon {
   width: 16px;
   height: auto;
+  filter: invert(1);
 }
 
 .firmware-progress {

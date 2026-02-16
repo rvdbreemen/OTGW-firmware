@@ -384,6 +384,7 @@ bool updateRebootLog(String text)
 
 void doRestart(const char* str) {
   DebugTln(str);
+  flushSettings();  // Persist any pending settings before reboot
   delay(2000);  // Enough time for messages to be sent.
   ESP.restart();
   delay(5000);  // Enough time to ensure we don't return.
