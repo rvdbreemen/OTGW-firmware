@@ -99,7 +99,22 @@ update_indexes: | $(CFGFILE)
 $(LIBRARIES): | update_indexes
 
 $(BOARDS): | update_indexes
-	$(CLICFG) core install $(PLATFORM)
+	@echo "Installing ESP8266 platform..."
+	@for i in 1 2 3; do \
+		if $(CLICFG) core install $(PLATFORM); then \
+			echo "✓ Platform installed successfully"; \
+			break; \
+		else \
+			if [ $$i -lt 3 ]; then \
+				wait_time=$$((2 ** $$i)); \
+				echo "⚠ Platform install failed (attempt $$i/3), retrying in $${wait_time}s..."; \
+				sleep $$wait_time; \
+			else \
+				echo "✗ Platform install failed after 3 attempts"; \
+				exit 1; \
+			fi; \
+		fi; \
+	done
 
 refresh: | $(CFGFILE)
 	@echo "Refreshing library index..."
