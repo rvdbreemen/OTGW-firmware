@@ -553,6 +553,45 @@ void PrintMQTTError(){
   }
 }
 
+//=======================================================================
+// ADR-040: Publish to source-specific MQTT topic
+// Publishes value to topic with source suffix (_thermostat, _boiler, _gateway)
+// Only called when settingMQTTSeparateSources is enabled
+//=======================================================================
+void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype) {
+  if (!settingMQTTSeparateSources) return;  // Feature disabled
+  if (!baseTopic || !value) return;          // Null safety
+  
+  char sourceTopic[MQTT_TOPIC_MAX_LEN];
+  const char* suffix;
+  
+  // Determine suffix based on message source (ADR-038: OpenTherm Data Flow Pipeline)
+  switch(rsptype) {
+    case OTGW_THERMOSTAT:        // T message - master request
+      suffix = "_thermostat";
+      break;
+    case OTGW_BOILER:            // B message - slave response
+      suffix = "_boiler";
+      break;
+    case OTGW_REQUEST_BOILER:    // R message - gateway override to boiler
+    case OTGW_ANSWER_THERMOSTAT: // A message - gateway override to thermostat
+      suffix = "_gateway";
+      break;
+    default:
+      // Don't publish for parity errors or unknown types
+      return;
+  }
+  
+  // Build source-specific topic: <baseTopic><suffix>
+  snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s%s"), baseTopic, suffix);
+  
+  // Publish to source-specific topic (not retained to save MQTT broker memory)
+  sendMQTTData(sourceTopic, value, false);
+  
+  // Note: Auto-discovery configs for source topics are sent by doAutoConfigureMsgid()
+  // when settingMQTTSeparateSources is enabled
+}
+
 /* 
   topic:  <string> , sensor topic, will be automatically prefixed with <mqtt topic>/value/<node_id>
   json:   <string> , payload to send
