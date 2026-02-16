@@ -22,7 +22,7 @@ Tracks all tasks from the [REST API Evaluation](docs/reviews/2026-02-16_restful-
 | HATEOAS / hypermedia links | ❌ Won't do | Too heavy for ESP8266; documented in ADR-035 |
 | Pagination | ❌ Won't do | Collections are small and bounded (documented in ADR-035) |
 
-**Current score: 7.8/10** (up from 5.4/10 before this PR)
+**Current score: 7.7/10** (up from 5.4/10 before this PR)
 
 ### Remaining gaps (acceptable for embedded IoT):
 1. **`Allow` header on 405** — RFC 7231 §6.5.5 requires listing valid methods. Needs per-endpoint method tracking. Low client impact since v2 errors include descriptive JSON messages.
@@ -122,7 +122,7 @@ Tracks all tasks from the [REST API Evaluation](docs/reviews/2026-02-16_restful-
 
 ## Summary
 
-**Phase 1 (this PR):** 43 tasks completed. All v2 endpoints implemented with RESTful patterns. All frontend calls migrated to v2. Score improved from 5.4 → 7.8/10.
+**Phase 1 (this PR):** 43 tasks completed. All v2 endpoints implemented with RESTful patterns. All frontend calls migrated to v2. Score improved from 5.4 → 7.7/10.
 
 **Phase 2 (v1.3.0):** 7 tasks remaining. Migrate non-API endpoints (`/ReBoot`, `/pic`, `/upload`) to proper v2 POST endpoints. Add `Allow` header to 405 responses.
 
