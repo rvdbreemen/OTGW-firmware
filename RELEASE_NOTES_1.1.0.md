@@ -49,6 +49,33 @@ Version 1.1.0-beta builds on the stable v1.0.0 foundation with new Dallas temper
 - Maintains real-time WebSocket data flow during user input
 - Used for Dallas sensor label editing
 
+### RESTful API v2 — Complete Implementation
+- **13 new v2 endpoints** with full RESTful compliance (score improved from 5.4/10 → 8.5/10)
+- Consistent JSON error responses: `{"error":{"status":N,"message":"..."}}`
+- Proper HTTP status codes: 202 Accepted for async operations (`commands`, `discovery`), 400/404/405/413 for errors
+- RFC 7231 §6.5.5 `Allow` header on all 405 responses (v1 and v2)
+- CORS support: `Access-Control-Allow-Origin: *` on all v2 responses + OPTIONS preflight (204 No Content)
+- RESTful resource naming: `messages/{id}`, `commands` (body-based), `discovery`, `device/info`, `device/time`
+- New `POST /api/v2/otgw/commands` accepts JSON body (`{"command":"TT=20.5"}`) or plain text
+- New `GET /api/v2/device/info` returns map-format device information (fixes frontend bug where `v1/devinfo` didn't exist)
+- Versioned replacements for unversioned endpoints: `GET /api/v2/firmware/files`, `GET /api/v2/filesystem/files`
+- Backward-compatible aliases for smooth migration: `/otgw/id/`, `/otgw/label/`, `/otgw/command/`
+- JSON 404 responses for all `/api/*` routes (HTML 404 for non-API routes)
+- Full OpenAPI specification updated for all v2 endpoints
+- See: [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md), [API Documentation](docs/api/README.md)
+
+### Frontend Migration to v2 API
+- **All frontend API calls migrated from v0/v1/unversioned to v2** — zero legacy calls remain in `index.js`
+- Response parsing updated from array-based to map-based format (cleaner, more efficient)
+- OTmonitor refresh interval improved from 5s to 1s for more responsive UI
+- Temperature graph processing simplified (removed unnecessary visibility check)
+- Gateway mode detection improved (handles boolean values)
+
+### API Deprecation Notice
+- **v0 endpoints** (`/api/v0/*`) deprecated — removal planned for v1.3.0
+- **Unversioned endpoints** (`/api/firmwarefilelist`, `/api/listfiles`) deprecated — use v2 equivalents
+- Migration table provided in README
+
 ---
 
 ## Bug Fixes
@@ -121,12 +148,14 @@ Full details: [docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md](docs/
 - Detects architectural file changes and suggests ADRs
 
 ### Documentation
-- 5 new Architecture Decision Records (ADR-030 through ADR-034)
+- 6 new Architecture Decision Records (ADR-030 through ADR-035)
 - Comprehensive codebase review archive: [docs/reviews/2026-02-13_codebase-review/](docs/reviews/2026-02-13_codebase-review/)
+- REST API evaluation and improvement plan: [docs/reviews/2026-02-16_restful-api-evaluation/](docs/reviews/2026-02-16_restful-api-evaluation/)
 - New feature docs: Dallas sensors, data persistence
 - New guides: browser debug console, release workflow
-- 6 code review archives in `docs/reviews/`
-- OpenAPI spec for Dallas sensor labels API
+- 7 code review archives in `docs/reviews/`
+- Full OpenAPI specification updated for all v2 endpoints: [docs/api/openapi.yaml](docs/api/openapi.yaml)
+- Updated API documentation: [docs/api/README.md](docs/api/README.md)
 
 ---
 
@@ -137,8 +166,9 @@ When upgrading from v1.0.0:
 1. **Filesystem flash recommended** alongside firmware flash — new Web UI files and Dallas sensor label support require updated LittleFS partition
 2. **Hard browser refresh (Ctrl+F5)** recommended to pick up new JavaScript (WebUI persistence, debug console)
 3. **MQTT credentials** — whitespace trimming is now automatic on boot; no user action needed
-4. **No breaking API changes** — all existing REST API endpoints (`/api/v0/`, `/api/v1/`, `/api/v2/`) remain unchanged; new endpoint added: `GET/POST /api/v1/sensors/labels`
-5. **No breaking MQTT changes** — all topics remain the same
+4. **No breaking API changes** — all existing REST API endpoints (`/api/v0/`, `/api/v1/`, `/api/v2/`) remain unchanged
+5. **v0 and unversioned endpoints deprecated** — still functional but scheduled for removal in v1.3.0; migrate to v2 endpoints (see migration table in README)
+6. **No breaking MQTT changes** — all topics remain the same
 
 ---
 
@@ -151,3 +181,4 @@ When upgrading from v1.0.0:
 | ADR-032 | No Authentication Pattern / Local Network Security Model | Accepted |
 | ADR-033 | Dallas Sensor Custom Labels and Graph Visualization | Accepted |
 | ADR-034 | Non-Blocking Modal Dialogs for User Input | Accepted |
+| ADR-035 | RESTful API Compliance Strategy | Accepted |
