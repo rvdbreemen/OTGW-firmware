@@ -1074,14 +1074,21 @@ body.disable-interaction {
 }
 
 .sensor-label-inline-editor {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
   width: 100%;
   max-width: 220px;
   font: inherit;
-  padding: 2px 6px;
+  line-height: normal;
+  padding: 0 6px;
+  margin: 0;
   border-radius: 3px;
   box-sizing: border-box;
   color: #212529;
   background: #fff;
-  border: 1px solid #007bff;
+  outline: 1px solid #007bff;
+  outline-offset: -1px;
+  border: none;
 }
 
