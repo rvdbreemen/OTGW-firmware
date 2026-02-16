@@ -100,6 +100,7 @@ void writeSettings(bool show)
   root[F("MQTThaprefix")] = settingMQTThaprefix;
   root[F("MQTTuniqueid")] = settingMQTTuniqueid;
   root[F("MQTTOTmessage")] = settingMQTTOTmessage;
+  root[F("MQTTSeparateSources")] = settingMQTTSeparateSources; // ADR-040
   root[F("MQTTharebootdetection")]= settingMQTTharebootdetection;  
   root[F("NTPenable")] = settingNTPenable;
   root[F("NTPtimezone")] = settingNTPtimezone;
@@ -205,6 +206,7 @@ void readSettings(bool show)
   if (strlen(settingMQTTuniqueid)==0 || strcmp_P(settingMQTTuniqueid, PSTR("null"))==0) strlcpy(settingMQTTuniqueid, getUniqueId(), sizeof(settingMQTTuniqueid));
 
   settingMQTTOTmessage    = doc[F("MQTTOTmessage")]|settingMQTTOTmessage;
+  settingMQTTSeparateSources = doc[F("MQTTSeparateSources")]|settingMQTTSeparateSources; // ADR-040
   settingNTPenable        = doc[F("NTPenable")]; 
   
   strlcpy(settingNTPtimezone, doc[F("NTPtimezone")] | "", sizeof(settingNTPtimezone));
@@ -344,6 +346,7 @@ void updateSetting(const char *field, const char *newValue)
     if (strlen(settingMQTTuniqueid) == 0)   strlcpy(settingMQTTuniqueid, getUniqueId(), sizeof(settingMQTTuniqueid));
   }
   if (strcasecmp_P(field, PSTR("MQTTOTmessage"))==0)   settingMQTTOTmessage = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("MQTTSeparateSources"))==0)  settingMQTTSeparateSources = EVALBOOLEAN(newValue); // ADR-040
   if (strstr_P(field, PSTR("mqtt")) != NULL)        pendingSideEffects |= SIDE_EFFECT_MQTT; // defer MQTT restart to flushSettings()
   
   if (strcasecmp_P(field, PSTR("NTPenable"))==0)      settingNTPenable = EVALBOOLEAN(newValue);

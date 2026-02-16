@@ -637,7 +637,14 @@ void print_f88(float& value)
 
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
-    sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
+    const char* baseTopic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
+    
+    // Always publish to original topic (backward compatibility)
+    sendMQTTData(baseTopic, _msg);
+    
+    // ADR-040: If feature enabled, also publish to source-specific topic
+    publishToSourceTopic(baseTopic, _msg, OTdata.rsptype);
+    
     value = _value;
   }
 }
@@ -654,7 +661,14 @@ void print_s16(int16_t& value)
 
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
-    sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
+    const char* baseTopic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
+    
+    // Always publish to original topic (backward compatibility)
+    sendMQTTData(baseTopic, _msg);
+    
+    // ADR-040: If feature enabled, also publish to source-specific topic
+    publishToSourceTopic(baseTopic, _msg, OTdata.rsptype);
+    
     value = _value;
   }
 }
@@ -666,20 +680,33 @@ void print_s8s8(uint16_t& value)
   //Build string for MQTT
   char _msg[15] {0};
   char _topic[50] {0};
+  const char* baseTopicStr = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
+  
+  // Publish HB (high byte)
   itoa((int8_t)OTdata.valueHB, _msg, 10);
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+  strlcpy(_topic, baseTopicStr, sizeof(_topic));
   strlcat(_topic, "_value_hb", sizeof(_topic));
-  //AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
+  
   if (is_value_valid(OTdata, OTlookupitem)){
+    // Always publish to original topic (backward compatibility)
     sendMQTTData(_topic, _msg);
+    
+    // ADR-040: If feature enabled, also publish to source-specific topic
+    publishToSourceTopic(_topic, _msg, OTdata.rsptype);
   }
-  //Build string for MQTT
+  
+  // Publish LB (low byte)
   itoa((int8_t)OTdata.valueLB, _msg, 10);
-  strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
+  strlcpy(_topic, baseTopicStr, sizeof(_topic));
   strlcat(_topic, "_value_lb", sizeof(_topic));
-  //AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
+  
   if (is_value_valid(OTdata, OTlookupitem)){
+    // Always publish to original topic (backward compatibility)
     sendMQTTData(_topic, _msg);
+    
+    // ADR-040: If feature enabled, also publish to source-specific topic
+    publishToSourceTopic(_topic, _msg, OTdata.rsptype);
+    
     value = OTdata.u16();
   }
 }
@@ -695,7 +722,14 @@ void print_u16(uint16_t& value)
   
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
-    sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
+    const char* baseTopic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
+    
+    // Always publish to original topic (backward compatibility)
+    sendMQTTData(baseTopic, _msg);
+    
+    // ADR-040: If feature enabled, also publish to source-specific topic
+    publishToSourceTopic(baseTopic, _msg, OTdata.rsptype);
+    
     value = _value;
   }
 }
