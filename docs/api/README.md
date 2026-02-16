@@ -42,9 +42,10 @@ http://{device-ip}/api
 
 ### API Versions
 
-- **v0**: Legacy API (deprecated, maintained for backward compatibility)
-- **v1**: Current stable API with improved structure  
-- **v2**: Optimized API with reduced payload sizes
+- **v1**: Current stable API with text-based error responses  
+- **v2**: RESTful-compliant API with JSON errors, proper status codes, and resource naming. **Recommended for new integrations.**
+
+> **Note:** v0 endpoints are deprecated and not documented here. Migrate to v1 or v2.
 
 ### Authentication
 
@@ -55,27 +56,42 @@ None. The device is designed for local network use only.
 ## Quick Reference
 
 ### Health & Status
-- `GET /v1/health` - Device health status
-- `GET /v0/devinfo` - Comprehensive device information
-- `GET /v1/devtime` - Current date/time
+- `GET /v2/health` - Device health status (JSON errors)
+- `GET /v1/health` - Device health status (text errors)
+- `GET /v2/device/info` - Comprehensive device information (map format)
+- `GET /v2/device/time` - Current date/time
 
 ### OpenTherm Data
-- `GET /v1/otgw/id/{msgid}` - Get value by message ID (0-127)
+- `GET /v2/otgw/messages/{msgid}` - Get value by message ID (0-127, RESTful)
+- `GET /v1/otgw/id/{msgid}` - Get value by message ID (v1 format)
 - `GET /v1/otgw/label/{label}` - Get value by label name
-- `GET /v1/otgw/otmonitor` - All OpenTherm data
-- `GET /v2/otgw/otmonitor` - Optimized payload version
+- `GET /v2/otgw/otmonitor` - All OpenTherm data (optimized v2 format)
+- `GET /v1/otgw/otmonitor` - All OpenTherm data (v1 format)
+- `GET /v2/otgw/telegraf` - OpenTherm data in Telegraf format
 
 ### Commands
-- `POST /v1/otgw/command/{command}` - Send OTGW command (format: `XX=value`)
+- `POST /v2/otgw/commands` - Send OTGW command (JSON body: `{"command":"TT=20.5"}`, returns 202)
+- `POST /v1/otgw/command/{command}` - Send OTGW command (URL path format)
+- `POST /v2/otgw/discovery` - Trigger MQTT autodiscovery (returns 202)
 - `POST /v1/otgw/autoconfigure` - Trigger MQTT autodiscovery
 
 ### Settings
-- `GET /v1/settings` - Get all settings
-- `POST /v1/settings` - Update settings
+- `GET /v2/settings` - Get all settings (JSON errors)
+- `POST /v2/settings` - Update settings (JSON errors)
+- `GET /v1/settings` - Get all settings (text errors)
+- `POST /v1/settings` - Update settings (text errors)
 
-### Firmware Updates
-- `GET /v1/flashstatus` - Flash status (ESP + PIC)
-- `GET /v1/pic/flashstatus` - PIC flash status only
+### Sensors
+- `GET /v2/sensors/labels` - Get Dallas sensor labels (JSON errors)
+- `POST /v2/sensors/labels` - Update Dallas sensor labels (JSON errors)
+
+### Firmware & Filesystem
+- `GET /v2/flash/status` - Flash status (ESP + PIC)
+- `GET /v2/pic/flash-status` - PIC flash status only
+- `GET /v2/firmware/files` - List PIC firmware files
+- `GET /v2/filesystem/files` - List filesystem files
+- `GET /v1/flashstatus` - Flash status (v1 format)
+- `GET /v1/pic/flashstatus` - PIC flash status (v1 format)
 
 ## Response Formats
 
@@ -93,19 +109,32 @@ None. The device is designed for local network use only.
 }
 ```
 
-### Error Response
+### Error Responses
+
+**v2 (JSON errors — recommended):**
+```json
+{"error":{"status":400,"message":"Invalid message ID"}}
+```
+
+**v1 (text errors):**
 ```
 400: invalid msgid\r\n
 ```
-Errors are returned as plain text with HTTP status codes.
+
+### v2 Queued Operations
+Commands and discovery return **202 Accepted**:
+```json
+{"status":"queued"}
+```
 
 ## Boolean Values
 
-**Important**: The v0 and v1 APIs return boolean values as strings:
+**Important**: The v1 API returns boolean values as strings:
 - `"true"` (string)
 - `"false"` (string)
 
-This is intentional for backward compatibility. Parse accordingly.
+The v2 `/device/info` endpoint returns proper JSON booleans (`true`/`false`).
+Parse accordingly based on which API version you use.
 
 ## OpenTherm Message IDs
 
@@ -159,67 +188,102 @@ This prevents crashes and ensures stable operation.
 
 ## Examples
 
-### Get Device Health
+### Get Device Health (v2)
 ```bash
-curl http://otgw.local/api/v1/health
+curl http://otgw.local/api/v2/health
 ```
 
-### Get Boiler Temperature
+### Get Device Information (v2)
+```bash
+curl http://otgw.local/api/v2/device/info
+```
+
+### Get Boiler Temperature (v2)
+```bash
+curl http://otgw.local/api/v2/otgw/messages/25
+```
+
+### Send Temperature Override (v2)
+```bash
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"command":"TT=21.5"}' \
+  http://otgw.local/api/v2/otgw/commands
+```
+
+### Get All OpenTherm Data (v2)
+```bash
+curl http://otgw.local/api/v2/otgw/otmonitor
+```
+
+### Trigger MQTT Autodiscovery (v2)
+```bash
+curl -X POST http://otgw.local/api/v2/otgw/discovery
+```
+
+### Get Boiler Temperature (v1)
 ```bash
 curl http://otgw.local/api/v1/otgw/id/25
 ```
 
-### Send Temperature Override
+### Send Temperature Override (v1)
 ```bash
 curl -X POST http://otgw.local/api/v1/otgw/command/TT=21.5
 ```
 
-### Get All OpenTherm Data
-```bash
-curl http://otgw.local/api/v1/otgw/otmonitor
-```
-
-### Trigger MQTT Autodiscovery
-```bash
-curl -X POST http://otgw.local/api/v1/otgw/autoconfigure
-```
-
 ## Integration Examples
 
-### Home Assistant REST Sensor
+### Home Assistant REST Sensor (v2)
 ```yaml
 sensor:
   - platform: rest
     name: "OTGW Boiler Temperature"
-    resource: "http://otgw.local/api/v1/otgw/id/25"
+    resource: "http://otgw.local/api/v2/otgw/messages/25"
     value_template: "{{ value_json.value }}"
     unit_of_measurement: "°C"
     scan_interval: 10
 ```
 
-### Python Script
+### Python Script (v2)
 ```python
 import requests
 
 # Get health status
-response = requests.get('http://otgw.local/api/v1/health')
+response = requests.get('http://otgw.local/api/v2/health')
 health = response.json()['health']
 print(f"Status: {health['status']}, Heap: {health['heap']} bytes")
 
-# Set temperature override
-cmd = requests.post('http://otgw.local/api/v1/otgw/command/TT=21.5')
-print(cmd.text)  # Should print "OK"
+# Get device info
+response = requests.get('http://otgw.local/api/v2/device/info')
+device = response.json()['device']
+print(f"Firmware: {device['fwversion']}, Gateway: {device['gatewaymode']}")
+
+# Set temperature override (v2: JSON body, returns 202)
+cmd = requests.post('http://otgw.local/api/v2/otgw/commands',
+                     json={"command": "TT=21.5"})
+print(cmd.json())  # {"status": "queued"}
 ```
 
-### JavaScript Fetch
+### JavaScript Fetch (v2)
 ```javascript
 // Get OpenTherm data
-fetch('http://otgw.local/api/v1/otgw/otmonitor')
-  .then(response => response.json())
+fetch('http://otgw.local/api/v2/otgw/otmonitor')
+  .then(response => {
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  })
   .then(data => {
-    console.log('OpenTherm Data:', data.otmonitor);
+    console.log('OpenTherm Data:', data);
   })
   .catch(error => console.error('Error:', error));
+
+// Send command (v2: JSON body)
+fetch('http://otgw.local/api/v2/otgw/commands', {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify({command: 'TT=21.5'})
+})
+  .then(response => response.json())
+  .then(data => console.log(data));  // {status: "queued"}
 ```
 
 ## Testing Tools
