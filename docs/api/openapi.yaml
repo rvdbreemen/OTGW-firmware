@@ -26,6 +26,8 @@ info:
     - RESTful resource endpoints: `/otgw/messages/{id}`, `/otgw/commands`, `/otgw/discovery`
     - Map-format device info (`/device/info`) replacing v0's array format
     - Consistent CORS headers on all responses
+    - **OPTIONS preflight support** for all v2 endpoints (returns 204 with CORS headers)
+    - **Allow header** on all 405 responses per RFC 7231 §6.5.5
   version: 1.1.0
   contact:
     name: Robert van den Breemen
@@ -1199,7 +1201,15 @@ components:
               message: "Invalid or missing message ID"
 
     MethodNotAllowed:
-      description: HTTP method not allowed (v1 text format)
+      description: |
+        HTTP method not allowed (v1 text format).
+        Includes `Allow` header listing valid methods per RFC 7231 §6.5.5.
+      headers:
+        Allow:
+          description: Comma-separated list of valid HTTP methods for this endpoint
+          schema:
+            type: string
+            example: "GET"
       content:
         text/plain:
           schema:
@@ -1207,7 +1217,15 @@ components:
             example: "405: method not allowed\r\n"
 
     MethodNotAllowedJson:
-      description: HTTP method not allowed (v2 JSON format)
+      description: |
+        HTTP method not allowed (v2 JSON format).
+        Includes `Allow` header listing valid methods per RFC 7231 §6.5.5.
+      headers:
+        Allow:
+          description: Comma-separated list of valid HTTP methods for this endpoint
+          schema:
+            type: string
+            example: "GET"
       content:
         application/json:
           schema:
@@ -1262,7 +1280,13 @@ x-api-design-notes: |
   **Error Handling**:
   - v1 errors return plain text responses (e.g., "400: invalid msgid\r\n")
   - v2 errors return structured JSON: {"error":{"status":N,"message":"..."}}
+  - All 405 responses include an `Allow` header listing valid methods (RFC 7231 §6.5.5)
   - Low heap conditions return 500 to prevent crashes
+  
+  **CORS Support**:
+  - All v2 responses include `Access-Control-Allow-Origin: *`
+  - v2 endpoints respond to OPTIONS preflight with 204 No Content and CORS headers
+  - CORS preflight response includes `Access-Control-Max-Age: 86400` (24h cache)
   
   **Polling Recommendations**:
   - Health endpoint: Poll every 30-60 seconds

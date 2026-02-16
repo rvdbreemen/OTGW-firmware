@@ -16,18 +16,17 @@ Tracks all tasks from the [REST API Evaluation](docs/reviews/2026-02-16_restful-
 | Frontend uses latest API | ✅ Compliant | Zero v0/v1/unversioned calls remain in `index.js` |
 | OpenAPI documentation | ✅ Compliant | All v2 endpoints documented in `docs/api/openapi.yaml` |
 | POST for state-changing actions | ✅ Compliant | v2 commands/discovery use POST; non-API endpoints (`/ReBoot`, `/pic`) are out of scope |
-| `Allow` header on 405 | ⚠️ Not done | RFC 7231 requires it; would need per-endpoint tracking (Future) |
-| OPTIONS/CORS preflight | ⚠️ Not done | Low impact for local-network device (Future) |
+| `Allow` header on 405 | ✅ Compliant | `sendApiMethodNotAllowed()` for v2; `sendHeader()` for v1 (RFC 7231 §6.5.5) |
+| OPTIONS/CORS preflight | ✅ Compliant | 204 No Content with CORS headers for all v2 endpoints |
 | Content negotiation (`Accept`) | ⚠️ Not done | JSON-only is acceptable for embedded IoT (documented decision) |
 | HATEOAS / hypermedia links | ❌ Won't do | Too heavy for ESP8266; documented in ADR-035 |
 | Pagination | ❌ Won't do | Collections are small and bounded (documented in ADR-035) |
 
-**Current score: 7.7/10** (up from 5.4/10 before this PR)
+**Current score: 8.5/10** (up from 5.4/10 before this PR)
 
 ### Remaining gaps (acceptable for embedded IoT):
-1. **`Allow` header on 405** — RFC 7231 §6.5.5 requires listing valid methods. Needs per-endpoint method tracking. Low client impact since v2 errors include descriptive JSON messages.
-2. **OPTIONS method** — Needed for CORS preflight from cross-origin web apps. Low impact since this is a local-network device.
-3. **Response envelope inconsistency** — Some v2 endpoints return array format (settings, sensors/labels) while others return map format. Array format is kept intentionally for settings since the frontend depends on the type/maxlen metadata in each array entry.
+1. **Content negotiation** — JSON-only is standard for embedded IoT APIs. Documented decision.
+2. **Response envelope inconsistency** — Some v2 endpoints return array format (settings, sensors/labels) while others return map format. Array format is kept intentionally for settings since the frontend depends on the type/maxlen metadata in each array entry.
 
 > **Note:** Non-API endpoints (`/ReBoot`, `/ResetWireless`, `/pic`, `/upload`, `/update`, `/status`) are **excluded** from this improvement scope. They serve specific hardware/OTA functions and will remain as-is.
 
@@ -103,14 +102,20 @@ Tracks all tasks from the [REST API Evaluation](docs/reviews/2026-02-16_restful-
 
 > Non-API endpoints (`/ReBoot`, `/ResetWireless`, `/pic`, `/upload`, `/update`, `/status`) are **excluded** from this improvement scope per project owner decision. They serve specific hardware/OTA functions and will remain as-is.
 
-- [ ] **T44** Add `Allow` header to 405 responses per RFC 7231 §6.5.5
-- [ ] **T45** OPTIONS method support for CORS preflight
-- [ ] **T46** Response metadata (`_meta` object) (Low priority)
+- [x] **T44** Add `Allow` header to 405 responses per RFC 7231 §6.5.5
+  - Created `sendApiMethodNotAllowed()` helper for v2 JSON responses
+  - Added `httpServer.sendHeader(F("Allow"), ...)` before each v1 text 405 response
+  - Updated OpenAPI spec with `Allow` header documentation on both `MethodNotAllowed` and `MethodNotAllowedJson` response types
+- [x] **T45** OPTIONS method support for CORS preflight
+  - Added OPTIONS handler at top of v2 routing block
+  - Returns 204 No Content with `Access-Control-Allow-Origin`, `Access-Control-Allow-Methods`, `Access-Control-Allow-Headers`, `Access-Control-Max-Age` headers
+  - Updated API README and OpenAPI spec design notes
+- [ ] **T46** Response metadata (`_meta` object) (Low priority — array format kept intentionally for settings/sensors/labels; frontend depends on type/maxlen metadata in array entries)
 
 ---
 
 ## Summary
 
-**Phase 1 (this PR):** 43 tasks completed. All v2 endpoints implemented with RESTful patterns. All frontend calls migrated to v2. Score improved from 5.4 → 7.7/10.
+**Phase 1 (this PR):** 45 tasks completed. All v2 endpoints implemented with RESTful patterns. All frontend calls migrated to v2. `Allow` header on all 405 responses (v1+v2). OPTIONS/CORS preflight for all v2 endpoints. Score improved from 5.4 → 8.5/10.
 
-**Future:** 3 optional tasks for `Allow` header, OPTIONS/CORS preflight, and response metadata — if needed.
+**Future:** 1 optional task for response metadata — if needed.
