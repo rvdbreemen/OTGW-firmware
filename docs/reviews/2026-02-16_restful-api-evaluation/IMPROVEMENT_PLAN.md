@@ -115,27 +115,19 @@ Upgrade all frontend REST API calls from deprecated v0/unversioned endpoints to 
 - **Backend prerequisite:** `/api/v2/device/info` must be implemented before `v0/devinfo` calls can migrate (currently only exists in v0).
 - **Backend prerequisite:** `/api/v2/firmware/files` must be implemented before `firmwarefilelist` calls can migrate.
 
-## Phase 2: Non-API Endpoint Migration & Enhanced Responses (v1.3.0) — Future
+## ~~Phase 2: Non-API Endpoint Migration~~ — EXCLUDED
 
-### 2.1 Migrate Non-API Action Endpoints to v2
-Move state-changing actions from root-level GET to proper POST under `/api/v2/`:
+> **Decision:** Non-API endpoints (`/ReBoot`, `/ResetWireless`, `/pic`, `/upload`, `/update`, `/status`) are **excluded** from the RESTful improvement scope per project owner decision. They serve specific hardware/OTA functions and will remain as-is.
 
-| Current Endpoint | v2 Endpoint | Changes |
-|------------------|-------------|---------|
-| `GET /ReBoot` | `POST /api/v2/device/reboot` | POST for actions, JSON response, 202 Accepted |
-| `GET /ResetWireless` | `POST /api/v2/device/reset-wireless` | POST for destructive actions, 202 Accepted |
-| `GET/POST /pic?action=upgrade` | `POST /api/v2/pic/upgrade` | Body-based params, JSON response |
-| `GET/POST /pic?action=refresh` | `POST /api/v2/pic/refresh` | Body-based params, JSON response |
-| `GET/POST /pic?action=delete` | `DELETE /api/v2/pic/firmware/{name}` | Proper HTTP DELETE method |
-| `POST /upload` | `POST /api/v2/filesystem/upload` | Under API namespace |
+## Future Improvements (if needed)
 
-### 2.2 OTA Update API Wrappers
-| Current Endpoint | v2 Endpoint | Changes |
-|------------------|-------------|---------|
-| `POST /update` | `POST /api/v2/firmware/upload` | Under API namespace, JSON status |
-| `GET /status` | `GET /api/v2/firmware/status` | Under API namespace |
+### Optional: `Allow` Header on 405
+RFC 7231 §6.5.5 requires 405 responses to include an `Allow` header listing valid methods. Low client impact since v2 errors include descriptive JSON messages.
 
-### 2.3 Response Metadata
+### Optional: OPTIONS/CORS Preflight
+Add CORS preflight support for v2 endpoints. Low impact since this is a local-network device.
+
+### Optional: Response Metadata
 Add optional metadata to v2 responses:
 ```json
 {
@@ -146,17 +138,6 @@ Add optional metadata to v2 responses:
   }
 }
 ```
-
-### 2.2 Content Negotiation
-Respect `Accept` header for response format selection (JSON default).
-
-### 2.3 OPTIONS Method Support
-Add CORS preflight support for v2 endpoints.
-
-## Phase 3: Advanced Features (v2.0.0) — Future
-
-### 3.1 Pagination for Large Collections
-Add pagination for sensor data and OpenTherm message lists.
 
 ### 3.2 Filtering and Sorting
 Add query parameters for filtering OpenTherm data:
