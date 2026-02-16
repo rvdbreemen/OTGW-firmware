@@ -272,7 +272,8 @@ fetch('http://otgw.local/api/v2/otgw/otmonitor')
     return response.json();
   })
   .then(data => {
-    console.log('OpenTherm Data:', data);
+    // v2 otmonitor returns optimized flat structure with name/value/unit/lastupdated per entry
+    console.log('OpenTherm Data:', data.otmonitor);
   })
   .catch(error => console.error('Error:', error));
 
