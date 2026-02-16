@@ -59,7 +59,7 @@ The following REST API versions and endpoints are **deprecated** and will be **r
 
 | Deprecated endpoint | Replacement |
 |---------------------|-------------|
-| `GET /api/v0/devinfo` | `GET /api/v0/devinfo` (remains available until v1.3.0; v2 equivalent planned) |
+| `GET /api/v0/devinfo` | `GET /api/v2/device/info` (planned) |
 | `GET /api/v0/devtime` | `GET /api/v1/devtime` or `GET /api/v2/device/time` (planned) |
 | `GET/POST /api/v0/settings` | `GET/POST /api/v1/settings` or `GET/POST /api/v2/settings` |
 | `GET /api/v0/otgw/{msgid}` | `GET /api/v1/otgw/id/{msgid}` or `GET /api/v2/otgw/messages/{msgid}` |

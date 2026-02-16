@@ -74,7 +74,7 @@ Upgrade all frontend REST API calls from deprecated v0/unversioned endpoints to 
 | Line(s) | Function | Current Call | Target Call | Notes |
 |---------|----------|-------------|-------------|-------|
 | 220 | `refreshGatewayMode()` | `v0/devinfo` | `v2/settings` or `v2/device/info` | Reads `gatewaymode` from devinfo |
-| 347 | `otgwDebug.info()` | `v1/devinfo` | `v0/devinfo` (fix) or `v2/device/info` | **BUG**: v1/devinfo doesn't exist; falls to 404 |
+| 347 | `otgwDebug.info()` | `v1/devinfo` | `v2/device/info` | **BUG**: v1/devinfo doesn't exist; currently returns 404. Temporary fix: use `v0/devinfo` until v2 is available |
 | 361 | `otgwDebug.settings()` | `v0/settings` | `v2/settings` | Debug console helper |
 | 2160 | `loadUISettings()` | `v0/settings` | `v2/settings` | Loads theme/UI prefs on page load |
 | 2448 | `refreshDevTime()` | `v0/devtime` | `v1/devtime` or `v2/device/time` | Clock display; note v0→v1 response format differs (array→map) |
