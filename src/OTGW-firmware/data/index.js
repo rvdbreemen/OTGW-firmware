@@ -1853,16 +1853,17 @@ function setupOTLogControls() {
       
       const container = e.target;
       manualScrollTimeout = setTimeout(function() {
-      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
+        const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
       
-      if (!isAtBottom && autoScroll) {
-        // User scrolled up, disable auto-scroll
-        autoScroll = false;
-        const chk = document.getElementById('chkAutoScroll');
-        if (chk) chk.checked = false;
-      }
-    }, 100);
-  });
+        if (!isAtBottom && autoScroll) {
+          // User scrolled up, disable auto-scroll
+          autoScroll = false;
+          const chk = document.getElementById('chkAutoScroll');
+          if (chk) chk.checked = false;
+        }
+      }, 100);
+    });
+  }
   
   // Mark as initialized after all listeners are successfully registered
   otLogControlsInitialized = true;
