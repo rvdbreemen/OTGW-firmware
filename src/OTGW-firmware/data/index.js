@@ -178,6 +178,7 @@ function updateGatewayModeIndicator(value) {
 }
 
 function parseGatewayModeValue(gatewayModeValue) {
+  if (typeof gatewayModeValue === 'boolean') return gatewayModeValue;
   if (typeof gatewayModeValue !== 'string') return null;
 
   const normalized = gatewayModeValue.trim().toLowerCase();
@@ -3160,6 +3161,7 @@ function saveSettings() {
     console.log("InputNr[" + i + "], InputId[" + field + "]");
     const fieldEl = document.getElementById(field);
     if (!fieldEl) continue;
+    var value;
     if (inputs[i].type == "checkbox") {
       value = fieldEl.checked;
     } else {
