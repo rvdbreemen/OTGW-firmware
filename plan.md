@@ -41,7 +41,7 @@ Tracks all tasks from the [REST API Evaluation](docs/reviews/2026-02-16_restful-
   - Routes to existing `apifirmwarefilelist()`
 - [x] **T23** `GET /api/v2/filesystem/files` — versioned replacement for `/api/listfiles` (Finding 11)
   - Routes to existing `apilistfiles()`
-- [ ] **T24** Update OpenAPI spec with new v2 endpoints (T18–T23)
+- [x] **T24** Update OpenAPI spec with new v2 endpoints (T18–T23)
 
 ## Phase 1C: Frontend Migration (`index.js`) ✅ DONE
 
