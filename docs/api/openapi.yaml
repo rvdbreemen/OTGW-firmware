@@ -9,10 +9,12 @@ info:
     
     **Base URL**: `http://{device-ip}/api`
     
-    **API Versions**:
-    - **v0** - Legacy API (maintained for backward compatibility)
-    - **v1** - Stable API with array-based responses
-    - **v2** - RESTful-compliant API with consistent JSON errors, proper status codes, and resource naming (ADR-035)
+    **Supported API Versions**:
+    - **v1** — Stable API with text-based error responses
+    - **v2** — RESTful-compliant API with JSON errors, proper status codes, and resource naming (ADR-035). **Recommended for new integrations.**
+    
+    **Deprecated** (not documented here):
+    - v0 endpoints are deprecated and will be removed in a future release. Migrate to v1 or v2.
     
     **Authentication**: None (device should be on trusted local network only)
     
@@ -21,7 +23,8 @@ info:
     **v2 API Improvements** (ADR-035):
     - All error responses return structured JSON: `{"error":{"status":N,"message":"..."}}`
     - Queued operations return 202 Accepted instead of 200 OK
-    - New RESTful resource endpoints: `/otgw/messages/{id}`, `/otgw/commands`, `/otgw/discovery`
+    - RESTful resource endpoints: `/otgw/messages/{id}`, `/otgw/commands`, `/otgw/discovery`
+    - Map-format device info (`/device/info`) replacing v0's array format
     - Consistent CORS headers on all responses
   version: 1.1.0
   contact:
@@ -52,6 +55,10 @@ tags:
     description: Send commands to the OpenTherm Gateway
   - name: Flash/Upgrade
     description: Firmware upgrade status and operations
+  - name: Sensors
+    description: Dallas temperature sensor label management
+  - name: Filesystem
+    description: Filesystem and firmware file listing
 
 paths:
   /v1/health:
@@ -149,51 +156,6 @@ paths:
                         type: integer
                         description: Unix epoch timestamp
                         example: 1739302200
-
-  /v0/devinfo:
-    get:
-      tags:
-        - Device Info
-      summary: Get comprehensive device information (legacy)
-      description: |
-        Returns comprehensive device information including firmware version,
-        hardware details, network info, memory stats, and connectivity status.
-        
-        **Note**: This is the v0 (legacy) endpoint. Values are returned as strings.
-      operationId: getDeviceInfo
-      responses:
-        '200':
-          description: Device information retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  devinfo:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        name:
-                          type: string
-                        value:
-                          type: string
-              examples:
-                example:
-                  value:
-                    devinfo:
-                      - name: "author"
-                        value: "Robert van den Breemen"
-                      - name: "fwversion"
-                        value: "1.1.0"
-                      - name: "hostname"
-                        value: "OTGW"
-                      - name: "ipaddress"
-                        value: "192.168.1.100"
-                      - name: "freeheap"
-                        value: "25600"
-                      - name: "gatewaymode"
-                        value: "true"
 
   /v1/flashstatus:
     get:
@@ -529,6 +491,26 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
+  /v2/otgw/telegraf:
+    get:
+      tags:
+        - OpenTherm Data
+      summary: Get OpenTherm data in Telegraf format (v2)
+      description: |
+        Returns all OpenTherm data in a format optimized for Telegraf
+        monitoring system integration. Same data as v1, with JSON error responses.
+      operationId: getTelegrafV2
+      responses:
+        '200':
+          description: Telegraf data retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                description: OpenTherm data in Telegraf format
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
   /v2/health:
     get:
       tags:
@@ -706,8 +688,11 @@ paths:
   /v2/sensors/labels:
     get:
       tags:
-        - Dallas Sensor Labels
-      summary: Get all sensor labels (v2)
+        - Sensors
+      summary: Get all Dallas sensor labels (v2)
+      description: |
+        Returns all configured Dallas temperature sensor labels.
+        Same data as v1, with JSON error responses.
       operationId: getAllDallasLabelsV2
       responses:
         '200':
@@ -722,8 +707,11 @@ paths:
           $ref: '#/components/responses/MethodNotAllowedJson'
     post:
       tags:
-        - Dallas Sensor Labels
-      summary: Update all sensor labels (v2)
+        - Sensors
+      summary: Update all Dallas sensor labels (v2)
+      description: |
+        Update all Dallas temperature sensor labels.
+        Same data as v1, with JSON error responses.
       operationId: updateAllDallasLabelsV2
       requestBody:
         required: true
@@ -905,7 +893,7 @@ paths:
   /v2/firmware/files:
     get:
       tags:
-        - Flash/Upgrade
+        - Filesystem
       summary: List PIC firmware files (v2 versioned)
       description: |
         Returns list of available PIC firmware files on the filesystem.
@@ -931,7 +919,7 @@ paths:
   /v2/filesystem/files:
     get:
       tags:
-        - Flash/Upgrade
+        - Filesystem
       summary: List filesystem files (v2 versioned)
       description: |
         Returns list of files on the LittleFS filesystem.
@@ -977,6 +965,187 @@ paths:
             text/plain:
               schema:
                 type: string
+
+  /v1/sensors/labels:
+    get:
+      tags:
+        - Sensors
+      summary: Get all Dallas sensor labels
+      description: |
+        Returns all configured Dallas temperature sensor labels.
+        Each sensor is identified by its 1-Wire address and has a user-defined label.
+      operationId: getDallasLabelsV1
+      responses:
+        '200':
+          description: Sensor labels retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                description: Map of sensor addresses to labels
+        '405':
+          description: Method not allowed
+          content:
+            text/plain:
+              schema:
+                type: string
+    post:
+      tags:
+        - Sensors
+      summary: Update all Dallas sensor labels
+      description: |
+        Update all Dallas temperature sensor labels. Provide a JSON object
+        mapping sensor addresses to their new labels.
+      operationId: updateDallasLabelsV1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: string
+              description: Map of sensor addresses to new labels
+      responses:
+        '200':
+          description: Labels updated successfully
+        '400':
+          description: Invalid label data
+          content:
+            text/plain:
+              schema:
+                type: string
+        '405':
+          description: Method not allowed
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  # --- v2 backward-compatibility aliases (prefer primary endpoints above) ---
+
+  /v2/otgw/id/{msgid}:
+    get:
+      tags:
+        - OpenTherm Data
+      summary: Get OpenTherm message by ID (v2 alias)
+      description: |
+        Backward-compatibility alias for `/v2/otgw/messages/{msgid}`.
+        **Prefer** `/v2/otgw/messages/{msgid}` for new integrations.
+      operationId: getOTGWValueByIdV2Alias
+      parameters:
+        - name: msgid
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 127
+      responses:
+        '200':
+          description: Message value retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/otgw/label/{msglabel}:
+    get:
+      tags:
+        - OpenTherm Data
+      summary: Get OpenTherm message by label (v2)
+      description: |
+        Retrieve the current value for an OpenTherm message using its
+        human-readable label. Same behavior as v1, with JSON error responses.
+      operationId: getOTGWLabelV2
+      parameters:
+        - name: msglabel
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "boilertemperature"
+      responses:
+        '200':
+          description: Message value retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/otgw/command/{command}:
+    post:
+      tags:
+        - OTGW Commands
+      summary: Send OTGW command via URL path (v2 alias)
+      description: |
+        Backward-compatibility alias for `/v2/otgw/commands`.
+        **Prefer** `/v2/otgw/commands` (JSON body) for new integrations.
+        Returns 202 Accepted with JSON error responses.
+      operationId: sendOTGWCommandV2Alias
+      parameters:
+        - name: command
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Z]{2}=.+$'
+          example: "TT=20.5"
+      responses:
+        '202':
+          description: Command queued for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [queued]
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+        '413':
+          description: Command too long
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /v2/otgw/autoconfigure:
+    post:
+      tags:
+        - OTGW Commands
+      summary: Trigger MQTT autodiscovery (v2 alias)
+      description: |
+        Backward-compatibility alias for `/v2/otgw/discovery`.
+        **Prefer** `/v2/otgw/discovery` for new integrations.
+        Returns 202 Accepted with JSON error responses.
+      operationId: autoConfigureV2Alias
+      responses:
+        '202':
+          description: Discovery accepted for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [accepted]
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
 
 components:
   schemas:
@@ -1030,7 +1199,7 @@ components:
               message: "Invalid or missing message ID"
 
     MethodNotAllowed:
-      description: HTTP method not allowed (v0/v1 text format)
+      description: HTTP method not allowed (v1 text format)
       content:
         text/plain:
           schema:
@@ -1076,18 +1245,23 @@ components:
             example: "500: internal server error (low heap)\r\n"
 
 x-api-design-notes: |
+  **Supported API Versions**:
+  - v1: Stable API with text-based error responses
+  - v2: RESTful-compliant API with JSON errors, 202 Accepted, resource naming (recommended)
+  - v0: Deprecated — not documented here, will be removed in a future release
+  
   **Memory Constraints**:
   - ESP8266 has limited RAM (~40KB available after core libraries)
   - API enforces minimum 4KB free heap before processing requests
   - Use v2 endpoints for reduced payload sizes when possible
   
   **Boolean Values**:
-  - v0/v1 APIs return booleans as strings: "true" or "false"
-  - This is intentional for consistency with legacy implementations
+  - v1 APIs return booleans as strings: "true" or "false"
+  - v2/device/info returns proper JSON booleans
   
   **Error Handling**:
-  - All errors return plain text responses
-  - HTTP status codes follow standard conventions
+  - v1 errors return plain text responses (e.g., "400: invalid msgid\r\n")
+  - v2 errors return structured JSON: {"error":{"status":N,"message":"..."}}
   - Low heap conditions return 500 to prevent crashes
   
   **Polling Recommendations**:
@@ -1096,6 +1270,6 @@ x-api-design-notes: |
   - OpenTherm data: Poll every 5-10 seconds
   
   **Home Assistant Integration**:
-  - Use /v1/otgw/autoconfigure to register entities
+  - Use /v2/otgw/discovery (or /v1/otgw/autoconfigure) to register entities
   - MQTT is the primary integration method
   - REST API provides fallback and manual control
