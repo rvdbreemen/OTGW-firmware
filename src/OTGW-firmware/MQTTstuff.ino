@@ -564,23 +564,23 @@ void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype
   
   char sourceTopic[MQTT_TOPIC_MAX_LEN];
   char sensorId[64];
-  const char* suffix;
-  const char* sourceName;
+  PGM_P suffix;
+  PGM_P sourceName;
   
   // Determine suffix and friendly name based on message source (ADR-038: OpenTherm Data Flow Pipeline)
   switch(rsptype) {
     case OTGW_THERMOSTAT:        // T message - master request
-      suffix = "_thermostat";
-      sourceName = "Thermostat";
+      suffix = PSTR("_thermostat");
+      sourceName = PSTR("Thermostat");
       break;
     case OTGW_BOILER:            // B message - slave response
-      suffix = "_boiler";
-      sourceName = "Boiler";
+      suffix = PSTR("_boiler");
+      sourceName = PSTR("Boiler");
       break;
     case OTGW_REQUEST_BOILER:    // R message - gateway override to boiler
     case OTGW_ANSWER_THERMOSTAT: // A message - gateway override to thermostat
-      suffix = "_gateway";
-      sourceName = "Gateway";
+      suffix = PSTR("_gateway");
+      sourceName = PSTR("Gateway");
       break;
     default:
       // Don't publish for parity errors or unknown types
