@@ -628,7 +628,7 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
 static inline void publishOTValueTopic(const char *topic, const char *value) {
   sendMQTTData(topic, value);
   if (OTlookupitem.msgcmd == OT_WRITE || OTlookupitem.msgcmd == OT_RW) {
-    publishToSourceTopic(topic, value, OTdata.rsptype, OTdata.id);
+    publishToSourceTopic(topic, value, OTdata.rsptype);
   }
 }
 
@@ -677,6 +677,7 @@ void print_s16(int16_t& value)
 void print_s8s8(uint16_t& value)
 {  
   AddLogf("%s = %3d / %3d %s", OTlookupitem.label, (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB, OTlookupitem.unit);
+  const bool valid = is_value_valid(OTdata, OTlookupitem);
 
   //Build string for MQTT
   char _msg[15] {0};
@@ -688,7 +689,7 @@ void print_s8s8(uint16_t& value)
   strlcpy(_topic, baseTopicStr, sizeof(_topic));
   strlcat(_topic, "_value_hb", sizeof(_topic));
   
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (valid){
     // Always publish to original topic (backward compatibility)
     publishOTValueTopic(_topic, _msg);
   }
@@ -698,7 +699,7 @@ void print_s8s8(uint16_t& value)
   strlcpy(_topic, baseTopicStr, sizeof(_topic));
   strlcat(_topic, "_value_lb", sizeof(_topic));
   
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (valid){
     // Always publish to original topic (backward compatibility)
     publishOTValueTopic(_topic, _msg);
     

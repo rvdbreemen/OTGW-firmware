@@ -53,7 +53,7 @@ static char       NodeId[MQTT_ID_MAX_LEN];
 
 // Source-specific HA auto-discovery cache.
 // Keyed by hash(sensorId-with-source) per source using open addressing.
-// This avoids duplicate discovery sends while supporting multiple topics per msgId
+// This avoids duplicate discovery sends while supporting multiple topics per value
 // (for example *_value_hb and *_value_lb).
 constexpr size_t  SOURCE_DISCOVERY_TABLE_SIZE = 192;
 static uint32_t   sourceConfigHashTable[3][SOURCE_DISCOVERY_TABLE_SIZE] = { {0} };
@@ -101,6 +101,29 @@ static bool setSourceConfigDone(const uint8_t sourceIdx, const char *sensorId) {
 
 static void clearSourceConfigDone() {
   memset(sourceConfigHashTable, 0, sizeof(sourceConfigHashTable));
+}
+
+static bool resolveSourcePublishInfo(byte rsptype, PGM_P &suffix, PGM_P &sourceName, uint8_t &sourceIdx) {
+  switch(rsptype) {
+    case OTGW_THERMOSTAT:        // T message - master request
+      suffix = PSTR("_thermostat");
+      sourceName = PSTR("Thermostat");
+      sourceIdx = 0;
+      return true;
+    case OTGW_BOILER:            // B message - slave response
+      suffix = PSTR("_boiler");
+      sourceName = PSTR("Boiler");
+      sourceIdx = 1;
+      return true;
+    case OTGW_REQUEST_BOILER:    // R message - gateway override to boiler
+    case OTGW_ANSWER_THERMOSTAT: // A message - gateway override to thermostat
+      suffix = PSTR("_gateway");
+      sourceName = PSTR("Gateway");
+      sourceIdx = 2;
+      return true;
+    default:
+      return false;
+  }
 }
 
 // Trim whitespace on both sides in-place
@@ -611,34 +634,20 @@ void PrintMQTTError(){
 // Publishes value to topic with source suffix (_thermostat, _boiler, _gateway)
 // Only called when settingMQTTSeparateSources is enabled
 //=======================================================================
-void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype, byte msgId) {
+void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype) {
   if (!settingMQTTSeparateSources) return;  // Feature disabled
   if (!baseTopic || !value) return;          // Null safety
-  (void)msgId;
   
   char sourceTopic[MQTT_TOPIC_MAX_LEN];
   char sensorId[64];
   PGM_P suffix;
   PGM_P sourceName;
+  uint8_t sourceIdx;
   
-  // Determine suffix and friendly name based on message source (ADR-038: OpenTherm Data Flow Pipeline)
-  switch(rsptype) {
-    case OTGW_THERMOSTAT:        // T message - master request
-      suffix = PSTR("_thermostat");
-      sourceName = PSTR("Thermostat");
-      break;
-    case OTGW_BOILER:            // B message - slave response
-      suffix = PSTR("_boiler");
-      sourceName = PSTR("Boiler");
-      break;
-    case OTGW_REQUEST_BOILER:    // R message - gateway override to boiler
-    case OTGW_ANSWER_THERMOSTAT: // A message - gateway override to thermostat
-      suffix = PSTR("_gateway");
-      sourceName = PSTR("Gateway");
-      break;
-    default:
-      // Don't publish for parity errors or unknown types
-      return;
+  // Determine suffix, source name and source index from message source.
+  if (!resolveSourcePublishInfo(rsptype, suffix, sourceName, sourceIdx)) {
+    // Don't publish for parity errors or unknown types
+    return;
   }
   
   // Build source-specific topic: <baseTopic><suffix>
@@ -660,15 +669,7 @@ void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype
     return;
   }
   
-  // Map rsptype to source index (0=thermostat, 1=boiler, 2=gateway)
-  uint8_t sourceIdx;
-  switch(rsptype) {
-    case OTGW_THERMOSTAT:        sourceIdx = 0; break;
-    case OTGW_BOILER:            sourceIdx = 1; break;
-    default:                     sourceIdx = 2; break; // R and A messages
-  }
-
-  // Dedupe by concrete source sensor-id, not only msgId.
+  // Dedupe by concrete source sensor-id.
   // This ensures multi-topic message IDs (_hb/_lb/etc.) all get discovery.
   if (getSourceConfigDone(sourceIdx, sensorId)) {
     return; // Already discovered
