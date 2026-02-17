@@ -12,7 +12,7 @@ Architecture Decision Records capture important architectural decisions along wi
 - [Platform & Build](#platform-and-build-system) (4 ADRs)
 - [Memory Management](#memory-management) (4 ADRs)
 - [Network & Security](#network-and-security) (3 ADRs)
-- [Integration](#integration-and-communication) (4 ADRs) 🆕
+- [Integration](#integration-and-communication) (5 ADRs) 🆕
 - [Core Systems](#system-architecture) (4 ADRs) 🆕
 - [Features & Extensions](#features-and-extensions) (8 ADRs) 🆕
 - [Browser & Client](#browser-and-client-compatibility) (4 ADRs)
@@ -67,6 +67,9 @@ Architecture Decision Records capture important architectural decisions along wi
 
 - **[ADR-037: Gateway Mode Detection via PR=M Polling](ADR-037-gateway-mode-detection.md)** 🆕  
   Periodic polling (PR=M command, 30s interval with 60s cache) to detect gateway vs. monitor mode, with PS=1 impact on time sync suppression.
+
+- **[ADR-040: MQTT Source-Specific Topics for OpenTherm Values](ADR-040-mqtt-source-specific-topics.md)** 🆕  
+  Publish OpenTherm values to source-specific MQTT topics (_thermostat, _boiler, _gateway suffixes) while maintaining backward compatibility with original topics. Default enabled, user-controllable via settingMQTTSeparateSources.
 
 ### System Architecture
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  
