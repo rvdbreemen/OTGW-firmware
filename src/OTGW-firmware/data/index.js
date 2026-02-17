@@ -3116,6 +3116,12 @@ function refreshSettings() {
             false
           );
           inputDiv.appendChild(sInput);
+          if (data[i].name == "mqttseparatesources") {
+            var hint = document.createElement("div");
+            hint.textContent = "Publishes extra MQTT topics with _thermostat, _boiler, and _gateway suffixes (legacy topics remain).";
+            hint.setAttribute("style", "font-size: 0.85em; opacity: 0.8; margin-top: 4px;");
+            inputDiv.appendChild(hint);
+          }
 
           rowDiv.appendChild(inputDiv);
           settings.appendChild(rowDiv);
@@ -3388,6 +3394,7 @@ var translateFields = [
   , ["s0intervalcount", "S0 interval pulses"]
   , ["s0totalcount", "S0 total pulses"]
   , ["mqttotmessage", "MQTT OT msg Enable"]
+  , ["mqttseparatesources", "MQTT Separate Sources (thermostat/boiler/gateway)"]
   , ["otgwcommandenable", "Boot Command Enabled"]
   , ["otgwcommands", "Boot Command"]
   , ["thermostatconnected", "Thermostat Connected"]

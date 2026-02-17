@@ -51,6 +51,58 @@ static char       MQTTPubNamespace[MQTT_NAMESPACE_MAX_LEN];
 static char       MQTTSubNamespace[MQTT_NAMESPACE_MAX_LEN];
 static char       NodeId[MQTT_ID_MAX_LEN];
 
+// Source-specific HA auto-discovery cache.
+// Keyed by hash(sensorId-with-source) per source using open addressing.
+// This avoids duplicate discovery sends while supporting multiple topics per msgId
+// (for example *_value_hb and *_value_lb).
+constexpr size_t  SOURCE_DISCOVERY_TABLE_SIZE = 192;
+static uint32_t   sourceConfigHashTable[3][SOURCE_DISCOVERY_TABLE_SIZE] = { {0} };
+
+static uint32_t hashSourceSensorId(const char *sensorId) {
+  uint32_t hash = 2166136261u; // FNV-1a 32-bit offset basis
+  if (!sensorId) return 1u;
+  while (*sensorId != '\0') {
+    hash ^= static_cast<uint8_t>(*sensorId++);
+    hash *= 16777619u; // FNV prime
+  }
+  return (hash == 0u) ? 1u : hash;
+}
+
+static bool getSourceConfigDone(const uint8_t sourceIdx, const char *sensorId) {
+  if (sourceIdx >= 3 || !sensorId) return false;
+  const uint32_t key = hashSourceSensorId(sensorId);
+  size_t slot = key % SOURCE_DISCOVERY_TABLE_SIZE;
+
+  for (size_t probe = 0; probe < SOURCE_DISCOVERY_TABLE_SIZE; probe++) {
+    const uint32_t entry = sourceConfigHashTable[sourceIdx][slot];
+    if (entry == 0u) return false;
+    if (entry == key) return true;
+    slot = (slot + 1u) % SOURCE_DISCOVERY_TABLE_SIZE;
+  }
+  return false;
+}
+
+static bool setSourceConfigDone(const uint8_t sourceIdx, const char *sensorId) {
+  if (sourceIdx >= 3 || !sensorId) return false;
+  const uint32_t key = hashSourceSensorId(sensorId);
+  size_t slot = key % SOURCE_DISCOVERY_TABLE_SIZE;
+
+  for (size_t probe = 0; probe < SOURCE_DISCOVERY_TABLE_SIZE; probe++) {
+    uint32_t &entry = sourceConfigHashTable[sourceIdx][slot];
+    if (entry == key) return true; // already recorded
+    if (entry == 0u) {
+      entry = key;
+      return true;
+    }
+    slot = (slot + 1u) % SOURCE_DISCOVERY_TABLE_SIZE;
+  }
+  return false;
+}
+
+static void clearSourceConfigDone() {
+  memset(sourceConfigHashTable, 0, sizeof(sourceConfigHashTable));
+}
+
 // Trim whitespace on both sides in-place
 static void trimInPlace(char *buffer) {
   if (buffer == nullptr) return;
@@ -239,6 +291,7 @@ void startMQTT()
   stateMQTT = MQTT_STATE_INIT;
   //setup for mqtt discovery
   clearMQTTConfigDone();
+  clearSourceConfigDone();
   strlcpy(NodeId, CSTR(settingMQTTuniqueid), sizeof(NodeId));
   buildNamespace(MQTTPubNamespace, sizeof(MQTTPubNamespace), CSTR(settingMQTTtopTopic), "value", NodeId);
   buildNamespace(MQTTSubNamespace, sizeof(MQTTSubNamespace), CSTR(settingMQTTtopTopic), "set", NodeId);
@@ -552,6 +605,116 @@ void PrintMQTTError(){
     default: MQTTDebugTln(F("Error: MQTT unknown error"));
   }
 }
+
+//=======================================================================
+// ADR-040: Publish to source-specific MQTT topic
+// Publishes value to topic with source suffix (_thermostat, _boiler, _gateway)
+// Only called when settingMQTTSeparateSources is enabled
+//=======================================================================
+void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype, byte msgId) {
+  if (!settingMQTTSeparateSources) return;  // Feature disabled
+  if (!baseTopic || !value) return;          // Null safety
+  (void)msgId;
+  
+  char sourceTopic[MQTT_TOPIC_MAX_LEN];
+  char sensorId[64];
+  PGM_P suffix;
+  PGM_P sourceName;
+  
+  // Determine suffix and friendly name based on message source (ADR-038: OpenTherm Data Flow Pipeline)
+  switch(rsptype) {
+    case OTGW_THERMOSTAT:        // T message - master request
+      suffix = PSTR("_thermostat");
+      sourceName = PSTR("Thermostat");
+      break;
+    case OTGW_BOILER:            // B message - slave response
+      suffix = PSTR("_boiler");
+      sourceName = PSTR("Boiler");
+      break;
+    case OTGW_REQUEST_BOILER:    // R message - gateway override to boiler
+    case OTGW_ANSWER_THERMOSTAT: // A message - gateway override to thermostat
+      suffix = PSTR("_gateway");
+      sourceName = PSTR("Gateway");
+      break;
+    default:
+      // Don't publish for parity errors or unknown types
+      return;
+  }
+  
+  // Build source-specific topic: <baseTopic><suffix>
+  // Critical review finding #2814343508: Check for buffer overflow
+  int written = snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s%S"), baseTopic, suffix);
+  if (written < 0 || written >= (int)sizeof(sourceTopic)) {
+    MQTTDebugTf(PSTR("ERROR: Source topic buffer overflow for %s\r\n"), baseTopic);
+    return;
+  }
+  
+  // Publish to source-specific topic (not retained to save MQTT broker memory)
+  sendMQTTData(sourceTopic, value, false);
+  
+  // ADR-040: Send Home Assistant auto-discovery for source-specific sensor
+  // Build sensor ID with suffix for unique discovery config
+  written = snprintf_P(sensorId, sizeof(sensorId), PSTR("%s%S"), baseTopic, suffix);
+  if (written < 0 || written >= (int)sizeof(sensorId)) {
+    MQTTDebugTf(PSTR("ERROR: Sensor ID buffer overflow for %s\r\n"), baseTopic);
+    return;
+  }
+  
+  // Map rsptype to source index (0=thermostat, 1=boiler, 2=gateway)
+  uint8_t sourceIdx;
+  switch(rsptype) {
+    case OTGW_THERMOSTAT:        sourceIdx = 0; break;
+    case OTGW_BOILER:            sourceIdx = 1; break;
+    default:                     sourceIdx = 2; break; // R and A messages
+  }
+
+  // Dedupe by concrete source sensor-id, not only msgId.
+  // This ensures multi-topic message IDs (_hb/_lb/etc.) all get discovery.
+  if (getSourceConfigDone(sourceIdx, sensorId)) {
+    return; // Already discovered
+  }
+
+  // Build discovery topic for source-specific sensor
+  // Format: homeassistant/sensor/<node_id>_<sensor_id>/config
+  char discoveryTopic[MQTT_TOPIC_MAX_LEN];
+  written = snprintf_P(discoveryTopic, sizeof(discoveryTopic),
+                       PSTR("%s/sensor/%s_%s/config"),
+                       settingMQTThaprefix, settingMQTTuniqueid, sensorId);
+
+  if (written < 0 || written >= (int)sizeof(discoveryTopic)) {
+    MQTTDebugTf(PSTR("ERROR: Discovery topic buffer overflow for %s\r\n"), sensorId);
+    return;
+  }
+
+  // Build discovery message with source in friendly name
+  char discoveryMsg[MQTT_MSG_MAX_LEN];
+  written = snprintf_P(discoveryMsg, sizeof(discoveryMsg),
+                       PSTR("{\"name\":\"%s (%S)\","
+                            "\"state_topic\":\"%s/%s\","
+                            "\"unique_id\":\"%s_%s\","
+                            "\"device\":{\"identifiers\":[\"%s\"],\"name\":\"%s\",\"model\":\"OTGW\",\"manufacturer\":\"Schelte Bron\"}}"),
+                       baseTopic, sourceName,           // Friendly name with source (sourceName is PROGMEM)
+                       MQTTPubNamespace, sourceTopic,   // State topic
+                       settingMQTTuniqueid, sensorId,   // Unique ID
+                       settingMQTTuniqueid,             // Device identifier
+                       settingHostname);                // Device name
+
+  if (written < 0 || written >= (int)sizeof(discoveryMsg)) {
+    MQTTDebugTf(PSTR("ERROR: Discovery message buffer overflow for %s\r\n"), sensorId);
+    return;
+  }
+
+  // Send discovery config
+  sendMQTTStreaming(discoveryTopic, discoveryMsg, strlen(discoveryMsg));
+
+  // Mark as discovered
+  if (!setSourceConfigDone(sourceIdx, sensorId)) {
+    MQTTDebugTf(PSTR("WARN: Source discovery cache full; cannot cache %s\r\n"), sensorId);
+  }
+
+  MQTTDebugTf(PSTR("Sent auto-discovery for source-specific sensor: %s\r\n"), sensorId);
+}
+
 
 /* 
   topic:  <string> , sensor topic, will be automatically prefixed with <mqtt topic>/value/<node_id>
