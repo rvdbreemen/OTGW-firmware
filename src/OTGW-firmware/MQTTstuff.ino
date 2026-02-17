@@ -741,19 +741,15 @@ bool getMQTTConfigDone(const uint8_t MSGid)
   }
 }
 //===========================================================================================
-bool setMQTTConfigDone(const uint8_t MSGid)
+void setMQTTConfigDone(const uint8_t MSGid)
 {
   uint8_t group = MSGid & 0b11100000;
   group = group>>5;
   uint8_t index = MSGid & 0b00011111;
   MQTTDebugTf(PSTR("Setting bit %d from group %d for MSGid %d\r\n"), index, group, MSGid);
   MQTTDebugTf(PSTR("Value before setting bit %d\r\n"), MQTTautoConfigMap[group]);
-  if(bitSet(MQTTautoConfigMap[group], index) > 0) {
-    MQTTDebugTf(PSTR("Value after setting bit  %d\r\n"), MQTTautoConfigMap[group]);
-    return true;
-  } else {
-    return false;
-  }
+  bitSet(MQTTautoConfigMap[group], index);
+  MQTTDebugTf(PSTR("Value after setting bit  %d\r\n"), MQTTautoConfigMap[group]);
 }
 //===========================================================================================
 void clearMQTTConfigDone()
@@ -800,25 +796,17 @@ void doAutoConfigure(bool bForceAll){
     if (!splitLine(sLine, ';', lineID, sTopic, MQTT_TOPIC_MAX_LEN, sMsg, MQTT_MSG_MAX_LEN)) continue;
 
     // 4. Decision: Do we send this line?
-    if (bForceAll || getMQTTConfigDone(lineID) || (lineID == OTGWdallasdataid)) {
-       
-       bool isDallas = (lineID == OTGWdallasdataid);
-       
-       // Special handling: Dallas sensors are managed by configSensors() which calls the worker function.
-       // We can skip them here to avoid duplication or complex logic, or handle them if desired.
-       // Current implementation delegates Dallas to configSensors(), so for bulk update, we should check if we need to trigger that.
-       if (isDallas) {
-          // For Dallas, we can't easily bulk-process because we need the sensor address which isn't in the config file
-          // So we skip it here and handle it strictly via the worker logic which configSensors calls.
-          continue; 
-       }
+    // Skip Dallas sensors - they need per-sensor addresses from configSensors()
+    if (lineID == OTGWdallasdataid) continue;
+
+    if (bForceAll || !getMQTTConfigDone(lineID)) {
 
        MQTTDebugTf(PSTR("Processing AutoConfig for ID %d\r\n"), lineID);
 
        // --- Perform Replacements (Topic & Msg) ---
        if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settingMQTThaprefix))) continue;
        if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%node_id%", NodeId)) continue;
-       if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%sensor_id%", "")) continue; 
+       if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%sensor_id%", "")) continue;
 
        if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%node_id%", NodeId)) continue;
        if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%sensor_id%", "")) continue;
@@ -833,7 +821,8 @@ void doAutoConfigure(bool bForceAll){
 
        // Send retained message (uses beginPublish/write/endPublish streaming)
        sendMQTTStreaming(sTopic, sMsg, msgLen);
-       
+       setMQTTConfigDone(lineID);
+
        doBackgroundTasks(); // Yield to network stack
     }
   }
@@ -845,7 +834,7 @@ void doAutoConfigure(bool bForceAll){
   resetMQTTBufferSize();
   
   // Trigger Dallas configuration separately as it requires specific sensor addresses
-  if (settingMQTTenable && (bForceAll || getMQTTConfigDone(OTGWdallasdataid))) {
+  if (settingMQTTenable && (bForceAll || !getMQTTConfigDone(OTGWdallasdataid))) {
       configSensors();
   }
 }
