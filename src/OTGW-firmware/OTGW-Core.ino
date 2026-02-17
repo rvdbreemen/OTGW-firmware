@@ -643,7 +643,7 @@ void print_f88(float& value)
     sendMQTTData(baseTopic, _msg);
     
     // ADR-040: If feature enabled, also publish to source-specific topic
-    publishToSourceTopic(baseTopic, _msg, OTdata.rsptype);
+    publishToSourceTopic(baseTopic, _msg, OTdata.rsptype, OTdata.id);
     
     value = _value;
   }
@@ -667,7 +667,7 @@ void print_s16(int16_t& value)
     sendMQTTData(baseTopic, _msg);
     
     // ADR-040: If feature enabled, also publish to source-specific topic
-    publishToSourceTopic(baseTopic, _msg, OTdata.rsptype);
+    publishToSourceTopic(baseTopic, _msg, OTdata.rsptype, OTdata.id);
     
     value = _value;
   }
@@ -692,7 +692,7 @@ void print_s8s8(uint16_t& value)
     sendMQTTData(_topic, _msg);
     
     // ADR-040: If feature enabled, also publish to source-specific topic
-    publishToSourceTopic(_topic, _msg, OTdata.rsptype);
+    publishToSourceTopic(_topic, _msg, OTdata.rsptype, OTdata.id);
   }
   
   // Publish LB (low byte)
@@ -705,7 +705,7 @@ void print_s8s8(uint16_t& value)
     sendMQTTData(_topic, _msg);
     
     // ADR-040: If feature enabled, also publish to source-specific topic
-    publishToSourceTopic(_topic, _msg, OTdata.rsptype);
+    publishToSourceTopic(_topic, _msg, OTdata.rsptype, OTdata.id);
     
     value = OTdata.u16();
   }
@@ -728,7 +728,7 @@ void print_u16(uint16_t& value)
     sendMQTTData(baseTopic, _msg);
     
     // ADR-040: If feature enabled, also publish to source-specific topic
-    publishToSourceTopic(baseTopic, _msg, OTdata.rsptype);
+    publishToSourceTopic(baseTopic, _msg, OTdata.rsptype, OTdata.id);
     
     value = _value;
   }
