@@ -625,6 +625,13 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   return _valid;
 }
 
+static inline void publishOTValueTopic(const char *topic, const char *value) {
+  sendMQTTData(topic, value);
+  if (OTlookupitem.msgcmd == OT_WRITE || OTlookupitem.msgcmd == OT_RW) {
+    publishToSourceTopic(topic, value, OTdata.rsptype, OTdata.id);
+  }
+}
+
 void print_f88(float& value)
 {
   //function to print data
@@ -640,10 +647,7 @@ void print_f88(float& value)
     const char* baseTopic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
     
     // Always publish to original topic (backward compatibility)
-    sendMQTTData(baseTopic, _msg);
-    
-    // ADR-040: If feature enabled, also publish to source-specific topic
-    publishToSourceTopic(baseTopic, _msg, OTdata.rsptype, OTdata.id);
+    publishOTValueTopic(baseTopic, _msg);
     
     value = _value;
   }
@@ -664,10 +668,7 @@ void print_s16(int16_t& value)
     const char* baseTopic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
     
     // Always publish to original topic (backward compatibility)
-    sendMQTTData(baseTopic, _msg);
-    
-    // ADR-040: If feature enabled, also publish to source-specific topic
-    publishToSourceTopic(baseTopic, _msg, OTdata.rsptype, OTdata.id);
+    publishOTValueTopic(baseTopic, _msg);
     
     value = _value;
   }
@@ -689,10 +690,7 @@ void print_s8s8(uint16_t& value)
   
   if (is_value_valid(OTdata, OTlookupitem)){
     // Always publish to original topic (backward compatibility)
-    sendMQTTData(_topic, _msg);
-    
-    // ADR-040: If feature enabled, also publish to source-specific topic
-    publishToSourceTopic(_topic, _msg, OTdata.rsptype, OTdata.id);
+    publishOTValueTopic(_topic, _msg);
   }
   
   // Publish LB (low byte)
@@ -702,10 +700,7 @@ void print_s8s8(uint16_t& value)
   
   if (is_value_valid(OTdata, OTlookupitem)){
     // Always publish to original topic (backward compatibility)
-    sendMQTTData(_topic, _msg);
-    
-    // ADR-040: If feature enabled, also publish to source-specific topic
-    publishToSourceTopic(_topic, _msg, OTdata.rsptype, OTdata.id);
+    publishOTValueTopic(_topic, _msg);
     
     value = OTdata.u16();
   }
@@ -725,10 +720,7 @@ void print_u16(uint16_t& value)
     const char* baseTopic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
     
     // Always publish to original topic (backward compatibility)
-    sendMQTTData(baseTopic, _msg);
-    
-    // ADR-040: If feature enabled, also publish to source-specific topic
-    publishToSourceTopic(baseTopic, _msg, OTdata.rsptype, OTdata.id);
+    publishOTValueTopic(baseTopic, _msg);
     
     value = _value;
   }
@@ -1052,11 +1044,11 @@ void print_mastermemberid(uint16_t& value)
   if (is_value_valid(OTdata, OTlookupitem)){
     //Build string for MQTT
     char _msg[15] {0};
-    sendMQTTData(F("master_configuration"), byte_to_binary(OTdata.valueHB));
-    sendMQTTData(F("master_configuration_smart_power"), (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
+    publishOTValueTopic("master_configuration", byte_to_binary(OTdata.valueHB));
+    publishOTValueTopic("master_configuration_smart_power", (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
     
     utoa(OTdata.valueLB, _msg, 10);
-    sendMQTTData(F("master_memberid_code"), _msg);
+    publishOTValueTopic("master_memberid_code", _msg);
     value = OTdata.u16();
   }
 }
@@ -1231,14 +1223,14 @@ void print_command(uint16_t& value)
     //AddLogf("%s = HB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueHB);
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_hb_u8", sizeof(_topic));
-    sendMQTTData(_topic, _msg);
+    publishOTValueTopic(_topic, _msg);
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_remote_command", sizeof(_topic));
     switch (OTdata.valueHB) {
-      case 1: sendMQTTData(_topic, "Remote Request Boiler Lockout-reset");  AddLogf("\r\n%s = remote command [%s]", OTlookupitem.label, "Remote Request Boiler Lockout-reset"); break;
-      case 2: sendMQTTData(_topic, "Remote Request Water filling"); AddLogf("\r\n%s = remote command [%s]", OTlookupitem.label, "Remote Request Water filling"); break;
-      case 10: sendMQTTData(_topic, "Remote Request Service request reset");  AddLogf("\r\n%s = remote command [%s]", OTlookupitem.label, "Remote Request Service request reset");break;
-      default: sendMQTTData(_topic, "Unknown command"); AddLogf("\r\n%s = remote command [%s]", OTlookupitem.label, "Unknown command");break;
+      case 1: publishOTValueTopic(_topic, "Remote Request Boiler Lockout-reset");  AddLogf("\r\n%s = remote command [%s]", OTlookupitem.label, "Remote Request Boiler Lockout-reset"); break;
+      case 2: publishOTValueTopic(_topic, "Remote Request Water filling"); AddLogf("\r\n%s = remote command [%s]", OTlookupitem.label, "Remote Request Water filling"); break;
+      case 10: publishOTValueTopic(_topic, "Remote Request Service request reset");  AddLogf("\r\n%s = remote command [%s]", OTlookupitem.label, "Remote Request Service request reset");break;
+      default: publishOTValueTopic(_topic, "Unknown command"); AddLogf("\r\n%s = remote command [%s]", OTlookupitem.label, "Unknown command");break;
     } 
 
     //flag8 valueLB
@@ -1246,7 +1238,7 @@ void print_command(uint16_t& value)
     //AddLogf("%s = LB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueLB);
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_lb_u8", sizeof(_topic));
-    sendMQTTData(_topic, _msg);
+    publishOTValueTopic(_topic, _msg);
     value = OTdata.u16();
   }
 }
@@ -1265,13 +1257,13 @@ void print_u8u8(uint16_t& value)
     //AddLogf("%s = HB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueHB);
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_hb_u8", sizeof(_topic));
-    sendMQTTData(_topic, _msg);
+    publishOTValueTopic(_topic, _msg);
     //flag8 valueLB
     utoa((OTdata.valueLB), _msg, 10);
     //AddLogf("%s = LB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueLB);
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_lb_u8", sizeof(_topic));
-    sendMQTTData(_topic, _msg);
+    publishOTValueTopic(_topic, _msg);
     value = OTdata.u16();
   }
 }
@@ -1289,13 +1281,13 @@ void print_date(uint16_t& value)
     //AddLogf("%s = HB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueHB);
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_month", sizeof(_topic));
-    sendMQTTData(_topic, _msg);
+    publishOTValueTopic(_topic, _msg);
     //flag8 valueLB
     utoa((OTdata.valueLB), _msg, 10);
     //AddLogf("%s = LB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueLB);
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_day_of_month", sizeof(_topic));
-    sendMQTTData(_topic, _msg);
+    publishOTValueTopic(_topic, _msg);
     value = OTdata.u16();
   }
 }
@@ -1324,15 +1316,15 @@ void print_daytime(uint16_t& value)
     //dayofweek
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_dayofweek", sizeof(_topic));
-    sendMQTTData(_topic, dayName); 
+    publishOTValueTopic(_topic, dayName); 
     //hour
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_hour", sizeof(_topic));
-    sendMQTTData(_topic, itoa((OTdata.valueHB & 0x1F), _msg, 10)); 
+    publishOTValueTopic(_topic, itoa((OTdata.valueHB & 0x1F), _msg, 10)); 
     //min
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_minutes", sizeof(_topic));
-    sendMQTTData(_topic, itoa((OTdata.valueLB), _msg, 10)); 
+    publishOTValueTopic(_topic, itoa((OTdata.valueLB), _msg, 10)); 
     value = OTdata.u16();
   }
 }

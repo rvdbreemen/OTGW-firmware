@@ -322,7 +322,7 @@ enum OpenThermMessageID {
 	OT_OpenThermVersionSlave, // f8.8  The implemented version of the OpenTherm Protocol Specification in the slave. 
 	OT_MasterVersion, // u8 / u8  Master product version number and type 
 	OT_SlaveVersion, // u8 / u8  Slave product version number and type
-	OT_RemehadFdUcodes, // u8 / u8 Remeha dF-/dU-codes
+	OT_RemehadFdUcodes = 131, // u8 / u8 Remeha dF-/dU-codes
 	OT_RemehaServicemessage, // u8 / u8 Remeha Servicemessage
 	OT_RemehaDetectionConnectedSCU, // u8 / u8 Remeha detection connected SCU’s
 };

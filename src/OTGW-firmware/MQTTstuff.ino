@@ -51,6 +51,58 @@ static char       MQTTPubNamespace[MQTT_NAMESPACE_MAX_LEN];
 static char       MQTTSubNamespace[MQTT_NAMESPACE_MAX_LEN];
 static char       NodeId[MQTT_ID_MAX_LEN];
 
+// Source-specific HA auto-discovery cache.
+// Keyed by hash(sensorId-with-source) per source using open addressing.
+// This avoids duplicate discovery sends while supporting multiple topics per msgId
+// (for example *_value_hb and *_value_lb).
+constexpr size_t  SOURCE_DISCOVERY_TABLE_SIZE = 192;
+static uint32_t   sourceConfigHashTable[3][SOURCE_DISCOVERY_TABLE_SIZE] = { {0} };
+
+static uint32_t hashSourceSensorId(const char *sensorId) {
+  uint32_t hash = 2166136261u; // FNV-1a 32-bit offset basis
+  if (!sensorId) return 1u;
+  while (*sensorId != '\0') {
+    hash ^= static_cast<uint8_t>(*sensorId++);
+    hash *= 16777619u; // FNV prime
+  }
+  return (hash == 0u) ? 1u : hash;
+}
+
+static bool getSourceConfigDone(const uint8_t sourceIdx, const char *sensorId) {
+  if (sourceIdx >= 3 || !sensorId) return false;
+  const uint32_t key = hashSourceSensorId(sensorId);
+  size_t slot = key % SOURCE_DISCOVERY_TABLE_SIZE;
+
+  for (size_t probe = 0; probe < SOURCE_DISCOVERY_TABLE_SIZE; probe++) {
+    const uint32_t entry = sourceConfigHashTable[sourceIdx][slot];
+    if (entry == 0u) return false;
+    if (entry == key) return true;
+    slot = (slot + 1u) % SOURCE_DISCOVERY_TABLE_SIZE;
+  }
+  return false;
+}
+
+static bool setSourceConfigDone(const uint8_t sourceIdx, const char *sensorId) {
+  if (sourceIdx >= 3 || !sensorId) return false;
+  const uint32_t key = hashSourceSensorId(sensorId);
+  size_t slot = key % SOURCE_DISCOVERY_TABLE_SIZE;
+
+  for (size_t probe = 0; probe < SOURCE_DISCOVERY_TABLE_SIZE; probe++) {
+    uint32_t &entry = sourceConfigHashTable[sourceIdx][slot];
+    if (entry == key) return true; // already recorded
+    if (entry == 0u) {
+      entry = key;
+      return true;
+    }
+    slot = (slot + 1u) % SOURCE_DISCOVERY_TABLE_SIZE;
+  }
+  return false;
+}
+
+static void clearSourceConfigDone() {
+  memset(sourceConfigHashTable, 0, sizeof(sourceConfigHashTable));
+}
+
 // Trim whitespace on both sides in-place
 static void trimInPlace(char *buffer) {
   if (buffer == nullptr) return;
@@ -239,6 +291,7 @@ void startMQTT()
   stateMQTT = MQTT_STATE_INIT;
   //setup for mqtt discovery
   clearMQTTConfigDone();
+  clearSourceConfigDone();
   strlcpy(NodeId, CSTR(settingMQTTuniqueid), sizeof(NodeId));
   buildNamespace(MQTTPubNamespace, sizeof(MQTTPubNamespace), CSTR(settingMQTTtopTopic), "value", NodeId);
   buildNamespace(MQTTSubNamespace, sizeof(MQTTSubNamespace), CSTR(settingMQTTtopTopic), "set", NodeId);
@@ -561,6 +614,7 @@ void PrintMQTTError(){
 void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype, byte msgId) {
   if (!settingMQTTSeparateSources) return;  // Feature disabled
   if (!baseTopic || !value) return;          // Null safety
+  (void)msgId;
   
   char sourceTopic[MQTT_TOPIC_MAX_LEN];
   char sensorId[64];
@@ -606,11 +660,6 @@ void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype
     return;
   }
   
-  // Check if we need to send auto-discovery config for this source-specific sensor
-  // Uses the same bitmap pattern as MQTTautoConfigMap: 8 x uint32_t = 256 bits per source
-  // 3 sources (thermostat=0, boiler=1, gateway=2) x 32 bytes = 96 bytes total
-  static uint32_t sourceConfigMap[3][8] = { {0} };
-
   // Map rsptype to source index (0=thermostat, 1=boiler, 2=gateway)
   uint8_t sourceIdx;
   switch(rsptype) {
@@ -619,11 +668,9 @@ void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype
     default:                     sourceIdx = 2; break; // R and A messages
   }
 
-  // Direct bit lookup by msgId — same approach as getMQTTConfigDone
-  uint8_t group = msgId >> 5;        // msgId / 32
-  uint8_t index = msgId & 0x1F;      // msgId % 32
-
-  if (bitRead(sourceConfigMap[sourceIdx][group], index)) {
+  // Dedupe by concrete source sensor-id, not only msgId.
+  // This ensures multi-topic message IDs (_hb/_lb/etc.) all get discovery.
+  if (getSourceConfigDone(sourceIdx, sensorId)) {
     return; // Already discovered
   }
 
@@ -661,7 +708,9 @@ void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype
   sendMQTTStreaming(discoveryTopic, discoveryMsg, strlen(discoveryMsg));
 
   // Mark as discovered
-  bitSet(sourceConfigMap[sourceIdx][group], index);
+  if (!setSourceConfigDone(sourceIdx, sensorId)) {
+    MQTTDebugTf(PSTR("WARN: Source discovery cache full; cannot cache %s\r\n"), sensorId);
+  }
 
   MQTTDebugTf(PSTR("Sent auto-discovery for source-specific sensor: %s\r\n"), sensorId);
 }
