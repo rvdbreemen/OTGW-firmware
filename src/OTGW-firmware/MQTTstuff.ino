@@ -558,7 +558,7 @@ void PrintMQTTError(){
 // Publishes value to topic with source suffix (_thermostat, _boiler, _gateway)
 // Only called when settingMQTTSeparateSources is enabled
 //=======================================================================
-void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype) {
+void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype, byte msgId) {
   if (!settingMQTTSeparateSources) return;  // Feature disabled
   if (!baseTopic || !value) return;          // Null safety
   
@@ -607,113 +607,63 @@ void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype
   }
   
   // Check if we need to send auto-discovery config for this source-specific sensor
-  // Critical review finding #2814343458: Memory-efficient two-level hash bitmap
-  // Option 1: 64-bit primary bitmap + 16-slot collision buffer (40 bytes vs 1920 bytes = 98% savings)
-  static uint64_t discoveredBitmap = 0;       // Primary: 8 bytes
-  static char collisionBuffer[16][32];        // Secondary: 512 bytes for rare collisions
-  static uint8_t collisionCount = 0;
-  
-  // DJB2 hash for consistent bit assignment
-  uint32_t hash = 5381;
-  for (const char* p = sensorId; *p; p++) {
-    hash = ((hash << 5) + hash) + *p;
+  // Uses the same bitmap pattern as MQTTautoConfigMap: 8 x uint32_t = 256 bits per source
+  // 3 sources (thermostat=0, boiler=1, gateway=2) x 32 bytes = 96 bytes total
+  static uint32_t sourceConfigMap[3][8] = { {0} };
+
+  // Map rsptype to source index (0=thermostat, 1=boiler, 2=gateway)
+  uint8_t sourceIdx;
+  switch(rsptype) {
+    case OTGW_THERMOSTAT:        sourceIdx = 0; break;
+    case OTGW_BOILER:            sourceIdx = 1; break;
+    default:                     sourceIdx = 2; break; // R and A messages
   }
-  uint8_t bit = hash % 64;  // Map to 64-bit bitmap
-  
-  bool alreadyDiscovered = false;
-  
-  // Check primary bitmap first (fast path)
-  if (discoveredBitmap & (1ULL << bit)) {
-    // Bit is set - either discovered or collision
-    // Check collision buffer to verify (handles hash conflicts)
-    alreadyDiscovered = true;  // Assume discovered unless proven collision
-    
-    // Scan collision buffer for this specific sensor
-    bool foundInCollisionBuffer = false;
-    for (uint8_t i = 0; i < collisionCount; i++) {
-      if (strcmp(collisionBuffer[i], sensorId) == 0) {
-        foundInCollisionBuffer = true;
-        break;
-      }
-    }
-    
-    // If not in collision buffer, this is the original sensor for this bit
-    // If in collision buffer, it's already discovered
-    if (!foundInCollisionBuffer) {
-      // This might be a new collision - need to check if we've seen this sensor before
-      // For safety, we'll treat it as potentially new and let it through if buffer has space
-      alreadyDiscovered = false;
-    }
+
+  // Direct bit lookup by msgId — same approach as getMQTTConfigDone
+  uint8_t group = msgId >> 5;        // msgId / 32
+  uint8_t index = msgId & 0x1F;      // msgId % 32
+
+  if (bitRead(sourceConfigMap[sourceIdx][group], index)) {
+    return; // Already discovered
   }
-  
-  if (!alreadyDiscovered) {
-    // Build discovery topic manually for source-specific sensor
-    // Format: homeassistant/sensor/<node_id>_<sensor_id>/config
-    char discoveryTopic[MQTT_TOPIC_MAX_LEN];
-    written = snprintf_P(discoveryTopic, sizeof(discoveryTopic), 
-                         PSTR("%s/sensor/%s_%s/config"), 
-                         settingMQTThaprefix, settingMQTTuniqueid, sensorId);
-    
-    // Critical review finding #2814343508: Check for buffer overflow
-    if (written < 0 || written >= (int)sizeof(discoveryTopic)) {
-      MQTTDebugTf(PSTR("ERROR: Discovery topic buffer overflow for %s\r\n"), sensorId);
-      return;
-    }
-    
-    // Build discovery message with source in friendly name
-    // Format: {"name":"<Sensor> (<Source>)","state_topic":"...","unique_id":"...","device":{...}}
-    char discoveryMsg[MQTT_MSG_MAX_LEN];
-    written = snprintf_P(discoveryMsg, sizeof(discoveryMsg),
-                         PSTR("{\"name\":\"%s (%S)\","
-                              "\"state_topic\":\"%s/%s\","
-                              "\"unique_id\":\"%s_%s\","
-                              "\"device\":{\"identifiers\":[\"%s\"],\"name\":\"%s\",\"model\":\"OTGW\",\"manufacturer\":\"Schelte Bron\"}}"),
-                         baseTopic, sourceName,           // Friendly name with source (sourceName is PROGMEM)
-                         MQTTPubNamespace, sourceTopic,   // State topic
-                         settingMQTTuniqueid, sensorId,   // Unique ID
-                         settingMQTTuniqueid,             // Device identifier
-                         settingHostname);                // Device name
-    
-    // Critical review finding #2814343508: Check for buffer overflow
-    if (written < 0 || written >= (int)sizeof(discoveryMsg)) {
-      MQTTDebugTf(PSTR("ERROR: Discovery message buffer overflow for %s\r\n"), sensorId);
-      return;
-    }
-    
-    // Send discovery config
-    sendMQTTStreaming(discoveryTopic, discoveryMsg, strlen(discoveryMsg));
-    
-    // Mark as discovered in bitmap
-    discoveredBitmap |= (1ULL << bit);
-    
-    // If bitmap bit was already set, this is a collision - store in collision buffer
-    if (collisionCount < 16) {
-      bool isCollision = false;
-      // Check if bit was already set before we set it
-      // This is approximate - we detect potential collisions and store them
-      for (uint8_t i = 0; i < collisionCount; i++) {
-        // If we have other sensors in collision buffer, this might be a collision
-        uint32_t otherHash = 5381;
-        for (const char* p = collisionBuffer[i]; *p; p++) {
-          otherHash = ((otherHash << 5) + otherHash) + *p;
-        }
-        if ((otherHash % 64) == bit) {
-          isCollision = true;
-          break;
-        }
-      }
-      
-      if (isCollision) {
-        // Store this sensor in collision buffer
-        strncpy(collisionBuffer[collisionCount], sensorId, sizeof(collisionBuffer[0]) - 1);
-        collisionBuffer[collisionCount][sizeof(collisionBuffer[0]) - 1] = '\0';
-        collisionCount++;
-        MQTTDebugTf(PSTR("Collision detected, stored in buffer: %s\r\n"), sensorId);
-      }
-    }
-    
-    MQTTDebugTf(PSTR("Sent auto-discovery for source-specific sensor: %s (bit %d)\r\n"), sensorId, bit);
+
+  // Build discovery topic for source-specific sensor
+  // Format: homeassistant/sensor/<node_id>_<sensor_id>/config
+  char discoveryTopic[MQTT_TOPIC_MAX_LEN];
+  written = snprintf_P(discoveryTopic, sizeof(discoveryTopic),
+                       PSTR("%s/sensor/%s_%s/config"),
+                       settingMQTThaprefix, settingMQTTuniqueid, sensorId);
+
+  if (written < 0 || written >= (int)sizeof(discoveryTopic)) {
+    MQTTDebugTf(PSTR("ERROR: Discovery topic buffer overflow for %s\r\n"), sensorId);
+    return;
   }
+
+  // Build discovery message with source in friendly name
+  char discoveryMsg[MQTT_MSG_MAX_LEN];
+  written = snprintf_P(discoveryMsg, sizeof(discoveryMsg),
+                       PSTR("{\"name\":\"%s (%S)\","
+                            "\"state_topic\":\"%s/%s\","
+                            "\"unique_id\":\"%s_%s\","
+                            "\"device\":{\"identifiers\":[\"%s\"],\"name\":\"%s\",\"model\":\"OTGW\",\"manufacturer\":\"Schelte Bron\"}}"),
+                       baseTopic, sourceName,           // Friendly name with source (sourceName is PROGMEM)
+                       MQTTPubNamespace, sourceTopic,   // State topic
+                       settingMQTTuniqueid, sensorId,   // Unique ID
+                       settingMQTTuniqueid,             // Device identifier
+                       settingHostname);                // Device name
+
+  if (written < 0 || written >= (int)sizeof(discoveryMsg)) {
+    MQTTDebugTf(PSTR("ERROR: Discovery message buffer overflow for %s\r\n"), sensorId);
+    return;
+  }
+
+  // Send discovery config
+  sendMQTTStreaming(discoveryTopic, discoveryMsg, strlen(discoveryMsg));
+
+  // Mark as discovered
+  bitSet(sourceConfigMap[sourceIdx][group], index);
+
+  MQTTDebugTf(PSTR("Sent auto-discovery for source-specific sensor: %s\r\n"), sensorId);
 }
 
 
