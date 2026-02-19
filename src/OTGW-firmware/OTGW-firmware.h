@@ -54,8 +54,14 @@ void setLed(int8_t, uint8_t);
 #define NTP_HOST_DEFAULT "pool.ntp.org"
 #define NTP_RESYNC_TIME 1800 //seconds = every 30 minutes
 #define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"  // Home Assistant discovery prefix
-#define CMSG_SIZE 512
+#define CMSG_SIZE 256
 #define JSON_BUFF_MAX   1024
+// MQTT setting field limits (character count, excluding null terminator)
+#define MQTT_TOP_TOPIC_MAX_CHARS 12
+#define MQTT_HA_PREFIX_MAX_CHARS 16
+// Average default unique id from getUniqueId() is "otgw-" + 12 hex chars = 17.
+// Keep 8 chars extra headroom for user customization.
+#define MQTT_UNIQUE_ID_MAX_CHARS 25
 // Replace CSTR macro with overloads to handle both String and char*
 // Includes null pointer protection to prevent crashes
 inline const char* CSTR(const String& x) { 
@@ -126,7 +132,7 @@ using namespace ace_time;
 //static BasicZoneProcessorCache<CACHE_SIZE> zoneProcessorCache;
 //static BasicZoneManager timezoneManager(zonedb::kZoneAndLinkRegistrySize, zonedb::kZoneAndLinkRegistry, zoneProcessorCache);
 static ExtendedZoneProcessor tzProcessor;
-static const int CACHE_SIZE = 3;
+static const int CACHE_SIZE = 2;
 static ExtendedZoneProcessorCache<CACHE_SIZE> zoneProcessorCache;
 static ExtendedZoneManager timezoneManager(
   zonedbx::kZoneAndLinkRegistrySize,
@@ -161,10 +167,10 @@ char      settingMQTTbroker[65] = "homeassistant.local";
 int16_t   settingMQTTbrokerPort = 1883; 
 char      settingMQTTuser[41] = "";
 char      settingMQTTpasswd[41] = "";
-char      settingMQTThaprefix[41] = HOME_ASSISTANT_DISCOVERY_PREFIX;
+char      settingMQTThaprefix[MQTT_HA_PREFIX_MAX_CHARS + 1] = HOME_ASSISTANT_DISCOVERY_PREFIX;
 bool      settingMQTTharebootdetection = true;
-char      settingMQTTtopTopic[41] = "OTGW";
-char      settingMQTTuniqueid[41] = ""; // Intialized in readsettings
+char      settingMQTTtopTopic[MQTT_TOP_TOPIC_MAX_CHARS + 1] = "OTGW";
+char      settingMQTTuniqueid[MQTT_UNIQUE_ID_MAX_CHARS + 1] = ""; // Initialized in readSettings
 bool      settingMQTTOTmessage = false;
 bool      settingMQTTSeparateSources = true; // ADR-040: Publish source-specific topics (_thermostat, _boiler, _gateway)
 bool      settingNTPenable = true;

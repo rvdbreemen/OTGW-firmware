@@ -41,7 +41,11 @@ static uint8_t wsClientCount = 0;
 // Maximum number of simultaneous WebSocket clients
 // Rationale: Each client uses ~700 bytes (256 byte buffer + overhead)
 // Limiting to 3 clients prevents heap exhaustion (3 × 700 = 2100 bytes max)
-#define MAX_WEBSOCKET_CLIENTS 3
+#define MAX_WEBSOCKET_CLIENTS WEBSOCKETS_SERVER_CLIENT_MAX
+
+// Enforce one cap for incoming and outgoing payloads.
+// Incoming is capped by the library (WEBSOCKETS_MAX_DATA_SIZE), outgoing is capped here.
+constexpr size_t WEBSOCKET_PAYLOAD_CAP = WEBSOCKETS_MAX_DATA_SIZE;
 
 // Track WebSocket initialization state
 static bool wsInitialized = false;
@@ -49,6 +53,43 @@ static bool wsInitialized = false;
 // Application-level keepalive tracking
 static unsigned long lastKeepaliveMs = 0;
 const unsigned long KEEPALIVE_INTERVAL_MS = 30000; // 30 seconds
+
+//===========================================================================================
+// Broadcast a text payload with hard payload cap enforcement.
+// Returns transmitted length, or 0 when not sent.
+//===========================================================================================
+static size_t broadcastWebSocketCapped(const char* payload, size_t payloadLen = 0) {
+  if (!wsInitialized || wsClientCount == 0 || payload == nullptr || !canSendWebSocket()) {
+    return 0;
+  }
+
+  size_t sendLen = payloadLen;
+  bool truncated = false;
+  size_t originalLen = payloadLen;
+
+  if (payloadLen == 0) {
+    originalLen = strnlen(payload, WEBSOCKET_PAYLOAD_CAP + 1);
+    if (originalLen > WEBSOCKET_PAYLOAD_CAP) {
+      sendLen = WEBSOCKET_PAYLOAD_CAP;
+      truncated = true;
+    } else {
+      sendLen = originalLen;
+    }
+  } else if (payloadLen > WEBSOCKET_PAYLOAD_CAP) {
+    sendLen = WEBSOCKET_PAYLOAD_CAP;
+    truncated = true;
+  }
+
+  if (sendLen == 0) return 0;
+  if (!webSocket.broadcastTXT(payload, sendLen)) return 0;
+
+  if (truncated) {
+    DebugTf(PSTR("[%lu] WebSocket payload capped: %u -> %u bytes\r\n"),
+            millis(), static_cast<unsigned>(originalLen), static_cast<unsigned>(sendLen));
+  }
+
+  return sendLen;
+}
 
 //===========================================================================================
 // WebSocket event handler
@@ -88,6 +129,13 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
       
     case WStype_TEXT:
       // Handle incoming text from client (currently not used, but available for future commands)
+      if (length > WEBSOCKET_PAYLOAD_CAP) {
+        DebugTf(PSTR("[%lu] WebSocket[%u] text too large (%u > %u), disconnecting\r\n"),
+                millis(), num, static_cast<unsigned>(length),
+                static_cast<unsigned>(WEBSOCKET_PAYLOAD_CAP));
+        webSocket.disconnect(num);
+        return;
+      }
       DebugTf(PSTR("[%lu] WebSocket[%u] received text (%u bytes)\r\n"),
               millis(), num, static_cast<unsigned>(length));
       break;
@@ -124,10 +172,10 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 // Used only for firmware upgrade progress notifications
 //===========================================================================================
 void sendWebSocketJSON(const char *json) {
-  if (wsClientCount > 0) {
+  const size_t sentLen = broadcastWebSocketCapped(json);
+  if (sentLen > 0) {
     Debugf(PSTR("[%lu] WebSocket broadcast JSON (%u bytes)\r\n"),
-           millis(), static_cast<unsigned>(strlen(json)));
-    webSocket.broadcastTXT(json);
+           millis(), static_cast<unsigned>(sentLen));
   }
 }
 
@@ -159,8 +207,9 @@ void handleWebSocket() {
   unsigned long now = millis();
   if (wsInitialized && wsClientCount > 0 && 
       (now - lastKeepaliveMs) >= KEEPALIVE_INTERVAL_MS) {
-    webSocket.broadcastTXT("{\"type\":\"keepalive\"}");
-    lastKeepaliveMs = now;
+    if (broadcastWebSocketCapped("{\"type\":\"keepalive\"}", 20) > 0) {
+      lastKeepaliveMs = now;
+    }
   }
 }
 
@@ -170,9 +219,7 @@ void handleWebSocket() {
 // Simplified: no queue, no JSON, just direct text broadcasting
 //===========================================================================================
 void sendLogToWebSocket(const char* logMessage) {
-  if (wsInitialized && wsClientCount > 0 && logMessage != nullptr) {
-    webSocket.broadcastTXT(logMessage);
-  }
+  broadcastWebSocketCapped(logMessage);
 }
 
 

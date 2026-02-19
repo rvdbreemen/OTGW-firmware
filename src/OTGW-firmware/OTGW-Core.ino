@@ -63,7 +63,7 @@ const char *hexheaders[] = {
 
 /* --- LOG marcro's ---*/
 
-#define OT_LOG_BUFFER_SIZE 512
+#define OT_LOG_BUFFER_SIZE 256
 char ot_log_buffer[OT_LOG_BUFFER_SIZE];
 
 #define ClrLog()            ({ ot_log_buffer[0] = '\0'; })
@@ -299,7 +299,7 @@ String executeCommand(const String sCmd){
   String line = OTGWSerial.readStringUntil('\n');
   
   // Safety check: Prevent memory exhaustion from malformed serial data
-  // OTGW responses should be <100 bytes typically, CMSG_SIZE (512) is generous limit
+  // OTGW responses should be <100 bytes typically, CMSG_SIZE (256) is generous limit
   if (line.length() > CMSG_SIZE) {
     OTGWDebugTf(PSTR("WARNING: OTGW response too long (%d bytes), truncating to %d\r\n"), line.length(), CMSG_SIZE);
     line = line.substring(0, CMSG_SIZE);

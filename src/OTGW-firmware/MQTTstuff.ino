@@ -35,8 +35,8 @@ static char       MQTTbrokerIPchar[20];
 constexpr size_t  MQTT_ID_MAX_LEN = 96;
 constexpr size_t  MQTT_NAMESPACE_MAX_LEN = 192;
 constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
-constexpr size_t  MQTT_MSG_MAX_LEN = 1200;
-constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 1200;
+// Sized from mqttha.cfg expansion worst-case (1123 bytes as of v1.2.0) + margin.
+constexpr size_t  MQTT_MSG_MAX_LEN = 1152;
 
 static            PubSubClient MQTTclient(wifiClient);
 
@@ -51,12 +51,58 @@ static char       MQTTPubNamespace[MQTT_NAMESPACE_MAX_LEN];
 static char       MQTTSubNamespace[MQTT_NAMESPACE_MAX_LEN];
 static char       NodeId[MQTT_ID_MAX_LEN];
 
+// Shared scratch buffers for MQTT auto-discovery file parsing.
+// Used by both doAutoConfigure() and doAutoConfigureMsgid().
+// Guarded because these flows are not designed for concurrent re-entry.
+struct MQTTAutoConfigScratch {
+  bool inUse;
+  char sMsg[MQTT_MSG_MAX_LEN];
+  char sTopic[MQTT_TOPIC_MAX_LEN];
+};
+static MQTTAutoConfigScratch mqttAutoCfgScratch = { false, {0}, {0} };
+
+static bool acquireMQTTAutoConfigScratch(char *&sMsg, char *&sTopic) {
+  if (mqttAutoCfgScratch.inUse) return false;
+  mqttAutoCfgScratch.inUse = true;
+  sMsg = mqttAutoCfgScratch.sMsg;
+  sTopic = mqttAutoCfgScratch.sTopic;
+  return true;
+}
+
+static void releaseMQTTAutoConfigScratch() {
+  mqttAutoCfgScratch.inUse = false;
+}
+
 // Source-specific HA auto-discovery cache.
-// Keyed by hash(sensorId-with-source) per source using open addressing.
-// This avoids duplicate discovery sends while supporting multiple topics per value
-// (for example *_value_hb and *_value_lb).
-constexpr size_t  SOURCE_DISCOVERY_TABLE_SIZE = 192;
-static uint32_t   sourceConfigHashTable[3][SOURCE_DISCOVERY_TABLE_SIZE] = { {0} };
+// Uses a compact Bloom filter per source to avoid duplicate discovery sends
+// while minimizing RAM. This is probabilistic dedupe (rare false positives).
+// False positives may skip a discovery publish until the next cache reset
+// (for example on MQTT reconnect via clearSourceConfigDone()).
+constexpr size_t  SOURCE_DISCOVERY_FILTER_BITS = 2048; // per source (power-of-two)
+constexpr size_t  SOURCE_DISCOVERY_FILTER_WORDS = SOURCE_DISCOVERY_FILTER_BITS / 32;
+constexpr uint8_t SOURCE_DISCOVERY_HASH_COUNT = 5;
+static uint32_t   sourceConfigFilter[3][SOURCE_DISCOVERY_FILTER_WORDS] = { {0} };
+
+static inline uint32_t mixHash32(uint32_t x) {
+  x ^= (x >> 16);
+  x *= 0x7feb352du;
+  x ^= (x >> 15);
+  x *= 0x846ca68bu;
+  x ^= (x >> 16);
+  return x;
+}
+
+static inline bool testFilterBit(const uint8_t sourceIdx, const uint16_t bitIndex) {
+  const uint16_t word = bitIndex >> 5;
+  const uint32_t mask = 1u << (bitIndex & 31u);
+  return (sourceConfigFilter[sourceIdx][word] & mask) != 0u;
+}
+
+static inline void setFilterBit(const uint8_t sourceIdx, const uint16_t bitIndex) {
+  const uint16_t word = bitIndex >> 5;
+  const uint32_t mask = 1u << (bitIndex & 31u);
+  sourceConfigFilter[sourceIdx][word] |= mask;
+}
 
 static uint32_t hashSourceSensorId(const char *sensorId) {
   uint32_t hash = 2166136261u; // FNV-1a 32-bit offset basis
@@ -70,37 +116,32 @@ static uint32_t hashSourceSensorId(const char *sensorId) {
 
 static bool getSourceConfigDone(const uint8_t sourceIdx, const char *sensorId) {
   if (sourceIdx >= 3 || !sensorId) return false;
-  const uint32_t key = hashSourceSensorId(sensorId);
-  size_t slot = key % SOURCE_DISCOVERY_TABLE_SIZE;
+  const uint32_t h1 = hashSourceSensorId(sensorId);
+  const uint32_t h2 = mixHash32(h1 ^ 0x9e3779b9u) | 1u; // odd step for double hashing
 
-  for (size_t probe = 0; probe < SOURCE_DISCOVERY_TABLE_SIZE; probe++) {
-    const uint32_t entry = sourceConfigHashTable[sourceIdx][slot];
-    if (entry == 0u) return false;
-    if (entry == key) return true;
-    slot = (slot + 1u) % SOURCE_DISCOVERY_TABLE_SIZE;
+  for (uint8_t i = 0; i < SOURCE_DISCOVERY_HASH_COUNT; i++) {
+    const uint16_t bitIndex = static_cast<uint16_t>((h1 + (static_cast<uint32_t>(i) * h2))
+                                  & (SOURCE_DISCOVERY_FILTER_BITS - 1u));
+    if (!testFilterBit(sourceIdx, bitIndex)) return false;
   }
-  return false;
+  return true;
 }
 
 static bool setSourceConfigDone(const uint8_t sourceIdx, const char *sensorId) {
   if (sourceIdx >= 3 || !sensorId) return false;
-  const uint32_t key = hashSourceSensorId(sensorId);
-  size_t slot = key % SOURCE_DISCOVERY_TABLE_SIZE;
+  const uint32_t h1 = hashSourceSensorId(sensorId);
+  const uint32_t h2 = mixHash32(h1 ^ 0x9e3779b9u) | 1u;
 
-  for (size_t probe = 0; probe < SOURCE_DISCOVERY_TABLE_SIZE; probe++) {
-    uint32_t &entry = sourceConfigHashTable[sourceIdx][slot];
-    if (entry == key) return true; // already recorded
-    if (entry == 0u) {
-      entry = key;
-      return true;
-    }
-    slot = (slot + 1u) % SOURCE_DISCOVERY_TABLE_SIZE;
+  for (uint8_t i = 0; i < SOURCE_DISCOVERY_HASH_COUNT; i++) {
+    const uint16_t bitIndex = static_cast<uint16_t>((h1 + (static_cast<uint32_t>(i) * h2))
+                                  & (SOURCE_DISCOVERY_FILTER_BITS - 1u));
+    setFilterBit(sourceIdx, bitIndex);
   }
-  return false;
+  return true;
 }
 
 static void clearSourceConfigDone() {
-  memset(sourceConfigHashTable, 0, sizeof(sourceConfigHashTable));
+  memset(sourceConfigFilter, 0, sizeof(sourceConfigFilter));
 }
 
 static bool resolveSourcePublishInfo(byte rsptype, PGM_P &suffix, PGM_P &sourceName, uint8_t &sourceIdx) {
@@ -146,6 +187,22 @@ static void trimInPlace(char *buffer) {
 // MOVED TO helperStuff.ino
 // static bool replaceAll ...
 
+static bool copyTrimmedField(char *dst, size_t dstSize, const char *src, const char *srcEnd = nullptr) {
+  if (!dst || !src || dstSize == 0) return false;
+
+  const char *begin = src;
+  const char *end = (srcEnd != nullptr) ? srcEnd : (src + strlen(src));
+
+  while (begin < end && isspace(static_cast<unsigned char>(*begin))) begin++;
+  while (end > begin && isspace(static_cast<unsigned char>(*(end - 1)))) end--;
+
+  const size_t len = static_cast<size_t>(end - begin);
+  if (len >= dstSize) return false;
+  if (len > 0) memmove(dst, begin, len);
+  dst[len] = '\0';
+  return true;
+}
+
 static bool splitLine(char *sIn, char del, byte &cID, char *cKey, size_t keySize, char *cVal, size_t valSize) {
   if (!sIn || !cKey || !cVal) return false;
   char *comment = strstr(sIn, "//");
@@ -160,21 +217,11 @@ static bool splitLine(char *sIn, char del, byte &cID, char *cKey, size_t keySize
   if (secondDel == nullptr || secondDel <= firstDel + 1 || *(secondDel + 1) == '\0') return false;
 
   char idBuf[8]{0};
-  strlcpy(idBuf, sIn, sizeof(idBuf));
-  char *idDel = strchr(idBuf, del);
-  if (!idDel) return false;
-  *idDel = '\0';
-  trimInPlace(idBuf);
+  if (!copyTrimmedField(idBuf, sizeof(idBuf), sIn, firstDel)) return false;
   cID = static_cast<byte>(strtoul(idBuf, nullptr, 10));
 
-  strlcpy(cKey, firstDel + 1, keySize);
-  char *keyEnd = strchr(cKey, del);
-  if (!keyEnd) return false;
-  *keyEnd = '\0';
-  trimInPlace(cKey);
-
-  strlcpy(cVal, secondDel + 1, valSize);
-  trimInPlace(cVal);
+  if (!copyTrimmedField(cKey, keySize, firstDel + 1, secondDel)) return false;
+  if (!copyTrimmedField(cVal, valSize, secondDel + 1)) return false;
 
   return strlen(cKey) > 0 && strlen(cVal) > 0;
 }
@@ -755,9 +802,14 @@ void sendMQTTData(const __FlashStringHelper *topic, const char *json, const bool
 
 void sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *json, const bool retain)
 {
-  static char payloadBuf[MQTT_MSG_MAX_LEN];
+  // This overload is used for short status/error literals in flash.
+  // Keep this scratch compact to reduce persistent RAM usage.
+  static char payloadBuf[256];
   strncpy_P(payloadBuf, reinterpret_cast<PGM_P>(json), sizeof(payloadBuf) - 1);
   payloadBuf[sizeof(payloadBuf) - 1] = '\0';
+  if (strlen_P(reinterpret_cast<PGM_P>(json)) >= sizeof(payloadBuf)) {
+    MQTTDebugTln(F("WARN: Flash MQTT payload truncated to 255 bytes"));
+  }
   sendMQTTData(topic, payloadBuf, retain);
 }
 
@@ -927,27 +979,27 @@ void clearMQTTConfigDone()
 }
 //===========================================================================================
 void doAutoConfigure(bool bForceAll){
-  // Option B: Function-Local Static Buffers (Zero Heap Allocation)
-  // Eliminates 2600 bytes transient heap allocation, adds 2600 bytes permanent static
-  // No mutex needed - function naturally non-reentrant
-  
   if (!settingMQTTenable) return;
 
-  // Function-local static buffers - allocated once, reused across calls
-  static char sLine[MQTT_CFG_LINE_MAX_LEN];
-  static char sTopic[MQTT_TOPIC_MAX_LEN];
-  static char sMsg[MQTT_MSG_MAX_LEN];
+  char* sMsg = nullptr;
+  char* sTopic = nullptr;
+  if (!acquireMQTTAutoConfigScratch(sMsg, sTopic)) {
+    MQTTDebugTln(F("WARN: AutoConfig scratch buffer busy; retry deferred"));
+    return;
+  }
 
   // 2. Open File ONCE
   LittleFS.begin();
   if (!LittleFS.exists(F("/mqttha.cfg"))) {
     DebugTln(F("Error: configuration file not found.")); 
+    releaseMQTTAutoConfigScratch();
     return;
   } 
 
   File fh = LittleFS.open(F("/mqttha.cfg"), "r");
   if (!fh) {
     DebugTln(F("Error: could not open configuration file.")); 
+    releaseMQTTAutoConfigScratch();
     return;
   } 
 
@@ -958,11 +1010,11 @@ void doAutoConfigure(bool bForceAll){
     feedWatchDog(); // Keep the dog happy during IO
     
     // Read line
-    size_t len = fh.readBytesUntil('\n', sLine, MQTT_CFG_LINE_MAX_LEN - 1);
-    sLine[len] = '\0';
+    size_t len = fh.readBytesUntil('\n', sMsg, MQTT_MSG_MAX_LEN - 1);
+    sMsg[len] = '\0';
     
     // Parse Line
-    if (!splitLine(sLine, ';', lineID, sTopic, MQTT_TOPIC_MAX_LEN, sMsg, MQTT_MSG_MAX_LEN)) continue;
+    if (!splitLine(sMsg, ';', lineID, sTopic, MQTT_TOPIC_MAX_LEN, sMsg, MQTT_MSG_MAX_LEN)) continue;
 
     // 4. Decision: Do we send this line?
     // Skip Dallas sensors - they need per-sensor addresses from configSensors()
@@ -1001,10 +1053,12 @@ void doAutoConfigure(bool bForceAll){
 
   fh.close();
   
-  // Note: No buffer cleanup needed - static buffers persist across calls
-  // resetMQTTBufferSize() is a no-op for static buffer strategy
+  // No dynamic MQTT buffer cleanup needed - reset is a no-op for static strategy.
   resetMQTTBufferSize();
-  
+
+  // Release shared scratch before potential nested Dallas auto-config calls.
+  releaseMQTTAutoConfigScratch();
+
   // Trigger Dallas configuration separately as it requires specific sensor addresses
   if (settingMQTTenable && (bForceAll || !getMQTTConfigDone(OTGWdallasdataid))) {
       configSensors();
@@ -1039,12 +1093,13 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
     return _result;
   } 
 
-  // Option B: Function-Local Static Buffers (Zero Heap Allocation)
-  // Single static buffer partitioned into 3 regions - allocated once, reused across calls
-  static char buffer[MQTT_MSG_MAX_LEN + MQTT_TOPIC_MAX_LEN + MQTT_CFG_LINE_MAX_LEN];
-  char* sMsg   = buffer;
-  char* sTopic = sMsg + MQTT_MSG_MAX_LEN;
-  char* sLine  = sTopic + MQTT_TOPIC_MAX_LEN;
+  char* sMsg = nullptr;
+  char* sTopic = nullptr;
+  if (!acquireMQTTAutoConfigScratch(sMsg, sTopic)) {
+    MQTTDebugTf(PSTR("WARN: AutoConfig scratch buffer busy for ID %d; retry deferred\r\n"), OTid);
+    return _result;
+  }
+
   byte lineID = 39; // 39 is unused in OT protocol so is a safe value
 
   //Let's open the MQTT autoconfig file
@@ -1054,6 +1109,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
 
   if (!LittleFS.exists(F("/mqttha.cfg"))) {
     DebugTln(F("Error: configuration file not found.")); 
+    releaseMQTTAutoConfigScratch();
     return _result;
   } 
 
@@ -1061,6 +1117,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
 
   if (!fh) {
     DebugTln(F("Error: could not open configuration file.")); 
+    releaseMQTTAutoConfigScratch();
     return _result;
   } 
 
@@ -1072,9 +1129,9 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
     //read file line by line, split and send to MQTT (topic, msg)
     feedWatchDog(); //start with feeding the dog
     
-    size_t len = fh.readBytesUntil('\n', sLine, MQTT_CFG_LINE_MAX_LEN - 1);
-    sLine[len] = '\0';
-    if (!splitLine(sLine, ';', lineID, sTopic, MQTT_TOPIC_MAX_LEN, sMsg, MQTT_MSG_MAX_LEN)) {  //splitLine() also filters comments
+    size_t len = fh.readBytesUntil('\n', sMsg, MQTT_MSG_MAX_LEN - 1);
+    sMsg[len] = '\0';
+    if (!splitLine(sMsg, ';', lineID, sTopic, MQTT_TOPIC_MAX_LEN, sMsg, MQTT_MSG_MAX_LEN)) {  //splitLine() also filters comments
       continue;
     }
 
@@ -1136,9 +1193,9 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
   
   fh.close();
   
-  // Note: No buffer cleanup needed - static buffer persists across calls
-  // resetMQTTBufferSize() is a no-op for static buffer strategy
+  // No dynamic MQTT buffer cleanup needed - reset is a no-op for static strategy.
   resetMQTTBufferSize();
+  releaseMQTTAutoConfigScratch();
 
   return _result;
 

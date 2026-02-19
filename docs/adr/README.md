@@ -10,7 +10,7 @@ Architecture Decision Records capture important architectural decisions along wi
 
 **By Topic:**
 - [Platform & Build](#platform-and-build-system) (4 ADRs)
-- [Memory Management](#memory-management) (4 ADRs)
+- [Memory Management](#memory-management) (5 ADRs)
 - [Network & Security](#network-and-security) (3 ADRs)
 - [Integration](#integration-and-communication) (5 ADRs) 🆕
 - [Core Systems](#system-architecture) (4 ADRs) 🆕
@@ -54,6 +54,9 @@ Architecture Decision Records capture important architectural decisions along wi
 
 - **[ADR-030: Heap Memory Monitoring and Emergency Recovery](ADR-030-heap-memory-monitoring-emergency-recovery.md)** 🆕  
   Proactive heap monitoring with 4-level health system and adaptive throttling to prevent crashes (CRITICAL <3KB, WARNING 3-5KB, LOW 5-8KB, HEALTHY >8KB).
+
+- **[ADR-041: Memory Headroom Optimization Profile for v1.2.0](ADR-041-memory-headroom-optimization-profile-v1.2.0.md)** 🆕  
+  Targeted low-risk memory reductions for v1.2.0 (WebSocket caps/guarding, shared MQTT scratch, Bloom dedupe, bounded MQTT buffers, AceTime/cache trims) while preserving required features.
 
 ### Integration and Communication
 - **[ADR-005: WebSocket for Real-Time Streaming](ADR-005-websocket-real-time-streaming.md)**  
@@ -263,6 +266,7 @@ ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
 6. 2024: ADR-019 (API v2)
 7. 2026: ADR-025 (Safari WebSocket fix), ADR-026 (Cache-busting), ADR-027 (Version warnings)
 8. 2026: ADR-036 (Boot sequence), ADR-037 (Gateway mode), ADR-038 (Data flow), ADR-039 (OTGraph)
+9. 2026: ADR-041 (Memory headroom optimization profile for v1.2.0)
 
 ## When to Create an ADR
 

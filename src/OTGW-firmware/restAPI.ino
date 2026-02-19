@@ -1111,10 +1111,10 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("mqttbrokerport"), settingMQTTbrokerPort, "i", 0, 65535);
   sendJsonSettingObj(F("mqttuser"), CSTR(settingMQTTuser), "s", 32);
   sendJsonSettingObj(F("mqttpasswd"), "notthepassword", "p", 100);
-  sendJsonSettingObj(F("mqtttoptopic"), CSTR(settingMQTTtopTopic), "s", 15);
-  sendJsonSettingObj(F("mqtthaprefix"), CSTR(settingMQTThaprefix), "s", 20);
+  sendJsonSettingObj(F("mqtttoptopic"), CSTR(settingMQTTtopTopic), "s", sizeof(settingMQTTtopTopic) - 1);
+  sendJsonSettingObj(F("mqtthaprefix"), CSTR(settingMQTThaprefix), "s", sizeof(settingMQTThaprefix) - 1);
   sendJsonSettingObj(F("mqttharebootdetection"), settingMQTTharebootdetection, "b");
-  sendJsonSettingObj(F("mqttuniqueid"), CSTR(settingMQTTuniqueid), "s", 20);
+  sendJsonSettingObj(F("mqttuniqueid"), CSTR(settingMQTTuniqueid), "s", sizeof(settingMQTTuniqueid) - 1);
   sendJsonSettingObj(F("mqttotmessage"), settingMQTTOTmessage, "b");
   sendJsonSettingObj(F("mqttseparatesources"), settingMQTTSeparateSources, "b");
   sendJsonSettingObj(F("ntpenable"), settingNTPenable, "b");

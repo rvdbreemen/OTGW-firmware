@@ -57,6 +57,9 @@
 // This must be defined BEFORE including WebSocketsServer.h
 // Saves ~256 bytes per client (768 bytes with 3 clients)
 #define WEBSOCKETS_MAX_DATA_SIZE 256
+// Limit concurrent WebSocket clients to reduce static RAM footprint.
+// Default in the library is 5.
+#define WEBSOCKETS_SERVER_CLIENT_MAX 3
 
 #include <WebSocketsServer.h>   // WebSocket server for streaming OT log messages to WebUI
 
