@@ -441,7 +441,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 void sendMQTT(const char* topic, const char *json);
 
 // Forward declaration; implementation is provided later in this file
-void sendMQTTStreaming(const char* topic, const char *json, const size_t len);
+bool sendMQTTStreaming(const char* topic, const char *json, const size_t len);
 
 void handleMQTT() 
 {  
@@ -706,7 +706,10 @@ void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype
   }
 
   // Send discovery config
-  sendMQTTStreaming(discoveryTopic, discoveryMsg, strlen(discoveryMsg));
+  if (!sendMQTTStreaming(discoveryTopic, discoveryMsg, strlen(discoveryMsg))) {
+    MQTTDebugTf(PSTR("WARN: Source discovery publish failed for %s; retry deferred\r\n"), sensorId);
+    return;
+  }
 
   // Mark as discovered
   if (!setSourceConfigDone(sourceIdx, sensorId)) {
@@ -769,16 +772,16 @@ void sendMQTT(const char* topic, const char *json) {
   sendMQTTStreaming(topic, json, strlen(json));
 }
 
-void sendMQTTStreaming(const char* topic, const char *json, const size_t len) 
+bool sendMQTTStreaming(const char* topic, const char *json, const size_t len)
 {
-  if (!settingMQTTenable) return;
-  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
-  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
+  if (!settingMQTTenable) return false;
+  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return false;}
+  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return false;}
   
   // Check heap health before publishing
   if (!canPublishMQTT()) {
     // Message dropped due to low heap - canPublishMQTT() handles logging
-    return;
+    return false;
   }
   
   MQTTDebugTf(PSTR("Sending MQTT (streaming): server %s:%d => TopicId [%s] (len=%d bytes)\r\n"), 
@@ -788,7 +791,7 @@ void sendMQTTStreaming(const char* topic, const char *json, const size_t len)
   // This allows it to use its buffer efficiently without reallocation
   if (!MQTTclient.beginPublish(topic, len, true)) {
     PrintMQTTError();
-    return;
+    return false;
   }
 
   // Write message in small chunks to avoid buffer overflow
@@ -804,7 +807,7 @@ void sendMQTTStreaming(const char* topic, const char *json, const size_t len)
       if (!MQTTclient.write(json[pos + i])) {
         PrintMQTTError();
         MQTTclient.endPublish(); // Clean up even on error
-        return;
+        return false;
       }
     }
     
@@ -814,9 +817,11 @@ void sendMQTTStreaming(const char* topic, const char *json, const size_t len)
   
   if (!MQTTclient.endPublish()) {
     PrintMQTTError();
+    return false;
   }
 
   feedWatchDog();
+  return true;
 } // sendMQTTStreaming()
 
 //===========================================================================================
@@ -984,8 +989,11 @@ void doAutoConfigure(bool bForceAll){
        size_t msgLen = strlen(sMsg);
 
        // Send retained message (uses beginPublish/write/endPublish streaming)
-       sendMQTTStreaming(sTopic, sMsg, msgLen);
-       setMQTTConfigDone(lineID);
+       if (sendMQTTStreaming(sTopic, sMsg, msgLen)) {
+         setMQTTConfigDone(lineID);
+       } else {
+         MQTTDebugTf(PSTR("WARN: AutoConfig publish failed for ID %d; retry deferred\r\n"), lineID);
+       }
 
        doBackgroundTasks(); // Yield to network stack
     }
@@ -1114,9 +1122,12 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
     
     // Static buffer strategy: use MQTT streaming with fixed 1350-byte buffer
     // No dynamic resizing - streaming handles arbitrarily large messages efficiently
-    sendMQTTStreaming(sTopic, sMsg, strlen(sMsg));
-    resetMQTTBufferSize();  // No-op, kept for API compatibility
-    _result = true;
+    if (sendMQTTStreaming(sTopic, sMsg, strlen(sMsg))) {
+      resetMQTTBufferSize();  // No-op, kept for API compatibility
+      _result = true;
+    } else {
+      MQTTDebugTf(PSTR("WARN: AutoConfig publish failed for ID %d; retry deferred\r\n"), OTid);
+    }
 
     // TODO: enable this break if we are sure the old config dump method is no longer needed
     // break;

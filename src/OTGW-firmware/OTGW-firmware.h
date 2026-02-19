@@ -237,6 +237,15 @@ bool      settingGPIOOUTPUTSenabled = false;
 int8_t    settingGPIOOUTPUTSpin = 16;
 int8_t    settingGPIOOUTPUTStriggerBit = 0;
 
+// GPIO conflict ownership used by settings validation.
+// Keep this in the global header so Arduino auto-generated prototypes
+// can resolve it before .ino function declarations.
+enum GPIOFeatureOwner {
+  GPIO_FEATURE_SENSOR = 0,
+  GPIO_FEATURE_S0,
+  GPIO_FEATURE_OUTPUT
+};
+
 //Now load Debug & network library
 #include "Debug.h"
 #include "networkStuff.h"

@@ -3207,25 +3207,36 @@ function sendPostSetting(field, value) {
     mode: "cors"
   };
 
-  fetch(APIGW + "v2/settings", other_params)
+  return fetch(APIGW + "v2/settings", other_params)
     .then((response) => {
-      //console.log(response.status );    //=> number 100–599
-      //console.log(response.statusText); //=> String
-      //console.log(response.headers);    //=> Headers
-      //console.log(response.url);        //=> String
-      //console.log(response.text());
-      //return response.text()
+      return response.text().then((body) => ({ response: response, body: body }));
+    })
+    .then((result) => {
+      const response = result.response;
+      let payload = null;
+      if (result.body) {
+        try {
+          payload = JSON.parse(result.body);
+        } catch (e) {
+          payload = null;
+        }
+      }
+
       const msgEl = document.getElementById("settingMessage");
       if (response.ok) {
-        if (msgEl) msgEl.textContent = "Saving changes... SUCCESS";
+        const isQueued = payload && payload.status === "queued";
+        if (msgEl) msgEl.textContent = isQueued ? "Saving changes... QUEUED" : "Saving changes... SUCCESS";
         setTimeout(function () {
           const msgEl = document.getElementById("settingMessage");
           if (msgEl) msgEl.textContent = "";
         }, 2000); //and clear the message
+        return true;
       } else {
         if (msgEl) msgEl.textContent = "Saving changes... FAILED";
+        return false;
       }
-    }, (error) => {
+    })
+    .catch((error) => {
       console.log("Error[" + error.message + "]"); //=> String
       return false;
     });

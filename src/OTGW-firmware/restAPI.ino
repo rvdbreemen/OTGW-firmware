@@ -62,6 +62,57 @@ static bool parseMsgId(const char *token, uint8_t &msgId) {
   return true;
 }
 
+static bool parsePostSettingsPayload(const String& body,
+                                     char *field,
+                                     size_t fieldSize,
+                                     char *newValue,
+                                     size_t newValueSize,
+                                     const __FlashStringHelper* &errorMsg) {
+  if (!field || !newValue || fieldSize == 0 || newValueSize == 0) {
+    errorMsg = F("Invalid server buffers");
+    return false;
+  }
+
+  field[0] = '\0';
+  newValue[0] = '\0';
+
+  StaticJsonDocument<256> doc;
+  DeserializationError error = deserializeJson(doc, body);
+  if (error) {
+    RESTDebugTf(PSTR("postSettings JSON parse error: %s\r\n"), error.c_str());
+    errorMsg = F("Invalid JSON");
+    return false;
+  }
+
+  const char* parsedField = doc[F("name")];
+  if (!parsedField || parsedField[0] == '\0') {
+    errorMsg = F("Missing name");
+    return false;
+  }
+
+  if (strlcpy(field, parsedField, fieldSize) >= fieldSize) {
+    errorMsg = F("Name too long");
+    return false;
+  }
+
+  JsonVariant val = doc[F("value")];
+  if (val.is<const char*>()) {
+    strlcpy(newValue, val.as<const char*>(), newValueSize);
+  } else if (val.is<bool>()) {
+    strlcpy(newValue, val.as<bool>() ? "true" : "false", newValueSize);
+  } else if (!val.isNull()) {
+    serializeJson(val, newValue, newValueSize);
+  }
+
+  if (newValue[0] == '\0') {
+    errorMsg = F("Missing value");
+    return false;
+  }
+
+  errorMsg = nullptr;
+  return true;
+}
+
 //=======================================================================
 
 void processAPI() 
@@ -1107,46 +1158,24 @@ void postSettings()
   // json string: {"name":"settingHostname","value":"abc"}  
   // json string: {"name":"darktheme","value":true}
   //------------------------------------------------------------ 
-  // Replaced manual string parsing with ArduinoJson (Finding #40)
-  // The old approach stripped braces/quotes and split on , and : which broke
-  // on values containing special characters ({, }, ", comma, colon).
-  StaticJsonDocument<256> doc;
-  DeserializationError error = deserializeJson(doc, httpServer.arg(0));
-  if (error) {
-    RESTDebugTf(PSTR("postSettings JSON parse error: %s\r\n"), error.c_str());
-    httpServer.send(400, F("application/json"), F("{\"error\":\"Invalid JSON\"}"));
-    return;
-  }
-
-  const char* field = doc[F("name")];
-  if (!field || field[0] == '\0') {
-    httpServer.send(400, F("application/json"), F("{\"error\":\"Missing name\"}"));
-    return;
-  }
-
-  // Extract value as string — handles both string and boolean/numeric JSON values
+  char field[25] = {0};
   char newValue[101] = {0};
-  JsonVariant val = doc[F("value")];
-  if (val.is<const char*>()) {
-    strlcpy(newValue, val.as<const char*>(), sizeof(newValue));
-  } else if (val.is<bool>()) {
-    strlcpy(newValue, val.as<bool>() ? "true" : "false", sizeof(newValue));
-  } else if (!val.isNull()) {
-    // Numeric or other type — serialize to string
-    serializeJson(val, newValue, sizeof(newValue));
+  const __FlashStringHelper* errorMsg = nullptr;
+  if (!parsePostSettingsPayload(httpServer.arg(0), field, sizeof(field), newValue, sizeof(newValue), errorMsg)) {
+    sendApiError(400, errorMsg ? errorMsg : F("Invalid settings payload"));
+    return;
   }
 
-  if (newValue[0] != '\0') {
-    RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
-    updateSetting(field, newValue);
-    // Synchronous flush: persist to flash NOW so the 200 OK is truthful.
-    // The deferred timer still handles MQTT/NTP command updates, but HTTP
-    // saves must be durable before we confirm success to the browser.
-    flushSettings();
-    httpServer.send(200, F("application/json"), httpServer.arg(0));
-  } else {
-    httpServer.send(400, F("application/json"), F("{\"error\":\"Missing value\"}"));
-  }
+  RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
+  updateSetting(field, newValue);
+
+  // Deferred single-save mode: updateSetting() marks dirty state and the loop
+  // timer flushes settings in a coalesced write.
+  char response[180];
+  snprintf_P(response, sizeof(response),
+             PSTR("{\"status\":\"queued\",\"name\":\"%s\",\"pending\":true}"),
+             field);
+  httpServer.send(200, F("application/json"), response);
 
 } // postSettings()
 

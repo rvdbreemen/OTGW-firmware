@@ -47,23 +47,32 @@ void flushSettings()
 
 //=======================================================================
 // GPIO conflict detection (Finding #27)
-// Returns true if the requested pin is already used by another feature.
-// 'caller' identifies which feature is requesting the pin (e.g. "sensor", "s0", "output")
-bool checkGPIOConflict(int pin, PGM_P caller)
+// Returns true if the requested pin is already used by another enabled feature.
+static bool isGPIOFeatureEnabled(GPIOFeatureOwner feature)
+{
+  switch (feature) {
+    case GPIO_FEATURE_SENSOR: return settingGPIOSENSORSenabled;
+    case GPIO_FEATURE_S0: return settingS0COUNTERenabled;
+    case GPIO_FEATURE_OUTPUT: return settingGPIOOUTPUTSenabled;
+    default: return false;
+  }
+}
+
+bool checkGPIOConflict(int pin, GPIOFeatureOwner caller)
 {
   if (pin < 0) return false; // disabled / not set
 
   bool conflict = false;
-  // Check against each configurable GPIO (excluding 'caller' itself)
-  if (strcasecmp_P(caller, PSTR("sensor")) != 0 && pin == settingGPIOSENSORSpin && settingGPIOSENSORSpin >= 0) {
+  // Check against each configurable GPIO (excluding caller), only when feature is enabled.
+  if (caller != GPIO_FEATURE_SENSOR && isGPIOFeatureEnabled(GPIO_FEATURE_SENSOR) && pin == settingGPIOSENSORSpin) {
     DebugTf(PSTR("GPIO conflict: pin %d already used by SENSORS\r\n"), pin);
     conflict = true;
   }
-  if (strcasecmp_P(caller, PSTR("s0")) != 0 && pin == settingS0COUNTERpin && settingS0COUNTERpin >= 0) {
+  if (caller != GPIO_FEATURE_S0 && isGPIOFeatureEnabled(GPIO_FEATURE_S0) && pin == static_cast<int>(settingS0COUNTERpin)) {
     DebugTf(PSTR("GPIO conflict: pin %d already used by S0 Counter\r\n"), pin);
     conflict = true;
   }
-  if (strcasecmp_P(caller, PSTR("output")) != 0 && pin == settingGPIOOUTPUTSpin && settingGPIOOUTPUTSpin >= 0) {
+  if (caller != GPIO_FEATURE_OUTPUT && isGPIOFeatureEnabled(GPIO_FEATURE_OUTPUT) && pin == settingGPIOOUTPUTSpin) {
     DebugTf(PSTR("GPIO conflict: pin %d already used by GPIO OUTPUTS\r\n"), pin);
     conflict = true;
   }
@@ -385,7 +394,7 @@ void updateSetting(const char *field, const char *newValue)
   if (strcasecmp_P(field, PSTR("GPIOSENSORSpin")) == 0)    
   {
     int newPin = atoi(newValue);
-    if (checkGPIOConflict(newPin, PSTR("sensor"))) {
+    if (checkGPIOConflict(newPin, GPIO_FEATURE_SENSOR)) {
       DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
     }
     settingGPIOSENSORSpin = newPin;
@@ -405,7 +414,7 @@ void updateSetting(const char *field, const char *newValue)
   if (strcasecmp_P(field, PSTR("S0COUNTERpin")) == 0)    
   {
     int newPin = atoi(newValue);
-    if (checkGPIOConflict(newPin, PSTR("s0"))) {
+    if (checkGPIOConflict(newPin, GPIO_FEATURE_S0)) {
       DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
     }
     settingS0COUNTERpin = newPin;
@@ -430,7 +439,7 @@ void updateSetting(const char *field, const char *newValue)
   if (strcasecmp_P(field, PSTR("GPIOOUTPUTSpin")) == 0)
   {
     int newPin = atoi(newValue);
-    if (checkGPIOConflict(newPin, PSTR("output"))) {
+    if (checkGPIOConflict(newPin, GPIO_FEATURE_OUTPUT)) {
       DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
     }
     settingGPIOOUTPUTSpin = newPin;

@@ -1,55 +1,72 @@
 # OTGW-firmware (ESP8266) for NodoShop OpenTherm Gateway
 
-> **🔧 Development Release — v1.2.0-beta**  
-> This build contains OpenTherm v4.2 protocol compliance fixes, memory safety improvements, and MQTT corrections.  
-> For the latest stable release, see the [releases page](https://github.com/rvdbreemen/OTGW-firmware/releases).
+> **✅ Latest Release — v1.2.0**  
+> This release adds OpenTherm v4.2 message-map alignment, source-specific MQTT publishing with Home Assistant discovery, and reliability fixes in discovery/settings/GPIO handling.  
+> Download binaries from the [releases page](https://github.com/rvdbreemen/OTGW-firmware/releases).
 
 [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 “devkit” that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-## 🚀 What's New in v1.2.0-beta
+## 🚀 What's New in v1.2.0
 
-Version 1.2.0-beta focuses on OpenTherm v4.2 message-map alignment, runtime safety hardening, and MQTT/Home Assistant discovery correctness.
+Version 1.2.0 focuses on protocol correctness, MQTT source separation, and operational reliability.
 
 > Full release notes: [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md)
 
 ### Highlights
 
-- **OpenTherm message-map updates (v4.2 alignment)**
-  - Added missing message IDs: 39, 93-97.
-  - Corrected R/W directions for IDs: 27, 37, 38, 98, 99, 109, 110, 112, 124, 126.
-  - Corrected data representation for FanSpeed (ID 35: `u8/u8`, unit `Hz`) and DHWFlowRate unit (`l/min`).
-- **Runtime safety hardening**
-  - Added bounds checks before OT map lookups in both `processOT()` and REST value lookup.
-  - Kept last-update array aligned with full `uint8_t` message-id range (`0-255`).
-  - Unknown message IDs now use safe fallback metadata instead of raw map indexing.
-- **Data-path completeness**
-  - Added missing `getOTGWValue()` mappings for IDs 113 and 114.
-  - Added handling for newly mapped IDs in parser output and REST retrieval.
-- **MQTT and Home Assistant corrections**
-  - Topic typo fix: `eletric_production` -> `electric_production` (including HA auto-discovery entry).
-  - Topic typo fix: `solar_storage_slave_fault_incidator` -> `solar_storage_slave_fault_indicator`.
-  - Display label typo fix: `Diagonostic_Indicator` -> `Diagnostic_Indicator`.
-- **Repository cleanup**
-  - Removed accidental artifact file `tmpclaude-ecc0-cwd`.
+- **OpenTherm v4.2 alignment**
+  - Added message IDs `39`, `93-97`.
+  - Corrected direction flags for IDs `27`, `37`, `38`, `98`, `99`, `109`, `110`, `112`, `124`, `126`.
+  - Corrected ID `35` (`FanSpeed`) representation to `u8/u8` with unit `Hz`.
+  - Corrected DHW flow unit to `l/min`.
+  - Added missing `getOTGWValue()` mappings for IDs `113` and `114`.
+- **MQTT source-specific publishing (ADR-040)**
+  - New optional source-specific topics for WRITE/RW values:
+    - `<prefix>/value/<node>/<sensor>_thermostat`
+    - `<prefix>/value/<node>/<sensor>_boiler`
+    - `<prefix>/value/<node>/<sensor>_gateway`
+  - Existing legacy topics remain published for backward compatibility.
+  - Source-specific Home Assistant discovery added with per-source dedupe.
+- **MQTT discovery reliability fixes**
+  - Discovery entries are now marked done only when publish succeeds.
+  - Prevents false "configured" state during transient broker failures.
+  - Applies to both global discovery and source-specific discovery paths.
+- **Settings persistence behavior (flash-wear aware)**
+  - Settings writes remain deferred/coalesced (single-save behavior).
+  - `POST /api/v2/settings` returns HTTP 200 with queued metadata.
+  - Web UI save flow treats queued persistence as success.
+  - Reboot path still flushes pending settings before restart.
+- **GPIO conflict validation cleanup**
+  - Conflict checker now evaluates only enabled features (sensor/S0/output).
+  - Warn-only behavior is preserved.
+
+### 1.1.0 -> 1.2.0 at a glance
+
+- Better protocol correctness (OpenTherm v4.2 coverage and data typing).
+- Better observability (thermostat/boiler/gateway values on separate MQTT topics).
+- Better resilience (discovery retry behavior, deferred settings writes, safer GPIO conflict checks).
 
 ### ⚠️ Migration impact
 
-The following MQTT topic renames are breaking for manual MQTT sensors/automations:
+The following MQTT topic corrections are breaking for manually configured sensors/automations:
 
 | Old Topic | New Topic |
 |-----------|-----------|
 | `eletric_production` | `electric_production` |
 | `solar_storage_slave_fault_incidator` | `solar_storage_slave_fault_indicator` |
 
-After upgrading, remove stale entities in Home Assistant (old topics become unavailable) and refresh discovery.
+After upgrading:
+1. Remove stale entities using old typo topics.
+2. Re-run MQTT discovery.
+3. Repoint any custom automations/sensors to corrected topic names.
 
 ---
 
-## What was new in v1.1.0-beta
+## What was new in v1.1.0
 
-Version 1.1.0-beta builds on the stable v1.0.0 foundation with new Dallas temperature sensor features, improved memory safety, WebUI data persistence, and enhanced developer tooling.
+Version 1.1.0 builds on the stable v1.0.0 foundation with new Dallas temperature sensor features, improved memory safety, WebUI data persistence, and enhanced developer tooling.
 
 ### New Features
 
