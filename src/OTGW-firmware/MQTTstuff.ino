@@ -35,8 +35,8 @@ static char       MQTTbrokerIPchar[20];
 constexpr size_t  MQTT_ID_MAX_LEN = 96;
 constexpr size_t  MQTT_NAMESPACE_MAX_LEN = 192;
 constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
-// Sized from mqttha.cfg expansion worst-case (1123 bytes as of v1.2.0) + margin.
-constexpr size_t  MQTT_MSG_MAX_LEN = 1152;
+// Conservative size for autodiscovery payload processing.
+constexpr size_t  MQTT_MSG_MAX_LEN = 1200;
 
 static            PubSubClient MQTTclient(wifiClient);
 
@@ -684,86 +684,91 @@ void PrintMQTTError(){
 void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype) {
   if (!settingMQTTSeparateSources) return;  // Feature disabled
   if (!baseTopic || !value) return;          // Null safety
-  
-  char sourceTopic[MQTT_TOPIC_MAX_LEN];
-  char sensorId[64];
+
+  // Static: publishToSourceTopic is called every ~1s per WRITE/RW OT message.
+  // feedWatchDog() does not yield, so re-entrancy is impossible.
+  // Discovery buffers are borrowed from mqttAutoCfgScratch (already allocated in BSS).
+  // Note: sensorId is identical to sourceTopic (same baseTopic+suffix), so it is omitted.
+  static char sourceTopic[MQTT_TOPIC_MAX_LEN];
   PGM_P suffix;
   PGM_P sourceName;
   uint8_t sourceIdx;
-  
+
   // Determine suffix, source name and source index from message source.
   if (!resolveSourcePublishInfo(rsptype, suffix, sourceName, sourceIdx)) {
     // Don't publish for parity errors or unknown types
     return;
   }
-  
+
   // Build source-specific topic: <baseTopic><suffix>
-  // Critical review finding #2814343508: Check for buffer overflow
   int written = snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s%S"), baseTopic, suffix);
   if (written < 0 || written >= (int)sizeof(sourceTopic)) {
     MQTTDebugTf(PSTR("ERROR: Source topic buffer overflow for %s\r\n"), baseTopic);
     return;
   }
-  
+
   // Publish to source-specific topic (not retained to save MQTT broker memory)
   sendMQTTData(sourceTopic, value, false);
-  
-  // ADR-040: Send Home Assistant auto-discovery for source-specific sensor
-  // Build sensor ID with suffix for unique discovery config
-  written = snprintf_P(sensorId, sizeof(sensorId), PSTR("%s%S"), baseTopic, suffix);
-  if (written < 0 || written >= (int)sizeof(sensorId)) {
-    MQTTDebugTf(PSTR("ERROR: Sensor ID buffer overflow for %s\r\n"), baseTopic);
-    return;
-  }
-  
-  // Dedupe by concrete source sensor-id.
+
+  // Dedupe: sourceTopic (== baseTopic+suffix) uniquely identifies this source sensor.
   // This ensures multi-topic message IDs (_hb/_lb/etc.) all get discovery.
-  if (getSourceConfigDone(sourceIdx, sensorId)) {
+  if (getSourceConfigDone(sourceIdx, sourceTopic)) {
     return; // Already discovered
   }
 
-  // Build discovery topic for source-specific sensor
-  // Format: homeassistant/sensor/<node_id>_<sensor_id>/config
-  char discoveryTopic[MQTT_TOPIC_MAX_LEN];
-  written = snprintf_P(discoveryTopic, sizeof(discoveryTopic),
-                       PSTR("%s/sensor/%s_%s/config"),
-                       settingMQTThaprefix, settingMQTTuniqueid, sensorId);
+  // Borrow shared scratch for the discovery phase only.
+  // If scratch is held by doAutoConfigure / doAutoConfigureMsgid, defer this discovery.
+  // acquireMQTTAutoConfigScratch fills: first arg -> sMsg (MQTT_MSG_MAX_LEN),
+  //                                    second arg -> sTopic (MQTT_TOPIC_MAX_LEN).
+  char *discoveryMsg;
+  char *discoveryTopic;
+  if (!acquireMQTTAutoConfigScratch(discoveryMsg, discoveryTopic)) {
+    MQTTDebugTf(PSTR("WARN: Scratch busy; source discovery deferred for %s\r\n"), sourceTopic);
+    return;
+  }
 
-  if (written < 0 || written >= (int)sizeof(discoveryTopic)) {
-    MQTTDebugTf(PSTR("ERROR: Discovery topic buffer overflow for %s\r\n"), sensorId);
+  // Build discovery topic for source-specific sensor
+  // Format: <haprefix>/sensor/<uniqueid>_<sourceTopic>/config
+  written = snprintf_P(discoveryTopic, MQTT_TOPIC_MAX_LEN,
+                       PSTR("%s/sensor/%s_%s/config"),
+                       settingMQTThaprefix, settingMQTTuniqueid, sourceTopic);
+  if (written < 0 || written >= MQTT_TOPIC_MAX_LEN) {
+    MQTTDebugTf(PSTR("ERROR: Discovery topic buffer overflow for %s\r\n"), sourceTopic);
+    releaseMQTTAutoConfigScratch();
     return;
   }
 
   // Build discovery message with source in friendly name
-  char discoveryMsg[MQTT_MSG_MAX_LEN];
-  written = snprintf_P(discoveryMsg, sizeof(discoveryMsg),
+  written = snprintf_P(discoveryMsg, MQTT_MSG_MAX_LEN,
                        PSTR("{\"name\":\"%s (%S)\","
                             "\"state_topic\":\"%s/%s\","
                             "\"unique_id\":\"%s_%s\","
                             "\"device\":{\"identifiers\":[\"%s\"],\"name\":\"%s\",\"model\":\"OTGW\",\"manufacturer\":\"Schelte Bron\"}}"),
-                       baseTopic, sourceName,           // Friendly name with source (sourceName is PROGMEM)
-                       MQTTPubNamespace, sourceTopic,   // State topic
-                       settingMQTTuniqueid, sensorId,   // Unique ID
-                       settingMQTTuniqueid,             // Device identifier
-                       settingHostname);                // Device name
-
-  if (written < 0 || written >= (int)sizeof(discoveryMsg)) {
-    MQTTDebugTf(PSTR("ERROR: Discovery message buffer overflow for %s\r\n"), sensorId);
+                       baseTopic, sourceName,             // Friendly name with source (sourceName is PROGMEM)
+                       MQTTPubNamespace, sourceTopic,     // State topic
+                       settingMQTTuniqueid, sourceTopic,  // Unique ID (sourceTopic == former sensorId)
+                       settingMQTTuniqueid,               // Device identifier
+                       settingHostname);                  // Device name
+  if (written < 0 || written >= MQTT_MSG_MAX_LEN) {
+    MQTTDebugTf(PSTR("ERROR: Discovery message buffer overflow for %s\r\n"), sourceTopic);
+    releaseMQTTAutoConfigScratch();
     return;
   }
 
   // Send discovery config
   if (!sendMQTTStreaming(discoveryTopic, discoveryMsg, strlen(discoveryMsg))) {
-    MQTTDebugTf(PSTR("WARN: Source discovery publish failed for %s; retry deferred\r\n"), sensorId);
+    MQTTDebugTf(PSTR("WARN: Source discovery publish failed for %s; retry deferred\r\n"), sourceTopic);
+    releaseMQTTAutoConfigScratch();
     return;
   }
 
   // Mark as discovered
-  if (!setSourceConfigDone(sourceIdx, sensorId)) {
-    MQTTDebugTf(PSTR("WARN: Source discovery cache full; cannot cache %s\r\n"), sensorId);
+  if (!setSourceConfigDone(sourceIdx, sourceTopic)) {
+    MQTTDebugTf(PSTR("WARN: Source discovery cache full; cannot cache %s\r\n"), sourceTopic);
   }
 
-  MQTTDebugTf(PSTR("Sent auto-discovery for source-specific sensor: %s\r\n"), sensorId);
+  MQTTDebugTf(PSTR("Sent auto-discovery for source-specific sensor: %s\r\n"), sourceTopic);
+  releaseMQTTAutoConfigScratch();
 }
 
 

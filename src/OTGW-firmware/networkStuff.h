@@ -56,7 +56,7 @@
 // Optimize WebSocket memory usage: reduce per-client buffer from 512 to 256 bytes
 // This must be defined BEFORE including WebSocketsServer.h
 // Saves ~256 bytes per client (768 bytes with 3 clients)
-#define WEBSOCKETS_MAX_DATA_SIZE 256
+#define WEBSOCKETS_MAX_DATA_SIZE 512
 // Limit concurrent WebSocket clients to reduce static RAM footprint.
 // Default in the library is 5.
 #define WEBSOCKETS_SERVER_CLIENT_MAX 3

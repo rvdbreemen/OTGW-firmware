@@ -63,7 +63,7 @@ const char *hexheaders[] = {
 
 /* --- LOG marcro's ---*/
 
-#define OT_LOG_BUFFER_SIZE 256
+#define OT_LOG_BUFFER_SIZE 512
 char ot_log_buffer[OT_LOG_BUFFER_SIZE];
 
 #define ClrLog()            ({ ot_log_buffer[0] = '\0'; })

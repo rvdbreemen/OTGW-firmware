@@ -54,7 +54,7 @@ void setLed(int8_t, uint8_t);
 #define NTP_HOST_DEFAULT "pool.ntp.org"
 #define NTP_RESYNC_TIME 1800 //seconds = every 30 minutes
 #define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"  // Home Assistant discovery prefix
-#define CMSG_SIZE 256
+#define CMSG_SIZE 512
 #define JSON_BUFF_MAX   1024
 // MQTT setting field limits (character count, excluding null terminator)
 #define MQTT_TOP_TOPIC_MAX_CHARS 12

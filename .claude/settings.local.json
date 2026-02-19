@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"d:/Users/Robert/Documents/GitHub/RvdB/OTGW-firmware\" log --oneline)"
+    ]
+  }
+}
