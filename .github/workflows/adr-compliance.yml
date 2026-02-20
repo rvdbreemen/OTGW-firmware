@@ -148,7 +148,7 @@ jobs:
           echo "arch_change_count=$arch_changes" >> $GITHUB_OUTPUT
           
           if [ $arch_changes -gt 0 ] && [ "${{ steps.new_adrs.outputs.new_adr_count }}" -eq 0 ]; then
-            echo "suggestion=This PR modifies architectural files but doesn't include a new ADR. Consider if an ADR is needed." >> $GITHUB_OUTPUT
+            echo "suggestion=This PR modifies architectural files but does not include a new ADR. Consider if an ADR is needed." >> $GITHUB_OUTPUT
           fi
       
       - name: Comment on PR
