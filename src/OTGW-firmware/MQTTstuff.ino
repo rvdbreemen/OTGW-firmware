@@ -38,6 +38,34 @@ constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
 constexpr size_t  MQTT_MSG_MAX_LEN = 1200;
 constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 1200;
 
+struct MQTTAutoConfigBuffers {
+  char line[MQTT_CFG_LINE_MAX_LEN];
+  char topic[MQTT_TOPIC_MAX_LEN];
+  char msg[MQTT_MSG_MAX_LEN];
+};
+
+// Shared autoconfig workspace for both autoconfig code paths.
+// This keeps only one persistent buffer set in RAM.
+static MQTTAutoConfigBuffers mqttAutoConfigBuffers;
+
+// Guard shared MQTT autoconfig buffers against accidental re-entry.
+// Current firmware is effectively single-threaded, but this protects future
+// callback/timer refactors from clobbering the shared workspace.
+static bool mqttAutoConfigInProgress = false;
+
+struct MQTTAutoConfigSessionLock {
+  bool locked = false;
+  MQTTAutoConfigSessionLock() {
+    if (!mqttAutoConfigInProgress) {
+      mqttAutoConfigInProgress = true;
+      locked = true;
+    }
+  }
+  ~MQTTAutoConfigSessionLock() {
+    if (locked) mqttAutoConfigInProgress = false;
+  }
+};
+
 static            PubSubClient MQTTclient(wifiClient);
 
 int8_t            reconnectAttempts = 0;
@@ -758,16 +786,20 @@ void clearMQTTConfigDone()
 }
 //===========================================================================================
 void doAutoConfigure(bool bForceAll){
-  // Option B: Function-Local Static Buffers (Zero Heap Allocation)
-  // Eliminates 2600 bytes transient heap allocation, adds 2600 bytes permanent static
-  // No mutex needed - function naturally non-reentrant
+  // Use shared static buffers (zero heap allocation, single RAM reservation)
+  // Re-entry is explicitly guarded via MQTTAutoConfigSessionLock.
   
   if (!settingMQTTenable) return;
 
-  // Function-local static buffers - allocated once, reused across calls
-  static char sLine[MQTT_CFG_LINE_MAX_LEN];
-  static char sTopic[MQTT_TOPIC_MAX_LEN];
-  static char sMsg[MQTT_MSG_MAX_LEN];
+  MQTTAutoConfigSessionLock sessionLock;
+  if (!sessionLock.locked) {
+    MQTTDebugTln(F("MQTT autoconfig already running, skipping doAutoConfigure()"));
+    return;
+  }
+
+  char *sLine = mqttAutoConfigBuffers.line;
+  char *sTopic = mqttAutoConfigBuffers.topic;
+  char *sMsg = mqttAutoConfigBuffers.msg;
 
   // 2. Open File ONCE
   LittleFS.begin();
@@ -854,6 +886,12 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
 {
   bool _result = false;
   const char *sensorId = (cfgSensorId != nullptr) ? cfgSensorId : "";
+
+  MQTTAutoConfigSessionLock sessionLock;
+  if (!sessionLock.locked) {
+    MQTTDebugTln(F("MQTT autoconfig already running, skipping doAutoConfigureMsgid()"));
+    return _result;
+  }
   
   if (!settingMQTTenable) {
     return _result;
@@ -867,12 +905,10 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
     return _result;
   } 
 
-  // Option B: Function-Local Static Buffers (Zero Heap Allocation)
-  // Single static buffer partitioned into 3 regions - allocated once, reused across calls
-  static char buffer[MQTT_MSG_MAX_LEN + MQTT_TOPIC_MAX_LEN + MQTT_CFG_LINE_MAX_LEN];
-  char* sMsg   = buffer;
-  char* sTopic = sMsg + MQTT_MSG_MAX_LEN;
-  char* sLine  = sTopic + MQTT_TOPIC_MAX_LEN;
+  // Shared static buffers with doAutoConfigure() to avoid duplicate persistent RAM usage
+  char *sLine = mqttAutoConfigBuffers.line;
+  char *sTopic = mqttAutoConfigBuffers.topic;
+  char *sMsg = mqttAutoConfigBuffers.msg;
   byte lineID = 39; // 39 is unused in OT protocol so is a safe value
 
   //Let's open the MQTT autoconfig file
@@ -895,8 +931,10 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
   //Lets go read the config and send it out to MQTT line by line
   while (fh.available())
   {
+    // Explicitly clear reused shared buffers each iteration for robustness.
     memset(sTopic, 0, MQTT_TOPIC_MAX_LEN);
     memset(sMsg, 0, MQTT_MSG_MAX_LEN);
+
     //read file line by line, split and send to MQTT (topic, msg)
     feedWatchDog(); //start with feeding the dog
     
