@@ -1122,20 +1122,20 @@ void postSettings()
   }
 
   // Extract value as string — handles both string and boolean/numeric JSON values
-  char newValue[101] = {0};
+  cMsg[0] = '\0';
   JsonVariant val = doc[F("value")];
   if (val.is<const char*>()) {
-    strlcpy(newValue, val.as<const char*>(), sizeof(newValue));
+    strlcpy(cMsg, val.as<const char*>(), sizeof(cMsg));
   } else if (val.is<bool>()) {
-    strlcpy(newValue, val.as<bool>() ? "true" : "false", sizeof(newValue));
+    strlcpy(cMsg, val.as<bool>() ? "true" : "false", sizeof(cMsg));
   } else if (!val.isNull()) {
     // Numeric or other type — serialize to string
-    serializeJson(val, newValue, sizeof(newValue));
+    serializeJson(val, cMsg, sizeof(cMsg));
   }
 
-  if (newValue[0] != '\0') {
-    RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
-    updateSetting(field, newValue);
+  if (cMsg[0] != '\0') {
+    RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, cMsg);
+    updateSetting(field, cMsg);
     // Synchronous flush: persist to flash NOW so the 200 OK is truthful.
     // The deferred timer still handles MQTT/NTP command updates, but HTTP
     // saves must be durable before we confirm success to the browser.
