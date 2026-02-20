@@ -889,10 +889,11 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
 
   MQTTAutoConfigSessionLock sessionLock;
   if (!sessionLock.locked) {
-    MQTTDebugTln(F("MQTT autoconfig already running, skipping doAutoConfigureMsgid()"));
-    return _result;
+    // Another autoconfig session is already active. This is expected for
+    // nested calls (e.g. configSensors() -> sensorAutoConfigure()) during a
+    // single autoconfig pass, so continue instead of skipping.
+    MQTTDebugTln(F("MQTT autoconfig already running, continuing nested doAutoConfigureMsgid()"));
   }
-  
   if (!settingMQTTenable) {
     return _result;
   }
