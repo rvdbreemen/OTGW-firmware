@@ -569,6 +569,10 @@ struct OpenthermData_t {
   void s16(int16_t value);
 };
 
+// External declarations for global variables
+extern OpenthermData_t OTdata;
+extern OpenthermData_t delayedOTdata;
+extern OpenthermData_t tmpOTdata;
 
 #endif
 
