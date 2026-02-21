@@ -628,7 +628,7 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
 static inline void publishOTValueTopic(const char *topic, const char *value) {
   sendMQTTData(topic, value);
   if (OTlookupitem.msgcmd == OT_WRITE || OTlookupitem.msgcmd == OT_RW) {
-    publishToSourceTopic(topic, value, OTdata.rsptype);
+    publishToSourceTopic(topic, value);
   }
 }
 

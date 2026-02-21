@@ -51,121 +51,35 @@ static char       MQTTPubNamespace[MQTT_NAMESPACE_MAX_LEN];
 static char       MQTTSubNamespace[MQTT_NAMESPACE_MAX_LEN];
 static char       NodeId[MQTT_ID_MAX_LEN];
 
-// Shared scratch buffers for MQTT auto-discovery file parsing.
-// Used by both doAutoConfigure() and doAutoConfigureMsgid().
-// Guarded because these flows are not designed for concurrent re-entry.
-struct MQTTAutoConfigScratch {
-  bool inUse;
-  char sMsg[MQTT_MSG_MAX_LEN];
-  char sTopic[MQTT_TOPIC_MAX_LEN];
+constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 1200;
+
+struct MQTTAutoConfigBuffers {
+  char line[MQTT_CFG_LINE_MAX_LEN];
+  char topic[MQTT_TOPIC_MAX_LEN];
+  char msg[MQTT_MSG_MAX_LEN];
 };
-static MQTTAutoConfigScratch mqttAutoCfgScratch = { false, {0}, {0} };
 
-static bool acquireMQTTAutoConfigScratch(char *&sMsg, char *&sTopic) {
-  if (mqttAutoCfgScratch.inUse) return false;
-  mqttAutoCfgScratch.inUse = true;
-  sMsg = mqttAutoCfgScratch.sMsg;
-  sTopic = mqttAutoCfgScratch.sTopic;
-  return true;
-}
+// Shared autoconfig workspace for both autoconfig code paths.
+// This keeps only one persistent buffer set in RAM.
+static MQTTAutoConfigBuffers mqttAutoConfigBuffers;
 
-static void releaseMQTTAutoConfigScratch() {
-  mqttAutoCfgScratch.inUse = false;
-}
+// Guard shared MQTT autoconfig buffers against accidental re-entry.
+// Current firmware is effectively single-threaded, but this protects future
+// callback/timer refactors from clobbering the shared workspace.
+static bool mqttAutoConfigInProgress = false;
 
-// Source-specific HA auto-discovery cache.
-// Uses a compact Bloom filter per source to avoid duplicate discovery sends
-// while minimizing RAM. This is probabilistic dedupe (rare false positives).
-// False positives may skip a discovery publish until the next cache reset
-// (for example on MQTT reconnect via clearSourceConfigDone()).
-constexpr size_t  SOURCE_DISCOVERY_FILTER_BITS = 2048; // per source (power-of-two)
-constexpr size_t  SOURCE_DISCOVERY_FILTER_WORDS = SOURCE_DISCOVERY_FILTER_BITS / 32;
-constexpr uint8_t SOURCE_DISCOVERY_HASH_COUNT = 5;
-static uint32_t   sourceConfigFilter[3][SOURCE_DISCOVERY_FILTER_WORDS] = { {0} };
-
-static inline uint32_t mixHash32(uint32_t x) {
-  x ^= (x >> 16);
-  x *= 0x7feb352du;
-  x ^= (x >> 15);
-  x *= 0x846ca68bu;
-  x ^= (x >> 16);
-  return x;
-}
-
-static inline bool testFilterBit(const uint8_t sourceIdx, const uint16_t bitIndex) {
-  const uint16_t word = bitIndex >> 5;
-  const uint32_t mask = 1u << (bitIndex & 31u);
-  return (sourceConfigFilter[sourceIdx][word] & mask) != 0u;
-}
-
-static inline void setFilterBit(const uint8_t sourceIdx, const uint16_t bitIndex) {
-  const uint16_t word = bitIndex >> 5;
-  const uint32_t mask = 1u << (bitIndex & 31u);
-  sourceConfigFilter[sourceIdx][word] |= mask;
-}
-
-static uint32_t hashSourceSensorId(const char *sensorId) {
-  uint32_t hash = 2166136261u; // FNV-1a 32-bit offset basis
-  if (!sensorId) return 1u;
-  while (*sensorId != '\0') {
-    hash ^= static_cast<uint8_t>(*sensorId++);
-    hash *= 16777619u; // FNV prime
+struct MQTTAutoConfigSessionLock {
+  bool locked = false;
+  MQTTAutoConfigSessionLock() {
+    if (!mqttAutoConfigInProgress) {
+      mqttAutoConfigInProgress = true;
+      locked = true;
+    }
   }
-  return (hash == 0u) ? 1u : hash;
-}
-
-static bool getSourceConfigDone(const uint8_t sourceIdx, const char *sensorId) {
-  if (sourceIdx >= 3 || !sensorId) return false;
-  const uint32_t h1 = hashSourceSensorId(sensorId);
-  const uint32_t h2 = mixHash32(h1 ^ 0x9e3779b9u) | 1u; // odd step for double hashing
-
-  for (uint8_t i = 0; i < SOURCE_DISCOVERY_HASH_COUNT; i++) {
-    const uint16_t bitIndex = static_cast<uint16_t>((h1 + (static_cast<uint32_t>(i) * h2))
-                                  & (SOURCE_DISCOVERY_FILTER_BITS - 1u));
-    if (!testFilterBit(sourceIdx, bitIndex)) return false;
+  ~MQTTAutoConfigSessionLock() {
+    if (locked) mqttAutoConfigInProgress = false;
   }
-  return true;
-}
-
-static bool setSourceConfigDone(const uint8_t sourceIdx, const char *sensorId) {
-  if (sourceIdx >= 3 || !sensorId) return false;
-  const uint32_t h1 = hashSourceSensorId(sensorId);
-  const uint32_t h2 = mixHash32(h1 ^ 0x9e3779b9u) | 1u;
-
-  for (uint8_t i = 0; i < SOURCE_DISCOVERY_HASH_COUNT; i++) {
-    const uint16_t bitIndex = static_cast<uint16_t>((h1 + (static_cast<uint32_t>(i) * h2))
-                                  & (SOURCE_DISCOVERY_FILTER_BITS - 1u));
-    setFilterBit(sourceIdx, bitIndex);
-  }
-  return true;
-}
-
-static void clearSourceConfigDone() {
-  memset(sourceConfigFilter, 0, sizeof(sourceConfigFilter));
-}
-
-static bool resolveSourcePublishInfo(byte rsptype, PGM_P &suffix, PGM_P &sourceName, uint8_t &sourceIdx) {
-  switch(rsptype) {
-    case OTGW_THERMOSTAT:        // T message - master request
-      suffix = PSTR("_thermostat");
-      sourceName = PSTR("Thermostat");
-      sourceIdx = 0;
-      return true;
-    case OTGW_BOILER:            // B message - slave response
-      suffix = PSTR("_boiler");
-      sourceName = PSTR("Boiler");
-      sourceIdx = 1;
-      return true;
-    case OTGW_REQUEST_BOILER:    // R message - gateway override to boiler
-    case OTGW_ANSWER_THERMOSTAT: // A message - gateway override to thermostat
-      suffix = PSTR("_gateway");
-      sourceName = PSTR("Gateway");
-      sourceIdx = 2;
-      return true;
-    default:
-      return false;
-  }
-}
+};
 
 // Trim whitespace on both sides in-place
 static void trimInPlace(char *buffer) {
@@ -361,7 +275,6 @@ void startMQTT()
   stateMQTT = MQTT_STATE_INIT;
   //setup for mqtt discovery
   clearMQTTConfigDone();
-  clearSourceConfigDone();
   strlcpy(NodeId, CSTR(settingMQTTuniqueid), sizeof(NodeId));
   buildNamespace(MQTTPubNamespace, sizeof(MQTTPubNamespace), CSTR(settingMQTTtopTopic), "value", NodeId);
   buildNamespace(MQTTSubNamespace, sizeof(MQTTSubNamespace), CSTR(settingMQTTtopTopic), "set", NodeId);
@@ -678,97 +591,32 @@ void PrintMQTTError(){
 
 //=======================================================================
 // ADR-040: Publish to source-specific MQTT topic
-// Publishes value to topic with source suffix (_thermostat, _boiler, _gateway)
-// Only called when settingMQTTSeparateSources is enabled
+// Publishes value to source-specific topic (_thermostat, _boiler, _gateway)
+// Reads OTdata.rsptype directly; only active when settingMQTTSeparateSources is enabled.
 //=======================================================================
-void publishToSourceTopic(const char* baseTopic, const char* value, byte rsptype) {
-  if (!settingMQTTSeparateSources) return;  // Feature disabled
-  if (!baseTopic || !value) return;          // Null safety
+void publishToSourceTopic(const char* topic, const char* value, const bool retain)
+{
+  if (!settingMQTTSeparateSources || !topic || !value) return;
 
-  // Static: publishToSourceTopic is called every ~1s per WRITE/RW OT message.
-  // feedWatchDog() does not yield, so re-entrancy is impossible.
-  // Discovery buffers are borrowed from mqttAutoCfgScratch (already allocated in BSS).
-  // Note: sensorId is identical to sourceTopic (same baseTopic+suffix), so it is omitted.
-  static char sourceTopic[MQTT_TOPIC_MAX_LEN];
-  PGM_P suffix;
-  PGM_P sourceName;
-  uint8_t sourceIdx;
+  // OTdata.rsptype is populated by processOT() before print_*() calls this helper.
+  char sourceTopic[MQTT_TOPIC_MAX_LEN];
 
-  // Determine suffix, source name and source index from message source.
-  if (!resolveSourcePublishInfo(rsptype, suffix, sourceName, sourceIdx)) {
-    // Don't publish for parity errors or unknown types
-    return;
+  switch (OTdata.rsptype) {
+    case OTGW_THERMOSTAT:
+      snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s_thermostat"), topic);
+      break;
+    case OTGW_BOILER:
+      snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s_boiler"), topic);
+      break;
+    case OTGW_REQUEST_BOILER:
+    case OTGW_ANSWER_THERMOSTAT:
+      snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s_gateway"), topic);
+      break;
+    default:
+      return;
   }
 
-  // Build source-specific topic: <baseTopic><suffix>
-  int written = snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s%S"), baseTopic, suffix);
-  if (written < 0 || written >= (int)sizeof(sourceTopic)) {
-    MQTTDebugTf(PSTR("ERROR: Source topic buffer overflow for %s\r\n"), baseTopic);
-    return;
-  }
-
-  // Publish to source-specific topic (not retained to save MQTT broker memory)
-  sendMQTTData(sourceTopic, value, false);
-
-  // Dedupe: sourceTopic (== baseTopic+suffix) uniquely identifies this source sensor.
-  // This ensures multi-topic message IDs (_hb/_lb/etc.) all get discovery.
-  if (getSourceConfigDone(sourceIdx, sourceTopic)) {
-    return; // Already discovered
-  }
-
-  // Borrow shared scratch for the discovery phase only.
-  // If scratch is held by doAutoConfigure / doAutoConfigureMsgid, defer this discovery.
-  // acquireMQTTAutoConfigScratch fills: first arg -> sMsg (MQTT_MSG_MAX_LEN),
-  //                                    second arg -> sTopic (MQTT_TOPIC_MAX_LEN).
-  char *discoveryMsg;
-  char *discoveryTopic;
-  if (!acquireMQTTAutoConfigScratch(discoveryMsg, discoveryTopic)) {
-    MQTTDebugTf(PSTR("WARN: Scratch busy; source discovery deferred for %s\r\n"), sourceTopic);
-    return;
-  }
-
-  // Build discovery topic for source-specific sensor
-  // Format: <haprefix>/sensor/<uniqueid>_<sourceTopic>/config
-  written = snprintf_P(discoveryTopic, MQTT_TOPIC_MAX_LEN,
-                       PSTR("%s/sensor/%s_%s/config"),
-                       settingMQTThaprefix, settingMQTTuniqueid, sourceTopic);
-  if (written < 0 || written >= MQTT_TOPIC_MAX_LEN) {
-    MQTTDebugTf(PSTR("ERROR: Discovery topic buffer overflow for %s\r\n"), sourceTopic);
-    releaseMQTTAutoConfigScratch();
-    return;
-  }
-
-  // Build discovery message with source in friendly name
-  written = snprintf_P(discoveryMsg, MQTT_MSG_MAX_LEN,
-                       PSTR("{\"name\":\"%s (%S)\","
-                            "\"state_topic\":\"%s/%s\","
-                            "\"unique_id\":\"%s_%s\","
-                            "\"device\":{\"identifiers\":[\"%s\"],\"name\":\"%s\",\"model\":\"OTGW\",\"manufacturer\":\"Schelte Bron\"}}"),
-                       baseTopic, sourceName,             // Friendly name with source (sourceName is PROGMEM)
-                       MQTTPubNamespace, sourceTopic,     // State topic
-                       settingMQTTuniqueid, sourceTopic,  // Unique ID (sourceTopic == former sensorId)
-                       settingMQTTuniqueid,               // Device identifier
-                       settingHostname);                  // Device name
-  if (written < 0 || written >= MQTT_MSG_MAX_LEN) {
-    MQTTDebugTf(PSTR("ERROR: Discovery message buffer overflow for %s\r\n"), sourceTopic);
-    releaseMQTTAutoConfigScratch();
-    return;
-  }
-
-  // Send discovery config
-  if (!sendMQTTStreaming(discoveryTopic, discoveryMsg, strlen(discoveryMsg))) {
-    MQTTDebugTf(PSTR("WARN: Source discovery publish failed for %s; retry deferred\r\n"), sourceTopic);
-    releaseMQTTAutoConfigScratch();
-    return;
-  }
-
-  // Mark as discovered
-  if (!setSourceConfigDone(sourceIdx, sourceTopic)) {
-    MQTTDebugTf(PSTR("WARN: Source discovery cache full; cannot cache %s\r\n"), sourceTopic);
-  }
-
-  MQTTDebugTf(PSTR("Sent auto-discovery for source-specific sensor: %s\r\n"), sourceTopic);
-  releaseMQTTAutoConfigScratch();
+  sendMQTTData(sourceTopic, value, retain);
 }
 
 
@@ -984,85 +832,88 @@ void clearMQTTConfigDone()
 }
 //===========================================================================================
 void doAutoConfigure(bool bForceAll){
+  // Use shared static buffers (zero heap allocation, single RAM reservation).
+  // Lock scope is limited to the file-parse/publish loop so it is released
+  // before configSensors() is called.  configSensors() -> sensorAutoConfigure()
+  // -> doAutoConfigureMsgid() can then acquire the lock independently.
+
   if (!settingMQTTenable) return;
 
-  char* sMsg = nullptr;
-  char* sTopic = nullptr;
-  if (!acquireMQTTAutoConfigScratch(sMsg, sTopic)) {
-    MQTTDebugTln(F("WARN: AutoConfig scratch buffer busy; retry deferred"));
-    return;
-  }
-
-  // 2. Open File ONCE
-  LittleFS.begin();
-  if (!LittleFS.exists(F("/mqttha.cfg"))) {
-    DebugTln(F("Error: configuration file not found.")); 
-    releaseMQTTAutoConfigScratch();
-    return;
-  } 
-
-  File fh = LittleFS.open(F("/mqttha.cfg"), "r");
-  if (!fh) {
-    DebugTln(F("Error: could not open configuration file.")); 
-    releaseMQTTAutoConfigScratch();
-    return;
-  } 
-
-  byte lineID = 0;
-  
-  // 3. Loop through file once
-  while (fh.available()) {
-    feedWatchDog(); // Keep the dog happy during IO
-    
-    // Read line
-    size_t len = fh.readBytesUntil('\n', sMsg, MQTT_MSG_MAX_LEN - 1);
-    sMsg[len] = '\0';
-    
-    // Parse Line
-    if (!splitLine(sMsg, ';', lineID, sTopic, MQTT_TOPIC_MAX_LEN, sMsg, MQTT_MSG_MAX_LEN)) continue;
-
-    // 4. Decision: Do we send this line?
-    // Skip Dallas sensors - they need per-sensor addresses from configSensors()
-    if (lineID == OTGWdallasdataid) continue;
-
-    if (bForceAll || !getMQTTConfigDone(lineID)) {
-
-       MQTTDebugTf(PSTR("Processing AutoConfig for ID %d\r\n"), lineID);
-
-       // --- Perform Replacements (Topic & Msg) ---
-       if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settingMQTThaprefix))) continue;
-       if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%node_id%", NodeId)) continue;
-       if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%sensor_id%", "")) continue;
-
-       if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%node_id%", NodeId)) continue;
-       if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%sensor_id%", "")) continue;
-       if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%hostname%", CSTR(settingHostname))) continue;
-       if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%version%", _VERSION)) continue;
-       if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_pub_topic%", MQTTPubNamespace)) continue;
-       if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_sub_topic%", MQTTSubNamespace)) continue;
-
-       // Static buffer strategy: use MQTT streaming with fixed 1350-byte buffer
-       // No dynamic resizing - streaming handles arbitrarily large messages efficiently
-       size_t msgLen = strlen(sMsg);
-
-       // Send retained message (uses beginPublish/write/endPublish streaming)
-       if (sendMQTTStreaming(sTopic, sMsg, msgLen)) {
-         setMQTTConfigDone(lineID);
-       } else {
-         MQTTDebugTf(PSTR("WARN: AutoConfig publish failed for ID %d; retry deferred\r\n"), lineID);
-       }
-
-       doBackgroundTasks(); // Yield to network stack
+  {
+    // Lock released at end of this block, before configSensors() is called.
+    MQTTAutoConfigSessionLock sessionLock;
+    if (!sessionLock.locked) {
+      MQTTDebugTln(F("MQTT autoconfig already running, skipping doAutoConfigure()"));
+      return;
     }
-  }
 
-  fh.close();
-  
-  // No dynamic MQTT buffer cleanup needed - reset is a no-op for static strategy.
-  resetMQTTBufferSize();
+    char *sLine = mqttAutoConfigBuffers.line;
+    char *sTopic = mqttAutoConfigBuffers.topic;
+    char *sMsg = mqttAutoConfigBuffers.msg;
 
-  // Release shared scratch before potential nested Dallas auto-config calls.
-  releaseMQTTAutoConfigScratch();
+    // 2. Open File ONCE
+    LittleFS.begin();
+    if (!LittleFS.exists(F("/mqttha.cfg"))) {
+      DebugTln(F("Error: configuration file not found.")); 
+      return;
+    } 
+
+    File fh = LittleFS.open(F("/mqttha.cfg"), "r");
+    if (!fh) {
+      DebugTln(F("Error: could not open configuration file.")); 
+      return;
+    } 
+
+    byte lineID = 0;
+    
+    // 3. Loop through file once
+    while (fh.available()) {
+      feedWatchDog(); // Keep the dog happy during IO
+      
+      // Read line into dedicated read buffer
+      size_t len = fh.readBytesUntil('\n', sLine, MQTT_CFG_LINE_MAX_LEN - 1);
+      sLine[len] = '\0';
+      
+      // Parse Line
+      if (!splitLine(sLine, ';', lineID, sTopic, MQTT_TOPIC_MAX_LEN, sMsg, MQTT_MSG_MAX_LEN)) continue;
+
+      // 4. Decision: Do we send this line?
+      // Skip Dallas sensors - they need per-sensor addresses from configSensors()
+      if (lineID == OTGWdallasdataid) continue;
+
+      if (bForceAll || !getMQTTConfigDone(lineID)) {
+
+         MQTTDebugTf(PSTR("Processing AutoConfig for ID %d\r\n"), lineID);
+
+         // --- Perform Replacements (Topic & Msg) ---
+         if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settingMQTThaprefix))) continue;
+         if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%node_id%", NodeId)) continue;
+         if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%sensor_id%", "")) continue;
+
+         if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%node_id%", NodeId)) continue;
+         if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%sensor_id%", "")) continue;
+         if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%hostname%", CSTR(settingHostname))) continue;
+         if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%version%", _VERSION)) continue;
+         if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_pub_topic%", MQTTPubNamespace)) continue;
+         if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_sub_topic%", MQTTSubNamespace)) continue;
+
+         // Static buffer strategy: use MQTT streaming with fixed 1350-byte buffer
+         // No dynamic resizing - streaming handles arbitrarily large messages efficiently
+         size_t msgLen = strlen(sMsg);
+
+         // Send retained message (uses beginPublish/write/endPublish streaming)
+         sendMQTTStreaming(sTopic, sMsg, msgLen);
+         setMQTTConfigDone(lineID);
+
+         doBackgroundTasks(); // Yield to network stack
+      }
+    }
+
+    fh.close();
+    
+    // Note: No buffer cleanup needed - static buffers persist across calls
+    resetMQTTBufferSize();
+  } // Lock released here - configSensors() can now acquire it independently
 
   // Trigger Dallas configuration separately as it requires specific sensor addresses
   if (settingMQTTenable && (bForceAll || !getMQTTConfigDone(OTGWdallasdataid))) {
@@ -1098,10 +949,9 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
     return _result;
   } 
 
-  char* sMsg = nullptr;
-  char* sTopic = nullptr;
-  if (!acquireMQTTAutoConfigScratch(sMsg, sTopic)) {
-    MQTTDebugTf(PSTR("WARN: AutoConfig scratch buffer busy for ID %d; retry deferred\r\n"), OTid);
+  MQTTAutoConfigSessionLock sessionLock;
+  if (!sessionLock.locked) {
+    MQTTDebugTf(PSTR("MQTT autoconfig already running, skipping doAutoConfigureMsgid()"));
     return _result;
   }
 
@@ -1109,12 +959,10 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
 
   //Let's open the MQTT autoconfig file
   File fh; //filehandle
-  // const char *cfgFilename = "/mqttha.cfg"; // moved to usage
   LittleFS.begin();
 
   if (!LittleFS.exists(F("/mqttha.cfg"))) {
     DebugTln(F("Error: configuration file not found.")); 
-    releaseMQTTAutoConfigScratch();
     return _result;
   } 
 
@@ -1122,9 +970,13 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
 
   if (!fh) {
     DebugTln(F("Error: could not open configuration file.")); 
-    releaseMQTTAutoConfigScratch();
     return _result;
   } 
+
+  // Shared static buffers with doAutoConfigure() to avoid duplicate persistent RAM usage
+  char *sLine = mqttAutoConfigBuffers.line;
+  char *sTopic = mqttAutoConfigBuffers.topic;
+  char *sMsg = mqttAutoConfigBuffers.msg;
 
   //Lets go read the config and send it out to MQTT line by line
   while (fh.available())
@@ -1134,9 +986,9 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
     //read file line by line, split and send to MQTT (topic, msg)
     feedWatchDog(); //start with feeding the dog
     
-    size_t len = fh.readBytesUntil('\n', sMsg, MQTT_MSG_MAX_LEN - 1);
-    sMsg[len] = '\0';
-    if (!splitLine(sMsg, ';', lineID, sTopic, MQTT_TOPIC_MAX_LEN, sMsg, MQTT_MSG_MAX_LEN)) {  //splitLine() also filters comments
+    size_t len = fh.readBytesUntil('\n', sLine, MQTT_CFG_LINE_MAX_LEN - 1);
+    sLine[len] = '\0';
+    if (!splitLine(sLine, ';', lineID, sTopic, MQTT_TOPIC_MAX_LEN, sMsg, MQTT_MSG_MAX_LEN)) {  //splitLine() also filters comments
       continue;
     }
 
@@ -1200,7 +1052,6 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
   
   // No dynamic MQTT buffer cleanup needed - reset is a no-op for static strategy.
   resetMQTTBufferSize();
-  releaseMQTTAutoConfigScratch();
 
   return _result;
 
