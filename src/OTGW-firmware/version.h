@@ -9,7 +9,7 @@
 #define _VERSION_GITHASH "3679ce5"
 #define _VERSION_PRERELEASE beta
 #define _VERSION_DATE "21-02-2026"
-#define _VERSION_TIME "21:26:33"
+#define _VERSION_TIME "21:25:57"
 #define _SEMVER_CORE "1.1.0"
 #define _SEMVER_BUILD "1.1.0+2573"
 #define _SEMVER_GITHASH "1.1.0+3679ce5"
