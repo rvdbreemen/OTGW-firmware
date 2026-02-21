@@ -702,6 +702,31 @@ void publishMQTTInt(const __FlashStringHelper* topic, int value) {
   sendMQTTData(topic, buffer);
 }
 
+void publishToSourceTopic(const char* topic, const char* json, const bool retain)
+{
+  if (!settingMQTTSeparateSources || !topic || !json) return;
+
+  // OTdata.rsptype is populated by processOT() before print_*() calls this helper.
+  char sourceTopic[MQTT_TOPIC_MAX_LEN];
+
+  switch (OTdata.rsptype) {
+    case OTGW_THERMOSTAT:
+      snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s_thermostat"), topic);
+      break;
+    case OTGW_BOILER:
+      snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s_boiler"), topic);
+      break;
+    case OTGW_REQUEST_BOILER:
+    case OTGW_ANSWER_THERMOSTAT:
+      snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s_gateway"), topic);
+      break;
+    default:
+      return;
+  }
+
+  sendMQTTData(sourceTopic, json, retain);
+}
+
 //===========================================================================================
 // resetMQTTBufferSize() - Static Buffer Strategy
 //

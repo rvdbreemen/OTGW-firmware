@@ -49,30 +49,36 @@ After upgrading, remove stale entities in Home Assistant (old topics become unav
 
 ## What was new in v1.1.0-beta
 
-Version 1.1.0-beta builds on the stable v1.0.0 foundation with new Dallas temperature sensor features, improved memory safety, WebUI data persistence, and enhanced developer tooling.
+Version 1.1.0-beta builds on the stable v1.0.0 foundation with new Dallas temperature sensor features, improved memory safety, WebUI data persistence, a complete RESTful API v2, and 20 bug fixes from a comprehensive codebase review.
+
+> 📝 Full release notes: [RELEASE_NOTES_1.1.0.md](RELEASE_NOTES_1.1.0.md)
 
 ### New Features
 
-- **Dallas Sensor Custom Labels & Graphs**: DS18x20 sensors now support custom labels (inline editing in Web UI), auto-discovery, MQTT/HA publishing, and real-time graph visualization with 16-color palette. Labels stored in `/dallas_labels.ini` with zero backend RAM usage. New bulk REST API: `GET/POST /api/v1/sensors/labels`. Label backup/restore during filesystem flash.
-- **WebUI Data Persistence**: Automatic log persistence to `localStorage` with debounced saves, dynamic memory management (adapts to browser resources), normal/capture modes, and auto-restoration on page load.
-- **Browser Debug Console (`otgwDebug`)**: Full diagnostic toolkit in browser console — `status()`, `info()`, `settings()`, `wsStatus()`, `logs()`, `api()`, `health()`, `exportLogs()`, and more.
+- **Dallas Sensor Custom Labels & Graphs**: DS18x20 sensors now support custom labels (inline editing in Web UI), auto-discovery, MQTT/HA publishing, and real-time graph visualization with 16-color palette. Labels stored in `/dallas_labels.ini` with zero backend RAM usage. New bulk REST API: `GET/POST /api/v2/sensors/labels`. Automatic label backup/restore during filesystem flash.
+- **WebUI Data Persistence**: Automatic log data persistence to `localStorage` with debounced 2-second saves, dynamic memory management (adapts to browser resources), normal/capture modes, and auto-restoration on page load.
+- **Browser Debug Console (`otgwDebug`)**: Full diagnostic toolkit in browser console — `status()`, `info()`, `settings()`, `wsStatus()`, `logs()`, `api()`, `health()`, `sendCmd()`, `exportLogs()`, and more.
 - **Non-Blocking Modal Dialogs**: Custom HTML/CSS modals replace blocking `prompt()`/`alert()`, maintaining real-time WebSocket data flow during user input.
-- **RESTful API v2**: Complete v2 API with 13 new endpoints — consistent JSON errors, proper HTTP status codes (202 for async), CORS support, RESTful resource naming (`messages/{id}`, `commands`, `device/info`). API compliance score improved from 5.4 → 8.5/10. Frontend fully migrated to v2 with zero legacy calls remaining. See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md).
+- **PS Mode (Print Summary) Detection**: Automatic detection of `PS=1` mode from the OTGW PIC. When active, the UI hides the OT log section, disables WebSocket streaming, and suppresses time-sync commands — improving compatibility with legacy integrations (e.g. Domoticz).
+- **RESTful API v2**: 13 new v2 endpoints with consistent JSON errors, proper HTTP status codes (202 for async), CORS/OPTIONS support, RESTful resource naming (`messages/{id}`, `commands`, `device/info`). API compliance score improved from 5.4 → 8.5/10. Frontend fully migrated to v2 with zero legacy calls remaining. See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md).
 
 ### Bug Fixes
 
 - **MQTT Whitespace Auth Fix**: Automatic trimming of whitespace in MQTT credentials, fixing authentication failures when upgrading from v0.10.x.
-- **Streaming File Serving**: Replaced full-file-to-RAM loading with chunked streaming — 95% memory reduction for serving Web UI files.
+- **Streaming File Serving**: Replaced full-file-to-RAM loading with chunked streaming — 95% memory reduction for serving Web UI files. This resolves the slow UI reported on v1.0.0.
+- **Settings Persistence**: Fixed settings appearing editable but reverting to defaults. Replaced manual string parsing with ArduinoJson and added synchronous flash write before HTTP 200 response.
+- **Dark Mode PIC Firmware Icons**: Icons in the PIC firmware tab are now white in dark mode via CSS `filter: invert(1)`.
+- **Gateway Mode Throttling**: Gateway mode polling now limited to once per minute, preventing excessive serial traffic.
 
-### Codebase Review & Bug Fixes
+### Codebase Review (20 findings resolved)
 
-A comprehensive code review identified and resolved 20 bugs across memory safety, data integrity, concurrency, security, and reliability:
+A comprehensive review identified and resolved 20 bugs across memory safety, data integrity, concurrency, security, and reliability:
 
-- **Memory safety**: Out-of-bounds array write on OT message ID 255 (crash/corruption), stack buffer overflow in hex file parser, year overflow truncation
-- **Data integrity**: Wrong bitmask corrupting afternoon/evening hours in MQTT time data, disconnected sensor (-127°C) published to MQTT
+- **Memory safety**: Out-of-bounds array write on OT message ID 255, stack buffer overflow in hex parser, year overflow
+- **Data integrity**: Wrong bitmask corrupting MQTT hours 16–23, disconnected sensor (-127°C) published to MQTT
 - **Concurrency**: ISR race conditions in S0 pulse counter causing incorrect energy readings
 - **Security**: Reflected XSS in REST API error pages, dead admin password code removed
-- **Reliability**: File descriptor leak in settings, null pointer crash on malformed MQTT topics, 750ms blocking sensor read (watchdog risk), HTTP client leak on PIC update failure
+- **Reliability**: File descriptor leak, null pointer crash on malformed MQTT topics, 750ms blocking sensor read, HTTP client leak
 - **Feature fix**: GPIO outputs gated by debug flag — feature was completely non-functional
 - **Flash wear**: Settings save reduced from 20 flash writes to 1 via deferred flush with 2s debounce
 - **Code quality**: Proper JSON parsing for settings POST, GPIO conflict detection, macro safety
@@ -81,31 +87,25 @@ Full details: [Codebase Review](docs/reviews/2026-02-13_codebase-review/CODEBASE
 
 ### Performance & Stability
 
-- **Heap Memory Monitoring**: 4-level health system (CRITICAL/WARNING/LOW/HEALTHY) with adaptive throttling and WebSocket backpressure control.
-- **Memory Safety**: Extensive optimizations using `PROGMEM` to drastically reduce RAM usage and heap fragmentation.
-- **Reliability**: Enhanced Watchdog integration and safe timer handling.
+- **Heap Memory Monitoring**: 4-level health system (CRITICAL/WARNING/LOW/HEALTHY) with adaptive throttling and WebSocket backpressure control ([ADR-030](docs/adr/ADR-030-heap-memory-monitoring.md)).
+- **Memory Safety**: Extensive optimizations using `PROGMEM` to reduce RAM usage and heap fragmentation.
+- **UI Improvements**: Refined editor styles, improved log auto-scroll behavior, better OTmonitor refresh (5s → 1s).
 - **MQTT Auto Discovery**: Improved Home Assistant integration stability.
 
 ### ⚠️ API Deprecation Notice
 
-The following REST API versions and endpoints are **deprecated** and will be **removed in the next minor release** (v1.3.0):
-
-- **`/api/v0/*`** — All v0 endpoints (`/api/v0/devinfo`, `/api/v0/devtime`, `/api/v0/settings`, `/api/v0/otgw/{msgid}`). Use the equivalent v1 or v2 endpoints instead.
-- **`/api/firmwarefilelist`** — Unversioned endpoint. A versioned replacement will be provided under `/api/v2/`.
-- **`/api/listfiles`** — Unversioned endpoint. A versioned replacement will be provided under `/api/v2/`.
-
-**Migration guide:**
+The following REST API versions and endpoints are **deprecated** and will be **removed in v1.3.0**:
 
 | Deprecated endpoint | Replacement |
 |---------------------|-------------|
 | `GET /api/v0/devinfo` | `GET /api/v2/device/info` |
-| `GET /api/v0/devtime` | `GET /api/v1/devtime` or `GET /api/v2/device/time` |
-| `GET/POST /api/v0/settings` | `GET/POST /api/v1/settings` or `GET/POST /api/v2/settings` |
-| `GET /api/v0/otgw/{msgid}` | `GET /api/v1/otgw/id/{msgid}` or `GET /api/v2/otgw/messages/{msgid}` |
+| `GET /api/v0/devtime` | `GET /api/v2/device/time` |
+| `GET/POST /api/v0/settings` | `GET/POST /api/v2/settings` |
+| `GET /api/v0/otgw/{msgid}` | `GET /api/v2/otgw/messages/{msgid}` |
 | `GET /api/firmwarefilelist` | `GET /api/v2/firmware/files` |
 | `GET /api/listfiles` | `GET /api/v2/filesystem/files` |
 
-New v2 API endpoints follow RESTful best practices (JSON errors, proper HTTP status codes, resource naming). See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md) for details.
+See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md) for details.
 
 ## 🏁 Introduced in v1.0.0
 

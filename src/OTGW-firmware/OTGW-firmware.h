@@ -93,6 +93,7 @@ bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 void sendMQTTData(const char*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const bool = false);
+void publishToSourceTopic(const char*, const char*, const bool = false);
 void addOTWGcmdtoqueue(const char* ,  int , const bool = false, const int16_t = 1000);
 void sendLogToWebSocket(const char* logMessage);
 
@@ -165,6 +166,7 @@ bool      settingMQTTharebootdetection = true;
 char      settingMQTTtopTopic[41] = "OTGW";
 char      settingMQTTuniqueid[41] = ""; // Intialized in readsettings
 bool      settingMQTTOTmessage = false;
+bool      settingMQTTSeparateSources = false;
 bool      settingNTPenable = true;
 char      settingNTPtimezone[65] = NTP_DEFAULT_TIMEZONE;
 char      settingNTPhostname[65] = NTP_HOST_DEFAULT;

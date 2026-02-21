@@ -637,7 +637,9 @@ void print_f88(float& value)
 
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
-    sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
+    const char* topic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
+    sendMQTTData(topic, _msg);
+    publishToSourceTopic(topic, _msg);
     value = _value;
   }
 }
@@ -654,7 +656,9 @@ void print_s16(int16_t& value)
 
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
-    sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
+    const char* topic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
+    sendMQTTData(topic, _msg);
+    publishToSourceTopic(topic, _msg);
     value = _value;
   }
 }
@@ -672,6 +676,7 @@ void print_s8s8(uint16_t& value)
   //AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
   if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(_topic, _msg);
+    publishToSourceTopic(_topic, _msg);
   }
   //Build string for MQTT
   itoa((int8_t)OTdata.valueLB, _msg, 10);
@@ -680,6 +685,7 @@ void print_s8s8(uint16_t& value)
   //AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
   if (is_value_valid(OTdata, OTlookupitem)){
     sendMQTTData(_topic, _msg);
+    publishToSourceTopic(_topic, _msg);
     value = OTdata.u16();
   }
 }
@@ -695,7 +701,9 @@ void print_u16(uint16_t& value)
   
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
-    sendMQTTData(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), _msg);
+    const char* topic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
+    sendMQTTData(topic, _msg);
+    publishToSourceTopic(topic, _msg);
     value = _value;
   }
 }
