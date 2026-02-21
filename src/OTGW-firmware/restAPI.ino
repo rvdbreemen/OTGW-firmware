@@ -885,7 +885,9 @@ void sendDeviceInfo()
   sendNestedJsonObj(F("mqttconnected"), CBOOLEAN(statusMQTTconnection));
   sendNestedJsonObj(F("thermostatconnected"), CBOOLEAN(bOTGWthermostatstate));
   sendNestedJsonObj(F("boilerconnected"), CBOOLEAN(bOTGWboilerstate));      
-  sendNestedJsonObj(F("gatewaymode"), CBOOLEAN(bOTGWgatewaystate));      
+  if (bOTGWgatewaystateKnown) {
+    sendNestedJsonObj(F("mode"), bOTGWgatewaystate ? "gateway" : "monitor");
+  }
   sendNestedJsonObj(F("otgwconnected"), CBOOLEAN(bOTGWonline));
   
   sendEndJsonObj(F("devinfo"));
@@ -943,7 +945,9 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("mqttconnected"), statusMQTTconnection);
   sendJsonMapEntry(F("thermostatconnected"), bOTGWthermostatstate);
   sendJsonMapEntry(F("boilerconnected"), bOTGWboilerstate);      
-  sendJsonMapEntry(F("gatewaymode"), bOTGWgatewaystate);      
+  if (bOTGWgatewaystateKnown) {
+    sendJsonMapEntry(F("mode"), bOTGWgatewaystate ? "gateway" : "monitor");
+  }
   sendJsonMapEntry(F("otgwconnected"), bOTGWonline);
   
   sendEndJsonMap(F("device"));

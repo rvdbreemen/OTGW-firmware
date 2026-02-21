@@ -23,6 +23,38 @@ static const char UpdateServerIndex[] PROGMEM =
      </script>
      <style type='text/css'>
         body { font-family: sans-serif; max-width: 600px; margin: 20px auto; }
+        form { margin: 12px 0; padding: 12px; border: 1px solid #c7d7ea; border-radius: 6px; background: #f8fbff; }
+        html.dark form { border-color: #555; background: #2b2b2b; }
+        input[type='file'] { margin: 8px 0 10px; }
+        #fwSubmit, #fsSubmit {
+          min-width: 170px;
+          padding: 10px 14px;
+          border: 1px solid #9aa7b5;
+          border-radius: 6px;
+          font-weight: 700;
+          background: #d7dde3;
+          color: #6c757d;
+          cursor: not-allowed;
+          transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+        }
+        #fwSubmit:enabled, #fsSubmit:enabled {
+          color: #fff;
+          cursor: pointer;
+          transform: translateY(0);
+        }
+        #fwSubmit:enabled {
+          background: #0a74da;
+          border-color: #075baa;
+        }
+        #fsSubmit:enabled {
+          background: #2e9d57;
+          border-color: #207240;
+        }
+        #fwSubmit:enabled:hover { background: #0864ba; }
+        #fsSubmit:enabled:hover { background: #27854a; }
+        #preserveWrap { margin-top: 10px; padding: 8px 10px; border-left: 3px solid #7aaad6; background: #eef6ff; border-radius: 4px; }
+        html.dark #preserveWrap { border-left-color: #4f89c1; background: #3a3a3a; }
+        #preserveHelp { margin-top: 4px; font-size: 12px; opacity: 0.85; }
         #pageProgress { display: none; }
         #updatePanel { margin-top: 10px; padding: 15px; background: #e8f4ff; border: 1px solid #7aaad6; color: black; }
         html.dark #updatePanel { background: #333; border: 1px solid #555; color: white; }
@@ -57,9 +89,11 @@ static const char UpdateServerIndex[] PROGMEM =
             Select a "<b>.littlefs.bin</b>" file to flash<br/>
             <input type='file' accept='.littlefs.bin' name='filesystem' required>
             <br/>
-            <label><input type="checkbox" id="chkPreserve" checked autocomplete="off"> Download backups (settings.ini + dallas_labels.ini if exists)</label>
-            <br/>
             <input id='fsSubmit' type='submit' value='Flash LittleFS' disabled>
+            <div id='preserveWrap'>
+              <label><input type="checkbox" id="chkPreserve" checked autocomplete="off"> Download backups (settings.ini + dallas_labels.ini if available)</label>
+              <div id='preserveHelp'>Recommended before LittleFS flash so you can restore settings and labels quickly.</div>
+            </div>
         </form>
         <div id='formError' style='color: #b00020; font-weight: bold; margin-top: 8px;'></div>
         <hr>

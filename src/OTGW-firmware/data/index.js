@@ -158,6 +158,7 @@ var graphRedrawTimer = null;
 
 let gatewayModeRefreshCounter = 0;
 let gatewayModeRefreshInFlight = false; // Prevents double-triggering even when force=true
+let gatewayModeLastKnown = null; // "gateway" | "monitor"
 const GATEWAY_MODE_REFRESH_INTERVAL = 60; // 60s max polling interval (at most once a minute)
 
 function updateGatewayModeIndicator(value) {
@@ -165,43 +166,54 @@ function updateGatewayModeIndicator(value) {
   const textEl = document.getElementById('gatewayModeText');
   if (!statusEl || !textEl) return;
 
-  if (value === true) {
+  if (value === 'gateway') {
     statusEl.className = 'mode-status mode-gateway';
     textEl.textContent = 'Mode: Gateway';
-  } else if (value === false) {
+  } else if (value === 'monitor') {
     statusEl.className = 'mode-status mode-monitor';
     textEl.textContent = 'Mode: Monitor';
+  } else if (value === 'unavailable') {
+    statusEl.className = 'mode-status mode-unknown';
+    textEl.textContent = 'Mode: Unavailable';
   } else {
     statusEl.className = 'mode-status mode-unknown';
-    textEl.textContent = 'Mode: Unknown';
+    textEl.textContent = 'Mode: Detecting...';
   }
 }
 
-function parseGatewayModeValue(gatewayModeValue) {
-  if (typeof gatewayModeValue === 'boolean') return gatewayModeValue;
-  if (typeof gatewayModeValue !== 'string') return null;
+function parseGatewayModeValue(modeValue) {
+  if (typeof modeValue === 'boolean') return modeValue ? 'gateway' : 'monitor';
+  if (typeof modeValue !== 'string') return null;
 
-  const normalized = gatewayModeValue.trim().toLowerCase();
-  if (normalized === 'on' || normalized === '1' || normalized === 'true' || normalized === 'gateway') {
-    return true;
+  const normalized = modeValue.trim().toLowerCase();
+  if (normalized === 'gateway' || normalized === 'on' || normalized === '1' || normalized === 'true') {
+    return 'gateway';
   }
-  if (normalized === 'off' || normalized === '0' || normalized === 'false' || normalized === 'monitor' || normalized === 'standalone') {
-    return false;
+  if (normalized === 'monitor' || normalized === 'off' || normalized === '0' || normalized === 'false') {
+    return 'monitor';
   }
   return null;
 }
 
 function updateGatewayModeFromDevInfoEntries(entries) {
-  let gatewayModeValue = null;
+  let modeValue = null;
 
   for (let i = 0; i < entries.length; i++) {
-    if (entries[i].name === 'gatewaymode') {
-      gatewayModeValue = entries[i].value;
+    if (entries[i].name === 'mode') {
+      modeValue = entries[i].value;
       break;
     }
   }
 
-  updateGatewayModeIndicator(parseGatewayModeValue(gatewayModeValue));
+  const parsedMode = parseGatewayModeValue(modeValue);
+  if (parsedMode) {
+    gatewayModeLastKnown = parsedMode;
+    updateGatewayModeIndicator(parsedMode);
+  } else if (gatewayModeLastKnown) {
+    updateGatewayModeIndicator(gatewayModeLastKnown);
+  } else {
+    updateGatewayModeIndicator('detecting');
+  }
 }
 
 function refreshGatewayMode(force) {
@@ -227,12 +239,23 @@ function refreshGatewayMode(force) {
     })
     .then(json => {
       const device = (json && json.device) ? json.device : {};
-      const gatewayModeValue = (device.gatewaymode !== undefined) ? device.gatewaymode : null;
-      updateGatewayModeIndicator(parseGatewayModeValue(gatewayModeValue));
+      const parsedMode = parseGatewayModeValue(device.mode);
+      if (parsedMode) {
+        gatewayModeLastKnown = parsedMode;
+        updateGatewayModeIndicator(parsedMode);
+      } else if (gatewayModeLastKnown) {
+        updateGatewayModeIndicator(gatewayModeLastKnown);
+      } else {
+        updateGatewayModeIndicator('detecting');
+      }
     })
     .catch(error => {
       console.warn('refreshGatewayMode warning:', error);
-      updateGatewayModeIndicator(null);
+      if (gatewayModeLastKnown) {
+        updateGatewayModeIndicator(gatewayModeLastKnown);
+      } else {
+        updateGatewayModeIndicator('unavailable');
+      }
     })
     .finally(() => {
       gatewayModeRefreshInFlight = false;
@@ -624,6 +647,9 @@ let currentMemoryUsageMB = 0;
 let storageQuotaMB = 10; // Default, will be detected
 
 let autoScroll = true;
+let frozenLogStartIndex = null; // Freeze visible slice when auto-scroll is disabled
+let lastRenderedStartIndex = 0;
+let lastRenderedLogHtml = null;
 let showTimestamps = true;
 let searchTerm = '';
 let updatePending = false;
@@ -632,6 +658,8 @@ let isFlashing = false;
 let currentFlashFilename = "";
 let flashModeActive = false; // Track if we're on the flash page
 let isPSmode = false; // Track PS=1 (Print Summary) mode from OTGW PIC
+let statusMessageText = ''; // Device status message from /v2/device/time
+let sensorSimulationActive = false; // Mirror of otmonitor.sensorsimulation for footer notice
 let flashPollTimer = null; // Timer for polling flash status as failsafe (both ESP and PIC)
 let otLogResponsiveInitialized = false;
 let otLogResizeTimer = null;
@@ -1664,8 +1692,22 @@ function renderLogDisplay() {
 
   // Always show up to RENDER_LIMIT lines
   const displayCount = Math.min(otLogFilteredBuffer.length, RENDER_LIMIT);
-  const startIndex = Math.max(0, otLogFilteredBuffer.length - displayCount);
-  const linesToShow = otLogFilteredBuffer.slice(startIndex);
+  const maxStartIndex = Math.max(0, otLogFilteredBuffer.length - displayCount);
+  let startIndex = maxStartIndex;
+
+  if (autoScroll) {
+    frozenLogStartIndex = null;
+  } else {
+    if (frozenLogStartIndex === null) {
+      frozenLogStartIndex = maxStartIndex;
+    }
+    if (frozenLogStartIndex < 0) frozenLogStartIndex = 0;
+    if (frozenLogStartIndex > maxStartIndex) frozenLogStartIndex = maxStartIndex;
+    startIndex = frozenLogStartIndex;
+  }
+
+  const linesToShow = otLogFilteredBuffer.slice(startIndex, startIndex + displayCount);
+  lastRenderedStartIndex = startIndex;
 
   // Build HTML
   let html = '';
@@ -1675,7 +1717,11 @@ function renderLogDisplay() {
     html += escapeHtml(line) + '\n';
   });
 
-  container.innerHTML = html;
+  // Avoid resetting scroll position when rendered content did not change.
+  if (html !== lastRenderedLogHtml) {
+    container.innerHTML = html;
+    lastRenderedLogHtml = html;
+  }
 
   // Auto-scroll to bottom if enabled
   if (autoScroll) {
@@ -1732,7 +1778,13 @@ function setupOTLogControls() {
   if (chkAutoScroll) {
     chkAutoScroll.addEventListener('change', function() {
       autoScroll = this.checked;
-      if (typeof saveUISetting === 'function') saveUISetting('#uiAutoScroll', autoScroll);
+      if (autoScroll) {
+        frozenLogStartIndex = null;
+        updateLogDisplay();
+      } else {
+        frozenLogStartIndex = lastRenderedStartIndex;
+      }
+      if (typeof saveUISetting === 'function') saveUISetting('ui_autoscroll', autoScroll);
     });
   }
 
@@ -1751,7 +1803,7 @@ function setupOTLogControls() {
       }
       
       updateLogCounters();
-      if (typeof saveUISetting === 'function') saveUISetting('#uiCaptureMode', e.target.checked);
+      if (typeof saveUISetting === 'function') saveUISetting('ui_capture', e.target.checked);
       console.log(`Capture mode ${captureMode ? 'enabled' : 'disabled'}, max lines: ${maxLogLines.toLocaleString()}`);
     });
   }
@@ -1860,6 +1912,7 @@ function setupOTLogControls() {
         if (!isAtBottom && autoScroll) {
           // User scrolled up, disable auto-scroll
           autoScroll = false;
+          frozenLogStartIndex = lastRenderedStartIndex;
           const chk = document.getElementById('chkAutoScroll');
           if (chk) chk.checked = false;
         }
@@ -2158,78 +2211,13 @@ const escapeHtml = (function() {
 
 //============================================================================  
 function loadUISettings() {
-  console.log("loadUISettings() ..");
-  fetch(APIGW + "v2/settings")
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      return response.json();
-    })
-    .then(json => {
-      let data = json.settings;
-      for (let i in data) {
-        let name = data[i].name;
-        let val = data[i].value;
-        
-        // Map backend settings to UI elements
-        if (name === "#uiAutoScroll") {
-           let newVal = strToBool(val);
-           autoScroll = newVal;
-           const chk = document.getElementById('chkAutoScroll');
-           if (chk) chk.checked = autoScroll;
-        } else if (name === "#uiAutoDownloadLog") {
-           let el = document.getElementById("chkAutoDownloadLog");
-           if(el) {
-             let isChecked = strToBool(val);
-             el.checked = isChecked;
-             toggleAutoDownloadLog(isChecked);
-           }
-        } else if (name === "#uiShowTimestamp") {
-           let el = document.getElementById("chkShowTimestamp");
-           // For this one, we also need to update global variable if needed, 
-           // but the event listener handles it on change. 
-           // Ideally we should trigger the logic.
-           if(el) {
-             el.checked = strToBool(val);
-             showTimestamps = el.checked;
-             updateLogDisplay(); 
-           }
-        } else if (name === "#uiCaptureMode") {
-           let el = document.getElementById("chkCaptureMode");
-           if(el) {
-             el.checked = strToBool(val);
-             captureMode = el.checked;
-             updateDynamicLimits();
-           }
-        } else if (name === "#uiStreamToFile") {
-           // We generally default this to false on reload as we lose the file handle
-           // But if we wanted to persist it we'd need to re-prompt user.
-           // For now, let's just leave it unchecked or respect it? 
-           // Browser security prevents auto-reopen without user gesture usually.
-           // So we skip restoring this one to true.
-        } else if (name === "#uiAutoScreenshot") {
-           let el = document.getElementById("chkAutoScreenshot");
-           if(el) {
-             el.checked = strToBool(val);
-             // Graph might not be loaded yet or needs to be notified
-             if (window.OTGraph) window.OTGraph.toggleAutoScreenshot(el.checked);
-           }
-        } else if (name === "#uiAutoExport") {
-           let el = document.getElementById("chkAutoExport");
-           if(el) {
-             el.checked = strToBool(val);
-             if (window.OTGraph) window.OTGraph.toggleAutoExport(el.checked);
-           }
-        }
-      }
-    })
-    .catch(error => console.error("Error loading UI settings:", error));
+  // Deprecated wrapper kept for compatibility with older call sites.
+  // The canonical loader is loadPersistentUI() using ui_* setting names.
+  loadPersistentUI();
 }
 
 function saveUISetting(field, value) {
-  // Wrapper to ensure we use the backend API
-  // field should start with # if it's a hidden setting
+  // Wrapper to ensure we use the backend API with canonical ui_* setting names.
   console.log("Saving UI Setting [" + field + "] = " + value);
   sendPostSetting(field, value);
 }
@@ -2237,9 +2225,7 @@ function saveUISetting(field, value) {
 //============================================================================  
 function initMainPage() {
   console.log("initMainPage()");
-  
-  loadUISettings();
-  
+
   // Check if we're in flash mode (from sessionStorage)
   try {
     if (sessionStorage.getItem('flashMode') === 'true') {
@@ -2444,6 +2430,40 @@ function setVisible(className, visible) {
   );
 }
 
+function renderBottomMessage() {
+  const msgEl = document.getElementById('message');
+  if (!msgEl) return;
+
+  let msgText = (typeof statusMessageText === 'string') ? statusMessageText : '';
+
+  if (isPSmode) {
+    msgText = 'PS=1 mode; No UI updates.';
+  } else {
+    if (typeof msgText === 'string' && msgText.toLowerCase().startsWith('sensorsimulation')) {
+      // Ignore stray summary field text when PS mode is not active.
+      msgText = '';
+    }
+    if (sensorSimulationActive) {
+      msgText = msgText ? (msgText + ' | Sensor simulation active.') : 'Sensor simulation active.';
+    }
+  }
+
+  msgEl.textContent = msgText;
+  if (isPSmode) msgEl.classList.add('ps-mode-watermark');
+  else msgEl.classList.remove('ps-mode-watermark');
+
+  // Add warning class if message contains version mismatch warning
+  if (!isPSmode && (msgText.toLowerCase().includes('littlefs') ||
+      msgText.toLowerCase().includes('version') ||
+      msgText.toLowerCase().includes('flash your'))) {
+    msgEl.classList.add('version-warning');
+  } else {
+    msgEl.classList.remove('version-warning');
+  }
+
+  msgEl.style.display = (msgText === '') ? 'none' : 'block';
+}
+
 //============================================================================  
 function refreshDevTime() {
   //console.log("Refresh api/v2/device/time ..");
@@ -2457,42 +2477,23 @@ function refreshDevTime() {
     .then(json => {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
       const devtime = json.devtime || {};
+      const hasPsmode = (devtime.psmode !== undefined);
+      const newPSmode = hasPsmode ? (devtime.psmode === true || devtime.psmode === 'true') : isPSmode;
       
       if (devtime.dateTime) {
         const timeEl = document.getElementById('theTime');
         if (timeEl) timeEl.textContent = devtime.dateTime;
       }
+      statusMessageText = devtime.message || '';
       
-      const msgText = devtime.message || '';
-      const msgEl = document.getElementById('message');
-      if (msgEl) {
-        msgEl.textContent = msgText;
-        
-        // Add warning class if message contains version mismatch warning
-        if (msgText.toLowerCase().includes('littlefs') || 
-            msgText.toLowerCase().includes('version') ||
-            msgText.toLowerCase().includes('flash your')) {
-          msgEl.classList.add('version-warning');
-        } else {
-          msgEl.classList.remove('version-warning');
-        }
-        
-        // Hide element if no message
-        if (msgText === '') {
-          msgEl.style.display = 'none';
-        } else {
-          msgEl.style.display = 'block';
-        }
-      }
-      
-      if (devtime.psmode !== undefined) {
-        var newPSmode = (devtime.psmode === true || devtime.psmode === 'true');
+      if (hasPsmode) {
         if (newPSmode !== isPSmode) {
           isPSmode = newPSmode;
           console.log('[PS mode] PS=1 mode changed to: ' + isPSmode);
           applyPSmodeState();
         }
       }
+      renderBottomMessage();
     })
     .catch(function (error) {
       var p = document.createElement('p');
@@ -2754,8 +2755,15 @@ function refreshDevInfo() {
       const ipaddress = device.ipaddress || "";
       const version = device.fwversion || "";
 
-      const gatewayModeValue = (device.gatewaymode !== undefined) ? device.gatewaymode : null;
-      updateGatewayModeIndicator(parseGatewayModeValue(gatewayModeValue));
+      const parsedMode = parseGatewayModeValue(device.mode);
+      if (parsedMode) {
+        gatewayModeLastKnown = parsedMode;
+        updateGatewayModeIndicator(parsedMode);
+      } else if (gatewayModeLastKnown) {
+        updateGatewayModeIndicator(gatewayModeLastKnown);
+      } else {
+        updateGatewayModeIndicator('detecting');
+      }
 
       const versionEl = document.getElementById('devVersion');
       if (versionEl) versionEl.textContent = version;
@@ -2770,6 +2778,9 @@ function refreshDevInfo() {
       p.appendChild(
         document.createTextNode('Error: ' + error.message)
       );
+      if (!gatewayModeLastKnown) {
+        updateGatewayModeIndicator('unavailable');
+      }
     });
 } // refreshDevInfo()
 
@@ -2823,7 +2834,10 @@ function refreshOTmonitor() {
       }
 
       if (typeof simState === 'boolean') {
+        const simChanged = (sensorSimulationActive !== simState);
+        sensorSimulationActive = simState;
         lastSensorSimulationState = simState;
+        if (simChanged) renderBottomMessage();
       }
 
       // Detect and register temperature sensors for the graph
@@ -2850,44 +2864,47 @@ function refreshOTmonitor() {
 
       for (let i in data) {
         // Map-based JSON: 'i' is the key (name), data[i] is the entry object
-        if (!data[i].name) data[i].name = i;
+        const entry = data[i];
+        if (!entry || typeof entry !== 'object') continue;
+        if (!entry.name) entry.name = i;
 
-        if (i === 'sensorsimulation') {
+        // Hide debug-only sensor simulation line from the main data table (map and array formats).
+        if (i === 'sensorsimulation' || entry.name === 'sensorsimulation') {
           continue;
         }
 
         //console.log("["+data[i].name+"]=>["+data[i].value+"]");
 
-        if ((document.getElementById("otmon_" + data[i].name)) == null) { // if element does not exists yet, then build page
+        if ((document.getElementById("otmon_" + entry.name)) == null) { // if element does not exists yet, then build page
           var rowDiv = document.createElement("div");
           rowDiv.setAttribute("class", "otmonrow");
           //rowDiv.setAttribute("id", "otmon_"+data[i].name);
           // rowDiv.style.background = "lightblue";
-          if (data[i].epoch == 0) rowDiv.classList.add('hidden-row');
+          if (entry.epoch == 0) rowDiv.classList.add('hidden-row');
           var epoch = document.createElement("INPUT");
           epoch.setAttribute("type", "hidden");
-          epoch.setAttribute("id", "otmon_epoch_" + data[i].name);
-          epoch.name = data[i].name;
-          epoch.value = data[i].epoch;
+          epoch.setAttribute("id", "otmon_epoch_" + entry.name);
+          epoch.name = entry.name;
+          epoch.value = entry.epoch;
           rowDiv.appendChild(epoch);
           //--- field Name ---
           var fldDiv = document.createElement("div");
           fldDiv.setAttribute("class", "otmoncolumn1");
           
           var displayName;
-          if (isDallasAddress(data[i])) {
-            displayName = data[i].name;
+          if (isDallasAddress(entry)) {
+            displayName = entry.name;
             // Check for custom label in cache
-            if (dallasLabelsCache[data[i].name]) {
-              displayName = dallasLabelsCache[data[i].name];
+            if (dallasLabelsCache[entry.name]) {
+              displayName = dallasLabelsCache[entry.name];
             }
             
             // Add click handler to allow editing label
             fldDiv.classList.add('editable-label');
-            fldDiv.title = 'Click to edit label (Address: ' + data[i].name + ')';
+            fldDiv.title = 'Click to edit label (Address: ' + entry.name + ')';
             fldDiv.onclick = (function(addr, node) {
               return function(evt) { openInlineSensorLabelEditor(addr, node, evt); };
-            })(data[i].name, fldDiv);
+            })(entry.name, fldDiv);
 
             // Create label text and edit icon
             var labelText = document.createElement('span');
@@ -2900,7 +2917,7 @@ function refreshOTmonitor() {
             editIcon.textContent = ' ✏️';
             fldDiv.appendChild(editIcon);
           } else {
-            displayName = translateToHuman(data[i].name);
+            displayName = translateToHuman(entry.name);
             fldDiv.textContent = displayName;
           }
           
@@ -2908,37 +2925,37 @@ function refreshOTmonitor() {
           //--- Value ---
           var valDiv = document.createElement("div");
           valDiv.setAttribute("class", "otmoncolumn2");
-          valDiv.setAttribute("id", "otmon_" + data[i].name);
-          if (data[i].value === "On") valDiv.innerHTML = "<span class='state-on'></span>";
-          else if (data[i].value === "Off") valDiv.innerHTML = "<span class='state-off'></span>";
-          else valDiv.textContent = data[i].value;
+          valDiv.setAttribute("id", "otmon_" + entry.name);
+          if (entry.value === "On") valDiv.innerHTML = "<span class='state-on'></span>";
+          else if (entry.value === "Off") valDiv.innerHTML = "<span class='state-off'></span>";
+          else valDiv.textContent = entry.value;
           rowDiv.appendChild(valDiv);
           //--- Unit  ---
           var unitDiv = document.createElement("div");
           unitDiv.setAttribute("class", "otmoncolumn3");
-          unitDiv.textContent = data[i].unit;
+          unitDiv.textContent = entry.unit;
           rowDiv.appendChild(unitDiv);
           otMonTable.appendChild(rowDiv);
         }
         else { //if the element exists, then update the value
-          var update = document.getElementById("otmon_" + data[i].name);
+          var update = document.getElementById("otmon_" + entry.name);
           if (update.parentNode) {
-            if (data[i].epoch == 0) {
+            if (entry.epoch == 0) {
               update.parentNode.classList.add('hidden-row');
             } else {
               update.parentNode.classList.remove('hidden-row');
             }
           }
-          var epoch = document.getElementById("otmon_epoch_" + data[i].name);
+          var epoch = document.getElementById("otmon_epoch_" + entry.name);
           // if ((Number(epoch.value)==0) && (Number(data[i].epoch)>0)) {
           //   //console.log ("unhide based on epoch");
           //   //setTimeout(function () { update.style.visibility = 'visible';}, 0);
           //   needReload = true;
           // } 
-          epoch.value = data[i].epoch;
-          if (data[i].value === "On") update.innerHTML = "<span class='state-on'></span>";
-          else if (data[i].value === "Off") update.innerHTML = "<span class='state-off'></span>";
-          else update.textContent = data[i].value;
+          epoch.value = entry.epoch;
+          if (entry.value === "On") update.innerHTML = "<span class='state-on'></span>";
+          else if (entry.value === "Off") update.innerHTML = "<span class='state-off'></span>";
+          else update.textContent = entry.value;
           //if (update.style.visibility == 'visible') update.textContent = data[i].value;
 
         }
@@ -2978,6 +2995,13 @@ function refreshDeviceInfo() {
       const device = json.device || {};
       for (let key in device) {
         console.log("[" + key + "]=>[" + device[key] + "]");
+        let displayValue = device[key];
+        if (key === 'mode') {
+          const parsedMode = parseGatewayModeValue(device[key]);
+          if (parsedMode === 'gateway') displayValue = 'Gateway';
+          else if (parsedMode === 'monitor') displayValue = 'Monitor';
+          else displayValue = 'Detecting...';
+        }
         var deviceinfoPage = document.getElementById('deviceinfoPage');
         if ((document.getElementById("devinfo_" + key)) == null) { // if element does not exists yet, then build page
           var rowDiv = document.createElement("div");
@@ -2991,9 +3015,13 @@ function refreshDeviceInfo() {
           //--- value on screen ---
           var valDiv = document.createElement("div");
           valDiv.setAttribute("class", "devinfocolumn2");
-          valDiv.textContent = device[key];
+          valDiv.textContent = displayValue;
           rowDiv.appendChild(valDiv);
           deviceinfoPage.appendChild(rowDiv);
+        } else {
+          const existingRow = document.getElementById("devinfo_" + key);
+          const valueEl = existingRow ? existingRow.querySelector('.devinfocolumn2') : null;
+          if (valueEl) valueEl.textContent = displayValue;
         }
       }
     })
@@ -3392,7 +3420,7 @@ var translateFields = [
   , ["otgwcommands", "Boot Command"]
   , ["thermostatconnected", "Thermostat Connected"]
   , ["boilerconnected", "Boiler Connected"]
-  , ["gatewaymode", "Gateway/Standalone"]
+  , ["mode", "Gateway/Monitor"]
   , ["otgwconnected", "HA Integration"]
   , ["gpiooutputsenabled", "GPIO Output Enabled"]
   , ["gpiooutputspin", "GPIO pin # to switch on/off"]
@@ -4045,10 +4073,7 @@ function sortStats(col) {
 
 //============================================================================
 function saveUISetting(field, value) {
-  // UI element settings should be hidden settings, marked by "#" in the API call
-  // Only checkboxes and dropdowns trigger this
-  const apiField = field.startsWith('#') ? field : '#' + field;
-  sendPostSetting(apiField, value);
+  sendPostSetting(field, value);
 }
 window.saveUISetting = saveUISetting;
 

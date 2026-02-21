@@ -147,6 +147,7 @@ bool      bOTGWonline = true;
 bool      bOTGWboilerstate = false;
 bool      bOTGWthermostatstate = false;
 bool      bOTGWgatewaystate = false;
+bool      bOTGWgatewaystateKnown = false;
 bool      bPSmode = false;  //default to PS=0 mode
 
 //All things that are settings 

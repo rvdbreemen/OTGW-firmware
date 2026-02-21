@@ -260,18 +260,22 @@ void doTaskEvery30s(){
   // This provides reliable detection of Gateway vs Monitor mode
   if (bPICavailable && bOTGWonline) {
     static bool bOTGWgatewaypreviousstate = false;
+    static bool bOTGWgatewaypreviousknown = false;
     bool newGatewayState = queryOTGWgatewaymode();
     
-    // Update the global state
-    bOTGWgatewaystate = newGatewayState;
-    
-    // Send MQTT update if state changed or first time
-    static bool firstRun = true;
-    if ((bOTGWgatewaystate != bOTGWgatewaypreviousstate) || firstRun) {
-      sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(bOTGWgatewaystate));
-      bOTGWgatewaypreviousstate = bOTGWgatewaystate;
-      firstRun = false;
-      DebugTf(PSTR("Gateway mode updated via PR=M: %s\r\n"), CCONOFF(bOTGWgatewaystate));
+    // Only publish/update when mode has been read successfully at least once.
+    if (bOTGWgatewaystateKnown) {
+      bOTGWgatewaystate = newGatewayState;
+
+      // Send MQTT update if state changed or first successful read
+      if ((bOTGWgatewaystate != bOTGWgatewaypreviousstate) || !bOTGWgatewaypreviousknown) {
+        sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(bOTGWgatewaystate));
+        bOTGWgatewaypreviousstate = bOTGWgatewaystate;
+        bOTGWgatewaypreviousknown = true;
+        DebugTf(PSTR("Gateway mode updated via PR=M: %s\r\n"), CCONOFF(bOTGWgatewaystate));
+      }
+    } else {
+      DebugTln(F("Gateway mode still unknown (waiting for first successful PR=M)"));
     }
   }
 }
