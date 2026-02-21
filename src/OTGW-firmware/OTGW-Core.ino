@@ -178,7 +178,7 @@ String getpicfwversion(){
 Query the actual gateway mode setting from the PIC firmware using PR=M command.
 According to OTGW documentation:
 - PR=M returns "PR: G" for Gateway mode (GW=1)
-- PR=M returns "PR: M" for Monitor/Standalone mode (GW=0)
+- PR=M returns "PR: M" for Monitor mode (GW=0)
 This provides a reliable way to detect the actual configured mode,
 rather than inferring it from message traffic.
 */
@@ -190,12 +190,14 @@ bool queryOTGWgatewaymode(){
 
   if (!bPICavailable) {
     OTGWDebugTln(F("queryOTGWgatewaymode: PIC not available"));
-    return false;
+    bOTGWgatewaystateKnown = hasCachedGatewayMode;
+    return cachedGatewayMode;
   }
 
   const uint32_t now = millis();
   if (hasCachedGatewayMode && ((uint32_t)(now - lastGatewayModeQueryMs) < GATEWAY_MODE_QUERY_MIN_INTERVAL_MS)) {
     OTGWDebugTf(PSTR("queryOTGWgatewaymode: throttled, using cached value [%s]\r\n"), CCONOFF(cachedGatewayMode));
+    bOTGWgatewaystateKnown = true;
     return cachedGatewayMode;
   }
   
@@ -206,29 +208,35 @@ bool queryOTGWgatewaymode(){
   
   // Response should be "G" for Gateway mode or "M" for Monitor mode
   // executeCommand() strips the "PR: " prefix, so we just get the value
-  bool isGatewayMode = false;
+  bool isGatewayMode = cachedGatewayMode;
+  bool parseOk = false;
   
   if (response.length() > 0) {
     char mode = response.charAt(0);
     if (mode == 'G' || mode == 'g') {
       isGatewayMode = true;
+      parseOk = true;
       OTGWDebugTln(F("queryOTGWgatewaymode: Gateway mode (G) detected"));
     } else if (mode == 'M' || mode == 'm') {
       isGatewayMode = false;
+      parseOk = true;
       OTGWDebugTln(F("queryOTGWgatewaymode: Monitor mode (M) detected"));
     } else {
-      OTGWDebugTf(PSTR("queryOTGWgatewaymode: Unexpected response [%s], defaulting to false\r\n"), CSTR(response));
-      isGatewayMode = false;
+      OTGWDebugTf(PSTR("queryOTGWgatewaymode: Unexpected response [%s], keeping cached value [%s]\r\n"),
+                  CSTR(response), CCONOFF(cachedGatewayMode));
     }
   } else {
-    OTGWDebugTln(F("queryOTGWgatewaymode: Empty response, defaulting to false"));
+    OTGWDebugTln(F("queryOTGWgatewaymode: Empty response, keeping cached value"));
   }
 
-  cachedGatewayMode = isGatewayMode;
-  hasCachedGatewayMode = true;
-  lastGatewayModeQueryMs = now;
+  if (parseOk) {
+    cachedGatewayMode = isGatewayMode;
+    hasCachedGatewayMode = true;
+    lastGatewayModeQueryMs = now;
+  }
+  bOTGWgatewaystateKnown = hasCachedGatewayMode;
   
-  return isGatewayMode;
+  return cachedGatewayMode;
 }
 
 //===================[ checkOTWGpicforupdate ]=====================
@@ -1555,6 +1563,13 @@ void processOT(const char *buf, int len){
   time_t now = time(nullptr);
 
   if (isvalidotmsg(buf, len)) { 
+    // Raw OT frames indicate normal streaming mode (PS=0).
+    if (bPSmode) {
+      bPSmode = false;
+      sMessage[0] = '\0';
+      OTGWDebugTln(F("PS mode auto-detected as OFF (raw OT stream resumed)"));
+    }
+
     //OT protocol messages are 9 chars long
     if (settingMQTTOTmessage) sendMQTTData(F("otmessage"), buf);
 
@@ -1914,6 +1929,15 @@ void processOT(const char *buf, int len){
     OTGWDebugTf(PSTR("Current device id: %s\r\n"), sPICdeviceid);    
     strlcpy(sPICtype, OTGWSerial.firmwareToString().c_str(), sizeof(sPICtype));
     OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), sPICtype);
+  } else if ((strchr(buf, '=') != nullptr) && (strchr(buf, ':') == nullptr)) {
+    // Summary key/value lines are emitted by PS=1 mode.
+    // Detect this even when PS=1 was enabled externally (e.g. Domoticz classic plugin),
+    // so WebUI can show the footer watermark reliably.
+    if (!bPSmode) {
+      OTGWDebugTln(F("PS mode auto-detected as ON (summary key=value stream)"));
+    }
+    bPSmode = true;
+    strlcpy(sMessage, "PS=1 mode; No UI updates.", sizeof(sMessage));
   } else {
     OTGWDebugTf(PSTR("Not processed, received from OTGW => (%s) [%d]\r\n"), buf, len);
   }

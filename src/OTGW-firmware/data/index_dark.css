@@ -272,6 +272,11 @@
   } 
   .right-0  {right: 0; padding-right: 10px; }
   .left-0   {left:  0; padding-left:  10px; }
+  .ps-mode-watermark {
+    color: #f0b35d !important;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+  }
   
   /* Version mismatch warning styling */
   .version-warning {
