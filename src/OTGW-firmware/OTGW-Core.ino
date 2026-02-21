@@ -1967,12 +1967,13 @@ void processOT(const char *buf, int len){
 void handleOTGW()
 {
   //handle serial communication and line processing
-  #define MAX_BUFFER_READ 256       //need to be 256 because of long PS=1 responses 
+  #define MAX_BUFFER_READ 512       //PS=1 summary lines can exceed 256 bytes
   #define MAX_BUFFER_WRITE 128
   static char sRead[MAX_BUFFER_READ];
   static char sWrite[MAX_BUFFER_WRITE];
   static size_t bytes_read = 0;
   static size_t bytes_write = 0;
+  static bool discardCurrentReadLine = false;
   static uint8_t outByte;
 
   //Handle incoming data from OTGW through serial port (READ BUFFER)
@@ -1985,17 +1986,26 @@ void handleOTGW()
   
   while (OTGWSerial.available()) {
     outByte = OTGWSerial.read();
-    OTGWstream.write(outByte);
     if (outByte == '\r' || outByte == '\n') {
-      if (bytes_read == 0) continue;
-      blinkLEDnow(LED2);
-      sRead[bytes_read] = '\0';
-      processOT(sRead, bytes_read);
+      if ((bytes_read == 0) && !discardCurrentReadLine) continue;
+
+      if (!discardCurrentReadLine) {
+        blinkLEDnow(LED2);
+        sRead[bytes_read] = '\0';
+        OTGWstream.write(reinterpret_cast<const uint8_t*>(sRead), bytes_read);
+        OTGWstream.write('\r');
+        OTGWstream.write('\n');
+        processOT(sRead, bytes_read);
+      }
+
       bytes_read = 0;
+      discardCurrentReadLine = false;
     } else if (bytes_read < (MAX_BUFFER_READ-1)) {
-      sRead[bytes_read++] = outByte;
+      if (!discardCurrentReadLine) {
+        sRead[bytes_read++] = outByte;
+      }
     } else {
-      // Buffer overflow detected - discard current buffer and log error
+      // Buffer overflow detected - discard this complete line and log error
       OTcurrentSystemState.errorBufferOverflow++;
       DebugTf(PSTR("Serial Buffer Overflow! Discarding %d bytes. Total overflows: %d\r\n"), 
               bytes_read, OTcurrentSystemState.errorBufferOverflow);
@@ -2008,18 +2018,9 @@ void handleOTGW()
         sendMQTTData(F("Error_BufferOverflow"), overflowCountBuf);
         overflowsSinceLastReport = 0;
       }
-      // Reset buffer to prevent processing corrupted data
+      // Drop this line until next CR/LF to avoid forwarding partial/corrupted data
       bytes_read = 0;
-      // Skip remaining bytes until we hit a line terminator to resync (max 256 bytes to prevent blocking)
-      uint16_t skipCount = 0;
-      while (OTGWSerial.available() && skipCount < MAX_BUFFER_READ) {
-        outByte = OTGWSerial.read();
-        OTGWstream.write(outByte);
-        skipCount++;
-        if (outByte == '\r' || outByte == '\n') {
-          break;
-        }
-      }
+      discardCurrentReadLine = true;
     }
   }
 
