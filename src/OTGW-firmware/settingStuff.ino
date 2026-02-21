@@ -100,6 +100,7 @@ void writeSettings(bool show)
   root[F("MQTThaprefix")] = settingMQTThaprefix;
   root[F("MQTTuniqueid")] = settingMQTTuniqueid;
   root[F("MQTTOTmessage")] = settingMQTTOTmessage;
+  root[F("MQTTseparatesources")] = settingMQTTSeparateSources;
   root[F("MQTTharebootdetection")]= settingMQTTharebootdetection;  
   root[F("NTPenable")] = settingNTPenable;
   root[F("NTPtimezone")] = settingNTPtimezone;
@@ -205,6 +206,7 @@ void readSettings(bool show)
   if (strlen(settingMQTTuniqueid)==0 || strcmp_P(settingMQTTuniqueid, PSTR("null"))==0) strlcpy(settingMQTTuniqueid, getUniqueId(), sizeof(settingMQTTuniqueid));
 
   settingMQTTOTmessage    = doc[F("MQTTOTmessage")]|settingMQTTOTmessage;
+  settingMQTTSeparateSources = doc[F("MQTTseparatesources")] | settingMQTTSeparateSources;
   settingNTPenable        = doc[F("NTPenable")]; 
   
   strlcpy(settingNTPtimezone, doc[F("NTPtimezone")] | "", sizeof(settingNTPtimezone));
@@ -254,9 +256,10 @@ void readSettings(bool show)
     Debugf(PSTR("MQTT broker           : %s\r\n"), CSTR(settingMQTTbroker));
     Debugf(PSTR("MQTT port             : %d\r\n"), settingMQTTbrokerPort);
     Debugf(PSTR("MQTT username         : %s\r\n"), CSTR(settingMQTTuser));
-    Debugf(PSTR("MQTT password         : %s\r\n"), CSTR(settingMQTTpasswd));
+    Debugf(PSTR("MQTT password set     : %s\r\n"), CBOOLEAN(settingMQTTpasswd[0] != '\0'));
     Debugf(PSTR("MQTT toptopic         : %s\r\n"), CSTR(settingMQTTtopTopic));
     Debugf(PSTR("MQTT uniqueid         : %s\r\n"), CSTR(settingMQTTuniqueid));
+    Debugf(PSTR("MQTT separate sources : %s\r\n"), CBOOLEAN(settingMQTTSeparateSources));
     Debugf(PSTR("HA prefix             : %s\r\n"), CSTR(settingMQTThaprefix));
     Debugf(PSTR("HA reboot detection   : %s\r\n"), CBOOLEAN(settingMQTTharebootdetection));
     Debugf(PSTR("NTP enabled           : %s\r\n"), CBOOLEAN(settingNTPenable));
@@ -344,6 +347,7 @@ void updateSetting(const char *field, const char *newValue)
     if (strlen(settingMQTTuniqueid) == 0)   strlcpy(settingMQTTuniqueid, getUniqueId(), sizeof(settingMQTTuniqueid));
   }
   if (strcasecmp_P(field, PSTR("MQTTOTmessage"))==0)   settingMQTTOTmessage = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("MQTTseparatesources"))==0) settingMQTTSeparateSources = EVALBOOLEAN(newValue);
   if (strstr_P(field, PSTR("mqtt")) != NULL)        pendingSideEffects |= SIDE_EFFECT_MQTT; // defer MQTT restart to flushSettings()
   
   if (strcasecmp_P(field, PSTR("NTPenable"))==0)      settingNTPenable = EVALBOOLEAN(newValue);
