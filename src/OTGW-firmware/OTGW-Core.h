@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h 
-**  Version  : v1.1.0-beta
+**  Version  : v1.2.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -35,6 +35,7 @@ typedef struct {
 	float 		CoolingControl = 0.0f; // f8.8  Cooling control signal (%) 
 	float 		TsetCH2 = 0.0f; // f8.8  Control setpoint for 2e CH circuit (°C)
 	float 		TrOverride = 0.0f; // f8.8  Remote override room setpoint 
+	float 		TrOverride2 = 0.0f; // f8.8  Remote override room setpoint 2 (°C)
 	uint16_t 	TSP = 0; // u8 / u8  Number of Transparent-Slave-Parameters supported by slave 
 	uint16_t 	TSPindexTSPvalue = 0; // u8 / u8  Index number / Value of referred-to transparent slave parameter. 
 	uint16_t 	FHBsize = 0; // u8 / u8  Size of Fault-History-Buffer supported by slave 
@@ -60,7 +61,7 @@ typedef struct {
 	float 		Tdhw2 = 0.0f; // f8.8  Domestic hot water temperature 2 (°C)
 	int16_t 	Texhaust = 0; // s16  Boiler exhaust temperature (°C)
 	float 		Theatexchanger = 0.0f; // f8.8  Heat Exchanger (°C)
-	uint16_t	FanSpeed = 0; // u16  Fan Speed (rpm)
+	uint16_t	FanSpeed = 0; // u8 / u8  Fan Speed setpoint / actual (Hz)
 	float 		ElectricalCurrentBurnerFlame = 0.0f; // f88 Electrical current through burner flame (µA)
 	float 		TRoomCH2= 0.0f; // f88  Room Temperature for 2nd CH circuit ("°C)
 	uint16_t	RelativeHumidity = 0; // u8 / u8 Relative Humidity (%)
@@ -84,7 +85,15 @@ typedef struct {
 	//RF
 	uint16_t	RFstrengthbatterylevel = 0; // u8/ u8 RF strength and battery level
 	uint16_t 	OperatingMode_HC1_HC2_DHW = 0; // u8 / u8 Operating Mode HC1, HC2/ DHW
-	uint16_t	RoomRemoteOverrideFunction = 0; // Function of manual and program changes in master and remote room setpoint
+
+	//Brand identification (mandatory since v4.1)
+	uint16_t	Brand = 0; // u8 / u8 Brand name index / character
+	uint16_t	BrandVersion = 0; // u8 / u8 Brand version index / character
+	uint16_t	BrandSerialNumber = 0; // u8 / u8 Brand serial number index / character
+
+	//Counters
+	uint16_t	CoolingOperationHours = 0; // u16 Cooling operation hours
+	uint16_t	PowerCycles = 0; // u16 Power cycles
 
 	//Electric Producer
 	uint16_t 	ElectricityProducerStarts = 0; // u16 Electricity producer starts 
@@ -235,10 +244,11 @@ enum OpenThermMessageID {
 	OT_Tdhw2, // f8.8  Domestic hot water temperature 2 (°C)
 	OT_Texhaust, // s16  Boiler exhaust temperature (°C)
 	OT_Theatexchanger, // f8.8 Heat exchanger temperature (°C)
-	OT_FanSpeed = 35, // u16  Fan Speed (rpm)
+	OT_FanSpeed = 35, // u8 / u8  Fan Speed setpoint / actual (Hz)
 	OT_ElectricalCurrentBurnerFlame, // f88 Electrical current through burner flame (µA)
 	OT_TRoomCH2, // f88  Room Temperature for 2nd CH circuit ("°C)
 	OT_RelativeHumidity, // u8 / u8 Relative Humidity (%)
+	OT_TrOverride2 = 39, // f8.8  Remote override room setpoint 2 (°C)
 	OT_TdhwSetUBTdhwSetLB = 48, // s8 / s8  DHW setpoint upper & lower bounds for adjustment  (°C)
 	OT_MaxTSetUBMaxTSetLB, // s8 / s8  Max CH water setpoint upper & lower bounds for adjustment  (°C)
 	OT_HcratioUBHcratioLB, // s8 / s8  OTC heat curve ratio upper & lower bounds for adjustment  
@@ -277,6 +287,11 @@ enum OpenThermMessageID {
 	OT_TSPEntryVH,	// u8 / u8 TSP Entry V/H
 	OT_FaultBufferSizeVH, // u8 / u8 Fault Buffer Size V/H
 	OT_FaultBufferEntryVH,	// u8 / u8 Fault Buffer Entry V/H
+	OT_Brand = 93, // u8 / u8 Brand name (index/char)
+	OT_BrandVersion, // u8 / u8 Brand version (index/char)
+	OT_BrandSerialNumber, // u8 / u8 Brand serial number (index/char)
+	OT_CoolingOperationHours, // u16 Cooling operation hours
+	OT_PowerCycles, // u16 Power cycles
 	OT_RFstrengthbatterylevel=98, // u8 / u8  RF strength and battery level
 	OT_OperatingMode_HC1_HC2_DHW, // u8 / u8 Operating Mode HC1, HC2/ DHW
 	OT_RemoteOverrideFunction, // flag8 / -  Function of manual and program changes in master and remote room setpoint. 
@@ -346,7 +361,7 @@ enum OpenThermMessageID {
 		{  16, OT_WRITE , ot_f88,        	"TrSet", "Room Setpoint", "°C" },
 		{  17, OT_READ  , ot_f88,        	"RelModLevel", "Relative Modulation Level", "%" },
 		{  18, OT_READ  , ot_f88,        	"CHPressure", "CH water pressure", "bar" },
-		{  19, OT_READ  , ot_f88,        	"DHWFlowRate", "DHW flow rate", "l/m" },
+		{  19, OT_READ  , ot_f88,        	"DHWFlowRate", "DHW flow rate", "l/min" },
 		{  20, OT_RW    , ot_special,    	"DayTime", "Day of Week and Time of Day", "" },
 		{  21, OT_RW    , ot_u8u8,       	"Date", "Calendar date ", "" },
 		{  22, OT_RW    , ot_u16,        	"Year", "Calendar year", "" },
@@ -354,7 +369,7 @@ enum OpenThermMessageID {
 		{  24, OT_WRITE , ot_f88,        	"Tr", "Room Temperature", "°C" },
 		{  25, OT_READ  , ot_f88,        	"Tboiler", "Boiler water temperature", "°C" },
 		{  26, OT_READ  , ot_f88,        	"Tdhw", "DHW temperature", "°C" },
-		{  27, OT_READ  , ot_f88,        	"Toutside", "Outside temperature", "°C" },
+		{  27, OT_RW    , ot_f88,        	"Toutside", "Outside temperature", "°C" },
 		{  28, OT_READ  , ot_f88,        	"Tret", "Return water temperature", "°C" },
 		{  29, OT_READ  , ot_f88,        	"Tsolarstorage", "Solar storage temperature", "°C" },
 		{  30, OT_READ  , ot_s16,        	"Tsolarcollector", "Solar collector temperature", "°C" },
@@ -362,11 +377,11 @@ enum OpenThermMessageID {
 		{  32, OT_READ  , ot_f88,        	"Tdhw2", "DHW2 temperature", "°C" },
 		{  33, OT_READ  , ot_s16,        	"Texhaust", "Exhaust temperature", "°C" },
 		{  34, OT_READ  , ot_f88, 	 	 	"Theatexchanger", "Boiler heat exchanger temperature", "°C" },
-		{  35, OT_READ  , ot_u8u8,	 	 	"FanSpeed", "Boiler fan speed and setpoint", "rpm" },
+		{  35, OT_READ  , ot_u8u8,	 	 	"FanSpeed", "Boiler fan speed and setpoint", "Hz" },
 		{  36, OT_READ  , ot_f88, 			"ElectricalCurrentBurnerFlame", "Electrical current through burner flame", "µA" },
-		{  37, OT_READ  , ot_f88, 			"TRoomCH2", "Room temperature for 2nd CH circuit", "°C" },
-		{  38, OT_READ  , ot_u8u8, 			"RelativeHumidity", "Relative Humidity", "%" },
-		{  39, OT_UNDEF , ot_undef, 		"", "", "" },
+		{  37, OT_WRITE , ot_f88, 			"TRoomCH2", "Room temperature for 2nd CH circuit", "°C" },
+		{  38, OT_RW    , ot_u8u8, 			"RelativeHumidity", "Relative Humidity", "%" },
+		{  39, OT_READ  , ot_f88, 			"TrOverride2", "Remote override room setpoint 2", "°C" },
 		{  40, OT_UNDEF , ot_undef, 		"", "", "" },
 		{  41, OT_UNDEF , ot_undef, 		"", "", "" },
 		{  42, OT_UNDEF , ot_undef, 		"", "", "" },
@@ -420,13 +435,13 @@ enum OpenThermMessageID {
 		{  90, OT_READ  , ot_u8u8, 			"FaultBufferSizeVH", "Fault Buffer Size V/H", "" },
 		{  91, OT_READ  , ot_u8u8, 			"FaultBufferEntryVH", "Fault Buffer Entry V/H", "" },
 		{  92, OT_UNDEF , ot_undef, 		"", "", "" },
-		{  93, OT_UNDEF , ot_undef, 		"", "", "" },
-		{  94, OT_UNDEF , ot_undef, 		"", "", "" },
-		{  95, OT_UNDEF , ot_undef, 		"", "", "" },
-		{  96, OT_UNDEF , ot_undef, 		"", "", "" },
-		{  97, OT_UNDEF , ot_undef, 		"", "", "" },
-		{  98, OT_READ  , ot_u8u8, 			"RFstrengthbatterylevel", "RF strength and battery level", "" },
-		{  99, OT_READ  , ot_u8u8, 			"OperatingMode_HC1_HC2_DHW", "Operating Mode HC1, HC2/ DHW", "" },
+		{  93, OT_READ  , ot_u8u8, 			"Brand", "Boiler brand name (index/char)", "" },
+		{  94, OT_READ  , ot_u8u8, 			"BrandVersion", "Boiler brand version (index/char)", "" },
+		{  95, OT_READ  , ot_u8u8, 			"BrandSerialNumber", "Boiler brand serial number (index/char)", "" },
+		{  96, OT_RW    , ot_u16, 			"CoolingOperationHours", "Cooling operation hours", "hrs" },
+		{  97, OT_RW    , ot_u16, 			"PowerCycles", "Power cycles", "" },
+		{  98, OT_WRITE , ot_u8u8, 			"RFstrengthbatterylevel", "RF strength and battery level", "" },
+		{  99, OT_RW    , ot_u8u8, 			"OperatingMode_HC1_HC2_DHW", "Operating Mode HC1, HC2/ DHW", "" },
 		{ 100, OT_READ  , ot_flag8,       	"RoomRemoteOverrideFunction", "Function of manual and program changes in master and remote room setpoint.", "" },
 		{ 101, OT_READ  , ot_flag8flag8, 	"SolarStorageMaster", "Solar Storage Master mode", "" },
 		{ 102, OT_READ  , ot_flag8u8,    	"SolarStorageASFflags", "Solar Storage Application-specific flags and OEM fault", "" },
@@ -436,10 +451,10 @@ enum OpenThermMessageID {
 		{ 106, OT_RW    , ot_u8u8,       	"SolarStorageTSPindexTSPvalue", "Solar Storage Index number / Value of referred-to transparent slave parameter", "" },
 		{ 107, OT_READ  , ot_u8u8,       	"SolarStorageFHBsize", "Solar Storage Size of Fault-History-Buffer supported by slave", "" },
 		{ 108, OT_READ  , ot_u8u8,       	"SolarStorageFHBindexFHBvalue", "Solar Storage Index number / Value of referred-to fault-history buffer entry", "" },
-		{ 109, OT_READ  , ot_u16, 			"ElectricityProducerStarts", "Electricity producer starts", "" },
-		{ 110, OT_READ  , ot_u16, 			"ElectricityProducerHours", "Electricity producer hours", "" },
+		{ 109, OT_RW    , ot_u16, 			"ElectricityProducerStarts", "Electricity producer starts", "" },
+		{ 110, OT_RW    , ot_u16, 			"ElectricityProducerHours", "Electricity producer hours", "" },
 		{ 111, OT_READ  , ot_u16, 			"ElectricityProduction", "Electricity production", "" },
-		{ 112, OT_READ  , ot_u16, 			"CumulativElectricityProduction", "Cumulativ Electricity production", "" },
+		{ 112, OT_RW    , ot_u16, 			"CumulativElectricityProduction", "Cumulativ Electricity production", "" },
 		{ 113, OT_RW    , ot_u16,         	"BurnerUnsuccessfulStarts", "Unsuccessful burner starts", "" },
 		{ 114, OT_RW    , ot_u16,         	"FlameSignalTooLow", "Flame signal too low count", "" },
 		{ 115, OT_READ  , ot_u16,         	"OEMDiagnosticCode", "OEM-specific diagnostic/service code", "" },
@@ -451,9 +466,9 @@ enum OpenThermMessageID {
 		{ 121, OT_RW    , ot_u16,         	"CHPumpOperationHours", "CH pump operation hours", "hrs" },
 		{ 122, OT_RW    , ot_u16,         	"DHWPumpValveOperationHours", "DHW pump/valve operation hours", "hrs" },
 		{ 123, OT_RW    , ot_u16,         	"DHWBurnerOperationHours", "DHW burner operation hours", "hrs" },
-		{ 124, OT_READ  , ot_f88,			"OpenThermVersionMaster", "Master Version OpenTherm Protocol Specification", "" },
+		{ 124, OT_WRITE , ot_f88,			"OpenThermVersionMaster", "Master Version OpenTherm Protocol Specification", "" },
 		{ 125, OT_READ  , ot_f88,			"OpenThermVersionSlave", "Slave Version OpenTherm Protocol Specification", "" },
-		{ 126, OT_READ  , ot_u8u8,			"MasterVersion", "Master product version number and type", "" },
+		{ 126, OT_WRITE , ot_u8u8,			"MasterVersion", "Master product version number and type", "" },
 		{ 127, OT_READ  , ot_u8u8,			"SlaveVersion", "Slave product version number and type", "" },
 		{ 128, OT_UNDEF , ot_undef,			"", "", "" },
 		{ 129, OT_UNDEF , ot_undef, 		"", "", "" },
@@ -469,7 +484,7 @@ enum OpenThermMessageID {
 
 #define OT_MSGID_MAX 133
 
-time_t msglastupdated[256] = {0}; //all msg, even if they are unknown
+time_t msglastupdated[256] = {0}; //all msg, even if they are unknown (id is uint8_t: 0-255)
 
 struct OT_cmd_t { // see all possible commands for PIC here: https://otgw.tclcode.com/firmware.html
 	char cmd[15];
