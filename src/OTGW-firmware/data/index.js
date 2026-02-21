@@ -1766,6 +1766,14 @@ function updateLogCounters() {
   updateMemoryDisplay();
 }
 
+function clearLogBuffer() {
+  otLogBuffer = [];
+  otLogFilteredBuffer = [];
+  try { if (window.localStorage) localStorage.removeItem(PERSISTENCE_KEY_LOGS); } catch(e) {}
+  updateLogDisplay();
+  updateLogCounters();
+}
+
 //============================================================================
 function setupOTLogControls() {
   // Only setup event listeners once to prevent duplicates
@@ -3562,6 +3570,7 @@ function handleFlashCompletion(filename, error) {
     stopFlashPolling();
     isFlashing = false;
     toggleInteraction(true);
+    clearLogBuffer();
     
     let progressBar = document.getElementById("flashProgressBar");
     let pctText = document.getElementById("flashPercentageText");
@@ -3733,7 +3742,8 @@ function handleFlashMessage(data) {
                 stopFlashPolling(); // Stop failsafe polling
                 isFlashing = false;
                 toggleInteraction(true);
-                
+                clearLogBuffer();
+
                 if (progressBar) {
                     progressBar.style.width = "100%";
                     if (progressBar.classList.contains('error')) progressBar.classList.remove('error');
