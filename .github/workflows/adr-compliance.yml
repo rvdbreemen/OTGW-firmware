@@ -154,13 +154,19 @@ jobs:
       - name: Comment on PR
         if: always()
         uses: actions/github-script@v6
+        env:
+          EVALUATE_STATUS: ${{ steps.evaluate.outputs.evaluate_status }}
+          CHECK_STATUS: ${{ steps.check_refs.outputs.check_status }}
+          NEW_ADR_COUNT: ${{ steps.new_adrs.outputs.new_adr_count }}
+          ARCH_CHANGE_COUNT: ${{ steps.detect_arch.outputs.arch_change_count }}
+          SUGGESTION: ${{ steps.detect_arch.outputs.suggestion }}
         with:
           script: |
-            const evaluate_status = '${{ steps.evaluate.outputs.evaluate_status }}';
-            const check_status = '${{ steps.check_refs.outputs.check_status }}';
-            const new_adr_count = '${{ steps.new_adrs.outputs.new_adr_count }}';
-            const arch_change_count = '${{ steps.detect_arch.outputs.arch_change_count }}';
-            const suggestion = '${{ steps.detect_arch.outputs.suggestion }}';
+            const evaluate_status = process.env.EVALUATE_STATUS;
+            const check_status = process.env.CHECK_STATUS;
+            const new_adr_count = process.env.NEW_ADR_COUNT;
+            const arch_change_count = process.env.ARCH_CHANGE_COUNT;
+            const suggestion = process.env.SUGGESTION;
             
             let body = '## 🔍 ADR Compliance Check\n\n';
             
@@ -169,8 +175,6 @@ jobs:
             } else {
               body += '❌ **Evaluation Framework:** FAILED - See logs for details\n';
             }
-            // Ensure all variables are declared and not mistyped (e.g., no 't' instead of 'let' or an accidental 't' left in code).
-                        
             // ADR reference check results
             if (check_status === '0' || check_status === '') {
               body += '✅ **ADR References:** All references are valid\n';
