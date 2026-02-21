@@ -256,7 +256,7 @@ void readSettings(bool show)
     Debugf(PSTR("MQTT broker           : %s\r\n"), CSTR(settingMQTTbroker));
     Debugf(PSTR("MQTT port             : %d\r\n"), settingMQTTbrokerPort);
     Debugf(PSTR("MQTT username         : %s\r\n"), CSTR(settingMQTTuser));
-    Debugf(PSTR("MQTT password         : %s\r\n"), CSTR(settingMQTTpasswd));
+    Debugf(PSTR("MQTT password set     : %s\r\n"), CBOOLEAN(settingMQTTpasswd[0] != '\0'));
     Debugf(PSTR("MQTT toptopic         : %s\r\n"), CSTR(settingMQTTtopTopic));
     Debugf(PSTR("MQTT uniqueid         : %s\r\n"), CSTR(settingMQTTuniqueid));
     Debugf(PSTR("MQTT separate sources : %s\r\n"), CBOOLEAN(settingMQTTSeparateSources));
