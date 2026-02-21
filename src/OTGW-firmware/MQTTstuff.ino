@@ -13,6 +13,7 @@
 #include <PubSubClient.h>           // MQTT client publish and subscribe functionality
 #include <ctype.h>
 #include <pgmspace.h>
+#include "OTGW-Core.h"              // Core OpenTherm data structures and functions
 
 // MQTT Streaming Mode - ALWAYS ENABLED
 // Large auto-discovery messages are sent in 128-byte chunks instead of
