@@ -73,6 +73,42 @@ char ot_log_buffer[OT_LOG_BUFFER_SIZE];
 
 /* --- End of LOG marcro's ---*/
 
+/* Send a single-line event to the WebSocket with a prefix character.
+   Prefix conventions: '>' sent command, '<' command response, '!' error/warning, '*' system event.
+   Uses ot_log_buffer; no additional buffers needed.
+   sendEventToWebSocket   - msg is a DRAM string; len < 0 means null-terminated, else bounded by len.
+   sendEventToWebSocket_P - msg_P is a PROGMEM string (pass with PSTR). */
+static void sendEventToWebSocket(char prefix, const char *msg, int len = -1) {
+  ClrLog();
+  AddLog(getOTLogTimestamp());
+  size_t _hlen = strlen(ot_log_buffer);
+  if (_hlen < (OT_LOG_BUFFER_SIZE - 1))
+    snprintf_P(ot_log_buffer + _hlen, OT_LOG_BUFFER_SIZE - _hlen, PSTR(" %c "), prefix);
+  if (len < 0) AddLog(msg);
+  else {
+    size_t _mlen = strlen(ot_log_buffer);
+    if (_mlen < (OT_LOG_BUFFER_SIZE - 1))
+      snprintf_P(ot_log_buffer + _mlen, OT_LOG_BUFFER_SIZE - _mlen, PSTR("%.*s"), len, msg);
+  }
+  AddLogln();
+  sendLogToWebSocket(ot_log_buffer);
+  ClrLog();
+}
+
+static void sendEventToWebSocket_P(char prefix, PGM_P msg_P) {
+  ClrLog();
+  AddLog(getOTLogTimestamp());
+  size_t _hlen = strlen(ot_log_buffer);
+  if (_hlen < (OT_LOG_BUFFER_SIZE - 1))
+    snprintf_P(ot_log_buffer + _hlen, OT_LOG_BUFFER_SIZE - _hlen, PSTR(" %c "), prefix);
+  size_t _mlen = strlen(ot_log_buffer);
+  if (_mlen < (OT_LOG_BUFFER_SIZE - 1))
+    strncat_P(ot_log_buffer, msg_P, OT_LOG_BUFFER_SIZE - _mlen - 1);
+  AddLogln();
+  sendLogToWebSocket(ot_log_buffer);
+  ClrLog();
+}
+
 static const char* skipOTLogTimestamp(const char* logLine)
 {
   if (!logLine) return logLine;
@@ -1425,6 +1461,8 @@ void handleOTGWqueue(){
       if (cmdqueue[i].retrycnt >= OTGW_CMD_RETRY){
         //max retry reached, so delete command from queue
         OTGWDebugTf(PSTR("CmdQueue: Delete [%d] from queue\r\n"), i);
+        snprintf_P(cMsg, sizeof(cMsg), PSTR("%s [dropped]"), cmdqueue[i].cmd);
+        sendEventToWebSocket('!', cMsg);
         for (int j = i; j < (cmdptr - 1); j++){
           // OTGWDebugTf(PSTR("CmdQueue: Moving [%d] => [%d]\r\n"), j+1, j);
           strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[j].cmd));
@@ -1529,13 +1567,7 @@ void sendOTGW(const char* buf, int len)
     OTGWSerial.write('\r');
     OTGWSerial.write('\n');
     OTGWSerial.flush();
-    // Log sent command to WebSocket
-    ClrLog();
-    AddLog(getOTLogTimestamp());
-    AddLogf(" > %.*s", len, buf);
-    AddLogln();
-    sendLogToWebSocket(ot_log_buffer);
-    ClrLog();
+    sendEventToWebSocket('>', buf, len);
   } else OTGWDebugln(F("Error: Write buffer not big enough!"));
 }
 
@@ -1868,81 +1900,97 @@ void processOT(const char *buf, int len){
     checkOTGWcmdqueue(buf, len);
     Debugln(buf);
     sendMQTTData(F("event_report"), buf);
-    // Log command response to WebSocket
-    ClrLog();
-    AddLog(getOTLogTimestamp());
-    AddLogf(" < %.*s", len, buf);
-    AddLogln();
-    sendLogToWebSocket(ot_log_buffer);
-    ClrLog();
+    sendEventToWebSocket('<', buf, (int)len);
   } else if (strcmp_P(buf, PSTR("NG")) == 0) {
     Debugln(F("NG - No Good. The command code is unknown."));
     sendMQTTData(F("event_report"), F("NG - No Good. The command code is unknown."));
+    sendEventToWebSocket_P('!', PSTR("NG - No Good"));
   } else if (strcmp_P(buf, PSTR("SE")) == 0) {
     Debugln(F("SE - Syntax Error. The command contained an unexpected character or was incomplete."));
     sendMQTTData(F("event_report"), F("SE - Syntax Error. The command contained an unexpected character or was incomplete."));
+    sendEventToWebSocket_P('!', PSTR("SE - Syntax Error"));
   } else if (strcmp_P(buf, PSTR("BV")) == 0) {
     Debugln(F("BV - Bad Value. The command contained a data value that is not allowed."));
     sendMQTTData(F("event_report"), F("BV - Bad Value. The command contained a data value that is not allowed."));
+    sendEventToWebSocket_P('!', PSTR("BV - Bad Value"));
   } else if (strcmp_P(buf, PSTR("OR")) == 0) {
     Debugln(F("OR - Out of Range. A number was specified outside of the allowed range."));
     sendMQTTData(F("event_report"), F("OR - Out of Range. A number was specified outside of the allowed range."));
+    sendEventToWebSocket_P('!', PSTR("OR - Out of Range"));
   } else if (strcmp_P(buf, PSTR("NS")) == 0) {
     Debugln(F("NS - No Space. The alternative Data-ID could not be added because the table is full."));
     sendMQTTData(F("event_report"), F("NS - No Space. The alternative Data-ID could not be added because the table is full."));
+    sendEventToWebSocket_P('!', PSTR("NS - No Space"));
   } else if (strcmp_P(buf, PSTR("NF")) == 0) {
     Debugln(F("NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table."));
     sendMQTTData(F("event_report"), F("NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table."));
+    sendEventToWebSocket_P('!', PSTR("NF - Not Found"));
   } else if (strcmp_P(buf, PSTR("OE")) == 0) {
     Debugln(F("OE - Overrun Error. The processor was busy and failed to process all received characters."));
     sendMQTTData(F("event_report"), F("OE - Overrun Error. The processor was busy and failed to process all received characters."));
+    sendEventToWebSocket_P('!', PSTR("OE - Overrun Error"));
   } else if (strcmp_P(buf, PSTR("Thermostat disconnected")) == 0) {
     Debugln(F("Thermostat disconnected"));
     sendMQTTData(F("event_report"), F("Thermostat disconnected"));
+    sendEventToWebSocket_P('*', PSTR("Thermostat disconnected"));
   } else if (strcmp_P(buf, PSTR("Thermostat connected")) == 0) {
     Debugln(F("Thermostat connected"));
     sendMQTTData(F("event_report"), F("Thermostat connected"));
+    sendEventToWebSocket_P('*', PSTR("Thermostat connected"));
   } else if (strcmp_P(buf, PSTR("Low power")) == 0) {
     Debugln(F("Low power"));
     sendMQTTData(F("event_report"), F("Low power"));
+    sendEventToWebSocket_P('*', PSTR("Low power"));
   } else if (strcmp_P(buf, PSTR("Medium power")) == 0) {
     Debugln(F("Medium power"));
     sendMQTTData(F("event_report"), F("Medium power"));
+    sendEventToWebSocket_P('*', PSTR("Medium power"));
   } else if (strcmp_P(buf, PSTR("High power")) == 0) {
     Debugln(F("High power"));
     sendMQTTData(F("event_report"), F("High power"));
+    sendEventToWebSocket_P('*', PSTR("High power"));
   } else if (strstr_P(buf, PSTR("\r\nError 01"))!= NULL) {
     char errorBuf[12];
     OTcurrentSystemState.error01++;
     OTGWDebugTf(PSTR("\r\nError 01 = %d\r\n"),OTcurrentSystemState.error01);
     snprintf_P(errorBuf, sizeof(errorBuf), PSTR("%u"), OTcurrentSystemState.error01);
     sendMQTTData(F("Error 01"), errorBuf);
+    snprintf_P(cMsg, sizeof(cMsg), PSTR("Error 01 [%u]"), OTcurrentSystemState.error01);
+    sendEventToWebSocket('!', cMsg);
   } else if (strstr_P(buf, PSTR("Error 02"))!= NULL) {
     char errorBuf[12];
     OTcurrentSystemState.error02++;
     OTGWDebugTf(PSTR("\r\nError 02 = %d\r\n"),OTcurrentSystemState.error02);
     snprintf_P(errorBuf, sizeof(errorBuf), PSTR("%u"), OTcurrentSystemState.error02);
     sendMQTTData(F("Error 02"), errorBuf);
+    snprintf_P(cMsg, sizeof(cMsg), PSTR("Error 02 [%u]"), OTcurrentSystemState.error02);
+    sendEventToWebSocket('!', cMsg);
   } else if (strstr_P(buf, PSTR("Error 03"))!= NULL) {
     char errorBuf[12];
     OTcurrentSystemState.error03++;
     OTGWDebugTf(PSTR("\r\nError 03 = %d\r\n"),OTcurrentSystemState.error03);
     snprintf_P(errorBuf, sizeof(errorBuf), PSTR("%u"), OTcurrentSystemState.error03);
     sendMQTTData(F("Error 03"), errorBuf);
+    snprintf_P(cMsg, sizeof(cMsg), PSTR("Error 03 [%u]"), OTcurrentSystemState.error03);
+    sendEventToWebSocket('!', cMsg);
   } else if (strstr_P(buf, PSTR("Error 04"))!= NULL){
     char errorBuf[12];
     OTcurrentSystemState.error04++;
     OTGWDebugTf(PSTR("\r\nError 04 = %d\r\n"),OTcurrentSystemState.error04);
     snprintf_P(errorBuf, sizeof(errorBuf), PSTR("%u"), OTcurrentSystemState.error04);
     sendMQTTData(F("Error 04"), errorBuf);
+    snprintf_P(cMsg, sizeof(cMsg), PSTR("Error 04 [%u]"), OTcurrentSystemState.error04);
+    sendEventToWebSocket('!', cMsg);
   } else if (strstr(buf, OTGW_BANNER)!=NULL){
     //found a banner, so get the version of PIC
     strlcpy(sPICfwversion, OTGWSerial.firmwareVersion(), sizeof(sPICfwversion));
     OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), sPICfwversion);
     strlcpy(sPICdeviceid, OTGWSerial.processorToString().c_str(), sizeof(sPICdeviceid));
-    OTGWDebugTf(PSTR("Current device id: %s\r\n"), sPICdeviceid);    
+    OTGWDebugTf(PSTR("Current device id: %s\r\n"), sPICdeviceid);
     strlcpy(sPICtype, OTGWSerial.firmwareToString().c_str(), sizeof(sPICtype));
     OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), sPICtype);
+    snprintf_P(cMsg, sizeof(cMsg), PSTR("OTGW PIC restarted [%s]"), sPICfwversion);
+    sendEventToWebSocket('*', cMsg);
   } else if ((strchr(buf, '=') != nullptr) && (strchr(buf, ':') == nullptr)) {
     // Summary key/value lines are emitted by PS=1 mode.
     // Detect this even when PS=1 was enabled externally (e.g. Domoticz classic plugin),
