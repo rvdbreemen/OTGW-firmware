@@ -38,6 +38,34 @@ constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
 constexpr size_t  MQTT_MSG_MAX_LEN = 1200;
 constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 1200;
 
+struct MQTTAutoConfigBuffers {
+  char line[MQTT_CFG_LINE_MAX_LEN];
+  char topic[MQTT_TOPIC_MAX_LEN];
+  char msg[MQTT_MSG_MAX_LEN];
+};
+
+// Shared autoconfig workspace for both autoconfig code paths.
+// This keeps only one persistent buffer set in RAM.
+static MQTTAutoConfigBuffers mqttAutoConfigBuffers;
+
+// Guard shared MQTT autoconfig buffers against accidental re-entry.
+// Current firmware is effectively single-threaded, but this protects future
+// callback/timer refactors from clobbering the shared workspace.
+static bool mqttAutoConfigInProgress = false;
+
+struct MQTTAutoConfigSessionLock {
+  bool locked = false;
+  MQTTAutoConfigSessionLock() {
+    if (!mqttAutoConfigInProgress) {
+      mqttAutoConfigInProgress = true;
+      locked = true;
+    }
+  }
+  ~MQTTAutoConfigSessionLock() {
+    if (locked) mqttAutoConfigInProgress = false;
+  }
+};
+
 static            PubSubClient MQTTclient(wifiClient);
 
 int8_t            reconnectAttempts = 0;
@@ -783,84 +811,93 @@ void clearMQTTConfigDone()
 }
 //===========================================================================================
 void doAutoConfigure(bool bForceAll){
-  // Option B: Function-Local Static Buffers (Zero Heap Allocation)
-  // Eliminates 2600 bytes transient heap allocation, adds 2600 bytes permanent static
-  // No mutex needed - function naturally non-reentrant
-  
+  // Use shared static buffers (zero heap allocation, single RAM reservation).
+  // Lock scope is limited to the file-parse/publish loop so it is released
+  // before configSensors() is called.  configSensors() -> sensorAutoConfigure()
+  // -> doAutoConfigureMsgid() can then acquire the lock independently.
+
   if (!settingMQTTenable) return;
 
-  // Function-local static buffers - allocated once, reused across calls
-  static char sLine[MQTT_CFG_LINE_MAX_LEN];
-  static char sTopic[MQTT_TOPIC_MAX_LEN];
-  static char sMsg[MQTT_MSG_MAX_LEN];
-
-  // 2. Open File ONCE
-  LittleFS.begin();
-  if (!LittleFS.exists(F("/mqttha.cfg"))) {
-    DebugTln(F("Error: configuration file not found.")); 
-    return;
-  } 
-
-  File fh = LittleFS.open(F("/mqttha.cfg"), "r");
-  if (!fh) {
-    DebugTln(F("Error: could not open configuration file.")); 
-    return;
-  } 
-
-  byte lineID = 0;
-  
-  // 3. Loop through file once
-  while (fh.available()) {
-    feedWatchDog(); // Keep the dog happy during IO
-    
-    // Read line
-    size_t len = fh.readBytesUntil('\n', sLine, MQTT_CFG_LINE_MAX_LEN - 1);
-    sLine[len] = '\0';
-    
-    // Parse Line
-    if (!splitLine(sLine, ';', lineID, sTopic, MQTT_TOPIC_MAX_LEN, sMsg, MQTT_MSG_MAX_LEN)) continue;
-
-    // 4. Decision: Do we send this line?
-    // Skip Dallas sensors - they need per-sensor addresses from configSensors()
-    if (lineID == OTGWdallasdataid) continue;
-
-    if (bForceAll || !getMQTTConfigDone(lineID)) {
-
-       MQTTDebugTf(PSTR("Processing AutoConfig for ID %d\r\n"), lineID);
-
-       // --- Perform Replacements (Topic & Msg) ---
-       if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settingMQTThaprefix))) continue;
-       if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%node_id%", NodeId)) continue;
-       if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%sensor_id%", "")) continue;
-
-       if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%node_id%", NodeId)) continue;
-       if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%sensor_id%", "")) continue;
-       if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%hostname%", CSTR(settingHostname))) continue;
-       if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%version%", _VERSION)) continue;
-       if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_pub_topic%", MQTTPubNamespace)) continue;
-       if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_sub_topic%", MQTTSubNamespace)) continue;
-
-       // Static buffer strategy: use MQTT streaming with fixed 1350-byte buffer
-       // No dynamic resizing - streaming handles arbitrarily large messages efficiently
-       size_t msgLen = strlen(sMsg);
-
-       // Send retained message (uses beginPublish/write/endPublish streaming)
-       sendMQTTStreaming(sTopic, sMsg, msgLen);
-       setMQTTConfigDone(lineID);
-
-       doBackgroundTasks(); // Yield to network stack
+  {
+    // Lock released at end of this block, before configSensors() is called.
+    MQTTAutoConfigSessionLock sessionLock;
+    if (!sessionLock.locked) {
+      MQTTDebugTln(F("MQTT autoconfig already running, skipping doAutoConfigure()"));
+      return;
     }
-  }
 
-  fh.close();
-  
-  // Note: No buffer cleanup needed - static buffers persist across calls
-  // resetMQTTBufferSize() is a no-op for static buffer strategy
-  resetMQTTBufferSize();
-  
+    char *sLine = mqttAutoConfigBuffers.line;
+    char *sTopic = mqttAutoConfigBuffers.topic;
+    char *sMsg = mqttAutoConfigBuffers.msg;
+
+    // 2. Open File ONCE
+    LittleFS.begin();
+    if (!LittleFS.exists(F("/mqttha.cfg"))) {
+      DebugTln(F("Error: configuration file not found.")); 
+      return;
+    } 
+
+    File fh = LittleFS.open(F("/mqttha.cfg"), "r");
+    if (!fh) {
+      DebugTln(F("Error: could not open configuration file.")); 
+      return;
+    } 
+
+    byte lineID = 0;
+    
+    // 3. Loop through file once
+    while (fh.available()) {
+      feedWatchDog(); // Keep the dog happy during IO
+      
+      // Read line
+      size_t len = fh.readBytesUntil('\n', sLine, MQTT_CFG_LINE_MAX_LEN - 1);
+      sLine[len] = '\0';
+      
+      // Parse Line
+      if (!splitLine(sLine, ';', lineID, sTopic, MQTT_TOPIC_MAX_LEN, sMsg, MQTT_MSG_MAX_LEN)) continue;
+
+      // 4. Decision: Do we send this line?
+      // Skip Dallas sensors - they need per-sensor addresses from configSensors()
+      if (lineID == OTGWdallasdataid) continue;
+
+      if (bForceAll || !getMQTTConfigDone(lineID)) {
+
+         MQTTDebugTf(PSTR("Processing AutoConfig for ID %d\r\n"), lineID);
+
+         // --- Perform Replacements (Topic & Msg) ---
+         if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settingMQTThaprefix))) continue;
+         if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%node_id%", NodeId)) continue;
+         if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%sensor_id%", "")) continue;
+
+         if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%node_id%", NodeId)) continue;
+         if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%sensor_id%", "")) continue;
+         if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%hostname%", CSTR(settingHostname))) continue;
+         if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%version%", _VERSION)) continue;
+         if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_pub_topic%", MQTTPubNamespace)) continue;
+         if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_sub_topic%", MQTTSubNamespace)) continue;
+
+         // Static buffer strategy: use MQTT streaming with fixed 1350-byte buffer
+         // No dynamic resizing - streaming handles arbitrarily large messages efficiently
+         size_t msgLen = strlen(sMsg);
+
+         // Send retained message (uses beginPublish/write/endPublish streaming)
+         sendMQTTStreaming(sTopic, sMsg, msgLen);
+         setMQTTConfigDone(lineID);
+
+         doBackgroundTasks(); // Yield to network stack
+      }
+    }
+
+    fh.close();
+    
+    // Note: No buffer cleanup needed - static buffers persist across calls
+    // resetMQTTBufferSize() is a no-op for static buffer strategy
+    resetMQTTBufferSize();
+  } // Lock released here - configSensors() can now acquire it independently
+
   // Trigger Dallas configuration separately as it requires specific sensor addresses
   if (settingMQTTenable && (bForceAll || !getMQTTConfigDone(OTGWdallasdataid))) {
-      configSensors();
+    configSensors();
   }
 }
 //===========================================================================================
@@ -879,7 +916,12 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
 {
   bool _result = false;
   const char *sensorId = (cfgSensorId != nullptr) ? cfgSensorId : "";
-  
+
+  MQTTAutoConfigSessionLock sessionLock;
+  if (!sessionLock.locked) {
+    MQTTDebugTln(F("MQTT autoconfig already running, skipping doAutoConfigureMsgid()"));
+    return _result;
+  }
   if (!settingMQTTenable) {
     return _result;
   }
@@ -892,12 +934,10 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
     return _result;
   } 
 
-  // Option B: Function-Local Static Buffers (Zero Heap Allocation)
-  // Single static buffer partitioned into 3 regions - allocated once, reused across calls
-  static char buffer[MQTT_MSG_MAX_LEN + MQTT_TOPIC_MAX_LEN + MQTT_CFG_LINE_MAX_LEN];
-  char* sMsg   = buffer;
-  char* sTopic = sMsg + MQTT_MSG_MAX_LEN;
-  char* sLine  = sTopic + MQTT_TOPIC_MAX_LEN;
+  // Shared static buffers with doAutoConfigure() to avoid duplicate persistent RAM usage
+  char *sLine = mqttAutoConfigBuffers.line;
+  char *sTopic = mqttAutoConfigBuffers.topic;
+  char *sMsg = mqttAutoConfigBuffers.msg;
   byte lineID = 39; // 39 is unused in OT protocol so is a safe value
 
   //Let's open the MQTT autoconfig file
@@ -920,8 +960,10 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
   //Lets go read the config and send it out to MQTT line by line
   while (fh.available())
   {
+    // Explicitly clear reused shared buffers each iteration for robustness.
     memset(sTopic, 0, MQTT_TOPIC_MAX_LEN);
     memset(sMsg, 0, MQTT_MSG_MAX_LEN);
+
     //read file line by line, split and send to MQTT (topic, msg)
     feedWatchDog(); //start with feeding the dog
     
