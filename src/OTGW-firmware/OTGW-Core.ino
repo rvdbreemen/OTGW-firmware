@@ -1525,10 +1525,17 @@ void sendOTGW(const char* buf, int len)
     OTGWDebug(F("] (")); OTGWDebug(len); OTGWDebug(F(")")); OTGWDebugln();
         
     //write buffer to serial
-    OTGWSerial.write(buf, len);         
+    OTGWSerial.write(buf, len);
     OTGWSerial.write('\r');
-    OTGWSerial.write('\n');            
-    OTGWSerial.flush(); 
+    OTGWSerial.write('\n');
+    OTGWSerial.flush();
+    // Log sent command to WebSocket
+    ClrLog();
+    AddLog(getOTLogTimestamp());
+    AddLogf(" > %.*s", len, buf);
+    AddLogln();
+    sendLogToWebSocket(ot_log_buffer);
+    ClrLog();
   } else OTGWDebugln(F("Error: Write buffer not big enough!"));
 }
 
@@ -1861,6 +1868,13 @@ void processOT(const char *buf, int len){
     checkOTGWcmdqueue(buf, len);
     Debugln(buf);
     sendMQTTData(F("event_report"), buf);
+    // Log command response to WebSocket
+    ClrLog();
+    AddLog(getOTLogTimestamp());
+    AddLogf(" < %.*s", len, buf);
+    AddLogln();
+    sendLogToWebSocket(ot_log_buffer);
+    ClrLog();
   } else if (strcmp_P(buf, PSTR("NG")) == 0) {
     Debugln(F("NG - No Good. The command code is unknown."));
     sendMQTTData(F("event_report"), F("NG - No Good. The command code is unknown."));
