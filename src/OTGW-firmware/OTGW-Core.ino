@@ -1974,6 +1974,7 @@ void handleOTGW()
   static size_t bytes_read = 0;
   static size_t bytes_write = 0;
   static bool discardCurrentReadLine = false;
+  static uint32_t droppedReadLines = 0;
   static uint8_t outByte;
 
   //Handle incoming data from OTGW through serial port (READ BUFFER)
@@ -1988,6 +1989,12 @@ void handleOTGW()
     outByte = OTGWSerial.read();
     if (outByte == '\r' || outByte == '\n') {
       if ((bytes_read == 0) && !discardCurrentReadLine) continue;
+
+      if (discardCurrentReadLine) {
+        droppedReadLines++;
+        DebugTf(PSTR("Serial line dropped after overflow. Dropped lines total: %lu\r\n"),
+                static_cast<unsigned long>(droppedReadLines));
+      }
 
       if (!discardCurrentReadLine) {
         blinkLEDnow(LED2);
