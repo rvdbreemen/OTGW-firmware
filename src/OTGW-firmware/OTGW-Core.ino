@@ -1607,6 +1607,7 @@ void processOT(const char *buf, int len){
       bPSmode = false;
       sMessage[0] = '\0';
       OTGWDebugTln(F("PS mode auto-detected as OFF (raw OT stream resumed)"));
+      sendEventToWebSocket_P('*', PSTR("PS=0 [auto-detected, raw mode resumed]"));
     }
 
     //OT protocol messages are 9 chars long
@@ -2076,8 +2077,10 @@ void handleOTGW()
     } else {
       // Buffer overflow detected - discard this complete line and log error
       OTcurrentSystemState.errorBufferOverflow++;
-      DebugTf(PSTR("Serial Buffer Overflow! Discarding %d bytes. Total overflows: %d\r\n"), 
+      DebugTf(PSTR("Serial Buffer Overflow! Discarding %d bytes. Total overflows: %d\r\n"),
               bytes_read, OTcurrentSystemState.errorBufferOverflow);
+      snprintf_P(cMsg, sizeof(cMsg), PSTR("Serial overflow [%u]"), OTcurrentSystemState.errorBufferOverflow);
+      sendEventToWebSocket('!', cMsg);
       // Rate limit MQTT notifications - only send every 10 overflows to avoid overwhelming broker
       static uint8_t overflowsSinceLastReport = 0;
       overflowsSinceLastReport++;
@@ -2101,10 +2104,12 @@ void handleOTGW()
     { //on CR, do something...
       sWrite[bytes_write] = 0;
       OTGWDebugTf(PSTR("Net2Ser: Sending to OTGW: [%s] (%d)\r\n"), sWrite, bytes_write);
+      if (bytes_write > 0) sendEventToWebSocket('>', sWrite); // log every ser2net command
       //check for reset command
       if (strcmp_P(sWrite, PSTR("GW=R"))==0){
         //detected [GW=R], then reset the gateway the gpio way
         OTGWDebugTln(F("Detected: GW=R. Reset gateway command executed."));
+        sendEventToWebSocket_P('!', PSTR("GW=R [reset]"));
         resetOTGW();
       } else if (strcasecmp_P(sWrite, PSTR("PS=1"))==0) {
         //detected [PS=1], then PrintSummary mode = true --> From this point on you need to ask for summary.
@@ -2114,10 +2119,12 @@ void handleOTGW()
           msglastupdated[i] = 0; //clear epoch values
         }
         strlcpy(sMessage, "PS=1 mode; No UI updates.", sizeof(sMessage));
+        sendEventToWebSocket_P('*', PSTR("PS=1 [print summary mode]"));
       } else if (strcasecmp_P(sWrite, PSTR("PS=0"))==0) {
         //detected [PS=0], then PrintSummary mode = OFF --> Raw mode is turned on again.
         bPSmode = false;
         sMessage[0] = '\0';
+        sendEventToWebSocket_P('*', PSTR("PS=0 [raw mode]"));
       }
       bytes_write = 0; //start next line
     } else if  (outByte == '\n')
