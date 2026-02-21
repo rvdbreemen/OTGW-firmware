@@ -170,6 +170,7 @@ void sendtimecommand(){
   if (!bPICavailable) return;           // only send when pic is available
   if (OTGWSerial.firmwareType() != FIRMWARE_OTGW) return; //only send timecommand when in gateway firmware, not in diagnostic or interface mode
 
+  DebugTln(F("Minute changed, sending time command to OTGW"));
   //send time command to OTGW
   //send time / weekday
   time_t now = time(nullptr);
@@ -309,7 +310,6 @@ void doTaskMinuteChanged(){
   if (WiFi.status() != WL_CONNECTED) {
     restartWifi();
   }
-  DebugTln(F("Minute changed, sending time command to OTGW"));
   sendtimecommand();
 }
 
