@@ -198,6 +198,33 @@ function parseGatewayModeValue(modeValue) {
   return null;
 }
 
+function formatGatewayModeDisplayValue(modeValue) {
+  const parsedMode = parseGatewayModeValue(modeValue);
+  if (parsedMode === 'gateway') return 'Gateway';
+  if (parsedMode === 'monitor') return 'Monitor';
+  if (parsedMode === 'detecting') return 'Detecting...';
+  return modeValue;
+}
+
+function formatDeviceInfoLabel(key) {
+  return translateToHuman(key);
+}
+
+const deviceInfoValueFormatters = {
+  otgwmode: formatGatewayModeDisplayValue
+};
+
+function formatDeviceInfoValue(key, value) {
+  if (typeof key !== 'string') return value;
+
+  const normalizedKey = key.trim().toLowerCase();
+  const formatter = deviceInfoValueFormatters[normalizedKey];
+  if (typeof formatter === 'function') {
+    return formatter(value);
+  }
+  return value;
+}
+
 // Apply a parsed gateway mode value to the indicator.
 // 'gateway'/'monitor' → update last-known and indicator.
 // 'detecting'         → show detecting, keep last-known unchanged.
@@ -2986,13 +3013,8 @@ function refreshDeviceInfo() {
       const device = json.device || {};
       for (let key in device) {
         console.log("[" + key + "]=>[" + device[key] + "]");
-        let displayValue = device[key];
-        if (key === 'otgwmode') {
-          const parsedMode = parseGatewayModeValue(device[key]);
-          if (parsedMode === 'gateway') displayValue = 'Gateway';
-          else if (parsedMode === 'monitor') displayValue = 'Monitor';
-          else displayValue = 'Detecting...';
-        }
+        const displayLabel = formatDeviceInfoLabel(key);
+        const displayValue = formatDeviceInfoValue(key, device[key]);
         var deviceinfoPage = document.getElementById('deviceinfoPage');
         if ((document.getElementById("devinfo_" + key)) == null) { // if element does not exists yet, then build page
           var rowDiv = document.createElement("div");
@@ -3001,7 +3023,7 @@ function refreshDeviceInfo() {
           //--- field Name ---
           var fldDiv = document.createElement("div");
           fldDiv.setAttribute("class", "devinfocolumn1");
-          fldDiv.textContent = translateToHuman(key);
+          fldDiv.textContent = displayLabel;
           rowDiv.appendChild(fldDiv);
           //--- value on screen ---
           var valDiv = document.createElement("div");
@@ -3011,7 +3033,9 @@ function refreshDeviceInfo() {
           deviceinfoPage.appendChild(rowDiv);
         } else {
           const existingRow = document.getElementById("devinfo_" + key);
+          const labelEl = existingRow ? existingRow.querySelector('.devinfocolumn1') : null;
           const valueEl = existingRow ? existingRow.querySelector('.devinfocolumn2') : null;
+          if (labelEl) labelEl.textContent = displayLabel;
           if (valueEl) valueEl.textContent = displayValue;
         }
       }
@@ -3247,12 +3271,27 @@ function sendPostSetting(field, value) {
 
 //============================================================================  
 function translateToHuman(longName) {
+  if (typeof longName === 'string') {
+    longName = longName.trim();
+  }
   //for(var index = 0; index < (translateFields.length -1); index++) 
   for (var index = 0; index < translateFields.length; index++) {
     if (translateFields[index][0] == longName) {
       return translateFields[index][1];
     }
   };
+
+  // Fallback to a case-insensitive lookup so table labels stay human-readable
+  // even if the API key casing varies.
+  if (typeof longName === 'string') {
+    const normalizedName = longName.toLowerCase();
+    for (var idx = 0; idx < translateFields.length; idx++) {
+      const fieldKey = translateFields[idx][0];
+      if (typeof fieldKey === 'string' && fieldKey.trim().toLowerCase() == normalizedName) {
+        return translateFields[idx][1];
+      }
+    }
+  }
   return longName;
 
 } // translateToHuman()
