@@ -64,9 +64,9 @@ Version `1.2.0-beta` (branch line `dev-1.2.0-stable-version`) builds on the `dev
 ### New configurable source-separated MQTT publishing (Issue #143)
 
 - Added `MQTTseparatesources` setting (REST + persisted settings support).
-- Firmware can publish source-suffixed topics per OpenTherm source (`_thermostat`, `_boiler`, `_gateway`) while retaining legacy unsuffixed topics for compatibility.
-- HA discovery generation now supports source-specific templates (`%source_suffix%`, `%source_name%`) for split entities when enabled.
-- MQTT publish helpers were refactored for clearer source suffix resolution and safer reuse.
+- Firmware can publish source-specific topics per OpenTherm source using nested paths (`<metric>/thermostat`, `<metric>/boiler`, `<metric>/gateway`) while retaining legacy unsuffixed topics for compatibility.
+- HA discovery generation supports source-specific templates (`%source_suffix%`, `%source_topic_segment%`, `%source_name%`) for split entities when enabled.
+- MQTT publish helpers were refactored for clearer source mapping resolution and safer reuse.
 
 ### MQTT auto-configuration robustness (HA discovery)
 
@@ -155,12 +155,23 @@ Manual MQTT consumers and older HA entities may need updates:
 - `RelativeHumidity_hb_u8` / `RelativeHumidity_lb_u8` (legacy split-byte decoding) -> `RelativeHumidity` canonical `f8.8` payload
 - HA discovery `FanSpeed` (`rpm`) -> `FanSpeed_setpoint_hz` + `FanSpeed_actual_hz` (`Hz`)
 - Legacy IDs `50-63` now suppressed on v4.x systems in default `AUTO` compatibility mode
+- Source-specific MQTT and HA discovery paths now use nested `<metric>/<source>` segments instead of `<metric>_<source>`
+
+Example source-path migrations (when `mqttseparatesources=true`):
+
+| Previous source-specific topic/path | New topic/path |
+|-----------|-----------|
+| `.../value/<node>/TSet_thermostat` | `.../value/<node>/TSet/thermostat` |
+| `.../value/<node>/Tr_boiler` | `.../value/<node>/Tr/boiler` |
+| `.../value/<node>/Toutside_gateway` | `.../value/<node>/Toutside/gateway` |
+| `homeassistant/sensor/<node>/MaxRelModLevelSetting_thermostat/config` | `homeassistant/sensor/<node>/MaxRelModLevelSetting/thermostat/config` |
 
 Compatibility retained:
 
 - IDs `71`, `77`, `78`, `87` keep `_hb_u8` / `_lb_u8` alias topics alongside spec-correct base topics.
 - IDs `98`, `99` keep raw byte alias topics and add semantic decoded topics.
-- Legacy unsuffixed MQTT topics remain published when source separation is enabled (source-suffixed topics are additive).
+- Legacy unsuffixed MQTT topics remain published when source separation is enabled (source-specific topics are additive).
+- Source-specific `uniq_id` values remain suffix-based (for example `...-TSet_thermostat`) to reduce HA entity-registry churn after rediscovery.
 
 ### Device info API payload changes (raw consumers)
 
@@ -173,11 +184,13 @@ If you parse device info JSON directly (instead of the Web UI), update these key
 
 ### After upgrading
 
-1. Trigger MQTT auto-discovery again (especially if using HA entities for `FanSpeed` or v4.2-affected IDs).
-2. Remove stale HA entities linked to typo topics and old `FanSpeed` discovery.
-3. Update manual MQTT automations/sensors to new topic names and payload formats.
-4. If you rely on legacy IDs `50-63`, confirm the system is truly pre-v4.2.
-5. If custom tooling reads `/api/.../device/info`, update field names to `otgwmode` and `wifiquality_text`.
+1. Clear retained MQTT discovery topics (`homeassistant/.../config`) for this device/prefix if you previously used source-separated topics; older retained paths can remain visible after upgrade.
+2. Optionally clear retained legacy source-specific value topics (underscore format) if you no longer need them in MQTT Explorer/history views.
+3. Trigger MQTT auto-discovery again (especially if using HA entities for `FanSpeed`, source-separated entities, or v4.2-affected IDs).
+4. Remove stale HA entities linked to typo topics, old `FanSpeed` discovery, or old source-specific discovery paths.
+5. Update manual MQTT automations/sensors to new topic names and payload formats (including nested source paths such as `TSet/thermostat`).
+6. If you rely on legacy IDs `50-63`, confirm the system is truly pre-v4.2.
+7. If custom tooling reads `/api/.../device/info`, update field names to `otgwmode` and `wifiquality_text`.
 
 Detailed OpenTherm MQTT/HA migration guidance: `docs/fixes/opentherm-v42-mqtt-breaking-changes.md`
 
