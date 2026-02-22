@@ -164,7 +164,9 @@ Publish state information of PIC firmware version information to MQTT broker.
 void sendMQTTstateinformation(){
   sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(bOTGWboilerstate)); 
   sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(bOTGWthermostatstate));
-  sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(bOTGWgatewaystate));
+  if (bOTGWgatewaystateKnown) {
+    sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(bOTGWgatewaystate));
+  }
   sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(bOTGWonline));
   sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(bOTGWonline));
 }
