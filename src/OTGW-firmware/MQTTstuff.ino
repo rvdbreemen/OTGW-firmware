@@ -778,7 +778,7 @@ static bool resolveSourceIndex(byte rsptype, uint8_t &sourceIndex) {
   }
 }
 
-static bool copySourceTableEntry(const char* const table[] PROGMEM, uint8_t sourceIndex, char *dest, size_t destSize)
+static bool copySourceTableEntry(const char* const table[], uint8_t sourceIndex, char *dest, size_t destSize)
 {
   if (!dest || destSize == 0 || sourceIndex >= 3) return false;
   PGM_P pValue = (PGM_P)pgm_read_ptr(&table[sourceIndex]);
