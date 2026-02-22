@@ -199,7 +199,7 @@ function updateGatewayModeFromDevInfoEntries(entries) {
   let modeValue = null;
 
   for (let i = 0; i < entries.length; i++) {
-    if (entries[i].name === 'mode') {
+    if (entries[i].name === 'otgwmode') {
       modeValue = entries[i].value;
       break;
     }
@@ -239,7 +239,7 @@ function refreshGatewayMode(force) {
     })
     .then(json => {
       const device = (json && json.device) ? json.device : {};
-      const parsedMode = parseGatewayModeValue(device.mode);
+      const parsedMode = parseGatewayModeValue(device.otgwmode);
       if (parsedMode) {
         gatewayModeLastKnown = parsedMode;
         updateGatewayModeIndicator(parsedMode);
@@ -2763,7 +2763,7 @@ function refreshDevInfo() {
       const ipaddress = device.ipaddress || "";
       const version = device.fwversion || "";
 
-      const parsedMode = parseGatewayModeValue(device.mode);
+      const parsedMode = parseGatewayModeValue(device.otgwmode);
       if (parsedMode) {
         gatewayModeLastKnown = parsedMode;
         updateGatewayModeIndicator(parsedMode);
@@ -3004,7 +3004,7 @@ function refreshDeviceInfo() {
       for (let key in device) {
         console.log("[" + key + "]=>[" + device[key] + "]");
         let displayValue = device[key];
-        if (key === 'mode') {
+        if (key === 'otgwmode') {
           const parsedMode = parseGatewayModeValue(device[key]);
           if (parsedMode === 'gateway') displayValue = 'Gateway';
           else if (parsedMode === 'monitor') displayValue = 'Monitor';
@@ -3396,6 +3396,7 @@ var translateFields = [
   , ["ssid", "Wifi Network (SSID)"]
   , ["wifirssi", "Wifi RX Power (dBm)"]
   , ["wifiquality", "Wifi Quality (%)"]
+  , ["wifiquality_text", "Wifi Quality"]
   , ["wifiqualitytldr", "Wifi Quality"]
   , ["lastreset", "Last Reset Reason"]
   , ["mqttconnected", "MQTT Connected"]
@@ -3428,7 +3429,7 @@ var translateFields = [
   , ["otgwcommands", "Boot Command"]
   , ["thermostatconnected", "Thermostat Connected"]
   , ["boilerconnected", "Boiler Connected"]
-  , ["mode", "Gateway Mode"]
+  , ["otgwmode", "Gateway Mode"]
   , ["otgwconnected", "HA Integration"]
   , ["gpiooutputsenabled", "GPIO Output Enabled"]
   , ["gpiooutputspin", "GPIO pin # to switch on/off"]
