@@ -18,8 +18,10 @@ Version 1.2.0-beta focuses on OpenTherm v4.2 message-map alignment, runtime safe
 
 - **OpenTherm message-map updates (v4.2 alignment)**
   - Added missing message IDs: 39, 93-97.
-  - Corrected R/W directions for IDs: 27, 37, 38, 98, 99, 109, 110, 112, 124, 126.
+  - Corrected R/W directions for IDs: 4, 27, 37, 38, 98, 99, 109, 110, 112, 124, 126.
+  - Corrected v4.2 data type / byte handling for IDs 38, 71, 77, 78, 87, 98, and 99.
   - Corrected data representation for FanSpeed (ID 35: `u8/u8`, unit `Hz`) and DHWFlowRate unit (`l/min`).
+  - Added v4.x reserved-ID handling for legacy pre-v4.2 IDs `50-63` (kept for legacy systems, suppressed on v4.x systems in default `AUTO` mode).
 - **Runtime safety hardening**
   - Added bounds checks before OT map lookups in both `processOT()` and REST value lookup.
   - Kept last-update array aligned with full `uint8_t` message-id range (`0-255`).
@@ -31,19 +33,39 @@ Version 1.2.0-beta focuses on OpenTherm v4.2 message-map alignment, runtime safe
   - Topic typo fix: `eletric_production` -> `electric_production` (including HA auto-discovery entry).
   - Topic typo fix: `solar_storage_slave_fault_incidator` -> `solar_storage_slave_fault_indicator`.
   - Display label typo fix: `Diagonostic_Indicator` -> `Diagnostic_Indicator`.
+  - Fixed HA discovery mapping for `vh_configuration_*` to use message ID `74` (not `70`).
+  - Fixed `Hcratio` HA discovery `stat_t` topic (`Hcratio`, not `DHWFlowRate`).
+  - Replaced broken HA `FanSpeed` entity with spec-aligned split sensors (`FanSpeed_setpoint_hz`, `FanSpeed_actual_hz`) using `Hz`.
+  - MQTT output for v4.2 single-byte IDs now publishes canonical base topics (with legacy `_hb_u8` / `_lb_u8` aliases retained where applicable).
 - **Repository cleanup**
   - Removed accidental artifact file `tmpclaude-ecc0-cwd`.
 
 ### ⚠️ Migration impact
 
-The following MQTT topic renames are breaking for manual MQTT sensors/automations:
+This release contains MQTT/HA breaking changes in addition to typo fixes. Full migration details: [docs/fixes/opentherm-v42-mqtt-breaking-changes.md](docs/fixes/opentherm-v42-mqtt-breaking-changes.md)
 
-| Old Topic | New Topic |
+Breaking changes for manual MQTT sensors/automations:
+
+| Previous behavior | v1.2.0-beta behavior |
 |-----------|-----------|
-| `eletric_production` | `electric_production` |
-| `solar_storage_slave_fault_incidator` | `solar_storage_slave_fault_indicator` |
+| `eletric_production` topic | `electric_production` |
+| `solar_storage_slave_fault_incidator` topic | `solar_storage_slave_fault_indicator` |
+| `RelativeHumidity_hb_u8` / `RelativeHumidity_lb_u8` (ID 38 decoded as `u8/u8`) | `RelativeHumidity` publishes v4.2 `f8.8` value |
+| HA discovery entity `FanSpeed` (`rpm`) | HA discovery now creates `FanSpeed_setpoint_hz` and `FanSpeed_actual_hz` (`Hz`) |
+| Legacy IDs `50-63` always decoded/published | Legacy IDs `50-63` suppressed on v4.x systems in default `AUTO` mode (reserved in v4.2) |
 
-After upgrading, remove stale entities in Home Assistant (old topics become unavailable) and refresh discovery.
+Compatibility notes:
+
+- IDs `71`, `77`, `78`, and `87` now publish spec-correct single-byte base topics and also keep legacy `_hb_u8` / `_lb_u8` alias topics.
+- IDs `98` and `99` keep raw byte alias topics and add semantic MQTT topics for decoded fields (RF sensor status / remote override operating mode).
+- Legacy IDs `50-63` remain available for actual pre-v4.2 systems.
+
+After upgrading:
+
+1. Remove stale Home Assistant entities (especially old `FanSpeed` and typo-topic entities).
+2. Trigger MQTT auto-discovery again.
+3. Update manual MQTT automations/sensors to the new topic names and payload formats.
+4. If you depend on legacy IDs `50-63`, confirm your device is truly pre-v4.2; v4.x devices now suppress those IDs by default.
 
 ---
 
@@ -348,6 +370,7 @@ There are two ways to integrate with Home Assistant:
 
 ## Important warnings / breaking changes
 
+- **Breaking changes (v1.2.0-beta):** OpenTherm v4.2 MQTT/HA alignment updates include `FanSpeed` HA entity split (`setpoint/actual`, `Hz`), `RelativeHumidity` payload format correction, and suppression of legacy IDs `50-63` on v4.x systems in default `AUTO` mode. See [docs/fixes/opentherm-v42-mqtt-breaking-changes.md](docs/fixes/opentherm-v42-mqtt-breaking-changes.md).
 - **Breaking change (v1.0.0):** Default GPIO pin for Dallas temperature sensors changed from **GPIO 13 (D7)** to **GPIO 10 (SD3)**. This aligns with the OTGW hardware default. If you're upgrading from a previous version and have sensors connected to GPIO 13, you'll need to either:
   - Reconnect your sensors to GPIO 10, OR
   - Change the GPIO pin setting back to 13 in the Settings page
@@ -367,7 +390,7 @@ For release artifacts, see <https://github.com/rvdbreemen/OTGW-firmware/releases
 
 | Version | Release notes |
 | --- | --- |
-| 1.2.0-beta | **Focus**: OpenTherm v4.2 alignment, runtime hardening, MQTT/HA discovery corrections.<br>**Protocol map**: Added IDs 39 and 93-97; corrected R/W direction for IDs 27, 37, 38, 98, 99, 109, 110, 112, 124, 126; corrected FanSpeed representation (ID 35, `u8/u8`, `Hz`) and DHWFlowRate unit (`l/min`).<br>**Safety**: Added OT map bounds checks in parser and REST paths; unknown IDs now handled with safe fallback metadata.<br>**MQTT/HA**: Fixed topics `eletric_production` -> `electric_production`, `solar_storage_slave_fault_incidator` -> `solar_storage_slave_fault_indicator`, plus `Diagnostic_Indicator` display typo fix.<br>**Cleanup**: Removed accidental repository artifact `tmpclaude-ecc0-cwd`.<br>**Migration**: Update manual MQTT automations for renamed topics and clean up stale HA entities.<br>Full notes: [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md) |
+| 1.2.0-beta | **Focus**: OpenTherm v4.2 alignment, runtime hardening, MQTT/HA discovery corrections.<br>**Protocol map**: Added IDs 39 and 93-97; corrected R/W direction for IDs 4, 27, 37, 38, 98, 99, 109, 110, 112, 124, 126; fixed v4.2 type/byte handling for IDs 38, 71, 77, 78, 87, 98, 99; added legacy ID `50-63` compatibility profile (v4.x reserved-ID suppression in `AUTO`).<br>**Safety**: Added OT map bounds checks in parser and REST paths; unknown IDs now handled with safe fallback metadata.<br>**MQTT/HA**: Fixed typo topics (`electric_production`, solar storage fault), corrected `vh_configuration_*` discovery ID mapping and `Hcratio` discovery state topic, split `FanSpeed` HA discovery into setpoint/actual (`Hz`), and aligned MQTT topic publishing for affected v4.2 IDs.<br>**Cleanup**: Removed accidental repository artifact `tmpclaude-ecc0-cwd`.<br>**Migration**: Manual MQTT/HA users must review `RelativeHumidity`, `FanSpeed`, and legacy IDs `50-63` behavior; see `docs/fixes/opentherm-v42-mqtt-breaking-changes.md`.<br>Full notes: [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md) |
 | 1.1.0-beta | **New Features**:<br>• Dallas Sensor Custom Labels — inline editing in Web UI, labels stored in `/dallas_labels.ini`, zero backend RAM, label backup/restore during filesystem flash<br>• Dallas Sensor Graph Visualization — sensors auto-appear in real-time graph with 16-color palette (light/dark themes)<br>• Dallas Sensor REST API — bulk `GET/POST /api/v2/sensors/labels`<br>• WebUI Data Persistence — automatic `localStorage` persistence with debounced saves, dynamic memory management, normal/capture modes, auto-restoration on page load<br>• Browser Debug Console (`otgwDebug`) — full diagnostic toolkit in browser console<br>• Non-Blocking Modal Dialogs — custom HTML/CSS modals replace blocking `prompt()`/`alert()`<br>• **RESTful API v2** — 13 new v2 endpoints with consistent JSON errors, proper HTTP status codes (202 for async), CORS support, RESTful resource naming; API compliance score 5.4→8.5/10; all frontend calls migrated to v2; v0/unversioned endpoints deprecated (ADR-035)<br>**Bug Fixes**:<br>• MQTT Whitespace Auth Fix — automatic trimming of credentials whitespace, fixing auth failures upgrading from v0.10.x<br>• Streaming File Serving — replaced full-file-to-RAM with chunked streaming (95% memory reduction)<br>• 20 bugs resolved from comprehensive codebase review: memory safety (OOB write, stack overflow), data integrity (MQTT hour bitmask, -127°C sensor), concurrency (ISR race), security (XSS), reliability (file descriptor leak, null pointer crash, blocking sensor read), GPIO output feature fix, flash wear reduction (20→1 writes), proper JSON settings parsing<br>**Improvements**:<br>• Heap Memory Monitoring — 4-level health system with adaptive throttling and WebSocket backpressure<br>• Settings flash wear reduction — deferred writes with 2s debounce (20 writes → 1)<br>• GPIO conflict detection for sensor/S0/output pin assignments<br>• ADR Compliance CI workflow for pull requests<br>• Build system: `version.hash` always generated, centralized `config.py`<br>• Reusable GitHub Actions composite actions for CI/CD<br>• Full OpenAPI spec updated for all v2 endpoints<br>**Migration Notes**:<br>• Filesystem flash recommended alongside firmware flash<br>• Hard browser refresh (Ctrl+F5) recommended<br>• v0/unversioned API endpoints deprecated (removal in v1.3.0); migrate to v2<br>• No breaking API or MQTT changes |
 | 1.0.0 | **Milestone Release**: The complete vision of the firmware with a stable API, modern UI, and robust integration.<br>**New Features**:<br>• Live Logging (real-time WebSocket streaming with backpressure handling, UI controls for auto-scroll, timestamps, and capture)<br>• Interactive Graphs (real-time data visualization with extended history buffers and time window controls)<br>• Modern Web UI (responsive design with fully integrated Dark Theme - persistent, refactored DevInfo page)<br>• Improved Tools (new build system `build.py` and automated flashing tool `flash_esp.py`, enhanced firmware update UI with live progress)<br>• Gateway Mode (reliable detection using `PR=M` command, checks every 30s)<br>• NTP Control (new `NTPsendtime` setting).<br>**Integration (MQTT & HA)**:<br>• Auto Discovery (added support for Outside Temperature override `outside`)<br>• Documentation (clarified `hotwater` command values/examples)<br>• Stability (static 1350-byte MQTT buffer to prevent heap fragmentation).<br>**Core Stability & Security**:<br>• Binary Safety (critical fix for Exception (2) crashes during PIC flashing, replaced `strncmp_P` with `memcmp_P`)<br>• Connectivity (rewritten Wi-Fi logic with improved watchdog handling)<br>• Security (CSRF protection on APIs, masked password fields, input sanitization)<br>• Data Parsing (better validation in `processLine`, support for Type 0 messages).<br>**Breaking Changes**:<br>• Dallas Sensors (default pin changed from GPIO 13/D7 to GPIO 10/SD3 to match hardware defaults).<br>**Documentation**: Added `FLASH_GUIDE.md`, `BUILD.md`. |
 | 0.10.3 | Web UI: Mask MQTT password field and support running behind a reverse proxy (auto-detect http/https)<br>Home Assistant: Improve discovery templates (remove empty unit_of_measurement and add additional sensors/boundary values)<br>Fix: Status functions and REST API status reporting<br>CI: Improved GitHub Actions build/release workflow and release artifacts. |

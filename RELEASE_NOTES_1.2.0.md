@@ -1,6 +1,7 @@
 # Release Notes — v1.2.0-beta
 
 **Release date:** 2026-02-17  
+**Last updated:** 2026-02-22 (post OpenTherm v4.2 MQTT/HA audit corrections)<br>
 **Release branch:** `dev-branch-v1.2.0-beta`  
 **Comparison target:** `dev`  
 **Base commit (merge-base):** `a279664`
@@ -11,7 +12,7 @@
 
 Version `1.2.0-beta` is a focused release on top of the `dev` branch that improves:
 
-- OpenTherm protocol map coverage and direction correctness (v4.2 alignment).
+- OpenTherm protocol map coverage, direction correctness, and v4.2 type/byte semantics (including reserved-ID handling compatibility).
 - Runtime safety around message-map indexing.
 - MQTT/Home Assistant topic correctness and discovery consistency.
 - Documentation quality for OpenTherm v4.2 analysis and migration.
@@ -75,6 +76,7 @@ The following map direction flags were corrected:
 
 | ID | Label | `dev` | `1.2.0-beta` |
 | --- | --- | --- | --- |
+| 4 | `Command` | `OT_RW` | `OT_WRITE` |
 | 27 | `Toutside` | `OT_READ` | `OT_RW` |
 | 37 | `TRoomCH2` | `OT_READ` | `OT_WRITE` |
 | 38 | `RelativeHumidity` | `OT_READ` | `OT_RW` |
@@ -89,7 +91,20 @@ The following map direction flags were corrected:
 ### Type/unit corrections
 
 - ID 35 (`FanSpeed`) is now handled as `u8/u8` (`print_u8u8`) with unit `Hz` instead of `rpm`.
+- ID 38 (`RelativeHumidity`) is now handled as `f8.8` (v4.2) instead of `u8/u8`.
+- IDs 71, 77, 78, and 87 now use v4.2 single-byte semantics (correct HB/LB selection) instead of generic `u8/u8` handling.
+- IDs 98 and 99 now use v4.2-special decoding with semantic MQTT topics, while keeping raw byte aliases for compatibility.
 - ID 19 (`DHWFlowRate`) unit string updated to `l/min`.
+
+### Legacy pre-v4.2 ID compatibility (IDs 50-63)
+
+Firmware now applies reserved-ID rules for IDs `50-63` using a compatibility profile:
+
+- `AUTO` (default): keep legacy decoding until a v4.x OpenTherm version is detected (`OpenThermVersionMaster` or `OpenThermVersionSlave` >= `4.0`), then suppress IDs `50-63` because they are reserved in OpenTherm v4.2+.
+- `V4X_STRICT`: always suppress IDs `50-63`.
+- `PRE_V42_LEGACY`: always decode/publish IDs `50-63` (legacy behavior).
+
+Current implementation note: the profile exists in firmware code and defaults to `AUTO`; it is not yet exposed as a user setting.
 
 ### Completeness fixes
 
@@ -139,6 +154,24 @@ Files:
 - `src/OTGW-firmware/OTGW-Core.ino`
 - `src/OTGW-firmware/data/mqttha.cfg`
 
+### HA discovery and MQTT topic alignment fixes
+
+- `mqttha.cfg`: fixed `vh_configuration_*` discovery entries to trigger on message ID `74` (`ConfigMemberIDVH`) instead of `70`.
+- `mqttha.cfg`: fixed `Hcratio` discovery `stat_t` topic to `%mqtt_pub_topic%/Hcratio` (was incorrectly `%mqtt_pub_topic%/DHWFlowRate`).
+- `mqttha.cfg`: replaced broken `FanSpeed` discovery entity with two spec-aligned sensors:
+  - `FanSpeed_setpoint_hz` -> `%mqtt_pub_topic%/FanSpeed_hb_u8`
+  - `FanSpeed_actual_hz` -> `%mqtt_pub_topic%/FanSpeed_lb_u8`
+  - Unit corrected to `Hz` (OpenTherm v4.2 defines Hz, not rpm)
+- Firmware: IDs `71`, `77`, `78`, `87` now publish canonical single-byte base topics (e.g. `RelativeVentilation`) and also publish legacy `_hb_u8` / `_lb_u8` aliases for backward compatibility.
+- Firmware: IDs `98` and `99` now publish semantic decoded topics in addition to raw byte aliases.
+- Firmware: ID `38` (`RelativeHumidity`) now publishes canonical `f8.8` value on `RelativeHumidity` instead of split `u8/u8` topics.
+
+Files:
+
+- `src/OTGW-firmware/OTGW-Core.h`
+- `src/OTGW-firmware/OTGW-Core.ino`
+- `src/OTGW-firmware/data/mqttha.cfg`
+
 ### Auto-configuration logic cleanup
 
 `doAutoConfigure()` now:
@@ -177,13 +210,30 @@ If you use manual MQTT sensors/automations, update these topic names:
 - `eletric_production` -> `electric_production`
 - `solar_storage_slave_fault_incidator` -> `solar_storage_slave_fault_indicator`
 
+### MQTT payload/topic behavior changes (OpenTherm v4.2 alignment)
+
+The following are breaking for manual MQTT consumers and Home Assistant entities created from older discovery data:
+
+- `RelativeHumidity` (ID `38`) no longer uses legacy `u8/u8` split topics (`RelativeHumidity_hb_u8`, `RelativeHumidity_lb_u8`); it now publishes the v4.2 `f8.8` value on `RelativeHumidity`.
+- `FanSpeed` HA discovery is now split into two sensors (`FanSpeed_setpoint_hz`, `FanSpeed_actual_hz`) with `Hz` units.
+- Legacy pre-v4.2 IDs `50-63` are suppressed on v4.x systems in default `AUTO` mode because those IDs are reserved in OpenTherm v4.2+.
+
+Compatibility retained:
+
+- IDs `71`, `77`, `78`, `87`: legacy `_hb_u8` / `_lb_u8` alias topics are still published alongside spec-correct base topics.
+- IDs `98`, `99`: raw byte alias topics are still published, plus new semantic decoded topics.
+
 ### Home Assistant cleanup
 
 After upgrade:
 
-1. Remove stale entities tied to old typo topics.
+1. Remove stale entities tied to old typo topics and the old `FanSpeed` entity.
 2. Trigger MQTT auto-discovery again.
-3. Verify that `electric_production` and solar storage fault entities are available.
+3. Verify that `FanSpeed_setpoint_hz` and `FanSpeed_actual_hz` entities are created.
+4. Verify that `electric_production` and solar storage fault entities are available.
+5. If you use legacy IDs `50-63`, verify whether your thermostat/boiler is pre-v4.2 (v4.x systems now suppress them in `AUTO` mode).
+
+Detailed migration guidance: `docs/fixes/opentherm-v42-mqtt-breaking-changes.md`
 
 ---
 
