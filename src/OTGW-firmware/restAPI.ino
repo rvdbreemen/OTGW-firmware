@@ -945,9 +945,7 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("mqttconnected"), statusMQTTconnection);
   sendJsonMapEntry(F("thermostatconnected"), bOTGWthermostatstate);
   sendJsonMapEntry(F("boilerconnected"), bOTGWboilerstate);      
-  if (bOTGWgatewaystateKnown) {
-    sendJsonMapEntry(F("mode"), bOTGWgatewaystate ? "gateway" : "monitor");
-  }
+  sendJsonMapEntry(F("otgwmode"), bOTGWgatewaystateKnown ? (bOTGWgatewaystate ? "gateway" : "monitor") : "detecting");
   sendJsonMapEntry(F("otgwconnected"), bOTGWonline);
   
   sendEndJsonMap(F("device"));
