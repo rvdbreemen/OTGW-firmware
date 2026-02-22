@@ -731,29 +731,29 @@ void publishMQTTInt(const __FlashStringHelper* topic, int value) {
   sendMQTTData(topic, buffer);
 }
 
-void publishToSourceTopic(const char* topic, const char* json, const bool retain)
+// ADR-040: Maps rsptype to PROGMEM topic suffix (_thermostat/_boiler/_gateway).
+// Returns false for parity errors / unknown types (caller should not publish).
+static bool resolveSourceSuffix(byte rsptype, PGM_P &suffix) {
+  switch (rsptype) {
+    case OTGW_THERMOSTAT:        suffix = PSTR("_thermostat"); return true;
+    case OTGW_BOILER:            suffix = PSTR("_boiler");     return true;
+    case OTGW_REQUEST_BOILER:
+    case OTGW_ANSWER_THERMOSTAT: suffix = PSTR("_gateway");    return true;
+    default: return false;
+  }
+}
+
+void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
 {
   if (!settingMQTTSeparateSources || !topic || !json) return;
-
-  // OTdata.rsptype is populated by processOT() before print_*() calls this helper.
-  char sourceTopic[MQTT_TOPIC_MAX_LEN];
-
-  switch (OTdata.rsptype) {
-    case OTGW_THERMOSTAT:
-      snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s_thermostat"), topic);
-      break;
-    case OTGW_BOILER:
-      snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s_boiler"), topic);
-      break;
-    case OTGW_REQUEST_BOILER:
-    case OTGW_ANSWER_THERMOSTAT:
-      snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s_gateway"), topic);
-      break;
-    default:
-      return;
-  }
-
-  sendMQTTData(sourceTopic, json, retain);
+  PGM_P suffix;
+  if (!resolveSourceSuffix(rsptype, suffix)) return;
+  static char sourceTopic[MQTT_TOPIC_MAX_LEN];
+  char suffixBuf[16];
+  strncpy_P(suffixBuf, suffix, sizeof(suffixBuf) - 1);
+  suffixBuf[sizeof(suffixBuf) - 1] = '\0';
+  snprintf(sourceTopic, sizeof(sourceTopic), "%s%s", topic, suffixBuf);
+  sendMQTTData(sourceTopic, json, false);
 }
 
 //===========================================================================================
@@ -913,7 +913,11 @@ bool doAutoConfigureMsgid(byte OTid)
   return doAutoConfigureMsgid(OTid, nullptr);
 }
 
-bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
+bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId) {
+  return doAutoConfigureMsgid(OTid, cfgSensorId, nullptr);
+}
+
+bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMqttTopic)
 {
   bool _result = false;
   const char *sensorId = (cfgSensorId != nullptr) ? cfgSensorId : "";
@@ -1016,19 +1020,37 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId )
     MQTTDebugf(PSTR("[%s]\r\n"), sMsg); 
     DebugFlush();
     
-    // Static buffer strategy: use MQTT streaming with fixed 1350-byte buffer
-    // No dynamic resizing - streaming handles arbitrarily large messages efficiently
+    // ADR-040: Source template detection — entries with %source_suffix% in mqttha.cfg
+    // are emitted 3× (thermostat/boiler/gateway). sLine is safe to reuse here: it held
+    // the raw file line which has already been parsed into sTopic/sMsg by splitLine().
+    if (strstr(sTopic, "%source_suffix%") || strstr(sMsg, "%source_suffix%")) {
+      if (settingMQTTSeparateSources && baseMqttTopic != nullptr) {
+        static const char* const srcSuffixes[] = {"_thermostat", "_boiler", "_gateway"};
+        static const char* const srcNames[]    = {"Thermostat",  "Boiler",  "Gateway"};
+        char savedTopic[MQTT_TOPIC_MAX_LEN];           // 200 bytes on stack — safe for ESP8266
+        strlcpy(savedTopic, sTopic, sizeof(savedTopic));
+        strlcpy(sLine, sMsg, MQTT_CFG_LINE_MAX_LEN);  // reuse sLine as sMsg save (same 1200 bytes)
+        for (uint8_t i = 0; i < 3; i++) {
+          strlcpy(sTopic, savedTopic, MQTT_TOPIC_MAX_LEN);
+          strlcpy(sMsg,   sLine,     MQTT_MSG_MAX_LEN);
+          if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%source_suffix%", srcSuffixes[i])) continue;
+          if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   "%source_suffix%", srcSuffixes[i])) continue;
+          if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   "%source_name%",   srcNames[i]))    continue;
+          sendMQTTStreaming(sTopic, sMsg, strlen(sMsg));
+          feedWatchDog();
+        }
+        _result = true;
+      }
+      continue; // skip regular single-send below (source templates on or off)
+    }
+
     sendMQTTStreaming(sTopic, sMsg, strlen(sMsg));
-    resetMQTTBufferSize();  // No-op, kept for API compatibility
     _result = true;
 
-    // TODO: enable this break if we are sure the old config dump method is no longer needed
-    // break;
-
   } // while available()
-  
+
   fh.close();
-  
+
   // Note: No buffer cleanup needed - static buffer persists across calls
   // resetMQTTBufferSize() is a no-op for static buffer strategy
   resetMQTTBufferSize();

@@ -690,11 +690,11 @@ void print_f88(float& value)
   if (is_value_valid(OTdata, OTlookupitem)){
     const char* topic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
     sendMQTTData(topic, _msg);
-    publishToSourceTopic(topic, _msg);
+    publishToSourceTopic(topic, _msg, OTdata.rsptype);
     value = _value;
   }
 }
-  
+
 
 void print_s16(int16_t& value)
 {    
@@ -709,7 +709,7 @@ void print_s16(int16_t& value)
   if (is_value_valid(OTdata, OTlookupitem)){
     const char* topic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
     sendMQTTData(topic, _msg);
-    publishToSourceTopic(topic, _msg);
+    publishToSourceTopic(topic, _msg, OTdata.rsptype);
     value = _value;
   }
 }
@@ -725,18 +725,19 @@ void print_s8s8(uint16_t& value)
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_value_hb", sizeof(_topic));
   //AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
-  if (is_value_valid(OTdata, OTlookupitem)){
+  const bool _valid = is_value_valid(OTdata, OTlookupitem);
+  if (_valid){
     sendMQTTData(_topic, _msg);
-    publishToSourceTopic(_topic, _msg);
+    publishToSourceTopic(_topic, _msg, OTdata.rsptype);
   }
   //Build string for MQTT
   itoa((int8_t)OTdata.valueLB, _msg, 10);
   strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
   strlcat(_topic, "_value_lb", sizeof(_topic));
   //AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (_valid){
     sendMQTTData(_topic, _msg);
-    publishToSourceTopic(_topic, _msg);
+    publishToSourceTopic(_topic, _msg, OTdata.rsptype);
     value = OTdata.u16();
   }
 }
@@ -754,7 +755,7 @@ void print_u16(uint16_t& value)
   if (is_value_valid(OTdata, OTlookupitem)){
     const char* topic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
     sendMQTTData(topic, _msg);
-    publishToSourceTopic(topic, _msg);
+    publishToSourceTopic(topic, _msg, OTdata.rsptype);
     value = _value;
   }
 }
@@ -1743,7 +1744,7 @@ void processOT(const char *buf, int len){
       if (is_value_valid(OTdata, OTlookupitem) && settingMQTTenable ) {
         if(getMQTTConfigDone(OTdata.id)==false) {
           MQTTDebugTf(PSTR("Need to set MQTT config for message %s (%d)\r\n"), OTlookupitem.label, OTdata.id);
-          bool success = doAutoConfigureMsgid(OTdata.id, NodeId);
+          bool success = doAutoConfigureMsgid(OTdata.id, NodeId, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
           if(success) {
             MQTTDebugTf(PSTR("Successfully sent MQTT config for message %s (%d)\r\n"), OTlookupitem.label, OTdata.id);
             setMQTTConfigDone(OTdata.id);
