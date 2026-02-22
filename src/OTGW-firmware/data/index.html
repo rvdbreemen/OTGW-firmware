@@ -15,6 +15,7 @@
         document.write('<link rel="stylesheet" type="text/css" href="' + css + '" id="theme-style">');
       })();
     </script>
+    <link rel="stylesheet" type="text/css" href="./index_common.css">
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <script src="./index.js"></script>
     <script src="./graph.js"></script>
@@ -29,7 +30,7 @@
         <div class="headercolumn" id='theTime'>[00:00:00]</div>
     </div>
     </font>
-    <div id="displayMainPage" class="page-section active">
+    <template id="pageNavTemplate">
       <div class="nav-container">
         <div class='nav-left'>
           <button type="button" class='home nav-item tabButton'>Home</button>
@@ -44,6 +45,9 @@
           </div>
         </div>
       </div>
+    </template>
+    <div id="displayMainPage" class="page-section active">
+      <div class="page-nav-shell"></div>
       <div id="mainPage">
         <div id="waiting">Wait for it...</div>
       </div>
@@ -167,54 +171,15 @@
       </div>
     </div>
     <div id="displayPICflash" class="page-section">
-      <div class="nav-container">
-        <div class='nav-left'>
-          <button type="button" class='home nav-item tabButton'>Home</button>
-        </div>
-        <div class='nav-right'>
-          <button type="button" class='basicSettings nav-item tabButton'>Settings</button>
-          <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
-          <div class="adv_dropdown hidden">
-            <span class="list_item tabPICflash">PIC firmware</span>
-            <span class="list_item tabDeviceInfo">Debug Information</span>
-            <span class="list_item FSexplorer">File system contents</span>
-          </div>
-        </div>
-      </div>
+      <div class="page-nav-shell"></div>
       <div id="displayPICpage"></div>
     </div>
     <div id="displayDeviceInfo" class="page-section">
-      <div class="nav-container">
-        <div class='nav-left'>
-          <button type="button" class='home nav-item tabButton'>Home</button>
-        </div>
-        <div class='nav-right'>
-          <button type="button" class='basicSettings nav-item tabButton'>Settings</button>
-          <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
-          <div class="adv_dropdown hidden">
-            <span class="list_item tabPICflash">PIC firmware</span>
-            <span class="list_item tabDeviceInfo">Debug Information</span>
-            <span class="list_item FSexplorer">File system contents</span>
-          </div>
-        </div>
-      </div>
+      <div class="page-nav-shell"></div>
       <div id="deviceinfoPage"></div>
     </div>
     <div id="displaySettingsPage" class="page-section">
-      <div class="nav-container">
-        <div class='nav-left'>
-          <button type="button" class='home nav-item tabButton'>Home</button>
-        </div>
-        <div class='nav-right'>
-          <button type="button" class='basicSettings nav-item tabButton'>Settings</button>
-          <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
-          <div class="adv_dropdown hidden">
-            <span class="list_item tabPICflash">PIC firmware</span>
-            <span class="list_item tabDeviceInfo">Debug Information</span>
-            <span class="list_item FSexplorer">File system contents</span>
-          </div>
-        </div>
-      </div>
+      <div class="page-nav-shell"></div>
       <div id="settingsPage"></div>
       <div id="settingMessage">Loading...</div>
     </div>

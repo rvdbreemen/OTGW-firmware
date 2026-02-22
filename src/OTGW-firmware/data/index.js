@@ -1168,7 +1168,7 @@ function getOTLogDisplayState() {
                  (/Android/.test(navigator.userAgent) && /Mobile/.test(navigator.userAgent));
 
   // Also check screen width as a fallback (standard breakpoint for tablets is 768px)
-  const isSmallScreen = window.innerWidth < 768;
+  const isSmallScreen = window.innerWidth <= MOBILE_BREAKPOINT_PX;
 
   const state = {
     isProxied: isProxied,
@@ -2248,6 +2248,30 @@ function saveUISetting(field, value) {
   sendPostSetting(field, value);
 }
 
+const MOBILE_BREAKPOINT_PX = 768;
+
+function renderSharedPageNavShell() {
+  var template = document.getElementById('pageNavTemplate');
+  if (!template) return;
+
+  Array.from(document.getElementsByClassName('page-nav-shell')).forEach(function (slot) {
+    if (!slot || slot.dataset.rendered === '1') return;
+
+    if (template.content && typeof template.content.cloneNode === 'function') {
+      slot.appendChild(template.content.cloneNode(true));
+    } else {
+      // Fallback for older browsers: clone via a temporary container.
+      var wrapper = document.createElement('div');
+      wrapper.innerHTML = template.innerHTML;
+      while (wrapper.firstChild) {
+        slot.appendChild(wrapper.firstChild);
+      }
+    }
+
+    slot.dataset.rendered = '1';
+  });
+}
+
 //============================================================================  
 function initMainPage() {
   console.log("initMainPage()");
@@ -2259,6 +2283,8 @@ function initMainPage() {
       flashModeActive = true;
     }
   } catch(e) { /* ignore */ }
+
+  renderSharedPageNavShell();
 
   Array.from(document.getElementsByClassName('FSexplorer')).forEach(
     function (el, idx, arr) {
@@ -3093,14 +3119,14 @@ function refreshSettings() {
           // rowDiv.style.border = "thick solid lightblue";
           // rowDiv.style.background = "lightblue";
           //--- field Name ---
-          var fldDiv = document.createElement("div");
-          fldDiv.className = 'settings-field-container';
-          fldDiv.setAttribute("style", "margin-right: 10px;");
-          fldDiv.textContent = translateToHuman(data[i].name);
-          rowDiv.appendChild(fldDiv);
+          var fldLabel = document.createElement("label");
+          fldLabel.className = 'settings-field-container';
+          fldLabel.setAttribute("for", data[i].name);
+          fldLabel.textContent = translateToHuman(data[i].name);
+          rowDiv.appendChild(fldLabel);
           //--- input ---
           var inputDiv = document.createElement("div");
-          inputDiv.setAttribute("style", "text-align: left;");
+          inputDiv.className = 'settings-input-container';
 
           var sInput = document.createElement("input");
           //----sInput.setAttribute("id", "setFld_"+data[i].name);
