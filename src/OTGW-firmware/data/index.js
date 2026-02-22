@@ -168,16 +168,16 @@ function updateGatewayModeIndicator(value) {
 
   if (value === 'gateway') {
     statusEl.className = 'mode-status mode-gateway';
-    textEl.textContent = 'Mode: Gateway';
+    textEl.textContent = 'Gateway Mode: Gateway';
   } else if (value === 'monitor') {
     statusEl.className = 'mode-status mode-monitor';
-    textEl.textContent = 'Mode: Monitor';
+    textEl.textContent = 'Gateway Mode: Monitor';
   } else if (value === 'unavailable') {
     statusEl.className = 'mode-status mode-unknown';
-    textEl.textContent = 'Mode: Unavailable';
+    textEl.textContent = 'Gateway Mode: Unavailable';
   } else {
     statusEl.className = 'mode-status mode-unknown';
-    textEl.textContent = 'Mode: Detecting...';
+    textEl.textContent = 'Gateway Mode: Detecting...';
   }
 }
 
@@ -3428,7 +3428,7 @@ var translateFields = [
   , ["otgwcommands", "Boot Command"]
   , ["thermostatconnected", "Thermostat Connected"]
   , ["boilerconnected", "Boiler Connected"]
-  , ["mode", "Gateway/Monitor"]
+  , ["mode", "Gateway Mode"]
   , ["otgwconnected", "HA Integration"]
   , ["gpiooutputsenabled", "GPIO Output Enabled"]
   , ["gpiooutputspin", "GPIO pin # to switch on/off"]
