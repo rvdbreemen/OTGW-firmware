@@ -16,10 +16,10 @@ void handleDebug(){
                     (WiFi.status() == WL_CONNECTED) ? "Connected" : "Disconnected",
                     CBOOLEAN(statusMQTTconnection),
                     CBOOLEAN(bOTGWonline));
-                Debugf(PSTR("Thermostat: %s | Boiler: %s | Gateway: %s\r\n"), 
-                    CBOOLEAN(bOTGWthermostatstate),
-                    CBOOLEAN(bOTGWboilerstate),
-                    CBOOLEAN(bOTGWgatewaystate));
+                Debugf(PSTR("Thermostat: %s | Boiler: %s | Gateway Mode: %s\r\n"),
+                    CCONOFF(bOTGWthermostatstate),
+                    CCONOFF(bOTGWboilerstate),
+                    bOTGWgatewaystateKnown ? CCONOFF(bOTGWgatewaystate) : "detecting");
                 Debugf(PSTR("CH Temp: %.1f°C | Room Temp: %.1f°C | Setpoint: %.1f°C\r\n"),
                     OTcurrentSystemState.Tboiler,
                     OTcurrentSystemState.Tr,
