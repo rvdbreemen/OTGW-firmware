@@ -237,21 +237,6 @@
   }
 
   /*-------------------------*/
-  /***
-  @media all and (max-width: 600px) {
-    .nav-container {
-      justify-content: space-around;
-    }
-  }
-  
-  @media all and (max-width: 400px) {
-    .nav-container {
-      -webkit-flex-flow: column wrap;
-      flex-flow: column wrap;
-      padding: 0;
-    }
-  }
-  ***/
   
   .tabButton a:hover {
     background-color: gray;
@@ -392,12 +377,12 @@
     clear: both;
   }
   
-  /* Responsive layout - makes the three columns stack on top of each other instead of next to each other */
-  @media screen and (max-width: 600px) {
-    .column {
-      width: 100%;
-    }
+/* Responsive layout - makes the three columns stack on top of each other instead of next to each other */
+@media screen and (max-width: 768px) {
+  .column {
+    width: 100%;
   }
+}
   
   /* PIC firmware page */
 .pictable {
@@ -542,7 +527,7 @@
 }
 
 /* Responsive: Stack on small screens */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   #deviceinfoPage {
     display: block;
     width: 100%;
@@ -826,39 +811,6 @@
   display: inline-block;
 }
 
-/* Responsive Design */
-@media (max-width: 767px) {
-  #otLogSection {
-    display: none !important;
-  }
-}
-
-@media (max-width: 767px) {
-  .ot-log-controls {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .btn-log-control,
-  .log-search,
-  .log-control-label {
-    width: 100%;
-  }
-  
-  .ot-log-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  
-  .ot-log-container.collapsed {
-    max-height: 150px;
-  }
-  
-  .ot-log-container:not(.collapsed) {
-    max-height: 400px;
-  }
-}
   /* Firmware Upgrade Progress */
   #flashProgressSection {
     margin-top: 12px;
@@ -1039,11 +991,6 @@ body.disable-interaction {
 
 .otmonrow.hidden-row {
   display: none !important;
-}
-
-.settings-field-container {
-  width: 320px;
-  float: left;
 }
 
 .flash-progress-bar {
