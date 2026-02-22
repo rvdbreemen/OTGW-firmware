@@ -1860,6 +1860,9 @@ void processOT(const char *buf, int len){
         case OT_TSPEntryVH:                             print_u8u8(OTcurrentSystemState.TSPEntryVH); break;
         case OT_FaultBufferSizeVH:                      print_u8u8(OTcurrentSystemState.FaultBufferSizeVH); break;
         case OT_FaultBufferEntryVH:                     print_u8u8(OTcurrentSystemState.FaultBufferEntryVH); break;
+        case OT_FilterDaysLeft:                         print_u16(OTcurrentSystemState.FilterDaysLeft); break;
+        case OT_ElectricalUsage:                        print_u16(OTcurrentSystemState.ElectricalUsage); break;
+        case OT_CompressorUsage:                        print_u16(OTcurrentSystemState.CompressorUsage); break;
         case OT_FanSpeed:                               print_u16(OTcurrentSystemState.FanSpeed); break;
         case OT_ElectricalCurrentBurnerFlame:           print_f88(OTcurrentSystemState.ElectricalCurrentBurnerFlame); break;
         case OT_TRoomCH2:                               print_f88(OTcurrentSystemState.TRoomCH2); break;
@@ -1883,6 +1886,7 @@ void processOT(const char *buf, int len){
         case OT_SolarStorageFHBindexFHBvalue:           print_u8u8(OTcurrentSystemState.SolarStorageFHBindexFHBvalue ); break;
         case OT_BurnerUnsuccessfulStarts:               print_u16(OTcurrentSystemState.BurnerUnsuccessfulStarts); break;
         case OT_FlameSignalTooLow:                      print_u16(OTcurrentSystemState.FlameSignalTooLow); break;
+        case OT_CompressorUsageLifetime:                print_u16(OTcurrentSystemState.CompressorUsageLifetime); break;
         default: 
             AddLogf("Unknown message [%02d] value [%04X] f8.8 [%3.2f] u16 [%d] s16 [%d]", OTdata.id, OTdata.value,  OTdata.f88(), OTdata.u16(), OTdata.s16());
             break;
@@ -2232,6 +2236,9 @@ const char* getOTGWValue(int msgid)
     case OT_TSPEntryVH:                        dtostrf(OTcurrentSystemState.TSPEntryVH, 0, 2, buffer); return buffer;
     case OT_FaultBufferSizeVH:                 dtostrf(OTcurrentSystemState.FaultBufferSizeVH, 0, 2, buffer); return buffer;
     case OT_FaultBufferEntryVH:                dtostrf(OTcurrentSystemState.FaultBufferEntryVH, 0, 2, buffer); return buffer;
+    case OT_FilterDaysLeft:                    dtostrf(OTcurrentSystemState.FilterDaysLeft, 0, 2, buffer); return buffer;
+    case OT_ElectricalUsage:                   dtostrf(OTcurrentSystemState.ElectricalUsage, 0, 2, buffer); return buffer;
+    case OT_CompressorUsage:                   dtostrf(OTcurrentSystemState.CompressorUsage, 0, 2, buffer); return buffer;
     case OT_FanSpeed:                          dtostrf(OTcurrentSystemState.FanSpeed, 0, 2, buffer); return buffer;
     case OT_ElectricalCurrentBurnerFlame:      dtostrf(OTcurrentSystemState.ElectricalCurrentBurnerFlame, 0, 2, buffer); return buffer;
     case OT_TRoomCH2:                          dtostrf(OTcurrentSystemState.TRoomCH2, 0, 2, buffer); return buffer;
@@ -2253,6 +2260,7 @@ const char* getOTGWValue(int msgid)
     case OT_SolarStorageTSPindexTSPvalue:      dtostrf(OTcurrentSystemState.SolarStorageTSPindexTSPvalue, 0, 2, buffer); return buffer;
     case OT_SolarStorageFHBsize:               dtostrf(OTcurrentSystemState.SolarStorageFHBsize, 0, 2, buffer); return buffer;
     case OT_SolarStorageFHBindexFHBvalue:      dtostrf(OTcurrentSystemState.SolarStorageFHBindexFHBvalue, 0, 2, buffer); return buffer;
+    case OT_CompressorUsageLifetime:           dtostrf(OTcurrentSystemState.CompressorUsageLifetime, 0, 2, buffer); return buffer;
     default: 
       strncpy_P(buffer, PSTR("Error: not implemented yet!\r\n"), sizeof(buffer) - 1);
       buffer[sizeof(buffer) - 1] = '\0';
