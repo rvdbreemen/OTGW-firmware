@@ -470,7 +470,9 @@ void handleMQTT()
         // birth message, sendMQTT retains  by default
         sendMQTT(MQTTPubNamespace, "online");
 
-        // First do AutoConfiguration for Homeassistant
+        // Startup discovery sweep (retained HA config topics). doAutoConfigure()
+        // now correctly handles duplicate msgid lines and expands source-template
+        // entries (%source_suffix%) into _thermostat/_boiler/_gateway variants.
         doAutoConfigure();
 
         //Subscribe to topics
@@ -830,6 +832,11 @@ void doAutoConfigure(bool bForceAll){
     char *sLine = mqttAutoConfigBuffers.line;
     char *sTopic = mqttAutoConfigBuffers.topic;
     char *sMsg = mqttAutoConfigBuffers.msg;
+    // Snapshot config state at function entry so duplicate lines with the same
+    // msgid (e.g. split entities and source-template entries) are all processed
+    // in the same run before the global per-msgid bit is set.
+    uint32_t autoConfigMapAtStart[8];
+    memcpy(autoConfigMapAtStart, MQTTautoConfigMap, sizeof(autoConfigMapAtStart));
 
     // 2. Open File ONCE
     LittleFS.begin();
@@ -861,7 +868,14 @@ void doAutoConfigure(bool bForceAll){
       // Skip Dallas sensors - they need per-sensor addresses from configSensors()
       if (lineID == OTGWdallasdataid) continue;
 
-      if (bForceAll || !getMQTTConfigDone(lineID)) {
+      bool alreadyConfiguredAtStart = false;
+      if (!bForceAll) {
+        const uint8_t group = (lineID >> 5) & 0x07;
+        const uint8_t index = lineID & 0x1F;
+        alreadyConfiguredAtStart = bitRead(autoConfigMapAtStart[group], index);
+      }
+
+      if (bForceAll || !alreadyConfiguredAtStart) {
 
          MQTTDebugTf(PSTR("Processing AutoConfig for ID %d\r\n"), lineID);
 
@@ -876,6 +890,30 @@ void doAutoConfigure(bool bForceAll){
          if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%version%", _VERSION)) continue;
          if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_pub_topic%", MQTTPubNamespace)) continue;
          if (!replaceAll(sMsg, MQTT_MSG_MAX_LEN, "%mqtt_sub_topic%", MQTTSubNamespace)) continue;
+
+         // ADR-040 source templates expand to 3 discovery entries from one line.
+         // This is used by manual/bulk discovery paths (doAutoConfigure()).
+         if (strstr(sTopic, "%source_suffix%") || strstr(sMsg, "%source_suffix%")) {
+           if (settingMQTTSeparateSources) {
+             static const char* const srcSuffixes[] = {"_thermostat", "_boiler", "_gateway"};
+             static const char* const srcNames[]    = {"Thermostat",  "Boiler",  "Gateway"};
+             char savedTopic[MQTT_TOPIC_MAX_LEN];
+             strlcpy(savedTopic, sTopic, sizeof(savedTopic));
+             strlcpy(sLine, sMsg, MQTT_CFG_LINE_MAX_LEN);  // reuse line buffer as msg backup
+             for (uint8_t i = 0; i < 3; i++) {
+               strlcpy(sTopic, savedTopic, MQTT_TOPIC_MAX_LEN);
+               strlcpy(sMsg,   sLine,     MQTT_MSG_MAX_LEN);
+               if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%source_suffix%", srcSuffixes[i])) continue;
+               if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   "%source_suffix%", srcSuffixes[i])) continue;
+               if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   "%source_name%",   srcNames[i]))    continue;
+               MQTTDebugTf(PSTR("MQTT source discovery (bulk) msgid %d -> %s\r\n"), lineID, sTopic);
+               sendMQTTStreaming(sTopic, sMsg, strlen(sMsg));
+               doBackgroundTasks(); // Yield between retained publishes
+             }
+             setMQTTConfigDone(lineID);
+           }
+           continue; // source template handled (or intentionally skipped when disabled)
+         }
 
          // Static buffer strategy: use MQTT streaming with fixed 1350-byte buffer
          // No dynamic resizing - streaming handles arbitrarily large messages efficiently
@@ -1036,6 +1074,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
           if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%source_suffix%", srcSuffixes[i])) continue;
           if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   "%source_suffix%", srcSuffixes[i])) continue;
           if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   "%source_name%",   srcNames[i]))    continue;
+          MQTTDebugTf(PSTR("MQTT source discovery (jit) msgid %d -> %s\r\n"), OTid, sTopic);
           sendMQTTStreaming(sTopic, sMsg, strlen(sMsg));
           feedWatchDog();
         }
