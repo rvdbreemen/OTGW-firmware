@@ -1,273 +1,194 @@
 # Release Notes — v1.2.0-beta
 
-**Release date:** 2026-02-17  
-**Last updated:** 2026-02-22 (post OpenTherm v4.2 MQTT/HA audit corrections)<br>
-**Release branch:** `dev-branch-v1.2.0-beta`  
-**Comparison target:** `dev`  
-**Base commit (merge-base):** `a279664`
+**Last updated:** 2026-02-22<br>
+**Release branch:** `dev-1.2.0-stable-version`<br>
+**Comparison target:** `dev` at `v1.1.0-beta` release commit `0a86aa7`<br>
+**Analyzed head:** `ea69853` (local branch; `origin/dev-1.2.0-stable-version` is ahead by 1 CI `version.h` commit `fbd66df`)<br>
 
 ---
 
 ## Overview
 
-Version `1.2.0-beta` is a focused release on top of the `dev` branch that improves:
+Version `1.2.0-beta` (branch line `dev-1.2.0-stable-version`) builds on the `dev` `v1.1.0-beta` baseline and adds a broader set of changes than the earlier beta-branch notes captured:
 
-- OpenTherm protocol map coverage, direction correctness, and v4.2 type/byte semantics (including reserved-ID handling compatibility).
-- Runtime safety around message-map indexing.
-- MQTT/Home Assistant topic correctness and discovery consistency.
-- Documentation quality for OpenTherm v4.2 analysis and migration.
-
-Compared with `dev`, this branch adds protocol-centric changes and discovery corrections rather than broad platform features.
-
----
-
-## Delta vs dev (high-level)
-
-### Commit delta (excluding merges)
-
-`dev-branch-v1.2.0-beta` contains functional changes mainly in:
-
-- `1c6fe19` — OpenTherm v4.2 protocol compliance analysis + implementation changes.
-- `43b94c5` — MQTT auto-configuration logic refactor and version bump.
-- `700fc79` — removal of accidental artifact file.
-
-Remaining unique commits in this branch are CI/version metadata updates.
-
-### File impact summary
-
-Compared to `dev` before this release-note update:
-
-- **30 files changed**
-- **1292 insertions / 172 deletions**
-- Main touched areas:
-  - OpenTherm core map and parser
-  - REST API value retrieval path
-  - MQTT auto-discovery and HA template config
-  - Documentation (`docs/reviews/2026-02-15_opentherm-v42-compliance/`)
+- OpenTherm v4.2 protocol map alignment and reserved-ID compatibility handling
+- Runtime safety hardening in OT map parsing and REST lookups
+- MQTT/Home Assistant discovery and topic correctness fixes
+- Configurable source-separated MQTT publishing + HA discovery templates
+- Gateway-mode detection/API/UI reliability improvements
+- Serial handling robustness and WebSocket event logging improvements
+- Web UI/mobile layout and flash UX refinements
+- Spec-audit tooling/CI and supporting documentation
 
 ---
 
-## Detailed Changes
+## Summary of Features and Fixes (v1.2.0 branch)
 
-## 1) OpenTherm v4.2 Message-Map Alignment
+### OpenTherm v4.2 alignment and protocol fixes
 
-### Added missing message IDs
+- Added missing OT message IDs: `39`, `93`, `94`, `95`, `96`, `97`.
+- Corrected OT direction flags for IDs `4`, `27`, `37`, `38`, `98`, `99`, `109`, `110`, `112`, `124`, `126`.
+- Corrected v4.2 type/byte semantics for IDs `38`, `71`, `77`, `78`, `87`, `98`, `99`.
+- Corrected data semantics/units:
+  - `FanSpeed` (ID `35`) handled as `u8/u8` and `Hz`
+  - `RelativeHumidity` (ID `38`) handled as `f8.8`
+  - `DHWFlowRate` unit updated to `l/min`
+- Added compatibility profile for legacy pre-v4.2 IDs `50-63`:
+  - `AUTO` (default runtime behavior in code): keep legacy decoding until OT v4.x is detected, then suppress reserved IDs `50-63`
+  - `V4X_STRICT`: always suppress
+  - `PRE_V42_LEGACY`: always decode/publish
+- Added missing `getOTGWValue()` mappings for IDs `113` and `114`.
 
-The following message IDs were added to the OT map and wired into runtime handling:
+### Runtime safety and correctness hardening
 
-| ID | Label | Type | Direction |
-| --- | --- | --- | --- |
-| 39 | `TrOverride2` | `f8.8` | `OT_READ` |
-| 93 | `Brand` | `u8/u8` | `OT_READ` |
-| 94 | `BrandVersion` | `u8/u8` | `OT_READ` |
-| 95 | `BrandSerialNumber` | `u8/u8` | `OT_READ` |
-| 96 | `CoolingOperationHours` | `u16` | `OT_RW` |
-| 97 | `PowerCycles` | `u16` | `OT_RW` |
+- Added OT map bounds checks before indexed lookups in parser and REST paths.
+- Unknown IDs now use safe fallback metadata instead of raw map indexing.
+- `sendOTGWvalue(int msgid)` now returns explicit out-of-range errors before OT map access.
+- Reused global `cMsg` buffer in settings POST parsing (`restAPI.ino`) to avoid extra temporary stack buffer allocation.
 
-Code paths updated:
+### MQTT / Home Assistant fixes and improvements
 
-- Map entries in `src/OTGW-firmware/OTGW-Core.h`
-- Parsing/printing switch in `src/OTGW-firmware/OTGW-Core.ino`
-- Value export in `getOTGWValue()` (`src/OTGW-firmware/OTGW-Core.ino`)
+- Fixed MQTT topic typos:
+  - `eletric_production` -> `electric_production`
+  - `solar_storage_slave_fault_incidator` -> `solar_storage_slave_fault_indicator`
+- Fixed label typo: `Diagonostic_Indicator` -> `Diagnostic_Indicator`.
+- Fixed HA discovery mismatches:
+  - `vh_configuration_*` now keyed to message ID `74`
+  - `Hcratio` HA `stat_t` now points to `Hcratio`
+  - `FanSpeed` HA discovery split into `FanSpeed_setpoint_hz` and `FanSpeed_actual_hz` (`Hz`)
+- v4.2 MQTT publishing alignment:
+  - IDs `71`, `77`, `78`, `87` publish canonical single-byte base topics and retain legacy `_hb_u8` / `_lb_u8` aliases
+  - IDs `98`, `99` publish semantic decoded topics and keep raw byte aliases
+  - ID `38` (`RelativeHumidity`) publishes canonical `f8.8` payload instead of legacy split-byte topics
 
-### Direction corrections for existing IDs
+### New configurable source-separated MQTT publishing (Issue #143)
 
-The following map direction flags were corrected:
+- Added `MQTTseparatesources` setting (REST + persisted settings support).
+- Firmware can publish source-suffixed topics per OpenTherm source (`_thermostat`, `_boiler`, `_gateway`) while retaining legacy unsuffixed topics for compatibility.
+- HA discovery generation now supports source-specific templates (`%source_suffix%`, `%source_name%`) for split entities when enabled.
+- MQTT publish helpers were refactored for clearer source suffix resolution and safer reuse.
 
-| ID | Label | `dev` | `1.2.0-beta` |
-| --- | --- | --- | --- |
-| 4 | `Command` | `OT_RW` | `OT_WRITE` |
-| 27 | `Toutside` | `OT_READ` | `OT_RW` |
-| 37 | `TRoomCH2` | `OT_READ` | `OT_WRITE` |
-| 38 | `RelativeHumidity` | `OT_READ` | `OT_RW` |
-| 98 | `RFstrengthbatterylevel` | `OT_READ` | `OT_WRITE` |
-| 99 | `OperatingMode_HC1_HC2_DHW` | `OT_READ` | `OT_RW` |
-| 109 | `ElectricityProducerStarts` | `OT_READ` | `OT_RW` |
-| 110 | `ElectricityProducerHours` | `OT_READ` | `OT_RW` |
-| 112 | `CumulativElectricityProduction` | `OT_READ` | `OT_RW` |
-| 124 | `OpenThermVersionMaster` | `OT_READ` | `OT_WRITE` |
-| 126 | `MasterVersion` | `OT_READ` | `OT_WRITE` |
+### MQTT auto-configuration robustness (HA discovery)
 
-### Type/unit corrections
+- `doAutoConfigure()` and `doAutoConfigureMsgid()` now share a single static buffer workspace to avoid duplicate persistent RAM reservations.
+- Added a scoped re-entry lock to prevent autoconfig buffer clobbering.
+- Lock scope was narrowed so Dallas sensor discovery (`configSensors()` path) can still run correctly.
+- `doAutoConfigure()` skips Dallas placeholder lines in the main file loop and triggers Dallas discovery separately when needed.
+- Auto-config state tracking logic was cleaned up (`getMQTTConfigDone` / `setMQTTConfigDone`) to reduce duplicate or skipped work.
 
-- ID 35 (`FanSpeed`) is now handled as `u8/u8` (`print_u8u8`) with unit `Hz` instead of `rpm`.
-- ID 38 (`RelativeHumidity`) is now handled as `f8.8` (v4.2) instead of `u8/u8`.
-- IDs 71, 77, 78, and 87 now use v4.2 single-byte semantics (correct HB/LB selection) instead of generic `u8/u8` handling.
-- IDs 98 and 99 now use v4.2-special decoding with semantic MQTT topics, while keeping raw byte aliases for compatibility.
-- ID 19 (`DHWFlowRate`) unit string updated to `l/min`.
+### Gateway mode detection / API / UI fixes
 
-### Legacy pre-v4.2 ID compatibility (IDs 50-63)
+- Gateway mode parsing fixed to handle actual `PR=M` response format (`M=G` / `M=M`) instead of assuming a single char.
+- Gateway mode now tracks a known/unknown state (`bOTGWgatewaystateKnown`) instead of defaulting to a false/monitor-like value.
+- MQTT gateway-mode state is only published after a successful mode read.
+- Device-info API field was standardized to `otgwmode` and can return `ON`/`OFF` or `detecting`.
+- Device-info key `wifiqualitytldr` was renamed to `wifiquality_text` for clearer semantics.
+- Web UI gateway indicator now supports `Gateway`, `Monitor`, `Detecting...`, and `Unavailable`, while preserving the last known mode when refreshes fail.
+- Gateway mode polling/refresh flow was cleaned up and moved into a 60-second task path.
+- Debug output text was updated for clearer gateway mode reporting.
 
-Firmware now applies reserved-ID rules for IDs `50-63` using a compatibility profile:
+### PS mode detection and UI message handling improvements
 
-- `AUTO` (default): keep legacy decoding until a v4.x OpenTherm version is detected (`OpenThermVersionMaster` or `OpenThermVersionSlave` >= `4.0`), then suppress IDs `50-63` because they are reserved in OpenTherm v4.2+.
-- `V4X_STRICT`: always suppress IDs `50-63`.
-- `PRE_V42_LEGACY`: always decode/publish IDs `50-63` (legacy behavior).
+- Firmware now auto-detects `PS=1` mode from summary `key=value` stream lines and auto-detects `PS=0` when raw OT frames resume.
+- Web UI footer messaging was refactored to consistently show PS mode state and version warnings.
+- Sensor simulation state is surfaced in the footer message but hidden from the main OT monitor table.
+- PS mode footer styling (watermark emphasis) added in both light and dark themes.
 
-Current implementation note: the profile exists in firmware code and defaults to `AUTO`; it is not yet exposed as a user setting.
+### Serial robustness and diagnostics
 
-### Completeness fixes
+- Increased OT serial read line buffer limit from `256` to `512` bytes (PS=1 summary lines can exceed 256 bytes).
+- Improved serial overflow handling:
+  - drop the current line after overflow
+  - wait for line terminator before resuming (no partial/corrupted forwarding)
+- Added dropped-line tracking counter for overflow-related line drops.
+- Expanded WebSocket event logging for OTGW activity using prefixed event lines (`>`, `<`, `!`, `*`):
+  - sent commands
+  - command responses
+  - OTGW error/status responses (`NG`, `SE`, `BV`, `OR`, `NS`, `NF`, `OE`, Error 01-04)
+  - queue drops and reset actions (`GW=R`)
+  - PS mode transitions
+  - serial overflow notifications
+  - PIC restart banner detection
+  - ser2net-injected OTGW commands
+- Time-command debug logging was clarified to avoid duplicate/noisy messages.
 
-- Added missing `getOTGWValue()` mappings for:
-  - ID 113 (`BurnerUnsuccessfulStarts`)
-  - ID 114 (`FlameSignalTooLow`)
+### Web UI / mobile / flash UX improvements
 
----
+- Added shared page-navigation template shell for multiple pages (`Home`, `Settings`, `Advanced`, etc.) to reduce duplication.
+- Added `index_common.css` for shared responsive/mobile behavior across light/dark themes.
+- Improved mobile responsiveness (notably at `<= 768px`):
+  - stacked navigation layout
+  - better settings form layout
+  - improved OT log controls on small screens
+  - larger tap targets and more consistent spacing
+- Settings UI markup improved (`label for=...` usage and input container class cleanup).
+- Device-info display formatting helpers added (including gateway mode formatting and case-insensitive label translation fallback).
+- OT log rendering improved:
+  - frozen viewport position when auto-scroll is disabled
+  - avoids unnecessary DOM rewrites when content has not changed
+- OT log buffer (including persisted `localStorage` logs) is now cleared after firmware/filesystem flash completion.
+- PIC/filesystem flash page UX improved with clearer backup checkbox help text and stronger submit button states/styles.
 
-## 2) Runtime Safety and Defensive Handling
+### Developer tooling / CI / documentation
 
-### OT map bounds checks
-
-To prevent out-of-bounds map reads:
-
-- `processOT()` now checks `OTdata.id <= OT_MSGID_MAX` before reading `OTmap`.
-- Unknown IDs get a safe fallback lookup object (`label="Unknown"` etc.).
-
-Files:
-
-- `src/OTGW-firmware/OTGW-Core.ino`
-
-### REST value lookup hardening
-
-- `sendOTGWvalue(int msgid)` now validates range before reading `OTmap[msgid]`.
-
-File:
-
-- `src/OTGW-firmware/restAPI.ino`
-
----
-
-## 3) MQTT and Home Assistant Discovery Corrections
-
-### Topic and label typo fixes
-
-Corrected typos in MQTT publications and HA discovery config:
-
-| Old | New |
-| --- | --- |
-| `eletric_production` | `electric_production` |
-| `solar_storage_slave_fault_incidator` | `solar_storage_slave_fault_indicator` |
-| `Diagonostic_Indicator` | `Diagnostic_Indicator` |
-
-Files:
-
-- `src/OTGW-firmware/OTGW-Core.ino`
-- `src/OTGW-firmware/data/mqttha.cfg`
-
-### HA discovery and MQTT topic alignment fixes
-
-- `mqttha.cfg`: fixed `vh_configuration_*` discovery entries to trigger on message ID `74` (`ConfigMemberIDVH`) instead of `70`.
-- `mqttha.cfg`: fixed `Hcratio` discovery `stat_t` topic to `%mqtt_pub_topic%/Hcratio` (was incorrectly `%mqtt_pub_topic%/DHWFlowRate`).
-- `mqttha.cfg`: replaced broken `FanSpeed` discovery entity with two spec-aligned sensors:
-  - `FanSpeed_setpoint_hz` -> `%mqtt_pub_topic%/FanSpeed_hb_u8`
-  - `FanSpeed_actual_hz` -> `%mqtt_pub_topic%/FanSpeed_lb_u8`
-  - Unit corrected to `Hz` (OpenTherm v4.2 defines Hz, not rpm)
-- Firmware: IDs `71`, `77`, `78`, `87` now publish canonical single-byte base topics (e.g. `RelativeVentilation`) and also publish legacy `_hb_u8` / `_lb_u8` aliases for backward compatibility.
-- Firmware: IDs `98` and `99` now publish semantic decoded topics in addition to raw byte aliases.
-- Firmware: ID `38` (`RelativeHumidity`) now publishes canonical `f8.8` value on `RelativeHumidity` instead of split `u8/u8` topics.
-
-Files:
-
-- `src/OTGW-firmware/OTGW-Core.h`
-- `src/OTGW-firmware/OTGW-Core.ino`
-- `src/OTGW-firmware/data/mqttha.cfg`
-
-### Auto-configuration logic cleanup
-
-`doAutoConfigure()` now:
-
-- skips Dallas placeholder line in central loop,
-- sends lines when `!getMQTTConfigDone(lineID)` (or forced),
-- marks message IDs as configured after publication attempt,
-- triggers Dallas-specific configuration via `configSensors()` only when needed.
-
-File:
-
-- `src/OTGW-firmware/MQTTstuff.ino`
+- Added spec-driven OpenTherm v4.2 audit tool: `tools/opentherm_v42_spec_audit.py`.
+- Added CI workflow to run the OT v4.2 spec audit and upload matrix/report artifacts.
+- ADR compliance workflow GitHub Script step now uses environment variables (fixes/avoids quoting/syntax issues in PR comments).
+- Added/updated supporting docs:
+  - `docs/fixes/opentherm-v42-mqtt-breaking-changes.md`
+  - OpenTherm v4.2 compliance review docs (`docs/reviews/2026-02-15_opentherm-v42-compliance/`)
+  - Issue #143 source-separation options analysis (`docs/reviews/2026-02-20_issue-143-source-separation/ISSUE_143_OPTIONS_ANALYSIS.md`)
+- Repository hygiene cleanup:
+  - removed accidental artifact file `tmpclaude-ecc0-cwd`
+  - ignore Claude local settings artifact path in `.gitignore`
 
 ---
 
-## 4) Documentation and Repository Hygiene
+## Breaking Changes / Migration Notes
 
-### Added OpenTherm v4.2 review docs
+### MQTT / Home Assistant (OpenTherm v4.2 alignment)
 
-- `docs/reviews/2026-02-15_opentherm-v42-compliance/README.md`
-- `docs/reviews/2026-02-15_opentherm-v42-compliance/OPENTHERM_V42_COMPLIANCE_PLAN.md`
-- `docs/reviews/2026-02-15_opentherm-v42-compliance/OUT_OF_SCOPE_ANALYSIS.md`
-
-### Cleanup
-
-- Removed accidental artifact file: `tmpclaude-ecc0-cwd`.
-
----
-
-## Breaking Changes and Migration Notes
-
-### MQTT topic renames
-
-If you use manual MQTT sensors/automations, update these topic names:
+Manual MQTT consumers and older HA entities may need updates:
 
 - `eletric_production` -> `electric_production`
 - `solar_storage_slave_fault_incidator` -> `solar_storage_slave_fault_indicator`
-
-### MQTT payload/topic behavior changes (OpenTherm v4.2 alignment)
-
-The following are breaking for manual MQTT consumers and Home Assistant entities created from older discovery data:
-
-- `RelativeHumidity` (ID `38`) no longer uses legacy `u8/u8` split topics (`RelativeHumidity_hb_u8`, `RelativeHumidity_lb_u8`); it now publishes the v4.2 `f8.8` value on `RelativeHumidity`.
-- `FanSpeed` HA discovery is now split into two sensors (`FanSpeed_setpoint_hz`, `FanSpeed_actual_hz`) with `Hz` units.
-- Legacy pre-v4.2 IDs `50-63` are suppressed on v4.x systems in default `AUTO` mode because those IDs are reserved in OpenTherm v4.2+.
+- `RelativeHumidity_hb_u8` / `RelativeHumidity_lb_u8` (legacy split-byte decoding) -> `RelativeHumidity` canonical `f8.8` payload
+- HA discovery `FanSpeed` (`rpm`) -> `FanSpeed_setpoint_hz` + `FanSpeed_actual_hz` (`Hz`)
+- Legacy IDs `50-63` now suppressed on v4.x systems in default `AUTO` compatibility mode
 
 Compatibility retained:
 
-- IDs `71`, `77`, `78`, `87`: legacy `_hb_u8` / `_lb_u8` alias topics are still published alongside spec-correct base topics.
-- IDs `98`, `99`: raw byte alias topics are still published, plus new semantic decoded topics.
+- IDs `71`, `77`, `78`, `87` keep `_hb_u8` / `_lb_u8` alias topics alongside spec-correct base topics.
+- IDs `98`, `99` keep raw byte alias topics and add semantic decoded topics.
+- Legacy unsuffixed MQTT topics remain published when source separation is enabled (source-suffixed topics are additive).
 
-### Home Assistant cleanup
+### Device info API payload changes (raw consumers)
 
-After upgrade:
+If you parse device info JSON directly (instead of the Web UI), update these keys:
 
-1. Remove stale entities tied to old typo topics and the old `FanSpeed` entity.
-2. Trigger MQTT auto-discovery again.
-3. Verify that `FanSpeed_setpoint_hz` and `FanSpeed_actual_hz` entities are created.
-4. Verify that `electric_production` and solar storage fault entities are available.
-5. If you use legacy IDs `50-63`, verify whether your thermostat/boiler is pre-v4.2 (v4.x systems now suppress them in `AUTO` mode).
+- `gatewaymode` / temporary `mode` usage -> `otgwmode`
+- `wifiqualitytldr` -> `wifiquality_text`
 
-Detailed migration guidance: `docs/fixes/opentherm-v42-mqtt-breaking-changes.md`
+`otgwmode` can be `ON`, `OFF`, or `detecting`.
 
----
+### After upgrading
 
-## Review Findings (vs dev)
+1. Trigger MQTT auto-discovery again (especially if using HA entities for `FanSpeed` or v4.2-affected IDs).
+2. Remove stale HA entities linked to typo topics and old `FanSpeed` discovery.
+3. Update manual MQTT automations/sensors to new topic names and payload formats.
+4. If you rely on legacy IDs `50-63`, confirm the system is truly pre-v4.2.
+5. If custom tooling reads `/api/.../device/info`, update field names to `otgwmode` and `wifiquality_text`.
 
-### Medium
-
-1. `doAutoConfigure()` marks discovery IDs as done even if publish fails.  
-File reference: `src/OTGW-firmware/MQTTstuff.ino:823` and `src/OTGW-firmware/MQTTstuff.ino:824`  
-Context: `sendMQTTStreaming()` returns `void`, so publish failure is not propagated, but `setMQTTConfigDone(lineID)` is still called.  
-Impact: if MQTT is disconnected or publish fails during discovery trigger, entries can be marked configured prematurely and may be skipped on later non-forced runs.
-
-### Low
-
-1. Previous README text claimed an `is_value_valid()` consistency fix that is not present as a code delta vs `dev`.  
-Status: corrected in current README update.
+Detailed OpenTherm MQTT/HA migration guidance: `docs/fixes/opentherm-v42-mqtt-breaking-changes.md`
 
 ---
 
-## Validation Status
+## Validation Basis
 
-This release-note update is based on:
+This summary was compiled from the git delta:
 
-- Commit and diff analysis between `dev` and `dev-branch-v1.2.0-beta`.
-- Manual code-path review of:
-  - `OTGW-Core.h`
-  - `OTGW-Core.ino`
-  - `restAPI.ino`
-  - `MQTTstuff.ino`
-  - `data/mqttha.cfg`
+- baseline: `0a86aa7` (`dev` v1.1.0-beta release notes/version update commit)
+- analyzed head: `ea69853` (`dev-1.2.0-stable-version` local)
+- note: remote branch is ahead by one CI-only `version.h` commit (`fbd66df`)
 
-Not executed in this review:
-
-- Hardware-in-the-loop boiler/thermostat validation
-- End-to-end MQTT broker integration tests
-- Full firmware compile/build pipeline
-
+Functional changes were derived from commit history and file diffs across firmware, Web UI, MQTT/HA config, CI workflows, and documentation.
