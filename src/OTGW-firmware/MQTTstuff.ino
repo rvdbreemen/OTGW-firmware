@@ -188,13 +188,23 @@ const char s_cmd_debugptr[] PROGMEM = "debugptr";
 // ADR-009: Keep source-template discovery literals in PROGMEM.
 const char s_mqtt_source_suffix_token[] PROGMEM = "%source_suffix%";
 const char s_mqtt_source_name_token[] PROGMEM = "%source_name%";
+const char s_mqtt_source_topic_segment_token[] PROGMEM = "%source_topic_segment%";
 
 const char s_mqtt_src_suffix_thermostat[] PROGMEM = "_thermostat";
 const char s_mqtt_src_suffix_boiler[] PROGMEM = "_boiler";
 const char s_mqtt_src_suffix_gateway[] PROGMEM = "_gateway";
+const char s_mqtt_src_key_thermostat[] PROGMEM = "thermostat";
+const char s_mqtt_src_key_boiler[] PROGMEM = "boiler";
+const char s_mqtt_src_key_gateway[] PROGMEM = "gateway";
 const char s_mqtt_src_name_thermostat[] PROGMEM = "Thermostat";
 const char s_mqtt_src_name_boiler[] PROGMEM = "Boiler";
 const char s_mqtt_src_name_gateway[] PROGMEM = "Gateway";
+
+const char* const mqttSourceKeys[] PROGMEM = {
+  s_mqtt_src_key_thermostat,
+  s_mqtt_src_key_boiler,
+  s_mqtt_src_key_gateway
+};
 
 const char* const mqttSourceSuffixes[] PROGMEM = {
   s_mqtt_src_suffix_thermostat,
@@ -495,7 +505,7 @@ void handleMQTT()
 
         // Startup discovery sweep (retained HA config topics). doAutoConfigure()
         // now correctly handles duplicate msgid lines and expands source-template
-        // entries (%source_suffix%) into _thermostat/_boiler/_gateway variants.
+        // entries into thermostat/boiler/gateway variants (using configured placeholders).
         doAutoConfigure();
 
         //Subscribe to topics
@@ -756,28 +766,37 @@ void publishMQTTInt(const __FlashStringHelper* topic, int value) {
   sendMQTTData(topic, buffer);
 }
 
-// ADR-040: Maps rsptype to PROGMEM topic suffix (_thermostat/_boiler/_gateway).
+// Shared source mapping for source-separated MQTT topics / HA discovery expansion.
 // Returns false for parity errors / unknown types (caller should not publish).
-static bool resolveSourceSuffix(byte rsptype, PGM_P &suffix) {
+static bool resolveSourceIndex(byte rsptype, uint8_t &sourceIndex) {
   switch (rsptype) {
-    case OTGW_THERMOSTAT:        suffix = PSTR("_thermostat"); return true;
-    case OTGW_BOILER:            suffix = PSTR("_boiler");     return true;
+    case OTGW_THERMOSTAT:        sourceIndex = 0; return true;
+    case OTGW_BOILER:            sourceIndex = 1; return true;
     case OTGW_REQUEST_BOILER:
-    case OTGW_ANSWER_THERMOSTAT: suffix = PSTR("_gateway");    return true;
+    case OTGW_ANSWER_THERMOSTAT: sourceIndex = 2; return true;
     default: return false;
   }
+}
+
+static bool copySourceTableEntry(const char* const table[] PROGMEM, uint8_t sourceIndex, char *dest, size_t destSize)
+{
+  if (!dest || destSize == 0 || sourceIndex >= 3) return false;
+  PGM_P pValue = (PGM_P)pgm_read_ptr(&table[sourceIndex]);
+  if (!pValue) { dest[0] = '\0'; return false; }
+  strncpy_P(dest, pValue, destSize - 1);
+  dest[destSize - 1] = '\0';
+  return true;
 }
 
 void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
 {
   if (!settingMQTTSeparateSources || !topic || !json) return;
-  PGM_P suffix;
-  if (!resolveSourceSuffix(rsptype, suffix)) return;
+  uint8_t sourceIndex = 0;
+  if (!resolveSourceIndex(rsptype, sourceIndex)) return;
   static char sourceTopic[MQTT_TOPIC_MAX_LEN];
-  char suffixBuf[16];
-  strncpy_P(suffixBuf, suffix, sizeof(suffixBuf) - 1);
-  suffixBuf[sizeof(suffixBuf) - 1] = '\0';
-  snprintf(sourceTopic, sizeof(sourceTopic), "%s%s", topic, suffixBuf);
+  char sourceKeyBuf[16];
+  if (!copySourceTableEntry(mqttSourceKeys, sourceIndex, sourceKeyBuf, sizeof(sourceKeyBuf))) return;
+  snprintf(sourceTopic, sizeof(sourceTopic), "%s/%s", topic, sourceKeyBuf);
   sendMQTTData(sourceTopic, json, false);
 }
 
@@ -857,10 +876,14 @@ void doAutoConfigure(bool bForceAll){
     char *sMsg = mqttAutoConfigBuffers.msg;
     char sourceSuffixToken[16];
     char sourceNameToken[16];
+    char sourceTopicSegmentToken[24];
     strncpy_P(sourceSuffixToken, s_mqtt_source_suffix_token, sizeof(sourceSuffixToken) - 1);
     sourceSuffixToken[sizeof(sourceSuffixToken) - 1] = '\0';
     strncpy_P(sourceNameToken, s_mqtt_source_name_token, sizeof(sourceNameToken) - 1);
     sourceNameToken[sizeof(sourceNameToken) - 1] = '\0';
+    strncpy_P(sourceTopicSegmentToken, s_mqtt_source_topic_segment_token, sizeof(sourceTopicSegmentToken) - 1);
+    sourceTopicSegmentToken[sizeof(sourceTopicSegmentToken) - 1] = '\0';
+    bool sourceTemplateSchemaLogged = false;
     // Snapshot config state at function entry so duplicate lines with the same
     // msgid (e.g. split entities and source-template entries) are all processed
     // in the same run before the global per-msgid bit is set.
@@ -922,24 +945,32 @@ void doAutoConfigure(bool bForceAll){
 
          // ADR-040 source templates expand to 3 discovery entries from one line.
          // This is used by manual/bulk discovery paths (doAutoConfigure()).
-         if (strstr(sTopic, sourceSuffixToken) || strstr(sMsg, sourceSuffixToken)) {
+         bool hasSourceSuffixToken = (strstr(sTopic, sourceSuffixToken) || strstr(sMsg, sourceSuffixToken));
+         bool hasSourceNameToken = (strstr(sTopic, sourceNameToken) || strstr(sMsg, sourceNameToken));
+         bool hasSourceTopicSegmentToken = (strstr(sTopic, sourceTopicSegmentToken) || strstr(sMsg, sourceTopicSegmentToken));
+         if (hasSourceSuffixToken || hasSourceNameToken || hasSourceTopicSegmentToken) {
+           if (!sourceTemplateSchemaLogged) {
+             if (hasSourceTopicSegmentToken) MQTTDebugTln(F("MQTT source template schema: nested %source_topic_segment% placeholders detected (likely updated mqttha.cfg)"));
+             else MQTTDebugTln(F("MQTT source template schema: legacy source placeholders only (older flashed mqttha.cfg may still be in use)"));
+             sourceTemplateSchemaLogged = true;
+           }
            if (settingMQTTSeparateSources) {
              char savedTopic[MQTT_TOPIC_MAX_LEN];
              strlcpy(savedTopic, sTopic, sizeof(savedTopic));
              strlcpy(sLine, sMsg, MQTT_CFG_LINE_MAX_LEN);  // reuse line buffer as msg backup
              for (uint8_t i = 0; i < 3; i++) {
                char srcSuffixBuf[16];
+               char srcKeyBuf[16];
                char srcNameBuf[16];
-               PGM_P pSrcSuffix = (PGM_P)pgm_read_ptr(&mqttSourceSuffixes[i]);
-               PGM_P pSrcName = (PGM_P)pgm_read_ptr(&mqttSourceNames[i]);
-               strncpy_P(srcSuffixBuf, pSrcSuffix, sizeof(srcSuffixBuf) - 1);
-               srcSuffixBuf[sizeof(srcSuffixBuf) - 1] = '\0';
-               strncpy_P(srcNameBuf, pSrcName, sizeof(srcNameBuf) - 1);
-               srcNameBuf[sizeof(srcNameBuf) - 1] = '\0';
+               if (!copySourceTableEntry(mqttSourceSuffixes, i, srcSuffixBuf, sizeof(srcSuffixBuf))) continue;
+               if (!copySourceTableEntry(mqttSourceKeys, i, srcKeyBuf, sizeof(srcKeyBuf))) continue;
+               if (!copySourceTableEntry(mqttSourceNames, i, srcNameBuf, sizeof(srcNameBuf))) continue;
                strlcpy(sTopic, savedTopic, MQTT_TOPIC_MAX_LEN);
                strlcpy(sMsg,   sLine,     MQTT_MSG_MAX_LEN);
                if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, sourceSuffixToken, srcSuffixBuf)) continue;
+               if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, sourceTopicSegmentToken, srcKeyBuf)) continue;
                if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   sourceSuffixToken, srcSuffixBuf)) continue;
+               if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   sourceTopicSegmentToken, srcKeyBuf)) continue;
                if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   sourceNameToken,   srcNameBuf))   continue;
                MQTTDebugTf(PSTR("MQTT source discovery (bulk) msgid %d -> %s\r\n"), lineID, sTopic);
                sendMQTTStreaming(sTopic, sMsg, strlen(sMsg));
@@ -1018,10 +1049,13 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
   char *sMsg = mqttAutoConfigBuffers.msg;
   char sourceSuffixToken[16];
   char sourceNameToken[16];
+  char sourceTopicSegmentToken[24];
   strncpy_P(sourceSuffixToken, s_mqtt_source_suffix_token, sizeof(sourceSuffixToken) - 1);
   sourceSuffixToken[sizeof(sourceSuffixToken) - 1] = '\0';
   strncpy_P(sourceNameToken, s_mqtt_source_name_token, sizeof(sourceNameToken) - 1);
   sourceNameToken[sizeof(sourceNameToken) - 1] = '\0';
+  strncpy_P(sourceTopicSegmentToken, s_mqtt_source_topic_segment_token, sizeof(sourceTopicSegmentToken) - 1);
+  sourceTopicSegmentToken[sizeof(sourceTopicSegmentToken) - 1] = '\0';
   byte lineID = 39; // 39 is unused in OT protocol so is a safe value
 
   //Let's open the MQTT autoconfig file
@@ -1099,27 +1133,30 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     MQTTDebugf(PSTR("[%s]\r\n"), sMsg); 
     DebugFlush();
     
-    // ADR-040: Source template detection — entries with %source_suffix% in mqttha.cfg
+    // ADR-040: Source template detection — entries with source placeholders in mqttha.cfg
     // are emitted 3× (thermostat/boiler/gateway). sLine is safe to reuse here: it held
     // the raw file line which has already been parsed into sTopic/sMsg by splitLine().
-    if (strstr(sTopic, sourceSuffixToken) || strstr(sMsg, sourceSuffixToken)) {
+    bool hasSourceSuffixToken = (strstr(sTopic, sourceSuffixToken) || strstr(sMsg, sourceSuffixToken));
+    bool hasSourceNameToken = (strstr(sTopic, sourceNameToken) || strstr(sMsg, sourceNameToken));
+    bool hasSourceTopicSegmentToken = (strstr(sTopic, sourceTopicSegmentToken) || strstr(sMsg, sourceTopicSegmentToken));
+    if (hasSourceSuffixToken || hasSourceNameToken || hasSourceTopicSegmentToken) {
       if (settingMQTTSeparateSources && baseMqttTopic != nullptr) {
         char savedTopic[MQTT_TOPIC_MAX_LEN];           // 200 bytes on stack — safe for ESP8266
         strlcpy(savedTopic, sTopic, sizeof(savedTopic));
         strlcpy(sLine, sMsg, MQTT_CFG_LINE_MAX_LEN);  // reuse sLine as sMsg save (same 1200 bytes)
         for (uint8_t i = 0; i < 3; i++) {
           char srcSuffixBuf[16];
+          char srcKeyBuf[16];
           char srcNameBuf[16];
-          PGM_P pSrcSuffix = (PGM_P)pgm_read_ptr(&mqttSourceSuffixes[i]);
-          PGM_P pSrcName = (PGM_P)pgm_read_ptr(&mqttSourceNames[i]);
-          strncpy_P(srcSuffixBuf, pSrcSuffix, sizeof(srcSuffixBuf) - 1);
-          srcSuffixBuf[sizeof(srcSuffixBuf) - 1] = '\0';
-          strncpy_P(srcNameBuf, pSrcName, sizeof(srcNameBuf) - 1);
-          srcNameBuf[sizeof(srcNameBuf) - 1] = '\0';
+          if (!copySourceTableEntry(mqttSourceSuffixes, i, srcSuffixBuf, sizeof(srcSuffixBuf))) continue;
+          if (!copySourceTableEntry(mqttSourceKeys, i, srcKeyBuf, sizeof(srcKeyBuf))) continue;
+          if (!copySourceTableEntry(mqttSourceNames, i, srcNameBuf, sizeof(srcNameBuf))) continue;
           strlcpy(sTopic, savedTopic, MQTT_TOPIC_MAX_LEN);
           strlcpy(sMsg,   sLine,     MQTT_MSG_MAX_LEN);
           if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, sourceSuffixToken, srcSuffixBuf)) continue;
+          if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, sourceTopicSegmentToken, srcKeyBuf)) continue;
           if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   sourceSuffixToken, srcSuffixBuf)) continue;
+          if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   sourceTopicSegmentToken, srcKeyBuf)) continue;
           if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   sourceNameToken,   srcNameBuf))   continue;
           MQTTDebugTf(PSTR("MQTT source discovery (jit) msgid %d -> %s\r\n"), OTid, sTopic);
           sendMQTTStreaming(sTopic, sMsg, strlen(sMsg));

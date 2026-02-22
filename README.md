@@ -27,7 +27,7 @@ Version 1.2.0-beta builds on the `dev` v1.1.0-beta baseline with OpenTherm v4.2 
 - **MQTT / Home Assistant correctness + expansion**
   - Fixed typo topics (`electric_production`, solar storage fault indicator), `Hcratio` HA discovery topic, and `vh_configuration_*` trigger mapping.
   - `FanSpeed` HA discovery is now split into `FanSpeed_setpoint_hz` / `FanSpeed_actual_hz` (`Hz`).
-  - Added configurable source-separated MQTT/HA discovery (`mqttseparatesources`) with `_thermostat`, `_boiler`, `_gateway` topics while retaining legacy unsuffixed topics.
+  - Added configurable source-separated MQTT/HA discovery (`mqttseparatesources`) with nested source paths (`<metric>/thermostat`, `<metric>/boiler`, `<metric>/gateway`) while retaining legacy unsuffixed topics.
   - Hardened MQTT auto-configuration buffer handling and re-entry behavior (shared static workspace + scoped lock).
 - **Gateway mode / API / UI reliability**
   - Fixed `PR=M` parsing (`M=G` / `M=M`) and added explicit unknown/detecting handling.
@@ -64,15 +64,16 @@ Compatibility notes:
 - IDs `71`, `77`, `78`, and `87` now publish spec-correct single-byte base topics and also keep legacy `_hb_u8` / `_lb_u8` alias topics.
 - IDs `98` and `99` keep raw byte alias topics and add semantic MQTT topics for decoded fields (RF sensor status / remote override operating mode).
 - Legacy IDs `50-63` remain available for actual pre-v4.2 systems.
-- Source-separated MQTT topics (`_thermostat`, `_boiler`, `_gateway`) are additive and controlled by `mqttseparatesources`; legacy unsuffixed topics are retained.
+- Source-separated MQTT topics are additive and controlled by `mqttseparatesources`; source-specific paths now use nested `<metric>/<source>` segments (for example `TSet/thermostat`) while legacy unsuffixed topics are retained.
 
 After upgrading:
 
 1. Remove stale Home Assistant entities (especially old `FanSpeed` and typo-topic entities).
-2. Trigger MQTT auto-discovery again.
-3. Update manual MQTT automations/sensors to the new topic names and payload formats.
-4. If you parse device info JSON directly, update key names to `otgwmode` and `wifiquality_text`.
-5. If you depend on legacy IDs `50-63`, confirm your device is truly pre-v4.2; v4.x devices now suppress those IDs by default.
+2. Clear retained MQTT discovery topics for this device/prefix (and optionally legacy source-specific value topics) if you previously used source-separated topics; older retained paths can remain visible in MQTT Explorer after upgrading.
+3. Trigger MQTT auto-discovery again.
+4. Update manual MQTT automations/sensors to the new topic names and payload formats (including nested source-specific paths like `TSet/thermostat`).
+5. If you parse device info JSON directly, update key names to `otgwmode` and `wifiquality_text`.
+6. If you depend on legacy IDs `50-63`, confirm your device is truly pre-v4.2; v4.x devices now suppress those IDs by default.
 
 ---
 
@@ -377,7 +378,7 @@ There are two ways to integrate with Home Assistant:
 
 ## Important warnings / breaking changes
 
-- **Breaking changes (v1.2.0-beta):** OpenTherm v4.2 MQTT/HA alignment updates include `FanSpeed` HA entity split (`setpoint/actual`, `Hz`), `RelativeHumidity` payload format correction, and suppression of legacy IDs `50-63` on v4.x systems in default `AUTO` mode. See [docs/fixes/opentherm-v42-mqtt-breaking-changes.md](docs/fixes/opentherm-v42-mqtt-breaking-changes.md).
+- **Breaking changes (v1.2.0-beta):** OpenTherm v4.2 MQTT/HA alignment updates include `FanSpeed` HA entity split (`setpoint/actual`, `Hz`), `RelativeHumidity` payload format correction, suppression of legacy IDs `50-63` on v4.x systems in default `AUTO` mode, and source-specific MQTT/HA topic path normalization to nested `<metric>/<source>` paths (manual retained-topic cleanup recommended after upgrade). See [docs/fixes/opentherm-v42-mqtt-breaking-changes.md](docs/fixes/opentherm-v42-mqtt-breaking-changes.md).
 - **Breaking change (v1.0.0):** Default GPIO pin for Dallas temperature sensors changed from **GPIO 13 (D7)** to **GPIO 10 (SD3)**. This aligns with the OTGW hardware default. If you're upgrading from a previous version and have sensors connected to GPIO 13, you'll need to either:
   - Reconnect your sensors to GPIO 10, OR
   - Change the GPIO pin setting back to 13 in the Settings page
