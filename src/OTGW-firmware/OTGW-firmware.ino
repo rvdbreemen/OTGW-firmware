@@ -170,7 +170,6 @@ void sendtimecommand(){
   if (!bPICavailable) return;           // only send when pic is available
   if (OTGWSerial.firmwareType() != FIRMWARE_OTGW) return; //only send timecommand when in gateway firmware, not in diagnostic or interface mode
 
-  DebugTln(F("Minute changed, sending time command to OTGW"));
   //send time command to OTGW
   //send time / weekday
   time_t now = time(nullptr);
@@ -256,7 +255,14 @@ void doTaskEvery5s(){
 //===[ Do task every 30s ]===
 void doTaskEvery30s(){
   //== do tasks ==
-  
+ 
+}
+
+//===[ Do task every 60s ]===
+void doTaskEvery60s(){
+
+  //== do tasks ==
+ 
   // Query the actual gateway mode setting from PIC using PR=M command
   // This provides reliable detection of Gateway vs Monitor mode
   if (bPICavailable && bOTGWonline) {
@@ -279,12 +285,7 @@ void doTaskEvery30s(){
       DebugTln(F("Gateway mode still unknown (waiting for first successful PR=M)"));
     }
   }
-}
 
-//===[ Do task every 60s ]===
-void doTaskEvery60s(){
-
-  //== do tasks ==
   if (strcmp_P(sPICdeviceid, PSTR("unknown")) == 0){
     //keep trying to figure out which pic is used!
     DebugTln(F("PIC is unknown, probe pic using PR=A"));

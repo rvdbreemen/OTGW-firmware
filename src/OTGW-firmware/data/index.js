@@ -192,23 +192,22 @@ function parseGatewayModeValue(modeValue) {
   if (normalized === 'monitor' || normalized === 'off' || normalized === '0' || normalized === 'false') {
     return 'monitor';
   }
+  if (normalized === 'detecting') {
+    return 'detecting';
+  }
   return null;
 }
 
-function updateGatewayModeFromDevInfoEntries(entries) {
-  let modeValue = null;
-
-  for (let i = 0; i < entries.length; i++) {
-    if (entries[i].name === 'otgwmode') {
-      modeValue = entries[i].value;
-      break;
-    }
-  }
-
-  const parsedMode = parseGatewayModeValue(modeValue);
-  if (parsedMode) {
+// Apply a parsed gateway mode value to the indicator.
+// 'gateway'/'monitor' → update last-known and indicator.
+// 'detecting'         → show detecting, keep last-known unchanged.
+// null               → fall back to last-known, or show detecting if nothing known yet.
+function applyParsedGatewayMode(parsedMode) {
+  if (parsedMode === 'gateway' || parsedMode === 'monitor') {
     gatewayModeLastKnown = parsedMode;
     updateGatewayModeIndicator(parsedMode);
+  } else if (parsedMode === 'detecting') {
+    updateGatewayModeIndicator('detecting');
   } else if (gatewayModeLastKnown) {
     updateGatewayModeIndicator(gatewayModeLastKnown);
   } else {
@@ -239,15 +238,7 @@ function refreshGatewayMode(force) {
     })
     .then(json => {
       const device = (json && json.device) ? json.device : {};
-      const parsedMode = parseGatewayModeValue(device.otgwmode);
-      if (parsedMode) {
-        gatewayModeLastKnown = parsedMode;
-        updateGatewayModeIndicator(parsedMode);
-      } else if (gatewayModeLastKnown) {
-        updateGatewayModeIndicator(gatewayModeLastKnown);
-      } else {
-        updateGatewayModeIndicator('detecting');
-      }
+      applyParsedGatewayMode(parseGatewayModeValue(device.otgwmode));
     })
     .catch(error => {
       console.warn('refreshGatewayMode warning:', error);
@@ -2763,15 +2754,7 @@ function refreshDevInfo() {
       const ipaddress = device.ipaddress || "";
       const version = device.fwversion || "";
 
-      const parsedMode = parseGatewayModeValue(device.otgwmode);
-      if (parsedMode) {
-        gatewayModeLastKnown = parsedMode;
-        updateGatewayModeIndicator(parsedMode);
-      } else if (gatewayModeLastKnown) {
-        updateGatewayModeIndicator(gatewayModeLastKnown);
-      } else {
-        updateGatewayModeIndicator('detecting');
-      }
+      applyParsedGatewayMode(parseGatewayModeValue(device.otgwmode));
 
       const versionEl = document.getElementById('devVersion');
       if (versionEl) versionEl.textContent = version;
@@ -3397,7 +3380,6 @@ var translateFields = [
   , ["wifirssi", "Wifi RX Power (dBm)"]
   , ["wifiquality", "Wifi Quality (%)"]
   , ["wifiquality_text", "Wifi Quality"]
-  , ["wifiqualitytldr", "Wifi Quality"]
   , ["lastreset", "Last Reset Reason"]
   , ["mqttconnected", "MQTT Connected"]
   , ["mqttenable", "MQTT Enable"]

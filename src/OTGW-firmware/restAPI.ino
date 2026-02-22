@@ -876,7 +876,7 @@ void sendDeviceInfo()
   sendNestedJsonObj(F("ssid"), CSTR(WiFi.SSID()));
   sendNestedJsonObj(F("wifirssi"), WiFi.RSSI());
   sendNestedJsonObj(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
-  sendNestedJsonObj(F("wifiqualitytldr"), dBmtoQuality(WiFi.RSSI()));
+  sendNestedJsonObj(F("wifiquality_text"), dBmtoQuality(WiFi.RSSI()));
   sendNestedJsonObj(F("ntpenable"), CBOOLEAN(settingNTPenable));
   sendNestedJsonObj(F("ntptimezone"), CSTR(settingNTPtimezone));
   sendNestedJsonObj(F("uptime"), upTime());
@@ -885,9 +885,7 @@ void sendDeviceInfo()
   sendNestedJsonObj(F("mqttconnected"), CBOOLEAN(statusMQTTconnection));
   sendNestedJsonObj(F("thermostatconnected"), CBOOLEAN(bOTGWthermostatstate));
   sendNestedJsonObj(F("boilerconnected"), CBOOLEAN(bOTGWboilerstate));      
-  if (bOTGWgatewaystateKnown) {
-    sendNestedJsonObj(F("mode"), bOTGWgatewaystate ? "gateway" : "monitor");
-  }
+  sendNestedJsonObj(F("otgwmode"), bOTGWgatewaystateKnown ? CCONOFF(bOTGWgatewaystate) : "detecting");
   sendNestedJsonObj(F("otgwconnected"), CBOOLEAN(bOTGWonline));
   
   sendEndJsonObj(F("devinfo"));
@@ -945,7 +943,7 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("mqttconnected"), statusMQTTconnection);
   sendJsonMapEntry(F("thermostatconnected"), bOTGWthermostatstate);
   sendJsonMapEntry(F("boilerconnected"), bOTGWboilerstate);      
-  sendJsonMapEntry(F("otgwmode"), bOTGWgatewaystateKnown ? (bOTGWgatewaystate ? "gateway" : "monitor") : "detecting");
+  sendJsonMapEntry(F("otgwmode"), bOTGWgatewaystateKnown ? CCONOFF(bOTGWgatewaystate) : "detecting");
   sendJsonMapEntry(F("otgwconnected"), bOTGWonline);
   
   sendEndJsonMap(F("device"));
