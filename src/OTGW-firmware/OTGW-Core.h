@@ -153,6 +153,12 @@ typedef struct {
 	uint16_t 	RemehaServicemessage = 0; // u16 Remeha Servicemessage
 	uint16_t    RemehaDetectionConnectedSCU =0; // u16 Remeha detection connected SCU’s
 
+	//Inventum
+	uint16_t 	FilterDaysLeft = 0;           // u16 Days left to change filter (Inventum, ID 92)
+	uint16_t 	ElectricalUsage = 0;           // u16 Electrical usage in W, daily reset (Inventum, ID 93)
+	uint16_t 	CompressorUsage = 0;           // u16 Compressor use in hours, daily reset (Inventum, ID 94)
+	uint16_t 	CompressorUsageLifetime = 0;   // u16 Compressor use in hours, lifetime (Inventum, ID 206)
+
 	//errors
 	uint16_t	error01 = 0;
 	uint16_t	error02 = 0;
@@ -277,6 +283,9 @@ enum OpenThermMessageID {
 	OT_TSPEntryVH,	// u8 / u8 TSP Entry V/H
 	OT_FaultBufferSizeVH, // u8 / u8 Fault Buffer Size V/H
 	OT_FaultBufferEntryVH,	// u8 / u8 Fault Buffer Entry V/H
+	OT_FilterDaysLeft,		// u16  Days left to change filter (Inventum)
+	OT_ElectricalUsage,		// u16  Electrical usage in W, daily reset (Inventum)
+	OT_CompressorUsage,		// u16  Compressor use in hours, daily reset (Inventum)
 	OT_RFstrengthbatterylevel=98, // u8 / u8  RF strength and battery level
 	OT_OperatingMode_HC1_HC2_DHW, // u8 / u8 Operating Mode HC1, HC2/ DHW
 	OT_RemoteOverrideFunction, // flag8 / -  Function of manual and program changes in master and remote room setpoint. 
@@ -310,6 +319,7 @@ enum OpenThermMessageID {
 	OT_RemehadFdUcodes, // u8 / u8 Remeha dF-/dU-codes
 	OT_RemehaServicemessage, // u8 / u8 Remeha Servicemessage
 	OT_RemehaDetectionConnectedSCU, // u8 / u8 Remeha detection connected SCU’s
+	OT_CompressorUsageLifetime = 206, // u16  Compressor use in hours, lifetime (Inventum)
 };
 	enum OTtype_t { ot_f88, ot_s16, ot_s8s8, ot_u16, ot_u8u8, ot_flag8, ot_flag8flag8, ot_special, ot_flag8u8, ot_u8, ot_undef}; 
  	enum OTmsgcmd_t { OT_READ, OT_WRITE, OT_RW, OT_UNDEF };
@@ -419,9 +429,9 @@ enum OpenThermMessageID {
 		{  89, OT_RW    , ot_u8u8, 			"TSPEntryVH", "TSP setting V/H", "" },
 		{  90, OT_READ  , ot_u8u8, 			"FaultBufferSizeVH", "Fault Buffer Size V/H", "" },
 		{  91, OT_READ  , ot_u8u8, 			"FaultBufferEntryVH", "Fault Buffer Entry V/H", "" },
-		{  92, OT_UNDEF , ot_undef, 		"", "", "" },
-		{  93, OT_UNDEF , ot_undef, 		"", "", "" },
-		{  94, OT_UNDEF , ot_undef, 		"", "", "" },
+		{  92, OT_READ  , ot_u16, 		"FilterDaysLeft", "Days left to change filter", "" },
+		{  93, OT_READ  , ot_u16, 		"ElectricalUsage", "Electrical usage (daily reset)", "W" },
+		{  94, OT_READ  , ot_u16, 		"CompressorUsage", "Compressor use (hours - daily reset)", "hrs" },
 		{  95, OT_UNDEF , ot_undef, 		"", "", "" },
 		{  96, OT_UNDEF , ot_undef, 		"", "", "" },
 		{  97, OT_UNDEF , ot_undef, 		"", "", "" },
@@ -461,13 +471,86 @@ enum OpenThermMessageID {
 		{ 131, OT_RW 	, ot_u8u8, 			"RemehadFdUcodes", "Remeha dF-/dU-codes", "" },
 		{ 132, OT_READ 	, ot_u8u8, 			"RemehaServicemessage", "Remeha Servicemessage", "" },
 		{ 133, OT_READ 	, ot_u8u8, 			"RemehaDetectionConnectedSCU", "Remeha detection connected SCU’s", "" },
+		{ 134, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 135, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 136, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 137, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 138, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 139, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 140, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 141, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 142, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 143, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 144, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 145, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 146, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 147, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 148, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 149, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 150, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 151, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 152, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 153, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 154, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 155, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 156, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 157, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 158, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 159, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 160, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 161, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 162, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 163, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 164, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 165, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 166, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 167, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 168, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 169, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 170, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 171, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 172, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 173, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 174, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 175, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 176, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 177, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 178, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 179, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 180, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 181, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 182, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 183, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 184, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 185, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 186, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 187, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 188, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 189, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 190, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 191, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 192, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 193, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 194, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 195, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 196, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 197, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 198, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 199, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 200, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 201, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 202, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 203, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 204, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 205, OT_UNDEF , ot_undef, 		"", "", "" },
+		{ 206, OT_READ  , ot_u16, 		"CompressorUsageLifetime", "Compressor use (hours - lifetime)", "hrs" },
 		// all data ids are not defined above are resevered for future use
 		// A foney id is used for sensors on GPIO ports, 
  		// 245 for counter and 
  		// 246 for Dallas temperature sensors
 	};
 
-#define OT_MSGID_MAX 133
+#define OT_MSGID_MAX 206
 
 time_t msglastupdated[256] = {0}; //all msg, even if they are unknown
 
