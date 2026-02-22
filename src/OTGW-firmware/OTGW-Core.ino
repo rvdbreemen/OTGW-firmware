@@ -242,25 +242,30 @@ bool queryOTGWgatewaymode(){
   
   OTGWDebugTf(PSTR("queryOTGWgatewaymode: PR=M response=[%s]\r\n"), CSTR(response));
   
-  // Response should be "G" for Gateway mode or "M" for Monitor mode
-  // executeCommand() strips the "PR: " prefix, so we just get the value
+  // Response format is "M=G" (Gateway mode) or "M=M" (Monitor mode).
+  // executeCommand() strips the "PR: " prefix, leaving e.g. " M=G" which is trimmed to "M=G".
+  // The value is the character after '='.
   bool isGatewayMode = cachedGatewayMode;
   bool parseOk = false;
-  
-  if (response.length() > 0) {
-    char mode = response.charAt(0);
-    if (mode == 'G' || mode == 'g') {
+
+  int eqPos = response.indexOf('=');
+  if (eqPos >= 0 && eqPos + 1 < (int)response.length()) {
+    char modeVal = response.charAt(eqPos + 1);
+    if (modeVal == 'G' || modeVal == 'g') {
       isGatewayMode = true;
       parseOk = true;
-      OTGWDebugTln(F("queryOTGWgatewaymode: Gateway mode (G) detected"));
-    } else if (mode == 'M' || mode == 'm') {
+      OTGWDebugTln(F("queryOTGWgatewaymode: Gateway mode detected"));
+    } else if (modeVal == 'M' || modeVal == 'm') {
       isGatewayMode = false;
       parseOk = true;
-      OTGWDebugTln(F("queryOTGWgatewaymode: Monitor mode (M) detected"));
+      OTGWDebugTln(F("queryOTGWgatewaymode: Monitor mode detected"));
     } else {
-      OTGWDebugTf(PSTR("queryOTGWgatewaymode: Unexpected response [%s], keeping cached value [%s]\r\n"),
-                  CSTR(response), CCONOFF(cachedGatewayMode));
+      OTGWDebugTf(PSTR("queryOTGWgatewaymode: Unexpected value [%c] in response [%s], keeping cached value [%s]\r\n"),
+                  modeVal, CSTR(response), CCONOFF(cachedGatewayMode));
     }
+  } else if (response.length() > 0) {
+    OTGWDebugTf(PSTR("queryOTGWgatewaymode: Unexpected response format [%s], keeping cached value [%s]\r\n"),
+                CSTR(response), CCONOFF(cachedGatewayMode));
   } else {
     OTGWDebugTln(F("queryOTGWgatewaymode: Empty response, keeping cached value"));
   }
@@ -338,7 +343,7 @@ String executeCommand(const String sCmd){
     feedWatchDog();
   }
   String _cmd = sCmd.substring(0,2);
-  OTGWDebugTf(PSTR("Send command: [%s]\r\n"), CSTR(_cmd));
+  OTGWDebugTf(PSTR("Awaiting response prefix: [%s]\r\n"), CSTR(_cmd));
   //fetch a line
   String line = OTGWSerial.readStringUntil('\n');
   
