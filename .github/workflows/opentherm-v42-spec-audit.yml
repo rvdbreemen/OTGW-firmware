@@ -1,0 +1,48 @@
+name: OpenTherm v4.2 Spec Audit
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+      - dev
+      - "dev-*"
+      - "copilot-*"
+      - "release/**"
+  push:
+    branches:
+      - dev
+      - "dev-*"
+      - main
+      - "copilot/*"
+
+jobs:
+  spec-audit:
+    name: Spec-driven OT v4.2 audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Run OpenTherm v4.2 spec audit
+        run: |
+          python tools/opentherm_v42_spec_audit.py \
+            --check \
+            --matrix-out .tmp/ot_v42_matrix_ci.csv \
+            --report-out .tmp/ot_v42_audit_report_ci.json
+
+      - name: Upload audit artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opentherm-v42-spec-audit-${{ github.run_id }}
+          path: |
+            .tmp/ot_v42_matrix_ci.csv
+            .tmp/ot_v42_audit_report_ci.json
+          if-no-files-found: warn

@@ -64,7 +64,7 @@ typedef struct {
 	uint16_t	FanSpeed = 0; // u8 / u8  Fan Speed setpoint / actual (Hz)
 	float 		ElectricalCurrentBurnerFlame = 0.0f; // f88 Electrical current through burner flame (µA)
 	float 		TRoomCH2= 0.0f; // f88  Room Temperature for 2nd CH circuit ("°C)
-	uint16_t	RelativeHumidity = 0; // u8 / u8 Relative Humidity (%)
+	float 		RelativeHumidity = 0.0f; // f8.8 Relative Humidity (%)
 	uint16_t 	TdhwSetUBTdhwSetLB = 0 ; // s8 / s8  DHW setpoint upper & lower bounds for adjustment  (°C)
 	uint16_t 	MaxTSetUBMaxTSetLB = 0; // s8 / s8  Max CH water setpoint upper & lower bounds for adjustment  (°C)
 	uint16_t	HcratioUBHcratioLB = 0; // s8 / s8  OTC heat curve ratio upper & lower bounds for adjustment  
@@ -273,7 +273,7 @@ enum OpenThermMessageID {
 	OT_OpenthermVersionVH, // f8.8 OpenTherm Version V/H
 	OT_VersionTypeVH,	// u8 / u8 Version & Type V/H
 	OT_RelativeVentilation, // u8 Relative Ventilation (%)
-	OT_RelativeHumidityExhaustAir, // u8 / u8 Relative Humidity (%)
+	OT_RelativeHumidityExhaustAir, // LB u8 Relative Humidity Exhaust Air (%), HB reserved
 	OT_CO2LevelExhaustAir, // u16 CO2 Level (ppm)
  	OT_SupplyInletTemperature,	// f8.8 Supply Inlet Temperature (°C)
  	OT_SupplyOutletTemperature, // f8.8 Supply Outlet Temperature(°C)
@@ -292,8 +292,8 @@ enum OpenThermMessageID {
 	OT_BrandSerialNumber, // u8 / u8 Brand serial number (index/char)
 	OT_CoolingOperationHours, // u16 Cooling operation hours
 	OT_PowerCycles, // u16 Power cycles
-	OT_RFstrengthbatterylevel=98, // u8 / u8  RF strength and battery level
-	OT_OperatingMode_HC1_HC2_DHW, // u8 / u8 Operating Mode HC1, HC2/ DHW
+	OT_RFstrengthbatterylevel=98, // special RF sensor status information
+	OT_OperatingMode_HC1_HC2_DHW, // special Remote Override Operating Mode (Heating/DHW)
 	OT_RemoteOverrideFunction, // flag8 / -  Function of manual and program changes in master and remote room setpoint. 
 	OT_SolarStorageMaster,	// flag8 / flag8  Solar Storage  Master flags.
 	OT_SolarStorageASFflags, // flag8 / u8 / Solar Storage OEM-fault-code  flag8 / u8  Application-specific fault flags and OEM fault code 
@@ -346,7 +346,7 @@ enum OpenThermMessageID {
         {   1, OT_WRITE , ot_f88,        	"TSet", "Control setpoint", "°C" },
         {   2, OT_WRITE , ot_flag8u8,    	"MasterConfigMemberIDcode", "Master Config / Member ID", "" },
         {   3, OT_READ  , ot_flag8u8,    	"SlaveConfigMemberIDcode", "Slave Config / Member ID", "" },
-        {   4, OT_RW    , ot_u8u8,       	"Command", "Command-Code", "" },
+        {   4, OT_WRITE , ot_u8u8,       	"Command", "Command-Code", "" },
 		{   5, OT_READ  , ot_flag8u8,    	"ASFflags", "Application-specific fault", "" },
 		{   6, OT_READ  , ot_flag8flag8,    "RBPflags", "Remote-parameter flags", "" },
 		{   7, OT_WRITE , ot_f88,        	"CoolingControl", "Cooling control signal", "%" },
@@ -380,7 +380,7 @@ enum OpenThermMessageID {
 		{  35, OT_READ  , ot_u8u8,	 	 	"FanSpeed", "Boiler fan speed and setpoint", "Hz" },
 		{  36, OT_READ  , ot_f88, 			"ElectricalCurrentBurnerFlame", "Electrical current through burner flame", "µA" },
 		{  37, OT_WRITE , ot_f88, 			"TRoomCH2", "Room temperature for 2nd CH circuit", "°C" },
-		{  38, OT_RW    , ot_u8u8, 			"RelativeHumidity", "Relative Humidity", "%" },
+		{  38, OT_RW    , ot_f88, 			"RelativeHumidity", "Relative Humidity", "%" },
 		{  39, OT_READ  , ot_f88, 			"TrOverride2", "Remote override room setpoint 2", "°C" },
 		{  40, OT_UNDEF , ot_undef, 		"", "", "" },
 		{  41, OT_UNDEF , ot_undef, 		"", "", "" },
@@ -413,14 +413,14 @@ enum OpenThermMessageID {
 		{  68, OT_UNDEF , ot_undef, 		"", "", "" },
 		{  69, OT_UNDEF , ot_undef, 		"", "", "" },
 		{  70, OT_READ  , ot_flag8flag8,  	"StatusVH", "Status Ventilation/Heat recovery", "" },
-		{  71, OT_WRITE , ot_u8, 			"ControlSetpointVH", "Control setpoint V/H", "" },
+		{  71, OT_WRITE , ot_u8, 			"ControlSetpointVH", "Control setpoint V/H", "%" },
 		{  72, OT_READ  , ot_flag8u8, 		"ASFFaultCodeVH", "Application-specific Fault Flags/Code V/H", "" },
 		{  73, OT_READ  , ot_u16,		 	"DiagnosticCodeVH", "Diagnostic code V/H", "" },
 		{  74, OT_READ  , ot_flag8u8,		"ConfigMemberIDVH", "Config/Member ID V/H", "" },
 		{  75, OT_READ  , ot_f88, 			"OpenthermVersionVH", "OpenTherm version V/H", "" },
 		{  76, OT_READ  , ot_u8u8, 			"VersionTypeVH", "Product version & type V/H", "" },
 		{  77, OT_READ  , ot_u8, 			"RelativeVentilation", "Relative ventilation", "%" },
-		{  78, OT_RW    , ot_u8u8, 			"RelativeHumidityExhaustAir", "Relative humidity exhaust air", "%" },
+		{  78, OT_RW    , ot_u8, 			"RelativeHumidityExhaustAir", "Relative humidity exhaust air", "%" },
 		{  79, OT_RW    , ot_u16, 			"CO2LevelExhaustAir", "CO2 level exhaust air", "ppm" },
  		{  80, OT_READ  , ot_f88, 			"SupplyInletTemperature", "Supply inlet temperature", "°C" },
  		{  81, OT_READ  , ot_f88, 			"SupplyOutletTemperature", "Supply outlet temperature", "°C" },
@@ -429,7 +429,7 @@ enum OpenThermMessageID {
 		{  84, OT_READ  , ot_u16, 			"ActualExhaustFanSpeed", "Actual exhaust fan speed", "rpm" },
 		{  85, OT_READ  , ot_u16, 			"ActualSupplyFanSpeed", "Actual supply fan speed", "rpm" },
 		{  86, OT_READ  , ot_flag8flag8, 	"RemoteParameterSettingVH", "Remote Parameter Setting V/H", "" },
-		{  87, OT_RW 	, ot_u8, 			"NominalVentilationValue", "Nominal Ventilation Value", "" },
+		{  87, OT_RW 	, ot_u8, 			"NominalVentilationValue", "Nominal Ventilation Value", "%" },
 		{  88, OT_READ  , ot_u8u8, 			"TSPNumberVH", "TSP Number V/H", "" },
 		{  89, OT_RW    , ot_u8u8, 			"TSPEntryVH", "TSP setting V/H", "" },
 		{  90, OT_READ  , ot_u8u8, 			"FaultBufferSizeVH", "Fault Buffer Size V/H", "" },
@@ -440,8 +440,8 @@ enum OpenThermMessageID {
 		{  95, OT_READ  , ot_u8u8, 			"BrandSerialNumber", "Boiler brand serial number (index/char)", "" },
 		{  96, OT_RW    , ot_u16, 			"CoolingOperationHours", "Cooling operation hours", "hrs" },
 		{  97, OT_RW    , ot_u16, 			"PowerCycles", "Power cycles", "" },
-		{  98, OT_WRITE , ot_u8u8, 			"RFstrengthbatterylevel", "RF strength and battery level", "" },
-		{  99, OT_RW    , ot_u8u8, 			"OperatingMode_HC1_HC2_DHW", "Operating Mode HC1, HC2/ DHW", "" },
+		{  98, OT_WRITE , ot_special, 		"RFstrengthbatterylevel", "RF sensor status information", "" },
+		{  99, OT_RW    , ot_special, 		"OperatingMode_HC1_HC2_DHW", "Remote Override Operating Mode (Heating/DHW)", "" },
 		{ 100, OT_READ  , ot_flag8,       	"RoomRemoteOverrideFunction", "Function of manual and program changes in master and remote room setpoint.", "" },
 		{ 101, OT_READ  , ot_flag8flag8, 	"SolarStorageMaster", "Solar Storage Master mode", "" },
 		{ 102, OT_READ  , ot_flag8u8,    	"SolarStorageASFflags", "Solar Storage Application-specific flags and OEM fault", "" },

@@ -68,6 +68,7 @@ char ot_log_buffer[OT_LOG_BUFFER_SIZE];
 
 #define ClrLog()            ({ ot_log_buffer[0] = '\0'; })
 #define AddLogf(...)        ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { snprintf(ot_log_buffer + _len, OT_LOG_BUFFER_SIZE - _len, __VA_ARGS__); } })
+#define AddLogf_P(...)      ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { snprintf_P(ot_log_buffer + _len, OT_LOG_BUFFER_SIZE - _len, __VA_ARGS__); } })
 #define AddLog(logstring)   ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, logstring, OT_LOG_BUFFER_SIZE); } })
 #define AddLogln()          ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, "\r\n", OT_LOG_BUFFER_SIZE); } })
 
@@ -140,6 +141,71 @@ static const char* skipOTLogTimestamp(const char* logLine)
 OpenthermData_t OTdata, delayedOTdata, tmpOTdata;
 
 #define OTGW_BANNER "OpenTherm Gateway"
+
+enum OTSpecCompatMode : uint8_t {
+  OT_SPEC_COMPAT_AUTO = 0,
+  OT_SPEC_COMPAT_V4X_STRICT,
+  OT_SPEC_COMPAT_PRE_V42_LEGACY
+};
+
+// Default behavior:
+// - AUTO keeps pre-v4.2 compatibility until a 4.x OpenTherm version is detected,
+//   then applies v4.x reserved-ID rules (notably IDs 50-63).
+static OTSpecCompatMode gOTSpecCompatMode = OT_SPEC_COMPAT_AUTO;
+
+static bool isLegacyPreV42CompatibilityId(uint8_t msgid)
+{
+  return (msgid >= 50U && msgid <= 63U);
+}
+
+static bool useV4xReservedIdRules()
+{
+  switch (gOTSpecCompatMode) {
+    case OT_SPEC_COMPAT_V4X_STRICT:
+      return true;
+    case OT_SPEC_COMPAT_PRE_V42_LEGACY:
+      return false;
+    case OT_SPEC_COMPAT_AUTO:
+    default:
+      return (OTcurrentSystemState.OpenThermVersionSlave >= 4.0f) ||
+             (OTcurrentSystemState.OpenThermVersionMaster >= 4.0f);
+  }
+}
+
+static bool isMsgIdReservedInActiveProfile(uint8_t msgid)
+{
+  return isLegacyPreV42CompatibilityId(msgid) && useV4xReservedIdRules();
+}
+
+static PGM_P activeOTSpecProfileName_P()
+{
+  if (useV4xReservedIdRules()) return PSTR("OpenTherm v4.x");
+  return PSTR("pre-v4.2 legacy");
+}
+
+static void copyProgmemString(char *dst, size_t dstSize, PGM_P src)
+{
+  if (dst == nullptr || dstSize == 0) return;
+  if (src == nullptr) {
+    dst[0] = '\0';
+    return;
+  }
+  strncpy_P(dst, src, dstSize - 1);
+  dst[dstSize - 1] = '\0';
+}
+
+static inline const __FlashStringHelper* toFlashStringHelper(PGM_P p)
+{
+  return reinterpret_cast<const __FlashStringHelper*>(p);
+}
+
+static void appendProgmemSuffix(char *dst, size_t dstSize, PGM_P suffix)
+{
+  if (dst == nullptr || dstSize == 0 || suffix == nullptr) return;
+  size_t len = strlen(dst);
+  if (len >= (dstSize - 1)) return;
+  strncat_P(dst, suffix, dstSize - len - 1);
+}
 
 //===================[ Send useful information to MQWTT ]=====================
 
@@ -668,6 +734,7 @@ const char *byte_to_binary(int x)
 */
 bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   if (OT.skipthis) return false;
+  if (isMsgIdReservedInActiveProfile(OT.id)) return false;
   bool _valid = false;
   _valid = _valid || (OTlookup.msgcmd==OT_READ && OT.type==OT_READ_ACK);
   _valid = _valid || (OTlookup.msgcmd==OT_WRITE && OT.type==OT_WRITE_DATA);
@@ -1302,6 +1369,219 @@ void print_u8u8(uint16_t& value)
   }
 }
 
+static void publish_u8_alias_topics(const char* baseTopic)
+{
+  char _topic[64] {0};
+  char _msg[10] {0};
+
+  utoa(OTdata.valueHB, _msg, 10);
+  strlcpy(_topic, baseTopic, sizeof(_topic));
+  appendProgmemSuffix(_topic, sizeof(_topic), PSTR("_hb_u8"));
+  sendMQTTData(_topic, _msg);
+  publishToSourceTopic(_topic, _msg, OTdata.rsptype);
+
+  utoa(OTdata.valueLB, _msg, 10);
+  strlcpy(_topic, baseTopic, sizeof(_topic));
+  appendProgmemSuffix(_topic, sizeof(_topic), PSTR("_lb_u8"));
+  sendMQTTData(_topic, _msg);
+  publishToSourceTopic(_topic, _msg, OTdata.rsptype);
+}
+
+static void print_u8_single(uint16_t& value, bool useHB)
+{
+  const uint8_t activeByte = useHB ? OTdata.valueHB : OTdata.valueLB;
+  const uint8_t reservedByte = useHB ? OTdata.valueLB : OTdata.valueHB;
+  const char activeByteName0 = useHB ? 'H' : 'L';
+  const char activeByteName1 = 'B';
+  const char reservedByteName0 = useHB ? 'L' : 'H';
+  const char reservedByteName1 = 'B';
+
+  AddLogf_P(PSTR("%s = %3u %s (%c%c used, %c%c=%u)"),
+            OTlookupitem.label,
+            activeByte,
+            OTlookupitem.unit,
+            activeByteName0, activeByteName1,
+            reservedByteName0, reservedByteName1,
+            reservedByte);
+
+  if (is_value_valid(OTdata, OTlookupitem)){
+    char _msg[10] {0};
+    const char* baseTopic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
+    utoa(activeByte, _msg, 10);
+    sendMQTTData(baseTopic, _msg);
+    publishToSourceTopic(baseTopic, _msg, OTdata.rsptype);
+
+    // Backward compatibility for earlier generic u8u8 decoding.
+    publish_u8_alias_topics(baseTopic);
+    value = activeByte;
+  }
+}
+
+void print_u8_hb(uint16_t& value)
+{
+  print_u8_single(value, true);
+}
+
+void print_u8_lb(uint16_t& value)
+{
+  print_u8_single(value, false);
+}
+
+static PGM_P rfSensorTypeToString_P(uint8_t code)
+{
+  switch (code) {
+    case 0x0: return PSTR("room_temperature_controller");
+    case 0x1: return PSTR("room_temperature_sensor");
+    case 0x2: return PSTR("outside_temperature_sensor");
+    case 0xF: return PSTR("not_defined_type");
+    default:  return PSTR("reserved");
+  }
+}
+
+static PGM_P rfBatteryIndicationToString_P(uint8_t code)
+{
+  switch (code) {
+    case 0x0: return PSTR("no_indication");
+    case 0x1: return PSTR("low_battery");
+    case 0x2: return PSTR("nearly_low_battery");
+    case 0x3: return PSTR("battery_ok");
+    default:  return PSTR("reserved");
+  }
+}
+
+static PGM_P rfSignalStrengthToString_P(uint8_t code)
+{
+  switch (code) {
+    case 0x0: return PSTR("no_indication");
+    case 0x1: return PSTR("strength_1_weak");
+    case 0x2: return PSTR("strength_2");
+    case 0x3: return PSTR("strength_3");
+    case 0x4: return PSTR("strength_4");
+    case 0x5: return PSTR("strength_5_perfect");
+    default:  return PSTR("reserved");
+  }
+}
+
+static PGM_P heatingOverrideModeToString_P(uint8_t code)
+{
+  switch (code) {
+    case 0: return PSTR("no_override");
+    case 1: return PSTR("auto");
+    case 2: return PSTR("comfort");
+    case 3: return PSTR("precomfort");
+    case 4: return PSTR("reduced");
+    case 5: return PSTR("protection");
+    case 6: return PSTR("off");
+    default: return PSTR("reserved");
+  }
+}
+
+static PGM_P dhwOverrideModeToString_P(uint8_t code)
+{
+  switch (code) {
+    case 0: return PSTR("no_override");
+    case 1: return PSTR("auto");
+    case 2: return PSTR("anti_legionella");
+    case 3: return PSTR("comfort");
+    case 4: return PSTR("reduced");
+    case 5: return PSTR("protection");
+    case 6: return PSTR("off");
+    default: return PSTR("reserved");
+  }
+}
+
+static PGM_P onOffToString_P(bool isOn)
+{
+  return isOn ? PSTR("ON") : PSTR("OFF");
+}
+
+void print_rf_sensor_status_information(uint16_t& value)
+{
+  const uint8_t sensorIndex = OTdata.valueHB & 0x0F;
+  const uint8_t sensorType = (OTdata.valueHB >> 4) & 0x0F;
+  const uint8_t batteryInd = OTdata.valueLB & 0x03;
+  const uint8_t signalStrength = (OTdata.valueLB >> 2) & 0x07;
+  char sensorTypeText[32] {0};
+  char signalStrengthText[24] {0};
+  char batteryIndText[24] {0};
+
+  copyProgmemString(sensorTypeText, sizeof(sensorTypeText), rfSensorTypeToString_P(sensorType));
+  copyProgmemString(signalStrengthText, sizeof(signalStrengthText), rfSignalStrengthToString_P(signalStrength));
+  copyProgmemString(batteryIndText, sizeof(batteryIndText), rfBatteryIndicationToString_P(batteryInd));
+
+  AddLogf_P(PSTR("%s = sensor_type[%u:%s] sensor_index[%u] signal[%u:%s] battery[%u:%s]"),
+            OTlookupitem.label,
+            sensorType, sensorTypeText,
+            sensorIndex,
+            signalStrength, signalStrengthText,
+            batteryInd, batteryIndText);
+
+  if (is_value_valid(OTdata, OTlookupitem)){
+    char _msg[16] {0};
+    publish_u8_alias_topics(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
+
+    utoa(sensorIndex, _msg, 10);
+    sendMQTTData(F("RFSensorStatusInformation_sensor_index"), _msg);
+
+    utoa(sensorType, _msg, 10);
+    sendMQTTData(F("RFSensorStatusInformation_sensor_type_code"), _msg);
+    sendMQTTData(F("RFSensorStatusInformation_sensor_type"), toFlashStringHelper(rfSensorTypeToString_P(sensorType)));
+
+    utoa(signalStrength, _msg, 10);
+    sendMQTTData(F("RFSensorStatusInformation_signal_strength_code"), _msg);
+    sendMQTTData(F("RFSensorStatusInformation_signal_strength"), toFlashStringHelper(rfSignalStrengthToString_P(signalStrength)));
+
+    utoa(batteryInd, _msg, 10);
+    sendMQTTData(F("RFSensorStatusInformation_battery_indication_code"), _msg);
+    sendMQTTData(F("RFSensorStatusInformation_battery_indication"), toFlashStringHelper(rfBatteryIndicationToString_P(batteryInd)));
+
+    value = OTdata.u16();
+  }
+}
+
+void print_remote_override_operating_mode(uint16_t& value)
+{
+  const uint8_t hc1Mode = OTdata.valueLB & 0x0F;
+  const uint8_t hc2Mode = (OTdata.valueLB >> 4) & 0x0F;
+  const uint8_t dhwMode = OTdata.valueHB & 0x0F;
+  const bool manualDhwPush = (OTdata.valueHB & 0x10) != 0;
+  char dhwModeText[20] {0};
+  char hc1ModeText[16] {0};
+  char hc2ModeText[16] {0};
+  char manualDhwPushText[4] {0};
+
+  copyProgmemString(dhwModeText, sizeof(dhwModeText), dhwOverrideModeToString_P(dhwMode));
+  copyProgmemString(hc1ModeText, sizeof(hc1ModeText), heatingOverrideModeToString_P(hc1Mode));
+  copyProgmemString(hc2ModeText, sizeof(hc2ModeText), heatingOverrideModeToString_P(hc2Mode));
+  copyProgmemString(manualDhwPushText, sizeof(manualDhwPushText), onOffToString_P(manualDhwPush));
+
+  AddLogf_P(PSTR("%s = DHW[%u:%s push:%s] HC1[%u:%s] HC2[%u:%s]"),
+            OTlookupitem.label,
+            dhwMode, dhwModeText, manualDhwPushText,
+            hc1Mode, hc1ModeText,
+            hc2Mode, hc2ModeText);
+
+  if (is_value_valid(OTdata, OTlookupitem)){
+    char _msg[16] {0};
+    publish_u8_alias_topics(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
+
+    utoa(dhwMode, _msg, 10);
+    sendMQTTData(F("RemoteOverrideOperatingMode_dhw_mode_code"), _msg);
+    sendMQTTData(F("RemoteOverrideOperatingMode_dhw_mode"), toFlashStringHelper(dhwOverrideModeToString_P(dhwMode)));
+    sendMQTTData(F("RemoteOverrideOperatingMode_manual_dhw_push"), toFlashStringHelper(onOffToString_P(manualDhwPush)));
+
+    utoa(hc1Mode, _msg, 10);
+    sendMQTTData(F("RemoteOverrideOperatingMode_hc1_mode_code"), _msg);
+    sendMQTTData(F("RemoteOverrideOperatingMode_hc1_mode"), toFlashStringHelper(heatingOverrideModeToString_P(hc1Mode)));
+
+    utoa(hc2Mode, _msg, 10);
+    sendMQTTData(F("RemoteOverrideOperatingMode_hc2_mode_code"), _msg);
+    sendMQTTData(F("RemoteOverrideOperatingMode_hc2_mode"), toFlashStringHelper(heatingOverrideModeToString_P(hc2Mode)));
+
+    value = OTdata.u16();
+  }
+}
+
 void print_date(uint16_t& value)
 { 
   
@@ -1794,8 +2074,14 @@ void processOT(const char *buf, int len){
       AddLog(" ");  // Space before payload for readability
       
       //next step interpret the OT protocol
-          
-      //#define OTprint(data, value, text, format) ({ data= value; OTGWDebugf("[%37s]", text); OTGWDebugf("= [format]", data)})
+      if (isMsgIdReservedInActiveProfile(OTdata.id)) {
+        char activeProfileName[20] {0};
+        copyProgmemString(activeProfileName, sizeof(activeProfileName), activeOTSpecProfileName_P());
+        AddLogf_P(PSTR("Reserved in %s profile (legacy pre-v4.2 ID %u ignored)"),
+                  activeProfileName,
+                  (unsigned)OTdata.id);
+      } else {
+        //#define OTprint(data, value, text, format) ({ data= value; OTGWDebugf("[%37s]", text); OTGWDebugf("= [format]", data)})
         //interpret values f8.8
 
       switch (static_cast<OpenThermMessageID>(OTdata.id)) {   
@@ -1865,14 +2151,14 @@ void processOT(const char *buf, int len){
         case OT_MasterVersion:                          print_u8u8(OTcurrentSystemState.MasterVersion ); break; 
         case OT_SlaveVersion:                           print_u8u8(OTcurrentSystemState.SlaveVersion); break;
         case OT_StatusVH:                               print_statusVH(OTcurrentSystemState.StatusVH); break;
-        case OT_ControlSetpointVH:                      print_u8u8(OTcurrentSystemState.ControlSetpointVH); break;
+        case OT_ControlSetpointVH:                      print_u8_lb(OTcurrentSystemState.ControlSetpointVH); break;
         case OT_ASFFaultCodeVH:                         print_flag8u8(OTcurrentSystemState.ASFFaultCodeVH); break;
         case OT_DiagnosticCodeVH:                       print_u16(OTcurrentSystemState.DiagnosticCodeVH); break;
         case OT_ConfigMemberIDVH:                       print_vh_configmemberid(OTcurrentSystemState.ConfigMemberIDVH); break;
         case OT_OpenthermVersionVH:                     print_f88(OTcurrentSystemState.OpenthermVersionVH); break;
         case OT_VersionTypeVH:                          print_u8u8(OTcurrentSystemState.VersionTypeVH ); break;
-        case OT_RelativeVentilation:                    print_u8u8(OTcurrentSystemState.RelativeVentilation); break;
-        case OT_RelativeHumidityExhaustAir:             print_u8u8(OTcurrentSystemState.RelativeHumidityExhaustAir); break;
+        case OT_RelativeVentilation:                    print_u8_lb(OTcurrentSystemState.RelativeVentilation); break;
+        case OT_RelativeHumidityExhaustAir:             print_u8_lb(OTcurrentSystemState.RelativeHumidityExhaustAir); break;
         case OT_CO2LevelExhaustAir:                     print_u16(OTcurrentSystemState.CO2LevelExhaustAir); break;
         case OT_SupplyInletTemperature:                 print_f88(OTcurrentSystemState.SupplyInletTemperature); break;
         case OT_SupplyOutletTemperature:                print_f88(OTcurrentSystemState.SupplyOutletTemperature); break;
@@ -1881,7 +2167,7 @@ void processOT(const char *buf, int len){
         case OT_ActualExhaustFanSpeed:                  print_u16(OTcurrentSystemState.ActualExhaustFanSpeed); break;
         case OT_ActualSupplyFanSpeed:                   print_u16(OTcurrentSystemState.ActualSupplyFanSpeed); break;
         case OT_RemoteParameterSettingVH:               print_vh_remoteparametersetting(OTcurrentSystemState.RemoteParameterSettingVH); break;
-        case OT_NominalVentilationValue:                print_u8u8(OTcurrentSystemState.NominalVentilationValue); break;
+        case OT_NominalVentilationValue:                print_u8_hb(OTcurrentSystemState.NominalVentilationValue); break;
         case OT_TSPNumberVH:                            print_u8u8(OTcurrentSystemState.TSPNumberVH); break;
         case OT_TSPEntryVH:                             print_u8u8(OTcurrentSystemState.TSPEntryVH); break;
         case OT_FaultBufferSizeVH:                      print_u8u8(OTcurrentSystemState.FaultBufferSizeVH); break;
@@ -1889,15 +2175,15 @@ void processOT(const char *buf, int len){
         case OT_FanSpeed:                               print_u8u8(OTcurrentSystemState.FanSpeed); break;
         case OT_ElectricalCurrentBurnerFlame:           print_f88(OTcurrentSystemState.ElectricalCurrentBurnerFlame); break;
         case OT_TRoomCH2:                               print_f88(OTcurrentSystemState.TRoomCH2); break;
-        case OT_RelativeHumidity:                       print_u8u8(OTcurrentSystemState.RelativeHumidity); break;
+        case OT_RelativeHumidity:                       print_f88(OTcurrentSystemState.RelativeHumidity); break;
         case OT_TrOverride2:                            print_f88(OTcurrentSystemState.TrOverride2); break;
         case OT_Brand:                                  print_u8u8(OTcurrentSystemState.Brand); break;
         case OT_BrandVersion:                           print_u8u8(OTcurrentSystemState.BrandVersion); break;
         case OT_BrandSerialNumber:                      print_u8u8(OTcurrentSystemState.BrandSerialNumber); break;
         case OT_CoolingOperationHours:                  print_u16(OTcurrentSystemState.CoolingOperationHours); break;
         case OT_PowerCycles:                            print_u16(OTcurrentSystemState.PowerCycles); break;
-        case OT_RFstrengthbatterylevel:                 print_u8u8(OTcurrentSystemState.RFstrengthbatterylevel); break;
-        case OT_OperatingMode_HC1_HC2_DHW:              print_u8u8(OTcurrentSystemState.OperatingMode_HC1_HC2_DHW ); break; 
+        case OT_RFstrengthbatterylevel:                 print_rf_sensor_status_information(OTcurrentSystemState.RFstrengthbatterylevel); break;
+        case OT_OperatingMode_HC1_HC2_DHW:              print_remote_override_operating_mode(OTcurrentSystemState.OperatingMode_HC1_HC2_DHW ); break;
         case OT_ElectricityProducerStarts:              print_u16(OTcurrentSystemState.ElectricityProducerStarts); break;
         case OT_ElectricityProducerHours:               print_u16(OTcurrentSystemState.ElectricityProducerHours); break;
         case OT_ElectricityProduction:                  print_u16(OTcurrentSystemState.ElectricityProduction); break;
@@ -1918,6 +2204,7 @@ void processOT(const char *buf, int len){
         default: 
             AddLogf("Unknown message [%02d] value [%04X] f8.8 [%3.2f] u16 [%d] s16 [%d]", OTdata.id, OTdata.value,  OTdata.f88(), OTdata.u16(), OTdata.s16());
             break;
+      }
       }
       if (OTdata.skipthis) AddLog(" <ignored> ");
       AddLogln();
