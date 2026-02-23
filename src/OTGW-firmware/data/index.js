@@ -1458,6 +1458,13 @@ function updateWSStatus(connected) {
 //============================================================================
 function formatLogLine(logLine) {
   if (!logLine) return "";
+
+  // Event lines from sendEventToWebSocket (sent cmds, responses, errors, system events)
+  if (logLine.isEvent) {
+    const pfx = (typeof logLine.prefix === 'string') ? logLine.prefix : ' ';
+    const content = (typeof logLine.label === 'string') ? logLine.label : '';
+    return pfx + ' ' + content;
+  }
   
   // Construct display line from the incoming JSON fields.
   const pad = (str, len) => (str + "").padEnd(len, ' ');
@@ -1537,6 +1544,21 @@ function parseLogLine(line) {
   } else {
       // Fallback timestamp
       obj.time = new Date().toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) + "." + (new Date().getMilliseconds() + "").padStart(3, '0');
+  }
+  
+  // Detect event prefix lines produced by sendEventToWebSocket:
+  // Format: HH:MM:SS.mmmmmm {prefix} {content}  where prefix is >, <, !, or *
+  const rest = line.substring(offset);
+  const eventMatch = rest.match(/^([><!*]) (.+)/);
+  if (eventMatch) {
+    return {
+      time: obj.time,
+      isEvent: true,
+      prefix: eventMatch[1],
+      // Fields below kept for object shape consistency (processStatsLine/OTGraph use id/valid)
+      source: '', raw: '', id: null, dir: '', valid: ' ',
+      label: eventMatch[2].trim(), value: '', unit: ''
+    };
   }
   
   // Adjust base offsets based on offset
