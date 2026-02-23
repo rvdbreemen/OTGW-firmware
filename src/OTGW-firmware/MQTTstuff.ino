@@ -43,6 +43,7 @@ struct MQTTAutoConfigBuffers {
   char line[MQTT_CFG_LINE_MAX_LEN];
   char topic[MQTT_TOPIC_MAX_LEN];
   char msg[MQTT_MSG_MAX_LEN];
+  char savedTopic[MQTT_TOPIC_MAX_LEN]; // source-template expansion backup (protected by session lock)
 };
 
 // Shared autoconfig workspace for both autoconfig code paths.
@@ -52,6 +53,7 @@ static MQTTAutoConfigBuffers mqttAutoConfigBuffers;
 // Guard shared MQTT autoconfig buffers against accidental re-entry.
 // Current firmware is effectively single-threaded, but this protects future
 // callback/timer refactors from clobbering the shared workspace.
+// Not volatile: ESP8266 is cooperative single-threaded; no ISR enters this path.
 static bool mqttAutoConfigInProgress = false;
 
 struct MQTTAutoConfigSessionLock {
@@ -65,6 +67,9 @@ struct MQTTAutoConfigSessionLock {
   ~MQTTAutoConfigSessionLock() {
     if (locked) mqttAutoConfigInProgress = false;
   }
+  // Prevent accidental copy/move which would cause double-release or leaked lock.
+  MQTTAutoConfigSessionLock(const MQTTAutoConfigSessionLock&) = delete;
+  MQTTAutoConfigSessionLock& operator=(const MQTTAutoConfigSessionLock&) = delete;
 };
 
 static            PubSubClient MQTTclient(wifiClient);
@@ -189,6 +194,25 @@ const char s_cmd_debugptr[] PROGMEM = "debugptr";
 const char s_mqtt_source_suffix_token[] PROGMEM = "%source_suffix%";
 const char s_mqtt_source_name_token[] PROGMEM = "%source_name%";
 const char s_mqtt_source_topic_segment_token[] PROGMEM = "%source_topic_segment%";
+
+// RAM copies of the above tokens — initialized once by initSourceTokens().
+// Made module-level static so both doAutoConfigure and doAutoConfigureMsgid share them
+// without re-copying from PROGMEM on every call.
+static char s_sourceSuffixToken[16];
+static char s_sourceNameToken[16];
+static char s_sourceTopicSegmentToken[24];
+
+static void initSourceTokens() {
+  static bool initialized = false;
+  if (initialized) return;
+  strncpy_P(s_sourceSuffixToken,       s_mqtt_source_suffix_token,         sizeof(s_sourceSuffixToken) - 1);
+  s_sourceSuffixToken[sizeof(s_sourceSuffixToken) - 1] = '\0';
+  strncpy_P(s_sourceNameToken,         s_mqtt_source_name_token,           sizeof(s_sourceNameToken) - 1);
+  s_sourceNameToken[sizeof(s_sourceNameToken) - 1] = '\0';
+  strncpy_P(s_sourceTopicSegmentToken, s_mqtt_source_topic_segment_token,  sizeof(s_sourceTopicSegmentToken) - 1);
+  s_sourceTopicSegmentToken[sizeof(s_sourceTopicSegmentToken) - 1] = '\0';
+  initialized = true;
+}
 
 const char s_mqtt_src_suffix_thermostat[] PROGMEM = "_thermostat";
 const char s_mqtt_src_suffix_boiler[] PROGMEM = "_boiler";
@@ -855,6 +879,47 @@ void clearMQTTConfigDone()
   memset(MQTTautoConfigMap, 0, sizeof(MQTTautoConfigMap));
 }
 //===========================================================================================
+// expandAndPublishSourceTemplates()
+// Expands a source-template discovery line into 3 per-source variants and publishes each.
+// Requires mqttAutoConfigBuffers.topic/.msg to be pre-populated with the template.
+// Uses .savedTopic and .line as scratch for the expansion loop (session lock must be held).
+// yieldHeavy=true calls doBackgroundTasks() after each publish (bulk path),
+//             false calls feedWatchDog() only (JIT path).
+// Returns true if at least one variant was successfully published.
+static bool expandAndPublishSourceTemplates(byte msgid, const char *logLabel, bool yieldHeavy)
+{
+  char *sTopic     = mqttAutoConfigBuffers.topic;
+  char *sMsg       = mqttAutoConfigBuffers.msg;
+  char *sLine      = mqttAutoConfigBuffers.line;
+  char *savedTopic = mqttAutoConfigBuffers.savedTopic;
+
+  strlcpy(savedTopic, sTopic, MQTT_TOPIC_MAX_LEN);
+  strlcpy(sLine, sMsg, MQTT_CFG_LINE_MAX_LEN);  // reuse line buffer as msg backup
+
+  bool published = false;
+  for (uint8_t i = 0; i < 3; i++) {
+    char srcSuffixBuf[16];
+    char srcKeyBuf[16];
+    char srcNameBuf[16];
+    if (!copySourceTableEntry(mqttSourceSuffixes, i, srcSuffixBuf, sizeof(srcSuffixBuf))) continue;
+    if (!copySourceTableEntry(mqttSourceKeys,     i, srcKeyBuf,    sizeof(srcKeyBuf)))    continue;
+    if (!copySourceTableEntry(mqttSourceNames,    i, srcNameBuf,   sizeof(srcNameBuf)))   continue;
+    strlcpy(sTopic, savedTopic, MQTT_TOPIC_MAX_LEN);
+    strlcpy(sMsg,   sLine,      MQTT_MSG_MAX_LEN);
+    if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, s_sourceSuffixToken,       srcSuffixBuf)) continue;
+    if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, s_sourceTopicSegmentToken, srcKeyBuf))    continue;
+    if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   s_sourceSuffixToken,       srcSuffixBuf)) continue;
+    if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   s_sourceTopicSegmentToken, srcKeyBuf))    continue;
+    if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   s_sourceNameToken,         srcNameBuf))   continue;
+    MQTTDebugTf(PSTR("MQTT source discovery (%s) msgid %d -> %s\r\n"), logLabel, (int)msgid, sTopic);
+    sendMQTTStreaming(sTopic, sMsg, strlen(sMsg));
+    published = true;
+    if (yieldHeavy) doBackgroundTasks();
+    else feedWatchDog();
+  }
+  return published;
+}
+//===========================================================================================
 void doAutoConfigure(bool bForceAll){
   // Use shared static buffers (zero heap allocation, single RAM reservation).
   // Lock scope is limited to the file-parse/publish loop so it is released
@@ -874,15 +939,7 @@ void doAutoConfigure(bool bForceAll){
     char *sLine = mqttAutoConfigBuffers.line;
     char *sTopic = mqttAutoConfigBuffers.topic;
     char *sMsg = mqttAutoConfigBuffers.msg;
-    char sourceSuffixToken[16];
-    char sourceNameToken[16];
-    char sourceTopicSegmentToken[24];
-    strncpy_P(sourceSuffixToken, s_mqtt_source_suffix_token, sizeof(sourceSuffixToken) - 1);
-    sourceSuffixToken[sizeof(sourceSuffixToken) - 1] = '\0';
-    strncpy_P(sourceNameToken, s_mqtt_source_name_token, sizeof(sourceNameToken) - 1);
-    sourceNameToken[sizeof(sourceNameToken) - 1] = '\0';
-    strncpy_P(sourceTopicSegmentToken, s_mqtt_source_topic_segment_token, sizeof(sourceTopicSegmentToken) - 1);
-    sourceTopicSegmentToken[sizeof(sourceTopicSegmentToken) - 1] = '\0';
+    initSourceTokens();
     bool sourceTemplateSchemaLogged = false;
     // Snapshot config state at function entry so duplicate lines with the same
     // msgid (e.g. split entities and source-template entries) are all processed
@@ -945,9 +1002,9 @@ void doAutoConfigure(bool bForceAll){
 
          // ADR-040 source templates expand to 3 discovery entries from one line.
          // This is used by manual/bulk discovery paths (doAutoConfigure()).
-         bool hasSourceSuffixToken = (strstr(sTopic, sourceSuffixToken) || strstr(sMsg, sourceSuffixToken));
-         bool hasSourceNameToken = (strstr(sTopic, sourceNameToken) || strstr(sMsg, sourceNameToken));
-         bool hasSourceTopicSegmentToken = (strstr(sTopic, sourceTopicSegmentToken) || strstr(sMsg, sourceTopicSegmentToken));
+         bool hasSourceSuffixToken = (strstr(sTopic, s_sourceSuffixToken) || strstr(sMsg, s_sourceSuffixToken));
+         bool hasSourceNameToken = (strstr(sTopic, s_sourceNameToken) || strstr(sMsg, s_sourceNameToken));
+         bool hasSourceTopicSegmentToken = (strstr(sTopic, s_sourceTopicSegmentToken) || strstr(sMsg, s_sourceTopicSegmentToken));
          if (hasSourceSuffixToken || hasSourceNameToken || hasSourceTopicSegmentToken) {
            if (!sourceTemplateSchemaLogged) {
              if (hasSourceTopicSegmentToken) MQTTDebugTln(F("MQTT source template schema: nested %source_topic_segment% placeholders detected (likely updated mqttha.cfg)"));
@@ -955,27 +1012,7 @@ void doAutoConfigure(bool bForceAll){
              sourceTemplateSchemaLogged = true;
            }
            if (settingMQTTSeparateSources) {
-             char savedTopic[MQTT_TOPIC_MAX_LEN];
-             strlcpy(savedTopic, sTopic, sizeof(savedTopic));
-             strlcpy(sLine, sMsg, MQTT_CFG_LINE_MAX_LEN);  // reuse line buffer as msg backup
-             for (uint8_t i = 0; i < 3; i++) {
-               char srcSuffixBuf[16];
-               char srcKeyBuf[16];
-               char srcNameBuf[16];
-               if (!copySourceTableEntry(mqttSourceSuffixes, i, srcSuffixBuf, sizeof(srcSuffixBuf))) continue;
-               if (!copySourceTableEntry(mqttSourceKeys, i, srcKeyBuf, sizeof(srcKeyBuf))) continue;
-               if (!copySourceTableEntry(mqttSourceNames, i, srcNameBuf, sizeof(srcNameBuf))) continue;
-               strlcpy(sTopic, savedTopic, MQTT_TOPIC_MAX_LEN);
-               strlcpy(sMsg,   sLine,     MQTT_MSG_MAX_LEN);
-               if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, sourceSuffixToken, srcSuffixBuf)) continue;
-               if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, sourceTopicSegmentToken, srcKeyBuf)) continue;
-               if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   sourceSuffixToken, srcSuffixBuf)) continue;
-               if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   sourceTopicSegmentToken, srcKeyBuf)) continue;
-               if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   sourceNameToken,   srcNameBuf))   continue;
-               MQTTDebugTf(PSTR("MQTT source discovery (bulk) msgid %d -> %s\r\n"), lineID, sTopic);
-               sendMQTTStreaming(sTopic, sMsg, strlen(sMsg));
-               doBackgroundTasks(); // Yield between retained publishes
-             }
+             expandAndPublishSourceTemplates(lineID, "bulk", true);
              setMQTTConfigDone(lineID);
            }
            continue; // source template handled (or intentionally skipped when disabled)
@@ -1047,15 +1084,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
   char *sLine = mqttAutoConfigBuffers.line;
   char *sTopic = mqttAutoConfigBuffers.topic;
   char *sMsg = mqttAutoConfigBuffers.msg;
-  char sourceSuffixToken[16];
-  char sourceNameToken[16];
-  char sourceTopicSegmentToken[24];
-  strncpy_P(sourceSuffixToken, s_mqtt_source_suffix_token, sizeof(sourceSuffixToken) - 1);
-  sourceSuffixToken[sizeof(sourceSuffixToken) - 1] = '\0';
-  strncpy_P(sourceNameToken, s_mqtt_source_name_token, sizeof(sourceNameToken) - 1);
-  sourceNameToken[sizeof(sourceNameToken) - 1] = '\0';
-  strncpy_P(sourceTopicSegmentToken, s_mqtt_source_topic_segment_token, sizeof(sourceTopicSegmentToken) - 1);
-  sourceTopicSegmentToken[sizeof(sourceTopicSegmentToken) - 1] = '\0';
+  initSourceTokens();
   byte lineID = 39; // 39 is unused in OT protocol so is a safe value
 
   //Let's open the MQTT autoconfig file
@@ -1078,10 +1107,6 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
   //Lets go read the config and send it out to MQTT line by line
   while (fh.available())
   {
-    // Explicitly clear reused shared buffers each iteration for robustness.
-    memset(sTopic, 0, MQTT_TOPIC_MAX_LEN);
-    memset(sMsg, 0, MQTT_MSG_MAX_LEN);
-
     //read file line by line, split and send to MQTT (topic, msg)
     feedWatchDog(); //start with feeding the dog
     
@@ -1136,33 +1161,12 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     // ADR-040: Source template detection — entries with source placeholders in mqttha.cfg
     // are emitted 3× (thermostat/boiler/gateway). sLine is safe to reuse here: it held
     // the raw file line which has already been parsed into sTopic/sMsg by splitLine().
-    bool hasSourceSuffixToken = (strstr(sTopic, sourceSuffixToken) || strstr(sMsg, sourceSuffixToken));
-    bool hasSourceNameToken = (strstr(sTopic, sourceNameToken) || strstr(sMsg, sourceNameToken));
-    bool hasSourceTopicSegmentToken = (strstr(sTopic, sourceTopicSegmentToken) || strstr(sMsg, sourceTopicSegmentToken));
+    bool hasSourceSuffixToken = (strstr(sTopic, s_sourceSuffixToken) || strstr(sMsg, s_sourceSuffixToken));
+    bool hasSourceNameToken = (strstr(sTopic, s_sourceNameToken) || strstr(sMsg, s_sourceNameToken));
+    bool hasSourceTopicSegmentToken = (strstr(sTopic, s_sourceTopicSegmentToken) || strstr(sMsg, s_sourceTopicSegmentToken));
     if (hasSourceSuffixToken || hasSourceNameToken || hasSourceTopicSegmentToken) {
       if (settingMQTTSeparateSources && baseMqttTopic != nullptr) {
-        char savedTopic[MQTT_TOPIC_MAX_LEN];           // 200 bytes on stack — safe for ESP8266
-        strlcpy(savedTopic, sTopic, sizeof(savedTopic));
-        strlcpy(sLine, sMsg, MQTT_CFG_LINE_MAX_LEN);  // reuse sLine as sMsg save (same 1200 bytes)
-        for (uint8_t i = 0; i < 3; i++) {
-          char srcSuffixBuf[16];
-          char srcKeyBuf[16];
-          char srcNameBuf[16];
-          if (!copySourceTableEntry(mqttSourceSuffixes, i, srcSuffixBuf, sizeof(srcSuffixBuf))) continue;
-          if (!copySourceTableEntry(mqttSourceKeys, i, srcKeyBuf, sizeof(srcKeyBuf))) continue;
-          if (!copySourceTableEntry(mqttSourceNames, i, srcNameBuf, sizeof(srcNameBuf))) continue;
-          strlcpy(sTopic, savedTopic, MQTT_TOPIC_MAX_LEN);
-          strlcpy(sMsg,   sLine,     MQTT_MSG_MAX_LEN);
-          if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, sourceSuffixToken, srcSuffixBuf)) continue;
-          if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, sourceTopicSegmentToken, srcKeyBuf)) continue;
-          if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   sourceSuffixToken, srcSuffixBuf)) continue;
-          if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   sourceTopicSegmentToken, srcKeyBuf)) continue;
-          if (!replaceAll(sMsg,   MQTT_MSG_MAX_LEN,   sourceNameToken,   srcNameBuf))   continue;
-          MQTTDebugTf(PSTR("MQTT source discovery (jit) msgid %d -> %s\r\n"), OTid, sTopic);
-          sendMQTTStreaming(sTopic, sMsg, strlen(sMsg));
-          feedWatchDog();
-        }
-        _result = true;
+        if (expandAndPublishSourceTemplates(OTid, "jit", false)) _result = true;
       }
       continue; // skip regular single-send below (source templates on or off)
     }

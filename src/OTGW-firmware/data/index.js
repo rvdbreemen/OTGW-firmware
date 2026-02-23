@@ -10,6 +10,7 @@
 */
 const localURL = window.location.protocol + '//' + window.location.host;
 const APIGW = window.location.protocol + '//' + window.location.host + '/api/';
+const MOBILE_BREAKPOINT_PX = 768;
 
 "use strict";
 // ============================================================================
@@ -2247,8 +2248,6 @@ function saveUISetting(field, value) {
   console.log("Saving UI Setting [" + field + "] = " + value);
   sendPostSetting(field, value);
 }
-
-const MOBILE_BREAKPOINT_PX = 768;
 
 function renderSharedPageNavShell() {
   var template = document.getElementById('pageNavTemplate');
