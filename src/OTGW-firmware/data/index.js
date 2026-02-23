@@ -1922,6 +1922,75 @@ function setupOTLogControls() {
   // Mark as initialized after all listeners are successfully registered
   otLogControlsInitialized = true;
   updateLogCounters();
+
+  // Command input bar - send one-shot OTGW commands
+  const otCmdInput = document.getElementById('otCmdInput');
+  const btnSendCmd = document.getElementById('btnSendCmd');
+  if (btnSendCmd && otCmdInput) {
+    btnSendCmd.addEventListener('click', function() {
+      sendOTGWcommand(otCmdInput.value);
+    });
+    otCmdInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        sendOTGWcommand(otCmdInput.value);
+      }
+    });
+  }
+}
+
+//============================================================================
+// Send a one-shot command to the OTGW PIC via the REST API
+//============================================================================
+function sendOTGWcommand(cmd) {
+  var trimmedCmd = (cmd || '').trim();
+  var statusEl = document.getElementById('otCmdStatus');
+
+  function clearStatus(delay) {
+    setTimeout(function() {
+      var el = document.getElementById('otCmdStatus');
+      if (el) { el.textContent = ''; el.className = 'ot-cmd-status'; }
+    }, delay);
+  }
+
+  if (!trimmedCmd) {
+    if (statusEl) {
+      statusEl.textContent = 'Enter a command first';
+      statusEl.className = 'ot-cmd-status ot-cmd-error';
+      clearStatus(2000);
+    }
+    return;
+  }
+
+  fetch(`${APIGW}v2/otgw/commands`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json; charset=UTF-8' },
+    body: JSON.stringify({ command: trimmedCmd })
+  })
+  .then(function(response) {
+    if (!response.ok) {
+      return response.text().then(function(text) {
+        throw new Error('HTTP ' + response.status + (text ? ': ' + text.trim() : ''));
+      });
+    }
+    return response.json();
+  })
+  .then(function(data) {
+    if (statusEl) {
+      statusEl.textContent = 'Queued: ' + trimmedCmd;
+      statusEl.className = 'ot-cmd-status ot-cmd-ok';
+      clearStatus(3000);
+    }
+    var inputEl = document.getElementById('otCmdInput');
+    if (inputEl) inputEl.value = '';
+  })
+  .catch(function(err) {
+    console.error('Command failed:', err);
+    if (statusEl) {
+      statusEl.textContent = 'Error: ' + err.message;
+      statusEl.className = 'ot-cmd-status ot-cmd-error';
+    }
+  });
 }
 
 //============================================================================
