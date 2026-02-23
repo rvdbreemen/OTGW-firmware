@@ -7,6 +7,28 @@
 
 ---
 
+## Breaking Changes
+
+> **Action required for upgraders from v1.1.x**
+
+### MQTT topic renames (Home Assistant entity cleanup needed)
+
+Two MQTT topic names were corrected for spelling. Existing Home Assistant entities subscribed to the old topic names will stop receiving updates after upgrade and will appear as orphaned entities:
+
+| Old topic (v1.1.x) | New topic (v1.2.0) | Reason |
+| --- | --- | --- |
+| `…/eletric_production` | `…/electric_production` | Spelling fix |
+| `…/solar_storage_slave_fault_incidator` | `…/solar_storage_slave_fault_indicator` | Spelling fix |
+
+**Migration**: Delete the old entities from Home Assistant (Settings → Devices & Services → MQTT → delete orphaned entities), then trigger MQTT discovery re-registration via the device UI or `POST /api/v2/otgw/discovery`.
+
+### MQTT separate-source topics are opt-in (default: disabled)
+A new feature (`MQTTseparatesources`) publishes source-specific MQTT topics per OT message (thermostat/boiler/gateway). **This is disabled by default** in v1.2.0 for backward compatibility. Upgraders are not affected unless they opt in.
+
+To enable: set `MQTTseparatesources = true` in settings, then run MQTT discovery to register the new per-source HA entities.
+
+---
+
 ## Overview
 
 Version `1.2.0-beta` (branch line `dev-1.2.0-stable-version`) builds on the `dev` `v1.1.0-beta` baseline and adds a broader set of changes than the earlier beta-branch notes captured:

@@ -1124,21 +1124,23 @@ void postSettings()
     return;
   }
 
-  // Extract value as string — handles both string and boolean/numeric JSON values
-  cMsg[0] = '\0';
+  // Extract value as string — use a local buffer to avoid clobbering the global cMsg
+  // which downstream callers (updateSetting, flushSettings) may also write to.
+  char newValue[CMSG_SIZE];
+  newValue[0] = '\0';
   JsonVariant val = doc[F("value")];
   if (val.is<const char*>()) {
-    strlcpy(cMsg, val.as<const char*>(), sizeof(cMsg));
+    strlcpy(newValue, val.as<const char*>(), sizeof(newValue));
   } else if (val.is<bool>()) {
-    strlcpy(cMsg, val.as<bool>() ? "true" : "false", sizeof(cMsg));
+    strlcpy(newValue, val.as<bool>() ? "true" : "false", sizeof(newValue));
   } else if (!val.isNull()) {
     // Numeric or other type — serialize to string
-    serializeJson(val, cMsg, sizeof(cMsg));
+    serializeJson(val, newValue, sizeof(newValue));
   }
 
-  if (cMsg[0] != '\0') {
-    RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, cMsg);
-    updateSetting(field, cMsg);
+  if (newValue[0] != '\0') {
+    RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
+    updateSetting(field, newValue);
     // Synchronous flush: persist to flash NOW so the 200 OK is truthful.
     // The deferred timer still handles MQTT/NTP command updates, but HTTP
     // saves must be durable before we confirm success to the browser.

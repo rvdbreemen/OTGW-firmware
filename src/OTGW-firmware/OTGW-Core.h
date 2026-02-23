@@ -56,7 +56,7 @@ typedef struct {
 	float 		Toutside = 0.0f; // f8.8  Outside temperature (°C)
 	float 		Tret = 0.0f; // f8.8  Return water temperature (°C)
 	float 		Tsolarstorage = 0.0f; // f8.8  Solar storage temperature (°C)
-	int16_t 	Tsolarcollector = 0.0f; // s16  Solar collector temperature (°C)
+	int16_t 	Tsolarcollector = 0; // s16  Solar collector temperature (°C)
 	float 		TflowCH2 = 0.0f; // f8.8  Flow water temperature CH2 circuit (°C)
 	float 		Tdhw2 = 0.0f; // f8.8  Domestic hot water temperature 2 (°C)
 	int16_t 	Texhaust = 0; // s16  Boiler exhaust temperature (°C)
@@ -64,7 +64,7 @@ typedef struct {
 	uint16_t	FanSpeed = 0; // u8 / u8  Fan Speed setpoint / actual (Hz)
 	float 		ElectricalCurrentBurnerFlame = 0.0f; // f88 Electrical current through burner flame (µA)
 	float 		TRoomCH2= 0.0f; // f88  Room Temperature for 2nd CH circuit ("°C)
-	float 		RelativeHumidity = 0.0f; // f8.8 Relative Humidity (%)
+	uint16_t 	RelativeHumidity = 0; // u8 / u8 Relative Humidity (%) — HB=humidity %, LB=reserved
 	uint16_t 	TdhwSetUBTdhwSetLB = 0 ; // s8 / s8  DHW setpoint upper & lower bounds for adjustment  (°C)
 	uint16_t 	MaxTSetUBMaxTSetLB = 0; // s8 / s8  Max CH water setpoint upper & lower bounds for adjustment  (°C)
 	uint16_t	HcratioUBHcratioLB = 0; // s8 / s8  OTC heat curve ratio upper & lower bounds for adjustment  
@@ -380,7 +380,7 @@ enum OpenThermMessageID {
 		{  35, OT_READ  , ot_u8u8,	 	 	"FanSpeed", "Boiler fan speed and setpoint", "Hz" },
 		{  36, OT_READ  , ot_f88, 			"ElectricalCurrentBurnerFlame", "Electrical current through burner flame", "µA" },
 		{  37, OT_WRITE , ot_f88, 			"TRoomCH2", "Room temperature for 2nd CH circuit", "°C" },
-		{  38, OT_RW    , ot_f88, 			"RelativeHumidity", "Relative Humidity", "%" },
+		{  38, OT_RW    , ot_u8u8, 			"RelativeHumidity", "Relative Humidity", "%" },
 		{  39, OT_READ  , ot_f88, 			"TrOverride2", "Remote override room setpoint 2", "°C" },
 		{  40, OT_UNDEF , ot_undef, 		"", "", "" },
 		{  41, OT_UNDEF , ot_undef, 		"", "", "" },
