@@ -2268,6 +2268,15 @@ function initMainPage() {
       });
     }
   );
+  Array.from(document.getElementsByClassName('tabPICSettings')).forEach(
+    function (el, idx, arr) {
+      el.addEventListener('click', function () {
+        picSettingsPage();
+        toggleHidden('adv_dropdown', true);
+        toggleHidden('btnSaveSettings', true);
+      });
+    }
+  );
   Array.from(document.getElementsByClassName('basicSettings')).forEach(
     function (el, idx, arr) {
       el.addEventListener('click', function () {
@@ -2356,6 +2365,7 @@ function showMainPage() {
   document.getElementById("displaySettingsPage").classList.remove('active');
   document.getElementById("displayDeviceInfo").classList.remove('active');
   document.getElementById("displayPICflash").classList.remove('active');
+  document.getElementById("displayPICSettings").classList.remove('active');
   
   refreshDevInfo();
   refreshOTmonitor();
@@ -2374,6 +2384,7 @@ function firmwarePage() {
   document.getElementById("displayMainPage").classList.remove('active');
   document.getElementById("displaySettingsPage").classList.remove('active');
   document.getElementById("displayDeviceInfo").classList.remove('active');
+  document.getElementById("displayPICSettings").classList.remove('active');
   var firmwarePage = document.getElementById("displayPICflash");
   refreshFirmware();
   document.getElementById("displayPICflash").classList.add('active');
@@ -2386,6 +2397,7 @@ function deviceinfoPage() {
   document.getElementById("displayMainPage").classList.remove('active');
   document.getElementById("displaySettingsPage").classList.remove('active');
   document.getElementById("displayPICflash").classList.remove('active');
+  document.getElementById("displayPICSettings").classList.remove('active');
   var deviceinfoPage = document.getElementById("deviceinfoPage");
   refreshDeviceInfo();
   document.getElementById("displayDeviceInfo").classList.add('active');
@@ -2399,11 +2411,98 @@ function settingsPage() {
   document.getElementById("displayMainPage").classList.remove('active');
   document.getElementById("displayDeviceInfo").classList.remove('active');
   document.getElementById("displayPICflash").classList.remove('active');
+  document.getElementById("displayPICSettings").classList.remove('active');
   var settingsPage = document.getElementById("settingsPage");
   refreshSettings();
   document.getElementById("displaySettingsPage").classList.add('active');
 
 } // settingsPage()
+
+function picSettingsPage() {
+  disconnectOTLogWebSocket();
+  clearInterval(tid);
+  refreshDevTime();
+  document.getElementById("displayMainPage").classList.remove('active');
+  document.getElementById("displaySettingsPage").classList.remove('active');
+  document.getElementById("displayDeviceInfo").classList.remove('active');
+  document.getElementById("displayPICflash").classList.remove('active');
+  refreshPICSettings();
+  document.getElementById("displayPICSettings").classList.add('active');
+} // picSettingsPage()
+
+function refreshPICSettings() {
+  console.log("refreshPICSettings()..");
+  var page = document.getElementById('picSettingsPage');
+  if (!page) return;
+
+  fetch(APIGW + 'v2/pic/settings')
+    .then(function(response) {
+      if (!response.ok) {
+        throw new Error('HTTP ' + response.status);
+      }
+      return response.json();
+    })
+    .then(function(json) {
+      var settings = json.pic_settings || {};
+
+      // Human-readable labels and descriptions for each setting key
+      var settingMeta = [
+        { key: 'mode',       label: 'Operating Mode',      desc: 'G=Gateway mode, M=Monitor mode' },
+        { key: 'leds',       label: 'LED Functions',        desc: 'LED assignment codes per LED A-F' },
+        { key: 'gpio',       label: 'GPIO Mode',            desc: 'GPIO pin function assignments' },
+        { key: 'hotwater',   label: 'Hot Water Override',   desc: 'DHW override (1=on, 0=off, A=auto)' },
+        { key: 'thermostat', label: 'Thermostat Sensor',    desc: 'Wireless thermostat sensor ID' },
+        { key: 'setpoint',   label: 'Setpoint Override',    desc: 'Current CH setpoint or temperature override' },
+        { key: 'counters',   label: 'Counter Config',       desc: 'Counter reset configuration' },
+        { key: 'altdata',    label: 'Alternative Data IDs', desc: 'Configured alternative OpenTherm data IDs' }
+      ];
+
+      page.innerHTML = '';
+
+      var table = document.createElement('table');
+      table.className = 'pic-settings-table';
+      var thead = document.createElement('thead');
+      thead.innerHTML = '<tr><th>Setting</th><th>Value</th><th>Description</th></tr>';
+      table.appendChild(thead);
+      var tbody = document.createElement('tbody');
+
+      settingMeta.forEach(function(meta) {
+        var value = settings.hasOwnProperty(meta.key) ? settings[meta.key] : '';
+        var tr = document.createElement('tr');
+
+        var tdLabel = document.createElement('td');
+        tdLabel.className = 'pic-settings-label';
+        tdLabel.textContent = meta.label;
+
+        var tdValue = document.createElement('td');
+        tdValue.className = value ? 'pic-settings-value' : 'pic-settings-loading';
+        tdValue.textContent = value || 'Loading\u2026';
+
+        var tdDesc = document.createElement('td');
+        tdDesc.className = 'pic-settings-desc';
+        tdDesc.textContent = meta.desc;
+
+        tr.appendChild(tdLabel);
+        tr.appendChild(tdValue);
+        tr.appendChild(tdDesc);
+        tbody.appendChild(tr);
+      });
+
+      table.appendChild(tbody);
+      page.appendChild(table);
+
+      var note = document.createElement('p');
+      note.className = 'pic-settings-note';
+      // Note: polling interval is controlled by doTaskEvery30s() on the firmware side
+      note.textContent = 'Settings are polled from the PIC gateway one at a time. Full refresh may take a few minutes.';
+      page.appendChild(note);
+    })
+    .catch(function(error) {
+      if (page) {
+        page.innerHTML = '<p class="pic-settings-error">Error loading PIC settings: ' + escapeHtml(error.message) + '</p>';
+      }
+    });
+} // refreshPICSettings()
 
 function toggleHidden(className, hideOnly) {
   Array.from(document.getElementsByClassName(className)).forEach(

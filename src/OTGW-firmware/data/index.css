@@ -1097,3 +1097,50 @@ body.disable-interaction {
   border: none;
 }
 
+
+/* PIC Settings Table */
+.pic-settings-table {
+  width: 100%;
+  max-width: 860px;
+  border-collapse: collapse;
+  font-size: 13px;
+  background-color: white;
+  margin: 10px;
+}
+.pic-settings-table thead th {
+  background-color: #004080;
+  color: white;
+  padding: 8px 12px;
+  text-align: left;
+}
+.pic-settings-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid #ddd;
+  vertical-align: top;
+}
+.pic-settings-label {
+  font-weight: 600;
+  width: 170px;
+  white-space: nowrap;
+}
+.pic-settings-value {
+  font-family: monospace;
+  width: 200px;
+}
+.pic-settings-loading {
+  color: #999;
+  font-style: italic;
+  width: 200px;
+}
+.pic-settings-desc {
+  color: #555;
+}
+.pic-settings-note {
+  font-size: 12px;
+  color: #888;
+  margin: 8px 10px;
+}
+.pic-settings-error {
+  color: red;
+  padding: 10px;
+}

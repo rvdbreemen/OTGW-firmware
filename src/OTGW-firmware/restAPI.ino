@@ -292,6 +292,10 @@ void processAPI()
           // GET /api/v2/pic/flash-status — RESTful name for pic/flashstatus
           if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
           sendPICFlashStatus();
+        } else if (wc > 4 && strcmp_P(words[4], PSTR("settings")) == 0) {
+          // GET /api/v2/pic/settings — PIC gateway settings (polled PR= commands)
+          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
+          sendPICSettingsV2();
         } else {
           sendApiNotFound(originalURI);
         }
@@ -971,6 +975,25 @@ void sendHealth()
 
 } // sendHealth()
 
+
+//=======================================================================
+// Sends PIC gateway settings as JSON map (v2 format).
+// Returns: {"pic_settings":{"mode":"M=G","leds":"LA=R ...","gpio":"...","hotwater":"...","thermostat":"...","setpoint":"...","counters":"...","altdata":"..."}}
+// Empty string for settings not yet queried (polled one per 30s, ~4 min full cycle).
+void sendPICSettingsV2()
+{
+  sendStartJsonMap(F("pic_settings"));
+  // Order must match picQueryCmds in queryNextPICsetting()
+  sendJsonMapEntry(F("mode"),       picSettingsCache[0]);
+  sendJsonMapEntry(F("leds"),       picSettingsCache[1]);
+  sendJsonMapEntry(F("gpio"),       picSettingsCache[2]);
+  sendJsonMapEntry(F("hotwater"),   picSettingsCache[3]);
+  sendJsonMapEntry(F("thermostat"), picSettingsCache[4]);
+  sendJsonMapEntry(F("setpoint"),   picSettingsCache[5]);
+  sendJsonMapEntry(F("counters"),   picSettingsCache[6]);
+  sendJsonMapEntry(F("altdata"),    picSettingsCache[7]);
+  sendEndJsonMap(F("pic_settings"));
+}
 
 //=======================================================================
 void sendPICFlashStatus()

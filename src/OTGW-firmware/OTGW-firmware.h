@@ -139,6 +139,14 @@ const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
 char      sPICfwversion[32] = "no pic found"; 
 char      sPICdeviceid[32] = "no pic found";
 char      sPICtype[32] = "no pic found";
+
+// PIC settings cache — stores responses from throttled PR= query commands
+// 8 settings queried round-robin, one per doTaskEvery30s() call (~4 min full cycle)
+#define PIC_SETTING_COUNT  8
+#define PIC_SETTING_MAX_LEN 64
+char      picSettingsCache[PIC_SETTING_COUNT][PIC_SETTING_MAX_LEN] = {};
+uint32_t  picSettingsCacheTime[PIC_SETTING_COUNT] = {};   // millis() timestamp (0=not yet queried)
+uint8_t   picSettingsQueryIdx = 0;                        // next setting index to query
 bool      bPICavailable = false;
 char      errorupgrade[129] = "";
 char      currentPICFlashFile[65] = ""; // Track current PIC flash filename for WebSocket progress

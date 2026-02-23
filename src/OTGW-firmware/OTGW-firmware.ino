@@ -255,7 +255,7 @@ void doTaskEvery5s(){
 //===[ Do task every 30s ]===
 void doTaskEvery30s(){
   //== do tasks ==
- 
+  queryNextPICsetting();
 }
 
 //===[ Do task every 60s ]===

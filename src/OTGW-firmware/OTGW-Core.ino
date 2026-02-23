@@ -282,6 +282,43 @@ bool queryOTGWgatewaymode(){
   return cachedGatewayMode;
 }
 
+//===================[ queryNextPICsetting ]=====================
+/*
+ * Query the next PIC setting in the rotation.
+ * Called periodically (doTaskEvery30s) to slowly poll all PR= report commands.
+ * One command per call; 8 commands × 30 s = ~4 min for a full refresh cycle.
+ *
+ * PR commands queried (indexed 0-7):
+ *   0: PR=M  Operating mode (G=gateway, M=monitor)
+ *   1: PR=L  LED functions
+ *   2: PR=G  GPIO mode
+ *   3: PR=H  Hot water override state
+ *   4: PR=T  Wireless thermostat sensor ID
+ *   5: PR=S  Setpoint override
+ *   6: PR=C  Counter configuration
+ *   7: PR=W  Alternative data-IDs
+ */
+void queryNextPICsetting() {
+  static const char picQueryCmds[PIC_SETTING_COUNT][5] PROGMEM = {
+    "PR=M", "PR=L", "PR=G", "PR=H", "PR=T", "PR=S", "PR=C", "PR=W"
+  };
+
+  if (!bPICavailable || !bOTGWonline || bPSmode) return;
+  if (OTGWSerial.firmwareType() != FIRMWARE_OTGW) return;
+
+  char cmdBuf[5];
+  memcpy_P(cmdBuf, picQueryCmds[picSettingsQueryIdx], sizeof(cmdBuf));
+
+  String response = executeCommand(cmdBuf);
+  strlcpy(picSettingsCache[picSettingsQueryIdx], response.c_str(), PIC_SETTING_MAX_LEN);
+  picSettingsCacheTime[picSettingsQueryIdx] = millis();
+
+  OTGWDebugTf(PSTR("queryNextPICsetting[%d]: [%s] => [%s]\r\n"),
+              picSettingsQueryIdx, cmdBuf, picSettingsCache[picSettingsQueryIdx]);
+
+  picSettingsQueryIdx = (picSettingsQueryIdx + 1) % PIC_SETTING_COUNT;
+}
+
 //===================[ checkOTWGpicforupdate ]=====================
 void checkOTWGpicforupdate(){
   if (sPICfwversion[0] == '\0') {
