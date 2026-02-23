@@ -64,7 +64,7 @@ typedef struct {
 	uint16_t	FanSpeed = 0; // u8 / u8  Fan Speed setpoint / actual (Hz)
 	float 		ElectricalCurrentBurnerFlame = 0.0f; // f88 Electrical current through burner flame (µA)
 	float 		TRoomCH2= 0.0f; // f88  Room Temperature for 2nd CH circuit ("°C)
-	uint16_t 	RelativeHumidity = 0; // u8 / u8 Relative Humidity (%) — HB=humidity %, LB=reserved
+	float 		RelativeHumidity = 0.0f; // f8.8 Relative Humidity (%)
 	uint16_t 	TdhwSetUBTdhwSetLB = 0 ; // s8 / s8  DHW setpoint upper & lower bounds for adjustment  (°C)
 	uint16_t 	MaxTSetUBMaxTSetLB = 0; // s8 / s8  Max CH water setpoint upper & lower bounds for adjustment  (°C)
 	uint16_t	HcratioUBHcratioLB = 0; // s8 / s8  OTC heat curve ratio upper & lower bounds for adjustment  
@@ -247,7 +247,7 @@ enum OpenThermMessageID {
 	OT_FanSpeed = 35, // u8 / u8  Fan Speed setpoint / actual (Hz)
 	OT_ElectricalCurrentBurnerFlame, // f88 Electrical current through burner flame (µA)
 	OT_TRoomCH2, // f88  Room Temperature for 2nd CH circuit ("°C)
-	OT_RelativeHumidity, // u8 / u8 Relative Humidity (%)
+	OT_RelativeHumidity, // f8.8 Relative Humidity (%)
 	OT_TrOverride2 = 39, // f8.8  Remote override room setpoint 2 (°C)
 	OT_TdhwSetUBTdhwSetLB = 48, // s8 / s8  DHW setpoint upper & lower bounds for adjustment  (°C)
 	OT_MaxTSetUBMaxTSetLB, // s8 / s8  Max CH water setpoint upper & lower bounds for adjustment  (°C)
@@ -380,7 +380,7 @@ enum OpenThermMessageID {
 		{  35, OT_READ  , ot_u8u8,	 	 	"FanSpeed", "Boiler fan speed and setpoint", "Hz" },
 		{  36, OT_READ  , ot_f88, 			"ElectricalCurrentBurnerFlame", "Electrical current through burner flame", "µA" },
 		{  37, OT_WRITE , ot_f88, 			"TRoomCH2", "Room temperature for 2nd CH circuit", "°C" },
-		{  38, OT_RW    , ot_u8u8, 			"RelativeHumidity", "Relative Humidity", "%" },
+		{  38, OT_RW    , ot_f88, 			"RelativeHumidity", "Relative Humidity", "%" },
 		{  39, OT_READ  , ot_f88, 			"TrOverride2", "Remote override room setpoint 2", "°C" },
 		{  40, OT_UNDEF , ot_undef, 		"", "", "" },
 		{  41, OT_UNDEF , ot_undef, 		"", "", "" },
