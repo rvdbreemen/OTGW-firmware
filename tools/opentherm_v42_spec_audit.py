@@ -71,6 +71,8 @@ FAILING_FINDING_KEYS = (
     "main_decode_missing_spec_ids",
     "decode_mismatches",
     "legacy_reserved_guard_missing",
+    "mqttha_required_base_entities_issues",
+    "mqttha_required_source_entities_issues",
     "mqttha_direct_topic_id_mismatch",
     "mqttha_fanspeed_discovery_issues",
     "mqttha_hcratio_discovery_issues",
@@ -286,6 +288,8 @@ def build_audit(
         "decode_mismatches": [],
         "reserved_legacy_ids_present": [],
         "legacy_reserved_guard_missing": [],
+        "mqttha_required_base_entities_issues": [],
+        "mqttha_required_source_entities_issues": [],
         "mqttha_direct_topic_id_mismatch": [],
         "mqttha_fanspeed_discovery_issues": [],
         "mqttha_hcratio_discovery_issues": [],
@@ -361,6 +365,96 @@ def build_audit(
     # mqttha checks (targeted + simple direct-topic consistency)
     label_to_id = {v["label"]: k for k, v in otmap.items() if v.get("label")}
     simple_leaf_re = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
+
+    required_base_entities = {
+        38: {
+            "disc_topic": "%homeassistant%/sensor/%node_id%/RelativeHumidity/config",
+            "stat_t": "%mqtt_pub_topic%/RelativeHumidity",
+            "unit_of_measurement": "%",
+            "state_class": "measurement",
+        },
+        71: {
+            "disc_topic": "%homeassistant%/sensor/%node_id%/ControlSetpointVH/config",
+            "stat_t": "%mqtt_pub_topic%/ControlSetpointVH",
+            "unit_of_measurement": "%",
+            "state_class": "measurement",
+        },
+    }
+
+    required_source_entities = {
+        38: {
+            "disc_topic": "%homeassistant%/sensor/%node_id%/RelativeHumidity/%source_topic_segment%/config",
+            "stat_t": "%mqtt_pub_topic%/RelativeHumidity/%source_topic_segment%",
+            "unit_of_measurement": "%",
+            "state_class": "measurement",
+        },
+        71: {
+            "disc_topic": "%homeassistant%/sensor/%node_id%/ControlSetpointVH/%source_topic_segment%/config",
+            "stat_t": "%mqtt_pub_topic%/ControlSetpointVH/%source_topic_segment%",
+            "unit_of_measurement": "%",
+            "state_class": "measurement",
+        },
+    }
+
+    mqttha_by_id: Dict[int, List[Dict[str, Any]]] = {}
+    for entry in mqttha_entries:
+        mqttha_by_id.setdefault(int(entry["id"]), []).append(entry)
+
+    def _check_required_mqttha_entities(
+        required: Dict[int, Dict[str, str]],
+        finding_key: str,
+        kind: str,
+    ) -> None:
+        for msg_id, expected in required.items():
+            entries = mqttha_by_id.get(msg_id, [])
+            matched_entry: Optional[Dict[str, Any]] = None
+            for entry in entries:
+                if entry.get("disc_topic") == expected["disc_topic"]:
+                    matched_entry = entry
+                    break
+
+            if matched_entry is None:
+                findings[finding_key].append(
+                    {
+                        "id": msg_id,
+                        "issue": f"missing_{kind}_entity",
+                        "expected_disc_topic": expected["disc_topic"],
+                    }
+                )
+                continue
+
+            payload = matched_entry.get("json")
+            if not isinstance(payload, dict):
+                findings[finding_key].append(
+                    {
+                        "id": msg_id,
+                        "line": matched_entry.get("line"),
+                        "issue": f"{kind}_entity_json_parse_error",
+                        "disc_topic": matched_entry.get("disc_topic"),
+                    }
+                )
+                continue
+
+            mismatches: Dict[str, Any] = {}
+            for field in ("stat_t", "unit_of_measurement", "state_class"):
+                actual = payload.get(field)
+                expected_val = expected[field]
+                if actual != expected_val:
+                    mismatches[field] = {"expected": expected_val, "actual": actual}
+
+            if mismatches:
+                findings[finding_key].append(
+                    {
+                        "id": msg_id,
+                        "line": matched_entry.get("line"),
+                        "issue": f"{kind}_entity_field_mismatch",
+                        "disc_topic": matched_entry.get("disc_topic"),
+                        "mismatches": mismatches,
+                    }
+                )
+
+    _check_required_mqttha_entities(required_base_entities, "mqttha_required_base_entities_issues", "base")
+    _check_required_mqttha_entities(required_source_entities, "mqttha_required_source_entities_issues", "source")
 
     for entry in mqttha_entries:
         payload = entry["json"]

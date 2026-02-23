@@ -1986,7 +1986,7 @@ static bool decodeAndPublishTemperatureAndSensorValue(OpenThermMessageID msgId)
     case OT_FanSpeed:                               print_u8u8(OTcurrentSystemState.FanSpeed); return true;
     case OT_ElectricalCurrentBurnerFlame:           print_f88(OTcurrentSystemState.ElectricalCurrentBurnerFlame); return true;
     case OT_TRoomCH2:                               print_f88(OTcurrentSystemState.TRoomCH2); return true;
-    case OT_RelativeHumidity:                       print_u8_hb(OTcurrentSystemState.RelativeHumidity); return true;
+    case OT_RelativeHumidity:                       print_f88(OTcurrentSystemState.RelativeHumidity); return true;
     case OT_TrOverride2:                            print_f88(OTcurrentSystemState.TrOverride2); return true;
     case OT_CoolingOperationHours:                  print_u16(OTcurrentSystemState.CoolingOperationHours); return true;
     case OT_PowerCycles:                            print_u16(OTcurrentSystemState.PowerCycles); return true;
@@ -2005,7 +2005,7 @@ static bool decodeAndPublishVentilationValue(OpenThermMessageID msgId)
 {
   switch (msgId) {
     case OT_StatusVH:                               print_statusVH(OTcurrentSystemState.StatusVH); return true;
-    case OT_ControlSetpointVH:                      print_u8_hb(OTcurrentSystemState.ControlSetpointVH); return true;
+    case OT_ControlSetpointVH:                      print_u8_lb(OTcurrentSystemState.ControlSetpointVH); return true;
     case OT_ASFFaultCodeVH:                         print_flag8u8(OTcurrentSystemState.ASFFaultCodeVH); return true;
     case OT_DiagnosticCodeVH:                       print_u16(OTcurrentSystemState.DiagnosticCodeVH); return true;
     case OT_ConfigMemberIDVH:                       print_vh_configmemberid(OTcurrentSystemState.ConfigMemberIDVH); return true;
