@@ -1,9 +1,42 @@
 # Release Notes — v1.2.0-beta
 
-**Last updated:** 2026-02-22<br>
-**Release branch:** `dev-1.2.0-stable-version`<br>
-**Comparison target:** `dev` at `v1.1.0-beta` release commit `0a86aa7`<br>
-**Analyzed head:** `ea69853` (local branch; `origin/dev-1.2.0-stable-version` is ahead by 1 CI `version.h` commit `fbd66df`)<br>
+**Last updated:** 2026-02-24<br>
+**Release branch:** `dev`<br>
+**Comparison target:** `v1.0.0` (tag `v1.0.0`, released 2026-02-08)<br>
+
+---
+
+## ✨ Headline: Comprehensive Home Assistant Discovery — All OpenTherm Message Types
+
+**v1.2.0 brings full Home Assistant MQTT auto-discovery for the complete OpenTherm protocol.**
+
+Previous releases focused primarily on heating and hot-water sensors. This release expands HA discovery to cover **every message category in the OpenTherm spec** — 309 discovery configurations spanning 80+ message IDs.
+
+### What is now exposed to Home Assistant automatically
+
+| System | Example entities | OpenTherm IDs |
+|---|---|---|
+| 🔥 **Central Heating** | Flame on/off, CH setpoint, boiler flow/return temperature, modulation level, water pressure | 0, 1, 14, 17, 18, 25, 27, 116, 117, 120, 121 |
+| 🧊 **Cooling** | Cooling active, cooling enabled, cooling control signal, cooling configuration | 0 (bits), 3 (bits), 7 |
+| ☀️ **Solar / Thermal Storage** | Solar collector temperature, solar storage temperature, solar storage mode/status, solar slave fault indicator | 29, 30, 101, 113, 114 |
+| 💧 **Domestic Hot Water (DHW)** | DHW temperature, DHW setpoint, flow rate, DHW 2 temperature, DHW enable, pump/burner starts and hours | 19, 26, 32, 48, 56, 57, 118, 119, 122, 123 |
+| 🌡️ **Room / Thermostat** | Room temperature, room setpoint, room setpoint CH2, remote override room setpoint | 9, 16, 23, 24 |
+| 💨 **Ventilation / Heat Recovery (VH)** | Ventilation enabled, relative ventilation position (ControlSetpointVH), ASF fault code, diagnostic code, VH versions/TSP | 70–91 |
+| 🌬️ **Secondary Circuit (CH2)** | CH2 setpoint, CH2 flow temperature, CH2 enable | 8, 31 |
+| 📊 **Sensors & Environment** | Relative humidity, outside temperature, electrical current (burner flame) | 27, 33, 36, 38 |
+| ⚡ **Electric / Other** | Electric production | 0 (bit) |
+| 🔧 **System & Status** | Gateway mode, thermostat connected, boiler connected, PIC version, boiler/gateway OT version | 0–5, 100, 115, 124–127, 245–246 |
+| 🔢 **Operational Counters** | CH pump starts/hours, DHW pump/valve starts/hours, DHW burner starts/hours, flame starts/hours | 116–123 |
+| 🌐 **Boiler / Remote Configuration** | Boiler configuration (DHW present, CH2 present, cooling config), master configuration (low-off pump control), remote boiler parameters | 3, 6, 48, 49 |
+| 🏭 **Fault & Diagnostic** | Service request, lockout reset, OEM fault code, OEM diagnostic code | 5, 115 |
+
+**Total: over 90 unique MQTT topics and 309 HA discovery configurations** across binary sensors, sensors, and climate entities.
+
+### Why this matters
+
+Previously, users with cooling-capable boilers, solar thermal systems, heat-recovery ventilation, or multi-circuit setups had to manually create MQTT sensors in Home Assistant. Now, once you enable MQTT auto-discovery, Home Assistant will **automatically** create entities for all those systems — the same way it creates heating entities.
+
+A boiler supporting cooling will now expose `Cooling` (binary sensor), `Cooling_enable`, `cooling_config`, and `CoolingControl` (percentage) directly as HA entities. A system with solar thermal collectors will get `Tsolarcollector` and `Tsolarstorage` temperature sensors, and solar storage mode/status sensors. A ventilation unit connected via OpenTherm will expose `vh_ventilation_enabled`, `ControlSetpointVH`, ASF fault codes, and more — all automatically, with no manual YAML needed.
 
 ---
 
@@ -31,22 +64,34 @@ To enable: set `MQTTseparatesources = true` in settings, then run MQTT discovery
 
 ## Overview
 
-Version `1.2.0-beta` (branch line `dev-1.2.0-stable-version`) builds on the `dev` `v1.1.0-beta` baseline and adds a broader set of changes than the earlier beta-branch notes captured:
+Version `1.2.0` builds on the stable `v1.0.0` baseline with two major release increments of improvements:
 
-- OpenTherm v4.2 protocol map alignment and reserved-ID compatibility handling
-- Runtime safety hardening in OT map parsing and REST lookups
-- MQTT/Home Assistant discovery and topic correctness fixes
-- Configurable source-separated MQTT publishing + HA discovery templates
-- Gateway-mode detection/API/UI reliability improvements
-- Serial handling robustness and WebSocket event logging improvements
-- Web UI/mobile layout and flash UX refinements
-- Spec-audit tooling/CI and supporting documentation
+**v1.1.0 additions** (Dallas sensors, RESTful API v2, memory safety, 20 bug fixes):
+
+- Dallas DS18x20 temperature sensors with custom labels, MQTT/HA publishing, and real-time graphs
+- Complete RESTful API v2 with consistent JSON errors, 202 Accepted for async ops, CORS, OpenAPI spec
+- Streaming file serving (95% memory reduction) — fixes the slow Web UI reported after v1.0.0
+- MQTT whitespace credential fix (whitespace trimmed automatically)
+- Non-blocking modal dialogs replacing `prompt()`/`alert()`
+- Browser debug console (`otgwDebug`) for in-browser diagnostics
+- PS mode (`PS=1`) auto-detection and UI handling
+- 20 bug fixes (out-of-bounds writes, XSS, ISR race conditions, file descriptor leaks, and more)
+
+**v1.2.0 additions** (OpenTherm v4.2 alignment, comprehensive HA discovery, source-separated MQTT, gateway reliability):
+
+- **Comprehensive Home Assistant MQTT auto-discovery** — all OpenTherm message types (see section above)
+- OpenTherm v4.2 protocol map alignment — new IDs, corrected types/directions/units
+- Configurable source-separated MQTT topics (`MQTTseparatesources`)
+- Gateway-mode detection reliability, serial robustness, WebSocket diagnostics
+- Web UI mobile/responsive improvements, shared navigation shell
 
 ---
 
-## Summary of Features and Fixes (v1.2.0 branch)
+## Summary of Features and Fixes
 
-### OpenTherm v4.2 alignment and protocol fixes
+### New in v1.2.0
+
+#### OpenTherm v4.2 alignment and protocol fixes
 
 - Added missing OT message IDs: `39`, `93`, `94`, `95`, `96`, `97`.
 - Corrected OT direction flags for IDs `4`, `27`, `37`, `38`, `98`, `99`, `109`, `110`, `112`, `124`, `126`.
@@ -166,6 +211,53 @@ Version `1.2.0-beta` (branch line `dev-1.2.0-stable-version`) builds on the `dev
 
 ---
 
+### New in v1.1.0
+
+#### Dallas DS18x20 temperature sensor improvements
+
+- DS18x20 sensors now support **custom labels** editable inline in the Web UI.
+- Labels are stored in `/dallas_labels.ini` with zero backend RAM usage.
+- Sensors automatically published to MQTT with HA auto-discovery (sensor name uses custom label when set).
+- New bulk REST API: `GET /api/v2/sensors/labels` and `POST /api/v2/sensors/labels`.
+- Automatic label backup/restore during filesystem flash operations.
+- Real-time graph visualization for Dallas sensors with 16-color palette.
+
+#### RESTful API v2
+
+- 13 new v2 endpoints with consistent JSON error responses, proper HTTP status codes (202 Accepted for async), CORS/OPTIONS preflight support, and RESTful resource naming.
+- New endpoints: `GET /api/v2/device/info`, `GET /api/v2/device/time`, `POST /api/v2/otgw/commands`, `POST /api/v2/otgw/discovery`, `GET /api/v2/otgw/messages/{id}`, `GET /api/v2/firmware/files`, `GET /api/v2/filesystem/files`, etc.
+- Full OpenAPI specification for all v2 endpoints in `docs/api/openapi.yaml`.
+- Frontend fully migrated to v2 API — zero legacy v0/v1 calls remain in the Web UI.
+- API compliance score improved from 5.4 → 8.5/10.
+- See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md).
+
+#### Memory and performance improvements
+
+- **Streaming file serving**: Replaced full-file-to-RAM loading with chunked streaming — 95% memory reduction for serving Web UI files. This resolves the slow UI loading reported on v1.0.0.
+- Settings save reduced from 20 flash writes to 1 via deferred flush with 2-second debounce — reduces flash wear significantly.
+- Heap memory 4-level health system (CRITICAL/WARNING/LOW/HEALTHY) with adaptive throttling and WebSocket backpressure control.
+
+#### Web UI improvements
+
+- **Non-blocking modal dialogs**: Custom HTML/CSS modals replace blocking `prompt()`/`alert()` calls, maintaining real-time WebSocket data flow during user input.
+- **PS mode (`PS=1`) auto-detection**: Automatic detection from the OTGW PIC. When active, the UI hides the OT log section, disables WebSocket streaming, and suppresses time-sync commands — improving compatibility with legacy integrations (e.g. Domoticz).
+- **WebUI data persistence**: Automatic log data persistence to `localStorage` with debounced 2-second saves, dynamic memory management, and auto-restoration on page load.
+- **Browser debug console (`otgwDebug`)**: Full diagnostic toolkit accessible in browser console — `status()`, `info()`, `settings()`, `wsStatus()`, `logs()`, `api()`, `health()`, `sendCmd()`, `exportLogs()`.
+
+#### Bug fixes (20 findings from comprehensive codebase review)
+
+- **Memory safety**: Out-of-bounds array write on OT message ID 255; stack buffer overflow in hex parser; year overflow in date handling.
+- **Data integrity**: Wrong bitmask corrupting MQTT hours 16–23; disconnected Dallas sensor (-127°C) published to MQTT.
+- **Concurrency**: ISR race conditions in S0 pulse counter causing incorrect energy readings.
+- **Security**: Reflected XSS in REST API error pages; dead admin password code removed.
+- **Reliability**: File descriptor leak in filesystem handler; null pointer crash on malformed MQTT topics; 750ms blocking sensor read replaced with non-blocking; HTTP client resource leak.
+- **Feature fix**: GPIO outputs gated by debug flag — the feature was completely non-functional before this fix.
+- **MQTT whitespace auth fix**: Automatic trimming of whitespace in MQTT credentials, fixing authentication failures when upgrading from v0.10.x.
+
+Full details in [Codebase Review](docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md).
+
+---
+
 ## Breaking Changes / Migration Notes
 
 ### MQTT / Home Assistant (OpenTherm v4.2 alignment)
@@ -220,10 +312,4 @@ Detailed OpenTherm MQTT/HA migration guidance: `docs/fixes/opentherm-v42-mqtt-br
 
 ## Validation Basis
 
-This summary was compiled from the git delta:
-
-- baseline: `0a86aa7` (`dev` v1.1.0-beta release notes/version update commit)
-- analyzed head: `ea69853` (`dev-1.2.0-stable-version` local)
-- note: remote branch is ahead by one CI-only `version.h` commit (`fbd66df`)
-
-Functional changes were derived from commit history and file diffs across firmware, Web UI, MQTT/HA config, CI workflows, and documentation.
+This summary was compiled from the git delta between `v1.0.0` (tag `v1.0.0`, commit `c03a635`, released 2026-02-08) and the current `dev` branch head. Functional changes were derived from commit history and file diffs across firmware, Web UI, MQTT/HA config, CI workflows, and documentation.
