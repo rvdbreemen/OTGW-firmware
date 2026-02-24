@@ -383,6 +383,7 @@ void loop()
       if (DUE(timer1s))                 doTaskEvery1s();
       if (minuteChanged())              doTaskMinuteChanged(); //exactly on the minute
       evalOutputs();                    // when the bits change, the output gpio bit will follow
+      evalWebhook();                    // when the trigger bit changes, fire the webhook
       handlePendingUpgrade();           // Check if we need to start an upgrade
     } 
 

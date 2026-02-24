@@ -1090,6 +1090,10 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("gpiooutputstriggerbit"), settingGPIOOUTPUTStriggerBit, "i", 0, 16);
   sendJsonSettingObj(F("otgwcommandenable"), settingOTGWcommandenable, "b");
   sendJsonSettingObj(F("otgwcommands"), CSTR(settingOTGWcommands), "s", 128);
+  sendJsonSettingObj(F("webhookenable"), settingWebhookEnabled, "b");
+  sendJsonSettingObj(F("webhookurlon"), CSTR(settingWebhookURLon), "s", 100);
+  sendJsonSettingObj(F("webhookurloff"), CSTR(settingWebhookURLoff), "s", 100);
+  sendJsonSettingObj(F("webhooktriggerbit"), settingWebhookTriggerBit, "i", 0, 15);
 
   sendEndJsonObj(F("settings"));
 

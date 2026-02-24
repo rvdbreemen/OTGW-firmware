@@ -236,6 +236,12 @@ bool      settingGPIOOUTPUTSenabled = false;
 int8_t    settingGPIOOUTPUTSpin = 16;
 int8_t    settingGPIOOUTPUTStriggerBit = 0;
 
+//Webhook Settings
+bool      settingWebhookEnabled = false;
+char      settingWebhookURLon[101] = "";    // URL called when trigger bit turns ON
+char      settingWebhookURLoff[101] = "";   // URL called when trigger bit turns OFF
+int8_t    settingWebhookTriggerBit = 1;     // Default: bit 1 = CH mode (slave: CH active)
+
 //Now load Debug & network library
 #include "Debug.h"
 #include "networkStuff.h"

@@ -87,8 +87,8 @@ void writeSettings(bool show)
 
   DebugT(F("[Settings] State: Serializing settings to JSON... "));
 
-  // Capacity reduced back to 1536 bytes (Dallas labels now in separate file)
-  DynamicJsonDocument doc(1536);
+  // Capacity increased to 1792 bytes to accommodate webhook URL settings
+  DynamicJsonDocument doc(1792);
   JsonObject root  = doc.to<JsonObject>();
   root[F("hostname")] = settingHostname;
   root[F("MQTTenable")] = settingMQTTenable;
@@ -128,6 +128,10 @@ void writeSettings(bool show)
   root[F("GPIOOUTPUTSenabled")] = settingGPIOOUTPUTSenabled;
   root[F("GPIOOUTPUTSpin")] = settingGPIOOUTPUTSpin;
   root[F("GPIOOUTPUTStriggerBit")] = settingGPIOOUTPUTStriggerBit;
+  root[F("WebhookEnabled")] = settingWebhookEnabled;
+  root[F("WebhookURLon")] = settingWebhookURLon;
+  root[F("WebhookURLoff")] = settingWebhookURLoff;
+  root[F("WebhookTriggerBit")] = settingWebhookTriggerBit;
   // Dallas sensor labels now stored in /dallas_labels.json (not in settings.json)
 
   serializeJsonPretty(root, file);
@@ -159,8 +163,8 @@ void readSettings(bool show)
 
   // Deserialize the JSON document
   // Use DynamicJsonDocument to eliminate stack overflow risk (moved from stack to heap)
-  // Capacity reduced back to 1536 bytes (Dallas labels now in separate file)
-  DynamicJsonDocument doc(1536);
+  // Capacity increased to 1792 bytes to accommodate webhook URL settings
+  DynamicJsonDocument doc(1792);
   DeserializationError error = deserializeJson(doc, file);
   if (error)
   {
@@ -239,6 +243,10 @@ void readSettings(bool show)
   settingGPIOOUTPUTSenabled = doc[F("GPIOOUTPUTSenabled")] | settingGPIOOUTPUTSenabled;
   settingGPIOOUTPUTSpin = doc[F("GPIOOUTPUTSpin")] | settingGPIOOUTPUTSpin;
   settingGPIOOUTPUTStriggerBit = doc[F("GPIOOUTPUTStriggerBit")] | settingGPIOOUTPUTStriggerBit;
+  settingWebhookEnabled = doc[F("WebhookEnabled")] | settingWebhookEnabled;
+  strlcpy(settingWebhookURLon, doc[F("WebhookURLon")] | "", sizeof(settingWebhookURLon));
+  strlcpy(settingWebhookURLoff, doc[F("WebhookURLoff")] | "", sizeof(settingWebhookURLoff));
+  settingWebhookTriggerBit = doc[F("WebhookTriggerBit")] | settingWebhookTriggerBit;
   
   // Dallas sensor labels now stored in /dallas_labels.json (not in settings.json)
 
@@ -278,6 +286,10 @@ void readSettings(bool show)
     Debugf(PSTR("GPIO Outputs          : %s\r\n"), CBOOLEAN(settingGPIOOUTPUTSenabled));
     Debugf(PSTR("GPIO Out. Pin         : %d\r\n"), settingGPIOOUTPUTSpin);
     Debugf(PSTR("GPIO Out. Trg. Bit    : %d\r\n"), settingGPIOOUTPUTStriggerBit);
+    Debugf(PSTR("Webhook enabled       : %s\r\n"), CBOOLEAN(settingWebhookEnabled));
+    Debugf(PSTR("Webhook URL ON        : %s\r\n"), CSTR(settingWebhookURLon));
+    Debugf(PSTR("Webhook URL OFF       : %s\r\n"), CSTR(settingWebhookURLoff));
+    Debugf(PSTR("Webhook Trigger Bit   : %d\r\n"), settingWebhookTriggerBit);
     }
   
   Debugln(F("-\r\n"));
@@ -440,6 +452,10 @@ void updateSetting(const char *field, const char *newValue)
     Debugln();
     DebugTf(PSTR("Need reboot before GPIO OUTPUTS will use new trigger bit %d!\r\n\n"), settingGPIOOUTPUTStriggerBit);
   }
+  if (strcasecmp_P(field, PSTR("WebhookEnabled")) == 0)  settingWebhookEnabled = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("WebhookURLon")) == 0)    strlcpy(settingWebhookURLon, newValue, sizeof(settingWebhookURLon));
+  if (strcasecmp_P(field, PSTR("WebhookURLoff")) == 0)   strlcpy(settingWebhookURLoff, newValue, sizeof(settingWebhookURLoff));
+  if (strcasecmp_P(field, PSTR("WebhookTriggerBit")) == 0) settingWebhookTriggerBit = atoi(newValue);
 
   // Mark settings dirty and restart debounce timer — actual write + service
   // restarts are deferred to flushSettings() which runs from loop() timer.
