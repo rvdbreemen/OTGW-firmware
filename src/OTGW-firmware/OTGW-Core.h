@@ -99,7 +99,7 @@ typedef struct {
 	uint16_t 	ElectricityProducerStarts = 0; // u16 Electricity producer starts 
 	uint16_t 	ElectricityProducerHours = 0; // u16 Electricity producer hours
 	uint16_t 	ElectricityProduction = 0; // u16 Electricity production
-	uint16_t 	CumulativElectricityProduction = 0; // u16 Cumulativ Electricity production
+	uint16_t 	CumulativeElectricityProduction = 0; // u16 Cumulative Electricity production
 	
 	//Solar Storage
 	uint16_t 	SolarStorageStatus = 0;
@@ -306,7 +306,7 @@ enum OpenThermMessageID {
 	OT_ElectricityProducerStarts, // u16 Electricity producer starts
 	OT_ElectricityProducerHours, //u16 Electricity producer hours
 	OT_ElectricityProduction, //u16 Electricity production
-	OT_CumulativElectricityProduction, // u16 Cumulativ Electricity production
+	OT_CumulativeElectricityProduction, // u16 Cumulative Electricity production
 	OT_BurnerUnsuccessfulStarts, // u16 Number of Un-successful burner starts 
 	OT_FlameSignalTooLow, //u16 Number of times flame signal too low
 	OT_OEMDiagnosticCode, // u16  OEM-specific diagnostic/service code 
@@ -380,7 +380,7 @@ enum OpenThermMessageID {
 		{  35, OT_READ  , ot_u8u8,	 	 	"FanSpeed", "Boiler fan speed and setpoint", "Hz" },
 		{  36, OT_READ  , ot_f88, 			"ElectricalCurrentBurnerFlame", "Electrical current through burner flame", "µA" },
 		{  37, OT_WRITE , ot_f88, 			"TRoomCH2", "Room temperature for 2nd CH circuit", "°C" },
-		{  38, OT_RW    , ot_f88, 			"RelativeHumidity", "Relative Humidity", "%" },
+		{  38, OT_RW    , ot_f88, 			"RelativeHumidity", "Relative Humidity", "%" }, // OTv4.2 spec: u8/u8 (HB=humidity%, LB=reserved); retained as f8.8 for backward compatibility
 		{  39, OT_READ  , ot_f88, 			"TrOverride2", "Remote override room setpoint 2", "°C" },
 		{  40, OT_UNDEF , ot_undef, 		"", "", "" },
 		{  41, OT_UNDEF , ot_undef, 		"", "", "" },
@@ -454,7 +454,7 @@ enum OpenThermMessageID {
 		{ 109, OT_RW    , ot_u16, 			"ElectricityProducerStarts", "Electricity producer starts", "" },
 		{ 110, OT_RW    , ot_u16, 			"ElectricityProducerHours", "Electricity producer hours", "" },
 		{ 111, OT_READ  , ot_u16, 			"ElectricityProduction", "Electricity production", "" },
-		{ 112, OT_RW    , ot_u16, 			"CumulativElectricityProduction", "Cumulativ Electricity production", "" },
+		{ 112, OT_RW    , ot_u16, 			"CumulativeElectricityProduction", "Cumulative Electricity production", "" },
 		{ 113, OT_RW    , ot_u16,         	"BurnerUnsuccessfulStarts", "Unsuccessful burner starts", "" },
 		{ 114, OT_RW    , ot_u16,         	"FlameSignalTooLow", "Flame signal too low count", "" },
 		{ 115, OT_READ  , ot_u16,         	"OEMDiagnosticCode", "OEM-specific diagnostic/service code", "" },

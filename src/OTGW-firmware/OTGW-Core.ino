@@ -988,7 +988,7 @@ void print_statusVH(uint16_t& value)
       publishMQTTOnOff(F("vh_ventilation_enabled"),   ((OTdata.valueHB) & 0x01));
       publishMQTTOnOff(F("vh_bypass_position"),       ((OTdata.valueHB) & 0x02));
       publishMQTTOnOff(F("vh_bypass_mode"),           ((OTdata.valueHB) & 0x04));
-      publishMQTTOnOff(F("vh_free_ventlation_mode"),  ((OTdata.valueHB) & 0x08));
+      publishMQTTOnOff(F("vh_free_ventilation_mode"),  ((OTdata.valueHB) & 0x08));
 
       OTcurrentSystemState.MasterStatusVH = OTdata.valueHB;
     }
@@ -1017,7 +1017,7 @@ void print_statusVH(uint16_t& value)
     if (is_value_valid(OTdata, OTlookupitem)){
       sendMQTTData(F("status_vh_slave"), _flag8_slave);
       publishMQTTOnOff(F("vh_fault"),                   ((OTdata.valueLB) & 0x01));
-      publishMQTTOnOff(F("vh_ventlation_mode"),         ((OTdata.valueLB) & 0x02));
+      publishMQTTOnOff(F("vh_ventilation_mode"),         ((OTdata.valueLB) & 0x02));
       publishMQTTOnOff(F("vh_bypass_status"),           ((OTdata.valueLB) & 0x04));
       publishMQTTOnOff(F("vh_bypass_automatic_status"), ((OTdata.valueLB) & 0x08));
       publishMQTTOnOff(F("vh_free_ventliation_status"), ((OTdata.valueLB) & 0x10));
@@ -1294,7 +1294,7 @@ void print_vh_remoteparametersetting(uint16_t& value)
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_hb_flag8", sizeof(_topic));
     sendMQTTData(_topic, byte_to_binary(OTdata.valueHB));
-    sendMQTTData(F("vh_tramfer_enble_nominal_ventlation_value"),    (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
+    sendMQTTData(F("vh_transfer_enable_nominal_ventilation_value"),    (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
   }
   //flag8 valueLB
   AddLogf("%s = LB flag8[%s] - [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
@@ -1302,7 +1302,7 @@ void print_vh_remoteparametersetting(uint16_t& value)
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_lb_flag8", sizeof(_topic));
     sendMQTTData(_topic, byte_to_binary(OTdata.valueLB));
-    sendMQTTData(F("vh_rw_nominal_ventlation_value"),    (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  
+    sendMQTTData(F("vh_rw_nominal_ventilation_value"),    (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));
     value = OTdata.u16();
   }
 }
@@ -1993,7 +1993,7 @@ static bool decodeAndPublishTemperatureAndSensorValue(OpenThermMessageID msgId)
     case OT_ElectricityProducerStarts:              print_u16(OTcurrentSystemState.ElectricityProducerStarts); return true;
     case OT_ElectricityProducerHours:               print_u16(OTcurrentSystemState.ElectricityProducerHours); return true;
     case OT_ElectricityProduction:                  print_u16(OTcurrentSystemState.ElectricityProduction); return true;
-    case OT_CumulativElectricityProduction:         print_u16(OTcurrentSystemState.CumulativElectricityProduction); return true;
+    case OT_CumulativeElectricityProduction:        print_u16(OTcurrentSystemState.CumulativeElectricityProduction); return true;
     case OT_BurnerUnsuccessfulStarts:               print_u16(OTcurrentSystemState.BurnerUnsuccessfulStarts); return true;
     case OT_FlameSignalTooLow:                      print_u16(OTcurrentSystemState.FlameSignalTooLow); return true;
     default:
@@ -2652,7 +2652,7 @@ const char* getOTGWValue(int msgid)
     case OT_ElectricityProducerStarts:         dtostrf(OTcurrentSystemState.ElectricityProducerStarts, 0, 2, buffer); return buffer;
     case OT_ElectricityProducerHours:          dtostrf(OTcurrentSystemState.ElectricityProducerHours, 0, 2, buffer); return buffer;
     case OT_ElectricityProduction:             dtostrf(OTcurrentSystemState.ElectricityProduction, 0, 2, buffer); return buffer;
-    case OT_CumulativElectricityProduction:    dtostrf(OTcurrentSystemState.CumulativElectricityProduction, 0, 2, buffer); return buffer;
+    case OT_CumulativeElectricityProduction:   dtostrf(OTcurrentSystemState.CumulativeElectricityProduction, 0, 2, buffer); return buffer;
     case OT_BurnerUnsuccessfulStarts:          dtostrf(OTcurrentSystemState.BurnerUnsuccessfulStarts, 0, 2, buffer); return buffer;
     case OT_FlameSignalTooLow:                 dtostrf(OTcurrentSystemState.FlameSignalTooLow, 0, 2, buffer); return buffer;
     case OT_RemehadFdUcodes:                   dtostrf(OTcurrentSystemState.RemehadFdUcodes, 0, 2, buffer); return buffer;
