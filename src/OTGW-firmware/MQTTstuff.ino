@@ -27,7 +27,7 @@
 #define MQTTDebugT(...)   ({ if (bDebugMQTT) DebugT(__VA_ARGS__);    })
 #define MQTTDebug(...)    ({ if (bDebugMQTT) Debug(__VA_ARGS__);    })
 
-void doAutoConfigure(bool bForceAll = false);
+void doAutoConfigure();
 
 // Declare some variables within global scope
 
@@ -364,8 +364,10 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
     } else if ((strcasecmp_P(msgPayload, PSTR("online")) == 0) && bHAcycle){
       DebugTln(F("Home Assistant went online!"));
       bHAcycle = false; //clear flag, so it does not trigger again
-      //restart stuff, to make sure it works correctly again
-      startMQTT();  // fixing some issues with hanging HA AutoDiscovery in some scenario's?
+      // HA restart does not affect the MQTT broker connection; no reconnect needed.
+      // Clearing the discovery bitfield is sufficient: JIT (Path B) re-publishes
+      // discovery configs as OpenTherm messages arrive (ADR-041).
+      clearMQTTConfigDone();
     } else {
       DebugTf(PSTR("Home Assistant Status=[%s] and HA cycle status [%s]\r\n"), msgPayload, CBOOLEAN(bHAcycle)); 
     }
@@ -527,10 +529,11 @@ void handleMQTT()
         // birth message, sendMQTT retains  by default
         sendMQTT(MQTTPubNamespace, "online");
 
-        // Startup discovery sweep (retained HA config topics). doAutoConfigure()
-        // now correctly handles duplicate msgid lines and expands source-template
-        // entries into thermostat/boiler/gateway variants (using configured placeholders).
-        doAutoConfigure();
+        // Reset discovery state on every connect so JIT (Path B) re-publishes
+        // discovery configs as OpenTherm messages arrive. This handles both
+        // normal reconnects and broker restarts (lost retained messages) without
+        // flooding the broker with configs for message IDs never seen in the wild.
+        clearMQTTConfigDone();
 
         //Subscribe to topics
         char topic[100];
@@ -920,8 +923,10 @@ static bool expandAndPublishSourceTemplates(byte msgid, const char *logLabel, bo
   return published;
 }
 //===========================================================================================
-void doAutoConfigure(bool bForceAll){
-  // Use shared static buffers (zero heap allocation, single RAM reservation).
+void doAutoConfigure(){
+  // Force-publishes HA discovery configs for all message IDs in mqttha.cfg.
+  // Intended only as an explicit utility (Serial 'F', REST API); never called
+  // automatically. Use shared static buffers (zero heap allocation).
   // Lock scope is limited to the file-parse/publish loop so it is released
   // before configSensors() is called.  configSensors() -> sensorAutoConfigure()
   // -> doAutoConfigureMsgid() can then acquire the lock independently.
@@ -941,11 +946,6 @@ void doAutoConfigure(bool bForceAll){
     char *sMsg = mqttAutoConfigBuffers.msg;
     initSourceTokens();
     bool sourceTemplateSchemaLogged = false;
-    // Snapshot config state at function entry so duplicate lines with the same
-    // msgid (e.g. split entities and source-template entries) are all processed
-    // in the same run before the global per-msgid bit is set.
-    uint32_t autoConfigMapAtStart[8];
-    memcpy(autoConfigMapAtStart, MQTTautoConfigMap, sizeof(autoConfigMapAtStart));
 
     // 2. Open File ONCE
     LittleFS.begin();
@@ -977,14 +977,7 @@ void doAutoConfigure(bool bForceAll){
       // Skip Dallas sensors - they need per-sensor addresses from configSensors()
       if (lineID == OTGWdallasdataid) continue;
 
-      bool alreadyConfiguredAtStart = false;
-      if (!bForceAll) {
-        const uint8_t group = (lineID >> 5) & 0x07;
-        const uint8_t index = lineID & 0x1F;
-        alreadyConfiguredAtStart = bitRead(autoConfigMapAtStart[group], index);
-      }
-
-      if (bForceAll || !alreadyConfiguredAtStart) {
+      {
 
          MQTTDebugTf(PSTR("Processing AutoConfig for ID %d\r\n"), lineID);
 
