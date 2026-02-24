@@ -8,9 +8,9 @@
 
 ## ✨ Headline: Comprehensive Home Assistant Discovery — All OpenTherm Message Types
 
-**v1.2.0 brings full Home Assistant MQTT auto-discovery for the complete OpenTherm protocol.**
+**v1.2.0-beta brings full Home Assistant MQTT auto-discovery for the complete OpenTherm protocol.**
 
-Previous releases focused primarily on heating and hot-water sensors. This release expands HA discovery to cover **every message category in the OpenTherm spec** — 309 discovery configurations spanning 80+ message IDs.
+Previous releases focused primarily on heating and hot-water sensors. This beta release expands HA discovery to cover **every message category in the OpenTherm spec** — 309 discovery configurations spanning 80+ message IDs.
 
 ### What is now exposed to Home Assistant automatically
 
