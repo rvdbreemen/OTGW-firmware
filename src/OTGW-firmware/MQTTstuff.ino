@@ -1031,7 +1031,7 @@ void doAutoConfigure(){
   } // Lock released here - configSensors() can now acquire it independently
 
   // Trigger Dallas configuration separately as it requires specific sensor addresses
-  if (settingMQTTenable && (bForceAll || !getMQTTConfigDone(OTGWdallasdataid))) {
+  if (settingMQTTenable && !getMQTTConfigDone(OTGWdallasdataid)) {
     configSensors();
   }
 }
