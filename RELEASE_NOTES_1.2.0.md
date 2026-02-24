@@ -36,7 +36,7 @@ Previous releases focused primarily on heating and hot-water sensors. This relea
 
 Previously, users with cooling-capable boilers, solar thermal systems, heat-recovery ventilation, or multi-circuit setups had to manually create MQTT sensors in Home Assistant. Now, once you enable MQTT auto-discovery, Home Assistant will **automatically** create entities for all those systems — the same way it creates heating entities.
 
-A boiler supporting cooling will now expose `Cooling` (binary sensor), `Cooling_enable`, `cooling_config`, and `CoolingControl` (percentage) directly as HA entities. A system with solar thermal collectors will get `Tsolarcollector` and `Tsolarstorage` temperature sensors, and solar storage mode/status sensors. A ventilation unit connected via OpenTherm will expose `vh_ventilation_enabled`, `ControlSetpointVH`, ASF fault codes, and more — all automatically, with no manual YAML needed.
+A boiler supporting cooling will now expose Home Assistant entities for cooling active (binary sensor), cooling enable, cooling configuration, and the cooling control signal (percentage), all created automatically via MQTT discovery. A system with solar thermal collectors will get `Tsolarcollector` and `Tsolarstorage` temperature sensors, and solar storage mode/status sensors. A ventilation unit connected via OpenTherm will expose `vh_ventilation_enabled`, `ControlSetpointVH`, ASF fault codes, and more — all automatically, with no manual YAML needed.
 
 ---
 
