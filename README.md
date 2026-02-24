@@ -14,7 +14,7 @@ Version 1.2.0-beta builds on the stable v1.0.0 foundation and includes two relea
 
 ### 🌟 Comprehensive Home Assistant Discovery — All OpenTherm Message Types
 
-**The most user-visible change in v1.2.0 is complete MQTT auto-discovery coverage for the entire OpenTherm protocol.**
+**The most user-visible change in v1.2.0-beta is complete MQTT auto-discovery coverage for the entire OpenTherm protocol.**
 
 Previously, Home Assistant auto-discovery focused on the most common heating-system entities. Now, **every supported OpenTherm message type is automatically exposed to Home Assistant**, including:
 
