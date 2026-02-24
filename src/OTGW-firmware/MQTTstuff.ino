@@ -564,6 +564,9 @@ void sendMQTTData(const char* topic, const char *json, const bool retain)
   if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
   if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
   
+  // Rate limiting: skip if OT message interval has not elapsed yet
+  if (!mqttPublishAllowed) return;
+
   // Check heap health before publishing
   if (!canPublishMQTT()) {
     // Message dropped due to low heap - canPublishMQTT() handles logging

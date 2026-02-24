@@ -100,6 +100,7 @@ void writeSettings(bool show)
   root[F("MQTThaprefix")] = settingMQTThaprefix;
   root[F("MQTTuniqueid")] = settingMQTTuniqueid;
   root[F("MQTTOTmessage")] = settingMQTTOTmessage;
+  root[F("MQTTinterval")] = settingMQTTinterval;
   root[F("MQTTharebootdetection")]= settingMQTTharebootdetection;  
   root[F("NTPenable")] = settingNTPenable;
   root[F("NTPtimezone")] = settingNTPtimezone;
@@ -205,6 +206,7 @@ void readSettings(bool show)
   if (strlen(settingMQTTuniqueid)==0 || strcmp_P(settingMQTTuniqueid, PSTR("null"))==0) strlcpy(settingMQTTuniqueid, getUniqueId(), sizeof(settingMQTTuniqueid));
 
   settingMQTTOTmessage    = doc[F("MQTTOTmessage")]|settingMQTTOTmessage;
+  settingMQTTinterval     = doc[F("MQTTinterval")] | settingMQTTinterval;
   settingNTPenable        = doc[F("NTPenable")]; 
   
   strlcpy(settingNTPtimezone, doc[F("NTPtimezone")] | "", sizeof(settingNTPtimezone));
@@ -259,6 +261,7 @@ void readSettings(bool show)
     Debugf(PSTR("MQTT uniqueid         : %s\r\n"), CSTR(settingMQTTuniqueid));
     Debugf(PSTR("HA prefix             : %s\r\n"), CSTR(settingMQTThaprefix));
     Debugf(PSTR("HA reboot detection   : %s\r\n"), CBOOLEAN(settingMQTTharebootdetection));
+    Debugf(PSTR("MQTT interval         : %d\r\n"), settingMQTTinterval);
     Debugf(PSTR("NTP enabled           : %s\r\n"), CBOOLEAN(settingNTPenable));
     Debugf(PSTR("NPT timezone          : %s\r\n"), CSTR(settingNTPtimezone));
     Debugf(PSTR("NPT hostname          : %s\r\n"), CSTR(settingNTPhostname));
@@ -344,6 +347,7 @@ void updateSetting(const char *field, const char *newValue)
     if (strlen(settingMQTTuniqueid) == 0)   strlcpy(settingMQTTuniqueid, getUniqueId(), sizeof(settingMQTTuniqueid));
   }
   if (strcasecmp_P(field, PSTR("MQTTOTmessage"))==0)   settingMQTTOTmessage = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("MQTTinterval"))==0)    settingMQTTinterval = (uint16_t)atoi(newValue);
   if (strstr_P(field, PSTR("mqtt")) != NULL)        pendingSideEffects |= SIDE_EFFECT_MQTT; // defer MQTT restart to flushSettings()
   
   if (strcasecmp_P(field, PSTR("NTPenable"))==0)      settingNTPenable = EVALBOOLEAN(newValue);

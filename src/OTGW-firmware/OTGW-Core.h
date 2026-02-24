@@ -470,6 +470,8 @@ enum OpenThermMessageID {
 #define OT_MSGID_MAX 133
 
 time_t msglastupdated[256] = {0}; //all msg, even if they are unknown
+uint32_t mqttlastsent[256] = {0}; // millis() last MQTT publish per OT ID: standard IDs 0-127 use master=idx, slave=idx+128; non-standard IDs (128+) use idx=id directly
+bool     mqttPublishAllowed = true; // MQTT interval gate: set false to suppress OT-specific publishes
 
 struct OT_cmd_t { // see all possible commands for PIC here: https://otgw.tclcode.com/firmware.html
 	char cmd[15];

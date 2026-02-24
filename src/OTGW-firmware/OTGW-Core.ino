@@ -676,6 +676,25 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   return _valid;
 }
 
+// Returns true if the MQTT publish interval allows sending for this OT message.
+// Index mapping for mqttlastsent[256]:
+//   Standard OT IDs (id 0-127): master uses index id, slave uses index id+128.
+//   Non-standard IDs (id 128-255): use index id directly (no master/slave split).
+// This ensures master status updates cannot starve slave status from publishing.
+// Updates mqttlastsent on success so it should be called once per message processing.
+bool shouldPublishMQTTForID(byte id, byte masterslave) {
+  if (settingMQTTinterval == 0) return true;
+  // Standard IDs: upper half tracks slave messages independently.
+  // Non-standard IDs (id >= 128) use their own ID directly (within array bounds).
+  uint8_t idx = (id < 128) ? id + (masterslave ? 128 : 0) : id;
+  uint32_t now = millis();
+  if ((uint32_t)(now - mqttlastsent[idx]) >= (uint32_t)settingMQTTinterval * 1000UL) {
+    mqttlastsent[idx] = now;
+    return true;
+  }
+  return false;
+}
+
 void print_f88(float& value)
 {
   //function to print data
@@ -1779,6 +1798,9 @@ void processOT(const char *buf, int len){
       //#define OTprint(data, value, text, format) ({ data= value; OTGWDebugf("[%37s]", text); OTGWDebugf("= [format]", data)})
         //interpret values f8.8
 
+      // Set the MQTT publish gate for this OT message (rate limiting by settingMQTTinterval)
+      mqttPublishAllowed = shouldPublishMQTTForID(OTdata.id, OTdata.masterslave);
+
       switch (static_cast<OpenThermMessageID>(OTdata.id)) {   
         case OT_Statusflags:                            print_status(OTcurrentSystemState.Statusflags); break;
         case OT_TSet:                                   print_f88(OTcurrentSystemState.TSet); break;         
@@ -1894,6 +1916,8 @@ void processOT(const char *buf, int len){
             AddLogf("Unknown message [%02d] value [%04X] f8.8 [%3.2f] u16 [%d] s16 [%d]", OTdata.id, OTdata.value,  OTdata.f88(), OTdata.u16(), OTdata.s16());
             break;
       }
+      // Reset the MQTT publish gate so non-OT sends (event_report, etc.) are not affected
+      mqttPublishAllowed = true;
       if (OTdata.skipthis) AddLog(" <ignored> ");
       AddLogln();
       OTGWDebugT(skipOTLogTimestamp(ot_log_buffer));
