@@ -227,7 +227,7 @@ Version `1.2.0` builds on the stable `v1.0.0` baseline with two major release in
 - 13 new v2 endpoints with consistent JSON error responses, proper HTTP status codes (202 Accepted for async), CORS/OPTIONS preflight support, and RESTful resource naming.
 - New endpoints: `GET /api/v2/device/info`, `GET /api/v2/device/time`, `POST /api/v2/otgw/commands`, `POST /api/v2/otgw/discovery`, `GET /api/v2/otgw/messages/{id}`, `GET /api/v2/firmware/files`, `GET /api/v2/filesystem/files`, etc.
 - Full OpenAPI specification for all v2 endpoints in `docs/api/openapi.yaml`.
-- Frontend fully migrated to v2 API — zero legacy v0/v1 calls remain in the Web UI.
+- Main Web UI migrated to v2 API — a few auxiliary flows (such as OTA health/label restore) still use v1 endpoints.
 - API compliance score improved from 5.4 → 8.5/10.
 - See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md).
 
