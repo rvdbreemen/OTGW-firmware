@@ -16,7 +16,7 @@ Previous releases focused primarily on heating and hot-water sensors. This beta 
 
 | System | Example entities | OpenTherm IDs |
 |---|---|---|
-| 🔥 **Central Heating** | Flame on/off, CH setpoint, boiler flow/return temperature, modulation level, water pressure | 0, 1, 14, 17, 18, 25, 27, 116, 117, 120, 121 |
+| 🔥 **Central Heating** | Flame on/off, CH setpoint, boiler flow/return temperature, modulation level, water pressure | 0, 1, 14, 17, 18, 25, 28 |
 | 🧊 **Cooling** | Cooling active, cooling enabled, cooling control signal, cooling configuration | 0 (bits), 3 (bits), 7 |
 | ☀️ **Solar / Thermal Storage** | Solar collector temperature, solar storage temperature, solar storage mode/status, solar slave fault indicator | 29, 30, 101, 113, 114 |
 | 💧 **Domestic Hot Water (DHW)** | DHW temperature, DHW setpoint, flow rate, DHW 2 temperature, DHW enable, pump/burner starts and hours | 19, 26, 32, 48, 56, 57, 118, 119, 122, 123 |
