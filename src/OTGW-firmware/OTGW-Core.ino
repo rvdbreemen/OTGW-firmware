@@ -1694,6 +1694,7 @@ void processPSSummary(const char *buf, int len) {
       if (msgid <= OT_MSGID_MAX) {
         PROGMEM_readAnything(&OTmap[msgid], OTlookupitem);
         const char *label = OTlookupitem.label;
+        bool bUpdated = false;
 
         switch (OTlookupitem.type) {
           case ot_f88: {
@@ -1701,6 +1702,7 @@ void processPSSummary(const char *buf, int len) {
             dtostrf(fval, 3, 2, vBuf);
             sendMQTTData(label, vBuf);
             msglastupdated[msgid] = now;
+            bUpdated = true;
             switch (msgid) {
               case  1: OTcurrentSystemState.TSet                  = fval; break;
               case  7: OTcurrentSystemState.CoolingControl        = fval; break;
@@ -1728,6 +1730,7 @@ void processPSSummary(const char *buf, int len) {
             itoa(ival, vBuf, 10);
             sendMQTTData(label, vBuf);
             msglastupdated[msgid] = now;
+            bUpdated = true;
             if (msgid == 33) OTcurrentSystemState.Texhaust = ival;
             break;
           }
@@ -1736,6 +1739,7 @@ void processPSSummary(const char *buf, int len) {
             utoa(ival, vBuf, 10);
             sendMQTTData(label, vBuf);
             msglastupdated[msgid] = now;
+            bUpdated = true;
             switch (msgid) {
               case 116: OTcurrentSystemState.BurnerStarts               = ival; break;
               case 117: OTcurrentSystemState.CHPumpStarts               = ival; break;
@@ -1766,6 +1770,7 @@ void processPSSummary(const char *buf, int len) {
               strlcat(topicBuf, "_value_lb", sizeof(topicBuf));
               sendMQTTData(topicBuf, vBuf);
               msglastupdated[msgid] = now;
+              bUpdated = true;
               switch (msgid) {
                 case 48: OTcurrentSystemState.TdhwSetUBTdhwSetLB = combined; break;
                 case 49: OTcurrentSystemState.MaxTSetUBMaxTSetLB = combined; break;
@@ -1791,6 +1796,7 @@ void processPSSummary(const char *buf, int len) {
               strlcat(topicBuf, "_value_lb", sizeof(topicBuf));
               sendMQTTData(topicBuf, vBuf);
               msglastupdated[msgid] = now;
+              bUpdated = true;
               if (msgid == 15) OTcurrentSystemState.MaxCapacityMinModLevel = combined;
             }
             break;
@@ -1800,6 +1806,7 @@ void processPSSummary(const char *buf, int len) {
             utoa(ival, vBuf, 10);
             sendMQTTData(label, vBuf);
             msglastupdated[msgid] = now;
+            bUpdated = true;
             switch (msgid) {
               case 71: OTcurrentSystemState.ControlSetpointVH  = ival; break;
               case 77: OTcurrentSystemState.RelativeVentilation = ival; break;
@@ -1816,6 +1823,7 @@ void processPSSummary(const char *buf, int len) {
                 if (fBuf[16 - b] == '1') lb |= (1 << b);
               }
               msglastupdated[msgid] = now;
+              bUpdated = true;
               if (msgid == 0) {
                 // Main Status flags: update state and publish individual bits
                 OTcurrentSystemState.MasterStatus = hb;
@@ -1844,6 +1852,25 @@ void processPSSummary(const char *buf, int len) {
           }
           default:
             break; // Unknown/unsupported type — skip
+        }
+
+        if (bUpdated) {
+          // Trigger HA auto-discovery for this message ID if not yet configured,
+          // using the same topics as the HA discovery configuration (mqttha.cfg).
+          if (settingMQTTenable && !getMQTTConfigDone(msgid)) {
+            if (doAutoConfigureMsgid(msgid, NodeId)) {
+              setMQTTConfigDone(msgid);
+            }
+          }
+          // Publish field to OT log WebSocket for dashboard visibility.
+          // For flag8/flag8 fields (e.g. Status), fBuf holds the raw binary summary
+          // string ("XXXXXXXX/YYYYYYYY") — the individual bit values are published
+          // via publishMQTTOnOff() above, but the log shows the compact PS=1 form.
+          ClrLog();
+          AddLogf("PS1 %-20s = %s", OTlookupitem.label, fBuf);
+          AddLogln();
+          sendLogToWebSocket(ot_log_buffer);
+          ClrLog();
         }
       }
     }
