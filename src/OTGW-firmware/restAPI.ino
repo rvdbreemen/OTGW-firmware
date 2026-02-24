@@ -40,6 +40,58 @@ static void sendApiMethodNotAllowed(const __FlashStringHelper* allowedMethods) {
 }
 
 //=======================================================================
+// CSRF same-origin helper for admin operations (ADR-054)
+// Returns true if the request appears to come from the same origin.
+// Permissive for legacy/non-browser clients that don't send Origin/Referer.
+static bool isSameOriginRequest() {
+  String origin = httpServer.header(F("Origin"));
+  if (origin.length() == 0) {
+    origin = httpServer.header(F("Referer"));
+  }
+  if (origin.length() == 0) return true;  // no origin header — allow (non-browser client)
+
+  String host = httpServer.hostHeader();
+  if (host.length() == 0) return true;  // can't validate without Host header
+
+  int schemeSep = origin.indexOf(F("://"));
+  if (schemeSep < 0) {
+    RESTDebugTln(F("REST CSRF: malformed Origin/Referer, rejecting"));
+    return false;
+  }
+  int hostStart = schemeSep + 3;
+  int pathStart = origin.indexOf('/', hostStart);
+  String originHostPort = (pathStart >= 0) ? origin.substring(hostStart, pathStart) : origin.substring(hostStart);
+  if (!originHostPort.equalsIgnoreCase(host)) {
+    RESTDebugTf(PSTR("REST CSRF: origin host '%s' != request host '%s'\r\n"),
+                originHostPort.c_str(), host.c_str());
+    return false;
+  }
+  return true;
+}
+
+// HTTP Basic Auth helper (ADR-054)
+// Returns true if request is authorized (no password set, or valid credentials
+// AND same-origin CSRF check passes).
+// Sends 401 or 403 and returns false if auth/CSRF fails.
+bool checkHttpAuth() {
+  if (settings.sHTTPpasswd[0] == '\0') return true;  // auth disabled
+
+  if (httpServer.method() == HTTP_OPTIONS) return true;  // allow CORS preflight
+
+  if (!httpServer.authenticate("admin", settings.sHTTPpasswd)) {
+    httpServer.requestAuthentication();
+    return false;
+  }
+
+  if (!isSameOriginRequest()) {
+    sendApiError(403, F("CSRF protection: invalid origin"));
+    return false;
+  }
+
+  return true;
+}
+
+//=======================================================================
 
 static bool isDigitStr(const char *s) {
   if (s == nullptr || *s == '\0') return false;
@@ -944,6 +996,7 @@ void sendDeviceTimeV2()
 //=======================================================================
 void sendDeviceSettings() 
 {
+  if (!checkHttpAuth()) return;
   RESTDebugTln(F("sending device settings ...\r"));
 
   sendStartJsonMap(F("settings"));
@@ -954,11 +1007,12 @@ void sendDeviceSettings()
   //sendJsonSettingObj("intager",  settingInteger , "i", 2, 60);
 
   sendJsonSettingObj(F("hostname"), CSTR(settings.sHostname), "s", 32);
+  sendJsonSettingObj(F("httppasswd"), F("notthepassword"), "p", 40);
   sendJsonSettingObj(F("mqttenable"), settings.mqtt.bEnable, "b");
   sendJsonSettingObj(F("mqttbroker"), CSTR(settings.mqtt.sBroker), "s", 32);
   sendJsonSettingObj(F("mqttbrokerport"), settings.mqtt.iBrokerPort, "i", 0, 65535);
   sendJsonSettingObj(F("mqttuser"), CSTR(settings.mqtt.sUser), "s", 32);
-  sendJsonSettingObj(F("mqttpasswd"), "notthepassword", "p", 100);
+  sendJsonSettingObj(F("mqttpasswd"), F("notthepassword"), "p", 100);
   sendJsonSettingObj(F("mqtttoptopic"), CSTR(settings.mqtt.sTopTopic), "s", 15);
   sendJsonSettingObj(F("mqtthaprefix"), CSTR(settings.mqtt.sHaprefix), "s", 20);
   sendJsonSettingObj(F("mqttharebootdetection"), settings.mqtt.bHaRebootDetect, "b");
@@ -1010,7 +1064,7 @@ void sendDeviceSettings()
 static const char* const PROGMEM knownSettings[] = {
   "darktheme", "gpiooutputsenabled", "gpiooutputspin", "gpiooutputstriggerbit",
   "gpiosensorsenabled", "gpiosensorsinterval", "gpiosensorslegacyformat", "gpiosensorspin",
-  "hostname", "ledblink",
+  "hostname", "httppasswd", "ledblink",
   "mqttbroker", "mqttbrokerport", "mqttenable", "mqtthaprefix", "mqttharebootdetection",
   "mqttinterval", "mqttotmessage", "mqttpasswd", "mqttseparatesources",
   "mqtttoptopic", "mqttuniqueid", "mqttuser",
@@ -1033,6 +1087,7 @@ static bool isKnownSetting(const char* field) {
 //=======================================================================
 void postSettings()
 {
+  if (!checkHttpAuth()) return;
   //------------------------------------------------------------
   // json string: {"name":"settingInterval","value":9}
   // json string: {"name":"settings.sHostname","value":"abc"}
@@ -1063,7 +1118,13 @@ void postSettings()
     return;
   }
 
-  RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
+  // Mask password fields in REST debug log
+  if (strcasecmp_P(field, PSTR("httppasswd")) == 0 ||
+      strcasecmp_P(field, PSTR("mqttpasswd")) == 0) {
+    RESTDebugTf(PSTR("--> field[%s] => newValue[***]\r\n"), field);
+  } else {
+    RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
+  }
   updateSetting(field, newValue);
   // Synchronous flush: persist to flash NOW so the 200 OK is truthful.
   // The deferred timer still handles MQTT/NTP command updates, but HTTP
