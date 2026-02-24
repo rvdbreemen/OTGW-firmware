@@ -157,8 +157,8 @@ static const char UpdateServerIndex[] PROGMEM =
              remaining--;
              
              // Check health endpoint to verify device is fully booted
-             console.log('[OTA] Health check: GET /api/v1/health?t=' + Date.now());
-             fetch('/api/v1/health?t=' + Date.now(), { 
+             console.log('[OTA] Health check: GET /api/v2/health?t=' + Date.now());
+             fetch('/api/v2/health?t=' + Date.now(), { 
                method: 'GET', 
                cache: 'no-store',
                headers: { 'Accept': 'application/json' }
@@ -186,7 +186,7 @@ static const char UpdateServerIndex[] PROGMEM =
                        if (labels && typeof labels === 'object' && Object.keys(labels).length > 0) {
                          console.log('[OTA] Restoring Dallas labels from memory cache');
                          progressText.textContent = 'Restoring Dallas labels...';
-                         labelsRestored = fetch('/api/v1/sensors/labels', {
+                         labelsRestored = fetch('/api/v2/sensors/labels', {
                            method: 'POST',
                            headers: { 'Content-Type': 'application/json' },
                            body: JSON.stringify(labels)
@@ -442,7 +442,7 @@ static const char UpdateServerSuccess[] PROGMEM =
            remainingSeconds--;
            
            // Check health endpoint to verify device is fully booted
-           fetch('/api/v1/health?t=' + Date.now(), { 
+           fetch('/api/v2/health?t=' + Date.now(), { 
              method: 'GET', 
              cache: 'no-store',
              headers: { 'Accept': 'application/json' }
@@ -467,7 +467,7 @@ static const char UpdateServerSuccess[] PROGMEM =
                      var labels = window.opener.dallasLabelsCache;
                      if (labels && typeof labels === 'object' && Object.keys(labels).length > 0) {
                        statusEl.textContent = "Restoring Dallas labels...";
-                       labelsRestored = fetch('/api/v1/sensors/labels', {
+                       labelsRestored = fetch('/api/v2/sensors/labels', {
                          method: 'POST',
                          headers: { 'Content-Type': 'application/json' },
                          body: JSON.stringify(labels)
