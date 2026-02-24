@@ -19,8 +19,13 @@ Two MQTT topic names were corrected for spelling. Existing Home Assistant entiti
 | --- | --- | --- |
 | `…/eletric_production` | `…/electric_production` | Spelling fix |
 | `…/solar_storage_slave_fault_incidator` | `…/solar_storage_slave_fault_indicator` | Spelling fix |
+| `…/CumulativElectricityProduction` | `…/CumulativeElectricityProduction` | Spelling fix |
+| `…/vh_free_ventlation_mode` | `…/vh_free_ventilation_mode` | Spelling fix |
+| `…/vh_ventlation_mode` | `…/vh_ventilation_mode` | Spelling fix |
+| `…/vh_tramfer_enble_nominal_ventlation_value` | `…/vh_transfer_enable_nominal_ventilation_value` | Spelling fix |
+| `…/vh_rw_nominal_ventlation_value` | `…/vh_rw_nominal_ventilation_value` | Spelling fix |
 
-**Migration**: Delete the old entities from Home Assistant (Settings → Devices & Services → MQTT → delete orphaned entities), then trigger MQTT discovery re-registration via the device UI or `POST /api/v2/otgw/discovery`.
+**Migration**: Delete the old entities from Home Assistant (Settings → Devices & Services → MQTT → delete orphaned entities), then trigger MQTT discovery re-registration via the device UI or `POST /api/v2/otgw/discovery`. Manual MQTT consumers must update topic subscriptions because these typo-fix renames do not publish backward-compatibility aliases.
 
 ### MQTT separate-source topics are opt-in (default: disabled)
 A new feature (`MQTTseparatesources`) publishes source-specific MQTT topics per OT message (thermostat/boiler/gateway). **This is disabled by default** in v1.2.0 for backward compatibility. Upgraders are not affected unless they opt in.
@@ -174,6 +179,11 @@ Manual MQTT consumers and older HA entities may need updates:
 
 - `eletric_production` -> `electric_production`
 - `solar_storage_slave_fault_incidator` -> `solar_storage_slave_fault_indicator`
+- `CumulativElectricityProduction` -> `CumulativeElectricityProduction`
+- `vh_free_ventlation_mode` -> `vh_free_ventilation_mode`
+- `vh_ventlation_mode` -> `vh_ventilation_mode`
+- `vh_tramfer_enble_nominal_ventlation_value` -> `vh_transfer_enable_nominal_ventilation_value`
+- `vh_rw_nominal_ventlation_value` -> `vh_rw_nominal_ventilation_value`
 - `RelativeHumidity_hb_u8` / `RelativeHumidity_lb_u8` (legacy split-byte decoding) -> `RelativeHumidity` canonical `f8.8` payload
 - HA discovery `FanSpeed` (`rpm`) -> `FanSpeed_setpoint_hz` + `FanSpeed_actual_hz` (`Hz`)
 - Legacy IDs `50-63` now suppressed on v4.x systems in default `AUTO` compatibility mode
@@ -210,7 +220,7 @@ If you parse device info JSON directly (instead of the Web UI), update these key
 2. Optionally clear retained legacy source-specific value topics (underscore format) if you no longer need them in MQTT Explorer/history views.
 3. Trigger MQTT auto-discovery again (especially if using HA entities for `FanSpeed`, source-separated entities, or v4.2-affected IDs).
 4. Remove stale HA entities linked to typo topics, old `FanSpeed` discovery, or old source-specific discovery paths.
-5. Update manual MQTT automations/sensors to new topic names and payload formats (including nested source paths such as `TSet/thermostat`).
+5. Update manual MQTT automations/sensors to new topic names and payload formats (including typo-fix renames like `CumulativeElectricityProduction`, `vh_*_ventilation_*`, and nested source paths such as `TSet/thermostat`).
 6. If you rely on legacy IDs `50-63`, confirm the system is truly pre-v4.2.
 7. If custom tooling reads `/api/.../device/info`, update field names to `otgwmode` and `wifiquality_text`.
 

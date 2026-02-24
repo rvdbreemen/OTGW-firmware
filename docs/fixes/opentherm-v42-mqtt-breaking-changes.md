@@ -57,6 +57,11 @@ This caused incorrect values, broken HA entities, and non-compliant behavior on 
 3. Typo-topic fixes (already breaking if manually subscribed)
    - `eletric_production` -> `electric_production`
    - `solar_storage_slave_fault_incidator` -> `solar_storage_slave_fault_indicator`
+   - `CumulativElectricityProduction` -> `CumulativeElectricityProduction`
+   - `vh_free_ventlation_mode` -> `vh_free_ventilation_mode`
+   - `vh_ventlation_mode` -> `vh_ventilation_mode`
+   - `vh_tramfer_enble_nominal_ventlation_value` -> `vh_transfer_enable_nominal_ventilation_value`
+   - `vh_rw_nominal_ventlation_value` -> `vh_rw_nominal_ventilation_value`
 
 ### Home Assistant discovery / entities
 
@@ -74,6 +79,7 @@ This caused incorrect values, broken HA entities, and non-compliant behavior on 
 - IDs `71`, `77`, `78`, `87`: legacy split alias topics are still published.
 - IDs `98`, `99`: raw byte aliases are still published, plus new semantic decoded topics.
 - Legacy IDs `50-63` remain supported for actual pre-v4.2 devices via `AUTO` (before v4.x is detected) and `PRE_V42_LEGACY`.
+- Typo-fix topic renames above do not publish legacy aliases; update manual subscriptions and allow HA to rediscover replacement entities.
 
 Current limitation:
 
@@ -88,6 +94,8 @@ Current limitation:
    - `RelativeHumidity_*_u8` -> `RelativeHumidity`
    - `eletric_production` -> `electric_production`
    - `solar_storage_slave_fault_incidator` -> `solar_storage_slave_fault_indicator`
+   - `CumulativElectricityProduction` -> `CumulativeElectricityProduction`
+   - `vh_*_ventlation_*` / `vh_*ventliation*` variants -> corrected `vh_*_ventilation_*` topics
 5. If you rely on IDs `50-63`, verify your device protocol generation:
    - pre-v4.2: legacy topics remain available
    - v4.x: reserved IDs are suppressed by default
