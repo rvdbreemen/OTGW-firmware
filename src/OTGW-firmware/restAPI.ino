@@ -44,6 +44,18 @@ static void sendApiMethodNotAllowed(const __FlashStringHelper* allowedMethods) {
 }
 
 //=======================================================================
+// HTTP Basic Auth helper (ADR-041)
+// Returns true if request is authorized (no password set, or valid credentials).
+// Sends 401 + WWW-Authenticate challenge and returns false if auth fails.
+// Username is fixed as "admin"; only the password is configurable.
+bool checkHttpAuth() {
+  if (settingHTTPpasswd[0] == '\0') return true;  // no password set, auth disabled
+  if (httpServer.authenticate("admin", settingHTTPpasswd)) return true;
+  httpServer.requestAuthentication();
+  return false;
+}
+
+//=======================================================================
 
 static bool isDigitStr(const char *s) {
   if (s == nullptr || *s == '\0') return false;
@@ -1043,6 +1055,7 @@ void sendDeviceTimeV2()
 //=======================================================================
 void sendDeviceSettings() 
 {
+  if (!checkHttpAuth()) return;
   RESTDebugTln(F("sending device settings ...\r"));
 
   sendStartJsonObj(F("settings"));
@@ -1053,6 +1066,7 @@ void sendDeviceSettings()
   //sendJsonSettingObj("intager",  settingInteger , "i", 2, 60);
 
   sendJsonSettingObj(F("hostname"), CSTR(settingHostname), "s", 32);
+  sendJsonSettingObj(F("httppasswd"), "notthepassword", "p", 40);
   sendJsonSettingObj(F("mqttenable"), settingMQTTenable, "b");
   sendJsonSettingObj(F("mqttbroker"), CSTR(settingMQTTbroker), "s", 32);
   sendJsonSettingObj(F("mqttbrokerport"), settingMQTTbrokerPort, "i", 0, 65535);
@@ -1099,6 +1113,7 @@ void sendDeviceSettings()
 //=======================================================================
 void postSettings()
 {
+  if (!checkHttpAuth()) return;
   //------------------------------------------------------------ 
   // json string: {"name":"settingInterval","value":9}  
   // json string: {"name":"settingHostname","value":"abc"}  

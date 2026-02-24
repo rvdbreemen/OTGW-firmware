@@ -91,6 +91,7 @@ void writeSettings(bool show)
   DynamicJsonDocument doc(1536);
   JsonObject root  = doc.to<JsonObject>();
   root[F("hostname")] = settingHostname;
+  root[F("httppasswd")] = settingHTTPpasswd;
   root[F("MQTTenable")] = settingMQTTenable;
   root[F("MQTTbroker")] = settingMQTTbroker;
   root[F("MQTTbrokerPort")] = settingMQTTbrokerPort;
@@ -173,6 +174,8 @@ void readSettings(bool show)
   strlcpy(settingHostname, doc[F("hostname")] | "", sizeof(settingHostname));
   if (strlen(settingHostname)==0) strlcpy(settingHostname, _HOSTNAME, sizeof(settingHostname));
 
+  strlcpy(settingHTTPpasswd, doc[F("httppasswd")] | "", sizeof(settingHTTPpasswd));
+
   settingMQTTenable       = doc[F("MQTTenable")]|settingMQTTenable;
   strlcpy(settingMQTTbroker, doc[F("MQTTbroker")] | "", sizeof(settingMQTTbroker));
   
@@ -250,6 +253,7 @@ void readSettings(bool show)
   if (show) {
     Debugln(F("\r\n==== read Settings ===================================================\r"));
     Debugf(PSTR("Hostname              : %s\r\n"), CSTR(settingHostname));
+    Debugf(PSTR("HTTP password         : %s\r\n"), settingHTTPpasswd[0] ? "***" : "(not set)");
     Debugf(PSTR("MQTT enabled          : %s\r\n"), CBOOLEAN(settingMQTTenable));
     Debugf(PSTR("MQTT broker           : %s\r\n"), CSTR(settingMQTTbroker));
     Debugf(PSTR("MQTT port             : %d\r\n"), settingMQTTbrokerPort);
@@ -305,7 +309,19 @@ void updateSetting(const char *field, const char *newValue)
     Debugln();
     DebugTf(PSTR("Need reboot before new %s.local will be available!\r\n\n"), settingHostname);
   }
-  
+
+  if (strcasecmp_P(field, PSTR("httppasswd")) == 0) {
+    // Only update if not the placeholder value (same pattern as MQTTpasswd)
+    if (newValue && strcasecmp_P(newValue, PSTR("notthepassword")) != 0) {
+      strlcpy(settingHTTPpasswd, newValue, sizeof(settingHTTPpasswd));
+      // Update OTA update server credentials immediately
+      if (settingHTTPpasswd[0] != '\0') {
+        httpUpdater.updateCredentials("admin", settingHTTPpasswd);
+      } else {
+        httpUpdater.updateCredentials("", "");
+      }
+    }
+  }
   if (strcasecmp_P(field, PSTR("MQTTenable"))==0)      settingMQTTenable = EVALBOOLEAN(newValue);
   if (strcasecmp_P(field, PSTR("MQTTbroker")) == 0)    strlcpy(settingMQTTbroker, newValue, sizeof(settingMQTTbroker));
   if (strcasecmp_P(field, PSTR("MQTTbrokerPort"))==0)  settingMQTTbrokerPort = atoi(newValue);

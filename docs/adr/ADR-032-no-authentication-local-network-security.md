@@ -2,7 +2,8 @@
 
 **Status:** Accepted  
 **Date:** 2026-02-07  
-**Decision Maker:** Copilot Agent based on codebase analysis and ADR-003
+**Decision Maker:** Copilot Agent based on codebase analysis and ADR-003  
+**Note:** Partially superseded by ADR-041 for settings/admin endpoints (optional opt-in auth added)
 
 ## Context
 

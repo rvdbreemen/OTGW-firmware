@@ -255,6 +255,10 @@ void startWiFi(const char* hostname, int timeOut)
   httpUpdater.setup(&httpServer);
   httpUpdater.setIndexPage(UpdateServerIndex);
   httpUpdater.setSuccessPage(UpdateServerSuccess);
+  // Apply HTTP Basic Auth credentials to OTA update server if password is configured
+  if (settingHTTPpasswd[0] != '\0') {
+    httpUpdater.updateCredentials("admin", settingHTTPpasswd);
+  }
   DebugTf(PSTR(" took [%lu] seconds => OK!\r\n"), (millis() - lTime) / 1000);
   
 } // startWiFi()
