@@ -1992,12 +1992,15 @@ function setupOTLogControls() {
 //============================================================================
 // Send a one-shot command to the OTGW PIC via the REST API
 //============================================================================
+let statusClearTimer = null;
+
 function sendOTGWcommand(cmd) {
   var trimmedCmd = (cmd || '').trim();
   var statusEl = document.getElementById('otCmdStatus');
 
   function clearStatus(delay) {
-    setTimeout(function() {
+    clearTimeout(statusClearTimer);
+    statusClearTimer = setTimeout(function() {
       var el = document.getElementById('otCmdStatus');
       if (el) { el.textContent = ''; el.className = 'ot-cmd-status'; }
     }, delay);
