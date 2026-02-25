@@ -3154,6 +3154,39 @@ function refreshSettings() {
         }
       }
       //console.log("-->done..");
+      // Inject webhook test buttons after webhook settings (if present and not already injected)
+      if (document.getElementById("D_webhooktriggerbit") && !document.getElementById("D_webhooktest")) {
+        var settings = document.getElementById('settingsPage');
+        var testDiv = document.createElement("div");
+        testDiv.setAttribute("id", "D_webhooktest");
+        testDiv.setAttribute("class", "settingDiv");
+        var labelDiv = document.createElement("div");
+        labelDiv.className = 'settings-field-container';
+        labelDiv.setAttribute("style", "margin-right: 10px;");
+        labelDiv.textContent = "Test Webhook";
+        testDiv.appendChild(labelDiv);
+        var btnDiv = document.createElement("div");
+        btnDiv.setAttribute("style", "text-align: left;");
+        var btnOn = document.createElement("button");
+        btnOn.setAttribute("type", "button");
+        btnOn.setAttribute("id", "btnWebhookTestOn");
+        btnOn.textContent = "Test ON";
+        btnOn.setAttribute("style", "margin-right: 6px;");
+        btnOn.addEventListener("click", function() { testWebhookUI(true); }, false);
+        var btnOff = document.createElement("button");
+        btnOff.setAttribute("type", "button");
+        btnOff.setAttribute("id", "btnWebhookTestOff");
+        btnOff.textContent = "Test OFF";
+        btnOff.addEventListener("click", function() { testWebhookUI(false); }, false);
+        btnDiv.appendChild(btnOn);
+        btnDiv.appendChild(btnOff);
+        var resultSpan = document.createElement("span");
+        resultSpan.setAttribute("id", "webhookTestResult");
+        resultSpan.setAttribute("style", "margin-left: 10px; font-style: italic;");
+        btnDiv.appendChild(resultSpan);
+        testDiv.appendChild(btnDiv);
+        settings.appendChild(testDiv);
+      }
     })
     .catch(function (error) {
       var p = document.createElement('p');
@@ -3164,6 +3197,28 @@ function refreshSettings() {
 
 } // refreshSettings()
 
+
+//============================================================================
+function testWebhookUI(stateOn) {
+  var resultEl = document.getElementById("webhookTestResult");
+  if (resultEl) resultEl.textContent = "Sending...";
+  fetch(APIGW + "v2/webhook/test?state=" + (stateOn ? "on" : "off"), {
+    method: "POST"
+  })
+    .then(function(response) {
+      if (!response.ok) {
+        throw new Error("HTTP " + response.status);
+      }
+      return response.json();
+    })
+    .then(function(json) {
+      if (resultEl) resultEl.textContent = "Sent (" + (stateOn ? "ON" : "OFF") + ")";
+      setTimeout(function() { if (resultEl) resultEl.textContent = ""; }, 3000);
+    })
+    .catch(function(error) {
+      if (resultEl) resultEl.textContent = "Error: " + error.message;
+    });
+}
 
 //============================================================================  
 function saveSettings() {
@@ -3416,6 +3471,10 @@ var translateFields = [
   , ["gpiooutputsenabled", "GPIO Output Enabled"]
   , ["gpiooutputspin", "GPIO pin # to switch on/off"]
   , ["gpiooutputstriggerbit", "Bit X (master/slave) to trigger on (0-15)"]
+  , ["webhookenable", "Webhook Enabled"]
+  , ["webhookurlon", "Webhook URL (ON state)"]
+  , ["webhookurloff", "Webhook URL (OFF state)"]
+  , ["webhooktriggerbit", "Webhook Trigger Bit (0-15)"]
   
 ];
 

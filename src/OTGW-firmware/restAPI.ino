@@ -416,6 +416,18 @@ void processAPI()
         } else {
           sendApiNotFound(originalURI);
         }
+      } else if (wc > 3 && strcmp_P(words[3], PSTR("webhook")) == 0) {
+        if (wc > 4 && strcmp_P(words[4], PSTR("test")) == 0) {
+          // POST /api/v2/webhook/test?state=on|off — fire webhook immediately for testing
+          if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST")); return; }
+          String stateParam = httpServer.arg(F("state"));
+          bool testOn = (stateParam.equalsIgnoreCase("on") || stateParam == "1");
+          testWebhook(testOn);
+          httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+          httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+        } else {
+          sendApiNotFound(originalURI);
+        }
       } else {
         sendApiNotFound(originalURI);
       }

@@ -17,6 +17,50 @@ static bool webhookLastState = false;
 static bool webhookInitialized = false;
 
 //=======================================================================
+// Send the webhook for the given state, regardless of current state.
+// Used by the test endpoint and called from evalWebhook() on change.
+//=======================================================================
+static void sendWebhook(bool stateOn) {
+  if (!settingWebhookEnabled) {
+    DebugTln(F("Webhook: not enabled"));
+    return;
+  }
+
+  const char* url = stateOn ? settingWebhookURLon : settingWebhookURLoff;
+  if (strlen(url) == 0) {
+    DebugTf(PSTR("Webhook: no URL configured for state %s\r\n"), stateOn ? "ON" : "OFF");
+    return;
+  }
+
+  DebugTf(PSTR("Webhook: calling [%s] (state=%s)\r\n"), url, stateOn ? "ON" : "OFF");
+
+  WiFiClient client;
+  HTTPClient http;
+  http.setTimeout(3000); // 3 second timeout to avoid stalling the main loop
+
+  if (http.begin(client, url)) {
+    int code = http.GET();
+    if (code > 0) {
+      DebugTf(PSTR("Webhook: HTTP response code: %d\r\n"), code);
+    } else {
+      DebugTf(PSTR("Webhook: HTTP GET failed, error: %s\r\n"), http.errorToString(code).c_str());
+    }
+    http.end();
+  } else {
+    DebugTln(F("Webhook: http.begin() failed (invalid URL?)"));
+  }
+  feedWatchDog(); // ensure watchdog is fed after potentially slow HTTP request
+}
+
+//=======================================================================
+// Fire the webhook for a specific state on demand (for testing).
+//=======================================================================
+void testWebhook(bool testOn) {
+  DebugTf(PSTR("Webhook: test requested for state %s\r\n"), testOn ? "ON" : "OFF");
+  sendWebhook(testOn);
+}
+
+//=======================================================================
 void evalWebhook() {
   if (!settingWebhookEnabled) return;
   if (strlen(settingWebhookURLon) == 0 && strlen(settingWebhookURLoff) == 0) return;
@@ -35,31 +79,9 @@ void evalWebhook() {
   if (bitState == webhookLastState) return;
   webhookLastState = bitState;
 
-  const char* url = bitState ? settingWebhookURLon : settingWebhookURLoff;
-  if (strlen(url) == 0) {
-    DebugTf(PSTR("Webhook: state changed to %s but no URL configured\r\n"), bitState ? "ON" : "OFF");
-    return;
-  }
-
-  DebugTf(PSTR("Webhook: bit %d changed to %s, calling [%s]\r\n"),
-          settingWebhookTriggerBit, bitState ? "ON" : "OFF", url);
-
-  WiFiClient client;
-  HTTPClient http;
-  http.setTimeout(3000); // 3 second timeout to avoid stalling the main loop
-
-  if (http.begin(client, url)) {
-    int code = http.GET();
-    if (code > 0) {
-      DebugTf(PSTR("Webhook: HTTP response code: %d\r\n"), code);
-    } else {
-      DebugTf(PSTR("Webhook: HTTP GET failed, error: %s\r\n"), http.errorToString(code).c_str());
-    }
-    http.end();
-  } else {
-    DebugTln(F("Webhook: http.begin() failed (invalid URL?)"));
-  }
-  feedWatchDog(); // ensure watchdog is fed after potentially slow HTTP request
+  DebugTf(PSTR("Webhook: bit %d changed to %s\r\n"),
+          settingWebhookTriggerBit, bitState ? "ON" : "OFF");
+  sendWebhook(bitState);
 }
 
 /***************************************************************************
