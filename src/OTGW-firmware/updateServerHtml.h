@@ -450,12 +450,100 @@ static const char UpdateServerIndex[] PROGMEM =
            })
            .catch(function() {});
 
+         function parseVersion(v) {
+           if (!v) {
+             return { nums: [0], pre: [] };
+           }
+           // Strip build metadata (+...) per SemVer
+           var plusIdx = v.indexOf('+');
+           if (plusIdx >= 0) {
+             v = v.substring(0, plusIdx);
+           }
+           // Split main version and prerelease (-...)
+           var main = v;
+           var pre = [];
+           var dashIdx = v.indexOf('-');
+           if (dashIdx >= 0) {
+             main = v.substring(0, dashIdx);
+             var preStr = v.substring(dashIdx + 1);
+             if (preStr) {
+               pre = preStr.split('.');
+             }
+           }
+           var parts = main.split('.');
+           var nums = [];
+           for (var i = 0; i < parts.length; i++) {
+             var n = parseInt(parts[i], 10);
+             nums.push(isNaN(n) ? 0 : n);
+           }
+           return { nums: nums, pre: pre };
+         }
+
          function versionLt(a, b) {
-           var pa = a.split('.').map(Number), pb = b.split('.').map(Number);
-           var len = Math.max(pa.length, pb.length);
+           var va = parseVersion(a);
+           var vb = parseVersion(b);
+
+           // Compare main numeric parts
+           var len = Math.max(va.nums.length, vb.nums.length);
            for (var i = 0; i < len; i++) {
-             if ((pa[i]||0) < (pb[i]||0)) return true;
-             if ((pa[i]||0) > (pb[i]||0)) return false;
+             var na = (i < va.nums.length) ? va.nums[i] : 0;
+             var nb = (i < vb.nums.length) ? vb.nums[i] : 0;
+             if (na < nb) return true;
+             if (na > nb) return false;
+           }
+
+           // Main versions equal: handle prerelease according to SemVer
+           var aHasPre = va.pre.length > 0;
+           var bHasPre = vb.pre.length > 0;
+
+           if (!aHasPre && bHasPre) {
+             // Normal version is greater than prerelease
+             return false;
+           }
+           if (aHasPre && !bHasPre) {
+             // Prerelease is less than normal version
+             return true;
+           }
+           if (!aHasPre && !bHasPre) {
+             // Completely equal
+             return false;
+           }
+
+           // Both have prerelease: compare identifiers
+           var preLen = Math.max(va.pre.length, vb.pre.length);
+           for (var j = 0; j < preLen; j++) {
+             var ida = va.pre[j];
+             var idb = vb.pre[j];
+
+             if (typeof ida === 'undefined' && typeof idb === 'undefined') {
+               break;
+             }
+             if (typeof ida === 'undefined') {
+               // a has fewer identifiers => lower precedence
+               return true;
+             }
+             if (typeof idb === 'undefined') {
+               return false;
+             }
+
+             var reNum = /^[0-9]+$/;
+             var aIsNum = reNum.test(ida);
+             var bIsNum = reNum.test(idb);
+
+             if (aIsNum && bIsNum) {
+               var ia = parseInt(ida, 10);
+               var ib = parseInt(idb, 10);
+               if (ia < ib) return true;
+               if (ia > ib) return false;
+             } else if (aIsNum && !bIsNum) {
+               // Numeric identifiers have lower precedence than non-numeric
+               return true;
+             } else if (!aIsNum && bIsNum) {
+               return false;
+             } else {
+               if (ida < idb) return true;
+               if (ida > idb) return false;
+             }
            }
            return false;
          }
