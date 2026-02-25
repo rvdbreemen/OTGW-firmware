@@ -92,6 +92,18 @@ def _norm_cell(cell: str) -> str:
     return cell.replace("f8.8", "f88")
 
 
+def _norm_unit(unit: str) -> str:
+    unit_norm = str(unit or "").strip().lower().replace(" ", "")
+    aliases = {
+        "h": "hours",
+        "hour": "hours",
+        "hrs": "hours",
+        "w": "watt",
+        "watts": "watt",
+    }
+    return aliases.get(unit_norm, unit_norm)
+
+
 def _spec_type_key(spec_row: Dict[str, Any]) -> str:
     hb = _norm_cell(spec_row["hb_type"])
     lb = _norm_cell(spec_row["lb_type"])
@@ -536,7 +548,7 @@ def build_audit(
         ):
             spec_unit = str(spec_ids[int(entry["id"])]["unit"]).replace("—", "").strip()
             cfg_unit = str(uom or "").strip()
-            if spec_unit and cfg_unit and spec_unit != cfg_unit:
+            if spec_unit and cfg_unit and _norm_unit(spec_unit) != _norm_unit(cfg_unit):
                 findings["mqttha_direct_unit_semantic_issues"].append(
                     {
                         "line": entry["line"],

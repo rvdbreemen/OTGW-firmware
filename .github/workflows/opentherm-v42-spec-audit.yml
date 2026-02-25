@@ -9,12 +9,6 @@ on:
       - "dev-*"
       - "copilot-*"
       - "release/**"
-  push:
-    branches:
-      - dev
-      - "dev-*"
-      - main
-      - "copilot/*"
 
 jobs:
   spec-audit:
