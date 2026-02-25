@@ -262,7 +262,11 @@ void doTaskEvery30s(){
 void doTaskEvery60s(){
 
   //== do tasks ==
- 
+
+  // Re-check FS/firmware hash match every 60s so the warning persists
+  // even if sMessage is cleared by PS=0 echo or OT frame handling.
+  checklittlefshash();
+
   // Query the actual gateway mode setting from PIC using PR=M command
   // This provides reliable detection of Gateway vs Monitor mode
   if (bPICavailable && bOTGWonline) {

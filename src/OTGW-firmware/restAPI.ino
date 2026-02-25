@@ -25,14 +25,10 @@
 // Returns: {"error":{"status":N,"message":"..."}}
 //=======================================================================
 static void sendApiError(int httpCode, const __FlashStringHelper* message) {
-  char msgBuf[80];
-  strncpy_P(msgBuf, (PGM_P)message, sizeof(msgBuf));
-  msgBuf[sizeof(msgBuf)-1] = 0;
-  
   char jsonBuff[200];
   snprintf_P(jsonBuff, sizeof(jsonBuff),
-    PSTR("{\"error\":{\"status\":%d,\"message\":\"%s\"}}"),
-    httpCode, msgBuf);
+    PSTR("{\"error\":{\"status\":%d,\"message\":\"%S\"}}"),
+    httpCode, (PGM_P)message);
   httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   httpServer.send(httpCode, F("application/json"), jsonBuff);
 }
@@ -66,7 +62,7 @@ static bool parseMsgId(const char *token, uint8_t &msgId) {
 
 void processAPI() 
 {
-  constexpr uint8_t MAX_WORDS = 10;
+  constexpr uint8_t MAX_WORDS = 8;
   constexpr size_t WORD_LEN = 32;
   char URI[50]   = "";
   char words[MAX_WORDS][WORD_LEN] = {{0}};
@@ -292,6 +288,11 @@ void processAPI()
           // GET /api/v2/pic/flash-status — RESTful name for pic/flashstatus
           if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
           sendPICFlashStatus();
+        } else if (wc > 4 && strcmp_P(words[4], PSTR("update-check")) == 0) {
+          // GET /api/v2/pic/update-check — on-demand check for available PIC firmware
+          // Makes an outbound request; only call when the user opens the PIC firmware tab.
+          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
+          sendPICUpdateCheck();
         } else {
           sendApiNotFound(originalURI);
         }
@@ -308,6 +309,10 @@ void processAPI()
           // GET /api/v2/filesystem/files — versioned replacement for /api/listfiles
           if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
           apilistfiles();
+        } else if (wc > 4 && strcmp_P(words[4], PSTR("hash-check")) == 0) {
+          // GET /api/v2/filesystem/hash-check — compare LittleFS version.hash with firmware hash
+          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
+          sendFilesystemHashCheck();
         } else {
           sendApiNotFound(originalURI);
         }
@@ -487,7 +492,7 @@ void sendOTGWvalue(int msgid){
       root[F("unit")] = OTlookupitem.unit;    
     }
   }
-  char sBuff[JSON_BUFF_MAX];
+  char sBuff[JSON_ENTRY_BUF];
   serializeJsonPretty(root, sBuff, sizeof(sBuff));
   //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff);
   //reply with json
@@ -520,7 +525,7 @@ void sendOTGWlabel(const char *msglabel){
     }
     root[F("unit")] = OTlookupitem.unit;    
   } 
-  char sBuff[JSON_BUFF_MAX];
+  char sBuff[JSON_ENTRY_BUF];
   serializeJsonPretty(root, sBuff, sizeof(sBuff));
   //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff);
   //reply with json
@@ -988,6 +993,47 @@ void sendPICFlashStatus()
 } // sendPICFlashStatus()
 
 //=======================================================================
+void sendPICUpdateCheck()
+{
+  // On-demand PIC firmware update check.
+  // Only called when the user opens the PIC firmware tab — never on a timer.
+  // Makes an outbound HTTP HEAD request to otgw.tclcode.com.
+  String latest = "";
+  if (strcmp_P(sPICdeviceid, PSTR("unknown")) != 0 && sPICdeviceid[0] != '\0') {
+    String picFile;
+    if (strcmp_P(sPICtype, PSTR("diagnose")) == 0) {
+      picFile = F("diagnose.hex");
+    } else if (strcmp_P(sPICtype, PSTR("interface")) == 0) {
+      picFile = F("interface.hex");
+    } else {
+      picFile = F("gateway.hex");
+    }
+    latest = checkforupdatepic(picFile);
+  }
+  bool updateAvailable = (latest.length() > 0 && latest != String(sPICfwversion));
+  sendStartJsonMap(F("pic_update"));
+  sendJsonMapEntry(F("current"), sPICfwversion);
+  sendJsonMapEntry(F("latest"), latest.c_str());
+  sendJsonMapEntry(F("update_available"), updateAvailable);
+  sendEndJsonMap(F("pic_update"));
+} // sendPICUpdateCheck()
+
+//=======================================================================
+void sendFilesystemHashCheck()
+{
+  // Read the hash stored in LittleFS and compare with the compiled-in firmware hash.
+  // Uses the cached getFilesystemHash() — safe to call from an HTTP handler.
+  String fsHash = getFilesystemHash();
+  bool match = (fsHash.length() > 0 &&
+                strcasecmp(fsHash.c_str(), _VERSION_GITHASH) == 0);
+  sendStartJsonMap(F("filesystem_check"));
+  sendJsonMapEntry(F("match"), match);
+  sendJsonMapEntry(F("fw_hash"), _VERSION_GITHASH);
+  sendJsonMapEntry(F("fs_hash"), fsHash.c_str());
+  sendEndJsonMap(F("filesystem_check"));
+} // sendFilesystemHashCheck()
+
+//=======================================================================
 void sendFlashStatus()
 {
   // Unified flash status endpoint - minimal response with only fields used by frontend
@@ -1126,7 +1172,8 @@ void postSettings()
 
   // Extract value as string — use a local buffer to avoid clobbering the global cMsg
   // which downstream callers (updateSetting, flushSettings) may also write to.
-  char newValue[CMSG_SIZE];
+  // 150 bytes covers the largest setting value (settingOTGWcommands, max 128 chars).
+  char newValue[150];
   newValue[0] = '\0';
   JsonVariant val = doc[F("value")];
   if (val.is<const char*>()) {
@@ -1188,7 +1235,7 @@ void updateAllDallasLabels() {
   }
   
   // Validate JSON format (parse to check validity)
-  DynamicJsonDocument doc(JSON_BUFF_MAX);
+  DynamicJsonDocument doc(768); // 16 sensors × ~40 bytes each + overhead ≈ 700 bytes max
   DeserializationError error = deserializeJson(doc, body);
   
   if (error) {

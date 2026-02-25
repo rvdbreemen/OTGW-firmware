@@ -976,6 +976,41 @@ body.disable-interaction {
   max-width: 720px;
 }
 
+.fs-mismatch-banner {
+  padding: 10px 16px;
+  background-color: #c62828;
+  color: white;
+  font-weight: bold;
+  text-align: center;
+}
+.fs-mismatch-banner a {
+  color: #ffcdd2;
+  text-decoration: underline;
+}
+
+.pic-update-banner {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  max-width: 720px;
+}
+.pic-update-banner.checking {
+  color: #888;
+}
+.pic-update-banner.update-available {
+  background-color: #e65c00;
+  color: white;
+  font-weight: bold;
+}
+.pic-update-banner.up-to-date {
+  background-color: #2e7d32;
+  color: white;
+}
+.pic-version-outdated {
+  color: #e65c00;
+  font-weight: bold;
+}
+
 .firmware-row-bold {
   font-weight: bold;
 }

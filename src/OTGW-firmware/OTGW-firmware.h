@@ -56,6 +56,7 @@ void setLed(int8_t, uint8_t);
 #define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"  // Home Assistant discovery prefix
 #define CMSG_SIZE 512
 #define JSON_BUFF_MAX   1024
+#define JSON_ENTRY_BUF   256  // max bytes for a single serialized JSON entry/object
 // Replace CSTR macro with overloads to handle both String and char*
 // Includes null pointer protection to prevent crashes
 inline const char* CSTR(const String& x) { 
