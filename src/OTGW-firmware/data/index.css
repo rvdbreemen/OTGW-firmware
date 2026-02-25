@@ -747,6 +747,39 @@
   cursor: pointer;
 }
 
+/* Command Input Bar */
+.ot-cmd-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.ot-cmd-input {
+  flex: 1;
+  min-width: 200px;
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  color: #000;
+  font-size: 13px;
+  font-family: 'Courier New', Consolas, monospace;
+}
+
+.ot-cmd-status {
+  font-size: 12px;
+  min-width: 100px;
+  color: #333;
+}
+
+.ot-cmd-ok {
+  color: #4caf50;
+}
+
+.ot-cmd-error {
+  color: #f44336;
+}
+
 /* Log Container */
 .ot-log-container {
   background: #1e1e1e;
