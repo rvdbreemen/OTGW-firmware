@@ -1549,7 +1549,7 @@ function parseLogLine(line) {
   // Detect event prefix lines produced by sendEventToWebSocket:
   // Format: HH:MM:SS.mmmmmm {prefix} {content}  where prefix is >, <, !, or *
   const rest = line.substring(offset);
-  const eventMatch = rest.match(/^([><!*]) (.+)/);
+  const eventMatch = rest.match(/^([><!*]) (.*)/);
   if (eventMatch) {
     return {
       time: obj.time,
