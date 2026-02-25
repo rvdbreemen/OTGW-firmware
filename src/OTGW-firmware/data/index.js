@@ -1486,6 +1486,13 @@ function updateWSStatus(connected) {
 //============================================================================
 function formatLogLine(logLine) {
   if (!logLine) return "";
+
+  // Event lines from sendEventToWebSocket (sent cmds, responses, errors, system events)
+  if (logLine.isEvent) {
+    const pfx = (typeof logLine.prefix === 'string') ? logLine.prefix : ' ';
+    const content = (typeof logLine.label === 'string') ? logLine.label : '';
+    return pfx + ' ' + content;
+  }
   
   // Construct display line from the incoming JSON fields.
   const pad = (str, len) => (str + "").padEnd(len, ' ');
@@ -1565,6 +1572,21 @@ function parseLogLine(line) {
   } else {
       // Fallback timestamp
       obj.time = new Date().toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) + "." + (new Date().getMilliseconds() + "").padStart(3, '0');
+  }
+  
+  // Detect event prefix lines produced by sendEventToWebSocket:
+  // Format: HH:MM:SS.mmmmmm {prefix} {content}  where prefix is >, <, !, or *
+  const rest = line.substring(offset);
+  const eventMatch = rest.match(/^([><!*]) (.*)/);
+  if (eventMatch) {
+    return {
+      time: obj.time,
+      isEvent: true,
+      prefix: eventMatch[1],
+      // Fields below kept for object shape consistency (processStatsLine/OTGraph use id/valid)
+      source: '', raw: '', id: null, dir: '', valid: ' ',
+      label: eventMatch[2].trim(), value: '', unit: ''
+    };
   }
   
   // Adjust base offsets based on offset
@@ -1950,6 +1972,83 @@ function setupOTLogControls() {
   // Mark as initialized after all listeners are successfully registered
   otLogControlsInitialized = true;
   updateLogCounters();
+
+  // Command input bar - send one-shot OTGW commands
+  const otCmdInput = document.getElementById('otCmdInput');
+  const btnSendCmd = document.getElementById('btnSendCmd');
+  if (btnSendCmd && otCmdInput) {
+    btnSendCmd.addEventListener('click', function() {
+      sendOTGWcommand(otCmdInput.value);
+    });
+    otCmdInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        sendOTGWcommand(otCmdInput.value);
+      }
+    });
+  }
+}
+
+//============================================================================
+// Send a one-shot command to the OTGW PIC via the REST API
+//============================================================================
+let statusClearTimer = null;
+
+function sendOTGWcommand(cmd) {
+  var trimmedCmd = (cmd || '').trim();
+  var statusEl = document.getElementById('otCmdStatus');
+
+  function clearStatus(delay) {
+    clearTimeout(statusClearTimer);
+    statusClearTimer = setTimeout(function() {
+      var el = document.getElementById('otCmdStatus');
+      if (el) { el.textContent = ''; el.className = 'ot-cmd-status'; }
+    }, delay);
+  }
+
+  if (!trimmedCmd) {
+    if (statusEl) {
+      statusEl.textContent = 'Enter a command first';
+      statusEl.className = 'ot-cmd-status ot-cmd-error';
+      clearStatus(2000);
+    }
+    return;
+  }
+
+  fetch(`${APIGW}v2/otgw/commands`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json; charset=UTF-8' },
+    body: JSON.stringify({ command: trimmedCmd })
+  })
+  .then(function(response) {
+    if (!response.ok) {
+      return response.text()
+        .catch(function(textErr) {
+          console.error('Failed to read error response body:', textErr);
+          return '';
+        })
+        .then(function(text) {
+          throw new Error('HTTP ' + response.status + (text ? ': ' + text.trim() : ''));
+        });
+    }
+    return response.json();
+  })
+  .then(function(data) {
+    if (statusEl) {
+      statusEl.textContent = 'Queued: ' + trimmedCmd;
+      statusEl.className = 'ot-cmd-status ot-cmd-ok';
+      clearStatus(3000);
+    }
+    var inputEl = document.getElementById('otCmdInput');
+    if (inputEl) inputEl.value = '';
+  })
+  .catch(function(err) {
+    console.error('Command failed:', err);
+    if (statusEl) {
+      statusEl.textContent = 'Error: ' + err.message;
+      statusEl.className = 'ot-cmd-status ot-cmd-error';
+    }
+  });
 }
 
 //============================================================================
