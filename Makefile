@@ -61,18 +61,78 @@ $(CFGFILE):
 
 ##
 # Make sure CFG is updated before libraries are called.
+# Retry up to 3 times with exponential backoff to handle transient network errors
 ##
 update_indexes: | $(CFGFILE)
-	$(CLICFG) core update-index
-	$(CLICFG) lib update-index
+	@echo "Updating package indexes..."
+	@for i in 1 2 3; do \
+		if $(CLICFG) core update-index; then \
+			echo "✓ Core index updated successfully"; \
+			break; \
+		else \
+			if [ $$i -lt 3 ]; then \
+				wait_time=$$((2 ** $$i)); \
+				echo "⚠ Core index update failed (attempt $$i/3), retrying in $${wait_time}s..."; \
+				sleep $$wait_time; \
+			else \
+				echo "✗ Core index update failed after 3 attempts"; \
+				exit 1; \
+			fi; \
+		fi; \
+	done
+	@for i in 1 2 3; do \
+		if $(CLICFG) lib update-index; then \
+			echo "✓ Library index updated successfully"; \
+			break; \
+		else \
+			if [ $$i -lt 3 ]; then \
+				wait_time=$$((2 ** $$i)); \
+				echo "⚠ Library index update failed (attempt $$i/3), retrying in $${wait_time}s..."; \
+				sleep $$wait_time; \
+			else \
+				echo "✗ Library index update failed after 3 attempts"; \
+				exit 1; \
+			fi; \
+		fi; \
+	done
 
 $(LIBRARIES): | update_indexes
 
 $(BOARDS): | update_indexes
-	$(CLICFG) core install $(PLATFORM)
+	@echo "Installing ESP8266 platform..."
+	@for i in 1 2 3; do \
+		if $(CLICFG) core install $(PLATFORM); then \
+			echo "✓ Platform installed successfully"; \
+			break; \
+		else \
+			if [ $$i -lt 3 ]; then \
+				wait_time=$$((2 ** $$i)); \
+				echo "⚠ Platform install failed (attempt $$i/3), retrying in $${wait_time}s..."; \
+				sleep $$wait_time; \
+			else \
+				echo "✗ Platform install failed after 3 attempts"; \
+				exit 1; \
+			fi; \
+		fi; \
+	done
 
 refresh: | $(CFGFILE)
-	$(CLICFG) lib update-index
+	@echo "Refreshing library index..."
+	@for i in 1 2 3; do \
+		if $(CLICFG) lib update-index; then \
+			echo "✓ Library index updated successfully"; \
+			break; \
+		else \
+			if [ $$i -lt 3 ]; then \
+				wait_time=$$((2 ** $$i)); \
+				echo "⚠ Library index update failed (attempt $$i/3), retrying in $${wait_time}s..."; \
+				sleep $$wait_time; \
+			else \
+				echo "✗ Library index update failed after 3 attempts"; \
+				exit 1; \
+			fi; \
+		fi; \
+	done
 
 flush: | $(CFGFILE)
 	$(CLICFG) cache clean

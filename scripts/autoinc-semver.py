@@ -333,8 +333,7 @@ def update_files(directory, version_info, ext_list, check_only=False):
 
 
 def update_version_hash(path, githash):
-    if not os.path.exists(path):
-        return
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as file:
         file.write(f"{githash}\n")
 

@@ -2,7 +2,7 @@
 
 **Status:** Accepted  
 **Date:** 2018-06-01 (Estimated)  
-**Updated:** 2026-01-28 (Documentation)
+**Updated:** 2026-02-16 (Clarified prefix-based deduplication, added v2 API cross-reference)
 
 ## Context
 
@@ -32,7 +32,7 @@ These commands must be sent to the PIC controller via serial interface, which ha
 **Architecture:**
 - **Queue:** Fixed-size array `cmdqueue[CMDQUEUE_MAX]`
 - **Size:** Configurable (typically 10-20 commands)
-- **Deduplication:** Identical commands merged (only keep latest)
+- **Deduplication:** Commands with the same 2-character prefix are merged (only keep latest value)
 - **Processing:** One command sent per loop iteration
 - **Retry:** Optional retry on failure (configurable)
 - **Priority:** FIFO order (first in, first out)
@@ -129,7 +129,10 @@ void handleOTGWqueue() {
 ### Positive
 - **Serial protection:** Commands sent at safe rate, no buffer overrun
 - **Deduplication:** Rapid duplicate commands collapsed to single execution
-  - Example: User clicking temp up 5 times → only final setpoint sent
+  - Deduplication matches on **command prefix** (first 2 characters), not exact string
+  - Example: User clicking temp up 5 times sends `TT=18`, `TT=19`, `TT=20` → only `TT=20` kept
+  - This is more aggressive than exact-string dedup: different values for the same command type are replaced
+  - Rationale: For setpoint commands, only the final desired value matters
 - **Reliability:** Retry logic handles transient failures
 - **Memory efficient:** Fixed-size array, no dynamic allocation
 - **Debugging:** Can inspect queue state via debug interface
@@ -153,7 +156,9 @@ void handleOTGWqueue() {
   - **Mitigation:** Timeout on command response (configurable)
   - **Mitigation:** Remove stuck command after max retries
 - **Duplicate detection bugs:** Wrong commands deduplicated
-  - **Mitigation:** Exact string match required for deduplication
+  - **Mitigation:** 2-character prefix match maps to OTGW command codes (TT, SW, CS, GW, etc.)
+  - All OTGW commands use unique 2-letter codes, so prefix matching is safe
+  - Commands with different prefixes are never deduplicated against each other
 - **Memory corruption:** Array bounds exceeded
   - **Mitigation:** Bounds checking on all queue operations
 
@@ -173,15 +178,16 @@ int cmdQueueHead = 0;      // Next command to send
 int cmdQueueTail = 0;      // Next free slot
 ```
 
-**Add command (with deduplication):**
+**Add command (with prefix-based deduplication):**
 ```cpp
 void addOTWGcmdtoqueue(const char* cmd) {
-  // Check if command already in queue
-  for (int i = cmdQueueHead; i != cmdQueueTail; i = (i + 1) % CMDQUEUE_MAX) {
-    if (strcmp(cmdqueue[i].cmd, cmd) == 0) {
-      // Already in queue - refresh it (move to end)
-      DebugTf(PSTR("Command already queued, refreshing: %s\r\n"), cmd);
-      // Copy to end, remove from current position
+  // Check if command with same prefix already in queue (2-char prefix match)
+  for (int i = 0; i < CMDQUEUE_MAX; i++) {
+    if (cmdqueue[i].cmd[0] != '\0' && strncmp(cmdqueue[i].cmd, cmd, 2) == 0) {
+      // Same command prefix found — replace with new value
+      // e.g., "TT=18" replaced by "TT=20"
+      strlcpy(cmdqueue[i].cmd, cmd, sizeof(cmdqueue[0].cmd));
+      DebugTf(PSTR("Command updated in queue: %s\r\n"), cmd);
       return;
     }
   }
@@ -334,10 +340,28 @@ GET /api/v1/otgw/queue
 }
 ```
 
+## v2 REST API Integration
+
+The v2 API (ADR-035) routes commands through the same queue with RESTful semantics:
+
+```cpp
+// POST /api/v2/otgw/commands
+// Body: {"command": "TT=20.5"}
+// Returns: 202 Accepted {"status": "queued"}
+void handleV2Commands() {
+  // Validate command format: 2-letter code + '=' + value
+  // Add to queue via addOTWGcmdtoqueue()
+  // Return 202 Accepted (async processing)
+}
+```
+
+This ensures all command sources (MQTT, REST v1, REST v2, Web UI, boot commands) share the same queue and benefit from deduplication.
+
 ## Related Decisions
 - ADR-004: Static Buffer Allocation Strategy (fixed-size queue array)
 - ADR-006: MQTT Integration Pattern (MQTT commands use queue)
 - ADR-007: Timer-Based Task Scheduling (queue processed in main loop)
+- ADR-035: RESTful API Compliance Strategy (v2 commands return 202 Accepted)
 
 ## References
 - Implementation: `OTGW-Core.ino` (queue functions)

@@ -2,7 +2,7 @@
 
 **Status:** Accepted  
 **Date:** 2020-06-01 (v1 introduced), 2024-01-01 (v2 introduced)  
-**Updated:** 2026-01-28 (Documentation)
+**Updated:** 2026-02-16 (Added ADR-035 cross-reference for v2 RESTful expansion)
 
 ## Context
 
@@ -279,11 +279,15 @@ v1 → v2: Change URL, update parser to handle map
 - `/api/v1/settings` - Configuration management
 - Standard error responses
 
-**v2 additions:**
+**v2 additions (see also ADR-035 for RESTful compliance details):**
 - Units in responses (`{"value": 20.5, "unit": "°C"}`)
 - Improved response times (optimized serialization)
-- Batch operations support
-- Metadata in responses (timestamp, version)
+- RESTful resource naming (e.g., `/otgw/messages/{id}`, `/otgw/commands`, `/device/info`)
+- Structured JSON error responses: `{"error": {"status": N, "message": "..."}}`
+- 202 Accepted for async command queuing
+- CORS preflight handling (OPTIONS → 204)
+- 405 Method Not Allowed with `Allow` header (RFC 7231)
+- Backward-compatible aliases for v1 endpoint names
 
 ## Documentation Strategy
 
@@ -301,6 +305,8 @@ v1 → v2: Change URL, update parser to handle map
 ## Related Decisions
 - ADR-018: ArduinoJson for Data Interchange (JSON serialization)
 - ADR-006: MQTT Integration Pattern (separate versioning strategy)
+- ADR-035: RESTful API Compliance Strategy (extends v2 with full RESTful compliance)
+- ADR-016: OpenTherm Command Queue (v2 commands return 202 Accepted)
 
 ## References
 - Implementation: `restAPI.ino` (version routing and handlers)

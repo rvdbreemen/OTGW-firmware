@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h 
-**  Version  : v1.0.0
+**  Version  : v1.1.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -469,7 +469,7 @@ enum OpenThermMessageID {
 
 #define OT_MSGID_MAX 133
 
-time_t msglastupdated[255] = {0}; //all msg, even if they are unknown
+time_t msglastupdated[256] = {0}; //all msg, even if they are unknown
 
 struct OT_cmd_t { // see all possible commands for PIC here: https://otgw.tclcode.com/firmware.html
 	char cmd[15];

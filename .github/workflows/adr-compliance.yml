@@ -9,6 +9,8 @@ on:
     branches:
       - main
       - dev
+      - 'dev-*'
+      - 'copilot-*'
       - 'release/**'
 
 jobs:
@@ -162,13 +164,13 @@ jobs:
             
             let body = '## 🔍 ADR Compliance Check\n\n';
             
-            // Evaluation framework results
             if (evaluate_status === '0') {
               body += '✅ **Evaluation Framework:** PASSED\n';
             } else {
               body += '❌ **Evaluation Framework:** FAILED - See logs for details\n';
             }
-            
+            // Ensure all variables are declared and not mistyped (e.g., no 't' instead of 'let' or an accidental 't' left in code).
+                        
             // ADR reference check results
             if (check_status === '0' || check_status === '') {
               body += '✅ **ADR References:** All references are valid\n';

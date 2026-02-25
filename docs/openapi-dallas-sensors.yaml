@@ -1,0 +1,213 @@
+openapi: 3.0.3
+info:
+  title: OTGW Firmware Dallas Temperature Sensor Labels API
+  description: |
+    REST API for managing Dallas DS18B20/DS18S20/DS1822 temperature sensor custom labels.
+    
+    Labels are stored in `/dallas_labels.ini` file on LittleFS filesystem with zero backend RAM usage.
+    The Web UI fetches labels on-demand and manages all label operations via bulk read/write operations.
+    
+    ## Architecture
+    - **Storage**: Labels stored in `/dallas_labels.ini` as JSON key-value pairs
+    - **Format**: `{"28FF64D1841703F1": "Living Room", "28FF64D1841703F2": "Kitchen"}`
+    - **Memory**: Zero persistent RAM usage (file-based only)
+    - **Operations**: Bulk read/write only (no single sensor operations)
+    
+    ## Design Philosophy
+    - Backend provides simple file access
+    - Frontend manages label lookup and modification logic
+    - Web UI uses read-modify-write pattern for single label updates
+    - Default label is hex address if not found in file
+    
+  version: 1.0.0
+  contact:
+    name: OTGW Firmware
+    url: https://github.com/rvdbreemen/OTGW-firmware
+  license:
+    name: MIT
+    url: https://github.com/rvdbreemen/OTGW-firmware/blob/main/LICENSE
+
+servers:
+  - url: http://{device-ip}
+    description: OTGW Firmware Device (HTTP only, local network)
+    variables:
+      device-ip:
+        default: "192.168.1.100"
+        description: IP address of the OTGW device on local network
+
+tags:
+  - name: Dallas Sensor Labels
+    description: Manage custom labels for Dallas temperature sensors
+
+paths:
+  /api/v1/sensors/labels:
+    get:
+      tags:
+        - Dallas Sensor Labels
+      summary: Get all sensor labels
+      description: |
+        Retrieves all Dallas temperature sensor labels from `/dallas_labels.ini` file.
+        
+        Returns empty object `{}` if:
+        - File does not exist
+        - No labels have been set
+        - All sensors use default (hex address) labels
+        
+        The returned object maps sensor addresses to custom labels.
+        Web UI should use sensor address as default label if not present in response.
+        
+      operationId: getAllDallasLabels
+      responses:
+        '200':
+          description: Successfully retrieved labels
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DallasLabelsMap'
+              examples:
+                withLabels:
+                  summary: With custom labels
+                  value:
+                    "28FF64D1841703F1": "Living Room"
+                    "28FF64D1841703F2": "Kitchen"
+                    "28FF64D1841703F3": "Bedroom"
+                noLabels:
+                  summary: No labels set
+                  value: {}
+        '500':
+          description: Failed to read or parse labels file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                error: "Failed to read labels file"
+    
+    post:
+      tags:
+        - Dallas Sensor Labels
+      summary: Update all sensor labels
+      description: |
+        Writes all Dallas temperature sensor labels to `/dallas_labels.ini` file.
+        
+        This endpoint:
+        - Replaces the entire labels file with provided data
+        - Validates JSON format before writing
+        - Does NOT validate sensor existence (allows pre-configuration)
+        - Creates file if it doesn't exist
+        
+        Use cases:
+        - Initial bulk label configuration
+        - Label import from backup
+        - Single label update (read-modify-write pattern)
+        
+        For single label update, frontend must:
+        1. GET /api/v1/sensors/labels
+        2. Modify one entry in returned object
+        3. POST entire object back to this endpoint
+        
+      operationId: updateAllDallasLabels
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DallasLabelsMap'
+            examples:
+              fullUpdate:
+                summary: Complete label set
+                value:
+                  "28FF64D1841703F1": "Living Room"
+                  "28FF64D1841703F2": "Kitchen"
+                  "28FF64D1841703F3": "Bedroom"
+              singleUpdate:
+                summary: After single label modification
+                value:
+                  "28FF64D1841703F1": "Living Room Updated"
+                  "28FF64D1841703F2": "Kitchen"
+              clearAll:
+                summary: Remove all labels
+                value: {}
+      responses:
+        '200':
+          description: Labels successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+              example:
+                success: true
+                message: "Labels updated successfully"
+        '400':
+          description: Invalid JSON format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                error: "Invalid JSON"
+        '500':
+          description: Failed to write labels file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                error: "Failed to write labels file"
+
+components:
+  schemas:
+    DallasLabelsMap:
+      type: object
+      description: |
+        Map of sensor addresses to custom labels.
+        
+        - **Keys**: 16-character hex sensor address (e.g., "28FF64D1841703F1")
+        - **Values**: Custom label string (max 16 characters recommended)
+        
+        Empty object `{}` indicates no labels are set.
+        
+      additionalProperties:
+        type: string
+        maxLength: 16
+        description: Custom label for the sensor (max 16 characters recommended)
+      example:
+        "28FF64D1841703F1": "Living Room"
+        "28FF64D1841703F2": "Kitchen"
+    
+    Success:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Labels updated successfully"
+    
+    Error:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          description: Error message describing what went wrong
+          example: "Failed to read labels file"
+
+  securitySchemes: {}
+
+security: []
+
+externalDocs:
+  description: OTGW Firmware Documentation
+  url: https://github.com/rvdbreemen/OTGW-firmware/wiki

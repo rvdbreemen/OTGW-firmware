@@ -16,10 +16,10 @@ void handleDebug(){
                     (WiFi.status() == WL_CONNECTED) ? "Connected" : "Disconnected",
                     CBOOLEAN(statusMQTTconnection),
                     CBOOLEAN(bOTGWonline));
-                Debugf(PSTR("Thermostat: %s | Boiler: %s | Gateway: %s\r\n"), 
-                    CBOOLEAN(bOTGWthermostatstate),
-                    CBOOLEAN(bOTGWboilerstate),
-                    CBOOLEAN(bOTGWgatewaystate));
+                Debugf(PSTR("Thermostat: %s | Boiler: %s | Gateway Mode: %s\r\n"),
+                    CCONOFF(bOTGWthermostatstate),
+                    CCONOFF(bOTGWboilerstate),
+                    bOTGWgatewaystateKnown ? CCONOFF(bOTGWgatewaystate) : "detecting");
                 Debugf(PSTR("CH Temp: %.1f°C | Room Temp: %.1f°C | Setpoint: %.1f°C\r\n"),
                     OTcurrentSystemState.Tboiler,
                     OTcurrentSystemState.Tr,
@@ -29,6 +29,7 @@ void handleDebug(){
                 Debugf(PSTR("2) Toggle debuglog - API handeling: %s\r\n"), CBOOLEAN(bDebugRestAPI));
                 Debugf(PSTR("3) Toggle debuglog - MQTT module: %s\r\n"), CBOOLEAN(bDebugMQTT));
                 Debugf(PSTR("4) Toggle debuglog - Sensor modules: %s\r\n"), CBOOLEAN(bDebugSensors));
+                Debugf(PSTR("d) Toggle debug helper - Dallas sensor simulation: %s\r\n"), CBOOLEAN(bDebugSensorSimulation));
                 Debugln(F("--- Commands ---"));
                 Debugln(F("q/k) Force read settings"));
                 Debugln(F("m) Force MQTT discovery (seen messages only)"));
@@ -44,6 +45,7 @@ void handleDebug(){
                 Debugln(F("j) Read GPIO output state"));
                 Debugln(F("l) Set MyDEBUG = true"));
                 Debugln(F("f) Show MyDEBUG status"));
+                Debugln(F("d) Toggle Dallas sensor simulation"));
                 Debugln();
                 break;
             case 'p':
@@ -105,6 +107,15 @@ void handleDebug(){
             case '4':   
                 bDebugSensors = !bDebugSensors;
                 DebugTf(PSTR("\r\nDebug Sensors: %s\r\n"), CBOOLEAN(bDebugSensors)); 
+                break;
+            case 'd':
+                bDebugSensorSimulation = !bDebugSensorSimulation;
+                DebugTf(PSTR("\r\nDebug Dallas sensor simulation: %s\r\n"), CBOOLEAN(bDebugSensorSimulation));
+                initSensors();
+                if (bDebugSensorSimulation)
+                {
+                  pollSensors();  // Force immediate sensor data so panel/graph update right away
+                }
                 break;
             case 'b':
                 DebugTln(F("Blink led 1"));
