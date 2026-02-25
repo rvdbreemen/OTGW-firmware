@@ -1,0 +1,124 @@
+/*
+***************************************************************************
+** Shared layout/responsive rules for OTGW web UI (light + dark themes)
+** Keep theme colors in index.css / index_dark.css.
+***************************************************************************
+*/
+
+.settings-field-container {
+  width: 320px;
+  float: left;
+  margin-right: 10px;
+}
+
+.settings-input-container {
+  text-align: left;
+}
+
+/* Shared responsive OT log behavior for phones/tablets */
+@media (max-width: 768px) {
+  #otLogSection {
+    display: none !important;
+  }
+
+  .ot-log-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-log-control,
+  .log-search,
+  .log-control-label {
+    width: 100%;
+  }
+
+  .ot-log-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .ot-log-container.collapsed {
+    max-height: 150px;
+  }
+
+  .ot-log-container:not(.collapsed) {
+    max-height: 400px;
+  }
+}
+
+/* Shared mobile nav/settings layout */
+@media (max-width: 768px) {
+  .nav-container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .nav-container .nav-left,
+  .nav-container .nav-right {
+    width: 100%;
+    flex-basis: auto;
+    flex-grow: 0;
+    min-height: 0;
+    justify-content: stretch;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .nav-container .nav-item {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .nav-right .adv_dropdown {
+    position: static;
+    top: auto;
+    right: auto;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 4px;
+  }
+
+  .settingDiv {
+    min-width: 0;
+    width: auto;
+    max-width: 100%;
+    text-align: left;
+    border-width: 2px;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    margin: 0 0 6px 0;
+  }
+
+  .settings-field-container {
+    float: none;
+    width: auto;
+    margin: 0 0 6px 0 !important;
+    font-weight: 600;
+  }
+
+  .settingDiv input[type="text"],
+  .settingDiv input[type="password"],
+  .settingDiv input[type="number"] {
+    width: 100%;
+    max-width: 100%;
+    min-height: 40px;
+    font-size: 16px;
+    box-sizing: border-box;
+  }
+
+  .settingDiv input[type="checkbox"] {
+    transform: scale(1.2);
+    transform-origin: left center;
+  }
+
+  #settingMessage {
+    width: auto;
+    max-width: 100%;
+    margin: 8px 10px;
+    box-sizing: border-box;
+  }
+}
