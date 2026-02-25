@@ -153,6 +153,9 @@ bool      bPSmode = false;  //default to PS=0 mode
 //All things that are settings 
 char      settingHostname[41] = _HOSTNAME;
 
+//HTTP authentication settings (optional - empty password disables auth)
+char      settingHTTPpasswd[41] = "";  // empty = no authentication required
+
 //MQTT settings
 bool      statusMQTTconnection = false; 
 bool      settingMQTTenable = true;
