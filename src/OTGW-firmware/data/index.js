@@ -1991,9 +1991,14 @@ function sendOTGWcommand(cmd) {
   })
   .then(function(response) {
     if (!response.ok) {
-      return response.text().then(function(text) {
-        throw new Error('HTTP ' + response.status + (text ? ': ' + text.trim() : ''));
-      });
+      return response.text()
+        .catch(function(textErr) {
+          console.error('Failed to read error response body:', textErr);
+          return '';
+        })
+        .then(function(text) {
+          throw new Error('HTTP ' + response.status + (text ? ': ' + text.trim() : ''));
+        });
     }
     return response.json();
   })
