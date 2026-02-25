@@ -1,15 +1,15 @@
-Release workflow
+# Release workflow
 
 - prepare `dev` branch:
   - checkout 'last' commit of everything that is part of new release. This can be any commit on `dev` that's ahead of `main`
   - ensure there are no pending changes, stash or discard any local changes
   - test build code, ensure there are no compiler errors
   - merge `main` into dev
-    NOTE: normally this merge will not produce any result as `main` normally is only updated by merging `dev` into `main`. 
+    NOTE: normally this merge will not produce any result as `main` normally is only updated by merging `dev` into `main`.
     However, this might happen sometimes (quick security fix, etc). This step is catch those times and ensure there are no conflicts when merging into `main`. Merge conflicts should be solved on `dev` branch, not on `main`.
 - merge `dev` into `main`:
   - checkout main
-  - merge `dev` 
+  - merge `dev`
   - there should be no conflicts on core files. If there are, STOP. The last step of prepping the `dev` branch was probaby skipped. Reset your local `main` branch to the last commit of the GH/`main` branch. Go back and complete prepping `dev` branch.
   - test build code, ensure there are no compiler errors
 - create release commit:
@@ -32,6 +32,23 @@ Release workflow
 
 Automated release workflow
 
- - The `.github/workflows/release.yml` workflow runs whenever you publish (not draft) a release on GitHub.
- - It verifies the release tag exists in the repository before doing any work; if the tag is missing, the workflow stops.
- - When the tag exists, it checks out the released tag, runs the shared setup and build scripts, and then pushes the compiled `build/*.elf`, `build/*.bin`, `build/*.littlefs.bin`, and `LICENSE` files into the GitHub Release assets via `softprops/action-gh-release`, inheriting the release metadata (name/body/prerelease) and preventing duplicate uploads with `allow_updates: true`.
+- The `.github/workflows/release.yml` workflow runs whenever you publish (not draft) a release on GitHub.
+- It verifies the release tag exists in the repository before doing any work; if the tag is missing, the workflow stops.
+- When the tag exists, it checks out the released tag, runs the shared setup and build scripts, and then pushes the compiled `build/*.elf`, `build/*.bin`, `build/*.littlefs.bin`, and `LICENSE` files into the GitHub Release assets via `softprops/action-gh-release`, inheriting the release metadata (name/body/prerelease) and preventing duplicate uploads with `allow_updates: true`.
+
+Branch lifecycle and hygiene
+
+- Long-lived branches:
+  - `main`: stable releases and release tags
+  - `dev`: active integration branch for upcoming releases
+- Temporary branches:
+  - `dev-*`, `copilot/*`, `codex/*`, `revert-*`, and any task/topic branch are temporary by default
+  - temporary branches should be merged through PR and then reviewed for cleanup in the next branch-hygiene pass
+- Stale branch handling:
+  - do not delete stale branches automatically
+  - maintain a branch status snapshot in `docs/process/branch-hygiene-status.md`
+  - classify each temporary branch as one of: `active`, `stale-merged`, `stale-unmerged`
+  - stale-unmerged branches require owner review before any deletion/archive action
+- Cadence:
+  - run a branch-hygiene pass after each stable release tag (`vx.x.x`)
+  - confirm `main` has been merged back into `dev` (hotfix parity) before classifying stale branches
