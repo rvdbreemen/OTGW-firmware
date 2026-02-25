@@ -41,6 +41,7 @@ The script now automatically detects when the semantic version (MAJOR.MINOR.PATC
 **Note**: Only semantic version changes trigger automatic updates. Build number changes do not trigger updates since build numbers are not included in project file version strings.
 
 **Excluded directories**: The script skips the following directories when scanning/updating:
+
 - `build`, `scripts`, `data`, `.github`, `docs`, `hardware`, `example-api`
 - `arduino`, `Arduino`, `libraries`, `staging`
 - `node_modules`, `.git`, `__pycache__`
@@ -48,3 +49,28 @@ The script now automatically detects when the semantic version (MAJOR.MINOR.PATC
 - Any hidden directories (starting with `.`)
 
 This script is used both by the CI/CD workflow and the local build script.
+
+## branch-hygiene-queue.ps1
+
+Generates a branch hygiene review queue for remote branches and exports it as CSV.
+
+### Branch Hygiene Usage
+
+```bash
+pwsh -File scripts/branch-hygiene-queue.ps1 -Remote origin -BaseBranch dev -InactiveDays 14 -OutputCsv docs/process/branch-hygiene-queue.csv
+```
+
+### Branch Hygiene Options
+
+- `-Remote` - Remote name to inspect (default: `origin`)
+- `-BaseBranch` - Base branch used for merge classification (default: `dev`)
+- `-InactiveDays` - Inactivity threshold for stale-unmerged classification (default: `14`)
+- `-OutputCsv` - Path to output CSV file
+
+### Branch Hygiene Behavior
+
+1. Fetches and prunes remote refs
+2. Enumerates remote branches excluding `origin/HEAD`, `origin/main`, and `origin/dev`
+3. Classifies each branch as `active`, `stale-merged`, or `stale-unmerged`
+4. Adds owner/decision/notes columns for manual review
+5. Exports a sorted review queue CSV for branch governance
