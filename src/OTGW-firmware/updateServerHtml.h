@@ -42,15 +42,12 @@ static const char UpdateServerIndex[] PROGMEM =
           cursor: pointer;
           transform: translateY(0);
         }
-        #fwSubmit:enabled {
-          background: #0a74da;
-          border-color: #075baa;
-        }
+        #fwSubmit:enabled,
         #fsSubmit:enabled {
           background: #2e9d57;
           border-color: #207240;
         }
-        #fwSubmit:enabled:hover { background: #0864ba; }
+        #fwSubmit:enabled:hover,
         #fsSubmit:enabled:hover { background: #27854a; }
         #preserveWrap { margin-top: 10px; padding: 8px 10px; border-left: 3px solid #7aaad6; background: #eef6ff; border-radius: 4px; }
         html.dark #preserveWrap { border-left-color: #4f89c1; background: #3a3a3a; }
