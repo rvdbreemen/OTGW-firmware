@@ -504,9 +504,11 @@ static const char UpdateServerIndex[] PROGMEM =
            for (var i = 0; i < releases.length; i++) {
              var rel = releases[i];
              var tag = (rel.tag_name || '').replace(/^v/, '');
-             var isInstalled = !!(tag && installedCore && installedCore === tag);
-             var isNewer = !!(tag && installedCore && !isInstalled && versionLt(installedCore, tag));
-             var isRollback = !!(tag && installedCore && !isInstalled && versionLt(tag, installedCore));
+             var tagCoreMatch = tag.match(/^(\d+\.\d+\.\d+)/);
+             var tagCore = tagCoreMatch ? tagCoreMatch[1] : tag;
+             var isInstalled = !!(tagCore && installedCore && installedCore === tagCore);
+             var isNewer = !!(tagCore && installedCore && !isInstalled && versionLt(installedCore, tagCore));
+             var isRollback = !!(tagCore && installedCore && !isInstalled && versionLt(tagCore, installedCore));
              var fwAsset = null, fsAsset = null;
              for (var j = 0; j < (rel.assets || []).length; j++) {
                var a = rel.assets[j];
