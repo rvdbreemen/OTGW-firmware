@@ -567,6 +567,8 @@ static const char UpdateServerIndex[] PROGMEM =
                return r.json();
              })
              .then(function(releases) {
+               // Exclude draft releases — drafts may have incomplete assets
+               releases = releases.filter(function(r) { return !r.draft; });
                ghReleases = releases;
                if (btn) btn.disabled = false;
                if (status) status.textContent = '';
