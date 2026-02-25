@@ -56,7 +56,7 @@ void ensureSensorDefaultLabels()
 {
   if (DallasrealDeviceCount < 1) return;
 
-  DynamicJsonDocument doc(JSON_BUFF_MAX);
+  DynamicJsonDocument doc(768); // 16 sensors × ~40 bytes each + overhead ≈ 700 bytes max
 
   // Read existing labels from file
   File labelsFile = LittleFS.open(F("/dallas_labels.ini"), "r");

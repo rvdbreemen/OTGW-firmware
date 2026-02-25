@@ -979,6 +979,41 @@ body.disable-interaction {
   max-width: 720px;
 }
 
+.fs-mismatch-banner {
+  padding: 10px 16px;
+  background-color: #7f0000;
+  color: #ffcdd2;
+  font-weight: bold;
+  text-align: center;
+}
+.fs-mismatch-banner a {
+  color: #ef9a9a;
+  text-decoration: underline;
+}
+
+.pic-update-banner {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  max-width: 720px;
+}
+.pic-update-banner.checking {
+  color: #888;
+}
+.pic-update-banner.update-available {
+  background-color: #bf360c;
+  color: #ffe0b2;
+  font-weight: bold;
+}
+.pic-update-banner.up-to-date {
+  background-color: #1b5e20;
+  color: #c8e6c9;
+}
+.pic-version-outdated {
+  color: #ff8a65;
+  font-weight: bold;
+}
+
 .firmware-row-bold {
   font-weight: bold;
 }

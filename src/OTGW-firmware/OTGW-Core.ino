@@ -348,27 +348,6 @@ bool queryOTGWgatewaymode(){
   return cachedGatewayMode;
 }
 
-//===================[ checkOTWGpicforupdate ]=====================
-void checkOTWGpicforupdate(){
-  if (sPICfwversion[0] == '\0') {
-    sMessage[0] = '\0'; //no firmware version found for some reason
-  } else {
-    OTGWDebugTf(PSTR("OTGW PIC firmware version = [%s]\r\n"), sPICfwversion);
-    String latest = checkforupdatepic("gateway.hex");
-    if (!bOTGWonline) {
-      strlcpy(sMessage, sPICfwversion, sizeof(sMessage)); 
-    } else if (latest.isEmpty()) {
-      sMessage[0] = '\0'; //two options: no internet connection OR no firmware version
-    } else if (latest != String(sPICfwversion)) {
-      snprintf_P(sMessage, sizeof(sMessage), PSTR("New PIC version %s available!"), latest.c_str());
-    }
-  }
-  //check if the esp8266 and the littlefs versions match
-  if (!checklittlefshash()) {
-    DebugTln(F("WARNING: Firmware and filesystem version mismatch detected!"));
-    snprintf_P(sMessage, sizeof(sMessage), PSTR("Flash your littleFS with matching version!"));
-  }
-}
 
 //===================[ sendOTGWbootcmd ]=====================
 void sendOTGWbootcmd(){
@@ -2756,9 +2735,9 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
 #ifndef DISABLE_WEBSOCKET
   // Send completion message in format frontend expects
   // Escape strings to prevent JSON injection
-  char buf[320]; // Sized for escaped filename (129) + error (257) + JSON overhead (~70)
+  char buf[320]; // Sized for escaped filename (129) + error (96) + JSON overhead (~70) = ~295 bytes
   char filenameEsc[129]; // currentPICFlashFile is 65 chars, doubled for worst-case escaping
-  char errorEsc[257]; // errorupgrade is 129 chars, doubled for worst-case escaping
+  char errorEsc[96]; // error messages are short literals (<50 chars); matches _setStatus() pattern
   jsonEscape(currentPICFlashFile, filenameEsc, sizeof(filenameEsc));
   jsonEscape(errorupgrade, errorEsc, sizeof(errorEsc));
   

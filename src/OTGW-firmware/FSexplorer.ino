@@ -252,8 +252,8 @@ void setupFSexplorer(){
 void apifirmwarefilelist() {
   DebugTf(PSTR("API: apifirmwarefilelist()\r\n"));
   
-  // Use small 256-byte buffer for streaming individual entries
-  char entryBuffer[256];
+  // 150 bytes covers longest entry: path (~30) + version (~32) + fwversion (~32) + JSON overhead
+  char entryBuffer[150];
   String version, fwversion;
   Dir dir;
   File f;
@@ -407,7 +407,7 @@ void apilistfiles()             // Senden aller Daten an den Client
   httpServer.sendContent(F("["));
 
   bool firstEntry = true;
-  char entryBuffer[256];
+  char entryBuffer[150];
   char typeBuf[5];
   for (int f = 0; f < fileNr; f++)
   {
