@@ -676,23 +676,50 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   return _valid;
 }
 
-// Returns true if the MQTT publish interval allows sending for this OT message.
-// Index mapping for mqttlastsent[256]:
+// Returns true if the OT message should be published to MQTT.
+// Publishes immediately when the raw value changed; otherwise publishes once per interval.
+// Index mapping for mqttlastsent/mqttlastvalue[256]:
 //   Standard OT IDs (id 0-127): master uses index id, slave uses index id+128.
 //   Non-standard IDs (id 128-255): use index id directly (no master/slave split).
 // This ensures master status updates cannot starve slave status from publishing.
-// Updates mqttlastsent on success so it should be called once per message processing.
 bool shouldPublishMQTTForID(byte id, byte masterslave) {
   if (settingMQTTinterval == 0) return true;
   // Standard IDs: upper half tracks slave messages independently.
   // Non-standard IDs (id >= 128) use their own ID directly (within array bounds).
   uint8_t idx = (id < 128) ? id + (masterslave ? 128 : 0) : id;
+  uint16_t newRaw = OTdata.u16();
   uint32_t now = millis();
-  if ((uint32_t)(now - mqttlastsent[idx]) >= (uint32_t)settingMQTTinterval * 1000UL) {
+  bool changed = (newRaw != mqttlastvalue[idx]);
+  bool due = ((uint32_t)(now - mqttlastsent[idx]) >= (uint32_t)settingMQTTinterval * 1000UL);
+  if (changed || due) {
     mqttlastsent[idx] = now;
+    mqttlastvalue[idx] = newRaw;
     return true;
   }
   return false;
+}
+
+// Returns true if an individual status bit (OT_Statusflags) should be published.
+// Publishes immediately on bit change; otherwise publishes once per per-bit interval.
+// bitSlot: 0-7 = master byte bits, 8-15 = slave byte bits.
+bool shouldPublishStatusBit(uint8_t bitSlot, bool newVal, bool prevVal) {
+  if (settingMQTTinterval == 0) return true;
+  bool changed = (newVal != prevVal);
+  bool due = ((uint32_t)(millis() - mqttlastsentstatusbit[bitSlot]) >= (uint32_t)settingMQTTinterval * 1000UL);
+  if (changed || due) {
+    mqttlastsentstatusbit[bitSlot] = millis();
+    return true;
+  }
+  return false;
+}
+
+// Publishes a single OT_Statusflags bit topic with per-bit change detection and interval throttling.
+// Temporarily overrides mqttPublishAllowed so sendMQTTData honours the per-bit decision.
+void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, uint8_t newVal, uint8_t prevVal) {
+  bool saved = mqttPublishAllowed;
+  mqttPublishAllowed = shouldPublishStatusBit(bitSlot, (bool)newVal, (bool)prevVal);
+  publishMQTTOnOff(topic, (bool)newVal);
+  mqttPublishAllowed = saved;
 }
 
 void print_f88(float& value)
@@ -803,13 +830,13 @@ void print_status(uint16_t& value)
     //Master Status
     if (is_value_valid(OTdata, OTlookupitem)){
       sendMQTTData("status_master", _flag8_master);
-      publishMQTTOnOff("ch_enable",        ((OTdata.valueHB) & 0x01));
-      publishMQTTOnOff("dhw_enable",       ((OTdata.valueHB) & 0x02));
-      publishMQTTOnOff("cooling_enable",   ((OTdata.valueHB) & 0x04));
-      publishMQTTOnOff("otc_active",       ((OTdata.valueHB) & 0x08));
-      publishMQTTOnOff("ch2_enable",       ((OTdata.valueHB) & 0x10));
-      publishMQTTOnOff("summerwintertime", ((OTdata.valueHB) & 0x20));
-      publishMQTTOnOff("dhw_blocking",     ((OTdata.valueHB) & 0x40));
+      publishStatusBitMQTT(0, "ch_enable",        (OTdata.valueHB & 0x01), (OTcurrentSystemState.MasterStatus & 0x01));
+      publishStatusBitMQTT(1, "dhw_enable",       (OTdata.valueHB & 0x02), (OTcurrentSystemState.MasterStatus & 0x02));
+      publishStatusBitMQTT(2, "cooling_enable",   (OTdata.valueHB & 0x04), (OTcurrentSystemState.MasterStatus & 0x04));
+      publishStatusBitMQTT(3, "otc_active",       (OTdata.valueHB & 0x08), (OTcurrentSystemState.MasterStatus & 0x08));
+      publishStatusBitMQTT(4, "ch2_enable",       (OTdata.valueHB & 0x10), (OTcurrentSystemState.MasterStatus & 0x10));
+      publishStatusBitMQTT(5, "summerwintertime", (OTdata.valueHB & 0x20), (OTcurrentSystemState.MasterStatus & 0x20));
+      publishStatusBitMQTT(6, "dhw_blocking",     (OTdata.valueHB & 0x40), (OTcurrentSystemState.MasterStatus & 0x40));
 
       OTcurrentSystemState.MasterStatus = OTdata.valueHB;
     }
@@ -840,14 +867,14 @@ void print_status(uint16_t& value)
     //Slave Status
     if (is_value_valid(OTdata, OTlookupitem)){
       sendMQTTData("status_slave", _flag8_slave);
-      publishMQTTOnOff("fault",                ((OTdata.valueLB) & 0x01));
-      publishMQTTOnOff("centralheating",       ((OTdata.valueLB) & 0x02));
-      publishMQTTOnOff("domestichotwater",     ((OTdata.valueLB) & 0x04));
-      publishMQTTOnOff("flame",                ((OTdata.valueLB) & 0x08));
-      publishMQTTOnOff("cooling",              ((OTdata.valueLB) & 0x10));
-      publishMQTTOnOff("centralheating2",      ((OTdata.valueLB) & 0x20));
-      publishMQTTOnOff("diagnostic_indicator", ((OTdata.valueLB) & 0x40));
-      publishMQTTOnOff("eletric_production",   ((OTdata.valueLB) & 0x80));
+      publishStatusBitMQTT(8,  "fault",                (OTdata.valueLB & 0x01), (OTcurrentSystemState.SlaveStatus & 0x01));
+      publishStatusBitMQTT(9,  "centralheating",       (OTdata.valueLB & 0x02), (OTcurrentSystemState.SlaveStatus & 0x02));
+      publishStatusBitMQTT(10, "domestichotwater",     (OTdata.valueLB & 0x04), (OTcurrentSystemState.SlaveStatus & 0x04));
+      publishStatusBitMQTT(11, "flame",                (OTdata.valueLB & 0x08), (OTcurrentSystemState.SlaveStatus & 0x08));
+      publishStatusBitMQTT(12, "cooling",              (OTdata.valueLB & 0x10), (OTcurrentSystemState.SlaveStatus & 0x10));
+      publishStatusBitMQTT(13, "centralheating2",      (OTdata.valueLB & 0x20), (OTcurrentSystemState.SlaveStatus & 0x20));
+      publishStatusBitMQTT(14, "diagnostic_indicator", (OTdata.valueLB & 0x40), (OTcurrentSystemState.SlaveStatus & 0x40));
+      publishStatusBitMQTT(15, "eletric_production",   (OTdata.valueLB & 0x80), (OTcurrentSystemState.SlaveStatus & 0x80));
 
       OTcurrentSystemState.SlaveStatus = OTdata.valueLB;
     }
