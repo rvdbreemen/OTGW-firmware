@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.1.0
+**  Version  : v1.2.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -56,6 +56,7 @@ void setLed(int8_t, uint8_t);
 #define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"  // Home Assistant discovery prefix
 #define CMSG_SIZE 512
 #define JSON_BUFF_MAX   1024
+#define JSON_ENTRY_BUF   256  // max bytes for a single serialized JSON entry/object
 // Replace CSTR macro with overloads to handle both String and char*
 // Includes null pointer protection to prevent crashes
 inline const char* CSTR(const String& x) { 
@@ -93,6 +94,7 @@ bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 void sendMQTTData(const char*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const bool = false);
+void publishToSourceTopic(const char*, const char*, byte);
 void addOTWGcmdtoqueue(const char* ,  int , const bool = false, const int16_t = 1000);
 void sendLogToWebSocket(const char* logMessage);
 
@@ -166,6 +168,7 @@ bool      settingMQTTharebootdetection = true;
 char      settingMQTTtopTopic[41] = "OTGW";
 char      settingMQTTuniqueid[41] = ""; // Intialized in readsettings
 bool      settingMQTTOTmessage = false;
+bool      settingMQTTSeparateSources = false; // ADR-040: publish source-specific topics (opt-in; default off for backward compat)
 bool      settingNTPenable = true;
 char      settingNTPtimezone[65] = NTP_DEFAULT_TIMEZONE;
 char      settingNTPhostname[65] = NTP_HOST_DEFAULT;

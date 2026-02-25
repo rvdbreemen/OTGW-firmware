@@ -1,6 +1,6 @@
 /*
 **  Program  : output_ext.ino
-**  Version  : v1.1.0
+**  Version  : v1.2.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
@@ -56,7 +56,7 @@ void ensureSensorDefaultLabels()
 {
   if (DallasrealDeviceCount < 1) return;
 
-  DynamicJsonDocument doc(JSON_BUFF_MAX);
+  DynamicJsonDocument doc(768); // 16 sensors × ~40 bytes each + overhead ≈ 700 bytes max
 
   // Read existing labels from file
   File labelsFile = LittleFS.open(F("/dallas_labels.ini"), "r");

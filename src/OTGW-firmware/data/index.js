@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v1.1.0
+**  Version  : v1.2.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -10,6 +10,7 @@
 */
 const localURL = window.location.protocol + '//' + window.location.host;
 const APIGW = window.location.protocol + '//' + window.location.host + '/api/';
+const MOBILE_BREAKPOINT_PX = 768;
 
 "use strict";
 // ============================================================================
@@ -196,6 +197,33 @@ function parseGatewayModeValue(modeValue) {
     return 'detecting';
   }
   return null;
+}
+
+function formatGatewayModeDisplayValue(modeValue) {
+  const parsedMode = parseGatewayModeValue(modeValue);
+  if (parsedMode === 'gateway') return 'Gateway';
+  if (parsedMode === 'monitor') return 'Monitor';
+  if (parsedMode === 'detecting') return 'Detecting...';
+  return modeValue;
+}
+
+function formatDeviceInfoLabel(key) {
+  return translateToHuman(key);
+}
+
+const deviceInfoValueFormatters = {
+  otgwmode: formatGatewayModeDisplayValue
+};
+
+function formatDeviceInfoValue(key, value) {
+  if (typeof key !== 'string') return value;
+
+  const normalizedKey = key.trim().toLowerCase();
+  const formatter = deviceInfoValueFormatters[normalizedKey];
+  if (typeof formatter === 'function') {
+    return formatter(value);
+  }
+  return value;
 }
 
 // Apply a parsed gateway mode value to the indicator.
@@ -1141,7 +1169,7 @@ function getOTLogDisplayState() {
                  (/Android/.test(navigator.userAgent) && /Mobile/.test(navigator.userAgent));
 
   // Also check screen width as a fallback (standard breakpoint for tablets is 768px)
-  const isSmallScreen = window.innerWidth < 768;
+  const isSmallScreen = window.innerWidth <= MOBILE_BREAKPOINT_PX;
 
   const state = {
     isProxied: isProxied,
@@ -2221,6 +2249,28 @@ function saveUISetting(field, value) {
   sendPostSetting(field, value);
 }
 
+function renderSharedPageNavShell() {
+  var template = document.getElementById('pageNavTemplate');
+  if (!template) return;
+
+  Array.from(document.getElementsByClassName('page-nav-shell')).forEach(function (slot) {
+    if (!slot || slot.dataset.rendered === '1') return;
+
+    if (template.content && typeof template.content.cloneNode === 'function') {
+      slot.appendChild(template.content.cloneNode(true));
+    } else {
+      // Fallback for older browsers: clone via a temporary container.
+      var wrapper = document.createElement('div');
+      wrapper.innerHTML = template.innerHTML;
+      while (wrapper.firstChild) {
+        slot.appendChild(wrapper.firstChild);
+      }
+    }
+
+    slot.dataset.rendered = '1';
+  });
+}
+
 //============================================================================  
 function initMainPage() {
   console.log("initMainPage()");
@@ -2232,6 +2282,8 @@ function initMainPage() {
       flashModeActive = true;
     }
   } catch(e) { /* ignore */ }
+
+  renderSharedPageNavShell();
 
   Array.from(document.getElementsByClassName('FSexplorer')).forEach(
     function (el, idx, arr) {
@@ -2338,8 +2390,39 @@ function initMainPage() {
     timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
   }
 
+  // Check filesystem/firmware hash match once on page load
+  checkFSMismatch();
+
   // startMainPage() is called after labels are loaded (or failed)
 } // initMainPage()
+
+//============================================================================
+function checkFSMismatch() {
+  fetch(APIGW + 'v2/filesystem/hash-check')
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+    .then(function(data) {
+      var fc = data && data.filesystem_check;
+      var banner = document.getElementById('fs-mismatch-banner');
+      if (!banner || !fc) return;
+      if (!fc.match) {
+        // Build the banner content with a link to the flash utility
+        while (banner.firstChild) banner.removeChild(banner.firstChild);
+        var icon = document.createTextNode('\u26a0\ufe0f ');
+        banner.appendChild(icon);
+        var msg = document.createTextNode(
+          'Firmware/filesystem mismatch (firmware: ' + fc.fw_hash +
+          ', filesystem: ' + (fc.fs_hash || 'unknown') + '). '
+        );
+        banner.appendChild(msg);
+        var link = document.createElement('a');
+        link.href = '/update';
+        link.textContent = 'Flash the matching LittleFS to fix this.';
+        banner.appendChild(link);
+        banner.classList.remove('hidden');
+      }
+    })
+    .catch(function() {}); // silently ignore — device may not be reachable yet
+}
 
 function showMainPage() {
   console.log("showMainPage()");
@@ -2609,6 +2692,13 @@ function refreshFirmware() {
       infoDiv.appendChild(versionSpan);
       displayPICpage.appendChild(infoDiv);
 
+      // Update-check banner — populated asynchronously after the page renders
+      let bannerDiv = document.createElement("div");
+      bannerDiv.id = "pic-update-banner";
+      bannerDiv.className = "pic-update-banner checking";
+      bannerDiv.textContent = "Checking for update\u2026";
+      displayPICpage.appendChild(bannerDiv);
+
       let tableDiv = document.createElement("div");
       tableDiv.setAttribute("class", "pictable");
 
@@ -2655,6 +2745,7 @@ function refreshFirmware() {
         //--- version on screen ---
         var valDiv = document.createElement("div");
         valDiv.setAttribute("class", "piccolumn2");
+        valDiv.id = "firmware_version_" + files[i].name;
         valDiv.textContent = files[i].version;
         rowDiv.appendChild(valDiv);
         //--- size on screen ---
@@ -2666,14 +2757,37 @@ function refreshFirmware() {
         var btn = document.createElement("div");
         btn.setAttribute("class", "piccolumn4");
         var a = document.createElement('a');
-        // a.title = "Update";
-        a.href = localURL + '/pic?action=refresh&name=' + files[i].name + '&version=' + files[i].version;
-        var img = document.createElement('img');
-        img.src = localURL + '/update.png';
-        img.title = "Update firmware from web";
-        img.className = 'firmware-icon';
-        img.setAttribute = ("alt", "Update");
-        a.appendChild(img);
+        a.href = "#";
+        let refreshImg = document.createElement('img');
+        refreshImg.src = localURL + '/update.png';
+        refreshImg.title = "Update firmware from web";
+        refreshImg.className = 'firmware-icon';
+        refreshImg.setAttribute("alt", "Update");
+        let refreshName = files[i].name;
+        let refreshVersion = files[i].version;
+        a.onclick = function(e) {
+          e.preventDefault();
+          refreshImg.style.opacity = '0.5';
+          refreshImg.style.cursor = 'wait';
+          fetch(localURL + '/pic?action=refresh&name=' + refreshName + '&version=' + refreshVersion)
+            .then(function() { return fetch(APIGW + "v2/firmware/files"); })
+            .then(function(r) { return r.json(); })
+            .then(function(updatedFiles) {
+              var entry = updatedFiles.find(function(f) { return f.name === refreshName; });
+              if (entry) {
+                var versionEl = document.getElementById('firmware_version_' + refreshName);
+                if (versionEl) versionEl.textContent = entry.version;
+              }
+              refreshImg.style.opacity = '';
+              refreshImg.style.cursor = '';
+            })
+            .catch(function(err) {
+              console.error('Refresh failed:', err);
+              refreshImg.style.opacity = '';
+              refreshImg.style.cursor = '';
+            });
+        };
+        a.appendChild(refreshImg);
         btn.appendChild(a);
         rowDiv.appendChild(btn);
         //--- flash to pic icon---
@@ -2723,6 +2837,34 @@ function refreshFirmware() {
       progressDiv.appendChild(barWrapper);
       
       displayPICpage.appendChild(progressDiv);
+
+      // Fire off the on-demand update check — makes an outbound call so may take a moment
+      fetch(APIGW + "v2/pic/update-check")
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function(data) {
+          var pu = data && data.pic_update;
+          var banner = document.getElementById('pic-update-banner');
+          if (!banner || !pu) return;
+          if (pu.update_available) {
+            banner.className = 'pic-update-banner update-available';
+            banner.textContent = 'New PIC firmware available: ' + pu.current + ' \u2192 ' + pu.latest + '. Click \u21ba to download, then \u2193 to flash.';
+            var verSpan = document.getElementById('pic_version_display');
+            if (verSpan) verSpan.className = 'pic-version-outdated';
+          } else if (pu.latest) {
+            banner.className = 'pic-update-banner up-to-date';
+            banner.textContent = 'PIC firmware is up to date (' + pu.current + ')';
+          } else {
+            banner.className = 'pic-update-banner checking';
+            banner.textContent = 'Could not check for updates';
+          }
+        })
+        .catch(function() {
+          var banner = document.getElementById('pic-update-banner');
+          if (banner) {
+            banner.className = 'pic-update-banner checking';
+            banner.textContent = 'Could not check for updates';
+          }
+        });
 
     })
     .catch(function (error) {
@@ -2986,13 +3128,8 @@ function refreshDeviceInfo() {
       const device = json.device || {};
       for (let key in device) {
         console.log("[" + key + "]=>[" + device[key] + "]");
-        let displayValue = device[key];
-        if (key === 'otgwmode') {
-          const parsedMode = parseGatewayModeValue(device[key]);
-          if (parsedMode === 'gateway') displayValue = 'Gateway';
-          else if (parsedMode === 'monitor') displayValue = 'Monitor';
-          else displayValue = 'Detecting...';
-        }
+        const displayLabel = formatDeviceInfoLabel(key);
+        const displayValue = formatDeviceInfoValue(key, device[key]);
         var deviceinfoPage = document.getElementById('deviceinfoPage');
         if ((document.getElementById("devinfo_" + key)) == null) { // if element does not exists yet, then build page
           var rowDiv = document.createElement("div");
@@ -3001,7 +3138,7 @@ function refreshDeviceInfo() {
           //--- field Name ---
           var fldDiv = document.createElement("div");
           fldDiv.setAttribute("class", "devinfocolumn1");
-          fldDiv.textContent = translateToHuman(key);
+          fldDiv.textContent = displayLabel;
           rowDiv.appendChild(fldDiv);
           //--- value on screen ---
           var valDiv = document.createElement("div");
@@ -3011,7 +3148,9 @@ function refreshDeviceInfo() {
           deviceinfoPage.appendChild(rowDiv);
         } else {
           const existingRow = document.getElementById("devinfo_" + key);
+          const labelEl = existingRow ? existingRow.querySelector('.devinfocolumn1') : null;
           const valueEl = existingRow ? existingRow.querySelector('.devinfocolumn2') : null;
+          if (labelEl) labelEl.textContent = displayLabel;
           if (valueEl) valueEl.textContent = displayValue;
         }
       }
@@ -3069,14 +3208,14 @@ function refreshSettings() {
           // rowDiv.style.border = "thick solid lightblue";
           // rowDiv.style.background = "lightblue";
           //--- field Name ---
-          var fldDiv = document.createElement("div");
-          fldDiv.className = 'settings-field-container';
-          fldDiv.setAttribute("style", "margin-right: 10px;");
-          fldDiv.textContent = translateToHuman(data[i].name);
-          rowDiv.appendChild(fldDiv);
+          var fldLabel = document.createElement("label");
+          fldLabel.className = 'settings-field-container';
+          fldLabel.setAttribute("for", data[i].name);
+          fldLabel.textContent = translateToHuman(data[i].name);
+          rowDiv.appendChild(fldLabel);
           //--- input ---
           var inputDiv = document.createElement("div");
-          inputDiv.setAttribute("style", "text-align: left;");
+          inputDiv.className = 'settings-input-container';
 
           var sInput = document.createElement("input");
           //----sInput.setAttribute("id", "setFld_"+data[i].name);
@@ -3247,12 +3386,27 @@ function sendPostSetting(field, value) {
 
 //============================================================================  
 function translateToHuman(longName) {
+  if (typeof longName === 'string') {
+    longName = longName.trim();
+  }
   //for(var index = 0; index < (translateFields.length -1); index++) 
   for (var index = 0; index < translateFields.length; index++) {
     if (translateFields[index][0] == longName) {
       return translateFields[index][1];
     }
   };
+
+  // Fallback to a case-insensitive lookup so table labels stay human-readable
+  // even if the API key casing varies.
+  if (typeof longName === 'string') {
+    const normalizedName = longName.toLowerCase();
+    for (var idx = 0; idx < translateFields.length; idx++) {
+      const fieldKey = translateFields[idx][0];
+      if (typeof fieldKey === 'string' && fieldKey.trim().toLowerCase() == normalizedName) {
+        return translateFields[idx][1];
+      }
+    }
+  }
   return longName;
 
 } // translateToHuman()
@@ -3469,9 +3623,9 @@ function parseFirmwareInfo(filename) {
     // Determine type from filename (check in specific order to avoid false positives)
     if (filename) {
         let fname = filename.toLowerCase();
-        // Check diagnostic first, then interface, default to gateway
-        if (fname.includes("diagnostic") || fname.includes("diag.hex")) {
-            displayType = "Diagnostic";
+        // Check diagnose first, then interface, default to gateway
+        if (fname.includes("diagnose")) {
+            displayType = "Diagnose";
         } else if (fname.includes("interface") || fname.includes("inter.hex")) {
             displayType = "Interface";
         }

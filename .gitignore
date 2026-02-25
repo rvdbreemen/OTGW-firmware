@@ -21,6 +21,7 @@ otmonitor-6.6/**
 otmonitor-6.6
 evaluation-report.json
 .tmp/
+.claude/settings.local.json
 
 /src/OTGW-firmware/build
 *.ino.map
