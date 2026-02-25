@@ -102,6 +102,12 @@
               </label>
             </div>
             
+            <div class="ot-cmd-bar">
+              <input type="text" id="otCmdInput" class="ot-cmd-input" placeholder="Command (e.g. PS=1, TT=20.5)" aria-label="OTGW command" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" maxlength="14" />
+              <button type="button" id="btnSendCmd" class="btn-log-control" title="Send command to OTGW PIC" aria-label="Send OTGW command">Send</button>
+              <span id="otCmdStatus" class="ot-cmd-status"></span>
+            </div>
+            
             <div id="otLogContainer" class="ot-log-container">
               <div id="otLogContent" class="ot-log-content" role="log" aria-live="polite"></div>
             </div>
