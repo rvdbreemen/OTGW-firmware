@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.0.0
+**  Version  : v1.1.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -107,7 +107,11 @@ char        sMessage[257] = "";
 uint32_t    MQTTautoConfigMap[8] = { 0 };
 bool        isESPFlashing = false;  // Flag to disable background tasks during ESP firmware flash
 bool        isPICFlashing = false;  // Flag to disable background tasks during PIC firmware flash
-
+// Deferred settings write timer (Finding #23: coalesce flash writes)
+// Declared globally so both settingStuff.ino and loop() can access
+uint32_t  timerFlushSettings_interval = 2000;  // 2 second debounce
+uint32_t  timerFlushSettings_due = 0;          // initially not due
+byte      timerFlushSettings_type = 0;         // SKIP_MISSED_TICKS
 // Helper inline function to check if any firmware flash is in progress
 inline bool isFlashing() {
   return isESPFlashing || isPICFlashing;
@@ -143,11 +147,11 @@ bool      bOTGWonline = true;
 bool      bOTGWboilerstate = false;
 bool      bOTGWthermostatstate = false;
 bool      bOTGWgatewaystate = false;
+bool      bOTGWgatewaystateKnown = false;
 bool      bPSmode = false;  //default to PS=0 mode
 
 //All things that are settings 
 char      settingHostname[41] = _HOSTNAME;
-char      settingAdminPassword[41] = "";
 
 //MQTT settings
 bool      statusMQTTconnection = false; 
@@ -193,10 +197,13 @@ struct
   int id;
   DeviceAddress addr;
   float tempC;
-  time_t lasttime;  
+  time_t lasttime;
 } DallasrealDevice[MAXDALLASDEVICES];
 // prototype to allow use in restAPI.ino
 char* getDallasAddress(DeviceAddress deviceAddress);
+
+// Dallas sensor labels are now stored in /dallas_labels.json file (not in RAM)
+// This saves 1024 bytes of persistent RAM
 
 
 // S0 Counter Settings and variables with global scope
@@ -221,6 +228,7 @@ bool      bDebugOTmsg = true;
 bool      bDebugRestAPI = false;
 bool      bDebugMQTT = false;
 bool      bDebugSensors = false;
+bool      bDebugSensorSimulation = false;
 
 //GPIO Output Settings
 bool      settingMyDEBUG = false;

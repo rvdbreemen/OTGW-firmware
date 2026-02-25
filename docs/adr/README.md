@@ -10,13 +10,13 @@ Architecture Decision Records capture important architectural decisions along wi
 
 **By Topic:**
 - [Platform & Build](#platform-and-build-system) (4 ADRs)
-- [Memory Management](#memory-management) (4 ADRs) 🆕
-- [Network & Security](#network-and-security) (4 ADRs) 🆕
-- [Integration](#integration-and-communication) (3 ADRs) 🆕
-- [Core Systems](#system-architecture) (6 ADRs)
-- [Features & Extensions](#features-and-extensions) (6 ADRs)
-- [Browser & Client](#browser-and-client-compatibility) (3 ADRs)
-- [OTA & Updates](#ota-and-firmware-updates) (1 ADR)
+- [Memory Management](#memory-management) (4 ADRs)
+- [Network & Security](#network-and-security) (3 ADRs)
+- [Integration](#integration-and-communication) (4 ADRs) 🆕
+- [Core Systems](#system-architecture) (4 ADRs) 🆕
+- [Features & Extensions](#features-and-extensions) (8 ADRs) 🆕
+- [Browser & Client](#browser-and-client-compatibility) (4 ADRs)
+- [OTA & Updates](#ota-and-firmware-updates) (2 ADRs)
 
 **Foundational ADRs** (most referenced by other ADRs):
 - **ADR-001:** ESP8266 Platform Selection (establishes hardware constraints)
@@ -65,12 +65,21 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-031: Two-Microcontroller Coordination Architecture](ADR-031-two-microcontroller-coordination-architecture.md)** 🆕  
   Master/Slave architecture with ESP8266 as network controller and PIC microcontroller for OpenTherm protocol (serial communication, GPIO reset control, firmware upgrade capability).
 
+- **[ADR-037: Gateway Mode Detection via PR=M Polling](ADR-037-gateway-mode-detection.md)** 🆕  
+  Periodic polling (PR=M command, 30s interval with 60s cache) to detect gateway vs. monitor mode, with PS=1 impact on time sync suppression.
+
 ### System Architecture
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  
   Non-blocking timer-based task scheduling with 49-day rollover protection for cooperative multitasking.
 
 - **[ADR-008: LittleFS for Configuration Persistence](ADR-008-littlefs-configuration-persistence.md)**  
   Using LittleFS filesystem with JSON files for configuration storage that survives firmware updates.
+
+- **[ADR-036: Boot Sequence Initialization Ordering](ADR-036-boot-sequence-ordering.md)** 🆕  
+  Deterministic 5-phase boot sequence (Hardware → Filesystem → Network → Application → OTGW) with critical dependency ordering (NTP before WiFi DHCP, webserver before MQTT).
+
+- **[ADR-038: OpenTherm Message Data Flow Pipeline](ADR-038-opentherm-data-flow-pipeline.md)** 🆕  
+  Synchronous fan-out architecture for OpenTherm messages (PIC Serial → processOT → MQTT + WebSocket + REST + Telnet) with per-consumer availability checks and bidirectional command flow.
 
 ### Hardware and Reliability
 - **[ADR-011: External Hardware Watchdog for Reliability](ADR-011-external-hardware-watchdog.md)**  
@@ -103,6 +112,9 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-019: REST API Versioning Strategy](ADR-019-rest-api-versioning-strategy.md)**  
   URL path-based API versioning (v0/v1/v2) with indefinite backward compatibility.
 
+- **[ADR-035: RESTful API Compliance Strategy](ADR-035-restful-api-compliance-strategy.md)** 🆕  
+  Expand v2 API with RESTful-compliant endpoints: consistent JSON errors, proper status codes, resource naming, and CORS headers.
+
 - **[ADR-020: Dallas DS18B20 Temperature Sensor Integration](ADR-020-dallas-ds18b20-sensor-integration.md)**  
   OneWire-based multi-sensor temperature monitoring with MQTT integration and auto-discovery.
 
@@ -118,6 +130,12 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-024: Debug Telnet Command Console](ADR-024-debug-telnet-command-console.md)**  
   Interactive telnet-based debug console for real-time diagnostics and hardware testing.
 
+- **[ADR-033: Dallas Sensor Custom Labels and Graph Visualization](ADR-033-dallas-sensor-custom-labels-graph-visualization.md)** 🆕  
+  Persistent custom sensor labels (16 chars max) with REST API endpoint, dynamic graph visualization with 16-color palette, and non-blocking inline editor.
+
+- **[ADR-039: Real-Time OTGraph Charting Architecture](ADR-039-otgraph-real-time-charting.md)** 🆕  
+  5-grid ECharts-based charting module with dynamic Dallas sensor registration, dual-theme palettes, LTTB sampling, and 24h data buffer for real-time OpenTherm monitoring.
+
 ### Browser and Client Compatibility
 - **[ADR-025: Safari WebSocket Connection Management During Firmware Upload](ADR-025-safari-websocket-connection-management.md)**  
   Proactively closing WebSocket before firmware upload to prevent Safari's connection pool exhaustion from dropping it mid-transfer.
@@ -128,8 +146,14 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-027: Version Mismatch Warning System in Web UI](ADR-027-version-mismatch-warning-system.md)**  
   Prominent visual warning banner that automatically appears when firmware and filesystem versions don't match to prevent user confusion.
 
+- **[ADR-034: Non-Blocking Modal Dialogs for User Input](ADR-034-non-blocking-modal-dialogs.md)** 🆕  
+  Custom HTML/CSS modal dialogs instead of blocking prompt() to maintain real-time data flow.
+
 
 ### OTA and Firmware Updates
+- **[ADR-028: File Streaming Over Loading for Memory Safety](ADR-028-file-streaming-over-loading.md)** 🆕  
+  Never load files >2KB into RAM; use streaming patterns to prevent memory exhaustion crashes.
+
 - **[ADR-029: Simple XHR-Based OTA Flash (KISS Principle)](ADR-029-simple-xhr-ota-flash.md)** 🆕  
   Simplified firmware flash mechanism using XHR with backend confirmation, eliminating WebSocket complexity and Safari bugs. Reduces code by 68.5% while improving reliability.
 
@@ -235,6 +259,7 @@ ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
 5. 2021: ADR-015 (NTP + AceTime - verified: commit 45b51f2)
 6. 2024: ADR-019 (API v2)
 7. 2026: ADR-025 (Safari WebSocket fix), ADR-026 (Cache-busting), ADR-027 (Version warnings)
+8. 2026: ADR-036 (Boot sequence), ADR-037 (Gateway mode), ADR-038 (Data flow), ADR-039 (OTGraph)
 
 ## When to Create an ADR
 

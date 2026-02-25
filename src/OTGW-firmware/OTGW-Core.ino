@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.0.0
+**  Version  : v1.1.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -73,6 +73,42 @@ char ot_log_buffer[OT_LOG_BUFFER_SIZE];
 
 /* --- End of LOG marcro's ---*/
 
+/* Send a single-line event to the WebSocket with a prefix character.
+   Prefix conventions: '>' sent command, '<' command response, '!' error/warning, '*' system event.
+   Uses ot_log_buffer; no additional buffers needed.
+   sendEventToWebSocket   - msg is a DRAM string; len < 0 means null-terminated, else bounded by len.
+   sendEventToWebSocket_P - msg_P is a PROGMEM string (pass with PSTR). */
+static void sendEventToWebSocket(char prefix, const char *msg, int len = -1) {
+  ClrLog();
+  AddLog(getOTLogTimestamp());
+  size_t _hlen = strlen(ot_log_buffer);
+  if (_hlen < (OT_LOG_BUFFER_SIZE - 1))
+    snprintf_P(ot_log_buffer + _hlen, OT_LOG_BUFFER_SIZE - _hlen, PSTR(" %c "), prefix);
+  if (len < 0) AddLog(msg);
+  else {
+    size_t _mlen = strlen(ot_log_buffer);
+    if (_mlen < (OT_LOG_BUFFER_SIZE - 1))
+      snprintf_P(ot_log_buffer + _mlen, OT_LOG_BUFFER_SIZE - _mlen, PSTR("%.*s"), len, msg);
+  }
+  AddLogln();
+  sendLogToWebSocket(ot_log_buffer);
+  ClrLog();
+}
+
+static void sendEventToWebSocket_P(char prefix, PGM_P msg_P) {
+  ClrLog();
+  AddLog(getOTLogTimestamp());
+  size_t _hlen = strlen(ot_log_buffer);
+  if (_hlen < (OT_LOG_BUFFER_SIZE - 1))
+    snprintf_P(ot_log_buffer + _hlen, OT_LOG_BUFFER_SIZE - _hlen, PSTR(" %c "), prefix);
+  size_t _mlen = strlen(ot_log_buffer);
+  if (_mlen < (OT_LOG_BUFFER_SIZE - 1))
+    strncat_P(ot_log_buffer, msg_P, OT_LOG_BUFFER_SIZE - _mlen - 1);
+  AddLogln();
+  sendLogToWebSocket(ot_log_buffer);
+  ClrLog();
+}
+
 static const char* skipOTLogTimestamp(const char* logLine)
 {
   if (!logLine) return logLine;
@@ -128,7 +164,9 @@ Publish state information of PIC firmware version information to MQTT broker.
 void sendMQTTstateinformation(){
   sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(bOTGWboilerstate)); 
   sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(bOTGWthermostatstate));
-  sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(bOTGWgatewaystate));
+  if (bOTGWgatewaystateKnown) {
+    sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(bOTGWgatewaystate));
+  }
   sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(bOTGWonline));
   sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(bOTGWonline));
 }
@@ -164,7 +202,7 @@ String getpicfwversion(){
   String line = executeCommand("PR=A");
   int p = line.indexOf(OTGW_BANNER);
   if (p >= 0) {
-    p += sizeof(OTGW_BANNER);
+    p += sizeof(OTGW_BANNER)-1;
     _ret = line.substring(p);
   } else {
     _ret ="No version found";
@@ -178,14 +216,27 @@ String getpicfwversion(){
 Query the actual gateway mode setting from the PIC firmware using PR=M command.
 According to OTGW documentation:
 - PR=M returns "PR: G" for Gateway mode (GW=1)
-- PR=M returns "PR: M" for Monitor/Standalone mode (GW=0)
+- PR=M returns "PR: M" for Monitor mode (GW=0)
 This provides a reliable way to detect the actual configured mode,
 rather than inferring it from message traffic.
 */
 bool queryOTGWgatewaymode(){
+  static uint32_t lastGatewayModeQueryMs = 0;
+  static bool cachedGatewayMode = false;
+  static bool hasCachedGatewayMode = false;
+  constexpr uint32_t GATEWAY_MODE_QUERY_MIN_INTERVAL_MS = 60000; // hard throttle: max one PR=M per minute
+
   if (!bPICavailable) {
     OTGWDebugTln(F("queryOTGWgatewaymode: PIC not available"));
-    return false;
+    bOTGWgatewaystateKnown = hasCachedGatewayMode;
+    return cachedGatewayMode;
+  }
+
+  const uint32_t now = millis();
+  if (hasCachedGatewayMode && ((uint32_t)(now - lastGatewayModeQueryMs) < GATEWAY_MODE_QUERY_MIN_INTERVAL_MS)) {
+    OTGWDebugTf(PSTR("queryOTGWgatewaymode: throttled, using cached value [%s]\r\n"), CCONOFF(cachedGatewayMode));
+    bOTGWgatewaystateKnown = true;
+    return cachedGatewayMode;
   }
   
   String response = executeCommand("PR=M");
@@ -193,27 +244,42 @@ bool queryOTGWgatewaymode(){
   
   OTGWDebugTf(PSTR("queryOTGWgatewaymode: PR=M response=[%s]\r\n"), CSTR(response));
   
-  // Response should be "G" for Gateway mode or "M" for Monitor mode
-  // executeCommand() strips the "PR: " prefix, so we just get the value
-  bool isGatewayMode = false;
-  
-  if (response.length() > 0) {
-    char mode = response.charAt(0);
-    if (mode == 'G' || mode == 'g') {
+  // Response format is "M=G" (Gateway mode) or "M=M" (Monitor mode).
+  // executeCommand() strips the "PR: " prefix, leaving e.g. " M=G" which is trimmed to "M=G".
+  // The value is the character after '='.
+  bool isGatewayMode = cachedGatewayMode;
+  bool parseOk = false;
+
+  int eqPos = response.indexOf('=');
+  if (eqPos >= 0 && eqPos + 1 < (int)response.length()) {
+    char modeVal = response.charAt(eqPos + 1);
+    if (modeVal == 'G' || modeVal == 'g') {
       isGatewayMode = true;
-      OTGWDebugTln(F("queryOTGWgatewaymode: Gateway mode (G) detected"));
-    } else if (mode == 'M' || mode == 'm') {
+      parseOk = true;
+      OTGWDebugTln(F("queryOTGWgatewaymode: Gateway mode detected"));
+    } else if (modeVal == 'M' || modeVal == 'm') {
       isGatewayMode = false;
-      OTGWDebugTln(F("queryOTGWgatewaymode: Monitor mode (M) detected"));
+      parseOk = true;
+      OTGWDebugTln(F("queryOTGWgatewaymode: Monitor mode detected"));
     } else {
-      OTGWDebugTf(PSTR("queryOTGWgatewaymode: Unexpected response [%s], defaulting to false\r\n"), CSTR(response));
-      isGatewayMode = false;
+      OTGWDebugTf(PSTR("queryOTGWgatewaymode: Unexpected value [%c] in response [%s], keeping cached value [%s]\r\n"),
+                  modeVal, CSTR(response), CCONOFF(cachedGatewayMode));
     }
+  } else if (response.length() > 0) {
+    OTGWDebugTf(PSTR("queryOTGWgatewaymode: Unexpected response format [%s], keeping cached value [%s]\r\n"),
+                CSTR(response), CCONOFF(cachedGatewayMode));
   } else {
-    OTGWDebugTln(F("queryOTGWgatewaymode: Empty response, defaulting to false"));
+    OTGWDebugTln(F("queryOTGWgatewaymode: Empty response, keeping cached value"));
   }
+
+  if (parseOk) {
+    cachedGatewayMode = isGatewayMode;
+    hasCachedGatewayMode = true;
+    lastGatewayModeQueryMs = now;
+  }
+  bOTGWgatewaystateKnown = hasCachedGatewayMode;
   
-  return isGatewayMode;
+  return cachedGatewayMode;
 }
 
 //===================[ checkOTWGpicforupdate ]=====================
@@ -279,7 +345,7 @@ String executeCommand(const String sCmd){
     feedWatchDog();
   }
   String _cmd = sCmd.substring(0,2);
-  OTGWDebugTf(PSTR("Send command: [%s]\r\n"), CSTR(_cmd));
+  OTGWDebugTf(PSTR("Awaiting response prefix: [%s]\r\n"), CSTR(_cmd));
   //fetch a line
   String line = OTGWSerial.readStringUntil('\n');
   
@@ -604,9 +670,9 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   if (OT.skipthis) return false;
   bool _valid = false;
   _valid = _valid || (OTlookup.msgcmd==OT_READ && OT.type==OT_READ_ACK);
-  _valid = _valid || (OTlookup.msgcmd==OT_WRITE && OTdata.type==OT_WRITE_DATA);
-  _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OTdata.type==OT_WRITE_DATA));
-  _valid = _valid || (OTdata.id==OT_Statusflags) || (OTdata.id==OT_StatusVH) || (OTdata.id==OT_SolarStorageMaster);;
+  _valid = _valid || (OTlookup.msgcmd==OT_WRITE && OT.type==OT_WRITE_DATA);
+  _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OT.type==OT_WRITE_DATA));
+  _valid = _valid || (OT.id==OT_Statusflags) || (OT.id==OT_StatusVH) || (OT.id==OT_SolarStorageMaster);;
   return _valid;
 }
 
@@ -718,13 +784,13 @@ void print_status(uint16_t& value)
     //Master Status
     if (is_value_valid(OTdata, OTlookupitem)){
       sendMQTTData("status_master", _flag8_master);
-      sendMQTTData("ch_enable",             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
-      sendMQTTData("dhw_enable",            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  
-      sendMQTTData("cooling_enable",        (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));   
-      sendMQTTData("otc_active",            (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  
-      sendMQTTData("ch2_enable",            (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));  
-      sendMQTTData("summerwintertime",      (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  
-      sendMQTTData("dhw_blocking",          (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));  
+      publishMQTTOnOff("ch_enable",        ((OTdata.valueHB) & 0x01));
+      publishMQTTOnOff("dhw_enable",       ((OTdata.valueHB) & 0x02));
+      publishMQTTOnOff("cooling_enable",   ((OTdata.valueHB) & 0x04));
+      publishMQTTOnOff("otc_active",       ((OTdata.valueHB) & 0x08));
+      publishMQTTOnOff("ch2_enable",       ((OTdata.valueHB) & 0x10));
+      publishMQTTOnOff("summerwintertime", ((OTdata.valueHB) & 0x20));
+      publishMQTTOnOff("dhw_blocking",     ((OTdata.valueHB) & 0x40));
 
       OTcurrentSystemState.MasterStatus = OTdata.valueHB;
     }
@@ -755,14 +821,14 @@ void print_status(uint16_t& value)
     //Slave Status
     if (is_value_valid(OTdata, OTlookupitem)){
       sendMQTTData("status_slave", _flag8_slave);
-      sendMQTTData("fault",                 (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  //delayms(5);  
-      sendMQTTData("centralheating",        (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  //delayms(5);  
-      sendMQTTData("domestichotwater",      (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));  //delayms(5);  
-      sendMQTTData("flame",                 (((OTdata.valueLB) & 0x08) ? "ON" : "OFF"));  //delayms(5);
-      sendMQTTData("cooling",               (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));  //delayms(5); 
-      sendMQTTData("centralheating2",       (((OTdata.valueLB) & 0x20) ? "ON" : "OFF"));  //delayms(5);
-      sendMQTTData("diagnostic_indicator",  (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));  //delayms(5);
-      sendMQTTData("eletric_production",    (((OTdata.valueLB) & 0x80) ? "ON" : "OFF"));  //delayms(5);
+      publishMQTTOnOff("fault",                ((OTdata.valueLB) & 0x01));
+      publishMQTTOnOff("centralheating",       ((OTdata.valueLB) & 0x02));
+      publishMQTTOnOff("domestichotwater",     ((OTdata.valueLB) & 0x04));
+      publishMQTTOnOff("flame",                ((OTdata.valueLB) & 0x08));
+      publishMQTTOnOff("cooling",              ((OTdata.valueLB) & 0x10));
+      publishMQTTOnOff("centralheating2",      ((OTdata.valueLB) & 0x20));
+      publishMQTTOnOff("diagnostic_indicator", ((OTdata.valueLB) & 0x40));
+      publishMQTTOnOff("eletric_production",   ((OTdata.valueLB) & 0x80));
 
       OTcurrentSystemState.SlaveStatus = OTdata.valueLB;
     }
@@ -843,10 +909,10 @@ void print_statusVH(uint16_t& value)
     //Master Status
     if (is_value_valid(OTdata, OTlookupitem)){
       sendMQTTData(F("status_vh_master"), _flag8_master);
-      sendMQTTData(F("vh_ventilation_enabled"),        (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
-      sendMQTTData(F("vh_bypass_position"),            (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  
-      sendMQTTData(F("vh_bypass_mode"),                (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));   
-      sendMQTTData(F("vh_free_ventlation_mode"),       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  
+      publishMQTTOnOff(F("vh_ventilation_enabled"),   ((OTdata.valueHB) & 0x01));
+      publishMQTTOnOff(F("vh_bypass_position"),       ((OTdata.valueHB) & 0x02));
+      publishMQTTOnOff(F("vh_bypass_mode"),           ((OTdata.valueHB) & 0x04));
+      publishMQTTOnOff(F("vh_free_ventlation_mode"),  ((OTdata.valueHB) & 0x08));
 
       OTcurrentSystemState.MasterStatusVH = OTdata.valueHB;
     }
@@ -874,12 +940,12 @@ void print_statusVH(uint16_t& value)
     //Slave Status
     if (is_value_valid(OTdata, OTlookupitem)){
       sendMQTTData(F("status_vh_slave"), _flag8_slave);
-      sendMQTTData(F("vh_fault"),                   (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));    
-      sendMQTTData(F("vh_ventlation_mode"),         (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));    
-      sendMQTTData(F("vh_bypass_status"),           (((OTdata.valueLB) & 0x04) ? "ON" : "OFF"));    
-      sendMQTTData(F("vh_bypass_automatic_status"), (((OTdata.valueLB) & 0x08) ? "ON" : "OFF"));  
-      sendMQTTData(F("vh_free_ventliation_status"), (((OTdata.valueLB) & 0x10) ? "ON" : "OFF"));    
-      sendMQTTData(F("vh_diagnostic_indicator"),    (((OTdata.valueLB) & 0x40) ? "ON" : "OFF"));  
+      publishMQTTOnOff(F("vh_fault"),                   ((OTdata.valueLB) & 0x01));
+      publishMQTTOnOff(F("vh_ventlation_mode"),         ((OTdata.valueLB) & 0x02));
+      publishMQTTOnOff(F("vh_bypass_status"),           ((OTdata.valueLB) & 0x04));
+      publishMQTTOnOff(F("vh_bypass_automatic_status"), ((OTdata.valueLB) & 0x08));
+      publishMQTTOnOff(F("vh_free_ventliation_status"), ((OTdata.valueLB) & 0x10));
+      publishMQTTOnOff(F("vh_diagnostic_indicator"),    ((OTdata.valueLB) & 0x40));
 
       OTcurrentSystemState.SlaveStatusVH = OTdata.valueLB;
     }
@@ -914,12 +980,12 @@ void print_ASFflags(uint16_t& value)
     //5: Water over-temp[ no OvT fault, over-temperat. Fault]
     //6: reserved
     //7: reserved
-    sendMQTTData(F("service_request"),       (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));    
-    sendMQTTData(F("lockout_reset"),         (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));    
-    sendMQTTData(F("low_water_pressure"),    (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));    
-    sendMQTTData(F("gas_flame_fault"),       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  
-    sendMQTTData(F("air_pressure_fault"),    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));    
-    sendMQTTData(F("water_over_temperature"),(((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  
+    publishMQTTOnOff(F("service_request"),       ((OTdata.valueHB) & 0x01));
+    publishMQTTOnOff(F("lockout_reset"),         ((OTdata.valueHB) & 0x02));
+    publishMQTTOnOff(F("low_water_pressure"),    ((OTdata.valueHB) & 0x04));
+    publishMQTTOnOff(F("gas_flame_fault"),       ((OTdata.valueHB) & 0x08));
+    publishMQTTOnOff(F("air_pressure_fault"),    ((OTdata.valueHB) & 0x10));
+    publishMQTTOnOff(F("water_over_temperature"), ((OTdata.valueHB) & 0x20));
     value = OTdata.u16();
   }
 }
@@ -1279,7 +1345,7 @@ void print_daytime(uint16_t& value)
     //hour
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_hour", sizeof(_topic));
-    sendMQTTData(_topic, itoa((OTdata.valueHB & 0x0F), _msg, 10)); 
+    sendMQTTData(_topic, itoa((OTdata.valueHB & 0x1F), _msg, 10)); 
     //min
     strlcpy(_topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(_topic));
     strlcat(_topic, "_minutes", sizeof(_topic));
@@ -1402,6 +1468,8 @@ void handleOTGWqueue(){
       if (cmdqueue[i].retrycnt >= OTGW_CMD_RETRY){
         //max retry reached, so delete command from queue
         OTGWDebugTf(PSTR("CmdQueue: Delete [%d] from queue\r\n"), i);
+        snprintf_P(cMsg, sizeof(cMsg), PSTR("%s [dropped]"), cmdqueue[i].cmd);
+        sendEventToWebSocket('!', cMsg);
         for (int j = i; j < (cmdptr - 1); j++){
           // OTGWDebugTf(PSTR("CmdQueue: Moving [%d] => [%d]\r\n"), j+1, j);
           strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[j].cmd));
@@ -1502,10 +1570,11 @@ void sendOTGW(const char* buf, int len)
     OTGWDebug(F("] (")); OTGWDebug(len); OTGWDebug(F(")")); OTGWDebugln();
         
     //write buffer to serial
-    OTGWSerial.write(buf, len);         
+    OTGWSerial.write(buf, len);
     OTGWSerial.write('\r');
-    OTGWSerial.write('\n');            
-    OTGWSerial.flush(); 
+    OTGWSerial.write('\n');
+    OTGWSerial.flush();
+    sendEventToWebSocket('>', buf, len);
   } else OTGWDebugln(F("Error: Write buffer not big enough!"));
 }
 
@@ -1540,6 +1609,14 @@ void processOT(const char *buf, int len){
   time_t now = time(nullptr);
 
   if (isvalidotmsg(buf, len)) { 
+    // Raw OT frames indicate normal streaming mode (PS=0).
+    if (bPSmode) {
+      bPSmode = false;
+      sMessage[0] = '\0';
+      OTGWDebugTln(F("PS mode auto-detected as OFF (raw OT stream resumed)"));
+      sendEventToWebSocket_P('*', PSTR("PS=0 [auto-detected, raw mode resumed]"));
+    }
+
     //OT protocol messages are 9 chars long
     if (settingMQTTOTmessage) sendMQTTData(F("otmessage"), buf);
 
@@ -1831,74 +1908,106 @@ void processOT(const char *buf, int len){
     checkOTGWcmdqueue(buf, len);
     Debugln(buf);
     sendMQTTData(F("event_report"), buf);
+    sendEventToWebSocket('<', buf, (int)len);
   } else if (strcmp_P(buf, PSTR("NG")) == 0) {
     Debugln(F("NG - No Good. The command code is unknown."));
     sendMQTTData(F("event_report"), F("NG - No Good. The command code is unknown."));
+    sendEventToWebSocket_P('!', PSTR("NG - No Good"));
   } else if (strcmp_P(buf, PSTR("SE")) == 0) {
     Debugln(F("SE - Syntax Error. The command contained an unexpected character or was incomplete."));
     sendMQTTData(F("event_report"), F("SE - Syntax Error. The command contained an unexpected character or was incomplete."));
+    sendEventToWebSocket_P('!', PSTR("SE - Syntax Error"));
   } else if (strcmp_P(buf, PSTR("BV")) == 0) {
     Debugln(F("BV - Bad Value. The command contained a data value that is not allowed."));
     sendMQTTData(F("event_report"), F("BV - Bad Value. The command contained a data value that is not allowed."));
+    sendEventToWebSocket_P('!', PSTR("BV - Bad Value"));
   } else if (strcmp_P(buf, PSTR("OR")) == 0) {
     Debugln(F("OR - Out of Range. A number was specified outside of the allowed range."));
     sendMQTTData(F("event_report"), F("OR - Out of Range. A number was specified outside of the allowed range."));
+    sendEventToWebSocket_P('!', PSTR("OR - Out of Range"));
   } else if (strcmp_P(buf, PSTR("NS")) == 0) {
     Debugln(F("NS - No Space. The alternative Data-ID could not be added because the table is full."));
     sendMQTTData(F("event_report"), F("NS - No Space. The alternative Data-ID could not be added because the table is full."));
+    sendEventToWebSocket_P('!', PSTR("NS - No Space"));
   } else if (strcmp_P(buf, PSTR("NF")) == 0) {
     Debugln(F("NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table."));
     sendMQTTData(F("event_report"), F("NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table."));
+    sendEventToWebSocket_P('!', PSTR("NF - Not Found"));
   } else if (strcmp_P(buf, PSTR("OE")) == 0) {
     Debugln(F("OE - Overrun Error. The processor was busy and failed to process all received characters."));
     sendMQTTData(F("event_report"), F("OE - Overrun Error. The processor was busy and failed to process all received characters."));
+    sendEventToWebSocket_P('!', PSTR("OE - Overrun Error"));
   } else if (strcmp_P(buf, PSTR("Thermostat disconnected")) == 0) {
     Debugln(F("Thermostat disconnected"));
     sendMQTTData(F("event_report"), F("Thermostat disconnected"));
+    sendEventToWebSocket_P('*', PSTR("Thermostat disconnected"));
   } else if (strcmp_P(buf, PSTR("Thermostat connected")) == 0) {
     Debugln(F("Thermostat connected"));
     sendMQTTData(F("event_report"), F("Thermostat connected"));
+    sendEventToWebSocket_P('*', PSTR("Thermostat connected"));
   } else if (strcmp_P(buf, PSTR("Low power")) == 0) {
     Debugln(F("Low power"));
     sendMQTTData(F("event_report"), F("Low power"));
+    sendEventToWebSocket_P('*', PSTR("Low power"));
   } else if (strcmp_P(buf, PSTR("Medium power")) == 0) {
     Debugln(F("Medium power"));
     sendMQTTData(F("event_report"), F("Medium power"));
+    sendEventToWebSocket_P('*', PSTR("Medium power"));
   } else if (strcmp_P(buf, PSTR("High power")) == 0) {
     Debugln(F("High power"));
     sendMQTTData(F("event_report"), F("High power"));
+    sendEventToWebSocket_P('*', PSTR("High power"));
   } else if (strstr_P(buf, PSTR("\r\nError 01"))!= NULL) {
     char errorBuf[12];
     OTcurrentSystemState.error01++;
     OTGWDebugTf(PSTR("\r\nError 01 = %d\r\n"),OTcurrentSystemState.error01);
     snprintf_P(errorBuf, sizeof(errorBuf), PSTR("%u"), OTcurrentSystemState.error01);
     sendMQTTData(F("Error 01"), errorBuf);
+    snprintf_P(cMsg, sizeof(cMsg), PSTR("Error 01 [%u]"), OTcurrentSystemState.error01);
+    sendEventToWebSocket('!', cMsg);
   } else if (strstr_P(buf, PSTR("Error 02"))!= NULL) {
     char errorBuf[12];
     OTcurrentSystemState.error02++;
     OTGWDebugTf(PSTR("\r\nError 02 = %d\r\n"),OTcurrentSystemState.error02);
     snprintf_P(errorBuf, sizeof(errorBuf), PSTR("%u"), OTcurrentSystemState.error02);
     sendMQTTData(F("Error 02"), errorBuf);
+    snprintf_P(cMsg, sizeof(cMsg), PSTR("Error 02 [%u]"), OTcurrentSystemState.error02);
+    sendEventToWebSocket('!', cMsg);
   } else if (strstr_P(buf, PSTR("Error 03"))!= NULL) {
     char errorBuf[12];
     OTcurrentSystemState.error03++;
     OTGWDebugTf(PSTR("\r\nError 03 = %d\r\n"),OTcurrentSystemState.error03);
     snprintf_P(errorBuf, sizeof(errorBuf), PSTR("%u"), OTcurrentSystemState.error03);
     sendMQTTData(F("Error 03"), errorBuf);
+    snprintf_P(cMsg, sizeof(cMsg), PSTR("Error 03 [%u]"), OTcurrentSystemState.error03);
+    sendEventToWebSocket('!', cMsg);
   } else if (strstr_P(buf, PSTR("Error 04"))!= NULL){
     char errorBuf[12];
     OTcurrentSystemState.error04++;
     OTGWDebugTf(PSTR("\r\nError 04 = %d\r\n"),OTcurrentSystemState.error04);
     snprintf_P(errorBuf, sizeof(errorBuf), PSTR("%u"), OTcurrentSystemState.error04);
     sendMQTTData(F("Error 04"), errorBuf);
+    snprintf_P(cMsg, sizeof(cMsg), PSTR("Error 04 [%u]"), OTcurrentSystemState.error04);
+    sendEventToWebSocket('!', cMsg);
   } else if (strstr(buf, OTGW_BANNER)!=NULL){
     //found a banner, so get the version of PIC
     strlcpy(sPICfwversion, OTGWSerial.firmwareVersion(), sizeof(sPICfwversion));
     OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), sPICfwversion);
     strlcpy(sPICdeviceid, OTGWSerial.processorToString().c_str(), sizeof(sPICdeviceid));
-    OTGWDebugTf(PSTR("Current device id: %s\r\n"), sPICdeviceid);    
+    OTGWDebugTf(PSTR("Current device id: %s\r\n"), sPICdeviceid);
     strlcpy(sPICtype, OTGWSerial.firmwareToString().c_str(), sizeof(sPICtype));
     OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), sPICtype);
+    snprintf_P(cMsg, sizeof(cMsg), PSTR("OTGW PIC restarted [%s]"), sPICfwversion);
+    sendEventToWebSocket('*', cMsg);
+  } else if ((strchr(buf, '=') != nullptr) && (strchr(buf, ':') == nullptr)) {
+    // Summary key/value lines are emitted by PS=1 mode.
+    // Detect this even when PS=1 was enabled externally (e.g. Domoticz classic plugin),
+    // so WebUI can show the footer watermark reliably.
+    if (!bPSmode) {
+      OTGWDebugTln(F("PS mode auto-detected as ON (summary key=value stream)"));
+    }
+    bPSmode = true;
+    strlcpy(sMessage, "PS=1 mode; No UI updates.", sizeof(sMessage));
   } else {
     OTGWDebugTf(PSTR("Not processed, received from OTGW => (%s) [%d]\r\n"), buf, len);
   }
@@ -1928,12 +2037,14 @@ void processOT(const char *buf, int len){
 void handleOTGW()
 {
   //handle serial communication and line processing
-  #define MAX_BUFFER_READ 256       //need to be 256 because of long PS=1 responses 
+  #define MAX_BUFFER_READ 512       //PS=1 summary lines can exceed 256 bytes
   #define MAX_BUFFER_WRITE 128
   static char sRead[MAX_BUFFER_READ];
   static char sWrite[MAX_BUFFER_WRITE];
   static size_t bytes_read = 0;
   static size_t bytes_write = 0;
+  static bool discardCurrentReadLine = false;
+  static uint32_t droppedReadLines = 0;
   static uint8_t outByte;
 
   //Handle incoming data from OTGW through serial port (READ BUFFER)
@@ -1946,20 +2057,37 @@ void handleOTGW()
   
   while (OTGWSerial.available()) {
     outByte = OTGWSerial.read();
-    OTGWstream.write(outByte);
     if (outByte == '\r' || outByte == '\n') {
-      if (bytes_read == 0) continue;
-      blinkLEDnow(LED2);
-      sRead[bytes_read] = '\0';
-      processOT(sRead, bytes_read);
+      if ((bytes_read == 0) && !discardCurrentReadLine) continue;
+
+      if (discardCurrentReadLine) {
+        droppedReadLines++;
+        DebugTf(PSTR("Serial line dropped after overflow. Dropped lines total: %lu\r\n"),
+                static_cast<unsigned long>(droppedReadLines));
+      }
+
+      if (!discardCurrentReadLine) {
+        blinkLEDnow(LED2);
+        sRead[bytes_read] = '\0';
+        OTGWstream.write(reinterpret_cast<const uint8_t*>(sRead), bytes_read);
+        OTGWstream.write('\r');
+        OTGWstream.write('\n');
+        processOT(sRead, bytes_read);
+      }
+
       bytes_read = 0;
+      discardCurrentReadLine = false;
     } else if (bytes_read < (MAX_BUFFER_READ-1)) {
-      sRead[bytes_read++] = outByte;
+      if (!discardCurrentReadLine) {
+        sRead[bytes_read++] = outByte;
+      }
     } else {
-      // Buffer overflow detected - discard current buffer and log error
+      // Buffer overflow detected - discard this complete line and log error
       OTcurrentSystemState.errorBufferOverflow++;
-      DebugTf(PSTR("Serial Buffer Overflow! Discarding %d bytes. Total overflows: %d\r\n"), 
+      DebugTf(PSTR("Serial Buffer Overflow! Discarding %d bytes. Total overflows: %d\r\n"),
               bytes_read, OTcurrentSystemState.errorBufferOverflow);
+      snprintf_P(cMsg, sizeof(cMsg), PSTR("Serial overflow [%u]"), OTcurrentSystemState.errorBufferOverflow);
+      sendEventToWebSocket('!', cMsg);
       // Rate limit MQTT notifications - only send every 10 overflows to avoid overwhelming broker
       static uint8_t overflowsSinceLastReport = 0;
       overflowsSinceLastReport++;
@@ -1969,18 +2097,9 @@ void handleOTGW()
         sendMQTTData(F("Error_BufferOverflow"), overflowCountBuf);
         overflowsSinceLastReport = 0;
       }
-      // Reset buffer to prevent processing corrupted data
+      // Drop this line until next CR/LF to avoid forwarding partial/corrupted data
       bytes_read = 0;
-      // Skip remaining bytes until we hit a line terminator to resync (max 256 bytes to prevent blocking)
-      uint16_t skipCount = 0;
-      while (OTGWSerial.available() && skipCount < MAX_BUFFER_READ) {
-        outByte = OTGWSerial.read();
-        OTGWstream.write(outByte);
-        skipCount++;
-        if (outByte == '\r' || outByte == '\n') {
-          break;
-        }
-      }
+      discardCurrentReadLine = true;
     }
   }
 
@@ -1992,10 +2111,12 @@ void handleOTGW()
     { //on CR, do something...
       sWrite[bytes_write] = 0;
       OTGWDebugTf(PSTR("Net2Ser: Sending to OTGW: [%s] (%d)\r\n"), sWrite, bytes_write);
+      if (bytes_write > 0) sendEventToWebSocket('>', sWrite); // log every ser2net command
       //check for reset command
       if (strcmp_P(sWrite, PSTR("GW=R"))==0){
         //detected [GW=R], then reset the gateway the gpio way
         OTGWDebugTln(F("Detected: GW=R. Reset gateway command executed."));
+        sendEventToWebSocket_P('!', PSTR("GW=R [reset]"));
         resetOTGW();
       } else if (strcasecmp_P(sWrite, PSTR("PS=1"))==0) {
         //detected [PS=1], then PrintSummary mode = true --> From this point on you need to ask for summary.
@@ -2005,10 +2126,12 @@ void handleOTGW()
           msglastupdated[i] = 0; //clear epoch values
         }
         strlcpy(sMessage, "PS=1 mode; No UI updates.", sizeof(sMessage));
+        sendEventToWebSocket_P('*', PSTR("PS=1 [print summary mode]"));
       } else if (strcasecmp_P(sWrite, PSTR("PS=0"))==0) {
         //detected [PS=0], then PrintSummary mode = OFF --> Raw mode is turned on again.
         bPSmode = false;
         sMessage[0] = '\0';
+        sendEventToWebSocket_P('*', PSTR("PS=0 [raw mode]"));
       }
       bytes_write = 0; //start next line
     } else if  (outByte == '\n')
@@ -2024,121 +2147,125 @@ void handleOTGW()
 }// END of handleOTGW
 
 //====================[ functions for REST API ]====================
-String getOTGWValue(int msgid)
+const char* getOTGWValue(int msgid)
 {
+  static char buffer[32];
+  
   switch (static_cast<OpenThermMessageID>(msgid)) { 
-    case OT_TSet:                              return String(OTcurrentSystemState.TSet); break;         
-    case OT_CoolingControl:                    return String(OTcurrentSystemState.CoolingControl); break;
-    case OT_TsetCH2:                           return String(OTcurrentSystemState.TsetCH2);  break;
-    case OT_TrOverride:                        return String(OTcurrentSystemState.TrOverride);  break;        
-    case OT_MaxRelModLevelSetting:             return String(OTcurrentSystemState.MaxRelModLevelSetting);  break;
-    case OT_TrSet:                             return String(OTcurrentSystemState.TrSet);  break;
-    case OT_TrSetCH2:                          return String(OTcurrentSystemState.TrSetCH2);  break;
-    case OT_RelModLevel:                       return String(OTcurrentSystemState.RelModLevel);  break;
-    case OT_CHPressure:                        return String(OTcurrentSystemState.CHPressure); break;
-    case OT_DHWFlowRate:                       return String(OTcurrentSystemState.DHWFlowRate);  break;
-    case OT_Tr:                                return String(OTcurrentSystemState.Tr);  break;  
-    case OT_Tboiler:                           return String(OTcurrentSystemState.Tboiler);  break;
-    case OT_Tdhw:                              return String(OTcurrentSystemState.Tdhw);  break;
-    case OT_Toutside:                          return String(OTcurrentSystemState.Toutside);  break;
-    case OT_Tret:                              return String(OTcurrentSystemState.Tret);  break;
-    case OT_Tsolarstorage:                     return String(OTcurrentSystemState.Tsolarstorage);  break;
-    case OT_Tsolarcollector:                   return String(OTcurrentSystemState.Tsolarcollector); break;
-    case OT_TflowCH2:                          return String(OTcurrentSystemState.TflowCH2); break;          
-    case OT_Tdhw2:                             return String(OTcurrentSystemState.Tdhw2); break;
-    case OT_Texhaust:                          return String(OTcurrentSystemState.Texhaust); break; 
-    case OT_Theatexchanger:                    return String(OTcurrentSystemState.Theatexchanger); break;
-    case OT_TdhwSet:                           return String(OTcurrentSystemState.TdhwSet); break;
-    case OT_MaxTSet:                           return String(OTcurrentSystemState.MaxTSet); break;
-    case OT_Hcratio:                           return String(OTcurrentSystemState.Hcratio); break;
-    case OT_Remoteparameter4:                  return String(OTcurrentSystemState.Remoteparameter4); break;
-    case OT_Remoteparameter5:                  return String(OTcurrentSystemState.Remoteparameter5); break;
-    case OT_Remoteparameter6:                  return String(OTcurrentSystemState.Remoteparameter6); break;
-    case OT_Remoteparameter7:                  return String(OTcurrentSystemState.Remoteparameter7); break;
-    case OT_Remoteparameter8:                  return String(OTcurrentSystemState.Remoteparameter8); break;
-    case OT_OpenThermVersionMaster:            return String(OTcurrentSystemState.OpenThermVersionMaster); break;
-    case OT_OpenThermVersionSlave:             return String(OTcurrentSystemState.OpenThermVersionSlave); break;
-    case OT_Statusflags:                       return String(OTcurrentSystemState.Statusflags); break;
-    case OT_ASFflags:                          return String(OTcurrentSystemState.ASFflags); break;
-    case OT_MasterConfigMemberIDcode:          return String(OTcurrentSystemState.MasterConfigMemberIDcode); break; 
-    case OT_SlaveConfigMemberIDcode:           return String(OTcurrentSystemState.SlaveConfigMemberIDcode); break;   
-    case OT_Command:                           return String(OTcurrentSystemState.Command);  break; 
-    case OT_RBPflags:                          return String(OTcurrentSystemState.RBPflags); break; 
-    case OT_TSP:                               return String(OTcurrentSystemState.TSP); break; 
-    case OT_TSPindexTSPvalue:                  return String(OTcurrentSystemState.TSPindexTSPvalue);  break; 
-    case OT_FHBsize:                           return String(OTcurrentSystemState.FHBsize);  break;  
-    case OT_FHBindexFHBvalue:                  return String(OTcurrentSystemState.FHBindexFHBvalue);  break; 
-    case OT_MaxCapacityMinModLevel:            return String(OTcurrentSystemState.MaxCapacityMinModLevel);  break; 
-    case OT_DayTime:                           return String(OTcurrentSystemState.DayTime);  break; 
-    case OT_Date:                              return String(OTcurrentSystemState.Date);  break; 
-    case OT_Year:                              return String(OTcurrentSystemState.Year);  break; 
-    case OT_TdhwSetUBTdhwSetLB:                return String(OTcurrentSystemState.TdhwSetUBTdhwSetLB); break;  
-    case OT_MaxTSetUBMaxTSetLB:                return String(OTcurrentSystemState.MaxTSetUBMaxTSetLB); break;  
-    case OT_HcratioUBHcratioLB:                return String(OTcurrentSystemState.HcratioUBHcratioLB); break; 
-    case OT_Remoteparameter4boundaries:        return String(OTcurrentSystemState.Remoteparameter4boundaries); break; 
-    case OT_Remoteparameter5boundaries:        return String(OTcurrentSystemState.Remoteparameter5boundaries); break;
-    case OT_Remoteparameter6boundaries:        return String(OTcurrentSystemState.Remoteparameter6boundaries); break;
-    case OT_Remoteparameter7boundaries:        return String(OTcurrentSystemState.Remoteparameter7boundaries); break;
-    case OT_Remoteparameter8boundaries:        return String(OTcurrentSystemState.Remoteparameter8boundaries); break;     
-    case OT_RemoteOverrideFunction:            return String(OTcurrentSystemState.RemoteOverrideFunction); break;
-    case OT_OEMDiagnosticCode:                 return String(OTcurrentSystemState.OEMDiagnosticCode);  break;
-    case OT_BurnerStarts:                      return String(OTcurrentSystemState.BurnerStarts);  break; 
-    case OT_CHPumpStarts:                      return String(OTcurrentSystemState.CHPumpStarts);  break; 
-    case OT_DHWPumpValveStarts:                return String(OTcurrentSystemState.DHWPumpValveStarts);  break; 
-    case OT_DHWBurnerStarts:                   return String(OTcurrentSystemState.DHWBurnerStarts);  break;
-    case OT_BurnerOperationHours:              return String(OTcurrentSystemState.BurnerOperationHours);  break;
-    case OT_CHPumpOperationHours:              return String(OTcurrentSystemState.CHPumpOperationHours);  break; 
-    case OT_DHWPumpValveOperationHours:        return String(OTcurrentSystemState.DHWPumpValveOperationHours);  break;  
-    case OT_DHWBurnerOperationHours:           return String(OTcurrentSystemState.DHWBurnerOperationHours);  break; 
-    case OT_MasterVersion:                     return String(OTcurrentSystemState.MasterVersion); break; 
-    case OT_SlaveVersion:                      return String(OTcurrentSystemState.SlaveVersion); break;
-    case OT_StatusVH:                          return String(OTcurrentSystemState.StatusVH); break;
-    case OT_ControlSetpointVH:                 return String(OTcurrentSystemState.ControlSetpointVH); break;
-    case OT_ASFFaultCodeVH:                    return String(OTcurrentSystemState.ASFFaultCodeVH); break;
-    case OT_DiagnosticCodeVH:                  return String(OTcurrentSystemState.DiagnosticCodeVH); break;
-    case OT_ConfigMemberIDVH:                  return String(OTcurrentSystemState.ConfigMemberIDVH); break;
-    case OT_OpenthermVersionVH:                return String(OTcurrentSystemState.OpenthermVersionVH); break;
-    case OT_VersionTypeVH:                     return String(OTcurrentSystemState.VersionTypeVH); break;
-    case OT_RelativeVentilation:               return String(OTcurrentSystemState.RelativeVentilation); break;
-    case OT_RelativeHumidityExhaustAir:        return String(OTcurrentSystemState.RelativeHumidityExhaustAir); break;
-    case OT_CO2LevelExhaustAir:                return String(OTcurrentSystemState.CO2LevelExhaustAir); break;
-    case OT_SupplyInletTemperature:            return String(OTcurrentSystemState.SupplyInletTemperature); break;
-    case OT_SupplyOutletTemperature:           return String(OTcurrentSystemState.SupplyOutletTemperature); break;
-    case OT_ExhaustInletTemperature:           return String(OTcurrentSystemState.ExhaustInletTemperature); break;
-    case OT_ExhaustOutletTemperature:          return String(OTcurrentSystemState.ExhaustOutletTemperature); break;
-    case OT_ActualExhaustFanSpeed:             return String(OTcurrentSystemState.ActualExhaustFanSpeed); break;
-    case OT_ActualSupplyFanSpeed:              return String(OTcurrentSystemState.ActualSupplyFanSpeed); break;
-    case OT_RemoteParameterSettingVH:          return String(OTcurrentSystemState.RemoteParameterSettingVH); break;
-    case OT_NominalVentilationValue:           return String(OTcurrentSystemState.NominalVentilationValue); break;
-    case OT_TSPNumberVH:                       return String(OTcurrentSystemState.TSPNumberVH); break;
-    case OT_TSPEntryVH:                        return String(OTcurrentSystemState.TSPEntryVH); break;
-    case OT_FaultBufferSizeVH:                 return String(OTcurrentSystemState.FaultBufferSizeVH); break;
-    case OT_FaultBufferEntryVH:                return String(OTcurrentSystemState.FaultBufferEntryVH); break;
-    case OT_FanSpeed:                          return String(OTcurrentSystemState.FanSpeed); break;
-    case OT_ElectricalCurrentBurnerFlame:      return String(OTcurrentSystemState.ElectricalCurrentBurnerFlame); break;
-    case OT_TRoomCH2:                          return String(OTcurrentSystemState.TRoomCH2); break;
-    case OT_RelativeHumidity:                  return String(OTcurrentSystemState.RelativeHumidity); break;
-    case OT_RFstrengthbatterylevel:            return String(OTcurrentSystemState.RFstrengthbatterylevel); break;
-    case OT_OperatingMode_HC1_HC2_DHW:         return String(OTcurrentSystemState.OperatingMode_HC1_HC2_DHW); break;
-    case OT_ElectricityProducerStarts:         return String(OTcurrentSystemState.ElectricityProducerStarts); break;
-    case OT_ElectricityProducerHours:          return String(OTcurrentSystemState.ElectricityProducerHours); break;
-    case OT_ElectricityProduction:             return String(OTcurrentSystemState.ElectricityProduction); break;
-    case OT_CumulativElectricityProduction:    return String(OTcurrentSystemState.CumulativElectricityProduction); break;
-    case OT_RemehadFdUcodes:                   return String(OTcurrentSystemState.RemehadFdUcodes); break;
-    case OT_RemehaServicemessage:              return String(OTcurrentSystemState.RemehaServicemessage); break;
-    case OT_RemehaDetectionConnectedSCU:       return String(OTcurrentSystemState.RemehaDetectionConnectedSCU); break;
-    case OT_SolarStorageMaster:                return String(OTcurrentSystemState.SolarStorageStatus); break;
-    case OT_SolarStorageASFflags:              return String(OTcurrentSystemState.SolarStorageASFflags); break;
-    case OT_SolarStorageSlaveConfigMemberIDcode:  return String(OTcurrentSystemState.SolarStorageSlaveConfigMemberIDcode); break;
-    case OT_SolarStorageVersionType:           return String(OTcurrentSystemState.SolarStorageVersionType); break;
-    case OT_SolarStorageTSP:                   return String(OTcurrentSystemState.SolarStorageTSP); break;
-    case OT_SolarStorageTSPindexTSPvalue:      return String(OTcurrentSystemState.SolarStorageTSPindexTSPvalue); break;
-    case OT_SolarStorageFHBsize:               return String(OTcurrentSystemState.SolarStorageFHBsize); break;
-    case OT_SolarStorageFHBindexFHBvalue:      return String(OTcurrentSystemState.SolarStorageFHBindexFHBvalue); break;
-
-    default: return "Error: not implemented yet!\r\n";
-  } 
-}
+    case OT_TSet:                              dtostrf(OTcurrentSystemState.TSet, 0, 2, buffer); return buffer;
+    case OT_CoolingControl:                    dtostrf(OTcurrentSystemState.CoolingControl, 0, 2, buffer); return buffer;
+    case OT_TsetCH2:                           dtostrf(OTcurrentSystemState.TsetCH2, 0, 2, buffer); return buffer;
+    case OT_TrOverride:                        dtostrf(OTcurrentSystemState.TrOverride, 0, 2, buffer); return buffer;
+    case OT_MaxRelModLevelSetting:             dtostrf(OTcurrentSystemState.MaxRelModLevelSetting, 0, 2, buffer); return buffer;
+    case OT_TrSet:                             dtostrf(OTcurrentSystemState.TrSet, 0, 2, buffer); return buffer;
+    case OT_TrSetCH2:                          dtostrf(OTcurrentSystemState.TrSetCH2, 0, 2, buffer); return buffer;
+    case OT_RelModLevel:                       dtostrf(OTcurrentSystemState.RelModLevel, 0, 2, buffer); return buffer;
+    case OT_CHPressure:                        dtostrf(OTcurrentSystemState.CHPressure, 0, 2, buffer); return buffer;
+    case OT_DHWFlowRate:                       dtostrf(OTcurrentSystemState.DHWFlowRate, 0, 2, buffer); return buffer;
+    case OT_Tr:                                dtostrf(OTcurrentSystemState.Tr, 0, 2, buffer); return buffer;
+    case OT_Tboiler:                           dtostrf(OTcurrentSystemState.Tboiler, 0, 2, buffer); return buffer;
+    case OT_Tdhw:                              dtostrf(OTcurrentSystemState.Tdhw, 0, 2, buffer); return buffer;
+    case OT_Toutside:                          dtostrf(OTcurrentSystemState.Toutside, 0, 2, buffer); return buffer;
+    case OT_Tret:                              dtostrf(OTcurrentSystemState.Tret, 0, 2, buffer); return buffer;
+    case OT_Tsolarstorage:                     dtostrf(OTcurrentSystemState.Tsolarstorage, 0, 2, buffer); return buffer;
+    case OT_Tsolarcollector:                   dtostrf(OTcurrentSystemState.Tsolarcollector, 0, 2, buffer); return buffer;
+    case OT_TflowCH2:                          dtostrf(OTcurrentSystemState.TflowCH2, 0, 2, buffer); return buffer;
+    case OT_Tdhw2:                             dtostrf(OTcurrentSystemState.Tdhw2, 0, 2, buffer); return buffer;
+    case OT_Texhaust:                          dtostrf(OTcurrentSystemState.Texhaust, 0, 2, buffer); return buffer;
+    case OT_Theatexchanger:                    dtostrf(OTcurrentSystemState.Theatexchanger, 0, 2, buffer); return buffer;
+    case OT_TdhwSet:                           dtostrf(OTcurrentSystemState.TdhwSet, 0, 2, buffer); return buffer;
+    case OT_MaxTSet:                           dtostrf(OTcurrentSystemState.MaxTSet, 0, 2, buffer); return buffer;
+    case OT_Hcratio:                           dtostrf(OTcurrentSystemState.Hcratio, 0, 2, buffer); return buffer;
+    case OT_Remoteparameter4:                  dtostrf(OTcurrentSystemState.Remoteparameter4, 0, 2, buffer); return buffer;
+    case OT_Remoteparameter5:                  dtostrf(OTcurrentSystemState.Remoteparameter5, 0, 2, buffer); return buffer;
+    case OT_Remoteparameter6:                  dtostrf(OTcurrentSystemState.Remoteparameter6, 0, 2, buffer); return buffer;
+    case OT_Remoteparameter7:                  dtostrf(OTcurrentSystemState.Remoteparameter7, 0, 2, buffer); return buffer;
+    case OT_Remoteparameter8:                  dtostrf(OTcurrentSystemState.Remoteparameter8, 0, 2, buffer); return buffer;
+    case OT_OpenThermVersionMaster:            dtostrf(OTcurrentSystemState.OpenThermVersionMaster, 0, 2, buffer); return buffer;
+    case OT_OpenThermVersionSlave:             dtostrf(OTcurrentSystemState.OpenThermVersionSlave, 0, 2, buffer); return buffer;
+    case OT_Statusflags:                       dtostrf(OTcurrentSystemState.Statusflags, 0, 2, buffer); return buffer;
+    case OT_ASFflags:                          dtostrf(OTcurrentSystemState.ASFflags, 0, 2, buffer); return buffer;
+    case OT_MasterConfigMemberIDcode:          dtostrf(OTcurrentSystemState.MasterConfigMemberIDcode, 0, 2, buffer); return buffer;
+    case OT_SlaveConfigMemberIDcode:           dtostrf(OTcurrentSystemState.SlaveConfigMemberIDcode, 0, 2, buffer); return buffer;
+    case OT_Command:                           dtostrf(OTcurrentSystemState.Command, 0, 2, buffer); return buffer;
+    case OT_RBPflags:                          dtostrf(OTcurrentSystemState.RBPflags, 0, 2, buffer); return buffer;
+    case OT_TSP:                               dtostrf(OTcurrentSystemState.TSP, 0, 2, buffer); return buffer;
+    case OT_TSPindexTSPvalue:                  dtostrf(OTcurrentSystemState.TSPindexTSPvalue, 0, 2, buffer); return buffer;
+    case OT_FHBsize:                           dtostrf(OTcurrentSystemState.FHBsize, 0, 2, buffer); return buffer;
+    case OT_FHBindexFHBvalue:                  dtostrf(OTcurrentSystemState.FHBindexFHBvalue, 0, 2, buffer); return buffer;
+    case OT_MaxCapacityMinModLevel:            dtostrf(OTcurrentSystemState.MaxCapacityMinModLevel, 0, 2, buffer); return buffer;
+    case OT_DayTime:                           dtostrf(OTcurrentSystemState.DayTime, 0, 2, buffer); return buffer;
+    case OT_Date:                              dtostrf(OTcurrentSystemState.Date, 0, 2, buffer); return buffer;
+    case OT_Year:                              dtostrf(OTcurrentSystemState.Year, 0, 2, buffer); return buffer;
+    case OT_TdhwSetUBTdhwSetLB:                dtostrf(OTcurrentSystemState.TdhwSetUBTdhwSetLB, 0, 2, buffer); return buffer;
+    case OT_MaxTSetUBMaxTSetLB:                dtostrf(OTcurrentSystemState.MaxTSetUBMaxTSetLB, 0, 2, buffer); return buffer;
+    case OT_HcratioUBHcratioLB:                dtostrf(OTcurrentSystemState.HcratioUBHcratioLB, 0, 2, buffer); return buffer;
+    case OT_Remoteparameter4boundaries:        dtostrf(OTcurrentSystemState.Remoteparameter4boundaries, 0, 2, buffer); return buffer;
+    case OT_Remoteparameter5boundaries:        dtostrf(OTcurrentSystemState.Remoteparameter5boundaries, 0, 2, buffer); return buffer;
+    case OT_Remoteparameter6boundaries:        dtostrf(OTcurrentSystemState.Remoteparameter6boundaries, 0, 2, buffer); return buffer;
+    case OT_Remoteparameter7boundaries:        dtostrf(OTcurrentSystemState.Remoteparameter7boundaries, 0, 2, buffer); return buffer;
+    case OT_Remoteparameter8boundaries:        dtostrf(OTcurrentSystemState.Remoteparameter8boundaries, 0, 2, buffer); return buffer;
+    case OT_RemoteOverrideFunction:            dtostrf(OTcurrentSystemState.RemoteOverrideFunction, 0, 2, buffer); return buffer;
+    case OT_OEMDiagnosticCode:                 dtostrf(OTcurrentSystemState.OEMDiagnosticCode, 0, 2, buffer); return buffer;
+    case OT_BurnerStarts:                      dtostrf(OTcurrentSystemState.BurnerStarts, 0, 2, buffer); return buffer;
+    case OT_CHPumpStarts:                      dtostrf(OTcurrentSystemState.CHPumpStarts, 0, 2, buffer); return buffer;
+    case OT_DHWPumpValveStarts:                dtostrf(OTcurrentSystemState.DHWPumpValveStarts, 0, 2, buffer); return buffer;
+    case OT_DHWBurnerStarts:                   dtostrf(OTcurrentSystemState.DHWBurnerStarts, 0, 2, buffer); return buffer;
+    case OT_BurnerOperationHours:              dtostrf(OTcurrentSystemState.BurnerOperationHours, 0, 2, buffer); return buffer;
+    case OT_CHPumpOperationHours:              dtostrf(OTcurrentSystemState.CHPumpOperationHours, 0, 2, buffer); return buffer;
+    case OT_DHWPumpValveOperationHours:        dtostrf(OTcurrentSystemState.DHWPumpValveOperationHours, 0, 2, buffer); return buffer;
+    case OT_DHWBurnerOperationHours:           dtostrf(OTcurrentSystemState.DHWBurnerOperationHours, 0, 2, buffer); return buffer;
+    case OT_MasterVersion:                     dtostrf(OTcurrentSystemState.MasterVersion, 0, 2, buffer); return buffer;
+    case OT_SlaveVersion:                      dtostrf(OTcurrentSystemState.SlaveVersion, 0, 2, buffer); return buffer;
+    case OT_StatusVH:                          dtostrf(OTcurrentSystemState.StatusVH, 0, 2, buffer); return buffer;
+    case OT_ControlSetpointVH:                 dtostrf(OTcurrentSystemState.ControlSetpointVH, 0, 2, buffer); return buffer;
+    case OT_ASFFaultCodeVH:                    dtostrf(OTcurrentSystemState.ASFFaultCodeVH, 0, 2, buffer); return buffer;
+    case OT_DiagnosticCodeVH:                  dtostrf(OTcurrentSystemState.DiagnosticCodeVH, 0, 2, buffer); return buffer;
+    case OT_ConfigMemberIDVH:                  dtostrf(OTcurrentSystemState.ConfigMemberIDVH, 0, 2, buffer); return buffer;
+    case OT_OpenthermVersionVH:                dtostrf(OTcurrentSystemState.OpenthermVersionVH, 0, 2, buffer); return buffer;
+    case OT_VersionTypeVH:                     dtostrf(OTcurrentSystemState.VersionTypeVH, 0, 2, buffer); return buffer;
+    case OT_RelativeVentilation:               dtostrf(OTcurrentSystemState.RelativeVentilation, 0, 2, buffer); return buffer;
+    case OT_RelativeHumidityExhaustAir:        dtostrf(OTcurrentSystemState.RelativeHumidityExhaustAir, 0, 2, buffer); return buffer;
+    case OT_CO2LevelExhaustAir:                dtostrf(OTcurrentSystemState.CO2LevelExhaustAir, 0, 2, buffer); return buffer;
+    case OT_SupplyInletTemperature:            dtostrf(OTcurrentSystemState.SupplyInletTemperature, 0, 2, buffer); return buffer;
+    case OT_SupplyOutletTemperature:           dtostrf(OTcurrentSystemState.SupplyOutletTemperature, 0, 2, buffer); return buffer;
+    case OT_ExhaustInletTemperature:           dtostrf(OTcurrentSystemState.ExhaustInletTemperature, 0, 2, buffer); return buffer;
+    case OT_ExhaustOutletTemperature:          dtostrf(OTcurrentSystemState.ExhaustOutletTemperature, 0, 2, buffer); return buffer;
+    case OT_ActualExhaustFanSpeed:             dtostrf(OTcurrentSystemState.ActualExhaustFanSpeed, 0, 2, buffer); return buffer;
+    case OT_ActualSupplyFanSpeed:              dtostrf(OTcurrentSystemState.ActualSupplyFanSpeed, 0, 2, buffer); return buffer;
+    case OT_RemoteParameterSettingVH:          dtostrf(OTcurrentSystemState.RemoteParameterSettingVH, 0, 2, buffer); return buffer;
+    case OT_NominalVentilationValue:           dtostrf(OTcurrentSystemState.NominalVentilationValue, 0, 2, buffer); return buffer;
+    case OT_TSPNumberVH:                       dtostrf(OTcurrentSystemState.TSPNumberVH, 0, 2, buffer); return buffer;
+    case OT_TSPEntryVH:                        dtostrf(OTcurrentSystemState.TSPEntryVH, 0, 2, buffer); return buffer;
+    case OT_FaultBufferSizeVH:                 dtostrf(OTcurrentSystemState.FaultBufferSizeVH, 0, 2, buffer); return buffer;
+    case OT_FaultBufferEntryVH:                dtostrf(OTcurrentSystemState.FaultBufferEntryVH, 0, 2, buffer); return buffer;
+    case OT_FanSpeed:                          dtostrf(OTcurrentSystemState.FanSpeed, 0, 2, buffer); return buffer;
+    case OT_ElectricalCurrentBurnerFlame:      dtostrf(OTcurrentSystemState.ElectricalCurrentBurnerFlame, 0, 2, buffer); return buffer;
+    case OT_TRoomCH2:                          dtostrf(OTcurrentSystemState.TRoomCH2, 0, 2, buffer); return buffer;
+    case OT_RelativeHumidity:                  dtostrf(OTcurrentSystemState.RelativeHumidity, 0, 2, buffer); return buffer;
+    case OT_RFstrengthbatterylevel:            dtostrf(OTcurrentSystemState.RFstrengthbatterylevel, 0, 2, buffer); return buffer;
+    case OT_OperatingMode_HC1_HC2_DHW:         dtostrf(OTcurrentSystemState.OperatingMode_HC1_HC2_DHW, 0, 2, buffer); return buffer;
+    case OT_ElectricityProducerStarts:         dtostrf(OTcurrentSystemState.ElectricityProducerStarts, 0, 2, buffer); return buffer;
+    case OT_ElectricityProducerHours:          dtostrf(OTcurrentSystemState.ElectricityProducerHours, 0, 2, buffer); return buffer;
+    case OT_ElectricityProduction:             dtostrf(OTcurrentSystemState.ElectricityProduction, 0, 2, buffer); return buffer;
+    case OT_CumulativElectricityProduction:    dtostrf(OTcurrentSystemState.CumulativElectricityProduction, 0, 2, buffer); return buffer;
+    case OT_RemehadFdUcodes:                   dtostrf(OTcurrentSystemState.RemehadFdUcodes, 0, 2, buffer); return buffer;
+    case OT_RemehaServicemessage:              dtostrf(OTcurrentSystemState.RemehaServicemessage, 0, 2, buffer); return buffer;
+    case OT_RemehaDetectionConnectedSCU:       dtostrf(OTcurrentSystemState.RemehaDetectionConnectedSCU, 0, 2, buffer); return buffer;
+    case OT_SolarStorageMaster:                dtostrf(OTcurrentSystemState.SolarStorageStatus, 0, 2, buffer); return buffer;
+    case OT_SolarStorageASFflags:              dtostrf(OTcurrentSystemState.SolarStorageASFflags, 0, 2, buffer); return buffer;
+    case OT_SolarStorageSlaveConfigMemberIDcode:  dtostrf(OTcurrentSystemState.SolarStorageSlaveConfigMemberIDcode, 0, 2, buffer); return buffer;
+    case OT_SolarStorageVersionType:           dtostrf(OTcurrentSystemState.SolarStorageVersionType, 0, 2, buffer); return buffer;
+    case OT_SolarStorageTSP:                   dtostrf(OTcurrentSystemState.SolarStorageTSP, 0, 2, buffer); return buffer;
+    case OT_SolarStorageTSPindexTSPvalue:      dtostrf(OTcurrentSystemState.SolarStorageTSPindexTSPvalue, 0, 2, buffer); return buffer;
+    case OT_SolarStorageFHBsize:               dtostrf(OTcurrentSystemState.SolarStorageFHBsize, 0, 2, buffer); return buffer;
+    case OT_SolarStorageFHBindexFHBvalue:      dtostrf(OTcurrentSystemState.SolarStorageFHBindexFHBvalue, 0, 2, buffer); return buffer;
+    default: 
+      strncpy_P(buffer, PSTR("Error: not implemented yet!\r\n"), sizeof(buffer) - 1);
+      buffer[sizeof(buffer) - 1] = '\0';
+      return buffer;
+  } // switch
+} // getOTGWValue
 
 void startOTGWstream()
 {
@@ -2349,8 +2476,8 @@ String checkforupdatepic(String filename){
     }
     latest = http.header(1);
     DebugTf(PSTR("Update %s -> [%s]\r\n"), filename.c_str(), latest.c_str());
-    http.end();
   } else OTGWDebugln(F("Failed to fetch version from Schelte Bron website"));
+  http.end(); // Always close connection, even on failure (Finding #24)
 
   return latest; 
 }
@@ -2387,8 +2514,8 @@ void refreshpic(String filename, String version) {
         }
       }
     }
+    http.end();
   }
-  http.end();
 }
 
 // --- Pending Upgrade Logic ---

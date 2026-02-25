@@ -19,6 +19,7 @@ Usage:
 
 import argparse
 import gzip
+import io
 import multiprocessing
 import os
 import platform
@@ -28,6 +29,15 @@ import stat
 import subprocess
 import sys
 import tarfile
+
+# Ensure stdout/stderr can handle Unicode on Windows
+if sys.platform == 'win32':
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    elif not isinstance(sys.stdout, io.TextIOWrapper) or sys.stdout.encoding != 'utf-8':
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 import traceback
 import urllib.request
 import zipfile
@@ -422,6 +432,10 @@ def build_firmware(project_dir, config_file):
     fqbn = "esp8266:esp8266:d1_mini:eesz=4M2M,xtal=160"
     cflags = "-DNO_GLOBAL_HTTPUPDATE"
     
+    # Use temporary directory for build artifacts
+    temp_build_dir = config.TEMP_DIR / "build"
+    temp_build_dir.mkdir(parents=True, exist_ok=True)
+    
     cmd = [
         "arduino-cli",
         "compile",
@@ -430,6 +444,7 @@ def build_firmware(project_dir, config_file):
         "--verbose",
         "--libraries", str(project_dir / "src" / "libraries"),
         "--build-property", f"compiler.cpp.extra_flags=\"{cflags}\"",
+        "--build-path", str(temp_build_dir),
         "--config-file", str(config_file),
         str(config.FIRMWARE_ROOT)
     ]
@@ -479,20 +494,20 @@ def build_filesystem(project_dir, config_file):
 
 
 def consolidate_build_artifacts(project_dir):
-    """Move all build artifacts from subdirectories to build root and clean up"""
+    """Move all build artifacts from temporary directory to build root and clean up"""
     print_step("Consolidating build artifacts")
     
     build_dir = config.BUILD_DIR
     # Ensure build dir exists
     build_dir.mkdir(exist_ok=True)
     
-    # Source build directory (where arduino-cli outputs)
-    src_build_dir = config.FIRMWARE_ROOT / "build"
+    # Temporary build directory (where arduino-cli outputs)
+    temp_build_dir = config.TEMP_DIR / "build"
     
     moved = []
     
     # Helper to move artifact
-    def process_artifact(source_path, dest_dir, action="copy"):
+    def process_artifact(source_path, dest_dir):
         if not source_path.exists():
             return False
             
@@ -510,32 +525,28 @@ def consolidate_build_artifacts(project_dir):
             dest_path.unlink()
         
         if source_path != dest_path:
-            if action == "move":
-                shutil.move(str(source_path), str(dest_path))
-                print_info(f"Moved: {source_path.name}")
-            else:
-                shutil.copy2(str(source_path), str(dest_path))
-                print_info(f"Copied: {source_path.name}")
+            shutil.move(str(source_path), str(dest_path))
+            print_info(f"Moved: {source_path.name}")
             moved.append(dest_path)
             return True
         return False
 
-    # 1. Copy artifacts from src/OTGW-firmware/build (arduino-cli output)
-    if src_build_dir.exists():
-        patterns = ["**/*.ino.bin", "**/*.ino.elf", "**/*.ino.map"]
+    # Move artifacts from temporary build directory
+    if temp_build_dir.exists():
+        patterns = ["**/*.ino.bin"]
         for pattern in patterns:
-            for file_path in src_build_dir.glob(pattern):
-                process_artifact(file_path, build_dir, action="copy")
+            for file_path in temp_build_dir.glob(pattern):
+                process_artifact(file_path, build_dir)
 
-    # 2. Move artifacts from subdirectories in build/ (if any)
-    patterns = ["**/*.ino.bin", "**/*.ino.elf", "**/*.littlefs.bin"]
+    # Move artifacts from subdirectories in build/ (if any)
+    patterns = ["**/*.ino.bin", "**/*.littlefs.bin"]
     for pattern in patterns:
         for file_path in build_dir.glob(pattern):
             # Skip files already in build root
             if file_path.parent == build_dir:
                 continue
             
-            process_artifact(file_path, build_dir, action="move")
+            process_artifact(file_path, build_dir)
             
     if moved:
         print_success(f"Consolidated {len(moved)} artifact(s) to build root")
@@ -564,16 +575,12 @@ def rename_build_artifacts(project_dir, semver):
     
     renamed = []
     
-    # Find and rename .bin and .elf files (only in build root)
-    for pattern in ["*.ino.bin", "*.ino.elf"]:
+    # Find and rename .bin files (only in build root)
+    for pattern in ["*.ino.bin"]:
         for file_path in build_dir.glob(pattern):
             # Create new name with version
             if file_path.suffix == ".bin":
                 new_name = file_path.stem.replace(".ino", "") + f"-{semver}.ino.bin"
-            elif file_path.suffix == ".elf":
-                new_name = file_path.stem.replace(".ino", "") + f"-{semver}.ino.elf"
-            else:
-                continue
             
             new_path = file_path.parent / new_name
             file_path.rename(new_path)
@@ -781,15 +788,33 @@ def check_esptool():
     return False
 
 
+def cleanup_temp_directory(project_dir):
+    """Clean up temporary build directory"""
+    print_step("Cleaning up temporary files")
+    
+    temp_dir = config.TEMP_DIR
+    
+    if temp_dir.exists():
+        print_info(f"Removing {temp_dir}...")
+        try:
+            shutil.rmtree(temp_dir)
+            print_success("Temporary directory cleaned")
+        except Exception as e:
+            print_warning(f"Could not remove {temp_dir}: {e}")
+    else:
+        print_info("No temporary directory to clean")
+
+
 def clean_build(project_dir):
-    """Clean build artifacts"""
+    """Clean build artifacts and optionally dependencies"""
     print_step("Cleaning build artifacts")
     
     build_dir = config.BUILD_DIR
     arduino_dir = project_dir / "arduino"
     staging_dir = project_dir / "staging"
+    temp_dir = config.TEMP_DIR
     
-    for d in [build_dir, arduino_dir, staging_dir]:
+    for d in [build_dir, arduino_dir, staging_dir, temp_dir]:
         if d.exists():
             print_info(f"Removing {d}...")
             try:
@@ -955,6 +980,9 @@ Examples:
     
     # List build artifacts
     list_build_artifacts(project_dir)
+    
+    # Clean up temporary directory
+    cleanup_temp_directory(project_dir)
     
     print(f"\n{Colors.OKGREEN}{Colors.BOLD}")
     print("=" * 60)

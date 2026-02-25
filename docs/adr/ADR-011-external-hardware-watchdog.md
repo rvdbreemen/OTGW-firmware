@@ -40,6 +40,11 @@ For an always-on device controlling home heating, crashes are unacceptable. The 
 - **Enable/Disable (register 7):** 1 = armed to reset, 0 = turned off
 - **Status query (register 17):** Read reset reason (bit 0 = watchdog reset)
 
+**Timing requirements:**
+- **Timeout window:** ~3 seconds without a feed triggers a reset
+- **Feed cadence:** Rate-limited to 100ms (max 10 feeds/sec)
+- **Blocking tolerance:** Any single blocking operation must stay below the 3s timeout, or watchdog must be explicitly managed
+
 **Watchdog feeding pattern:**
 ```cpp
 void loop() {
@@ -171,6 +176,7 @@ Wire.endTransmission();
   - Disable during OTA firmware updates (prevents timeout during flash)
   - Disable during WiFi reconnection attempts
   - Enable during normal operation
+  - Disable briefly during other long-running flash or filesystem operations
 
 **Command 3: Read Reset Reason**
 ```cpp

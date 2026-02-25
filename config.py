@@ -12,3 +12,4 @@ DATA_DIR = FIRMWARE_ROOT / "data"
 # Environment Config (Overridable)
 # Allows overriding build directory via environment variable
 BUILD_DIR = PROJECT_DIR / os.getenv("OTGW_BUILD_DIR", "build")
+TEMP_DIR = PROJECT_DIR / ".tmp"

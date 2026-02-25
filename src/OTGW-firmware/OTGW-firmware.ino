@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v1.0.0
+**  Version  : v1.1.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -255,31 +255,37 @@ void doTaskEvery5s(){
 //===[ Do task every 30s ]===
 void doTaskEvery30s(){
   //== do tasks ==
-  
-  // Query the actual gateway mode setting from PIC using PR=M command
-  // This provides reliable detection of Gateway vs Monitor mode
-  if (bPICavailable && bOTGWonline) {
-    static bool bOTGWgatewaypreviousstate = false;
-    bool newGatewayState = queryOTGWgatewaymode();
-    
-    // Update the global state
-    bOTGWgatewaystate = newGatewayState;
-    
-    // Send MQTT update if state changed or first time
-    static bool firstRun = true;
-    if ((bOTGWgatewaystate != bOTGWgatewaypreviousstate) || firstRun) {
-      sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(bOTGWgatewaystate));
-      bOTGWgatewaypreviousstate = bOTGWgatewaystate;
-      firstRun = false;
-      DebugTf(PSTR("Gateway mode updated via PR=M: %s\r\n"), CCONOFF(bOTGWgatewaystate));
-    }
-  }
+ 
 }
 
 //===[ Do task every 60s ]===
 void doTaskEvery60s(){
 
   //== do tasks ==
+ 
+  // Query the actual gateway mode setting from PIC using PR=M command
+  // This provides reliable detection of Gateway vs Monitor mode
+  if (bPICavailable && bOTGWonline) {
+    static bool bOTGWgatewaypreviousstate = false;
+    static bool bOTGWgatewaypreviousknown = false;
+    bool newGatewayState = queryOTGWgatewaymode();
+    
+    // Only publish/update when mode has been read successfully at least once.
+    if (bOTGWgatewaystateKnown) {
+      bOTGWgatewaystate = newGatewayState;
+
+      // Send MQTT update if state changed or first successful read
+      if ((bOTGWgatewaystate != bOTGWgatewaypreviousstate) || !bOTGWgatewaypreviousknown) {
+        sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(bOTGWgatewaystate));
+        bOTGWgatewaypreviousstate = bOTGWgatewaystate;
+        bOTGWgatewaypreviousknown = true;
+        DebugTf(PSTR("Gateway mode updated via PR=M: %s\r\n"), CCONOFF(bOTGWgatewaystate));
+      }
+    } else {
+      DebugTln(F("Gateway mode still unknown (waiting for first successful PR=M)"));
+    }
+  }
+
   if (strcmp_P(sPICdeviceid, PSTR("unknown")) == 0){
     //keep trying to figure out which pic is used!
     DebugTln(F("PIC is unknown, probe pic using PR=A"));
@@ -305,7 +311,6 @@ void doTaskMinuteChanged(){
   if (WiFi.status() != WL_CONNECTED) {
     restartWifi();
   }
-  DebugTln(F("Minute changed, sending time command to OTGW"));
   sendtimecommand();
 }
 
@@ -368,6 +373,7 @@ void loop()
   
   if (!isFlashing()) {
     // Only run these tasks when NOT flashing firmware (ESP or PIC)
+      if (DUE(timerFlushSettings))      flushSettings();  // coalesced settings write + service restarts
       if (DUE(timerpollsensor))         pollSensors();    // poll the temperature sensors connected to 2wire gpio pin 
       if (DUE(timers0counter))          sendS0Counters(); // poll the s0 counter connected to gpio pin when due
       if (DUE(timer5min))               do5minevent();  

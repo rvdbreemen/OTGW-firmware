@@ -342,10 +342,16 @@ class WorkspaceEvaluator:
         build_docs = ["BUILD.md", "FLASH_GUIDE.md"]
         for doc in build_docs:
             doc_path = self.project_dir / doc
+            docs_path = self.project_dir / "docs" / doc
             if doc_path.exists():
                 self.add_result(EvaluationResult(
                     "Documentation", doc, "PASS",
                     f"Found ({doc_path.stat().st_size} bytes)"
+                ))
+            elif docs_path.exists():
+                self.add_result(EvaluationResult(
+                    "Documentation", doc, "PASS",
+                    f"Found (docs/{doc}, {docs_path.stat().st_size} bytes)"
                 ))
             else:
                 self.add_result(EvaluationResult(

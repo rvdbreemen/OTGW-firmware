@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v1.0.0
+**  Version  : v1.1.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -12,7 +12,106 @@ const localURL = window.location.protocol + '//' + window.location.host;
 const APIGW = window.location.protocol + '//' + window.location.host + '/api/';
 
 "use strict";
+// ============================================================================
+// Utility Functions for Safe Operations
+// ============================================================================
 
+/**
+ * Safely parse JSON with validation and error handling
+ * @param {string} text - The JSON string to parse
+ * @returns {object|null} Parsed object or null on error
+ */
+function safeJSONParse(text) {
+  if (!text || typeof text !== 'string') {
+    console.warn('safeJSONParse: Invalid input (not a string)');
+    return null;
+  }
+  
+  // Quick validation - JSON should start with { or [
+  const trimmed = text.trim();
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+    console.warn('safeJSONParse: Input does not look like JSON');
+    return null;
+  }
+  
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error('safeJSONParse: Parse error:', e.message);
+    return null;
+  }
+}
+
+/**
+ * Safely get element by ID with optional warning
+ * @param {string} id - Element ID
+ * @param {boolean} warnIfMissing - Whether to log warning if not found
+ * @returns {Element|null} The element or null
+ */
+function safeGetElementById(id, warnIfMissing = false) {
+  const element = document.getElementById(id);
+  if (!element && warnIfMissing) {
+    console.warn(`Element not found: #${id}`);
+  }
+  return element;
+}
+
+// ============================================================================
+// Helper to detect Dallas sensor entries via explicit type or legacy address format.
+function isDallasAddress(entry) {
+  if (entry == null) return false;
+  if (entry.type === 'dallas') return true;
+
+  var name = (typeof entry === 'string') ? entry : entry.name;
+  if (typeof name !== 'string') return false;
+
+  // Legacy and standard hex address formats (8/9/16 chars).
+  var len = name.length;
+  return (len === 8 || len === 9 || len === 16) &&
+         /^[0-9A-Fa-f]+$/.test(name);
+}
+// Global cache for Dallas sensor labels (loaded from /dallas_labels.ini)
+var dallasLabelsCache = {};
+
+// Function to fetch Dallas sensor labels from backend
+function fetchDallasLabels() {
+  return fetch(APIGW + 'v2/sensors/labels')
+    .then(function(response) {
+      if (!response.ok) {
+        console.warn('Failed to fetch Dallas labels:', response.status);
+        return {};
+      }
+      var contentType = response.headers.get('content-type') || '';
+      if (contentType.indexOf('application/json') === -1) {
+        return {};
+      }
+      return response.json();
+    })
+    .then(function(labels) {
+      dallasLabelsCache = labels || {};
+      console.log('Dallas labels loaded:', Object.keys(dallasLabelsCache).length, 'labels');
+      if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.refreshSensorLabels === 'function') {
+        OTGraph.refreshSensorLabels(dallasLabelsCache);
+      }
+      // Update existing panel labels for sensor addresses already rendered
+      for (var addr in dallasLabelsCache) {
+        if (!dallasLabelsCache.hasOwnProperty(addr)) continue;
+        var el = document.getElementById('otmon_' + addr);
+        if (el && el.parentNode) {
+          var labelSpan = el.parentNode.querySelector('.sensor-label-text');
+          if (labelSpan && labelSpan.textContent !== dallasLabelsCache[addr]) {
+            labelSpan.textContent = dallasLabelsCache[addr];
+          }
+        }
+      }
+      return dallasLabelsCache;
+    })
+    .catch(function(error) {
+      console.warn('Error fetching Dallas labels:', error);
+      dallasLabelsCache = {};
+      return dallasLabelsCache;
+    });
+}
 
 console.log(`Hash=${window.location.hash}`);
 window.onload = initMainPage;
@@ -39,8 +138,9 @@ document.addEventListener('visibilitychange', function () {
   // When tab becomes visible again, resume UI updates
   if (!flashModeActive) {
     refreshDevTime();
+    refreshGatewayMode(true);
     if (!timeupdate) {
-      timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+      timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
     }
     // Ensure WebSocket is connected (will reconnect if needed)
     initOTLogWebSocket();
@@ -53,6 +153,105 @@ document.addEventListener('visibilitychange', function () {
 
 var tid = 0;
 var timeupdate = null; // Will be started when needed
+var lastSensorSimulationState = null;
+var graphRedrawTimer = null;
+
+let gatewayModeRefreshCounter = 0;
+let gatewayModeRefreshInFlight = false; // Prevents double-triggering even when force=true
+let gatewayModeLastKnown = null; // "gateway" | "monitor"
+const GATEWAY_MODE_REFRESH_INTERVAL = 60; // 60s max polling interval (at most once a minute)
+
+function updateGatewayModeIndicator(value) {
+  const statusEl = document.getElementById('gatewayModeStatus');
+  const textEl = document.getElementById('gatewayModeText');
+  if (!statusEl || !textEl) return;
+
+  if (value === 'gateway') {
+    statusEl.className = 'mode-status mode-gateway';
+    textEl.textContent = 'Gateway Mode: Gateway';
+  } else if (value === 'monitor') {
+    statusEl.className = 'mode-status mode-monitor';
+    textEl.textContent = 'Gateway Mode: Monitor';
+  } else if (value === 'unavailable') {
+    statusEl.className = 'mode-status mode-unknown';
+    textEl.textContent = 'Gateway Mode: Unavailable';
+  } else {
+    statusEl.className = 'mode-status mode-unknown';
+    textEl.textContent = 'Gateway Mode: Detecting...';
+  }
+}
+
+function parseGatewayModeValue(modeValue) {
+  if (typeof modeValue === 'boolean') return modeValue ? 'gateway' : 'monitor';
+  if (typeof modeValue !== 'string') return null;
+
+  const normalized = modeValue.trim().toLowerCase();
+  if (normalized === 'gateway' || normalized === 'on' || normalized === '1' || normalized === 'true') {
+    return 'gateway';
+  }
+  if (normalized === 'monitor' || normalized === 'off' || normalized === '0' || normalized === 'false') {
+    return 'monitor';
+  }
+  if (normalized === 'detecting') {
+    return 'detecting';
+  }
+  return null;
+}
+
+// Apply a parsed gateway mode value to the indicator.
+// 'gateway'/'monitor' → update last-known and indicator.
+// 'detecting'         → show detecting, keep last-known unchanged.
+// null               → fall back to last-known, or show detecting if nothing known yet.
+function applyParsedGatewayMode(parsedMode) {
+  if (parsedMode === 'gateway' || parsedMode === 'monitor') {
+    gatewayModeLastKnown = parsedMode;
+    updateGatewayModeIndicator(parsedMode);
+  } else if (parsedMode === 'detecting') {
+    updateGatewayModeIndicator('detecting');
+  } else if (gatewayModeLastKnown) {
+    updateGatewayModeIndicator(gatewayModeLastKnown);
+  } else {
+    updateGatewayModeIndicator('detecting');
+  }
+}
+
+function refreshGatewayMode(force) {
+  // In-flight check MUST occur before force check to ensure throttle has priority
+  if (gatewayModeRefreshInFlight) return;
+  
+  if (flashModeActive || !isPageVisible()) return;
+  
+  if (!force && gatewayModeRefreshCounter < GATEWAY_MODE_REFRESH_INTERVAL) {
+    gatewayModeRefreshCounter++;
+    return;
+  }
+
+  gatewayModeRefreshCounter = 0;
+  gatewayModeRefreshInFlight = true;
+
+  fetch(APIGW + 'v2/device/info')
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    })
+    .then(json => {
+      const device = (json && json.device) ? json.device : {};
+      applyParsedGatewayMode(parseGatewayModeValue(device.otgwmode));
+    })
+    .catch(error => {
+      console.warn('refreshGatewayMode warning:', error);
+      if (gatewayModeLastKnown) {
+        updateGatewayModeIndicator(gatewayModeLastKnown);
+      } else {
+        updateGatewayModeIndicator('unavailable');
+      }
+    })
+    .finally(() => {
+      gatewayModeRefreshInFlight = false;
+    });
+}
 
 //============================================================================
 // Flash Mode Management - stops all background activity during flashing
@@ -83,7 +282,7 @@ function exitFlashMode() {
   
   // Restart time update
   if (!timeupdate) {
-    timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+    timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
   }
   
   // Restart WebSocket if on main page
@@ -129,7 +328,7 @@ window.otgwDebug = {
     console.log('  otgwDebug.persistence()   - Show localStorage persistence info');
     console.log('');
     console.log('%c⚙️  API Testing:', 'color: #00aaff; font-weight: bold;');
-    console.log('  otgwDebug.api(endpoint)   - Test API endpoint (e.g., "v1/devinfo")');
+    console.log('  otgwDebug.api(endpoint)   - Test API endpoint (e.g., "v2/device/info")');
     console.log('  otgwDebug.health()        - Check system health API');
     console.log('  otgwDebug.sendCmd(cmd)    - Send OTGW command (e.g., "PS=1")');
     console.log('');
@@ -161,11 +360,11 @@ window.otgwDebug = {
   // Show device information
   info: async function() {
     try {
-      const response = await fetch(APIGW + 'v1/devinfo');
+      const response = await fetch(APIGW + 'v2/device/info');
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       console.group('📱 Device Information');
-      console.table(data.devinfo || data);
+      console.table(data.device || data);
       console.groupEnd();
     } catch (error) {
       console.error('Failed to fetch device info:', error);
@@ -175,7 +374,7 @@ window.otgwDebug = {
   // Show current settings
   settings: async function() {
     try {
-      const response = await fetch(APIGW + 'v0/settings');
+      const response = await fetch(APIGW + 'v2/settings');
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       console.group('⚙️  Current Settings');
@@ -313,14 +512,14 @@ window.otgwDebug = {
 
   // Check system health
   health: async function() {
-    return await this.api('v1/health');
+    return await this.api('v2/health');
   },
 
   // Send OTGW command
   sendCmd: async function(cmd) {
     console.log(`📤 Sending command: ${cmd}`);
     try {
-      const response = await fetch(APIGW + `v1/otgw/command/${cmd}`, {
+      const response = await fetch(APIGW + `v2/otgw/command/${cmd}`, {
         method: 'POST'
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -439,6 +638,9 @@ let currentMemoryUsageMB = 0;
 let storageQuotaMB = 10; // Default, will be detected
 
 let autoScroll = true;
+let frozenLogStartIndex = null; // Freeze visible slice when auto-scroll is disabled
+let lastRenderedStartIndex = 0;
+let lastRenderedLogHtml = null;
 let showTimestamps = true;
 let searchTerm = '';
 let updatePending = false;
@@ -446,6 +648,9 @@ let otLogControlsInitialized = false;
 let isFlashing = false;
 let currentFlashFilename = "";
 let flashModeActive = false; // Track if we're on the flash page
+let isPSmode = false; // Track PS=1 (Print Summary) mode from OTGW PIC
+let statusMessageText = ''; // Device status message from /v2/device/time
+let sensorSimulationActive = false; // Mirror of otmonitor.sensorsimulation for footer notice
 let flashPollTimer = null; // Timer for polling flash status as failsafe (both ESP and PIC)
 let otLogResponsiveInitialized = false;
 let otLogResizeTimer = null;
@@ -740,7 +945,7 @@ function restoreDataFromLocalStorage() {
     // Restore log buffer
     const savedLogs = localStorage.getItem(PERSISTENCE_KEY_LOGS);
     if (savedLogs) {
-      const logs = JSON.parse(savedLogs);
+      const logs = safeJSONParse(savedLogs);
       if (Array.isArray(logs) && logs.length > 0) {
         otLogBuffer = logs;
         updateFilteredBuffer();
@@ -752,7 +957,7 @@ function restoreDataFromLocalStorage() {
     // Restore preferences
     const savedPrefs = localStorage.getItem(PERSISTENCE_KEY_PREFS);
     if (savedPrefs) {
-      const prefs = JSON.parse(savedPrefs);
+      const prefs = safeJSONParse(savedPrefs);
       if (prefs) {
         autoScroll = prefs.autoScroll !== undefined ? prefs.autoScroll : true;
         showTimestamps = prefs.showTimestamps !== undefined ? prefs.showTimestamps : true;
@@ -942,7 +1147,8 @@ function getOTLogDisplayState() {
     isProxied: isProxied,
     isPhone: isPhone,
     isSmallScreen: isSmallScreen,
-    disabled: (isProxied || isPhone || isSmallScreen)
+    isPSmode: isPSmode,
+    disabled: (isProxied || isPhone || isSmallScreen || isPSmode)
   };
   
   return state;
@@ -1003,6 +1209,8 @@ function initOTLogWebSocket(force) {
       console.log("[WebSocket] FALLBACK: Smartphone detected. Disabling OpenTherm Monitor to save resources.");
     } else if (displayState.isSmallScreen) {
       console.log("[WebSocket] FALLBACK: Small screen detected (width: " + window.innerWidth + "px). Disabling OpenTherm Monitor.");
+    } else if (displayState.isPSmode) {
+      console.log("[WebSocket] FALLBACK: PS=1 mode detected. Disabling OpenTherm Monitor to reduce device load.");
     }
     const logSection = document.getElementById('otLogSection');
     if (logSection) {
@@ -1475,8 +1683,22 @@ function renderLogDisplay() {
 
   // Always show up to RENDER_LIMIT lines
   const displayCount = Math.min(otLogFilteredBuffer.length, RENDER_LIMIT);
-  const startIndex = Math.max(0, otLogFilteredBuffer.length - displayCount);
-  const linesToShow = otLogFilteredBuffer.slice(startIndex);
+  const maxStartIndex = Math.max(0, otLogFilteredBuffer.length - displayCount);
+  let startIndex = maxStartIndex;
+
+  if (autoScroll) {
+    frozenLogStartIndex = null;
+  } else {
+    if (frozenLogStartIndex === null) {
+      frozenLogStartIndex = maxStartIndex;
+    }
+    if (frozenLogStartIndex < 0) frozenLogStartIndex = 0;
+    if (frozenLogStartIndex > maxStartIndex) frozenLogStartIndex = maxStartIndex;
+    startIndex = frozenLogStartIndex;
+  }
+
+  const linesToShow = otLogFilteredBuffer.slice(startIndex, startIndex + displayCount);
+  lastRenderedStartIndex = startIndex;
 
   // Build HTML
   let html = '';
@@ -1486,7 +1708,11 @@ function renderLogDisplay() {
     html += escapeHtml(line) + '\n';
   });
 
-  container.innerHTML = html;
+  // Avoid resetting scroll position when rendered content did not change.
+  if (html !== lastRenderedLogHtml) {
+    container.innerHTML = html;
+    lastRenderedLogHtml = html;
+  }
 
   // Auto-scroll to bottom if enabled
   if (autoScroll) {
@@ -1531,6 +1757,14 @@ function updateLogCounters() {
   updateMemoryDisplay();
 }
 
+function clearLogBuffer() {
+  otLogBuffer = [];
+  otLogFilteredBuffer = [];
+  try { if (window.localStorage) localStorage.removeItem(PERSISTENCE_KEY_LOGS); } catch(e) {}
+  updateLogDisplay();
+  updateLogCounters();
+}
+
 //============================================================================
 function setupOTLogControls() {
   // Only setup event listeners once to prevent duplicates
@@ -1539,10 +1773,19 @@ function setupOTLogControls() {
   }
   
   // Auto-scroll checkbox
-  document.getElementById('chkAutoScroll').addEventListener('change', function() {
-    autoScroll = this.checked;
-    if (typeof saveUISetting === 'function') saveUISetting('#uiAutoScroll', autoScroll);
-  });
+  const chkAutoScroll = document.getElementById('chkAutoScroll');
+  if (chkAutoScroll) {
+    chkAutoScroll.addEventListener('change', function() {
+      autoScroll = this.checked;
+      if (autoScroll) {
+        frozenLogStartIndex = null;
+        updateLogDisplay();
+      } else {
+        frozenLogStartIndex = lastRenderedStartIndex;
+      }
+      if (typeof saveUISetting === 'function') saveUISetting('ui_autoscroll', autoScroll);
+    });
+  }
 
   // Toggle Capture Mode
   const chkCapture = document.getElementById('chkCaptureMode');
@@ -1559,7 +1802,7 @@ function setupOTLogControls() {
       }
       
       updateLogCounters();
-      if (typeof saveUISetting === 'function') saveUISetting('#uiCaptureMode', e.target.checked);
+      if (typeof saveUISetting === 'function') saveUISetting('ui_capture', e.target.checked);
       console.log(`Capture mode ${captureMode ? 'enabled' : 'disabled'}, max lines: ${maxLogLines.toLocaleString()}`);
     });
   }
@@ -1592,28 +1835,34 @@ function setupOTLogControls() {
   }
   
   // Clear log button
-  document.getElementById('btnClearLog').addEventListener('click', function(e) {
-    e.preventDefault();
-    const count = otLogBuffer.length.toLocaleString();
-    if (confirm(`Clear ${count} log entries from memory and browser storage?\n\nThis cannot be undone.`)) {
-      otLogBuffer = [];
-      otLogFilteredBuffer = [];
-      updateLogDisplay();
-      updateLogCounters();
-      // Clear localStorage as well
-      clearStoredData();
-    }
-  });
+  const btnClearLog = document.getElementById('btnClearLog');
+  if (btnClearLog) {
+    btnClearLog.addEventListener('click', function(e) {
+      e.preventDefault();
+      const count = otLogBuffer.length.toLocaleString();
+      if (confirm(`Clear ${count} log entries from memory and browser storage?\n\nThis cannot be undone.`)) {
+        otLogBuffer = [];
+        otLogFilteredBuffer = [];
+        updateLogDisplay();
+        updateLogCounters();
+        // Clear localStorage as well
+        clearStoredData();
+      }
+    });
+  }
   
   // Download log
-  document.getElementById('btnDownloadLog').addEventListener('click', function(e) {
-    e.preventDefault();
-    try {
-      downloadLog(false);
-    } catch (err) {
-      console.error('Failed to download log:', err);
-    }
-  });
+  const btnDownloadLog = document.getElementById('btnDownloadLog');
+  if (btnDownloadLog) {
+    btnDownloadLog.addEventListener('click', function(e) {
+      e.preventDefault();
+      try {
+        downloadLog(false);
+      } catch (err) {
+        console.error('Failed to download log:', err);
+      }
+    });
+  }
 
   // Auto Download Log
   const chkAutoDL = document.getElementById('chkAutoDownloadLog');
@@ -1625,40 +1874,50 @@ function setupOTLogControls() {
   }
   
   // Search functionality
-  document.getElementById('searchLog').addEventListener('input', function(e) {
-    searchTerm = e.target.value;
-    updateFilteredBuffer();
-    updateLogDisplay();
-    updateLogCounters();
-  });
+  const searchLog = document.getElementById('searchLog');
+  if (searchLog) {
+    searchLog.addEventListener('input', function(e) {
+      searchTerm = e.target.value;
+      updateFilteredBuffer();
+      updateLogDisplay();
+      updateLogCounters();
+    });
+  }
   
   // Toggle timestamps
-  document.getElementById('chkShowTimestamp').addEventListener('change', function(e) {
-    showTimestamps = e.target.checked;
-    updateLogDisplay();
-    if (typeof saveUISetting === 'function') saveUISetting('ui_timestamps', e.target.checked);
-  });
+  const chkShowTimestamp = document.getElementById('chkShowTimestamp');
+  if (chkShowTimestamp) {
+    chkShowTimestamp.addEventListener('change', function(e) {
+      showTimestamps = e.target.checked;
+      updateLogDisplay();
+      if (typeof saveUISetting === 'function') saveUISetting('ui_timestamps', e.target.checked);
+    });
+  }
   
   // Manual scroll detection (disable auto-scroll checkbox if user scrolls up)
   let manualScrollTimeout = null;
-  document.getElementById('otLogContent').addEventListener('scroll', function(e) {
-    // Debounce scroll handling to avoid excessive DOM reads/writes
-    if (manualScrollTimeout !== null) {
-      clearTimeout(manualScrollTimeout);
-    }
-    
-    const container = e.target;
-    manualScrollTimeout = setTimeout(function() {
-      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
-      
-      if (!isAtBottom && autoScroll) {
-        // User scrolled up, disable auto-scroll
-        autoScroll = false;
-        const chk = document.getElementById('chkAutoScroll');
-        if (chk) chk.checked = false;
+  const otLogContent = document.getElementById('otLogContent');
+  if (otLogContent) {
+    otLogContent.addEventListener('scroll', function(e) {
+      // Debounce scroll handling to avoid excessive DOM reads/writes
+      if (manualScrollTimeout !== null) {
+        clearTimeout(manualScrollTimeout);
       }
-    }, 100);
-  });
+      
+      const container = e.target;
+      manualScrollTimeout = setTimeout(function() {
+        const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
+      
+        if (!isAtBottom && autoScroll) {
+          // User scrolled up, disable auto-scroll
+          autoScroll = false;
+          frozenLogStartIndex = lastRenderedStartIndex;
+          const chk = document.getElementById('chkAutoScroll');
+          if (chk) chk.checked = false;
+        }
+      }, 100);
+    });
+  }
   
   // Mark as initialized after all listeners are successfully registered
   otLogControlsInitialized = true;
@@ -1951,78 +2210,13 @@ const escapeHtml = (function() {
 
 //============================================================================  
 function loadUISettings() {
-  console.log("loadUISettings() ..");
-  fetch(APIGW + "v0/settings")
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      return response.json();
-    })
-    .then(json => {
-      let data = json.settings;
-      for (let i in data) {
-        let name = data[i].name;
-        let val = data[i].value;
-        
-        // Map backend settings to UI elements
-        if (name === "#uiAutoScroll") {
-           let newVal = strToBool(val);
-           autoScroll = newVal;
-           const chk = document.getElementById('chkAutoScroll');
-           if (chk) chk.checked = autoScroll;
-        } else if (name === "#uiAutoDownloadLog") {
-           let el = document.getElementById("chkAutoDownloadLog");
-           if(el) {
-             let isChecked = strToBool(val);
-             el.checked = isChecked;
-             toggleAutoDownloadLog(isChecked);
-           }
-        } else if (name === "#uiShowTimestamp") {
-           let el = document.getElementById("chkShowTimestamp");
-           // For this one, we also need to update global variable if needed, 
-           // but the event listener handles it on change. 
-           // Ideally we should trigger the logic.
-           if(el) {
-             el.checked = strToBool(val);
-             showTimestamps = el.checked;
-             updateLogDisplay(); 
-           }
-        } else if (name === "#uiCaptureMode") {
-           let el = document.getElementById("chkCaptureMode");
-           if(el) {
-             el.checked = strToBool(val);
-             captureMode = el.checked;
-             updateDynamicLimits();
-           }
-        } else if (name === "#uiStreamToFile") {
-           // We generally default this to false on reload as we lose the file handle
-           // But if we wanted to persist it we'd need to re-prompt user.
-           // For now, let's just leave it unchecked or respect it? 
-           // Browser security prevents auto-reopen without user gesture usually.
-           // So we skip restoring this one to true.
-        } else if (name === "#uiAutoScreenshot") {
-           let el = document.getElementById("chkAutoScreenshot");
-           if(el) {
-             el.checked = strToBool(val);
-             // Graph might not be loaded yet or needs to be notified
-             if (window.OTGraph) window.OTGraph.toggleAutoScreenshot(el.checked);
-           }
-        } else if (name === "#uiAutoExport") {
-           let el = document.getElementById("chkAutoExport");
-           if(el) {
-             el.checked = strToBool(val);
-             if (window.OTGraph) window.OTGraph.toggleAutoExport(el.checked);
-           }
-        }
-      }
-    })
-    .catch(error => console.error("Error loading UI settings:", error));
+  // Deprecated wrapper kept for compatibility with older call sites.
+  // The canonical loader is loadPersistentUI() using ui_* setting names.
+  loadPersistentUI();
 }
 
 function saveUISetting(field, value) {
-  // Wrapper to ensure we use the backend API
-  // field should start with # if it's a hidden setting
+  // Wrapper to ensure we use the backend API with canonical ui_* setting names.
   console.log("Saving UI Setting [" + field + "] = " + value);
   sendPostSetting(field, value);
 }
@@ -2030,9 +2224,7 @@ function saveUISetting(field, value) {
 //============================================================================  
 function initMainPage() {
   console.log("initMainPage()");
-  
-  loadUISettings();
-  
+
   // Check if we're in flash mode (from sessionStorage)
   try {
     if (sessionStorage.getItem('flashMode') === 'true') {
@@ -2120,17 +2312,33 @@ function initMainPage() {
       OTGraph.init();
   }
 
+  function startMainPage() {
+    if (window.location.hash == "#tabPICflash") {
+      firmwarePage();
+    } else {
+      showMainPage();
+    }
+  }
+
+  // Fetch Dallas sensor labels on page load before initial render
+  fetchDallasLabels()
+    .then(function() {
+      console.log('Dallas labels cache initialized');
+    })
+    .catch(function() {
+      console.warn('Dallas labels cache init failed, continuing');
+    })
+    .then(function() {
+      startMainPage();
+    });
+
   // Start time updates if not in flash mode
   if (!flashModeActive && !timeupdate) {
     refreshDevTime();
-    timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+    timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
   }
 
-  if (window.location.hash == "#tabPICflash") {
-    firmwarePage();
-  } else {
-    showMainPage();
-  }
+  // startMainPage() is called after labels are loaded (or failed)
 } // initMainPage()
 
 function showMainPage() {
@@ -2221,10 +2429,44 @@ function setVisible(className, visible) {
   );
 }
 
+function renderBottomMessage() {
+  const msgEl = document.getElementById('message');
+  if (!msgEl) return;
+
+  let msgText = (typeof statusMessageText === 'string') ? statusMessageText : '';
+
+  if (isPSmode) {
+    msgText = 'PS=1 mode; No UI updates.';
+  } else {
+    if (typeof msgText === 'string' && msgText.toLowerCase().startsWith('sensorsimulation')) {
+      // Ignore stray summary field text when PS mode is not active.
+      msgText = '';
+    }
+    if (sensorSimulationActive) {
+      msgText = msgText ? (msgText + ' | Sensor simulation active.') : 'Sensor simulation active.';
+    }
+  }
+
+  msgEl.textContent = msgText;
+  if (isPSmode) msgEl.classList.add('ps-mode-watermark');
+  else msgEl.classList.remove('ps-mode-watermark');
+
+  // Add warning class if message contains version mismatch warning
+  if (!isPSmode && (msgText.toLowerCase().includes('littlefs') ||
+      msgText.toLowerCase().includes('version') ||
+      msgText.toLowerCase().includes('flash your'))) {
+    msgEl.classList.add('version-warning');
+  } else {
+    msgEl.classList.remove('version-warning');
+  }
+
+  msgEl.style.display = (msgText === '') ? 'none' : 'block';
+}
+
 //============================================================================  
 function refreshDevTime() {
-  //console.log("Refresh api/v0/devtime ..");
-  fetch(APIGW + "v0/devtime")
+  //console.log("Refresh api/v2/device/time ..");
+  fetch(APIGW + "v2/device/time")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2233,36 +2475,24 @@ function refreshDevTime() {
     })
     .then(json => {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
-      for (let i in json.devtime) {
-        if (json.devtime[i].name == "dateTime") {
-          //console.log("Got new time ["+json.devtime[i].value+"]");
-          const timeEl = document.getElementById('theTime');
-          if (timeEl) timeEl.textContent = json.devtime[i].value;
-        }
-        if (json.devtime[i].name == "message") {
-          const msgEl = document.getElementById('message');
-          if (msgEl) {
-            const msgText = json.devtime[i].value || '';
-            msgEl.textContent = msgText;
-            
-            // Add warning class if message contains version mismatch warning
-            if (msgText.toLowerCase().includes('littlefs') || 
-                msgText.toLowerCase().includes('version') ||
-                msgText.toLowerCase().includes('flash your')) {
-              msgEl.classList.add('version-warning');
-            } else {
-              msgEl.classList.remove('version-warning');
-            }
-            
-            // Hide element if no message
-            if (msgText === '') {
-              msgEl.style.display = 'none';
-            } else {
-              msgEl.style.display = 'block';
-            }
-          }
+      const devtime = json.devtime || {};
+      const hasPsmode = (devtime.psmode !== undefined);
+      const newPSmode = hasPsmode ? (devtime.psmode === true || devtime.psmode === 'true') : isPSmode;
+      
+      if (devtime.dateTime) {
+        const timeEl = document.getElementById('theTime');
+        if (timeEl) timeEl.textContent = devtime.dateTime;
+      }
+      statusMessageText = devtime.message || '';
+      
+      if (hasPsmode) {
+        if (newPSmode !== isPSmode) {
+          isPSmode = newPSmode;
+          console.log('[PS mode] PS=1 mode changed to: ' + isPSmode);
+          applyPSmodeState();
         }
       }
+      renderBottomMessage();
     })
     .catch(function (error) {
       var p = document.createElement('p');
@@ -2272,16 +2502,50 @@ function refreshDevTime() {
     });
 
 } // refreshDevTime()
+
+//============================================================================
+// Apply PS=1 mode state to the UI
+// When PS=1 is active: hide the OT log section (like smartphone mode),
+// disconnect the WebSocket, and stop OT monitor polling to reduce device load.
+function applyPSmodeState() {
+  if (isPSmode) {
+    console.log('[PS mode] Entering PS=1 mode - disabling OT monitor and WebSocket');
+    // Hide the OT log section (same as smartphone mode)
+    var logSection = document.getElementById('otLogSection');
+    if (logSection) {
+      logSection.classList.add('hidden');
+    }
+    // Disconnect WebSocket
+    disconnectOTLogWebSocket();
+    // Stop OT monitor polling
+    if (tid) {
+      clearInterval(tid);
+      tid = 0;
+    }
+  } else {
+    console.log('[PS mode] Exiting PS=1 mode - re-enabling OT monitor and WebSocket');
+    // Re-evaluate display state (may still be disabled by smartphone/proxy/screen size)
+    updateOTLogResponsiveState();
+    // Restart OT monitor polling if on main page
+    if (document.getElementById('displayMainPage') &&
+        document.getElementById('displayMainPage').classList.contains('active')) {
+      if (!tid) {
+        tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+      }
+    }
+  }
+} // applyPSmodeState()
+
 //============================================================================      
 // Global variable to store available firmware files info
 let availableFirmwareFiles = [];
 
 function refreshFirmware() {
-  console.log("refreshFirmware() .. " + APIGW + "firmwarefilelist");
+  console.log("refreshFirmware() .. " + APIGW + "v2/firmware/files");
   
   let picInfo = { type: "Unknown", version: "Unknown", available: "Unknown", device: "Unknown" };
 
-  fetch(APIGW + "v0/devinfo")
+  fetch(APIGW + "v2/device/info")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2289,16 +2553,14 @@ function refreshFirmware() {
       return response.json();
     })
     .then(json => {
-       if (json.devinfo) {
-         const data = json.devinfo;
-         for (let i in data) {
-           if (data[i].name === "picfwtype") picInfo.type = data[i].value;
-           if (data[i].name === "picfwversion") picInfo.version = data[i].value;
-           if (data[i].name === "picavailable") picInfo.available = data[i].value;
-           if (data[i].name === "picdeviceid") picInfo.device = data[i].value;
-         }
+       if (json.device) {
+         const d = json.device;
+         if (d.picfwtype !== undefined) picInfo.type = d.picfwtype;
+         if (d.picfwversion !== undefined) picInfo.version = d.picfwversion;
+         if (d.picavailable !== undefined) picInfo.available = String(d.picavailable);
+         if (d.picdeviceid !== undefined) picInfo.device = d.picdeviceid;
        }
-       return fetch(APIGW + "firmwarefilelist");
+       return fetch(APIGW + "v2/firmware/files");
     })
     .then(response => {
       if (!response.ok) {
@@ -2478,7 +2740,7 @@ function refreshFirmware() {
 function refreshDevInfo() {
   const devNameEl = document.getElementById('devName');
   if (devNameEl) devNameEl.textContent = "";
-  fetch(APIGW + "v0/devinfo")
+  fetch(APIGW + "v2/device/info")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2487,19 +2749,12 @@ function refreshDevInfo() {
     })
     .then(json => {
       console.log("parsed .., data is [" + JSON.stringify(json) + "]");
-      data = json.devinfo;
-      let hostname = "";
-      let ipaddress = "";
-      let version = "";
-      for (let i in data) {
-        if (data[i].name == "fwversion") {
-          version = data[i].value;
-        } else if (data[i].name == 'hostname') {
-          hostname = data[i].value;
-        } else if (data[i].name == 'ipaddress') {
-          ipaddress = data[i].value;
-        }
-      }
+      const device = json.device || {};
+      const hostname = device.hostname || "";
+      const ipaddress = device.ipaddress || "";
+      const version = device.fwversion || "";
+
+      applyParsedGatewayMode(parseGatewayModeValue(device.otgwmode));
 
       const versionEl = document.getElementById('devVersion');
       if (versionEl) versionEl.textContent = version;
@@ -2514,12 +2769,15 @@ function refreshDevInfo() {
       p.appendChild(
         document.createTextNode('Error: ' + error.message)
       );
+      if (!gatewayModeLastKnown) {
+        updateGatewayModeIndicator('unavailable');
+      }
     });
 } // refreshDevInfo()
 
 //============================================================================  
 function refreshOTmonitor() {
-  if (flashModeActive || !isPageVisible()) return;
+  if (flashModeActive || !isPageVisible() || isPSmode) return;
 
   data = {};
   fetch(APIGW + "v2/otgw/otmonitor")  //api/v2/otgw/otmonitor
@@ -2533,6 +2791,57 @@ function refreshOTmonitor() {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
       data = json.otmonitor;
 
+      // React to Dallas sensor simulation toggle to refresh labels on demand
+      var simState = null;
+      if (data && data.sensorsimulation && typeof data.sensorsimulation.value !== 'undefined') {
+        simState = data.sensorsimulation.value;
+      }
+
+      if (typeof simState === 'string') {
+        simState = (simState.toLowerCase() === 'true' || simState.toLowerCase() === 'on');
+      }
+
+      if (simState === true && lastSensorSimulationState !== true) {
+        fetchDallasLabels()
+          .then(function() {
+            if (typeof OTGraph !== 'undefined' && OTGraph) {
+              if (typeof OTGraph.refreshSensorLabels === 'function') {
+                OTGraph.refreshSensorLabels(dallasLabelsCache);
+              }
+              if (typeof OTGraph.detectAndRegisterSensors === 'function') {
+                OTGraph.detectAndRegisterSensors(data);
+              }
+              if (typeof OTGraph.updateChart === 'function') {
+                if (graphRedrawTimer) {
+                  clearTimeout(graphRedrawTimer);
+                }
+                graphRedrawTimer = setTimeout(function() {
+                  OTGraph.updateChart();
+                  graphRedrawTimer = null;
+                }, 250);
+              }
+            }
+          });
+      }
+
+      if (typeof simState === 'boolean') {
+        const simChanged = (sensorSimulationActive !== simState);
+        sensorSimulationActive = simState;
+        lastSensorSimulationState = simState;
+        if (simChanged) renderBottomMessage();
+      }
+
+      // Detect and register temperature sensors for the graph
+      if (typeof OTGraph !== 'undefined' && OTGraph.running) {
+        OTGraph.detectAndRegisterSensors(data);
+        if (dallasLabelsCache && Object.keys(dallasLabelsCache).length > 0 &&
+            typeof OTGraph.refreshSensorLabels === 'function') {
+          OTGraph.refreshSensorLabels(dallasLabelsCache);
+        }
+        // Process sensor data with current timestamp
+        OTGraph.processSensorData(data, new Date());
+      }
+
       let otMonPage = document.getElementById('mainPage');
       let otMonTable = document.querySelector(".otmontable");
       
@@ -2545,64 +2854,99 @@ function refreshOTmonitor() {
       }
 
       for (let i in data) {
-        // Support for new Map-based JSON (less redundant):
-        // If data is an object map, 'i' is the key (name).
-        // If data is an array, 'i' is the index, and data[i] has a 'name' property.
-        if (!data[i].name) data[i].name = i;
+        // Map-based JSON: 'i' is the key (name), data[i] is the entry object
+        const entry = data[i];
+        if (!entry || typeof entry !== 'object') continue;
+        if (!entry.name) entry.name = i;
+
+        // Hide debug-only sensor simulation line from the main data table (map and array formats).
+        if (i === 'sensorsimulation' || entry.name === 'sensorsimulation') {
+          continue;
+        }
 
         //console.log("["+data[i].name+"]=>["+data[i].value+"]");
 
-        if ((document.getElementById("otmon_" + data[i].name)) == null) { // if element does not exists yet, then build page
+        if ((document.getElementById("otmon_" + entry.name)) == null) { // if element does not exists yet, then build page
           var rowDiv = document.createElement("div");
           rowDiv.setAttribute("class", "otmonrow");
           //rowDiv.setAttribute("id", "otmon_"+data[i].name);
           // rowDiv.style.background = "lightblue";
-          if (data[i].epoch == 0) rowDiv.classList.add('hidden-row');
+          if (entry.epoch == 0) rowDiv.classList.add('hidden-row');
           var epoch = document.createElement("INPUT");
           epoch.setAttribute("type", "hidden");
-          epoch.setAttribute("id", "otmon_epoch_" + data[i].name);
-          epoch.name = data[i].name;
-          epoch.value = data[i].epoch;
+          epoch.setAttribute("id", "otmon_epoch_" + entry.name);
+          epoch.name = entry.name;
+          epoch.value = entry.epoch;
           rowDiv.appendChild(epoch);
           //--- field Name ---
           var fldDiv = document.createElement("div");
           fldDiv.setAttribute("class", "otmoncolumn1");
-          fldDiv.textContent = translateToHuman(data[i].name);
+          
+          var displayName;
+          if (isDallasAddress(entry)) {
+            displayName = entry.name;
+            // Check for custom label in cache
+            if (dallasLabelsCache[entry.name]) {
+              displayName = dallasLabelsCache[entry.name];
+            }
+            
+            // Add click handler to allow editing label
+            fldDiv.classList.add('editable-label');
+            fldDiv.title = 'Click to edit label (Address: ' + entry.name + ')';
+            fldDiv.onclick = (function(addr, node) {
+              return function(evt) { openInlineSensorLabelEditor(addr, node, evt); };
+            })(entry.name, fldDiv);
+
+            // Create label text and edit icon
+            var labelText = document.createElement('span');
+            labelText.setAttribute('class', 'sensor-label-text');
+            labelText.textContent = displayName;
+            fldDiv.appendChild(labelText);
+
+            var editIcon = document.createElement('span');
+            editIcon.setAttribute('class', 'sensor-edit-icon');
+            editIcon.textContent = ' ✏️';
+            fldDiv.appendChild(editIcon);
+          } else {
+            displayName = translateToHuman(entry.name);
+            fldDiv.textContent = displayName;
+          }
+          
           rowDiv.appendChild(fldDiv);
           //--- Value ---
           var valDiv = document.createElement("div");
           valDiv.setAttribute("class", "otmoncolumn2");
-          valDiv.setAttribute("id", "otmon_" + data[i].name);
-          if (data[i].value === "On") valDiv.innerHTML = "<span class='state-on'></span>";
-          else if (data[i].value === "Off") valDiv.innerHTML = "<span class='state-off'></span>";
-          else valDiv.textContent = data[i].value;
+          valDiv.setAttribute("id", "otmon_" + entry.name);
+          if (entry.value === "On") valDiv.innerHTML = "<span class='state-on'></span>";
+          else if (entry.value === "Off") valDiv.innerHTML = "<span class='state-off'></span>";
+          else valDiv.textContent = entry.value;
           rowDiv.appendChild(valDiv);
           //--- Unit  ---
           var unitDiv = document.createElement("div");
           unitDiv.setAttribute("class", "otmoncolumn3");
-          unitDiv.textContent = data[i].unit;
+          unitDiv.textContent = entry.unit;
           rowDiv.appendChild(unitDiv);
           otMonTable.appendChild(rowDiv);
         }
         else { //if the element exists, then update the value
-          var update = document.getElementById("otmon_" + data[i].name);
+          var update = document.getElementById("otmon_" + entry.name);
           if (update.parentNode) {
-            if (data[i].epoch == 0) {
+            if (entry.epoch == 0) {
               update.parentNode.classList.add('hidden-row');
             } else {
               update.parentNode.classList.remove('hidden-row');
             }
           }
-          var epoch = document.getElementById("otmon_epoch_" + data[i].name);
+          var epoch = document.getElementById("otmon_epoch_" + entry.name);
           // if ((Number(epoch.value)==0) && (Number(data[i].epoch)>0)) {
           //   //console.log ("unhide based on epoch");
           //   //setTimeout(function () { update.style.visibility = 'visible';}, 0);
           //   needReload = true;
           // } 
-          epoch.value = data[i].epoch;
-          if (data[i].value === "On") update.innerHTML = "<span class='state-on'></span>";
-          else if (data[i].value === "Off") update.innerHTML = "<span class='state-off'></span>";
-          else update.textContent = data[i].value;
+          epoch.value = entry.epoch;
+          if (entry.value === "On") update.innerHTML = "<span class='state-on'></span>";
+          else if (entry.value === "Off") update.innerHTML = "<span class='state-off'></span>";
+          else update.textContent = entry.value;
           //if (update.style.visibility == 'visible') update.textContent = data[i].value;
 
         }
@@ -2630,7 +2974,7 @@ function refreshDeviceInfo() {
   console.log("refreshDeviceInfo() ..");
 
   data = {};
-  fetch(APIGW + "v0/devinfo")
+  fetch(APIGW + "v2/device/info")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2639,26 +2983,36 @@ function refreshDeviceInfo() {
     })
     .then(json => {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
-      data = json.devinfo;
-      for (let i in data) {
-        console.log("[" + data[i].name + "]=>[" + data[i].value + "]");
+      const device = json.device || {};
+      for (let key in device) {
+        console.log("[" + key + "]=>[" + device[key] + "]");
+        let displayValue = device[key];
+        if (key === 'otgwmode') {
+          const parsedMode = parseGatewayModeValue(device[key]);
+          if (parsedMode === 'gateway') displayValue = 'Gateway';
+          else if (parsedMode === 'monitor') displayValue = 'Monitor';
+          else displayValue = 'Detecting...';
+        }
         var deviceinfoPage = document.getElementById('deviceinfoPage');
-        if ((document.getElementById("devinfo_" + data[i].name)) == null) { // if element does not exists yet, then build page
+        if ((document.getElementById("devinfo_" + key)) == null) { // if element does not exists yet, then build page
           var rowDiv = document.createElement("div");
           rowDiv.setAttribute("class", "devinforow");
-          rowDiv.setAttribute("id", "devinfo_" + data[i].name);
-          // rowDiv.style.background = "lightblue";
+          rowDiv.setAttribute("id", "devinfo_" + key);
           //--- field Name ---
           var fldDiv = document.createElement("div");
           fldDiv.setAttribute("class", "devinfocolumn1");
-          fldDiv.textContent = translateToHuman(data[i].name);
+          fldDiv.textContent = translateToHuman(key);
           rowDiv.appendChild(fldDiv);
           //--- value on screen ---
           var valDiv = document.createElement("div");
           valDiv.setAttribute("class", "devinfocolumn2");
-          valDiv.textContent = data[i].value;
+          valDiv.textContent = displayValue;
           rowDiv.appendChild(valDiv);
           deviceinfoPage.appendChild(rowDiv);
+        } else {
+          const existingRow = document.getElementById("devinfo_" + key);
+          const valueEl = existingRow ? existingRow.querySelector('.devinfocolumn2') : null;
+          if (valueEl) valueEl.textContent = displayValue;
         }
       }
     })
@@ -2685,7 +3039,7 @@ const hiddenSettings = [
 function refreshSettings() {
   console.log("refreshSettings() ..");
   data = {};
-  fetch(APIGW + "v0/settings")
+  fetch(APIGW + "v2/settings")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2826,6 +3180,7 @@ function saveSettings() {
     console.log("InputNr[" + i + "], InputId[" + field + "]");
     const fieldEl = document.getElementById(field);
     if (!fieldEl) continue;
+    var value;
     if (inputs[i].type == "checkbox") {
       value = fieldEl.checked;
     } else {
@@ -2865,7 +3220,7 @@ function sendPostSetting(field, value) {
     mode: "cors"
   };
 
-  fetch(APIGW + "v0/settings", other_params)
+  fetch(APIGW + "v2/settings", other_params)
     .then((response) => {
       //console.log(response.status );    //=> number 100–599
       //console.log(response.statusText); //=> String
@@ -3024,7 +3379,7 @@ var translateFields = [
   , ["ssid", "Wifi Network (SSID)"]
   , ["wifirssi", "Wifi RX Power (dBm)"]
   , ["wifiquality", "Wifi Quality (%)"]
-  , ["wifiqualitytldr", "Wifi Quality"]
+  , ["wifiquality_text", "Wifi Quality"]
   , ["lastreset", "Last Reset Reason"]
   , ["mqttconnected", "MQTT Connected"]
   , ["mqttenable", "MQTT Enable"]
@@ -3056,7 +3411,7 @@ var translateFields = [
   , ["otgwcommands", "Boot Command"]
   , ["thermostatconnected", "Thermostat Connected"]
   , ["boilerconnected", "Boiler Connected"]
-  , ["gatewaymode", "Gateway/Standalone"]
+  , ["otgwmode", "Gateway Mode"]
   , ["otgwconnected", "HA Integration"]
   , ["gpiooutputsenabled", "GPIO Output Enabled"]
   , ["gpiooutputspin", "GPIO pin # to switch on/off"]
@@ -3066,7 +3421,7 @@ var translateFields = [
 
 //============================================================================
 function applyTheme() {
-  fetch(APIGW + "v0/settings")
+  fetch(APIGW + "v2/settings")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -3151,7 +3506,7 @@ function stopFlashPolling() {
 
 function pollFlashStatus() {
     // Use unified endpoint that works for both ESP and PIC flash
-    fetch(APIGW + 'v1/flashstatus')
+    fetch(APIGW + 'v2/flash/status')
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -3198,6 +3553,7 @@ function handleFlashCompletion(filename, error) {
     stopFlashPolling();
     isFlashing = false;
     toggleInteraction(true);
+    clearLogBuffer();
     
     let progressBar = document.getElementById("flashProgressBar");
     let pctText = document.getElementById("flashPercentageText");
@@ -3231,7 +3587,7 @@ function handleFlashCompletion(filename, error) {
     
     // Restart polling
     if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
 }
 
 function handleFlashError(filename, error) {
@@ -3247,7 +3603,7 @@ function handleFlashError(filename, error) {
     
     // Restart polling
     if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
 }
 
 // function pollForReboot() - Removed
@@ -3295,7 +3651,7 @@ function performFlash(filename) {
                 toggleInteraction(true);
                 // Restart polling
                 if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-                if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+                if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
                 return;
              }
 
@@ -3329,7 +3685,7 @@ function performFlash(filename) {
                     
                     // Restart polling on start failure
                     if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-                    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+                    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
                 });
         }
     }, 100);
@@ -3369,7 +3725,8 @@ function handleFlashMessage(data) {
                 stopFlashPolling(); // Stop failsafe polling
                 isFlashing = false;
                 toggleInteraction(true);
-                
+                clearLogBuffer();
+
                 if (progressBar) {
                     progressBar.style.width = "100%";
                     if (progressBar.classList.contains('error')) progressBar.classList.remove('error');
@@ -3398,7 +3755,7 @@ function handleFlashMessage(data) {
                 
                 // Restart polling
                 if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-                if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+                if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
             } else if (msg.state === 'error' || msg.state === 'abort') {
                 // Error or abort
                 stopFlashPolling(); // Stop failsafe polling
@@ -3412,7 +3769,7 @@ function handleFlashMessage(data) {
                 
                 // Restart polling
                 if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-                if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); }, 1000);
+                if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
             }
             
             return true; // It was a flash message
@@ -3709,10 +4066,7 @@ function sortStats(col) {
 
 //============================================================================
 function saveUISetting(field, value) {
-  // UI element settings should be hidden settings, marked by "#" in the API call
-  // Only checkboxes and dropdowns trigger this
-  const apiField = field.startsWith('#') ? field : '#' + field;
-  sendPostSetting(apiField, value);
+  sendPostSetting(field, value);
 }
 window.saveUISetting = saveUISetting;
 
@@ -3746,7 +4100,7 @@ function loadPersistentUI() {
   console.log("Loading persistent UI settings...");
   const apiPath = (typeof APIGW !== 'undefined') ? APIGW : (window.location.protocol + '//' + window.location.host + '/api/');
   
-  fetch(apiPath + "v1/settings")
+  fetch(apiPath + "v2/settings")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -3842,3 +4196,171 @@ function loadPersistentUI() {
     .catch(err => console.error("Error loading persistent settings:", err));
 }
 
+//============================================================================
+// Edit sensor label functionality - inline non-blocking editor
+//============================================================================
+var activeSensorLabelEditor = null;
+
+function openInlineSensorLabelEditor(address, targetNode, evt) {
+  if (!address || !targetNode) return;
+  if (evt) {
+    evt.preventDefault();
+    evt.stopPropagation();
+  }
+
+  closeInlineSensorLabelEditor();
+
+  var labelTextNode = targetNode.querySelector('.sensor-label-text');
+  var currentLabel = address;
+  var labelKey = address + '_label';
+  if (dallasLabelsCache && typeof dallasLabelsCache[address] === 'string' && dallasLabelsCache[address].trim() !== '') {
+    currentLabel = dallasLabelsCache[address].trim();
+  } else if (typeof data !== 'undefined' && data[labelKey] && data[labelKey].value) {
+    currentLabel = data[labelKey].value;
+  }
+
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.maxLength = 16;
+  input.className = 'sensor-label-inline-editor';
+  input.value = currentLabel;
+  input.title = 'Enter new label and press Enter to save';
+
+  if (labelTextNode) {
+    targetNode.replaceChild(input, labelTextNode);
+  } else {
+    targetNode.insertBefore(input, targetNode.firstChild);
+  }
+
+  activeSensorLabelEditor = {
+    address: address,
+    container: targetNode,
+    input: input,
+    originalText: currentLabel,
+    saving: false  // Guard flag to prevent duplicate saves
+  };
+
+  input.focus();
+  input.select();
+
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveInlineSensorLabel();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeInlineSensorLabelEditor(true);
+    }
+  });
+
+  input.addEventListener('blur', function() {
+    if (activeSensorLabelEditor && activeSensorLabelEditor.input === input) {
+      // Only save if label changed to avoid unnecessary flash writes
+      var newLabel = input.value.trim() || address;
+      if (newLabel !== activeSensorLabelEditor.originalText) {
+        saveInlineSensorLabel();
+      } else {
+        // Label unchanged, just close the editor
+        closeInlineSensorLabelEditor(true);
+      }
+    }
+  });
+}
+
+function closeInlineSensorLabelEditor(cancelOnly) {
+  if (!activeSensorLabelEditor) return;
+
+  var editor = activeSensorLabelEditor;
+  var container = editor.container;
+  var input = editor.input;
+  var text = cancelOnly ? editor.originalText : (input ? input.value.trim() : editor.originalText);
+  if (!text) text = editor.address;
+
+  var labelText = document.createElement('span');
+  labelText.setAttribute('class', 'sensor-label-text');
+  labelText.textContent = text;
+
+  if (container && input && input.parentNode === container) {
+    container.replaceChild(labelText, input);
+  }
+
+  activeSensorLabelEditor = null;
+}
+
+function saveInlineSensorLabel() {
+  if (!activeSensorLabelEditor) return;
+  
+  var editor = activeSensorLabelEditor;
+  
+  // Guard against duplicate saves (e.g., blur triggered during save)
+  if (editor.saving) return;
+  
+  var input = editor.input;
+  if (!input) {
+    closeInlineSensorLabelEditor(true);
+    return;
+  }
+
+  var newLabel = input.value.trim();
+  if (newLabel.length === 0) {
+    newLabel = editor.address;
+  }
+
+  if (newLabel.length > 16) {
+    newLabel = newLabel.substring(0, 16);
+  }
+
+  // Set saving flag before disabling input
+  editor.saving = true;
+  input.disabled = true;
+
+  // Use bulk labels endpoint with read-modify-write flow
+  var labelsUrl = APIGW + 'v2/sensors/labels';
+
+  fetch(labelsUrl)
+    .then(function (response) {
+      if (!response.ok) {
+        throw new Error('HTTP ' + response.status);
+      }
+      var contentType = response.headers.get('content-type') || '';
+      if (contentType.indexOf('application/json') === -1) {
+        // No JSON body; start from empty labels map
+        return {};
+      }
+      return response.json();
+    })
+    .then(function (labels) {
+      // Modify the label for the current address
+      labels[editor.address] = newLabel;
+
+      // Write all labels back
+      return fetch(labelsUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(labels)
+      });
+    })
+    .then(function(response) {
+      if (!response.ok) {
+        throw new Error('HTTP ' + response.status);
+      }
+      // Success! Update cache and close editor
+      dallasLabelsCache[editor.address] = newLabel;
+      if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.refreshSensorLabels === 'function') {
+        OTGraph.refreshSensorLabels(dallasLabelsCache);
+      }
+      closeInlineSensorLabelEditor();
+      refreshOTmonitor();
+    })
+    .catch(function(error) {
+      console.error('Error updating sensor label:', error);
+      if (input) {
+        input.disabled = false;
+        input.focus();
+        input.select();
+      }
+      editor.saving = false;
+    });
+}

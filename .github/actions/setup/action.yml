@@ -22,6 +22,7 @@ runs:
     - id: clean-arduino-cache
       run: |
         rm -rf ~/.arduino15/packages/ ~/.arduino15/staging
+        rm -rf staging arduino
       shell: bash
     - id: update-arduino-index
       run: |
