@@ -2,7 +2,7 @@
 """
 OpenTherm v4.2 spec-driven audit for OTGW firmware and HA discovery.
 
-Ground truth: specification/OpenTherm-Protocol-Specification-v4.2-message-id-reference.md
+Ground truth: Specification/OpenTherm-Protocol-Specification-v4.2-message-id-reference.md
 
 What this checks:
 - OTmap coverage and direction/type alignment against the v4.2 Markdown spec
@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 
-DEFAULT_SPEC = Path("specification/OpenTherm-Protocol-Specification-v4.2-message-id-reference.md")
+DEFAULT_SPEC = Path("Specification/OpenTherm-Protocol-Specification-v4.2-message-id-reference.md")
 DEFAULT_HEADER = Path("src/OTGW-firmware/OTGW-Core.h")
 DEFAULT_SOURCE = Path("src/OTGW-firmware/OTGW-Core.ino")
 DEFAULT_MQTTHA = Path("src/OTGW-firmware/data/mqttha.cfg")
