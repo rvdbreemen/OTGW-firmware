@@ -71,7 +71,59 @@ bool checkGPIOConflict(int pin, PGM_P caller)
 }
 
 //=======================================================================
-void writeSettings(bool show) 
+// Webhook settings are stored in a separate plain file (/webhook.cfg)
+// to avoid inflating the ArduinoJson document in writeSettings/readSettings.
+// Format: one value per line — enabled, triggerBit, urlON, urlOFF.
+// Uses the global cMsg buffer; no ArduinoJson involved.
+//=======================================================================
+
+// Read one CRLF/LF-terminated line from f into cMsg; null-terminate and strip CR.
+static int readLineToMsg(File &f) {
+  int n = f.readBytesUntil('\n', cMsg, sizeof(cMsg) - 1);
+  cMsg[n] = '\0';
+  if (n > 0 && cMsg[n-1] == '\r') cMsg[--n] = '\0';
+  return n;
+}
+
+void readWebhookSettings() {
+  File file = LittleFS.open(WEBHOOK_SETTINGS_FILE, "r");
+  if (!file) {
+    DebugTf(PSTR("[Webhook] No settings file (%s), using defaults\r\n"), WEBHOOK_SETTINGS_FILE);
+    return; // first boot: keep compiled-in defaults
+  }
+
+  readLineToMsg(file); settingWebhookEnabled   = (cMsg[0] == '1');
+  readLineToMsg(file); settingWebhookTriggerBit = (int8_t)atoi(cMsg);
+  readLineToMsg(file); strlcpy(settingWebhookURLon,  cMsg, sizeof(settingWebhookURLon));
+  readLineToMsg(file); strlcpy(settingWebhookURLoff, cMsg, sizeof(settingWebhookURLoff));
+
+  file.close();
+  DebugTf(PSTR("[Webhook] Settings loaded from %s\r\n"), WEBHOOK_SETTINGS_FILE);
+}
+
+void writeWebhookSettings() {
+  File file = LittleFS.open(WEBHOOK_SETTINGS_FILE, "w");
+  if (!file) {
+    DebugTf(PSTR("[Webhook] Error: open(%s, 'w') FAILED!\r\n"), WEBHOOK_SETTINGS_FILE);
+    return;
+  }
+  snprintf_P(cMsg, sizeof(cMsg), PSTR("%d"), settingWebhookTriggerBit);
+  size_t written = 0;
+  written += file.print(settingWebhookEnabled ? '1' : '0'); written += file.print('\n');
+  written += file.print(cMsg); written += file.print('\n');
+  written += file.print(settingWebhookURLon);  written += file.print('\n');
+  written += file.print(settingWebhookURLoff); written += file.print('\n');
+  file.close();
+  if (written == 0) {
+    DebugTf(PSTR("[Webhook] Warning: no bytes written to %s\r\n"), WEBHOOK_SETTINGS_FILE);
+  } else {
+    DebugTf(PSTR("[Webhook] Settings saved to %s\r\n"), WEBHOOK_SETTINGS_FILE);
+  }
+}
+
+
+//=======================================================================
+void writeSettings(bool show)
 {
 
   //let's use JSON to write the setting file
@@ -87,8 +139,8 @@ void writeSettings(bool show)
 
   DebugT(F("[Settings] State: Serializing settings to JSON... "));
 
-  // Capacity increased to 1792 bytes to accommodate webhook URL settings
-  DynamicJsonDocument doc(1792);
+  // Capacity reduced back to 1536 bytes (webhook URLs now in separate /webhook.cfg)
+  DynamicJsonDocument doc(1536);
   JsonObject root  = doc.to<JsonObject>();
   root[F("hostname")] = settingHostname;
   root[F("MQTTenable")] = settingMQTTenable;
@@ -128,11 +180,8 @@ void writeSettings(bool show)
   root[F("GPIOOUTPUTSenabled")] = settingGPIOOUTPUTSenabled;
   root[F("GPIOOUTPUTSpin")] = settingGPIOOUTPUTSpin;
   root[F("GPIOOUTPUTStriggerBit")] = settingGPIOOUTPUTStriggerBit;
-  root[F("WebhookEnabled")] = settingWebhookEnabled;
-  root[F("WebhookURLon")] = settingWebhookURLon;
-  root[F("WebhookURLoff")] = settingWebhookURLoff;
-  root[F("WebhookTriggerBit")] = settingWebhookTriggerBit;
   // Dallas sensor labels now stored in /dallas_labels.json (not in settings.json)
+  // Webhook settings now stored in /webhook.cfg (streaming, no ArduinoJson)
 
   serializeJsonPretty(root, file);
   if (show) {
@@ -141,7 +190,9 @@ void writeSettings(bool show)
   }
   Debugln(F("\r\n[Settings] State: File write complete, closing file"));
   file.close();
-  DebugTf(PSTR("[Settings] State: Settings saved successfully to %s\r\n"), SETTINGS_FILE);  
+  DebugTf(PSTR("[Settings] State: Settings saved successfully to %s\r\n"), SETTINGS_FILE);
+
+  writeWebhookSettings(); // separate streaming file, no ArduinoJson  
 
 } // writeSettings()
 
@@ -163,8 +214,8 @@ void readSettings(bool show)
 
   // Deserialize the JSON document
   // Use DynamicJsonDocument to eliminate stack overflow risk (moved from stack to heap)
-  // Capacity increased to 1792 bytes to accommodate webhook URL settings
-  DynamicJsonDocument doc(1792);
+  // Capacity reduced back to 1536 bytes (webhook URLs now in separate /webhook.cfg)
+  DynamicJsonDocument doc(1536);
   DeserializationError error = deserializeJson(doc, file);
   if (error)
   {
@@ -243,15 +294,13 @@ void readSettings(bool show)
   settingGPIOOUTPUTSenabled = doc[F("GPIOOUTPUTSenabled")] | settingGPIOOUTPUTSenabled;
   settingGPIOOUTPUTSpin = doc[F("GPIOOUTPUTSpin")] | settingGPIOOUTPUTSpin;
   settingGPIOOUTPUTStriggerBit = doc[F("GPIOOUTPUTStriggerBit")] | settingGPIOOUTPUTStriggerBit;
-  settingWebhookEnabled = doc[F("WebhookEnabled")] | settingWebhookEnabled;
-  strlcpy(settingWebhookURLon, doc[F("WebhookURLon")] | "", sizeof(settingWebhookURLon));
-  strlcpy(settingWebhookURLoff, doc[F("WebhookURLoff")] | "", sizeof(settingWebhookURLoff));
-  settingWebhookTriggerBit = doc[F("WebhookTriggerBit")] | settingWebhookTriggerBit;
-  
+  // Webhook settings now in separate /webhook.cfg (streaming, no ArduinoJson)
   // Dallas sensor labels now stored in /dallas_labels.json (not in settings.json)
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
+
+  readWebhookSettings(); // streaming read, no ArduinoJson
 
   DebugTln(F(" .. done\r\n"));
 
