@@ -2244,7 +2244,11 @@ function initMainPage() {
   Array.from(document.getElementsByClassName('btnSaveSettings')).forEach(
     function (el, idx, arr) {
       el.addEventListener('click', function () {
-        saveSettings();
+        if (document.getElementById("displayWebhookPage").classList.contains('active')) {
+          saveWebhookSettings();
+        } else {
+          saveSettings();
+        }
         toggleHidden('adv_dropdown', true);
         toggleHidden('btnSaveSettings', true);
       });
@@ -2263,6 +2267,15 @@ function initMainPage() {
     function (el, idx, arr) {
       el.addEventListener('click', function () {
         firmwarePage();
+        toggleHidden('adv_dropdown', true);
+        toggleHidden('btnSaveSettings', true);
+      });
+    }
+  );
+  Array.from(document.getElementsByClassName('tabWebhook')).forEach(
+    function (el, idx, arr) {
+      el.addEventListener('click', function () {
+        webhookPage();
         toggleHidden('adv_dropdown', true);
         toggleHidden('btnSaveSettings', true);
       });
@@ -2356,6 +2369,7 @@ function showMainPage() {
   document.getElementById("displaySettingsPage").classList.remove('active');
   document.getElementById("displayDeviceInfo").classList.remove('active');
   document.getElementById("displayPICflash").classList.remove('active');
+  document.getElementById("displayWebhookPage").classList.remove('active');
   
   refreshDevInfo();
   refreshOTmonitor();
@@ -2374,10 +2388,11 @@ function firmwarePage() {
   document.getElementById("displayMainPage").classList.remove('active');
   document.getElementById("displaySettingsPage").classList.remove('active');
   document.getElementById("displayDeviceInfo").classList.remove('active');
+  document.getElementById("displayWebhookPage").classList.remove('active');
   var firmwarePage = document.getElementById("displayPICflash");
   refreshFirmware();
   document.getElementById("displayPICflash").classList.add('active');
-} // deviceinfoPage()
+} // firmwarePage()
 
 function deviceinfoPage() {
   disconnectOTLogWebSocket();
@@ -2386,6 +2401,7 @@ function deviceinfoPage() {
   document.getElementById("displayMainPage").classList.remove('active');
   document.getElementById("displaySettingsPage").classList.remove('active');
   document.getElementById("displayPICflash").classList.remove('active');
+  document.getElementById("displayWebhookPage").classList.remove('active');
   var deviceinfoPage = document.getElementById("deviceinfoPage");
   refreshDeviceInfo();
   document.getElementById("displayDeviceInfo").classList.add('active');
@@ -2399,11 +2415,25 @@ function settingsPage() {
   document.getElementById("displayMainPage").classList.remove('active');
   document.getElementById("displayDeviceInfo").classList.remove('active');
   document.getElementById("displayPICflash").classList.remove('active');
+  document.getElementById("displayWebhookPage").classList.remove('active');
   var settingsPage = document.getElementById("settingsPage");
   refreshSettings();
   document.getElementById("displaySettingsPage").classList.add('active');
 
 } // settingsPage()
+
+function webhookPage() {
+  disconnectOTLogWebSocket();
+  clearInterval(tid);
+  refreshDevTime();
+  document.getElementById("displayMainPage").classList.remove('active');
+  document.getElementById("displayDeviceInfo").classList.remove('active');
+  document.getElementById("displayPICflash").classList.remove('active');
+  document.getElementById("displaySettingsPage").classList.remove('active');
+  refreshWebhookPage();
+  document.getElementById("displayWebhookPage").classList.add('active');
+
+} // webhookPage()
 
 function toggleHidden(className, hideOnly) {
   Array.from(document.getElementsByClassName(className)).forEach(
@@ -3033,7 +3063,11 @@ const hiddenSettings = [
   "ui_autoscreenshot", 
   "ui_autodownloadlog",
   "ui_autoexport",
-  "ui_graphtimewindow"
+  "ui_graphtimewindow",
+  "webhookenable",
+  "webhookurlon",
+  "webhookurloff",
+  "webhooktriggerbit"
 ];
 
 function refreshSettings() {
@@ -3154,39 +3188,6 @@ function refreshSettings() {
         }
       }
       //console.log("-->done..");
-      // Inject webhook test buttons after webhook settings (if present and not already injected)
-      if (document.getElementById("D_webhooktriggerbit") && !document.getElementById("D_webhooktest")) {
-        var settings = document.getElementById('settingsPage');
-        var testDiv = document.createElement("div");
-        testDiv.setAttribute("id", "D_webhooktest");
-        testDiv.setAttribute("class", "settingDiv");
-        var labelDiv = document.createElement("div");
-        labelDiv.className = 'settings-field-container';
-        labelDiv.setAttribute("style", "margin-right: 10px;");
-        labelDiv.textContent = "Test Webhook";
-        testDiv.appendChild(labelDiv);
-        var btnDiv = document.createElement("div");
-        btnDiv.setAttribute("style", "text-align: left;");
-        var btnOn = document.createElement("button");
-        btnOn.setAttribute("type", "button");
-        btnOn.setAttribute("id", "btnWebhookTestOn");
-        btnOn.textContent = "Test ON";
-        btnOn.setAttribute("style", "margin-right: 6px;");
-        btnOn.addEventListener("click", function() { testWebhookUI(true); }, false);
-        var btnOff = document.createElement("button");
-        btnOff.setAttribute("type", "button");
-        btnOff.setAttribute("id", "btnWebhookTestOff");
-        btnOff.textContent = "Test OFF";
-        btnOff.addEventListener("click", function() { testWebhookUI(false); }, false);
-        btnDiv.appendChild(btnOn);
-        btnDiv.appendChild(btnOff);
-        var resultSpan = document.createElement("span");
-        resultSpan.setAttribute("id", "webhookTestResult");
-        resultSpan.setAttribute("style", "margin-left: 10px; font-style: italic;");
-        btnDiv.appendChild(resultSpan);
-        testDiv.appendChild(btnDiv);
-        settings.appendChild(testDiv);
-      }
     })
     .catch(function (error) {
       var p = document.createElement('p');
@@ -3211,13 +3212,154 @@ function testWebhookUI(stateOn) {
       }
       return response.json();
     })
-    .then(function(json) {
+    .then(function() {
       if (resultEl) resultEl.textContent = "Sent (" + (stateOn ? "ON" : "OFF") + ")";
       setTimeout(function() { if (resultEl) resultEl.textContent = ""; }, 3000);
     })
     .catch(function(error) {
       if (resultEl) resultEl.textContent = "Error: " + error.message;
     });
+}
+
+//============================================================================
+function refreshWebhookPage() {
+  var page = document.getElementById("webhookPage");
+  if (!page) return;
+  while (page.firstChild) page.removeChild(page.firstChild);
+
+  fetch(APIGW + "v2/settings")
+    .then(function(response) {
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      return response.json();
+    })
+    .then(function(json) {
+      var wh = {};
+      json.settings.forEach(function(s) {
+        if (s.name === "webhookenable" || s.name === "webhookurlon" ||
+            s.name === "webhookurloff" || s.name === "webhooktriggerbit") {
+          wh[s.name] = s;
+        }
+      });
+
+      var fields = [
+        { key: "webhookenable",    label: "Webhook Enabled",        type: "b" },
+        { key: "webhookurlon",     label: "URL (ON state)",          type: "s", maxlen: 100 },
+        { key: "webhookurloff",    label: "URL (OFF state)",         type: "s", maxlen: 100 },
+        { key: "webhooktriggerbit",label: "Trigger Bit (0-15)",      type: "i", min: 0, max: 15 }
+      ];
+
+      fields.forEach(function(f) {
+        var s = wh[f.key];
+        if (!s) return;
+
+        var rowDiv = document.createElement("div");
+        rowDiv.className = "settingDiv";
+
+        var labelDiv = document.createElement("div");
+        labelDiv.className = "settings-field-container";
+        labelDiv.style.marginRight = "10px";
+        labelDiv.textContent = f.label;
+        rowDiv.appendChild(labelDiv);
+
+        var inputDiv = document.createElement("div");
+        inputDiv.style.textAlign = "left";
+
+        var input = document.createElement("input");
+        input.id = "WH_" + f.key;
+        input.className = "input-normal";
+        if (f.type === "b") {
+          input.type = "checkbox";
+          input.checked = strToBool(s.value);
+        } else if (f.type === "s") {
+          input.type = "text";
+          input.maxLength = f.maxlen || 100;
+          input.size = 20;
+          input.value = s.value;
+        } else {
+          input.type = "number";
+          input.min = f.min;
+          input.max = f.max;
+          input.step = 1;
+          input.value = s.value;
+        }
+        function markChanged() { input.className = "input-changed"; setVisible("btnSaveSettings", true); }
+        input.addEventListener("change", markChanged, false);
+        input.addEventListener("keydown", markChanged, false);
+
+        inputDiv.appendChild(input);
+        rowDiv.appendChild(inputDiv);
+        page.appendChild(rowDiv);
+      });
+
+      // Test Webhook row
+      var testDiv = document.createElement("div");
+      testDiv.className = "settingDiv";
+
+      var testLabelDiv = document.createElement("div");
+      testLabelDiv.className = "settings-field-container";
+      testLabelDiv.style.marginRight = "10px";
+      testLabelDiv.textContent = "Test Webhook";
+      testDiv.appendChild(testLabelDiv);
+
+      var testBtnDiv = document.createElement("div");
+      testBtnDiv.style.textAlign = "left";
+
+      var btnOn = document.createElement("button");
+      btnOn.type = "button";
+      btnOn.textContent = "Test ON";
+      btnOn.style.marginRight = "6px";
+      btnOn.addEventListener("click", function() { testWebhookUI(true); }, false);
+
+      var btnOff = document.createElement("button");
+      btnOff.type = "button";
+      btnOff.textContent = "Test OFF";
+      btnOff.addEventListener("click", function() { testWebhookUI(false); }, false);
+
+      var resultSpan = document.createElement("span");
+      resultSpan.id = "webhookTestResult";
+      resultSpan.style.cssText = "margin-left:10px;font-style:italic;";
+
+      testBtnDiv.appendChild(btnOn);
+      testBtnDiv.appendChild(btnOff);
+      testBtnDiv.appendChild(resultSpan);
+      testDiv.appendChild(testBtnDiv);
+      page.appendChild(testDiv);
+    })
+    .catch(function(error) {
+      var p = document.createElement("p");
+      p.textContent = "Error loading webhook settings: " + error.message;
+      page.appendChild(p);
+    });
+}
+
+//============================================================================
+function saveWebhookSettings() {
+  var fields = ["webhookenable", "webhookurlon", "webhookurloff", "webhooktriggerbit"];
+  var msgEl = document.getElementById("webhookMessage");
+  fields.forEach(function(name) {
+    var el = document.getElementById("WH_" + name);
+    if (!el || el.className !== "input-changed") return;
+    el.className = "input-normal";
+    var value = (el.type === "checkbox") ? String(el.checked) : el.value;
+    var body = JSON.stringify({ "name": name, "value": value });
+    fetch(APIGW + "v2/settings", {
+      headers: { "content-type": "application/json; charset=UTF-8" },
+      body: body,
+      method: "POST",
+      mode: "cors"
+    })
+    .then(function(response) {
+      if (response.ok) {
+        if (msgEl) { msgEl.textContent = "Saved"; setTimeout(function() { if (msgEl) msgEl.textContent = ""; }, 2000); }
+      } else {
+        if (msgEl) msgEl.textContent = "Save failed";
+      }
+    })
+    .catch(function(error) {
+      console.log("webhook save error: " + error.message);
+      if (msgEl) msgEl.textContent = "Save failed: " + error.message;
+    });
+  });
 }
 
 //============================================================================  
