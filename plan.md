@@ -73,10 +73,10 @@ Tracks all tasks from the [REST API Evaluation](docs/reviews/2026-02-16_restful-
   - Routes to existing `apilistfiles()`
 - [x] **T24** Update OpenAPI spec with new v2 endpoints (T18–T23)
 
-## Phase 1C: Frontend Migration (`index.js`) ✅ DONE
+## Phase 1C: Frontend Migration ✅ DONE
 
 > All frontend calls migrated from deprecated v0/v1/unversioned to v2.
-> **Zero v0, v1, or unversioned API calls remain in the frontend.**
+> **Zero v0, v1, or unversioned API calls remain in the frontend (index.js and updateServerHtml.h).**
 
 - [x] **T25** ~~Fix bug: `index.js:347`~~ → directly migrated to v2/device/info (T37)
 - [x] **T26** Migrate `refreshGatewayMode()` — `v0/devinfo` → `v2/device/info` (map format parsing)
@@ -97,6 +97,7 @@ Tracks all tasks from the [REST API Evaluation](docs/reviews/2026-02-16_restful-
 - [x] **T41** Migrate `pollFlashStatus()` — `v1/flashstatus` → `v2/flash/status`
 - [x] **T42** Migrate `loadPersistentUI()` — `v1/settings` → `v2/settings`
 - [x] **T43** Migrate `saveDallasLabel()` — `v1/sensors/labels` → `v2/sensors/labels`
+- [x] **T47** Migrate OTA page (`updateServerHtml.h`) — `v1/health` → `v2/health`, `v1/sensors/labels` → `v2/sensors/labels`
 
 ## Future Improvements (if needed)
 
