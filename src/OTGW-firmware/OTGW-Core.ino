@@ -678,7 +678,8 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
 
 // Returns true if the OT message should be published to MQTT.
 // Publishes immediately when the raw value changed; otherwise publishes once per interval.
-// Index mapping for mqttlastsent/mqttlastvalue[256]:
+// mqttlastsent[idx] is packed: bits 31-16 = last published raw u16, bits 15-0 = seconds-since-boot timestamp.
+// Index mapping for mqttlastsent[256]:
 //   Standard OT IDs (id 0-127): master uses index id, slave uses index id+128.
 //   Non-standard IDs (id 128-255): use index id directly (no master/slave split).
 // This ensures master status updates cannot starve slave status from publishing.
@@ -688,12 +689,13 @@ bool shouldPublishMQTTForID(byte id, byte masterslave) {
   // Non-standard IDs (id >= 128) use their own ID directly (within array bounds).
   uint8_t idx = (id < 128) ? id + (masterslave ? 128 : 0) : id;
   uint16_t newRaw = OTdata.u16();
-  uint32_t now = millis();
-  bool changed = (newRaw != mqttlastvalue[idx]);
-  bool due = ((uint32_t)(now - mqttlastsent[idx]) >= (uint32_t)settingMQTTinterval * 1000UL);
+  uint16_t now_s  = (uint16_t)(millis() / 1000UL);
+  uint16_t lastVal  = (uint16_t)(mqttlastsent[idx] >> 16);
+  uint16_t lastSent = (uint16_t)(mqttlastsent[idx] & 0xFFFF);
+  bool changed = (newRaw != lastVal);
+  bool due = ((uint16_t)(now_s - lastSent) >= (uint16_t)settingMQTTinterval);
   if (changed || due) {
-    mqttlastsent[idx] = now;
-    mqttlastvalue[idx] = newRaw;
+    mqttlastsent[idx] = ((uint32_t)newRaw << 16) | (uint32_t)now_s;
     return true;
   }
   return false;
@@ -705,9 +707,10 @@ bool shouldPublishMQTTForID(byte id, byte masterslave) {
 bool shouldPublishStatusBit(uint8_t bitSlot, bool newVal, bool prevVal) {
   if (settingMQTTinterval == 0) return true;
   bool changed = (newVal != prevVal);
-  bool due = ((uint32_t)(millis() - mqttlastsentstatusbit[bitSlot]) >= (uint32_t)settingMQTTinterval * 1000UL);
+  uint16_t now_s = (uint16_t)(millis() / 1000UL);
+  bool due = ((uint16_t)(now_s - mqttlastsentstatusbit[bitSlot]) >= (uint16_t)settingMQTTinterval);
   if (changed || due) {
-    mqttlastsentstatusbit[bitSlot] = millis();
+    mqttlastsentstatusbit[bitSlot] = now_s;
     return true;
   }
   return false;
