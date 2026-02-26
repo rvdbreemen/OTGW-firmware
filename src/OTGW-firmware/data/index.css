@@ -740,7 +740,12 @@
   gap: 5px;
   font-size: 13px;
   cursor: pointer;
+  -webkit-user-select: none;
   user-select: none;
+}
+
+.log-control-inline {
+  display: inline-flex;
 }
 
 .log-control-label input[type="checkbox"] {
@@ -810,8 +815,6 @@
   white-space: pre;
   line-height: 1.4;
   max-height: inherit;
-  scrollbar-width: thin;
-  scrollbar-color: #555 #1e1e1e;
 }
 
 .ot-log-content::-webkit-scrollbar {
@@ -1060,8 +1063,23 @@ body.disable-interaction {
   display: block;
 }
 
-.otmonrow.hidden-row {
-  display: none !important;
+.otmonrow.no-data-row {
+  opacity: 0.65;
+}
+
+.otmonrow.no-data-row .otmoncolumn2 {
+  font-style: italic;
+}
+
+.otmoncolumn2.no-data-value {
+  color: #5a5a5a;
+  font-style: italic;
+}
+
+.ot-log-mode-notice {
+  margin: 8px 0 12px;
+  font-size: 0.95em;
+  font-style: italic;
 }
 
 .flash-progress-bar {
