@@ -71,6 +71,34 @@ static const char UpdateServerIndex[] PROGMEM =
         html.dark #updateError { color: #ff5555; }
         #retryButton { margin-top: 10px; background-color: #d32f2f; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-weight: bold; }
         #retryButton:hover { background-color: #b71c1c; }
+        #ghSection { margin-top: 16px; padding: 12px; border: 1px solid #c7d7ea; border-radius: 6px; background: #f8fbff; }
+        html.dark #ghSection { border-color: #555; background: #2b2b2b; }
+        #ghSection h2 { margin: 0 0 8px; font-size: 1.1em; }
+        #ghCurrentVersion { margin: 4px 0 10px; font-size: 13px; color: #555; }
+        html.dark #ghCurrentVersion { color: #aaa; }
+        #ghCheckBtn { padding: 8px 16px; background: #5a67d8; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: 700; }
+        #ghCheckBtn:hover:not(:disabled) { background: #4c51bf; }
+        #ghCheckBtn:disabled { background: #9aa7b5; cursor: not-allowed; }
+        #ghStatus { margin: 8px 0; font-size: 13px; color: #555; min-height: 18px; }
+        html.dark #ghStatus { color: #aaa; }
+        .gh-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        .gh-table th { text-align: left; padding: 5px 8px; background: #e8f0fe; border-bottom: 2px solid #c7d7ea; }
+        html.dark .gh-table th { background: #3a3a3a; border-bottom-color: #555; color: #ddd; }
+        .gh-table td { padding: 5px 8px; border-bottom: 1px solid #e0e8f0; vertical-align: middle; }
+        html.dark .gh-table td { border-bottom-color: #444; color: #ddd; }
+        .gh-current-row td { background: #f0fff4; }
+        html.dark .gh-current-row td { background: #1a3a2a; }
+        .gh-badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 11px; font-weight: 700; margin-left: 4px; vertical-align: middle; }
+        .gh-badge.installed { background: #38a169; color: #fff; }
+        .gh-badge.update { background: #3182ce; color: #fff; }
+        .gh-btn { padding: 4px 10px; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 700; }
+        .gh-btn.fw { background: #0a74da; }
+        .gh-btn.fw:hover { background: #0864ba; }
+        .gh-btn.fs { background: #2e9d57; }
+        .gh-btn.fs:hover { background: #27854a; }
+        .gh-btn.rb { background: #dd6b20; }
+        .gh-btn.rb:hover { background: #c05621; }
+        .gh-na { color: #aaa; font-size: 12px; }
      </style>
      </head>
      <body>
@@ -99,6 +127,13 @@ static const char UpdateServerIndex[] PROGMEM =
         <br/>Backup your files first to your local filesystem (using FSexplorer) 
         and upload them after the flashing of your LittleFS.
         <hr>
+         <div id='ghSection'>
+           <h2>Update from GitHub</h2>
+           <div id='ghCurrentVersion'>Installed version: detecting...</div>
+           <button id='ghCheckBtn' onclick='loadReleases()'>Check for Updates</button>
+           <div id='ghStatus'></div>
+           <div id='ghList' style='display:none'></div>
+         </div>
      </div>
      <div id='pageProgress'>
        <h1>OTGW firmware Flash utility</h1>
@@ -395,6 +430,278 @@ static const char UpdateServerIndex[] PROGMEM =
          
          initUploadForm('fwForm', 'flash');
          initUploadForm('fsForm', 'filesystem');
+
+         // === GitHub Releases: one-click OTA from GitHub ===
+         var ghReleases = null;
+         var currentVersion = '';
+
+         // Auto-detect installed firmware version
+         fetch('/api/v2/device/info', { cache: 'no-store' })
+           .then(function(r) { return r.ok ? r.json() : null; })
+           .then(function(data) {
+             if (data && data.device && data.device.fwversion) {
+               currentVersion = data.device.fwversion;
+               var el = document.getElementById('ghCurrentVersion');
+               if (el) el.textContent = 'Installed: ' + currentVersion;
+             }
+           })
+           .catch(function() {});
+
+         function parseVersion(v) {
+           if (!v) {
+             return { nums: [0], pre: [] };
+           }
+           // Strip build metadata (+...) per SemVer
+           var plusIdx = v.indexOf('+');
+           if (plusIdx >= 0) {
+             v = v.substring(0, plusIdx);
+           }
+           // Split main version and prerelease (-...)
+           var main = v;
+           var pre = [];
+           var dashIdx = v.indexOf('-');
+           if (dashIdx >= 0) {
+             main = v.substring(0, dashIdx);
+             var preStr = v.substring(dashIdx + 1);
+             if (preStr) {
+               pre = preStr.split('.');
+             }
+           }
+           var parts = main.split('.');
+           var nums = [];
+           for (var i = 0; i < parts.length; i++) {
+             var n = parseInt(parts[i], 10);
+             nums.push(isNaN(n) ? 0 : n);
+           }
+           return { nums: nums, pre: pre };
+         }
+
+         function versionLt(a, b) {
+           var va = parseVersion(a);
+           var vb = parseVersion(b);
+
+           // Compare main numeric parts
+           var len = Math.max(va.nums.length, vb.nums.length);
+           for (var i = 0; i < len; i++) {
+             var na = (i < va.nums.length) ? va.nums[i] : 0;
+             var nb = (i < vb.nums.length) ? vb.nums[i] : 0;
+             if (na < nb) return true;
+             if (na > nb) return false;
+           }
+
+           // Main versions equal: handle prerelease according to SemVer
+           var aHasPre = va.pre.length > 0;
+           var bHasPre = vb.pre.length > 0;
+
+           if (!aHasPre && bHasPre) {
+             // Normal version is greater than prerelease
+             return false;
+           }
+           if (aHasPre && !bHasPre) {
+             // Prerelease is less than normal version
+             return true;
+           }
+           if (!aHasPre && !bHasPre) {
+             // Completely equal
+             return false;
+           }
+
+           // Both have prerelease: compare identifiers
+           var preLen = Math.max(va.pre.length, vb.pre.length);
+           for (var j = 0; j < preLen; j++) {
+             var ida = va.pre[j];
+             var idb = vb.pre[j];
+
+             if (typeof ida === 'undefined' && typeof idb === 'undefined') {
+               break;
+             }
+             if (typeof ida === 'undefined') {
+               // a has fewer identifiers => lower precedence
+               return true;
+             }
+             if (typeof idb === 'undefined') {
+               return false;
+             }
+
+             var reNum = /^[0-9]+$/;
+             var aIsNum = reNum.test(ida);
+             var bIsNum = reNum.test(idb);
+
+             if (aIsNum && bIsNum) {
+               var ia = parseInt(ida, 10);
+               var ib = parseInt(idb, 10);
+               if (ia < ib) return true;
+               if (ia > ib) return false;
+             } else if (aIsNum && !bIsNum) {
+               // Numeric identifiers have lower precedence than non-numeric
+               return true;
+             } else if (!aIsNum && bIsNum) {
+               return false;
+             } else {
+               if (ida < idb) return true;
+               if (ida > idb) return false;
+             }
+           }
+           return false;
+         }
+
+         function escHtml(s) {
+           return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+         }
+
+         window.loadReleases = function() {
+           var btn = document.getElementById('ghCheckBtn');
+           var status = document.getElementById('ghStatus');
+           var list = document.getElementById('ghList');
+           if (btn) btn.disabled = true;
+           if (status) status.textContent = 'Fetching releases from GitHub...';
+           if (list) list.style.display = 'none';
+           fetch('https://api.github.com/repos/rvdbreemen/OTGW-firmware/releases?per_page=10', {
+             headers: { 'Accept': 'application/vnd.github.v3+json' }
+           })
+             .then(function(r) {
+               if (!r.ok) throw new Error('GitHub API HTTP ' + r.status);
+               return r.json();
+             })
+             .then(function(releases) {
+               // Exclude draft releases — drafts may have incomplete assets
+               releases = releases.filter(function(r) { return !r.draft; });
+               ghReleases = releases;
+               if (btn) btn.disabled = false;
+               if (status) status.textContent = '';
+               renderReleases(releases);
+             })
+             .catch(function(e) {
+               if (btn) btn.disabled = false;
+               if (status) status.textContent = 'Failed: ' + (e.message || String(e));
+             });
+         };
+
+         function renderReleases(releases) {
+           var list = document.getElementById('ghList');
+           if (!list) return;
+           var coreMatch = currentVersion.match(/^(\d+\.\d+\.\d+)/);
+           var installedCore = coreMatch ? coreMatch[1] : '';
+           if (!releases || releases.length === 0) {
+             list.innerHTML = '<p>No releases found.</p>';
+             list.style.display = 'block';
+             return;
+           }
+           var html = '<table class="gh-table"><thead><tr><th>Release</th><th>Date</th><th>Firmware</th><th>Filesystem</th></tr></thead><tbody>';
+           for (var i = 0; i < releases.length; i++) {
+             var rel = releases[i];
+             var tag = (rel.tag_name || '').replace(/^v/, '');
+             var tagCoreMatch = tag.match(/^(\d+\.\d+\.\d+)/);
+             var tagCore = tagCoreMatch ? tagCoreMatch[1] : tag;
+             var isInstalled = !!(tagCore && installedCore && installedCore === tagCore);
+             var isNewer = !!(tagCore && installedCore && !isInstalled && versionLt(installedCore, tagCore));
+             var isRollback = !!(tagCore && installedCore && !isInstalled && versionLt(tagCore, installedCore));
+             var fwAsset = null, fsAsset = null;
+             for (var j = 0; j < (rel.assets || []).length; j++) {
+               var a = rel.assets[j];
+               if (!fwAsset && a.name && a.name.indexOf('.ino.bin') >= 0) fwAsset = a;
+               if (!fsAsset && a.name && a.name.indexOf('.littlefs.bin') >= 0) fsAsset = a;
+             }
+             var nameHtml = escHtml(rel.name || rel.tag_name || '');
+             if (isInstalled) nameHtml += ' <span class="gh-badge installed">Installed</span>';
+             else if (isNewer) nameHtml += ' <span class="gh-badge update">Update</span>';
+             var date = (rel.published_at || '').substring(0, 10);
+             var fwBtnCls = 'gh-btn fw' + (isRollback ? ' rb' : '');
+             var fwBtnLbl = isRollback ? 'Rollback FW' : 'Flash FW';
+             var fwBtn = fwAsset
+               ? '<button class="' + fwBtnCls + '" onclick="ghFlash(' + i + ',true);">' + fwBtnLbl + '</button>'
+               : '<span class="gh-na">N/A</span>';
+             var fsBtn = fsAsset
+               ? '<button class="gh-btn fs" onclick="ghFlash(' + i + ',false);">Flash FS</button>'
+               : '<span class="gh-na">N/A</span>';
+             html += '<tr' + (isInstalled ? ' class="gh-current-row"' : '') + '><td>' + nameHtml + '</td><td>' + escHtml(date) + '</td><td>' + fwBtn + '</td><td>' + fsBtn + '</td></tr>';
+           }
+           html += '</tbody></table>';
+           list.innerHTML = html;
+           list.style.display = 'block';
+         }
+
+         window.ghFlash = function(idx, isFirmware) {
+           if (!ghReleases || idx >= ghReleases.length) return;
+           var rel = ghReleases[idx];
+           var asset = null;
+           for (var j = 0; j < (rel.assets || []).length; j++) {
+             var a = rel.assets[j];
+             if (isFirmware && a.name && a.name.indexOf('.ino.bin') >= 0) { asset = a; break; }
+             if (!isFirmware && a.name && a.name.indexOf('.littlefs.bin') >= 0) { asset = a; break; }
+           }
+           if (!asset) { alert('Asset not found in this release.'); return; }
+           if (!isFirmware) {
+             if (!confirm('WARNING: Flashing filesystem (LittleFS) will erase all files including settings!\nBackup first using the checkboxes above. Continue?')) return;
+           }
+           var downloadUrl = asset.browser_download_url;
+           var filename = asset.name;
+           var targetLabel = (isFirmware ? 'flash' : 'filesystem') + ' (GitHub ' + (rel.tag_name || '') + ')';
+           showProgressPage();
+           if (fileEl) fileEl.textContent = filename;
+           if (targetEl) targetEl.textContent = targetLabel;
+           progressBar.style.width = '0%';
+           progressText.textContent = 'Downloading from GitHub...';
+           errorEl.textContent = '';
+           retryBtn.style.display = 'none';
+           fetch(downloadUrl)
+             .then(function(r) {
+               if (!r.ok) throw new Error('Download failed: HTTP ' + r.status);
+               return r.blob();
+             })
+             .then(function(blob) {
+               progressBar.style.width = '10%';
+               progressText.textContent = 'Uploading to device...';
+               var action = (isFirmware ? '/update?cmd=0' : '/update?cmd=100') + '&size=' + blob.size;
+               var fd = new FormData();
+               fd.append(isFirmware ? 'firmware' : 'filesystem', blob, filename);
+               var xhr = new XMLHttpRequest();
+               xhr.open('POST', action, true);
+               xhr.timeout = 300000;
+               xhr.upload.onprogress = function(ev) {
+                 if (ev.lengthComputable) {
+                   var pct = Math.round((ev.loaded / ev.total) * 100);
+                   if (pct > 100) pct = 100;
+                   progressBar.style.width = pct + '%';
+                   progressText.textContent = 'Uploading: ' + pct + '% (' + formatBytes(ev.loaded) + ' / ' + formatBytes(ev.total) + ')';
+                 }
+               };
+               xhr.onload = function() {
+                 if (xhr.status >= 200 && xhr.status < 300) {
+                   var resp = xhr.responseText || '';
+                   if (resp.indexOf('Flash error') !== -1) {
+                     progressText.textContent = 'Flash error';
+                     errorEl.textContent = resp;
+                     retryBtn.style.display = 'block';
+                   } else {
+                     progressBar.style.width = '100%';
+                     progressText.textContent = 'Flash complete! Device rebooting...';
+                     waitForDeviceReboot();
+                   }
+                 } else {
+                   progressText.textContent = 'Upload failed';
+                   errorEl.textContent = 'Upload failed: HTTP ' + xhr.status;
+                   retryBtn.style.display = 'block';
+                 }
+               };
+               xhr.ontimeout = function() {
+                 progressText.textContent = 'Upload timeout';
+                 errorEl.textContent = 'Timeout. Flash may still be in progress. Wait 60s and check manually.';
+                 retryBtn.style.display = 'block';
+               };
+               xhr.onerror = function() {
+                 progressText.textContent = 'Upload error';
+                 errorEl.textContent = 'Connection lost during upload.';
+                 retryBtn.style.display = 'block';
+               };
+               xhr.send(fd);
+             })
+             .catch(function(e) {
+               progressText.textContent = 'Download failed';
+               errorEl.textContent = 'Cannot download from GitHub: ' + (e.message || String(e)) + ' — try manual upload instead.';
+               retryBtn.style.display = 'block';
+             });
+         };
        })();
      </script>
      </html>)";
