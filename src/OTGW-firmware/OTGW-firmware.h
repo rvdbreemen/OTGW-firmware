@@ -50,7 +50,6 @@ void setLed(int8_t, uint8_t);
 //Defaults and macro definitions
 #define _HOSTNAME       "OTGW"
 #define SETTINGS_FILE         "/settings.ini"
-#define WEBHOOK_SETTINGS_FILE "/webhook.cfg"
 #define NTP_DEFAULT_TIMEZONE "Europe/Amsterdam"
 #define NTP_HOST_DEFAULT "pool.ntp.org"
 #define NTP_RESYNC_TIME 1800 //seconds = every 30 minutes
