@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index_dark.css
-**  Version  : v1.2.0-beta
+**  Version  : v1.3.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -748,6 +748,43 @@
 
 .log-control-label input[type="checkbox"] {
   cursor: pointer;
+}
+
+/* Command Input Bar */
+.ot-cmd-bar {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.ot-cmd-input {
+  flex: 0 1 34ch;
+  width: 34ch;
+  max-width: 420px;
+  min-width: 220px;
+  padding: 6px 12px;
+  border: 1px solid #444;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: 'Courier New', Consolas, monospace;
+  background-color: #2c2c2e;
+  color: #e0e0e0;
+}
+
+.ot-cmd-status {
+  font-size: 12px;
+  min-width: 100px;
+  color: #e0e0e0;
+}
+
+.ot-cmd-ok {
+  color: #4caf50;
+}
+
+.ot-cmd-error {
+  color: #f44336;
 }
 
 /* Log Container */
