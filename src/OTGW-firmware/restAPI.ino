@@ -571,26 +571,29 @@ void processAPI()
 
 
 //====[ implementing REST API ]====
+static void buildOTGWValueResponse(uint_fast8_t msgid, char *out, size_t outSize) {
+  PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
+  if (OTlookupitem.type==ot_undef) {  //message is undefined, return error
+    strlcpy(out, "{\"error\":\"message undefined: reserved for future use\"}", outSize);
+    return;
+  }
+
+  RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
+  if (OTlookupitem.type == ot_f88) {
+    snprintf_P(out, outSize, PSTR("{\"label\":\"%s\",\"value\":%.3f,\"unit\":\"%s\"}"),
+               OTlookupitem.label, atof(getOTGWValue(msgid)), OTlookupitem.unit);
+  } else {// all other message types convert to integer
+    snprintf_P(out, outSize, PSTR("{\"label\":\"%s\",\"value\":%d,\"unit\":\"%s\"}"),
+               OTlookupitem.label, atoi(getOTGWValue(msgid)), OTlookupitem.unit);
+  }
+}
+
 void sendOTGWvalue(int msgid){
   char sBuff[JSON_ENTRY_BUF];
   if (msgid < 0 || msgid > OT_MSGID_MAX) {
     strlcpy(sBuff, "{\"error\":\"message id: out of range\"}", sizeof(sBuff));
   } else {
-    PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
-    if (OTlookupitem.type==ot_undef) {  //message is undefined, return error
-      strlcpy(sBuff, "{\"error\":\"message undefined: reserved for future use\"}", sizeof(sBuff));
-    } else 
-    { //message id's need to be between 0 and OT_MSGID_MAX
-      //Debug print the values first
-      RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
-      if (OTlookupitem.type == ot_f88) {
-        snprintf_P(sBuff, sizeof(sBuff), PSTR("{\"label\":\"%s\",\"value\":%.3f,\"unit\":\"%s\"}"),
-                   OTlookupitem.label, atof(getOTGWValue(msgid)), OTlookupitem.unit);
-      } else {// all other message types convert to integer
-        snprintf_P(sBuff, sizeof(sBuff), PSTR("{\"label\":\"%s\",\"value\":%d,\"unit\":\"%s\"}"),
-                   OTlookupitem.label, atoi(getOTGWValue(msgid)), OTlookupitem.unit);
-      }
-    }
+    buildOTGWValueResponse(static_cast<uint_fast8_t>(msgid), sBuff, sizeof(sBuff));
   }
   //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff);
   //reply with json
@@ -607,19 +610,8 @@ void sendOTGWlabel(const char *msglabel){
   }
   if (msgid > OT_MSGID_MAX){
     strlcpy(sBuff, "{\"error\":\"message id: reserved for future use\"}", sizeof(sBuff));
-  } else if (OTlookupitem.type==ot_undef) {  //message is undefined, return error
-    strlcpy(sBuff, "{\"error\":\"message undefined: reserved for future use\"}", sizeof(sBuff));
-  } else 
-  { //message id's need to be between 0 and OT_MSGID_MAX
-    //RESTDebug print the values first
-    RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
-    if (OTlookupitem.type == ot_f88) {
-      snprintf_P(sBuff, sizeof(sBuff), PSTR("{\"label\":\"%s\",\"value\":%.3f,\"unit\":\"%s\"}"),
-                 OTlookupitem.label, atof(getOTGWValue(msgid)), OTlookupitem.unit);
-    } else {// all other message types convert to integer
-      snprintf_P(sBuff, sizeof(sBuff), PSTR("{\"label\":\"%s\",\"value\":%d,\"unit\":\"%s\"}"),
-                 OTlookupitem.label, atoi(getOTGWValue(msgid)), OTlookupitem.unit);
-    }
+  } else {
+    buildOTGWValueResponse(msgid, sBuff, sizeof(sBuff));
   } 
   //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff);
   //reply with json
