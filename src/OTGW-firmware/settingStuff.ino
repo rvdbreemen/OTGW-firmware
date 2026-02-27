@@ -87,8 +87,10 @@ void writeSettings(bool show)
 
   DebugT(F("[Settings] State: Serializing settings to JSON... "));
 
-  // Capacity reduced back to 1536 bytes (Dallas labels now in separate file)
-  DynamicJsonDocument doc(1536);
+  // Capacity set to 2048 bytes: 39 settings × ~16 bytes/slot = 624 bytes for slots,
+  // ~752 bytes for key strings (F() copies), ~136 bytes for default string values = ~1512 bytes
+  // at default config. 2048 provides headroom for user-configured longer strings.
+  DynamicJsonDocument doc(2048);
   JsonObject root  = doc.to<JsonObject>();
   root[F("hostname")] = settingHostname;
   root[F("MQTTenable")] = settingMQTTenable;
@@ -158,10 +160,10 @@ void readSettings(bool show)
     return;
   }
 
-  // Deserialize the JSON document
-  // Use DynamicJsonDocument to eliminate stack overflow risk (moved from stack to heap)
-  // Capacity reduced back to 1536 bytes (Dallas labels now in separate file)
-  DynamicJsonDocument doc(1536);
+  // Capacity set to 2048 bytes: 39 settings × ~16 bytes/slot = 624 bytes for slots,
+  // ~752 bytes for key strings (F() copies), ~136 bytes for default string values = ~1512 bytes
+  // at default config. 2048 provides headroom for user-configured longer strings.
+  DynamicJsonDocument doc(2048);
   DeserializationError error = deserializeJson(doc, file);
   if (error)
   {

@@ -191,8 +191,7 @@ void initSensors() {
 
   if (numberOfDevices < 1 or DallasrealDeviceCount < 1)
   {
-    DebugTln(F("***ERR No Sensors Found, disabled GPIO Sensors! Reboot node to search again."));
-    settingGPIOSENSORSenabled = false;
+    DebugTf(PSTR("***ERR No Sensors Found on GPIO%d. Check wiring and reboot to search again.\r\n"), settingGPIOSENSORSpin);
     return;
   }
 
