@@ -41,7 +41,9 @@ String escapeJsonString(const char* str) {
   return result;
 }
 
-// Shared helper to extract a simple JSON field value (string/number/bool/null) into a bounded buffer
+// Shared helper to extract a simple JSON field value (string/number/bool/null) into a bounded buffer.
+// Returns true when key is found and value is copied into out; false otherwise.
+// Intended for flat JSON objects (no nested object/array parsing).
 bool extractJsonFieldText(const char* json, const char* key, char* out, size_t outSize)
 {
   if (!json || !key || !out || outSize == 0) return false;
@@ -63,7 +65,8 @@ bool extractJsonFieldText(const char* json, const char* key, char* out, size_t o
     p++;
     size_t n = 0;
     while (*p && *p != '"' && n + 1 < outSize) {
-      if (*p == '\\' && *(p + 1)) {
+      if (*p == '\\') {
+        if (*(p + 1) == '\0') return false;
         p++;
         switch (*p) {
           case '"': out[n++] = '"'; break;
@@ -86,7 +89,7 @@ bool extractJsonFieldText(const char* json, const char* key, char* out, size_t o
   }
 
   const char* start = p;
-  while (*p && *p != ',' && *p != '}' && !isspace(static_cast<unsigned char>(*p))) p++;
+  while (*p && *p != ',' && *p != '}' && *p != ']' && !isspace(static_cast<unsigned char>(*p))) p++;
   size_t len = static_cast<size_t>(p - start);
   if (len == 0) return false;
   if (len >= outSize) len = outSize - 1;
