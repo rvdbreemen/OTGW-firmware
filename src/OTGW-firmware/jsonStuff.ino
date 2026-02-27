@@ -54,7 +54,7 @@ bool extractJsonFieldText(const char* json, const char* key, char* out, size_t o
   const char* keyPos = strstr(json, cMsg);
   if (!keyPos) return false;
 
-  const char* p = keyPos + strlen(keyPattern);
+  const char* p = keyPos + strlen(cMsg);
   while (*p && isspace(static_cast<unsigned char>(*p))) p++;
   if (*p != ':') return false;
   p++;
