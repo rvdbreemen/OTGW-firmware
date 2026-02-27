@@ -73,59 +73,6 @@ bool checkGPIOConflict(int pin, PGM_P caller)
 }
 
 //=======================================================================
-static bool extractJsonValueText(const char* json, const char* key, char* out, size_t outSize)
-{
-  if (!json || !key || !out || outSize == 0) return false;
-  out[0] = '\0';
-
-  char keyPattern[64];
-  int keyLen = snprintf_P(keyPattern, sizeof(keyPattern), PSTR("\"%s\""), key);
-  if (keyLen < 0 || static_cast<size_t>(keyLen) >= sizeof(keyPattern)) return false;
-  const char* keyPos = strstr(json, keyPattern);
-  if (!keyPos) return false;
-
-  const char* p = keyPos + strlen(keyPattern);
-  while (*p && isspace(static_cast<unsigned char>(*p))) p++;
-  if (*p != ':') return false;
-  p++;
-  while (*p && isspace(static_cast<unsigned char>(*p))) p++;
-
-  if (*p == '"') {
-    p++;
-    size_t n = 0;
-    while (*p && *p != '"' && n + 1 < outSize) {
-      if (*p == '\\' && *(p + 1)) {
-        p++;
-        switch (*p) {
-          case '"': out[n++] = '"'; break;
-          case '\\': out[n++] = '\\'; break;
-          case '/': out[n++] = '/'; break;
-          case 'b': out[n++] = '\b'; break;
-          case 'f': out[n++] = '\f'; break;
-          case 'n': out[n++] = '\n'; break;
-          case 'r': out[n++] = '\r'; break;
-          case 't': out[n++] = '\t'; break;
-          default: out[n++] = *p; break;
-        }
-        p++;
-      } else {
-        out[n++] = *p++;
-      }
-    }
-    out[n] = '\0';
-    return true;
-  }
-
-  const char* start = p;
-  while (*p && *p != ',' && *p != '}' && !isspace(static_cast<unsigned char>(*p))) p++;
-  size_t len = static_cast<size_t>(p - start);
-  if (len == 0) return false;
-  if (len >= outSize) len = outSize - 1;
-  memcpy(out, start, len);
-  out[len] = '\0';
-  return true;
-}
-
 static bool parseJsonKVLine(const char* line, char* keyOut, size_t keyOutSize, char* valueOut, size_t valueOutSize)
 {
   if (!line || !keyOut || keyOutSize == 0 || !valueOut || valueOutSize == 0) return false;
