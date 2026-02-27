@@ -137,7 +137,8 @@ static bool parseJsonKVLine(const char* line, char* keyOut, size_t keyOutSize, c
   keyStart++;
   const char* keyEnd = keyStart;
   while (*keyEnd) {
-    if (*keyEnd == '\\' && *(keyEnd + 1)) {
+    if (*keyEnd == '\\') {
+      if (*(keyEnd + 1) == '\0') return false;
       keyEnd += 2;
       continue;
     }
@@ -160,7 +161,8 @@ static bool parseJsonKVLine(const char* line, char* keyOut, size_t keyOutSize, c
     p++;
     size_t n = 0;
     while (*p && n + 1 < valueOutSize) {
-      if (*p == '\\' && *(p + 1)) {
+      if (*p == '\\') {
+        if (*(p + 1) == '\0') return false;
         p++;
         switch (*p) {
           case '"': valueOut[n++] = '"'; break;
@@ -324,8 +326,8 @@ void readSettings(bool show)
     if (len == (sizeof(lineBuf) - 1)) {
       char discardBuf[32];
       while (file.available()) {
-        size_t chunkLen = file.readBytesUntil('\n', discardBuf, sizeof(discardBuf));
-        if (chunkLen < sizeof(discardBuf)) break;
+        size_t chunkLen = file.readBytesUntil('\n', discardBuf, sizeof(discardBuf) - 1);
+        if (chunkLen < (sizeof(discardBuf) - 1)) break;
         yield();
       }
     }

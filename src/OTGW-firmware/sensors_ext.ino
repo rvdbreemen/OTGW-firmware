@@ -108,7 +108,7 @@ void ensureSensorDefaultLabels()
       } else {
         labelsJson.remove(labelsJson.length() - 1);
         labelsJson.trim();
-        if (labelsJson != F("{")) {
+        if (!labelsJson.equals(F("{"))) {
           labelsJson += F(",");
         }
         labelsJson += additions;
