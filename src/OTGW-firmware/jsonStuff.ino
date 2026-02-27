@@ -43,7 +43,7 @@ String escapeJsonString(const char* str) {
 
 // Shared helper to extract a simple JSON field value (string/number/bool/null) into a bounded buffer.
 // Returns true when key is found and value is copied into out; false otherwise.
-// Intended for flat JSON objects (no nested object/array parsing).
+// Intended for simple key/value extraction in flat JSON objects.
 bool extractJsonFieldText(const char* json, const char* key, char* out, size_t outSize)
 {
   if (!json || !key || !out || outSize == 0) return false;
@@ -64,7 +64,7 @@ bool extractJsonFieldText(const char* json, const char* key, char* out, size_t o
   if (*p == '"') {
     p++;
     size_t n = 0;
-    while (*p && *p != '"' && n + 1 < outSize) {
+    while (*p && *p != '"' && n < (outSize - 1)) {
       if (*p == '\\') {
         if (*(p + 1) == '\0') return false;
         p++;
