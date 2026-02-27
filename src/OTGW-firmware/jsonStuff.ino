@@ -49,10 +49,9 @@ bool extractJsonFieldText(const char* json, const char* key, char* out, size_t o
   if (!json || !key || !out || outSize == 0) return false;
   out[0] = '\0';
 
-  char keyPattern[64];
-  int keyLen = snprintf_P(keyPattern, sizeof(keyPattern), PSTR("\"%s\""), key);
-  if (keyLen < 0 || static_cast<size_t>(keyLen) >= sizeof(keyPattern)) return false;
-  const char* keyPos = strstr(json, keyPattern);
+  int keyLen = snprintf_P(cMsg, sizeof(cMsg), PSTR("\"%s\""), key);
+  if (keyLen < 0 || static_cast<size_t>(keyLen) >= sizeof(cMsg)) return false;
+  const char* keyPos = strstr(json, cMsg);
   if (!keyPos) return false;
 
   const char* p = keyPos + strlen(keyPattern);
