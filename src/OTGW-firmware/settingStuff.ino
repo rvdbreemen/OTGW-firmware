@@ -135,8 +135,16 @@ static bool parseJsonKVLine(const char* line, char* keyOut, size_t keyOutSize, c
   const char* keyStart = strchr(line, '"');
   if (!keyStart) return false;
   keyStart++;
-  const char* keyEnd = strchr(keyStart, '"');
-  if (!keyEnd) return false;
+  const char* keyEnd = keyStart;
+  while (*keyEnd) {
+    if (*keyEnd == '\\' && *(keyEnd + 1)) {
+      keyEnd += 2;
+      continue;
+    }
+    if (*keyEnd == '"') break;
+    keyEnd++;
+  }
+  if (*keyEnd != '"') return false;
   size_t keyLen = static_cast<size_t>(keyEnd - keyStart);
   if (keyLen == 0 || keyLen >= keyOutSize) return false;
   memcpy(keyOut, keyStart, keyLen);
@@ -314,7 +322,12 @@ void readSettings(bool show)
     size_t len = file.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
     lineBuf[len] = '\0';
     if (len == (sizeof(lineBuf) - 1)) {
-      while (file.available() && file.read() != '\n') { yield(); }
+      char discardBuf[32];
+      while (file.available()) {
+        size_t chunkLen = file.readBytesUntil('\n', discardBuf, sizeof(discardBuf));
+        if (chunkLen < sizeof(discardBuf)) break;
+        yield();
+      }
     }
 
     if (parseJsonKVLine(lineBuf, keyBuf, sizeof(keyBuf), valueBuf, sizeof(valueBuf))) {
