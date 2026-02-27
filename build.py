@@ -211,7 +211,6 @@ def install_dependencies(project_dir, config_file):
     # Install libraries
     libraries = [
         "WiFiManager@2.0.15-rc.1",
-        "ArduinoJson@6.17.2",
         "pubsubclient@2.8.0",
         "TelnetStream@1.2.4",
         "AceCommon@1.6.2",

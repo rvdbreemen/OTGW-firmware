@@ -58,6 +58,98 @@ static bool parseMsgId(const char *token, uint8_t &msgId) {
   return true;
 }
 
+static bool extractJsonFieldText(const char* json, const char* key, char* out, size_t outSize) {
+  if (!json || !key || !out || outSize == 0) return false;
+  out[0] = '\0';
+
+  char keyPattern[40];
+  snprintf_P(keyPattern, sizeof(keyPattern), PSTR("\"%s\""), key);
+  const char* keyPos = strstr(json, keyPattern);
+  if (!keyPos) return false;
+
+  const char* p = keyPos + strlen(keyPattern);
+  while (*p && isspace(static_cast<unsigned char>(*p))) p++;
+  if (*p != ':') return false;
+  p++;
+  while (*p && isspace(static_cast<unsigned char>(*p))) p++;
+
+  if (*p == '"') {
+    p++;
+    size_t n = 0;
+    while (*p && *p != '"' && n + 1 < outSize) {
+      if (*p == '\\' && *(p + 1)) {
+        p++;
+      }
+      out[n++] = *p++;
+    }
+    out[n] = '\0';
+    return true;
+  }
+
+  const char* start = p;
+  while (*p && *p != ',' && *p != '}' && !isspace(static_cast<unsigned char>(*p))) p++;
+  size_t len = static_cast<size_t>(p - start);
+  if (len == 0) return false;
+  if (len >= outSize) len = outSize - 1;
+  memcpy(out, start, len);
+  out[len] = '\0';
+  return true;
+}
+
+static bool parseSettingRequestBody(const String& body, char* field, size_t fieldSize, char* value, size_t valueSize) {
+  if (body.length() == 0) return false;
+  if (!extractJsonFieldText(body.c_str(), "name", field, fieldSize)) return false;
+  if (field[0] == '\0') return false;
+  if (!extractJsonFieldText(body.c_str(), "value", value, valueSize)) return false;
+  if (strcmp_P(value, PSTR("null")) == 0) value[0] = '\0';
+  return true;
+}
+
+static bool isValidDallasLabelJson(const String& body) {
+  const char* p = body.c_str();
+  while (*p && isspace(static_cast<unsigned char>(*p))) p++;
+  if (*p != '{') return false;
+  p++;
+  while (*p && isspace(static_cast<unsigned char>(*p))) p++;
+  if (*p == '}') return true;
+
+  while (*p) {
+    if (*p != '"') return false;
+    p++;
+    while (*p && *p != '"') {
+      if (*p == '\\' && *(p + 1)) p++;
+      p++;
+    }
+    if (*p != '"') return false;
+    p++;
+    while (*p && isspace(static_cast<unsigned char>(*p))) p++;
+    if (*p != ':') return false;
+    p++;
+    while (*p && isspace(static_cast<unsigned char>(*p))) p++;
+    if (*p != '"') return false;
+    p++;
+    while (*p && *p != '"') {
+      if (*p == '\\' && *(p + 1)) p++;
+      p++;
+    }
+    if (*p != '"') return false;
+    p++;
+    while (*p && isspace(static_cast<unsigned char>(*p))) p++;
+    if (*p == ',') {
+      p++;
+      while (*p && isspace(static_cast<unsigned char>(*p))) p++;
+      continue;
+    }
+    if (*p == '}') {
+      p++;
+      while (*p && isspace(static_cast<unsigned char>(*p))) p++;
+      return *p == '\0';
+    }
+    return false;
+  }
+  return false;
+}
+
 //=======================================================================
 
 void processAPI() 
@@ -340,16 +432,11 @@ void processAPI()
 
           // Read command from request body (JSON: {"command":"TT=20.5"} or plain text)
           const String& body = httpServer.arg(0);
-          StaticJsonDocument<128> cmdDoc;
-          DeserializationError err = deserializeJson(cmdDoc, body);
-          const char* cmdStr = nullptr;
-          if (!err) {
-            cmdStr = cmdDoc[F("command")];
+          char cmdBuf[64] = "";
+          if (!extractJsonFieldText(body.c_str(), "command", cmdBuf, sizeof(cmdBuf))) {
+            strlcpy(cmdBuf, body.c_str(), sizeof(cmdBuf));
           }
-          // Fallback: accept plain text body (e.g., "TT=20.5")
-          if (!cmdStr || cmdStr[0] == '\0') {
-            cmdStr = body.c_str();
-          }
+          const char* cmdStr = cmdBuf;
 
           if (!cmdStr || cmdStr[0] == '\0') {
             sendApiError(400, F("Missing command"));
@@ -470,30 +557,26 @@ void processAPI()
 
 //====[ implementing REST API ]====
 void sendOTGWvalue(int msgid){
-  StaticJsonDocument<256> doc;
-  JsonObject root  = doc.to<JsonObject>();
+  char sBuff[JSON_ENTRY_BUF];
   if (msgid < 0 || msgid > OT_MSGID_MAX) {
-    root[F("error")] = "message id: out of range";
+    strlcpy(sBuff, "{\"error\":\"message id: out of range\"}", sizeof(sBuff));
   } else {
     PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
     if (OTlookupitem.type==ot_undef) {  //message is undefined, return error
-      root[F("error")] = "message undefined: reserved for future use";
+      strlcpy(sBuff, "{\"error\":\"message undefined: reserved for future use\"}", sizeof(sBuff));
     } else 
     { //message id's need to be between 0 and OT_MSGID_MAX
       //Debug print the values first
       RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
-      //build the json
-      root[F("label")] = OTlookupitem.label;
       if (OTlookupitem.type == ot_f88) {
-        root[F("value")] = atof(getOTGWValue(msgid)); 
+        snprintf_P(sBuff, sizeof(sBuff), PSTR("{\"label\":\"%s\",\"value\":%.3f,\"unit\":\"%s\"}"),
+                   OTlookupitem.label, atof(getOTGWValue(msgid)), OTlookupitem.unit);
       } else {// all other message types convert to integer
-        root[F("value")] = atoi(getOTGWValue(msgid));
+        snprintf_P(sBuff, sizeof(sBuff), PSTR("{\"label\":\"%s\",\"value\":%d,\"unit\":\"%s\"}"),
+                   OTlookupitem.label, atoi(getOTGWValue(msgid)), OTlookupitem.unit);
       }
-      root[F("unit")] = OTlookupitem.unit;    
     }
   }
-  char sBuff[JSON_ENTRY_BUF];
-  serializeJsonPretty(root, sBuff, sizeof(sBuff));
   //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff);
   //reply with json
   httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
@@ -501,32 +584,28 @@ void sendOTGWvalue(int msgid){
 }
 
 void sendOTGWlabel(const char *msglabel){
-  StaticJsonDocument<256> doc;
-  JsonObject root  = doc.to<JsonObject>();
+  char sBuff[JSON_ENTRY_BUF];
   uint_fast8_t msgid;
   for (msgid = 0; msgid<= OT_MSGID_MAX; msgid++){
     PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
     if (strcasecmp(OTlookupitem.label, msglabel)==0) break;
   }
   if (msgid > OT_MSGID_MAX){
-    root[F("error")] = "message id: reserved for future use";
+    strlcpy(sBuff, "{\"error\":\"message id: reserved for future use\"}", sizeof(sBuff));
   } else if (OTlookupitem.type==ot_undef) {  //message is undefined, return error
-    root[F("error")] = "message undefined: reserved for future use";
+    strlcpy(sBuff, "{\"error\":\"message undefined: reserved for future use\"}", sizeof(sBuff));
   } else 
   { //message id's need to be between 0 and OT_MSGID_MAX
     //RESTDebug print the values first
     RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
-    //build the json
-    root[F("label")] = OTlookupitem.label;
     if (OTlookupitem.type == ot_f88) {
-      root[F("value")] = atof(getOTGWValue(msgid)); 
+      snprintf_P(sBuff, sizeof(sBuff), PSTR("{\"label\":\"%s\",\"value\":%.3f,\"unit\":\"%s\"}"),
+                 OTlookupitem.label, atof(getOTGWValue(msgid)), OTlookupitem.unit);
     } else {// all other message types convert to integer
-      root[F("value")] = atoi(getOTGWValue(msgid));
+      snprintf_P(sBuff, sizeof(sBuff), PSTR("{\"label\":\"%s\",\"value\":%d,\"unit\":\"%s\"}"),
+                 OTlookupitem.label, atoi(getOTGWValue(msgid)), OTlookupitem.unit);
     }
-    root[F("unit")] = OTlookupitem.unit;    
   } 
-  char sBuff[JSON_ENTRY_BUF];
-  serializeJsonPretty(root, sBuff, sizeof(sBuff));
   //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff);
   //reply with json
   httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
@@ -1153,36 +1232,12 @@ void postSettings()
   // json string: {"name":"settingHostname","value":"abc"}  
   // json string: {"name":"darktheme","value":true}
   //------------------------------------------------------------ 
-  // Replaced manual string parsing with ArduinoJson (Finding #40)
-  // The old approach stripped braces/quotes and split on , and : which broke
-  // on values containing special characters ({, }, ", comma, colon).
-  StaticJsonDocument<256> doc;
-  DeserializationError error = deserializeJson(doc, httpServer.arg(0));
-  if (error) {
-    RESTDebugTf(PSTR("postSettings JSON parse error: %s\r\n"), error.c_str());
+  char field[64] = "";
+  char newValue[150] = "";
+  if (!parseSettingRequestBody(httpServer.arg(0), field, sizeof(field), newValue, sizeof(newValue))) {
+    RESTDebugTln(F("postSettings JSON parse error"));
     httpServer.send(400, F("application/json"), F("{\"error\":\"Invalid JSON\"}"));
     return;
-  }
-
-  const char* field = doc[F("name")];
-  if (!field || field[0] == '\0') {
-    httpServer.send(400, F("application/json"), F("{\"error\":\"Missing name\"}"));
-    return;
-  }
-
-  // Extract value as string — use a local buffer to avoid clobbering the global cMsg
-  // which downstream callers (updateSetting, flushSettings) may also write to.
-  // 150 bytes covers the largest setting value (settingOTGWcommands, max 128 chars).
-  char newValue[150];
-  newValue[0] = '\0';
-  JsonVariant val = doc[F("value")];
-  if (val.is<const char*>()) {
-    strlcpy(newValue, val.as<const char*>(), sizeof(newValue));
-  } else if (val.is<bool>()) {
-    strlcpy(newValue, val.as<bool>() ? "true" : "false", sizeof(newValue));
-  } else if (!val.isNull()) {
-    // Numeric or other type — serialize to string
-    serializeJson(val, newValue, sizeof(newValue));
   }
 
   if (newValue[0] != '\0') {
@@ -1225,50 +1280,26 @@ void updateAllDallasLabels() {
   const String& body = httpServer.arg(F("plain"));
   
   if (body.length() == 0) {
-    StaticJsonDocument<128> errorDoc;
-    errorDoc[F("success")] = false;
-    errorDoc[F("error")] = F("Empty request body");
-    String response;
-    serializeJson(errorDoc, response);
-    httpServer.send(400, F("application/json"), response);
+    httpServer.send(400, F("application/json"), F("{\"success\":false,\"error\":\"Empty request body\"}"));
     return;
   }
   
-  // Validate JSON format (parse to check validity)
-  DynamicJsonDocument doc(768); // 16 sensors × ~40 bytes each + overhead ≈ 700 bytes max
-  DeserializationError error = deserializeJson(doc, body);
-  
-  if (error) {
-    StaticJsonDocument<128> errorDoc;
-    errorDoc[F("success")] = false;
-    errorDoc[F("error")] = F("Invalid JSON format");
-    String response;
-    serializeJson(errorDoc, response);
-    httpServer.send(400, F("application/json"), response);
+  if (!isValidDallasLabelJson(body)) {
+    httpServer.send(400, F("application/json"), F("{\"success\":false,\"error\":\"Invalid JSON format\"}"));
     return;
   }
   
   // Write directly to file
   File labelsFile = LittleFS.open(F("/dallas_labels.ini"), "w");
   if (!labelsFile) {
-    StaticJsonDocument<128> errorDoc;
-    errorDoc[F("success")] = false;
-    errorDoc[F("error")] = F("Failed to open file for writing");
-    String response;
-    serializeJson(errorDoc, response);
-    httpServer.send_P(500, PSTR("application/json"), response.c_str());
+    httpServer.send(500, F("application/json"), F("{\"success\":false,\"error\":\"Failed to open file for writing\"}"));
     return;
   }
   
   labelsFile.print(body);
   labelsFile.close();
   
-  // Success response
-  StaticJsonDocument<64> responseDoc;
-  responseDoc[F("success")] = true;
-  String response;
-  serializeJson(responseDoc, response);
-  httpServer.send(200, F("application/json"), response);
+  httpServer.send(200, F("application/json"), F("{\"success\":true}"));
 }
 
 //====================================================

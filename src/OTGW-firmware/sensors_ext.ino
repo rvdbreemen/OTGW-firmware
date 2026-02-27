@@ -56,33 +56,35 @@ void ensureSensorDefaultLabels()
 {
   if (DallasrealDeviceCount < 1) return;
 
-  DynamicJsonDocument doc(768); // 16 sensors × ~40 bytes each + overhead ≈ 700 bytes max
-
-  // Read existing labels from file
+  String labelsJson = "{}";
   File labelsFile = LittleFS.open(F("/dallas_labels.ini"), "r");
-  if (labelsFile)
-  {
-    DeserializationError err = deserializeJson(doc, labelsFile);
+  if (labelsFile) {
+    labelsJson = labelsFile.readString();
     labelsFile.close();
-    if (err)
-    {
-      DebugTf(PSTR("Error reading labels file: %s, creating new\r\n"), err.c_str());
-      doc.clear();
-    }
+  }
+  labelsJson.trim();
+  if (!labelsJson.startsWith(F("{")) || !labelsJson.endsWith(F("}"))) {
+    labelsJson = F("{}");
   }
 
   bool changed = false;
   const char* prefix = bDebugSensorSimulation ? "Sim Sensor" : "Sensor";
+  String additions = "";
 
   for (int i = 0; i < DallasrealDeviceCount; i++)
   {
-    // Use String to ensure ArduinoJson copies the key (getDallasAddress returns static buffer)
     String addr = String(getDallasAddress(DallasrealDevice[i].addr));
-    if (!doc.containsKey(addr))
+    String key = String("\"") + addr + "\"";
+    if (labelsJson.indexOf(key) < 0)
     {
       char label[24];
       snprintf_P(label, sizeof(label), PSTR("%s %d"), prefix, i + 1);
-      doc[addr] = label;
+      String escapedLabel = escapeJsonString(label);
+      if (additions.length() > 0) additions += ",";
+      additions += key;
+      additions += ":\"";
+      additions += escapedLabel;
+      additions += "\"";
       changed = true;
       DebugTf(PSTR("Created default label '%s' for sensor %s\r\n"), label, addr.c_str());
     }
@@ -93,7 +95,19 @@ void ensureSensorDefaultLabels()
     File outFile = LittleFS.open(F("/dallas_labels.ini"), "w");
     if (outFile)
     {
-      serializeJson(doc, outFile);
+      if (labelsJson == "{}") {
+        outFile.print(F("{"));
+        outFile.print(additions);
+        outFile.print(F("}"));
+      } else {
+        labelsJson.remove(labelsJson.length() - 1);
+        if (!labelsJson.endsWith(F("{"))) {
+          labelsJson += F(",");
+        }
+        labelsJson += additions;
+        labelsJson += F("}");
+        outFile.print(labelsJson);
+      }
       outFile.close();
       DebugTf(PSTR("Saved %d sensor label(s) to dallas_labels.ini\r\n"), DallasrealDeviceCount);
     }

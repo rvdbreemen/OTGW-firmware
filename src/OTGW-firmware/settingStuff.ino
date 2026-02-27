@@ -10,6 +10,8 @@
 ***************************************************************************      
 */
 
+#include <ctype.h>
+
 //=======================================================================
 // Deferred settings write support (Finding #23: reduce flash wear + service restarts)
 // Side-effect bitmask flags
@@ -71,13 +73,90 @@ bool checkGPIOConflict(int pin, PGM_P caller)
 }
 
 //=======================================================================
+static bool extractJsonValueText(const char* json, const char* key, char* out, size_t outSize)
+{
+  if (!json || !key || !out || outSize == 0) return false;
+  out[0] = '\0';
+
+  char keyPattern[48];
+  snprintf_P(keyPattern, sizeof(keyPattern), PSTR("\"%s\""), key);
+  const char* keyPos = strstr(json, keyPattern);
+  if (!keyPos) return false;
+
+  const char* p = keyPos + strlen(keyPattern);
+  while (*p && isspace(static_cast<unsigned char>(*p))) p++;
+  if (*p != ':') return false;
+  p++;
+  while (*p && isspace(static_cast<unsigned char>(*p))) p++;
+
+  if (*p == '"') {
+    p++;
+    size_t n = 0;
+    while (*p && *p != '"' && n + 1 < outSize) {
+      if (*p == '\\' && *(p + 1)) {
+        p++;
+        switch (*p) {
+          case '"': out[n++] = '"'; break;
+          case '\\': out[n++] = '\\'; break;
+          case '/': out[n++] = '/'; break;
+          case 'b': out[n++] = '\b'; break;
+          case 'f': out[n++] = '\f'; break;
+          case 'n': out[n++] = '\n'; break;
+          case 'r': out[n++] = '\r'; break;
+          case 't': out[n++] = '\t'; break;
+          default: out[n++] = *p; break;
+        }
+        p++;
+      } else {
+        out[n++] = *p++;
+      }
+    }
+    out[n] = '\0';
+    return true;
+  }
+
+  const char* start = p;
+  while (*p && *p != ',' && *p != '}' && !isspace(static_cast<unsigned char>(*p))) p++;
+  size_t len = static_cast<size_t>(p - start);
+  if (len == 0) return false;
+  if (len >= outSize) len = outSize - 1;
+  memcpy(out, start, len);
+  out[len] = '\0';
+  return true;
+}
+
+static void writeJsonStringKV(File& file, const __FlashStringHelper* key, const char* value, bool withComma)
+{
+  String escaped = escapeJsonString(value);
+  file.printf_P(PSTR("  \"%S\": \"%s\"%s\n"),
+                reinterpret_cast<PGM_P>(key),
+                escaped.c_str(),
+                withComma ? "," : "");
+}
+
+static void writeJsonBoolKV(File& file, const __FlashStringHelper* key, bool value, bool withComma)
+{
+  file.printf_P(PSTR("  \"%S\": %s%s\n"),
+                reinterpret_cast<PGM_P>(key),
+                value ? "true" : "false",
+                withComma ? "," : "");
+}
+
+static void writeJsonIntKV(File& file, const __FlashStringHelper* key, int value, bool withComma)
+{
+  file.printf_P(PSTR("  \"%S\": %d%s\n"),
+                reinterpret_cast<PGM_P>(key),
+                value,
+                withComma ? "," : "");
+}
+
+//=======================================================================
 void writeSettings(bool show) 
 {
 
-  //let's use JSON to write the setting file
   DebugTf(PSTR("[Settings] State: writeSettings called (show=%s)\r\n"), show ? "true" : "false");
   DebugTf(PSTR("[Settings] Writing to [%s] ..\r\n"), SETTINGS_FILE);
-  File file = LittleFS.open(SETTINGS_FILE, "w"); // open for reading and writing
+  File file = LittleFS.open(SETTINGS_FILE, "w");
   if (!file) 
   {
     DebugTf(PSTR("[Settings] Error: open(%s, 'w') FAILED!!! --> Bailout\r\n"), SETTINGS_FILE);
@@ -85,56 +164,57 @@ void writeSettings(bool show)
   }
   yield();
 
-  DebugT(F("[Settings] State: Serializing settings to JSON... "));
+  DebugT(F("[Settings] State: Writing JSON settings... "));
 
-  // Capacity reduced back to 1536 bytes (Dallas labels now in separate file)
-  DynamicJsonDocument doc(1536);
-  JsonObject root  = doc.to<JsonObject>();
-  root[F("hostname")] = settingHostname;
-  root[F("MQTTenable")] = settingMQTTenable;
-  root[F("MQTTbroker")] = settingMQTTbroker;
-  root[F("MQTTbrokerPort")] = settingMQTTbrokerPort;
-  root[F("MQTTuser")] = settingMQTTuser;
-  root[F("MQTTpasswd")] = settingMQTTpasswd;
-  root[F("MQTTtoptopic")] = settingMQTTtopTopic;
-  root[F("MQTThaprefix")] = settingMQTThaprefix;
-  root[F("MQTTuniqueid")] = settingMQTTuniqueid;
-  root[F("MQTTOTmessage")] = settingMQTTOTmessage;
-  root[F("MQTTseparatesources")] = settingMQTTSeparateSources;
-  root[F("MQTTharebootdetection")]= settingMQTTharebootdetection;  
-  root[F("NTPenable")] = settingNTPenable;
-  root[F("NTPtimezone")] = settingNTPtimezone;
-  root[F("NTPhostname")] = settingNTPhostname;
-  root[F("NTPsendtime")] = settingNTPsendtime;
-  root[F("LEDblink")] = settingLEDblink;
-  root[F("darktheme")] = settingDarkTheme;
-  root[F("ui_autoscroll")] = settingUIAutoScroll;
-  root[F("ui_timestamps")] = settingUIShowTimestamp;
-  root[F("ui_capture")] = settingUICaptureMode;
-  root[F("ui_autoscreenshot")] = settingUIAutoScreenshot;
-  root[F("ui_autodownloadlog")] = settingUIAutoDownloadLog;
-  root[F("ui_autoexport")] = settingUIAutoExport;
-  root[F("ui_graphtimewindow")] = settingUIGraphTimeWindow;
-  root[F("GPIOSENSORSenabled")] = settingGPIOSENSORSenabled;
-  root[F("GPIOSENSORSlegacyformat")] = settingGPIOSENSORSlegacyformat;
-  root[F("GPIOSENSORSpin")] = settingGPIOSENSORSpin;
-  root[F("GPIOSENSORSinterval")] = settingGPIOSENSORSinterval;
-  root[F("S0COUNTERenabled")] = settingS0COUNTERenabled;
-  root[F("S0COUNTERpin")] = settingS0COUNTERpin;
-  root[F("S0COUNTERdebouncetime")] = settingS0COUNTERdebouncetime;
-  root[F("S0COUNTERpulsekw")] = settingS0COUNTERpulsekw;
-  root[F("S0COUNTERinterval")] = settingS0COUNTERinterval;
-  root[F("OTGWcommandenable")] = settingOTGWcommandenable;
-  root[F("OTGWcommands")] = settingOTGWcommands;
-  root[F("GPIOOUTPUTSenabled")] = settingGPIOOUTPUTSenabled;
-  root[F("GPIOOUTPUTSpin")] = settingGPIOOUTPUTSpin;
-  root[F("GPIOOUTPUTStriggerBit")] = settingGPIOOUTPUTStriggerBit;
-  // Dallas sensor labels now stored in /dallas_labels.json (not in settings.json)
+  file.print(F("{\n"));
+  writeJsonStringKV(file, F("hostname"), settingHostname, true);
+  writeJsonBoolKV(file, F("MQTTenable"), settingMQTTenable, true);
+  writeJsonStringKV(file, F("MQTTbroker"), settingMQTTbroker, true);
+  writeJsonIntKV(file, F("MQTTbrokerPort"), settingMQTTbrokerPort, true);
+  writeJsonStringKV(file, F("MQTTuser"), settingMQTTuser, true);
+  writeJsonStringKV(file, F("MQTTpasswd"), settingMQTTpasswd, true);
+  writeJsonStringKV(file, F("MQTTtoptopic"), settingMQTTtopTopic, true);
+  writeJsonStringKV(file, F("MQTThaprefix"), settingMQTThaprefix, true);
+  writeJsonStringKV(file, F("MQTTuniqueid"), settingMQTTuniqueid, true);
+  writeJsonBoolKV(file, F("MQTTOTmessage"), settingMQTTOTmessage, true);
+  writeJsonBoolKV(file, F("MQTTseparatesources"), settingMQTTSeparateSources, true);
+  writeJsonBoolKV(file, F("MQTTharebootdetection"), settingMQTTharebootdetection, true);
+  writeJsonBoolKV(file, F("NTPenable"), settingNTPenable, true);
+  writeJsonStringKV(file, F("NTPtimezone"), settingNTPtimezone, true);
+  writeJsonStringKV(file, F("NTPhostname"), settingNTPhostname, true);
+  writeJsonBoolKV(file, F("NTPsendtime"), settingNTPsendtime, true);
+  writeJsonBoolKV(file, F("LEDblink"), settingLEDblink, true);
+  writeJsonBoolKV(file, F("darktheme"), settingDarkTheme, true);
+  writeJsonBoolKV(file, F("ui_autoscroll"), settingUIAutoScroll, true);
+  writeJsonBoolKV(file, F("ui_timestamps"), settingUIShowTimestamp, true);
+  writeJsonBoolKV(file, F("ui_capture"), settingUICaptureMode, true);
+  writeJsonBoolKV(file, F("ui_autoscreenshot"), settingUIAutoScreenshot, true);
+  writeJsonBoolKV(file, F("ui_autodownloadlog"), settingUIAutoDownloadLog, true);
+  writeJsonBoolKV(file, F("ui_autoexport"), settingUIAutoExport, true);
+  writeJsonIntKV(file, F("ui_graphtimewindow"), settingUIGraphTimeWindow, true);
+  writeJsonBoolKV(file, F("GPIOSENSORSenabled"), settingGPIOSENSORSenabled, true);
+  writeJsonBoolKV(file, F("GPIOSENSORSlegacyformat"), settingGPIOSENSORSlegacyformat, true);
+  writeJsonIntKV(file, F("GPIOSENSORSpin"), settingGPIOSENSORSpin, true);
+  writeJsonIntKV(file, F("GPIOSENSORSinterval"), settingGPIOSENSORSinterval, true);
+  writeJsonBoolKV(file, F("S0COUNTERenabled"), settingS0COUNTERenabled, true);
+  writeJsonIntKV(file, F("S0COUNTERpin"), settingS0COUNTERpin, true);
+  writeJsonIntKV(file, F("S0COUNTERdebouncetime"), settingS0COUNTERdebouncetime, true);
+  writeJsonIntKV(file, F("S0COUNTERpulsekw"), settingS0COUNTERpulsekw, true);
+  writeJsonIntKV(file, F("S0COUNTERinterval"), settingS0COUNTERinterval, true);
+  writeJsonBoolKV(file, F("OTGWcommandenable"), settingOTGWcommandenable, true);
+  writeJsonStringKV(file, F("OTGWcommands"), settingOTGWcommands, true);
+  writeJsonBoolKV(file, F("GPIOOUTPUTSenabled"), settingGPIOOUTPUTSenabled, true);
+  writeJsonIntKV(file, F("GPIOOUTPUTSpin"), settingGPIOOUTPUTSpin, true);
+  writeJsonIntKV(file, F("GPIOOUTPUTStriggerBit"), settingGPIOOUTPUTStriggerBit, false);
+  file.print(F("}\n"));
 
-  serializeJsonPretty(root, file);
   if (show) {
     DebugTln(F("\r\n[Settings] JSON content:"));
-    serializeJsonPretty(root, TelnetStream); //Debug stream ;-)
+    File showFile = LittleFS.open(SETTINGS_FILE, "r");
+    while (showFile && showFile.available()) {
+      TelnetStream.write(showFile.read());
+    }
+    if (showFile) showFile.close();
   }
   Debugln(F("\r\n[Settings] State: File write complete, closing file"));
   file.close();
@@ -146,9 +226,6 @@ void writeSettings(bool show)
 //=======================================================================
 void readSettings(bool show) 
 {
-  // Open file for reading
-  File file =  LittleFS.open(SETTINGS_FILE, "r");
-
   DebugTf(PSTR(" %s ..\r\n"), SETTINGS_FILE);
   if (!LittleFS.exists(SETTINGS_FILE)) 
   {  //create settings file if it does not exist yet.
@@ -158,94 +235,57 @@ void readSettings(bool show)
     return;
   }
 
-  // Deserialize the JSON document
-  // Use DynamicJsonDocument to eliminate stack overflow risk (moved from stack to heap)
-  // Capacity reduced back to 1536 bytes (Dallas labels now in separate file)
-  DynamicJsonDocument doc(1536);
-  DeserializationError error = deserializeJson(doc, file);
-  if (error)
-  {
-    DebugTln(F("Failed to read file, use existing defaults."));
-    DebugTf(PSTR("Settings Deserialisation error:  %s \r\n"), error.c_str());
+  File file = LittleFS.open(SETTINGS_FILE, "r");
+  if (!file) {
+    DebugTln(F("Failed to open settings file, use existing defaults."));
+    return;
+  }
+  String json = file.readString();
+  file.close();
+  if (json.length() == 0) {
+    DebugTln(F("Settings file is empty, use existing defaults."));
     return;
   }
 
-  // Copy values from the JsonDocument to the Config 
-  strlcpy(settingHostname, doc[F("hostname")] | "", sizeof(settingHostname));
-  if (strlen(settingHostname)==0) strlcpy(settingHostname, _HOSTNAME, sizeof(settingHostname));
+  const char* keys[] = {
+    "hostname", "MQTTenable", "MQTTbroker", "MQTTbrokerPort", "MQTTuser", "MQTTpasswd",
+    "MQTTtoptopic", "MQTThaprefix", "MQTTuniqueid", "MQTTOTmessage", "MQTTseparatesources",
+    "MQTTharebootdetection", "NTPenable", "NTPtimezone", "NTPhostname", "NTPsendtime",
+    "LEDblink", "darktheme", "ui_autoscroll", "ui_timestamps", "ui_capture", "ui_autoscreenshot",
+    "ui_autodownloadlog", "ui_autoexport", "ui_graphtimewindow", "GPIOSENSORSenabled",
+    "GPIOSENSORSlegacyformat", "GPIOSENSORSpin", "GPIOSENSORSinterval", "S0COUNTERenabled",
+    "S0COUNTERpin", "S0COUNTERdebouncetime", "S0COUNTERpulsekw", "S0COUNTERinterval",
+    "OTGWcommandenable", "OTGWcommands", "GPIOOUTPUTSenabled", "GPIOOUTPUTSpin", "GPIOOUTPUTStriggerBit"
+  };
 
-  settingMQTTenable       = doc[F("MQTTenable")]|settingMQTTenable;
-  strlcpy(settingMQTTbroker, doc[F("MQTTbroker")] | "", sizeof(settingMQTTbroker));
-  
-  settingMQTTbrokerPort   = doc[F("MQTTbrokerPort")] | settingMQTTbrokerPort; //default port
-  strlcpy(settingMQTTuser, doc[F("MQTTuser")] | "", sizeof(settingMQTTuser));
-  // Trim leading/trailing whitespace from username
-  char* trimmedUser = trimwhitespace(settingMQTTuser);
-  if (trimmedUser != settingMQTTuser) {
-    memmove(settingMQTTuser, trimmedUser, strlen(trimmedUser) + 1);
+  char valueBuf[150];
+  for (size_t i = 0; i < (sizeof(keys) / sizeof(keys[0])); i++) {
+    if (extractJsonValueText(json.c_str(), keys[i], valueBuf, sizeof(valueBuf))) {
+      updateSetting(keys[i], valueBuf);
+    }
   }
-  strlcpy(settingMQTTpasswd, doc[F("MQTTpasswd")] | "", sizeof(settingMQTTpasswd));
-  // Trim leading/trailing whitespace from password
-  char* trimmedPasswd = trimwhitespace(settingMQTTpasswd);
-  if (trimmedPasswd != settingMQTTpasswd) {
-    memmove(settingMQTTpasswd, trimmedPasswd, strlen(trimmedPasswd) + 1);
-  }
-  
-  strlcpy(settingMQTTtopTopic, doc[F("MQTTtoptopic")] | "", sizeof(settingMQTTtopTopic));
+
+  if (strlen(settingHostname)==0) strlcpy(settingHostname, _HOSTNAME, sizeof(settingHostname));
   if (strlen(settingMQTTtopTopic)==0 || strcmp_P(settingMQTTtopTopic, PSTR("null"))==0) {
     strlcpy(settingMQTTtopTopic, _HOSTNAME, sizeof(settingMQTTtopTopic));
     for(int i=0; settingMQTTtopTopic[i]; i++) settingMQTTtopTopic[i] = tolower(settingMQTTtopTopic[i]);
   }
-  
-  strlcpy(settingMQTThaprefix, doc[F("MQTThaprefix")] | "", sizeof(settingMQTThaprefix));
-  if (strlen(settingMQTThaprefix)==0 || strcmp_P(settingMQTThaprefix, PSTR("null"))==0) strlcpy(settingMQTThaprefix, HOME_ASSISTANT_DISCOVERY_PREFIX, sizeof(settingMQTThaprefix));
-  
-  settingMQTTharebootdetection = doc[F("MQTTharebootdetection")]|settingMQTTharebootdetection;	  
-  
-  strlcpy(settingMQTTuniqueid, doc[F("MQTTuniqueid")] | "", sizeof(settingMQTTuniqueid));
-  if (strlen(settingMQTTuniqueid)==0 || strcmp_P(settingMQTTuniqueid, PSTR("null"))==0) strlcpy(settingMQTTuniqueid, getUniqueId(), sizeof(settingMQTTuniqueid));
-
-  settingMQTTOTmessage    = doc[F("MQTTOTmessage")]|settingMQTTOTmessage;
-  settingMQTTSeparateSources = doc[F("MQTTseparatesources")] | settingMQTTSeparateSources;
-  settingNTPenable        = doc[F("NTPenable")]; 
-  
-  strlcpy(settingNTPtimezone, doc[F("NTPtimezone")] | "", sizeof(settingNTPtimezone));
-  if (strlen(settingNTPtimezone)==0 || strcmp_P(settingNTPtimezone, PSTR("null"))==0)  strlcpy(settingNTPtimezone, "Europe/Amsterdam", sizeof(settingNTPtimezone)); //default to amsterdam timezone
-  
-  strlcpy(settingNTPhostname, doc[F("NTPhostname")] | "", sizeof(settingNTPhostname));
-  if (strlen(settingNTPhostname)==0 || strcmp_P(settingNTPhostname, PSTR("null"))==0)  strlcpy(settingNTPhostname, NTP_HOST_DEFAULT, sizeof(settingNTPhostname));  
-  settingNTPsendtime      = doc[F("NTPsendtime")]|settingNTPsendtime;
-  settingLEDblink         = doc[F("LEDblink")]|settingLEDblink;
-  settingDarkTheme        = doc[F("darktheme")]|settingDarkTheme;
-  settingUIAutoScroll      = doc[F("ui_autoscroll")] | settingUIAutoScroll;
-  settingUIShowTimestamp   = doc[F("ui_timestamps")] | settingUIShowTimestamp;
-  settingUICaptureMode     = doc[F("ui_capture")] | settingUICaptureMode;
-  settingUIAutoScreenshot  = doc[F("ui_autoscreenshot")] | settingUIAutoScreenshot;
-  settingUIAutoDownloadLog = doc[F("ui_autodownloadlog")] | settingUIAutoDownloadLog;
-  settingUIAutoExport      = doc[F("ui_autoexport")] | settingUIAutoExport;
-  settingUIGraphTimeWindow = doc[F("ui_graphtimewindow")] | settingUIGraphTimeWindow;
-  settingGPIOSENSORSenabled = doc[F("GPIOSENSORSenabled")] | settingGPIOSENSORSenabled;
-  settingGPIOSENSORSlegacyformat = doc[F("GPIOSENSORSlegacyformat")] | settingGPIOSENSORSlegacyformat;
-  settingGPIOSENSORSpin = doc[F("GPIOSENSORSpin")] | settingGPIOSENSORSpin;
-  settingGPIOSENSORSinterval = doc[F("GPIOSENSORSinterval")] | settingGPIOSENSORSinterval;
-  CHANGE_INTERVAL_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS); 
-  settingS0COUNTERenabled = doc[F("S0COUNTERenabled")] | settingS0COUNTERenabled;
-  settingS0COUNTERpin = doc[F("S0COUNTERpin")] | settingS0COUNTERpin;
-  settingS0COUNTERdebouncetime = doc[F("S0COUNTERdebouncetime")] | settingS0COUNTERdebouncetime;
-  settingS0COUNTERpulsekw = doc[F("S0COUNTERpulsekw")] | settingS0COUNTERpulsekw;
-  settingS0COUNTERinterval = doc[F("S0COUNTERinterval")] | settingS0COUNTERinterval;
-  CHANGE_INTERVAL_SEC(timers0counter, settingS0COUNTERinterval, CATCH_UP_MISSED_TICKS); 
-  settingOTGWcommandenable = doc[F("OTGWcommandenable")] | settingOTGWcommandenable;
-  strlcpy(settingOTGWcommands, doc[F("OTGWcommands")] | "", sizeof(settingOTGWcommands));
+  if (strlen(settingMQTThaprefix)==0 || strcmp_P(settingMQTThaprefix, PSTR("null"))==0) {
+    strlcpy(settingMQTThaprefix, HOME_ASSISTANT_DISCOVERY_PREFIX, sizeof(settingMQTThaprefix));
+  }
+  if (strlen(settingMQTTuniqueid)==0 || strcmp_P(settingMQTTuniqueid, PSTR("null"))==0) {
+    strlcpy(settingMQTTuniqueid, getUniqueId(), sizeof(settingMQTTuniqueid));
+  }
+  if (strlen(settingNTPtimezone)==0 || strcmp_P(settingNTPtimezone, PSTR("null"))==0) {
+    strlcpy(settingNTPtimezone, NTP_DEFAULT_TIMEZONE, sizeof(settingNTPtimezone));
+  }
+  if (strlen(settingNTPhostname)==0 || strcmp_P(settingNTPhostname, PSTR("null"))==0) {
+    strlcpy(settingNTPhostname, NTP_HOST_DEFAULT, sizeof(settingNTPhostname));
+  }
   if (strcmp_P(settingOTGWcommands, PSTR("null"))==0) settingOTGWcommands[0] = 0;
-  settingGPIOOUTPUTSenabled = doc[F("GPIOOUTPUTSenabled")] | settingGPIOOUTPUTSenabled;
-  settingGPIOOUTPUTSpin = doc[F("GPIOOUTPUTSpin")] | settingGPIOOUTPUTSpin;
-  settingGPIOOUTPUTStriggerBit = doc[F("GPIOOUTPUTStriggerBit")] | settingGPIOOUTPUTStriggerBit;
-  
-  // Dallas sensor labels now stored in /dallas_labels.json (not in settings.json)
 
-  // Close the file (Curiously, File's destructor doesn't close the file)
-  file.close();
+  settingsDirty = false;
+  pendingSideEffects = 0;
 
   DebugTln(F(" .. done\r\n"));
 

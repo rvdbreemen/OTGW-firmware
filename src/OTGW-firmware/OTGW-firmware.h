@@ -20,7 +20,6 @@
 // #define DISABLE_WEBSOCKET
 
 #include <TelnetStream.h>       // https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
-#include <ArduinoJson.h>        // https://arduinojson.org/
 #include "Wire.h"
 #include "safeTimers.h"
 #include <OTGWSerial.h>         // Bron Schelte's Serial class - it upgrades and more

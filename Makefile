@@ -18,7 +18,7 @@ CLICFG := $(CLI) --config-file $(CFGFILE)
 # bug in http stream, fallback to 2.7.4
 # ESP8266URL := https://github.com/esp8266/Arduino/releases/download/3.0.2/package_esp8266com_index.json
 ESP8266URL := https://github.com/esp8266/Arduino/releases/download/2.7.4/package_esp8266com_index.json
-LIBRARIES := libraries/WiFiManager libraries/ArduinoJson libraries/PubSubClient libraries/TelnetStream libraries/AceCommon libraries/AceSorting libraries/AceTime libraries/OneWire libraries/DallasTemperature libraries/WebSockets libraries/Time
+LIBRARIES := libraries/WiFiManager libraries/PubSubClient libraries/TelnetStream libraries/AceCommon libraries/AceSorting libraries/AceTime libraries/OneWire libraries/DallasTemperature libraries/WebSockets libraries/Time
 BOARDS := arduino/package_esp8266com_index.json
 # PORT can be overridden by the environment or on the command line. E.g.:
 # export PORT=/dev/ttyUSB2; make upload, or: make upload PORT=/dev/ttyUSB2
@@ -140,8 +140,6 @@ flush: | $(CFGFILE)
 libraries/WiFiManager: | $(BOARDS)
 	$(CLICFG) lib install WiFiManager@2.0.15-rc.1
 
-libraries/ArduinoJson:
-	$(CLICFG) lib install ArduinoJson@6.17.2
 
 libraries/PubSubClient:
 	$(CLICFG) lib install pubsubclient@2.8.0
