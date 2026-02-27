@@ -593,7 +593,7 @@ void sendOTGWvalue(int msgid){
   if (msgid < 0 || msgid > OT_MSGID_MAX) {
     strlcpy(sBuff, "{\"error\":\"message id: out of range\"}", sizeof(sBuff));
   } else {
-    buildOTGWValueResponse(static_cast<uint_fast8_t>(msgid), sBuff, sizeof(sBuff));
+    buildOTGWValueResponse(msgid, sBuff, sizeof(sBuff));
   }
   //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff);
   //reply with json
