@@ -78,8 +78,9 @@ static bool extractJsonValueText(const char* json, const char* key, char* out, s
   if (!json || !key || !out || outSize == 0) return false;
   out[0] = '\0';
 
-  char keyPattern[48];
-  snprintf_P(keyPattern, sizeof(keyPattern), PSTR("\"%s\""), key);
+  char keyPattern[64];
+  int keyLen = snprintf_P(keyPattern, sizeof(keyPattern), PSTR("\"%s\""), key);
+  if (keyLen < 0 || static_cast<size_t>(keyLen) >= sizeof(keyPattern)) return false;
   const char* keyPos = strstr(json, keyPattern);
   if (!keyPos) return false;
 
@@ -262,6 +263,8 @@ void readSettings(bool show)
   for (size_t i = 0; i < (sizeof(keys) / sizeof(keys[0])); i++) {
     if (extractJsonValueText(json.c_str(), keys[i], valueBuf, sizeof(valueBuf))) {
       updateSetting(keys[i], valueBuf);
+    } else if (bDebug) {
+      DebugTf(PSTR("[Settings] key not found in file: %s\r\n"), keys[i]);
     }
   }
 

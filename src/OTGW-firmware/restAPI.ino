@@ -62,8 +62,9 @@ static bool extractJsonFieldText(const char* json, const char* key, char* out, s
   if (!json || !key || !out || outSize == 0) return false;
   out[0] = '\0';
 
-  char keyPattern[40];
-  snprintf_P(keyPattern, sizeof(keyPattern), PSTR("\"%s\""), key);
+  char keyPattern[64];
+  int keyLen = snprintf_P(keyPattern, sizeof(keyPattern), PSTR("\"%s\""), key);
+  if (keyLen < 0 || static_cast<size_t>(keyLen) >= sizeof(keyPattern)) return false;
   const char* keyPos = strstr(json, keyPattern);
   if (!keyPos) return false;
 
@@ -79,8 +80,21 @@ static bool extractJsonFieldText(const char* json, const char* key, char* out, s
     while (*p && *p != '"' && n + 1 < outSize) {
       if (*p == '\\' && *(p + 1)) {
         p++;
+        switch (*p) {
+          case '"': out[n++] = '"'; break;
+          case '\\': out[n++] = '\\'; break;
+          case '/': out[n++] = '/'; break;
+          case 'b': out[n++] = '\b'; break;
+          case 'f': out[n++] = '\f'; break;
+          case 'n': out[n++] = '\n'; break;
+          case 'r': out[n++] = '\r'; break;
+          case 't': out[n++] = '\t'; break;
+          default: out[n++] = *p; break;
+        }
+        p++;
+      } else {
+        out[n++] = *p++;
       }
-      out[n++] = *p++;
     }
     out[n] = '\0';
     return true;
@@ -96,17 +110,18 @@ static bool extractJsonFieldText(const char* json, const char* key, char* out, s
   return true;
 }
 
-static bool parseSettingRequestBody(const String& body, char* field, size_t fieldSize, char* value, size_t valueSize) {
-  if (body.length() == 0) return false;
-  if (!extractJsonFieldText(body.c_str(), "name", field, fieldSize)) return false;
+static bool parseSettingRequestBody(const char* body, char* field, size_t fieldSize, char* value, size_t valueSize) {
+  if (!body || body[0] == '\0') return false;
+  if (!extractJsonFieldText(body, "name", field, fieldSize)) return false;
   if (field[0] == '\0') return false;
-  if (!extractJsonFieldText(body.c_str(), "value", value, valueSize)) return false;
+  if (!extractJsonFieldText(body, "value", value, valueSize)) return false;
   if (strcmp_P(value, PSTR("null")) == 0) value[0] = '\0';
   return true;
 }
 
-static bool isValidDallasLabelJson(const String& body) {
-  const char* p = body.c_str();
+static bool isValidDallasLabelJson(const char* body) {
+  if (!body) return false;
+  const char* p = body;
   while (*p && isspace(static_cast<unsigned char>(*p))) p++;
   if (*p != '{') return false;
   p++;
@@ -143,7 +158,7 @@ static bool isValidDallasLabelJson(const String& body) {
     if (*p == '}') {
       p++;
       while (*p && isspace(static_cast<unsigned char>(*p))) p++;
-      return *p == '\0';
+      return (*p == '\0');
     }
     return false;
   }
@@ -1234,7 +1249,8 @@ void postSettings()
   //------------------------------------------------------------ 
   char field[64] = "";
   char newValue[150] = "";
-  if (!parseSettingRequestBody(httpServer.arg(0), field, sizeof(field), newValue, sizeof(newValue))) {
+  const String& body = httpServer.arg(0);
+  if (!parseSettingRequestBody(body.c_str(), field, sizeof(field), newValue, sizeof(newValue))) {
     RESTDebugTln(F("postSettings JSON parse error"));
     httpServer.send(400, F("application/json"), F("{\"error\":\"Invalid JSON\"}"));
     return;
@@ -1284,7 +1300,7 @@ void updateAllDallasLabels() {
     return;
   }
   
-  if (!isValidDallasLabelJson(body)) {
+  if (!isValidDallasLabelJson(body.c_str())) {
     httpServer.send(400, F("application/json"), F("{\"success\":false,\"error\":\"Invalid JSON format\"}"));
     return;
   }
