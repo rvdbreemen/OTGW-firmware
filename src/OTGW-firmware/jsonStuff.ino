@@ -50,16 +50,17 @@ bool extractJsonFieldText(const char* json, const char* key, char* out, size_t o
   out[0] = '\0';
 
   // Uses global cMsg as scratch buffer to avoid per-helper stack duplication.
-  // Call from single-threaded normal firmware context (not ISR).
+  // Call from single-threaded normal firmware context (not ISR), and only when
+  // other code paths are not concurrently using cMsg as temporary storage.
   for (const char* k = key; *k; k++) {
-    if (*k == '"' || *k == '\\') return false;
+    if (*k == '"' || *k == '\\' || static_cast<unsigned char>(*k) < 0x20) return false;
   }
   int keyLen = snprintf_P(cMsg, sizeof(cMsg), PSTR("\"%s\""), key);
   if (keyLen < 0 || static_cast<size_t>(keyLen) >= sizeof(cMsg)) return false;
   const char* keyPos = strstr(json, cMsg);
   if (!keyPos) return false;
 
-  const char* p = keyPos + strlen(cMsg);
+  const char* p = keyPos + keyLen;
   while (*p && isspace(static_cast<unsigned char>(*p))) p++;
   if (*p != ':') return false;
   p++;
