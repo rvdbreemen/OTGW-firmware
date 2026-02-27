@@ -55,11 +55,17 @@ const uint8_t DallasSimDeviceAddresses[SIM_SENSOR_COUNT][8] = {
 void ensureSensorDefaultLabels()
 {
   if (DallasrealDeviceCount < 1) return;
+  const size_t MAX_DALLAS_LABELS_FILE_SIZE = 4096;
 
   String labelsJson = "{}";
   File labelsFile = LittleFS.open(F("/dallas_labels.ini"), "r");
   if (labelsFile) {
-    labelsJson = labelsFile.readString();
+    const size_t labelsFileSize = labelsFile.size();
+    if (labelsFileSize > 0 && labelsFileSize <= MAX_DALLAS_LABELS_FILE_SIZE) {
+      labelsJson = labelsFile.readString();
+    } else if (labelsFileSize > MAX_DALLAS_LABELS_FILE_SIZE) {
+      DebugTf(PSTR("Dallas labels file too large (%u bytes), resetting to defaults\r\n"), static_cast<unsigned int>(labelsFileSize));
+    }
     labelsFile.close();
   }
   labelsJson.trim();
@@ -101,6 +107,7 @@ void ensureSensorDefaultLabels()
         outFile.print(F("}"));
       } else {
         labelsJson.remove(labelsJson.length() - 1);
+        labelsJson.trim();
         if (!labelsJson.endsWith(F("{"))) {
           labelsJson += F(",");
         }

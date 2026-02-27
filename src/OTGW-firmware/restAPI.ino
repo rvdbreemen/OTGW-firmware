@@ -1285,10 +1285,15 @@ void getDallasLabels() {
 // Update all Dallas sensor labels in file (bulk operation)
 void updateAllDallasLabels() {
   // Parse JSON body from request
+  const size_t MAX_DALLAS_LABELS_BODY_SIZE = 4096;
   const String& body = httpServer.arg(F("plain"));
   
   if (body.length() == 0) {
     httpServer.send(400, F("application/json"), F("{\"success\":false,\"error\":\"Empty request body\"}"));
+    return;
+  }
+  if (body.length() > MAX_DALLAS_LABELS_BODY_SIZE) {
+    httpServer.send(413, F("application/json"), F("{\"success\":false,\"error\":\"Request body too large\"}"));
     return;
   }
   

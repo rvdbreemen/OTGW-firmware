@@ -126,6 +126,65 @@ static bool extractJsonValueText(const char* json, const char* key, char* out, s
   return true;
 }
 
+static bool parseJsonKVLine(const char* line, char* keyOut, size_t keyOutSize, char* valueOut, size_t valueOutSize)
+{
+  if (!line || !keyOut || keyOutSize == 0 || !valueOut || valueOutSize == 0) return false;
+  keyOut[0] = '\0';
+  valueOut[0] = '\0';
+
+  const char* keyStart = strchr(line, '"');
+  if (!keyStart) return false;
+  keyStart++;
+  const char* keyEnd = strchr(keyStart, '"');
+  if (!keyEnd) return false;
+  size_t keyLen = static_cast<size_t>(keyEnd - keyStart);
+  if (keyLen == 0 || keyLen >= keyOutSize) return false;
+  memcpy(keyOut, keyStart, keyLen);
+  keyOut[keyLen] = '\0';
+
+  const char* p = keyEnd + 1;
+  while (*p && isspace(static_cast<unsigned char>(*p))) p++;
+  if (*p != ':') return false;
+  p++;
+  while (*p && isspace(static_cast<unsigned char>(*p))) p++;
+
+  if (*p == '"') {
+    p++;
+    size_t n = 0;
+    while (*p && n + 1 < valueOutSize) {
+      if (*p == '\\' && *(p + 1)) {
+        p++;
+        switch (*p) {
+          case '"': valueOut[n++] = '"'; break;
+          case '\\': valueOut[n++] = '\\'; break;
+          case '/': valueOut[n++] = '/'; break;
+          case 'b': valueOut[n++] = '\b'; break;
+          case 'f': valueOut[n++] = '\f'; break;
+          case 'n': valueOut[n++] = '\n'; break;
+          case 'r': valueOut[n++] = '\r'; break;
+          case 't': valueOut[n++] = '\t'; break;
+          default: valueOut[n++] = *p; break;
+        }
+        p++;
+        continue;
+      }
+      if (*p == '"') break;
+      valueOut[n++] = *p++;
+    }
+    valueOut[n] = '\0';
+    return true;
+  }
+
+  const char* start = p;
+  while (*p && *p != ',' && *p != '}' && !isspace(static_cast<unsigned char>(*p))) p++;
+  size_t len = static_cast<size_t>(p - start);
+  if (len == 0) return false;
+  if (len >= valueOutSize) len = valueOutSize - 1;
+  memcpy(valueOut, start, len);
+  valueOut[len] = '\0';
+  return true;
+}
+
 static void writeJsonStringKV(File& file, const __FlashStringHelper* key, const char* value, bool withComma)
 {
   String escaped = escapeJsonString(value);
@@ -241,32 +300,28 @@ void readSettings(bool show)
     DebugTln(F("Failed to open settings file, use existing defaults."));
     return;
   }
-  String json = file.readString();
-  file.close();
-  if (json.length() == 0) {
+  if (file.size() == 0) {
+    file.close();
     DebugTln(F("Settings file is empty, use existing defaults."));
     return;
   }
-
-  const char* keys[] = {
-    "hostname", "MQTTenable", "MQTTbroker", "MQTTbrokerPort", "MQTTuser", "MQTTpasswd",
-    "MQTTtoptopic", "MQTThaprefix", "MQTTuniqueid", "MQTTOTmessage", "MQTTseparatesources",
-    "MQTTharebootdetection", "NTPenable", "NTPtimezone", "NTPhostname", "NTPsendtime",
-    "LEDblink", "darktheme", "ui_autoscroll", "ui_timestamps", "ui_capture", "ui_autoscreenshot",
-    "ui_autodownloadlog", "ui_autoexport", "ui_graphtimewindow", "GPIOSENSORSenabled",
-    "GPIOSENSORSlegacyformat", "GPIOSENSORSpin", "GPIOSENSORSinterval", "S0COUNTERenabled",
-    "S0COUNTERpin", "S0COUNTERdebouncetime", "S0COUNTERpulsekw", "S0COUNTERinterval",
-    "OTGWcommandenable", "OTGWcommands", "GPIOOUTPUTSenabled", "GPIOOUTPUTSpin", "GPIOOUTPUTStriggerBit"
-  };
-
+  static const size_t JSON_LINE_BUF = 256;
+  char lineBuf[JSON_LINE_BUF];
+  char keyBuf[64];
   char valueBuf[150];
-  for (size_t i = 0; i < (sizeof(keys) / sizeof(keys[0])); i++) {
-    if (extractJsonValueText(json.c_str(), keys[i], valueBuf, sizeof(valueBuf))) {
-      updateSetting(keys[i], valueBuf);
-    } else if (bDebug) {
-      DebugTf(PSTR("[Settings] key not found in file: %s\r\n"), keys[i]);
+
+  while (file.available()) {
+    size_t len = file.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
+    lineBuf[len] = '\0';
+    if (len == (sizeof(lineBuf) - 1)) {
+      while (file.available() && file.read() != '\n') { yield(); }
+    }
+
+    if (parseJsonKVLine(lineBuf, keyBuf, sizeof(keyBuf), valueBuf, sizeof(valueBuf))) {
+      updateSetting(keyBuf, valueBuf);
     }
   }
+  file.close();
 
   if (strlen(settingHostname)==0) strlcpy(settingHostname, _HOSTNAME, sizeof(settingHostname));
   if (strlen(settingMQTTtopTopic)==0 || strcmp_P(settingMQTTtopTopic, PSTR("null"))==0) {
