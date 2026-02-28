@@ -194,6 +194,7 @@ void applySettingFromFile(const char *key, const char *val) {
   if (strcasecmp_P(key, PSTR("MQTThaprefix")) == 0)            { strlcpy(settingMQTThaprefix, val, sizeof(settingMQTThaprefix)); return; }
   if (strcasecmp_P(key, PSTR("MQTTuniqueid")) == 0)            { strlcpy(settingMQTTuniqueid, val, sizeof(settingMQTTuniqueid)); return; }
   if (strcasecmp_P(key, PSTR("MQTTOTmessage")) == 0)           { settingMQTTOTmessage = EVALBOOLEAN(val); return; }
+  if (strcasecmp_P(key, PSTR("MQTTseparatesources")) == 0)     { settingMQTTSeparateSources = EVALBOOLEAN(val); return; }
   if (strcasecmp_P(key, PSTR("MQTTharebootdetection")) == 0)   { settingMQTTharebootdetection = EVALBOOLEAN(val); return; }
   if (strcasecmp_P(key, PSTR("NTPenable")) == 0)               { settingNTPenable = EVALBOOLEAN(val); return; }
   if (strcasecmp_P(key, PSTR("NTPtimezone")) == 0)             { strlcpy(settingNTPtimezone, val, sizeof(settingNTPtimezone)); return; }
