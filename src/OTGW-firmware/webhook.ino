@@ -82,7 +82,7 @@ static bool isLocalUrl(const char* url) {
   if (o1 == 169 && o2 == 254)             return true;  // link-local
   // 127.x.x.x loopback excluded: calling self could create a feedback loop
 
-  DebugTf(PSTR("Webhook: URL rejected (non-local IP %d.%d.%d.%d)\r\n"),
+  DebugTf(PSTR("Webhook: URL rejected (non-local IP %u.%u.%u.%u)\r\n"),
           o1, o2, o3, o4);
   return false;
 }
