@@ -17,6 +17,77 @@ static bool webhookLastState = false;
 static bool webhookInitialized = false;
 
 //=======================================================================
+// Validate that a webhook URL targets a local-network host.
+// Enforces the ADR-003/ADR-032 security model: the device is local-only
+// and must not make outbound calls to public Internet addresses.
+//
+// Rules:
+//  - Scheme must be http:// (ADR-003: no HTTPS on ESP8266)
+//  - Dotted-decimal IPv4 host must be RFC1918 or link-local; loopback
+//    and public IPs are rejected
+//  - Hostnames (letters/digits/dashes/dots) are allowed — local DNS
+//    is trusted on a private network (ADR-032 trust model)
+//=======================================================================
+static bool isLocalUrl(const char* url) {
+  // Scheme must be http://
+  if (strncasecmp_P(url, PSTR("http://"), 7) != 0) {
+    DebugTln(F("Webhook: URL rejected (scheme must be http://)"));
+    return false;
+  }
+
+  // Extract host: scan from after "http://" to first '/', ':' or NUL
+  const char* host = url + 7;
+  size_t hostLen = 0;
+  while (host[hostLen] && host[hostLen] != '/' && host[hostLen] != ':') {
+    hostLen++;
+  }
+  if (hostLen == 0 || hostLen >= 64) {
+    DebugTln(F("Webhook: URL rejected (invalid host)"));
+    return false;
+  }
+
+  // Copy into a small stack buffer for analysis
+  char hostBuf[64];
+  memcpy(hostBuf, host, hostLen);
+  hostBuf[hostLen] = '\0';
+
+  // Determine whether the host is a bare IPv4 dotted-decimal address
+  bool isIp = true;
+  int dotCount = 0;
+  for (size_t i = 0; i < hostLen; i++) {
+    char c = hostBuf[i];
+    if (c == '.') { dotCount++; }
+    else if (c < '0' || c > '9') { isIp = false; break; }
+  }
+  // Must have exactly 3 dots to be a valid IPv4 (rejects "1.2.3.4.5", "...")
+  if (isIp && dotCount != 3) isIp = false;
+
+  if (!isIp) {
+    // Hostname (e.g. shelly.local, shelly-relay) — allowed per ADR-032
+    // local-only trust model; DNS resolution is on the trusted LAN.
+    return true;
+  }
+
+  // Parse the four octets and validate range (use %u to reject negatives)
+  unsigned int o1 = 0, o2 = 0, o3 = 0, o4 = 0;
+  if (sscanf(hostBuf, "%u.%u.%u.%u", &o1, &o2, &o3, &o4) != 4 ||
+      o1 > 255 || o2 > 255 || o3 > 255 || o4 > 255) {
+    DebugTln(F("Webhook: URL rejected (malformed IP)"));
+    return false;
+  }
+
+  if (o1 == 10)                            return true;  // 10.0.0.0/8
+  if (o1 == 172 && o2 >= 16 && o2 <= 31)  return true;  // 172.16.0.0/12
+  if (o1 == 192 && o2 == 168)             return true;  // 192.168.0.0/16
+  if (o1 == 169 && o2 == 254)             return true;  // link-local
+  // 127.x.x.x loopback excluded: calling self could create a feedback loop
+
+  DebugTf(PSTR("Webhook: URL rejected (non-local IP %d.%d.%d.%d)\r\n"),
+          o1, o2, o3, o4);
+  return false;
+}
+
+//=======================================================================
 // Send the webhook for the given state, regardless of current state.
 // Used by the test endpoint and called from evalWebhook() on change.
 //=======================================================================
@@ -35,6 +106,12 @@ static void sendWebhook(bool stateOn) {
   const char* url = stateOn ? settingWebhookURLon : settingWebhookURLoff;
   if (strlen(url) == 0) {
     DebugTf(PSTR("Webhook: no URL configured for state %s\r\n"), stateOn ? "ON" : "OFF");
+    return;
+  }
+
+  // Enforce local-network-only policy (ADR-003/ADR-032)
+  if (!isLocalUrl(url)) {
+    DebugTln(F("Webhook: blocked (must target local subnet; see ADR-032)"));
     return;
   }
 
