@@ -681,6 +681,112 @@ void sendJsonSettingObj(const __FlashStringHelper* cName, bool bValue, const cha
   sendJsonSettingObj(nameBuf, bValue, sType);
 }
 
+//=======================================================================
+// Minimal streaming JSON field extractor for flat JSON object bodies.
+// Extracts the value of a named field from a flat JSON object string.
+// Handles:
+//   - String values:  {"key":"value"}  → result = "value"
+//   - Bool literals:  {"key":true}     → result = "true"
+//   - Numbers:        {"key":42}       → result = "42"
+// 'key' is a PROGMEM string (use F() macro at call site).
+// Returns true if the field was found and result was populated.
+// NOTE: Uses cMsg as scratch for building the search pattern.
+//       Not safe to call from ISR or concurrently.
+//=======================================================================
+bool extractJsonField(const String& json, const __FlashStringHelper* key,
+                      char* result, size_t resultSize) {
+  if (!result || resultSize == 0) return false;
+  result[0] = '\0';
+  // Build search pattern: "keyname"
+  snprintf_P(cMsg, sizeof(cMsg), PSTR("\"%S\""), (PGM_P)key);
+  int idx = json.indexOf(cMsg);
+  if (idx < 0) return false;
+
+  int colon = json.indexOf(':', idx + (int)strlen(cMsg));
+  if (colon < 0) return false;
+
+  int start = colon + 1;
+  int len   = (int)json.length();
+  while (start < len && json[start] == ' ') start++;
+  if (start >= len) return false;
+
+  if (json[start] == '"') {
+    // Quoted string value — find closing quote
+    int q2 = json.indexOf('"', start + 1);
+    if (q2 <= start) return false;
+    int n = q2 - start - 1;
+    if (n <= 0 || (size_t)(n + 1) > resultSize) return false;
+    json.substring(start + 1, q2).toCharArray(result, resultSize);
+  } else {
+    // Unquoted value: bool literal (true/false) or number
+    int end = start;
+    while (end < len) {
+      char c = json[end];
+      if (c == ',' || c == '}' || c == ' ' || c == '\r' || c == '\n') break;
+      end++;
+    }
+    int n = end - start;
+    if (n <= 0 || (size_t)(n + 1) > resultSize) return false;
+    json.substring(start, end).toCharArray(result, resultSize);
+  }
+  return result[0] != '\0';
+}
+
+//=======================================================================
+// Read one "key":"value" string pair from a flat JSON object file.
+// Advances the file position past the separator (comma or closing brace).
+// Both key and value must be quoted strings.
+// Returns false at end of object ('}') or on read error.
+// Used by ensureSensorDefaultLabels() to stream dallas_labels.ini without
+// loading the full file into RAM.
+//=======================================================================
+bool readJsonStringPair(File& f, char* key, size_t keySize,
+                        char* val, size_t valSize) {
+  if (!key || keySize == 0 || !val || valSize == 0) return false;
+  key[0] = val[0] = '\0';
+
+  // Skip whitespace, commas, and opening brace to reach first '"'
+  int ch;
+  do {
+    ch = f.read();
+    if (ch < 0) return false;
+  } while (ch == ' ' || ch == '\n' || ch == '\r' || ch == ',' || ch == '{');
+
+  if (ch == '}') return false; // end of object
+  if (ch != '"') return false; // unexpected character
+
+  // Read key until closing quote
+  size_t i = 0;
+  while ((ch = f.read()) >= 0 && ch != '"') {
+    if (i < keySize - 1) key[i++] = (char)ch;
+  }
+  key[i] = '\0';
+
+  // Skip whitespace and colon
+  do { ch = f.read(); } while (ch >= 0 && (ch == ' ' || ch == ':'));
+  if (ch != '"') return false; // value must be a quoted string
+
+  // Read value until closing quote
+  i = 0;
+  while ((ch = f.read()) >= 0 && ch != '"') {
+    if (i < valSize - 1) val[i++] = (char)ch;
+  }
+  val[i] = '\0';
+
+  return key[0] != '\0';
+}
+
+//=======================================================================
+// Write one "key":"value" pair to an open file.
+// Prepends a comma separator if 'addComma' is true (for all but the first pair).
+// Used by ensureSensorDefaultLabels() to rebuild dallas_labels.ini.
+//=======================================================================
+void writeJsonStringPair(File& f, const char* key, const char* val, bool addComma) {
+  if (addComma) f.print(',');
+  f.print('"'); f.print(key);
+  f.print(F("\":\"")); f.print(val); f.print('"');
+}
+
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a

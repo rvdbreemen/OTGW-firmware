@@ -340,31 +340,12 @@ void processAPI()
 
           // Read command from request body (JSON: {"command":"TT=20.5"} or plain text)
           const String& body = httpServer.arg(0);
+          char cmdBuf[64] = {0};
           // Try to extract "command" field from JSON body; fall back to plain text
-          static char cmdBuf[64];
-          const char* cmdStr = nullptr;
           if (body.startsWith("{")) {
-            // Minimal streaming extraction: find "command": "..." in body
-            int cmdIdx = body.indexOf(F("\"command\""));
-            if (cmdIdx >= 0) {
-              int colon = body.indexOf(':', cmdIdx);
-              if (colon >= 0) {
-                int q1 = body.indexOf('"', colon + 1);
-                int q2 = (q1 >= 0) ? body.indexOf('"', q1 + 1) : -1;
-                if (q1 >= 0 && q2 > q1) {
-                  int len = q2 - q1 - 1;
-                  if (len > 0 && len < (int)sizeof(cmdBuf)) {
-                    body.substring(q1 + 1, q2).toCharArray(cmdBuf, sizeof(cmdBuf));
-                    cmdStr = cmdBuf;
-                  }
-                }
-              }
-            }
+            extractJsonField(body, F("command"), cmdBuf, sizeof(cmdBuf));
           }
-          // Fallback: accept plain text body (e.g., "TT=20.5")
-          if (!cmdStr || cmdStr[0] == '\0') {
-            cmdStr = body.c_str();
-          }
+          const char* cmdStr = (cmdBuf[0] != '\0') ? cmdBuf : body.c_str();
 
           if (!cmdStr || cmdStr[0] == '\0') {
             sendApiError(400, F("Missing command"));
@@ -507,61 +488,59 @@ void processAPI()
 
 //====[ implementing REST API ]====
 void sendOTGWvalue(int msgid){
-  char sBuff[JSON_ENTRY_BUF];
-  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   if (msgid < 0 || msgid > OT_MSGID_MAX) {
-    httpServer.send_P(200, PSTR("application/json"),
-      PSTR("{\"error\": \"message id: out of range\"}"));
+    sendStartJsonMap("");
+    sendJsonMapEntry(F("error"), F("message id: out of range"));
+    sendEndJsonMap("");
     return;
   }
   PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
   if (OTlookupitem.type == ot_undef) {
-    httpServer.send_P(200, PSTR("application/json"),
-      PSTR("{\"error\": \"message undefined: reserved for future use\"}"));
+    sendStartJsonMap("");
+    sendJsonMapEntry(F("error"), F("message undefined: reserved for future use"));
+    sendEndJsonMap("");
     return;
   }
   RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
+  sendStartJsonMap("");
+  sendJsonMapEntry(F("label"), OTlookupitem.label);
   if (OTlookupitem.type == ot_f88) {
-    snprintf_P(sBuff, sizeof(sBuff),
-      PSTR("{\r\n  \"label\": \"%s\",\r\n  \"value\": %s,\r\n  \"unit\": \"%s\"\r\n}"),
-      OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
+    sendJsonMapEntry(F("value"), atof(getOTGWValue(msgid)));
   } else {
-    snprintf_P(sBuff, sizeof(sBuff),
-      PSTR("{\r\n  \"label\": \"%s\",\r\n  \"value\": %d,\r\n  \"unit\": \"%s\"\r\n}"),
-      OTlookupitem.label, atoi(getOTGWValue(msgid)), OTlookupitem.unit);
+    sendJsonMapEntry(F("value"), (int32_t)atoi(getOTGWValue(msgid))); // cast selects int32_t overload
   }
-  httpServer.send(200, F("application/json"), sBuff);
+  sendJsonMapEntry(F("unit"), OTlookupitem.unit);
+  sendEndJsonMap("");
 }
 
 void sendOTGWlabel(const char *msglabel){
-  char sBuff[JSON_ENTRY_BUF];
-  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   uint_fast8_t msgid;
   for (msgid = 0; msgid <= OT_MSGID_MAX; msgid++){
     PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
     if (strcasecmp(OTlookupitem.label, msglabel) == 0) break;
   }
   if (msgid > OT_MSGID_MAX){
-    httpServer.send_P(200, PSTR("application/json"),
-      PSTR("{\"error\": \"message id: reserved for future use\"}"));
+    sendStartJsonMap("");
+    sendJsonMapEntry(F("error"), F("message id: reserved for future use"));
+    sendEndJsonMap("");
     return;
   }
   if (OTlookupitem.type == ot_undef) {
-    httpServer.send_P(200, PSTR("application/json"),
-      PSTR("{\"error\": \"message undefined: reserved for future use\"}"));
+    sendStartJsonMap("");
+    sendJsonMapEntry(F("error"), F("message undefined: reserved for future use"));
+    sendEndJsonMap("");
     return;
   }
   RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
+  sendStartJsonMap("");
+  sendJsonMapEntry(F("label"), OTlookupitem.label);
   if (OTlookupitem.type == ot_f88) {
-    snprintf_P(sBuff, sizeof(sBuff),
-      PSTR("{\r\n  \"label\": \"%s\",\r\n  \"value\": %s,\r\n  \"unit\": \"%s\"\r\n}"),
-      OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
+    sendJsonMapEntry(F("value"), atof(getOTGWValue(msgid)));
   } else {
-    snprintf_P(sBuff, sizeof(sBuff),
-      PSTR("{\r\n  \"label\": \"%s\",\r\n  \"value\": %d,\r\n  \"unit\": \"%s\"\r\n}"),
-      OTlookupitem.label, atoi(getOTGWValue(msgid)), OTlookupitem.unit);
+    sendJsonMapEntry(F("value"), (int32_t)atoi(getOTGWValue(msgid))); // cast selects int32_t overload
   }
-  httpServer.send(200, F("application/json"), sBuff);
+  sendJsonMapEntry(F("unit"), OTlookupitem.unit);
+  sendEndJsonMap("");
 }
 
 //=======================================================================
@@ -1187,7 +1166,7 @@ void postSettings()
   // Accepts JSON body: {"name":"settingInterval","value":9}
   //                    {"name":"settingHostname","value":"abc"}
   //                    {"name":"darktheme","value":true}
-  // Parsed by minimal streaming extraction — no ArduinoJson.
+  // Parsed via extractJsonField() from jsonStuff.ino.
   //------------------------------------------------------------
   const String& body = httpServer.arg(0);
   if (body.length() == 0 || !body.startsWith("{")) {
@@ -1195,68 +1174,26 @@ void postSettings()
     return;
   }
 
-  // Extract "name" field
   char field[50];
-  field[0] = '\0';
-  {
-    int idx = body.indexOf(F("\"name\""));
-    if (idx >= 0) {
-      int colon = body.indexOf(':', idx);
-      int q1 = (colon >= 0) ? body.indexOf('"', colon + 1) : -1;
-      int q2 = (q1 >= 0)    ? body.indexOf('"', q1 + 1)   : -1;
-      if (q1 >= 0 && q2 > q1 && (q2 - q1 - 1) < (int)sizeof(field)) {
-        body.substring(q1 + 1, q2).toCharArray(field, sizeof(field));
-      }
-    }
-  }
-  if (field[0] == '\0') {
+  if (!extractJsonField(body, F("name"), field, sizeof(field))) {
     httpServer.send(400, F("application/json"), F("{\"error\":\"Missing name\"}"));
     return;
   }
 
-  // Extract "value" field — supports quoted string, bool literal, or number
   // 150 bytes covers the largest setting value (settingOTGWcommands, max 128 chars).
   char newValue[150];
-  newValue[0] = '\0';
-  {
-    int idx = body.indexOf(F("\"value\""));
-    if (idx >= 0) {
-      int colon = body.indexOf(':', idx);
-      if (colon >= 0) {
-        // Skip whitespace after colon
-        int start = colon + 1;
-        while (start < (int)body.length() && body[start] == ' ') start++;
-        if (start < (int)body.length()) {
-          if (body[start] == '"') {
-            // Quoted string value
-            int q2 = body.indexOf('"', start + 1);
-            if (q2 > start && (q2 - start - 1) < (int)sizeof(newValue)) {
-              body.substring(start + 1, q2).toCharArray(newValue, sizeof(newValue));
-            }
-          } else {
-            // Unquoted value (bool: true/false, or number)
-            int end = start;
-            while (end < (int)body.length() && body[end] != ',' && body[end] != '}' && body[end] != ' ') end++;
-            if ((end - start) < (int)sizeof(newValue)) {
-              body.substring(start, end).toCharArray(newValue, sizeof(newValue));
-            }
-          }
-        }
-      }
-    }
+  if (!extractJsonField(body, F("value"), newValue, sizeof(newValue))) {
+    httpServer.send(400, F("application/json"), F("{\"error\":\"Missing value\"}"));
+    return;
   }
 
-  if (newValue[0] != '\0') {
-    RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
-    updateSetting(field, newValue);
-    // Synchronous flush: persist to flash NOW so the 200 OK is truthful.
-    // The deferred timer still handles MQTT/NTP command updates, but HTTP
-    // saves must be durable before we confirm success to the browser.
-    flushSettings();
-    httpServer.send(200, F("application/json"), body);
-  } else {
-    httpServer.send(400, F("application/json"), F("{\"error\":\"Missing value\"}"));
-  }
+  RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
+  updateSetting(field, newValue);
+  // Synchronous flush: persist to flash NOW so the 200 OK is truthful.
+  // The deferred timer still handles MQTT/NTP command updates, but HTTP
+  // saves must be durable before we confirm success to the browser.
+  flushSettings();
+  httpServer.send(200, F("application/json"), body);
 
 } // postSettings()
 
