@@ -148,15 +148,20 @@ void writeSettings(bool show)
 //=======================================================================
 void readSettings(bool show) 
 {
-  // Open file for reading
-  File file =  LittleFS.open(SETTINGS_FILE, "r");
-
   DebugTf(PSTR(" %s ..\r\n"), SETTINGS_FILE);
   if (!LittleFS.exists(SETTINGS_FILE)) 
   {  //create settings file if it does not exist yet.
     DebugTln(F(" .. file not found! --> created file!"));
     writeSettings(show);
     readSettings(false); //now it should work...
+    return;
+  }
+
+  // Open file for reading (only after confirming it exists)
+  File file = LittleFS.open(SETTINGS_FILE, "r");
+  if (!file)
+  {
+    DebugTln(F("Failed to open settings file for reading."));
     return;
   }
 
@@ -169,6 +174,7 @@ void readSettings(bool show)
   {
     DebugTln(F("Failed to read file, use existing defaults."));
     DebugTf(PSTR("Settings Deserialisation error:  %s \r\n"), error.c_str());
+    file.close();
     return;
   }
 
