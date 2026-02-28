@@ -291,6 +291,11 @@ void readSettings(bool show)
   }
   file.close();
 
+  // Loading from file must NOT trigger a rewrite or service restarts —
+  // clear any dirty/side-effect state set by updateSetting() above.
+  settingsDirty = false;
+  pendingSideEffects = 0;
+
   // Post-processing: apply defaults for any missing or empty values
   if (strlen(settingHostname) == 0) strlcpy(settingHostname, _HOSTNAME, sizeof(settingHostname));
 
@@ -374,7 +379,7 @@ void updateSetting(const char *field, const char *newValue)
     if (strlen(settingHostname)==0) snprintf_P(settingHostname, sizeof(settingHostname), PSTR("OTGW-%06x"), (unsigned int)ESP.getChipId());
     
     //strip away anything beyond the dot
-    char *dot = strchr(settingMQTTtopTopic, '.');
+    char *dot = strchr(settingHostname, '.');
     if (dot) *dot = '\0';
     
     // Defer MDNS/LLMNR and MQTT restart to flushSettings()
