@@ -2296,7 +2296,11 @@ function initMainPage() {
   Array.from(document.getElementsByClassName('btnSaveSettings')).forEach(
     function (el, idx, arr) {
       el.addEventListener('click', function () {
-        saveSettings();
+        if (document.getElementById("displayWebhookPage").classList.contains('active')) {
+          saveWebhookSettings();
+        } else {
+          saveSettings();
+        }
         toggleHidden('adv_dropdown', true);
         toggleHidden('btnSaveSettings', true);
       });
@@ -2315,6 +2319,15 @@ function initMainPage() {
     function (el, idx, arr) {
       el.addEventListener('click', function () {
         firmwarePage();
+        toggleHidden('adv_dropdown', true);
+        toggleHidden('btnSaveSettings', true);
+      });
+    }
+  );
+  Array.from(document.getElementsByClassName('tabWebhook')).forEach(
+    function (el, idx, arr) {
+      el.addEventListener('click', function () {
+        webhookPage();
         toggleHidden('adv_dropdown', true);
         toggleHidden('btnSaveSettings', true);
       });
@@ -2439,6 +2452,7 @@ function showMainPage() {
   document.getElementById("displaySettingsPage").classList.remove('active');
   document.getElementById("displayDeviceInfo").classList.remove('active');
   document.getElementById("displayPICflash").classList.remove('active');
+  document.getElementById("displayWebhookPage").classList.remove('active');
   
   refreshDevInfo();
   refreshOTmonitor();
@@ -2457,10 +2471,11 @@ function firmwarePage() {
   document.getElementById("displayMainPage").classList.remove('active');
   document.getElementById("displaySettingsPage").classList.remove('active');
   document.getElementById("displayDeviceInfo").classList.remove('active');
+  document.getElementById("displayWebhookPage").classList.remove('active');
   var firmwarePage = document.getElementById("displayPICflash");
   refreshFirmware();
   document.getElementById("displayPICflash").classList.add('active');
-} // deviceinfoPage()
+} // firmwarePage()
 
 function deviceinfoPage() {
   disconnectOTLogWebSocket();
@@ -2469,6 +2484,7 @@ function deviceinfoPage() {
   document.getElementById("displayMainPage").classList.remove('active');
   document.getElementById("displaySettingsPage").classList.remove('active');
   document.getElementById("displayPICflash").classList.remove('active');
+  document.getElementById("displayWebhookPage").classList.remove('active');
   var deviceinfoPage = document.getElementById("deviceinfoPage");
   refreshDeviceInfo();
   document.getElementById("displayDeviceInfo").classList.add('active');
@@ -2482,11 +2498,25 @@ function settingsPage() {
   document.getElementById("displayMainPage").classList.remove('active');
   document.getElementById("displayDeviceInfo").classList.remove('active');
   document.getElementById("displayPICflash").classList.remove('active');
+  document.getElementById("displayWebhookPage").classList.remove('active');
   var settingsPage = document.getElementById("settingsPage");
   refreshSettings();
   document.getElementById("displaySettingsPage").classList.add('active');
 
 } // settingsPage()
+
+function webhookPage() {
+  disconnectOTLogWebSocket();
+  clearInterval(tid);
+  refreshDevTime();
+  document.getElementById("displayMainPage").classList.remove('active');
+  document.getElementById("displayDeviceInfo").classList.remove('active');
+  document.getElementById("displayPICflash").classList.remove('active');
+  document.getElementById("displaySettingsPage").classList.remove('active');
+  refreshWebhookPage();
+  document.getElementById("displayWebhookPage").classList.add('active');
+
+} // webhookPage()
 
 function toggleHidden(className, hideOnly) {
   Array.from(document.getElementsByClassName(className)).forEach(
@@ -3172,7 +3202,11 @@ const hiddenSettings = [
   "ui_autoscreenshot", 
   "ui_autodownloadlog",
   "ui_autoexport",
-  "ui_graphtimewindow"
+  "ui_graphtimewindow",
+  "webhookenable",
+  "webhookurlon",
+  "webhookurloff",
+  "webhooktriggerbit"
 ];
 
 function refreshSettings() {
@@ -3190,17 +3224,19 @@ function refreshSettings() {
       data = json.settings;
       const msgEl = document.getElementById("settingMessage");
       if (msgEl) msgEl.textContent = "";
-      for (let i in data) {
-        console.log("[" + data[i].name + "]=>[" + data[i].value + "]");
+      for (const key in data) {
+        if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
+        const s = data[key]; // s.value, s.type, s.maxlen, s.max, s.min
+        console.log("[" + key + "]=>[" + s.value + "]");
         // Skip hidden settings
-        if (data[i].name.startsWith('#') || hiddenSettings.includes(data[i].name)) continue;
+        if (key.startsWith('#') || hiddenSettings.includes(key)) continue;
 
         var settings = document.getElementById('settingsPage');
-        if ((document.getElementById("D_" + data[i].name)) == null) {
+        if ((document.getElementById("D_" + key)) == null) {
           var rowDiv = document.createElement("div");
           rowDiv.setAttribute("class", "settingDiv");
-          //----rowDiv.setAttribute("id", "settingR_"+data[i].name);
-          rowDiv.setAttribute("id", "D_" + data[i].name);
+          //----rowDiv.setAttribute("id", "settingR_"+key);
+          rowDiv.setAttribute("id", "D_" + key);
           // rowDiv.setAttribute("style", "text-align: right;");
           // rowDiv.style.marginLeft = "10px";
           // rowDiv.style.marginRight = "10px";
@@ -3210,46 +3246,46 @@ function refreshSettings() {
           //--- field Name ---
           var fldLabel = document.createElement("label");
           fldLabel.className = 'settings-field-container';
-          fldLabel.setAttribute("for", data[i].name);
-          fldLabel.textContent = translateToHuman(data[i].name);
+          fldLabel.setAttribute("for", key);
+          fldLabel.textContent = translateToHuman(key);
           rowDiv.appendChild(fldLabel);
           //--- input ---
           var inputDiv = document.createElement("div");
           inputDiv.className = 'settings-input-container';
 
           var sInput = document.createElement("input");
-          //----sInput.setAttribute("id", "setFld_"+data[i].name);
-          sInput.setAttribute("id", data[i].name);
-          if (data[i].type == "b") {
+          //----sInput.setAttribute("id", "setFld_"+key);
+          sInput.setAttribute("id", key);
+          if (s.type == "b") {
             sInput.setAttribute("type", "checkbox");
-            sInput.checked = strToBool(data[i].value);
+            sInput.checked = strToBool(s.value);
           }
-          else if (data[i].type == "s") {
+          else if (s.type == "s") {
             sInput.setAttribute("type", "text");
-            sInput.setAttribute("maxlength", data[i].maxlen);
-            sInput.setAttribute("size", (data[i].maxlen > 20 ? 20 : data[i].maxlen));
+            sInput.setAttribute("maxlength", s.maxlen);
+            sInput.setAttribute("size", (s.maxlen > 20 ? 20 : s.maxlen));
           }
-          else if (data[i].type == "p") {
+          else if (s.type == "p") {
             sInput.setAttribute("type", "password");
-            sInput.setAttribute("maxlength", data[i].maxlen);
-            sInput.setAttribute("size", (data[i].maxlen > 20 ? 20 : data[i].maxlen));
+            sInput.setAttribute("maxlength", s.maxlen);
+            sInput.setAttribute("size", (s.maxlen > 20 ? 20 : s.maxlen));
           }
-          else if (data[i].type == "f") {
+          else if (s.type == "f") {
             sInput.setAttribute("type", "number");
-            sInput.max = data[i].max;
-            sInput.min = data[i].min;
-            sInput.step = (data[i].min + data[i].max) / 1000;
+            sInput.max = s.max;
+            sInput.min = s.min;
+            sInput.step = (s.min + s.max) / 1000;
           }
-          else if (data[i].type == "i") {
+          else if (s.type == "i") {
             sInput.setAttribute("type", "number");
             sInput.setAttribute("size", 10);
-            sInput.max = data[i].max;
-            sInput.min = data[i].min;
-            //sInput.step = (data[i].min + data[i].max) / 1000;
+            sInput.max = s.max;
+            sInput.min = s.min;
+            //sInput.step = (s.min + s.max) / 1000;
             sInput.step = 1;
           }
-          sInput.setAttribute("value", data[i].value);
-          const fieldName = data[i].name;
+          sInput.setAttribute("value", s.value);
+          const fieldName = key;
           sInput.addEventListener('change',
             function () { 
               var inputEl = document.getElementById(fieldName);
@@ -3279,16 +3315,16 @@ function refreshSettings() {
           settings.appendChild(rowDiv);
         }
         else {
-          //----document.getElementById("setFld_"+data[i].name).style.background = "white";
-          const inputEl = document.getElementById(data[i].name);
+          //----document.getElementById("setFld_"+key).style.background = "white";
+          const inputEl = document.getElementById(key);
           if (inputEl) {
             inputEl.className = "input-normal";
-            //----document.getElementById("setFld_"+data[i].name).value = data[i].value;
-            // document.getElementById(data[i].name).value = data[i].value;
+            //----document.getElementById("setFld_"+key).value = s.value;
+            // document.getElementById(key).value = s.value;
             // FIX If checkbox change checked iso value
-            if (data[i].type == "b")
-              inputEl.checked = strToBool(data[i].value);
-            else inputEl.value = data[i].value;
+            if (s.type == "b")
+              inputEl.checked = strToBool(s.value);
+            else inputEl.value = s.value;
           }
         }
       }
@@ -3303,6 +3339,168 @@ function refreshSettings() {
 
 } // refreshSettings()
 
+
+//============================================================================
+function testWebhookUI(stateOn) {
+  var resultEl = document.getElementById("webhookTestResult");
+  if (resultEl) resultEl.textContent = "Sending...";
+  fetch(APIGW + "v2/webhook/test?state=" + (stateOn ? "on" : "off"), {
+    method: "POST"
+  })
+    .then(function(response) {
+      if (!response.ok) {
+        throw new Error("HTTP " + response.status);
+      }
+      return response.json();
+    })
+    .then(function() {
+      if (resultEl) resultEl.textContent = "Sent (" + (stateOn ? "ON" : "OFF") + ")";
+      setTimeout(function() { if (resultEl) resultEl.textContent = ""; }, 3000);
+    })
+    .catch(function(error) {
+      if (resultEl) resultEl.textContent = "Error: " + error.message;
+    });
+}
+
+//============================================================================
+function refreshWebhookPage() {
+  var page = document.getElementById("webhookPage");
+  if (!page) return;
+  while (page.firstChild) page.removeChild(page.firstChild);
+
+  fetch(APIGW + "v2/settings")
+    .then(function(response) {
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      return response.json();
+    })
+    .then(function(json) {
+      var wh = {};
+      ["webhookenable", "webhookurlon", "webhookurloff", "webhooktriggerbit"].forEach(function(key) {
+        if (json.settings && json.settings[key] !== undefined) {
+          wh[key] = json.settings[key];
+        }
+      });
+
+      var fields = [
+        { key: "webhookenable",    label: "Webhook Enabled",        type: "b" },
+        { key: "webhookurlon",     label: "URL (ON state)",          type: "s", maxlen: 100 },
+        { key: "webhookurloff",    label: "URL (OFF state)",         type: "s", maxlen: 100 },
+        { key: "webhooktriggerbit",label: "Trigger Bit (0-15)",      type: "i", min: 0, max: 15 }
+      ];
+
+      fields.forEach(function(f) {
+        var s = wh[f.key];
+        if (!s) return;
+
+        var rowDiv = document.createElement("div");
+        rowDiv.className = "settingDiv";
+
+        var labelDiv = document.createElement("div");
+        labelDiv.className = "settings-field-container";
+        labelDiv.style.marginRight = "10px";
+        labelDiv.textContent = f.label;
+        rowDiv.appendChild(labelDiv);
+
+        var inputDiv = document.createElement("div");
+        inputDiv.style.textAlign = "left";
+
+        var input = document.createElement("input");
+        input.id = "WH_" + f.key;
+        input.className = "input-normal";
+        if (f.type === "b") {
+          input.type = "checkbox";
+          input.checked = strToBool(s.value);
+        } else if (f.type === "s") {
+          input.type = "text";
+          input.maxLength = f.maxlen || 100;
+          input.size = 20;
+          input.value = s.value;
+        } else {
+          input.type = "number";
+          input.min = f.min;
+          input.max = f.max;
+          input.step = 1;
+          input.value = s.value;
+        }
+        function markChanged() { input.className = "input-changed"; setVisible("btnSaveSettings", true); }
+        input.addEventListener("change", markChanged, false);
+        input.addEventListener("keydown", markChanged, false);
+
+        inputDiv.appendChild(input);
+        rowDiv.appendChild(inputDiv);
+        page.appendChild(rowDiv);
+      });
+
+      // Test Webhook row
+      var testDiv = document.createElement("div");
+      testDiv.className = "settingDiv";
+
+      var testLabelDiv = document.createElement("div");
+      testLabelDiv.className = "settings-field-container";
+      testLabelDiv.style.marginRight = "10px";
+      testLabelDiv.textContent = "Test Webhook";
+      testDiv.appendChild(testLabelDiv);
+
+      var testBtnDiv = document.createElement("div");
+      testBtnDiv.style.textAlign = "left";
+
+      var btnOn = document.createElement("button");
+      btnOn.type = "button";
+      btnOn.textContent = "Test ON";
+      btnOn.style.marginRight = "6px";
+      btnOn.addEventListener("click", function() { testWebhookUI(true); }, false);
+
+      var btnOff = document.createElement("button");
+      btnOff.type = "button";
+      btnOff.textContent = "Test OFF";
+      btnOff.addEventListener("click", function() { testWebhookUI(false); }, false);
+
+      var resultSpan = document.createElement("span");
+      resultSpan.id = "webhookTestResult";
+      resultSpan.style.cssText = "margin-left:10px;font-style:italic;";
+
+      testBtnDiv.appendChild(btnOn);
+      testBtnDiv.appendChild(btnOff);
+      testBtnDiv.appendChild(resultSpan);
+      testDiv.appendChild(testBtnDiv);
+      page.appendChild(testDiv);
+    })
+    .catch(function(error) {
+      var p = document.createElement("p");
+      p.textContent = "Error loading webhook settings: " + error.message;
+      page.appendChild(p);
+    });
+}
+
+//============================================================================
+function saveWebhookSettings() {
+  var fields = ["webhookenable", "webhookurlon", "webhookurloff", "webhooktriggerbit"];
+  var msgEl = document.getElementById("webhookMessage");
+  fields.forEach(function(name) {
+    var el = document.getElementById("WH_" + name);
+    if (!el || el.className !== "input-changed") return;
+    el.className = "input-normal";
+    var value = (el.type === "checkbox") ? String(el.checked) : el.value;
+    var body = JSON.stringify({ "name": name, "value": value });
+    fetch(APIGW + "v2/settings", {
+      headers: { "content-type": "application/json; charset=UTF-8" },
+      body: body,
+      method: "POST",
+      mode: "cors"
+    })
+    .then(function(response) {
+      if (response.ok) {
+        if (msgEl) { msgEl.textContent = "Saved"; setTimeout(function() { if (msgEl) msgEl.textContent = ""; }, 2000); }
+      } else {
+        if (msgEl) msgEl.textContent = "Save failed";
+      }
+    })
+    .catch(function(error) {
+      console.log("webhook save error: " + error.message);
+      if (msgEl) msgEl.textContent = "Save failed: " + error.message;
+    });
+  });
+}
 
 //============================================================================  
 function saveSettings() {
@@ -3570,6 +3768,10 @@ var translateFields = [
   , ["gpiooutputsenabled", "GPIO Output Enabled"]
   , ["gpiooutputspin", "GPIO pin # to switch on/off"]
   , ["gpiooutputstriggerbit", "Bit X (master/slave) to trigger on (0-15)"]
+  , ["webhookenable", "Webhook Enabled"]
+  , ["webhookurlon", "Webhook URL (ON state)"]
+  , ["webhookurloff", "Webhook URL (OFF state)"]
+  , ["webhooktriggerbit", "Webhook Trigger Bit (0-15)"]
   
 ];
 
@@ -3584,14 +3786,12 @@ function applyTheme() {
     })
     .then(json => {
       let data = json.settings;
-      for (let i in data) {
-        if (data[i].name == "darktheme") {
-           let isDark = strToBool(data[i].value);
-           document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
-           localStorage.setItem('theme', isDark ? 'dark' : 'light');
-           if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.setTheme === 'function') {
-               OTGraph.setTheme(isDark ? 'dark' : 'light');
-           }
+      if (data && data["darktheme"]) {
+        let isDark = strToBool(data["darktheme"].value);
+        document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.setTheme === 'function') {
+            OTGraph.setTheme(isDark ? 'dark' : 'light');
         }
       }
     })
@@ -4264,10 +4464,7 @@ function loadPersistentUI() {
     .then(json => {
       if (!json || !json.settings) return;
       const settings = json.settings;
-      const getVal = (name) => {
-        const s = settings.find(s => s.name === name);
-        return s ? s.value : null;
-      };
+      const getVal = (name) => settings[name] ? settings[name].value : null;
 
       // Auto Scroll
       const autoScrollVal = getVal("ui_autoscroll");

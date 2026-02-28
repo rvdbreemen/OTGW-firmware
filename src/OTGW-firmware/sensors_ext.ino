@@ -56,48 +56,73 @@ void ensureSensorDefaultLabels()
 {
   if (DallasrealDeviceCount < 1) return;
 
-  DynamicJsonDocument doc(768); // 16 sensors × ~40 bytes each + overhead ≈ 700 bytes max
+  // ── Pass 1: read existing key→label pairs from file via readJsonStringPair() ──
+  struct { char addr[17]; char label[24]; } existing[MAXDALLASDEVICES];
+  int existingCount = 0;
 
-  // Read existing labels from file
   File labelsFile = LittleFS.open(F("/dallas_labels.ini"), "r");
   if (labelsFile)
   {
-    DeserializationError err = deserializeJson(doc, labelsFile);
-    labelsFile.close();
-    if (err)
+    char key[17], val[24];
+    while (existingCount < MAXDALLASDEVICES &&
+           readJsonStringPair(labelsFile, key, sizeof(key), val, sizeof(val)))
     {
-      DebugTf(PSTR("Error reading labels file: %s, creating new\r\n"), err.c_str());
-      doc.clear();
+      strlcpy(existing[existingCount].addr,  key, sizeof(existing[0].addr));
+      strlcpy(existing[existingCount].label, val, sizeof(existing[0].label));
+      existingCount++;
     }
+    labelsFile.close();
   }
 
+  // ── Check whether any currently-found sensors are missing a label ──
   bool changed = false;
-  const char* prefix = bDebugSensorSimulation ? "Sim Sensor" : "Sensor";
-
   for (int i = 0; i < DallasrealDeviceCount; i++)
   {
-    // Use String to ensure ArduinoJson copies the key (getDallasAddress returns static buffer)
-    String addr = String(getDallasAddress(DallasrealDevice[i].addr));
-    if (!doc.containsKey(addr))
-    {
-      char label[24];
-      snprintf_P(label, sizeof(label), PSTR("%s %d"), prefix, i + 1);
-      doc[addr] = label;
-      changed = true;
-      DebugTf(PSTR("Created default label '%s' for sensor %s\r\n"), label, addr.c_str());
+    const char* addr = getDallasAddress(DallasrealDevice[i].addr);
+    bool found = false;
+    for (int j = 0; j < existingCount; j++) {
+      if (strcmp(existing[j].addr, addr) == 0) { found = true; break; }
     }
+    if (!found) { changed = true; break; }
+  }
+  if (!changed) return;
+
+  // ── Pass 2: rebuild the file ──
+  // Write all existing labels back first, then append defaults for new sensors.
+  File outFile = LittleFS.open(F("/dallas_labels.ini"), "w");
+  if (!outFile) return;
+
+  const char* prefix = bDebugSensorSimulation ? "Sim Sensor" : "Sensor";
+  outFile.print('{');
+  bool first = true;
+
+  // Preserve existing labels
+  for (int j = 0; j < existingCount; j++)
+  {
+    writeJsonStringPair(outFile, existing[j].addr, existing[j].label, !first);
+    first = false;
   }
 
-  if (changed)
+  // Append defaults for sensors not yet in file
+  for (int i = 0; i < DallasrealDeviceCount; i++)
   {
-    File outFile = LittleFS.open(F("/dallas_labels.ini"), "w");
-    if (outFile)
-    {
-      serializeJson(doc, outFile);
-      outFile.close();
-      DebugTf(PSTR("Saved %d sensor label(s) to dallas_labels.ini\r\n"), DallasrealDeviceCount);
+    const char* addr = getDallasAddress(DallasrealDevice[i].addr);
+    bool found = false;
+    for (int j = 0; j < existingCount; j++) {
+      if (strcmp(existing[j].addr, addr) == 0) { found = true; break; }
     }
+    if (found) continue;
+
+    char label[24];
+    snprintf_P(label, sizeof(label), PSTR("%s %d"), prefix, i + 1);
+    DebugTf(PSTR("Created default label '%s' for sensor %s\r\n"), label, addr);
+    writeJsonStringPair(outFile, addr, label, !first);
+    first = false;
   }
+
+  outFile.print('}');
+  outFile.close();
+  DebugTf(PSTR("Saved %d sensor label(s) to dallas_labels.ini\r\n"), DallasrealDeviceCount);
 }
 
 void initSimulatedDallasSensors()
