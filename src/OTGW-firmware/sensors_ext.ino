@@ -133,6 +133,7 @@ DallasTemperature sensors(&oneWire);
 
 // Initialise the oneWire bus on the GPIO pin 
 void initSensors() {
+  bSensorsDetected = false;  // Reset runtime detection state on each init call
   if (!settingGPIOSENSORSenabled && !bDebugSensorSimulation)
   {
     DallasrealDeviceCount = 0;
@@ -144,6 +145,7 @@ void initSensors() {
   {
     initSimulatedDallasSensors();
     ensureSensorDefaultLabels();
+    bSensorsDetected = true;  // Simulation counts as successfully initialized
     return;
   }
 
@@ -191,13 +193,13 @@ void initSensors() {
 
   if (numberOfDevices < 1 or DallasrealDeviceCount < 1)
   {
-    DebugTln(F("***ERR No Sensors Found, disabled GPIO Sensors! Reboot node to search again."));
-    settingGPIOSENSORSenabled = false;
-    return;
+    DebugTf(PSTR("***ERR No Sensors Found on GPIO%d. Check wiring and reboot to search again.\r\n"), settingGPIOSENSORSpin);
+    return;  // bSensorsDetected stays false
   }
 
   // Create default labels for discovered sensors if they don't exist yet
   ensureSensorDefaultLabels();
+  bSensorsDetected = true;  // Sensors successfully detected and initialized
 }
 
 // Send the sensor device address to MQ for Autoconfigure
@@ -221,7 +223,7 @@ if (settingMQTTenable) {
  void pollSensors()
  {
   time_t now = time(nullptr);
-  if (!settingGPIOSENSORSenabled && !bDebugSensorSimulation) return;
+  if (!bSensorsDetected) return;  // Guard on runtime detection state, not persisted setting
 
   if (!bDebugSensorSimulation)
   {

@@ -413,7 +413,7 @@ ESP8266: Re-query version
 
 - **OTGWSerial Library:** `src/libraries/OTGWSerial/` (PIC communication abstraction)
 - **PIC Firmware:** https://otgw.tclcode.com/ (Schelte Bron's site)
-- **OpenTherm Specification:** `Specification/OpenTherm-Protocol-Specification-v4.2.pdf`
+- **OpenTherm Specification:** `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.pdf`
 - **Hardware Schematics:** NodoShop OTGW hardware documentation
 - **OTGW Commands:** https://otgw.tclcode.com/firmware.html (PIC command reference)
 - **ADR-012:** PIC Firmware Upgrade via Web UI

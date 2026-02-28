@@ -7,7 +7,7 @@ Branch Reviewed: main (current codebase)
 Target Version: v1.1.0-beta
 Reviewer: GitHub Copilot Advanced Agent
 Document Type: Compliance Analysis & Task Breakdown
-Reference Spec: Specification/OpenTherm-Protocol-Specification-v4.2-message-id-reference.md
+Reference Spec: docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2-message-id-reference.md
 Status: IMPLEMENTED
 ---
 
@@ -732,9 +732,9 @@ De v4.2 spec waarschuwt dat u16 counters (IDs 96, 97, 109-114, 116-123) overflow
 
 ## 7. Referenties
 
-- **Spec v4.2**: `Specification/OpenTherm-Protocol-Specification-v4.2-message-id-reference.md`
-- **Spec v4.2 (PDF)**: `Specification/OpenTherm-Protocol-Specification-v4.2.pdf`
-- **Remeha data-IDs**: `Specification/New OT data-ids.txt`
+- **Spec v4.2**: `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2-message-id-reference.md`
+- **Spec v4.2 (PDF)**: `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.pdf`
+- **Remeha data-IDs**: `docs/opentherm specification/New OT data-ids.txt`
 - **OTmap definitie**: `src/OTGW-firmware/OTGW-Core.h:329-468`
 - **processOT functie**: `src/OTGW-firmware/OTGW-Core.ino:1720-1834`
 - **getOTGWValue functie**: `src/OTGW-firmware/OTGW-Core.ino:2042-2156`

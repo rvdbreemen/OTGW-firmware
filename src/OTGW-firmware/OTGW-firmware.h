@@ -192,6 +192,7 @@ int8_t    settingGPIOSENSORSpin = 10;            // GPIO 13 = D7, GPIO 10 = SDIO
 int16_t   settingGPIOSENSORSinterval = 20;       // Interval time to read out temp and send to MQ
 byte      OTGWdallasdataid = 246;                // foney dataid to be used to do autoconfigure for temp sensors
 int       DallasrealDeviceCount = 0;             // Total temperature devices found on the bus
+bool      bSensorsDetected = false;              // Runtime: true when sensors (real/simulated) successfully initialized this boot
 #define   MAXDALLASDEVICES 16                    // maximum number of devices on the bus
 
 // Define structure to store temperature device addresses found on bus with their latest tempC value
