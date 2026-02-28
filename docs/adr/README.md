@@ -108,8 +108,11 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-017: WiFiManager for Initial Configuration](ADR-017-wifimanager-initial-configuration.md)**  
   Captive portal for easy first-time WiFi setup without hardcoded credentials.
 
-- **[ADR-018: ArduinoJson for Data Interchange](ADR-018-arduinojson-data-interchange.md)**  
-  Standardized JSON handling for settings persistence, REST API, MQTT, and WebSocket communication.
+- **[ADR-018: ArduinoJson for Data Interchange](ADR-018-arduinojson-data-interchange.md)** *(Superseded by ADR-042)*  
+  ~~Standardized JSON handling for settings persistence, REST API, MQTT, and WebSocket communication.~~
+
+- **[ADR-042: Streaming JSON I/O — No ArduinoJson](ADR-042-streaming-json-no-arduinojson.md)** 🆕  
+  Mandate streaming JSON helpers with global scratch buffers instead of ArduinoJson; eliminates heap allocation and the settings-reset bug from buffer overflow.
 
 ### Features and Extensions
 - **[ADR-019: REST API Versioning Strategy](ADR-019-rest-api-versioning-strategy.md)**  
