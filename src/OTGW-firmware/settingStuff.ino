@@ -144,10 +144,12 @@ static bool parseJsonKVLine(const char* line, char* keyOut, size_t keyOutSize, c
 
 static void writeJsonStringKV(File& file, const __FlashStringHelper* key, const char* value, bool withComma)
 {
-  String escaped = escapeJsonString(value);
+  // Use global cMsg as escape scratch — no heap allocation.
+  // writeSettings() holds no yield() between calls, so cMsg cannot be clobbered mid-write.
+  escapeJsonStringTo(value, cMsg, sizeof(cMsg));
   file.printf_P(PSTR("  \"%S\": \"%s\"%s\n"),
                 reinterpret_cast<PGM_P>(key),
-                escaped.c_str(),
+                cMsg,
                 withComma ? "," : "");
 }
 
@@ -268,24 +270,26 @@ void readSettings(bool show)
     DebugTln(F("Settings file is empty, use existing defaults."));
     return;
   }
-  static const size_t JSON_LINE_BUF = 256;
-  char lineBuf[JSON_LINE_BUF];
+  // Use global cMsg as line buffer — saves 288 bytes of stack (256 lineBuf + 32 discardBuf).
+  // Safe: readSettings() runs in setup() before the main loop starts;
+  // cMsg is not in use by any concurrent code path during that window.
   char keyBuf[64];
   char valueBuf[201]; // must fit the largest setting value (WebhookPayload: 201 bytes)
 
   while (file.available()) {
-    size_t len = file.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
-    lineBuf[len] = '\0';
-    if (len == (sizeof(lineBuf) - 1)) {
-      char discardBuf[32];
+    size_t len = file.readBytesUntil('\n', cMsg, CMSG_SIZE - 1);
+    cMsg[len] = '\0';
+    if (len == (CMSG_SIZE - 1)) {
+      // Line was longer than cMsg — discard remainder and skip it.
       while (file.available()) {
-        size_t chunkLen = file.readBytesUntil('\n', discardBuf, sizeof(discardBuf) - 1);
-        if (chunkLen < (sizeof(discardBuf) - 1)) break;
+        size_t chunkLen = file.readBytesUntil('\n', cMsg, CMSG_SIZE - 1);
+        if (chunkLen < (CMSG_SIZE - 1)) break;
         yield();
       }
+      continue;
     }
 
-    if (parseJsonKVLine(lineBuf, keyBuf, sizeof(keyBuf), valueBuf, sizeof(valueBuf))) {
+    if (parseJsonKVLine(cMsg, keyBuf, sizeof(keyBuf), valueBuf, sizeof(valueBuf))) {
       updateSetting(keyBuf, valueBuf);
     }
   }
