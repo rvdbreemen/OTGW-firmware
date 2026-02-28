@@ -518,9 +518,12 @@ void updateSetting(const char *field, const char *newValue)
       strcasecmp_P(field, PSTR("WebhookEnabled")) == 0) {
     settingWebhookEnabled = EVALBOOLEAN(newValue);
   }
-  if (strcasecmp_P(field, PSTR("WebhookURLon")) == 0)    strlcpy(settingWebhookURLon, newValue, sizeof(settingWebhookURLon));
-  if (strcasecmp_P(field, PSTR("WebhookURLoff")) == 0)   strlcpy(settingWebhookURLoff, newValue, sizeof(settingWebhookURLoff));
-  if (strcasecmp_P(field, PSTR("WebhookTriggerBit")) == 0) settingWebhookTriggerBit = atoi(newValue);
+  if (strcasecmp_P(field, PSTR("WebhookURLon")) == 0 ||
+      strcasecmp_P(field, PSTR("webhookurlon")) == 0)   strlcpy(settingWebhookURLon, newValue, sizeof(settingWebhookURLon));
+  if (strcasecmp_P(field, PSTR("WebhookURLoff")) == 0 ||
+      strcasecmp_P(field, PSTR("webhookurloff")) == 0)  strlcpy(settingWebhookURLoff, newValue, sizeof(settingWebhookURLoff));
+  if (strcasecmp_P(field, PSTR("WebhookTriggerBit")) == 0 ||
+      strcasecmp_P(field, PSTR("webhooktriggerbit")) == 0) settingWebhookTriggerBit = constrain(atoi(newValue), 0, 15);
 
   // Mark settings dirty and restart debounce timer — actual write + service
   // restarts are deferred to flushSettings() which runs from loop() timer.

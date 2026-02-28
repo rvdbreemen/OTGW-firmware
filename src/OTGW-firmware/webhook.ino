@@ -26,6 +26,12 @@ static void sendWebhook(bool stateOn) {
     return;
   }
 
+  // Fail fast if WiFi is not connected — avoids stalling the main loop
+  if (WiFi.status() != WL_CONNECTED) {
+    DebugTln(F("Webhook: WiFi not connected, skipping"));
+    return;
+  }
+
   const char* url = stateOn ? settingWebhookURLon : settingWebhookURLoff;
   if (strlen(url) == 0) {
     DebugTf(PSTR("Webhook: no URL configured for state %s\r\n"), stateOn ? "ON" : "OFF");
@@ -36,10 +42,12 @@ static void sendWebhook(bool stateOn) {
 
   WiFiClient client;
   HTTPClient http;
-  http.setTimeout(3000); // 3 second timeout to avoid stalling the main loop
+  http.setTimeout(3000); // 3-second timeout
 
   if (http.begin(client, url)) {
+    yield(); // allow other tasks while TCP stack works
     int code = http.GET();
+    yield(); // allow other tasks after response
     if (code > 0) {
       DebugTf(PSTR("Webhook: HTTP response code: %d\r\n"), code);
     } else {
@@ -49,7 +57,7 @@ static void sendWebhook(bool stateOn) {
   } else {
     DebugTln(F("Webhook: http.begin() failed (invalid URL?)"));
   }
-  feedWatchDog(); // ensure watchdog is fed after potentially slow HTTP request
+  feedWatchDog(); // feed watchdog after potentially slow HTTP request
 }
 
 //=======================================================================
