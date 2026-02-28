@@ -170,11 +170,11 @@ void readSettings(bool show)
   // at default config. 2048 provides headroom for user-configured longer strings.
   DynamicJsonDocument doc(2048);
   DeserializationError error = deserializeJson(doc, file);
+  file.close();
   if (error)
   {
     DebugTln(F("Failed to read file, use existing defaults."));
     DebugTf(PSTR("Settings Deserialisation error:  %s \r\n"), error.c_str());
-    file.close();
     return;
   }
 
