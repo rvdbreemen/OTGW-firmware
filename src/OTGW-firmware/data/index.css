@@ -257,6 +257,7 @@
   } 
   .right-0  {right: 0; padding-right: 10px; }
   .left-0   {left:  0; padding-left:  10px; }
+  #heap-info { margin-right: 8px; }
   .ps-mode-watermark {
     color: #9c5700 !important;
     font-weight: 700;
