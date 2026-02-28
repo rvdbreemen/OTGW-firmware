@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v1.1.0-beta
+**  Version  : v1.2.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -110,7 +110,7 @@ void sendBeforenext(){
 //=======================================================================
 void sendNestedJsonObj(const char *cName, const char *cValue)
 {
-  char jsonBuff[JSON_BUFF_MAX] = "";
+  char jsonBuff[JSON_ENTRY_BUF] = "";
   
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": \"%s\"}"), cName, cValue);
 
@@ -121,9 +121,9 @@ void sendNestedJsonObj(const char *cName, const char *cValue)
 //=======================================================================
 void sendNestedJsonObj(const char *cName, String sValue)
 {
-  char jsonBuff[JSON_BUFF_MAX] = "";
-  
-  if (sValue.length() > (JSON_BUFF_MAX - 65) )
+  char jsonBuff[JSON_ENTRY_BUF] = "";
+
+  if (sValue.length() > (JSON_ENTRY_BUF - 65) )
   {
     DebugTf(PSTR("[2] sValue.length() [%d]\r\n"), sValue.length());
   }
@@ -181,7 +181,7 @@ void sendNestedJsonObj(const char *cName, float fValue)
 //============= build OTmonitor string ========================
 void sendJsonOTmonObj(const char *cName, const char *cValue, const char *cUnit, time_t epoch)
 {
-  char jsonBuff[JSON_BUFF_MAX] = "";
+  char jsonBuff[JSON_ENTRY_BUF] = "";
   
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": \"%s\", \"unit\": \"%s\", \"epoch\": %d}")
                                       , cName, cValue, cUnit, (uint32_t)epoch);
@@ -347,7 +347,7 @@ void sendJsonMapEntry(const char *cName, float fValue)
 
 void sendJsonMapEntry(const char *cName, const char *cValue)
 {
-  char jsonBuff[JSON_BUFF_MAX] = "";
+  char jsonBuff[JSON_ENTRY_BUF] = "";
 
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": \"%s\""), cName, cValue);
 
@@ -358,9 +358,9 @@ void sendJsonMapEntry(const char *cName, const char *cValue)
 
 void sendJsonMapEntry(const char *cName, String sValue)
 {
-  char jsonBuff[JSON_BUFF_MAX] = "";
-  
-  if (sValue.length() > (JSON_BUFF_MAX - 65) )
+  char jsonBuff[JSON_ENTRY_BUF] = "";
+
+  if (sValue.length() > (JSON_ENTRY_BUF - 65) )
   {
     DebugTf(PSTR("[2] sValue.length() [%d]\r\n"), sValue.length());
   }
@@ -384,7 +384,7 @@ void sendEndJsonMap(const char *objName)
 
 void sendJsonOTmonMapEntry(const char *cName, const char *cValue, const char *cUnit, time_t epoch)
 {
-  char jsonBuff[JSON_BUFF_MAX] = "";
+  char jsonBuff[JSON_ENTRY_BUF] = "";
   
   // Compact format: "name": {"value": "val", "unit": "u", "epoch": 123}
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": \"%s\", \"unit\": \"%s\", \"epoch\": %d}")

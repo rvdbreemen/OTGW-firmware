@@ -333,7 +333,7 @@ All examples in this documentation use cURL and can be run directly from command
 ## Support & Documentation
 
 - **Main README**: See repository root for general firmware documentation
-- **OpenTherm Specification**: `Specification/` directory in repository
+- **OpenTherm Specification**: `docs/opentherm specification/` directory in repository
 - **OTGW Hardware**: https://otgw.tclcode.com/
 - **Issues**: https://github.com/rvdbreemen/OTGW-firmware/issues
 

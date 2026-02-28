@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v1.1.0-beta
+**  Version  : v1.2.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -266,8 +266,8 @@ bool updateRebootLog(String text)
   #define LOG_LINE_LENGTH 140
 
   char log_line[LOG_LINE_LENGTH] = {0};
-  char log_line_regs[LOG_LINE_LENGTH] = {0};
-  char log_line_excpt[LOG_LINE_LENGTH] = {0};
+  char log_line_regs[120] = {0};  // "ESP register contents: epc1=0x12345678, ..." = 116 chars max
+  char log_line_excpt[64]  = {0}; // "- Access to invalid address (29)" = 32 chars max
   uint32_t errorCode = -1;
 
   //waitforNTPsync();
