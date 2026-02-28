@@ -112,7 +112,7 @@ Architecture Decision Records capture important architectural decisions along wi
   ~~Standardized JSON handling for settings persistence, REST API, MQTT, and WebSocket communication.~~
 
 - **[ADR-042: Streaming JSON I/O — No ArduinoJson](ADR-042-streaming-json-no-arduinojson.md)** 🆕  
-  Mandate streaming JSON helpers with global scratch buffers instead of ArduinoJson; eliminates heap allocation and the settings-reset bug from buffer overflow.
+  Mandate streaming JSON helpers with global scratch buffers instead of ArduinoJson; eliminates ArduinoJson heap documents, avoids ArduinoJson-driven fragmentation, and fixes the settings-reset bug from buffer overflow.
 
 ### Features and Extensions
 - **[ADR-019: REST API Versioning Strategy](ADR-019-rest-api-versioning-strategy.md)**  
