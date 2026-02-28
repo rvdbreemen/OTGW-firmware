@@ -514,7 +514,10 @@ void updateSetting(const char *field, const char *newValue)
     Debugln();
     DebugTf(PSTR("Need reboot before GPIO OUTPUTS will use new trigger bit %d!\r\n\n"), settingGPIOOUTPUTStriggerBit);
   }
-  if (strcasecmp_P(field, PSTR("WebhookEnabled")) == 0)  settingWebhookEnabled = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("webhookenable")) == 0 ||
+      strcasecmp_P(field, PSTR("WebhookEnabled")) == 0) {
+    settingWebhookEnabled = EVALBOOLEAN(newValue);
+  }
   if (strcasecmp_P(field, PSTR("WebhookURLon")) == 0)    strlcpy(settingWebhookURLon, newValue, sizeof(settingWebhookURLon));
   if (strcasecmp_P(field, PSTR("WebhookURLoff")) == 0)   strlcpy(settingWebhookURLoff, newValue, sizeof(settingWebhookURLoff));
   if (strcasecmp_P(field, PSTR("WebhookTriggerBit")) == 0) settingWebhookTriggerBit = atoi(newValue);
