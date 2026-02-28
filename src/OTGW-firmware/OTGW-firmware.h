@@ -252,8 +252,8 @@ int8_t    settingGPIOOUTPUTStriggerBit = 0;
 
 //Webhook Settings
 bool      settingWebhookEnabled = false;
-char      settingWebhookURLon[101] = "";    // URL called when trigger bit turns ON (max 100)
-char      settingWebhookURLoff[101] = "";   // URL called when trigger bit turns OFF (max 100)
+char      settingWebhookURLon[101]  = "http://homeassistant.local:8123/api/webhook/otgw_boiler";
+char      settingWebhookURLoff[101] = "http://homeassistant.local:8123/api/webhook/otgw_boiler";
 int8_t    settingWebhookTriggerBit = 1;     // Default: bit 1 = CH mode (slave: CH active)
 char      settingWebhookPayload[201] = "";  // Body template for HTTP POST; empty = HTTP GET
                                             // Supported variables: {state} {tboiler} {tr}

@@ -3206,7 +3206,9 @@ const hiddenSettings = [
   "webhookenable",
   "webhookurlon",
   "webhookurloff",
-  "webhooktriggerbit"
+  "webhooktriggerbit",
+  "webhookpayload",
+  "webhookcontenttype"
 ];
 
 function refreshSettings() {
@@ -3375,7 +3377,7 @@ function refreshWebhookPage() {
     })
     .then(function(json) {
       var wh = {};
-      ["webhookenable", "webhookurlon", "webhookurloff", "webhooktriggerbit"].forEach(function(key) {
+      ["webhookenable", "webhookurlon", "webhookurloff", "webhooktriggerbit", "webhookpayload", "webhookcontenttype"].forEach(function(key) {
         if (json.settings && json.settings[key] !== undefined) {
           wh[key] = json.settings[key];
         }
@@ -3383,9 +3385,11 @@ function refreshWebhookPage() {
 
       var fields = [
         { key: "webhookenable",    label: "Webhook Enabled",        type: "b" },
-        { key: "webhookurlon",     label: "URL (ON state)",          type: "s", maxlen: 100 },
-        { key: "webhookurloff",    label: "URL (OFF state)",         type: "s", maxlen: 100 },
-        { key: "webhooktriggerbit",label: "Trigger Bit (0-15)",      type: "i", min: 0, max: 15 }
+        { key: "webhookurlon",     label: "URL (ON state)",          type: "s", maxlen: 100, size: 60, placeholder: "http://homeassistant.local:8123/api/webhook/otgw_boiler" },
+        { key: "webhookurloff",    label: "URL (OFF state)",         type: "s", maxlen: 100, size: 60, placeholder: "http://homeassistant.local:8123/api/webhook/otgw_boiler" },
+        { key: "webhooktriggerbit",label: "Trigger Bit (0-15)",      type: "i", min: 0, max: 15 },
+        { key: "webhookpayload",    label: "Payload Template",        type: "s", maxlen: 200, size: 86, placeholder: '{"state":"{state}","tboiler":{tboiler},"tr":{tr},"relmod":{relmod},"flame":{flameon}}' },
+        { key: "webhookcontenttype",label: "Content-Type (POST)",     type: "s", maxlen: 31,  size: 20 }
       ];
 
       fields.forEach(function(f) {
@@ -3413,8 +3417,9 @@ function refreshWebhookPage() {
         } else if (f.type === "s") {
           input.type = "text";
           input.maxLength = f.maxlen || 100;
-          input.size = 20;
+          input.size = f.size || 20;
           input.value = s.value;
+          if (f.placeholder) input.placeholder = f.placeholder;
         } else {
           input.type = "number";
           input.min = f.min;
@@ -3474,7 +3479,7 @@ function refreshWebhookPage() {
 
 //============================================================================
 function saveWebhookSettings() {
-  var fields = ["webhookenable", "webhookurlon", "webhookurloff", "webhooktriggerbit"];
+  var fields = ["webhookenable", "webhookurlon", "webhookurloff", "webhooktriggerbit", "webhookpayload", "webhookcontenttype"];
   var msgEl = document.getElementById("webhookMessage");
   fields.forEach(function(name) {
     var el = document.getElementById("WH_" + name);
@@ -3772,6 +3777,8 @@ var translateFields = [
   , ["webhookurlon", "Webhook URL (ON state)"]
   , ["webhookurloff", "Webhook URL (OFF state)"]
   , ["webhooktriggerbit", "Webhook Trigger Bit (0-15)"]
+  , ["webhookpayload", "Webhook Payload Template"]
+  , ["webhookcontenttype", "Webhook Content-Type (POST)"]
   
 ];
 
