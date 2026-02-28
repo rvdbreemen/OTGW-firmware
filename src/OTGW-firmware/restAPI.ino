@@ -322,9 +322,9 @@ void processAPI()
           if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
           sendOTmonitorV2();
         } else if (wc > 4 && strcmp_P(words[4], PSTR("telegraf")) == 0) {
-          // GET /api/v2/otgw/telegraf
+          // GET /api/v2/otgw/telegraf — map format (use otmonitor map, same data)
           if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-          sendTelegraf();
+          sendOTmonitorV2();
         } else if (wc > 4 && strcmp_P(words[4], PSTR("messages")) == 0) {
           // GET /api/v2/otgw/messages/{id} — RESTful resource name for OT message by ID
           if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
@@ -1103,7 +1103,7 @@ void sendDeviceSettings()
 {
   RESTDebugTln(F("sending device settings ...\r"));
 
-  sendStartJsonObj(F("settings"));
+  sendStartJsonMap(F("settings"));
 
   //sendJsonSettingObj("string",   settingString,   "p", sizeof(settingString)-1);  
   //sendJsonSettingObj("string",   settingString,   "s", sizeof(settingString)-1);
@@ -1154,7 +1154,7 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("webhookurloff"), CSTR(settingWebhookURLoff), "s", 100);
   sendJsonSettingObj(F("webhooktriggerbit"), settingWebhookTriggerBit, "i", 0, 15);
 
-  sendEndJsonObj(F("settings"));
+  sendEndJsonMap(F("settings"));
 
 } // sendDeviceSettings()
 

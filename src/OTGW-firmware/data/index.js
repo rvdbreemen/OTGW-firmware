@@ -3224,17 +3224,19 @@ function refreshSettings() {
       data = json.settings;
       const msgEl = document.getElementById("settingMessage");
       if (msgEl) msgEl.textContent = "";
-      for (let i in data) {
-        console.log("[" + data[i].name + "]=>[" + data[i].value + "]");
+      for (const key in data) {
+        if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
+        const s = data[key]; // s.value, s.type, s.maxlen, s.max, s.min
+        console.log("[" + key + "]=>[" + s.value + "]");
         // Skip hidden settings
-        if (data[i].name.startsWith('#') || hiddenSettings.includes(data[i].name)) continue;
+        if (key.startsWith('#') || hiddenSettings.includes(key)) continue;
 
         var settings = document.getElementById('settingsPage');
-        if ((document.getElementById("D_" + data[i].name)) == null) {
+        if ((document.getElementById("D_" + key)) == null) {
           var rowDiv = document.createElement("div");
           rowDiv.setAttribute("class", "settingDiv");
-          //----rowDiv.setAttribute("id", "settingR_"+data[i].name);
-          rowDiv.setAttribute("id", "D_" + data[i].name);
+          //----rowDiv.setAttribute("id", "settingR_"+key);
+          rowDiv.setAttribute("id", "D_" + key);
           // rowDiv.setAttribute("style", "text-align: right;");
           // rowDiv.style.marginLeft = "10px";
           // rowDiv.style.marginRight = "10px";
@@ -3244,46 +3246,46 @@ function refreshSettings() {
           //--- field Name ---
           var fldLabel = document.createElement("label");
           fldLabel.className = 'settings-field-container';
-          fldLabel.setAttribute("for", data[i].name);
-          fldLabel.textContent = translateToHuman(data[i].name);
+          fldLabel.setAttribute("for", key);
+          fldLabel.textContent = translateToHuman(key);
           rowDiv.appendChild(fldLabel);
           //--- input ---
           var inputDiv = document.createElement("div");
           inputDiv.className = 'settings-input-container';
 
           var sInput = document.createElement("input");
-          //----sInput.setAttribute("id", "setFld_"+data[i].name);
-          sInput.setAttribute("id", data[i].name);
-          if (data[i].type == "b") {
+          //----sInput.setAttribute("id", "setFld_"+key);
+          sInput.setAttribute("id", key);
+          if (s.type == "b") {
             sInput.setAttribute("type", "checkbox");
-            sInput.checked = strToBool(data[i].value);
+            sInput.checked = strToBool(s.value);
           }
-          else if (data[i].type == "s") {
+          else if (s.type == "s") {
             sInput.setAttribute("type", "text");
-            sInput.setAttribute("maxlength", data[i].maxlen);
-            sInput.setAttribute("size", (data[i].maxlen > 20 ? 20 : data[i].maxlen));
+            sInput.setAttribute("maxlength", s.maxlen);
+            sInput.setAttribute("size", (s.maxlen > 20 ? 20 : s.maxlen));
           }
-          else if (data[i].type == "p") {
+          else if (s.type == "p") {
             sInput.setAttribute("type", "password");
-            sInput.setAttribute("maxlength", data[i].maxlen);
-            sInput.setAttribute("size", (data[i].maxlen > 20 ? 20 : data[i].maxlen));
+            sInput.setAttribute("maxlength", s.maxlen);
+            sInput.setAttribute("size", (s.maxlen > 20 ? 20 : s.maxlen));
           }
-          else if (data[i].type == "f") {
+          else if (s.type == "f") {
             sInput.setAttribute("type", "number");
-            sInput.max = data[i].max;
-            sInput.min = data[i].min;
-            sInput.step = (data[i].min + data[i].max) / 1000;
+            sInput.max = s.max;
+            sInput.min = s.min;
+            sInput.step = (s.min + s.max) / 1000;
           }
-          else if (data[i].type == "i") {
+          else if (s.type == "i") {
             sInput.setAttribute("type", "number");
             sInput.setAttribute("size", 10);
-            sInput.max = data[i].max;
-            sInput.min = data[i].min;
-            //sInput.step = (data[i].min + data[i].max) / 1000;
+            sInput.max = s.max;
+            sInput.min = s.min;
+            //sInput.step = (s.min + s.max) / 1000;
             sInput.step = 1;
           }
-          sInput.setAttribute("value", data[i].value);
-          const fieldName = data[i].name;
+          sInput.setAttribute("value", s.value);
+          const fieldName = key;
           sInput.addEventListener('change',
             function () { 
               var inputEl = document.getElementById(fieldName);
@@ -3313,16 +3315,16 @@ function refreshSettings() {
           settings.appendChild(rowDiv);
         }
         else {
-          //----document.getElementById("setFld_"+data[i].name).style.background = "white";
-          const inputEl = document.getElementById(data[i].name);
+          //----document.getElementById("setFld_"+key).style.background = "white";
+          const inputEl = document.getElementById(key);
           if (inputEl) {
             inputEl.className = "input-normal";
-            //----document.getElementById("setFld_"+data[i].name).value = data[i].value;
-            // document.getElementById(data[i].name).value = data[i].value;
+            //----document.getElementById("setFld_"+key).value = s.value;
+            // document.getElementById(key).value = s.value;
             // FIX If checkbox change checked iso value
-            if (data[i].type == "b")
-              inputEl.checked = strToBool(data[i].value);
-            else inputEl.value = data[i].value;
+            if (s.type == "b")
+              inputEl.checked = strToBool(s.value);
+            else inputEl.value = s.value;
           }
         }
       }
@@ -3373,10 +3375,9 @@ function refreshWebhookPage() {
     })
     .then(function(json) {
       var wh = {};
-      json.settings.forEach(function(s) {
-        if (s.name === "webhookenable" || s.name === "webhookurlon" ||
-            s.name === "webhookurloff" || s.name === "webhooktriggerbit") {
-          wh[s.name] = s;
+      ["webhookenable", "webhookurlon", "webhookurloff", "webhooktriggerbit"].forEach(function(key) {
+        if (json.settings && json.settings[key] !== undefined) {
+          wh[key] = json.settings[key];
         }
       });
 
@@ -3785,14 +3786,12 @@ function applyTheme() {
     })
     .then(json => {
       let data = json.settings;
-      for (let i in data) {
-        if (data[i].name == "darktheme") {
-           let isDark = strToBool(data[i].value);
-           document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
-           localStorage.setItem('theme', isDark ? 'dark' : 'light');
-           if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.setTheme === 'function') {
-               OTGraph.setTheme(isDark ? 'dark' : 'light');
-           }
+      if (data && data["darktheme"]) {
+        let isDark = strToBool(data["darktheme"].value);
+        document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.setTheme === 'function') {
+            OTGraph.setTheme(isDark ? 'dark' : 'light');
         }
       }
     })
@@ -4465,10 +4464,7 @@ function loadPersistentUI() {
     .then(json => {
       if (!json || !json.settings) return;
       const settings = json.settings;
-      const getVal = (name) => {
-        const s = settings.find(s => s.name === name);
-        return s ? s.value : null;
-      };
+      const getVal = (name) => settings[name] ? settings[name].value : null;
 
       // Auto Scroll
       const autoScrollVal = getVal("ui_autoscroll");

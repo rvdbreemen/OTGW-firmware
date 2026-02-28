@@ -490,11 +490,10 @@ void sendJsonSettingObj(const char *cName, float fValue, const char *fType, int 
 {
   char jsonBuff[200] = "";
 
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.3f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %.3f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
                                       , cName, fValue, fType, minValue, maxValue);
 
   sendBeforenext();
-  sendIdent();
   httpServer.sendContent(jsonBuff);
 
 } // sendJsonSettingObj(*char, float, *char, int, int)
@@ -507,25 +506,24 @@ void sendJsonSettingObj(const char *cName, float fValue, const char *fType, int 
 
   switch(decPlaces) {
     case 0:
-      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.0f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
+      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %.0f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
                                       , cName, fValue, fType, minValue, maxValue);
       break;
     case 2:
-      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.2f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
+      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %.2f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
                                       , cName, fValue, fType, minValue, maxValue);
       break;
     case 5:
-      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.5f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
+      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %.5f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
                                       , cName, fValue, fType, minValue, maxValue);
       break;
     default:
-      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
+      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
                                       , cName, fValue, fType, minValue, maxValue);
 
   }
 
   sendBeforenext();
-  sendIdent();
   httpServer.sendContent(jsonBuff);
 
 } // sendJsonSettingObj(*char, float, *char, int, int, int)
@@ -536,11 +534,10 @@ void sendJsonSettingObj(const char *cName, int iValue, const char *iType, int mi
 {
   char jsonBuff[200] = "";
 
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %d, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %d, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
                                       , cName, iValue, iType, minValue, maxValue);
 
   sendBeforenext();
-  sendIdent();
   httpServer.sendContent(jsonBuff);
 } // sendJsonSettingObj(*char, int, *char, int, int)
 
@@ -550,14 +547,11 @@ void sendJsonSettingObj(const char *cName, int iValue, const char *iType, int mi
 void sendJsonSettingObj(const char *cName, const char *cValue, const char *sType, int maxLen)
 {
   char jsonBuff[200] = {0};
-  char buffer[100] = {0};
 
-  str_cstrlit(cValue, buffer, sizeof(buffer));
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\":\"%s\", \"type\": \"%s\", \"maxlen\": %d}")
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": \"%s\", \"type\": \"%s\", \"maxlen\": %d}")
                                       , cName, cValue, sType, maxLen);
 
   sendBeforenext();
-  sendIdent();
   httpServer.sendContent(jsonBuff);
 
 } // sendJsonSettingObj(*char, *char, *char, int, int)
@@ -567,11 +561,10 @@ void sendJsonSettingObj(const char *cName, bool bValue, const char *sType)
 {
   char jsonBuff[200] = "";
 
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\":\"%s\", \"type\": \"%s\"}")
-                                      , cName,  CBOOLEAN(bValue), sType);
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %s, \"type\": \"%s\"}")
+                                      , cName, CBOOLEAN(bValue), sType);
 
   sendBeforenext();
-  sendIdent();
   httpServer.sendContent(jsonBuff);
  
 } // sendJsonSettingObj(*char, bool, *char)    
