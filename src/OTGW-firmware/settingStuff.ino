@@ -128,6 +128,7 @@ void writeSettings(bool show)
   wStrF (file, PSTR("MQTThaprefix"),            settingMQTThaprefix);
   wStrF (file, PSTR("MQTTuniqueid"),            settingMQTTuniqueid);
   wBoolF(file, PSTR("MQTTOTmessage"),           settingMQTTOTmessage);
+  wBoolF(file, PSTR("MQTTseparatesources"),     settingMQTTSeparateSources);
   wBoolF(file, PSTR("MQTTharebootdetection"),   settingMQTTharebootdetection);
   wBoolF(file, PSTR("NTPenable"),               settingNTPenable);
   wStrF (file, PSTR("NTPtimezone"),             settingNTPtimezone);
