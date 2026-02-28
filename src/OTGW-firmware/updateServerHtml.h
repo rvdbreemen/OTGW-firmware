@@ -107,7 +107,7 @@ static const char UpdateServerIndex[] PROGMEM =
          <div id='ghSection'>
            <h2>Update from GitHub</h2>
            <div id='ghCurrentVersion'>Installed version: detecting...</div>
-           <button id='ghCheckBtn' onclick='loadReleases()'>Check for Updates</button>
+           <button id='ghCheckBtn' onclick='loadReleases()'>Refresh</button>
            <div id='ghStatus'></div>
            <div id='ghList' style='display:none'></div>
          </div>
@@ -599,6 +599,7 @@ static const char UpdateServerIndex[] PROGMEM =
                if (!fwAsset && a.name && a.name.indexOf('.ino.bin') >= 0) fwAsset = a;
                if (!fsAsset && a.name && a.name.indexOf('.littlefs.bin') >= 0) fsAsset = a;
              }
+             if (!fwAsset && !fsAsset) continue;
              var nameHtml = escHtml(rel.name || rel.tag_name || '');
              if (isInstalled) nameHtml += ' <span class="gh-badge installed">Installed</span>';
              else if (isNewer) nameHtml += ' <span class="gh-badge update">Update</span>';
@@ -617,6 +618,8 @@ static const char UpdateServerIndex[] PROGMEM =
            list.innerHTML = html;
            list.style.display = 'block';
          }
+
+         loadReleases();
 
          window.ghFlash = function(idx, isFirmware) {
            if (!ghReleases || idx >= ghReleases.length) return;
