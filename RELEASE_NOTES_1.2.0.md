@@ -1,7 +1,7 @@
 # Release Notes — v1.2.0-beta
 
-**Last updated:** 2026-02-24<br>
-**Release branch:** `dev`<br>
+**Last updated:** 2026-02-28<br>
+**Release branch:** `dev-1.2.0-stable-version-adding-webhook`<br>
 **Comparison target:** `v1.0.0` (tag `v1.0.0`, released 2026-02-08)<br>
 
 ---
@@ -61,9 +61,16 @@ Two MQTT topic names were corrected for spelling. Existing Home Assistant entiti
 **Migration**: Delete the old entities from Home Assistant (Settings → Devices & Services → MQTT → delete orphaned entities), then trigger MQTT discovery re-registration via the device UI or `POST /api/v2/otgw/discovery`. Manual MQTT consumers must update topic subscriptions because these typo-fix renames do not publish backward-compatibility aliases.
 
 ### MQTT separate-source topics are opt-in (default: disabled)
+
 A new feature (`MQTTseparatesources`) publishes source-specific MQTT topics per OT message (thermostat/boiler/gateway). **This is disabled by default** in v1.2.0 for backward compatibility. Upgraders are not affected unless they opt in.
 
 To enable: set `MQTTseparatesources = true` in settings, then run MQTT discovery to register the new per-source HA entities.
+
+### v0 and v1 REST API removed (action required for API consumers)
+
+All `/api/v0/` and `/api/v1/` endpoints have been **removed**. Any client calling these paths will now receive **410 Gone**.
+
+**Migration**: Update all integrations to use the `/api/v2/` equivalents. See [docs/api/README.md](docs/api/README.md) for the complete v2 endpoint reference. The v2 API has been available since v1.1.0 — no functional changes were made to the v2 endpoints themselves.
 
 ---
 
@@ -82,13 +89,16 @@ Version `1.2.0` builds on the stable `v1.0.0` baseline with two major release in
 - PS mode (`PS=1`) auto-detection and UI handling
 - 20 bug fixes (out-of-bounds writes, XSS, ISR race conditions, file descriptor leaks, and more)
 
-**v1.2.0 additions** (OpenTherm v4.2 alignment, comprehensive HA discovery, source-separated MQTT, gateway reliability):
+**v1.2.0 additions** (OpenTherm v4.2 alignment, comprehensive HA discovery, source-separated MQTT, gateway reliability, webhook, v2-only API):
 
 - **Comprehensive Home Assistant MQTT auto-discovery** — all OpenTherm message types (see section above)
 - OpenTherm v4.2 protocol map alignment — new IDs, corrected types/directions/units
 - Configurable source-separated MQTT topics (`MQTTseparatesources`)
 - Gateway-mode detection reliability, serial robustness, WebSocket diagnostics
 - Web UI mobile/responsive improvements, shared navigation shell
+- **Webhook** — HTTP call on OpenTherm status bit change (configurable URL, payload, content type)
+- **v0 and v1 REST API removed** — only v2 remains; ArduinoJson replaced with streaming JSON I/O
+- **Bug fix** — `MQTTseparatesources` setting not persisted across reboots
 
 ---
 
@@ -210,9 +220,34 @@ Version `1.2.0` builds on the stable `v1.0.0` baseline with two major release in
   - `docs/fixes/opentherm-v42-mqtt-breaking-changes.md`
   - OpenTherm v4.2 compliance review docs (`docs/reviews/2026-02-15_opentherm-v42-compliance/`)
   - Issue #143 source-separation options analysis (`docs/reviews/2026-02-20_issue-143-source-separation/ISSUE_143_OPTIONS_ANALYSIS.md`)
+  - REST API documentation updated to v2-only (`docs/api/README.md`, `docs/api/openapi.yaml`)
 - Repository hygiene cleanup:
   - removed accidental artifact file `tmpclaude-ecc0-cwd`
   - ignore Claude local settings artifact path in `.gitignore`
+
+### Webhook support (new in this branch)
+
+A new webhook feature allows the firmware to make an outbound HTTP call when a configurable OpenTherm status bit changes.
+
+- Triggered by any configurable OpenTherm status bit (default: bit 1 — flame on/off).
+- Separate URL, payload body, and content type for the "on" and "off" event.
+- URLs are restricted to the local network (`isLocalUrl()` — ADR-003/ADR-032); external URLs are rejected.
+- Disabled by default (`settingWebhookEnabled = false`). Settings are persisted alongside other device settings.
+- New settings: `webhookEnabled`, `webhookURLon`, `webhookURLoff`, `webhookTriggerBit`, `webhookPayload`, `webhookContentType`.
+- Test endpoint: `GET /api/v2/webhook/test` triggers a test call to verify the configured URL is reachable.
+
+### v0 and v1 REST API removed (new in this branch)
+
+The v0 and v1 REST API versions have been removed. Any request to `/api/v0/` or `/api/v1/` now returns **410 Gone**.
+
+- Only `/api/v2/` endpoints remain — see [docs/api/README.md](docs/api/README.md) for the full reference.
+- ArduinoJson dependency removed; settings I/O replaced with lightweight streaming helpers (`wStrF`, `wBoolF`, `wIntF`, `parseSettingsLine()`), reducing both flash and RAM usage.
+- All in-firmware references to v1 endpoints (OTA health polling, sensor label restore) updated to v2.
+- OpenAPI specification and API documentation updated to v2-only.
+
+### Bug fixes (new in this branch)
+
+- **`MQTTseparatesources` not persisted**: The setting was written to `settings.ini` by `writeSettings()` but was absent from `applySettingFromFile()`, causing it to silently reset to `false` on every reboot. Fixed in `settingStuff.ino`.
 
 ---
 
