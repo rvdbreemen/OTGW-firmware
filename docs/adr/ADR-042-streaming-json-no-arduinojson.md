@@ -22,8 +22,10 @@ problems emerged:
   a full-featured parser library is unnecessary.
 
 A dedicated set of lightweight streaming helpers (in `jsonStuff.ino`) now covers all
-production use-cases with zero heap allocation and using only the existing global scratch
-buffer `cMsg[512]`.
+production use-cases without ArduinoJson heap documents. Most JSON generation and parsing
+uses the existing global scratch buffer `cMsg[512]` and other bounded stack/global buffers,
+with only short-lived `String` heap allocations where HTTP handlers already expose a
+`String` body.
 
 ## Decision
 
