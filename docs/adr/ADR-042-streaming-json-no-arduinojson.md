@@ -87,9 +87,9 @@ responses are generated once and streamed, so the streaming helpers are equally 
 ## Consequences
 
 ### Positive
-- **No ArduinoJson heap documents** — all JSON generation and file parsing uses
-  fixed-size global/stack buffers; only short-lived `String` allocations remain in HTTP
-  request handlers where the framework already provides a `String` body.
+- **Zero heap fragmentation from ArduinoJson documents** — all JSON generation and file
+  parsing uses fixed-size global/stack buffers; only short-lived `String` allocations
+  remain in HTTP request handlers where the framework already provides a `String` body.
 - **Settings file never overflows** — each field is written directly with bounded
   `snprintf_P` calls; there is no document-size constraint.
 - **~5 KB flash saved** by removing the ArduinoJson library.
