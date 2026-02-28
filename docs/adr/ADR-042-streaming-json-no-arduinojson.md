@@ -52,8 +52,9 @@ operate on global scratch buffers.**
    `cMsg[512]` scratch buffer is the canonical single-use scratch area for JSON formatting.
    Local buffers are allowed for short-lived values that must not alias `cMsg`.
 5. **Strings written to JSON settings files must be escaped** using `wStrF()` from
-   `settingStuff.ino` (which performs in-place escape of `"`, `\`, `\n`, `\r`, `\t`) or
-   an equivalent helper.
+   `settingStuff.ino` (which performs per-character escaping of `"`, `\`, `\n`, `\r`, `\t`
+   while writing to the output `File`, without modifying the input buffer) or an equivalent
+   helper.
 
 ### What is NOT affected
 
