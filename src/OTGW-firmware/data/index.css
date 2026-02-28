@@ -1064,16 +1064,7 @@ body.disable-interaction {
 }
 
 .otmonrow.no-data-row {
-  opacity: 0.65;
-}
-
-.otmonrow.no-data-row .otmoncolumn2 {
-  font-style: italic;
-}
-
-.otmoncolumn2.no-data-value {
-  color: #5a5a5a;
-  font-style: italic;
+  display: none;
 }
 
 .ot-log-mode-notice {

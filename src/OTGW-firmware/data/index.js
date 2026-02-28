@@ -3204,13 +3204,11 @@ function refreshOTmonitor() {
           var valDiv = document.createElement("div");
           valDiv.setAttribute("class", "otmoncolumn2");
           valDiv.setAttribute("id", "otmon_" + entry.name);
-          if (entry.epoch == 0) {
-            valDiv.textContent = 'No data yet';
-            valDiv.classList.add('no-data-value');
+          if (entry.epoch != 0) {
+            if (entry.value === "On") valDiv.innerHTML = "<span class='state-on'></span>";
+            else if (entry.value === "Off") valDiv.innerHTML = "<span class='state-off'></span>";
+            else valDiv.textContent = entry.value;
           }
-          else if (entry.value === "On") valDiv.innerHTML = "<span class='state-on'></span>";
-          else if (entry.value === "Off") valDiv.innerHTML = "<span class='state-off'></span>";
-          else valDiv.textContent = entry.value;
           rowDiv.appendChild(valDiv);
           //--- Unit  ---
           var unitDiv = document.createElement("div");
@@ -3235,15 +3233,12 @@ function refreshOTmonitor() {
           //   needReload = true;
           // } 
           epoch.value = entry.epoch;
-          if (entry.epoch == 0) {
-            update.textContent = 'No data yet';
-            update.classList.add('no-data-value');
-          }
-          else {
-            update.classList.remove('no-data-value');
+          if (entry.epoch != 0) {
             if (entry.value === "On") update.innerHTML = "<span class='state-on'></span>";
             else if (entry.value === "Off") update.innerHTML = "<span class='state-off'></span>";
             else update.textContent = entry.value;
+          } else {
+            update.textContent = '';
           }
           //if (update.style.visibility == 'visible') update.textContent = data[i].value;
 

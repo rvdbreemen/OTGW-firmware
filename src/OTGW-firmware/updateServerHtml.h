@@ -104,13 +104,21 @@ static const char UpdateServerIndex[] PROGMEM =
      <body>
      <div id='pageForm'>
        <h1>OTGW firmware Flash utility</h1>
+         <div id='ghSection'>
+           <h2>Update from GitHub</h2>
+           <div id='ghCurrentVersion'>Installed version: detecting...</div>
+           <button id='ghCheckBtn' onclick='loadReleases()'>Check for Updates</button>
+           <div id='ghStatus'></div>
+           <div id='ghList' style='display:none'></div>
+         </div>
+        <hr>
        <form id='fwForm' method='POST' action='?cmd=0' enctype='multipart/form-data'>
             Select a "<b>.ino.bin</b>" file to flash<br/>
             <input type='file' accept='.ino.bin' name='firmware' required>
             <br/>
             <input id='fwSubmit' type='submit' value='Flash Firmware' disabled>
         </form>
-        <form id='fsForm' method='POST' action='?cmd=100' enctype='multipart/form-data'> 
+        <form id='fsForm' method='POST' action='?cmd=100' enctype='multipart/form-data'>
             Select a "<b>.littlefs.bin</b>" file to flash<br/>
             <input type='file' accept='.littlefs.bin' name='filesystem' required>
             <br/>
@@ -121,19 +129,6 @@ static const char UpdateServerIndex[] PROGMEM =
             </div>
         </form>
         <div id='formError' style='color: #b00020; font-weight: bold; margin-top: 8px;'></div>
-        <hr>
-        <br/><font color='red'>Warning!!!</font>
-        <br/>You will lose all your files when flashing LittleFS. 
-        <br/>Backup your files first to your local filesystem (using FSexplorer) 
-        and upload them after the flashing of your LittleFS.
-        <hr>
-         <div id='ghSection'>
-           <h2>Update from GitHub</h2>
-           <div id='ghCurrentVersion'>Installed version: detecting...</div>
-           <button id='ghCheckBtn' onclick='loadReleases()'>Check for Updates</button>
-           <div id='ghStatus'></div>
-           <div id='ghList' style='display:none'></div>
-         </div>
      </div>
      <div id='pageProgress'>
        <h1>OTGW firmware Flash utility</h1>
