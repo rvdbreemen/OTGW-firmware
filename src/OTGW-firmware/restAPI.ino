@@ -421,7 +421,17 @@ void processAPI()
           // POST /api/v2/webhook/test?state=on|off — fire webhook immediately for testing
           if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST")); return; }
           String stateParam = httpServer.arg(F("state"));
-          bool testOn = (stateParam.equalsIgnoreCase("on") || stateParam == "1");
+          if (!stateParam.length()) {
+            sendApiError(400, F("Missing required 'state' parameter; expected on|1 or off|0"));
+            return;
+          }
+          bool isOn  = (stateParam.equalsIgnoreCase("on")  || stateParam == "1");
+          bool isOff = (stateParam.equalsIgnoreCase("off") || stateParam == "0");
+          if (!isOn && !isOff) {
+            sendApiError(400, F("Invalid state; expected on|1 or off|0"));
+            return;
+          }
+          bool testOn = isOn;
           testWebhook(testOn);
           httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
           httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
