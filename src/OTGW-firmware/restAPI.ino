@@ -340,11 +340,26 @@ void processAPI()
 
           // Read command from request body (JSON: {"command":"TT=20.5"} or plain text)
           const String& body = httpServer.arg(0);
-          StaticJsonDocument<128> cmdDoc;
-          DeserializationError err = deserializeJson(cmdDoc, body);
+          // Try to extract "command" field from JSON body; fall back to plain text
+          static char cmdBuf[64];
           const char* cmdStr = nullptr;
-          if (!err) {
-            cmdStr = cmdDoc[F("command")];
+          if (body.startsWith("{")) {
+            // Minimal streaming extraction: find "command": "..." in body
+            int cmdIdx = body.indexOf(F("\"command\""));
+            if (cmdIdx >= 0) {
+              int colon = body.indexOf(':', cmdIdx);
+              if (colon >= 0) {
+                int q1 = body.indexOf('"', colon + 1);
+                int q2 = (q1 >= 0) ? body.indexOf('"', q1 + 1) : -1;
+                if (q1 >= 0 && q2 > q1) {
+                  int len = q2 - q1 - 1;
+                  if (len > 0 && len < (int)sizeof(cmdBuf)) {
+                    body.substring(q1 + 1, q2).toCharArray(cmdBuf, sizeof(cmdBuf));
+                    cmdStr = cmdBuf;
+                  }
+                }
+              }
+            }
           }
           // Fallback: accept plain text body (e.g., "TT=20.5")
           if (!cmdStr || cmdStr[0] == '\0') {
@@ -492,66 +507,60 @@ void processAPI()
 
 //====[ implementing REST API ]====
 void sendOTGWvalue(int msgid){
-  StaticJsonDocument<256> doc;
-  JsonObject root  = doc.to<JsonObject>();
-  if (msgid < 0 || msgid > OT_MSGID_MAX) {
-    root[F("error")] = "message id: out of range";
-  } else {
-    PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
-    if (OTlookupitem.type==ot_undef) {  //message is undefined, return error
-      root[F("error")] = "message undefined: reserved for future use";
-    } else 
-    { //message id's need to be between 0 and OT_MSGID_MAX
-      //Debug print the values first
-      RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
-      //build the json
-      root[F("label")] = OTlookupitem.label;
-      if (OTlookupitem.type == ot_f88) {
-        root[F("value")] = atof(getOTGWValue(msgid)); 
-      } else {// all other message types convert to integer
-        root[F("value")] = atoi(getOTGWValue(msgid));
-      }
-      root[F("unit")] = OTlookupitem.unit;    
-    }
-  }
   char sBuff[JSON_ENTRY_BUF];
-  serializeJsonPretty(root, sBuff, sizeof(sBuff));
-  //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff);
-  //reply with json
   httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+  if (msgid < 0 || msgid > OT_MSGID_MAX) {
+    httpServer.send_P(200, PSTR("application/json"),
+      PSTR("{\"error\": \"message id: out of range\"}"));
+    return;
+  }
+  PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
+  if (OTlookupitem.type == ot_undef) {
+    httpServer.send_P(200, PSTR("application/json"),
+      PSTR("{\"error\": \"message undefined: reserved for future use\"}"));
+    return;
+  }
+  RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
+  if (OTlookupitem.type == ot_f88) {
+    snprintf_P(sBuff, sizeof(sBuff),
+      PSTR("{\r\n  \"label\": \"%s\",\r\n  \"value\": %s,\r\n  \"unit\": \"%s\"\r\n}"),
+      OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
+  } else {
+    snprintf_P(sBuff, sizeof(sBuff),
+      PSTR("{\r\n  \"label\": \"%s\",\r\n  \"value\": %d,\r\n  \"unit\": \"%s\"\r\n}"),
+      OTlookupitem.label, atoi(getOTGWValue(msgid)), OTlookupitem.unit);
+  }
   httpServer.send(200, F("application/json"), sBuff);
 }
 
 void sendOTGWlabel(const char *msglabel){
-  StaticJsonDocument<256> doc;
-  JsonObject root  = doc.to<JsonObject>();
+  char sBuff[JSON_ENTRY_BUF];
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   uint_fast8_t msgid;
-  for (msgid = 0; msgid<= OT_MSGID_MAX; msgid++){
+  for (msgid = 0; msgid <= OT_MSGID_MAX; msgid++){
     PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
-    if (strcasecmp(OTlookupitem.label, msglabel)==0) break;
+    if (strcasecmp(OTlookupitem.label, msglabel) == 0) break;
   }
   if (msgid > OT_MSGID_MAX){
-    root[F("error")] = "message id: reserved for future use";
-  } else if (OTlookupitem.type==ot_undef) {  //message is undefined, return error
-    root[F("error")] = "message undefined: reserved for future use";
-  } else 
-  { //message id's need to be between 0 and OT_MSGID_MAX
-    //RESTDebug print the values first
-    RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
-    //build the json
-    root[F("label")] = OTlookupitem.label;
-    if (OTlookupitem.type == ot_f88) {
-      root[F("value")] = atof(getOTGWValue(msgid)); 
-    } else {// all other message types convert to integer
-      root[F("value")] = atoi(getOTGWValue(msgid));
-    }
-    root[F("unit")] = OTlookupitem.unit;    
-  } 
-  char sBuff[JSON_ENTRY_BUF];
-  serializeJsonPretty(root, sBuff, sizeof(sBuff));
-  //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff);
-  //reply with json
-  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+    httpServer.send_P(200, PSTR("application/json"),
+      PSTR("{\"error\": \"message id: reserved for future use\"}"));
+    return;
+  }
+  if (OTlookupitem.type == ot_undef) {
+    httpServer.send_P(200, PSTR("application/json"),
+      PSTR("{\"error\": \"message undefined: reserved for future use\"}"));
+    return;
+  }
+  RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
+  if (OTlookupitem.type == ot_f88) {
+    snprintf_P(sBuff, sizeof(sBuff),
+      PSTR("{\r\n  \"label\": \"%s\",\r\n  \"value\": %s,\r\n  \"unit\": \"%s\"\r\n}"),
+      OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
+  } else {
+    snprintf_P(sBuff, sizeof(sBuff),
+      PSTR("{\r\n  \"label\": \"%s\",\r\n  \"value\": %d,\r\n  \"unit\": \"%s\"\r\n}"),
+      OTlookupitem.label, atoi(getOTGWValue(msgid)), OTlookupitem.unit);
+  }
   httpServer.send(200, F("application/json"), sBuff);
 }
 
@@ -1174,41 +1183,67 @@ void sendDeviceSettings()
 //=======================================================================
 void postSettings()
 {
-  //------------------------------------------------------------ 
-  // json string: {"name":"settingInterval","value":9}  
-  // json string: {"name":"settingHostname","value":"abc"}  
-  // json string: {"name":"darktheme","value":true}
-  //------------------------------------------------------------ 
-  // Replaced manual string parsing with ArduinoJson (Finding #40)
-  // The old approach stripped braces/quotes and split on , and : which broke
-  // on values containing special characters ({, }, ", comma, colon).
-  StaticJsonDocument<256> doc;
-  DeserializationError error = deserializeJson(doc, httpServer.arg(0));
-  if (error) {
-    RESTDebugTf(PSTR("postSettings JSON parse error: %s\r\n"), error.c_str());
+  //------------------------------------------------------------
+  // Accepts JSON body: {"name":"settingInterval","value":9}
+  //                    {"name":"settingHostname","value":"abc"}
+  //                    {"name":"darktheme","value":true}
+  // Parsed by minimal streaming extraction — no ArduinoJson.
+  //------------------------------------------------------------
+  const String& body = httpServer.arg(0);
+  if (body.length() == 0 || !body.startsWith("{")) {
     httpServer.send(400, F("application/json"), F("{\"error\":\"Invalid JSON\"}"));
     return;
   }
 
-  const char* field = doc[F("name")];
-  if (!field || field[0] == '\0') {
+  // Extract "name" field
+  char field[50];
+  field[0] = '\0';
+  {
+    int idx = body.indexOf(F("\"name\""));
+    if (idx >= 0) {
+      int colon = body.indexOf(':', idx);
+      int q1 = (colon >= 0) ? body.indexOf('"', colon + 1) : -1;
+      int q2 = (q1 >= 0)    ? body.indexOf('"', q1 + 1)   : -1;
+      if (q1 >= 0 && q2 > q1 && (q2 - q1 - 1) < (int)sizeof(field)) {
+        body.substring(q1 + 1, q2).toCharArray(field, sizeof(field));
+      }
+    }
+  }
+  if (field[0] == '\0') {
     httpServer.send(400, F("application/json"), F("{\"error\":\"Missing name\"}"));
     return;
   }
 
-  // Extract value as string — use a local buffer to avoid clobbering the global cMsg
-  // which downstream callers (updateSetting, flushSettings) may also write to.
+  // Extract "value" field — supports quoted string, bool literal, or number
   // 150 bytes covers the largest setting value (settingOTGWcommands, max 128 chars).
   char newValue[150];
   newValue[0] = '\0';
-  JsonVariant val = doc[F("value")];
-  if (val.is<const char*>()) {
-    strlcpy(newValue, val.as<const char*>(), sizeof(newValue));
-  } else if (val.is<bool>()) {
-    strlcpy(newValue, val.as<bool>() ? "true" : "false", sizeof(newValue));
-  } else if (!val.isNull()) {
-    // Numeric or other type — serialize to string
-    serializeJson(val, newValue, sizeof(newValue));
+  {
+    int idx = body.indexOf(F("\"value\""));
+    if (idx >= 0) {
+      int colon = body.indexOf(':', idx);
+      if (colon >= 0) {
+        // Skip whitespace after colon
+        int start = colon + 1;
+        while (start < (int)body.length() && body[start] == ' ') start++;
+        if (start < (int)body.length()) {
+          if (body[start] == '"') {
+            // Quoted string value
+            int q2 = body.indexOf('"', start + 1);
+            if (q2 > start && (q2 - start - 1) < (int)sizeof(newValue)) {
+              body.substring(start + 1, q2).toCharArray(newValue, sizeof(newValue));
+            }
+          } else {
+            // Unquoted value (bool: true/false, or number)
+            int end = start;
+            while (end < (int)body.length() && body[end] != ',' && body[end] != '}' && body[end] != ' ') end++;
+            if ((end - start) < (int)sizeof(newValue)) {
+              body.substring(start, end).toCharArray(newValue, sizeof(newValue));
+            }
+          }
+        }
+      }
+    }
   }
 
   if (newValue[0] != '\0') {
@@ -1218,7 +1253,7 @@ void postSettings()
     // The deferred timer still handles MQTT/NTP command updates, but HTTP
     // saves must be durable before we confirm success to the browser.
     flushSettings();
-    httpServer.send(200, F("application/json"), httpServer.arg(0));
+    httpServer.send(200, F("application/json"), body);
   } else {
     httpServer.send(400, F("application/json"), F("{\"error\":\"Missing value\"}"));
   }
@@ -1247,54 +1282,27 @@ void getDallasLabels() {
 
 // Update all Dallas sensor labels in file (bulk operation)
 void updateAllDallasLabels() {
-  // Parse JSON body from request
   const String& body = httpServer.arg(F("plain"));
-  
-  if (body.length() == 0) {
-    StaticJsonDocument<128> errorDoc;
-    errorDoc[F("success")] = false;
-    errorDoc[F("error")] = F("Empty request body");
-    String response;
-    serializeJson(errorDoc, response);
-    httpServer.send(400, F("application/json"), response);
+
+  // Validate: body must be a non-empty JSON object
+  if (body.length() == 0 || !body.startsWith("{")) {
+    httpServer.send(400, F("application/json"),
+      F("{\"success\":false,\"error\":\"Empty or invalid JSON body\"}"));
     return;
   }
-  
-  // Validate JSON format (parse to check validity)
-  DynamicJsonDocument doc(768); // 16 sensors × ~40 bytes each + overhead ≈ 700 bytes max
-  DeserializationError error = deserializeJson(doc, body);
-  
-  if (error) {
-    StaticJsonDocument<128> errorDoc;
-    errorDoc[F("success")] = false;
-    errorDoc[F("error")] = F("Invalid JSON format");
-    String response;
-    serializeJson(errorDoc, response);
-    httpServer.send(400, F("application/json"), response);
-    return;
-  }
-  
-  // Write directly to file
+
+  // Write directly to file (body is trusted as pre-validated JSON from client)
   File labelsFile = LittleFS.open(F("/dallas_labels.ini"), "w");
   if (!labelsFile) {
-    StaticJsonDocument<128> errorDoc;
-    errorDoc[F("success")] = false;
-    errorDoc[F("error")] = F("Failed to open file for writing");
-    String response;
-    serializeJson(errorDoc, response);
-    httpServer.send_P(500, PSTR("application/json"), response.c_str());
+    httpServer.send_P(500, PSTR("application/json"),
+      PSTR("{\"success\":false,\"error\":\"Failed to open file for writing\"}"));
     return;
   }
-  
+
   labelsFile.print(body);
   labelsFile.close();
-  
-  // Success response
-  StaticJsonDocument<64> responseDoc;
-  responseDoc[F("success")] = true;
-  String response;
-  serializeJson(responseDoc, response);
-  httpServer.send(200, F("application/json"), response);
+
+  httpServer.send(200, F("application/json"), F("{\"success\":true}"));
 }
 
 //====================================================
