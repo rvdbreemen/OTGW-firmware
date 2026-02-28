@@ -546,12 +546,29 @@ void sendJsonSettingObj(const char *cName, int iValue, const char *iType, int mi
 
 void sendJsonSettingObj(const char *cName, const char *cValue, const char *sType, int maxLen)
 {
-  char jsonBuff[200] = {0};
-
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": \"%s\", \"type\": \"%s\", \"maxlen\": %d}")
-                                      , cName, cValue, sType, maxLen);
-
+  // Send prefix
+  char jsonBuff[64] = {0};
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": \""), cName);
   sendBeforenext();
+  httpServer.sendContent(jsonBuff);
+
+  // Send value with JSON string escaping (handles " and \ in payload templates)
+  char chunk[32];
+  size_t ci = 0;
+  for (const char *p = cValue; *p; p++) {
+    if (ci >= sizeof(chunk) - 2) { chunk[ci] = '\0'; httpServer.sendContent(chunk); ci = 0; }
+    char c = *p;
+    if      (c == '"')  { chunk[ci++] = '\\'; chunk[ci++] = '"';  }
+    else if (c == '\\') { chunk[ci++] = '\\'; chunk[ci++] = '\\'; }
+    else if (c == '\n') { chunk[ci++] = '\\'; chunk[ci++] = 'n';  }
+    else if (c == '\r') { chunk[ci++] = '\\'; chunk[ci++] = 'r';  }
+    else if (c == '\t') { chunk[ci++] = '\\'; chunk[ci++] = 't';  }
+    else                { chunk[ci++] = c; }
+  }
+  if (ci > 0) { chunk[ci] = '\0'; httpServer.sendContent(chunk); }
+
+  // Send suffix
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\", \"type\": \"%s\", \"maxlen\": %d}"), sType, maxLen);
   httpServer.sendContent(jsonBuff);
 
 } // sendJsonSettingObj(*char, *char, *char, int, int)
