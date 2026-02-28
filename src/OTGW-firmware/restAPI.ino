@@ -160,7 +160,7 @@ void processAPI()
         }
       } else if (wc > 3 && strcmp_P(words[3], PSTR("device")) == 0) {
         if (wc > 4 && strcmp_P(words[4], PSTR("info")) == 0) {
-          // GET /api/v2/device/info — v2 equivalent of v0/devinfo (map format)
+          // GET /api/v2/device/info (map format)
           if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
           sendDeviceInfoV2();
         } else if (wc > 4 && strcmp_P(words[4], PSTR("time")) == 0) {
@@ -338,40 +338,9 @@ void processAPI()
         sendApiNotFound(originalURI);
       }
     }
-    else if (wc > 2 && strcmp_P(words[2], PSTR("v0")) == 0)
-    { //v0 API calls — DEPRECATED: will be removed in v1.3.0 (see ADR-035)
-      if (wc > 3 && strcmp_P(words[3], PSTR("otgw")) == 0) {
-        // GET /api/v0/otgw/{msgid} — DEPRECATED: use /api/v1/otgw/id/{msgid} or /api/v2/otgw/messages/{msgid}
-        if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
-        uint8_t msgId = 0;
-        if (wc > 4 && parseMsgId(words[4], msgId)) {
-          sendOTGWvalue(msgId);
-        } else {
-          httpServer.send_P(400, PSTR("text/plain"), PSTR("400: invalid msgid\r\n"));
-        }
-      }
-      else if (wc > 3 && strcmp_P(words[3], PSTR("devinfo")) == 0) {
-        // GET /api/v0/devinfo — DEPRECATED: use /api/v2/device/info
-        if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
-        sendDeviceInfo();
-      }
-      else if (wc > 3 && strcmp_P(words[3], PSTR("devtime")) == 0) {
-        // GET /api/v0/devtime — DEPRECATED: use /api/v2/device/time
-        if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
-        sendDeviceTime();
-      }
-      else if (wc > 3 && strcmp_P(words[3], PSTR("settings")) == 0) {
-        // GET/POST /api/v0/settings — DEPRECATED: use /api/v2/settings
-        if (isPostOrPut) {
-          postSettings();
-        } else if (isGet) {
-          sendDeviceSettings();
-        } else {
-          httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n"));
-        }
-      } else {
-        sendApiNotFound(originalURI);
-      }
+    else if (wc > 2 && (strcmp_P(words[2], PSTR("v0")) == 0 || strcmp_P(words[2], PSTR("v1")) == 0))
+    { // v0 and v1 APIs removed — use /api/v2 (see ADR-035)
+      sendApiError(410, F("API version removed; use /api/v2"));
     } else {
       sendApiNotFound(originalURI);
     }
