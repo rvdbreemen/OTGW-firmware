@@ -65,8 +65,23 @@ void evalWebhook() {
   if (!settingWebhookEnabled) return;
   if (strlen(settingWebhookURLon) == 0 && strlen(settingWebhookURLoff) == 0) return;
 
+  // Clamp trigger bit index to valid range [0..15] to avoid undefined shift behaviour
+  int8_t rawTriggerBit = static_cast<int8_t>(settingWebhookTriggerBit);
+  int8_t clampedTriggerBit = rawTriggerBit;
+  if (clampedTriggerBit < 0) {
+    clampedTriggerBit = 0;
+  } else if (clampedTriggerBit > 15) {
+    clampedTriggerBit = 15;
+  }
+  if (clampedTriggerBit != rawTriggerBit) {
+    DebugTf(PSTR("Webhook: invalid trigger bit %d, clamped to %d\r\n"),
+            rawTriggerBit, clampedTriggerBit);
+    settingWebhookTriggerBit = clampedTriggerBit;
+  }
+  uint8_t bitIndex = static_cast<uint8_t>(clampedTriggerBit);
+
   // Compute current bit state using the same Statusflags layout as GPIO outputs
-  bool bitState = (OTcurrentSystemState.Statusflags & (1U << settingWebhookTriggerBit)) != 0;
+  bool bitState = (OTcurrentSystemState.Statusflags & (1U << bitIndex)) != 0;
 
   // On first call, initialise the last-known state without firing the webhook
   if (!webhookInitialized) {
