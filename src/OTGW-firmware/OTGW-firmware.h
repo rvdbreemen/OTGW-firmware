@@ -97,6 +97,17 @@ void publishToSourceTopic(const char*, const char*, byte);
 void addOTWGcmdtoqueue(const char* ,  int , const bool = false, const int16_t = 1000);
 void sendLogToWebSocket(const char* logMessage);
 
+// Forward declarations for functions defined in later .ino files
+// (Arduino auto-prototype generation can fail for these)
+void readSettings(bool show);
+void writeSettings(bool show);
+void updateSetting(const char *field, const char *newValue);
+void GetVersion(const char* hexfile, char* version, size_t destSize);
+void startWebSocket();
+void handleWebSocket();
+void testWebhook(bool testOn);
+void evalWebhook();
+
 //Global variables
 WiFiClient  wifiClient;
 char        cMsg[CMSG_SIZE];

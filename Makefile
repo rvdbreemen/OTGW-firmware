@@ -60,6 +60,27 @@ $(CFGFILE):
 	$(CLICFG) config set library.enable_unsafe_install true
 
 ##
+# Retry helper: retries a command up to 3 times with exponential backoff.
+# Usage: $(call retry,command-to-run)
+##
+define retry
+@for i in 1 2 3; do \
+	if $(1); then \
+		break; \
+	else \
+		if [ $$i -lt 3 ]; then \
+			wait_time=$$((2 ** $$i)); \
+			echo "⚠ Install failed (attempt $$i/3), retrying in $${wait_time}s..."; \
+			sleep $$wait_time; \
+		else \
+			echo "✗ Install failed after 3 attempts"; \
+			exit 1; \
+		fi; \
+	fi; \
+done
+endef
+
+##
 # Make sure CFG is updated before libraries are called.
 # Retry up to 3 times with exponential backoff to handle transient network errors
 ##
@@ -137,35 +158,40 @@ refresh: | $(CFGFILE)
 flush: | $(CFGFILE)
 	$(CLICFG) cache clean
 
+##
+# Serialize library installs to prevent concurrent arduino-cli operations
+# which cause "unexpected EOF" archive extraction errors under make -j.
+# Each library depends (order-only) on the previous one in the chain.
+##
 libraries/WiFiManager: | $(BOARDS)
-	$(CLICFG) lib install WiFiManager@2.0.15-rc.1
+	$(call retry,$(CLICFG) lib install WiFiManager@2.0.15-rc.1)
 
-libraries/PubSubClient:
-	$(CLICFG) lib install pubsubclient@2.8.0
+libraries/PubSubClient: | libraries/WiFiManager
+	$(call retry,$(CLICFG) lib install pubsubclient@2.8.0)
 
-libraries/TelnetStream:
-	$(CLICFG) lib install TelnetStream@1.2.4
+libraries/TelnetStream: | libraries/PubSubClient
+	$(call retry,$(CLICFG) lib install TelnetStream@1.2.4)
 
-libraries/AceCommon:
-	$(CLICFG) lib install AceCommon@1.6.2
+libraries/AceCommon: | libraries/TelnetStream
+	$(call retry,$(CLICFG) lib install AceCommon@1.6.2)
 
-libraries/AceSorting:
-	$(CLICFG) lib install AceSorting@1.0.0
+libraries/AceSorting: | libraries/AceCommon
+	$(call retry,$(CLICFG) lib install AceSorting@1.0.0)
 
-libraries/AceTime:
-	$(CLICFG) lib install AceTime@2.0.1
+libraries/AceTime: | libraries/AceSorting
+	$(call retry,$(CLICFG) lib install AceTime@2.0.1)
 
-libraries/Time:
-	$(CLICFG) lib install Time@1.6.1
+libraries/Time: | libraries/AceTime
+	$(call retry,$(CLICFG) lib install Time@1.6.1)
 
-libraries/OneWire:
-	$(CLICFG) lib install OneWire@2.3.8
+libraries/OneWire: | libraries/Time
+	$(call retry,$(CLICFG) lib install OneWire@2.3.8)
 
 libraries/DallasTemperature: | libraries/OneWire
-	$(CLICFG) lib install DallasTemperature@3.9.0
+	$(call retry,$(CLICFG) lib install DallasTemperature@3.9.0)
 
-libraries/WebSockets:
-	$(CLICFG) lib install WebSockets@2.3.5
+libraries/WebSockets: | libraries/DallasTemperature
+	$(call retry,$(CLICFG) lib install WebSockets@2.3.5)
 
 $(IMAGE): $(BOARDS) $(LIBRARIES) $(SOURCES)
 	$(info Build code)

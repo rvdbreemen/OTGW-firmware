@@ -74,7 +74,14 @@ bool checkGPIOConflict(int pin, PGM_P caller)
 // Streaming JSON write helpers — write each field directly to the open file.
 // No heap allocation; cMsg is used only as a scratch buffer for numeric formatting.
 // All key literals are in PROGMEM (PGM_P).
-static void wStrF(File &f, PGM_P key, const char *val, bool last = false) {
+// Forward declarations with default parameters
+void wStrF(File &f, PGM_P key, const char *val, bool last = false);
+void wBoolF(File &f, PGM_P key, bool val, bool last = false);
+void wIntF(File &f, PGM_P key, long val, bool last = false);
+void applySettingFromFile(const char *key, const char *val);
+void parseSettingsLine();
+
+void wStrF(File &f, PGM_P key, const char *val, bool last) {
   f.print(F("  \""));
   f.print(FPSTR(key));
   f.print(F("\": \""));
@@ -89,14 +96,14 @@ static void wStrF(File &f, PGM_P key, const char *val, bool last = false) {
   f.print(last ? F("\"\r\n") : F("\",\r\n"));
 }
 
-static void wBoolF(File &f, PGM_P key, bool val, bool last = false) {
+void wBoolF(File &f, PGM_P key, bool val, bool last) {
   f.print(F("  \""));
   f.print(FPSTR(key));
   f.print(val ? F("\": true") : F("\": false"));
   f.print(last ? F("\r\n") : F(",\r\n"));
 }
 
-static void wIntF(File &f, PGM_P key, long val, bool last = false) {
+void wIntF(File &f, PGM_P key, long val, bool last) {
   f.print(F("  \""));
   f.print(FPSTR(key));
   f.print(F("\": "));
@@ -174,7 +181,7 @@ void writeSettings(bool show)
 
 // Apply one key/value pair loaded from the settings file to the in-memory settings.
 // rawVal is already unescaped (for string values) or the raw token (bool/int).
-static void applySettingFromFile(const char *key, const char *val) {
+void applySettingFromFile(const char *key, const char *val) {
   if (strcasecmp_P(key, PSTR("hostname")) == 0)                { strlcpy(settingHostname, val, sizeof(settingHostname)); return; }
   if (strcasecmp_P(key, PSTR("MQTTenable")) == 0)              { settingMQTTenable = EVALBOOLEAN(val); return; }
   if (strcasecmp_P(key, PSTR("MQTTbroker")) == 0)              { strlcpy(settingMQTTbroker, val, sizeof(settingMQTTbroker)); return; }
@@ -228,7 +235,7 @@ static void applySettingFromFile(const char *key, const char *val) {
 // Parse one JSON line from cMsg and dispatch to applySettingFromFile().
 // Handles:  "key": "string value",   "key": true,   "key": 123
 // Modifies cMsg in-place (null-terminates key; unescapes string values).
-static void parseSettingsLine() {
+void parseSettingsLine() {
   char *p = cMsg;
   while (*p == ' ' || *p == '\t') p++; // skip leading whitespace
   if (*p != '"') return;               // not a key-value line ({, }, empty)
