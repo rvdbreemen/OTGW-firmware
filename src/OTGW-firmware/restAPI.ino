@@ -121,112 +121,7 @@ void processAPI()
 
   if (wc > 1 && strcmp_P(words[1], PSTR("api")) == 0) {
 
-    if (wc > 2 && strcmp_P(words[2], PSTR("v1")) == 0)
-    { //v1 API calls
-      if (wc > 3 && strcmp_P(words[3], PSTR("health")) == 0) {
-        if (!isGet) { httpServer.sendHeader(F("Allow"), F("GET")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
-        sendHealth();
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("devtime")) == 0) {
-        // GET /api/v1/devtime - Map format version
-        if (!isGet) { httpServer.sendHeader(F("Allow"), F("GET")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
-        sendDeviceTimeV2();
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("flashstatus")) == 0) {
-        // GET /api/v1/flashstatus - Unified flash status for both ESP and PIC
-        if (!isGet) { httpServer.sendHeader(F("Allow"), F("GET")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
-        sendFlashStatus();
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("settings")) == 0) {
-        if (isPostOrPut) {
-          postSettings();
-        } else if (isGet) {
-          sendDeviceSettings();
-        } else {
-          httpServer.sendHeader(F("Allow"), F("GET, POST, PUT"));
-          httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n"));
-        }
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("pic")) == 0) {
-        if (wc > 4 && strcmp_P(words[4], PSTR("flashstatus")) == 0) {
-          // GET /api/v1/pic/flashstatus
-          // Minimal endpoint for polling PIC flash state during upgrade
-          if (!isGet) { httpServer.sendHeader(F("Allow"), F("GET")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
-          sendPICFlashStatus();
-        } else {
-          sendApiNotFound(originalURI);
-        }
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("otgw")) == 0) {
-        if (wc > 4 && strcmp_P(words[4], PSTR("telegraf")) == 0) {
-          // GET /api/v1/otgw/telegraf
-          // Response: see json response
-          if (!isGet) { httpServer.sendHeader(F("Allow"), F("GET")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
-          sendTelegraf();
-        } else if (wc > 4 && strcmp_P(words[4], PSTR("otmonitor")) == 0) {
-          // GET /api/v1/otgw/otmonitor
-          // Response: see json response
-          if (!isGet) { httpServer.sendHeader(F("Allow"), F("GET")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
-          sendOTmonitor();
-        } else if (wc > 4 && strcmp_P(words[4], PSTR("autoconfigure")) == 0) {
-          // POST /api/v1/otgw/autoconfigure
-          // Response: sends all autodiscovery topics to MQTT for HA integration
-          if (!isPostOrPut) { httpServer.sendHeader(F("Allow"), F("POST, PUT")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
-          httpServer.send_P(200, PSTR("text/plain"), PSTR("OK"));
-          doAutoConfigure();
-        } else if (wc > 5 && strcmp_P(words[4], PSTR("id")) == 0) {
-          if (!isGet) { httpServer.sendHeader(F("Allow"), F("GET")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
-          uint8_t msgId = 0;
-          if (parseMsgId(words[5], msgId)) {
-            sendOTGWvalue(msgId);
-          } else {
-            httpServer.send_P(400, PSTR("text/plain"), PSTR("400: invalid msgid\r\n"));
-          }
-        } else if (wc > 5 && strcmp_P(words[4], PSTR("label")) == 0) {
-          // GET /api/v1/otgw/label/{msglabel}
-          if (!isGet) { httpServer.sendHeader(F("Allow"), F("GET")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
-          if (words[5][0] == '\0') { httpServer.send_P(400, PSTR("text/plain"), PSTR("400: missing label\r\n")); return; }
-          sendOTGWlabel(words[5]);
-        } else if (wc > 5 && strcmp_P(words[4], PSTR("command")) == 0) {
-          if (!isPostOrPut) { httpServer.sendHeader(F("Allow"), F("POST, PUT")); httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
-
-          if (words[5][0] == '\0') {
-            httpServer.send_P(400, PSTR("text/plain"), PSTR("400: missing command\r\n"));
-            return;
-          }
-
-          constexpr size_t kMaxCmdLen = sizeof(cmdqueue[0].cmd) - 1; // matches OT_cmd_t::cmd buffer
-          const size_t cmdLen = strlen(words[5]);
-          if ((cmdLen < 3) || (words[5][2] != '=')) {
-            httpServer.send_P(400, PSTR("text/plain"), PSTR("400: invalid command format\r\n"));
-            return;
-          }
-          if (cmdLen > kMaxCmdLen) {
-            httpServer.send_P(413, PSTR("text/plain"), PSTR("413: command too long\r\n"));
-            return;
-          }
-
-          addOTWGcmdtoqueue(words[5], static_cast<int>(cmdLen));
-          httpServer.send_P(200, PSTR("text/plain"), PSTR("OK"));
-        } else {
-          sendApiNotFound(originalURI);
-        }
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("sensors")) == 0) {
-        // Sensor label operations (bulk only)
-        if (wc > 4 && strcmp_P(words[4], PSTR("labels")) == 0) {
-          // GET /api/v1/sensors/labels (get all labels from file)
-          // POST/PUT /api/v1/sensors/labels (update all labels in file)
-          if (isGet) {
-            getDallasLabels();
-          } else if (isPostOrPut) {
-            updateAllDallasLabels();
-          } else {
-            httpServer.sendHeader(F("Allow"), F("GET, POST, PUT"));
-            httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); 
-          }
-        } else {
-          sendApiNotFound(originalURI);
-        }
-      } else {
-        sendApiNotFound(originalURI);
-      }
-    }
-    else if (wc > 2 && strcmp_P(words[2], PSTR("v2")) == 0)
+    if (wc > 2 && strcmp_P(words[2], PSTR("v2")) == 0)
     { //v2 API calls — RESTful compliant (ADR-035)
       // T45: OPTIONS preflight for all v2 endpoints (CORS support)
       if (method == HTTP_OPTIONS) {
@@ -461,12 +356,12 @@ void processAPI()
         sendDeviceInfo();
       }
       else if (wc > 3 && strcmp_P(words[3], PSTR("devtime")) == 0) {
-        // GET /api/v0/devtime — DEPRECATED: use /api/v1/devtime
+        // GET /api/v0/devtime — DEPRECATED: use /api/v2/device/time
         if (!isGet) { httpServer.send_P(405, PSTR("text/plain"), PSTR("405: method not allowed\r\n")); return; }
         sendDeviceTime();
       }
       else if (wc > 3 && strcmp_P(words[3], PSTR("settings")) == 0) {
-        // GET/POST /api/v0/settings — DEPRECATED: use /api/v1/settings or /api/v2/settings
+        // GET/POST /api/v0/settings — DEPRECATED: use /api/v2/settings
         if (isPostOrPut) {
           postSettings();
         } else if (isGet) {
@@ -651,55 +546,6 @@ void sendEndJsonMap(const __FlashStringHelper* objName) {
 }
 //=======================================================================
 
-void sendTelegraf() 
-{
-  RESTDebugTln(F("sending OT monitor values to Telegraf...\r"));
-
-  sendStartJsonArray();
-  
-  sendJsonOTmonObj(F("flamestatus"), isFlameStatus(), F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("chmodus"), isCentralHeatingActive(),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("chenable"), isCentralHeatingEnabled(),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("ch2modus"), isCentralHeating2Active(),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("ch2enable"), isCentralHeating2enabled(),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("dhwmode"), isDomesticHotWaterActive(),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("dhwenable"), isDomesticHotWaterEnabled(),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("diagnosticindicator"), isDiagnosticIndicator(),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("faultindicator"), isFaultIndicator(),F(""), msglastupdated[OT_Statusflags]);
-  
-  sendJsonOTmonObj(F("coolingmodus"), isCoolingEnabled(),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("coolingactive"), isCoolingActive(),F(""), msglastupdated[OT_Statusflags]);  
-  sendJsonOTmonObj(F("otcactive"), isOutsideTemperatureCompensationActive(),F(""), msglastupdated[OT_Statusflags]);
-
-  sendJsonOTmonObj(F("servicerequest"), isServiceRequest(),F(""), msglastupdated[OT_ASFflags]);
-  sendJsonOTmonObj(F("lockoutreset"), isLockoutReset(),F(""), msglastupdated[OT_ASFflags]);
-  sendJsonOTmonObj(F("lowwaterpressure"), isLowWaterPressure(),F(""), msglastupdated[OT_ASFflags]);
-  sendJsonOTmonObj(F("gasflamefault"), isGasFlameFault(),F(""), msglastupdated[OT_ASFflags]);
-  sendJsonOTmonObj(F("airtemp"), isAirTemperature(),F(""), msglastupdated[OT_ASFflags]);
-  sendJsonOTmonObj(F("waterovertemperature"), isWaterOverTemperature(),F(""), msglastupdated[OT_ASFflags]);
-  
-
-  sendJsonOTmonObj(F("outsidetemperature"), OTcurrentSystemState.Toutside, F("°C"), msglastupdated[OT_Toutside]);
-  sendJsonOTmonObj(F("roomtemperature"), OTcurrentSystemState.Tr, F("°C"), msglastupdated[OT_Tr]);
-  sendJsonOTmonObj(F("roomsetpoint"), OTcurrentSystemState.TrSet, F("°C"), msglastupdated[OT_TrSet]);
-  sendJsonOTmonObj(F("remoteroomsetpoint"), OTcurrentSystemState.TrOverride, F("°C"), msglastupdated[OT_TrOverride]);
-  sendJsonOTmonObj(F("controlsetpoint"), OTcurrentSystemState.TSet,F("°C"), msglastupdated[OT_TSet]);
-  sendJsonOTmonObj(F("relmodlvl"), OTcurrentSystemState.RelModLevel,F("%"), msglastupdated[OT_RelModLevel]);
-  sendJsonOTmonObj(F("maxrelmodlvl"), OTcurrentSystemState.MaxRelModLevelSetting, F("%"), msglastupdated[OT_MaxRelModLevelSetting]);
- 
-  sendJsonOTmonObj(F("boilertemperature"), OTcurrentSystemState.Tboiler, F("°C"), msglastupdated[OT_Tboiler]);
-  sendJsonOTmonObj(F("returnwatertemperature"), OTcurrentSystemState.Tret,F("°C"), msglastupdated[OT_Tret]);
-  sendJsonOTmonObj(F("dhwtemperature"), OTcurrentSystemState.Tdhw,F("°C"), msglastupdated[OT_Tdhw]);
-  sendJsonOTmonObj(F("dhwsetpoint"), OTcurrentSystemState.TdhwSet,F("°C"), msglastupdated[OT_TdhwSet]);
-  sendJsonOTmonObj(F("maxchwatersetpoint"), OTcurrentSystemState.MaxTSet,F("°C"), msglastupdated[OT_MaxTSet]);
-  sendJsonOTmonObj(F("chwaterpressure"), OTcurrentSystemState.CHPressure, F("bar"), msglastupdated[OT_CHPressure]);
-  sendJsonOTmonObj(F("oemfaultcode"), OTcurrentSystemState.OEMDiagnosticCode, F(""), msglastupdated[OT_OEMDiagnosticCode]);
-
-  sendEndJsonArray();
-
-} // sendTelegraf()
-//=======================================================================
-
 void sendOTmonitorV2() 
 {
   time_t now = time(nullptr); // needed for Dallas sensor display
@@ -768,74 +614,6 @@ void sendOTmonitorV2()
 
   sendEndJsonMap(F("otmonitor"));
 }
-
-void sendOTmonitor() 
-{
-  time_t now = time(nullptr); // needed for Dallas sensor display
-  RESTDebugTln(F("sending OT monitor values (V1)...\r"));
-
-  sendStartJsonObj(F("otmonitor"));
-
-  sendJsonOTmonObj(F("flamestatus"), CONOFF(isFlameStatus()),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("chmodus"), CONOFF(isCentralHeatingActive()),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("chenable"), CONOFF(isCentralHeatingEnabled()),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("ch2modus"), CONOFF(isCentralHeating2Active()),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("ch2enable"), CONOFF(isCentralHeating2enabled()),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("dhwmode"), CONOFF(isDomesticHotWaterActive()),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("dhwenable"), CONOFF(isDomesticHotWaterEnabled()),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("diagnosticindicator"), CONOFF(isDiagnosticIndicator()),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("faultindicator"), CONOFF(isFaultIndicator()),F(""), msglastupdated[OT_Statusflags]);
-  
-  sendJsonOTmonObj(F("coolingmodus"), CONOFF(isCoolingEnabled()),F(""), msglastupdated[OT_Statusflags]);
-  sendJsonOTmonObj(F("coolingactive"), CONOFF(isCoolingActive()),F(""), msglastupdated[OT_Statusflags]);  
-  sendJsonOTmonObj(F("otcactive"), CONOFF(isOutsideTemperatureCompensationActive()),F(""), msglastupdated[OT_Statusflags]);
-
-  sendJsonOTmonObj(F("servicerequest"), CONOFF(isServiceRequest()),F(""), msglastupdated[OT_ASFflags]);
-  sendJsonOTmonObj(F("lockoutreset"), CONOFF(isLockoutReset()),F(""), msglastupdated[OT_ASFflags]);
-  sendJsonOTmonObj(F("lowwaterpressure"), CONOFF(isLowWaterPressure()),F(""), msglastupdated[OT_ASFflags]);
-  sendJsonOTmonObj(F("gasflamefault"), CONOFF(isGasFlameFault()),F(""), msglastupdated[OT_ASFflags]);
-  sendJsonOTmonObj(F("airtemp"), CONOFF(isAirTemperature()),F(""), msglastupdated[OT_ASFflags]);
-  sendJsonOTmonObj(F("waterovertemperature"), CONOFF(isWaterOverTemperature()),F(""), msglastupdated[OT_ASFflags]);
-  
-
-  sendJsonOTmonObj(F("outsidetemperature"), OTcurrentSystemState.Toutside, F("°C"), msglastupdated[OT_Toutside]);
-  sendJsonOTmonObj(F("roomtemperature"), OTcurrentSystemState.Tr, F("°C"), msglastupdated[OT_Tr]);
-  sendJsonOTmonObj(F("roomsetpoint"), OTcurrentSystemState.TrSet, F("°C"), msglastupdated[OT_TrSet]);
-  sendJsonOTmonObj(F("remoteroomsetpoint"), OTcurrentSystemState.TrOverride, F("°C"), msglastupdated[OT_TrOverride]);
-  sendJsonOTmonObj(F("controlsetpoint"), OTcurrentSystemState.TSet,F("°C"), msglastupdated[OT_TSet]);
-  sendJsonOTmonObj(F("relmodlvl"), OTcurrentSystemState.RelModLevel,F("%"), msglastupdated[OT_RelModLevel]);
-  sendJsonOTmonObj(F("maxrelmodlvl"), OTcurrentSystemState.MaxRelModLevelSetting, F("%"), msglastupdated[OT_MaxRelModLevelSetting]);
- 
-  sendJsonOTmonObj(F("boilertemperature"), OTcurrentSystemState.Tboiler, F("°C"), msglastupdated[OT_Tboiler]);
-  sendJsonOTmonObj(F("returnwatertemperature"), OTcurrentSystemState.Tret,F("°C"), msglastupdated[OT_Tret]);
-  sendJsonOTmonObj(F("dhwtemperature"), OTcurrentSystemState.Tdhw,F("°C"), msglastupdated[OT_Tdhw]);
-  sendJsonOTmonObj(F("dhwsetpoint"), OTcurrentSystemState.TdhwSet,F("°C"), msglastupdated[OT_TdhwSet]);
-  sendJsonOTmonObj(F("maxchwatersetpoint"), OTcurrentSystemState.MaxTSet,F("°C"), msglastupdated[OT_MaxTSet]);
-  sendJsonOTmonObj(F("chwaterpressure"), OTcurrentSystemState.CHPressure, F("bar"), msglastupdated[OT_CHPressure]);
-  sendJsonOTmonObj(F("oemdiagnosticcode"), OTcurrentSystemState.OEMDiagnosticCode, F(""), msglastupdated[OT_OEMDiagnosticCode]);
-  sendJsonOTmonObj(F("oemfaultcode"), OTcurrentSystemState.ASFflags & 0xFF, F(""), msglastupdated[OT_ASFflags]);
-
-  if (settingS0COUNTERenabled) 
-  {
-    sendJsonOTmonObj(F("s0powerkw"), OTGWs0powerkw , F("kW"), OTGWs0lasttime);
-    sendJsonOTmonObj(F("s0intervalcount"), OTGWs0pulseCount , F(""), OTGWs0lasttime);
-    sendJsonOTmonObj(F("s0totalcount"), OTGWs0pulseCountTot , F(""), OTGWs0lasttime);
-  }
-  sendJsonOTmonObj(F("sensorsimulation"), bDebugSensorSimulation, F(""), now);
-  if (settingGPIOSENSORSenabled || bDebugSensorSimulation) 
-  {
-    sendJsonOTmonObj(F("numberofsensors"), DallasrealDeviceCount , F(""), now );
-    for (int i = 0; i < DallasrealDeviceCount; i++) {
-        const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
-        sendJsonOTmonObjDallasTemp(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
-        // Labels now managed by Web UI via /dallas_labels.ini file (not sent in API)
-    }
-  }
-
-  sendEndJsonObj(F("otmonitor"));
-
-
-} // sendOTmonitor()
 
 //=======================================================================
 void sendDeviceInfo() 
