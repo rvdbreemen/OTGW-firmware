@@ -25,3 +25,5 @@ evaluation-report.json
 
 /src/OTGW-firmware/build
 *.ino.map
+tmpclaude-*
+nul

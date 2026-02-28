@@ -259,7 +259,7 @@ void parseSettingsLine() {
           case 'n':  *out++ = '\n'; break;
           case 'r':  *out++ = '\r'; break;
           case 't':  *out++ = '\t'; break;
-          default:   *out++ = *p;  break; // handles \" and \\
+          default:   *out++ = *p;  break; // handles \" and backslash
         }
         p++;
       } else {
