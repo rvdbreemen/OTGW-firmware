@@ -782,9 +782,18 @@ bool readJsonStringPair(File& f, char* key, size_t keySize,
 // Used by ensureSensorDefaultLabels() to rebuild dallas_labels.ini.
 //=======================================================================
 void writeJsonStringPair(File& f, const char* key, const char* val, bool addComma) {
+  if (!key || !val) return;
+
   if (addComma) f.print(',');
-  f.print('"'); f.print(key);
-  f.print(F("\":\"")); f.print(val); f.print('"');
+
+  String escapedKey = escapeJsonString(key);
+  String escapedVal = escapeJsonString(val);
+
+  f.print('"');
+  f.print(escapedKey);
+  f.print(F("\":\""));
+  f.print(escapedVal);
+  f.print('"');
 }
 
 /***************************************************************************
