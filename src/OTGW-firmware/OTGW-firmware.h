@@ -20,7 +20,6 @@
 // #define DISABLE_WEBSOCKET
 
 #include <TelnetStream.h>       // https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
-#include <ArduinoJson.h>        // https://arduinojson.org/
 #include "Wire.h"
 #include "safeTimers.h"
 #include <OTGWSerial.h>         // Bron Schelte's Serial class - it upgrades and more
@@ -56,6 +55,7 @@ void setLed(int8_t, uint8_t);
 #define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"  // Home Assistant discovery prefix
 #define CMSG_SIZE 512
 #define JSON_BUFF_MAX   1024
+#define JSON_ENTRY_BUF   256  // max bytes for a single serialized JSON entry/object
 // Replace CSTR macro with overloads to handle both String and char*
 // Includes null pointer protection to prevent crashes
 inline const char* CSTR(const String& x) { 
@@ -90,9 +90,11 @@ bool updateLittleFSStatus(const char *probePath = nullptr);
 bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 
 //prototype
+bool extractJsonFieldText(const char* json, const char* key, char* out, size_t outSize);
 void sendMQTTData(const char*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const bool = false);
+void publishToSourceTopic(const char*, const char*, byte);
 void addOTWGcmdtoqueue(const char* ,  int , const bool = false, const int16_t = 1000);
 void sendLogToWebSocket(const char* logMessage);
 
@@ -167,6 +169,7 @@ char      settingMQTTtopTopic[41] = "OTGW";
 char      settingMQTTuniqueid[41] = ""; // Intialized in readsettings
 bool      settingMQTTOTmessage = false;
 uint16_t  settingMQTTinterval = 0;   // MQTT publish interval in seconds (0 = publish every message)
+bool      settingMQTTSeparateSources = false; // ADR-040: publish source-specific topics (opt-in; default off for backward compat)
 bool      settingNTPenable = true;
 char      settingNTPtimezone[65] = NTP_DEFAULT_TIMEZONE;
 char      settingNTPhostname[65] = NTP_HOST_DEFAULT;
