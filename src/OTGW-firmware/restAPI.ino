@@ -505,7 +505,7 @@ void sendOTGWvalue(int msgid){
   sendStartJsonMap("");
   sendJsonMapEntry(F("label"), OTlookupitem.label);
   if (OTlookupitem.type == ot_f88) {
-    sendJsonMapEntry(F("value"), atof(getOTGWValue(msgid)));
+    sendJsonMapEntry(F("value"), (float)atof(getOTGWValue(msgid))); // cast selects float overload (atof returns double → ambiguous without cast)
   } else {
     sendJsonMapEntry(F("value"), (int32_t)atoi(getOTGWValue(msgid))); // cast selects int32_t overload
   }
@@ -535,7 +535,7 @@ void sendOTGWlabel(const char *msglabel){
   sendStartJsonMap("");
   sendJsonMapEntry(F("label"), OTlookupitem.label);
   if (OTlookupitem.type == ot_f88) {
-    sendJsonMapEntry(F("value"), atof(getOTGWValue(msgid)));
+    sendJsonMapEntry(F("value"), (float)atof(getOTGWValue(msgid))); // cast selects float overload (atof returns double → ambiguous without cast)
   } else {
     sendJsonMapEntry(F("value"), (int32_t)atoi(getOTGWValue(msgid))); // cast selects int32_t overload
   }
