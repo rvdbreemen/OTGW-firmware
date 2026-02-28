@@ -155,8 +155,8 @@ typedef struct {
 
 	//Inventum
 	uint16_t 	FilterDaysLeft = 0;           // u16 Days left to change filter (Inventum, ID 92)
-	uint16_t 	ElectricalUsage = 0;           // u16 Electrical usage in W, daily reset (Inventum, ID 93)
-	uint16_t 	CompressorUsage = 0;           // u16 Compressor use in hours, daily reset (Inventum, ID 94)
+	uint16_t 	Brand = 0;                     // u8/u8 Brand identification index/char (OpenTherm v4.2, ID 93)
+	uint16_t 	BrandVersion = 0;              // u8/u8 Brand version index/char (OpenTherm v4.2, ID 94)
 	uint16_t 	CompressorUsageLifetime = 0;   // u16 Compressor use in hours, lifetime (Inventum, ID 206)
 
 	//errors
@@ -284,8 +284,8 @@ enum OpenThermMessageID {
 	OT_FaultBufferSizeVH, // u8 / u8 Fault Buffer Size V/H
 	OT_FaultBufferEntryVH,	// u8 / u8 Fault Buffer Entry V/H
 	OT_FilterDaysLeft,		// u16  Days left to change filter (Inventum)
-	OT_ElectricalUsage,		// u16  Electrical usage in W, daily reset (Inventum)
-	OT_CompressorUsage,		// u16  Compressor use in hours, daily reset (Inventum)
+	OT_Brand,				// u8/u8  Brand identification index/char (OpenTherm v4.2)
+	OT_BrandVersion,		// u8/u8  Brand version index/char (OpenTherm v4.2)
 	OT_RFstrengthbatterylevel=98, // u8 / u8  RF strength and battery level
 	OT_OperatingMode_HC1_HC2_DHW, // u8 / u8 Operating Mode HC1, HC2/ DHW
 	OT_RemoteOverrideFunction, // flag8 / -  Function of manual and program changes in master and remote room setpoint. 
@@ -430,8 +430,8 @@ enum OpenThermMessageID {
 		{  90, OT_READ  , ot_u8u8, 			"FaultBufferSizeVH", "Fault Buffer Size V/H", "" },
 		{  91, OT_READ  , ot_u8u8, 			"FaultBufferEntryVH", "Fault Buffer Entry V/H", "" },
 		{  92, OT_READ  , ot_u16, 		"FilterDaysLeft", "Days left to change filter", "" },
-		{  93, OT_READ  , ot_u16, 		"ElectricalUsage", "Electrical usage (daily reset)", "W" },
-		{  94, OT_READ  , ot_u16, 		"CompressorUsage", "Compressor use (hours - daily reset)", "hrs" },
+		{  93, OT_READ  , ot_u8u8, 		"Brand", "Brand identification", "" },
+		{  94, OT_READ  , ot_u8u8, 		"BrandVersion", "Brand version", "" },
 		{  95, OT_UNDEF , ot_undef, 		"", "", "" },
 		{  96, OT_UNDEF , ot_undef, 		"", "", "" },
 		{  97, OT_UNDEF , ot_undef, 		"", "", "" },

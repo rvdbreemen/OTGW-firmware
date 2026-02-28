@@ -1861,8 +1861,8 @@ void processOT(const char *buf, int len){
         case OT_FaultBufferSizeVH:                      print_u8u8(OTcurrentSystemState.FaultBufferSizeVH); break;
         case OT_FaultBufferEntryVH:                     print_u8u8(OTcurrentSystemState.FaultBufferEntryVH); break;
         case OT_FilterDaysLeft:                         print_u16(OTcurrentSystemState.FilterDaysLeft); break;
-        case OT_ElectricalUsage:                        print_u16(OTcurrentSystemState.ElectricalUsage); break;
-        case OT_CompressorUsage:                        print_u16(OTcurrentSystemState.CompressorUsage); break;
+        case OT_Brand:                                  print_u8u8(OTcurrentSystemState.Brand); break;
+        case OT_BrandVersion:                           print_u8u8(OTcurrentSystemState.BrandVersion); break;
         case OT_FanSpeed:                               print_u16(OTcurrentSystemState.FanSpeed); break;
         case OT_ElectricalCurrentBurnerFlame:           print_f88(OTcurrentSystemState.ElectricalCurrentBurnerFlame); break;
         case OT_TRoomCH2:                               print_f88(OTcurrentSystemState.TRoomCH2); break;
@@ -2237,8 +2237,8 @@ const char* getOTGWValue(int msgid)
     case OT_FaultBufferSizeVH:                 dtostrf(OTcurrentSystemState.FaultBufferSizeVH, 0, 2, buffer); return buffer;
     case OT_FaultBufferEntryVH:                dtostrf(OTcurrentSystemState.FaultBufferEntryVH, 0, 2, buffer); return buffer;
     case OT_FilterDaysLeft:                    dtostrf(OTcurrentSystemState.FilterDaysLeft, 0, 2, buffer); return buffer;
-    case OT_ElectricalUsage:                   dtostrf(OTcurrentSystemState.ElectricalUsage, 0, 2, buffer); return buffer;
-    case OT_CompressorUsage:                   dtostrf(OTcurrentSystemState.CompressorUsage, 0, 2, buffer); return buffer;
+    case OT_Brand:                                 dtostrf(OTcurrentSystemState.Brand, 0, 2, buffer); return buffer;
+    case OT_BrandVersion:                          dtostrf(OTcurrentSystemState.BrandVersion, 0, 2, buffer); return buffer;
     case OT_FanSpeed:                          dtostrf(OTcurrentSystemState.FanSpeed, 0, 2, buffer); return buffer;
     case OT_ElectricalCurrentBurnerFlame:      dtostrf(OTcurrentSystemState.ElectricalCurrentBurnerFlame, 0, 2, buffer); return buffer;
     case OT_TRoomCH2:                          dtostrf(OTcurrentSystemState.TRoomCH2, 0, 2, buffer); return buffer;
