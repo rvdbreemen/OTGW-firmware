@@ -135,6 +135,7 @@ void writeSettings(bool show)
   wStrF (file, PSTR("MQTThaprefix"),            settingMQTThaprefix);
   wStrF (file, PSTR("MQTTuniqueid"),            settingMQTTuniqueid);
   wBoolF(file, PSTR("MQTTOTmessage"),           settingMQTTOTmessage);
+  wBoolF(file, PSTR("MQTTseparatesources"),     settingMQTTSeparateSources);
   wBoolF(file, PSTR("MQTTharebootdetection"),   settingMQTTharebootdetection);
   wBoolF(file, PSTR("NTPenable"),               settingNTPenable);
   wStrF (file, PSTR("NTPtimezone"),             settingNTPtimezone);
@@ -222,7 +223,13 @@ void applySettingFromFile(const char *key, const char *val) {
   if (strcasecmp_P(key, PSTR("WebhookEnabled")) == 0)          { settingWebhookEnabled = EVALBOOLEAN(val); return; }
   if (strcasecmp_P(key, PSTR("WebhookURLon")) == 0)            { strlcpy(settingWebhookURLon, val, sizeof(settingWebhookURLon)); return; }
   if (strcasecmp_P(key, PSTR("WebhookURLoff")) == 0)           { strlcpy(settingWebhookURLoff, val, sizeof(settingWebhookURLoff)); return; }
-  if (strcasecmp_P(key, PSTR("WebhookTriggerBit")) == 0)       { settingWebhookTriggerBit = atoi(val); return; }
+  if (strcasecmp_P(key, PSTR("WebhookTriggerBit")) == 0) {
+    int bit = atoi(val);
+    if (bit < 0)       bit = 0;
+    else if (bit > 15) bit = 15;
+    settingWebhookTriggerBit = bit;
+    return;
+  }
 }
 
 // Parse one JSON line from cMsg and dispatch to applySettingFromFile().
