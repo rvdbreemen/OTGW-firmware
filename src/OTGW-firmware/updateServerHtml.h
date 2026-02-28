@@ -61,7 +61,7 @@ static const char UpdateServerIndex[] PROGMEM =
         html.dark #progressContainer { background-color: #444; border-color: #666; }
         
         /* Progress bar fill */
-        #progressBar { height: 100%; background-color: #2196F3; transition: width 0.3s ease; width: 0%; }
+        #progressBar { height: 100%; background-color: #2196F3; transition: width 0.3s ease, background-color 0.5s ease; width: 0%; }
         
         /* Progress text overlay */
         #progressText { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: #fff; text-shadow: 0 0 4px rgba(0,0,0,0.9); }
@@ -134,6 +134,7 @@ static const char UpdateServerIndex[] PROGMEM =
            pageProgress.style.display = 'block';
            retryBtn.style.display = 'none';
            errorEl.textContent = '';
+           progressBar.style.backgroundColor = '';
          }
          
          window.retryFlash = function() {
@@ -358,6 +359,7 @@ static const char UpdateServerIndex[] PROGMEM =
                      // Backend returns 200 only after flash is complete
                      console.log('[OTA] State: Flash complete (backend confirmed), device rebooting');
                      progressBar.style.width = '100%';
+                     progressBar.style.backgroundColor = '#4CAF50';
                      progressText.textContent = 'Flash complete! Device rebooting...';
                      waitForDeviceReboot();
                    }
