@@ -87,8 +87,10 @@ void writeSettings(bool show)
 
   DebugT(F("[Settings] State: Serializing settings to JSON... "));
 
-  // Capacity reduced back to 1536 bytes (Dallas labels now in separate file)
-  DynamicJsonDocument doc(1536);
+  // Capacity set to 2048 bytes: 39 settings × ~16 bytes/slot = 624 bytes for slots,
+  // ~752 bytes for key strings (F() copies), ~136 bytes for default string values = ~1512 bytes
+  // at default config. 2048 provides headroom for user-configured longer strings.
+  DynamicJsonDocument doc(2048);
   JsonObject root  = doc.to<JsonObject>();
   root[F("hostname")] = settingHostname;
   root[F("MQTTenable")] = settingMQTTenable;
@@ -146,9 +148,6 @@ void writeSettings(bool show)
 //=======================================================================
 void readSettings(bool show) 
 {
-  // Open file for reading
-  File file =  LittleFS.open(SETTINGS_FILE, "r");
-
   DebugTf(PSTR(" %s ..\r\n"), SETTINGS_FILE);
   if (!LittleFS.exists(SETTINGS_FILE)) 
   {  //create settings file if it does not exist yet.
@@ -158,11 +157,20 @@ void readSettings(bool show)
     return;
   }
 
-  // Deserialize the JSON document
-  // Use DynamicJsonDocument to eliminate stack overflow risk (moved from stack to heap)
-  // Capacity reduced back to 1536 bytes (Dallas labels now in separate file)
-  DynamicJsonDocument doc(1536);
+  // Open file for reading (only after confirming it exists)
+  File file = LittleFS.open(SETTINGS_FILE, "r");
+  if (!file)
+  {
+    DebugTf(PSTR("Failed to open settings file '%s' for reading.\r\n"), SETTINGS_FILE);
+    return;
+  }
+
+  // Capacity set to 2048 bytes: 39 settings × ~16 bytes/slot = 624 bytes for slots,
+  // ~752 bytes for key strings (F() copies), ~136 bytes for default string values = ~1512 bytes
+  // at default config. 2048 provides headroom for user-configured longer strings.
+  DynamicJsonDocument doc(2048);
   DeserializationError error = deserializeJson(doc, file);
+  file.close();
   if (error)
   {
     DebugTln(F("Failed to read file, use existing defaults."));
