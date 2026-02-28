@@ -161,7 +161,7 @@ void readSettings(bool show)
   File file = LittleFS.open(SETTINGS_FILE, "r");
   if (!file)
   {
-    DebugTln(F("Failed to open settings file for reading."));
+    DebugTf(PSTR("Failed to open settings file '%s' for reading.\r\n"), SETTINGS_FILE);
     return;
   }
 
