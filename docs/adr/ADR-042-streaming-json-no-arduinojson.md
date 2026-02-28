@@ -21,11 +21,11 @@ problems emerged:
 - JSON for settings persistence and Dallas sensor labels is simple flat key/value pairs;
   a full-featured parser library is unnecessary.
 
-A dedicated set of lightweight streaming helpers (in `jsonStuff.ino`) now covers all
-production use-cases without ArduinoJson heap documents. Most JSON generation and parsing
-uses the existing global scratch buffer `cMsg[512]` and other bounded stack/global buffers,
+A dedicated set of lightweight streaming helpers now covers all production use-cases
+without ArduinoJson heap documents. Most JSON generation and file parsing uses the
+existing global scratch buffer `cMsg[512]` and other bounded stack/global buffers,
 with only short-lived `String` heap allocations where HTTP handlers already expose a
-`String` body.
+`String` body (e.g. `extractJsonField()`).
 
 ## Decision
 
@@ -36,11 +36,13 @@ operate on global scratch buffers.**
 
 1. **No `DynamicJsonDocument`, `StaticJsonDocument`, `JsonObject`, `JsonArray`,
    `deserializeJson`, or `serializeJson`** in any `.ino`, `.cpp`, or `.h` file.
-2. **JSON generation** uses the helpers in `jsonStuff.ino`:
-   - `wStrF(file, PSTR("key"), value)` / `wBoolF(...)` / `wIntF(...)` for settings files.
-   - `sendStartJsonMap()` / `sendJsonMapEntry()` / `sendEndJsonMap()` for HTTP responses.
-   - `sendStartJsonObj()` / `sendJsonObj()` / `sendEndJsonObj()` for legacy array-format
-     responses.
+2. **JSON generation** uses the helpers spread across two modules:
+   - `wStrF(file, PSTR("key"), value)` / `wBoolF(...)` / `wIntF(...)` in
+     `settingStuff.ino` — write settings fields directly to a LittleFS `File`.
+   - `sendStartJsonMap()` / `sendJsonMapEntry()` / `sendEndJsonMap()` in
+     `jsonStuff.ino` — stream HTTP responses as a JSON object.
+   - `sendStartJsonObj()` / `sendNestedJsonObj()` / `sendEndJsonObj()` in
+     `jsonStuff.ino` — legacy array-format HTTP responses (OTmonitor, Telegraf).
 3. **JSON parsing** uses the helpers in `jsonStuff.ino`:
    - `extractJsonField(body, F("key"), buf, sizeof(buf))` for individual field extraction
      from a `String` body.
@@ -49,8 +51,9 @@ operate on global scratch buffers.**
 4. **All intermediate buffers must be global or stack-allocated and bounded**.  The global
    `cMsg[512]` scratch buffer is the canonical single-use scratch area for JSON formatting.
    Local buffers are allowed for short-lived values that must not alias `cMsg`.
-5. **Strings written to JSON files must be escaped** using `wStrF()` (which performs
-   in-place escape of `"`, `\`, `\n`, `\r`, `\t`) or an equivalent helper.
+5. **Strings written to JSON settings files must be escaped** using `wStrF()` from
+   `settingStuff.ino` (which performs in-place escape of `"`, `\`, `\n`, `\r`, `\t`) or
+   an equivalent helper.
 
 ### What is NOT affected
 
@@ -84,7 +87,9 @@ responses are generated once and streamed, so the streaming helpers are equally 
 ## Consequences
 
 ### Positive
-- **Zero heap fragmentation** from JSON I/O — all buffers are fixed-size global or stack.
+- **No ArduinoJson heap documents** — all JSON generation and file parsing uses
+  fixed-size global/stack buffers; only short-lived `String` allocations remain in HTTP
+  request handlers where the framework already provides a `String` body.
 - **Settings file never overflows** — each field is written directly with bounded
   `snprintf_P` calls; there is no document-size constraint.
 - **~5 KB flash saved** by removing the ArduinoJson library.
@@ -95,7 +100,7 @@ responses are generated once and streamed, so the streaming helpers are equally 
 ### Negative
 - **No type-safe key access** — field extraction is string-based; typos in key names are
   not caught at compile time.
-- **Manual escaping** — developers must use `wStrF()` (or equivalent) for string values;
+- **Manual escaping** — developers must use `wStrF()` from `settingStuff.ino` (or equivalent) for string values;
   forgetting to escape is a latent bug.
 - **Limited to flat structures** — the helpers do not support arbitrarily nested JSON;
   deeply nested responses must be hand-crafted with `sendContent_P` calls.
@@ -103,7 +108,7 @@ responses are generated once and streamed, so the streaming helpers are equally 
 ### Risks & Mitigation
 - **Missing escape in `writeJsonStringPair()`** — labels containing `"` or `\` would
   produce invalid JSON.  **Mitigation:** use `wStrF`-style character-by-character
-  escaping in `writeJsonStringPair()`.
+  escaping in `writeJsonStringPair()` (`jsonStuff.ino`).
 - **`extractJsonField()` returns false for empty string values** — a valid
   `{"value":""}` would be rejected.  **Mitigation:** track whether the field was found
   separately from whether the value is empty; fix the helper to return true when the
