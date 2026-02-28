@@ -252,9 +252,15 @@ int8_t    settingGPIOOUTPUTStriggerBit = 0;
 
 //Webhook Settings
 bool      settingWebhookEnabled = false;
-char      settingWebhookURLon[101] = "";    // URL called when trigger bit turns ON
-char      settingWebhookURLoff[101] = "";   // URL called when trigger bit turns OFF
+char      settingWebhookURLon[101] = "";    // URL called when trigger bit turns ON (max 100)
+char      settingWebhookURLoff[101] = "";   // URL called when trigger bit turns OFF (max 100)
 int8_t    settingWebhookTriggerBit = 1;     // Default: bit 1 = CH mode (slave: CH active)
+char      settingWebhookPayload[201] = "";  // Body template for HTTP POST; empty = HTTP GET
+                                            // Supported variables: {state} {tboiler} {tr}
+                                            // {tset} {tdhw} {relmod} {chpressure}
+                                            // {flameon} {chmode} {dhwmode}
+char      settingWebhookContentType[32] = "application/json"; // Content-Type for POST requests
+                                            // Common values: application/json, text/plain
 
 //Now load Debug & network library
 #include "Debug.h"

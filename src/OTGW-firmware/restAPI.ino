@@ -900,6 +900,8 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("webhookurlon"), CSTR(settingWebhookURLon), "s", 100);
   sendJsonSettingObj(F("webhookurloff"), CSTR(settingWebhookURLoff), "s", 100);
   sendJsonSettingObj(F("webhooktriggerbit"), settingWebhookTriggerBit, "i", 0, 15);
+  sendJsonSettingObj(F("webhookpayload"), CSTR(settingWebhookPayload), "s", 200);
+  sendJsonSettingObj(F("webhookcontenttype"), CSTR(settingWebhookContentType), "s", 31);
 
   sendEndJsonMap(F("settings"));
 

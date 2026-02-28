@@ -167,7 +167,9 @@ void writeSettings(bool show)
   wBoolF(file, PSTR("WebhookEnabled"),          settingWebhookEnabled);
   wStrF (file, PSTR("WebhookURLon"),            settingWebhookURLon);
   wStrF (file, PSTR("WebhookURLoff"),           settingWebhookURLoff);
-  wIntF (file, PSTR("WebhookTriggerBit"),       settingWebhookTriggerBit, true); // last field
+  wIntF (file, PSTR("WebhookTriggerBit"),       settingWebhookTriggerBit);
+  wStrF (file, PSTR("WebhookPayload"),          settingWebhookPayload);
+  wStrF (file, PSTR("WebhookContentType"),      settingWebhookContentType, true); // last field
   file.print(F("}\r\n"));
 
   file.close();
@@ -230,6 +232,8 @@ void applySettingFromFile(const char *key, const char *val) {
     settingWebhookTriggerBit = bit;
     return;
   }
+  if (strcasecmp_P(key, PSTR("WebhookPayload")) == 0)          { strlcpy(settingWebhookPayload, val, sizeof(settingWebhookPayload)); return; }
+  if (strcasecmp_P(key, PSTR("WebhookContentType")) == 0)     { strlcpy(settingWebhookContentType, val, sizeof(settingWebhookContentType)); return; }
 }
 
 // Parse one JSON line from cMsg and dispatch to applySettingFromFile().
@@ -367,6 +371,8 @@ void readSettings(bool show)
     Debugf(PSTR("Webhook URL ON        : %s\r\n"), CSTR(settingWebhookURLon));
     Debugf(PSTR("Webhook URL OFF       : %s\r\n"), CSTR(settingWebhookURLoff));
     Debugf(PSTR("Webhook Trigger Bit   : %d\r\n"), settingWebhookTriggerBit);
+    Debugf(PSTR("Webhook Payload       : %s\r\n"), CSTR(settingWebhookPayload));
+    Debugf(PSTR("Webhook ContentType   : %s\r\n"), CSTR(settingWebhookContentType));
   }
 
   Debugln(F("-\r\n"));
@@ -540,6 +546,10 @@ void updateSetting(const char *field, const char *newValue)
       strcasecmp_P(field, PSTR("webhookurloff")) == 0)  strlcpy(settingWebhookURLoff, newValue, sizeof(settingWebhookURLoff));
   if (strcasecmp_P(field, PSTR("WebhookTriggerBit")) == 0 ||
       strcasecmp_P(field, PSTR("webhooktriggerbit")) == 0) settingWebhookTriggerBit = constrain(atoi(newValue), 0, 15);
+  if (strcasecmp_P(field, PSTR("WebhookPayload")) == 0 ||
+      strcasecmp_P(field, PSTR("webhookpayload")) == 0)    strlcpy(settingWebhookPayload, newValue, sizeof(settingWebhookPayload));
+  if (strcasecmp_P(field, PSTR("WebhookContentType")) == 0 ||
+      strcasecmp_P(field, PSTR("webhookcontenttype")) == 0) strlcpy(settingWebhookContentType, newValue, sizeof(settingWebhookContentType));
 
   // Mark settings dirty and restart debounce timer — actual write + service
   // restarts are deferred to flushSettings() which runs from loop() timer.
