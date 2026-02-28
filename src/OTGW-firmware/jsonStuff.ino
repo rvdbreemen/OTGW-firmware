@@ -41,6 +41,19 @@ String escapeJsonString(const char* str) {
   return result;
 }
 
+// Helper function to unescape a single JSON escape character (the char after '\').
+// Returns the unescaped character; unknown escapes pass through unchanged.
+static inline char unescapeJsonChar(char esc) {
+  switch (esc) {
+    case '"':  return '"';
+    case '\\': return '\\';
+    case 'n':  return '\n';
+    case 'r':  return '\r';
+    case 't':  return '\t';
+    default:   return esc;
+  }
+}
+
 static int iIdentlevel = 0;
 bool bFirst = true; 
 
@@ -711,12 +724,25 @@ bool extractJsonField(const String& json, const __FlashStringHelper* key,
   if (start >= len) return false;
 
   if (json[start] == '"') {
-    // Quoted string value — find closing quote
-    int q2 = json.indexOf('"', start + 1);
-    if (q2 <= start) return false;
-    int n = q2 - start - 1;
-    if (n <= 0 || (size_t)(n + 1) > resultSize) return false;
-    json.substring(start + 1, q2).toCharArray(result, resultSize);
+    // Quoted string value — scan for closing quote respecting backslash escapes
+    int pos = start + 1;
+    while (pos < len) {
+      if (json[pos] == '\\' && pos + 1 < len) { pos += 2; continue; } // skip escaped char
+      if (json[pos] == '"') break;
+      pos++;
+    }
+    if (pos >= len) return false; // no closing quote found
+    // Copy and unescape value into result (empty string is valid)
+    size_t ri = 0;
+    for (int si = start + 1; si < pos && ri < resultSize - 1; si++) {
+      if (json[si] == '\\' && si + 1 < pos) {
+        result[ri++] = unescapeJsonChar(json[++si]);
+      } else {
+        result[ri++] = json[si];
+      }
+    }
+    result[ri] = '\0';
+    return true; // field found; empty string is a valid value
   } else {
     // Unquoted value: bool literal (true/false) or number
     int end = start;
@@ -728,8 +754,8 @@ bool extractJsonField(const String& json, const __FlashStringHelper* key,
     int n = end - start;
     if (n <= 0 || (size_t)(n + 1) > resultSize) return false;
     json.substring(start, end).toCharArray(result, resultSize);
+    return true;
   }
-  return result[0] != '\0';
 }
 
 //=======================================================================
@@ -755,9 +781,13 @@ bool readJsonStringPair(File& f, char* key, size_t keySize,
   if (ch == '}') return false; // end of object
   if (ch != '"') return false; // unexpected character
 
-  // Read key until closing quote
+  // Read key until unescaped closing quote
   size_t i = 0;
   while ((ch = f.read()) >= 0 && ch != '"') {
+    if (ch == '\\') {
+      int esc = f.read(); if (esc < 0) break;
+      ch = unescapeJsonChar((char)esc);
+    }
     if (i < keySize - 1) key[i++] = (char)ch;
   }
   key[i] = '\0';
@@ -766,9 +796,13 @@ bool readJsonStringPair(File& f, char* key, size_t keySize,
   do { ch = f.read(); } while (ch >= 0 && (ch == ' ' || ch == ':'));
   if (ch != '"') return false; // value must be a quoted string
 
-  // Read value until closing quote
+  // Read value until unescaped closing quote
   i = 0;
   while ((ch = f.read()) >= 0 && ch != '"') {
+    if (ch == '\\') {
+      int esc = f.read(); if (esc < 0) break;
+      ch = unescapeJsonChar((char)esc);
+    }
     if (i < valSize - 1) val[i++] = (char)ch;
   }
   val[i] = '\0';

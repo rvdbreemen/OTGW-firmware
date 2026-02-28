@@ -505,7 +505,7 @@ void sendOTGWvalue(int msgid){
   sendStartJsonMap("");
   sendJsonMapEntry(F("label"), OTlookupitem.label);
   if (OTlookupitem.type == ot_f88) {
-    sendJsonMapEntry(F("value"), atof(getOTGWValue(msgid)));
+    sendJsonMapEntry(F("value"), (float)atof(getOTGWValue(msgid)));
   } else {
     sendJsonMapEntry(F("value"), (int32_t)atoi(getOTGWValue(msgid))); // cast selects int32_t overload
   }
@@ -535,7 +535,7 @@ void sendOTGWlabel(const char *msglabel){
   sendStartJsonMap("");
   sendJsonMapEntry(F("label"), OTlookupitem.label);
   if (OTlookupitem.type == ot_f88) {
-    sendJsonMapEntry(F("value"), atof(getOTGWValue(msgid)));
+    sendJsonMapEntry(F("value"), (float)atof(getOTGWValue(msgid)));
   } else {
     sendJsonMapEntry(F("value"), (int32_t)atoi(getOTGWValue(msgid))); // cast selects int32_t overload
   }
@@ -1221,8 +1221,9 @@ void getDallasLabels() {
 void updateAllDallasLabels() {
   const String& body = httpServer.arg(F("plain"));
 
-  // Validate: body must be a non-empty JSON object
-  if (body.length() == 0 || !body.startsWith("{")) {
+  // Validate: body must be a non-empty JSON object (starts with '{', ends with '}')
+  size_t bodyLen = body.length();
+  if (bodyLen == 0 || !body.startsWith("{") || body[bodyLen - 1] != '}') {
     httpServer.send(400, F("application/json"),
       F("{\"success\":false,\"error\":\"Empty or invalid JSON body\"}"));
     return;
