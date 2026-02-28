@@ -886,6 +886,8 @@ void sendDeviceTimeV2()
   sendJsonMapEntry(F("epoch"), (int)now);
   sendJsonMapEntry(F("message"), sMessage);
   sendJsonMapEntry(F("psmode"), bPSmode);
+  sendJsonMapEntry(F("freeheap"), ESP.getFreeHeap());
+  sendJsonMapEntry(F("maxfreeblock"), ESP.getMaxFreeBlockSize());
 
   sendEndJsonMap(F("devtime"));
 

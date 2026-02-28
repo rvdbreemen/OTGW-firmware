@@ -698,6 +698,8 @@ let currentFlashFilename = "";
 let flashModeActive = false; // Track if we're on the flash page
 let isPSmode = false; // Track PS=1 (Print Summary) mode from OTGW PIC
 let statusMessageText = ''; // Device status message from /v2/device/time
+let currentFreeHeap = null;    // Free heap bytes from /v2/device/time
+let currentMaxFreeBlock = null; // Max free block bytes from /v2/device/time
 let sensorSimulationActive = false; // Mirror of otmonitor.sensorsimulation for footer notice
 let flashPollTimer = null; // Timer for polling flash status as failsafe (both ESP and PIC)
 let otLogResponsiveInitialized = false;
@@ -2701,7 +2703,14 @@ function renderBottomMessage() {
   msgEl.style.display = (msgText === '') ? 'none' : 'block';
 }
 
-//============================================================================  
+//============================================================================
+function updateHeapDisplay() {
+  const el = document.getElementById('heap-info');
+  if (!el || currentFreeHeap === null) return;
+  el.textContent = `Heap: (${currentFreeHeap} / ${currentMaxFreeBlock})`;
+}
+
+//============================================================================
 function refreshDevTime() {
   //console.log("Refresh api/v2/device/time ..");
   fetch(APIGW + "v2/device/time")
@@ -2722,7 +2731,10 @@ function refreshDevTime() {
         if (timeEl) timeEl.textContent = devtime.dateTime;
       }
       statusMessageText = devtime.message || '';
-      
+      if (devtime.freeheap !== undefined)    currentFreeHeap = devtime.freeheap;
+      if (devtime.maxfreeblock !== undefined) currentMaxFreeBlock = devtime.maxfreeblock;
+      updateHeapDisplay();
+
       if (hasPsmode) {
         if (newPSmode !== isPSmode) {
           isPSmode = newPSmode;

@@ -98,6 +98,8 @@ static const char UpdateServerIndex[] PROGMEM =
         .gh-btn.fs:hover { background: #27854a; }
         .gh-btn.rb { background: #dd6b20; }
         .gh-btn.rb:hover { background: #c05621; }
+        .gh-btn.both { background: #6b46c1; }
+        .gh-btn.both:hover { background: #553c9a; }
         .gh-na { color: #aaa; font-size: 12px; }
      </style>
      </head>
@@ -175,76 +177,149 @@ static const char UpdateServerIndex[] PROGMEM =
            formErrorEl.textContent = '';
          };
          
-         function waitForDeviceReboot() {
+         // Download a single file from the device and trigger a browser download
+         function downloadBackup(url, prefix) {
+           return fetch(url)
+             .then(function(resp) {
+               if (!resp.ok && resp.status === 404) return null;
+               if (!resp.ok) throw new Error('HTTP ' + resp.status);
+               return resp.blob();
+             })
+             .then(function(blob) {
+               if (!blob) return; // File doesn't exist
+               var now = new Date();
+               var stamp = now.toISOString().replace(/[:.]/g, '-');
+               var filename = prefix + '-' + stamp + '.ini';
+               var objUrl = window.URL.createObjectURL(blob);
+               var a = document.createElement('a');
+               a.style.display = 'none';
+               a.href = objUrl;
+               a.download = filename;
+               document.body.appendChild(a);
+               a.click();
+               window.URL.revokeObjectURL(objUrl);
+               document.body.removeChild(a);
+               console.log('[OTA] State: Backup downloaded as ' + filename);
+               return new Promise(function(resolve) { setTimeout(resolve, 500); });
+             });
+         }
+
+         // Back up settings.ini and dallas_labels.ini to the browser
+         function doBackups() {
+           var settingsBackup = downloadBackup('/settings.ini', 'settings')
+             .catch(function(e) {
+               if (!confirm('Could not backup settings.ini. Continue anyway?')) {
+                 throw e;
+               }
+             });
+           var labelsBackup = downloadBackup('/dallas_labels.ini', 'dallas_labels')
+             .catch(function(e) {
+               console.log('[OTA] Dallas labels backup skipped (non-fatal)', e);
+             });
+           return Promise.all([settingsBackup, labelsBackup])
+             .then(function() {
+               console.log('[OTA] State: All backups complete');
+               return new Promise(function(resolve) { setTimeout(resolve, 500); });
+             });
+         }
+
+         // Upload a blob to the device via XHR; returns a Promise
+         function xhrUpload(action, fieldName, blob, filename) {
+           return new Promise(function(resolve, reject) {
+             var fd = new FormData();
+             fd.append(fieldName, blob, filename);
+             var xhr = new XMLHttpRequest();
+             xhr.open('POST', action, true);
+             xhr.timeout = 300000;
+             xhr.upload.onprogress = function(ev) {
+               if (ev.lengthComputable) {
+                 var pct = Math.min(Math.round((ev.loaded / ev.total) * 100), 100);
+                 progressBar.style.width = pct + '%';
+                 progressText.textContent = 'Uploading: ' + pct + '% (' + formatBytes(ev.loaded) + ' / ' + formatBytes(ev.total) + ')';
+               }
+             };
+             xhr.onload = function() {
+               if (xhr.status >= 200 && xhr.status < 300 && (xhr.responseText || '').indexOf('Flash error') === -1) {
+                 progressBar.style.width = '100%';
+                 resolve();
+               } else {
+                 reject(new Error(xhr.responseText || 'HTTP ' + xhr.status));
+               }
+             };
+             xhr.ontimeout = function() { reject(new Error('Upload timeout')); };
+             xhr.onerror = function() { reject(new Error('Connection lost during upload')); };
+             xhr.send(fd);
+           });
+         }
+
+         // Wait for the device to reboot and come back online.
+         // onReady: optional callback called when device is healthy.
+         //          If null/undefined, performs the default labels-restore + redirect to /.
+         function waitForDeviceReboot(onReady) {
            console.log('[OTA] State: Waiting for device reboot');
            var remaining = 60;
            progressText.textContent = 'Device rebooting... (' + remaining + 's)';
            progressBar.style.width = '100%';
-           
+
            var checkInterval = setInterval(function() {
              remaining--;
-             
-             // Check health endpoint to verify device is fully booted
+
              console.log('[OTA] Health check: GET /api/v2/health?t=' + Date.now());
-             fetch('/api/v2/health?t=' + Date.now(), { 
-               method: 'GET', 
+             fetch('/api/v2/health?t=' + Date.now(), {
+               method: 'GET',
                cache: 'no-store',
                headers: { 'Accept': 'application/json' }
              })
                .then(function(res) {
-                 if (res.ok) {
-                   return res.json();
-                 }
+                 if (res.ok) return res.json();
                  throw new Error('HTTP ' + res.status);
                })
                .then(function(data) {
-                 console.log('[OTA] Health response: ', JSON.stringify(data, null, 2));
-                 
-                 // Validate health response - simple object access
                  if (data && data.health && data.health.status === 'UP') {
                    clearInterval(checkInterval);
                    console.log('[OTA] State: Device is healthy');
-                   progressText.textContent = 'Device is back online!';
-                   
-                   // Try to restore dallas labels from parent window cache
-                   var labelsRestored = Promise.resolve();
-                   try {
-                     if (window.opener && window.opener.dallasLabelsCache) {
-                       var labels = window.opener.dallasLabelsCache;
-                       if (labels && typeof labels === 'object' && Object.keys(labels).length > 0) {
-                         console.log('[OTA] Restoring Dallas labels from memory cache');
-                         progressText.textContent = 'Restoring Dallas labels...';
-                         labelsRestored = fetch('/api/v2/sensors/labels', {
-                           method: 'POST',
-                           headers: { 'Content-Type': 'application/json' },
-                           body: JSON.stringify(labels)
-                         })
-                         .then(function(res) {
-                           if (res.ok) {
-                             console.log('[OTA] Dallas labels restored successfully');
-                           } else {
-                             console.error('[OTA] Label restore failed: HTTP ' + res.status);
-                           }
-                         })
-                         .catch(function(err) {
-                           console.error('[OTA] Label restore error:', err);
-                         });
+                   if (onReady) {
+                     // Intermediate reboot: hand control back to caller
+                     onReady();
+                   } else {
+                     // Final reboot: restore labels, then redirect to /
+                     progressText.textContent = 'Device is back online!';
+                     var labelsRestored = Promise.resolve();
+                     try {
+                       if (window.opener && window.opener.dallasLabelsCache) {
+                         var labels = window.opener.dallasLabelsCache;
+                         if (labels && typeof labels === 'object' && Object.keys(labels).length > 0) {
+                           console.log('[OTA] Restoring Dallas labels from memory cache');
+                           progressText.textContent = 'Restoring Dallas labels...';
+                           labelsRestored = fetch('/api/v2/sensors/labels', {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json' },
+                             body: JSON.stringify(labels)
+                           })
+                           .then(function(res) {
+                             if (res.ok) {
+                               console.log('[OTA] Dallas labels restored successfully');
+                             } else {
+                               console.error('[OTA] Label restore failed: HTTP ' + res.status);
+                             }
+                           })
+                           .catch(function(err) {
+                             console.error('[OTA] Label restore error:', err);
+                           });
+                         }
                        }
-                     }
-                   } catch(e) { console.log('[OTA] Label restore skipped:', e); }
-                   
-                   labelsRestored.then(function() {
-                     progressText.textContent = 'Redirecting...';
-                     setTimeout(function() {
-                       window.location.href = '/';
-                     }, 1000);
-                   });
+                     } catch(e) { console.log('[OTA] Label restore skipped:', e); }
+                     labelsRestored.then(function() {
+                       progressText.textContent = 'Redirecting...';
+                       setTimeout(function() { window.location.href = '/'; }, 1000);
+                     });
+                   }
                  }
                })
                .catch(function(e) {
                  // Ignore - device still rebooting
                });
-             
+
              if (remaining <= 0) {
                clearInterval(checkInterval);
                console.log('[OTA] State: Timeout reached, redirecting anyway');
@@ -252,18 +327,18 @@ static const char UpdateServerIndex[] PROGMEM =
                window.location.href = '/';
                return;
              }
-             
+
              progressText.textContent = 'Device rebooting... (' + remaining + 's)';
            }, 1000);
          }
-         
+
          function formatBytes(bytes) {
            if (!bytes || bytes < 0) return '0 B';
            if (bytes < 1024) return bytes + ' B';
            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
            return (bytes / 1024 / 1024).toFixed(2) + ' MB';
          }
-         
+
          function initUploadForm(formId, targetName) {
            var form = document.getElementById(formId);
            if (!form) return;
@@ -276,14 +351,14 @@ static const char UpdateServerIndex[] PROGMEM =
                if (formErrorEl) formErrorEl.textContent = '';
              });
            }
-           
+
            form.addEventListener('submit', function(e) {
              if (!input || !input.files || input.files.length === 0) {
                if (formErrorEl) formErrorEl.textContent = 'Select a file first.';
                e.preventDefault();
                return;
              }
-             
+
              e.preventDefault();
              console.log('[OTA] State: Form submitted for ' + targetName);
              console.log('[OTA] File: ' + input.files[0].name + ' (' + formatBytes(input.files[0].size) + ')');
@@ -294,80 +369,36 @@ static const char UpdateServerIndex[] PROGMEM =
              progressBar.style.width = '0%';
              progressText.textContent = 'Preparing upload...';
              errorEl.textContent = '';
-             
+
              if (!window.FormData || !window.XMLHttpRequest) {
                errorEl.textContent = 'Browser not supported';
                retryBtn.style.display = 'block';
                return;
              }
-             
+
              var preFlight = Promise.resolve();
-             
+
              // Backup settings and dallas labels before filesystem flash
              if (formId === 'fsForm') {
                var chk = document.getElementById('chkPreserve');
                if (chk && chk.checked) {
                  console.log('[OTA] State: Downloading backups before filesystem flash');
                  progressText.textContent = 'Downloading backups...';
-                 
-                 // Helper to download a file as backup
-                 function downloadBackup(url, prefix) {
-                   return fetch(url)
-                     .then(function(resp) {
-                       if (!resp.ok && resp.status === 404) return null;
-                       if (!resp.ok) throw new Error('HTTP ' + resp.status);
-                       return resp.blob();
-                     })
-                     .then(function(blob) {
-                       if (!blob) return; // File doesn't exist
-                       var now = new Date();
-                       var stamp = now.toISOString().replace(/[:.]/g, '-');
-                       var filename = prefix + '-' + stamp + '.ini';
-                       var objUrl = window.URL.createObjectURL(blob);
-                       var a = document.createElement('a');
-                       a.style.display = 'none';
-                       a.href = objUrl;
-                       a.download = filename;
-                       document.body.appendChild(a);
-                       a.click();
-                       window.URL.revokeObjectURL(objUrl);
-                       document.body.removeChild(a);
-                       console.log('[OTA] State: Backup downloaded as ' + filename);
-                       return new Promise(function(resolve) { setTimeout(resolve, 500); });
-                     });
-                 }
-                 
-                 var settingsBackup = downloadBackup('/settings.ini', 'settings')
-                   .catch(function(e) {
-                     if (!confirm('Could not backup settings.ini. Continue anyway?')) {
-                       throw e;
-                     }
-                   });
-                 
-                 var labelsBackup = downloadBackup('/dallas_labels.ini', 'dallas_labels')
-                   .catch(function(e) {
-                     console.log('[OTA] Dallas labels backup skipped (non-fatal)', e);
-                   });
-                 
-                 preFlight = Promise.all([settingsBackup, labelsBackup])
-                   .then(function() {
-                     console.log('[OTA] State: All backups complete');
-                     return new Promise(function(resolve) { setTimeout(resolve, 500); });
-                   });
+                 preFlight = doBackups();
                }
              }
-             
+
              preFlight.then(function() {
                var action = form.action;
                if (action.indexOf('size=') === -1) {
                  action += (action.indexOf('?') === -1 ? '?' : '&') + 'size=' + encodeURIComponent(input.files[0].size);
                }
-               
+
                console.log('[OTA] State: Starting XHR upload to ' + action);
                var xhr = new XMLHttpRequest();
                xhr.open('POST', action, true);
                xhr.timeout = 300000; // 5 minutes for flash operations
-               
+
                xhr.upload.onprogress = function(ev) {
                  if (ev.lengthComputable) {
                    var pct = Math.round((ev.loaded / ev.total) * 100);
@@ -377,7 +408,7 @@ static const char UpdateServerIndex[] PROGMEM =
                    progressText.textContent = 'Uploading: ' + pct + '% (' + formatBytes(ev.loaded) + ' / ' + formatBytes(ev.total) + ')';
                  }
                };
-               
+
                xhr.onload = function() {
                  if (xhr.status >= 200 && xhr.status < 300) {
                    var responseText = xhr.responseText || '';
@@ -386,12 +417,11 @@ static const char UpdateServerIndex[] PROGMEM =
                      errorEl.textContent = responseText;
                      retryBtn.style.display = 'block';
                    } else {
-                     // Backend returns 200 only after flash is complete
                      console.log('[OTA] State: Flash complete (backend confirmed), device rebooting');
                      progressBar.style.width = '100%';
                      progressBar.style.backgroundColor = '#4CAF50';
                      progressText.textContent = 'Flash complete! Device rebooting...';
-                     waitForDeviceReboot();
+                     waitForDeviceReboot(null);
                    }
                  } else {
                    progressText.textContent = 'Upload failed';
@@ -399,21 +429,21 @@ static const char UpdateServerIndex[] PROGMEM =
                    retryBtn.style.display = 'block';
                  }
                };
-               
+
                xhr.ontimeout = function() {
                  console.error('[OTA] Error: Upload timeout after 5 minutes');
                  progressText.textContent = 'Upload timeout';
                  errorEl.textContent = 'Connection timeout - flash may still be in progress. Wait 60 seconds and check device manually.';
                  retryBtn.style.display = 'block';
                };
-               
+
                xhr.onerror = function() {
                  console.error('[OTA] Error: Upload connection lost');
                  progressText.textContent = 'Upload error';
                  errorEl.textContent = 'Upload connection lost - flash may still be in progress. Wait 60 seconds and check device manually.';
                  retryBtn.style.display = 'block';
                };
-               
+
                console.log('[OTA] State: Sending FormData via XHR');
                xhr.send(new FormData(form));
              }).catch(function(e) {
@@ -584,7 +614,7 @@ static const char UpdateServerIndex[] PROGMEM =
              list.style.display = 'block';
              return;
            }
-           var html = '<table class="gh-table"><thead><tr><th>Release</th><th>Date</th><th>Firmware</th><th>Filesystem</th></tr></thead><tbody>';
+           var html = '<table class="gh-table"><thead><tr><th>Release</th><th>Date</th><th>Firmware</th><th>Filesystem</th><th>Update</th></tr></thead><tbody>';
            for (var i = 0; i < releases.length; i++) {
              var rel = releases[i];
              var tag = (rel.tag_name || '').replace(/^v/, '');
@@ -612,7 +642,10 @@ static const char UpdateServerIndex[] PROGMEM =
              var fsBtn = fsAsset
                ? '<button class="gh-btn fs" onclick="ghFlash(' + i + ',false);">Flash FS</button>'
                : '<span class="gh-na">N/A</span>';
-             html += '<tr' + (isInstalled ? ' class="gh-current-row"' : '') + '><td>' + nameHtml + '</td><td>' + escHtml(date) + '</td><td>' + fwBtn + '</td><td>' + fsBtn + '</td></tr>';
+             var bothBtn = (fwAsset && fsAsset)
+               ? '<button class="gh-btn both" onclick="ghFlashBoth(' + i + ');">Flash Both</button>'
+               : '<span class="gh-na">—</span>';
+             html += '<tr' + (isInstalled ? ' class="gh-current-row"' : '') + '><td>' + nameHtml + '</td><td>' + escHtml(date) + '</td><td>' + fwBtn + '</td><td>' + fsBtn + '</td><td>' + bothBtn + '</td></tr>';
            }
            html += '</tbody></table>';
            list.innerHTML = html;
@@ -653,54 +686,96 @@ static const char UpdateServerIndex[] PROGMEM =
                progressBar.style.width = '10%';
                progressText.textContent = 'Uploading to device...';
                var action = (isFirmware ? '/update?cmd=0' : '/update?cmd=100') + '&size=' + blob.size;
-               var fd = new FormData();
-               fd.append(isFirmware ? 'firmware' : 'filesystem', blob, filename);
-               var xhr = new XMLHttpRequest();
-               xhr.open('POST', action, true);
-               xhr.timeout = 300000;
-               xhr.upload.onprogress = function(ev) {
-                 if (ev.lengthComputable) {
-                   var pct = Math.round((ev.loaded / ev.total) * 100);
-                   if (pct > 100) pct = 100;
-                   progressBar.style.width = pct + '%';
-                   progressText.textContent = 'Uploading: ' + pct + '% (' + formatBytes(ev.loaded) + ' / ' + formatBytes(ev.total) + ')';
-                 }
-               };
-               xhr.onload = function() {
-                 if (xhr.status >= 200 && xhr.status < 300) {
-                   var resp = xhr.responseText || '';
-                   if (resp.indexOf('Flash error') !== -1) {
-                     progressText.textContent = 'Flash error';
-                     errorEl.textContent = resp;
-                     retryBtn.style.display = 'block';
-                   } else {
-                     progressBar.style.width = '100%';
-                     progressText.textContent = 'Flash complete! Device rebooting...';
-                     waitForDeviceReboot();
-                   }
-                 } else {
-                   progressText.textContent = 'Upload failed';
-                   errorEl.textContent = 'Upload failed: HTTP ' + xhr.status;
-                   retryBtn.style.display = 'block';
-                 }
-               };
-               xhr.ontimeout = function() {
-                 progressText.textContent = 'Upload timeout';
-                 errorEl.textContent = 'Timeout. Flash may still be in progress. Wait 60s and check manually.';
-                 retryBtn.style.display = 'block';
-               };
-               xhr.onerror = function() {
-                 progressText.textContent = 'Upload error';
-                 errorEl.textContent = 'Connection lost during upload.';
-                 retryBtn.style.display = 'block';
-               };
-               xhr.send(fd);
+               var fieldName = isFirmware ? 'firmware' : 'filesystem';
+               return xhrUpload(action, fieldName, blob, filename)
+                 .then(function() {
+                   progressText.textContent = 'Flash complete! Device rebooting...';
+                   waitForDeviceReboot(null);
+                 });
              })
              .catch(function(e) {
-               progressText.textContent = 'Download failed';
-               errorEl.textContent = 'Cannot download from GitHub: ' + (e.message || String(e)) + ' — try manual upload instead.';
+               progressText.textContent = 'Failed';
+               errorEl.textContent = (e.message || String(e)) + (String(e.message).indexOf('download') >= 0 ? ' — try manual upload instead.' : '');
                retryBtn.style.display = 'block';
              });
+         };
+
+         window.ghFlashBoth = function(idx) {
+           if (!ghReleases || idx >= ghReleases.length) return;
+           var rel = ghReleases[idx];
+           var fwAsset = null, fsAsset = null;
+           for (var j = 0; j < (rel.assets || []).length; j++) {
+             var a = rel.assets[j];
+             if (!fwAsset && a.name && a.name.indexOf('.ino.bin') >= 0) fwAsset = a;
+             if (!fsAsset && a.name && a.name.indexOf('.littlefs.bin') >= 0) fsAsset = a;
+           }
+           if (!fwAsset || !fsAsset) { alert('Both firmware and filesystem assets are required.'); return; }
+
+           var tag = rel.tag_name || '';
+
+           showProgressPage();
+           progressBar.style.width = '0%';
+           progressBar.style.backgroundColor = '';
+           progressText.textContent = 'Downloading firmware + filesystem from GitHub...';
+           errorEl.textContent = '';
+           retryBtn.style.display = 'none';
+
+           // Step 1: Download both blobs in parallel
+           Promise.all([
+             fetch(fwAsset.browser_download_url).then(function(r) {
+               if (!r.ok) throw new Error('Firmware download failed: HTTP ' + r.status);
+               return r.blob();
+             }),
+             fetch(fsAsset.browser_download_url).then(function(r) {
+               if (!r.ok) throw new Error('Filesystem download failed: HTTP ' + r.status);
+               return r.blob();
+             })
+           ])
+           .then(function(blobs) {
+             var fwBlob = blobs[0], fsBlob = blobs[1];
+             // Step 2: Backup settings + labels before filesystem flash
+             progressText.textContent = 'Downloading backups...';
+             return doBackups().then(function() { return [fwBlob, fsBlob]; });
+           })
+           .then(function(blobs) {
+             var fwBlob = blobs[0], fsBlob = blobs[1];
+             // Step 3: Flash firmware
+             if (fileEl) fileEl.textContent = fwAsset.name;
+             if (targetEl) targetEl.textContent = 'firmware (1/2) \u2014 GitHub ' + tag;
+             progressBar.style.width = '0%';
+             progressBar.style.backgroundColor = '';
+             progressText.textContent = 'Uploading firmware (1/2)...';
+             return xhrUpload('/update?cmd=0&size=' + fwBlob.size, 'firmware', fwBlob, fwAsset.name)
+               .then(function() {
+                 // Step 4: Firmware uploaded — wait for device to reboot, then flash filesystem
+                 progressBar.style.backgroundColor = '#4CAF50';
+                 progressText.textContent = 'Firmware flashed! Device rebooting... (1/2)';
+                 return new Promise(function(resolve, reject) {
+                   waitForDeviceReboot(function() {
+                     // Step 5: Device is back — flash filesystem
+                     if (fileEl) fileEl.textContent = fsAsset.name;
+                     if (targetEl) targetEl.textContent = 'filesystem (2/2) \u2014 GitHub ' + tag;
+                     progressBar.style.width = '0%';
+                     progressBar.style.backgroundColor = '';
+                     progressText.textContent = 'Uploading filesystem (2/2)...';
+                     xhrUpload('/update?cmd=100&size=' + fsBlob.size, 'filesystem', fsBlob, fsAsset.name)
+                       .then(function() {
+                         // Step 6: Filesystem uploaded — wait for device to reboot, then redirect to /
+                         progressBar.style.backgroundColor = '#4CAF50';
+                         progressText.textContent = 'Filesystem flashed! Device rebooting... (2/2)';
+                         waitForDeviceReboot(null);
+                         resolve();
+                       })
+                       .catch(reject);
+                   });
+                 });
+               });
+           })
+           .catch(function(e) {
+             progressText.textContent = 'Failed';
+             errorEl.textContent = String(e.message || e);
+             retryBtn.style.display = 'block';
+           });
          };
        })();
      </script>
