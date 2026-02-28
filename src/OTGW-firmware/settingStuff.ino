@@ -271,7 +271,7 @@ void readSettings(bool show)
   static const size_t JSON_LINE_BUF = 256;
   char lineBuf[JSON_LINE_BUF];
   char keyBuf[64];
-  char valueBuf[150];
+  char valueBuf[201]; // must fit the largest setting value (WebhookPayload: 201 bytes)
 
   while (file.available()) {
     size_t len = file.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
