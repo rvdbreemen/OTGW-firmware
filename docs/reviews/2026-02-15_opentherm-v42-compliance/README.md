@@ -52,5 +52,5 @@ This review compares the OTGW-firmware implementation against the OpenTherm Prot
 
 ## Reference Specification
 
-- `Specification/OpenTherm-Protocol-Specification-v4.2-message-id-reference.md`
-- `Specification/OpenTherm-Protocol-Specification-v4.2.pdf`
+- `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2-message-id-reference.md`
+- `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.pdf`
