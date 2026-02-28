@@ -54,6 +54,68 @@ static inline char unescapeJsonChar(char esc) {
   }
 }
 
+// Shared helper to extract a simple JSON field value (string/number/bool/null) into a bounded buffer.
+// Returns true when key is found and value is copied into out; false otherwise.
+// Intended for simple key/value extraction in flat JSON objects.
+bool extractJsonFieldText(const char* json, const char* key, char* out, size_t outSize)
+{
+  if (!json || !key || !out || outSize == 0) return false;
+  out[0] = '\0';
+
+  // Uses global cMsg as scratch buffer to avoid per-helper stack duplication.
+  // Call from single-threaded normal firmware context (not ISR), and only when
+  // other code paths are not concurrently using cMsg as temporary storage.
+  for (const char* k = key; *k; k++) {
+    if (*k == '"' || *k == '\\' || static_cast<unsigned char>(*k) < 0x20) return false;
+  }
+  int keyLen = snprintf_P(cMsg, sizeof(cMsg), PSTR("\"%s\""), key);
+  if (keyLen < 0 || static_cast<size_t>(keyLen) >= sizeof(cMsg)) return false;
+  const char* keyPos = strstr(json, cMsg);
+  if (!keyPos) return false;
+
+  const char* p = keyPos + keyLen;
+  while (*p && isspace(static_cast<unsigned char>(*p))) p++;
+  if (*p != ':') return false;
+  p++;
+  while (*p && isspace(static_cast<unsigned char>(*p))) p++;
+
+  if (*p == '"') {
+    p++;
+    size_t n = 0;
+    while (*p && *p != '"' && n < (outSize - 1)) {
+      if (*p == '\\') {
+        if (*(p + 1) == '\0') return false;
+        p++;
+        switch (*p) {
+          case '"': out[n++] = '"'; break;
+          case '\\': out[n++] = '\\'; break;
+          case '/': out[n++] = '/'; break;
+          case 'b': out[n++] = '\b'; break;
+          case 'f': out[n++] = '\f'; break;
+          case 'n': out[n++] = '\n'; break;
+          case 'r': out[n++] = '\r'; break;
+          case 't': out[n++] = '\t'; break;
+          default: out[n++] = *p; break;
+        }
+        p++;
+      } else {
+        out[n++] = *p++;
+      }
+    }
+    out[n] = '\0';
+    return true;
+  }
+
+  const char* start = p;
+  while (*p && *p != ',' && *p != '}' && *p != ']' && !isspace(static_cast<unsigned char>(*p))) p++;
+  size_t len = static_cast<size_t>(p - start);
+  if (len == 0) return false;
+  if (len >= outSize) len = outSize - 1;
+  memcpy(out, start, len);
+  out[len] = '\0';
+  return true;
+}
+
 static int iIdentlevel = 0;
 bool bFirst = true; 
 
