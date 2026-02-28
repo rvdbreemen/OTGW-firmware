@@ -20,7 +20,6 @@
 // #define DISABLE_WEBSOCKET
 
 #include <TelnetStream.h>       // https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
-#include <ArduinoJson.h>        // https://arduinojson.org/
 #include "Wire.h"
 #include "safeTimers.h"
 #include <OTGWSerial.h>         // Bron Schelte's Serial class - it upgrades and more
@@ -49,7 +48,7 @@ void setLed(int8_t, uint8_t);
 
 //Defaults and macro definitions
 #define _HOSTNAME       "OTGW"
-#define SETTINGS_FILE   "/settings.ini"
+#define SETTINGS_FILE         "/settings.ini"
 #define NTP_DEFAULT_TIMEZONE "Europe/Amsterdam"
 #define NTP_HOST_DEFAULT "pool.ntp.org"
 #define NTP_RESYNC_TIME 1800 //seconds = every 30 minutes
@@ -97,6 +96,17 @@ void sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const 
 void publishToSourceTopic(const char*, const char*, byte);
 void addOTWGcmdtoqueue(const char* ,  int , const bool = false, const int16_t = 1000);
 void sendLogToWebSocket(const char* logMessage);
+
+// Forward declarations for functions defined in later .ino files
+// (Arduino auto-prototype generation can fail for these)
+void readSettings(bool show);
+void writeSettings(bool show);
+void updateSetting(const char *field, const char *newValue);
+void GetVersion(const char* hexfile, char* version, size_t destSize);
+void startWebSocket();
+void handleWebSocket();
+void testWebhook(bool testOn);
+void evalWebhook();
 
 //Global variables
 WiFiClient  wifiClient;
@@ -239,6 +249,12 @@ bool      settingMyDEBUG = false;
 bool      settingGPIOOUTPUTSenabled = false;
 int8_t    settingGPIOOUTPUTSpin = 16;
 int8_t    settingGPIOOUTPUTStriggerBit = 0;
+
+//Webhook Settings
+bool      settingWebhookEnabled = false;
+char      settingWebhookURLon[101] = "";    // URL called when trigger bit turns ON
+char      settingWebhookURLoff[101] = "";   // URL called when trigger bit turns OFF
+int8_t    settingWebhookTriggerBit = 1;     // Default: bit 1 = CH mode (slave: CH active)
 
 //Now load Debug & network library
 #include "Debug.h"
