@@ -88,8 +88,82 @@ static bool isLocalUrl(const char* url) {
 }
 
 //=======================================================================
+// Expand a payload template by replacing {variable} placeholders with
+// current OpenTherm state values.
+//
+// Supported variables:
+//   {state}      — "ON" or "OFF" (the current trigger-bit state)
+//   {tboiler}    — boiler flow temperature (°C, 1 decimal)
+//   {tr}         — room temperature (°C, 1 decimal)
+//   {tset}       — CH water setpoint (°C, 1 decimal)
+//   {tdhw}       — DHW temperature (°C, 1 decimal)
+//   {relmod}     — relative modulation level (%, 0 decimals)
+//   {chpressure} — CH circuit pressure (bar, 2 decimals)
+//   {flameon}    — "true"/"false" — burner flame active (slave status bit 3)
+//   {chmode}     — "true"/"false" — CH active (slave status bit 1)
+//   {dhwmode}    — "true"/"false" — DHW active (slave status bit 2)
+//
+// Unknown {variables} are passed through unchanged.
+//
+// Note: HTTPS / public-internet targets (e.g. Discord) require a local
+// relay such as a Node-RED flow or Home Assistant webhook automation, as
+// this device only makes outbound HTTP calls to local-network hosts.
+//=======================================================================
+static void expandPayload(const char* tmpl, char* out, size_t outLen, bool stateOn) {
+  size_t di = 0;
+  const char* p = tmpl;
+  while (*p && di < outLen - 1) {
+    if (*p != '{') { out[di++] = *p++; continue; }
+
+    // Scan for the closing brace
+    const char* end = strchr(p + 1, '}');
+    if (!end) { out[di++] = *p++; continue; }   // no closing brace — literal '{'
+
+    size_t nameLen = (size_t)(end - p - 1);
+    if (nameLen == 0 || nameLen >= 20) { out[di++] = *p++; continue; }
+
+    char varName[20];
+    memcpy(varName, p + 1, nameLen);
+    varName[nameLen] = '\0';
+
+    char val[16] = "";
+    if      (strcmp_P(varName, PSTR("state"))      == 0) { strcpy(val, stateOn ? "ON" : "OFF"); }
+    else if (strcmp_P(varName, PSTR("tboiler"))    == 0) { snprintf(val, sizeof(val), "%.1f", OTcurrentSystemState.Tboiler); }
+    else if (strcmp_P(varName, PSTR("tr"))         == 0) { snprintf(val, sizeof(val), "%.1f", OTcurrentSystemState.Tr); }
+    else if (strcmp_P(varName, PSTR("tset"))       == 0) { snprintf(val, sizeof(val), "%.1f", OTcurrentSystemState.TSet); }
+    else if (strcmp_P(varName, PSTR("tdhw"))       == 0) { snprintf(val, sizeof(val), "%.1f", OTcurrentSystemState.Tdhw); }
+    else if (strcmp_P(varName, PSTR("relmod"))     == 0) { snprintf(val, sizeof(val), "%.0f", OTcurrentSystemState.RelModLevel); }
+    else if (strcmp_P(varName, PSTR("chpressure")) == 0) { snprintf(val, sizeof(val), "%.2f", OTcurrentSystemState.CHPressure); }
+    else if (strcmp_P(varName, PSTR("flameon"))    == 0) { strcpy(val, (OTcurrentSystemState.SlaveStatus & (1U << 3)) ? "true" : "false"); }
+    else if (strcmp_P(varName, PSTR("chmode"))     == 0) { strcpy(val, (OTcurrentSystemState.SlaveStatus & (1U << 1)) ? "true" : "false"); }
+    else if (strcmp_P(varName, PSTR("dhwmode"))    == 0) { strcpy(val, (OTcurrentSystemState.SlaveStatus & (1U << 2)) ? "true" : "false"); }
+    else { out[di++] = *p++; continue; }  // unknown variable — pass '{' literally
+
+    size_t valLen = strlen(val);
+    size_t avail  = outLen - 1 - di;
+    if (valLen > avail) valLen = avail;
+    memcpy(out + di, val, valLen);
+    di += valLen;
+    p = end + 1;  // advance past '}'
+  }
+  out[di] = '\0';
+}
+
+//=======================================================================
 // Send the webhook for the given state, regardless of current state.
 // Used by the test endpoint and called from evalWebhook() on change.
+//
+// Behaviour:
+//   - settingWebhookPayload empty  → HTTP GET (compatible with Shelly
+//     and other devices that accept URL-encoded commands)
+//   - settingWebhookPayload set    → HTTP POST with Content-Type:
+//     application/json; {variable} placeholders in the template are
+//     expanded to live OpenTherm values before sending.
+//
+// Example payload for a local Home Assistant webhook:
+//   {"state":"{state}","tboiler":{tboiler},"tr":{tr}}
+//
+// See expandPayload() for the full list of supported variables.
 //=======================================================================
 static void sendWebhook(bool stateOn) {
   if (!settingWebhookEnabled) {
@@ -115,7 +189,17 @@ static void sendWebhook(bool stateOn) {
     return;
   }
 
-  DebugTf(PSTR("Webhook: calling [%s] (state=%s)\r\n"), url, stateOn ? "ON" : "OFF");
+  bool hasPayload = (settingWebhookPayload[0] != '\0');
+
+  // Expand the payload template once, outside the HTTP block (static to
+  // keep off the 4 KB CONT stack)
+  static char expandedPayload[201];
+  if (hasPayload) {
+    expandPayload(settingWebhookPayload, expandedPayload, sizeof(expandedPayload), stateOn);
+    DebugTf(PSTR("Webhook: POST [%s] payload=%s\r\n"), url, expandedPayload);
+  } else {
+    DebugTf(PSTR("Webhook: GET  [%s] (state=%s)\r\n"), url, stateOn ? "ON" : "OFF");
+  }
 
   WiFiClient client;
   HTTPClient http;
@@ -123,12 +207,23 @@ static void sendWebhook(bool stateOn) {
 
   if (http.begin(client, url)) {
     yield(); // allow other tasks while TCP stack works
-    int code = http.GET();
+    int code;
+    if (hasPayload) {
+      // Use the configured Content-Type, or fall back to application/json if unset
+      const char* ct = (settingWebhookContentType[0] != '\0')
+                       ? settingWebhookContentType
+                       : "application/json";
+      http.addHeader(F("Content-Type"), ct);
+      code = http.POST(expandedPayload);
+    } else {
+      code = http.GET();
+    }
     yield(); // allow other tasks after response
     if (code > 0) {
       DebugTf(PSTR("Webhook: HTTP response code: %d\r\n"), code);
     } else {
-      DebugTf(PSTR("Webhook: HTTP GET failed, error: %s\r\n"), http.errorToString(code).c_str());
+      DebugTf(PSTR("Webhook: HTTP %s failed, error: %s\r\n"),
+              hasPayload ? "POST" : "GET", http.errorToString(code).c_str());
     }
     http.end();
   } else {
