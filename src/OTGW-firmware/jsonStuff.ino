@@ -10,35 +10,33 @@
 ***************************************************************************      
 */
 
-// Helper function to escape JSON string values
-// Replaces: " with \", \ with \\, control chars with \uXXXX
-String escapeJsonString(const char* str) {
-  if (!str) return String("");
-  
-  String result;
-  result.reserve(strlen(str) + 10); // Reserve some extra space for escapes
-  
+// Buffer-writing variant: escapes str into out[0..outSize-1], no heap allocation.
+// Truncates silently if out is too small. Safe to call with cMsg as out.
+static void escapeJsonStringTo(const char* str, char* out, size_t outSize) {
+  if (!str || !out || outSize == 0) { if (out && outSize) out[0] = '\0'; return; }
+  size_t n = 0;
   for (const char* p = str; *p; p++) {
     switch (*p) {
-      case '"':  result += "\\\""; break;
-      case '\\': result += "\\\\"; break;
-      case '\b': result += "\\b";  break;
-      case '\f': result += "\\f";  break;
-      case '\n': result += "\\n";  break;
-      case '\r': result += "\\r";  break;
-      case '\t': result += "\\t";  break;
+      case '"':  if (n + 2 < outSize) { out[n++] = '\\'; out[n++] = '"';  } break;
+      case '\\': if (n + 2 < outSize) { out[n++] = '\\'; out[n++] = '\\'; } break;
+      case '\b': if (n + 2 < outSize) { out[n++] = '\\'; out[n++] = 'b';  } break;
+      case '\f': if (n + 2 < outSize) { out[n++] = '\\'; out[n++] = 'f';  } break;
+      case '\n': if (n + 2 < outSize) { out[n++] = '\\'; out[n++] = 'n';  } break;
+      case '\r': if (n + 2 < outSize) { out[n++] = '\\'; out[n++] = 'r';  } break;
+      case '\t': if (n + 2 < outSize) { out[n++] = '\\'; out[n++] = 't';  } break;
       default:
-        if (*p < 0x20) {
-          // Control character - use \uXXXX notation
-          char buf[7];
-          snprintf(buf, sizeof(buf), "\\u%04X", (unsigned char)*p);
-          result += buf;
+        if ((unsigned char)*p < 0x20) {
+          if (n + 6 < outSize) {
+            out[n++] = '\\'; out[n++] = 'u'; out[n++] = '0'; out[n++] = '0';
+            out[n++] = "0123456789abcdef"[((unsigned char)*p >> 4) & 0xF];
+            out[n++] = "0123456789abcdef"[ (unsigned char)*p       & 0xF];
+          }
         } else {
-          result += *p;
+          if (n + 1 < outSize) out[n++] = *p;
         }
     }
   }
-  return result;
+  out[n] = '\0';
 }
 
 // Helper function to unescape a single JSON escape character (the char after '\').
@@ -892,8 +890,12 @@ void writeJsonStringPair(File& f, const char* key, const char* val, bool addComm
 
   if (addComma) f.print(',');
 
-  String escapedKey = escapeJsonString(key);
-  String escapedVal = escapeJsonString(val);
+  // Dallas label keys are hex addresses (≤16 chars); values are user labels (≤24 chars).
+  // Fixed stack buffers avoid heap allocation; worst-case doubled size gives safe margin.
+  char escapedKey[35];
+  char escapedVal[51];
+  escapeJsonStringTo(key, escapedKey, sizeof(escapedKey));
+  escapeJsonStringTo(val, escapedVal, sizeof(escapedVal));
 
   f.print('"');
   f.print(escapedKey);
