@@ -235,6 +235,7 @@ Starting with hardware version 2.3, the included ESP8266 devkit changed from Nod
 - **ADR Skill for Copilot**: [.github/skills/adr/](.github/skills/adr/) - Automated ADR management and compliance
 - **WebSocket architecture**: [WEBSOCKET_FLOW.md](docs/WEBSOCKET_FLOW.md) - Complete WebSocket flow explanation
 - **WebSocket quick reference**: [WEBSOCKET_QUICK_REFERENCE.md](docs/WEBSOCKET_QUICK_REFERENCE.md) - Short WebSocket overview
+- **WiFi recovery (triple reset)**: [docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md](docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md) - Force WiFi config portal when network credentials are invalid
 - NodoShop OTGW product page: <https://www.nodo-shop.nl/nl/opentherm-gateway/211-opentherm-gateway.html>
 - Original OTGW project site (Schelte Bron): <http://otgw.tclcode.com/>
 - OTGW PIC firmware downloads: <http://otgw.tclcode.com/download.html>
@@ -252,6 +253,8 @@ The exact steps and screenshots live in the wiki, but the general flow is:
    - **Manual method**: Follow the wiki instructions
 2. Connect the OTGW to your network and open the Web UI via `http://<device-ip>/`.
    If the device cannot connect, it starts a Wi-Fi configuration portal using an AP named `<hostname>-<mac>`.
+  - **Recovery option (Wemos/ESP8266 reset-only)**: press the reset button **3 times within 10 seconds** to force the Wi-Fi config portal on next boot.
+  - Forced recovery clears stored Wi-Fi credentials first, then starts the portal.
 3. Configure MQTT (broker, credentials, topic prefix) and enable Home Assistant MQTT Auto Discovery.
 4. Add the MQTT integration in Home Assistant; entities should appear automatically.
 
