@@ -140,6 +140,11 @@ static const char* skipOTLogTimestamp(const char* logLine)
 //some variable's
 OpenthermData_t OTdata, delayedOTdata, tmpOTdata;
 
+// Definitions moved from OTGW-Core.h (extern declarations remain in header)
+time_t msglastupdated[256] = {0};
+struct OT_cmd_t cmdqueue[CMDQUEUE_MAX];
+int cmdQueueSize = 0;  // fill-pointer: entries are 0..cmdQueueSize-1, left-shift on deletion
+
 #define OTGW_BANNER "OpenTherm Gateway"
 
 enum OTSpecCompatMode : uint8_t {
@@ -1683,12 +1688,12 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
 
   //check to see if the cmd is in queue
   bool foundcmd = false;
-  int8_t insertptr = cmdptr; //set insertptr to next empty slot
+  int8_t insertptr = cmdQueueSize; //set insertptr to next empty slot
   if (!forceQueue){
     char cmd[3];
     memset(cmd, 0, sizeof(cmd));
     memcpy(cmd, buf, 2);
-    for (int i=0; i<cmdptr; i++){
+    for (int i=0; i<cmdQueueSize; i++){
       if (strncmp(cmdqueue[i].cmd, cmd, 2) == 0) {
         //found cmd exists, set the inertptr to found slot
         foundcmd = true;
@@ -1700,7 +1705,7 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
   if (foundcmd) OTGWDebugTf(PSTR("CmdQueue: Found cmd exists in slot [%d]\r\n"), insertptr);
   else OTGWDebugTf(PSTR("CmdQueue: Adding cmd end of queue, slot [%d]\r\n"), insertptr);
 
-  if (!foundcmd && cmdptr >= CMDQUEUE_MAX) {
+  if (!foundcmd && cmdQueueSize >= CMDQUEUE_MAX) {
     OTGWDebugTln(F("CmdQueue: Error: Reached max queue"));
     OTGWDebugFlush();
     return;
@@ -1731,14 +1736,14 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
   //if not found
   if (!foundcmd) {
     //if not reached max of queue
-    if (cmdptr < CMDQUEUE_MAX) {
-      cmdptr++; //next free slot
-      OTGWDebugTf(PSTR("CmdQueue: Next free queue slot: [%d]\r\n"), cmdptr);
+    if (cmdQueueSize < CMDQUEUE_MAX) {
+      cmdQueueSize++; //next free slot
+      OTGWDebugTf(PSTR("CmdQueue: Next free queue slot: [%d]\r\n"), cmdQueueSize);
     } else {
       // Should be prevented above; keep as defensive fallback.
       OTGWDebugTln(F("CmdQueue: Error: Reached max queue"));
     }
-  } else OTGWDebugTf(PSTR("CmdQueue: Found command at: [%d] - [%d]\r\n"), insertptr, cmdptr);
+  } else OTGWDebugTf(PSTR("CmdQueue: Found command at: [%d] - [%d]\r\n"), insertptr, cmdQueueSize);
   OTGWDebugFlush();
 }
 
@@ -1748,9 +1753,9 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
   If retry max is reached the cmd is delete from the queue
 */
 void handleOTGWqueue(){
-  // OTGWDebugTf(PSTR("CmdQueue: Commands in queue [%d]\r\n"), (int)cmdptr);
+  // OTGWDebugTf(PSTR("CmdQueue: Commands in queue [%d]\r\n"), (int)cmdQueueSize);
   const uint32_t now = millis();
-  for (int i = 0; i < cmdptr; i++) {
+  for (int i = 0; i < cmdQueueSize; i++) {
     // OTGWDebugTf(PSTR("CmdQueue: Checking due in queue slot[%d]:[%lu]=>[%lu]\r\n"), (int)i, (unsigned long)millis(), (unsigned long)cmdqueue[i].due);
     if ((int32_t)(now - cmdqueue[i].due) >= 0) {
       OTGWDebugTf(PSTR("CmdQueue: Queue slot [%d] due\r\n"), i);
@@ -1762,18 +1767,18 @@ void handleOTGWqueue(){
         OTGWDebugTf(PSTR("CmdQueue: Delete [%d] from queue\r\n"), i);
         snprintf_P(cMsg, sizeof(cMsg), PSTR("%s [dropped]"), cmdqueue[i].cmd);
         sendEventToWebSocket('!', cMsg);
-        for (int j = i; j < (cmdptr - 1); j++){
+        for (int j = i; j < (cmdQueueSize - 1); j++){
           // OTGWDebugTf(PSTR("CmdQueue: Moving [%d] => [%d]\r\n"), j+1, j);
           strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[j].cmd));
           cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
           cmdqueue[j].retrycnt = cmdqueue[j+1].retrycnt;
           cmdqueue[j].due = cmdqueue[j+1].due;
         }
-        cmdptr--;
-        cmdqueue[cmdptr].cmd[0] = '\0';
-        cmdqueue[cmdptr].cmdlen = 0;
-        cmdqueue[cmdptr].retrycnt = 0;
-        cmdqueue[cmdptr].due = 0;
+        cmdQueueSize--;
+        cmdqueue[cmdQueueSize].cmd[0] = '\0';
+        cmdqueue[cmdQueueSize].cmdlen = 0;
+        cmdqueue[cmdQueueSize].retrycnt = 0;
+        cmdqueue[cmdQueueSize].due = 0;
         i--; // re-check current index after shift
       }
       // //exit queue handling, after 1 command
@@ -1810,7 +1815,7 @@ void checkOTGWcmdqueue(const char *buf, unsigned int len){
   char value[11]; memset( value, 0, sizeof(value));
   memcpy(cmd, buf, 2);
   memcpy(value, buf+3, ((len-3)<(sizeof(value)-1))?(len-3):(sizeof(value)-1));
-  for (int i=0; i<cmdptr; i++){
+  for (int i=0; i<cmdQueueSize; i++){
       OTGWDebugTf(PSTR("CmdQueue: Checking [%2s]==>[%d]:[%s] from queue\r\n"), cmd, i, cmdqueue[i].cmd); 
     if (strncmp(cmdqueue[i].cmd, cmd, 2) == 0){
       //command found, check value
@@ -1819,18 +1824,18 @@ void checkOTGWcmdqueue(const char *buf, unsigned int len){
         //value found, thus remove command from queue
         OTGWDebugTf(PSTR("CmdQueue: Found value [%s]==>[%d]:[%s]\r\n"), value, i, cmdqueue[i].cmd); 
         OTGWDebugTf(PSTR("CmdQueue: Remove from queue [%d]:[%s] from queue\r\n"), i, cmdqueue[i].cmd);
-        for (int j = i; j < (cmdptr - 1); j++){
+        for (int j = i; j < (cmdQueueSize - 1); j++){
           OTGWDebugTf(PSTR("CmdQueue: Moving [%d] => [%d]\r\n"), j+1, j);
           strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[j].cmd));
           cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
           cmdqueue[j].retrycnt = cmdqueue[j+1].retrycnt;
           cmdqueue[j].due = cmdqueue[j+1].due;
         }
-        cmdptr--;
-        cmdqueue[cmdptr].cmd[0] = '\0';
-        cmdqueue[cmdptr].cmdlen = 0;
-        cmdqueue[cmdptr].retrycnt = 0;
-        cmdqueue[cmdptr].due = 0;
+        cmdQueueSize--;
+        cmdqueue[cmdQueueSize].cmd[0] = '\0';
+        cmdqueue[cmdQueueSize].cmdlen = 0;
+        cmdqueue[cmdQueueSize].retrycnt = 0;
+        cmdqueue[cmdQueueSize].due = 0;
         break;
       // } else OTGWDebugTf(PSTR("Error: Did not find value [%s]==>[%d]:[%s]\r\n"), value, i, cmdqueue[i].cmd); 
     }
