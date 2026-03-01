@@ -254,7 +254,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
             if (LittleFSmounted) {
               updateLittleFSStatus(F("/.ota_post"));
               if (_serial_output) Debugln(F("[OTA] Restoring settings to filesystem"));
-              writeSettings(true);
+              writeSettings(false);  // show=false: TelnetStream not connected during OTA
             } else {
               LittleFSmounted = false;
               if (_serial_output) Debugln(F("[OTA] Error: LittleFS mount failed"));

@@ -232,6 +232,9 @@ void writeSettings(bool show)
   writeJsonStringKV(file, F("WebhookPayload"), settingWebhookPayload, true);
   writeJsonStringKV(file, F("WebhookContentType"), settingWebhookContentType, false);
   file.print(F("}\n"));
+  Debugln(F("\r\n[Settings] State: File write complete, closing file"));
+  file.close();  // Close write handle before any subsequent read
+  DebugTf(PSTR("[Settings] State: Settings saved successfully to %s\r\n"), SETTINGS_FILE);
 
   if (show) {
     DebugTln(F("\r\n[Settings] JSON content:"));
@@ -241,9 +244,6 @@ void writeSettings(bool show)
     }
     if (showFile) showFile.close();
   }
-  Debugln(F("\r\n[Settings] State: File write complete, closing file"));
-  file.close();
-  DebugTf(PSTR("[Settings] State: Settings saved successfully to %s\r\n"), SETTINGS_FILE);
 
 } // writeSettings()
 
@@ -270,26 +270,28 @@ void readSettings(bool show)
     DebugTln(F("Settings file is empty, use existing defaults."));
     return;
   }
-  // Use global cMsg as line buffer — saves 288 bytes of stack (256 lineBuf + 32 discardBuf).
-  // Safe: readSettings() runs in setup() before the main loop starts;
-  // cMsg is not in use by any concurrent code path during that window.
+  // Own line buffer — prevents cMsg clobber if readSettings() is called from an
+  // HTTP handler where file.readBytesUntil() calls yield() internally, which
+  // could allow writeSettings() → writeJsonStringKV() to overwrite cMsg mid-parse.
+  char lineBuf[256];
   char keyBuf[64];
   char valueBuf[201]; // must fit the largest setting value (WebhookPayload: 201 bytes)
 
   while (file.available()) {
-    size_t len = file.readBytesUntil('\n', cMsg, CMSG_SIZE - 1);
-    cMsg[len] = '\0';
-    if (len == (CMSG_SIZE - 1)) {
-      // Line was longer than cMsg — discard remainder and skip it.
+    size_t len = file.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
+    lineBuf[len] = '\0';
+    if (len == (sizeof(lineBuf) - 1)) {
+      // Line was longer than lineBuf — discard remainder and skip it.
       while (file.available()) {
-        size_t chunkLen = file.readBytesUntil('\n', cMsg, CMSG_SIZE - 1);
-        if (chunkLen < (CMSG_SIZE - 1)) break;
+        char discardBuf[32];
+        size_t chunkLen = file.readBytesUntil('\n', discardBuf, sizeof(discardBuf) - 1);
+        if (chunkLen < (sizeof(discardBuf) - 1)) break;
         yield();
       }
       continue;
     }
 
-    if (parseJsonKVLine(cMsg, keyBuf, sizeof(keyBuf), valueBuf, sizeof(valueBuf))) {
+    if (parseJsonKVLine(lineBuf, keyBuf, sizeof(keyBuf), valueBuf, sizeof(valueBuf))) {
       updateSetting(keyBuf, valueBuf);
     }
   }
