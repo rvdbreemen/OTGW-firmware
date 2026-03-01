@@ -9,27 +9,27 @@ void handleDebug(){
                 Debugln(F("---===[ Debug Help Menu ]===---"));
                 Debugf(PSTR("ESP Firmware: %s\r\n"), _VERSION);
                 Debugf(PSTR("FS Hash match: %s\r\n"), CBOOLEAN(checklittlefshash()));
-                Debugf(PSTR("PIC: %s | Type: %s | Version: %s\r\n"), sPICdeviceid, sPICtype, sPICfwversion);
+                Debugf(PSTR("PIC: %s | Type: %s | Version: %s\r\n"), state.pic.sDeviceid, state.pic.sType, state.pic.sFwversion);
                 Debugln();
                 Debugln(F("--- Status ---"));
                 Debugf(PSTR("WiFi: %s | MQTT: %s | OTGW: %s\r\n"), 
                     (WiFi.status() == WL_CONNECTED) ? "Connected" : "Disconnected",
-                    CBOOLEAN(statusMQTTconnection),
-                    CBOOLEAN(bOTGWonline));
+                    CBOOLEAN(state.mqtt.bConnected),
+                    CBOOLEAN(state.otgw.bOnline));
                 Debugf(PSTR("Thermostat: %s | Boiler: %s | Gateway Mode: %s\r\n"),
-                    CCONOFF(bOTGWthermostatstate),
-                    CCONOFF(bOTGWboilerstate),
-                    bOTGWgatewaystateKnown ? CCONOFF(bOTGWgatewaystate) : "detecting");
+                    CCONOFF(state.otgw.bThermostatState),
+                    CCONOFF(state.otgw.bBoilerState),
+                    state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
                 Debugf(PSTR("CH Temp: %.1f°C | Room Temp: %.1f°C | Setpoint: %.1f°C\r\n"),
                     OTcurrentSystemState.Tboiler,
                     OTcurrentSystemState.Tr,
                     OTcurrentSystemState.TrSet);
                 Debugln();
-                Debugf(PSTR("1) Toggle debuglog - OT message parsing: %s\r\n"), CBOOLEAN(bDebugOTmsg));
-                Debugf(PSTR("2) Toggle debuglog - API handeling: %s\r\n"), CBOOLEAN(bDebugRestAPI));
-                Debugf(PSTR("3) Toggle debuglog - MQTT module: %s\r\n"), CBOOLEAN(bDebugMQTT));
-                Debugf(PSTR("4) Toggle debuglog - Sensor modules: %s\r\n"), CBOOLEAN(bDebugSensors));
-                Debugf(PSTR("d) Toggle debug helper - Dallas sensor simulation: %s\r\n"), CBOOLEAN(bDebugSensorSimulation));
+                Debugf(PSTR("1) Toggle debuglog - OT message parsing: %s\r\n"), CBOOLEAN(state.debug.bOTmsg));
+                Debugf(PSTR("2) Toggle debuglog - API handeling: %s\r\n"), CBOOLEAN(state.debug.bRestAPI));
+                Debugf(PSTR("3) Toggle debuglog - MQTT module: %s\r\n"), CBOOLEAN(state.debug.bMQTT));
+                Debugf(PSTR("4) Toggle debuglog - Sensor modules: %s\r\n"), CBOOLEAN(state.debug.bSensors));
+                Debugf(PSTR("d) Toggle debug helper - Dallas sensor simulation: %s\r\n"), CBOOLEAN(state.debug.bSensorSim));
                 Debugln(F("--- Commands ---"));
                 Debugln(F("q/k) Force read settings"));
                 Debugln(F("F) Force MQTT discovery for ALL message IDs"));
@@ -55,12 +55,12 @@ void handleDebug(){
                 DebugTln(F("Send PR=A command, to ID the chip"));
                 getpicfwversion();
                 DebugTln(F("Debug --> PR=A report firmware version, type"));
-                strlcpy(sPICfwversion, OTGWSerial.firmwareVersion(), sizeof(sPICfwversion));
-                OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), sPICfwversion);
-                strlcpy(sPICdeviceid, OTGWSerial.processorToString().c_str(), sizeof(sPICdeviceid));
-                OTGWDebugTf(PSTR("Current device id: %s\r\n"), sPICdeviceid);
-                strlcpy(sPICtype, OTGWSerial.firmwareToString().c_str(), sizeof(sPICtype));
-                OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), sPICtype);
+                strlcpy(state.pic.sFwversion, OTGWSerial.firmwareVersion(), sizeof(state.pic.sFwversion));
+                OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), state.pic.sFwversion);
+                strlcpy(state.pic.sDeviceid, OTGWSerial.processorToString().c_str(), sizeof(state.pic.sDeviceid));
+                OTGWDebugTf(PSTR("Current device id: %s\r\n"), state.pic.sDeviceid);
+                strlcpy(state.pic.sType, OTGWSerial.firmwareToString().c_str(), sizeof(state.pic.sType));
+                OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
                 break;
             case 'q':
                 DebugTln(F("Read settings"));
@@ -68,45 +68,45 @@ void handleDebug(){
                 break;
             case 'F':
                 DebugTln(F("Force MQTT Discovery for ALL message IDs"));
-                DebugTf(PSTR("Enable MQTT: %s\r\n"), CBOOLEAN(settingMQTTenable));
+                DebugTf(PSTR("Enable MQTT: %s\r\n"), CBOOLEAN(settings.mqtt.bEnable));
                 doAutoConfigure();
                 break;
             case 'r':   
                 if (WiFi.status() != WL_CONNECTED)
                 {
                     DebugTln(F("Reconnecting to wifi"));
-                    startWiFi(CSTR(settingHostname), 240);
+                    startWiFi(CSTR(settings.sHostname), 240);
                     //check OTGW and telnet
                     startTelnet();
                     startOTGWstream(); 
                 } else DebugTln(F("Wifi is connected"));
                     
-                if (!statusMQTTconnection) {
+                if (!state.mqtt.bConnected) {
                     DebugTln(F("Reconnecting MQTT"));
                     startMQTT();
                 } else DebugTln(F("MQTT is connected"));
                 break;
             case '1':   
-                bDebugOTmsg = !bDebugOTmsg; 
-                DebugTf(PSTR("\r\nDebug OTmsg: %s\r\n"), CBOOLEAN(bDebugOTmsg)); 
+                state.debug.bOTmsg = !state.debug.bOTmsg; 
+                DebugTf(PSTR("\r\nDebug OTmsg: %s\r\n"), CBOOLEAN(state.debug.bOTmsg)); 
                 break;
             case '2':   
-                bDebugRestAPI = !bDebugRestAPI; 
-                DebugTf(PSTR("\r\nDebug RestAPI: %s\r\n"), CBOOLEAN(bDebugRestAPI)); 
+                state.debug.bRestAPI = !state.debug.bRestAPI; 
+                DebugTf(PSTR("\r\nDebug RestAPI: %s\r\n"), CBOOLEAN(state.debug.bRestAPI)); 
                 break;
             case '3':   
-                bDebugMQTT = !bDebugMQTT; 
-                DebugTf(PSTR("\r\nDebug MQTT: %s\r\n"), CBOOLEAN(bDebugMQTT)); 
+                state.debug.bMQTT = !state.debug.bMQTT; 
+                DebugTf(PSTR("\r\nDebug MQTT: %s\r\n"), CBOOLEAN(state.debug.bMQTT)); 
                 break;
             case '4':   
-                bDebugSensors = !bDebugSensors;
-                DebugTf(PSTR("\r\nDebug Sensors: %s\r\n"), CBOOLEAN(bDebugSensors)); 
+                state.debug.bSensors = !state.debug.bSensors;
+                DebugTf(PSTR("\r\nDebug Sensors: %s\r\n"), CBOOLEAN(state.debug.bSensors)); 
                 break;
             case 'd':
-                bDebugSensorSimulation = !bDebugSensorSimulation;
-                DebugTf(PSTR("\r\nDebug Dallas sensor simulation: %s\r\n"), CBOOLEAN(bDebugSensorSimulation));
+                state.debug.bSensorSim = !state.debug.bSensorSim;
+                DebugTf(PSTR("\r\nDebug Dallas sensor simulation: %s\r\n"), CBOOLEAN(state.debug.bSensorSim));
                 initSensors();
-                if (bDebugSensorSimulation)
+                if (state.debug.bSensorSim)
                 {
                   pollSensors();  // Force immediate sensor data so panel/graph update right away
                 }
@@ -121,10 +121,10 @@ void handleDebug(){
                 break;
             case 'u':
                 DebugTln(F("gpio output on "));
-                digitalWrite(settingGPIOOUTPUTSpin, ON);
+                digitalWrite(settings.outputs.iPin, ON);
                 break;
             case 'j':
-                DebugTf(PSTR("read gpio output state (0== led ON): %d \r\n"), digitalRead(settingGPIOOUTPUTSpin));
+                DebugTf(PSTR("read gpio output state (0== led ON): %d \r\n"), digitalRead(settings.outputs.iPin));
                 break;
             case 'k':
                 DebugTln(F("read settings"));
@@ -132,14 +132,14 @@ void handleDebug(){
                 break;
             case 'o':
                 DebugTln(F("gpio output off"));
-                digitalWrite(settingGPIOOUTPUTSpin, OFF);
+                digitalWrite(settings.outputs.iPin, OFF);
                 break;
             case 'l':
                 DebugTln(F("MyDEBUG =true"));
-                settingMyDEBUG = true;
+                settings.bMyDEBUG = true;
                 break;
             case 'f':
-                if(settingMyDEBUG)
+                if(settings.bMyDEBUG)
                 {
                     DebugTln(F("MyDEBUG = true"));
                 }else{

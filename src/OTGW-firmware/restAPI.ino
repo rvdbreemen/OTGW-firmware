@@ -13,12 +13,12 @@
 #include <string.h>
 #include <ctype.h>
 
-#define RESTDebugTln(...) ({ if (bDebugRestAPI) DebugTln(__VA_ARGS__);    })
-#define RESTDebugln(...)  ({ if (bDebugRestAPI) Debugln(__VA_ARGS__);    })
-#define RESTDebugTf(...)  ({ if (bDebugRestAPI) DebugTf(__VA_ARGS__);    })
-#define RESTDebugf(...)   ({ if (bDebugRestAPI) Debugf(__VA_ARGS__);    })
-#define RESTDebugT(...)   ({ if (bDebugRestAPI) DebugT(__VA_ARGS__);    })
-#define RESTDebug(...)    ({ if (bDebugRestAPI) Debug(__VA_ARGS__);    })
+#define RESTDebugTln(...) ({ if (state.debug.bRestAPI) DebugTln(__VA_ARGS__);    })
+#define RESTDebugln(...)  ({ if (state.debug.bRestAPI) Debugln(__VA_ARGS__);    })
+#define RESTDebugTf(...)  ({ if (state.debug.bRestAPI) DebugTf(__VA_ARGS__);    })
+#define RESTDebugf(...)   ({ if (state.debug.bRestAPI) Debugf(__VA_ARGS__);    })
+#define RESTDebugT(...)   ({ if (state.debug.bRestAPI) DebugT(__VA_ARGS__);    })
+#define RESTDebug(...)    ({ if (state.debug.bRestAPI) Debug(__VA_ARGS__);    })
 
 //=======================================================================
 // RESTful v2 API: Consistent JSON error response helper (ADR-035)
@@ -164,7 +164,7 @@ void processAPI()
     }
   }
   
-  if (bDebugRestAPI)
+  if (state.debug.bRestAPI)
   {
     DebugT(F(">>"));
     for (uint_fast8_t  w=0; w<wc; w++)
@@ -610,14 +610,14 @@ void sendOTmonitorV2()
   sendJsonOTmonMapEntry(F("oemdiagnosticcode"), OTcurrentSystemState.OEMDiagnosticCode, F(""), msglastupdated[OT_OEMDiagnosticCode]);
   sendJsonOTmonMapEntry(F("oemfaultcode"), OTcurrentSystemState.ASFflags & 0xFF, F(""), msglastupdated[OT_ASFflags]);
 
-  if (settingS0COUNTERenabled) 
+  if (settings.s0.bEnabled) 
   {
     sendJsonOTmonMapEntry(F("s0powerkw"), OTGWs0powerkw , F("kW"), OTGWs0lasttime);
     sendJsonOTmonMapEntry(F("s0intervalcount"), OTGWs0pulseCount , F(""), OTGWs0lasttime);
     sendJsonOTmonMapEntry(F("s0totalcount"), OTGWs0pulseCountTot , F(""), OTGWs0lasttime);
   }
-  sendJsonOTmonMapEntry(F("sensorsimulation"), bDebugSensorSimulation, F(""), now);
-  if (settingGPIOSENSORSenabled || bDebugSensorSimulation) 
+  sendJsonOTmonMapEntry(F("sensorsimulation"), state.debug.bSensorSim, F(""), now);
+  if (settings.sensors.bEnabled || state.debug.bSensorSim) 
   {
     sendJsonOTmonMapEntry(F("numberofsensors"), DallasrealDeviceCount , F(""), now );
     for (int i = 0; i < DallasrealDeviceCount; i++) {
@@ -637,13 +637,13 @@ void sendDeviceInfo()
 
   sendNestedJsonObj(F("author"), F("Robert van den Breemen"));
   sendNestedJsonObj(F("fwversion"), _SEMVER_FULL);
-  sendNestedJsonObj(F("picavailable"), CBOOLEAN(bPICavailable));
-  sendNestedJsonObj(F("picfwversion"), sPICfwversion);
-  sendNestedJsonObj(F("picdeviceid"), sPICdeviceid);
-  sendNestedJsonObj(F("picfwtype"), sPICtype);
+  sendNestedJsonObj(F("picavailable"), CBOOLEAN(state.pic.bAvailable));
+  sendNestedJsonObj(F("picfwversion"), state.pic.sFwversion);
+  sendNestedJsonObj(F("picdeviceid"), state.pic.sDeviceid);
+  sendNestedJsonObj(F("picfwtype"), state.pic.sType);
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
   sendNestedJsonObj(F("compiled"), cMsg);
-  sendNestedJsonObj(F("hostname"), CSTR(settingHostname));
+  sendNestedJsonObj(F("hostname"), CSTR(settings.sHostname));
   sendNestedJsonObj(F("ipaddress"), CSTR(WiFi.localIP().toString()));
   sendNestedJsonObj(F("macaddress"), CSTR(WiFi.macAddress()));
   sendNestedJsonObj(F("freeheap"), ESP.getFreeHeap());
@@ -687,16 +687,16 @@ void sendDeviceInfo()
   sendNestedJsonObj(F("wifirssi"), WiFi.RSSI());
   sendNestedJsonObj(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
   sendNestedJsonObj(F("wifiquality_text"), dBmtoQuality(WiFi.RSSI()));
-  sendNestedJsonObj(F("ntpenable"), CBOOLEAN(settingNTPenable));
-  sendNestedJsonObj(F("ntptimezone"), CSTR(settingNTPtimezone));
+  sendNestedJsonObj(F("ntpenable"), CBOOLEAN(settings.ntp.bEnable));
+  sendNestedJsonObj(F("ntptimezone"), CSTR(settings.ntp.sTimezone));
   sendNestedJsonObj(F("uptime"), upTime());
   sendNestedJsonObj(F("lastreset"), lastReset);
-  sendNestedJsonObj(F("bootcount"), rebootCount);
-  sendNestedJsonObj(F("mqttconnected"), CBOOLEAN(statusMQTTconnection));
-  sendNestedJsonObj(F("thermostatconnected"), CBOOLEAN(bOTGWthermostatstate));
-  sendNestedJsonObj(F("boilerconnected"), CBOOLEAN(bOTGWboilerstate));      
-  sendNestedJsonObj(F("otgwmode"), bOTGWgatewaystateKnown ? CCONOFF(bOTGWgatewaystate) : "detecting");
-  sendNestedJsonObj(F("otgwconnected"), CBOOLEAN(bOTGWonline));
+  sendNestedJsonObj(F("bootcount"), state.uptime.iRebootCount);
+  sendNestedJsonObj(F("mqttconnected"), CBOOLEAN(state.mqtt.bConnected));
+  sendNestedJsonObj(F("thermostatconnected"), CBOOLEAN(state.otgw.bThermostatState));
+  sendNestedJsonObj(F("boilerconnected"), CBOOLEAN(state.otgw.bBoilerState));      
+  sendNestedJsonObj(F("otgwmode"), state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
+  sendNestedJsonObj(F("otgwconnected"), CBOOLEAN(state.otgw.bOnline));
   
   sendEndJsonObj(F("devinfo"));
 
@@ -711,13 +711,13 @@ void sendDeviceInfoV2()
 
   sendJsonMapEntry(F("author"), F("Robert van den Breemen"));
   sendJsonMapEntry(F("fwversion"), _SEMVER_FULL);
-  sendJsonMapEntry(F("picavailable"), bPICavailable);
-  sendJsonMapEntry(F("picfwversion"), sPICfwversion);
-  sendJsonMapEntry(F("picdeviceid"), sPICdeviceid);
-  sendJsonMapEntry(F("picfwtype"), sPICtype);
+  sendJsonMapEntry(F("picavailable"), state.pic.bAvailable);
+  sendJsonMapEntry(F("picfwversion"), state.pic.sFwversion);
+  sendJsonMapEntry(F("picdeviceid"), state.pic.sDeviceid);
+  sendJsonMapEntry(F("picfwtype"), state.pic.sType);
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
   sendJsonMapEntry(F("compiled"), cMsg);
-  sendJsonMapEntry(F("hostname"), CSTR(settingHostname));
+  sendJsonMapEntry(F("hostname"), CSTR(settings.sHostname));
   sendJsonMapEntry(F("ipaddress"), CSTR(WiFi.localIP().toString()));
   sendJsonMapEntry(F("macaddress"), CSTR(WiFi.macAddress()));
   sendJsonMapEntry(F("freeheap"), ESP.getFreeHeap());
@@ -745,16 +745,16 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());
   sendJsonMapEntry(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
   sendJsonMapEntry(F("wifiquality_text"), dBmtoQuality(WiFi.RSSI()));
-  sendJsonMapEntry(F("ntpenable"), settingNTPenable);
-  sendJsonMapEntry(F("ntptimezone"), CSTR(settingNTPtimezone));
+  sendJsonMapEntry(F("ntpenable"), settings.ntp.bEnable);
+  sendJsonMapEntry(F("ntptimezone"), CSTR(settings.ntp.sTimezone));
   sendJsonMapEntry(F("uptime"), upTime());
   sendJsonMapEntry(F("lastreset"), lastReset);
-  sendJsonMapEntry(F("bootcount"), rebootCount);
-  sendJsonMapEntry(F("mqttconnected"), statusMQTTconnection);
-  sendJsonMapEntry(F("thermostatconnected"), bOTGWthermostatstate);
-  sendJsonMapEntry(F("boilerconnected"), bOTGWboilerstate);      
-  sendJsonMapEntry(F("otgwmode"), bOTGWgatewaystateKnown ? CCONOFF(bOTGWgatewaystate) : "detecting");
-  sendJsonMapEntry(F("otgwconnected"), bOTGWonline);
+  sendJsonMapEntry(F("bootcount"), state.uptime.iRebootCount);
+  sendJsonMapEntry(F("mqttconnected"), state.mqtt.bConnected);
+  sendJsonMapEntry(F("thermostatconnected"), state.otgw.bThermostatState);
+  sendJsonMapEntry(F("boilerconnected"), state.otgw.bBoilerState);      
+  sendJsonMapEntry(F("otgwmode"), state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
+  sendJsonMapEntry(F("otgwconnected"), state.otgw.bOnline);
   
   sendEndJsonMap(F("device"));
 
@@ -772,9 +772,9 @@ void sendHealth()
   sendJsonMapEntry(F("uptime"), upTime());
   sendJsonMapEntry(F("heap"), ESP.getFreeHeap());
   sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());
-  sendJsonMapEntry(F("mqttconnected"), CBOOLEAN(statusMQTTconnection));
-  sendJsonMapEntry(F("otgwconnected"), CBOOLEAN(bOTGWonline));
-  sendJsonMapEntry(F("picavailable"), CBOOLEAN(bPICavailable));
+  sendJsonMapEntry(F("mqttconnected"), CBOOLEAN(state.mqtt.bConnected));
+  sendJsonMapEntry(F("otgwconnected"), CBOOLEAN(state.otgw.bOnline));
+  sendJsonMapEntry(F("picavailable"), CBOOLEAN(state.pic.bAvailable));
   sendJsonMapEntry(F("littlefsMounted"), CBOOLEAN(LittleFSmounted));
   
   sendEndJsonMap(F("health"));
@@ -788,10 +788,10 @@ void sendPICFlashStatus()
   // Minimal PIC flash status endpoint for polling during flash
   // Returns: {"flashstatus":{"flashing":true|false,"progress":0-100,"filename":"...","error":"..."}}
   sendStartJsonMap(F("flashstatus"));
-  sendJsonMapEntry(F("flashing"), isPICFlashing);
-  sendJsonMapEntry(F("progress"), currentPICFlashProgress);
-  sendJsonMapEntry(F("filename"), currentPICFlashFile);
-  sendJsonMapEntry(F("error"), errorupgrade);
+  sendJsonMapEntry(F("flashing"), state.flash.bPICactive);
+  sendJsonMapEntry(F("progress"), state.flash.iPICprogress);
+  sendJsonMapEntry(F("filename"), state.flash.sPICfile);
+  sendJsonMapEntry(F("error"), state.flash.sError);
   sendEndJsonMap(F("flashstatus"));
 } // sendPICFlashStatus()
 
@@ -802,20 +802,20 @@ void sendPICUpdateCheck()
   // Only called when the user opens the PIC firmware tab — never on a timer.
   // Makes an outbound HTTP HEAD request to otgw.tclcode.com.
   String latest = "";
-  if (strcmp_P(sPICdeviceid, PSTR("unknown")) != 0 && sPICdeviceid[0] != '\0') {
+  if (strcmp_P(state.pic.sDeviceid, PSTR("unknown")) != 0 && state.pic.sDeviceid[0] != '\0') {
     String picFile;
-    if (strcmp_P(sPICtype, PSTR("diagnose")) == 0) {
+    if (strcmp_P(state.pic.sType, PSTR("diagnose")) == 0) {
       picFile = F("diagnose.hex");
-    } else if (strcmp_P(sPICtype, PSTR("interface")) == 0) {
+    } else if (strcmp_P(state.pic.sType, PSTR("interface")) == 0) {
       picFile = F("interface.hex");
     } else {
       picFile = F("gateway.hex");
     }
     latest = checkforupdatepic(picFile);
   }
-  bool updateAvailable = (latest.length() > 0 && latest != String(sPICfwversion));
+  bool updateAvailable = (latest.length() > 0 && latest != String(state.pic.sFwversion));
   sendStartJsonMap(F("pic_update"));
-  sendJsonMapEntry(F("current"), sPICfwversion);
+  sendJsonMapEntry(F("current"), state.pic.sFwversion);
   sendJsonMapEntry(F("latest"), latest.c_str());
   sendJsonMapEntry(F("update_available"), updateAvailable);
   sendEndJsonMap(F("pic_update"));
@@ -843,10 +843,10 @@ void sendFlashStatus()
   // Returns: {"flashstatus":{"flashing":bool,"pic_flashing":bool,"pic_progress":0-100,"pic_filename":"...","pic_error":"..."}}
   sendStartJsonMap(F("flashstatus"));
   sendJsonMapEntry(F("flashing"), isFlashing());
-  sendJsonMapEntry(F("pic_flashing"), isPICFlashing);
-  sendJsonMapEntry(F("pic_progress"), currentPICFlashProgress);
-  sendJsonMapEntry(F("pic_filename"), currentPICFlashFile);
-  sendJsonMapEntry(F("pic_error"), errorupgrade);
+  sendJsonMapEntry(F("pic_flashing"), state.flash.bPICactive);
+  sendJsonMapEntry(F("pic_progress"), state.flash.iPICprogress);
+  sendJsonMapEntry(F("pic_filename"), state.flash.sPICfile);
+  sendJsonMapEntry(F("pic_error"), state.flash.sError);
   sendEndJsonMap(F("flashstatus"));
 } // sendFlashStatus()
 
@@ -859,13 +859,13 @@ void sendDeviceTime()
   sendStartJsonObj(F("devtime"));
   time_t now = time(nullptr);
   //Timezone based devtime
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
   snprintf_P(buf, sizeof(buf), PSTR("%04d-%02d-%02d %02d:%02d:%02d"), myTime.year(), myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second());
   sendNestedJsonObj(F("dateTime"), buf); 
   sendNestedJsonObj(F("epoch"), (int)now);
   sendNestedJsonObj(F("message"), sMessage);
-  sendNestedJsonObj(F("psmode"), CBOOLEAN(bPSmode));
+  sendNestedJsonObj(F("psmode"), CBOOLEAN(state.otgw.bPSmode));
 
   sendEndJsonObj(F("devtime"));
 
@@ -879,13 +879,13 @@ void sendDeviceTimeV2()
   sendStartJsonMap(F("devtime"));
   time_t now = time(nullptr);
   //Timezone based devtime
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
   snprintf_P(buf, sizeof(buf), PSTR("%04d-%02d-%02d %02d:%02d:%02d"), myTime.year(), myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second());
   sendJsonMapEntry(F("dateTime"), buf); 
   sendJsonMapEntry(F("epoch"), (int)now);
   sendJsonMapEntry(F("message"), sMessage);
-  sendJsonMapEntry(F("psmode"), bPSmode);
+  sendJsonMapEntry(F("psmode"), state.otgw.bPSmode);
   sendJsonMapEntry(F("freeheap"), ESP.getFreeHeap());
   sendJsonMapEntry(F("maxfreeblock"), ESP.getMaxFreeBlockSize());
 
@@ -905,51 +905,51 @@ void sendDeviceSettings()
   //sendJsonSettingObj("float",    settingFloat,    "f", 0, 10,  5);
   //sendJsonSettingObj("intager",  settingInteger , "i", 2, 60);
 
-  sendJsonSettingObj(F("hostname"), CSTR(settingHostname), "s", 32);
-  sendJsonSettingObj(F("mqttenable"), settingMQTTenable, "b");
-  sendJsonSettingObj(F("mqttbroker"), CSTR(settingMQTTbroker), "s", 32);
-  sendJsonSettingObj(F("mqttbrokerport"), settingMQTTbrokerPort, "i", 0, 65535);
-  sendJsonSettingObj(F("mqttuser"), CSTR(settingMQTTuser), "s", 32);
+  sendJsonSettingObj(F("hostname"), CSTR(settings.sHostname), "s", 32);
+  sendJsonSettingObj(F("mqttenable"), settings.mqtt.bEnable, "b");
+  sendJsonSettingObj(F("mqttbroker"), CSTR(settings.mqtt.sBroker), "s", 32);
+  sendJsonSettingObj(F("mqttbrokerport"), settings.mqtt.iBrokerPort, "i", 0, 65535);
+  sendJsonSettingObj(F("mqttuser"), CSTR(settings.mqtt.sUser), "s", 32);
   sendJsonSettingObj(F("mqttpasswd"), "notthepassword", "p", 100);
-  sendJsonSettingObj(F("mqtttoptopic"), CSTR(settingMQTTtopTopic), "s", 15);
-  sendJsonSettingObj(F("mqtthaprefix"), CSTR(settingMQTThaprefix), "s", 20);
-  sendJsonSettingObj(F("mqttharebootdetection"), settingMQTTharebootdetection, "b");
-  sendJsonSettingObj(F("mqttuniqueid"), CSTR(settingMQTTuniqueid), "s", 20);
-  sendJsonSettingObj(F("mqttotmessage"), settingMQTTOTmessage, "b");
-  sendJsonSettingObj(F("mqttseparatesources"), settingMQTTSeparateSources, "b");
-  sendJsonSettingObj(F("ntpenable"), settingNTPenable, "b");
-  sendJsonSettingObj(F("ntptimezone"), CSTR(settingNTPtimezone), "s", 50);
-  sendJsonSettingObj(F("ntphostname"), CSTR(settingNTPhostname), "s", 50);
-  sendJsonSettingObj(F("ntpsendtime"), settingNTPsendtime, "b");
-  sendJsonSettingObj(F("ledblink"), settingLEDblink, "b");
-  sendJsonSettingObj(F("darktheme"), settingDarkTheme, "b");
-  sendJsonSettingObj(F("ui_autoscroll"), settingUIAutoScroll, "b");
-  sendJsonSettingObj(F("ui_timestamps"), settingUIShowTimestamp, "b");
-  sendJsonSettingObj(F("ui_capture"), settingUICaptureMode, "b");
-  sendJsonSettingObj(F("ui_autoscreenshot"), settingUIAutoScreenshot, "b");
-  sendJsonSettingObj(F("ui_autodownloadlog"), settingUIAutoDownloadLog, "b");
-  sendJsonSettingObj(F("ui_autoexport"), settingUIAutoExport, "b");
-  sendJsonSettingObj(F("ui_graphtimewindow"), settingUIGraphTimeWindow, "i", 0, 1440);
-  sendJsonSettingObj(F("gpiosensorsenabled"), settingGPIOSENSORSenabled, "b");
-  sendJsonSettingObj(F("gpiosensorslegacyformat"), settingGPIOSENSORSlegacyformat, "b");
-  sendJsonSettingObj(F("gpiosensorspin"), settingGPIOSENSORSpin, "i", 0, 16);
-  sendJsonSettingObj(F("gpiosensorsinterval"), settingGPIOSENSORSinterval, "i", 5, 65535);
-  sendJsonSettingObj(F("s0counterenabled"), settingS0COUNTERenabled, "b");
-  sendJsonSettingObj(F("s0counterpin"), settingS0COUNTERpin, "i", 1, 16);
-  sendJsonSettingObj(F("s0counterdebouncetime"), settingS0COUNTERdebouncetime, "i", 0, 1000);
-  sendJsonSettingObj(F("s0counterpulsekw"), settingS0COUNTERpulsekw, "i", 1, 5000);
-  sendJsonSettingObj(F("s0counterinterval"), settingS0COUNTERinterval, "i", 5, 65535);
-  sendJsonSettingObj(F("gpiooutputsenabled"), settingGPIOOUTPUTSenabled, "b");
-  sendJsonSettingObj(F("gpiooutputspin"), settingGPIOOUTPUTSpin, "i", 0, 16);
-  sendJsonSettingObj(F("gpiooutputstriggerbit"), settingGPIOOUTPUTStriggerBit, "i", 0, 16);
-  sendJsonSettingObj(F("otgwcommandenable"), settingOTGWcommandenable, "b");
-  sendJsonSettingObj(F("otgwcommands"), CSTR(settingOTGWcommands), "s", 128);
-  sendJsonSettingObj(F("webhookenable"), settingWebhookEnabled, "b");
-  sendJsonSettingObj(F("webhookurlon"), CSTR(settingWebhookURLon), "s", 100);
-  sendJsonSettingObj(F("webhookurloff"), CSTR(settingWebhookURLoff), "s", 100);
-  sendJsonSettingObj(F("webhooktriggerbit"), settingWebhookTriggerBit, "i", 0, 15);
-  sendJsonSettingObj(F("webhookpayload"), CSTR(settingWebhookPayload), "s", 200);
-  sendJsonSettingObj(F("webhookcontenttype"), CSTR(settingWebhookContentType), "s", 31);
+  sendJsonSettingObj(F("mqtttoptopic"), CSTR(settings.mqtt.sTopTopic), "s", 15);
+  sendJsonSettingObj(F("mqtthaprefix"), CSTR(settings.mqtt.sHaprefix), "s", 20);
+  sendJsonSettingObj(F("mqttharebootdetection"), settings.mqtt.bHaRebootDetect, "b");
+  sendJsonSettingObj(F("mqttuniqueid"), CSTR(settings.mqtt.sUniqueid), "s", 20);
+  sendJsonSettingObj(F("mqttotmessage"), settings.mqtt.bOTmessage, "b");
+  sendJsonSettingObj(F("mqttseparatesources"), settings.mqtt.bSeparateSources, "b");
+  sendJsonSettingObj(F("ntpenable"), settings.ntp.bEnable, "b");
+  sendJsonSettingObj(F("ntptimezone"), CSTR(settings.ntp.sTimezone), "s", 50);
+  sendJsonSettingObj(F("ntphostname"), CSTR(settings.ntp.sHostname), "s", 50);
+  sendJsonSettingObj(F("ntpsendtime"), settings.ntp.bSendtime, "b");
+  sendJsonSettingObj(F("ledblink"), settings.bLEDblink, "b");
+  sendJsonSettingObj(F("darktheme"), settings.bDarkTheme, "b");
+  sendJsonSettingObj(F("ui_autoscroll"), settings.ui.bAutoScroll, "b");
+  sendJsonSettingObj(F("ui_timestamps"), settings.ui.bShowTimestamp, "b");
+  sendJsonSettingObj(F("ui_capture"), settings.ui.bCaptureMode, "b");
+  sendJsonSettingObj(F("ui_autoscreenshot"), settings.ui.bAutoScreenshot, "b");
+  sendJsonSettingObj(F("ui_autodownloadlog"), settings.ui.bAutoDownloadLog, "b");
+  sendJsonSettingObj(F("ui_autoexport"), settings.ui.bAutoExport, "b");
+  sendJsonSettingObj(F("ui_graphtimewindow"), settings.ui.iGraphTimeWindow, "i", 0, 1440);
+  sendJsonSettingObj(F("gpiosensorsenabled"), settings.sensors.bEnabled, "b");
+  sendJsonSettingObj(F("gpiosensorslegacyformat"), settings.sensors.bLegacyFormat, "b");
+  sendJsonSettingObj(F("gpiosensorspin"), settings.sensors.iPin, "i", 0, 16);
+  sendJsonSettingObj(F("gpiosensorsinterval"), settings.sensors.iInterval, "i", 5, 65535);
+  sendJsonSettingObj(F("s0counterenabled"), settings.s0.bEnabled, "b");
+  sendJsonSettingObj(F("s0counterpin"), settings.s0.iPin, "i", 1, 16);
+  sendJsonSettingObj(F("s0counterdebouncetime"), settings.s0.iDebounceTime, "i", 0, 1000);
+  sendJsonSettingObj(F("s0counterpulsekw"), settings.s0.iPulsekw, "i", 1, 5000);
+  sendJsonSettingObj(F("s0counterinterval"), settings.s0.iInterval, "i", 5, 65535);
+  sendJsonSettingObj(F("gpiooutputsenabled"), settings.outputs.bEnabled, "b");
+  sendJsonSettingObj(F("gpiooutputspin"), settings.outputs.iPin, "i", 0, 16);
+  sendJsonSettingObj(F("gpiooutputstriggerbit"), settings.outputs.iTriggerBit, "i", 0, 16);
+  sendJsonSettingObj(F("otgwcommandenable"), settings.otgw.bEnable, "b");
+  sendJsonSettingObj(F("otgwcommands"), CSTR(settings.otgw.sCommands), "s", 128);
+  sendJsonSettingObj(F("webhookenable"), settings.webhook.bEnabled, "b");
+  sendJsonSettingObj(F("webhookurlon"), CSTR(settings.webhook.sURLon), "s", 100);
+  sendJsonSettingObj(F("webhookurloff"), CSTR(settings.webhook.sURLoff), "s", 100);
+  sendJsonSettingObj(F("webhooktriggerbit"), settings.webhook.iTriggerBit, "i", 0, 15);
+  sendJsonSettingObj(F("webhookpayload"), CSTR(settings.webhook.sPayload), "s", 200);
+  sendJsonSettingObj(F("webhookcontenttype"), CSTR(settings.webhook.sContentType), "s", 31);
 
   sendEndJsonMap(F("settings"));
 
@@ -961,7 +961,7 @@ void postSettings()
 {
   //------------------------------------------------------------
   // json string: {"name":"settingInterval","value":9}
-  // json string: {"name":"settingHostname","value":"abc"}
+  // json string: {"name":"settings.sHostname","value":"abc"}
   // json string: {"name":"darktheme","value":true}
   //------------------------------------------------------------
   char field[64] = "";

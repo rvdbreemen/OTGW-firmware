@@ -12,11 +12,11 @@
  The S0 port is to be connected in a NO mode, with pulse closing contact pulling a configurable pin to Low.
  MQ interface is enabled with Home Assistant AutoConfigure, for this the OTGW function is reused by using a foney dataid (245)
  // S0 Counter Settings and variables with global scope, to be defined in xx.h 
- bool      settingS0COUNTERenabled = false;      
- uint8_t   settingS0COUNTERpin = 12;               // GPIO 12 = D6, preferred, can be any pin with Interupt support
- uint16_t  settingS0COUNTERdebouncetime = 80;      // Depending on S0 switch a debouncetime should be tailored
- uint16_t  settingS0COUNTERpulsekw = 1000;         // Most S0 counters have 1000 pulses per kW, but this can be different
- uint16_t  settingS0COUNTERinterval = 60;          // Sugggested measurement reporting interval
+ bool      settings.s0.bEnabled = false;      
+ uint8_t   settings.s0.iPin = 12;               // GPIO 12 = D6, preferred, can be any pin with Interupt support
+ uint16_t  settings.s0.iDebounceTime = 80;      // Depending on S0 switch a debouncetime should be tailored
+ uint16_t  settings.s0.iPulsekw = 1000;         // Most S0 counters have 1000 pulses per kW, but this can be different
+ uint16_t  settings.s0.iInterval = 60;          // Sugggested measurement reporting interval
  uint16_t  OTGWs0pulseCount;                       // Number of S0 pulses in measurement interval
  uint32_t  OTGWs0pulseCountTot = 0;                // Number of S0 pulses since start of measurement
  float     OTGWs0powerkw = 0 ;                     // Calculated kW actual consumption based on time between last pulses and settings
@@ -35,7 +35,7 @@
 
  interrupt_time = millis() ;
   // If interrupts come faster than debouncetime, assume it's a bounce and ignore
-  if (interrupt_time - last_interrupt_time > (volatile uint16_t)settingS0COUNTERdebouncetime)
+  if (interrupt_time - last_interrupt_time > (volatile uint16_t)settings.s0.iDebounceTime)
   {
     pulseCount++;
     last_pulse_duration = interrupt_time - last_interrupt_time ;
@@ -46,19 +46,19 @@
 
  void initS0Count()
  { 
-   if (!settingS0COUNTERenabled) return;
+   if (!settings.s0.bEnabled) return;
    //------------------------------------------------------------------------------------------------------------------------------
 
-   pinMode(settingS0COUNTERpin, INPUT_PULLUP);         // Set interrupt pulse counting pin as input (Dig 3 / INT1)
+   pinMode(settings.s0.iPin, INPUT_PULLUP);         // Set interrupt pulse counting pin as input (Dig 3 / INT1)
    OTGWs0pulseCount=0;                                 // Make sure pulse count starts at zero
-   attachInterrupt(digitalPinToInterrupt(settingS0COUNTERpin), IRQcounter, FALLING) ;
-   if (bDebugSensors) DebugTf(PSTR("*** S0PulseCounter initialized on GPIO[%d] )\r\n"), settingS0COUNTERpin) ;
+   attachInterrupt(digitalPinToInterrupt(settings.s0.iPin), IRQcounter, FALLING) ;
+   if (state.debug.bSensors) DebugTf(PSTR("*** S0PulseCounter initialized on GPIO[%d] )\r\n"), settings.s0.iPin) ;
  } //end SETUP
 
  void sendS0Counters() 
  {
    time_t now = time(nullptr);
-   if (!settingS0COUNTERenabled) return;
+   if (!settings.s0.bEnabled) return;
 
    noInterrupts();
    uint16_t localPulseCount = pulseCount;
@@ -71,11 +71,11 @@
    interrupts();
 
    if (localPulseCount != 0) {
-     OTGWs0powerkw = (float)3600000 / (float)settingS0COUNTERpulsekw / (float)localPulseDuration;
-     if (bDebugSensors) DebugTf(PSTR("*** S0PulseCount(%d) S0PulseCountTot(%d)\r\n"), OTGWs0pulseCount, OTGWs0pulseCountTot) ;
-     if (bDebugSensors) DebugTf(PSTR("*** S0LastPulsetime(%d) S0Pulsekw:(%4.3f) \r\n"), last_pulse_duration, OTGWs0powerkw) ;
+     OTGWs0powerkw = (float)3600000 / (float)settings.s0.iPulsekw / (float)localPulseDuration;
+     if (state.debug.bSensors) DebugTf(PSTR("*** S0PulseCount(%d) S0PulseCountTot(%d)\r\n"), OTGWs0pulseCount, OTGWs0pulseCountTot) ;
+     if (state.debug.bSensors) DebugTf(PSTR("*** S0LastPulsetime(%d) S0Pulsekw:(%4.3f) \r\n"), last_pulse_duration, OTGWs0powerkw) ;
      OTGWs0lasttime = now ;
-     if (settingMQTTenable ) {
+     if (settings.mqtt.bEnable ) {
        sensorAutoConfigure(OTGWs0dataid, true , "" ) ;     // Configure S0 sensor with the  
        s0sendMQ() ; 
      }  

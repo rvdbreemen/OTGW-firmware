@@ -31,7 +31,7 @@
 #include "OTGW-ModUpdateServer.h"
 
 // External declarations
-extern bool isESPFlashing;          // ESP flashing state flag
+extern bool state.flash.bESPactive;          // ESP flashing state flag
 extern bool LittleFSmounted;        // LittleFS mount status flag
 extern void sendWebSocketJSON(const char *json);
 extern FSInfo LittleFSinfo;         // LittleFS filesystem information
@@ -142,7 +142,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         }
 
         // Set global flag to disable background tasks during ESP flash
-        ::isESPFlashing = true;
+        ::state.flash.bESPactive = true;
         
         WiFiUDP::stopAll();
 
@@ -267,13 +267,13 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           }
 
           // Clear global flag - flash completed successfully
-          ::isESPFlashing = false;
+          ::state.flash.bESPactive = false;
         } else {
           _setUpdaterError();
           _setStatus(UPDATE_ERROR, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, _updaterError);
           
           // Clear global flag - flash failed
-          ::isESPFlashing = false;
+          ::state.flash.bESPactive = false;
         }
         // if (_serial_output) 
         //   OTGWSerial.setDebugOutput(false);
@@ -290,7 +290,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _setStatus(UPDATE_ABORT, _status.target.c_str(), _status.flash_written, _status.flash_total, _status.filename, emptyString);
         
         // Clear global flag - flash aborted
-        ::isESPFlashing = false;
+        ::state.flash.bESPactive = false;
       }
       delay(0);
     });

@@ -55,7 +55,7 @@ void _debugBOL(const char *fn, int line)
    // Initialize timezone on first call or refresh every 5 minutes (300 seconds)
    // Check now_sec > 0 to ensure time is set
    if (now_sec > 0 && (!tzInitialized || now_sec - lastTzUpdate > 300)) {
-     TimeZone newTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+     TimeZone newTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
      // Only update cache if timezone is valid
      if (!newTz.isError()) {
        cachedTz = newTz;
@@ -71,7 +71,7 @@ void _debugBOL(const char *fn, int line)
    // If timezone not yet initialized, try to initialize it now (first call fallback)
    // This handles cases when time is not set yet (now_sec <= 0) or when primary initialization failed
    if (!tzInitialized) {
-     cachedTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+     cachedTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
      tzInitialized = true;  // Mark as initialized to avoid repeated attempts on every call
      // Note: Even if timezone creation fails, the error object is safe to use
    }

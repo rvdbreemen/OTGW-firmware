@@ -154,9 +154,9 @@ static void expandPayload(const char* tmpl, char* out, size_t outLen, bool state
 // Used by the test endpoint and called from evalWebhook() on change.
 //
 // Behaviour:
-//   - settingWebhookPayload empty  → HTTP GET (compatible with Shelly
+//   - settings.webhook.sPayload empty  → HTTP GET (compatible with Shelly
 //     and other devices that accept URL-encoded commands)
-//   - settingWebhookPayload set    → HTTP POST with Content-Type:
+//   - settings.webhook.sPayload set    → HTTP POST with Content-Type:
 //     application/json; {variable} placeholders in the template are
 //     expanded to live OpenTherm values before sending.
 //
@@ -166,7 +166,7 @@ static void expandPayload(const char* tmpl, char* out, size_t outLen, bool state
 // See expandPayload() for the full list of supported variables.
 //=======================================================================
 static void sendWebhook(bool stateOn) {
-  if (!settingWebhookEnabled) {
+  if (!settings.webhook.bEnabled) {
     DebugTln(F("Webhook: not enabled"));
     return;
   }
@@ -177,7 +177,7 @@ static void sendWebhook(bool stateOn) {
     return;
   }
 
-  const char* url = stateOn ? settingWebhookURLon : settingWebhookURLoff;
+  const char* url = stateOn ? settings.webhook.sURLon : settings.webhook.sURLoff;
   if (strlen(url) == 0) {
     DebugTf(PSTR("Webhook: no URL configured for state %s\r\n"), stateOn ? "ON" : "OFF");
     return;
@@ -189,13 +189,13 @@ static void sendWebhook(bool stateOn) {
     return;
   }
 
-  bool hasPayload = (settingWebhookPayload[0] != '\0');
+  bool hasPayload = (settings.webhook.sPayload[0] != '\0');
 
   // Expand the payload template once, outside the HTTP block (static to
   // keep off the 4 KB CONT stack)
   static char expandedPayload[201];
   if (hasPayload) {
-    expandPayload(settingWebhookPayload, expandedPayload, sizeof(expandedPayload), stateOn);
+    expandPayload(settings.webhook.sPayload, expandedPayload, sizeof(expandedPayload), stateOn);
     DebugTf(PSTR("Webhook: POST [%s] payload=%s\r\n"), url, expandedPayload);
   } else {
     DebugTf(PSTR("Webhook: GET  [%s] (state=%s)\r\n"), url, stateOn ? "ON" : "OFF");
@@ -210,8 +210,8 @@ static void sendWebhook(bool stateOn) {
     int code;
     if (hasPayload) {
       // Use the configured Content-Type, or fall back to application/json if unset
-      const char* ct = (settingWebhookContentType[0] != '\0')
-                       ? settingWebhookContentType
+      const char* ct = (settings.webhook.sContentType[0] != '\0')
+                       ? settings.webhook.sContentType
                        : "application/json";
       http.addHeader(F("Content-Type"), ct);
       code = http.POST(expandedPayload);
@@ -242,11 +242,11 @@ void testWebhook(bool testOn) {
 
 //=======================================================================
 void evalWebhook() {
-  if (!settingWebhookEnabled) return;
-  if (strlen(settingWebhookURLon) == 0 && strlen(settingWebhookURLoff) == 0) return;
+  if (!settings.webhook.bEnabled) return;
+  if (strlen(settings.webhook.sURLon) == 0 && strlen(settings.webhook.sURLoff) == 0) return;
 
   // Clamp trigger bit index to valid range [0..15] to avoid undefined shift behaviour
-  int8_t rawTriggerBit = static_cast<int8_t>(settingWebhookTriggerBit);
+  int8_t rawTriggerBit = static_cast<int8_t>(settings.webhook.iTriggerBit);
   int8_t clampedTriggerBit = rawTriggerBit;
   if (clampedTriggerBit < 0) {
     clampedTriggerBit = 0;
@@ -256,7 +256,7 @@ void evalWebhook() {
   if (clampedTriggerBit != rawTriggerBit) {
     DebugTf(PSTR("Webhook: invalid trigger bit %d, clamped to %d\r\n"),
             rawTriggerBit, clampedTriggerBit);
-    settingWebhookTriggerBit = clampedTriggerBit;
+    settings.webhook.iTriggerBit = clampedTriggerBit;
   }
   uint8_t bitIndex = static_cast<uint8_t>(clampedTriggerBit);
 
@@ -275,7 +275,7 @@ void evalWebhook() {
   webhookLastState = bitState;
 
   DebugTf(PSTR("Webhook: bit %d changed to %s\r\n"),
-          settingWebhookTriggerBit, bitState ? "ON" : "OFF");
+          settings.webhook.iTriggerBit, bitState ? "ON" : "OFF");
   sendWebhook(bitState);
 }
 
