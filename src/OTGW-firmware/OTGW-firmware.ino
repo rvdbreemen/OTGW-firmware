@@ -192,42 +192,69 @@ void setup() {
 //=====================================================================
 
 
-//====[ restartWifi ]===
-/*
-  The restartWifi function takes tries to just reconnect to the wifi. When the wifi is restated, it then waits for maximum of 30 seconds (timeout).
-  It keeps count of how many times it tried, when it tried to reconnect for 15 times. It goes into failsafe mode, and reboots the ESP.
-  The watchdog is turned off during this process
-*/
-void restartWifi(){
-  static int iTryRestarts = 0; //So if we have more than 15 restarts, then it's time to reboot
-  iTryRestarts++;          //Count the number of attempts
+//====[ Non-blocking WiFi Reconnect State Machine (ADR-046) ]===
+// Replaces blocking restartWifi() — no delay() in reconnect path.
+// Called every loop iteration from doBackgroundTasks().
 
-  WiFi.hostname(settings.sHostname);  //make sure hostname is set
-  if (WiFi.begin()) // if the wifi ssid exist, you can try to connect. 
-  {
-    //active wait for connections, this can take seconds
-    DECLARE_TIMER_SEC(timeoutWifiConnect, 30, CATCH_UP_MISSED_TICKS);
-    while ((WiFi.status() != WL_CONNECTED))
-    {  
-      delay(100);
-      feedWatchDog();  //feeding the dog, while waiting activly
-      if DUE(timeoutWifiConnect) break; //timeout, then break out of this loop
-    }
+enum WifiState_t {
+  WIFI_IDLE,         // connected, monitoring
+  WIFI_DISCONNECTED, // just dropped — start reconnect
+  WIFI_CONNECTING,   // waiting non-blocking for connection
+  WIFI_RECONNECTED,  // just came back — restart services
+  WIFI_FAILED        // too many retries — trigger reboot
+};
+static WifiState_t wifiState = WIFI_IDLE;
+static int wifiRetryCount = 0;
+
+void loopWifi() {
+  DECLARE_TIMER_SEC(timerWifiRetry, 5, CATCH_UP_MISSED_TICKS);
+
+  switch (wifiState) {
+    case WIFI_IDLE:
+      if (WiFi.status() != WL_CONNECTED) {
+        DebugTln(F("WiFi: connection lost, starting non-blocking reconnect"));
+        isConnected = false;
+        wifiRetryCount = 0;
+        wifiState = WIFI_DISCONNECTED;
+      }
+      break;
+
+    case WIFI_DISCONNECTED:
+      WiFi.hostname(settings.sHostname);
+      WiFi.begin();  // uses stored credentials
+      RESTART_TIMER(timerWifiRetry);
+      wifiState = WIFI_CONNECTING;
+      break;
+
+    case WIFI_CONNECTING:
+      if (WiFi.status() == WL_CONNECTED) {
+        wifiState = WIFI_RECONNECTED;
+        wifiRetryCount = 0;
+      } else if (DUE(timerWifiRetry)) {
+        wifiRetryCount++;
+        DebugTf(PSTR("WiFi: connect attempt %d failed\r\n"), wifiRetryCount);
+        if (wifiRetryCount >= 15) {
+          wifiState = WIFI_FAILED;
+        } else {
+          wifiState = WIFI_DISCONNECTED;  // retry
+        }
+      }
+      break;
+
+    case WIFI_RECONNECTED:
+      isConnected = true;
+      startTelnet();
+      startOTGWstream();
+      startMQTT();
+      startWebSocket();
+      wifiState = WIFI_IDLE;
+      DebugTln(F("WiFi: reconnected, services restarted"));
+      break;
+
+    case WIFI_FAILED:
+      doRestart("WiFi: too many reconnect failures");
+      break;
   }
-
-  if (WiFi.status() == WL_CONNECTED)
-  { //when reconnect, restart some services, just to make sure all works
-    // Turn off ESP reconnect, to make sure that's not the issue (16/11/2021)
-    startTelnet();
-    startOTGWstream(); 
-    startMQTT();
-    startWebSocket(); // Restart WebSocket server
-    iTryRestarts = 0; //reset attempt counter
-    return;
-  }
-
-  //if all fails, and retry 15 is hit, then reboot esp
-  if (iTryRestarts >= 15) doRestart("Too many wifi reconnect attempts");
 }
 
 void sendMQTTuptime(){
@@ -393,10 +420,7 @@ void doTaskEvery60s(){
 //===[ Do task exactly on the minute ]===
 void doTaskMinuteChanged(){
   //== do tasks ==
-  //if no wifi, try reconnecting (once a minute)
-  if (WiFi.status() != WL_CONNECTED) {
-    restartWifi();
-  }
+  // WiFi reconnect is now handled by loopWifi() state machine in doBackgroundTasks()
   sendtimecommand();
 }
 
@@ -411,12 +435,13 @@ void do5minevent(){
 void doBackgroundTasks()
 {
   feedWatchDog();               // Feed the dog before it bites!
-  
+  loopWifi();                   // Non-blocking WiFi reconnect state machine (ADR-046)
+
   // Check for critically low heap and attempt recovery if needed
   if (getHeapHealth() == HEAP_CRITICAL) {
     emergencyHeapRecovery();
   }
-  
+
   if (WiFi.status() == WL_CONNECTED) {
     // During firmware flash, keep essential services but skip heavy background tasks
     // ESP flash: Skip MQTT, OTGW, NTP to reduce interference
