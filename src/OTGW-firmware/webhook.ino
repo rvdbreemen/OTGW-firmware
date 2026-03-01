@@ -165,34 +165,24 @@ static void expandPayload(const char* tmpl, char* out, size_t outLen, bool state
 //
 // See expandPayload() for the full list of supported variables.
 //=======================================================================
-static void sendWebhook(bool stateOn) {
-  if (!settings.webhook.bEnabled) {
-    DebugTln(F("Webhook: not enabled"));
-    return;
-  }
-
-  // Fail fast if WiFi is not connected — avoids stalling the main loop
-  if (WiFi.status() != WL_CONNECTED) {
-    DebugTln(F("Webhook: WiFi not connected, skipping"));
-    return;
-  }
-
+// Attempt to send the webhook. Returns true on HTTP 2xx, false on any error.
+// Timeout reduced from 3000ms to 1000ms (ADR-047: minimize main loop blocking).
+static bool attemptSendWebhook(bool stateOn) {
   const char* url = stateOn ? settings.webhook.sURLon : settings.webhook.sURLoff;
   if (strlen(url) == 0) {
     DebugTf(PSTR("Webhook: no URL configured for state %s\r\n"), stateOn ? "ON" : "OFF");
-    return;
+    return true; // nothing to send is "success"
   }
 
   // Enforce local-network-only policy (ADR-003/ADR-032)
   if (!isLocalUrl(url)) {
     DebugTln(F("Webhook: blocked (must target local subnet; see ADR-032)"));
-    return;
+    return true; // policy block is not a retryable error
   }
 
   bool hasPayload = (settings.webhook.sPayload[0] != '\0');
 
-  // Expand the payload template once, outside the HTTP block (static to
-  // keep off the 4 KB CONT stack)
+  // Expand the payload template (static to keep off the 4 KB CONT stack)
   static char expandedPayload[201];
   if (hasPayload) {
     expandPayload(settings.webhook.sPayload, expandedPayload, sizeof(expandedPayload), stateOn);
@@ -203,33 +193,38 @@ static void sendWebhook(bool stateOn) {
 
   WiFiClient client;
   HTTPClient http;
-  http.setTimeout(3000); // 3-second timeout
+  http.setTimeout(1000); // 1-second timeout (was 3s; local LAN should respond <500ms)
 
-  if (http.begin(client, url)) {
-    yield(); // allow other tasks while TCP stack works
-    int code;
-    if (hasPayload) {
-      // Use the configured Content-Type, or fall back to application/json if unset
-      const char* ct = (settings.webhook.sContentType[0] != '\0')
-                       ? settings.webhook.sContentType
-                       : "application/json";
-      http.addHeader(F("Content-Type"), ct);
-      code = http.POST(expandedPayload);
-    } else {
-      code = http.GET();
-    }
-    yield(); // allow other tasks after response
-    if (code > 0) {
-      DebugTf(PSTR("Webhook: HTTP response code: %d\r\n"), code);
-    } else {
-      DebugTf(PSTR("Webhook: HTTP %s failed, error: %s\r\n"),
-              hasPayload ? "POST" : "GET", http.errorToString(code).c_str());
-    }
-    http.end();
-  } else {
+  if (!http.begin(client, url)) {
     DebugTln(F("Webhook: http.begin() failed (invalid URL?)"));
+    return false;
   }
-  feedWatchDog(); // feed watchdog after potentially slow HTTP request
+
+  yield();
+  int code;
+  if (hasPayload) {
+    const char* ct = (settings.webhook.sContentType[0] != '\0')
+                     ? settings.webhook.sContentType
+                     : "application/json";
+    http.addHeader(F("Content-Type"), ct);
+    code = http.POST(expandedPayload);
+  } else {
+    code = http.GET();
+  }
+  yield();
+  http.end();
+  feedWatchDog();
+
+  if (code >= 200 && code < 300) {
+    DebugTf(PSTR("Webhook: HTTP response code: %d\r\n"), code);
+    return true;
+  }
+  // ADR-004 compliant: no String from http.errorToString()
+  char errBuf[32];
+  snprintf_P(errBuf, sizeof(errBuf), PSTR("HTTP error %d"), code);
+  DebugTf(PSTR("Webhook: %s %s failed: %s\r\n"),
+          hasPayload ? "POST" : "GET", url, errBuf);
+  return false;
 }
 
 //=======================================================================
@@ -237,46 +232,87 @@ static void sendWebhook(bool stateOn) {
 //=======================================================================
 void testWebhook(bool testOn) {
   DebugTf(PSTR("Webhook: test requested for state %s\r\n"), testOn ? "ON" : "OFF");
-  sendWebhook(testOn);
+  attemptSendWebhook(testOn);
 }
 
 //=======================================================================
-void evalWebhook() {
-  if (!settings.webhook.bEnabled) return;
-  if (strlen(settings.webhook.sURLon) == 0 && strlen(settings.webhook.sURLoff) == 0) return;
-
-  // Clamp trigger bit index to valid range [0..15] to avoid undefined shift behaviour
+// Evaluate trigger bit state from current OpenTherm status flags.
+// Returns the boolean value of the configured trigger bit.
+//=======================================================================
+static bool evalTriggerBit() {
   int8_t rawTriggerBit = static_cast<int8_t>(settings.webhook.iTriggerBit);
   int8_t clampedTriggerBit = rawTriggerBit;
-  if (clampedTriggerBit < 0) {
-    clampedTriggerBit = 0;
-  } else if (clampedTriggerBit > 15) {
-    clampedTriggerBit = 15;
-  }
+  if (clampedTriggerBit < 0) clampedTriggerBit = 0;
+  else if (clampedTriggerBit > 15) clampedTriggerBit = 15;
   if (clampedTriggerBit != rawTriggerBit) {
     DebugTf(PSTR("Webhook: invalid trigger bit %d, clamped to %d\r\n"),
             rawTriggerBit, clampedTriggerBit);
     settings.webhook.iTriggerBit = clampedTriggerBit;
   }
-  uint8_t bitIndex = static_cast<uint8_t>(clampedTriggerBit);
+  return (OTcurrentSystemState.Statusflags & (1U << static_cast<uint8_t>(clampedTriggerBit))) != 0;
+}
 
-  // Compute current bit state using the same Statusflags layout as GPIO outputs
-  bool bitState = (OTcurrentSystemState.Statusflags & (1U << bitIndex)) != 0;
+//=======================================================================
+// Non-blocking webhook state machine with retry (ADR-047)
+// Replaces evalWebhook() — decouples detection from sending.
+// States: WH_IDLE -> WH_PENDING -> WH_RETRY_WAIT -> WH_IDLE
+//=======================================================================
+enum WebhookState_t { WH_IDLE, WH_PENDING, WH_RETRY_WAIT };
+static WebhookState_t webhookState = WH_IDLE;
+static bool    webhookPendingStateOn = false;
+static uint8_t webhookRetryCount = 0;
 
-  // On first call, initialise the last-known state without firing the webhook
-  if (!webhookInitialized) {
-    webhookLastState = bitState;
-    webhookInitialized = true;
-    return;
+void evalWebhook() {
+  if (!settings.webhook.bEnabled) return;
+  if (strlen(settings.webhook.sURLon) == 0 && strlen(settings.webhook.sURLoff) == 0) return;
+
+  DECLARE_TIMER_SEC(timerWebhookRetry, 30, SKIP_MISSED_TICKS);
+
+  // Always evaluate trigger bit (track latest state even during retry wait)
+  bool bitState = evalTriggerBit();
+
+  switch (webhookState) {
+    case WH_IDLE:
+      if (!webhookInitialized) {
+        webhookLastState = bitState;
+        webhookInitialized = true;
+        break;
+      }
+      if (bitState != webhookLastState) {
+        webhookLastState = bitState;
+        webhookPendingStateOn = bitState;
+        webhookRetryCount = 0;
+        webhookState = WH_PENDING;
+        DebugTf(PSTR("Webhook: bit changed -> %s, queuing send\r\n"),
+                bitState ? "ON" : "OFF");
+      }
+      break;
+
+    case WH_PENDING:
+      if (WiFi.status() != WL_CONNECTED) break; // wait for WiFi
+      {
+        bool ok = attemptSendWebhook(webhookPendingStateOn);
+        if (ok) {
+          webhookState = WH_IDLE;
+          webhookRetryCount = 0;
+        } else {
+          webhookRetryCount++;
+          if (webhookRetryCount >= 3) {
+            DebugTln(F("Webhook: max retries reached, giving up"));
+            webhookState = WH_IDLE;
+          } else {
+            RESTART_TIMER(timerWebhookRetry);
+            webhookState = WH_RETRY_WAIT;
+            DebugTf(PSTR("Webhook: send failed, retry %d/3 in 30s\r\n"), webhookRetryCount);
+          }
+        }
+      }
+      break;
+
+    case WH_RETRY_WAIT:
+      if (DUE(timerWebhookRetry)) webhookState = WH_PENDING;
+      break;
   }
-
-  // Only act when the state has changed
-  if (bitState == webhookLastState) return;
-  webhookLastState = bitState;
-
-  DebugTf(PSTR("Webhook: bit %d changed to %s\r\n"),
-          settings.webhook.iTriggerBit, bitState ? "ON" : "OFF");
-  sendWebhook(bitState);
 }
 
 /***************************************************************************
