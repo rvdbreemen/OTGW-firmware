@@ -300,8 +300,9 @@ bool updateRebootLog(String text)
 
     if (rtc_info->reason == REASON_EXT_SYS_RST) {
       //external reset, so try to fetch the reset reason from the tiny watchdog and print that
-      snprintf_P(log_line_regs, LOG_LINE_LENGTH, PSTR("External Reason: External Watchdog reason: %s\r\n"), CSTR(initWatchDog()));
-      Debugf(log_line_regs);      
+      { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason));
+        snprintf_P(log_line_regs, LOG_LINE_LENGTH, PSTR("External Reason: External Watchdog reason: %s\r\n"), wdReason);
+        Debugf(log_line_regs); }      
     }
 
     if	(rtc_info->reason	==	REASON_EXCEPTION_RST)	{

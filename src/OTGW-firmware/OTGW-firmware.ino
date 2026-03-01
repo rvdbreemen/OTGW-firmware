@@ -162,7 +162,7 @@ void setup() {
   startWebSocket();          // start the WebSocket server for OT log streaming
   startMQTT();               // start the MQTT after webserver, always.
  
-  initWatchDog();            // setup the WatchDog
+  { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason)); }  // setup the WatchDog
   strlcpy(lastReset, ESP.getResetReason().c_str(), sizeof(lastReset));
   SetupDebugf(PSTR("Last reset reason: [%s]\r\n"), CSTR(lastReset));
   rebootCount = updateRebootCount();

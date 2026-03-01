@@ -262,20 +262,17 @@ void detectPIC(){
 Get the information of the pic firmware: version  number, device type and firmware type. 
 This is done by sending a PR=A command, requesting a banner from the PIC. This will trigger detection of version.
 */
-String getpicfwversion(){
-  String _ret="";
-
-  String line = executeCommand("PR=A");
-  int p = line.indexOf(OTGW_BANNER);
-  if (p >= 0) {
+void getpicfwversion(){
+  char buf[128];
+  executeCommand("PR=A", buf, sizeof(buf));
+  const char* p = strstr(buf, OTGW_BANNER);
+  if (p) {
     p += sizeof(OTGW_BANNER)-1;
-    _ret = line.substring(p);
+    OTGWDebugTf(PSTR("getpicfwversion: Current firmware version: %s\r\n"), p);
   } else {
-    _ret ="No version found";
+    OTGWDebugTf(PSTR("getpicfwversion: No version found in response: %s\r\n"), buf);
   }
-  OTGWDebugTf(PSTR("getpicfwversion: Current firmware version: %s\r\n"), CSTR(_ret));
-  _ret.trim();
-  return _ret;
+  // Callers fetch version from OTGWSerial.firmwareVersion() after this triggers banner detection
 }
 //===================[ queryOTGWgatewaymode ]======================
 /*
@@ -305,20 +302,25 @@ bool queryOTGWgatewaymode(){
     return cachedGatewayMode;
   }
   
-  String response = executeCommand("PR=M");
-  response.trim();
-  
-  OTGWDebugTf(PSTR("queryOTGWgatewaymode: PR=M response=[%s]\r\n"), CSTR(response));
-  
+  char response[128];
+  executeCommand("PR=M", response, sizeof(response));
+  // Trim leading/trailing whitespace in-place
+  char* rp = response;
+  while (*rp == ' ' || *rp == '\t' || *rp == '\r' || *rp == '\n') rp++;
+  size_t rlen = strlen(rp);
+  while (rlen > 0 && (rp[rlen-1] == ' ' || rp[rlen-1] == '\t' || rp[rlen-1] == '\r' || rp[rlen-1] == '\n')) rp[--rlen] = '\0';
+
+  OTGWDebugTf(PSTR("queryOTGWgatewaymode: PR=M response=[%s]\r\n"), rp);
+
   // Response format is "M=G" (Gateway mode) or "M=M" (Monitor mode).
   // executeCommand() strips the "PR: " prefix, leaving e.g. " M=G" which is trimmed to "M=G".
   // The value is the character after '='.
   bool isGatewayMode = cachedGatewayMode;
   bool parseOk = false;
 
-  int eqPos = response.indexOf('=');
-  if (eqPos >= 0 && eqPos + 1 < (int)response.length()) {
-    char modeVal = response.charAt(eqPos + 1);
+  const char* eqp = strchr(rp, '=');
+  if (eqp && *(eqp + 1) != '\0') {
+    char modeVal = *(eqp + 1);
     if (modeVal == 'G' || modeVal == 'g') {
       isGatewayMode = true;
       parseOk = true;
@@ -329,11 +331,11 @@ bool queryOTGWgatewaymode(){
       OTGWDebugTln(F("queryOTGWgatewaymode: Monitor mode detected"));
     } else {
       OTGWDebugTf(PSTR("queryOTGWgatewaymode: Unexpected value [%c] in response [%s], keeping cached value [%s]\r\n"),
-                  modeVal, CSTR(response), CCONOFF(cachedGatewayMode));
+                  modeVal, rp, CCONOFF(cachedGatewayMode));
     }
-  } else if (response.length() > 0) {
+  } else if (rlen > 0) {
     OTGWDebugTf(PSTR("queryOTGWgatewaymode: Unexpected response format [%s], keeping cached value [%s]\r\n"),
-                CSTR(response), CCONOFF(cachedGatewayMode));
+                rp, CCONOFF(cachedGatewayMode));
   } else {
     OTGWDebugTln(F("queryOTGWgatewaymode: Empty response, keeping cached value"));
   }
@@ -369,19 +371,22 @@ void sendOTGWbootcmd(){
 }
 
 //===================[ OTGW Command & Response ]===================
-String executeCommand(const String sCmd){
-  //send command to OTGW
-  OTGWDebugTf(PSTR("OTGW Send Cmd [%s]\r\n"), CSTR(sCmd));
-  if (sCmd.length() < 2) {
+void executeCommand(const char* sCmd, char* outBuf, size_t outSize){
+  //send command to OTGW — uses char[] buffers per ADR-004 (no heap allocation)
+  if (outSize > 0) outBuf[0] = '\0';
+  OTGWDebugTf(PSTR("OTGW Send Cmd [%s]\r\n"), sCmd);
+  size_t cmdLen = strlen(sCmd);
+  if (cmdLen < 2) {
     OTGWDebugTln(F("Send command too short"));
-    return "SE - Command too short.";
+    strlcpy(outBuf, "SE - Command too short.", outSize);
+    return;
   }
   OTGWSerial.setTimeout(1000);
   DECLARE_TIMER_MS(tmrWaitForIt, 1000);
-  while((OTGWSerial.availableForWrite() < (int)(sCmd.length()+2)) && !DUE(tmrWaitForIt)){
+  while((OTGWSerial.availableForWrite() < (int)(cmdLen+2)) && !DUE(tmrWaitForIt)){
     feedWatchDog();
   }
-  OTGWSerial.write(CSTR(sCmd));
+  OTGWSerial.write(sCmd);
   OTGWSerial.write("\r\n");
   OTGWSerial.flush();
   //wait for response
@@ -389,69 +394,64 @@ String executeCommand(const String sCmd){
   while(!OTGWSerial.available() && !DUE(tmrWaitForIt)) {
     feedWatchDog();
   }
-  String _cmd = sCmd.substring(0,2);
-  OTGWDebugTf(PSTR("Awaiting response prefix: [%s]\r\n"), CSTR(_cmd));
-  //fetch a line
-  String line = OTGWSerial.readStringUntil('\n');
-  
-  // Safety check: Prevent memory exhaustion from malformed serial data
-  // OTGW responses should be <100 bytes typically, CMSG_SIZE (512) is generous limit
-  if (line.length() > CMSG_SIZE) {
-    OTGWDebugTf(PSTR("WARNING: OTGW response too long (%d bytes), truncating to %d\r\n"), line.length(), CMSG_SIZE);
-    line = line.substring(0, CMSG_SIZE);
+  char cmdPrefix[3] = { sCmd[0], sCmd[1], '\0' };
+  OTGWDebugTf(PSTR("Awaiting response prefix: [%s]\r\n"), cmdPrefix);
+  //fetch a line into static buffer
+  char line[256];
+  int lineLen = OTGWSerial.readBytesUntil('\n', line, sizeof(line)-1);
+  line[lineLen] = '\0';
+  // Trim trailing whitespace (CR, spaces)
+  while (lineLen > 0 && (line[lineLen-1] == '\r' || line[lineLen-1] == ' ' || line[lineLen-1] == '\t')) {
+    line[--lineLen] = '\0';
   }
-  
-  line.trim();
-  String _ret ="";
-  if (line.length() >= 3 && line.startsWith(_cmd) && line.charAt(2) == ':'){
+
+  if (lineLen >= 3 && strncmp(line, cmdPrefix, 2) == 0 && line[2] == ':'){
     // Responses: When a serial command is accepted by the gateway, it responds with the two letters of the command code, a colon, and the interpreted data value.
     // Command:   "TT=19.125"
     // Response:  "TT: 19.13"
-    //            [XX:response string]   
-    _ret = line.substring(3);
-  } else if (line.startsWith("NG")){
-    _ret = "NG - No Good. The command code is unknown.";
-  } else if (line.startsWith("SE")){
-    _ret = "SE - Syntax Error. The command contained an unexpected character or was incomplete.";
-  } else if (line.startsWith("BV")){
-    _ret = "BV - Bad Value. The command contained a data value that is not allowed.";
-  } else if (line.startsWith("OR")){
-    _ret = "OR - Out of Range. A number was specified outside of the allowed range.";
-  } else if (line.startsWith("NS")){
-    _ret = "NS - No Space. The alternative Data-ID could not be added because the table is full.";
-  } else if (line.startsWith("NF")){
-    _ret = "NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table.";
-  } else if (line.startsWith("OE")){
-    _ret = "OE - Overrun Error. The processor was busy and failed to process all received characters.";
-  } else if (line.length()==0) {
+    //            [XX:response string]
+    strlcpy(outBuf, line + 3, outSize);
+  } else if (strncmp(line, "NG", 2) == 0){
+    strlcpy(outBuf, "NG - No Good. The command code is unknown.", outSize);
+  } else if (strncmp(line, "SE", 2) == 0){
+    strlcpy(outBuf, "SE - Syntax Error. The command contained an unexpected character or was incomplete.", outSize);
+  } else if (strncmp(line, "BV", 2) == 0){
+    strlcpy(outBuf, "BV - Bad Value. The command contained a data value that is not allowed.", outSize);
+  } else if (strncmp(line, "OR", 2) == 0){
+    strlcpy(outBuf, "OR - Out of Range. A number was specified outside of the allowed range.", outSize);
+  } else if (strncmp(line, "NS", 2) == 0){
+    strlcpy(outBuf, "NS - No Space. The alternative Data-ID could not be added because the table is full.", outSize);
+  } else if (strncmp(line, "NF", 2) == 0){
+    strlcpy(outBuf, "NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table.", outSize);
+  } else if (strncmp(line, "OE", 2) == 0){
+    strlcpy(outBuf, "OE - Overrun Error. The processor was busy and failed to process all received characters.", outSize);
+  } else if (lineLen == 0) {
     //just an empty line... most likely it's a timeout situation
-    _ret = "TO - Timeout. No response.";
+    strlcpy(outBuf, "TO - Timeout. No response.", outSize);
   } else {
-    _ret = line; //some commands return a string, just return that.
-  } 
-  OTGWDebugTf(PSTR("Command send [%s]-[%s] - Response line: [%s] - Returned value: [%s]\r\n"), CSTR(sCmd), CSTR(_cmd), CSTR(line), CSTR(_ret));
-  return _ret;
+    strlcpy(outBuf, line, outSize); //some commands return a string, just return that.
+  }
+  OTGWDebugTf(PSTR("Command send [%s]-[%s] - Response line: [%s] - Returned value: [%s]\r\n"), sCmd, cmdPrefix, line, outBuf);
 }
 //===================[ Watchdog OTGW ]===============================
-String initWatchDog() {
-  // Hardware WatchDog is based on: 
+void initWatchDog(char* reasonBuf, size_t reasonSize) {
+  // Hardware WatchDog is based on:
   // https://github.com/rvdbreemen/ESPEasySlaves/tree/master/TinyI2CWatchdog
   // Code here is based on ESPEasy code, modified to work in the project.
 
   // configure hardware pins according to eeprom settings.
+  if (reasonSize > 0) reasonBuf[0] = '\0';
   OTGWDebugTln(F("Setup Watchdog"));
   OTGWDebugTln(F("INIT : I2C"));
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);  //configure the I2C bus
   //=============================================
   // I2C Watchdog boot status check
-  String ReasonReset = "";
-  
   delay(100);
   Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   // OTGW WD address
   Wire.write(0x83);             // command to set pointer
   Wire.write(17);               // pointer value to status byte
   Wire.endTransmission();
-  
+
   Wire.requestFrom((uint8_t)EXT_WD_I2C_ADDRESS, (uint8_t)1);
   if (Wire.available())
   {
@@ -459,11 +459,10 @@ String initWatchDog() {
     if (status & 0x1)
     {
       OTGWDebugTln(F("INIT : Reset by WD!"));
-      ReasonReset = "Reset by External WD\r\n";
+      strlcpy(reasonBuf, "Reset by External WD\r\n", reasonSize);
       //lastReset = BOOT_CAUSE_EXT_WD;
     }
   }
-  return ReasonReset;
   //===========================================
 }
 
