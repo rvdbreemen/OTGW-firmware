@@ -22,8 +22,9 @@ static const char UpdateServerIndex[] PROGMEM =
       })();
      </script>
      <style type='text/css'>
-        body { font-family: sans-serif; max-width: 600px; margin: 20px auto; }
-        form { margin: 12px 0; padding: 12px; border: 1px solid #c7d7ea; border-radius: 6px; background: #f8fbff; }
+        body { font-family: sans-serif; max-width: 920px; margin: 20px auto; padding: 0 12px; box-sizing: border-box; }
+        #pageForm { --panel-width: fit-content; }
+        form { margin: 12px 0; padding: 12px; border: 1px solid #c7d7ea; border-radius: 6px; background: #f8fbff; width: var(--panel-width); max-width: 100%; box-sizing: border-box; }
         html.dark form { border-color: #555; background: #2b2b2b; }
         input[type='file'] { margin: 8px 0 10px; }
         #fwSubmit, #fsSubmit {
@@ -71,7 +72,7 @@ static const char UpdateServerIndex[] PROGMEM =
         html.dark #updateError { color: #ff5555; }
         #retryButton { margin-top: 10px; background-color: #d32f2f; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-weight: bold; }
         #retryButton:hover { background-color: #b71c1c; }
-        #ghSection { margin-top: 16px; padding: 12px; border: 1px solid #c7d7ea; border-radius: 6px; background: #f8fbff; }
+        #ghSection { margin-top: 16px; padding: 12px; border: 1px solid #c7d7ea; border-radius: 6px; background: #f8fbff; display: block; width: var(--panel-width); max-width: 100%; box-sizing: border-box; }
         html.dark #ghSection { border-color: #555; background: #2b2b2b; }
         #ghSection h2 { margin: 0 0 8px; font-size: 1.1em; }
         #ghCurrentVersion { margin: 4px 0 10px; font-size: 13px; color: #555; }
@@ -81,19 +82,23 @@ static const char UpdateServerIndex[] PROGMEM =
         #ghCheckBtn:disabled { background: #9aa7b5; cursor: not-allowed; }
         #ghStatus { margin: 8px 0; font-size: 13px; color: #555; min-height: 18px; }
         html.dark #ghStatus { color: #aaa; }
-        #ghList { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        .gh-table { width: 100%; max-width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        #ghList { width: auto; max-width: 100%; overflow-x: hidden; }
+        .gh-table { width: auto; display: inline-table; table-layout: auto; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
         .gh-table th { text-align: left; padding: 5px 8px; background: #e8f0fe; border-bottom: 2px solid #c7d7ea; }
         html.dark .gh-table th { background: #3a3a3a; border-bottom-color: #555; color: #ddd; }
         .gh-table td { padding: 5px 8px; border-bottom: 1px solid #e0e8f0; vertical-align: middle; }
-        .gh-table th, .gh-table td { overflow-wrap: break-word; word-wrap: break-word; word-break: break-word; }
+        .gh-table th, .gh-table td { white-space: nowrap; }
+        .gh-table th:nth-child(2), .gh-table td:nth-child(2) { width: 10ch; }
+        .gh-table th:nth-child(3), .gh-table td:nth-child(3),
+        .gh-table th:nth-child(4), .gh-table td:nth-child(4),
+        .gh-table th:nth-child(5), .gh-table td:nth-child(5) { width: 13ch; }
         html.dark .gh-table td { border-bottom-color: #444; color: #ddd; }
         .gh-current-row td { background: #f0fff4; }
         html.dark .gh-current-row td { background: #1a3a2a; }
         .gh-badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 11px; font-weight: 700; margin-left: 4px; vertical-align: middle; }
         .gh-badge.installed { background: #38a169; color: #fff; }
         .gh-badge.update { background: #3182ce; color: #fff; }
-        .gh-btn { padding: 4px 10px; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 700; }
+        .gh-btn { width: 11ch; padding: 4px 6px; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-size: 11px; font-weight: 700; text-align: center; box-sizing: border-box; }
         .gh-btn.fw { background: #0a74da; }
         .gh-btn.fw:hover { background: #0864ba; }
         .gh-btn.fs { background: #2e9d57; }
@@ -115,7 +120,6 @@ static const char UpdateServerIndex[] PROGMEM =
            <div id='ghStatus'></div>
            <div id='ghList' style='display:none'></div>
          </div>
-        <hr>
        <form id='fwForm' method='POST' action='?cmd=0' enctype='multipart/form-data'>
             Select a "<b>.ino.bin</b>" file to flash<br/>
             <input type='file' accept='.ino.bin' name='firmware' required>
@@ -616,7 +620,7 @@ static const char UpdateServerIndex[] PROGMEM =
              list.style.display = 'block';
              return;
            }
-           var html = '<table class="gh-table"><thead><tr><th>Release</th><th>Date</th><th>Firmware</th><th>Filesystem</th><th>Update</th></tr></thead><tbody>';
+           var html = '<table class="gh-table"><thead><tr><th>Release</th><th>Date</th><th>Firmware</th><th>Filesystem</th><th>Both</th></tr></thead><tbody>';
            for (var i = 0; i < releases.length; i++) {
              var rel = releases[i];
              var tag = (rel.tag_name || '').replace(/^v/, '');
@@ -646,13 +650,27 @@ static const char UpdateServerIndex[] PROGMEM =
                : '<span class="gh-na">N/A</span>';
              var bothBtn = (fwAsset && fsAsset)
                ? '<button class="gh-btn both" onclick="ghFlashBoth(' + i + ');">Flash Both</button>'
-               : '<span class="gh-na">—</span>';
+               : '<span class="gh-na">N/A</span>';
              html += '<tr' + (isInstalled ? ' class="gh-current-row"' : '') + '><td>' + nameHtml + '</td><td>' + escHtml(date) + '</td><td>' + fwBtn + '</td><td>' + fsBtn + '</td><td>' + bothBtn + '</td></tr>';
            }
            html += '</tbody></table>';
            list.innerHTML = html;
            list.style.display = 'block';
+           syncPanelWidths();
          }
+
+         function syncPanelWidths() {
+           var pageFormEl = document.getElementById('pageForm');
+           var table = document.querySelector('#ghList .gh-table');
+           if (!pageFormEl || !table) return;
+           var tableRect = table.getBoundingClientRect();
+           var panelWidth = Math.ceil(tableRect.width + 24);
+           pageFormEl.style.setProperty('--panel-width', panelWidth + 'px');
+         }
+
+         window.addEventListener('resize', function() {
+           syncPanelWidths();
+         });
 
          loadReleases();
 
