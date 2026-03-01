@@ -81,10 +81,12 @@ static const char UpdateServerIndex[] PROGMEM =
         #ghCheckBtn:disabled { background: #9aa7b5; cursor: not-allowed; }
         #ghStatus { margin: 8px 0; font-size: 13px; color: #555; min-height: 18px; }
         html.dark #ghStatus { color: #aaa; }
-        .gh-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        #ghList { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .gh-table { width: 100%; max-width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
         .gh-table th { text-align: left; padding: 5px 8px; background: #e8f0fe; border-bottom: 2px solid #c7d7ea; }
         html.dark .gh-table th { background: #3a3a3a; border-bottom-color: #555; color: #ddd; }
         .gh-table td { padding: 5px 8px; border-bottom: 1px solid #e0e8f0; vertical-align: middle; }
+        .gh-table th, .gh-table td { overflow-wrap: break-word; word-wrap: break-word; word-break: break-word; }
         html.dark .gh-table td { border-bottom-color: #444; color: #ddd; }
         .gh-current-row td { background: #f0fff4; }
         html.dark .gh-current-row td { background: #1a3a2a; }
@@ -635,7 +637,7 @@ static const char UpdateServerIndex[] PROGMEM =
              else if (isNewer) nameHtml += ' <span class="gh-badge update">Update</span>';
              var date = (rel.published_at || '').substring(0, 10);
              var fwBtnCls = 'gh-btn fw' + (isRollback ? ' rb' : '');
-             var fwBtnLbl = isRollback ? 'Rollback FW' : 'Flash FW';
+            var fwBtnLbl = 'Flash FW';
              var fwBtn = fwAsset
                ? '<button class="' + fwBtnCls + '" onclick="ghFlash(' + i + ',true);">' + fwBtnLbl + '</button>'
                : '<span class="gh-na">N/A</span>';
