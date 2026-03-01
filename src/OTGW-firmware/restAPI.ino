@@ -114,286 +114,288 @@ static bool isValidDallasLabelJson(const char* body) {
 }
 
 //=======================================================================
+// v2 API Route Dispatch Table (ADR-044)
+// Each resource gets its own handler function. Adding a new endpoint
+// requires: (1) add handler function, (2) add one entry to kV2Routes[].
+//=======================================================================
 
-void processAPI() 
-{
-  constexpr uint8_t MAX_WORDS = 8;
-  constexpr size_t WORD_LEN = 32;
-  char URI[50]   = "";
-  char words[MAX_WORDS][WORD_LEN] = {{0}};
+constexpr uint8_t API_MAX_WORDS = 8;
+constexpr size_t  API_WORD_LEN  = 32;
 
-  const HTTPMethod method = httpServer.method();
+// Common OPTIONS/CORS preflight response for all v2 endpoints
+static void sendApiOptions() {
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+  httpServer.sendHeader(F("Access-Control-Allow-Methods"), F("GET, POST, PUT, OPTIONS"));
+  httpServer.sendHeader(F("Access-Control-Allow-Headers"), F("Content-Type"));
+  httpServer.sendHeader(F("Access-Control-Max-Age"), F("86400"));
+  httpServer.send(204);
+}
+
+// Helper to queue a command from URL segment or request body, with validation
+static void handleCommandSubmit(const char* cmdStr) {
+  if (!cmdStr || cmdStr[0] == '\0') {
+    sendApiError(400, F("Missing command"));
+    return;
+  }
+  constexpr size_t kMaxCmdLen = sizeof(cmdqueue[0].cmd) - 1;
+  const size_t cmdLen = strlen(cmdStr);
+  if ((cmdLen < 3) || (cmdStr[2] != '=')) {
+    sendApiError(400, F("Invalid command format (expected XX=value)"));
+    return;
+  }
+  if (cmdLen > kMaxCmdLen) {
+    sendApiError(413, F("Command too long"));
+    return;
+  }
+  addOTWGcmdtoqueue(cmdStr, static_cast<int>(cmdLen));
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+  httpServer.send(202, F("application/json"), F("{\"status\":\"queued\"}"));
+}
+
+//=== Resource handler functions ===
+
+static void handleHealth(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+  sendHealth();
+}
+
+static void handleSettings(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (method == HTTP_POST || method == HTTP_PUT) {
+    postSettings();
+  } else if (method == HTTP_GET) {
+    sendDeviceSettings();
+  } else {
+    sendApiMethodNotAllowed(F("GET, POST, PUT"));
+  }
+}
+
+static void handleSensors(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (wc > 4 && strcmp_P(words[4], PSTR("labels")) == 0) {
+    if (method == HTTP_GET) {
+      getDallasLabels();
+    } else if (method == HTTP_POST || method == HTTP_PUT) {
+      updateAllDallasLabels();
+    } else {
+      sendApiMethodNotAllowed(F("GET, POST, PUT"));
+    }
+  } else {
+    sendApiNotFound(originalURI);
+  }
+}
+
+static void handleDevice(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+  if (wc > 4 && strcmp_P(words[4], PSTR("info")) == 0) {
+    sendDeviceInfoV2();
+  } else if (wc > 4 && strcmp_P(words[4], PSTR("time")) == 0) {
+    sendDeviceTimeV2();
+  } else {
+    sendApiNotFound(originalURI);
+  }
+}
+
+static void handleFlash(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+  if (wc > 4 && strcmp_P(words[4], PSTR("status")) == 0) {
+    sendFlashStatus();
+  } else {
+    sendApiNotFound(originalURI);
+  }
+}
+
+static void handlePic(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+  if (wc > 4 && strcmp_P(words[4], PSTR("flash-status")) == 0) {
+    sendPICFlashStatus();
+  } else if (wc > 4 && strcmp_P(words[4], PSTR("update-check")) == 0) {
+    sendPICUpdateCheck();
+  } else {
+    sendApiNotFound(originalURI);
+  }
+}
+
+static void handleFirmware(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+  if (wc > 4 && strcmp_P(words[4], PSTR("files")) == 0) {
+    apifirmwarefilelist();
+  } else {
+    sendApiNotFound(originalURI);
+  }
+}
+
+static void handleFilesystem(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+  if (wc > 4 && strcmp_P(words[4], PSTR("files")) == 0) {
+    apilistfiles();
+  } else if (wc > 4 && strcmp_P(words[4], PSTR("hash-check")) == 0) {
+    sendFilesystemHashCheck();
+  } else {
+    sendApiNotFound(originalURI);
+  }
+}
+
+static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
   const bool isGet = (method == HTTP_GET);
   const bool isPostOrPut = (method == HTTP_POST || method == HTTP_PUT);
 
+  if (wc <= 4) { sendApiNotFound(originalURI); return; }
+
+  if (strcmp_P(words[4], PSTR("otmonitor")) == 0 || strcmp_P(words[4], PSTR("telegraf")) == 0) {
+    if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
+    sendOTmonitorV2();
+  } else if (strcmp_P(words[4], PSTR("messages")) == 0 || strcmp_P(words[4], PSTR("id")) == 0) {
+    // GET /api/v2/otgw/messages/{id} or /api/v2/otgw/id/{id} (compat alias)
+    if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
+    uint8_t msgId = 0;
+    if (wc > 5 && parseMsgId(words[5], msgId)) {
+      sendOTGWvalue(msgId);
+    } else {
+      sendApiError(400, F("Invalid or missing message ID"));
+    }
+  } else if (strcmp_P(words[4], PSTR("commands")) == 0) {
+    // POST /api/v2/otgw/commands — command in body, 202 Accepted
+    if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    const String& body = httpServer.arg(0);
+    char cmdBuf[64] = "";
+    if (!extractJsonFieldText(body.c_str(), "command", cmdBuf, sizeof(cmdBuf))) {
+      strlcpy(cmdBuf, body.c_str(), sizeof(cmdBuf));
+    }
+    handleCommandSubmit(cmdBuf);
+  } else if (strcmp_P(words[4], PSTR("command")) == 0) {
+    // POST /api/v2/otgw/command/{cmd} — backward compat alias (prefer /commands)
+    if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    if (wc <= 5 || words[5][0] == '\0') { sendApiError(400, F("Missing command")); return; }
+    handleCommandSubmit(words[5]);
+  } else if (strcmp_P(words[4], PSTR("discovery")) == 0 || strcmp_P(words[4], PSTR("autoconfigure")) == 0) {
+    // POST /api/v2/otgw/discovery (or /autoconfigure compat alias)
+    if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+    httpServer.send(202, F("application/json"), F("{\"status\":\"accepted\"}"));
+    doAutoConfigure();
+  } else if (strcmp_P(words[4], PSTR("label")) == 0) {
+    if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
+    if (wc <= 5 || words[5][0] == '\0') { sendApiError(400, F("Missing label")); return; }
+    sendOTGWlabel(words[5]);
+  } else {
+    sendApiNotFound(originalURI);
+  }
+}
+
+static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (wc > 4 && strcmp_P(words[4], PSTR("test")) == 0) {
+    if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST")); return; }
+    String stateParam = httpServer.arg(F("state"));
+    if (!stateParam.length()) {
+      sendApiError(400, F("Missing required 'state' parameter; expected on|1 or off|0"));
+      return;
+    }
+    bool isOn  = (stateParam.equalsIgnoreCase("on")  || stateParam == "1");
+    bool isOff = (stateParam.equalsIgnoreCase("off") || stateParam == "0");
+    if (!isOn && !isOff) {
+      sendApiError(400, F("Invalid state; expected on|1 or off|0"));
+      return;
+    }
+    testWebhook(isOn);
+    httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+  } else {
+    sendApiNotFound(originalURI);
+  }
+}
+
+//=== Route dispatch table (ADR-044) ===
+// Adding a new v2 resource: (1) write handler function above, (2) add entry below.
+typedef void (*ApiResourceHandler)(const char[][API_WORD_LEN], uint8_t, HTTPMethod, const char*);
+
+struct ApiRoute {
+  PGM_P              segment;
+  ApiResourceHandler handler;
+};
+
+static const char kRouteHealth[]     PROGMEM = "health";
+static const char kRouteSettings[]   PROGMEM = "settings";
+static const char kRouteSensors[]    PROGMEM = "sensors";
+static const char kRouteDevice[]     PROGMEM = "device";
+static const char kRouteFlash[]      PROGMEM = "flash";
+static const char kRoutePic[]        PROGMEM = "pic";
+static const char kRouteFirmware[]   PROGMEM = "firmware";
+static const char kRouteFilesystem[] PROGMEM = "filesystem";
+static const char kRouteOtgw[]       PROGMEM = "otgw";
+static const char kRouteWebhook[]    PROGMEM = "webhook";
+
+static const ApiRoute kV2Routes[] = {
+  { kRouteHealth,     handleHealth },
+  { kRouteSettings,   handleSettings },
+  { kRouteSensors,    handleSensors },
+  { kRouteDevice,     handleDevice },
+  { kRouteFlash,      handleFlash },
+  { kRoutePic,        handlePic },
+  { kRouteFirmware,   handleFirmware },
+  { kRouteFilesystem, handleFilesystem },
+  { kRouteOtgw,       handleOtgw },
+  { kRouteWebhook,    handleWebhook },
+  { nullptr,          nullptr }  // sentinel
+};
+
+//=======================================================================
+void processAPI()
+{
+  char URI[50]   = "";
+  char words[API_MAX_WORDS][API_WORD_LEN] = {{0}};
+
+  const HTTPMethod method = httpServer.method();
   const size_t uriLen = strlcpy(URI, httpServer.uri().c_str(), sizeof(URI));
   char originalURI[sizeof(URI)];
   strlcpy(originalURI, URI, sizeof(originalURI));
 
   RESTDebugTf(PSTR("from[%s] URI[%s] method[%s] \r\n"), httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(method).c_str());
 
-  if (uriLen >= sizeof(URI))
-  {
+  if (uriLen >= sizeof(URI)) {
     RESTDebugTln(F("==> Bailout due to oversized URI"));
     httpServer.send_P(414, PSTR("text/plain"), PSTR("414: URI too long\r\n"));
     return;
   }
 
-  if (ESP.getFreeHeap() < 4096) // to prevent firmware from crashing!
-  {
-    // Lowered from 8500 to 4096 in v1.0.0-rc3.
-    // The new WebSocket server (port 81) consumes significant heap, establishing a new lower normal baseline.
-    // The REST API refactor to C-strings reduces fragmentation, making operation at 4KB safe.
-    RESTDebugTf(PSTR("==> Bailout due to low heap (%d bytes))\r\n"), ESP.getFreeHeap() );
-    httpServer.send_P(500, PSTR("text/plain"), PSTR("500: internal server error (low heap)\r\n")); 
+  if (ESP.getFreeHeap() < 4096) {
+    RESTDebugTf(PSTR("==> Bailout due to low heap (%d bytes))\r\n"), ESP.getFreeHeap());
+    httpServer.send_P(500, PSTR("text/plain"), PSTR("500: internal server error (low heap)\r\n"));
     return;
   }
 
+  // Parse URI into words[] tokens
   uint8_t wc = 0;
   {
     char *savePtr = nullptr;
-
-    if (URI[0] == '/' && wc < MAX_WORDS) {
-      words[wc][0] = '\0';
-      wc++;
-    }
-
-    for (char *token = strtok_r(URI, "/", &savePtr); token && wc < MAX_WORDS; token = strtok_r(nullptr, "/", &savePtr)) {
-      strlcpy(words[wc], token, WORD_LEN);
+    if (URI[0] == '/' && wc < API_MAX_WORDS) { words[wc][0] = '\0'; wc++; }
+    for (char *token = strtok_r(URI, "/", &savePtr); token && wc < API_MAX_WORDS; token = strtok_r(nullptr, "/", &savePtr)) {
+      strlcpy(words[wc], token, API_WORD_LEN);
       wc++;
     }
   }
-  
-  if (state.debug.bRestAPI)
-  {
+
+  if (state.debug.bRestAPI) {
     DebugT(F(">>"));
-    for (uint_fast8_t  w=0; w<wc; w++)
-    {
-      Debugf(PSTR("word[%d] => [%s], "), w, words[w]);
-    }
+    for (uint_fast8_t w = 0; w < wc; w++) { Debugf(PSTR("word[%d] => [%s], "), w, words[w]); }
     Debugln(F(" "));
   }
 
+  // Route: /api/v2/{resource}/...
   if (wc > 1 && strcmp_P(words[1], PSTR("api")) == 0) {
+    if (wc > 2 && strcmp_P(words[2], PSTR("v2")) == 0) {
+      // OPTIONS preflight for all v2 endpoints (CORS)
+      if (method == HTTP_OPTIONS) { sendApiOptions(); return; }
 
-    if (wc > 2 && strcmp_P(words[2], PSTR("v2")) == 0)
-    { //v2 API calls — RESTful compliant (ADR-035)
-      // T45: OPTIONS preflight for all v2 endpoints (CORS support)
-      if (method == HTTP_OPTIONS) {
-        httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
-        httpServer.sendHeader(F("Access-Control-Allow-Methods"), F("GET, OPTIONS"));
-        httpServer.sendHeader(F("Access-Control-Allow-Headers"), F("Content-Type"));
-        httpServer.sendHeader(F("Access-Control-Max-Age"), F("86400"));
-        httpServer.send(204);
-        return;
+      // Dispatch via route table
+      if (wc > 3) {
+        for (const ApiRoute* r = kV2Routes; r->segment != nullptr; r++) {
+          if (strcmp_P(words[3], r->segment) == 0) {
+            r->handler(words, wc, method, originalURI);
+            return;
+          }
+        }
       }
-      if (wc > 3 && strcmp_P(words[3], PSTR("health")) == 0) {
-        // GET /api/v2/health
-        if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-        sendHealth();
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("settings")) == 0) {
-        // GET/POST /api/v2/settings
-        if (isPostOrPut) {
-          postSettings();
-        } else if (isGet) {
-          sendDeviceSettings();
-        } else {
-          sendApiMethodNotAllowed(F("GET, POST, PUT"));
-        }
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("sensors")) == 0) {
-        if (wc > 4 && strcmp_P(words[4], PSTR("labels")) == 0) {
-          // GET/POST /api/v2/sensors/labels
-          if (isGet) {
-            getDallasLabels();
-          } else if (isPostOrPut) {
-            updateAllDallasLabels();
-          } else {
-            sendApiMethodNotAllowed(F("GET, POST, PUT"));
-          }
-        } else {
-          sendApiNotFound(originalURI);
-        }
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("device")) == 0) {
-        if (wc > 4 && strcmp_P(words[4], PSTR("info")) == 0) {
-          // GET /api/v2/device/info (map format)
-          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-          sendDeviceInfoV2();
-        } else if (wc > 4 && strcmp_P(words[4], PSTR("time")) == 0) {
-          // GET /api/v2/device/time — RESTful name for devtime (map format)
-          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-          sendDeviceTimeV2();
-        } else {
-          sendApiNotFound(originalURI);
-        }
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("flash")) == 0) {
-        if (wc > 4 && strcmp_P(words[4], PSTR("status")) == 0) {
-          // GET /api/v2/flash/status — RESTful name for flashstatus
-          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-          sendFlashStatus();
-        } else {
-          sendApiNotFound(originalURI);
-        }
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("pic")) == 0) {
-        if (wc > 4 && strcmp_P(words[4], PSTR("flash-status")) == 0) {
-          // GET /api/v2/pic/flash-status — RESTful name for pic/flashstatus
-          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-          sendPICFlashStatus();
-        } else if (wc > 4 && strcmp_P(words[4], PSTR("update-check")) == 0) {
-          // GET /api/v2/pic/update-check — on-demand check for available PIC firmware
-          // Makes an outbound request; only call when the user opens the PIC firmware tab.
-          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-          sendPICUpdateCheck();
-        } else {
-          sendApiNotFound(originalURI);
-        }
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("firmware")) == 0) {
-        if (wc > 4 && strcmp_P(words[4], PSTR("files")) == 0) {
-          // GET /api/v2/firmware/files — versioned replacement for /api/firmwarefilelist
-          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-          apifirmwarefilelist();
-        } else {
-          sendApiNotFound(originalURI);
-        }
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("filesystem")) == 0) {
-        if (wc > 4 && strcmp_P(words[4], PSTR("files")) == 0) {
-          // GET /api/v2/filesystem/files — versioned replacement for /api/listfiles
-          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-          apilistfiles();
-        } else if (wc > 4 && strcmp_P(words[4], PSTR("hash-check")) == 0) {
-          // GET /api/v2/filesystem/hash-check — compare LittleFS version.hash with firmware hash
-          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-          sendFilesystemHashCheck();
-        } else {
-          sendApiNotFound(originalURI);
-        }
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("otgw")) == 0) {
-        if (wc > 4 && strcmp_P(words[4], PSTR("otmonitor")) == 0) {
-          // GET /api/v2/otgw/otmonitor
-          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-          sendOTmonitorV2();
-        } else if (wc > 4 && strcmp_P(words[4], PSTR("telegraf")) == 0) {
-          // GET /api/v2/otgw/telegraf — map format (use otmonitor map, same data)
-          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-          sendOTmonitorV2();
-        } else if (wc > 4 && strcmp_P(words[4], PSTR("messages")) == 0) {
-          // GET /api/v2/otgw/messages/{id} — RESTful resource name for OT message by ID
-          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-          uint8_t msgId = 0;
-          if (wc > 5 && parseMsgId(words[5], msgId)) {
-            sendOTGWvalue(msgId);
-          } else {
-            sendApiError(400, F("Invalid or missing message ID"));
-          }
-        } else if (wc > 4 && strcmp_P(words[4], PSTR("commands")) == 0) {
-          // POST /api/v2/otgw/commands — RESTful: command in body, 202 Accepted
-          if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
-
-          // Read command from request body (JSON: {"command":"TT=20.5"} or plain text)
-          const String& body = httpServer.arg(0);
-          char cmdBuf[64] = "";
-          if (!extractJsonFieldText(body.c_str(), "command", cmdBuf, sizeof(cmdBuf))) {
-            strlcpy(cmdBuf, body.c_str(), sizeof(cmdBuf));
-          }
-          const char* cmdStr = cmdBuf;
-
-          if (!cmdStr || cmdStr[0] == '\0') {
-            sendApiError(400, F("Missing command"));
-            return;
-          }
-
-          constexpr size_t kMaxCmdLen = sizeof(cmdqueue[0].cmd) - 1;
-          const size_t cmdLen = strlen(cmdStr);
-          if ((cmdLen < 3) || (cmdStr[2] != '=')) {
-            sendApiError(400, F("Invalid command format (expected XX=value)"));
-            return;
-          }
-          if (cmdLen > kMaxCmdLen) {
-            sendApiError(413, F("Command too long"));
-            return;
-          }
-
-          addOTWGcmdtoqueue(cmdStr, static_cast<int>(cmdLen));
-          // 202 Accepted — command queued for async processing
-          httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
-          httpServer.send(202, F("application/json"), F("{\"status\":\"queued\"}"));
-        } else if (wc > 4 && strcmp_P(words[4], PSTR("discovery")) == 0) {
-          // POST /api/v2/otgw/discovery — RESTful name for MQTT autodiscovery trigger
-          if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
-          // 202 Accepted — discovery messages sent asynchronously
-          httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
-          httpServer.send(202, F("application/json"), F("{\"status\":\"accepted\"}"));
-          doAutoConfigure();
-        } else if (wc > 4 && strcmp_P(words[4], PSTR("id")) == 0) {
-          // GET /api/v2/otgw/id/{msgid} — backward compat alias for messages/{id}
-          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-          uint8_t msgId = 0;
-          if (wc > 5 && parseMsgId(words[5], msgId)) {
-            sendOTGWvalue(msgId);
-          } else {
-            sendApiError(400, F("Invalid or missing message ID"));
-          }
-        } else if (wc > 4 && strcmp_P(words[4], PSTR("label")) == 0) {
-          // GET /api/v2/otgw/label/{msglabel}
-          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-          if (wc <= 5 || words[5][0] == '\0') { sendApiError(400, F("Missing label")); return; }
-          sendOTGWlabel(words[5]);
-        } else if (wc > 4 && strcmp_P(words[4], PSTR("command")) == 0) {
-          // POST /api/v2/otgw/command/{cmd} — backward compat alias (prefer /commands)
-          if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
-          if (wc <= 5 || words[5][0] == '\0') {
-            sendApiError(400, F("Missing command"));
-            return;
-          }
-          constexpr size_t kMaxCmdLen = sizeof(cmdqueue[0].cmd) - 1;
-          const size_t cmdLen = strlen(words[5]);
-          if ((cmdLen < 3) || (words[5][2] != '=')) {
-            sendApiError(400, F("Invalid command format (expected XX=value)"));
-            return;
-          }
-          if (cmdLen > kMaxCmdLen) {
-            sendApiError(413, F("Command too long"));
-            return;
-          }
-          addOTWGcmdtoqueue(words[5], static_cast<int>(cmdLen));
-          httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
-          httpServer.send(202, F("application/json"), F("{\"status\":\"queued\"}"));
-        } else if (wc > 4 && strcmp_P(words[4], PSTR("autoconfigure")) == 0) {
-          // POST /api/v2/otgw/autoconfigure — backward compat alias (prefer /discovery)
-          if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
-          httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
-          httpServer.send(202, F("application/json"), F("{\"status\":\"accepted\"}"));
-          doAutoConfigure();
-        } else {
-          sendApiNotFound(originalURI);
-        }
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("webhook")) == 0) {
-        if (wc > 4 && strcmp_P(words[4], PSTR("test")) == 0) {
-          // POST /api/v2/webhook/test?state=on|off — fire webhook immediately for testing
-          if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST")); return; }
-          String stateParam = httpServer.arg(F("state"));
-          if (!stateParam.length()) {
-            sendApiError(400, F("Missing required 'state' parameter; expected on|1 or off|0"));
-            return;
-          }
-          bool isOn  = (stateParam.equalsIgnoreCase("on")  || stateParam == "1");
-          bool isOff = (stateParam.equalsIgnoreCase("off") || stateParam == "0");
-          if (!isOn && !isOff) {
-            sendApiError(400, F("Invalid state; expected on|1 or off|0"));
-            return;
-          }
-          bool testOn = isOn;
-          testWebhook(testOn);
-          httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
-          httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
-        } else {
-          sendApiNotFound(originalURI);
-        }
-      } else {
-        sendApiNotFound(originalURI);
-      }
-    }
-    else if (wc > 2 && (strcmp_P(words[2], PSTR("v0")) == 0 || strcmp_P(words[2], PSTR("v1")) == 0))
-    { // v0 and v1 APIs removed — use /api/v2 (see ADR-035)
+      sendApiNotFound(originalURI);
+    } else if (wc > 2 && (strcmp_P(words[2], PSTR("v0")) == 0 || strcmp_P(words[2], PSTR("v1")) == 0)) {
       sendApiError(410, F("API version removed; use /api/v2"));
     } else {
       sendApiNotFound(originalURI);
