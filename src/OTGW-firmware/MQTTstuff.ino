@@ -46,9 +46,23 @@ struct MQTTAutoConfigBuffers {
   char savedTopic[MQTT_TOPIC_MAX_LEN]; // source-template expansion backup (protected by session lock)
 };
 
-// Shared autoconfig workspace for both autoconfig code paths.
-// This keeps only one persistent buffer set in RAM.
-static MQTTAutoConfigBuffers mqttAutoConfigBuffers;
+// Shared autoconfig workspace — lazy-allocated on first use to save ~2800 bytes
+// of RAM when MQTT auto-discovery is never triggered (P4: ADR-004/ADR-030).
+// Once allocated, kept permanently (never freed — acceptable for embedded).
+static MQTTAutoConfigBuffers* pMqttAutoConfigBuffers = nullptr;
+
+// Lazy-allocate the autoconfig buffers on first use. Returns nullptr on OOM.
+static MQTTAutoConfigBuffers* getMqttAutoConfigBuffers() {
+  if (!pMqttAutoConfigBuffers) {
+    pMqttAutoConfigBuffers = new MQTTAutoConfigBuffers();
+    if (pMqttAutoConfigBuffers) {
+      MQTTDebugTln(F("MQTT autoconfig buffers allocated"));
+    } else {
+      DebugTln(F("ERROR: Failed to allocate MQTT autoconfig buffers (OOM)"));
+    }
+  }
+  return pMqttAutoConfigBuffers;
+}
 
 // Guard shared MQTT autoconfig buffers against accidental re-entry.
 // Current firmware is effectively single-threaded, but this protects future
@@ -884,17 +898,19 @@ void clearMQTTConfigDone()
 //===========================================================================================
 // expandAndPublishSourceTemplates()
 // Expands a source-template discovery line into 3 per-source variants and publishes each.
-// Requires mqttAutoConfigBuffers.topic/.msg to be pre-populated with the template.
+// Requires pMqttAutoConfigBuffers->topic/.msg to be pre-populated with the template.
 // Uses .savedTopic and .line as scratch for the expansion loop (session lock must be held).
 // yieldHeavy=true calls doBackgroundTasks() after each publish (bulk path),
 //             false calls feedWatchDog() only (JIT path).
 // Returns true if at least one variant was successfully published.
 static bool expandAndPublishSourceTemplates(byte msgid, const char *logLabel, bool yieldHeavy)
 {
-  char *sTopic     = mqttAutoConfigBuffers.topic;
-  char *sMsg       = mqttAutoConfigBuffers.msg;
-  char *sLine      = mqttAutoConfigBuffers.line;
-  char *savedTopic = mqttAutoConfigBuffers.savedTopic;
+  MQTTAutoConfigBuffers* acBuf = getMqttAutoConfigBuffers();
+  if (!acBuf) return false;
+  char *sTopic     = acBuf->topic;
+  char *sMsg       = acBuf->msg;
+  char *sLine      = acBuf->line;
+  char *savedTopic = acBuf->savedTopic;
 
   strlcpy(savedTopic, sTopic, MQTT_TOPIC_MAX_LEN);
   strlcpy(sLine, sMsg, MQTT_CFG_LINE_MAX_LEN);  // reuse line buffer as msg backup
@@ -941,9 +957,11 @@ void doAutoConfigure(){
       return;
     }
 
-    char *sLine = mqttAutoConfigBuffers.line;
-    char *sTopic = mqttAutoConfigBuffers.topic;
-    char *sMsg = mqttAutoConfigBuffers.msg;
+    MQTTAutoConfigBuffers* acBuf = getMqttAutoConfigBuffers();
+    if (!acBuf) { DebugTln(F("ERROR: MQTT autoconfig OOM, aborting")); return; }
+    char *sLine = acBuf->line;
+    char *sTopic = acBuf->topic;
+    char *sMsg = acBuf->msg;
     initSourceTokens();
     bool sourceTemplateSchemaLogged = false;
 
@@ -1073,10 +1091,12 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     return _result;
   } 
 
-  // Shared static buffers with doAutoConfigure() to avoid duplicate persistent RAM usage
-  char *sLine = mqttAutoConfigBuffers.line;
-  char *sTopic = mqttAutoConfigBuffers.topic;
-  char *sMsg = mqttAutoConfigBuffers.msg;
+  // Shared lazy-allocated buffers with doAutoConfigure() to avoid duplicate persistent RAM usage
+  MQTTAutoConfigBuffers* acBuf = getMqttAutoConfigBuffers();
+  if (!acBuf) { DebugTln(F("ERROR: MQTT autoconfig OOM, aborting")); return _result; }
+  char *sLine = acBuf->line;
+  char *sTopic = acBuf->topic;
+  char *sMsg = acBuf->msg;
   initSourceTokens();
   byte lineID = 39; // 39 is unused in OT protocol so is a safe value
 
