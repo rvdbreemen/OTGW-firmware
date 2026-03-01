@@ -289,6 +289,8 @@ This provides a reliable way to detect the actual configured mode,
 rather than inferring it from message traffic.
 */
 bool queryOTGWgatewaymode(){
+  // DESIGN: single-threaded throttle state; not testable without reboot.
+  // Acceptable for cooperative single-threaded ESP8266 — no concurrency risk.
   static uint32_t lastGatewayModeQueryMs = 0;
   static bool cachedGatewayMode = false;
   static bool hasCachedGatewayMode = false;
