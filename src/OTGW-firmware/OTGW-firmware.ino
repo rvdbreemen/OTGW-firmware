@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v1.1.0
+**  Version  : v1.2.0
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -262,7 +262,11 @@ void doTaskEvery30s(){
 void doTaskEvery60s(){
 
   //== do tasks ==
- 
+
+  // Re-check FS/firmware hash match every 60s so the warning persists
+  // even if sMessage is cleared by PS=0 echo or OT frame handling.
+  checklittlefshash();
+
   // Query the actual gateway mode setting from PIC using PR=M command
   // This provides reliable detection of Gateway vs Monitor mode
   if (bPICavailable && bOTGWonline) {
@@ -383,6 +387,7 @@ void loop()
       if (DUE(timer1s))                 doTaskEvery1s();
       if (minuteChanged())              doTaskMinuteChanged(); //exactly on the minute
       evalOutputs();                    // when the bits change, the output gpio bit will follow
+      evalWebhook();                    // when the trigger bit changes, fire the webhook
       handlePendingUpgrade();           // Check if we need to start an upgrade
     } 
 

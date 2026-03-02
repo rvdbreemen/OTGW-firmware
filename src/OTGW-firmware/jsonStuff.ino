@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v1.1.0
+**  Version  : v1.2.0
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -39,6 +39,19 @@ String escapeJsonString(const char* str) {
     }
   }
   return result;
+}
+
+// Helper function to unescape a single JSON escape character (the char after '\').
+// Returns the unescaped character; unknown escapes pass through unchanged.
+static inline char unescapeJsonChar(char esc) {
+  switch (esc) {
+    case '"':  return '"';
+    case '\\': return '\\';
+    case 'n':  return '\n';
+    case 'r':  return '\r';
+    case 't':  return '\t';
+    default:   return esc;
+  }
 }
 
 static int iIdentlevel = 0;
@@ -110,7 +123,7 @@ void sendBeforenext(){
 //=======================================================================
 void sendNestedJsonObj(const char *cName, const char *cValue)
 {
-  char jsonBuff[JSON_BUFF_MAX] = "";
+  char jsonBuff[JSON_ENTRY_BUF] = "";
   
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": \"%s\"}"), cName, cValue);
 
@@ -121,9 +134,9 @@ void sendNestedJsonObj(const char *cName, const char *cValue)
 //=======================================================================
 void sendNestedJsonObj(const char *cName, String sValue)
 {
-  char jsonBuff[JSON_BUFF_MAX] = "";
-  
-  if (sValue.length() > (JSON_BUFF_MAX - 65) )
+  char jsonBuff[JSON_ENTRY_BUF] = "";
+
+  if (sValue.length() > (JSON_ENTRY_BUF - 65) )
   {
     DebugTf(PSTR("[2] sValue.length() [%d]\r\n"), sValue.length());
   }
@@ -181,7 +194,7 @@ void sendNestedJsonObj(const char *cName, float fValue)
 //============= build OTmonitor string ========================
 void sendJsonOTmonObj(const char *cName, const char *cValue, const char *cUnit, time_t epoch)
 {
-  char jsonBuff[JSON_BUFF_MAX] = "";
+  char jsonBuff[JSON_ENTRY_BUF] = "";
   
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": \"%s\", \"unit\": \"%s\", \"epoch\": %d}")
                                       , cName, cValue, cUnit, (uint32_t)epoch);
@@ -347,7 +360,7 @@ void sendJsonMapEntry(const char *cName, float fValue)
 
 void sendJsonMapEntry(const char *cName, const char *cValue)
 {
-  char jsonBuff[JSON_BUFF_MAX] = "";
+  char jsonBuff[JSON_ENTRY_BUF] = "";
 
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": \"%s\""), cName, cValue);
 
@@ -358,9 +371,9 @@ void sendJsonMapEntry(const char *cName, const char *cValue)
 
 void sendJsonMapEntry(const char *cName, String sValue)
 {
-  char jsonBuff[JSON_BUFF_MAX] = "";
-  
-  if (sValue.length() > (JSON_BUFF_MAX - 65) )
+  char jsonBuff[JSON_ENTRY_BUF] = "";
+
+  if (sValue.length() > (JSON_ENTRY_BUF - 65) )
   {
     DebugTf(PSTR("[2] sValue.length() [%d]\r\n"), sValue.length());
   }
@@ -384,7 +397,7 @@ void sendEndJsonMap(const char *objName)
 
 void sendJsonOTmonMapEntry(const char *cName, const char *cValue, const char *cUnit, time_t epoch)
 {
-  char jsonBuff[JSON_BUFF_MAX] = "";
+  char jsonBuff[JSON_ENTRY_BUF] = "";
   
   // Compact format: "name": {"value": "val", "unit": "u", "epoch": 123}
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": \"%s\", \"unit\": \"%s\", \"epoch\": %d}")
@@ -477,11 +490,10 @@ void sendJsonSettingObj(const char *cName, float fValue, const char *fType, int 
 {
   char jsonBuff[200] = "";
 
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.3f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %.3f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
                                       , cName, fValue, fType, minValue, maxValue);
 
   sendBeforenext();
-  sendIdent();
   httpServer.sendContent(jsonBuff);
 
 } // sendJsonSettingObj(*char, float, *char, int, int)
@@ -494,25 +506,24 @@ void sendJsonSettingObj(const char *cName, float fValue, const char *fType, int 
 
   switch(decPlaces) {
     case 0:
-      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.0f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
+      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %.0f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
                                       , cName, fValue, fType, minValue, maxValue);
       break;
     case 2:
-      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.2f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
+      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %.2f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
                                       , cName, fValue, fType, minValue, maxValue);
       break;
     case 5:
-      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.5f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
+      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %.5f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
                                       , cName, fValue, fType, minValue, maxValue);
       break;
     default:
-      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
+      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
                                       , cName, fValue, fType, minValue, maxValue);
 
   }
 
   sendBeforenext();
-  sendIdent();
   httpServer.sendContent(jsonBuff);
 
 } // sendJsonSettingObj(*char, float, *char, int, int, int)
@@ -523,11 +534,10 @@ void sendJsonSettingObj(const char *cName, int iValue, const char *iType, int mi
 {
   char jsonBuff[200] = "";
 
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %d, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %d, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
                                       , cName, iValue, iType, minValue, maxValue);
 
   sendBeforenext();
-  sendIdent();
   httpServer.sendContent(jsonBuff);
 } // sendJsonSettingObj(*char, int, *char, int, int)
 
@@ -536,15 +546,29 @@ void sendJsonSettingObj(const char *cName, int iValue, const char *iType, int mi
 
 void sendJsonSettingObj(const char *cName, const char *cValue, const char *sType, int maxLen)
 {
-  char jsonBuff[200] = {0};
-  char buffer[100] = {0};
-
-  str_cstrlit(cValue, buffer, sizeof(buffer));
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\":\"%s\", \"type\": \"%s\", \"maxlen\": %d}")
-                                      , cName, cValue, sType, maxLen);
-
+  // Send prefix
+  char jsonBuff[64] = {0};
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": \""), cName);
   sendBeforenext();
-  sendIdent();
+  httpServer.sendContent(jsonBuff);
+
+  // Send value with JSON string escaping (handles " and \ in payload templates)
+  char chunk[32];
+  size_t ci = 0;
+  for (const char *p = cValue; *p; p++) {
+    if (ci >= sizeof(chunk) - 2) { chunk[ci] = '\0'; httpServer.sendContent(chunk); ci = 0; }
+    char c = *p;
+    if      (c == '"')  { chunk[ci++] = '\\'; chunk[ci++] = '"';  }
+    else if (c == '\\') { chunk[ci++] = '\\'; chunk[ci++] = '\\'; }
+    else if (c == '\n') { chunk[ci++] = '\\'; chunk[ci++] = 'n';  }
+    else if (c == '\r') { chunk[ci++] = '\\'; chunk[ci++] = 'r';  }
+    else if (c == '\t') { chunk[ci++] = '\\'; chunk[ci++] = 't';  }
+    else                { chunk[ci++] = c; }
+  }
+  if (ci > 0) { chunk[ci] = '\0'; httpServer.sendContent(chunk); }
+
+  // Send suffix
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\", \"type\": \"%s\", \"maxlen\": %d}"), sType, maxLen);
   httpServer.sendContent(jsonBuff);
 
 } // sendJsonSettingObj(*char, *char, *char, int, int)
@@ -554,11 +578,10 @@ void sendJsonSettingObj(const char *cName, bool bValue, const char *sType)
 {
   char jsonBuff[200] = "";
 
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\":\"%s\", \"type\": \"%s\"}")
-                                      , cName,  CBOOLEAN(bValue), sType);
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %s, \"type\": \"%s\"}")
+                                      , cName, CBOOLEAN(bValue), sType);
 
   sendBeforenext();
-  sendIdent();
   httpServer.sendContent(jsonBuff);
  
 } // sendJsonSettingObj(*char, bool, *char)    
@@ -679,6 +702,142 @@ void sendJsonSettingObj(const __FlashStringHelper* cName, bool bValue, const cha
   strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
   nameBuf[sizeof(nameBuf)-1] = 0;
   sendJsonSettingObj(nameBuf, bValue, sType);
+}
+
+//=======================================================================
+// Minimal streaming JSON field extractor for flat JSON object bodies.
+// Extracts the value of a named field from a flat JSON object string.
+// Handles:
+//   - String values:  {"key":"value"}  → result = "value"
+//   - Bool literals:  {"key":true}     → result = "true"
+//   - Numbers:        {"key":42}       → result = "42"
+// 'key' is a PROGMEM string (use F() macro at call site).
+// Returns true if the field was found and result was populated.
+// NOTE: Uses cMsg as scratch for building the search pattern.
+//       Not safe to call from ISR or concurrently.
+//=======================================================================
+bool extractJsonField(const String& json, const __FlashStringHelper* key,
+                      char* result, size_t resultSize) {
+  if (!result || resultSize == 0) return false;
+  result[0] = '\0';
+  // Build search pattern: "keyname"
+  snprintf_P(cMsg, sizeof(cMsg), PSTR("\"%S\""), (PGM_P)key);
+  int idx = json.indexOf(cMsg);
+  if (idx < 0) return false;
+
+  int colon = json.indexOf(':', idx + (int)strlen(cMsg));
+  if (colon < 0) return false;
+
+  int start = colon + 1;
+  int len   = (int)json.length();
+  while (start < len && json[start] == ' ') start++;
+  if (start >= len) return false;
+
+  if (json[start] == '"') {
+    // Quoted string value — scan for closing quote respecting backslash escapes
+    int pos = start + 1;
+    while (pos < len) {
+      if (json[pos] == '\\' && pos + 1 < len) { pos += 2; continue; } // skip escaped char
+      if (json[pos] == '"') break;
+      pos++;
+    }
+    if (pos >= len) return false; // no closing quote found
+    // Copy and unescape value into result (empty string is valid)
+    size_t ri = 0;
+    for (int si = start + 1; si < pos && ri < resultSize - 1; si++) {
+      if (json[si] == '\\' && si + 1 < pos) {
+        result[ri++] = unescapeJsonChar(json[++si]);
+      } else {
+        result[ri++] = json[si];
+      }
+    }
+    result[ri] = '\0';
+    return true; // field found; empty string is a valid value
+  } else {
+    // Unquoted value: bool literal (true/false) or number
+    int end = start;
+    while (end < len) {
+      char c = json[end];
+      if (c == ',' || c == '}' || c == ' ' || c == '\r' || c == '\n') break;
+      end++;
+    }
+    int n = end - start;
+    if (n <= 0 || (size_t)(n + 1) > resultSize) return false;
+    json.substring(start, end).toCharArray(result, resultSize);
+    return true;
+  }
+}
+
+//=======================================================================
+// Read one "key":"value" string pair from a flat JSON object file.
+// Advances the file position past the separator (comma or closing brace).
+// Both key and value must be quoted strings.
+// Returns false at end of object ('}') or on read error.
+// Used by ensureSensorDefaultLabels() to stream dallas_labels.ini without
+// loading the full file into RAM.
+//=======================================================================
+bool readJsonStringPair(File& f, char* key, size_t keySize,
+                        char* val, size_t valSize) {
+  if (!key || keySize == 0 || !val || valSize == 0) return false;
+  key[0] = val[0] = '\0';
+
+  // Skip whitespace, commas, and opening brace to reach first '"'
+  int ch;
+  do {
+    ch = f.read();
+    if (ch < 0) return false;
+  } while (ch == ' ' || ch == '\n' || ch == '\r' || ch == ',' || ch == '{');
+
+  if (ch == '}') return false; // end of object
+  if (ch != '"') return false; // unexpected character
+
+  // Read key until unescaped closing quote
+  size_t i = 0;
+  while ((ch = f.read()) >= 0 && ch != '"') {
+    if (ch == '\\') {
+      int esc = f.read(); if (esc < 0) break;
+      ch = unescapeJsonChar((char)esc);
+    }
+    if (i < keySize - 1) key[i++] = (char)ch;
+  }
+  key[i] = '\0';
+
+  // Skip whitespace and colon
+  do { ch = f.read(); } while (ch >= 0 && (ch == ' ' || ch == ':'));
+  if (ch != '"') return false; // value must be a quoted string
+
+  // Read value until unescaped closing quote
+  i = 0;
+  while ((ch = f.read()) >= 0 && ch != '"') {
+    if (ch == '\\') {
+      int esc = f.read(); if (esc < 0) break;
+      ch = unescapeJsonChar((char)esc);
+    }
+    if (i < valSize - 1) val[i++] = (char)ch;
+  }
+  val[i] = '\0';
+
+  return key[0] != '\0';
+}
+
+//=======================================================================
+// Write one "key":"value" pair to an open file.
+// Prepends a comma separator if 'addComma' is true (for all but the first pair).
+// Used by ensureSensorDefaultLabels() to rebuild dallas_labels.ini.
+//=======================================================================
+void writeJsonStringPair(File& f, const char* key, const char* val, bool addComma) {
+  if (!key || !val) return;
+
+  if (addComma) f.print(',');
+
+  String escapedKey = escapeJsonString(key);
+  String escapedVal = escapeJsonString(val);
+
+  f.print('"');
+  f.print(escapedKey);
+  f.print(F("\":\""));
+  f.print(escapedVal);
+  f.print('"');
 }
 
 /***************************************************************************
