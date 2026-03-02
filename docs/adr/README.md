@@ -12,7 +12,7 @@ Architecture Decision Records capture important architectural decisions along wi
 - [Platform & Build](#platform-and-build-system) (4 ADRs)
 - [Memory Management](#memory-management) (4 ADRs)
 - [Network & Security](#network-and-security) (3 ADRs)
-- [Integration](#integration-and-communication) (4 ADRs) 🆕
+- [Integration](#integration-and-communication) (5 ADRs) 🆕
 - [Core Systems](#system-architecture) (4 ADRs) 🆕
 - [Features & Extensions](#features-and-extensions) (8 ADRs) 🆕
 - [Browser & Client](#browser-and-client-compatibility) (4 ADRs)
@@ -68,6 +68,9 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-037: Gateway Mode Detection via PR=M Polling](ADR-037-gateway-mode-detection.md)** 🆕  
   Periodic polling (PR=M command, 30s interval with 60s cache) to detect gateway vs. monitor mode, with PS=1 impact on time sync suppression.
 
+- **[ADR-040: MQTT Source-Specific Topics for OpenTherm Values](ADR-040-mqtt-source-specific-topics.md)** 🆕
+  Additive source-specific MQTT and HA discovery topics using nested `<metric>/<source>` paths with opt-in enablement (`MQTTseparatesources`) and backward-compatible base topics.
+
 ### System Architecture
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  
   Non-blocking timer-based task scheduling with 49-day rollover protection for cooperative multitasking.
@@ -105,8 +108,11 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-017: WiFiManager for Initial Configuration](ADR-017-wifimanager-initial-configuration.md)**  
   Captive portal for easy first-time WiFi setup without hardcoded credentials.
 
-- **[ADR-018: ArduinoJson for Data Interchange](ADR-018-arduinojson-data-interchange.md)**  
-  Standardized JSON handling for settings persistence, REST API, MQTT, and WebSocket communication.
+- **[ADR-018: ArduinoJson for Data Interchange](ADR-018-arduinojson-data-interchange.md)** *(Superseded by ADR-042)*  
+  ~~Standardized JSON handling for settings persistence, REST API, MQTT, and WebSocket communication.~~
+
+- **[ADR-042: Streaming JSON I/O — No ArduinoJson](ADR-042-streaming-json-no-arduinojson.md)** 🆕  
+  Mandate streaming JSON helpers with global scratch buffers instead of ArduinoJson; eliminates ArduinoJson heap documents, avoids ArduinoJson-driven fragmentation, and fixes the settings-reset bug from buffer overflow.
 
 ### Features and Extensions
 - **[ADR-019: REST API Versioning Strategy](ADR-019-rest-api-versioning-strategy.md)**  

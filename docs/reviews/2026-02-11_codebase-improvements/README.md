@@ -246,7 +246,7 @@ docs/reviews/2026-02-11_codebase-improvements/
 - Flash Guide: `/docs/FLASH_GUIDE.md`
 
 ### External Resources
-- OpenTherm Protocol Specification: `/Specification/`
+- OpenTherm Protocol Specification: `/docs/opentherm specification/`
 - PIC Firmware Documentation: https://otgw.tclcode.com/
 
 ---

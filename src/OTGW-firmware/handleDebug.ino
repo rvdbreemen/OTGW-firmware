@@ -32,7 +32,6 @@ void handleDebug(){
                 Debugf(PSTR("d) Toggle debug helper - Dallas sensor simulation: %s\r\n"), CBOOLEAN(bDebugSensorSimulation));
                 Debugln(F("--- Commands ---"));
                 Debugln(F("q/k) Force read settings"));
-                Debugln(F("m) Force MQTT discovery (seen messages only)"));
                 Debugln(F("F) Force MQTT discovery for ALL message IDs"));
                 Debugln(F("r) Reconnect wifi, telnet, otgwstream and mqtt"));
                 Debugln(F("p) Reset PIC manually"));
@@ -67,15 +66,10 @@ void handleDebug(){
                 DebugTln(F("Read settings"));
                 readSettings(true);
                 break;
-            case 'm':
-                DebugTln(F("Configure MQTT Discovery"));
-                DebugTf(PSTR("Enable MQTT: %s\r\n"), CBOOLEAN(settingMQTTenable));
-                doAutoConfigure();
-                break;
             case 'F':
                 DebugTln(F("Force MQTT Discovery for ALL message IDs"));
                 DebugTf(PSTR("Enable MQTT: %s\r\n"), CBOOLEAN(settingMQTTenable));
-                doAutoConfigure(true);
+                doAutoConfigure();
                 break;
             case 'r':   
                 if (WiFi.status() != WL_CONNECTED)

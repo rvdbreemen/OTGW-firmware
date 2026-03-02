@@ -14,9 +14,10 @@ Version 1.1.0 builds on the stable v1.0.0 foundation and delivers significant im
 
 ## ⚠️ Breaking Changes
 
-There are **no breaking changes** in v1.1.0 relative to v1.0.0.
+There are **no breaking changes to REST API endpoints, MQTT topics, or on-device settings** in v1.1.0 relative to v1.0.0.
+However, there is a **minor breaking change for custom REST API consumers** due to a response field rename (see the Migration Notes section below).
 
-- All existing REST API endpoints (`/api/v0/`, `/api/v1/`, `/api/v2/`) remain functional.
+- All existing REST API endpoints (`/api/v0/`, `/api/v1/`, `/api/v2/`) remain functional (no paths removed or primary semantics changed).
 - All MQTT topics are unchanged.
 - All settings are preserved on upgrade.
 
@@ -267,8 +268,7 @@ Full details: [docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md](docs/
 - Full OpenAPI 3.0 specification updated for all v2 endpoints: [docs/api/openapi.yaml](docs/api/openapi.yaml)
 - Updated API reference documentation: [docs/api/README.md](docs/api/README.md)
 - New feature docs: Dallas sensors, data persistence, gateway mode
-- New guides: browser debug console, release workflow
-- OpenTherm v4.2 specification converted to searchable Markdown: [docs/opentherm/](docs/opentherm/)
+- OpenTherm v4.2 specification converted to searchable Markdown: [docs/opentherm specification/](docs/opentherm%20specification/))
 
 ---
 

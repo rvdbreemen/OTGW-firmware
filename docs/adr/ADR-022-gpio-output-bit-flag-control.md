@@ -342,5 +342,5 @@ When GPIO LOW:
 
 ## References
 - Implementation: `outputs_ext.ino`
-- OpenTherm specification: `Specification/OpenTherm-Protocol-Specification-v4.2.pdf`
+- OpenTherm specification: `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.pdf`
 - GPIO reference: ESP8266 pinout diagrams in `docs/`

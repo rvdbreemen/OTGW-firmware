@@ -358,9 +358,8 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_setStatus(uint8_t phase, cons
   // Broadcast via WebSocket
   // Use a static buffer to avoid stack overflow, but protect with interrupt disable? 
   // No, we are in non-interrupt context usually. But strictly speaking static is not thread safe.
-  // Stack is better if size is reasonable. 320 bytes provides safety margin for edge cases.
   // Max size: state(5) + flash_written(10) + flash_total(10) + filename(64) + error(96) + overhead(69) = 254 bytes
-  char buf[320];
+  char buf[256];
   char filenameEsc[64];
   char errorEsc[96];
   _jsonEscape(_status.filename, filenameEsc, sizeof(filenameEsc));
@@ -424,7 +423,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_jsonEscape(const String &in, 
 template <typename ServerType>
 void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusJson()
 {
-  constexpr size_t JSON_STATUS_BUFFER_SIZE = 320;
+  constexpr size_t JSON_STATUS_BUFFER_SIZE = 256;
   char buf[JSON_STATUS_BUFFER_SIZE];
   char filenameEsc[64];
   char errorEsc[96];
