@@ -1,2 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# CI-generated version assets — always keep our local copy during merges/rebases
+src/OTGW-firmware/version.h    merge=ours
+src/OTGW-firmware/version.hash merge=ours

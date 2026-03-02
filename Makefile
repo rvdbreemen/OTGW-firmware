@@ -18,7 +18,7 @@ CLICFG := $(CLI) --config-file $(CFGFILE)
 # bug in http stream, fallback to 2.7.4
 # ESP8266URL := https://github.com/esp8266/Arduino/releases/download/3.0.2/package_esp8266com_index.json
 ESP8266URL := https://github.com/esp8266/Arduino/releases/download/2.7.4/package_esp8266com_index.json
-LIBRARIES := libraries/WiFiManager libraries/ArduinoJson libraries/PubSubClient libraries/TelnetStream libraries/AceCommon libraries/AceSorting libraries/AceTime libraries/OneWire libraries/DallasTemperature libraries/WebSockets libraries/Time
+LIBRARIES := libraries/WiFiManager libraries/PubSubClient libraries/TelnetStream libraries/AceCommon libraries/AceSorting libraries/AceTime libraries/OneWire libraries/DallasTemperature libraries/WebSockets libraries/Time
 BOARDS := arduino/package_esp8266com_index.json
 # PORT can be overridden by the environment or on the command line. E.g.:
 # export PORT=/dev/ttyUSB2; make upload, or: make upload PORT=/dev/ttyUSB2
@@ -58,6 +58,27 @@ $(CFGFILE):
 	$(CLICFG) config set directories.user $(PWD)
 	$(CLICFG) config set sketch.always_export_binaries true
 	$(CLICFG) config set library.enable_unsafe_install true
+
+##
+# Retry helper: retries a command up to 3 times with exponential backoff.
+# Usage: $(call retry,command-to-run)
+##
+define retry
+@for i in 1 2 3; do \
+	if $(1); then \
+		break; \
+	else \
+		if [ $$i -lt 3 ]; then \
+			wait_time=$$((2 ** $$i)); \
+			echo "⚠ Install failed (attempt $$i/3), retrying in $${wait_time}s..."; \
+			sleep $$wait_time; \
+		else \
+			echo "✗ Install failed after 3 attempts"; \
+			exit 1; \
+		fi; \
+	fi; \
+done
+endef
 
 ##
 # Make sure CFG is updated before libraries are called.
@@ -137,38 +158,40 @@ refresh: | $(CFGFILE)
 flush: | $(CFGFILE)
 	$(CLICFG) cache clean
 
+##
+# Serialize library installs to prevent concurrent arduino-cli operations
+# which cause "unexpected EOF" archive extraction errors under make -j.
+# Each library depends (order-only) on the previous one in the chain.
+##
 libraries/WiFiManager: | $(BOARDS)
-	$(CLICFG) lib install WiFiManager@2.0.15-rc.1
+	$(call retry,$(CLICFG) lib install WiFiManager@2.0.15-rc.1)
 
-libraries/ArduinoJson:
-	$(CLICFG) lib install ArduinoJson@6.17.2
+libraries/PubSubClient: | libraries/WiFiManager
+	$(call retry,$(CLICFG) lib install pubsubclient@2.8.0)
 
-libraries/PubSubClient:
-	$(CLICFG) lib install pubsubclient@2.8.0
+libraries/TelnetStream: | libraries/PubSubClient
+	$(call retry,$(CLICFG) lib install TelnetStream@1.2.4)
 
-libraries/TelnetStream:
-	$(CLICFG) lib install TelnetStream@1.2.4
+libraries/AceCommon: | libraries/TelnetStream
+	$(call retry,$(CLICFG) lib install AceCommon@1.6.2)
 
-libraries/AceCommon:
-	$(CLICFG) lib install AceCommon@1.6.2
+libraries/AceSorting: | libraries/AceCommon
+	$(call retry,$(CLICFG) lib install AceSorting@1.0.0)
 
-libraries/AceSorting:
-	$(CLICFG) lib install AceSorting@1.0.0
+libraries/AceTime: | libraries/AceSorting
+	$(call retry,$(CLICFG) lib install AceTime@2.0.1)
 
-libraries/AceTime:
-	$(CLICFG) lib install AceTime@2.0.1
+libraries/Time: | libraries/AceTime
+	$(call retry,$(CLICFG) lib install Time@1.6.1)
 
-libraries/Time:
-	$(CLICFG) lib install Time@1.6.1
-
-libraries/OneWire:
-	$(CLICFG) lib install OneWire@2.3.8
+libraries/OneWire: | libraries/Time
+	$(call retry,$(CLICFG) lib install OneWire@2.3.8)
 
 libraries/DallasTemperature: | libraries/OneWire
-	$(CLICFG) lib install DallasTemperature@3.9.0
+	$(call retry,$(CLICFG) lib install DallasTemperature@3.9.0)
 
-libraries/WebSockets:
-	$(CLICFG) lib install WebSockets@2.3.5
+libraries/WebSockets: | libraries/DallasTemperature
+	$(call retry,$(CLICFG) lib install WebSockets@2.3.5)
 
 $(IMAGE): $(BOARDS) $(LIBRARIES) $(SOURCES)
 	$(info Build code)

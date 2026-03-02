@@ -670,10 +670,10 @@ Before implementing or modifying frontend features, verify browser support:
 - Update README.md for significant feature changes
 - Keep release notes format consistent (see README.md)
 - **OpenTherm Protocol**:
-  - Documentation is found in the `Specification` folder
-  - Version 2.2: `Specification/Opentherm Protocol v2.2.pdf`
-  - Version 4.2: `Specification/OpenTherm-Protocol-Specification-v4.2.pdf`
-  - Other files in the `Specification` folder provide additional information
+  - Documentation is found in the `docs/opentherm specification` folder
+  - Version 2.2: `docs/opentherm specification/Opentherm Protocol v2.2.pdf`
+  - Version 4.2: `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.pdf`
+  - Other files in the `docs/opentherm specification` folder provide additional information
 - **PIC Firmware & Hardware**:
   - Schelte Bron's website: https://otgw.tclcode.com/index.html#intro
   - Firmware commands: https://otgw.tclcode.com/firmware.html
