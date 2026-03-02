@@ -249,18 +249,13 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           if (_serial_output) Debugf(PSTR("[OTA] End: success (%u bytes)\r\n"), upload.totalSize);
           
           if (_status.target == "filesystem") {
+            // Mount filesystem, restore settings, then reboot (HTTP_POST handler below)
             LittleFSmounted = LittleFS.begin();
             if (LittleFSmounted) {
               updateLittleFSStatus(F("/.ota_post"));
-              // Restore settings from ESP memory to new filesystem
-              // During filesystem-only OTA, only the LittleFS partition is erased/written.
-              // The ESP8266 continues running the current firmware and RAM remains intact.
-              // All settings loaded at boot (global variables like settingHostname, etc.)
-              // are still valid in RAM, so we write them back to the fresh filesystem.
               if (_serial_output) Debugln(F("[OTA] Restoring settings to filesystem"));
-              writeSettings(true);
+              writeSettings(false);  // show=false: TelnetStream not connected during OTA
             } else {
-              // Ensure state is explicitly false and log failure for diagnostics
               LittleFSmounted = false;
               if (_serial_output) Debugln(F("[OTA] Error: LittleFS mount failed"));
             }

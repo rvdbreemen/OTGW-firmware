@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v1.2.0
+**  Version  : v1.3.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -11,6 +11,7 @@
 const localURL = window.location.protocol + '//' + window.location.host;
 const APIGW = window.location.protocol + '//' + window.location.host + '/api/';
 const MOBILE_BREAKPOINT_PX = 768;
+const PS_MODE_NOTICE_TEXT = 'PS=1 mode active: live OpenTherm log streaming is paused, panel data remains visible.';
 
 "use strict";
 // ============================================================================
@@ -121,17 +122,51 @@ function isPageVisible() {
   return !(document.hidden || document.visibilityState === 'hidden');
 }
 
+function isMainPageActive() {
+  var mainPage = document.getElementById('displayMainPage');
+  return !!(mainPage && mainPage.classList.contains('active'));
+}
+
+function startOTmonitorPolling() {
+  if (!tid) {
+    tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+  }
+}
+
+function stopOTmonitorPolling() {
+  if (tid) {
+    clearInterval(tid);
+    tid = 0;
+  }
+}
+
+function startTimeUpdates() {
+  if (!timeupdate) {
+    timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
+  }
+}
+
+function stopTimeUpdates() {
+  if (timeupdate) {
+    clearInterval(timeupdate);
+    timeupdate = null;
+  }
+}
+
+function setActivePageSection(activeId) {
+  ['displayMainPage', 'displaySettingsPage', 'displayDeviceInfo', 'displayPICflash', 'displayWebhookPage'].forEach(function(id) {
+    var section = document.getElementById(id);
+    if (!section) return;
+    if (id === activeId) section.classList.add('active');
+    else section.classList.remove('active');
+  });
+}
+
 document.addEventListener('visibilitychange', function () {
   if (!isPageVisible()) {
     // When tab is hidden, stop UI updates to save resources but KEEP WebSocket connected
-    if (timeupdate) {
-      clearInterval(timeupdate);
-      timeupdate = null;
-    }
-    if (tid) {
-      clearInterval(tid);
-      tid = 0;
-    }
+    stopTimeUpdates();
+    stopOTmonitorPolling();
     // WebSocket stays connected to continue gathering data in background
     // The watchdog timer will keep it alive and reconnect if needed
     return;
@@ -140,14 +175,10 @@ document.addEventListener('visibilitychange', function () {
   if (!flashModeActive) {
     refreshDevTime();
     refreshGatewayMode(true);
-    if (!timeupdate) {
-      timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
-    }
+    startTimeUpdates();
     // Ensure WebSocket is connected (will reconnect if needed)
     initOTLogWebSocket();
-    if (!tid) {
-      tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-    }
+    startOTmonitorPolling();
   }
 });
 
@@ -289,14 +320,8 @@ function enterFlashMode() {
   flashModeActive = true;
   
   // Stop all timers
-  if (timeupdate) {
-    clearInterval(timeupdate);
-    timeupdate = null;
-  }
-  if (tid) {
-    clearInterval(tid);
-    tid = 0;
-  }
+  stopTimeUpdates();
+  stopOTmonitorPolling();
   
   // Disconnect WebSocket
   disconnectOTLogWebSocket();
@@ -309,17 +334,12 @@ function exitFlashMode() {
   flashModeActive = false;
   
   // Restart time update
-  if (!timeupdate) {
-    timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
-  }
+  startTimeUpdates();
   
   // Restart WebSocket if on main page
-  if (document.getElementById('displayMainPage') && 
-      document.getElementById('displayMainPage').classList.contains('active')) {
+  if (isMainPageActive()) {
     initOTLogWebSocket();
-    if (!tid) {
-      tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-    }
+    startOTmonitorPolling();
   }
   
   console.log('Flash mode exited - background activity resumed');
@@ -678,6 +698,8 @@ let currentFlashFilename = "";
 let flashModeActive = false; // Track if we're on the flash page
 let isPSmode = false; // Track PS=1 (Print Summary) mode from OTGW PIC
 let statusMessageText = ''; // Device status message from /v2/device/time
+let currentFreeHeap = null;    // Free heap bytes from /v2/device/time
+let currentMaxFreeBlock = null; // Max free block bytes from /v2/device/time
 let sensorSimulationActive = false; // Mirror of otmonitor.sensorsimulation for footer notice
 let flashPollTimer = null; // Timer for polling flash status as failsafe (both ESP and PIC)
 let otLogResponsiveInitialized = false;
@@ -1176,10 +1198,28 @@ function getOTLogDisplayState() {
     isPhone: isPhone,
     isSmallScreen: isSmallScreen,
     isPSmode: isPSmode,
-    disabled: (isProxied || isPhone || isSmallScreen || isPSmode)
+    sectionDisabled: (isProxied || isPhone || isSmallScreen),
+    wsDisabled: (isProxied || isPhone || isSmallScreen || isPSmode)
   };
   
   return state;
+}
+
+//============================================================================
+function updateOTLogModeNotice(displayState) {
+  const noticeEl = document.getElementById('otLogModeNotice');
+  if (!noticeEl) {
+    return;
+  }
+
+  if (displayState && displayState.isPSmode) {
+    noticeEl.textContent = PS_MODE_NOTICE_TEXT;
+    noticeEl.classList.remove('hidden');
+    return;
+  }
+
+  noticeEl.textContent = '';
+  noticeEl.classList.add('hidden');
 }
 
 //============================================================================
@@ -1192,8 +1232,9 @@ function updateOTLogResponsiveState() {
   }
 
   const displayState = getOTLogDisplayState();
+  updateOTLogModeNotice(displayState);
 
-  if (displayState.disabled) {
+  if (displayState.sectionDisabled) {
     logSection.classList.add('hidden');
     disconnectOTLogWebSocket();
     return;
@@ -1201,6 +1242,11 @@ function updateOTLogResponsiveState() {
 
   if (logSection.classList.contains('hidden')) {
     logSection.classList.remove('hidden');
+  }
+
+  if (displayState.wsDisabled) {
+    disconnectOTLogWebSocket();
+    return;
   }
 
   if (!otLogWS || otLogWS.readyState === WebSocket.CLOSED) {
@@ -1229,7 +1275,7 @@ function initOTLogWebSocket(force) {
 
   const displayState = getOTLogDisplayState();
 
-  if (displayState.disabled && !force && !isFlashing) {
+  if (displayState.wsDisabled && !force && !isFlashing) {
     console.log('[WebSocket] Skipping connect: display disabled');
     if (displayState.isProxied) {
       console.log("[WebSocket] FALLBACK: HTTPS reverse proxy detected. WebSocket connections not supported. Disabling OpenTherm Monitor.");
@@ -1238,10 +1284,11 @@ function initOTLogWebSocket(force) {
     } else if (displayState.isSmallScreen) {
       console.log("[WebSocket] FALLBACK: Small screen detected (width: " + window.innerWidth + "px). Disabling OpenTherm Monitor.");
     } else if (displayState.isPSmode) {
-      console.log("[WebSocket] FALLBACK: PS=1 mode detected. Disabling OpenTherm Monitor to reduce device load.");
+      console.log("[WebSocket] FALLBACK: PS=1 mode detected. Pausing OpenTherm log live stream.");
     }
+    updateOTLogModeNotice(displayState);
     const logSection = document.getElementById('otLogSection');
-    if (logSection) {
+    if (logSection && displayState.sectionDisabled) {
       logSection.classList.add('hidden');
     }
     return; // Do not connect WebSocket
@@ -1486,6 +1533,13 @@ function updateWSStatus(connected) {
 //============================================================================
 function formatLogLine(logLine) {
   if (!logLine) return "";
+
+  // Event lines from sendEventToWebSocket (sent cmds, responses, errors, system events)
+  if (logLine.isEvent) {
+    const pfx = (typeof logLine.prefix === 'string') ? logLine.prefix : ' ';
+    const content = (typeof logLine.label === 'string') ? logLine.label : '';
+    return pfx + ' ' + content;
+  }
   
   // Construct display line from the incoming JSON fields.
   const pad = (str, len) => (str + "").padEnd(len, ' ');
@@ -1565,6 +1619,21 @@ function parseLogLine(line) {
   } else {
       // Fallback timestamp
       obj.time = new Date().toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) + "." + (new Date().getMilliseconds() + "").padStart(3, '0');
+  }
+  
+  // Detect event prefix lines produced by sendEventToWebSocket:
+  // Format: HH:MM:SS.mmmmmm {prefix} {content}  where prefix is >, <, !, or *
+  const rest = line.substring(offset);
+  const eventMatch = rest.match(/^([><!*]) (.*)/);
+  if (eventMatch) {
+    return {
+      time: obj.time,
+      isEvent: true,
+      prefix: eventMatch[1],
+      // Fields below kept for object shape consistency (processStatsLine/OTGraph use id/valid)
+      source: '', raw: '', id: null, dir: '', valid: ' ',
+      label: eventMatch[2].trim(), value: '', unit: ''
+    };
   }
   
   // Adjust base offsets based on offset
@@ -1950,6 +2019,83 @@ function setupOTLogControls() {
   // Mark as initialized after all listeners are successfully registered
   otLogControlsInitialized = true;
   updateLogCounters();
+
+  // Command input bar - send one-shot OTGW commands
+  const otCmdInput = document.getElementById('otCmdInput');
+  const btnSendCmd = document.getElementById('btnSendCmd');
+  if (btnSendCmd && otCmdInput) {
+    btnSendCmd.addEventListener('click', function() {
+      sendOTGWcommand(otCmdInput.value);
+    });
+    otCmdInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        sendOTGWcommand(otCmdInput.value);
+      }
+    });
+  }
+}
+
+//============================================================================
+// Send a one-shot command to the OTGW PIC via the REST API
+//============================================================================
+let statusClearTimer = null;
+
+function sendOTGWcommand(cmd) {
+  var trimmedCmd = (cmd || '').trim();
+  var statusEl = document.getElementById('otCmdStatus');
+
+  function clearStatus(delay) {
+    clearTimeout(statusClearTimer);
+    statusClearTimer = setTimeout(function() {
+      var el = document.getElementById('otCmdStatus');
+      if (el) { el.textContent = ''; el.className = 'ot-cmd-status'; }
+    }, delay);
+  }
+
+  if (!trimmedCmd) {
+    if (statusEl) {
+      statusEl.textContent = 'Enter a command first';
+      statusEl.className = 'ot-cmd-status ot-cmd-error';
+      clearStatus(2000);
+    }
+    return;
+  }
+
+  fetch(`${APIGW}v2/otgw/commands`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json; charset=UTF-8' },
+    body: JSON.stringify({ command: trimmedCmd })
+  })
+  .then(function(response) {
+    if (!response.ok) {
+      return response.text()
+        .catch(function(textErr) {
+          console.error('Failed to read error response body:', textErr);
+          return '';
+        })
+        .then(function(text) {
+          throw new Error('HTTP ' + response.status + (text ? ': ' + text.trim() : ''));
+        });
+    }
+    return response.json();
+  })
+  .then(function(data) {
+    if (statusEl) {
+      statusEl.textContent = 'Queued: ' + trimmedCmd;
+      statusEl.className = 'ot-cmd-status ot-cmd-ok';
+      clearStatus(3000);
+    }
+    var inputEl = document.getElementById('otCmdInput');
+    if (inputEl) inputEl.value = '';
+  })
+  .catch(function(err) {
+    console.error('Command failed:', err);
+    if (statusEl) {
+      statusEl.textContent = 'Error: ' + err.message;
+      statusEl.className = 'ot-cmd-status ot-cmd-error';
+    }
+  });
 }
 
 //============================================================================
@@ -2031,7 +2177,7 @@ async function rotateLogFile() {
         // Update UI
         const displayEl = document.getElementById('logFileDisplay');
         const filenameEl = document.getElementById('currentLogFile');
-        if (displayEl) displayEl.style.display = 'inline';
+        if (displayEl) displayEl.classList.remove('hidden');
         if (filenameEl) filenameEl.textContent = filename;
 
         // Mark session start (Queue it)
@@ -2085,7 +2231,7 @@ function stopFileStreaming() {
   
   // Hide UI
   const displayEl = document.getElementById('logFileDisplay');
-  if (displayEl) displayEl.style.display = 'none';
+  if (displayEl) displayEl.classList.add('hidden');
 
   console.log("File streaming stopped.");
 }
@@ -2400,7 +2546,7 @@ function initMainPage() {
   // Start time updates if not in flash mode
   if (!flashModeActive && !timeupdate) {
     refreshDevTime();
-    timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
+    startTimeUpdates();
   }
 
   // Check filesystem/firmware hash match once on page load
@@ -2439,7 +2585,7 @@ function checkFSMismatch() {
 
 function showMainPage() {
   console.log("showMainPage()");
-  clearInterval(tid);
+  stopOTmonitorPolling();
   
   // Exit flash mode if it was active
   if (flashModeActive) {
@@ -2448,17 +2594,13 @@ function showMainPage() {
   
   refreshDevTime();
   
-  document.getElementById("displayMainPage").classList.add('active');
-  document.getElementById("displaySettingsPage").classList.remove('active');
-  document.getElementById("displayDeviceInfo").classList.remove('active');
-  document.getElementById("displayPICflash").classList.remove('active');
-  document.getElementById("displayWebhookPage").classList.remove('active');
+  setActivePageSection('displayMainPage');
   
   refreshDevInfo();
   refreshOTmonitor();
   
   if (!flashModeActive) {
-    tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+    startOTmonitorPolling();
     // Initialize WebSocket for OT log streaming
     initOTLogWebSocket();
   }
@@ -2466,42 +2608,27 @@ function showMainPage() {
 
 function firmwarePage() {
   initOTLogWebSocket();
-  clearInterval(tid);
+  stopOTmonitorPolling();
   refreshDevTime();
-  document.getElementById("displayMainPage").classList.remove('active');
-  document.getElementById("displaySettingsPage").classList.remove('active');
-  document.getElementById("displayDeviceInfo").classList.remove('active');
-  document.getElementById("displayWebhookPage").classList.remove('active');
-  var firmwarePage = document.getElementById("displayPICflash");
   refreshFirmware();
-  document.getElementById("displayPICflash").classList.add('active');
+  setActivePageSection('displayPICflash');
 } // firmwarePage()
 
 function deviceinfoPage() {
   disconnectOTLogWebSocket();
-  clearInterval(tid);
+  stopOTmonitorPolling();
   refreshDevTime();
-  document.getElementById("displayMainPage").classList.remove('active');
-  document.getElementById("displaySettingsPage").classList.remove('active');
-  document.getElementById("displayPICflash").classList.remove('active');
-  document.getElementById("displayWebhookPage").classList.remove('active');
-  var deviceinfoPage = document.getElementById("deviceinfoPage");
   refreshDeviceInfo();
-  document.getElementById("displayDeviceInfo").classList.add('active');
+  setActivePageSection('displayDeviceInfo');
 
 } // deviceinfoPage()
 
 function settingsPage() {
   disconnectOTLogWebSocket();
-  clearInterval(tid);
+  stopOTmonitorPolling();
   refreshDevTime();
-  document.getElementById("displayMainPage").classList.remove('active');
-  document.getElementById("displayDeviceInfo").classList.remove('active');
-  document.getElementById("displayPICflash").classList.remove('active');
-  document.getElementById("displayWebhookPage").classList.remove('active');
-  var settingsPage = document.getElementById("settingsPage");
   refreshSettings();
-  document.getElementById("displaySettingsPage").classList.add('active');
+  setActivePageSection('displaySettingsPage');
 
 } // settingsPage()
 
@@ -2549,7 +2676,7 @@ function renderBottomMessage() {
   let msgText = (typeof statusMessageText === 'string') ? statusMessageText : '';
 
   if (isPSmode) {
-    msgText = 'PS=1 mode; No UI updates.';
+    msgText = 'PS=1 mode; live log stream paused.';
   } else {
     if (typeof msgText === 'string' && msgText.toLowerCase().startsWith('sensorsimulation')) {
       // Ignore stray summary field text when PS mode is not active.
@@ -2576,7 +2703,14 @@ function renderBottomMessage() {
   msgEl.style.display = (msgText === '') ? 'none' : 'block';
 }
 
-//============================================================================  
+//============================================================================
+function updateHeapDisplay() {
+  const el = document.getElementById('heap-info');
+  if (!el || currentFreeHeap === null) return;
+  el.textContent = `Heap: (${currentFreeHeap} / ${currentMaxFreeBlock})`;
+}
+
+//============================================================================
 function refreshDevTime() {
   //console.log("Refresh api/v2/device/time ..");
   fetch(APIGW + "v2/device/time")
@@ -2597,7 +2731,10 @@ function refreshDevTime() {
         if (timeEl) timeEl.textContent = devtime.dateTime;
       }
       statusMessageText = devtime.message || '';
-      
+      if (devtime.freeheap !== undefined)    currentFreeHeap = devtime.freeheap;
+      if (devtime.maxfreeblock !== undefined) currentMaxFreeBlock = devtime.maxfreeblock;
+      updateHeapDisplay();
+
       if (hasPsmode) {
         if (newPSmode !== isPSmode) {
           isPSmode = newPSmode;
@@ -2618,33 +2755,23 @@ function refreshDevTime() {
 
 //============================================================================
 // Apply PS=1 mode state to the UI
-// When PS=1 is active: hide the OT log section (like smartphone mode),
-// disconnect the WebSocket, and stop OT monitor polling to reduce device load.
+// When PS=1 is active: keep OT monitor panel/tabs visible, pause WebSocket log stream,
+// and continue monitor polling so parsed PS data remains visible.
 function applyPSmodeState() {
   if (isPSmode) {
-    console.log('[PS mode] Entering PS=1 mode - disabling OT monitor and WebSocket');
-    // Hide the OT log section (same as smartphone mode)
-    var logSection = document.getElementById('otLogSection');
-    if (logSection) {
-      logSection.classList.add('hidden');
-    }
-    // Disconnect WebSocket
-    disconnectOTLogWebSocket();
-    // Stop OT monitor polling
-    if (tid) {
-      clearInterval(tid);
-      tid = 0;
+    console.log('[PS mode] Entering PS=1 mode - keeping OT monitor visible and pausing live log stream');
+    updateOTLogResponsiveState();
+    if (isMainPageActive()) {
+      refreshOTmonitor();
+      startOTmonitorPolling();
     }
   } else {
-    console.log('[PS mode] Exiting PS=1 mode - re-enabling OT monitor and WebSocket');
+    console.log('[PS mode] Exiting PS=1 mode - re-enabling OT monitor live stream');
     // Re-evaluate display state (may still be disabled by smartphone/proxy/screen size)
     updateOTLogResponsiveState();
     // Restart OT monitor polling if on main page
-    if (document.getElementById('displayMainPage') &&
-        document.getElementById('displayMainPage').classList.contains('active')) {
-      if (!tid) {
-        tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-      }
+    if (isMainPageActive()) {
+      startOTmonitorPolling();
     }
   }
 } // applyPSmodeState()
@@ -2949,7 +3076,7 @@ function refreshDevInfo() {
 
 //============================================================================  
 function refreshOTmonitor() {
-  if (flashModeActive || !isPageVisible() || isPSmode) return;
+  if (flashModeActive || !isPageVisible()) return;
 
   data = {};
   fetch(APIGW + "v2/otgw/otmonitor")  //api/v2/otgw/otmonitor
@@ -3043,7 +3170,7 @@ function refreshOTmonitor() {
           rowDiv.setAttribute("class", "otmonrow");
           //rowDiv.setAttribute("id", "otmon_"+data[i].name);
           // rowDiv.style.background = "lightblue";
-          if (entry.epoch == 0) rowDiv.classList.add('hidden-row');
+          if (entry.epoch == 0) rowDiv.classList.add('no-data-row');
           var epoch = document.createElement("INPUT");
           epoch.setAttribute("type", "hidden");
           epoch.setAttribute("id", "otmon_epoch_" + entry.name);
@@ -3089,9 +3216,11 @@ function refreshOTmonitor() {
           var valDiv = document.createElement("div");
           valDiv.setAttribute("class", "otmoncolumn2");
           valDiv.setAttribute("id", "otmon_" + entry.name);
-          if (entry.value === "On") valDiv.innerHTML = "<span class='state-on'></span>";
-          else if (entry.value === "Off") valDiv.innerHTML = "<span class='state-off'></span>";
-          else valDiv.textContent = entry.value;
+          if (entry.epoch != 0) {
+            if (entry.value === "On") valDiv.innerHTML = "<span class='state-on'></span>";
+            else if (entry.value === "Off") valDiv.innerHTML = "<span class='state-off'></span>";
+            else valDiv.textContent = entry.value;
+          }
           rowDiv.appendChild(valDiv);
           //--- Unit  ---
           var unitDiv = document.createElement("div");
@@ -3104,9 +3233,9 @@ function refreshOTmonitor() {
           var update = document.getElementById("otmon_" + entry.name);
           if (update.parentNode) {
             if (entry.epoch == 0) {
-              update.parentNode.classList.add('hidden-row');
+              update.parentNode.classList.add('no-data-row');
             } else {
-              update.parentNode.classList.remove('hidden-row');
+              update.parentNode.classList.remove('no-data-row');
             }
           }
           var epoch = document.getElementById("otmon_epoch_" + entry.name);
@@ -3116,9 +3245,13 @@ function refreshOTmonitor() {
           //   needReload = true;
           // } 
           epoch.value = entry.epoch;
-          if (entry.value === "On") update.innerHTML = "<span class='state-on'></span>";
-          else if (entry.value === "Off") update.innerHTML = "<span class='state-off'></span>";
-          else update.textContent = entry.value;
+          if (entry.epoch != 0) {
+            if (entry.value === "On") update.innerHTML = "<span class='state-on'></span>";
+            else if (entry.value === "Off") update.innerHTML = "<span class='state-off'></span>";
+            else update.textContent = entry.value;
+          } else {
+            update.textContent = '';
+          }
           //if (update.style.visibility == 'visible') update.textContent = data[i].value;
 
         }
@@ -3947,8 +4080,8 @@ function handleFlashCompletion(filename, error) {
     }, 10000);
     
     // Restart polling
-    if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
+    startOTmonitorPolling();
+    startTimeUpdates();
 }
 
 function handleFlashError(filename, error) {
@@ -3963,8 +4096,8 @@ function handleFlashError(filename, error) {
     if (pctText) pctText.textContent = "Flash failed: " + (error || "Unknown error");
     
     // Restart polling
-    if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
+    startOTmonitorPolling();
+    startTimeUpdates();
 }
 
 // function pollForReboot() - Removed
@@ -3975,8 +4108,8 @@ function performFlash(filename) {
     isFlashing = true;
     toggleInteraction(false);
     // Stop polling during upgrade to prevent interference and reduce load
-    if (tid) { clearInterval(tid); tid = 0; }
-    if (timeupdate) { clearInterval(timeupdate); timeupdate = 0; }
+  stopOTmonitorPolling();
+  stopTimeUpdates();
 
     let progressSection = document.getElementById("flashProgressSection");
     let progressBar = document.getElementById("flashProgressBar");
@@ -4011,8 +4144,8 @@ function performFlash(filename) {
                 isFlashing = false;
                 toggleInteraction(true);
                 // Restart polling
-                if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-                if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
+                startOTmonitorPolling();
+                startTimeUpdates();
                 return;
              }
 
@@ -4045,8 +4178,8 @@ function performFlash(filename) {
                     stopFlashPolling();
                     
                     // Restart polling on start failure
-                    if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-                    if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
+                    startOTmonitorPolling();
+                    startTimeUpdates();
                 });
         }
     }, 100);
@@ -4115,8 +4248,8 @@ function handleFlashMessage(data) {
                 }, 10000);
                 
                 // Restart polling
-                if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-                if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
+                startOTmonitorPolling();
+                startTimeUpdates();
             } else if (msg.state === 'error' || msg.state === 'abort') {
                 // Error or abort
                 stopFlashPolling(); // Stop failsafe polling
@@ -4129,8 +4262,8 @@ function handleFlashMessage(data) {
                 if (progressBar) progressBar.classList.add('error');
                 
                 // Restart polling
-                if (!tid) tid = setInterval(function () { refreshOTmonitor(); }, 1000);
-                if (!timeupdate) timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
+                startOTmonitorPolling();
+                startTimeUpdates();
             }
             
             return true; // It was a flash message
