@@ -196,5 +196,5 @@ If the override doesn't seem to work:
 
 - [OTGW Firmware README](../README.md) - Main documentation
 - [MQTT Integration ADR](../docs/adr/ADR-006-mqtt-integration-pattern.md) - MQTT architecture
-- [OpenTherm Specification](../Specification/) - Protocol details
+- [OpenTherm Specification](../docs/opentherm%20specification/) - Protocol details
 - [Schelte Bron's OTGW Documentation](http://otgw.tclcode.com/) - Original OTGW project

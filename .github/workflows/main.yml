@@ -6,10 +6,8 @@ on:
       - dev
       - 'dev-*'
       - main
-      - actions
-      - make-tweaks
-      - tarball-naming
       - 'copilot/*'
+      - 'codex/*'
 
 jobs:
   build:

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v1.1.0
+**  Version  : v1.2.0-beta
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -79,7 +79,11 @@ void startWebserver(){
       f.close();
     });
   } else{
-    // Serve index.html with version-aware caching
+    // Serve index.html with ETag-based caching:
+    //  - Browser caches index.html but always revalidates via If-None-Match (ETag = fsHash).
+    //  - Unchanged FS → server replies 304 Not Modified (headers only, no body re-download).
+    //  - FS upgraded → ETag changes → server replies 200 with fresh content.
+    //  - JS assets use ?v=<fsHash> versioned URLs for independent long-term caching.
     auto sendIndex = []() {
       File f = LittleFS.open("/index.html", "r");
       if (!f) {
@@ -87,45 +91,49 @@ void startWebserver(){
         return;
       }
 
-      // Check if firmware and filesystem versions match
       String fsHash = getFilesystemHash();
-      bool versionMismatch = (fsHash.length() > 0 && strcasecmp(fsHash.c_str(), _VERSION_GITHASH) != 0);
-      
-      if (versionMismatch) {
-        // Version mismatch: disable caching and inject version hash for cache-busting
-        httpServer.sendHeader(F("Cache-Control"), F("no-store, no-cache, must-revalidate"));
-        httpServer.sendHeader(F("Pragma"), F("no-cache"));
-        
-        // Stream file line-by-line to avoid loading entire file into RAM (11KB+)
-        // This prevents memory exhaustion when version mismatch occurs
-        httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-        httpServer.send(200, F("text/html; charset=UTF-8"), F(""));
-        
-        while (f.available()) {
-          String line = f.readStringUntil('\n');
-          // Important: readStringUntil consumes the terminator, so we must add it back usually.
-          // However, for string replacement check, we do it on the content.
-          
-          if (line.indexOf(F("src=\"./index.js\"")) >= 0) {
-            line.replace(F("src=\"./index.js\""), "src=\"./index.js?v=" + fsHash + "\"");
-          }
-          if (line.indexOf(F("src=\"./graph.js\"")) >= 0) {
-             line.replace(F("src=\"./graph.js\""), "src=\"./graph.js?v=" + fsHash + "\"");
-          }
-          
-          httpServer.sendContent(line);
-          if (f.available() || line.length() > 0) {
-             httpServer.sendContent(F("\n")); // Restore the newline
-          }
+
+      if (fsHash.length() > 0) {
+        // ETags must be double-quoted per RFC 7232.
+        String etag = "\"" + fsHash + "\"";
+
+        // Conditional GET: return 304 if browser's cached copy is still current.
+        if (httpServer.hasHeader(F("If-None-Match")) &&
+            httpServer.header(F("If-None-Match")) == etag) {
+          f.close();
+          httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+          httpServer.sendHeader(F("ETag"), etag);
+          httpServer.send(304);
+          return;
         }
-        httpServer.sendContent(F("")); // End of chunked stream
-        f.close();
-      } else {
-        // Versions match: allow normal caching (1 hour) and stream file to save memory
-        httpServer.sendHeader(F("Cache-Control"), F("public, max-age=3600"));
-        httpServer.streamFile(f, F("text/html; charset=UTF-8"));
-        f.close();
+
+        httpServer.sendHeader(F("ETag"), etag);
       }
+
+      // no-cache + ETag: browser stores the response but revalidates each visit.
+      // On a local device this is a cheap If-None-Match round-trip, not a full download.
+      httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+
+      // Stream line-by-line to inject ?v=<hash> into JS asset URLs.
+      // When the FS hash changes the versioned URL changes — browser fetches fresh JS
+      // without needing a manual CTRL+F5.
+      httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+      httpServer.send(200, F("text/html; charset=UTF-8"), F(""));
+
+      while (f.available()) {
+        String line = f.readStringUntil('\n');
+        if (fsHash.length() > 0) {
+          if (line.indexOf(F("src=\"./index.js\"")) >= 0)
+            line.replace(F("src=\"./index.js\""), "src=\"./index.js?v=" + fsHash + "\"");
+          if (line.indexOf(F("src=\"./graph.js\"")) >= 0)
+            line.replace(F("src=\"./graph.js\""), "src=\"./graph.js?v=" + fsHash + "\"");
+        }
+        httpServer.sendContent(line);
+        if (f.available() || line.length() > 0)
+          httpServer.sendContent(F("\n"));
+      }
+      httpServer.sendContent(F("")); // End chunked stream
+      f.close();
     };
     
     httpServer.on("/", sendIndex);
@@ -144,36 +152,30 @@ void startWebserver(){
   });
   
   httpServer.on("/index.js", []() {
-    // JavaScript caching depends on version match
+    // ?v=<hash> versioned requests get long-term cache; bare /index.js gets no-cache.
+    // index.html always injects the current hash, so versioned URLs naturally rotate
+    // whenever the filesystem is upgraded.
+    String v = httpServer.arg("v");
     String fsHash = getFilesystemHash();
-    bool versionMismatch = (fsHash.length() > 0 && strcasecmp(fsHash.c_str(), _VERSION_GITHASH) != 0);
-    
-    if (versionMismatch) {
-      // Version mismatch: short cache to ensure fresh load after filesystem update
-      httpServer.sendHeader(F("Cache-Control"), F("public, max-age=60"));
-    } else {
-      // Versions match: normal caching (1 day)
+    if (v.length() > 0 && v == fsHash) {
       httpServer.sendHeader(F("Cache-Control"), F("public, max-age=86400"));
+    } else {
+      httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
     }
-    
     File f = LittleFS.open("/index.js", "r");
     httpServer.streamFile(f, F("application/javascript"));
     f.close();
   });
-  
+
   httpServer.on("/graph.js", []() {
-    // JavaScript caching depends on version match
+    // Same versioned-URL caching strategy as index.js (see above).
+    String v = httpServer.arg("v");
     String fsHash = getFilesystemHash();
-    bool versionMismatch = (fsHash.length() > 0 && strcasecmp(fsHash.c_str(), _VERSION_GITHASH) != 0);
-    
-    if (versionMismatch) {
-      // Version mismatch: short cache to ensure fresh load after filesystem update
-      httpServer.sendHeader(F("Cache-Control"), F("public, max-age=60"));
-    } else {
-      // Versions match: normal caching (1 day)
+    if (v.length() > 0 && v == fsHash) {
       httpServer.sendHeader(F("Cache-Control"), F("public, max-age=86400"));
+    } else {
+      httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
     }
-    
     File f = LittleFS.open("/graph.js", "r");
     httpServer.streamFile(f, F("application/javascript"));
     f.close();
@@ -182,6 +184,10 @@ void startWebserver(){
   httpServer.on("/pic", upgradepic);
   // all other api calls are catched in FSexplorer onNotFounD!
   httpServer.on("/api", HTTP_ANY, processAPI);  //was only HTTP_GET (20210110)
+
+  // Enable collection of If-None-Match so index.html ETag conditional requests work.
+  static const char* reqHeaders[] = { "If-None-Match" };
+  httpServer.collectHeaders(reqHeaders, 1);
 
   httpServer.begin();
   // Set up first message as the IP address
@@ -246,8 +252,8 @@ void setupFSexplorer(){
 void apifirmwarefilelist() {
   DebugTf(PSTR("API: apifirmwarefilelist()\r\n"));
   
-  // Use small 256-byte buffer for streaming individual entries
-  char entryBuffer[256];
+  // 150 bytes covers longest entry: path (~30) + version (~32) + fwversion (~32) + JSON overhead
+  char entryBuffer[150];
   String version, fwversion;
   Dir dir;
   File f;
@@ -401,7 +407,7 @@ void apilistfiles()             // Senden aller Daten an den Client
   httpServer.sendContent(F("["));
 
   bool firstEntry = true;
-  char entryBuffer[256];
+  char entryBuffer[150];
   char typeBuf[5];
   for (int f = 0; f < fileNr; f++)
   {

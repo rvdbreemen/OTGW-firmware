@@ -42,15 +42,12 @@ static const char UpdateServerIndex[] PROGMEM =
           cursor: pointer;
           transform: translateY(0);
         }
-        #fwSubmit:enabled {
-          background: #0a74da;
-          border-color: #075baa;
-        }
+        #fwSubmit:enabled,
         #fsSubmit:enabled {
           background: #2e9d57;
           border-color: #207240;
         }
-        #fwSubmit:enabled:hover { background: #0864ba; }
+        #fwSubmit:enabled:hover,
         #fsSubmit:enabled:hover { background: #27854a; }
         #preserveWrap { margin-top: 10px; padding: 8px 10px; border-left: 3px solid #7aaad6; background: #eef6ff; border-radius: 4px; }
         html.dark #preserveWrap { border-left-color: #4f89c1; background: #3a3a3a; }
@@ -64,7 +61,7 @@ static const char UpdateServerIndex[] PROGMEM =
         html.dark #progressContainer { background-color: #444; border-color: #666; }
         
         /* Progress bar fill */
-        #progressBar { height: 100%; background-color: #2196F3; transition: width 0.3s ease; width: 0%; }
+        #progressBar { height: 100%; background-color: #2196F3; transition: width 0.3s ease, background-color 0.5s ease; width: 0%; }
         
         /* Progress text overlay */
         #progressText { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: #fff; text-shadow: 0 0 4px rgba(0,0,0,0.9); }
@@ -137,6 +134,7 @@ static const char UpdateServerIndex[] PROGMEM =
            pageProgress.style.display = 'block';
            retryBtn.style.display = 'none';
            errorEl.textContent = '';
+           progressBar.style.backgroundColor = '';
          }
          
          window.retryFlash = function() {
@@ -157,8 +155,8 @@ static const char UpdateServerIndex[] PROGMEM =
              remaining--;
              
              // Check health endpoint to verify device is fully booted
-             console.log('[OTA] Health check: GET /api/v1/health?t=' + Date.now());
-             fetch('/api/v1/health?t=' + Date.now(), { 
+             console.log('[OTA] Health check: GET /api/v2/health?t=' + Date.now());
+             fetch('/api/v2/health?t=' + Date.now(), { 
                method: 'GET', 
                cache: 'no-store',
                headers: { 'Accept': 'application/json' }
@@ -186,7 +184,7 @@ static const char UpdateServerIndex[] PROGMEM =
                        if (labels && typeof labels === 'object' && Object.keys(labels).length > 0) {
                          console.log('[OTA] Restoring Dallas labels from memory cache');
                          progressText.textContent = 'Restoring Dallas labels...';
-                         labelsRestored = fetch('/api/v1/sensors/labels', {
+                         labelsRestored = fetch('/api/v2/sensors/labels', {
                            method: 'POST',
                            headers: { 'Content-Type': 'application/json' },
                            body: JSON.stringify(labels)
@@ -361,6 +359,7 @@ static const char UpdateServerIndex[] PROGMEM =
                      // Backend returns 200 only after flash is complete
                      console.log('[OTA] State: Flash complete (backend confirmed), device rebooting');
                      progressBar.style.width = '100%';
+                     progressBar.style.backgroundColor = '#4CAF50';
                      progressText.textContent = 'Flash complete! Device rebooting...';
                      waitForDeviceReboot();
                    }
@@ -442,7 +441,7 @@ static const char UpdateServerSuccess[] PROGMEM =
            remainingSeconds--;
            
            // Check health endpoint to verify device is fully booted
-           fetch('/api/v1/health?t=' + Date.now(), { 
+           fetch('/api/v2/health?t=' + Date.now(), { 
              method: 'GET', 
              cache: 'no-store',
              headers: { 'Accept': 'application/json' }
@@ -467,7 +466,7 @@ static const char UpdateServerSuccess[] PROGMEM =
                      var labels = window.opener.dallasLabelsCache;
                      if (labels && typeof labels === 'object' && Object.keys(labels).length > 0) {
                        statusEl.textContent = "Restoring Dallas labels...";
-                       labelsRestored = fetch('/api/v1/sensors/labels', {
+                       labelsRestored = fetch('/api/v2/sensors/labels', {
                          method: 'POST',
                          headers: { 'Content-Type': 'application/json' },
                          body: JSON.stringify(labels)
