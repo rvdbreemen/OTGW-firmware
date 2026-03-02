@@ -1,6 +1,10 @@
 # OTGW-firmware (ESP8266) for NodoShop OpenTherm Gateway
 
-> **v1.2.0** — Comprehensive Home Assistant discovery for all OpenTherm message types, OpenTherm v4.2 protocol alignment, gateway/logging reliability, MQTT/HA improvements (source-separated topics), Web UI/mobile polish, **webhook support** (HTTP call on OpenTherm status bit change), and a streamlined v2-only REST API.
+> **⚠️ DEVELOPMENT BRANCH WARNING**
+> **This is the development branch (`dev`) and contains the latest work-in-progress features.**
+> For the latest stable release, please check the [releases page](https://github.com/rvdbreemen/OTGW-firmware/releases) (latest: **v1.2.0**) or switch to the [`main` branch](https://github.com/rvdbreemen/OTGW-firmware/tree/main).
+>
+> **For production use, we recommend using the stable releases.**
 
 [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
 
