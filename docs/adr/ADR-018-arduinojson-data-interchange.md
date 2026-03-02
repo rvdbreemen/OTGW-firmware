@@ -1,8 +1,8 @@
 # ADR-018: ArduinoJson for Data Interchange
 
-**Status:** Accepted  
+**Status:** Superseded by ADR-042  
 **Date:** 2018-01-01 (Estimated)  
-**Updated:** 2026-01-28 (Documentation)
+**Updated:** 2026-02-28 (Superseded — see ADR-042: Streaming JSON I/O — No ArduinoJson)
 
 ## Context
 

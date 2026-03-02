@@ -248,8 +248,7 @@ def should_skip_path(path, base_dir):
     skip_dirs = {
         "arduino", "Arduino", "libraries", "staging", "build", 
         "node_modules", ".git", "__pycache__", ".github",
-        "scripts", "docs", "hardware", "example-api", "Specification",
-        "specification"
+        "scripts", "docs", "hardware", "example-api"
     }
     
     # Check if any part of the path is in skip_dirs

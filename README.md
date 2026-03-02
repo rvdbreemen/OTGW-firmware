@@ -1,7 +1,7 @@
 # OTGW-firmware (ESP8266) for NodoShop OpenTherm Gateway
 
-> **🔧 Development Release — v1.2.0-beta**  
-> This build delivers comprehensive Home Assistant discovery for all OpenTherm message types, OpenTherm v4.2 compliance fixes, gateway/logging reliability improvements, MQTT/HA corrections (including source-separated topics), and Web UI/mobile refinements.<br>
+> **🔧 Development Release — v1.2.0-beta**
+> This build delivers comprehensive Home Assistant discovery for all OpenTherm message types, OpenTherm v4.2 compliance fixes, gateway/logging reliability improvements, MQTT/HA corrections (including source-separated topics), Web UI/mobile refinements, **webhook support** (HTTP call on OpenTherm status bit change), and a streamlined v2-only REST API (v0/v1 removed).<br>
 > For the latest stable release, see the [releases page](https://github.com/rvdbreemen/OTGW-firmware/releases).
 
 [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
@@ -62,10 +62,23 @@ Previously, Home Assistant auto-discovery focused on the most common heating-sys
 - **Tooling and docs**
   - Added OpenTherm v4.2 spec-audit tool + CI workflow.
   - Added detailed migration docs for MQTT/HA v4.2 changes and source-separation analysis docs.
+- **Webhook support** *(new in this branch)*
+  - Configurable HTTP call triggered on OpenTherm status bit change (e.g. flame on/off).
+  - Separate URL, payload, and content type for "on" and "off" events.
+  - Restricted to local network URLs only (ADR-003/ADR-032).
+  - Controlled by `webhookEnabled` setting (disabled by default).
+- **v0 and v1 REST API removed** *(new in this branch)*
+  - Only `/api/v2/` endpoints remain. Requests to `/api/v0/` or `/api/v1/` return **410 Gone**.
+  - All in-firmware health-check and sensor-label calls updated to v2.
+  - ArduinoJson dependency removed; settings I/O replaced with lightweight streaming helpers.
+- **Bug fix: `MQTTseparatesources` not persisted** *(new in this branch)*
+  - The setting was written to `settings.ini` but never read back on boot, silently resetting to `false` after every reboot.
 
 ### ⚠️ Migration impact
 
 This release contains MQTT/HA breaking changes (OpenTherm v4.2 alignment), device-info API key changes for raw API consumers, and new optional source-separated MQTT topic behavior. Full OpenTherm MQTT/HA migration details: [docs/fixes/opentherm-v42-mqtt-breaking-changes.md](docs/fixes/opentherm-v42-mqtt-breaking-changes.md)
+
+**REST API breaking change**: v0 and v1 API endpoints have been removed. Any client calling `/api/v0/` or `/api/v1/` will receive **410 Gone**. Migrate to `/api/v2/` equivalents — see [docs/api/README.md](docs/api/README.md).
 
 Breaking changes for manual MQTT sensors/automations:
 
@@ -328,21 +341,21 @@ This allows the OTGW to use external temperature data for OpenTherm communicatio
 
 ### REST API
 
-- Read OpenTherm values via `/api/v0/` (deprecated), `/api/v1/`, and `/api/v2/` (recommended) endpoints.
-- **v2 API (recommended)**: RESTful-compliant endpoints with consistent JSON errors, proper HTTP status codes, CORS support, and resource-based naming. See [API Documentation](docs/api/README.md).
-- Send OTGW commands via `POST /api/v2/otgw/commands` (JSON body) or `POST /api/v1/otgw/command/{cmd}` (URL-based).
+- Read OpenTherm values via `/api/v2/` endpoints. v0 and v1 have been removed (return 410 Gone).
+- **v2 API**: RESTful-compliant endpoints with consistent JSON errors, proper HTTP status codes, CORS support, and resource-based naming. See [API Documentation](docs/api/README.md).
+- Send OTGW commands via `POST /api/v2/otgw/commands` (JSON body) or the alias `POST /api/v2/otgw/command/{cmd}` (URL-based).
 - **Manage Dallas sensor labels** via `GET/POST /api/v2/sensors/labels` — fetch and update custom names for temperature sensors.
   - **Bulk operations only**: Frontend manages label lookup and modification using read-modify-write pattern.
   - **File-based storage**: Labels stored in `/dallas_labels.ini` with zero backend RAM usage.
 - Full OpenAPI specification: [docs/api/openapi.yaml](docs/api/openapi.yaml).
-- **Health check endpoint:** `GET /api/v2/health` (or `/api/v1/health`) — returns device status including uptime, heap usage, and operational status. Used by OTA flash verification to confirm device is fully operational after reboot.
+- **Health check endpoint:** `GET /api/v2/health` — returns device status including uptime, heap usage, and operational status. Used by OTA flash verification to confirm device is fully operational after reboot.
 
 **OTA Flash Improvements (v1.0.0-rc7):**
 The firmware flash mechanism has been simplified for improved reliability:
 
 - **Firmware upload** (`/update?cmd=0`) and **filesystem upload** (`/update?cmd=100`) endpoints now block until flash operations complete
 - Backend returns HTTP 200 only after flash write succeeds, preventing false-success detection
-- Frontend uses `/api/v1/health` health check polling to verify device is fully operational (status: "UP")
+- Frontend uses `/api/v2/health` health check polling to verify device is fully operational (status: "UP")
 - **Removed:** Real-time WebSocket flash progress updates (simplified for reliability; flash operations complete in 10-30 seconds)
 - See [ADR-029](docs/adr/ADR-029-simple-xhr-ota-flash.md) for architectural rationale
 
@@ -356,7 +369,7 @@ The firmware flash mechanism has been simplified for improved reliability:
   - **Custom labels**: Click sensor names in the Web UI to assign friendly labels (max 16 characters).
   - **Graph visualization**: Sensors appear automatically in the real-time graph with 16 unique colors per theme.
   - **File-based storage**: Labels stored in `/dallas_labels.ini` file with zero backend RAM usage.
-  - **Bulk API**: GET/POST `/api/v2/sensors/labels` (or `/api/v1/sensors/labels`) for fetching and updating all labels at once.
+  - **Bulk API**: GET/POST `/api/v2/sensors/labels` for fetching and updating all labels at once.
   - **Automatic backup & restore**: Labels automatically backed up before filesystem flash and restored after reboot.
 - S0 pulse counter for kWh meters on a configurable GPIO.
 
@@ -401,7 +414,8 @@ There are two ways to integrate with Home Assistant:
 - **Breaking change (v1.0.0):** Default GPIO pin for Dallas temperature sensors changed from **GPIO 13 (D7)** to **GPIO 10 (SD3)**. This aligns with the OTGW hardware default. If you're upgrading from a previous version and have sensors connected to GPIO 13, you'll need to either:
   - Reconnect your sensors to GPIO 10, OR
   - Change the GPIO pin setting back to 13 in the Settings page
-- **New API endpoint (v1.0.0):** A new optimized `/api/v2/otgw/otmonitor` endpoint uses a map-based JSON format. The original v1 endpoint remains available for compatibility. See [API_CHANGES_v1.0.0.md](example-api/API_CHANGES_v1.0.0.md) for details.
+- **REST API v0/v1 removed (v1.2.0):** Only `/api/v2/` remains. Requests to `/api/v0/` or `/api/v1/` return 410 Gone. See [docs/api/README.md](docs/api/README.md) for the v2 endpoint reference.
+- **New API endpoint (v1.0.0):** A new optimized `/api/v2/otgw/otmonitor` endpoint uses a map-based JSON format. See [API_CHANGES_v1.0.0.md](example-api/API_CHANGES_v1.0.0.md) for details.
 - **Do not flash OTGW PIC firmware over Wi-Fi using OTmonitor.** You can brick the PIC. Use the built-in PIC firmware upgrade feature instead (based on code by Schelte Bron).
 - **Breaking change (v0.8.0):** MQTT topic naming conventions changed; MQTT-based integrations may need updates.
 - **Breaking change (v0.7.2+):** LittleFS is used; switching required a full reflash via USB and settings are not preserved.
@@ -417,7 +431,7 @@ For release artifacts, see <https://github.com/rvdbreemen/OTGW-firmware/releases
 
 | Version | Release notes |
 | --- | --- |
-| 1.2.0-beta | **Focus**: Comprehensive Home Assistant discovery for all OpenTherm message types (heating, cooling, solar, DHW, ventilation, CH2, humidity, counters, and more), OpenTherm v4.2 alignment, runtime hardening, gateway-mode reliability, MQTT/HA improvements (including source-separated topics), serial/WebSocket diagnostics, and Web UI/mobile polish.<br>**Protocol**: Added IDs `39` and `93-97`; corrected directions/types/units for multiple IDs (including `38`, `71`, `77`, `78`, `87`, `98`, `99`); added legacy ID `50-63` compatibility profile (v4.x reserved-ID suppression in `AUTO`); added `getOTGWValue()` mappings for `113/114`.<br>**Safety**: Added OT map bounds checks in parser/REST, safe fallback metadata for unknown IDs, and out-of-range validation in `sendOTGWvalue()`.<br>**MQTT/HA**: Fixed typo topics and HA discovery mismatches (`vh_configuration_*`, `Hcratio`), split `FanSpeed` HA discovery into setpoint/actual (`Hz`), aligned v4.2 MQTT publishing, added configurable `mqttseparatesources` with `_thermostat/_boiler/_gateway` topics plus source-aware HA discovery templates, and hardened MQTT autoconfig shared-buffer/re-entry behavior.<br>**Gateway/API/UI**: Fixed `PR=M` parsing (`M=G`/`M=M`), added explicit gateway mode detecting/unknown handling, standardized device-info keys to `otgwmode` and `wifiquality_text`, improved Web UI gateway indicator/status messaging, and added PS mode footer handling/sensor-simulation message cleanup.<br>**Diagnostics/Robustness**: Increased OT serial line buffer (`256` -> `512`), safely drops overflowed lines, tracks dropped-line count, adds richer WebSocket event logging (commands/responses/errors/PS mode/reset/PIC restart), and clears persisted logs after flash completion.<br>**Web UI / Tooling**: Added shared nav shell + `index_common.css`, improved mobile/responsive settings/log layouts, improved flash-page button/help UX, added OpenTherm v4.2 spec-audit tool + CI workflow, and cleaned repository artifacts.<br>**Migration**: Review OpenTherm MQTT/HA changes (`RelativeHumidity`, `FanSpeed`, legacy IDs `50-63`) and raw device-info key renames (`otgwmode`, `wifiquality_text`); see `docs/fixes/opentherm-v42-mqtt-breaking-changes.md`.<br>Full notes: [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md) |
+| 1.2.0-beta | **Focus**: Comprehensive Home Assistant discovery for all OpenTherm message types (heating, cooling, solar, DHW, ventilation, CH2, humidity, counters, and more), OpenTherm v4.2 alignment, runtime hardening, gateway-mode reliability, MQTT/HA improvements (including source-separated topics), serial/WebSocket diagnostics, and Web UI/mobile polish.<br>**Protocol**: Added IDs `39` and `93-97`; corrected directions/types/units for multiple IDs (including `38`, `71`, `77`, `78`, `87`, `98`, `99`); added legacy ID `50-63` compatibility profile (v4.x reserved-ID suppression in `AUTO`); added `getOTGWValue()` mappings for `113/114`.<br>**Safety**: Added OT map bounds checks in parser/REST, safe fallback metadata for unknown IDs, and out-of-range validation in `sendOTGWvalue()`.<br>**MQTT/HA**: Fixed typo topics and HA discovery mismatches (`vh_configuration_*`, `Hcratio`), split `FanSpeed` HA discovery into setpoint/actual (`Hz`), aligned v4.2 MQTT publishing, added configurable `mqttseparatesources` with `_thermostat/_boiler/_gateway` topics plus source-aware HA discovery templates, and hardened MQTT autoconfig shared-buffer/re-entry behavior.<br>**Gateway/API/UI**: Fixed `PR=M` parsing (`M=G`/`M=M`), added explicit gateway mode detecting/unknown handling, standardized device-info keys to `otgwmode` and `wifiquality_text`, improved Web UI gateway indicator/status messaging, and added PS mode footer handling/sensor-simulation message cleanup.<br>**Diagnostics/Robustness**: Increased OT serial line buffer (`256` -> `512`), safely drops overflowed lines, tracks dropped-line count, adds richer WebSocket event logging (commands/responses/errors/PS mode/reset/PIC restart), and clears persisted logs after flash completion.<br>**Web UI / Tooling**: Added shared nav shell + `index_common.css`, improved mobile/responsive settings/log layouts, improved flash-page button/help UX, added OpenTherm v4.2 spec-audit tool + CI workflow, and cleaned repository artifacts.<br>**Migration**: Review OpenTherm MQTT/HA changes (`RelativeHumidity`, `FanSpeed`, legacy IDs `50-63`) and raw device-info key renames (`otgwmode`, `wifiquality_text`); see `docs/fixes/opentherm-v42-mqtt-breaking-changes.md`.<br>**Webhook**: HTTP call on OpenTherm status bit change (configurable URL, payload, content type for on/off events; restricted to local network; disabled by default).<br>**API**: v0 and v1 removed — only `/api/v2/` remains (v0/v1 return 410 Gone); ArduinoJson removed, streaming JSON I/O.<br>**Bug fix**: `MQTTseparatesources` was not persisted across reboots.<br>Full notes: [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md) |
 | 1.1.0-beta | **New Features**:<br>• Dallas Sensor Custom Labels — inline editing in Web UI, labels stored in `/dallas_labels.ini`, zero backend RAM, label backup/restore during filesystem flash<br>• Dallas Sensor Graph Visualization — sensors auto-appear in real-time graph with 16-color palette (light/dark themes)<br>• Dallas Sensor REST API — bulk `GET/POST /api/v2/sensors/labels`<br>• WebUI Data Persistence — automatic `localStorage` persistence with debounced saves, dynamic memory management, normal/capture modes, auto-restoration on page load<br>• Browser Debug Console (`otgwDebug`) — full diagnostic toolkit in browser console<br>• Non-Blocking Modal Dialogs — custom HTML/CSS modals replace blocking `prompt()`/`alert()`<br>• **RESTful API v2** — 13 new v2 endpoints with consistent JSON errors, proper HTTP status codes (202 for async), CORS support, RESTful resource naming; API compliance score 5.4→8.5/10; all frontend calls migrated to v2; v0/unversioned endpoints deprecated (ADR-035)<br>**Bug Fixes**:<br>• MQTT Whitespace Auth Fix — automatic trimming of credentials whitespace, fixing auth failures upgrading from v0.10.x<br>• Streaming File Serving — replaced full-file-to-RAM with chunked streaming (95% memory reduction)<br>• 20 bugs resolved from comprehensive codebase review: memory safety (OOB write, stack overflow), data integrity (MQTT hour bitmask, -127°C sensor), concurrency (ISR race), security (XSS), reliability (file descriptor leak, null pointer crash, blocking sensor read), GPIO output feature fix, flash wear reduction (20→1 writes), proper JSON settings parsing<br>**Improvements**:<br>• Heap Memory Monitoring — 4-level health system with adaptive throttling and WebSocket backpressure<br>• Settings flash wear reduction — deferred writes with 2s debounce (20 writes → 1)<br>• GPIO conflict detection for sensor/S0/output pin assignments<br>• ADR Compliance CI workflow for pull requests<br>• Build system: `version.hash` always generated, centralized `config.py`<br>• Reusable GitHub Actions composite actions for CI/CD<br>• Full OpenAPI spec updated for all v2 endpoints<br>**Migration Notes**:<br>• Filesystem flash recommended alongside firmware flash<br>• Hard browser refresh (Ctrl+F5) recommended<br>• v0/unversioned API endpoints deprecated (removal in v1.3.0); migrate to v2<br>• No breaking API or MQTT changes |
 | 1.0.0 | **Milestone Release**: The complete vision of the firmware with a stable API, modern UI, and robust integration.<br>**New Features**:<br>• Live Logging (real-time WebSocket streaming with backpressure handling, UI controls for auto-scroll, timestamps, and capture)<br>• Interactive Graphs (real-time data visualization with extended history buffers and time window controls)<br>• Modern Web UI (responsive design with fully integrated Dark Theme - persistent, refactored DevInfo page)<br>• Improved Tools (new build system `build.py` and automated flashing tool `flash_esp.py`, enhanced firmware update UI with live progress)<br>• Gateway Mode (reliable detection using `PR=M` command, checks every 30s)<br>• NTP Control (new `NTPsendtime` setting).<br>**Integration (MQTT & HA)**:<br>• Auto Discovery (added support for Outside Temperature override `outside`)<br>• Documentation (clarified `hotwater` command values/examples)<br>• Stability (static 1350-byte MQTT buffer to prevent heap fragmentation).<br>**Core Stability & Security**:<br>• Binary Safety (critical fix for Exception (2) crashes during PIC flashing, replaced `strncmp_P` with `memcmp_P`)<br>• Connectivity (rewritten Wi-Fi logic with improved watchdog handling)<br>• Security (CSRF protection on APIs, masked password fields, input sanitization)<br>• Data Parsing (better validation in `processLine`, support for Type 0 messages).<br>**Breaking Changes**:<br>• Dallas Sensors (default pin changed from GPIO 13/D7 to GPIO 10/SD3 to match hardware defaults).<br>**Documentation**: Added `FLASH_GUIDE.md`, `BUILD.md`. |
 | 0.10.3 | Web UI: Mask MQTT password field and support running behind a reverse proxy (auto-detect http/https)<br>Home Assistant: Improve discovery templates (remove empty unit_of_measurement and add additional sensors/boundary values)<br>Fix: Status functions and REST API status reporting<br>CI: Improved GitHub Actions build/release workflow and release artifacts. |
