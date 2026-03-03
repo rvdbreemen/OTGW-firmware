@@ -144,10 +144,12 @@ static bool parseJsonKVLine(const char* line, char* keyOut, size_t keyOutSize, c
 
 static void writeJsonStringKV(File& file, const __FlashStringHelper* key, const char* value, bool withComma)
 {
-  String escaped = escapeJsonString(value);
+  // Use global cMsg as escape scratch — no heap allocation.
+  // writeSettings() holds no yield() between calls, so cMsg cannot be clobbered mid-write.
+  escapeJsonStringTo(value, cMsg, sizeof(cMsg));
   file.printf_P(PSTR("  \"%S\": \"%s\"%s\n"),
                 reinterpret_cast<PGM_P>(key),
-                escaped.c_str(),
+                cMsg,
                 withComma ? "," : "");
 }
 
@@ -168,13 +170,13 @@ static void writeJsonIntKV(File& file, const __FlashStringHelper* key, int value
 }
 
 //=======================================================================
-void writeSettings(bool show) 
+void writeSettings(bool show)
 {
 
   DebugTf(PSTR("[Settings] State: writeSettings called (show=%s)\r\n"), show ? "true" : "false");
   DebugTf(PSTR("[Settings] Writing to [%s] ..\r\n"), SETTINGS_FILE);
   File file = LittleFS.open(SETTINGS_FILE, "w");
-  if (!file) 
+  if (!file)
   {
     DebugTf(PSTR("[Settings] Error: open(%s, 'w') FAILED!!! --> Bailout\r\n"), SETTINGS_FILE);
     return;
@@ -223,8 +225,17 @@ void writeSettings(bool show)
   writeJsonStringKV(file, F("OTGWcommands"), settingOTGWcommands, true);
   writeJsonBoolKV(file, F("GPIOOUTPUTSenabled"), settingGPIOOUTPUTSenabled, true);
   writeJsonIntKV(file, F("GPIOOUTPUTSpin"), settingGPIOOUTPUTSpin, true);
-  writeJsonIntKV(file, F("GPIOOUTPUTStriggerBit"), settingGPIOOUTPUTStriggerBit, false);
+  writeJsonIntKV(file, F("GPIOOUTPUTStriggerBit"), settingGPIOOUTPUTStriggerBit, true);
+  writeJsonBoolKV(file, F("WebhookEnabled"), settingWebhookEnabled, true);
+  writeJsonStringKV(file, F("WebhookURLon"), settingWebhookURLon, true);
+  writeJsonStringKV(file, F("WebhookURLoff"), settingWebhookURLoff, true);
+  writeJsonIntKV(file, F("WebhookTriggerBit"), settingWebhookTriggerBit, true);
+  writeJsonStringKV(file, F("WebhookPayload"), settingWebhookPayload, true);
+  writeJsonStringKV(file, F("WebhookContentType"), settingWebhookContentType, false);
   file.print(F("}\n"));
+  Debugln(F("\r\n[Settings] State: File write complete, closing file"));
+  file.close();  // Close write handle before any subsequent read
+  DebugTf(PSTR("[Settings] State: Settings saved successfully to %s\r\n"), SETTINGS_FILE);
 
   if (show) {
     DebugTln(F("\r\n[Settings] JSON content:"));
@@ -234,18 +245,15 @@ void writeSettings(bool show)
     }
     if (showFile) showFile.close();
   }
-  Debugln(F("\r\n[Settings] State: File write complete, closing file"));
-  file.close();
-  DebugTf(PSTR("[Settings] State: Settings saved successfully to %s\r\n"), SETTINGS_FILE);  
 
 } // writeSettings()
 
 
 //=======================================================================
-void readSettings(bool show) 
+void readSettings(bool show)
 {
   DebugTf(PSTR(" %s ..\r\n"), SETTINGS_FILE);
-  if (!LittleFS.exists(SETTINGS_FILE)) 
+  if (!LittleFS.exists(SETTINGS_FILE))
   {  //create settings file if it does not exist yet.
     DebugTln(F(" .. file not found! --> created file!"));
     writeSettings(show);
@@ -263,21 +271,25 @@ void readSettings(bool show)
     DebugTln(F("Settings file is empty, use existing defaults."));
     return;
   }
-  static const size_t JSON_LINE_BUF = 256;
-  char lineBuf[JSON_LINE_BUF];
+  // Own line buffer — prevents cMsg clobber if readSettings() is called from an
+  // HTTP handler where file.readBytesUntil() calls yield() internally, which
+  // could allow writeSettings() → writeJsonStringKV() to overwrite cMsg mid-parse.
+  char lineBuf[256];
   char keyBuf[64];
-  char valueBuf[150];
+  char valueBuf[201]; // must fit the largest setting value (WebhookPayload: 201 bytes)
 
   while (file.available()) {
     size_t len = file.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
     lineBuf[len] = '\0';
     if (len == (sizeof(lineBuf) - 1)) {
-      char discardBuf[32];
+      // Line was longer than lineBuf — discard remainder and skip it.
       while (file.available()) {
+        char discardBuf[32];
         size_t chunkLen = file.readBytesUntil('\n', discardBuf, sizeof(discardBuf) - 1);
         if (chunkLen < (sizeof(discardBuf) - 1)) break;
         yield();
       }
+      continue;
     }
 
     if (parseJsonKVLine(lineBuf, keyBuf, sizeof(keyBuf), valueBuf, sizeof(valueBuf))) {
@@ -286,27 +298,35 @@ void readSettings(bool show)
   }
   file.close();
 
-  if (strlen(settingHostname)==0) strlcpy(settingHostname, _HOSTNAME, sizeof(settingHostname));
-  if (strlen(settingMQTTtopTopic)==0 || strcmp_P(settingMQTTtopTopic, PSTR("null"))==0) {
-    strlcpy(settingMQTTtopTopic, _HOSTNAME, sizeof(settingMQTTtopTopic));
-    for(int i=0; settingMQTTtopTopic[i]; i++) settingMQTTtopTopic[i] = tolower(settingMQTTtopTopic[i]);
-  }
-  if (strlen(settingMQTThaprefix)==0 || strcmp_P(settingMQTThaprefix, PSTR("null"))==0) {
-    strlcpy(settingMQTThaprefix, HOME_ASSISTANT_DISCOVERY_PREFIX, sizeof(settingMQTThaprefix));
-  }
-  if (strlen(settingMQTTuniqueid)==0 || strcmp_P(settingMQTTuniqueid, PSTR("null"))==0) {
-    strlcpy(settingMQTTuniqueid, getUniqueId(), sizeof(settingMQTTuniqueid));
-  }
-  if (strlen(settingNTPtimezone)==0 || strcmp_P(settingNTPtimezone, PSTR("null"))==0) {
-    strlcpy(settingNTPtimezone, NTP_DEFAULT_TIMEZONE, sizeof(settingNTPtimezone));
-  }
-  if (strlen(settingNTPhostname)==0 || strcmp_P(settingNTPhostname, PSTR("null"))==0) {
-    strlcpy(settingNTPhostname, NTP_HOST_DEFAULT, sizeof(settingNTPhostname));
-  }
-  if (strcmp_P(settingOTGWcommands, PSTR("null"))==0) settingOTGWcommands[0] = 0;
-
+  // Loading from file must NOT trigger a rewrite or service restarts —
+  // clear any dirty/side-effect state set by updateSetting() above.
   settingsDirty = false;
   pendingSideEffects = 0;
+
+  // Post-processing: apply defaults for any missing or empty values
+  if (strlen(settingHostname) == 0) strlcpy(settingHostname, _HOSTNAME, sizeof(settingHostname));
+
+  char *trimmedUser = trimwhitespace(settingMQTTuser);
+  if (trimmedUser != settingMQTTuser) memmove(settingMQTTuser, trimmedUser, strlen(trimmedUser) + 1);
+  char *trimmedPasswd = trimwhitespace(settingMQTTpasswd);
+  if (trimmedPasswd != settingMQTTpasswd) memmove(settingMQTTpasswd, trimmedPasswd, strlen(trimmedPasswd) + 1);
+
+  if (strlen(settingMQTTtopTopic) == 0 || strcmp_P(settingMQTTtopTopic, PSTR("null")) == 0) {
+    strlcpy(settingMQTTtopTopic, _HOSTNAME, sizeof(settingMQTTtopTopic));
+    for (int i = 0; settingMQTTtopTopic[i]; i++) settingMQTTtopTopic[i] = tolower(settingMQTTtopTopic[i]);
+  }
+  if (strlen(settingMQTThaprefix) == 0 || strcmp_P(settingMQTThaprefix, PSTR("null")) == 0)
+    strlcpy(settingMQTThaprefix, HOME_ASSISTANT_DISCOVERY_PREFIX, sizeof(settingMQTThaprefix));
+  if (strlen(settingMQTTuniqueid) == 0 || strcmp_P(settingMQTTuniqueid, PSTR("null")) == 0)
+    strlcpy(settingMQTTuniqueid, getUniqueId(), sizeof(settingMQTTuniqueid));
+  if (strlen(settingNTPtimezone) == 0 || strcmp_P(settingNTPtimezone, PSTR("null")) == 0)
+    strlcpy(settingNTPtimezone, "Europe/Amsterdam", sizeof(settingNTPtimezone));
+  if (strlen(settingNTPhostname) == 0 || strcmp_P(settingNTPhostname, PSTR("null")) == 0)
+    strlcpy(settingNTPhostname, NTP_HOST_DEFAULT, sizeof(settingNTPhostname));
+  if (strcmp_P(settingOTGWcommands, PSTR("null")) == 0) settingOTGWcommands[0] = 0;
+
+  CHANGE_INTERVAL_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS);
+  CHANGE_INTERVAL_SEC(timers0counter, settingS0COUNTERinterval, CATCH_UP_MISSED_TICKS);
 
   DebugTln(F(" .. done\r\n"));
 
@@ -343,8 +363,14 @@ void readSettings(bool show)
     Debugf(PSTR("GPIO Outputs          : %s\r\n"), CBOOLEAN(settingGPIOOUTPUTSenabled));
     Debugf(PSTR("GPIO Out. Pin         : %d\r\n"), settingGPIOOUTPUTSpin);
     Debugf(PSTR("GPIO Out. Trg. Bit    : %d\r\n"), settingGPIOOUTPUTStriggerBit);
-    }
-  
+    Debugf(PSTR("Webhook enabled       : %s\r\n"), CBOOLEAN(settingWebhookEnabled));
+    Debugf(PSTR("Webhook URL ON        : %s\r\n"), CSTR(settingWebhookURLon));
+    Debugf(PSTR("Webhook URL OFF       : %s\r\n"), CSTR(settingWebhookURLoff));
+    Debugf(PSTR("Webhook Trigger Bit   : %d\r\n"), settingWebhookTriggerBit);
+    Debugf(PSTR("Webhook Payload       : %s\r\n"), CSTR(settingWebhookPayload));
+    Debugf(PSTR("Webhook ContentType   : %s\r\n"), CSTR(settingWebhookContentType));
+  }
+
   Debugln(F("-\r\n"));
 
 } // readSettings()
@@ -361,7 +387,7 @@ void updateSetting(const char *field, const char *newValue)
     if (strlen(settingHostname)==0) snprintf_P(settingHostname, sizeof(settingHostname), PSTR("OTGW-%06x"), (unsigned int)ESP.getChipId());
     
     //strip away anything beyond the dot
-    char *dot = strchr(settingMQTTtopTopic, '.');
+    char *dot = strchr(settingHostname, '.');
     if (dot) *dot = '\0';
     
     // Defer MDNS/LLMNR and MQTT restart to flushSettings()
@@ -507,6 +533,20 @@ void updateSetting(const char *field, const char *newValue)
     Debugln();
     DebugTf(PSTR("Need reboot before GPIO OUTPUTS will use new trigger bit %d!\r\n\n"), settingGPIOOUTPUTStriggerBit);
   }
+  if (strcasecmp_P(field, PSTR("webhookenable")) == 0 ||
+      strcasecmp_P(field, PSTR("WebhookEnabled")) == 0) {
+    settingWebhookEnabled = EVALBOOLEAN(newValue);
+  }
+  if (strcasecmp_P(field, PSTR("WebhookURLon")) == 0 ||
+      strcasecmp_P(field, PSTR("webhookurlon")) == 0)   strlcpy(settingWebhookURLon, newValue, sizeof(settingWebhookURLon));
+  if (strcasecmp_P(field, PSTR("WebhookURLoff")) == 0 ||
+      strcasecmp_P(field, PSTR("webhookurloff")) == 0)  strlcpy(settingWebhookURLoff, newValue, sizeof(settingWebhookURLoff));
+  if (strcasecmp_P(field, PSTR("WebhookTriggerBit")) == 0 ||
+      strcasecmp_P(field, PSTR("webhooktriggerbit")) == 0) settingWebhookTriggerBit = constrain(atoi(newValue), 0, 15);
+  if (strcasecmp_P(field, PSTR("WebhookPayload")) == 0 ||
+      strcasecmp_P(field, PSTR("webhookpayload")) == 0)    strlcpy(settingWebhookPayload, newValue, sizeof(settingWebhookPayload));
+  if (strcasecmp_P(field, PSTR("WebhookContentType")) == 0 ||
+      strcasecmp_P(field, PSTR("webhookcontenttype")) == 0) strlcpy(settingWebhookContentType, newValue, sizeof(settingWebhookContentType));
 
   // Mark settings dirty and restart debounce timer — actual write + service
   // restarts are deferred to flushSettings() which runs from loop() timer.

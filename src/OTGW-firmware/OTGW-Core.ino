@@ -764,7 +764,6 @@ void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool 
   mqttPublishAllowed = saved;
 }
 
-
 void print_f88(float& value)
 {
   //function to print data

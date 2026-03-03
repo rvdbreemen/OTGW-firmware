@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.1.0-beta
+**  Version  : v1.3.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -48,7 +48,7 @@ void setLed(int8_t, uint8_t);
 
 //Defaults and macro definitions
 #define _HOSTNAME       "OTGW"
-#define SETTINGS_FILE   "/settings.ini"
+#define SETTINGS_FILE         "/settings.ini"
 #define NTP_DEFAULT_TIMEZONE "Europe/Amsterdam"
 #define NTP_HOST_DEFAULT "pool.ntp.org"
 #define NTP_RESYNC_TIME 1800 //seconds = every 30 minutes
@@ -97,6 +97,17 @@ void sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const 
 void publishToSourceTopic(const char*, const char*, byte);
 void addOTWGcmdtoqueue(const char* ,  int , const bool = false, const int16_t = 1000);
 void sendLogToWebSocket(const char* logMessage);
+
+// Forward declarations for functions defined in later .ino files
+// (Arduino auto-prototype generation can fail for these)
+void readSettings(bool show);
+void writeSettings(bool show);
+void updateSetting(const char *field, const char *newValue);
+void GetVersion(const char* hexfile, char* version, size_t destSize);
+void startWebSocket();
+void handleWebSocket();
+void testWebhook(bool testOn);
+void evalWebhook();
 
 //Global variables
 WiFiClient  wifiClient;
@@ -193,6 +204,7 @@ int8_t    settingGPIOSENSORSpin = 10;            // GPIO 13 = D7, GPIO 10 = SDIO
 int16_t   settingGPIOSENSORSinterval = 20;       // Interval time to read out temp and send to MQ
 byte      OTGWdallasdataid = 246;                // foney dataid to be used to do autoconfigure for temp sensors
 int       DallasrealDeviceCount = 0;             // Total temperature devices found on the bus
+bool      bSensorsDetected = false;              // Runtime: true when sensors (real/simulated) successfully initialized this boot
 #define   MAXDALLASDEVICES 16                    // maximum number of devices on the bus
 
 // Define structure to store temperature device addresses found on bus with their latest tempC value
@@ -239,6 +251,18 @@ bool      settingMyDEBUG = false;
 bool      settingGPIOOUTPUTSenabled = false;
 int8_t    settingGPIOOUTPUTSpin = 16;
 int8_t    settingGPIOOUTPUTStriggerBit = 0;
+
+//Webhook Settings
+bool      settingWebhookEnabled = false;
+char      settingWebhookURLon[101]  = "http://homeassistant.local:8123/api/webhook/otgw_boiler";
+char      settingWebhookURLoff[101] = "http://homeassistant.local:8123/api/webhook/otgw_boiler";
+int8_t    settingWebhookTriggerBit = 1;     // Default: bit 1 = CH mode (slave: CH active)
+char      settingWebhookPayload[201] = "";  // Body template for HTTP POST; empty = HTTP GET
+                                            // Supported variables: {state} {tboiler} {tr}
+                                            // {tset} {tdhw} {relmod} {chpressure}
+                                            // {flameon} {chmode} {dhwmode}
+char      settingWebhookContentType[32] = "application/json"; // Content-Type for POST requests
+                                            // Common values: application/json, text/plain
 
 //Now load Debug & network library
 #include "Debug.h"
