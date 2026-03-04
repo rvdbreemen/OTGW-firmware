@@ -249,18 +249,13 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           if (_serial_output) Debugf(PSTR("[OTA] End: success (%u bytes)\r\n"), upload.totalSize);
           
           if (_status.target == "filesystem") {
+            // Mount filesystem, restore settings, then reboot (HTTP_POST handler below)
             LittleFSmounted = LittleFS.begin();
             if (LittleFSmounted) {
               updateLittleFSStatus(F("/.ota_post"));
-              // Restore settings from ESP memory to new filesystem
-              // During filesystem-only OTA, only the LittleFS partition is erased/written.
-              // The ESP8266 continues running the current firmware and RAM remains intact.
-              // All settings loaded at boot (global variables like settingHostname, etc.)
-              // are still valid in RAM, so we write them back to the fresh filesystem.
               if (_serial_output) Debugln(F("[OTA] Restoring settings to filesystem"));
-              writeSettings(true);
+              writeSettings(false);  // show=false: TelnetStream not connected during OTA
             } else {
-              // Ensure state is explicitly false and log failure for diagnostics
               LittleFSmounted = false;
               if (_serial_output) Debugln(F("[OTA] Error: LittleFS mount failed"));
             }
@@ -358,9 +353,8 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_setStatus(uint8_t phase, cons
   // Broadcast via WebSocket
   // Use a static buffer to avoid stack overflow, but protect with interrupt disable? 
   // No, we are in non-interrupt context usually. But strictly speaking static is not thread safe.
-  // Stack is better if size is reasonable. 320 bytes provides safety margin for edge cases.
   // Max size: state(5) + flash_written(10) + flash_total(10) + filename(64) + error(96) + overhead(69) = 254 bytes
-  char buf[320];
+  char buf[256];
   char filenameEsc[64];
   char errorEsc[96];
   _jsonEscape(_status.filename, filenameEsc, sizeof(filenameEsc));
@@ -424,7 +418,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_jsonEscape(const String &in, 
 template <typename ServerType>
 void ESP8266HTTPUpdateServerTemplate<ServerType>::_sendStatusJson()
 {
-  constexpr size_t JSON_STATUS_BUFFER_SIZE = 320;
+  constexpr size_t JSON_STATUS_BUFFER_SIZE = 256;
   char buf[JSON_STATUS_BUFFER_SIZE];
   char filenameEsc[64];
   char errorEsc[96];

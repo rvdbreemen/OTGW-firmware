@@ -15,6 +15,7 @@
         document.write('<link rel="stylesheet" type="text/css" href="' + css + '" id="theme-style">');
       })();
     </script>
+    <link rel="stylesheet" type="text/css" href="./index_common.css">
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <script src="./index.js"></script>
     <script src="./graph.js"></script>
@@ -29,7 +30,7 @@
         <div class="headercolumn" id='theTime'>[00:00:00]</div>
     </div>
     </font>
-    <div id="displayMainPage" class="page-section active">
+    <template id="pageNavTemplate">
       <div class="nav-container">
         <div class='nav-left'>
           <button type="button" class='home nav-item tabButton'>Home</button>
@@ -39,11 +40,18 @@
           <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
           <div class="adv_dropdown hidden">
             <span class="list_item tabPICflash">PIC firmware</span>
+            <span class="list_item tabWebhook">Webhook</span>
             <span class="list_item tabDeviceInfo">Debug Information</span>
             <span class="list_item FSexplorer">File system contents</span>
           </div>
         </div>
       </div>
+    </template>
+    <!-- Persistent firmware/filesystem mismatch warning — shown by checkFSMismatch() in index.js -->
+    <div id="fs-mismatch-banner" class="fs-mismatch-banner hidden"></div>
+
+    <div id="displayMainPage" class="page-section active">
+      <div class="page-nav-shell"></div>
       <div id="mainPage">
         <div id="waiting">Wait for it...</div>
       </div>
@@ -60,6 +68,7 @@
             <span id="gatewayModeText" title="Gateway mode values: ON (gateway) or OFF (monitor)">Gateway Mode: Detecting...</span>
           </div>
         </div>
+        <div id="otLogModeNotice" class="ot-log-mode-notice hidden" role="status" aria-live="polite"></div>
         
         <div class="ot-log-tabs">
           <button type="button" class="tab-link active" onclick="openLogTab(event, 'Log')">Log</button>
@@ -75,7 +84,7 @@
               </label>
               <button type="button" id="btnClearLog" class="btn-log-control" title="Clear log buffer" aria-label="Clear the OpenTherm log buffer">Clear</button>
               <button type="button" id="btnDownloadLog" class="btn-log-control" title="Download log to file" aria-label="Download the OpenTherm log to a file">Download</button>
-              <label class="log-control-label" style="display:inline-flex;" title="Automatically save log every 15 minutes">
+              <label class="log-control-label log-control-inline" title="Automatically save log every 15 minutes">
                   <input type="checkbox" id="chkAutoDownloadLog" aria-label="Auto download log every 15 minutes" />
                   Auto
               </label>
@@ -94,6 +103,12 @@
               </label>
             </div>
             
+            <div class="ot-cmd-bar">
+              <input type="text" id="otCmdInput" class="ot-cmd-input" placeholder="Command (e.g. PS=1, TT=20.5)" aria-label="OTGW command" autocomplete="off" autocorrect="off" spellcheck="false" maxlength="14" />
+              <button type="button" id="btnSendCmd" class="btn-log-control" title="Send command to OTGW PIC" aria-label="Send OTGW command">Send</button>
+              <span id="otCmdStatus" class="ot-cmd-status"></span>
+            </div>
+            
             <div id="otLogContainer" class="ot-log-container">
               <div id="otLogContent" class="ot-log-content" role="log" aria-live="polite"></div>
             </div>
@@ -102,7 +117,7 @@
               <span>Lines: <span id="logLineCount">0</span><span id="logLimitDisplay"> / 2000</span></span>
               <span>Filtered: <span id="logFilteredCount">0</span></span>
               <span>Buffer: <span id="memUsage">0</span></span>
-              <span id="logFileDisplay" style="display:none">Log: <span id="currentLogFile">None</span></span>
+              <span id="logFileDisplay" class="hidden">Log: <span id="currentLogFile">None</span></span>
             </div>
         </div>
 
@@ -176,6 +191,7 @@
           <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
           <div class="adv_dropdown hidden">
             <span class="list_item tabPICflash">PIC firmware</span>
+            <span class="list_item tabWebhook">Webhook</span>
             <span class="list_item tabDeviceInfo">Debug Information</span>
             <span class="list_item FSexplorer">File system contents</span>
           </div>
@@ -193,6 +209,7 @@
           <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
           <div class="adv_dropdown hidden">
             <span class="list_item tabPICflash">PIC firmware</span>
+            <span class="list_item tabWebhook">Webhook</span>
             <span class="list_item tabDeviceInfo">Debug Information</span>
             <span class="list_item FSexplorer">File system contents</span>
           </div>
@@ -210,6 +227,7 @@
           <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
           <div class="adv_dropdown hidden">
             <span class="list_item tabPICflash">PIC firmware</span>
+            <span class="list_item tabWebhook">Webhook</span>
             <span class="list_item tabDeviceInfo">Debug Information</span>
             <span class="list_item FSexplorer">File system contents</span>
           </div>
@@ -217,6 +235,25 @@
       </div>
       <div id="settingsPage"></div>
       <div id="settingMessage">Loading...</div>
+    </div>
+    <div id="displayWebhookPage" class="page-section">
+      <div class="nav-container">
+        <div class='nav-left'>
+          <button type="button" class='home nav-item tabButton'>Home</button>
+        </div>
+        <div class='nav-right'>
+          <button type="button" class='basicSettings nav-item tabButton'>Settings</button>
+          <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
+          <div class="adv_dropdown hidden">
+            <span class="list_item tabPICflash">PIC firmware</span>
+            <span class="list_item tabWebhook">Webhook</span>
+            <span class="list_item tabDeviceInfo">Debug Information</span>
+            <span class="list_item FSexplorer">File system contents</span>
+          </div>
+        </div>
+      </div>
+      <div id="webhookPage"></div>
+      <div id="webhookMessage"></div>
     </div>
     <div class="footer">
       <div class="nav-left">
@@ -226,7 +263,7 @@
     <!-- KEEP THIS --->
 
     <!-- Pin to bottom right corner -->
-    <div class="bottom right-0">2021-2026 &copy; Robert van den Breemen</div>
+    <div class="bottom right-0"><span id="heap-info"></span>2021-2026 &copy; Robert van den Breemen</div>
 
     <!-- Pin to bottom left corner -->
     <div id="message" class="bottom left-0"></div>
