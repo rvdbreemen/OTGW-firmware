@@ -166,7 +166,7 @@ static void expandPayload(const char* tmpl, char* out, size_t outLen, bool state
 // See expandPayload() for the full list of supported variables.
 //=======================================================================
 // Attempt to send the webhook. Returns true on HTTP 2xx, false on any error.
-// Timeout reduced from 3000ms to 1000ms (ADR-047: minimize main loop blocking).
+// Timeout reduced from 3000ms to 1000ms (ADR-048: webhook state machine / minimize main loop blocking).
 static bool attemptSendWebhook(bool stateOn) {
   const char* url = stateOn ? settings.webhook.sURLon : settings.webhook.sURLoff;
   if (strlen(url) == 0) {
