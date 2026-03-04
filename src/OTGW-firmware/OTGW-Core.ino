@@ -3159,12 +3159,82 @@ void fwupgradestart(const char *hexfile) {
   DebugTln(F("--- fwupgradestart() complete ---"));
 }
 
+// Validate that a file stored in LittleFS is a valid Intel HEX file.
+// Checks record structure and checksums; requires an EOF record.
+// Returns true only if the file passes all checks.
+// Security note: This guards against corrupted or non-HEX downloads over the
+// unauthenticated HTTP channel; it does NOT authenticate the origin.
+bool validateIntelHex(const char *filepath) {
+  File f = LittleFS.open(filepath, "r");
+  if (!f) return false;
+
+  char line[128];  // 128 bytes handles records up to 59 data bytes, sufficient for PIC hex files
+  bool hasEof = false;
+  bool valid = true;
+
+  // Helper: parse two hex chars at position pos in line[], returns -1 on invalid input or out of bounds
+  auto hexByte = [&](int pos) -> int {
+    if (pos + 1 >= (int)sizeof(line)) return -1; // bounds guard
+    char h[3] = {line[pos], line[pos + 1], '\0'};
+    char *end;
+    long v = strtol(h, &end, 16);
+    if (end != h + 2) return -1;
+    return (int)v;
+  };
+
+  while (f.available() && valid) {
+    int len = f.readBytesUntil('\n', line, sizeof(line) - 1);
+    if (len <= 0) break;
+    // Strip trailing CR/LF
+    while (len > 0 && (line[len - 1] == '\r' || line[len - 1] == '\n')) len--;
+    line[len] = '\0';
+    if (len == 0) continue; // Skip blank lines
+
+    // Each record must start with ':'
+    if (line[0] != ':') { valid = false; break; }
+
+    // Minimum record: ':LLAAAATTCC' = 11 chars (0 data bytes)
+    if (len < 11) { valid = false; break; }
+
+    int byteCount = hexByte(1);
+    if (byteCount < 0) { valid = false; break; }
+
+    // Expected record length: ':' + (LL + AAAA + TT + data + CC) * 2 hex chars
+    // = 1 + (byteCount + 5) * 2  (5 = LL(1) + AAAA(2) + TT(1) + CC(1))
+    int expectedLen = 1 + (byteCount + 5) * 2;
+    if (len < expectedLen) { valid = false; break; }
+
+    // Verify checksum: sum of all bytes (LL + addr_hi + addr_lo + type + data + CC) must equal 0 mod 256
+    byte sum = 0;
+    for (int i = 1; i < expectedLen; i += 2) {
+      int b = hexByte(i);
+      if (b < 0) { valid = false; break; }
+      sum += (byte)b;
+    }
+    if (!valid) break;
+    if (sum != 0) { valid = false; break; }
+
+    // Check record type (positions 7-8)
+    int recType = hexByte(7);
+    if (recType < 0) { valid = false; break; }
+    if (recType == 1) { // EOF record
+      hasEof = true;
+      break;
+    }
+  }
+
+  f.close();
+  return valid && hasEof;
+}
+
 String checkforupdatepic(String filename){
   WiFiClient client;
   HTTPClient http;
   String latest = "";
   int code;
 
+  // Security note: download is over unencrypted HTTP; ensure device is on a
+  // trusted local network and is not reachable from untrusted networks.
   http.begin(client, "http://otgw.tclcode.com/download/" + String(state.pic.sDeviceid) + "/" + filename);
   char useragent[40] = "esp8266-otgw-firmware/";
   strlcat(useragent, _SEMVER_CORE, sizeof(useragent));
@@ -3195,23 +3265,32 @@ void refreshpic(String filename, String version) {
 
   if (latest != version) {
     OTGWDebugTf(PSTR("Update (%s)%s: %s -> %s\r\n"), state.pic.sDeviceid, filename.c_str(), version.c_str(), latest.c_str());
+    OTGWDebugTln(F("NOTE: PIC firmware is downloaded over plain HTTP (no TLS); ensure device is on a trusted local network."));
     http.begin(client, "http://otgw.tclcode.com/download/" + String(state.pic.sDeviceid) + "/" + filename);
     char useragent[40] = "esp8266-otgw-firmware/";
     strlcat(useragent, _SEMVER_CORE, sizeof(useragent));
     http.setUserAgent(useragent);
     code = http.GET();
     if (code == HTTP_CODE_OK) {
-      File f = LittleFS.open("/" + String(state.pic.sDeviceid) + "/" + filename, "w");
+      String hexpath = "/" + String(state.pic.sDeviceid) + "/" + filename;
+      File f = LittleFS.open(hexpath, "w");
       if (f) {
         http.writeToStream(&f);
         f.close();
-        String verfile = "/" + String(state.pic.sDeviceid) + "/" + filename;
-        verfile.replace(".hex", ".ver");
-        f = LittleFS.open(verfile, "w");
-        if (f) {
-          f.print(latest + "\n");
-          f.close();
-          OTGWDebugTln(F("Update successful"));
+        // Validate the downloaded file is a well-formed Intel HEX before accepting it.
+        // This rejects truncated or non-HEX responses that could corrupt the PIC.
+        if (!validateIntelHex(hexpath.c_str())) {
+          OTGWDebugTln(F("ERROR: Downloaded file failed Intel HEX validation - discarding"));
+          LittleFS.remove(hexpath);
+        } else {
+          String verfile = hexpath;
+          verfile.replace(".hex", ".ver");
+          f = LittleFS.open(verfile, "w");
+          if (f) {
+            f.print(latest + "\n");
+            f.close();
+            OTGWDebugTln(F("Update successful"));
+          }
         }
       }
     }
