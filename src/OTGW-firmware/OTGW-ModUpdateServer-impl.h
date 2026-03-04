@@ -31,7 +31,7 @@
 #include "OTGW-ModUpdateServer.h"
 
 // External declarations
-extern bool state.flash.bESPactive;          // ESP flashing state flag
+extern OTGWState state;             // Global state object (provides flash.bESPactive flag)
 extern bool LittleFSmounted;        // LittleFS mount status flag
 extern void sendWebSocketJSON(const char *json);
 extern FSInfo LittleFSinfo;         // LittleFS filesystem information
