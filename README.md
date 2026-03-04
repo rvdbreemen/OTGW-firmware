@@ -1,6 +1,10 @@
 # OTGW-firmware (ESP8266) for NodoShop OpenTherm Gateway
 
-> **v1.2.0** — Comprehensive Home Assistant discovery for all OpenTherm message types, OpenTherm v4.2 protocol alignment, gateway/logging reliability, MQTT/HA improvements (source-separated topics), Web UI/mobile polish, **webhook support** (HTTP call on OpenTherm status bit change), and a streamlined v2-only REST API.
+> **⚠️ DEVELOPMENT BRANCH WARNING**
+> **This is the development branch (`dev`) and contains the latest work-in-progress features.**
+> For the latest stable release, please check the [releases page](https://github.com/rvdbreemen/OTGW-firmware/releases) (latest: **v1.2.0**) or switch to the [`main` branch](https://github.com/rvdbreemen/OTGW-firmware/tree/main).
+>
+> **For production use, we recommend using the stable releases.**
 
 [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
 
@@ -107,7 +111,11 @@ After upgrading:
 
 ---
 
-## What was new in v1.1.0
+## What was new in v1.2.0-beta
+
+Version 1.2.0 builds on the stable v1.0.0 foundation and includes two release increments of improvements. Full release notes: [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md)
+
+### Comprehensive Home Assistant Discovery — All OpenTherm Message Types
 
 Version 1.1.0 built on v1.0.0 with Dallas temperature sensor enhancements, a complete RESTful API v2, PS mode compatibility, WebUI data persistence, and 20 resolved bugs.
 
@@ -115,14 +123,30 @@ Version 1.1.0 built on v1.0.0 with Dallas temperature sensor enhancements, a com
 
 ### Highlights
 
-- **Dallas Sensor Labels & Graphs**: Custom labels for DS18x20 sensors (inline Web UI editing, stored in `/dallas_labels.ini` with zero backend RAM usage), auto-discovery, MQTT/HA publishing, and real-time graph with 16-color palette.
-- **RESTful API v2**: 13 new `/api/v2/` endpoints with consistent JSON errors, CORS support, and OpenAPI 3.0 spec. API compliance raised from 5.4 to 8.5/10. Frontend fully migrated.
-- **WebUI Data Persistence & Diagnostics**: Log data persisted to `localStorage`, restored on page load, cleared after firmware flash. Browser debug console (`otgwDebug`) for in-browser diagnostics. Non-blocking modal dialogs.
-- **PS Mode Detection**: Automatic `PS=1` detection — suspends OT log and WebSocket streaming, suppresses time-sync commands; improves Domoticz compatibility.
-- **20 Bug Fixes**: Out-of-bounds write (ID 255), wrong MQTT hour bitmask (hours 16–23), ISR race conditions (S0 counter), reflected XSS, GPIO outputs non-functional in production builds, 750 ms blocking sensor read, disconnected sensor publishing -127°C, file descriptor leak, null pointer crash on malformed MQTT topics, flash wear reduced (20 writes → 1), and more.
-- **MQTT Whitespace Auth Fix**: Credentials trimmed automatically on boot — fixes auth failures when upgrading from v0.10.x.
-- **Streaming File Serving**: Chunked file serving replaces full-file-to-RAM (95% memory reduction) — resolves the slow Web UI reported on v1.0.0.
-- **Heap Memory Monitoring**: 4-level health system (CRITICAL/WARNING/LOW/HEALTHY) with adaptive throttling and WebSocket backpressure control.
+MQTT topic renames (OpenTherm v4.2 alignment), REST API v0/v1 removal, and device-info key changes. Full details: [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md)
+
+---
+
+## What was new in v1.1.0
+
+Version 1.1.0-beta builds on the stable v1.0.0 foundation with Dallas temperature sensor enhancements, a complete RESTful API v2, WebUI data persistence, and 20 bug fixes from a comprehensive codebase review. Full release notes: [RELEASE_NOTES_1.1.0.md](RELEASE_NOTES_1.1.0.md)
+
+### Dallas Sensors, RESTful API v2, and 20-Bug Codebase Overhaul
+
+**v1.1.0-beta delivers custom labels and real-time graphs for Dallas temperature sensors, a fully RESTful API v2 with 13 new endpoints (compliance score 5.4 → 8.5/10), and resolution of 20 bugs spanning memory safety, data integrity, concurrency, and security.**
+
+- **Dallas Sensor Custom Labels & Graphs** — Inline label editing in the Web UI, stored in `/dallas_labels.ini` with zero backend RAM, automatic backup/restore during filesystem flash, and real-time graph visualization with 16-color palette. REST API: `GET/POST /api/v2/sensors/labels`.
+- **RESTful API v2** — 13 new endpoints with consistent JSON errors, proper HTTP status codes (202 for async), CORS/OPTIONS support, RESTful resource naming (`messages/{id}`, `commands`, `device/info`). All frontend calls migrated to v2. See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md).
+- **20-bug codebase review** — Memory safety (OOB write, stack overflow), data integrity (MQTT hour bitmask, −127°C sensor published to MQTT), concurrency (ISR race in S0 counter), security (reflected XSS), reliability (file descriptor leak, null pointer crash, 750ms blocking sensor read), GPIO output feature fix, flash wear reduction (20 writes → 1). Full details: [Codebase Review](docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md).
+- **WebUI Data Persistence** — Automatic `localStorage` persistence with debounced saves, dynamic memory management, normal/capture modes, and auto-restoration on page load.
+- **Heap Memory Monitoring** — 4-level health system (CRITICAL/WARNING/LOW/HEALTHY) with adaptive throttling and WebSocket backpressure control ([ADR-030](docs/adr/ADR-030-heap-memory-monitoring.md)).
+- **Browser Debug Console (`otgwDebug`)** — Full diagnostic toolkit in the browser console: `status()`, `info()`, `settings()`, `wsStatus()`, `logs()`, `api()`, `health()`, `sendCmd()`, `exportLogs()`, and more.
+- **PS Mode detection** — Automatic detection of `PS=1`; hides the OT log section, disables WebSocket streaming, suppresses time-sync commands.
+- **MQTT auth fix** — Whitespace automatically trimmed from MQTT credentials, fixing auth failures when upgrading from v0.10.x.
+
+### Notes for upgraders from v1.0.x
+
+No breaking API or MQTT changes. A filesystem flash and hard browser refresh (Ctrl+F5) are recommended. The v0 and unversioned REST API endpoints deprecated in this release were removed in v1.2.0-beta (return 410 Gone).
 
 ## 🏁 Introduced in v1.0.0
 

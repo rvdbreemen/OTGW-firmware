@@ -267,8 +267,7 @@ Full details: [docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md](docs/
 - Full OpenAPI 3.0 specification updated for all v2 endpoints: [docs/api/openapi.yaml](docs/api/openapi.yaml)
 - Updated API reference documentation: [docs/api/README.md](docs/api/README.md)
 - New feature docs: Dallas sensors, data persistence, gateway mode
-- New guides: browser debug console, release workflow
-- OpenTherm v4.2 specification converted to searchable Markdown: [docs/opentherm/](docs/opentherm/)
+- OpenTherm v4.2 specification converted to searchable Markdown: [docs/opentherm specification/](docs/opentherm%20specification/))
 
 ---
 

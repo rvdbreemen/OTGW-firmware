@@ -12,8 +12,8 @@ Architecture Decision Records capture important architectural decisions along wi
 - [Platform & Build](#platform-and-build-system) (4 ADRs)
 - [Memory Management](#memory-management) (4 ADRs)
 - [Network & Security](#network-and-security) (3 ADRs)
-- [Integration](#integration-and-communication) (5 ADRs) 🆕
-- [Core Systems](#system-architecture) (4 ADRs) 🆕
+- [Integration](#integration-and-communication) (6 ADRs) 🆕
+- [Core Systems](#system-architecture) (5 ADRs) 🆕
 - [Features & Extensions](#features-and-extensions) (8 ADRs) 🆕
 - [Browser & Client](#browser-and-client-compatibility) (4 ADRs)
 - [OTA & Updates](#ota-and-firmware-updates) (2 ADRs)
@@ -71,6 +71,9 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-040: MQTT Source-Specific Topics for OpenTherm Values](ADR-040-mqtt-source-specific-topics.md)** 🆕
   Additive source-specific MQTT and HA discovery topics using nested `<metric>/<source>` paths with opt-in enablement (`MQTTseparatesources`) and backward-compatible base topics.
 
+- **[ADR-044: Webhook Outbound HTTP Integration](ADR-044-webhook-outbound-http-integration.md)** 🆕
+  Configurable outbound HTTP GET/POST triggered on OpenTherm StatusFlags bit edges; local-network-only URL enforcement, payload template expansion, and REST test endpoint.
+
 ### System Architecture
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  
   Non-blocking timer-based task scheduling with 49-day rollover protection for cooperative multitasking.
@@ -83,6 +86,9 @@ Architecture Decision Records capture important architectural decisions along wi
 
 - **[ADR-038: OpenTherm Message Data Flow Pipeline](ADR-038-opentherm-data-flow-pipeline.md)** 🆕  
   Synchronous fan-out architecture for OpenTherm messages (PIC Serial → processOT → MQTT + WebSocket + REST + Telnet) with per-consumer availability checks and bidirectional command flow.
+
+- **[ADR-045: PS=1 Print Summary Parsing](ADR-045-ps1-print-summary-parsing.md)** 🆕
+  Full parsing of OTGW PIC Print Summary (PS=1) comma-separated output; maps 25/34 fields to MsgIDs and publishes via the same MQTT/HA discovery pipeline as normal OT frames.
 
 ### Hardware and Reliability
 - **[ADR-011: External Hardware Watchdog for Reliability](ADR-011-external-hardware-watchdog.md)**  
@@ -269,6 +275,8 @@ ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
 6. 2024: ADR-019 (API v2)
 7. 2026: ADR-025 (Safari WebSocket fix), ADR-026 (Cache-busting), ADR-027 (Version warnings)
 8. 2026: ADR-036 (Boot sequence), ADR-037 (Gateway mode), ADR-038 (Data flow), ADR-039 (OTGraph)
+9. 2026: ADR-040 (MQTT source topics), ADR-041 (JIT HA discovery), ADR-042 (No ArduinoJson), ADR-043 (Triple-reset WiFi)
+10. 2026: ADR-044 (Webhook HTTP integration), ADR-045 (PS=1 summary parsing)
 
 ## When to Create an ADR
 
