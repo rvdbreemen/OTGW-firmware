@@ -64,7 +64,7 @@ The function was called from `doTaskMinuteChanged()` (a timer callback), making 
 **Key properties:**
 - Zero blocking: each call to `loopWifi()` returns immediately
 - Uses `DECLARE_TIMER_SEC` from safeTimers.h for timeout tracking
-- Up to 3 reconnection attempts before giving up (prevents infinite retry storm)
+- Up to 15 reconnection attempts before giving up and triggering a device reboot (prevents infinite retry storm)
 - Called from `doBackgroundTasks()` before the WiFi-dependent service checks
 - `yield()` and `feedWatchDog()` called at appropriate points
 
