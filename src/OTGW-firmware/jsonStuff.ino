@@ -10,33 +10,35 @@
 ***************************************************************************      
 */
 
-// Buffer-writing variant: escapes str into out[0..outSize-1], no heap allocation.
-// Truncates silently if out is too small. Safe to call with cMsg as out.
-static void escapeJsonStringTo(const char* str, char* out, size_t outSize) {
-  if (!str || !out || outSize == 0) { if (out && outSize) out[0] = '\0'; return; }
-  size_t n = 0;
+// Helper function to escape JSON string values
+// Replaces: " with \", \ with \\, control chars with \uXXXX
+String escapeJsonString(const char* str) {
+  if (!str) return String("");
+  
+  String result;
+  result.reserve(strlen(str) + 10); // Reserve some extra space for escapes
+  
   for (const char* p = str; *p; p++) {
     switch (*p) {
-      case '"':  if (n + 2 < outSize) { out[n++] = '\\'; out[n++] = '"';  } break;
-      case '\\': if (n + 2 < outSize) { out[n++] = '\\'; out[n++] = '\\'; } break;
-      case '\b': if (n + 2 < outSize) { out[n++] = '\\'; out[n++] = 'b';  } break;
-      case '\f': if (n + 2 < outSize) { out[n++] = '\\'; out[n++] = 'f';  } break;
-      case '\n': if (n + 2 < outSize) { out[n++] = '\\'; out[n++] = 'n';  } break;
-      case '\r': if (n + 2 < outSize) { out[n++] = '\\'; out[n++] = 'r';  } break;
-      case '\t': if (n + 2 < outSize) { out[n++] = '\\'; out[n++] = 't';  } break;
+      case '"':  result += "\\\""; break;
+      case '\\': result += "\\\\"; break;
+      case '\b': result += "\\b";  break;
+      case '\f': result += "\\f";  break;
+      case '\n': result += "\\n";  break;
+      case '\r': result += "\\r";  break;
+      case '\t': result += "\\t";  break;
       default:
-        if ((unsigned char)*p < 0x20) {
-          if (n + 6 < outSize) {
-            out[n++] = '\\'; out[n++] = 'u'; out[n++] = '0'; out[n++] = '0';
-            out[n++] = "0123456789abcdef"[((unsigned char)*p >> 4) & 0xF];
-            out[n++] = "0123456789abcdef"[ (unsigned char)*p       & 0xF];
-          }
+        if (*p < 0x20) {
+          // Control character - use \uXXXX notation
+          char buf[7];
+          snprintf(buf, sizeof(buf), "\\u%04X", (unsigned char)*p);
+          result += buf;
         } else {
-          if (n + 1 < outSize) out[n++] = *p;
+          result += *p;
         }
     }
   }
-  out[n] = '\0';
+  return result;
 }
 
 // Helper function to unescape a single JSON escape character (the char after '\').
@@ -50,68 +52,6 @@ static inline char unescapeJsonChar(char esc) {
     case 't':  return '\t';
     default:   return esc;
   }
-}
-
-// Shared helper to extract a simple JSON field value (string/number/bool/null) into a bounded buffer.
-// Returns true when key is found and value is copied into out; false otherwise.
-// Intended for simple key/value extraction in flat JSON objects.
-bool extractJsonFieldText(const char* json, const char* key, char* out, size_t outSize)
-{
-  if (!json || !key || !out || outSize == 0) return false;
-  out[0] = '\0';
-
-  // Uses global cMsg as scratch buffer to avoid per-helper stack duplication.
-  // Call from single-threaded normal firmware context (not ISR), and only when
-  // other code paths are not concurrently using cMsg as temporary storage.
-  for (const char* k = key; *k; k++) {
-    if (*k == '"' || *k == '\\' || static_cast<unsigned char>(*k) < 0x20) return false;
-  }
-  int keyLen = snprintf_P(cMsg, sizeof(cMsg), PSTR("\"%s\""), key);
-  if (keyLen < 0 || static_cast<size_t>(keyLen) >= sizeof(cMsg)) return false;
-  const char* keyPos = strstr(json, cMsg);
-  if (!keyPos) return false;
-
-  const char* p = keyPos + keyLen;
-  while (*p && isspace(static_cast<unsigned char>(*p))) p++;
-  if (*p != ':') return false;
-  p++;
-  while (*p && isspace(static_cast<unsigned char>(*p))) p++;
-
-  if (*p == '"') {
-    p++;
-    size_t n = 0;
-    while (*p && *p != '"' && n < (outSize - 1)) {
-      if (*p == '\\') {
-        if (*(p + 1) == '\0') return false;
-        p++;
-        switch (*p) {
-          case '"': out[n++] = '"'; break;
-          case '\\': out[n++] = '\\'; break;
-          case '/': out[n++] = '/'; break;
-          case 'b': out[n++] = '\b'; break;
-          case 'f': out[n++] = '\f'; break;
-          case 'n': out[n++] = '\n'; break;
-          case 'r': out[n++] = '\r'; break;
-          case 't': out[n++] = '\t'; break;
-          default: out[n++] = *p; break;
-        }
-        p++;
-      } else {
-        out[n++] = *p++;
-      }
-    }
-    out[n] = '\0';
-    return true;
-  }
-
-  const char* start = p;
-  while (*p && *p != ',' && *p != '}' && *p != ']' && !isspace(static_cast<unsigned char>(*p))) p++;
-  size_t len = static_cast<size_t>(p - start);
-  if (len == 0) return false;
-  if (len >= outSize) len = outSize - 1;
-  memcpy(out, start, len);
-  out[len] = '\0';
-  return true;
 }
 
 static int iIdentlevel = 0;
@@ -890,12 +830,8 @@ void writeJsonStringPair(File& f, const char* key, const char* val, bool addComm
 
   if (addComma) f.print(',');
 
-  // Dallas label keys are hex addresses (≤16 chars); values are user labels (≤24 chars).
-  // Fixed stack buffers avoid heap allocation; worst-case doubled size gives safe margin.
-  char escapedKey[35];
-  char escapedVal[51];
-  escapeJsonStringTo(key, escapedKey, sizeof(escapedKey));
-  escapeJsonStringTo(val, escapedVal, sizeof(escapedVal));
+  String escapedKey = escapeJsonString(key);
+  String escapedVal = escapeJsonString(val);
 
   f.print('"');
   f.print(escapedKey);

@@ -257,7 +257,6 @@
   } 
   .right-0  {right: 0; padding-right: 10px; }
   .left-0   {left:  0; padding-left:  10px; }
-  #heap-info { margin-right: 8px; }
   .ps-mode-watermark {
     color: #9c5700 !important;
     font-weight: 700;
@@ -741,52 +740,11 @@
   gap: 5px;
   font-size: 13px;
   cursor: pointer;
-  -webkit-user-select: none;
   user-select: none;
-}
-
-.log-control-inline {
-  display: inline-flex;
 }
 
 .log-control-label input[type="checkbox"] {
   cursor: pointer;
-}
-
-/* Command Input Bar */
-.ot-cmd-bar {
-  display: flex;
-  gap: 8px;
-  margin-top: 6px;
-  margin-bottom: 8px;
-  align-items: center;
-}
-
-.ot-cmd-input {
-  flex: 0 1 34ch;
-  width: 34ch;
-  max-width: 420px;
-  min-width: 220px;
-  padding: 6px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  color: #000;
-  font-size: 13px;
-  font-family: 'Courier New', Consolas, monospace;
-}
-
-.ot-cmd-status {
-  font-size: 12px;
-  min-width: 100px;
-  color: #333;
-}
-
-.ot-cmd-ok {
-  color: #4caf50;
-}
-
-.ot-cmd-error {
-  color: #f44336;
 }
 
 /* Log Container */
@@ -816,6 +774,8 @@
   white-space: pre;
   line-height: 1.4;
   max-height: inherit;
+  scrollbar-width: thin;
+  scrollbar-color: #555 #1e1e1e;
 }
 
 .ot-log-content::-webkit-scrollbar {
@@ -1064,14 +1024,8 @@ body.disable-interaction {
   display: block;
 }
 
-.otmonrow.no-data-row {
-  display: none;
-}
-
-.ot-log-mode-notice {
-  margin: 8px 0 12px;
-  font-size: 0.95em;
-  font-style: italic;
+.otmonrow.hidden-row {
+  display: none !important;
 }
 
 .flash-progress-bar {

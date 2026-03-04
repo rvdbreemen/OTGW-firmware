@@ -58,61 +58,6 @@ static bool parseMsgId(const char *token, uint8_t &msgId) {
   return true;
 }
 
-static bool parseSettingRequestBody(const char* body, char* field, size_t fieldSize, char* value, size_t valueSize) {
-  if (!body || body[0] == '\0') return false;
-  if (!extractJsonFieldText(body, "name", field, fieldSize)) return false;
-  if (field[0] == '\0') return false;
-  if (!extractJsonFieldText(body, "value", value, valueSize)) return false;
-  if (strcmp_P(value, PSTR("null")) == 0) value[0] = '\0';
-  return true;
-}
-
-static bool isValidDallasLabelJson(const char* body) {
-  if (!body) return false;
-  const char* p = body;
-  while (*p && isspace(static_cast<unsigned char>(*p))) p++;
-  if (*p != '{') return false;
-  p++;
-  while (*p && isspace(static_cast<unsigned char>(*p))) p++;
-  if (*p == '}') return true;
-
-  while (*p) {
-    if (*p != '"') return false;
-    p++;
-    while (*p && *p != '"') {
-      if (*p == '\\' && *(p + 1)) p++;
-      p++;
-    }
-    if (*p != '"') return false;
-    p++;
-    while (*p && isspace(static_cast<unsigned char>(*p))) p++;
-    if (*p != ':') return false;
-    p++;
-    while (*p && isspace(static_cast<unsigned char>(*p))) p++;
-    if (*p != '"') return false;
-    p++;
-    while (*p && *p != '"') {
-      if (*p == '\\' && *(p + 1)) p++;
-      p++;
-    }
-    if (*p != '"') return false;
-    p++;
-    while (*p && isspace(static_cast<unsigned char>(*p))) p++;
-    if (*p == ',') {
-      p++;
-      while (*p && isspace(static_cast<unsigned char>(*p))) p++;
-      continue;
-    }
-    if (*p == '}') {
-      p++;
-      while (*p && isspace(static_cast<unsigned char>(*p))) p++;
-      return (*p == '\0');
-    }
-    return false;
-  }
-  return false;
-}
-
 //=======================================================================
 
 void processAPI() 
@@ -290,11 +235,12 @@ void processAPI()
 
           // Read command from request body (JSON: {"command":"TT=20.5"} or plain text)
           const String& body = httpServer.arg(0);
-          char cmdBuf[64] = "";
-          if (!extractJsonFieldText(body.c_str(), "command", cmdBuf, sizeof(cmdBuf))) {
-            strlcpy(cmdBuf, body.c_str(), sizeof(cmdBuf));
+          char cmdBuf[64] = {0};
+          // Try to extract "command" field from JSON body; fall back to plain text
+          if (body.startsWith("{")) {
+            extractJsonField(body, F("command"), cmdBuf, sizeof(cmdBuf));
           }
-          const char* cmdStr = cmdBuf;
+          const char* cmdStr = (cmdBuf[0] != '\0') ? cmdBuf : body.c_str();
 
           if (!cmdStr || cmdStr[0] == '\0') {
             sendApiError(400, F("Missing command"));
@@ -405,52 +351,60 @@ void processAPI()
 
 
 //====[ implementing REST API ]====
-static void buildOTGWValueResponse(uint_fast8_t msgid, char *out, size_t outSize) {
-  PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
-  if (OTlookupitem.type==ot_undef) {  //message is undefined, return error
-    strlcpy(out, "{\"error\":\"message undefined: reserved for future use\"}", outSize);
+void sendOTGWvalue(int msgid){
+  if (msgid < 0 || msgid > OT_MSGID_MAX) {
+    sendStartJsonMap("");
+    sendJsonMapEntry(F("error"), F("message id: out of range"));
+    sendEndJsonMap("");
     return;
   }
-
+  PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
+  if (OTlookupitem.type == ot_undef) {
+    sendStartJsonMap("");
+    sendJsonMapEntry(F("error"), F("message undefined: reserved for future use"));
+    sendEndJsonMap("");
+    return;
+  }
   RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
+  sendStartJsonMap("");
+  sendJsonMapEntry(F("label"), OTlookupitem.label);
   if (OTlookupitem.type == ot_f88) {
-    snprintf_P(out, outSize, PSTR("{\"label\":\"%s\",\"value\":%.3f,\"unit\":\"%s\"}"),
-               OTlookupitem.label, atof(getOTGWValue(msgid)), OTlookupitem.unit);
-  } else {// all other message types convert to integer
-    snprintf_P(out, outSize, PSTR("{\"label\":\"%s\",\"value\":%d,\"unit\":\"%s\"}"),
-               OTlookupitem.label, atoi(getOTGWValue(msgid)), OTlookupitem.unit);
-  }
-}
-
-void sendOTGWvalue(int msgid){
-  char sBuff[JSON_ENTRY_BUF];
-  if (msgid < 0 || msgid > OT_MSGID_MAX) {
-    strlcpy(sBuff, "{\"error\":\"message id: out of range\"}", sizeof(sBuff));
+    sendJsonMapEntry(F("value"), (float)atof(getOTGWValue(msgid)));
   } else {
-    buildOTGWValueResponse(msgid, sBuff, sizeof(sBuff));
+    sendJsonMapEntry(F("value"), (int32_t)atoi(getOTGWValue(msgid))); // cast selects int32_t overload
   }
-  //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff);
-  //reply with json
-  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
-  httpServer.send(200, F("application/json"), sBuff);
+  sendJsonMapEntry(F("unit"), OTlookupitem.unit);
+  sendEndJsonMap("");
 }
 
 void sendOTGWlabel(const char *msglabel){
-  char sBuff[JSON_ENTRY_BUF];
   uint_fast8_t msgid;
   for (msgid = 0; msgid <= OT_MSGID_MAX; msgid++){
     PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
     if (strcasecmp(OTlookupitem.label, msglabel) == 0) break;
   }
   if (msgid > OT_MSGID_MAX){
-    strlcpy(sBuff, "{\"error\":\"message id: reserved for future use\"}", sizeof(sBuff));
-  } else {
-    buildOTGWValueResponse(msgid, sBuff, sizeof(sBuff));
+    sendStartJsonMap("");
+    sendJsonMapEntry(F("error"), F("message id: reserved for future use"));
+    sendEndJsonMap("");
+    return;
   }
-  //RESTDebugTf(PSTR("Json = %s\r\n"), sBuff);
-  //reply with json
-  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
-  httpServer.send(200, F("application/json"), sBuff);
+  if (OTlookupitem.type == ot_undef) {
+    sendStartJsonMap("");
+    sendJsonMapEntry(F("error"), F("message undefined: reserved for future use"));
+    sendEndJsonMap("");
+    return;
+  }
+  RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
+  sendStartJsonMap("");
+  sendJsonMapEntry(F("label"), OTlookupitem.label);
+  if (OTlookupitem.type == ot_f88) {
+    sendJsonMapEntry(F("value"), (float)atof(getOTGWValue(msgid)));
+  } else {
+    sendJsonMapEntry(F("value"), (int32_t)atoi(getOTGWValue(msgid))); // cast selects int32_t overload
+  }
+  sendJsonMapEntry(F("unit"), OTlookupitem.unit);
+  sendEndJsonMap("");
 }
 
 //=======================================================================
@@ -886,8 +840,6 @@ void sendDeviceTimeV2()
   sendJsonMapEntry(F("epoch"), (int)now);
   sendJsonMapEntry(F("message"), sMessage);
   sendJsonMapEntry(F("psmode"), bPSmode);
-  sendJsonMapEntry(F("freeheap"), ESP.getFreeHeap());
-  sendJsonMapEntry(F("maxfreeblock"), ESP.getMaxFreeBlockSize());
 
   sendEndJsonMap(F("devtime"));
 
@@ -960,30 +912,37 @@ void sendDeviceSettings()
 void postSettings()
 {
   //------------------------------------------------------------
-  // json string: {"name":"settingInterval","value":9}
-  // json string: {"name":"settingHostname","value":"abc"}
-  // json string: {"name":"darktheme","value":true}
+  // Accepts JSON body: {"name":"settingInterval","value":9}
+  //                    {"name":"settingHostname","value":"abc"}
+  //                    {"name":"darktheme","value":true}
+  // Parsed via extractJsonField() from jsonStuff.ino.
   //------------------------------------------------------------
-  char field[64] = "";
-  char newValue[150] = "";
   const String& body = httpServer.arg(0);
-  if (!parseSettingRequestBody(body.c_str(), field, sizeof(field), newValue, sizeof(newValue))) {
-    RESTDebugTln(F("postSettings JSON parse error"));
+  if (body.length() == 0 || !body.startsWith("{")) {
     httpServer.send(400, F("application/json"), F("{\"error\":\"Invalid JSON\"}"));
     return;
   }
 
-  if (newValue[0] != '\0') {
-    RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
-    updateSetting(field, newValue);
-    // Synchronous flush: persist to flash NOW so the 200 OK is truthful.
-    // The deferred timer still handles MQTT/NTP command updates, but HTTP
-    // saves must be durable before we confirm success to the browser.
-    flushSettings();
-    httpServer.send(200, F("application/json"), httpServer.arg(0));
-  } else {
-    httpServer.send(400, F("application/json"), F("{\"error\":\"Missing value\"}"));
+  char field[50];
+  if (!extractJsonField(body, F("name"), field, sizeof(field))) {
+    httpServer.send(400, F("application/json"), F("{\"error\":\"Missing name\"}"));
+    return;
   }
+
+  // 150 bytes covers the largest setting value (settingOTGWcommands, max 128 chars).
+  char newValue[150];
+  if (!extractJsonField(body, F("value"), newValue, sizeof(newValue))) {
+    httpServer.send(400, F("application/json"), F("{\"error\":\"Missing value\"}"));
+    return;
+  }
+
+  RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
+  updateSetting(field, newValue);
+  // Synchronous flush: persist to flash NOW so the 200 OK is truthful.
+  // The deferred timer still handles MQTT/NTP command updates, but HTTP
+  // saves must be durable before we confirm success to the browser.
+  flushSettings();
+  httpServer.send(200, F("application/json"), body);
 
 } // postSettings()
 
@@ -1009,28 +968,21 @@ void getDallasLabels() {
 
 // Update all Dallas sensor labels in file (bulk operation)
 void updateAllDallasLabels() {
-  // Parse JSON body from request
-  const size_t MAX_DALLAS_LABELS_BODY_SIZE = 4096;
   const String& body = httpServer.arg(F("plain"));
 
-  if (body.length() == 0) {
-    httpServer.send(400, F("application/json"), F("{\"success\":false,\"error\":\"Empty request body\"}"));
-    return;
-  }
-  if (body.length() > MAX_DALLAS_LABELS_BODY_SIZE) {
-    httpServer.send(413, F("application/json"), F("{\"success\":false,\"error\":\"Request body too large\"}"));
-    return;
-  }
-
-  if (!isValidDallasLabelJson(body.c_str())) {
-    httpServer.send(400, F("application/json"), F("{\"success\":false,\"error\":\"Invalid JSON format\"}"));
+  // Validate: body must be a non-empty JSON object (starts with '{', ends with '}')
+  size_t bodyLen = body.length();
+  if (bodyLen == 0 || !body.startsWith("{") || body[bodyLen - 1] != '}') {
+    httpServer.send(400, F("application/json"),
+      F("{\"success\":false,\"error\":\"Empty or invalid JSON body\"}"));
     return;
   }
 
-  // Write directly to file
+  // Write directly to file (body is trusted as pre-validated JSON from client)
   File labelsFile = LittleFS.open(F("/dallas_labels.ini"), "w");
   if (!labelsFile) {
-    httpServer.send(500, F("application/json"), F("{\"success\":false,\"error\":\"Failed to open file for writing\"}"));
+    httpServer.send_P(500, PSTR("application/json"),
+      PSTR("{\"success\":false,\"error\":\"Failed to open file for writing\"}"));
     return;
   }
 

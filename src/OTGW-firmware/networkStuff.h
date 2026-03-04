@@ -144,7 +144,7 @@ void resetWiFiSettings(void)
 }
 
 //===========================================================================================
-void startWiFi(const char* hostname, int timeOut, bool forceConfigPortal = false, bool clearSavedCredentials = false) 
+void startWiFi(const char* hostname, int timeOut) 
 {    
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 
@@ -175,12 +175,6 @@ void startWiFi(const char* hostname, int timeOut, bool forceConfigPortal = false
   manageWiFi.setShowInfoErase(false);
   manageWiFi.setMenu(wm_menu);
   manageWiFi.setHostname(hostname);
-
-  if (forceConfigPortal && clearSavedCredentials)
-  {
-    DebugTln(F("Force portal trigger active: clearing stored WiFi credentials"));
-    resetWiFiSettings();
-  }
   
   //--- fetches ssid and pass and tries to connect
   //--- if it does not connect it starts an access point with the specified name
@@ -194,14 +188,8 @@ void startWiFi(const char* hostname, int timeOut, bool forceConfigPortal = false
   DebugTf(PSTR("Wifi status: %s\r\n"), wifiConnected ? "Connected" : "Not connected");
   DebugTf(PSTR("Wifi AP stored: %s\r\n"), wifiSaved ? "Yes" : "No");
   DebugTf(PSTR("Config portal SSID: %s\r\n"), thisAP);
-  DebugTf(PSTR("Force config portal: %s\r\n"), forceConfigPortal ? "Yes" : "No");
 
-  if (forceConfigPortal)
-  {
-    DebugTln(F("Force-starting WiFi config portal."));
-    wifiConnected = false;
-  }
-  else if (wifiConnected)
+  if (wifiConnected)
   {
     DebugTln(F("Wifi already connected, skipping connect."));
   }
