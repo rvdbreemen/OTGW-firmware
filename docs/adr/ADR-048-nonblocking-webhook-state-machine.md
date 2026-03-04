@@ -26,7 +26,7 @@ Problems:
 
 ## Decision
 
-**Refactor webhook into a three-state machine that decouples detection from sending and adds retry with exponential backoff.**
+**Refactor webhook into a three-state machine that decouples detection from sending and adds retry with a fixed 30s backoff interval.**
 
 ### State machine design
 
