@@ -47,11 +47,11 @@ The function was called from `doTaskMinuteChanged()` (a timer callback), making 
     │                                         │
     │  retries < MAX_RETRIES && timeout       │
     │◄──────────────────── FAILED ◄───────────┘
-    │   (restart from                  timeout without
-    │    DISCONNECTED)                  WL_CONNECTED
-    │
-    │  retries >= MAX_RETRIES
-    │◄──── give up, back to IDLE
+         (restart from                  timeout without
+          DISCONNECTED)                  WL_CONNECTED
+
+                retries >= MAX_RETRIES
+          FAILED ──────────────────────► doRestart() [device reboots]
 ```
 
 **States:**
@@ -101,13 +101,13 @@ Use a `Ticker` or safeTimer to schedule reconnection attempts.
 - **Zero main-loop blocking:** Each `loopWifi()` call takes <1ms
 - **Watchdog safe:** No risk of WDT timeout during reconnection
 - **Observable:** State transitions logged via DebugTf
-- **Bounded retries:** Gives up after 3 attempts, preventing retry storms
+- **Bounded retries:** Gives up after 15 attempts then reboots, preventing infinite retry storms
 - **Cooperative:** Other services (OT message processing, MQTT keepalive) continue running
 - **Consistent pattern:** Same state machine approach used for webhook (ADR-048)
 
 ### Negative
 - **Reconnection takes longer:** Non-blocking approach spreads the reconnection over multiple loop iterations instead of a single blocking call
-  - Accepted: The delay is barely noticeable (5s timeout × 3 retries = 15s max) and all services remain responsive during the process
+  - Accepted: The delay is barely noticeable (5s timeout × 15 retries = 75s max) and all services remain responsive during the process
 - **More code:** State machine is more verbose than a simple while loop
   - Accepted: The clarity and safety benefits outweigh the verbosity
 
@@ -117,7 +117,7 @@ Refactored in P9 of the C++ refactoring plan (OTGW-firmware.ino):
 - `restartWifi()` removed from `doTaskMinuteChanged()`
 - `loopWifi()` added to `doBackgroundTasks()` as first call
 - States: `WIFI_IDLE`, `WIFI_DISCONNECTED`, `WIFI_CONNECTING`, `WIFI_RECONNECTED`, `WIFI_FAILED`
-- 5-second connection timeout, 3 retry attempts
+- 5-second connection timeout, 15 retry attempts before rebooting
 
 ## Related Decisions
 - ADR-007: Timer-Based Task Scheduling (cooperative scheduling model)
