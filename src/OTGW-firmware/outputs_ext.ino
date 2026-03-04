@@ -20,7 +20,7 @@ static bool validateGPIOOutputsConfig() {
     DebugTf(PSTR("GPIO Outputs: invalid pin %d\r\n"), settings.outputs.iPin);
     return false;
   }
-  if (settings.outputs.iTriggerBit < 0 || settings.outputs.iTriggerBit > 7) {
+  if (settings.outputs.iTriggerBit < 0 || settings.outputs.iTriggerBit > 15) {
     DebugTf(PSTR("GPIO Outputs: invalid trigger bit %d\r\n"), settings.outputs.iTriggerBit);
     return false;
   }
