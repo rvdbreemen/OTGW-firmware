@@ -120,6 +120,7 @@ char        sMessage[257] = "";
 uint32_t    MQTTautoConfigMap[8] = { 0 };
 bool        isESPFlashing = false;  // Flag to disable background tasks during ESP firmware flash
 bool        isPICFlashing = false;  // Flag to disable background tasks during PIC firmware flash
+bool        bSetupComplete = false; // ADR-036: guard doBackgroundTasks() during setup()
 // Deferred settings write timer (Finding #23: coalesce flash writes)
 // Declared globally so both settingStuff.ino and loop() can access
 uint32_t  timerFlushSettings_interval = 2000;  // 2 second debounce

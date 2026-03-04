@@ -154,6 +154,7 @@ The ESP8266 has extremely limited RAM (~40KB usable after Arduino core). Dynamic
 - **PROGMEM errors:** Reading from PROGMEM requires special functions
   - **Mitigation:** Always use `_P` variants (`strcmp_P`, `snprintf_P`)
   - **Mitigation:** Code review checklist enforces PROGMEM usage
+- **Justified SDK exception:** `ESP.getResetReason()` returns `Arduino::String` — the ESP8266 Arduino SDK does not expose a `const char*` variant. Usage is limited to one call in `setup()` via `strlcpy(lastReset, ESP.getResetReason().c_str(), sizeof(lastReset))`. The temporary String is freed immediately; no heap fragmentation risk in practice. This is the only accepted String exception in setup().
 
 ## Implementation Patterns
 

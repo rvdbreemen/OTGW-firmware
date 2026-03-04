@@ -727,6 +727,10 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
 // should be published now (either value changed or interval elapsed)
 bool shouldPublishMQTTForID(byte id, byte masterslave) {
   if (settingMQTTinterval == 0) return true;   // legacy: always publish
+  // IDs 128-255 (manufacturer-specific/Remeha) wrap when offset +128, aliasing
+  // with critical RESPONSE slots (Status flags, TSet…). Always publish to avoid
+  // cross-slot throttle contamination. (ADR-006)
+  if (id > 127) return true;
   byte idx = (masterslave == OT_MSGTYPE_REQUEST) ? (uint8_t)(id + 128) : (uint8_t)id;
   uint32_t packed = mqttlastsent[idx];
   uint16_t lastVal  = (uint16_t)(packed >> 16);             // bits 31-16: last published u16

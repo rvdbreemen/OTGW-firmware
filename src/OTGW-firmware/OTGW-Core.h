@@ -529,8 +529,11 @@ enum OTGW_response_type {
 	OTGW_PARITY_ERROR,
 	OTGW_UNDEF	
 };
+#define OT_MSGTYPE_REQUEST  0  // masterslave: 0=master (thermostat → boiler request)
+#define OT_MSGTYPE_RESPONSE 1  // masterslave: 1=slave  (boiler → thermostat response)
+
 struct OpenthermData_t {
-  char buf[10];	
+  char buf[10];
   byte len;
   uint32_t value;
   byte masterslave; //0=master, 1=slave
