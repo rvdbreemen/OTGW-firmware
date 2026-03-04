@@ -1,0 +1,230 @@
+name: ADR Agent
+
+# Automatically validates ADR compliance and creates missing ADRs on every push
+# and pull request using the GitHub Copilot Coding Agent.
+#
+# On each push or pull request the workflow:
+#   1. Detects architectural changes in the commit / PR diff.
+#   2. Checks whether those changes are covered by existing ADRs.
+#   3. If gaps are found, creates a GitHub Issue (labelled 'copilot' and 'adr')
+#      so the Copilot Coding Agent picks it up, writes the missing ADR(s),
+#      and opens a pull request for human review.
+#
+# Requirements:
+#   - GitHub Copilot Coding Agent must be enabled on the repository
+#     (Settings → Copilot → Coding agent).
+#   - GITHUB_TOKEN needs `issues: write` (granted via the permissions block).
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - 'dev-*'
+      - 'copilot/*'
+      - 'copilot-*'
+      - 'codex/*'
+      - 'release/**'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+      - dev
+      - 'dev-*'
+      - 'copilot/*'
+      - 'copilot-*'
+      - 'release/**'
+
+permissions:
+  issues: write
+
+jobs:
+  adr-agent:
+    runs-on: ubuntu-latest
+    name: Validate ADRs and trigger Copilot agent if gaps found
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed files
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            # For a push, compare against the previous commit.
+            # On the very first commit GITHUB_SHA~1 may not exist; fall back to
+            # the empty tree so the diff still works.
+            BASE=$(git rev-parse "${GITHUB_SHA}~1" 2>/dev/null || git hash-object -t tree /dev/null)
+            HEAD="${GITHUB_SHA}"
+          fi
+
+          CHANGED=$(git diff --name-only "${BASE}" "${HEAD}" 2>/dev/null || true)
+          echo "Changed files:"
+          echo "${CHANGED}"
+          echo "changed_files<<EOF" >> "${GITHUB_OUTPUT}"
+          echo "${CHANGED}" >> "${GITHUB_OUTPUT}"
+          echo "EOF" >> "${GITHUB_OUTPUT}"
+
+      - name: Check for architectural changes and ADR coverage
+        id: adr_check
+        env:
+          CHANGED_FILES: ${{ steps.changes.outputs.changed_files }}
+        run: |
+          # Patterns that indicate architecturally significant changes.
+          ARCH_PATTERNS=(
+            "src/OTGW-firmware/OTGW-firmware.ino"
+            "src/OTGW-firmware/.*API.*\.ino"
+            "src/OTGW-firmware/.*MQTT.*\.ino"
+            "src/OTGW-firmware/webSocket.*\.ino"
+            "src/libraries/.*"
+            "Makefile"
+            "build\.py"
+            "\.github/workflows/.*"
+          )
+
+          arch_files=""
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            for pattern in "${ARCH_PATTERNS[@]}"; do
+              if echo "$file" | grep -qE "^${pattern}$"; then
+                arch_files="${arch_files}${file}"$'\n'
+                break
+              fi
+            done
+          done <<< "${CHANGED_FILES}"
+
+          if [ -z "$arch_files" ]; then
+            echo "No architecturally significant files changed. Nothing to do."
+            echo "arch_changed=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          echo "Architecturally significant files changed:"
+          echo "${arch_files}"
+          echo "arch_changed=true" >> "${GITHUB_OUTPUT}"
+          echo "arch_files<<EOF" >> "${GITHUB_OUTPUT}"
+          echo "${arch_files}" >> "${GITHUB_OUTPUT}"
+          echo "EOF" >> "${GITHUB_OUTPUT}"
+
+          # Check whether new ADRs were included in this push / PR.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE=$(git rev-parse "${GITHUB_SHA}~1" 2>/dev/null || git hash-object -t tree /dev/null)
+            HEAD="${GITHUB_SHA}"
+          fi
+
+          new_adrs=$(git diff --name-only --diff-filter=A "${BASE}" "${HEAD}" 2>/dev/null \
+            | grep -E "^docs/adr/ADR-[0-9]" || true)
+
+          if [ -n "$new_adrs" ]; then
+            echo "New ADR(s) already included in this change:"
+            echo "$new_adrs"
+            echo "new_adrs_included=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "No new ADRs included — Copilot agent will be asked to review and write any required ADRs."
+            echo "new_adrs_included=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Collect commit / PR context for the agent
+        id: context
+        if: steps.adr_check.outputs.arch_changed == 'true' && steps.adr_check.outputs.new_adrs_included == 'false'
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            REF_LABEL="PR #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.title }}"
+            DIFF_BASE="${{ github.event.pull_request.base.sha }}"
+            DIFF_HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            REF_LABEL="push to ${{ github.ref_name }} (commit ${{ github.sha }})"
+            DIFF_BASE=$(git rev-parse "${GITHUB_SHA}~1" 2>/dev/null || git hash-object -t tree /dev/null)
+            DIFF_HEAD="${GITHUB_SHA}"
+          fi
+
+          # Capture the short diff summary (stat only — keep issue body small).
+          DIFF_STAT=$(git diff --stat "${DIFF_BASE}" "${DIFF_HEAD}" 2>/dev/null | tail -20 || true)
+
+          echo "ref_label=${REF_LABEL}" >> "${GITHUB_OUTPUT}"
+
+          echo "diff_stat<<EOF" >> "${GITHUB_OUTPUT}"
+          echo "${DIFF_STAT}" >> "${GITHUB_OUTPUT}"
+          echo "EOF" >> "${GITHUB_OUTPUT}"
+
+      - name: Trigger Copilot agent to validate and write ADRs
+        if: steps.adr_check.outputs.arch_changed == 'true' && steps.adr_check.outputs.new_adrs_included == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REF_LABEL: ${{ steps.context.outputs.ref_label }}
+          ARCH_FILES: ${{ steps.adr_check.outputs.arch_files }}
+          DIFF_STAT: ${{ steps.context.outputs.diff_stat }}
+        run: |
+          BODY="## ADR Validation Request
+
+          A push or pull request has modified architecturally significant files \
+          without including a new ADR. Please review the changes and:
+
+          1. **Validate** whether the changed code aligns with existing ADRs in \`docs/adr/\`.
+          2. **Identify** any architectural decisions introduced or changed by this commit that are not yet documented.
+          3. **Write** any missing ADR(s) following the template in \`.github/agents/adr-generator.agent.md\`.
+          4. **Commit** the new ADR file(s) to \`docs/adr/\` and open a pull request.
+
+          ### Change context
+
+          **Ref:** ${REF_LABEL}
+
+          **Architecturally significant files changed:**
+          \`\`\`
+          ${ARCH_FILES}
+          \`\`\`
+
+          **Diff summary:**
+          \`\`\`
+          ${DIFF_STAT}
+          \`\`\`
+
+          ### Instructions for the Copilot coding agent
+
+          - Use the \`adr-generator\` agent persona (\`.github/agents/adr-generator.agent.md\`) \
+          for writing any new ADRs.
+          - Follow the ADR format, numbering, and status conventions in \`docs/adr/README.md\`.
+          - If no new ADR is required, close this issue with a comment explaining why.
+          - Do **not** modify existing accepted ADRs; create a superseding ADR instead.
+
+          ---
+          *Triggered automatically by the [ADR Agent](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) workflow.*"
+
+          ISSUE_URL=$(gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "ADR review: architectural change in ${REF_LABEL}" \
+            --body "${BODY}" \
+            --label "copilot" \
+            --label "adr")
+
+          echo "✅ Copilot agent issue created: ${ISSUE_URL}"
+          echo "ISSUE_URL=${ISSUE_URL}" >> "${GITHUB_ENV}"
+
+      - name: Summary
+        if: always()
+        env:
+          ARCH_CHANGED: ${{ steps.adr_check.outputs.arch_changed }}
+          NEW_ADRS_INCLUDED: ${{ steps.adr_check.outputs.new_adrs_included }}
+        run: |
+          echo "### ADR Agent 🏛️" >> "${GITHUB_STEP_SUMMARY}"
+          echo "" >> "${GITHUB_STEP_SUMMARY}"
+
+          if [ "${ARCH_CHANGED}" != "true" ]; then
+            echo "✅ No architecturally significant files changed — no ADR review needed." >> "${GITHUB_STEP_SUMMARY}"
+          elif [ "${NEW_ADRS_INCLUDED}" = "true" ]; then
+            echo "✅ Architecturally significant files changed **and** new ADR(s) included in this change." >> "${GITHUB_STEP_SUMMARY}"
+          else
+            echo "🤖 Architecturally significant files changed without a new ADR — Copilot coding agent triggered." >> "${GITHUB_STEP_SUMMARY}"
+            if [ -n "${ISSUE_URL}" ]; then
+              echo "" >> "${GITHUB_STEP_SUMMARY}"
+              echo "Issue: ${ISSUE_URL}" >> "${GITHUB_STEP_SUMMARY}"
+            fi
+          fi
