@@ -188,8 +188,11 @@ uint32_t updateRebootCount()
     if (fh) {
       //read from file
       if (fh.available()){
-        //read the first line 
-        _reboot  = fh.readStringUntil('\n').toInt();
+        //read the first line — static char avoids heap allocation (ADR-004)
+        char cntBuf[12] = {0};
+        uint8_t n = fh.readBytesUntil('\n', cntBuf, sizeof(cntBuf) - 1);
+        cntBuf[n] = '\0';
+        _reboot = (uint32_t)strtoul(cntBuf, nullptr, 10);
       }
     }
     fh.close();
@@ -203,7 +206,7 @@ uint32_t updateRebootCount()
     }
     fh.close();
   }
-  DebugTf(PSTR("Reboot count = [%d]\r\n"), rebootCount);
+  DebugTf(PSTR("Reboot count = [%d]\r\n"), _reboot);
   return _reboot;
 }
 
@@ -356,10 +359,12 @@ bool updateRebootLog(String text)
       if (infh) {
         //read from file
         while (infh.available() && (i < LOG_LINES)){
-          //read the first line 
-          String line = infh.readStringUntil('\n');
+          //read the next line — char buffer avoids heap allocation (ADR-004)
+          char line[LOG_LINE_LENGTH] = {0};
+          int n = infh.readBytesUntil('\n', line, sizeof(line) - 1);
+          line[n] = '\0';
           // Filter out empty or very short lines (< 3 chars) to keep log file clean
-          if (line.length() > 3) {
+          if (n > 3) {
             outfh.print(line);
           }
           i++;
@@ -460,32 +465,35 @@ bool minuteChanged(){
   return _ret;
 }
 
+// Path to the LittleFS file containing the build git hash (used by checklittlefshash and getFilesystemHash)
+#define GITHASH_FILE "/version.hash"
+
 /*
   check if the version githash is in the littlefs as version.hash
 
 */
 bool checklittlefshash(){
-  #define GITHASH_FILE "/version.hash"
   static const char fsMismatchMsg[] PROGMEM = "Flash your littleFS with matching version!";
-  String _githash="";
+  char _githash[16] = {0};  // git short hash is 7 chars; 16 is ample (ADR-004)
   if (LittleFS.begin()) {
     //start with opening the file
     File fh = LittleFS.open(GITHASH_FILE, "r");
     if (fh) {
       //read from file
       if (fh.available()){
-        //read the first line 
-         _githash = fh.readStringUntil('\n');
-         _githash.trim(); // Remove CR/LF and any extra whitespace
+        uint8_t n = fh.readBytesUntil('\n', _githash, sizeof(_githash) - 1);
+        _githash[n] = '\0';
+        // Trim trailing \r (readBytesUntil drops \n but keeps \r on Windows-style lines)
+        if (n > 0 && _githash[n-1] == '\r') _githash[n-1] = '\0';
       }
       fh.close();
     }
-    DebugTf(PSTR("Check githash = [%s]\r\n"), CSTR(_githash));
-    DebugTf(PSTR("FS githash = [%s] | FW githash = [%s]\r\n"), CSTR(_githash), _VERSION_GITHASH);
-    bool match = (strcasecmp(CSTR(_githash), _VERSION_GITHASH)==0);
+    DebugTf(PSTR("Check githash = [%s]\r\n"), _githash);
+    DebugTf(PSTR("FS githash = [%s] | FW githash = [%s]\r\n"), _githash, _VERSION_GITHASH);
+    bool match = (strcasecmp(_githash, _VERSION_GITHASH)==0);
     if (!match) {
-      DebugTf(PSTR("WARNING: Firmware version (%s) does not match filesystem version (%s)\r\n"), 
-              _VERSION_GITHASH, CSTR(_githash));
+      DebugTf(PSTR("WARNING: Firmware version (%s) does not match filesystem version (%s)\r\n"),
+              _VERSION_GITHASH, _githash);
       DebugTln(F("This may cause compatibility issues. Flash matching filesystem version."));
       strncpy_P(sMessage, fsMismatchMsg, sizeof(sMessage) - 1);
       sMessage[sizeof(sMessage) - 1] = '\0';
@@ -501,20 +509,21 @@ bool checklittlefshash(){
   Get filesystem version hash from /version.hash file
   Returns empty string if file not found or error
 */
-String getFilesystemHash(){
-  #define GITHASH_FILE "/version.hash"
-  static String _githash = ""; // Cache the hash
-  
+const char* getFilesystemHash(){
+  // Static char cache — avoids permanent heap String (ADR-004)
+  static char _githash[16] = {0};
+
   // Return cached value if available
-  if (_githash.length() > 0) return _githash;
+  if (_githash[0] != '\0') return _githash;
 
   if (LittleFS.begin()) {
     if (LittleFS.exists(GITHASH_FILE)) {
       File fh = LittleFS.open(GITHASH_FILE, "r");
       if (fh) {
         if (fh.available()){
-          _githash = fh.readStringUntil('\n');
-          _githash.trim(); // Remove any whitespace/newlines
+          uint8_t n = fh.readBytesUntil('\n', _githash, sizeof(_githash) - 1);
+          _githash[n] = '\0';
+          if (n > 0 && _githash[n-1] == '\r') _githash[n-1] = '\0';
         }
         fh.close();
       }

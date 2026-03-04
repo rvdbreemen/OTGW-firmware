@@ -14,7 +14,7 @@
  // S0 Counter Settings and variables with global scope, to be defined in xx.h 
  bool      settingS0COUNTERenabled = false;      
  uint8_t   settingS0COUNTERpin = 12;               // GPIO 12 = D6, preferred, can be any pin with Interupt support
- uint16_t  settingS0COUNTERdebouncetime = 80;      // Depending on S0 switch a debouncetime should be tailored
+ volatile uint16_t settingS0COUNTERdebouncetime = 80; // volatile: read by IRAM_ATTR ISR (ADR-021)
  uint16_t  settingS0COUNTERpulsekw = 1000;         // Most S0 counters have 1000 pulses per kW, but this can be different
  uint16_t  settingS0COUNTERinterval = 60;          // Sugggested measurement reporting interval
  uint16_t  OTGWs0pulseCount;                       // Number of S0 pulses in measurement interval
@@ -35,7 +35,7 @@
 
  interrupt_time = millis() ;
   // If interrupts come faster than debouncetime, assume it's a bounce and ignore
-  if (interrupt_time - last_interrupt_time > (volatile uint16_t)settingS0COUNTERdebouncetime)
+  if (interrupt_time - last_interrupt_time > settingS0COUNTERdebouncetime)
   {
     pulseCount++;
     last_pulse_duration = interrupt_time - last_interrupt_time ;
