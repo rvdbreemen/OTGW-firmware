@@ -197,6 +197,7 @@ void writeSettings(bool show)
   writeJsonStringKV(file, F("MQTTuniqueid"), settingMQTTuniqueid, true);
   writeJsonBoolKV(file, F("MQTTOTmessage"), settingMQTTOTmessage, true);
   writeJsonBoolKV(file, F("MQTTseparatesources"), settingMQTTSeparateSources, true);
+  writeJsonIntKV(file, F("MQTTinterval"), settingMQTTinterval, true);
   writeJsonBoolKV(file, F("MQTTharebootdetection"), settingMQTTharebootdetection, true);
   writeJsonBoolKV(file, F("NTPenable"), settingNTPenable, true);
   writeJsonStringKV(file, F("NTPtimezone"), settingNTPtimezone, true);
@@ -340,6 +341,7 @@ void readSettings(bool show)
     Debugf(PSTR("MQTT toptopic         : %s\r\n"), CSTR(settingMQTTtopTopic));
     Debugf(PSTR("MQTT uniqueid         : %s\r\n"), CSTR(settingMQTTuniqueid));
     Debugf(PSTR("MQTT separate sources : %s\r\n"), CBOOLEAN(settingMQTTSeparateSources));
+    Debugf(PSTR("MQTT interval         : %d\r\n"), settingMQTTinterval);
     Debugf(PSTR("HA prefix             : %s\r\n"), CSTR(settingMQTThaprefix));
     Debugf(PSTR("HA reboot detection   : %s\r\n"), CBOOLEAN(settingMQTTharebootdetection));
     Debugf(PSTR("NTP enabled           : %s\r\n"), CBOOLEAN(settingNTPenable));
@@ -433,6 +435,7 @@ void updateSetting(const char *field, const char *newValue)
     if (strlen(settingMQTTuniqueid) == 0)   strlcpy(settingMQTTuniqueid, getUniqueId(), sizeof(settingMQTTuniqueid));
   }
   if (strcasecmp_P(field, PSTR("MQTTOTmessage"))==0)   settingMQTTOTmessage = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("MQTTinterval"))==0)    settingMQTTinterval = (uint16_t)atoi(newValue);
   if (strcasecmp_P(field, PSTR("MQTTseparatesources"))==0) settingMQTTSeparateSources = EVALBOOLEAN(newValue);
   if (strstr_P(field, PSTR("mqtt")) != NULL)        pendingSideEffects |= SIDE_EFFECT_MQTT; // defer MQTT restart to flushSettings()
   

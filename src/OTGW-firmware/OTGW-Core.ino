@@ -722,6 +722,48 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   return _valid;
 }
 
+// =====================[ MQTT throttle helpers ]==================
+// shouldPublishMQTTForID - returns true if this OT slot's value
+// should be published now (either value changed or interval elapsed)
+bool shouldPublishMQTTForID(byte id, byte masterslave) {
+  if (settingMQTTinterval == 0) return true;   // legacy: always publish
+  byte idx = (masterslave == OT_MSGTYPE_REQUEST) ? (uint8_t)(id + 128) : (uint8_t)id;
+  uint32_t packed = mqttlastsent[idx];
+  uint16_t lastVal  = (uint16_t)(packed >> 16);             // bits 31-16: last published u16
+  uint16_t lastTime = (uint16_t)(packed & 0xFFFF);           // bits 15-0:  seconds-since-boot
+  uint16_t newVal   = OTdata.value;
+  uint16_t now      = (uint16_t)(millis() / 1000UL);
+  bool valueChanged   = (newVal != lastVal);
+  bool intervalElapsed = ((uint16_t)(now - lastTime) >= settingMQTTinterval);
+  if (valueChanged || intervalElapsed) {
+    mqttlastsent[idx] = ((uint32_t)newVal << 16) | now;
+    return true;
+  }
+  return false;
+}
+
+// shouldPublishStatusBit - per-bit publish decision for OT_Statusflags
+bool shouldPublishStatusBit(uint8_t bitSlot, bool newVal, bool prevVal) {
+  if (settingMQTTinterval == 0) return true;   // legacy: always publish
+  uint16_t lastTime = mqttlastsentstatusbit[bitSlot];
+  uint16_t now      = (uint16_t)(millis() / 1000UL);
+  bool valueChanged   = (newVal != prevVal);
+  bool intervalElapsed = ((uint16_t)(now - lastTime) >= settingMQTTinterval);
+  if (valueChanged || intervalElapsed) {
+    mqttlastsentstatusbit[bitSlot] = now;
+    return true;
+  }
+  return false;
+}
+
+// publishStatusBitMQTT - publish a status bit using per-bit change-detect + interval
+void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool prevVal) {
+  bool saved = mqttPublishAllowed;
+  mqttPublishAllowed = shouldPublishStatusBit(bitSlot, newVal, prevVal);
+  publishMQTTOnOff(topic, newVal);
+  mqttPublishAllowed = saved;
+}
+
 void print_f88(float& value)
 {
   //function to print data
@@ -839,13 +881,13 @@ void print_status(uint16_t& value)
     //Master Status
     if (is_value_valid(OTdata, OTlookupitem)){
       sendMQTTData("status_master", _flag8_master);
-      publishMQTTOnOff("ch_enable",        ((OTdata.valueHB) & 0x01));
-      publishMQTTOnOff("dhw_enable",       ((OTdata.valueHB) & 0x02));
-      publishMQTTOnOff("cooling_enable",   ((OTdata.valueHB) & 0x04));
-      publishMQTTOnOff("otc_active",       ((OTdata.valueHB) & 0x08));
-      publishMQTTOnOff("ch2_enable",       ((OTdata.valueHB) & 0x10));
-      publishMQTTOnOff("summerwintertime", ((OTdata.valueHB) & 0x20));
-      publishMQTTOnOff("dhw_blocking",     ((OTdata.valueHB) & 0x40));
+      publishStatusBitMQTT(0, "ch_enable",        (OTdata.valueHB & 0x01), (OTcurrentSystemState.MasterStatus & 0x01));
+      publishStatusBitMQTT(1, "dhw_enable",       (OTdata.valueHB & 0x02), (OTcurrentSystemState.MasterStatus & 0x02));
+      publishStatusBitMQTT(2, "cooling_enable",   (OTdata.valueHB & 0x04), (OTcurrentSystemState.MasterStatus & 0x04));
+      publishStatusBitMQTT(3, "otc_active",       (OTdata.valueHB & 0x08), (OTcurrentSystemState.MasterStatus & 0x08));
+      publishStatusBitMQTT(4, "ch2_enable",       (OTdata.valueHB & 0x10), (OTcurrentSystemState.MasterStatus & 0x10));
+      publishStatusBitMQTT(5, "summerwintertime", (OTdata.valueHB & 0x20), (OTcurrentSystemState.MasterStatus & 0x20));
+      publishStatusBitMQTT(6, "dhw_blocking",     (OTdata.valueHB & 0x40), (OTcurrentSystemState.MasterStatus & 0x40));
 
       OTcurrentSystemState.MasterStatus = OTdata.valueHB;
     }
@@ -876,14 +918,14 @@ void print_status(uint16_t& value)
     //Slave Status
     if (is_value_valid(OTdata, OTlookupitem)){
       sendMQTTData("status_slave", _flag8_slave);
-      publishMQTTOnOff("fault",                ((OTdata.valueLB) & 0x01));
-      publishMQTTOnOff("centralheating",       ((OTdata.valueLB) & 0x02));
-      publishMQTTOnOff("domestichotwater",     ((OTdata.valueLB) & 0x04));
-      publishMQTTOnOff("flame",                ((OTdata.valueLB) & 0x08));
-      publishMQTTOnOff("cooling",              ((OTdata.valueLB) & 0x10));
-      publishMQTTOnOff("centralheating2",      ((OTdata.valueLB) & 0x20));
-      publishMQTTOnOff("diagnostic_indicator", ((OTdata.valueLB) & 0x40));
-      publishMQTTOnOff("electric_production",   ((OTdata.valueLB) & 0x80));
+      publishStatusBitMQTT(8,  "fault",                (OTdata.valueLB & 0x01), (OTcurrentSystemState.SlaveStatus & 0x01));
+      publishStatusBitMQTT(9,  "centralheating",       (OTdata.valueLB & 0x02), (OTcurrentSystemState.SlaveStatus & 0x02));
+      publishStatusBitMQTT(10, "domestichotwater",     (OTdata.valueLB & 0x04), (OTcurrentSystemState.SlaveStatus & 0x04));
+      publishStatusBitMQTT(11, "flame",                (OTdata.valueLB & 0x08), (OTcurrentSystemState.SlaveStatus & 0x08));
+      publishStatusBitMQTT(12, "cooling",              (OTdata.valueLB & 0x10), (OTcurrentSystemState.SlaveStatus & 0x10));
+      publishStatusBitMQTT(13, "centralheating2",      (OTdata.valueLB & 0x20), (OTcurrentSystemState.SlaveStatus & 0x20));
+      publishStatusBitMQTT(14, "diagnostic_indicator", (OTdata.valueLB & 0x40), (OTcurrentSystemState.SlaveStatus & 0x40));
+      publishStatusBitMQTT(15, "electric_production",  (OTdata.valueLB & 0x80), (OTcurrentSystemState.SlaveStatus & 0x80));
 
       OTcurrentSystemState.SlaveStatus = OTdata.valueLB;
     }
@@ -2575,7 +2617,11 @@ void processOT(const char *buf, int len){
       AddLog(" ");  // Space before payload for readability
       
       //next step interpret the OT protocol
+      // Set the MQTT publish gate for this OT message (rate limiting by settingMQTTinterval)
+      mqttPublishAllowed = shouldPublishMQTTForID(OTdata.id, OTdata.masterslave);
       decodeAndPublishOTValue();
+      // Reset the MQTT publish gate so non-OT sends (event_report, etc.) are not affected
+      mqttPublishAllowed = true;
 
       if (OTdata.skipthis) AddLog(" <ignored> ");
       AddLogln();

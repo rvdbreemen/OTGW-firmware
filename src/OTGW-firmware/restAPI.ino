@@ -916,6 +916,7 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("mqttharebootdetection"), settingMQTTharebootdetection, "b");
   sendJsonSettingObj(F("mqttuniqueid"), CSTR(settingMQTTuniqueid), "s", 20);
   sendJsonSettingObj(F("mqttotmessage"), settingMQTTOTmessage, "b");
+  sendJsonSettingObj(F("mqttinterval"), settingMQTTinterval, "i", 0, 3600);
   sendJsonSettingObj(F("mqttseparatesources"), settingMQTTSeparateSources, "b");
   sendJsonSettingObj(F("ntpenable"), settingNTPenable, "b");
   sendJsonSettingObj(F("ntptimezone"), CSTR(settingNTPtimezone), "s", 50);
