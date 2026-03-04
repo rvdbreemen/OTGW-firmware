@@ -651,6 +651,7 @@ void PrintMQTTError(){
 */
 void sendMQTTData(const char* topic, const char *json, const bool retain) 
 {
+  if (!mqttPublishAllowed) return;
   if (!settingMQTTenable) return;
   if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
   if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 

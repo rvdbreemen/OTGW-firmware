@@ -179,6 +179,7 @@ bool      settingMQTTharebootdetection = true;
 char      settingMQTTtopTopic[41] = "OTGW";
 char      settingMQTTuniqueid[41] = ""; // Intialized in readsettings
 bool      settingMQTTOTmessage = false;
+uint16_t  settingMQTTinterval = 0;   // MQTT publish interval in seconds (0 = publish every message)
 bool      settingMQTTSeparateSources = false; // ADR-040: publish source-specific topics (opt-in; default off for backward compat)
 bool      settingNTPenable = true;
 char      settingNTPtimezone[65] = NTP_DEFAULT_TIMEZONE;
