@@ -225,7 +225,7 @@ void sendMQTTversioninfo(){
   sendMQTTData("otgw-firmware/reboot_reason", lastReset);
   sendMQTTData("otgw-pic/version", state.pic.sFwversion);
   sendMQTTData("otgw-pic/deviceid", state.pic.sDeviceid);
-  sendMQTTData("otgw-pic/firmwaretype", state.pic.sDeviceid);
+  sendMQTTData("otgw-pic/firmwaretype", state.pic.sType);
   sendMQTTData("otgw-pic/picavailable", CCONOFF(state.pic.bAvailable));
 }
 
