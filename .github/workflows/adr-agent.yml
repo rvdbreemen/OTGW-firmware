@@ -155,6 +155,18 @@ jobs:
           echo "${DIFF_STAT}" >> "${GITHUB_OUTPUT}"
           echo "EOF" >> "${GITHUB_OUTPUT}"
 
+      - name: Ensure required labels exist
+        if: steps.adr_check.outputs.arch_changed == 'true' && steps.adr_check.outputs.new_adrs_included == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "copilot" --repo "${{ github.repository }}" \
+            --description "Tasks for the GitHub Copilot coding agent" \
+            --color "0075ca" --force
+          gh label create "adr" --repo "${{ github.repository }}" \
+            --description "Architecture Decision Record" \
+            --color "e4e669" --force
+
       - name: Trigger Copilot agent to validate and write ADRs
         if: steps.adr_check.outputs.arch_changed == 'true' && steps.adr_check.outputs.new_adrs_included == 'false'
         env:
