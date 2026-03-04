@@ -512,7 +512,7 @@ void updateSetting(const char *field, const char *newValue)
   {
     settings.outputs.bEnabled = EVALBOOLEAN(newValue);
     Debugln();
-    DebugTf(PSTR("Need reboot before GPIO OUTPUTS will be enabled on pin GPIO%d!\r\n\n"), settings.outputs.bEnabled);
+    DebugTf(PSTR("Need reboot before GPIO OUTPUTS will be enabled on pin GPIO%d!\r\n\n"), settings.outputs.iPin);
   }
   if (strcasecmp_P(field, PSTR("GPIOOUTPUTSpin")) == 0)
   {
