@@ -2688,12 +2688,8 @@ void processOT(const char *buf, int len){
     OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
     snprintf_P(cMsg, sizeof(cMsg), PSTR("OTGW PIC restarted [%s]"), state.pic.sFwversion);
     sendEventToWebSocket('*', cMsg);
-  } else if (strchr(buf, ',') != nullptr) {
-    // Comma-separated line: handle PS=1 summary (25 or 34 comma-separated fields).
-    // processPSSummary() validates the field count and returns silently if not a PS=1 line.
-    processPSSummary(buf, len);
   } else if ((strchr(buf, '=') != nullptr) && (strchr(buf, ':') == nullptr)) {
-    // Lines containing '=' but no ':' are echoed commands in PS=1 mode.
+    // Summary key/value lines are emitted by PS=1 mode.
     // Detect this even when PS=1 was enabled externally (e.g. Domoticz classic plugin),
     // so WebUI can show the footer watermark reliably.
     if (!state.otgw.bPSmode) {

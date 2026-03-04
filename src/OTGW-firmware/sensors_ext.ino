@@ -55,7 +55,6 @@ const uint8_t DallasSimDeviceAddresses[SIM_SENSOR_COUNT][8] = {
 void ensureSensorDefaultLabels()
 {
   if (DallasrealDeviceCount < 1) return;
-  const size_t MAX_DALLAS_LABELS_FILE_SIZE = 4096;
 
   // ── Pass 1: read existing key→label pairs from file via readJsonStringPair() ──
   struct { char addr[17]; char label[24]; } existing[MAXDALLASDEVICES];

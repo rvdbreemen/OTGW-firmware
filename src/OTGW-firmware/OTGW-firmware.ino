@@ -147,8 +147,6 @@ void setup() {
   //setup NTP before connecting to wifi will enable DHCP to overrule the NTP setting
   startNTP();
 
-  bool forceWifiPortal = shouldForceWifiConfigPortal();
-
   //start with setting wifi hostname
   startWiFi(CSTR(settings.sHostname), 240, forceWifiPortal, forceWifiPortal);  // timeout 240 seconds
   blinkLED(LED1, 3, 100);

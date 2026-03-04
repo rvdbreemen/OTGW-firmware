@@ -55,6 +55,6 @@ jobs:
           prerelease: ${{ github.event.release.prerelease }}
           files: |
             build/*.elf
-            build/*.bin
+            build/*.ino.bin
             build/*.littlefs.bin
             LICENSE
