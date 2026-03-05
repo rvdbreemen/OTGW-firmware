@@ -2786,12 +2786,17 @@ void processOT(const char *buf, int len){
     Debugln(buf);
     sendMQTTData(F("event_report"), buf);
     sendEventToWebSocket('<', buf, (int)len);
-    // PS mode detection: still detect PS=1 from these echo lines even when set externally
-    if (!bPSmode) {
-      OTGWDebugTln(F("PS mode auto-detected as ON (summary key=value stream)"));
+    // PS=0 echo: the PIC is exiting summary mode — update state accordingly.
+    // All other XX=value lines (PS=1, TT=20.0, etc.) indicate PS=1 mode is active.
+    if (strcasecmp_P(buf, PSTR("PS=0")) == 0) {
+      if (bPSmode) OTGWDebugTln(F("PS=0 echo: exiting PS=1 mode"));
+      bPSmode = false;
+      sMessage[0] = '\0';
+    } else {
+      if (!bPSmode) OTGWDebugTln(F("PS mode auto-detected as ON (summary key=value stream)"));
+      bPSmode = true;
+      strlcpy(sMessage, "PS=1 mode; No UI updates.", sizeof(sMessage));
     }
-    bPSmode = true;
-    strlcpy(sMessage, "PS=1 mode; No UI updates.", sizeof(sMessage));
   } else {
     OTGWDebugTf(PSTR("Not processed, received from OTGW => (%s) [%d]\r\n"), buf, len);
     sendMQTTData(F("event_report"), buf);
