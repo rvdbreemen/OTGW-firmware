@@ -10,10 +10,10 @@ Version 1.3.0 builds on the solid v1.2.0 foundation with focused reliability, us
 
 ### Highlights
 
-- **Configurable MQTT Publishing Interval:** Introduced OTPublishGate to configure a minimum publishing interval (in seconds) for OpenTherm variables. This throttles rapid state changes to a manageable rate without missing critical updates, vastly reducing MQTT broker load.
+- **Configurable MQTT Publishing Interval:** Introduced `OTPublishGate` to configure a minimum publishing interval (in seconds) for OpenTherm variables. This throttles rapid state changes to a manageable rate without missing critical updates, vastly reducing MQTT broker load.
 - **Triple-Reset WiFi Recovery:** Triple-clicking the hardware reset button within 10 seconds now clears all stored WiFi credentials and restarts the WiFiManager captive portal for easy reconfiguration without reflashing.
-- **One-Shot OTGW PIC Commands from Web UI:** Type raw OTGW PIC commands (e.g., TT=20.5) in a command bar right directly on the Web UI Monitor page.
-- **PS=1 Full Automation:** PS=1 mode (Print Summary) is now fully parsed! Fields are pushed to MQTT and accurately auto-discovered in Home Assistant!
+- **One-Shot OTGW PIC Commands from Web UI:** Type raw OTGW PIC commands (e.g., `TT=20.5`) in a command bar right directly on the Web UI Monitor page.
+- **PS=1 Full Automation:** `PS=1` mode (Print Summary) is now fully parsed! Fields are pushed to MQTT and accurately auto-discovered in Home Assistant!
 - **OTGW Event Reporting:** Core events from the OpenTherm Gateway PIC are intelligently pushed over MQTT and WebSockets.
 - **No Breaking Changes:** Fully backwards compatible with v1.2.0!
 
