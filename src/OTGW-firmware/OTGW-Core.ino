@@ -2771,10 +2771,13 @@ void processOT(const char *buf, int len){
     strlcpy(sPICtype, OTGWSerial.firmwareToString().c_str(), sizeof(sPICtype));
     OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), sPICtype);
     snprintf_P(cMsg, sizeof(cMsg), PSTR("OTGW PIC restarted [%s]"), sPICfwversion);
+    sendMQTTData(F("event_report"), cMsg);
     sendEventToWebSocket('*', cMsg);
   } else if (strchr(buf, ',') != nullptr) {
     // Comma-separated line: handle PS=1 summary (25 or 34 comma-separated fields).
     // processPSSummary() validates the field count and returns silently if not a PS=1 line.
+    // Forward raw line to WebSocket so the OT Monitor tab shows activity in PS=1 mode.
+    sendEventToWebSocket('<', buf, (int)len);
     processPSSummary(buf, len);
   } else if ((strchr(buf, '=') != nullptr) && (strchr(buf, ':') == nullptr)) {
     // Lines containing '=' but no ':' are echoed commands or command responses in PS=1 mode
@@ -2792,6 +2795,8 @@ void processOT(const char *buf, int len){
     strlcpy(sMessage, "PS=1 mode; No UI updates.", sizeof(sMessage));
   } else {
     OTGWDebugTf(PSTR("Not processed, received from OTGW => (%s) [%d]\r\n"), buf, len);
+    sendMQTTData(F("event_report"), buf);
+    sendEventToWebSocket('<', buf, (int)len);
   }
 }
 
@@ -2832,9 +2837,13 @@ void handleOTGW()
   //Handle incoming data from OTGW through serial port (READ BUFFER)
   if (OTGWSerial.hasOverrun()) {
     DebugT(F("Serial Overrun\r\n"));
+    sendMQTTData(F("event_report"), "Serial Overrun");
+    sendEventToWebSocket_P('!', PSTR("Serial Overrun"));
   }
   if (OTGWSerial.hasRxError()){
     DebugT(F("Serial Rx Error\r\n"));
+    sendMQTTData(F("event_report"), "Serial Rx Error");
+    sendEventToWebSocket_P('!', PSTR("Serial Rx Error"));
   }
   
   while (OTGWSerial.available()) {
