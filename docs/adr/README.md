@@ -10,7 +10,7 @@ Architecture Decision Records capture important architectural decisions along wi
 
 **By Topic:**
 - [Platform & Build](#platform-and-build-system) (4 ADRs)
-- [Memory Management](#memory-management) (4 ADRs)
+- [Memory Management](#memory-management) (5 ADRs)
 - [Network & Security](#network-and-security) (3 ADRs)
 - [Integration](#integration-and-communication) (5 ADRs) 🆕
 - [Core Systems](#system-architecture) (4 ADRs) 🆕
@@ -52,8 +52,11 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-028: File Streaming Over Loading for Memory Safety](ADR-028-file-streaming-over-loading.md)**  
   Never load files >2KB into RAM; use streaming patterns to prevent memory exhaustion crashes.
 
-- **[ADR-030: Heap Memory Monitoring and Emergency Recovery](ADR-030-heap-memory-monitoring-emergency-recovery.md)** 🆕  
+- **[ADR-030: Heap Memory Monitoring and Emergency Recovery](ADR-030-heap-memory-monitoring-emergency-recovery.md)** 🆕
   Proactive heap monitoring with 4-level health system and adaptive throttling to prevent crashes (CRITICAL <3KB, WARNING 3-5KB, LOW 5-8KB, HEALTHY >8KB).
+
+- **[ADR-044: Global State — extern Declaration in Header, Definition in .ino](ADR-044-global-state-header-definition-pattern.md)** 🆕
+  `extern` declarations in headers + single definition in owning `.ino` to avoid ODR violations in any multi-TU build; applies to `msglastupdated[]`, `mqttlastsent[]`, `mqttPublishAllowed`, etc.
 
 ### Integration and Communication
 - **[ADR-005: WebSocket for Real-Time Streaming](ADR-005-websocket-real-time-streaming.md)**  
