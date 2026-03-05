@@ -140,6 +140,12 @@ static const char* skipOTLogTimestamp(const char* logLine)
 //some variable's
 OpenthermData_t OTdata, delayedOTdata, tmpOTdata;
 
+// Global state arrays — defined here (one definition rule), declared extern in OTGW-Core.h. (ADR-044)
+time_t   msglastupdated[256]       = {0}; // last-updated timestamp per OT msg id (0-255)
+uint32_t mqttlastsent[256]         = {0}; // packed throttle: bits31-16=last published u16, bits15-0=seconds-since-boot
+uint16_t mqttlastsentstatusbit[16] = {0}; // per-bit publish timers for OT_Statusflags (slots 0-7=master, 8-15=slave)
+bool     mqttPublishAllowed        = true; // MQTT interval gate — managed via OTPublishGate (OTGW-Core.h)
+
 #define OTGW_BANNER "OpenTherm Gateway"
 
 enum OTSpecCompatMode : uint8_t {
@@ -723,9 +729,11 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
 }
 
 // =====================[ MQTT throttle helpers ]==================
-// shouldPublishMQTTForID - returns true if this OT slot's value
-// should be published now (either value changed or interval elapsed)
-bool shouldPublishMQTTForID(byte id, byte masterslave) {
+// shouldPublishMQTTForID - returns true if this OT slot's value should be
+// published now (value changed OR interval elapsed). Takes explicit rawValue
+// so the caller controls which value is compared — normal OT mode passes
+// OTdata.value; PS=1 mode passes 0 to rely on interval-only gating. (ADR-006)
+bool shouldPublishMQTTForID(byte id, byte masterslave, uint16_t rawValue) {
   if (settingMQTTinterval == 0) return true;   // legacy: always publish
   // IDs 128-255 (manufacturer-specific/Remeha) wrap when offset +128, aliasing
   // with critical RESPONSE slots (Status flags, TSet…). Always publish to avoid
@@ -735,12 +743,31 @@ bool shouldPublishMQTTForID(byte id, byte masterslave) {
   uint32_t packed = mqttlastsent[idx];
   uint16_t lastVal  = (uint16_t)(packed >> 16);             // bits 31-16: last published u16
   uint16_t lastTime = (uint16_t)(packed & 0xFFFF);           // bits 15-0:  seconds-since-boot
-  uint16_t newVal   = OTdata.value;
   uint16_t now      = (uint16_t)(millis() / 1000UL);
-  bool valueChanged   = (newVal != lastVal);
+  bool valueChanged    = (rawValue != lastVal);
   bool intervalElapsed = ((uint16_t)(now - lastTime) >= settingMQTTinterval);
   if (valueChanged || intervalElapsed) {
-    mqttlastsent[idx] = ((uint32_t)newVal << 16) | now;
+    mqttlastsent[idx] = ((uint32_t)rawValue << 16) | now;
+    return true;
+  }
+  return false;
+}
+
+// shouldPublishMQTTForPSField - interval-only gate for PS=1 summary fields.
+// PS=1 mode does not carry a raw OT uint16 (values are pre-decoded ASCII),
+// so change-detection uses only the time dimension. Shares the mqttlastsent[]
+// array with normal OT mode (response slot, masterslave=0) so both paths
+// respect the same per-ID interval regardless of which mode is active. (ADR-006)
+bool shouldPublishMQTTForPSField(byte id) {
+  if (settingMQTTinterval == 0) return true;
+  if (id > 127) return true;
+  // PS=1 summary fields are always slave responses → idx = id (masterslave==0)
+  byte idx = id;
+  uint16_t lastTime = (uint16_t)(mqttlastsent[idx] & 0xFFFFUL);
+  uint16_t now      = (uint16_t)(millis() / 1000UL);
+  if ((uint16_t)(now - lastTime) >= settingMQTTinterval) {
+    // Preserve the last-value bits; update only the time field
+    mqttlastsent[idx] = (mqttlastsent[idx] & 0xFFFF0000UL) | (uint32_t)now;
     return true;
   }
   return false;
@@ -751,7 +778,7 @@ bool shouldPublishStatusBit(uint8_t bitSlot, bool newVal, bool prevVal) {
   if (settingMQTTinterval == 0) return true;   // legacy: always publish
   uint16_t lastTime = mqttlastsentstatusbit[bitSlot];
   uint16_t now      = (uint16_t)(millis() / 1000UL);
-  bool valueChanged   = (newVal != prevVal);
+  bool valueChanged    = (newVal != prevVal);
   bool intervalElapsed = ((uint16_t)(now - lastTime) >= settingMQTTinterval);
   if (valueChanged || intervalElapsed) {
     mqttlastsentstatusbit[bitSlot] = now;
@@ -760,12 +787,12 @@ bool shouldPublishStatusBit(uint8_t bitSlot, bool newVal, bool prevVal) {
   return false;
 }
 
-// publishStatusBitMQTT - publish a status bit using per-bit change-detect + interval
+// publishStatusBitMQTT - publish a status bit with per-bit change-detect + interval.
+// Uses OTPublishGate (RAII) so the outer gate state is always restored even if
+// publishMQTTOnOff() or any callee throws or early-returns. (ADR-006)
 void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool prevVal) {
-  bool saved = mqttPublishAllowed;
-  mqttPublishAllowed = shouldPublishStatusBit(bitSlot, newVal, prevVal);
+  OTPublishGate gate(shouldPublishStatusBit(bitSlot, newVal, prevVal));
   publishMQTTOnOff(topic, newVal);
-  mqttPublishAllowed = saved;
 }
 
 void print_f88(float& value)
@@ -2035,6 +2062,12 @@ void processPSSummary(const char *buf, int len) {
         const char *label = OTlookupitem.label;
         bool bUpdated = false;
 
+        // Per-field MQTT throttle gate. PS=1 uses interval-only gating (no
+        // value-change detection) — the PIC already suppresses fields that haven't
+        // changed. Shares mqttlastsent[] with normal OT mode so both paths respect
+        // the same per-ID interval regardless of which mode is active. (ADR-006)
+        OTPublishGate psGate(shouldPublishMQTTForPSField(msgid));
+
         switch (OTlookupitem.type) {
           case ot_f88: {
             float fval = atof(fBuf);
@@ -2096,7 +2129,8 @@ void processPSSummary(const char *buf, int len) {
             // PS=1 format: "XX/YY" decimal; publish as _value_hb and _value_lb
             const char *slash = strchr(fBuf, '/');
             if (slash != nullptr) {
-              char topicBuf[50];
+              // Use MQTT_TOPIC_MAX_LEN (not a magic 50) so label+"_value_hb" never truncates
+              char topicBuf[MQTT_TOPIC_MAX_LEN];
               int8_t  ub       = (int8_t)atoi(fBuf);
               int8_t  lb       = (int8_t)atoi(slash + 1);
               uint16_t combined = ((uint8_t)ub << 8) | (uint8_t)lb;
@@ -2122,7 +2156,8 @@ void processPSSummary(const char *buf, int len) {
             // PS=1 format: "XX/YY" decimal; publish as _value_hb and _value_lb
             const char *slash = strchr(fBuf, '/');
             if (slash != nullptr) {
-              char topicBuf[50];
+              // Use MQTT_TOPIC_MAX_LEN (not a magic 50) so label+"_value_hb" never truncates
+              char topicBuf[MQTT_TOPIC_MAX_LEN];
               uint8_t  hb      = (uint8_t)atoi(fBuf);
               uint8_t  lb      = (uint8_t)atoi(slash + 1);
               uint16_t combined = ((uint16_t)hb << 8) | lb;
@@ -2164,24 +2199,27 @@ void processPSSummary(const char *buf, int len) {
               msglastupdated[msgid] = now;
               bUpdated = true;
               if (msgid == 0) {
-                // Main Status flags: update state and publish individual bits
+                // Main Status flags: use publishStatusBitMQTT for per-bit change-detect
+                // + interval throttle — consistent with normal OT frame processing.
+                // publishStatusBitMQTT creates its own nested OTPublishGate which
+                // overrides the outer psGate for each individual bit. (ADR-006)
+                publishStatusBitMQTT(0, "ch_enable",        hb & 0x01, OTcurrentSystemState.MasterStatus & 0x01);
+                publishStatusBitMQTT(1, "dhw_enable",       hb & 0x02, OTcurrentSystemState.MasterStatus & 0x02);
+                publishStatusBitMQTT(2, "cooling_enable",   hb & 0x04, OTcurrentSystemState.MasterStatus & 0x04);
+                publishStatusBitMQTT(3, "otc_active",       hb & 0x08, OTcurrentSystemState.MasterStatus & 0x08);
+                publishStatusBitMQTT(4, "ch2_enable",       hb & 0x10, OTcurrentSystemState.MasterStatus & 0x10);
+                publishStatusBitMQTT(5, "summerwintertime", hb & 0x20, OTcurrentSystemState.MasterStatus & 0x20);
+                publishStatusBitMQTT(6, "dhw_blocking",     hb & 0x40, OTcurrentSystemState.MasterStatus & 0x40);
+                publishStatusBitMQTT(8,  "fault",                lb & 0x01, OTcurrentSystemState.SlaveStatus & 0x01);
+                publishStatusBitMQTT(9,  "centralheating",       lb & 0x02, OTcurrentSystemState.SlaveStatus & 0x02);
+                publishStatusBitMQTT(10, "domestichotwater",     lb & 0x04, OTcurrentSystemState.SlaveStatus & 0x04);
+                publishStatusBitMQTT(11, "flame",                lb & 0x08, OTcurrentSystemState.SlaveStatus & 0x08);
+                publishStatusBitMQTT(12, "cooling",              lb & 0x10, OTcurrentSystemState.SlaveStatus & 0x10);
+                publishStatusBitMQTT(13, "centralheating2",      lb & 0x20, OTcurrentSystemState.SlaveStatus & 0x20);
+                publishStatusBitMQTT(14, "diagnostic_indicator", lb & 0x40, OTcurrentSystemState.SlaveStatus & 0x40);
                 OTcurrentSystemState.MasterStatus = hb;
                 OTcurrentSystemState.SlaveStatus  = lb;
                 OTcurrentSystemState.Statusflags  = ((uint16_t)hb << 8) | lb;
-                publishMQTTOnOff(F("ch_enable"),        hb & 0x01);
-                publishMQTTOnOff(F("dhw_enable"),       hb & 0x02);
-                publishMQTTOnOff(F("cooling_enable"),   hb & 0x04);
-                publishMQTTOnOff(F("otc_active"),       hb & 0x08);
-                publishMQTTOnOff(F("ch2_enable"),       hb & 0x10);
-                publishMQTTOnOff(F("summerwintertime"), hb & 0x20);
-                publishMQTTOnOff(F("dhw_blocking"),     hb & 0x40);
-                publishMQTTOnOff(F("fault"),                lb & 0x01);
-                publishMQTTOnOff(F("centralheating"),       lb & 0x02);
-                publishMQTTOnOff(F("domestichotwater"),     lb & 0x04);
-                publishMQTTOnOff(F("flame"),                lb & 0x08);
-                publishMQTTOnOff(F("cooling"),              lb & 0x10);
-                publishMQTTOnOff(F("centralheating2"),      lb & 0x20);
-                publishMQTTOnOff(F("diagnostic_indicator"), lb & 0x40);
               } else {
                 // Other flag8/flag8 fields (RBPflags=6, StatusVH=70): publish raw binary string
                 sendMQTTData(label, fBuf);
@@ -2621,11 +2659,13 @@ void processOT(const char *buf, int len){
       AddLog(" ");  // Space before payload for readability
       
       //next step interpret the OT protocol
-      // Set the MQTT publish gate for this OT message (rate limiting by settingMQTTinterval)
-      mqttPublishAllowed = shouldPublishMQTTForID(OTdata.id, OTdata.masterslave);
-      decodeAndPublishOTValue();
-      // Reset the MQTT publish gate so non-OT sends (event_report, etc.) are not affected
-      mqttPublishAllowed = true;
+      // OTPublishGate RAII: gate closes for this OT slot's throttle decision and
+      // is guaranteed to reopen (restore true) when the scope exits, even on early
+      // return. Non-OT sends (event_report, etc.) that follow are not affected. (ADR-006)
+      {
+        OTPublishGate gate(shouldPublishMQTTForID(OTdata.id, OTdata.masterslave, OTdata.value));
+        decodeAndPublishOTValue();
+      }
 
       if (OTdata.skipthis) AddLog(" <ignored> ");
       AddLogln();
@@ -2737,9 +2777,14 @@ void processOT(const char *buf, int len){
     // processPSSummary() validates the field count and returns silently if not a PS=1 line.
     processPSSummary(buf, len);
   } else if ((strchr(buf, '=') != nullptr) && (strchr(buf, ':') == nullptr)) {
-    // Lines containing '=' but no ':' are echoed commands in PS=1 mode.
-    // Detect this even when PS=1 was enabled externally (e.g. Domoticz classic plugin),
-    // so WebUI can show the footer watermark reliably.
+    // Lines containing '=' but no ':' are echoed commands or command responses in PS=1 mode
+    // (e.g. "PS=0" after sending PS=0 to exit PS mode, "TT=20.0" for a setpoint command echo).
+    // Forward to WebSocket and MQTT so the OT Monitor tab remains usable in PS=1 mode and
+    // the user can see the result of commands like "PS=0". (ADR-038)
+    Debugln(buf);
+    sendMQTTData(F("event_report"), buf);
+    sendEventToWebSocket('<', buf, (int)len);
+    // PS mode detection: still detect PS=1 from these echo lines even when set externally
     if (!bPSmode) {
       OTGWDebugTln(F("PS mode auto-detected as ON (summary key=value stream)"));
     }
