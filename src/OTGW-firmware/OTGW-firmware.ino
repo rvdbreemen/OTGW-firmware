@@ -64,6 +64,7 @@ void setup() {
   setLed(LED2, ON);
 
   LittleFSmounted = LittleFS.begin();
+  if (!LittleFSmounted) SetupDebugln(F("*** ERROR: LittleFS mount FAILED - running on compile-time defaults ***"));
   readSettings(true);
   checklittlefshash();
 
@@ -111,8 +112,10 @@ void setup() {
   setLed(LED2, OFF);
   sendMQTTuptime();
   sendMQTTversioninfo();
+  if (!LittleFSmounted) sendMQTTData(F("otgw-firmware/error"), "LittleFS mount failed - running on defaults", false);
   initS0Count();        // init S0 counter
   initSensors();        // init DS18B20 (after MQ is up!)
+  bSetupComplete = true; // ADR-036: allow doBackgroundTasks() to run service handlers
 }
 //=====================================================================
 
@@ -329,12 +332,17 @@ void do5minevent(){
 void doBackgroundTasks()
 {
   feedWatchDog();               // Feed the dog before it bites!
-  
+
+  // ADR-036: block service handlers until setup() completes.
+  // blinkLED/delayms in setup() would otherwise invoke handleMQTT() before
+  // startMQTT() sets the 1350-byte buffer, and handleOTGW() before resetOTGW().
+  if (!bSetupComplete) return;
+
   // Check for critically low heap and attempt recovery if needed
   if (getHeapHealth() == HEAP_CRITICAL) {
     emergencyHeapRecovery();
   }
-  
+
   if (WiFi.status() == WL_CONNECTED) {
     // During firmware flash, keep essential services but skip heavy background tasks
     // ESP flash: Skip MQTT, OTGW, NTP to reduce interference

@@ -1,8 +1,9 @@
 # ADR-006: MQTT Integration Pattern
 
-**Status:** Accepted  
-**Date:** 2018-06-01 (Estimated)  
+**Status:** Accepted
+**Date:** 2018-06-01 (Estimated)
 **Updated:** 2026-02-16 (Added complete state machine, heap-aware backpressure)
+**Updated:** 2026-03-05 (v1.3.0: configurable interval throttle, OTPublishGate RAII, PS=1 integration)
 
 ## Context
 
@@ -64,6 +65,46 @@ enum states_of_MQTT {
 - Splits large messages into 128-byte chunks via `beginPublish()`/`write()`/`endPublish()`
 - Eliminates buffer resize cycles
 - Saves 200-400 bytes of heap
+
+**Configurable publish interval (v1.3.0+, `settingMQTTinterval`):**
+
+Users with high-traffic MQTT brokers can set a minimum interval (seconds) between publishes per OpenTherm message ID. The design:
+
+- `settingMQTTinterval = 0` (default): legacy mode — every OT value published immediately, no throttling.
+- `settingMQTTinterval > 0`: a message is published only if its raw value has changed since last publish, OR the interval has elapsed. This ensures changes are never suppressed and the broker receives a periodic refresh even for stable values.
+- Per-slot state is packed into `mqttlastsent[256]` (1 KB): bits 31–16 hold the last published `uint16_t` value; bits 15–0 hold the seconds-since-boot timestamp (wraps ~18h; safe for intervals ≤ 3600s with `uint16_t` subtraction).
+- **IDs 128–255** (manufacturer-specific/Remeha): always published regardless of interval to prevent cross-slot aliasing (adding 128 to a REQUEST id would collide with RESPONSE slot 0 = Status flags).
+- **Status bits** (OT_Statusflags, id=0): each bit has its own slot in `mqttlastsentstatusbit[16]` (slots 0–7 = master bits, 8–15 = slave bits) so each bit refreshes independently.
+
+**OTPublishGate RAII pattern (v1.3.0+):**
+
+The MQTT publish decision for a given OT slot is communicated to `sendMQTTData()` via the global `bool mqttPublishAllowed`. Manual save/restore is replaced by the `OTPublishGate` RAII struct which saves the previous value on construction and restores it in the destructor:
+
+```cpp
+// Normal OT frame path (processOT):
+{
+  OTPublishGate gate(shouldPublishMQTTForID(OTdata.id, OTdata.masterslave, OTdata.value));
+  decodeAndPublishOTValue();
+} // gate destructor restores mqttPublishAllowed = true
+
+// Per-bit status (publishStatusBitMQTT):
+void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool prevVal) {
+  OTPublishGate gate(shouldPublishStatusBit(bitSlot, newVal, prevVal));
+  publishMQTTOnOff(topic, newVal);
+}
+```
+
+The RAII approach ensures the gate can never be left in the `false` state even if a callee returns early or the call stack is interrupted by a `yield()`.
+
+**PS=1 mode throttle (v1.3.0+):**
+
+When the OTGW PIC is in PS=1 (Print Summary) mode, `processPSSummary()` handles publishing. PS=1 fields are throttled using `shouldPublishMQTTForPSField(msgid)` which:
+
+- Uses **interval-only** gating (no value-change detection) — the PIC already suppresses unchanged fields in PS=1 output.
+- Updates **only the time field** in `mqttlastsent[idx]`, preserving the last-value bits so normal OT mode change-detection remains valid if the device switches back to standard mode.
+- Shares `mqttlastsent[]` with normal OT mode so the interval is honoured regardless of which mode is active.
+
+Status bits in PS=1 use `publishStatusBitMQTT()` (the same function as normal OT mode), giving identical per-bit change-detection + interval behaviour in both modes.
 
 ## Alternatives Considered
 
