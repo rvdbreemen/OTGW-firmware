@@ -10,6 +10,8 @@
 ***************************************************************************      
 */
 
+#include <ctype.h>
+
 //=======================================================================
 // Deferred settings write support (Finding #23: reduce flash wear + service restarts)
 // Side-effect bitmask flags
@@ -71,50 +73,107 @@ bool checkGPIOConflict(int pin, PGM_P caller)
 }
 
 //=======================================================================
-// Streaming JSON write helpers — write each field directly to the open file.
-// No heap allocation; cMsg is used only as a scratch buffer for numeric formatting.
-// All key literals are in PROGMEM (PGM_P).
-// Forward declarations with default parameters
-void wStrF(File &f, PGM_P key, const char *val, bool last = false);
-void wBoolF(File &f, PGM_P key, bool val, bool last = false);
-void wIntF(File &f, PGM_P key, long val, bool last = false);
-void applySettingFromFile(const char *key, const char *val);
-void parseSettingsLine();
+static bool parseJsonKVLine(const char* line, char* keyOut, size_t keyOutSize, char* valueOut, size_t valueOutSize)
+{
+  if (!line || !keyOut || keyOutSize == 0 || !valueOut || valueOutSize == 0) return false;
+  keyOut[0] = '\0';
+  valueOut[0] = '\0';
 
-void wStrF(File &f, PGM_P key, const char *val, bool last) {
-  f.print(F("  \""));
-  f.print(FPSTR(key));
-  f.print(F("\": \""));
-  for (const char *p = val; *p; p++) {
-    if      (*p == '"')  { f.write('\\'); f.write('"');  }
-    else if (*p == '\\') { f.write('\\'); f.write('\\'); }
-    else if (*p == '\n') { f.print(F("\\n")); }
-    else if (*p == '\r') { f.print(F("\\r")); }
-    else if (*p == '\t') { f.print(F("\\t")); }
-    else                 { f.write((uint8_t)*p); }
+  const char* keyStart = strchr(line, '"');
+  if (!keyStart) return false;
+  keyStart++;
+  const char* keyEnd = keyStart;
+  while (*keyEnd) {
+    if (*keyEnd == '\\') {
+      if (*(keyEnd + 1) == '\0') return false;
+      keyEnd += 2;
+      continue;
+    }
+    if (*keyEnd == '"') break;
+    keyEnd++;
   }
-  f.print(last ? F("\"\r\n") : F("\",\r\n"));
+  if (*keyEnd != '"') return false;
+  size_t keyLen = static_cast<size_t>(keyEnd - keyStart);
+  if (keyLen == 0 || keyLen >= keyOutSize) return false;
+  memcpy(keyOut, keyStart, keyLen);
+  keyOut[keyLen] = '\0';
+
+  const char* p = keyEnd + 1;
+  while (*p && isspace(static_cast<unsigned char>(*p))) p++;
+  if (*p != ':') return false;
+  p++;
+  while (*p && isspace(static_cast<unsigned char>(*p))) p++;
+
+  if (*p == '"') {
+    p++;
+    size_t n = 0;
+    while (*p && n + 1 < valueOutSize) {
+      if (*p == '\\') {
+        if (*(p + 1) == '\0') return false;
+        p++;
+        switch (*p) {
+          case '"': valueOut[n++] = '"'; break;
+          case '\\': valueOut[n++] = '\\'; break;
+          case '/': valueOut[n++] = '/'; break;
+          case 'b': valueOut[n++] = '\b'; break;
+          case 'f': valueOut[n++] = '\f'; break;
+          case 'n': valueOut[n++] = '\n'; break;
+          case 'r': valueOut[n++] = '\r'; break;
+          case 't': valueOut[n++] = '\t'; break;
+          default: valueOut[n++] = *p; break;
+        }
+        p++;
+        continue;
+      }
+      if (*p == '"') break;
+      valueOut[n++] = *p++;
+    }
+    valueOut[n] = '\0';
+    return true;
+  }
+
+  const char* start = p;
+  while (*p && *p != ',' && *p != '}' && !isspace(static_cast<unsigned char>(*p))) p++;
+  size_t len = static_cast<size_t>(p - start);
+  if (len == 0) return false;
+  if (len >= valueOutSize) len = valueOutSize - 1;
+  memcpy(valueOut, start, len);
+  valueOut[len] = '\0';
+  return true;
 }
 
-void wBoolF(File &f, PGM_P key, bool val, bool last) {
-  f.print(F("  \""));
-  f.print(FPSTR(key));
-  f.print(val ? F("\": true") : F("\": false"));
-  f.print(last ? F("\r\n") : F(",\r\n"));
+static void writeJsonStringKV(File& file, const __FlashStringHelper* key, const char* value, bool withComma)
+{
+  // Use global cMsg as escape scratch — no heap allocation.
+  // writeSettings() holds no yield() between calls, so cMsg cannot be clobbered mid-write.
+  escapeJsonStringTo(value, cMsg, sizeof(cMsg));
+  file.printf_P(PSTR("  \"%S\": \"%s\"%s\n"),
+                reinterpret_cast<PGM_P>(key),
+                cMsg,
+                withComma ? "," : "");
 }
 
-void wIntF(File &f, PGM_P key, long val, bool last) {
-  f.print(F("  \""));
-  f.print(FPSTR(key));
-  f.print(F("\": "));
-  snprintf_P(cMsg, sizeof(cMsg), PSTR("%ld"), val);
-  f.print(cMsg);
-  f.print(last ? F("\r\n") : F(",\r\n"));
+static void writeJsonBoolKV(File& file, const __FlashStringHelper* key, bool value, bool withComma)
+{
+  file.printf_P(PSTR("  \"%S\": %s%s\n"),
+                reinterpret_cast<PGM_P>(key),
+                value ? "true" : "false",
+                withComma ? "," : "");
+}
+
+static void writeJsonIntKV(File& file, const __FlashStringHelper* key, int value, bool withComma)
+{
+  file.printf_P(PSTR("  \"%S\": %d%s\n"),
+                reinterpret_cast<PGM_P>(key),
+                value,
+                withComma ? "," : "");
 }
 
 //=======================================================================
 void writeSettings(bool show)
 {
+
+  DebugTf(PSTR("[Settings] State: writeSettings called (show=%s)\r\n"), show ? "true" : "false");
   DebugTf(PSTR("[Settings] Writing to [%s] ..\r\n"), SETTINGS_FILE);
   File file = LittleFS.open(SETTINGS_FILE, "w");
   if (!file)
@@ -124,162 +183,71 @@ void writeSettings(bool show)
   }
   yield();
 
-  file.print(F("{\r\n"));
-  wStrF (file, PSTR("hostname"),                settingHostname);
-  wBoolF(file, PSTR("MQTTenable"),              settingMQTTenable);
-  wStrF (file, PSTR("MQTTbroker"),              settingMQTTbroker);
-  wIntF (file, PSTR("MQTTbrokerPort"),          settingMQTTbrokerPort);
-  wStrF (file, PSTR("MQTTuser"),                settingMQTTuser);
-  wStrF (file, PSTR("MQTTpasswd"),              settingMQTTpasswd);
-  wStrF (file, PSTR("MQTTtoptopic"),            settingMQTTtopTopic);
-  wStrF (file, PSTR("MQTThaprefix"),            settingMQTThaprefix);
-  wStrF (file, PSTR("MQTTuniqueid"),            settingMQTTuniqueid);
-  wBoolF(file, PSTR("MQTTOTmessage"),           settingMQTTOTmessage);
-  wBoolF(file, PSTR("MQTTseparatesources"),     settingMQTTSeparateSources);
-  wBoolF(file, PSTR("MQTTharebootdetection"),   settingMQTTharebootdetection);
-  wBoolF(file, PSTR("NTPenable"),               settingNTPenable);
-  wStrF (file, PSTR("NTPtimezone"),             settingNTPtimezone);
-  wStrF (file, PSTR("NTPhostname"),             settingNTPhostname);
-  wBoolF(file, PSTR("NTPsendtime"),             settingNTPsendtime);
-  wBoolF(file, PSTR("LEDblink"),                settingLEDblink);
-  wBoolF(file, PSTR("darktheme"),               settingDarkTheme);
-  wBoolF(file, PSTR("ui_autoscroll"),           settingUIAutoScroll);
-  wBoolF(file, PSTR("ui_timestamps"),           settingUIShowTimestamp);
-  wBoolF(file, PSTR("ui_capture"),              settingUICaptureMode);
-  wBoolF(file, PSTR("ui_autoscreenshot"),       settingUIAutoScreenshot);
-  wBoolF(file, PSTR("ui_autodownloadlog"),      settingUIAutoDownloadLog);
-  wBoolF(file, PSTR("ui_autoexport"),           settingUIAutoExport);
-  wIntF (file, PSTR("ui_graphtimewindow"),      settingUIGraphTimeWindow);
-  wBoolF(file, PSTR("GPIOSENSORSenabled"),      settingGPIOSENSORSenabled);
-  wBoolF(file, PSTR("GPIOSENSORSlegacyformat"), settingGPIOSENSORSlegacyformat);
-  wIntF (file, PSTR("GPIOSENSORSpin"),          settingGPIOSENSORSpin);
-  wIntF (file, PSTR("GPIOSENSORSinterval"),     settingGPIOSENSORSinterval);
-  wBoolF(file, PSTR("S0COUNTERenabled"),        settingS0COUNTERenabled);
-  wIntF (file, PSTR("S0COUNTERpin"),            settingS0COUNTERpin);
-  wIntF (file, PSTR("S0COUNTERdebouncetime"),   settingS0COUNTERdebouncetime);
-  wIntF (file, PSTR("S0COUNTERpulsekw"),        settingS0COUNTERpulsekw);
-  wIntF (file, PSTR("S0COUNTERinterval"),       settingS0COUNTERinterval);
-  wBoolF(file, PSTR("OTGWcommandenable"),       settingOTGWcommandenable);
-  wStrF (file, PSTR("OTGWcommands"),            settingOTGWcommands);
-  wBoolF(file, PSTR("GPIOOUTPUTSenabled"),      settingGPIOOUTPUTSenabled);
-  wIntF (file, PSTR("GPIOOUTPUTSpin"),          settingGPIOOUTPUTSpin);
-  wIntF (file, PSTR("GPIOOUTPUTStriggerBit"),   settingGPIOOUTPUTStriggerBit);
-  wBoolF(file, PSTR("WebhookEnabled"),          settingWebhookEnabled);
-  wStrF (file, PSTR("WebhookURLon"),            settingWebhookURLon);
-  wStrF (file, PSTR("WebhookURLoff"),           settingWebhookURLoff);
-  wIntF (file, PSTR("WebhookTriggerBit"),       settingWebhookTriggerBit);
-  wStrF (file, PSTR("WebhookPayload"),          settingWebhookPayload);
-  wStrF (file, PSTR("WebhookContentType"),      settingWebhookContentType, true); // last field
-  file.print(F("}\r\n"));
+  DebugT(F("[Settings] State: Writing JSON settings... "));
 
-  file.close();
+  file.print(F("{\n"));
+  writeJsonStringKV(file, F("hostname"), settingHostname, true);
+  writeJsonBoolKV(file, F("MQTTenable"), settingMQTTenable, true);
+  writeJsonStringKV(file, F("MQTTbroker"), settingMQTTbroker, true);
+  writeJsonIntKV(file, F("MQTTbrokerPort"), settingMQTTbrokerPort, true);
+  writeJsonStringKV(file, F("MQTTuser"), settingMQTTuser, true);
+  writeJsonStringKV(file, F("MQTTpasswd"), settingMQTTpasswd, true);
+  writeJsonStringKV(file, F("MQTTtoptopic"), settingMQTTtopTopic, true);
+  writeJsonStringKV(file, F("MQTThaprefix"), settingMQTThaprefix, true);
+  writeJsonStringKV(file, F("MQTTuniqueid"), settingMQTTuniqueid, true);
+  writeJsonBoolKV(file, F("MQTTOTmessage"), settingMQTTOTmessage, true);
+  writeJsonBoolKV(file, F("MQTTseparatesources"), settingMQTTSeparateSources, true);
+  writeJsonIntKV(file, F("MQTTinterval"), settingMQTTinterval, true);
+  writeJsonBoolKV(file, F("MQTTharebootdetection"), settingMQTTharebootdetection, true);
+  writeJsonBoolKV(file, F("NTPenable"), settingNTPenable, true);
+  writeJsonStringKV(file, F("NTPtimezone"), settingNTPtimezone, true);
+  writeJsonStringKV(file, F("NTPhostname"), settingNTPhostname, true);
+  writeJsonBoolKV(file, F("NTPsendtime"), settingNTPsendtime, true);
+  writeJsonBoolKV(file, F("LEDblink"), settingLEDblink, true);
+  writeJsonBoolKV(file, F("darktheme"), settingDarkTheme, true);
+  writeJsonBoolKV(file, F("ui_autoscroll"), settingUIAutoScroll, true);
+  writeJsonBoolKV(file, F("ui_timestamps"), settingUIShowTimestamp, true);
+  writeJsonBoolKV(file, F("ui_capture"), settingUICaptureMode, true);
+  writeJsonBoolKV(file, F("ui_autoscreenshot"), settingUIAutoScreenshot, true);
+  writeJsonBoolKV(file, F("ui_autodownloadlog"), settingUIAutoDownloadLog, true);
+  writeJsonBoolKV(file, F("ui_autoexport"), settingUIAutoExport, true);
+  writeJsonIntKV(file, F("ui_graphtimewindow"), settingUIGraphTimeWindow, true);
+  writeJsonBoolKV(file, F("GPIOSENSORSenabled"), settingGPIOSENSORSenabled, true);
+  writeJsonBoolKV(file, F("GPIOSENSORSlegacyformat"), settingGPIOSENSORSlegacyformat, true);
+  writeJsonIntKV(file, F("GPIOSENSORSpin"), settingGPIOSENSORSpin, true);
+  writeJsonIntKV(file, F("GPIOSENSORSinterval"), settingGPIOSENSORSinterval, true);
+  writeJsonBoolKV(file, F("S0COUNTERenabled"), settingS0COUNTERenabled, true);
+  writeJsonIntKV(file, F("S0COUNTERpin"), settingS0COUNTERpin, true);
+  writeJsonIntKV(file, F("S0COUNTERdebouncetime"), settingS0COUNTERdebouncetime, true);
+  writeJsonIntKV(file, F("S0COUNTERpulsekw"), settingS0COUNTERpulsekw, true);
+  writeJsonIntKV(file, F("S0COUNTERinterval"), settingS0COUNTERinterval, true);
+  writeJsonBoolKV(file, F("OTGWcommandenable"), settingOTGWcommandenable, true);
+  writeJsonStringKV(file, F("OTGWcommands"), settingOTGWcommands, true);
+  writeJsonBoolKV(file, F("GPIOOUTPUTSenabled"), settingGPIOOUTPUTSenabled, true);
+  writeJsonIntKV(file, F("GPIOOUTPUTSpin"), settingGPIOOUTPUTSpin, true);
+  writeJsonIntKV(file, F("GPIOOUTPUTStriggerBit"), settingGPIOOUTPUTStriggerBit, true);
+  writeJsonBoolKV(file, F("WebhookEnabled"), settingWebhookEnabled, true);
+  writeJsonStringKV(file, F("WebhookURLon"), settingWebhookURLon, true);
+  writeJsonStringKV(file, F("WebhookURLoff"), settingWebhookURLoff, true);
+  writeJsonIntKV(file, F("WebhookTriggerBit"), settingWebhookTriggerBit, true);
+  writeJsonStringKV(file, F("WebhookPayload"), settingWebhookPayload, true);
+  writeJsonStringKV(file, F("WebhookContentType"), settingWebhookContentType, false);
+  file.print(F("}\n"));
+  Debugln(F("\r\n[Settings] State: File write complete, closing file"));
+  file.close();  // Close write handle before any subsequent read
   DebugTf(PSTR("[Settings] State: Settings saved successfully to %s\r\n"), SETTINGS_FILE);
+
+  if (show) {
+    DebugTln(F("\r\n[Settings] JSON content:"));
+    File showFile = LittleFS.open(SETTINGS_FILE, "r");
+    while (showFile && showFile.available()) {
+      TelnetStream.write(showFile.read());
+    }
+    if (showFile) showFile.close();
+  }
 
 } // writeSettings()
 
-
-//=======================================================================
-// Streaming JSON read helpers — parse one key-value pair from cMsg in-place.
-
-// Apply one key/value pair loaded from the settings file to the in-memory settings.
-// rawVal is already unescaped (for string values) or the raw token (bool/int).
-void applySettingFromFile(const char *key, const char *val) {
-  if (strcasecmp_P(key, PSTR("hostname")) == 0)                { strlcpy(settingHostname, val, sizeof(settingHostname)); return; }
-  if (strcasecmp_P(key, PSTR("MQTTenable")) == 0)              { settingMQTTenable = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("MQTTbroker")) == 0)              { strlcpy(settingMQTTbroker, val, sizeof(settingMQTTbroker)); return; }
-  if (strcasecmp_P(key, PSTR("MQTTbrokerPort")) == 0)          { settingMQTTbrokerPort = atoi(val); return; }
-  if (strcasecmp_P(key, PSTR("MQTTuser")) == 0)                { strlcpy(settingMQTTuser, val, sizeof(settingMQTTuser)); return; }
-  if (strcasecmp_P(key, PSTR("MQTTpasswd")) == 0)              { strlcpy(settingMQTTpasswd, val, sizeof(settingMQTTpasswd)); return; }
-  if (strcasecmp_P(key, PSTR("MQTTtoptopic")) == 0)            { strlcpy(settingMQTTtopTopic, val, sizeof(settingMQTTtopTopic)); return; }
-  if (strcasecmp_P(key, PSTR("MQTThaprefix")) == 0)            { strlcpy(settingMQTThaprefix, val, sizeof(settingMQTThaprefix)); return; }
-  if (strcasecmp_P(key, PSTR("MQTTuniqueid")) == 0)            { strlcpy(settingMQTTuniqueid, val, sizeof(settingMQTTuniqueid)); return; }
-  if (strcasecmp_P(key, PSTR("MQTTOTmessage")) == 0)           { settingMQTTOTmessage = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("MQTTseparatesources")) == 0)     { settingMQTTSeparateSources = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("MQTTharebootdetection")) == 0)   { settingMQTTharebootdetection = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("NTPenable")) == 0)               { settingNTPenable = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("NTPtimezone")) == 0)             { strlcpy(settingNTPtimezone, val, sizeof(settingNTPtimezone)); return; }
-  if (strcasecmp_P(key, PSTR("NTPhostname")) == 0)             { strlcpy(settingNTPhostname, val, sizeof(settingNTPhostname)); return; }
-  if (strcasecmp_P(key, PSTR("NTPsendtime")) == 0)             { settingNTPsendtime = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("LEDblink")) == 0)                { settingLEDblink = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("darktheme")) == 0)               { settingDarkTheme = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("ui_autoscroll")) == 0)           { settingUIAutoScroll = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("ui_timestamps")) == 0)           { settingUIShowTimestamp = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("ui_capture")) == 0)              { settingUICaptureMode = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("ui_autoscreenshot")) == 0)       { settingUIAutoScreenshot = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("ui_autodownloadlog")) == 0)      { settingUIAutoDownloadLog = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("ui_autoexport")) == 0)           { settingUIAutoExport = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("ui_graphtimewindow")) == 0)      { settingUIGraphTimeWindow = atoi(val); return; }
-  if (strcasecmp_P(key, PSTR("GPIOSENSORSenabled")) == 0)      { settingGPIOSENSORSenabled = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("GPIOSENSORSlegacyformat")) == 0) { settingGPIOSENSORSlegacyformat = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("GPIOSENSORSpin")) == 0)          { settingGPIOSENSORSpin = atoi(val); return; }
-  if (strcasecmp_P(key, PSTR("GPIOSENSORSinterval")) == 0)     { settingGPIOSENSORSinterval = atoi(val); return; }
-  if (strcasecmp_P(key, PSTR("S0COUNTERenabled")) == 0)        { settingS0COUNTERenabled = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("S0COUNTERpin")) == 0)            { settingS0COUNTERpin = atoi(val); return; }
-  if (strcasecmp_P(key, PSTR("S0COUNTERdebouncetime")) == 0)   { settingS0COUNTERdebouncetime = atoi(val); return; }
-  if (strcasecmp_P(key, PSTR("S0COUNTERpulsekw")) == 0)        { settingS0COUNTERpulsekw = atoi(val); return; }
-  if (strcasecmp_P(key, PSTR("S0COUNTERinterval")) == 0)       { settingS0COUNTERinterval = atoi(val); return; }
-  if (strcasecmp_P(key, PSTR("OTGWcommandenable")) == 0)       { settingOTGWcommandenable = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("OTGWcommands")) == 0)            { strlcpy(settingOTGWcommands, val, sizeof(settingOTGWcommands)); return; }
-  if (strcasecmp_P(key, PSTR("GPIOOUTPUTSenabled")) == 0)      { settingGPIOOUTPUTSenabled = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("GPIOOUTPUTSpin")) == 0)          { settingGPIOOUTPUTSpin = atoi(val); return; }
-  if (strcasecmp_P(key, PSTR("GPIOOUTPUTStriggerBit")) == 0)   { settingGPIOOUTPUTStriggerBit = atoi(val); return; }
-  if (strcasecmp_P(key, PSTR("WebhookEnabled")) == 0)          { settingWebhookEnabled = EVALBOOLEAN(val); return; }
-  if (strcasecmp_P(key, PSTR("WebhookURLon")) == 0)            { strlcpy(settingWebhookURLon, val, sizeof(settingWebhookURLon)); return; }
-  if (strcasecmp_P(key, PSTR("WebhookURLoff")) == 0)           { strlcpy(settingWebhookURLoff, val, sizeof(settingWebhookURLoff)); return; }
-  if (strcasecmp_P(key, PSTR("WebhookTriggerBit")) == 0) {
-    int bit = atoi(val);
-    if (bit < 0)       bit = 0;
-    else if (bit > 15) bit = 15;
-    settingWebhookTriggerBit = bit;
-    return;
-  }
-  if (strcasecmp_P(key, PSTR("WebhookPayload")) == 0)          { strlcpy(settingWebhookPayload, val, sizeof(settingWebhookPayload)); return; }
-  if (strcasecmp_P(key, PSTR("WebhookContentType")) == 0)     { strlcpy(settingWebhookContentType, val, sizeof(settingWebhookContentType)); return; }
-}
-
-// Parse one JSON line from cMsg and dispatch to applySettingFromFile().
-// Handles:  "key": "string value",   "key": true,   "key": 123
-// Modifies cMsg in-place (null-terminates key; unescapes string values).
-void parseSettingsLine() {
-  char *p = cMsg;
-  while (*p == ' ' || *p == '\t') p++; // skip leading whitespace
-  if (*p != '"') return;               // not a key-value line ({, }, empty)
-  p++;                                 // skip opening '"'
-  const char *key = p;
-  while (*p && *p != '"') p++;         // find closing '"' of key
-  if (!*p) return;
-  *p++ = '\0';                         // null-terminate key
-  while (*p == ':' || *p == ' ') p++;  // skip ': '
-
-  const char *val;
-  if (*p == '"') {
-    // String value — unescape in-place
-    p++;
-    char *out = p;
-    val = out;
-    while (*p && *p != '"') {
-      if (*p == '\\' && *(p + 1)) {
-        p++;
-        switch (*p) {
-          case 'n':  *out++ = '\n'; break;
-          case 'r':  *out++ = '\r'; break;
-          case 't':  *out++ = '\t'; break;
-          default:   *out++ = *p;  break; // handles \" and backslash
-        }
-        p++;
-      } else {
-        *out++ = *p++;
-      }
-    }
-    *out = '\0';
-  } else {
-    // Bool or integer — strip trailing ',' '\r' '\n'
-    val = p;
-    while (*p && *p != ',' && *p != '\r' && *p != '\n') p++;
-    *p = '\0';
-  }
-  applySettingFromFile(key, val);
-}
 
 //=======================================================================
 void readSettings(bool show)
@@ -294,20 +262,46 @@ void readSettings(bool show)
   }
 
   File file = LittleFS.open(SETTINGS_FILE, "r");
-  if (!file)
-  {
-    DebugTln(F("[Settings] Error: could not open settings file, using defaults."));
+  if (!file) {
+    DebugTln(F("Failed to open settings file, use existing defaults."));
     return;
   }
+  if (file.size() == 0) {
+    file.close();
+    DebugTln(F("Settings file is empty, use existing defaults."));
+    return;
+  }
+  // Own line buffer — prevents cMsg clobber if readSettings() is called from an
+  // HTTP handler where file.readBytesUntil() calls yield() internally, which
+  // could allow writeSettings() → writeJsonStringKV() to overwrite cMsg mid-parse.
+  char lineBuf[256];
+  char keyBuf[64];
+  char valueBuf[201]; // must fit the largest setting value (WebhookPayload: 201 bytes)
 
-  // Stream each line; parseSettingsLine() dispatches key/value to applySettingFromFile()
   while (file.available()) {
-    int n = file.readBytesUntil('\n', cMsg, sizeof(cMsg) - 1);
-    cMsg[n] = '\0';
-    if (n > 0 && cMsg[n - 1] == '\r') cMsg[--n] = '\0';
-    parseSettingsLine();
+    size_t len = file.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
+    lineBuf[len] = '\0';
+    if (len == (sizeof(lineBuf) - 1)) {
+      // Line was longer than lineBuf — discard remainder and skip it.
+      while (file.available()) {
+        char discardBuf[32];
+        size_t chunkLen = file.readBytesUntil('\n', discardBuf, sizeof(discardBuf) - 1);
+        if (chunkLen < (sizeof(discardBuf) - 1)) break;
+        yield();
+      }
+      continue;
+    }
+
+    if (parseJsonKVLine(lineBuf, keyBuf, sizeof(keyBuf), valueBuf, sizeof(valueBuf))) {
+      updateSetting(keyBuf, valueBuf);
+    }
   }
   file.close();
+
+  // Loading from file must NOT trigger a rewrite or service restarts —
+  // clear any dirty/side-effect state set by updateSetting() above.
+  settingsDirty = false;
+  pendingSideEffects = 0;
 
   // Post-processing: apply defaults for any missing or empty values
   if (strlen(settingHostname) == 0) strlcpy(settingHostname, _HOSTNAME, sizeof(settingHostname));
@@ -347,6 +341,7 @@ void readSettings(bool show)
     Debugf(PSTR("MQTT toptopic         : %s\r\n"), CSTR(settingMQTTtopTopic));
     Debugf(PSTR("MQTT uniqueid         : %s\r\n"), CSTR(settingMQTTuniqueid));
     Debugf(PSTR("MQTT separate sources : %s\r\n"), CBOOLEAN(settingMQTTSeparateSources));
+    Debugf(PSTR("MQTT interval         : %d\r\n"), settingMQTTinterval);
     Debugf(PSTR("HA prefix             : %s\r\n"), CSTR(settingMQTThaprefix));
     Debugf(PSTR("HA reboot detection   : %s\r\n"), CBOOLEAN(settingMQTTharebootdetection));
     Debugf(PSTR("NTP enabled           : %s\r\n"), CBOOLEAN(settingNTPenable));
@@ -392,7 +387,7 @@ void updateSetting(const char *field, const char *newValue)
     if (strlen(settingHostname)==0) snprintf_P(settingHostname, sizeof(settingHostname), PSTR("OTGW-%06x"), (unsigned int)ESP.getChipId());
     
     //strip away anything beyond the dot
-    char *dot = strchr(settingMQTTtopTopic, '.');
+    char *dot = strchr(settingHostname, '.');
     if (dot) *dot = '\0';
     
     // Defer MDNS/LLMNR and MQTT restart to flushSettings()
@@ -440,6 +435,7 @@ void updateSetting(const char *field, const char *newValue)
     if (strlen(settingMQTTuniqueid) == 0)   strlcpy(settingMQTTuniqueid, getUniqueId(), sizeof(settingMQTTuniqueid));
   }
   if (strcasecmp_P(field, PSTR("MQTTOTmessage"))==0)   settingMQTTOTmessage = EVALBOOLEAN(newValue);
+  if (strcasecmp_P(field, PSTR("MQTTinterval"))==0)    settingMQTTinterval = (uint16_t)atoi(newValue);
   if (strcasecmp_P(field, PSTR("MQTTseparatesources"))==0) settingMQTTSeparateSources = EVALBOOLEAN(newValue);
   if (strstr_P(field, PSTR("mqtt")) != NULL)        pendingSideEffects |= SIDE_EFFECT_MQTT; // defer MQTT restart to flushSettings()
   
