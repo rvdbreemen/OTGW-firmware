@@ -2776,8 +2776,7 @@ void processOT(const char *buf, int len){
   } else if (strchr(buf, ',') != nullptr) {
     // Comma-separated line: handle PS=1 summary (25 or 34 comma-separated fields).
     // processPSSummary() validates the field count and returns silently if not a PS=1 line.
-    // Forward raw line to WebSocket so the OT Monitor tab shows activity in PS=1 mode.
-    sendEventToWebSocket('<', buf, (int)len);
+    // Individual decoded field lines are forwarded to WebSocket inside processPSSummary().
     processPSSummary(buf, len);
   } else if ((strchr(buf, '=') != nullptr) && (strchr(buf, ':') == nullptr)) {
     // Lines containing '=' but no ':' are echoed commands or command responses in PS=1 mode

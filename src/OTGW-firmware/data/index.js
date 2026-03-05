@@ -11,7 +11,7 @@
 const localURL = window.location.protocol + '//' + window.location.host;
 const APIGW = window.location.protocol + '//' + window.location.host + '/api/';
 const MOBILE_BREAKPOINT_PX = 768;
-const PS_MODE_NOTICE_TEXT = 'PS=1 mode active: live OpenTherm log streaming is paused, panel data remains visible.';
+const PS_MODE_NOTICE_TEXT = 'PS=1 mode active: showing decoded field summaries. Raw OT frames not available.';
 
 "use strict";
 // ============================================================================
@@ -1199,7 +1199,7 @@ function getOTLogDisplayState() {
     isSmallScreen: isSmallScreen,
     isPSmode: isPSmode,
     sectionDisabled: (isProxied || isPhone || isSmallScreen),
-    wsDisabled: (isProxied || isPhone || isSmallScreen || isPSmode)
+    wsDisabled: (isProxied || isPhone || isSmallScreen)
   };
   
   return state;
@@ -1283,8 +1283,6 @@ function initOTLogWebSocket(force) {
       console.log("[WebSocket] FALLBACK: Smartphone detected. Disabling OpenTherm Monitor to save resources.");
     } else if (displayState.isSmallScreen) {
       console.log("[WebSocket] FALLBACK: Small screen detected (width: " + window.innerWidth + "px). Disabling OpenTherm Monitor.");
-    } else if (displayState.isPSmode) {
-      console.log("[WebSocket] FALLBACK: PS=1 mode detected. Pausing OpenTherm log live stream.");
     }
     updateOTLogModeNotice(displayState);
     const logSection = document.getElementById('otLogSection');
@@ -2676,7 +2674,7 @@ function renderBottomMessage() {
   let msgText = (typeof statusMessageText === 'string') ? statusMessageText : '';
 
   if (isPSmode) {
-    msgText = 'PS=1 mode; live log stream paused.';
+    msgText = 'PS=1 mode; showing decoded field summaries.';
   } else {
     if (typeof msgText === 'string' && msgText.toLowerCase().startsWith('sensorsimulation')) {
       // Ignore stray summary field text when PS mode is not active.
