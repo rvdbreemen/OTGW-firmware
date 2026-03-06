@@ -102,6 +102,7 @@ void sendLogToWebSocket(const char* logMessage);
 void readSettings(bool show);
 void writeSettings(bool show);
 void updateSetting(const char *field, const char *newValue);
+void escapeJsonStringTo(const char* src, char* dest, size_t destSize);
 void GetVersion(const char* hexfile, char* version, size_t destSize);
 void startWebSocket();
 void handleWebSocket();
