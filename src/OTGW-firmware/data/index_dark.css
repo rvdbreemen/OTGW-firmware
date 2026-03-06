@@ -527,6 +527,45 @@
   border: 1px solid #1a1a1a;
 }
 
+#deviceinfoCrashLog {
+  max-width: 960px;
+  margin: 0 0 14px 0;
+}
+
+.crashlog-panel {
+  background: #463318;
+  border: 1px solid #7c5a20;
+  border-left: 5px solid #ffae42;
+  padding: 10px 12px;
+  color: #f7ddb2;
+}
+
+.crashlog-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.crashlog-intro {
+  margin-bottom: 8px;
+}
+
+.crashlog-label {
+  font-weight: 600;
+  margin: 8px 0 4px 0;
+}
+
+.crashlog-pre {
+  margin: 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+}
+
 /* Responsive: Stack on small screens */
 @media (max-width: 768px) {
   #deviceinfoPage {
@@ -556,6 +595,10 @@
     font-size: 13px;
     border: none;
     padding: 0 0 0 10px;
+  }
+
+  #deviceinfoCrashLog {
+    max-width: 100%;
   }
 }
 

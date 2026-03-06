@@ -2617,6 +2617,7 @@ function deviceinfoPage() {
   stopOTmonitorPolling();
   refreshDevTime();
   refreshDeviceInfo();
+  refreshCrashLogInfo();
   setActivePageSection('displayDeviceInfo');
 
 } // deviceinfoPage()
@@ -3324,6 +3325,70 @@ function refreshDeviceInfo() {
     });
 
 } // refreshDeviceInfo()
+
+function renderCrashLogInfo(crashlog) {
+  const panel = document.getElementById('deviceinfoCrashLog');
+  if (!panel) return;
+
+  const hasCrashLog = !!(crashlog && crashlog.available);
+  if (!hasCrashLog) {
+    panel.classList.add('hidden');
+    panel.innerHTML = '';
+    return;
+  }
+
+  panel.classList.remove('hidden');
+  panel.innerHTML = '';
+
+  const title = document.createElement('div');
+  title.className = 'crashlog-title';
+  title.textContent = 'Stored Crash / Reboot Diagnostics';
+  panel.appendChild(title);
+
+  const intro = document.createElement('div');
+  intro.className = 'crashlog-intro';
+  intro.textContent = 'Latest abnormal reboot entry found in the stored reboot log.';
+  panel.appendChild(intro);
+
+  const summaryLabel = document.createElement('div');
+  summaryLabel.className = 'crashlog-label';
+  summaryLabel.textContent = 'Summary';
+  panel.appendChild(summaryLabel);
+
+  const summaryPre = document.createElement('pre');
+  summaryPre.className = 'crashlog-pre';
+  summaryPre.textContent = crashlog.summary || '';
+  panel.appendChild(summaryPre);
+
+  if (crashlog.details) {
+    const detailsLabel = document.createElement('div');
+    detailsLabel.className = 'crashlog-label';
+    detailsLabel.textContent = 'Details';
+    panel.appendChild(detailsLabel);
+
+    const detailsPre = document.createElement('pre');
+    detailsPre.className = 'crashlog-pre';
+    detailsPre.textContent = crashlog.details;
+    panel.appendChild(detailsPre);
+  }
+}
+
+function refreshCrashLogInfo() {
+  fetch(APIGW + 'v2/device/crashlog')
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    })
+    .then(json => {
+      renderCrashLogInfo(json.crashlog || {});
+    })
+    .catch(error => {
+      console.warn('refreshCrashLogInfo error:', error);
+      renderCrashLogInfo(null);
+    });
+}
 
 //============================================================================  
 const hiddenSettings = [
