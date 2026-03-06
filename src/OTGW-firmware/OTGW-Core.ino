@@ -427,6 +427,10 @@ void sendOTGWbootcmd(){
 String executeCommand(const String sCmd){
   //send command to OTGW
   OTGWDebugTf(PSTR("OTGW Send Cmd [%s]\r\n"), CSTR(sCmd));
+  if (bDebugOTGWSimulation) {
+    OTGWDebugTln(F("OTGW simulation active - executeCommand blocked"));
+    return "SE - OTGW simulation active.";
+  }
   if (sCmd.length() < 2) {
     OTGWDebugTln(F("Send command too short"));
     return "SE - Command too short.";
@@ -1969,6 +1973,12 @@ void checkOTGWcmdqueue(const char *buf, unsigned int len){
 */
 void sendOTGW(const char* buf, int len)
 {
+  if (bDebugOTGWSimulation) {
+    OTGWDebugTln(F("OTGW simulation active - serial send blocked"));
+    sendEventToWebSocket_P('!', PSTR("OTGW simulation blocked serial send"));
+    return;
+  }
+
   // while (OTGWSerial.availableForWrite() < (len+2)) {
   //   //cannot write, buffer full, wait for some space in serial out buffer
   // feedWatchDog();     //this yields for other processes
@@ -1991,6 +2001,60 @@ void sendOTGW(const char* buf, int len)
     OTGWSerial.flush();
     sendEventToWebSocket('>', buf, len);
   } else OTGWDebugln(F("Error: Write buffer not big enough!"));
+}
+
+static void dispatchOTGWInputLine(const char* buf, size_t len)
+{
+  if (len == 0) return;
+
+  blinkLEDnow(LED2);
+  OTGWstream.write(reinterpret_cast<const uint8_t*>(buf), len);
+  OTGWstream.write('\r');
+  OTGWstream.write('\n');
+  processOT(buf, len);
+}
+
+static bool readOTGWSimulationLine(File& replayFile, char* buffer, size_t bufferSize, size_t& lineLen)
+{
+  lineLen = 0;
+  bool discardCurrentLine = false;
+
+  while (replayFile.available()) {
+    int inByte = replayFile.read();
+    if (inByte < 0) break;
+
+    char inChar = static_cast<char>(inByte);
+    if (inChar == '\r' || inChar == '\n') {
+      if (discardCurrentLine) {
+        discardCurrentLine = false;
+        lineLen = 0;
+        continue;
+      }
+      if (lineLen == 0) continue;
+
+      buffer[lineLen] = '\0';
+      return true;
+    }
+
+    if (!discardCurrentLine) {
+      if (lineLen < (bufferSize - 1)) {
+        buffer[lineLen++] = inChar;
+      } else {
+        discardCurrentLine = true;
+        lineLen = 0;
+        DebugTln(F("OTGW simulation line too long, discarding line"));
+      }
+    }
+    feedWatchDog();
+  }
+
+  if (!discardCurrentLine && lineLen > 0) {
+    buffer[lineLen] = '\0';
+    return true;
+  }
+
+  lineLen = 0;
+  return false;
 }
 
 /*
@@ -2872,94 +2936,176 @@ void handleOTGW()
   static bool discardCurrentReadLine = false;
   static uint32_t droppedReadLines = 0;
   static uint8_t outByte;
+  static File otgwSimulationFile;
+  static bool otgwSimulationWasEnabled = false;
+  static char sReplay[MAX_BUFFER_READ];
+
+  if (!bDebugOTGWSimulation && otgwSimulationWasEnabled) {
+    if (otgwSimulationFile) otgwSimulationFile.close();
+    otgwSimulationWasEnabled = false;
+    bytes_read = 0;
+    bytes_write = 0;
+    discardCurrentReadLine = false;
+  }
+
+  if (bDebugOTGWSimulation) {
+    if (!otgwSimulationWasEnabled) {
+      if (otgwSimulationFile) otgwSimulationFile.close();
+      otgwSimulationWasEnabled = true;
+      bytes_read = 0;
+      bytes_write = 0;
+      discardCurrentReadLine = false;
+      otgwSimulationNextDueMs = 0;
+    }
+
+    while (OTGWSerial.available()) {
+      OTGWSerial.read();
+      feedWatchDog();
+    }
+
+    if (!LittleFSmounted) {
+      DebugTln(F("OTGW simulation disabled: LittleFS not mounted"));
+      sendEventToWebSocket_P('!', PSTR("OTGW simulation disabled [LittleFS unavailable]"));
+      bDebugOTGWSimulation = false;
+      if (otgwSimulationFile) otgwSimulationFile.close();
+      otgwSimulationWasEnabled = false;
+      return;
+    }
+
+    if (!otgwSimulationFile) {
+      otgwSimulationFile = LittleFS.open(F("/otgw_simulation.log"), "r");
+      if (!otgwSimulationFile) {
+        DebugTln(F("OTGW simulation disabled: /otgw_simulation.log not found"));
+        sendEventToWebSocket_P('!', PSTR("OTGW simulation disabled [/otgw_simulation.log missing]"));
+        bDebugOTGWSimulation = false;
+        otgwSimulationWasEnabled = false;
+        return;
+      }
+    }
+
+    if ((otgwSimulationNextDueMs == 0) || (static_cast<int32_t>(millis() - otgwSimulationNextDueMs) >= 0)) {
+      size_t replayLen = 0;
+      bool haveReplayLine = false;
+      uint8_t replayPass = 0;
+
+      while (!haveReplayLine && replayPass < 2) {
+        haveReplayLine = readOTGWSimulationLine(otgwSimulationFile, sReplay, sizeof(sReplay), replayLen);
+        if (haveReplayLine) break;
+
+        if (otgwSimulationFile) otgwSimulationFile.close();
+        replayPass++;
+        otgwSimulationFile = LittleFS.open(F("/otgw_simulation.log"), "r");
+        if (!otgwSimulationFile) break;
+      }
+
+      if (haveReplayLine) {
+        dispatchOTGWInputLine(sReplay, replayLen);
+        otgwSimulationNextDueMs = millis() + otgwSimulationIntervalMs;
+      } else if (!otgwSimulationFile) {
+        DebugTln(F("OTGW simulation disabled: replay file reopen failed"));
+        sendEventToWebSocket_P('!', PSTR("OTGW simulation disabled [replay file reopen failed]"));
+        bDebugOTGWSimulation = false;
+        otgwSimulationWasEnabled = false;
+        return;
+      }
+    }
+  }
 
   //Handle incoming data from OTGW through serial port (READ BUFFER)
-  if (OTGWSerial.hasOverrun()) {
-    DebugT(F("Serial Overrun\r\n"));
-    reportOTGWEvent_P(PSTR("Serial Overrun"), '!', true);
-  }
-  if (OTGWSerial.hasRxError()){
-    DebugT(F("Serial Rx Error\r\n"));
-    reportOTGWEvent_P(PSTR("Serial Rx Error"), '!', true);
-  }
-  
-  while (OTGWSerial.available()) {
-    outByte = OTGWSerial.read();
-    if (outByte == '\r' || outByte == '\n') {
-      if ((bytes_read == 0) && !discardCurrentReadLine) continue;
+  if (!bDebugOTGWSimulation) {
+    if (OTGWSerial.hasOverrun()) {
+      DebugT(F("Serial Overrun\r\n"));
+      reportOTGWEvent_P(PSTR("Serial Overrun"), '!', true);
+    }
+    if (OTGWSerial.hasRxError()){
+      DebugT(F("Serial Rx Error\r\n"));
+      reportOTGWEvent_P(PSTR("Serial Rx Error"), '!', true);
+    }
+    
+    while (OTGWSerial.available()) {
+      outByte = OTGWSerial.read();
+      if (outByte == '\r' || outByte == '\n') {
+        if ((bytes_read == 0) && !discardCurrentReadLine) continue;
 
-      if (discardCurrentReadLine) {
-        droppedReadLines++;
-        DebugTf(PSTR("Serial line dropped after overflow. Dropped lines total: %lu\r\n"),
-                static_cast<unsigned long>(droppedReadLines));
-      }
+        if (discardCurrentReadLine) {
+          droppedReadLines++;
+          DebugTf(PSTR("Serial line dropped after overflow. Dropped lines total: %lu\r\n"),
+                  static_cast<unsigned long>(droppedReadLines));
+        }
 
-      if (!discardCurrentReadLine) {
-        blinkLEDnow(LED2);
-        sRead[bytes_read] = '\0';
-        OTGWstream.write(reinterpret_cast<const uint8_t*>(sRead), bytes_read);
-        OTGWstream.write('\r');
-        OTGWstream.write('\n');
-        processOT(sRead, bytes_read);
-      }
+        if (!discardCurrentReadLine) {
+          sRead[bytes_read] = '\0';
+          dispatchOTGWInputLine(sRead, bytes_read);
+        }
 
-      bytes_read = 0;
-      discardCurrentReadLine = false;
-    } else if (bytes_read < (MAX_BUFFER_READ-1)) {
-      if (!discardCurrentReadLine) {
-        sRead[bytes_read++] = outByte;
+        bytes_read = 0;
+        discardCurrentReadLine = false;
+      } else if (bytes_read < (MAX_BUFFER_READ-1)) {
+        if (!discardCurrentReadLine) {
+          sRead[bytes_read++] = outByte;
+        }
+      } else {
+        // Buffer overflow detected - discard this complete line and log error
+        OTcurrentSystemState.errorBufferOverflow++;
+        DebugTf(PSTR("Serial Buffer Overflow! Discarding %d bytes. Total overflows: %d\r\n"),
+                bytes_read, OTcurrentSystemState.errorBufferOverflow);
+        snprintf_P(cMsg, sizeof(cMsg), PSTR("Serial overflow [%u]"), OTcurrentSystemState.errorBufferOverflow);
+        sendEventToWebSocket('!', cMsg);
+        // Rate limit MQTT notifications - only send every 10 overflows to avoid overwhelming broker
+        static uint8_t overflowsSinceLastReport = 0;
+        overflowsSinceLastReport++;
+        if (overflowsSinceLastReport >= 10) {
+          char overflowCountBuf[7] = {0};
+          utoa(OTcurrentSystemState.errorBufferOverflow, overflowCountBuf, 10);
+          sendMQTTData(F("Error_BufferOverflow"), overflowCountBuf);
+          overflowsSinceLastReport = 0;
+        }
+        // Drop this line until next CR/LF to avoid forwarding partial/corrupted data
+        bytes_read = 0;
+        discardCurrentReadLine = true;
       }
-    } else {
-      // Buffer overflow detected - discard this complete line and log error
-      OTcurrentSystemState.errorBufferOverflow++;
-      DebugTf(PSTR("Serial Buffer Overflow! Discarding %d bytes. Total overflows: %d\r\n"),
-              bytes_read, OTcurrentSystemState.errorBufferOverflow);
-      snprintf_P(cMsg, sizeof(cMsg), PSTR("Serial overflow [%u]"), OTcurrentSystemState.errorBufferOverflow);
-      sendEventToWebSocket('!', cMsg);
-      // Rate limit MQTT notifications - only send every 10 overflows to avoid overwhelming broker
-      static uint8_t overflowsSinceLastReport = 0;
-      overflowsSinceLastReport++;
-      if (overflowsSinceLastReport >= 10) {
-        char overflowCountBuf[7] = {0};
-        utoa(OTcurrentSystemState.errorBufferOverflow, overflowCountBuf, 10);
-        sendMQTTData(F("Error_BufferOverflow"), overflowCountBuf);
-        overflowsSinceLastReport = 0;
-      }
-      // Drop this line until next CR/LF to avoid forwarding partial/corrupted data
-      bytes_read = 0;
-      discardCurrentReadLine = true;
     }
   }
 
   //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
   while (OTGWstream.available()){
     outByte = OTGWstream.read();  // read from port 25238
-    OTGWSerial.write(outByte);    // write to serial port
+    if (!bDebugOTGWSimulation) {
+      OTGWSerial.write(outByte);    // write to serial port
+    }
     if (outByte == '\r')
     { //on CR, do something...
       sWrite[bytes_write] = 0;
-      OTGWDebugTf(PSTR("Net2Ser: Sending to OTGW: [%s] (%d)\r\n"), sWrite, bytes_write);
-      if (bytes_write > 0) sendEventToWebSocket('>', sWrite); // log every ser2net command
-      //check for reset command
-      if (strcmp_P(sWrite, PSTR("GW=R"))==0){
-        //detected [GW=R], then reset the gateway the gpio way
-        OTGWDebugTln(F("Detected: GW=R. Reset gateway command executed."));
-        sendEventToWebSocket_P('!', PSTR("GW=R [reset]"));
-        resetOTGW();
-      } else if (strcasecmp_P(sWrite, PSTR("PS=1"))==0) {
-        //detected [PS=1], then PrintSummary mode = true --> From this point on you need to ask for summary.
-        bPSmode = true;
-        //reset all msglastupdated in webui
-        for(int i = 0; i <= OT_MSGID_MAX; i++){
-          msglastupdated[i] = 0; //clear epoch values
+      if (bDebugOTGWSimulation) {
+        OTGWDebugTf(PSTR("Net2Ser blocked by simulation mode: [%s] (%d)\r\n"), sWrite, bytes_write);
+        if (bytes_write > 0) {
+          snprintf_P(cMsg, sizeof(cMsg), PSTR("Simulation blocked cmd [%s]"), sWrite);
+          sendEventToWebSocket('!', cMsg);
         }
-        strlcpy(sMessage, "PS=1 mode; No UI updates.", sizeof(sMessage));
-        sendEventToWebSocket_P('*', PSTR("PS=1 [print summary mode]"));
-      } else if (strcasecmp_P(sWrite, PSTR("PS=0"))==0) {
-        //detected [PS=0], then PrintSummary mode = OFF --> Raw mode is turned on again.
-        bPSmode = false;
-        sMessage[0] = '\0';
-        sendEventToWebSocket_P('*', PSTR("PS=0 [raw mode]"));
+      } else {
+        OTGWDebugTf(PSTR("Net2Ser: Sending to OTGW: [%s] (%d)\r\n"), sWrite, bytes_write);
+        if (bytes_write > 0) sendEventToWebSocket('>', sWrite); // log every ser2net command
+        //check for reset command
+        if (strcmp_P(sWrite, PSTR("GW=R"))==0){
+          //detected [GW=R], then reset the gateway the gpio way
+          OTGWDebugTln(F("Detected: GW=R. Reset gateway command executed."));
+          sendEventToWebSocket_P('!', PSTR("GW=R [reset]"));
+          resetOTGW();
+        } else if (strcasecmp_P(sWrite, PSTR("PS=1"))==0) {
+          //detected [PS=1], then PrintSummary mode = true --> From this point on you need to ask for summary.
+          bPSmode = true;
+          //reset all msglastupdated in webui
+          for(int i = 0; i <= OT_MSGID_MAX; i++){
+            msglastupdated[i] = 0; //clear epoch values
+          }
+          strlcpy(sMessage, "PS=1 mode; No UI updates.", sizeof(sMessage));
+          sendEventToWebSocket_P('*', PSTR("PS=1 [print summary mode]"));
+        } else if (strcasecmp_P(sWrite, PSTR("PS=0"))==0) {
+          //detected [PS=0], then PrintSummary mode = OFF --> Raw mode is turned on again.
+          bPSmode = false;
+          sMessage[0] = '\0';
+          sendEventToWebSocket_P('*', PSTR("PS=0 [raw mode]"));
+        }
       }
       bytes_write = 0; //start next line
     } else if  (outByte == '\n')

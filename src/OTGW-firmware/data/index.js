@@ -1223,6 +1223,34 @@ function updateOTLogModeNotice(displayState) {
 }
 
 //============================================================================
+function setOTLogCommandsOnly(enabled) {
+  const logSection = document.getElementById('otLogSection');
+  if (!logSection) {
+    return;
+  }
+
+  if (enabled) {
+    logSection.classList.add('commands-only');
+    logSection.classList.remove('hidden');
+
+    const logPanel = document.getElementById('Log');
+    if (logPanel) {
+      logPanel.classList.add('active');
+    }
+
+    const tabLinks = document.getElementsByClassName('tab-link');
+    for (let i = 0; i < tabLinks.length; i++) {
+      tabLinks[i].classList.remove('active');
+    }
+
+    currentTab = 'Log';
+    return;
+  }
+
+  logSection.classList.remove('commands-only');
+}
+
+//============================================================================
 function updateOTLogResponsiveState() {
   if (flashModeActive) return;
 
@@ -1235,10 +1263,12 @@ function updateOTLogResponsiveState() {
   updateOTLogModeNotice(displayState);
 
   if (displayState.sectionDisabled) {
-    logSection.classList.add('hidden');
+    setOTLogCommandsOnly(true);
     disconnectOTLogWebSocket();
     return;
   }
+
+  setOTLogCommandsOnly(false);
 
   if (logSection.classList.contains('hidden')) {
     logSection.classList.remove('hidden');
@@ -1287,7 +1317,7 @@ function initOTLogWebSocket(force) {
     updateOTLogModeNotice(displayState);
     const logSection = document.getElementById('otLogSection');
     if (logSection && displayState.sectionDisabled) {
-      logSection.classList.add('hidden');
+      setOTLogCommandsOnly(true);
     }
     return; // Do not connect WebSocket
   }

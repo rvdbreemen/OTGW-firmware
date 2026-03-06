@@ -465,6 +465,10 @@
   break-inside: avoid;
   page-break-inside: avoid;
 }
+
+.otmonrow.no-data-row {
+  display: none;
+}
 .otmoncolumn1 {
   flex: 1;
   padding-left: 10px;
@@ -664,6 +668,19 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
+.ot-log-section.commands-only .ot-log-tabs,
+.ot-log-section.commands-only .ot-log-controls,
+.ot-log-section.commands-only .ot-log-container,
+.ot-log-section.commands-only .ot-log-footer,
+.ot-log-section.commands-only #Statistics,
+.ot-log-section.commands-only #Graph {
+  display: none;
+}
+
+.ot-log-section.commands-only #Log {
+  display: block;
+}
+
 /* Log Header */
 .ot-log-header {
   display: flex;
@@ -786,11 +803,42 @@
   gap: 5px;
   font-size: 13px;
   cursor: pointer;
+  -webkit-user-select: none;
   user-select: none;
 }
 
 .log-control-label input[type="checkbox"] {
   cursor: pointer;
+}
+
+.ot-cmd-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 16px;
+  padding: 10px 12px;
+  background: #252629;
+  border: 1px solid #3a3a3c;
+  border-radius: 6px;
+}
+
+.ot-cmd-input {
+  flex: 1 1 260px;
+  min-width: 220px;
+  padding: 7px 12px;
+  border: 1px solid #4a4a4c;
+  border-radius: 4px;
+  font-size: 13px;
+  background-color: #1f2022;
+  color: #e0e0e0;
+}
+
+.ot-cmd-status {
+  flex: 1 1 180px;
+  min-height: 18px;
+  font-size: 12px;
+  color: #a0a8b0;
 }
 
 /* Log Container */
