@@ -10,6 +10,48 @@
 ***************************************************************************      
 */
 
+// In-place buffer version to avoid heap allocations
+void escapeJsonStringTo(const char* src, char* dest, size_t destSize) {
+  if (!src || !dest || destSize == 0) {
+    if (dest && destSize > 0) dest[0] = '\0';
+    return;
+  }
+
+  size_t destIdx = 0;
+  for (const char* p = src; *p && destIdx < destSize - 1; p++) {
+    const char* esc = nullptr;
+    char hex[7];
+    
+    switch (*p) {
+      case '"':  esc = "\\\""; break;
+      case '\\': esc = "\\\\"; break;
+      case '\b': esc = "\\b";  break;
+      case '\f': esc = "\\f";  break;
+      case '\n': esc = "\\n";  break;
+      case '\r': esc = "\\r";  break;
+      case '\t': esc = "\\t";  break;
+      default:
+        if (*p < 0x20) {
+          snprintf(hex, sizeof(hex), "\\u%04X", (unsigned char)*p);
+          esc = hex;
+        }
+    }
+
+    if (esc) {
+      size_t len = strlen(esc);
+      if (destIdx + len < destSize - 1) {
+        strcpy(&dest[destIdx], esc);
+        destIdx += len;
+      } else {
+        break; // Out of space
+      }
+    } else {
+      dest[destIdx++] = *p;
+    }
+  }
+  dest[destIdx] = '\0';
+}
+
 // Helper function to escape JSON string values
 // Replaces: " with \", \ with \\, control chars with \uXXXX
 String escapeJsonString(const char* str) {

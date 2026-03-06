@@ -313,6 +313,25 @@ const MQTT_set_cmd_t setcmds[] PROGMEM = {
 
 const int nrcmds = sizeof(setcmds) / sizeof(setcmds[0]);
 
+static int findMQTTSetCommandIndex(const char *topicToken)
+{
+  if (!topicToken) return -1;
+
+  for (int i = 0; i < nrcmds; i++) {
+    PGM_P pSetCmd = (PGM_P)pgm_read_ptr(&setcmds[i].setcmd);
+    if (strcasecmp_P(topicToken, pSetCmd) == 0) {
+      return i;
+    }
+
+    PGM_P pOtgwCmd = (PGM_P)pgm_read_ptr(&setcmds[i].otgwcmd);
+    if (strlen_P(pOtgwCmd) > 0 && strcasecmp_P(topicToken, pOtgwCmd) == 0) {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
 //===========================================================================================
 void startMQTT() 
 {
@@ -403,37 +422,28 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
       token = strtok(NULL, "/");
       MQTTDebugf(PSTR("%s"), token);
       if (token != NULL){
-        //loop thru command list
-        int i;
-        for (i=0; i<nrcmds; i++){
-          // Read setcmd pointer from Flash
-          PGM_P pSetCmd = (PGM_P)pgm_read_ptr(&setcmds[i].setcmd);
-          if (strcasecmp_P(token, pSetCmd) == 0){
-            //found a match
-            // Read ottype and otgwcmd from Flash
-            PGM_P pOtType = (PGM_P)pgm_read_ptr(&setcmds[i].ottype);
-            PGM_P pOtgwCmd = (PGM_P)pgm_read_ptr(&setcmds[i].otgwcmd);
-            
-            if (strcasecmp_P("raw", pOtType) == 0){
-              //raw command
-              snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s"), msgPayload);
-              MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
-              addOTWGcmdtoqueue((char *)otgwcmd, strlen(otgwcmd), true);
-            } else {
-              //all other commands are <otgwcmd>=<payload message> 
-              // Copy command string from Flash to temp buffer for snprintf
-              char cmdBuf[10];
-              strncpy_P(cmdBuf, pOtgwCmd, sizeof(cmdBuf));
-              cmdBuf[sizeof(cmdBuf)-1] = 0; // Ensure null termination
-              
-              snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s=%s"), cmdBuf, msgPayload);
-              MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
-              addOTWGcmdtoqueue((char *)otgwcmd, strlen(otgwcmd), true);
-            }
-            break; //exit loop
-          } 
-        }
-        if (i >= nrcmds){
+        const int cmdIndex = findMQTTSetCommandIndex(token);
+        if (cmdIndex >= 0) {
+          PGM_P pOtgwCmd = (PGM_P)pgm_read_ptr(&setcmds[cmdIndex].otgwcmd);
+          PGM_P pOtType = (PGM_P)pgm_read_ptr(&setcmds[cmdIndex].ottype);
+
+          if (strcasecmp_P("raw", pOtType) == 0){
+            //raw command
+            snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s"), msgPayload);
+            MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
+            addOTWGcmdtoqueue((char *)otgwcmd, strlen(otgwcmd), true);
+          } else {
+            //all other commands are <otgwcmd>=<payload message>
+            // Copy command string from Flash to temp buffer for snprintf
+            char cmdBuf[10];
+            strncpy_P(cmdBuf, pOtgwCmd, sizeof(cmdBuf));
+            cmdBuf[sizeof(cmdBuf)-1] = 0; // Ensure null termination
+
+            snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s=%s"), cmdBuf, msgPayload);
+            MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
+            addOTWGcmdtoqueue((char *)otgwcmd, strlen(otgwcmd), true);
+          }
+        } else {
           //no match found
           MQTTDebugln();
           MQTTDebugTf(PSTR("No match found for command: [%s]\r\n"), token);
