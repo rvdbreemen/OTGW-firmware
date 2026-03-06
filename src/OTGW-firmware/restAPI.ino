@@ -163,6 +163,10 @@ void processAPI()
           // GET /api/v2/device/info (map format)
           if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
           sendDeviceInfoV2();
+        } else if (wc > 4 && strcmp_P(words[4], PSTR("crashlog")) == 0) {
+          // GET /api/v2/device/crashlog
+          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
+          sendDeviceCrashLog();
         } else if (wc > 4 && strcmp_P(words[4], PSTR("time")) == 0) {
           // GET /api/v2/device/time — RESTful name for devtime (map format)
           if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
@@ -734,6 +738,22 @@ void sendHealth()
   sendEndJsonMap(F("health"));
 
 } // sendHealth()
+
+//=======================================================================
+// Sends latest stored abnormal reboot/crash diagnostics if available.
+// Returns: {"crashlog":{"available":true,"summary":"...","details":"..."}}
+void sendDeviceCrashLog()
+{
+  char crashSummary[160] = {0};
+  char crashDetails[160] = {0};
+  bool hasCrashLog = readLatestCrashLog(crashSummary, sizeof(crashSummary), crashDetails, sizeof(crashDetails));
+
+  sendStartJsonMap(F("crashlog"));
+  sendJsonMapEntry(F("available"), hasCrashLog);
+  sendJsonMapEntry(F("summary"), hasCrashLog ? crashSummary : "");
+  sendJsonMapEntry(F("details"), hasCrashLog ? crashDetails : "");
+  sendEndJsonMap(F("crashlog"));
+}
 
 
 //=======================================================================

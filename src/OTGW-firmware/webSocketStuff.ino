@@ -50,6 +50,10 @@ static bool wsInitialized = false;
 static unsigned long lastKeepaliveMs = 0;
 const unsigned long KEEPALIVE_INTERVAL_MS = 30000; // 30 seconds
 
+bool hasWebSocketClients() {
+  return wsInitialized && (wsClientCount > 0);
+}
+
 //===========================================================================================
 // WebSocket event handler
 //===========================================================================================
@@ -170,7 +174,7 @@ void handleWebSocket() {
 // Simplified: no queue, no JSON, just direct text broadcasting
 //===========================================================================================
 void sendLogToWebSocket(const char* logMessage) {
-  if (wsInitialized && wsClientCount > 0 && logMessage != nullptr) {
+  if (hasWebSocketClients() && logMessage != nullptr) {
     webSocket.broadcastTXT(logMessage);
   }
 }

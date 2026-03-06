@@ -261,6 +261,78 @@ bool updateLittleFSStatus(const __FlashStringHelper *probePath)
   return updateLittleFSStatus(pathBuffer);
 }
 
+static bool isRebootLogSummaryLine(const char* line)
+{
+  return (line != nullptr && strstr(line, " - reboot cause: ") != nullptr);
+}
+
+static bool isRebootLogDetailLine(const char* line)
+{
+  return (line != nullptr &&
+          (strncmp_P(line, PSTR("ESP register contents:"), 22) == 0 ||
+           strncmp_P(line, PSTR("External Reason:"), 16) == 0));
+}
+
+static void trimRebootLogLine(char* line)
+{
+  if (line == nullptr) return;
+
+  size_t len = strlen(line);
+  while (len > 0 && (line[len - 1] == '\r' || line[len - 1] == '\n')) {
+    line[--len] = '\0';
+  }
+}
+
+bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t detailsSize)
+{
+  static const char rebootLogFile[] = "/reboot_log.txt";
+  char pendingSummary[160] = {0};
+  char line[160] = {0};
+
+  if (summary == nullptr || summarySize == 0 || details == nullptr || detailsSize == 0) {
+    return false;
+  }
+
+  summary[0] = '\0';
+  details[0] = '\0';
+
+  if (!LittleFS.begin()) {
+    return false;
+  }
+
+  File fh = LittleFS.open(rebootLogFile, "r");
+  if (!fh) {
+    return false;
+  }
+
+  while (fh.available()) {
+    size_t n = fh.readBytesUntil('\n', line, sizeof(line) - 1);
+    line[n] = '\0';
+    trimRebootLogLine(line);
+
+    if (line[0] == '\0') {
+      continue;
+    }
+
+    if (isRebootLogSummaryLine(line)) {
+      strlcpy(pendingSummary, line, sizeof(pendingSummary));
+      continue;
+    }
+
+    if (pendingSummary[0] != '\0' && isRebootLogDetailLine(line)) {
+      strlcpy(summary, pendingSummary, summarySize);
+      strlcpy(details, line, detailsSize);
+      fh.close();
+      return true;
+    }
+
+    pendingSummary[0] = '\0';
+  }
+
+  fh.close();
+  return false;
+}
+
 bool updateRebootLog(String text)
 {
   #define REBOOTLOG_FILE "/reboot_log.txt"
