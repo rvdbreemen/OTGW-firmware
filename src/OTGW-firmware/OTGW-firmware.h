@@ -247,6 +247,9 @@ bool      bDebugRestAPI = false;
 bool      bDebugMQTT = false;
 bool      bDebugSensors = false;
 bool      bDebugSensorSimulation = false;
+bool      bDebugOTGWSimulation = false;
+uint32_t  otgwSimulationIntervalMs = 750;
+uint32_t  otgwSimulationNextDueMs = 0;
 
 //GPIO Output Settings
 bool      settingMyDEBUG = false;
