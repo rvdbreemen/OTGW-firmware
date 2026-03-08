@@ -1,7 +1,8 @@
 # ADR-045: PS=1 Print Summary Parsing
 
-**Status:** Accepted  
+**Status:** Superseded by ADR-046  
 **Date:** 2026-03-02
+**Updated:** 2026-03-07 (Superseded — see ADR-046: PS=1 Summary Translation with Shared Publish Helpers)
 
 ## Context
 
