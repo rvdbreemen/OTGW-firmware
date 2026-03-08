@@ -848,6 +848,156 @@ void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool 
   publishMQTTOnOff(topic, newVal);
 }
 
+static void copyBinaryByteString(uint8_t value, char *dest, size_t destSize)
+{
+  if (!dest || destSize == 0) return;
+  strlcpy(dest, byte_to_binary(value), destSize);
+}
+
+static void buildStatusMasterText(uint8_t valueHB, char *statusText, size_t statusTextSize)
+{
+  if (!statusText || statusTextSize < 9) return;
+  statusText[0] = ((valueHB & 0x01) ? 'C' : '-');
+  statusText[1] = ((valueHB & 0x02) ? 'D' : '-');
+  statusText[2] = ((valueHB & 0x04) ? 'C' : '-');
+  statusText[3] = ((valueHB & 0x08) ? 'O' : '-');
+  statusText[4] = ((valueHB & 0x10) ? '2' : '-');
+  statusText[5] = ((valueHB & 0x20) ? 'S' : 'W');
+  statusText[6] = ((valueHB & 0x40) ? 'B' : '-');
+  statusText[7] = ((valueHB & 0x80) ? '.' : '-');
+  statusText[8] = '\0';
+}
+
+static void buildStatusSlaveText(uint8_t valueLB, char *statusText, size_t statusTextSize)
+{
+  if (!statusText || statusTextSize < 9) return;
+  statusText[0] = ((valueLB & 0x01) ? 'E' : '-');
+  statusText[1] = ((valueLB & 0x02) ? 'C' : '-');
+  statusText[2] = ((valueLB & 0x04) ? 'W' : '-');
+  statusText[3] = ((valueLB & 0x08) ? 'F' : '-');
+  statusText[4] = ((valueLB & 0x10) ? 'C' : '-');
+  statusText[5] = ((valueLB & 0x20) ? '2' : '-');
+  statusText[6] = ((valueLB & 0x40) ? 'D' : '-');
+  statusText[7] = ((valueLB & 0x80) ? 'P' : '-');
+  statusText[8] = '\0';
+}
+
+static void publishMasterStatusState(uint8_t valueHB, const char *statusText)
+{
+  sendMQTTData("status_master", statusText);
+  publishStatusBitMQTT(0, "ch_enable",        (valueHB & 0x01), (OTcurrentSystemState.MasterStatus & 0x01));
+  publishStatusBitMQTT(1, "dhw_enable",       (valueHB & 0x02), (OTcurrentSystemState.MasterStatus & 0x02));
+  publishStatusBitMQTT(2, "cooling_enable",   (valueHB & 0x04), (OTcurrentSystemState.MasterStatus & 0x04));
+  publishStatusBitMQTT(3, "otc_active",       (valueHB & 0x08), (OTcurrentSystemState.MasterStatus & 0x08));
+  publishStatusBitMQTT(4, "ch2_enable",       (valueHB & 0x10), (OTcurrentSystemState.MasterStatus & 0x10));
+  publishStatusBitMQTT(5, "summerwintertime", (valueHB & 0x20), (OTcurrentSystemState.MasterStatus & 0x20));
+  publishStatusBitMQTT(6, "dhw_blocking",     (valueHB & 0x40), (OTcurrentSystemState.MasterStatus & 0x40));
+  OTcurrentSystemState.MasterStatus = valueHB;
+}
+
+static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
+{
+  sendMQTTData("status_slave", statusText);
+  publishStatusBitMQTT(8,  "fault",                (valueLB & 0x01), (OTcurrentSystemState.SlaveStatus & 0x01));
+  publishStatusBitMQTT(9,  "centralheating",       (valueLB & 0x02), (OTcurrentSystemState.SlaveStatus & 0x02));
+  publishStatusBitMQTT(10, "domestichotwater",     (valueLB & 0x04), (OTcurrentSystemState.SlaveStatus & 0x04));
+  publishStatusBitMQTT(11, "flame",                (valueLB & 0x08), (OTcurrentSystemState.SlaveStatus & 0x08));
+  publishStatusBitMQTT(12, "cooling",              (valueLB & 0x10), (OTcurrentSystemState.SlaveStatus & 0x10));
+  publishStatusBitMQTT(13, "centralheating2",      (valueLB & 0x20), (OTcurrentSystemState.SlaveStatus & 0x20));
+  publishStatusBitMQTT(14, "diagnostic_indicator", (valueLB & 0x40), (OTcurrentSystemState.SlaveStatus & 0x40));
+  publishStatusBitMQTT(15, "electric_production",  (valueLB & 0x80), (OTcurrentSystemState.SlaveStatus & 0x80));
+  OTcurrentSystemState.SlaveStatus = valueLB;
+}
+
+static uint16_t publishCombinedStatusState(uint8_t valueHB, uint8_t valueLB)
+{
+  char masterStatus[9] {0};
+  char slaveStatus[9] {0};
+  buildStatusMasterText(valueHB, masterStatus, sizeof(masterStatus));
+  buildStatusSlaveText(valueLB, slaveStatus, sizeof(slaveStatus));
+  publishMasterStatusState(valueHB, masterStatus);
+  publishSlaveStatusState(valueLB, slaveStatus);
+  return (OTcurrentSystemState.MasterStatus << 8) | OTcurrentSystemState.SlaveStatus;
+}
+
+static void buildStatusVHMasterText(uint8_t valueHB, char *statusText, size_t statusTextSize)
+{
+  if (!statusText || statusTextSize < 9) return;
+  statusText[0] = ((valueHB & 0x01) ? 'V' : '-');
+  statusText[1] = ((valueHB & 0x02) ? 'P' : '-');
+  statusText[2] = ((valueHB & 0x04) ? 'M' : '-');
+  statusText[3] = ((valueHB & 0x08) ? 'F' : '-');
+  statusText[4] = ((valueHB & 0x10) ? '.' : '-');
+  statusText[5] = ((valueHB & 0x20) ? '.' : '-');
+  statusText[6] = ((valueHB & 0x40) ? '.' : '-');
+  statusText[7] = ((valueHB & 0x80) ? '.' : '-');
+  statusText[8] = '\0';
+}
+
+static void buildStatusVHSlaveText(uint8_t valueLB, char *statusText, size_t statusTextSize)
+{
+  if (!statusText || statusTextSize < 9) return;
+  statusText[0] = ((valueLB & 0x01) ? 'F' : '-');
+  statusText[1] = ((valueLB & 0x02) ? 'V' : '-');
+  statusText[2] = ((valueLB & 0x04) ? 'P' : '-');
+  statusText[3] = ((valueLB & 0x08) ? 'A' : '-');
+  statusText[4] = ((valueLB & 0x10) ? 'F' : '-');
+  statusText[5] = ((valueLB & 0x20) ? '.' : '-');
+  statusText[6] = ((valueLB & 0x40) ? 'D' : '-');
+  statusText[7] = ((valueLB & 0x80) ? '.' : '-');
+  statusText[8] = '\0';
+}
+
+static void publishMasterStatusVHState(uint8_t valueHB, const char *statusText)
+{
+  sendMQTTData(F("status_vh_master"), statusText);
+  publishMQTTOnOff(F("vh_ventilation_enabled"),    ((valueHB) & 0x01));
+  publishMQTTOnOff(F("vh_bypass_position"),        ((valueHB) & 0x02));
+  publishMQTTOnOff(F("vh_bypass_mode"),            ((valueHB) & 0x04));
+  publishMQTTOnOff(F("vh_free_ventilation_mode"), ((valueHB) & 0x08));
+  OTcurrentSystemState.MasterStatusVH = valueHB;
+}
+
+static void publishSlaveStatusVHState(uint8_t valueLB, const char *statusText)
+{
+  sendMQTTData(F("status_vh_slave"), statusText);
+  publishMQTTOnOff(F("vh_fault"),                    ((valueLB) & 0x01));
+  publishMQTTOnOff(F("vh_ventilation_mode"),         ((valueLB) & 0x02));
+  publishMQTTOnOff(F("vh_bypass_status"),            ((valueLB) & 0x04));
+  publishMQTTOnOff(F("vh_bypass_automatic_status"),  ((valueLB) & 0x08));
+  publishMQTTOnOff(F("vh_free_ventliation_status"),  ((valueLB) & 0x10));
+  publishMQTTOnOff(F("vh_diagnostic_indicator"),     ((valueLB) & 0x40));
+  OTcurrentSystemState.SlaveStatusVH = valueLB;
+}
+
+static uint16_t publishCombinedStatusVHState(uint8_t valueHB, uint8_t valueLB)
+{
+  char masterStatus[9] {0};
+  char slaveStatus[9] {0};
+  buildStatusVHMasterText(valueHB, masterStatus, sizeof(masterStatus));
+  buildStatusVHSlaveText(valueLB, slaveStatus, sizeof(slaveStatus));
+  publishMasterStatusVHState(valueHB, masterStatus);
+  publishSlaveStatusVHState(valueLB, slaveStatus);
+  return (OTcurrentSystemState.MasterStatusVH << 8) | OTcurrentSystemState.SlaveStatusVH;
+}
+
+static uint16_t publishRBPFlagsState(uint8_t transferEnableFlags, uint8_t readWriteFlags)
+{
+  char transferEnableText[9] {0};
+  char readWriteText[9] {0};
+  copyBinaryByteString(transferEnableFlags, transferEnableText, sizeof(transferEnableText));
+  copyBinaryByteString(readWriteFlags, readWriteText, sizeof(readWriteText));
+
+  sendMQTTData(F("RBP_flags_transfer_enable"), transferEnableText);
+  sendMQTTData(F("RBP_flags_read_write"), readWriteText);
+  sendMQTTData(F("rbp_dhw_setpoint"),        ((transferEnableFlags & 0x01) ? "ON" : "OFF"));
+  sendMQTTData(F("rbp_max_ch_setpoint"),     ((transferEnableFlags & 0x02) ? "ON" : "OFF"));
+  sendMQTTData(F("rbp_rw_dhw_setpoint"),     ((readWriteFlags & 0x01) ? "ON" : "OFF"));
+  sendMQTTData(F("rbp_rw_max_ch_setpoint"),  ((readWriteFlags & 0x02) ? "ON" : "OFF"));
+
+  return ((uint16_t)transferEnableFlags << 8) | readWriteFlags;
+}
+
 void print_f88(float& value)
 {
   //function to print data
@@ -964,16 +1114,7 @@ void print_status(uint16_t& value)
 
     //Master Status
     if (is_value_valid(OTdata, OTlookupitem)){
-      sendMQTTData("status_master", _flag8_master);
-      publishStatusBitMQTT(0, "ch_enable",        (OTdata.valueHB & 0x01), (OTcurrentSystemState.MasterStatus & 0x01));
-      publishStatusBitMQTT(1, "dhw_enable",       (OTdata.valueHB & 0x02), (OTcurrentSystemState.MasterStatus & 0x02));
-      publishStatusBitMQTT(2, "cooling_enable",   (OTdata.valueHB & 0x04), (OTcurrentSystemState.MasterStatus & 0x04));
-      publishStatusBitMQTT(3, "otc_active",       (OTdata.valueHB & 0x08), (OTcurrentSystemState.MasterStatus & 0x08));
-      publishStatusBitMQTT(4, "ch2_enable",       (OTdata.valueHB & 0x10), (OTcurrentSystemState.MasterStatus & 0x10));
-      publishStatusBitMQTT(5, "summerwintertime", (OTdata.valueHB & 0x20), (OTcurrentSystemState.MasterStatus & 0x20));
-      publishStatusBitMQTT(6, "dhw_blocking",     (OTdata.valueHB & 0x40), (OTcurrentSystemState.MasterStatus & 0x40));
-
-      OTcurrentSystemState.MasterStatus = OTdata.valueHB;
+      publishMasterStatusState(OTdata.valueHB, _flag8_master);
     }
   } else {
     // Parse slave bits
@@ -1001,17 +1142,7 @@ void print_status(uint16_t& value)
     
     //Slave Status
     if (is_value_valid(OTdata, OTlookupitem)){
-      sendMQTTData("status_slave", _flag8_slave);
-      publishStatusBitMQTT(8,  "fault",                (OTdata.valueLB & 0x01), (OTcurrentSystemState.SlaveStatus & 0x01));
-      publishStatusBitMQTT(9,  "centralheating",       (OTdata.valueLB & 0x02), (OTcurrentSystemState.SlaveStatus & 0x02));
-      publishStatusBitMQTT(10, "domestichotwater",     (OTdata.valueLB & 0x04), (OTcurrentSystemState.SlaveStatus & 0x04));
-      publishStatusBitMQTT(11, "flame",                (OTdata.valueLB & 0x08), (OTcurrentSystemState.SlaveStatus & 0x08));
-      publishStatusBitMQTT(12, "cooling",              (OTdata.valueLB & 0x10), (OTcurrentSystemState.SlaveStatus & 0x10));
-      publishStatusBitMQTT(13, "centralheating2",      (OTdata.valueLB & 0x20), (OTcurrentSystemState.SlaveStatus & 0x20));
-      publishStatusBitMQTT(14, "diagnostic_indicator", (OTdata.valueLB & 0x40), (OTcurrentSystemState.SlaveStatus & 0x40));
-      publishStatusBitMQTT(15, "electric_production",  (OTdata.valueLB & 0x80), (OTcurrentSystemState.SlaveStatus & 0x80));
-
-      OTcurrentSystemState.SlaveStatus = OTdata.valueLB;
+      publishSlaveStatusState(OTdata.valueLB, _flag8_slave);
     }
   }
 
@@ -1089,13 +1220,7 @@ void print_statusVH(uint16_t& value)
     AddLogf("%s = VH Master [%s]", OTlookupitem.label, _flag8_master);
     //Master Status
     if (is_value_valid(OTdata, OTlookupitem)){
-      sendMQTTData(F("status_vh_master"), _flag8_master);
-      publishMQTTOnOff(F("vh_ventilation_enabled"),   ((OTdata.valueHB) & 0x01));
-      publishMQTTOnOff(F("vh_bypass_position"),       ((OTdata.valueHB) & 0x02));
-      publishMQTTOnOff(F("vh_bypass_mode"),           ((OTdata.valueHB) & 0x04));
-      publishMQTTOnOff(F("vh_free_ventilation_mode"),  ((OTdata.valueHB) & 0x08));
-
-      OTcurrentSystemState.MasterStatusVH = OTdata.valueHB;
+      publishMasterStatusVHState(OTdata.valueHB, _flag8_master);
     }
   } else {
     // Parse slave bits
@@ -1120,15 +1245,7 @@ void print_statusVH(uint16_t& value)
 
     //Slave Status
     if (is_value_valid(OTdata, OTlookupitem)){
-      sendMQTTData(F("status_vh_slave"), _flag8_slave);
-      publishMQTTOnOff(F("vh_fault"),                   ((OTdata.valueLB) & 0x01));
-      publishMQTTOnOff(F("vh_ventilation_mode"),         ((OTdata.valueLB) & 0x02));
-      publishMQTTOnOff(F("vh_bypass_status"),           ((OTdata.valueLB) & 0x04));
-      publishMQTTOnOff(F("vh_bypass_automatic_status"), ((OTdata.valueLB) & 0x08));
-      publishMQTTOnOff(F("vh_free_ventliation_status"), ((OTdata.valueLB) & 0x10));
-      publishMQTTOnOff(F("vh_diagnostic_indicator"),    ((OTdata.valueLB) & 0x40));
-
-      OTcurrentSystemState.SlaveStatusVH = OTdata.valueLB;
+      publishSlaveStatusVHState(OTdata.valueLB, _flag8_slave);
     }
   }
 
@@ -1175,36 +1292,7 @@ void print_RBPflags(uint16_t& value)
 {
   AddLogf("%s = M[%s] OEM fault code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   if (is_value_valid(OTdata, OTlookupitem)){
-    //Build string for MQTT
-    //Remote Boiler Paramaters
-    sendMQTTData(F("RBP_flags_transfer_enable"), byte_to_binary(OTdata.valueHB));  
-    sendMQTTData(F("RBP_flags_read_write"), byte_to_binary(OTdata.valueLB));  
-
-    //bit: [clear/0, set/1]
-    //0: DHW setpoint
-    //1: max CH setpoint
-    //2: reserved
-    //3: reserved
-    //4: reserved
-    //5: reserved
-    //6: reserved
-    //7: reserved
-    sendMQTTData(F("rbp_dhw_setpoint"),       (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));    
-    sendMQTTData(F("rbp_max_ch_setpoint"),    (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));    
-
-    //bit: [clear/0, set/1]
-    //0: read write  DHW setpoint
-    //1: read write max CH setpoint
-    //2: reserved
-    //3: reserved
-    //4: reserved
-    //5: reserved
-    //6: reserved
-    //7: reserved
-    sendMQTTData(F("rbp_rw_dhw_setpoint"),       (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));    
-    sendMQTTData(F("rbp_rw_max_ch_setpoint"),    (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));    
-
-    value = OTdata.u16();
+    value = publishRBPFlagsState(OTdata.valueHB, OTdata.valueLB);
   }
 }
 
@@ -2225,6 +2313,320 @@ static const uint8_t PSSUMMARY_MSGIDS_NEW[34] PROGMEM = {
   /* 33 */ 123  // DHWBurnerOperationHours   (u16)
 };
 
+static void enterPSMode(PGM_P debugMessage, PGM_P eventMessage, bool clearMsgLastUpdated)
+{
+  if (!bPSmode && debugMessage) {
+    OTGWDebugTln(reinterpret_cast<const __FlashStringHelper*>(debugMessage));
+  }
+
+  bPSmode = true;
+  copyProgmemString(sMessage, sizeof(sMessage), PSTR("PS=1 mode; decoded summary updates active."));
+
+  if (clearMsgLastUpdated) {
+    for (int i = 0; i <= OT_MSGID_MAX; i++) {
+      msglastupdated[i] = 0;
+    }
+  }
+
+  if (eventMessage) {
+    sendEventToWebSocket_P('*', eventMessage);
+  }
+}
+
+static void leavePSMode(PGM_P debugMessage, PGM_P eventMessage)
+{
+  if (bPSmode && debugMessage) {
+    OTGWDebugTln(reinterpret_cast<const __FlashStringHelper*>(debugMessage));
+  }
+
+  bPSmode = false;
+  sMessage[0] = '\0';
+
+  if (eventMessage) {
+    sendEventToWebSocket_P('*', eventMessage);
+  }
+}
+
+static bool parseStrictSignedLong(const char *text, long minValue, long maxValue, long &value)
+{
+  if (!text || *text == '\0') return false;
+
+  char *endPtr = nullptr;
+  long parsedValue = strtol(text, &endPtr, 10);
+  if ((endPtr == text) || (*endPtr != '\0') || (parsedValue < minValue) || (parsedValue > maxValue)) {
+    return false;
+  }
+
+  value = parsedValue;
+  return true;
+}
+
+static bool parseStrictUnsignedLong(const char *text, unsigned long maxValue, unsigned long &value)
+{
+  if (!text || *text == '\0' || *text == '-') return false;
+
+  char *endPtr = nullptr;
+  unsigned long parsedValue = strtoul(text, &endPtr, 10);
+  if ((endPtr == text) || (*endPtr != '\0') || (parsedValue > maxValue)) {
+    return false;
+  }
+
+  value = parsedValue;
+  return true;
+}
+
+static bool parseStrictFloat(const char *text, float &value)
+{
+  if (!text || *text == '\0') return false;
+
+  char *endPtr = nullptr;
+  double parsedValue = strtod(text, &endPtr);
+  if ((endPtr == text) || (*endPtr != '\0')) {
+    return false;
+  }
+
+  value = static_cast<float>(parsedValue);
+  return true;
+}
+
+static bool splitPSSummaryPair(const char *text, char separator,
+                               char *left, size_t leftSize,
+                               char *right, size_t rightSize)
+{
+  if (!text || !left || !right || leftSize == 0 || rightSize == 0) return false;
+
+  const char *separatorPos = strchr(text, separator);
+  if (!separatorPos || strchr(separatorPos + 1, separator)) return false;
+
+  const size_t leftLen = static_cast<size_t>(separatorPos - text);
+  const size_t rightLen = strlen(separatorPos + 1);
+  if (leftLen == 0 || rightLen == 0 || leftLen >= leftSize || rightLen >= rightSize) return false;
+
+  memcpy(left, text, leftLen);
+  left[leftLen] = '\0';
+  strlcpy(right, separatorPos + 1, rightSize);
+  return true;
+}
+
+static bool parsePSSummaryS8S8(const char *text, int8_t &upperByte, int8_t &lowerByte)
+{
+  char left[12] {0};
+  char right[12] {0};
+  long leftValue = 0;
+  long rightValue = 0;
+  if (!splitPSSummaryPair(text, '/', left, sizeof(left), right, sizeof(right))) return false;
+  if (!parseStrictSignedLong(left, -128, 127, leftValue)) return false;
+  if (!parseStrictSignedLong(right, -128, 127, rightValue)) return false;
+  upperByte = static_cast<int8_t>(leftValue);
+  lowerByte = static_cast<int8_t>(rightValue);
+  return true;
+}
+
+static bool parsePSSummaryU8U8(const char *text, uint8_t &upperByte, uint8_t &lowerByte)
+{
+  char left[12] {0};
+  char right[12] {0};
+  unsigned long leftValue = 0;
+  unsigned long rightValue = 0;
+  if (!splitPSSummaryPair(text, '/', left, sizeof(left), right, sizeof(right))) return false;
+  if (!parseStrictUnsignedLong(left, 255UL, leftValue)) return false;
+  if (!parseStrictUnsignedLong(right, 255UL, rightValue)) return false;
+  upperByte = static_cast<uint8_t>(leftValue);
+  lowerByte = static_cast<uint8_t>(rightValue);
+  return true;
+}
+
+static bool parseBinaryOctet(const char *text, uint8_t &value)
+{
+  if (!text || strlen(text) != 8) return false;
+
+  value = 0;
+  for (uint8_t i = 0; i < 8; i++) {
+    if (text[i] != '0' && text[i] != '1') return false;
+    value = static_cast<uint8_t>((value << 1) | (text[i] - '0'));
+  }
+  return true;
+}
+
+static bool parsePSSummaryFlag8Flag8(const char *text, uint8_t &upperByte, uint8_t &lowerByte)
+{
+  char left[9] {0};
+  char right[9] {0};
+  if (!splitPSSummaryPair(text, '/', left, sizeof(left), right, sizeof(right))) return false;
+  if (!parseBinaryOctet(left, upperByte)) return false;
+  if (!parseBinaryOctet(right, lowerByte)) return false;
+  return true;
+}
+
+static void updatePSSummaryFloatState(uint8_t msgid, float fval)
+{
+  switch (msgid) {
+    case  1: OTcurrentSystemState.TSet                  = fval; break;
+    case  7: OTcurrentSystemState.CoolingControl        = fval; break;
+    case  8: OTcurrentSystemState.TsetCH2               = fval; break;
+    case 14: OTcurrentSystemState.MaxRelModLevelSetting = fval; break;
+    case 16: OTcurrentSystemState.TrSet                 = fval; break;
+    case 17: OTcurrentSystemState.RelModLevel           = fval; break;
+    case 18: OTcurrentSystemState.CHPressure            = fval; break;
+    case 19: OTcurrentSystemState.DHWFlowRate           = fval; break;
+    case 23: OTcurrentSystemState.TrSetCH2              = fval; break;
+    case 24: OTcurrentSystemState.Tr                    = fval; break;
+    case 25: OTcurrentSystemState.Tboiler               = fval; break;
+    case 26: OTcurrentSystemState.Tdhw                  = fval; break;
+    case 27: OTcurrentSystemState.Toutside              = fval; break;
+    case 28: OTcurrentSystemState.Tret                  = fval; break;
+    case 31: OTcurrentSystemState.TflowCH2              = fval; break;
+    case 56: OTcurrentSystemState.TdhwSet               = fval; break;
+    case 57: OTcurrentSystemState.MaxTSet               = fval; break;
+    default: break;
+  }
+}
+
+static void updatePSSummaryU16State(uint8_t msgid, uint16_t value)
+{
+  switch (msgid) {
+    case 116: OTcurrentSystemState.BurnerStarts               = value; break;
+    case 117: OTcurrentSystemState.CHPumpStarts               = value; break;
+    case 118: OTcurrentSystemState.DHWPumpValveStarts         = value; break;
+    case 119: OTcurrentSystemState.DHWBurnerStarts            = value; break;
+    case 120: OTcurrentSystemState.BurnerOperationHours       = value; break;
+    case 121: OTcurrentSystemState.CHPumpOperationHours       = value; break;
+    case 122: OTcurrentSystemState.DHWPumpValveOperationHours = value; break;
+    case 123: OTcurrentSystemState.DHWBurnerOperationHours    = value; break;
+    default:  break;
+  }
+}
+
+static void publishPSSummarySplitBytes(const char *label, const char *hbSuffix, const char *lbSuffix,
+                                       const char *hbValue, const char *lbValue)
+{
+  char topicBuf[MQTT_TOPIC_MAX_LEN];
+  strlcpy(topicBuf, label, sizeof(topicBuf));
+  strlcat(topicBuf, hbSuffix, sizeof(topicBuf));
+  sendMQTTData(topicBuf, hbValue);
+  strlcpy(topicBuf, label, sizeof(topicBuf));
+  strlcat(topicBuf, lbSuffix, sizeof(topicBuf));
+  sendMQTTData(topicBuf, lbValue);
+}
+
+static void ensurePSSummaryDiscovery(uint8_t msgid)
+{
+  if (settingMQTTenable && !getMQTTConfigDone(msgid)) {
+    if (doAutoConfigureMsgid(msgid, NodeId)) {
+      setMQTTConfigDone(msgid);
+    }
+  }
+}
+
+static void logPSSummaryField(const char *label, const char *rawField)
+{
+  ClrLog();
+  AddLogf_P(PSTR("PS1 %-20s = %s"), label, rawField);
+  AddLogln();
+  sendLogToWebSocket(ot_log_buffer);
+  ClrLog();
+}
+
+static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const char *label, const char *rawField, time_t now)
+{
+  char valueBuf[12] {0};
+
+  switch (valueType) {
+    case ot_f88: {
+      float value = 0.0f;
+      if (!parseStrictFloat(rawField, value)) return false;
+      dtostrf(value, 3, 2, valueBuf);
+      sendMQTTData(label, valueBuf);
+      msglastupdated[msgid] = now;
+      updatePSSummaryFloatState(msgid, value);
+      return true;
+    }
+
+    case ot_s16: {
+      long parsedValue = 0;
+      if (!parseStrictSignedLong(rawField, -32768L, 32767L, parsedValue)) return false;
+      itoa(static_cast<int16_t>(parsedValue), valueBuf, 10);
+      sendMQTTData(label, valueBuf);
+      msglastupdated[msgid] = now;
+      if (msgid == 33) OTcurrentSystemState.Texhaust = static_cast<int16_t>(parsedValue);
+      return true;
+    }
+
+    case ot_u16: {
+      unsigned long parsedValue = 0;
+      if (!parseStrictUnsignedLong(rawField, 65535UL, parsedValue)) return false;
+      utoa(static_cast<uint16_t>(parsedValue), valueBuf, 10);
+      sendMQTTData(label, valueBuf);
+      msglastupdated[msgid] = now;
+      updatePSSummaryU16State(msgid, static_cast<uint16_t>(parsedValue));
+      return true;
+    }
+
+    case ot_s8s8: {
+      int8_t upperByte = 0;
+      int8_t lowerByte = 0;
+      if (!parsePSSummaryS8S8(rawField, upperByte, lowerByte)) return false;
+      char lowerValueBuf[12] {0};
+      itoa(upperByte, valueBuf, 10);
+      itoa(lowerByte, lowerValueBuf, 10);
+      publishPSSummarySplitBytes(label, "_value_hb", "_value_lb", valueBuf, lowerValueBuf);
+      msglastupdated[msgid] = now;
+      if (msgid == 48) OTcurrentSystemState.TdhwSetUBTdhwSetLB = ((uint8_t)upperByte << 8) | (uint8_t)lowerByte;
+      else if (msgid == 49) OTcurrentSystemState.MaxTSetUBMaxTSetLB = ((uint8_t)upperByte << 8) | (uint8_t)lowerByte;
+      return true;
+    }
+
+    case ot_u8u8: {
+      uint8_t upperByte = 0;
+      uint8_t lowerByte = 0;
+      if (!parsePSSummaryU8U8(rawField, upperByte, lowerByte)) return false;
+      char lowerValueBuf[12] {0};
+      utoa(upperByte, valueBuf, 10);
+      utoa(lowerByte, lowerValueBuf, 10);
+      publishPSSummarySplitBytes(label, "_value_hb", "_value_lb", valueBuf, lowerValueBuf);
+      msglastupdated[msgid] = now;
+      if (msgid == 15) OTcurrentSystemState.MaxCapacityMinModLevel = ((uint16_t)upperByte << 8) | lowerByte;
+      return true;
+    }
+
+    case ot_u8: {
+      unsigned long parsedValue = 0;
+      if (!parseStrictUnsignedLong(rawField, 255UL, parsedValue)) return false;
+      utoa(static_cast<uint8_t>(parsedValue), valueBuf, 10);
+      sendMQTTData(label, valueBuf);
+      msglastupdated[msgid] = now;
+      if (msgid == 71) OTcurrentSystemState.ControlSetpointVH = static_cast<uint8_t>(parsedValue);
+      else if (msgid == 77) OTcurrentSystemState.RelativeVentilation = static_cast<uint8_t>(parsedValue);
+      return true;
+    }
+
+    case ot_flag8flag8: {
+      uint8_t upperByte = 0;
+      uint8_t lowerByte = 0;
+      if (!parsePSSummaryFlag8Flag8(rawField, upperByte, lowerByte)) return false;
+      msglastupdated[msgid] = now;
+      switch (msgid) {
+        case 0:
+          OTcurrentSystemState.Statusflags = publishCombinedStatusState(upperByte, lowerByte);
+          break;
+        case 6:
+          OTcurrentSystemState.RBPflags = publishRBPFlagsState(upperByte, lowerByte);
+          break;
+        case 70:
+          OTcurrentSystemState.StatusVH = publishCombinedStatusVHState(upperByte, lowerByte);
+          break;
+        default:
+          sendMQTTData(label, rawField);
+          break;
+      }
+      return true;
+    }
+
+    default:
+      return false;
+  }
+}
+
 /*
   Process a PS=1 (Print Summary) comma-separated summary line from the OTGW PIC firmware.
   Parses each field, updates OTcurrentSystemState, and publishes to MQTT.
@@ -2232,111 +2634,15 @@ static const uint8_t PSSUMMARY_MSGIDS_NEW[34] PROGMEM = {
   New firmware (v5+) : 34 fields / 33 commas.
 */
 void processPSSummary(const char *buf, int len) {
-  auto countPSSummaryCommas = [](const char *summary, int summaryLen) {
-    int commaCount = 0;
-    for (int i = 0; i < summaryLen; i++) {
-      if (summary[i] == ',') commaCount++;
-    }
-    return commaCount;
-  };
+  int commaCount = 0;
+  for (int i = 0; i < len; i++) {
+    if (buf[i] == ',') commaCount++;
+  }
 
-  auto setPSSummaryModeActive = []() {
-    if (!bPSmode) {
-      OTGWDebugTln(F("PS mode auto-detected as ON (comma-separated summary)"));
-    }
-    bPSmode = true;
-    strlcpy(sMessage, "PS=1 mode; No UI updates.", sizeof(sMessage));
-  };
-
-  auto updatePSSummaryFloatState = [](uint8_t msgid, float fval) {
-    switch (msgid) {
-      case  1: OTcurrentSystemState.TSet                  = fval; break;
-      case  7: OTcurrentSystemState.CoolingControl        = fval; break;
-      case  8: OTcurrentSystemState.TsetCH2               = fval; break;
-      case 14: OTcurrentSystemState.MaxRelModLevelSetting = fval; break;
-      case 16: OTcurrentSystemState.TrSet                 = fval; break;
-      case 17: OTcurrentSystemState.RelModLevel           = fval; break;
-      case 18: OTcurrentSystemState.CHPressure            = fval; break;
-      case 19: OTcurrentSystemState.DHWFlowRate           = fval; break;
-      case 23: OTcurrentSystemState.TrSetCH2              = fval; break;
-      case 24: OTcurrentSystemState.Tr                    = fval; break;
-      case 25: OTcurrentSystemState.Tboiler               = fval; break;
-      case 26: OTcurrentSystemState.Tdhw                  = fval; break;
-      case 27: OTcurrentSystemState.Toutside              = fval; break;
-      case 28: OTcurrentSystemState.Tret                  = fval; break;
-      case 31: OTcurrentSystemState.TflowCH2              = fval; break;
-      case 56: OTcurrentSystemState.TdhwSet               = fval; break;
-      case 57: OTcurrentSystemState.MaxTSet               = fval; break;
-      default: break;
-    }
-  };
-
-  auto updatePSSummaryU16State = [](uint8_t msgid, uint16_t ival) {
-    switch (msgid) {
-      case 116: OTcurrentSystemState.BurnerStarts               = ival; break;
-      case 117: OTcurrentSystemState.CHPumpStarts               = ival; break;
-      case 118: OTcurrentSystemState.DHWPumpValveStarts         = ival; break;
-      case 119: OTcurrentSystemState.DHWBurnerStarts            = ival; break;
-      case 120: OTcurrentSystemState.BurnerOperationHours       = ival; break;
-      case 121: OTcurrentSystemState.CHPumpOperationHours       = ival; break;
-      case 122: OTcurrentSystemState.DHWPumpValveOperationHours = ival; break;
-      case 123: OTcurrentSystemState.DHWBurnerOperationHours    = ival; break;
-      default:  break;
-    }
-  };
-
-  auto publishPSSummarySplitBytes = [](const char *label, const char *hbSuffix, const char *lbSuffix, const char *hbValue, const char *lbValue) {
-    char topicBuf[MQTT_TOPIC_MAX_LEN];
-    strlcpy(topicBuf, label, sizeof(topicBuf));
-    strlcat(topicBuf, hbSuffix, sizeof(topicBuf));
-    sendMQTTData(topicBuf, hbValue);
-    strlcpy(topicBuf, label, sizeof(topicBuf));
-    strlcat(topicBuf, lbSuffix, sizeof(topicBuf));
-    sendMQTTData(topicBuf, lbValue);
-  };
-
-  auto publishPSSummaryStatusFlags = [](uint8_t msgid, uint8_t hb, uint8_t lb, const char *label, const char *rawField) {
-    if (msgid == 0) {
-      publishStatusBitMQTT(0, "ch_enable",        hb & 0x01, OTcurrentSystemState.MasterStatus & 0x01);
-      publishStatusBitMQTT(1, "dhw_enable",       hb & 0x02, OTcurrentSystemState.MasterStatus & 0x02);
-      publishStatusBitMQTT(2, "cooling_enable",   hb & 0x04, OTcurrentSystemState.MasterStatus & 0x04);
-      publishStatusBitMQTT(3, "otc_active",       hb & 0x08, OTcurrentSystemState.MasterStatus & 0x08);
-      publishStatusBitMQTT(4, "ch2_enable",       hb & 0x10, OTcurrentSystemState.MasterStatus & 0x10);
-      publishStatusBitMQTT(5, "summerwintertime", hb & 0x20, OTcurrentSystemState.MasterStatus & 0x20);
-      publishStatusBitMQTT(6, "dhw_blocking",     hb & 0x40, OTcurrentSystemState.MasterStatus & 0x40);
-      publishStatusBitMQTT(8,  "fault",                lb & 0x01, OTcurrentSystemState.SlaveStatus & 0x01);
-      publishStatusBitMQTT(9,  "centralheating",       lb & 0x02, OTcurrentSystemState.SlaveStatus & 0x02);
-      publishStatusBitMQTT(10, "domestichotwater",     lb & 0x04, OTcurrentSystemState.SlaveStatus & 0x04);
-      publishStatusBitMQTT(11, "flame",                lb & 0x08, OTcurrentSystemState.SlaveStatus & 0x08);
-      publishStatusBitMQTT(12, "cooling",              lb & 0x10, OTcurrentSystemState.SlaveStatus & 0x10);
-      publishStatusBitMQTT(13, "centralheating2",      lb & 0x20, OTcurrentSystemState.SlaveStatus & 0x20);
-      publishStatusBitMQTT(14, "diagnostic_indicator", lb & 0x40, OTcurrentSystemState.SlaveStatus & 0x40);
-      OTcurrentSystemState.MasterStatus = hb;
-      OTcurrentSystemState.SlaveStatus  = lb;
-      OTcurrentSystemState.Statusflags  = ((uint16_t)hb << 8) | lb;
-    } else {
-      sendMQTTData(label, rawField);
-    }
-  };
-
-  auto finishPSSummaryField = [](uint8_t msgid, const char *label, const char *rawField) {
-    if (settingMQTTenable && !getMQTTConfigDone(msgid)) {
-      if (doAutoConfigureMsgid(msgid, NodeId)) {
-        setMQTTConfigDone(msgid);
-      }
-    }
-    ClrLog();
-    AddLogf_P(PSTR("PS1 %-20s = %s"), label, rawField);
-    AddLogln();
-    sendLogToWebSocket(ot_log_buffer);
-    ClrLog();
-  };
-
-  const int commaCount = countPSSummaryCommas(buf, len);
   const bool bFW5 = (commaCount == 33);
   if (commaCount != 24 && commaCount != 33) return;
 
-  setPSSummaryModeActive();
+  enterPSMode(PSTR("PS mode auto-detected as ON (comma-separated summary)"), nullptr, false);
 
   const time_t now = time(nullptr);
   const uint8_t *msgIdTable = bFW5 ? PSSUMMARY_MSGIDS_NEW : PSSUMMARY_MSGIDS_OLD;
@@ -2359,100 +2665,11 @@ void processPSSummary(const char *buf, int len) {
       if (msgid <= OT_MSGID_MAX) {
         PROGMEM_readAnything(&OTmap[msgid], OTlookupitem);
         const char *label = OTlookupitem.label;
-        bool bUpdated = false;
         OTPublishGate psGate(shouldPublishMQTTForPSField(msgid));
 
-        switch (OTlookupitem.type) {
-          case ot_f88: {
-            const float fval = atof(fBuf);
-            dtostrf(fval, 3, 2, vBuf);
-            sendMQTTData(label, vBuf);
-            msglastupdated[msgid] = now;
-            updatePSSummaryFloatState(msgid, fval);
-            bUpdated = true;
-            break;
-          }
-          case ot_s16: {
-            const int16_t ival = (int16_t)atoi(fBuf);
-            itoa(ival, vBuf, 10);
-            sendMQTTData(label, vBuf);
-            msglastupdated[msgid] = now;
-            if (msgid == 33) OTcurrentSystemState.Texhaust = ival;
-            bUpdated = true;
-            break;
-          }
-          case ot_u16: {
-            const uint16_t ival = (uint16_t)atoi(fBuf);
-            utoa(ival, vBuf, 10);
-            sendMQTTData(label, vBuf);
-            msglastupdated[msgid] = now;
-            updatePSSummaryU16State(msgid, ival);
-            bUpdated = true;
-            break;
-          }
-          case ot_s8s8: {
-            const char *slash = strchr(fBuf, '/');
-            if (slash != nullptr) {
-              const int8_t ub = (int8_t)atoi(fBuf);
-              const int8_t lb = (int8_t)atoi(slash + 1);
-              const uint16_t combined = ((uint8_t)ub << 8) | (uint8_t)lb;
-              itoa(ub, vBuf, 10);
-              char lbBuf[12];
-              itoa(lb, lbBuf, 10);
-              publishPSSummarySplitBytes(label, "_value_hb", "_value_lb", vBuf, lbBuf);
-              msglastupdated[msgid] = now;
-              if (msgid == 48) OTcurrentSystemState.TdhwSetUBTdhwSetLB = combined;
-              else if (msgid == 49) OTcurrentSystemState.MaxTSetUBMaxTSetLB = combined;
-              bUpdated = true;
-            }
-            break;
-          }
-          case ot_u8u8: {
-            const char *slash = strchr(fBuf, '/');
-            if (slash != nullptr) {
-              const uint8_t hb = (uint8_t)atoi(fBuf);
-              const uint8_t lb = (uint8_t)atoi(slash + 1);
-              const uint16_t combined = ((uint16_t)hb << 8) | lb;
-              utoa(hb, vBuf, 10);
-              char lbBuf[12];
-              utoa(lb, lbBuf, 10);
-              publishPSSummarySplitBytes(label, "_value_hb", "_value_lb", vBuf, lbBuf);
-              msglastupdated[msgid] = now;
-              if (msgid == 15) OTcurrentSystemState.MaxCapacityMinModLevel = combined;
-              bUpdated = true;
-            }
-            break;
-          }
-          case ot_u8: {
-            const uint8_t ival = (uint8_t)atoi(fBuf);
-            utoa(ival, vBuf, 10);
-            sendMQTTData(label, vBuf);
-            msglastupdated[msgid] = now;
-            if (msgid == 71) OTcurrentSystemState.ControlSetpointVH = ival;
-            else if (msgid == 77) OTcurrentSystemState.RelativeVentilation = ival;
-            bUpdated = true;
-            break;
-          }
-          case ot_flag8flag8: {
-            if (fieldLen >= 17 && fBuf[8] == '/') {
-              uint8_t hb = 0;
-              uint8_t lb = 0;
-              for (int b = 0; b < 8; b++) {
-                if (fBuf[7 - b] == '1')  hb |= (1 << b);
-                if (fBuf[16 - b] == '1') lb |= (1 << b);
-              }
-              msglastupdated[msgid] = now;
-              publishPSSummaryStatusFlags(msgid, hb, lb, label, fBuf);
-              bUpdated = true;
-            }
-            break;
-          }
-          default:
-            break;
-        }
-
-        if (bUpdated) {
-          finishPSSummaryField(msgid, label, fBuf);
+        if (publishPSSummaryFieldValue(msgid, OTlookupitem.type, label, fBuf, now)) {
+          ensurePSSummaryDiscovery(msgid);
+          logPSSummaryField(label, fBuf);
         }
       }
     }
@@ -2689,10 +2906,8 @@ void processOT(const char *buf, int len){
   if (isvalidotmsg(buf, len)) { 
     // Raw OT frames indicate normal streaming mode (PS=0).
     if (bPSmode) {
-      bPSmode = false;
-      sMessage[0] = '\0';
-      OTGWDebugTln(F("PS mode auto-detected as OFF (raw OT stream resumed)"));
-      sendEventToWebSocket_P('*', PSTR("PS=0 [auto-detected, raw mode resumed]"));
+      leavePSMode(PSTR("PS mode auto-detected as OFF (raw OT stream resumed)"),
+                  PSTR("PS=0 [auto-detected, raw mode resumed]"));
     }
 
     //OT protocol messages are 9 chars long
@@ -2980,13 +3195,9 @@ void processOT(const char *buf, int len){
     // PS=0 echo: the PIC is exiting summary mode — update state accordingly.
     // All other XX=value lines (PS=1, TT=20.0, etc.) indicate PS=1 mode is active.
     if (strcasecmp_P(buf, PSTR("PS=0")) == 0) {
-      if (bPSmode) OTGWDebugTln(F("PS=0 echo: exiting PS=1 mode"));
-      bPSmode = false;
-      sMessage[0] = '\0';
+      leavePSMode(PSTR("PS=0 echo: exiting PS=1 mode"), nullptr);
     } else {
-      if (!bPSmode) OTGWDebugTln(F("PS mode auto-detected as ON (summary key=value stream)"));
-      bPSmode = true;
-      strlcpy(sMessage, "PS=1 mode; No UI updates.", sizeof(sMessage));
+      enterPSMode(PSTR("PS mode auto-detected as ON (summary key=value stream)"), nullptr, false);
     }
   } else {
     OTGWDebugTf(PSTR("Not processed, received from OTGW => (%s) [%d]\r\n"), buf, len);
@@ -3123,18 +3334,10 @@ void handleOTGW()
           resetOTGW();
         } else if (strcasecmp_P(sWrite, PSTR("PS=1"))==0) {
           //detected [PS=1], then PrintSummary mode = true --> From this point on you need to ask for summary.
-          bPSmode = true;
-          //reset all msglastupdated in webui
-          for(int i = 0; i <= OT_MSGID_MAX; i++){
-            msglastupdated[i] = 0; //clear epoch values
-          }
-          strlcpy(sMessage, "PS=1 mode; No UI updates.", sizeof(sMessage));
-          sendEventToWebSocket_P('*', PSTR("PS=1 [print summary mode]"));
+          enterPSMode(nullptr, PSTR("PS=1 [print summary mode]"), true);
         } else if (strcasecmp_P(sWrite, PSTR("PS=0"))==0) {
           //detected [PS=0], then PrintSummary mode = OFF --> Raw mode is turned on again.
-          bPSmode = false;
-          sMessage[0] = '\0';
-          sendEventToWebSocket_P('*', PSTR("PS=0 [raw mode]"));
+          leavePSMode(nullptr, PSTR("PS=0 [raw mode]"));
         }
       }
       bytes_write = 0; //start next line

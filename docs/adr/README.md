@@ -90,8 +90,11 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-038: OpenTherm Message Data Flow Pipeline](ADR-038-opentherm-data-flow-pipeline.md)** 🆕  
   Synchronous fan-out architecture for OpenTherm messages (PIC Serial → processOT → MQTT + WebSocket + REST + Telnet) with per-consumer availability checks and bidirectional command flow.
 
-- **[ADR-045: PS=1 Print Summary Parsing](ADR-045-ps1-print-summary-parsing.md)** 🆕
-  Full parsing of OTGW PIC Print Summary (PS=1) comma-separated output; maps 25/34 fields to MsgIDs and publishes via the same MQTT/HA discovery pipeline as normal OT frames.
+- **[ADR-045: PS=1 Print Summary Parsing](ADR-045-ps1-print-summary-parsing.md)** *(Superseded by ADR-046)*  
+  Historical record of the original PS=1 synthetic-frame design.
+
+- **[ADR-046: PS=1 Summary Translation with Shared Publish Helpers](ADR-046-ps1-summary-translation-shared-publish-helpers.md)** 🆕
+  PS=1 uses a dedicated summary-translation path with strict parsing, centralized PS-mode helpers, and selective reuse of shared publish/state helpers.
 
 ### Hardware and Reliability
 - **[ADR-011: External Hardware Watchdog for Reliability](ADR-011-external-hardware-watchdog.md)**  
