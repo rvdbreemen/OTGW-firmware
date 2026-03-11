@@ -16,12 +16,12 @@ void setOutputState(bool set_HIGH);
 static bool outputsInitialized = false;
 
 static bool validateGPIOOutputsConfig() {
-  if (settingGPIOOUTPUTSpin < 0 || settingGPIOOUTPUTSpin > 16) {
-    DebugTf(PSTR("GPIO Outputs: invalid pin %d\r\n"), settingGPIOOUTPUTSpin);
+  if (settings.outputs.iPin < 0 || settings.outputs.iPin > 16) {
+    DebugTf(PSTR("GPIO Outputs: invalid pin %d\r\n"), settings.outputs.iPin);
     return false;
   }
-  if (settingGPIOOUTPUTStriggerBit < 0 || settingGPIOOUTPUTStriggerBit > 7) {
-    DebugTf(PSTR("GPIO Outputs: invalid trigger bit %d\r\n"), settingGPIOOUTPUTStriggerBit);
+  if (settings.outputs.iTriggerBit < 0 || settings.outputs.iTriggerBit > 15) {
+    DebugTf(PSTR("GPIO Outputs: invalid trigger bit %d\r\n"), settings.outputs.iTriggerBit);
     return false;
   }
   return true;
@@ -30,12 +30,12 @@ static bool validateGPIOOutputsConfig() {
 void initOutputs() {
   DebugTf(PSTR("inside initOutputsO%d...\r\n"), 1);
 
-  if (!settingGPIOOUTPUTSenabled) return;
+  if (!settings.outputs.bEnabled) return;
   if (!validateGPIOOutputsConfig()) return;
 
-  DebugTf(PSTR("init GPIO Output on GPIO%d...\r\n"), settingGPIOOUTPUTSpin);
+  DebugTf(PSTR("init GPIO Output on GPIO%d...\r\n"), settings.outputs.iPin);
 
-  pinMode(settingGPIOOUTPUTSpin, OUTPUT);
+  pinMode(settings.outputs.iPin, OUTPUT);
   outputsInitialized = true;
   setOutputState(OFF);
 
@@ -49,18 +49,18 @@ void setOutputState(uint8_t status = ON){
 }
 
 void setOutputState(bool set_HIGH = true){
-  if(!settingGPIOOUTPUTSenabled) return;
+  if(!settings.outputs.bEnabled) return;
   if (!validateGPIOOutputsConfig()) return;
   if (!outputsInitialized) {
-    pinMode(settingGPIOOUTPUTSpin, OUTPUT);
+    pinMode(settings.outputs.iPin, OUTPUT);
     outputsInitialized = true;
   }
-  digitalWrite(settingGPIOOUTPUTSpin,set_HIGH?HIGH:LOW);
-  DebugTf(PSTR("Output GPIO%d set to %d"), settingGPIOOUTPUTSpin, digitalRead(settingGPIOOUTPUTSpin));
+  digitalWrite(settings.outputs.iPin,set_HIGH?HIGH:LOW);
+  DebugTf(PSTR("Output GPIO%d set to %d"), settings.outputs.iPin, digitalRead(settings.outputs.iPin));
 }
 
 void evalOutputs(){
-  if(!settingGPIOOUTPUTSenabled) return;
+  if(!settings.outputs.bEnabled) return;
   if (!validateGPIOOutputsConfig()) return;
   // master HB
   // bit: [clear/0, set/1]
@@ -82,12 +82,12 @@ void evalOutputs(){
   //  5: CH2 mode [CH2 not active, CH2 active]
   //  6: diagnostic indication [no diagnostics, diagnostic event]
   //  7: reserved
-  bool bitState = (OTcurrentSystemState.Statusflags & (1U << settingGPIOOUTPUTStriggerBit)) != 0;
+  bool bitState = (OTcurrentSystemState.Statusflags & (1U << settings.outputs.iTriggerBit)) != 0;
 
-  if (settingMyDEBUG) {
-    settingMyDEBUG = false;
-    DebugTf(PSTR("current gpio output state: %d \r\n"), digitalRead(settingGPIOOUTPUTSpin));
-    DebugTf(PSTR("bitState: bit: %d , state %d \r\n"), settingGPIOOUTPUTStriggerBit, bitState);
+  if (settings.bMyDEBUG) {
+    settings.bMyDEBUG = false;
+    DebugTf(PSTR("current gpio output state: %d \r\n"), digitalRead(settings.outputs.iPin));
+    DebugTf(PSTR("bitState: bit: %d , state %d \r\n"), settings.outputs.iTriggerBit, bitState);
     DebugFlush();
   }
 

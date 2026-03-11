@@ -31,10 +31,10 @@ const char* getOTLogTimestamp() {
   static char timestamp[16]; // "HH:MM:SS.mmmmmm"
   timeval now;
   gettimeofday(&now, nullptr);
-  // Default to UTC if not initialized, but typically settingNTPtimezone is valid
+  // Default to UTC if not initialized, but typically settings.ntp.sTimezone is valid
   // Recreating the timezone object is what _debugBOL does, so we follow that pattern
   // assuming timezoneManager is available.
-  TimeZone myTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  TimeZone myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   if (myTz.isError()) {
     // Fallback if generic name failed
     myTz = TimeZone::forTimeOffset(TimeOffset::forMinutes(0)); 
@@ -375,8 +375,9 @@ bool updateRebootLog(String text)
 
     if (rtc_info->reason == REASON_EXT_SYS_RST) {
       //external reset, so try to fetch the reset reason from the tiny watchdog and print that
-      snprintf_P(log_line_regs, LOG_LINE_LENGTH, PSTR("External Reason: External Watchdog reason: %s\r\n"), CSTR(initWatchDog()));
-      Debugf(log_line_regs);      
+      { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason));
+        snprintf_P(log_line_regs, LOG_LINE_LENGTH, PSTR("External Reason: External Watchdog reason: %s\r\n"), wdReason);
+        Debugf(log_line_regs); }      
     }
 
     if	(rtc_info->reason	==	REASON_EXCEPTION_RST)	{
@@ -409,7 +410,7 @@ bool updateRebootLog(String text)
     }
   }
 
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
   snprintf_P(log_line, LOG_LINE_LENGTH, PSTR("%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n"), myTime.year(),  myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second(), CSTR(text), errorCode, log_line_excpt);
 
@@ -472,9 +473,9 @@ String upTime()
   char    calcUptime[20];
 
   snprintf_P(calcUptime, sizeof(calcUptime), PSTR("%d(d)-%02d:%02d(H:m)")
-                                          , int((upTimeSeconds / (60 * 60 * 24)) % 365)
-                                          , int((upTimeSeconds / (60 * 60)) % 24)
-                                          , int((upTimeSeconds / (60)) % 60));
+                                          , int((state.uptime.iSeconds / (60 * 60 * 24)) % 365)
+                                          , int((state.uptime.iSeconds / (60 * 60)) % 24)
+                                          , int((state.uptime.iSeconds / (60)) % 60));
 
   return calcUptime;
 
@@ -487,7 +488,7 @@ bool prefix(const char *pre, const char *str)
 
 bool yearChanged(){
   static int16_t lastyear = -1;
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
   int16_t thisyear = myTime.year();
   bool _ret = (lastyear != thisyear); //year changed
@@ -500,7 +501,7 @@ bool yearChanged(){
 
 bool dayChanged(){
   static int8_t lastday = -1;
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
   int8_t thisday = myTime.day();
   bool _ret = (lastday != thisday);
@@ -513,7 +514,7 @@ bool dayChanged(){
 
 bool hourChanged(){
   static int8_t lasthour = -1;
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
   int8_t thishour = myTime.hour();
   bool _ret = (lasthour != thishour);
@@ -526,7 +527,7 @@ bool hourChanged(){
 
 bool minuteChanged(){
   static int8_t lastminute = -1;
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
   int8_t thisminute = myTime.minute();
   bool _ret = (lastminute != thisminute);

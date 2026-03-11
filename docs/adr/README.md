@@ -96,6 +96,18 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-046: PS=1 Summary Translation with Shared Publish Helpers](ADR-046-ps1-summary-translation-shared-publish-helpers.md)** 🆕
   PS=1 uses a dedicated summary-translation path with strict parsing, centralized PS-mode helpers, and selective reuse of shared publish/state helpers.
 
+- **[ADR-047: Non-Blocking WiFi Reconnect State Machine](ADR-047-nonblocking-wifi-reconnect.md)** 🆕
+  Cooperative reconnect state machine that retries without blocking the main loop and reboots after repeated failure.
+
+- **[ADR-048: Non-Blocking Webhook State Machine with Retry](ADR-048-nonblocking-webhook-state-machine.md)** 🆕
+  Webhook delivery runs as a non-blocking state machine with bounded retry behavior to avoid stalling loop processing.
+
+- **[ADR-050: Centralized API Route Dispatch Table](ADR-050-centralized-api-route-dispatch.md)** 🆕
+  `/api/v2` routing uses a dispatch table instead of a long conditional chain to keep endpoint registration centralized and maintainable.
+
+- **[ADR-051: Dual Encapsulating Structs (Settings + State)](ADR-051-dual-encapsulating-structs.md)** 🆕
+  Persistent configuration and runtime state are grouped into dedicated top-level structs to replace sprawling flat globals.
+
 ### Hardware and Reliability
 - **[ADR-011: External Hardware Watchdog for Reliability](ADR-011-external-hardware-watchdog.md)**  
   I2C hardware watchdog chip that automatically resets the ESP8266 if firmware hangs or crashes.
@@ -106,6 +118,9 @@ Architecture Decision Records capture important architectural decisions along wi
 ### Development and Build
 - **[ADR-013: Arduino Framework Over ESP-IDF](ADR-013-arduino-framework-over-esp-idf.md)**  
   Using Arduino framework for rapid development and rich ecosystem instead of low-level ESP-IDF.
+
+- **[ADR-049: String Class Prohibition in Protocol Paths](ADR-049-string-prohibition-protocol-paths.md)** 🆕
+  Protocol hot paths use bounded char buffers instead of `String` to reduce heap fragmentation and peak RAM usage on ESP8266.
 
 - **[ADR-014: Dual Build System (Makefile + Python Script)](ADR-014-dual-build-system.md)**  
   Makefile for CI/CD and build.py wrapper for cross-platform developer convenience.

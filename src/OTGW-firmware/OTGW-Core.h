@@ -507,13 +507,13 @@ struct OTPublishGate {
 struct OT_cmd_t { // see all possible commands for PIC here: https://otgw.tclcode.com/firmware.html
 	char cmd[15];
 	int cmdlen;
-	int retrycnt; 
+	int retrycnt;
 	unsigned long due;
 };
 
 #define CMDQUEUE_MAX 20
-struct OT_cmd_t cmdqueue[CMDQUEUE_MAX];
-static int cmdptr = 0;
+extern struct OT_cmd_t cmdqueue[CMDQUEUE_MAX];
+extern int cmdQueueSize;  // fill-pointer: number of active entries (0..CMDQUEUE_MAX)
 
 enum OpenThermStatus {
 	OT_NOT_INITIALIZED,
