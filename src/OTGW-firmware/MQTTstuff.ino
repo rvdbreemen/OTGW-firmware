@@ -165,6 +165,39 @@ static void buildNamespace(char *dest, size_t destSize, const char *base, const 
   strlcat(dest, node, destSize);
 }
 
+static size_t copyMQTTPayloadToBuffer(const byte *payload, unsigned int length, char *dest, size_t destSize) {
+  if (!dest || destSize == 0) return 0;
+  dest[0] = '\0';
+  if (!payload || length == 0) return 0;
+
+  const size_t copyLen = (length < (destSize - 1)) ? length : (destSize - 1);
+  memcpy(dest, payload, copyLen);
+  dest[copyLen] = '\0';
+  return copyLen;
+}
+
+static bool readMQTTTopicToken(const char *&cursor, char *token, size_t tokenSize) {
+  if (!cursor || !token || tokenSize == 0) return false;
+
+  while (*cursor == '/') {
+    cursor++;
+  }
+  if (*cursor == '\0') {
+    token[0] = '\0';
+    return false;
+  }
+
+  size_t len = 0;
+  while (*cursor != '\0' && *cursor != '/') {
+    if (len < (tokenSize - 1)) {
+      token[len++] = *cursor;
+    }
+    cursor++;
+  }
+  token[len] = '\0';
+  return (len > 0);
+}
+
 //set command list
 // Move strings to PROGMEM to save RAM
 const char s_raw[] PROGMEM = "raw";
@@ -327,6 +360,25 @@ const MQTT_set_cmd_t setcmds[] PROGMEM = {
 
 const int nrcmds = sizeof(setcmds) / sizeof(setcmds[0]);
 
+static int findMQTTSetCommandIndex(const char *topicToken)
+{
+  if (!topicToken) return -1;
+
+  for (int i = 0; i < nrcmds; i++) {
+    PGM_P pSetCmd = (PGM_P)pgm_read_ptr(&setcmds[i].setcmd);
+    if (strcasecmp_P(topicToken, pSetCmd) == 0) {
+      return i;
+    }
+
+    PGM_P pOtgwCmd = (PGM_P)pgm_read_ptr(&setcmds[i].otgwcmd);
+    if (strlen_P(pOtgwCmd) > 0 && strcasecmp_P(topicToken, pOtgwCmd) == 0) {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
 //===========================================================================================
 void startMQTT() 
 {
@@ -362,8 +414,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 
   //detect home assistant going down...
   char msgPayload[50];
-  int msglen = min((int)(length)+1, (int)sizeof(msgPayload));
-  strlcpy(msgPayload, (char *)payload, msglen);
+  copyMQTTPayloadToBuffer(payload, length, msgPayload, sizeof(msgPayload));
   if (strcasecmp_P(topic, PSTR("homeassistant/status")) == 0) {
     //incoming message on status, detect going down
     if (!settings.mqtt.bHaRebootDetect) {
@@ -389,68 +440,67 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 
 
   // parse the incoming topic and execute commands
-  char* token;
   char otgwcmd[51]={0};
+  char topicToken[MQTT_ID_MAX_LEN] = {0};
+  const char *topicCursor = topic;
 
   //first check toptopic part, it can include the seperator, e.g. "myHome/OTGW" or "OTGW""
   const size_t topTopicLen = strlen(CSTR(settings.mqtt.sTopTopic));
-  if (strncmp(topic, CSTR(settings.mqtt.sTopTopic), topTopicLen) != 0) {
+  if (strncmp(topicCursor, CSTR(settings.mqtt.sTopTopic), topTopicLen) != 0) {
     MQTTDebugln(F("MQTT: wrong top topic"));
     return;
   } else {
     //remove the top topic part
     MQTTDebugTf(PSTR("Parsing topic: %s/"), CSTR(settings.mqtt.sTopTopic));
-    topic += topTopicLen;
-    while (*topic == '/') {
-      topic++;
+    topicCursor += topTopicLen;
+    while (*topicCursor == '/') {
+      topicCursor++;
     }
   }
   // naming convention /set/<node id>/<command>
-  token = strtok(topic, "/"); 
-  if (token == NULL) { MQTTDebugln(F("MQTT: missing 'set' token")); return; }
-  MQTTDebugf(PSTR("%s/"), token);
-  if (strcasecmp(token, "set") == 0) {
-    token = strtok(NULL, "/");
-    if (token == NULL) { MQTTDebugln(F("MQTT: missing node-id token")); return; }
-    MQTTDebugf(PSTR("%s/"), token); 
-    if (strcasecmp(token, NodeId) == 0) {
-      token = strtok(NULL, "/");
-      MQTTDebugf(PSTR("%s"), token);
-      if (token != NULL){
-        //loop thru command list
-        int i;
-        for (i=0; i<nrcmds; i++){
-          // Read setcmd pointer from Flash
-          PGM_P pSetCmd = (PGM_P)pgm_read_ptr(&setcmds[i].setcmd);
-          if (strcasecmp_P(token, pSetCmd) == 0){
-            //found a match
-            // Read ottype and otgwcmd from Flash
-            PGM_P pOtType = (PGM_P)pgm_read_ptr(&setcmds[i].ottype);
-            PGM_P pOtgwCmd = (PGM_P)pgm_read_ptr(&setcmds[i].otgwcmd);
-            
-            if (strcasecmp_P("raw", pOtType) == 0){
-              //raw command
-              snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s"), msgPayload);
-              MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
-              addOTWGcmdtoqueue((char *)otgwcmd, strlen(otgwcmd), true);
-            } else {
-              //all other commands are <otgwcmd>=<payload message> 
-              // Copy command string from Flash to temp buffer for snprintf
-              char cmdBuf[10];
-              strncpy_P(cmdBuf, pOtgwCmd, sizeof(cmdBuf));
-              cmdBuf[sizeof(cmdBuf)-1] = 0; // Ensure null termination
-              
-              snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s=%s"), cmdBuf, msgPayload);
-              MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
-              addOTWGcmdtoqueue((char *)otgwcmd, strlen(otgwcmd), true);
-            }
-            break; //exit loop
-          } 
-        }
-        if (i >= nrcmds){
+  if (!readMQTTTopicToken(topicCursor, topicToken, sizeof(topicToken))) {
+    MQTTDebugln(F("MQTT: missing 'set' token"));
+    return;
+  }
+  MQTTDebugf(PSTR("%s/"), topicToken);
+  if (strcasecmp_P(topicToken, PSTR("set")) == 0) {
+    if (!readMQTTTopicToken(topicCursor, topicToken, sizeof(topicToken))) {
+      MQTTDebugln(F("MQTT: missing node-id token"));
+      return;
+    }
+    MQTTDebugf(PSTR("%s/"), topicToken);
+    if (strcasecmp(topicToken, NodeId) == 0) {
+      if (!readMQTTTopicToken(topicCursor, topicToken, sizeof(topicToken))) {
+        MQTTDebugln(F("MQTT: missing command token"));
+        return;
+      }
+      MQTTDebugf(PSTR("%s"), topicToken);
+      if (topicToken[0] != '\0') {
+        const int cmdIndex = findMQTTSetCommandIndex(topicToken);
+        if (cmdIndex >= 0) {
+          PGM_P pOtgwCmd = (PGM_P)pgm_read_ptr(&setcmds[cmdIndex].otgwcmd);
+          PGM_P pOtType = (PGM_P)pgm_read_ptr(&setcmds[cmdIndex].ottype);
+
+          if (pOtType == s_raw){
+            //raw command
+            snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s"), msgPayload);
+            MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
+            addOTWGcmdtoqueue(otgwcmd, strlen(otgwcmd), true);
+          } else {
+            //all other commands are <otgwcmd>=<payload message>
+            // Copy command string from Flash to temp buffer for snprintf
+            char cmdBuf[10];
+            strncpy_P(cmdBuf, pOtgwCmd, sizeof(cmdBuf));
+            cmdBuf[sizeof(cmdBuf)-1] = 0; // Ensure null termination
+
+            snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s=%s"), cmdBuf, msgPayload);
+            MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
+            addOTWGcmdtoqueue(otgwcmd, strlen(otgwcmd), true);
+          }
+        } else {
           //no match found
           MQTTDebugln();
-          MQTTDebugTf(PSTR("No match found for command: [%s]\r\n"), token);
+          MQTTDebugTf(PSTR("No match found for command: [%s]\r\n"), topicToken);
         }
       }
     }
@@ -666,6 +716,7 @@ void PrintMQTTError(){
 void sendMQTTData(const char* topic, const char *json, const bool retain) 
 {
   if (!settings.mqtt.bEnable) return;
+  if (!mqttPublishAllowed) return;
   if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
   if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
   

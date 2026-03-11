@@ -1,4 +1,4 @@
-# ADR-046: Dual Encapsulating Structs (Settings + State)
+# ADR-051: Dual Encapsulating Structs (Settings + State)
 
 **Status:** Accepted
 **Date:** 2026-03-01

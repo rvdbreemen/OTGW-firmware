@@ -20,6 +20,7 @@ void handleDebug(){
                     CCONOFF(state.otgw.bThermostatState),
                     CCONOFF(state.otgw.bBoilerState),
                     state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
+                Debugf(PSTR("OTGW Simulation: %s\r\n"), CBOOLEAN(state.debug.bOTGWSimulation));
                 Debugf(PSTR("CH Temp: %.1f°C | Room Temp: %.1f°C | Setpoint: %.1f°C\r\n"),
                     OTcurrentSystemState.Tboiler,
                     OTcurrentSystemState.Tr,
@@ -36,6 +37,7 @@ void handleDebug(){
                 Debugln(F("r) Reconnect wifi, telnet, otgwstream and mqtt"));
                 Debugln(F("p) Reset PIC manually"));
                 Debugln(F("a) Send PR=A command to ID PIC firmware version and type"));
+                Debugln(F("S) Toggle OTGW serial simulation replay"));
                 Debugln(F("--- GPIO/Debug ---"));
                 Debugln(F("b) Blink LED 1 (5 times)"));
                 Debugln(F("i) Initialize relay outputs"));
@@ -109,6 +111,16 @@ void handleDebug(){
                 if (state.debug.bSensorSim)
                 {
                   pollSensors();  // Force immediate sensor data so panel/graph update right away
+                }
+                break;
+            case 'S':
+                state.debug.bOTGWSimulation = !state.debug.bOTGWSimulation;
+                state.debug.iOTGWSimulationNextDueMs = 0;
+                DebugTf(PSTR("\r\nDebug OTGW serial simulation: %s\r\n"), CBOOLEAN(state.debug.bOTGWSimulation));
+                if (state.debug.bOTGWSimulation) {
+                    sendEventToWebSocket_P('*', PSTR("OTGW simulation enabled [replay active]"));
+                } else {
+                    sendEventToWebSocket_P('*', PSTR("OTGW simulation disabled [live serial resumed]"));
                 }
                 break;
             case 'b':

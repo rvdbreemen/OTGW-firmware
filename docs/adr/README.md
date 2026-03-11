@@ -10,10 +10,10 @@ Architecture Decision Records capture important architectural decisions along wi
 
 **By Topic:**
 - [Platform & Build](#platform-and-build-system) (4 ADRs)
-- [Memory Management](#memory-management) (4 ADRs)
+- [Memory Management](#memory-management) (5 ADRs)
 - [Network & Security](#network-and-security) (3 ADRs)
-- [Integration](#integration-and-communication) (5 ADRs) 🆕
-- [Core Systems](#system-architecture) (4 ADRs) 🆕
+- [Integration](#integration-and-communication) (6 ADRs) 🆕
+- [Core Systems](#system-architecture) (5 ADRs) 🆕
 - [Features & Extensions](#features-and-extensions) (8 ADRs) 🆕
 - [Browser & Client](#browser-and-client-compatibility) (4 ADRs)
 - [OTA & Updates](#ota-and-firmware-updates) (2 ADRs)
@@ -52,8 +52,11 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-028: File Streaming Over Loading for Memory Safety](ADR-028-file-streaming-over-loading.md)**  
   Never load files >2KB into RAM; use streaming patterns to prevent memory exhaustion crashes.
 
-- **[ADR-030: Heap Memory Monitoring and Emergency Recovery](ADR-030-heap-memory-monitoring-emergency-recovery.md)** 🆕  
+- **[ADR-030: Heap Memory Monitoring and Emergency Recovery](ADR-030-heap-memory-monitoring-emergency-recovery.md)** 🆕
   Proactive heap monitoring with 4-level health system and adaptive throttling to prevent crashes (CRITICAL <3KB, WARNING 3-5KB, LOW 5-8KB, HEALTHY >8KB).
+
+- **[ADR-044: Global State — extern Declaration in Header, Definition in .ino](ADR-044-global-state-header-definition-pattern.md)** 🆕
+  `extern` declarations in headers + single definition in owning `.ino` to avoid ODR violations in any multi-TU build; applies to `msglastupdated[]`, `mqttlastsent[]`, `mqttPublishAllowed`, etc.
 
 ### Integration and Communication
 - **[ADR-005: WebSocket for Real-Time Streaming](ADR-005-websocket-real-time-streaming.md)**  
@@ -71,6 +74,9 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-040: MQTT Source-Specific Topics for OpenTherm Values](ADR-040-mqtt-source-specific-topics.md)** 🆕
   Additive source-specific MQTT and HA discovery topics using nested `<metric>/<source>` paths with opt-in enablement (`MQTTseparatesources`) and backward-compatible base topics.
 
+- **[ADR-044: Webhook Outbound HTTP Integration](ADR-044-webhook-outbound-http-integration.md)** 🆕
+  Configurable outbound HTTP GET/POST triggered on OpenTherm StatusFlags bit edges; local-network-only URL enforcement, payload template expansion, and REST test endpoint.
+
 ### System Architecture
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  
   Non-blocking timer-based task scheduling with 49-day rollover protection for cooperative multitasking.
@@ -84,6 +90,24 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-038: OpenTherm Message Data Flow Pipeline](ADR-038-opentherm-data-flow-pipeline.md)** 🆕  
   Synchronous fan-out architecture for OpenTherm messages (PIC Serial → processOT → MQTT + WebSocket + REST + Telnet) with per-consumer availability checks and bidirectional command flow.
 
+- **[ADR-045: PS=1 Print Summary Parsing](ADR-045-ps1-print-summary-parsing.md)** *(Superseded by ADR-046)*  
+  Historical record of the original PS=1 synthetic-frame design.
+
+- **[ADR-046: PS=1 Summary Translation with Shared Publish Helpers](ADR-046-ps1-summary-translation-shared-publish-helpers.md)** 🆕
+  PS=1 uses a dedicated summary-translation path with strict parsing, centralized PS-mode helpers, and selective reuse of shared publish/state helpers.
+
+- **[ADR-047: Non-Blocking WiFi Reconnect State Machine](ADR-047-nonblocking-wifi-reconnect.md)** 🆕
+  Cooperative reconnect state machine that retries without blocking the main loop and reboots after repeated failure.
+
+- **[ADR-048: Non-Blocking Webhook State Machine with Retry](ADR-048-nonblocking-webhook-state-machine.md)** 🆕
+  Webhook delivery runs as a non-blocking state machine with bounded retry behavior to avoid stalling loop processing.
+
+- **[ADR-050: Centralized API Route Dispatch Table](ADR-050-centralized-api-route-dispatch.md)** 🆕
+  `/api/v2` routing uses a dispatch table instead of a long conditional chain to keep endpoint registration centralized and maintainable.
+
+- **[ADR-051: Dual Encapsulating Structs (Settings + State)](ADR-051-dual-encapsulating-structs.md)** 🆕
+  Persistent configuration and runtime state are grouped into dedicated top-level structs to replace sprawling flat globals.
+
 ### Hardware and Reliability
 - **[ADR-011: External Hardware Watchdog for Reliability](ADR-011-external-hardware-watchdog.md)**  
   I2C hardware watchdog chip that automatically resets the ESP8266 if firmware hangs or crashes.
@@ -94,6 +118,9 @@ Architecture Decision Records capture important architectural decisions along wi
 ### Development and Build
 - **[ADR-013: Arduino Framework Over ESP-IDF](ADR-013-arduino-framework-over-esp-idf.md)**  
   Using Arduino framework for rapid development and rich ecosystem instead of low-level ESP-IDF.
+
+- **[ADR-049: String Class Prohibition in Protocol Paths](ADR-049-string-prohibition-protocol-paths.md)** 🆕
+  Protocol hot paths use bounded char buffers instead of `String` to reduce heap fragmentation and peak RAM usage on ESP8266.
 
 - **[ADR-014: Dual Build System (Makefile + Python Script)](ADR-014-dual-build-system.md)**  
   Makefile for CI/CD and build.py wrapper for cross-platform developer convenience.
@@ -269,6 +296,8 @@ ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
 6. 2024: ADR-019 (API v2)
 7. 2026: ADR-025 (Safari WebSocket fix), ADR-026 (Cache-busting), ADR-027 (Version warnings)
 8. 2026: ADR-036 (Boot sequence), ADR-037 (Gateway mode), ADR-038 (Data flow), ADR-039 (OTGraph)
+9. 2026: ADR-040 (MQTT source topics), ADR-041 (JIT HA discovery), ADR-042 (No ArduinoJson), ADR-043 (Triple-reset WiFi)
+10. 2026: ADR-044 (Webhook HTTP integration), ADR-045 (PS=1 summary parsing)
 
 ## When to Create an ADR
 

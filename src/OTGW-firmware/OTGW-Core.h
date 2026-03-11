@@ -484,7 +484,25 @@ enum OpenThermMessageID {
 
 #define OT_MSGID_MAX 133
 
-extern time_t msglastupdated[256]; //all msg, even if they are unknown (id is uint8_t: 0-255)
+// Global arrays defined in OTGW-Core.ino (extern declarations here to avoid ODR violations).
+// Definitions in headers cause duplicate-symbol linker errors in any multi-TU build.
+// Arduino merges all .ino files into one .cpp so it happens to work, but the correct
+// pattern is extern declaration in the header + a single definition in one .ino file. (ADR-044)
+extern time_t   msglastupdated[256];       // last-updated timestamp per OT msg id (0-255)
+extern uint32_t mqttlastsent[256];         // packed throttle state: bits31-16=last u16 value, bits15-0=seconds-since-boot
+extern uint16_t mqttlastsentstatusbit[16]; // per-bit publish timers for OT_Statusflags (slots 0-7=master, 8-15=slave)
+extern bool     mqttPublishAllowed;        // MQTT interval gate — managed via OTPublishGate, checked in sendMQTTData
+
+// RAII guard for the MQTT publish gate. Saves/restores mqttPublishAllowed on scope exit
+// so nested or interrupted gate operations can never leave the gate stuck false.
+// Usage:  { OTPublishGate gate(shouldPublishMQTTForID(...)); decodeAndPublishOTValue(); }
+struct OTPublishGate {
+  bool _saved;
+  explicit OTPublishGate(bool allow) : _saved(mqttPublishAllowed) { mqttPublishAllowed = allow; }
+  ~OTPublishGate() { mqttPublishAllowed = _saved; }
+  OTPublishGate(const OTPublishGate&) = delete;
+  OTPublishGate& operator=(const OTPublishGate&) = delete;
+};
 
 struct OT_cmd_t { // see all possible commands for PIC here: https://otgw.tclcode.com/firmware.html
 	char cmd[15];
@@ -526,8 +544,11 @@ enum OTGW_response_type {
 	OTGW_PARITY_ERROR,
 	OTGW_UNDEF	
 };
+#define OT_MSGTYPE_REQUEST  0  // masterslave: 0=master (thermostat → boiler request)
+#define OT_MSGTYPE_RESPONSE 1  // masterslave: 1=slave  (boiler → thermostat response)
+
 struct OpenthermData_t {
-  char buf[10];	
+  char buf[10];
   byte len;
   uint32_t value;
   byte masterslave; //0=master, 1=slave

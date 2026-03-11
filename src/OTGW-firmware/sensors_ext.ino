@@ -145,13 +145,10 @@ void initSimulatedDallasSensors()
   }
 }
 
-// Setup a oneWire instance to communicate with any OneWire devices
-// needs a PIN to init correctly, pin is changed when we initSensors()
-// this still may cause problems though because we this configures the pin already
-// BUT, we're an OTGW, on a NODO print, so we are pretty sure nothing
-// else is connected on these pins unlease somebody tweaked something.
-// still don't like this too much:
-OneWire oneWire(settings.sensors.iPin);
+// Use default constructor (no pin) so no GPIO is touched before settings load.
+// oneWire.begin(settingGPIOSENSORSpin) is called inside initSensors() after
+// readSettings() has loaded the correct pin value. (ADR-020)
+OneWire oneWire;
 
 // Pass our oneWire reference to Dallas Temperature sensor 
 DallasTemperature sensors(&oneWire);

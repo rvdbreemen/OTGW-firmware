@@ -137,6 +137,7 @@ void setup() {
   setLed(LED2, ON);
 
   LittleFSmounted = LittleFS.begin();
+  if (!LittleFSmounted) SetupDebugln(F("*** ERROR: LittleFS mount FAILED - running on compile-time defaults ***"));
   readSettings(true);
   checklittlefshash();
 
@@ -184,13 +185,15 @@ void setup() {
   setLed(LED2, OFF);
   sendMQTTuptime();
   sendMQTTversioninfo();
+  if (!LittleFSmounted) sendMQTTData(F("otgw-firmware/error"), "LittleFS mount failed - running on defaults", false);
   initS0Count();        // init S0 counter
   initSensors();        // init DS18B20 (after MQ is up!)
+  state.bSetupComplete = true; // ADR-036: allow doBackgroundTasks() to run service handlers
 }
 //=====================================================================
 
 
-//====[ Non-blocking WiFi Reconnect State Machine (ADR-046) ]===
+//====[ Non-blocking WiFi Reconnect State Machine (ADR-047) ]===
 // Replaces blocking restartWifi() — no delay() in reconnect path.
 // Called every loop iteration from doBackgroundTasks().
 
@@ -433,7 +436,12 @@ void do5minevent(){
 void doBackgroundTasks()
 {
   feedWatchDog();               // Feed the dog before it bites!
-  loopWifi();                   // Non-blocking WiFi reconnect state machine (ADR-046)
+
+  // ADR-036: block service handlers until setup() completes.
+  // blinkLED/delayms in setup() would otherwise invoke handleMQTT() before
+  // startMQTT() sets the 1350-byte buffer, and handleOTGW() before resetOTGW().
+  if (!state.bSetupComplete) return;
+  loopWifi();                   // Non-blocking WiFi reconnect state machine (ADR-047)
 
   // Check for critically low heap and attempt recovery if needed
   if (getHeapHealth() == HEAP_CRITICAL) {

@@ -253,7 +253,7 @@ static bool evalTriggerBit() {
 }
 
 //=======================================================================
-// Non-blocking webhook state machine with retry (ADR-047)
+// Non-blocking webhook state machine with retry (ADR-048)
 // Replaces evalWebhook() — decouples detection from sending.
 // States: WH_IDLE -> WH_PENDING -> WH_RETRY_WAIT -> WH_IDLE
 //=======================================================================

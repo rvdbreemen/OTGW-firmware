@@ -10,35 +10,148 @@
 ***************************************************************************      
 */
 
-// Helper function to escape JSON string values
-// Replaces: " with \", \ with \\, control chars with \uXXXX
-String escapeJsonString(const char* str) {
-  if (!str) return String("");
-  
-  String result;
-  result.reserve(strlen(str) + 10); // Reserve some extra space for escapes
-  
-  for (const char* p = str; *p; p++) {
+// In-place buffer version to avoid heap allocations
+void escapeJsonStringTo(const char* src, char* dest, size_t destSize) {
+  if (!src || !dest || destSize == 0) {
+    if (dest && destSize > 0) dest[0] = '\0';
+    return;
+  }
+
+  size_t destIdx = 0;
+  for (const char* p = src; *p && destIdx < destSize - 1; p++) {
+    const char* esc = nullptr;
+    char hex[7];
+    
     switch (*p) {
-      case '"':  result += "\\\""; break;
-      case '\\': result += "\\\\"; break;
-      case '\b': result += "\\b";  break;
-      case '\f': result += "\\f";  break;
-      case '\n': result += "\\n";  break;
-      case '\r': result += "\\r";  break;
-      case '\t': result += "\\t";  break;
+      case '"':  esc = "\\\""; break;
+      case '\\': esc = "\\\\"; break;
+      case '\b': esc = "\\b";  break;
+      case '\f': esc = "\\f";  break;
+      case '\n': esc = "\\n";  break;
+      case '\r': esc = "\\r";  break;
+      case '\t': esc = "\\t";  break;
       default:
         if (*p < 0x20) {
-          // Control character - use \uXXXX notation
-          char buf[7];
-          snprintf(buf, sizeof(buf), "\\u%04X", (unsigned char)*p);
-          result += buf;
-        } else {
-          result += *p;
+          snprintf(hex, sizeof(hex), "\\u%04X", (unsigned char)*p);
+          esc = hex;
         }
     }
+
+    if (esc) {
+      size_t len = strlen(esc);
+      if (destIdx + len < destSize - 1) {
+        strcpy(&dest[destIdx], esc);
+        destIdx += len;
+      } else {
+        break; // Out of space
+      }
+    } else {
+      dest[destIdx++] = *p;
+    }
   }
-  return result;
+  dest[destIdx] = '\0';
+}
+
+static void sendEscapedJsonStringContent(const char* src) {
+  if (!src) return;
+
+  char chunk[24];
+  size_t chunkIdx = 0;
+
+  for (const char* p = src; *p; p++) {
+    const char* esc = nullptr;
+    char hex[7];
+
+    switch (*p) {
+      case '"':  esc = "\\\""; break;
+      case '\\': esc = "\\\\"; break;
+      case '\b': esc = "\\b";  break;
+      case '\f': esc = "\\f";  break;
+      case '\n': esc = "\\n";  break;
+      case '\r': esc = "\\r";  break;
+      case '\t': esc = "\\t";  break;
+      default:
+        if (*p < 0x20) {
+          snprintf_P(hex, sizeof(hex), PSTR("\\u%04X"), (unsigned char)*p);
+          esc = hex;
+        }
+        break;
+    }
+
+    if (esc) {
+      const size_t escLen = strlen(esc);
+      if ((chunkIdx + escLen) >= sizeof(chunk)) {
+        chunk[chunkIdx] = '\0';
+        httpServer.sendContent(chunk);
+        chunkIdx = 0;
+      }
+      memcpy(chunk + chunkIdx, esc, escLen);
+      chunkIdx += escLen;
+    } else {
+      if ((chunkIdx + 1) >= sizeof(chunk)) {
+        chunk[chunkIdx] = '\0';
+        httpServer.sendContent(chunk);
+        chunkIdx = 0;
+      }
+      chunk[chunkIdx++] = *p;
+    }
+  }
+
+  if (chunkIdx > 0) {
+    chunk[chunkIdx] = '\0';
+    httpServer.sendContent(chunk);
+  }
+}
+
+static void writeEscapedJsonStringContent(File& f, const char* src) {
+  if (!src) return;
+
+  char chunk[24];
+  size_t chunkIdx = 0;
+
+  for (const char* p = src; *p; p++) {
+    const char* esc = nullptr;
+    char hex[7];
+
+    switch (*p) {
+      case '"':  esc = "\\\""; break;
+      case '\\': esc = "\\\\"; break;
+      case '\b': esc = "\\b";  break;
+      case '\f': esc = "\\f";  break;
+      case '\n': esc = "\\n";  break;
+      case '\r': esc = "\\r";  break;
+      case '\t': esc = "\\t";  break;
+      default:
+        if (*p < 0x20) {
+          snprintf_P(hex, sizeof(hex), PSTR("\\u%04X"), (unsigned char)*p);
+          esc = hex;
+        }
+        break;
+    }
+
+    if (esc) {
+      const size_t escLen = strlen(esc);
+      if ((chunkIdx + escLen) >= sizeof(chunk)) {
+        chunk[chunkIdx] = '\0';
+        f.print(chunk);
+        chunkIdx = 0;
+      }
+      memcpy(chunk + chunkIdx, esc, escLen);
+      chunkIdx += escLen;
+    } else {
+      if ((chunkIdx + 1) >= sizeof(chunk)) {
+        chunk[chunkIdx] = '\0';
+        f.print(chunk);
+        chunkIdx = 0;
+      }
+      chunk[chunkIdx++] = *p;
+    }
+  }
+
+  if (chunkIdx > 0) {
+    chunk[chunkIdx] = '\0';
+    f.print(chunk);
+  }
 }
 
 // Helper function to unescape a single JSON escape character (the char after '\').
@@ -360,29 +473,23 @@ void sendJsonMapEntry(const char *cName, float fValue)
 
 void sendJsonMapEntry(const char *cName, const char *cValue)
 {
-  char jsonBuff[JSON_ENTRY_BUF] = "";
-
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": \"%s\""), cName, cValue);
-
   sendBeforenext();
   sendIdent();
-  httpServer.sendContent(jsonBuff);
+  httpServer.sendContent_P(PSTR("\""));
+  sendEscapedJsonStringContent(CSTR(cName));
+  httpServer.sendContent_P(PSTR("\": \""));
+  sendEscapedJsonStringContent(CSTR(cValue));
+  httpServer.sendContent_P(PSTR("\""));
 }
 
 void sendJsonMapEntry(const char *cName, String sValue)
 {
-  char jsonBuff[JSON_ENTRY_BUF] = "";
-
   if (sValue.length() > (JSON_ENTRY_BUF - 65) )
   {
     DebugTf(PSTR("[2] sValue.length() [%d]\r\n"), sValue.length());
   }
-  
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": \"%s\""), cName, sValue.c_str());
 
-  sendBeforenext();
-  sendIdent();
-  httpServer.sendContent(jsonBuff);
+  sendJsonMapEntry(cName, sValue.c_str());
 }
 
 void sendEndJsonMap(const char *objName)
@@ -829,14 +936,10 @@ void writeJsonStringPair(File& f, const char* key, const char* val, bool addComm
   if (!key || !val) return;
 
   if (addComma) f.print(',');
-
-  String escapedKey = escapeJsonString(key);
-  String escapedVal = escapeJsonString(val);
-
   f.print('"');
-  f.print(escapedKey);
+  writeEscapedJsonStringContent(f, key);
   f.print(F("\":\""));
-  f.print(escapedVal);
+  writeEscapedJsonStringContent(f, val);
   f.print('"');
 }
 
