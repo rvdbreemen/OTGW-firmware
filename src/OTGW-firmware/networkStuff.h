@@ -304,12 +304,12 @@ void startLLMNR(const char *hostname)
 
 void startNTP(){
   // Initialisation ezTime
-  if (!settingNTPenable) return;
-  if (strlen(settingNTPtimezone)==0) strlcpy(settingNTPtimezone, NTP_DEFAULT_TIMEZONE, sizeof(settingNTPtimezone));
-  if (strlen(settingNTPhostname)==0) strlcpy(settingNTPhostname, NTP_HOST_DEFAULT, sizeof(settingNTPhostname));
+  if (!settings.ntp.bEnable) return;
+  if (strlen(settings.ntp.sTimezone)==0) strlcpy(settings.ntp.sTimezone, NTP_DEFAULT_TIMEZONE, sizeof(settings.ntp.sTimezone));
+  if (strlen(settings.ntp.sHostname)==0) strlcpy(settings.ntp.sHostname, NTP_HOST_DEFAULT, sizeof(settings.ntp.sHostname));
 
   //void configTime(int timezone_sec, int daylightOffset_sec, const char* server1, const char* server2, const char* server3)
-  configTime(0, 0, settingNTPhostname, nullptr, nullptr);
+  configTime(0, 0, settings.ntp.sHostname, nullptr, nullptr);
   // Configure NTP before WiFi, so DHCP can override the NTP server(s)
   
   NtpStatus = TIME_WAITFORSYNC;
@@ -332,25 +332,25 @@ void getNTPtime(){
 void loopNTP(){
 time_t now;
 now = time(nullptr); //this is now...
-if (!settingNTPenable) return;
+if (!settings.ntp.bEnable) return;
   switch (NtpStatus){
     case TIME_NOTSET:
     case TIME_NEEDSYNC:
       NtpLastSync = now; //remember last sync
       DebugTln(F("Start time syncing"));
       startNTP();
-      DebugTf(PSTR("Starting timezone lookup for [%s]\r\n"), CSTR(settingNTPtimezone));
+      DebugTf(PSTR("Starting timezone lookup for [%s]\r\n"), CSTR(settings.ntp.sTimezone));
       NtpStatus = TIME_WAITFORSYNC;
       break;
     case TIME_WAITFORSYNC:
       if ((now > EPOCH_2000_01_01) && (now >= NtpLastSync)) { 
         //DebugTf(PSTR("Waited for sync: epoch: %lld\r\n"), time(nullptr));
         NtpLastSync = now; //remember last sync         
-        TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+        TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
         if (myTz.isError()){
-          DebugTf(PSTR("Error: Timezone Invalid/Not Found: [%s]\r\n"), CSTR(settingNTPtimezone));
-          strlcpy(settingNTPtimezone, NTP_DEFAULT_TIMEZONE, sizeof(settingNTPtimezone));
-          myTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone)); //try with default Timezone instead
+          DebugTf(PSTR("Error: Timezone Invalid/Not Found: [%s]\r\n"), CSTR(settings.ntp.sTimezone));
+          strlcpy(settings.ntp.sTimezone, NTP_DEFAULT_TIMEZONE, sizeof(settings.ntp.sTimezone));
+          myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone)); //try with default Timezone instead
         } else {
           //found the timezone, now set the time 
           ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
@@ -381,8 +381,8 @@ if (!settingNTPenable) return;
   //   Debug(now);
   //   Debugln();
   //   DebugT("Timezone : ");
-  //   Debugln(CSTR(settingNTPtimezone));
-  //   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  //   Debugln(CSTR(settings.ntp.sTimezone));
+  //   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   //   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
     
   //   DebugTf(PSTR("%02d:%02d:%02d %02d-%02d-%04d\r\n"), myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());

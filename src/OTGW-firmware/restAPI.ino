@@ -13,12 +13,12 @@
 #include <string.h>
 #include <ctype.h>
 
-#define RESTDebugTln(...) ({ if (bDebugRestAPI) DebugTln(__VA_ARGS__);    })
-#define RESTDebugln(...)  ({ if (bDebugRestAPI) Debugln(__VA_ARGS__);    })
-#define RESTDebugTf(...)  ({ if (bDebugRestAPI) DebugTf(__VA_ARGS__);    })
-#define RESTDebugf(...)   ({ if (bDebugRestAPI) Debugf(__VA_ARGS__);    })
-#define RESTDebugT(...)   ({ if (bDebugRestAPI) DebugT(__VA_ARGS__);    })
-#define RESTDebug(...)    ({ if (bDebugRestAPI) Debug(__VA_ARGS__);    })
+#define RESTDebugTln(...) ({ if (state.debug.bRestAPI) DebugTln(__VA_ARGS__);    })
+#define RESTDebugln(...)  ({ if (state.debug.bRestAPI) Debugln(__VA_ARGS__);    })
+#define RESTDebugTf(...)  ({ if (state.debug.bRestAPI) DebugTf(__VA_ARGS__);    })
+#define RESTDebugf(...)   ({ if (state.debug.bRestAPI) Debugf(__VA_ARGS__);    })
+#define RESTDebugT(...)   ({ if (state.debug.bRestAPI) DebugT(__VA_ARGS__);    })
+#define RESTDebug(...)    ({ if (state.debug.bRestAPI) Debug(__VA_ARGS__);    })
 
 //=======================================================================
 // RESTful v2 API: Consistent JSON error response helper (ADR-035)
@@ -59,124 +59,288 @@ static bool parseMsgId(const char *token, uint8_t &msgId) {
 }
 
 //=======================================================================
+// v2 API Route Dispatch Table (ADR-050)
+// Each resource gets its own handler function. Adding a new endpoint
+// requires: (1) add handler function, (2) add one entry to kV2Routes[].
+//=======================================================================
 
-void processAPI() 
-{
-  constexpr uint8_t MAX_WORDS = 8;
-  constexpr size_t WORD_LEN = 32;
-  char URI[50]   = "";
-  char words[MAX_WORDS][WORD_LEN] = {{0}};
+constexpr uint8_t API_MAX_WORDS = 8;
+constexpr size_t  API_WORD_LEN  = 32;
 
-  const HTTPMethod method = httpServer.method();
+// Common OPTIONS/CORS preflight response for all v2 endpoints
+static void sendApiOptions() {
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+  httpServer.sendHeader(F("Access-Control-Allow-Methods"), F("GET, POST, PUT, OPTIONS"));
+  httpServer.sendHeader(F("Access-Control-Allow-Headers"), F("Content-Type"));
+  httpServer.sendHeader(F("Access-Control-Max-Age"), F("86400"));
+  httpServer.send(204);
+}
+
+// Helper to queue a command from URL segment or request body, with validation
+static void handleCommandSubmit(const char* cmdStr) {
+  if (!cmdStr || cmdStr[0] == '\0') {
+    sendApiError(400, F("Missing command"));
+    return;
+  }
+  constexpr size_t kMaxCmdLen = sizeof(cmdqueue[0].cmd) - 1;
+  const size_t cmdLen = strlen(cmdStr);
+  if ((cmdLen < 3) || (cmdStr[2] != '=')) {
+    sendApiError(400, F("Invalid command format (expected XX=value)"));
+    return;
+  }
+  if (cmdLen > kMaxCmdLen) {
+    sendApiError(413, F("Command too long"));
+    return;
+  }
+  addOTWGcmdtoqueue(cmdStr, static_cast<int>(cmdLen));
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+  httpServer.send(202, F("application/json"), F("{\"status\":\"queued\"}"));
+}
+
+//=== Resource handler functions ===
+
+static void handleHealth(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+  sendHealth();
+}
+
+static void handleSettings(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (method == HTTP_POST || method == HTTP_PUT) {
+    postSettings();
+  } else if (method == HTTP_GET) {
+    sendDeviceSettings();
+  } else {
+    sendApiMethodNotAllowed(F("GET, POST, PUT"));
+  }
+}
+
+static void handleSensors(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (wc > 4 && strcmp_P(words[4], PSTR("labels")) == 0) {
+    if (method == HTTP_GET) {
+      getDallasLabels();
+    } else if (method == HTTP_POST || method == HTTP_PUT) {
+      updateAllDallasLabels();
+    } else {
+      sendApiMethodNotAllowed(F("GET, POST, PUT"));
+    }
+  } else {
+    sendApiNotFound(originalURI);
+  }
+}
+
+static void handleDevice(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+  if (wc > 4 && strcmp_P(words[4], PSTR("info")) == 0) {
+    sendDeviceInfoV2();
+  } else if (wc > 4 && strcmp_P(words[4], PSTR("time")) == 0) {
+    sendDeviceTimeV2();
+  } else {
+    sendApiNotFound(originalURI);
+  }
+}
+
+static void handleFlash(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+  if (wc > 4 && strcmp_P(words[4], PSTR("status")) == 0) {
+    sendFlashStatus();
+  } else {
+    sendApiNotFound(originalURI);
+  }
+}
+
+static void handlePic(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+  if (wc > 4 && strcmp_P(words[4], PSTR("flash-status")) == 0) {
+    sendPICFlashStatus();
+  } else if (wc > 4 && strcmp_P(words[4], PSTR("update-check")) == 0) {
+    sendPICUpdateCheck();
+  } else {
+    sendApiNotFound(originalURI);
+  }
+}
+
+static void handleFirmware(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+  if (wc > 4 && strcmp_P(words[4], PSTR("files")) == 0) {
+    apifirmwarefilelist();
+  } else {
+    sendApiNotFound(originalURI);
+  }
+}
+
+static void handleFilesystem(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+  if (wc > 4 && strcmp_P(words[4], PSTR("files")) == 0) {
+    apilistfiles();
+  } else if (wc > 4 && strcmp_P(words[4], PSTR("hash-check")) == 0) {
+    sendFilesystemHashCheck();
+  } else {
+    sendApiNotFound(originalURI);
+  }
+}
+
+static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
   const bool isGet = (method == HTTP_GET);
   const bool isPostOrPut = (method == HTTP_POST || method == HTTP_PUT);
 
+  if (wc <= 4) { sendApiNotFound(originalURI); return; }
+
+  if (strcmp_P(words[4], PSTR("otmonitor")) == 0 || strcmp_P(words[4], PSTR("telegraf")) == 0) {
+    if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
+    sendOTmonitorV2();
+  } else if (strcmp_P(words[4], PSTR("messages")) == 0 || strcmp_P(words[4], PSTR("id")) == 0) {
+    // GET /api/v2/otgw/messages/{id} or /api/v2/otgw/id/{id} (compat alias)
+    if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
+    uint8_t msgId = 0;
+    if (wc > 5 && parseMsgId(words[5], msgId)) {
+      sendOTGWvalue(msgId);
+    } else {
+      sendApiError(400, F("Invalid or missing message ID"));
+    }
+  } else if (strcmp_P(words[4], PSTR("commands")) == 0) {
+    // POST /api/v2/otgw/commands — command in body, 202 Accepted
+    if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    const String& body = httpServer.arg(0);
+    char cmdBuf[64] = "";
+    if (!extractJsonFieldText(body.c_str(), "command", cmdBuf, sizeof(cmdBuf))) {
+      strlcpy(cmdBuf, body.c_str(), sizeof(cmdBuf));
+    }
+    handleCommandSubmit(cmdBuf);
+  } else if (strcmp_P(words[4], PSTR("command")) == 0) {
+    // POST /api/v2/otgw/command/{cmd} — backward compat alias (prefer /commands)
+    if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    if (wc <= 5 || words[5][0] == '\0') { sendApiError(400, F("Missing command")); return; }
+    handleCommandSubmit(words[5]);
+  } else if (strcmp_P(words[4], PSTR("discovery")) == 0 || strcmp_P(words[4], PSTR("autoconfigure")) == 0) {
+    // POST /api/v2/otgw/discovery (or /autoconfigure compat alias)
+    if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+    httpServer.send(202, F("application/json"), F("{\"status\":\"accepted\"}"));
+    doAutoConfigure();
+  } else if (strcmp_P(words[4], PSTR("label")) == 0) {
+    if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
+    if (wc <= 5 || words[5][0] == '\0') { sendApiError(400, F("Missing label")); return; }
+    sendOTGWlabel(words[5]);
+  } else {
+    sendApiNotFound(originalURI);
+  }
+}
+
+static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (wc > 4 && strcmp_P(words[4], PSTR("test")) == 0) {
+    if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST")); return; }
+    String stateParam = httpServer.arg(F("state"));
+    if (!stateParam.length()) {
+      sendApiError(400, F("Missing required 'state' parameter; expected on|1 or off|0"));
+      return;
+    }
+    bool isOn  = (stateParam.equalsIgnoreCase("on")  || stateParam == "1");
+    bool isOff = (stateParam.equalsIgnoreCase("off") || stateParam == "0");
+    if (!isOn && !isOff) {
+      sendApiError(400, F("Invalid state; expected on|1 or off|0"));
+      return;
+    }
+    testWebhook(isOn);
+    httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+  } else {
+    sendApiNotFound(originalURI);
+  }
+}
+
+//=== Route dispatch table (ADR-050) ===
+// Adding a new v2 resource: (1) write handler function above, (2) add entry below.
+typedef void (*ApiResourceHandler)(const char[][API_WORD_LEN], uint8_t, HTTPMethod, const char*);
+
+struct ApiRoute {
+  PGM_P              segment;
+  ApiResourceHandler handler;
+};
+
+static const char kRouteHealth[]     PROGMEM = "health";
+static const char kRouteSettings[]   PROGMEM = "settings";
+static const char kRouteSensors[]    PROGMEM = "sensors";
+static const char kRouteDevice[]     PROGMEM = "device";
+static const char kRouteFlash[]      PROGMEM = "flash";
+static const char kRoutePic[]        PROGMEM = "pic";
+static const char kRouteFirmware[]   PROGMEM = "firmware";
+static const char kRouteFilesystem[] PROGMEM = "filesystem";
+static const char kRouteOtgw[]       PROGMEM = "otgw";
+static const char kRouteWebhook[]    PROGMEM = "webhook";
+
+static const ApiRoute kV2Routes[] = {
+  { kRouteHealth,     handleHealth },
+  { kRouteSettings,   handleSettings },
+  { kRouteSensors,    handleSensors },
+  { kRouteDevice,     handleDevice },
+  { kRouteFlash,      handleFlash },
+  { kRoutePic,        handlePic },
+  { kRouteFirmware,   handleFirmware },
+  { kRouteFilesystem, handleFilesystem },
+  { kRouteOtgw,       handleOtgw },
+  { kRouteWebhook,    handleWebhook },
+  { nullptr,          nullptr }  // sentinel
+};
+
+//=======================================================================
+void processAPI()
+{
+  char URI[50]   = "";
+  char words[API_MAX_WORDS][API_WORD_LEN] = {{0}};
+
+  const HTTPMethod method = httpServer.method();
   const size_t uriLen = strlcpy(URI, httpServer.uri().c_str(), sizeof(URI));
   char originalURI[sizeof(URI)];
   strlcpy(originalURI, URI, sizeof(originalURI));
 
   RESTDebugTf(PSTR("from[%s] URI[%s] method[%s] \r\n"), httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(method).c_str());
 
-  if (uriLen >= sizeof(URI))
-  {
+  if (uriLen >= sizeof(URI)) {
     RESTDebugTln(F("==> Bailout due to oversized URI"));
     httpServer.send_P(414, PSTR("text/plain"), PSTR("414: URI too long\r\n"));
     return;
   }
 
-  if (ESP.getFreeHeap() < 4096) // to prevent firmware from crashing!
-  {
-    // Lowered from 8500 to 4096 in v1.0.0-rc3.
-    // The new WebSocket server (port 81) consumes significant heap, establishing a new lower normal baseline.
-    // The REST API refactor to C-strings reduces fragmentation, making operation at 4KB safe.
-    RESTDebugTf(PSTR("==> Bailout due to low heap (%d bytes))\r\n"), ESP.getFreeHeap() );
-    httpServer.send_P(500, PSTR("text/plain"), PSTR("500: internal server error (low heap)\r\n")); 
+  if (ESP.getFreeHeap() < 4096) {
+    RESTDebugTf(PSTR("==> Bailout due to low heap (%d bytes))\r\n"), ESP.getFreeHeap());
+    httpServer.send_P(500, PSTR("text/plain"), PSTR("500: internal server error (low heap)\r\n"));
     return;
   }
 
+  // Parse URI into words[] tokens
   uint8_t wc = 0;
   {
     char *savePtr = nullptr;
-
-    if (URI[0] == '/' && wc < MAX_WORDS) {
-      words[wc][0] = '\0';
-      wc++;
-    }
-
-    for (char *token = strtok_r(URI, "/", &savePtr); token && wc < MAX_WORDS; token = strtok_r(nullptr, "/", &savePtr)) {
-      strlcpy(words[wc], token, WORD_LEN);
+    if (URI[0] == '/' && wc < API_MAX_WORDS) { words[wc][0] = '\0'; wc++; }
+    for (char *token = strtok_r(URI, "/", &savePtr); token && wc < API_MAX_WORDS; token = strtok_r(nullptr, "/", &savePtr)) {
+      strlcpy(words[wc], token, API_WORD_LEN);
       wc++;
     }
   }
-  
-  if (bDebugRestAPI)
-  {
+
+  if (state.debug.bRestAPI) {
     DebugT(F(">>"));
-    for (uint_fast8_t  w=0; w<wc; w++)
-    {
-      Debugf(PSTR("word[%d] => [%s], "), w, words[w]);
-    }
+    for (uint_fast8_t w = 0; w < wc; w++) { Debugf(PSTR("word[%d] => [%s], "), w, words[w]); }
     Debugln(F(" "));
   }
 
+  // Route: /api/v2/{resource}/...
   if (wc > 1 && strcmp_P(words[1], PSTR("api")) == 0) {
+    if (wc > 2 && strcmp_P(words[2], PSTR("v2")) == 0) {
+      // OPTIONS preflight for all v2 endpoints (CORS)
+      if (method == HTTP_OPTIONS) { sendApiOptions(); return; }
 
-    if (wc > 2 && strcmp_P(words[2], PSTR("v2")) == 0)
-    { //v2 API calls — RESTful compliant (ADR-035)
-      // T45: OPTIONS preflight for all v2 endpoints (CORS support)
-      if (method == HTTP_OPTIONS) {
-        httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
-        httpServer.sendHeader(F("Access-Control-Allow-Methods"), F("GET, OPTIONS"));
-        httpServer.sendHeader(F("Access-Control-Allow-Headers"), F("Content-Type"));
-        httpServer.sendHeader(F("Access-Control-Max-Age"), F("86400"));
-        httpServer.send(204);
-        return;
-      }
-      if (wc > 3 && strcmp_P(words[3], PSTR("health")) == 0) {
-        // GET /api/v2/health
-        if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-        sendHealth();
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("settings")) == 0) {
-        // GET/POST /api/v2/settings
-        if (isPostOrPut) {
-          postSettings();
-        } else if (isGet) {
-          sendDeviceSettings();
-        } else {
-          sendApiMethodNotAllowed(F("GET, POST, PUT"));
-        }
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("sensors")) == 0) {
-        if (wc > 4 && strcmp_P(words[4], PSTR("labels")) == 0) {
-          // GET/POST /api/v2/sensors/labels
-          if (isGet) {
-            getDallasLabels();
-          } else if (isPostOrPut) {
-            updateAllDallasLabels();
-          } else {
-            sendApiMethodNotAllowed(F("GET, POST, PUT"));
+      // Dispatch via route table
+      if (wc > 3) {
+        for (const ApiRoute* r = kV2Routes; r->segment != nullptr; r++) {
+          if (strcmp_P(words[3], r->segment) == 0) {
+            r->handler(words, wc, method, originalURI);
+            return;
           }
-        } else {
-          sendApiNotFound(originalURI);
         }
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("device")) == 0) {
-        if (wc > 4 && strcmp_P(words[4], PSTR("info")) == 0) {
-          // GET /api/v2/device/info (map format)
-          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-          sendDeviceInfoV2();
-        } else if (wc > 4 && strcmp_P(words[4], PSTR("crashlog")) == 0) {
-          // GET /api/v2/device/crashlog
-          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-          sendDeviceCrashLog();
-        } else if (wc > 4 && strcmp_P(words[4], PSTR("time")) == 0) {
-          // GET /api/v2/device/time — RESTful name for devtime (map format)
-          if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-          sendDeviceTimeV2();
-        } else {
-          sendApiNotFound(originalURI);
-        }
-      } else if (wc > 3 && strcmp_P(words[3], PSTR("flash")) == 0) {
-        if (wc > 4 && strcmp_P(words[4], PSTR("status")) == 0) {
-          // GET /api/v2/flash/status — RESTful name for flashstatus
+      }
+      sendApiNotFound(originalURI);
+    } else if (wc > 2 && (strcmp_P(words[2], PSTR("v0")) == 0 || strcmp_P(words[2], PSTR("v1")) == 0)) {
           if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
           sendFlashStatus();
         } else {
@@ -568,14 +732,14 @@ void sendOTmonitorV2()
   sendJsonOTmonMapEntry(F("oemdiagnosticcode"), OTcurrentSystemState.OEMDiagnosticCode, F(""), msglastupdated[OT_OEMDiagnosticCode]);
   sendJsonOTmonMapEntry(F("oemfaultcode"), OTcurrentSystemState.ASFflags & 0xFF, F(""), msglastupdated[OT_ASFflags]);
 
-  if (settingS0COUNTERenabled) 
+  if (settings.s0.bEnabled) 
   {
     sendJsonOTmonMapEntry(F("s0powerkw"), OTGWs0powerkw , F("kW"), OTGWs0lasttime);
     sendJsonOTmonMapEntry(F("s0intervalcount"), OTGWs0pulseCount , F(""), OTGWs0lasttime);
     sendJsonOTmonMapEntry(F("s0totalcount"), OTGWs0pulseCountTot , F(""), OTGWs0lasttime);
   }
-  sendJsonOTmonMapEntry(F("sensorsimulation"), bDebugSensorSimulation, F(""), now);
-  if (settingGPIOSENSORSenabled || bDebugSensorSimulation) 
+  sendJsonOTmonMapEntry(F("sensorsimulation"), state.debug.bSensorSim, F(""), now);
+  if (settings.sensors.bEnabled || state.debug.bSensorSim) 
   {
     sendJsonOTmonMapEntry(F("numberofsensors"), DallasrealDeviceCount , F(""), now );
     for (int i = 0; i < DallasrealDeviceCount; i++) {
@@ -595,13 +759,13 @@ void sendDeviceInfo()
 
   sendNestedJsonObj(F("author"), F("Robert van den Breemen"));
   sendNestedJsonObj(F("fwversion"), _SEMVER_FULL);
-  sendNestedJsonObj(F("picavailable"), CBOOLEAN(bPICavailable));
-  sendNestedJsonObj(F("picfwversion"), sPICfwversion);
-  sendNestedJsonObj(F("picdeviceid"), sPICdeviceid);
-  sendNestedJsonObj(F("picfwtype"), sPICtype);
+  sendNestedJsonObj(F("picavailable"), CBOOLEAN(state.pic.bAvailable));
+  sendNestedJsonObj(F("picfwversion"), state.pic.sFwversion);
+  sendNestedJsonObj(F("picdeviceid"), state.pic.sDeviceid);
+  sendNestedJsonObj(F("picfwtype"), state.pic.sType);
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
   sendNestedJsonObj(F("compiled"), cMsg);
-  sendNestedJsonObj(F("hostname"), CSTR(settingHostname));
+  sendNestedJsonObj(F("hostname"), CSTR(settings.sHostname));
   sendNestedJsonObj(F("ipaddress"), CSTR(WiFi.localIP().toString()));
   sendNestedJsonObj(F("macaddress"), CSTR(WiFi.macAddress()));
   sendNestedJsonObj(F("freeheap"), ESP.getFreeHeap());
@@ -645,16 +809,16 @@ void sendDeviceInfo()
   sendNestedJsonObj(F("wifirssi"), WiFi.RSSI());
   sendNestedJsonObj(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
   sendNestedJsonObj(F("wifiquality_text"), dBmtoQuality(WiFi.RSSI()));
-  sendNestedJsonObj(F("ntpenable"), CBOOLEAN(settingNTPenable));
-  sendNestedJsonObj(F("ntptimezone"), CSTR(settingNTPtimezone));
+  sendNestedJsonObj(F("ntpenable"), CBOOLEAN(settings.ntp.bEnable));
+  sendNestedJsonObj(F("ntptimezone"), CSTR(settings.ntp.sTimezone));
   sendNestedJsonObj(F("uptime"), upTime());
   sendNestedJsonObj(F("lastreset"), lastReset);
-  sendNestedJsonObj(F("bootcount"), rebootCount);
-  sendNestedJsonObj(F("mqttconnected"), CBOOLEAN(statusMQTTconnection));
-  sendNestedJsonObj(F("thermostatconnected"), CBOOLEAN(bOTGWthermostatstate));
-  sendNestedJsonObj(F("boilerconnected"), CBOOLEAN(bOTGWboilerstate));      
-  sendNestedJsonObj(F("otgwmode"), bOTGWgatewaystateKnown ? CCONOFF(bOTGWgatewaystate) : "detecting");
-  sendNestedJsonObj(F("otgwconnected"), CBOOLEAN(bOTGWonline));
+  sendNestedJsonObj(F("bootcount"), state.uptime.iRebootCount);
+  sendNestedJsonObj(F("mqttconnected"), CBOOLEAN(state.mqtt.bConnected));
+  sendNestedJsonObj(F("thermostatconnected"), CBOOLEAN(state.otgw.bThermostatState));
+  sendNestedJsonObj(F("boilerconnected"), CBOOLEAN(state.otgw.bBoilerState));      
+  sendNestedJsonObj(F("otgwmode"), state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
+  sendNestedJsonObj(F("otgwconnected"), CBOOLEAN(state.otgw.bOnline));
   
   sendEndJsonObj(F("devinfo"));
 
@@ -669,13 +833,13 @@ void sendDeviceInfoV2()
 
   sendJsonMapEntry(F("author"), F("Robert van den Breemen"));
   sendJsonMapEntry(F("fwversion"), _SEMVER_FULL);
-  sendJsonMapEntry(F("picavailable"), bPICavailable);
-  sendJsonMapEntry(F("picfwversion"), sPICfwversion);
-  sendJsonMapEntry(F("picdeviceid"), sPICdeviceid);
-  sendJsonMapEntry(F("picfwtype"), sPICtype);
+  sendJsonMapEntry(F("picavailable"), state.pic.bAvailable);
+  sendJsonMapEntry(F("picfwversion"), state.pic.sFwversion);
+  sendJsonMapEntry(F("picdeviceid"), state.pic.sDeviceid);
+  sendJsonMapEntry(F("picfwtype"), state.pic.sType);
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
   sendJsonMapEntry(F("compiled"), cMsg);
-  sendJsonMapEntry(F("hostname"), CSTR(settingHostname));
+  sendJsonMapEntry(F("hostname"), CSTR(settings.sHostname));
   sendJsonMapEntry(F("ipaddress"), CSTR(WiFi.localIP().toString()));
   sendJsonMapEntry(F("macaddress"), CSTR(WiFi.macAddress()));
   sendJsonMapEntry(F("freeheap"), ESP.getFreeHeap());
@@ -703,16 +867,16 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());
   sendJsonMapEntry(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
   sendJsonMapEntry(F("wifiquality_text"), dBmtoQuality(WiFi.RSSI()));
-  sendJsonMapEntry(F("ntpenable"), settingNTPenable);
-  sendJsonMapEntry(F("ntptimezone"), CSTR(settingNTPtimezone));
+  sendJsonMapEntry(F("ntpenable"), settings.ntp.bEnable);
+  sendJsonMapEntry(F("ntptimezone"), CSTR(settings.ntp.sTimezone));
   sendJsonMapEntry(F("uptime"), upTime());
   sendJsonMapEntry(F("lastreset"), lastReset);
-  sendJsonMapEntry(F("bootcount"), rebootCount);
-  sendJsonMapEntry(F("mqttconnected"), statusMQTTconnection);
-  sendJsonMapEntry(F("thermostatconnected"), bOTGWthermostatstate);
-  sendJsonMapEntry(F("boilerconnected"), bOTGWboilerstate);      
-  sendJsonMapEntry(F("otgwmode"), bOTGWgatewaystateKnown ? CCONOFF(bOTGWgatewaystate) : "detecting");
-  sendJsonMapEntry(F("otgwconnected"), bOTGWonline);
+  sendJsonMapEntry(F("bootcount"), state.uptime.iRebootCount);
+  sendJsonMapEntry(F("mqttconnected"), state.mqtt.bConnected);
+  sendJsonMapEntry(F("thermostatconnected"), state.otgw.bThermostatState);
+  sendJsonMapEntry(F("boilerconnected"), state.otgw.bBoilerState);      
+  sendJsonMapEntry(F("otgwmode"), state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
+  sendJsonMapEntry(F("otgwconnected"), state.otgw.bOnline);
   
   sendEndJsonMap(F("device"));
 
@@ -730,9 +894,9 @@ void sendHealth()
   sendJsonMapEntry(F("uptime"), upTime());
   sendJsonMapEntry(F("heap"), ESP.getFreeHeap());
   sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());
-  sendJsonMapEntry(F("mqttconnected"), CBOOLEAN(statusMQTTconnection));
-  sendJsonMapEntry(F("otgwconnected"), CBOOLEAN(bOTGWonline));
-  sendJsonMapEntry(F("picavailable"), CBOOLEAN(bPICavailable));
+  sendJsonMapEntry(F("mqttconnected"), CBOOLEAN(state.mqtt.bConnected));
+  sendJsonMapEntry(F("otgwconnected"), CBOOLEAN(state.otgw.bOnline));
+  sendJsonMapEntry(F("picavailable"), CBOOLEAN(state.pic.bAvailable));
   sendJsonMapEntry(F("littlefsMounted"), CBOOLEAN(LittleFSmounted));
   
   sendEndJsonMap(F("health"));
@@ -762,10 +926,10 @@ void sendPICFlashStatus()
   // Minimal PIC flash status endpoint for polling during flash
   // Returns: {"flashstatus":{"flashing":true|false,"progress":0-100,"filename":"...","error":"..."}}
   sendStartJsonMap(F("flashstatus"));
-  sendJsonMapEntry(F("flashing"), isPICFlashing);
-  sendJsonMapEntry(F("progress"), currentPICFlashProgress);
-  sendJsonMapEntry(F("filename"), currentPICFlashFile);
-  sendJsonMapEntry(F("error"), errorupgrade);
+  sendJsonMapEntry(F("flashing"), state.flash.bPICactive);
+  sendJsonMapEntry(F("progress"), state.flash.iPICprogress);
+  sendJsonMapEntry(F("filename"), state.flash.sPICfile);
+  sendJsonMapEntry(F("error"), state.flash.sError);
   sendEndJsonMap(F("flashstatus"));
 } // sendPICFlashStatus()
 
@@ -776,20 +940,20 @@ void sendPICUpdateCheck()
   // Only called when the user opens the PIC firmware tab — never on a timer.
   // Makes an outbound HTTP HEAD request to otgw.tclcode.com.
   String latest = "";
-  if (strcmp_P(sPICdeviceid, PSTR("unknown")) != 0 && sPICdeviceid[0] != '\0') {
+  if (strcmp_P(state.pic.sDeviceid, PSTR("unknown")) != 0 && state.pic.sDeviceid[0] != '\0') {
     String picFile;
-    if (strcmp_P(sPICtype, PSTR("diagnose")) == 0) {
+    if (strcmp_P(state.pic.sType, PSTR("diagnose")) == 0) {
       picFile = F("diagnose.hex");
-    } else if (strcmp_P(sPICtype, PSTR("interface")) == 0) {
+    } else if (strcmp_P(state.pic.sType, PSTR("interface")) == 0) {
       picFile = F("interface.hex");
     } else {
       picFile = F("gateway.hex");
     }
     latest = checkforupdatepic(picFile);
   }
-  bool updateAvailable = (latest.length() > 0 && latest != String(sPICfwversion));
+  bool updateAvailable = (latest.length() > 0 && latest != String(state.pic.sFwversion));
   sendStartJsonMap(F("pic_update"));
-  sendJsonMapEntry(F("current"), sPICfwversion);
+  sendJsonMapEntry(F("current"), state.pic.sFwversion);
   sendJsonMapEntry(F("latest"), latest.c_str());
   sendJsonMapEntry(F("update_available"), updateAvailable);
   sendEndJsonMap(F("pic_update"));
@@ -817,10 +981,10 @@ void sendFlashStatus()
   // Returns: {"flashstatus":{"flashing":bool,"pic_flashing":bool,"pic_progress":0-100,"pic_filename":"...","pic_error":"..."}}
   sendStartJsonMap(F("flashstatus"));
   sendJsonMapEntry(F("flashing"), isFlashing());
-  sendJsonMapEntry(F("pic_flashing"), isPICFlashing);
-  sendJsonMapEntry(F("pic_progress"), currentPICFlashProgress);
-  sendJsonMapEntry(F("pic_filename"), currentPICFlashFile);
-  sendJsonMapEntry(F("pic_error"), errorupgrade);
+  sendJsonMapEntry(F("pic_flashing"), state.flash.bPICactive);
+  sendJsonMapEntry(F("pic_progress"), state.flash.iPICprogress);
+  sendJsonMapEntry(F("pic_filename"), state.flash.sPICfile);
+  sendJsonMapEntry(F("pic_error"), state.flash.sError);
   sendEndJsonMap(F("flashstatus"));
 } // sendFlashStatus()
 
@@ -833,13 +997,13 @@ void sendDeviceTime()
   sendStartJsonObj(F("devtime"));
   time_t now = time(nullptr);
   //Timezone based devtime
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
   snprintf_P(buf, sizeof(buf), PSTR("%04d-%02d-%02d %02d:%02d:%02d"), myTime.year(), myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second());
   sendNestedJsonObj(F("dateTime"), buf); 
   sendNestedJsonObj(F("epoch"), (int)now);
   sendNestedJsonObj(F("message"), sMessage);
-  sendNestedJsonObj(F("psmode"), CBOOLEAN(bPSmode));
+  sendNestedJsonObj(F("psmode"), CBOOLEAN(state.otgw.bPSmode));
 
   sendEndJsonObj(F("devtime"));
 
@@ -853,13 +1017,15 @@ void sendDeviceTimeV2()
   sendStartJsonMap(F("devtime"));
   time_t now = time(nullptr);
   //Timezone based devtime
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
   snprintf_P(buf, sizeof(buf), PSTR("%04d-%02d-%02d %02d:%02d:%02d"), myTime.year(), myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second());
   sendJsonMapEntry(F("dateTime"), buf); 
   sendJsonMapEntry(F("epoch"), (int)now);
   sendJsonMapEntry(F("message"), sMessage);
-  sendJsonMapEntry(F("psmode"), bPSmode);
+  sendJsonMapEntry(F("psmode"), state.otgw.bPSmode);
+  sendJsonMapEntry(F("freeheap"), ESP.getFreeHeap());
+  sendJsonMapEntry(F("maxfreeblock"), ESP.getMaxFreeBlockSize());
 
   sendEndJsonMap(F("devtime"));
 
@@ -877,52 +1043,52 @@ void sendDeviceSettings()
   //sendJsonSettingObj("float",    settingFloat,    "f", 0, 10,  5);
   //sendJsonSettingObj("intager",  settingInteger , "i", 2, 60);
 
-  sendJsonSettingObj(F("hostname"), CSTR(settingHostname), "s", 32);
-  sendJsonSettingObj(F("mqttenable"), settingMQTTenable, "b");
-  sendJsonSettingObj(F("mqttbroker"), CSTR(settingMQTTbroker), "s", 32);
-  sendJsonSettingObj(F("mqttbrokerport"), settingMQTTbrokerPort, "i", 0, 65535);
-  sendJsonSettingObj(F("mqttuser"), CSTR(settingMQTTuser), "s", 32);
+  sendJsonSettingObj(F("hostname"), CSTR(settings.sHostname), "s", 32);
+  sendJsonSettingObj(F("mqttenable"), settings.mqtt.bEnable, "b");
+  sendJsonSettingObj(F("mqttbroker"), CSTR(settings.mqtt.sBroker), "s", 32);
+  sendJsonSettingObj(F("mqttbrokerport"), settings.mqtt.iBrokerPort, "i", 0, 65535);
+  sendJsonSettingObj(F("mqttuser"), CSTR(settings.mqtt.sUser), "s", 32);
   sendJsonSettingObj(F("mqttpasswd"), "notthepassword", "p", 100);
-  sendJsonSettingObj(F("mqtttoptopic"), CSTR(settingMQTTtopTopic), "s", 15);
-  sendJsonSettingObj(F("mqtthaprefix"), CSTR(settingMQTThaprefix), "s", 20);
-  sendJsonSettingObj(F("mqttharebootdetection"), settingMQTTharebootdetection, "b");
-  sendJsonSettingObj(F("mqttuniqueid"), CSTR(settingMQTTuniqueid), "s", 20);
-  sendJsonSettingObj(F("mqttotmessage"), settingMQTTOTmessage, "b");
-  sendJsonSettingObj(F("mqttinterval"), settingMQTTinterval, "i", 0, 3600);
-  sendJsonSettingObj(F("mqttseparatesources"), settingMQTTSeparateSources, "b");
-  sendJsonSettingObj(F("ntpenable"), settingNTPenable, "b");
-  sendJsonSettingObj(F("ntptimezone"), CSTR(settingNTPtimezone), "s", 50);
-  sendJsonSettingObj(F("ntphostname"), CSTR(settingNTPhostname), "s", 50);
-  sendJsonSettingObj(F("ntpsendtime"), settingNTPsendtime, "b");
-  sendJsonSettingObj(F("ledblink"), settingLEDblink, "b");
-  sendJsonSettingObj(F("darktheme"), settingDarkTheme, "b");
-  sendJsonSettingObj(F("ui_autoscroll"), settingUIAutoScroll, "b");
-  sendJsonSettingObj(F("ui_timestamps"), settingUIShowTimestamp, "b");
-  sendJsonSettingObj(F("ui_capture"), settingUICaptureMode, "b");
-  sendJsonSettingObj(F("ui_autoscreenshot"), settingUIAutoScreenshot, "b");
-  sendJsonSettingObj(F("ui_autodownloadlog"), settingUIAutoDownloadLog, "b");
-  sendJsonSettingObj(F("ui_autoexport"), settingUIAutoExport, "b");
-  sendJsonSettingObj(F("ui_graphtimewindow"), settingUIGraphTimeWindow, "i", 0, 1440);
-  sendJsonSettingObj(F("gpiosensorsenabled"), settingGPIOSENSORSenabled, "b");
-  sendJsonSettingObj(F("gpiosensorslegacyformat"), settingGPIOSENSORSlegacyformat, "b");
-  sendJsonSettingObj(F("gpiosensorspin"), settingGPIOSENSORSpin, "i", 0, 16);
-  sendJsonSettingObj(F("gpiosensorsinterval"), settingGPIOSENSORSinterval, "i", 5, 65535);
-  sendJsonSettingObj(F("s0counterenabled"), settingS0COUNTERenabled, "b");
-  sendJsonSettingObj(F("s0counterpin"), settingS0COUNTERpin, "i", 1, 16);
-  sendJsonSettingObj(F("s0counterdebouncetime"), settingS0COUNTERdebouncetime, "i", 0, 1000);
-  sendJsonSettingObj(F("s0counterpulsekw"), settingS0COUNTERpulsekw, "i", 1, 5000);
-  sendJsonSettingObj(F("s0counterinterval"), settingS0COUNTERinterval, "i", 5, 65535);
-  sendJsonSettingObj(F("gpiooutputsenabled"), settingGPIOOUTPUTSenabled, "b");
-  sendJsonSettingObj(F("gpiooutputspin"), settingGPIOOUTPUTSpin, "i", 0, 16);
-  sendJsonSettingObj(F("gpiooutputstriggerbit"), settingGPIOOUTPUTStriggerBit, "i", 0, 16);
-  sendJsonSettingObj(F("otgwcommandenable"), settingOTGWcommandenable, "b");
-  sendJsonSettingObj(F("otgwcommands"), CSTR(settingOTGWcommands), "s", 128);
-  sendJsonSettingObj(F("webhookenable"), settingWebhookEnabled, "b");
-  sendJsonSettingObj(F("webhookurlon"), CSTR(settingWebhookURLon), "s", 100);
-  sendJsonSettingObj(F("webhookurloff"), CSTR(settingWebhookURLoff), "s", 100);
-  sendJsonSettingObj(F("webhooktriggerbit"), settingWebhookTriggerBit, "i", 0, 15);
-  sendJsonSettingObj(F("webhookpayload"), CSTR(settingWebhookPayload), "s", 200);
-  sendJsonSettingObj(F("webhookcontenttype"), CSTR(settingWebhookContentType), "s", 31);
+  sendJsonSettingObj(F("mqtttoptopic"), CSTR(settings.mqtt.sTopTopic), "s", 15);
+  sendJsonSettingObj(F("mqtthaprefix"), CSTR(settings.mqtt.sHaprefix), "s", 20);
+  sendJsonSettingObj(F("mqttharebootdetection"), settings.mqtt.bHaRebootDetect, "b");
+  sendJsonSettingObj(F("mqttuniqueid"), CSTR(settings.mqtt.sUniqueid), "s", 20);
+  sendJsonSettingObj(F("mqttotmessage"), settings.mqtt.bOTmessage, "b");
+  sendJsonSettingObj(F("mqttinterval"), settings.mqtt.iInterval, "i", 0, 3600);
+  sendJsonSettingObj(F("mqttseparatesources"), settings.mqtt.bSeparateSources, "b");
+  sendJsonSettingObj(F("ntpenable"), settings.ntp.bEnable, "b");
+  sendJsonSettingObj(F("ntptimezone"), CSTR(settings.ntp.sTimezone), "s", 50);
+  sendJsonSettingObj(F("ntphostname"), CSTR(settings.ntp.sHostname), "s", 50);
+  sendJsonSettingObj(F("ntpsendtime"), settings.ntp.bSendtime, "b");
+  sendJsonSettingObj(F("ledblink"), settings.bLEDblink, "b");
+  sendJsonSettingObj(F("darktheme"), settings.bDarkTheme, "b");
+  sendJsonSettingObj(F("ui_autoscroll"), settings.ui.bAutoScroll, "b");
+  sendJsonSettingObj(F("ui_timestamps"), settings.ui.bShowTimestamp, "b");
+  sendJsonSettingObj(F("ui_capture"), settings.ui.bCaptureMode, "b");
+  sendJsonSettingObj(F("ui_autoscreenshot"), settings.ui.bAutoScreenshot, "b");
+  sendJsonSettingObj(F("ui_autodownloadlog"), settings.ui.bAutoDownloadLog, "b");
+  sendJsonSettingObj(F("ui_autoexport"), settings.ui.bAutoExport, "b");
+  sendJsonSettingObj(F("ui_graphtimewindow"), settings.ui.iGraphTimeWindow, "i", 0, 1440);
+  sendJsonSettingObj(F("gpiosensorsenabled"), settings.sensors.bEnabled, "b");
+  sendJsonSettingObj(F("gpiosensorslegacyformat"), settings.sensors.bLegacyFormat, "b");
+  sendJsonSettingObj(F("gpiosensorspin"), settings.sensors.iPin, "i", 0, 16);
+  sendJsonSettingObj(F("gpiosensorsinterval"), settings.sensors.iInterval, "i", 5, 65535);
+  sendJsonSettingObj(F("s0counterenabled"), settings.s0.bEnabled, "b");
+  sendJsonSettingObj(F("s0counterpin"), settings.s0.iPin, "i", 1, 16);
+  sendJsonSettingObj(F("s0counterdebouncetime"), settings.s0.iDebounceTime, "i", 0, 1000);
+  sendJsonSettingObj(F("s0counterpulsekw"), settings.s0.iPulsekw, "i", 1, 5000);
+  sendJsonSettingObj(F("s0counterinterval"), settings.s0.iInterval, "i", 5, 65535);
+  sendJsonSettingObj(F("gpiooutputsenabled"), settings.outputs.bEnabled, "b");
+  sendJsonSettingObj(F("gpiooutputspin"), settings.outputs.iPin, "i", 0, 16);
+  sendJsonSettingObj(F("gpiooutputstriggerbit"), settings.outputs.iTriggerBit, "i", 0, 16);
+  sendJsonSettingObj(F("otgwcommandenable"), settings.otgw.bEnable, "b");
+  sendJsonSettingObj(F("otgwcommands"), CSTR(settings.otgw.sCommands), "s", 128);
+  sendJsonSettingObj(F("webhookenable"), settings.webhook.bEnabled, "b");
+  sendJsonSettingObj(F("webhookurlon"), CSTR(settings.webhook.sURLon), "s", 100);
+  sendJsonSettingObj(F("webhookurloff"), CSTR(settings.webhook.sURLoff), "s", 100);
+  sendJsonSettingObj(F("webhooktriggerbit"), settings.webhook.iTriggerBit, "i", 0, 15);
+  sendJsonSettingObj(F("webhookpayload"), CSTR(settings.webhook.sPayload), "s", 200);
+  sendJsonSettingObj(F("webhookcontenttype"), CSTR(settings.webhook.sContentType), "s", 31);
 
   sendEndJsonMap(F("settings"));
 
@@ -933,10 +1099,9 @@ void sendDeviceSettings()
 void postSettings()
 {
   //------------------------------------------------------------
-  // Accepts JSON body: {"name":"settingInterval","value":9}
-  //                    {"name":"settingHostname","value":"abc"}
-  //                    {"name":"darktheme","value":true}
-  // Parsed via extractJsonField() from jsonStuff.ino.
+  // json string: {"name":"settingInterval","value":9}
+  // json string: {"name":"settings.sHostname","value":"abc"}
+  // json string: {"name":"darktheme","value":true}
   //------------------------------------------------------------
   const String& body = httpServer.arg(0);
   if (body.length() == 0 || !body.startsWith("{")) {

@@ -224,10 +224,10 @@ void setupFSexplorer(){
  
   httpServer.onNotFound([]() 
   {
-    if (bDebugRestAPI) DebugTf(PSTR("in 'onNotFound()'!! [%s] => \r\n"), String(httpServer.uri()).c_str());
+    if (state.debug.bRestAPI) DebugTf(PSTR("in 'onNotFound()'!! [%s] => \r\n"), String(httpServer.uri()).c_str());
     if (httpServer.uri().indexOf("/api/") == 0) 
     {
-      if (bDebugRestAPI) DebugTf(PSTR("next: processAPI(%s)\r\n"), String(httpServer.uri()).c_str());
+      if (state.debug.bRestAPI) DebugTf(PSTR("next: processAPI(%s)\r\n"), String(httpServer.uri()).c_str());
       processAPI();
     }
     // else if (httpServer.uri() == "/")
@@ -237,7 +237,7 @@ void setupFSexplorer(){
     // }
     else
     {
-      if (bDebugRestAPI) DebugTf(PSTR("next: handleFile(%s)\r\n")
+      if (state.debug.bRestAPI) DebugTf(PSTR("next: handleFile(%s)\r\n")
                       , String(httpServer.urlDecode(httpServer.uri())).c_str());
       if (!handleFile(httpServer.urlDecode(httpServer.uri())))
       {
@@ -259,7 +259,7 @@ void apifirmwarefilelist() {
   File f;
   bool firstEntry = true;
 
-  String dirpath = "/" + String(sPICdeviceid);
+  String dirpath = "/" + String(state.pic.sDeviceid);
   DebugTf(PSTR("dirpath=%s\r\n"), dirpath.c_str());
   
   // Start chunked response with JSON array opening
