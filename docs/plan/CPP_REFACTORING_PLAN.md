@@ -76,7 +76,7 @@ bool queryOTGWgatewaymode();  // output via bOTGWgatewaystate global (no change)
 Use `OTGWSerial.readBytesUntil('\n', buf, size)` instead of `readStringUntil`. Update the ~6 callers of `executeCommand()` (all in OTGW-Core.ino).
 
 **Lines changed:** ~80 in OTGW-Core.ino, ~20 caller-side adjustments
-**New ADR:** ADR-043 -- String Class Prohibition in Protocol Paths (extends ADR-004)
+**New ADR:** ADR-049 -- String Class Prohibition in Protocol Paths (extends ADR-004)
 
 ---
 
@@ -160,7 +160,7 @@ void processAPI() {
 - Result: all API routing through `processAPI()`, no split registration
 
 **Lines changed:** restAPI.ino restructure (~400 LOC); FSexplorer.ino -4 lines
-**New ADR:** ADR-044 -- Centralized API Route Dispatch Table
+**New ADR:** ADR-050 -- Centralized API Route Dispatch Table
 
 ---
 
@@ -192,7 +192,7 @@ time_t msglastupdated[256] = {0};
 ```
 
 **Lines changed:** 3 lines (remove, add definition, add extern)
-**No new ADR required** -- ADR-044 covers this pattern
+**No new ADR required** -- ADR-050 covers this pattern
 
 ---
 
@@ -233,7 +233,7 @@ Alternatively, reduce buffer sizes: `line` 1200->512, `msg` 1200->512 = **~1400 
 ## PRIORITY 5 -- Score 12 | Settings + State Objects: Two Encapsulating Structs (User Requested)
 
 **File:** `src/OTGW-firmware/OTGW-firmware.h:112-264`, `settingStuff.ino`
-**ADR:** New ADR-045 -- Settings and Runtime State Organization
+**ADR:** New ADR-051 -- Settings and Runtime State Organization
 
 ### Problem
 
@@ -570,7 +570,7 @@ extern byte      OTGWs0dataid;
 **Risk mitigation:** Rename one sub-section per commit; each commit independently buildable.
 
 **Lines changed:** ~250 settings substitutions + ~100 state substitutions + ~170 lines of struct definitions
-**New ADR:** ADR-045 -- Settings and Runtime State Organization with Dual Encapsulating Objects
+**New ADR:** ADR-051 -- Settings and Runtime State Organization with Dual Encapsulating Objects
 
 ---
 
@@ -762,7 +762,7 @@ void loopWifi() {
 Remove `restartWifi()` and the `doTaskMinuteChanged()` call. Add `loopWifi()` call to `doBackgroundTasks()` unconditionally (before the WiFi-connected guard).
 
 **Lines changed:** ~50 new lines + delete old `restartWifi()` (~30 lines)
-**New ADR:** ADR-046 -- Non-Blocking WiFi Reconnect State Machine
+**New ADR:** ADR-047 -- Non-Blocking WiFi Reconnect State Machine
 
 ---
 
@@ -851,7 +851,7 @@ void loopWebhook() {  // replaces evalWebhook()
 **Note on "truly non-blocking":** ESP8266 `HTTPClient` is inherently synchronous -- achieving zero-block sending requires async HTTP libraries not available within platform constraints. The 1-second timeout is the practical minimum that avoids false failures on a local LAN.
 
 **Lines changed:** ~60 new lines; replace `evalWebhook()` (~35 lines)
-**New ADR:** ADR-047 -- Webhook Non-Blocking State Machine with Retry
+**New ADR:** ADR-048 -- Webhook Non-Blocking State Machine with Retry
 
 ---
 
@@ -869,7 +869,7 @@ These would require fundamental architectural changes inconsistent with the ESP8
 
 ## Proposed New ADRs
 
-### ADR-043: String Class Prohibition in Protocol Paths
+### ADR-049: String Class Prohibition in Protocol Paths
 - **Status:** PROPOSED
 - **Decision:** `String` is prohibited in all serial I/O, command execution, and protocol parsing paths
 - **Extends:** ADR-004 (static buffer allocation)
@@ -877,7 +877,7 @@ These would require fundamental architectural changes inconsistent with the ESP8
 - **Violations to remediate:** `executeCommand()`, `getpicfwversion()`, `queryOTGWgatewaymode()`
 - **Acceptable use:** WiFiManager configuration portal (library-internal only)
 
-### ADR-044: Centralized API Route Dispatch Table
+### ADR-050: Centralized API Route Dispatch Table
 - **Status:** PROPOSED
 - **Decision:** All v2 API routing via `kV2Routes[]` struct-array dispatch table
 - **Pattern:** `ApiRoute { PGM_P segment; ApiResourceHandler handler }` with sentinel entry
@@ -885,7 +885,7 @@ These would require fundamental architectural changes inconsistent with the ESP8
 - **Removes:** Dual registration in FSexplorer.ino for deprecated v0/v1 endpoints
 - **Constraint:** Route table stays in DRAM (~120-160 bytes acceptable); string literals in PROGMEM
 
-### ADR-045: Settings and Runtime State Organization with Dual Encapsulating Objects
+### ADR-051: Settings and Runtime State Organization with Dual Encapsulating Objects
 - **Status:** PROPOSED
 - **Two objects, parallel two-level design with Hungarian-prefixed members (b/s/i/f):**
   - `OTGWSettings settings` -- all 62+ persistent `setting*` globals, sub-sections: `settings.mqtt.sBroker`, `settings.ntp.sTimezone`, `settings.sensors.iPin`, `settings.webhook.bEnabled`, `settings.ui.iGraphTimeWindow`, etc.
@@ -895,7 +895,7 @@ These would require fundamental architectural changes inconsistent with the ESP8
 - **Factory reset patterns:** `settings = OTGWSettings{}` / `settings.mqtt = MQTTSection{}` / `state.debug = {}`
 - **Migration:** One sub-section per commit; settings and state migrations are independent
 
-### ADR-046: Non-Blocking WiFi Reconnect State Machine
+### ADR-047: Non-Blocking WiFi Reconnect State Machine
 - **Status:** PROPOSED
 - **Decision:** Replace blocking `restartWifi()` with non-blocking `loopWifi()` state machine
 - **States:** `WIFI_IDLE` -> `WIFI_DISCONNECTED` -> `WIFI_CONNECTING` -> `WIFI_RECONNECTED` / `WIFI_FAILED`
@@ -904,7 +904,7 @@ These would require fundamental architectural changes inconsistent with the ESP8
 - **`isConnected`:** Updated synchronously with state transitions (no staleness)
 - **Justification:** Eliminates up to 30-second main loop freeze during WiFi reconnect; critical for heating system that must not stop processing OpenTherm data during network recovery
 
-### ADR-047: Webhook Non-Blocking State Machine with Retry
+### ADR-048: Webhook Non-Blocking State Machine with Retry
 - **Status:** PROPOSED
 - **Decision:** Replace direct `evalWebhook()` call with `loopWebhook()` state machine
 - **States:** `WH_IDLE` -> `WH_PENDING` -> `WH_RETRY_WAIT` -> `WH_IDLE`
@@ -932,11 +932,11 @@ These would require fundamental architectural changes inconsistent with the ESP8
 | `src/OTGW-firmware/OTGW-firmware.ino` | loopWifi() replaces restartWifi() | P9 |
 | `src/OTGW-firmware/webhook.ino` | loopWebhook() replaces evalWebhook() + retry state | P10 |
 | `src/OTGW-firmware/Debug.h` | Document conditional debug macro pattern | P7 |
-| `docs/adr/ADR-043-*.md` | New: String prohibition in protocol paths | P1 |
-| `docs/adr/ADR-044-*.md` | New: API route dispatch table | P2 |
-| `docs/adr/ADR-045-*.md` | New: Settings and state dual encapsulating objects | P5 |
-| `docs/adr/ADR-046-*.md` | New: Non-blocking WiFi reconnect state machine | P9 |
-| `docs/adr/ADR-047-*.md` | New: Webhook state machine with retry | P10 |
+| `docs/adr/ADR-049-*.md` | New: String prohibition in protocol paths | P1 |
+| `docs/adr/ADR-050-*.md` | New: API route dispatch table | P2 |
+| `docs/adr/ADR-051-*.md` | New: Settings and state dual encapsulating objects | P5 |
+| `docs/adr/ADR-047-*.md` | New: Non-blocking WiFi reconnect state machine | P9 |
+| `docs/adr/ADR-048-*.md` | New: Webhook state machine with retry | P10 |
 | `docs/adr/ADR-016-*.md` | Update: document cmdqueue fill-pointer pattern | P6 |
 
 ---
@@ -944,7 +944,7 @@ These would require fundamental architectural changes inconsistent with the ESP8
 ## Existing Utilities to Reuse
 
 - **`safeTimers.h`** `DECLARE_TIMER_MS` / `DUE` -- use for all throttle/debounce (do not replace)
-- **`checkGPIOConflict()`** in `settingStuff.ino:54` -- already centralized, reference in ADR-045
+- **`checkGPIOConflict()`** in `settingStuff.ino:54` -- already centralized, reference in ADR-051
 - **`sendApiError()` / `sendApiMethodNotAllowed()`** in `restAPI.ino:27-40` -- keep and extend
 - **`PROGMEM_readAnything<T>()`** in `helperStuff.ino:16` -- use for PROGMEM route table reads
 - **`extractJsonFieldText()`** in `helperStuff.ino` -- use in new API handler functions
@@ -957,11 +957,11 @@ These would require fundamental architectural changes inconsistent with the ESP8
 
 Execute as separate commits, each independently buildable and testable:
 
-1. **ADR-043 + Fix executeCommand()** -- highest impact, isolated to OTGW-Core.ino
+1. **ADR-049 + Fix executeCommand()** -- highest impact, isolated to OTGW-Core.ino
 2. **P3 Fix: msglastupdated[]** -- 2-line change, code quality improvement
-3. **ADR-044 + API dispatch table** -- restructure restAPI.ino, no functional change
+3. **ADR-050 + API dispatch table** -- restructure restAPI.ino, no functional change
 4. **P4 Fix: MQTTAutoConfigBuffers lazy alloc** -- isolated to MQTTstuff.ino
-5. **ADR-045 + Settings struct grouping** -- largest scope, do per-struct incrementally
+5. **ADR-051 + Settings struct grouping** -- largest scope, do per-struct incrementally
 6. **P6: cmdqueue audit** -- rename cmdptr, move definition, add documentation
 7. **P7: Debug macro documentation** -- final cleanup
 8. **P9: WiFi reconnect state machine** -- isolated to OTGW-firmware.ino

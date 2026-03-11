@@ -72,6 +72,9 @@ char ot_log_buffer[OT_LOG_BUFFER_SIZE];
 #define AddLog(logstring)   ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, logstring, OT_LOG_BUFFER_SIZE); } })
 #define AddLogln()          ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, "\r\n", OT_LOG_BUFFER_SIZE); } })
 
+static uint32_t gOTGWStartupQuietUntilMs = 0;
+static const uint32_t OTGW_STARTUP_QUIET_PERIOD_MS = 15000;
+
 /* --- End of LOG marcro's ---*/
 
 /* Send a single-line event to the WebSocket with a prefix character.
@@ -110,6 +113,50 @@ static void sendEventToWebSocket_P(char prefix, PGM_P msg_P) {
   ClrLog();
 }
 
+static void scheduleOTGWStartupQuietPeriod()
+{
+  gOTGWStartupQuietUntilMs = millis() + OTGW_STARTUP_QUIET_PERIOD_MS;
+}
+
+static bool isOTGWStartupQuietPeriodActive()
+{
+  return (gOTGWStartupQuietUntilMs != 0) &&
+         ((int32_t)(gOTGWStartupQuietUntilMs - millis()) > 0);
+}
+
+static bool canFanOutOTGWEvent()
+{
+  return (settings.mqtt.bEnable && MQTTclient.connected() && isValidIP(MQTTbrokerIP)) || hasWebSocketClients();
+}
+
+static void reportOTGWEvent(const char *eventMsg, char prefix, bool suppressDuringStartup = false)
+{
+  if (eventMsg == nullptr) return;
+  if (suppressDuringStartup && isOTGWStartupQuietPeriodActive()) return;
+  if (!canFanOutOTGWEvent()) return;
+
+  if (settings.mqtt.bEnable && MQTTclient.connected() && isValidIP(MQTTbrokerIP)) {
+    sendMQTTData(F("event_report"), eventMsg);
+  }
+  if (hasWebSocketClients()) {
+    sendEventToWebSocket(prefix, eventMsg);
+  }
+}
+
+static void reportOTGWEvent_P(PGM_P eventMsg_P, char prefix, bool suppressDuringStartup = false)
+{
+  if (eventMsg_P == nullptr) return;
+  if (suppressDuringStartup && isOTGWStartupQuietPeriodActive()) return;
+  if (!canFanOutOTGWEvent()) return;
+
+  if (settings.mqtt.bEnable && MQTTclient.connected() && isValidIP(MQTTbrokerIP)) {
+    sendMQTTData(F("event_report"), reinterpret_cast<const __FlashStringHelper*>(eventMsg_P));
+  }
+  if (hasWebSocketClients()) {
+    sendEventToWebSocket_P(prefix, eventMsg_P);
+  }
+}
+
 static const char* skipOTLogTimestamp(const char* logLine)
 {
   if (!logLine) return logLine;
@@ -140,8 +187,11 @@ static const char* skipOTLogTimestamp(const char* logLine)
 //some variable's
 OpenthermData_t OTdata, delayedOTdata, tmpOTdata;
 
-// Definitions moved from OTGW-Core.h (extern declarations remain in header)
-time_t msglastupdated[256] = {0};
+// Global state arrays — defined here (one definition rule), declared extern in OTGW-Core.h. (ADR-044)
+time_t   msglastupdated[256]       = {0}; // last-updated timestamp per OT msg id (0-255)
+uint32_t mqttlastsent[256]         = {0}; // packed throttle: bits31-16=last published u16, bits15-0=seconds-since-boot
+uint16_t mqttlastsentstatusbit[16] = {0}; // per-bit publish timers for OT_Statusflags (slots 0-7=master, 8-15=slave)
+bool     mqttPublishAllowed        = true; // MQTT interval gate — managed via OTPublishGate (OTGW-Core.h)
 struct OT_cmd_t cmdqueue[CMDQUEUE_MAX];
 int cmdQueueSize = 0;  // fill-pointer: entries are 0..cmdQueueSize-1, left-shift on deletion
 
@@ -244,6 +294,7 @@ void sendMQTTstateinformation(){
 
 //===================[ Reset OTGW ]===============================
 void resetOTGW() {
+  scheduleOTGWStartupQuietPeriod();
   OTGWSerial.resetPic();
 }
 
@@ -253,6 +304,7 @@ void resetOTGW() {
 */
 void detectPIC(){
   OTGWSerial.registerFirmwareCallback(fwreportinfo); //register the callback to report version, type en device ID
+  scheduleOTGWStartupQuietPeriod();
   OTGWSerial.resetPic(); // make sure it the firmware is detected
   state.pic.bAvailable = OTGWSerial.find(ETX);
   if (state.pic.bAvailable) {
@@ -383,6 +435,11 @@ void executeCommand(const char* sCmd, char* outBuf, size_t outSize){
   if (outSize > 0) outBuf[0] = '\0';
   OTGWDebugTf(PSTR("OTGW Send Cmd [%s]\r\n"), sCmd);
   size_t cmdLen = strlen(sCmd);
+  if (state.debug.bOTGWSimulation) {
+    OTGWDebugTln(F("OTGW simulation active - executeCommand blocked"));
+    strlcpy(outBuf, "SE - OTGW simulation active.", outSize);
+    return;
+  }
   if (cmdLen < 2) {
     OTGWDebugTln(F("Send command too short"));
     strlcpy(outBuf, "SE - Command too short.", outSize);
@@ -728,6 +785,223 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   return _valid;
 }
 
+// =====================[ MQTT throttle helpers ]==================
+// shouldPublishMQTTForID - returns true if this OT slot's value should be
+// published now (value changed OR interval elapsed). Takes explicit rawValue
+// so the caller controls which value is compared — normal OT mode passes
+// OTdata.value; PS=1 mode passes 0 to rely on interval-only gating. (ADR-006)
+bool shouldPublishMQTTForID(byte id, byte masterslave, uint16_t rawValue) {
+  if (settings.mqtt.iInterval == 0) return true;   // legacy: always publish
+  // IDs 128-255 (manufacturer-specific/Remeha) wrap when offset +128, aliasing
+  // with critical RESPONSE slots (Status flags, TSet…). Always publish to avoid
+  // cross-slot throttle contamination. (ADR-006)
+  if (id > 127) return true;
+  byte idx = (masterslave == OT_MSGTYPE_REQUEST) ? (uint8_t)(id + 128) : (uint8_t)id;
+  uint32_t packed = mqttlastsent[idx];
+  uint16_t lastVal  = (uint16_t)(packed >> 16);             // bits 31-16: last published u16
+  uint16_t lastTime = (uint16_t)(packed & 0xFFFF);           // bits 15-0:  seconds-since-boot
+  uint16_t now      = (uint16_t)(millis() / 1000UL);
+  bool valueChanged    = (rawValue != lastVal);
+  bool intervalElapsed = ((uint16_t)(now - lastTime) >= settings.mqtt.iInterval);
+  if (valueChanged || intervalElapsed) {
+    mqttlastsent[idx] = ((uint32_t)rawValue << 16) | now;
+    return true;
+  }
+  return false;
+}
+
+// shouldPublishMQTTForPSField - interval-only gate for PS=1 summary fields.
+// PS=1 mode does not carry a raw OT uint16 (values are pre-decoded ASCII),
+// so change-detection uses only the time dimension. Shares the mqttlastsent[]
+// array with normal OT mode (response slot, masterslave=0) so both paths
+// respect the same per-ID interval regardless of which mode is active. (ADR-006)
+bool shouldPublishMQTTForPSField(byte id) {
+  if (settings.mqtt.iInterval == 0) return true;
+  if (id > 127) return true;
+  // PS=1 summary fields are always slave responses → idx = id (masterslave==0)
+  byte idx = id;
+  uint16_t lastTime = (uint16_t)(mqttlastsent[idx] & 0xFFFFUL);
+  uint16_t now      = (uint16_t)(millis() / 1000UL);
+  if ((uint16_t)(now - lastTime) >= settings.mqtt.iInterval) {
+    // Preserve the last-value bits; update only the time field
+    mqttlastsent[idx] = (mqttlastsent[idx] & 0xFFFF0000UL) | (uint32_t)now;
+    return true;
+  }
+  return false;
+}
+
+// shouldPublishStatusBit - per-bit publish decision for OT_Statusflags
+bool shouldPublishStatusBit(uint8_t bitSlot, bool newVal, bool prevVal) {
+  if (settings.mqtt.iInterval == 0) return true;   // legacy: always publish
+  uint16_t lastTime = mqttlastsentstatusbit[bitSlot];
+  uint16_t now      = (uint16_t)(millis() / 1000UL);
+  bool valueChanged    = (newVal != prevVal);
+  bool intervalElapsed = ((uint16_t)(now - lastTime) >= settings.mqtt.iInterval);
+  if (valueChanged || intervalElapsed) {
+    mqttlastsentstatusbit[bitSlot] = now;
+    return true;
+  }
+  return false;
+}
+
+// publishStatusBitMQTT - publish a status bit with per-bit change-detect + interval.
+// Uses OTPublishGate (RAII) so the outer gate state is always restored even if
+// publishMQTTOnOff() or any callee throws or early-returns. (ADR-006)
+void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool prevVal) {
+  OTPublishGate gate(shouldPublishStatusBit(bitSlot, newVal, prevVal));
+  publishMQTTOnOff(topic, newVal);
+}
+
+static void copyBinaryByteString(uint8_t value, char *dest, size_t destSize)
+{
+  if (!dest || destSize == 0) return;
+  strlcpy(dest, byte_to_binary(value), destSize);
+}
+
+static void buildStatusMasterText(uint8_t valueHB, char *statusText, size_t statusTextSize)
+{
+  if (!statusText || statusTextSize < 9) return;
+  statusText[0] = ((valueHB & 0x01) ? 'C' : '-');
+  statusText[1] = ((valueHB & 0x02) ? 'D' : '-');
+  statusText[2] = ((valueHB & 0x04) ? 'C' : '-');
+  statusText[3] = ((valueHB & 0x08) ? 'O' : '-');
+  statusText[4] = ((valueHB & 0x10) ? '2' : '-');
+  statusText[5] = ((valueHB & 0x20) ? 'S' : 'W');
+  statusText[6] = ((valueHB & 0x40) ? 'B' : '-');
+  statusText[7] = ((valueHB & 0x80) ? '.' : '-');
+  statusText[8] = '\0';
+}
+
+static void buildStatusSlaveText(uint8_t valueLB, char *statusText, size_t statusTextSize)
+{
+  if (!statusText || statusTextSize < 9) return;
+  statusText[0] = ((valueLB & 0x01) ? 'E' : '-');
+  statusText[1] = ((valueLB & 0x02) ? 'C' : '-');
+  statusText[2] = ((valueLB & 0x04) ? 'W' : '-');
+  statusText[3] = ((valueLB & 0x08) ? 'F' : '-');
+  statusText[4] = ((valueLB & 0x10) ? 'C' : '-');
+  statusText[5] = ((valueLB & 0x20) ? '2' : '-');
+  statusText[6] = ((valueLB & 0x40) ? 'D' : '-');
+  statusText[7] = ((valueLB & 0x80) ? 'P' : '-');
+  statusText[8] = '\0';
+}
+
+static void publishMasterStatusState(uint8_t valueHB, const char *statusText)
+{
+  sendMQTTData("status_master", statusText);
+  publishStatusBitMQTT(0, "ch_enable",        (valueHB & 0x01), (OTcurrentSystemState.MasterStatus & 0x01));
+  publishStatusBitMQTT(1, "dhw_enable",       (valueHB & 0x02), (OTcurrentSystemState.MasterStatus & 0x02));
+  publishStatusBitMQTT(2, "cooling_enable",   (valueHB & 0x04), (OTcurrentSystemState.MasterStatus & 0x04));
+  publishStatusBitMQTT(3, "otc_active",       (valueHB & 0x08), (OTcurrentSystemState.MasterStatus & 0x08));
+  publishStatusBitMQTT(4, "ch2_enable",       (valueHB & 0x10), (OTcurrentSystemState.MasterStatus & 0x10));
+  publishStatusBitMQTT(5, "summerwintertime", (valueHB & 0x20), (OTcurrentSystemState.MasterStatus & 0x20));
+  publishStatusBitMQTT(6, "dhw_blocking",     (valueHB & 0x40), (OTcurrentSystemState.MasterStatus & 0x40));
+  OTcurrentSystemState.MasterStatus = valueHB;
+}
+
+static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
+{
+  sendMQTTData("status_slave", statusText);
+  publishStatusBitMQTT(8,  "fault",                (valueLB & 0x01), (OTcurrentSystemState.SlaveStatus & 0x01));
+  publishStatusBitMQTT(9,  "centralheating",       (valueLB & 0x02), (OTcurrentSystemState.SlaveStatus & 0x02));
+  publishStatusBitMQTT(10, "domestichotwater",     (valueLB & 0x04), (OTcurrentSystemState.SlaveStatus & 0x04));
+  publishStatusBitMQTT(11, "flame",                (valueLB & 0x08), (OTcurrentSystemState.SlaveStatus & 0x08));
+  publishStatusBitMQTT(12, "cooling",              (valueLB & 0x10), (OTcurrentSystemState.SlaveStatus & 0x10));
+  publishStatusBitMQTT(13, "centralheating2",      (valueLB & 0x20), (OTcurrentSystemState.SlaveStatus & 0x20));
+  publishStatusBitMQTT(14, "diagnostic_indicator", (valueLB & 0x40), (OTcurrentSystemState.SlaveStatus & 0x40));
+  publishStatusBitMQTT(15, "electric_production",  (valueLB & 0x80), (OTcurrentSystemState.SlaveStatus & 0x80));
+  OTcurrentSystemState.SlaveStatus = valueLB;
+}
+
+static uint16_t publishCombinedStatusState(uint8_t valueHB, uint8_t valueLB)
+{
+  char masterStatus[9] {0};
+  char slaveStatus[9] {0};
+  buildStatusMasterText(valueHB, masterStatus, sizeof(masterStatus));
+  buildStatusSlaveText(valueLB, slaveStatus, sizeof(slaveStatus));
+  publishMasterStatusState(valueHB, masterStatus);
+  publishSlaveStatusState(valueLB, slaveStatus);
+  return (OTcurrentSystemState.MasterStatus << 8) | OTcurrentSystemState.SlaveStatus;
+}
+
+static void buildStatusVHMasterText(uint8_t valueHB, char *statusText, size_t statusTextSize)
+{
+  if (!statusText || statusTextSize < 9) return;
+  statusText[0] = ((valueHB & 0x01) ? 'V' : '-');
+  statusText[1] = ((valueHB & 0x02) ? 'P' : '-');
+  statusText[2] = ((valueHB & 0x04) ? 'M' : '-');
+  statusText[3] = ((valueHB & 0x08) ? 'F' : '-');
+  statusText[4] = ((valueHB & 0x10) ? '.' : '-');
+  statusText[5] = ((valueHB & 0x20) ? '.' : '-');
+  statusText[6] = ((valueHB & 0x40) ? '.' : '-');
+  statusText[7] = ((valueHB & 0x80) ? '.' : '-');
+  statusText[8] = '\0';
+}
+
+static void buildStatusVHSlaveText(uint8_t valueLB, char *statusText, size_t statusTextSize)
+{
+  if (!statusText || statusTextSize < 9) return;
+  statusText[0] = ((valueLB & 0x01) ? 'F' : '-');
+  statusText[1] = ((valueLB & 0x02) ? 'V' : '-');
+  statusText[2] = ((valueLB & 0x04) ? 'P' : '-');
+  statusText[3] = ((valueLB & 0x08) ? 'A' : '-');
+  statusText[4] = ((valueLB & 0x10) ? 'F' : '-');
+  statusText[5] = ((valueLB & 0x20) ? '.' : '-');
+  statusText[6] = ((valueLB & 0x40) ? 'D' : '-');
+  statusText[7] = ((valueLB & 0x80) ? '.' : '-');
+  statusText[8] = '\0';
+}
+
+static void publishMasterStatusVHState(uint8_t valueHB, const char *statusText)
+{
+  sendMQTTData(F("status_vh_master"), statusText);
+  publishMQTTOnOff(F("vh_ventilation_enabled"),    ((valueHB) & 0x01));
+  publishMQTTOnOff(F("vh_bypass_position"),        ((valueHB) & 0x02));
+  publishMQTTOnOff(F("vh_bypass_mode"),            ((valueHB) & 0x04));
+  publishMQTTOnOff(F("vh_free_ventilation_mode"), ((valueHB) & 0x08));
+  OTcurrentSystemState.MasterStatusVH = valueHB;
+}
+
+static void publishSlaveStatusVHState(uint8_t valueLB, const char *statusText)
+{
+  sendMQTTData(F("status_vh_slave"), statusText);
+  publishMQTTOnOff(F("vh_fault"),                    ((valueLB) & 0x01));
+  publishMQTTOnOff(F("vh_ventilation_mode"),         ((valueLB) & 0x02));
+  publishMQTTOnOff(F("vh_bypass_status"),            ((valueLB) & 0x04));
+  publishMQTTOnOff(F("vh_bypass_automatic_status"),  ((valueLB) & 0x08));
+  publishMQTTOnOff(F("vh_free_ventliation_status"),  ((valueLB) & 0x10));
+  publishMQTTOnOff(F("vh_diagnostic_indicator"),     ((valueLB) & 0x40));
+  OTcurrentSystemState.SlaveStatusVH = valueLB;
+}
+
+static uint16_t publishCombinedStatusVHState(uint8_t valueHB, uint8_t valueLB)
+{
+  char masterStatus[9] {0};
+  char slaveStatus[9] {0};
+  buildStatusVHMasterText(valueHB, masterStatus, sizeof(masterStatus));
+  buildStatusVHSlaveText(valueLB, slaveStatus, sizeof(slaveStatus));
+  publishMasterStatusVHState(valueHB, masterStatus);
+  publishSlaveStatusVHState(valueLB, slaveStatus);
+  return (OTcurrentSystemState.MasterStatusVH << 8) | OTcurrentSystemState.SlaveStatusVH;
+}
+
+static uint16_t publishRBPFlagsState(uint8_t transferEnableFlags, uint8_t readWriteFlags)
+{
+  char transferEnableText[9] {0};
+  char readWriteText[9] {0};
+  copyBinaryByteString(transferEnableFlags, transferEnableText, sizeof(transferEnableText));
+  copyBinaryByteString(readWriteFlags, readWriteText, sizeof(readWriteText));
+
+  sendMQTTData(F("RBP_flags_transfer_enable"), transferEnableText);
+  sendMQTTData(F("RBP_flags_read_write"), readWriteText);
+  sendMQTTData(F("rbp_dhw_setpoint"),        ((transferEnableFlags & 0x01) ? "ON" : "OFF"));
+  sendMQTTData(F("rbp_max_ch_setpoint"),     ((transferEnableFlags & 0x02) ? "ON" : "OFF"));
+  sendMQTTData(F("rbp_rw_dhw_setpoint"),     ((readWriteFlags & 0x01) ? "ON" : "OFF"));
+  sendMQTTData(F("rbp_rw_max_ch_setpoint"),  ((readWriteFlags & 0x02) ? "ON" : "OFF"));
+
+  return ((uint16_t)transferEnableFlags << 8) | readWriteFlags;
+}
+
 void print_f88(float& value)
 {
   //function to print data
@@ -844,16 +1118,7 @@ void print_status(uint16_t& value)
 
     //Master Status
     if (is_value_valid(OTdata, OTlookupitem)){
-      sendMQTTData("status_master", _flag8_master);
-      publishMQTTOnOff("ch_enable",        ((OTdata.valueHB) & 0x01));
-      publishMQTTOnOff("dhw_enable",       ((OTdata.valueHB) & 0x02));
-      publishMQTTOnOff("cooling_enable",   ((OTdata.valueHB) & 0x04));
-      publishMQTTOnOff("otc_active",       ((OTdata.valueHB) & 0x08));
-      publishMQTTOnOff("ch2_enable",       ((OTdata.valueHB) & 0x10));
-      publishMQTTOnOff("summerwintertime", ((OTdata.valueHB) & 0x20));
-      publishMQTTOnOff("dhw_blocking",     ((OTdata.valueHB) & 0x40));
-
-      OTcurrentSystemState.MasterStatus = OTdata.valueHB;
+      publishMasterStatusState(OTdata.valueHB, _flag8_master);
     }
   } else {
     // Parse slave bits
@@ -881,17 +1146,7 @@ void print_status(uint16_t& value)
     
     //Slave Status
     if (is_value_valid(OTdata, OTlookupitem)){
-      sendMQTTData("status_slave", _flag8_slave);
-      publishMQTTOnOff("fault",                ((OTdata.valueLB) & 0x01));
-      publishMQTTOnOff("centralheating",       ((OTdata.valueLB) & 0x02));
-      publishMQTTOnOff("domestichotwater",     ((OTdata.valueLB) & 0x04));
-      publishMQTTOnOff("flame",                ((OTdata.valueLB) & 0x08));
-      publishMQTTOnOff("cooling",              ((OTdata.valueLB) & 0x10));
-      publishMQTTOnOff("centralheating2",      ((OTdata.valueLB) & 0x20));
-      publishMQTTOnOff("diagnostic_indicator", ((OTdata.valueLB) & 0x40));
-      publishMQTTOnOff("electric_production",   ((OTdata.valueLB) & 0x80));
-
-      OTcurrentSystemState.SlaveStatus = OTdata.valueLB;
+      publishSlaveStatusState(OTdata.valueLB, _flag8_slave);
     }
   }
 
@@ -969,13 +1224,7 @@ void print_statusVH(uint16_t& value)
     AddLogf("%s = VH Master [%s]", OTlookupitem.label, _flag8_master);
     //Master Status
     if (is_value_valid(OTdata, OTlookupitem)){
-      sendMQTTData(F("status_vh_master"), _flag8_master);
-      publishMQTTOnOff(F("vh_ventilation_enabled"),   ((OTdata.valueHB) & 0x01));
-      publishMQTTOnOff(F("vh_bypass_position"),       ((OTdata.valueHB) & 0x02));
-      publishMQTTOnOff(F("vh_bypass_mode"),           ((OTdata.valueHB) & 0x04));
-      publishMQTTOnOff(F("vh_free_ventilation_mode"),  ((OTdata.valueHB) & 0x08));
-
-      OTcurrentSystemState.MasterStatusVH = OTdata.valueHB;
+      publishMasterStatusVHState(OTdata.valueHB, _flag8_master);
     }
   } else {
     // Parse slave bits
@@ -1000,15 +1249,7 @@ void print_statusVH(uint16_t& value)
 
     //Slave Status
     if (is_value_valid(OTdata, OTlookupitem)){
-      sendMQTTData(F("status_vh_slave"), _flag8_slave);
-      publishMQTTOnOff(F("vh_fault"),                   ((OTdata.valueLB) & 0x01));
-      publishMQTTOnOff(F("vh_ventilation_mode"),         ((OTdata.valueLB) & 0x02));
-      publishMQTTOnOff(F("vh_bypass_status"),           ((OTdata.valueLB) & 0x04));
-      publishMQTTOnOff(F("vh_bypass_automatic_status"), ((OTdata.valueLB) & 0x08));
-      publishMQTTOnOff(F("vh_free_ventliation_status"), ((OTdata.valueLB) & 0x10));
-      publishMQTTOnOff(F("vh_diagnostic_indicator"),    ((OTdata.valueLB) & 0x40));
-
-      OTcurrentSystemState.SlaveStatusVH = OTdata.valueLB;
+      publishSlaveStatusVHState(OTdata.valueLB, _flag8_slave);
     }
   }
 
@@ -1055,36 +1296,7 @@ void print_RBPflags(uint16_t& value)
 {
   AddLogf("%s = M[%s] OEM fault code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   if (is_value_valid(OTdata, OTlookupitem)){
-    //Build string for MQTT
-    //Remote Boiler Paramaters
-    sendMQTTData(F("RBP_flags_transfer_enable"), byte_to_binary(OTdata.valueHB));  
-    sendMQTTData(F("RBP_flags_read_write"), byte_to_binary(OTdata.valueLB));  
-
-    //bit: [clear/0, set/1]
-    //0: DHW setpoint
-    //1: max CH setpoint
-    //2: reserved
-    //3: reserved
-    //4: reserved
-    //5: reserved
-    //6: reserved
-    //7: reserved
-    sendMQTTData(F("rbp_dhw_setpoint"),       (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));    
-    sendMQTTData(F("rbp_max_ch_setpoint"),    (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));    
-
-    //bit: [clear/0, set/1]
-    //0: read write  DHW setpoint
-    //1: read write max CH setpoint
-    //2: reserved
-    //3: reserved
-    //4: reserved
-    //5: reserved
-    //6: reserved
-    //7: reserved
-    sendMQTTData(F("rbp_rw_dhw_setpoint"),       (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));    
-    sendMQTTData(F("rbp_rw_max_ch_setpoint"),    (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));    
-
-    value = OTdata.u16();
+    value = publishRBPFlagsState(OTdata.valueHB, OTdata.valueLB);
   }
 }
 
@@ -1853,6 +2065,12 @@ void checkOTGWcmdqueue(const char *buf, unsigned int len){
 */
 void sendOTGW(const char* buf, int len)
 {
+  if (state.debug.bOTGWSimulation) {
+    OTGWDebugTln(F("OTGW simulation active - serial send blocked"));
+    sendEventToWebSocket_P('!', PSTR("OTGW simulation blocked serial send"));
+    return;
+  }
+
   // while (OTGWSerial.availableForWrite() < (len+2)) {
   //   //cannot write, buffer full, wait for some space in serial out buffer
   // feedWatchDog();     //this yields for other processes
@@ -1875,6 +2093,597 @@ void sendOTGW(const char* buf, int len)
     OTGWSerial.flush();
     sendEventToWebSocket('>', buf, len);
   } else OTGWDebugln(F("Error: Write buffer not big enough!"));
+}
+
+static void dispatchOTGWInputLine(const char* buf, size_t len)
+{
+  if (len == 0) return;
+
+  blinkLEDnow(LED2);
+  OTGWstream.write(reinterpret_cast<const uint8_t*>(buf), len);
+  OTGWstream.write('\r');
+  OTGWstream.write('\n');
+  processOT(buf, len);
+}
+
+static bool readOTGWSimulationLine(File& replayFile, char* buffer, size_t bufferSize, size_t& lineLen)
+{
+  lineLen = 0;
+  bool discardCurrentLine = false;
+
+  while (replayFile.available()) {
+    int inByte = replayFile.read();
+    if (inByte < 0) break;
+
+    char inChar = static_cast<char>(inByte);
+    if (inChar == '\r' || inChar == '\n') {
+      if (discardCurrentLine) {
+        discardCurrentLine = false;
+        lineLen = 0;
+        continue;
+      }
+      if (lineLen == 0) continue;
+
+      buffer[lineLen] = '\0';
+      return true;
+    }
+
+    if (!discardCurrentLine) {
+      if (lineLen < (bufferSize - 1)) {
+        buffer[lineLen++] = inChar;
+      } else {
+        discardCurrentLine = true;
+        lineLen = 0;
+        DebugTln(F("OTGW simulation line too long, discarding line"));
+      }
+    }
+    feedWatchDog();
+  }
+
+  if (!discardCurrentLine && lineLen > 0) {
+    buffer[lineLen] = '\0';
+    return true;
+  }
+
+  lineLen = 0;
+  return false;
+}
+
+static void resetOTGWLineBuffers(size_t& bytesRead, size_t& bytesWrite, bool& discardCurrentReadLine)
+{
+  bytesRead = 0;
+  bytesWrite = 0;
+  discardCurrentReadLine = false;
+}
+
+static bool reopenOTGWSimulationFile(File& otgwSimulationFile)
+{
+  if (otgwSimulationFile) otgwSimulationFile.close();
+  otgwSimulationFile = LittleFS.open(F("/otgw_simulation.log"), "r");
+  return static_cast<bool>(otgwSimulationFile);
+}
+
+static bool replayNextOTGWSimulationLine(File& otgwSimulationFile, char* sReplay, size_t replaySize)
+{
+  size_t replayLen = 0;
+  bool haveReplayLine = false;
+  uint8_t replayPass = 0;
+
+  while (!haveReplayLine && replayPass < 2) {
+    haveReplayLine = readOTGWSimulationLine(otgwSimulationFile, sReplay, replaySize, replayLen);
+    if (haveReplayLine) break;
+
+    replayPass++;
+    if (!reopenOTGWSimulationFile(otgwSimulationFile)) break;
+  }
+
+  if (haveReplayLine) {
+    dispatchOTGWInputLine(sReplay, replayLen);
+    state.debug.iOTGWSimulationNextDueMs = millis() + state.debug.iOTGWSimulationIntervalMs;
+    return true;
+  }
+
+  return false;
+}
+
+static bool handleOTGWSimulation(File& otgwSimulationFile,
+                                 bool& otgwSimulationWasEnabled,
+                                 size_t& bytesRead,
+                                 size_t& bytesWrite,
+                                 bool& discardCurrentReadLine,
+                                 char* sReplay,
+                                 size_t replaySize)
+{
+  if (!state.debug.bOTGWSimulation && otgwSimulationWasEnabled) {
+    if (otgwSimulationFile) otgwSimulationFile.close();
+    otgwSimulationWasEnabled = false;
+    resetOTGWLineBuffers(bytesRead, bytesWrite, discardCurrentReadLine);
+  }
+
+  if (!state.debug.bOTGWSimulation) return false;
+
+  if (!otgwSimulationWasEnabled) {
+    if (otgwSimulationFile) otgwSimulationFile.close();
+    otgwSimulationWasEnabled = true;
+    resetOTGWLineBuffers(bytesRead, bytesWrite, discardCurrentReadLine);
+    state.debug.iOTGWSimulationNextDueMs = 0;
+  }
+
+  while (OTGWSerial.available()) {
+    OTGWSerial.read();
+    feedWatchDog();
+  }
+
+  if (!LittleFSmounted) {
+    DebugTln(F("OTGW simulation disabled: LittleFS not mounted"));
+    sendEventToWebSocket_P('!', PSTR("OTGW simulation disabled [LittleFS unavailable]"));
+    state.debug.bOTGWSimulation = false;
+    if (otgwSimulationFile) otgwSimulationFile.close();
+    otgwSimulationWasEnabled = false;
+    return true;
+  }
+
+  if (!otgwSimulationFile && !reopenOTGWSimulationFile(otgwSimulationFile)) {
+    DebugTln(F("OTGW simulation disabled: /otgw_simulation.log not found"));
+    sendEventToWebSocket_P('!', PSTR("OTGW simulation disabled [/otgw_simulation.log missing]"));
+    state.debug.bOTGWSimulation = false;
+    otgwSimulationWasEnabled = false;
+    return true;
+  }
+
+  if ((state.debug.iOTGWSimulationNextDueMs == 0) || (static_cast<int32_t>(millis() - state.debug.iOTGWSimulationNextDueMs) >= 0)) {
+    if (!replayNextOTGWSimulationLine(otgwSimulationFile, sReplay, replaySize) && !otgwSimulationFile) {
+      DebugTln(F("OTGW simulation disabled: replay file reopen failed"));
+      sendEventToWebSocket_P('!', PSTR("OTGW simulation disabled [replay file reopen failed]"));
+      state.debug.bOTGWSimulation = false;
+      otgwSimulationWasEnabled = false;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/*
+  PS=1 (Print Summary) mode field-to-MsgID mapping tables.
+  When in PS=1 mode, the OTGW PIC firmware outputs a single comma-separated summary
+  line per OpenTherm cycle. Two formats exist:
+    - Old firmware (< v5): 25 comma-separated fields (24 commas)
+    - New firmware (v5+) : 34 comma-separated fields (33 commas)
+  Each entry is the OpenTherm MsgID for the corresponding field position.
+*/
+static const uint8_t PSSUMMARY_MSGIDS_OLD[25] PROGMEM = {
+  /*  0 */ 0,   // Status flags         (flag8/flag8)
+  /*  1 */ 1,   // TSet                 (f88)
+  /*  2 */ 6,   // RBPflags             (flag8/flag8)
+  /*  3 */ 14,  // MaxRelModLevelSetting(f88)
+  /*  4 */ 15,  // MaxCapacityMinModLevel (u8/u8)
+  /*  5 */ 16,  // TrSet                (f88)
+  /*  6 */ 17,  // RelModLevel          (f88)
+  /*  7 */ 18,  // CHPressure           (f88)
+  /*  8 */ 24,  // Tr                   (f88)
+  /*  9 */ 25,  // Tboiler              (f88)
+  /* 10 */ 26,  // Tdhw                 (f88)
+  /* 11 */ 27,  // Toutside             (f88)
+  /* 12 */ 28,  // Tret                 (f88)
+  /* 13 */ 48,  // TdhwSetUBTdhwSetLB   (s8/s8)
+  /* 14 */ 49,  // MaxTSetUBMaxTSetLB   (s8/s8)
+  /* 15 */ 56,  // TdhwSet              (f88)
+  /* 16 */ 57,  // MaxTSet              (f88)
+  /* 17 */ 116, // BurnerStarts         (u16)
+  /* 18 */ 117, // CHPumpStarts         (u16)
+  /* 19 */ 118, // DHWPumpValveStarts   (u16)
+  /* 20 */ 119, // DHWBurnerStarts      (u16)
+  /* 21 */ 120, // BurnerOperationHours (u16)
+  /* 22 */ 121, // CHPumpOperationHours (u16)
+  /* 23 */ 122, // DHWPumpValveOperationHours (u16)
+  /* 24 */ 123  // DHWBurnerOperationHours    (u16)
+};
+
+static const uint8_t PSSUMMARY_MSGIDS_NEW[34] PROGMEM = {
+  /*  0 */ 0,   // Status flags              (flag8/flag8)
+  /*  1 */ 1,   // TSet                      (f88)
+  /*  2 */ 6,   // RBPflags                  (flag8/flag8)
+  /*  3 */ 7,   // CoolingControl            (f88)     [new in v5+]
+  /*  4 */ 8,   // TsetCH2                   (f88)     [new in v5+]
+  /*  5 */ 14,  // MaxRelModLevelSetting     (f88)
+  /*  6 */ 15,  // MaxCapacityMinModLevel    (u8/u8)
+  /*  7 */ 16,  // TrSet                     (f88)
+  /*  8 */ 17,  // RelModLevel               (f88)
+  /*  9 */ 18,  // CHPressure                (f88)
+  /* 10 */ 19,  // DHWFlowRate               (f88)     [new in v5+]
+  /* 11 */ 23,  // TrSetCH2                  (f88)     [new in v5+]
+  /* 12 */ 24,  // Tr                        (f88)
+  /* 13 */ 25,  // Tboiler                   (f88)
+  /* 14 */ 26,  // Tdhw                      (f88)
+  /* 15 */ 27,  // Toutside                  (f88)
+  /* 16 */ 28,  // Tret                      (f88)
+  /* 17 */ 31,  // TflowCH2                  (f88)     [new in v5+]
+  /* 18 */ 33,  // Texhaust                  (s16)     [new in v5+]
+  /* 19 */ 48,  // TdhwSetUBTdhwSetLB        (s8/s8)
+  /* 20 */ 49,  // MaxTSetUBMaxTSetLB        (s8/s8)
+  /* 21 */ 56,  // TdhwSet                   (f88)
+  /* 22 */ 57,  // MaxTSet                   (f88)
+  /* 23 */ 70,  // StatusVH                  (flag8/flag8) [new in v5+]
+  /* 24 */ 71,  // ControlSetpointVH         (u8)      [new in v5+]
+  /* 25 */ 77,  // RelativeVentilation       (u8)      [new in v5+]
+  /* 26 */ 116, // BurnerStarts              (u16)
+  /* 27 */ 117, // CHPumpStarts              (u16)
+  /* 28 */ 118, // DHWPumpValveStarts        (u16)
+  /* 29 */ 119, // DHWBurnerStarts           (u16)
+  /* 30 */ 120, // BurnerOperationHours      (u16)
+  /* 31 */ 121, // CHPumpOperationHours      (u16)
+  /* 32 */ 122, // DHWPumpValveOperationHours(u16)
+  /* 33 */ 123  // DHWBurnerOperationHours   (u16)
+};
+
+static void enterPSMode(PGM_P debugMessage, PGM_P eventMessage, bool clearMsgLastUpdated)
+{
+  if (!state.otgw.bPSmode && debugMessage) {
+    OTGWDebugTln(reinterpret_cast<const __FlashStringHelper*>(debugMessage));
+  }
+
+  state.otgw.bPSmode = true;
+  copyProgmemString(sMessage, sizeof(sMessage), PSTR("PS=1 mode; decoded summary updates active."));
+
+  if (clearMsgLastUpdated) {
+    for (int i = 0; i <= OT_MSGID_MAX; i++) {
+      msglastupdated[i] = 0;
+    }
+  }
+
+  if (eventMessage) {
+    sendEventToWebSocket_P('*', eventMessage);
+  }
+}
+
+static void leavePSMode(PGM_P debugMessage, PGM_P eventMessage)
+{
+  if (state.otgw.bPSmode && debugMessage) {
+    OTGWDebugTln(reinterpret_cast<const __FlashStringHelper*>(debugMessage));
+  }
+
+  state.otgw.bPSmode = false;
+  sMessage[0] = '\0';
+
+  if (eventMessage) {
+    sendEventToWebSocket_P('*', eventMessage);
+  }
+}
+
+static bool parseStrictSignedLong(const char *text, long minValue, long maxValue, long &value)
+{
+  if (!text || *text == '\0') return false;
+
+  char *endPtr = nullptr;
+  long parsedValue = strtol(text, &endPtr, 10);
+  if ((endPtr == text) || (*endPtr != '\0') || (parsedValue < minValue) || (parsedValue > maxValue)) {
+    return false;
+  }
+
+  value = parsedValue;
+  return true;
+}
+
+static bool parseStrictUnsignedLong(const char *text, unsigned long maxValue, unsigned long &value)
+{
+  if (!text || *text == '\0' || *text == '-') return false;
+
+  char *endPtr = nullptr;
+  unsigned long parsedValue = strtoul(text, &endPtr, 10);
+  if ((endPtr == text) || (*endPtr != '\0') || (parsedValue > maxValue)) {
+    return false;
+  }
+
+  value = parsedValue;
+  return true;
+}
+
+static bool parseStrictFloat(const char *text, float &value)
+{
+  if (!text || *text == '\0') return false;
+
+  char *endPtr = nullptr;
+  double parsedValue = strtod(text, &endPtr);
+  if ((endPtr == text) || (*endPtr != '\0')) {
+    return false;
+  }
+
+  value = static_cast<float>(parsedValue);
+  return true;
+}
+
+static bool splitPSSummaryPair(const char *text, char separator,
+                               char *left, size_t leftSize,
+                               char *right, size_t rightSize)
+{
+  if (!text || !left || !right || leftSize == 0 || rightSize == 0) return false;
+
+  const char *separatorPos = strchr(text, separator);
+  if (!separatorPos || strchr(separatorPos + 1, separator)) return false;
+
+  const size_t leftLen = static_cast<size_t>(separatorPos - text);
+  const size_t rightLen = strlen(separatorPos + 1);
+  if (leftLen == 0 || rightLen == 0 || leftLen >= leftSize || rightLen >= rightSize) return false;
+
+  memcpy(left, text, leftLen);
+  left[leftLen] = '\0';
+  strlcpy(right, separatorPos + 1, rightSize);
+  return true;
+}
+
+static bool parsePSSummaryS8S8(const char *text, int8_t &upperByte, int8_t &lowerByte)
+{
+  char left[12] {0};
+  char right[12] {0};
+  long leftValue = 0;
+  long rightValue = 0;
+  if (!splitPSSummaryPair(text, '/', left, sizeof(left), right, sizeof(right))) return false;
+  if (!parseStrictSignedLong(left, -128, 127, leftValue)) return false;
+  if (!parseStrictSignedLong(right, -128, 127, rightValue)) return false;
+  upperByte = static_cast<int8_t>(leftValue);
+  lowerByte = static_cast<int8_t>(rightValue);
+  return true;
+}
+
+static bool parsePSSummaryU8U8(const char *text, uint8_t &upperByte, uint8_t &lowerByte)
+{
+  char left[12] {0};
+  char right[12] {0};
+  unsigned long leftValue = 0;
+  unsigned long rightValue = 0;
+  if (!splitPSSummaryPair(text, '/', left, sizeof(left), right, sizeof(right))) return false;
+  if (!parseStrictUnsignedLong(left, 255UL, leftValue)) return false;
+  if (!parseStrictUnsignedLong(right, 255UL, rightValue)) return false;
+  upperByte = static_cast<uint8_t>(leftValue);
+  lowerByte = static_cast<uint8_t>(rightValue);
+  return true;
+}
+
+static bool parseBinaryOctet(const char *text, uint8_t &value)
+{
+  if (!text || strlen(text) != 8) return false;
+
+  value = 0;
+  for (uint8_t i = 0; i < 8; i++) {
+    if (text[i] != '0' && text[i] != '1') return false;
+    value = static_cast<uint8_t>((value << 1) | (text[i] - '0'));
+  }
+  return true;
+}
+
+static bool parsePSSummaryFlag8Flag8(const char *text, uint8_t &upperByte, uint8_t &lowerByte)
+{
+  char left[9] {0};
+  char right[9] {0};
+  if (!splitPSSummaryPair(text, '/', left, sizeof(left), right, sizeof(right))) return false;
+  if (!parseBinaryOctet(left, upperByte)) return false;
+  if (!parseBinaryOctet(right, lowerByte)) return false;
+  return true;
+}
+
+static void updatePSSummaryFloatState(uint8_t msgid, float fval)
+{
+  switch (msgid) {
+    case  1: OTcurrentSystemState.TSet                  = fval; break;
+    case  7: OTcurrentSystemState.CoolingControl        = fval; break;
+    case  8: OTcurrentSystemState.TsetCH2               = fval; break;
+    case 14: OTcurrentSystemState.MaxRelModLevelSetting = fval; break;
+    case 16: OTcurrentSystemState.TrSet                 = fval; break;
+    case 17: OTcurrentSystemState.RelModLevel           = fval; break;
+    case 18: OTcurrentSystemState.CHPressure            = fval; break;
+    case 19: OTcurrentSystemState.DHWFlowRate           = fval; break;
+    case 23: OTcurrentSystemState.TrSetCH2              = fval; break;
+    case 24: OTcurrentSystemState.Tr                    = fval; break;
+    case 25: OTcurrentSystemState.Tboiler               = fval; break;
+    case 26: OTcurrentSystemState.Tdhw                  = fval; break;
+    case 27: OTcurrentSystemState.Toutside              = fval; break;
+    case 28: OTcurrentSystemState.Tret                  = fval; break;
+    case 31: OTcurrentSystemState.TflowCH2              = fval; break;
+    case 56: OTcurrentSystemState.TdhwSet               = fval; break;
+    case 57: OTcurrentSystemState.MaxTSet               = fval; break;
+    default: break;
+  }
+}
+
+static void updatePSSummaryU16State(uint8_t msgid, uint16_t value)
+{
+  switch (msgid) {
+    case 116: OTcurrentSystemState.BurnerStarts               = value; break;
+    case 117: OTcurrentSystemState.CHPumpStarts               = value; break;
+    case 118: OTcurrentSystemState.DHWPumpValveStarts         = value; break;
+    case 119: OTcurrentSystemState.DHWBurnerStarts            = value; break;
+    case 120: OTcurrentSystemState.BurnerOperationHours       = value; break;
+    case 121: OTcurrentSystemState.CHPumpOperationHours       = value; break;
+    case 122: OTcurrentSystemState.DHWPumpValveOperationHours = value; break;
+    case 123: OTcurrentSystemState.DHWBurnerOperationHours    = value; break;
+    default:  break;
+  }
+}
+
+static void publishPSSummarySplitBytes(const char *label, const char *hbSuffix, const char *lbSuffix,
+                                       const char *hbValue, const char *lbValue)
+{
+  char topicBuf[MQTT_TOPIC_MAX_LEN];
+  strlcpy(topicBuf, label, sizeof(topicBuf));
+  strlcat(topicBuf, hbSuffix, sizeof(topicBuf));
+  sendMQTTData(topicBuf, hbValue);
+  strlcpy(topicBuf, label, sizeof(topicBuf));
+  strlcat(topicBuf, lbSuffix, sizeof(topicBuf));
+  sendMQTTData(topicBuf, lbValue);
+}
+
+static void ensurePSSummaryDiscovery(uint8_t msgid)
+{
+  if (settings.mqtt.bEnable && !getMQTTConfigDone(msgid)) {
+    if (doAutoConfigureMsgid(msgid, NodeId)) {
+      setMQTTConfigDone(msgid);
+    }
+  }
+}
+
+static void logPSSummaryField(const char *label, const char *rawField)
+{
+  ClrLog();
+  AddLogf_P(PSTR("PS1 %-20s = %s"), label, rawField);
+  AddLogln();
+  sendLogToWebSocket(ot_log_buffer);
+  ClrLog();
+}
+
+static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const char *label, const char *rawField, time_t now)
+{
+  char valueBuf[12] {0};
+
+  switch (valueType) {
+    case ot_f88: {
+      float value = 0.0f;
+      if (!parseStrictFloat(rawField, value)) return false;
+      dtostrf(value, 3, 2, valueBuf);
+      sendMQTTData(label, valueBuf);
+      msglastupdated[msgid] = now;
+      updatePSSummaryFloatState(msgid, value);
+      return true;
+    }
+
+    case ot_s16: {
+      long parsedValue = 0;
+      if (!parseStrictSignedLong(rawField, -32768L, 32767L, parsedValue)) return false;
+      itoa(static_cast<int16_t>(parsedValue), valueBuf, 10);
+      sendMQTTData(label, valueBuf);
+      msglastupdated[msgid] = now;
+      if (msgid == 33) OTcurrentSystemState.Texhaust = static_cast<int16_t>(parsedValue);
+      return true;
+    }
+
+    case ot_u16: {
+      unsigned long parsedValue = 0;
+      if (!parseStrictUnsignedLong(rawField, 65535UL, parsedValue)) return false;
+      utoa(static_cast<uint16_t>(parsedValue), valueBuf, 10);
+      sendMQTTData(label, valueBuf);
+      msglastupdated[msgid] = now;
+      updatePSSummaryU16State(msgid, static_cast<uint16_t>(parsedValue));
+      return true;
+    }
+
+    case ot_s8s8: {
+      int8_t upperByte = 0;
+      int8_t lowerByte = 0;
+      if (!parsePSSummaryS8S8(rawField, upperByte, lowerByte)) return false;
+      char lowerValueBuf[12] {0};
+      itoa(upperByte, valueBuf, 10);
+      itoa(lowerByte, lowerValueBuf, 10);
+      publishPSSummarySplitBytes(label, "_value_hb", "_value_lb", valueBuf, lowerValueBuf);
+      msglastupdated[msgid] = now;
+      if (msgid == 48) OTcurrentSystemState.TdhwSetUBTdhwSetLB = ((uint8_t)upperByte << 8) | (uint8_t)lowerByte;
+      else if (msgid == 49) OTcurrentSystemState.MaxTSetUBMaxTSetLB = ((uint8_t)upperByte << 8) | (uint8_t)lowerByte;
+      return true;
+    }
+
+    case ot_u8u8: {
+      uint8_t upperByte = 0;
+      uint8_t lowerByte = 0;
+      if (!parsePSSummaryU8U8(rawField, upperByte, lowerByte)) return false;
+      char lowerValueBuf[12] {0};
+      utoa(upperByte, valueBuf, 10);
+      utoa(lowerByte, lowerValueBuf, 10);
+      publishPSSummarySplitBytes(label, "_value_hb", "_value_lb", valueBuf, lowerValueBuf);
+      msglastupdated[msgid] = now;
+      if (msgid == 15) OTcurrentSystemState.MaxCapacityMinModLevel = ((uint16_t)upperByte << 8) | lowerByte;
+      return true;
+    }
+
+    case ot_u8: {
+      unsigned long parsedValue = 0;
+      if (!parseStrictUnsignedLong(rawField, 255UL, parsedValue)) return false;
+      utoa(static_cast<uint8_t>(parsedValue), valueBuf, 10);
+      sendMQTTData(label, valueBuf);
+      msglastupdated[msgid] = now;
+      if (msgid == 71) OTcurrentSystemState.ControlSetpointVH = static_cast<uint8_t>(parsedValue);
+      else if (msgid == 77) OTcurrentSystemState.RelativeVentilation = static_cast<uint8_t>(parsedValue);
+      return true;
+    }
+
+    case ot_flag8flag8: {
+      uint8_t upperByte = 0;
+      uint8_t lowerByte = 0;
+      if (!parsePSSummaryFlag8Flag8(rawField, upperByte, lowerByte)) return false;
+      msglastupdated[msgid] = now;
+      switch (msgid) {
+        case 0:
+          OTcurrentSystemState.Statusflags = publishCombinedStatusState(upperByte, lowerByte);
+          break;
+        case 6:
+          OTcurrentSystemState.RBPflags = publishRBPFlagsState(upperByte, lowerByte);
+          break;
+        case 70:
+          OTcurrentSystemState.StatusVH = publishCombinedStatusVHState(upperByte, lowerByte);
+          break;
+        default:
+          sendMQTTData(label, rawField);
+          break;
+      }
+      return true;
+    }
+
+    default:
+      return false;
+  }
+}
+
+/*
+  Process a PS=1 (Print Summary) comma-separated summary line from the OTGW PIC firmware.
+  Parses each field, updates OTcurrentSystemState, and publishes to MQTT.
+  Old firmware (< v5): 25 fields / 24 commas.
+  New firmware (v5+) : 34 fields / 33 commas.
+*/
+void processPSSummary(const char *buf, int len) {
+  int commaCount = 0;
+  for (int i = 0; i < len; i++) {
+    if (buf[i] == ',') commaCount++;
+  }
+
+  const bool bFW5 = (commaCount == 33);
+  if (commaCount != 24 && commaCount != 33) return;
+
+  enterPSMode(PSTR("PS mode auto-detected as ON (comma-separated summary)"), nullptr, false);
+
+  const time_t now = time(nullptr);
+  const uint8_t *msgIdTable = bFW5 ? PSSUMMARY_MSGIDS_NEW : PSSUMMARY_MSGIDS_OLD;
+  const uint8_t tableSize   = bFW5 ? 34 : 25;
+  const char *p = buf;
+  const char *end = buf + len;
+  int idx = 0;
+  char fBuf[22];
+  char vBuf[12];
+
+  while (p <= end && idx < tableSize) {
+    const char *comma = (const char*)memchr(p, ',', end - p);
+    const int fieldLen = (comma != nullptr) ? (int)(comma - p) : (int)(end - p);
+
+    if (fieldLen > 0 && fieldLen < (int)sizeof(fBuf)) {
+      memcpy(fBuf, p, fieldLen);
+      fBuf[fieldLen] = '\0';
+
+      const uint8_t msgid = pgm_read_byte(&msgIdTable[idx]);
+      if (msgid <= OT_MSGID_MAX) {
+        PROGMEM_readAnything(&OTmap[msgid], OTlookupitem);
+        const char *label = OTlookupitem.label;
+        OTPublishGate psGate(shouldPublishMQTTForPSField(msgid));
+
+        if (publishPSSummaryFieldValue(msgid, OTlookupitem.type, label, fBuf, now)) {
+          ensurePSSummaryDiscovery(msgid);
+          logPSSummaryField(label, fBuf);
+        }
+      }
+    }
+
+    if (comma == nullptr) break;
+    p = comma + 1;
+    idx++;
+  }
+
+  OTGWDebugTf(PSTR("PS=1 summary parsed: %d fields (%s firmware)\r\n"), idx + 1, bFW5 ? "v5+" : "<v5");
 }
 
 /*
@@ -2407,10 +3216,8 @@ void processOT(const char *buf, int len){
   if (isvalidotmsg(buf, len)) { 
     // Raw OT frames indicate normal streaming mode (PS=0).
     if (state.otgw.bPSmode) {
-      state.otgw.bPSmode = false;
-      sMessage[0] = '\0';
-      OTGWDebugTln(F("PS mode auto-detected as OFF (raw OT stream resumed)"));
-      sendEventToWebSocket_P('*', PSTR("PS=0 [auto-detected, raw mode resumed]"));
+      leavePSMode(PSTR("PS mode auto-detected as OFF (raw OT stream resumed)"),
+                  PSTR("PS=0 [auto-detected, raw mode resumed]"));
     }
 
     //OT protocol messages are 9 chars long
@@ -2581,7 +3388,13 @@ void processOT(const char *buf, int len){
       AddLog(" ");  // Space before payload for readability
       
       //next step interpret the OT protocol
-      decodeAndPublishOTValue();
+      // OTPublishGate RAII: gate closes for this OT slot's throttle decision and
+      // is guaranteed to reopen (restore true) when the scope exits, even on early
+      // return. Non-OT sends (event_report, etc.) that follow are not affected. (ADR-006)
+      {
+        OTPublishGate gate(shouldPublishMQTTForID(OTdata.id, OTdata.masterslave, OTdata.value));
+        decodeAndPublishOTValue();
+      }
 
       if (OTdata.skipthis) AddLog(" <ignored> ");
       AddLogln();
@@ -2596,56 +3409,43 @@ void processOT(const char *buf, int len){
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
     checkOTGWcmdqueue(buf, len);
     Debugln(buf);
-    sendMQTTData(F("event_report"), buf);
-    sendEventToWebSocket('<', buf, (int)len);
+    reportOTGWEvent(buf, '<', true);
   } else if (strcmp_P(buf, PSTR("NG")) == 0) {
     Debugln(F("NG - No Good. The command code is unknown."));
-    sendMQTTData(F("event_report"), F("NG - No Good. The command code is unknown."));
-    sendEventToWebSocket_P('!', PSTR("NG - No Good"));
+    reportOTGWEvent_P(PSTR("NG - No Good. The command code is unknown."), '!', true);
   } else if (strcmp_P(buf, PSTR("SE")) == 0) {
     Debugln(F("SE - Syntax Error. The command contained an unexpected character or was incomplete."));
-    sendMQTTData(F("event_report"), F("SE - Syntax Error. The command contained an unexpected character or was incomplete."));
-    sendEventToWebSocket_P('!', PSTR("SE - Syntax Error"));
+    reportOTGWEvent_P(PSTR("SE - Syntax Error. The command contained an unexpected character or was incomplete."), '!', true);
   } else if (strcmp_P(buf, PSTR("BV")) == 0) {
     Debugln(F("BV - Bad Value. The command contained a data value that is not allowed."));
-    sendMQTTData(F("event_report"), F("BV - Bad Value. The command contained a data value that is not allowed."));
-    sendEventToWebSocket_P('!', PSTR("BV - Bad Value"));
+    reportOTGWEvent_P(PSTR("BV - Bad Value. The command contained a data value that is not allowed."), '!', true);
   } else if (strcmp_P(buf, PSTR("OR")) == 0) {
     Debugln(F("OR - Out of Range. A number was specified outside of the allowed range."));
-    sendMQTTData(F("event_report"), F("OR - Out of Range. A number was specified outside of the allowed range."));
-    sendEventToWebSocket_P('!', PSTR("OR - Out of Range"));
+    reportOTGWEvent_P(PSTR("OR - Out of Range. A number was specified outside of the allowed range."), '!', true);
   } else if (strcmp_P(buf, PSTR("NS")) == 0) {
     Debugln(F("NS - No Space. The alternative Data-ID could not be added because the table is full."));
-    sendMQTTData(F("event_report"), F("NS - No Space. The alternative Data-ID could not be added because the table is full."));
-    sendEventToWebSocket_P('!', PSTR("NS - No Space"));
+    reportOTGWEvent_P(PSTR("NS - No Space. The alternative Data-ID could not be added because the table is full."), '!', true);
   } else if (strcmp_P(buf, PSTR("NF")) == 0) {
     Debugln(F("NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table."));
-    sendMQTTData(F("event_report"), F("NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table."));
-    sendEventToWebSocket_P('!', PSTR("NF - Not Found"));
+    reportOTGWEvent_P(PSTR("NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table."), '!', true);
   } else if (strcmp_P(buf, PSTR("OE")) == 0) {
     Debugln(F("OE - Overrun Error. The processor was busy and failed to process all received characters."));
-    sendMQTTData(F("event_report"), F("OE - Overrun Error. The processor was busy and failed to process all received characters."));
-    sendEventToWebSocket_P('!', PSTR("OE - Overrun Error"));
+    reportOTGWEvent_P(PSTR("OE - Overrun Error. The processor was busy and failed to process all received characters."), '!', true);
   } else if (strcmp_P(buf, PSTR("Thermostat disconnected")) == 0) {
     Debugln(F("Thermostat disconnected"));
-    sendMQTTData(F("event_report"), F("Thermostat disconnected"));
-    sendEventToWebSocket_P('*', PSTR("Thermostat disconnected"));
+    reportOTGWEvent_P(PSTR("Thermostat disconnected"), '*', true);
   } else if (strcmp_P(buf, PSTR("Thermostat connected")) == 0) {
     Debugln(F("Thermostat connected"));
-    sendMQTTData(F("event_report"), F("Thermostat connected"));
-    sendEventToWebSocket_P('*', PSTR("Thermostat connected"));
+    reportOTGWEvent_P(PSTR("Thermostat connected"), '*', true);
   } else if (strcmp_P(buf, PSTR("Low power")) == 0) {
     Debugln(F("Low power"));
-    sendMQTTData(F("event_report"), F("Low power"));
-    sendEventToWebSocket_P('*', PSTR("Low power"));
+    reportOTGWEvent_P(PSTR("Low power"), '*', true);
   } else if (strcmp_P(buf, PSTR("Medium power")) == 0) {
     Debugln(F("Medium power"));
-    sendMQTTData(F("event_report"), F("Medium power"));
-    sendEventToWebSocket_P('*', PSTR("Medium power"));
+    reportOTGWEvent_P(PSTR("Medium power"), '*', true);
   } else if (strcmp_P(buf, PSTR("High power")) == 0) {
     Debugln(F("High power"));
-    sendMQTTData(F("event_report"), F("High power"));
-    sendEventToWebSocket_P('*', PSTR("High power"));
+    reportOTGWEvent_P(PSTR("High power"), '*', true);
   } else if (strstr_P(buf, PSTR("\r\nError 01"))!= NULL) {
     char errorBuf[12];
     OTcurrentSystemState.error01++;
@@ -2687,18 +3487,31 @@ void processOT(const char *buf, int len){
     strlcpy(state.pic.sType, OTGWSerial.firmwareToString().c_str(), sizeof(state.pic.sType));
     OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
     snprintf_P(cMsg, sizeof(cMsg), PSTR("OTGW PIC restarted [%s]"), state.pic.sFwversion);
-    sendEventToWebSocket('*', cMsg);
-  } else if ((strchr(buf, '=') != nullptr) && (strchr(buf, ':') == nullptr)) {
-    // Summary key/value lines are emitted by PS=1 mode.
-    // Detect this even when PS=1 was enabled externally (e.g. Domoticz classic plugin),
-    // so WebUI can show the footer watermark reliably.
-    if (!state.otgw.bPSmode) {
-      OTGWDebugTln(F("PS mode auto-detected as ON (summary key=value stream)"));
+    reportOTGWEvent(cMsg, '*', true);
+  } else if (strchr(buf, ',') != nullptr) {
+    // Comma-separated line: handle PS=1 summary (25 or 34 comma-separated fields).
+    // processPSSummary() validates the field count and returns silently if not a PS=1 line.
+    // Individual decoded field lines are forwarded to WebSocket inside processPSSummary().
+    if (!isOTGWStartupQuietPeriodActive()) {
+      processPSSummary(buf, len);
     }
-    state.otgw.bPSmode = true;
-    strlcpy(sMessage, "PS=1 mode; No UI updates.", sizeof(sMessage));
+  } else if ((strchr(buf, '=') != nullptr) && (strchr(buf, ':') == nullptr)) {
+    // Lines containing '=' but no ':' are echoed commands or command responses in PS=1 mode
+    // (e.g. "PS=0" after sending PS=0 to exit PS mode, "TT=20.0" for a setpoint command echo).
+    // Forward to WebSocket and MQTT so the OT Monitor tab remains usable in PS=1 mode and
+    // the user can see the result of commands like "PS=0". (ADR-038)
+    Debugln(buf);
+    reportOTGWEvent(buf, '<', true);
+    // PS=0 echo: the PIC is exiting summary mode — update state accordingly.
+    // All other XX=value lines (PS=1, TT=20.0, etc.) indicate PS=1 mode is active.
+    if (strcasecmp_P(buf, PSTR("PS=0")) == 0) {
+      leavePSMode(PSTR("PS=0 echo: exiting PS=1 mode"), nullptr);
+    } else {
+      enterPSMode(PSTR("PS mode auto-detected as ON (summary key=value stream)"), nullptr, false);
+    }
   } else {
     OTGWDebugTf(PSTR("Not processed, received from OTGW => (%s) [%d]\r\n"), buf, len);
+    reportOTGWEvent(buf, '<', true);
   }
 }
 
@@ -2735,92 +3548,107 @@ void handleOTGW()
   static bool discardCurrentReadLine = false;
   static uint32_t droppedReadLines = 0;
   static uint8_t outByte;
+  static File otgwSimulationFile;
+  static bool otgwSimulationWasEnabled = false;
+  static char sReplay[MAX_BUFFER_READ];
+
+  if (handleOTGWSimulation(otgwSimulationFile,
+                           otgwSimulationWasEnabled,
+                           bytes_read,
+                           bytes_write,
+                           discardCurrentReadLine,
+                           sReplay,
+                           sizeof(sReplay))) {
+    return;
+  }
 
   //Handle incoming data from OTGW through serial port (READ BUFFER)
-  if (OTGWSerial.hasOverrun()) {
-    DebugT(F("Serial Overrun\r\n"));
-  }
-  if (OTGWSerial.hasRxError()){
-    DebugT(F("Serial Rx Error\r\n"));
-  }
-  
-  while (OTGWSerial.available()) {
-    outByte = OTGWSerial.read();
-    if (outByte == '\r' || outByte == '\n') {
-      if ((bytes_read == 0) && !discardCurrentReadLine) continue;
+  if (!state.debug.bOTGWSimulation) {
+    if (OTGWSerial.hasOverrun()) {
+      DebugT(F("Serial Overrun\r\n"));
+      reportOTGWEvent_P(PSTR("Serial Overrun"), '!', true);
+    }
+    if (OTGWSerial.hasRxError()){
+      DebugT(F("Serial Rx Error\r\n"));
+      reportOTGWEvent_P(PSTR("Serial Rx Error"), '!', true);
+    }
+    
+    while (OTGWSerial.available()) {
+      outByte = OTGWSerial.read();
+      if (outByte == '\r' || outByte == '\n') {
+        if ((bytes_read == 0) && !discardCurrentReadLine) continue;
 
-      if (discardCurrentReadLine) {
-        droppedReadLines++;
-        DebugTf(PSTR("Serial line dropped after overflow. Dropped lines total: %lu\r\n"),
-                static_cast<unsigned long>(droppedReadLines));
-      }
+        if (discardCurrentReadLine) {
+          droppedReadLines++;
+          DebugTf(PSTR("Serial line dropped after overflow. Dropped lines total: %lu\r\n"),
+                  static_cast<unsigned long>(droppedReadLines));
+        }
 
-      if (!discardCurrentReadLine) {
-        blinkLEDnow(LED2);
-        sRead[bytes_read] = '\0';
-        OTGWstream.write(reinterpret_cast<const uint8_t*>(sRead), bytes_read);
-        OTGWstream.write('\r');
-        OTGWstream.write('\n');
-        processOT(sRead, bytes_read);
-      }
+        if (!discardCurrentReadLine) {
+          sRead[bytes_read] = '\0';
+          dispatchOTGWInputLine(sRead, bytes_read);
+        }
 
-      bytes_read = 0;
-      discardCurrentReadLine = false;
-    } else if (bytes_read < (MAX_BUFFER_READ-1)) {
-      if (!discardCurrentReadLine) {
-        sRead[bytes_read++] = outByte;
+        bytes_read = 0;
+        discardCurrentReadLine = false;
+      } else if (bytes_read < (MAX_BUFFER_READ-1)) {
+        if (!discardCurrentReadLine) {
+          sRead[bytes_read++] = outByte;
+        }
+      } else {
+        // Buffer overflow detected - discard this complete line and log error
+        OTcurrentSystemState.errorBufferOverflow++;
+        DebugTf(PSTR("Serial Buffer Overflow! Discarding %d bytes. Total overflows: %d\r\n"),
+                bytes_read, OTcurrentSystemState.errorBufferOverflow);
+        snprintf_P(cMsg, sizeof(cMsg), PSTR("Serial overflow [%u]"), OTcurrentSystemState.errorBufferOverflow);
+        sendEventToWebSocket('!', cMsg);
+        // Rate limit MQTT notifications - only send every 10 overflows to avoid overwhelming broker
+        static uint8_t overflowsSinceLastReport = 0;
+        overflowsSinceLastReport++;
+        if (overflowsSinceLastReport >= 10) {
+          char overflowCountBuf[7] = {0};
+          utoa(OTcurrentSystemState.errorBufferOverflow, overflowCountBuf, 10);
+          sendMQTTData(F("Error_BufferOverflow"), overflowCountBuf);
+          overflowsSinceLastReport = 0;
+        }
+        // Drop this line until next CR/LF to avoid forwarding partial/corrupted data
+        bytes_read = 0;
+        discardCurrentReadLine = true;
       }
-    } else {
-      // Buffer overflow detected - discard this complete line and log error
-      OTcurrentSystemState.errorBufferOverflow++;
-      DebugTf(PSTR("Serial Buffer Overflow! Discarding %d bytes. Total overflows: %d\r\n"),
-              bytes_read, OTcurrentSystemState.errorBufferOverflow);
-      snprintf_P(cMsg, sizeof(cMsg), PSTR("Serial overflow [%u]"), OTcurrentSystemState.errorBufferOverflow);
-      sendEventToWebSocket('!', cMsg);
-      // Rate limit MQTT notifications - only send every 10 overflows to avoid overwhelming broker
-      static uint8_t overflowsSinceLastReport = 0;
-      overflowsSinceLastReport++;
-      if (overflowsSinceLastReport >= 10) {
-        char overflowCountBuf[7] = {0};
-        utoa(OTcurrentSystemState.errorBufferOverflow, overflowCountBuf, 10);
-        sendMQTTData(F("Error_BufferOverflow"), overflowCountBuf);
-        overflowsSinceLastReport = 0;
-      }
-      // Drop this line until next CR/LF to avoid forwarding partial/corrupted data
-      bytes_read = 0;
-      discardCurrentReadLine = true;
     }
   }
 
   //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
   while (OTGWstream.available()){
     outByte = OTGWstream.read();  // read from port 25238
-    OTGWSerial.write(outByte);    // write to serial port
+    if (!state.debug.bOTGWSimulation) {
+      OTGWSerial.write(outByte);    // write to serial port
+    }
     if (outByte == '\r')
     { //on CR, do something...
       sWrite[bytes_write] = 0;
-      OTGWDebugTf(PSTR("Net2Ser: Sending to OTGW: [%s] (%d)\r\n"), sWrite, bytes_write);
-      if (bytes_write > 0) sendEventToWebSocket('>', sWrite); // log every ser2net command
-      //check for reset command
-      if (strcmp_P(sWrite, PSTR("GW=R"))==0){
-        //detected [GW=R], then reset the gateway the gpio way
-        OTGWDebugTln(F("Detected: GW=R. Reset gateway command executed."));
-        sendEventToWebSocket_P('!', PSTR("GW=R [reset]"));
-        resetOTGW();
-      } else if (strcasecmp_P(sWrite, PSTR("PS=1"))==0) {
-        //detected [PS=1], then PrintSummary mode = true --> From this point on you need to ask for summary.
-        state.otgw.bPSmode = true;
-        //reset all msglastupdated in webui
-        for(int i = 0; i <= OT_MSGID_MAX; i++){
-          msglastupdated[i] = 0; //clear epoch values
+      if (state.debug.bOTGWSimulation) {
+        OTGWDebugTf(PSTR("Net2Ser blocked by simulation mode: [%s] (%d)\r\n"), sWrite, bytes_write);
+        if (bytes_write > 0) {
+          snprintf_P(cMsg, sizeof(cMsg), PSTR("Simulation blocked cmd [%s]"), sWrite);
+          sendEventToWebSocket('!', cMsg);
         }
-        strlcpy(sMessage, "PS=1 mode; No UI updates.", sizeof(sMessage));
-        sendEventToWebSocket_P('*', PSTR("PS=1 [print summary mode]"));
-      } else if (strcasecmp_P(sWrite, PSTR("PS=0"))==0) {
-        //detected [PS=0], then PrintSummary mode = OFF --> Raw mode is turned on again.
-        state.otgw.bPSmode = false;
-        sMessage[0] = '\0';
-        sendEventToWebSocket_P('*', PSTR("PS=0 [raw mode]"));
+      } else {
+        OTGWDebugTf(PSTR("Net2Ser: Sending to OTGW: [%s] (%d)\r\n"), sWrite, bytes_write);
+        if (bytes_write > 0) sendEventToWebSocket('>', sWrite); // log every ser2net command
+        //check for reset command
+        if (strcmp_P(sWrite, PSTR("GW=R"))==0){
+          //detected [GW=R], then reset the gateway the gpio way
+          OTGWDebugTln(F("Detected: GW=R. Reset gateway command executed."));
+          sendEventToWebSocket_P('!', PSTR("GW=R [reset]"));
+          resetOTGW();
+        } else if (strcasecmp_P(sWrite, PSTR("PS=1"))==0) {
+          //detected [PS=1], then PrintSummary mode = true --> From this point on you need to ask for summary.
+          enterPSMode(nullptr, PSTR("PS=1 [print summary mode]"), true);
+        } else if (strcasecmp_P(sWrite, PSTR("PS=0"))==0) {
+          //detected [PS=0], then PrintSummary mode = OFF --> Raw mode is turned on again.
+          leavePSMode(nullptr, PSTR("PS=0 [raw mode]"));
+        }
       }
       bytes_write = 0; //start next line
     } else if  (outByte == '\n')

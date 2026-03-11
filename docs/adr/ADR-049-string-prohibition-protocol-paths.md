@@ -1,4 +1,4 @@
-# ADR-044: String Class Prohibition in Protocol Paths
+# ADR-049: String Class Prohibition in Protocol Paths
 
 **Status:** Accepted
 **Date:** 2026-03-01

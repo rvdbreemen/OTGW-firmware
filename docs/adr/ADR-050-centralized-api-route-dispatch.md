@@ -1,4 +1,4 @@
-# ADR-045: Centralized API Route Dispatch Table
+# ADR-050: Centralized API Route Dispatch Table
 
 **Status:** Accepted
 **Date:** 2026-03-01

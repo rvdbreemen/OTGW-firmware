@@ -35,7 +35,7 @@
 
 /*---- einde macro's ------------------------------------------------------------------*/
 
-// Module-specific conditional debug macros (ADR-045: uses state.debug.* flags)
+// Module-specific conditional debug macros (ADR-051: uses state.debug.* flags)
 // Each .ino file defines its own set with a per-module flag and prefix.
 // Pattern (intentionally duplicated per-file — Arduino single-TU, no conflict):
 //

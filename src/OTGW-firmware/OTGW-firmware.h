@@ -88,6 +88,7 @@ void emergencyHeapRecovery();
 void resetMQTTBufferSize();
 bool updateLittleFSStatus(const char *probePath = nullptr);
 bool updateLittleFSStatus(const __FlashStringHelper *probePath);
+bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t detailsSize);
 
 //prototype
 void sendMQTTData(const char*, const char*, const bool = false);
@@ -102,13 +103,14 @@ void sendLogToWebSocket(const char* logMessage);
 void readSettings(bool show);
 void writeSettings(bool show);
 void updateSetting(const char *field, const char *newValue);
+void escapeJsonStringTo(const char* src, char* dest, size_t destSize);
 void GetVersion(const char* hexfile, char* version, size_t destSize);
 void startWebSocket();
 void handleWebSocket();
 void testWebhook(bool testOn);
 void evalWebhook();
 
-//===================[ Runtime State — transient, never persisted (ADR-045) ]===================
+//===================[ Runtime State — transient, never persisted (ADR-051) ]===================
 // Sub-section structs for OTGWState — groups runtime state by system component.
 // Hungarian prefixes: b=bool, s=string/char[], i=int/uint, f=float
 
@@ -141,11 +143,14 @@ struct FlashSection {          // state.flash — Firmware upgrade operations
 };
 
 struct DebugSection {          // state.debug — Runtime diagnostic output flags
-  bool bOTmsg     = true;   // was bDebugOTmsg — OpenTherm message trace
-  bool bRestAPI   = false;  // was bDebugRestAPI — REST API request trace
-  bool bMQTT      = false;  // was bDebugMQTT — MQTT publish/receive trace
-  bool bSensors   = false;  // was bDebugSensors — Dallas sensor scan trace
-  bool bSensorSim = false;  // was bDebugSensorSimulation
+  bool     bOTmsg                 = true;   // was bDebugOTmsg — OpenTherm message trace
+  bool     bRestAPI               = false;  // was bDebugRestAPI — REST API request trace
+  bool     bMQTT                  = false;  // was bDebugMQTT — MQTT publish/receive trace
+  bool     bSensors               = false;  // was bDebugSensors — Dallas sensor scan trace
+  bool     bSensorSim             = false;  // was bDebugSensorSimulation
+  bool     bOTGWSimulation        = false;  // was bDebugOTGWSimulation
+  uint32_t iOTGWSimulationIntervalMs = 750;
+  uint32_t iOTGWSimulationNextDueMs  = 0;
 };
 
 struct UptimeSection {         // state.uptime — System longevity counters
@@ -160,11 +165,12 @@ struct OTGWState {
   FlashSection       flash;  // state.flash.bESPactive, state.flash.iPICprogress
   DebugSection       debug;  // state.debug.bOTmsg, state.debug.bMQTT
   UptimeSection      uptime; // state.uptime.iSeconds, state.uptime.iRebootCount
+  bool               bSetupComplete = false;
 };
 
 OTGWState state;
 
-//===================[ Persistent Settings — serialized to LittleFS (ADR-045) ]===================
+//===================[ Persistent Settings — serialized to LittleFS (ADR-051) ]===================
 // Sub-section structs for OTGWSettings — groups configuration by feature area.
 // Hungarian prefixes: b=bool, s=string/char[], i=int/uint, f=float
 
@@ -180,6 +186,7 @@ struct MQTTSettingsSection {
   char    sTopTopic[41]    = "OTGW";
   char    sUniqueid[41]    = "";  // Initialized in readSettings
   bool    bOTmessage       = false;
+  uint16_t iInterval       = 0;   // MQTT publish interval in seconds (0 = publish every message)
   bool    bSeparateSources = false; // ADR-040: publish source-specific topics
 };
 
