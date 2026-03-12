@@ -118,6 +118,9 @@ function fetchDallasLabels() {
 console.log(`Hash=${window.location.hash}`);
 window.onload = initMainPage;
 
+let mainPageCompatWarningShown = false;
+let otLogCompatWarningShown = false;
+
 function isPageVisible() {
   return !(document.hidden || document.visibilityState === 'hidden');
 }
@@ -128,6 +131,9 @@ function isMainPageActive() {
 }
 
 function startOTmonitorPolling() {
+  if (!isMainPageActive()) {
+    return;
+  }
   if (!tid) {
     tid = setInterval(function () { refreshOTmonitor(); }, 1000);
   }
@@ -1798,11 +1804,94 @@ function updateFilteredBuffer() {
 // Flag to ensure we only render at most once per animation frame
 let logRenderScheduled = false;
 
+function getMainPageContainer() {
+  var mainPage = document.getElementById('mainPage');
+  if (mainPage) {
+    return mainPage;
+  }
+
+  var displayMainPage = document.getElementById('displayMainPage');
+  if (!displayMainPage) {
+    return null;
+  }
+
+  mainPage = document.createElement('div');
+  mainPage.id = 'mainPage';
+
+  var waiting = document.getElementById('waiting');
+  if (waiting) {
+    mainPage.appendChild(waiting);
+  } else {
+    var placeholder = document.createElement('div');
+    placeholder.id = 'waiting';
+    placeholder.textContent = 'Wait for it...';
+    mainPage.appendChild(placeholder);
+  }
+
+  var otLogSection = document.getElementById('otLogSection');
+  if (otLogSection && otLogSection.parentNode === displayMainPage) {
+    displayMainPage.insertBefore(mainPage, otLogSection);
+  } else {
+    var navShell = displayMainPage.querySelector('.page-nav-shell');
+    if (navShell && navShell.parentNode === displayMainPage) {
+      displayMainPage.insertBefore(mainPage, navShell.nextSibling);
+    } else {
+      displayMainPage.appendChild(mainPage);
+    }
+  }
+
+  if (!mainPageCompatWarningShown) {
+    console.warn('mainPage element missing; recreated compatible container');
+    mainPageCompatWarningShown = true;
+  }
+
+  return mainPage;
+}
+
+function getOTLogContentElement() {
+  var container = document.getElementById('otLogContent');
+  if (container) {
+    return container;
+  }
+
+  var logPanel = document.getElementById('Log');
+  if (!logPanel) {
+    return null;
+  }
+
+  var logContainer = document.getElementById('otLogContainer');
+  if (!logContainer) {
+    logContainer = document.createElement('div');
+    logContainer.id = 'otLogContainer';
+    logContainer.className = 'ot-log-container';
+
+    var logFooter = logPanel.querySelector('.ot-log-footer');
+    if (logFooter) {
+      logPanel.insertBefore(logContainer, logFooter);
+    } else {
+      logPanel.appendChild(logContainer);
+    }
+  }
+
+  container = document.createElement('div');
+  container.id = 'otLogContent';
+  container.className = 'ot-log-content';
+  container.setAttribute('role', 'log');
+  container.setAttribute('aria-live', 'polite');
+  logContainer.appendChild(container);
+
+  if (!otLogCompatWarningShown) {
+    console.warn('otLogContent element missing; recreated compatible container');
+    otLogCompatWarningShown = true;
+  }
+
+  return container;
+}
+
 // Internal function that performs the actual DOM update
 function renderLogDisplay() {
-  const container = document.getElementById('otLogContent');
+  const container = getOTLogContentElement();
   if (!container) {
-    console.error("otLogContent element not found!");
     return;
   }
 
@@ -2021,7 +2110,7 @@ function setupOTLogControls() {
   
   // Manual scroll detection (disable auto-scroll checkbox if user scrolls up)
   let manualScrollTimeout = null;
-  const otLogContent = document.getElementById('otLogContent');
+  const otLogContent = getOTLogContentElement();
   if (otLogContent) {
     otLogContent.addEventListener('scroll', function(e) {
       // Debounce scroll handling to avoid excessive DOM reads/writes
@@ -3133,7 +3222,7 @@ function refreshDevInfo() {
 
 //============================================================================  
 function refreshOTmonitor() {
-  if (flashModeActive || !isPageVisible()) return;
+  if (flashModeActive || !isPageVisible() || !isMainPageActive()) return;
 
   data = {};
   fetch(APIGW + "v2/otgw/otmonitor")  //api/v2/otgw/otmonitor
@@ -3198,7 +3287,14 @@ function refreshOTmonitor() {
         OTGraph.processSensorData(data, new Date());
       }
 
-      let otMonPage = document.getElementById('mainPage');
+      if (!isMainPageActive()) {
+        return;
+      }
+
+      let otMonPage = getMainPageContainer();
+      if (!otMonPage) {
+        return;
+      }
       let otMonTable = document.querySelector(".otmontable");
       
       // If table doesn't exist, create it (and clear waiting/existing content)
