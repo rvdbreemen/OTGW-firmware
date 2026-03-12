@@ -1,0 +1,23 @@
+{
+    "editor.suggest.snippetsPreventQuickSuggestions": false,
+    "aiXcoder.showTrayIcon": true,
+    "DevChat.Language": "en",
+    "DevChat.PythonForChat": "c:\\Users\\rvdbr\\.vscode\\extensions\\merico.devchat-0.1.47\\tools\\python-3.11.6-embed-amd64\\python.exe",
+    "cmake.sourceDirectory": "D:/Users/Robert/Documents/GitHub/RvdB/OTGW-firmware/libraries/ArduinoJson",
+    "chat.tools.terminal.autoApprove": {
+        "/^python evaluate\\.py --report --verbose$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^Write-Host \"Stashing local changes temporarily\\.\\.\\.\" -ForegroundColor Yellow\ngit stash push -m \"Temporary stash for cherry-pick\"\n\nWrite-Host \"`nNow attempting cherry-pick again\\.\\.\\.\" -ForegroundColor Yellow\nWrite-Host \"\"\n\n# Cherry-pick commit 1: Evaluation framework\nWrite-Host \"Cherry-picking fc63a60 \\(Evaluation framework\\)\\.\\.\\.\" -ForegroundColor Cyan\ngit cherry-pick fc63a60\n\nif \\(\\$LASTEXITCODE -eq 0\\) \\{\n    Write-Host \"✓ Successfully cherry-picked fc63a60\" -ForegroundColor Green\n\\} else \\{\n    Write-Host \"✗ Cherry-pick failed\" -ForegroundColor Red\n    git status\n\\}\n$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    },
+    "chat.agentSessionProjection.enabled": true,
+    "chat.customAgentInSubagent.enabled": true,
+    "chat.unifiedAgentsBar.enabled": true,
+    "github.copilot.chat.switchAgent.enabled": true,
+    "claudeCodeChat.permissions.yoloMode": true,
+    "chatgpt.openOnStartup": false
+}

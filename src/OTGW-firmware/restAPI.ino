@@ -594,6 +594,7 @@ void sendOTmonitorV2()
     sendJsonOTmonMapEntry(F("numberofsensors"), DallasrealDeviceCount , F(""), now );
     for (int i = 0; i < DallasrealDeviceCount; i++) {
       const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
+      if (!strDeviceAddress) continue;
       sendJsonOTmonMapEntryDallasTemp(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
       // Labels now managed by Web UI via /dallas_labels.ini file (not sent in API)
     }
@@ -814,13 +815,13 @@ void sendFilesystemHashCheck()
 {
   // Read the hash stored in LittleFS and compare with the compiled-in firmware hash.
   // Uses the cached getFilesystemHash() — safe to call from an HTTP handler.
-  String fsHash = getFilesystemHash();
-  bool match = (fsHash.length() > 0 &&
-                strcasecmp(fsHash.c_str(), _VERSION_GITHASH) == 0);
+  const char* fsHash = getFilesystemHash();
+  bool match = (fsHash[0] != '\0' &&
+                strcasecmp(fsHash, _VERSION_GITHASH) == 0);
   sendStartJsonMap(F("filesystem_check"));
   sendJsonMapEntry(F("match"), match);
   sendJsonMapEntry(F("fw_hash"), _VERSION_GITHASH);
-  sendJsonMapEntry(F("fs_hash"), fsHash.c_str());
+  sendJsonMapEntry(F("fs_hash"), fsHash);
   sendEndJsonMap(F("filesystem_check"));
 } // sendFilesystemHashCheck()
 
@@ -945,6 +946,31 @@ void sendDeviceSettings()
 } // sendDeviceSettings()
 
 
+// PROGMEM whitelist of recognised setting field names (canonical lower-case).
+// Keep sorted alphabetically for readability; lookup is linear (small list).
+static const char* const PROGMEM knownSettings[] = {
+  "darktheme", "gpiooutputsenabled", "gpiooutputspin", "gpiooutputstriggerbit",
+  "gpiosensorsenabled", "gpiosensorsinterval", "gpiosensorslegacyformat", "gpiosensorspin",
+  "hostname", "ledblink",
+  "mqttbroker", "mqttbrokerport", "mqttenable", "mqtthaprefix", "mqttharebootdetection",
+  "mqttinterval", "mqttotmessage", "mqttpasswd", "mqttseparatesources",
+  "mqtttoptopic", "mqttuniqueid", "mqttuser",
+  "ntpenable", "ntphostname", "ntpsendtime", "ntptimezone",
+  "otgwcommandenable", "otgwcommands",
+  "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
+  "ui_autodownloadlog", "ui_autoexport", "ui_autoscreenshot", "ui_autoscroll",
+  "ui_capture", "ui_graphtimewindow", "ui_timestamps",
+  "webhookcontenttype", "webhookenable", "webhookenabled",
+  "webhookpayload", "webhooktriggerbit", "webhookurloff", "webhookurlon",
+};
+
+static bool isKnownSetting(const char* field) {
+  for (size_t i = 0; i < sizeof(knownSettings) / sizeof(knownSettings[0]); i++) {
+    if (strcasecmp(field, knownSettings[i]) == 0) return true;
+  }
+  return false;
+}
+
 //=======================================================================
 void postSettings()
 {
@@ -962,6 +988,12 @@ void postSettings()
   char field[50];
   if (!extractJsonField(body, F("name"), field, sizeof(field))) {
     httpServer.send(400, F("application/json"), F("{\"error\":\"Missing name\"}"));
+    return;
+  }
+
+  if (!isKnownSetting(field)) {
+    DebugTf(PSTR("postSettings: unknown field [%s], rejected\r\n"), field);
+    httpServer.send(400, F("application/json"), F("{\"error\":\"Unknown setting name\"}"));
     return;
   }
 
@@ -1008,13 +1040,48 @@ void updateAllDallasLabels() {
 
   // Validate: body must be a non-empty JSON object (starts with '{', ends with '}')
   size_t bodyLen = body.length();
-  if (bodyLen == 0 || !body.startsWith("{") || body[bodyLen - 1] != '}') {
+  if (bodyLen == 0 || body[0] != '{' || body[bodyLen - 1] != '}') {
     httpServer.send(400, F("application/json"),
       F("{\"success\":false,\"error\":\"Empty or invalid JSON body\"}"));
     return;
   }
+  // Limit file size to prevent filling LittleFS (labels are short strings)
+  if (bodyLen > 2048) {
+    httpServer.send(400, F("application/json"),
+      F("{\"success\":false,\"error\":\"Body too large (max 2048 bytes)\"}"));
+    return;
+  }
+  // Basic structural check: all keys and values must be quoted strings.
+  // Scan for unquoted colons preceded/followed by quoted strings.
+  {
+    const char* p = body.c_str() + 1; // skip opening '{'
+    while (*p && *p != '}') {
+      while (*p == ' ' || *p == '\r' || *p == '\n' || *p == ',') p++;
+      if (*p == '}') break;
+      if (*p != '"') {
+        httpServer.send(400, F("application/json"),
+          F("{\"success\":false,\"error\":\"Invalid JSON: expected quoted key\"}"));
+        return;
+      }
+      // skip key string
+      p++;
+      while (*p && *p != '"') { if (*p == '\\' && *(p+1)) p++; p++; }
+      if (*p != '"') { httpServer.send(400, F("application/json"), F("{\"success\":false,\"error\":\"Invalid JSON: unterminated key\"}")); return; }
+      p++; // skip closing quote
+      while (*p == ' ') p++;
+      if (*p != ':') { httpServer.send(400, F("application/json"), F("{\"success\":false,\"error\":\"Invalid JSON: expected colon\"}")); return; }
+      p++; // skip colon
+      while (*p == ' ') p++;
+      if (*p != '"') { httpServer.send(400, F("application/json"), F("{\"success\":false,\"error\":\"Invalid JSON: expected quoted value\"}")); return; }
+      // skip value string
+      p++;
+      while (*p && *p != '"') { if (*p == '\\' && *(p+1)) p++; p++; }
+      if (*p != '"') { httpServer.send(400, F("application/json"), F("{\"success\":false,\"error\":\"Invalid JSON: unterminated value\"}")); return; }
+      p++; // skip closing quote
+    }
+  }
 
-  // Write directly to file (body is trusted as pre-validated JSON from client)
+  // Write validated JSON to file
   File labelsFile = LittleFS.open(F("/dallas_labels.ini"), "w");
   if (!labelsFile) {
     httpServer.send_P(500, PSTR("application/json"),

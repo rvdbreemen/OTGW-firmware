@@ -210,15 +210,15 @@ def install_dependencies(project_dir, config_file):
     
     # Install libraries
     libraries = [
-        "WiFiManager@2.0.15-rc.1",
+        "WiFiManager@2.0.17",
         "pubsubclient@2.8.0",
         "TelnetStream@1.2.4",
         "AceCommon@1.6.2",
         "AceSorting@1.0.0",
         "AceTime@2.0.1",
         "OneWire@2.3.8",
-        "DallasTemperature@3.9.0",
-        "WebSockets@2.3.5"
+        "DallasTemperature@4.0.6",
+        "WebSockets@2.3.6"
     ]
     
     for lib in libraries:
