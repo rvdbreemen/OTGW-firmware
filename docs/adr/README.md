@@ -180,6 +180,8 @@ Architecture Decision Records capture important architectural decisions along wi
 
 ## ADR Template
 
+`docs/adr/README.md` is the canonical ADR guide for this repository. Other instruction files should link here instead of restating ADR templates or lifecycle rules.
+
 When creating new ADRs, use this structure:
 
 ```markdown
@@ -287,6 +289,10 @@ ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
 ## When to Create an ADR
 
 Create an ADR when making a decision that:
+- Changes architecture, service/module boundaries, deployment topology, or integration patterns
+- Changes non-functional requirements such as security, availability, performance, privacy/compliance, or resilience
+- Changes external interfaces or contracts, including API behavior and breaking changes
+- Introduces or replaces frameworks, libraries, tooling, or build/CI patterns with broad architectural impact
 - Has long-term impact on the architecture
 - Affects multiple components or modules
 - Involves trade-offs between alternatives
@@ -301,7 +307,14 @@ Don't create ADRs for:
 - Code refactoring that maintains same structure
 - Configuration changes
 - Documentation updates
+- Small dependency or tooling updates without architectural impact
 - Minor feature additions within existing patterns
+
+## ADR Workflow
+
+- **Before implementing:** Read the relevant ADRs to align with existing decisions.
+- **During planning:** Create or update an ADR when a change materially alters architecture, protocols, data flow, or external behavior.
+- **After implementation:** Update the ADR status as needed and link the ADR from the PR or review description.
 
 ## Implementation Notes
 
@@ -338,7 +351,7 @@ Refer to specific RC numbers when documenting pre-release features.
 ## Superseding ADRs
 
 When an architectural decision changes:
-1. Do NOT modify the original ADR
+1. Accepted ADRs are immutable; do NOT modify the original ADR beyond the status line needed to record supersession
 2. Create a new ADR that supersedes the old one
 3. Update the old ADR's status to "Superseded by ADR-XXX"
 4. Reference the original ADR in the new one
