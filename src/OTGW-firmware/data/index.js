@@ -2069,8 +2069,27 @@ function setupOTLogControls() {
 //============================================================================
 let statusClearTimer = null;
 
+function normalizeOTGWcommand(cmd) {
+  var trimmedCmd = (cmd || '').trim();
+  if (!trimmedCmd) return '';
+
+  var normalizedCmd = trimmedCmd.replace(/\s*=\s*/g, '=');
+  var spacedCommandMatch = normalizedCmd.match(/^([A-Za-z]{2})\s+(.+)$/);
+  if (spacedCommandMatch) {
+    normalizedCmd = spacedCommandMatch[1] + '=' + spacedCommandMatch[2].trim();
+  }
+
+  var compactMatch = normalizedCmd.match(/^([A-Za-z]{2})=(.+)$/);
+  if (compactMatch) {
+    return compactMatch[1].toUpperCase() + '=' + compactMatch[2].trim();
+  }
+
+  return normalizedCmd;
+}
+
 function sendOTGWcommand(cmd) {
   var trimmedCmd = (cmd || '').trim();
+  var normalizedCmd = normalizeOTGWcommand(trimmedCmd);
   var statusEl = document.getElementById('otCmdStatus');
 
   function clearStatus(delay) {
@@ -2090,10 +2109,19 @@ function sendOTGWcommand(cmd) {
     return;
   }
 
+  if (!/^[A-Z]{2}=.+$/.test(normalizedCmd)) {
+    if (statusEl) {
+      statusEl.textContent = 'Use XX=value, e.g. PS=1 or TT=20.5';
+      statusEl.className = 'ot-cmd-status ot-cmd-error';
+      clearStatus(3500);
+    }
+    return;
+  }
+
   fetch(`${APIGW}v2/otgw/commands`, {
     method: 'POST',
     headers: { 'content-type': 'application/json; charset=UTF-8' },
-    body: JSON.stringify({ command: trimmedCmd })
+    body: JSON.stringify({ command: normalizedCmd })
   })
   .then(function(response) {
     if (!response.ok) {
@@ -2110,7 +2138,7 @@ function sendOTGWcommand(cmd) {
   })
   .then(function(data) {
     if (statusEl) {
-      statusEl.textContent = 'Queued: ' + trimmedCmd;
+      statusEl.textContent = 'Queued: ' + normalizedCmd;
       statusEl.className = 'ot-cmd-status ot-cmd-ok';
       clearStatus(3000);
     }

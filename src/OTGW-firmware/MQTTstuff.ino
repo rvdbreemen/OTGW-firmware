@@ -39,6 +39,9 @@ constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
 constexpr size_t  MQTT_MSG_MAX_LEN = 1200;
 constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 1200;
 
+struct MQTTAutoConfigBuffers;
+static MQTTAutoConfigBuffers* getMqttAutoConfigBuffers();
+
 struct MQTTAutoConfigBuffers {
   char line[MQTT_CFG_LINE_MAX_LEN];
   char topic[MQTT_TOPIC_MAX_LEN];
