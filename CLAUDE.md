@@ -625,3 +625,114 @@ Tests:
 Full help available: `backlog --help`
 
 <!-- BACKLOG.MD GUIDELINES END -->
+
+---
+
+# OTGW-firmware Project Guidelines
+
+## Project Overview
+
+ESP8266 firmware for the NodoShop OpenTherm Gateway. Provides Web UI, MQTT, REST API, and TCP serial socket with Home Assistant integration focus.
+
+- **Platform**: ESP8266 (NodeMCU / Wemos D1 mini), ~40KB usable RAM
+- **Language**: Arduino C/C++ (.ino files), single translation unit
+- **Serial**: Reserved exclusively for PIC communication — never write to Serial after init
+- **Debug output**: Use `DebugTln()`, `DebugTf()`, etc. (telnet port 23), never Serial
+
+## Architecture Decision Records (ADRs)
+
+ADRs live in `docs/adr/`. **Read relevant ADRs before making changes that affect architecture.**
+
+### When to create an ADR
+Create one when a change affects: architecture, NFRs (security/performance/availability), API contracts, new/replaced dependencies, or build/CI tooling.
+
+Do NOT create ADRs for: pure refactors, bug fixes, minor features within existing patterns.
+
+### ADR lifecycle (IMMUTABLE once Accepted)
+- **Proposed** → Draft; **Accepted** → Stands; **Deprecated** → No longer recommended; **Superseded** → Replaced
+- To reverse a decision: create a NEW ADR that supersedes the old one; mark old as "Superseded by ADR-XXX"
+
+### ADR format
+```
+# ADR-NNN-Short-Title
+## Status: Proposed | Accepted | Deprecated | Superseded
+## Context — problem, constraints, alternatives considered
+## Decision — chosen approach and rationale
+## Consequences — benefits, trade-offs, risks
+## Related — relevant code, issues, PRs, prior ADRs
+```
+
+## Critical Coding Rules
+
+### PROGMEM — MANDATORY (ESP8266 has ~40KB RAM)
+
+All string literals MUST stay in flash, not RAM:
+```cpp
+DebugTln(F("Message"));                              // F() for functions supporting it
+DebugTf(PSTR("Value: %d\r\n"), value);               // PSTR() for printf-style
+snprintf_P(buf, size, PSTR("Format: %s"), str);      // snprintf_P for all formatting
+const char myStr[] PROGMEM = "Long string";          // PROGMEM for string constants
+```
+For string comparisons: use `strcmp_P()`, `strcasecmp_P()` with `PSTR()`.
+
+### No String class in hot paths (ADR-004)
+- Use `char[]` buffers with `strlcpy`, `strncat`, `snprintf_P`
+- `String` is only acceptable in setup/init code or truly one-off contexts
+- Heap fragmentation on ESP8266 is a real stability concern
+
+### Binary data: use memcmp_P, never strncmp_P/strstr_P (CRITICAL)
+`strncmp_P`/`strstr_P` on binary data causes Exception (2) crashes. Use:
+```cpp
+if (memcmp_P(datamem + ptr, banner, bannerLen) == 0) { ... }  // CORRECT
+```
+
+### File serving — stream, never load into RAM
+- Files >2KB: MUST use `httpServer.streamFile(f, mimeType)` or chunked transfer
+- Files >10KB: CRITICAL — always stream, loading causes crash
+- `index.html` is ~11KB — never call `f.readString()` on it
+
+### Network — HTTP/WS only (no HTTPS/WSS)
+This firmware uses plain HTTP and WS protocols only. **Never add HTTPS or WSS support.**
+
+### Static buffers, cooperative scheduling
+- Re-entrancy: `doBackgroundTasks()` can be re-entered via `feedWatchDog()` → `yield()`
+- Buffers shared across a yield window must be local/static, not global scratch buffers
+- `mqttAutoCfgScratch` and `ot_log_buffer` have documented ownership rules — respect them
+
+### Timer management
+Use `DECLARE_TIMER_SEC()` / `DECLARE_TIMER_MS()` macros and check with `DUE()`. See `safeTimers.h`.
+
+### Command queue
+Never send commands directly to the PIC serial port. Always use `addOTWGcmdtoqueue()`.
+
+## Build Commands
+
+```bash
+python build.py              # Build firmware + filesystem
+python build.py --firmware   # Firmware only
+python build.py --clean      # Clean build
+python evaluate.py           # Code quality check (PROGMEM, unsafe patterns)
+python evaluate.py --quick   # Fast check
+```
+
+## Settings & State Architecture (ADR-051)
+
+- `OTGWSettings settings` — persistent, serialized to LittleFS as JSON
+- `OTGWState state` — transient runtime state, never persisted
+- Both use two-level named sub-sections with Hungarian prefixes (b=bool, s=char[], i=int, f=float)
+- Access as: `settings.mqtt.sBroker`, `state.otgw.bOnline`, etc.
+
+## REST API Versioning
+
+- `/api/v0/` — legacy; `/api/v1/` — standard; `/api/v2/` — current preferred
+- Dispatch table in `restAPI.ino` (`kV2Routes[]`) — add new endpoints by adding one entry
+- Always return JSON errors via `sendApiError(httpCode, F("message"))`
+
+## Important Constraints
+
+- **Never** write to Serial after OTGW initialization (it's the PIC serial link)
+- **Never** flash PIC firmware over WiFi using OTmonitor (can brick the PIC)
+- **Never** add HTTPS/WSS — HTTP/WS only
+- **Always** use `addOTWGcmdtoqueue()` for OTGW commands
+- **Always** validate buffer sizes before string operations
+- **Always** feed watchdog in long-running loops: `feedWatchDog()`

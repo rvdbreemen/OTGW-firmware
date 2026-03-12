@@ -398,7 +398,11 @@ void updateSetting(const char *field, const char *newValue)
   
   if (strcasecmp_P(field, PSTR("MQTTenable"))==0)      settings.mqtt.bEnable = EVALBOOLEAN(newValue);
   if (strcasecmp_P(field, PSTR("MQTTbroker")) == 0)    strlcpy(settings.mqtt.sBroker, newValue, sizeof(settings.mqtt.sBroker));
-  if (strcasecmp_P(field, PSTR("MQTTbrokerPort"))==0)  settings.mqtt.iBrokerPort = atoi(newValue);
+  if (strcasecmp_P(field, PSTR("MQTTbrokerPort"))==0) {
+    int port = atoi(newValue);
+    if (port < 1 || port > 65535) { DebugTf(PSTR("WARNING: MQTTbrokerPort %d out of range 1-65535, ignored\r\n"), port); }
+    else settings.mqtt.iBrokerPort = port;
+  }
   if (strcasecmp_P(field, PSTR("MQTTuser"))==0) {
     strlcpy(settings.mqtt.sUser, newValue, sizeof(settings.mqtt.sUser));
     // Trim leading/trailing whitespace from username
@@ -434,7 +438,11 @@ void updateSetting(const char *field, const char *newValue)
     if (strlen(settings.mqtt.sUniqueid) == 0)   strlcpy(settings.mqtt.sUniqueid, getUniqueId(), sizeof(settings.mqtt.sUniqueid));
   }
   if (strcasecmp_P(field, PSTR("MQTTOTmessage"))==0)   settings.mqtt.bOTmessage = EVALBOOLEAN(newValue);
-  if (strcasecmp_P(field, PSTR("MQTTinterval"))==0)    settings.mqtt.iInterval = (uint16_t)atoi(newValue);
+  if (strcasecmp_P(field, PSTR("MQTTinterval"))==0) {
+    int val = atoi(newValue);
+    if (val < 0 || val > 65535) { DebugTf(PSTR("WARNING: MQTTinterval %d out of range 0-65535, ignored\r\n"), val); }
+    else settings.mqtt.iInterval = (uint16_t)val;
+  }
   if (strcasecmp_P(field, PSTR("MQTTseparatesources"))==0) settings.mqtt.bSeparateSources = EVALBOOLEAN(newValue);
   if (strstr_P(field, PSTR("mqtt")) != NULL)        pendingSideEffects |= SIDE_EFFECT_MQTT; // defer MQTT restart to flushSettings()
   
@@ -457,7 +465,10 @@ void updateSetting(const char *field, const char *newValue)
   if (strcasecmp_P(field, PSTR("ui_autoscreenshot"))==0)  settings.ui.bAutoScreenshot = EVALBOOLEAN(newValue);
   if (strcasecmp_P(field, PSTR("ui_autodownloadlog"))==0) settings.ui.bAutoDownloadLog = EVALBOOLEAN(newValue);
   if (strcasecmp_P(field, PSTR("ui_autoexport"))==0)      settings.ui.bAutoExport = EVALBOOLEAN(newValue);
-  if (strcasecmp_P(field, PSTR("ui_graphtimewindow"))==0) settings.ui.iGraphTimeWindow = atoi(newValue);
+  if (strcasecmp_P(field, PSTR("ui_graphtimewindow"))==0) {
+    int val = atoi(newValue);
+    settings.ui.iGraphTimeWindow = constrain(val, 1, 1440);
+  }
 
   if (strcasecmp_P(field, PSTR("GPIOSENSORSenabled")) == 0)
   {
@@ -471,19 +482,23 @@ void updateSetting(const char *field, const char *newValue)
     Debugln();
     DebugTf(PSTR("Updated GPIO Sensors Legacy Format to %s\r\n\n"), CBOOLEAN(settings.sensors.bLegacyFormat));
   }
-  if (strcasecmp_P(field, PSTR("GPIOSENSORSpin")) == 0)    
+  if (strcasecmp_P(field, PSTR("GPIOSENSORSpin")) == 0)
   {
     int newPin = atoi(newValue);
-    if (checkGPIOConflict(newPin, PSTR("sensor"))) {
-      DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
+    if (newPin < 0 || newPin > 16) { DebugTf(PSTR("WARNING: GPIOSENSORSpin %d out of range 0-16, ignored\r\n"), newPin); }
+    else {
+      if (checkGPIOConflict(newPin, PSTR("sensor"))) {
+        DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
+      }
+      settings.sensors.iPin = newPin;
+      Debugln();
+      DebugTf(PSTR("Need reboot before GPIO SENSORS will use new pin GPIO%d!\r\n\n"), settings.sensors.iPin);
     }
-    settings.sensors.iPin = newPin;
-    Debugln();
-    DebugTf(PSTR("Need reboot before GPIO SENSORS will use new pin GPIO%d!\r\n\n"), settings.sensors.iPin);
   }
   if (strcasecmp_P(field, PSTR("GPIOSENSORSinterval")) == 0) {
-    settings.sensors.iInterval = atoi(newValue);
-    CHANGE_INTERVAL_SEC(timerpollsensor, settings.sensors.iInterval, CATCH_UP_MISSED_TICKS); 
+    int val = atoi(newValue);
+    settings.sensors.iInterval = constrain(val, 1, 3600);
+    CHANGE_INTERVAL_SEC(timerpollsensor, settings.sensors.iInterval, CATCH_UP_MISSED_TICKS);
   }
   if (strcasecmp_P(field, PSTR("S0COUNTERenabled")) == 0)
   {
@@ -491,22 +506,26 @@ void updateSetting(const char *field, const char *newValue)
     Debugln();
     DebugTf(PSTR("Need reboot before S0 Counter starts counting on pin GPIO%d!\r\n\n"), settings.s0.iPin);
   }
-  if (strcasecmp_P(field, PSTR("S0COUNTERpin")) == 0)    
+  if (strcasecmp_P(field, PSTR("S0COUNTERpin")) == 0)
   {
     int newPin = atoi(newValue);
-    if (checkGPIOConflict(newPin, PSTR("s0"))) {
-      DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
+    if (newPin < 0 || newPin > 16) { DebugTf(PSTR("WARNING: S0COUNTERpin %d out of range 0-16, ignored\r\n"), newPin); }
+    else {
+      if (checkGPIOConflict(newPin, PSTR("s0"))) {
+        DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
+      }
+      settings.s0.iPin = newPin;
+      Debugln();
+      DebugTf(PSTR("Need reboot before S0 Counter will use new pin GPIO%d!\r\n\n"), settings.s0.iPin);
     }
-    settings.s0.iPin = newPin;
-    Debugln();
-    DebugTf(PSTR("Need reboot before S0 Counter will use new pin GPIO%d!\r\n\n"), settings.s0.iPin);
   }
-  if (strcasecmp_P(field, PSTR("S0COUNTERdebouncetime")) == 0) settings.s0.iDebounceTime = atoi(newValue);
-  if (strcasecmp_P(field, PSTR("S0COUNTERpulsekw")) == 0)      settings.s0.iPulsekw = atoi(newValue);
+  if (strcasecmp_P(field, PSTR("S0COUNTERdebouncetime")) == 0) { int val = atoi(newValue); settings.s0.iDebounceTime = constrain(val, 0, 1000); }
+  if (strcasecmp_P(field, PSTR("S0COUNTERpulsekw")) == 0)      { int val = atoi(newValue); settings.s0.iPulsekw = constrain(val, 1, 100000); }
 
   if (strcasecmp_P(field, PSTR("S0COUNTERinterval")) == 0) {
-    settings.s0.iInterval = atoi(newValue);
-    CHANGE_INTERVAL_SEC(timers0counter, settings.s0.iInterval, CATCH_UP_MISSED_TICKS); 
+    int val = atoi(newValue);
+    settings.s0.iInterval = constrain(val, 1, 3600);
+    CHANGE_INTERVAL_SEC(timers0counter, settings.s0.iInterval, CATCH_UP_MISSED_TICKS);
   }
   if (strcasecmp_P(field, PSTR("OTGWcommandenable"))==0)    settings.otgw.bEnable = EVALBOOLEAN(newValue);
   if (strcasecmp_P(field, PSTR("OTGWcommands"))==0)         strlcpy(settings.otgw.sCommands, newValue, sizeof(settings.otgw.sCommands));
@@ -519,16 +538,20 @@ void updateSetting(const char *field, const char *newValue)
   if (strcasecmp_P(field, PSTR("GPIOOUTPUTSpin")) == 0)
   {
     int newPin = atoi(newValue);
-    if (checkGPIOConflict(newPin, PSTR("output"))) {
-      DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
+    if (newPin < 0 || newPin > 16) { DebugTf(PSTR("WARNING: GPIOOUTPUTSpin %d out of range 0-16, ignored\r\n"), newPin); }
+    else {
+      if (checkGPIOConflict(newPin, PSTR("output"))) {
+        DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
+      }
+      settings.outputs.iPin = newPin;
+      Debugln();
+      DebugTf(PSTR("Need reboot before GPIO OUTPUTS will use new pin GPIO%d!\r\n\n"), settings.outputs.iPin);
     }
-    settings.outputs.iPin = newPin;
-    Debugln();
-    DebugTf(PSTR("Need reboot before GPIO OUTPUTS will use new pin GPIO%d!\r\n\n"), settings.outputs.iPin);
   }
   if (strcasecmp_P(field, PSTR("GPIOOUTPUTStriggerBit")) == 0)
   {
-    settings.outputs.iTriggerBit = atoi(newValue);
+    int val = atoi(newValue);
+    settings.outputs.iTriggerBit = constrain(val, 0, 15);
     Debugln();
     DebugTf(PSTR("Need reboot before GPIO OUTPUTS will use new trigger bit %d!\r\n\n"), settings.outputs.iTriggerBit);
   }

@@ -7,8 +7,36 @@
 **  Borrowed from OpenTherm library from: 
 **      https://github.com/jpraus/arduino-opentherm
 **
-**  TERMS OF USE: MIT License. See bottom of file.                                                            
-***************************************************************************      
+**  TERMS OF USE: MIT License. See bottom of file.
+***************************************************************************
+*/
+
+/*
+***************************************************************************
+**  OTGW-Core.ino — Section Map
+**
+**  Event / Log Helpers              ~ line  108
+**  Global Data Arrays & Variables   ~ line  216
+**  OT Spec Profile Helpers          ~ line  241
+**  Send useful information to MQTT   ~ line  296
+**  Reset OTGW                       ~ line  326
+**  getpicfwversion                  ~ line  348
+**  queryOTGWgatewaymode             ~ line  365
+**  sendOTGWbootcmd                  ~ line  444
+**  OTGW Command & Response          ~ line  463
+**  Watchdog OTGW                    ~ line  531
+**  OpenTherm Data Types             ~ line  598
+**  Status Bit Query Helpers         ~ line  681
+**  MQTT throttle helpers            ~ line  820
+**  OT Message Field Formatters      ~ line 1037
+**  Command Queue implementation      ~ line 1902
+**  Send buffer to OTGW              ~ line 2095
+**  PS=1 Summary Parsing             ~ line 2281
+**  OT Message Processing            ~ line 2725
+**  HandleOTGW                       ~ line 3256
+**  functions for REST API           ~ line 3403
+**  Upgrade PIC firmware             ~ line 3537
+***************************************************************************
 */
 
 #define OTGWDebugTln(...) ({ if (state.debug.bOTmsg) DebugTln(__VA_ARGS__);    })
@@ -77,6 +105,7 @@ static const uint32_t OTGW_STARTUP_QUIET_PERIOD_MS = 15000;
 
 /* --- End of LOG marcro's ---*/
 
+//===================[ Event / Log Helpers ]===================
 /* Send a single-line event to the WebSocket with a prefix character.
    Prefix conventions: '>' sent command, '<' command response, '!' error/warning, '*' system event.
    Uses ot_log_buffer; no additional buffers needed.
@@ -184,6 +213,7 @@ static const char* skipOTLogTimestamp(const char* logLine)
 }
 
 
+//===================[ Global Data Arrays & Variables ]================
 //some variable's
 OpenthermData_t OTdata, delayedOTdata, tmpOTdata;
 
@@ -208,6 +238,7 @@ enum OTSpecCompatMode : uint8_t {
 //   then applies v4.x reserved-ID rules (notably IDs 50-63).
 static OTSpecCompatMode gOTSpecCompatMode = OT_SPEC_COMPAT_AUTO;
 
+//===================[ OT Spec Profile Helpers ]====================
 static bool isLegacyPreV42CompatibilityId(uint8_t msgid)
 {
   return (msgid >= 50U && msgid <= 63U);
@@ -262,7 +293,7 @@ static void appendProgmemSuffix(char *dst, size_t dstSize, PGM_P suffix)
   strncat_P(dst, suffix, dstSize - len - 1);
 }
 
-//===================[ Send useful information to MQWTT ]=====================
+//===================[ Send useful information to MQTT ]======================
 
 /*
 Publish usefull firmware version information to MQTT broker.
@@ -564,7 +595,7 @@ void feedWatchDog() {
 
 //===================[ END Watchdog OTGW ]===============================
 
-//=======================================================================
+//===================[ OpenTherm Data Types & Protocol Helpers ]=========
 float OpenthermData_t::f88() {
   float value = (int8_t) valueHB;
   return value + (float)valueLB / 256.0f;
@@ -647,6 +678,7 @@ OpenThermMessageID getDataID(unsigned long frame)
     return (OpenThermMessageID)((frame >> 16) & 0xFF);
 }
 
+//===================[ Status Bit Query Helpers ]========================
 //parsing responses - helper functions
 // bit: description [ clear/0, set/1]
 // 0: CH enable [ CH is disabled, CH is enabled]
@@ -1001,6 +1033,8 @@ static uint16_t publishRBPFlagsState(uint8_t transferEnableFlags, uint8_t readWr
 
   return ((uint16_t)transferEnableFlags << 8) | readWriteFlags;
 }
+
+//===================[ OT Message Field Formatters ]=========
 
 void print_f88(float& value)
 {
@@ -1865,7 +1899,7 @@ void print_daytime(uint16_t& value)
   }
 }
 
-//===================[ Command Queue implementatoin ]=============================
+//===================[ Command Queue implementation ]============================
 
 #define OTGW_CMD_RETRY 5
 #define OTGW_CMD_INTERVAL_MS 5000
@@ -2243,6 +2277,8 @@ static bool handleOTGWSimulation(File& otgwSimulationFile,
 
   return false;
 }
+
+//===================[ PS=1 Summary Parsing ]===============
 
 /*
   PS=1 (Print Summary) mode field-to-MsgID mapping tables.
@@ -2685,6 +2721,8 @@ void processPSSummary(const char *buf, int len) {
 
   OTGWDebugTf(PSTR("PS=1 summary parsed: %d fields (%s firmware)\r\n"), idx + 1, bFW5 ? "v5+" : "<v5");
 }
+
+//===================[ OT Message Processing ]===============
 
 /*
   This function checks if the string received is a valid "raw OT message".
@@ -3140,6 +3178,12 @@ void processOT(const char *buf, int len){
   } else if (strcmp_P(buf, PSTR("High power")) == 0) {
     Debugln(F("High power"));
     reportOTGWEvent_P(PSTR("High power"), '*', true);
+  // cMsg SAFETY NOTE: snprintf_P(cMsg,...) → sendEventToWebSocket('!', cMsg) is safe here.
+  // sendEventToWebSocket copies cMsg into ot_log_buffer synchronously (AddLog call) before
+  // any yield. So even if doBackgroundTasks re-enters via feedWatchDog, cMsg is no longer
+  // needed by the time any yield can occur. Exception: reportOTGWEvent (below) calls both
+  // sendMQTTData AND sendEventToWebSocket; feedWatchDog in the MQTT path can yield between
+  // the two calls, so callers of reportOTGWEvent must use a local buffer (see evtBuf below).
   } else if (strstr_P(buf, PSTR("\r\nError 01"))!= NULL) {
     char errorBuf[12];
     OTcurrentSystemState.error01++;
@@ -3180,8 +3224,7 @@ void processOT(const char *buf, int len){
     OTGWDebugTf(PSTR("Current device id: %s\r\n"), state.pic.sDeviceid);
     strlcpy(state.pic.sType, OTGWSerial.firmwareToString().c_str(), sizeof(state.pic.sType));
     OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
-    snprintf_P(cMsg, sizeof(cMsg), PSTR("OTGW PIC restarted [%s]"), state.pic.sFwversion);
-    reportOTGWEvent(cMsg, '*', true);
+    { char evtBuf[60]; snprintf_P(evtBuf, sizeof(evtBuf), PSTR("OTGW PIC restarted [%s]"), state.pic.sFwversion); reportOTGWEvent(evtBuf, '*', true); }
   } else if (strchr(buf, ',') != nullptr) {
     // Comma-separated line: handle PS=1 summary (25 or 34 comma-separated fields).
     // processPSSummary() validates the field count and returns silently if not a PS=1 line.
@@ -3300,7 +3343,7 @@ void handleOTGW()
         static uint8_t overflowsSinceLastReport = 0;
         overflowsSinceLastReport++;
         if (overflowsSinceLastReport >= 10) {
-          char overflowCountBuf[7] = {0};
+          char overflowCountBuf[12] = {0};
           utoa(OTcurrentSystemState.errorBufferOverflow, overflowCountBuf, 10);
           sendMQTTData(F("Error_BufferOverflow"), overflowCountBuf);
           overflowsSinceLastReport = 0;

@@ -91,15 +91,17 @@ void startWebserver(){
         return;
       }
 
-      String fsHash = getFilesystemHash();
+      const char* fsHash = getFilesystemHash();
+      bool hasHash = (fsHash && fsHash[0] != '\0');
 
-      if (fsHash.length() > 0) {
+      if (hasHash) {
         // ETags must be double-quoted per RFC 7232.
-        String etag = "\"" + fsHash + "\"";
+        char etag[24];
+        snprintf_P(etag, sizeof(etag), PSTR("\"%s\""), fsHash);
 
         // Conditional GET: return 304 if browser's cached copy is still current.
         if (httpServer.hasHeader(F("If-None-Match")) &&
-            httpServer.header(F("If-None-Match")) == etag) {
+            strcmp(httpServer.header(F("If-None-Match")).c_str(), etag) == 0) {
           f.close();
           httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
           httpServer.sendHeader(F("ETag"), etag);
@@ -111,26 +113,39 @@ void startWebserver(){
       }
 
       // no-cache + ETag: browser stores the response but revalidates each visit.
-      // On a local device this is a cheap If-None-Match round-trip, not a full download.
       httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
 
       // Stream line-by-line to inject ?v=<hash> into JS asset URLs.
-      // When the FS hash changes the versioned URL changes — browser fetches fresh JS
-      // without needing a manual CTRL+F5.
       httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
       httpServer.send(200, F("text/html; charset=UTF-8"), F(""));
 
+      // Use a fixed-size line buffer instead of String to avoid heap fragmentation.
+      static char lineBuf[512];
       while (f.available()) {
-        String line = f.readStringUntil('\n');
-        if (fsHash.length() > 0) {
-          if (line.indexOf(F("src=\"./index.js\"")) >= 0)
-            line.replace(F("src=\"./index.js\""), "src=\"./index.js?v=" + fsHash + "\"");
-          if (line.indexOf(F("src=\"./graph.js\"")) >= 0)
-            line.replace(F("src=\"./graph.js\""), "src=\"./graph.js?v=" + fsHash + "\"");
+        int n = f.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
+        lineBuf[n] = '\0';
+        // Strip trailing CR if present
+        if (n > 0 && lineBuf[n - 1] == '\r') lineBuf[--n] = '\0';
+
+        // Inject ?v=<hash> into JS asset URLs for cache-busting.
+        if (hasHash && strstr_P(lineBuf, PSTR("src=\"./index.js\""))) {
+          // Build replacement line in a second buffer
+          static char outBuf[512];
+          // Find and replace the src attribute
+          char* pos = strstr(lineBuf, "src=\"./index.js\"");
+          *pos = '\0'; // terminate prefix
+          snprintf_P(outBuf, sizeof(outBuf), PSTR("%ssrc=\"./index.js?v=%s\"%s"), lineBuf, fsHash, pos + 16);
+          httpServer.sendContent(outBuf);
+        } else if (hasHash && strstr_P(lineBuf, PSTR("src=\"./graph.js\""))) {
+          static char outBuf[512];
+          char* pos = strstr(lineBuf, "src=\"./graph.js\"");
+          *pos = '\0';
+          snprintf_P(outBuf, sizeof(outBuf), PSTR("%ssrc=\"./graph.js?v=%s\"%s"), lineBuf, fsHash, pos + 16);
+          httpServer.sendContent(outBuf);
+        } else {
+          httpServer.sendContent(lineBuf);
         }
-        httpServer.sendContent(line);
-        if (f.available() || line.length() > 0)
-          httpServer.sendContent(F("\n"));
+        httpServer.sendContent(F("\n"));
       }
       httpServer.sendContent(F("")); // End chunked stream
       f.close();
@@ -153,11 +168,9 @@ void startWebserver(){
   
   httpServer.on("/index.js", []() {
     // ?v=<hash> versioned requests get long-term cache; bare /index.js gets no-cache.
-    // index.html always injects the current hash, so versioned URLs naturally rotate
-    // whenever the filesystem is upgraded.
-    String v = httpServer.arg("v");
-    String fsHash = getFilesystemHash();
-    if (v.length() > 0 && v == fsHash) {
+    const char* fsHash = getFilesystemHash();
+    // httpServer.arg() returns String by value — compare directly to avoid dangling c_str()
+    if (httpServer.hasArg("v") && fsHash[0] != '\0' && strcmp(httpServer.arg("v").c_str(), fsHash) == 0) {
       httpServer.sendHeader(F("Cache-Control"), F("public, max-age=86400"));
     } else {
       httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
@@ -169,9 +182,8 @@ void startWebserver(){
 
   httpServer.on("/graph.js", []() {
     // Same versioned-URL caching strategy as index.js (see above).
-    String v = httpServer.arg("v");
-    String fsHash = getFilesystemHash();
-    if (v.length() > 0 && v == fsHash) {
+    const char* fsHash = getFilesystemHash();
+    if (httpServer.hasArg("v") && fsHash[0] != '\0' && strcmp(httpServer.arg("v").c_str(), fsHash) == 0) {
       httpServer.sendHeader(F("Cache-Control"), F("public, max-age=86400"));
     } else {
       httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
@@ -224,10 +236,10 @@ void setupFSexplorer(){
  
   httpServer.onNotFound([]() 
   {
-    if (state.debug.bRestAPI) DebugTf(PSTR("in 'onNotFound()'!! [%s] => \r\n"), String(httpServer.uri()).c_str());
-    if (httpServer.uri().indexOf("/api/") == 0) 
+    if (state.debug.bRestAPI) DebugTf(PSTR("in 'onNotFound()'!! [%s] => \r\n"), httpServer.uri().c_str());
+    if (httpServer.uri().indexOf("/api/") == 0)
     {
-      if (state.debug.bRestAPI) DebugTf(PSTR("next: processAPI(%s)\r\n"), String(httpServer.uri()).c_str());
+      if (state.debug.bRestAPI) DebugTf(PSTR("next: processAPI(%s)\r\n"), httpServer.uri().c_str());
       processAPI();
     }
     // else if (httpServer.uri() == "/")

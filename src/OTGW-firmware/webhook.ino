@@ -183,7 +183,7 @@ static bool attemptSendWebhook(bool stateOn) {
   bool hasPayload = (settings.webhook.sPayload[0] != '\0');
 
   // Expand the payload template (static to keep off the 4 KB CONT stack)
-  static char expandedPayload[201];
+  static char expandedPayload[384];
   if (hasPayload) {
     expandPayload(settings.webhook.sPayload, expandedPayload, sizeof(expandedPayload), stateOn);
     DebugTf(PSTR("Webhook: POST [%s] payload=%s\r\n"), url, expandedPayload);

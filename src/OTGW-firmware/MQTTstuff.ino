@@ -416,7 +416,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   }  
 
   //detect home assistant going down...
-  char msgPayload[50];
+  char msgPayload[128];
   copyMQTTPayloadToBuffer(payload, length, msgPayload, sizeof(msgPayload));
   if (strcasecmp_P(topic, PSTR("homeassistant/status")) == 0) {
     //incoming message on status, detect going down
@@ -444,7 +444,8 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 
   // parse the incoming topic and execute commands
   char otgwcmd[51]={0};
-  char topicToken[MQTT_ID_MAX_LEN] = {0};
+  static char topicToken[MQTT_ID_MAX_LEN];
+  topicToken[0] = '\0';
   const char *topicCursor = topic;
 
   //first check toptopic part, it can include the seperator, e.g. "myHome/OTGW" or "OTGW""
@@ -603,7 +604,7 @@ void handleMQTT()
         clearMQTTConfigDone();
 
         //Subscribe to topics
-        char topic[100];
+        char topic[MQTT_TOPIC_MAX_LEN];
         strlcpy(topic, MQTTSubNamespace, sizeof(topic));
         strlcat(topic, "/#", sizeof(topic));
         MQTTDebugTf(PSTR("Subscribe to MQTT: TopicId [%s]\r\n"), topic);
@@ -794,13 +795,12 @@ void sendMQTTStreaming(const char* topic, const char *json, const size_t len)
   while (pos < len) {
     size_t chunkLen = (len - pos) > CHUNK_SIZE ? CHUNK_SIZE : (len - pos);
     
-    // Write chunk
-    for (size_t i = 0; i < chunkLen; i++) {
-      if (!MQTTclient.write(json[pos + i])) {
-        PrintMQTTError();
-        MQTTclient.endPublish(); // Clean up even on error
-        return;
-      }
+    // Write chunk as a bulk block instead of byte-by-byte
+    size_t written = MQTTclient.write((const uint8_t*)(json + pos), chunkLen);
+    if (written != chunkLen) {
+      PrintMQTTError();
+      MQTTclient.endPublish(); // Clean up even on error
+      return;
     }
     
     pos += chunkLen;
@@ -886,13 +886,19 @@ static bool copySourceTableEntry(const char* const table[], uint8_t sourceIndex,
 void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
 {
   if (!settings.mqtt.bSeparateSources || !topic || !json) return;
+  // Re-entrancy guard: sendMQTTData may yield via feedWatchDog, allowing
+  // a second processOT call to overwrite the static buffer mid-publish.
+  static bool inUse = false;
+  if (inUse) return;
+  inUse = true;
   uint8_t sourceIndex = 0;
-  if (!resolveSourceIndex(rsptype, sourceIndex)) return;
+  if (!resolveSourceIndex(rsptype, sourceIndex)) { inUse = false; return; }
   static char sourceTopic[MQTT_TOPIC_MAX_LEN];
   char sourceKeyBuf[16];
-  if (!copySourceTableEntry(mqttSourceKeys, sourceIndex, sourceKeyBuf, sizeof(sourceKeyBuf))) return;
+  if (!copySourceTableEntry(mqttSourceKeys, sourceIndex, sourceKeyBuf, sizeof(sourceKeyBuf))) { inUse = false; return; }
   snprintf(sourceTopic, sizeof(sourceTopic), "%s/%s", topic, sourceKeyBuf);
   sendMQTTData(sourceTopic, json, false);
+  inUse = false;
 }
 
 //===========================================================================================
