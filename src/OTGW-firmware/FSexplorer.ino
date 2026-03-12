@@ -127,6 +127,13 @@ void startWebserver(){
         // Strip trailing CR if present
         if (n > 0 && lineBuf[n - 1] == '\r') lineBuf[--n] = '\0';
 
+        // In chunked mode an empty sendContent() marks end-of-response.
+        // Blank HTML lines must therefore emit only a newline chunk.
+        if (n == 0) {
+          httpServer.sendContent(F("\n"));
+          continue;
+        }
+
         // Inject ?v=<hash> into JS asset URLs for cache-busting.
         if (hasHash && strstr_P(lineBuf, PSTR("src=\"./index.js\""))) {
           // Build replacement line in a second buffer
