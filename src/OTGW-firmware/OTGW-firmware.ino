@@ -149,7 +149,7 @@ void setup() {
   startNTP();
 
   //start with setting wifi hostname
-  startWiFi(CSTR(settings.sHostname), 240, forceWifiPortal, forceWifiPortal);  // timeout 240 seconds
+  startWiFi(CSTR(settings.sHostname), 240);  // timeout 240 seconds
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
 
