@@ -4,7 +4,7 @@
 
 This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provides network connectivity (Web UI, MQTT, REST API, and TCP serial socket) for the OpenTherm Gateway hardware, with a focus on reliable Home Assistant integration.
 
-## Architecture Decision Records (ADRs)
+## ADR Workflow Reminder
 
 **IMPORTANT:** This project maintains Architecture Decision Records (ADRs) as docs-as-code that document key architectural choices. Before making changes that affect architecture, consult the relevant ADRs:
 
@@ -13,70 +13,13 @@ This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provi
 - **ADR Index:** `docs/adr/README.md` provides navigation and decision summaries
 - **ADR Skill:** `.github/skills/adr/SKILL.md` provides comprehensive ADR creation guidance
 
-### When to Create ADRs
+Treat `docs/adr/README.md` as the **single source of truth** for:
+- when an ADR is required
+- the ADR template and naming conventions
+- lifecycle, immutability, and superseding rules
+- PR and code-review expectations for architectural changes
 
-Create an ADR when a change affects:
-- **Architecture**: Service/module structure, deployment topology, integration patterns, platform choices
-- **NFRs (Non-Functional Requirements)**: Security, availability, performance, privacy/compliance, resilience
-- **Interfaces/Contracts**: API contracts, breaking changes, major coupling/decoupling decisions
-- **Dependencies**: New or replaced frameworks/libraries/tooling with broad impact
-- **Build/Tooling**: Build system, CI/CD, development processes with architectural impact
-
-Do NOT create ADRs for:
-- Pure refactors without architectural impact
-- Small dependency bumps without impact on architecture/NFRs
-- Bug fixes that don't change architecture
-- Minor feature additions within existing patterns
-
-### ADR Lifecycle and Immutability
-
-**Critical:** Accepted ADRs are **immutable**. Never edit an accepted ADR to change its meaning.
-
-- **Proposed** → Draft, reviewable, can be revised
-- **Accepted** → Decision stands, implementation follows/runs
-- **Deprecated** → Decision is no longer recommended; kept for historical context until fully superseded
-- **Superseded** → Replaced by newer decision (mark old ADR with "Superseded by ADR-XXX")
-
-**If you need to reverse a decision:**
-1. Create a NEW ADR that supersedes the old one
-2. Mark the old ADR status as "Superseded by ADR-XXX"
-3. In the new ADR, explicitly state "Supersedes: ADR-XXX"
-
-### ADR Content: Focus on "Why"
-
-ADRs must focus on **rationale and trade-offs** ("why"), not just implementation ("how"):
-- Context (problem statement/forces/constraints)
-- Decision (chosen approach with rationale)
-- Alternatives Considered (2-3 options with pros/cons and rejection reasons)
-- Consequences (positive impacts, negative impacts, risks with mitigation)
-- References (link to relevant code, issues, PRs, documentation)
-
-**Keep ADRs short** (1-2 screens); link to detailed design docs when needed.
-
-### PR and Code Review Integration
-
-**For all PRs:**
-- If a PR changes architecture/NFRs/interfaces/dependencies/tooling, **link to the relevant ADR** in the PR description
-- If no ADR exists and the change is architecturally significant, **create a new ADR as part of the same PR**
-- If the code would reverse an existing ADR, **create a new superseding ADR** (don't rewrite history)
-
-**During code review:**
-- Verify architecturally significant changes have linked ADRs
-- If ADR is missing, request one and explain which decision should be captured
-- If code violates an accepted ADR, request alignment or a superseding ADR
-
-**Legacy non-compliance:**
-- Existing code may not comply with newer ADRs
-- Call it out and propose remediation (incremental cleanup or tech-debt tasks)
-- Don't let legacy non-compliance block new ADR adoption
-
-### ADR Compliance
-
-- Follow patterns established in ADRs (e.g., static buffers, PROGMEM, no HTTPS)
-- Don't violate architectural decisions without discussing alternatives
-- If architectural decisions change, create new ADR that supersedes the old one (immutability)
-- Reference ADR numbers in code comments, reviews, and pull requests
-- Use ADR skill (`.github/skills/adr/SKILL.md`) for creating comprehensive ADRs
+For architecturally significant changes, read the relevant ADRs before coding, follow the existing decisions, and link any applicable ADR in the PR description. Use `.github/skills/adr/SKILL.md` when you need help drafting or checking an ADR.
 
 ## Technology Stack
 
@@ -102,46 +45,7 @@ ADRs must focus on **rationale and trade-offs** ("why"), not just implementation
 
 ## Architecture Decision Records (ADRs)
 
-When making decisions for refactors, feature additions, or bug fixes, always review existing ADRs first so you understand prior context and constraints.
-
-### ADR Location
-
-- Store ADRs under `docs/adr/`.
-- If the folder does not exist yet, create it when adding the first ADR.
-
-### ADR Format (MANDATORY)
-
-Use this template for new decisions and updates to existing ones:
-
-```
-# ADR-YYYYMMDD-Short-Title
-
-## Status
-Proposed | Accepted | Deprecated | Superseded
-
-## Context
-- What problem are we solving?
-- What constraints apply (hardware, memory, security, compatibility)?
-- What alternatives were considered?
-
-## Decision
-- The chosen approach and rationale.
-- Why alternatives were not chosen.
-
-## Consequences
-- Expected benefits.
-- Trade-offs, risks, or migration notes.
-
-## Related
-- Links to relevant code paths, issues, or PRs.
-- Links to prior ADRs if this supersedes or depends on them.
-```
-
-### ADR Workflow (MANDATORY)
-
-- **Before** implementing: read relevant ADRs to align with existing decisions.
-- **During** planning: if a change materially alters architecture, protocols, data flow, or external behavior, write a new ADR.
-- **After** implementation: ensure ADR status is updated (e.g., Proposed → Accepted) and reference the change.
+When making decisions for refactors, feature additions, or bug fixes, always review existing ADRs first so you understand prior context and constraints. Use `docs/adr/README.md` for the canonical ADR location, template, workflow, and superseding rules; do not introduce a conflicting template here.
 
 ## Network Architecture and Security
 
