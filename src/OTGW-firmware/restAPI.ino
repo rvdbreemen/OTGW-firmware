@@ -75,6 +75,7 @@ static void handleFlash(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod
 static void handlePic(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleFirmware(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleFilesystem(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 
@@ -112,6 +113,28 @@ static void handleCommandSubmit(const char* cmdStr) {
   addOTWGcmdtoqueue(cmdStr, static_cast<int>(cmdLen));
   httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   httpServer.send(202, F("application/json"), F("{\"status\":\"queued\"}"));
+}
+
+static void sendOTGWSimulationStatus() {
+  static const char kOTGWSimulationFile[] PROGMEM = "/otgw_simulation.log";
+  char jsonBuf[160];
+  snprintf_P(jsonBuf, sizeof(jsonBuf),
+             PSTR("{\"simulation\":{\"active\":%s,\"file\":\"%S\",\"interval_ms\":%lu}}"),
+             state.debug.bOTGWSimulation ? "true" : "false",
+             reinterpret_cast<PGM_P>(kOTGWSimulationFile),
+             static_cast<unsigned long>(state.debug.iOTGWSimulationIntervalMs));
+  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+  httpServer.send(200, F("application/json"), jsonBuf);
+}
+
+static void setOTGWSimulationEnabled(bool enabled) {
+  state.debug.bOTGWSimulation = enabled;
+  state.debug.iOTGWSimulationNextDueMs = 0;
+  if (enabled) {
+    sendEventToWebSocket_P('*', PSTR("OTGW simulation enabled [replay active]"));
+  } else {
+    sendEventToWebSocket_P('*', PSTR("OTGW simulation disabled [live serial resumed]"));
+  }
 }
 
 //=== Resource handler functions ===
@@ -194,6 +217,33 @@ static void handleFilesystem(const char words[][API_WORD_LEN], uint8_t wc, HTTPM
   } else {
     sendApiNotFound(originalURI);
   }
+}
+
+static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  const bool isGet = (method == HTTP_GET);
+  const bool isPostOrPut = (method == HTTP_POST || method == HTTP_PUT);
+
+  if (wc == 4) {
+    if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
+    sendOTGWSimulationStatus();
+    return;
+  }
+
+  if (wc > 4 && strcmp_P(words[4], PSTR("start")) == 0) {
+    if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    setOTGWSimulationEnabled(true);
+    sendOTGWSimulationStatus();
+    return;
+  }
+
+  if (wc > 4 && strcmp_P(words[4], PSTR("stop")) == 0) {
+    if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    setOTGWSimulationEnabled(false);
+    sendOTGWSimulationStatus();
+    return;
+  }
+
+  sendApiNotFound(originalURI);
 }
 
 static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
@@ -282,6 +332,7 @@ static const char kRouteFlash[]      PROGMEM = "flash";
 static const char kRoutePic[]        PROGMEM = "pic";
 static const char kRouteFirmware[]   PROGMEM = "firmware";
 static const char kRouteFilesystem[] PROGMEM = "filesystem";
+static const char kRouteSimulate[]   PROGMEM = "simulate";
 static const char kRouteOtgw[]       PROGMEM = "otgw";
 static const char kRouteWebhook[]    PROGMEM = "webhook";
 
@@ -294,6 +345,7 @@ static const ApiRoute kV2Routes[] = {
   { kRoutePic,        handlePic },
   { kRouteFirmware,   handleFirmware },
   { kRouteFilesystem, handleFilesystem },
+  { kRouteSimulate,   handleSimulate },
   { kRouteOtgw,       handleOtgw },
   { kRouteWebhook,    handleWebhook },
   { nullptr,          nullptr }  // sentinel
@@ -670,6 +722,7 @@ void sendDeviceInfo()
   sendNestedJsonObj(F("boilerconnected"), CBOOLEAN(state.otgw.bBoilerState));      
   sendNestedJsonObj(F("otgwmode"), state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
   sendNestedJsonObj(F("otgwconnected"), CBOOLEAN(state.otgw.bOnline));
+  sendNestedJsonObj(F("otgwsimulation"), CBOOLEAN(state.debug.bOTGWSimulation));
   
   sendEndJsonObj(F("devinfo"));
 
@@ -728,6 +781,7 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("boilerconnected"), state.otgw.bBoilerState);      
   sendJsonMapEntry(F("otgwmode"), state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
   sendJsonMapEntry(F("otgwconnected"), state.otgw.bOnline);
+  sendJsonMapEntry(F("otgwsimulation"), state.debug.bOTGWSimulation);
   
   sendEndJsonMap(F("device"));
 

@@ -304,6 +304,7 @@ function refreshGatewayMode(force) {
     .then(json => {
       const device = (json && json.device) ? json.device : {};
       applyParsedGatewayMode(parseGatewayModeValue(device.otgwmode));
+      applyOTGWSimulationState(device.otgwsimulation);
     })
     .catch(error => {
       console.warn('refreshGatewayMode warning:', error);
@@ -707,6 +708,7 @@ let statusMessageText = ''; // Device status message from /v2/device/time
 let currentFreeHeap = null;    // Free heap bytes from /v2/device/time
 let currentMaxFreeBlock = null; // Max free block bytes from /v2/device/time
 let sensorSimulationActive = false; // Mirror of otmonitor.sensorsimulation for footer notice
+let otgwSimulationActive = false; // Mirror of device.otgwsimulation for status badge
 let flashPollTimer = null; // Timer for polling flash status as failsafe (both ESP and PIC)
 let otLogResponsiveInitialized = false;
 let otLogResizeTimer = null;
@@ -1562,6 +1564,45 @@ function updateWSStatus(connected) {
     statusTextEl.textContent = 'Disconnected';
     // statusEl.style.color = 'red'; // Force color - removed, using CSS class
   }
+}
+
+function parseSimulationValue(rawValue) {
+  if (typeof rawValue === 'boolean') return rawValue;
+  if (typeof rawValue === 'string') {
+    const normalized = rawValue.trim().toLowerCase();
+    if (normalized === 'true' || normalized === 'on' || normalized === '1') return true;
+    if (normalized === 'false' || normalized === 'off' || normalized === '0') return false;
+  }
+  return null;
+}
+
+function applyOTGWSimulationState(rawValue) {
+  const parsedValue = parseSimulationValue(rawValue);
+  if (parsedValue === null) return;
+  otgwSimulationActive = parsedValue;
+  updateSimulationBadge();
+}
+
+function updateSimulationBadge() {
+  const badgeEl = document.getElementById('simulationBadge');
+  if (!badgeEl) return;
+
+  const activeModes = [];
+  if (otgwSimulationActive) activeModes.push('OT replay');
+  if (sensorSimulationActive) activeModes.push('Dallas sensors');
+
+  if (activeModes.length === 0) {
+    badgeEl.classList.add('hidden');
+    badgeEl.removeAttribute('title');
+    badgeEl.setAttribute('aria-hidden', 'true');
+    return;
+  }
+
+  badgeEl.textContent = 'SIMULATION';
+  badgeEl.title = 'Simulation active: ' + activeModes.join(' + ');
+  badgeEl.setAttribute('aria-label', badgeEl.title);
+  badgeEl.setAttribute('aria-hidden', 'false');
+  badgeEl.classList.remove('hidden');
 }
 
 //============================================================================
@@ -3200,6 +3241,7 @@ function refreshDevInfo() {
       const version = device.fwversion || "";
 
       applyParsedGatewayMode(parseGatewayModeValue(device.otgwmode));
+      applyOTGWSimulationState(device.otgwsimulation);
 
       const versionEl = document.getElementById('devVersion');
       if (versionEl) versionEl.textContent = version;
@@ -3242,9 +3284,7 @@ function refreshOTmonitor() {
         simState = data.sensorsimulation.value;
       }
 
-      if (typeof simState === 'string') {
-        simState = (simState.toLowerCase() === 'true' || simState.toLowerCase() === 'on');
-      }
+      simState = parseSimulationValue(simState);
 
       if (simState === true && lastSensorSimulationState !== true) {
         fetchDallasLabels()
@@ -3274,6 +3314,7 @@ function refreshOTmonitor() {
         sensorSimulationActive = simState;
         lastSensorSimulationState = simState;
         if (simChanged) renderBottomMessage();
+        updateSimulationBadge();
       }
 
       // Detect and register temperature sensors for the graph
@@ -3442,7 +3483,9 @@ function refreshDeviceInfo() {
     .then(json => {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
       const device = json.device || {};
+      applyOTGWSimulationState(device.otgwsimulation);
       for (let key in device) {
+        if (key === 'otgwsimulation') continue;
         console.log("[" + key + "]=>[" + device[key] + "]");
         const displayLabel = formatDeviceInfoLabel(key);
         const displayValue = formatDeviceInfoValue(key, device[key]);

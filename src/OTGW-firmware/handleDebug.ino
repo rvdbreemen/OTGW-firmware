@@ -37,7 +37,7 @@ void handleDebug(){
                 Debugln(F("r) Reconnect wifi, telnet, otgwstream and mqtt"));
                 Debugln(F("p) Reset PIC manually"));
                 Debugln(F("a) Send PR=A command to ID PIC firmware version and type"));
-                Debugln(F("S) Toggle OTGW serial simulation replay"));
+                Debugln(F("s/S) Toggle OTGW serial simulation replay"));
                 Debugln(F("--- GPIO/Debug ---"));
                 Debugln(F("b) Blink LED 1 (5 times)"));
                 Debugln(F("i) Initialize relay outputs"));
@@ -113,6 +113,7 @@ void handleDebug(){
                   pollSensors();  // Force immediate sensor data so panel/graph update right away
                 }
                 break;
+            case 's':
             case 'S':
                 state.debug.bOTGWSimulation = !state.debug.bOTGWSimulation;
                 state.debug.iOTGWSimulationNextDueMs = 0;
