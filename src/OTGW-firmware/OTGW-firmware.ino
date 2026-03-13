@@ -441,7 +441,15 @@ void doBackgroundTasks()
   // blinkLED/delayms in setup() would otherwise invoke handleMQTT() before
   // startMQTT() sets the 1350-byte buffer, and handleOTGW() before resetOTGW().
   if (!state.bSetupComplete) return;
-  loopWifi();                   // Non-blocking WiFi reconnect state machine (ADR-047)
+  // ADR-047: Non-blocking WiFi reconnect state machine.
+  // Guard: skip during any flash operation (ESP or PIC).
+  // During Update.write() the ESP8266 suspends flash reads, starving the WiFi
+  // stack. After the write, WiFi.status() may transiently return WL_DISCONNECTED,
+  // causing loopWifi() to initiate a reconnect mid-upload. If the reconnect
+  // completes while the upload is still in progress, WIFI_RECONNECTED calls
+  // startWebSocket()/startMQTT(), potentially tearing down the HTTP connection
+  // carrying the OTA data and leaving the LittleFS partition partially written.
+  if (!isFlashing()) loopWifi();
 
   // Check for critically low heap and attempt recovery if needed
   if (getHeapHealth() == HEAP_CRITICAL) {
