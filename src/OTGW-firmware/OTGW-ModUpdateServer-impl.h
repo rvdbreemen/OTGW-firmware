@@ -175,7 +175,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           if (uploadTotal > 0 && uploadTotal > fsSize) {
             _updaterError = F("filesystem image too large");
             _setStatus(UPDATE_ERROR, "filesystem", 0, uploadTotal, upload.filename, _updaterError);
-          } else if (!Update.begin(uploadTotal > 0 ? uploadTotal : fsSize, U_FS)){//start with max available size
+          } else if (!Update.begin(fsSize, U_FS)){//always use full partition size to erase stale old-filesystem data in upper blocks
             if (_serial_output) Update.printError(OTGWSerial);
             _setUpdaterError();
             _setStatus(UPDATE_ERROR, "filesystem", 0, uploadTotal, upload.filename, _updaterError);
