@@ -929,6 +929,7 @@ void sendDeviceTimeV2()
   sendJsonMapEntry(F("epoch"), (int)now);
   sendJsonMapEntry(F("message"), sMessage);
   sendJsonMapEntry(F("psmode"), state.otgw.bPSmode);
+  sendJsonMapEntry(F("otgwsimulation"), state.debug.bOTGWSimulation);
   sendJsonMapEntry(F("freeheap"), ESP.getFreeHeap());
   sendJsonMapEntry(F("maxfreeblock"), ESP.getMaxFreeBlockSize());
 

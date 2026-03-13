@@ -2929,6 +2929,10 @@ function refreshDevTime() {
           applyPSmodeState();
         }
       }
+
+      if (devtime.otgwsimulation !== undefined) {
+        applyOTGWSimulationState(devtime.otgwsimulation);
+      }
       renderBottomMessage();
     })
     .catch(function (error) {
