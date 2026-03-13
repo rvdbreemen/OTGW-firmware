@@ -181,7 +181,6 @@ void writeSettings(bool show)
     DebugTf(PSTR("[Settings] Error: open(%s, 'w') FAILED!!! --> Bailout\r\n"), SETTINGS_FILE);
     return;
   }
-  yield();
 
   DebugT(F("[Settings] State: Writing JSON settings... "));
   file.print(F("{\n"));
