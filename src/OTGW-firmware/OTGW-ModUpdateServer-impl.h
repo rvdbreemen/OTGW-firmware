@@ -74,16 +74,13 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
     _password = password;
     _resetStatus();
 
-    Update.onProgress([this](size_t progress, size_t total) {
-      if (_status.phase == UPDATE_ERROR || _status.phase == UPDATE_ABORT || _status.phase == UPDATE_END) {
-        return;
-      }
-      _status.flash_written = progress;
-      if (total > 0) {
-        _status.flash_total = total;
-      }
-      _setStatus(UPDATE_WRITE, _status.target, _status.flash_written, _status.flash_total, _status.filename, emptyString);
-    });
+    // NOTE: Do NOT register Update.onProgress() here.
+    // The UPLOAD_FILE_WRITE handler already calls _setStatus() before each
+    // Update.write() chunk. Registering onProgress would cause a re-entrant
+    // call chain: httpServer.handleClient() -> [upload handler] -> Update.write()
+    // -> onProgress -> _setStatus() -> sendWebSocketJSON() -> webSocket.broadcastTXT()
+    // which allocates ~416 bytes of extra stack inside Update.write() and
+    // overflows the ESP8266's ~4KB cont-context stack, crashing the firmware.
 
     // handler for the /update form page
     _server->on(path.c_str(), HTTP_GET, [&](){
