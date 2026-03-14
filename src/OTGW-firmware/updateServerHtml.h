@@ -185,35 +185,6 @@ static const char UpdateServerIndex[] PROGMEM =
              });
          }
 
-         // Upload a blob to the device via XHR; returns a Promise
-         function xhrUpload(action, fieldName, blob, filename) {
-           return new Promise(function(resolve, reject) {
-             var fd = new FormData();
-             fd.append(fieldName, blob, filename);
-             var xhr = new XMLHttpRequest();
-             xhr.open('POST', action, true);
-             xhr.timeout = 300000;
-             xhr.upload.onprogress = function(ev) {
-               if (ev.lengthComputable) {
-                 var pct = Math.min(Math.round((ev.loaded / ev.total) * 100), 100);
-                 progressBar.style.width = pct + '%';
-                 progressText.textContent = 'Uploading: ' + pct + '% (' + formatBytes(ev.loaded) + ' / ' + formatBytes(ev.total) + ')';
-               }
-             };
-             xhr.onload = function() {
-               if (xhr.status >= 200 && xhr.status < 300 && (xhr.responseText || '').indexOf('Flash error') === -1) {
-                 progressBar.style.width = '100%';
-                 resolve();
-               } else {
-                 reject(new Error(xhr.responseText || 'HTTP ' + xhr.status));
-               }
-             };
-             xhr.ontimeout = function() { reject(new Error('Upload timeout')); };
-             xhr.onerror = function() { reject(new Error('Connection lost during upload')); };
-             xhr.send(fd);
-           });
-         }
-
          // Wait for the device to reboot and come back online.
          // onReady: optional callback called when device is healthy.
          //          If null/undefined, performs the default labels-restore + redirect to /.
@@ -447,7 +418,6 @@ static const char UpdateServerSuccess[] PROGMEM =
       <h1>OTGW firmware Flash utility</h1>
       <br/>
       <h2>Flashing successful!</h2>
-      %SETTINGS_MSG%
       <br/>
       <br/>Wait for the OTGW firmware to reboot and start the HTTP server
       <br/>

@@ -1,8 +1,8 @@
 # ADR-029: Simple XHR-Based OTA Flash (KISS Principle)
 
-**Status:** Accepted  
-**Date:** 2026-02-04  
-**Updated:** 2026-02-04 (Initial version)  
+**Status:** Accepted
+**Date:** 2026-02-04
+**Updated:** 2026-03-14 (Corrected health endpoint, watchdog mechanism, backup scope; removed dead `xhrUpload` function, `%SETTINGS_MSG%` placeholder, status tracking struct)  
 **Supersedes:** Previous WebSocket + Polling dual-mode flash implementation (dev branch)  
 **Related to:** ADR-003 (HTTP-Only Architecture), ADR-004 (Static Buffer Allocation), ADR-011 (Hardware Watchdog)
 
@@ -113,7 +113,7 @@ Browser-specific code: Yes (Safari)
 2. Backend blocks until flash write completes (10-30 seconds)
 3. Backend returns HTTP 200 only after flash is complete
 4. Frontend waits for device reboot (60-second timeout)
-5. Frontend polls `/api/v1/health` to verify device is operational
+5. Frontend polls `/api/v2/health` to verify device is operational
 6. Redirect to homepage when health check succeeds
 
 **Pros:**
@@ -150,10 +150,10 @@ Browser-specific code: Yes (Safari)
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ Settings Backup (filesystem only, optional)                 │
-│ - Check "Download settings backup" checkbox                 │
-│ - Download /settings.ini via fetch() to local filesystem    │
-│ - Triggers browser download dialog                          │
-│ - Wait 1 second for download to start                       │
+│ - Check "Download backups" checkbox                         │
+│ - Download /settings.ini via fetch() → browser download    │
+│ - Download /dallas_labels.ini via fetch() if present        │
+│ - Wait 500ms between downloads                              │
 └──────────────────────┬──────────────────────────────────────┘
                        │
                        ▼
@@ -194,7 +194,7 @@ Browser-specific code: Yes (Safari)
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ Health Check Polling Loop                                    │
-│ - GET /api/v1/health?t=<timestamp> every 1 second          │
+│ - GET /api/v2/health?t=<timestamp> every 1 second          │
 │ - Parse JSON response: { health: { status: "UP", ... } }   │
 │ - If status === 'UP': Device is operational → Redirect     │
 │ - If error/timeout: Ignore (device still rebooting)         │
@@ -213,23 +213,25 @@ Browser-specific code: Yes (Safari)
 ### Code Structure
 
 ```javascript
-// updateServerHtml.h (399 lines total, ~150 lines core logic)
+// updateServerHtml.h
 
 // Utility functions
-function showProgressPage() { ... }           // Show progress panel
-function formatBytes(bytes) { ... }           // Format file sizes
-function waitForDeviceReboot() { ... }        // Health check polling
-function retryFlash() { ... }                 // Reset UI to form view
+function showProgressPage() { ... }              // Show progress panel, hide form
+window.retryFlash = function() { ... }           // Reset UI back to form view
+function downloadBackup(url, prefix) { ... }     // Download one file to browser
+function doBackups() { ... }                     // Download settings + labels before FS flash
+function waitForDeviceReboot(onReady) { ... }    // Poll /api/v2/health until UP, then redirect
+function formatBytes(bytes) { ... }              // Format file sizes for display
 
-// Form initialization
+// Form initialization (called for both firmware and filesystem forms)
 function initUploadForm(formId, targetName) {
   // Enable submit button when file selected
   // Handle form submit:
-  //   1. Settings backup (filesystem only)
-  //   2. XHR upload with progress
-  //   3. Wait for backend response
-  //   4. Health check polling
-  //   5. Redirect
+  //   1. For filesystem: doBackups() (optional, controlled by checkbox)
+  //   2. XHR upload with xhr.upload.onprogress → progress bar
+  //   3. Wait for backend HTTP 200 response
+  //   4. On success: waitForDeviceReboot(null) → health check → redirect
+  //   5. On error: show error text + "Try Again" button
 }
 
 initUploadForm('fwForm', 'flash');
@@ -238,13 +240,13 @@ initUploadForm('fsForm', 'filesystem');
 
 ### Watchdog Coordination (ADR-011)
 
-OTA flash temporarily relaxes watchdog constraints while still preventing lockups:
+OTA flash coordinates with the external hardware watchdog (NodoShop I2C watchdog on address 0x26) and gates background tasks using the `state.flash.bESPactive` flag:
 
-1. **Disable watchdog during long flash writes** using `WatchDogEnabled(0)`.
-2. **Feed watchdog on every flash chunk** via `FEEDWATCHDOGNOW` inside the upload handler.
-3. **Re-enable watchdog** after flashing completes and reboot is initiated.
+1. **`state.flash.bESPactive = true`** at `UPLOAD_FILE_START` — this flag causes `doBackgroundTasks()` to skip MQTT, OTGW, NTP and other background work for the duration of the flash.
+2. **Feed hardware watchdog on every write chunk** via `Wire.beginTransmission(0x26); Wire.write(0xA5); Wire.endTransmission();` inside the upload handler.
+3. **`state.flash.bESPactive = false`** at `UPLOAD_FILE_END` (success or error) and `UPLOAD_FILE_ABORTED` — restores normal background operation.
 
-This prevents spurious resets during long flash writes while keeping recovery protection for the rest of the lifecycle.
+This prevents spurious background activity during flash writes while keeping the hardware watchdog satisfied through direct I2C writes on every received chunk.
 
 ### State Management
 
@@ -460,14 +462,14 @@ The backend must:
    - Return HTTP 500 or error message if flash failed
 
 2. **Provide health check endpoint**
-   - Endpoint: `/api/v1/health`
+   - Endpoint: `/api/v2/health`
    - Response format: `{ "health": { "status": "UP", "uptime": "...", ... } }`
    - Return 200 OK with status=UP when device is fully operational
    - Return error or non-UP status while still initializing
 
 3. **Settings auto-restore**
-   - Restore settings from ESP memory after filesystem flash
-   - Settings backup (manual download) is optional safety measure
+   - After filesystem flash: mount LittleFS, call `writeSettings(false)` to write in-RAM settings to the new image, then call `settingsMarkClean()` to prevent the deferred-flush timer from triggering service restarts during the 1-second window before reboot
+   - Settings backup (manual browser download) is an optional safety measure on top of this
 
 ### Frontend Implementation
 
@@ -485,10 +487,11 @@ function initUploadForm(formId, targetName) {
   //    e. Show error on failure
 }
 
-function waitForDeviceReboot() {
-  // Poll /api/v1/health every 1 second
-  // Redirect when data.health.status === 'UP'
-  // Timeout after 60 seconds
+function waitForDeviceReboot(onReady) {
+  // Poll /api/v2/health every 1 second
+  // If onReady is provided: call it when UP (intermediate reboot)
+  // If onReady is null: restore Dallas labels from cache, redirect to /
+  // Timeout after 60 seconds: redirect anyway
 }
 
 function formatBytes(bytes) {
@@ -510,7 +513,7 @@ window.retryFlash = function() {
 
 Simplified success page that:
 1. Shows "Flashing successful!" message
-2. Polls `/api/v1/health` every 1 second
+2. Polls `/api/v2/health` every 1 second
 3. Shows countdown: "Waiting for device... (Xs)"
 4. Redirects when `data.health.status === 'UP'`
 5. Redirects after 60 seconds if device doesn't respond
@@ -523,7 +526,7 @@ console.log('[OTA] State: Form submitted for flash');
 console.log('[OTA] File: firmware.bin (412 KB)');
 console.log('[OTA] Progress: 45% (185344/412160)');
 console.log('[OTA] State: Flash complete (backend confirmed), device rebooting');
-console.log('[OTA] Health check: GET /api/v1/health?t=1612345678');
+console.log('[OTA] Health check: GET /api/v2/health?t=1612345678');
 console.log('[OTA] Health response: {"health":{"status":"UP",...}}');
 console.log('[OTA] State: Device is healthy, redirecting');
 ```
@@ -689,11 +692,10 @@ console.log('[OTA] State: Device is healthy, redirecting');
    - No WebSocket connection = more memory available for flash operations
 
 4. **ADR-011: External Hardware Watchdog**
-   - **Critical integration:** Watchdog must be managed during OTA flash
-   - **Implementation:** Watchdog disabled at start, fed on every chunk, re-enabled after completion
-   - **Rationale:** Flash operations can block for 10-20 seconds (exceeds 3-second watchdog timeout)
-   - **Code:** FEEDWATCHDOGNOW macro called in upload handler (OTGW-ModUpdateServer-impl.h:206)
-   - **Safety:** Feeding on chunks provides protection during upload phase while preventing timeout during flash writes
+   - **Critical integration:** Watchdog must be fed during OTA flash; background tasks must be suppressed
+   - **Implementation:** `state.flash.bESPactive = true` suppresses background tasks; hardware watchdog fed via I2C write (`Wire.beginTransmission(0x26); Wire.write(0xA5); Wire.endTransmission()`) on every upload chunk; flag cleared on completion, error, or abort
+   - **Rationale:** Flash write chunks can block for seconds; hardware watchdog would reset the device without explicit feeding
+   - **Safety:** Chunk-level feeding keeps watchdog satisfied throughout the entire upload and flash-write phase
 
 ### Future Considerations
 
