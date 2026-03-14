@@ -57,8 +57,7 @@ ESP8266HTTPUpdateServerTemplate<ServerType>::ESP8266HTTPUpdateServerTemplate(boo
   _username = emptyString;
   _password = emptyString;
   _authenticated = false;
-  _lastProgressPerc = 0;
-  _resetStatus();
+  _uploadTarget = emptyString;
 }
 
 template <typename ServerType>
@@ -67,7 +66,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
     _server = server;
     _username = username;
     _password = password;
-    _resetStatus();
+    _uploadTarget = emptyString;
 
     // handler for the /update form page
     _server->on(path.c_str(), HTTP_GET, [&](){
@@ -84,19 +83,14 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
       // Update.hasError() returns false when Update.begin() was never called
       // (e.g. "image too large"), so _updaterError must be tested independently.
       if (Update.hasError() || _updaterError.length()) {
-        _setStatus(UPDATE_ERROR, _status.target);
         // Restore normal operation regardless of how the error arose.
         // Not clearing bESPactive here would permanently disable loopWifi().
         ::state.flash.bESPactive = false;
         // If we unmounted LittleFS in UPLOAD_FILE_START but never remounted it
         // (error/abort before or during flash), attempt recovery now so the web UI
         // remains functional without a reboot.
-        if (!LittleFSmounted && _status.target == "filesystem") {
+        if (!LittleFSmounted && _uploadTarget == "filesystem") {
           LittleFSmounted = LittleFS.begin();
-          if (!LittleFSmounted) {
-            LittleFS.format();
-            LittleFSmounted = LittleFS.begin();
-          }
         }
         _server->send(200, F("text/html"), String(F("Flash error: ")) + _updaterError);
       } else {
@@ -122,9 +116,6 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         if(!_authenticated){
           if (_serial_output)
             Debugln(F("Unauthenticated Update\n"));
-          _status.flash_written = 0;
-          _status.flash_total = 0;
-          _setStatus(UPDATE_ERROR, emptyString);
           return;
         }
 
@@ -145,12 +136,8 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
             uploadTotal = static_cast<size_t>(parsedSize);
           }
         }
-        _status.flash_total = uploadTotal;
-        _status.flash_written = 0;
-
-        _lastProgressPerc = 0;
-
         if (upload.name == F("filesystem")) {
+          _uploadTarget = "filesystem";
           size_t fsSize = ((size_t) &_FS_end - (size_t) &_FS_start);
           if (_serial_output) {
             Debugf(PSTR("[OTA] Target: filesystem (%u bytes)\r\n"), static_cast<unsigned>(fsSize));
@@ -159,27 +146,20 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           LittleFS.end();
           if (uploadTotal > 0 && uploadTotal > fsSize) {
             _updaterError = F("filesystem image too large");
-            _setStatus(UPDATE_ERROR, "filesystem");
           } else if (!Update.begin(fsSize, U_FS)){//always use full partition size to erase stale old-filesystem data in upper blocks
             if (_serial_output) Update.printError(OTGWSerial);
             _setUpdaterError();
-            _setStatus(UPDATE_ERROR, "filesystem");
-          } else {
-            _setStatus(UPDATE_START, "filesystem");
           }
         } else {
+          _uploadTarget = "firmware";
           uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
           if (_serial_output) {
             Debugf(PSTR("[OTA] Target: firmware (%u bytes)\r\n"), static_cast<unsigned>(maxSketchSpace));
           }
           if (uploadTotal > 0 && uploadTotal > maxSketchSpace) {
             _updaterError = F("firmware image too large");
-            _setStatus(UPDATE_ERROR, "firmware");
           } else if (!Update.begin(uploadTotal > 0 ? uploadTotal : maxSketchSpace, U_FLASH)){//start with max available size
             _setUpdaterError();
-            _setStatus(UPDATE_ERROR, "firmware");
-          } else {
-            _setStatus(UPDATE_START, "firmware");
           }
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
@@ -187,30 +167,13 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           blinkLEDnow(LED1);
         }
 
-        // Feed the dog on every chunk (Main branch behavior)
+        // Feed the dog on every chunk
         Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
-        
-        // Update flash progress counters (used for debug log output below)
-        if (_status.flash_total > 0) {
-           _status.flash_written = upload.totalSize; // approximation based on upload bytes received
-           int currentPerc = (_status.flash_written * 100) / _status.flash_total;
-           if (currentPerc != _lastProgressPerc) {
-             _lastProgressPerc = currentPerc;
-             if (_serial_output) {
-               Debugf(PSTR("[OTA] Write: %d%% (%u/%u bytes)\r\n"), currentPerc,
-                      static_cast<unsigned>(_status.flash_written),
-                      static_cast<unsigned>(_status.flash_total));
-             }
-             _setStatus(UPDATE_WRITE, _status.target);
-           }
-        }
-        
-        // Now perform the blocking flash write
+
         size_t written = Update.write(upload.buf, upload.currentSize);
 
         if (written != upload.currentSize) {
           _setUpdaterError();
-          _setStatus(UPDATE_ERROR, _status.target);
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
         if (_serial_output) {
@@ -218,25 +181,11 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         }
         bool updateOk = Update.end(true); //true to set the size to the current progress
         if(updateOk){
-          if (_status.flash_total == 0 && upload.totalSize > 0) {
-            _status.flash_total = upload.totalSize;
-          }
-          if (_status.flash_written < upload.totalSize) {
-            _status.flash_written = upload.totalSize;
-          }
-          _setStatus(UPDATE_END, _status.target);
           if (_serial_output) Debugf(PSTR("[OTA] End: success (%u bytes)\r\n"), upload.totalSize);
-          
-          if (_status.target == "filesystem") {
+
+          if (_uploadTarget == "filesystem") {
             // Mount filesystem, restore settings, then reboot (HTTP_POST handler below)
             LittleFSmounted = LittleFS.begin();
-            if (!LittleFSmounted) {
-              // Mount failed (e.g. partial write left stale metadata). Attempt a clean
-              // format so the device boots with defaults rather than staying unrecoverable.
-              if (_serial_output) Debugln(F("[OTA] LittleFS mount failed; formatting for recovery"));
-              LittleFS.format();
-              LittleFSmounted = LittleFS.begin();
-            }
             if (LittleFSmounted) {
               updateLittleFSStatus(F("/.ota_post"));
               if (_serial_output) Debugln(F("[OTA] Restoring settings to filesystem"));
@@ -246,10 +195,10 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
               settingsMarkClean();
             } else {
               LittleFSmounted = false;
-              if (_serial_output) Debugln(F("[OTA] Error: LittleFS mount failed even after format"));
+              if (_serial_output) Debugln(F("[OTA] Error: LittleFS mount failed"));
             }
           }
-          
+
           if (_serial_output) {
             DebugTln(F("[OTA] Preparing to reboot..."));
             DebugFlush();  // Ensure debug output is sent before reboot
@@ -259,18 +208,15 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           ::state.flash.bESPactive = false;
         } else {
           _setUpdaterError();
-          _setStatus(UPDATE_ERROR, _status.target);
-
           // Clear global flag - flash failed
           ::state.flash.bESPactive = false;
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_ABORTED){
         Update.end();
         if (_serial_output) Debugln(F("[OTA] Abort: update cancelled"));
-        _setStatus(UPDATE_ABORT, _status.target);
         ::state.flash.bESPactive = false;
         // LittleFS was unmounted at UPLOAD_FILE_START; HTTP_POST error handler
-        // will remount it (with format+recover if needed) when it runs next.
+        // will remount it if needed when it runs next.
       }
       delay(0);
     });
@@ -295,30 +241,6 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_setUpdaterError()
   StreamString str;
   Update.printError(str);
   _updaterError = str.c_str();
-}
-
-template <typename ServerType>
-void ESP8266HTTPUpdateServerTemplate<ServerType>::_resetStatus()
-{
-  _status.phase = UPDATE_IDLE;
-  _status.target = emptyString;
-  _status.flash_written = 0;
-  _status.flash_total = 0;
-}
-
-template <typename ServerType>
-void ESP8266HTTPUpdateServerTemplate<ServerType>::_setStatus(uint8_t phase, const String &target)
-{
-  _status.phase = static_cast<UpdatePhase>(phase);
-  _status.target = target;
-  if (_status.flash_total > 0 && _status.flash_written > _status.flash_total) {
-    if (_serial_output) {
-      Debugf(PSTR("[OTA] Warning: flash_written (%u) > flash_total (%u); clamping\r\n"),
-             static_cast<unsigned>(_status.flash_written),
-             static_cast<unsigned>(_status.flash_total));
-    }
-    _status.flash_written = _status.flash_total;
-  }
 }
 
 };

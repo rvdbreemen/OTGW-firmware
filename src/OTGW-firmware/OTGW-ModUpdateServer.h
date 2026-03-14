@@ -60,36 +60,17 @@ class ESP8266HTTPUpdateServerTemplate
 
   protected:
     void _setUpdaterError();
-    void _resetStatus();
-    void _setStatus(uint8_t phase, const String &target);
 
   private:
-    enum UpdatePhase : uint8_t {
-      UPDATE_IDLE = 0,
-      UPDATE_START,
-      UPDATE_WRITE,
-      UPDATE_END,
-      UPDATE_ERROR,
-      UPDATE_ABORT
-    };
-
-    struct UpdateStatus {
-      UpdatePhase phase;
-      String target;        // "filesystem" or "firmware" — checked in UPLOAD_FILE_END
-      size_t flash_written; // bytes written; clamped to flash_total in _setStatus()
-      size_t flash_total;   // declared upload size; used for progress logging
-    };
-
     bool _serial_output;
     ESP8266WebServerTemplate<ServerType> *_server;
     String _username;
     String _password;
     bool _authenticated;
     String _updaterError;
+    String _uploadTarget;   // "filesystem" or "firmware" — set in UPLOAD_FILE_START
     const char *_serverIndex;
     const char *_serverSuccess;
-    int _lastProgressPerc;
-    UpdateStatus _status;
 };
 
 };
