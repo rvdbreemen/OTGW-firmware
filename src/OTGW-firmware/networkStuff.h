@@ -84,21 +84,18 @@ extern ESP8266WebServer  httpServer;
 extern ESP8266HTTPUpdateServer httpUpdater;
 extern FSInfo            LittleFSinfo;
 extern bool              LittleFSmounted;
-extern bool              isConnected;
-
 #define WM_DEBUG_PORT TelnetStream
 
 //=====[ Forward declarations ]================================================
 
 void feedWatchDog();   // defined in OTGW-firmware.ino
 
-void startWiFi(const char* hostname, int timeOut);
+void startWiFi(const char* hostname, int timeOut, bool forcePortal = false);
 void resetWiFiSettings(void);
 void startTelnet();
 void startMDNS(const char *hostname);
 void startLLMNR(const char *hostname);
 void startNTP();
-void getNTPtime();
 void loopNTP();
 bool isNTPtimeSet();
 const char* getMacAddress();

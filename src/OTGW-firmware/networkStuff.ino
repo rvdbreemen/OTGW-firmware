@@ -24,7 +24,6 @@ ESP8266HTTPUpdateServer httpUpdater(true);
 
 FSInfo LittleFSinfo;
 bool   LittleFSmounted = false;
-bool   isConnected     = false;
 
 //=====[ WiFi ]================================================================
 
@@ -47,7 +46,7 @@ void resetWiFiSettings(void)
 }
 
 //===========================================================================================
-void startWiFi(const char* hostname, int timeOut)
+void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 {
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 
@@ -81,7 +80,12 @@ void startWiFi(const char* hostname, int timeOut)
   DebugTf(PSTR("Wifi AP stored: %s\r\n"), wifiSaved ? "Yes" : "No");
   DebugTf(PSTR("Config portal SSID: %s\r\n"), thisAP);
 
-  if (wifiConnected)
+  if (forcePortal)
+  {
+    DebugTln(F("Triple-reset detected, forcing WiFi config portal."));
+    wifiConnected = false;
+  }
+  else if (wifiConnected)
   {
     DebugTln(F("Wifi already connected, skipping connect."));
   }
@@ -199,20 +203,6 @@ void startNTP()
   NtpStatus = TIME_WAITFORSYNC;
 }
 
-void getNTPtime()
-{
-  struct timespec tp;
-  double tNow;
-  long dt_sec, dt_ms, dt_nsec;
-  clock_gettime(CLOCK_REALTIME, &tp);
-  tNow   = tp.tv_sec + (tp.tv_nsec / 1.0e9);
-  dt_sec = tp.tv_sec;
-  dt_ms  = tp.tv_nsec / 1000000UL;
-  dt_nsec = tp.tv_nsec;
-  DebugTf(PSTR("tNow=%20.10f tNow_sec=%16.10ld tNow_nsec=%16.10ld dt_sec=%16li(s) dt_msec=%16li(sm) dt_nsec=%16li(ns)\r\n"),
-          (double)tNow, tp.tv_sec, tp.tv_nsec, dt_sec, dt_ms, dt_nsec);
-  DebugFlush();
-}
 
 void loopNTP()
 {
