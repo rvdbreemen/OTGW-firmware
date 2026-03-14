@@ -189,6 +189,9 @@ void setup() {
   if (!LittleFSmounted) sendMQTTData(F("otgw-firmware/error"), "LittleFS mount failed - running on defaults", false);
   initS0Count();        // init S0 counter
   initSensors();        // init DS18B20 (after MQ is up!)
+  // Clear the triple-reset portal counter: a successful setup() proves the device is healthy.
+  // This prevents USB flash resets or stale RTC data from triggering the portal on next boot.
+  clearWifiPortalResetState();
   state.bSetupComplete = true; // ADR-036: allow doBackgroundTasks() to run service handlers
 }
 //=====================================================================
