@@ -61,10 +61,7 @@ class ESP8266HTTPUpdateServerTemplate
   protected:
     void _setUpdaterError();
     void _resetStatus();
-    void _setStatus(uint8_t phase, const String &target, size_t received, size_t total, const String &filename, const String &error);
-    void _sendStatusJson();
-    void _jsonEscape(const String &in, char *out, size_t outSize);
-    const char *_phaseToString(uint8_t phase);
+    void _setStatus(uint8_t phase, const String &target);
 
   private:
     enum UpdatePhase : uint8_t {
@@ -78,15 +75,9 @@ class ESP8266HTTPUpdateServerTemplate
 
     struct UpdateStatus {
       UpdatePhase phase;
-      String target;
-      size_t received;
-      size_t total;
-      size_t upload_received;
-      size_t upload_total;
-      size_t flash_written;
-      size_t flash_total;
-      String filename;
-      String error;
+      String target;        // "filesystem" or "firmware" — checked in UPLOAD_FILE_END
+      size_t flash_written; // bytes written; clamped to flash_total in _setStatus()
+      size_t flash_total;   // declared upload size; used for progress logging
     };
 
     bool _serial_output;
@@ -97,9 +88,6 @@ class ESP8266HTTPUpdateServerTemplate
     String _updaterError;
     const char *_serverIndex;
     const char *_serverSuccess;
-    size_t _lastFeedbackBytes;
-    unsigned long _lastFeedbackTime;
-    unsigned long _lastDogFeedTime;
     int _lastProgressPerc;
     UpdateStatus _status;
 };

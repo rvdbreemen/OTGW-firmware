@@ -22,6 +22,15 @@ static bool    settingsDirty = false;
 static uint8_t pendingSideEffects = 0;
 
 //=======================================================================
+// Clear the dirty flag and pending side-effects without writing or restarting services.
+// Call this after a direct writeSettings() to prevent the deferred-flush timer from
+// triggering unnecessary service restarts (e.g. during the OTA reboot window).
+void settingsMarkClean()
+{
+  settingsDirty = false;
+  pendingSideEffects = 0;
+}
+
 void flushSettings()
 {
   if (!settingsDirty) return;
