@@ -185,35 +185,6 @@ static const char UpdateServerIndex[] PROGMEM =
              });
          }
 
-         // Upload a blob to the device via XHR; returns a Promise
-         function xhrUpload(action, fieldName, blob, filename) {
-           return new Promise(function(resolve, reject) {
-             var fd = new FormData();
-             fd.append(fieldName, blob, filename);
-             var xhr = new XMLHttpRequest();
-             xhr.open('POST', action, true);
-             xhr.timeout = 300000;
-             xhr.upload.onprogress = function(ev) {
-               if (ev.lengthComputable) {
-                 var pct = Math.min(Math.round((ev.loaded / ev.total) * 100), 100);
-                 progressBar.style.width = pct + '%';
-                 progressText.textContent = 'Uploading: ' + pct + '% (' + formatBytes(ev.loaded) + ' / ' + formatBytes(ev.total) + ')';
-               }
-             };
-             xhr.onload = function() {
-               if (xhr.status >= 200 && xhr.status < 300 && (xhr.responseText || '').indexOf('Flash error') === -1) {
-                 progressBar.style.width = '100%';
-                 resolve();
-               } else {
-                 reject(new Error(xhr.responseText || 'HTTP ' + xhr.status));
-               }
-             };
-             xhr.ontimeout = function() { reject(new Error('Upload timeout')); };
-             xhr.onerror = function() { reject(new Error('Connection lost during upload')); };
-             xhr.send(fd);
-           });
-         }
-
          // Wait for the device to reboot and come back online.
          // onReady: optional callback called when device is healthy.
          //          If null/undefined, performs the default labels-restore + redirect to /.
@@ -423,112 +394,23 @@ static const char UpdateServerIndex[] PROGMEM =
      </script>
      </html>)";
 
-static const char UpdateServerSuccess[] PROGMEM = 
+static const char UpdateServerSuccess[] PROGMEM =
   R"SUCCESS(<html charset="UTF-8">
       <head>
-      <script>
-        (function() {
-          var css = "/index.css";
-          try {
-            var storedTheme = localStorage.getItem('theme');
-            if (storedTheme === 'dark') {
-              css = "/index_dark.css";
-              document.documentElement.className = 'dark';
-            }
-          } catch (e) { console.error(e); }
-          document.write('<link rel="stylesheet" type="text/css" href="' + css + '" id="theme-style">');
-        })();
-      </script>
-      <style type='text/css'>
-        body { font-family: sans-serif; }
-      </style>
+      <meta http-equiv="refresh" content="60;url=/">
+      <style type='text/css'>body { font-family: sans-serif; }</style>
       </head>
       <body>
       <h1>OTGW firmware Flash utility</h1>
-      <br/>
       <h2>Flashing successful!</h2>
-      %SETTINGS_MSG%
-      <br/>
-      <br/>Wait for the OTGW firmware to reboot and start the HTTP server
-      <br/>
-      <br/><span id="status" style="font-weight:bold; color: #666;">Waiting for device... (60s)</span>
-      <br/>
-      <br/>If nothing happens, refresh with <span style='font-size:1.3em;'><b><a href="/">this link here</a></b></span>.
-      </body>
+      <p>Device is rebooting. Redirecting in <span id="c">60</span> seconds.<br>
+      If nothing happens, <a href="/">click here</a>.</p>
       <script>
-         var remainingSeconds = 60;
-         var statusEl = document.getElementById("status");
-         
-         var poller = setInterval(function() {
-           remainingSeconds--;
-           
-           // Check health endpoint to verify device is fully booted
-           fetch('/api/v2/health?t=' + Date.now(), { 
-             method: 'GET', 
-             cache: 'no-store',
-             headers: { 'Accept': 'application/json' }
-           })
-             .then(function(res) {
-               if (res.ok) {
-                 return res.json();
-               }
-               throw new Error('HTTP ' + res.status);
-             })
-             .then(function(data) {
-               // Validate health response - simple object access
-               if (data && data.health && data.health.status === 'UP') {
-                 clearInterval(poller);
-                 statusEl.textContent = "Device is back online!";
-                 statusEl.style.color = "green";
-                 
-                 // Try to restore dallas labels from parent window cache
-                 var labelsRestored = Promise.resolve();
-                 try {
-                   if (window.opener && window.opener.dallasLabelsCache) {
-                     var labels = window.opener.dallasLabelsCache;
-                     if (labels && typeof labels === 'object' && Object.keys(labels).length > 0) {
-                       statusEl.textContent = "Restoring Dallas labels...";
-                       labelsRestored = fetch('/api/v2/sensors/labels', {
-                         method: 'POST',
-                         headers: { 'Content-Type': 'application/json' },
-                         body: JSON.stringify(labels)
-                       })
-                       .then(function(res) {
-                         if (res.ok) {
-                           console.log('[OTA] Dallas labels restored');
-                         }
-                       })
-                       .catch(function(err) {
-                         console.error('[OTA] Label restore error:', err);
-                       });
-                     }
-                   }
-                 } catch(e) {}
-                 
-                 labelsRestored.then(function() {
-                   statusEl.textContent = "Redirecting...";
-                   setTimeout(function() {
-                     window.location.href = "/";
-                   }, 1000);
-                 });
-               }
-             })
-             .catch(function(e) {
-               // Ignore - device still rebooting
-             });
-           
-           if (remainingSeconds <= 0) {
-             clearInterval(poller);
-             statusEl.textContent = "Redirecting...";
-             window.location.href = "/";
-             return;
-           }
-           
-           statusEl.textContent = "Waiting for device... (" + remainingSeconds + "s)";
-           statusEl.style.color = "#666";
-         }, 1000);
-    </script>
-    </html>)SUCCESS";
+        var c = 60, el = document.getElementById('c');
+        setInterval(function() { if (--c <= 0) { window.location.href='/'; } else { el.textContent = c; } }, 1000);
+      </script>
+      </body>
+      </html>)SUCCESS";
      
 
 #endif // UPDATESERVERHTML_H

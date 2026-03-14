@@ -1,10 +1,10 @@
 /*
-***************************************************************************  
+***************************************************************************
 **  Program  : OTGW-MonUpdateServer.h
 **  Modified to work with OTGW Nodoshop Hardware Watchdog
-** 
-**  This is the ESP8266HTTPUpdateServer.h file 
-**  Created and modified by Ivan Grokhotkov, Miguel Angel Ajo, Earle Philhower and many others 
+**
+**  This is the ESP8266HTTPUpdateServer.h file
+**  Created and modified by Ivan Grokhotkov, Miguel Angel Ajo, Earle Philhower and many others
 **  see: https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266HTTPUpdateServer
 **
 **  ... and then modified by Willem Aandewiel
@@ -54,54 +54,23 @@ class ESP8266HTTPUpdateServerTemplate
       _username = username;
       _password = password;
     }
-    
+
     void setIndexPage(const char *indexPage);
     void setSuccessPage(const char *succesPage);
 
   protected:
     void _setUpdaterError();
-    void _resetStatus();
-    void _setStatus(uint8_t phase, const String &target, size_t received, size_t total, const String &filename, const String &error);
-    void _sendStatusJson();
-    void _jsonEscape(const String &in, char *out, size_t outSize);
-    const char *_phaseToString(uint8_t phase);
 
   private:
-    enum UpdatePhase : uint8_t {
-      UPDATE_IDLE = 0,
-      UPDATE_START,
-      UPDATE_WRITE,
-      UPDATE_END,
-      UPDATE_ERROR,
-      UPDATE_ABORT
-    };
-
-    struct UpdateStatus {
-      UpdatePhase phase;
-      String target;
-      size_t received;
-      size_t total;
-      size_t upload_received;
-      size_t upload_total;
-      size_t flash_written;
-      size_t flash_total;
-      String filename;
-      String error;
-    };
-
     bool _serial_output;
     ESP8266WebServerTemplate<ServerType> *_server;
     String _username;
     String _password;
     bool _authenticated;
     String _updaterError;
+    String _target;          // "filesystem" or "firmware"
     const char *_serverIndex;
     const char *_serverSuccess;
-    size_t _lastFeedbackBytes;
-    unsigned long _lastFeedbackTime;
-    unsigned long _lastDogFeedTime;
-    int _lastProgressPerc;
-    UpdateStatus _status;
 };
 
 };
