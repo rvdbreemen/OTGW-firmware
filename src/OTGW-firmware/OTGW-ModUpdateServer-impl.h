@@ -175,7 +175,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           if (uploadTotal > 0 && uploadTotal > fsSize) {
             _updaterError = F("filesystem image too large");
             _setStatus(UPDATE_ERROR, "filesystem", 0, uploadTotal, upload.filename, _updaterError);
-          } else if (!Update.begin(fsSize, U_FS)){//always use full partition size to erase stale old-filesystem data in upper blocks
+          } else if (!Update.begin(uploadTotal > 0 ? uploadTotal : fsSize, U_FS)){//start with upload size; upper sectors cleaned in UPLOAD_FILE_END
             if (_serial_output) Update.printError(OTGWSerial);
             _setUpdaterError();
             _setStatus(UPDATE_ERROR, "filesystem", 0, uploadTotal, upload.filename, _updaterError);
@@ -249,6 +249,38 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           if (_serial_output) Debugf(PSTR("[OTA] End: success (%u bytes)\r\n"), upload.totalSize);
           
           if (_status.target == "filesystem") {
+            // Erase sectors above the uploaded image to eliminate stale old-filesystem
+            // metadata in the upper LittleFS blocks.  The ESP8266 Updater only erases
+            // sectors JIT during write(), so sectors above upload.totalSize still contain
+            // data from the previous filesystem.  LittleFS mounts with block_count derived
+            // from the full partition size and will scan every block; encountering mixed
+            // new+old metadata triggers blocking LittleFS traversals that exceed the
+            // Software WDT timeout, causing a ctx:cont crash and endless reboot loop.
+            //
+            // Feed both the HW watchdog (I2C at 0x26) and SW WDT (via Wire.endTransmission
+            // which calls yield()) between each 4 KB sector erase to prevent WD resets
+            // during what can be a 100–200 ms total erase window.
+            if (upload.totalSize > 0) {
+              const size_t curFsSize = ((size_t)&_FS_end - (size_t)&_FS_start);
+              const uint32_t fsFirstSector = ((uint32_t)(&_FS_start) - 0x40200000U) / 4096U;
+              const size_t uploadedSectors = (upload.totalSize + 4095U) / 4096U;
+              const size_t totalSectors    = curFsSize / 4096U;
+              if (uploadedSectors < totalSectors) {
+                if (_serial_output)
+                  Debugf(PSTR("[OTA] Erasing %u stale upper sector(s) (blocks %u–%u)\r\n"),
+                         (unsigned)(totalSectors - uploadedSectors),
+                         (unsigned)uploadedSectors,
+                         (unsigned)(totalSectors - 1U));
+                for (size_t s = uploadedSectors; s < totalSectors; s++) {
+                  ESP.flashEraseSector(fsFirstSector + s);
+                  // Feed HW watchdog (I2C device at 0x26) and reset SW WDT via yield()
+                  Wire.beginTransmission(EXT_WD_I2C_ADDRESS);
+                  Wire.write(0xA5);
+                  Wire.endTransmission();  // Wire I2C calls yield() internally
+                }
+              }
+            }
+
             // Mount filesystem, restore settings, then reboot (HTTP_POST handler below)
             LittleFSmounted = LittleFS.begin();
             if (LittleFSmounted) {
