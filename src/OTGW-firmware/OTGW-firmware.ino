@@ -149,7 +149,8 @@ void setup() {
   startNTP();
 
   //start with setting wifi hostname
-  startWiFi(CSTR(settings.sHostname), 240);  // timeout 240 seconds
+  bool forceWifiPortal = shouldForceWifiConfigPortal();
+  startWiFi(CSTR(settings.sHostname), 240, forceWifiPortal);  // timeout 240 seconds
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
 
@@ -214,7 +215,6 @@ void loopWifi() {
     case WIFI_IDLE:
       if (WiFi.status() != WL_CONNECTED) {
         DebugTln(F("WiFi: connection lost, starting non-blocking reconnect"));
-        isConnected = false;
         wifiRetryCount = 0;
         wifiState = WIFI_DISCONNECTED;
       }
@@ -243,7 +243,6 @@ void loopWifi() {
       break;
 
     case WIFI_RECONNECTED:
-      isConnected = true;
       startTelnet();
       startOTGWstream();
       startMQTT();
