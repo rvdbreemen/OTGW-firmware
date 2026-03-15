@@ -100,9 +100,16 @@ void sendLogToWebSocket(const char* logMessage);
 
 // Forward declarations for functions defined in later .ino files
 // (Arduino auto-prototype generation can fail for these)
+enum class GPIOConflictCaller : uint8_t {
+  Sensor,
+  S0,
+  Output,
+};
+
 void readSettings(bool show);
 void writeSettings(bool show);
 void updateSetting(const char *field, const char *newValue);
+bool checkGPIOConflict(int pin, GPIOConflictCaller caller);
 void escapeJsonStringTo(const char* src, char* dest, size_t destSize);
 void GetVersion(const char* hexfile, char* version, size_t destSize);
 void startWebSocket();
