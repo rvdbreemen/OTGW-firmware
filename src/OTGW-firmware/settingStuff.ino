@@ -60,21 +60,21 @@ void flushSettings()
 // GPIO conflict detection (Finding #27)
 // Returns true if the requested pin is already used by another feature.
 // 'caller' identifies which feature is requesting the pin (e.g. "sensor", "s0", "output")
-bool checkGPIOConflict(int pin, PGM_P caller)
+bool checkGPIOConflict(int pin, GPIOConflictCaller caller)
 {
   if (pin < 0) return false; // disabled / not set
 
   bool conflict = false;
   // Check against each configurable GPIO (excluding 'caller' itself)
-  if (strcasecmp_P(caller, PSTR("sensor")) != 0 && pin == settings.sensors.iPin && settings.sensors.iPin >= 0) {
+  if (caller != GPIOConflictCaller::Sensor && pin == settings.sensors.iPin && settings.sensors.iPin >= 0) {
     DebugTf(PSTR("GPIO conflict: pin %d already used by SENSORS\r\n"), pin);
     conflict = true;
   }
-  if (strcasecmp_P(caller, PSTR("s0")) != 0 && pin == settings.s0.iPin && settings.s0.iPin >= 0) {
+  if (caller != GPIOConflictCaller::S0 && pin == settings.s0.iPin && settings.s0.iPin >= 0) {
     DebugTf(PSTR("GPIO conflict: pin %d already used by S0 Counter\r\n"), pin);
     conflict = true;
   }
-  if (strcasecmp_P(caller, PSTR("output")) != 0 && pin == settings.outputs.iPin && settings.outputs.iPin >= 0) {
+  if (caller != GPIOConflictCaller::Output && pin == settings.outputs.iPin && settings.outputs.iPin >= 0) {
     DebugTf(PSTR("GPIO conflict: pin %d already used by GPIO OUTPUTS\r\n"), pin);
     conflict = true;
   }
@@ -495,7 +495,7 @@ void updateSetting(const char *field, const char *newValue)
     int newPin = atoi(newValue);
     if (newPin < 0 || newPin > 16) { DebugTf(PSTR("WARNING: GPIOSENSORSpin %d out of range 0-16, ignored\r\n"), newPin); }
     else {
-      if (checkGPIOConflict(newPin, PSTR("sensor"))) {
+      if (checkGPIOConflict(newPin, GPIOConflictCaller::Sensor)) {
         DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
       }
       settings.sensors.iPin = newPin;
@@ -519,7 +519,7 @@ void updateSetting(const char *field, const char *newValue)
     int newPin = atoi(newValue);
     if (newPin < 0 || newPin > 16) { DebugTf(PSTR("WARNING: S0COUNTERpin %d out of range 0-16, ignored\r\n"), newPin); }
     else {
-      if (checkGPIOConflict(newPin, PSTR("s0"))) {
+      if (checkGPIOConflict(newPin, GPIOConflictCaller::S0)) {
         DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
       }
       settings.s0.iPin = newPin;
@@ -548,7 +548,7 @@ void updateSetting(const char *field, const char *newValue)
     int newPin = atoi(newValue);
     if (newPin < 0 || newPin > 16) { DebugTf(PSTR("WARNING: GPIOOUTPUTSpin %d out of range 0-16, ignored\r\n"), newPin); }
     else {
-      if (checkGPIOConflict(newPin, PSTR("output"))) {
+      if (checkGPIOConflict(newPin, GPIOConflictCaller::Output)) {
         DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
       }
       settings.outputs.iPin = newPin;
