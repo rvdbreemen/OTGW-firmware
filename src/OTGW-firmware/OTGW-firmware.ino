@@ -434,6 +434,23 @@ void do5minevent(){
   sendMQTTstateinformation();
 }
 
+static void handleEspFlashBackgroundTasks()
+{
+  handleDebug();              // Keep telnet debug active for monitoring
+  httpServer.handleClient();  // MUST continue - processes upload chunks
+  MDNS.update();              // Keep MDNS active for network discovery
+  handleWebSocket();          // Keep WebSocket service responsive during flash
+}
+
+static void handlePicFlashBackgroundTasks()
+{
+  handleDebug();              // Keep telnet debug active for monitoring
+  httpServer.handleClient();  // Keep HTTP active
+  MDNS.update();              // Keep MDNS active for network discovery
+  handleOTGW();               // REQUIRED for PIC flash - processes serial communication
+  handleWebSocket();          // Keep WebSocket service responsive during flash
+}
+
 //===[ Do the background tasks ]===
 void doBackgroundTasks()
 {
@@ -459,22 +476,10 @@ void doBackgroundTasks()
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    // During firmware flash, keep essential services but skip heavy background tasks
-    // ESP flash: Skip MQTT, OTGW, NTP to reduce interference
-    // PIC flash: Skip MQTT, NTP but KEEP OTGW (needed for serial communication during upgrade)
     if (state.flash.bESPactive) {
-      // ESP flash: minimal services only
-      handleDebug();              // Keep telnet debug active for monitoring
-      httpServer.handleClient();  // MUST continue - processes upload chunks
-      MDNS.update();              // Keep MDNS active for network discovery
-      handleWebSocket();          // Process WebSocket events for flash progress updates
+      handleEspFlashBackgroundTasks();
     } else if (state.flash.bPICactive) {
-      // PIC flash: same as ESP but MUST call handleOTGW for serial communication
-      handleDebug();              // Keep telnet debug active for monitoring
-      httpServer.handleClient();  // Keep HTTP active
-      MDNS.update();              // Keep MDNS active for network discovery
-      handleOTGW();               // REQUIRED for PIC flash - processes serial communication
-      handleWebSocket();          // Process WebSocket events for flash progress updates
+      handlePicFlashBackgroundTasks();
     } else {
       //while connected handle everything that uses network stuff
       handleDebug();

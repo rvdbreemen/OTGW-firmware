@@ -57,10 +57,7 @@ ESP8266HTTPUpdateServerTemplate<ServerType>::ESP8266HTTPUpdateServerTemplate(boo
   _username = emptyString;
   _password = emptyString;
   _authenticated = false;
-  _uploadTarget = emptyString;
-  _uploadExpectedBytes = 0;
-  _uploadWrittenBytes = 0;
-  _uploadBlockIndex = 0;
+  _resetUploadTracking();
 }
 
 template <typename ServerType>
@@ -69,7 +66,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
     _server = server;
     _username = username;
     _password = password;
-    _uploadTarget = emptyString;
+  _resetUploadTracking();
 
     // handler for the /update form page
     _server->on(path.c_str(), HTTP_GET, [&](){
@@ -113,177 +110,219 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
       HTTPUpload& upload = _server->upload();
 
       if(upload.status == UPLOAD_FILE_START){
-        _updaterError.clear();
-        _uploadExpectedBytes = 0;
-        _uploadWrittenBytes = 0;
-        _uploadBlockIndex = 0;
-
-        _authenticated = (_username == emptyString || _password == emptyString || _server->authenticate(_username.c_str(), _password.c_str()));
-        if(!_authenticated){
-          if (_serial_output)
-            DebugTln(F("Unauthenticated Update"));
-          return;
-        }
-
-        if (_serial_output) {
-          DebugTf(PSTR("[OTA] Flash start: %s (size: %s)\r\n"), upload.filename.c_str(), _server->arg("size").c_str());
-        }
-
-        // Set global flag to disable background tasks during ESP flash
-        ::state.flash.bESPactive = true;
-        
-        WiFiUDP::stopAll();
-
-        size_t uploadTotal = 0;
-        String sizeArg = _server->arg("size");
-        if (sizeArg.length()) {
-          long parsedSize = sizeArg.toInt();
-          if (parsedSize > 0) {
-            uploadTotal = static_cast<size_t>(parsedSize);
-          }
-        }
-        _uploadExpectedBytes = uploadTotal;
-        if (upload.name == F("filesystem")) {
-          _uploadTarget = "filesystem";
-          size_t fsSize = ((size_t) &_FS_end - (size_t) &_FS_start);
-          if (_serial_output) {
-            DebugTf(PSTR("[OTA] Target: filesystem (%u bytes)\r\n"), static_cast<unsigned>(fsSize));
-            DebugTf(PSTR("[OTA] XHR upload start: target=filesystem file=%s expected=%u bytes\r\n"),
-                   upload.filename.c_str(),
-                   static_cast<unsigned>(_uploadExpectedBytes));
-          }
-          close_all_fs();
-          LittleFS.end();
-          if (uploadTotal > 0 && uploadTotal > fsSize) {
-            _updaterError = F("filesystem image too large");
-          } else if (!Update.begin(fsSize, U_FS)){//always use full partition size to erase stale old-filesystem data in upper blocks
-            if (_serial_output) Update.printError(OTGWSerial);
-            _setUpdaterError();
-          }
-        } else {
-          _uploadTarget = "firmware";
-          uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-          if (_serial_output) {
-            DebugTf(PSTR("[OTA] Target: firmware (%u bytes)\r\n"), static_cast<unsigned>(maxSketchSpace));
-            DebugTf(PSTR("[OTA] XHR upload start: target=firmware file=%s expected=%u bytes\r\n"),
-                   upload.filename.c_str(),
-                   static_cast<unsigned>(_uploadExpectedBytes));
-          }
-          if (uploadTotal > 0 && uploadTotal > maxSketchSpace) {
-            _updaterError = F("firmware image too large");
-          } else if (!Update.begin(uploadTotal > 0 ? uploadTotal : maxSketchSpace, U_FLASH)){//start with max available size
-            _setUpdaterError();
-          }
-        }
+        _handleUploadStart(upload);
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
-        if (_serial_output) {
-          blinkLEDnow(LED1);
-        }
-
-        // Feed the dog on every chunk
-        Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
-
-        size_t written = Update.write(upload.buf, upload.currentSize);
-
-        if (written != upload.currentSize) {
-          _setUpdaterError();
-        } else {
-          _uploadBlockIndex++;
-          _uploadWrittenBytes += written;
-
-          if (_serial_output) {
-            if (_uploadExpectedBytes > 0) {
-              unsigned long pct = static_cast<unsigned long>((_uploadWrittenBytes * 100UL) / _uploadExpectedBytes);
-              if (pct > 100UL) pct = 100UL;
-              DebugTf(PSTR("[OTA] XHR upload progress: target=%s block=%lu chunk=%u total=%u/%u (%lu%%)\r\n"),
-                     _uploadTarget.c_str(),
-                     static_cast<unsigned long>(_uploadBlockIndex),
-                     static_cast<unsigned>(written),
-                     static_cast<unsigned>(_uploadWrittenBytes),
-                     static_cast<unsigned>(_uploadExpectedBytes),
-                     pct);
-            } else {
-              DebugTf(PSTR("[OTA] XHR upload progress: target=%s block=%lu chunk=%u total=%u bytes\r\n"),
-                     _uploadTarget.c_str(),
-                     static_cast<unsigned long>(_uploadBlockIndex),
-                     static_cast<unsigned>(written),
-                     static_cast<unsigned>(_uploadWrittenBytes));
-            }
-            DebugFlush();
-          }
-        }
+        _handleUploadWrite(upload);
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
-        if (_serial_output) {
-          if (_uploadExpectedBytes > 0) {
-            DebugTf(PSTR("[OTA] XHR upload complete: target=%s file=%s received=%u/%u bytes in %lu block(s)\r\n"),
-                   _uploadTarget.c_str(),
-                   upload.filename.c_str(),
-                   static_cast<unsigned>(_uploadWrittenBytes),
-                   static_cast<unsigned>(_uploadExpectedBytes),
-                   static_cast<unsigned long>(_uploadBlockIndex));
-          } else {
-            DebugTf(PSTR("[OTA] XHR upload complete: target=%s file=%s received=%u bytes in %lu block(s)\r\n"),
-                   _uploadTarget.c_str(),
-                   upload.filename.c_str(),
-                   static_cast<unsigned>(_uploadWrittenBytes),
-                   static_cast<unsigned long>(_uploadBlockIndex));
-          }
-          DebugTln(F("[OTA] End: finalizing flash..."));
-        }
-        bool updateOk = Update.end(true); //true to set the size to the current progress
-        if(updateOk){
-          if (_serial_output) DebugTf(PSTR("[OTA] End: success (%u bytes)\r\n"), upload.totalSize);
-
-          if (_uploadTarget == "filesystem") {
-            // Mount filesystem, restore settings, then reboot (HTTP_POST handler below)
-            LittleFSmounted = LittleFS.begin();
-            if (LittleFSmounted) {
-              updateLittleFSStatus(F("/.ota_post"));
-              if (_serial_output) DebugTln(F("[OTA] Restoring settings to filesystem"));
-              writeSettings(false);  // show=false: TelnetStream not connected during OTA
-              // Clear the deferred-flush dirty flag so the 2-second timer does not trigger
-              // MQTT/NTP/MDNS service restarts during the 1-second window before reboot.
-              settingsMarkClean();
-            } else {
-              LittleFSmounted = false;
-              if (_serial_output) DebugTln(F("[OTA] Error: LittleFS mount failed"));
-            }
-          }
-
-          if (_serial_output) {
-            DebugTln(F("[OTA] Preparing to reboot..."));
-            DebugFlush();  // Ensure debug output is sent before reboot
-          }
-
-          // Clear global flag - flash completed successfully
-          ::state.flash.bESPactive = false;
-        } else {
-          _setUpdaterError();
-          // Clear global flag - flash failed
-          ::state.flash.bESPactive = false;
-        }
-        _uploadExpectedBytes = 0;
-        _uploadWrittenBytes = 0;
-        _uploadBlockIndex = 0;
+        _handleUploadEnd(upload);
       } else if(_authenticated && upload.status == UPLOAD_FILE_ABORTED){
-        Update.end();
-        if (_serial_output) {
-          DebugTf(PSTR("[OTA] XHR upload aborted: target=%s file=%s after %u bytes in %lu block(s)\r\n"),
-                 _uploadTarget.c_str(),
-                 upload.filename.c_str(),
-                 static_cast<unsigned>(_uploadWrittenBytes),
-                 static_cast<unsigned long>(_uploadBlockIndex));
-          DebugTln(F("[OTA] Abort: update cancelled"));
-        }
-        ::state.flash.bESPactive = false;
-        _uploadExpectedBytes = 0;
-        _uploadWrittenBytes = 0;
-        _uploadBlockIndex = 0;
-        // LittleFS was unmounted at UPLOAD_FILE_START; HTTP_POST error handler
-        // will remount it if needed when it runs next.
+        _handleUploadAbort(upload);
       }
       delay(0);
     });
+}
+
+template <typename ServerType>
+void ESP8266HTTPUpdateServerTemplate<ServerType>::_resetUploadTracking()
+{
+  _uploadTarget = emptyString;
+  _uploadExpectedBytes = 0;
+  _uploadWrittenBytes = 0;
+  _uploadBlockIndex = 0;
+}
+
+template <typename ServerType>
+size_t ESP8266HTTPUpdateServerTemplate<ServerType>::_parseUploadTotalSize() const
+{
+  size_t uploadTotal = 0;
+  String sizeArg = _server->arg("size");
+  if (sizeArg.length()) {
+    long parsedSize = sizeArg.toInt();
+    if (parsedSize > 0) {
+      uploadTotal = static_cast<size_t>(parsedSize);
+    }
+  }
+  return uploadTotal;
+}
+
+template <typename ServerType>
+void ESP8266HTTPUpdateServerTemplate<ServerType>::_beginFilesystemUpload(HTTPUpload& upload, size_t uploadTotal)
+{
+  _uploadTarget = "filesystem";
+  size_t fsSize = ((size_t) &_FS_end - (size_t) &_FS_start);
+  if (_serial_output) {
+    DebugTf(PSTR("[OTA] Target: filesystem (%u bytes)\r\n"), static_cast<unsigned>(fsSize));
+    DebugTf(PSTR("[OTA] XHR upload start: target=filesystem file=%s expected=%u bytes\r\n"),
+           upload.filename.c_str(),
+           static_cast<unsigned>(_uploadExpectedBytes));
+  }
+  close_all_fs();
+  LittleFS.end();
+  if (uploadTotal > 0 && uploadTotal > fsSize) {
+    _updaterError = F("filesystem image too large");
+  } else if (!Update.begin(fsSize, U_FS)) { // always use full partition size to erase stale upper-block data
+    if (_serial_output) Update.printError(OTGWSerial);
+    _setUpdaterError();
+  }
+}
+
+template <typename ServerType>
+void ESP8266HTTPUpdateServerTemplate<ServerType>::_beginFirmwareUpload(HTTPUpload& upload, size_t uploadTotal)
+{
+  _uploadTarget = "firmware";
+  uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+  if (_serial_output) {
+    DebugTf(PSTR("[OTA] Target: firmware (%u bytes)\r\n"), static_cast<unsigned>(maxSketchSpace));
+    DebugTf(PSTR("[OTA] XHR upload start: target=firmware file=%s expected=%u bytes\r\n"),
+           upload.filename.c_str(),
+           static_cast<unsigned>(_uploadExpectedBytes));
+  }
+  if (uploadTotal > 0 && uploadTotal > maxSketchSpace) {
+    _updaterError = F("firmware image too large");
+  } else if (!Update.begin(uploadTotal > 0 ? uploadTotal : maxSketchSpace, U_FLASH)) { // start with max available size
+    _setUpdaterError();
+  }
+}
+
+template <typename ServerType>
+void ESP8266HTTPUpdateServerTemplate<ServerType>::_handleUploadStart(HTTPUpload& upload)
+{
+  _updaterError.clear();
+  _resetUploadTracking();
+
+  _authenticated = (_username == emptyString || _password == emptyString || _server->authenticate(_username.c_str(), _password.c_str()));
+  if(!_authenticated){
+    if (_serial_output)
+      DebugTln(F("Unauthenticated Update"));
+    return;
+  }
+
+  if (_serial_output) {
+    DebugTf(PSTR("[OTA] Flash start: %s (size: %s)\r\n"), upload.filename.c_str(), _server->arg("size").c_str());
+  }
+
+  ::state.flash.bESPactive = true;
+  WiFiUDP::stopAll();
+
+  size_t uploadTotal = _parseUploadTotalSize();
+  _uploadExpectedBytes = uploadTotal;
+
+  if (upload.name == F("filesystem")) {
+    _beginFilesystemUpload(upload, uploadTotal);
+  } else {
+    _beginFirmwareUpload(upload, uploadTotal);
+  }
+}
+
+template <typename ServerType>
+void ESP8266HTTPUpdateServerTemplate<ServerType>::_handleUploadWrite(HTTPUpload& upload)
+{
+  if (_serial_output) {
+    blinkLEDnow(LED1);
+  }
+
+  Wire.beginTransmission(0x26);   Wire.write(0xA5);   Wire.endTransmission();
+
+  size_t written = Update.write(upload.buf, upload.currentSize);
+
+  if (written != upload.currentSize) {
+    _setUpdaterError();
+    return;
+  }
+
+  _uploadBlockIndex++;
+  _uploadWrittenBytes += written;
+
+  if (_serial_output) {
+    if (_uploadExpectedBytes > 0) {
+      unsigned long pct = static_cast<unsigned long>((_uploadWrittenBytes * 100UL) / _uploadExpectedBytes);
+      if (pct > 100UL) pct = 100UL;
+      DebugTf(PSTR("[OTA] XHR upload progress: target=%s block=%lu chunk=%u total=%u/%u (%lu%%)\r\n"),
+             _uploadTarget.c_str(),
+             static_cast<unsigned long>(_uploadBlockIndex),
+             static_cast<unsigned>(written),
+             static_cast<unsigned>(_uploadWrittenBytes),
+             static_cast<unsigned>(_uploadExpectedBytes),
+             pct);
+    } else {
+      DebugTf(PSTR("[OTA] XHR upload progress: target=%s block=%lu chunk=%u total=%u bytes\r\n"),
+             _uploadTarget.c_str(),
+             static_cast<unsigned long>(_uploadBlockIndex),
+             static_cast<unsigned>(written),
+             static_cast<unsigned>(_uploadWrittenBytes));
+    }
+    DebugFlush();
+  }
+}
+
+template <typename ServerType>
+void ESP8266HTTPUpdateServerTemplate<ServerType>::_handleUploadEnd(HTTPUpload& upload)
+{
+  if (_serial_output) {
+    if (_uploadExpectedBytes > 0) {
+      DebugTf(PSTR("[OTA] XHR upload complete: target=%s file=%s received=%u/%u bytes in %lu block(s)\r\n"),
+             _uploadTarget.c_str(),
+             upload.filename.c_str(),
+             static_cast<unsigned>(_uploadWrittenBytes),
+             static_cast<unsigned>(_uploadExpectedBytes),
+             static_cast<unsigned long>(_uploadBlockIndex));
+    } else {
+      DebugTf(PSTR("[OTA] XHR upload complete: target=%s file=%s received=%u bytes in %lu block(s)\r\n"),
+             _uploadTarget.c_str(),
+             upload.filename.c_str(),
+             static_cast<unsigned>(_uploadWrittenBytes),
+             static_cast<unsigned long>(_uploadBlockIndex));
+    }
+    DebugTln(F("[OTA] End: finalizing flash..."));
+  }
+
+  bool updateOk = Update.end(true);
+  if(updateOk){
+    if (_serial_output) DebugTf(PSTR("[OTA] End: success (%u bytes)\r\n"), upload.totalSize);
+
+    if (_uploadTarget == "filesystem") {
+      LittleFSmounted = LittleFS.begin();
+      if (LittleFSmounted) {
+        updateLittleFSStatus(F("/.ota_post"));
+        if (_serial_output) DebugTln(F("[OTA] Restoring settings to filesystem"));
+        writeSettings(false);
+        settingsMarkClean();
+      } else {
+        LittleFSmounted = false;
+        if (_serial_output) DebugTln(F("[OTA] Error: LittleFS mount failed"));
+      }
+    }
+
+    if (_serial_output) {
+      DebugTln(F("[OTA] Preparing to reboot..."));
+      DebugFlush();
+    }
+
+    ::state.flash.bESPactive = false;
+  } else {
+    _setUpdaterError();
+    ::state.flash.bESPactive = false;
+  }
+
+  _resetUploadTracking();
+}
+
+template <typename ServerType>
+void ESP8266HTTPUpdateServerTemplate<ServerType>::_handleUploadAbort(HTTPUpload& upload)
+{
+  Update.end();
+  if (_serial_output) {
+    DebugTf(PSTR("[OTA] XHR upload aborted: target=%s file=%s after %u bytes in %lu block(s)\r\n"),
+           _uploadTarget.c_str(),
+           upload.filename.c_str(),
+           static_cast<unsigned>(_uploadWrittenBytes),
+           static_cast<unsigned long>(_uploadBlockIndex));
+    DebugTln(F("[OTA] Abort: update cancelled"));
+  }
+  ::state.flash.bESPactive = false;
+  _resetUploadTracking();
+  // LittleFS was unmounted at UPLOAD_FILE_START; HTTP_POST error handler
+  // will remount it if needed when it runs next.
 }
 
 template <typename ServerType>
