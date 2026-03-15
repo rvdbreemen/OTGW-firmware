@@ -14,6 +14,7 @@ v1.3.0 builds on v1.2.0 with focused reliability, usability, and memory improvem
 - Configurable MQTT publishing interval to reduce broker load.
 - Triple-reset WiFi recovery.
 - One-shot OTGW PIC commands from the web UI.
+- Safer OTA and LittleFS flashing with browser-side backup support, health-check reboot verification, and better updater diagnostics.
 - Full PS=1 summary parsing with MQTT/HA discovery.
 - OTGW events reported via MQTT and WebSocket.
 - Heap status included directly in device info.
@@ -27,6 +28,12 @@ v1.3.0 builds on v1.2.0 with focused reliability, usability, and memory improvem
 - String heap fragmentation eliminated from the settings save path.
 - ArduinoJson library fully removed in favor of a custom JSON writer.
 - REST API v2 migration officially completed for the OTA updater.
+
+**Firmware update / OTA:**
+- OTA updater now uses `/api/v2/health` consistently to verify that the device is fully back online after reboot.
+- Filesystem flashes can optionally download browser backups of `settings.ini` and `dallas_labels.ini` before erase/write.
+- OTA upload start, per-chunk progress, completion, and abort are now logged through telnet debug output.
+- LittleFS OTA corruption regression fixed by suppressing WiFi reconnect activity during flash and erasing the full filesystem partition before write.
 
 ---
 
@@ -61,6 +68,15 @@ v1.3.0 fully parses all PS=1 summary fields and:
 ### 🧠 Heap Status in Device Info
 Free heap, max contiguous block size, and heap health level are now included in GET /api/v2/device/info. These values are also surfaced on the firmware flash utility page to help diagnose low-memory conditions before flashing.
 
+### 🔄 OTA / LittleFS Flashing Hardening
+The firmware update flow received a substantial reliability pass after v1.2.0:
+
+- The Web UI firmware updater now relies on `/api/v2/health` for reboot verification and status validation.
+- Before a LittleFS flash, the browser can download backup copies of `settings.ini` and `dallas_labels.ini`.
+- After a successful filesystem flash, the firmware remounts LittleFS, rewrites settings to the fresh filesystem, clears deferred side effects with `settingsMarkClean()`, and then reboots cleanly.
+- Dallas labels cached in the browser are restored through `POST /api/v2/sensors/labels` once the health check reports the device as `UP`.
+- OTA XHR uploads now emit detailed telnet-debug messages for start, progress, completion, and abort, including byte counts and block counts.
+
 ---
 
 ## Bug Fixes
@@ -74,6 +90,12 @@ The hostname formatting fix inadvertently stripped periods from the wrong buffer
 ### Webhook Payload Truncation on Settings Load
 The settings loader payload buffer was previously constrained. It has been widened to ensure long webhook payloads load cleanly without trailing character amputation upon reboot.
 
+### OTA Filesystem Corruption During Flash
+Two OTA-specific issues that could damage a filesystem flash were fixed:
+
+- WiFi reconnect handling is now suppressed while an ESP flash is in progress, preventing reconnect side effects from tearing down the HTTP upload mid-write.
+- LittleFS OTA flashes now erase the full filesystem partition size instead of only the uploaded image size, avoiding stale metadata in untouched upper blocks.
+
 ---
 
 ## Memory and Performance Improvements
@@ -83,6 +105,9 @@ Removed heavy String logic from writeSettings(). Each call historically dropped 
 
 ### REST API v2 Migration Complete
 The OTA update page was officially moved from legacy endpoints to /api/v2. The REST API v1 handles are now entirely obsolete inside the WebUI layer.
+
+### OTA Restart Hygiene
+`settingsMarkClean()` was added so OTA-triggered settings writes do not leave deferred MQTT, NTP, mDNS, or similar service restarts pending during the short reboot window after a successful flash.
 
 ### ArduinoJson Removed
 To squeeze out even more free RAM, ArduinoJson was stripped from the build. All serialization has been migrated to a bounded manual JSON writing architecture.
