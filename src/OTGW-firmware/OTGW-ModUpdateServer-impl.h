@@ -58,6 +58,9 @@ ESP8266HTTPUpdateServerTemplate<ServerType>::ESP8266HTTPUpdateServerTemplate(boo
   _password = emptyString;
   _authenticated = false;
   _uploadTarget = emptyString;
+  _uploadExpectedBytes = 0;
+  _uploadWrittenBytes = 0;
+  _uploadBlockIndex = 0;
 }
 
 template <typename ServerType>
@@ -111,6 +114,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
 
       if(upload.status == UPLOAD_FILE_START){
         _updaterError.clear();
+        _uploadExpectedBytes = 0;
+        _uploadWrittenBytes = 0;
+        _uploadBlockIndex = 0;
 
         _authenticated = (_username == emptyString || _password == emptyString || _server->authenticate(_username.c_str(), _password.c_str()));
         if(!_authenticated){
@@ -136,11 +142,15 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
             uploadTotal = static_cast<size_t>(parsedSize);
           }
         }
+        _uploadExpectedBytes = uploadTotal;
         if (upload.name == F("filesystem")) {
           _uploadTarget = "filesystem";
           size_t fsSize = ((size_t) &_FS_end - (size_t) &_FS_start);
           if (_serial_output) {
             Debugf(PSTR("[OTA] Target: filesystem (%u bytes)\r\n"), static_cast<unsigned>(fsSize));
+            Debugf(PSTR("[OTA] XHR upload start: target=filesystem file=%s expected=%u bytes\r\n"),
+                   upload.filename.c_str(),
+                   static_cast<unsigned>(_uploadExpectedBytes));
           }
           close_all_fs();
           LittleFS.end();
@@ -155,6 +165,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
           if (_serial_output) {
             Debugf(PSTR("[OTA] Target: firmware (%u bytes)\r\n"), static_cast<unsigned>(maxSketchSpace));
+            Debugf(PSTR("[OTA] XHR upload start: target=firmware file=%s expected=%u bytes\r\n"),
+                   upload.filename.c_str(),
+                   static_cast<unsigned>(_uploadExpectedBytes));
           }
           if (uploadTotal > 0 && uploadTotal > maxSketchSpace) {
             _updaterError = F("firmware image too large");
@@ -174,9 +187,47 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
 
         if (written != upload.currentSize) {
           _setUpdaterError();
+        } else {
+          _uploadBlockIndex++;
+          _uploadWrittenBytes += written;
+
+          if (_serial_output) {
+            if (_uploadExpectedBytes > 0) {
+              unsigned long pct = static_cast<unsigned long>((_uploadWrittenBytes * 100UL) / _uploadExpectedBytes);
+              if (pct > 100UL) pct = 100UL;
+              Debugf(PSTR("[OTA] XHR upload progress: target=%s block=%lu chunk=%u total=%u/%u (%lu%%)\r\n"),
+                     _uploadTarget.c_str(),
+                     static_cast<unsigned long>(_uploadBlockIndex),
+                     static_cast<unsigned>(written),
+                     static_cast<unsigned>(_uploadWrittenBytes),
+                     static_cast<unsigned>(_uploadExpectedBytes),
+                     pct);
+            } else {
+              Debugf(PSTR("[OTA] XHR upload progress: target=%s block=%lu chunk=%u total=%u bytes\r\n"),
+                     _uploadTarget.c_str(),
+                     static_cast<unsigned long>(_uploadBlockIndex),
+                     static_cast<unsigned>(written),
+                     static_cast<unsigned>(_uploadWrittenBytes));
+            }
+            DebugFlush();
+          }
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()){
         if (_serial_output) {
+          if (_uploadExpectedBytes > 0) {
+            Debugf(PSTR("[OTA] XHR upload complete: target=%s file=%s received=%u/%u bytes in %lu block(s)\r\n"),
+                   _uploadTarget.c_str(),
+                   upload.filename.c_str(),
+                   static_cast<unsigned>(_uploadWrittenBytes),
+                   static_cast<unsigned>(_uploadExpectedBytes),
+                   static_cast<unsigned long>(_uploadBlockIndex));
+          } else {
+            Debugf(PSTR("[OTA] XHR upload complete: target=%s file=%s received=%u bytes in %lu block(s)\r\n"),
+                   _uploadTarget.c_str(),
+                   upload.filename.c_str(),
+                   static_cast<unsigned>(_uploadWrittenBytes),
+                   static_cast<unsigned long>(_uploadBlockIndex));
+          }
           DebugTln(F("[OTA] End: finalizing flash..."));
         }
         bool updateOk = Update.end(true); //true to set the size to the current progress
@@ -211,10 +262,23 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           // Clear global flag - flash failed
           ::state.flash.bESPactive = false;
         }
+        _uploadExpectedBytes = 0;
+        _uploadWrittenBytes = 0;
+        _uploadBlockIndex = 0;
       } else if(_authenticated && upload.status == UPLOAD_FILE_ABORTED){
         Update.end();
-        if (_serial_output) Debugln(F("[OTA] Abort: update cancelled"));
+        if (_serial_output) {
+          Debugf(PSTR("[OTA] XHR upload aborted: target=%s file=%s after %u bytes in %lu block(s)\r\n"),
+                 _uploadTarget.c_str(),
+                 upload.filename.c_str(),
+                 static_cast<unsigned>(_uploadWrittenBytes),
+                 static_cast<unsigned long>(_uploadBlockIndex));
+          Debugln(F("[OTA] Abort: update cancelled"));
+        }
         ::state.flash.bESPactive = false;
+        _uploadExpectedBytes = 0;
+        _uploadWrittenBytes = 0;
+        _uploadBlockIndex = 0;
         // LittleFS was unmounted at UPLOAD_FILE_START; HTTP_POST error handler
         // will remount it if needed when it runs next.
       }

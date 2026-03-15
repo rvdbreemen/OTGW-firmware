@@ -69,6 +69,9 @@ class ESP8266HTTPUpdateServerTemplate
     bool _authenticated;
     String _updaterError;
     String _uploadTarget;   // "filesystem" or "firmware" — set in UPLOAD_FILE_START
+    size_t _uploadExpectedBytes;
+    size_t _uploadWrittenBytes;
+    uint32_t _uploadBlockIndex;
     const char *_serverIndex;
     const char *_serverSuccess;
 };
