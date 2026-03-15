@@ -62,6 +62,15 @@ class ESP8266HTTPUpdateServerTemplate
     void _setUpdaterError();
 
   private:
+    void _resetUploadTracking();
+    size_t _parseUploadTotalSize() const;
+    void _beginFilesystemUpload(HTTPUpload& upload, size_t uploadTotal);
+    void _beginFirmwareUpload(HTTPUpload& upload, size_t uploadTotal);
+    void _handleUploadStart(HTTPUpload& upload);
+    void _handleUploadWrite(HTTPUpload& upload);
+    void _handleUploadEnd(HTTPUpload& upload);
+    void _handleUploadAbort(HTTPUpload& upload);
+
     bool _serial_output;
     ESP8266WebServerTemplate<ServerType> *_server;
     String _username;
