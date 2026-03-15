@@ -3788,15 +3788,22 @@ bool validateIntelHex(const char *filepath) {
   return valid && hasEof;
 }
 
-String checkforupdatepic(String filename){
+// checkforupdatepic — fetches the latest available version string for a PIC firmware file.
+// latest[] is filled with the version on success, or left empty on failure.
+// Uses char[] buffers throughout; no heap String allocation (ADR-004/ADR-049).
+void checkforupdatepic(const char* filename, char* latest, size_t latestSize){
   WiFiClient client;
   HTTPClient http;
-  String latest = "";
+  if (latestSize > 0) latest[0] = '\0';
   int code;
+
+  char url[128];
+  snprintf_P(url, sizeof(url), PSTR("http://otgw.tclcode.com/download/%s/%s"),
+             state.pic.sDeviceid, filename);
 
   // Security note: download is over unencrypted HTTP; ensure device is on a
   // trusted local network and is not reachable from untrusted networks.
-  http.begin(client, "http://otgw.tclcode.com/download/" + String(state.pic.sDeviceid) + "/" + filename);
+  http.begin(client, url);
   char useragent[40] = "esp8266-otgw-firmware/";
   strlcat(useragent, _SEMVER_CORE, sizeof(useragent));
   http.setUserAgent(useragent);
@@ -3806,49 +3813,55 @@ String checkforupdatepic(String filename){
     for (int i = 0; i< http.headers(); i++) {
       DebugTf(PSTR("%s: %s\r\n"), hexheaders[i], http.header(i).c_str());
     }
-    latest = http.header(1);
-    DebugTf(PSTR("Update %s -> [%s]\r\n"), filename.c_str(), latest.c_str());
+    strlcpy(latest, http.header(1).c_str(), latestSize);
+    DebugTf(PSTR("Update %s -> [%s]\r\n"), filename, latest);
   } else OTGWDebugln(F("Failed to fetch version from Schelte Bron website"));
   http.end(); // Always close connection, even on failure (Finding #24)
-
-  return latest; 
 }
 
-void refreshpic(String filename, String version) {
+void refreshpic(const char* filename, const char* version) {
   if (strcmp(state.pic.sDeviceid, "unknown") == 0) return; // no pic version found, don't upgrade
 
   WiFiClient client;
   HTTPClient http;
-  String latest;
+  char latest[32] = "";
   int code;
 
-  latest = checkforupdatepic(filename);
+  checkforupdatepic(filename, latest, sizeof(latest));
 
-  if (latest != version) {
-    OTGWDebugTf(PSTR("Update (%s)%s: %s -> %s\r\n"), state.pic.sDeviceid, filename.c_str(), version.c_str(), latest.c_str());
+  if (strcmp(latest, version) != 0 && latest[0] != '\0') {
+    OTGWDebugTf(PSTR("Update (%s)%s: %s -> %s\r\n"), state.pic.sDeviceid, filename, version, latest);
     OTGWDebugTln(F("NOTE: PIC firmware is downloaded over plain HTTP (no TLS); ensure device is on a trusted local network."));
-    http.begin(client, "http://otgw.tclcode.com/download/" + String(state.pic.sDeviceid) + "/" + filename);
+
+    char url[128];
+    snprintf_P(url, sizeof(url), PSTR("http://otgw.tclcode.com/download/%s/%s"),
+               state.pic.sDeviceid, filename);
+    http.begin(client, url);
     char useragent[40] = "esp8266-otgw-firmware/";
     strlcat(useragent, _SEMVER_CORE, sizeof(useragent));
     http.setUserAgent(useragent);
     code = http.GET();
     if (code == HTTP_CODE_OK) {
-      String hexpath = "/" + String(state.pic.sDeviceid) + "/" + filename;
+      char hexpath[64];
+      snprintf_P(hexpath, sizeof(hexpath), PSTR("/%s/%s"), state.pic.sDeviceid, filename);
       File f = LittleFS.open(hexpath, "w");
       if (f) {
         http.writeToStream(&f);
         f.close();
         // Validate the downloaded file is a well-formed Intel HEX before accepting it.
         // This rejects truncated or non-HEX responses that could corrupt the PIC.
-        if (!validateIntelHex(hexpath.c_str())) {
+        if (!validateIntelHex(hexpath)) {
           OTGWDebugTln(F("ERROR: Downloaded file failed Intel HEX validation - discarding"));
           LittleFS.remove(hexpath);
         } else {
-          String verfile = hexpath;
-          verfile.replace(".hex", ".ver");
+          char verfile[64];
+          strlcpy(verfile, hexpath, sizeof(verfile));
+          char* ext = strstr(verfile, ".hex");
+          if (ext) strlcpy(ext, ".ver", sizeof(verfile) - (ext - verfile));
           f = LittleFS.open(verfile, "w");
           if (f) {
-            f.print(latest + "\n");
+            f.print(latest);
+            f.print("\n");
             f.close();
             OTGWDebugTln(F("Update successful"));
           }
@@ -3860,17 +3873,17 @@ void refreshpic(String filename, String version) {
 }
 
 // --- Pending Upgrade Logic ---
-String pendingUpgradePath = "";
+char pendingUpgradePath[129] = "";
 
 void handlePendingUpgrade() {
-  if (pendingUpgradePath != F("")) {
+  if (pendingUpgradePath[0] != '\0') {
     DebugTln(F(""));
     DebugTln(F("=== Starting Deferred PIC Upgrade ==="));
-    DebugTf(PSTR("Hex file path: %s\r\n"), pendingUpgradePath.c_str());
+    DebugTf(PSTR("Hex file path: %s\r\n"), pendingUpgradePath);
     DebugTf(PSTR("Flash state: state.flash.bESPactive=%d, state.flash.bPICactive=%d\r\n"), state.flash.bESPactive, state.flash.bPICactive);
     DebugTf(PSTR("Free heap: %d bytes\r\n"), ESP.getFreeHeap());
-    upgradepicnow(pendingUpgradePath.c_str());
-    pendingUpgradePath = "";
+    upgradepicnow(pendingUpgradePath);
+    pendingUpgradePath[0] = '\0';
     DebugTln(F("Deferred upgrade initiated, upgrade now runs in background"));
     DebugTln(F("Monitor progress via telnet or WebUI"));
     DebugTln(F("======================================="));
@@ -3878,16 +3891,19 @@ void handlePendingUpgrade() {
 }
 
 void upgradepic() {
-  const String action = httpServer.arg("action");
-  const String filename = httpServer.arg("name");
-  const String version = httpServer.arg("version");
+  char action[32]   = "";
+  char filename[65] = "";
+  char version[32]  = "";
+  strlcpy(action,   httpServer.arg("action").c_str(),  sizeof(action));
+  strlcpy(filename, httpServer.arg("name").c_str(),    sizeof(filename));
+  strlcpy(version,  httpServer.arg("version").c_str(), sizeof(version));
 
   DebugTln(F("=== PIC Flash HTTP Request Received ==="));
-  DebugTf(PSTR("Action: %s, File: %s, Version: %s\r\n"), action.c_str(), filename.c_str(), version.c_str());
+  DebugTf(PSTR("Action: %s, File: %s, Version: %s\r\n"), action, filename, version);
   DebugTf(PSTR("PIC Device ID: %s\r\n"), state.pic.sDeviceid);
   DebugTf(PSTR("Current state: state.flash.bPICactive=%d, state.flash.bESPactive=%d\r\n"), state.flash.bPICactive, state.flash.bESPactive);
   
-  if (action.isEmpty() || filename.isEmpty()) {
+  if (action[0] == '\0' || filename[0] == '\0') {
     DebugTln(F("ERROR: Missing action or filename parameter"));
     httpServer.send_P(400, PSTR("text/plain"), PSTR("Missing action or name"));
     return;
@@ -3899,24 +3915,25 @@ void upgradepic() {
     return; // no pic version found, don't upgrade
   }
   
-  if (action == F("upgrade")) {
-    DebugTf(PSTR("Upgrade requested for /%s/%s\r\n"), state.pic.sDeviceid, filename.c_str());
+  if (strcmp_P(action, PSTR("upgrade")) == 0) {
+    DebugTf(PSTR("Upgrade requested for /%s/%s\r\n"), state.pic.sDeviceid, filename);
     httpServer.send_P(200, PSTR("application/json"), PSTR("{\"status\":\"started\"}"));
     httpServer.client().flush();  // Ensure response buffer is sent to client
     DebugTln(F("HTTP response sent and flushed"));
     
     // Defer the actual upgrade start to the main loop to ensure HTTP response is sent
-    pendingUpgradePath = "/" + String(state.pic.sDeviceid) + "/" + filename;
-    DebugTf(PSTR("Pending upgrade queued: [%s]\r\n"), pendingUpgradePath.c_str());
+    snprintf_P(pendingUpgradePath, sizeof(pendingUpgradePath), PSTR("/%s/%s"),
+               state.pic.sDeviceid, filename);
+    DebugTf(PSTR("Pending upgrade queued: [%s]\r\n"), pendingUpgradePath);
     DebugTln(F("=== HTTP handler complete, upgrade will start in main loop ==="));
     return;
-  } else if (action == F("refresh")) {
-    DebugTf(PSTR("Refresh %s/%s\r\n"), state.pic.sDeviceid, filename.c_str());
+  } else if (strcmp_P(action, PSTR("refresh")) == 0) {
+    DebugTf(PSTR("Refresh %s/%s\r\n"), state.pic.sDeviceid, filename);
     refreshpic(filename, version);
-  } else if (action == F("delete")) {
-    DebugTf(PSTR("Delete %s/%s\r\n"), state.pic.sDeviceid, filename.c_str());
+  } else if (strcmp_P(action, PSTR("delete")) == 0) {
+    DebugTf(PSTR("Delete %s/%s\r\n"), state.pic.sDeviceid, filename);
     char path[64];
-    snprintf_P(path, sizeof(path), PSTR("/%s/%s"), state.pic.sDeviceid, filename.c_str());
+    snprintf_P(path, sizeof(path), PSTR("/%s/%s"), state.pic.sDeviceid, filename);
     LittleFS.remove(path);
     char *ext = strstr(path, ".hex");
     if (ext) {

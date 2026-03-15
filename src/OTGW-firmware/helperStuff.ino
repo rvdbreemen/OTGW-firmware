@@ -333,7 +333,7 @@ bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t
   return false;
 }
 
-bool updateRebootLog(String text)
+bool updateRebootLog(const char* text)
 {
   #define REBOOTLOG_FILE "/reboot_log.txt"
   #define TEMPLOG_FILE "/reboot_log.t.txt"
@@ -412,7 +412,7 @@ bool updateRebootLog(String text)
 
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
-  snprintf_P(log_line, LOG_LINE_LENGTH, PSTR("%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n"), myTime.year(),  myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second(), CSTR(text), errorCode, log_line_excpt);
+  snprintf_P(log_line, LOG_LINE_LENGTH, PSTR("%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n"), myTime.year(),  myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second(), text, errorCode, log_line_excpt);
 
   if (LittleFS.begin()) {
     //start with opening the file
@@ -468,9 +468,9 @@ void doRestart(const char* str) {
   delay(5000);  // Enough time to ensure we don't return.
 }
 
-String upTime() 
+const char* upTime() 
 {
-  char    calcUptime[20];
+  static char calcUptime[20];
 
   snprintf_P(calcUptime, sizeof(calcUptime), PSTR("%d(d)-%02d:%02d(H:m)")
                                           , int((state.uptime.iSeconds / (60 * 60 * 24)) % 365)
@@ -663,7 +663,7 @@ void str_cstrlit(const char *str, char *buffer, size_t buflen)
     *buffer = '\0';
 }
 
-String strHTTPmethod(HTTPMethod method)
+const char* strHTTPmethod(HTTPMethod method)
 {
   switch (method)
   {
@@ -738,17 +738,14 @@ int signal_quality_perc_quad(int rssi) {
   --> https://www.metageek.com/training/resources/wifi-signal-strength-basics/
   TL;DR strings on quality is based on this
 */
-String dBmtoQuality(int dBm)
+const char* dBmtoQuality(int dBm)
 {
-  String _ret="Amazing";
-  if (dBm<=-67) { _ret = "Very good";}
-  if (dBm<=-70) { _ret = "Okay";}
-  if (dBm<=-80) { _ret = "Not good enough";}
-  if (dBm<=-90) { _ret = "Unusable";}
-  //if (dBm<=-30) { _ret = "Amazing";}
-
-  return (_ret);
-}//dBmtoPercentage 
+  if (dBm<=-90) return "Unusable";
+  if (dBm<=-80) return "Not good enough";
+  if (dBm<=-70) return "Okay";
+  if (dBm<=-67) return "Very good";
+  return "Amazing";
+} // dBmtoQuality
 
 // Replace all occurrences of token with replacement, guarding buffer size
 bool replaceAll(char *buffer, const size_t bufSize, const char *token, const char *replacement) {

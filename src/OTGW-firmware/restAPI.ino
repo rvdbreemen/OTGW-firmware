@@ -362,7 +362,7 @@ void processAPI()
   char originalURI[sizeof(URI)];
   strlcpy(originalURI, URI, sizeof(originalURI));
 
-  RESTDebugTf(PSTR("from[%s] URI[%s] method[%s] \r\n"), httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(method).c_str());
+  RESTDebugTf(PSTR("from[%s] URI[%s] method[%s] \r\n"), httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(method));
 
   if (uriLen >= sizeof(URI)) {
     RESTDebugTln(F("==> Bailout due to oversized URI"));
@@ -844,22 +844,22 @@ void sendPICUpdateCheck()
   // On-demand PIC firmware update check.
   // Only called when the user opens the PIC firmware tab — never on a timer.
   // Makes an outbound HTTP HEAD request to otgw.tclcode.com.
-  String latest = "";
+  char latest[32] = "";
   if (strcmp_P(state.pic.sDeviceid, PSTR("unknown")) != 0 && state.pic.sDeviceid[0] != '\0') {
-    String picFile;
+    const char* picFile;
     if (strcmp_P(state.pic.sType, PSTR("diagnose")) == 0) {
-      picFile = F("diagnose.hex");
+      picFile = "diagnose.hex";
     } else if (strcmp_P(state.pic.sType, PSTR("interface")) == 0) {
-      picFile = F("interface.hex");
+      picFile = "interface.hex";
     } else {
-      picFile = F("gateway.hex");
+      picFile = "gateway.hex";
     }
-    latest = checkforupdatepic(picFile);
+    checkforupdatepic(picFile, latest, sizeof(latest));
   }
-  bool updateAvailable = (latest.length() > 0 && latest != String(state.pic.sFwversion));
+  bool updateAvailable = (latest[0] != '\0' && strcmp(latest, state.pic.sFwversion) != 0);
   sendStartJsonMap(F("pic_update"));
   sendJsonMapEntry(F("current"), state.pic.sFwversion);
-  sendJsonMapEntry(F("latest"), latest.c_str());
+  sendJsonMapEntry(F("latest"), latest);
   sendJsonMapEntry(F("update_available"), updateAvailable);
   sendEndJsonMap(F("pic_update"));
 } // sendPICUpdateCheck()
