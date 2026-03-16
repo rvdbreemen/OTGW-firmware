@@ -21,6 +21,29 @@ Treat `docs/adr/README.md` as the **single source of truth** for:
 
 For architecturally significant changes, read the relevant ADRs before coding, follow the existing decisions, and link any applicable ADR in the PR description. Use `.github/skills/adr/SKILL.md` when you need help drafting or checking an ADR.
 
+### ADR Hotspots
+
+The following areas frequently look like "just a bug fix" but often cross into architecture, contracts, or NFRs. When working in these files or subsystems, explicitly ask whether an ADR is affected before coding.
+
+- **OTA / update flow**: `OTGW-ModUpdateServer-impl.h`, `OTGW-ModUpdateServer.h`, `updateServerHtml.h`, `flash_esp.py`, `build.py`
+  - Ask: does this change alter update transport, reboot verification, browser/server coordination, persistence behavior, or operator recovery workflow?
+- **Settings / state model**: `OTGW-firmware.h`, `settingStuff.ino`, settings persistence helpers, boot-time settings load
+  - Ask: does this change alter the configuration model, runtime state ownership, initialization ordering, or persistence format?
+- **Persistence and filesystem behavior**: `LittleFS` usage, `settings.ini`, `version.hash`, streaming file serving, backup/restore during flash
+  - Ask: does this change alter what survives reboot/flash, how files are written, or memory-safety patterns for file handling?
+- **REST API and external contracts**: `restAPI*.ino`, JSON payload shapes, endpoint routing, HTTP status behavior
+  - Ask: does this change alter an API contract, response structure, versioning behavior, or compatibility expectations?
+- **MQTT and Home Assistant integration**: `MQTTstuff.ino`, topic naming, discovery payloads, source-specific topic layout
+  - Ask: does this change alter published topics, retained payload structure, discovery entities, or client compatibility?
+- **Network behavior and protocol choices**: HTTP/WS communication, WebSocket lifecycle, telnet diagnostics, polling/state machines
+  - Ask: does this change alter transport assumptions, security model, concurrency behavior, or service coordination?
+- **Build / tooling / release flow**: `build.py`, `Makefile`, evaluation checks, artifact naming, CI/CD behavior
+  - Ask: does this change alter developer workflow, build guarantees, release artifacts, or policy enforcement?
+- **Memory-safety patterns tied to existing ADRs**: PROGMEM usage, static buffers, file streaming, heap protection, protocol hot paths
+  - Ask: is this only an implementation cleanup, or does it change an established project-wide rule?
+
+If the answer is unclear, stop and inspect `docs/adr/README.md` before proceeding. If a change modifies one of these project-wide behaviors, prefer documenting it with an ADR or explicitly recording why no ADR is needed.
+
 ## Technology Stack
 
 - **Platform**: ESP8266 (NodeMCU / Wemos D1 mini)
@@ -67,6 +90,9 @@ When making decisions for refactors, feature additions, or bug fixes, always rev
 - Prefer bounded buffers over `String` class to reduce heap fragmentation
 - Always feed the watchdog in long-running operations
 - Use telnet (port 23) for debug output, NOT Serial (Serial is reserved for OTGW PIC communication)
+- **Use typed internal control flow**: If a parameter selects one of a small set of internal behaviors, use an `enum class`, numeric ID, or dedicated flag instead of string tokens.
+- **Do not use text as internal branch selection** unless the text is actual user/domain data. Internal discriminator strings are fragile on ESP8266 and can hide RAM-vs-flash pointer bugs.
+- **Fix layout/spacing structurally**: For Web UI rendering issues, prefer HTML/CSS structure or spacing styles over inserting ad hoc spaces into runtime-generated strings.
 
 ### Naming Conventions
 
@@ -112,6 +138,7 @@ When making decisions for refactors, feature additions, or bug fixes, always rev
   - Use `strcmp_P()`, `strcasecmp_P()` for comparing null-terminated strings with PROGMEM literals.
   - **CRITICAL**: Use `memcmp_P()` for comparing binary data (not `strncmp_P()` or `strstr_P()`).
   - Wrap the distinct string literal in `PSTR()`.
+  - **CRITICAL**: The RAM/flash storage domain must match the helper. Never pass a `PGM_P` discriminator or flash pointer into logic that expects a RAM string.
   
   Example:
   ```cpp
@@ -128,6 +155,17 @@ When making decisions for refactors, feature additions, or bug fixes, always rev
   // BAD - strncmp_P/strstr_P on binary data causes crashes:
   if (strncmp_P(datamem + ptr, banner, len) == 0) { ... }  // DANGEROUS!
   if (strstr_P(datamem + ptr, banner) != NULL) { ... }      // DANGEROUS!
+
+  // BAD - using text in flash as an internal control discriminator:
+  bool checkThing(PGM_P caller) {
+    return strcasecmp_P(caller, PSTR("sensor")) == 0;  // FRAGILE AND EASY TO MISUSE
+  }
+
+  // GOOD - use a typed discriminator for internal behavior:
+  enum class Caller : uint8_t { Sensor, Output };
+  bool checkThing(Caller caller) {
+    return caller == Caller::Sensor;
+  }
   ```
 
 - **Create function overloads** when existing functions don't support PROGMEM types:
@@ -151,6 +189,7 @@ When making decisions for refactors, feature additions, or bug fixes, always rev
 - The ESP8266 has only ~80KB of RAM total, with ~40KB typically available after core libraries
 - Every byte of string literal in RAM is a byte unavailable for runtime operations
 - This is **non-negotiable** - PROGMEM usage is critical for firmware stability
+- **Post-mortem rule**: If a bug involves `_P` helpers, `PGM_P`, or `__FlashStringHelper`, assume a storage-domain mismatch until proven otherwise.
 
 #### File Serving and Streaming (CRITICAL - Prevents Memory Exhaustion)
 
@@ -343,6 +382,8 @@ When making decisions for refactors, feature additions, or bug fixes, always rev
 - **MANDATORY**: Always use `F()` macro for string literals: `DebugTln(F("Message"))`
 - **MANDATORY**: Always use `PSTR()` macro for formatted strings: `DebugTf(PSTR("Value: %d"), val)`
 - Never use plain string literals without `F()` or `PSTR()` - see Memory Management section
+- **MANDATORY for operator-visible lifecycle logs**: Use `DebugT*` macros for OTA, reboot, recovery, flash, and other field-diagnostic events so timestamps are always present in telnet output.
+- Use plain `Debug*` macros only when timestamp/context prefixing is intentionally unnecessary.
 
 ### Browser Compatibility (MANDATORY for Frontend Code)
 
@@ -527,6 +568,7 @@ Before implementing or modifying frontend features, verify browser support:
   - Build filesystem only: `python build.py --filesystem`
   - Clean build: `python build.py --clean`
   - Build script auto-installs arduino-cli if missing
+- **Resolve merge-conflict markers before build/test**: Files containing `<<<<<<<`, `=======`, or `>>>>>>>` must be fixed before compilation. Treat merge markers as build blockers, not as downstream compiler issues.
 - **Flash firmware**: `python flash_esp.py` (downloads and flashes latest release)
   - Flash from local build: `python flash_esp.py --build`
   - See [FLASH_GUIDE.md](../docs/FLASH_GUIDE.md) for detailed instructions
@@ -537,6 +579,7 @@ Before implementing or modifying frontend features, verify browser support:
 - **Build artifacts**: Located in `build/` directory with versioned filenames
 - **CI/CD**: Uses GitHub Actions with the same Makefile
 - **Always test on actual hardware when possible** (ESP8266 behavior can differ from simulation)
+- **Regression focus for filesystem/OTA work**: Validate both firmware and filesystem upload flows, and confirm telnet output is sufficient to distinguish upload progress, flash finalization, and reboot.
 
 ## Common Patterns
 

@@ -35,6 +35,17 @@
 
 /*---- einde macro's ------------------------------------------------------------------*/
 
+// Module-specific conditional debug macros (ADR-051: uses state.debug.* flags)
+// Each .ino file defines its own set with a per-module flag and prefix.
+// Pattern (intentionally duplicated per-file — Arduino single-TU, no conflict):
+//
+//   #define XxxDebugTln(...) ({ if (state.debug.bXxx) DebugTln(__VA_ARGS__); })
+//   #define XxxDebugTf(...)  ({ if (state.debug.bXxx) DebugTf(__VA_ARGS__);  })
+//   ... (Tln, ln, Tf, f, T, plain)
+//
+// Modules: OTGWDebug* (bOTmsg), MQTTDebug* (bMQTT), RESTDebug* (bRestAPI),
+//          SensorDebug* (bSensors) — see each .ino file header.
+
 // needs #include <TelnetStream.h>       // Version 0.0.1 - https://github.com/jandrassy/TelnetStream
 
 //#include <sys/time.h>
@@ -55,7 +66,7 @@ void _debugBOL(const char *fn, int line)
    // Initialize timezone on first call or refresh every 5 minutes (300 seconds)
    // Check now_sec > 0 to ensure time is set
    if (now_sec > 0 && (!tzInitialized || now_sec - lastTzUpdate > 300)) {
-     TimeZone newTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+     TimeZone newTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
      // Only update cache if timezone is valid
      if (!newTz.isError()) {
        cachedTz = newTz;
@@ -71,7 +82,7 @@ void _debugBOL(const char *fn, int line)
    // If timezone not yet initialized, try to initialize it now (first call fallback)
    // This handles cases when time is not set yet (now_sec <= 0) or when primary initialization failed
    if (!tzInitialized) {
-     cachedTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+     cachedTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
      tzInitialized = true;  // Mark as initialized to avoid repeated attempts on every call
      // Note: Even if timezone creation fails, the error object is safe to use
    }

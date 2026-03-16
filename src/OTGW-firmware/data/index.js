@@ -118,6 +118,9 @@ function fetchDallasLabels() {
 console.log(`Hash=${window.location.hash}`);
 window.onload = initMainPage;
 
+let mainPageCompatWarningShown = false;
+let otLogCompatWarningShown = false;
+
 function isPageVisible() {
   return !(document.hidden || document.visibilityState === 'hidden');
 }
@@ -128,6 +131,9 @@ function isMainPageActive() {
 }
 
 function startOTmonitorPolling() {
+  if (!isMainPageActive()) {
+    return;
+  }
   if (!tid) {
     tid = setInterval(function () { refreshOTmonitor(); }, 1000);
   }
@@ -298,6 +304,7 @@ function refreshGatewayMode(force) {
     .then(json => {
       const device = (json && json.device) ? json.device : {};
       applyParsedGatewayMode(parseGatewayModeValue(device.otgwmode));
+      applyOTGWSimulationState(device.otgwsimulation);
     })
     .catch(error => {
       console.warn('refreshGatewayMode warning:', error);
@@ -701,6 +708,7 @@ let statusMessageText = ''; // Device status message from /v2/device/time
 let currentFreeHeap = null;    // Free heap bytes from /v2/device/time
 let currentMaxFreeBlock = null; // Max free block bytes from /v2/device/time
 let sensorSimulationActive = false; // Mirror of otmonitor.sensorsimulation for footer notice
+let otgwSimulationActive = false; // Mirror of device.otgwsimulation for status badge
 let flashPollTimer = null; // Timer for polling flash status as failsafe (both ESP and PIC)
 let otLogResponsiveInitialized = false;
 let otLogResizeTimer = null;
@@ -1558,6 +1566,45 @@ function updateWSStatus(connected) {
   }
 }
 
+function parseSimulationValue(rawValue) {
+  if (typeof rawValue === 'boolean') return rawValue;
+  if (typeof rawValue === 'string') {
+    const normalized = rawValue.trim().toLowerCase();
+    if (normalized === 'true' || normalized === 'on' || normalized === '1') return true;
+    if (normalized === 'false' || normalized === 'off' || normalized === '0') return false;
+  }
+  return null;
+}
+
+function applyOTGWSimulationState(rawValue) {
+  const parsedValue = parseSimulationValue(rawValue);
+  if (parsedValue === null) return;
+  otgwSimulationActive = parsedValue;
+  updateSimulationBadge();
+}
+
+function updateSimulationBadge() {
+  const badgeEl = document.getElementById('simulationBadge');
+  if (!badgeEl) return;
+
+  const activeModes = [];
+  if (otgwSimulationActive) activeModes.push('OT replay');
+  if (sensorSimulationActive) activeModes.push('Dallas sensors');
+
+  if (activeModes.length === 0) {
+    badgeEl.classList.add('hidden');
+    badgeEl.removeAttribute('title');
+    badgeEl.setAttribute('aria-hidden', 'true');
+    return;
+  }
+
+  badgeEl.textContent = 'SIMULATION';
+  badgeEl.title = 'Simulation active: ' + activeModes.join(' + ');
+  badgeEl.setAttribute('aria-label', badgeEl.title);
+  badgeEl.setAttribute('aria-hidden', 'false');
+  badgeEl.classList.remove('hidden');
+}
+
 //============================================================================
 function formatLogLine(logLine) {
   if (!logLine) return "";
@@ -1798,11 +1845,94 @@ function updateFilteredBuffer() {
 // Flag to ensure we only render at most once per animation frame
 let logRenderScheduled = false;
 
+function getMainPageContainer() {
+  var mainPage = document.getElementById('mainPage');
+  if (mainPage) {
+    return mainPage;
+  }
+
+  var displayMainPage = document.getElementById('displayMainPage');
+  if (!displayMainPage) {
+    return null;
+  }
+
+  mainPage = document.createElement('div');
+  mainPage.id = 'mainPage';
+
+  var waiting = document.getElementById('waiting');
+  if (waiting) {
+    mainPage.appendChild(waiting);
+  } else {
+    var placeholder = document.createElement('div');
+    placeholder.id = 'waiting';
+    placeholder.textContent = 'Wait for it...';
+    mainPage.appendChild(placeholder);
+  }
+
+  var otLogSection = document.getElementById('otLogSection');
+  if (otLogSection && otLogSection.parentNode === displayMainPage) {
+    displayMainPage.insertBefore(mainPage, otLogSection);
+  } else {
+    var navShell = displayMainPage.querySelector('.page-nav-shell');
+    if (navShell && navShell.parentNode === displayMainPage) {
+      displayMainPage.insertBefore(mainPage, navShell.nextSibling);
+    } else {
+      displayMainPage.appendChild(mainPage);
+    }
+  }
+
+  if (!mainPageCompatWarningShown) {
+    console.warn('mainPage element missing; recreated compatible container');
+    mainPageCompatWarningShown = true;
+  }
+
+  return mainPage;
+}
+
+function getOTLogContentElement() {
+  var container = document.getElementById('otLogContent');
+  if (container) {
+    return container;
+  }
+
+  var logPanel = document.getElementById('Log');
+  if (!logPanel) {
+    return null;
+  }
+
+  var logContainer = document.getElementById('otLogContainer');
+  if (!logContainer) {
+    logContainer = document.createElement('div');
+    logContainer.id = 'otLogContainer';
+    logContainer.className = 'ot-log-container';
+
+    var logFooter = logPanel.querySelector('.ot-log-footer');
+    if (logFooter) {
+      logPanel.insertBefore(logContainer, logFooter);
+    } else {
+      logPanel.appendChild(logContainer);
+    }
+  }
+
+  container = document.createElement('div');
+  container.id = 'otLogContent';
+  container.className = 'ot-log-content';
+  container.setAttribute('role', 'log');
+  container.setAttribute('aria-live', 'polite');
+  logContainer.appendChild(container);
+
+  if (!otLogCompatWarningShown) {
+    console.warn('otLogContent element missing; recreated compatible container');
+    otLogCompatWarningShown = true;
+  }
+
+  return container;
+}
+
 // Internal function that performs the actual DOM update
 function renderLogDisplay() {
-  const container = document.getElementById('otLogContent');
+  const container = getOTLogContentElement();
   if (!container) {
-    console.error("otLogContent element not found!");
     return;
   }
 
@@ -2021,7 +2151,7 @@ function setupOTLogControls() {
   
   // Manual scroll detection (disable auto-scroll checkbox if user scrolls up)
   let manualScrollTimeout = null;
-  const otLogContent = document.getElementById('otLogContent');
+  const otLogContent = getOTLogContentElement();
   if (otLogContent) {
     otLogContent.addEventListener('scroll', function(e) {
       // Debounce scroll handling to avoid excessive DOM reads/writes
@@ -2069,8 +2199,27 @@ function setupOTLogControls() {
 //============================================================================
 let statusClearTimer = null;
 
+function normalizeOTGWcommand(cmd) {
+  var trimmedCmd = (cmd || '').trim();
+  if (!trimmedCmd) return '';
+
+  var normalizedCmd = trimmedCmd.replace(/\s*=\s*/g, '=');
+  var spacedCommandMatch = normalizedCmd.match(/^([A-Za-z]{2})\s+(.+)$/);
+  if (spacedCommandMatch) {
+    normalizedCmd = spacedCommandMatch[1] + '=' + spacedCommandMatch[2].trim();
+  }
+
+  var compactMatch = normalizedCmd.match(/^([A-Za-z]{2})=(.+)$/);
+  if (compactMatch) {
+    return compactMatch[1].toUpperCase() + '=' + compactMatch[2].trim();
+  }
+
+  return normalizedCmd;
+}
+
 function sendOTGWcommand(cmd) {
   var trimmedCmd = (cmd || '').trim();
+  var normalizedCmd = normalizeOTGWcommand(trimmedCmd);
   var statusEl = document.getElementById('otCmdStatus');
 
   function clearStatus(delay) {
@@ -2090,10 +2239,19 @@ function sendOTGWcommand(cmd) {
     return;
   }
 
+  if (!/^[A-Z]{2}=.+$/.test(normalizedCmd)) {
+    if (statusEl) {
+      statusEl.textContent = 'Use XX=value, e.g. PS=1 or TT=20.5';
+      statusEl.className = 'ot-cmd-status ot-cmd-error';
+      clearStatus(3500);
+    }
+    return;
+  }
+
   fetch(`${APIGW}v2/otgw/commands`, {
     method: 'POST',
     headers: { 'content-type': 'application/json; charset=UTF-8' },
-    body: JSON.stringify({ command: trimmedCmd })
+    body: JSON.stringify({ command: normalizedCmd })
   })
   .then(function(response) {
     if (!response.ok) {
@@ -2110,7 +2268,7 @@ function sendOTGWcommand(cmd) {
   })
   .then(function(data) {
     if (statusEl) {
-      statusEl.textContent = 'Queued: ' + trimmedCmd;
+      statusEl.textContent = 'Queued: ' + normalizedCmd;
       statusEl.className = 'ot-cmd-status ot-cmd-ok';
       clearStatus(3000);
     }
@@ -2771,6 +2929,10 @@ function refreshDevTime() {
           applyPSmodeState();
         }
       }
+
+      if (devtime.otgwsimulation !== undefined) {
+        applyOTGWSimulationState(devtime.otgwsimulation);
+      }
       renderBottomMessage();
     })
     .catch(function (error) {
@@ -3083,6 +3245,7 @@ function refreshDevInfo() {
       const version = device.fwversion || "";
 
       applyParsedGatewayMode(parseGatewayModeValue(device.otgwmode));
+      applyOTGWSimulationState(device.otgwsimulation);
 
       const versionEl = document.getElementById('devVersion');
       if (versionEl) versionEl.textContent = version;
@@ -3105,7 +3268,7 @@ function refreshDevInfo() {
 
 //============================================================================  
 function refreshOTmonitor() {
-  if (flashModeActive || !isPageVisible()) return;
+  if (flashModeActive || !isPageVisible() || !isMainPageActive()) return;
 
   data = {};
   fetch(APIGW + "v2/otgw/otmonitor")  //api/v2/otgw/otmonitor
@@ -3125,9 +3288,7 @@ function refreshOTmonitor() {
         simState = data.sensorsimulation.value;
       }
 
-      if (typeof simState === 'string') {
-        simState = (simState.toLowerCase() === 'true' || simState.toLowerCase() === 'on');
-      }
+      simState = parseSimulationValue(simState);
 
       if (simState === true && lastSensorSimulationState !== true) {
         fetchDallasLabels()
@@ -3157,6 +3318,7 @@ function refreshOTmonitor() {
         sensorSimulationActive = simState;
         lastSensorSimulationState = simState;
         if (simChanged) renderBottomMessage();
+        updateSimulationBadge();
       }
 
       // Detect and register temperature sensors for the graph
@@ -3170,7 +3332,14 @@ function refreshOTmonitor() {
         OTGraph.processSensorData(data, new Date());
       }
 
-      let otMonPage = document.getElementById('mainPage');
+      if (!isMainPageActive()) {
+        return;
+      }
+
+      let otMonPage = getMainPageContainer();
+      if (!otMonPage) {
+        return;
+      }
       let otMonTable = document.querySelector(".otmontable");
       
       // If table doesn't exist, create it (and clear waiting/existing content)
@@ -3318,7 +3487,9 @@ function refreshDeviceInfo() {
     .then(json => {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
       const device = json.device || {};
+      applyOTGWSimulationState(device.otgwsimulation);
       for (let key in device) {
+        if (key === 'otgwsimulation') continue;
         console.log("[" + key + "]=>[" + device[key] + "]");
         const displayLabel = formatDeviceInfoLabel(key);
         const displayValue = formatDeviceInfoValue(key, device[key]);
