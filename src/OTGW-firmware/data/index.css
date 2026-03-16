@@ -721,6 +721,22 @@
   background: #f44336;
 }
 
+.simulation-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #0a84ff;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+  box-shadow: 0 0 0 1px rgba(10, 132, 255, 0.2), 0 0 10px rgba(10, 132, 255, 0.35);
+}
+
 .status-separator {
   opacity: 0.6;
 }

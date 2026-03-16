@@ -821,58 +821,59 @@ void sendJsonSettingObj(const __FlashStringHelper* cName, bool bValue, const cha
 // 'key' is a PROGMEM string (use F() macro at call site).
 // Returns true if the field was found and result was populated.
 // NOTE: Uses cMsg as scratch for building the search pattern.
+//       Safe: String::indexOf() does not yield, so cMsg cannot be clobbered mid-use.
 //       Not safe to call from ISR or concurrently.
 //=======================================================================
-bool extractJsonField(const String& json, const __FlashStringHelper* key,
+bool extractJsonField(const char* json, const __FlashStringHelper* key,
                       char* result, size_t resultSize) {
-  if (!result || resultSize == 0) return false;
+  if (!json || !result || resultSize == 0) return false;
   result[0] = '\0';
   // Build search pattern: "keyname"
   snprintf_P(cMsg, sizeof(cMsg), PSTR("\"%S\""), (PGM_P)key);
-  int idx = json.indexOf(cMsg);
-  if (idx < 0) return false;
+  const char* found = strstr(json, cMsg);
+  if (!found) return false;
 
-  int colon = json.indexOf(':', idx + (int)strlen(cMsg));
-  if (colon < 0) return false;
+  const char* colon = strchr(found + strlen(cMsg), ':');
+  if (!colon) return false;
 
-  int start = colon + 1;
-  int len   = (int)json.length();
-  while (start < len && json[start] == ' ') start++;
-  if (start >= len) return false;
+  const char* p = colon + 1;
+  while (*p == ' ') p++;
+  if (*p == '\0') return false;
 
-  if (json[start] == '"') {
+  if (*p == '"') {
     // Quoted string value — scan for closing quote respecting backslash escapes
-    int pos = start + 1;
-    while (pos < len) {
-      if (json[pos] == '\\' && pos + 1 < len) { pos += 2; continue; } // skip escaped char
-      if (json[pos] == '"') break;
-      pos++;
-    }
-    if (pos >= len) return false; // no closing quote found
-    // Copy and unescape value into result (empty string is valid)
+    p++; // skip opening quote
     size_t ri = 0;
-    for (int si = start + 1; si < pos && ri < resultSize - 1; si++) {
-      if (json[si] == '\\' && si + 1 < pos) {
-        result[ri++] = unescapeJsonChar(json[++si]);
-      } else {
-        result[ri++] = json[si];
+    while (*p != '\0') {
+      if (*p == '\\' && *(p + 1) != '\0') {
+        p++;
+        if (ri < resultSize - 1) result[ri++] = unescapeJsonChar(*p);
+        p++;
+        continue;
       }
+      if (*p == '"') break;
+      if (ri < resultSize - 1) result[ri++] = *p;
+      p++;
     }
+    if (*p != '"') return false; // no closing quote found
     result[ri] = '\0';
-    return true; // field found; empty string is a valid value
+    return true;
   } else {
     // Unquoted value: bool literal (true/false) or number
-    int end = start;
-    while (end < len) {
-      char c = json[end];
-      if (c == ',' || c == '}' || c == ' ' || c == '\r' || c == '\n') break;
-      end++;
-    }
-    int n = end - start;
-    if (n <= 0 || (size_t)(n + 1) > resultSize) return false;
-    json.substring(start, end).toCharArray(result, resultSize);
+    const char* end = p;
+    while (*end && *end != ',' && *end != '}' && *end != ' ' && *end != '\r' && *end != '\n') end++;
+    size_t n = end - p;
+    if (n == 0 || n + 1 > resultSize) return false;
+    memcpy(result, p, n);
+    result[n] = '\0';
     return true;
   }
+}
+
+// Convenience wrapper accepting Arduino String (delegates to const char* version)
+bool extractJsonField(const String& json, const __FlashStringHelper* key,
+                      char* result, size_t resultSize) {
+  return extractJsonField(json.c_str(), key, result, resultSize);
 }
 
 //=======================================================================

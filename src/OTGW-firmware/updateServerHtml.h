@@ -121,6 +121,88 @@ static const char UpdateServerIndex[] PROGMEM =
          var errorEl = document.getElementById('updateError');
          var retryBtn = document.getElementById('retryButton');
          var formErrorEl = document.getElementById('formError');
+
+         function restoreDallasLabelsFromOpener(onStatus) {
+           var labelsRestored = Promise.resolve();
+           try {
+             if (window.opener && window.opener.dallasLabelsCache) {
+               var labels = window.opener.dallasLabelsCache;
+               if (labels && typeof labels === 'object' && Object.keys(labels).length > 0) {
+                 if (onStatus) onStatus('Restoring Dallas labels...');
+                 labelsRestored = fetch('/api/v2/sensors/labels', {
+                   method: 'POST',
+                   headers: { 'Content-Type': 'application/json' },
+                   body: JSON.stringify(labels)
+                 })
+                 .then(function(res) {
+                   if (res.ok) {
+                     console.log('[OTA] Dallas labels restored');
+                   } else {
+                     console.error('[OTA] Label restore failed: HTTP ' + res.status);
+                   }
+                 })
+                 .catch(function(err) {
+                   console.error('[OTA] Label restore error:', err);
+                 });
+               }
+             }
+           } catch (e) {
+             console.log('[OTA] Label restore skipped:', e);
+           }
+           return labelsRestored;
+         }
+
+         function redirectToHome(delayMs) {
+           setTimeout(function() {
+             window.location.href = '/';
+           }, delayMs || 1000);
+         }
+
+         function pollUntilHealthy(options) {
+           var remaining = options.timeoutSeconds || 60;
+           if (options.onTick) {
+             options.onTick(remaining);
+           }
+
+           var timer = setInterval(function() {
+             remaining--;
+
+             console.log('[OTA] Health check: GET /api/v2/health?t=' + Date.now());
+             fetch('/api/v2/health?t=' + Date.now(), {
+               method: 'GET',
+               cache: 'no-store',
+               headers: { 'Accept': 'application/json' }
+             })
+               .then(function(res) {
+                 if (res.ok) return res.json();
+                 throw new Error('HTTP ' + res.status);
+               })
+               .then(function(data) {
+                 if (data && data.health && data.health.status === 'UP') {
+                   clearInterval(timer);
+                   console.log('[OTA] State: Device is healthy');
+                   options.onHealthy();
+                 }
+               })
+               .catch(function() {
+                 // Ignore - device still rebooting
+               });
+
+             if (remaining <= 0) {
+               clearInterval(timer);
+               if (options.onTimeout) {
+                 options.onTimeout();
+               }
+               return;
+             }
+
+             if (options.onTick) {
+               options.onTick(remaining);
+             }
+           }, 1000);
+
+           return timer;
+         }
          
          function showProgressPage() {
            console.log('[OTA] State: Showing progress page');
@@ -185,113 +267,39 @@ static const char UpdateServerIndex[] PROGMEM =
              });
          }
 
-         // Upload a blob to the device via XHR; returns a Promise
-         function xhrUpload(action, fieldName, blob, filename) {
-           return new Promise(function(resolve, reject) {
-             var fd = new FormData();
-             fd.append(fieldName, blob, filename);
-             var xhr = new XMLHttpRequest();
-             xhr.open('POST', action, true);
-             xhr.timeout = 300000;
-             xhr.upload.onprogress = function(ev) {
-               if (ev.lengthComputable) {
-                 var pct = Math.min(Math.round((ev.loaded / ev.total) * 100), 100);
-                 progressBar.style.width = pct + '%';
-                 progressText.textContent = 'Uploading: ' + pct + '% (' + formatBytes(ev.loaded) + ' / ' + formatBytes(ev.total) + ')';
-               }
-             };
-             xhr.onload = function() {
-               if (xhr.status >= 200 && xhr.status < 300 && (xhr.responseText || '').indexOf('Flash error') === -1) {
-                 progressBar.style.width = '100%';
-                 resolve();
-               } else {
-                 reject(new Error(xhr.responseText || 'HTTP ' + xhr.status));
-               }
-             };
-             xhr.ontimeout = function() { reject(new Error('Upload timeout')); };
-             xhr.onerror = function() { reject(new Error('Connection lost during upload')); };
-             xhr.send(fd);
-           });
-         }
-
          // Wait for the device to reboot and come back online.
          // onReady: optional callback called when device is healthy.
          //          If null/undefined, performs the default labels-restore + redirect to /.
          function waitForDeviceReboot(onReady) {
            console.log('[OTA] State: Waiting for device reboot');
-           var remaining = 60;
-           progressText.textContent = 'Device rebooting... (' + remaining + 's)';
            progressBar.style.width = '100%';
 
-           var checkInterval = setInterval(function() {
-             remaining--;
+           pollUntilHealthy({
+             timeoutSeconds: 60,
+             onTick: function(remaining) {
+               progressText.textContent = 'Device rebooting... (' + remaining + 's)';
+             },
+             onHealthy: function() {
+               if (onReady) {
+                 onReady();
+                 return;
+               }
 
-             console.log('[OTA] Health check: GET /api/v2/health?t=' + Date.now());
-             fetch('/api/v2/health?t=' + Date.now(), {
-               method: 'GET',
-               cache: 'no-store',
-               headers: { 'Accept': 'application/json' }
-             })
-               .then(function(res) {
-                 if (res.ok) return res.json();
-                 throw new Error('HTTP ' + res.status);
-               })
-               .then(function(data) {
-                 if (data && data.health && data.health.status === 'UP') {
-                   clearInterval(checkInterval);
-                   console.log('[OTA] State: Device is healthy');
-                   if (onReady) {
-                     // Intermediate reboot: hand control back to caller
-                     onReady();
-                   } else {
-                     // Final reboot: restore labels, then redirect to /
-                     progressText.textContent = 'Device is back online!';
-                     var labelsRestored = Promise.resolve();
-                     try {
-                       if (window.opener && window.opener.dallasLabelsCache) {
-                         var labels = window.opener.dallasLabelsCache;
-                         if (labels && typeof labels === 'object' && Object.keys(labels).length > 0) {
-                           console.log('[OTA] Restoring Dallas labels from memory cache');
-                           progressText.textContent = 'Restoring Dallas labels...';
-                           labelsRestored = fetch('/api/v2/sensors/labels', {
-                             method: 'POST',
-                             headers: { 'Content-Type': 'application/json' },
-                             body: JSON.stringify(labels)
-                           })
-                           .then(function(res) {
-                             if (res.ok) {
-                               console.log('[OTA] Dallas labels restored successfully');
-                             } else {
-                               console.error('[OTA] Label restore failed: HTTP ' + res.status);
-                             }
-                           })
-                           .catch(function(err) {
-                             console.error('[OTA] Label restore error:', err);
-                           });
-                         }
-                       }
-                     } catch(e) { console.log('[OTA] Label restore skipped:', e); }
-                     labelsRestored.then(function() {
-                       progressText.textContent = 'Redirecting...';
-                       setTimeout(function() { window.location.href = '/'; }, 1000);
-                     });
-                   }
-                 }
-               })
-               .catch(function(e) {
-                 // Ignore - device still rebooting
+               progressText.textContent = 'Device is back online!';
+               restoreDallasLabelsFromOpener(function(status) {
+                 console.log('[OTA] ' + status);
+                 progressText.textContent = status;
+               }).then(function() {
+                 progressText.textContent = 'Redirecting...';
+                 redirectToHome(1000);
                });
-
-             if (remaining <= 0) {
-               clearInterval(checkInterval);
+             },
+             onTimeout: function() {
                console.log('[OTA] State: Timeout reached, redirecting anyway');
                progressText.textContent = 'Redirecting...';
                window.location.href = '/';
-               return;
              }
-
-             progressText.textContent = 'Device rebooting... (' + remaining + 's)';
-           }, 1000);
+           });
          }
 
          function formatBytes(bytes) {
@@ -447,7 +455,6 @@ static const char UpdateServerSuccess[] PROGMEM =
       <h1>OTGW firmware Flash utility</h1>
       <br/>
       <h2>Flashing successful!</h2>
-      %SETTINGS_MSG%
       <br/>
       <br/>Wait for the OTGW firmware to reboot and start the HTTP server
       <br/>
@@ -456,77 +463,111 @@ static const char UpdateServerSuccess[] PROGMEM =
       <br/>If nothing happens, refresh with <span style='font-size:1.3em;'><b><a href="/">this link here</a></b></span>.
       </body>
       <script>
-         var remainingSeconds = 60;
-         var statusEl = document.getElementById("status");
-         
-         var poller = setInterval(function() {
-           remainingSeconds--;
-           
-           // Check health endpoint to verify device is fully booted
-           fetch('/api/v2/health?t=' + Date.now(), { 
-             method: 'GET', 
-             cache: 'no-store',
-             headers: { 'Accept': 'application/json' }
-           })
-             .then(function(res) {
-               if (res.ok) {
-                 return res.json();
-               }
-               throw new Error('HTTP ' + res.status);
-             })
-             .then(function(data) {
-               // Validate health response - simple object access
-               if (data && data.health && data.health.status === 'UP') {
-                 clearInterval(poller);
-                 statusEl.textContent = "Device is back online!";
-                 statusEl.style.color = "green";
-                 
-                 // Try to restore dallas labels from parent window cache
-                 var labelsRestored = Promise.resolve();
-                 try {
-                   if (window.opener && window.opener.dallasLabelsCache) {
-                     var labels = window.opener.dallasLabelsCache;
-                     if (labels && typeof labels === 'object' && Object.keys(labels).length > 0) {
-                       statusEl.textContent = "Restoring Dallas labels...";
-                       labelsRestored = fetch('/api/v2/sensors/labels', {
-                         method: 'POST',
-                         headers: { 'Content-Type': 'application/json' },
-                         body: JSON.stringify(labels)
-                       })
-                       .then(function(res) {
-                         if (res.ok) {
-                           console.log('[OTA] Dallas labels restored');
-                         }
-                       })
-                       .catch(function(err) {
-                         console.error('[OTA] Label restore error:', err);
-                       });
-                     }
+         function restoreDallasLabelsFromOpener(onStatus) {
+           var labelsRestored = Promise.resolve();
+           try {
+             if (window.opener && window.opener.dallasLabelsCache) {
+               var labels = window.opener.dallasLabelsCache;
+               if (labels && typeof labels === 'object' && Object.keys(labels).length > 0) {
+                 if (onStatus) onStatus('Restoring Dallas labels...');
+                 labelsRestored = fetch('/api/v2/sensors/labels', {
+                   method: 'POST',
+                   headers: { 'Content-Type': 'application/json' },
+                   body: JSON.stringify(labels)
+                 })
+                 .then(function(res) {
+                   if (res.ok) {
+                     console.log('[OTA] Dallas labels restored');
+                   } else {
+                     console.error('[OTA] Label restore failed: HTTP ' + res.status);
                    }
-                 } catch(e) {}
-                 
-                 labelsRestored.then(function() {
-                   statusEl.textContent = "Redirecting...";
-                   setTimeout(function() {
-                     window.location.href = "/";
-                   }, 1000);
+                 })
+                 .catch(function(err) {
+                   console.error('[OTA] Label restore error:', err);
                  });
                }
+             }
+           } catch (e) {
+             console.log('[OTA] Label restore skipped:', e);
+           }
+           return labelsRestored;
+         }
+
+         function redirectToHome(delayMs) {
+           setTimeout(function() {
+             window.location.href = '/';
+           }, delayMs || 1000);
+         }
+
+         function pollUntilHealthy(options) {
+           var remaining = options.timeoutSeconds || 60;
+           if (options.onTick) {
+             options.onTick(remaining);
+           }
+
+           var timer = setInterval(function() {
+             remaining--;
+
+             fetch('/api/v2/health?t=' + Date.now(), {
+               method: 'GET',
+               cache: 'no-store',
+               headers: { 'Accept': 'application/json' }
              })
-             .catch(function(e) {
-               // Ignore - device still rebooting
+               .then(function(res) {
+                 if (res.ok) return res.json();
+                 throw new Error('HTTP ' + res.status);
+               })
+               .then(function(data) {
+                 if (data && data.health && data.health.status === 'UP') {
+                   clearInterval(timer);
+                   options.onHealthy();
+                 }
+               })
+               .catch(function() {
+                 // Ignore - device still rebooting
+               });
+
+             if (remaining <= 0) {
+               clearInterval(timer);
+               if (options.onTimeout) {
+                 options.onTimeout();
+               }
+               return;
+             }
+
+             if (options.onTick) {
+               options.onTick(remaining);
+             }
+           }, 1000);
+
+           return timer;
+         }
+
+         var remainingSeconds = 60;
+         var statusEl = document.getElementById("status");
+
+         pollUntilHealthy({
+           timeoutSeconds: 60,
+           onTick: function(remaining) {
+             remainingSeconds = remaining;
+             statusEl.textContent = "Waiting for device... (" + remainingSeconds + "s)";
+             statusEl.style.color = "#666";
+           },
+           onHealthy: function() {
+             statusEl.textContent = "Device is back online!";
+             statusEl.style.color = "green";
+             restoreDallasLabelsFromOpener(function(status) {
+               statusEl.textContent = status;
+             }).then(function() {
+               statusEl.textContent = "Redirecting...";
+               redirectToHome(1000);
              });
-           
-           if (remainingSeconds <= 0) {
-             clearInterval(poller);
+           },
+           onTimeout: function() {
              statusEl.textContent = "Redirecting...";
              window.location.href = "/";
-             return;
            }
-           
-           statusEl.textContent = "Waiting for device... (" + remainingSeconds + "s)";
-           statusEl.style.color = "#666";
-         }, 1000);
+         });
     </script>
     </html>)SUCCESS";
      
