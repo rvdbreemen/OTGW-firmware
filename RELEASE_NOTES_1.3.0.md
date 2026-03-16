@@ -1,131 +1,161 @@
 # Release Notes — v1.3.0
 
-**Last updated:** 2026-03-05<br>
-**Release branch:** dev<br>
-**Comparison target:** v1.2.0<br>
+**Last updated:** 2026-03-16<br>
+**Release branch:** `dev`<br>
+**Comparison target:** `main` (current stable `v1.2.0`)<br>
 
 ---
 
-## Summary
+## ✨ Headline: Safer Upgrades, Better Recovery, and Full `PS=1` Integration
 
-v1.3.0 builds on v1.2.0 with focused reliability, usability, and memory improvements. There are no breaking changes: no MQTT topic renames, no API removals, and no settings format changes.
+v1.3.0 builds on the current stable `v1.2.0` release. It focuses on OTA and LittleFS reliability, WiFi recovery, MQTT publish control, fuller `PS=1` support, and lower heap pressure.
 
-**New features:** 
-- Configurable MQTT publishing interval to reduce broker load.
-- Triple-reset WiFi recovery.
-- One-shot OTGW PIC commands from the web UI.
-- Safer OTA and LittleFS flashing with browser-side backup support, health-check reboot verification, and better updater diagnostics.
-- Full PS=1 summary parsing with MQTT/HA discovery.
-- OTGW events reported via MQTT and WebSocket.
-- Heap status included directly in device info.
+For users already on `v1.2.0`, this is largely a backward-compatible upgrade: there are no new MQTT topic renames, no new REST API removals, and no settings-format migration.
 
-**Bug fixes:** 
-- Boot-time spurious service restarts.
-- Hostname dot-stripping targeting the wrong buffer.
-- Webhook payload truncation on settings load.
+---
 
-**Memory / performance:** 
-- String heap fragmentation eliminated from the settings save path.
-- ArduinoJson library fully removed in favor of a custom JSON writer.
-- REST API v2 migration officially completed for the OTA updater.
+## Overview
 
-**Firmware update / OTA:**
-- OTA updater now uses `/api/v2/health` consistently to verify that the device is fully back online after reboot.
-- Filesystem flashes can optionally download browser backups of `settings.ini` and `dallas_labels.ini` before erase/write.
-- OTA upload start, per-chunk progress, completion, and abort are now logged through telnet debug output.
-- LittleFS OTA corruption regression fixed by suppressing WiFi reconnect activity during flash and erasing the full filesystem partition before write.
+**User-visible additions:**
+- Configurable MQTT publish gating for OpenTherm and `PS=1` summary data.
+- Full `PS=1` summary parsing with MQTT publishing and Home Assistant discovery.
+- One-shot OTGW PIC commands from the monitor page.
+- Triple-reset WiFi recovery to reopen the captive portal without reflashing.
+- Safer OTA / LittleFS flashing with backup, validation, and better logging.
+- Richer device-info and Web UI status reporting, including heap visibility.
+
+**Internal improvements:**
+- Bounded manual JSON writing in place of ArduinoJson.
+- Reduced `String` churn in settings persistence.
+- Cleaner OTA reboot handoff and deferred-service handling.
+- Larger structural cleanup around settings/state ownership and route handling.
 
 ---
 
 ## New Features
 
-### ⏱️ Configurable MQTT Publishing Interval
-**Problem solved**: Certain OT values update very frequently. Previously, every change immediately pushed an MQTT message, sometimes flooding the broker and consuming excess WiFi airtime.
-**Solution**: Introduced OTPublishGate to configure a minimum publishing interval (in seconds) for OpenTherm variables. This throttles rapid state changes to a manageable rate without missing critical updates, vastly reducing MQTT broker load.
+### Configurable MQTT Publish Gating
 
-### 📢 OTGW Events reporting via MQTT and WebSocket
-OpenTherm Gateway specific events and diagnostic messages from the PIC are now appropriately published via MQTT and WebSocket, allowing Home Assistant and other smart home integrators to trace internal hardware notifications dynamically.
+OpenTherm values can change quickly enough to flood an MQTT broker or waste WiFi airtime. v1.3.0 adds configurable publish gating so frequent updates can be rate-limited without changing the existing topic layout.
 
-### 🔁 Triple-Reset WiFi Recovery
-**Problem solved**: when WiFi credentials become invalid (router replaced, SSID changed, password changed, device moved), the only previous recovery path was to physically re-flash the firmware.
-**Solution**: triple-clicking the hardware reset button within 10 seconds now clears all stored WiFi credentials and restarts the WiFiManager captive portal for reconfiguration. Normal single resets and double resets remain unaffected.
-See [docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md](docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md) for detailed instructions.
+- Normal OpenTherm publishing now uses interval-aware gating.
+- `PS=1` summary fields follow the same release philosophy and no longer bypass MQTT discipline.
+- The `OTPublishGate` pattern makes the decision explicit and restores previous publish state safely.
 
-### 💻 One-Shot OTGW PIC Commands from the Web UI
-A command bar has been added to the OpenTherm Monitor page. You can now type raw OTGW PIC commands directly in the browser and see the response in the log in real time — without needing a telnet or serial connection.
-**Examples**:
-- TT=20.5 — set room temperature target
-- SH=60 — set hot water temperature setpoint
-- PR=A — print firmware revision
-- GW=R — reset the gateway PIC
+### Full `PS=1` Summary Translation
 
-### 📊 PS=1 Summary Parsing with MQTT/HA Discovery
-Previously, PS=1 mode (Print Summary) was detected and the firmware would stop streaming raw OT frames — but the PS=1 summary lines themselves were not parsed.
-v1.3.0 fully parses all PS=1 summary fields and:
-- Publishes each field to MQTT (using the same topic structure as normal OT message publishing).
-- Registers Home Assistant auto-discovery entries per field, so PS mode users now get proper HA sensor entities.
+Previous releases detected `PS=1` mode but did not fully turn the summary output into first-class firmware data. v1.3.0 now parses `PS=1` summary lines into the normal OTGW data path.
 
-### 🧠 Heap Status in Device Info
-Free heap, max contiguous block size, and heap health level are now included in GET /api/v2/device/info. These values are also surfaced on the firmware flash utility page to help diagnose low-memory conditions before flashing.
+- Summary fields are published to MQTT.
+- Home Assistant discovery can expose `PS=1`-derived values.
+- Status-bit handling stays aligned with the normal OT mode behavior.
+- OTGW events and command-style responses are surfaced more clearly through MQTT and WebSocket logging.
 
-### 🔄 OTA / LittleFS Flashing Hardening
-The firmware update flow received a substantial reliability pass after v1.2.0:
+### Monitor-Page Command Bar and Better Status Visibility
 
-- The Web UI firmware updater now relies on `/api/v2/health` for reboot verification and status validation.
-- Before a LittleFS flash, the browser can download backup copies of `settings.ini` and `dallas_labels.ini`.
-- After a successful filesystem flash, the firmware remounts LittleFS, rewrites settings to the fresh filesystem, clears deferred side effects with `settingsMarkClean()`, and then reboots cleanly.
-- Dallas labels cached in the browser are restored through `POST /api/v2/sensors/labels` once the health check reports the device as `UP`.
-- OTA XHR uploads now emit detailed telnet-debug messages for start, progress, completion, and abort, including byte counts and block counts.
+The main Web UI monitor page now allows direct one-shot OTGW PIC commands from the browser.
+
+- Send commands such as `TT=20.5`, `SH=60`, `PR=A`, or `GW=R` without leaving the UI.
+- Responses remain visible in the monitor/log view.
+- The UI now exposes more state feedback, including simulation visibility and richer heap/device status reporting.
+
+### Triple-Reset WiFi Recovery
+
+When saved WiFi credentials are no longer valid, you no longer need to reflash the ESP8266 just to recover network access.
+
+- Three quick hardware resets within 10 seconds clear stored WiFi credentials.
+- The device immediately reopens the WiFiManager captive portal for reconfiguration.
+- Normal reboot behavior remains unchanged outside that reset pattern.
+
+Detailed guide: [docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md](docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md)
+
+### OTA / LittleFS Hardening
+
+The firmware and filesystem updater received a substantial reliability pass in this release.
+
+- Reboot verification now consistently uses `GET /api/v2/health`.
+- Before a LittleFS flash, the browser can download `settings.ini` and `dallas_labels.ini` backups.
+- After a successful filesystem flash, settings are rewritten to the fresh filesystem and the reboot handoff is cleaned up before restart.
+- Dallas labels cached in the browser are restored after the device reports healthy again.
+- OTA XHR uploads now emit detailed telnet logs for start, progress, completion, and abort.
 
 ---
 
 ## Bug Fixes
 
 ### Boot-Time Spurious Service Restarts
-readSettings() used to flag the configuration as dirty initially, forcing a service restart over WiFi during the first loop() iteration. This caused MQTT drops almost immediately after connecting. Addressed by clearing dirty flags post-initialization.
 
-### Hostname Dot-Stripping Targeting Wrong Buffer
-The hostname formatting fix inadvertently stripped periods from the wrong buffer pointer, now corrected to cleanly address settingHostname.
+Settings initialization could leave the system marked dirty at boot, which triggered avoidable service restarts in the first loop iteration and could drop MQTT soon after connect. That startup path is now cleaned up.
 
-### Webhook Payload Truncation on Settings Load
-The settings loader payload buffer was previously constrained. It has been widened to ensure long webhook payloads load cleanly without trailing character amputation upon reboot.
+### Hostname Normalization Fix
 
-### OTA Filesystem Corruption During Flash
-Two OTA-specific issues that could damage a filesystem flash were fixed:
+Dot-stripping in hostname cleanup previously targeted the wrong buffer. v1.3.0 corrects the write target so hostname normalization affects the actual hostname setting.
 
-- WiFi reconnect handling is now suppressed while an ESP flash is in progress, preventing reconnect side effects from tearing down the HTTP upload mid-write.
-- LittleFS OTA flashes now erase the full filesystem partition size instead of only the uploaded image size, avoiding stale metadata in untouched upper blocks.
+### Webhook Payload Truncation
+
+Long webhook payloads could be truncated when loaded from settings. The relevant buffer handling has been widened so payloads survive reboot and reload intact.
+
+### Safer Filesystem Flashing
+
+Two OTA-specific corruption paths were fixed:
+
+- WiFi reconnect activity is now suppressed while flash writes are active.
+- LittleFS OTA flashes erase the full filesystem partition instead of only the uploaded image size.
+
+### GPIO Conflict Detection
+
+The settings path now detects conflicting GPIO assignments earlier, reducing the chance of overlapping sensor, S0-counter, and output-pin usage making it into runtime behavior unnoticed.
 
 ---
 
 ## Memory and Performance Improvements
 
-### String Heap Fragmentation Eliminated
-Removed heavy String logic from writeSettings(). Each call historically dropped and reallocated strings causing heap fragmentation. The saving path now uses a global static scratch buffer to sidestep dynamic memory entirely.
+### Manual JSON Writer Instead of ArduinoJson
 
-### REST API v2 Migration Complete
-The OTA update page was officially moved from legacy endpoints to /api/v2. The REST API v1 handles are now entirely obsolete inside the WebUI layer.
+ArduinoJson has been removed from the firmware-side data path in favor of bounded manual JSON writing helpers. This reduces dependency weight and gives tighter control over RAM use.
 
-### OTA Restart Hygiene
-`settingsMarkClean()` was added so OTA-triggered settings writes do not leave deferred MQTT, NTP, mDNS, or similar service restarts pending during the short reboot window after a successful flash.
+### Lower Heap Churn in Settings Persistence
 
-### ArduinoJson Removed
-To squeeze out even more free RAM, ArduinoJson was stripped from the build. All serialization has been migrated to a bounded manual JSON writing architecture.
+The settings write path was reworked to avoid repeated `String` allocation and reallocation. Static scratch buffers now handle the hot path more predictably.
+
+### Cleaner OTA Reboot Window
+
+`settingsMarkClean()` and related cleanup ensure that OTA-triggered writes do not leave unnecessary MQTT, NTP, mDNS, or similar service restarts pending during the short reboot handoff.
+
+### Broader Structural Cleanup
+
+This release also includes larger internal cleanup that improves maintainability and reduces state ambiguity:
+
+- clearer split between persistent settings and transient runtime state
+- more centralized route and helper handling
+- safer status propagation around MQTT and OTA flows
 
 ---
 
 ## Breaking Changes
 
-There are **no breaking changes** in v1.3.0 regarding external behaviors, topics, or endpoints.
+There are **no new breaking changes** in v1.3.0 relative to `main` / `v1.2.0`.
 
-| Area | v1.2.0 → v1.3.0 |
-|------|-----------------|
-| MQTT topics | No changes |
-| HA discovery | Additive only (PS=1 fields added) |
-| REST API | Legacy removed internally; v2 untouched |
-| Settings keys | No changes |
+| Area | `v1.2.0` -> `v1.3.0` |
+|------|-----------------------|
+| MQTT topics | No new renames |
+| Home Assistant discovery | Additive only (`PS=1` summary coverage) |
+| REST API | No new removals beyond the existing v2-only baseline |
+| Settings format | No migration required |
+
+The migration items introduced in `v1.2.0` still apply where relevant. See [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md) and [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md).
+
+---
+
+## Upgrade Notes
+
+1. Flash both firmware and filesystem so the Web UI, updater flow, and `PS=1` features stay in sync.
+2. Hard-refresh the browser after flashing.
+3. If your WiFi environment is unstable or credentials have changed, use the new triple-reset recovery flow instead of reflashing.
+4. If you are upgrading from older than `v1.2.0`, review the earlier MQTT and API migration notes first.
 
 ---
 
 ## Validation Basis
-Compiled from the git delta between v1.2.0 and the current 1.3.0 release. Changes derived from commit history across firmware, Web UI, settings handling, and documentation.
+
+These notes were compiled from the `main..dev` branch delta, excluding CI-only version bumps and merge noise, and then cross-checked against the changed firmware, Web UI, OTA, and documentation files.
