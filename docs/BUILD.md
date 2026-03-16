@@ -16,10 +16,13 @@ python build.py
 The build script will automatically:
 
 1. Check for required dependencies
+2. Check for unresolved merge-conflict markers in source files
 2. Install arduino-cli if not present
 3. Update version information
 4. Build the firmware and filesystem
 5. Create versioned build artifacts in the `build/` directory
+
+If unresolved Git merge markers such as `<<<<<<<`, `=======`, or `>>>>>>>` are present, `build.py` now fails early with the affected file paths instead of letting the compiler emit harder-to-diagnose downstream errors.
 
 ## Prerequisites
 
