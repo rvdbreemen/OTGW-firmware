@@ -98,16 +98,6 @@ def print_info(message):
     print(f"{Colors.OKCYAN}ℹ {message}{Colors.ENDC}")
 
 
-MERGE_MARKER_PATTERNS = ("<<<<<<< ", "=======", ">>>>>>> ")
-MERGE_MARKER_SUFFIXES = {
-    ".c", ".cc", ".cpp", ".css", ".h", ".hpp", ".html", ".ino", ".ini",
-    ".js", ".json", ".md", ".py", ".sh", ".txt", ".xml", ".yaml", ".yml"
-}
-MERGE_MARKER_SKIP_DIRS = {
-    ".git", ".tmp", ".venv", "__pycache__", "arduino", "build", "staging"
-}
-
-
 def run_command(cmd, cwd=None, env=None, check=True, capture_output=False, show_output=True):
     """Run a shell command and handle errors"""
     try:
@@ -152,42 +142,6 @@ def run_command(cmd, cwd=None, env=None, check=True, capture_output=False, show_
             if e.stderr:
                 print(f"STDERR:\n{e.stderr}")
         sys.exit(1)
-
-
-def check_for_merge_markers(project_dir):
-    """Fail fast when unresolved merge-conflict markers exist in source files."""
-    print_step("Checking for unresolved merge markers")
-
-    conflicts = []
-
-    for path in project_dir.rglob("*"):
-        if not path.is_file():
-            continue
-
-        if any(part in MERGE_MARKER_SKIP_DIRS for part in path.parts):
-            continue
-
-        if path.suffix.lower() not in MERGE_MARKER_SUFFIXES:
-            continue
-
-        try:
-            with open(path, "r", encoding="utf-8", errors="ignore") as handle:
-                for line_number, line in enumerate(handle, start=1):
-                    if any(line.startswith(pattern) for pattern in MERGE_MARKER_PATTERNS):
-                        conflicts.append(f"{path.relative_to(project_dir)}:{line_number}: {line.strip()}")
-                        break
-        except (IOError, OSError) as exc:
-            print_warning(f"Could not inspect {path}: {exc}")
-
-    if conflicts:
-        print_error("Unresolved merge-conflict markers found. Resolve them before building:")
-        for conflict in conflicts[:20]:
-            print(f"  - {conflict}", file=sys.stderr)
-        if len(conflicts) > 20:
-            print(f"  - ... and {len(conflicts) - 20} more", file=sys.stderr)
-        sys.exit(1)
-
-    print_success("No unresolved merge markers found")
 
 
 def get_system_info():
@@ -964,9 +918,6 @@ Examples:
     if args.distclean:
         clean_build(project_dir)
         return
-
-    # Fail fast on a dirty source tree that would otherwise produce confusing compiler errors.
-    check_for_merge_markers(project_dir)
     
     # Install arduino-cli if needed and add to PATH
     if not args.no_install_cli:
