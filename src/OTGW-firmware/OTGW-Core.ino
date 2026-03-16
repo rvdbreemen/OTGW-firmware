@@ -3224,6 +3224,7 @@ void processOT(const char *buf, int len){
     OTGWDebugTf(PSTR("Current device id: %s\r\n"), state.pic.sDeviceid);
     strlcpy(state.pic.sType, OTGWSerial.firmwareToString().c_str(), sizeof(state.pic.sType));
     OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
+    sendMQTTversioninfo();
     { char evtBuf[60]; snprintf_P(evtBuf, sizeof(evtBuf), PSTR("OTGW PIC restarted [%s]"), state.pic.sFwversion); reportOTGWEvent(evtBuf, '*', true); }
   } else if (strchr(buf, ',') != nullptr) {
     // Comma-separated line: handle PS=1 summary (25 or 34 comma-separated fields).
@@ -3677,6 +3678,7 @@ void fwreportinfo(OTGWFirmware fw, const char *version) {
     //instead of using the firmware string
     strlcpy(state.pic.sType, OTGWSerial.firmwareToString(fw).c_str(), sizeof(state.pic.sType));
     OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
+    sendMQTTversioninfo();
 }
 
 void fwupgradestart(const char *hexfile) {

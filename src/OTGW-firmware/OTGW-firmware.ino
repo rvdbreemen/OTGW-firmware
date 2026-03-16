@@ -402,7 +402,9 @@ void doTaskEvery60s(){
     }
   }
 
-  if (strcmp_P(state.pic.sDeviceid, PSTR("unknown")) == 0){
+  if ((strcmp_P(state.pic.sDeviceid, PSTR("unknown")) == 0)
+      || (strcmp_P(state.pic.sDeviceid, PSTR("no pic found")) == 0)
+      || (state.pic.sDeviceid[0] == '\0')) {
     //keep trying to figure out which pic is used!
     DebugTln(F("PIC is unknown, probe pic using PR=A"));
     //Force banner fetch
@@ -414,6 +416,7 @@ void doTaskEvery60s(){
     DebugTf(PSTR("Current device id: %s\r\n"), state.pic.sDeviceid);    
     strlcpy(state.pic.sType, OTGWSerial.firmwareToString().c_str(), sizeof(state.pic.sType));
     DebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
+    sendMQTTversioninfo();
   }
   
   // Log heap statistics every minute for monitoring
