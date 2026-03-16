@@ -217,6 +217,20 @@ Starting with hardware version 2.3, the included ESP8266 devkit changed from Nod
 - OTGW PIC firmware downloads: <http://otgw.tclcode.com/download.html>
 - GitHub releases (prebuilt firmware binaries): <https://github.com/rvdbreemen/OTGW-firmware/releases>
 
+## Review Checklist
+
+Use this short checklist when reviewing firmware changes, especially in hardware-sensitive or recovery-related code paths.
+
+1. **Internal control flow**: If a parameter selects behavior, should it be an `enum class` or numeric ID instead of a string token?
+2. **Flash vs RAM correctness**: Does every `PGM_P`, `F()`, `PSTR()`, `_P` helper, or PROGMEM comparison match the real storage domain?
+3. **Crash potential**: Could a wrong pointer or wrong string helper turn this into an ESP8266 exception during boot, flash, or command handling?
+4. **Operator logs**: Are OTA and recovery lifecycle logs using timestamped `DebugT*` macros so telnet output is consistent?
+5. **Shared paths**: If firmware and filesystem use the same workflow, is the logic implemented once in the common path instead of duplicated?
+6. **UI fixes**: If the issue is visual spacing or layout, is it fixed structurally in markup/CSS instead of by injecting ad hoc spaces into runtime strings?
+7. **Build hygiene**: Is the tree free of unresolved merge markers before spending time on compile failures?
+
+These checks come directly from the regression and recovery work documented in [docs/reviews/2026-03-16_gpio-ota-postmortem/](docs/reviews/2026-03-16_gpio-ota-postmortem/).
+
 ## Quick start (high level)
 
 The exact steps and screenshots live in the wiki, but the general flow is:
