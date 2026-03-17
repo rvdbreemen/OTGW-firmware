@@ -14,7 +14,6 @@
   
   html {
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
     font-family: 'Dosis', sans-serif;
     line-height: 1.6;
     color: black;
@@ -81,8 +80,8 @@
   }
   
   .container-card {
-    padding: 50;
-    margin: 50;
+    padding: 50px;
+    margin: 50px;
     list-style: none;
     flex-direction: row; /*row | row-reverse | column | column-reverse*/
     
@@ -93,6 +92,7 @@
     display: flex;
     
     -webkit-flex-flow: row wrap;
+    flex-flow: row wrap;
     justify-content: space-around; /* flex-start | flex-end | center | space-between | space-around | space-evenly */
   
   }
@@ -110,6 +110,7 @@
     display: flex;
     
     -webkit-flex-flow: column wrap;
+    flex-flow: column wrap;
     justify-content: flex-start;
     margin-top: 10px;
   }
@@ -879,26 +880,33 @@
   white-space: pre;
   line-height: 1.4;
   max-height: inherit;
-  scrollbar-width: thin;
-  scrollbar-color: #555 #1e1e1e;
 }
 
-.ot-log-content::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+@supports (scrollbar-width: thin) {
+  .ot-log-content {
+    scrollbar-width: thin;
+    scrollbar-color: #555 #1e1e1e;
+  }
 }
 
-.ot-log-content::-webkit-scrollbar-track {
-  background: #1e1e1e;
-}
+@supports selector(::-webkit-scrollbar) {
+  .ot-log-content::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
 
-.ot-log-content::-webkit-scrollbar-thumb {
-  background: #555;
-  border-radius: 5px;
-}
+  .ot-log-content::-webkit-scrollbar-track {
+    background: #1e1e1e;
+  }
 
-.ot-log-content::-webkit-scrollbar-thumb:hover {
-  background: #777;
+  .ot-log-content::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 5px;
+  }
+
+  .ot-log-content::-webkit-scrollbar-thumb:hover {
+    background: #777;
+  }
 }
 
 /* Log Footer */
