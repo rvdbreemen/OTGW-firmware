@@ -602,7 +602,7 @@ void handleMQTT()
         // normal reconnects and broker restarts (lost retained messages) without
         // flooding the broker with configs for message IDs never seen in the wild.
         clearMQTTConfigDone();
-        requestMQTTStatusRepublish();
+        requestMQTTRepublishAll();
 
         //Subscribe to topics
         char topic[MQTT_TOPIC_MAX_LEN];

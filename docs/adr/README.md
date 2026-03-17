@@ -65,6 +65,9 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-006: MQTT Integration Pattern](ADR-006-mqtt-integration-pattern.md)**  
   MQTT client implementation with Home Assistant Auto-Discovery for zero-configuration integration.
 
+- **[ADR-052: MQTT Publish Eligibility and Reconnect Refresh Contract](ADR-052-mqtt-publish-eligibility-contract.md)** 🆕
+  Precise contract for first-seen, value-change, stale-refresh, and reconnect-reset behavior for normal MQTT topics plus combined and per-bit `msgid 0` status topics.
+
 - **[ADR-031: Two-Microcontroller Coordination Architecture](ADR-031-two-microcontroller-coordination-architecture.md)** 🆕  
   Master/Slave architecture with ESP8266 as network controller and PIC microcontroller for OpenTherm protocol (serial communication, GPIO reset control, firmware upgrade capability).
 
