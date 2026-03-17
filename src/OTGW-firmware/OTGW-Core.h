@@ -492,6 +492,7 @@ extern time_t   msglastupdated[256];       // last-updated timestamp per OT msg 
 extern uint32_t mqttlastsent[256];         // packed throttle state: bits31-16=last u16 value, bits15-0=seconds-since-boot
 extern uint16_t mqttlastsentstatusbit[16]; // per-bit publish timers for OT_Statusflags (slots 0-7=master, 8-15=slave)
 extern bool     mqttPublishAllowed;        // MQTT interval gate — managed via OTPublishGate, checked in sendMQTTData
+void requestMQTTRepublishAll();            // reset MQTT publish eligibility so next observed values publish as first-seen again
 void requestMQTTStatusRepublish();         // force the next observed master/slave status frames to republish
 
 // RAII guard for the MQTT publish gate. Saves/restores mqttPublishAllowed on scope exit
