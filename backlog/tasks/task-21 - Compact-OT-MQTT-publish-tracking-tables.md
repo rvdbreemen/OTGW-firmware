@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@copilot'
 created_date: '2026-03-18 19:44'
-updated_date: '2026-03-18 21:47'
+updated_date: '2026-03-18 22:19'
 labels:
   - memory mqtt restapi core
 dependencies: []
@@ -40,3 +40,13 @@ OTGW-Core now keeps per-message tracking arrays for REST timestamps and MQTT thr
 3. Update the REST last-updated path to read from the new uint16_t table, accepting that the reported second counter can represent only the most recent 65535 seconds (18h 12m 15s) before wrap.
 4. Preserve first-seen and status-slot isolation with explicit lookup helpers for normal OT IDs, status bits, and status bytes, then validate build output and wrap behavior reasoning for both MQTT and REST consumers.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented low-risk tracking compaction: dense uint16_t REST last-updated table for OT monitor fields plus sentinel-based MQTT first-seen tracking using uint16_t rolling seconds.
+
+Validated with full firmware build after fixing a local name-shadowing compile error in enterPSMode().
+
+Measured result: global RAM 58068 -> 57164 bytes, reclaiming 904 bytes and leaving 24756 bytes free. This preserves the low-risk behavior path but does not yet meet AC #1's 1024-byte target.
+<!-- SECTION:NOTES:END -->
