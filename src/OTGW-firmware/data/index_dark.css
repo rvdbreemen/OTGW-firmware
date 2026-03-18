@@ -894,24 +894,22 @@
   }
 }
 
-@supports selector(::-webkit-scrollbar) {
-  .ot-log-content::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
+.ot-log-content::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
 
-  .ot-log-content::-webkit-scrollbar-track {
-    background: #1e1e1e;
-  }
+.ot-log-content::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
 
-  .ot-log-content::-webkit-scrollbar-thumb {
-    background: #555;
-    border-radius: 5px;
-  }
+.ot-log-content::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 5px;
+}
 
-  .ot-log-content::-webkit-scrollbar-thumb:hover {
-    background: #777;
-  }
+.ot-log-content::-webkit-scrollbar-thumb:hover {
+  background: #777;
 }
 
 /* Log Footer */
