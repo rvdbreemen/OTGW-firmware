@@ -1,9 +1,11 @@
 ---
 id: TASK-21
 title: Compact OT/MQTT publish tracking tables
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@copilot'
 created_date: '2026-03-18 19:44'
+updated_date: '2026-03-18 21:47'
 labels:
   - memory mqtt restapi core
 dependencies: []
@@ -29,3 +31,12 @@ OTGW-Core now keeps per-message tracking arrays for REST timestamps and MQTT thr
 - [ ] #3 REST API last-updated timestamps remain available for the supported fields
 - [ ] #4 No cross-slot contamination is introduced in MQTT gating logic
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Replace both MQTT and REST tracking timestamps with uint16_t storage and keep all interval comparisons wrap-safe using unsigned subtraction against seconds-since-boot values.
+2. Split the current 256-entry mixed-purpose tracking into dedicated dense tables: one for MQTT publish slots and one for REST-exposed OT fields, so width reduction and scope reduction both contribute to RAM savings.
+3. Update the REST last-updated path to read from the new uint16_t table, accepting that the reported second counter can represent only the most recent 65535 seconds (18h 12m 15s) before wrap.
+4. Preserve first-seen and status-slot isolation with explicit lookup helpers for normal OT IDs, status bits, and status bytes, then validate build output and wrap behavior reasoning for both MQTT and REST consumers.
+<!-- SECTION:PLAN:END -->

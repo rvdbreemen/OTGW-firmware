@@ -218,16 +218,122 @@ static const char* skipOTLogTimestamp(const char* logLine)
 OpenthermData_t OTdata, delayedOTdata, tmpOTdata;
 
 // Global state arrays — defined here (one definition rule), declared extern in OTGW-Core.h. (ADR-044)
-time_t   msglastupdated[256]       = {0}; // last-updated timestamp per OT msg id (0-255)
 uint32_t mqttlastsent[256]         = {0}; // packed throttle: bits31-16=last published u16, bits15-0=seconds-since-boot
 uint16_t mqttlastsentstatusbit[16] = {0}; // per-bit publish timers for OT_Statusflags (slots 0-7=master, 8-15=slave)
 bool     mqttPublishAllowed        = true; // MQTT interval gate — managed via OTPublishGate (OTGW-Core.h)
-static uint8_t mqttSeenSlots[32]         = {0}; // 256 publish slots: first-seen tracking for normal OT MQTT topics
-static uint8_t mqttSeenStatusBits[2]     = {0}; // 16 per-bit slots for OT_Statusflags first-seen tracking
-static uint8_t mqttSeenStatusBytes       = 0;   // bit0=master status byte seen, bit1=slave status byte seen
 static uint16_t mqttlastsentstatusbyte[2] = {0}; // combined status_master/status_slave publish timers
 static bool mqttForceNextMasterStatusPublish = true;
 static bool mqttForceNextSlaveStatusPublish  = true;
+
+static constexpr uint16_t TRACKED_TIME_UNSEEN = 0xFFFFU;
+static constexpr uint32_t TRACKED_TIME_MODULUS = 65535UL;
+
+enum RestLastUpdatedSlot : uint8_t {
+  REST_UPDATED_STATUSFLAGS = 0,
+  REST_UPDATED_ASFFLAGS,
+  REST_UPDATED_TOUTSIDE,
+  REST_UPDATED_TR,
+  REST_UPDATED_TRSET,
+  REST_UPDATED_TROVERRIDE,
+  REST_UPDATED_TSET,
+  REST_UPDATED_RELMODLEVEL,
+  REST_UPDATED_MAXRELMODLEVELSETTING,
+  REST_UPDATED_TBOILER,
+  REST_UPDATED_TRET,
+  REST_UPDATED_TDHW,
+  REST_UPDATED_TDHWSET,
+  REST_UPDATED_MAXTSET,
+  REST_UPDATED_CHPRESSURE,
+  REST_UPDATED_OEMDIAGNOSTICCODE,
+  REST_UPDATED_COUNT
+};
+
+static uint16_t restLastUpdated[REST_UPDATED_COUNT] = {
+  TRACKED_TIME_UNSEEN, TRACKED_TIME_UNSEEN, TRACKED_TIME_UNSEEN, TRACKED_TIME_UNSEEN,
+  TRACKED_TIME_UNSEEN, TRACKED_TIME_UNSEEN, TRACKED_TIME_UNSEEN, TRACKED_TIME_UNSEEN,
+  TRACKED_TIME_UNSEEN, TRACKED_TIME_UNSEEN, TRACKED_TIME_UNSEEN, TRACKED_TIME_UNSEEN,
+  TRACKED_TIME_UNSEEN, TRACKED_TIME_UNSEEN, TRACKED_TIME_UNSEEN, TRACKED_TIME_UNSEEN
+};
+
+static uint16_t currentTrackedSeconds()
+{
+  return static_cast<uint16_t>((millis() / 1000UL) % TRACKED_TIME_MODULUS);
+}
+
+static uint16_t elapsedTrackedSeconds(uint16_t now, uint16_t lastTime)
+{
+  return (now >= lastTime)
+           ? static_cast<uint16_t>(now - lastTime)
+           : static_cast<uint16_t>((TRACKED_TIME_MODULUS - lastTime) + now);
+}
+
+static int8_t restLastUpdatedSlotForMsgId(uint8_t msgId)
+{
+  switch (msgId) {
+    case OT_Statusflags: return REST_UPDATED_STATUSFLAGS;
+    case OT_ASFflags: return REST_UPDATED_ASFFLAGS;
+    case OT_Toutside: return REST_UPDATED_TOUTSIDE;
+    case OT_Tr: return REST_UPDATED_TR;
+    case OT_TrSet: return REST_UPDATED_TRSET;
+    case OT_TrOverride: return REST_UPDATED_TROVERRIDE;
+    case OT_TSet: return REST_UPDATED_TSET;
+    case OT_RelModLevel: return REST_UPDATED_RELMODLEVEL;
+    case OT_MaxRelModLevelSetting: return REST_UPDATED_MAXRELMODLEVELSETTING;
+    case OT_Tboiler: return REST_UPDATED_TBOILER;
+    case OT_Tret: return REST_UPDATED_TRET;
+    case OT_Tdhw: return REST_UPDATED_TDHW;
+    case OT_TdhwSet: return REST_UPDATED_TDHWSET;
+    case OT_MaxTSet: return REST_UPDATED_MAXTSET;
+    case OT_CHPressure: return REST_UPDATED_CHPRESSURE;
+    case OT_OEMDiagnosticCode: return REST_UPDATED_OEMDIAGNOSTICCODE;
+    default: return -1;
+  }
+}
+
+static void clearMsgLastUpdated()
+{
+  for (uint8_t i = 0; i < REST_UPDATED_COUNT; i++) {
+    restLastUpdated[i] = TRACKED_TIME_UNSEEN;
+  }
+}
+
+uint16_t getMsgLastUpdated(uint8_t msgId)
+{
+  int8_t slot = restLastUpdatedSlotForMsgId(msgId);
+  if (slot < 0) return 0;
+  uint16_t tracked = restLastUpdated[slot];
+  return (tracked == TRACKED_TIME_UNSEEN) ? 0 : tracked;
+}
+
+static void setMsgLastUpdated(uint8_t msgId, uint16_t trackedNow)
+{
+  int8_t slot = restLastUpdatedSlotForMsgId(msgId);
+  if (slot >= 0) {
+    restLastUpdated[slot] = trackedNow;
+  }
+}
+
+static void resetMqttTrackedState()
+{
+  for (uint16_t i = 0; i < 256; i++) {
+    mqttlastsent[i] = TRACKED_TIME_UNSEEN;
+  }
+  for (uint8_t i = 0; i < 16; i++) {
+    mqttlastsentstatusbit[i] = TRACKED_TIME_UNSEEN;
+  }
+  mqttlastsentstatusbyte[0] = TRACKED_TIME_UNSEEN;
+  mqttlastsentstatusbyte[1] = TRACKED_TIME_UNSEEN;
+}
+
+struct TrackingStateInitializer {
+  TrackingStateInitializer()
+  {
+    clearMsgLastUpdated();
+    resetMqttTrackedState();
+  }
+};
+
+static TrackingStateInitializer gTrackingStateInitializer;
 struct OT_cmd_t cmdqueue[CMDQUEUE_MAX];
 int cmdQueueSize = 0;  // fill-pointer: entries are 0..cmdQueueSize-1, left-shift on deletion
 
@@ -834,34 +940,24 @@ static bool shouldForceSlaveStatusPublish()
   return mqttForceNextSlaveStatusPublish;
 }
 
-static bool isPublishSlotSeen(const uint8_t *bitmap, uint8_t slot)
+static bool hasTrackedTime(uint16_t trackedTime)
 {
-  return (bitmap[slot >> 3] & (uint8_t)(1U << (slot & 0x07))) != 0;
+  return trackedTime != TRACKED_TIME_UNSEEN;
 }
 
-static void setPublishSlotSeen(uint8_t *bitmap, uint8_t slot)
+static uint16_t getPackedSlotTime(uint32_t packed)
 {
-  bitmap[slot >> 3] |= (uint8_t)(1U << (slot & 0x07));
+  return static_cast<uint16_t>(packed & 0xFFFFU);
 }
 
-static bool isStatusByteSeen(uint8_t byteSlot)
+static void setPackedSlot(uint8_t idx, uint16_t rawValue, uint16_t trackedNow)
 {
-  return (mqttSeenStatusBytes & (uint8_t)(1U << byteSlot)) != 0;
-}
-
-static void setStatusByteSeen(uint8_t byteSlot)
-{
-  mqttSeenStatusBytes |= (uint8_t)(1U << byteSlot);
+  mqttlastsent[idx] = (static_cast<uint32_t>(rawValue) << 16) | trackedNow;
 }
 
 void requestMQTTRepublishAll()
 {
-  memset(mqttlastsent, 0, sizeof(mqttlastsent));
-  memset(mqttSeenSlots, 0, sizeof(mqttSeenSlots));
-  memset(mqttlastsentstatusbit, 0, sizeof(mqttlastsentstatusbit));
-  memset(mqttSeenStatusBits, 0, sizeof(mqttSeenStatusBits));
-  memset(mqttlastsentstatusbyte, 0, sizeof(mqttlastsentstatusbyte));
-  mqttSeenStatusBytes = 0;
+  resetMqttTrackedState();
   requestMQTTStatusRepublish();
 }
 
@@ -888,21 +984,20 @@ bool shouldPublishMQTTForID(byte id, byte masterslave, uint16_t rawValue) {
                                 ? shouldForceMasterStatusPublish()
                                 : shouldForceSlaveStatusPublish();
     if (forcePublish) {
-      uint16_t now = (uint16_t)(millis() / 1000UL);
-      mqttlastsent[idx] = ((uint32_t)rawValue << 16) | now;
+      uint16_t now = currentTrackedSeconds();
+      setPackedSlot(idx, rawValue, now);
       return true;
     }
   }
-  const bool firstSeen = !isPublishSlotSeen(mqttSeenSlots, idx);
   uint32_t packed = mqttlastsent[idx];
+  const bool firstSeen = !hasTrackedTime(getPackedSlotTime(packed));
   uint16_t lastVal  = (uint16_t)(packed >> 16);             // bits 31-16: last published u16
-  uint16_t lastTime = (uint16_t)(packed & 0xFFFF);           // bits 15-0:  seconds-since-boot
-  uint16_t now      = (uint16_t)(millis() / 1000UL);
+  uint16_t lastTime = getPackedSlotTime(packed);            // bits 15-0: rolling seconds-since-boot
+  uint16_t now      = currentTrackedSeconds();
   bool valueChanged    = (rawValue != lastVal);
-  bool intervalElapsed = ((uint16_t)(now - lastTime) >= settings.mqtt.iInterval);
+  bool intervalElapsed = !firstSeen && (elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval);
   if (firstSeen || valueChanged || intervalElapsed) {
-    mqttlastsent[idx] = ((uint32_t)rawValue << 16) | now;
-    setPublishSlotSeen(mqttSeenSlots, idx);
+    setPackedSlot(idx, rawValue, now);
     return true;
   }
   return false;
@@ -919,13 +1014,12 @@ bool shouldPublishMQTTForPSField(byte id) {
   if (id == OT_Statusflags) return true; // status uses dedicated combined-byte and per-bit gates
   // PS=1 summary fields are always slave responses → idx = id (masterslave==0)
   byte idx = id;
-  const bool firstSeen = !isPublishSlotSeen(mqttSeenSlots, idx);
-  uint16_t lastTime = (uint16_t)(mqttlastsent[idx] & 0xFFFFUL);
-  uint16_t now      = (uint16_t)(millis() / 1000UL);
-  if (firstSeen || (uint16_t)(now - lastTime) >= settings.mqtt.iInterval) {
+  uint16_t lastTime = getPackedSlotTime(mqttlastsent[idx]);
+  const bool firstSeen = !hasTrackedTime(lastTime);
+  uint16_t now      = currentTrackedSeconds();
+  if (firstSeen || elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval) {
     // Preserve the last-value bits; update only the time field
-    mqttlastsent[idx] = (mqttlastsent[idx] & 0xFFFF0000UL) | (uint32_t)now;
-    setPublishSlotSeen(mqttSeenSlots, idx);
+    mqttlastsent[idx] = (mqttlastsent[idx] & 0xFFFF0000UL) | static_cast<uint32_t>(now);
     return true;
   }
   return false;
@@ -933,20 +1027,18 @@ bool shouldPublishMQTTForPSField(byte id) {
 
 // shouldPublishStatusBit - per-bit publish decision for OT_Statusflags
 bool shouldPublishStatusBit(uint8_t bitSlot, bool newVal, bool prevVal, bool forcePublish) {
-  const bool firstSeen = !isPublishSlotSeen(mqttSeenStatusBits, bitSlot);
-  const uint16_t now = (uint16_t)(millis() / 1000UL);
+  const uint16_t lastTime = mqttlastsentstatusbit[bitSlot];
+  const bool firstSeen = !hasTrackedTime(lastTime);
+  const uint16_t now = currentTrackedSeconds();
   if (forcePublish) {
     mqttlastsentstatusbit[bitSlot] = now;
-    setPublishSlotSeen(mqttSeenStatusBits, bitSlot);
     return true;
   }
   if (settings.mqtt.iInterval == 0) return true;   // legacy: always publish
-  uint16_t lastTime = mqttlastsentstatusbit[bitSlot];
   bool valueChanged    = (newVal != prevVal);
-  bool intervalElapsed = ((uint16_t)(now - lastTime) >= settings.mqtt.iInterval);
+  bool intervalElapsed = !firstSeen && (elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval);
   if (firstSeen || valueChanged || intervalElapsed) {
     mqttlastsentstatusbit[bitSlot] = now;
-    setPublishSlotSeen(mqttSeenStatusBits, bitSlot);
     return true;
   }
   return false;
@@ -954,20 +1046,18 @@ bool shouldPublishStatusBit(uint8_t bitSlot, bool newVal, bool prevVal, bool for
 
 static bool shouldPublishStatusByte(uint8_t byteSlot, uint8_t newVal, uint8_t prevVal, bool forcePublish)
 {
-  const bool firstSeen = !isStatusByteSeen(byteSlot);
-  const uint16_t now = (uint16_t)(millis() / 1000UL);
+  const uint16_t lastTime = mqttlastsentstatusbyte[byteSlot];
+  const bool firstSeen = !hasTrackedTime(lastTime);
+  const uint16_t now = currentTrackedSeconds();
   if (forcePublish) {
     mqttlastsentstatusbyte[byteSlot] = now;
-    setStatusByteSeen(byteSlot);
     return true;
   }
   if (settings.mqtt.iInterval == 0) return true;
-  const uint16_t lastTime = mqttlastsentstatusbyte[byteSlot];
   const bool valueChanged = (newVal != prevVal);
-  const bool intervalElapsed = ((uint16_t)(now - lastTime) >= settings.mqtt.iInterval);
+  const bool intervalElapsed = !firstSeen && (elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval);
   if (firstSeen || valueChanged || intervalElapsed) {
     mqttlastsentstatusbyte[byteSlot] = now;
-    setStatusByteSeen(byteSlot);
     return true;
   }
   return false;
@@ -2474,9 +2564,7 @@ static void enterPSMode(PGM_P debugMessage, PGM_P eventMessage, bool clearMsgLas
   state.statusMessage = StatusMessage::PSModeActive;
 
   if (clearMsgLastUpdated) {
-    for (int i = 0; i <= OT_MSGID_MAX; i++) {
-      msglastupdated[i] = 0;
-    }
+    clearMsgLastUpdated();
   }
 
   if (eventMessage) {
@@ -2680,9 +2768,10 @@ static void logPSSummaryField(const char *label, const char *rawField)
   ClrLog();
 }
 
-static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const char *label, const char *rawField, time_t now)
+static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const char *label, const char *rawField)
 {
   char valueBuf[12] {0};
+  const uint16_t trackedNow = currentTrackedSeconds();
 
   switch (valueType) {
     case ot_f88: {
@@ -2690,7 +2779,7 @@ static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const c
       if (!parseStrictFloat(rawField, value)) return false;
       dtostrf(value, 3, 2, valueBuf);
       sendMQTTData(label, valueBuf);
-      msglastupdated[msgid] = now;
+      setMsgLastUpdated(msgid, trackedNow);
       updatePSSummaryFloatState(msgid, value);
       return true;
     }
@@ -2700,7 +2789,7 @@ static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const c
       if (!parseStrictSignedLong(rawField, -32768L, 32767L, parsedValue)) return false;
       itoa(static_cast<int16_t>(parsedValue), valueBuf, 10);
       sendMQTTData(label, valueBuf);
-      msglastupdated[msgid] = now;
+      setMsgLastUpdated(msgid, trackedNow);
       if (msgid == 33) OTcurrentSystemState.Texhaust = static_cast<int16_t>(parsedValue);
       return true;
     }
@@ -2710,7 +2799,7 @@ static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const c
       if (!parseStrictUnsignedLong(rawField, 65535UL, parsedValue)) return false;
       utoa(static_cast<uint16_t>(parsedValue), valueBuf, 10);
       sendMQTTData(label, valueBuf);
-      msglastupdated[msgid] = now;
+      setMsgLastUpdated(msgid, trackedNow);
       updatePSSummaryU16State(msgid, static_cast<uint16_t>(parsedValue));
       return true;
     }
@@ -2723,7 +2812,7 @@ static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const c
       itoa(upperByte, valueBuf, 10);
       itoa(lowerByte, lowerValueBuf, 10);
       publishPSSummarySplitBytes(label, "_value_hb", "_value_lb", valueBuf, lowerValueBuf);
-      msglastupdated[msgid] = now;
+      setMsgLastUpdated(msgid, trackedNow);
       if (msgid == 48) OTcurrentSystemState.TdhwSetUBTdhwSetLB = ((uint8_t)upperByte << 8) | (uint8_t)lowerByte;
       else if (msgid == 49) OTcurrentSystemState.MaxTSetUBMaxTSetLB = ((uint8_t)upperByte << 8) | (uint8_t)lowerByte;
       return true;
@@ -2737,7 +2826,7 @@ static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const c
       utoa(upperByte, valueBuf, 10);
       utoa(lowerByte, lowerValueBuf, 10);
       publishPSSummarySplitBytes(label, "_value_hb", "_value_lb", valueBuf, lowerValueBuf);
-      msglastupdated[msgid] = now;
+      setMsgLastUpdated(msgid, trackedNow);
       if (msgid == 15) OTcurrentSystemState.MaxCapacityMinModLevel = ((uint16_t)upperByte << 8) | lowerByte;
       return true;
     }
@@ -2747,7 +2836,7 @@ static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const c
       if (!parseStrictUnsignedLong(rawField, 255UL, parsedValue)) return false;
       utoa(static_cast<uint8_t>(parsedValue), valueBuf, 10);
       sendMQTTData(label, valueBuf);
-      msglastupdated[msgid] = now;
+      setMsgLastUpdated(msgid, trackedNow);
       if (msgid == 71) OTcurrentSystemState.ControlSetpointVH = static_cast<uint8_t>(parsedValue);
       else if (msgid == 77) OTcurrentSystemState.RelativeVentilation = static_cast<uint8_t>(parsedValue);
       return true;
@@ -2757,7 +2846,7 @@ static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const c
       uint8_t upperByte = 0;
       uint8_t lowerByte = 0;
       if (!parsePSSummaryFlag8Flag8(rawField, upperByte, lowerByte)) return false;
-      msglastupdated[msgid] = now;
+      setMsgLastUpdated(msgid, trackedNow);
       switch (msgid) {
         case 0:
           OTcurrentSystemState.Statusflags = publishCombinedStatusState(upperByte, lowerByte);
@@ -2797,7 +2886,6 @@ void processPSSummary(const char *buf, int len) {
 
   enterPSMode(PSTR("PS mode auto-detected as ON (comma-separated summary)"), nullptr, false);
 
-  const time_t now = time(nullptr);
   const uint8_t *msgIdTable = bFW5 ? PSSUMMARY_MSGIDS_NEW : PSSUMMARY_MSGIDS_OLD;
   const uint8_t tableSize   = bFW5 ? 34 : 25;
   const char *p = buf;
@@ -2820,7 +2908,7 @@ void processPSSummary(const char *buf, int len) {
         const char *label = OTlookupitem.label;
         OTPublishGate psGate(shouldPublishMQTTForPSField(msgid));
 
-        if (publishPSSummaryFieldValue(msgid, OTlookupitem.type, label, fBuf, now)) {
+        if (publishPSSummaryFieldValue(msgid, OTlookupitem.type, label, fBuf)) {
           ensurePSSummaryDiscovery(msgid);
           logPSSummaryField(label, fBuf);
         }
@@ -3164,7 +3252,7 @@ void processOT(const char *buf, int len){
       OTdata.skipthis |= (OTdata.rsptype == OTGW_PARITY_ERROR);
 
       //keep track of last update time of each message id
-      msglastupdated[OTdata.id] = now;
+      setMsgLastUpdated(OTdata.id, currentTrackedSeconds());
       
       //Read information from this OT message ready for use...
       if (OTdata.id <= OT_MSGID_MAX) {
