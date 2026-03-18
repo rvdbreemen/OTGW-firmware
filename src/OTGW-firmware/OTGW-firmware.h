@@ -106,10 +106,17 @@ enum class GPIOConflictCaller : uint8_t {
   Output,
 };
 
+enum class StatusMessage : uint8_t {
+  None,
+  LittleFSMismatch,
+  PSModeActive,
+};
+
 void readSettings(bool show);
 void writeSettings(bool show);
 void updateSetting(const char *field, const char *newValue);
 bool checkGPIOConflict(int pin, GPIOConflictCaller caller);
+const __FlashStringHelper* getStatusMessageText();
 void escapeJsonStringTo(const char* src, char* dest, size_t destSize);
 void GetVersion(const char* hexfile, char* version, size_t destSize);
 void startWebSocket();
@@ -172,6 +179,7 @@ struct OTGWState {
   FlashSection       flash;  // state.flash.bESPactive, state.flash.iPICprogress
   DebugSection       debug;  // state.debug.bOTmsg, state.debug.bMQTT
   UptimeSection      uptime; // state.uptime.iSeconds, state.uptime.iRebootCount
+  StatusMessage      statusMessage = StatusMessage::None;
   bool               bSetupComplete = false;
 };
 
@@ -274,7 +282,6 @@ WiFiClient  wifiClient;
 char        cMsg[CMSG_SIZE];
 char        fChar[10];
 char        lastReset[129] = "";
-char        sMessage[257] = "";
 uint32_t    MQTTautoConfigMap[8] = { 0 };
 // Deferred settings write timer (Finding #23: coalesce flash writes)
 uint32_t  timerFlushSettings_interval = 2000;  // 2 second debounce

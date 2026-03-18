@@ -907,7 +907,7 @@ void sendDeviceTime()
   snprintf_P(buf, sizeof(buf), PSTR("%04d-%02d-%02d %02d:%02d:%02d"), myTime.year(), myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second());
   sendNestedJsonObj(F("dateTime"), buf); 
   sendNestedJsonObj(F("epoch"), (int)now);
-  sendNestedJsonObj(F("message"), sMessage);
+  sendNestedJsonObj(F("message"), getStatusMessageText());
   sendNestedJsonObj(F("psmode"), CBOOLEAN(state.otgw.bPSmode));
 
   sendEndJsonObj(F("devtime"));
@@ -927,7 +927,7 @@ void sendDeviceTimeV2()
   snprintf_P(buf, sizeof(buf), PSTR("%04d-%02d-%02d %02d:%02d:%02d"), myTime.year(), myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second());
   sendJsonMapEntry(F("dateTime"), buf); 
   sendJsonMapEntry(F("epoch"), (int)now);
-  sendJsonMapEntry(F("message"), sMessage);
+  sendJsonMapEntry(F("message"), getStatusMessageText());
   sendJsonMapEntry(F("psmode"), state.otgw.bPSmode);
   sendJsonMapEntry(F("otgwsimulation"), state.debug.bOTGWSimulation);
   sendJsonMapEntry(F("freeheap"), ESP.getFreeHeap());
