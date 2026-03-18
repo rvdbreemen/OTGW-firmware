@@ -12,6 +12,7 @@ const localURL = window.location.protocol + '//' + window.location.host;
 const APIGW = window.location.protocol + '//' + window.location.host + '/api/';
 const MOBILE_BREAKPOINT_PX = 768;
 const PS_MODE_NOTICE_TEXT = 'PS=1 mode active: showing decoded field summaries. Raw OT frames not available.';
+const WEBKIT_SCROLLBAR_STYLE_ID = 'otgw-webkit-scrollbar-style';
 
 "use strict";
 // ============================================================================
@@ -56,6 +57,26 @@ function safeGetElementById(id, warnIfMissing = false) {
     console.warn(`Element not found: #${id}`);
   }
   return element;
+}
+
+function ensureWebkitScrollbarStyles() {
+  if (!('WebkitAppearance' in document.documentElement.style)) {
+    return;
+  }
+
+  if (document.getElementById(WEBKIT_SCROLLBAR_STYLE_ID)) {
+    return;
+  }
+
+  const style = document.createElement('style');
+  style.id = WEBKIT_SCROLLBAR_STYLE_ID;
+  style.textContent = [
+    '.ot-log-content::-webkit-scrollbar { width: 10px; height: 10px; }',
+    '.ot-log-content::-webkit-scrollbar-track { background: #1e1e1e; }',
+    '.ot-log-content::-webkit-scrollbar-thumb { background: #555; border-radius: 5px; }',
+    '.ot-log-content::-webkit-scrollbar-thumb:hover { background: #777; }'
+  ].join('\n');
+  document.head.appendChild(style);
 }
 
 // ============================================================================
@@ -2606,6 +2627,7 @@ function renderSharedPageNavShell() {
 //============================================================================  
 function initMainPage() {
   console.log("initMainPage()");
+  ensureWebkitScrollbarStyles();
 
   // Check if we're in flash mode (from sessionStorage)
   try {
