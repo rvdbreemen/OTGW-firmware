@@ -1,11 +1,11 @@
 ---
 id: TASK-19
 title: Replace global sMessage scratch buffer with smaller status representation
-status: In Progress
+status: Done
 assignee:
   - '@github-copilot'
 created_date: '2026-03-18 19:44'
-updated_date: '2026-03-18 20:12'
+updated_date: '2026-03-18 21:08'
 labels:
   - memory api
 dependencies: []
@@ -25,10 +25,10 @@ The firmware keeps a global sMessage[257] buffer in persistent RAM for API/statu
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Persistent RAM used for global status messaging is reduced by at least 200 bytes
-- [ ] #2 REST API message fields still return meaningful values where currently expected
-- [ ] #3 LittleFS mismatch and PS=1 status reporting continue to work correctly
-- [ ] #4 No new heap allocations are introduced in the replacement path
+- [x] #1 Persistent RAM used for global status messaging is reduced by at least 200 bytes
+- [x] #2 REST API message fields still return meaningful values where currently expected
+- [x] #3 LittleFS mismatch and PS=1 status reporting continue to work correctly
+- [x] #4 No new heap allocations are introduced in the replacement path
 <!-- AC:END -->
 
 ## Implementation Notes
