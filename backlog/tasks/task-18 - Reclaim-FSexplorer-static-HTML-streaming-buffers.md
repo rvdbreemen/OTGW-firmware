@@ -1,10 +1,10 @@
 ---
 id: TASK-18
 title: Reclaim FSexplorer static HTML streaming buffers
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-03-18 19:44'
-updated_date: '2026-03-18 19:48'
+updated_date: '2026-03-18 21:08'
 labels:
   - memory performance filesystem
 dependencies: []
@@ -26,10 +26,10 @@ Evaluate the option to use the global scratch buffers that are available.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Persistent RAM used by the FSexplorer HTML streaming handler is reduced by at least 1024 bytes
-- [ ] #2 index.html and graph.js cache-busting behavior remains unchanged
-- [ ] #3 The handler continues to avoid Arduino String allocations in the hot path
-- [ ] #4 Chunked transfer behavior remains correct for empty lines and end-of-response handling
+- [x] #1 Persistent RAM used by the FSexplorer HTML streaming handler is reduced by at least 1024 bytes
+- [x] #2 index.html and graph.js cache-busting behavior remains unchanged
+- [x] #3 The handler continues to avoid Arduino String allocations in the hot path
+- [x] #4 Chunked transfer behavior remains correct for empty lines and end-of-response handling
 <!-- AC:END -->
 
 ## Implementation Notes
