@@ -2554,7 +2554,7 @@ static const uint8_t PSSUMMARY_MSGIDS_NEW[34] PROGMEM = {
   /* 33 */ 123  // DHWBurnerOperationHours   (u16)
 };
 
-static void enterPSMode(PGM_P debugMessage, PGM_P eventMessage, bool clearMsgLastUpdated)
+static void enterPSMode(PGM_P debugMessage, PGM_P eventMessage, bool resetMsgLastUpdated)
 {
   if (!state.otgw.bPSmode && debugMessage) {
     OTGWDebugTln(reinterpret_cast<const __FlashStringHelper*>(debugMessage));
@@ -2563,7 +2563,7 @@ static void enterPSMode(PGM_P debugMessage, PGM_P eventMessage, bool clearMsgLas
   state.otgw.bPSmode = true;
   state.statusMessage = StatusMessage::PSModeActive;
 
-  if (clearMsgLastUpdated) {
+  if (resetMsgLastUpdated) {
     clearMsgLastUpdated();
   }
 
