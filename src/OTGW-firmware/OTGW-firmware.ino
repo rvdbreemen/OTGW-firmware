@@ -376,7 +376,7 @@ void doTaskEvery60s(){
   //== do tasks ==
 
   // Re-check FS/firmware hash match every 60s so the warning persists
-  // even if sMessage is cleared by PS=0 echo or OT frame handling.
+  // even if other runtime status messages are set and cleared elsewhere.
   checklittlefshash();
 
   // Query the actual gateway mode setting from PIC using PR=M command

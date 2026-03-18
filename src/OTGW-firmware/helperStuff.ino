@@ -546,7 +546,6 @@ bool minuteChanged(){
 
 */
 bool checklittlefshash(){
-  static const char fsMismatchMsg[] PROGMEM = "Flash your littleFS with matching version!";
   char _githash[16] = {0};  // git short hash is 7 chars; 16 is ample (ADR-004)
   if (LittleFS.begin()) {
     //start with opening the file
@@ -568,14 +567,26 @@ bool checklittlefshash(){
       DebugTf(PSTR("WARNING: Firmware version (%s) does not match filesystem version (%s)\r\n"),
               _VERSION_GITHASH, _githash);
       DebugTln(F("This may cause compatibility issues. Flash matching filesystem version."));
-      strncpy_P(sMessage, fsMismatchMsg, sizeof(sMessage) - 1);
-      sMessage[sizeof(sMessage) - 1] = '\0';
-    } else if (strcmp_P(sMessage, fsMismatchMsg) == 0) {
-      sMessage[0] = '\0';
+      state.statusMessage = StatusMessage::LittleFSMismatch;
+    } else if (state.statusMessage == StatusMessage::LittleFSMismatch) {
+      state.statusMessage = StatusMessage::None;
     }
     return match;
   }
   return false;
+}
+
+const __FlashStringHelper* getStatusMessageText()
+{
+  switch (state.statusMessage) {
+    case StatusMessage::LittleFSMismatch:
+      return F("Flash your littleFS with matching version!");
+    case StatusMessage::PSModeActive:
+      return F("PS=1 mode; decoded summary updates active.");
+    case StatusMessage::None:
+    default:
+      return F("");
+  }
 }
 
 /*

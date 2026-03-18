@@ -2471,7 +2471,7 @@ static void enterPSMode(PGM_P debugMessage, PGM_P eventMessage, bool clearMsgLas
   }
 
   state.otgw.bPSmode = true;
-  copyProgmemString(sMessage, sizeof(sMessage), PSTR("PS=1 mode; decoded summary updates active."));
+  state.statusMessage = StatusMessage::PSModeActive;
 
   if (clearMsgLastUpdated) {
     for (int i = 0; i <= OT_MSGID_MAX; i++) {
@@ -2491,7 +2491,9 @@ static void leavePSMode(PGM_P debugMessage, PGM_P eventMessage)
   }
 
   state.otgw.bPSmode = false;
-  sMessage[0] = '\0';
+  if (state.statusMessage == StatusMessage::PSModeActive) {
+    state.statusMessage = StatusMessage::None;
+  }
 
   if (eventMessage) {
     sendEventToWebSocket_P('*', eventMessage);

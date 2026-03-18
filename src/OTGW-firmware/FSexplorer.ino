@@ -136,19 +136,29 @@ void startWebserver(){
 
         // Inject ?v=<hash> into JS asset URLs for cache-busting.
         if (hasHash && strstr_P(lineBuf, PSTR("src=\"./index.js\""))) {
-          // Build replacement line in a second buffer
-          static char outBuf[512];
-          // Find and replace the src attribute
           char* pos = strstr(lineBuf, "src=\"./index.js\"");
           *pos = '\0'; // terminate prefix
-          snprintf_P(outBuf, sizeof(outBuf), PSTR("%ssrc=\"./index.js?v=%s\"%s"), lineBuf, fsHash, pos + 16);
-          httpServer.sendContent(outBuf);
+          if (lineBuf[0] != '\0') {
+            httpServer.sendContent(lineBuf);
+          }
+          httpServer.sendContent(F("src=\"./index.js?v="));
+          httpServer.sendContent(fsHash);
+          httpServer.sendContent(F("\""));
+          if (*(pos + 16) != '\0') {
+            httpServer.sendContent(pos + 16);
+          }
         } else if (hasHash && strstr_P(lineBuf, PSTR("src=\"./graph.js\""))) {
-          static char outBuf[512];
           char* pos = strstr(lineBuf, "src=\"./graph.js\"");
           *pos = '\0';
-          snprintf_P(outBuf, sizeof(outBuf), PSTR("%ssrc=\"./graph.js?v=%s\"%s"), lineBuf, fsHash, pos + 16);
-          httpServer.sendContent(outBuf);
+          if (lineBuf[0] != '\0') {
+            httpServer.sendContent(lineBuf);
+          }
+          httpServer.sendContent(F("src=\"./graph.js?v="));
+          httpServer.sendContent(fsHash);
+          httpServer.sendContent(F("\""));
+          if (*(pos + 16) != '\0') {
+            httpServer.sendContent(pos + 16);
+          }
         } else {
           httpServer.sendContent(lineBuf);
         }
