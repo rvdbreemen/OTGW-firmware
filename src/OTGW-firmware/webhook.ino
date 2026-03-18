@@ -109,7 +109,8 @@ static bool isLocalUrl(const char* url) {
 // relay such as a Node-RED flow or Home Assistant webhook automation, as
 // this device only makes outbound HTTP calls to local-network hosts.
 //=======================================================================
-static void expandPayload(const char* tmpl, char* out, size_t outLen, bool stateOn) {
+static bool expandPayload(const char* tmpl, char* out, size_t outLen, bool stateOn) {
+  bool truncated = false;
   size_t di = 0;
   const char* p = tmpl;
   while (*p && di < outLen - 1) {
@@ -141,12 +142,38 @@ static void expandPayload(const char* tmpl, char* out, size_t outLen, bool state
 
     size_t valLen = strlen(val);
     size_t avail  = outLen - 1 - di;
-    if (valLen > avail) valLen = avail;
+    if (valLen > avail) {
+      valLen = avail;
+      truncated = true;
+    }
     memcpy(out + di, val, valLen);
     di += valLen;
     p = end + 1;  // advance past '}'
   }
+  if (*p != '\0') truncated = true;
   out[di] = '\0';
+  return truncated;
+}
+
+//=======================================================================
+// Expand and send the configured payload body for a POST webhook.
+// The expansion buffer is owned by this active send attempt so it does not
+// consume persistent RAM while the webhook state machine is idle.
+//=======================================================================
+static int sendWebhookPost(HTTPClient& http, const char* url, bool stateOn) {
+  char expandedPayload[384];
+  bool wasTruncated = expandPayload(settings.webhook.sPayload, expandedPayload, sizeof(expandedPayload), stateOn);
+  if (wasTruncated) {
+    DebugTf(PSTR("Webhook: expanded payload truncated to %u bytes for %s\r\n"),
+            static_cast<unsigned int>(sizeof(expandedPayload) - 1), url);
+  }
+  DebugTf(PSTR("Webhook: POST [%s] payload=%s\r\n"), url, expandedPayload);
+
+  const char* ct = (settings.webhook.sContentType[0] != '\0')
+                   ? settings.webhook.sContentType
+                   : "application/json";
+  http.addHeader(F("Content-Type"), ct);
+  return http.POST(reinterpret_cast<uint8_t*>(expandedPayload), strlen(expandedPayload));
 }
 
 //=======================================================================
@@ -181,13 +208,7 @@ static bool attemptSendWebhook(bool stateOn) {
   }
 
   bool hasPayload = (settings.webhook.sPayload[0] != '\0');
-
-  // Expand the payload template (static to keep off the 4 KB CONT stack)
-  static char expandedPayload[384];
-  if (hasPayload) {
-    expandPayload(settings.webhook.sPayload, expandedPayload, sizeof(expandedPayload), stateOn);
-    DebugTf(PSTR("Webhook: POST [%s] payload=%s\r\n"), url, expandedPayload);
-  } else {
+  if (!hasPayload) {
     DebugTf(PSTR("Webhook: GET  [%s] (state=%s)\r\n"), url, stateOn ? "ON" : "OFF");
   }
 
@@ -203,11 +224,7 @@ static bool attemptSendWebhook(bool stateOn) {
   yield();
   int code;
   if (hasPayload) {
-    const char* ct = (settings.webhook.sContentType[0] != '\0')
-                     ? settings.webhook.sContentType
-                     : "application/json";
-    http.addHeader(F("Content-Type"), ct);
-    code = http.POST(expandedPayload);
+    code = sendWebhookPost(http, url, stateOn);
   } else {
     code = http.GET();
   }
