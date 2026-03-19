@@ -3669,6 +3669,10 @@ function refreshSettings() {
           fldLabel.className = 'settings-field-container';
           fldLabel.setAttribute("for", key);
           fldLabel.textContent = translateToHuman(key);
+          const tooltipText = translateTooltip(key);
+          if (tooltipText) {
+            fldLabel.setAttribute("title", tooltipText);
+          }
           rowDiv.appendChild(fldLabel);
           //--- input ---
           var inputDiv = document.createElement("div");
@@ -3706,6 +3710,9 @@ function refreshSettings() {
             sInput.step = 1;
           }
           sInput.setAttribute("value", s.value);
+          if (tooltipText) {
+            sInput.setAttribute("title", tooltipText);
+          }
           const fieldName = key;
           sInput.addEventListener('change',
             function () { 
@@ -4034,6 +4041,32 @@ function translateToHuman(longName) {
 } // translateToHuman()
 
 
+//============================================================================
+function translateTooltip(longName) {
+  if (typeof longName === 'string') {
+    longName = longName.trim();
+  }
+
+  for (var index = 0; index < translateTooltips.length; index++) {
+    if (translateTooltips[index][0] == longName) {
+      return translateTooltips[index][1];
+    }
+  }
+
+  if (typeof longName === 'string') {
+    const normalizedName = longName.toLowerCase();
+    for (var idx = 0; idx < translateTooltips.length; idx++) {
+      const fieldKey = translateTooltips[idx][0];
+      if (typeof fieldKey === 'string' && fieldKey.trim().toLowerCase() == normalizedName) {
+        return translateTooltips[idx][1];
+      }
+    }
+  }
+  return "";
+
+} // translateTooltip()
+
+
 
 //============================================================================  
 function setBackGround(field, newColor) {
@@ -4084,17 +4117,17 @@ function strToBool(s) {
 
 var translateFields = [
 
-  ["hostname", "HostName"]
-  , ["mqttbroker", "MQTT Broker IP/URL"]
+  ["hostname", "Hostname"]
+  , ["mqttbroker", "MQTT Broker Host/IP"]
   , ["mqttbrokerport", "MQTT Broker Port"]
   , ["mqttuser", "MQTT User"]
-  , ["mqttpasswd", "Password MQTT User"]
-  , ["mqtttoptopic", "MQTT Top Topic"]
-  , ["mqttuniqueid", "MQTT Uniqueid"]
-  , ["influxdbhostname", "InfluxDB hostname"]
-  , ["influxdbport", "InfluxDB port (default: 8086)"]
-  , ["influxdbdatabasename", "InfluxDB database name"]
-  , ["flamestatus", "Flame status"]
+  , ["mqttpasswd", "MQTT Password"]
+  , ["mqtttoptopic", "MQTT Base Topic"]
+  , ["mqttuniqueid", "MQTT Unique ID"]
+  , ["influxdbhostname", "InfluxDB Hostname"]
+  , ["influxdbport", "InfluxDB Port (default: 8086)"]
+  , ["influxdbdatabasename", "InfluxDB Database Name"]
+  , ["flamestatus", "Flame Status"]
   , ["chenable", "Central Heating Enabled"]
   , ["chmodus", "Central Heating Status"]
   , ["ch2enable", "Central Heating 2 Enabled"]
@@ -4114,8 +4147,8 @@ var translateFields = [
   , ["returnwatertemperature", "Return Water Temperature"]
   , ["controlsetpoint", "Control Setpoint"]
   , ["maxchwatersetpoint", "Max. CH Water Setpoint"]
-  , ["dhwtemperature", "Domestic Hotwater Temperature"]
-  , ["dhwsetpoint", "Domestic Hotwater Setpoint"]
+  , ["dhwtemperature", "Domestic Hot Water Temperature"]
+  , ["dhwsetpoint", "Domestic Hot Water Setpoint"]
   , ["oemfaultcode", "OEM Fault Code"]
   , ["oemdiagnosticcode", "OEM Diagnostic Code"]
   , ["coolingmodus", "Cooling Enabled"]
@@ -4133,74 +4166,126 @@ var translateFields = [
   , ["picfwversion", "PIC Firmware Version"]
   , ["picdeviceid", "PIC Device ID"]
   , ["picfwtype", "PIC Firmware Type"]
-  , ["compiled", "Compiled on (date/time)"]
-  , ["HostName", "Hostname (add .local)"]
-  , ["ipaddress", "IP address"]
-  , ["macaddress", "MAC address"]
-  , ["freeheap", "Free Heap Mem (bytes)"]
-  , ["maxfreeblock", "Max. Free Mem (bytes)"]
+  , ["compiled", "Compiled On"]
+  , ["HostName", "Hostname (.local)"]
+  , ["ipaddress", "IP Address"]
+  , ["macaddress", "MAC Address"]
+  , ["freeheap", "Free Heap Memory (bytes)"]
+  , ["maxfreeblock", "Max. Free Block (bytes)"]
   , ["chipid", "Unique Chip ID"]
   , ["coreversion", "Arduino Core Version"]
   , ["sdkversion", "Espressif SDK Version"]
-  , ["cpufreq", "CPU speed (MHz)"]
+  , ["cpufreq", "CPU Speed (MHz)"]
   , ["sketchsize", "Sketch Size (bytes)"]
   , ["freesketchspace", "Sketch Free (bytes)"]
   , ["flashchipid", "Flash ID"]
   , ["flashchipsize", "Flash Chip Size (MB)"]
   , ["flashchiprealsize", "Real Flash Chip (MB)"]
-  , ["littlefssize", "LittleFS size (MB)"]
+  , ["littlefssize", "LittleFS Size (MB)"]
   , ["flashchipspeed", "Flash Chip Speed (MHz)"]
   , ["flashchipmode", "Flash Mode"]
   , ["boardtype", "Board Type"]
-  , ["ssid", "Wifi Network (SSID)"]
-  , ["wifirssi", "Wifi RX Power (dBm)"]
-  , ["wifiquality", "Wifi Quality (%)"]
-  , ["wifiquality_text", "Wifi Quality"]
+  , ["ssid", "Wi-Fi Network (SSID)"]
+  , ["wifirssi", "Wi-Fi Signal Strength (dBm)"]
+  , ["wifiquality", "Wi-Fi Quality (%)"]
+  , ["wifiquality_text", "Wi-Fi Quality"]
   , ["lastreset", "Last Reset Reason"]
   , ["mqttconnected", "MQTT Connected"]
-  , ["mqttenable", "MQTT Enable"]
-  , ["mqtthaprefix", "MQTT Auto Discovery prefix"]
-  , ["mqttharebootdetection", "MQTT Home Assistant reboot detection"]
-  , ["ntpenable", "NTP Enable"]
+  , ["mqttenable", "MQTT Enabled"]
+  , ["mqtthaprefix", "MQTT Auto-Discovery Prefix"]
+  , ["mqttharebootdetection", "MQTT Home Assistant Reboot Detection"]
+  , ["ntpenable", "NTP Enabled"]
   , ["ntptimezone", "NTP Timezone"]
-  , ["ntphostname", "NTP hostname"]
-  , ["ntpsendtime", "Send time to Thermostat"]
+  , ["ntphostname", "NTP Hostname"]
+  , ["ntpsendtime", "Send Time to Thermostat"]
   , ["uptime", "Uptime Since Boot"]
-  , ["bootcount", "Nr. Reboots"]
-  , ["ledblink", "Heartbeat LED (on/off)"]
-  , ["darktheme", "Dark Theme (on/off)"]
+  , ["bootcount", "Number of Reboots"]
+  , ["ledblink", "Heartbeat LED"]
+  , ["darktheme", "Dark Theme"]
   , ["gpiosensorsenabled", "GPIO Sensors Enabled"]
   , ["gpiosensorslegacyformat", "GPIO Sensors Legacy Format"]
   , ["gpiosensorsinterval", "GPIO Publish Interval (sec)"]
-  , ["gpiosensorspin", "GPIO pin # (SD3 = GPIO10 => 10)"]
-  , ["numberofsensors", "Number of temperature sensors"]
+  , ["gpiosensorspin", "GPIO Sensor Pin (SD3 = GPIO10 => 10)"]
+  , ["numberofsensors", "Number of Temperature Sensors"]
   , ["s0counterenabled", "S0 Counter Enabled"]
   , ["s0counterinterval", "S0 Counter Interval (sec)"]
-  , ["s0counterpin", "S0 Counter pin # (D6 = GPIO12 => 12)"]
-  , ["s0counterdebouncetime", "S0 Counter debouncetime (mS)"]
-  , ["s0counterpulsekw", "S0 pulses per kW"]
-  , ["s0powerkw", "S0 actual power (kW)"]
-  , ["s0intervalcount", "S0 interval pulses"]
-  , ["s0totalcount", "S0 total pulses"]
+  , ["s0counterpin", "S0 Counter Pin (D6 = GPIO12 => 12)"]
+  , ["s0counterdebouncetime", "S0 Counter Debounce Time (ms)"]
+  , ["s0counterpulsekw", "S0 Pulses per kWh"]
+  , ["s0powerkw", "S0 Actual Power (kW)"]
+  , ["s0intervalcount", "S0 Interval Pulses"]
+  , ["s0totalcount", "S0 Total Pulses"]
   , ["mqttinterval", "MQTT Publish Interval (sec)"]
-  , ["mqttotmessage", "MQTT OT msg Enable"]
+  , ["mqttotmessage", "MQTT Raw OpenTherm Messages"]
   , ["mqttseparatesources", "MQTT Separate Sources"]
-  , ["otgwcommandenable", "Boot Command Enabled"]
+  , ["otgwcommandenable", "Run Boot Command"]
   , ["otgwcommands", "Boot Command"]
   , ["thermostatconnected", "Thermostat Connected"]
   , ["boilerconnected", "Boiler Connected"]
   , ["otgwmode", "Gateway Mode"]
-  , ["otgwconnected", "HA Integration"]
-  , ["gpiooutputsenabled", "GPIO Output Enabled"]
-  , ["gpiooutputspin", "GPIO pin # to switch on/off"]
-  , ["gpiooutputstriggerbit", "Bit X (master/slave) to trigger on (0-15)"]
+  , ["otgwconnected", "Home Assistant Integration"]
+  , ["gpiooutputsenabled", "GPIO Output Trigger Enabled"]
+  , ["gpiooutputspin", "GPIO Output Pin"]
+  , ["gpiooutputstriggerbit", "GPIO Trigger Bit (0-15)"]
   , ["webhookenable", "Webhook Enabled"]
-  , ["webhookurlon", "Webhook URL (ON state)"]
-  , ["webhookurloff", "Webhook URL (OFF state)"]
+  , ["webhookurlon", "Webhook URL (On State)"]
+  , ["webhookurloff", "Webhook URL (Off State)"]
   , ["webhooktriggerbit", "Webhook Trigger Bit (0-15)"]
   , ["webhookpayload", "Webhook Payload Template"]
   , ["webhookcontenttype", "Webhook Content-Type (POST)"]
   
+];
+
+var translateTooltips = [
+
+  ["hostname", "Device name on your network. Use letters, numbers and hyphens only."]
+  , ["HostName", "Advertised hostname. Add .local when you open the device by mDNS name."]
+  , ["ssid", "Read-only name of the Wi-Fi network the gateway is connected to."]
+  , ["mqttconnected", "Read-only MQTT connection state. This should show connected after broker login succeeds."]
+  , ["mqttenable", "Turn MQTT publishing on when you use an MQTT broker like Home Assistant."]
+  , ["mqttbroker", "Hostname or IP address of your MQTT broker."]
+  , ["mqttbrokerport", "Broker port, usually 1883 for plain MQTT."]
+  , ["mqttuser", "Leave empty if your MQTT broker does not require a login."]
+  , ["mqttpasswd", "Password for the MQTT user. Leave empty when authentication is disabled."]
+  , ["mqtttoptopic", "Base topic used for all MQTT publish and command topics."]
+  , ["mqttuniqueid", "Unique device ID used for MQTT discovery. Change only if you need a new device identity."]
+  , ["mqtthaprefix", "Home Assistant discovery prefix. Keep the default unless your HA setup uses a custom prefix."]
+  , ["mqttharebootdetection", "Enable this if Home Assistant should republish discovery after it restarts."]
+  , ["mqttinterval", "Minimum time between repeated MQTT updates when a value does not change. Use 0 to publish every update."]
+  , ["mqttotmessage", "Publish raw OpenTherm messages on MQTT for diagnostics and advanced integrations."]
+  , ["mqttseparatesources", "Publish thermostat and boiler values on separate MQTT topics when available."]
+  , ["ntpenable", "Use an NTP server to keep the gateway clock in sync."]
+  , ["ntptimezone", "Timezone name used for local time and daylight saving changes."]
+  , ["ntphostname", "Hostname of the NTP server. The default pool server is usually fine."]
+  , ["ntpsendtime", "Send the current time from this gateway to the thermostat when supported."]
+  , ["ledblink", "Blink the onboard LED as a heartbeat to show the firmware is running."]
+  , ["darktheme", "Use the dark color theme in the web interface."]
+  , ["gpiosensorsenabled", "Enable 1-Wire temperature sensors connected to the selected GPIO pin."]
+  , ["gpiosensorslegacyformat", "Use the older MQTT payload format only if an existing setup depends on it."]
+  , ["gpiosensorsinterval", "Seconds between GPIO sensor updates. Use a higher value to reduce MQTT traffic."]
+  , ["gpiosensorspin", "GPIO pin used for the 1-Wire bus. GPIO10 is the default hardware wiring."]
+  , ["numberofsensors", "Read-only count of detected temperature sensors on the configured 1-Wire bus."]
+  , ["s0counterenabled", "Enable the S0 pulse counter input for energy or meter pulses."]
+  , ["s0counterinterval", "Seconds between S0 counter updates and MQTT publishes."]
+  , ["s0counterpin", "GPIO pin connected to the S0 pulse output of your meter."]
+  , ["s0counterdebouncetime", "Ignore pulses that arrive sooner than this debounce time in milliseconds."]
+  , ["s0counterpulsekw", "Number of S0 pulses per kWh reported by your meter."]
+  , ["otgwcommandenable", "Run the boot command automatically after the gateway starts."]
+  , ["otgwcommands", "Command sent to the OTGW at startup. Use the normal OTGW serial command format."]
+  , ["thermostatconnected", "Read-only status showing whether the thermostat side is currently detected."]
+  , ["boilerconnected", "Read-only status showing whether the boiler side is currently detected."]
+  , ["otgwmode", "Current gateway operating mode reported by the firmware."]
+  , ["otgwconnected", "Shows whether the Home Assistant integration is currently enabled and detected."]
+  , ["gpiooutputsenabled", "Enable the GPIO output trigger feature."]
+  , ["gpiooutputspin", "GPIO pin that will be switched when the selected status bit changes."]
+  , ["gpiooutputstriggerbit", "Status bit number to follow. Use values 0 through 15."]
+  , ["webhookenable", "Enable HTTP callbacks when the selected status bit changes."]
+  , ["webhookurlon", "URL to call when the tracked bit switches on."]
+  , ["webhookurloff", "URL to call when the tracked bit switches off."]
+  , ["webhooktriggerbit", "Status bit number that triggers the webhook. Use values 0 through 15."]
+  , ["webhookpayload", "Optional POST body. Leave empty when the receiving service does not need a payload."]
+  , ["webhookcontenttype", "HTTP Content-Type header sent with POST requests, for example application/json."]
+
 ];
 
 //============================================================================
