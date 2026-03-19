@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@copilot'
 created_date: '2026-03-18 19:44'
-updated_date: '2026-03-19 00:07'
+updated_date: '2026-03-19 00:42'
 labels:
   - memory mqtt restapi core
 dependencies: []
@@ -53,4 +53,8 @@ Measured result: global RAM 58068 -> 57164 bytes, reclaiming 904 bytes and leavi
 Added MQTT gate debug tracing for validation: normal OT publishes now log previous/current raw values and status publishes log previous/current status bitsets plus per-bit decisions under the existing MQTT debug flag.
 
 Validated with firmware build after the debug instrumentation change; build succeeded at 57184 bytes global RAM (20 bytes above the prior 57164-byte baseline).
+
+Extended status-style MQTT gating to ID70 (ventilation/heat-recovery): added separate combined-byte and per-bit tracked timers plus force-republish state so ID70 now follows the same first/change/interval path and MQTT debug pattern as ID0.
+
+Validated with firmware build after the ID70 change; build succeeded at 57412 bytes global RAM, an increase of 228 bytes over the prior 57184-byte debug baseline.
 <!-- SECTION:NOTES:END -->
