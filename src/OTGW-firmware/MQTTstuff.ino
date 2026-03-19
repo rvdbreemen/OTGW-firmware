@@ -36,8 +36,9 @@ static char       MQTTbrokerIPchar[20];
 constexpr size_t  MQTT_ID_MAX_LEN = 96;
 constexpr size_t  MQTT_NAMESPACE_MAX_LEN = 192;
 constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
-constexpr size_t  MQTT_MSG_MAX_LEN = 1200;
-constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 1200;
+constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 1024;
+constexpr size_t  MQTT_CLIENT_BUFFER_SIZE = 384;
+constexpr size_t  MQTT_PROGMEM_STAGE_LEN = 63;
 
 struct MQTTAutoConfigBuffers;
 static MQTTAutoConfigBuffers* getMqttAutoConfigBuffers();
@@ -65,11 +66,10 @@ struct MQTTAutoConfigTemplateContext {
   const char *sourceTopicSegment;
 };
 
-// Shared autoconfig workspace — lazy-allocated on first use to save RAM when
-// MQTT auto-discovery is never triggered (P4: ADR-004/ADR-030).
+// Shared autoconfig workspace for the active discovery session only.
 // JSON payloads are stream-rendered directly from the config template, so the
-// workspace only keeps the raw config line plus the rendered topic.
-// Once allocated, kept permanently (never freed — acceptable for embedded).
+// workspace only keeps the raw config line plus the rendered topic while a
+// discovery pass is in progress.
 static MQTTAutoConfigBuffers* pMqttAutoConfigBuffers = nullptr;
 
 // Lazy-allocate the autoconfig buffers on first use. Returns nullptr on OOM.
@@ -84,6 +84,22 @@ static MQTTAutoConfigBuffers* getMqttAutoConfigBuffers() {
   }
   return pMqttAutoConfigBuffers;
 }
+
+static void releaseMqttAutoConfigBuffers() {
+  if (pMqttAutoConfigBuffers) {
+    delete pMqttAutoConfigBuffers;
+    pMqttAutoConfigBuffers = nullptr;
+    MQTTDebugTln(F("MQTT autoconfig buffers released"));
+  }
+}
+
+struct MQTTAutoConfigBufferSession {
+  MQTTAutoConfigBuffers* buffers = nullptr;
+  MQTTAutoConfigBufferSession() : buffers(getMqttAutoConfigBuffers()) {}
+  ~MQTTAutoConfigBufferSession() { releaseMqttAutoConfigBuffers(); }
+  MQTTAutoConfigBufferSession(const MQTTAutoConfigBufferSession&) = delete;
+  MQTTAutoConfigBufferSession& operator=(const MQTTAutoConfigBufferSession&) = delete;
+};
 
 // Guard shared MQTT autoconfig buffers against accidental re-entry.
 // Current firmware is effectively single-threaded, but this protects future
@@ -286,6 +302,35 @@ static bool writeMqttChunk(const char *data, size_t len)
     }
     pos += chunkLen;
     feedWatchDog();
+  }
+  return true;
+}
+
+static bool writeMqttProgmemChunk(PGM_P data, size_t len)
+{
+  char stage[MQTT_PROGMEM_STAGE_LEN + 1];
+  size_t pos = 0;
+  while (pos < len) {
+    size_t chunkLen = (len - pos) > MQTT_PROGMEM_STAGE_LEN ? MQTT_PROGMEM_STAGE_LEN : (len - pos);
+    for (size_t i = 0; i < chunkLen; i++) {
+      stage[i] = static_cast<char>(pgm_read_byte(data + pos + i));
+    }
+    size_t written = MQTTclient.write(reinterpret_cast<const uint8_t*>(stage), chunkLen);
+    if (written != chunkLen) {
+      PrintMQTTError();
+      return false;
+    }
+    pos += chunkLen;
+    feedWatchDog();
+  }
+  return true;
+}
+
+static bool beginMqttPublish(const char *topic, size_t len, bool retain)
+{
+  if (!MQTTclient.beginPublish(topic, len, retain)) {
+    PrintMQTTError();
+    return false;
   }
   return true;
 }
@@ -574,9 +619,9 @@ void startMQTT()
 {
   if (!settings.mqtt.bEnable) return;
   
-  // Static buffer allocation to prevent heap fragmentation on ESP8266
-  // Allocates 1350 bytes permanently but avoids dynamic reallocation issues
-  MQTTclient.setBufferSize(1350);
+  // Outbound publishes now stream via beginPublish/write/endPublish.
+  // Keep only enough client buffer for inbound subscribed topics and payloads.
+  MQTTclient.setBufferSize(MQTT_CLIENT_BUFFER_SIZE);
   
   stateMQTT = MQTT_STATE_INIT;
   //setup for mqtt discovery
@@ -922,7 +967,13 @@ void sendMQTTData(const char* topic, const char *json, const bool retain)
   snprintf_P(full_topic, sizeof(full_topic), PSTR("%s/"), MQTTPubNamespace);
   strlcat(full_topic, topic, sizeof(full_topic));
   MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settings.mqtt.sBroker, settings.mqtt.iBrokerPort, full_topic, json);
-  if (!MQTTclient.publish(full_topic, json, retain)) PrintMQTTError();
+  const size_t payloadLen = strlen(json);
+  if (!beginMqttPublish(full_topic, payloadLen, retain)) return;
+  if (!writeMqttChunk(json, payloadLen)) {
+    MQTTclient.endPublish();
+    return;
+  }
+  if (!MQTTclient.endPublish()) PrintMQTTError();
   feedWatchDog();//feed the dog
 } // sendMQTTData()
 
@@ -936,10 +987,35 @@ void sendMQTTData(const __FlashStringHelper *topic, const char *json, const bool
 
 void sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *json, const bool retain)
 {
-  static char payloadBuf[MQTT_MSG_MAX_LEN];
-  strncpy_P(payloadBuf, reinterpret_cast<PGM_P>(json), sizeof(payloadBuf) - 1);
-  payloadBuf[sizeof(payloadBuf) - 1] = '\0';
-  sendMQTTData(topic, payloadBuf, retain);
+  if (!settings.mqtt.bEnable) return;
+  if (!mqttPublishAllowed) return;
+  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;}
+  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;}
+  if (!canPublishMQTT()) return;
+
+  char topicBuf[MQTT_TOPIC_MAX_LEN];
+  char full_topic[MQTT_TOPIC_MAX_LEN];
+  strncpy_P(topicBuf, reinterpret_cast<PGM_P>(topic), sizeof(topicBuf) - 1);
+  topicBuf[sizeof(topicBuf) - 1] = '\0';
+  snprintf_P(full_topic, sizeof(full_topic), PSTR("%s/"), MQTTPubNamespace);
+  strlcat(full_topic, topicBuf, sizeof(full_topic));
+
+  MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message ["),
+              settings.mqtt.sBroker,
+              settings.mqtt.iBrokerPort,
+              full_topic);
+  MQTTDebug(json);
+  MQTTDebugln(F("]"));
+
+  PGM_P payload = reinterpret_cast<PGM_P>(json);
+  const size_t payloadLen = strlen_P(payload);
+  if (!beginMqttPublish(full_topic, payloadLen, retain)) return;
+  if (!writeMqttProgmemChunk(payload, payloadLen)) {
+    MQTTclient.endPublish();
+    return;
+  }
+  if (!MQTTclient.endPublish()) PrintMQTTError();
+  feedWatchDog();
 }
 
 /* 
@@ -970,10 +1046,7 @@ void sendMQTTStreaming(const char* topic, const char *json, const size_t len)
 
   // Use beginPublish which tells PubSubClient the total length upfront
   // This allows it to use its buffer efficiently without reallocation
-  if (!MQTTclient.beginPublish(topic, len, true)) {
-    PrintMQTTError();
-    return;
-  }
+  if (!beginMqttPublish(topic, len, true)) return;
 
   // Write message in small chunks to avoid buffer overflow
   // PubSubClient's write() method handles buffering internally
@@ -1090,28 +1163,22 @@ void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
 }
 
 //===========================================================================================
-// resetMQTTBufferSize() - Static Buffer Strategy
+// resetMQTTBufferSize() - fixed inbound buffer strategy
 //
-// INTENTIONALLY A NO-OP to maintain static 1350-byte MQTT buffer allocation.
-//
-// Historical context:
-// - Originally shrunk buffer to 256 bytes after auto-discovery to "save RAM"
-// - This caused heap fragmentation through repeated realloc() calls on ESP8266
-// - Bot reviewer identified this as defeating the static buffer fix
+// INTENTIONALLY A NO-OP.
 //
 // Current strategy:
-// - Buffer allocated once at startup (1350 bytes)
-// - NEVER resized during runtime = zero fragmentation
-// - MQTT streaming handles all message sizes efficiently
-// - Function kept as no-op for API compatibility with existing code
+// - PubSubClient buffer is allocated once at startup
+// - Outbound publishes stream via beginPublish/write/endPublish
+// - Buffer is never resized at runtime, avoiding heap churn
+// - Function is kept for API compatibility with existing discovery call sites
 //
-// Memory impact: 1350 bytes permanently allocated (acceptable trade-off for stability)
+// Memory impact: fixed MQTT client buffer of MQTT_CLIENT_BUFFER_SIZE bytes.
 //===========================================================================================
 void resetMQTTBufferSize()
 {
   if (!settings.mqtt.bEnable) return;
-  // Intentionally empty - maintains static buffer, prevents heap fragmentation
-  // See function comment above for rationale
+  // Intentionally empty - buffer is fixed for app lifetime
 }
 //===========================================================================================
 bool getMQTTConfigDone(const uint8_t MSGid)
@@ -1202,7 +1269,8 @@ void doAutoConfigure(){
       return;
     }
 
-    MQTTAutoConfigBuffers* acBuf = getMqttAutoConfigBuffers();
+    MQTTAutoConfigBufferSession bufferSession;
+    MQTTAutoConfigBuffers* acBuf = bufferSession.buffers;
     if (!acBuf) { DebugTln(F("ERROR: MQTT autoconfig OOM, aborting")); return; }
     char *sLine = acBuf->line;
     char *sTopic = acBuf->topic;
@@ -1284,8 +1352,6 @@ void doAutoConfigure(){
 
     fh.close();
     
-    // Note: No buffer cleanup needed - static buffers persist across calls
-    // resetMQTTBufferSize() is a no-op for static buffer strategy
     resetMQTTBufferSize();
   } // Lock released here - configSensors() can now acquire it independently
 
@@ -1332,8 +1398,8 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     return _result;
   } 
 
-  // Shared lazy-allocated buffers with doAutoConfigure() to avoid duplicate persistent RAM usage
-  MQTTAutoConfigBuffers* acBuf = getMqttAutoConfigBuffers();
+  MQTTAutoConfigBufferSession bufferSession;
+  MQTTAutoConfigBuffers* acBuf = bufferSession.buffers;
   if (!acBuf) { DebugTln(F("ERROR: MQTT autoconfig OOM, aborting")); return _result; }
   char *sLine = acBuf->line;
   char *sTopic = acBuf->topic;
@@ -1415,8 +1481,6 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
 
   fh.close();
 
-  // Note: No buffer cleanup needed - static buffer persists across calls
-  // resetMQTTBufferSize() is a no-op for static buffer strategy
   resetMQTTBufferSize();
 
   return _result;
