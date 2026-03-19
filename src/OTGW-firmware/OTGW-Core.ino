@@ -222,8 +222,12 @@ uint32_t mqttlastsent[256]         = {0}; // packed throttle: bits31-16=last pub
 uint16_t mqttlastsentstatusbit[16] = {0}; // per-bit publish timers for OT_Statusflags (slots 0-7=master, 8-15=slave)
 bool     mqttPublishAllowed        = true; // MQTT interval gate — managed via OTPublishGate (OTGW-Core.h)
 static uint16_t mqttlastsentstatusbyte[2] = {0}; // combined status_master/status_slave publish timers
+static uint16_t mqttlastsentstatusvhbit[16] = {0}; // per-bit publish timers for OT_StatusVH (slots 0-7=master, 8-15=slave)
+static uint16_t mqttlastsentstatusvhbyte[2] = {0}; // combined status_vh_master/status_vh_slave publish timers
 static bool mqttForceNextMasterStatusPublish = true;
 static bool mqttForceNextSlaveStatusPublish  = true;
+static bool mqttForceNextMasterStatusVHPublish = true;
+static bool mqttForceNextSlaveStatusVHPublish  = true;
 
 static constexpr uint16_t TRACKED_TIME_UNSEEN = 0xFFFFU;
 static constexpr uint32_t TRACKED_TIME_MODULUS = 65535UL;
@@ -320,9 +324,12 @@ static void resetMqttTrackedState()
   }
   for (uint8_t i = 0; i < 16; i++) {
     mqttlastsentstatusbit[i] = TRACKED_TIME_UNSEEN;
+    mqttlastsentstatusvhbit[i] = TRACKED_TIME_UNSEEN;
   }
   mqttlastsentstatusbyte[0] = TRACKED_TIME_UNSEEN;
   mqttlastsentstatusbyte[1] = TRACKED_TIME_UNSEEN;
+  mqttlastsentstatusvhbyte[0] = TRACKED_TIME_UNSEEN;
+  mqttlastsentstatusvhbyte[1] = TRACKED_TIME_UNSEEN;
 }
 
 struct TrackingStateInitializer {
@@ -930,6 +937,65 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
 }
 
 // =====================[ MQTT throttle helpers ]==================
+#define CoreMQTTDebugTf(...) ({ if (state.debug.bMQTT) DebugTf(__VA_ARGS__); })
+
+static char mqttPublishSourceTag(byte masterslave)
+{
+  return (masterslave == OT_MSGTYPE_REQUEST) ? 'M' : 'S';
+}
+
+static void logMQTTValueGateDecision(byte id,
+                                     byte masterslave,
+                                     uint8_t idx,
+                                     uint16_t previousValue,
+                                     uint16_t currentValue,
+                                     bool firstSeen,
+                                     bool valueChanged,
+                                     bool intervalElapsed,
+                                     uint16_t lastTime,
+                                     uint16_t now,
+                                     bool allowPublish,
+                                     const __FlashStringHelper *reason)
+{
+  CoreMQTTDebugTf(PSTR("MQTT gate id=%u src=%c slot=%u prev=0x%04X curr=0x%04X first=%s changed=%s interval=%s last=%u now=%u => %s [%S]\r\n"),
+                  id,
+                  mqttPublishSourceTag(masterslave),
+                  idx,
+                  previousValue,
+                  currentValue,
+                  CBOOLEAN(firstSeen),
+                  CBOOLEAN(valueChanged),
+                  CBOOLEAN(intervalElapsed),
+                  lastTime,
+                  now,
+                  allowPublish ? "publish" : "skip",
+                  reason);
+}
+
+static void logMQTTStatusBitDecision(uint8_t bitSlot,
+                                     const char *topic,
+                                     bool previousValue,
+                                     bool currentValue,
+                                     uint8_t previousBits,
+                                     uint8_t currentBits,
+                                     bool forcePublish,
+                                     bool allowPublish)
+{
+  char previousBitsText[9] {0};
+  char currentBitsText[9] {0};
+  copyBinaryByteString(previousBits, previousBitsText, sizeof(previousBitsText));
+  copyBinaryByteString(currentBits, currentBitsText, sizeof(currentBitsText));
+  CoreMQTTDebugTf(PSTR("MQTT gate bit[%u] %s prev=%s curr=%s prev_bits=%s curr_bits=%s force=%s => %s\r\n"),
+                  bitSlot,
+                  topic,
+                  CBOOLEAN(previousValue),
+                  CBOOLEAN(currentValue),
+                  previousBitsText,
+                  currentBitsText,
+                  CBOOLEAN(forcePublish),
+                  allowPublish ? "publish" : "skip");
+}
+
 static bool shouldForceMasterStatusPublish()
 {
   return mqttForceNextMasterStatusPublish;
@@ -938,6 +1004,16 @@ static bool shouldForceMasterStatusPublish()
 static bool shouldForceSlaveStatusPublish()
 {
   return mqttForceNextSlaveStatusPublish;
+}
+
+static bool shouldForceMasterStatusVHPublish()
+{
+  return mqttForceNextMasterStatusVHPublish;
+}
+
+static bool shouldForceSlaveStatusVHPublish()
+{
+  return mqttForceNextSlaveStatusVHPublish;
 }
 
 static bool hasTrackedTime(uint16_t trackedTime)
@@ -965,6 +1041,8 @@ void requestMQTTStatusRepublish()
 {
   mqttForceNextMasterStatusPublish = true;
   mqttForceNextSlaveStatusPublish = true;
+  mqttForceNextMasterStatusVHPublish = true;
+  mqttForceNextSlaveStatusVHPublish = true;
 }
 
 // shouldPublishMQTTForID - returns true if this OT slot's value should be
@@ -972,31 +1050,40 @@ void requestMQTTStatusRepublish()
 // so the caller controls which value is compared — normal OT mode passes
 // OTdata.value; PS=1 mode passes 0 to rely on interval-only gating. (ADR-006)
 bool shouldPublishMQTTForID(byte id, byte masterslave, uint16_t rawValue) {
-  if (settings.mqtt.iInterval == 0) return true;   // legacy: always publish
+  if (id == OT_Statusflags || id == OT_StatusVH) {
+    CoreMQTTDebugTf(PSTR("MQTT gate id=%u src=%c curr=0x%04X => publish [delegated to status-byte/bit gates]\r\n"),
+                    id,
+                    mqttPublishSourceTag(masterslave),
+                    rawValue);
+    return true; // status uses dedicated combined-byte and per-bit gates
+  }
   // IDs 128-255 (manufacturer-specific/Remeha) wrap when offset +128, aliasing
   // with critical RESPONSE slots (Status flags, TSet…). Always publish to avoid
   // cross-slot throttle contamination. (ADR-006)
-  if (id > 127) return true;
-  byte idx = (masterslave == OT_MSGTYPE_REQUEST) ? (uint8_t)(id + 128) : (uint8_t)id;
-  if (id == OT_Statusflags) return true; // status uses dedicated combined-byte and per-bit gates
-  if (id == OT_Statusflags) {
-    const bool forcePublish = (masterslave == OT_MSGTYPE_REQUEST)
-                                ? shouldForceMasterStatusPublish()
-                                : shouldForceSlaveStatusPublish();
-    if (forcePublish) {
-      uint16_t now = currentTrackedSeconds();
-      setPackedSlot(idx, rawValue, now);
-      return true;
-    }
+  if (id > 127) {
+    CoreMQTTDebugTf(PSTR("MQTT gate id=%u src=%c prev=%s curr=0x%04X => publish [passthrough id>127]\r\n"),
+                    id,
+                    mqttPublishSourceTag(masterslave),
+                    "untracked",
+                    rawValue);
+    return true;
   }
+  byte idx = (masterslave == OT_MSGTYPE_REQUEST) ? (uint8_t)(id + 128) : (uint8_t)id;
   uint32_t packed = mqttlastsent[idx];
   const bool firstSeen = !hasTrackedTime(getPackedSlotTime(packed));
   uint16_t lastVal  = (uint16_t)(packed >> 16);             // bits 31-16: last published u16
   uint16_t lastTime = getPackedSlotTime(packed);            // bits 15-0: rolling seconds-since-boot
   uint16_t now      = currentTrackedSeconds();
+  if (settings.mqtt.iInterval == 0) {
+    logMQTTValueGateDecision(id, masterslave, idx, lastVal, rawValue, firstSeen, rawValue != lastVal, false, lastTime, now, true, F("interval=0"));
+    return true;   // legacy: always publish
+  }
   bool valueChanged    = (rawValue != lastVal);
   bool intervalElapsed = !firstSeen && (elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval);
-  if (firstSeen || valueChanged || intervalElapsed) {
+  const bool allowPublish = firstSeen || valueChanged || intervalElapsed;
+  logMQTTValueGateDecision(id, masterslave, idx, lastVal, rawValue, firstSeen, valueChanged, intervalElapsed, lastTime, now, allowPublish,
+                           allowPublish ? F("tracked update") : F("suppressed by interval"));
+  if (allowPublish) {
     setPackedSlot(idx, rawValue, now);
     return true;
   }
@@ -1009,15 +1096,34 @@ bool shouldPublishMQTTForID(byte id, byte masterslave, uint16_t rawValue) {
 // array with normal OT mode (response slot, masterslave=0) so both paths
 // respect the same per-ID interval regardless of which mode is active. (ADR-006)
 bool shouldPublishMQTTForPSField(byte id) {
-  if (settings.mqtt.iInterval == 0) return true;
-  if (id > 127) return true;
-  if (id == OT_Statusflags) return true; // status uses dedicated combined-byte and per-bit gates
+  if (settings.mqtt.iInterval == 0) {
+    CoreMQTTDebugTf(PSTR("MQTT gate PS id=%u => publish [interval=0]\r\n"), id);
+    return true;
+  }
+  if (id > 127) {
+    CoreMQTTDebugTf(PSTR("MQTT gate PS id=%u => publish [passthrough id>127]\r\n"), id);
+    return true;
+  }
+  if (id == OT_Statusflags || id == OT_StatusVH) {
+    CoreMQTTDebugTf(PSTR("MQTT gate PS id=%u => publish [delegated to status-byte/bit gates]\r\n"), id);
+    return true; // status uses dedicated combined-byte and per-bit gates
+  }
   // PS=1 summary fields are always slave responses → idx = id (masterslave==0)
   byte idx = id;
   uint16_t lastTime = getPackedSlotTime(mqttlastsent[idx]);
   const bool firstSeen = !hasTrackedTime(lastTime);
   uint16_t now      = currentTrackedSeconds();
-  if (firstSeen || elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval) {
+  const bool intervalElapsed = !firstSeen && (elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval);
+  const bool allowPublish = firstSeen || intervalElapsed;
+  CoreMQTTDebugTf(PSTR("MQTT gate PS id=%u slot=%u first=%s interval=%s last=%u now=%u => %s\r\n"),
+                  id,
+                  idx,
+                  CBOOLEAN(firstSeen),
+                  CBOOLEAN(intervalElapsed),
+                  lastTime,
+                  now,
+                  allowPublish ? "publish" : "skip");
+  if (allowPublish) {
     // Preserve the last-value bits; update only the time field
     mqttlastsent[idx] = (mqttlastsent[idx] & 0xFFFF0000UL) | static_cast<uint32_t>(now);
     return true;
@@ -1026,19 +1132,47 @@ bool shouldPublishMQTTForPSField(byte id) {
 }
 
 // shouldPublishStatusBit - per-bit publish decision for OT_Statusflags
-bool shouldPublishStatusBit(uint8_t bitSlot, bool newVal, bool prevVal, bool forcePublish) {
-  const uint16_t lastTime = mqttlastsentstatusbit[bitSlot];
+static bool shouldPublishTrackedStatusBit(uint16_t *trackedSlots, uint8_t bitSlot, bool newVal, bool prevVal, bool forcePublish) {
+  const uint16_t lastTime = trackedSlots[bitSlot];
   const bool firstSeen = !hasTrackedTime(lastTime);
   const uint16_t now = currentTrackedSeconds();
   if (forcePublish) {
-    mqttlastsentstatusbit[bitSlot] = now;
+    trackedSlots[bitSlot] = now;
     return true;
   }
   if (settings.mqtt.iInterval == 0) return true;   // legacy: always publish
   bool valueChanged    = (newVal != prevVal);
   bool intervalElapsed = !firstSeen && (elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval);
   if (firstSeen || valueChanged || intervalElapsed) {
-    mqttlastsentstatusbit[bitSlot] = now;
+    trackedSlots[bitSlot] = now;
+    return true;
+  }
+  return false;
+}
+
+bool shouldPublishStatusBit(uint8_t bitSlot, bool newVal, bool prevVal, bool forcePublish) {
+  return shouldPublishTrackedStatusBit(mqttlastsentstatusbit, bitSlot, newVal, prevVal, forcePublish);
+}
+
+static bool shouldPublishStatusVHBit(uint8_t bitSlot, bool newVal, bool prevVal, bool forcePublish)
+{
+  return shouldPublishTrackedStatusBit(mqttlastsentstatusvhbit, bitSlot, newVal, prevVal, forcePublish);
+}
+
+static bool shouldPublishTrackedStatusByte(uint16_t *trackedSlots, uint8_t byteSlot, uint8_t newVal, uint8_t prevVal, bool forcePublish)
+{
+  const uint16_t lastTime = trackedSlots[byteSlot];
+  const bool firstSeen = !hasTrackedTime(lastTime);
+  const uint16_t now = currentTrackedSeconds();
+  if (forcePublish) {
+    trackedSlots[byteSlot] = now;
+    return true;
+  }
+  if (settings.mqtt.iInterval == 0) return true;
+  const bool valueChanged = (newVal != prevVal);
+  const bool intervalElapsed = !firstSeen && (elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval);
+  if (firstSeen || valueChanged || intervalElapsed) {
+    trackedSlots[byteSlot] = now;
     return true;
   }
   return false;
@@ -1046,28 +1180,31 @@ bool shouldPublishStatusBit(uint8_t bitSlot, bool newVal, bool prevVal, bool for
 
 static bool shouldPublishStatusByte(uint8_t byteSlot, uint8_t newVal, uint8_t prevVal, bool forcePublish)
 {
-  const uint16_t lastTime = mqttlastsentstatusbyte[byteSlot];
-  const bool firstSeen = !hasTrackedTime(lastTime);
-  const uint16_t now = currentTrackedSeconds();
-  if (forcePublish) {
-    mqttlastsentstatusbyte[byteSlot] = now;
-    return true;
-  }
-  if (settings.mqtt.iInterval == 0) return true;
-  const bool valueChanged = (newVal != prevVal);
-  const bool intervalElapsed = !firstSeen && (elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval);
-  if (firstSeen || valueChanged || intervalElapsed) {
-    mqttlastsentstatusbyte[byteSlot] = now;
-    return true;
-  }
-  return false;
+  return shouldPublishTrackedStatusByte(mqttlastsentstatusbyte, byteSlot, newVal, prevVal, forcePublish);
+}
+
+static bool shouldPublishStatusVHByte(uint8_t byteSlot, uint8_t newVal, uint8_t prevVal, bool forcePublish)
+{
+  return shouldPublishTrackedStatusByte(mqttlastsentstatusvhbyte, byteSlot, newVal, prevVal, forcePublish);
 }
 
 // publishStatusBitMQTT - publish a status bit with per-bit change-detect + interval.
 // Uses OTPublishGate (RAII) so the outer gate state is always restored even if
 // publishMQTTOnOff() or any callee throws or early-returns. (ADR-006)
-void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool prevVal, bool forcePublish = false) {
-  OTPublishGate gate(shouldPublishStatusBit(bitSlot, newVal, prevVal, forcePublish));
+void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool prevVal,
+                          bool forcePublish, uint8_t previousBits, uint8_t currentBits) {
+  const bool allowPublish = shouldPublishStatusBit(bitSlot, newVal, prevVal, forcePublish);
+  logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, previousBits, currentBits, forcePublish, allowPublish);
+  OTPublishGate gate(allowPublish);
+  publishMQTTOnOff(topic, newVal);
+}
+
+static void publishStatusVHBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool prevVal,
+                                   bool forcePublish, uint8_t previousBits, uint8_t currentBits)
+{
+  const bool allowPublish = shouldPublishStatusVHBit(bitSlot, newVal, prevVal, forcePublish);
+  logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, previousBits, currentBits, forcePublish, allowPublish);
+  OTPublishGate gate(allowPublish);
   publishMQTTOnOff(topic, newVal);
 }
 
@@ -1110,19 +1247,30 @@ static void publishMasterStatusState(uint8_t valueHB, const char *statusText)
   const uint8_t previousStatus = OTcurrentSystemState.MasterStatus;
   const bool forcePublish = shouldForceMasterStatusPublish();
   const bool publishCombined = shouldPublishStatusByte(0, valueHB, previousStatus, forcePublish);
+  char previousBitsText[9] {0};
+  char currentBitsText[9] {0};
+  copyBinaryByteString(previousStatus, previousBitsText, sizeof(previousBitsText));
+  copyBinaryByteString(valueHB, currentBitsText, sizeof(currentBitsText));
+  CoreMQTTDebugTf(PSTR("MQTT gate status_master prev=0x%02X[%s] curr=0x%02X[%s] force=%s => %s\r\n"),
+                  previousStatus,
+                  previousBitsText,
+                  valueHB,
+                  currentBitsText,
+                  CBOOLEAN(forcePublish),
+                  publishCombined ? "publish" : "skip");
   OTcurrentSystemState.MasterStatus = valueHB;
   mqttForceNextMasterStatusPublish = false;
   {
     OTPublishGate gate(publishCombined);
     sendMQTTData("status_master", statusText);
   }
-  publishStatusBitMQTT(0, "ch_enable",        (valueHB & 0x01), (previousStatus & 0x01), forcePublish);
-  publishStatusBitMQTT(1, "dhw_enable",       (valueHB & 0x02), (previousStatus & 0x02), forcePublish);
-  publishStatusBitMQTT(2, "cooling_enable",   (valueHB & 0x04), (previousStatus & 0x04), forcePublish);
-  publishStatusBitMQTT(3, "otc_active",       (valueHB & 0x08), (previousStatus & 0x08), forcePublish);
-  publishStatusBitMQTT(4, "ch2_enable",       (valueHB & 0x10), (previousStatus & 0x10), forcePublish);
-  publishStatusBitMQTT(5, "summerwintertime", (valueHB & 0x20), (previousStatus & 0x20), forcePublish);
-  publishStatusBitMQTT(6, "dhw_blocking",     (valueHB & 0x40), (previousStatus & 0x40), forcePublish);
+  publishStatusBitMQTT(0, "ch_enable",        (valueHB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueHB);
+  publishStatusBitMQTT(1, "dhw_enable",       (valueHB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueHB);
+  publishStatusBitMQTT(2, "cooling_enable",   (valueHB & 0x04), (previousStatus & 0x04), forcePublish, previousStatus, valueHB);
+  publishStatusBitMQTT(3, "otc_active",       (valueHB & 0x08), (previousStatus & 0x08), forcePublish, previousStatus, valueHB);
+  publishStatusBitMQTT(4, "ch2_enable",       (valueHB & 0x10), (previousStatus & 0x10), forcePublish, previousStatus, valueHB);
+  publishStatusBitMQTT(5, "summerwintertime", (valueHB & 0x20), (previousStatus & 0x20), forcePublish, previousStatus, valueHB);
+  publishStatusBitMQTT(6, "dhw_blocking",     (valueHB & 0x40), (previousStatus & 0x40), forcePublish, previousStatus, valueHB);
 }
 
 static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
@@ -1130,20 +1278,31 @@ static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
   const uint8_t previousStatus = OTcurrentSystemState.SlaveStatus;
   const bool forcePublish = shouldForceSlaveStatusPublish();
   const bool publishCombined = shouldPublishStatusByte(1, valueLB, previousStatus, forcePublish);
+  char previousBitsText[9] {0};
+  char currentBitsText[9] {0};
+  copyBinaryByteString(previousStatus, previousBitsText, sizeof(previousBitsText));
+  copyBinaryByteString(valueLB, currentBitsText, sizeof(currentBitsText));
+  CoreMQTTDebugTf(PSTR("MQTT gate status_slave prev=0x%02X[%s] curr=0x%02X[%s] force=%s => %s\r\n"),
+                  previousStatus,
+                  previousBitsText,
+                  valueLB,
+                  currentBitsText,
+                  CBOOLEAN(forcePublish),
+                  publishCombined ? "publish" : "skip");
   OTcurrentSystemState.SlaveStatus = valueLB;
   mqttForceNextSlaveStatusPublish = false;
   {
     OTPublishGate gate(publishCombined);
     sendMQTTData("status_slave", statusText);
   }
-  publishStatusBitMQTT(8,  "fault",                (valueLB & 0x01), (previousStatus & 0x01), forcePublish);
-  publishStatusBitMQTT(9,  "centralheating",       (valueLB & 0x02), (previousStatus & 0x02), forcePublish);
-  publishStatusBitMQTT(10, "domestichotwater",     (valueLB & 0x04), (previousStatus & 0x04), forcePublish);
-  publishStatusBitMQTT(11, "flame",                (valueLB & 0x08), (previousStatus & 0x08), forcePublish);
-  publishStatusBitMQTT(12, "cooling",              (valueLB & 0x10), (previousStatus & 0x10), forcePublish);
-  publishStatusBitMQTT(13, "centralheating2",      (valueLB & 0x20), (previousStatus & 0x20), forcePublish);
-  publishStatusBitMQTT(14, "diagnostic_indicator", (valueLB & 0x40), (previousStatus & 0x40), forcePublish);
-  publishStatusBitMQTT(15, "electric_production",  (valueLB & 0x80), (previousStatus & 0x80), forcePublish);
+  publishStatusBitMQTT(8,  "fault",                (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB);
+  publishStatusBitMQTT(9,  "centralheating",       (valueLB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueLB);
+  publishStatusBitMQTT(10, "domestichotwater",     (valueLB & 0x04), (previousStatus & 0x04), forcePublish, previousStatus, valueLB);
+  publishStatusBitMQTT(11, "flame",                (valueLB & 0x08), (previousStatus & 0x08), forcePublish, previousStatus, valueLB);
+  publishStatusBitMQTT(12, "cooling",              (valueLB & 0x10), (previousStatus & 0x10), forcePublish, previousStatus, valueLB);
+  publishStatusBitMQTT(13, "centralheating2",      (valueLB & 0x20), (previousStatus & 0x20), forcePublish, previousStatus, valueLB);
+  publishStatusBitMQTT(14, "diagnostic_indicator", (valueLB & 0x40), (previousStatus & 0x40), forcePublish, previousStatus, valueLB);
+  publishStatusBitMQTT(15, "electric_production",  (valueLB & 0x80), (previousStatus & 0x80), forcePublish, previousStatus, valueLB);
 }
 
 static uint16_t publishCombinedStatusState(uint8_t valueHB, uint8_t valueLB)
@@ -1187,24 +1346,60 @@ static void buildStatusVHSlaveText(uint8_t valueLB, char *statusText, size_t sta
 
 static void publishMasterStatusVHState(uint8_t valueHB, const char *statusText)
 {
-  sendMQTTData(F("status_vh_master"), statusText);
-  publishMQTTOnOff(F("vh_ventilation_enabled"),    ((valueHB) & 0x01));
-  publishMQTTOnOff(F("vh_bypass_position"),        ((valueHB) & 0x02));
-  publishMQTTOnOff(F("vh_bypass_mode"),            ((valueHB) & 0x04));
-  publishMQTTOnOff(F("vh_free_ventilation_mode"), ((valueHB) & 0x08));
+  const uint8_t previousStatus = OTcurrentSystemState.MasterStatusVH;
+  const bool forcePublish = shouldForceMasterStatusVHPublish();
+  const bool publishCombined = shouldPublishStatusVHByte(0, valueHB, previousStatus, forcePublish);
+  char previousBitsText[9] {0};
+  char currentBitsText[9] {0};
+  copyBinaryByteString(previousStatus, previousBitsText, sizeof(previousBitsText));
+  copyBinaryByteString(valueHB, currentBitsText, sizeof(currentBitsText));
+  CoreMQTTDebugTf(PSTR("MQTT gate status_vh_master prev=0x%02X[%s] curr=0x%02X[%s] force=%s => %s\r\n"),
+                  previousStatus,
+                  previousBitsText,
+                  valueHB,
+                  currentBitsText,
+                  CBOOLEAN(forcePublish),
+                  publishCombined ? "publish" : "skip");
   OTcurrentSystemState.MasterStatusVH = valueHB;
+  mqttForceNextMasterStatusVHPublish = false;
+  {
+    OTPublishGate gate(publishCombined);
+    sendMQTTData(F("status_vh_master"), statusText);
+  }
+  publishStatusVHBitMQTT(0, "vh_ventilation_enabled",    (valueHB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueHB);
+  publishStatusVHBitMQTT(1, "vh_bypass_position",        (valueHB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueHB);
+  publishStatusVHBitMQTT(2, "vh_bypass_mode",            (valueHB & 0x04), (previousStatus & 0x04), forcePublish, previousStatus, valueHB);
+  publishStatusVHBitMQTT(3, "vh_free_ventilation_mode", (valueHB & 0x08), (previousStatus & 0x08), forcePublish, previousStatus, valueHB);
 }
 
 static void publishSlaveStatusVHState(uint8_t valueLB, const char *statusText)
 {
-  sendMQTTData(F("status_vh_slave"), statusText);
-  publishMQTTOnOff(F("vh_fault"),                    ((valueLB) & 0x01));
-  publishMQTTOnOff(F("vh_ventilation_mode"),         ((valueLB) & 0x02));
-  publishMQTTOnOff(F("vh_bypass_status"),            ((valueLB) & 0x04));
-  publishMQTTOnOff(F("vh_bypass_automatic_status"),  ((valueLB) & 0x08));
-  publishMQTTOnOff(F("vh_free_ventliation_status"),  ((valueLB) & 0x10));
-  publishMQTTOnOff(F("vh_diagnostic_indicator"),     ((valueLB) & 0x40));
+  const uint8_t previousStatus = OTcurrentSystemState.SlaveStatusVH;
+  const bool forcePublish = shouldForceSlaveStatusVHPublish();
+  const bool publishCombined = shouldPublishStatusVHByte(1, valueLB, previousStatus, forcePublish);
+  char previousBitsText[9] {0};
+  char currentBitsText[9] {0};
+  copyBinaryByteString(previousStatus, previousBitsText, sizeof(previousBitsText));
+  copyBinaryByteString(valueLB, currentBitsText, sizeof(currentBitsText));
+  CoreMQTTDebugTf(PSTR("MQTT gate status_vh_slave prev=0x%02X[%s] curr=0x%02X[%s] force=%s => %s\r\n"),
+                  previousStatus,
+                  previousBitsText,
+                  valueLB,
+                  currentBitsText,
+                  CBOOLEAN(forcePublish),
+                  publishCombined ? "publish" : "skip");
   OTcurrentSystemState.SlaveStatusVH = valueLB;
+  mqttForceNextSlaveStatusVHPublish = false;
+  {
+    OTPublishGate gate(publishCombined);
+    sendMQTTData(F("status_vh_slave"), statusText);
+  }
+  publishStatusVHBitMQTT(0, "vh_fault",                   (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB);
+  publishStatusVHBitMQTT(1, "vh_ventilation_mode",        (valueLB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueLB);
+  publishStatusVHBitMQTT(2, "vh_bypass_status",           (valueLB & 0x04), (previousStatus & 0x04), forcePublish, previousStatus, valueLB);
+  publishStatusVHBitMQTT(3, "vh_bypass_automatic_status", (valueLB & 0x08), (previousStatus & 0x08), forcePublish, previousStatus, valueLB);
+  publishStatusVHBitMQTT(4, "vh_free_ventliation_status", (valueLB & 0x10), (previousStatus & 0x10), forcePublish, previousStatus, valueLB);
+  publishStatusVHBitMQTT(6, "vh_diagnostic_indicator",    (valueLB & 0x40), (previousStatus & 0x40), forcePublish, previousStatus, valueLB);
 }
 
 static uint16_t publishCombinedStatusVHState(uint8_t valueHB, uint8_t valueLB)

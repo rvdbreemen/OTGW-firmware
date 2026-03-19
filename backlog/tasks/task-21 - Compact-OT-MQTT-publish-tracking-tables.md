@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@copilot'
 created_date: '2026-03-18 19:44'
-updated_date: '2026-03-18 22:19'
+updated_date: '2026-03-19 00:07'
 labels:
   - memory mqtt restapi core
 dependencies: []
@@ -49,4 +49,8 @@ Implemented low-risk tracking compaction: dense uint16_t REST last-updated table
 Validated with full firmware build after fixing a local name-shadowing compile error in enterPSMode().
 
 Measured result: global RAM 58068 -> 57164 bytes, reclaiming 904 bytes and leaving 24756 bytes free. This preserves the low-risk behavior path but does not yet meet AC #1's 1024-byte target.
+
+Added MQTT gate debug tracing for validation: normal OT publishes now log previous/current raw values and status publishes log previous/current status bitsets plus per-bit decisions under the existing MQTT debug flag.
+
+Validated with firmware build after the debug instrumentation change; build succeeded at 57184 bytes global RAM (20 bytes above the prior 57164-byte baseline).
 <!-- SECTION:NOTES:END -->
