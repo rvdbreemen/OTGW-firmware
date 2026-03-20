@@ -157,33 +157,22 @@ static bool expandPayload(const char* tmpl, char* out, size_t outLen, bool state
 
 //=======================================================================
 // Expand and send the configured payload body for a POST webhook.
-// The expansion buffer is static to avoid a 384-byte stack allocation inside the
-// HTTP call chain (review K5: ESP8266 CONT-stack is 4 KB).
-// The webhook state machine is effectively single-threaded, but the in-use guard
-// defends against accidental re-entry that could corrupt the buffer.
+// Uses the global cMsg scratch buffer (512 bytes) for the expanded payload —
+// avoids a large stack allocation in the HTTP call chain (ESP8266 CONT-stack = 4 KB).
 //=======================================================================
 static int sendWebhookPost(HTTPClient& http, const char* url, bool stateOn) {
-  static char expandedPayload[384];
-  static bool inWebhookPost = false;
-  if (inWebhookPost) {
-    DebugTln(F("Webhook: POST re-entry blocked"));
-    return -1;
-  }
-  inWebhookPost = true;
-  bool wasTruncated = expandPayload(settings.webhook.sPayload, expandedPayload, sizeof(expandedPayload), stateOn);
+  bool wasTruncated = expandPayload(settings.webhook.sPayload, cMsg, sizeof(cMsg), stateOn);
   if (wasTruncated) {
     DebugTf(PSTR("Webhook: expanded payload truncated to %u bytes for %s\r\n"),
-            static_cast<unsigned int>(sizeof(expandedPayload) - 1), url);
+            static_cast<unsigned int>(sizeof(cMsg) - 1), url);
   }
-  DebugTf(PSTR("Webhook: POST [%s] payload=%s\r\n"), url, expandedPayload);
+  DebugTf(PSTR("Webhook: POST [%s] payload=%s\r\n"), url, cMsg);
 
   const char* ct = (settings.webhook.sContentType[0] != '\0')
                    ? settings.webhook.sContentType
                    : "application/json";
   http.addHeader(F("Content-Type"), ct);
-  int result = http.POST(reinterpret_cast<uint8_t*>(expandedPayload), strlen(expandedPayload));
-  inWebhookPost = false;
-  return result;
+  return http.POST(reinterpret_cast<uint8_t*>(cMsg), strlen(cMsg));
 }
 
 //=======================================================================
