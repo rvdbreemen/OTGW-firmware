@@ -153,12 +153,13 @@ static bool parseJsonKVLine(const char* line, char* keyOut, size_t keyOutSize, c
 
 static void writeJsonStringKV(File& file, const __FlashStringHelper* key, const char* value, bool withComma)
 {
-  // Use global cMsg as escape scratch — no heap allocation.
-  // writeSettings() holds no yield() between calls, so cMsg cannot be clobbered mid-write.
-  escapeJsonStringTo(value, cMsg, sizeof(cMsg));
+  // Use a local escape buffer to avoid clobbering the shared global cMsg (review K4).
+  // Settings strings are at most 201 bytes; CMSG_SIZE (512) is an upper bound.
+  char escapeBuf[CMSG_SIZE];
+  escapeJsonStringTo(value, escapeBuf, sizeof(escapeBuf));
   file.printf_P(PSTR("  \"%S\": \"%s\"%s\n"),
                 reinterpret_cast<PGM_P>(key),
-                cMsg,
+                escapeBuf,
                 withComma ? "," : "");
 }
 

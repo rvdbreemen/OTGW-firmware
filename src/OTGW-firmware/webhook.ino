@@ -157,11 +157,19 @@ static bool expandPayload(const char* tmpl, char* out, size_t outLen, bool state
 
 //=======================================================================
 // Expand and send the configured payload body for a POST webhook.
-// The expansion buffer is owned by this active send attempt so it does not
-// consume persistent RAM while the webhook state machine is idle.
+// The expansion buffer is static to avoid a 384-byte stack allocation inside the
+// HTTP call chain (review K5: ESP8266 CONT-stack is 4 KB).
+// The webhook state machine is effectively single-threaded, but the in-use guard
+// defends against accidental re-entry that could corrupt the buffer.
 //=======================================================================
 static int sendWebhookPost(HTTPClient& http, const char* url, bool stateOn) {
-  char expandedPayload[384];
+  static char expandedPayload[384];
+  static bool inWebhookPost = false;
+  if (inWebhookPost) {
+    DebugTln(F("Webhook: POST re-entry blocked"));
+    return -1;
+  }
+  inWebhookPost = true;
   bool wasTruncated = expandPayload(settings.webhook.sPayload, expandedPayload, sizeof(expandedPayload), stateOn);
   if (wasTruncated) {
     DebugTf(PSTR("Webhook: expanded payload truncated to %u bytes for %s\r\n"),
@@ -173,7 +181,9 @@ static int sendWebhookPost(HTTPClient& http, const char* url, bool stateOn) {
                    ? settings.webhook.sContentType
                    : "application/json";
   http.addHeader(F("Content-Type"), ct);
-  return http.POST(reinterpret_cast<uint8_t*>(expandedPayload), strlen(expandedPayload));
+  int result = http.POST(reinterpret_cast<uint8_t*>(expandedPayload), strlen(expandedPayload));
+  inWebhookPost = false;
+  return result;
 }
 
 //=======================================================================

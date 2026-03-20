@@ -102,7 +102,11 @@ static void handleCommandSubmit(const char* cmdStr) {
   }
   constexpr size_t kMaxCmdLen = sizeof(cmdqueue[0].cmd) - 1;
   const size_t cmdLen = strlen(cmdStr);
-  if ((cmdLen < 3) || (cmdStr[2] != '=')) {
+  // OTGW commands are two uppercase letters followed by '=' and a value.
+  // Reject non-alphabetic prefixes to prevent malformed bytes reaching the command queue (review I2).
+  if ((cmdLen < 3) || (cmdStr[2] != '=') ||
+      !isalpha(static_cast<unsigned char>(cmdStr[0])) ||
+      !isalpha(static_cast<unsigned char>(cmdStr[1]))) {
     sendApiError(400, F("Invalid command format (expected XX=value)"));
     return;
   }

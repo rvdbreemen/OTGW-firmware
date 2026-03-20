@@ -295,7 +295,9 @@ bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t
   summary[0] = '\0';
   details[0] = '\0';
 
-  if (!LittleFS.begin()) {
+  // Use the existing LittleFSmounted flag rather than calling LittleFS.begin() again.
+  // Calling begin() during or after OTA (when LittleFS.end() was invoked) is unsafe (K3).
+  if (!LittleFSmounted) {
     return false;
   }
 
