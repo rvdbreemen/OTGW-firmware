@@ -4,7 +4,6 @@
 **Date:** 2020-01-01 (Estimated)  
 **Updated:** 2026-01-28 (Documentation)  
 **Enhanced:** 2025-12-15 (v1.0.0 heap protection system)  
-**Superseded:** 2026-03-21 (ADR-053 extends with large feature-buffer static-global rule)
 
 ## Context
 
