@@ -39,11 +39,6 @@ constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
 constexpr size_t  MQTT_MSG_MAX_LEN = 1200;
 constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 1200;
 
-struct MQTTAutoConfigBuffers {
-  char line[MQTT_CFG_LINE_MAX_LEN];
-  char topic[MQTT_TOPIC_MAX_LEN];
-};
-
 struct MQTTAutoConfigLineView {
   byte id;
   char *topicTemplate;
@@ -62,10 +57,10 @@ struct MQTTAutoConfigTemplateContext {
   const char *sourceTopicSegment;
 };
 
-// Shared autoconfig workspace — static global (ADR-004).
-// JSON payloads are stream-rendered directly from the config template, so the
-// workspace only keeps the raw config line plus the rendered topic.
-static MQTTAutoConfigBuffers mqttAutoConfigBuf;
+// Raw config line buffer — static global: lines in mqttha.cfg reach ~900 bytes (ADR-053).
+// Cannot use cMsg (512 bytes) or stack (too large for ESP8266 4KB CONT stack).
+// Topic render target uses the global cMsg scratch buffer (≤200 bytes, fits in CMSG_SIZE).
+static char mqttAutoConfigLine[MQTT_CFG_LINE_MAX_LEN];
 
 // Guard shared MQTT autoconfig buffers against accidental re-entry.
 // Current firmware is effectively single-threaded, but this protects future
@@ -1184,9 +1179,8 @@ void doAutoConfigure(){
       return;
     }
 
-    MQTTAutoConfigBuffers* acBuf = &mqttAutoConfigBuf;
-    char *sLine = acBuf->line;
-    char *sTopic = acBuf->topic;
+    char *sLine  = mqttAutoConfigLine;
+    char *sTopic = cMsg;
     initSourceTokens();
     bool sourceTemplateSchemaLogged = false;
 
@@ -1313,10 +1307,10 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     return _result;
   } 
 
-  // Shared static workspace with doAutoConfigure() (ADR-004)
-  MQTTAutoConfigBuffers* acBuf = &mqttAutoConfigBuf;
-  char *sLine = acBuf->line;
-  char *sTopic = acBuf->topic;
+  // Shared line + topic workspace (ADR-053): mqttAutoConfigLine for raw line,
+  // cMsg for the rendered topic.
+  char *sLine  = mqttAutoConfigLine;
+  char *sTopic = cMsg;
   initSourceTokens();
   byte lineID = 39; // 39 is unused in OT protocol so is a safe value
 

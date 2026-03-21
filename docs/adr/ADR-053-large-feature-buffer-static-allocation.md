@@ -28,14 +28,21 @@ This pattern is still a violation of ADR-004: the lazy allocation introduces a s
 
 **All feature-specific working buffers must be declared as file-static globals, not heap-allocated — even when the feature is only used occasionally.**
 
-The MQTT auto-discovery lazy-allocation pattern is replaced with a plain static global:
+The MQTT auto-discovery lazy-allocation pattern is replaced with a plain static global for the line buffer, combined with `cMsg` (the global scratch buffer) for the rendered topic:
 
 ```cpp
 // MQTTstuff.ino
-static MQTTAutoConfigBuffers mqttAutoConfigBuf;  // { char line[1200]; char topic[200]; }
+// Raw config line buffer — static global: lines in mqttha.cfg reach ~900 bytes.
+// Cannot use cMsg (512 bytes) or stack (too large for ESP8266 4KB CONT stack).
+// Topic render target uses the global cMsg scratch buffer (≤200 bytes, fits in CMSG_SIZE).
+static char mqttAutoConfigLine[MQTT_CFG_LINE_MAX_LEN];  // 1200 bytes
+
+// In call sites:
+char *sLine  = mqttAutoConfigLine;  // raw config line (up to 1200 bytes)
+char *sTopic = cMsg;                // rendered topic  (up to 200 bytes, fits in cMsg[512])
 ```
 
-All call sites use `&mqttAutoConfigBuf` directly. The nullable-pointer guard (`if (!acBuf) { ... return; }`) is removed.
+The `MQTTAutoConfigBuffers` struct is eliminated. The nullable-pointer guard (`if (!acBuf) { ... return; }`) is removed.
 
 **Rule for large feature buffers:**  
 If a feature subsystem needs a large working area (≥ ~100 bytes) that lives for the lifetime of the device, declare it as a `static` global in the owning `.ino` file. Do not use `new` / `malloc`, even for "allocate-once, never free" patterns.
@@ -84,38 +91,41 @@ This extends ADR-004's core principle ("no dynamic allocation") to explicitly co
 - Zero additional RAM cost
 
 **Cons:**
-- cMsg is only 512 bytes; the autoconfig line buffer needs 1200 bytes
+- cMsg is only 512 bytes; the autoconfig line buffer needs 1200 bytes (lines reach ~900 bytes)
 - cMsg is used throughout the firmware for unrelated operations; sharing it during a multi-step auto-discovery pass would require careful locking
 
-**Why not chosen:** Buffer too small; sharing would require complex state management.
+**Partially chosen:** cMsg IS used for the rendered topic (`sTopic`, ≤200 bytes, fits in `cMsg[512]`). The raw config line buffer (`sLine`, up to 1200 bytes) cannot use `cMsg` and must remain a separate static global.
 
 ## Consequences
 
 ### Positive
-- **No heap fragmentation:** `mqttAutoConfigBuf` is placed in BSS at link time; no runtime `new` call
-- **Simpler call sites:** `&mqttAutoConfigBuf` is never null; OOM guard removed
+- **No heap fragmentation:** `mqttAutoConfigLine` is placed in BSS at link time; no runtime `new` call
+- **cMsg used for topic buffer:** `sTopic = cMsg` (200 bytes ≤ 512-byte `cMsg`) — consistent with project scratch-buffer convention
+- **Struct eliminated:** `MQTTAutoConfigBuffers` struct removed; only one module-specific static remains (`mqttAutoConfigLine`)
+- **Simpler call sites:** OOM guard removed; both pointers are never null
 - **Consistent with ADR-004:** No exceptions to the static-allocation rule remain in normal firmware operation
 - **Deterministic memory layout:** Full BSS footprint is known at link time
 
 ### Negative
-- **Always-resident cost:** 1400 bytes of BSS are reserved even if auto-discovery is never run
-  - **Accepted trade-off:** Deterministic memory layout is worth more on this platform than saving 1400 bytes in a rarely-encountered configuration
-- **Larger BSS segment:** Compile-time image shows ~1400 bytes higher BSS usage
+- **Always-resident cost:** 1200 bytes of BSS for `mqttAutoConfigLine`, even if auto-discovery is never run
+  - **Accepted trade-off:** Deterministic memory layout is worth more on this platform than saving 1200 bytes in a rarely-encountered configuration
+- **cMsg shared for sTopic:** `sTopic = cMsg` means callers must not call auto-discovery while `cMsg` is in use for another purpose. Single-threaded ESP8266 loop ensures this is safe.
 
 ### Risks & Mitigation
-- **Concurrent access:** `mqttAutoConfigBuf` is shared between `doAutoConfigure()` and `doAutoConfigureMsgid()`. The existing `MQTTAutoConfigSessionLock` guard already prevents concurrent re-entry; this ADR does not change that behaviour.
+- **Concurrent access:** `mqttAutoConfigLine` and `cMsg` are shared between `doAutoConfigure()` and `doAutoConfigureMsgid()`. The existing `MQTTAutoConfigSessionLock` guard prevents concurrent re-entry; this ADR does not change that behaviour.
 - **Buffer overflow:** Line buffer is 1200 bytes; auto-discovery lines that exceed this would silently truncate. This was already true under the lazy-allocation scheme.
 
 ## Implementation Patterns
 
-**Feature-specific static global (correct):**
+**Feature-specific: use static for oversized buffers, cMsg for small scratch (correct):**
 ```cpp
-// GOOD — file-static global; always present, never fragmented, never null
-static MyFeatureBuf featureBuf;
+// GOOD — large buffer as static global; small scratch via cMsg
+static char featureLineBuffer[LARGE_LINE_MAX];  // too large for stack or cMsg
 
 void doFeatureWork() {
-  MyFeatureBuf* buf = &featureBuf;
-  // ... use buf ...
+  char *sLine  = featureLineBuffer;  // static global — safe
+  char *sTopic = cMsg;               // global scratch — fits (≤200 bytes ≤ CMSG_SIZE=512)
+  // ... use sLine and sTopic ...
 }
 ```
 
@@ -144,7 +154,7 @@ void doFeatureWork() {
 - ADR-030: Heap Memory Monitoring and Emergency Recovery
 
 ## References
-- MQTT auto-discovery implementation: `src/OTGW-firmware/MQTTstuff.ino` (`mqttAutoConfigBuf`, `MQTTAutoConfigSessionLock`)
+- MQTT auto-discovery implementation: `src/OTGW-firmware/MQTTstuff.ino` (`mqttAutoConfigLine`, `cMsg` for `sTopic`, `MQTTAutoConfigSessionLock`)
 - Heap protection implementation: `src/OTGW-firmware/OTGW-firmware.h` (CSTR macro, heap levels)
 - Developer guidelines: `.github/copilot-instructions.md` (Memory Management section)
 - PR: copilot/review-codewijzigingen-sinds-laatste-release (commit d514661 — code change; superseding ADR added in follow-up)
