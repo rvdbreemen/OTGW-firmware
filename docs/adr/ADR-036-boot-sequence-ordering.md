@@ -2,14 +2,15 @@
 
 **Status:** Accepted  
 **Date:** 2026-02-16  
-**Updated:** 2026-02-16 (Initial documentation of existing pattern)
+**Updated:** 2026-03-21 (Swapped startNTP/startWiFi order to fix hostname regression)
 
 ## Context
 
 The OTGW-firmware `setup()` function initializes ~20 subsystems in a specific order. Several of these subsystems have **non-obvious ordering dependencies** that, if violated, cause failures ranging from silent misconfiguration to hard crashes.
 
 **Problem scenarios observed or anticipated:**
-- NTP configured **after** WiFi → DHCP cannot override NTP server (ESP8266 SDK limitation)
+- NTP configured **before** WiFi → ESP8266 SDK resets hostname to "esp-XXXXXX" — **fixed** by moving startNTP after startWiFi
+- NTP configured **after** WiFi → DHCP cannot override NTP server (ESP8266 SDK limitation) — accepted tradeoff
 - MQTT started **before** webserver → port conflict or initialization race
 - PIC reset **after** OTGWstream start → serial bridge receives stale/corrupt data
 - Watchdog enabled **during** WiFi connect → watchdog fires on slow WiFi (240s timeout)
@@ -47,13 +48,21 @@ The boot sequence is organized into 5 phases:
 
 ### Phase 3: Network Connectivity
 ```
-8.  startNTP()            — Configure NTP **BEFORE** WiFi (DHCP override)
-9.  startWiFi(hostname, 240) — Connect to WiFi (up to 240s timeout)
+8.  startWiFi(hostname, 240) — Connect to WiFi (up to 240s timeout)
+9.  startNTP()            — Configure NTP after WiFi (hostname preserved)
 10. startTelnet()         — Debug port 23 (available immediately after WiFi)
 11. startMDNS(hostname)   — mDNS responder for hostname.local resolution
 12. startLLMNR(hostname)  — LLMNR for Windows hostname resolution
 ```
-**Critical dependency:** NTP must be configured before WiFi connects. The ESP8266 SDK's `configTime()` sets up SNTP which can be overridden by DHCP option 42 (NTP server). If WiFi connects first, the DHCP NTP override is missed.
+**Ordering rationale (hostname vs DHCP NTP override tradeoff):**
+Calling `configTime()` (inside `startNTP()`) **before** `WiFi.begin()` caused the ESP8266 SDK
+to reset the DHCP-registered hostname to the default "esp-XXXXXX" form, making the
+user-configured hostname invisible to routers and DHCP leases (GitHub issue: hostname not used).
+
+The previous order (`startNTP` then `startWiFi`) was intended to allow DHCP option 42 to
+override the NTP server. However this caused a more severe regression — the hostname was wrong.
+The tradeoff: DHCP NTP override is no longer supported, but the configured hostname now works
+correctly. NTP server can still be configured via the firmware settings page.
 
 ### Phase 4: Application Services
 ```
