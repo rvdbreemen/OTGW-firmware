@@ -26,26 +26,32 @@ This pattern is still a violation of ADR-004: the lazy allocation introduces a s
 
 ## Decision
 
-**All feature-specific working buffers must be declared as file-static globals, not heap-allocated — even when the feature is only used occasionally.**
+**All feature-specific working buffers must be declared as file-static globals or reuse the global `cMsg` scratch buffer — never heap-allocated.**
 
-The MQTT auto-discovery lazy-allocation pattern is replaced with a plain static global for the line buffer, combined with `cMsg` (the global scratch buffer) for the rendered topic:
+The MQTT auto-discovery lazy-allocation pattern is replaced by growing the global `cMsg` scratch buffer (`CMSG_SIZE`) from 512 to 1200 bytes (matching `MQTT_CFG_LINE_MAX_LEN`) and using it directly as the line buffer (`sLine`). The rendered topic (`sTopic`) uses a small stack-local buffer:
 
 ```cpp
-// MQTTstuff.ino
-// Raw config line buffer — static global: lines in mqttha.cfg reach ~900 bytes.
-// Cannot use cMsg (512 bytes) or stack (too large for ESP8266 4KB CONT stack).
-// Topic render target uses the global cMsg scratch buffer (≤200 bytes, fits in CMSG_SIZE).
-static char mqttAutoConfigLine[MQTT_CFG_LINE_MAX_LEN];  // 1200 bytes
+// OTGW-firmware.h
+#define CMSG_SIZE 1200  // Large enough for mqttha.cfg lines (max 898 bytes observed)
+char cMsg[CMSG_SIZE];   // global scratch buffer
 
-// In call sites:
-char *sLine  = mqttAutoConfigLine;  // raw config line (up to 1200 bytes)
-char *sTopic = cMsg;                // rendered topic  (up to 200 bytes, fits in cMsg[512])
+// MQTTstuff.ino — in doAutoConfigure() and doAutoConfigureMsgid()
+char *sLine  = cMsg;                  // global scratch (CMSG_SIZE=1200, fits all lines)
+char sTopic[MQTT_TOPIC_MAX_LEN];      // stack — 200 bytes, safe on 4KB CONT stack
 ```
+
+The `MQTTAutoConfigBuffers` struct and the separate `mqttAutoConfigLine[1200]` static are both eliminated. The resulting memory layout:
+
+| Before | After | Delta |
+|---|---|---|
+| `cMsg[512]` + `mqttAutoConfigLine[1200]` = **1712 bytes BSS** | `cMsg[1200]` = **1200 bytes BSS** | **−512 bytes BSS** |
+
+**Critical constraint:** `expandAndPublishSourceTemplates()` must use `feedWatchDog()` (not `doBackgroundTasks()`) between the 3 source-template variants. Rationale: `topicTemplate` and `msgTemplate` are pointers into `cMsg` (the line buffer); a `doBackgroundTasks()` call can invoke `httpServer.handleClient()` or `handleMQTT()`, which write to `cMsg`, corrupting the template strings before the next variant is rendered. `feedWatchDog()` only feeds the hardware watchdog and blinks the LED — it does not touch `cMsg`.
 
 The `MQTTAutoConfigBuffers` struct is eliminated. The nullable-pointer guard (`if (!acBuf) { ... return; }`) is removed.
 
 **Rule for large feature buffers:**  
-If a feature subsystem needs a large working area (≥ ~100 bytes) that lives for the lifetime of the device, declare it as a `static` global in the owning `.ino` file. Do not use `new` / `malloc`, even for "allocate-once, never free" patterns.
+If a feature subsystem needs a working area that fits within `CMSG_SIZE`, use `cMsg`. If the area is larger than `CMSG_SIZE`, grow `CMSG_SIZE` to fit and document the reason. Do not use `new` / `malloc`, even for "allocate-once, never free" patterns.
 
 This extends ADR-004's core principle ("no dynamic allocation") to explicitly cover large feature-specific working buffers that are only used during specific operations.
 
@@ -86,47 +92,49 @@ This extends ADR-004's core principle ("no dynamic allocation") to explicitly co
 
 **Why not chosen:** Not feasible for read-write scratch buffers.
 
-### Alternative 4: Reuse cMsg (512-byte global scratch buffer)
+### Alternative 4: Keep separate `mqttAutoConfigLine[1200]` static global
 **Pros:**
-- Zero additional RAM cost
+- Simple — no change to `cMsg`, no template-pointer safety concern
+- No need to remove `doBackgroundTasks()` from `expandAndPublishSourceTemplates`
 
 **Cons:**
-- cMsg is only 512 bytes; the autoconfig line buffer needs 1200 bytes (lines reach ~900 bytes)
-- cMsg is used throughout the firmware for unrelated operations; sharing it during a multi-step auto-discovery pass would require careful locking
+- Total BSS = 512 (`cMsg`) + 1200 (`mqttAutoConfigLine`) = **1712 bytes** — wastes 512 bytes unnecessarily
+- Two buffers with overlapping lifetimes in the same call chain is unnecessarily complex
 
-**Partially chosen:** cMsg IS used for the rendered topic (`sTopic`, ≤200 bytes, fits in `cMsg[512]`). The raw config line buffer (`sLine`, up to 1200 bytes) cannot use `cMsg` and must remain a separate static global.
+**Why not chosen:** Growing `cMsg` eliminates the duplication and saves 512 bytes BSS with only a minor structural change (`feedWatchDog()` instead of `doBackgroundTasks()` in one function).
 
 ## Consequences
 
 ### Positive
-- **No heap fragmentation:** `mqttAutoConfigLine` is placed in BSS at link time; no runtime `new` call
-- **cMsg used for topic buffer:** `sTopic = cMsg` (200 bytes ≤ 512-byte `cMsg`) — consistent with project scratch-buffer convention
-- **Struct eliminated:** `MQTTAutoConfigBuffers` struct removed; only one module-specific static remains (`mqttAutoConfigLine`)
-- **Simpler call sites:** OOM guard removed; both pointers are never null
+- **No heap fragmentation:** `cMsg` (1200 bytes) is placed in BSS at link time; no runtime `new` call
+- **512 bytes BSS saved:** Replacing `cMsg[512]` + `mqttAutoConfigLine[1200]` with `cMsg[1200]` alone
+- **Struct eliminated:** `MQTTAutoConfigBuffers` struct and separate line static removed entirely
+- **Simpler call sites:** OOM guard removed; all pointers are never null
 - **Consistent with ADR-004:** No exceptions to the static-allocation rule remain in normal firmware operation
 - **Deterministic memory layout:** Full BSS footprint is known at link time
 
 ### Negative
-- **Always-resident cost:** 1200 bytes of BSS for `mqttAutoConfigLine`, even if auto-discovery is never run
-  - **Accepted trade-off:** Deterministic memory layout is worth more on this platform than saving 1200 bytes in a rarely-encountered configuration
-- **cMsg shared for sTopic:** `sTopic = cMsg` means callers must not call auto-discovery while `cMsg` is in use for another purpose. Single-threaded ESP8266 loop ensures this is safe.
+- **Always-resident cost:** `cMsg[1200]` is always in BSS, even if auto-discovery is never run
+  - **Accepted trade-off:** Deterministic memory layout is worth more on this platform than conditional savings
+- **`doBackgroundTasks()` removed from inner source-template loop:** `expandAndPublishSourceTemplates()` now uses `feedWatchDog()` only. The device yields slightly less during the 3-variant loop of rare bulk-discovery runs. Since each MQTT publish takes only a few ms, the practical impact is negligible.
+- **`CMSG_SIZE` growth affects all `sizeof(cMsg)` call sites:** All existing `snprintf_P(cMsg, sizeof(cMsg), ...)` calls now receive 1200 as the bound. This is safe (more room, not less), and no code assumed `sizeof(cMsg) == 512` explicitly.
 
 ### Risks & Mitigation
-- **Concurrent access:** `mqttAutoConfigLine` and `cMsg` are shared between `doAutoConfigure()` and `doAutoConfigureMsgid()`. The existing `MQTTAutoConfigSessionLock` guard prevents concurrent re-entry; this ADR does not change that behaviour.
-- **Buffer overflow:** Line buffer is 1200 bytes; auto-discovery lines that exceed this would silently truncate. This was already true under the lazy-allocation scheme.
+- **Concurrent access:** `cMsg` is shared between all callers. The existing `MQTTAutoConfigSessionLock` guard prevents concurrent MQTT auto-discovery re-entry. For other `cMsg` users, the single-threaded ESP8266 cooperative model prevents true concurrency; the design requires callers not to hold `cMsg` across `doBackgroundTasks()` calls.
+- **Buffer overflow:** Line buffer capacity is now `CMSG_SIZE=1200` bytes; auto-discovery lines that exceed this would silently truncate. This was already true under the previous scheme.
+- **Template corruption:** Mitigated by using `feedWatchDog()` (not `doBackgroundTasks()`) in `expandAndPublishSourceTemplates()` — see Decision section.
 
 ## Implementation Patterns
 
-**Feature-specific: use static for oversized buffers, cMsg for small scratch (correct):**
+**Canonical pattern — use `cMsg` for all scratch work up to `CMSG_SIZE` (correct):**
 ```cpp
-// GOOD — large buffer as static global; small scratch via cMsg
-static char featureLineBuffer[LARGE_LINE_MAX];  // too large for stack or cMsg
+// GOOD — use cMsg for raw line buffer (grown to CMSG_SIZE=1200);
+//         stack buffer for small rendered output (200 bytes ≤ 4KB CONT stack)
+char *sLine  = cMsg;                  // global scratch — safe, CMSG_SIZE=1200
+char sTopic[MQTT_TOPIC_MAX_LEN];      // stack — 200 bytes, safe on CONT stack
 
-void doFeatureWork() {
-  char *sLine  = featureLineBuffer;  // static global — safe
-  char *sTopic = cMsg;               // global scratch — fits (≤200 bytes ≤ CMSG_SIZE=512)
-  // ... use sLine and sTopic ...
-}
+// IMPORTANT: do NOT call doBackgroundTasks() while cMsg holds data you still need.
+// Use feedWatchDog() instead (does not touch cMsg).
 ```
 
 **Lazy heap allocation (prohibited):**
@@ -154,7 +162,7 @@ void doFeatureWork() {
 - ADR-030: Heap Memory Monitoring and Emergency Recovery
 
 ## References
-- MQTT auto-discovery implementation: `src/OTGW-firmware/MQTTstuff.ino` (`mqttAutoConfigLine`, `cMsg` for `sTopic`, `MQTTAutoConfigSessionLock`)
-- Heap protection implementation: `src/OTGW-firmware/OTGW-firmware.h` (CSTR macro, heap levels)
+- MQTT auto-discovery implementation: `src/OTGW-firmware/MQTTstuff.ino` (`cMsg` as `sLine`, stack `sTopic`, `MQTTAutoConfigSessionLock`)
+- Global scratch buffer: `src/OTGW-firmware/OTGW-firmware.h` (`CMSG_SIZE`, `cMsg[CMSG_SIZE]`)
 - Developer guidelines: `.github/copilot-instructions.md` (Memory Management section)
-- PR: copilot/review-codewijzigingen-sinds-laatste-release (commit d514661 — code change; superseding ADR added in follow-up)
+- PR: copilot/review-codewijzigingen-sinds-laatste-release (code change and ADR follow-up)

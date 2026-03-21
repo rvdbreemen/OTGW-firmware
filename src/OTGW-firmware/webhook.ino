@@ -157,7 +157,7 @@ static bool expandPayload(const char* tmpl, char* out, size_t outLen, bool state
 
 //=======================================================================
 // Expand and send the configured payload body for a POST webhook.
-// Uses the global cMsg scratch buffer (512 bytes) for the expanded payload —
+// Uses the global cMsg scratch buffer (CMSG_SIZE bytes) for the expanded payload —
 // avoids a large stack allocation in the HTTP call chain (ESP8266 CONT-stack = 4 KB).
 //=======================================================================
 static int sendWebhookPost(HTTPClient& http, const char* url, bool stateOn) {
