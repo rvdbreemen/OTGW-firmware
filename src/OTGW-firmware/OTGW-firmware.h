@@ -123,7 +123,7 @@ void startWebSocket();
 void handleWebSocket();
 void testWebhook(bool testOn);
 void evalWebhook();
-bool checkHttpAuth();  // HTTP Basic Auth guard (ADR-041; defined in restAPI.ino)
+bool checkHttpAuth();  // HTTP Basic Auth guard (ADR-053; defined in restAPI.ino)
 
 //===================[ Runtime State — transient, never persisted (ADR-051) ]===================
 // Sub-section structs for OTGWState — groups runtime state by system component.
