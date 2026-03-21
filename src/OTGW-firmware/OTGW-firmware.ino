@@ -146,12 +146,11 @@ void setup() {
   setLed(LED1, ON);
   SetupDebugln(F("Attempting to connect to WiFi network\r"));
 
-  //setup NTP before connecting to wifi will enable DHCP to overrule the NTP setting
-  startNTP();
-
-  //start with setting wifi hostname
   bool forceWifiPortal = shouldForceWifiConfigPortal();
   startWiFi(CSTR(settings.sHostname), 240, forceWifiPortal);  // timeout 240 seconds
+
+  //setup NTP after WiFi; startNTP() restores hostname after configTime()
+  startNTP();
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
 

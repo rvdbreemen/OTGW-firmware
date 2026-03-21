@@ -217,8 +217,11 @@ static const char* skipOTLogTimestamp(const char* logLine)
 //some variable's
 OpenthermData_t OTdata, delayedOTdata, tmpOTdata;
 
+static constexpr uint8_t MQTT_TRACKED_RESPONSE_ID_COUNT = 128; // linear msgid slots for IDs 0-127
+static constexpr uint16_t MQTT_TRACKED_SLOT_COUNT = MQTT_TRACKED_RESPONSE_ID_COUNT * 2; // response + request view
+
 // Global state arrays — defined here (one definition rule), declared extern in OTGW-Core.h. (ADR-044)
-uint32_t mqttlastsent[256]         = {0}; // packed throttle: bits31-16=last published u16, bits15-0=seconds-since-boot
+uint32_t mqttlastsent[MQTT_TRACKED_SLOT_COUNT] = {0}; // packed throttle for msgids 0-127: bits31-16=last published u16, bits15-0=seconds-since-boot
 uint16_t mqttlastsentstatusbit[16] = {0}; // per-bit publish timers for OT_Statusflags (slots 0-7=master, 8-15=slave)
 bool     mqttPublishAllowed        = true; // MQTT interval gate — managed via OTPublishGate (OTGW-Core.h)
 static uint16_t mqttlastsentstatusbyte[2] = {0}; // combined status_master/status_slave publish timers
@@ -321,9 +324,18 @@ static void setMsgLastUpdated(uint8_t msgId, uint16_t trackedNow)
   }
 }
 
+static bool tryGetTrackedSlotIndex(uint8_t id, byte masterslave, uint8_t &trackedSlot)
+{
+  if (id > 127) return false;
+  trackedSlot = (masterslave == OT_MSGTYPE_REQUEST)
+                ? static_cast<uint8_t>(id + MQTT_TRACKED_RESPONSE_ID_COUNT)
+                : id;
+  return true;
+}
+
 static void resetMqttTrackedState()
 {
-  for (uint16_t i = 0; i < 256; i++) {
+  for (uint16_t i = 0; i < MQTT_TRACKED_SLOT_COUNT; i++) {
     mqttlastsent[i] = TRACKED_TIME_UNSEEN;
   }
   for (uint8_t i = 0; i < 16; i++) {
@@ -1072,7 +1084,8 @@ bool shouldPublishMQTTForID(byte id, byte masterslave, uint16_t rawValue) {
                     rawValue);
     return true;
   }
-  byte idx = (masterslave == OT_MSGTYPE_REQUEST) ? (uint8_t)(id + 128) : (uint8_t)id;
+  uint8_t idx = 0;
+  if (!tryGetTrackedSlotIndex(id, masterslave, idx)) return true;
   uint32_t packed = mqttlastsent[idx];
   const bool firstSeen = !hasTrackedTime(getPackedSlotTime(packed));
   uint16_t lastVal  = (uint16_t)(packed >> 16);             // bits 31-16: last published u16
@@ -1112,8 +1125,8 @@ bool shouldPublishMQTTForPSField(byte id) {
     CoreMQTTDebugTf(PSTR("MQTT gate PS id=%u => publish [delegated to status-byte/bit gates]\r\n"), id);
     return true; // status uses dedicated combined-byte and per-bit gates
   }
-  // PS=1 summary fields are always slave responses → idx = id (masterslave==0)
-  byte idx = id;
+  uint8_t idx = 0;
+  if (!tryGetTrackedSlotIndex(id, 0, idx)) return true;
   uint16_t lastTime = getPackedSlotTime(mqttlastsent[idx]);
   const bool firstSeen = !hasTrackedTime(lastTime);
   uint16_t now      = currentTrackedSeconds();
