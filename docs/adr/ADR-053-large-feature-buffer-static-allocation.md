@@ -24,46 +24,53 @@ static MQTTAutoConfigBuffers* getMqttAutoConfigBuffers() {
 
 This pattern is still a violation of ADR-004: the lazy allocation introduces a single `new` call that fragments the heap at an unpredictable moment (the first auto-discovery run, which can happen at any time during device operation), and adds nullable-pointer complexity for no practical benefit (auto-discovery runs on almost every device that has MQTT enabled).
 
-After an iterative analysis of all buffer uses in the codebase (see Alternatives Considered), the optimal minimum-memory design was determined to be a single enlarged `cMsg[1200]` global that serves both as the general scratch buffer and as the MQTT autoconfig line workspace.
+After an iterative analysis of all buffer uses in the codebase (see Alternatives Considered), the optimal minimum-memory design was determined to be two named globals: `cMsg[512]` for general scratch work and `sLine[1200]` dedicated to the MQTT autoconfig line buffer.
 
 ## Decision
 
-**All feature-specific working buffers must be declared as global or file-scope static arrays — never heap-allocated. When a feature needs a buffer larger than the default general scratch size, the general scratch buffer is enlarged to accommodate it rather than adding a second large global.**
+**All feature-specific working buffers must be declared as global arrays — never heap-allocated, never local static, never local stack. When a feature needs a large buffer, add a named purpose-specific global.**
 
-The MQTT auto-discovery lazy-allocation pattern is replaced by a single enlarged global scratch buffer declared in `OTGW-firmware.h`:
+The MQTT auto-discovery lazy-allocation pattern is replaced by two explicitly-named global buffers declared in `OTGW-firmware.h`:
 
 ```cpp
 // OTGW-firmware.h
-#define CMSG_SIZE  1200  // General-purpose scratch buffer + MQTT autoconfig line workspace.
-                         // Sized to mqttha.cfg max observed line (~900 bytes) with headroom.
-                         // All other users (webhook, REST API, JSON, MQTT topic) need ≤512 bytes.
-char cMsg[CMSG_SIZE];    // global scratch buffer
+#define CMSG_SIZE  512   // General-purpose scratch buffer (webhook, REST API, JSON, MQTT topic).
+                         // All known users need ≤512 bytes.
+#define SLINE_SIZE 1200  // MQTT autoconfig line buffer.  mqttha.cfg lines reach ~900 bytes max.
+                         // Exclusively owned by MQTTstuff.ino; guarded by mqttAutoConfigInProgress.
+char cMsg[CMSG_SIZE];    // global general-purpose scratch buffer
+char sLine[SLINE_SIZE];  // MQTT autoconfig line scratch (MQTTstuff.ino, guarded by mqttAutoConfigInProgress)
 
 // MQTTstuff.ino — in doAutoConfigure() and doAutoConfigureMsgid()
-char sTopic[MQTT_TOPIC_MAX_LEN];  // local stack variable (200 bytes) — separate from cMsg
-                                   // because topicTemplate/msgTemplate point INTO cMsg
+char *sTopic = cMsg;     // global scratch reused for rendered topic (≤200 bytes, fits in CMSG_SIZE)
+                         // Safe: topicTemplate/msgTemplate point INTO sLine, not cMsg.
 ```
 
-The `MQTTAutoConfigBuffers` struct, the `sLine[SLINE_SIZE]` global, and the `mqttAutoConfigLine[1200]` file-scope static are all eliminated. The resulting memory layout:
+The `MQTTAutoConfigBuffers` struct and the `mqttAutoConfigLine[1200]` file-scope static are eliminated. The resulting memory layout:
 
 | Design | BSS for these buffers | Notes |
 |---|---|---|
-| Previous: `cMsg[512]` + `mqttAutoConfigLine[1200]` + stack `sTopic[200]` | **1712 bytes BSS** | Two globals |
-| Multi-buffer: `cMsg[512]` + `sLine[1200]` + `cMsg` as sTopic | **1712 bytes BSS** | Two globals, same total |
-| **Final (this ADR): `cMsg[1200]` + stack `sTopic[200]`** | **1200 bytes BSS** | Single global, −512 bytes |
+| Previous: `cMsg[512]` + heap `MQTTAutoConfigBuffers` (1400B) | **512 bytes BSS** + heap | Heap fragmentation |
+| Previous: `cMsg[512]` + `mqttAutoConfigLine[1200]` + stack `sTopic[200]` | **1712 bytes BSS** | Local static + stack |
+| Enlarged single buffer: `cMsg[1200]` + stack `sTopic[200]` | **1200 bytes BSS** | Stack variable |
+| **Final (this ADR): `cMsg[512]` + `sLine[1200]` + `cMsg` as sTopic** | **1712 bytes BSS** | No stack/static, clear names |
 
-**Why `sTopic` must be a local stack variable (not `cMsg`):**  
-`sTopic` holds the *rendered* topic (≤200 bytes). `topicTemplate` and `msgTemplate` are pointers INTO `cMsg` (the raw config line). Rendering `sTopic` directly into `cMsg` would overwrite the template that the message rendering still needs. A 200-byte stack allocation is safe on the ESP8266's 4 KB CONT-stack.
+**Why `cMsg` (not a stack variable) is the right choice for `sTopic`:**  
+With `sLine` holding the raw config line, `topicTemplate` and `msgTemplate` are pointers INTO `sLine`. Rendering `sTopic` into `cMsg` is safe because `cMsg` and `sLine` are disjoint globals. No stack allocation is needed, and no risk of corrupting the templates.
 
-**Critical constraint:** `expandAndPublishSourceTemplates()` must use `feedWatchDog()` (not `doBackgroundTasks()`) between the 3 source-template variants. Rationale: `topicTemplate` and `msgTemplate` are pointers into `cMsg`; `doBackgroundTasks()` routes HTTP/MQTT callbacks that write to `cMsg`, corrupting those pointers. `feedWatchDog()` feeds the hardware watchdog only — it does not touch `cMsg`.
+**Why NOT using a single `cMsg[1200]`:**  
+Growing `cMsg` to 1200 bytes would silently widen the bounds for all `snprintf_P(cMsg, sizeof(cMsg), ...)` call sites — webhook, REST API, JSON helpers — which need ≤512 bytes. A 1200-byte `cMsg` gives them a bound they will never use, wasting 688 bytes of BSS permanently. A named `sLine[1200]` makes the MQTT-specific usage explicit and keeps `cMsg` bounded at its correct size.
+
+**Critical constraint:** `expandAndPublishSourceTemplates()` and the per-line publish loop must use `feedWatchDog()` (not `doBackgroundTasks()`) when `cMsg` is live as `sTopic`. Rationale: `doBackgroundTasks()` routes HTTP/MQTT callbacks that write to `cMsg`, which would corrupt the rendered topic. `feedWatchDog()` feeds the hardware watchdog only — it does not touch `cMsg` or `sLine`.
 
 The `MQTTAutoConfigBuffers` struct is eliminated. The nullable-pointer guard (`if (!acBuf) { ... return; }`) is removed.
 
-**Rule for feature buffers:**  
-- Use `cMsg` for all scratch work.  
-- If a feature needs more space than the current `CMSG_SIZE`, increase `CMSG_SIZE` with a comment explaining the new minimum.  
+**Rules for feature buffers:**  
+- Use `cMsg` for all general scratch work (≤512 bytes).  
+- For scratch work >512 bytes, add a named global with a descriptive size constant.  
 - Never use `new` / `malloc`, even for "allocate-once, never free" patterns.  
-- Never use local static buffers (persists across calls, hidden state).
+- Never use local static buffers (hidden persistent state).
+- Never use local stack buffers for MQTT autoconfig workspace (defeats the purpose of explicit global ownership).
 
 ## Alternatives Considered
 
@@ -102,73 +109,96 @@ The `MQTTAutoConfigBuffers` struct is eliminated. The nullable-pointer guard (`i
 
 **Why not chosen:** Not feasible for read-write scratch buffers.
 
-### Alternative 4: Two named global scratch buffers (`cMsg[512]` + `sLine[1200]`)
+### Alternative 4: Two named global scratch buffers (`cMsg[512]` + `sLine[1200]`) — **chosen**
 **Pros:**
-- `cMsg` stays bounded at 512 bytes for all other callers
-- Named `sLine` buffer makes MQTT-specific usage visible at a glance
+- `cMsg` stays bounded at its original 512 bytes for all other callers — no silent bound changes
+- Named `sLine` buffer makes MQTT-specific large-buffer usage visible at a glance
+- `cMsg` can be reused as `sTopic` (safe because templates point into `sLine`, not `cMsg`)
+- No stack or local static buffers anywhere in the MQTT autoconfig path
+- Both buffers are explicitly guarded: `mqttAutoConfigInProgress` gates all access to `sLine` and to `cMsg`-as-sTopic
 
 **Cons:**
-- 1712 bytes BSS (512 bytes more than the chosen design)
-- Two large globals always resident, even though `sLine` is only used during MQTT autoconfig
-- `cMsg` at 512 bytes can still be used as `sTopic` (rendering into `cMsg` is safe with this design)
+- 1712 bytes BSS (512 bytes more than the single `cMsg[1200]` design)
+- `sLine` is always resident even if MQTT autoconfig is never run
 
-**Why not chosen:** 512 bytes more BSS for a naming benefit that is better achieved with a comment on `CMSG_SIZE`. All `cMsg` users (REST API, webhook, JSON helpers) need ≤512 bytes; growing `cMsg` to 1200 bytes adds headroom they never use, but costs nothing at runtime.
+**Why chosen:** Explicit ownership is more important than saving 512 bytes. `cMsg` keeps its original semantic (general-purpose, ≤512 bytes); `sLine` clearly names the MQTT-specific large buffer. The 512-byte cost is the same as having both the old `mqttAutoConfigLine` file-scope static AND `cMsg[512]`, so there is no regression vs. the pre-PR state.
 
-### Alternative 5: Dedicated `sTopicBuf[MQTT_TOPIC_MAX_LEN]` global for sTopic
+### Alternative 5: Single enlarged `cMsg[1200]` with `sTopic` as local stack variable
 **Pros:**
-- All buffers are named: `cMsg` (general scratch + line), `sTopicBuf` (MQTT topic)
-- Zero risk of aliasing between the line buffer and the topic buffer
+- Only 1200 bytes BSS (−512 vs. two-global design)
+- One fewer global to declare and document
 
 **Cons:**
-- Adds 200 bytes BSS that can be avoided by a 200-byte stack allocation
-- `sTopicBuf` is only non-null during MQTT autoconfig iterations — wasteful for the rest of firmware operation
-- The ESP8266 CONT-stack is 4 KB; 200 bytes is a trivially small stack frame
+- `sizeof(cMsg)` silently returns 1200 everywhere: webhook, REST API, JSON helpers that write ≤512 bytes will receive a bound of 1200 — technically safe but misleading
+- `sTopic` becomes a local stack variable (200 bytes) — still a "local buffer" which is the pattern we are trying to eliminate
+- The purpose of the large `cMsg` is not obvious to future maintainers; comment must explain why a general-purpose scratch buffer is 1200 bytes
 
-**Why not chosen:** A 200-byte stack variable during autoconfig (a rare, brief operation) is better than 200 bytes of always-resident BSS.
+**Why not chosen:** The 200-byte stack variable re-introduces the "local buffer" anti-pattern, and the 512-byte saving is not worth the semantic confusion of a 1200-byte general-purpose scratch buffer.
+
+### Alternative 6: Dedicated `sTopicBuf[MQTT_TOPIC_MAX_LEN]` global for sTopic
+**Pros:**
+- All buffers are named: `cMsg` (general scratch), `sLine` (config line), `sTopicBuf` (MQTT topic)
+- Zero risk of aliasing between any pair of buffers
+
+**Cons:**
+- Adds 200 bytes BSS: total 1712 + 200 = **1912 bytes BSS**
+- `sTopicBuf` is only used during MQTT autoconfig topic rendering — wasteful for the rest of firmware operation
+- `cMsg` already serves the same purpose safely (given `sLine` separation)
+
+**Why not chosen:** 200 extra bytes for a third large global when `cMsg` already does the job safely with the two-buffer design.
 
 ## Consequences
 
 ### Positive
-- **No heap fragmentation:** `cMsg` is placed in BSS at link time; no runtime `new` call
-- **Minimum BSS:** 1200 bytes for this buffer region (512 bytes less than the two-global design)
+- **No heap fragmentation:** `cMsg` and `sLine` are placed in BSS at link time; no runtime `new` call
+- **No local buffers:** No stack or local static buffers anywhere in the MQTT autoconfig path
 - **Struct eliminated:** `MQTTAutoConfigBuffers` struct removed; no nullable-pointer boilerplate
-- **Simpler call sites:** OOM guard removed; `cMsg` is never null
+- **Simpler call sites:** OOM guard removed; `cMsg` and `sLine` are never null
 - **Consistent with ADR-004:** No exceptions to the static-allocation rule remain in normal firmware operation
 - **Deterministic memory layout:** Full BSS footprint is known at link time
+- **Clear buffer ownership:** `cMsg` for general scratch (≤512 bytes), `sLine` for MQTT autoconfig lines (≤1200 bytes)
 
 ### Negative
-- **Always-resident cost:** `cMsg[1200]` is always in BSS, even if auto-discovery is never run
+- **Always-resident cost:** `sLine[1200]` is always in BSS, even if auto-discovery is never run
   - **Accepted trade-off:** Deterministic memory layout is worth more on this platform than conditional savings
-- **`doBackgroundTasks()` removed from inner source-template loop:** `expandAndPublishSourceTemplates()` uses `feedWatchDog()` only between per-source publishes. The device yields slightly less during the 3-variant loop of rare bulk-discovery runs; each MQTT publish takes only a few ms, so the practical impact is negligible.
-- **`cMsg` size increased:** From 512 to 1200 bytes. All `snprintf_P(cMsg, sizeof(cMsg), ...)` call sites will silently receive 1200 as the bound instead of 512. Since these callers only write ≤512 bytes, the larger bound is always safe.
+  - The old design also had `mqttAutoConfigLine[1200]` always resident — no regression
+- **`doBackgroundTasks()` removed from inner per-line loop:** `feedWatchDog()` is the only yield used during autoconfig. The device yields slightly less during bulk-discovery runs; each MQTT publish takes only a few ms, so the practical impact is negligible.
+- **BSS slightly larger than single-buffer design:** 1712 bytes vs. 1200 bytes for the single `cMsg[1200]` alternative. Accepted because explicit named buffers prevent semantic confusion.
 
 ### Risks & Mitigation
-- **Concurrent access:** `cMsg` is shared globally. The existing `MQTTAutoConfigSessionLock` guard prevents concurrent MQTT auto-discovery re-entry. For other `cMsg` users, the single-threaded ESP8266 cooperative model prevents true concurrency; callers must not hold `cMsg` across `doBackgroundTasks()` calls.
-- **Buffer overflow during MQTT line read:** Line buffer capacity is `CMSG_SIZE=1200` bytes; auto-discovery lines that exceed this would silently truncate at `CMSG_SIZE − 1`. The maximum observed line in `mqttha.cfg` is ~900 bytes, so 1200 bytes provides adequate headroom.
-- **sTopic/cMsg aliasing:** `sTopic` is a local stack variable (200 bytes); it is distinct from `cMsg`. `topicTemplate`/`msgTemplate` point into `cMsg`; rendering into `sTopic` does not corrupt them. `feedWatchDog()` (not `doBackgroundTasks()`) is used inside `expandAndPublishSourceTemplates()` to ensure `cMsg` is not overwritten between `renderTemplateToBuffer()` and `sendMQTTTemplateStreaming()` within the same iteration.
+- **Concurrent access — `sLine`:** `sLine` is guarded by `mqttAutoConfigInProgress` (via `MQTTAutoConfigSessionLock`). Any code path that tries to acquire the lock while it is held will see the guard and return early.
+- **Concurrent access — `cMsg` as sTopic:** `cMsg` is held as `sTopic` only during MQTT autoconfig, during which `feedWatchDog()` (not `doBackgroundTasks()`) is the only yield. No HTTP/MQTT callback can overwrite `cMsg` during that window.
+- **Buffer overflow during MQTT line read:** Line buffer capacity is `SLINE_SIZE=1200` bytes; lines exceeding this would silently truncate at `SLINE_SIZE − 1`. The maximum observed line in `mqttha.cfg` is ~900 bytes, so 1200 bytes provides adequate headroom.
+- **`cMsg` (sTopic) bound:** `sTopic` uses `cMsg[512]`; rendered MQTT topics are bounded to `MQTT_TOPIC_MAX_LEN=200` bytes by `renderTemplateToBuffer()` and `replaceAll()`. A 200-byte topic fits easily in `cMsg[512]`.
 
 ## Implementation Patterns
 
-**Final pattern — single enlarged `cMsg` (correct):**
+**Final pattern — two named globals, `cMsg` as sTopic pointer (correct):**
 ```cpp
 // OTGW-firmware.h
-#define CMSG_SIZE  1200  // General-purpose scratch buffer + MQTT autoconfig line workspace.
-                         // Sized to mqttha.cfg max observed line (~900 bytes) with headroom.
-char cMsg[CMSG_SIZE];    // global scratch buffer (only one large buffer needed)
+#define CMSG_SIZE  512   // General-purpose scratch buffer.  All users need ≤512 bytes.
+#define SLINE_SIZE 1200  // MQTT autoconfig line buffer.  Lines reach ~900 bytes max.
+char cMsg[CMSG_SIZE];    // global general-purpose scratch
+char sLine[SLINE_SIZE];  // MQTT autoconfig line scratch (MQTTstuff.ino, guarded)
 
 // MQTTstuff.ino — doAutoConfigure() and doAutoConfigureMsgid()
-char sTopic[MQTT_TOPIC_MAX_LEN];  // 200-byte stack variable (separate from cMsg line buffer)
+// Acquire lock first (gates sLine and cMsg-as-sTopic):
+MQTTAutoConfigSessionLock sessionLock;
+if (!sessionLock.locked) { return; }
 
-// Read config line into cMsg:
-size_t len = fh.readBytesUntil('\n', cMsg, CMSG_SIZE - 1);
-cMsg[len] = '\0';
-parseAutoConfigLine(cMsg, ';', &lineView);  // topicTemplate/msgTemplate point into cMsg
+char *sTopic = cMsg;  // global scratch reused as rendered topic (≤200 bytes, fits in CMSG_SIZE)
 
-// Render topic into the SEPARATE stack buffer:
+// Read config line into sLine (the dedicated global, guarded):
+size_t len = fh.readBytesUntil('\n', sLine, SLINE_SIZE - 1);
+sLine[len] = '\0';
+parseAutoConfigLine(sLine, ';', &lineView);  // topicTemplate/msgTemplate point into sLine
+
+// Render topic into cMsg (safe because cMsg and sLine are disjoint):
 renderTemplateToBuffer(lineView.topicTemplate, sTopic, MQTT_TOPIC_MAX_LEN, &renderCtx);
 
-// IMPORTANT: do NOT call doBackgroundTasks() within expandAndPublishSourceTemplates()
-// while cMsg holds the active config line.  Use feedWatchDog() instead.
+// IMPORTANT: use feedWatchDog() (not doBackgroundTasks()) while cMsg is live as sTopic.
+// doBackgroundTasks() routes HTTP/MQTT callbacks that write to cMsg.
+feedWatchDog();
 ```
 
 **Lazy heap allocation (prohibited):**
@@ -211,7 +241,7 @@ void doFeatureWork() {
 - ADR-030: Heap Memory Monitoring and Emergency Recovery
 
 ## References
-- MQTT auto-discovery implementation: `src/OTGW-firmware/MQTTstuff.ino` (`cMsg` as config line buffer, `sTopic` as local stack, `MQTTAutoConfigSessionLock`)
-- Global scratch buffer: `src/OTGW-firmware/OTGW-firmware.h` (`CMSG_SIZE=1200`, `cMsg[CMSG_SIZE]`)
+- MQTT auto-discovery implementation: `src/OTGW-firmware/MQTTstuff.ino` (`sLine` as config line buffer, `cMsg` as sTopic, `MQTTAutoConfigSessionLock`)
+- Global scratch buffers: `src/OTGW-firmware/OTGW-firmware.h` (`CMSG_SIZE=512`, `SLINE_SIZE=1200`, `cMsg[CMSG_SIZE]`, `sLine[SLINE_SIZE]`)
 - Developer guidelines: `.github/copilot-instructions.md` (Memory Management section)
 - PR: copilot/review-codewijzigingen-sinds-laatste-release (code change and ADR follow-up)

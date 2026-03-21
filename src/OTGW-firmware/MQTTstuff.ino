@@ -57,18 +57,22 @@ struct MQTTAutoConfigTemplateContext {
   const char *sourceTopicSegment;
 };
 
-// MQTT autoconfig scratch buffers (ADR-053 single-buffer design):
-//   cMsg[CMSG_SIZE=1200] — global, serves as the raw config line workspace AND general scratch.
-//                          Sized to mqttha.cfg max observed line (~900 bytes) with headroom.
-//   sTopic — local stack variable (char sTopic[MQTT_TOPIC_MAX_LEN], 200 bytes) in each
-//             autoconfig function.  Must be a separate buffer since topicTemplate and
-//             msgTemplate are pointers INTO cMsg; rendering the topic into cMsg would
-//             overwrite the template before the message is published.
+// MQTT autoconfig scratch buffers (ADR-053 two-buffer design):
+//   cMsg[CMSG_SIZE=512] — global general-purpose scratch, reused as sTopic (rendered MQTT
+//                          discovery topic, ≤200 bytes) during autoconfig.  cMsg is safe for
+//                          sTopic because template pointers (topicTemplate/msgTemplate) point
+//                          into sLine, not cMsg.
+//   sLine[SLINE_SIZE=1200] — global, exclusively holds raw config file lines (≤900 bytes from
+//                          mqttha.cfg).  Only used by MQTT autoconfig; guarded by
+//                          mqttAutoConfigInProgress.
 // feedWatchDog() is used (not doBackgroundTasks()) inside expandAndPublishSourceTemplates()
-// to prevent cMsg from being overwritten between the three per-source renders within
-// a single iteration (ADR-053).
+// and in the per-line loop to prevent cMsg or sLine from being overwritten by HTTP/MQTT
+// callbacks between the three per-source renders within a single iteration (ADR-053).
 
-// Guard shared MQTT autoconfig buffers against accidental re-entry.
+// Guard shared MQTT autoconfig buffers (cMsg for sTopic, sLine for config lines) against
+// accidental re-entry.  Acquiring this lock is the exclusive gate for using sLine; it also
+// guarantees cMsg is held for sTopic since feedWatchDog() (not doBackgroundTasks()) is the
+// only yield used during autoconfig, so no HTTP/MQTT callback can overwrite cMsg mid-use.
 // Current firmware is effectively single-threaded, but this protects future
 // callback/timer refactors from clobbering the shared workspace.
 // Not volatile: ESP8266 is cooperative single-threaded; no ISR enters this path.
@@ -1129,11 +1133,11 @@ void clearMQTTConfigDone()
 //===========================================================================================
 // expandAndPublishSourceTemplates()
 // Expands a source-template discovery line into 3 per-source variants and publishes each.
-// Renders topic variants into renderedTopic (local stack buffer, 200 bytes) and stream-renders
-// the JSON payload directly from the original template (in cMsg global).
+// Renders topic variants into renderedTopic (cMsg global, passed as sTopic pointer) and
+// stream-renders the JSON payload from the original template (in sLine global).
 // feedWatchDog() is used (not doBackgroundTasks()) between per-source publishes to prevent
-// cMsg from being overwritten mid-iteration: doBackgroundTasks() routes HTTP/MQTT callbacks
-// that write to cMsg.  topicTemplate/msgTemplate point into cMsg; renderedTopic is separate.
+// cMsg from being overwritten by HTTP/MQTT callbacks mid-iteration: topicTemplate/msgTemplate
+// point into sLine; renderedTopic points into cMsg — keeping the two buffers disjoint.
 // Returns true if at least one variant was successfully published.
 static bool expandAndPublishSourceTemplates(byte msgid,
                                            const char *logLabel,
@@ -1184,7 +1188,7 @@ void doAutoConfigure(){
       return;
     }
 
-    char sTopic[MQTT_TOPIC_MAX_LEN];             // stack: rendered topic (≤200 bytes, separate from cMsg line buffer)
+    char *sTopic = cMsg;                         // cMsg reused as rendered topic (≤200 bytes, fits in CMSG_SIZE)
     initSourceTokens();
     bool sourceTemplateSchemaLogged = false;
 
@@ -1207,13 +1211,13 @@ void doAutoConfigure(){
     while (fh.available()) {
       feedWatchDog(); // Keep the dog happy during IO
       
-      // Read line
-      size_t len = fh.readBytesUntil('\n', cMsg, CMSG_SIZE - 1);
-      cMsg[len] = '\0';
+      // Read line into sLine (the dedicated global config-line buffer, guarded by mqttAutoConfigInProgress)
+      size_t len = fh.readBytesUntil('\n', sLine, SLINE_SIZE - 1);
+      sLine[len] = '\0';
       MQTTAutoConfigLineView lineView;
       
       // Parse Line
-      if (!parseAutoConfigLine(cMsg, ';', &lineView)) continue;
+      if (!parseAutoConfigLine(sLine, ';', &lineView)) continue;
       lineID = lineView.id;
 
       // 4. Decision: Do we send this line?
@@ -1257,14 +1261,14 @@ void doAutoConfigure(){
          if (!sendMQTTTemplateStreaming(sTopic, lineView.msgTemplate, &renderCtx)) continue;
          setMQTTConfigDone(lineID);
 
-         doBackgroundTasks(); // Yield to network stack
+         feedWatchDog(); // Keep the dog happy between publishes (not doBackgroundTasks — cMsg is live as sTopic)
       }
     }
 
     fh.close();
     
-    // Note: cMsg is global and persists across calls; no cleanup needed.
-    // resetMQTTBufferSize() is a no-op for static buffer strategy
+    // Note: cMsg (sTopic) and sLine are globals; they persist across calls.
+    // No cleanup needed; guard (mqttAutoConfigInProgress) is released by sessionLock dtor.
     resetMQTTBufferSize();
   } // Lock released here - configSensors() can now acquire it independently
 
@@ -1311,11 +1315,13 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     return _result;
   } 
 
-  // Workspace (ADR-053 single-buffer design): cMsg[CMSG_SIZE=1200] for raw config lines.
-  // sTopic is a local stack variable (200 bytes) — must be separate from cMsg since
-  // topicTemplate/msgTemplate are pointers INTO cMsg (overwriting them would corrupt the template).
-  // expandAndPublishSourceTemplates() uses feedWatchDog() only — see function comment.
-  char sTopic[MQTT_TOPIC_MAX_LEN];
+  // Workspace (ADR-053 two-buffer design):
+  //   sLine[SLINE_SIZE=1200] — global, holds raw config file lines (≤900 bytes). Guarded by
+  //                            mqttAutoConfigInProgress (acquired above via sessionLock).
+  //   sTopic = cMsg — cMsg global reused as rendered topic (≤200 bytes). Safe because
+  //                   topicTemplate/msgTemplate point into sLine, not cMsg.
+  //   feedWatchDog() is the only yield — prevents HTTP/MQTT callbacks from overwriting cMsg.
+  char *sTopic = cMsg;                         // cMsg reused for rendered topic (≤200 bytes, fits in CMSG_SIZE)
   initSourceTokens();
   byte lineID = 39; // 39 is unused in OT protocol so is a safe value
 
@@ -1342,10 +1348,11 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     //read file line by line, split and send to MQTT (topic, msg)
     feedWatchDog(); //start with feeding the dog
     
-    size_t len = fh.readBytesUntil('\n', cMsg, CMSG_SIZE - 1);
-    cMsg[len] = '\0';
+    // Read line into sLine (global config-line buffer, guarded by mqttAutoConfigInProgress)
+    size_t len = fh.readBytesUntil('\n', sLine, SLINE_SIZE - 1);
+    sLine[len] = '\0';
     MQTTAutoConfigLineView lineView;
-    if (!parseAutoConfigLine(cMsg, ';', &lineView)) {  // parseAutoConfigLine() also filters comments
+    if (!parseAutoConfigLine(sLine, ';', &lineView)) {  // parseAutoConfigLine() also filters comments
       continue;
     }
     lineID = lineView.id;
@@ -1364,7 +1371,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     renderCtx.mqttPubTopic = MQTTPubNamespace;
     renderCtx.mqttSubTopic = MQTTSubNamespace;
 
-    // discovery topic prefix
+    // discovery topic prefix (rendered into cMsg via sTopic pointer)
     MQTTDebugTf(PSTR("sTopic[%s]==>"), lineView.topicTemplate); 
     if (!renderTemplateToBuffer(lineView.topicTemplate, sTopic, MQTT_TOPIC_MAX_LEN, &renderCtx)) { MQTTDebugTln(F("MQTT: topic template rendering overflow")); continue; }
     if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settings.mqtt.sHaprefix))) { MQTTDebugTln(F("MQTT: topic replacement overflow")); continue; }
@@ -1394,8 +1401,8 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
 
   fh.close();
 
-  // Note: cMsg is global and persists across calls; no cleanup needed.
-  // resetMQTTBufferSize() is a no-op for static buffer strategy
+  // Note: cMsg (sTopic) and sLine are globals; they persist across calls.
+  // No cleanup needed; guard (mqttAutoConfigInProgress) is released by sessionLock dtor.
   resetMQTTBufferSize();
 
   return _result;
