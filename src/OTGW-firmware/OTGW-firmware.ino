@@ -145,16 +145,11 @@ void setup() {
   setLed(LED1, ON);
   SetupDebugln(F("Attempting to connect to WiFi network\r"));
 
-  //start with setting wifi hostname — hostname must be set before NTP/configTime()
-  //to prevent the ESP8266 SDK from resetting the hostname to "esp-XXXXXX"
   bool forceWifiPortal = shouldForceWifiConfigPortal();
   startWiFi(CSTR(settings.sHostname), 240, forceWifiPortal);  // timeout 240 seconds
 
-  //setup NTP after WiFi so the configured hostname is preserved;
-  //DHCP option 42 (NTP server override) is therefore not supported
+  //setup NTP after WiFi; startNTP() restores hostname after configTime()
   startNTP();
-  // configTime() inside startNTP() may reset the station hostname; restore our configured hostname
-  WiFi.hostname(CSTR(settings.sHostname));
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
 
