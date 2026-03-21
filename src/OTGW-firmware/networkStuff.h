@@ -100,6 +100,7 @@ void loopNTP();
 bool isNTPtimeSet();
 const char* getMacAddress();
 const char* getUniqueId();
+bool checkHttpAuth();
 
 #endif // NETWORKSTUFF_H
 

@@ -247,7 +247,11 @@ void setupFSexplorer(){
   httpServer.on("/api/firmwarefilelist", apifirmwarefilelist);  // DEPRECATED: unversioned, will be removed in v1.3.0 (see ADR-035)
   httpServer.on("/api/listfiles", apilistfiles);               // DEPRECATED: unversioned, will be removed in v1.3.0 (see ADR-035)
   // httpServer.on("/LittleFSformat", formatLittleFS);
-  httpServer.on("/upload", HTTP_POST, []() {}, handleFileUpload);
+  httpServer.on("/upload", HTTP_POST, []() {
+    // If auth failed, handleFileUpload skipped the write; send 401 challenge here.
+    // If auth succeeded, the 303 redirect was already sent by handleFileUpload.
+    checkHttpAuth();
+  }, handleFileUpload);
   httpServer.on("/ReBoot", reBootESP);
   httpServer.on("/ResetWireless", resetWirelessButton);
  
@@ -374,6 +378,7 @@ void apilistfiles()             // Senden aller Daten an den Client
 
   // Handle file delete request: ?delete=<path>
   if (httpServer.hasArg("delete")) {
+    if (!checkHttpAuth()) return;  // 401 already sent
     strlcpy(cMsg, httpServer.arg("delete").c_str(), sizeof(cMsg));
     // Normalize: LittleFS paths must start with '/'
     if (cMsg[0] != '/' && cMsg[0] != '\0') {
@@ -495,6 +500,7 @@ bool handleFile(String&& path)
 {
   if (httpServer.hasArg("delete")) 
   {
+    if (!checkHttpAuth()) return false;
     DebugTf(PSTR("Delete -> [%s]\n\r"),  httpServer.arg("delete").c_str());
     LittleFS.remove(httpServer.arg("delete"));    // Datei löschen
     httpServer.sendContent(Header);
@@ -511,9 +517,15 @@ bool handleFile(String&& path)
 void handleFileUpload() 
 {
   static File fsUploadFile;
+  static bool uploadAuthorized = true;
   HTTPUpload& upload = httpServer.upload();
   if (upload.status == UPLOAD_FILE_START) 
   {
+    // Check auth by reading headers only - does NOT send a response.
+    // If auth is required and fails, skip the file open so nothing is written.
+    uploadAuthorized = (settings.sHTTPpasswd[0] == '\0' || httpServer.authenticate("admin", settings.sHTTPpasswd));
+    if (!uploadAuthorized) return;
+
     if (upload.filename.length() > 30) 
     {
       upload.filename = upload.filename.substring(upload.filename.length() - 30, upload.filename.length());  // Dateinamen auf 30 Zeichen kürzen
@@ -539,8 +551,10 @@ void handleFileUpload()
   {
     if (fsUploadFile)
       fsUploadFile.close();
-    DebugT(F("FileUpload Size: ")); Debugln((String)upload.totalSize);
-    httpServer.sendContent(Header);
+    if (uploadAuthorized) {
+      DebugT(F("FileUpload Size: ")); Debugln((String)upload.totalSize);
+      httpServer.sendContent(Header);
+    }
   }
   
 } // handleFileUpload() 
@@ -596,12 +610,14 @@ bool freeSpace(uint16_t const& printsize)
 //=====================================================================================
 void reBootESP()
 {
+  if (!checkHttpAuth()) return;
   DebugTln(F("Redirect and ReBoot .."));
   doRedirect("Reboot OTGW firmware ..", 120, "/", true);   
 } // reBootESP()
 
 void resetWirelessButton()
 {
+  if (!checkHttpAuth()) return;
   DebugTln(F("Reset Wireless settings.."));
   resetWiFiSettings();
   doRedirect("Reboot OTGW firmware with reset wireless settings..", 120, "/", true);   

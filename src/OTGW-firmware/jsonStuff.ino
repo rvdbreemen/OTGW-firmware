@@ -803,6 +803,18 @@ void sendJsonSettingObj(const __FlashStringHelper* cName, const char *cValue, co
   sendJsonSettingObj(nameBuf, cValue, sType, maxLen);
 }
 
+// Overload for PROGMEM value string (avoids RAM literal for password placeholders)
+void sendJsonSettingObj(const __FlashStringHelper* cName, const __FlashStringHelper* fValue, const char *sType, int maxLen) {
+  // Copy flash value to small stack buffer; password placeholders are short (<20 chars).
+  char valueBuf[24];
+  strncpy_P(valueBuf, (PGM_P)fValue, sizeof(valueBuf));
+  valueBuf[sizeof(valueBuf)-1] = '\0';
+  char nameBuf[35];
+  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf)-1] = '\0';
+  sendJsonSettingObj(nameBuf, valueBuf, sType, maxLen);
+}
+
 // For: void sendJsonSettingObj(const char *cName, bool bValue, const char *sType)
 void sendJsonSettingObj(const __FlashStringHelper* cName, bool bValue, const char *sType) {
   char nameBuf[35];
