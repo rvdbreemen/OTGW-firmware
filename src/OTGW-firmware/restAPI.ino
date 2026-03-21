@@ -1008,7 +1008,6 @@ void sendDeviceSettings()
   //sendJsonSettingObj("intager",  settingInteger , "i", 2, 60);
 
   sendJsonSettingObj(F("hostname"), CSTR(settings.sHostname), "s", 32);
-  sendJsonSettingObj(F("httppasswd"), F("notthispassword"), "p", 40);
   sendJsonSettingObj(F("mqttenable"), settings.mqtt.bEnable, "b");
   sendJsonSettingObj(F("mqttbroker"), CSTR(settings.mqtt.sBroker), "s", 32);
   sendJsonSettingObj(F("mqttbrokerport"), settings.mqtt.iBrokerPort, "i", 0, 65535);
@@ -1054,6 +1053,7 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("webhooktriggerbit"), settings.webhook.iTriggerBit, "i", 0, 15);
   sendJsonSettingObj(F("webhookpayload"), CSTR(settings.webhook.sPayload), "s", 200);
   sendJsonSettingObj(F("webhookcontenttype"), CSTR(settings.webhook.sContentType), "s", 31);
+  sendJsonSettingObj(F("httppasswd"), F("notthispassword"), "p", 40);
 
   sendEndJsonMap(F("settings"));
 
