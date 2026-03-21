@@ -2,7 +2,7 @@
 
 **Status:** Accepted  
 **Date:** 2016-01-01 (Initial development)  
-**Updated:** 2026-01-28 (Documentation)
+**Updated:** 2026-03-21 (Core upgrade to 3.1.2)
 
 ## Context
 
@@ -31,7 +31,7 @@ The choice of framework affects:
 
 **Key characteristics:**
 - **Language:** Arduino C/C++ (.ino files)
-- **Core version:** ESP8266 Arduino Core 2.7.4+
+- **Core version:** ESP8266 Arduino Core 3.1.2 (latest stable, upgraded from 2.7.4 on 2026-03-21)
 - **Build tool:** arduino-cli (command-line compilation)
 - **IDE support:** Arduino IDE, VS Code, PlatformIO (all supported)
 - **Library ecosystem:** Full access to Arduino libraries
@@ -227,8 +227,17 @@ arduino-cli compile \
 - ADR-002: Modular .ino File Architecture (Arduino sketch pattern)
 - ADR-007: Timer-Based Task Scheduling (setup/loop pattern)
 
+## Version History
+
+| Date | Core Version | Notes |
+|------|-------------|-------|
+| 2016-01-01 | 2.x initial | Project started |
+| ~2020 | 2.7.4 | Pinned; 3.0.2 had HTTP stream regression |
+| 2026-03-21 | **3.1.2** | Upgraded to latest stable; fixed `WString::operator==(const __FlashStringHelper*)` removal by replacing `String == F()` comparisons with `String == "literal"` or `String.isEmpty()`. Updated libraries: WiFiManager→2.0.17, TelnetStream→1.3.0, DallasTemperature→4.0.6, WebSockets→2.7.2. |
+
 ## References
 - ESP8266 Arduino Core: https://github.com/esp8266/Arduino
+- ESP8266 Arduino Core 3.1.2 docs: https://arduino-esp8266.readthedocs.io/en/3.1.2/
 - Arduino language reference: https://www.arduino.cc/reference/en/
 - Build system: `Makefile`, `build.py`
 - ESP-IDF comparison: https://docs.espressif.com/projects/esp8266-rtos-sdk/

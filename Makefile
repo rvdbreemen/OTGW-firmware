@@ -15,9 +15,9 @@ PLATFORM := esp8266:esp8266
 CFGFILE := $(PWD)/arduino/arduino-cli.yaml
 # Add CLICFG command to add config file location to CLI command
 CLICFG := $(CLI) --config-file $(CFGFILE)
-# bug in http stream, fallback to 2.7.4
-# ESP8266URL := https://github.com/esp8266/Arduino/releases/download/3.0.2/package_esp8266com_index.json
-ESP8266URL := https://github.com/esp8266/Arduino/releases/download/2.7.4/package_esp8266com_index.json
+# bug in http stream was fixed in 3.1.x; upgraded from 2.7.4 to 3.1.2
+# ESP8266URL := https://github.com/esp8266/Arduino/releases/download/2.7.4/package_esp8266com_index.json
+ESP8266URL := https://github.com/esp8266/Arduino/releases/download/3.1.2/package_esp8266com_index.json
 LIBRARIES := libraries/WiFiManager libraries/PubSubClient libraries/TelnetStream libraries/AceCommon libraries/AceSorting libraries/AceTime libraries/OneWire libraries/DallasTemperature libraries/WebSockets libraries/Time
 BOARDS := arduino/package_esp8266com_index.json
 # PORT can be overridden by the environment or on the command line. E.g.:
@@ -122,7 +122,7 @@ $(LIBRARIES): | update_indexes
 $(BOARDS): | update_indexes
 	@echo "Installing ESP8266 platform..."
 	@for i in 1 2 3; do \
-		if $(CLICFG) core install $(PLATFORM); then \
+		if $(CLICFG) core install $(PLATFORM)@3.1.2; then \
 			echo "✓ Platform installed successfully"; \
 			break; \
 		else \
@@ -164,13 +164,13 @@ flush: | $(CFGFILE)
 # Each library depends (order-only) on the previous one in the chain.
 ##
 libraries/WiFiManager: | $(BOARDS)
-	$(call retry,$(CLICFG) lib install WiFiManager@2.0.15-rc.1)
+	$(call retry,$(CLICFG) lib install WiFiManager@2.0.17)
 
 libraries/PubSubClient: | libraries/WiFiManager
 	$(call retry,$(CLICFG) lib install pubsubclient@2.8.0)
 
 libraries/TelnetStream: | libraries/PubSubClient
-	$(call retry,$(CLICFG) lib install TelnetStream@1.2.4)
+	$(call retry,$(CLICFG) lib install TelnetStream@1.3.0)
 
 libraries/AceCommon: | libraries/TelnetStream
 	$(call retry,$(CLICFG) lib install AceCommon@1.6.2)
@@ -188,10 +188,10 @@ libraries/OneWire: | libraries/Time
 	$(call retry,$(CLICFG) lib install OneWire@2.3.8)
 
 libraries/DallasTemperature: | libraries/OneWire
-	$(call retry,$(CLICFG) lib install DallasTemperature@3.9.0)
+	$(call retry,$(CLICFG) lib install DallasTemperature@4.0.6)
 
 libraries/WebSockets: | libraries/DallasTemperature
-	$(call retry,$(CLICFG) lib install WebSockets@2.3.5)
+	$(call retry,$(CLICFG) lib install WebSockets@2.7.2)
 
 $(IMAGE): $(BOARDS) $(LIBRARIES) $(SOURCES)
 	$(info Build code)

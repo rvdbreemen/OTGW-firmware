@@ -207,7 +207,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_handleUploadStart(HTTPUpload&
   size_t uploadTotal = _parseUploadTotalSize();
   _uploadExpectedBytes = uploadTotal;
 
-  if (upload.name == F("filesystem")) {
+  if (upload.name == "filesystem") {
     _beginFilesystemUpload(upload, uploadTotal);
   } else {
     _beginFirmwareUpload(upload, uploadTotal);

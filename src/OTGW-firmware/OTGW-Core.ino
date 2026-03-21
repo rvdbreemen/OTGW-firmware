@@ -4278,7 +4278,7 @@ void refreshpic(String filename, String version) {
 String pendingUpgradePath = "";
 
 void handlePendingUpgrade() {
-  if (pendingUpgradePath != F("")) {
+  if (!pendingUpgradePath.isEmpty()) {
     DebugTln(F(""));
     DebugTln(F("=== Starting Deferred PIC Upgrade ==="));
     DebugTf(PSTR("Hex file path: %s\r\n"), pendingUpgradePath.c_str());
@@ -4314,7 +4314,7 @@ void upgradepic() {
     return; // no pic version found, don't upgrade
   }
   
-  if (action == F("upgrade")) {
+  if (action == "upgrade") {
     DebugTf(PSTR("Upgrade requested for /%s/%s\r\n"), state.pic.sDeviceid, filename.c_str());
     httpServer.send_P(200, PSTR("application/json"), PSTR("{\"status\":\"started\"}"));
     httpServer.client().flush();  // Ensure response buffer is sent to client
@@ -4325,10 +4325,10 @@ void upgradepic() {
     DebugTf(PSTR("Pending upgrade queued: [%s]\r\n"), pendingUpgradePath.c_str());
     DebugTln(F("=== HTTP handler complete, upgrade will start in main loop ==="));
     return;
-  } else if (action == F("refresh")) {
+  } else if (action == "refresh") {
     DebugTf(PSTR("Refresh %s/%s\r\n"), state.pic.sDeviceid, filename.c_str());
     refreshpic(filename, version);
-  } else if (action == F("delete")) {
+  } else if (action == "delete") {
     DebugTf(PSTR("Delete %s/%s\r\n"), state.pic.sDeviceid, filename.c_str());
     char path[64];
     snprintf_P(path, sizeof(path), PSTR("/%s/%s"), state.pic.sDeviceid, filename.c_str());
