@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v1.3.0-beta
+**  Version  : v1.3.0-rc2
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3632,9 +3632,50 @@ const hiddenSettings = [
 
 const httpPasswordPlaceholderValues = ["notthepassword", "notthispassword"];
 const httpPasswordSavePlaceholder = "notthispassword";
+const httpPasswordPlaceholderPrefix = "password=";
+const passwordPlaceholderFields = ["httppasswd", "mqttpasswd"];
 
 function isHttpPasswordPlaceholder(value) {
-  return typeof value === 'string' && httpPasswordPlaceholderValues.indexOf(value) >= 0;
+  return getHttpPasswordPlaceholderLength(value) !== null;
+}
+
+function getHttpPasswordPlaceholderLength(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  if (httpPasswordPlaceholderValues.indexOf(value) >= 0) {
+    return 0;
+  }
+
+  if (value.indexOf(httpPasswordPlaceholderPrefix) !== 0) {
+    return null;
+  }
+
+  const lengthText = value.substring(httpPasswordPlaceholderPrefix.length);
+  if (!/^\d+$/.test(lengthText)) {
+    return null;
+  }
+
+  return parseInt(lengthText, 10);
+}
+
+function isPasswordPlaceholderField(field) {
+  return passwordPlaceholderFields.indexOf(field) >= 0;
+}
+
+function getOriginalPasswordPrefill(field) {
+  if (!field || !data[field]) {
+    return "";
+  }
+
+  const currentValue = data[field].value;
+  const currentLength = getHttpPasswordPlaceholderLength(currentValue);
+  if (currentLength === null || currentLength <= 0) {
+    return "";
+  }
+
+  return currentValue;
 }
 
 function refreshSettings() {
@@ -3716,8 +3757,8 @@ function refreshSettings() {
             //sInput.step = (s.min + s.max) / 1000;
             sInput.step = 1;
           }
-          if (key === "httppasswd" && isHttpPasswordPlaceholder(s.value)) {
-            sInput.setAttribute("value", "");
+          if (isPasswordPlaceholderField(key) && isHttpPasswordPlaceholder(s.value)) {
+            sInput.setAttribute("value", getHttpPasswordPlaceholderLength(s.value) > 0 ? s.value : "");
           } else {
             sInput.setAttribute("value", s.value);
           }
@@ -3763,8 +3804,8 @@ function refreshSettings() {
             // FIX If checkbox change checked iso value
             if (s.type == "b")
               inputEl.checked = strToBool(s.value);
-            else if (key === "httppasswd" && isHttpPasswordPlaceholder(s.value))
-              inputEl.value = "";
+            else if (isPasswordPlaceholderField(key) && isHttpPasswordPlaceholder(s.value))
+              inputEl.value = getHttpPasswordPlaceholderLength(s.value) > 0 ? s.value : "";
             else inputEl.value = s.value;
           }
         }
@@ -3966,7 +4007,7 @@ function saveSettings() {
       value = fieldEl.checked;
     } else {
       value = fieldEl.value;
-      if (field === "httppasswd" && value === "") {
+      if (isPasswordPlaceholderField(field) && value === getOriginalPasswordPrefill(field) && value !== "") {
         value = httpPasswordSavePlaceholder;
       }
     }
@@ -4256,7 +4297,7 @@ var translateFields = [
 var translateTooltips = [
 
   ["hostname", "Device name on your network. Use letters, numbers and hyphens only."]
-  , ["httppasswd", "Password for protected admin endpoints. Username is admin. Leave empty to keep protection disabled, or type a new password to change it."]
+  , ["httppasswd", "Password for protected admin endpoints such as settings, maintenance actions, file management, reboot, and OTA update. Username is admin."]
   , ["HostName", "Advertised hostname. Add .local when you open the device by mDNS name."]
   , ["ssid", "Read-only name of the Wi-Fi network the gateway is connected to."]
   , ["mqttconnected", "Read-only MQTT connection state. This should show connected after broker login succeeds."]
@@ -4264,7 +4305,7 @@ var translateTooltips = [
   , ["mqttbroker", "Hostname or IP address of your MQTT broker."]
   , ["mqttbrokerport", "Broker port, usually 1883 for plain MQTT."]
   , ["mqttuser", "Leave empty if your MQTT broker does not require a login."]
-  , ["mqttpasswd", "Password for the MQTT user. Leave empty when authentication is disabled."]
+  , ["mqttpasswd", "Password used when connecting to the configured MQTT broker with the MQTT user."]
   , ["mqtttoptopic", "Base topic used for all MQTT publish and command topics."]
   , ["mqttuniqueid", "Unique device ID used for MQTT discovery. Change only if you need a new device identity."]
   , ["mqtthaprefix", "Home Assistant discovery prefix. Keep the default unless your HA setup uses a custom prefix."]

@@ -1,14 +1,14 @@
 # Release Notes — v1.3.0
 
-**Last updated:** 2026-03-16<br>
+**Last updated:** 2026-03-21<br>
 **Release branch:** `dev`<br>
 **Comparison target:** `main` (current stable `v1.2.0`)<br>
 
 ---
 
-## ✨ Headline: Safer Upgrades, Better Recovery, and Full `PS=1` Integration
+## ✨ Headline: Safer Upgrades, Better Recovery, Optional Admin Protection, and Full `PS=1` Integration
 
-v1.3.0 builds on the current stable `v1.2.0` release. It focuses on OTA and LittleFS reliability, WiFi recovery, MQTT publish control, fuller `PS=1` support, and lower heap pressure.
+v1.3.0 builds on the current stable `v1.2.0` release. It focuses on OTA and LittleFS reliability, WiFi recovery, optional protection for admin endpoints, MQTT publish control, fuller `PS=1` support, and lower heap pressure.
 
 For users already on `v1.2.0`, this is largely a backward-compatible upgrade: there are no new MQTT topic renames, no new REST API removals, and no settings-format migration.
 
@@ -17,12 +17,13 @@ For users already on `v1.2.0`, this is largely a backward-compatible upgrade: th
 ## Overview
 
 **User-visible additions:**
+- Optional HTTP Basic Auth for protected settings and maintenance endpoints.
 - Configurable MQTT publish gating for OpenTherm and `PS=1` summary data.
 - Full `PS=1` summary parsing with MQTT publishing and Home Assistant discovery.
 - One-shot OTGW PIC commands from the monitor page.
 - Triple-reset WiFi recovery to reopen the captive portal without reflashing.
 - Safer OTA / LittleFS flashing with backup, validation, and better logging.
-- Richer device-info and Web UI status reporting, including heap visibility.
+- Richer device-info and Web UI status reporting, including heap visibility and improved settings tooltips.
 
 **Internal improvements:**
 - Bounded manual JSON writing in place of ArduinoJson.
@@ -34,6 +35,17 @@ For users already on `v1.2.0`, this is largely a backward-compatible upgrade: th
 
 ## New Features
 
+### Optional Protection for Admin Endpoints
+
+v1.3.0 adds optional HTTP Basic Authentication for sensitive admin operations while keeping the device usable out of the box on trusted local networks.
+
+- Authentication is disabled by default when the Protected Endpoints Password is empty.
+- When configured, settings read/write, file-management, reboot, reset, and OTA update endpoints require authentication.
+- The Web UI now exposes this password in the Settings tab as a masked field, and unchanged saves preserve the stored value.
+- Username is fixed to `admin`, keeping the ESP8266-side implementation lightweight.
+
+This is an additive security feature, not a breaking change: existing setups continue to work unchanged until a password is configured.
+
 ### Configurable MQTT Publish Gating
 
 OpenTherm values can change quickly enough to flood an MQTT broker or waste WiFi airtime. v1.3.0 adds configurable publish gating so frequent updates can be rate-limited without changing the existing topic layout.
@@ -41,6 +53,7 @@ OpenTherm values can change quickly enough to flood an MQTT broker or waste WiFi
 - Normal OpenTherm publishing now uses interval-aware gating.
 - `PS=1` summary fields follow the same release philosophy and no longer bypass MQTT discipline.
 - The `OTPublishGate` pattern makes the decision explicit and restores previous publish state safely.
+- MQTT connection status is republished more predictably after boot and reconnect, reducing stale availability state in consumers.
 
 ### Full `PS=1` Summary Translation
 
@@ -57,7 +70,7 @@ The main Web UI monitor page now allows direct one-shot OTGW PIC commands from t
 
 - Send commands such as `TT=20.5`, `SH=60`, `PR=A`, or `GW=R` without leaving the UI.
 - Responses remain visible in the monitor/log view.
-- The UI now exposes more state feedback, including simulation visibility and richer heap/device status reporting.
+- The UI now exposes more state feedback, including simulation visibility, richer heap/device status reporting, and clearer field descriptions in the settings screen.
 
 ### Triple-Reset WiFi Recovery
 
@@ -91,6 +104,10 @@ Settings initialization could leave the system marked dirty at boot, which trigg
 
 Dot-stripping in hostname cleanup previously targeted the wrong buffer. v1.3.0 corrects the write target so hostname normalization affects the actual hostname setting.
 
+### File Explorer Delete Handling
+
+Filesystem delete handling in the browser path was corrected so file-removal actions behave consistently again.
+
 ### Webhook Payload Truncation
 
 Long webhook payloads could be truncated when loaded from settings. The relevant buffer handling has been widened so payloads survive reboot and reload intact.
@@ -101,6 +118,10 @@ Two OTA-specific corruption paths were fixed:
 
 - WiFi reconnect activity is now suppressed while flash writes are active.
 - LittleFS OTA flashes erase the full filesystem partition instead of only the uploaded image size.
+
+### IP Validation Correction
+
+IP validation was tightened so only `255.255.255.255` is rejected as the broadcast address; valid addresses containing an octet of `255` are no longer incorrectly blocked.
 
 ### GPIO Conflict Detection
 
@@ -142,8 +163,9 @@ There are **no new breaking changes** in v1.3.0 relative to `main` / `v1.2.0`.
 | Home Assistant discovery | Additive only (`PS=1` summary coverage) |
 | REST API | No new removals beyond the existing v2-only baseline |
 | Settings format | No migration required |
+| Protected endpoints auth | New optional feature, disabled by default |
 
-The migration items introduced in `v1.2.0` still apply where relevant. See [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md) and [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md).
+The migration items introduced in `v1.2.0` still apply where relevant. If you are upgrading from older than `v1.2.0`, review the earlier MQTT and API migration notes first. See [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md) and [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md).
 
 ---
 
@@ -158,4 +180,4 @@ The migration items introduced in `v1.2.0` still apply where relevant. See [RELE
 
 ## Validation Basis
 
-These notes were compiled from the `main..dev` branch delta, excluding CI-only version bumps and merge noise, and then cross-checked against the changed firmware, Web UI, OTA, and documentation files.
+These notes were compiled from the `main..dev` branch delta, excluding CI-only version bumps and merge noise, and then cross-checked against the changed firmware, Web UI, OTA, MQTT, and documentation files.

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v1.3.0-beta
+**  Version  : v1.3.0-rc2
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -23,9 +23,27 @@ static uint8_t pendingSideEffects = 0;
 
 static bool isHttpPasswordPlaceholder(const char* value)
 {
-  return value &&
-         (strcasecmp_P(value, PSTR("notthepassword")) == 0 ||
-          strcasecmp_P(value, PSTR("notthispassword")) == 0);
+  if (!value) return false;
+
+  if (strcasecmp_P(value, PSTR("notthepassword")) == 0 ||
+      strcasecmp_P(value, PSTR("notthispassword")) == 0) {
+    return true;
+  }
+
+  const size_t prefixLen = sizeof("password=") - 1;
+  if (strncasecmp_P(value, PSTR("password="), prefixLen) != 0) {
+    return false;
+  }
+
+  const char* lengthPart = value + prefixLen;
+  if (*lengthPart == '\0') return false;
+
+  while (*lengthPart) {
+    if (!isdigit(static_cast<unsigned char>(*lengthPart))) return false;
+    lengthPart++;
+  }
+
+  return true;
 }
 
 //=======================================================================
@@ -450,7 +468,7 @@ void updateSetting(const char *field, const char *newValue)
     }
   }
   if (strcasecmp_P(field, PSTR("MQTTpasswd"))==0){
-    if ( newValue && strcasecmp_P(newValue, PSTR("notthepassword")) != 0 ){
+    if (newValue && !isHttpPasswordPlaceholder(newValue)) {
       strlcpy(settings.mqtt.sPasswd, newValue, sizeof(settings.mqtt.sPasswd));
       // Trim leading/trailing whitespace from password
       char* trimmedPasswd = trimwhitespace(settings.mqtt.sPasswd);

@@ -1,15 +1,20 @@
 # Breaking Changes Log
 
-This document lists all the breaking changes from **v1.0.0** onwards. Always check this file before upgrading your firmware if you skip versions, especially if you rely heavily on custom automations via MQTT or precise data structure parsing directly from the REST API endpoints.
+This document is the cumulative log of breaking changes from **v1.0.0** onwards. Always check this file before upgrading your firmware if you skip versions, especially if you rely heavily on custom automations via MQTT or precise data structure parsing directly from the REST API endpoints.
 
 ---
 
 ## 🛑 v1.3.0
 
-There are **no breaking changes** in `v1.3.0` regarding external behaviors, topics, or endpoints.
+There are **no new breaking changes** in `v1.3.0` regarding external behaviors, MQTT topics, REST endpoints, or settings format.
 
-1. **REST API Version 0 & 1 Removal finalized:** Legacy API v0 (`/api/v0`) and v1 endpoints originally deprecated and functionally hollowed out in `v1.2.0` are now completely eradicated from the system. (Return `410 Gone`). Always use `/api/v2/`.
-2. **ArduinoJson completely removed:** The codebase relies on a manual JSON serialization method to dramatically improve memory efficiency. External representation of valid API queries remains identical, but custom integration parser strictly expecting loose or non-orthodox formatting might need to be adjusted.
+What changed in `v1.3.0` without breaking existing `v1.2.0` setups:
+
+1. **Optional protected admin endpoints:** HTTP Basic Auth can now protect settings and maintenance routes, but it is disabled by default until a password is configured.
+2. **Manual JSON serialization:** ArduinoJson was removed from firmware-side JSON generation to reduce RAM pressure, but the external JSON contract remains the same for supported clients.
+3. **Additive `PS=1` coverage:** More `PS=1` summary data is translated into the normal publish/discovery path, but no existing topic renames or API removals were introduced in this release.
+
+> **Important:** The significant migration items still belong to `v1.2.0`. If you are upgrading from older than `v1.2.0`, review the v1.2.0 and v1.0.0 sections below before flashing `v1.3.0`.
 
 ## 🛑 v1.2.0
 
@@ -18,6 +23,11 @@ There are **no breaking changes** in `v1.3.0` regarding external behaviors, topi
 1. **MQTT Topics Renames:**
    - Typo `eletric_production` renamed to `electric_production`.
    - Typo `solar_storage_slave_fault_incidator` renamed to `solar_storage_slave_fault_indicator`.
+   - Typo `CumulativElectricityProduction` renamed to `CumulativeElectricityProduction`.
+   - Typo `vh_free_ventlation_mode` renamed to `vh_free_ventilation_mode`.
+   - Typo `vh_ventlation_mode` renamed to `vh_ventilation_mode`.
+   - Typo `vh_tramfer_enble_nominal_ventlation_value` renamed to `vh_transfer_enable_nominal_ventilation_value`.
+   - Typo `vh_rw_nominal_ventlation_value` renamed to `vh_rw_nominal_ventilation_value`.
    - `RelativeHumidity_hb_u8` & `RelativeHumidity_lb_u8` (formerly ID 38 misdecoded as `u8/u8`) is now `RelativeHumidity` publishing a v4.2 standard `f8.8` value.
 2. **Legacy IDs 50-63 (Auto Suppression):** For v4.x compliant systems (most common setups), OpenTherm IDs `50-63` are now strictly defined as reserved and suppressed by default in `AUTO` mode.
 3. **Advanced `FanSpeed` translation:** Standard HA discovery no longer parses `FanSpeed` natively in `rpm` — it creates the dual entities `FanSpeed_setpoint_hz` and `FanSpeed_actual_hz` (`Hz`).
@@ -30,14 +40,14 @@ There are **no breaking changes** in `v1.3.0` regarding external behaviors, topi
 
 ## 🛑 v1.1.0
 
-There are **no breaking changes** in `v1.1.0`. All prior `v1.0.0` implementations strictly persisted.
-1. The **`otgwmode`** logic debuted here functionally inside the REST API without fundamentally breaking `v1`.
+There are **no breaking changes** in `v1.1.0`. All prior `v1.0.0` integrations remain valid.
 
 ## 🛑 v1.0.0
 
 The `v1.0.0` milestone stabilized the core code of this custom firmware versus the historical versions. It includes fundamental architectural lock-ins.
 
 1. **GPIO Defaults Adjustments (Dallas Sensors):** The default GPIO for the Dallas temperature sensors changed globally to GPIO 10 to officially match standard hardware specifications across devkit board revisions. Upgraders migrating from `<= v0.10.x` have to manually migrate their pin setups or allow `auto-migration` (which attempts it but explicitly suggests reviewing the setup page).
-2. **WebSocket Priority:** Legacy polling for log frames via HTTP has been officially destroyed. External solutions wanting live message-frame data must attach to the pure WebSocket (`ws://<ip>:8080`) port. 
+2. **Live log transport changed to WebSocket:** Legacy polling for live log frames over HTTP was removed. External solutions wanting real-time message-frame data must attach to the WebSocket endpoint instead of the old polling approach.
+3. **Configuration should be re-verified after upgrade:** Settings preservation and migration behavior changed significantly in the v1.0.0 milestone. Existing users upgrading from pre-1.0 builds should review their configuration after flashing, especially Dallas-sensor-related settings.
 
 ---

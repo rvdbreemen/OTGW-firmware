@@ -6,16 +6,17 @@ This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gatew
 
 ## 🚀 What's New in v1.3.0
 
-Version 1.3.0 builds on the stable v1.2.0 release with safer upgrades, better recovery behavior, fuller `PS=1` integration, and lower RAM pressure. Full release notes: [RELEASE_NOTES_1.3.0.md](RELEASE_NOTES_1.3.0.md) / [Breaking Changes Log](docs/BREAKING_CHANGES.md)
+Version 1.3.0 builds on the stable v1.2.0 release with safer upgrades, better recovery behavior, optional protection for admin endpoints, fuller `PS=1` integration, and lower RAM pressure. Full release notes: [RELEASE_NOTES_1.3.0.md](RELEASE_NOTES_1.3.0.md) / [Breaking Changes Log](docs/BREAKING_CHANGES.md)
 
 ### Highlights
 
-- **Configurable MQTT Publish Gating:** OpenTherm and `PS=1` summary publishing can now be rate-limited to reduce MQTT broker load and WiFi chatter.
+- **Optional Protected Admin Endpoints:** Settings, maintenance, file-management, reboot, and OTA routes can now be protected with HTTP Basic Auth using the configurable Protected Endpoints Password setting.
+- **Configurable MQTT Publish Gating:** OpenTherm and `PS=1` summary publishing can now be rate-limited to reduce MQTT broker load and WiFi chatter, with better status republish behavior after boot and reconnect.
 - **Full `PS=1` Summary Integration:** `PS=1` output is now translated into the normal data pipeline, published to MQTT, and exposed to Home Assistant discovery.
-- **Web UI Control and Visibility:** The monitor page now supports one-shot OTGW PIC commands, clearer status feedback, simulation visibility, and richer device heap reporting.
+- **Web UI Control and Visibility:** The monitor page now supports one-shot OTGW PIC commands, richer settings tooltips, clearer status feedback, simulation visibility, and improved heap/device reporting.
 - **Safer OTA / LittleFS Updates:** The updater now verifies reboots through `/api/v2/health`, supports browser backups of `settings.ini` and `dallas_labels.ini`, preserves settings more cleanly, and hardens filesystem flashing against corruption.
 - **Triple-Reset WiFi Recovery:** Three quick hardware resets within 10 seconds clear stored WiFi credentials and reopen the captive portal without requiring a reflash.
-- **Memory and Internal Cleanup:** JSON writing and settings persistence were tightened to reduce heap fragmentation and improve firmware stability.
+- **Memory and Internal Cleanup:** ArduinoJson was removed from firmware JSON paths, settings/state ownership was clarified, and JSON writing plus settings persistence were tightened to reduce heap fragmentation and improve firmware stability.
 - **No New Breaking Changes:** For v1.2.0 users, this release adds features and hardening without introducing new MQTT topic, REST API, or settings-format breaks.
 
 ## What was new in v1.2.0
