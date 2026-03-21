@@ -64,7 +64,10 @@ HTTP 400.
 ## Documented Only (Not Fixed in This PR)
 
 ### I1 — Lazy `new` for MQTT autoconfig buffers
-Documented in REVIEW.md. Requires ADR update. Architectural change out of scope.
+**Status: FIXED (code + ADR-053)**
+The lazy `new`-based MQTT autoconfig buffers were removed in favor of the
+`cMsg` / `sLine` global-buffer design, with the decision and constraints
+captured in ADR-053. Documentation in REVIEW.md was updated accordingly.
 
 ### I3 — `OTGWState state` / `OTGWSettings settings` defined in header
 Documented in REVIEW.md. All other globals are also defined in the header
