@@ -1,7 +1,8 @@
-# ADR-044: Webhook Outbound HTTP Integration
+# ADR-055: Webhook Outbound HTTP Integration
 
-**Status:** Accepted  
+**Status:** Superseded by ADR-057  
 **Date:** 2026-03-02
+**Updated:** 2026-03-21 (Superseded - see ADR-057: Webhook Delivery, Retry, and Protected Test Endpoint Policy)
 
 ## Context
 
