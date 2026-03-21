@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.css
-**  Version  : v1.1.0-beta
+**  Version  : v1.3.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -14,7 +14,6 @@
   
   html {
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
     font-family: 'Dosis', sans-serif;
     line-height: 1.6;
     color: black;
@@ -81,8 +80,8 @@
   }
   
   .container-card {
-    padding: 50;
-    margin: 50;
+    padding: 50px;
+    margin: 50px;
     list-style: none;
     flex-direction: row; /*row | row-reverse | column | column-reverse*/
     
@@ -93,6 +92,7 @@
     display: flex;
     
     -webkit-flex-flow: row wrap;
+    flex-flow: row wrap;
     justify-content: space-around; /* flex-start | flex-end | center | space-between | space-around | space-evenly */
   
   }
@@ -110,6 +110,7 @@
     display: flex;
     
     -webkit-flex-flow: column wrap;
+    flex-flow: column wrap;
     justify-content: flex-start;
     margin-top: 10px;
   }
@@ -237,21 +238,6 @@
   }
 
   /*-------------------------*/
-  /***
-  @media all and (max-width: 600px) {
-    .nav-container {
-      justify-content: space-around;
-    }
-  }
-  
-  @media all and (max-width: 400px) {
-    .nav-container {
-      -webkit-flex-flow: column wrap;
-      flex-flow: column wrap;
-      padding: 0;
-    }
-  }
-  ***/
   
   .tabButton a:hover {
     background-color: gray;
@@ -392,12 +378,12 @@
     clear: both;
   }
   
-  /* Responsive layout - makes the three columns stack on top of each other instead of next to each other */
-  @media screen and (max-width: 600px) {
-    .column {
-      width: 100%;
-    }
+/* Responsive layout - makes the three columns stack on top of each other instead of next to each other */
+@media screen and (max-width: 768px) {
+  .column {
+    width: 100%;
   }
+}
   
   /* PIC firmware page */
 .pictable {
@@ -479,6 +465,10 @@
   break-inside: avoid;
   page-break-inside: avoid;
 }
+
+.otmonrow.no-data-row {
+  display: none;
+}
 .otmoncolumn1 {
   flex: 1;
   padding-left: 10px;
@@ -541,8 +531,47 @@
   border: 1px solid white;
 }
 
+#deviceinfoCrashLog {
+  max-width: 960px;
+  margin: 0 0 14px 0;
+}
+
+.crashlog-panel {
+  background: #ffe7b3;
+  border: 1px solid #f0b74a;
+  border-left: 5px solid #d98200;
+  padding: 10px 12px;
+  color: #4a3200;
+}
+
+.crashlog-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.crashlog-intro {
+  margin-bottom: 8px;
+}
+
+.crashlog-label {
+  font-weight: 600;
+  margin: 8px 0 4px 0;
+}
+
+.crashlog-pre {
+  margin: 0;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+}
+
 /* Responsive: Stack on small screens */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   #deviceinfoPage {
     display: block;
     width: 100%;
@@ -570,6 +599,10 @@
     font-size: 13px;
     border: none;
     padding: 0 0 0 10px;
+  }
+
+  #deviceinfoCrashLog {
+    max-width: 100%;
   }
 }
 
@@ -635,6 +668,19 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
+.ot-log-section.commands-only .ot-log-tabs,
+.ot-log-section.commands-only .ot-log-controls,
+.ot-log-section.commands-only .ot-log-container,
+.ot-log-section.commands-only .ot-log-footer,
+.ot-log-section.commands-only #Statistics,
+.ot-log-section.commands-only #Graph {
+  display: none;
+}
+
+.ot-log-section.commands-only #Log {
+  display: block;
+}
+
 /* Log Header */
 .ot-log-header {
   display: flex;
@@ -674,6 +720,22 @@
 
 .ws-disconnected {
   background: #f44336;
+}
+
+.simulation-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #0a84ff;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+  box-shadow: 0 0 0 1px rgba(10, 132, 255, 0.2), 0 0 10px rgba(10, 132, 255, 0.35);
 }
 
 .status-separator {
@@ -755,11 +817,40 @@
   gap: 5px;
   font-size: 13px;
   cursor: pointer;
+  -webkit-user-select: none;
   user-select: none;
 }
 
 .log-control-label input[type="checkbox"] {
   cursor: pointer;
+}
+
+.ot-cmd-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 16px;
+  padding: 10px 12px;
+  background: #eef6fb;
+  border: 1px solid #d3e6f5;
+  border-radius: 6px;
+}
+
+.ot-cmd-input {
+  flex: 1 1 260px;
+  min-width: 220px;
+  padding: 7px 12px;
+  border: 1px solid #b8d2e4;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.ot-cmd-status {
+  flex: 1 1 180px;
+  min-height: 18px;
+  font-size: 12px;
+  color: #4b6476;
 }
 
 /* Log Container */
@@ -789,26 +880,13 @@
   white-space: pre;
   line-height: 1.4;
   max-height: inherit;
-  scrollbar-width: thin;
-  scrollbar-color: #555 #1e1e1e;
 }
 
-.ot-log-content::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.ot-log-content::-webkit-scrollbar-track {
-  background: #1e1e1e;
-}
-
-.ot-log-content::-webkit-scrollbar-thumb {
-  background: #555;
-  border-radius: 5px;
-}
-
-.ot-log-content::-webkit-scrollbar-thumb:hover {
-  background: #777;
+@supports (scrollbar-width: thin) {
+  .ot-log-content {
+    scrollbar-width: thin;
+    scrollbar-color: #555 #1e1e1e;
+  }
 }
 
 /* Log Footer */
@@ -826,39 +904,6 @@
   display: inline-block;
 }
 
-/* Responsive Design */
-@media (max-width: 767px) {
-  #otLogSection {
-    display: none !important;
-  }
-}
-
-@media (max-width: 767px) {
-  .ot-log-controls {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .btn-log-control,
-  .log-search,
-  .log-control-label {
-    width: 100%;
-  }
-  
-  .ot-log-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  
-  .ot-log-container.collapsed {
-    max-height: 150px;
-  }
-  
-  .ot-log-container:not(.collapsed) {
-    max-height: 400px;
-  }
-}
   /* Firmware Upgrade Progress */
   #flashProgressSection {
     margin-top: 12px;
@@ -1024,6 +1069,41 @@ body.disable-interaction {
   max-width: 720px;
 }
 
+.fs-mismatch-banner {
+  padding: 10px 16px;
+  background-color: #c62828;
+  color: white;
+  font-weight: bold;
+  text-align: center;
+}
+.fs-mismatch-banner a {
+  color: #ffcdd2;
+  text-decoration: underline;
+}
+
+.pic-update-banner {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  max-width: 720px;
+}
+.pic-update-banner.checking {
+  color: #888;
+}
+.pic-update-banner.update-available {
+  background-color: #e65c00;
+  color: white;
+  font-weight: bold;
+}
+.pic-update-banner.up-to-date {
+  background-color: #2e7d32;
+  color: white;
+}
+.pic-version-outdated {
+  color: #e65c00;
+  font-weight: bold;
+}
+
 .firmware-row-bold {
   font-weight: bold;
 }
@@ -1039,11 +1119,6 @@ body.disable-interaction {
 
 .otmonrow.hidden-row {
   display: none !important;
-}
-
-.settings-field-container {
-  width: 320px;
-  float: left;
 }
 
 .flash-progress-bar {

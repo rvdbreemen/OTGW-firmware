@@ -10,10 +10,10 @@ Architecture Decision Records capture important architectural decisions along wi
 
 **By Topic:**
 - [Platform & Build](#platform-and-build-system) (4 ADRs)
-- [Memory Management](#memory-management) (4 ADRs)
+- [Memory Management](#memory-management) (5 ADRs)
 - [Network & Security](#network-and-security) (3 ADRs)
-- [Integration](#integration-and-communication) (4 ADRs) 🆕
-- [Core Systems](#system-architecture) (4 ADRs) 🆕
+- [Integration](#integration-and-communication) (6 ADRs) 🆕
+- [Core Systems](#system-architecture) (5 ADRs) 🆕
 - [Features & Extensions](#features-and-extensions) (8 ADRs) 🆕
 - [Browser & Client](#browser-and-client-compatibility) (4 ADRs)
 - [OTA & Updates](#ota-and-firmware-updates) (2 ADRs)
@@ -52,8 +52,11 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-028: File Streaming Over Loading for Memory Safety](ADR-028-file-streaming-over-loading.md)**  
   Never load files >2KB into RAM; use streaming patterns to prevent memory exhaustion crashes.
 
-- **[ADR-030: Heap Memory Monitoring and Emergency Recovery](ADR-030-heap-memory-monitoring-emergency-recovery.md)** 🆕  
+- **[ADR-030: Heap Memory Monitoring and Emergency Recovery](ADR-030-heap-memory-monitoring-emergency-recovery.md)** 🆕
   Proactive heap monitoring with 4-level health system and adaptive throttling to prevent crashes (CRITICAL <3KB, WARNING 3-5KB, LOW 5-8KB, HEALTHY >8KB).
+
+- **[ADR-044: Global State — extern Declaration in Header, Definition in .ino](ADR-044-global-state-header-definition-pattern.md)** 🆕
+  `extern` declarations in headers + single definition in owning `.ino` to avoid ODR violations in any multi-TU build; applies to `msglastupdated[]`, `mqttlastsent[]`, `mqttPublishAllowed`, etc.
 
 ### Integration and Communication
 - **[ADR-005: WebSocket for Real-Time Streaming](ADR-005-websocket-real-time-streaming.md)**  
@@ -62,11 +65,20 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-006: MQTT Integration Pattern](ADR-006-mqtt-integration-pattern.md)**  
   MQTT client implementation with Home Assistant Auto-Discovery for zero-configuration integration.
 
+- **[ADR-052: MQTT Publish Eligibility and Reconnect Refresh Contract](ADR-052-mqtt-publish-eligibility-contract.md)** 🆕
+  Precise contract for first-seen, value-change, stale-refresh, and reconnect-reset behavior for normal MQTT topics plus combined and per-bit `msgid 0` status topics.
+
 - **[ADR-031: Two-Microcontroller Coordination Architecture](ADR-031-two-microcontroller-coordination-architecture.md)** 🆕  
   Master/Slave architecture with ESP8266 as network controller and PIC microcontroller for OpenTherm protocol (serial communication, GPIO reset control, firmware upgrade capability).
 
 - **[ADR-037: Gateway Mode Detection via PR=M Polling](ADR-037-gateway-mode-detection.md)** 🆕  
   Periodic polling (PR=M command, 30s interval with 60s cache) to detect gateway vs. monitor mode, with PS=1 impact on time sync suppression.
+
+- **[ADR-040: MQTT Source-Specific Topics for OpenTherm Values](ADR-040-mqtt-source-specific-topics.md)** 🆕
+  Additive source-specific MQTT and HA discovery topics using nested `<metric>/<source>` paths with opt-in enablement (`MQTTseparatesources`) and backward-compatible base topics.
+
+- **[ADR-044: Webhook Outbound HTTP Integration](ADR-044-webhook-outbound-http-integration.md)** 🆕
+  Configurable outbound HTTP GET/POST triggered on OpenTherm StatusFlags bit edges; local-network-only URL enforcement, payload template expansion, and REST test endpoint.
 
 ### System Architecture
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  
@@ -81,6 +93,24 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-038: OpenTherm Message Data Flow Pipeline](ADR-038-opentherm-data-flow-pipeline.md)** 🆕  
   Synchronous fan-out architecture for OpenTherm messages (PIC Serial → processOT → MQTT + WebSocket + REST + Telnet) with per-consumer availability checks and bidirectional command flow.
 
+- **[ADR-045: PS=1 Print Summary Parsing](ADR-045-ps1-print-summary-parsing.md)** *(Superseded by ADR-046)*  
+  Historical record of the original PS=1 synthetic-frame design.
+
+- **[ADR-046: PS=1 Summary Translation with Shared Publish Helpers](ADR-046-ps1-summary-translation-shared-publish-helpers.md)** 🆕
+  PS=1 uses a dedicated summary-translation path with strict parsing, centralized PS-mode helpers, and selective reuse of shared publish/state helpers.
+
+- **[ADR-047: Non-Blocking WiFi Reconnect State Machine](ADR-047-nonblocking-wifi-reconnect.md)** 🆕
+  Cooperative reconnect state machine that retries without blocking the main loop and reboots after repeated failure.
+
+- **[ADR-048: Non-Blocking Webhook State Machine with Retry](ADR-048-nonblocking-webhook-state-machine.md)** 🆕
+  Webhook delivery runs as a non-blocking state machine with bounded retry behavior to avoid stalling loop processing.
+
+- **[ADR-050: Centralized API Route Dispatch Table](ADR-050-centralized-api-route-dispatch.md)** 🆕
+  `/api/v2` routing uses a dispatch table instead of a long conditional chain to keep endpoint registration centralized and maintainable.
+
+- **[ADR-051: Dual Encapsulating Structs (Settings + State)](ADR-051-dual-encapsulating-structs.md)** 🆕
+  Persistent configuration and runtime state are grouped into dedicated top-level structs to replace sprawling flat globals.
+
 ### Hardware and Reliability
 - **[ADR-011: External Hardware Watchdog for Reliability](ADR-011-external-hardware-watchdog.md)**  
   I2C hardware watchdog chip that automatically resets the ESP8266 if firmware hangs or crashes.
@@ -91,6 +121,9 @@ Architecture Decision Records capture important architectural decisions along wi
 ### Development and Build
 - **[ADR-013: Arduino Framework Over ESP-IDF](ADR-013-arduino-framework-over-esp-idf.md)**  
   Using Arduino framework for rapid development and rich ecosystem instead of low-level ESP-IDF.
+
+- **[ADR-049: String Class Prohibition in Protocol Paths](ADR-049-string-prohibition-protocol-paths.md)** 🆕
+  Protocol hot paths use bounded char buffers instead of `String` to reduce heap fragmentation and peak RAM usage on ESP8266.
 
 - **[ADR-014: Dual Build System (Makefile + Python Script)](ADR-014-dual-build-system.md)**  
   Makefile for CI/CD and build.py wrapper for cross-platform developer convenience.
@@ -105,8 +138,14 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-017: WiFiManager for Initial Configuration](ADR-017-wifimanager-initial-configuration.md)**  
   Captive portal for easy first-time WiFi setup without hardcoded credentials.
 
-- **[ADR-018: ArduinoJson for Data Interchange](ADR-018-arduinojson-data-interchange.md)**  
-  Standardized JSON handling for settings persistence, REST API, MQTT, and WebSocket communication.
+- **[ADR-018: ArduinoJson for Data Interchange](ADR-018-arduinojson-data-interchange.md)** *(Superseded by ADR-042)*  
+  ~~Standardized JSON handling for settings persistence, REST API, MQTT, and WebSocket communication.~~
+
+- **[ADR-042: Streaming JSON I/O — No ArduinoJson](ADR-042-streaming-json-no-arduinojson.md)** 🆕
+  Mandate streaming JSON helpers with global scratch buffers instead of ArduinoJson; eliminates ArduinoJson heap documents, avoids ArduinoJson-driven fragmentation, and fixes the settings-reset bug from buffer overflow.
+
+- **[ADR-043: Reset-Pattern WiFi Recovery Trigger](ADR-043-reset-pattern-wifi-recovery.md)** 🆕
+  Triple-reset within a 10-second window forces WiFiManager configuration portal and clears saved WiFi credentials for deterministic recovery on ESP8266.
 
 ### Features and Extensions
 - **[ADR-019: REST API Versioning Strategy](ADR-019-rest-api-versioning-strategy.md)**  
@@ -158,6 +197,8 @@ Architecture Decision Records capture important architectural decisions along wi
   Simplified firmware flash mechanism using XHR with backend confirmation, eliminating WebSocket complexity and Safari bugs. Reduces code by 68.5% while improving reliability.
 
 ## ADR Template
+
+`docs/adr/README.md` is the canonical ADR guide for this repository. Other instruction files should link here instead of restating ADR templates or lifecycle rules.
 
 When creating new ADRs, use this structure:
 
@@ -260,10 +301,16 @@ ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
 6. 2024: ADR-019 (API v2)
 7. 2026: ADR-025 (Safari WebSocket fix), ADR-026 (Cache-busting), ADR-027 (Version warnings)
 8. 2026: ADR-036 (Boot sequence), ADR-037 (Gateway mode), ADR-038 (Data flow), ADR-039 (OTGraph)
+9. 2026: ADR-040 (MQTT source topics), ADR-041 (JIT HA discovery), ADR-042 (No ArduinoJson), ADR-043 (Triple-reset WiFi)
+10. 2026: ADR-044 (Webhook HTTP integration), ADR-045 (PS=1 summary parsing)
 
 ## When to Create an ADR
 
 Create an ADR when making a decision that:
+- Changes architecture, service/module boundaries, deployment topology, or integration patterns
+- Changes non-functional requirements such as security, availability, performance, privacy/compliance, or resilience
+- Changes external interfaces or contracts, including API behavior and breaking changes
+- Introduces or replaces frameworks, libraries, tooling, or build/CI patterns with broad architectural impact
 - Has long-term impact on the architecture
 - Affects multiple components or modules
 - Involves trade-offs between alternatives
@@ -278,7 +325,14 @@ Don't create ADRs for:
 - Code refactoring that maintains same structure
 - Configuration changes
 - Documentation updates
+- Small dependency or tooling updates without architectural impact
 - Minor feature additions within existing patterns
+
+## ADR Workflow
+
+- **Before implementing:** Read the relevant ADRs to align with existing decisions.
+- **During planning:** Create or update an ADR when a change materially alters architecture, protocols, data flow, or external behavior.
+- **After implementation:** Update the ADR status as needed and link the ADR from the PR or review description.
 
 ## Implementation Notes
 
@@ -315,7 +369,7 @@ Refer to specific RC numbers when documenting pre-release features.
 ## Superseding ADRs
 
 When an architectural decision changes:
-1. Do NOT modify the original ADR
+1. Accepted ADRs are immutable; do NOT modify the original ADR beyond the status line needed to record supersession
 2. Create a new ADR that supersedes the old one
 3. Update the old ADR's status to "Superseded by ADR-XXX"
 4. Reference the original ADR in the new one

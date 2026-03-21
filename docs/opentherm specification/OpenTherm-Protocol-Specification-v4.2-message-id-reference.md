@@ -224,12 +224,12 @@ Legend:
 | 83 | R/- | Teo (Exhaust outlet temperature) | — | — | _f8.8 combined_ | _f8.8 combined_ | −40–127 | °C | No |
 | 84 | R/- | RPM-exhaust (Exhaust fan speed) | — | — | _u16 combined_ | _u16 combined_ | 0–6000 | rpm | No |
 | 85 | R/- | RPM-supply (Supply/inlet fan speed) | — | — | _u16 combined_ | _u16 combined_ | 0–6000 | rpm | No |
-| 96 | R/W | Cooling Operation Hours | — | — | _u16 combined_ | _u16 combined_ | 0–65535 | hours | No |
+| 96 | R/W | Cooling Operation Hours | — | — | _u16 combined_ | _u16 combined_ | 0–65535 | h | No |
 | 97 | R/W | Power Cycles | — | — | _u16 combined_ | _u16 combined_ | 0–65535 | cycles | No |
 | 98 | -/W | RF sensor status information | special | special | Sensor type (see [§9](#9-rf-sensor-status-information-id-98)) | RF strength & battery (see [§9](#9-rf-sensor-status-information-id-98)) | — | — | No |
 | 109 | R/W | Electricity producer starts | — | — | _u16 combined_ | _u16 combined_ | 0–65535 | starts | No |
-| 110 | R/W | Electricity producer hours | — | — | _u16 combined_ | _u16 combined_ | 0–65535 | hours | No |
-| 111 | R/- | Electricity production | — | — | _u16 combined_ | _u16 combined_ | 0–65535 | Watt | No |
+| 110 | R/W | Electricity producer hours | — | — | _u16 combined_ | _u16 combined_ | 0–65535 | h | No |
+| 111 | R/- | Electricity production | — | — | _u16 combined_ | _u16 combined_ | 0–65535 | W | No |
 | 112 | R/W | Cumulative Electricity production | — | — | _u16 combined_ | _u16 combined_ | 0–65535 | kWh | No |
 | 113 | R/W | Unsuccessful burner starts | — | — | _u16 combined_ | _u16 combined_ | 0–65535 | starts | No |
 | 114 | R/W | Flame signal too low count | — | — | _u16 combined_ | _u16 combined_ | 0–65535 | count | No |

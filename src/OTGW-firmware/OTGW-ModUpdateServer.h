@@ -60,34 +60,16 @@ class ESP8266HTTPUpdateServerTemplate
 
   protected:
     void _setUpdaterError();
-    void _resetStatus();
-    void _setStatus(uint8_t phase, const String &target, size_t received, size_t total, const String &filename, const String &error);
-    void _sendStatusJson();
-    void _jsonEscape(const String &in, char *out, size_t outSize);
-    const char *_phaseToString(uint8_t phase);
 
   private:
-    enum UpdatePhase : uint8_t {
-      UPDATE_IDLE = 0,
-      UPDATE_START,
-      UPDATE_WRITE,
-      UPDATE_END,
-      UPDATE_ERROR,
-      UPDATE_ABORT
-    };
-
-    struct UpdateStatus {
-      UpdatePhase phase;
-      String target;
-      size_t received;
-      size_t total;
-      size_t upload_received;
-      size_t upload_total;
-      size_t flash_written;
-      size_t flash_total;
-      String filename;
-      String error;
-    };
+    void _resetUploadTracking();
+    size_t _parseUploadTotalSize() const;
+    void _beginFilesystemUpload(HTTPUpload& upload, size_t uploadTotal);
+    void _beginFirmwareUpload(HTTPUpload& upload, size_t uploadTotal);
+    void _handleUploadStart(HTTPUpload& upload);
+    void _handleUploadWrite(HTTPUpload& upload);
+    void _handleUploadEnd(HTTPUpload& upload);
+    void _handleUploadAbort(HTTPUpload& upload);
 
     bool _serial_output;
     ESP8266WebServerTemplate<ServerType> *_server;
@@ -95,13 +77,12 @@ class ESP8266HTTPUpdateServerTemplate
     String _password;
     bool _authenticated;
     String _updaterError;
+    String _uploadTarget;   // "filesystem" or "firmware" — set in UPLOAD_FILE_START
+    size_t _uploadExpectedBytes;
+    size_t _uploadWrittenBytes;
+    uint32_t _uploadBlockIndex;
     const char *_serverIndex;
     const char *_serverSuccess;
-    size_t _lastFeedbackBytes;
-    unsigned long _lastFeedbackTime;
-    unsigned long _lastDogFeedTime;
-    int _lastProgressPerc;
-    UpdateStatus _status;
 };
 
 };

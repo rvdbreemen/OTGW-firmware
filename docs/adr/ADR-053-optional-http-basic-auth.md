@@ -1,8 +1,8 @@
-# ADR-041: Optional HTTP Basic Authentication for Settings
+# ADR-053: Optional HTTP Basic Authentication for Settings
 
 **Status:** Accepted  
 **Date:** 2026-02-24  
-**Supersedes:** ADR-032 (partially — ADR-032 remains the baseline; this adds opt-in auth for settings)
+**Supersedes:** ADR-032 (the no-auth baseline; this adds opt-in auth for settings)
 
 ## Context
 

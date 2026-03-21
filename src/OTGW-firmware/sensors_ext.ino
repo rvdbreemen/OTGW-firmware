@@ -1,6 +1,6 @@
 /*
 **  Program  : output_ext.ino
-**  Version  : v1.1.0-beta
+**  Version  : v1.3.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
@@ -15,9 +15,9 @@
 // #include <OneWire.h>
 // #include <DallasTemperature.h>
 // GPIO Sensor Settings
-// bool      settingGPIOSENSORSenabled = false;
-// int8_t    settingGPIOSENSORSpin = 10;             
-// int16_t   settingGPIOSENSORSinterval = 20;       // Interval time to read out temp and send to MQ
+// bool      settings.sensors.bEnabled = false;
+// int8_t    settings.sensors.iPin = 10;             
+// int16_t   settings.sensors.iInterval = 20;       // Interval time to read out temp and send to MQ
 // byte      OTGWdallasdataid = 246;                // foney dataid to be used to do autoconfigure for temp sensors
 // int       DallasrealDeviceCount = 0;             // Total temperature devices found on the bus
 // #define   MAXDALLASDEVICES 16                    // maximum number of devices on the bus
@@ -56,48 +56,73 @@ void ensureSensorDefaultLabels()
 {
   if (DallasrealDeviceCount < 1) return;
 
-  DynamicJsonDocument doc(JSON_BUFF_MAX);
+  // ── Pass 1: read existing key→label pairs from file via readJsonStringPair() ──
+  struct { char addr[17]; char label[24]; } existing[MAXDALLASDEVICES];
+  int existingCount = 0;
 
-  // Read existing labels from file
   File labelsFile = LittleFS.open(F("/dallas_labels.ini"), "r");
   if (labelsFile)
   {
-    DeserializationError err = deserializeJson(doc, labelsFile);
-    labelsFile.close();
-    if (err)
+    char key[17], val[24];
+    while (existingCount < MAXDALLASDEVICES &&
+           readJsonStringPair(labelsFile, key, sizeof(key), val, sizeof(val)))
     {
-      DebugTf(PSTR("Error reading labels file: %s, creating new\r\n"), err.c_str());
-      doc.clear();
+      strlcpy(existing[existingCount].addr,  key, sizeof(existing[0].addr));
+      strlcpy(existing[existingCount].label, val, sizeof(existing[0].label));
+      existingCount++;
     }
+    labelsFile.close();
   }
 
+  // ── Check whether any currently-found sensors are missing a label ──
   bool changed = false;
-  const char* prefix = bDebugSensorSimulation ? "Sim Sensor" : "Sensor";
-
   for (int i = 0; i < DallasrealDeviceCount; i++)
   {
-    // Use String to ensure ArduinoJson copies the key (getDallasAddress returns static buffer)
-    String addr = String(getDallasAddress(DallasrealDevice[i].addr));
-    if (!doc.containsKey(addr))
-    {
-      char label[24];
-      snprintf_P(label, sizeof(label), PSTR("%s %d"), prefix, i + 1);
-      doc[addr] = label;
-      changed = true;
-      DebugTf(PSTR("Created default label '%s' for sensor %s\r\n"), label, addr.c_str());
+    const char* addr = getDallasAddress(DallasrealDevice[i].addr);
+    bool found = false;
+    for (int j = 0; j < existingCount; j++) {
+      if (strcmp(existing[j].addr, addr) == 0) { found = true; break; }
     }
+    if (!found) { changed = true; break; }
+  }
+  if (!changed) return;
+
+  // ── Pass 2: rebuild the file ──
+  // Write all existing labels back first, then append defaults for new sensors.
+  File outFile = LittleFS.open(F("/dallas_labels.ini"), "w");
+  if (!outFile) return;
+
+  const char* prefix = state.debug.bSensorSim ? "Sim Sensor" : "Sensor";
+  outFile.print('{');
+  bool first = true;
+
+  // Preserve existing labels
+  for (int j = 0; j < existingCount; j++)
+  {
+    writeJsonStringPair(outFile, existing[j].addr, existing[j].label, !first);
+    first = false;
   }
 
-  if (changed)
+  // Append defaults for sensors not yet in file
+  for (int i = 0; i < DallasrealDeviceCount; i++)
   {
-    File outFile = LittleFS.open(F("/dallas_labels.ini"), "w");
-    if (outFile)
-    {
-      serializeJson(doc, outFile);
-      outFile.close();
-      DebugTf(PSTR("Saved %d sensor label(s) to dallas_labels.ini\r\n"), DallasrealDeviceCount);
+    const char* addr = getDallasAddress(DallasrealDevice[i].addr);
+    bool found = false;
+    for (int j = 0; j < existingCount; j++) {
+      if (strcmp(existing[j].addr, addr) == 0) { found = true; break; }
     }
+    if (found) continue;
+
+    char label[24];
+    snprintf_P(label, sizeof(label), PSTR("%s %d"), prefix, i + 1);
+    DebugTf(PSTR("Created default label '%s' for sensor %s\r\n"), label, addr);
+    writeJsonStringPair(outFile, addr, label, !first);
+    first = false;
   }
+
+  outFile.print('}');
+  outFile.close();
+  DebugTf(PSTR("Saved %d sensor label(s) to dallas_labels.ini\r\n"), DallasrealDeviceCount);
 }
 
 void initSimulatedDallasSensors()
@@ -114,42 +139,41 @@ void initSimulatedDallasSensors()
     DallasrealDevice[i].lasttime = 0;
   }
 
-  if (bDebugSensors)
+  if (state.debug.bSensors)
   {
     DebugTf(PSTR("Sensor simulation enabled: %d virtual sensors initialized\r\n"), SIM_SENSOR_COUNT);
   }
 }
 
-// Setup a oneWire instance to communicate with any OneWire devices
-// needs a PIN to init correctly, pin is changed when we initSensors()
-// this still may cause problems though because we this configures the pin already
-// BUT, we're an OTGW, on a NODO print, so we are pretty sure nothing
-// else is connected on these pins unlease somebody tweaked something.
-// still don't like this too much:
-OneWire oneWire(settingGPIOSENSORSpin);
+// Use default constructor (no pin) so no GPIO is touched before settings load.
+// oneWire.begin(settingGPIOSENSORSpin) is called inside initSensors() after
+// readSettings() has loaded the correct pin value. (ADR-020)
+OneWire oneWire;
 
 // Pass our oneWire reference to Dallas Temperature sensor 
 DallasTemperature sensors(&oneWire);
 
 // Initialise the oneWire bus on the GPIO pin 
 void initSensors() {
-  if (!settingGPIOSENSORSenabled && !bDebugSensorSimulation)
+  bSensorsDetected = false;  // Reset runtime detection state on each init call
+  if (!settings.sensors.bEnabled && !state.debug.bSensorSim)
   {
     DallasrealDeviceCount = 0;
     numberOfDevices = 0;
     return;
   }
 
-  if (bDebugSensorSimulation)
+  if (state.debug.bSensorSim)
   {
     initSimulatedDallasSensors();
     ensureSensorDefaultLabels();
+    bSensorsDetected = true;  // Simulation counts as successfully initialized
     return;
   }
 
-  if (bDebugSensors)DebugTf(PSTR("init GPIO Temperature sensors on GPIO%d...\r\n"), settingGPIOSENSORSpin);
+  if (state.debug.bSensors)DebugTf(PSTR("init GPIO Temperature sensors on GPIO%d...\r\n"), settings.sensors.iPin);
 
-  oneWire.begin(settingGPIOSENSORSpin);
+  oneWire.begin(settings.sensors.iPin);
 
   // Start the DS18B20 sensor
   sensors.begin();
@@ -165,7 +189,7 @@ void initSensors() {
     DebugTf(PSTR("***ERR More (%d) sensor devices found than allowed(%d) on the bus\r\n"), numberOfDevices, MAXDALLASDEVICES);
     numberOfDevices = MAXDALLASDEVICES ;  // limit to max number of devices
   }
-  if (bDebugSensors) DebugTf(PSTR("Sensors: Found %d device(s)\r\n"), numberOfDevices);
+  if (state.debug.bSensors) DebugTf(PSTR("Sensors: Found %d device(s)\r\n"), numberOfDevices);
    // Loop through each device, check if it is real temp sensor
 
   for (int i = 0; i < numberOfDevices; i++)
@@ -173,7 +197,7 @@ void initSensors() {
     // Search the wire for address
     if (sensors.getAddress(DallasrealDevice[i].addr, i))
     {
-    if (bDebugSensors) DebugTf(PSTR("Device address %u device(s)\r\n"), (unsigned int) DallasrealDevice[i].addr);
+    if (state.debug.bSensors) DebugTf(PSTR("Device address %u device(s)\r\n"), (unsigned int) DallasrealDevice[i].addr);
     DallasrealDevice[i].id = DallasrealDeviceCount ;
     DallasrealDevice[i].tempC = 0 ;
     DallasrealDevice[i].lasttime = 0 ;
@@ -191,26 +215,26 @@ void initSensors() {
 
   if (numberOfDevices < 1 or DallasrealDeviceCount < 1)
   {
-    DebugTln(F("***ERR No Sensors Found, disabled GPIO Sensors! Reboot node to search again."));
-    settingGPIOSENSORSenabled = false;
-    return;
+    DebugTf(PSTR("***ERR No Sensors Found on GPIO%d. Check wiring and reboot to search again.\r\n"), settings.sensors.iPin);
+    return;  // bSensorsDetected stays false
   }
 
   // Create default labels for discovered sensors if they don't exist yet
   ensureSensorDefaultLabels();
+  bSensorsDetected = true;  // Sensors successfully detected and initialized
 }
 
 // Send the sensor device address to MQ for Autoconfigure
 void configSensors() 
 {
-if (settingMQTTenable) {
-    if (bDebugSensors) DebugTf(PSTR("Sensor Device MQ configuration started \r\n"));
+if (settings.mqtt.bEnable) {
+    if (state.debug.bSensors) DebugTf(PSTR("Sensor Device MQ configuration started \r\n"));
 
     for (int i = 0; i < DallasrealDeviceCount ; i++) 
     {
       // Now configure the MQ interface, it will return immediatly when already configured
       const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
-      if (bDebugSensors) DebugTf(PSTR("Sensor Device MQ configuration for device no[%d] addr[%s] \r\n"), i, strDeviceAddress);
+      if (state.debug.bSensors) DebugTf(PSTR("Sensor Device MQ configuration for device no[%d] addr[%s] \r\n"), i, strDeviceAddress);
       sensorAutoConfigure(OTGWdallasdataid, false, strDeviceAddress) ;     // Configure sensor with the Dallas Deviceaddress
     }
     // after last sensor set the ConfigDone flag
@@ -221,27 +245,27 @@ if (settingMQTTenable) {
  void pollSensors()
  {
   time_t now = time(nullptr);
-  if (!settingGPIOSENSORSenabled && !bDebugSensorSimulation) return;
+  if (!bSensorsDetected) return;  // Guard on runtime detection state, not persisted setting
 
-  if (!bDebugSensorSimulation)
+  if (!state.debug.bSensorSim)
   {
     sensors.requestTemperatures(); // Non-blocking: setWaitForConversion(false) in initSensors()
   }
   bool simUpdateDue = true;
-  if (bDebugSensorSimulation && simLastUpdateTime != 0 && (now - simLastUpdateTime) < SIM_SENSOR_UPDATE_INTERVAL_SECONDS)
+  if (state.debug.bSensorSim && simLastUpdateTime != 0 && (now - simLastUpdateTime) < SIM_SENSOR_UPDATE_INTERVAL_SECONDS)
   {
     simUpdateDue = false;
   }
 
   // check if HA Autoconfigure must be performed (initial or as repeat for HA reboot)
-  if (settingMQTTenable && getMQTTConfigDone(OTGWdallasdataid)==false) configSensors() ;
+  if (settings.mqtt.bEnable && getMQTTConfigDone(OTGWdallasdataid)==false) configSensors() ;
   // Loop through each real device, store temperature data and send to MQ 
   for (int i = 0; i < DallasrealDeviceCount; i++)
   {
     // Convert device address to string
     const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
     // Store the C temp in struc to allow it to be shown on Homepage through restAPI.ino
-    if (bDebugSensorSimulation)
+    if (state.debug.bSensorSim)
     {
       if (simUpdateDue)
       {
@@ -257,7 +281,7 @@ if (settingMQTTenable) {
       float tempC = sensors.getTempC(DallasrealDevice[i].addr);
       if (tempC == DEVICE_DISCONNECTED_C) {
         // Sensor disconnected or read error — skip, keep previous value (Finding #29)
-        if (bDebugSensors) DebugTf(PSTR("Sensor [%s] disconnected or read error, skipping\r\n"), strDeviceAddress);
+        if (state.debug.bSensors) DebugTf(PSTR("Sensor [%s] disconnected or read error, skipping\r\n"), strDeviceAddress);
         continue;
       }
       DallasrealDevice[i].tempC = tempC;
@@ -265,32 +289,32 @@ if (settingMQTTenable) {
     DallasrealDevice[i].lasttime = now ;
     
     // Debug logging: always show simulated values in telnet for visibility
-    if (bDebugSensorSimulation)
+    if (state.debug.bSensorSim)
     {
       if (simUpdateDue)
       {
         DebugTf(PSTR("[SIM] Sensor device no[%d] addr[%s] TempC: %4.1f\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
       }
     }
-    else if (bDebugSensors)
+    else if (state.debug.bSensors)
     {
       DebugTf(PSTR("Sensor device no[%d] addr[%s] TempC: %f\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
     }
 
-    if (settingMQTTenable ) {
+    if (settings.mqtt.bEnable ) {
       //Build string for MQTT, use sendMQTTData for this
-      // ref MQTTPubNamespace = settingMQTTtopTopic + "/value/" + strDeviceAddress ;
+      // ref MQTTPubNamespace = settings.mqtt.sTopTopic + "/value/" + strDeviceAddress ;
       char _msg[15]{0};
       // strDeviceAddress is already a const char* from getDallasAddress()
       // Just format the temperature value
       snprintf_P(_msg, sizeof _msg, PSTR("%4.1f"), DallasrealDevice[i].tempC);
 
       // DebugTf(PSTR("Topic: %s -- Payload: %s\r\n"), strDeviceAddress, _msg);
-      if (bDebugSensors) DebugFlush();
+      if (state.debug.bSensors) DebugFlush();
       sendMQTTData(strDeviceAddress, _msg);
     }
   }
-  if (bDebugSensorSimulation)
+  if (state.debug.bSensorSim)
   {
     simLastUpdateTime = now;
   }
@@ -305,7 +329,7 @@ char* getDallasAddress(DeviceAddress deviceAddress)
   static char dest[17]; // 8 bytes * 2 chars + 1 null
   static const char hexchars[] PROGMEM = "0123456789ABCDEF";
   
-  if (settingGPIOSENSORSlegacyformat) {
+  if (settings.sensors.bLegacyFormat) {
     // Replicate the "buggy" behavior of previous versions (~v0.10.x)
     // which produced a compressed/corrupted ID (approx 9-10 chars)
     // This provides backward compatibility for Home Assistant automations.
