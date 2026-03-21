@@ -21,6 +21,13 @@
 static bool    settingsDirty = false;
 static uint8_t pendingSideEffects = 0;
 
+static bool isHttpPasswordPlaceholder(const char* value)
+{
+  return value &&
+         (strcasecmp_P(value, PSTR("notthepassword")) == 0 ||
+          strcasecmp_P(value, PSTR("notthispassword")) == 0);
+}
+
 //=======================================================================
 // Clear the dirty flag and pending side-effects without writing or restarting services.
 // Call this after a direct writeSettings() to prevent the deferred-flush timer from
@@ -413,8 +420,8 @@ void updateSetting(const char *field, const char *newValue)
   }
 
   if (strcasecmp_P(field, PSTR("httppasswd")) == 0) {
-    // Only update if not the placeholder value (same pattern as MQTTpasswd)
-    if (newValue && strcasecmp_P(newValue, PSTR("notthepassword")) != 0) {
+    // Only update if not the placeholder value.
+    if (newValue && !isHttpPasswordPlaceholder(newValue)) {
       strlcpy(settings.sHTTPpasswd, newValue, sizeof(settings.sHTTPpasswd));
       // Trim leading/trailing whitespace — trailing spaces are easy to enter in the UI
       char* trimmed = trimwhitespace(settings.sHTTPpasswd);
