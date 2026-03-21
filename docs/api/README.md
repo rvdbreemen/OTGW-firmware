@@ -75,6 +75,18 @@ None. The device is designed for local network use only.
 - `GET /v2/settings` - Get all settings
 - `POST /v2/settings` - Update settings
 
+#### Settings Password Fields
+
+The `httppasswd` and `mqttpasswd` settings use a protected round-trip format so the real stored password is never returned by the API.
+
+- `GET /v2/settings`
+  - `password=0` means no password is currently stored
+  - `password=XX` means a password is stored and `XX` is its length
+- `POST /v2/settings`
+  - `notthispassword` keeps the existing stored password unchanged
+  - `""` clears the stored password
+  - any other string replaces the stored password with the submitted value
+
 ### Sensors
 
 - `GET /v2/sensors/labels` - Get Dallas sensor labels

@@ -11,8 +11,8 @@ Architecture Decision Records capture important architectural decisions along wi
 **By Topic:**
 - [Platform & Build](#platform-and-build-system) (4 ADRs)
 - [Memory Management](#memory-management) (5 ADRs)
-- [Network & Security](#network-and-security) (3 ADRs)
-- [Integration](#integration-and-communication) (6 ADRs) 🆕
+- [Network & Security](#network-and-security) (5 ADRs)
+- [Integration](#integration-and-communication) (7 ADRs) 🆕
 - [Core Systems](#system-architecture) (5 ADRs) 🆕
 - [Features & Extensions](#features-and-extensions) (8 ADRs) 🆕
 - [Browser & Client](#browser-and-client-compatibility) (4 ADRs)
@@ -40,7 +40,13 @@ Architecture Decision Records capture important architectural decisions along wi
   Running HTTP, WebSocket, Telnet, and MQTT services simultaneously on different ports.
 
 - **[ADR-032: No Authentication Pattern (Local Network Security Model)](ADR-032-no-authentication-local-network-security.md)** 🆕  
-  Explicit decision to omit authentication in favor of network-level security (WiFi encryption, network segmentation, VPN for remote access).
+  Baseline local-network trust model for OTGW interfaces; partially superseded by ADR-056 for protected admin endpoints and secret-handling behavior.
+
+- **[ADR-054: Optional HTTP Basic Authentication for Settings](ADR-054-optional-http-basic-auth.md)** *(Superseded by ADR-056)*  
+  Historical introduction of opt-in Basic Auth for settings/admin operations before the broader protected-boundary and secret-handling contract was documented in ADR-056.
+
+- **[ADR-056: Protected Admin Endpoint Security and Secret-Handling Contract](ADR-056-protected-admin-endpoint-security-and-secret-handling-contract.md)** 🆕  
+  Defines the protected admin boundary, same-origin enforcement, password round-trip contract, OTA credential propagation, and local-network HTTP-only constraints.
 
 ### Memory Management
 - **[ADR-004: Static Buffer Allocation Strategy](ADR-004-static-buffer-allocation.md)** *(Superseded by ADR-053)*  
@@ -80,8 +86,11 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-040: MQTT Source-Specific Topics for OpenTherm Values](ADR-040-mqtt-source-specific-topics.md)** 🆕
   Additive source-specific MQTT and HA discovery topics using nested `<metric>/<source>` paths with opt-in enablement (`MQTTseparatesources`) and backward-compatible base topics.
 
-- **[ADR-044: Webhook Outbound HTTP Integration](ADR-044-webhook-outbound-http-integration.md)** 🆕
-  Configurable outbound HTTP GET/POST triggered on OpenTherm StatusFlags bit edges; local-network-only URL enforcement, payload template expansion, and REST test endpoint.
+- **[ADR-055: Webhook Outbound HTTP Integration](ADR-055-webhook-outbound-http-integration.md)** *(Superseded by ADR-057)*
+  Historical record of introducing local-network outbound webhook support before retry, protected test-endpoint, and delivery policy were consolidated in ADR-057.
+
+- **[ADR-057: Webhook Delivery, Retry, and Protected Test Endpoint Policy](ADR-057-webhook-delivery-retry-and-protected-test-endpoint-policy.md)** 🆕
+  Defines edge-triggered outbound webhook delivery, bounded timeout and retry behavior, local-only URL policy, and the protected webhook test endpoint; builds on ADR-048's non-blocking state machine.
 
 ### System Architecture
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  
@@ -305,7 +314,9 @@ ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
 7. 2026: ADR-025 (Safari WebSocket fix), ADR-026 (Cache-busting), ADR-027 (Version warnings)
 8. 2026: ADR-036 (Boot sequence), ADR-037 (Gateway mode), ADR-038 (Data flow), ADR-039 (OTGraph)
 9. 2026: ADR-040 (MQTT source topics), ADR-041 (JIT HA discovery), ADR-042 (No ArduinoJson), ADR-043 (Triple-reset WiFi)
-10. 2026: ADR-044 (Webhook HTTP integration), ADR-045 (PS=1 summary parsing)
+10. 2026: ADR-044 (Global state header definition), ADR-045 (PS=1 summary parsing)
+11. 2026: ADR-054 (Optional HTTP Basic Auth), ADR-055 (Webhook HTTP integration)
+12. 2026: ADR-056 (Protected admin security contract), ADR-057 (Webhook delivery + test endpoint policy)
 
 ## When to Create an ADR
 
