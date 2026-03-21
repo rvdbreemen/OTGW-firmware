@@ -151,7 +151,7 @@ The `MQTTAutoConfigBuffers` struct is eliminated. The nullable-pointer guard (`i
 
 ### Positive
 - **No heap fragmentation:** `cMsg` and `sLine` are placed in BSS at link time; no runtime `new` call
-- **No local buffers:** No stack or local static buffers anywhere in the MQTT autoconfig path
+- **No large local work buffers:** No large stack or local static workspace buffers in the MQTT autoconfig path; primary work buffers (`cMsg`, `sLine`) are global, and only small, short-lived local helpers are permitted
 - **Struct eliminated:** `MQTTAutoConfigBuffers` struct removed; no nullable-pointer boilerplate
 - **Simpler call sites:** OOM guard removed; `cMsg` and `sLine` are never null
 - **Consistent with ADR-004:** No exceptions to the static-allocation rule remain in normal firmware operation
