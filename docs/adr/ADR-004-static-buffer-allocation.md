@@ -3,7 +3,6 @@
 **Status:** Superseded by ADR-053  
 **Date:** 2020-01-01 (Estimated)  
 **Updated:** 2026-01-28 (Documentation)  
-**Enhanced:** 2025-12-15 (v1.0.0 heap protection system)  
 
 ## Context
 
