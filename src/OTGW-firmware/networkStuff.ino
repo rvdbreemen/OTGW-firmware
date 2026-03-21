@@ -200,6 +200,8 @@ void startNTP()
   if (strlen(settings.ntp.sHostname) == 0) strlcpy(settings.ntp.sHostname, NTP_HOST_DEFAULT, sizeof(settings.ntp.sHostname));
 
   configTime(0, 0, settings.ntp.sHostname, nullptr, nullptr);
+  // configTime() may reset the station hostname to "esp-XXXXXX"; restore it
+  WiFi.hostname(CSTR(settings.sHostname));
   NtpStatus = TIME_WAITFORSYNC;
 }
 

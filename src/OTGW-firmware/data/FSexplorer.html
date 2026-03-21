@@ -234,7 +234,6 @@
                      document.querySelectorAll('.delete-link').forEach((node) => {
                        node.addEventListener('click', (event) => {
                          event.preventDefault();
-                         if (!confirm('Are you sure you want to delete this file?')) return;
                          let href = node.getAttribute('data-href');
 
                          fetch('api/listfiles?delete=' + encodeURIComponent(href))
