@@ -128,16 +128,16 @@ static bool expandPayload(const char* tmpl, char* out, size_t outLen, bool state
     varName[nameLen] = '\0';
 
     char val[16] = "";
-    if      (strcmp_P(varName, PSTR("state"))      == 0) { strcpy(val, stateOn ? "ON" : "OFF"); }
-    else if (strcmp_P(varName, PSTR("tboiler"))    == 0) { snprintf(val, sizeof(val), "%.1f", OTcurrentSystemState.Tboiler); }
-    else if (strcmp_P(varName, PSTR("tr"))         == 0) { snprintf(val, sizeof(val), "%.1f", OTcurrentSystemState.Tr); }
-    else if (strcmp_P(varName, PSTR("tset"))       == 0) { snprintf(val, sizeof(val), "%.1f", OTcurrentSystemState.TSet); }
-    else if (strcmp_P(varName, PSTR("tdhw"))       == 0) { snprintf(val, sizeof(val), "%.1f", OTcurrentSystemState.Tdhw); }
-    else if (strcmp_P(varName, PSTR("relmod"))     == 0) { snprintf(val, sizeof(val), "%.0f", OTcurrentSystemState.RelModLevel); }
-    else if (strcmp_P(varName, PSTR("chpressure")) == 0) { snprintf(val, sizeof(val), "%.2f", OTcurrentSystemState.CHPressure); }
-    else if (strcmp_P(varName, PSTR("flameon"))    == 0) { strcpy(val, (OTcurrentSystemState.SlaveStatus & (1U << 3)) ? "true" : "false"); }
-    else if (strcmp_P(varName, PSTR("chmode"))     == 0) { strcpy(val, (OTcurrentSystemState.SlaveStatus & (1U << 1)) ? "true" : "false"); }
-    else if (strcmp_P(varName, PSTR("dhwmode"))    == 0) { strcpy(val, (OTcurrentSystemState.SlaveStatus & (1U << 2)) ? "true" : "false"); }
+    if      (strcmp_P(varName, PSTR("state"))      == 0) { snprintf_P(val, sizeof(val), stateOn ? PSTR("ON") : PSTR("OFF")); }
+    else if (strcmp_P(varName, PSTR("tboiler"))    == 0) { snprintf_P(val, sizeof(val), PSTR("%.1f"), OTcurrentSystemState.Tboiler); }
+    else if (strcmp_P(varName, PSTR("tr"))         == 0) { snprintf_P(val, sizeof(val), PSTR("%.1f"), OTcurrentSystemState.Tr); }
+    else if (strcmp_P(varName, PSTR("tset"))       == 0) { snprintf_P(val, sizeof(val), PSTR("%.1f"), OTcurrentSystemState.TSet); }
+    else if (strcmp_P(varName, PSTR("tdhw"))       == 0) { snprintf_P(val, sizeof(val), PSTR("%.1f"), OTcurrentSystemState.Tdhw); }
+    else if (strcmp_P(varName, PSTR("relmod"))     == 0) { snprintf_P(val, sizeof(val), PSTR("%.0f"), OTcurrentSystemState.RelModLevel); }
+    else if (strcmp_P(varName, PSTR("chpressure")) == 0) { snprintf_P(val, sizeof(val), PSTR("%.2f"), OTcurrentSystemState.CHPressure); }
+    else if (strcmp_P(varName, PSTR("flameon"))    == 0) { snprintf_P(val, sizeof(val), (OTcurrentSystemState.SlaveStatus & (1U << 3)) ? PSTR("true") : PSTR("false")); }
+    else if (strcmp_P(varName, PSTR("chmode"))     == 0) { snprintf_P(val, sizeof(val), (OTcurrentSystemState.SlaveStatus & (1U << 1)) ? PSTR("true") : PSTR("false")); }
+    else if (strcmp_P(varName, PSTR("dhwmode"))    == 0) { snprintf_P(val, sizeof(val), (OTcurrentSystemState.SlaveStatus & (1U << 2)) ? PSTR("true") : PSTR("false")); }
     else { out[di++] = *p++; continue; }  // unknown variable — pass '{' literally
 
     size_t valLen = strlen(val);

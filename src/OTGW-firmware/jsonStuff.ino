@@ -40,7 +40,7 @@ void escapeJsonStringTo(const char* src, char* dest, size_t destSize) {
     if (esc) {
       size_t len = strlen(esc);
       if (destIdx + len < destSize - 1) {
-        strcpy(&dest[destIdx], esc);
+        memcpy(&dest[destIdx], esc, len);
         destIdx += len;
       } else {
         break; // Out of space
