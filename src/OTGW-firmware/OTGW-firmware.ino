@@ -153,6 +153,8 @@ void setup() {
   //setup NTP after WiFi so the configured hostname is preserved;
   //DHCP option 42 (NTP server override) is therefore not supported
   startNTP();
+  // configTime() inside startNTP() may reset the station hostname; restore our configured hostname
+  WiFi.hostname(CSTR(settings.sHostname));
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
 
