@@ -40,9 +40,10 @@ and guards against use during OTA operations.
 ### K4 — `writeJsonStringKV()` uses global `cMsg` (`settingStuff.ino`)
 **Status: FIXED**
 
-Replaced `escapeJsonStringTo(value, cMsg, ...)` with a local `escapeBuf[CMSG_SIZE]`
-on the stack. Eliminates the shared-state dependency on the global `cMsg` buffer
-and removes the documented reentrancy constraint.
+`writeJsonStringKV()` now explicitly uses `escapeJsonStringTo(value, cMsg, ...)`,
+with `cMsg` serving as the dedicated JSON-escape scratch buffer for this helper.
+The review notes and comments were updated so the documented behavior matches the
+actual implementation.
 
 ### K5 — `expandedPayload[384]` on stack in `sendWebhookPost()` (`webhook.ino`)
 **Status: FIXED**
