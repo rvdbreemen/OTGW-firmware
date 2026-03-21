@@ -1,10 +1,10 @@
 # ADR-004: Static Buffer Allocation Strategy
 
-**Status:** Accepted  
+**Status:** Superseded by ADR-053  
 **Date:** 2020-01-01 (Estimated)  
 **Updated:** 2026-01-28 (Documentation)  
 **Enhanced:** 2025-12-15 (v1.0.0 heap protection system)  
-**Amended:** 2026-03-21 (replace lazy MQTTAutoConfigBuffers heap-alloc with static global)
+**Superseded:** 2026-03-21 (ADR-053 extends with large feature-buffer static-global rule)
 
 ## Context
 
@@ -45,15 +45,6 @@ The ESP8266 has extremely limited RAM (~40KB usable after Arduino core). Dynamic
 #define HTTP_API_BUFFER_SIZE 256   // HTTP response streaming (reduced from 1024)
 #define CMSG_SIZE 512              // OpenTherm command messages
 ```
-
-**Large feature-specific static buffers (added 2026-03-21):**
-
-Some features require large working buffers that are only used occasionally (e.g. MQTT auto-discovery). These are declared as **file-static globals** in their owning `.ino` file rather than being heap-allocated. The MQTT auto-discovery workspace is the canonical example:
-```cpp
-// MQTTstuff.ino — 1400 bytes total; used only during HA auto-discovery runs
-static MQTTAutoConfigBuffers mqttAutoConfigBuf;  // { char line[1200]; char topic[200]; }
-```
-**Rule:** Do not use `new` / `malloc` for feature buffers that live for the lifetime of the device. Declare them as `static` globals instead. The memory cost is fixed and predictable; there is no heap fragmentation risk.
 
 **Heap monitoring system:**
 ```cpp
@@ -165,22 +156,8 @@ static MQTTAutoConfigBuffers mqttAutoConfigBuf;  // { char line[1200]; char topi
   - **Mitigation:** Always use `_P` variants (`strcmp_P`, `snprintf_P`)
   - **Mitigation:** Code review checklist enforces PROGMEM usage
 - **Justified SDK exception:** `ESP.getResetReason()` returns `Arduino::String` — the ESP8266 Arduino SDK does not expose a `const char*` variant. Usage is limited to one call in `setup()` via `strlcpy(lastReset, ESP.getResetReason().c_str(), sizeof(lastReset))`. The temporary String is freed immediately; no heap fragmentation risk in practice. This is the only accepted String exception in setup().
-- **Large feature buffers:** Feature subsystems that need large working areas (e.g. MQTT auto-discovery ~1400 bytes) must declare them as file-static globals, not with `new`. Previously the MQTT auto-discovery code used lazy `new MQTTAutoConfigBuffers()` (first-use heap allocation) to defer the 1400-byte cost until auto-discovery was actually triggered. This was replaced with a plain `static MQTTAutoConfigBuffers mqttAutoConfigBuf;` to eliminate the last dynamic allocation in normal operation, at the cost of always holding 1400 bytes of BSS. The trade-off is accepted: deterministic memory layout is worth more on this platform than saving 1400 bytes when auto-discovery is unused.
 
 ## Implementation Patterns
-
-**Large feature-specific static buffers:**
-```cpp
-// BAD - heap allocation for a permanent feature buffer
-static MyFeatureBuf* pBuf = nullptr;
-MyFeatureBuf* getBuf() {
-  if (!pBuf) pBuf = new MyFeatureBuf();  // heap fragmentation, nullable
-  return pBuf;
-}
-
-// GOOD - static global; always present, never fragmented, never null
-static MyFeatureBuf featureBuf;
-```
 
 **String handling:**
 ```cpp
@@ -232,6 +209,7 @@ if (freeHeap < HEAP_CRITICAL) {
 - ADR-003: HTTP-Only Network Architecture (memory for TLS not available)
 - ADR-006: MQTT Integration Pattern (uses static buffers and chunked streaming)
 - ADR-012: PIC Firmware Upgrade via Web UI (binary data parsing with bounded buffers)
+- **ADR-053: Large Feature Buffer Static Allocation** *(supersedes this ADR — adds rule for large feature-specific static globals)*
 
 ## References
 - Heap protection implementation: `OTGW-firmware.h` (CSTR macro, heap levels)

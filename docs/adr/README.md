@@ -43,8 +43,11 @@ Architecture Decision Records capture important architectural decisions along wi
   Explicit decision to omit authentication in favor of network-level security (WiFi encryption, network segmentation, VPN for remote access).
 
 ### Memory Management
-- **[ADR-004: Static Buffer Allocation Strategy](ADR-004-static-buffer-allocation.md)**  
+- **[ADR-004: Static Buffer Allocation Strategy](ADR-004-static-buffer-allocation.md)** *(Superseded by ADR-053)*  
   How static buffer allocation prevents heap fragmentation and crashes on the memory-constrained ESP8266.
+
+- **[ADR-053: Large Feature Buffer Static Allocation](ADR-053-large-feature-buffer-static-allocation.md)** 🆕  
+  Extends ADR-004: large feature-specific working buffers must be declared as file-static globals (`static T buf;`), never heap-allocated with `new` — even for "allocate-once, never-free" patterns. Canonical example: `mqttAutoConfigBuf` in `MQTTstuff.ino`.
 
 - **[ADR-009: PROGMEM Usage for String Literals](ADR-009-progmem-string-literals.md)**  
   Mandatory use of PROGMEM (F() and PSTR() macros) to move string literals from RAM to flash memory.
