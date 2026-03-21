@@ -9,16 +9,21 @@ Architecture Decision Records capture important architectural decisions along wi
 ## Quick Navigation
 
 **By Topic:**
-- [Platform & Build](#platform-and-build-system) (4 ADRs)
-- [Memory Management](#memory-management) (5 ADRs)
+
+- [Platform & Build System](#platform-and-build-system) (2 ADRs)
 - [Network & Security](#network-and-security) (5 ADRs)
-- [Integration](#integration-and-communication) (7 ADRs) 🆕
-- [Core Systems](#system-architecture) (5 ADRs) 🆕
-- [Features & Extensions](#features-and-extensions) (8 ADRs) 🆕
+- [Memory Management](#memory-management) (6 ADRs)
+- [Integration & Communication](#integration-and-communication) (8 ADRs)
+- [System Architecture](#system-architecture) (10 ADRs)
+- [Hardware & Reliability](#hardware-and-reliability) (2 ADRs)
+- [Development & Build](#development-and-build) (3 ADRs)
+- [Core Services](#core-services) (6 ADRs)
+- [Features & Extensions](#features-and-extensions) (9 ADRs)
 - [Browser & Client](#browser-and-client-compatibility) (4 ADRs)
 - [OTA & Updates](#ota-and-firmware-updates) (2 ADRs)
 
 **Foundational ADRs** (most referenced by other ADRs):
+
 - **ADR-001:** ESP8266 Platform Selection (establishes hardware constraints)
 - **ADR-004:** Static Buffer Allocation (referenced by 8 other ADRs)
 - **ADR-007:** Timer-Based Task Scheduling (enables non-blocking architecture)
@@ -26,6 +31,7 @@ Architecture Decision Records capture important architectural decisions along wi
 ## ADR Index
 
 ### Platform and Build System
+
 - **[ADR-001: ESP8266 Platform Selection](ADR-001-esp8266-platform-selection.md)**  
   Why we chose ESP8266 over ESP32, Raspberry Pi, and other alternatives for the network controller platform.
 
@@ -33,6 +39,7 @@ Architecture Decision Records capture important architectural decisions along wi
   How the codebase is organized into multiple `.ino` files by functional domain while maintaining Arduino compatibility.
 
 ### Network and Security
+
 - **[ADR-003: HTTP-Only Network Architecture (No HTTPS)](ADR-003-http-only-no-https.md)**  
   Why the firmware uses HTTP only (no HTTPS/TLS) and the security model for local network deployment.
 
@@ -49,6 +56,7 @@ Architecture Decision Records capture important architectural decisions along wi
   Defines the protected admin boundary, same-origin enforcement, password round-trip contract, OTA credential propagation, and local-network HTTP-only constraints.
 
 ### Memory Management
+
 - **[ADR-004: Static Buffer Allocation Strategy](ADR-004-static-buffer-allocation.md)** *(Superseded by ADR-053)*  
   How static buffer allocation prevents heap fragmentation and crashes on the memory-constrained ESP8266.
 
@@ -68,6 +76,7 @@ Architecture Decision Records capture important architectural decisions along wi
   `extern` declarations in headers + single definition in owning `.ino` to avoid ODR violations in any multi-TU build; applies to `msglastupdated[]`, `mqttlastsent[]`, `mqttPublishAllowed`, etc.
 
 ### Integration and Communication
+
 - **[ADR-005: WebSocket for Real-Time Streaming](ADR-005-websocket-real-time-streaming.md)**  
   Using WebSocket protocol on port 81 for real-time OpenTherm message streaming to web browsers.
 
@@ -93,6 +102,7 @@ Architecture Decision Records capture important architectural decisions along wi
   Defines edge-triggered outbound webhook delivery, bounded timeout and retry behavior, local-only URL policy, and the protected webhook test endpoint; builds on ADR-048's non-blocking state machine.
 
 ### System Architecture
+
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  
   Non-blocking timer-based task scheduling with 49-day rollover protection for cooperative multitasking.
 
@@ -124,6 +134,7 @@ Architecture Decision Records capture important architectural decisions along wi
   Persistent configuration and runtime state are grouped into dedicated top-level structs to replace sprawling flat globals.
 
 ### Hardware and Reliability
+
 - **[ADR-011: External Hardware Watchdog for Reliability](ADR-011-external-hardware-watchdog.md)**  
   I2C hardware watchdog chip that automatically resets the ESP8266 if firmware hangs or crashes.
 
@@ -131,6 +142,7 @@ Architecture Decision Records capture important architectural decisions along wi
   Safe PIC microcontroller firmware flashing through the Web UI with WebSocket progress streaming.
 
 ### Development and Build
+
 - **[ADR-013: Arduino Framework Over ESP-IDF](ADR-013-arduino-framework-over-esp-idf.md)**  
   Using Arduino framework for rapid development and rich ecosystem instead of low-level ESP-IDF.
 
@@ -141,6 +153,7 @@ Architecture Decision Records capture important architectural decisions along wi
   Makefile for CI/CD and build.py wrapper for cross-platform developer convenience.
 
 ### Core Services
+
 - **[ADR-015: NTP and AceTime for Time Management](ADR-015-ntp-acetime-time-management.md)**  
   Network time synchronization with AceTime library for comprehensive timezone and DST support.
 
@@ -160,6 +173,7 @@ Architecture Decision Records capture important architectural decisions along wi
   Triple-reset within a 10-second window forces WiFiManager configuration portal and clears saved WiFi credentials for deterministic recovery on ESP8266.
 
 ### Features and Extensions
+
 - **[ADR-019: REST API Versioning Strategy](ADR-019-rest-api-versioning-strategy.md)**  
   URL path-based API versioning (v0/v1/v2) with indefinite backward compatibility.
 
@@ -188,6 +202,7 @@ Architecture Decision Records capture important architectural decisions along wi
   5-grid ECharts-based charting module with dynamic Dallas sensor registration, dual-theme palettes, LTTB sampling, and 24h data buffer for real-time OpenTherm monitoring.
 
 ### Browser and Client Compatibility
+
 - **[ADR-025: Safari WebSocket Connection Management During Firmware Upload](ADR-025-safari-websocket-connection-management.md)**  
   Proactively closing WebSocket before firmware upload to prevent Safari's connection pool exhaustion from dropping it mid-transfer.
 
@@ -200,8 +215,8 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-034: Non-Blocking Modal Dialogs for User Input](ADR-034-non-blocking-modal-dialogs.md)** 🆕  
   Custom HTML/CSS modal dialogs instead of blocking prompt() to maintain real-time data flow.
 
-
 ### OTA and Firmware Updates
+
 - **[ADR-028: File Streaming Over Loading for Memory Safety](ADR-028-file-streaming-over-loading.md)** 🆕  
   Never load files >2KB into RAM; use streaming patterns to prevent memory exhaustion crashes.
 
@@ -245,7 +260,9 @@ Links to relevant documentation, code, or resources.
 ## Key Architectural Themes
 
 ### Memory Constraints
+
 The ESP8266's limited RAM (~40KB usable) drives many architectural decisions:
+
 - Static buffer allocation (ADR-004)
 - PROGMEM for strings (ADR-009)
 - No HTTPS/TLS (ADR-003)
@@ -253,13 +270,16 @@ The ESP8266's limited RAM (~40KB usable) drives many architectural decisions:
 - Heap monitoring and adaptive throttling
 
 ### Local Network Only
+
 The firmware is designed for trusted local network deployment:
+
 - HTTP only, no HTTPS (ADR-003)
 - **No authentication by default** on management endpoints (Web UI, REST API, filesystem, firmware upload)
 - WebSocket uses ws:// not wss://
 - **Security via network isolation** (primary security control)
 
 **Security Recommendations:**
+
 - Deploy only on trusted, isolated local networks
 - Use VPN for remote access (never expose directly to internet)
 - Consider adding authentication layer for production deployments
@@ -267,21 +287,27 @@ The firmware is designed for trusted local network deployment:
 - Regularly review network access controls
 
 ### Home Assistant Focus
+
 Primary integration target is Home Assistant:
+
 - MQTT Auto-Discovery (ADR-006)
 - Standard HA entity patterns
 - Climate control integration
 - Zero-configuration setup
 
 ### Cooperative Multitasking
+
 Single-core ESP8266 requires careful task management:
+
 - Timer-based scheduling (ADR-007)
 - Non-blocking operations
 - Watchdog feeding
 - No delay() calls
 
 ### Arduino Ecosystem
+
 Maintaining Arduino compatibility for community contributions:
+
 - Arduino framework (ADR-001, ADR-013)
 - Modular .ino files (ADR-002)
 - Arduino IDE support
@@ -290,7 +316,8 @@ Maintaining Arduino compatibility for community contributions:
 ## Architectural Dependencies
 
 **Foundation Layer** (all other ADRs depend on these):
-```
+
+```text
 ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
                      │
                      ├──> ADR-004 (Static Buffers) ──> Referenced by 8 ADRs
@@ -299,12 +326,14 @@ ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
 ```
 
 **Most Referenced ADRs:**
+
 - **ADR-004:** Static Buffer Allocation (8 references)
 - **ADR-001:** ESP8266 Platform (7 references)
 - **ADR-007:** Timer-Based Scheduling (6 references)
 - **ADR-008:** LittleFS Persistence (5 references)
 
 **Decision Timeline** (earliest to latest):
+
 1. 2016: ADR-001 (ESP8266), ADR-013 (Arduino)
 2. 2018: ADR-002 (Modular), ADR-003 (HTTP-only), ADR-007 (Timers)
 3. 2019: ADR-005 (WebSocket), ADR-012 (PIC upgrade), ADR-020 (Sensors)
@@ -321,6 +350,7 @@ ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
 ## When to Create an ADR
 
 Create an ADR when making a decision that:
+
 - Changes architecture, service/module boundaries, deployment topology, or integration patterns
 - Changes non-functional requirements such as security, availability, performance, privacy/compliance, or resilience
 - Changes external interfaces or contracts, including API behavior and breaking changes
@@ -335,6 +365,7 @@ Create an ADR when making a decision that:
 ## When NOT to Create an ADR
 
 Don't create ADRs for:
+
 - Bug fixes that don't change architecture
 - Code refactoring that maintains same structure
 - Configuration changes
@@ -352,11 +383,13 @@ Don't create ADRs for:
 
 **Memory Measurements:**
 The claimed memory savings in ADR-004 (3,130-3,730 bytes or 7.8-9.3% of RAM) are estimates based on:
+
 - Static buffer conversions: ~1,500 bytes
 - PROGMEM strings: ~2,000 bytes (see ADR-009)
 - Optimized libraries: ~400-500 bytes
 
 To verify these measurements:
+
 ```bash
 # Build and check binary size
 python build.py --firmware
@@ -368,12 +401,14 @@ size build/OTGW-firmware.elf
 
 **Heap Levels (Standardized):**
 Throughout the codebase, use these constant names:
+
 - `HEAP_CRITICAL` - Less than 3KB (emergency mode)
 - `HEAP_WARNING` - 3-5KB (throttle aggressively)
 - `HEAP_LOW` - 5-8KB (reduce message rates)
 - Normal operation: Greater than 8KB
 
 **Version Numbering:**
+
 - Release versions: `v1.0.0`, `v1.0.1`, `v2.0.0`
 - Release candidates: `v1.0.0-rc1`, `v1.0.0-rc4`
 - Development builds: `v1.0.0-dev+gitSHA`
@@ -383,6 +418,7 @@ Refer to specific RC numbers when documenting pre-release features.
 ## Superseding ADRs
 
 When an architectural decision changes:
+
 1. Accepted ADRs are immutable; do NOT modify the original ADR beyond the status line needed to record supersession
 2. Create a new ADR that supersedes the old one
 3. Update the old ADR's status to "Superseded by ADR-XXX"
@@ -397,13 +433,15 @@ When an architectural decision changes:
 - **Usage Guide:** `.github/skills/adr/USAGE_GUIDE.md`
 
 The ADR skill helps you:
+
 - Create well-structured ADRs using best practices
 - Check code changes against existing ADRs
 - Document architectural decisions with proper alternatives
 - Maintain ADR compliance in PRs and CI/CD
 
 **To use the skill:**
-```
+
+```text
 Ask Copilot: "Use the ADR skill to create ADR-XXX for [decision]"
 Ask Copilot: "Check my changes against existing ADRs"
 Ask Copilot: "Does this require a new ADR?"
@@ -415,14 +453,15 @@ See `.github/skills/adr/USAGE_GUIDE.md` for comprehensive usage instructions and
 
 - **ADR Skill (Copilot):** `.github/skills/adr/SKILL.md` 🆕
 - **ADR Skill Usage Guide:** `.github/skills/adr/USAGE_GUIDE.md` 🆕
-- **ADR Best Practices:** https://adr.github.io/
-- **Michael Nygard's ADR Template:** https://github.com/joelparkerhenderson/architecture-decision-record
+- **ADR Best Practices:** <https://adr.github.io/>
+- **Michael Nygard's ADR Template:** <https://github.com/joelparkerhenderson/architecture-decision-record>
 - **Copilot Instructions:** `.github/copilot-instructions.md` (references ADRs)
 - **Evaluation Framework:** `evaluate.py` (enforces decisions like PROGMEM usage)
 
 ## Maintenance
 
 ADRs are living documentation:
+
 - Review ADRs when onboarding new developers
 - Reference ADRs in code reviews
 - Update ADR status when decisions change

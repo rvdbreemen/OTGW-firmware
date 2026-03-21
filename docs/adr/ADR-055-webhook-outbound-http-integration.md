@@ -45,11 +45,14 @@ Key design choices:
 ## Alternatives Considered
 
 ### Alternative 1: MQTT-only integration
+
 **Pros:**
+
 - Already implemented (ADR-006)
 - Bidirectional; supports multiple subscribers
 
 **Cons:**
+
 - Requires MQTT broker (Mosquitto, HA Mosquitto add-on)
 - Shelly and similar devices cannot subscribe to MQTT without extra firmware
 - Adds overhead for users who only want simple local HTTP triggers
@@ -57,20 +60,26 @@ Key design choices:
 **Why not chosen:** MQTT is the right solution for rich integrations, but too heavyweight for simple relay-on/relay-off scenarios.
 
 ### Alternative 2: WebSocket push events
+
 **Pros:**
+
 - Already exists (ADR-005); clients connected to port 81 already receive OT frames
 
 **Cons:**
+
 - Requires a WebSocket client to be permanently connected
 - No standard support in automation platforms as a server-push receiver
 
 **Why not chosen:** The source side (OTGW) already pushes events; the problem is the consumer side has no WebSocket listener in most setups.
 
 ### Alternative 3: Full outbound HTTPS support
+
 **Pros:**
+
 - Would allow direct calls to Discord, cloud APIs, public webhooks
 
 **Cons:**
+
 - BearSSL on ESP8266 requires 20–30 KB heap (>50% of available RAM); combined with TLS session state can cause out-of-memory crashes (ADR-003, ADR-001)
 - Violates the "local-network appliance" security model (ADR-032)
 - Users with public internet targets should use a local relay (Node-RED, HA automation)
@@ -78,11 +87,14 @@ Key design choices:
 **Why not chosen:** Memory cost is prohibitive; ADR-003 explicitly excludes HTTPS.
 
 ### Alternative 4: Send webhook on every OpenTherm cycle (not just on change)
+
 **Pros:**
+
 - Simpler implementation (no state tracking)
 - Consumers always have fresh data
 
 **Cons:**
+
 - OpenTherm frames arrive every ~1 second; 86,400 HTTP requests/day would overload local devices (Shelly, HA)
 - Blocking HTTP calls at 1 Hz would saturate the main loop
 
@@ -91,17 +103,20 @@ Key design choices:
 ## Consequences
 
 **Positive:**
+
 - Enables zero-MQTT integrations with Shelly, Domoticz, OpenHAB, HA webhooks, Node-RED
 - Reuses existing StatusFlags bit layout (ADR-022) for consistent configuration
 - Template expansion allows rich payloads from a single call
 - Local-only URL enforcement preserves the security model (ADR-003, ADR-032)
 
 **Negative:**
+
 - Blocking HTTP calls (up to 3 seconds on failure) introduce latency spikes in the main loop
 - Only one trigger bit can be monitored; multiple simultaneous conditions require separate MQTT subscriptions
 - No retry on failure: a missed webhook (WiFi glitch, target unreachable) is silently dropped
 
 **Risks and Mitigation:**
+
 - *Main loop stall:* Mitigated by 3-second `http.setTimeout()` and `yield()` calls around request/response; watchdog is fed after the call (ADR-011).
 - *Template injection / URL injection:* Template expansion only replaces known variable names; unknown `{placeholders}` are passed through as literal text. URL validation rejects non-local targets before any connection is attempted.
 - *Config portal exposure:* The webhook test endpoint (`/api/v2/webhook/test`) is unauthenticated, consistent with the rest of the API (ADR-032). It can only call URLs that already pass `isLocalUrl()`.

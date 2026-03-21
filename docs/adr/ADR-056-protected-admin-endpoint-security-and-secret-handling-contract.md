@@ -27,10 +27,12 @@ Define a single protected-admin contract for OTGW-firmware.
 A single optional password, stored in `settings.sHTTPpasswd`, defines the protected admin boundary.
 
 When `settings.sHTTPpasswd` is empty:
+
 - Admin protection is disabled.
 - The firmware behaves like the ADR-032 baseline local-network mode.
 
 When `settings.sHTTPpasswd` is non-empty:
+
 - The fixed username is `admin`.
 - The following routes and operations are protected:
   - `GET /api/v2/settings`
@@ -44,6 +46,7 @@ When `settings.sHTTPpasswd` is non-empty:
   - `POST` or `PUT /api/v2/webhook/test?state=...`
 
 The following remain outside this protected boundary and continue to follow ADR-032:
+
 - Health and flash-status reads
 - OpenTherm data and device-info reads
 - WebSocket streaming
@@ -55,6 +58,7 @@ The following remain outside this protected boundary and continue to follow ADR-
 Protected admin requests use HTTP Basic Authentication with username `admin`.
 
 For routes guarded through `checkHttpAuth()`:
+
 - `HTTP OPTIONS` is allowed for preflight handling.
 - A valid Basic Auth header is required when protection is enabled.
 - If `Origin` or `Referer` is present, its host:port must match the request `Host` header exactly.
@@ -70,6 +74,7 @@ This same-origin check is not a session or token framework. It is a lightweight 
 The settings API must never return the actual stored admin password or MQTT password.
 
 For protected password fields:
+
 - `GET /api/v2/settings` returns `password=N`, where `N` is the stored password length.
 - `password=0` means no password is currently stored.
 - `POST /api/v2/settings` with `notthispassword` preserves the existing stored value.
@@ -78,6 +83,7 @@ For protected password fields:
 - New admin password values are trimmed for leading and trailing whitespace before storage.
 
 The documented contract is:
+
 - Read: `password=N`
 - Preserve on write: `notthispassword`
 - Clear on write: empty string
@@ -90,6 +96,7 @@ The implementation may continue to accept older placeholder aliases for compatib
 The OTA update server uses the same protected-endpoints password as the rest of the admin boundary.
 
 The firmware must:
+
 - Apply the current `settings.sHTTPpasswd` to the OTA update server during WiFi/server startup
 - Update OTA credentials immediately when the password changes
 - Clear OTA credentials immediately when the password is cleared
@@ -99,6 +106,7 @@ This keeps `/update` aligned with the current admin-protection setting without r
 ### 5. Local-network and HTTP-only constraints
 
 This protection model is defense-in-depth inside the existing OTGW deployment model:
+
 - HTTP only, never HTTPS
 - Local-network appliance, not internet-facing
 - No claim of transport confidentiality
@@ -111,10 +119,12 @@ Configured protection is intended to reduce accidental or casual administrative 
 ### Alternative 1: Keep ADR-054 as-is
 
 **Pros:**
+
 - No new ADR needed
 - Preserves the original "optional auth for settings" story
 
 **Cons:**
+
 - No longer matches the actual protected route surface
 - Does not document CSRF behavior
 - Does not document secret round-trip semantics
@@ -126,10 +136,12 @@ Configured protection is intended to reduce accidental or casual administrative 
 ### Alternative 2: Protect every interface and route
 
 **Pros:**
+
 - Simpler conceptual security boundary
 - Stronger application-level access control
 
 **Cons:**
+
 - Breaks ADR-032 baseline behavior
 - Would interfere with existing local-network integrations
 - Adds friction to diagnostics and read-only monitoring paths
@@ -140,10 +152,12 @@ Configured protection is intended to reduce accidental or casual administrative 
 ### Alternative 3: Introduce sessions, cookies, CSRF tokens, and role-based auth
 
 **Pros:**
+
 - More conventional web-application security model
 - More precise separation of browser and API clients
 
 **Cons:**
+
 - More RAM, code, and state complexity
 - Harder to operate on ESP8266
 - Misaligned with the project's embedded/local-network design constraints

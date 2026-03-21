@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-03-01
 **Relates to:** ADR-007 (Timer-Based Task Scheduling), ADR-047 (WiFi State Machine)
+**Clarification:** 2026-03-21 - This ADR remains the mechanism-level decision for cooperative webhook retry. The current implementation retains one pending transition at a time and does not queue or guarantee preservation of every intermediate state change during a retry cycle. See ADR-057 for the policy-level delivery contract.
 
 ## Context
 
@@ -19,6 +20,7 @@ void evalWebhook() {
 ```
 
 Problems:
+
 1. **3-second blocking:** `http.setTimeout(3000)` could stall the main loop for 3s if the target device was slow or unreachable
 2. **No retry:** If the HTTP request failed (network glitch, target temporarily down), the event was lost forever
 3. **String allocation in error path:** `http.errorToString(code).c_str()` created a temporary `String` object on every failure (ADR-004 violation)
@@ -30,7 +32,7 @@ Problems:
 
 ### State machine design
 
-```
+```text
            bit changed
   IDLE ─────────────────► PENDING
     ▲                        │
@@ -50,6 +52,7 @@ Problems:
 ```
 
 **States:**
+
 - `WH_IDLE` — monitoring trigger bit for changes; no pending send
 - `WH_PENDING` — state change detected, ready to attempt HTTP send
 - `WH_RETRY_WAIT` — send failed, waiting 30s before retry (up to 3 attempts)
@@ -77,16 +80,19 @@ Problems:
 ## Alternatives Considered
 
 ### Alternative 1: Background task with Ticker
+
 Use a `Ticker` timer to schedule webhook retries in the background.
 
 **Why not chosen:** Ticker callbacks run in interrupt context on ESP8266, where HTTP client calls are not safe. Would need to set a flag and process in the main loop anyway — which is exactly what the state machine does, more explicitly.
 
 ### Alternative 2: Queue-based approach
+
 Queue webhook events and process them from a FIFO.
 
 **Why not chosen:** Over-engineered for a single-event feature. There's only ever one pending webhook (the most recent state change). A state machine with one pending-state boolean is simpler and sufficient.
 
 ### Alternative 3: Keep blocking with shorter timeout
+
 Just reduce the timeout from 3s to 1s and accept the blocking.
 
 **Why not chosen:** Even 1s of blocking is significant at 4 OT messages/second. And without retry, failed sends are still lost. The state machine solves both problems.
@@ -94,6 +100,7 @@ Just reduce the timeout from 3s to 1s and accept the blocking.
 ## Consequences
 
 ### Positive
+
 - **Max 1s blocking per attempt** (down from 3s), and only when WiFi is connected
 - **Automatic retry:** Up to 3 attempts with 30s backoff — transient failures recovered
 - **No heap allocation:** ADR-004 compliant error reporting
@@ -102,6 +109,7 @@ Just reduce the timeout from 3s to 1s and accept the blocking.
 - **Testable:** `attemptSendWebhook(bool)` can be called independently via REST API test endpoint
 
 ### Negative
+
 - **State machine complexity:** More code than a simple "detect and send" function
   - Accepted: The retry and non-blocking benefits justify the added structure
 - **30s retry delay:** A failed webhook may take up to 90s to succeed
@@ -110,6 +118,7 @@ Just reduce the timeout from 3s to 1s and accept the blocking.
 ## Implementation
 
 Refactored in P10 of the C++ refactoring plan (webhook.ino):
+
 - `sendWebhook()` → `attemptSendWebhook()` returning `bool`
 - `evalTriggerBit()` extracted as helper
 - `evalWebhook()` rewritten as `WH_IDLE`/`WH_PENDING`/`WH_RETRY_WAIT` state machine
@@ -118,6 +127,7 @@ Refactored in P10 of the C++ refactoring plan (webhook.ino):
 - Error reporting: `String` → `snprintf_P` with stack buffer
 
 ## Related Decisions
+
 - ADR-007: Timer-Based Task Scheduling (cooperative scheduling model)
 - ADR-047: Non-Blocking WiFi Reconnect (same state machine pattern)
 - ADR-004: Static Buffer Allocation (no String in error path)
