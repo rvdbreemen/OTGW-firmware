@@ -40,7 +40,7 @@ static void sendApiMethodNotAllowed(const __FlashStringHelper* allowedMethods) {
 }
 
 //=======================================================================
-// CSRF same-origin helper for admin operations (ADR-041)
+// CSRF same-origin helper for admin operations (ADR-054)
 // Returns true if the request appears to come from the same origin.
 // Permissive for legacy/non-browser clients that don't send Origin/Referer.
 static bool isSameOriginRequest() {
@@ -69,7 +69,7 @@ static bool isSameOriginRequest() {
   return true;
 }
 
-// HTTP Basic Auth helper (ADR-041)
+// HTTP Basic Auth helper (ADR-054)
 // Returns true if request is authorized (no password set, or valid credentials
 // AND same-origin CSRF check passes).
 // Sends 401 or 403 and returns false if auth/CSRF fails.

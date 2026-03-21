@@ -379,9 +379,6 @@ void apilistfiles()             // Senden aller Daten an den Client
   // Handle file delete request: ?delete=<path>
   if (httpServer.hasArg("delete")) {
     if (!checkHttpAuth()) return;  // 401 already sent
-    char fileToDelete[64];
-    // httpServer.arg() returns String by value; copy to stack buffer immediately.
-    strlcpy(fileToDelete, httpServer.arg("delete").c_str(), sizeof(fileToDelete));
     strlcpy(cMsg, httpServer.arg("delete").c_str(), sizeof(cMsg));
     // Normalize: LittleFS paths must start with '/'
     if (cMsg[0] != '/' && cMsg[0] != '\0') {
@@ -503,7 +500,7 @@ bool handleFile(String&& path)
 {
   if (httpServer.hasArg("delete")) 
   {
-    if (!checkHttpAuth()) return true;  // 401 already sent; return true to suppress 404
+    if (!checkHttpAuth()) return false;
     DebugTf(PSTR("Delete -> [%s]\n\r"),  httpServer.arg("delete").c_str());
     LittleFS.remove(httpServer.arg("delete"));    // Datei löschen
     httpServer.sendContent(Header);

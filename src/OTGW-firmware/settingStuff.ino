@@ -341,7 +341,7 @@ void readSettings(bool show)
   if (show) {
     Debugln(F("\r\n==== read Settings ===================================================\r"));
     Debugf(PSTR("Hostname              : %s\r\n"), CSTR(settings.sHostname));
-    Debugf(PSTR("HTTP password set     : %s\r\n"), CBOOLEAN(settings.sHTTPpasswd[0] != '\0'));
+    Debugf(PSTR("HTTP password         : %s\r\n"), settings.sHTTPpasswd[0] ? "***" : "(not set)");
     Debugf(PSTR("MQTT enabled          : %s\r\n"), CBOOLEAN(settings.mqtt.bEnable));
     Debugf(PSTR("MQTT broker           : %s\r\n"), CSTR(settings.mqtt.sBroker));
     Debugf(PSTR("MQTT port             : %d\r\n"), settings.mqtt.iBrokerPort);
@@ -413,7 +413,7 @@ void updateSetting(const char *field, const char *newValue)
   }
 
   if (strcasecmp_P(field, PSTR("httppasswd")) == 0) {
-    // Only update if not the placeholder sentinel value (same pattern as MQTTpasswd)
+    // Only update if not the placeholder value (same pattern as MQTTpasswd)
     if (newValue && strcasecmp_P(newValue, PSTR("notthepassword")) != 0) {
       strlcpy(settings.sHTTPpasswd, newValue, sizeof(settings.sHTTPpasswd));
       // Trim leading/trailing whitespace — trailing spaces are easy to enter in the UI

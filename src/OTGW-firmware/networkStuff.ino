@@ -148,7 +148,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   httpUpdater.setup(&httpServer);
   httpUpdater.setIndexPage(UpdateServerIndex);
   httpUpdater.setSuccessPage(UpdateServerSuccess);
-  // Apply HTTP Basic Auth credentials to OTA update server if password is configured (ADR-041)
+  // Apply HTTP Basic Auth credentials to OTA update server if password is configured
   if (settings.sHTTPpasswd[0] != '\0') {
     httpUpdater.updateCredentials("admin", settings.sHTTPpasswd);
   }

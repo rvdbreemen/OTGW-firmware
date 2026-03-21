@@ -127,7 +127,7 @@ void startWebSocket();
 void handleWebSocket();
 void testWebhook(bool testOn);
 void evalWebhook();
-bool checkHttpAuth();  // HTTP Basic Auth guard (ADR-053; defined in restAPI.ino)
+bool checkHttpAuth();  // HTTP Basic Auth guard (ADR-054; defined in restAPI.ino)
 
 //===================[ Runtime State — transient, never persisted (ADR-051) ]===================
 // Sub-section structs for OTGWState — groups runtime state by system component.
@@ -264,11 +264,11 @@ struct OTGWBootSection {            // PIC boot-time command injection
 
 struct OTGWSettings {
   // Device-level fields (universal device identity)
-  char sHostname[41]   = _HOSTNAME;
-  char sHTTPpasswd[41] = "";  // empty = HTTP auth disabled (ADR-041)
-  bool bLEDblink       = true;
-  bool bDarkTheme      = false;
-  bool bMyDEBUG        = false;
+  char sHostname[41] = _HOSTNAME;
+  char sHTTPpasswd[41] = "";  // HTTP Basic Auth password (empty = no authentication required)
+  bool bLEDblink     = true;
+  bool bDarkTheme    = false;
+  bool bMyDEBUG      = false;
 
   // Named sub-sections — access as settings.mqtt.sBroker, settings.ntp.sTimezone, etc.
   MQTTSettingsSection mqtt;
