@@ -47,7 +47,7 @@ Architecture Decision Records capture important architectural decisions along wi
   How static buffer allocation prevents heap fragmentation and crashes on the memory-constrained ESP8266.
 
 - **[ADR-053: Large Feature Buffer Static Allocation](ADR-053-large-feature-buffer-static-allocation.md)** 🆕  
-  Extends ADR-004: large feature-specific working buffers must be declared as file-static globals (`static T buf;`), never heap-allocated with `new` — even for "allocate-once, never-free" patterns. Canonical example: `mqttAutoConfigBuf` in `MQTTstuff.ino`.
+  Extends ADR-004: large feature-specific working buffers must be declared as file-static globals (`static T buf;`), never heap-allocated with `new` — even for "allocate-once, never-free" patterns. Canonical example: MQTT Home Assistant auto-discovery uses the shared static `sLine` buffer for payloads and `cMsg` as the topic buffer in `MQTTstuff.ino`.
 
 - **[ADR-009: PROGMEM Usage for String Literals](ADR-009-progmem-string-literals.md)**  
   Mandatory use of PROGMEM (F() and PSTR() macros) to move string literals from RAM to flash memory.
