@@ -46,13 +46,13 @@ The review notes and comments were updated so the documented behavior matches th
 actual implementation.
 
 ### K5 — `expandedPayload[384]` on stack in `sendWebhookPost()` (`webhook.ino`)
-**Status: DOCUMENTED ONLY (not fixed in this PR)**
+**Status: FIXED**
 
-Investigation confirmed that `sendWebhookPost()` still builds its expanded payload
-using the shared global `cMsg` scratch buffer; the local `expandedPayload[384]`
-stack allocation has not yet been refactored to a `static` buffer with a
-reentrancy guard. This remains a known issue and will be addressed in a future PR
-alongside the broader webhook buffering changes.
+`sendWebhookPost()` no longer allocates a local `expandedPayload[384]` buffer on
+the stack. It now builds the expanded webhook payload using the shared global
+`cMsg` scratch buffer instead, aligning webhook formatting with the project-wide
+static-buffer pattern. Any further webhook buffering or reentrancy refinements
+are tracked separately from this K5 issue.
 
 ### I2 — `handleCommandSubmit()` missing alphabetic prefix check (`restAPI.ino`)
 **Status: FIXED**
