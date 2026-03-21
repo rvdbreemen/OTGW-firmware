@@ -36,9 +36,8 @@ static char       MQTTbrokerIPchar[20];
 constexpr size_t  MQTT_ID_MAX_LEN = 96;
 constexpr size_t  MQTT_NAMESPACE_MAX_LEN = 192;
 constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
-constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 1024;
-constexpr size_t  MQTT_CLIENT_BUFFER_SIZE = 384;
-constexpr size_t  MQTT_PROGMEM_STAGE_LEN = 63;
+constexpr size_t  MQTT_MSG_MAX_LEN = 1200;
+constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 1200;
 
 struct MQTTAutoConfigLineView {
   byte id;
