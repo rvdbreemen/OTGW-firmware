@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.3.0-beta
+**  Version  : v1.3.0-rc2
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1012,7 +1012,12 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("mqttbroker"), CSTR(settings.mqtt.sBroker), "s", 32);
   sendJsonSettingObj(F("mqttbrokerport"), settings.mqtt.iBrokerPort, "i", 0, 65535);
   sendJsonSettingObj(F("mqttuser"), CSTR(settings.mqtt.sUser), "s", 32);
-  sendJsonSettingObj(F("mqttpasswd"), F("notthepassword"), "p", 100);
+  char mqttPasswordPlaceholder[sizeof("password=100")];
+  snprintf_P(mqttPasswordPlaceholder,
+             sizeof(mqttPasswordPlaceholder),
+             PSTR("password=%u"),
+             static_cast<unsigned>(strnlen(settings.mqtt.sPasswd, sizeof(settings.mqtt.sPasswd))));
+  sendJsonSettingObj(F("mqttpasswd"), mqttPasswordPlaceholder, "p", 100);
   sendJsonSettingObj(F("mqtttoptopic"), CSTR(settings.mqtt.sTopTopic), "s", 15);
   sendJsonSettingObj(F("mqtthaprefix"), CSTR(settings.mqtt.sHaprefix), "s", 20);
   sendJsonSettingObj(F("mqttharebootdetection"), settings.mqtt.bHaRebootDetect, "b");
@@ -1053,7 +1058,12 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("webhooktriggerbit"), settings.webhook.iTriggerBit, "i", 0, 15);
   sendJsonSettingObj(F("webhookpayload"), CSTR(settings.webhook.sPayload), "s", 200);
   sendJsonSettingObj(F("webhookcontenttype"), CSTR(settings.webhook.sContentType), "s", 31);
-  sendJsonSettingObj(F("httppasswd"), F("notthispassword"), "p", 40);
+  char httpPasswordPlaceholder[sizeof("password=40")];
+  snprintf_P(httpPasswordPlaceholder,
+             sizeof(httpPasswordPlaceholder),
+             PSTR("password=%u"),
+             static_cast<unsigned>(strnlen(settings.sHTTPpasswd, sizeof(settings.sHTTPpasswd))));
+  sendJsonSettingObj(F("httppasswd"), httpPasswordPlaceholder, "p", 40);
 
   sendEndJsonMap(F("settings"));
 
