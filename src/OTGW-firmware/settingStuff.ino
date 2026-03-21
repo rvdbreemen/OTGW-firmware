@@ -194,6 +194,7 @@ void writeSettings(bool show)
   DebugT(F("[Settings] State: Writing JSON settings... "));
   file.print(F("{\n"));
   writeJsonStringKV(file, F("hostname"), settings.sHostname, true);
+  writeJsonStringKV(file, F("httppasswd"), settings.sHTTPpasswd, true);
   writeJsonBoolKV(file, F("MQTTenable"), settings.mqtt.bEnable, true);
   writeJsonStringKV(file, F("MQTTbroker"), settings.mqtt.sBroker, true);
   writeJsonIntKV(file, F("MQTTbrokerPort"), settings.mqtt.iBrokerPort, true);
@@ -340,6 +341,7 @@ void readSettings(bool show)
   if (show) {
     Debugln(F("\r\n==== read Settings ===================================================\r"));
     Debugf(PSTR("Hostname              : %s\r\n"), CSTR(settings.sHostname));
+    Debugf(PSTR("HTTP password         : %s\r\n"), settings.sHTTPpasswd[0] ? "***" : "(not set)");
     Debugf(PSTR("MQTT enabled          : %s\r\n"), CBOOLEAN(settings.mqtt.bEnable));
     Debugf(PSTR("MQTT broker           : %s\r\n"), CSTR(settings.mqtt.sBroker));
     Debugf(PSTR("MQTT port             : %d\r\n"), settings.mqtt.iBrokerPort);
@@ -386,7 +388,13 @@ void readSettings(bool show)
 //=======================================================================
 void updateSetting(const char *field, const char *newValue)
 { //do not just trust the caller to do the right thing, server side validation is here!
-  DebugTf(PSTR("-> field[%s], newValue[%s]\r\n"), field, newValue);
+  // Mask password fields in debug log to avoid leaking credentials
+  if (strcasecmp_P(field, PSTR("httppasswd")) == 0 ||
+      strcasecmp_P(field, PSTR("MQTTpasswd")) == 0) {
+    DebugTf(PSTR("-> field[%s], newValue[***]\r\n"), field);
+  } else {
+    DebugTf(PSTR("-> field[%s], newValue[%s]\r\n"), field, newValue);
+  }
 
   if (strcasecmp_P(field, PSTR("hostname"))==0) 
   { //make sure we have a valid hostname here...
@@ -403,7 +411,22 @@ void updateSetting(const char *field, const char *newValue)
     Debugln();
     DebugTf(PSTR("Need reboot before new %s.local will be available!\r\n\n"), settings.sHostname);
   }
-  
+
+  if (strcasecmp_P(field, PSTR("httppasswd")) == 0) {
+    // Only update if not the placeholder value (same pattern as MQTTpasswd)
+    if (newValue && strcasecmp_P(newValue, PSTR("notthepassword")) != 0) {
+      strlcpy(settings.sHTTPpasswd, newValue, sizeof(settings.sHTTPpasswd));
+      // Trim leading/trailing whitespace — trailing spaces are easy to enter in the UI
+      char* trimmed = trimwhitespace(settings.sHTTPpasswd);
+      if (trimmed != settings.sHTTPpasswd) memmove(settings.sHTTPpasswd, trimmed, strlen(trimmed) + 1);
+      // Update OTA update server credentials immediately
+      if (settings.sHTTPpasswd[0] != '\0') {
+        httpUpdater.updateCredentials("admin", settings.sHTTPpasswd);
+      } else {
+        httpUpdater.updateCredentials("", "");
+      }
+    }
+  }
   if (strcasecmp_P(field, PSTR("MQTTenable"))==0)      settings.mqtt.bEnable = EVALBOOLEAN(newValue);
   if (strcasecmp_P(field, PSTR("MQTTbroker")) == 0)    strlcpy(settings.mqtt.sBroker, newValue, sizeof(settings.mqtt.sBroker));
   if (strcasecmp_P(field, PSTR("MQTTbrokerPort"))==0) {

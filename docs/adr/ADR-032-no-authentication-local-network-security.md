@@ -1,8 +1,9 @@
 # ADR-032: No Authentication Pattern (Local Network Security Model)
 
-**Status:** Accepted  
+**Status:** Superseded by ADR-053  
 **Date:** 2026-02-07  
-**Decision Maker:** Copilot Agent based on codebase analysis and ADR-003
+**Decision Maker:** Copilot Agent based on codebase analysis and ADR-003  
+**Note:** Partially superseded by ADR-054 for settings/admin endpoints (optional opt-in auth added)
 
 ## Context
 
