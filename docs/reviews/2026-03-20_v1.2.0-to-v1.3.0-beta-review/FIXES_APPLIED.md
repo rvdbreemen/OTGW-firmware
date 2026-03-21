@@ -46,11 +46,13 @@ The review notes and comments were updated so the documented behavior matches th
 actual implementation.
 
 ### K5 — `expandedPayload[384]` on stack in `sendWebhookPost()` (`webhook.ino`)
-**Status: FIXED**
+**Status: DOCUMENTED ONLY (not fixed in this PR)**
 
-Changed `char expandedPayload[384]` from a local stack variable to `static char`
-with a `static bool inWebhookPost` reentrancy guard. Saves 384 bytes of CONT-stack
-on every webhook invocation.
+Investigation confirmed that `sendWebhookPost()` still builds its expanded payload
+using the shared global `cMsg` scratch buffer; the local `expandedPayload[384]`
+stack allocation has not yet been refactored to a `static` buffer with a
+reentrancy guard. This remains a known issue and will be addressed in a future PR
+alongside the broader webhook buffering changes.
 
 ### I2 — `handleCommandSubmit()` missing alphabetic prefix check (`restAPI.ino`)
 **Status: FIXED**
