@@ -3630,6 +3630,13 @@ const hiddenSettings = [
   "webhookcontenttype"
 ];
 
+const httpPasswordPlaceholderValues = ["notthepassword", "notthispassword"];
+const httpPasswordSavePlaceholder = "notthispassword";
+
+function isHttpPasswordPlaceholder(value) {
+  return typeof value === 'string' && httpPasswordPlaceholderValues.indexOf(value) >= 0;
+}
+
 function refreshSettings() {
   console.log("refreshSettings() ..");
   data = {};
@@ -3709,7 +3716,11 @@ function refreshSettings() {
             //sInput.step = (s.min + s.max) / 1000;
             sInput.step = 1;
           }
-          sInput.setAttribute("value", s.value);
+          if (key === "httppasswd" && isHttpPasswordPlaceholder(s.value)) {
+            sInput.setAttribute("value", "");
+          } else {
+            sInput.setAttribute("value", s.value);
+          }
           if (tooltipText) {
             sInput.setAttribute("title", tooltipText);
           }
@@ -3752,6 +3763,8 @@ function refreshSettings() {
             // FIX If checkbox change checked iso value
             if (s.type == "b")
               inputEl.checked = strToBool(s.value);
+            else if (key === "httppasswd" && isHttpPasswordPlaceholder(s.value))
+              inputEl.value = "";
             else inputEl.value = s.value;
           }
         }
@@ -3953,6 +3966,9 @@ function saveSettings() {
       value = fieldEl.checked;
     } else {
       value = fieldEl.value;
+      if (field === "httppasswd" && value === "") {
+        value = httpPasswordSavePlaceholder;
+      }
     }
     console.log("==> name[" + field + "], value[" + value + "]");
 
@@ -4118,6 +4134,7 @@ function strToBool(s) {
 var translateFields = [
 
   ["hostname", "Hostname"]
+  , ["httppasswd", "Admin Password"]
   , ["mqttbroker", "MQTT Broker Host/IP"]
   , ["mqttbrokerport", "MQTT Broker Port"]
   , ["mqttuser", "MQTT User"]
@@ -4239,6 +4256,7 @@ var translateFields = [
 var translateTooltips = [
 
   ["hostname", "Device name on your network. Use letters, numbers and hyphens only."]
+  , ["httppasswd", "Optional admin password for protected settings and maintenance endpoints. Leave empty to keep authentication disabled."]
   , ["HostName", "Advertised hostname. Add .local when you open the device by mDNS name."]
   , ["ssid", "Read-only name of the Wi-Fi network the gateway is connected to."]
   , ["mqttconnected", "Read-only MQTT connection state. This should show connected after broker login succeeds."]

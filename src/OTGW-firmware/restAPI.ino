@@ -352,6 +352,7 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
 static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (wc > 4 && strcmp_P(words[4], PSTR("test")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST")); return; }
+    if (!checkHttpAuth()) return;
     String stateParam = httpServer.arg(F("state"));
     if (!stateParam.length()) {
       sendApiError(400, F("Missing required 'state' parameter; expected on|1 or off|0"));
@@ -1007,7 +1008,7 @@ void sendDeviceSettings()
   //sendJsonSettingObj("intager",  settingInteger , "i", 2, 60);
 
   sendJsonSettingObj(F("hostname"), CSTR(settings.sHostname), "s", 32);
-  sendJsonSettingObj(F("httppasswd"), F("notthepassword"), "p", 40);
+  sendJsonSettingObj(F("httppasswd"), F("notthispassword"), "p", 40);
   sendJsonSettingObj(F("mqttenable"), settings.mqtt.bEnable, "b");
   sendJsonSettingObj(F("mqttbroker"), CSTR(settings.mqtt.sBroker), "s", 32);
   sendJsonSettingObj(F("mqttbrokerport"), settings.mqtt.iBrokerPort, "i", 0, 65535);
