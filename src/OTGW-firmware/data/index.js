@@ -4134,7 +4134,7 @@ function strToBool(s) {
 var translateFields = [
 
   ["hostname", "Hostname"]
-  , ["httppasswd", "Admin Password"]
+  , ["httppasswd", "Protected Endpoints Password"]
   , ["mqttbroker", "MQTT Broker Host/IP"]
   , ["mqttbrokerport", "MQTT Broker Port"]
   , ["mqttuser", "MQTT User"]
@@ -4256,7 +4256,7 @@ var translateFields = [
 var translateTooltips = [
 
   ["hostname", "Device name on your network. Use letters, numbers and hyphens only."]
-  , ["httppasswd", "Optional admin password for protected settings and maintenance endpoints. Leave empty to keep authentication disabled."]
+  , ["httppasswd", "Password for protected admin endpoints. Username is admin. Leave empty to keep protection disabled, or type a new password to change it."]
   , ["HostName", "Advertised hostname. Add .local when you open the device by mDNS name."]
   , ["ssid", "Read-only name of the Wi-Fi network the gateway is connected to."]
   , ["mqttconnected", "Read-only MQTT connection state. This should show connected after broker login succeeds."]
