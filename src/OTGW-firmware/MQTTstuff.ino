@@ -57,14 +57,15 @@ struct MQTTAutoConfigTemplateContext {
   const char *sourceTopicSegment;
 };
 
-// MQTT autoconfig scratch buffers (ADR-053 multi-buffer design):
-//   sLine[SLINE_SIZE]  — global, holds raw mqttha.cfg lines (up to ~900 bytes observed).
-//   cMsg[CMSG_SIZE]    — global scratch reused as sTopic in both autoconfig paths (≤200 bytes).
-// Using cMsg for sTopic is safe: renderTemplateToBuffer() and sendMQTTTemplateStreaming()
-// do not internally write to cMsg.  doBackgroundTasks() (called after each publish) may
-// overwrite cMsg, but cMsg is re-rendered at the start of every iteration anyway.
-// expandAndPublishSourceTemplates() still uses feedWatchDog() (not doBackgroundTasks())
-// to prevent cMsg from being corrupted between the three per-source publishes within
+// MQTT autoconfig scratch buffers (ADR-053 single-buffer design):
+//   cMsg[CMSG_SIZE=1200] — global, serves as the raw config line workspace AND general scratch.
+//                          Sized to mqttha.cfg max observed line (~900 bytes) with headroom.
+//   sTopic — local stack variable (char sTopic[MQTT_TOPIC_MAX_LEN], 200 bytes) in each
+//             autoconfig function.  Must be a separate buffer since topicTemplate and
+//             msgTemplate are pointers INTO cMsg; rendering the topic into cMsg would
+//             overwrite the template before the message is published.
+// feedWatchDog() is used (not doBackgroundTasks()) inside expandAndPublishSourceTemplates()
+// to prevent cMsg from being overwritten between the three per-source renders within
 // a single iteration (ADR-053).
 
 // Guard shared MQTT autoconfig buffers against accidental re-entry.
@@ -1128,12 +1129,11 @@ void clearMQTTConfigDone()
 //===========================================================================================
 // expandAndPublishSourceTemplates()
 // Expands a source-template discovery line into 3 per-source variants and publishes each.
-// Renders topic variants into renderedTopic (= cMsg) and stream-renders the
-// JSON payload directly from the original template (in sLine global).
+// Renders topic variants into renderedTopic (local stack buffer, 200 bytes) and stream-renders
+// the JSON payload directly from the original template (in cMsg global).
 // feedWatchDog() is used (not doBackgroundTasks()) between per-source publishes to prevent
 // cMsg from being overwritten mid-iteration: doBackgroundTasks() routes HTTP/MQTT callbacks
-// that write to cMsg.  topicTemplate/msgTemplate point into sLine (separate global —
-// safe from doBackgroundTasks()); renderedTopic/cMsg is re-rendered each iteration.
+// that write to cMsg.  topicTemplate/msgTemplate point into cMsg; renderedTopic is separate.
 // Returns true if at least one variant was successfully published.
 static bool expandAndPublishSourceTemplates(byte msgid,
                                            const char *logLabel,
@@ -1184,7 +1184,7 @@ void doAutoConfigure(){
       return;
     }
 
-    char *sTopic = cMsg;                     // global scratch buffer reused as topic (≤200 bytes, fits in CMSG_SIZE)
+    char sTopic[MQTT_TOPIC_MAX_LEN];             // stack: rendered topic (≤200 bytes, separate from cMsg line buffer)
     initSourceTokens();
     bool sourceTemplateSchemaLogged = false;
 
@@ -1208,12 +1208,12 @@ void doAutoConfigure(){
       feedWatchDog(); // Keep the dog happy during IO
       
       // Read line
-      size_t len = fh.readBytesUntil('\n', sLine, MQTT_CFG_LINE_MAX_LEN - 1);
-      sLine[len] = '\0';
+      size_t len = fh.readBytesUntil('\n', cMsg, CMSG_SIZE - 1);
+      cMsg[len] = '\0';
       MQTTAutoConfigLineView lineView;
       
       // Parse Line
-      if (!parseAutoConfigLine(sLine, ';', &lineView)) continue;
+      if (!parseAutoConfigLine(cMsg, ';', &lineView)) continue;
       lineID = lineView.id;
 
       // 4. Decision: Do we send this line?
@@ -1263,7 +1263,7 @@ void doAutoConfigure(){
 
     fh.close();
     
-    // Note: No buffer cleanup needed - global sLine and cMsg persist across calls
+    // Note: cMsg is global and persists across calls; no cleanup needed.
     // resetMQTTBufferSize() is a no-op for static buffer strategy
     resetMQTTBufferSize();
   } // Lock released here - configSensors() can now acquire it independently
@@ -1311,10 +1311,11 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     return _result;
   } 
 
-  // Workspace (ADR-053 multi-buffer design): sLine (global, SLINE_SIZE=1200) for raw config lines;
-  // cMsg (global, reused as sTopic, ≤200 bytes) for the rendered discovery topic.
+  // Workspace (ADR-053 single-buffer design): cMsg[CMSG_SIZE=1200] for raw config lines.
+  // sTopic is a local stack variable (200 bytes) — must be separate from cMsg since
+  // topicTemplate/msgTemplate are pointers INTO cMsg (overwriting them would corrupt the template).
   // expandAndPublishSourceTemplates() uses feedWatchDog() only — see function comment.
-  char *sTopic = cMsg;
+  char sTopic[MQTT_TOPIC_MAX_LEN];
   initSourceTokens();
   byte lineID = 39; // 39 is unused in OT protocol so is a safe value
 
@@ -1341,10 +1342,10 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     //read file line by line, split and send to MQTT (topic, msg)
     feedWatchDog(); //start with feeding the dog
     
-    size_t len = fh.readBytesUntil('\n', sLine, MQTT_CFG_LINE_MAX_LEN - 1);
-    sLine[len] = '\0';
+    size_t len = fh.readBytesUntil('\n', cMsg, CMSG_SIZE - 1);
+    cMsg[len] = '\0';
     MQTTAutoConfigLineView lineView;
-    if (!parseAutoConfigLine(sLine, ';', &lineView)) {  // parseAutoConfigLine() also filters comments
+    if (!parseAutoConfigLine(cMsg, ';', &lineView)) {  // parseAutoConfigLine() also filters comments
       continue;
     }
     lineID = lineView.id;
@@ -1393,7 +1394,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
 
   fh.close();
 
-  // Note: No buffer cleanup needed - global sLine and cMsg persist across calls
+  // Note: cMsg is global and persists across calls; no cleanup needed.
   // resetMQTTBufferSize() is a no-op for static buffer strategy
   resetMQTTBufferSize();
 
