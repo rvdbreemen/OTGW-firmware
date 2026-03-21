@@ -141,27 +141,26 @@ boolean isValidIP(IPAddress ip)
    *   255.255.255.255
    *   1 => 255||255||255||255 =255>0 = true 
    *   2 => !(false || false ) = true
-   *   3 +> !(true || true || true || true) = false
-   *   4 => !(false && false && false && false) = true
-   *   5 => !(true) = false
-   *   true && true && false && true && false = false ==> correct, this is an invalid address
+   *   3 => !(true && true && true && true) = false  (all four octets are 255 => global broadcast)
+   *   true && true && false = false ==> correct, this is an invalid address
    *   
    *   0.123.12.1       => true && false && true && true && true = false  ==> correct, this is an invalid address 
    *   10.0.0.0         => true && false && true && true && true = false  ==> correct, this is an invalid address 
-   *   10.255.0.1       => true && true && false && true && true = false  ==> correct, this is an invalid address 
-   *   150.150.255.150  => true && true && false && true && true = false  ==> correct, this is an invalid address 
+   *   10.255.0.1       => true && true && true && true && true = true    ==> correct, this is a valid address 
+   *   150.150.255.150  => true && true && true && true && true = true    ==> correct, this is a valid address 
    *   
-   *   123.21.1.99      => true && true && true && true && true = true    ==> correct, this is annvalid address 
-   *   1.1.1.1          => true && true && true && true && true = true    ==> correct, this is annvalid address 
+   *   123.21.1.99      => true && true && true && true && true = true    ==> correct, this is a valid address 
+   *   1.1.1.1          => true && true && true && true && true = true    ==> correct, this is a valid address 
    *   
    *   Some references on valid ip addresses: 
-   *   - https://www.quora.com/How-do-you-identify-an-invalid-IP-address
+   *   - https://www.rfc-editor.org/rfc/rfc3986 (IPv4 octet range 0-255)
+   *   - https://www.rfc-editor.org/rfc/rfc1123 (dotted-decimal host syntax)
    *   
    */
   boolean _isValidIP = false;
   _isValidIP = ((ip[0] || ip[1] || ip[2] || ip[3])>0);                             // if any bits are set, then it is not 0.0.0.0
   _isValidIP &= !((ip[0]==0) || (ip[3]==0));                                       // if either the first or last is a 0, then it is invalid
-  _isValidIP &= !((ip[0]==255) || (ip[1]==255) || (ip[2]==255) || (ip[3]==255)) ;  // if any of the octets is 255, then it is invalid  
+  _isValidIP &= !(ip[0]==255 && ip[1]==255 && ip[2]==255 && ip[3]==255);             // only reject global broadcast address 255.255.255.255
   _isValidIP &= !(ip[0]==127 && ip[1]==0 && ip[2]==0 && ip[3]==1);                 // if not 127.0.0.0 then it might be valid
   _isValidIP &= !(ip[0]>=224);                                                     // if ip[0] >=224 then reserved space  
   
@@ -296,7 +295,9 @@ bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t
   summary[0] = '\0';
   details[0] = '\0';
 
-  if (!LittleFS.begin()) {
+  // Use the existing LittleFSmounted flag rather than calling LittleFS.begin() again.
+  // Calling begin() during or after OTA (when LittleFS.end() was invoked) is unsafe (K3).
+  if (!LittleFSmounted) {
     return false;
   }
 

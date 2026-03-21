@@ -229,8 +229,12 @@ static bool mqttForceNextSlaveStatusPublish  = true;
 static bool mqttForceNextMasterStatusVHPublish = true;
 static bool mqttForceNextSlaveStatusVHPublish  = true;
 
-static constexpr uint16_t TRACKED_TIME_UNSEEN = 0xFFFFU;
-static constexpr uint32_t TRACKED_TIME_MODULUS = 65535UL;
+// TRACKED_TIME_UNSEEN must be a sentinel that currentTrackedSeconds() can never produce.
+// currentTrackedSeconds() returns values in [0, TRACKED_TIME_MODULUS-1] = [0, 65534].
+// 0xFFFF (65535) is therefore never produced, making it a safe "not yet seen" marker.
+// TRACKED_TIME_MODULUS = 65535 keeps the rolling window at ~18.2 hours.
+static constexpr uint16_t TRACKED_TIME_UNSEEN  = 0xFFFFU; // sentinel: never produced by currentTrackedSeconds()
+static constexpr uint32_t TRACKED_TIME_MODULUS = 65535UL; // modulus → valid range [0, 65534]
 
 enum RestLastUpdatedSlot : uint8_t {
   REST_UPDATED_STATUSFLAGS = 0,
