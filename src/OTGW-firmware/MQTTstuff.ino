@@ -39,9 +39,6 @@ constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
 constexpr size_t  MQTT_MSG_MAX_LEN = 1200;
 constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 1200;
 
-struct MQTTAutoConfigBuffers;
-static MQTTAutoConfigBuffers* getMqttAutoConfigBuffers();
-
 struct MQTTAutoConfigBuffers {
   char line[MQTT_CFG_LINE_MAX_LEN];
   char topic[MQTT_TOPIC_MAX_LEN];
@@ -65,25 +62,10 @@ struct MQTTAutoConfigTemplateContext {
   const char *sourceTopicSegment;
 };
 
-// Shared autoconfig workspace — lazy-allocated on first use to save RAM when
-// MQTT auto-discovery is never triggered (P4: ADR-004/ADR-030).
+// Shared autoconfig workspace — static global (ADR-004).
 // JSON payloads are stream-rendered directly from the config template, so the
 // workspace only keeps the raw config line plus the rendered topic.
-// Once allocated, kept permanently (never freed — acceptable for embedded).
-static MQTTAutoConfigBuffers* pMqttAutoConfigBuffers = nullptr;
-
-// Lazy-allocate the autoconfig buffers on first use. Returns nullptr on OOM.
-static MQTTAutoConfigBuffers* getMqttAutoConfigBuffers() {
-  if (!pMqttAutoConfigBuffers) {
-    pMqttAutoConfigBuffers = new MQTTAutoConfigBuffers();
-    if (pMqttAutoConfigBuffers) {
-      MQTTDebugTln(F("MQTT autoconfig buffers allocated"));
-    } else {
-      DebugTln(F("ERROR: Failed to allocate MQTT autoconfig buffers (OOM)"));
-    }
-  }
-  return pMqttAutoConfigBuffers;
-}
+static MQTTAutoConfigBuffers mqttAutoConfigBuf;
 
 // Guard shared MQTT autoconfig buffers against accidental re-entry.
 // Current firmware is effectively single-threaded, but this protects future
@@ -1202,8 +1184,7 @@ void doAutoConfigure(){
       return;
     }
 
-    MQTTAutoConfigBuffers* acBuf = getMqttAutoConfigBuffers();
-    if (!acBuf) { DebugTln(F("ERROR: MQTT autoconfig OOM, aborting")); return; }
+    MQTTAutoConfigBuffers* acBuf = &mqttAutoConfigBuf;
     char *sLine = acBuf->line;
     char *sTopic = acBuf->topic;
     initSourceTokens();
@@ -1332,9 +1313,8 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     return _result;
   } 
 
-  // Shared lazy-allocated buffers with doAutoConfigure() to avoid duplicate persistent RAM usage
-  MQTTAutoConfigBuffers* acBuf = getMqttAutoConfigBuffers();
-  if (!acBuf) { DebugTln(F("ERROR: MQTT autoconfig OOM, aborting")); return _result; }
+  // Shared static workspace with doAutoConfigure() (ADR-004)
+  MQTTAutoConfigBuffers* acBuf = &mqttAutoConfigBuf;
   char *sLine = acBuf->line;
   char *sTopic = acBuf->topic;
   initSourceTokens();
