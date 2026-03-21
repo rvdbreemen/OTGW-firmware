@@ -488,7 +488,7 @@ enum OpenThermMessageID {
 // Definitions in headers cause duplicate-symbol linker errors in any multi-TU build.
 // Arduino merges all .ino files into one .cpp so it happens to work, but the correct
 // pattern is extern declaration in the header + a single definition in one .ino file. (ADR-044)
-extern uint32_t mqttlastsent[256];         // packed throttle state: bits31-16=last u16 value, bits15-0=seconds-since-boot
+extern uint32_t mqttlastsent[];            // packed throttle state for OT msgids 0-127: bits31-16=last u16 value, bits15-0=seconds-since-boot
 extern uint16_t mqttlastsentstatusbit[16]; // per-bit publish timers for OT_Statusflags (slots 0-7=master, 8-15=slave)
 extern bool     mqttPublishAllowed;        // MQTT interval gate — managed via OTPublishGate, checked in sendMQTTData
 uint16_t getMsgLastUpdated(uint8_t msgId); // rolling seconds-since-boot for REST last-updated fields (0 when unseen)

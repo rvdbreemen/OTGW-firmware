@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@copilot'
 created_date: '2026-03-18 19:44'
-updated_date: '2026-03-19 00:42'
+updated_date: '2026-03-19 18:04'
 labels:
   - memory mqtt restapi core
 dependencies: []
@@ -57,4 +57,19 @@ Validated with firmware build after the debug instrumentation change; build succ
 Extended status-style MQTT gating to ID70 (ventilation/heat-recovery): added separate combined-byte and per-bit tracked timers plus force-republish state so ID70 now follows the same first/change/interval path and MQTT debug pattern as ID0.
 
 Validated with firmware build after the ID70 change; build succeeded at 57412 bytes global RAM, an increase of 228 bytes over the prior 57184-byte debug baseline.
+
+Identified a low-risk follow-up compaction: only 113 IDs in the 0-127 OpenTherm range are currently trackable; replacing the dense 256-slot MQTT table with a dense 226-slot tracked-ID table should recover the missing 120 bytes needed to cross the 1024-byte target while preserving status-ID special cases and passthrough behavior for untracked IDs.
+
+Validated dense tracked-ID follow-up with full firmware build. Global RAM is now 57292 bytes, improving the post-ID70 baseline by 120 bytes (57412 -> 57292) but still missing AC #1's 1024-byte target. Keeping TASK-21 in progress and moving to TASK-23 for the next larger MQTT RAM reduction.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Superseded by later direction and larger wins elsewhere.
+
+Reason:
+- The original tracking-table target stayed open only because it aimed for an additional 1024-byte reduction inside the tracking subsystem itself.
+- You later requested the simpler linear 0..127 mapping instead of denser or sparse tracking variants.
+- Subsequent MQTT publish-path changes reclaimed roughly 1200 bytes of persistent RAM without increasing tracking-table complexity.
+<!-- SECTION:FINAL_SUMMARY:END -->

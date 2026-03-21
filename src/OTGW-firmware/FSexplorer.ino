@@ -372,6 +372,26 @@ void apilistfiles()             // Senden aller Daten an den Client
   static const char kTypeDir[] PROGMEM = "dir";
   static const char kTypeFile[] PROGMEM = "file";
 
+  // Handle file delete request: ?delete=<path>
+  if (httpServer.hasArg("delete")) {
+    strlcpy(cMsg, httpServer.arg("delete").c_str(), sizeof(cMsg));
+    // Normalize: LittleFS paths must start with '/'
+    if (cMsg[0] != '/' && cMsg[0] != '\0') {
+      size_t len = strnlen(cMsg, sizeof(cMsg) - 2);
+      memmove(cMsg + 1, cMsg, len + 1);
+      cMsg[0] = '/';
+    }
+    DebugTf(PSTR("Delete -> [%s]\r\n"), cMsg);
+    if (!LittleFS.exists(cMsg)) {
+      httpServer.send(404, F("text/plain"), F("File not found"));
+    } else if (LittleFS.remove(cMsg)) {
+      httpServer.send(200, F("text/plain"), F("File deleted"));
+    } else {
+      httpServer.send(500, F("text/plain"), F("Delete failed"));
+    }
+    return;
+  }
+
   FSInfo LittleFSinfo;
   String path = "/";
   if (httpServer.hasArg("path")) {
