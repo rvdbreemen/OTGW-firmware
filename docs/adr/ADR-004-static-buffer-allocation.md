@@ -208,7 +208,6 @@ if (freeHeap < HEAP_CRITICAL) {
 - ADR-003: HTTP-Only Network Architecture (memory for TLS not available)
 - ADR-006: MQTT Integration Pattern (uses static buffers and chunked streaming)
 - ADR-012: PIC Firmware Upgrade via Web UI (binary data parsing with bounded buffers)
-- **ADR-053: Large Feature Buffer Static Allocation** *(supersedes this ADR — adds rule for large feature-specific static globals)*
 
 ## References
 - Heap protection implementation: `OTGW-firmware.h` (CSTR macro, heap levels)
