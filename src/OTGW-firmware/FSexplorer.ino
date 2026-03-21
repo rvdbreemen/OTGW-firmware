@@ -382,18 +382,17 @@ void apilistfiles()             // Senden aller Daten an den Client
     char fileToDelete[64];
     // httpServer.arg() returns String by value; copy to stack buffer immediately.
     strlcpy(fileToDelete, httpServer.arg("delete").c_str(), sizeof(fileToDelete));
+    strlcpy(cMsg, httpServer.arg("delete").c_str(), sizeof(cMsg));
     // Normalize: LittleFS paths must start with '/'
-    if (fileToDelete[0] != '/' && fileToDelete[0] != '\0') {
-      size_t len = strlen(fileToDelete);
-      if (len < sizeof(fileToDelete) - 1) {      // ensure room for prepended '/'
-        memmove(fileToDelete + 1, fileToDelete, len + 1);
-        fileToDelete[0] = '/';
-      }
+    if (cMsg[0] != '/' && cMsg[0] != '\0') {
+      size_t len = strnlen(cMsg, sizeof(cMsg) - 2);
+      memmove(cMsg + 1, cMsg, len + 1);
+      cMsg[0] = '/';
     }
-    DebugTf(PSTR("Delete -> [%s]\r\n"), fileToDelete);
-    if (!LittleFS.exists(fileToDelete)) {
+    DebugTf(PSTR("Delete -> [%s]\r\n"), cMsg);
+    if (!LittleFS.exists(cMsg)) {
       httpServer.send(404, F("text/plain"), F("File not found"));
-    } else if (LittleFS.remove(fileToDelete)) {
+    } else if (LittleFS.remove(cMsg)) {
       httpServer.send(200, F("text/plain"), F("File deleted"));
     } else {
       httpServer.send(500, F("text/plain"), F("Delete failed"));

@@ -55,17 +55,17 @@ struct WifiPortalResetState {
 uint32_t wifiPortalResetWindowDeadline = 0;
 bool wifiPortalResetWindowOpen = false;
 
-bool readWifiPortalResetState(WifiPortalResetState &state) {
-  return ESP.rtcUserMemoryRead(WIFI_PORTAL_RESET_RTC_SLOT, reinterpret_cast<uint32_t*>(&state), sizeof(state));
+bool readWifiPortalResetState(WifiPortalResetState &portalState) {
+  return ESP.rtcUserMemoryRead(WIFI_PORTAL_RESET_RTC_SLOT, reinterpret_cast<uint32_t*>(&portalState), sizeof(portalState));
 }
 
-bool writeWifiPortalResetState(const WifiPortalResetState &state) {
-  return ESP.rtcUserMemoryWrite(WIFI_PORTAL_RESET_RTC_SLOT, const_cast<uint32_t*>(reinterpret_cast<const uint32_t*>(&state)), sizeof(state));
+bool writeWifiPortalResetState(const WifiPortalResetState &portalState) {
+  return ESP.rtcUserMemoryWrite(WIFI_PORTAL_RESET_RTC_SLOT, const_cast<uint32_t*>(reinterpret_cast<const uint32_t*>(&portalState)), sizeof(portalState));
 }
 
 void clearWifiPortalResetState() {
-  WifiPortalResetState state = { WIFI_PORTAL_RESET_MAGIC, 0 };
-  writeWifiPortalResetState(state);
+  WifiPortalResetState portalState = { WIFI_PORTAL_RESET_MAGIC, 0 };
+  writeWifiPortalResetState(portalState);
 }
 
 bool isExternalSystemReset() {
@@ -74,32 +74,33 @@ bool isExternalSystemReset() {
 }
 
 bool shouldForceWifiConfigPortal() {
-  WifiPortalResetState state = { WIFI_PORTAL_RESET_MAGIC, 0 };
+  // Use 'portalState' to avoid shadowing the global 'OTGWState state' (review K1)
+  WifiPortalResetState portalState = { WIFI_PORTAL_RESET_MAGIC, 0 };
   WifiPortalResetState storedState = { 0, 0 };
   if (readWifiPortalResetState(storedState) && (storedState.magic == WIFI_PORTAL_RESET_MAGIC)) {
-    state = storedState;
+    portalState = storedState;
   }
 
   bool externalReset = isExternalSystemReset();
   if (externalReset) {
-    if (state.resetCount < 255) {
-      state.resetCount++;
+    if (portalState.resetCount < 255) {
+      portalState.resetCount++;
     }
   } else {
-    state.resetCount = 0;
+    portalState.resetCount = 0;
   }
 
-  bool forcePortal = (state.resetCount >= WIFI_PORTAL_RESET_TRIGGER_COUNT);
+  bool forcePortal = (portalState.resetCount >= WIFI_PORTAL_RESET_TRIGGER_COUNT);
   if (forcePortal) {
-    SetupDebugTf(PSTR("Detected %u external resets -> force WiFi config portal\r\n"), (unsigned int)state.resetCount);
-    state.resetCount = 0;
+    SetupDebugTf(PSTR("Detected %u external resets -> force WiFi config portal\r\n"), (unsigned int)portalState.resetCount);
+    portalState.resetCount = 0;
     wifiPortalResetWindowOpen = false;
     wifiPortalResetWindowDeadline = 0;
-  } else if (state.resetCount > 0) {
+  } else if (portalState.resetCount > 0) {
     wifiPortalResetWindowOpen = true;
     wifiPortalResetWindowDeadline = millis() + WIFI_PORTAL_RESET_WINDOW_MS;
     SetupDebugTf(PSTR("External reset count: %u/%u (window %lu ms)\r\n"),
-      (unsigned int)state.resetCount,
+      (unsigned int)portalState.resetCount,
       (unsigned int)WIFI_PORTAL_RESET_TRIGGER_COUNT,
       (unsigned long)WIFI_PORTAL_RESET_WINDOW_MS);
   } else {
@@ -107,7 +108,7 @@ bool shouldForceWifiConfigPortal() {
     wifiPortalResetWindowDeadline = 0;
   }
 
-  writeWifiPortalResetState(state);
+  writeWifiPortalResetState(portalState);
   return forcePortal;
 }
 
@@ -145,12 +146,11 @@ void setup() {
   setLed(LED1, ON);
   SetupDebugln(F("Attempting to connect to WiFi network\r"));
 
-  //setup NTP before connecting to wifi will enable DHCP to overrule the NTP setting
-  startNTP();
-
-  //start with setting wifi hostname
   bool forceWifiPortal = shouldForceWifiConfigPortal();
   startWiFi(CSTR(settings.sHostname), 240, forceWifiPortal);  // timeout 240 seconds
+
+  //setup NTP after WiFi; startNTP() restores hostname after configTime()
+  startNTP();
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
 
