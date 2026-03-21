@@ -53,7 +53,8 @@ void setLed(int8_t, uint8_t);
 #define NTP_HOST_DEFAULT "pool.ntp.org"
 #define NTP_RESYNC_TIME 1800 //seconds = every 30 minutes
 #define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"  // Home Assistant discovery prefix
-#define CMSG_SIZE 1200  // Large enough for mqttha.cfg lines (max 898 bytes observed)
+#define CMSG_SIZE  512   // General-purpose scratch buffer (webhook, REST API, JSON formatting, etc.)
+#define SLINE_SIZE 1200  // MQTT autoconfig line buffer; mqttha.cfg lines reach ~900 bytes
 #define JSON_BUFF_MAX   1024
 #define JSON_ENTRY_BUF   256  // max bytes for a single serialized JSON entry/object
 // Replace CSTR macro with overloads to handle both String and char*
@@ -280,6 +281,7 @@ OTGWSettings settings;
 //===================[ Global variables — not part of settings or state ]===================
 WiFiClient  wifiClient;
 char        cMsg[CMSG_SIZE];
+char        sLine[SLINE_SIZE];  // MQTT autoconfig line scratch (MQTTstuff.ino)
 char        fChar[10];
 char        lastReset[129] = "";
 uint32_t    MQTTautoConfigMap[8] = { 0 };

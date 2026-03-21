@@ -57,11 +57,15 @@ struct MQTTAutoConfigTemplateContext {
   const char *sourceTopicSegment;
 };
 
-// Raw config lines in mqttha.cfg reach ~900 bytes — cMsg (now CMSG_SIZE=1200) is used as sLine.
-// Topic render target uses a 200-byte stack buffer in the caller (fits in MQTT_TOPIC_MAX_LEN).
-// expandAndPublishSourceTemplates() uses feedWatchDog() (not doBackgroundTasks()) so that
-// doBackgroundTasks()->httpServer.handleClient() cannot corrupt cMsg/sLine between the 3 variants
-// while topicTemplate/msgTemplate still point into it (ADR-053).
+// MQTT autoconfig scratch buffers (ADR-053 multi-buffer design):
+//   sLine[SLINE_SIZE]  — global, holds raw mqttha.cfg lines (up to ~900 bytes observed).
+//   cMsg[CMSG_SIZE]    — global scratch reused as sTopic in both autoconfig paths (≤200 bytes).
+// Using cMsg for sTopic is safe: renderTemplateToBuffer() and sendMQTTTemplateStreaming()
+// do not internally write to cMsg.  doBackgroundTasks() (called after each publish) may
+// overwrite cMsg, but cMsg is re-rendered at the start of every iteration anyway.
+// expandAndPublishSourceTemplates() still uses feedWatchDog() (not doBackgroundTasks())
+// to prevent cMsg from being corrupted between the three per-source publishes within
+// a single iteration (ADR-053).
 
 // Guard shared MQTT autoconfig buffers against accidental re-entry.
 // Current firmware is effectively single-threaded, but this protects future
@@ -1124,11 +1128,12 @@ void clearMQTTConfigDone()
 //===========================================================================================
 // expandAndPublishSourceTemplates()
 // Expands a source-template discovery line into 3 per-source variants and publishes each.
-// Renders topic variants into the shared topic buffer and stream-renders the
-// JSON payload directly from the original template.
-// feedWatchDog() is used (not doBackgroundTasks()) to prevent cMsg corruption:
-// topicTemplate/msgTemplate point into cMsg (sLine); doBackgroundTasks() could
-// overwrite cMsg via httpServer.handleClient()/handleMQTT() between variants.
+// Renders topic variants into renderedTopic (= cMsg) and stream-renders the
+// JSON payload directly from the original template (in sLine global).
+// feedWatchDog() is used (not doBackgroundTasks()) between per-source publishes to prevent
+// cMsg from being overwritten mid-iteration: doBackgroundTasks() routes HTTP/MQTT callbacks
+// that write to cMsg.  topicTemplate/msgTemplate point into sLine (separate global —
+// safe from doBackgroundTasks()); renderedTopic/cMsg is re-rendered each iteration.
 // Returns true if at least one variant was successfully published.
 static bool expandAndPublishSourceTemplates(byte msgid,
                                            const char *logLabel,
@@ -1179,8 +1184,7 @@ void doAutoConfigure(){
       return;
     }
 
-    char *sLine  = cMsg;                     // global scratch buffer (CMSG_SIZE=1200, fits max 898-byte lines)
-    char sTopic[MQTT_TOPIC_MAX_LEN];         // stack buffer — 200 bytes, safe on 4KB CONT stack
+    char *sTopic = cMsg;                     // global scratch buffer reused as topic (≤200 bytes, fits in CMSG_SIZE)
     initSourceTokens();
     bool sourceTemplateSchemaLogged = false;
 
@@ -1259,7 +1263,7 @@ void doAutoConfigure(){
 
     fh.close();
     
-    // Note: No buffer cleanup needed - static buffers persist across calls
+    // Note: No buffer cleanup needed - global sLine and cMsg persist across calls
     // resetMQTTBufferSize() is a no-op for static buffer strategy
     resetMQTTBufferSize();
   } // Lock released here - configSensors() can now acquire it independently
@@ -1307,10 +1311,10 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     return _result;
   } 
 
-  // Workspace (ADR-053): cMsg (CMSG_SIZE=1200) for raw line; stack sTopic for rendered topic.
+  // Workspace (ADR-053 multi-buffer design): sLine (global, SLINE_SIZE=1200) for raw config lines;
+  // cMsg (global, reused as sTopic, ≤200 bytes) for the rendered discovery topic.
   // expandAndPublishSourceTemplates() uses feedWatchDog() only — see function comment.
-  char *sLine  = cMsg;
-  char sTopic[MQTT_TOPIC_MAX_LEN];
+  char *sTopic = cMsg;
   initSourceTokens();
   byte lineID = 39; // 39 is unused in OT protocol so is a safe value
 
@@ -1389,7 +1393,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
 
   fh.close();
 
-  // Note: No buffer cleanup needed - static buffer persists across calls
+  // Note: No buffer cleanup needed - global sLine and cMsg persist across calls
   // resetMQTTBufferSize() is a no-op for static buffer strategy
   resetMQTTBufferSize();
 
