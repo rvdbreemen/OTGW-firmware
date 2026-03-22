@@ -18,7 +18,7 @@ CLICFG := $(CLI) --config-file $(CFGFILE)
 # bug in http stream, fallback to 2.7.4
 # ESP8266URL := https://github.com/esp8266/Arduino/releases/download/3.0.2/package_esp8266com_index.json
 ESP8266URL := https://github.com/esp8266/Arduino/releases/download/2.7.4/package_esp8266com_index.json
-LIBRARIES := libraries/WiFiManager libraries/PubSubClient libraries/TelnetStream libraries/AceCommon libraries/AceSorting libraries/AceTime libraries/OneWire libraries/DallasTemperature libraries/WebSockets libraries/Time
+LIBRARIES := libraries/WiFiManager libraries/PubSubClient libraries/TelnetStream libraries/AceCommon libraries/AceSorting libraries/AceTime libraries/OneWire libraries/DallasTemperature libraries/WebSockets
 BOARDS := arduino/package_esp8266com_index.json
 # PORT can be overridden by the environment or on the command line. E.g.:
 # export PORT=/dev/ttyUSB2; make upload, or: make upload PORT=/dev/ttyUSB2
@@ -164,7 +164,7 @@ flush: | $(CFGFILE)
 # Each library depends (order-only) on the previous one in the chain.
 ##
 libraries/WiFiManager: | $(BOARDS)
-	$(call retry,$(CLICFG) lib install WiFiManager@2.0.15-rc.1)
+	$(call retry,$(CLICFG) lib install WiFiManager@2.0.17)
 
 libraries/PubSubClient: | libraries/WiFiManager
 	$(call retry,$(CLICFG) lib install pubsubclient@2.8.0)
@@ -181,17 +181,14 @@ libraries/AceSorting: | libraries/AceCommon
 libraries/AceTime: | libraries/AceSorting
 	$(call retry,$(CLICFG) lib install AceTime@2.0.1)
 
-libraries/Time: | libraries/AceTime
-	$(call retry,$(CLICFG) lib install Time@1.6.1)
-
-libraries/OneWire: | libraries/Time
+libraries/OneWire: | libraries/AceTime
 	$(call retry,$(CLICFG) lib install OneWire@2.3.8)
 
 libraries/DallasTemperature: | libraries/OneWire
-	$(call retry,$(CLICFG) lib install DallasTemperature@3.9.0)
+	$(call retry,$(CLICFG) lib install DallasTemperature@4.0.6)
 
 libraries/WebSockets: | libraries/DallasTemperature
-	$(call retry,$(CLICFG) lib install WebSockets@2.3.5)
+	$(call retry,$(CLICFG) lib install WebSockets@2.3.6)
 
 $(IMAGE): $(BOARDS) $(LIBRARIES) $(SOURCES)
 	$(info Build code)
