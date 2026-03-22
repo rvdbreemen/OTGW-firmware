@@ -583,13 +583,13 @@ bool queryOTGWgatewaymode(){
   Each call sends exactly one PR= query and advances to the next setting.
   Call this every ~30 seconds to complete a full cycle in ~3 minutes.
 
-  PR= command mapping (OTGW PIC firmware by Schelte Bron):
-    PR=T  → temperature override (TT or TC value; "--" = not set on PIC)
-    PR=W  → max CH water setpoint (SH value; "--" = not set on PIC)
-    PR=S  → setback temperature (SB value; "--" = not set on PIC)
-    PR=H  → hotwater mode (HW: "0"=off, "1"=on, "P"=push, "A"=auto)
-    PR=O  → outside temperature override (OT value; "--" = not set on PIC)
-    PR=V  → ventilation setpoint (VS value; "--" = not set on PIC)
+  PR= command mapping (verified against pyotgw/vars.py — same as HA opentherm_gw integration):
+    PR=O  → setpoint override: "O=T20.5" (TT active), "O=C20.5" (TC active), or "O=N" (none)
+    PR=S  → setback temperature: "S=15.0"
+    PR=W  → DHW (hot water) override: "W=0" (off), "W=1" (on), or "W=A" (auto)
+    PR=G  → GPIO A+B function codes: "G=00" (two digits, one per pin)
+    PR=L  → LED A–F function chars: "L=RFFTTT" (six chars)
+    PR=T  → Tweaks: "T=NM" (ignore_transitions + ovrd_high_byte, two chars)
 
   Values are stored in state.picSettings and published to MQTT when they change.
   Skips queries when PIC is unavailable, offline, or flashing is in progress.
@@ -612,23 +612,23 @@ void queryNextPICsetting() {
 
   switch (idx) {
     case 0:
-      letter = 'T'; stateField = state.picSettings.sTempOverride;
-      fieldSize = sizeof(state.picSettings.sTempOverride);  mqttTopic = F("otgw-pic/settings/temp_override");   break;
+      letter = 'O'; stateField = state.picSettings.sSetpointOverride;
+      fieldSize = sizeof(state.picSettings.sSetpointOverride); mqttTopic = F("otgw-pic/settings/setpoint_override"); break;
     case 1:
-      letter = 'W'; stateField = state.picSettings.sMaxCHSetpoint;
-      fieldSize = sizeof(state.picSettings.sMaxCHSetpoint); mqttTopic = F("otgw-pic/settings/max_ch_setpoint"); break;
-    case 2:
       letter = 'S'; stateField = state.picSettings.sSetback;
-      fieldSize = sizeof(state.picSettings.sSetback);       mqttTopic = F("otgw-pic/settings/setback");         break;
+      fieldSize = sizeof(state.picSettings.sSetback);          mqttTopic = F("otgw-pic/settings/setback");           break;
+    case 2:
+      letter = 'W'; stateField = state.picSettings.sDhwOverride;
+      fieldSize = sizeof(state.picSettings.sDhwOverride);      mqttTopic = F("otgw-pic/settings/dhw_override");      break;
     case 3:
-      letter = 'H'; stateField = state.picSettings.sHotwater;
-      fieldSize = sizeof(state.picSettings.sHotwater);      mqttTopic = F("otgw-pic/settings/hotwater");        break;
+      letter = 'G'; stateField = state.picSettings.sGpio;
+      fieldSize = sizeof(state.picSettings.sGpio);             mqttTopic = F("otgw-pic/settings/gpio");              break;
     case 4:
-      letter = 'O'; stateField = state.picSettings.sOutsideTemp;
-      fieldSize = sizeof(state.picSettings.sOutsideTemp);   mqttTopic = F("otgw-pic/settings/outside_temp");    break;
+      letter = 'L'; stateField = state.picSettings.sLed;
+      fieldSize = sizeof(state.picSettings.sLed);              mqttTopic = F("otgw-pic/settings/led");               break;
     case 5:
-      letter = 'V'; stateField = state.picSettings.sVentilation;
-      fieldSize = sizeof(state.picSettings.sVentilation);   mqttTopic = F("otgw-pic/settings/ventilation");     break;
+      letter = 'T'; stateField = state.picSettings.sTweaks;
+      fieldSize = sizeof(state.picSettings.sTweaks);           mqttTopic = F("otgw-pic/settings/tweaks");            break;
     default: return;
   }
 
@@ -646,7 +646,7 @@ void queryNextPICsetting() {
 
   OTGWDebugTf(PSTR("queryNextPICsetting: PR=%c response=[%s]\r\n"), letter, rp);
 
-  // Responses are "X=value" (e.g. "T=20.5") — first char must match expected letter
+  // Responses are "X=value" (e.g. "O=T20.5", "O=C20.5", "O=N", "S=15.0", "W=A") — first char must match expected letter
   const char* eqp = strchr(rp, '=');
   if (!eqp || rp[0] != letter || *(eqp + 1) == '\0') {
     // NG, SE, TO, empty, or wrong letter — ignore, keep previous cached value
@@ -673,12 +673,12 @@ void queryNextPICsetting() {
   Only publishes fields that have been queried (non-empty).
 */
 void publishAllPICsettings() {
-  if (state.picSettings.sTempOverride[0]  != '\0') sendMQTTData(F("otgw-pic/settings/temp_override"),   state.picSettings.sTempOverride);
-  if (state.picSettings.sMaxCHSetpoint[0] != '\0') sendMQTTData(F("otgw-pic/settings/max_ch_setpoint"), state.picSettings.sMaxCHSetpoint);
-  if (state.picSettings.sSetback[0]       != '\0') sendMQTTData(F("otgw-pic/settings/setback"),         state.picSettings.sSetback);
-  if (state.picSettings.sHotwater[0]      != '\0') sendMQTTData(F("otgw-pic/settings/hotwater"),        state.picSettings.sHotwater);
-  if (state.picSettings.sOutsideTemp[0]   != '\0') sendMQTTData(F("otgw-pic/settings/outside_temp"),    state.picSettings.sOutsideTemp);
-  if (state.picSettings.sVentilation[0]   != '\0') sendMQTTData(F("otgw-pic/settings/ventilation"),     state.picSettings.sVentilation);
+  if (state.picSettings.sSetpointOverride[0] != '\0') sendMQTTData(F("otgw-pic/settings/setpoint_override"), state.picSettings.sSetpointOverride);
+  if (state.picSettings.sSetback[0]          != '\0') sendMQTTData(F("otgw-pic/settings/setback"),           state.picSettings.sSetback);
+  if (state.picSettings.sDhwOverride[0]      != '\0') sendMQTTData(F("otgw-pic/settings/dhw_override"),      state.picSettings.sDhwOverride);
+  if (state.picSettings.sGpio[0]             != '\0') sendMQTTData(F("otgw-pic/settings/gpio"),              state.picSettings.sGpio);
+  if (state.picSettings.sLed[0]              != '\0') sendMQTTData(F("otgw-pic/settings/led"),               state.picSettings.sLed);
+  if (state.picSettings.sTweaks[0]           != '\0') sendMQTTData(F("otgw-pic/settings/tweaks"),            state.picSettings.sTweaks);
 }
 
 //===================[ sendOTGWbootcmd ]=====================

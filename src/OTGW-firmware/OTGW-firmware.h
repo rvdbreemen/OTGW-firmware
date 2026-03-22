@@ -178,12 +178,13 @@ struct UptimeSection {         // state.uptime — System longevity counters
 };
 
 struct PicSettingsSection {    // state.picSettings — settings polled from PIC via PR= commands
-  char sTempOverride[16]   = "";  // PR=T: active temperature override (TT or TC value; "--" = not set on PIC)
-  char sMaxCHSetpoint[16]  = "";  // PR=W: max CH water setpoint (SH value; "--" = not set on PIC)
-  char sSetback[16]        = "";  // PR=S: setback temperature (SB value; "--" = not set on PIC)
-  char sHotwater[8]        = "";  // PR=H: hotwater mode override (0/1/P/A; "--" = not set on PIC)
-  char sOutsideTemp[16]    = "";  // PR=O: outside temperature override (OT value; "--" = not set on PIC)
-  char sVentilation[8]     = "";  // PR=V: ventilation setpoint (VS value; "--" = not set on PIC)
+  // Source: pyotgw/vars.py OTGW_REPORTS mapping (same commands used by HA opentherm_gw integration)
+  char sSetpointOverride[16]  = "";  // PR=O: setpoint override mode+value ("T20.5", "C20.5", or "N")
+  char sSetback[16]           = "";  // PR=S: setback temperature ("15.0")
+  char sDhwOverride[8]        = "";  // PR=W: DHW (hot water) override ("0"=off, "1"=on, "A"=auto)
+  char sGpio[8]               = "";  // PR=G: GPIO A+B function codes ("00".."77")
+  char sLed[8]                = "";  // PR=L: LED A–F function chars ("RFFTTT" = 6 chars + null + spare)
+  char sTweaks[8]             = "";  // PR=T: tweaks ("NM": ignore_transitions + ovrd_high_byte)
 };
 
 struct OTGWState {

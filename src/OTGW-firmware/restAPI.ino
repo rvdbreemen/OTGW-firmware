@@ -888,16 +888,17 @@ void sendDeviceCrashLog()
 // GET /api/v2/pic/settings
 // Returns the cached PIC settings last queried via PR= commands.
 // Values are refreshed gradually (~every 3 minutes per setting).
-// Empty string means "not yet queried"; "--" means "not set on PIC".
+// Empty string means "not yet queried".
+// PR= command mapping verified against pyotgw/vars.py (HA opentherm_gw integration).
 void sendPICsettings()
 {
   sendStartJsonMap(F("pic_settings"));
-  sendJsonMapEntry(F("temp_override"),   state.picSettings.sTempOverride);
-  sendJsonMapEntry(F("max_ch_setpoint"), state.picSettings.sMaxCHSetpoint);
-  sendJsonMapEntry(F("setback"),         state.picSettings.sSetback);
-  sendJsonMapEntry(F("hotwater"),        state.picSettings.sHotwater);
-  sendJsonMapEntry(F("outside_temp"),    state.picSettings.sOutsideTemp);
-  sendJsonMapEntry(F("ventilation"),     state.picSettings.sVentilation);
+  sendJsonMapEntry(F("setpoint_override"), state.picSettings.sSetpointOverride);
+  sendJsonMapEntry(F("setback"),           state.picSettings.sSetback);
+  sendJsonMapEntry(F("dhw_override"),      state.picSettings.sDhwOverride);
+  sendJsonMapEntry(F("gpio"),              state.picSettings.sGpio);
+  sendJsonMapEntry(F("led"),               state.picSettings.sLed);
+  sendJsonMapEntry(F("tweaks"),            state.picSettings.sTweaks);
   sendEndJsonMap(F("pic_settings"));
 } // sendPICsettings()
 
