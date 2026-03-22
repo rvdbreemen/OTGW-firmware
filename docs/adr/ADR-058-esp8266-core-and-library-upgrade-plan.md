@@ -104,7 +104,7 @@ Update `build.py` and `Makefile` to the following versions. The core stays at 2.
 **Required build-file changes for TelnetStream 1.3.0:**
 
 `NetApiHelpers` must be installed *before* TelnetStream in the dependency chain. In both `build.py` and
-`Makefile` add `NetApiHelpers@1.0.0` (or latest) immediately before the TelnetStream install entry.
+`Makefile` add `NetApiHelpers@1.0.2` (pinned to match the implementation record) immediately before the TelnetStream install entry.
 
 **Libraries confirmed already at latest stable — no changes needed:**
 
