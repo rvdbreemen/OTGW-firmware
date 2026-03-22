@@ -250,6 +250,8 @@ static void handlePic(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     sendPICFlashStatus();
   } else if (wc > 4 && strcmp_P(words[4], PSTR("update-check")) == 0) {
     sendPICUpdateCheck();
+  } else if (wc > 4 && strcmp_P(words[4], PSTR("settings")) == 0) {
+    sendPICsettings();
   } else {
     sendApiNotFound(originalURI);
   }
@@ -881,6 +883,23 @@ void sendDeviceCrashLog()
   sendEndJsonMap(F("crashlog"));
 }
 
+
+//=======================================================================
+// GET /api/v2/pic/settings
+// Returns the cached PIC settings last queried via PR= commands.
+// Values are refreshed gradually (~every 3 minutes per setting).
+// Empty string means "not yet queried"; "--" means "not set on PIC".
+void sendPICsettings()
+{
+  sendStartJsonMap(F("pic_settings"));
+  sendJsonMapEntry(F("temp_override"),   state.picSettings.sTempOverride);
+  sendJsonMapEntry(F("max_ch_setpoint"), state.picSettings.sMaxCHSetpoint);
+  sendJsonMapEntry(F("setback"),         state.picSettings.sSetback);
+  sendJsonMapEntry(F("hotwater"),        state.picSettings.sHotwater);
+  sendJsonMapEntry(F("outside_temp"),    state.picSettings.sOutsideTemp);
+  sendJsonMapEntry(F("ventilation"),     state.picSettings.sVentilation);
+  sendEndJsonMap(F("pic_settings"));
+} // sendPICsettings()
 
 //=======================================================================
 void sendPICFlashStatus()

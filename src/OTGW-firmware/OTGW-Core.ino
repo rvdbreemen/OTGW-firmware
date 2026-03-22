@@ -22,6 +22,8 @@
 **  Reset OTGW                       ~ line  326
 **  getpicfwversion                  ~ line  348
 **  queryOTGWgatewaymode             ~ line  365
+**  queryNextPICsetting              ~ line  580
+**  publishAllPICsettings            ~ line  680
 **  sendOTGWbootcmd                  ~ line  444
 **  OTGW Command & Response          ~ line  463
 **  Watchdog OTGW                    ~ line  531
@@ -575,6 +577,109 @@ bool queryOTGWgatewaymode(){
   return cachedGatewayMode;
 }
 
+//===================[ queryNextPICsetting ]======================
+/*
+  Gradually polls PIC settings one at a time via PR= commands.
+  Each call sends exactly one PR= query and advances to the next setting.
+  Call this every ~30 seconds to complete a full cycle in ~3 minutes.
+
+  PR= command mapping (OTGW PIC firmware by Schelte Bron):
+    PR=T  → temperature override (TT or TC value; "--" = not set on PIC)
+    PR=W  → max CH water setpoint (SH value; "--" = not set on PIC)
+    PR=S  → setback temperature (SB value; "--" = not set on PIC)
+    PR=H  → hotwater mode (HW: "0"=off, "1"=on, "P"=push, "A"=auto)
+    PR=O  → outside temperature override (OT value; "--" = not set on PIC)
+    PR=V  → ventilation setpoint (VS value; "--" = not set on PIC)
+
+  Values are stored in state.picSettings and published to MQTT when they change.
+  Skips queries when PIC is unavailable, offline, or flashing is in progress.
+*/
+void queryNextPICsetting() {
+  if (!state.pic.bAvailable || !state.otgw.bOnline) return;
+  if (state.flash.bESPactive || state.flash.bPICactive) return;
+
+  static uint8_t nextQueryIdx = 0;
+  constexpr uint8_t kNQueries = 6;
+
+  const uint8_t idx = nextQueryIdx;
+  nextQueryIdx = (nextQueryIdx + 1) % kNQueries;
+
+  // Resolve all query properties in a single switch (letter, state field, MQTT topic)
+  char        letter     = 0;
+  char*       stateField = nullptr;
+  size_t      fieldSize  = 0;
+  const __FlashStringHelper* mqttTopic = nullptr;
+
+  switch (idx) {
+    case 0:
+      letter = 'T'; stateField = state.picSettings.sTempOverride;
+      fieldSize = sizeof(state.picSettings.sTempOverride);  mqttTopic = F("otgw-pic/settings/temp_override");   break;
+    case 1:
+      letter = 'W'; stateField = state.picSettings.sMaxCHSetpoint;
+      fieldSize = sizeof(state.picSettings.sMaxCHSetpoint); mqttTopic = F("otgw-pic/settings/max_ch_setpoint"); break;
+    case 2:
+      letter = 'S'; stateField = state.picSettings.sSetback;
+      fieldSize = sizeof(state.picSettings.sSetback);       mqttTopic = F("otgw-pic/settings/setback");         break;
+    case 3:
+      letter = 'H'; stateField = state.picSettings.sHotwater;
+      fieldSize = sizeof(state.picSettings.sHotwater);      mqttTopic = F("otgw-pic/settings/hotwater");        break;
+    case 4:
+      letter = 'O'; stateField = state.picSettings.sOutsideTemp;
+      fieldSize = sizeof(state.picSettings.sOutsideTemp);   mqttTopic = F("otgw-pic/settings/outside_temp");    break;
+    case 5:
+      letter = 'V'; stateField = state.picSettings.sVentilation;
+      fieldSize = sizeof(state.picSettings.sVentilation);   mqttTopic = F("otgw-pic/settings/ventilation");     break;
+    default: return;
+  }
+
+  char cmd[5];
+  snprintf_P(cmd, sizeof(cmd), PSTR("PR=%c"), letter);
+
+  char response[64];
+  executeCommand(cmd, response, sizeof(response));
+
+  // Trim leading/trailing whitespace in-place
+  char* rp = response;
+  while (*rp == ' ' || *rp == '\t' || *rp == '\r' || *rp == '\n') rp++;
+  size_t rlen = strlen(rp);
+  while (rlen > 0 && (rp[rlen-1] == ' ' || rp[rlen-1] == '\t' || rp[rlen-1] == '\r' || rp[rlen-1] == '\n')) rp[--rlen] = '\0';
+
+  OTGWDebugTf(PSTR("queryNextPICsetting: PR=%c response=[%s]\r\n"), letter, rp);
+
+  // Responses are "X=value" (e.g. "T=20.5") — first char must match expected letter
+  const char* eqp = strchr(rp, '=');
+  if (!eqp || rp[0] != letter || *(eqp + 1) == '\0') {
+    // NG, SE, TO, empty, or wrong letter — ignore, keep previous cached value
+    if (rlen > 0) {
+      OTGWDebugTf(PSTR("queryNextPICsetting: PR=%c unexpected/unsupported response [%s]\r\n"), letter, rp);
+    }
+    return;
+  }
+
+  const char* value = eqp + 1;
+
+  // Publish and update cached value only when it changes
+  if (strcmp(stateField, value) != 0) {
+    strlcpy(stateField, value, fieldSize);
+    OTGWDebugTf(PSTR("queryNextPICsetting: PR=%c updated to [%s]\r\n"), letter, value);
+    sendMQTTData(mqttTopic, value);
+  }
+}
+
+//===================[ publishAllPICsettings ]=====================
+/*
+  Publishes all currently cached PIC settings to MQTT.
+  Call on reconnect or initial publish to sync all topics.
+  Only publishes fields that have been queried (non-empty).
+*/
+void publishAllPICsettings() {
+  if (state.picSettings.sTempOverride[0]  != '\0') sendMQTTData(F("otgw-pic/settings/temp_override"),   state.picSettings.sTempOverride);
+  if (state.picSettings.sMaxCHSetpoint[0] != '\0') sendMQTTData(F("otgw-pic/settings/max_ch_setpoint"), state.picSettings.sMaxCHSetpoint);
+  if (state.picSettings.sSetback[0]       != '\0') sendMQTTData(F("otgw-pic/settings/setback"),         state.picSettings.sSetback);
+  if (state.picSettings.sHotwater[0]      != '\0') sendMQTTData(F("otgw-pic/settings/hotwater"),        state.picSettings.sHotwater);
+  if (state.picSettings.sOutsideTemp[0]   != '\0') sendMQTTData(F("otgw-pic/settings/outside_temp"),    state.picSettings.sOutsideTemp);
+  if (state.picSettings.sVentilation[0]   != '\0') sendMQTTData(F("otgw-pic/settings/ventilation"),     state.picSettings.sVentilation);
+}
 
 //===================[ sendOTGWbootcmd ]=====================
 void sendOTGWbootcmd(){

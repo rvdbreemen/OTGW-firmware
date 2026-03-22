@@ -177,13 +177,23 @@ struct UptimeSection {         // state.uptime — System longevity counters
   uint32_t iRebootCount  = 0;  // was rebootCount
 };
 
+struct PicSettingsSection {    // state.picSettings — settings polled from PIC via PR= commands
+  char sTempOverride[16]   = "";  // PR=T: active temperature override (TT or TC value; "--" = not set on PIC)
+  char sMaxCHSetpoint[16]  = "";  // PR=W: max CH water setpoint (SH value; "--" = not set on PIC)
+  char sSetback[16]        = "";  // PR=S: setback temperature (SB value; "--" = not set on PIC)
+  char sHotwater[8]        = "";  // PR=H: hotwater mode override (0/1/P/A; "--" = not set on PIC)
+  char sOutsideTemp[16]    = "";  // PR=O: outside temperature override (OT value; "--" = not set on PIC)
+  char sVentilation[8]     = "";  // PR=V: ventilation setpoint (VS value; "--" = not set on PIC)
+};
+
 struct OTGWState {
-  PICSection         pic;     // state.pic.bAvailable, state.pic.sFwversion
-  OTGWProtocol       otgw;   // state.otgw.bOnline, state.otgw.bBoilerState
-  MQTTRuntimeSection mqtt;   // state.mqtt.bConnected
-  FlashSection       flash;  // state.flash.bESPactive, state.flash.iPICprogress
-  DebugSection       debug;  // state.debug.bOTmsg, state.debug.bMQTT
-  UptimeSection      uptime; // state.uptime.iSeconds, state.uptime.iRebootCount
+  PICSection         pic;         // state.pic.bAvailable, state.pic.sFwversion
+  OTGWProtocol       otgw;        // state.otgw.bOnline, state.otgw.bBoilerState
+  MQTTRuntimeSection mqtt;        // state.mqtt.bConnected
+  FlashSection       flash;       // state.flash.bESPactive, state.flash.iPICprogress
+  DebugSection       debug;       // state.debug.bOTmsg, state.debug.bMQTT
+  UptimeSection      uptime;      // state.uptime.iSeconds, state.uptime.iRebootCount
+  PicSettingsSection picSettings; // state.picSettings — PR=-polled settings from PIC
   StatusMessage      statusMessage = StatusMessage::None;
   bool               bSetupComplete = false;
 };
