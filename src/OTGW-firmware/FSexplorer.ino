@@ -215,8 +215,8 @@ void startWebserver(){
   httpServer.on("/api", HTTP_ANY, processAPI);  //was only HTTP_GET (20210110)
 
   // Enable collection of If-None-Match so index.html ETag conditional requests work.
-  static const char* reqHeaders[] = { "If-None-Match" };
-  httpServer.collectHeaders(reqHeaders, 1);
+    static const char* reqHeaders[] = { "If-None-Match" };
+    httpServer.collectHeaders(reqHeaders, 1);
 
   httpServer.begin();
   // Set up first message as the IP address
