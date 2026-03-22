@@ -1,6 +1,6 @@
 # ADR-058: ESP8266 Core 3.1.2 and Library Upgrade Plan
 
-## Status: Proposed
+## Status: Implemented — Pending Hardware Validation
 
 ## Date: 2026-03-22
 
@@ -194,8 +194,40 @@ on a real D1 mini or NodeMCU device **for both Phase 1 and Phase 2** before merg
 
 ### Phase 4 — ADR status update
 
-Once both phases pass hardware validation, update this ADR's status from **Proposed** to **Accepted** and
-record the measured heap delta.
+Once hardware validation passes, update this ADR's status to **Accepted** and record the measured heap delta
+(expected: +14–16 KB vs Core 2.7.4 baseline).
+
+## Implementation record
+
+**Branch:** `claude/arduino-upgrade-analysis-PwiZg`
+**Date:** 2026-03-22
+
+### Changes made
+
+`build.py`:
+- `board_manager.additional_urls` → `https://arduino.esp8266.com/stable/package_esp8266com_index.json`
+- `core install esp8266:esp8266` → `esp8266:esp8266@3.1.2`
+- Added `NetApiHelpers@1.0.2` before TelnetStream in library list
+- `TelnetStream@1.2.4` → `1.3.0`
+- `AceTime@2.0.1` → `4.1.0`
+- `WebSockets@2.3.6` → `2.7.2`
+
+`Makefile`:
+- `ESP8266URL` → `https://arduino.esp8266.com/stable/package_esp8266com_index.json`
+- `core install $(PLATFORM)` → `$(PLATFORM)@3.1.2`
+- Added `libraries/NetApiHelpers` to `LIBRARIES` list and install chain
+- `NetApiHelpers@1.0.2` install rule added (serialised before TelnetStream)
+- `TelnetStream@1.2.4` → `1.3.0`; dependency updated to `libraries/NetApiHelpers`
+- `AceTime@2.0.1` → `4.1.0`
+- `WebSockets@2.3.6` → `2.7.2`
+
+### Pre-commit verification
+
+`python3 evaluate.py --quick` result: **22/22 checks passed, health score 100%**
+
+### Still required before merging to dev
+
+All items in the Phase 3 hardware validation checklist above must be completed on physical hardware.
 
 ## Consequences
 
