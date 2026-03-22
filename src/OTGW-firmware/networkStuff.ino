@@ -233,9 +233,9 @@ void startNTP()
   WiFi.hostname(CSTR(settings.sHostname));
   configTime(0, 0, settings.ntp.sHostname, nullptr, nullptr);
   // Capture hostname immediately after configTime() to detect if the SDK
-  // reset it, *before* we restore it.  This drives the DHCP re-announce
+  // reset it, *before* we restore it. This drives the DHCP re-announce
   // decision below.
-  bool hostnameWasReset = (WiFi.hostname() != String(CSTR(settings.sHostname)));
+  bool hostnameWasReset = (strcmp(WiFi.hostname().c_str(), CSTR(settings.sHostname)) != 0);
   WiFi.hostname(CSTR(settings.sHostname));
 
   // If configTime() did reset the hostname, the DHCP lease may have been
