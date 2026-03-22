@@ -232,22 +232,22 @@ void startNTP()
   // station hostname to "ESP-XXXXXX" on some ESP8266 SDK versions.
   WiFi.hostname(CSTR(settings.sHostname));
   configTime(0, 0, settings.ntp.sHostname, nullptr, nullptr);
-  // Restore hostname after configTime(). On some routers/DNS setups we also
-  // need to force the DHCP client to re-announce the hostname, but doing that
-  // on every NTP resync would drop the STA lease and break long-lived
-  // connections (MQTT/Telnet/WebSocket). Limit the DHCP restart to a
-  // one-time, conditional fix when the current STA hostname is wrong.
+  // Capture hostname immediately after configTime() to detect if the SDK
+  // reset it, *before* we restore it.  This drives the DHCP re-announce
+  // decision below.
+  bool hostnameWasReset = (WiFi.hostname() != String(CSTR(settings.sHostname)));
   WiFi.hostname(CSTR(settings.sHostname));
 
+  // If configTime() did reset the hostname, the DHCP lease may have been
+  // re-announced with the wrong name.  Force a DHCP re-announce once so the
+  // router sees the correct hostname.  Only do this once to avoid dropping
+  // the STA lease on every 30-min NTP resync (which would break MQTT/Telnet/
+  // WebSocket connections).
   static bool sDhcpHostnameFixed = false;
-  if (!sDhcpHostnameFixed && WiFi.isConnected()) {
-    const char *desiredHostname = CSTR(settings.sHostname);
-    String currentHostname = WiFi.hostname();
-    if (currentHostname != desiredHostname) {
-      wifi_station_dhcpc_stop();
-      wifi_station_dhcpc_start();
-      sDhcpHostnameFixed = true;
-    }
+  if (!sDhcpHostnameFixed && hostnameWasReset && WiFi.isConnected()) {
+    wifi_station_dhcpc_stop();
+    wifi_station_dhcpc_start();
+    sDhcpHostnameFixed = true;
   }
   NtpStatus = TIME_WAITFORSYNC;
 }
