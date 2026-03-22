@@ -1,9 +1,9 @@
 # ADR-015: NTP and AceTime for Time Management
 
-**Status:** Accepted  
-**Date:** 2021-10-16 (AceTime adopted, replaced ezTime)  
-**Git Evidence:** Commit 45b51f2 (October 16, 2021)  
-**Updated:** 2026-01-28 (Documentation)
+**Status:** Accepted
+**Date:** 2021-10-16 (AceTime adopted, replaced ezTime)
+**Git Evidence:** Commit 45b51f2 (October 16, 2021)
+**Updated:** 2026-03-22 (AceTime upgraded 2.0.1 → 4.1.0, TZDB 2025b; see ADR-058)
 
 **Note on Dates:** This project's git history was truncated on April 23, 2021 when the repository was migrated. The AceTime adoption date is verified with git evidence.
 
@@ -169,6 +169,8 @@ ace_time::TimeZone tz = zoneManager.createForZoneName(settingNTPtimezone);
   - **Mitigation:** AceTime actively maintained, updates available
 - **Time zones change:** Political changes to timezone rules
   - **Mitigation:** AceTime database can be updated with firmware update
+  - **Realised (2026-03-22):** AceTime upgraded from 2.0.1 → 4.1.0, shipping TZDB 2025b; all
+    DST rules current through 2025. No API changes required in firmware source (see ADR-058).
 
 ## Implementation Details
 

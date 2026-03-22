@@ -1,8 +1,8 @@
 # ADR-017: WiFiManager for Initial Configuration
 
-**Status:** Accepted  
-**Date:** 2018-01-01 (Estimated)  
-**Updated:** 2026-01-28 (Documentation)
+**Status:** Accepted
+**Date:** 2018-01-01 (Estimated)
+**Updated:** 2026-03-22 (Library version updated to 2.0.17)
 
 ## Context
 
@@ -47,7 +47,7 @@ The ESP8266 needs WiFi credentials to connect to the network. First-time users f
    - After max retries, fall back to AP mode
    - User can reconfigure WiFi
 
-**Library:** WiFiManager 2.0.15-rc.1
+**Library:** WiFiManager 2.0.17
 
 ## Alternatives Considered
 

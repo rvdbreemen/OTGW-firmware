@@ -1,8 +1,8 @@
 # ADR-013: Arduino Framework Over ESP-IDF
 
-**Status:** Accepted  
-**Date:** 2016-01-01 (Initial development)  
-**Updated:** 2026-01-28 (Documentation)
+**Status:** Accepted
+**Date:** 2016-01-01 (Initial development)
+**Updated:** 2026-03-22 (Core version updated to 3.1.2; see ADR-058)
 
 ## Context
 
@@ -31,7 +31,7 @@ The choice of framework affects:
 
 **Key characteristics:**
 - **Language:** Arduino C/C++ (.ino files)
-- **Core version:** ESP8266 Arduino Core 2.7.4+
+- **Core version:** ESP8266 Arduino Core 3.1.2 (upgraded from 2.7.4; see ADR-058)
 - **Build tool:** arduino-cli (command-line compilation)
 - **IDE support:** Arduino IDE, VS Code, PlatformIO (all supported)
 - **Library ecosystem:** Full access to Arduino libraries
@@ -136,7 +136,7 @@ The choice of framework affects:
 
 ### Risks & Mitigation
 - **Arduino core bugs:** Framework bugs affect firmware
-  - **Mitigation:** Pin to stable core version (2.7.4), test before upgrading
+  - **Mitigation:** Pin to stable core version (3.1.2), test before upgrading; see ADR-058 for upgrade history
 - **Library compatibility:** Some libraries may not work with ESP8266
   - **Mitigation:** Careful library selection, test on hardware
 - **Memory constraints:** Arduino overhead leaves less RAM for application
