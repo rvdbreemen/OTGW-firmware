@@ -87,7 +87,24 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   }
   else if (wifiConnected)
   {
-    DebugTln(F("Wifi already connected, skipping connect."));
+    // If the SDK auto-connected using a default/old hostname, ensure the DHCP
+    // server sees the desired hostname. Avoid forcing a reconnect here so we
+    // don't accidentally drop a working connection and fall back into the
+    // WiFiManager config portal on transient failures.
+    String currentHostname = WiFi.hostname();
+    if (currentHostname == hostname)
+    {
+      DebugTln(F("Wifi already connected with correct hostname, skipping hostname update."));
+    }
+    else
+    {
+      DebugTf(PSTR("Wifi connected with hostname '%s', updating to '%s' without reconnect.\r\n"),
+              currentHostname.c_str(), hostname);
+      // Update the hostname for future DHCP negotiations; the current lease
+      // will typically keep using the old hostname until the next reconnect.
+      WiFi.hostname(hostname);
+      DebugTln(F("Hostname updated; keeping existing WiFi connection active."));
+    }
   }
   else if (wifiSaved)
   {
@@ -95,6 +112,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     int directConnectTimeout = timeOut / 2;
     if (directConnectTimeout < 5) directConnectTimeout = 5;
     DebugTf(PSTR("Direct connect timeout: %d sec\r\n"), directConnectTimeout);
+    WiFi.hostname(hostname);  // set before begin() so DHCP sends the correct hostname
     WiFi.begin(); // use stored credentials
     DECLARE_TIMER_SEC(timeoutWifiConnectInitial, directConnectTimeout, CATCH_UP_MISSED_TICKS);
     while (WiFi.status() != WL_CONNECTED)
@@ -144,6 +162,13 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   DebugT(F("IP address: " ));  Debugln(WiFi.localIP());
   DebugT(F("IP gateway: " ));  Debugln(WiFi.gatewayIP());
   Debugln();
+
+  // Catch-all: regardless of which path connected (direct, portal, SDK
+  // auto-connect), ensure the DHCP lease carries the correct hostname.
+  // wifi_station_dhcpc_stop/start forces a DHCP re-announce.
+  WiFi.hostname(hostname);
+  wifi_station_dhcpc_stop();
+  wifi_station_dhcpc_start();
 
   httpUpdater.setup(&httpServer);
   httpUpdater.setIndexPage(UpdateServerIndex);
@@ -203,9 +228,27 @@ void startNTP()
   if (strlen(settings.ntp.sTimezone) == 0) strlcpy(settings.ntp.sTimezone, NTP_DEFAULT_TIMEZONE, sizeof(settings.ntp.sTimezone));
   if (strlen(settings.ntp.sHostname) == 0) strlcpy(settings.ntp.sHostname, NTP_HOST_DEFAULT, sizeof(settings.ntp.sHostname));
 
-  configTime(0, 0, settings.ntp.sHostname, nullptr, nullptr);
-  // configTime() may reset the station hostname to "esp-XXXXXX"; restore it
+  // Set hostname before configTime() — configTime() is known to reset the
+  // station hostname to "ESP-XXXXXX" on some ESP8266 SDK versions.
   WiFi.hostname(CSTR(settings.sHostname));
+  configTime(0, 0, settings.ntp.sHostname, nullptr, nullptr);
+  // Capture hostname immediately after configTime() to detect if the SDK
+  // reset it, *before* we restore it. This drives the DHCP re-announce
+  // decision below.
+  bool hostnameWasReset = (strcmp(WiFi.hostname().c_str(), CSTR(settings.sHostname)) != 0);
+  WiFi.hostname(CSTR(settings.sHostname));
+
+  // If configTime() did reset the hostname, the DHCP lease may have been
+  // re-announced with the wrong name.  Force a DHCP re-announce once so the
+  // router sees the correct hostname.  Only do this once to avoid dropping
+  // the STA lease on every 30-min NTP resync (which would break MQTT/Telnet/
+  // WebSocket connections).
+  static bool sDhcpHostnameFixed = false;
+  if (!sDhcpHostnameFixed && hostnameWasReset && WiFi.isConnected()) {
+    wifi_station_dhcpc_stop();
+    wifi_station_dhcpc_start();
+    sDhcpHostnameFixed = true;
+  }
   NtpStatus = TIME_WAITFORSYNC;
 }
 
