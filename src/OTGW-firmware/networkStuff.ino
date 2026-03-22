@@ -88,6 +88,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   else if (wifiConnected)
   {
     DebugTln(F("Wifi already connected, skipping connect."));
+    WiFi.hostname(hostname);  // ensure correct hostname even if SDK auto-connected
   }
   else if (wifiSaved)
   {
@@ -95,6 +96,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     int directConnectTimeout = timeOut / 2;
     if (directConnectTimeout < 5) directConnectTimeout = 5;
     DebugTf(PSTR("Direct connect timeout: %d sec\r\n"), directConnectTimeout);
+    WiFi.hostname(hostname);  // set before begin() so DHCP sends the correct hostname
     WiFi.begin(); // use stored credentials
     DECLARE_TIMER_SEC(timeoutWifiConnectInitial, directConnectTimeout, CATCH_UP_MISSED_TICKS);
     while (WiFi.status() != WL_CONNECTED)
@@ -203,9 +205,15 @@ void startNTP()
   if (strlen(settings.ntp.sTimezone) == 0) strlcpy(settings.ntp.sTimezone, NTP_DEFAULT_TIMEZONE, sizeof(settings.ntp.sTimezone));
   if (strlen(settings.ntp.sHostname) == 0) strlcpy(settings.ntp.sHostname, NTP_HOST_DEFAULT, sizeof(settings.ntp.sHostname));
 
-  configTime(0, 0, settings.ntp.sHostname, nullptr, nullptr);
-  // configTime() may reset the station hostname to "esp-XXXXXX"; restore it
+  // Set hostname before configTime() — configTime() is known to reset the
+  // station hostname to "ESP-XXXXXX" on some ESP8266 SDK versions.
   WiFi.hostname(CSTR(settings.sHostname));
+  configTime(0, 0, settings.ntp.sHostname, nullptr, nullptr);
+  // Restore hostname after configTime() and force the DHCP client to
+  // re-announce it so the router/DNS always sees the correct name.
+  WiFi.hostname(CSTR(settings.sHostname));
+  wifi_station_dhcpc_stop();
+  wifi_station_dhcpc_start();
   NtpStatus = TIME_WAITFORSYNC;
 }
 
