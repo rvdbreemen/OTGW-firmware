@@ -142,6 +142,11 @@ void setup() {
   readSettings(true);
   checklittlefshash();
 
+  // Set hostname ASAP after loading settings.  WiFi.persistent(true) from a
+  // previous boot lets the SDK auto-connect before startWiFi() is reached;
+  // without this early call the DHCP request carries the default "ESP-XXXXXX".
+  WiFi.hostname(CSTR(settings.sHostname));
+
   // Connect to and initialise WiFi network
   setLed(LED1, ON);
   SetupDebugln(F("Attempting to connect to WiFi network\r"));

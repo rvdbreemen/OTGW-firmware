@@ -147,6 +147,13 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   DebugT(F("IP gateway: " ));  Debugln(WiFi.gatewayIP());
   Debugln();
 
+  // Catch-all: regardless of which path connected (direct, portal, SDK
+  // auto-connect), ensure the DHCP lease carries the correct hostname.
+  // wifi_station_dhcpc_stop/start forces a DHCP re-announce.
+  WiFi.hostname(hostname);
+  wifi_station_dhcpc_stop();
+  wifi_station_dhcpc_start();
+
   httpUpdater.setup(&httpServer);
   httpUpdater.setIndexPage(UpdateServerIndex);
   httpUpdater.setSuccessPage(UpdateServerSuccess);
