@@ -88,29 +88,22 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   else if (wifiConnected)
   {
     // If the SDK auto-connected using a default/old hostname, ensure the DHCP
-    // server sees the desired hostname by forcing a short reconnect when needed.
+    // server sees the desired hostname. Avoid forcing a reconnect here so we
+    // don't accidentally drop a working connection and fall back into the
+    // WiFiManager config portal on transient failures.
     String currentHostname = WiFi.hostname();
     if (currentHostname == hostname)
     {
-      DebugTln(F("Wifi already connected with correct hostname, skipping reconnect."));
+      DebugTln(F("Wifi already connected with correct hostname, skipping hostname update."));
     }
     else
     {
-      DebugTf(PSTR("Wifi connected with hostname '%s', updating to '%s' and renewing DHCP lease.\r\n"),
+      DebugTf(PSTR("Wifi connected with hostname '%s', updating to '%s' without reconnect.\r\n"),
               currentHostname.c_str(), hostname);
-      WiFi.hostname(hostname);  // set desired hostname before DHCP renew
-      WiFi.disconnect();        // drop current lease so DHCP will re-announce hostname
-      WiFi.begin();             // reconnect using stored credentials
-      DECLARE_TIMER_SEC(timeoutWifiReconnect, 5, CATCH_UP_MISSED_TICKS);
-      while (WiFi.status() != WL_CONNECTED)
-      {
-        delay(100);
-        feedWatchDog();
-        if DUE(timeoutWifiReconnect) break;
-      }
-      wifiConnected = (WiFi.status() == WL_CONNECTED);
-      DebugTf(PSTR("Reconnect with updated hostname result: %s\r\n"),
-              wifiConnected ? "Connected" : "Failed");
+      // Update the hostname for future DHCP negotiations; the current lease
+      // will typically keep using the old hostname until the next reconnect.
+      WiFi.hostname(hostname);
+      DebugTln(F("Hostname updated; keeping existing WiFi connection active."));
     }
   }
   else if (wifiSaved)
