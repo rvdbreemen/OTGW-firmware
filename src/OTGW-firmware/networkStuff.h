@@ -34,6 +34,10 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266LLMNR.h>
 
+extern "C" {
+  #include "user_interface.h"   // wifi_station_dhcpc_stop/start
+}
+
 #include <WiFiUdp.h>            // part of ESP8266 Core
 #include <LittleFS.h>
 #include "OTGW-ModUpdateServer.h"   // <<special version for Nodoshop Watchdog needed>>
