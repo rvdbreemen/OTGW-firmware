@@ -1,6 +1,6 @@
 # ADR-058: ESP8266 Core 3.1.2 and Library Upgrade Plan
 
-## Status: Implemented — Pending Hardware Validation
+**Status:** Proposed
 
 ## Date: 2026-03-22
 
