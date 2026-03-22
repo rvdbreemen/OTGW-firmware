@@ -216,11 +216,23 @@ void startNTP()
   // station hostname to "ESP-XXXXXX" on some ESP8266 SDK versions.
   WiFi.hostname(CSTR(settings.sHostname));
   configTime(0, 0, settings.ntp.sHostname, nullptr, nullptr);
-  // Restore hostname after configTime() and force the DHCP client to
-  // re-announce it so the router/DNS always sees the correct name.
+  // Restore hostname after configTime(). On some routers/DNS setups we also
+  // need to force the DHCP client to re-announce the hostname, but doing that
+  // on every NTP resync would drop the STA lease and break long-lived
+  // connections (MQTT/Telnet/WebSocket). Limit the DHCP restart to a
+  // one-time, conditional fix when the current STA hostname is wrong.
   WiFi.hostname(CSTR(settings.sHostname));
-  wifi_station_dhcpc_stop();
-  wifi_station_dhcpc_start();
+
+  static bool sDhcpHostnameFixed = false;
+  if (!sDhcpHostnameFixed && WiFi.isConnected()) {
+    const char *desiredHostname = CSTR(settings.sHostname);
+    String currentHostname = WiFi.hostname();
+    if (currentHostname != desiredHostname) {
+      wifi_station_dhcpc_stop();
+      wifi_station_dhcpc_start();
+      sDhcpHostnameFixed = true;
+    }
+  }
   NtpStatus = TIME_WAITFORSYNC;
 }
 
