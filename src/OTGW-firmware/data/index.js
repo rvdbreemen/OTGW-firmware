@@ -2624,7 +2624,18 @@ function renderSharedPageNavShell() {
   });
 }
 
-//============================================================================  
+//============================================================================
+function updateThemeToggle() {
+  var isDark = localStorage.getItem('theme') === 'dark';
+  var icon  = isDark ? '\u2600' : '\u263D';   // ☀ sun  or  ☽ crescent moon
+  var title = isDark ? 'Switch to light theme' : 'Switch to dark theme';
+  document.querySelectorAll('.theme-toggle-btn').forEach(function(btn) {
+    btn.textContent = icon;
+    btn.title       = title;
+  });
+}
+
+//============================================================================
 function initMainPage() {
   console.log("initMainPage()");
   ensureWebkitScrollbarStyles();
@@ -2638,6 +2649,25 @@ function initMainPage() {
   } catch(e) { /* ignore */ }
 
   renderSharedPageNavShell();
+  updateThemeToggle();
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.classList.contains('theme-toggle-btn')) return;
+    var isDark = localStorage.getItem('theme') !== 'dark';  // toggle
+    document.getElementById('theme-style').href = isDark ? 'index_dark.css' : 'index.css';
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.setTheme === 'function') {
+      OTGraph.setTheme(isDark ? 'dark' : 'light');
+    }
+    var cb = document.getElementById('darktheme');
+    if (cb) cb.checked = isDark;
+    fetch(APIGW + 'v2/settings', {
+      method: 'POST', mode: 'cors',
+      headers: { 'content-type': 'application/json; charset=UTF-8' },
+      body: JSON.stringify({ name: 'darktheme', value: String(isDark) })
+    }).catch(function(err) { console.warn('Theme save failed:', err.message); });
+    updateThemeToggle();
+  });
 
   Array.from(document.getElementsByClassName('FSexplorer')).forEach(
     function (el, idx, arr) {
@@ -3776,6 +3806,8 @@ function refreshSettings() {
               }
               if (fieldName == "darktheme") {
                  document.getElementById('theme-style').href = this.checked ? "index_dark.css" : "index.css";
+                 localStorage.setItem('theme', this.checked ? 'dark' : 'light');
+                 updateThemeToggle();
               }
               setVisible('btnSaveSettings', true);
             },
@@ -4023,6 +4055,7 @@ function saveSettings() {
         let isDark = fieldEl.checked;
         document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
         localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        updateThemeToggle();
       }
 
       //processWithTimeout([(data.length -1), 0], 2, data, sendPostReading);
@@ -4365,6 +4398,7 @@ function applyTheme() {
         if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.setTheme === 'function') {
             OTGraph.setTheme(isDark ? 'dark' : 'light');
         }
+        updateThemeToggle();
       }
     })
     .catch(error => console.log(error));
