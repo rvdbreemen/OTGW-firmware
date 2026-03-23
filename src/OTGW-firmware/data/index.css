@@ -168,6 +168,21 @@
     box-shadow: none;
   }
 
+  .nav-container > .theme-toggle-btn {
+    background: rgba(0, 0, 0, 0.13);
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    color: #222;
+  }
+  .nav-container > .theme-toggle-btn:hover {
+    background: rgba(0, 0, 0, 0.24);
+    border-color: rgba(0, 0, 0, 0.24);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.10);
+  }
+  .nav-container > .theme-toggle-btn:active {
+    transform: translate(1px, 1px);
+    box-shadow: none;
+  }
+
   .nav-img {
     height: 30px;
     object-fit: cover;
