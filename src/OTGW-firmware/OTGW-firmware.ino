@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v1.3.0-rc2
+**  Version  : v1.3.0-rc3
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -229,7 +229,10 @@ void loopWifi() {
       break;
 
     case WIFI_DISCONNECTED:
-      WiFi.hostname(settings.sHostname);
+      DebugTf(PSTR("WiFi: reconnect attempt %d starting for hostname [%s]\r\n"),
+              wifiRetryCount + 1,
+              CSTR(settings.sHostname));
+      WiFi.hostname(CSTR(settings.sHostname));
       WiFi.begin();  // uses stored credentials
       RESTART_TIMER(timerWifiRetry);
       wifiState = WIFI_CONNECTING;
@@ -251,12 +254,20 @@ void loopWifi() {
       break;
 
     case WIFI_RECONNECTED:
+      // Match the startup path: re-apply the configured hostname and force a
+      // DHCP re-announce so the renewed lease uses the expected name.
+      WiFi.hostname(CSTR(settings.sHostname));
+      DebugTf(PSTR("WiFi: reconnected, re-announcing DHCP lease for hostname [%s]\r\n"),
+              CSTR(settings.sHostname));
+      wifi_station_dhcpc_stop();
+      wifi_station_dhcpc_start();
       startTelnet();
       startOTGWstream();
       startMQTT();
       startWebSocket();
       wifiState = WIFI_IDLE;
-      DebugTln(F("WiFi: reconnected, services restarted"));
+      DebugTf(PSTR("WiFi: reconnected, services restarted; IP=%s\r\n"),
+              WiFi.localIP().toString().c_str());
       break;
 
     case WIFI_FAILED:

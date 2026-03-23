@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v1.3.0-rc2
+**  Version  : v1.3.0-rc3
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -18,6 +18,7 @@
 
 NtpStatus_t NtpStatus  = TIME_NOTSET;
 time_t      NtpLastSync = 0;
+static bool sDhcpHostnameFixed = false;  // set once after any DHCP restart to prevent double-announce
 
 ESP8266WebServer        httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater(true);
@@ -163,12 +164,16 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   DebugT(F("IP gateway: " ));  Debugln(WiFi.gatewayIP());
   Debugln();
 
-  // Catch-all: regardless of which path connected (direct, portal, SDK
-  // auto-connect), ensure the DHCP lease carries the correct hostname.
-  // wifi_station_dhcpc_stop/start forces a DHCP re-announce.
+  // Catch-all: if the hostname still doesn't match after all connection paths,
+  // force a DHCP re-announce. Mark it done so startNTP() doesn't do it again.
   WiFi.hostname(hostname);
-  wifi_station_dhcpc_stop();
-  wifi_station_dhcpc_start();
+  if (!sDhcpHostnameFixed && strcmp(WiFi.hostname().c_str(), hostname) != 0) {
+    DebugTf(PSTR("Catch-all: hostname mismatch after connect ('%s' vs '%s'), forcing DHCP re-announce.\r\n"),
+            WiFi.hostname().c_str(), hostname);
+    wifi_station_dhcpc_stop();
+    wifi_station_dhcpc_start();
+    sDhcpHostnameFixed = true;
+  }
 
   httpUpdater.setup(&httpServer);
   httpUpdater.setIndexPage(UpdateServerIndex);
@@ -243,7 +248,6 @@ void startNTP()
   // router sees the correct hostname.  Only do this once to avoid dropping
   // the STA lease on every 30-min NTP resync (which would break MQTT/Telnet/
   // WebSocket connections).
-  static bool sDhcpHostnameFixed = false;
   if (!sDhcpHostnameFixed && hostnameWasReset && WiFi.isConnected()) {
     wifi_station_dhcpc_stop();
     wifi_station_dhcpc_start();
