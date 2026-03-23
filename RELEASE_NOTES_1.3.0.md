@@ -6,9 +6,9 @@
 
 ---
 
-## ✨ Headline: Safer Upgrades, Better Recovery, Optional Admin Protection, and Full `PS=1` Integration
+## ✨ Headline: Safer Upgrades, Better Recovery, Optional Admin Protection, Full `PS=1` Integration, and Web UI Polish
 
-v1.3.0 builds on the current stable `v1.2.0` release. It focuses on OTA and LittleFS reliability, WiFi recovery, optional protection for admin endpoints, MQTT publish control, fuller `PS=1` support, and lower heap pressure.
+v1.3.0 builds on the current stable `v1.2.0` release. It focuses on OTA and LittleFS reliability, WiFi recovery, optional protection for admin endpoints, MQTT publish control, fuller `PS=1` support, Web UI improvements and fixes, and lower heap pressure.
 
 For users already on `v1.2.0`, this is largely a backward-compatible upgrade: there are no new MQTT topic renames, no new REST API removals, and no settings-format migration.
 
@@ -22,13 +22,25 @@ For users already on `v1.2.0`, this is largely a backward-compatible upgrade: th
 - Full `PS=1` summary parsing with MQTT publishing and Home Assistant discovery.
 - One-shot OTGW PIC commands from the monitor page.
 - Triple-reset WiFi recovery to reopen the captive portal without reflashing.
-- Safer OTA / LittleFS flashing with backup, validation, and better logging.
+- Safer OTA / LittleFS flashing with backup, validation, Dallas label auto-preservation, and better logging.
+- File System Explorer now hides the firmware-update button on touch devices (smartphones and tablets).
 - Richer device-info and Web UI status reporting, including heap visibility and improved settings tooltips.
+
+**Bug fixes:**
+
+- Settings page blank on iOS Safari.
+- Boot-time spurious service restarts.
+- Hostname normalization writing to wrong buffer.
+- File Explorer delete handling.
+- Webhook payload truncation after reboot.
+- Unsafe LittleFS OTA flashing (WiFi activity during write, partial partition erase).
+- IP validation incorrectly rejecting valid addresses with a `255` octet.
 
 **Internal improvements:**
 - Bounded manual JSON writing in place of ArduinoJson.
 - Reduced `String` churn in settings persistence.
 - Cleaner OTA reboot handoff and deferred-service handling.
+- CSS vendor prefix cleanup across all four stylesheets.
 - Larger structural cleanup around settings/state ownership and route handling.
 
 ---
@@ -51,8 +63,7 @@ This is an additive security feature, not a breaking change: existing setups con
 OpenTherm values can change quickly enough to flood an MQTT broker or waste WiFi airtime. v1.3.0 adds configurable publish gating so frequent updates can be rate-limited without changing the existing topic layout.
 
 - Normal OpenTherm publishing now uses interval-aware gating.
-- `PS=1` summary fields follow the same release philosophy and no longer bypass MQTT discipline.
-- The `OTPublishGate` pattern makes the decision explicit and restores previous publish state safely.
+- `PS=1` summary fields follow the same gating behavior and no longer bypass MQTT rate limiting.
 - MQTT connection status is republished more predictably after boot and reconnect, reducing stale availability state in consumers.
 
 ### Full `PS=1` Summary Translation
@@ -64,14 +75,6 @@ Previous releases detected `PS=1` mode but did not fully turn the summary output
 - Status-bit handling stays aligned with the normal OT mode behavior.
 - OTGW events and command-style responses are surfaced more clearly through MQTT and WebSocket logging.
 
-### Web UI Polish
-
-**File System Explorer touch device guard:** The "Update Firmware" button in the File System Explorer is now hidden on smartphones and tablets. Detection uses `(pointer: coarse) and (hover: none)` — matching finger/stylus input devices — which is more reliable than viewport width and avoids false-positives on resized desktop windows.
-
-**Settings page iOS Safari fix:** The Settings page was not rendering on iPhone Safari (Firefox on iPhone was unaffected). The root cause was a DOM-timing issue: `setActivePageSection` was called after the async `refreshSettings()` fetch started, and Safari's stricter DOM scheduling meant the active section was not accessible when the `active` class needed to be applied. The fix reorders the call to show the page section first, then sets a loading indicator, then starts the fetch. A secondary issue — the error handler silently discarded fetch failures by appending to a detached DOM node — was also fixed; errors now display inline in the settings panel.
-
-**CSS vendor prefix cleanup across all four stylesheets:** Obsolete `-moz-transition`, `-ms-transition`, and `-o-transition` prefixes (obsolete since 2012–2013) were removed. `-webkit-transition` and `-webkit-appearance` are retained for older iOS Safari / Android WebView compatibility. Dead selectors from a previous layout era (`.outer-div`, `.inner-div`, `.container-card`, `.container-box`, `.div1`) were removed.
-
 ### Monitor-Page Command Bar and Better Status Visibility
 
 The main Web UI monitor page now allows direct one-shot OTGW PIC commands from the browser.
@@ -79,6 +82,10 @@ The main Web UI monitor page now allows direct one-shot OTGW PIC commands from t
 - Send commands such as `TT=20.5`, `SH=60`, `PR=A`, or `GW=R` without leaving the UI.
 - Responses remain visible in the monitor/log view.
 - The UI now exposes more state feedback, including simulation visibility, richer heap/device status reporting, and clearer field descriptions in the settings screen.
+
+### File System Explorer: Firmware-Update Button Hidden on Touch Devices
+
+The "Update Firmware" button in the File System Explorer is now hidden on smartphones and tablets. Detection uses the CSS media query `(pointer: coarse) and (hover: none)`, which matches finger/stylus input devices regardless of screen size — more reliable than a viewport-width breakpoint and avoids false-positives on resized desktop windows.
 
 ### Triple-Reset WiFi Recovery
 
@@ -97,8 +104,8 @@ The firmware and filesystem updater received a substantial reliability pass in t
 - Reboot verification now consistently uses `GET /api/v2/health`.
 - Before a LittleFS flash, the browser can download `settings.ini` and `dallas_labels.ini` backups.
 - After a successful filesystem flash, settings are rewritten to the fresh filesystem and the reboot handoff is cleaned up before restart.
-- **Dallas labels survive a full filesystem wipe:** Immediately before a LittleFS flash, the updater fetches `/api/v2/sensors/labels` and saves the result to `localStorage`. After the device reports healthy, the labels are automatically restored via `POST /api/v2/sensors/labels` — no user action required and no data lost even though LittleFS is fully erased. This path is exercised whether or not the optional `settings.ini`/`dallas_labels.ini` browser-backup checkbox is checked.
-- Health-check polling was tightened to prevent a race where the timeout handler and the healthy-device handler could both fire on the final tick.
+- **Dallas labels survive a full filesystem wipe:** Immediately before a LittleFS flash, the updater fetches `/api/v2/sensors/labels` and saves the result to `localStorage`. After the device reports healthy, the labels are automatically restored via `POST /api/v2/sensors/labels` — no user action required and no data lost even though LittleFS is fully erased. This path runs whether or not the optional browser-backup checkbox is checked.
+- Health-check polling was tightened to prevent a race where the timeout handler and the success handler could both fire on the final tick.
 - OTA XHR uploads now emit detailed telnet logs for start, progress, completion, and abort.
 
 ---
@@ -107,7 +114,7 @@ The firmware and filesystem updater received a substantial reliability pass in t
 
 ### Settings Page Blank on iOS Safari
 
-The Settings page did not render on iPhone Safari; Firefox on iPhone was unaffected. The fix is described under [Web UI Polish](#web-ui-polish) above.
+The Settings page did not render on iPhone Safari; Firefox on iPhone was unaffected. The root cause was a DOM-timing issue: `setActivePageSection` was called after the async `refreshSettings()` fetch started, and Safari's stricter DOM scheduling meant the active section was not accessible when the `active` class needed to be applied. The fix reorders the call — show the page section first, set a loading indicator, then start the fetch. A secondary issue was also fixed: the error handler was appending an error node to a detached DOM element (silently discarding the error); it now displays the message inline in the settings panel.
 
 ### Boot-Time Spurious Service Restarts
 
@@ -156,13 +163,17 @@ The settings write path was reworked to avoid repeated `String` allocation and r
 
 `settingsMarkClean()` and related cleanup ensure that OTA-triggered writes do not leave unnecessary MQTT, NTP, mDNS, or similar service restarts pending during the short reboot handoff.
 
+### CSS Vendor Prefix Cleanup
+
+Obsolete `-moz-transition`, `-ms-transition`, and `-o-transition` prefixes (unused since 2012–2013) were removed from all four stylesheets (`FSexplorer.css`, `FSexplorer_dark.css`, `index.css`, `index_dark.css`). `-webkit-transition` and `-webkit-appearance` are retained for older iOS Safari and Android WebView compatibility. Dead selectors from a previous layout era (`.outer-div`, `.inner-div`, `.container-card`, `.container-box`, `.div1`) were also removed.
+
 ### Broader Structural Cleanup
 
 This release also includes larger internal cleanup that improves maintainability and reduces state ambiguity:
 
-- clearer split between persistent settings and transient runtime state
-- more centralized route and helper handling
-- safer status propagation around MQTT and OTA flows
+- Clearer split between persistent settings and transient runtime state.
+- More centralized route and helper handling.
+- Safer status propagation around MQTT and OTA flows.
 
 ---
 
@@ -170,8 +181,8 @@ This release also includes larger internal cleanup that improves maintainability
 
 There are **no new breaking changes** in v1.3.0 relative to `main` / `v1.2.0`.
 
-| Area | `v1.2.0` -> `v1.3.0` |
-|------|-----------------------|
+| Area | v1.2.0 -> v1.3.0 |
+| ---- | ---------------- |
 | MQTT topics | No new renames |
 | Home Assistant discovery | Additive only (`PS=1` summary coverage) |
 | REST API | No new removals beyond the existing v2-only baseline |
@@ -193,4 +204,4 @@ The migration items introduced in `v1.2.0` still apply where relevant. If you ar
 
 ## Validation Basis
 
-These notes were compiled from the `main..dev` branch delta, excluding CI-only version bumps and merge noise, and then cross-checked against the changed firmware, Web UI, OTA, MQTT, and documentation files. Last updated 2026-03-24 to include the Web UI polish items, iOS Safari fix, CSS cleanup, and Dallas label localStorage improvements from rc3.
+These notes were compiled from the `main..dev` branch delta, excluding CI-only version bumps and merge noise, and then cross-checked against the changed firmware, Web UI, OTA, MQTT, and documentation files.
