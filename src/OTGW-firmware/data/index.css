@@ -169,17 +169,17 @@
   }
 
   .nav-container > .theme-toggle-btn {
-    background: rgba(0, 0, 0, 0.13);
-    border: 1px solid rgba(0, 0, 0, 0.15);
-    color: #222;
+    background-color: lightblue;
+    border: none;
+    border-radius: 5px;
+    color: #505050;
+    box-shadow: 2px 2px 2px 0px grey;
   }
   .nav-container > .theme-toggle-btn:hover {
-    background: rgba(0, 0, 0, 0.24);
-    border-color: rgba(0, 0, 0, 0.24);
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.10);
+    color: black;
   }
   .nav-container > .theme-toggle-btn:active {
-    transform: translate(1px, 1px);
+    transform: translate(2px, 2px);
     box-shadow: none;
   }
 
