@@ -1,6 +1,6 @@
 # Release Notes — v1.3.0
 
-**Last updated:** 2026-03-21<br>
+**Last updated:** 2026-03-24<br>
 **Release branch:** `dev`<br>
 **Comparison target:** `main` (current stable `v1.2.0`)<br>
 
@@ -64,6 +64,14 @@ Previous releases detected `PS=1` mode but did not fully turn the summary output
 - Status-bit handling stays aligned with the normal OT mode behavior.
 - OTGW events and command-style responses are surfaced more clearly through MQTT and WebSocket logging.
 
+### Web UI Polish
+
+**File System Explorer touch device guard:** The "Update Firmware" button in the File System Explorer is now hidden on smartphones and tablets. Detection uses `(pointer: coarse) and (hover: none)` — matching finger/stylus input devices — which is more reliable than viewport width and avoids false-positives on resized desktop windows.
+
+**Settings page iOS Safari fix:** The Settings page was not rendering on iPhone Safari (Firefox on iPhone was unaffected). The root cause was a DOM-timing issue: `setActivePageSection` was called after the async `refreshSettings()` fetch started, and Safari's stricter DOM scheduling meant the active section was not accessible when the `active` class needed to be applied. The fix reorders the call to show the page section first, then sets a loading indicator, then starts the fetch. A secondary issue — the error handler silently discarded fetch failures by appending to a detached DOM node — was also fixed; errors now display inline in the settings panel.
+
+**CSS vendor prefix cleanup across all four stylesheets:** Obsolete `-moz-transition`, `-ms-transition`, and `-o-transition` prefixes (obsolete since 2012–2013) were removed. `-webkit-transition` and `-webkit-appearance` are retained for older iOS Safari / Android WebView compatibility. Dead selectors from a previous layout era (`.outer-div`, `.inner-div`, `.container-card`, `.container-box`, `.div1`) were removed.
+
 ### Monitor-Page Command Bar and Better Status Visibility
 
 The main Web UI monitor page now allows direct one-shot OTGW PIC commands from the browser.
@@ -89,12 +97,17 @@ The firmware and filesystem updater received a substantial reliability pass in t
 - Reboot verification now consistently uses `GET /api/v2/health`.
 - Before a LittleFS flash, the browser can download `settings.ini` and `dallas_labels.ini` backups.
 - After a successful filesystem flash, settings are rewritten to the fresh filesystem and the reboot handoff is cleaned up before restart.
-- Dallas labels cached in the browser are restored after the device reports healthy again.
+- **Dallas labels survive a full filesystem wipe:** Immediately before a LittleFS flash, the updater fetches `/api/v2/sensors/labels` and saves the result to `localStorage`. After the device reports healthy, the labels are automatically restored via `POST /api/v2/sensors/labels` — no user action required and no data lost even though LittleFS is fully erased. This path is exercised whether or not the optional `settings.ini`/`dallas_labels.ini` browser-backup checkbox is checked.
+- Health-check polling was tightened to prevent a race where the timeout handler and the healthy-device handler could both fire on the final tick.
 - OTA XHR uploads now emit detailed telnet logs for start, progress, completion, and abort.
 
 ---
 
 ## Bug Fixes
+
+### Settings Page Blank on iOS Safari
+
+The Settings page did not render on iPhone Safari; Firefox on iPhone was unaffected. The fix is described under [Web UI Polish](#web-ui-polish) above.
 
 ### Boot-Time Spurious Service Restarts
 
@@ -180,4 +193,4 @@ The migration items introduced in `v1.2.0` still apply where relevant. If you ar
 
 ## Validation Basis
 
-These notes were compiled from the `main..dev` branch delta, excluding CI-only version bumps and merge noise, and then cross-checked against the changed firmware, Web UI, OTA, MQTT, and documentation files.
+These notes were compiled from the `main..dev` branch delta, excluding CI-only version bumps and merge noise, and then cross-checked against the changed firmware, Web UI, OTA, MQTT, and documentation files. Last updated 2026-03-24 to include the Web UI polish items, iOS Safari fix, CSS cleanup, and Dallas label localStorage improvements from rc3.
