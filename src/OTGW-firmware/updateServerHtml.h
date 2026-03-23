@@ -122,34 +122,60 @@ static const char UpdateServerIndex[] PROGMEM =
          var retryBtn = document.getElementById('retryButton');
          var formErrorEl = document.getElementById('formError');
 
-         function restoreDallasLabelsFromOpener(onStatus) {
+         function restoreDallasLabelsFromStorage(onStatus) {
            var labelsRestored = Promise.resolve();
            try {
-             if (window.opener && window.opener.dallasLabelsCache) {
-               var labels = window.opener.dallasLabelsCache;
-               if (labels && typeof labels === 'object' && Object.keys(labels).length > 0) {
-                 if (onStatus) onStatus('Restoring Dallas labels...');
-                 labelsRestored = fetch('/api/v2/sensors/labels', {
-                   method: 'POST',
-                   headers: { 'Content-Type': 'application/json' },
-                   body: JSON.stringify(labels)
-                 })
-                 .then(function(res) {
-                   if (res.ok) {
-                     console.log('[OTA] Dallas labels restored');
-                   } else {
-                     console.error('[OTA] Label restore failed: HTTP ' + res.status);
-                   }
-                 })
-                 .catch(function(err) {
-                   console.error('[OTA] Label restore error:', err);
-                 });
-               }
+             var stored = localStorage.getItem('otgw_dallas_restore');
+             if (!stored) return labelsRestored;
+             var entry;
+             try { entry = JSON.parse(stored); } catch(e) { localStorage.removeItem('otgw_dallas_restore'); return labelsRestored; }
+             // Discard if older than 24 hours (stale / wrong-device guard)
+             if (!entry || !entry.data || !entry.savedAt || (Date.now() - entry.savedAt) > 86400000) {
+               localStorage.removeItem('otgw_dallas_restore');
+               return labelsRestored;
              }
+             var labels = entry.data;
+             if (typeof labels !== 'object' || Object.keys(labels).length === 0) {
+               localStorage.removeItem('otgw_dallas_restore');
+               return labelsRestored;
+             }
+             if (onStatus) onStatus('Restoring Dallas sensor labels...');
+             labelsRestored = fetch('/api/v2/sensors/labels', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify(labels)
+             })
+             .then(function(res) {
+               if (res.ok) {
+                 localStorage.removeItem('otgw_dallas_restore');
+                 console.log('[OTA] Dallas labels restored (' + Object.keys(labels).length + ' sensor(s))');
+               } else {
+                 console.error('[OTA] Label restore failed: HTTP ' + res.status);
+               }
+             })
+             .catch(function(err) {
+               console.error('[OTA] Label restore error:', err);
+             });
            } catch (e) {
              console.log('[OTA] Label restore skipped:', e);
            }
            return labelsRestored;
+         }
+
+         function saveDallasLabelsToStorage() {
+           return fetch('/api/v2/sensors/labels', { cache: 'no-store' })
+             .then(function(res) {
+               if (!res.ok) return;
+               return res.json();
+             })
+             .then(function(labels) {
+               if (!labels || typeof labels !== 'object' || Object.keys(labels).length === 0) return;
+               localStorage.setItem('otgw_dallas_restore', JSON.stringify({ data: labels, savedAt: Date.now() }));
+               console.log('[OTA] Dallas labels saved to localStorage (' + Object.keys(labels).length + ' sensor(s))');
+             })
+             .catch(function(e) {
+               console.log('[OTA] Dallas labels save skipped (no sensors or error):', e);
+             });
          }
 
          function redirectToHome(delayMs) {
@@ -286,7 +312,7 @@ static const char UpdateServerIndex[] PROGMEM =
                }
 
                progressText.textContent = 'Device is back online!';
-               restoreDallasLabelsFromOpener(function(status) {
+               restoreDallasLabelsFromStorage(function(status) {
                  console.log('[OTA] ' + status);
                  progressText.textContent = status;
                }).then(function() {
@@ -348,13 +374,16 @@ static const char UpdateServerIndex[] PROGMEM =
 
              var preFlight = Promise.resolve();
 
-             // Backup settings and dallas labels before filesystem flash
+             // Before filesystem flash: download backups and save Dallas labels to localStorage
              if (formId === 'fsForm') {
                var chk = document.getElementById('chkPreserve');
                if (chk && chk.checked) {
                  console.log('[OTA] State: Downloading backups before filesystem flash');
                  progressText.textContent = 'Downloading backups...';
-                 preFlight = doBackups();
+                 preFlight = doBackups().then(function() { return saveDallasLabelsToStorage(); });
+               } else {
+                 // Always save labels to localStorage even when file download is skipped
+                 preFlight = saveDallasLabelsToStorage();
                }
              }
 
@@ -463,30 +492,40 @@ static const char UpdateServerSuccess[] PROGMEM =
       <br/>If nothing happens, refresh with <span style='font-size:1.3em;'><b><a href="/">this link here</a></b></span>.
       </body>
       <script>
-         function restoreDallasLabelsFromOpener(onStatus) {
+         function restoreDallasLabelsFromStorage(onStatus) {
            var labelsRestored = Promise.resolve();
            try {
-             if (window.opener && window.opener.dallasLabelsCache) {
-               var labels = window.opener.dallasLabelsCache;
-               if (labels && typeof labels === 'object' && Object.keys(labels).length > 0) {
-                 if (onStatus) onStatus('Restoring Dallas labels...');
-                 labelsRestored = fetch('/api/v2/sensors/labels', {
-                   method: 'POST',
-                   headers: { 'Content-Type': 'application/json' },
-                   body: JSON.stringify(labels)
-                 })
-                 .then(function(res) {
-                   if (res.ok) {
-                     console.log('[OTA] Dallas labels restored');
-                   } else {
-                     console.error('[OTA] Label restore failed: HTTP ' + res.status);
-                   }
-                 })
-                 .catch(function(err) {
-                   console.error('[OTA] Label restore error:', err);
-                 });
-               }
+             var stored = localStorage.getItem('otgw_dallas_restore');
+             if (!stored) return labelsRestored;
+             var entry;
+             try { entry = JSON.parse(stored); } catch(e) { localStorage.removeItem('otgw_dallas_restore'); return labelsRestored; }
+             // Discard if older than 24 hours (stale / wrong-device guard)
+             if (!entry || !entry.data || !entry.savedAt || (Date.now() - entry.savedAt) > 86400000) {
+               localStorage.removeItem('otgw_dallas_restore');
+               return labelsRestored;
              }
+             var labels = entry.data;
+             if (typeof labels !== 'object' || Object.keys(labels).length === 0) {
+               localStorage.removeItem('otgw_dallas_restore');
+               return labelsRestored;
+             }
+             if (onStatus) onStatus('Restoring Dallas sensor labels...');
+             labelsRestored = fetch('/api/v2/sensors/labels', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify(labels)
+             })
+             .then(function(res) {
+               if (res.ok) {
+                 localStorage.removeItem('otgw_dallas_restore');
+                 console.log('[OTA] Dallas labels restored (' + Object.keys(labels).length + ' sensor(s))');
+               } else {
+                 console.error('[OTA] Label restore failed: HTTP ' + res.status);
+               }
+             })
+             .catch(function(err) {
+               console.error('[OTA] Label restore error:', err);
+             });
            } catch (e) {
              console.log('[OTA] Label restore skipped:', e);
            }
@@ -556,7 +595,7 @@ static const char UpdateServerSuccess[] PROGMEM =
            onHealthy: function() {
              statusEl.textContent = "Device is back online!";
              statusEl.style.color = "green";
-             restoreDallasLabelsFromOpener(function(status) {
+             restoreDallasLabelsFromStorage(function(status) {
                statusEl.textContent = status;
              }).then(function() {
                statusEl.textContent = "Redirecting...";
