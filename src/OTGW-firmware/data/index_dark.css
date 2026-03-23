@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index_dark.css
-**  Version  : v1.3.0-rc2
+**  Version  : v1.3.0-rc3
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -57,62 +57,12 @@
      font-size: 12pt;
   }
   
-  .outer-div {
-    /*width: 90%; */
-    text-align: center;
-    background-color: #1a1a1a 
-  }
-  .inner-div {
-    display: inline-block; 
-    /*
-    margin: 0 auto;
-    padding: 3px;
-    background-color: #2c2c2e
-    */
-  }
-
   #displayMainPage, #displayPICflash, #displayDeviceInfo, #displaySettingsPage {
     max-width: 100%;
   }
 
   #displayPICflash div#firmwarename {
     width: 80%;
-  }
-  
-  .container-card {
-    padding: 50px;
-    margin: 50px;
-    list-style: none;
-    flex-direction: row; /*row | row-reverse | column | column-reverse*/
-    
-    display: -webkit-box;
-    display: -moz-box;
-    display: -ms-flexbox;
-    display: -webkit-flex;
-    display: flex;
-    
-    -webkit-flex-flow: row wrap;
-    flex-flow: row wrap;
-    justify-content: space-around; /* flex-start | flex-end | center | space-between | space-around | space-evenly */
-  
-  }
-  
-  .container-box {
-    padding: 10px;
-    margin: 10px;
-    list-style: none;
-    flex-direction: column; /*row | row-reverse | column | column-reverse*/
-    
-    display: -webkit-box;
-    display: -moz-box;
-    display: -ms-flexbox;
-    display: -webkit-flex;
-    display: flex;
-    
-    -webkit-flex-flow: column wrap;
-    flex-flow: column wrap;
-    justify-content: flex-start;
-    margin-top: 10px;
   }
   
   /*--------------------- N A V - B A R -----------------*/
@@ -276,26 +226,6 @@
     z-index: 1000;
   }
               
-  /*-- next 4 are for the API doc page --------*/
-  .div1 { 
-    float: left;  
-    margin-left: 20px; 
-    margin-top: 10px;
-  }
-  .div1 a:link, a:visited { 
-    background-color: #2c2c2e; 
-    color: #e0e0e0; 
-    padding: 5px 15px; 
-    width: 210px; 
-    text-align: right; 
-    text-decoration: none; 
-    display: inline-block;
-  }
-  .div1 a:hover, a:active { 
-    background-color: #3a3a3c;
-    color: #fff;
-  }
-  
 /* Graph Tab */
 .ot-graph-container {
     width: 100%;
@@ -430,9 +360,6 @@
   pointer-events: none;
   opacity: 0;
   -webkit-transition: opacity .15s ease-in-out;
-  -moz-transition: opacity .15s ease-in-out;
-  -ms-transition: opacity .15s ease-in-out;
-  -o-transition: opacity .15s ease-in-out;
   transition: opacity .15s ease-in-out;
 
   display: block;
@@ -609,11 +536,21 @@
 
 /* SettingsPage */
 #settingMessage {
-  background-color: #d35400;
+  display: none;
   width: 860px;
   margin-left: 10px;
   color: white;
   text-align: center;
+  padding: 8px;
+  border-radius: 4px;
+}
+#settingMessage.loading {
+  display: block;
+  background-color: #1565C0;
+}
+#settingMessage.error {
+  display: block;
+  background-color: #d35400;
 }
 
   /* define tag selectors () -------------------------------------------------- */

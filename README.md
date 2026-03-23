@@ -132,6 +132,28 @@ The exact steps and screenshots live in the wiki, but the general flow is:
 
 The Web UI and APIs are designed for use on a trusted local network. Do not expose the device directly to the internet; use a VPN for remote access. A reverse proxy can help with basic HTTP UI/API access, but live WebSocket features still assume plain HTTP/WS and may not work correctly through an HTTPS proxy.
 
+## Protected Endpoints Password
+
+You can optionally set an **endpoint password** in the settings (field: `httppasswd`). When set, the following actions require HTTP Basic Auth with username `admin` and your chosen password:
+
+### What IS protected
+
+- **Settings** — reading or changing any device configuration (MQTT broker, hostname, passwords, etc.)
+- **File management** — uploading or deleting files on the device's internal storage
+- **Reboot** — remotely restarting the gateway
+- **Reset wireless settings** — wiping saved Wi-Fi credentials and rebooting (requires re-pairing to your network)
+- **Over-the-air (OTA) firmware update** — flashing new firmware via the browser
+- **Webhook test** — manually triggering the configured webhook to verify it works
+
+### What is NOT protected
+
+- Reading sensor and OpenTherm values — monitoring only, no risk
+- Device status and health info — read-only
+- Main web UI page — entry point only
+- WebSocket connection — intentionally open by design for home automation integrations such as Home Assistant
+
+> **In short:** the password guards everything that can **change** the device — its settings, files, firmware, or cause it to restart. Read-only monitoring stays open.
+
 ## Community and support
 
 - Discord: <https://discord.gg/zjW3ju7vGQ>
@@ -156,6 +178,25 @@ The Web UI and APIs are designed for use on a trusted local network. Do not expo
 - Supports Home Assistant MQTT Auto Discovery (Home Assistant Core v2021.2.0+).
 - Accepts OTGW commands via MQTT (topic structure depends on your configured prefix; see the wiki for exact topics and examples).
 - Publishes event topics for command responses/errors and thermostat connection/power state changes.
+
+#### MQTT Publish Interval
+
+The MQTT interval setting controls how chatty the gateway is with your home automation system.
+
+Your boiler and thermostat are constantly talking to each other — many times per second. The gateway "listens in" on that conversation. Without an interval, it would flood your MQTT broker with the same values over and over, even when nothing changed (e.g. "boiler water is 65°C" published hundreds of times a minute).
+
+**What the setting does:**
+
+- **`0` (default)** — publish every single message from the boiler, even duplicates. Maximum freshness, maximum traffic.
+- **`60` (for example)** — a value is only re-published if it changed, or if 60 seconds have passed since the last publish. So you still get instant updates when something changes, but quiet values get a "heartbeat" only once per minute.
+
+**In plain terms:**
+
+Imagine your boiler is a kid who keeps shouting *"I'm still 65 degrees! Still 65! Still 65!"* every second. The interval setting tells the gateway: *"Only pass that along if the number changed, or if it's been a minute since you last said it."*
+
+It keeps your Home Assistant event log clean and reduces load on the MQTT broker, while still guaranteeing you'll get periodic confirmations that values are still the same (so HA doesn't think sensors went dead).
+
+Set this in the Web UI under **Settings → MQTT → Publish Interval (sec)**, or via the REST API field `mqttinterval`.
 
 #### MQTT Commands
 

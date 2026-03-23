@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v1.3.0-rc2
+**  Version  : v1.3.0-rc3
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -2836,8 +2836,10 @@ function settingsPage() {
   disconnectOTLogWebSocket();
   stopOTmonitorPolling();
   refreshDevTime();
-  refreshSettings();
   setActivePageSection('displaySettingsPage');
+  var msgEl = document.getElementById("settingMessage");
+  if (msgEl) { msgEl.textContent = "Loading settings\u2026"; msgEl.className = "loading"; }
+  refreshSettings();
 
 } // settingsPage()
 
@@ -3692,7 +3694,7 @@ function refreshSettings() {
       console.log("parsed .., data is [" + JSON.stringify(json) + "]");
       data = json.settings;
       const msgEl = document.getElementById("settingMessage");
-      if (msgEl) msgEl.textContent = "";
+      if (msgEl) { msgEl.textContent = ""; msgEl.className = ""; }
       for (const key in data) {
         if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
         const s = data[key]; // s.value, s.type, s.maxlen, s.max, s.min
@@ -3813,10 +3815,8 @@ function refreshSettings() {
       //console.log("-->done..");
     })
     .catch(function (error) {
-      var p = document.createElement('p');
-      p.appendChild(
-        document.createTextNode('Error: ' + error.message)
-      );
+      var msgEl = document.getElementById("settingMessage");
+      if (msgEl) { msgEl.textContent = "Error loading settings: " + error.message; msgEl.className = "error"; }
     });
 
 } // refreshSettings()
