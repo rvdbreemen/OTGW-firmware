@@ -177,13 +177,41 @@ struct UptimeSection {         // state.uptime — System longevity counters
   uint32_t iRebootCount  = 0;  // was rebootCount
 };
 
+struct PicSettingsSection {    // state.picSettings — settings polled from PIC via PR= commands
+  // Source: Schelte Bron's OTGW firmware documentation (https://otgw.tclcode.com/firmware.html)
+  // PR=A (About/version) is handled by getpicfwversion(); PR=M (mode) by queryOTGWgatewaymode().
+  // All other PR= reports are polled gradually by queryNextPICsetting(), one per 30s tick.
+
+  // --- Active settings (most useful for HA integration) ---
+  char sSetpointOverride[16]  = "";  // PR=O: setpoint override ("T20.5" TT active, "C20.5" TC active, "N" none)
+  char sSetback[16]           = "";  // PR=S: setback temperature (SB command value, e.g. "15.0")
+  char sDhwOverride[8]        = "";  // PR=W: DHW/hot-water override ("0"=off, "1"=on, "A"=auto)
+
+  // --- Hardware configuration ---
+  char sGpio[8]               = "";  // PR=G: GPIO A+B function codes (two digits, e.g. "05")
+  char sGpioStates[8]         = "";  // PR=I: GPIO A+B current input states (two digits, e.g. "00")
+  char sLed[8]                = "";  // PR=L: LED A–F function chars (six chars, e.g. "RFFTTT")
+  char sTweaks[8]             = "";  // PR=T: tweaks (two chars: ignore_transitions + ovrd_high_byte)
+  char sTempSensor[4]         = "";  // PR=D: external temp sensor function ("O"=outside, "R"=return; v5+ only)
+  char sSmartPower[8]         = "";  // PR=P: smart power mode ("L"=low, "M"=medium, "H"=high, "N"=off)
+  char sThermostatDetect[8]   = "";  // PR=R: thermostat detection setting
+
+  // --- Diagnostics ---
+  char sBuilddate[24]         = "";  // PR=B: firmware build date/time (e.g. "17:52 12-03-2023")
+  char sClockMHz[4]           = "";  // PR=C: PIC clock speed in MHz (e.g. "4")
+  char sResetCause[4]         = "";  // PR=Q: last reset cause ("W"=watchdog, "B"=brownout, "P"=power-on)
+  char sStandaloneInterval[8] = "";  // PR=N: message interval in standalone mode (seconds)
+  char sVoltageRef[4]         = "";  // PR=V: voltage reference setting (numeric)
+};
+
 struct OTGWState {
-  PICSection         pic;     // state.pic.bAvailable, state.pic.sFwversion
-  OTGWProtocol       otgw;   // state.otgw.bOnline, state.otgw.bBoilerState
-  MQTTRuntimeSection mqtt;   // state.mqtt.bConnected
-  FlashSection       flash;  // state.flash.bESPactive, state.flash.iPICprogress
-  DebugSection       debug;  // state.debug.bOTmsg, state.debug.bMQTT
-  UptimeSection      uptime; // state.uptime.iSeconds, state.uptime.iRebootCount
+  PICSection         pic;         // state.pic.bAvailable, state.pic.sFwversion
+  OTGWProtocol       otgw;        // state.otgw.bOnline, state.otgw.bBoilerState
+  MQTTRuntimeSection mqtt;        // state.mqtt.bConnected
+  FlashSection       flash;       // state.flash.bESPactive, state.flash.iPICprogress
+  DebugSection       debug;       // state.debug.bOTmsg, state.debug.bMQTT
+  UptimeSection      uptime;      // state.uptime.iSeconds, state.uptime.iRebootCount
+  PicSettingsSection picSettings; // state.picSettings — PR=-polled settings from PIC
   StatusMessage      statusMessage = StatusMessage::None;
   bool               bSetupComplete = false;
 };
