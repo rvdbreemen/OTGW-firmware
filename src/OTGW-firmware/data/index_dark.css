@@ -1178,3 +1178,40 @@ body.disable-interaction {
   border: none;
 }
 
+
+/* --- Gateway Settings panel (PR= polled values on PIC firmware page) --- */
+.pic-settings-section {
+  max-width: 720px;
+  margin: 18px 0 0 0;
+}
+.pic-settings-section-heading {
+  font-size: 1em;
+  font-weight: bold;
+  margin: 0 0 6px 0;
+  padding: 6px 10px;
+  background-color: #2c2c2e;
+  border: 1px solid #444;
+  border-radius: 3px 3px 0 0;
+}
+.pic-settings-group-cell {
+  display: table-cell;
+  padding: 5px 15px;
+  font-style: italic;
+  color: #999;
+  font-size: 0.9em;
+  border: none;
+  background: transparent;
+}
+.pic-settings-pending {
+  color: #666;
+  font-style: italic;
+}
+.pic-settings-refresh {
+  margin-top: 8px;
+  font-size: 0.85em;
+  color: #aaa;
+}
+.pic-settings-refresh button {
+  margin-right: 8px;
+  cursor: pointer;
+}
