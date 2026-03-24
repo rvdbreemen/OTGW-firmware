@@ -3240,6 +3240,15 @@ function refreshFirmware() {
       
       displayPICpage.appendChild(progressDiv);
 
+      // --- Gateway Settings section (PR= polled values) ---
+      var picSettingsSection = document.createElement('div');
+      picSettingsSection.id = 'picSettingsSection';
+      picSettingsSection.className = 'pic-settings-section';
+      displayPICpage.appendChild(picSettingsSection);
+
+      // Populate gateway settings now that the container exists
+      refreshPICsettings();
+
       // Fire off the on-demand update check — makes an outbound call so may take a moment
       fetch(APIGW + "v2/pic/update-check")
         .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
@@ -3278,6 +3287,139 @@ function refreshFirmware() {
 
 
 }
+
+
+//============================================================================
+// Gateway Settings panel — populated from GET /api/v2/pic/settings
+// Appends a read-only table to displayPICpage showing all 15 PR= cached values.
+function refreshPICsettings() {
+  var container = document.getElementById('picSettingsSection');
+  if (!container) return;
+
+  // Grouped display: [ label, json_key, unit_hint ]
+  var groups = [
+    {
+      title: 'Active state',
+      rows: [
+        ['Setpoint override',     'setpoint_override',   ''],
+        ['Setback temperature',   'setback',             '\u00b0C'],
+        ['DHW override',          'dhw_override',        '(0=off 1=on A=auto)']
+      ]
+    },
+    {
+      title: 'Hardware config',
+      rows: [
+        ['GPIO functions',        'gpio',                ''],
+        ['GPIO states',           'gpio_states',         ''],
+        ['LED functions',         'led',                 ''],
+        ['Tweaks',                'tweaks',              ''],
+        ['Temp sensor',           'temp_sensor',         '(O=outside R=return)'],
+        ['Smart power',           'smart_power',         '(L/M/H/N)'],
+        ['Thermostat detect',     'thermostat_detect',   '']
+      ]
+    },
+    {
+      title: 'Diagnostics',
+      rows: [
+        ['Build date',            'builddate',           ''],
+        ['Clock speed',           'clock_mhz',           'MHz'],
+        ['Reset cause',           'reset_cause',         '(W=watchdog B=brownout P=power-on)'],
+        ['Standalone interval',   'standalone_interval', 's'],
+        ['Voltage reference',     'voltage_ref',         '']
+      ]
+    }
+  ];
+
+  fetch(APIGW + 'v2/pic/settings')
+    .then(function(r) {
+      if (!r.ok) { throw new Error('HTTP ' + r.status); }
+      return r.json();
+    })
+    .then(function(json) {
+      var s = (json && json.pic_settings) ? json.pic_settings : {};
+
+      // Clear previous content
+      while (container.lastChild) { container.lastChild.remove(); }
+
+      var heading = document.createElement('div');
+      heading.className = 'pic-settings-section-heading';
+      heading.textContent = 'Gateway Settings';
+      container.appendChild(heading);
+
+      var table = document.createElement('div');
+      table.className = 'pictable';
+
+      groups.forEach(function(group) {
+        // Group header row
+        var groupRow = document.createElement('div');
+        groupRow.className = 'picrow';
+        var groupCell = document.createElement('div');
+        groupCell.className = 'piccolumn1 pic-settings-group-cell';
+        groupCell.setAttribute('colspan', '2');
+        groupCell.style.fontStyle = 'italic';
+        groupCell.style.color = '';
+        groupCell.textContent = group.title;
+        var emptyCell = document.createElement('div');
+        emptyCell.className = 'piccolumn2';
+        emptyCell.textContent = '';
+        groupRow.appendChild(groupCell);
+        groupRow.appendChild(emptyCell);
+        table.appendChild(groupRow);
+
+        group.rows.forEach(function(rowDef) {
+          var label = rowDef[0];
+          var key   = rowDef[1];
+          var unit  = rowDef[2];
+          var val   = (s[key] !== undefined && s[key] !== '') ? s[key] : null;
+
+          var row = document.createElement('div');
+          row.className = 'picrow';
+
+          var c1 = document.createElement('div');
+          c1.className = 'piccolumn1';
+          c1.textContent = label;
+          row.appendChild(c1);
+
+          var c2 = document.createElement('div');
+          c2.className = 'piccolumn2';
+          if (val !== null) {
+            c2.textContent = val + (unit ? '\u00a0' + unit : '');
+          } else {
+            c2.className += ' pic-settings-pending';
+            c2.textContent = '\u2014';
+          }
+          row.appendChild(c2);
+
+          table.appendChild(row);
+        });
+      });
+
+      container.appendChild(table);
+
+      var footer = document.createElement('div');
+      footer.className = 'pic-settings-refresh';
+      var btn = document.createElement('button');
+      btn.className = 'nav-item';
+      btn.textContent = '\u21bb Refresh';
+      btn.addEventListener('click', function() { refreshPICsettings(); });
+      footer.appendChild(btn);
+      var note = document.createElement('span');
+      note.textContent = 'Polled every \u223c7.5\u00a0min (one PR= command per 30\u00a0s tick)';
+      footer.appendChild(note);
+      container.appendChild(footer);
+    })
+    .catch(function(err) {
+      while (container.lastChild) { container.lastChild.remove(); }
+      var heading = document.createElement('div');
+      heading.className = 'pic-settings-section-heading';
+      heading.textContent = 'Gateway Settings';
+      container.appendChild(heading);
+      var msg = document.createElement('div');
+      msg.style.padding = '8px 10px';
+      msg.textContent = 'Could not load PIC settings: ' + err.message;
+      container.appendChild(msg);
+    });
+} // refreshPICsettings()
 
 
 //============================================================================  
