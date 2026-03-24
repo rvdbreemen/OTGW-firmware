@@ -367,7 +367,7 @@ void doTaskEvery5s(){
 //===[ Do task every 30s ]===
 void doTaskEvery30s(){
   //== do tasks ==
-  // Gradually poll PIC settings via PR= commands (one per tick, ~3-min full cycle)
+  // Gradually poll PIC settings via PR= commands (one per tick, ~7.5-min full cycle)
   queryNextPICsetting();
 }
 

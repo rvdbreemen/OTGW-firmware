@@ -689,11 +689,23 @@ void queryNextPICsetting() {
   OTGWDebugTf(PSTR("queryNextPICsetting: PR=%c response=[%s]\r\n"), letter, rp);
 
   // Responses are "X=value" (e.g. "O=T20.5", "O=N", "S=15.0", "W=A", "B=17:52 12-03-2023")
-  // First char must match the expected letter; NG/SE/TO are silently ignored.
+  // First char must match the expected letter.
   const char* eqp = strchr(rp, '=');
   if (!eqp || rp[0] != letter || *(eqp + 1) == '\0') {
+    if (rlen >= 2) {
+      // Known OTGW error/unsupported responses: silently ignore (NG=No Good,
+      // SE=Syntax Error, TO=Timeout, BV=Bad Value, OR=Out of Range).
+      // These are expected for PR= commands the PIC firmware doesn't support.
+      if ((strncmp_P(rp, PSTR("NG"), 2) == 0) ||
+          (strncmp_P(rp, PSTR("SE"), 2) == 0) ||
+          (strncmp_P(rp, PSTR("TO"), 2) == 0) ||
+          (strncmp_P(rp, PSTR("BV"), 2) == 0) ||
+          (strncmp_P(rp, PSTR("OR"), 2) == 0)) {
+        return; // silently ignore
+      }
+    }
     if (rlen > 0) {
-      OTGWDebugTf(PSTR("queryNextPICsetting: PR=%c unexpected/unsupported response [%s]\r\n"), letter, rp);
+      OTGWDebugTf(PSTR("queryNextPICsetting: PR=%c unexpected response [%s]\r\n"), letter, rp);
     }
     return;
   }
@@ -703,8 +715,9 @@ void queryNextPICsetting() {
   // Publish and update cached value only when it changes
   if (strcmp(stateField, value) != 0) {
     strlcpy(stateField, value, fieldSize);
-    OTGWDebugTf(PSTR("queryNextPICsetting: PR=%c updated to [%s]\r\n"), letter, value);
-    sendMQTTData(mqttTopic, value);
+    // Log and publish the cached (possibly truncated) value to keep MQTT and REST consistent
+    OTGWDebugTf(PSTR("queryNextPICsetting: PR=%c updated to [%s]\r\n"), letter, stateField);
+    sendMQTTData(mqttTopic, stateField);
   }
 }
 
