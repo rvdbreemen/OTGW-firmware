@@ -383,7 +383,8 @@ void doTaskEvery5s(){
 //===[ Do task every 30s ]===
 void doTaskEvery30s(){
   //== do tasks ==
- 
+  // Gradually poll PIC settings via PR= commands (one per tick, ~7.5-min full cycle)
+  queryNextPICsetting();
 }
 
 //===[ Do task every 60s ]===
@@ -451,6 +452,7 @@ void do5minevent(){
   sendMQTTuptime();
   sendMQTTversioninfo();
   sendMQTTstateinformation();
+  publishAllPICsettings();  // Re-publish cached PIC settings every 5 min
 }
 
 static void handleEspFlashBackgroundTasks()

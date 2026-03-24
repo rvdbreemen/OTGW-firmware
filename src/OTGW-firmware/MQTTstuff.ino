@@ -824,6 +824,7 @@ void handleMQTT()
         }
         MQTTclient.subscribe("homeassistant/status"); //start monitoring the status of homeassistant, if it goes down, then force a restart after it comes back online.
         sendMQTTversioninfo();
+        publishAllPICsettings();  // Republish any cached PIC settings on (re)connect
       }
       else
       { // no connection, try again, do a non-blocking wait for 3 seconds.

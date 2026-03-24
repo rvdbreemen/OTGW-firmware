@@ -250,6 +250,8 @@ static void handlePic(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     sendPICFlashStatus();
   } else if (wc > 4 && strcmp_P(words[4], PSTR("update-check")) == 0) {
     sendPICUpdateCheck();
+  } else if (wc > 4 && strcmp_P(words[4], PSTR("settings")) == 0) {
+    sendPICsettings();
   } else {
     sendApiNotFound(originalURI);
   }
@@ -881,6 +883,36 @@ void sendDeviceCrashLog()
   sendEndJsonMap(F("crashlog"));
 }
 
+
+//=======================================================================
+// GET /api/v2/pic/settings
+// Returns the cached PIC settings last queried via PR= commands.
+// Settings are polled one per 30s tick; full cycle completes in ~7.5 minutes.
+// Empty string means "not yet queried" (or not supported by this firmware version).
+// Source: Schelte Bron's OTGW firmware docs (https://otgw.tclcode.com/firmware.html)
+void sendPICsettings()
+{
+  sendStartJsonMap(F("pic_settings"));
+  // Active settings
+  sendJsonMapEntry(F("setpoint_override"),   state.picSettings.sSetpointOverride);
+  sendJsonMapEntry(F("setback"),             state.picSettings.sSetback);
+  sendJsonMapEntry(F("dhw_override"),        state.picSettings.sDhwOverride);
+  // Hardware configuration
+  sendJsonMapEntry(F("gpio"),                state.picSettings.sGpio);
+  sendJsonMapEntry(F("gpio_states"),         state.picSettings.sGpioStates);
+  sendJsonMapEntry(F("led"),                 state.picSettings.sLed);
+  sendJsonMapEntry(F("tweaks"),              state.picSettings.sTweaks);
+  sendJsonMapEntry(F("temp_sensor"),         state.picSettings.sTempSensor);
+  sendJsonMapEntry(F("smart_power"),         state.picSettings.sSmartPower);
+  sendJsonMapEntry(F("thermostat_detect"),   state.picSettings.sThermostatDetect);
+  // Diagnostics
+  sendJsonMapEntry(F("builddate"),           state.picSettings.sBuilddate);
+  sendJsonMapEntry(F("clock_mhz"),           state.picSettings.sClockMHz);
+  sendJsonMapEntry(F("reset_cause"),         state.picSettings.sResetCause);
+  sendJsonMapEntry(F("standalone_interval"), state.picSettings.sStandaloneInterval);
+  sendJsonMapEntry(F("voltage_ref"),         state.picSettings.sVoltageRef);
+  sendEndJsonMap(F("pic_settings"));
+} // sendPICsettings()
 
 //=======================================================================
 void sendPICFlashStatus()
