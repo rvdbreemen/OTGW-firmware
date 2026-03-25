@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v1.3.0
+**  Version  : v1.3.0-rc4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3292,6 +3292,194 @@ function refreshFirmware() {
 //============================================================================
 // Gateway Settings panel — populated from GET /api/v2/pic/settings
 // Appends a read-only table to displayPICpage showing all 15 PR= cached values.
+function mapPICCode(code, table, fallbackPrefix) {
+  if (typeof code !== 'string' || code.length === 0) return '';
+
+  if (Object.prototype.hasOwnProperty.call(table, code)) {
+    return table[code];
+  }
+
+  return fallbackPrefix ? (fallbackPrefix + code) : code;
+}
+
+function formatPICSetpointOverride(value) {
+  if (typeof value !== 'string' || value.length === 0) return '';
+
+  if (value === 'N' || value === '0') {
+    return 'No override';
+  }
+
+  if (value.length > 1) {
+    var mode = value.charAt(0);
+    var temp = value.slice(1);
+    if (mode === 'T') return 'Temporary override to ' + temp + ' °C';
+    if (mode === 'C') return 'Constant override to ' + temp + ' °C';
+  }
+
+  return value;
+}
+
+function formatPICDhwOverride(value) {
+  return mapPICCode(value, {
+    '0': 'Off',
+    '1': 'On',
+    'A': 'Auto',
+    'P': 'Push once'
+  }, 'Code ');
+}
+
+function formatPICGpioFunctions(value) {
+  if (typeof value !== 'string' || value.length === 0) return '';
+
+  var gpioMap = {
+    '0': 'Input',
+    '1': 'Ground',
+    '2': 'Vcc',
+    '3': 'LED E',
+    '4': 'LED F',
+    '5': 'Home',
+    '6': 'Away',
+    '7': 'DS18x20 sensor',
+    '8': 'DHW block'
+  };
+  var labels = ['A', 'B'];
+  var parts = [];
+
+  for (var i = 0; i < value.length && i < labels.length; i++) {
+    parts.push(labels[i] + ': ' + mapPICCode(value.charAt(i), gpioMap, 'Code '));
+  }
+
+  return parts.length ? parts.join(' | ') : value;
+}
+
+function formatPICGpioStates(value) {
+  if (typeof value !== 'string' || value.length === 0) return '';
+
+  var labels = ['A', 'B'];
+  var parts = [];
+
+  for (var i = 0; i < value.length && i < labels.length; i++) {
+    parts.push(labels[i] + ': ' + (value.charAt(i) === '1' ? 'High' : 'Low'));
+  }
+
+  return parts.length ? parts.join(' | ') : value;
+}
+
+function formatPICLedFunctions(value) {
+  if (typeof value !== 'string' || value.length === 0) return '';
+
+  var ledMap = {
+    'R': 'Receive',
+    'X': 'Transmit',
+    'T': 'Master traffic',
+    'B': 'Slave traffic',
+    'O': 'Remote override active',
+    'F': 'Flame',
+    'H': 'Central heating',
+    'W': 'Hot water',
+    'C': 'Comfort mode',
+    'E': 'Transmission error',
+    'M': 'Maintenance required',
+    'P': 'Raised power mode'
+  };
+  var labels = ['A', 'B', 'C', 'D', 'E', 'F'];
+  var parts = [];
+
+  for (var i = 0; i < value.length && i < labels.length; i++) {
+    parts.push(labels[i] + ': ' + mapPICCode(value.charAt(i), ledMap, 'Code '));
+  }
+
+  return parts.length ? parts.join(' | ') : value;
+}
+
+function formatPICTweaks(value) {
+  if (typeof value !== 'string' || value.length === 0) return '';
+
+  var parts = [];
+
+  if (value.length >= 1) {
+    parts.push('Ignore transitions: ' + (value.charAt(0) === '1' ? 'On' : 'Off'));
+  }
+  if (value.length >= 2) {
+    parts.push('Override in high byte: ' + (value.charAt(1) === '1' ? 'On' : 'Off'));
+  }
+
+  return parts.length ? parts.join(' | ') : value;
+}
+
+function formatPICTempSensor(value) {
+  return mapPICCode(value, {
+    'O': 'Outside temperature',
+    'R': 'Return water temperature'
+  }, 'Code ');
+}
+
+function formatPICSmartPower(value) {
+  return mapPICCode(value, {
+    'L': 'Low power',
+    'M': 'Medium power',
+    'H': 'High power',
+    'N': 'Normal power'
+  }, 'Code ');
+}
+
+function formatPICThermostatDetect(value) {
+  return mapPICCode(value, {
+    'C': 'Forced: Remeha Celcia 20',
+    'I': 'Forced: Remeha iSense',
+    'S': 'Forced: Standard thermostat',
+    'D': 'Auto-detect (default)',
+    'A': 'Auto-detect'
+  }, 'Code ');
+}
+
+function formatPICResetCause(value) {
+  return mapPICCode(value, {
+    'B': 'Brownout',
+    'C': 'By command (GW=R)',
+    'E': 'External reset',
+    'L': 'Stuck in loop',
+    'O': 'Stack overflow',
+    'P': 'Power-on',
+    'S': 'Serial BREAK',
+    'U': 'Stack underflow',
+    'W': 'Watchdog timer'
+  }, 'Code ');
+}
+
+function formatPICVoltageRef(value) {
+  return (typeof value === 'string' && value.length > 0) ? ('Level ' + value) : '';
+}
+
+function formatPICSettingValue(key, value) {
+  switch (key) {
+    case 'setpoint_override':
+      return formatPICSetpointOverride(value);
+    case 'dhw_override':
+      return formatPICDhwOverride(value);
+    case 'gpio':
+      return formatPICGpioFunctions(value);
+    case 'gpio_states':
+      return formatPICGpioStates(value);
+    case 'led':
+      return formatPICLedFunctions(value);
+    case 'tweaks':
+      return formatPICTweaks(value);
+    case 'temp_sensor':
+      return formatPICTempSensor(value);
+    case 'smart_power':
+      return formatPICSmartPower(value);
+    case 'thermostat_detect':
+      return formatPICThermostatDetect(value);
+    case 'reset_cause':
+      return formatPICResetCause(value);
+    case 'voltage_ref':
+      return formatPICVoltageRef(value);
+    default:
+      return value;
+  }
+}
+
 function refreshPICsettings() {
   var container = document.getElementById('picSettingsSection');
   if (!container) return;
@@ -3371,6 +3559,7 @@ function refreshPICsettings() {
           var key   = rowDef[1];
           var unit  = rowDef[2];
           var val   = (s[key] !== undefined && s[key] !== '') ? s[key] : null;
+          var displayVal = val !== null ? formatPICSettingValue(key, val) : null;
 
           var row = document.createElement('div');
           row.className = 'picrow';
@@ -3383,7 +3572,7 @@ function refreshPICsettings() {
           var c2 = document.createElement('div');
           c2.className = 'piccolumn2';
           if (val !== null) {
-            c2.textContent = val + (unit ? '\u00a0' + unit : '');
+            c2.textContent = displayVal + (unit ? '\u00a0' + unit : '');
           } else {
             c2.className += ' pic-settings-pending';
             c2.textContent = '\u2014';
