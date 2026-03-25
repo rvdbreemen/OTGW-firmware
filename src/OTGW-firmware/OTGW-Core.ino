@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.3.0
+**  Version  : v1.3.0-rc4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -489,7 +489,7 @@ This is done by sending a PR=A command, requesting a banner from the PIC. This w
 */
 void getpicfwversion(){
   char buf[128];
-  executeCommand("PR=A", buf, sizeof(buf));
+  executeCommand("PR=A", buf, sizeof(buf), true);
   const char* p = strstr(buf, OTGW_BANNER);
   if (p) {
     p += sizeof(OTGW_BANNER)-1;
@@ -530,7 +530,7 @@ bool queryOTGWgatewaymode(){
   }
   
   char response[128];
-  executeCommand("PR=M", response, sizeof(response));
+  executeCommand("PR=M", response, sizeof(response), true);
   // Trim leading/trailing whitespace in-place
   char* rp = response;
   while (*rp == ' ' || *rp == '\t' || *rp == '\r' || *rp == '\n') rp++;
@@ -678,7 +678,7 @@ void queryNextPICsetting() {
   snprintf_P(cmd, sizeof(cmd), PSTR("PR=%c"), letter);
 
   char response[64];
-  executeCommand(cmd, response, sizeof(response));
+  executeCommand(cmd, response, sizeof(response), true);
 
   // Trim leading/trailing whitespace in-place
   char* rp = response;
@@ -717,6 +717,11 @@ void queryNextPICsetting() {
     strlcpy(stateField, value, fieldSize);
     // Log and publish the cached (possibly truncated) value to keep MQTT and REST consistent
     OTGWDebugTf(PSTR("queryNextPICsetting: PR=%c updated to [%s]\r\n"), letter, stateField);
+    if (hasWebSocketClients()) {
+      char eventBuf[80];
+      snprintf_P(eventBuf, sizeof(eventBuf), PSTR("PIC discovery updated: PR=%c -> %s"), letter, stateField);
+      sendEventToWebSocket('*', eventBuf);
+    }
     sendMQTTData(mqttTopic, stateField);
   }
 }
@@ -768,7 +773,7 @@ void sendOTGWbootcmd(){
 }
 
 //===================[ OTGW Command & Response ]===================
-void executeCommand(const char* sCmd, char* outBuf, size_t outSize){
+void executeCommand(const char* sCmd, char* outBuf, size_t outSize, bool mirrorToWebSocket){
   //send command to OTGW — uses char[] buffers per ADR-004 (no heap allocation)
   if (outSize > 0) outBuf[0] = '\0';
   OTGWDebugTf(PSTR("OTGW Send Cmd [%s]\r\n"), sCmd);
@@ -776,11 +781,17 @@ void executeCommand(const char* sCmd, char* outBuf, size_t outSize){
   if (state.debug.bOTGWSimulation) {
     OTGWDebugTln(F("OTGW simulation active - executeCommand blocked"));
     strlcpy(outBuf, "SE - OTGW simulation active.", outSize);
+    if (mirrorToWebSocket && hasWebSocketClients()) {
+      sendEventToWebSocket_P('!', PSTR("SE - OTGW simulation active."));
+    }
     return;
   }
   if (cmdLen < 2) {
     OTGWDebugTln(F("Send command too short"));
     strlcpy(outBuf, "SE - Command too short.", outSize);
+    if (mirrorToWebSocket && hasWebSocketClients()) {
+      sendEventToWebSocket_P('!', PSTR("SE - Command too short."));
+    }
     return;
   }
   OTGWSerial.setTimeout(1000);
@@ -791,6 +802,9 @@ void executeCommand(const char* sCmd, char* outBuf, size_t outSize){
   OTGWSerial.write(sCmd);
   OTGWSerial.write("\r\n");
   OTGWSerial.flush();
+  if (mirrorToWebSocket && hasWebSocketClients()) {
+    sendEventToWebSocket('>', sCmd);
+  }
   //wait for response
   RESTART_TIMER(tmrWaitForIt);
   while(!OTGWSerial.available() && !DUE(tmrWaitForIt)) {
@@ -832,6 +846,21 @@ void executeCommand(const char* sCmd, char* outBuf, size_t outSize){
     strlcpy(outBuf, "TO - Timeout. No response.", outSize);
   } else {
     strlcpy(outBuf, line, outSize); //some commands return a string, just return that.
+  }
+  if (mirrorToWebSocket && hasWebSocketClients()) {
+    if (lineLen == 0) {
+      sendEventToWebSocket_P('!', PSTR("TO - Timeout. No response."));
+    } else if ((strncmp(line, "NG", 2) == 0) ||
+               (strncmp(line, "SE", 2) == 0) ||
+               (strncmp(line, "BV", 2) == 0) ||
+               (strncmp(line, "OR", 2) == 0) ||
+               (strncmp(line, "NS", 2) == 0) ||
+               (strncmp(line, "NF", 2) == 0) ||
+               (strncmp(line, "OE", 2) == 0)) {
+      sendEventToWebSocket('!', line);
+    } else {
+      sendEventToWebSocket('<', line);
+    }
   }
   OTGWDebugTf(PSTR("Command send [%s]-[%s] - Response line: [%s] - Returned value: [%s]\r\n"), sCmd, cmdPrefix, line, outBuf);
 }
