@@ -180,7 +180,7 @@ struct UptimeSection {         // state.uptime — System longevity counters
 struct PicSettingsSection {    // state.picSettings — settings polled from PIC via PR= commands
   // Source: Schelte Bron's OTGW firmware documentation (https://otgw.tclcode.com/firmware.html)
   // PR=A (About/version) is handled by getpicfwversion(); PR=M (mode) by queryOTGWgatewaymode().
-  // All other PR= reports are polled gradually by queryNextPICsetting(), one per 30s tick.
+  // All other PR= reports are polled on-demand by queryNextPICsetting(), one per 3s tick.
 
   // --- Active settings (most useful for HA integration) ---
   char sSetpointOverride[16]  = "";  // PR=O: setpoint override ("T20.5" TT active, "C20.5" TC active, "N" none)
