@@ -887,11 +887,12 @@ void sendDeviceCrashLog()
 //=======================================================================
 // GET /api/v2/pic/settings
 // Returns the cached PIC settings last queried via PR= commands.
-// Settings are polled one per 30s tick; full cycle completes in ~7.5 minutes.
+// Triggers a new readout cycle (one PR= every 3s, ~45s full cycle).
 // Empty string means "not yet queried" (or not supported by this firmware version).
 // Source: Schelte Bron's OTGW firmware docs (https://otgw.tclcode.com/firmware.html)
 void sendPICsettings()
 {
+  triggerPICsettingsReadout();  // re-read all settings from PIC
   sendStartJsonMap(F("pic_settings"));
   // Active settings
   sendJsonMapEntry(F("setpoint_override"),   state.picSettings.sSetpointOverride);

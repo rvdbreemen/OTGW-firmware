@@ -197,6 +197,7 @@ void setup() {
   // Clear the triple-reset portal counter: a successful setup() proves the device is healthy.
   // This prevents USB flash resets or stale RTC data from triggering the portal on next boot.
   clearWifiPortalResetState();
+  triggerPICsettingsReadout();  // Start initial PIC settings discovery cycle
   state.bSetupComplete = true; // ADR-036: allow doBackgroundTasks() to run service handlers
 }
 //=====================================================================
@@ -383,8 +384,6 @@ void doTaskEvery5s(){
 //===[ Do task every 30s ]===
 void doTaskEvery30s(){
   //== do tasks ==
-  // Gradually poll PIC settings via PR= commands (one per tick, ~7.5-min full cycle)
-  queryNextPICsetting();
 }
 
 //===[ Do task every 60s ]===
@@ -535,6 +534,7 @@ void loop()
       if (DUE(timer5s))                 doTaskEvery5s();
       if (DUE(timer1s))                 doTaskEvery1s();
       if (minuteChanged())              doTaskMinuteChanged(); //exactly on the minute
+      pollPICsettings();                // on-demand PIC settings readout (3s spacing)
       evalOutputs();                    // when the bits change, the output gpio bit will follow
       evalWebhook();                    // when the trigger bit changes, fire the webhook
       handlePendingUpgrade();           // Check if we need to start an upgrade

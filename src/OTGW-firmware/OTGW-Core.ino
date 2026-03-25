@@ -577,11 +577,47 @@ bool queryOTGWgatewaymode(){
   return cachedGatewayMode;
 }
 
+//===================[ PIC settings readout control ]=============
+/*
+  On-demand PIC settings readout.
+  Call triggerPICsettingsReadout() to start a full cycle.
+  pollPICsettings() is called from the main loop every iteration;
+  it spaces out PR= commands every 3 seconds when a cycle is active.
+
+  A cycle runs automatically at boot. Subsequent cycles are triggered
+  by the REST API (GET /api/v2/pic/settings) or after any command
+  is sent to the PIC via addOTWGcmdtoqueue().
+
+  Multiple rapid triggers are coalesced: while a cycle is in
+  progress, additional triggers are silently ignored.
+*/
+static bool     picSettingsCycleActive = false;
+static uint8_t  picSettingsQueryIdx    = 0;
+static constexpr uint8_t kPICSettingsCount = 15;
+
+void triggerPICsettingsReadout() {
+  if (picSettingsCycleActive) {
+    return;  // cycle already in progress — ignore until it completes
+  }
+  picSettingsQueryIdx    = 0;
+  picSettingsCycleActive = true;
+  OTGWDebugTln(F("PIC settings readout cycle triggered"));
+}
+
+void pollPICsettings() {
+  if (!picSettingsCycleActive) return;
+
+  DECLARE_TIMER_SEC(timerPICquery, 3, SKIP_MISSED_TICKS);
+  if (!DUE(timerPICquery)) return;
+
+  queryNextPICsetting();
+}
+
 //===================[ queryNextPICsetting ]======================
 /*
-  Gradually polls PIC settings one at a time via PR= commands.
-  Each call sends exactly one PR= query and advances to the next setting.
-  Call this every ~30 seconds to complete a full cycle in ~7.5 minutes.
+  Polls one PIC setting via a PR= command and advances to the next.
+  Called by pollPICsettings() every 3 seconds during an active cycle.
+  A full cycle of 15 settings completes in ~45 seconds.
 
   PR= command reference (Schelte Bron, https://otgw.tclcode.com/firmware.html):
     PR=A and PR=M are handled separately (getpicfwversion / queryOTGWgatewaymode).
@@ -610,11 +646,12 @@ void queryNextPICsetting() {
   if (!state.pic.bAvailable || !state.otgw.bOnline) return;
   if (state.flash.bESPactive || state.flash.bPICactive) return;
 
-  static uint8_t nextQueryIdx = 0;
-  constexpr uint8_t kNQueries = 15;
-
-  const uint8_t idx = nextQueryIdx;
-  nextQueryIdx = (nextQueryIdx + 1) % kNQueries;
+  const uint8_t idx = picSettingsQueryIdx;
+  picSettingsQueryIdx++;
+  if (picSettingsQueryIdx >= kPICSettingsCount) {
+    picSettingsCycleActive = false;
+    OTGWDebugTln(F("PIC settings readout cycle complete"));
+  }
 
   // Resolve all query properties in a single switch (letter, state field, MQTT topic)
   char        letter     = 0;
@@ -2616,6 +2653,16 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
       OTGWDebugTln(F("CmdQueue: Error: Reached max queue"));
     }
   } else OTGWDebugTf(PSTR("CmdQueue: Found command at: [%d] - [%d]\r\n"), insertptr, cmdQueueSize);
+
+  // Trigger PIC settings re-read after any setting-change command.
+  // Exclude read-only commands: PR (print register), PS (print summary), SC (time sync).
+  if (len >= 2 &&
+      !(buf[0] == 'P' && buf[1] == 'R') &&
+      !(buf[0] == 'P' && buf[1] == 'S') &&
+      !(buf[0] == 'S' && buf[1] == 'C')) {
+    triggerPICsettingsReadout();
+  }
+
   OTGWDebugFlush();
 }
 

@@ -143,7 +143,7 @@ let mainPageCompatWarningShown = false;
 let otLogCompatWarningShown = false;
 let picSettingsRefreshTimer = null;
 
-const PIC_SETTINGS_REFRESH_INTERVAL_MS = 30000;
+const PIC_SETTINGS_REFRESH_INTERVAL_MS = 3000;
 const PIC_SETTINGS_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 function isPageVisible() {
@@ -342,16 +342,16 @@ function updateGatewayModeIndicator(value) {
 
   if (value === 'gateway') {
     statusEl.className = 'mode-status mode-gateway';
-    textEl.textContent = 'Gateway Mode: Gateway';
+    textEl.textContent = 'Gateway';
   } else if (value === 'monitor') {
     statusEl.className = 'mode-status mode-monitor';
-    textEl.textContent = 'Gateway Mode: Monitor';
+    textEl.textContent = 'Monitor';
   } else if (value === 'unavailable') {
     statusEl.className = 'mode-status mode-unknown';
-    textEl.textContent = 'Gateway Mode: Unavailable';
+    textEl.textContent = 'Unavailable';
   } else {
     statusEl.className = 'mode-status mode-unknown';
-    textEl.textContent = 'Gateway Mode: Detecting...';
+    textEl.textContent = 'Detecting...';
   }
 }
 
@@ -1691,15 +1691,16 @@ function updateWSStatus(connected) {
   
   if (!statusEl || !statusTextEl) return;
   
+  var tip = 'Live WebSocket connection to the gateway for real-time OpenTherm message streaming';
   if (connected) {
     statusEl.className = 'ws-status ws-connected';
     statusTextEl.textContent = 'Connected';
-    // statusEl.style.color = 'green'; // Force color - removed, using CSS class
   } else {
     statusEl.className = 'ws-status ws-disconnected';
     statusTextEl.textContent = 'Disconnected';
-    // statusEl.style.color = 'red'; // Force color - removed, using CSS class
   }
+  statusEl.title = tip;
+  statusTextEl.title = tip;
 }
 
 function parseSimulationValue(rawValue) {
@@ -3734,7 +3735,7 @@ function refreshPICsettings() {
       var footer = document.createElement('div');
       footer.className = 'pic-settings-refresh';
       var note = document.createElement('span');
-      note.innerHTML = 'Polled every \u223c7.5\u00a0min (one PR= command per 30\u00a0s tick). '
+      note.innerHTML = 'Settings read on demand (one PR= every 3\u00a0s, full cycle \u223c45\u00a0s). '
         + '<span class="pic-val-live">Green</span>\u00a0=\u00a0live, '
         + '<span class="pic-val-cached">orange</span>\u00a0=\u00a0cached (up to 7\u00a0days), '
         + 'gray\u00a0=\u00a0not yet discovered.';
