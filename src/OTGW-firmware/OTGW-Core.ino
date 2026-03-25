@@ -604,10 +604,12 @@ bool queryOTGWgatewaymode(){
 
   Values are stored in state.picSettings and published to MQTT when they change.
   NG/SE/TO responses are silently ignored (keeps previous cached value).
-  Skips all queries when PIC is unavailable, offline, or flashing is in progress.
+  Skips all queries when PIC is unavailable or flashing is in progress.
+  PR= queries work regardless of OpenTherm bus activity (bOnline), because the PIC
+  responds to these commands independently of the boiler/thermostat being present.
 */
 void queryNextPICsetting() {
-  if (!state.pic.bAvailable || !state.otgw.bOnline) return;
+  if (!state.pic.bAvailable) return;
   if (state.flash.bESPactive || state.flash.bPICactive) return;
 
   static uint8_t nextQueryIdx = 0;
