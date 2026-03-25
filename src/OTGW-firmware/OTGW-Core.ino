@@ -758,18 +758,20 @@ void queryNextPICsetting() {
   }
 
   const char* value = eqp + 1;
+  bool changed = (strcmp(stateField, value) != 0);
 
-  // Publish and update cached value only when it changes
-  if (strcmp(stateField, value) != 0) {
+  if (changed) {
     strlcpy(stateField, value, fieldSize);
-    // Log and publish the cached (possibly truncated) value to keep MQTT and REST consistent
     OTGWDebugTf(PSTR("queryNextPICsetting: PR=%c updated to [%s]\r\n"), letter, stateField);
-    if (hasWebSocketClients()) {
-      char eventBuf[80];
-      snprintf_P(eventBuf, sizeof(eventBuf), PSTR("PIC discovery updated: PR=%c -> %s"), letter, stateField);
-      sendEventToWebSocket('*', eventBuf);
-    }
     sendMQTTData(mqttTopic, stateField);
+  }
+
+  // Always notify WebSocket clients during a readout cycle so the UI
+  // shows discovery progress (the first boot cycle has no clients yet).
+  if (hasWebSocketClients()) {
+    char eventBuf[80];
+    snprintf_P(eventBuf, sizeof(eventBuf), PSTR("PIC setting PR=%c = %s"), letter, stateField);
+    sendEventToWebSocket('*', eventBuf);
   }
 }
 

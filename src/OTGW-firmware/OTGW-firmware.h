@@ -193,12 +193,12 @@ struct PicSettingsSection {    // state.picSettings — settings polled from PIC
   char sLed[8]                = "";  // PR=L: LED A–F function chars (six chars, e.g. "RFFTTT")
   char sTweaks[8]             = "";  // PR=T: tweaks (two chars: ignore_transitions + ovrd_high_byte)
   char sTempSensor[4]         = "";  // PR=D: external temp sensor function ("O"=outside, "R"=return; v5+ only)
-  char sSmartPower[8]         = "";  // PR=P: smart power mode ("L"=low, "M"=medium, "H"=high, "N"=off)
+  char sSmartPower[16]        = "";  // PR=P: smart power mode ("L"/"Low power", "M"/"Medium power", "H"/"High power", "N"/"Normal power")
   char sThermostatDetect[8]   = "";  // PR=R: thermostat detection setting
 
   // --- Diagnostics ---
   char sBuilddate[24]         = "";  // PR=B: firmware build date/time (e.g. "17:52 12-03-2023")
-  char sClockMHz[4]           = "";  // PR=C: PIC clock speed in MHz (e.g. "4")
+  char sClockMHz[8]           = "";  // PR=C: PIC clock speed in MHz (e.g. "4", "4 MHz")
   char sResetCause[4]         = "";  // PR=Q: last reset cause ("W"=watchdog, "B"=brownout, "P"=power-on)
   char sStandaloneInterval[8] = "";  // PR=N: message interval in standalone mode (seconds)
   char sVoltageRef[4]         = "";  // PR=V: voltage reference setting (numeric)

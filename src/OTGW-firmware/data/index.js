@@ -3564,7 +3564,18 @@ function formatPICResetCause(value) {
 }
 
 function formatPICVoltageRef(value) {
-  return (typeof value === 'string' && value.length > 0) ? ('Level ' + value) : '';
+  if (typeof value !== 'string' || value.length === 0) return '';
+
+  var level = parseInt(value, 10);
+  if (isNaN(level) || level < 0 || level > 9) return 'Level ' + value;
+
+  // Voltage per level for each PIC variant (from OTGW firmware docs)
+  var f88  = [0.625, 0.833, 1.042, 1.250, 1.458, 1.667, 1.875, 2.083, 2.292, 2.500];
+  var f1847 = [0.832, 0.960, 1.088, 1.216, 1.344, 1.472, 1.600, 1.728, 1.856, 1.984];
+
+  return 'Level ' + level
+    + ' (F88: ' + f88[level].toFixed(3) + 'V'
+    + ' / F1847: ' + f1847[level].toFixed(3) + 'V)';
 }
 
 function formatPICSettingValue(key, value) {
@@ -3617,7 +3628,7 @@ function refreshPICsettings() {
       rows: [
         ['Setpoint override',     'setpoint_override',   ''],
         ['Setback temperature',   'setback',             '\u00b0C'],
-        ['DHW override',          'dhw_override',        '(0=off 1=on A=auto)']
+        ['DHW override',          'dhw_override',        '']
       ]
     },
     {
@@ -3627,8 +3638,8 @@ function refreshPICsettings() {
         ['GPIO states',           'gpio_states',         ''],
         ['LED functions',         'led',                 ''],
         ['Tweaks',                'tweaks',              ''],
-        ['Temp sensor',           'temp_sensor',         '(O=outside R=return)'],
-        ['Smart power',           'smart_power',         '(L/M/H/N)'],
+        ['Temp sensor',           'temp_sensor',         ''],
+        ['Smart power',           'smart_power',         ''],
         ['Thermostat detect',     'thermostat_detect',   '']
       ]
     },
@@ -3636,8 +3647,8 @@ function refreshPICsettings() {
       title: 'Diagnostics',
       rows: [
         ['Build date',            'builddate',           ''],
-        ['Clock speed',           'clock_mhz',           'MHz'],
-        ['Reset cause',           'reset_cause',         '(W=watchdog B=brownout P=power-on)'],
+        ['Clock speed',           'clock_mhz',           ''],
+        ['Reset cause',           'reset_cause',         ''],
         ['Standalone interval',   'standalone_interval', 's'],
         ['Voltage reference',     'voltage_ref',         '']
       ]
