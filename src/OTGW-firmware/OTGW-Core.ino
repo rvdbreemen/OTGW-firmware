@@ -658,19 +658,29 @@ void queryNextPICsetting() {
     // Diagnostics
     case 10:
       letter = 'B'; stateField = state.picSettings.sBuilddate;
-      fieldSize = sizeof(state.picSettings.sBuilddate);        mqttTopic = F("otgw-pic/settings/builddate");         break;
+      fieldSize = sizeof(state.picSettings.sBuilddate);        
+      mqttTopic = F("otgw-pic/settings/builddate");         
+      break;
     case 11:
       letter = 'C'; stateField = state.picSettings.sClockMHz;
-      fieldSize = sizeof(state.picSettings.sClockMHz);         mqttTopic = F("otgw-pic/settings/clock_mhz");         break;
+      fieldSize = sizeof(state.picSettings.sClockMHz);         
+      mqttTopic = F("otgw-pic/settings/clock_mhz");         
+      break;
     case 12:
       letter = 'Q'; stateField = state.picSettings.sResetCause;
-      fieldSize = sizeof(state.picSettings.sResetCause);       mqttTopic = F("otgw-pic/settings/reset_cause");       break;
+      fieldSize = sizeof(state.picSettings.sResetCause);       
+      mqttTopic = F("otgw-pic/settings/reset_cause");       
+      break;
     case 13:
       letter = 'N'; stateField = state.picSettings.sStandaloneInterval;
-      fieldSize = sizeof(state.picSettings.sStandaloneInterval); mqttTopic = F("otgw-pic/settings/standalone_interval"); break;
+      fieldSize = sizeof(state.picSettings.sStandaloneInterval); 
+      mqttTopic = F("otgw-pic/settings/standalone_interval"); 
+      break;
     case 14:
       letter = 'V'; stateField = state.picSettings.sVoltageRef;
-      fieldSize = sizeof(state.picSettings.sVoltageRef);       mqttTopic = F("otgw-pic/settings/voltage_ref");       break;
+      fieldSize = sizeof(state.picSettings.sVoltageRef);       
+      mqttTopic = F("otgw-pic/settings/voltage_ref");       
+      break;
     default: return;
   }
 

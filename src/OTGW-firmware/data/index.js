@@ -141,6 +141,10 @@ window.onload = initMainPage;
 
 let mainPageCompatWarningShown = false;
 let otLogCompatWarningShown = false;
+let picSettingsRefreshTimer = null;
+
+const PIC_SETTINGS_REFRESH_INTERVAL_MS = 30000;
+const PIC_SETTINGS_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 function isPageVisible() {
   return !(document.hidden || document.visibilityState === 'hidden');
@@ -149,6 +153,111 @@ function isPageVisible() {
 function isMainPageActive() {
   var mainPage = document.getElementById('displayMainPage');
   return !!(mainPage && mainPage.classList.contains('active'));
+}
+
+function getPICSettingsStorageKey() {
+  return 'otgwPicSettings:' + window.location.hostname;
+}
+
+function getPICSettingsCache() {
+  if (!window.localStorage) {
+    return null;
+  }
+
+  try {
+    var raw = localStorage.getItem(getPICSettingsStorageKey());
+    if (!raw) {
+      return null;
+    }
+
+    var parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || !parsed.settings || typeof parsed.settings !== 'object') {
+      return null;
+    }
+
+    return parsed;
+  } catch (e) {
+    console.warn('Failed to read PIC settings cache:', e);
+    return null;
+  }
+}
+
+function savePICSettingToCache(key, value, timestampMs) {
+  if (!window.localStorage) {
+    return;
+  }
+
+  try {
+    var cache = getPICSettingsCache() || { host: window.location.hostname, settings: {} };
+    cache.host = window.location.hostname;
+    cache.settings[key] = {
+      value: value,
+      timestamp: timestampMs
+    };
+    localStorage.setItem(getPICSettingsStorageKey(), JSON.stringify(cache));
+  } catch (e) {
+    console.warn('Failed to save PIC settings cache:', e);
+  }
+}
+
+function getPICSettingFromCache(key) {
+  var cache = getPICSettingsCache();
+  if (!cache || !cache.settings || !cache.settings[key]) {
+    return null;
+  }
+
+  var entry = cache.settings[key];
+  if (!entry || typeof entry.value !== 'string' || typeof entry.timestamp !== 'number') {
+    return null;
+  }
+
+  if ((Date.now() - entry.timestamp) > PIC_SETTINGS_CACHE_MAX_AGE_MS) {
+    return null;
+  }
+
+  return entry;
+}
+
+function isPICSettingDiscovered(value) {
+  return typeof value === 'string' && value !== '' && value !== '--';
+}
+
+function startPICsettingsRefreshTimer() {
+  if (picSettingsRefreshTimer || !isPageVisible()) {
+    return;
+  }
+
+  var container = document.getElementById('picSettingsSection');
+  var picPage = document.getElementById('displayPICflash');
+  var picPageActive = !!(picPage && picPage.classList.contains('active'));
+
+  if (!container || !picPageActive) {
+    return;
+  }
+
+  picSettingsRefreshTimer = setInterval(function() {
+    if (!isPageVisible()) {
+      return;
+    }
+
+    var currentContainer = document.getElementById('picSettingsSection');
+    var currentPicPage = document.getElementById('displayPICflash');
+    var currentPicPageActive = !!(currentPicPage && currentPicPage.classList.contains('active'));
+
+    if (!currentContainer || !currentPicPageActive) {
+      stopPICsettingsRefreshTimer();
+      return;
+    }
+
+    refreshPICsettings();
+  }, PIC_SETTINGS_REFRESH_INTERVAL_MS);
+}
+
+function stopPICsettingsRefreshTimer() {
+  if (picSettingsRefreshTimer) {
+    clearInterval(picSettingsRefreshTimer);
+    picSettingsRefreshTimer = null;
+  }
 }
 
 function startOTmonitorPolling() {
@@ -187,6 +296,10 @@ function setActivePageSection(activeId) {
     if (id === activeId) section.classList.add('active');
     else section.classList.remove('active');
   });
+
+  if (activeId !== 'displayPICflash') {
+    stopPICsettingsRefreshTimer();
+  }
 }
 
 document.addEventListener('visibilitychange', function () {
@@ -194,6 +307,7 @@ document.addEventListener('visibilitychange', function () {
     // When tab is hidden, stop UI updates to save resources but KEEP WebSocket connected
     stopTimeUpdates();
     stopOTmonitorPolling();
+    stopPICsettingsRefreshTimer();
     // WebSocket stays connected to continue gathering data in background
     // The watchdog timer will keep it alive and reconnect if needed
     return;
@@ -206,6 +320,7 @@ document.addEventListener('visibilitychange', function () {
     // Ensure WebSocket is connected (will reconnect if needed)
     initOTLogWebSocket();
     startOTmonitorPolling();
+    startPICsettingsRefreshTimer();
   }
 });
 
@@ -3349,7 +3464,7 @@ function formatPICGpioFunctions(value) {
     parts.push(labels[i] + ': ' + mapPICCode(value.charAt(i), gpioMap, 'Code '));
   }
 
-  return parts.length ? parts.join(' | ') : value;
+  return parts.length ? parts.join('\n') : value;
 }
 
 function formatPICGpioStates(value) {
@@ -3362,7 +3477,7 @@ function formatPICGpioStates(value) {
     parts.push(labels[i] + ': ' + (value.charAt(i) === '1' ? 'High' : 'Low'));
   }
 
-  return parts.length ? parts.join(' | ') : value;
+  return parts.length ? parts.join('\n') : value;
 }
 
 function formatPICLedFunctions(value) {
@@ -3389,7 +3504,7 @@ function formatPICLedFunctions(value) {
     parts.push(labels[i] + ': ' + mapPICCode(value.charAt(i), ledMap, 'Code '));
   }
 
-  return parts.length ? parts.join(' | ') : value;
+  return parts.length ? parts.join('\n') : value;
 }
 
 function formatPICTweaks(value) {
@@ -3404,7 +3519,7 @@ function formatPICTweaks(value) {
     parts.push('Override in high byte: ' + (value.charAt(1) === '1' ? 'On' : 'Off'));
   }
 
-  return parts.length ? parts.join(' | ') : value;
+  return parts.length ? parts.join('\n') : value;
 }
 
 function formatPICTempSensor(value) {
@@ -3480,6 +3595,16 @@ function formatPICSettingValue(key, value) {
   }
 }
 
+function setPICValueWithBreaks(el, text, unit) {
+  var suffix = unit ? '\u00a0' + unit : '';
+  var lines = text.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    if (i > 0) el.appendChild(document.createElement('br'));
+    el.appendChild(document.createTextNode(lines[i]));
+  }
+  if (suffix) el.appendChild(document.createTextNode(suffix));
+}
+
 function refreshPICsettings() {
   var container = document.getElementById('picSettingsSection');
   if (!container) return;
@@ -3525,6 +3650,7 @@ function refreshPICsettings() {
     })
     .then(function(json) {
       var s = (json && json.pic_settings) ? json.pic_settings : {};
+      var now = Date.now();
 
       // Clear previous content
       while (container.lastChild) { container.lastChild.remove(); }
@@ -3558,7 +3684,22 @@ function refreshPICsettings() {
           var label = rowDef[0];
           var key   = rowDef[1];
           var unit  = rowDef[2];
-          var val   = (s[key] !== undefined && s[key] !== '') ? s[key] : null;
+          var apiVal = (typeof s[key] === 'string') ? s[key] : '';
+          var val = null;
+
+          var valState = 'unknown'; // 'live' | 'cached' | 'unknown'
+          if (isPICSettingDiscovered(apiVal)) {
+            val = apiVal;
+            valState = 'live';
+            savePICSettingToCache(key, apiVal, now);
+          } else {
+            var cachedEntry = getPICSettingFromCache(key);
+            if (cachedEntry) {
+              val = cachedEntry.value;
+              valState = 'cached';
+            }
+          }
+
           var displayVal = val !== null ? formatPICSettingValue(key, val) : null;
 
           var row = document.createElement('div');
@@ -3571,10 +3712,15 @@ function refreshPICsettings() {
 
           var c2 = document.createElement('div');
           c2.className = 'piccolumn2';
-          if (val !== null) {
-            c2.textContent = displayVal + (unit ? '\u00a0' + unit : '');
+          if (valState === 'live') {
+            c2.className += ' pic-val-live';
+            setPICValueWithBreaks(c2, displayVal, unit);
+          } else if (valState === 'cached') {
+            c2.className += ' pic-val-cached';
+            c2.title = 'Cached value (not yet polled this session)';
+            setPICValueWithBreaks(c2, displayVal, unit);
           } else {
-            c2.className += ' pic-settings-pending';
+            c2.className += ' pic-val-unknown';
             c2.textContent = '\u2014';
           }
           row.appendChild(c2);
@@ -3587,15 +3733,15 @@ function refreshPICsettings() {
 
       var footer = document.createElement('div');
       footer.className = 'pic-settings-refresh';
-      var btn = document.createElement('button');
-      btn.className = 'nav-item';
-      btn.textContent = '\u21bb Refresh';
-      btn.addEventListener('click', function() { refreshPICsettings(); });
-      footer.appendChild(btn);
       var note = document.createElement('span');
-      note.textContent = 'Polled every \u223c7.5\u00a0min (one PR= command per 30\u00a0s tick)';
+      note.innerHTML = 'Polled every \u223c7.5\u00a0min (one PR= command per 30\u00a0s tick). '
+        + '<span class="pic-val-live">Green</span>\u00a0=\u00a0live, '
+        + '<span class="pic-val-cached">orange</span>\u00a0=\u00a0cached (up to 7\u00a0days), '
+        + 'gray\u00a0=\u00a0not yet discovered.';
       footer.appendChild(note);
       container.appendChild(footer);
+
+      startPICsettingsRefreshTimer();
     })
     .catch(function(err) {
       while (container.lastChild) { container.lastChild.remove(); }
@@ -3607,6 +3753,7 @@ function refreshPICsettings() {
       msg.style.padding = '8px 10px';
       msg.textContent = 'Could not load PIC settings: ' + err.message;
       container.appendChild(msg);
+      stopPICsettingsRefreshTimer();
     });
 } // refreshPICsettings()
 

@@ -1152,7 +1152,14 @@ body.disable-interaction {
   border: none;
   background: transparent;
 }
-.pic-settings-pending {
+.pic-val-live {
+  color: #388e3c;
+  font-weight: 500;
+}
+.pic-val-cached {
+  color: #e65100;
+}
+.pic-val-unknown {
   color: #aaa;
   font-style: italic;
 }
