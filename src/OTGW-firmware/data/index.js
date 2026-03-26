@@ -3035,8 +3035,12 @@ function renderBottomMessage() {
   if (isPSmode) {
     msgText = 'PS=1 mode; showing decoded field summaries.';
   } else {
+    // Suppress LittleFS mismatch here — already shown in the top banner
+    if (typeof msgText === 'string' && (msgText.toLowerCase().includes('littlefs') ||
+        msgText.toLowerCase().includes('flash your'))) {
+      msgText = '';
+    }
     if (typeof msgText === 'string' && msgText.toLowerCase().startsWith('sensorsimulation')) {
-      // Ignore stray summary field text when PS mode is not active.
       msgText = '';
     }
     if (sensorSimulationActive) {
@@ -3047,15 +3051,7 @@ function renderBottomMessage() {
   msgEl.textContent = msgText;
   if (isPSmode) msgEl.classList.add('ps-mode-watermark');
   else msgEl.classList.remove('ps-mode-watermark');
-
-  // Add warning class if message contains version mismatch warning
-  if (!isPSmode && (msgText.toLowerCase().includes('littlefs') ||
-      msgText.toLowerCase().includes('version') ||
-      msgText.toLowerCase().includes('flash your'))) {
-    msgEl.classList.add('version-warning');
-  } else {
-    msgEl.classList.remove('version-warning');
-  }
+  msgEl.classList.remove('version-warning');
 
   msgEl.style.display = (msgText === '') ? 'none' : 'block';
 }
