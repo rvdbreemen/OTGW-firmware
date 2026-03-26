@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v1.2.0
+**  Version  : v1.3.0
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -91,15 +91,17 @@ void startWebserver(){
         return;
       }
 
-      String fsHash = getFilesystemHash();
+      const char* fsHash = getFilesystemHash();
+      bool hasHash = (fsHash && fsHash[0] != '\0');
 
-      if (fsHash.length() > 0) {
+      if (hasHash) {
         // ETags must be double-quoted per RFC 7232.
-        String etag = "\"" + fsHash + "\"";
+        char etag[24];
+        snprintf_P(etag, sizeof(etag), PSTR("\"%s\""), fsHash);
 
         // Conditional GET: return 304 if browser's cached copy is still current.
         if (httpServer.hasHeader(F("If-None-Match")) &&
-            httpServer.header(F("If-None-Match")) == etag) {
+            strcmp(httpServer.header(F("If-None-Match")).c_str(), etag) == 0) {
           f.close();
           httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
           httpServer.sendHeader(F("ETag"), etag);
@@ -111,26 +113,56 @@ void startWebserver(){
       }
 
       // no-cache + ETag: browser stores the response but revalidates each visit.
-      // On a local device this is a cheap If-None-Match round-trip, not a full download.
       httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
 
       // Stream line-by-line to inject ?v=<hash> into JS asset URLs.
-      // When the FS hash changes the versioned URL changes — browser fetches fresh JS
-      // without needing a manual CTRL+F5.
       httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
       httpServer.send(200, F("text/html; charset=UTF-8"), F(""));
 
+      // Use a fixed-size line buffer instead of String to avoid heap fragmentation.
+      static char lineBuf[512];
       while (f.available()) {
-        String line = f.readStringUntil('\n');
-        if (fsHash.length() > 0) {
-          if (line.indexOf(F("src=\"./index.js\"")) >= 0)
-            line.replace(F("src=\"./index.js\""), "src=\"./index.js?v=" + fsHash + "\"");
-          if (line.indexOf(F("src=\"./graph.js\"")) >= 0)
-            line.replace(F("src=\"./graph.js\""), "src=\"./graph.js?v=" + fsHash + "\"");
-        }
-        httpServer.sendContent(line);
-        if (f.available() || line.length() > 0)
+        int n = f.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
+        lineBuf[n] = '\0';
+        // Strip trailing CR if present
+        if (n > 0 && lineBuf[n - 1] == '\r') lineBuf[--n] = '\0';
+
+        // In chunked mode an empty sendContent() marks end-of-response.
+        // Blank HTML lines must therefore emit only a newline chunk.
+        if (n == 0) {
           httpServer.sendContent(F("\n"));
+          continue;
+        }
+
+        // Inject ?v=<hash> into JS asset URLs for cache-busting.
+        if (hasHash && strstr_P(lineBuf, PSTR("src=\"./index.js\""))) {
+          char* pos = strstr(lineBuf, "src=\"./index.js\"");
+          *pos = '\0'; // terminate prefix
+          if (lineBuf[0] != '\0') {
+            httpServer.sendContent(lineBuf);
+          }
+          httpServer.sendContent(F("src=\"./index.js?v="));
+          httpServer.sendContent(fsHash);
+          httpServer.sendContent(F("\""));
+          if (*(pos + 16) != '\0') {
+            httpServer.sendContent(pos + 16);
+          }
+        } else if (hasHash && strstr_P(lineBuf, PSTR("src=\"./graph.js\""))) {
+          char* pos = strstr(lineBuf, "src=\"./graph.js\"");
+          *pos = '\0';
+          if (lineBuf[0] != '\0') {
+            httpServer.sendContent(lineBuf);
+          }
+          httpServer.sendContent(F("src=\"./graph.js?v="));
+          httpServer.sendContent(fsHash);
+          httpServer.sendContent(F("\""));
+          if (*(pos + 16) != '\0') {
+            httpServer.sendContent(pos + 16);
+          }
+        } else {
+          httpServer.sendContent(lineBuf);
+        }
+        httpServer.sendContent(F("\n"));
       }
       httpServer.sendContent(F("")); // End chunked stream
       f.close();
@@ -153,11 +185,9 @@ void startWebserver(){
   
   httpServer.on("/index.js", []() {
     // ?v=<hash> versioned requests get long-term cache; bare /index.js gets no-cache.
-    // index.html always injects the current hash, so versioned URLs naturally rotate
-    // whenever the filesystem is upgraded.
-    String v = httpServer.arg("v");
-    String fsHash = getFilesystemHash();
-    if (v.length() > 0 && v == fsHash) {
+    const char* fsHash = getFilesystemHash();
+    // httpServer.arg() returns String by value — compare directly to avoid dangling c_str()
+    if (httpServer.hasArg("v") && fsHash[0] != '\0' && strcmp(httpServer.arg("v").c_str(), fsHash) == 0) {
       httpServer.sendHeader(F("Cache-Control"), F("public, max-age=86400"));
     } else {
       httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
@@ -169,9 +199,8 @@ void startWebserver(){
 
   httpServer.on("/graph.js", []() {
     // Same versioned-URL caching strategy as index.js (see above).
-    String v = httpServer.arg("v");
-    String fsHash = getFilesystemHash();
-    if (v.length() > 0 && v == fsHash) {
+    const char* fsHash = getFilesystemHash();
+    if (httpServer.hasArg("v") && fsHash[0] != '\0' && strcmp(httpServer.arg("v").c_str(), fsHash) == 0) {
       httpServer.sendHeader(F("Cache-Control"), F("public, max-age=86400"));
     } else {
       httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
@@ -186,8 +215,8 @@ void startWebserver(){
   httpServer.on("/api", HTTP_ANY, processAPI);  //was only HTTP_GET (20210110)
 
   // Enable collection of If-None-Match so index.html ETag conditional requests work.
-  static const char* reqHeaders[] = { "If-None-Match" };
-  httpServer.collectHeaders(reqHeaders, 1);
+    static const char* reqHeaders[] = { "If-None-Match" };
+    httpServer.collectHeaders(reqHeaders, 1);
 
   httpServer.begin();
   // Set up first message as the IP address
@@ -218,16 +247,20 @@ void setupFSexplorer(){
   httpServer.on("/api/firmwarefilelist", apifirmwarefilelist);  // DEPRECATED: unversioned, will be removed in v1.3.0 (see ADR-035)
   httpServer.on("/api/listfiles", apilistfiles);               // DEPRECATED: unversioned, will be removed in v1.3.0 (see ADR-035)
   // httpServer.on("/LittleFSformat", formatLittleFS);
-  httpServer.on("/upload", HTTP_POST, []() {}, handleFileUpload);
+  httpServer.on("/upload", HTTP_POST, []() {
+    // If auth failed, handleFileUpload skipped the write; send 401 challenge here.
+    // If auth succeeded, the 303 redirect was already sent by handleFileUpload.
+    checkHttpAuth();
+  }, handleFileUpload);
   httpServer.on("/ReBoot", reBootESP);
   httpServer.on("/ResetWireless", resetWirelessButton);
  
   httpServer.onNotFound([]() 
   {
-    if (bDebugRestAPI) DebugTf(PSTR("in 'onNotFound()'!! [%s] => \r\n"), String(httpServer.uri()).c_str());
-    if (httpServer.uri().indexOf("/api/") == 0) 
+    if (state.debug.bRestAPI) DebugTf(PSTR("in 'onNotFound()'!! [%s] => \r\n"), httpServer.uri().c_str());
+    if (httpServer.uri().indexOf("/api/") == 0)
     {
-      if (bDebugRestAPI) DebugTf(PSTR("next: processAPI(%s)\r\n"), String(httpServer.uri()).c_str());
+      if (state.debug.bRestAPI) DebugTf(PSTR("next: processAPI(%s)\r\n"), httpServer.uri().c_str());
       processAPI();
     }
     // else if (httpServer.uri() == "/")
@@ -237,7 +270,7 @@ void setupFSexplorer(){
     // }
     else
     {
-      if (bDebugRestAPI) DebugTf(PSTR("next: handleFile(%s)\r\n")
+      if (state.debug.bRestAPI) DebugTf(PSTR("next: handleFile(%s)\r\n")
                       , String(httpServer.urlDecode(httpServer.uri())).c_str());
       if (!handleFile(httpServer.urlDecode(httpServer.uri())))
       {
@@ -259,7 +292,7 @@ void apifirmwarefilelist() {
   File f;
   bool firstEntry = true;
 
-  String dirpath = "/" + String(sPICdeviceid);
+  String dirpath = "/" + String(state.pic.sDeviceid);
   DebugTf(PSTR("dirpath=%s\r\n"), dirpath.c_str());
   
   // Start chunked response with JSON array opening
@@ -342,6 +375,27 @@ void apilistfiles()             // Senden aller Daten an den Client
   static const char kMoreFilesMsg[] PROGMEM = "More files not listed ..";
   static const char kTypeDir[] PROGMEM = "dir";
   static const char kTypeFile[] PROGMEM = "file";
+
+  // Handle file delete request: ?delete=<path>
+  if (httpServer.hasArg("delete")) {
+    if (!checkHttpAuth()) return;  // 401 already sent
+    strlcpy(cMsg, httpServer.arg("delete").c_str(), sizeof(cMsg));
+    // Normalize: LittleFS paths must start with '/'
+    if (cMsg[0] != '/' && cMsg[0] != '\0') {
+      size_t len = strnlen(cMsg, sizeof(cMsg) - 2);
+      memmove(cMsg + 1, cMsg, len + 1);
+      cMsg[0] = '/';
+    }
+    DebugTf(PSTR("Delete -> [%s]\r\n"), cMsg);
+    if (!LittleFS.exists(cMsg)) {
+      httpServer.send(404, F("text/plain"), F("File not found"));
+    } else if (LittleFS.remove(cMsg)) {
+      httpServer.send(200, F("text/plain"), F("File deleted"));
+    } else {
+      httpServer.send(500, F("text/plain"), F("Delete failed"));
+    }
+    return;
+  }
 
   FSInfo LittleFSinfo;
   String path = "/";
@@ -446,6 +500,7 @@ bool handleFile(String&& path)
 {
   if (httpServer.hasArg("delete")) 
   {
+    if (!checkHttpAuth()) return false;
     DebugTf(PSTR("Delete -> [%s]\n\r"),  httpServer.arg("delete").c_str());
     LittleFS.remove(httpServer.arg("delete"));    // Datei löschen
     httpServer.sendContent(Header);
@@ -462,9 +517,15 @@ bool handleFile(String&& path)
 void handleFileUpload() 
 {
   static File fsUploadFile;
+  static bool uploadAuthorized = true;
   HTTPUpload& upload = httpServer.upload();
   if (upload.status == UPLOAD_FILE_START) 
   {
+    // Check auth by reading headers only - does NOT send a response.
+    // If auth is required and fails, skip the file open so nothing is written.
+    uploadAuthorized = (settings.sHTTPpasswd[0] == '\0' || httpServer.authenticate("admin", settings.sHTTPpasswd));
+    if (!uploadAuthorized) return;
+
     if (upload.filename.length() > 30) 
     {
       upload.filename = upload.filename.substring(upload.filename.length() - 30, upload.filename.length());  // Dateinamen auf 30 Zeichen kürzen
@@ -490,8 +551,10 @@ void handleFileUpload()
   {
     if (fsUploadFile)
       fsUploadFile.close();
-    DebugT(F("FileUpload Size: ")); Debugln((String)upload.totalSize);
-    httpServer.sendContent(Header);
+    if (uploadAuthorized) {
+      DebugT(F("FileUpload Size: ")); Debugln((String)upload.totalSize);
+      httpServer.sendContent(Header);
+    }
   }
   
 } // handleFileUpload() 
@@ -547,12 +610,14 @@ bool freeSpace(uint16_t const& printsize)
 //=====================================================================================
 void reBootESP()
 {
+  if (!checkHttpAuth()) return;
   DebugTln(F("Redirect and ReBoot .."));
   doRedirect("Reboot OTGW firmware ..", 120, "/", true);   
 } // reBootESP()
 
 void resetWirelessButton()
 {
+  if (!checkHttpAuth()) return;
   DebugTln(F("Reset Wireless settings.."));
   resetWiFiSettings();
   doRedirect("Reboot OTGW firmware with reset wireless settings..", 120, "/", true);   

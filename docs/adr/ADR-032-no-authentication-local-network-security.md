@@ -2,11 +2,13 @@
 
 **Status:** Accepted  
 **Date:** 2026-02-07  
-**Decision Maker:** Copilot Agent based on codebase analysis and ADR-003
+**Decision Maker:** Copilot Agent based on codebase analysis and ADR-003  
+**Note:** Partially superseded by ADR-056 for protected admin endpoints and secret-handling behavior; ADR-032 remains the baseline for unauthenticated local-network interfaces outside that boundary
 
 ## Context
 
 The OTGW-firmware provides multiple network-accessible interfaces:
+
 - **HTTP Server:** REST API, Web UI, file system explorer
 - **WebSocket Server:** Real-time OpenTherm message streaming (port 81)
 - **MQTT Client:** Home Assistant integration
@@ -16,6 +18,7 @@ The OTGW-firmware provides multiple network-accessible interfaces:
 **Security question:** Should these interfaces require authentication (username/password, API keys, JWT tokens)?
 
 **Key considerations:**
+
 1. **Target deployment:** Home local network (not internet-facing)
 2. **Memory constraints:** ESP8266 has ~20-25KB available RAM
 3. **Primary use case:** Home automation integration (Home Assistant)
@@ -36,7 +39,7 @@ The OTGW-firmware provides multiple network-accessible interfaces:
 
 **Security Model:**
 
-```
+```text
 ┌──────────────────────────────────────────────────────────┐
 │ Security Layers (Defense in Depth)                       │
 └──────────────────────────────────────────────────────────┘
@@ -67,6 +70,7 @@ Layer 4: Application Layer (OTGW-firmware)
 ```
 
 **Implementation:**
+
 - HTTP endpoints: No authentication required
 - WebSocket: No authentication required
 - REST API: No authentication required
@@ -75,6 +79,7 @@ Layer 4: Application Layer (OTGW-firmware)
 - Firmware updates: No authentication required (blank username/password accepted)
 
 **MQTT Exception:**
+
 - MQTT broker may require username/password
 - Credentials stored in OTGW settings
 - Authentication handled by broker, not OTGW
@@ -85,12 +90,14 @@ Layer 4: Application Layer (OTGW-firmware)
 ### Alternative 1: HTTP Basic Authentication
 
 **Pros:**
+
 - Simple to implement
 - Supported by all browsers
 - Standard protocol (RFC 7617)
 - Username/password protection
 
 **Cons:**
+
 - Credentials sent in base64 (easily decoded without TLS)
 - Every HTTP request requires authentication header
 - Breaks MQTT Auto-Discovery (Home Assistant can't auto-auth)
@@ -103,12 +110,14 @@ Layer 4: Application Layer (OTGW-firmware)
 ### Alternative 2: API Keys
 
 **Pros:**
+
 - Token-based access control
 - Can revoke keys
 - Modern pattern
 - Better than passwords
 
 **Cons:**
+
 - Requires key generation and storage
 - Key management complexity
 - Breaks MQTT Auto-Discovery
@@ -121,12 +130,14 @@ Layer 4: Application Layer (OTGW-firmware)
 ### Alternative 3: JWT Tokens
 
 **Pros:**
+
 - Stateless authentication
 - Industry standard
 - Can include claims
 - Supports expiration
 
 **Cons:**
+
 - Complex implementation
 - Requires TLS for security
 - Significant RAM overhead
@@ -139,11 +150,13 @@ Layer 4: Application Layer (OTGW-firmware)
 ### Alternative 4: TLS Client Certificates
 
 **Pros:**
+
 - Strong cryptographic authentication
 - Mutual TLS provides encryption + auth
 - No password management
 
 **Cons:**
+
 - Extremely complex setup
 - Certificate management nightmare
 - 20-30KB RAM for TLS (prohibitive)
@@ -156,6 +169,7 @@ Layer 4: Application Layer (OTGW-firmware)
 ### Alternative 5: Network Segmentation with Firewall Rules
 
 **Pros:**
+
 - Strong security boundary
 - No application changes needed
 - Router-level control
@@ -163,6 +177,7 @@ Layer 4: Application Layer (OTGW-firmware)
 - Protects all services simultaneously
 
 **Cons:**
+
 - Requires network configuration
 - User responsibility
 - Not enforced by device
@@ -235,6 +250,7 @@ Layer 4: Application Layer (OTGW-firmware)
 ### Risks & Mitigation
 
 **Risk 1:** User exposes device to internet
+
 - **Impact:** CRITICAL - Full compromise, malware installation, boiler control
 - **Likelihood:** Medium - Some users may enable port forwarding
 - **Mitigation:** Prominent warning in README.md
@@ -244,6 +260,7 @@ Layer 4: Application Layer (OTGW-firmware)
 - **Monitoring:** Cannot prevent user misconfiguration
 
 **Risk 2:** Malicious client on local network
+
 - **Impact:** High - Can control boiler, modify settings, upload malware
 - **Likelihood:** Low - Requires local network access
 - **Mitigation:** Network segmentation isolates IoT devices
@@ -252,6 +269,7 @@ Layer 4: Application Layer (OTGW-firmware)
 - **Monitoring:** No application-level defense
 
 **Risk 3:** Compromised local network
+
 - **Impact:** High - Attacker has access to all devices
 - **Likelihood:** Low - Requires WiFi password compromise
 - **Mitigation:** WPA3 encryption recommended
@@ -267,18 +285,21 @@ Layer 4: Application Layer (OTGW-firmware)
 ### For Users
 
 **MUST DO:**
+
 1. ❌ **NEVER expose device directly to internet** (no port forwarding)
 2. ✅ **Use VPN for remote access** (WireGuard, OpenVPN)
 3. ✅ **Keep device on trusted local network only**
 4. ✅ **Use strong WiFi password (WPA2/WPA3)**
 
 **SHOULD DO:**
+
 1. ✅ **Network segmentation:** Separate IoT VLAN
 2. ✅ **Router firewall rules:** Limit device access
 3. ✅ **WiFi client isolation:** Prevent device-to-device attacks
 4. ✅ **Regular firmware updates:** Keep device patched
 
 **COULD DO:**
+
 1. ✅ **Reverse proxy with authentication** (for advanced users)
    - Note: WebSocket features may not work via HTTPS proxy (see ADR-003)
 2. ✅ **Network monitoring:** IDS/IPS on router
@@ -287,11 +308,13 @@ Layer 4: Application Layer (OTGW-firmware)
 ### For Developers
 
 **MUST NOT:**
+
 1. ❌ **Do NOT add internet-facing features**
 2. ❌ **Do NOT document port forwarding patterns**
 3. ❌ **Do NOT create cloud integration without explicit user consent**
 
 **SHOULD:**
+
 1. ✅ **Maintain local-network-only design**
 2. ✅ **Document security model clearly**
 3. ✅ **Review network code for vulnerabilities**
@@ -300,6 +323,7 @@ Layer 4: Application Layer (OTGW-firmware)
 ## Explicit Trust Model
 
 **Assumptions:**
+
 1. Local network is trusted
 2. Physical access is controlled
 3. WiFi is encrypted (WPA2/WPA3)
@@ -308,6 +332,7 @@ Layer 4: Application Layer (OTGW-firmware)
 6. Device is NOT exposed to internet
 
 **Out of Scope:**
+
 - Defense against local network attackers
 - Protection against compromised local devices
 - Audit trail of device access
@@ -338,6 +363,7 @@ if (settingMQTTuser.length() > 0) {
 ```
 
 **Rationale:**
+
 - Password is for external MQTT broker
 - OTGW doesn't validate the password
 - Password masked in UI to prevent shoulder surfing
@@ -348,6 +374,7 @@ if (settingMQTTuser.length() > 0) {
 ### If TLS Were Possible (ESP32)
 
 **Hypothetical ESP32 Implementation:**
+
 - Could support HTTPS (20-30KB RAM available)
 - Could use TLS client certificates
 - Could implement OAuth2/JWT
@@ -389,6 +416,7 @@ If future requirements demand authentication (e.g., cloud integration, multi-use
 5. **Update security documentation**
 
 **Likely triggers:**
+
 - Cloud integration feature requested
 - Multi-tenant deployment needed
 - Regulatory compliance required

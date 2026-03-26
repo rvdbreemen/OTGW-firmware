@@ -11,7 +11,10 @@ info:
 
     **API Version**: v2. Earlier versions (v0, v1) have been removed and return 410 Gone.
 
-    **Authentication**: None (device should be on trusted local network only)
+    **Authentication**: Optional HTTP Basic Auth (username `admin`, password from settings).
+    When no password is configured, all endpoints are open.
+    When a password is set, mutating endpoints and settings require authentication.
+    CSRF same-origin validation is enforced for authenticated browser requests.
 
     **Content-Type**: All responses are `application/json`
 
@@ -49,12 +52,18 @@ tags:
     description: Access OpenTherm message data
   - name: OTGW Commands
     description: Send commands to the OpenTherm Gateway
+  - name: PIC Gateway
+    description: PIC microcontroller status and settings
   - name: Flash/Upgrade
     description: Firmware upgrade status and operations
   - name: Sensors
     description: Dallas temperature sensor label management
   - name: Filesystem
     description: Filesystem and firmware file listing
+  - name: Simulation
+    description: OTGW simulation mode control
+  - name: Webhook
+    description: Webhook testing
 
 paths:
   /v2/health:
@@ -102,6 +111,9 @@ paths:
                       otgwconnected:
                         type: string
                         enum: ["true", "false"]
+                      picavailable:
+                        type: string
+                        enum: ["true", "false"]
                       littlefsMounted:
                         type: string
                         enum: ["true", "false"]
@@ -113,7 +125,13 @@ paths:
       tags:
         - Settings
       summary: Get device settings
-      description: Retrieve all device configuration settings as a JSON object.
+      description: |
+        Retrieve all device configuration settings as a JSON object.
+        Requires authentication when HTTP password is configured.
+
+        Password fields use a protected round-trip format:
+        - `password=0` means no password is currently stored
+        - `password=XX` means a password is stored and `XX` is its length
       operationId: getSettings
       responses:
         '200':
@@ -122,12 +140,26 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  settings:
+                    type: object
+                    description: All device settings with type metadata
+        '401':
+          description: Authentication required
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     post:
       tags:
         - Settings
-      summary: Update device settings
+      summary: Update a single device setting
+      description: |
+        Update one device setting by name. Requires authentication when HTTP
+        password is configured.
+
+        Password field behavior for `httppasswd` and `mqttpasswd`:
+        - `"notthispassword"` keeps the existing stored password unchanged
+        - `""` clears the stored password
+        - Any other string replaces the stored password
       operationId: updateSettings
       requestBody:
         required: true
@@ -135,15 +167,44 @@ paths:
           application/json:
             schema:
               type: object
+              required:
+                - name
+                - value
               properties:
                 name:
                   type: string
-                value: {}
+                  description: Setting field name
+                value:
+                  description: New value for the setting
+            example:
+              name: "hostname"
+              value: "MyOTGW"
+      responses:
+        '200':
+          description: Settings updated successfully (echoes submitted JSON)
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '401':
+          description: Authentication required
+        '403':
+          description: CSRF protection - invalid origin
+    put:
+      tags:
+        - Settings
+      summary: Update a single device setting (PUT alias)
+      description: Alias for POST. Same behavior.
+      operationId: updateSettingsPut
+      requestBody:
+        $ref: '#/paths/~1v2~1settings/post/requestBody'
       responses:
         '200':
           description: Settings updated successfully
         '400':
           $ref: '#/components/responses/BadRequestJson'
+        '401':
+          description: Authentication required
+        '403':
+          description: CSRF protection - invalid origin
 
   /v2/sensors/labels:
     get:
@@ -153,6 +214,7 @@ paths:
       description: |
         Returns all configured Dallas temperature sensor labels.
         Each sensor is identified by its 1-Wire address and has a user-defined label.
+        Returns empty object `{}` if no labels file exists.
       operationId: getAllDallasLabels
       responses:
         '200':
@@ -163,6 +225,9 @@ paths:
                 type: object
                 additionalProperties:
                   type: string
+              example:
+                "28FF64D1841703F1": "Living Room"
+                "28FF94E2841703F2": "Kitchen"
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     post:
@@ -181,6 +246,9 @@ paths:
               type: object
               additionalProperties:
                 type: string
+            example:
+              "28FF64D1841703F1": "Living Room"
+              "28FF94E2841703F2": "Kitchen"
       responses:
         '200':
           description: Labels updated successfully
@@ -195,7 +263,8 @@ paths:
         - Device Info
       summary: Get comprehensive device information
       description: |
-        Returns device information as a flat JSON object (map format).
+        Returns device information as a flat JSON map. Boolean values are
+        proper JSON booleans (not strings) in this endpoint.
 
         Includes firmware version, PIC details, network info, memory,
         connectivity status, and gateway mode.
@@ -223,30 +292,86 @@ paths:
                         type: string
                       picfwtype:
                         type: string
+                      compiled:
+                        type: string
                       hostname:
                         type: string
                       ipaddress:
                         type: string
+                      macaddress:
+                        type: string
                       freeheap:
                         type: integer
-                      gatewaymode:
+                      maxfreeblock:
+                        type: integer
+                      chipid:
+                        type: string
+                      coreversion:
+                        type: string
+                      sdkversion:
+                        type: string
+                      cpufreq:
+                        type: integer
+                      sketchsize:
+                        type: integer
+                      freesketchspace:
+                        type: integer
+                      flashchipid:
+                        type: string
+                      flashchipsize:
+                        type: number
+                      flashchiprealsize:
+                        type: number
+                      LittleFSsize:
+                        type: number
+                      flashchipspeed:
+                        type: number
+                      flashchipmode:
+                        type: string
+                      ssid:
+                        type: string
+                      wifirssi:
+                        type: integer
+                      wifiquality:
+                        type: integer
+                      wifiquality_text:
+                        type: string
+                      ntpenable:
                         type: boolean
+                      ntptimezone:
+                        type: string
+                      uptime:
+                        type: string
+                      lastreset:
+                        type: string
+                      bootcount:
+                        type: integer
                       mqttconnected:
                         type: boolean
+                      thermostatconnected:
+                        type: boolean
+                      boilerconnected:
+                        type: boolean
+                      otgwmode:
+                        type: string
+                        description: '"on", "off", or "detecting"'
                       otgwconnected:
+                        type: boolean
+                      otgwsimulation:
                         type: boolean
               examples:
                 example:
                   value:
                     device:
                       author: "Robert van den Breemen"
-                      fwversion: "1.2.0"
+                      fwversion: "1.3.0"
                       picavailable: true
                       hostname: "OTGW"
                       ipaddress: "192.168.1.100"
                       freeheap: 25600
-                      gatewaymode: true
                       mqttconnected: true
+                      otgwconnected: true
+                      otgwsimulation: false
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
@@ -255,7 +380,9 @@ paths:
       tags:
         - Device Info
       summary: Get device date/time
-      description: Returns the current device date and time.
+      description: |
+        Returns the current device date and time with timezone applied,
+        plus runtime status fields.
       operationId: getDeviceTime
       responses:
         '200':
@@ -270,14 +397,59 @@ paths:
                     properties:
                       dateTime:
                         type: string
-                        example: "2026-02-16 10:30:00"
+                        example: "2026-03-26 10:30:00"
                       epoch:
                         type: integer
-                        example: 1739702200
+                        example: 1774548600
                       message:
                         type: string
+                        description: Current status message text
                       psmode:
                         type: boolean
+                        description: Priority Service mode active
+                      otgwsimulation:
+                        type: boolean
+                        description: OTGW simulation mode active
+                      freeheap:
+                        type: integer
+                        description: Free heap memory in bytes
+                      maxfreeblock:
+                        type: integer
+                        description: Largest contiguous free block
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/device/crashlog:
+    get:
+      tags:
+        - Device Info
+      summary: Get crash log
+      description: |
+        Returns the latest stored abnormal reboot/crash diagnostics,
+        if available. Includes exception cause and stack trace summary.
+      operationId: getDeviceCrashLog
+      responses:
+        '200':
+          description: Crash log retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  crashlog:
+                    type: object
+                    properties:
+                      available:
+                        type: boolean
+                        description: Whether a crash log is available
+                      summary:
+                        type: string
+                        description: Short crash summary (empty if not available)
+                        example: "Exception (28) at 0x40201234"
+                      details:
+                        type: string
+                        description: Detailed crash info (empty if not available)
+                        example: "epc1=0x40201234 epc2=0x00000000"
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
@@ -301,8 +473,10 @@ paths:
                     properties:
                       flashing:
                         type: boolean
+                        description: Any flash operation in progress
                       pic_flashing:
                         type: boolean
+                        description: PIC flash specifically in progress
                       pic_progress:
                         type: integer
                         minimum: 0
@@ -317,7 +491,7 @@ paths:
   /v2/pic/flash-status:
     get:
       tags:
-        - Flash/Upgrade
+        - PIC Gateway
       summary: Get PIC flash status
       description: Minimal endpoint for polling PIC flash state during upgrade.
       operationId: getPICFlashStatus
@@ -336,6 +510,8 @@ paths:
                         type: boolean
                       progress:
                         type: integer
+                        minimum: 0
+                        maximum: 100
                       filename:
                         type: string
                       error:
@@ -346,9 +522,12 @@ paths:
   /v2/pic/update-check:
     get:
       tags:
-        - Flash/Upgrade
+        - PIC Gateway
       summary: Check for PIC firmware updates
-      description: Returns whether a PIC firmware update is available.
+      description: |
+        Checks for available PIC firmware updates by making an outbound HTTP
+        request to otgw.tclcode.com. Only call on-demand (e.g., when the user
+        opens the firmware tab).
       operationId: getPICUpdateCheck
       responses:
         '200':
@@ -357,6 +536,109 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  pic_update:
+                    type: object
+                    properties:
+                      current:
+                        type: string
+                        description: Currently installed PIC firmware version
+                      latest:
+                        type: string
+                        description: Latest available version from otgw.tclcode.com
+                      update_available:
+                        type: boolean
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/pic/settings:
+    get:
+      tags:
+        - PIC Gateway
+      summary: Get PIC gateway settings
+      description: |
+        Returns the cached PIC gateway settings last queried via PR= commands.
+        Triggers a new readout cycle (one PR= command every 3 seconds,
+        approximately 45 seconds for a full cycle).
+
+        Empty string values mean "not yet queried" or "not supported by this
+        firmware version".
+
+        Source: Schelte Bron's OTGW firmware docs (https://otgw.tclcode.com/firmware.html)
+      operationId: getPICSettings
+      responses:
+        '200':
+          description: PIC settings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pic_settings:
+                    type: object
+                    properties:
+                      setpoint_override:
+                        type: string
+                        description: Current temperature setpoint override (PR=A)
+                      setback:
+                        type: string
+                        description: Setback temperature (PR=B)
+                      dhw_override:
+                        type: string
+                        description: DHW override state
+                      gpio:
+                        type: string
+                        description: GPIO pin configuration (PR=G)
+                      gpio_states:
+                        type: string
+                        description: GPIO pin states (PR=I)
+                      led:
+                        type: string
+                        description: LED function assignments (PR=L)
+                      tweaks:
+                        type: string
+                        description: Tweak flags (PR=T)
+                      temp_sensor:
+                        type: string
+                        description: Temperature sensor reading (PR=O)
+                      smart_power:
+                        type: string
+                        description: Smart power mode (PR=P)
+                      thermostat_detect:
+                        type: string
+                        description: Thermostat detection mode (PR=D)
+                      builddate:
+                        type: string
+                        description: PIC firmware build date (PR=B)
+                      clock_mhz:
+                        type: string
+                        description: PIC clock speed (PR=C)
+                      reset_cause:
+                        type: string
+                        description: Last PIC reset cause (PR=Q)
+                      standalone_interval:
+                        type: string
+                        description: Standalone mode interval (PR=M)
+                      voltage_ref:
+                        type: string
+                        description: Voltage reference (PR=V)
+              example:
+                pic_settings:
+                  setpoint_override: "20.00"
+                  setback: "15.00"
+                  dhw_override: ""
+                  gpio: "0/1"
+                  gpio_states: "0/0"
+                  led: "F/X/O/M/P/C"
+                  tweaks: "1/1/1/1"
+                  temp_sensor: "O=19.50"
+                  smart_power: "Low"
+                  thermostat_detect: "I"
+                  builddate: "2023-01-01"
+                  clock_mhz: "4"
+                  reset_cause: "Power-on"
+                  standalone_interval: "0"
+                  voltage_ref: "3.3"
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
@@ -414,8 +696,8 @@ paths:
         - Filesystem
       summary: Check firmware/filesystem version match
       description: |
-        Returns the firmware git hash and filesystem git hash.
-        Used to detect mismatches between firmware and filesystem (e.g. after
+        Compares the firmware git hash with the filesystem git hash.
+        Used to detect mismatches between firmware and filesystem (e.g., after
         a firmware-only OTA update without flashing the new LittleFS image).
       operationId: getFilesystemHashCheck
       responses:
@@ -425,6 +707,102 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  filesystem_check:
+                    type: object
+                    properties:
+                      match:
+                        type: boolean
+                      fw_hash:
+                        type: string
+                      fs_hash:
+                        type: string
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/simulate:
+    get:
+      tags:
+        - Simulation
+      summary: Get OTGW simulation status
+      description: Returns the current OTGW simulation mode status.
+      operationId: getSimulationStatus
+      responses:
+        '200':
+          description: Simulation status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationStatus'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/simulate/start:
+    post:
+      tags:
+        - Simulation
+      summary: Start OTGW simulation
+      description: |
+        Enables OTGW simulation mode. The gateway replays data from
+        `/otgw_simulation.log` instead of reading from the PIC serial port.
+      operationId: startSimulation
+      security:
+        - basicAuth: []
+      responses:
+        '200':
+          description: Simulation started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationStatus'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    put:
+      tags:
+        - Simulation
+      summary: Start OTGW simulation (PUT alias)
+      operationId: startSimulationPut
+      responses:
+        '200':
+          description: Simulation started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationStatus'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/simulate/stop:
+    post:
+      tags:
+        - Simulation
+      summary: Stop OTGW simulation
+      description: |
+        Disables OTGW simulation mode. Resumes reading from the live PIC serial port.
+      operationId: stopSimulation
+      security:
+        - basicAuth: []
+      responses:
+        '200':
+          description: Simulation stopped
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationStatus'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    put:
+      tags:
+        - Simulation
+      summary: Stop OTGW simulation (PUT alias)
+      operationId: stopSimulationPut
+      responses:
+        '200':
+          description: Simulation stopped
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationStatus'
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
@@ -435,7 +813,9 @@ paths:
       summary: Get all OpenTherm data
       description: |
         Returns all available OpenTherm data. Includes temperatures, status flags,
-        pressures, and sensor data.
+        pressures, S0 counter data (when enabled), and Dallas sensor data (when enabled).
+
+        Each entry has value, unit, and lastupdated (seconds since boot) fields.
       operationId: getOTmonitor
       responses:
         '200':
@@ -444,7 +824,10 @@ paths:
             application/json:
               schema:
                 type: object
-                description: OpenTherm data structure
+                properties:
+                  otmonitor:
+                    type: object
+                    description: Map of OpenTherm data entries
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
@@ -452,8 +835,10 @@ paths:
     get:
       tags:
         - OpenTherm Data
-      summary: Get OpenTherm data in Telegraf format
-      description: Returns all OpenTherm data in a format optimized for Telegraf monitoring system integration.
+      summary: Get OpenTherm data (Telegraf alias)
+      description: |
+        Same response as `/v2/otgw/otmonitor`. Provided as a compatibility alias
+        for Telegraf monitoring system integration.
       operationId: getTelegraf
       responses:
         '200':
@@ -462,7 +847,6 @@ paths:
             application/json:
               schema:
                 type: object
-                description: OpenTherm data in Telegraf format
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
@@ -471,7 +855,10 @@ paths:
       tags:
         - OpenTherm Data
       summary: Get OpenTherm message by ID
-      description: Retrieve the current value for an OpenTherm message by its numeric ID (0-127).
+      description: |
+        Retrieve the current value for an OpenTherm message by its numeric ID (0-127).
+        The value type depends on the message: float for f88 (fixed-point) types,
+        integer for all others.
       operationId: getOTGWMessage
       parameters:
         - name: msgid
@@ -494,6 +881,10 @@ paths:
                   value: {}
                   unit:
                     type: string
+              example:
+                label: "boilertemperature"
+                value: 45.5
+                unit: "\u00b0C"
         '400':
           $ref: '#/components/responses/BadRequestJson'
         '405':
@@ -508,7 +899,14 @@ paths:
         Send a command to the OpenTherm Gateway. The command is provided in the
         JSON request body. Returns 202 Accepted because the command is queued
         for asynchronous processing.
+
+        If the body is not valid JSON with a `command` field, the raw body text
+        is used as the command string.
+
+        Command format: two alphabetic characters + `=` + value (e.g., `TT=20.5`).
       operationId: sendOTGWCommand
+      security:
+        - basicAuth: []
       requestBody:
         required: true
         content:
@@ -520,7 +918,7 @@ paths:
               properties:
                 command:
                   type: string
-                  pattern: '^[A-Z]{2}=.+$'
+                  pattern: '^[A-Za-z]{2}=.+$'
                   description: OTGW command in format XX=value
             example:
               command: "TT=20.5"
@@ -547,6 +945,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+    put:
+      tags:
+        - OTGW Commands
+      summary: Send command (PUT alias)
+      operationId: sendOTGWCommandPut
+      requestBody:
+        $ref: '#/paths/~1v2~1otgw~1commands/post/requestBody'
+      responses:
+        '202':
+          description: Command queued for processing
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
 
   /v2/otgw/discovery:
     post:
@@ -558,6 +970,8 @@ paths:
         Use this to register or re-register all entities with Home Assistant.
         Returns 202 Accepted because discovery messages are sent asynchronously.
       operationId: triggerDiscovery
+      security:
+        - basicAuth: []
       responses:
         '202':
           description: Discovery accepted for processing
@@ -573,23 +987,76 @@ paths:
                 status: "accepted"
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
-
-  /v2/webhook/test:
-    get:
+    put:
       tags:
         - OTGW Commands
+      summary: Trigger MQTT autodiscovery (PUT alias)
+      operationId: triggerDiscoveryPut
+      security:
+        - basicAuth: []
+      responses:
+        '202':
+          description: Discovery accepted for processing
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/webhook/test:
+    post:
+      tags:
+        - Webhook
       summary: Test webhook delivery
       description: |
         Triggers a test webhook call to verify the configured webhook URL is reachable.
-        Only functional when webhook is enabled in settings.
+        Requires authentication when HTTP password is configured.
       operationId: testWebhook
+      parameters:
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: ["on", "off", "1", "0"]
+          description: Webhook state to test (on/1 or off/0)
       responses:
         '200':
-          description: Webhook test result
+          description: Webhook test completed
           content:
             application/json:
               schema:
                 type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+              example:
+                status: "ok"
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '401':
+          description: Authentication required
+        '403':
+          description: CSRF protection - invalid origin
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    put:
+      tags:
+        - Webhook
+      summary: Test webhook delivery (PUT alias)
+      operationId: testWebhookPut
+      parameters:
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: ["on", "off", "1", "0"]
+      responses:
+        '200':
+          description: Webhook test completed
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '401':
+          description: Authentication required
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
@@ -629,7 +1096,9 @@ paths:
       tags:
         - OpenTherm Data
       summary: Get OpenTherm message by label
-      description: Retrieve the current value for an OpenTherm message using its human-readable label.
+      description: |
+        Retrieve the current value for an OpenTherm message using its
+        human-readable label. Label matching is case-insensitive.
       operationId: getOTGWLabel
       parameters:
         - name: msglabel
@@ -645,6 +1114,12 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  label:
+                    type: string
+                  value: {}
+                  unit:
+                    type: string
         '400':
           $ref: '#/components/responses/BadRequestJson'
         '405':
@@ -660,13 +1135,15 @@ paths:
         **Prefer** `/v2/otgw/commands` (JSON body) for new integrations.
         Returns 202 Accepted.
       operationId: sendOTGWCommandAlias
+      security:
+        - basicAuth: []
       parameters:
         - name: command
           in: path
           required: true
           schema:
             type: string
-            pattern: '^[A-Z]{2}=.+$'
+            pattern: '^[A-Za-z]{2}=.+$'
           example: "TT=20.5"
       responses:
         '202':
@@ -689,6 +1166,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+    put:
+      tags:
+        - OTGW Commands
+      summary: Send OTGW command via URL path (PUT alias)
+      operationId: sendOTGWCommandAliasPut
+      parameters:
+        - name: command
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Command queued for processing
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
 
   /v2/otgw/autoconfigure:
     post:
@@ -711,6 +1206,16 @@ paths:
                   status:
                     type: string
                     enum: [accepted]
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    put:
+      tags:
+        - OTGW Commands
+      summary: Trigger MQTT autodiscovery (PUT alias)
+      operationId: autoConfigureAliasPut
+      responses:
+        '202':
+          description: Discovery accepted for processing
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
@@ -736,6 +1241,27 @@ components:
         error:
           status: 400
           message: "Invalid message ID"
+
+    SimulationStatus:
+      type: object
+      properties:
+        simulation:
+          type: object
+          properties:
+            active:
+              type: boolean
+              description: Whether simulation mode is currently active
+            file:
+              type: string
+              description: Path to the simulation log file
+            interval_ms:
+              type: integer
+              description: Replay interval in milliseconds
+      example:
+        simulation:
+          active: false
+          file: "/otgw_simulation.log"
+          interval_ms: 1000
 
   responses:
     BadRequestJson:
@@ -810,7 +1336,7 @@ x-api-design-notes: |
 
   **Boolean Values**:
   - `/v2/health` returns booleans as strings: "true" or "false"
-  - `/v2/device/info` returns proper JSON booleans
+  - `/v2/device/info` and `/v2/device/time` return proper JSON booleans
 
   **Error Handling**:
   - All errors return structured JSON: {"error":{"status":N,"message":"..."}}
@@ -826,6 +1352,7 @@ x-api-design-notes: |
   - Health endpoint: Poll every 30-60 seconds (each call writes a probe file to LittleFS)
   - Flash status: Poll every 1-2 seconds during upgrades
   - OpenTherm data: Poll every 5-10 seconds
+  - PIC settings: On-demand only (triggers PR= readout cycle)
 
   **Home Assistant Integration**:
   - Use /v2/otgw/discovery to register entities

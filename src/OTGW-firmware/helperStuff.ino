@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v1.2.0
+**  Version  : v1.3.0
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -17,13 +17,6 @@ template <typename T> void PROGMEM_readAnything (const T * sce, T& dest)
   memcpy_P (&dest, sce, sizeof (T));
 }
 
-template <typename T> T PROGMEM_getAnything (const T * sce)
-{
-  static T temp;
-  memcpy_P (&temp, sce, sizeof (T));
-  return temp;
-}
-
 //===========================================================================================
 // Get High Resolution Timestamp for Logs
 //===========================================================================================
@@ -31,10 +24,10 @@ const char* getOTLogTimestamp() {
   static char timestamp[16]; // "HH:MM:SS.mmmmmm"
   timeval now;
   gettimeofday(&now, nullptr);
-  // Default to UTC if not initialized, but typically settingNTPtimezone is valid
+  // Default to UTC if not initialized, but typically settings.ntp.sTimezone is valid
   // Recreating the timezone object is what _debugBOL does, so we follow that pattern
   // assuming timezoneManager is available.
-  TimeZone myTz = timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  TimeZone myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   if (myTz.isError()) {
     // Fallback if generic name failed
     myTz = TimeZone::forTimeOffset(TimeOffset::forMinutes(0)); 
@@ -78,36 +71,6 @@ char *trimwhitespace(char *str)
 }
 
 
-//===========================================================================================
-uint8_t splitString(char* inStrng, char delimiter, char* wOut[], uint8_t maxWords) 
-{
-    uint8_t wordCount = 0;
-    char* next = trimwhitespace(inStrng);
-    
-    while(next && *next && wordCount < maxWords) 
-    {
-      char* found = strchr(next, delimiter);
-      if (found) {
-        *found = '\0'; // terminate token
-        wOut[wordCount] = trimwhitespace(next);
-        next = found + 1;
-      } else {
-        // Last word
-        wOut[wordCount] = trimwhitespace(next);
-        next = NULL;
-      }
-      wordCount++;
-    }
-    // zero rest of the words
-    for(int i=wordCount; i< maxWords; i++)
-    {
-      wOut[i] = NULL;
-    }
-
-    return wordCount;
-    
-} // splitString()
-
 
 //===========================================================================================
 boolean isValidIP(IPAddress ip)
@@ -141,27 +104,26 @@ boolean isValidIP(IPAddress ip)
    *   255.255.255.255
    *   1 => 255||255||255||255 =255>0 = true 
    *   2 => !(false || false ) = true
-   *   3 +> !(true || true || true || true) = false
-   *   4 => !(false && false && false && false) = true
-   *   5 => !(true) = false
-   *   true && true && false && true && false = false ==> correct, this is an invalid address
+   *   3 => !(true && true && true && true) = false  (all four octets are 255 => global broadcast)
+   *   true && true && false = false ==> correct, this is an invalid address
    *   
    *   0.123.12.1       => true && false && true && true && true = false  ==> correct, this is an invalid address 
    *   10.0.0.0         => true && false && true && true && true = false  ==> correct, this is an invalid address 
-   *   10.255.0.1       => true && true && false && true && true = false  ==> correct, this is an invalid address 
-   *   150.150.255.150  => true && true && false && true && true = false  ==> correct, this is an invalid address 
+   *   10.255.0.1       => true && true && true && true && true = true    ==> correct, this is a valid address 
+   *   150.150.255.150  => true && true && true && true && true = true    ==> correct, this is a valid address 
    *   
-   *   123.21.1.99      => true && true && true && true && true = true    ==> correct, this is annvalid address 
-   *   1.1.1.1          => true && true && true && true && true = true    ==> correct, this is annvalid address 
+   *   123.21.1.99      => true && true && true && true && true = true    ==> correct, this is a valid address 
+   *   1.1.1.1          => true && true && true && true && true = true    ==> correct, this is a valid address 
    *   
    *   Some references on valid ip addresses: 
-   *   - https://www.quora.com/How-do-you-identify-an-invalid-IP-address
+   *   - https://www.rfc-editor.org/rfc/rfc3986 (IPv4 octet range 0-255)
+   *   - https://www.rfc-editor.org/rfc/rfc1123 (dotted-decimal host syntax)
    *   
    */
   boolean _isValidIP = false;
   _isValidIP = ((ip[0] || ip[1] || ip[2] || ip[3])>0);                             // if any bits are set, then it is not 0.0.0.0
   _isValidIP &= !((ip[0]==0) || (ip[3]==0));                                       // if either the first or last is a 0, then it is invalid
-  _isValidIP &= !((ip[0]==255) || (ip[1]==255) || (ip[2]==255) || (ip[3]==255)) ;  // if any of the octets is 255, then it is invalid  
+  _isValidIP &= !(ip[0]==255 && ip[1]==255 && ip[2]==255 && ip[3]==255);             // only reject global broadcast address 255.255.255.255
   _isValidIP &= !(ip[0]==127 && ip[1]==0 && ip[2]==0 && ip[3]==1);                 // if not 127.0.0.0 then it might be valid
   _isValidIP &= !(ip[0]>=224);                                                     // if ip[0] >=224 then reserved space  
   
@@ -188,8 +150,11 @@ uint32_t updateRebootCount()
     if (fh) {
       //read from file
       if (fh.available()){
-        //read the first line 
-        _reboot  = fh.readStringUntil('\n').toInt();
+        //read the first line — static char avoids heap allocation (ADR-004)
+        char cntBuf[12] = {0};
+        uint8_t n = fh.readBytesUntil('\n', cntBuf, sizeof(cntBuf) - 1);
+        cntBuf[n] = '\0';
+        _reboot = (uint32_t)strtoul(cntBuf, nullptr, 10);
       }
     }
     fh.close();
@@ -203,7 +168,7 @@ uint32_t updateRebootCount()
     }
     fh.close();
   }
-  DebugTf(PSTR("Reboot count = [%d]\r\n"), rebootCount);
+  DebugTf(PSTR("Reboot count = [%d]\r\n"), _reboot);
   return _reboot;
 }
 
@@ -258,6 +223,80 @@ bool updateLittleFSStatus(const __FlashStringHelper *probePath)
   return updateLittleFSStatus(pathBuffer);
 }
 
+static bool isRebootLogSummaryLine(const char* line)
+{
+  return (line != nullptr && strstr(line, " - reboot cause: ") != nullptr);
+}
+
+static bool isRebootLogDetailLine(const char* line)
+{
+  return (line != nullptr &&
+          (strncmp_P(line, PSTR("ESP register contents:"), 22) == 0 ||
+           strncmp_P(line, PSTR("External Reason:"), 16) == 0));
+}
+
+static void trimRebootLogLine(char* line)
+{
+  if (line == nullptr) return;
+
+  size_t len = strlen(line);
+  while (len > 0 && (line[len - 1] == '\r' || line[len - 1] == '\n')) {
+    line[--len] = '\0';
+  }
+}
+
+bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t detailsSize)
+{
+  static const char rebootLogFile[] = "/reboot_log.txt";
+  char pendingSummary[160] = {0};
+  char line[160] = {0};
+
+  if (summary == nullptr || summarySize == 0 || details == nullptr || detailsSize == 0) {
+    return false;
+  }
+
+  summary[0] = '\0';
+  details[0] = '\0';
+
+  // Use the existing LittleFSmounted flag rather than calling LittleFS.begin() again.
+  // Calling begin() during or after OTA (when LittleFS.end() was invoked) is unsafe (K3).
+  if (!LittleFSmounted) {
+    return false;
+  }
+
+  File fh = LittleFS.open(rebootLogFile, "r");
+  if (!fh) {
+    return false;
+  }
+
+  while (fh.available()) {
+    size_t n = fh.readBytesUntil('\n', line, sizeof(line) - 1);
+    line[n] = '\0';
+    trimRebootLogLine(line);
+
+    if (line[0] == '\0') {
+      continue;
+    }
+
+    if (isRebootLogSummaryLine(line)) {
+      strlcpy(pendingSummary, line, sizeof(pendingSummary));
+      continue;
+    }
+
+    if (pendingSummary[0] != '\0' && isRebootLogDetailLine(line)) {
+      strlcpy(summary, pendingSummary, summarySize);
+      strlcpy(details, line, detailsSize);
+      fh.close();
+      return true;
+    }
+
+    pendingSummary[0] = '\0';
+  }
+
+  fh.close();
+  return false;
+}
+
 bool updateRebootLog(String text)
 {
   #define REBOOTLOG_FILE "/reboot_log.txt"
@@ -300,8 +339,9 @@ bool updateRebootLog(String text)
 
     if (rtc_info->reason == REASON_EXT_SYS_RST) {
       //external reset, so try to fetch the reset reason from the tiny watchdog and print that
-      snprintf_P(log_line_regs, LOG_LINE_LENGTH, PSTR("External Reason: External Watchdog reason: %s\r\n"), CSTR(initWatchDog()));
-      Debugf(log_line_regs);      
+      { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason));
+        snprintf_P(log_line_regs, LOG_LINE_LENGTH, PSTR("External Reason: External Watchdog reason: %s\r\n"), wdReason);
+        Debugf(log_line_regs); }      
     }
 
     if	(rtc_info->reason	==	REASON_EXCEPTION_RST)	{
@@ -334,7 +374,7 @@ bool updateRebootLog(String text)
     }
   }
 
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
   snprintf_P(log_line, LOG_LINE_LENGTH, PSTR("%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n"), myTime.year(),  myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second(), CSTR(text), errorCode, log_line_excpt);
 
@@ -356,10 +396,12 @@ bool updateRebootLog(String text)
       if (infh) {
         //read from file
         while (infh.available() && (i < LOG_LINES)){
-          //read the first line 
-          String line = infh.readStringUntil('\n');
+          //read the next line — char buffer avoids heap allocation (ADR-004)
+          char line[LOG_LINE_LENGTH] = {0};
+          int n = infh.readBytesUntil('\n', line, sizeof(line) - 1);
+          line[n] = '\0';
           // Filter out empty or very short lines (< 3 chars) to keep log file clean
-          if (line.length() > 3) {
+          if (n > 3) {
             outfh.print(line);
           }
           i++;
@@ -395,22 +437,17 @@ String upTime()
   char    calcUptime[20];
 
   snprintf_P(calcUptime, sizeof(calcUptime), PSTR("%d(d)-%02d:%02d(H:m)")
-                                          , int((upTimeSeconds / (60 * 60 * 24)) % 365)
-                                          , int((upTimeSeconds / (60 * 60)) % 24)
-                                          , int((upTimeSeconds / (60)) % 60));
+                                          , int((state.uptime.iSeconds / (60 * 60 * 24)) % 365)
+                                          , int((state.uptime.iSeconds / (60 * 60)) % 24)
+                                          , int((state.uptime.iSeconds / (60)) % 60));
 
   return calcUptime;
 
 } // upTime()
 
-bool prefix(const char *pre, const char *str)
-{
-    return strncmp(pre, str, strlen(pre)) == 0;
-}
-
 bool yearChanged(){
   static int16_t lastyear = -1;
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
   int16_t thisyear = myTime.year();
   bool _ret = (lastyear != thisyear); //year changed
@@ -423,7 +460,7 @@ bool yearChanged(){
 
 bool dayChanged(){
   static int8_t lastday = -1;
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
   int8_t thisday = myTime.day();
   bool _ret = (lastday != thisday);
@@ -434,22 +471,9 @@ bool dayChanged(){
   return _ret;
 }
 
-bool hourChanged(){
-  static int8_t lasthour = -1;
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
-  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
-  int8_t thishour = myTime.hour();
-  bool _ret = (lasthour != thishour);
-  if (_ret){
-    //hour changed
-    lasthour = thishour;
-  }
-  return _ret;
-}
-
 bool minuteChanged(){
   static int8_t lastminute = -1;
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
   int8_t thisminute = myTime.minute();
   bool _ret = (lastminute != thisminute);
@@ -460,61 +484,76 @@ bool minuteChanged(){
   return _ret;
 }
 
+// Path to the LittleFS file containing the build git hash (used by checklittlefshash and getFilesystemHash)
+#define GITHASH_FILE "/version.hash"
+
 /*
   check if the version githash is in the littlefs as version.hash
 
 */
 bool checklittlefshash(){
-  #define GITHASH_FILE "/version.hash"
-  static const char fsMismatchMsg[] PROGMEM = "Flash your littleFS with matching version!";
-  String _githash="";
+  char _githash[16] = {0};  // git short hash is 7 chars; 16 is ample (ADR-004)
   if (LittleFS.begin()) {
     //start with opening the file
     File fh = LittleFS.open(GITHASH_FILE, "r");
     if (fh) {
       //read from file
       if (fh.available()){
-        //read the first line 
-         _githash = fh.readStringUntil('\n');
-         _githash.trim(); // Remove CR/LF and any extra whitespace
+        uint8_t n = fh.readBytesUntil('\n', _githash, sizeof(_githash) - 1);
+        _githash[n] = '\0';
+        // Trim trailing \r (readBytesUntil drops \n but keeps \r on Windows-style lines)
+        if (n > 0 && _githash[n-1] == '\r') _githash[n-1] = '\0';
       }
       fh.close();
     }
-    DebugTf(PSTR("Check githash = [%s]\r\n"), CSTR(_githash));
-    DebugTf(PSTR("FS githash = [%s] | FW githash = [%s]\r\n"), CSTR(_githash), _VERSION_GITHASH);
-    bool match = (strcasecmp(CSTR(_githash), _VERSION_GITHASH)==0);
+    DebugTf(PSTR("Check githash = [%s]\r\n"), _githash);
+    DebugTf(PSTR("FS githash = [%s] | FW githash = [%s]\r\n"), _githash, _VERSION_GITHASH);
+    bool match = (strcasecmp(_githash, _VERSION_GITHASH)==0);
     if (!match) {
-      DebugTf(PSTR("WARNING: Firmware version (%s) does not match filesystem version (%s)\r\n"), 
-              _VERSION_GITHASH, CSTR(_githash));
+      DebugTf(PSTR("WARNING: Firmware version (%s) does not match filesystem version (%s)\r\n"),
+              _VERSION_GITHASH, _githash);
       DebugTln(F("This may cause compatibility issues. Flash matching filesystem version."));
-      strncpy_P(sMessage, fsMismatchMsg, sizeof(sMessage) - 1);
-      sMessage[sizeof(sMessage) - 1] = '\0';
-    } else if (strcmp_P(sMessage, fsMismatchMsg) == 0) {
-      sMessage[0] = '\0';
+      state.statusMessage = StatusMessage::LittleFSMismatch;
+    } else if (state.statusMessage == StatusMessage::LittleFSMismatch) {
+      state.statusMessage = StatusMessage::None;
     }
     return match;
   }
   return false;
 }
 
+const __FlashStringHelper* getStatusMessageText()
+{
+  switch (state.statusMessage) {
+    case StatusMessage::LittleFSMismatch:
+      return F("Flash your littleFS with matching version!");
+    case StatusMessage::PSModeActive:
+      return F("PS=1 mode; decoded summary updates active.");
+    case StatusMessage::None:
+    default:
+      return F("");
+  }
+}
+
 /*
   Get filesystem version hash from /version.hash file
   Returns empty string if file not found or error
 */
-String getFilesystemHash(){
-  #define GITHASH_FILE "/version.hash"
-  static String _githash = ""; // Cache the hash
-  
+const char* getFilesystemHash(){
+  // Static char cache — avoids permanent heap String (ADR-004)
+  static char _githash[16] = {0};
+
   // Return cached value if available
-  if (_githash.length() > 0) return _githash;
+  if (_githash[0] != '\0') return _githash;
 
   if (LittleFS.begin()) {
     if (LittleFS.exists(GITHASH_FILE)) {
       File fh = LittleFS.open(GITHASH_FILE, "r");
       if (fh) {
         if (fh.available()){
-          _githash = fh.readStringUntil('\n');
-          _githash.trim(); // Remove any whitespace/newlines
+          uint8_t n = fh.readBytesUntil('\n', _githash, sizeof(_githash) - 1);
+          _githash[n] = '\0';
+          if (n > 0 && _githash[n-1] == '\r') _githash[n-1] = '\0';
         }
         fh.close();
       }
@@ -523,63 +562,6 @@ String getFilesystemHash(){
   return _githash;
 }
 
-
-/*
-** Does not generate hex character constants.
-** Always generates triple-digit octal constants.
-** Always generates escapes in preference to octal.
-** Escape question mark to ensure no trigraphs are generated by repetitive use.
-** Handling of 0x80..0xFF is locale-dependent (might be octal, might be literal).
-*/
-
-void chr_cstrlit(unsigned char u, char *buffer, size_t buflen)
-{
-    if (buflen < 2)
-        *buffer = '\0';
-    else if (isprint(u) && u != '\'' && u != '\"' && u != '\\' && u != '\?')
-        snprintf_P(buffer, buflen, PSTR("%c"), u);
-    else if (buflen < 3)
-        *buffer = '\0';
-    else
-    {
-        switch (u)
-        {
-        case '\a':  strlcpy(buffer, "\\a", buflen); break;
-        case '\b':  strlcpy(buffer, "\\b", buflen); break;
-        case '\f':  strlcpy(buffer, "\\f", buflen); break;
-        case '\n':  strlcpy(buffer, "\\n", buflen); break;
-        case '\r':  strlcpy(buffer, "\\r", buflen); break;
-        case '\t':  strlcpy(buffer, "\\t", buflen); break;
-        case '\v':  strlcpy(buffer, "\\v", buflen); break;
-        case '\\':  strlcpy(buffer, "\\\\", buflen); break;
-        case '\'':  strlcpy(buffer, "\\'", buflen); break;
-        case '\"':  strlcpy(buffer, "\\\"", buflen); break;
-        case '\?':  strlcpy(buffer, "\\\?", buflen); break;
-        default:
-            if (buflen < 5)
-                *buffer = '\0';
-            else
-                snprintf_P(buffer, buflen, PSTR("\\%03o"), u);
-            break;
-        }
-    }
-}
-
-void str_cstrlit(const char *str, char *buffer, size_t buflen)
-{
-    unsigned char u;
-    size_t len;
-
-    while ((u = (unsigned char)*str++) != '\0')
-    {
-        chr_cstrlit(u, buffer, buflen);
-        if ((len = strlen(buffer)) == 0)
-            return;
-        buffer += len;
-        buflen -= len;
-    }
-    *buffer = '\0';
-}
 
 String strHTTPmethod(HTTPMethod method)
 {
@@ -603,31 +585,6 @@ String strHTTPmethod(HTTPMethod method)
       return "";
   }
 }
-
-/*
- * Written by Ahmad Shamshiri
-  * with lots of research, this sources was used:
- * https://support.randomsolutions.nl/827069-Best-dBm-Values-for-Wifi 
- * This is approximate percentage calculation of RSSI
- * WiFi Signal Strength Calculation
- * Written Aug 08, 2019 at 21:45 in Ajax, Ontario, Canada
- */
-
-int dBmtoPercentage(int dBm)
-{
-  const int RSSI_MAX =-50;// define maximum strength of signal in dBm
-  const int RSSI_MIN =-100;// define minimum strength of signal in dBm
-  int quality;
-    if(dBm <= RSSI_MIN){
-      quality = 0;
-    } else if(dBm >= RSSI_MAX) {  
-      quality = 100;
-    } else {
-      quality = 2 * (dBm + 100);
-    }
-
-  return quality;
-}//dBmtoPercentage 
 
 /*
   RSSI signal quality to percentage quad function
@@ -666,7 +623,7 @@ String dBmtoQuality(int dBm)
   //if (dBm<=-30) { _ret = "Amazing";}
 
   return (_ret);
-}//dBmtoPercentage 
+}//dBmtoQuality
 
 // Replace all occurrences of token with replacement, guarding buffer size
 bool replaceAll(char *buffer, const size_t bufSize, const char *token, const char *replacement) {
