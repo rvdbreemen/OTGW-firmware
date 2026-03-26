@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h 
-**  Version  : v1.3.0-rc4
+**  Version  : v1.3.0
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -186,13 +186,6 @@ enum OTValueType {
 	OT_VALTYPE_STATUS,   // status flags (master/slave)
 	OT_VALTYPE_DATETIME, // date or time
 	OT_VALTYPE_SPECIAL   // special formatting
-};
-
-enum OpenThermResponseStatus {
-	OT_NONE,
-	OT_SUCCESS,
-	OT_INVALID,
-	OT_TIMEOUT
 };
 
 enum OpenThermMessageType {
@@ -516,18 +509,6 @@ struct OT_cmd_t { // see all possible commands for PIC here: https://otgw.tclcod
 #define CMDQUEUE_MAX 20
 extern struct OT_cmd_t cmdqueue[CMDQUEUE_MAX];
 extern int cmdQueueSize;  // fill-pointer: number of active entries (0..CMDQUEUE_MAX)
-
-enum OpenThermStatus {
-	OT_NOT_INITIALIZED,
-	OT_READY,
-	OT_DELAY,
-	OT_REQUEST_SENDING,
-	OT_RESPONSE_WAITING,
-	OT_RESPONSE_START_BIT,
-	OT_RESPONSE_RECEIVING,
-	OT_RESPONSE_READY,
-	OT_RESPONSE_INVALID	
-};
 
 /**
  * Structure to hold Opentherm data packet content.

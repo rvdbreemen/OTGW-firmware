@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.3.0-rc4
+**  Version  : v1.3.0
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -315,7 +315,6 @@ OTGWSettings settings;
 WiFiClient  wifiClient;
 char        cMsg[CMSG_SIZE];
 char        sLine[SLINE_SIZE];  // MQTT autoconfig line scratch (MQTTstuff.ino, guarded by mqttAutoConfigInProgress)
-char        fChar[10];
 char        lastReset[129] = "";
 uint32_t    MQTTautoConfigMap[8] = { 0 };
 // Deferred settings write timer (Finding #23: coalesce flash writes)

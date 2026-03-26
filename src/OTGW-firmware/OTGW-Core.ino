@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.3.0-rc4
+**  Version  : v1.3.0
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1020,17 +1020,6 @@ void OpenthermData_t::s16(int16_t value) {
 }
 
 //parsing helpers
-const char *statusToString(OpenThermResponseStatus status)
-{
-	switch (status) {
-		case OT_NONE:    return "None";
-		case OT_SUCCESS: return "Success";
-		case OT_INVALID: return "Invalid";
-		case OT_TIMEOUT: return "Timeout";
-		default:         return "Unknown";
-	}
-}
-
 const char *messageTypeToString(OpenThermMessageType message_type)
 {
 	switch (message_type) {

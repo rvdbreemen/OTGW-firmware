@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.css
-**  Version  : v1.3.0-rc4
+**  Version  : v1.3.0
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -322,13 +322,6 @@
     display: table;
     clear: both;
   }
-  
-/* Responsive layout - makes the three columns stack on top of each other instead of next to each other */
-@media screen and (max-width: 768px) {
-  .column {
-    width: 100%;
-  }
-}
   
   /* PIC firmware page */
 .pictable {
@@ -1073,23 +1066,6 @@ body.disable-interaction {
   display: none !important;
 }
 
-.flash-progress-bar {
-  width: 0%;
-  background-color: #4CAF50;
-}
-
-.flash-progress-bar.error {
-  background-color: red;
-}
-
-.flash-progress-section {
-  display: none;
-}
-
-.flash-progress-section.active {
-  display: block;
-}
-
 .waiting-error {
   color: red;
 }
@@ -1139,10 +1115,6 @@ body.disable-interaction {
   border: 1px solid #ddd;
   border-radius: 3px 3px 0 0;
 }
-.pic-settings-group-heading {
-  display: table-row;
-}
-.pic-settings-group-heading td,
 .pic-settings-group-cell {
   display: table-cell;
   padding: 5px 15px;
