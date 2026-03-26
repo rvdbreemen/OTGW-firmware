@@ -19,7 +19,8 @@ Version 1.3.0 is a major feature release building on v1.2.0 with PIC settings vi
 - **Safer OTA / LittleFS Updates:** Reboot verification via `/api/v2/health`, browser backups of `settings.ini` and `dallas_labels.ini`, Dallas labels auto-preserved through localStorage, hardened filesystem flashing against WiFi reconnect corruption.
 - **Triple-Reset WiFi Recovery:** Three quick hardware resets within 10 seconds clear stored WiFi credentials and reopen the captive portal without requiring a reflash.
 - **Non-Blocking WiFi Reconnect:** The blocking 30-second reconnect loop is replaced with a state machine, preventing main-loop freezes on a heating system controller.
-- **Memory and Internal Cleanup:** ArduinoJson removed, settings/state reorganized into structs, String class eliminated from hot paths, MQTT autodiscovery memory reduced via streaming template rendering. Global variables reduced from 70% to 70% dynamic memory usage despite all new features.
+- **Security Hardening:** Centralized HTTP Basic Auth enforcement for all POST/PUT API endpoints. CORS wildcard replaced with dynamic origin validation. Webhook hostname SSRF prevention via DNS resolution. XSS fix in statistics table. Boot command and MQTT payload validation. ~450 lines of dead code removed.
+- **Memory and Stability:** ArduinoJson removed, settings/state reorganized into structs, String class eliminated from hot paths including CSRF validation. MQTT autodiscovery memory reduced via streaming. ~1,400 bytes of stack pressure eliminated through centralized buffers. Fixed `millis()` wraparound bug, f8.8 negative value encoding, and OT message parse validation.
 - **No New Breaking Changes:** For v1.2.0 users, this release adds features and hardening without introducing new MQTT topic, REST API, or settings-format breaks.
 
 ## What was new in v1.2.0

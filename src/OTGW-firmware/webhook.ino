@@ -62,18 +62,24 @@ static bool isLocalUrl(const char* url) {
   // Must have exactly 3 dots to be a valid IPv4 (rejects "1.2.3.4.5", "...")
   if (isIp && dotCount != 3) isIp = false;
 
-  if (!isIp) {
-    // Hostname (e.g. shelly.local, shelly-relay) — allowed per ADR-032
-    // local-only trust model; DNS resolution is on the trusted LAN.
-    return true;
-  }
-
-  // Parse the four octets and validate range (use %u to reject negatives)
   unsigned int o1 = 0, o2 = 0, o3 = 0, o4 = 0;
-  if (sscanf(hostBuf, "%u.%u.%u.%u", &o1, &o2, &o3, &o4) != 4 ||
-      o1 > 255 || o2 > 255 || o3 > 255 || o4 > 255) {
-    DebugTln(F("Webhook: URL rejected (malformed IP)"));
-    return false;
+
+  if (!isIp) {
+    // Hostname — resolve to IP and validate it's local (prevents SSRF via DNS rebinding)
+    IPAddress resolved;
+    if (!WiFi.hostByName(hostBuf, resolved)) {
+      DebugTf(PSTR("Webhook: URL rejected (DNS lookup failed for %s)\r\n"), hostBuf);
+      return false;
+    }
+    o1 = resolved[0]; o2 = resolved[1]; o3 = resolved[2]; o4 = resolved[3];
+    DebugTf(PSTR("Webhook: hostname %s resolved to %u.%u.%u.%u\r\n"), hostBuf, o1, o2, o3, o4);
+  } else {
+    // Parse the four octets and validate range
+    if (sscanf(hostBuf, "%u.%u.%u.%u", &o1, &o2, &o3, &o4) != 4 ||
+        o1 > 255 || o2 > 255 || o3 > 255 || o4 > 255) {
+      DebugTln(F("Webhook: URL rejected (malformed IP)"));
+      return false;
+    }
   }
 
   if (o1 == 10)                            return true;  // 10.0.0.0/8

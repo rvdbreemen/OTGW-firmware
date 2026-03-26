@@ -619,6 +619,14 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   //detect home assistant going down...
   char msgPayload[128];
   copyMQTTPayloadToBuffer(payload, length, msgPayload, sizeof(msgPayload));
+
+  // Check if payload was truncated — refuse to forward truncated commands to PIC
+  if (length >= sizeof(msgPayload)) {
+    DebugTf(PSTR("WARNING: MQTT payload truncated (%u > %u), skipping command\r\n"),
+            length, (unsigned int)(sizeof(msgPayload) - 1));
+    return;
+  }
+
   if (strcasecmp_P(topic, PSTR("homeassistant/status")) == 0) {
     //incoming message on status, detect going down
     if (!settings.mqtt.bHaRebootDetect) {

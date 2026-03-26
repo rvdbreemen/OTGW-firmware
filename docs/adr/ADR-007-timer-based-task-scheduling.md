@@ -1,18 +1,18 @@
 # ADR-007: Timer-Based Task Scheduling
 
 **Status:** Accepted  
-**Date:** 2018-06-01 (Estimated)  
-**Updated:** 2026-01-28 (Documentation)  
+**Date:** 2018-06-01 (Estimated)
+**Updated:** 2026-03-26 (Timer cascade updated: removed 5s/30s, added 3s PIC readout)
 **Enhanced:** 2020-01-01 (49-day rollover protection)
 
 ## Context
 
 The ESP8266 is a single-core processor running a cooperative multitasking environment. The firmware must handle multiple periodic tasks without blocking:
 - WiFi connection monitoring
-- MQTT publishing (every 30 seconds for slow-changing values)
+- MQTT publishing (on value change, with configurable interval gating)
 - NTP time synchronization (every 30 minutes)
 - Watchdog feeding (every 3 seconds max)
-- Sensor readings (every 5 seconds)
+- PIC settings on-demand readout (every 3 seconds when active)
 - LED status updates (every second)
 - Settings auto-save (every 5 minutes if changed)
 
@@ -239,12 +239,11 @@ if (DUE(timer)) { }
 
 **Firmware usage:**
 ```cpp
-DECLARE_TIMER_SEC(publish1sec, 1);      // LED updates, status
-DECLARE_TIMER_SEC(publish5sec, 5);      // Sensor reads
-DECLARE_TIMER_SEC(publish30sec, 30);    // MQTT publishes
-DECLARE_TIMER_SEC(publish60sec, 60);    // Heap monitoring
-DECLARE_TIMER_MIN(publish5min, 5);      // Settings auto-save
-DECLARE_TIMER_MIN(ntpTimer, 30);        // NTP resync
+DECLARE_TIMER_SEC(timer1s, 1);           // Command queue, status updates
+DECLARE_TIMER_SEC(timer3s, 3);           // PIC settings on-demand readout
+DECLARE_TIMER_SEC(timer60s, 60);         // Gateway mode check, heap stats
+DECLARE_TIMER_MIN(timer5min, 5);         // MQTT state republish, settings auto-save
+DECLARE_TIMER_MIN(ntpTimer, 30);         // NTP resync
 ```
 
 ## Watchdog Feeding
