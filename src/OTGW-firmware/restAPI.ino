@@ -20,6 +20,15 @@
 #define RESTDebugT(...)   ({ if (state.debug.bRestAPI) DebugT(__VA_ARGS__);    })
 #define RESTDebug(...)    ({ if (state.debug.bRestAPI) Debug(__VA_ARGS__);    })
 
+// H3: Send dynamic CORS Allow-Origin header echoing the request Origin,
+// instead of a wildcard. Only sends the header when Origin is present.
+static void sendCorsOriginHeader() {
+  String origin = httpServer.header("Origin");
+  if (origin.length() > 0) {
+    httpServer.sendHeader(F("Access-Control-Allow-Origin"), origin);
+  }
+}
+
 //=======================================================================
 // RESTful v2 API: Consistent JSON error response helper (ADR-035)
 // Returns: {"error":{"status":N,"message":"..."}}
@@ -29,7 +38,7 @@ static void sendApiError(int httpCode, const __FlashStringHelper* message) {
   snprintf_P(jsonBuff, sizeof(jsonBuff),
     PSTR("{\"error\":{\"status\":%d,\"message\":\"%S\"}}"),
     httpCode, (PGM_P)message);
-  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+  sendCorsOriginHeader();
   httpServer.send(httpCode, F("application/json"), jsonBuff);
 }
 
@@ -44,26 +53,31 @@ static void sendApiMethodNotAllowed(const __FlashStringHelper* allowedMethods) {
 // Returns true if the request appears to come from the same origin.
 // Permissive for legacy/non-browser clients that don't send Origin/Referer.
 static bool isSameOriginRequest() {
-  String origin = httpServer.header(F("Origin"));
-  if (origin.length() == 0) {
-    origin = httpServer.header(F("Referer"));
+  // Use static buffers to avoid String heap allocations (H6).
+  // Sizes: Origin/Referer up to 128 chars, Host up to 64 chars.
+  static char originBuf[128];
+  static char hostBuf[64];
+
+  strlcpy(originBuf, httpServer.header(F("Origin")).c_str(), sizeof(originBuf));
+  if (originBuf[0] == '\0') {
+    strlcpy(originBuf, httpServer.header(F("Referer")).c_str(), sizeof(originBuf));
   }
-  if (origin.length() == 0) return true;  // no origin header — allow (non-browser client)
+  if (originBuf[0] == '\0') return true;  // no origin header — allow (non-browser client)
 
-  String host = httpServer.hostHeader();
-  if (host.length() == 0) return true;  // can't validate without Host header
+  strlcpy(hostBuf, httpServer.hostHeader().c_str(), sizeof(hostBuf));
+  if (hostBuf[0] == '\0') return true;  // can't validate without Host header
 
-  int schemeSep = origin.indexOf(F("://"));
-  if (schemeSep < 0) {
+  const char* schemeSep = strstr(originBuf, "://");
+  if (schemeSep == nullptr) {
     RESTDebugTln(F("REST CSRF: malformed Origin/Referer, rejecting"));
     return false;
   }
-  int hostStart = schemeSep + 3;
-  int pathStart = origin.indexOf('/', hostStart);
-  String originHostPort = (pathStart >= 0) ? origin.substring(hostStart, pathStart) : origin.substring(hostStart);
-  if (!originHostPort.equalsIgnoreCase(host)) {
-    RESTDebugTf(PSTR("REST CSRF: origin host '%s' != request host '%s'\r\n"),
-                originHostPort.c_str(), host.c_str());
+  const char* hostStart = schemeSep + 3;
+  const char* pathStart = strchr(hostStart, '/');
+  size_t hostLen = pathStart ? (size_t)(pathStart - hostStart) : strlen(hostStart);
+  size_t reqHostLen = strlen(hostBuf);
+  if (hostLen != reqHostLen || strncasecmp(hostStart, hostBuf, hostLen) != 0) {
+    RESTDebugTf(PSTR("REST CSRF: origin host != request host '%s'\r\n"), hostBuf);
     return false;
   }
   return true;
@@ -139,7 +153,7 @@ void sendApiNotFound(const char *URI);
 
 // Common OPTIONS/CORS preflight response for all v2 endpoints
 static void sendApiOptions() {
-  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+  sendCorsOriginHeader();
   httpServer.sendHeader(F("Access-Control-Allow-Methods"), F("GET, POST, PUT, OPTIONS"));
   httpServer.sendHeader(F("Access-Control-Allow-Headers"), F("Content-Type"));
   httpServer.sendHeader(F("Access-Control-Max-Age"), F("86400"));
@@ -167,7 +181,7 @@ static void handleCommandSubmit(const char* cmdStr) {
     return;
   }
   addOTWGcmdtoqueue(cmdStr, static_cast<int>(cmdLen));
-  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+  sendCorsOriginHeader();
   httpServer.send(202, F("application/json"), F("{\"status\":\"queued\"}"));
 }
 
@@ -179,7 +193,7 @@ static void sendOTGWSimulationStatus() {
              state.debug.bOTGWSimulation ? "true" : "false",
              reinterpret_cast<PGM_P>(kOTGWSimulationFile),
              static_cast<unsigned long>(state.debug.iOTGWSimulationIntervalMs));
-  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+  sendCorsOriginHeader();
   httpServer.send(200, F("application/json"), jsonBuf);
 }
 
@@ -201,6 +215,8 @@ static void handleHealth(const char words[][API_WORD_LEN], uint8_t wc, HTTPMetho
 }
 
 static void handleSettings(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  // Auth required for all methods (GET includes sensitive config)
+  if (!checkHttpAuth()) return;
   if (method == HTTP_POST || method == HTTP_PUT) {
     postSettings();
   } else if (method == HTTP_GET) {
@@ -291,7 +307,6 @@ static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
 
   if (wc > 4 && strcmp_P(words[4], PSTR("start")) == 0) {
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
-    if (!checkHttpAuth()) return;
     setOTGWSimulationEnabled(true);
     sendOTGWSimulationStatus();
     return;
@@ -299,7 +314,6 @@ static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
 
   if (wc > 4 && strcmp_P(words[4], PSTR("stop")) == 0) {
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
-    if (!checkHttpAuth()) return;
     setOTGWSimulationEnabled(false);
     sendOTGWSimulationStatus();
     return;
@@ -329,7 +343,6 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
   } else if (strcmp_P(words[4], PSTR("commands")) == 0) {
     // POST /api/v2/otgw/commands — command in body, 202 Accepted
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
-    if (!checkHttpAuth()) return;
     const String& body = httpServer.arg(0);
     char cmdBuf[64] = "";
     if (!extractJsonField(body, F("command"), cmdBuf, sizeof(cmdBuf))) {
@@ -339,14 +352,12 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
   } else if (strcmp_P(words[4], PSTR("command")) == 0) {
     // POST /api/v2/otgw/command/{cmd} — backward compat alias (prefer /commands)
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
-    if (!checkHttpAuth()) return;
     if (wc <= 5 || words[5][0] == '\0') { sendApiError(400, F("Missing command")); return; }
     handleCommandSubmit(words[5]);
   } else if (strcmp_P(words[4], PSTR("discovery")) == 0 || strcmp_P(words[4], PSTR("autoconfigure")) == 0) {
     // POST /api/v2/otgw/discovery (or /autoconfigure compat alias)
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
-    if (!checkHttpAuth()) return;
-    httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+    sendCorsOriginHeader();
     httpServer.send(202, F("application/json"), F("{\"status\":\"accepted\"}"));
     doAutoConfigure();
   } else if (strcmp_P(words[4], PSTR("label")) == 0) {
@@ -361,7 +372,6 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
 static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (wc > 4 && strcmp_P(words[4], PSTR("test")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST")); return; }
-    if (!checkHttpAuth()) return;
     String stateParam = httpServer.arg(F("state"));
     if (!stateParam.length()) {
       sendApiError(400, F("Missing required 'state' parameter; expected on|1 or off|0"));
@@ -374,7 +384,7 @@ static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMeth
       return;
     }
     testWebhook(isOn);
-    httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+    sendCorsOriginHeader();
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
   } else {
     sendApiNotFound(originalURI);
@@ -467,6 +477,11 @@ void processAPI()
     if (wc > 2 && strcmp_P(words[2], PSTR("v2")) == 0) {
       // OPTIONS preflight for all v2 endpoints (CORS)
       if (method == HTTP_OPTIONS) { sendApiOptions(); return; }
+
+      // H5: Centralized auth check — all POST/PUT mutations require auth
+      if (method == HTTP_POST || method == HTTP_PUT) {
+        if (!checkHttpAuth()) return;
+      }
 
       // Dispatch via route table
       if (wc > 3) {
@@ -889,9 +904,8 @@ void sendDeviceTimeV2()
 } // sendDeviceTimeV2()
 
 //=======================================================================
-void sendDeviceSettings() 
+void sendDeviceSettings()
 {
-  if (!checkHttpAuth()) return;
   RESTDebugTln(F("sending device settings ...\r"));
 
   sendStartJsonMap(F("settings"));
@@ -992,7 +1006,6 @@ static bool isKnownSetting(const char* field) {
 //=======================================================================
 void postSettings()
 {
-  if (!checkHttpAuth()) return;
   //------------------------------------------------------------
   // json string: {"name":"settingInterval","value":9}
   // json string: {"name":"settings.sHostname","value":"abc"}
@@ -1130,7 +1143,7 @@ void sendApiNotFound(const char *URI)
   }
 
   // For non-API routes, return HTML 404 (legacy behavior)
-  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
+  sendCorsOriginHeader();
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send_P(404, PSTR("text/html; charset=UTF-8"), PSTR("<!DOCTYPE HTML><html><head>"));
 

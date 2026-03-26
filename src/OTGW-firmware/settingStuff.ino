@@ -437,7 +437,7 @@ void updateSetting(const char *field, const char *newValue)
     DebugTf(PSTR("Need reboot before new %s.local will be available!\r\n\n"), settings.sHostname);
   }
 
-  if (strcasecmp_P(field, PSTR("httppasswd")) == 0) {
+  else if (strcasecmp_P(field, PSTR("httppasswd")) == 0) {
     // Only update if not the placeholder value.
     if (newValue && !isHttpPasswordPlaceholder(newValue)) {
       strlcpy(settings.sHTTPpasswd, newValue, sizeof(settings.sHTTPpasswd));
@@ -452,14 +452,14 @@ void updateSetting(const char *field, const char *newValue)
       }
     }
   }
-  if (strcasecmp_P(field, PSTR("MQTTenable"))==0)      settings.mqtt.bEnable = EVALBOOLEAN(newValue);
-  if (strcasecmp_P(field, PSTR("MQTTbroker")) == 0)    strlcpy(settings.mqtt.sBroker, newValue, sizeof(settings.mqtt.sBroker));
-  if (strcasecmp_P(field, PSTR("MQTTbrokerPort"))==0) {
+  else if (strcasecmp_P(field, PSTR("MQTTenable"))==0)      settings.mqtt.bEnable = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("MQTTbroker")) == 0)    strlcpy(settings.mqtt.sBroker, newValue, sizeof(settings.mqtt.sBroker));
+  else if (strcasecmp_P(field, PSTR("MQTTbrokerPort"))==0) {
     int port = atoi(newValue);
     if (port < 1 || port > 65535) { DebugTf(PSTR("WARNING: MQTTbrokerPort %d out of range 1-65535, ignored\r\n"), port); }
     else settings.mqtt.iBrokerPort = port;
   }
-  if (strcasecmp_P(field, PSTR("MQTTuser"))==0) {
+  else if (strcasecmp_P(field, PSTR("MQTTuser"))==0) {
     strlcpy(settings.mqtt.sUser, newValue, sizeof(settings.mqtt.sUser));
     // Trim leading/trailing whitespace from username
     char* trimmedUser = trimwhitespace(settings.mqtt.sUser);
@@ -467,7 +467,7 @@ void updateSetting(const char *field, const char *newValue)
       memmove(settings.mqtt.sUser, trimmedUser, strlen(trimmedUser) + 1);
     }
   }
-  if (strcasecmp_P(field, PSTR("MQTTpasswd"))==0){
+  else if (strcasecmp_P(field, PSTR("MQTTpasswd"))==0){
     if (newValue && !isHttpPasswordPlaceholder(newValue)) {
       strlcpy(settings.mqtt.sPasswd, newValue, sizeof(settings.mqtt.sPasswd));
       // Trim leading/trailing whitespace from password
@@ -477,68 +477,66 @@ void updateSetting(const char *field, const char *newValue)
       }
     }
   }
-  if (strcasecmp_P(field, PSTR("MQTTtoptopic"))==0)    {
+  else if (strcasecmp_P(field, PSTR("MQTTtoptopic"))==0)    {
     strlcpy(settings.mqtt.sTopTopic, newValue, sizeof(settings.mqtt.sTopTopic));
     if (strlen(settings.mqtt.sTopTopic)==0)    {
       strlcpy(settings.mqtt.sTopTopic, _HOSTNAME, sizeof(settings.mqtt.sTopTopic));
       for(int i = 0; settings.mqtt.sTopTopic[i]; i++) settings.mqtt.sTopTopic[i] = tolower(settings.mqtt.sTopTopic[i]);
     }
   }
-  if (strcasecmp_P(field, PSTR("MQTThaprefix"))==0)    {
+  else if (strcasecmp_P(field, PSTR("MQTThaprefix"))==0)    {
     strlcpy(settings.mqtt.sHaprefix, newValue, sizeof(settings.mqtt.sHaprefix));
     if (strlen(settings.mqtt.sHaprefix)==0)    strlcpy(settings.mqtt.sHaprefix, HOME_ASSISTANT_DISCOVERY_PREFIX, sizeof(settings.mqtt.sHaprefix));
   }
-  if (strcasecmp_P(field, PSTR("MQTTharebootdetection"))==0)      settings.mqtt.bHaRebootDetect = EVALBOOLEAN(newValue);
-  if (strcasecmp_P(field, PSTR("MQTTuniqueid")) == 0)  {
-    strlcpy(settings.mqtt.sUniqueid, newValue, sizeof(settings.mqtt.sUniqueid));     
+  else if (strcasecmp_P(field, PSTR("MQTTharebootdetection"))==0)      settings.mqtt.bHaRebootDetect = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("MQTTuniqueid")) == 0)  {
+    strlcpy(settings.mqtt.sUniqueid, newValue, sizeof(settings.mqtt.sUniqueid));
     if (strlen(settings.mqtt.sUniqueid) == 0)   strlcpy(settings.mqtt.sUniqueid, getUniqueId(), sizeof(settings.mqtt.sUniqueid));
   }
-  if (strcasecmp_P(field, PSTR("MQTTOTmessage"))==0)   settings.mqtt.bOTmessage = EVALBOOLEAN(newValue);
-  if (strcasecmp_P(field, PSTR("MQTTinterval"))==0) {
+  else if (strcasecmp_P(field, PSTR("MQTTOTmessage"))==0)   settings.mqtt.bOTmessage = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("MQTTinterval"))==0) {
     int val = atoi(newValue);
     if (val < 0 || val > 65535) { DebugTf(PSTR("WARNING: MQTTinterval %d out of range 0-65535, ignored\r\n"), val); }
     else settings.mqtt.iInterval = (uint16_t)val;
   }
-  if (strcasecmp_P(field, PSTR("MQTTseparatesources"))==0) settings.mqtt.bSeparateSources = EVALBOOLEAN(newValue);
-  if (strstr_P(field, PSTR("mqtt")) != NULL)        pendingSideEffects |= SIDE_EFFECT_MQTT; // defer MQTT restart to flushSettings()
-  
-  if (strcasecmp_P(field, PSTR("NTPenable"))==0)      settings.ntp.bEnable = EVALBOOLEAN(newValue);
-  if (strcasecmp_P(field, PSTR("NTPhostname"))==0)    {
-    strlcpy(settings.ntp.sHostname, newValue, sizeof(settings.ntp.sHostname)); 
+  else if (strcasecmp_P(field, PSTR("MQTTseparatesources"))==0) settings.mqtt.bSeparateSources = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("NTPenable"))==0)      settings.ntp.bEnable = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("NTPhostname"))==0)    {
+    strlcpy(settings.ntp.sHostname, newValue, sizeof(settings.ntp.sHostname));
     pendingSideEffects |= SIDE_EFFECT_NTP; // defer NTP restart to flushSettings()
   }
-  if (strcasecmp_P(field, PSTR("NTPtimezone"))==0)    {
+  else if (strcasecmp_P(field, PSTR("NTPtimezone"))==0)    {
     strlcpy(settings.ntp.sTimezone, newValue, sizeof(settings.ntp.sTimezone));
     pendingSideEffects |= SIDE_EFFECT_NTP; // defer NTP restart to flushSettings()
   }
-  if (strcasecmp_P(field, PSTR("NTPsendtime"))==0)    settings.ntp.bSendtime = EVALBOOLEAN(newValue);
-  if (strcasecmp_P(field, PSTR("LEDblink"))==0)      settings.bLEDblink = EVALBOOLEAN(newValue);
-  if (strcasecmp_P(field, PSTR("darktheme"))==0)     settings.bDarkTheme = EVALBOOLEAN(newValue);
-  
-  if (strcasecmp_P(field, PSTR("ui_autoscroll"))==0)      settings.ui.bAutoScroll = EVALBOOLEAN(newValue);
-  if (strcasecmp_P(field, PSTR("ui_timestamps"))==0)      settings.ui.bShowTimestamp = EVALBOOLEAN(newValue);
-  if (strcasecmp_P(field, PSTR("ui_capture"))==0)         settings.ui.bCaptureMode = EVALBOOLEAN(newValue);
-  if (strcasecmp_P(field, PSTR("ui_autoscreenshot"))==0)  settings.ui.bAutoScreenshot = EVALBOOLEAN(newValue);
-  if (strcasecmp_P(field, PSTR("ui_autodownloadlog"))==0) settings.ui.bAutoDownloadLog = EVALBOOLEAN(newValue);
-  if (strcasecmp_P(field, PSTR("ui_autoexport"))==0)      settings.ui.bAutoExport = EVALBOOLEAN(newValue);
-  if (strcasecmp_P(field, PSTR("ui_graphtimewindow"))==0) {
+  else if (strcasecmp_P(field, PSTR("NTPsendtime"))==0)    settings.ntp.bSendtime = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("LEDblink"))==0)      settings.bLEDblink = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("darktheme"))==0)     settings.bDarkTheme = EVALBOOLEAN(newValue);
+
+  else if (strcasecmp_P(field, PSTR("ui_autoscroll"))==0)      settings.ui.bAutoScroll = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("ui_timestamps"))==0)      settings.ui.bShowTimestamp = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("ui_capture"))==0)         settings.ui.bCaptureMode = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("ui_autoscreenshot"))==0)  settings.ui.bAutoScreenshot = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("ui_autodownloadlog"))==0) settings.ui.bAutoDownloadLog = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("ui_autoexport"))==0)      settings.ui.bAutoExport = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("ui_graphtimewindow"))==0) {
     int val = atoi(newValue);
     settings.ui.iGraphTimeWindow = constrain(val, 1, 1440);
   }
 
-  if (strcasecmp_P(field, PSTR("GPIOSENSORSenabled")) == 0)
+  else if (strcasecmp_P(field, PSTR("GPIOSENSORSenabled")) == 0)
   {
     settings.sensors.bEnabled = EVALBOOLEAN(newValue);
     Debugln();
     DebugTf(PSTR("Need reboot before GPIO SENSORS will search for sensors on pin GPIO%d!\r\n\n"), settings.sensors.iPin);
   }
-  if (strcasecmp_P(field, PSTR("GPIOSENSORSlegacyformat")) == 0)
+  else if (strcasecmp_P(field, PSTR("GPIOSENSORSlegacyformat")) == 0)
   {
     settings.sensors.bLegacyFormat = EVALBOOLEAN(newValue);
     Debugln();
     DebugTf(PSTR("Updated GPIO Sensors Legacy Format to %s\r\n\n"), CBOOLEAN(settings.sensors.bLegacyFormat));
   }
-  if (strcasecmp_P(field, PSTR("GPIOSENSORSpin")) == 0)
+  else if (strcasecmp_P(field, PSTR("GPIOSENSORSpin")) == 0)
   {
     int newPin = atoi(newValue);
     if (newPin < 0 || newPin > 16) { DebugTf(PSTR("WARNING: GPIOSENSORSpin %d out of range 0-16, ignored\r\n"), newPin); }
@@ -551,18 +549,18 @@ void updateSetting(const char *field, const char *newValue)
       DebugTf(PSTR("Need reboot before GPIO SENSORS will use new pin GPIO%d!\r\n\n"), settings.sensors.iPin);
     }
   }
-  if (strcasecmp_P(field, PSTR("GPIOSENSORSinterval")) == 0) {
+  else if (strcasecmp_P(field, PSTR("GPIOSENSORSinterval")) == 0) {
     int val = atoi(newValue);
     settings.sensors.iInterval = constrain(val, 1, 3600);
     CHANGE_INTERVAL_SEC(timerpollsensor, settings.sensors.iInterval, CATCH_UP_MISSED_TICKS);
   }
-  if (strcasecmp_P(field, PSTR("S0COUNTERenabled")) == 0)
+  else if (strcasecmp_P(field, PSTR("S0COUNTERenabled")) == 0)
   {
     settings.s0.bEnabled = EVALBOOLEAN(newValue);
     Debugln();
     DebugTf(PSTR("Need reboot before S0 Counter starts counting on pin GPIO%d!\r\n\n"), settings.s0.iPin);
   }
-  if (strcasecmp_P(field, PSTR("S0COUNTERpin")) == 0)
+  else if (strcasecmp_P(field, PSTR("S0COUNTERpin")) == 0)
   {
     int newPin = atoi(newValue);
     if (newPin < 0 || newPin > 16) { DebugTf(PSTR("WARNING: S0COUNTERpin %d out of range 0-16, ignored\r\n"), newPin); }
@@ -575,23 +573,23 @@ void updateSetting(const char *field, const char *newValue)
       DebugTf(PSTR("Need reboot before S0 Counter will use new pin GPIO%d!\r\n\n"), settings.s0.iPin);
     }
   }
-  if (strcasecmp_P(field, PSTR("S0COUNTERdebouncetime")) == 0) { int val = atoi(newValue); settings.s0.iDebounceTime = constrain(val, 0, 1000); }
-  if (strcasecmp_P(field, PSTR("S0COUNTERpulsekw")) == 0)      { int val = atoi(newValue); settings.s0.iPulsekw = constrain(val, 1, 100000); }
+  else if (strcasecmp_P(field, PSTR("S0COUNTERdebouncetime")) == 0) { int val = atoi(newValue); settings.s0.iDebounceTime = constrain(val, 0, 1000); }
+  else if (strcasecmp_P(field, PSTR("S0COUNTERpulsekw")) == 0)      { int val = atoi(newValue); settings.s0.iPulsekw = constrain(val, 1, 100000); }
 
-  if (strcasecmp_P(field, PSTR("S0COUNTERinterval")) == 0) {
+  else if (strcasecmp_P(field, PSTR("S0COUNTERinterval")) == 0) {
     int val = atoi(newValue);
     settings.s0.iInterval = constrain(val, 1, 3600);
     CHANGE_INTERVAL_SEC(timers0counter, settings.s0.iInterval, CATCH_UP_MISSED_TICKS);
   }
-  if (strcasecmp_P(field, PSTR("OTGWcommandenable"))==0)    settings.otgw.bEnable = EVALBOOLEAN(newValue);
-  if (strcasecmp_P(field, PSTR("OTGWcommands"))==0)         strlcpy(settings.otgw.sCommands, newValue, sizeof(settings.otgw.sCommands));
-  if (strcasecmp_P(field, PSTR("GPIOOUTPUTSenabled")) == 0)
+  else if (strcasecmp_P(field, PSTR("OTGWcommandenable"))==0)    settings.otgw.bEnable = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("OTGWcommands"))==0)         strlcpy(settings.otgw.sCommands, newValue, sizeof(settings.otgw.sCommands));
+  else if (strcasecmp_P(field, PSTR("GPIOOUTPUTSenabled")) == 0)
   {
     settings.outputs.bEnabled = EVALBOOLEAN(newValue);
     Debugln();
     DebugTf(PSTR("Need reboot before GPIO OUTPUTS will be enabled on pin GPIO%d!\r\n\n"), settings.outputs.iPin);
   }
-  if (strcasecmp_P(field, PSTR("GPIOOUTPUTSpin")) == 0)
+  else if (strcasecmp_P(field, PSTR("GPIOOUTPUTSpin")) == 0)
   {
     int newPin = atoi(newValue);
     if (newPin < 0 || newPin > 16) { DebugTf(PSTR("WARNING: GPIOOUTPUTSpin %d out of range 0-16, ignored\r\n"), newPin); }
@@ -604,27 +602,40 @@ void updateSetting(const char *field, const char *newValue)
       DebugTf(PSTR("Need reboot before GPIO OUTPUTS will use new pin GPIO%d!\r\n\n"), settings.outputs.iPin);
     }
   }
-  if (strcasecmp_P(field, PSTR("GPIOOUTPUTStriggerBit")) == 0)
+  else if (strcasecmp_P(field, PSTR("GPIOOUTPUTStriggerBit")) == 0)
   {
     int val = atoi(newValue);
     settings.outputs.iTriggerBit = constrain(val, 0, 15);
     Debugln();
     DebugTf(PSTR("Need reboot before GPIO OUTPUTS will use new trigger bit %d!\r\n\n"), settings.outputs.iTriggerBit);
   }
-  if (strcasecmp_P(field, PSTR("webhookenable")) == 0 ||
+  else if (strcasecmp_P(field, PSTR("webhookenable")) == 0 ||
       strcasecmp_P(field, PSTR("WebhookEnabled")) == 0) {
     settings.webhook.bEnabled = EVALBOOLEAN(newValue);
   }
-  if (strcasecmp_P(field, PSTR("WebhookURLon")) == 0 ||
-      strcasecmp_P(field, PSTR("webhookurlon")) == 0)   strlcpy(settings.webhook.sURLon, newValue, sizeof(settings.webhook.sURLon));
-  if (strcasecmp_P(field, PSTR("WebhookURLoff")) == 0 ||
-      strcasecmp_P(field, PSTR("webhookurloff")) == 0)  strlcpy(settings.webhook.sURLoff, newValue, sizeof(settings.webhook.sURLoff));
-  if (strcasecmp_P(field, PSTR("WebhookTriggerBit")) == 0 ||
+  else if (strcasecmp_P(field, PSTR("WebhookURLon")) == 0 ||
+      strcasecmp_P(field, PSTR("webhookurlon")) == 0) {
+    strlcpy(settings.webhook.sURLon, newValue, sizeof(settings.webhook.sURLon));
+    if (strlen(newValue) >= sizeof(settings.webhook.sURLon)) {
+      DebugTf(PSTR("Warning: webhook URL truncated [%s]\r\n"), field);
+    }
+  }
+  else if (strcasecmp_P(field, PSTR("WebhookURLoff")) == 0 ||
+      strcasecmp_P(field, PSTR("webhookurloff")) == 0) {
+    strlcpy(settings.webhook.sURLoff, newValue, sizeof(settings.webhook.sURLoff));
+    if (strlen(newValue) >= sizeof(settings.webhook.sURLoff)) {
+      DebugTf(PSTR("Warning: webhook URL truncated [%s]\r\n"), field);
+    }
+  }
+  else if (strcasecmp_P(field, PSTR("WebhookTriggerBit")) == 0 ||
       strcasecmp_P(field, PSTR("webhooktriggerbit")) == 0) settings.webhook.iTriggerBit = constrain(atoi(newValue), 0, 15);
-  if (strcasecmp_P(field, PSTR("WebhookPayload")) == 0 ||
+  else if (strcasecmp_P(field, PSTR("WebhookPayload")) == 0 ||
       strcasecmp_P(field, PSTR("webhookpayload")) == 0)    strlcpy(settings.webhook.sPayload, newValue, sizeof(settings.webhook.sPayload));
-  if (strcasecmp_P(field, PSTR("WebhookContentType")) == 0 ||
+  else if (strcasecmp_P(field, PSTR("WebhookContentType")) == 0 ||
       strcasecmp_P(field, PSTR("webhookcontenttype")) == 0) strlcpy(settings.webhook.sContentType, newValue, sizeof(settings.webhook.sContentType));
+
+  // Side-effect checks — independent if's, multiple can fire
+  if (strstr_P(field, PSTR("mqtt")) != NULL)        pendingSideEffects |= SIDE_EFFECT_MQTT; // defer MQTT restart to flushSettings()
 
   // Mark settings dirty and restart debounce timer — actual write + service
   // restarts are deferred to flushSettings() which runs from loop() timer.

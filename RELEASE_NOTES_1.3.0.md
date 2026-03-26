@@ -218,6 +218,22 @@ IP validation was tightened so only `255.255.255.255` is rejected as the broadca
 
 The settings path now detects conflicting GPIO assignments earlier, reducing the chance of overlapping sensor, S0-counter, and output-pin usage making it into runtime behavior unnoticed.
 
+### MQTT Topic Bug in u8 Alias Publishing
+
+`publish_u8_alias_topics()` was appending the `_hb_u8`/`_lb_u8` suffix to a wrong local buffer instead of the global topic buffer, causing both HB and LB values to publish to the unsuffixed base topic (with LB silently overwriting HB). Fixed to use the correct buffer throughout.
+
+### Startup Quiet Period Timer Wraparound
+
+The OTGW startup quiet period used a `millis() + duration` pattern that could wrap around after ~49 days of uptime. Replaced with an elapsed-time comparison using a bool flag, which is safe across the full 32-bit rollover range.
+
+### f8.8 Negative Value Encoding
+
+The `f88()` setter had undefined behavior when encoding negative floating-point values (cast of negative float to unsigned byte). Rewritten using `int16_t` fixed-point arithmetic which correctly handles two's complement encoding for all values.
+
+### OpenTherm Message Parse Validation
+
+The `sscanf` return value for hex parsing of OT messages was not checked. A malformed message could produce an incorrect value. Now aborts processing if the hex conversion fails.
+
 ---
 
 ## Memory and Performance Improvements
@@ -238,13 +254,43 @@ The settings write path was reworked to avoid repeated `String` allocation and r
 
 Obsolete `-moz-transition`, `-ms-transition`, and `-o-transition` prefixes (unused since 2012–2013) were removed from all four stylesheets (`FSexplorer.css`, `FSexplorer_dark.css`, `index.css`, `index_dark.css`). `-webkit-transition` and `-webkit-appearance` are retained for older iOS Safari and Android WebView compatibility. Dead selectors from a previous layout era (`.outer-div`, `.inner-div`, `.container-card`, `.container-box`, `.div1`) were also removed.
 
-### Broader Structural Cleanup
+### Security Hardening
 
-This release also includes larger internal cleanup that improves maintainability and reduces state ambiguity:
+- **Centralized auth enforcement:** All POST/PUT API requests are now guarded by `checkHttpAuth()` in the central `processAPI()` dispatcher, eliminating the risk of individual handlers forgetting to check credentials.
+- **CORS wildcard removed:** `Access-Control-Allow-Origin: *` replaced with dynamic origin echoing — only the requesting origin is reflected, preventing cross-site API abuse from arbitrary websites.
+- **CSRF validation hardened:** `isSameOriginRequest()` rewritten to use static `char[]` buffers instead of Arduino `String` class, eliminating heap fragmentation on every authenticated request.
+- **Webhook SSRF prevention:** Hostname-based webhook URLs are now DNS-resolved and the resolved IP is validated against RFC1918 ranges, preventing DNS rebinding attacks that could exfiltrate data to external servers.
+- **XSS fix:** Statistics table in the Web UI now escapes all fields with `escapeHtml()` to prevent XSS via crafted OpenTherm labels.
+- **Boot command validation:** `sendOTGWbootcmd()` now validates each semicolon-separated command has an alphabetic prefix (same check as the REST API `handleCommandSubmit`), rejecting malformed commands.
+- **MQTT payload truncation guard:** Incoming MQTT command payloads that exceed the buffer size are now rejected with a warning instead of silently truncating (which could send incorrect values to the PIC).
+- **Webhook URL truncation warning:** Setting a webhook URL longer than the buffer size now logs a warning, alerting the user to potential truncation issues.
+- **Settings dispatch optimized:** `updateSetting()` converted from 40+ independent `if` statements to an `else if` chain, preventing unnecessary string comparisons after a match and reducing CPU waste.
+
+### Dead Code Removal
+
+Approximately 450 lines of dead code were identified and removed across the codebase:
+
+- Legacy v1 JSON output functions (`sendDeviceInfo`, `sendDeviceTime`, `sendNestedJsonObj`, `sendJsonOTmonObj`, and related PROGMEM wrappers) — all replaced by v2 Map-based equivalents.
+- Unused helper functions (`dBmtoPercentage`, `statusToString`, `hourChanged`, `prefix`, `splitString`, `chr_cstrlit`/`str_cstrlit`, `PROGMEM_getAnything`).
+- Dead enums (`OpenThermStatus`, `OpenThermResponseStatus`), unused global (`fChar[10]`).
+- Dead CSS classes (`.flash-progress-bar`, `.flash-progress-section`, `.column`, `.pic-settings-group-heading`).
+- Stale comments and commented-out variable declarations.
+- Empty timer functions (`doTaskEvery5s`, `doTaskEvery30s`) and their associated timer declarations.
+
+### Stack Pressure Reduction
+
+ESP8266 has only 4KB of CONT stack. Several hot-path functions allocated large buffers on the stack that are now static or shared:
+
+- `executeCommand()` line buffer (256 bytes), `getpicfwversion()` and `queryOTGWgatewaymode()` response buffers (128 bytes each), and `processAPI()` word array (256 bytes) are now static.
+- Ten duplicate `_topic[50]` buffers across OT print functions consolidated into a single shared `otTopic[50]` global buffer, saving 450 bytes of combined static/stack overhead.
+- Net effect: ~1,400 bytes of stack pressure removed.
+
+### Broader Structural Cleanup
 
 - Clearer split between persistent settings and transient runtime state.
 - More centralized route and helper handling.
 - Safer status propagation around MQTT and OTA flows.
+- Crash log endpoint (`GET /api/v2/device/crashlog`) wired up to the REST API dispatch table.
 
 ---
 

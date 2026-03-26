@@ -42,7 +42,11 @@ v1.3.0 is a major feature release: PIC gateway settings visibility, one-click Gi
 - **String class eliminated from hot paths:** Protocol, settings, and HTTP handlers use char[] buffers, reducing heap fragmentation.
 - **MQTT autodiscovery optimized:** Streaming template rendering and in-place line parsing replace bulk buffer allocation.
 - **Non-blocking WiFi reconnect:** State machine replaces the blocking 30-second reconnect loop.
-- **REST API v2 completed:** Dispatch table routing; all remaining v1 calls migrated.
+- **REST API v2 completed:** Dispatch table routing; all remaining v1 calls migrated. Crash log endpoint wired up.
+- **Security hardening:** Centralized auth for all POST/PUT in API dispatcher. CORS wildcard replaced with dynamic origin. Webhook SSRF prevention via DNS resolution. CSRF validation rewritten without String class. XSS fix in statistics table. Boot command and MQTT payload validation.
+- **Dead code removal:** ~450 lines of legacy v1 JSON functions, unused helpers, dead enums, and stale CSS removed.
+- **Stack pressure reduced:** ~1,400 bytes freed via centralized `otTopic` buffer and static local buffers in hot-path functions.
+- **Bug fixes:** u8 MQTT topic suffix bug, `millis()` 49-day wraparound, f8.8 negative encoding UB, OT hex parse validation, settings dispatch optimized to else-if chain.
 - **WiFiManager 2.0.17:** Upgraded from 2.0.15-rc.1 to stable release.
 
 ## Upgrade notes

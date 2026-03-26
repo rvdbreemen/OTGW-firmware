@@ -102,7 +102,8 @@ char ot_log_buffer[OT_LOG_BUFFER_SIZE];
 #define AddLog(logstring)   ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, logstring, OT_LOG_BUFFER_SIZE); } })
 #define AddLogln()          ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, "\r\n", OT_LOG_BUFFER_SIZE); } })
 
-static uint32_t gOTGWStartupQuietUntilMs = 0;
+static uint32_t gOTGWStartupQuietStartMs = 0;
+static bool     gOTGWStartupQuietActive  = false;
 static const uint32_t OTGW_STARTUP_QUIET_PERIOD_MS = 15000;
 
 /* --- End of LOG marcro's ---*/
@@ -146,13 +147,18 @@ static void sendEventToWebSocket_P(char prefix, PGM_P msg_P) {
 
 static void scheduleOTGWStartupQuietPeriod()
 {
-  gOTGWStartupQuietUntilMs = millis() + OTGW_STARTUP_QUIET_PERIOD_MS;
+  gOTGWStartupQuietStartMs = millis();
+  gOTGWStartupQuietActive  = true;
 }
 
 static bool isOTGWStartupQuietPeriodActive()
 {
-  return (gOTGWStartupQuietUntilMs != 0) &&
-         ((int32_t)(gOTGWStartupQuietUntilMs - millis()) > 0);
+  if (!gOTGWStartupQuietActive) return false;
+  if ((millis() - gOTGWStartupQuietStartMs) >= OTGW_STARTUP_QUIET_PERIOD_MS) {
+    gOTGWStartupQuietActive = false;
+    return false;
+  }
+  return true;
 }
 
 static bool canFanOutOTGWEvent()
@@ -806,8 +812,16 @@ void sendOTGWbootcmd(){
   int i = 0;
   cmd = strtok(bootcmds, ";");
   while (cmd != NULL) {
-    OTGWDebugTf(PSTR("Boot command[%d]: %s\r\n"), i++, cmd);
-    addOTWGcmdtoqueue(cmd, strlen(cmd), true);
+    size_t cmdLen = strlen(cmd);
+    // Validate alphabetic prefix (same check as handleCommandSubmit)
+    if (cmdLen >= 3 && cmd[2] == '=' &&
+        isalpha((unsigned char)cmd[0]) && isalpha((unsigned char)cmd[1])) {
+      OTGWDebugTf(PSTR("Boot command[%d]: %s\r\n"), i, cmd);
+      addOTWGcmdtoqueue(cmd, cmdLen, true);
+    } else {
+      OTGWDebugTf(PSTR("Boot command[%d]: skipped invalid [%s]\r\n"), i, cmd);
+    }
+    i++;
     cmd = strtok(NULL, ";");
   }
 }
@@ -978,16 +992,10 @@ float OpenthermData_t::f88() {
 }
 
 void OpenthermData_t::f88(float value) {
-  if (value >= 0) {
-    valueHB = (byte) value;
-    float fraction = (value - valueHB);
-    valueLB = fraction * 256.0f;
-  }
-  else {
-    valueHB = (byte)(value - 1);
-    float fraction = (value - valueHB - 1);
-    valueLB = fraction * 256.0f;
-  }
+  // f8.8 format: signed high byte + unsigned fractional low byte (two's complement)
+  int16_t fixed = (int16_t)(value * 256.0f);
+  valueHB = (uint8_t)((fixed >> 8) & 0xFF);
+  valueLB = (uint8_t)(fixed & 0xFF);
 }
 
 uint16_t OpenthermData_t::u16() {
@@ -2245,18 +2253,17 @@ void print_u8u8(uint16_t& value)
 
 static void publish_u8_alias_topics(const char* baseTopic)
 {
-  char _topic[64] {0};
   char _msg[10] {0};
 
   utoa(OTdata.valueHB, _msg, 10);
   strlcpy(otTopic, baseTopic, sizeof(otTopic));
-  appendProgmemSuffix(_topic, sizeof(otTopic), PSTR("_hb_u8"));
+  appendProgmemSuffix(otTopic, sizeof(otTopic), PSTR("_hb_u8"));
   sendMQTTData(otTopic, _msg);
   publishToSourceTopic(otTopic, _msg, OTdata.rsptype);
 
   utoa(OTdata.valueLB, _msg, 10);
   strlcpy(otTopic, baseTopic, sizeof(otTopic));
-  appendProgmemSuffix(_topic, sizeof(otTopic), PSTR("_lb_u8"));
+  appendProgmemSuffix(otTopic, sizeof(otTopic), PSTR("_lb_u8"));
   sendMQTTData(otTopic, _msg);
   publishToSourceTopic(otTopic, _msg, OTdata.rsptype);
 }
@@ -3672,7 +3679,7 @@ void processOT(const char *buf, int len){
     memset(OTdata.buf, 0, sizeof(OTdata.buf));        // clear buffer
     memcpy(OTdata.buf, buf, len);                     // copy the raw message to the buffer
     OTdata.len = len;                                 // set the length of the message  
-    sscanf(bufval, "%8x", &value);                    // extract the value
+    if (sscanf(bufval, "%8x", &value) != 1) return;    // extract the value, abort on parse failure
     OTdata.value = value;                             // store the value
     OTdata.type = (value >> 28) & 0x7;                // byte 1 = take 3 bits that define msg msgType
     OTdata.masterslave = (OTdata.type >> 2) & 0x1;    // MSB from type --> 0 = master and 1 = slave

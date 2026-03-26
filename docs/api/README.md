@@ -46,7 +46,20 @@ http://{device-ip}/api
 
 ### Authentication
 
-Optional HTTP Basic Auth. When a password is configured in device settings, all mutating endpoints and the settings endpoint require authentication with username `admin` and the configured password. Read-only endpoints (health, device info, OpenTherm data) do not require authentication unless a password is set.
+Optional HTTP Basic Auth. When a password is configured in device settings, mutating endpoints require authentication with username `admin` and the configured password.
+
+**Protected endpoints** (require auth when password is set):
+
+- Settings: `GET/POST/PUT /api/v2/settings`
+- OTGW commands: `POST /api/v2/otgw/commands`, `POST /api/v2/otgw/command/{cmd}`
+- MQTT discovery: `POST /api/v2/otgw/discovery`, `POST /api/v2/otgw/autoconfigure`
+- Simulation: `POST /api/v2/simulate/start`, `POST /api/v2/simulate/stop`
+- Webhook test: `POST /api/v2/webhook/test`
+- File management, reboot, reset, and OTA update endpoints
+
+**Unprotected endpoints** (always accessible):
+
+- Health, device info/time/crashlog, OpenTherm data, sensor labels, PIC settings, firmware/filesystem info
 
 CSRF same-origin validation is enforced for authenticated requests from browsers (Origin/Referer header must match the Host header).
 
@@ -168,6 +181,25 @@ Returns the current device date and time.
   }
 }
 ```
+
+#### `GET /api/v2/device/crashlog`
+
+Returns the latest stored abnormal reboot/crash diagnostics, if available.
+
+**Authentication**: Not required
+
+**Response** `200 OK`:
+```json
+{
+  "crashlog": {
+    "available": true,
+    "summary": "Exception (28) at 0x40201234",
+    "details": "epc1=0x40201234 epc2=0x00000000 ..."
+  }
+}
+```
+
+When no crash log is available, `available` is `false` and `summary`/`details` are empty strings.
 
 ---
 

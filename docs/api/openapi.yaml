@@ -419,6 +419,40 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
+  /v2/device/crashlog:
+    get:
+      tags:
+        - Device Info
+      summary: Get crash log
+      description: |
+        Returns the latest stored abnormal reboot/crash diagnostics,
+        if available. Includes exception cause and stack trace summary.
+      operationId: getDeviceCrashLog
+      responses:
+        '200':
+          description: Crash log retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  crashlog:
+                    type: object
+                    properties:
+                      available:
+                        type: boolean
+                        description: Whether a crash log is available
+                      summary:
+                        type: string
+                        description: Short crash summary (empty if not available)
+                        example: "Exception (28) at 0x40201234"
+                      details:
+                        type: string
+                        description: Detailed crash info (empty if not available)
+                        example: "epc1=0x40201234 epc2=0x00000000"
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
   /v2/flash/status:
     get:
       tags:
@@ -712,6 +746,8 @@ paths:
         Enables OTGW simulation mode. The gateway replays data from
         `/otgw_simulation.log` instead of reading from the PIC serial port.
       operationId: startSimulation
+      security:
+        - basicAuth: []
       responses:
         '200':
           description: Simulation started
@@ -744,6 +780,8 @@ paths:
       description: |
         Disables OTGW simulation mode. Resumes reading from the live PIC serial port.
       operationId: stopSimulation
+      security:
+        - basicAuth: []
       responses:
         '200':
           description: Simulation stopped
@@ -867,6 +905,8 @@ paths:
 
         Command format: two alphabetic characters + `=` + value (e.g., `TT=20.5`).
       operationId: sendOTGWCommand
+      security:
+        - basicAuth: []
       requestBody:
         required: true
         content:
@@ -930,6 +970,8 @@ paths:
         Use this to register or re-register all entities with Home Assistant.
         Returns 202 Accepted because discovery messages are sent asynchronously.
       operationId: triggerDiscovery
+      security:
+        - basicAuth: []
       responses:
         '202':
           description: Discovery accepted for processing
@@ -950,6 +992,8 @@ paths:
         - OTGW Commands
       summary: Trigger MQTT autodiscovery (PUT alias)
       operationId: triggerDiscoveryPut
+      security:
+        - basicAuth: []
       responses:
         '202':
           description: Discovery accepted for processing
@@ -1091,6 +1135,8 @@ paths:
         **Prefer** `/v2/otgw/commands` (JSON body) for new integrations.
         Returns 202 Accepted.
       operationId: sendOTGWCommandAlias
+      security:
+        - basicAuth: []
       parameters:
         - name: command
           in: path
