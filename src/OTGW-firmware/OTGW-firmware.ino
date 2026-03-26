@@ -375,16 +375,13 @@ void doTaskEvery1s(){
   }
 }
 
-//===[ Do task every 5s ]===
-void doTaskEvery5s(){
+//===[ Do task every 3s ]===
+void doTaskEvery3s(){
   //== do tasks ==
-  
+  if (!picSettingsCycleActive) return;
+  queryNextPICsetting();
 }
 
-//===[ Do task every 30s ]===
-void doTaskEvery30s(){
-  //== do tasks ==
-}
 
 //===[ Do task every 60s ]===
 void doTaskEvery60s(){
@@ -518,23 +515,20 @@ void doBackgroundTasks()
 void loop()
 {
   DECLARE_TIMER_SEC(timer1s, 1, SKIP_MISSED_TICKS);
-  DECLARE_TIMER_SEC(timer5s, 5, SKIP_MISSED_TICKS);
-  DECLARE_TIMER_SEC(timer30s, 30, CATCH_UP_MISSED_TICKS);
+  DECLARE_TIMER_SEC(timer3s, 3, SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS);
-  
+
   if (!isFlashing()) {
     // Only run these tasks when NOT flashing firmware (ESP or PIC)
       if (DUE(timerFlushSettings))      flushSettings();  // coalesced settings write + service restarts
-      if (DUE(timerpollsensor))         pollSensors();    // poll the temperature sensors connected to 2wire gpio pin 
+      if (DUE(timerpollsensor))         pollSensors();    // poll the temperature sensors connected to 2wire gpio pin
       if (DUE(timers0counter))          sendS0Counters(); // poll the s0 counter connected to gpio pin when due
-      if (DUE(timer5min))               do5minevent();  
+      if (DUE(timer5min))               do5minevent();
       if (DUE(timer60s))                doTaskEvery60s();
-      if (DUE(timer30s))                doTaskEvery30s();
-      if (DUE(timer5s))                 doTaskEvery5s();
+      if (DUE(timer3s))                 doTaskEvery3s();
       if (DUE(timer1s))                 doTaskEvery1s();
       if (minuteChanged())              doTaskMinuteChanged(); //exactly on the minute
-      pollPICsettings();                // on-demand PIC settings readout (3s spacing)
       evalOutputs();                    // when the bits change, the output gpio bit will follow
       evalWebhook();                    // when the trigger bit changes, fire the webhook
       handlePendingUpgrade();           // Check if we need to start an upgrade

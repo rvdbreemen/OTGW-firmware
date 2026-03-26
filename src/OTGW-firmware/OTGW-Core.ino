@@ -591,7 +591,7 @@ bool queryOTGWgatewaymode(){
   Multiple rapid triggers are coalesced: while a cycle is in
   progress, additional triggers are silently ignored.
 */
-static bool     picSettingsCycleActive = false;
+bool            picSettingsCycleActive = false;
 static uint8_t  picSettingsQueryIdx    = 0;
 static constexpr uint8_t kPICSettingsCount = 15;
 
@@ -602,15 +602,6 @@ void triggerPICsettingsReadout() {
   picSettingsQueryIdx    = 0;
   picSettingsCycleActive = true;
   OTGWDebugTln(F("PIC settings readout cycle triggered"));
-}
-
-void pollPICsettings() {
-  if (!picSettingsCycleActive) return;
-
-  DECLARE_TIMER_SEC(timerPICquery, 3, SKIP_MISSED_TICKS);
-  if (!DUE(timerPICquery)) return;
-
-  queryNextPICsetting();
 }
 
 //===================[ queryNextPICsetting ]======================
