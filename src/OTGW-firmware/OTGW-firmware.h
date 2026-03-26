@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.2.0
+**  Version  : v1.3.0
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -53,7 +53,12 @@ void setLed(int8_t, uint8_t);
 #define NTP_HOST_DEFAULT "pool.ntp.org"
 #define NTP_RESYNC_TIME 1800 //seconds = every 30 minutes
 #define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"  // Home Assistant discovery prefix
-#define CMSG_SIZE 512
+#define CMSG_SIZE  512   // General-purpose scratch buffer (webhook, REST API, JSON, MQTT topic render).
+                         // All known users need ≤512 bytes.  MQTT autoconfig lines (≤900 bytes)
+                         // use sLine[SLINE_SIZE] instead, so cMsg stays at its original size.
+#define SLINE_SIZE 1200  // MQTT autoconfig line buffer.  mqttha.cfg lines reach ~900 bytes max.
+                         // Exclusively owned by MQTTstuff.ino; guarded by mqttAutoConfigInProgress.
+#define OT_TOPIC_LEN 50  // Shared MQTT topic scratch for OT print_* functions.
 #define JSON_BUFF_MAX   1024
 #define JSON_ENTRY_BUF   256  // max bytes for a single serialized JSON entry/object
 // Replace CSTR macro with overloads to handle both String and char*
@@ -88,6 +93,7 @@ void emergencyHeapRecovery();
 void resetMQTTBufferSize();
 bool updateLittleFSStatus(const char *probePath = nullptr);
 bool updateLittleFSStatus(const __FlashStringHelper *probePath);
+bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t detailsSize);
 
 //prototype
 void sendMQTTData(const char*, const char*, const bool = false);
@@ -99,43 +105,233 @@ void sendLogToWebSocket(const char* logMessage);
 
 // Forward declarations for functions defined in later .ino files
 // (Arduino auto-prototype generation can fail for these)
+enum class GPIOConflictCaller : uint8_t {
+  Sensor,
+  S0,
+  Output,
+};
+
+enum class StatusMessage : uint8_t {
+  None,
+  LittleFSMismatch,
+  PSModeActive,
+};
+
 void readSettings(bool show);
 void writeSettings(bool show);
 void updateSetting(const char *field, const char *newValue);
+bool checkGPIOConflict(int pin, GPIOConflictCaller caller);
+const __FlashStringHelper* getStatusMessageText();
+void escapeJsonStringTo(const char* src, char* dest, size_t destSize);
 void GetVersion(const char* hexfile, char* version, size_t destSize);
 void startWebSocket();
 void handleWebSocket();
 void testWebhook(bool testOn);
 void evalWebhook();
+bool checkHttpAuth();  // HTTP Basic Auth guard (ADR-054; defined in restAPI.ino)
+extern bool picSettingsCycleActive;  // PIC settings readout cycle flag (OTGW-Core.ino)
 
-//Global variables
+//===================[ Runtime State — transient, never persisted (ADR-051) ]===================
+// Sub-section structs for OTGWState — groups runtime state by system component.
+// Hungarian prefixes: b=bool, s=string/char[], i=int/uint, f=float
+
+struct PICSection {            // state.pic — PIC microcontroller identity/status
+  bool bAvailable     = false;           // was bPICavailable
+  char sFwversion[32] = "no pic found";  // was sPICfwversion
+  char sDeviceid[32]  = "no pic found";  // was sPICdeviceid
+  char sType[32]      = "no pic found";  // was sPICtype
+};
+
+struct OTGWProtocol {          // state.otgw — OpenTherm protocol & bus state
+  bool bOnline           = true;   // was bOTGWonline — serial link alive
+  bool bPSmode           = false;  // was bPSmode — Print Summary mode (PS=1)
+  bool bGatewayMode      = false;  // was bOTGWgatewaystate — true=gateway, false=monitor
+  bool bGatewayModeKnown = false;  // was bOTGWgatewaystateKnown
+  bool bBoilerState      = false;  // was bOTGWboilerstate — CH/boiler active
+  bool bThermostatState  = false;  // was bOTGWthermostatstate
+};
+
+struct MQTTRuntimeSection {    // state.mqtt — MQTT broker connection state
+  bool bConnected        = false;  // was statusMQTTconnection
+};
+
+struct FlashSection {          // state.flash — Firmware upgrade operations
+  bool bESPactive        = false;  // was isESPFlashing
+  bool bPICactive        = false;  // was isPICFlashing
+  char sError[129]       = "";     // was errorupgrade
+  char sPICfile[65]      = "";     // was currentPICFlashFile
+  int  iPICprogress      = 0;      // was currentPICFlashProgress — percent 0-100
+};
+
+struct DebugSection {          // state.debug — Runtime diagnostic output flags
+  bool     bOTmsg                 = true;   // was bDebugOTmsg — OpenTherm message trace
+  bool     bRestAPI               = false;  // was bDebugRestAPI — REST API request trace
+  bool     bMQTT                  = false;  // was bDebugMQTT — MQTT publish/receive trace
+  bool     bSensors               = false;  // was bDebugSensors — Dallas sensor scan trace
+  bool     bSensorSim             = false;  // was bDebugSensorSimulation
+  bool     bOTGWSimulation        = false;  // was bDebugOTGWSimulation
+  uint32_t iOTGWSimulationIntervalMs = 750;
+  uint32_t iOTGWSimulationNextDueMs  = 0;
+};
+
+struct UptimeSection {         // state.uptime — System longevity counters
+  uint32_t iSeconds      = 0;  // was upTimeSeconds
+  uint32_t iRebootCount  = 0;  // was rebootCount
+};
+
+struct PicSettingsSection {    // state.picSettings — settings polled from PIC via PR= commands
+  // Source: Schelte Bron's OTGW firmware documentation (https://otgw.tclcode.com/firmware.html)
+  // PR=A (About/version) is handled by getpicfwversion(); PR=M (mode) by queryOTGWgatewaymode().
+  // All other PR= reports are polled on-demand by queryNextPICsetting(), one per 3s tick.
+
+  // --- Active settings (most useful for HA integration) ---
+  char sSetpointOverride[16]  = "";  // PR=O: setpoint override ("T20.5" TT active, "C20.5" TC active, "N" none)
+  char sSetback[16]           = "";  // PR=S: setback temperature (SB command value, e.g. "15.0")
+  char sDhwOverride[8]        = "";  // PR=W: DHW/hot-water override ("0"=off, "1"=on, "A"=auto)
+
+  // --- Hardware configuration ---
+  char sGpio[8]               = "";  // PR=G: GPIO A+B function codes (two digits, e.g. "05")
+  char sGpioStates[8]         = "";  // PR=I: GPIO A+B current input states (two digits, e.g. "00")
+  char sLed[8]                = "";  // PR=L: LED A–F function chars (six chars, e.g. "RFFTTT")
+  char sTweaks[8]             = "";  // PR=T: tweaks (two chars: ignore_transitions + ovrd_high_byte)
+  char sTempSensor[4]         = "";  // PR=D: external temp sensor function ("O"=outside, "R"=return; v5+ only)
+  char sSmartPower[16]        = "";  // PR=P: smart power mode ("L"/"Low power", "M"/"Medium power", "H"/"High power", "N"/"Normal power")
+  char sThermostatDetect[8]   = "";  // PR=R: thermostat detection setting
+
+  // --- Diagnostics ---
+  char sBuilddate[24]         = "";  // PR=B: firmware build date/time (e.g. "17:52 12-03-2023")
+  char sClockMHz[8]           = "";  // PR=C: PIC clock speed in MHz (e.g. "4", "4 MHz")
+  char sResetCause[4]         = "";  // PR=Q: last reset cause ("W"=watchdog, "B"=brownout, "P"=power-on)
+  char sStandaloneInterval[8] = "";  // PR=N: message interval in standalone mode (seconds)
+  char sVoltageRef[4]         = "";  // PR=V: voltage reference setting (numeric)
+};
+
+struct OTGWState {
+  PICSection         pic;         // state.pic.bAvailable, state.pic.sFwversion
+  OTGWProtocol       otgw;        // state.otgw.bOnline, state.otgw.bBoilerState
+  MQTTRuntimeSection mqtt;        // state.mqtt.bConnected
+  FlashSection       flash;       // state.flash.bESPactive, state.flash.iPICprogress
+  DebugSection       debug;       // state.debug.bOTmsg, state.debug.bMQTT
+  UptimeSection      uptime;      // state.uptime.iSeconds, state.uptime.iRebootCount
+  PicSettingsSection picSettings; // state.picSettings — PR=-polled settings from PIC
+  StatusMessage      statusMessage = StatusMessage::None;
+  bool               bSetupComplete = false;
+};
+
+OTGWState state;
+
+//===================[ Persistent Settings — serialized to LittleFS (ADR-051) ]===================
+// Sub-section structs for OTGWSettings — groups configuration by feature area.
+// Hungarian prefixes: b=bool, s=string/char[], i=int/uint, f=float
+
+struct MQTTSettingsSection {
+  bool    bEnable          = true;
+  bool    bSecure          = false;
+  char    sBroker[65]      = "homeassistant.local";
+  int16_t iBrokerPort      = 1883;
+  char    sUser[41]        = "";
+  char    sPasswd[41]      = "";
+  char    sHaprefix[41]    = HOME_ASSISTANT_DISCOVERY_PREFIX;
+  bool    bHaRebootDetect  = true;
+  char    sTopTopic[41]    = "OTGW";
+  char    sUniqueid[41]    = "";  // Initialized in readSettings
+  bool    bOTmessage       = false;
+  uint16_t iInterval       = 0;   // MQTT publish interval in seconds (0 = publish every message)
+  bool    bSeparateSources = false; // ADR-040: publish source-specific topics
+};
+
+struct NTPSection {
+  bool bEnable        = true;
+  char sTimezone[65]  = NTP_DEFAULT_TIMEZONE;
+  char sHostname[65]  = NTP_HOST_DEFAULT;
+  bool bSendtime      = false;
+};
+
+struct SensorsSection {             // Dallas DS18B20 external sensors
+  bool    bEnabled       = false;
+  bool    bLegacyFormat  = false;   // Default to false (new standard format)
+  int8_t  iPin           = 10;     // GPIO 13 = D7, GPIO 10 = SDIO 3
+  int16_t iInterval      = 20;     // Interval time to read out temp and send to MQ
+};
+
+struct S0Section {
+  bool     bEnabled      = false;
+  uint8_t  iPin          = 12;     // GPIO 12 = D6, preferred
+  uint16_t iDebounceTime = 80;     // Depending on S0 switch
+  uint16_t iPulsekw      = 1000;   // Most S0 counters have 1000 pulses per kW
+  uint16_t iInterval     = 60;     // Suggested measurement reporting interval
+};
+
+struct OutputsSection {             // GPIO relay outputs
+  bool   bEnabled    = false;
+  int8_t iPin        = 16;
+  int8_t iTriggerBit = 0;
+};
+
+struct WebhookSection {
+  bool   bEnabled         = false;
+  char   sURLon[101]      = "http://homeassistant.local:8123/api/webhook/otgw_boiler";
+  char   sURLoff[101]     = "http://homeassistant.local:8123/api/webhook/otgw_boiler";
+  int8_t iTriggerBit      = 1;     // Default: bit 1 = CH mode (slave: CH active)
+  char   sPayload[201]    = "";    // Body template for HTTP POST; empty = HTTP GET
+  char   sContentType[32] = "application/json";
+};
+
+struct UISection {
+  bool bAutoScroll      = true;
+  bool bShowTimestamp   = true;
+  bool bCaptureMode     = false;
+  bool bAutoScreenshot  = false;
+  bool bAutoDownloadLog = false;
+  bool bAutoExport      = false;
+  int  iGraphTimeWindow = 60;      // Default to 1 Hour (60 minutes)
+};
+
+struct OTGWBootSection {            // PIC boot-time command injection
+  bool bEnable        = false;
+  char sCommands[129] = "";
+};
+
+struct OTGWSettings {
+  // Device-level fields (universal device identity)
+  char sHostname[41] = _HOSTNAME;
+  char sHTTPpasswd[41] = "";  // HTTP Basic Auth password (empty = no authentication required)
+  bool bLEDblink     = true;
+  bool bDarkTheme    = false;
+  bool bMyDEBUG      = false;
+
+  // Named sub-sections — access as settings.mqtt.sBroker, settings.ntp.sTimezone, etc.
+  MQTTSettingsSection mqtt;
+  NTPSection          ntp;
+  SensorsSection      sensors;
+  S0Section           s0;
+  OutputsSection      outputs;
+  WebhookSection      webhook;
+  UISection           ui;
+  OTGWBootSection     otgw;
+};
+
+OTGWSettings settings;
+
+//===================[ Global variables — not part of settings or state ]===================
 WiFiClient  wifiClient;
 char        cMsg[CMSG_SIZE];
-char        fChar[10];
+char        sLine[SLINE_SIZE];  // MQTT autoconfig line scratch (MQTTstuff.ino, guarded by mqttAutoConfigInProgress)
+char        otTopic[OT_TOPIC_LEN];  // Shared MQTT topic scratch for OT print_* functions (sequential, not re-entrant)
 char        lastReset[129] = "";
-uint32_t    upTimeSeconds = 0;
-uint32_t    rebootCount = 0;
-char        sMessage[257] = "";    
 uint32_t    MQTTautoConfigMap[8] = { 0 };
-bool        isESPFlashing = false;  // Flag to disable background tasks during ESP firmware flash
-bool        isPICFlashing = false;  // Flag to disable background tasks during PIC firmware flash
 // Deferred settings write timer (Finding #23: coalesce flash writes)
-// Declared globally so both settingStuff.ino and loop() can access
 uint32_t  timerFlushSettings_interval = 2000;  // 2 second debounce
 uint32_t  timerFlushSettings_due = 0;          // initially not due
 byte      timerFlushSettings_type = 0;         // SKIP_MISSED_TICKS
+
 // Helper inline function to check if any firmware flash is in progress
 inline bool isFlashing() {
-  return isESPFlashing || isPICFlashing;
+  return state.flash.bESPactive || state.flash.bPICactive;
 }
 
 //Use acetime
 using namespace ace_time;
-//static BasicZoneProcessor timeProcessor;
-//static const int CACHE_SIZE = 3;
-// static BasicZoneManager<CACHE_SIZE> manager(zonedb::kZoneRegistrySize, zonedb::kZoneRegistry);
-//static BasicZoneProcessorCache<CACHE_SIZE> zoneProcessorCache;
-//static BasicZoneManager timezoneManager(zonedb::kZoneAndLinkRegistrySize, zonedb::kZoneAndLinkRegistry, zoneProcessorCache);
 static ExtendedZoneProcessor tzProcessor;
 static const int CACHE_SIZE = 3;
 static ExtendedZoneProcessorCache<CACHE_SIZE> zoneProcessorCache;
@@ -147,62 +343,11 @@ static ExtendedZoneManager timezoneManager(
 const char *weekDayName[]  {  "Unknown", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Unknown" };
 const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
 
-//Information on OTGW 
-char      sPICfwversion[32] = "no pic found"; 
-char      sPICdeviceid[32] = "no pic found";
-char      sPICtype[32] = "no pic found";
-bool      bPICavailable = false;
-char      errorupgrade[129] = "";
-char      currentPICFlashFile[65] = ""; // Track current PIC flash filename for WebSocket progress
-int       currentPICFlashProgress = 0;  // Track current PIC flash progress percentage (0-100) 
-bool      bOTGWonline = true;
-bool      bOTGWboilerstate = false;
-bool      bOTGWthermostatstate = false;
-bool      bOTGWgatewaystate = false;
-bool      bOTGWgatewaystateKnown = false;
-bool      bPSmode = false;  //default to PS=0 mode
-
-//All things that are settings 
-char      settingHostname[41] = _HOSTNAME;
-
-//MQTT settings
-bool      statusMQTTconnection = false; 
-bool      settingMQTTenable = true;
-bool      settingMQTTsecure = false; 
-char      settingMQTTbroker[65] = "homeassistant.local";
-int16_t   settingMQTTbrokerPort = 1883; 
-char      settingMQTTuser[41] = "";
-char      settingMQTTpasswd[41] = "";
-char      settingMQTThaprefix[41] = HOME_ASSISTANT_DISCOVERY_PREFIX;
-bool      settingMQTTharebootdetection = true;
-char      settingMQTTtopTopic[41] = "OTGW";
-char      settingMQTTuniqueid[41] = ""; // Intialized in readsettings
-bool      settingMQTTOTmessage = false;
-bool      settingMQTTSeparateSources = false; // ADR-040: publish source-specific topics (opt-in; default off for backward compat)
-bool      settingNTPenable = true;
-char      settingNTPtimezone[65] = NTP_DEFAULT_TIMEZONE;
-char      settingNTPhostname[65] = NTP_HOST_DEFAULT;
-bool      settingNTPsendtime = false;
-bool      settingLEDblink = true;
-bool      settingDarkTheme = false;
-
-// WebUI Settings (persisted)
-bool      settingUIAutoScroll = true;
-bool      settingUIShowTimestamp = true;
-bool      settingUICaptureMode = false;
-bool      settingUIAutoScreenshot = false;
-bool      settingUIAutoDownloadLog = false;
-bool      settingUIAutoExport = false; 
-int       settingUIGraphTimeWindow = 60; // Default to 1 Hour (60 minutes)
-
-// GPIO Sensor Settings
-bool      settingGPIOSENSORSenabled = false;
-bool      settingGPIOSENSORSlegacyformat = false; // Default to false (new standard format)
-int8_t    settingGPIOSENSORSpin = 10;            // GPIO 13 = D7, GPIO 10 = SDIO 3  
-int16_t   settingGPIOSENSORSinterval = 20;       // Interval time to read out temp and send to MQ
-byte      OTGWdallasdataid = 246;                // foney dataid to be used to do autoconfigure for temp sensors
+//===================[ Module-local variables with extern declarations ]===================
+// Dallas sensor variables — definitions in sensors_ext.ino
+byte      OTGWdallasdataid = 246;                // foney dataid for temp sensor autoconfigure
 int       DallasrealDeviceCount = 0;             // Total temperature devices found on the bus
-bool      bSensorsDetected = false;              // Runtime: true when sensors (real/simulated) successfully initialized this boot
+bool      bSensorsDetected = false;              // Runtime: true when sensors initialized this boot
 #define   MAXDALLASDEVICES 16                    // maximum number of devices on the bus
 
 // Define structure to store temperature device addresses found on bus with their latest tempC value
@@ -216,51 +361,12 @@ struct
 // prototype to allow use in restAPI.ino
 char* getDallasAddress(DeviceAddress deviceAddress);
 
-// Dallas sensor labels are now stored in /dallas_labels.json file (not in RAM)
-// This saves 1024 bytes of persistent RAM
-
-
-// S0 Counter Settings and variables with global scope
-bool      settingS0COUNTERenabled = false;      
-uint8_t   settingS0COUNTERpin = 12;               // GPIO 12 = D6, preferred, can be any pin with Interupt support
-uint16_t  settingS0COUNTERdebouncetime = 80;      // Depending on S0 switch a debouncetime should be tailored
-uint16_t  settingS0COUNTERpulsekw = 1000;         // Most S0 counters have 1000 pulses per kW, but this can be different
-uint16_t  settingS0COUNTERinterval = 60;          // Sugggested measurement reporting interval
+// S0 Counter variables — definitions here, used across modules
 uint16_t  OTGWs0pulseCount;                       // Number of S0 pulses in measurement interval
 uint32_t  OTGWs0pulseCountTot = 0;                // Number of S0 pulses since start of measurement
-float     OTGWs0powerkw = 0.0f ;                  // Calculated kW actual consumption based on time between last pulses and settings
+float     OTGWs0powerkw = 0.0f ;                  // Calculated kW actual consumption
 time_t    OTGWs0lasttime = 0;                     // Last time S0 counters have been read
-byte      OTGWs0dataid = 245;                     // foney dataid to be used to do autoconfigure for counter
-
-
-//boot commands
-bool      settingOTGWcommandenable = false;
-char      settingOTGWcommands[129] = "";
-
-//debug flags 
-bool      bDebugOTmsg = true;
-bool      bDebugRestAPI = false;
-bool      bDebugMQTT = false;
-bool      bDebugSensors = false;
-bool      bDebugSensorSimulation = false;
-
-//GPIO Output Settings
-bool      settingMyDEBUG = false;
-bool      settingGPIOOUTPUTSenabled = false;
-int8_t    settingGPIOOUTPUTSpin = 16;
-int8_t    settingGPIOOUTPUTStriggerBit = 0;
-
-//Webhook Settings
-bool      settingWebhookEnabled = false;
-char      settingWebhookURLon[101]  = "http://homeassistant.local:8123/api/webhook/otgw_boiler";
-char      settingWebhookURLoff[101] = "http://homeassistant.local:8123/api/webhook/otgw_boiler";
-int8_t    settingWebhookTriggerBit = 1;     // Default: bit 1 = CH mode (slave: CH active)
-char      settingWebhookPayload[201] = "";  // Body template for HTTP POST; empty = HTTP GET
-                                            // Supported variables: {state} {tboiler} {tr}
-                                            // {tset} {tdhw} {relmod} {chpressure}
-                                            // {flameon} {chmode} {dhwmode}
-char      settingWebhookContentType[32] = "application/json"; // Content-Type for POST requests
-                                            // Common values: application/json, text/plain
+byte      OTGWs0dataid = 245;                     // foney dataid for counter autoconfigure
 
 //Now load Debug & network library
 #include "Debug.h"

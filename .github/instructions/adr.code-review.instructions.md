@@ -7,7 +7,7 @@ excludeAgent: "coding-agent"
 
 ## Review Checklist for Architectural Changes
 
-When reviewing PRs, verify ADR compliance for architecturally significant changes.
+When reviewing PRs, verify ADR compliance for architecturally significant changes. Use `docs/adr/README.md` as the source of truth for ADR format, lifecycle, and superseding rules.
 
 ### Check 1: ADR Exists
 
@@ -52,7 +52,7 @@ If the PR supersedes an existing ADR:
 - Verify the new ADR includes "Supersedes: ADR-XXX"
 - Verify the old ADR is marked "Superseded by ADR-YYY"
 - Check that the supersession rationale is clear
-- Ensure the old ADR content is NOT modified (immutability)
+- Ensure the old ADR content is NOT modified beyond the allowed status update (immutability)
 
 **Action if supersession is incorrect:**
 - Request proper supersession linking

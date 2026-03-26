@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v1.2.0
+**  Version  : v1.3.0
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -49,6 +49,10 @@ static bool wsInitialized = false;
 // Application-level keepalive tracking
 static unsigned long lastKeepaliveMs = 0;
 const unsigned long KEEPALIVE_INTERVAL_MS = 30000; // 30 seconds
+
+bool hasWebSocketClients() {
+  return wsInitialized && (wsClientCount > 0);
+}
 
 //===========================================================================================
 // WebSocket event handler
@@ -170,7 +174,7 @@ void handleWebSocket() {
 // Simplified: no queue, no JSON, just direct text broadcasting
 //===========================================================================================
 void sendLogToWebSocket(const char* logMessage) {
-  if (wsInitialized && wsClientCount > 0 && logMessage != nullptr) {
+  if (hasWebSocketClients() && logMessage != nullptr) {
     webSocket.broadcastTXT(logMessage);
   }
 }

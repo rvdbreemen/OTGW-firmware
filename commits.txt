@@ -1,0 +1,68 @@
+176adfd Merge branch 'dev-branch-v1.3.0' into dev
+662260b CI: update version.h
+b2a07b6 Update PS mode handling and version information
+0e7fcd7 CI: update version.h
+e4e996e Update PS=1 mode handling and version information
+ef531e8 CI: update version.h
+5011e59 Merge branch 'dev-branch-v1.3.0' of https://github.com/rvdbreemen/OTGW-firmware into dev-branch-v1.3.0
+604ffd1 Report OTGW events via MQTT/WebSocket
+727813e CI: update version.h
+093c736 Merge branch 'dev-branch-v1.3.0' of https://github.com/rvdbreemen/OTGW-firmware into dev-branch-v1.3.0
+2e39b09 chore: Update version to 1.3.0-beta+30ce678 and increment build number
+c817ce5 CI: update version.h
+30ce678 Merge branch 'dev-branch-v1.3.0' of https://github.com/rvdbreemen/OTGW-firmware into dev-branch-v1.3.0
+a45398f Introduce OTPublishGate and MQTT interval gating
+1de32a8 refactor: Remove outdated REST API improvement implementation plan
+e7485a3 CI: update version.h
+e012865 feat: Enhance memory management and error handling in setup process
+a47494b CI: update version.h
+b1bc932 Add workflows to trigger GitHub Copilot Coding Agent programmatically and auto-validate ADRs (#472)
+5167cbb CI: update version.h
+e152b95 docs: Add ADR-044 (Webhook) and ADR-045 (PS=1 parsing) to close ADR backlog (#470)
+822b85e Add configurable MQTT publishing interval to reduce broker load (#458)
+c3162e9 CI: update version.h
+da8606d Merge branch 'dev' of https://github.com/rvdbreemen/OTGW-firmware into dev
+a2e1b0d Bump version to v1.3.0-beta across all relevant files
+a208277 CI: update version.h
+bac5b82 Release v1.2.0
+2b31b5d Update release workflow to include .ino.bin files
+4a5c62e Prepare v1.2.0 release: update docs & version
+dd2a3b4 Removing the beta label from the main stable version
+669c274 Bump OTGW firmware build to 2642
+14f4ad6 Release v1.1.0 — docs and version updates
+7cdeb2b CI: update version.h
+ff6b2dc Merge branch 'dev-branch-v1.3.0' of https://github.com/rvdbreemen/OTGW-firmware into dev-branch-v1.3.0
+8636465 feat: Update README.md for v1.3.0-beta release with new features and improvements
+77ecd57 CI: update version.h
+54cdeda Merge branch 'dev-branch-v1.3.0' of https://github.com/rvdbreemen/OTGW-firmware into dev-branch-v1.3.0
+59f3025 chore: update version to 1.3.0-beta+f4a12df and adjust related files
+f4a12df chore: update version to 1.3.0-beta+1f46f48 and adjust related files
+f6bbab0 CI: update version.h
+1f46f48 feat: implement triple-reset WiFi recovery mechanism and update documentation
+c628f24 fix: update writeSettings behavior and improve file handling; update version to 1.3.0-beta+cc66801
+cc66801 CI: update version.h
+e06bad7 Merge branch 'dev-branch-v1.3.0' of https://github.com/rvdbreemen/OTGW-firmware into dev-branch-v1.3.0
+28c96d6 feat: add heap memory info to device status and update version to 1.3.0-beta+1ef9372
+9f424d3 CI: update version.h
+1ef9372 Merge branch 'dev-branch-v1.3.0' of https://github.com/rvdbreemen/OTGW-firmware into dev-branch-v1.3.0
+c79e1f5 refactor: rename button for clarity and add check for assets in update process
+4a3c7dd CI: update version.h
+89b2062 Merge branch 'dev-branch-v1.3.0' of https://github.com/rvdbreemen/OTGW-firmware into dev-branch-v1.3.0
+42842a7 refactor: update UI for no data state and enhance GitHub update section
+eb28947 CI: update version.h
+c612fab Merge branch 'dev-branch-v1.3.0' of https://github.com/rvdbreemen/OTGW-firmware into dev-branch-v1.3.0
+513b27d refactor: replace String heap allocations with global scratch buffer writes
+4a844a2 CI: update version.h
+8d44d8b fix: widen valueBuf to prevent WebhookPayload truncation on settings read
+c6db4a1 CI: update version.h
+1d2543f fix: prevent spurious service restarts and settings rewrite on boot
+404841e CI: update version.h
+1a60c6f Remove ArduinoJson dependency and refactor firmware JSON paths to bounded manual handling (#465)
+771c6cf Single-click GitHub release OTA with rollback (#460)
+89a32e9 Complete REST API v2 migration: eliminate remaining v1 calls in OTA update page (#461)
+dcb6907 Enhance UI and functionality for log controls and PS mode handling
+a071581 Add PS=1 response interpretation in parsing (#455)
+dab4ed1 Enhance command bar styling in index.css and index_dark.css for improved layout
+95892a4 Bump version to v1.3.0-beta across multiple files
+a95280b Support one-shot OTGW PIC commands from the web UI (#453)
+b1f699e Refactor OpenTherm v4.2 spec audit workflow: remove push triggers and add unit normalization function

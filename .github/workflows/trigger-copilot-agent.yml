@@ -1,0 +1,136 @@
+name: Trigger Copilot Coding Agent
+
+# Programmatically trigger the GitHub Copilot Coding Agent on a task.
+#
+# How it works:
+#   1. Run this workflow via "Run workflow" (workflow_dispatch).
+#   2. Fill in the task title, description, and optionally choose a custom
+#      agent persona from the agents defined in .github/agents/.
+#   3. The workflow creates a GitHub Issue and assigns it to the Copilot
+#      coding agent, which will analyze the repository, implement the task,
+#      and open a pull request for human review.
+#
+# Requirements:
+#   - The repository must have the GitHub Copilot coding agent enabled
+#     (Settings → Copilot → Coding agent).
+#   - The GITHUB_TOKEN used here needs `issues: write` permission (already
+#     granted via the `permissions` block below).
+
+on:
+  workflow_dispatch:
+    inputs:
+      title:
+        description: "Short task title (used as the issue title)"
+        required: true
+        type: string
+      task:
+        description: "Detailed task description for the Copilot coding agent"
+        required: true
+        type: string
+      agent:
+        description: >
+          Custom agent persona to use (optional).
+          Corresponds to a file in .github/agents/.
+          Leave blank to let the coding agent decide.
+        required: false
+        default: ""
+        type: choice
+        options:
+          - ""
+          - adr-generator
+          - api-architect
+          - context7
+          - critical-thinking
+          - debug
+          - devils-advocate
+          - expert-cpp-software-engineer
+          - implementation-plan
+          - specification
+          - task-planner
+          - task-researcher
+      labels:
+        description: >
+          Additional comma-separated labels to apply to the issue (optional).
+          The 'copilot' label is always added automatically.
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  issues: write
+
+jobs:
+  trigger-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create issue and assign to Copilot coding agent
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: ${{ inputs.title }}
+          TASK: ${{ inputs.task }}
+          AGENT: ${{ inputs.agent }}
+          EXTRA_LABELS: ${{ inputs.labels }}
+        run: |
+          # Build the issue body, optionally including an agent-persona hint.
+          BODY="## Task
+
+          ${TASK}"
+
+          if [ -n "${AGENT}" ]; then
+            BODY="${BODY}
+
+          ---
+          **Agent persona requested:** \`${AGENT}\`
+
+          Please use the instructions in \`.github/agents/${AGENT}.agent.md\` to \
+          guide your approach to this task."
+          fi
+
+          BODY="${BODY}
+
+          ---
+          *This issue was created automatically by the \
+          [Trigger Copilot Coding Agent](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) \
+          workflow.*"
+
+          # Build the label list: always include 'copilot'.
+          LABEL_ARGS="--label copilot"
+          if [ -n "${EXTRA_LABELS}" ]; then
+            IFS=',' read -ra LABELS <<< "${EXTRA_LABELS}"
+            for label in "${LABELS[@]}"; do
+              trimmed=$(echo "${label}" | xargs)
+              if [ -n "${trimmed}" ]; then
+                LABEL_ARGS="${LABEL_ARGS} --label \"${trimmed}\""
+              fi
+            done
+          fi
+
+          # Create the issue.
+          # shellcheck disable=SC2086
+          ISSUE_URL=$(gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "${TITLE}" \
+            --body "${BODY}" \
+            ${LABEL_ARGS})
+
+          echo "✅ Issue created: ${ISSUE_URL}"
+          echo "The GitHub Copilot coding agent will pick up this issue and open a pull request."
+          echo ""
+          echo "ISSUE_URL=${ISSUE_URL}" >> "${GITHUB_ENV}"
+
+      - name: Summary
+        env:
+          INPUT_TITLE: ${{ inputs.title }}
+          INPUT_AGENT: ${{ inputs.agent }}
+        run: |
+          echo "### Copilot Coding Agent triggered 🤖" >> "${GITHUB_STEP_SUMMARY}"
+          echo "" >> "${GITHUB_STEP_SUMMARY}"
+          echo "| Field | Value |" >> "${GITHUB_STEP_SUMMARY}"
+          echo "| --- | --- |" >> "${GITHUB_STEP_SUMMARY}"
+          echo "| Issue | ${ISSUE_URL} |" >> "${GITHUB_STEP_SUMMARY}"
+          echo "| Task | ${INPUT_TITLE} |" >> "${GITHUB_STEP_SUMMARY}"
+          if [ -n "${INPUT_AGENT}" ]; then
+            echo "| Agent persona | \`${INPUT_AGENT}\` |" >> "${GITHUB_STEP_SUMMARY}"
+          fi
+          echo "" >> "${GITHUB_STEP_SUMMARY}"
+          echo "The Copilot coding agent will analyze the repository, implement the task, and open a pull request for review." >> "${GITHUB_STEP_SUMMARY}"

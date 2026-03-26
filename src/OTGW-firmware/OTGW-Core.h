@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h 
-**  Version  : v1.2.0
+**  Version  : v1.3.0
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -186,13 +186,6 @@ enum OTValueType {
 	OT_VALTYPE_STATUS,   // status flags (master/slave)
 	OT_VALTYPE_DATETIME, // date or time
 	OT_VALTYPE_SPECIAL   // special formatting
-};
-
-enum OpenThermResponseStatus {
-	OT_NONE,
-	OT_SUCCESS,
-	OT_INVALID,
-	OT_TIMEOUT
 };
 
 enum OpenThermMessageType {
@@ -484,30 +477,38 @@ enum OpenThermMessageID {
 
 #define OT_MSGID_MAX 133
 
-time_t msglastupdated[256] = {0}; //all msg, even if they are unknown (id is uint8_t: 0-255)
+// Global arrays defined in OTGW-Core.ino (extern declarations here to avoid ODR violations).
+// Definitions in headers cause duplicate-symbol linker errors in any multi-TU build.
+// Arduino merges all .ino files into one .cpp so it happens to work, but the correct
+// pattern is extern declaration in the header + a single definition in one .ino file. (ADR-044)
+extern uint32_t mqttlastsent[];            // packed throttle state for OT msgids 0-127: bits31-16=last u16 value, bits15-0=seconds-since-boot
+extern uint16_t mqttlastsentstatusbit[16]; // per-bit publish timers for OT_Statusflags (slots 0-7=master, 8-15=slave)
+extern bool     mqttPublishAllowed;        // MQTT interval gate — managed via OTPublishGate, checked in sendMQTTData
+uint16_t getMsgLastUpdated(uint8_t msgId); // rolling seconds-since-boot for REST last-updated fields (0 when unseen)
+void requestMQTTRepublishAll();            // reset MQTT publish eligibility so next observed values publish as first-seen again
+void requestMQTTStatusRepublish();         // force the next observed master/slave status frames to republish
+
+// RAII guard for the MQTT publish gate. Saves/restores mqttPublishAllowed on scope exit
+// so nested or interrupted gate operations can never leave the gate stuck false.
+// Usage:  { OTPublishGate gate(shouldPublishMQTTForID(...)); decodeAndPublishOTValue(); }
+struct OTPublishGate {
+  bool _saved;
+  explicit OTPublishGate(bool allow) : _saved(mqttPublishAllowed) { mqttPublishAllowed = allow; }
+  ~OTPublishGate() { mqttPublishAllowed = _saved; }
+  OTPublishGate(const OTPublishGate&) = delete;
+  OTPublishGate& operator=(const OTPublishGate&) = delete;
+};
 
 struct OT_cmd_t { // see all possible commands for PIC here: https://otgw.tclcode.com/firmware.html
 	char cmd[15];
 	int cmdlen;
-	int retrycnt; 
+	int retrycnt;
 	unsigned long due;
 };
 
 #define CMDQUEUE_MAX 20
-struct OT_cmd_t cmdqueue[CMDQUEUE_MAX];
-static int cmdptr = 0;
-
-enum OpenThermStatus {
-	OT_NOT_INITIALIZED,
-	OT_READY,
-	OT_DELAY,
-	OT_REQUEST_SENDING,
-	OT_RESPONSE_WAITING,
-	OT_RESPONSE_START_BIT,
-	OT_RESPONSE_RECEIVING,
-	OT_RESPONSE_READY,
-	OT_RESPONSE_INVALID	
-};
+extern struct OT_cmd_t cmdqueue[CMDQUEUE_MAX];
+extern int cmdQueueSize;  // fill-pointer: number of active entries (0..CMDQUEUE_MAX)
 
 /**
  * Structure to hold Opentherm data packet content.
@@ -526,8 +527,11 @@ enum OTGW_response_type {
 	OTGW_PARITY_ERROR,
 	OTGW_UNDEF	
 };
+#define OT_MSGTYPE_REQUEST  0  // masterslave: 0=master (thermostat → boiler request)
+#define OT_MSGTYPE_RESPONSE 1  // masterslave: 1=slave  (boiler → thermostat response)
+
 struct OpenthermData_t {
-  char buf[10];	
+  char buf[10];
   byte len;
   uint32_t value;
   byte masterslave; //0=master, 1=slave

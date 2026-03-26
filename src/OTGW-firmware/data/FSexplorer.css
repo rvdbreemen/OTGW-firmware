@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : FSexplorer.html
-**  Version  : v1.2.0
+**  Version  : v1.3.0
 ***************************************************************************  
 */
 :root {
@@ -88,6 +88,7 @@ td:nth-child(n+5) {
 a {
     color: var(--primary-color);
     text-decoration: none;
+    -webkit-transition: color 0.2s;
     transition: color 0.2s;
 }
 a:hover {
@@ -152,7 +153,6 @@ form[action="/upload"] {
     color: var(--primary-color);
     border-bottom: 2px solid #e0f7fa; /* Light cyan border to match theme */
     padding-bottom: 15px;
-    display: block;
     width: 100%;
 }
 
@@ -212,6 +212,7 @@ input[type="submit"], input[type="button"], .button {
     font-weight: 500;
     border-radius: 6px;
     cursor: pointer;
+    -webkit-transition: all 0.2s ease;
     transition: all 0.2s ease;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     height: auto;
@@ -219,6 +220,7 @@ input[type="submit"], input[type="button"], .button {
     min-width: 140px;
     margin: 0;
     -webkit-appearance: none;
+    appearance: none;
 }
 
 input[type="submit"]:hover, input[type="button"]:hover, .button:hover {
@@ -285,5 +287,14 @@ hr {
 /* Highlighting styles from original JS */
 tr[style*="background-color"] {
     background-color: #d4edda !important;
+}
+
+/* Hide firmware update button on touch devices (phones and tablets).
+   pointer:coarse = finger/stylus input; hover:none = no mouse hover capability.
+   This is more reliable than screen width, which can misfire on resized desktop windows. */
+@media (pointer: coarse) and (hover: none) {
+    .desktop-only {
+        display: none;
+    }
 }
 

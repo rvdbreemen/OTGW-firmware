@@ -47,6 +47,26 @@
   }
 }
 
+/* Theme toggle button — sits as a direct flex child of nav-container */
+.theme-toggle-btn {
+  flex-shrink: 0;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  font-size: 1.25em;
+  line-height: 1;
+  border-radius: 6px;
+  margin-left: 8px;
+  margin-right: 4px;
+  cursor: pointer;
+  -webkit-transition: background 0.2s, box-shadow 0.2s;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
 /* Shared mobile nav/settings layout */
 @media (max-width: 768px) {
   .nav-container {
@@ -120,5 +140,12 @@
     max-width: 100%;
     margin: 8px 10px;
     box-sizing: border-box;
+  }
+
+  /* On mobile the nav stacks vertically; keep the toggle button compact and right-aligned */
+  .nav-container > .theme-toggle-btn {
+    align-self: flex-end;
+    margin-left: 0;
+    margin-right: 4px;
   }
 }

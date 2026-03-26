@@ -10,6 +10,8 @@
           var storedTheme = localStorage.getItem('theme');
           if (storedTheme === 'dark') {
             css = "index_dark.css";
+          } else if (!storedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            css = "index_dark.css";
           }
         } catch (e) { console.error(e); }
         document.write('<link rel="stylesheet" type="text/css" href="' + css + '" id="theme-style">');
@@ -28,6 +30,7 @@
         <div class="headercolumn" id="devName">[hostname]</div>
         <div class="headercolumn" id="devVersion">[version]</div>
         <div class="headercolumn" id='theTime'>[00:00:00]</div>
+        <span class="headercolumn theme-toggle-btn" id="headerThemeToggle" role="button" tabindex="0" title="Toggle theme" aria-label="Toggle theme"></span>
     </div>
     </font>
     <template id="pageNavTemplate">
@@ -61,13 +64,15 @@
         <div class="ot-log-header">
           <h3>OpenTherm Monitor</h3>
           <div class="ot-log-status">
-            <span id="wsStatus" class="ws-status ws-disconnected">●</span>
-            <span id="wsStatusText">Disconnected</span>
+            <span id="wsStatus" class="ws-status ws-disconnected" title="Live WebSocket connection to the gateway for real-time OpenTherm message streaming">●</span>
+            <span id="wsStatusText" title="Live WebSocket connection to the gateway for real-time OpenTherm message streaming">Disconnected</span>
+            <span id="simulationBadge" class="simulation-badge hidden" aria-live="polite">SIMULATION</span>
             <span class="status-separator">|</span>
-            <span id="gatewayModeStatus" class="mode-status mode-unknown">●</span>
-            <span id="gatewayModeText" title="Gateway mode values: ON (gateway) or OFF (monitor)">Gateway Mode: Detecting...</span>
+            <span id="gatewayModeStatus" class="mode-status mode-unknown" title="Gateway mode: actively modifies OpenTherm messages. Monitor mode: passively observes traffic without interfering.">●</span>
+            <span id="gatewayModeText" title="Gateway mode: actively modifies OpenTherm messages. Monitor mode: passively observes traffic without interfering.">Detecting...</span>
           </div>
         </div>
+        <div id="otLogModeNotice" class="ot-log-mode-notice hidden" role="status" aria-live="polite"></div>
         
         <div class="ot-log-tabs">
           <button type="button" class="tab-link active" onclick="openLogTab(event, 'Log')">Log</button>
@@ -83,7 +88,7 @@
               </label>
               <button type="button" id="btnClearLog" class="btn-log-control" title="Clear log buffer" aria-label="Clear the OpenTherm log buffer">Clear</button>
               <button type="button" id="btnDownloadLog" class="btn-log-control" title="Download log to file" aria-label="Download the OpenTherm log to a file">Download</button>
-              <label class="log-control-label" style="display:inline-flex;" title="Automatically save log every 15 minutes">
+              <label class="log-control-label log-control-inline" title="Automatically save log every 15 minutes">
                   <input type="checkbox" id="chkAutoDownloadLog" aria-label="Auto download log every 15 minutes" />
                   Auto
               </label>
@@ -102,6 +107,12 @@
               </label>
             </div>
             
+            <div class="ot-cmd-bar">
+              <input type="text" id="otCmdInput" class="ot-cmd-input" placeholder="Command (e.g. PS=1, TT=20.5)" aria-label="OTGW command" autocomplete="off" autocorrect="off" spellcheck="false" maxlength="14" />
+              <button type="button" id="btnSendCmd" class="btn-log-control" title="Send command to OTGW PIC" aria-label="Send OTGW command">Send</button>
+              <span id="otCmdStatus" class="ot-cmd-status"></span>
+            </div>
+            
             <div id="otLogContainer" class="ot-log-container">
               <div id="otLogContent" class="ot-log-content" role="log" aria-live="polite"></div>
             </div>
@@ -110,7 +121,7 @@
               <span>Lines: <span id="logLineCount">0</span><span id="logLimitDisplay"> / 2000</span></span>
               <span>Filtered: <span id="logFilteredCount">0</span></span>
               <span>Buffer: <span id="memUsage">0</span></span>
-              <span id="logFileDisplay" style="display:none">Log: <span id="currentLogFile">None</span></span>
+              <span id="logFileDisplay" class="hidden">Log: <span id="currentLogFile">None</span></span>
             </div>
         </div>
 
@@ -208,6 +219,7 @@
           </div>
         </div>
       </div>
+      <div id="deviceinfoCrashLog" class="crashlog-panel hidden"></div>
       <div id="deviceinfoPage"></div>
     </div>
     <div id="displaySettingsPage" class="page-section">
@@ -227,7 +239,7 @@
         </div>
       </div>
       <div id="settingsPage"></div>
-      <div id="settingMessage">Loading...</div>
+      <div id="settingMessage"></div>
     </div>
     <div id="displayWebhookPage" class="page-section">
       <div class="nav-container">
@@ -256,7 +268,7 @@
     <!-- KEEP THIS --->
 
     <!-- Pin to bottom right corner -->
-    <div class="bottom right-0">2021-2026 &copy; Robert van den Breemen</div>
+    <div class="bottom right-0"><span id="heap-info" style="display:inline-block; margin-right:0.75rem;"></span>2021-2026 &copy; Robert van den Breemen</div>
 
     <!-- Pin to bottom left corner -->
     <div id="message" class="bottom left-0"></div>

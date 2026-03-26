@@ -1,7 +1,7 @@
 <!--
 ***************************************************************************  
 **  Program  : FSexplorer.html
-**  Version  : v1.2.0
+**  Version  : v1.3.0
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -234,7 +234,6 @@
                      document.querySelectorAll('.delete-link').forEach((node) => {
                        node.addEventListener('click', (event) => {
                          event.preventDefault();
-                         if (!confirm('Are you sure you want to delete this file?')) return;
                          let href = node.getAttribute('data-href');
 
                          fetch('api/listfiles?delete=' + encodeURIComponent(href))
@@ -383,7 +382,7 @@
       <div class="system-actions">
            <h3>System Actions</h3>
            <div class="button-row">
-                <form action='/update' method='GET'>
+                <form action='/update' method='GET' class='desktop-only'>
                   <input type='submit' class='button' name='SUBMIT' value='Update Firmware' ENABLED/>
                 </form>
                 <form action='/ReBoot'>

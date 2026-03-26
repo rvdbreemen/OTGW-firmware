@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index_dark.css
-**  Version  : v1.2.0
+**  Version  : v1.3.0
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -14,7 +14,6 @@
   
   html {
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
     font-family: 'Dosis', sans-serif;
     line-height: 1.6;
     color: #e0e0e0;
@@ -58,20 +57,6 @@
      font-size: 12pt;
   }
   
-  .outer-div {
-    /*width: 90%; */
-    text-align: center;
-    background-color: #1a1a1a 
-  }
-  .inner-div {
-    display: inline-block; 
-    /*
-    margin: 0 auto;
-    padding: 3px;
-    background-color: #2c2c2e
-    */
-  }
-
   #displayMainPage, #displayPICflash, #displayDeviceInfo, #displaySettingsPage {
     max-width: 100%;
   }
@@ -80,43 +65,9 @@
     width: 80%;
   }
   
-  .container-card {
-    padding: 50;
-    margin: 50;
-    list-style: none;
-    flex-direction: row; /*row | row-reverse | column | column-reverse*/
-    
-    display: -webkit-box;
-    display: -moz-box;
-    display: -ms-flexbox;
-    display: -webkit-flex;
-    display: flex;
-    
-    -webkit-flex-flow: row wrap;
-    justify-content: space-around; /* flex-start | flex-end | center | space-between | space-around | space-evenly */
-  
-  }
-  
-  .container-box {
-    padding: 10px;
-    margin: 10px;
-    list-style: none;
-    flex-direction: column; /*row | row-reverse | column | column-reverse*/
-    
-    display: -webkit-box;
-    display: -moz-box;
-    display: -ms-flexbox;
-    display: -webkit-flex;
-    display: flex;
-    
-    -webkit-flex-flow: column wrap;
-    justify-content: flex-start;
-    margin-top: 10px;
-  }
-  
   /*--------------------- N A V - B A R -----------------*/
 .nav-container,.footer {
-    background: #2c2c2e;
+    background: #383838;
     padding: 6px;
     min-height: 50px;
     display: flex;
@@ -200,10 +151,10 @@
     font-size: 16px;
     height: 40px;
     width: 110px;
-    background-color: #3a3a3c;
+    background-color: #4e4e4e;
     border: none;
     border-radius: 5px;
-    color: #b0b0b0;
+    color: #c8c8c8;
     cursor: pointer;
     box-shadow: 2px 2px 2px 0px #000;
   }
@@ -215,6 +166,27 @@
   .nav-item:active {
     transform: translate(2px, 2px);
     box-shadow: none;
+  }
+
+  .theme-toggle-btn {
+    cursor: pointer;
+    opacity: 0.7;
+    position: relative;
+    top: 6px;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .theme-toggle-btn:hover {
+    opacity: 1;
+  }
+  @media screen and (max-width: 600px) {
+    .theme-toggle-btn {
+      position: absolute;
+      top: 8px;
+      right: 0;
+      margin: 0;
+    }
   }
 
   .nav-img {
@@ -275,26 +247,6 @@
     z-index: 1000;
   }
               
-  /*-- next 4 are for the API doc page --------*/
-  .div1 { 
-    float: left;  
-    margin-left: 20px; 
-    margin-top: 10px;
-  }
-  .div1 a:link, a:visited { 
-    background-color: #2c2c2e; 
-    color: #e0e0e0; 
-    padding: 5px 15px; 
-    width: 210px; 
-    text-align: right; 
-    text-decoration: none; 
-    display: inline-block;
-  }
-  .div1 a:hover, a:active { 
-    background-color: #3a3a3c;
-    color: #fff;
-  }
-  
 /* Graph Tab */
 .ot-graph-container {
     width: 100%;
@@ -354,6 +306,7 @@
     flex-wrap: wrap;
     align-items: baseline;
     padding-bottom: 5px;
+    position: relative;
   }
   
   .headercolumnbig{
@@ -376,13 +329,6 @@
     display: table;
     clear: both;
   }
-  
-/* Responsive layout - makes the three columns stack on top of each other instead of next to each other */
-@media screen and (max-width: 768px) {
-  .column {
-    width: 100%;
-  }
-}
   
   /* PIC firmware page */
 .pictable {
@@ -429,9 +375,6 @@
   pointer-events: none;
   opacity: 0;
   -webkit-transition: opacity .15s ease-in-out;
-  -moz-transition: opacity .15s ease-in-out;
-  -ms-transition: opacity .15s ease-in-out;
-  -o-transition: opacity .15s ease-in-out;
   transition: opacity .15s ease-in-out;
 
   display: block;
@@ -464,6 +407,10 @@
   border: 1px solid #1a1a1a;
   break-inside: avoid;
   page-break-inside: avoid;
+}
+
+.otmonrow.no-data-row {
+  display: none;
 }
 .otmoncolumn1 {
   flex: 1;
@@ -527,6 +474,45 @@
   border: 1px solid #1a1a1a;
 }
 
+#deviceinfoCrashLog {
+  max-width: 960px;
+  margin: 0 0 14px 0;
+}
+
+.crashlog-panel {
+  background: #463318;
+  border: 1px solid #7c5a20;
+  border-left: 5px solid #ffae42;
+  padding: 10px 12px;
+  color: #f7ddb2;
+}
+
+.crashlog-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.crashlog-intro {
+  margin-bottom: 8px;
+}
+
+.crashlog-label {
+  font-weight: 600;
+  margin: 8px 0 4px 0;
+}
+
+.crashlog-pre {
+  margin: 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+}
+
 /* Responsive: Stack on small screens */
 @media (max-width: 768px) {
   #deviceinfoPage {
@@ -557,15 +543,29 @@
     border: none;
     padding: 0 0 0 10px;
   }
+
+  #deviceinfoCrashLog {
+    max-width: 100%;
+  }
 }
 
 /* SettingsPage */
 #settingMessage {
-  background-color: #d35400;
+  display: none;
   width: 860px;
   margin-left: 10px;
   color: white;
   text-align: center;
+  padding: 8px;
+  border-radius: 4px;
+}
+#settingMessage.loading {
+  display: block;
+  background-color: #1565C0;
+}
+#settingMessage.error {
+  display: block;
+  background-color: #d35400;
 }
 
   /* define tag selectors () -------------------------------------------------- */
@@ -621,6 +621,19 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
+.ot-log-section.commands-only .ot-log-tabs,
+.ot-log-section.commands-only .ot-log-controls,
+.ot-log-section.commands-only .ot-log-container,
+.ot-log-section.commands-only .ot-log-footer,
+.ot-log-section.commands-only #Statistics,
+.ot-log-section.commands-only #Graph {
+  display: none;
+}
+
+.ot-log-section.commands-only #Log {
+  display: block;
+}
+
 /* Log Header */
 .ot-log-header {
   display: flex;
@@ -660,6 +673,22 @@
 
 .ws-disconnected {
   background: #f44336;
+}
+
+.simulation-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #3b9dff;
+  color: #04111f;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+  box-shadow: 0 0 0 1px rgba(59, 157, 255, 0.28), 0 0 12px rgba(59, 157, 255, 0.3);
 }
 
 .status-separator {
@@ -743,11 +772,42 @@
   gap: 5px;
   font-size: 13px;
   cursor: pointer;
+  -webkit-user-select: none;
   user-select: none;
 }
 
 .log-control-label input[type="checkbox"] {
   cursor: pointer;
+}
+
+.ot-cmd-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 16px;
+  padding: 10px 12px;
+  background: #252629;
+  border: 1px solid #3a3a3c;
+  border-radius: 6px;
+}
+
+.ot-cmd-input {
+  flex: 1 1 260px;
+  min-width: 220px;
+  padding: 7px 12px;
+  border: 1px solid #4a4a4c;
+  border-radius: 4px;
+  font-size: 13px;
+  background-color: #1f2022;
+  color: #e0e0e0;
+}
+
+.ot-cmd-status {
+  flex: 1 1 180px;
+  min-height: 18px;
+  font-size: 12px;
+  color: #a0a8b0;
 }
 
 /* Log Container */
@@ -777,26 +837,13 @@
   white-space: pre;
   line-height: 1.4;
   max-height: inherit;
-  scrollbar-width: thin;
-  scrollbar-color: #555 #1e1e1e;
 }
 
-.ot-log-content::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.ot-log-content::-webkit-scrollbar-track {
-  background: #1e1e1e;
-}
-
-.ot-log-content::-webkit-scrollbar-thumb {
-  background: #555;
-  border-radius: 5px;
-}
-
-.ot-log-content::-webkit-scrollbar-thumb:hover {
-  background: #777;
+@supports (scrollbar-width: thin) {
+  .ot-log-content {
+    scrollbar-width: thin;
+    scrollbar-color: #555 #1e1e1e;
+  }
 }
 
 /* Log Footer */
@@ -1032,23 +1079,6 @@ body.disable-interaction {
   display: none !important;
 }
 
-.flash-progress-bar {
-  width: 0%;
-  background-color: #4CAF50;
-}
-
-.flash-progress-bar.error {
-  background-color: red;
-}
-
-.flash-progress-section {
-  display: none;
-}
-
-.flash-progress-section.active {
-  display: block;
-}
-
 .waiting-error {
   color: red;
 }
@@ -1083,3 +1113,47 @@ body.disable-interaction {
   border: none;
 }
 
+
+/* --- Gateway Settings panel (PR= polled values on PIC firmware page) --- */
+.pic-settings-section {
+  max-width: 720px;
+  margin: 18px 0 0 0;
+}
+.pic-settings-section-heading {
+  font-size: 1em;
+  font-weight: bold;
+  margin: 0 0 6px 0;
+  padding: 6px 10px;
+  background-color: #2c2c2e;
+  border: 1px solid #444;
+  border-radius: 3px 3px 0 0;
+}
+.pic-settings-group-cell {
+  display: table-cell;
+  padding: 5px 15px;
+  font-style: italic;
+  color: #999;
+  font-size: 0.9em;
+  border: none;
+  background: transparent;
+}
+.pic-val-live {
+  color: #66bb6a;
+  font-weight: 500;
+}
+.pic-val-cached {
+  color: #ffa726;
+}
+.pic-val-unknown {
+  color: #666;
+  font-style: italic;
+}
+.pic-settings-refresh {
+  margin-top: 8px;
+  font-size: 0.85em;
+  color: #aaa;
+}
+.pic-settings-refresh button {
+  margin-right: 8px;
+  cursor: pointer;
+}

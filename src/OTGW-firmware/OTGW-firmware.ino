@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v1.2.0
+**  Version  : v1.3.0
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -39,8 +39,82 @@
 #define ON LOW
 #define OFF HIGH
 
-DECLARE_TIMER_SEC(timerpollsensor, settingGPIOSENSORSinterval, CATCH_UP_MISSED_TICKS);
-DECLARE_TIMER_SEC(timers0counter, settingS0COUNTERinterval, CATCH_UP_MISSED_TICKS);
+DECLARE_TIMER_SEC(timerpollsensor, settings.sensors.iInterval, CATCH_UP_MISSED_TICKS);
+DECLARE_TIMER_SEC(timers0counter, settings.s0.iInterval, CATCH_UP_MISSED_TICKS);
+
+#define WIFI_PORTAL_RESET_MAGIC           0x4F544750UL  // "OTGP"
+#define WIFI_PORTAL_RESET_RTC_SLOT        96            // RTC user memory slot (4-byte units)
+#define WIFI_PORTAL_RESET_TRIGGER_COUNT   3
+#define WIFI_PORTAL_RESET_WINDOW_MS       10000UL
+
+struct WifiPortalResetState {
+  uint32_t magic;
+  uint32_t resetCount;
+};
+
+uint32_t wifiPortalResetWindowDeadline = 0;
+bool wifiPortalResetWindowOpen = false;
+
+bool readWifiPortalResetState(WifiPortalResetState &portalState) {
+  return ESP.rtcUserMemoryRead(WIFI_PORTAL_RESET_RTC_SLOT, reinterpret_cast<uint32_t*>(&portalState), sizeof(portalState));
+}
+
+bool writeWifiPortalResetState(const WifiPortalResetState &portalState) {
+  return ESP.rtcUserMemoryWrite(WIFI_PORTAL_RESET_RTC_SLOT, const_cast<uint32_t*>(reinterpret_cast<const uint32_t*>(&portalState)), sizeof(portalState));
+}
+
+void clearWifiPortalResetState() {
+  WifiPortalResetState portalState = { WIFI_PORTAL_RESET_MAGIC, 0 };
+  writeWifiPortalResetState(portalState);
+}
+
+bool isExternalSystemReset() {
+  rst_info *resetInfo = ESP.getResetInfoPtr();
+  return (resetInfo != nullptr) && (resetInfo->reason == REASON_EXT_SYS_RST);
+}
+
+bool shouldForceWifiConfigPortal() {
+  // Use 'portalState' to avoid shadowing the global 'OTGWState state' (review K1)
+  WifiPortalResetState portalState = { WIFI_PORTAL_RESET_MAGIC, 0 };
+  WifiPortalResetState storedState = { 0, 0 };
+  if (readWifiPortalResetState(storedState) && (storedState.magic == WIFI_PORTAL_RESET_MAGIC)) {
+    portalState = storedState;
+  }
+
+  bool externalReset = isExternalSystemReset();
+  if (externalReset) {
+    if (portalState.resetCount < 255) {
+      portalState.resetCount++;
+    }
+  } else {
+    portalState.resetCount = 0;
+  }
+
+  bool forcePortal = (portalState.resetCount >= WIFI_PORTAL_RESET_TRIGGER_COUNT);
+  if (forcePortal) {
+    SetupDebugTf(PSTR("Detected %u external resets -> force WiFi config portal\r\n"), (unsigned int)portalState.resetCount);
+    portalState.resetCount = 0;
+    wifiPortalResetWindowOpen = false;
+    wifiPortalResetWindowDeadline = 0;
+  } else if (portalState.resetCount > 0) {
+    wifiPortalResetWindowOpen = true;
+    wifiPortalResetWindowDeadline = millis() + WIFI_PORTAL_RESET_WINDOW_MS;
+    SetupDebugTf(PSTR("External reset count: %u/%u (window %lu ms)\r\n"),
+      (unsigned int)portalState.resetCount,
+      (unsigned int)WIFI_PORTAL_RESET_TRIGGER_COUNT,
+      (unsigned long)WIFI_PORTAL_RESET_WINDOW_MS);
+  } else {
+    wifiPortalResetWindowOpen = false;
+    wifiPortalResetWindowDeadline = 0;
+  }
+
+  writeWifiPortalResetState(portalState);
+  return forcePortal;
+}
+
+bool wifiPortalResetWindowExpired() {
+  return wifiPortalResetWindowOpen && ((int32_t)(millis() - wifiPortalResetWindowDeadline) >= 0);
+}
   
 //=====================================================================
 void setup() {
@@ -64,33 +138,39 @@ void setup() {
   setLed(LED2, ON);
 
   LittleFSmounted = LittleFS.begin();
+  if (!LittleFSmounted) SetupDebugln(F("*** ERROR: LittleFS mount FAILED - running on compile-time defaults ***"));
   readSettings(true);
   checklittlefshash();
+
+  // Set hostname ASAP after loading settings.  WiFi.persistent(true) from a
+  // previous boot lets the SDK auto-connect before startWiFi() is reached;
+  // without this early call the DHCP request carries the default "ESP-XXXXXX".
+  WiFi.hostname(CSTR(settings.sHostname));
 
   // Connect to and initialise WiFi network
   setLed(LED1, ON);
   SetupDebugln(F("Attempting to connect to WiFi network\r"));
 
-  //setup NTP before connecting to wifi will enable DHCP to overrule the NTP setting
-  startNTP();
+  bool forceWifiPortal = shouldForceWifiConfigPortal();
+  startWiFi(CSTR(settings.sHostname), 240, forceWifiPortal);  // timeout 240 seconds
 
-  //start with setting wifi hostname
-  startWiFi(CSTR(settingHostname), 240);  // timeout 240 seconds
+  //setup NTP after WiFi; startNTP() restores hostname after configTime()
+  startNTP();
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
 
   startTelnet();              // start the debug port 23
-  startMDNS(CSTR(settingHostname));
-  startLLMNR(CSTR(settingHostname));
+  startMDNS(CSTR(settings.sHostname));
+  startLLMNR(CSTR(settings.sHostname));
   setupFSexplorer();
   startWebserver();
   startWebSocket();          // start the WebSocket server for OT log streaming
   startMQTT();               // start the MQTT after webserver, always.
  
-  initWatchDog();            // setup the WatchDog
+  { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason)); }  // setup the WatchDog
   strlcpy(lastReset, ESP.getResetReason().c_str(), sizeof(lastReset));
   SetupDebugf(PSTR("Last reset reason: [%s]\r\n"), CSTR(lastReset));
-  rebootCount = updateRebootCount();
+  state.uptime.iRebootCount = updateRebootCount();
   updateRebootLog(lastReset);
   
   SetupDebugln(F("Setup finished!\r\n"));
@@ -111,69 +191,111 @@ void setup() {
   setLed(LED2, OFF);
   sendMQTTuptime();
   sendMQTTversioninfo();
+  if (!LittleFSmounted) sendMQTTData(F("otgw-firmware/error"), "LittleFS mount failed - running on defaults", false);
   initS0Count();        // init S0 counter
   initSensors();        // init DS18B20 (after MQ is up!)
+  // Clear the triple-reset portal counter: a successful setup() proves the device is healthy.
+  // This prevents USB flash resets or stale RTC data from triggering the portal on next boot.
+  clearWifiPortalResetState();
+  triggerPICsettingsReadout();  // Start initial PIC settings discovery cycle
+  state.bSetupComplete = true; // ADR-036: allow doBackgroundTasks() to run service handlers
 }
 //=====================================================================
 
 
-//====[ restartWifi ]===
-/*
-  The restartWifi function takes tries to just reconnect to the wifi. When the wifi is restated, it then waits for maximum of 30 seconds (timeout).
-  It keeps count of how many times it tried, when it tried to reconnect for 15 times. It goes into failsafe mode, and reboots the ESP.
-  The watchdog is turned off during this process
-*/
-void restartWifi(){
-  static int iTryRestarts = 0; //So if we have more than 15 restarts, then it's time to reboot
-  iTryRestarts++;          //Count the number of attempts
+//====[ Non-blocking WiFi Reconnect State Machine (ADR-047) ]===
+// Replaces blocking restartWifi() — no delay() in reconnect path.
+// Called every loop iteration from doBackgroundTasks().
 
-  WiFi.hostname(settingHostname);  //make sure hostname is set
-  if (WiFi.begin()) // if the wifi ssid exist, you can try to connect. 
-  {
-    //active wait for connections, this can take seconds
-    DECLARE_TIMER_SEC(timeoutWifiConnect, 30, CATCH_UP_MISSED_TICKS);
-    while ((WiFi.status() != WL_CONNECTED))
-    {  
-      delay(100);
-      feedWatchDog();  //feeding the dog, while waiting activly
-      if DUE(timeoutWifiConnect) break; //timeout, then break out of this loop
-    }
+enum WifiState_t {
+  WIFI_IDLE,         // connected, monitoring
+  WIFI_DISCONNECTED, // just dropped — start reconnect
+  WIFI_CONNECTING,   // waiting non-blocking for connection
+  WIFI_RECONNECTED,  // just came back — restart services
+  WIFI_FAILED        // too many retries — trigger reboot
+};
+static WifiState_t wifiState = WIFI_IDLE;
+static int wifiRetryCount = 0;
+
+void loopWifi() {
+  DECLARE_TIMER_SEC(timerWifiRetry, 5, CATCH_UP_MISSED_TICKS);
+
+  switch (wifiState) {
+    case WIFI_IDLE:
+      if (WiFi.status() != WL_CONNECTED) {
+        DebugTln(F("WiFi: connection lost, starting non-blocking reconnect"));
+        wifiRetryCount = 0;
+        wifiState = WIFI_DISCONNECTED;
+      }
+      break;
+
+    case WIFI_DISCONNECTED:
+      DebugTf(PSTR("WiFi: reconnect attempt %d starting for hostname [%s]\r\n"),
+              wifiRetryCount + 1,
+              CSTR(settings.sHostname));
+      WiFi.hostname(CSTR(settings.sHostname));
+      WiFi.begin();  // uses stored credentials
+      RESTART_TIMER(timerWifiRetry);
+      wifiState = WIFI_CONNECTING;
+      break;
+
+    case WIFI_CONNECTING:
+      if (WiFi.status() == WL_CONNECTED) {
+        wifiState = WIFI_RECONNECTED;
+        wifiRetryCount = 0;
+      } else if (DUE(timerWifiRetry)) {
+        wifiRetryCount++;
+        DebugTf(PSTR("WiFi: connect attempt %d failed\r\n"), wifiRetryCount);
+        if (wifiRetryCount >= 15) {
+          wifiState = WIFI_FAILED;
+        } else {
+          wifiState = WIFI_DISCONNECTED;  // retry
+        }
+      }
+      break;
+
+    case WIFI_RECONNECTED:
+      // Match the startup path: re-apply the configured hostname and force a
+      // DHCP re-announce so the renewed lease uses the expected name.
+      WiFi.hostname(CSTR(settings.sHostname));
+      DebugTf(PSTR("WiFi: reconnected, re-announcing DHCP lease for hostname [%s]\r\n"),
+              CSTR(settings.sHostname));
+      wifi_station_dhcpc_stop();
+      wifi_station_dhcpc_start();
+      startTelnet();
+      startOTGWstream();
+      startMQTT();
+      startWebSocket();
+      wifiState = WIFI_IDLE;
+      DebugTf(PSTR("WiFi: reconnected, services restarted; IP=%s\r\n"),
+              WiFi.localIP().toString().c_str());
+      break;
+
+    case WIFI_FAILED:
+      doRestart("WiFi: too many reconnect failures");
+      break;
   }
-
-  if (WiFi.status() == WL_CONNECTED)
-  { //when reconnect, restart some services, just to make sure all works
-    // Turn off ESP reconnect, to make sure that's not the issue (16/11/2021)
-    startTelnet();
-    startOTGWstream(); 
-    startMQTT();
-    startWebSocket(); // Restart WebSocket server
-    iTryRestarts = 0; //reset attempt counter
-    return;
-  }
-
-  //if all fails, and retry 15 is hit, then reboot esp
-  if (iTryRestarts >= 15) doRestart("Too many wifi reconnect attempts");
 }
 
 void sendMQTTuptime(){
-  DebugTf(PSTR("Uptime seconds: %lu\r\n"), (unsigned long)upTimeSeconds);
+  DebugTf(PSTR("Uptime seconds: %lu\r\n"), (unsigned long)state.uptime.iSeconds);
   char uptimeBuf[11] = {0};
-  snprintf_P(uptimeBuf, sizeof(uptimeBuf), PSTR("%lu"), (unsigned long)upTimeSeconds);
+  snprintf_P(uptimeBuf, sizeof(uptimeBuf), PSTR("%lu"), (unsigned long)state.uptime.iSeconds);
   sendMQTTData(F("otgw-firmware/uptime"), uptimeBuf, false);
 }
 
 void sendtimecommand(){
-  if (bPSmode) return;                  // when in Print Summary mode (PS=1), no timesync commands (improving legacy/Domoticz compatibility)
-  if (!settingNTPenable) return;        // if NTP is disabled, then return
-  if (!settingNTPsendtime) return;      // if NTP send time is disabled, then return
+  if (state.otgw.bPSmode) return;                  // when in Print Summary mode (PS=1), no timesync commands (improving legacy/Domoticz compatibility)
+  if (!settings.ntp.bEnable) return;        // if NTP is disabled, then return
+  if (!settings.ntp.bSendtime) return;      // if NTP send time is disabled, then return
   if (NtpStatus != TIME_SYNC) return;   // only send time command when time is synced
-  if (!bPICavailable) return;           // only send when pic is available
+  if (!state.pic.bAvailable) return;           // only send when pic is available
   if (OTGWSerial.firmwareType() != FIRMWARE_OTGW) return; //only send timecommand when in gateway firmware, not in diagnostic or interface mode
 
   //send time command to OTGW
   //send time / weekday
   time_t now = time(nullptr);
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settingNTPtimezone));
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
   //DebugTf(PSTR("%02d:%02d:%02d %02d-%02d-%04d\r\n"), myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
 
@@ -223,7 +345,7 @@ void blinkLED(uint8_t led, int nr, uint32_t waittime_ms){
 
 void blinkLEDnow(uint8_t led = LED1){
   pinMode(led, OUTPUT);
-  if (settingLEDblink) {
+  if (settings.bLEDblink) {
     digitalWrite(led, !digitalRead(led));
   } else setLed(led, OFF);
 
@@ -243,20 +365,23 @@ void delayms(unsigned long delay_ms)
 void doTaskEvery1s(){
   //== do tasks ==
   handleOTGWqueue(); //just check if there are commands to retry
-  upTimeSeconds++;
+  state.uptime.iSeconds++;
+
+  if (wifiPortalResetWindowExpired()) {
+    SetupDebugTln(F("Reset trigger window expired, clearing pending reset count"));
+    clearWifiPortalResetState();
+    wifiPortalResetWindowOpen = false;
+    wifiPortalResetWindowDeadline = 0;
+  }
 }
 
-//===[ Do task every 5s ]===
-void doTaskEvery5s(){
+//===[ Do task every 3s ]===
+void doTaskEvery3s(){
   //== do tasks ==
-  
+  if (!picSettingsCycleActive) return;
+  queryNextPICsetting();
 }
 
-//===[ Do task every 30s ]===
-void doTaskEvery30s(){
-  //== do tasks ==
- 
-}
 
 //===[ Do task every 60s ]===
 void doTaskEvery60s(){
@@ -264,44 +389,47 @@ void doTaskEvery60s(){
   //== do tasks ==
 
   // Re-check FS/firmware hash match every 60s so the warning persists
-  // even if sMessage is cleared by PS=0 echo or OT frame handling.
+  // even if other runtime status messages are set and cleared elsewhere.
   checklittlefshash();
 
   // Query the actual gateway mode setting from PIC using PR=M command
   // This provides reliable detection of Gateway vs Monitor mode
-  if (bPICavailable && bOTGWonline) {
+  if (state.pic.bAvailable && state.otgw.bOnline) {
     static bool bOTGWgatewaypreviousstate = false;
     static bool bOTGWgatewaypreviousknown = false;
     bool newGatewayState = queryOTGWgatewaymode();
     
     // Only publish/update when mode has been read successfully at least once.
-    if (bOTGWgatewaystateKnown) {
-      bOTGWgatewaystate = newGatewayState;
+    if (state.otgw.bGatewayModeKnown) {
+      state.otgw.bGatewayMode = newGatewayState;
 
       // Send MQTT update if state changed or first successful read
-      if ((bOTGWgatewaystate != bOTGWgatewaypreviousstate) || !bOTGWgatewaypreviousknown) {
-        sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(bOTGWgatewaystate));
-        bOTGWgatewaypreviousstate = bOTGWgatewaystate;
+      if ((state.otgw.bGatewayMode != bOTGWgatewaypreviousstate) || !bOTGWgatewaypreviousknown) {
+        sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(state.otgw.bGatewayMode));
+        bOTGWgatewaypreviousstate = state.otgw.bGatewayMode;
         bOTGWgatewaypreviousknown = true;
-        DebugTf(PSTR("Gateway mode updated via PR=M: %s\r\n"), CCONOFF(bOTGWgatewaystate));
+        DebugTf(PSTR("Gateway mode updated via PR=M: %s\r\n"), CCONOFF(state.otgw.bGatewayMode));
       }
     } else {
       DebugTln(F("Gateway mode still unknown (waiting for first successful PR=M)"));
     }
   }
 
-  if (strcmp_P(sPICdeviceid, PSTR("unknown")) == 0){
+  if ((strcmp_P(state.pic.sDeviceid, PSTR("unknown")) == 0)
+      || (strcmp_P(state.pic.sDeviceid, PSTR("no pic found")) == 0)
+      || (state.pic.sDeviceid[0] == '\0')) {
     //keep trying to figure out which pic is used!
     DebugTln(F("PIC is unknown, probe pic using PR=A"));
     //Force banner fetch
     getpicfwversion();
     //This should retreive the information here
-    strlcpy(sPICfwversion, OTGWSerial.firmwareVersion(), sizeof(sPICfwversion));
-    DebugTf(PSTR("Current firmware version: %s\r\n"), sPICfwversion);
-    strlcpy(sPICdeviceid, OTGWSerial.processorToString().c_str(), sizeof(sPICdeviceid));
-    DebugTf(PSTR("Current device id: %s\r\n"), sPICdeviceid);    
-    strlcpy(sPICtype, OTGWSerial.firmwareToString().c_str(), sizeof(sPICtype));
-    DebugTf(PSTR("Current firmware type: %s\r\n"), sPICtype);
+    strlcpy(state.pic.sFwversion, OTGWSerial.firmwareVersion(), sizeof(state.pic.sFwversion));
+    DebugTf(PSTR("Current firmware version: %s\r\n"), state.pic.sFwversion);
+    strlcpy(state.pic.sDeviceid, OTGWSerial.processorToString().c_str(), sizeof(state.pic.sDeviceid));
+    DebugTf(PSTR("Current device id: %s\r\n"), state.pic.sDeviceid);    
+    strlcpy(state.pic.sType, OTGWSerial.firmwareToString().c_str(), sizeof(state.pic.sType));
+    DebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
+    sendMQTTversioninfo();
   }
   
   // Log heap statistics every minute for monitoring
@@ -311,10 +439,7 @@ void doTaskEvery60s(){
 //===[ Do task exactly on the minute ]===
 void doTaskMinuteChanged(){
   //== do tasks ==
-  //if no wifi, try reconnecting (once a minute)
-  if (WiFi.status() != WL_CONNECTED) {
-    restartWifi();
-  }
+  // WiFi reconnect is now handled by loopWifi() state machine in doBackgroundTasks()
   sendtimecommand();
 }
 
@@ -323,35 +448,55 @@ void do5minevent(){
   sendMQTTuptime();
   sendMQTTversioninfo();
   sendMQTTstateinformation();
+  publishAllPICsettings();  // Re-publish cached PIC settings every 5 min
+}
+
+static void handleEspFlashBackgroundTasks()
+{
+  handleDebug();              // Keep telnet debug active for monitoring
+  httpServer.handleClient();  // MUST continue - processes upload chunks
+  MDNS.update();              // Keep MDNS active for network discovery
+  handleWebSocket();          // Keep WebSocket service responsive during flash
+}
+
+static void handlePicFlashBackgroundTasks()
+{
+  handleDebug();              // Keep telnet debug active for monitoring
+  httpServer.handleClient();  // Keep HTTP active
+  MDNS.update();              // Keep MDNS active for network discovery
+  handleOTGW();               // REQUIRED for PIC flash - processes serial communication
+  handleWebSocket();          // Keep WebSocket service responsive during flash
 }
 
 //===[ Do the background tasks ]===
 void doBackgroundTasks()
 {
   feedWatchDog();               // Feed the dog before it bites!
-  
+
+  // ADR-036: block service handlers until setup() completes.
+  // blinkLED/delayms in setup() would otherwise invoke handleMQTT() before
+  // startMQTT() sets the 1350-byte buffer, and handleOTGW() before resetOTGW().
+  if (!state.bSetupComplete) return;
+  // ADR-047: Non-blocking WiFi reconnect state machine.
+  // Guard: skip during any flash operation (ESP or PIC).
+  // During Update.write() the ESP8266 suspends flash reads, starving the WiFi
+  // stack. After the write, WiFi.status() may transiently return WL_DISCONNECTED,
+  // causing loopWifi() to initiate a reconnect mid-upload. If the reconnect
+  // completes while the upload is still in progress, WIFI_RECONNECTED calls
+  // startWebSocket()/startMQTT(), potentially tearing down the HTTP connection
+  // carrying the OTA data and leaving the LittleFS partition partially written.
+  if (!isFlashing()) loopWifi();
+
   // Check for critically low heap and attempt recovery if needed
   if (getHeapHealth() == HEAP_CRITICAL) {
     emergencyHeapRecovery();
   }
-  
+
   if (WiFi.status() == WL_CONNECTED) {
-    // During firmware flash, keep essential services but skip heavy background tasks
-    // ESP flash: Skip MQTT, OTGW, NTP to reduce interference
-    // PIC flash: Skip MQTT, NTP but KEEP OTGW (needed for serial communication during upgrade)
-    if (isESPFlashing) {
-      // ESP flash: minimal services only
-      handleDebug();              // Keep telnet debug active for monitoring
-      httpServer.handleClient();  // MUST continue - processes upload chunks
-      MDNS.update();              // Keep MDNS active for network discovery
-      handleWebSocket();          // Process WebSocket events for flash progress updates
-    } else if (isPICFlashing) {
-      // PIC flash: same as ESP but MUST call handleOTGW for serial communication
-      handleDebug();              // Keep telnet debug active for monitoring
-      httpServer.handleClient();  // Keep HTTP active
-      MDNS.update();              // Keep MDNS active for network discovery
-      handleOTGW();               // REQUIRED for PIC flash - processes serial communication
-      handleWebSocket();          // Process WebSocket events for flash progress updates
+    if (state.flash.bESPactive) {
+      handleEspFlashBackgroundTasks();
+    } else if (state.flash.bPICactive) {
+      handlePicFlashBackgroundTasks();
     } else {
       //while connected handle everything that uses network stuff
       handleDebug();
@@ -370,20 +515,18 @@ void doBackgroundTasks()
 void loop()
 {
   DECLARE_TIMER_SEC(timer1s, 1, SKIP_MISSED_TICKS);
-  DECLARE_TIMER_SEC(timer5s, 5, SKIP_MISSED_TICKS);
-  DECLARE_TIMER_SEC(timer30s, 30, CATCH_UP_MISSED_TICKS);
+  DECLARE_TIMER_SEC(timer3s, 3, SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS);
-  
+
   if (!isFlashing()) {
     // Only run these tasks when NOT flashing firmware (ESP or PIC)
       if (DUE(timerFlushSettings))      flushSettings();  // coalesced settings write + service restarts
-      if (DUE(timerpollsensor))         pollSensors();    // poll the temperature sensors connected to 2wire gpio pin 
+      if (DUE(timerpollsensor))         pollSensors();    // poll the temperature sensors connected to 2wire gpio pin
       if (DUE(timers0counter))          sendS0Counters(); // poll the s0 counter connected to gpio pin when due
-      if (DUE(timer5min))               do5minevent();  
+      if (DUE(timer5min))               do5minevent();
       if (DUE(timer60s))                doTaskEvery60s();
-      if (DUE(timer30s))                doTaskEvery30s();
-      if (DUE(timer5s))                 doTaskEvery5s();
+      if (DUE(timer3s))                 doTaskEvery3s();
       if (DUE(timer1s))                 doTaskEvery1s();
       if (minuteChanged())              doTaskMinuteChanged(); //exactly on the minute
       evalOutputs();                    // when the bits change, the output gpio bit will follow
