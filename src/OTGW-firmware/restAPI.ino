@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.3.0-rc4
+**  Version  : v1.3.0
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -230,6 +230,8 @@ static void handleDevice(const char words[][API_WORD_LEN], uint8_t wc, HTTPMetho
     sendDeviceInfoV2();
   } else if (wc > 4 && strcmp_P(words[4], PSTR("time")) == 0) {
     sendDeviceTimeV2();
+  } else if (wc > 4 && strcmp_P(words[4], PSTR("crashlog")) == 0) {
+    sendDeviceCrashLog();
   } else {
     sendApiNotFound(originalURI);
   }
@@ -537,63 +539,7 @@ void sendOTGWlabel(const char *msglabel){
 }
 
 //=======================================================================
-// Helper Overloads for sendJsonOTmonObj and others to support PROGMEM functionality
-// These ensure aggressive PROGMEM usage by allowing F() macros in calls
-// while maintaining compatibility with the underlying implementation.
-//=======================================================================
-
-void sendStartJsonObj(const __FlashStringHelper* objName) {
-  char buf[33];
-  strncpy_P(buf, (PGM_P)objName, sizeof(buf));
-  buf[sizeof(buf)-1] = 0;
-  sendStartJsonObj(buf);
-}
-
-void sendEndJsonObj(const __FlashStringHelper* objName) {
-  char buf[33];
-  strncpy_P(buf, (PGM_P)objName, sizeof(buf));
-  buf[sizeof(buf)-1] = 0;
-  sendEndJsonObj(buf);
-}
-
-template <typename T>
-void sendJsonOTmonObj(const __FlashStringHelper* label, T value, const __FlashStringHelper* unit, unsigned long lastupdated) {
-  char labelBuf[35]; // Buffer for label (longest ~25 chars)
-  char unitBuf[10];  // Buffer for unit
-  
-  // Copy PROGMEM strings to temporary stack buffers
-  strncpy_P(labelBuf, (PGM_P)label, sizeof(labelBuf));
-  labelBuf[sizeof(labelBuf)-1] = 0;
-  
-  strncpy_P(unitBuf, (PGM_P)unit, sizeof(unitBuf));
-  unitBuf[sizeof(unitBuf)-1] = 0;
-  
-  // Call original function (assuming it takes const char*)
-  sendJsonOTmonObj(labelBuf, value, unitBuf, lastupdated);
-}
-
-// Overload for mixed arguments (Flash label, dynamic unit)
-template <typename T>
-void sendJsonOTmonObj(const __FlashStringHelper* label, T value, const char* unit, unsigned long lastupdated) {
-  char labelBuf[35];
-  strncpy_P(labelBuf, (PGM_P)label, sizeof(labelBuf));
-  labelBuf[sizeof(labelBuf)-1] = 0;
-  
-  sendJsonOTmonObj(labelBuf, value, unit, lastupdated);
-}
-
-// Overload for mixed arguments (Dynamic label, Flash unit)
-template <typename T>
-void sendJsonOTmonObj(const char* label, T value, const __FlashStringHelper* unit, unsigned long lastupdated) {
-  char unitBuf[10];
-  strncpy_P(unitBuf, (PGM_P)unit, sizeof(unitBuf));
-  unitBuf[sizeof(unitBuf)-1] = 0;
-  
-  sendJsonOTmonObj(label, value, unitBuf, lastupdated);
-}
-
-//=======================================================================
-// Helpers for NEW Map-based JSON functions (sendJsonOTmonMapEntry)
+// Helpers for Map-based JSON functions (sendJsonOTmonMapEntry)
 //=======================================================================
 
 template <typename T>
@@ -713,79 +659,6 @@ void sendOTmonitorV2()
 
   sendEndJsonMap(F("otmonitor"));
 }
-
-//=======================================================================
-void sendDeviceInfo() 
-{
-  sendStartJsonObj(F("devinfo"));
-
-  sendNestedJsonObj(F("author"), F("Robert van den Breemen"));
-  sendNestedJsonObj(F("fwversion"), _SEMVER_FULL);
-  sendNestedJsonObj(F("picavailable"), CBOOLEAN(state.pic.bAvailable));
-  sendNestedJsonObj(F("picfwversion"), state.pic.sFwversion);
-  sendNestedJsonObj(F("picdeviceid"), state.pic.sDeviceid);
-  sendNestedJsonObj(F("picfwtype"), state.pic.sType);
-  snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
-  sendNestedJsonObj(F("compiled"), cMsg);
-  sendNestedJsonObj(F("hostname"), CSTR(settings.sHostname));
-  sendNestedJsonObj(F("ipaddress"), CSTR(WiFi.localIP().toString()));
-  sendNestedJsonObj(F("macaddress"), CSTR(WiFi.macAddress()));
-  sendNestedJsonObj(F("freeheap"), ESP.getFreeHeap());
-  sendNestedJsonObj(F("maxfreeblock"), ESP.getMaxFreeBlockSize());
-  sendNestedJsonObj(F("chipid"), CSTR(String( ESP.getChipId(), HEX )));
-  sendNestedJsonObj(F("coreversion"), CSTR(ESP.getCoreVersion()) );
-  sendNestedJsonObj(F("sdkversion"),  ESP.getSdkVersion());
-  sendNestedJsonObj(F("cpufreq"), ESP.getCpuFreqMHz());
-  sendNestedJsonObj(F("sketchsize"), ESP.getSketchSize() );
-  sendNestedJsonObj(F("freesketchspace"),  ESP.getFreeSketchSpace() );
-
-  snprintf_P(cMsg, sizeof(cMsg), PSTR("%08X"), ESP.getFlashChipId());
-  sendNestedJsonObj(F("flashchipid"), cMsg);  // flashChipId
-  sendNestedJsonObj(F("flashchipsize"), (ESP.getFlashChipSize() / 1024.0f / 1024.0f));
-  sendNestedJsonObj(F("flashchiprealsize"), (ESP.getFlashChipRealSize() / 1024.0f / 1024.0f));
-
-  LittleFS.info(LittleFSinfo);
-  sendNestedJsonObj(F("LittleFSsize"), floorf((LittleFSinfo.totalBytes / (1024.0f * 1024.0f))));
-
-  sendNestedJsonObj(F("flashchipspeed"), floorf((ESP.getFlashChipSpeed() / 1000.0f / 1000.0f)));
-
-  FlashMode_t ideMode = ESP.getFlashChipMode();
-  sendNestedJsonObj(F("flashchipmode"), flashMode[ideMode]);
-//   sendNestedJsonObj("boardtype",
-// #if defined(ARDUINO_ESP8266_NODEMCU)
-//      "ESP8266_NODEMCU"
-// #elif defined(ARDUINO_ESP8266_GENERIC)
-//      "ESP8266_GENERIC"
-// #elif defined(ESP8266_ESP01)
-//      "ESP8266_ESP01"
-// #elif defined(ESP8266_ESP12)
-//      "ESP8266_ESP12"
-// #elif defined(ARDUINO_ESP8266_WEMOS_D1MINI)
-//      "WEMOS_D1MINI"
-// #else 
-//      "Unknown board"
-// #endif
-
-//   );
-  sendNestedJsonObj(F("ssid"), CSTR(WiFi.SSID()));
-  sendNestedJsonObj(F("wifirssi"), WiFi.RSSI());
-  sendNestedJsonObj(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
-  sendNestedJsonObj(F("wifiquality_text"), dBmtoQuality(WiFi.RSSI()));
-  sendNestedJsonObj(F("ntpenable"), CBOOLEAN(settings.ntp.bEnable));
-  sendNestedJsonObj(F("ntptimezone"), CSTR(settings.ntp.sTimezone));
-  sendNestedJsonObj(F("uptime"), upTime());
-  sendNestedJsonObj(F("lastreset"), lastReset);
-  sendNestedJsonObj(F("bootcount"), state.uptime.iRebootCount);
-  sendNestedJsonObj(F("mqttconnected"), CBOOLEAN(state.mqtt.bConnected));
-  sendNestedJsonObj(F("thermostatconnected"), CBOOLEAN(state.otgw.bThermostatState));
-  sendNestedJsonObj(F("boilerconnected"), CBOOLEAN(state.otgw.bBoilerState));      
-  sendNestedJsonObj(F("otgwmode"), state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
-  sendNestedJsonObj(F("otgwconnected"), CBOOLEAN(state.otgw.bOnline));
-  sendNestedJsonObj(F("otgwsimulation"), CBOOLEAN(state.debug.bOTGWSimulation));
-  
-  sendEndJsonObj(F("devinfo"));
-
-} // sendDeviceInfo()
 
 //=======================================================================
 // Sends device info as JSON map (v2 format)
@@ -983,26 +856,6 @@ void sendFlashStatus()
   sendEndJsonMap(F("flashstatus"));
 } // sendFlashStatus()
 
-
-//=======================================================================
-void sendDeviceTime() 
-{
-  char buf[50];
-  
-  sendStartJsonObj(F("devtime"));
-  time_t now = time(nullptr);
-  //Timezone based devtime
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
-  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
-  snprintf_P(buf, sizeof(buf), PSTR("%04d-%02d-%02d %02d:%02d:%02d"), myTime.year(), myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second());
-  sendNestedJsonObj(F("dateTime"), buf); 
-  sendNestedJsonObj(F("epoch"), (int)now);
-  sendNestedJsonObj(F("message"), getStatusMessageText());
-  sendNestedJsonObj(F("psmode"), CBOOLEAN(state.otgw.bPSmode));
-
-  sendEndJsonObj(F("devtime"));
-
-} // sendDeviceTime()
 
 //=======================================================================
 void sendDeviceTimeV2() 

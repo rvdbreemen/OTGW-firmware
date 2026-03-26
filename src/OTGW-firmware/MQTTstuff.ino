@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.3.0-rc4
+**  Version  : v1.3.0
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -124,10 +124,6 @@ static void trimInPlace(char *buffer) {
     memmove(buffer, buffer + start, len - start + 1);
   }
 }
-
-// Replace all occurrences of token with replacement, guarding buffer size
-// MOVED TO helperStuff.ino
-// static bool replaceAll ...
 
 static bool parseAutoConfigLine(char *sIn, char del, void *viewPtr) {
   MQTTAutoConfigLineView &view = *static_cast<MQTTAutoConfigLineView*>(viewPtr);

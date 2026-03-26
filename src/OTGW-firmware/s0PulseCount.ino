@@ -1,7 +1,7 @@
 /* 
  ***************************************************************************  
  **  Program  : s0PulseCount
- **  Version  : v1.3.0-rc4
+ **  Version  : v1.3.0
  **
  **  Copyright (c) 2021-2024 Rob Roos / Robert van Breemen
  **     based on Framework ESP8266 from Willem Aandewiel
@@ -10,18 +10,8 @@
  ***************************************************************************      
  Functionality to measure number of pulses from a S0 output, eg from an energy consumption meter.
  The S0 port is to be connected in a NO mode, with pulse closing contact pulling a configurable pin to Low.
- MQ interface is enabled with Home Assistant AutoConfigure, for this the OTGW function is reused by using a foney dataid (245)
- // S0 Counter Settings and variables with global scope, to be defined in xx.h 
- bool      settings.s0.bEnabled = false;      
- uint8_t   settings.s0.iPin = 12;               // GPIO 12 = D6, preferred, can be any pin with Interupt support
- uint16_t  settings.s0.iDebounceTime = 80;      // Depending on S0 switch a debouncetime should be tailored
- uint16_t  settings.s0.iPulsekw = 1000;         // Most S0 counters have 1000 pulses per kW, but this can be different
- uint16_t  settings.s0.iInterval = 60;          // Sugggested measurement reporting interval
- uint16_t  OTGWs0pulseCount;                       // Number of S0 pulses in measurement interval
- uint32_t  OTGWs0pulseCountTot = 0;                // Number of S0 pulses since start of measurement
- float     OTGWs0powerkw = 0 ;                     // Calculated kW actual consumption based on time between last pulses and settings
- time_t    OTGWs0lasttime = 0;                     // Last time S0 counters have been read
- byte      OTGWs0dataid = 245;                     // Foney dataid to be used to do autoconfigure, align value with mqttha.cfg contents
+ MQ interface is enabled with Home Assistant AutoConfigure, using a virtual dataid (245).
+ Settings are in settings.s0.* (see OTGW-firmware.h).
  */
  #include <Arduino.h>
  //-----------------------------------------------------------------------------------------------------------

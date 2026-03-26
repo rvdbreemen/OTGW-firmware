@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v1.3.0-rc4
+**  Version  : v1.3.0
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -202,25 +202,6 @@ void sendEndJsonObj(const char *objName)
 
 } // sendEndJsonObj()
 //=======================================================================
-void sendStartJsonArray()
-{
-  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
-  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  httpServer.send_P(200, PSTR("application/json"), PSTR(" "));
-  httpServer.sendContent_P(PSTR("[\r\n"));
-  iIdentlevel++;
-  bFirst = true;
-
-} // sendStartJsonObj()
-
-
-//=======================================================================
-void sendEndJsonArray()
-{
-  iIdentlevel--;
-  httpServer.sendContent_P(PSTR("\r\n]\r\n"));
-} // sendEndJsonObj()
-//=======================================================================
 void sendIdent(){
   for (int i = iIdentlevel; i >0; i--){
     httpServer.sendContent_P(PSTR("  "));
@@ -234,177 +215,7 @@ void sendBeforenext(){
   bFirst = false;
 } //sendBeforenext()
 //=======================================================================
-void sendNestedJsonObj(const char *cName, const char *cValue)
-{
-  char jsonBuff[JSON_ENTRY_BUF] = "";
-  
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": \"%s\"}"), cName, cValue);
-
-  sendBeforenext();
-  sendIdent();
-  httpServer.sendContent(jsonBuff);
-} // sendNestedJsonObj(*char, *char)
-//=======================================================================
-void sendNestedJsonObj(const char *cName, String sValue)
-{
-  char jsonBuff[JSON_ENTRY_BUF] = "";
-
-  if (sValue.length() > (JSON_ENTRY_BUF - 65) )
-  {
-    DebugTf(PSTR("[2] sValue.length() [%d]\r\n"), sValue.length());
-  }
-  
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": \"%s\"}"), cName, sValue.c_str());
-
-  sendBeforenext();
-  sendIdent();
-  httpServer.sendContent(jsonBuff);
-
-} // sendNestedJsonObj(*char, String)
-
-
-//=======================================================================
-void sendNestedJsonObj(const char *cName, int32_t iValue)
-{
-  char jsonBuff[200] = "";
-  
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %d}"), cName, iValue);
-
-  sendBeforenext();
-  sendIdent();
-  httpServer.sendContent(jsonBuff);
-
-} // sendNestedJsonObj(*char, int)
-
-//=======================================================================
-void sendNestedJsonObj(const char *cName, uint32_t uValue)
-{
-  char jsonBuff[200] = "";
-  
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %u}"), cName, uValue);
-
-  sendBeforenext();
-  sendIdent();
-  httpServer.sendContent(jsonBuff);
-  
-} // sendNestedJsonObj(*char, uint)
-
-
-//=======================================================================
-void sendNestedJsonObj(const char *cName, float fValue)
-{
-  char jsonBuff[200] = "";
-  
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.3f}"), cName, fValue);
-
-  sendBeforenext();
-  sendIdent();
-  httpServer.sendContent(jsonBuff);
-
-} // sendNestedJsonObj(*char, float)
-
-
-//============= build OTmonitor string ========================
-void sendJsonOTmonObj(const char *cName, const char *cValue, const char *cUnit, time_t epoch)
-{
-  char jsonBuff[JSON_ENTRY_BUF] = "";
-  
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": \"%s\", \"unit\": \"%s\", \"epoch\": %d}")
-                                      , cName, cValue, cUnit, (uint32_t)epoch);
-
-  sendBeforenext();
-  sendIdent();
-  httpServer.sendContent(jsonBuff);
-
-} // sendJsonOTmonObj(*char, *char, *char)
-
-//=======================================================================
-void sendJsonOTmonObj(const char *cName, int32_t iValue, const char *cUnit, time_t epoch)
-{
-  char jsonBuff[200] = "";
-  
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %d, \"unit\": \"%s\", \"epoch\": %d}")
-                                      , cName, iValue, cUnit, (uint32_t)epoch);
-
-  sendBeforenext();
-  sendIdent();
-  httpServer.sendContent(jsonBuff);
-
-} // sendJsonOTmonObj(*char, int, *char)
-
-//=======================================================================
-void sendJsonOTmonObj(const char *cName, uint32_t uValue, const char *cUnit, time_t epoch)
-{
-  char jsonBuff[200] = "";
-  
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %u, \"unit\": \"%s\", \"epoch\": %d}")
-                                      , cName, uValue, cUnit, (uint32_t)epoch);
-
-  sendBeforenext();
-  sendIdent();
-  httpServer.sendContent(jsonBuff);
-
-} // sendNestedJsonObj(*char, uint, *char, time_t)
-
-
-//=======================================================================
-void sendJsonOTmonObj(const char *cName, float fValue, const char *cUnit, time_t epoch)
-{
-  char jsonBuff[200] = "";
-  
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.3f, \"unit\": \"%s\", \"epoch\": %d}")
-                                      , cName, fValue, cUnit, (uint32_t)epoch);
-
-  sendBeforenext();
-  sendIdent();
-  httpServer.sendContent(jsonBuff);
-
-} // sendJsonOTmonObj(*char, float, *char, time_t)
-//=======================================================================
-void sendJsonOTmonObj(const char *cName, bool bValue, const char *cUnit, time_t epoch)
-{
-  char jsonBuff[200] = "";
-  
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %s, \"unit\": \"%s\", \"epoch\": %d}")
-                                      , cName, CBOOLEAN(bValue), cUnit, (uint32_t)epoch);
-
-  sendBeforenext();
-  sendIdent();
-  httpServer.sendContent(jsonBuff);
-
-} // sendJsonOTmonObj(*char, bool, *char, time_t)
-
-//=======================================================================
-// Dallas temperature-specific helper (1 decimal precision)
-//=======================================================================
-void sendJsonOTmonObjDallasTemp(const char *cName, float fValue, const char *cUnit, time_t epoch)
-{
-  char jsonBuff[200] = "";
-  
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.1f, \"unit\": \"%s\", \"type\": \"dallas\", \"epoch\": %d}")
-                                      , cName, fValue, cUnit, (uint32_t)epoch);
-
-  sendBeforenext();
-  sendIdent();
-  httpServer.sendContent(jsonBuff);
-
-} // sendJsonOTmonObjDallasTemp(*char, float, *char, time_t)
-
-void sendJsonOTmonObjDallasTemp(const char *cName, float fValue, const __FlashStringHelper *cUnit, time_t epoch)
-{
-  char jsonBuff[200] = "";
-
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("{\"name\": \"%s\", \"value\": %.1f, \"unit\": \"%S\", \"type\": \"dallas\", \"epoch\": %d}")
-                                      , cName, fValue, reinterpret_cast<PGM_P>(cUnit), (uint32_t)epoch);
-
-  sendBeforenext();
-  sendIdent();
-  httpServer.sendContent(jsonBuff);
-
-} // sendJsonOTmonObjDallasTemp(*char, float, *FlashStringHelper, time_t)
-
-//=======================================================================
-// New Map-based output functions for less redundant JSON
+// Map-based output functions for compact JSON
 //=======================================================================
 
 void sendStartJsonMap(const char *objName)
@@ -593,50 +404,6 @@ void sendJsonOTmonMapEntryDallasTemp(const char *cName, float fValue, const __Fl
 //=======================================================================
 // ************ function to build Json Settings string ******************
 //=======================================================================
-void sendJsonSettingObj(const char *cName, float fValue, const char *fType, int minValue, int maxValue)
-{
-  char jsonBuff[200] = "";
-
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %.3f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
-                                      , cName, fValue, fType, minValue, maxValue);
-
-  sendBeforenext();
-  httpServer.sendContent(jsonBuff);
-
-} // sendJsonSettingObj(*char, float, *char, int, int)
-
-
-//=======================================================================
-void sendJsonSettingObj(const char *cName, float fValue, const char *fType, int minValue, int maxValue, int decPlaces)
-{
-  char jsonBuff[200] = "";
-
-  switch(decPlaces) {
-    case 0:
-      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %.0f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
-                                      , cName, fValue, fType, minValue, maxValue);
-      break;
-    case 2:
-      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %.2f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
-                                      , cName, fValue, fType, minValue, maxValue);
-      break;
-    case 5:
-      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %.5f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
-                                      , cName, fValue, fType, minValue, maxValue);
-      break;
-    default:
-      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %f, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
-                                      , cName, fValue, fType, minValue, maxValue);
-
-  }
-
-  sendBeforenext();
-  httpServer.sendContent(jsonBuff);
-
-} // sendJsonSettingObj(*char, float, *char, int, int, int)
-
-
-//=======================================================================
 void sendJsonSettingObj(const char *cName, int iValue, const char *iType, int minValue, int maxValue)
 {
   char jsonBuff[200] = "";
@@ -697,25 +464,6 @@ void sendJsonSettingObj(const char *cName, bool bValue, const char *sType)
 // Helper Overloads for PROGMEM support
 //=======================================================================
 
-// sendNestedJsonObj helpers
-template <typename T>
-void sendNestedJsonObj(const __FlashStringHelper* cName, T value) {
-  char nameBuf[35]; 
-  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
-  nameBuf[sizeof(nameBuf)-1] = 0;
-  sendNestedJsonObj(nameBuf, value);
-}
-
-void sendNestedJsonObj(const __FlashStringHelper* cName, const __FlashStringHelper* cValue) {
-  char nameBuf[35];
-  char valBuf[101]; 
-  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
-  nameBuf[sizeof(nameBuf)-1] = 0;
-  strncpy_P(valBuf, (PGM_P)cValue, sizeof(valBuf));
-  valBuf[sizeof(valBuf)-1] = 0;
-  sendNestedJsonObj(nameBuf, (const char*)valBuf);
-}
-
 // sendJsonMapEntry helpers
 void sendJsonMapEntry(const __FlashStringHelper* cName, bool bValue) {
   char nameBuf[35];
@@ -770,22 +518,6 @@ void sendJsonMapEntry(const __FlashStringHelper* cName, const __FlashStringHelpe
 }
 
 // sendJsonSettingObj helpers
-
-// For: void sendJsonSettingObj(const char *cName, float fValue, const char *fType, int minValue, int maxValue)
-void sendJsonSettingObj(const __FlashStringHelper* cName, float fValue, const char *fType, int minValue, int maxValue) {
-  char nameBuf[35];
-  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
-  nameBuf[sizeof(nameBuf)-1] = 0;
-  sendJsonSettingObj(nameBuf, fValue, fType, minValue, maxValue);
-}
-
-// For: void sendJsonSettingObj(const char *cName, float fValue, const char *fType, int minValue, int maxValue, int decPlaces)
-void sendJsonSettingObj(const __FlashStringHelper* cName, float fValue, const char *fType, int minValue, int maxValue, int decPlaces) {
-  char nameBuf[35];
-  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
-  nameBuf[sizeof(nameBuf)-1] = 0;
-  sendJsonSettingObj(nameBuf, fValue, fType, minValue, maxValue, decPlaces);
-}
 
 // For: void sendJsonSettingObj(const char *cName, int iValue, const char *iType, int minValue, int maxValue)
 void sendJsonSettingObj(const __FlashStringHelper* cName, int iValue, const char *iType, int minValue, int maxValue) {

@@ -6,18 +6,20 @@ This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gatew
 
 ## 🚀 What's New in v1.3.0
 
-Version 1.3.0 builds on the stable v1.2.0 release with safer upgrades, better recovery behavior, optional protection for admin endpoints, fuller `PS=1` integration, and lower RAM pressure. Full release notes: [RELEASE_NOTES_1.3.0.md](RELEASE_NOTES_1.3.0.md) / [Breaking Changes Log](docs/BREAKING_CHANGES.md)
+Version 1.3.0 is a major feature release building on v1.2.0 with PIC settings visibility, safer upgrades, better recovery, optional admin protection, fuller `PS=1` integration, and significantly lower RAM pressure. Full release notes: [RELEASE_NOTES_1.3.0.md](RELEASE_NOTES_1.3.0.md) / [Breaking Changes Log](docs/BREAKING_CHANGES.md)
 
 ### Highlights
 
-- **Optional Protected Admin Endpoints:** Settings, maintenance, file-management, reboot, and OTA routes can now be protected with HTTP Basic Auth using the configurable Protected Endpoints Password setting.
+- **PIC Gateway Settings Panel:** All 15 PIC configuration registers (setpoint override, GPIO, LEDs, tweaks, smart power, thermostat detection, etc.) are now exposed via REST API (`/api/v2/pic/settings`), MQTT, and a new "Gateway Settings" section in the Web UI. Settings are read on-demand from the PIC (one PR= every 3s, full cycle ~45s) and cached in the browser with localStorage for up to 7 days. Live values show in green, cached in amber.
+- **Single-Click GitHub Release OTA:** The update page now lists GitHub releases with Installed/Update/Rollback badges. One-click download and flash with semver-aware version comparison including pre-release tags.
+- **Optional Protected Admin Endpoints:** Settings, maintenance, file-management, reboot, and OTA routes can now be protected with HTTP Basic Auth.
 - **Configurable MQTT Publish Gating:** OpenTherm and `PS=1` summary publishing can now be rate-limited to reduce MQTT broker load and WiFi chatter, with better status republish behavior after boot and reconnect.
 - **Full `PS=1` Summary Integration:** `PS=1` output is now translated into the normal data pipeline, published to MQTT, and exposed to Home Assistant discovery.
-- **Web UI Control and Visibility:** The monitor page now supports one-shot OTGW PIC commands, richer settings tooltips, clearer status feedback, simulation visibility, and improved heap/device reporting.
-- **Safer OTA / LittleFS Updates:** The updater now verifies reboots through `/api/v2/health`, supports browser backups of `settings.ini` and `dallas_labels.ini`, preserves settings more cleanly, and hardens filesystem flashing against corruption. Dallas sensor labels are automatically saved to `localStorage` before a filesystem flash and restored to the device after it comes back online — surviving full LittleFS wipes transparently.
+- **Web UI Enhancements:** Light/dark theme toggle, one-shot OTGW PIC commands from the monitor page, richer settings tooltips, gateway mode indicator, WebSocket connection status with tooltips, simulation badge, and improved heap/device reporting.
+- **Safer OTA / LittleFS Updates:** Reboot verification via `/api/v2/health`, browser backups of `settings.ini` and `dallas_labels.ini`, Dallas labels auto-preserved through localStorage, hardened filesystem flashing against WiFi reconnect corruption.
 - **Triple-Reset WiFi Recovery:** Three quick hardware resets within 10 seconds clear stored WiFi credentials and reopen the captive portal without requiring a reflash.
-- **Web UI Polish:** The File System Explorer hides the firmware-update button on smartphones and tablets (touch-only devices), keeping the dangerous operation desktop-only. Settings page loading is now reliable on iOS Safari, with a clear loading indicator and proper error messaging when the device is unreachable.
-- **Memory and Internal Cleanup:** ArduinoJson was removed from firmware JSON paths, settings/state ownership was clarified, and JSON writing plus settings persistence were tightened to reduce heap fragmentation and improve firmware stability.
+- **Non-Blocking WiFi Reconnect:** The blocking 30-second reconnect loop is replaced with a state machine, preventing main-loop freezes on a heating system controller.
+- **Memory and Internal Cleanup:** ArduinoJson removed, settings/state reorganized into structs, String class eliminated from hot paths, MQTT autodiscovery memory reduced via streaming template rendering. Global variables reduced from 70% to 70% dynamic memory usage despite all new features.
 - **No New Breaking Changes:** For v1.2.0 users, this release adds features and hardening without introducing new MQTT topic, REST API, or settings-format breaks.
 
 ## What was new in v1.2.0

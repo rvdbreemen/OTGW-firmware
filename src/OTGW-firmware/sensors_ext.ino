@@ -1,6 +1,6 @@
 /*
 **  Program  : output_ext.ino
-**  Version  : v1.3.0-rc4
+**  Version  : v1.3.0
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
@@ -11,29 +11,6 @@
 ** most code shamelessly copied from Miles Burton's - Arduino Dallas library
 ** example 'Multiple'   
 */
-// To be included in OTGW-firmware.h 
-// #include <OneWire.h>
-// #include <DallasTemperature.h>
-// GPIO Sensor Settings
-// bool      settings.sensors.bEnabled = false;
-// int8_t    settings.sensors.iPin = 10;             
-// int16_t   settings.sensors.iInterval = 20;       // Interval time to read out temp and send to MQ
-// byte      OTGWdallasdataid = 246;                // foney dataid to be used to do autoconfigure for temp sensors
-// int       DallasrealDeviceCount = 0;             // Total temperature devices found on the bus
-// #define   MAXDALLASDEVICES 16                    // maximum number of devices on the bus
-//
-// // Define structure to store temperature device addresses found on bus with their latest tempC value
-// struct
-// {
-//   int id;
-//   DeviceAddress addr;
-//   float tempC;
-//   time_t lasttime;
-// } DallasrealDevice[MAXDALLASDEVICES];
-//
-// prototype to allow use in restAPI.ino
-// char* getDallasAddress(DeviceAddress deviceAddress);
-
 // Number of temperature devices found
 int numberOfDevices;
 

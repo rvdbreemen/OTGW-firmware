@@ -1,33 +1,43 @@
 # Release Notes — v1.3.0
 
-**Last updated:** 2026-03-24<br>
+**Last updated:** 2026-03-26<br>
 **Release branch:** `dev`<br>
 **Comparison target:** `main` (current stable `v1.2.0`)<br>
 
 ---
 
-## ✨ Headline: Safer Upgrades, Better Recovery, Optional Admin Protection, Full `PS=1` Integration, and Web UI Polish
+## ✨ Headline: PIC Settings Visibility, One-Click OTA, Safer Upgrades, Optional Admin Protection, Full `PS=1` Integration, and Major Memory Optimization
 
-v1.3.0 builds on the current stable `v1.2.0` release. It focuses on OTA and LittleFS reliability, WiFi recovery, optional protection for admin endpoints, MQTT publish control, fuller `PS=1` support, Web UI improvements and fixes, and lower heap pressure.
+v1.3.0 is a major feature release building on `v1.2.0`. It exposes all PIC gateway settings through the Web UI, REST API, and MQTT; adds one-click GitHub release OTA updates; hardens OTA/LittleFS reliability; adds WiFi recovery; optionally protects admin endpoints; delivers fuller `PS=1` support; significantly reduces RAM pressure; and polishes the Web UI with theme toggling, better status indicators, and richer formatting.
 
-For users already on `v1.2.0`, this is largely a backward-compatible upgrade: there are no new MQTT topic renames, no new REST API removals, and no settings-format migration.
+For users already on `v1.2.0`, this is a backward-compatible upgrade: there are no new MQTT topic renames, no new REST API removals, and no settings-format migration.
 
 ---
 
 ## Overview
 
 **User-visible additions:**
+- PIC gateway settings exposed via REST API, MQTT, and a new Web UI panel with human-readable formatting, color-coded live/cached values, and browser localStorage caching.
+- Single-click GitHub release OTA with version comparison, rollback support, and Installed/Update/Rollback badges.
 - Optional HTTP Basic Auth for protected settings and maintenance endpoints.
 - Configurable MQTT publish gating for OpenTherm and `PS=1` summary data.
 - Full `PS=1` summary parsing with MQTT publishing and Home Assistant discovery.
-- One-shot OTGW PIC commands from the monitor page.
+- One-shot OTGW PIC commands from the monitor page with command/response/error feedback.
+- Light/dark theme toggle button with persistent preference.
 - Triple-reset WiFi recovery to reopen the captive portal without reflashing.
 - Safer OTA / LittleFS flashing with backup, validation, Dallas label auto-preservation, and better logging.
-- File System Explorer now hides the firmware-update button on touch devices (smartphones and tablets).
-- Richer device-info and Web UI status reporting, including heap visibility and improved settings tooltips.
+- OTGW simulation mode for testing without physical hardware.
+- Crash log endpoint for ESP8266 diagnostics.
+- OTGW event reporting (PIC restart, serial errors) via MQTT and WebSocket.
+- Heap memory info in device status and Web UI footer.
+- GPIO conflict detection at boot.
+- Gateway mode and WebSocket connection status indicators with tooltips.
+- File System Explorer now hides the firmware-update button on touch devices.
+- Richer device-info and settings tooltips throughout the Web UI.
 
 **Bug fixes:**
 
+- ESP hostname reverting to `ESP-XXXXXX` — deep audit of all hostname code paths.
 - Settings page blank on iOS Safari.
 - Boot-time spurious service restarts.
 - Hostname normalization writing to wrong buffer.
@@ -35,17 +45,50 @@ For users already on `v1.2.0`, this is largely a backward-compatible upgrade: th
 - Webhook payload truncation after reboot.
 - Unsafe LittleFS OTA flashing (WiFi activity during write, partial partition erase).
 - IP validation incorrectly rejecting valid addresses with a `255` octet.
+- NTP hostname not applied in all code paths.
+- Numeric settings accepted out-of-range values.
+- MQTT subscription topic truncation.
+- WiFi portal triggered by stale RTC data after USB flash.
+- PIC settings buffer truncation for fields returning longer-than-expected text.
 
 **Internal improvements:**
-- Bounded manual JSON writing in place of ArduinoJson.
-- Reduced `String` churn in settings persistence.
-- Cleaner OTA reboot handoff and deferred-service handling.
+- ArduinoJson dependency completely removed; bounded manual JSON handling.
+- Global variables reorganized into `OTGWSettings` and `OTGWState` structs.
+- `String` class eliminated from hot paths (protocol, settings, HTTP handlers).
+- MQTT autodiscovery memory reduced via streaming template rendering.
+- Non-blocking WiFi reconnect state machine replaces blocking 30-second loop.
+- Non-blocking webhook with retry and backoff.
+- REST API v2 migration completed; dispatch table routing.
 - CSS vendor prefix cleanup across all four stylesheets.
-- Larger structural cleanup around settings/state ownership and route handling.
+- WiFiManager upgraded to stable 2.0.17.
 
 ---
 
 ## New Features
+
+### PIC Gateway Settings Panel
+
+All 15 PIC configuration registers are now exposed through the firmware, giving full visibility into the OTGW gateway's internal settings.
+
+- **REST API**: `GET /api/v2/pic/settings` returns all cached PIC settings as JSON. Calling this endpoint also triggers a fresh readout cycle from the PIC.
+- **MQTT**: Each setting is published to `otgw-pic/settings/<key>` when its value changes.
+- **Web UI**: A new "Gateway Settings" section on the PIC firmware page displays all settings in grouped tables with human-readable formatting:
+  - Setpoint override, setback temperature, DHW override decoded into readable text.
+  - GPIO functions, LED assignments, and tweaks shown per-pin with descriptive labels.
+  - Smart power, thermostat detection, reset cause, and voltage reference decoded with lookup tables (voltage reference shows actual voltage levels for both PIC16F88 and PIC16F1847).
+  - Build date, clock speed, and standalone interval shown as-is.
+- **On-demand readout**: Settings are read from the PIC one PR= command every 3 seconds (full cycle ~45 seconds). A cycle runs automatically at boot, and is re-triggered when the REST API is called or when any setting-change command is sent to the PIC. Multiple rapid triggers are coalesced.
+- **Browser caching**: Values are cached in browser `localStorage` per hostname for up to 7 days. Live values display in green, cached values in amber, and undiscovered values in gray.
+- **WebSocket feedback**: Each successful PR= read during a cycle sends a WebSocket event so the browser can show discovery progress in real time.
+
+### Single-Click GitHub Release OTA
+
+The OTA update page now connects directly to GitHub releases for one-click firmware updates.
+
+- Lists available GitHub releases with semver-aware version comparison including pre-release tags.
+- Shows Installed/Update/Rollback badges for each release.
+- One-click download and flash without manual file management.
+- Intel HEX integrity validation for PIC firmware downloads.
 
 ### Optional Protection for Admin Endpoints
 
@@ -83,9 +126,37 @@ The main Web UI monitor page now allows direct one-shot OTGW PIC commands from t
 - Responses remain visible in the monitor/log view.
 - The UI now exposes more state feedback, including simulation visibility, richer heap/device status reporting, and clearer field descriptions in the settings screen.
 
+### Light/Dark Theme Toggle
+
+The Web UI now includes a theme toggle button to switch between light and dark themes. The user's preference is persisted across sessions.
+
+### OTGW Simulation Mode
+
+A new simulation mode allows testing the firmware and Web UI without a physical OTGW gateway connected. When active, a SIMULATION badge is shown in the monitor header. Controllable via the REST API.
+
+### Crash Log Endpoint
+
+A new `/api/v2/device/crashlog` endpoint exposes ESP8266 crash information (stack trace, exception cause) for diagnostics. Also displayed in the Device Info page.
+
+### OTGW Event Reporting
+
+PIC restart events, non-processed serial lines, serial overrun, and serial RX errors are now forwarded as events over MQTT and WebSocket, improving visibility into gateway health.
+
+### Heap Memory in Device Status
+
+Free heap and fragmentation percentage are now shown in the Web UI footer and available via the device info API endpoint.
+
+### GPIO Conflict Detection
+
+The firmware now detects conflicting GPIO pin assignments at boot (e.g., Dallas sensor pin conflicting with S0 counter or output pins) and logs a warning.
+
+### Gateway Mode and WebSocket Status Indicators
+
+The OpenTherm Monitor header now shows compact gateway mode ("Gateway" / "Monitor") and WebSocket connection status indicators with descriptive tooltips explaining what each means.
+
 ### File System Explorer: Firmware-Update Button Hidden on Touch Devices
 
-The "Update Firmware" button in the File System Explorer is now hidden on smartphones and tablets. Detection uses the CSS media query `(pointer: coarse) and (hover: none)`, which matches finger/stylus input devices regardless of screen size — more reliable than a viewport-width breakpoint and avoids false-positives on resized desktop windows.
+The "Update Firmware" button in the File System Explorer is now hidden on smartphones and tablets. Detection uses the CSS media query `(pointer: coarse) and (hover: none)`, which matches finger/stylus input devices regardless of screen size.
 
 ### Triple-Reset WiFi Recovery
 
