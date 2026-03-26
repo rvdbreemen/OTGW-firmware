@@ -3441,7 +3441,7 @@ function formatPICDhwOverride(value) {
     '1': 'On',
     'A': 'Auto',
     'P': 'Push once'
-  }, 'Code ');
+  });
 }
 
 function formatPICGpioFunctions(value) {
@@ -3462,7 +3462,7 @@ function formatPICGpioFunctions(value) {
   var parts = [];
 
   for (var i = 0; i < value.length && i < labels.length; i++) {
-    parts.push(labels[i] + ': ' + mapPICCode(value.charAt(i), gpioMap, 'Code '));
+    parts.push(labels[i] + ': ' + mapPICCode(value.charAt(i), gpioMap));
   }
 
   return parts.length ? parts.join('\n') : value;
@@ -3502,7 +3502,7 @@ function formatPICLedFunctions(value) {
   var parts = [];
 
   for (var i = 0; i < value.length && i < labels.length; i++) {
-    parts.push(labels[i] + ': ' + mapPICCode(value.charAt(i), ledMap, 'Code '));
+    parts.push(labels[i] + ': ' + mapPICCode(value.charAt(i), ledMap));
   }
 
   return parts.length ? parts.join('\n') : value;
@@ -3527,7 +3527,7 @@ function formatPICTempSensor(value) {
   return mapPICCode(value, {
     'O': 'Outside temperature',
     'R': 'Return water temperature'
-  }, 'Code ');
+  });
 }
 
 function formatPICSmartPower(value) {
@@ -3536,7 +3536,7 @@ function formatPICSmartPower(value) {
     'M': 'Medium power',
     'H': 'High power',
     'N': 'Normal power'
-  }, 'Code ');
+  });
 }
 
 function formatPICThermostatDetect(value) {
@@ -3546,7 +3546,7 @@ function formatPICThermostatDetect(value) {
     'S': 'Forced: Standard thermostat',
     'D': 'Auto-detect (default)',
     'A': 'Auto-detect'
-  }, 'Code ');
+  });
 }
 
 function formatPICResetCause(value) {
@@ -3560,7 +3560,7 @@ function formatPICResetCause(value) {
     'S': 'Serial BREAK',
     'U': 'Stack underflow',
     'W': 'Watchdog timer'
-  }, 'Code ');
+  });
 }
 
 function formatPICVoltageRef(value) {

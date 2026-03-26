@@ -129,6 +129,7 @@ void handleWebSocket();
 void testWebhook(bool testOn);
 void evalWebhook();
 bool checkHttpAuth();  // HTTP Basic Auth guard (ADR-054; defined in restAPI.ino)
+extern bool picSettingsCycleActive;  // PIC settings readout cycle flag (OTGW-Core.ino)
 
 //===================[ Runtime State — transient, never persisted (ADR-051) ]===================
 // Sub-section structs for OTGWState — groups runtime state by system component.
