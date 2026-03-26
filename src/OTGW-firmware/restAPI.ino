@@ -291,6 +291,7 @@ static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
 
   if (wc > 4 && strcmp_P(words[4], PSTR("start")) == 0) {
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    if (!checkHttpAuth()) return;
     setOTGWSimulationEnabled(true);
     sendOTGWSimulationStatus();
     return;
@@ -298,6 +299,7 @@ static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
 
   if (wc > 4 && strcmp_P(words[4], PSTR("stop")) == 0) {
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    if (!checkHttpAuth()) return;
     setOTGWSimulationEnabled(false);
     sendOTGWSimulationStatus();
     return;
@@ -327,6 +329,7 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
   } else if (strcmp_P(words[4], PSTR("commands")) == 0) {
     // POST /api/v2/otgw/commands — command in body, 202 Accepted
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    if (!checkHttpAuth()) return;
     const String& body = httpServer.arg(0);
     char cmdBuf[64] = "";
     if (!extractJsonField(body, F("command"), cmdBuf, sizeof(cmdBuf))) {
@@ -336,11 +339,13 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
   } else if (strcmp_P(words[4], PSTR("command")) == 0) {
     // POST /api/v2/otgw/command/{cmd} — backward compat alias (prefer /commands)
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    if (!checkHttpAuth()) return;
     if (wc <= 5 || words[5][0] == '\0') { sendApiError(400, F("Missing command")); return; }
     handleCommandSubmit(words[5]);
   } else if (strcmp_P(words[4], PSTR("discovery")) == 0 || strcmp_P(words[4], PSTR("autoconfigure")) == 0) {
     // POST /api/v2/otgw/discovery (or /autoconfigure compat alias)
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    if (!checkHttpAuth()) return;
     httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
     httpServer.send(202, F("application/json"), F("{\"status\":\"accepted\"}"));
     doAutoConfigure();
@@ -415,12 +420,15 @@ static const ApiRoute kV2Routes[] = {
 //=======================================================================
 void processAPI()
 {
-  char URI[50]   = "";
-  char words[API_MAX_WORDS][API_WORD_LEN] = {{0}};
+  // Static buffers save ~356 bytes of stack (not re-entrant in cooperative scheduler)
+  static char URI[50];
+  static char words[API_MAX_WORDS][API_WORD_LEN];
+  static char originalURI[sizeof(URI)];
+  URI[0] = '\0';
+  memset(words, 0, sizeof(words));
 
   const HTTPMethod method = httpServer.method();
   const size_t uriLen = strlcpy(URI, httpServer.uri().c_str(), sizeof(URI));
-  char originalURI[sizeof(URI)];
   strlcpy(originalURI, URI, sizeof(originalURI));
 
   RESTDebugTf(PSTR("from[%s] URI[%s] method[%s] \r\n"), httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(method).c_str());
