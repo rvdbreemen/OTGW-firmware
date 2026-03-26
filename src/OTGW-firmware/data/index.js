@@ -5489,10 +5489,10 @@ function updateStatisticsDisplay() {
         var dir = r.dir || 'Unk';
 
         html += '<tr>';
-        html += '<td>' + r.hex + '</td>';
-        html += '<td>' + r.id + '</td>';
-        html += '<td>' + dir + '</td>';
-        html += '<td>' + r.label + '</td>';
+        html += '<td>' + escapeHtml(r.hex) + '</td>';
+        html += '<td>' + escapeHtml(String(r.id)) + '</td>';
+        html += '<td>' + escapeHtml(dir) + '</td>';
+        html += '<td>' + escapeHtml(r.label) + '</td>';
         html += '<td>' + avgInterval + '</td>';
         html += '<td>' + escapeHtml(r.value) + '</td>';
         html += '</tr>';
