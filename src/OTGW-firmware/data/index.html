@@ -10,6 +10,8 @@
           var storedTheme = localStorage.getItem('theme');
           if (storedTheme === 'dark') {
             css = "index_dark.css";
+          } else if (!storedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            css = "index_dark.css";
           }
         } catch (e) { console.error(e); }
         document.write('<link rel="stylesheet" type="text/css" href="' + css + '" id="theme-style">');
@@ -28,6 +30,7 @@
         <div class="headercolumn" id="devName">[hostname]</div>
         <div class="headercolumn" id="devVersion">[version]</div>
         <div class="headercolumn" id='theTime'>[00:00:00]</div>
+        <button type="button" class="theme-toggle-btn" id="headerThemeToggle" title="Toggle theme" aria-label="Toggle theme"></button>
     </div>
     </font>
     <template id="pageNavTemplate">
@@ -45,7 +48,6 @@
             <span class="list_item FSexplorer">File system contents</span>
           </div>
         </div>
-        <button type="button" class="theme-toggle-btn" title="Toggle theme" aria-label="Toggle theme"></button>
       </div>
     </template>
     <!-- Persistent firmware/filesystem mismatch warning — shown by checkFSMismatch() in index.js -->
@@ -198,7 +200,6 @@
             <span class="list_item FSexplorer">File system contents</span>
           </div>
         </div>
-        <button type="button" class="theme-toggle-btn" title="Toggle theme" aria-label="Toggle theme"></button>
       </div>
       <div id="displayPICpage"></div>
     </div>
@@ -217,7 +218,6 @@
             <span class="list_item FSexplorer">File system contents</span>
           </div>
         </div>
-        <button type="button" class="theme-toggle-btn" title="Toggle theme" aria-label="Toggle theme"></button>
       </div>
       <div id="deviceinfoCrashLog" class="crashlog-panel hidden"></div>
       <div id="deviceinfoPage"></div>
@@ -237,7 +237,6 @@
             <span class="list_item FSexplorer">File system contents</span>
           </div>
         </div>
-        <button type="button" class="theme-toggle-btn" title="Toggle theme" aria-label="Toggle theme"></button>
       </div>
       <div id="settingsPage"></div>
       <div id="settingMessage"></div>
@@ -257,7 +256,6 @@
             <span class="list_item FSexplorer">File system contents</span>
           </div>
         </div>
-        <button type="button" class="theme-toggle-btn" title="Toggle theme" aria-label="Toggle theme"></button>
       </div>
       <div id="webhookPage"></div>
       <div id="webhookMessage"></div>

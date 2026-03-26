@@ -4878,13 +4878,18 @@ function applyTheme() {
     .then(json => {
       let data = json.settings;
       if (data && data["darktheme"]) {
-        let isDark = strToBool(data["darktheme"].value);
-        document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
-        localStorage.setItem('theme', isDark ? 'dark' : 'light');
-        if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.setTheme === 'function') {
-            OTGraph.setTheme(isDark ? 'dark' : 'light');
+        // Only apply server theme if the browser has no local preference yet
+        var localTheme = null;
+        try { localTheme = localStorage.getItem('theme'); } catch(e) {}
+        if (!localTheme) {
+          let isDark = strToBool(data["darktheme"].value);
+          document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
+          try { localStorage.setItem('theme', isDark ? 'dark' : 'light'); } catch(e) {}
+          if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.setTheme === 'function') {
+              OTGraph.setTheme(isDark ? 'dark' : 'light');
+          }
+          updateThemeToggle();
         }
-        updateThemeToggle();
       }
     })
     .catch(error => console.log(error));
