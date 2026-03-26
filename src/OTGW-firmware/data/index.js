@@ -2743,7 +2743,7 @@ function renderSharedPageNavShell() {
 //============================================================================
 function updateThemeToggle() {
   var isDark = localStorage.getItem('theme') === 'dark';
-  var icon  = isDark ? '\u2600' : '\u263D';   // ☀ sun  or  ☽ crescent moon
+  var icon  = isDark ? '\u2600\uFE0E' : '\u263D\uFE0E';   // ☀︎ sun  or  ☽︎ moon (text presentation, not emoji)
   var title = isDark ? 'Switch to light theme' : 'Switch to dark theme';
   document.querySelectorAll('.theme-toggle-btn').forEach(function(btn) {
     btn.textContent = icon;
@@ -2767,8 +2767,7 @@ function initMainPage() {
   renderSharedPageNavShell();
   updateThemeToggle();
 
-  document.addEventListener('click', function(e) {
-    if (!e.target.classList.contains('theme-toggle-btn')) return;
+  function doThemeToggle() {
     var isDark = localStorage.getItem('theme') !== 'dark';  // toggle
     document.getElementById('theme-style').href = isDark ? 'index_dark.css' : 'index.css';
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
@@ -2783,6 +2782,16 @@ function initMainPage() {
       body: JSON.stringify({ name: 'darktheme', value: String(isDark) })
     }).catch(function(err) { console.warn('Theme save failed:', err.message); });
     updateThemeToggle();
+  }
+
+  document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('theme-toggle-btn')) doThemeToggle();
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.target.classList.contains('theme-toggle-btn') && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      doThemeToggle();
+    }
   });
 
   Array.from(document.getElementsByClassName('FSexplorer')).forEach(
