@@ -162,6 +162,10 @@ static void sendApiOptions() {
 
 // Helper to queue a command from URL segment or request body, with validation
 static void handleCommandSubmit(const char* cmdStr) {
+  if (!isPICEnabled()) {
+    sendApiError(503, F("No PIC detected - commands disabled"));
+    return;
+  }
   if (!cmdStr || cmdStr[0] == '\0') {
     sendApiError(400, F("Missing command"));
     return;
@@ -264,6 +268,7 @@ static void handleFlash(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod
 
 static void handlePic(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+  if (!isPICEnabled()) { sendApiError(503, F("No PIC detected - PIC functions disabled")); return; }
   if (wc > 4 && strcmp_P(words[4], PSTR("flash-status")) == 0) {
     sendPICFlashStatus();
   } else if (wc > 4 && strcmp_P(words[4], PSTR("update-check")) == 0) {

@@ -398,9 +398,10 @@ void doTaskEvery60s(){
 
   // Probe PIC firmware version if still unknown — non-blocking, queues PR=A.
   // State update + MQTT publish handled by handlePRresponse() when banner arrives.
-  if ((strcmp_P(state.pic.sDeviceid, PSTR("unknown")) == 0)
-      || (strcmp_P(state.pic.sDeviceid, PSTR("no pic found")) == 0)
-      || (state.pic.sDeviceid[0] == '\0')) {
+  if (isPICEnabled()
+      && ((strcmp_P(state.pic.sDeviceid, PSTR("unknown")) == 0)
+          || (strcmp_P(state.pic.sDeviceid, PSTR("no pic found")) == 0)
+          || (state.pic.sDeviceid[0] == '\0'))) {
     DebugTln(F("PIC is unknown, probe pic using PR=A"));
     getpicfwversion();
   }

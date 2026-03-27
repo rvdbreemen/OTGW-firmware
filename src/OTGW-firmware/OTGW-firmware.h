@@ -220,6 +220,10 @@ struct OTGWState {
 
 OTGWState state;
 
+// Central PIC availability guard — returns true only when a PIC was detected at boot.
+// All PIC-related operations (commands, queries, upgrades) check this before proceeding.
+inline bool isPICEnabled() { return state.pic.bAvailable; }
+
 //===================[ Persistent Settings — serialized to LittleFS (ADR-051) ]===================
 // Sub-section structs for OTGWSettings — groups configuration by feature area.
 // Hungarian prefixes: b=bool, s=string/char[], i=int/uint, f=float

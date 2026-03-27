@@ -485,6 +485,7 @@ void detectPIC(){
       DebugTln(F("ETX found after reset: Pic detected!"));
   } else {
       DebugTln(F("No ETX found after reset: no Pic detected!"));
+      DebugTln(F("All PIC-related functions are disabled (no PIC-based OTGW detected)"));
   }
 }
 
@@ -543,6 +544,7 @@ static uint8_t  picSettingsQueryIdx    = 0;
 static constexpr uint8_t kPICSettingsCount = 15;
 
 void triggerPICsettingsReadout() {
+  if (!isPICEnabled()) return;
   if (picSettingsCycleActive) {
     return;  // cycle already in progress — ignore until it completes
   }
@@ -745,6 +747,7 @@ static void handlePRresponse(const char* buf, size_t len) {
   Only publishes fields that have been queried (non-empty).
 */
 void publishAllPICsettings() {
+  if (!isPICEnabled()) return;
   // Active settings
   if (state.picSettings.sSetpointOverride[0]   != '\0') sendMQTTData(F("otgw-pic/settings/setpoint_override"),   state.picSettings.sSetpointOverride);
   if (state.picSettings.sSetback[0]            != '\0') sendMQTTData(F("otgw-pic/settings/setback"),             state.picSettings.sSetback);
@@ -767,6 +770,7 @@ void publishAllPICsettings() {
 
 //===================[ sendOTGWbootcmd ]=====================
 void sendOTGWbootcmd(){
+  if (!isPICEnabled()) return;
   if (!settings.otgw.bEnable) return;
   OTGWDebugTf(PSTR("OTGW boot message = [%s]\r\n"), CSTR(settings.otgw.sCommands));
 
@@ -798,6 +802,14 @@ void executeCommand(const char* sCmd, char* outBuf, size_t outSize, bool mirrorT
   if (outSize > 0) outBuf[0] = '\0';
   OTGWDebugTf(PSTR("OTGW Send Cmd [%s]\r\n"), sCmd);
   size_t cmdLen = strlen(sCmd);
+  if (!isPICEnabled()) {
+    OTGWDebugTln(F("executeCommand: No PIC detected - command ignored"));
+    strlcpy(outBuf, "NG - No PIC detected, command ignored.", outSize);
+    if (mirrorToWebSocket && hasWebSocketClients()) {
+      sendEventToWebSocket_P('!', PSTR("NG - No PIC detected, command ignored."));
+    }
+    return;
+  }
   if (state.debug.bOTGWSimulation) {
     OTGWDebugTln(F("OTGW simulation active - executeCommand blocked"));
     strlcpy(outBuf, "SE - OTGW simulation active.", outSize);
@@ -2547,6 +2559,11 @@ static void removeFromCmdQueue(int index) {
 
 //void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue = false, const int16_t delay = OTGW_DELAY_SEND_MS);
 void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, const int16_t delay){
+  if (!isPICEnabled()) {
+    OTGWDebugTln(F("CmdQueue: No PIC detected - command ignored"));
+    return;
+  }
+
   constexpr int kMaxCmdLen = (int)(sizeof(cmdqueue[0].cmd) - 1);
 
   if (buf == nullptr) {
@@ -2729,6 +2746,10 @@ void checkOTGWcmdqueue(const char *buf, unsigned int len){
 */
 void sendOTGW(const char* buf, int len)
 {
+  if (!isPICEnabled()) {
+    OTGWDebugTln(F("sendOTGW: No PIC detected - command ignored"));
+    return;
+  }
   if (state.debug.bOTGWSimulation) {
     OTGWDebugTln(F("OTGW simulation active - serial send blocked"));
     sendEventToWebSocket_P('!', PSTR("OTGW simulation blocked serial send"));
@@ -4195,6 +4216,10 @@ void startOTGWstream()
 //---------[ Upgrade PIC stuff taken from Schelte Bron's NodeMCU Firmware ]---------
 
 void upgradepicnow(const char *filename) {
+  if (!isPICEnabled()) {
+    DebugTln(F("PIC upgrade rejected: no PIC detected"));
+    return;
+  }
   if (OTGWSerial.busy()) {
     DebugTln(F("ERROR: PIC upgrade already in progress, ignoring request"));
     return; // if already in programming mode, never call it twice
@@ -4537,6 +4562,11 @@ void handlePendingUpgrade() {
 }
 
 void upgradepic() {
+  if (!isPICEnabled()) {
+    httpServer.send_P(400, PSTR("text/plain"), PSTR("No PIC detected - PIC functions disabled"));
+    return;
+  }
+
   const String action = httpServer.arg("action");
   const String filename = httpServer.arg("name");
   const String version = httpServer.arg("version");
