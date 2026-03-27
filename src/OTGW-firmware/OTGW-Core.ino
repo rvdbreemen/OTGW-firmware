@@ -2643,13 +2643,14 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
     }
   } else OTGWDebugTf(PSTR("CmdQueue: Found command at: [%d] - [%d]\r\n"), insertptr, cmdQueueSize);
 
-  // Trigger PIC settings re-read after any setting-change command.
-  // Exclude read-only commands: PR (print register), PS (print summary), SC (time sync).
-  if (len >= 2 &&
-      !(buf[0] == 'P' && buf[1] == 'R') &&
-      !(buf[0] == 'P' && buf[1] == 'S') &&
-      !(buf[0] == 'S' && buf[1] == 'C')) {
-    triggerPICsettingsReadout();
+  // Trigger PIC settings re-read only for commands that modify readable PIC settings (PR=).
+  // GW→PR=M, SB→PR=S, VR→PR=V, TS→PR=D, IT/OH→PR=T, GA/GB→PR=G, LA-LF→PR=L
+  if (len >= 2) {
+    char cmd[3] = { buf[0], buf[1], '\0' };
+    static const char kSettingsCmds[] PROGMEM = "GW GA GB SB VR TS IT OH LA LB LC LD LE LF";
+    if (strstr_P(kSettingsCmds, cmd)) {
+      triggerPICsettingsReadout();
+    }
   }
 
   OTGWDebugFlush();
