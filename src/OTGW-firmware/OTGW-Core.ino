@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.3.0
+**  Version  : v1.3.1-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -494,93 +494,34 @@ Get the information of the pic firmware: version  number, device type and firmwa
 This is done by sending a PR=A command, requesting a banner from the PIC. This will trigger detection of version.
 */
 void getpicfwversion(){
-  static char buf[128];
-  executeCommand("PR=A", buf, sizeof(buf), true);
-  const char* p = strstr(buf, OTGW_BANNER);
-  if (p) {
-    p += sizeof(OTGW_BANNER)-1;
-    OTGWDebugTf(PSTR("getpicfwversion: Current firmware version: %s\r\n"), p);
-  } else {
-    OTGWDebugTf(PSTR("getpicfwversion: No version found in response: %s\r\n"), buf);
-  }
-  // Callers fetch version from OTGWSerial.firmwareVersion() after this triggers banner detection
+  // Non-blocking: queues PR=A via the command queue.
+  // The banner response is processed by handlePRresponse() which copies
+  // OTGWSerial version fields into state.pic.* and publishes MQTT.
+  addOTWGcmdtoqueue("PR=A", 4, true);
 }
 //===================[ queryOTGWgatewaymode ]======================
 /*
 Query the actual gateway mode setting from the PIC firmware using PR=M command.
-According to OTGW documentation:
-- PR=M returns "PR: G" for Gateway mode (GW=1)
-- PR=M returns "PR: M" for Monitor mode (GW=0)
-This provides a reliable way to detect the actual configured mode,
-rather than inferring it from message traffic.
+Non-blocking: queues PR=M via the command queue. The response is processed
+asynchronously by handlePRresponse() when it arrives via processOT().
 */
-bool queryOTGWgatewaymode(){
-  // DESIGN: single-threaded throttle state; not testable without reboot.
-  // Acceptable for cooperative single-threaded ESP8266 — no concurrency risk.
+void queryOTGWgatewaymode(){
   static uint32_t lastGatewayModeQueryMs = 0;
-  static bool cachedGatewayMode = false;
-  static bool hasCachedGatewayMode = false;
-  constexpr uint32_t GATEWAY_MODE_QUERY_MIN_INTERVAL_MS = 60000; // hard throttle: max one PR=M per minute
+  constexpr uint32_t GATEWAY_MODE_QUERY_MIN_INTERVAL_MS = 60000; // max one PR=M per minute
 
   if (!state.pic.bAvailable) {
     OTGWDebugTln(F("queryOTGWgatewaymode: PIC not available"));
-    state.otgw.bGatewayModeKnown = hasCachedGatewayMode;
-    return cachedGatewayMode;
+    return;
   }
 
   const uint32_t now = millis();
-  if (hasCachedGatewayMode && ((uint32_t)(now - lastGatewayModeQueryMs) < GATEWAY_MODE_QUERY_MIN_INTERVAL_MS)) {
-    OTGWDebugTf(PSTR("queryOTGWgatewaymode: throttled, using cached value [%s]\r\n"), CCONOFF(cachedGatewayMode));
-    state.otgw.bGatewayModeKnown = true;
-    return cachedGatewayMode;
-  }
-  
-  static char response[128];
-  executeCommand("PR=M", response, sizeof(response), true);
-  // Trim leading/trailing whitespace in-place
-  char* rp = response;
-  while (*rp == ' ' || *rp == '\t' || *rp == '\r' || *rp == '\n') rp++;
-  size_t rlen = strlen(rp);
-  while (rlen > 0 && (rp[rlen-1] == ' ' || rp[rlen-1] == '\t' || rp[rlen-1] == '\r' || rp[rlen-1] == '\n')) rp[--rlen] = '\0';
-
-  OTGWDebugTf(PSTR("queryOTGWgatewaymode: PR=M response=[%s]\r\n"), rp);
-
-  // Response format is "M=G" (Gateway mode) or "M=M" (Monitor mode).
-  // executeCommand() strips the "PR: " prefix, leaving e.g. " M=G" which is trimmed to "M=G".
-  // The value is the character after '='.
-  bool isGatewayMode = cachedGatewayMode;
-  bool parseOk = false;
-
-  const char* eqp = strchr(rp, '=');
-  if (eqp && *(eqp + 1) != '\0') {
-    char modeVal = *(eqp + 1);
-    if (modeVal == 'G' || modeVal == 'g') {
-      isGatewayMode = true;
-      parseOk = true;
-      OTGWDebugTln(F("queryOTGWgatewaymode: Gateway mode detected"));
-    } else if (modeVal == 'M' || modeVal == 'm') {
-      isGatewayMode = false;
-      parseOk = true;
-      OTGWDebugTln(F("queryOTGWgatewaymode: Monitor mode detected"));
-    } else {
-      OTGWDebugTf(PSTR("queryOTGWgatewaymode: Unexpected value [%c] in response [%s], keeping cached value [%s]\r\n"),
-                  modeVal, rp, CCONOFF(cachedGatewayMode));
-    }
-  } else if (rlen > 0) {
-    OTGWDebugTf(PSTR("queryOTGWgatewaymode: Unexpected response format [%s], keeping cached value [%s]\r\n"),
-                rp, CCONOFF(cachedGatewayMode));
-  } else {
-    OTGWDebugTln(F("queryOTGWgatewaymode: Empty response, keeping cached value"));
+  if (state.otgw.bGatewayModeKnown && ((uint32_t)(now - lastGatewayModeQueryMs) < GATEWAY_MODE_QUERY_MIN_INTERVAL_MS)) {
+    OTGWDebugTf(PSTR("queryOTGWgatewaymode: throttled\r\n"));
+    return;
   }
 
-  if (parseOk) {
-    cachedGatewayMode = isGatewayMode;
-    hasCachedGatewayMode = true;
-    lastGatewayModeQueryMs = now;
-  }
-  state.otgw.bGatewayModeKnown = hasCachedGatewayMode;
-  
-  return cachedGatewayMode;
+  lastGatewayModeQueryMs = now;
+  addOTWGcmdtoqueue("PR=M", 4, true);  // forceQueue=true; response handled by handlePRresponse()
 }
 
 //===================[ PIC settings readout control ]=============
@@ -650,124 +591,159 @@ void queryNextPICsetting() {
     OTGWDebugTln(F("PIC settings readout cycle complete"));
   }
 
-  // Resolve all query properties in a single switch (letter, state field, MQTT topic)
-  char        letter     = 0;
-  char*       stateField = nullptr;
-  size_t      fieldSize  = 0;
-  const __FlashStringHelper* mqttTopic = nullptr;
-
+  // Map index → register letter. Response parsing is handled asynchronously
+  // by handlePRresponse() when the PR: response arrives via processOT().
+  char letter = 0;
   switch (idx) {
-    // Active settings (most useful for HA integration)
-    case 0:
-      letter = 'O'; stateField = state.picSettings.sSetpointOverride;
-      fieldSize = sizeof(state.picSettings.sSetpointOverride); mqttTopic = F("otgw-pic/settings/setpoint_override"); break;
-    case 1:
-      letter = 'S'; stateField = state.picSettings.sSetback;
-      fieldSize = sizeof(state.picSettings.sSetback);          mqttTopic = F("otgw-pic/settings/setback");           break;
-    case 2:
-      letter = 'W'; stateField = state.picSettings.sDhwOverride;
-      fieldSize = sizeof(state.picSettings.sDhwOverride);      mqttTopic = F("otgw-pic/settings/dhw_override");      break;
-    // Hardware configuration
-    case 3:
-      letter = 'G'; stateField = state.picSettings.sGpio;
-      fieldSize = sizeof(state.picSettings.sGpio);             mqttTopic = F("otgw-pic/settings/gpio");              break;
-    case 4:
-      letter = 'I'; stateField = state.picSettings.sGpioStates;
-      fieldSize = sizeof(state.picSettings.sGpioStates);       mqttTopic = F("otgw-pic/settings/gpio_states");       break;
-    case 5:
-      letter = 'L'; stateField = state.picSettings.sLed;
-      fieldSize = sizeof(state.picSettings.sLed);              mqttTopic = F("otgw-pic/settings/led");               break;
-    case 6:
-      letter = 'T'; stateField = state.picSettings.sTweaks;
-      fieldSize = sizeof(state.picSettings.sTweaks);           mqttTopic = F("otgw-pic/settings/tweaks");            break;
-    case 7:
-      letter = 'D'; stateField = state.picSettings.sTempSensor;
-      fieldSize = sizeof(state.picSettings.sTempSensor);       mqttTopic = F("otgw-pic/settings/temp_sensor");       break;
-    case 8:
-      letter = 'P'; stateField = state.picSettings.sSmartPower;
-      fieldSize = sizeof(state.picSettings.sSmartPower);       mqttTopic = F("otgw-pic/settings/smart_power");       break;
-    case 9:
-      letter = 'R'; stateField = state.picSettings.sThermostatDetect;
-      fieldSize = sizeof(state.picSettings.sThermostatDetect); mqttTopic = F("otgw-pic/settings/thermostat_detect"); break;
-    // Diagnostics
-    case 10:
-      letter = 'B'; stateField = state.picSettings.sBuilddate;
-      fieldSize = sizeof(state.picSettings.sBuilddate);        
-      mqttTopic = F("otgw-pic/settings/builddate");         
-      break;
-    case 11:
-      letter = 'C'; stateField = state.picSettings.sClockMHz;
-      fieldSize = sizeof(state.picSettings.sClockMHz);         
-      mqttTopic = F("otgw-pic/settings/clock_mhz");         
-      break;
-    case 12:
-      letter = 'Q'; stateField = state.picSettings.sResetCause;
-      fieldSize = sizeof(state.picSettings.sResetCause);       
-      mqttTopic = F("otgw-pic/settings/reset_cause");       
-      break;
-    case 13:
-      letter = 'N'; stateField = state.picSettings.sStandaloneInterval;
-      fieldSize = sizeof(state.picSettings.sStandaloneInterval); 
-      mqttTopic = F("otgw-pic/settings/standalone_interval"); 
-      break;
-    case 14:
-      letter = 'V'; stateField = state.picSettings.sVoltageRef;
-      fieldSize = sizeof(state.picSettings.sVoltageRef);       
-      mqttTopic = F("otgw-pic/settings/voltage_ref");       
-      break;
+    case  0: letter = 'O'; break;  // Setpoint override
+    case  1: letter = 'S'; break;  // Setback temperature
+    case  2: letter = 'W'; break;  // DHW override
+    case  3: letter = 'G'; break;  // GPIO configuration
+    case  4: letter = 'I'; break;  // GPIO states
+    case  5: letter = 'L'; break;  // LED configuration
+    case  6: letter = 'T'; break;  // Tweaks
+    case  7: letter = 'D'; break;  // Temperature sensor
+    case  8: letter = 'P'; break;  // Smart power
+    case  9: letter = 'R'; break;  // Thermostat detect
+    case 10: letter = 'B'; break;  // Build date
+    case 11: letter = 'C'; break;  // Clock MHz
+    case 12: letter = 'Q'; break;  // Reset cause
+    case 13: letter = 'N'; break;  // Standalone interval
+    case 14: letter = 'V'; break;  // Voltage reference
     default: return;
   }
 
   char cmd[5];
   snprintf_P(cmd, sizeof(cmd), PSTR("PR=%c"), letter);
+  addOTWGcmdtoqueue(cmd, 4, true);  // forceQueue=true: bypass PR prefix dedup
+}
 
-  static char response[64];
-  executeCommand(cmd, response, sizeof(response), true);
+//===================[ handlePRresponse ]==========================
+/*
+  Asynchronous handler for PR: responses from the PIC.
+  Called from processOT() when a line starting with "PR:" is received.
+  Dispatches based on register letter: updates state, publishes MQTT.
+  Special cases: 'M' (gateway mode), 'A' (firmware banner).
+*/
+static void handlePRresponse(const char* buf, size_t len) {
+  // buf = "PR: X=value" or "PR: OpenTherm Gateway x.x"
+  if (len < 4 || buf[0] != 'P' || buf[1] != 'R' || buf[2] != ':') return;
 
-  // Trim leading/trailing whitespace in-place
-  char* rp = response;
-  while (*rp == ' ' || *rp == '\t' || *rp == '\r' || *rp == '\n') rp++;
-  size_t rlen = strlen(rp);
-  while (rlen > 0 && (rp[rlen-1] == ' ' || rp[rlen-1] == '\t' || rp[rlen-1] == '\r' || rp[rlen-1] == '\n')) rp[--rlen] = '\0';
+  // Skip "PR:" prefix and trim leading whitespace
+  const char* payload = buf + 3;
+  while (*payload == ' ') payload++;
+  size_t plen = strlen(payload);
+  if (plen == 0) return;
 
-  OTGWDebugTf(PSTR("queryNextPICsetting: PR=%c response=[%s]\r\n"), letter, rp);
+  // --- Banner response (PR=A): "OpenTherm Gateway x.x" ---
+  if (strstr_P(payload, PSTR("OpenTherm Gateway"))) {
+    // OTGWSerial detects the banner at byte level during handleOTGW() reads,
+    // so firmwareVersion/processorToString/firmwareToString are already set.
+    strlcpy(state.pic.sFwversion, OTGWSerial.firmwareVersion(), sizeof(state.pic.sFwversion));
+    strlcpy(state.pic.sDeviceid, OTGWSerial.processorToString().c_str(), sizeof(state.pic.sDeviceid));
+    strlcpy(state.pic.sType, OTGWSerial.firmwareToString().c_str(), sizeof(state.pic.sType));
+    OTGWDebugTf(PSTR("handlePRresponse: banner → fw=[%s] dev=[%s] type=[%s]\r\n"),
+                state.pic.sFwversion, state.pic.sDeviceid, state.pic.sType);
+    sendMQTTversioninfo();
+    return;
+  }
 
-  // Responses are "X=value" (e.g. "O=T20.5", "O=N", "S=15.0", "W=A", "B=17:52 12-03-2023")
-  // First char must match the expected letter.
-  const char* eqp = strchr(rp, '=');
-  if (!eqp || rp[0] != letter || *(eqp + 1) == '\0') {
-    if (rlen >= 2) {
-      // Known OTGW error/unsupported responses: silently ignore (NG=No Good,
-      // SE=Syntax Error, TO=Timeout, BV=Bad Value, OR=Out of Range).
-      // These are expected for PR= commands the PIC firmware doesn't support.
-      if ((strncmp_P(rp, PSTR("NG"), 2) == 0) ||
-          (strncmp_P(rp, PSTR("SE"), 2) == 0) ||
-          (strncmp_P(rp, PSTR("TO"), 2) == 0) ||
-          (strncmp_P(rp, PSTR("BV"), 2) == 0) ||
-          (strncmp_P(rp, PSTR("OR"), 2) == 0)) {
-        return; // silently ignore
-      }
+  // --- Register response: "X=value" ---
+  if (plen < 3 || payload[1] != '=') return;  // need at least "X=v"
+  const char  reg   = payload[0];
+  const char* value = payload + 2;
+
+  // --- Gateway mode (register 'M'): "M=G" or "M=M" ---
+  if (reg == 'M') {
+    static bool prevGatewayMode = false;
+    static bool prevGatewayKnown = false;
+    char modeVal = value[0];
+    bool isGateway;
+    if (modeVal == 'G' || modeVal == 'g') {
+      isGateway = true;
+    } else if (modeVal == 'M' || modeVal == 'm') {
+      isGateway = false;
+    } else {
+      OTGWDebugTf(PSTR("handlePRresponse: PR=M unexpected value [%c]\r\n"), modeVal);
+      return;
     }
-    if (rlen > 0) {
-      OTGWDebugTf(PSTR("queryNextPICsetting: PR=%c unexpected response [%s]\r\n"), letter, rp);
+    state.otgw.bGatewayMode = isGateway;
+    state.otgw.bGatewayModeKnown = true;
+    if (isGateway != prevGatewayMode || !prevGatewayKnown) {
+      sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(isGateway));
+      prevGatewayMode = isGateway;
+      prevGatewayKnown = true;
+      OTGWDebugTf(PSTR("handlePRresponse: gateway mode = %s\r\n"), CCONOFF(isGateway));
     }
     return;
   }
 
-  const char* value = eqp + 1;
-  bool changed = (strcmp(stateField, value) != 0);
+  // --- PIC settings registers ---
+  char*       stateField = nullptr;
+  size_t      fieldSize  = 0;
+  const __FlashStringHelper* mqttTopic = nullptr;
 
+  switch (reg) {
+    case 'O': stateField = state.picSettings.sSetpointOverride;
+              fieldSize = sizeof(state.picSettings.sSetpointOverride);
+              mqttTopic = F("otgw-pic/settings/setpoint_override"); break;
+    case 'S': stateField = state.picSettings.sSetback;
+              fieldSize = sizeof(state.picSettings.sSetback);
+              mqttTopic = F("otgw-pic/settings/setback");           break;
+    case 'W': stateField = state.picSettings.sDhwOverride;
+              fieldSize = sizeof(state.picSettings.sDhwOverride);
+              mqttTopic = F("otgw-pic/settings/dhw_override");      break;
+    case 'G': stateField = state.picSettings.sGpio;
+              fieldSize = sizeof(state.picSettings.sGpio);
+              mqttTopic = F("otgw-pic/settings/gpio");              break;
+    case 'I': stateField = state.picSettings.sGpioStates;
+              fieldSize = sizeof(state.picSettings.sGpioStates);
+              mqttTopic = F("otgw-pic/settings/gpio_states");       break;
+    case 'L': stateField = state.picSettings.sLed;
+              fieldSize = sizeof(state.picSettings.sLed);
+              mqttTopic = F("otgw-pic/settings/led");               break;
+    case 'T': stateField = state.picSettings.sTweaks;
+              fieldSize = sizeof(state.picSettings.sTweaks);
+              mqttTopic = F("otgw-pic/settings/tweaks");            break;
+    case 'D': stateField = state.picSettings.sTempSensor;
+              fieldSize = sizeof(state.picSettings.sTempSensor);
+              mqttTopic = F("otgw-pic/settings/temp_sensor");       break;
+    case 'P': stateField = state.picSettings.sSmartPower;
+              fieldSize = sizeof(state.picSettings.sSmartPower);
+              mqttTopic = F("otgw-pic/settings/smart_power");       break;
+    case 'R': stateField = state.picSettings.sThermostatDetect;
+              fieldSize = sizeof(state.picSettings.sThermostatDetect);
+              mqttTopic = F("otgw-pic/settings/thermostat_detect"); break;
+    case 'B': stateField = state.picSettings.sBuilddate;
+              fieldSize = sizeof(state.picSettings.sBuilddate);
+              mqttTopic = F("otgw-pic/settings/builddate");         break;
+    case 'C': stateField = state.picSettings.sClockMHz;
+              fieldSize = sizeof(state.picSettings.sClockMHz);
+              mqttTopic = F("otgw-pic/settings/clock_mhz");         break;
+    case 'Q': stateField = state.picSettings.sResetCause;
+              fieldSize = sizeof(state.picSettings.sResetCause);
+              mqttTopic = F("otgw-pic/settings/reset_cause");       break;
+    case 'N': stateField = state.picSettings.sStandaloneInterval;
+              fieldSize = sizeof(state.picSettings.sStandaloneInterval);
+              mqttTopic = F("otgw-pic/settings/standalone_interval"); break;
+    case 'V': stateField = state.picSettings.sVoltageRef;
+              fieldSize = sizeof(state.picSettings.sVoltageRef);
+              mqttTopic = F("otgw-pic/settings/voltage_ref");       break;
+    default:
+      OTGWDebugTf(PSTR("handlePRresponse: unknown register [%c]\r\n"), reg);
+      return;
+  }
+
+  bool changed = (strcmp(stateField, value) != 0);
   if (changed) {
     strlcpy(stateField, value, fieldSize);
-    OTGWDebugTf(PSTR("queryNextPICsetting: PR=%c updated to [%s]\r\n"), letter, stateField);
+    OTGWDebugTf(PSTR("handlePRresponse: PR=%c updated to [%s]\r\n"), reg, stateField);
     sendMQTTData(mqttTopic, stateField);
   }
 
-  // Always notify WebSocket clients during a readout cycle so the UI
-  // shows discovery progress (the first boot cycle has no clients yet).
   if (hasWebSocketClients()) {
     char eventBuf[80];
-    snprintf_P(eventBuf, sizeof(eventBuf), PSTR("PIC setting PR=%c = %s"), letter, stateField);
+    snprintf_P(eventBuf, sizeof(eventBuf), PSTR("PIC setting PR=%c = %s"), reg, stateField);
     sendEventToWebSocket('*', eventBuf);
   }
 }
@@ -3801,6 +3777,9 @@ void processOT(const char *buf, int len){
     } 
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
     checkOTGWcmdqueue(buf, len);
+    if (buf[0] == 'P' && buf[1] == 'R') {
+      handlePRresponse(buf, len);  // process PR: responses (PIC settings, gateway mode, banner)
+    }
     Debugln(buf);
     reportOTGWEvent(buf, '<', true);
   } else if (strcmp_P(buf, PSTR("NG")) == 0) {
