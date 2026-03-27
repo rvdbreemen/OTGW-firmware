@@ -698,9 +698,11 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("author"), F("Robert van den Breemen"));
   sendJsonMapEntry(F("fwversion"), _SEMVER_FULL);
   sendJsonMapEntry(F("picavailable"), state.pic.bAvailable);
-  sendJsonMapEntry(F("picfwversion"), state.pic.sFwversion);
-  sendJsonMapEntry(F("picdeviceid"), state.pic.sDeviceid);
-  sendJsonMapEntry(F("picfwtype"), state.pic.sType);
+  if (isPICEnabled()) {
+    sendJsonMapEntry(F("picfwversion"), state.pic.sFwversion);
+    sendJsonMapEntry(F("picdeviceid"), state.pic.sDeviceid);
+    sendJsonMapEntry(F("picfwtype"), state.pic.sType);
+  }
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
   sendJsonMapEntry(F("compiled"), cMsg);
   sendJsonMapEntry(F("hostname"), CSTR(settings.sHostname));
@@ -737,10 +739,12 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("lastreset"), lastReset);
   sendJsonMapEntry(F("bootcount"), state.uptime.iRebootCount);
   sendJsonMapEntry(F("mqttconnected"), state.mqtt.bConnected);
-  sendJsonMapEntry(F("thermostatconnected"), state.otgw.bThermostatState);
-  sendJsonMapEntry(F("boilerconnected"), state.otgw.bBoilerState);      
-  sendJsonMapEntry(F("otgwmode"), state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
-  sendJsonMapEntry(F("otgwconnected"), state.otgw.bOnline);
+  if (isPICEnabled()) {
+    sendJsonMapEntry(F("thermostatconnected"), state.otgw.bThermostatState);
+    sendJsonMapEntry(F("boilerconnected"), state.otgw.bBoilerState);
+    sendJsonMapEntry(F("otgwmode"), state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
+    sendJsonMapEntry(F("otgwconnected"), state.otgw.bOnline);
+  }
   sendJsonMapEntry(F("otgwsimulation"), state.debug.bOTGWSimulation);
   
   sendEndJsonMap(F("device"));
@@ -877,10 +881,12 @@ void sendFlashStatus()
   // Returns: {"flashstatus":{"flashing":bool,"pic_flashing":bool,"pic_progress":0-100,"pic_filename":"...","pic_error":"..."}}
   sendStartJsonMap(F("flashstatus"));
   sendJsonMapEntry(F("flashing"), isFlashing());
-  sendJsonMapEntry(F("pic_flashing"), state.flash.bPICactive);
-  sendJsonMapEntry(F("pic_progress"), state.flash.iPICprogress);
-  sendJsonMapEntry(F("pic_filename"), state.flash.sPICfile);
-  sendJsonMapEntry(F("pic_error"), state.flash.sError);
+  if (isPICEnabled()) {
+    sendJsonMapEntry(F("pic_flashing"), state.flash.bPICactive);
+    sendJsonMapEntry(F("pic_progress"), state.flash.iPICprogress);
+    sendJsonMapEntry(F("pic_filename"), state.flash.sPICfile);
+    sendJsonMapEntry(F("pic_error"), state.flash.sError);
+  }
   sendEndJsonMap(F("flashstatus"));
 } // sendFlashStatus()
 

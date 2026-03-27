@@ -447,9 +447,11 @@ void sendMQTTversioninfo(){
   sendMQTTData("otgw-firmware/version", _SEMVER_FULL);
   sendMQTTData("otgw-firmware/reboot_count", rebootCountBuf);
   sendMQTTData("otgw-firmware/reboot_reason", lastReset);
-  sendMQTTData("otgw-pic/version", state.pic.sFwversion);
-  sendMQTTData("otgw-pic/deviceid", state.pic.sDeviceid);
-  sendMQTTData("otgw-pic/firmwaretype", state.pic.sType);
+  if (isPICEnabled()) {
+    sendMQTTData("otgw-pic/version", state.pic.sFwversion);
+    sendMQTTData("otgw-pic/deviceid", state.pic.sDeviceid);
+    sendMQTTData("otgw-pic/firmwaretype", state.pic.sType);
+  }
   sendMQTTData("otgw-pic/picavailable", CCONOFF(state.pic.bAvailable));
 }
 
@@ -457,7 +459,8 @@ void sendMQTTversioninfo(){
 Publish state information of PIC firmware version information to MQTT broker.
 */
 void sendMQTTstateinformation(){
-  sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState)); 
+  if (!isPICEnabled()) return;
+  sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
   sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
   if (state.otgw.bGatewayModeKnown) {
     sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(state.otgw.bGatewayMode));
@@ -468,6 +471,7 @@ void sendMQTTstateinformation(){
 
 //===================[ Reset OTGW ]===============================
 void resetOTGW() {
+  if (!isPICEnabled()) return;
   scheduleOTGWStartupQuietPeriod();
   OTGWSerial.resetPic();
 }
@@ -3630,16 +3634,16 @@ void processOT(const char *buf, int len){
     } 
 
     //If the Boiler messages have not been seen for 30 seconds, then set the state to false. 
-    state.otgw.bBoilerState = (now < (epochBoilerlastseen+30));  
+    state.otgw.bBoilerState = (now < (epochBoilerlastseen+30));
     if ((state.otgw.bBoilerState != bOTGWboilerpreviousstate) || (cntOTmessagesprocessed==1)) {
-      sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState)); 
+      if (isPICEnabled()) sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
       bOTGWboilerpreviousstate = state.otgw.bBoilerState;
     }
 
-    //If the Thermostat messages have not been seen for 30 seconds, then set the state to false. 
+    //If the Thermostat messages have not been seen for 30 seconds, then set the state to false.
     state.otgw.bThermostatState = (now < (epochThermostatlastseen+30));
-    if ((state.otgw.bThermostatState != bOTGWthermostatpreviousstate) || (cntOTmessagesprocessed==1)){      
-      sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
+    if ((state.otgw.bThermostatState != bOTGWthermostatpreviousstate) || (cntOTmessagesprocessed==1)){
+      if (isPICEnabled()) sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
       bOTGWthermostatpreviousstate = state.otgw.bThermostatState;
     }
     
@@ -3651,8 +3655,10 @@ void processOT(const char *buf, int len){
     //If both (Boiler and Thermostat and Gateway) are offline, then the OTGW is considered offline as a whole.
     state.otgw.bOnline = (state.otgw.bBoilerState && state.otgw.bThermostatState) || (state.otgw.bBoilerState && bOTGWgatewayactive);
     if ((state.otgw.bOnline != bOTGWpreviousstate) || (cntOTmessagesprocessed==1)){
-      sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otgw.bOnline));
-      sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
+      if (isPICEnabled()) {
+        sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otgw.bOnline));
+        sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
+      }
       // nodeMCU online/offline zelf naar 'otgw-firmware/' pushen
       bOTGWpreviousstate = state.otgw.bOnline; //remember state, so we can detect statechanges
     }
