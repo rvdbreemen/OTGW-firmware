@@ -71,3 +71,15 @@ A major feature release building on v1.2.0. **No breaking changes** — backward
 3. If upgrading from older than v1.2.0, review the earlier MQTT and API migration notes in [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md).
 
 Full release notes: [RELEASE_NOTES_1.3.0.md](RELEASE_NOTES_1.3.0.md)
+
+---
+
+### Thank you
+
+This release would not have been possible without the community. Thank you to everyone who tested, reported issues, and pushed for improvements. The Discord community continues to be an amazing source of feedback, testing, and ideas.
+
+Special thanks to: @hvxl, @sjorsjuhmaniac, @DaveDavenport, @DutchessNicole, @RobR, @GeorgeZ83, @tjfsteele, @vampywiz19, @Stemplar, @proditaki, and everyone in the Discord who keeps testing on the edge.
+
+Join the community on Discord: https://discord.gg/zjW3ju7vGQ
+
+If you want to support the project: [Buy me a coffee](https://www.buymeacoffee.com/rvdbreemen)
