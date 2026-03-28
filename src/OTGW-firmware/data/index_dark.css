@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index_dark.css
-**  Version  : v1.3.0
+**  Version  : v1.3.1-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -22,6 +22,7 @@
   
   body {
     max-width: 100%;
+    padding-bottom: 1.5em;
   }
 
   table {
