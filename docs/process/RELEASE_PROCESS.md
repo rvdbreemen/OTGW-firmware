@@ -22,16 +22,18 @@ See `CLAUDE.md` for ADR creation criteria and format.
 
 Before starting the release, ensure `dev` is in a releasable state.
 
-1. Commit all open/uncommitted changes on `dev`.
+1. Commit all open/uncommitted changes on `dev` and push to remote.
 2. Run `python build.py` to verify the build succeeds.
-3. If the build fails, fix the issue and commit again. Repeat until green.
+3. Commit version.h changes from build.py and push to remote.
+4. If the build fails, fix the issue, commit, push, and retry. Repeat until green.
 
 ---
 
 ## Phase 2: Merge dev to main
 
-1. `git checkout main && git merge dev`
-2. Verify merge succeeded without conflicts.
+1. `git checkout main && git pull origin main`
+2. `git merge dev` — resolve conflicts if any (prefer dev for version.h).
+3. Commit merge and push to remote.
 
 ---
 
@@ -172,7 +174,7 @@ Run through every item below before creating the GitHub release.
 
 - [ ] `src/OTGW-firmware/version.h` — `_VERSION_PRERELEASE` is **commented out** (no `-beta`, `-rc`)
 - [ ] `_SEMVER_FULL`, `_SEMVER_NOBUILD`, `_VERSION` contain no pre-release suffix
-- [ ] File header comments show the correct version (CI auto-fixes via `scripts/autoinc-semver.py` — verify after last CI run)
+- [ ] File header comments show the correct version (`python build.py` runs `autoinc-semver.py` to propagate)
 
 > **Check:** `grep -r "beta\|rc\|-dev" src/OTGW-firmware/ --include="*.h" --include="*.ino"`
 
@@ -199,12 +201,6 @@ Run through every item below before creating the GitHub release.
 - [ ] `python evaluate.py` passes without errors
 - [ ] `python build.py` builds cleanly (firmware + filesystem)
 
-### CI / GitHub Actions
-
-- [ ] All CI checks pass on `main` (green build)
-- [ ] No hardcoded pre-release version strings in `.github/workflows/`
-- [ ] Release workflow triggers on `release: published` — no changes needed
-
 ### Git state
 
 - [ ] Working tree is clean (`git status`)
@@ -217,17 +213,15 @@ Run through every item below before creating the GitHub release.
 
 Once the checklist is complete:
 
-1. **Commit all outstanding changes on `main`** — Documentation, version updates, etc.
+1. **Commit all outstanding changes on `main`** and push to remote.
 
 2. **Remove pre-release from `version.h`** — Comment out `_VERSION_PRERELEASE` (or remove the `beta`/`rc` suffix) so the firmware version string is a clean `v<version>` without any pre-release tag. Verify: `grep -n "PRERELEASE" src/OTGW-firmware/version.h`
 
 3. **Run `python build.py`** — This runs `autoinc-semver.py` internally (increments build number, updates version strings across all files) and builds firmware + filesystem. Verify the build succeeds.
 
-4. **Commit the release build** on `main`.
+4. **Commit the release build** on `main` and push to remote.
 
-5. **Push `main`**.
-
-6. **Create draft GitHub release (creates the tag):**
+5. **Create draft GitHub release (creates the tag):**
 
    ```bash
    gh release create v<version> --target main --title "v<version>" --notes-file RELEASE_GITHUB_<version>.md --draft
@@ -235,13 +229,13 @@ Once the checklist is complete:
 
    This creates the `v<version>` tag on the latest `main` commit and a draft release. The release is not yet visible to the public.
 
-7. **Upload build artifacts to the draft release:**
+6. **Upload build artifacts to the draft release:**
 
    ```bash
    gh release upload v<version> build/*.ino.bin build/*.littlefs.bin --clobber
    ```
 
-8. **Verify artifacts are attached:**
+7. **Verify artifacts are attached:**
 
    ```bash
    gh release view v<version> --json assets --jq '.assets[].name'
@@ -249,7 +243,7 @@ Once the checklist is complete:
 
    Confirm that `.ino.bin` and `.littlefs.bin` are listed.
 
-9. **Publish the release (only after artifacts are confirmed):**
+8. **Publish the release (only after artifacts are confirmed):**
 
    ```bash
    gh release edit v<version> --draft=false --latest
@@ -259,11 +253,43 @@ Once the checklist is complete:
 
 ---
 
-## Phase 7: Post-release verification
+## Phase 7: Post-release verification & Discord announcement
 
 - [ ] Verify artifacts are attached to the GitHub release
 - [ ] Flash a device and verify `fwversion` in `GET /api/v2/device/info` shows correct version (no `-beta`)
-- [ ] Announce on Discord
+- [ ] Announce on Discord (automated via OTGW bot, see below)
+
+### Discord release announcements
+
+Post release announcements in both community channels via the OTGW bot (`mcp__discord__discord_send`).
+
+**Dutch — `#nederlandse-ondersteuning`** (channel ID: `815561033036333076`):
+
+```text
+**OTGW-firmware v<version> is beschikbaar!**
+
+<korte samenvatting in het Nederlands>
+
+Special shoutout naar **<contributor>** voor <bijdrage>!
+
+Download: https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v<tag>
+```
+
+**English — `#english-support`** (channel ID: `931267109726593116`):
+
+```text
+**OTGW-firmware v<version> is now available!**
+
+<short summary in English>
+
+Special shoutout to **<contributor>** for <contribution>!
+
+Download: https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v<tag>
+```
+
+Both messages must include the contributor shoutout from the Thank You section and a direct link to the GitHub release.
+
+**CHECKPOINT: Show both Discord messages to the user for approval before sending.**
 
 ## Phase 8: Sync dev branch with main
 
@@ -303,9 +329,9 @@ This project follows [Semantic Versioning](https://semver.org/):
 | **Minor** | New backward-compatible features |
 | **Patch** | Backward-compatible bug fixes |
 | **Pre-release** | `beta` during development; commented out for stable releases |
-| **Build** | Auto-incremented by CI on every push; not user-controlled |
+| **Build** | Auto-incremented by `build.py` on every build; not user-controlled |
 
-Version strings are generated by `scripts/autoinc-semver.py` from `version.h`. Do not edit derived macros (`_SEMVER_FULL`, `_SEMVER_NOBUILD`, `_VERSION`) by hand — they are overwritten by CI. Edit only `_VERSION_MAJOR`, `_VERSION_MINOR`, `_VERSION_PATCH`, and `_VERSION_PRERELEASE`.
+Version strings are generated by `scripts/autoinc-semver.py` (called by `build.py`) from `version.h`. Do not edit derived macros (`_SEMVER_FULL`, `_SEMVER_NOBUILD`, `_VERSION`) by hand — they are overwritten by `build.py`. Edit only `_VERSION_MAJOR`, `_VERSION_MINOR`, `_VERSION_PATCH`, and `_VERSION_PRERELEASE`.
 
 ---
 
