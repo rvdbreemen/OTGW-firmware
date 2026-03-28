@@ -30,3 +30,7 @@ Special shoutout to **fuzzyduck** for finding the critical web GUI timeout bug, 
 Thanks also to **Schelte (.otgw)** for the key diagnostic insight that missed R/A messages were causing temperature spikes, and **simontemplar** for spotting the UI overlap issue in Firefox/LibreWolf.
 
 Join us on [Discord](https://discord.gg/zjW3ju7vGQ) for support and discussion.
+
+---
+
+Previous release: [v1.3.0](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.3.0)
