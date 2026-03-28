@@ -25,4 +25,8 @@ v1.3.1 is a stability release fixing command queue reliability, CS override inte
 
 ## Thank you
 
-Thanks to the community members who reported the CS override issue and provided detailed logs that helped pinpoint the root cause. Join us on [Discord](https://discord.gg/zjW3ju7vGQ) for support and discussion.
+Special shoutout to **fuzzyduck** for finding the critical web GUI timeout bug, testing multiple beta builds, and confirming the final fix after 2+ hours of monitoring!
+
+Thanks also to **Schelte (.otgw)** for the key diagnostic insight that missed R/A messages were causing temperature spikes, and **simontemplar** for spotting the UI overlap issue in Firefox/LibreWolf.
+
+Join us on [Discord](https://discord.gg/zjW3ju7vGQ) for support and discussion.
