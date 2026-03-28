@@ -2703,8 +2703,21 @@ void checkOTGWcmdqueue(const char *buf, unsigned int len){
   for (int i=0; i<cmdQueueSize; i++){
       OTGWDebugTf(PSTR("CmdQueue: Checking [%2s]==>[%d]:[%s] from queue\r\n"), cmd, i, cmdqueue[i].cmd); 
     if (strncmp(cmdqueue[i].cmd, cmd, 2) == 0){
+      // For PR commands, also match the register letter to avoid removing
+      // the wrong PR=X entry.  Command format: "PR=X", response: "PR: X=value".
+      // Normal register response has '=' at buf[5] (e.g. "PR: O=T20.5").
+      // Banner response (PR=A) has no '=' there (e.g. "PR: OpenTherm Gateway 6.2").
+      if (cmd[0] == 'P' && cmd[1] == 'R' && cmdqueue[i].cmdlen >= 4 && len > 5) {
+        if (buf[5] == '=') {
+          // Register response — match register letter at buf[4]
+          if (cmdqueue[i].cmd[3] != buf[4]) continue;
+        } else {
+          // Banner response — only PR=A expects this
+          if (cmdqueue[i].cmd[3] != 'A') continue;
+        }
+      }
       //command found, check value
-      OTGWDebugTf(PSTR("CmdQueue: Found cmd [%2s]==>[%d]:[%s]\r\n"), cmd, i, cmdqueue[i].cmd); 
+      OTGWDebugTf(PSTR("CmdQueue: Found cmd [%2s]==>[%d]:[%s]\r\n"), cmd, i, cmdqueue[i].cmd);
       // if(strstr(cmdqueue[i].cmd, value)){
         //value found, thus remove command from queue
         OTGWDebugTf(PSTR("CmdQueue: Found value [%s]==>[%d]:[%s]\r\n"), value, i, cmdqueue[i].cmd); 
