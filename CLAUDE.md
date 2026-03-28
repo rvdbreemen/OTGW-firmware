@@ -662,6 +662,13 @@ Do NOT create ADRs for: pure refactors, bug fixes, minor features within existin
 ## Related — relevant code, issues, PRs, prior ADRs
 ```
 
+## Naming Conventions
+
+- **Variables**: camelCase (`settingHostname`, `lastReset`)
+- **Constants/defines**: UPPER_CASE (`ON`, `OFF`, `CMSG_SIZE`)
+- **Functions**: camelCase (`startWiFi`, `readSettings`)
+- **Global settings**: prefix with `setting` (`settingMqttBroker`)
+
 ## Critical Coding Rules
 
 ### PROGMEM — MANDATORY (ESP8266 has ~40KB RAM)
@@ -674,6 +681,8 @@ snprintf_P(buf, size, PSTR("Format: %s"), str);      // snprintf_P for all forma
 const char myStr[] PROGMEM = "Long string";          // PROGMEM for string constants
 ```
 For string comparisons: use `strcmp_P()`, `strcasecmp_P()` with `PSTR()`.
+
+**Post-mortem rule**: If a bug involves `_P` helpers, `PGM_P`, or `__FlashStringHelper`, assume a storage-domain mismatch until proven otherwise. The RAM/flash domain must match the helper — never pass a PROGMEM pointer where RAM is expected or vice versa.
 
 ### No String class in hot paths (ADR-004)
 - Use `char[]` buffers with `strlcpy`, `strncat`, `snprintf_P`
@@ -693,6 +702,15 @@ if (memcmp_P(datamem + ptr, banner, bannerLen) == 0) { ... }  // CORRECT
 
 ### Network — HTTP/WS only (no HTTPS/WSS)
 This firmware uses plain HTTP and WS protocols only. **Never add HTTPS or WSS support.**
+- Target environment: local network only, not internet-exposed
+- Security model: trusted LAN; use VPN for remote access
+- Reverse proxy: REST API works behind HTTPS proxy, but WebSocket (live OT log) assumes plain HTTP
+
+### Typed internal control flow
+Use `enum class`, numeric IDs, or flags for internal behavior selection — not string tokens. Internal discriminator strings are fragile on ESP8266 and can hide RAM-vs-flash pointer bugs.
+
+### Browser compatibility (frontend code)
+All frontend JavaScript must work in Chrome, Firefox, and Safari (latest + 2 versions back). Always check element existence before DOM access, wrap `JSON.parse()` in try-catch, check `response.ok` on fetch, and add `.catch()` on all async operations.
 
 ### Static buffers, cooperative scheduling
 - Re-entrancy: `doBackgroundTasks()` can be re-entered via `feedWatchDog()` → `yield()`
@@ -727,6 +745,10 @@ python evaluate.py --quick   # Fast check
 - `/api/v0/` — legacy; `/api/v1/` — standard; `/api/v2/` — current preferred
 - Dispatch table in `restAPI.ino` (`kV2Routes[]`) — add new endpoints by adding one entry
 - Always return JSON errors via `sendApiError(httpCode, F("message"))`
+
+## Additional Skills Reference
+
+Project-specific skills for GitHub Copilot live in `.github/skills/`. The `adr` skill is mirrored to `.claude/skills/adr/` for direct use. Other skills there (pdf, docx, refactor, webapp-testing, etc.) can be consulted as reference when relevant.
 
 ## Important Constraints
 

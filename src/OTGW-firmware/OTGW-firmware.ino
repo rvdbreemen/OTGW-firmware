@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v1.3.0
+**  Version  : v1.3.1-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -303,20 +303,18 @@ void sendtimecommand(){
   //Send msg id xx: hour:minute/day of week
   int day_of_week = (myTime.dayOfWeek()+6)%7+1;
   snprintf_P(msg, sizeof(msg), PSTR("SC=%d:%02d/%d"), myTime.hour(), myTime.minute(), day_of_week);
-  sendOTGW(msg, strlen(msg)); //bypass command queue, no delays
-  
+  addOTWGcmdtoqueue(msg, strlen(msg), false, 0);
+
   if (dayChanged()){
     //Send msg id 21: month, day
     snprintf_P(msg, sizeof(msg), PSTR("SR=21:%d,%d"), myTime.month(), myTime.day());
-    addOTWGcmdtoqueue(msg, strlen(msg), true, 0); 
-    handleOTGWqueue(); //send command right away
+    addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
   }
-  
+
   if (yearChanged()){
-    //Send msg id 22: HB of Year, LB of Year 
+    //Send msg id 22: HB of Year, LB of Year
     snprintf_P(msg, sizeof(msg), PSTR("SR=22:%d,%d"), (myTime.year() >> 8) & 0xFF, myTime.year() & 0xFF);
     addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
-    handleOTGWqueue(); //send command right away
   }
 }
 
@@ -392,44 +390,19 @@ void doTaskEvery60s(){
   // even if other runtime status messages are set and cleared elsewhere.
   checklittlefshash();
 
-  // Query the actual gateway mode setting from PIC using PR=M command
-  // This provides reliable detection of Gateway vs Monitor mode
+  // Query gateway mode from PIC — non-blocking, queues PR=M.
+  // State update + MQTT publish handled by handlePRresponse() when response arrives.
   if (state.pic.bAvailable && state.otgw.bOnline) {
-    static bool bOTGWgatewaypreviousstate = false;
-    static bool bOTGWgatewaypreviousknown = false;
-    bool newGatewayState = queryOTGWgatewaymode();
-    
-    // Only publish/update when mode has been read successfully at least once.
-    if (state.otgw.bGatewayModeKnown) {
-      state.otgw.bGatewayMode = newGatewayState;
-
-      // Send MQTT update if state changed or first successful read
-      if ((state.otgw.bGatewayMode != bOTGWgatewaypreviousstate) || !bOTGWgatewaypreviousknown) {
-        sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(state.otgw.bGatewayMode));
-        bOTGWgatewaypreviousstate = state.otgw.bGatewayMode;
-        bOTGWgatewaypreviousknown = true;
-        DebugTf(PSTR("Gateway mode updated via PR=M: %s\r\n"), CCONOFF(state.otgw.bGatewayMode));
-      }
-    } else {
-      DebugTln(F("Gateway mode still unknown (waiting for first successful PR=M)"));
-    }
+    queryOTGWgatewaymode();
   }
 
+  // Probe PIC firmware version if still unknown — non-blocking, queues PR=A.
+  // State update + MQTT publish handled by handlePRresponse() when banner arrives.
   if ((strcmp_P(state.pic.sDeviceid, PSTR("unknown")) == 0)
       || (strcmp_P(state.pic.sDeviceid, PSTR("no pic found")) == 0)
       || (state.pic.sDeviceid[0] == '\0')) {
-    //keep trying to figure out which pic is used!
     DebugTln(F("PIC is unknown, probe pic using PR=A"));
-    //Force banner fetch
     getpicfwversion();
-    //This should retreive the information here
-    strlcpy(state.pic.sFwversion, OTGWSerial.firmwareVersion(), sizeof(state.pic.sFwversion));
-    DebugTf(PSTR("Current firmware version: %s\r\n"), state.pic.sFwversion);
-    strlcpy(state.pic.sDeviceid, OTGWSerial.processorToString().c_str(), sizeof(state.pic.sDeviceid));
-    DebugTf(PSTR("Current device id: %s\r\n"), state.pic.sDeviceid);    
-    strlcpy(state.pic.sType, OTGWSerial.firmwareToString().c_str(), sizeof(state.pic.sType));
-    DebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
-    sendMQTTversioninfo();
   }
   
   // Log heap statistics every minute for monitoring
