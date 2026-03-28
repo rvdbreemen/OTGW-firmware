@@ -235,7 +235,13 @@ Once the checklist is complete:
 
    This creates the `v<version>` tag on the latest `main` commit and publishes the release.
 
-7. **Release workflow fires automatically** — `.github/workflows/release.yml` checks out the release tag, builds firmware + filesystem, and attaches `.elf`, `.ino.bin`, and `.littlefs.bin` artifacts to the release. These are the official release binaries.
+7. **Upload build artifacts to the release:**
+
+   ```bash
+   gh release upload v<version> build/*.elf build/*.ino.bin build/*.littlefs.bin --clobber
+   ```
+
+   This attaches the locally built `.elf`, `.ino.bin`, and `.littlefs.bin` files to the GitHub release. These are the official release binaries.
 
 ---
 
