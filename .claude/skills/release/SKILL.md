@@ -106,11 +106,10 @@ Generate all documentation files on `main`. Show content to the user before writ
 
 1. **Commit all outstanding changes on `main`** (documentation, version updates, etc.)
 2. **Remove pre-release from `version.h`**: Comment out `_VERSION_PRERELEASE` so the build produces a clean `v<version>` without `-beta`. Verify: `grep -n "PRERELEASE" src/OTGW-firmware/version.h`
-3. **Run `python build.py`** to verify a clean release build. Fix any issues.
-4. **Commit the release build**
-5. **Push `main`**
-6. **Tag the version**: `gh release create v<version> --target main --title "v<version>" --notes-file RELEASE_GITHUB_<version>.md --latest` — this creates the `v<version>` tag on `main` and triggers the release workflow
-7. **Release workflow** (`.github/workflows/release.yml`) checks out the tag, builds, and attaches `.elf`, `.ino.bin`, `.littlefs.bin` artifacts
+3. **Run `python build.py`** to produce the release build. Fix any issues.
+4. **Commit the release build** and push `main`
+5. **Create GitHub release with tag**: `gh release create v<version> --target main --title "v<version>" --notes-file RELEASE_GITHUB_<version>.md --latest`
+6. **Upload build artifacts to the release**: `gh release upload v<version> build/*.elf build/*.ino.bin build/*.littlefs.bin --clobber`
 
 ### Phase 6: Post-release verification
 
