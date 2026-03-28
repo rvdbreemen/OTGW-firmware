@@ -303,20 +303,18 @@ void sendtimecommand(){
   //Send msg id xx: hour:minute/day of week
   int day_of_week = (myTime.dayOfWeek()+6)%7+1;
   snprintf_P(msg, sizeof(msg), PSTR("SC=%d:%02d/%d"), myTime.hour(), myTime.minute(), day_of_week);
-  sendOTGW(msg, strlen(msg)); //bypass command queue, no delays
-  
+  addOTWGcmdtoqueue(msg, strlen(msg), false, 0);
+
   if (dayChanged()){
     //Send msg id 21: month, day
     snprintf_P(msg, sizeof(msg), PSTR("SR=21:%d,%d"), myTime.month(), myTime.day());
-    addOTWGcmdtoqueue(msg, strlen(msg), true, 0); 
-    handleOTGWqueue(); //send command right away
+    addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
   }
-  
+
   if (yearChanged()){
-    //Send msg id 22: HB of Year, LB of Year 
+    //Send msg id 22: HB of Year, LB of Year
     snprintf_P(msg, sizeof(msg), PSTR("SR=22:%d,%d"), (myTime.year() >> 8) & 0xFF, myTime.year() & 0xFF);
     addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
-    handleOTGWqueue(); //send command right away
   }
 }
 

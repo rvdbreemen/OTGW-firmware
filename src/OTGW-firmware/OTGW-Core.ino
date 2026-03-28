@@ -635,18 +635,8 @@ static void handlePRresponse(const char* buf, size_t len) {
   size_t plen = strlen(payload);
   if (plen == 0) return;
 
-  // --- Banner response (PR=A): "OpenTherm Gateway x.x" ---
-  if (strstr_P(payload, PSTR("OpenTherm Gateway"))) {
-    // OTGWSerial detects the banner at byte level during handleOTGW() reads,
-    // so firmwareVersion/processorToString/firmwareToString are already set.
-    strlcpy(state.pic.sFwversion, OTGWSerial.firmwareVersion(), sizeof(state.pic.sFwversion));
-    strlcpy(state.pic.sDeviceid, OTGWSerial.processorToString().c_str(), sizeof(state.pic.sDeviceid));
-    strlcpy(state.pic.sType, OTGWSerial.firmwareToString().c_str(), sizeof(state.pic.sType));
-    OTGWDebugTf(PSTR("handlePRresponse: banner → fw=[%s] dev=[%s] type=[%s]\r\n"),
-                state.pic.sFwversion, state.pic.sDeviceid, state.pic.sType);
-    sendMQTTversioninfo();
-    return;
-  }
+  // Note: PR=A banner ("OpenTherm Gateway x.x") never reaches here because
+  // the banner has no ":" at position 2. It is handled in processOT() directly.
 
   // --- Register response: "X=value" ---
   if (plen < 3 || payload[1] != '=') return;  // need at least "X=v"
@@ -2529,10 +2519,28 @@ void print_daytime(uint16_t& value)
 
 #define OTGW_CMD_RETRY 5
 #define OTGW_CMD_INTERVAL_MS 5000
+#define SER2NET_QUIET_MS 2000       // queue pauses after ser2net activity
+static uint32_t lastSer2netCmdMs = 0 - SER2NET_QUIET_MS;  // expired at boot
 #define OTGW_DELAY_SEND_MS 1000
 #define MAX_QUEUE_MSGSIZE 127
+
+// Remove entry at index from the command queue, shifting remaining entries down.
+static void removeFromCmdQueue(int index) {
+  for (int j = index; j < (cmdQueueSize - 1); j++) {
+    strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[j].cmd));
+    cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
+    cmdqueue[j].retrycnt = cmdqueue[j+1].retrycnt;
+    cmdqueue[j].due = cmdqueue[j+1].due;
+  }
+  cmdQueueSize--;
+  cmdqueue[cmdQueueSize].cmd[0] = '\0';
+  cmdqueue[cmdQueueSize].cmdlen = 0;
+  cmdqueue[cmdQueueSize].retrycnt = 0;
+  cmdqueue[cmdQueueSize].due = 0;
+}
+
 /*
-  addOTWGcmdtoqueue adds a command to the queue. 
+  addOTWGcmdtoqueue adds a command to the queue.
   First it checks the queue, if the command is in the queue, it's updated.
   Otherwise it's simply added to the queue, unless there are no free queue slots.
 */
@@ -2568,7 +2576,7 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
     memset(cmd, 0, sizeof(cmd));
     memcpy(cmd, buf, 2);
     for (int i=0; i<cmdQueueSize; i++){
-      if (strncmp(cmdqueue[i].cmd, cmd, 2) == 0) {
+      if (cmdqueue[i].cmd[0] == cmd[0] && cmdqueue[i].cmd[1] == cmd[1]) {
         //found cmd exists, set the inertptr to found slot
         foundcmd = true;
         insertptr = i;
@@ -2623,8 +2631,8 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
   // GW→PR=M, SB→PR=S, VR→PR=V, TS→PR=D, IT/OH→PR=T, GA/GB→PR=G, LA-LF→PR=L
   if (len >= 2) {
     char cmd[3] = { buf[0], buf[1], '\0' };
-    static const char kSettingsCmds[] PROGMEM = "GW GA GB SB VR TS IT OH LA LB LC LD LE LF";
-    if (strstr_P(kSettingsCmds, cmd)) {
+    static const char kSettingsCmds[] = "GW GA GB SB VR TS IT OH LA LB LC LD LE LF";
+    if (strstr(kSettingsCmds, cmd)) {
       triggerPICsettingsReadout();
     }
   }
@@ -2638,7 +2646,8 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
   If retry max is reached the cmd is delete from the queue
 */
 void handleOTGWqueue(){
-  // OTGWDebugTf(PSTR("CmdQueue: Commands in queue [%d]\r\n"), (int)cmdQueueSize);
+  // Pause queue processing briefly after ser2net activity to avoid collisions
+  if ((millis() - lastSer2netCmdMs) < SER2NET_QUIET_MS) return;
   const uint32_t now = millis();
   for (int i = 0; i < cmdQueueSize; i++) {
     // OTGWDebugTf(PSTR("CmdQueue: Checking due in queue slot[%d]:[%lu]=>[%lu]\r\n"), (int)i, (unsigned long)millis(), (unsigned long)cmdqueue[i].due);
@@ -2652,18 +2661,7 @@ void handleOTGWqueue(){
         OTGWDebugTf(PSTR("CmdQueue: Delete [%d] from queue\r\n"), i);
         snprintf_P(cMsg, sizeof(cMsg), PSTR("%s [dropped]"), cmdqueue[i].cmd);
         sendEventToWebSocket('!', cMsg);
-        for (int j = i; j < (cmdQueueSize - 1); j++){
-          // OTGWDebugTf(PSTR("CmdQueue: Moving [%d] => [%d]\r\n"), j+1, j);
-          strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[j].cmd));
-          cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
-          cmdqueue[j].retrycnt = cmdqueue[j+1].retrycnt;
-          cmdqueue[j].due = cmdqueue[j+1].due;
-        }
-        cmdQueueSize--;
-        cmdqueue[cmdQueueSize].cmd[0] = '\0';
-        cmdqueue[cmdQueueSize].cmdlen = 0;
-        cmdqueue[cmdQueueSize].retrycnt = 0;
-        cmdqueue[cmdQueueSize].due = 0;
+        removeFromCmdQueue(i);
         i--; // re-check current index after shift
       }
       // //exit queue handling, after 1 command
@@ -2701,26 +2699,21 @@ void checkOTGWcmdqueue(const char *buf, unsigned int len){
   memcpy(cmd, buf, 2);
   memcpy(value, buf+3, ((len-3)<(sizeof(value)-1))?(len-3):(sizeof(value)-1));
   for (int i=0; i<cmdQueueSize; i++){
-      OTGWDebugTf(PSTR("CmdQueue: Checking [%2s]==>[%d]:[%s] from queue\r\n"), cmd, i, cmdqueue[i].cmd); 
-    if (strncmp(cmdqueue[i].cmd, cmd, 2) == 0){
-      //command found, check value
-      OTGWDebugTf(PSTR("CmdQueue: Found cmd [%2s]==>[%d]:[%s]\r\n"), cmd, i, cmdqueue[i].cmd); 
-      // if(strstr(cmdqueue[i].cmd, value)){
-        //value found, thus remove command from queue
-        OTGWDebugTf(PSTR("CmdQueue: Found value [%s]==>[%d]:[%s]\r\n"), value, i, cmdqueue[i].cmd); 
+      OTGWDebugTf(PSTR("CmdQueue: Checking [%2s]==>[%d]:[%s] from queue\r\n"), cmd, i, cmdqueue[i].cmd);
+    if (cmdqueue[i].cmd[0] == cmd[0] && cmdqueue[i].cmd[1] == cmd[1]){
+      // For PR commands, also match the register letter
+      // (e.g., response "PR: S=16.00" must match "PR=S" in queue, not "PR=O")
+      // value starts at buf+3, which may have a leading space (e.g., " S=16.00")
+      if (cmd[0] == 'P' && cmd[1] == 'R' && cmdqueue[i].cmdlen >= 4) {
+        const char* reg = value;
+        while (*reg == ' ') reg++;
+        if (cmdqueue[i].cmd[3] != *reg) continue;
+      }
+      //command found
+      OTGWDebugTf(PSTR("CmdQueue: Found cmd [%2s]==>[%d]:[%s]\r\n"), cmd, i, cmdqueue[i].cmd);
+        OTGWDebugTf(PSTR("CmdQueue: Found value [%s]==>[%d]:[%s]\r\n"), value, i, cmdqueue[i].cmd);
         OTGWDebugTf(PSTR("CmdQueue: Remove from queue [%d]:[%s] from queue\r\n"), i, cmdqueue[i].cmd);
-        for (int j = i; j < (cmdQueueSize - 1); j++){
-          OTGWDebugTf(PSTR("CmdQueue: Moving [%d] => [%d]\r\n"), j+1, j);
-          strlcpy(cmdqueue[j].cmd, cmdqueue[j+1].cmd, sizeof(cmdqueue[j].cmd));
-          cmdqueue[j].cmdlen = cmdqueue[j+1].cmdlen;
-          cmdqueue[j].retrycnt = cmdqueue[j+1].retrycnt;
-          cmdqueue[j].due = cmdqueue[j+1].due;
-        }
-        cmdQueueSize--;
-        cmdqueue[cmdQueueSize].cmd[0] = '\0';
-        cmdqueue[cmdQueueSize].cmdlen = 0;
-        cmdqueue[cmdQueueSize].retrycnt = 0;
-        cmdqueue[cmdQueueSize].due = 0;
+        removeFromCmdQueue(i);
         break;
       // } else OTGWDebugTf(PSTR("Error: Did not find value [%s]==>[%d]:[%s]\r\n"), value, i, cmdqueue[i].cmd); 
     }
@@ -3865,6 +3858,14 @@ void processOT(const char *buf, int len){
     strlcpy(state.pic.sType, OTGWSerial.firmwareToString().c_str(), sizeof(state.pic.sType));
     OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
     sendMQTTversioninfo();
+    // Banner is the response to PR=A — remove it directly from the command queue
+    for (int qi = 0; qi < cmdQueueSize; qi++) {
+      if (cmdqueue[qi].cmd[0] == 'P' && cmdqueue[qi].cmd[1] == 'R' &&
+          cmdqueue[qi].cmdlen >= 4 && cmdqueue[qi].cmd[3] == 'A') {
+        removeFromCmdQueue(qi);
+        break;
+      }
+    }
     { char evtBuf[60]; snprintf_P(evtBuf, sizeof(evtBuf), PSTR("OTGW PIC restarted [%s]"), state.pic.sFwversion); reportOTGWEvent(evtBuf, '*', true); }
   } else if (strchr(buf, ',') != nullptr) {
     // Comma-separated line: handle PS=1 summary (25 or 34 comma-separated fields).
@@ -4014,6 +4015,22 @@ void handleOTGW()
       } else {
         OTGWDebugTf(PSTR("Net2Ser: Sending to OTGW: [%s] (%d)\r\n"), sWrite, bytes_write);
         if (bytes_write > 0) sendEventToWebSocket('>', sWrite); // log every ser2net command
+        // Track ser2net activity and remove conflicting queue entries
+        if (bytes_write >= 3 && sWrite[2] == '=') {
+          lastSer2netCmdMs = millis();
+          // Remove matching command from queue to prevent override
+          for (int qi = 0; qi < cmdQueueSize; qi++) {
+            if (cmdqueue[qi].cmd[0] == sWrite[0] && cmdqueue[qi].cmd[1] == sWrite[1]) {
+              // For PR commands, also match the register letter (e.g., ser2net PR=S must not remove PR=O)
+              if (sWrite[0] == 'P' && sWrite[1] == 'R' && bytes_write >= 4 && cmdqueue[qi].cmdlen >= 4) {
+                if (cmdqueue[qi].cmd[3] != sWrite[3]) continue;
+              }
+              OTGWDebugTf(PSTR("Ser2net: Removing [%s] from queue (overridden by ser2net)\r\n"), cmdqueue[qi].cmd);
+              removeFromCmdQueue(qi);
+              break;
+            }
+          }
+        }
         //check for reset command
         if (strcmp_P(sWrite, PSTR("GW=R"))==0){
           //detected [GW=R], then reset the gateway the gpio way
