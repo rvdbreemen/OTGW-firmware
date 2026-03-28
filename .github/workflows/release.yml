@@ -45,16 +45,13 @@ jobs:
       - name: Build release artifacts
         uses: ./.github/actions/build
 
-      - name: Publish release assets
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.release.tag_name }}
-          name: ${{ github.event.release.name }}
-          body: ${{ github.event.release.body }}
-          draft: false
-          prerelease: ${{ github.event.release.prerelease }}
-          files: |
-            build/*.elf
-            build/*.ino.bin
-            build/*.littlefs.bin
-            LICENSE
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            build/*.elf \
+            build/*.ino.bin \
+            build/*.littlefs.bin \
+            LICENSE \
+            --clobber
