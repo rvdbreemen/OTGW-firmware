@@ -108,8 +108,10 @@ Generate all documentation files on `main`. Show content to the user before writ
 2. **Remove pre-release from `version.h`**: Comment out `_VERSION_PRERELEASE` so the build produces a clean `v<version>` without `-beta`. Verify: `grep -n "PRERELEASE" src/OTGW-firmware/version.h`
 3. **Run `python build.py`** to produce the release build. Fix any issues.
 4. **Commit the release build** and push `main`
-5. **Create GitHub release with tag**: `gh release create v<version> --target main --title "v<version>" --notes-file RELEASE_GITHUB_<version>.md --latest`
-6. **Upload build artifacts to the release**: `gh release upload v<version> build/*.elf build/*.ino.bin build/*.littlefs.bin --clobber`
+5. **Create draft GitHub release with tag**: `gh release create v<version> --target main --title "v<version>" --notes-file RELEASE_GITHUB_<version>.md --draft`
+6. **Upload build artifacts to the draft release**: `gh release upload v<version> build/*.ino.bin build/*.littlefs.bin --clobber`
+7. **Verify artifacts are attached**: `gh release view v<version> --json assets --jq '.assets[].name'`
+8. **Publish the release**: `gh release edit v<version> --draft=false --latest` — only after confirming artifacts are present
 
 ### Phase 6: Post-release verification
 

@@ -227,21 +227,35 @@ Once the checklist is complete:
 
 5. **Push `main`**.
 
-6. **Create GitHub release (creates the tag):**
+6. **Create draft GitHub release (creates the tag):**
 
    ```bash
-   gh release create v<version> --target main --title "v<version>" --notes-file RELEASE_GITHUB_<version>.md --latest
+   gh release create v<version> --target main --title "v<version>" --notes-file RELEASE_GITHUB_<version>.md --draft
    ```
 
-   This creates the `v<version>` tag on the latest `main` commit and publishes the release.
+   This creates the `v<version>` tag on the latest `main` commit and a draft release. The release is not yet visible to the public.
 
-7. **Upload build artifacts to the release:**
+7. **Upload build artifacts to the draft release:**
 
    ```bash
-   gh release upload v<version> build/*.elf build/*.ino.bin build/*.littlefs.bin --clobber
+   gh release upload v<version> build/*.ino.bin build/*.littlefs.bin --clobber
    ```
 
-   This attaches the locally built `.elf`, `.ino.bin`, and `.littlefs.bin` files to the GitHub release. These are the official release binaries.
+8. **Verify artifacts are attached:**
+
+   ```bash
+   gh release view v<version> --json assets --jq '.assets[].name'
+   ```
+
+   Confirm that `.ino.bin` and `.littlefs.bin` are listed.
+
+9. **Publish the release (only after artifacts are confirmed):**
+
+   ```bash
+   gh release edit v<version> --draft=false --latest
+   ```
+
+   This makes the release public and marks it as the latest release. Once published, the release is immutable — assets can no longer be changed.
 
 ---
 
