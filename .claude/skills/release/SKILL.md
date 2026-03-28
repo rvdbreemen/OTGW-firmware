@@ -94,6 +94,7 @@ Generate all documentation files on `main`. Show content to the user before writ
 2. **`RELEASE_GITHUB_<version>.md`** (repository root) — Concise GitHub release body with:
    - Bug fixes, improvements, upgrade notes
    - **Thank You section**: special shoutout to most active contributor, then bullet list of other contributors with their contribution. Ends with Discord invite link.
+   - **Previous release link**: always end with `Previous release: [v<prev>](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v<prev>)`
 3. **`docs/BREAKING_CHANGES.md`** — Prepend a new version section. Always declare explicitly whether there are breaking changes or not.
 4. **`README.md`** — Demote current "What's New" to "What was new", add new "What's New in v<version>" section with highlights
 5. **ADRs** — If any changes warrant a new ADR, propose it.
