@@ -36,9 +36,9 @@ Before starting the release, check whether any architectural changes since the p
 
 ### Phase 1: Stabilize dev branch
 
-1. Commit all open/uncommitted changes on `dev`
+1. Commit all open/uncommitted changes on `dev` and push to remote
 2. Run `python build.py` to verify the build works
-3. If the build fails, fix the issue and commit again
+3. If the build fails, fix the issue, commit and push again
 4. Repeat until the build succeeds on `dev`
 
 **CHECKPOINT: Confirm with user that dev is stable and ready to merge.**
