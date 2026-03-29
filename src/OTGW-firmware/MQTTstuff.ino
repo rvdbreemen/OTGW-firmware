@@ -689,6 +689,10 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
       }
       MQTTDebugf(PSTR("%s"), topicToken);
       if (topicToken[0] != '\0') {
+        if (!isPICEnabled()) {
+          MQTTDebugln(F(" MQTT command ignored: no PIC detected"));
+          return;
+        }
         const int cmdIndex = findMQTTSetCommandIndex(topicToken);
         if (cmdIndex >= 0) {
           PGM_P pOtgwCmd = (PGM_P)pgm_read_ptr(&setcmds[cmdIndex].otgwcmd);
@@ -1281,6 +1285,9 @@ void doAutoConfigure(){
       // 4. Decision: Do we send this line?
       // Skip Dallas sensors - they need per-sensor addresses from configSensors()
       if (lineID == OTGWdallasdataid) continue;
+      // Skip PIC-specific discovery entries when no PIC is detected.
+      // Relies on the "otgw-pic/" topic prefix convention — update if topics are renamed.
+      if (!isPICEnabled() && strstr_P(sLine, PSTR("otgw-pic/"))) continue;
 
       {
 
