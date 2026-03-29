@@ -22,19 +22,40 @@ The version argument is the target release version (without `v` prefix). The pre
 
 Follow these phases in order, pausing for user approval at the marked checkpoints.
 
-### Phase 0: ADR validation
+### Phase 0: Prepare — clean state & detect previous release
 
-Before starting the release, check whether any architectural changes since the previous release require new or updated ADRs.
+Start every release by ensuring a clean working state and detecting the baseline.
 
-1. Detect the previous release tag: `git describe --tags --abbrev=0`
-2. List commits that touch code (not just docs/version bumps): `git log <prev-tag>..HEAD --oneline -- src/`
+1. **Ensure you are on `dev`**: `git checkout dev`
+2. **Commit and push any uncommitted changes**:
+   - `git status` — if there are modified or untracked files, stage, commit, and push them
+   - `git pull` — incorporate any remote changes
+   - `git push origin dev` — ensure local and remote are in sync
+   - Verify: `git status` must show `nothing to commit, working tree clean`
+3. **Detect the latest GitHub release** (this is the authoritative previous release, not a local git tag):
+   ```bash
+   gh release view --json tagName,name,publishedAt --jq '{tag: .tagName, title: .name, date: .publishedAt}'
+   ```
+   Store the tag name (e.g., `v1.3.2`) and published date for use in later phases.
+4. **Verify the release tag exists locally**: `git fetch --tags && git log <prev-tag> --oneline -1`
+5. **List code changes since that release**: `git log <prev-tag>..HEAD --oneline -- src/ | grep -v "CI: update version.h"`
+   - If there are no code changes, warn the user and ask whether to proceed.
+
+### Phase 1: ADR validation
+
+Check whether any architectural changes since the previous release require new or updated ADRs.
+
+1. Review the code commits from Phase 0 step 5
+2. For each significant change — does it affect: architecture, NFRs (security/performance/availability), API contracts, new/replaced dependencies, or build/CI tooling?
+3. Check `docs/adr/` for existing ADRs that may need their Related section updated.
+4. If new ADRs are needed, create them now on `dev` before proceeding.
 3. Review each significant change — does it affect: architecture, NFRs (security/performance/availability), API contracts, new/replaced dependencies, or build/CI tooling?
 4. Check `docs/adr/` for existing ADRs that may need their Related section updated.
 5. If new ADRs are needed, create them now on `dev` before proceeding.
 
 **CHECKPOINT: Present any missing or needed ADRs to the user. Do not proceed until all architectural decisions are documented.**
 
-### Phase 1: Stabilize dev branch
+### Phase 2: Stabilize dev branch
 
 1. Commit all open/uncommitted changes on `dev` and push to remote
 2. Run `python build.py` to verify the build works
@@ -43,12 +64,12 @@ Before starting the release, check whether any architectural changes since the p
 
 **CHECKPOINT: Confirm with user that dev is stable and ready to merge.**
 
-### Phase 2: Merge dev to main
+### Phase 3: Merge dev to main
 
 1. `git checkout main && git merge dev`
 2. Verify merge succeeded without conflicts
 
-### Phase 3: Gather changes & contributors
+### Phase 4: Gather changes & contributors
 
 On `main`, gather all information for the release notes.
 
@@ -86,7 +107,7 @@ On `main`, gather all information for the release notes.
 
 **CHECKPOINT: Present the categorized changes AND contributor list. Ask user to confirm before proceeding.**
 
-### Phase 4: Documentation
+### Phase 5: Documentation
 
 Generate all documentation files on `main`. Show content to the user before writing.
 
@@ -100,7 +121,7 @@ Generate all documentation files on `main`. Show content to the user before writ
 
 **CHECKPOINT: Show all generated documentation to the user for review.**
 
-### Phase 5: Release execution
+### Phase 6: Release execution
 
 **CHECKPOINT: Confirm with user before starting — these steps are not reversible.**
 
@@ -113,7 +134,7 @@ Generate all documentation files on `main`. Show content to the user before writ
 7. **Verify artifacts are attached**: `gh release view v<version> --json assets --jq '.assets[].name'`
 8. **Publish the release**: `gh release edit v<version> --draft=false --latest` — only after confirming artifacts are present
 
-### Phase 6: Post-release verification & Discord announcement
+### Phase 7: Post-release verification & Discord announcement
 
 1. Verify release artifacts are attached to the GitHub release
 2. Remind user to flash a device and check `GET /api/v2/device/info`
@@ -123,7 +144,7 @@ Generate all documentation files on `main`. Show content to the user before writ
    - Both messages include: version, summary, contributor shoutout, download link
    - **CHECKPOINT: Show both messages to the user before sending.**
 
-### Phase 7: Sync dev branch
+### Phase 8: Sync dev branch
 
 1. `git checkout dev`
 2. `git merge main`
