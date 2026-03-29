@@ -104,19 +104,24 @@ Generate all documentation files on `main`. Show content to the user before writ
 
 **CHECKPOINT: Confirm with user before starting — these steps are not reversible.**
 
-1. **Commit all outstanding changes on `main`** (documentation, version updates, etc.)
+1. **Commit all outstanding changes on `main`** and push to remote
 2. **Remove pre-release from `version.h`**: Comment out `_VERSION_PRERELEASE` so the build produces a clean `v<version>` without `-beta`. Verify: `grep -n "PRERELEASE" src/OTGW-firmware/version.h`
-3. **Run `python build.py`** to verify a clean release build. Fix any issues.
-4. **Commit the release build**
-5. **Push `main`**
-6. **Tag the version**: `gh release create v<version> --target main --title "v<version>" --notes-file RELEASE_GITHUB_<version>.md --latest` — this creates the `v<version>` tag on `main` and triggers the release workflow
-7. **Release workflow** (`.github/workflows/release.yml`) checks out the tag, builds, and attaches `.elf`, `.ino.bin`, `.littlefs.bin` artifacts
+3. **Run `python build.py`** to produce the release build. Fix any issues.
+4. **Commit the release build** and push `main` to remote
+5. **Create draft GitHub release with tag**: `gh release create v<version> --target main --title "v<version>" --notes-file RELEASE_GITHUB_<version>.md --draft`
+6. **Upload build artifacts to the draft release**: `gh release upload v<version> build/*.ino.bin build/*.littlefs.bin --clobber`
+7. **Verify artifacts are attached**: `gh release view v<version> --json assets --jq '.assets[].name'`
+8. **Publish the release**: `gh release edit v<version> --draft=false --latest` — only after confirming artifacts are present
 
-### Phase 6: Post-release verification
+### Phase 6: Post-release verification & Discord announcement
 
 1. Verify release artifacts are attached to the GitHub release
 2. Remind user to flash a device and check `GET /api/v2/device/info`
-3. Remind user to announce on Discord
+3. **Announce on Discord** — post release announcements in both community channels:
+   - Dutch in `#nederlandse-ondersteuning` (channel ID: `815561033036333076`) via `mcp__discord__discord_send`
+   - English in `#english-support` (channel ID: `931267109726593116`) via `mcp__discord__discord_send`
+   - Both messages include: version, summary, contributor shoutout, download link
+   - **CHECKPOINT: Show both messages to the user before sending.**
 
 ### Phase 7: Sync dev branch
 
@@ -130,6 +135,9 @@ Generate all documentation files on `main`. Show content to the user before writ
 
 ## Important rules
 
+- **Always push to remote after every commit** — keep local and remote in sync throughout the release
+- **Always create releases as draft first** — upload artifacts, verify, then publish. Once published, releases are immutable.
+- **No CI workflows for releases** — builds are done locally via `python build.py`, artifacts uploaded via `gh release upload`
 - **Never skip a checkpoint** — always wait for user approval
 - **Never force-push** — all pushes are normal pushes
 - **Read `docs/process/RELEASE_PROCESS.md`** at the start of every release for the latest process updates
