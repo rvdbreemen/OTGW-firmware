@@ -1,7 +1,7 @@
 <!--
 ***************************************************************************  
 **  Program  : FSexplorer.html
-**  Version  : v1.3.1
+**  Version  : v1.3.2-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -30,6 +30,12 @@
       <title>FSexplorer ESP</title>
       <script>
          let currentPath = '/';
+
+         function formatBytes(bytes) {
+             if (bytes < 1024) return bytes + ' Byte';
+             if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+             return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+         }
 
          document.addEventListener('DOMContentLoaded', () => {
              let main = document.querySelector('main');
@@ -87,6 +93,25 @@
                    .then(function (json) {
                      main.innerHTML = '';
 
+                     // Split storage info (last entry) from file entries
+                     var storageEntry = json.length > 0 ? json[json.length - 1] : null;
+                     var files = json.slice(0, -1);
+
+                     // LittleFS removes empty directories automatically.
+                     // If the directory is gone, navigate back to root.
+                     if (files.length === 0 && currentPath !== '/') {
+                       currentPath = '/';
+                       loadFileList();
+                       return;
+                     }
+
+                     // Sort: directories first, then alphabetical (case-insensitive)
+                     files.sort(function(a, b) {
+                       if (a.type === 'dir' && b.type !== 'dir') return -1;
+                       if (a.type !== 'dir' && b.type === 'dir') return 1;
+                       return a.name.localeCompare(b.name, undefined, {sensitivity: 'base'});
+                     });
+
                      const table = document.createElement('table');
                      table.style.width = '90%';
 
@@ -122,27 +147,16 @@
                        }
                      }
 
-                     let i = 0;
-                     for (; i < json.length - 1; i++) {
+                     for (var i = 0; i < files.length; i++) {
                        const row = table.insertRow();
-                       if (highlightFile && json[i].name === highlightFile) {
+                       if (highlightFile && files[i].name === highlightFile) {
                          row.style.backgroundColor = '#d4edda';
                        }
 
-                       let fullPath = currentPath === '/' ? json[i].name : currentPath + '/' + json[i].name;
+                       let fullPath = currentPath === '/' ? files[i].name : currentPath + '/' + files[i].name;
                        if (currentPath !== '/' && !fullPath.startsWith('/')) fullPath = '/' + fullPath;
 
-                       if (json[i].name.indexOf("More files not") > -1) {
-                         const nameCell = row.insertCell();
-                         nameCell.width = '20%';
-                         nameCell.setAttribute('nowrap', '');
-                         nameCell.textContent = json[i].name;
-                         for (let j = 0; j < 3; j++) {
-                           const cell = row.insertCell();
-                           cell.width = '10%';
-                           cell.setAttribute('nowrap', '');
-                         }
-                       } else if (json[i].type === 'dir') {
+                       if (files[i].type === 'dir') {
                          const nameCell = row.insertCell();
                          nameCell.width = '20%';
                          nameCell.setAttribute('nowrap', '');
@@ -150,8 +164,8 @@
                          const dirLink = document.createElement('a');
                          dirLink.href = '#';
                          dirLink.className = 'dir-link';
-                         dirLink.setAttribute('data-name', json[i].name);
-                         dirLink.textContent = json[i].name + '/';
+                         dirLink.setAttribute('data-name', files[i].name);
+                         dirLink.textContent = files[i].name + '/';
                          dirBold.appendChild(dirLink);
                          nameCell.appendChild(dirBold);
 
@@ -171,14 +185,14 @@
                          const fileLink = document.createElement('a');
                          fileLink.href = fullPath;
                          fileLink.target = '_blank';
-                         fileLink.textContent = json[i].name;
+                         fileLink.textContent = files[i].name;
                          nameCell.appendChild(fileLink);
 
                          const sizeCell = row.insertCell();
                          sizeCell.width = '10%';
                          sizeCell.setAttribute('nowrap', '');
                          const sizeSmall = document.createElement('small');
-                         sizeSmall.textContent = json[i].size;
+                         sizeSmall.textContent = formatBytes(files[i].size);
                          sizeCell.appendChild(sizeSmall);
 
                          const downloadCell = row.insertCell();
@@ -186,7 +200,7 @@
                          downloadCell.setAttribute('nowrap', '');
                          const downloadLink = document.createElement('a');
                          downloadLink.href = fullPath;
-                         downloadLink.download = json[i].name;
+                         downloadLink.download = files[i].name;
                          downloadLink.textContent = ' Download ';
                          downloadCell.appendChild(downloadLink);
 
@@ -196,7 +210,7 @@
 
                          const protectedFiles = ['FSexplorer.html', 'FSexplorer.css', 'FSexplorer.png',
                                                  'index.html', 'index.js', 'index.css', 'settings.png'];
-                         if (!protectedFiles.includes(json[i].name)) {
+                         if (!protectedFiles.includes(files[i].name)) {
                            const deleteLink = document.createElement('a');
                            deleteLink.href = '#';
                            deleteLink.setAttribute('data-href', fullPath);
@@ -250,14 +264,21 @@
                        });
                      });
 
-                     if (json[i]) {
+                     if (storageEntry && storageEntry.usedBytes !== undefined) {
+                       if (storageEntry.truncated) {
+                         const warning = document.createElement('p');
+                         warning.style.color = 'orange';
+                         warning.textContent = 'Not all files shown (directory has more entries).';
+                         main.appendChild(warning);
+                       }
                        const storageInfo = document.createElement('p');
                        const boldTag = document.createElement('b');
                        boldTag.textContent = 'LittleFS';
                        storageInfo.appendChild(boldTag);
-                       storageInfo.appendChild(document.createTextNode(' used ' + json[i].usedBytes + ' by ' + json[i].totalBytes));
+                       storageInfo.appendChild(document.createTextNode(
+                         ' used ' + formatBytes(storageEntry.usedBytes) + ' of ' + formatBytes(storageEntry.totalBytes)));
                        main.appendChild(storageInfo);
-                       freeBytes = json[i].freeBytes;
+                       freeBytes = storageEntry.freeBytes;
                      }
 
                      if (fileSize) fileSize.textContent = ' ';
