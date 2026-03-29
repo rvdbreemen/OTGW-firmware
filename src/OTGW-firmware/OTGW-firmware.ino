@@ -396,14 +396,18 @@ void doTaskEvery60s(){
     queryOTGWgatewaymode();
   }
 
-  // Probe PIC firmware version if still unknown — non-blocking, queues PR=A.
-  // State update + MQTT publish handled by handlePRresponse() when banner arrives.
-  if (isPICEnabled()
-      && ((strcmp_P(state.pic.sDeviceid, PSTR("unknown")) == 0)
-          || (strcmp_P(state.pic.sDeviceid, PSTR("no pic found")) == 0)
-          || (state.pic.sDeviceid[0] == '\0'))) {
+  // Probe PIC firmware version if still unknown.
+  // Runs regardless of isPICEnabled() so a transient boot-probe miss can recover:
+  // detectPIC() relies on a single ETX check; if that fails, this 60s retry is the
+  // only automatic path to re-detect a real PIC and re-enable all PIC functions.
+  // Writes directly to serial (bypassing the guarded command queue).
+  // Banner response in processOT() sets state.pic.bAvailable = true on success.
+  if ((strcmp_P(state.pic.sDeviceid, PSTR("unknown")) == 0)
+      || (strcmp_P(state.pic.sDeviceid, PSTR("no pic found")) == 0)
+      || (state.pic.sDeviceid[0] == '\0')) {
     DebugTln(F("PIC is unknown, probe pic using PR=A"));
-    getpicfwversion();
+    OTGWSerial.write("PR=A\r\n");
+    OTGWSerial.flush();
   }
   
   // Log heap statistics every minute for monitoring

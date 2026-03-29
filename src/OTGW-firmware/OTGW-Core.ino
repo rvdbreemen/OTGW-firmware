@@ -3878,6 +3878,11 @@ void processOT(const char *buf, int len){
     sendEventToWebSocket('!', cMsg);
   } else if (strstr(buf, OTGW_BANNER)!=NULL){
     //found a banner, so get the version of PIC
+    // Re-enable PIC functions if boot-time detection missed it (transient startup failure).
+    if (!state.pic.bAvailable) {
+      state.pic.bAvailable = true;
+      DebugTln(F("PIC detected via banner — PIC functions re-enabled"));
+    }
     strlcpy(state.pic.sFwversion, OTGWSerial.firmwareVersion(), sizeof(state.pic.sFwversion));
     OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), state.pic.sFwversion);
     strlcpy(state.pic.sDeviceid, OTGWSerial.processorToString().c_str(), sizeof(state.pic.sDeviceid));
