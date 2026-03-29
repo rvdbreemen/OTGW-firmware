@@ -4,21 +4,41 @@ This document describes the complete end-to-end release process for OTGW-firmwar
 
 ---
 
-## Phase 0: ADR validation
+## Phase 0: Prepare — clean state & detect previous release
 
-Before starting the release, check whether any architectural changes since the previous release require new or updated ADRs.
+Start every release by ensuring a clean working state and detecting the baseline.
 
-1. Detect the previous release tag: `git describe --tags --abbrev=0`
-2. List commits that touch code (not just docs/version bumps): `git log <prev-tag>..HEAD --oneline -- src/`
-3. Review each significant change — does it affect: architecture, NFRs (security/performance/availability), API contracts, new/replaced dependencies, or build/CI tooling?
-4. Check `docs/adr/` for existing ADRs that may need their Related section updated.
-5. If new ADRs are needed, create them now on `dev` before proceeding.
+1. **Ensure you are on `dev`**: `git checkout dev`
+2. **Commit and push any uncommitted changes**:
+   - `git status` — if there are modified or untracked files, stage, commit, and push them.
+   - `git pull` — incorporate any remote changes.
+   - `git push origin dev` — ensure local and remote are in sync.
+   - Verify: `git status` must show `nothing to commit, working tree clean`.
+3. **Detect the latest GitHub release** (this is the authoritative previous release, not a local git tag):
+   ```bash
+   gh release view --json tagName,name,publishedAt --jq '{tag: .tagName, title: .name, date: .publishedAt}'
+   ```
+   Store the tag name (e.g., `v1.3.2`) and published date for use in later phases.
+4. **Verify the release tag exists locally**: `git fetch --tags && git log <prev-tag> --oneline -1`
+5. **List code changes since that release**: `git log <prev-tag>..HEAD --oneline -- src/ | grep -v "CI: update version.h"`
+   - If there are no code changes, warn the user and ask whether to proceed.
+
+---
+
+## Phase 1: ADR validation
+
+Check whether any architectural changes since the previous release require new or updated ADRs.
+
+1. Review the code commits from Phase 0 step 5.
+2. For each significant change — does it affect: architecture, NFRs (security/performance/availability), API contracts, new/replaced dependencies, or build/CI tooling?
+3. Check `docs/adr/` for existing ADRs that may need their Related section updated.
+4. If new ADRs are needed, create them now on `dev` before proceeding.
 
 See `CLAUDE.md` for ADR creation criteria and format.
 
 ---
 
-## Phase 1: Stabilize dev branch
+## Phase 2: Stabilize dev branch
 
 Before starting the release, ensure `dev` is in a releasable state.
 
@@ -29,7 +49,7 @@ Before starting the release, ensure `dev` is in a releasable state.
 
 ---
 
-## Phase 2: Merge dev to main
+## Phase 3: Merge dev to main
 
 1. `git checkout main && git pull origin main`
 2. `git merge dev` — resolve conflicts if any (prefer dev for version.h).
@@ -37,7 +57,7 @@ Before starting the release, ensure `dev` is in a releasable state.
 
 ---
 
-## Phase 3: Gather changes & contributors
+## Phase 4: Gather changes & contributors
 
 On `main`, gather all information for the release notes.
 
@@ -52,7 +72,7 @@ Gather contributors from GitHub (closed issues, merged PRs) and Discord (`#beta-
 
 ---
 
-## Phase 4: Documentation artifacts
+## Phase 5: Documentation artifacts
 
 Create or update the following files on `main`.
 
@@ -166,7 +186,7 @@ Check if any changes warrant a new ADR or update to an existing one:
 
 ---
 
-## Phase 5: Pre-release checklist
+## Phase 6: Pre-release checklist
 
 Run through every item below before creating the GitHub release.
 
@@ -209,7 +229,7 @@ Run through every item below before creating the GitHub release.
 
 ---
 
-## Phase 6: Release execution
+## Phase 7: Release execution
 
 Once the checklist is complete:
 
@@ -257,7 +277,7 @@ Once the checklist is complete:
 
 ---
 
-## Phase 7: Post-release verification & Discord announcement
+## Phase 8: Post-release verification & Discord announcement
 
 - [ ] Verify artifacts are attached to the GitHub release
 - [ ] Flash a device and verify `fwversion` in `GET /api/v2/device/info` shows correct version (no `-beta`)
@@ -295,7 +315,7 @@ Both messages must include the contributor shoutout from the Thank You section a
 
 **CHECKPOINT: Show both Discord messages to the user for approval before sending.**
 
-## Phase 8: Sync dev branch with main
+## Phase 9: Sync dev branch with main
 
 After every release, `dev` must be updated so it descends from the release commit on `main`. This ensures future development builds on the released code.
 
