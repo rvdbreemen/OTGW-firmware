@@ -38,16 +38,15 @@ Before starting the release, check whether any architectural changes since the p
 
 1. Commit all open/uncommitted changes on `dev` and push to remote
 2. Run `python build.py` to verify the build works
-3. Commit version.h changes from build.py and push to remote
-4. If the build fails, fix the issue, commit, push, and retry
+3. If the build fails, fix the issue, commit and push again
+4. Repeat until the build succeeds on `dev`
 
 **CHECKPOINT: Confirm with user that dev is stable and ready to merge.**
 
 ### Phase 2: Merge dev to main
 
-1. `git checkout main && git pull origin main`
-2. `git merge dev` — resolve conflicts if any (prefer dev for version.h)
-3. Commit merge and push to remote
+1. `git checkout main && git merge dev`
+2. Verify merge succeeded without conflicts
 
 ### Phase 3: Gather changes & contributors
 
@@ -95,7 +94,6 @@ Generate all documentation files on `main`. Show content to the user before writ
 2. **`RELEASE_GITHUB_<version>.md`** (repository root) — Concise GitHub release body with:
    - Bug fixes, improvements, upgrade notes
    - **Thank You section**: special shoutout to most active contributor, then bullet list of other contributors with their contribution. Ends with Discord invite link.
-   - **Previous release link**: always end with `Previous release: [v<prev>](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v<prev>)`
 3. **`docs/BREAKING_CHANGES.md`** — Prepend a new version section. Always declare explicitly whether there are breaking changes or not.
 4. **`README.md`** — Demote current "What's New" to "What was new", add new "What's New in v<version>" section with highlights
 5. **ADRs** — If any changes warrant a new ADR, propose it.
@@ -106,59 +104,19 @@ Generate all documentation files on `main`. Show content to the user before writ
 
 **CHECKPOINT: Confirm with user before starting — these steps are not reversible.**
 
-1. **Commit all outstanding changes on `main`** and push to remote
+1. **Commit all outstanding changes on `main`** (documentation, version updates, etc.)
 2. **Remove pre-release from `version.h`**: Comment out `_VERSION_PRERELEASE` so the build produces a clean `v<version>` without `-beta`. Verify: `grep -n "PRERELEASE" src/OTGW-firmware/version.h`
-3. **Run `python build.py`** to produce the release build. Fix any issues.
-4. **Commit the release build** and push `main` to remote
-5. **Create draft GitHub release with tag**: `gh release create v<version> --target main --title "v<version>" --notes-file RELEASE_GITHUB_<version>.md --draft`
-6. **Upload build artifacts to the draft release**: `gh release upload v<version> build/*.ino.bin build/*.littlefs.bin --clobber`
-7. **Verify artifacts are attached**: `gh release view v<version> --json assets --jq '.assets[].name'`
-8. **Publish the release**: `gh release edit v<version> --draft=false --latest` — only after confirming artifacts are present
+3. **Run `python build.py`** to verify a clean release build. Fix any issues.
+4. **Commit the release build**
+5. **Push `main`**
+6. **Tag the version**: `gh release create v<version> --target main --title "v<version>" --notes-file RELEASE_GITHUB_<version>.md --latest` — this creates the `v<version>` tag on `main` and triggers the release workflow
+7. **Release workflow** (`.github/workflows/release.yml`) checks out the tag, builds, and attaches `.elf`, `.ino.bin`, `.littlefs.bin` artifacts
 
-### Phase 6: Post-release verification & Discord announcement
+### Phase 6: Post-release verification
 
 1. Verify release artifacts are attached to the GitHub release
 2. Remind user to flash a device and check `GET /api/v2/device/info`
-3. **Announce on Discord** — post release announcements in both community channels:
-
-**Step 3a — Dutch announcement in `#nederlandse-ondersteuning`** (channel ID: `815561033036333076`):
-- Log in to Discord: `mcp__discord__discord_login`
-- Send message via `mcp__discord__discord_send` with a Dutch message containing:
-  - Version number and one-line summary in Dutch
-  - Link to the GitHub release
-  - Shoutout to the most active contributor (same person as in Thank You section)
-  - Invite to test and report issues
-
-Example format:
-```
-**OTGW-firmware v<version> is beschikbaar!**
-
-<korte samenvatting van de belangrijkste wijzigingen in het Nederlands>
-
-Special shoutout naar **<contributor>** voor <bijdrage>!
-
-Download: https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v<tag>
-```
-
-**Step 3b — English announcement in `#english-support`** (channel ID: `931267109726593116`):
-- Send message via `mcp__discord__discord_send` with an English message containing:
-  - Version number and one-line summary in English
-  - Link to the GitHub release
-  - Shoutout to the most active contributor
-  - Invite to test and report issues
-
-Example format:
-```
-**OTGW-firmware v<version> is now available!**
-
-<short summary of the key changes in English>
-
-Special shoutout to **<contributor>** for <contribution>!
-
-Download: https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v<tag>
-```
-
-**CHECKPOINT: Show both messages to the user before sending.**
+3. Remind user to announce on Discord
 
 ### Phase 7: Sync dev branch
 
@@ -172,9 +130,6 @@ Download: https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v<tag>
 
 ## Important rules
 
-- **Always push to remote after every commit** — keep local and remote in sync throughout the release
-- **Always create releases as draft first** — upload artifacts, verify, then publish. Once published, releases are immutable.
-- **No CI workflows for releases** — builds are done locally via `python build.py`, artifacts uploaded via `gh release upload`
 - **Never skip a checkpoint** — always wait for user approval
 - **Never force-push** — all pushes are normal pushes
 - **Read `docs/process/RELEASE_PROCESS.md`** at the start of every release for the latest process updates

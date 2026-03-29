@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v1.3.1
+**  Version  : v1.3.2-beta
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -368,28 +368,38 @@ void apifirmwarefilelist() {
 
 
 //=====================================================================================
+// Stack-based formatBytes — writes into caller-supplied buffer, no heap allocation.
+static void formatBytesTo(size_t bytes, char *buf, size_t bufSize)
+{
+  if (bytes < 1024) {
+    snprintf_P(buf, bufSize, PSTR("%u Byte"), (unsigned)bytes);
+  } else if (bytes < (1024 * 1024)) {
+    snprintf_P(buf, bufSize, PSTR("%.1f KB"), bytes / 1024.0);
+  } else {
+    snprintf_P(buf, bufSize, PSTR("%.1f MB"), bytes / 1024.0 / 1024.0);
+  }
+}
+
+//=====================================================================================
 
 
-void apilistfiles()             // Senden aller Daten an den Client
-{   
-  static const char kMoreFilesMsg[] PROGMEM = "More files not listed ..";
-  static const char kTypeDir[] PROGMEM = "dir";
-  static const char kTypeFile[] PROGMEM = "file";
-
-  // Handle file delete request: ?delete=<path>
+void apilistfiles()
+{
+  // --- Delete handler: local buffer instead of global cMsg ---
   if (httpServer.hasArg("delete")) {
     if (!checkHttpAuth()) return;  // 401 already sent
-    strlcpy(cMsg, httpServer.arg("delete").c_str(), sizeof(cMsg));
+    char deletePath[34];  // LittleFS paths are max 31 chars + '/' prefix + '\0'
+    strlcpy(deletePath, httpServer.arg("delete").c_str(), sizeof(deletePath));
     // Normalize: LittleFS paths must start with '/'
-    if (cMsg[0] != '/' && cMsg[0] != '\0') {
-      size_t len = strnlen(cMsg, sizeof(cMsg) - 2);
-      memmove(cMsg + 1, cMsg, len + 1);
-      cMsg[0] = '/';
+    if (deletePath[0] != '/' && deletePath[0] != '\0') {
+      size_t len = strnlen(deletePath, sizeof(deletePath) - 2);
+      memmove(deletePath + 1, deletePath, len + 1);
+      deletePath[0] = '/';
     }
-    DebugTf(PSTR("Delete -> [%s]\r\n"), cMsg);
-    if (!LittleFS.exists(cMsg)) {
+    DebugTf(PSTR("Delete -> [%s]\r\n"), deletePath);
+    if (!LittleFS.exists(deletePath)) {
       httpServer.send(404, F("text/plain"), F("File not found"));
-    } else if (LittleFS.remove(cMsg)) {
+    } else if (LittleFS.remove(deletePath)) {
       httpServer.send(200, F("text/plain"), F("File deleted"));
     } else {
       httpServer.send(500, F("text/plain"), F("Delete failed"));
@@ -397,62 +407,11 @@ void apilistfiles()             // Senden aller Daten an den Client
     return;
   }
 
-  FSInfo LittleFSinfo;
+  // --- File listing: stream directly from LittleFS, no buffering/sorting ---
+  // Sorting and size formatting are handled by the frontend (FSexplorer.html).
   String path = "/";
   if (httpServer.hasArg("path")) {
-      path = httpServer.arg("path");
-  }
-
-  #define LEN_FILENAME 32
-  typedef struct _fileMeta {
-    char    Name[LEN_FILENAME];     
-    int32_t Size;
-    bool    isDir;
-  } fileMeta;
-
-  _fileMeta dirMap[MAX_FILES_IN_LIST+1];
-  int fileNr = 0;
-    
-  Dir dir = LittleFS.openDir(path);         // List files on LittleFS
-  while (dir.next() && (fileNr < MAX_FILES_IN_LIST))  
-  {
-    dirMap[fileNr].Name[0] = '\0';
-    strlcat(dirMap[fileNr].Name, dir.fileName().c_str(), LEN_FILENAME); 
-    dirMap[fileNr].Size = dir.fileSize();
-    dirMap[fileNr].isDir = dir.isDirectory();
-    fileNr++;
-  }
-  //DebugTf(PSTR("fileNr[%d], Max[%d]\r\n"), fileNr, MAX_FILES_IN_LIST);
-
-  // -- bubble sort dirMap op .Name--
-  for (int8_t y = 0; y < fileNr; y++) {
-    yield();
-    for (int8_t x = y + 1; x < fileNr; x++)  {
-      //DebugTf(PSTR("y[%d], x[%d] => seq[y][%s] / seq[x][%s] "), y, x, dirMap[y].Name, dirMap[x].Name);
-      if (strcasecmp(dirMap[x].Name, dirMap[y].Name) <= 0)
-      {
-        //Debug(F(" !switch!"));
-        fileMeta temp = dirMap[y];
-        dirMap[y] = dirMap[x];
-        dirMap[x] = temp;
-      } /* end if */
-      //Debugln();
-    } /* end for */
-  } /* end for */
-  
-  if (fileNr >= MAX_FILES_IN_LIST)
-  {
-    fileNr = MAX_FILES_IN_LIST;
-    dirMap[fileNr].Name[0] = '\0';
-    //--- if you change this message you also have to 
-    //--- change FSexplorer.html
-    size_t msgLen = strlen_P(kMoreFilesMsg);
-    size_t copyLen = min((size_t)29, msgLen);
-    memcpy_P(dirMap[fileNr].Name, kMoreFilesMsg, copyLen);
-    dirMap[fileNr].Name[copyLen] = '\0';
-    dirMap[fileNr].Size = 0;
-    dirMap[fileNr].isDir = false;
-    fileNr++;
+    path = httpServer.arg("path");
   }
 
   httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
@@ -460,38 +419,43 @@ void apilistfiles()             // Senden aller Daten an den Client
   httpServer.send(200, F("application/json"), F(""));
   httpServer.sendContent(F("["));
 
-  bool firstEntry = true;
-  char entryBuffer[150];
-  char typeBuf[5];
-  for (int f = 0; f < fileNr; f++)
-  {
-    DebugTf(PSTR("[%3d] >> [%s]\r\n"), f, dirMap[f].Name);
-    if (!firstEntry) httpServer.sendContent(F(","));
-    firstEntry = false;
+  char buf[100];
+  bool first = true;
+  int fileCount = 0;
+  bool truncated = false;
 
-    String sizeStr = formatBytes(dirMap[f].Size);
-    PGM_P typePgm = dirMap[f].isDir ? kTypeDir : kTypeFile;
-    strncpy_P(typeBuf, typePgm, sizeof(typeBuf));
-    typeBuf[sizeof(typeBuf) - 1] = '\0';
-    snprintf_P(entryBuffer, sizeof(entryBuffer),
-               PSTR("{\"name\":\"%s\",\"size\":\"%s\",\"type\":\"%s\"}"),
-               dirMap[f].Name, sizeStr.c_str(), typeBuf);
-    httpServer.sendContent(entryBuffer);
+  Dir dir = LittleFS.openDir(path);
+  while (dir.next()) {
+    feedWatchDog();
+    // Skip hidden files/directories (names starting with '.')
+    if (dir.fileName().charAt(0) == '.') continue;
+    if (fileCount >= MAX_FILES_IN_LIST) { truncated = true; break; }
+    if (!first) httpServer.sendContent(F(","));
+    first = false;
+
+    snprintf_P(buf, sizeof(buf),
+      PSTR("{\"name\":\"%s\",\"size\":%ld,\"type\":\"%s\"}"),
+      dir.fileName().c_str(), (long)dir.fileSize(),
+      dir.isDirectory() ? "dir" : "file");
+    httpServer.sendContent(buf);
+    fileCount++;
   }
 
-  LittleFS.info(LittleFSinfo);
-  if (!firstEntry) httpServer.sendContent(F(","));
-  String usedStr = formatBytes(LittleFSinfo.usedBytes * 1.05);  // +5% safety
-  String totalStr = formatBytes(LittleFSinfo.totalBytes);
-  unsigned long freeBytes = (unsigned long)(LittleFSinfo.totalBytes - (LittleFSinfo.usedBytes * 1.05));
-  snprintf_P(entryBuffer, sizeof(entryBuffer),
-             PSTR("{\"usedBytes\":\"%s\",\"totalBytes\":\"%s\",\"freeBytes\":\"%lu\"}"),
-             usedStr.c_str(), totalStr.c_str(), freeBytes);
-  httpServer.sendContent(entryBuffer);
+  // Storage info as last entry (raw bytes — frontend formats for display)
+  FSInfo fsInfo;
+  LittleFS.info(fsInfo);
+  if (!first) httpServer.sendContent(F(","));
+  unsigned long usedBytes = (unsigned long)(fsInfo.usedBytes * 1.05);
+  unsigned long freeBytes = fsInfo.totalBytes - usedBytes;
+  snprintf_P(buf, sizeof(buf),
+    PSTR("{\"usedBytes\":%lu,\"totalBytes\":%lu,\"freeBytes\":%lu,\"truncated\":%s}"),
+    usedBytes, fsInfo.totalBytes, freeBytes,
+    truncated ? "true" : "false");
+  httpServer.sendContent(buf);
 
   httpServer.sendContent(F("]\r\n"));
   httpServer.sendContent(F(""));
-  
+
 } // apilistfiles()
 
 
