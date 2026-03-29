@@ -368,6 +368,19 @@ void apifirmwarefilelist() {
 
 
 //=====================================================================================
+// Stack-based formatBytes — writes into caller-supplied buffer, no heap allocation.
+static void formatBytesTo(size_t bytes, char *buf, size_t bufSize)
+{
+  if (bytes < 1024) {
+    snprintf_P(buf, bufSize, PSTR("%u Byte"), (unsigned)bytes);
+  } else if (bytes < (1024 * 1024)) {
+    snprintf_P(buf, bufSize, PSTR("%.1f KB"), bytes / 1024.0);
+  } else {
+    snprintf_P(buf, bufSize, PSTR("%.1f MB"), bytes / 1024.0 / 1024.0);
+  }
+}
+
+//=====================================================================================
 
 
 void apilistfiles()
