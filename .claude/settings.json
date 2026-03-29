@@ -2,8 +2,7 @@
   "permissions": {
     "allow": [
       "mcp__discord__*",
-      "Bash(git *)",
-      "Bash(gh *)"
+      "Bash(*)"
     ]
   }
 }
