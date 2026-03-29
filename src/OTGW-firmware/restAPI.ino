@@ -162,6 +162,10 @@ static void sendApiOptions() {
 
 // Helper to queue a command from URL segment or request body, with validation
 static void handleCommandSubmit(const char* cmdStr) {
+  if (!isPICEnabled()) {
+    sendApiError(503, F("No PIC detected - commands disabled"));
+    return;
+  }
   if (!cmdStr || cmdStr[0] == '\0') {
     sendApiError(400, F("Missing command"));
     return;
@@ -264,6 +268,7 @@ static void handleFlash(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod
 
 static void handlePic(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+  if (!isPICEnabled()) { sendApiError(503, F("No PIC detected - PIC functions disabled")); return; }
   if (wc > 4 && strcmp_P(words[4], PSTR("flash-status")) == 0) {
     sendPICFlashStatus();
   } else if (wc > 4 && strcmp_P(words[4], PSTR("update-check")) == 0) {
@@ -693,9 +698,11 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("author"), F("Robert van den Breemen"));
   sendJsonMapEntry(F("fwversion"), _SEMVER_FULL);
   sendJsonMapEntry(F("picavailable"), state.pic.bAvailable);
-  sendJsonMapEntry(F("picfwversion"), state.pic.sFwversion);
-  sendJsonMapEntry(F("picdeviceid"), state.pic.sDeviceid);
-  sendJsonMapEntry(F("picfwtype"), state.pic.sType);
+  if (isPICEnabled()) {
+    sendJsonMapEntry(F("picfwversion"), state.pic.sFwversion);
+    sendJsonMapEntry(F("picdeviceid"), state.pic.sDeviceid);
+    sendJsonMapEntry(F("picfwtype"), state.pic.sType);
+  }
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
   sendJsonMapEntry(F("compiled"), cMsg);
   sendJsonMapEntry(F("hostname"), CSTR(settings.sHostname));
@@ -732,10 +739,12 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("lastreset"), lastReset);
   sendJsonMapEntry(F("bootcount"), state.uptime.iRebootCount);
   sendJsonMapEntry(F("mqttconnected"), state.mqtt.bConnected);
-  sendJsonMapEntry(F("thermostatconnected"), state.otgw.bThermostatState);
-  sendJsonMapEntry(F("boilerconnected"), state.otgw.bBoilerState);      
-  sendJsonMapEntry(F("otgwmode"), state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
-  sendJsonMapEntry(F("otgwconnected"), state.otgw.bOnline);
+  if (isPICEnabled()) {
+    sendJsonMapEntry(F("thermostatconnected"), state.otgw.bThermostatState);
+    sendJsonMapEntry(F("boilerconnected"), state.otgw.bBoilerState);
+    sendJsonMapEntry(F("otgwmode"), state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
+    sendJsonMapEntry(F("otgwconnected"), state.otgw.bOnline);
+  }
   sendJsonMapEntry(F("otgwsimulation"), state.debug.bOTGWSimulation);
   
   sendEndJsonMap(F("device"));
@@ -872,10 +881,12 @@ void sendFlashStatus()
   // Returns: {"flashstatus":{"flashing":bool,"pic_flashing":bool,"pic_progress":0-100,"pic_filename":"...","pic_error":"..."}}
   sendStartJsonMap(F("flashstatus"));
   sendJsonMapEntry(F("flashing"), isFlashing());
-  sendJsonMapEntry(F("pic_flashing"), state.flash.bPICactive);
-  sendJsonMapEntry(F("pic_progress"), state.flash.iPICprogress);
-  sendJsonMapEntry(F("pic_filename"), state.flash.sPICfile);
-  sendJsonMapEntry(F("pic_error"), state.flash.sError);
+  if (isPICEnabled()) {
+    sendJsonMapEntry(F("pic_flashing"), state.flash.bPICactive);
+    sendJsonMapEntry(F("pic_progress"), state.flash.iPICprogress);
+    sendJsonMapEntry(F("pic_filename"), state.flash.sPICfile);
+    sendJsonMapEntry(F("pic_error"), state.flash.sError);
+  }
   sendEndJsonMap(F("flashstatus"));
 } // sendFlashStatus()
 

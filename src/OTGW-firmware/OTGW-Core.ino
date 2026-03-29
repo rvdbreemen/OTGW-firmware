@@ -447,9 +447,11 @@ void sendMQTTversioninfo(){
   sendMQTTData("otgw-firmware/version", _SEMVER_FULL);
   sendMQTTData("otgw-firmware/reboot_count", rebootCountBuf);
   sendMQTTData("otgw-firmware/reboot_reason", lastReset);
-  sendMQTTData("otgw-pic/version", state.pic.sFwversion);
-  sendMQTTData("otgw-pic/deviceid", state.pic.sDeviceid);
-  sendMQTTData("otgw-pic/firmwaretype", state.pic.sType);
+  if (isPICEnabled()) {
+    sendMQTTData("otgw-pic/version", state.pic.sFwversion);
+    sendMQTTData("otgw-pic/deviceid", state.pic.sDeviceid);
+    sendMQTTData("otgw-pic/firmwaretype", state.pic.sType);
+  }
   sendMQTTData("otgw-pic/picavailable", CCONOFF(state.pic.bAvailable));
 }
 
@@ -457,7 +459,8 @@ void sendMQTTversioninfo(){
 Publish state information of PIC firmware version information to MQTT broker.
 */
 void sendMQTTstateinformation(){
-  sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState)); 
+  if (!isPICEnabled()) return;
+  sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
   sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
   if (state.otgw.bGatewayModeKnown) {
     sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(state.otgw.bGatewayMode));
@@ -468,6 +471,7 @@ void sendMQTTstateinformation(){
 
 //===================[ Reset OTGW ]===============================
 void resetOTGW() {
+  if (!isPICEnabled()) return;
   scheduleOTGWStartupQuietPeriod();
   OTGWSerial.resetPic();
 }
@@ -485,6 +489,7 @@ void detectPIC(){
       DebugTln(F("ETX found after reset: Pic detected!"));
   } else {
       DebugTln(F("No ETX found after reset: no Pic detected!"));
+      DebugTln(F("All PIC-related functions are disabled (no PIC-based OTGW detected)"));
   }
 }
 
@@ -543,6 +548,7 @@ static uint8_t  picSettingsQueryIdx    = 0;
 static constexpr uint8_t kPICSettingsCount = 15;
 
 void triggerPICsettingsReadout() {
+  if (!isPICEnabled()) return;
   if (picSettingsCycleActive) {
     return;  // cycle already in progress — ignore until it completes
   }
@@ -745,6 +751,7 @@ static void handlePRresponse(const char* buf, size_t len) {
   Only publishes fields that have been queried (non-empty).
 */
 void publishAllPICsettings() {
+  if (!isPICEnabled()) return;
   // Active settings
   if (state.picSettings.sSetpointOverride[0]   != '\0') sendMQTTData(F("otgw-pic/settings/setpoint_override"),   state.picSettings.sSetpointOverride);
   if (state.picSettings.sSetback[0]            != '\0') sendMQTTData(F("otgw-pic/settings/setback"),             state.picSettings.sSetback);
@@ -767,6 +774,7 @@ void publishAllPICsettings() {
 
 //===================[ sendOTGWbootcmd ]=====================
 void sendOTGWbootcmd(){
+  if (!isPICEnabled()) return;
   if (!settings.otgw.bEnable) return;
   OTGWDebugTf(PSTR("OTGW boot message = [%s]\r\n"), CSTR(settings.otgw.sCommands));
 
@@ -798,6 +806,14 @@ void executeCommand(const char* sCmd, char* outBuf, size_t outSize, bool mirrorT
   if (outSize > 0) outBuf[0] = '\0';
   OTGWDebugTf(PSTR("OTGW Send Cmd [%s]\r\n"), sCmd);
   size_t cmdLen = strlen(sCmd);
+  if (!isPICEnabled()) {
+    OTGWDebugTln(F("executeCommand: No PIC detected - command ignored"));
+    strlcpy(outBuf, "NG - No PIC detected, command ignored.", outSize);
+    if (mirrorToWebSocket && hasWebSocketClients()) {
+      sendEventToWebSocket_P('!', PSTR("NG - No PIC detected, command ignored."));
+    }
+    return;
+  }
   if (state.debug.bOTGWSimulation) {
     OTGWDebugTln(F("OTGW simulation active - executeCommand blocked"));
     strlcpy(outBuf, "SE - OTGW simulation active.", outSize);
@@ -2547,6 +2563,11 @@ static void removeFromCmdQueue(int index) {
 
 //void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue = false, const int16_t delay = OTGW_DELAY_SEND_MS);
 void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, const int16_t delay){
+  if (!isPICEnabled()) {
+    OTGWDebugTln(F("CmdQueue: No PIC detected - command ignored"));
+    return;
+  }
+
   constexpr int kMaxCmdLen = (int)(sizeof(cmdqueue[0].cmd) - 1);
 
   if (buf == nullptr) {
@@ -2729,6 +2750,10 @@ void checkOTGWcmdqueue(const char *buf, unsigned int len){
 */
 void sendOTGW(const char* buf, int len)
 {
+  if (!isPICEnabled()) {
+    OTGWDebugTln(F("sendOTGW: No PIC detected - command ignored"));
+    return;
+  }
   if (state.debug.bOTGWSimulation) {
     OTGWDebugTln(F("OTGW simulation active - serial send blocked"));
     sendEventToWebSocket_P('!', PSTR("OTGW simulation blocked serial send"));
@@ -3609,16 +3634,16 @@ void processOT(const char *buf, int len){
     } 
 
     //If the Boiler messages have not been seen for 30 seconds, then set the state to false. 
-    state.otgw.bBoilerState = (now < (epochBoilerlastseen+30));  
+    state.otgw.bBoilerState = (now < (epochBoilerlastseen+30));
     if ((state.otgw.bBoilerState != bOTGWboilerpreviousstate) || (cntOTmessagesprocessed==1)) {
-      sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState)); 
+      if (isPICEnabled()) sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
       bOTGWboilerpreviousstate = state.otgw.bBoilerState;
     }
 
-    //If the Thermostat messages have not been seen for 30 seconds, then set the state to false. 
+    //If the Thermostat messages have not been seen for 30 seconds, then set the state to false.
     state.otgw.bThermostatState = (now < (epochThermostatlastseen+30));
-    if ((state.otgw.bThermostatState != bOTGWthermostatpreviousstate) || (cntOTmessagesprocessed==1)){      
-      sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
+    if ((state.otgw.bThermostatState != bOTGWthermostatpreviousstate) || (cntOTmessagesprocessed==1)){
+      if (isPICEnabled()) sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
       bOTGWthermostatpreviousstate = state.otgw.bThermostatState;
     }
     
@@ -3630,8 +3655,10 @@ void processOT(const char *buf, int len){
     //If both (Boiler and Thermostat and Gateway) are offline, then the OTGW is considered offline as a whole.
     state.otgw.bOnline = (state.otgw.bBoilerState && state.otgw.bThermostatState) || (state.otgw.bBoilerState && bOTGWgatewayactive);
     if ((state.otgw.bOnline != bOTGWpreviousstate) || (cntOTmessagesprocessed==1)){
-      sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otgw.bOnline));
-      sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
+      if (isPICEnabled()) {
+        sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otgw.bOnline));
+        sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
+      }
       // nodeMCU online/offline zelf naar 'otgw-firmware/' pushen
       bOTGWpreviousstate = state.otgw.bOnline; //remember state, so we can detect statechanges
     }
@@ -3851,6 +3878,11 @@ void processOT(const char *buf, int len){
     sendEventToWebSocket('!', cMsg);
   } else if (strstr(buf, OTGW_BANNER)!=NULL){
     //found a banner, so get the version of PIC
+    // Re-enable PIC functions if boot-time detection missed it (transient startup failure).
+    if (!state.pic.bAvailable) {
+      state.pic.bAvailable = true;
+      DebugTln(F("PIC detected via banner — PIC functions re-enabled"));
+    }
     strlcpy(state.pic.sFwversion, OTGWSerial.firmwareVersion(), sizeof(state.pic.sFwversion));
     OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), state.pic.sFwversion);
     strlcpy(state.pic.sDeviceid, OTGWSerial.processorToString().c_str(), sizeof(state.pic.sDeviceid));
@@ -4195,6 +4227,10 @@ void startOTGWstream()
 //---------[ Upgrade PIC stuff taken from Schelte Bron's NodeMCU Firmware ]---------
 
 void upgradepicnow(const char *filename) {
+  if (!isPICEnabled()) {
+    DebugTln(F("PIC upgrade rejected: no PIC detected"));
+    return;
+  }
   if (OTGWSerial.busy()) {
     DebugTln(F("ERROR: PIC upgrade already in progress, ignoring request"));
     return; // if already in programming mode, never call it twice
@@ -4537,6 +4573,11 @@ void handlePendingUpgrade() {
 }
 
 void upgradepic() {
+  if (!isPICEnabled()) {
+    httpServer.send_P(400, PSTR("text/plain"), PSTR("No PIC detected - PIC functions disabled"));
+    return;
+  }
+
   const String action = httpServer.arg("action");
   const String filename = httpServer.arg("name");
   const String version = httpServer.arg("version");
