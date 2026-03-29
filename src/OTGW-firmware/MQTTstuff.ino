@@ -1285,7 +1285,8 @@ void doAutoConfigure(){
       // 4. Decision: Do we send this line?
       // Skip Dallas sensors - they need per-sensor addresses from configSensors()
       if (lineID == OTGWdallasdataid) continue;
-      // Skip PIC-specific discovery entries when no PIC is detected
+      // Skip PIC-specific discovery entries when no PIC is detected.
+      // Relies on the "otgw-pic/" topic prefix convention — update if topics are renamed.
       if (!isPICEnabled() && strstr_P(sLine, PSTR("otgw-pic/"))) continue;
 
       {

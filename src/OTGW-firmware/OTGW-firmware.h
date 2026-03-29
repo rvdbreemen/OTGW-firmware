@@ -220,7 +220,8 @@ struct OTGWState {
 
 OTGWState state;
 
-// Central PIC availability guard — returns true only when a PIC was detected at boot.
+// Central PIC availability guard — returns true when a PIC is available.
+// Set at boot by detectPIC() and can flip true at runtime if a PIC banner is received.
 // All PIC-related operations (commands, queries, upgrades) check this before proceeding.
 inline bool isPICEnabled() { return state.pic.bAvailable; }
 
