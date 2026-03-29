@@ -4,19 +4,19 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 “devkit” that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-## 🚀 What's New in v1.3.1
+## 🚀 What's New in v1.3.2
 
-Version 1.3.1 is a stability release fixing command queue reliability, CS override interference, and serial coordination issues reported after v1.3.0. Full release notes: [RELEASE_NOTES_1.3.1.md](RELEASE_NOTES_1.3.1.md)
+Version 1.3.2 fixes the persistent file explorer failures reported after v1.3.1. Full release notes: [RELEASE_NOTES_1.3.2.md](RELEASE_NOTES_1.3.2.md)
 
 ### Highlights
 
-- **CS override fix:** Setpoint commands (CS=) from Home Assistant / MQTT are no longer intermittently overridden by the thermostat's lower setpoint.
-- **Command queue overhaul:** PR command responses are now correctly matched by register letter, preventing wrong queue entries from being removed. PR=A banner detection properly dequeues the command. All time-sync commands now go through the queue.
-- **Ser2net awareness:** The command queue detects traffic from port 25238 (OTmonitor) and pauses briefly to avoid conflicting commands on the PIC serial bus. Conflicting queue entries are automatically removed.
-- **Non-blocking PIC queries:** PR= settings and gateway mode queries are fully asynchronous, no longer blocking the HTTP server.
-- **UI fix:** Log window no longer overlaps the status bar in Firefox/LibreWolf.
-- **Crash fix:** Inverted `strstr_P` arguments in the PIC settings trigger caused an Exception (2) crash.
-- **No breaking changes** vs v1.3.0.
+- **File delete reliability fix:** The delete handler no longer uses the shared global buffer, preventing "Failed to delete file" errors and unresponsive behavior caused by background task interference.
+- **Streaming file listing:** The file explorer backend now streams directly from LittleFS instead of loading all entries into RAM. Sorting and formatting moved to the frontend.
+- **No breaking changes** vs v1.3.1.
+
+## What was new in v1.3.1
+
+Version 1.3.1 was a stability release fixing command queue reliability, CS override interference, and serial coordination issues reported after v1.3.0. Full release notes: [RELEASE_NOTES_1.3.1.md](RELEASE_NOTES_1.3.1.md)
 
 ## What was new in v1.3.0
 
