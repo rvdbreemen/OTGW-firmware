@@ -368,28 +368,44 @@ void apifirmwarefilelist() {
 
 
 //=====================================================================================
+// Stack-based formatBytes — writes into caller-supplied buffer, no heap allocation.
+static void formatBytesTo(size_t bytes, char *buf, size_t bufSize)
+{
+  if (bytes < 1024) {
+    snprintf_P(buf, bufSize, PSTR("%u Byte"), (unsigned)bytes);
+  } else if (bytes < (1024 * 1024)) {
+    snprintf_P(buf, bufSize, PSTR("%.1f KB"), bytes / 1024.0);
+  } else {
+    snprintf_P(buf, bufSize, PSTR("%.1f MB"), bytes / 1024.0 / 1024.0);
+  }
+}
+
+//=====================================================================================
 
 
 void apilistfiles()             // Senden aller Daten an den Client
-{   
+{
   static const char kMoreFilesMsg[] PROGMEM = "More files not listed ..";
   static const char kTypeDir[] PROGMEM = "dir";
   static const char kTypeFile[] PROGMEM = "file";
 
   // Handle file delete request: ?delete=<path>
+  // Uses a local buffer — the global cMsg is shared with MQTT/webhook/settings
+  // and can be clobbered by background tasks between LittleFS calls.
   if (httpServer.hasArg("delete")) {
     if (!checkHttpAuth()) return;  // 401 already sent
-    strlcpy(cMsg, httpServer.arg("delete").c_str(), sizeof(cMsg));
+    char deletePath[64];
+    strlcpy(deletePath, httpServer.arg("delete").c_str(), sizeof(deletePath));
     // Normalize: LittleFS paths must start with '/'
-    if (cMsg[0] != '/' && cMsg[0] != '\0') {
-      size_t len = strnlen(cMsg, sizeof(cMsg) - 2);
-      memmove(cMsg + 1, cMsg, len + 1);
-      cMsg[0] = '/';
+    if (deletePath[0] != '/' && deletePath[0] != '\0') {
+      size_t len = strnlen(deletePath, sizeof(deletePath) - 2);
+      memmove(deletePath + 1, deletePath, len + 1);
+      deletePath[0] = '/';
     }
-    DebugTf(PSTR("Delete -> [%s]\r\n"), cMsg);
-    if (!LittleFS.exists(cMsg)) {
+    DebugTf(PSTR("Delete -> [%s]\r\n"), deletePath);
+    if (!LittleFS.exists(deletePath)) {
       httpServer.send(404, F("text/plain"), F("File not found"));
-    } else if (LittleFS.remove(cMsg)) {
+    } else if (LittleFS.remove(deletePath)) {
       httpServer.send(200, F("text/plain"), F("File deleted"));
     } else {
       httpServer.send(500, F("text/plain"), F("Delete failed"));
@@ -463,30 +479,33 @@ void apilistfiles()             // Senden aller Daten an den Client
   bool firstEntry = true;
   char entryBuffer[150];
   char typeBuf[5];
+  char sizeBuf[16];
   for (int f = 0; f < fileNr; f++)
   {
     DebugTf(PSTR("[%3d] >> [%s]\r\n"), f, dirMap[f].Name);
     if (!firstEntry) httpServer.sendContent(F(","));
     firstEntry = false;
 
-    String sizeStr = formatBytes(dirMap[f].Size);
+    // Use stack buffer instead of String to avoid heap fragmentation in the loop
+    formatBytesTo(dirMap[f].Size, sizeBuf, sizeof(sizeBuf));
     PGM_P typePgm = dirMap[f].isDir ? kTypeDir : kTypeFile;
     strncpy_P(typeBuf, typePgm, sizeof(typeBuf));
     typeBuf[sizeof(typeBuf) - 1] = '\0';
     snprintf_P(entryBuffer, sizeof(entryBuffer),
                PSTR("{\"name\":\"%s\",\"size\":\"%s\",\"type\":\"%s\"}"),
-               dirMap[f].Name, sizeStr.c_str(), typeBuf);
+               dirMap[f].Name, sizeBuf, typeBuf);
     httpServer.sendContent(entryBuffer);
   }
 
   LittleFS.info(LittleFSinfo);
   if (!firstEntry) httpServer.sendContent(F(","));
-  String usedStr = formatBytes(LittleFSinfo.usedBytes * 1.05);  // +5% safety
-  String totalStr = formatBytes(LittleFSinfo.totalBytes);
+  char usedBuf[16], totalBuf[16];
+  formatBytesTo((size_t)(LittleFSinfo.usedBytes * 1.05), usedBuf, sizeof(usedBuf));  // +5% safety
+  formatBytesTo(LittleFSinfo.totalBytes, totalBuf, sizeof(totalBuf));
   unsigned long freeBytes = (unsigned long)(LittleFSinfo.totalBytes - (LittleFSinfo.usedBytes * 1.05));
   snprintf_P(entryBuffer, sizeof(entryBuffer),
              PSTR("{\"usedBytes\":\"%s\",\"totalBytes\":\"%s\",\"freeBytes\":\"%lu\"}"),
-             usedStr.c_str(), totalStr.c_str(), freeBytes);
+             usedBuf, totalBuf, freeBytes);
   httpServer.sendContent(entryBuffer);
 
   httpServer.sendContent(F("]\r\n"));
