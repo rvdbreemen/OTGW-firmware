@@ -142,7 +142,7 @@ window.onload = initMainPage;
 let mainPageCompatWarningShown = false;
 let otLogCompatWarningShown = false;
 let picSettingsRefreshTimer = null;
-let picAvailable = true;  // PIC detected at boot; updated from /api/v2/device/info
+let picAvailable = false;  // Unknown until /api/v2/device/info confirms PIC is present
 
 const PIC_SETTINGS_REFRESH_INTERVAL_MS = 3000;
 const PIC_SETTINGS_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -2917,8 +2917,21 @@ function initMainPage() {
   }
 
   function startMainPage() {
-    if (window.location.hash == "#tabPICflash" && picAvailable) {
-      firmwarePage();
+    if (window.location.hash == "#tabPICflash") {
+      // Must resolve PIC availability before routing to the PIC flash page.
+      // picAvailable defaults to false; fetch device info first.
+      fetch(APIGW + 'v2/device/info')
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(r.statusText); })
+        .then(function(json) {
+          var d = json.device || {};
+          applyPICAvailability(d.picavailable);
+          if (picAvailable) {
+            firmwarePage();
+          } else {
+            showMainPage();
+          }
+        })
+        .catch(function() { showMainPage(); });
     } else {
       showMainPage();
     }
