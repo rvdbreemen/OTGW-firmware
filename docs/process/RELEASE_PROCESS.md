@@ -223,8 +223,12 @@ Once the checklist is complete:
 
 5. **Create draft GitHub release (creates the tag):**
 
+   Derive a short title (3-6 words) that summarizes the release theme. Format: `v<version> — <Short Title>`.
+
+   Examples: `v1.3.2 — File Explorer Reliability Fix`, `v1.4.0 — REST API v3 & Prometheus`, `v1.3.1 — Command Queue & CS Override Fix`.
+
    ```bash
-   gh release create v<version> --target main --title "v<version>" --notes-file RELEASE_GITHUB_<version>.md --draft
+   gh release create v<version> --target main --title "v<version> — <Short Title>" --notes-file RELEASE_GITHUB_<version>.md --draft
    ```
 
    This creates the `v<version>` tag on the latest `main` commit and a draft release. The release is not yet visible to the public.
