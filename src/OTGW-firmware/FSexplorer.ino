@@ -286,30 +286,44 @@ void apifirmwarefilelist() {
   // 150 bytes covers longest entry: path (~30) + version (~32) + fwversion (~32) + JSON overhead
   char entryBuffer[150];
   String version, fwversion;
-  Dir dir;
   File f;
   bool firstEntry = true;
 
   String dirpath = "/" + String(state.pic.sDeviceid);
   DebugTf(PSTR("dirpath=%s\r\n"), dirpath.c_str());
-  
+
   // Start chunked response with JSON array opening
   httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send(200, F("application/json"), F(""));
   httpServer.sendContent(F("["));
-  
+
   // Also stream to debug telnet
   DebugTln(F("--- Firmware File List (streamed) ---"));
   DebugTln(F("["));
-  
-  dir = LittleFS.openDir(dirpath);	
+
+#if defined(ESP8266)
+  Dir dir = LittleFS.openDir(dirpath);
   while (dir.next()) {
-    DebugTf(PSTR("dir.fileName()=%s\r\n"), dir.fileName().c_str());
-    if (dir.fileName().endsWith(".hex")) {
+    String entryName = dir.fileName();
+    size_t entrySize = dir.fileSize();
+#elif defined(ESP32)
+  File dirFile = LittleFS.open(dirpath);
+  if (!dirFile || !dirFile.isDirectory()) {
+    httpServer.sendContent(F("]\r\n"));
+    httpServer.sendContent(F(""));
+    return;
+  }
+  File entry = dirFile.openNextFile();
+  while (entry) {
+    String entryName = String(entry.name());
+    size_t entrySize = entry.size();
+#endif
+    DebugTf(PSTR("entry=%s\r\n"), entryName.c_str());
+    if (entryName.endsWith(".hex")) {
       version="";
       fwversion="";
-      String hexfile = dirpath + "/" + dir.fileName();   
+      String hexfile = dirpath + "/" + entryName;
       String verfile = hexfile;
       verfile.replace(".hex", ".ver");
       f = LittleFS.open(verfile, "r");
@@ -317,42 +331,45 @@ void apifirmwarefilelist() {
         version = f.readStringUntil('\n');
         version.trim();
         f.close();
-      } 
-      
+      }
+
       char fwversionBuf[32] = {0};
       GetVersion(hexfile.c_str(), fwversionBuf, sizeof(fwversionBuf));
       fwversion = fwversionBuf;
 
-      DebugTf(PSTR("GetVersion(%s) returned [%s]\r\n"), hexfile.c_str(), fwversion.c_str());  
+      DebugTf(PSTR("GetVersion(%s) returned [%s]\r\n"), hexfile.c_str(), fwversion.c_str());
       if (fwversion.length() && strcmp(fwversion.c_str(),version.c_str())) {
         version=fwversion;
         if (f = LittleFS.open(verfile, "w")) {
           DebugTf(PSTR("writing %s to %s\r\n"),version.c_str(),verfile.c_str());
           f.print(version + "\n");
           f.close();
-        } 
+        }
       }
       Debugln();
-      
+
       // Add comma separator after first entry
       if (!firstEntry) {
         httpServer.sendContent(F(","));
         DebugTln(F(",")); // Also to debug telnet
       }
       firstEntry = false;
-      
+
       // Stream this entry directly (fits in 256-byte buffer)
       // CSTR() macro handles null safety globally - returns "" if null
-      snprintf_P(entryBuffer, sizeof(entryBuffer), 
-                 PSTR("{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d}"), 
-                 CSTR(dir.fileName()), CSTR(version), dir.fileSize());
+      snprintf_P(entryBuffer, sizeof(entryBuffer),
+                 PSTR("{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d}"),
+                 CSTR(entryName), CSTR(version), (int)entrySize);
       httpServer.sendContent(entryBuffer);
-      
+
       // Also stream entry to debug telnet
       DebugTf(PSTR("  %s\r\n"), entryBuffer);
-      
+
       feedWatchDog(); // Feed watchdog during potentially long operation
     }
+#if defined(ESP32)
+    entry = dirFile.openNextFile();
+#endif
   }
   
   // Close JSON array
@@ -422,21 +439,46 @@ void apilistfiles()
   int fileCount = 0;
   bool truncated = false;
 
+#if defined(ESP8266)
   Dir dir = LittleFS.openDir(path);
   while (dir.next()) {
+    String fname = dir.fileName();
+    long   fsize = (long)dir.fileSize();
+    bool   isDir = dir.isDirectory();
+#elif defined(ESP32)
+  File dirFile = LittleFS.open(path);
+  if (!dirFile || !dirFile.isDirectory()) {
+    httpServer.sendContent(F("]\r\n"));
+    httpServer.sendContent(F(""));
+    return;
+  }
+  File entry = dirFile.openNextFile();
+  while (entry) {
+    String fname = String(entry.name());
+    long   fsize = (long)entry.size();
+    bool   isDir = entry.isDirectory();
+#endif
     feedWatchDog();
     // Skip hidden files/directories (names starting with '.')
-    if (dir.fileName().charAt(0) == '.') continue;
+    if (fname.charAt(0) == '.') {
+#if defined(ESP32)
+      entry = dirFile.openNextFile();
+#endif
+      continue;
+    }
     if (fileCount >= MAX_FILES_IN_LIST) { truncated = true; break; }
     if (!first) httpServer.sendContent(F(","));
     first = false;
 
     snprintf_P(buf, sizeof(buf),
       PSTR("{\"name\":\"%s\",\"size\":%ld,\"type\":\"%s\"}"),
-      dir.fileName().c_str(), (long)dir.fileSize(),
-      dir.isDirectory() ? "dir" : "file");
+      fname.c_str(), fsize,
+      isDir ? "dir" : "file");
     httpServer.sendContent(buf);
     fileCount++;
+#if defined(ESP32)
+    entry = dirFile.openNextFile();
+#endif
   }
 
   // Storage info as last entry (raw bytes — frontend formats for display)
