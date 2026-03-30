@@ -20,6 +20,7 @@
 
 #include <WebServer.h>
 #include <Update.h>
+#include <StreamString.h>
 #include <LittleFS.h>
 #include "Wire.h"
 

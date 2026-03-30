@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.4.0-beta
+**  Version  : v1.3.5-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -455,13 +455,37 @@ static void appendProgmemSuffix(char *dst, size_t dstSize, PGM_P suffix)
   strncat_P(dst, suffix, dstSize - len - 1);
 }
 
-static void handlePicFlashBackgroundTasks()
-{
-  handleDebug();              // Keep telnet debug active for monitoring
-  httpServer.handleClient();  // Keep HTTP active
-  MDNS.update();              // Keep MDNS active for network discovery
-  handleOTGW();               // REQUIRED for PIC flash - processes serial communication
-  handleWebSocket();          // Keep WebSocket service responsive during flash
+//===================[ Send useful information to MQTT ]======================
+
+/*
+Publish usefull firmware version information to MQTT broker.
+*/
+void sendMQTTversioninfo(){
+  char rebootCountBuf[12];
+  snprintf_P(rebootCountBuf, sizeof(rebootCountBuf), PSTR("%lu"), static_cast<unsigned long>(state.uptime.iRebootCount));
+  sendMQTTData("otgw-firmware/version", _SEMVER_FULL);
+  sendMQTTData("otgw-firmware/reboot_count", rebootCountBuf);
+  sendMQTTData("otgw-firmware/reboot_reason", lastReset);
+  if (isPICEnabled()) {
+    sendMQTTData("otgw-pic/version", state.pic.sFwversion);
+    sendMQTTData("otgw-pic/deviceid", state.pic.sDeviceid);
+    sendMQTTData("otgw-pic/firmwaretype", state.pic.sType);
+  }
+  sendMQTTData("otgw-pic/picavailable", CCONOFF(state.pic.bAvailable));
+}
+
+/*
+Publish state information of PIC firmware version information to MQTT broker.
+*/
+void sendMQTTstateinformation(){
+  if (!isPICEnabled()) return;
+  sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
+  sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
+  if (state.otgw.bGatewayModeKnown) {
+    sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(state.otgw.bGatewayMode));
+  }
+  sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otgw.bOnline));
+  sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
 }
 
 //===================[ Reset OTGW ]===============================
@@ -3997,14 +4021,16 @@ void handleOTGW()
 
   //Handle incoming data from OTGW through serial port (READ BUFFER)
   if (!state.debug.bOTGWSimulation) {
-    if (platformSerialHasOverrun(OTGWSerial)) {
+#if defined(ESP8266)
+    if (OTGWSerial.hasOverrun()) {
       DebugT(F("Serial Overrun\r\n"));
       reportOTGWEvent_P(PSTR("Serial Overrun"), '!', true);
     }
-    if (platformSerialHasRxError(OTGWSerial)) {
+    if (OTGWSerial.hasRxError()){
       DebugT(F("Serial Rx Error\r\n"));
       reportOTGWEvent_P(PSTR("Serial Rx Error"), '!', true);
     }
+#endif
     
     while (OTGWSerial.available()) {
       outByte = OTGWSerial.read();
