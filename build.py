@@ -860,9 +860,9 @@ def check_esptool():
 def cleanup_temp_directory(project_dir):
     """Clean up temporary build directory"""
     print_step("Cleaning up temporary files")
-    
+
     temp_dir = config.TEMP_DIR
-    
+
     if temp_dir.exists():
         print_info(f"Removing {temp_dir}...")
         try:
@@ -872,6 +872,100 @@ def cleanup_temp_directory(project_dir):
             print_warning(f"Could not remove {temp_dir}: {e}")
     else:
         print_info("No temporary directory to clean")
+
+
+# =============================================================================
+# PlatformIO backend
+# =============================================================================
+
+# Map target names to PlatformIO environment names
+PIO_ENV_MAP = {
+    "esp8266": "esp8266",
+    "esp32": "esp32",
+}
+
+
+def check_platformio():
+    """Check if PlatformIO CLI is available. Exit if not found."""
+    print_step("Checking for PlatformIO")
+    try:
+        result = subprocess.run(
+            ["pio", "--version"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            print_success(f"PlatformIO found: {result.stdout.strip()}")
+            return True
+    except FileNotFoundError:
+        pass
+    print_error("PlatformIO CLI (pio) not found. Install it: pip install platformio")
+    sys.exit(1)
+
+
+def build_firmware_pio(project_dir, target):
+    """Build firmware using PlatformIO."""
+    tcfg = TARGETS[target]
+    env_name = PIO_ENV_MAP[target]
+    print_step(f"Building firmware [{tcfg['name']}] (PlatformIO)")
+    run_command(["pio", "run", "-e", env_name], cwd=project_dir)
+    print_success(f"Firmware build complete [{tcfg['name']}]")
+
+
+def build_filesystem_pio(project_dir, target):
+    """Build LittleFS filesystem using PlatformIO."""
+    tcfg = TARGETS[target]
+    env_name = PIO_ENV_MAP[target]
+    print_step(f"Building filesystem [{tcfg['name']}] (PlatformIO)")
+    run_command(["pio", "run", "-e", env_name, "-t", "buildfs"], cwd=project_dir)
+    print_success(f"Filesystem build complete [{tcfg['name']}]")
+
+
+def collect_pio_artifacts(project_dir, target):
+    """Copy PlatformIO build artifacts to the common build/ directory."""
+    tcfg = TARGETS[target]
+    env_name = PIO_ENV_MAP[target]
+    print_step(f"Collecting build artifacts [{tcfg['name']}]")
+
+    pio_build_dir = project_dir / ".pio" / "build" / env_name
+    build_dir = config.BUILD_DIR
+    build_dir.mkdir(exist_ok=True)
+
+    collected = []
+
+    # Firmware binary
+    fw_src = pio_build_dir / "firmware.bin"
+    if fw_src.exists():
+        fw_dest = build_dir / f"{config.PROJECT_NAME}-{target}.ino.bin"
+        shutil.copy2(fw_src, fw_dest)
+        print_info(f"Copied: firmware.bin -> {fw_dest.name}")
+        collected.append(fw_dest)
+
+    # Filesystem binary
+    fs_src = pio_build_dir / "littlefs.bin"
+    if fs_src.exists():
+        fs_dest = build_dir / f"{config.PROJECT_NAME}-{target}.littlefs.bin"
+        shutil.copy2(fs_src, fs_dest)
+        print_info(f"Copied: littlefs.bin -> {fs_dest.name}")
+        collected.append(fs_dest)
+
+    # ESP32 extras needed for merged binary
+    if target == "esp32":
+        for extra in ["bootloader.bin", "partitions.bin"]:
+            src = pio_build_dir / extra
+            if src.exists():
+                dest = build_dir / f"{target}-{extra}"
+                shutil.copy2(src, dest)
+                print_info(f"Copied: {extra} -> {dest.name}")
+                collected.append(dest)
+
+    if collected:
+        print_success(f"Collected {len(collected)} artifact(s)")
+    else:
+        print_warning("No build artifacts found in PlatformIO output")
+
+    return collected
 
 
 def clean_build(project_dir):
@@ -901,18 +995,41 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python build.py                          # Full build for ESP8266 + ESP32 (default)
-  python build.py --target esp8266         # Build for ESP8266 only
-  python build.py --target esp32           # Build for ESP32 only
-  python build.py --firmware               # Build firmware only
-  python build.py --filesystem             # Build filesystem only
-  python build.py --merged                 # Build and create merged binary
-  python build.py --merged --compress      # Build and create compressed merged binary
-  python build.py --clean                  # Clean build artifacts
-  python build.py --distclean              # Also remove cores/libraries cache
+  python build.py                              # Full build (arduino-cli, default)
+  python build.py --target esp8266             # ESP8266 only
+  python build.py --pio --target esp8266       # ESP8266 with PlatformIO backend
+  python build.py --firmware                   # Build firmware only
+  python build.py --filesystem                 # Build filesystem only
+  python build.py --merged                     # Build and create merged binary
+  python build.py --merged --compress          # Build and create compressed merged binary
+  python build.py --clean                      # Clean build artifacts
+  python build.py --distclean                  # Also remove cores/libraries cache
         """
     )
-    
+
+    # Backend selection
+    backend_group = parser.add_mutually_exclusive_group()
+    backend_group.add_argument(
+        "--backend",
+        choices=["arduino-cli", "platformio"],
+        default="arduino-cli",
+        help="Build backend (default: arduino-cli)"
+    )
+    backend_group.add_argument(
+        "--arduino-cli",
+        action="store_const",
+        const="arduino-cli",
+        dest="backend",
+        help="Shorthand for --backend arduino-cli"
+    )
+    backend_group.add_argument(
+        "--pio",
+        action="store_const",
+        const="platformio",
+        dest="backend",
+        help="Shorthand for --backend platformio"
+    )
+
     parser.add_argument(
         "--firmware",
         action="store_true",
@@ -952,14 +1069,14 @@ Examples:
     parser.add_argument(
         "--no-install-cli",
         action="store_true",
-        help="Skip arduino-cli installation check/install"
+        help="Skip arduino-cli installation check/install (arduino-cli backend only)"
     )
     parser.add_argument(
         "--no-color",
         action="store_true",
         help="Disable colored output"
     )
-    
+
     args = parser.parse_args()
     
     # Disable colors if requested or on Windows (unless ANSICON is present)
@@ -974,18 +1091,21 @@ Examples:
     # Get project directory (script should be in project root)
     project_dir = Path(__file__).parent.resolve()
     
+    use_pio = (args.backend == "platformio")
+
     print(f"{Colors.HEADER}{Colors.BOLD}")
     print("=" * 60)
     print("  OTGW-firmware Local Build Script")
+    print(f"  Backend: {'PlatformIO' if use_pio else 'arduino-cli'}")
     print("=" * 60)
     print(f"{Colors.ENDC}")
-    
+
     # Check system
     system, machine = get_system_info()
-    
+
     # Check Python version
     check_python_version()
-    
+
     # Handle cleaning options
     if args.distclean and args.clean:
         print_error("Use only one of --clean or --distclean")
@@ -996,7 +1116,7 @@ Examples:
     if args.distclean:
         clean_build(project_dir)
         return
-    
+
     # Resolve target list
     if args.target == "all":
         target_names = list(TARGETS.keys())
@@ -1005,20 +1125,21 @@ Examples:
 
     print_info(f"Target(s): {', '.join(TARGETS[t]['name'] for t in target_names)}")
 
-    # Install arduino-cli if needed and add to PATH
-    if not args.no_install_cli:
-        cli_install_dir = install_arduino_cli(system)
-        # Add arduino-cli to PATH for subprocess calls
-        if cli_install_dir:
-            current_path = os.environ.get("PATH", "")
-            os.environ["PATH"] = f"{cli_install_dir}{os.pathsep}{current_path}"
-            print_info(f"Added {cli_install_dir} to PATH for this build session")
+    # Backend-specific setup
+    config_file = None
+    if use_pio:
+        check_platformio()
+    else:
+        # Arduino-CLI setup
+        if not args.no_install_cli:
+            cli_install_dir = install_arduino_cli(system)
+            if cli_install_dir:
+                current_path = os.environ.get("PATH", "")
+                os.environ["PATH"] = f"{cli_install_dir}{os.pathsep}{current_path}"
+                print_info(f"Added {cli_install_dir} to PATH for this build session")
 
-    # Setup arduino-cli config (with board manager URLs for all requested targets)
-    config_file = setup_arduino_config(project_dir, target_names)
-
-    # Install dependencies (cores for all requested targets + shared libraries)
-    install_dependencies(project_dir, config_file, target_names)
+        config_file = setup_arduino_config(project_dir, target_names)
+        install_dependencies(project_dir, config_file, target_names)
 
     # Update version
     update_version(project_dir)
@@ -1035,17 +1156,28 @@ Examples:
         tcfg = TARGETS[target]
         print(f"\n{Colors.HEADER}{Colors.BOLD}--- Building for {tcfg['name']} ---{Colors.ENDC}\n")
 
-        # Build based on arguments
-        if args.firmware and not args.filesystem:
-            build_firmware(project_dir, config_file, target)
-        elif args.filesystem and not args.firmware:
-            build_filesystem(project_dir, config_file, target)
-        else:
-            build_firmware(project_dir, config_file, target)
-            build_filesystem(project_dir, config_file, target)
+        if use_pio:
+            # PlatformIO build path
+            if args.firmware and not args.filesystem:
+                build_firmware_pio(project_dir, target)
+            elif args.filesystem and not args.firmware:
+                build_filesystem_pio(project_dir, target)
+            else:
+                build_firmware_pio(project_dir, target)
+                build_filesystem_pio(project_dir, target)
 
-        # Consolidate build artifacts from subdirectories
-        consolidate_build_artifacts(project_dir, target)
+            collect_pio_artifacts(project_dir, target)
+        else:
+            # Arduino-CLI build path
+            if args.firmware and not args.filesystem:
+                build_firmware(project_dir, config_file, target)
+            elif args.filesystem and not args.firmware:
+                build_filesystem(project_dir, config_file, target)
+            else:
+                build_firmware(project_dir, config_file, target)
+                build_filesystem(project_dir, config_file, target)
+
+            consolidate_build_artifacts(project_dir, target)
 
         # Rename artifacts with version
         rename_build_artifacts(project_dir, semver, target)
@@ -1068,9 +1200,10 @@ Examples:
     # List build artifacts
     list_build_artifacts(project_dir)
 
-    # Clean up temporary directory
-    cleanup_temp_directory(project_dir)
-    
+    # Clean up temporary directory (arduino-cli only; PlatformIO uses .pio/)
+    if not use_pio:
+        cleanup_temp_directory(project_dir)
+
     print(f"\n{Colors.OKGREEN}{Colors.BOLD}")
     print("=" * 60)
     print("  Build completed successfully!")
