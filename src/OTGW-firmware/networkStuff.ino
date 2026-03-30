@@ -23,10 +23,12 @@ time_t      NtpLastSync = 0;
 // Port is fixed in the constructor; begin() needs no port argument.
 SimpleTelnet<1> debugTelnet(23);
 
-ESP8266WebServer        httpServer(80);
-ESP8266HTTPUpdateServer httpUpdater(true);
+OTGWWebServer           httpServer(80);
+OTGWUpdateServer        httpUpdater(true);
 
+#if defined(ESP8266)
 FSInfo LittleFSinfo;
+#endif
 bool   LittleFSmounted = false;
 
 //=====[ WiFi ]================================================================
@@ -140,7 +142,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     {
       DebugTln(F("failed to connect and hit timeout"));
       delay(2000);  // Enough time for messages to be sent.
-      ESP.restart();
+      platformRestart();
       delay(5000);  // Enough time to ensure we don't return.
     }
   }
@@ -174,6 +176,12 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   // loopWifi() WIFI_DISCONNECTED calls wifi_station_dhcpc_start() before WiFi.begin()
   // in the correct (not-connected) state, so no SDK DHCP call is needed here.
   WiFi.hostname(hostname);
+  if (!sDhcpHostnameFixed && strcmp(WiFi.hostname().c_str(), hostname) != 0) {
+    DebugTf(PSTR("Catch-all: hostname mismatch after connect ('%s' vs '%s'), forcing DHCP re-announce.\r\n"),
+            WiFi.hostname().c_str(), hostname);
+    platformRestartDHCP();
+    sDhcpHostnameFixed = true;
+  }
 
   httpUpdater.setup(&httpServer);
   httpUpdater.setIndexPage(UpdateServerIndex);
@@ -333,6 +341,7 @@ void startMDNS(const char *hostname)
 
 void startLLMNR(const char *hostname)
 {
+#if HAS_LLMNR
   DebugTf(PSTR("LLMNR setup as [%s]\r\n"), hostname);
   if (LLMNR.begin(hostname))               // Start the LLMNR responder for hostname
   {
@@ -342,6 +351,9 @@ void startLLMNR(const char *hostname)
   {
     DebugTln(F("Error setting up LLMNR responder!\r\n"));
   }
+#else
+  (void)hostname;  // LLMNR not available on this platform
+#endif
 } // startLLMNR()
 
 //=====[ NTP ]=================================================================
@@ -362,6 +374,16 @@ void startNTP()
   // connected resets the IP to 0.0.0.0 — see issue #525 and analysis report in
   // docs/reviews/2026-04-07_issue-525-sdk-dhcp-analysis/ANALYSIS_REPORT.md
   WiFi.hostname(CSTR(settings.sHostname));
+
+  // If configTime() did reset the hostname, the DHCP lease may have been
+  // re-announced with the wrong name.  Force a DHCP re-announce once so the
+  // router sees the correct hostname.  Only do this once to avoid dropping
+  // the STA lease on every 30-min NTP resync (which would break MQTT/Telnet/
+  // WebSocket connections).
+  if (!sDhcpHostnameFixed && hostnameWasReset && WiFi.isConnected()) {
+    platformRestartDHCP();
+    sDhcpHostnameFixed = true;
+  }
   NtpStatus = TIME_WAITFORSYNC;
 }
 

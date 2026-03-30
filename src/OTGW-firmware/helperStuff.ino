@@ -200,7 +200,12 @@ bool updateLittleFSStatus(const char *probePath)
   static const char defaultPath[] PROGMEM = "/.health";
   bool useDefault = (probePath == nullptr);
   
+#if defined(ESP8266)
   LittleFSmounted = LittleFS.info(LittleFSinfo);
+#elif defined(ESP32)
+  // ESP32 LittleFS doesn't have .info() — check totalBytes > 0 as mounted indicator
+  LittleFSmounted = (LittleFS.totalBytes() > 0);
+#endif
   if (!LittleFSmounted) {
     return false;
   }
@@ -331,55 +336,29 @@ bool updateRebootLog(String text)
   //waitforNTPsync();
   loopNTP(); // make sure time is up to date (improved error logging)
 
+#if defined(ESP8266)
+  // ESP8266 SDK provides detailed reset info with register contents
   struct	rst_info	*rtc_info	=	system_get_rst_info();
-  
+
   if (rtc_info == NULL) {
     DebugTf(PSTR("no reset info available:	%x\r\n"),	errorCode);
   } else {
 
     DebugTf(PSTR("reset reason:	%x\r\n"),	rtc_info->reason);
     errorCode = rtc_info->reason;
-    // Rst cause No.    Cause                     GPIO state
-    //--------------    -------------------       -------------
-    // 0                Power reboot              Changed
-    // 1                Hardware WDT reset        Changed
-    // 2                Fatal exception           Unchanged
-    // 3                Software watchdog reset   Unchanged
-    // 4                Software reset            Unchanged
-    // 5                Deep-sleep                Changed
-    // 6                Hardware reset            Changed
 
     if	(rtc_info->reason	==	REASON_WDT_RST	|| rtc_info->reason	==	REASON_EXCEPTION_RST	|| rtc_info->reason	==	REASON_SOFT_WDT_RST)	{
-
-      //The	address	of	the	last	crash	is	printed,	which	is	used	to	debug	garbled	output
       snprintf_P(log_line_regs, LOG_LINE_LENGTH, PSTR("ESP register contents: epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x, depc=0x%08x\r\n"), rtc_info->epc1, rtc_info->epc2, rtc_info->epc3, rtc_info->excvaddr, rtc_info->depc);
       Debugf(log_line_regs);
     }
 
     if (rtc_info->reason == REASON_EXT_SYS_RST) {
-      //external reset, so try to fetch the reset reason from the tiny watchdog and print that
       { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason));
         snprintf_P(log_line_regs, LOG_LINE_LENGTH, PSTR("External Reason: External Watchdog reason: %s\r\n"), wdReason);
-        Debugf(log_line_regs); }      
+        Debugf(log_line_regs); }
     }
 
     if	(rtc_info->reason	==	REASON_EXCEPTION_RST)	{
-
-      // Fatal exception No.    Description             Possible Causes
-      // -------------------    --------------          -------------------
-      //  0                     Invalid command         1. Damaged BIN binaries
-      //                                                2. Wild pointers
-      //
-      //  6                     Division by zero        Division by zero
-      //
-      //  9                     Unaligned read/write    1. Unaligned read/write Cache addresses
-      //                        operation addresses     2. Wild pointers
-      //
-      //  28/29                 Access to invalid       1. Access to Cache after it is turned off
-      //                        address                 2. Wild pointers
-      //
-      // more reasons can be found in the "corebits.h" file of the Extensa SDK
-
       switch(rtc_info->exccause) {
         case 0:   snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Invalid command (0)")); break;
         case 6:   snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Division by zero (6)")); break;
@@ -388,10 +367,20 @@ bool updateRebootLog(String text)
         case 29:  snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Access to invalid address (29)")); break;
         default:  snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Other (not specified) (%d)"), rtc_info->exccause); break;
       }
-
       Debugf(PSTR("Fatal exception (%d): %s\r\n"),	rtc_info->exccause, log_line_excpt);
     }
   }
+#elif defined(ESP32)
+  // ESP32: use esp_reset_reason() — no register-level crash info via this API
+  esp_reset_reason_t reason = esp_reset_reason();
+  errorCode = (uint32_t)reason;
+  DebugTf(PSTR("reset reason: %x\r\n"), errorCode);
+  if (platformIsExternalReset()) {
+    char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason));
+    snprintf_P(log_line_regs, LOG_LINE_LENGTH, PSTR("External Reason: External Watchdog reason: %s\r\n"), wdReason);
+    Debugf(log_line_regs);
+  }
+#endif
 
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
@@ -447,7 +436,7 @@ void doRestart(const char* str) {
   DebugTln(str);
   flushSettings();  // Persist any pending settings before reboot
   delay(2000);  // Enough time for messages to be sent.
-  ESP.restart();
+  platformRestart();
   delay(5000);  // Enough time to ensure we don't return.
 }
 
@@ -701,7 +690,7 @@ static uint32_t mqttDropCount = 0;
 // Check current heap health level
 //===========================================================================================
 HeapHealthLevel getHeapHealth() {
-  uint32_t freeHeap = ESP.getFreeHeap();
+  uint32_t freeHeap = platformFreeHeap();
   
   if (freeHeap < HEAP_CRITICAL_THRESHOLD) {
     return HEAP_CRITICAL;
@@ -726,7 +715,7 @@ bool canSendWebSocket() {
     // Log warning periodically (use unsigned arithmetic for rollover safety)
     if ((uint32_t)(now - lastWebSocketWarningMs) > WARNING_LOG_INTERVAL_MS) {
       DebugTf(PSTR("HEAP-CRITICAL: Blocking WebSocket (dropped %u msgs, heap=%u bytes)\r\n"), 
-              webSocketDropCount, ESP.getFreeHeap());
+              webSocketDropCount, platformFreeHeap());
       lastWebSocketWarningMs = now;
     }
     return false;
@@ -756,7 +745,7 @@ bool canSendWebSocket() {
   // Log warning if we're dropping messages (use unsigned arithmetic for rollover safety)
   if (webSocketDropCount > 0 && (uint32_t)(now - lastWebSocketWarningMs) > WARNING_LOG_INTERVAL_MS) {
     DebugTf(PSTR("WebSocket throttled: dropped %u msgs (heap=%u bytes)\r\n"), 
-            webSocketDropCount, ESP.getFreeHeap());
+            webSocketDropCount, platformFreeHeap());
     lastWebSocketWarningMs = now;
     webSocketDropCount = 0; // reset counter after reporting
   }
@@ -777,7 +766,7 @@ bool canPublishMQTT() {
     // Log warning periodically (use unsigned arithmetic for rollover safety)
     if ((uint32_t)(now - lastMQTTWarningMs) > WARNING_LOG_INTERVAL_MS) {
       DebugTf(PSTR("HEAP-CRITICAL: Blocking MQTT (dropped %u msgs, heap=%u bytes)\r\n"), 
-              mqttDropCount, ESP.getFreeHeap());
+              mqttDropCount, platformFreeHeap());
       lastMQTTWarningMs = now;
     }
     return false;
@@ -807,7 +796,7 @@ bool canPublishMQTT() {
   // Log warning if we're dropping messages (use unsigned arithmetic for rollover safety)
   if (mqttDropCount > 0 && (uint32_t)(now - lastMQTTWarningMs) > WARNING_LOG_INTERVAL_MS) {
     DebugTf(PSTR("MQTT throttled: dropped %u msgs (heap=%u bytes)\r\n"), 
-            mqttDropCount, ESP.getFreeHeap());
+            mqttDropCount, platformFreeHeap());
     lastMQTTWarningMs = now;
     mqttDropCount = 0; // reset counter after reporting
   }
@@ -819,8 +808,8 @@ bool canPublishMQTT() {
 // Get heap statistics for debugging
 //===========================================================================================
 void logHeapStats() {
-  uint32_t freeHeap = ESP.getFreeHeap();
-  uint32_t maxBlock = ESP.getMaxFreeBlockSize();
+  uint32_t freeHeap = platformFreeHeap();
+  uint32_t maxBlock = platformMaxFreeBlock();
   HeapHealthLevel level = getHeapHealth();
   
   const char* levelStr = "UNKNOWN";
@@ -850,7 +839,7 @@ void emergencyHeapRecovery() {
   }
   lastRecoveryMs = now;
   
-  uint32_t heapBefore = ESP.getFreeHeap();
+  uint32_t heapBefore = platformFreeHeap();
   DebugTf(PSTR("Emergency heap recovery starting (heap=%u bytes)\r\n"), heapBefore);
   
   // Force MQTT buffer to minimum size
@@ -860,7 +849,7 @@ void emergencyHeapRecovery() {
   yield();
   delay(10);
   
-  uint32_t heapAfter = ESP.getFreeHeap();
+  uint32_t heapAfter = platformFreeHeap();
   // Calculate recovered bytes safely (handle case where heap decreased)
   // Use int32_t to avoid overflow and allow negative values
   int32_t recovered = (int32_t)heapAfter - (int32_t)heapBefore;

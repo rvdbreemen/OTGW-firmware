@@ -20,6 +20,9 @@
 #ifndef __HTTP_UPDATE_SERVER_H
 #define __HTTP_UPDATE_SERVER_H
 
+#if defined(ESP8266)
+// ---- ESP8266 implementation (original, template-based) --------------------
+
 #include <ESP8266WebServer.h>
 #include <WiFiClient.h>
 
@@ -54,7 +57,7 @@ class ESP8266HTTPUpdateServerTemplate
       _username = username;
       _password = password;
     }
-    
+
     void setIndexPage(const char *indexPage);
     void setSuccessPage(const char *succesPage);
 
@@ -91,9 +94,18 @@ class ESP8266HTTPUpdateServerTemplate
 
 
 using ESP8266HTTPUpdateServer = esp8266httpupdateserver::ESP8266HTTPUpdateServerTemplate<WiFiServer>;
+// Unified alias used by the rest of the firmware
+using OTGWUpdateServer = ESP8266HTTPUpdateServer;
 
 namespace BearSSL {
 using ESP8266HTTPUpdateServerSecure = esp8266httpupdateserver::ESP8266HTTPUpdateServerTemplate<WiFiServerSecure>;
 };
 
-#endif
+#elif defined(ESP32)
+// ---- ESP32 implementation -------------------------------------------------
+
+#include "OTGW-ModUpdateServer-esp32.h"
+
+#endif // ESP8266 / ESP32
+
+#endif // __HTTP_UPDATE_SERVER_H

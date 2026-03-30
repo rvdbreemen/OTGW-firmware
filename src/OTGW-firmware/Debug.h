@@ -110,13 +110,13 @@ void _debugBOL(const char *fn, int line)
 
    // Refresh time decomposition and heap stats at most once per second.
    // ZonedDateTime::forUnixSeconds64() computes DST rules and UTC offset;
-   // ESP.getMaxFreeBlockSize() walks the entire free list — both are too
+   // platformMaxFreeBlock() walks the entire free list — both are too
    // expensive to run on every debug line under high-volume flags.
    if (now_sec != lastCachedSec) {
      ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now_sec, cachedTz);
      snprintf(cachedPrefix, sizeof(cachedPrefix), "%02d:%02d:%02d.%%06d (%7u|%6u) ",
               myTime.hour(), myTime.minute(), myTime.second(),
-              ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
+              platformFreeHeap(), platformMaxFreeBlock());
      lastCachedSec  = now_sec;
    }
 

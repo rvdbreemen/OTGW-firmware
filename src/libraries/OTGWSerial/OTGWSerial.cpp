@@ -832,8 +832,19 @@ bool OTGWUpgrade::upgradeTick() {
 }
 
 OTGWSerial::OTGWSerial(int resetPin, int progressLed)
+#if defined(ESP8266)
 : HardwareSerial(UART0), _reset(resetPin), _led(progressLed) {
     HardwareSerial::begin(9600, SERIAL_8N1);
+#elif defined(ESP32)
+: HardwareSerial(1), _reset(resetPin), _led(progressLed) {
+    // ESP32 Serial1 needs explicit RX/TX pin assignment.
+    // PIN_PIC_RX/TX are defined in boards.h; if not defined, use defaults.
+    #if defined(PIN_PIC_RX) && defined(PIN_PIC_TX)
+      HardwareSerial::begin(9600, SERIAL_8N1, PIN_PIC_RX, PIN_PIC_TX);
+    #else
+      HardwareSerial::begin(9600, SERIAL_8N1, 16, 17);
+    #endif
+#endif
     // The PIC may have been confused by garbage on the
     // serial interface when the NodeMCU resets.
     resetPic();

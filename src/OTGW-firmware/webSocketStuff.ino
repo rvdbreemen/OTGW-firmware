@@ -75,9 +75,9 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
         
         // Check heap health before accepting connection
         // Use WARNING threshold to be conservative
-        if (ESP.getFreeHeap() < HEAP_WARNING_THRESHOLD) {
+        if (platformFreeHeap() < HEAP_WARNING_THRESHOLD) {
           DebugTf(PSTR("[%lu] WebSocket[%u]: Low heap (%u bytes), rejecting connection\r\n"), 
-            millis(), num, ESP.getFreeHeap());
+            millis(), num, platformFreeHeap());
           webSocket.disconnect(num);
           return;
         }
