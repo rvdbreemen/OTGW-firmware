@@ -45,7 +45,7 @@ void handlePendingUpgrade();
 
 void blinkLEDnow();
 void blinkLEDnow(uint8_t);
-void setLed(int8_t, uint8_t);
+void setLed(uint8_t, uint8_t);
 
 //Defaults and macro definitions
 #define _HOSTNAME       "OTGW"

@@ -260,6 +260,26 @@ void sendJsonMapEntry(const char *cName, int32_t iValue)
   httpServer.sendContent(jsonBuff);
 }
 
+// Extra overloads to resolve type ambiguity on ESP32 where int/int32_t and
+// unsigned int/uint32_t are distinct types (int32_t = long on xtensa-esp32).
+#if defined(ESP32)
+void sendJsonMapEntry(const char *cName, int iValue) {
+  sendJsonMapEntry(cName, (int32_t)iValue);
+}
+void sendJsonMapEntry(const char *cName, unsigned int uValue) {
+  sendJsonMapEntry(cName, (uint32_t)uValue);
+}
+#endif
+void sendJsonMapEntry(const char *cName, int8_t iValue) {
+  sendJsonMapEntry(cName, (int32_t)iValue);
+}
+void sendJsonMapEntry(const char *cName, int16_t iValue) {
+  sendJsonMapEntry(cName, (int32_t)iValue);
+}
+void sendJsonMapEntry(const char *cName, uint16_t uValue) {
+  sendJsonMapEntry(cName, (uint32_t)uValue);
+}
+
 void sendJsonMapEntry(const char *cName, uint32_t uValue)
 {
   char jsonBuff[120] = "";
@@ -336,6 +356,25 @@ void sendJsonOTmonMapEntry(const char *cName, int32_t iValue, const char *cUnit,
   sendBeforenext();
   sendIdent();
   httpServer.sendContent(jsonBuff);
+}
+
+// Extra overloads to resolve type ambiguity on ESP32
+#if defined(ESP32)
+void sendJsonOTmonMapEntry(const char *cName, int iValue, const char *cUnit, time_t epoch) {
+  sendJsonOTmonMapEntry(cName, (int32_t)iValue, cUnit, epoch);
+}
+void sendJsonOTmonMapEntry(const char *cName, unsigned int uValue, const char *cUnit, time_t epoch) {
+  sendJsonOTmonMapEntry(cName, (uint32_t)uValue, cUnit, epoch);
+}
+#endif
+void sendJsonOTmonMapEntry(const char *cName, int8_t iValue, const char *cUnit, time_t epoch) {
+  sendJsonOTmonMapEntry(cName, (int32_t)iValue, cUnit, epoch);
+}
+void sendJsonOTmonMapEntry(const char *cName, int16_t iValue, const char *cUnit, time_t epoch) {
+  sendJsonOTmonMapEntry(cName, (int32_t)iValue, cUnit, epoch);
+}
+void sendJsonOTmonMapEntry(const char *cName, uint16_t uValue, const char *cUnit, time_t epoch) {
+  sendJsonOTmonMapEntry(cName, (uint32_t)uValue, cUnit, epoch);
 }
 
 void sendJsonOTmonMapEntry(const char *cName, uint32_t uValue, const char *cUnit, time_t epoch)
@@ -477,6 +516,25 @@ void sendJsonMapEntry(const __FlashStringHelper* cName, int32_t iValue) {
   strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
   nameBuf[sizeof(nameBuf)-1] = 0;
   sendJsonMapEntry(nameBuf, iValue);
+}
+
+// Extra overloads to resolve type ambiguity on ESP32 (see char* overloads above)
+#if defined(ESP32)
+void sendJsonMapEntry(const __FlashStringHelper* cName, int iValue) {
+  sendJsonMapEntry(cName, (int32_t)iValue);
+}
+void sendJsonMapEntry(const __FlashStringHelper* cName, unsigned int uValue) {
+  sendJsonMapEntry(cName, (uint32_t)uValue);
+}
+#endif
+void sendJsonMapEntry(const __FlashStringHelper* cName, int8_t iValue) {
+  sendJsonMapEntry(cName, (int32_t)iValue);
+}
+void sendJsonMapEntry(const __FlashStringHelper* cName, int16_t iValue) {
+  sendJsonMapEntry(cName, (int32_t)iValue);
+}
+void sendJsonMapEntry(const __FlashStringHelper* cName, uint16_t uValue) {
+  sendJsonMapEntry(cName, (uint32_t)uValue);
 }
 
 void sendJsonMapEntry(const __FlashStringHelper* cName, uint32_t uValue) {

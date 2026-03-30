@@ -27,6 +27,7 @@
 #define OTGWSerial_h
 
 #include <HardwareSerial.h>
+#include <FS.h>
 
 typedef enum {
     PIC16F88,

@@ -22,7 +22,9 @@
 #include <HTTPClient.h>
 #include <Update.h>
 #include <Preferences.h>
+#include <LittleFS.h>
 #include <esp_system.h>
+#include <esp_mac.h>
 
 // ---- Platform name -------------------------------------------------------
 #define PLATFORM_NAME "ESP32"
