@@ -442,14 +442,22 @@ void apilistfiles()
   }
 
   // Storage info as last entry (raw bytes — frontend formats for display)
+  unsigned long totalBytes, usedBytesRaw;
+#if defined(ESP8266)
   FSInfo fsInfo;
   LittleFS.info(fsInfo);
+  totalBytes = fsInfo.totalBytes;
+  usedBytesRaw = fsInfo.usedBytes;
+#elif defined(ESP32)
+  totalBytes = LittleFS.totalBytes();
+  usedBytesRaw = LittleFS.usedBytes();
+#endif
   if (!first) httpServer.sendContent(F(","));
-  unsigned long usedBytes = (unsigned long)(fsInfo.usedBytes * 1.05);
-  unsigned long freeBytes = fsInfo.totalBytes - usedBytes;
+  unsigned long usedBytes = (unsigned long)(usedBytesRaw * 1.05);
+  unsigned long freeBytes = totalBytes - usedBytes;
   snprintf_P(buf, sizeof(buf),
     PSTR("{\"usedBytes\":%lu,\"totalBytes\":%lu,\"freeBytes\":%lu,\"truncated\":%s}"),
-    usedBytes, fsInfo.totalBytes, freeBytes,
+    usedBytes, totalBytes, freeBytes,
     truncated ? "true" : "false");
   httpServer.sendContent(buf);
 
@@ -562,13 +570,21 @@ const String &contentType(String& filename)
 } // &contentType()
 
 //=====================================================================================
-bool freeSpace(uint16_t const& printsize) 
-{    
+bool freeSpace(uint16_t const& printsize)
+{
+  unsigned long totalB, usedB;
+#if defined(ESP8266)
   FSInfo LittleFSinfo;
   LittleFS.info(LittleFSinfo);
-  Debugln(formatBytes(LittleFSinfo.totalBytes - (LittleFSinfo.usedBytes * 1.05)) + " im LittleFS frei");
-  return (LittleFSinfo.totalBytes - (LittleFSinfo.usedBytes * 1.05) > printsize) ? true : false;
-  
+  totalB = LittleFSinfo.totalBytes;
+  usedB  = LittleFSinfo.usedBytes;
+#elif defined(ESP32)
+  totalB = LittleFS.totalBytes();
+  usedB  = LittleFS.usedBytes();
+#endif
+  Debugln(formatBytes(totalB - (unsigned long)(usedB * 1.05)) + " im LittleFS frei");
+  return (totalB - (unsigned long)(usedB * 1.05) > printsize);
+
 } // freeSpace()
 
 //=====================================================================================

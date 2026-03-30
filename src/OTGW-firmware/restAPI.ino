@@ -454,8 +454,8 @@ void processAPI()
     return;
   }
 
-  if (ESP.getFreeHeap() < 4096) {
-    RESTDebugTf(PSTR("==> Bailout due to low heap (%d bytes))\r\n"), ESP.getFreeHeap());
+  if (platformFreeHeap() < 4096) {
+    RESTDebugTf(PSTR("==> Bailout due to low heap (%d bytes))\r\n"), platformFreeHeap());
     httpServer.send_P(500, PSTR("text/plain"), PSTR("500: internal server error (low heap)\r\n"));
     return;
   }
@@ -709,27 +709,37 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("hostname"), CSTR(settings.sHostname));
   sendJsonMapEntry(F("ipaddress"), CSTR(WiFi.localIP().toString()));
   sendJsonMapEntry(F("macaddress"), CSTR(WiFi.macAddress()));
-  sendJsonMapEntry(F("freeheap"), ESP.getFreeHeap());
-  sendJsonMapEntry(F("maxfreeblock"), ESP.getMaxFreeBlockSize());
-  sendJsonMapEntry(F("chipid"), CSTR(String( ESP.getChipId(), HEX )));
+  sendJsonMapEntry(F("platform"), F(PLATFORM_NAME));
+  sendJsonMapEntry(F("freeheap"), platformFreeHeap());
+  sendJsonMapEntry(F("maxfreeblock"), platformMaxFreeBlock());
+  snprintf_P(cMsg, sizeof(cMsg), PSTR("%06X"), (unsigned int)platformChipId());
+  sendJsonMapEntry(F("chipid"), cMsg);
+#if defined(ESP8266)
   sendJsonMapEntry(F("coreversion"), CSTR(ESP.getCoreVersion()) );
+#elif defined(ESP32)
+  sendJsonMapEntry(F("coreversion"), ESP.getSdkVersion());
+#endif
   sendJsonMapEntry(F("sdkversion"),  ESP.getSdkVersion());
   sendJsonMapEntry(F("cpufreq"), ESP.getCpuFreqMHz());
-  sendJsonMapEntry(F("sketchsize"), ESP.getSketchSize() );
-  sendJsonMapEntry(F("freesketchspace"),  ESP.getFreeSketchSpace() );
+  sendJsonMapEntry(F("sketchsize"), platformSketchSize() );
+  sendJsonMapEntry(F("freesketchspace"),  platformFreeSketchSpace() );
 
-  snprintf_P(cMsg, sizeof(cMsg), PSTR("%08X"), ESP.getFlashChipId());
+  snprintf_P(cMsg, sizeof(cMsg), PSTR("%08X"), (unsigned int)platformFlashChipId());
   sendJsonMapEntry(F("flashchipid"), cMsg);
-  sendJsonMapEntry(F("flashchipsize"), (ESP.getFlashChipSize() / 1024.0f / 1024.0f));
-  sendJsonMapEntry(F("flashchiprealsize"), (ESP.getFlashChipRealSize() / 1024.0f / 1024.0f));
+  sendJsonMapEntry(F("flashchipsize"), (platformFlashChipSize() / 1024.0f / 1024.0f));
+  sendJsonMapEntry(F("flashchiprealsize"), (platformFlashChipRealSize() / 1024.0f / 1024.0f));
 
+#if defined(ESP8266)
   LittleFS.info(LittleFSinfo);
   sendJsonMapEntry(F("LittleFSsize"), floorf((LittleFSinfo.totalBytes / (1024.0f * 1024.0f))));
+#elif defined(ESP32)
+  sendJsonMapEntry(F("LittleFSsize"), floorf((LittleFS.totalBytes() / (1024.0f * 1024.0f))));
+#endif
 
-  sendJsonMapEntry(F("flashchipspeed"), floorf((ESP.getFlashChipSpeed() / 1000.0f / 1000.0f)));
+  sendJsonMapEntry(F("flashchipspeed"), floorf((platformFlashChipSpeed() / 1000.0f / 1000.0f)));
 
-  FlashMode_t ideMode = ESP.getFlashChipMode();
-  sendJsonMapEntry(F("flashchipmode"), flashMode[ideMode]);
+  uint8_t ideMode = platformFlashChipMode();
+  sendJsonMapEntry(F("flashchipmode"), flashMode[ideMode < 4 ? ideMode : 4]);
   sendJsonMapEntry(F("ssid"), CSTR(WiFi.SSID()));
   sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());
   sendJsonMapEntry(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
@@ -762,7 +772,7 @@ void sendHealth()
   updateLittleFSStatus(F("/.health"));
   sendJsonMapEntry(F("status"), LittleFSmounted ? F("UP") : F("DEGRADED"));
   sendJsonMapEntry(F("uptime"), upTime());
-  sendJsonMapEntry(F("heap"), ESP.getFreeHeap());
+  sendJsonMapEntry(F("heap"), platformFreeHeap());
   sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());
   sendJsonMapEntry(F("mqttconnected"), CBOOLEAN(state.mqtt.bConnected));
   sendJsonMapEntry(F("otgwconnected"), CBOOLEAN(state.otgw.bOnline));
@@ -908,8 +918,8 @@ void sendDeviceTimeV2()
   sendJsonMapEntry(F("message"), getStatusMessageText());
   sendJsonMapEntry(F("psmode"), state.otgw.bPSmode);
   sendJsonMapEntry(F("otgwsimulation"), state.debug.bOTGWSimulation);
-  sendJsonMapEntry(F("freeheap"), ESP.getFreeHeap());
-  sendJsonMapEntry(F("maxfreeblock"), ESP.getMaxFreeBlockSize());
+  sendJsonMapEntry(F("freeheap"), platformFreeHeap());
+  sendJsonMapEntry(F("maxfreeblock"), platformMaxFreeBlock());
 
   sendEndJsonMap(F("devtime"));
 
