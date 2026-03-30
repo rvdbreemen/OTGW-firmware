@@ -21,11 +21,9 @@
 #include <ESP8266mDNS.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266LLMNR.h>
-#include <LittleFS.h>
 
 extern "C" {
   #include "user_interface.h"   // wifi_station_dhcpc_stop/start, system_get_rst_info
-  int clock_gettime(clockid_t unused, struct timespec *tp);
 }
 
 // ---- Platform name -------------------------------------------------------
@@ -38,45 +36,11 @@ extern "C" {
 // ---- Unified type aliases ------------------------------------------------
 using OTGWWebServer = ESP8266WebServer;
 
-// ---- Platform functions --------------------------------------------------
+// ---- FSInfo (ESP32 uses a different struct) ------------------------------
+// ESP8266 LittleFS.info(FSInfo&) is the native API — no shim needed.
+// On ESP32, see platform_esp32.h for the compatibility wrapper.
 
-// WiFi hostname
-inline void platformSetHostname(const char *hostname) {
-  WiFi.hostname(hostname);
-}
-
-inline const char* platformGetHostname() {
-  static char _hn[64];
-  strlcpy(_hn, WiFi.hostname().c_str(), sizeof(_hn));
-  return _hn;
-}
-
-// LittleFS info (native on ESP8266)
-inline bool platformFSInfo(FSInfo &info) {
-  return LittleFS.info(info);
-}
-
-// Core/SDK version
-inline const char* platformCoreVersion() {
-  static char _ver[32];
-  strlcpy(_ver, ESP.getCoreVersion().c_str(), sizeof(_ver));
-  return _ver;
-}
-
-// MAC address
-inline void platformGetMacAddress(uint8_t *mac) {
-  WiFi.macAddress(mac);
-}
-
-// SDK version
-inline const char* platformSdkVersion() {
-  return ESP.getSdkVersion();
-}
-
-// CPU frequency
-inline uint32_t platformCpuFreqMHz() {
-  return ESP.getCpuFreqMHz();
-}
+// ---- Platform shim functions ---------------------------------------------
 
 // Chip identity
 inline uint32_t platformChipId() {
@@ -151,53 +115,10 @@ inline bool platformIsExternalReset() {
   return (resetInfo != nullptr) && (resetInfo->reason == REASON_EXT_SYS_RST);
 }
 
-inline uint32_t platformResetCode() {
-  struct rst_info *rtc_info = system_get_rst_info();
-  return (rtc_info != nullptr) ? rtc_info->reason : (uint32_t)-1;
-}
-
-// Register dump for crash analysis (WDT, exception, soft WDT resets)
-inline void platformResetRegisterDump(char *buf, size_t bufLen) {
-  buf[0] = '\0';
-  struct rst_info *rtc_info = system_get_rst_info();
-  if (rtc_info == nullptr) return;
-  if (rtc_info->reason == REASON_WDT_RST ||
-      rtc_info->reason == REASON_EXCEPTION_RST ||
-      rtc_info->reason == REASON_SOFT_WDT_RST) {
-    snprintf_P(buf, bufLen,
-      PSTR("ESP register contents: epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x, depc=0x%08x\r\n"),
-      rtc_info->epc1, rtc_info->epc2, rtc_info->epc3, rtc_info->excvaddr, rtc_info->depc);
-  }
-}
-
-// Exception cause description
-inline void platformResetExceptionInfo(char *buf, size_t bufLen) {
-  buf[0] = '\0';
-  struct rst_info *rtc_info = system_get_rst_info();
-  if (rtc_info == nullptr || rtc_info->reason != REASON_EXCEPTION_RST) return;
-  switch (rtc_info->exccause) {
-    case 0:   snprintf_P(buf, bufLen, PSTR("- Invalid command (0)")); break;
-    case 6:   snprintf_P(buf, bufLen, PSTR("- Division by zero (6)")); break;
-    case 9:   snprintf_P(buf, bufLen, PSTR("- Unaligned read/write operation addresses (9)")); break;
-    case 28:  snprintf_P(buf, bufLen, PSTR("- Access to invalid address (28)")); break;
-    case 29:  snprintf_P(buf, bufLen, PSTR("- Access to invalid address (29)")); break;
-    default:  snprintf_P(buf, bufLen, PSTR("- Other (not specified) (%d)"), rtc_info->exccause); break;
-  }
-}
-
 // DHCP restart
 inline void platformRestartDHCP() {
   wifi_station_dhcpc_stop();
   wifi_station_dhcpc_start();
-}
-
-// Serial error checks (ESP8266 HardwareSerial has these; ESP32 does not)
-inline bool platformSerialHasOverrun(HardwareSerial &serial) {
-  return serial.hasOverrun();
-}
-
-inline bool platformSerialHasRxError(HardwareSerial &serial) {
-  return serial.hasRxError();
 }
 
 /***************************************************************************

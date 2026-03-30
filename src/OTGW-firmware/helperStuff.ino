@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v1.4.0-beta
+**  Version  : v1.3.5-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -200,7 +200,12 @@ bool updateLittleFSStatus(const char *probePath)
   static const char defaultPath[] PROGMEM = "/.health";
   bool useDefault = (probePath == nullptr);
   
-  LittleFSmounted = platformFSInfo(LittleFSinfo);
+#if defined(ESP8266)
+  LittleFSmounted = LittleFS.info(LittleFSinfo);
+#elif defined(ESP32)
+  // ESP32 LittleFS doesn't have .info() — check totalBytes > 0 as mounted indicator
+  LittleFSmounted = (LittleFS.totalBytes() > 0);
+#endif
   if (!LittleFSmounted) {
     return false;
   }
@@ -331,22 +336,51 @@ bool updateRebootLog(String text)
   //waitforNTPsync();
   loopNTP(); // make sure time is up to date (improved error logging)
 
-  errorCode = platformResetCode();
+#if defined(ESP8266)
+  // ESP8266 SDK provides detailed reset info with register contents
+  struct	rst_info	*rtc_info	=	system_get_rst_info();
+
+  if (rtc_info == NULL) {
+    DebugTf(PSTR("no reset info available:	%x\r\n"),	errorCode);
+  } else {
+
+    DebugTf(PSTR("reset reason:	%x\r\n"),	rtc_info->reason);
+    errorCode = rtc_info->reason;
+
+    if	(rtc_info->reason	==	REASON_WDT_RST	|| rtc_info->reason	==	REASON_EXCEPTION_RST	|| rtc_info->reason	==	REASON_SOFT_WDT_RST)	{
+      snprintf_P(log_line_regs, LOG_LINE_LENGTH, PSTR("ESP register contents: epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x, depc=0x%08x\r\n"), rtc_info->epc1, rtc_info->epc2, rtc_info->epc3, rtc_info->excvaddr, rtc_info->depc);
+      Debugf(log_line_regs);
+    }
+
+    if (rtc_info->reason == REASON_EXT_SYS_RST) {
+      { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason));
+        snprintf_P(log_line_regs, LOG_LINE_LENGTH, PSTR("External Reason: External Watchdog reason: %s\r\n"), wdReason);
+        Debugf(log_line_regs); }
+    }
+
+    if	(rtc_info->reason	==	REASON_EXCEPTION_RST)	{
+      switch(rtc_info->exccause) {
+        case 0:   snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Invalid command (0)")); break;
+        case 6:   snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Division by zero (6)")); break;
+        case 9:   snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Unaligned read/write operation addresses (9)")); break;
+        case 28:  snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Access to invalid address (28)")); break;
+        case 29:  snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Access to invalid address (29)")); break;
+        default:  snprintf_P(log_line_excpt, LOG_LINE_LENGTH, PSTR("- Other (not specified) (%d)"), rtc_info->exccause); break;
+      }
+      Debugf(PSTR("Fatal exception (%d): %s\r\n"),	rtc_info->exccause, log_line_excpt);
+    }
+  }
+#elif defined(ESP32)
+  // ESP32: use esp_reset_reason() — no register-level crash info via this API
+  esp_reset_reason_t reason = esp_reset_reason();
+  errorCode = (uint32_t)reason;
   DebugTf(PSTR("reset reason: %x\r\n"), errorCode);
-
-  platformResetRegisterDump(log_line_regs, sizeof(log_line_regs));
-  if (log_line_regs[0] != '\0') Debugf(log_line_regs);
-
   if (platformIsExternalReset()) {
     char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason));
     snprintf_P(log_line_regs, LOG_LINE_LENGTH, PSTR("External Reason: External Watchdog reason: %s\r\n"), wdReason);
     Debugf(log_line_regs);
   }
-
-  platformResetExceptionInfo(log_line_excpt, sizeof(log_line_excpt));
-  if (log_line_excpt[0] != '\0') {
-    Debugf(PSTR("Fatal exception: %s\r\n"), log_line_excpt);
-  }
+#endif
 
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
@@ -821,45 +855,6 @@ void emergencyHeapRecovery() {
   int32_t recovered = (int32_t)heapAfter - (int32_t)heapBefore;
   DebugTf(PSTR("Emergency heap recovery complete (heap=%u bytes, recovered=%ld bytes)\r\n"), 
           heapAfter, (long)recovered);
-}
-
-//===[ blink status led ]===
-void setLed(uint8_t led, uint8_t status){
-  pinMode(led, OUTPUT);
-  digitalWrite(led, status);
-}
-
-void blinkLEDms(uint32_t delay){
-  //blink the statusled, when time passed
-  DECLARE_TIMER_MS(timerBlink, delay);
-  if (DUE(timerBlink)) {
-    blinkLEDnow();
-  }
-}
-
-void blinkLED(uint8_t led, int nr, uint32_t waittime_ms){
-    for (int i = nr; i>0; i--){
-      blinkLEDnow(led);
-      delayms(waittime_ms);
-      blinkLEDnow(led);
-      delayms(waittime_ms);
-    }
-}
-
-void blinkLEDnow(uint8_t led = LED1){
-  pinMode(led, OUTPUT);
-  if (settings.bLEDblink) {
-    digitalWrite(led, !digitalRead(led));
-  } else setLed(led, OFF);
-
-}
-
-//===[ no-blocking delay with running background tasks in ms ]===
-void delayms(unsigned long delay_ms)
-{
-  DECLARE_TIMER_MS(timerDelayms, delay_ms);
-  while (DUE(timerDelayms))
-    doBackgroundTasks();
 }
 
 /***************************************************************************

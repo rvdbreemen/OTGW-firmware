@@ -59,8 +59,6 @@
 //   I2C for watchdog, two LEDs, one button, PIC reset line.
 // GPIO numbers below are sensible defaults — update when the hardware ships.
 
-#warning "ESP32 pin definitions are hypothetical — verify against actual hardware before deploying"
-
 #define PIN_I2C_SCL       22   // Standard ESP32 I2C SCL
 #define PIN_I2C_SDA       21   // Standard ESP32 I2C SDA
 #define PIN_BUTTON        0    // BOOT button (active LOW, pull-up)

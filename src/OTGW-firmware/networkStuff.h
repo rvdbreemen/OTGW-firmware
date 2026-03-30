@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program : networkStuff.h
-**  Version  : v1.4.0-beta
+**  Version  : v1.3.5-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -48,6 +48,10 @@
  * - Do NOT expose the OTGW HTTP/WebSocket ports directly to the internet.
  */
 
+#if defined(ESP8266)
+extern "C" int clock_gettime(clockid_t unused, struct timespec *tp);
+#endif
+
 //=====[ Types ]===============================================================
 
 enum NtpStatus_t {
@@ -68,7 +72,9 @@ extern NtpStatus_t       NtpStatus;
 extern time_t            NtpLastSync;
 extern OTGWWebServer     httpServer;
 extern OTGWUpdateServer  httpUpdater;
+#if defined(ESP8266)
 extern FSInfo            LittleFSinfo;
+#endif
 extern bool              LittleFSmounted;
 #define WM_DEBUG_PORT debugTelnet
 

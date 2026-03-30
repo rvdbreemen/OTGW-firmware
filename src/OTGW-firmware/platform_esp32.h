@@ -22,10 +22,7 @@
 #include <HTTPClient.h>
 #include <Update.h>
 #include <Preferences.h>
-#include <LittleFS.h>
 #include <esp_system.h>
-#include <esp_mac.h>
-#include <esp_netif.h>
 
 // ---- Platform name -------------------------------------------------------
 #define PLATFORM_NAME "ESP32"
@@ -38,7 +35,8 @@
 using OTGWWebServer = WebServer;
 
 // ---- FSInfo compatibility ------------------------------------------------
-// ESP8266 uses FSInfo struct natively. Define it here for ESP32.
+// ESP8266 uses FSInfo struct with LittleFS.info(). ESP32 LittleFS has
+// totalBytes() and usedBytes() methods instead. Provide a shim.
 struct FSInfo {
   size_t totalBytes;
   size_t usedBytes;
@@ -48,47 +46,24 @@ struct FSInfo {
   size_t maxPathLength;
 };
 
-// ---- Platform functions --------------------------------------------------
-
-// WiFi hostname
-inline void platformSetHostname(const char *hostname) {
-  WiFi.setHostname(hostname);
+namespace platform_esp32_internal {
+  inline bool getLittleFSInfo(FSInfo &info) {
+    info.totalBytes   = LittleFS.totalBytes();
+    info.usedBytes    = LittleFS.usedBytes();
+    info.blockSize    = 0;   // not directly exposed on ESP32
+    info.pageSize     = 0;
+    info.maxOpenFiles = 10;
+    info.maxPathLength = 255;
+    return true;
+  }
 }
 
-inline const char* platformGetHostname() {
-  return WiFi.getHostname();
-}
+// Macro to make LittleFS.info(fsInfo) work on ESP32
+// ESP8266: LittleFS.info(fsInfo) is a member function returning bool
+// ESP32:   We provide this as a free function via macro
+#define LittleFS_info(info) platform_esp32_internal::getLittleFSInfo(info)
 
-// LittleFS info (ESP32: construct from totalBytes/usedBytes)
-inline bool platformFSInfo(FSInfo &info) {
-  info.totalBytes    = LittleFS.totalBytes();
-  info.usedBytes     = LittleFS.usedBytes();
-  info.blockSize     = 0;
-  info.pageSize      = 0;
-  info.maxOpenFiles  = 10;
-  info.maxPathLength = 255;
-  return (info.totalBytes > 0);
-}
-
-// Core/SDK version
-inline const char* platformCoreVersion() {
-  return ESP.getSdkVersion();
-}
-
-// SDK version
-inline const char* platformSdkVersion() {
-  return ESP.getSdkVersion();
-}
-
-// CPU frequency
-inline uint32_t platformCpuFreqMHz() {
-  return ESP.getCpuFreqMHz();
-}
-
-// MAC address
-inline void platformGetMacAddress(uint8_t *mac) {
-  esp_efuse_mac_get_default(mac);
-}
+// ---- Platform shim functions ---------------------------------------------
 
 // Chip identity (derive a 32-bit ID from the 48-bit MAC)
 inline uint32_t platformChipId() {
@@ -147,7 +122,7 @@ inline uint32_t platformFlashChipId() {
 }
 
 inline uint8_t platformFlashChipMode() {
-  return 4;  // Not available on ESP32; return index for "Unknown" in flashMode[]
+  return 0;  // Not directly available on ESP32 in the same enum
 }
 
 inline uint32_t platformSketchSize() {
@@ -168,12 +143,7 @@ inline uint32_t platformHardwareRandom() {
   return esp_random();
 }
 
-// RTC user memory — emulated via NVS Preferences on ESP32.
-// WARNING: Unlike ESP8266 RTC memory (battery-backed SRAM, unlimited writes),
-// NVS on ESP32 is flash-backed with finite erase/write cycles (10K-100K per
-// sector). Only call platformRtcWrite() infrequently (boot, reset, deep sleep).
-// Never use in a loop or on a timer. For high-frequency volatile storage on
-// ESP32, consider RTC_DATA_ATTR variables instead.
+// RTC user memory — emulated via NVS Preferences on ESP32
 inline bool platformRtcRead(uint32_t slot, uint32_t *data, size_t len) {
   Preferences prefs;
   if (!prefs.begin("otgw_rtc", true)) return false;  // read-only
@@ -199,39 +169,11 @@ inline bool platformIsExternalReset() {
   return (esp_reset_reason() == ESP_RST_EXT);
 }
 
-inline uint32_t platformResetCode() {
-  return (uint32_t)esp_reset_reason();
-}
-
-// Register dump — not available on ESP32 via esp_reset_reason() API
-inline void platformResetRegisterDump(char *buf, size_t bufLen) {
-  buf[0] = '\0';
-}
-
-// Exception cause — not available on ESP32 via esp_reset_reason() API
-inline void platformResetExceptionInfo(char *buf, size_t bufLen) {
-  buf[0] = '\0';
-}
-
-// DHCP restart — use esp_netif API to restart only the DHCP client without
-// dropping the WiFi association (mirrors ESP8266's wifi_station_dhcpc_stop/start).
+// DHCP restart — ESP32 doesn't expose low-level DHCP controls the same way;
+// disconnect + reconnect achieves the same re-announce effect.
 inline void platformRestartDHCP() {
-  esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-  if (netif) {
-    esp_netif_dhcpc_stop(netif);
-    esp_netif_dhcpc_start(netif);
-  }
-}
-
-// Serial error checks (ESP32 HardwareSerial does not expose overrun/rx error)
-inline bool platformSerialHasOverrun(HardwareSerial &serial) {
-  (void)serial;
-  return false;
-}
-
-inline bool platformSerialHasRxError(HardwareSerial &serial) {
-  (void)serial;
-  return false;
+  WiFi.disconnect(false);  // keep credentials
+  WiFi.reconnect();
 }
 
 /***************************************************************************

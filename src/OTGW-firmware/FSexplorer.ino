@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v1.4.0-beta
+**  Version  : v1.3.5-beta
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -286,36 +286,30 @@ void apifirmwarefilelist() {
   // 150 bytes covers longest entry: path (~30) + version (~32) + fwversion (~32) + JSON overhead
   char entryBuffer[150];
   String version, fwversion;
+  Dir dir;
   File f;
   bool firstEntry = true;
 
   String dirpath = "/" + String(state.pic.sDeviceid);
   DebugTf(PSTR("dirpath=%s\r\n"), dirpath.c_str());
-
+  
   // Start chunked response with JSON array opening
   httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send(200, F("application/json"), F(""));
   httpServer.sendContent(F("["));
-
+  
   // Also stream to debug telnet
   DebugTln(F("--- Firmware File List (streamed) ---"));
   DebugTln(F("["));
-
-  PlatformDir dir(dirpath.c_str());
-  if (!dir.valid()) {
-    httpServer.sendContent(F("]\r\n"));
-    httpServer.sendContent(F(""));
-    return;
-  }
+  
+  dir = LittleFS.openDir(dirpath);	
   while (dir.next()) {
-    String entryName = dir.fileName();
-    size_t entrySize = dir.fileSize();
-    DebugTf(PSTR("entry=%s\r\n"), entryName.c_str());
-    if (entryName.endsWith(".hex")) {
+    DebugTf(PSTR("dir.fileName()=%s\r\n"), dir.fileName().c_str());
+    if (dir.fileName().endsWith(".hex")) {
       version="";
       fwversion="";
-      String hexfile = dirpath + "/" + entryName;
+      String hexfile = dirpath + "/" + dir.fileName();   
       String verfile = hexfile;
       verfile.replace(".hex", ".ver");
       f = LittleFS.open(verfile, "r");
@@ -323,40 +317,40 @@ void apifirmwarefilelist() {
         version = f.readStringUntil('\n');
         version.trim();
         f.close();
-      }
-
+      } 
+      
       char fwversionBuf[32] = {0};
       GetVersion(hexfile.c_str(), fwversionBuf, sizeof(fwversionBuf));
       fwversion = fwversionBuf;
 
-      DebugTf(PSTR("GetVersion(%s) returned [%s]\r\n"), hexfile.c_str(), fwversion.c_str());
+      DebugTf(PSTR("GetVersion(%s) returned [%s]\r\n"), hexfile.c_str(), fwversion.c_str());  
       if (fwversion.length() && strcmp(fwversion.c_str(),version.c_str())) {
         version=fwversion;
         if (f = LittleFS.open(verfile, "w")) {
           DebugTf(PSTR("writing %s to %s\r\n"),version.c_str(),verfile.c_str());
           f.print(version + "\n");
           f.close();
-        }
+        } 
       }
       Debugln();
-
+      
       // Add comma separator after first entry
       if (!firstEntry) {
         httpServer.sendContent(F(","));
         DebugTln(F(",")); // Also to debug telnet
       }
       firstEntry = false;
-
+      
       // Stream this entry directly (fits in 256-byte buffer)
       // CSTR() macro handles null safety globally - returns "" if null
-      snprintf_P(entryBuffer, sizeof(entryBuffer),
-                 PSTR("{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d}"),
-                 CSTR(entryName), CSTR(version), (int)entrySize);
+      snprintf_P(entryBuffer, sizeof(entryBuffer), 
+                 PSTR("{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d}"), 
+                 CSTR(dir.fileName()), CSTR(version), dir.fileSize());
       httpServer.sendContent(entryBuffer);
-
+      
       // Also stream entry to debug telnet
       DebugTf(PSTR("  %s\r\n"), entryBuffer);
-
+      
       feedWatchDog(); // Feed watchdog during potentially long operation
     }
   }
@@ -428,38 +422,34 @@ void apilistfiles()
   int fileCount = 0;
   bool truncated = false;
 
-  PlatformDir dir(path.c_str());
-  if (!dir.valid()) {
-    httpServer.sendContent(F("]\r\n"));
-    httpServer.sendContent(F(""));
-    return;
-  }
+  Dir dir = LittleFS.openDir(path);
   while (dir.next()) {
-    String fname = dir.fileName();
-    long   fsize = (long)dir.fileSize();
-    bool   isDir = dir.isDirectory();
     feedWatchDog();
     // Skip hidden files/directories (names starting with '.')
-    if (fname.charAt(0) == '.') {
-      continue;
-    }
+    if (dir.fileName().charAt(0) == '.') continue;
     if (fileCount >= MAX_FILES_IN_LIST) { truncated = true; break; }
     if (!first) httpServer.sendContent(F(","));
     first = false;
 
     snprintf_P(buf, sizeof(buf),
       PSTR("{\"name\":\"%s\",\"size\":%ld,\"type\":\"%s\"}"),
-      fname.c_str(), fsize,
-      isDir ? "dir" : "file");
+      dir.fileName().c_str(), (long)dir.fileSize(),
+      dir.isDirectory() ? "dir" : "file");
     httpServer.sendContent(buf);
     fileCount++;
   }
 
   // Storage info as last entry (raw bytes — frontend formats for display)
+  unsigned long totalBytes, usedBytesRaw;
+#if defined(ESP8266)
   FSInfo fsInfo;
-  platformFSInfo(fsInfo);
-  unsigned long totalBytes = fsInfo.totalBytes;
-  unsigned long usedBytesRaw = fsInfo.usedBytes;
+  LittleFS.info(fsInfo);
+  totalBytes = fsInfo.totalBytes;
+  usedBytesRaw = fsInfo.usedBytes;
+#elif defined(ESP32)
+  totalBytes = LittleFS.totalBytes();
+  usedBytesRaw = LittleFS.usedBytes();
+#endif
   if (!first) httpServer.sendContent(F(","));
   unsigned long usedBytes = (unsigned long)(usedBytesRaw * 1.05);
   unsigned long freeBytes = totalBytes - usedBytes;
@@ -580,10 +570,16 @@ const String &contentType(String& filename)
 //=====================================================================================
 bool freeSpace(uint16_t const& printsize)
 {
-  FSInfo fsInfo;
-  platformFSInfo(fsInfo);
-  unsigned long totalB = fsInfo.totalBytes;
-  unsigned long usedB  = fsInfo.usedBytes;
+  unsigned long totalB, usedB;
+#if defined(ESP8266)
+  FSInfo LittleFSinfo;
+  LittleFS.info(LittleFSinfo);
+  totalB = LittleFSinfo.totalBytes;
+  usedB  = LittleFSinfo.usedBytes;
+#elif defined(ESP32)
+  totalB = LittleFS.totalBytes();
+  usedB  = LittleFS.usedBytes();
+#endif
   Debugln(formatBytes(totalB - (unsigned long)(usedB * 1.05)) + " im LittleFS frei");
   return (totalB - (unsigned long)(usedB * 1.05) > printsize);
 

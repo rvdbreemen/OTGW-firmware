@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v1.4.0-beta
+**  Version  : v1.3.5-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -27,7 +27,9 @@ SimpleTelnet<1> debugTelnet(23);
 OTGWWebServer           httpServer(80);
 OTGWUpdateServer        httpUpdater(true);
 
+#if defined(ESP8266)
 FSInfo LittleFSinfo;
+#endif
 bool   LittleFSmounted = false;
 
 //=====[ WiFi ]================================================================
@@ -96,7 +98,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     // server sees the desired hostname. Avoid forcing a reconnect here so we
     // don't accidentally drop a working connection and fall back into the
     // WiFiManager config portal on transient failures.
-    String currentHostname = platformGetHostname();
+    String currentHostname = WiFi.hostname();
     if (currentHostname == hostname)
     {
       DebugTln(F("Wifi already connected with correct hostname, skipping hostname update."));
@@ -107,7 +109,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
               currentHostname.c_str(), hostname);
       // Update the hostname for future DHCP negotiations; the current lease
       // will typically keep using the old hostname until the next reconnect.
-      platformSetHostname(hostname);
+      WiFi.hostname(hostname);
       DebugTln(F("Hostname updated; keeping existing WiFi connection active."));
     }
   }
@@ -117,7 +119,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     int directConnectTimeout = timeOut / 2;
     if (directConnectTimeout < 5) directConnectTimeout = 5;
     DebugTf(PSTR("Direct connect timeout: %d sec\r\n"), directConnectTimeout);
-    platformSetHostname(hostname);  // set before begin() so DHCP sends the correct hostname
+    WiFi.hostname(hostname);  // set before begin() so DHCP sends the correct hostname
     WiFi.begin(); // use stored credentials
     DECLARE_TIMER_SEC(timeoutWifiConnectInitial, directConnectTimeout, CATCH_UP_MISSED_TICKS);
     while (WiFi.status() != WL_CONNECTED)
@@ -147,9 +149,6 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   }
   DebugTf(PSTR("Wifi status: %s\r\n"), WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
   DebugTf(PSTR("Connected to: %s\r\n"), WiFi.localIP().toString().c_str());
-  // SDK auto-reconnect handles brief WiFi glitches (channel hops, momentary
-  // interference) transparently at the radio level, often in <1 second.
-  // loopWifi() (ADR-047) is the fallback for longer outages.
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
 
@@ -173,11 +172,10 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 
   // Catch-all: if the hostname still doesn't match after all connection paths,
   // force a DHCP re-announce. Mark it done so startNTP() doesn't do it again.
-  platformSetHostname(hostname);
-  const char *_hn = platformGetHostname();
-  if (!sDhcpHostnameFixed && strcmp(_hn, hostname) != 0) {
+  WiFi.hostname(hostname);
+  if (!sDhcpHostnameFixed && strcmp(WiFi.hostname().c_str(), hostname) != 0) {
     DebugTf(PSTR("Catch-all: hostname mismatch after connect ('%s' vs '%s'), forcing DHCP re-announce.\r\n"),
-            _hn, hostname);
+            WiFi.hostname().c_str(), hostname);
     platformRestartDHCP();
     sDhcpHostnameFixed = true;
   }
@@ -355,13 +353,13 @@ void startNTP()
 
   // Set hostname before configTime() — configTime() is known to reset the
   // station hostname to "ESP-XXXXXX" on some ESP8266 SDK versions.
-  platformSetHostname(CSTR(settings.sHostname));
+  WiFi.hostname(CSTR(settings.sHostname));
   configTime(0, 0, settings.ntp.sHostname, nullptr, nullptr);
   // Capture hostname immediately after configTime() to detect if the SDK
   // reset it, *before* we restore it. This drives the DHCP re-announce
   // decision below.
-  bool hostnameWasReset = (strcmp(platformGetHostname(), CSTR(settings.sHostname)) != 0);
-  platformSetHostname(CSTR(settings.sHostname));
+  bool hostnameWasReset = (strcmp(WiFi.hostname().c_str(), CSTR(settings.sHostname)) != 0);
+  WiFi.hostname(CSTR(settings.sHostname));
 
   // If configTime() did reset the hostname, the DHCP lease may have been
   // re-announced with the wrong name.  Force a DHCP re-announce once so the
@@ -423,49 +421,24 @@ bool isNTPtimeSet()
   return NtpStatus == TIME_SYNC;
 }
 
-void sendtimecommand(){
-  if (state.otgw.bPSmode) return;                  // when in Print Summary mode (PS=1), no timesync commands (improving legacy/Domoticz compatibility)
-  if (!settings.ntp.bEnable) return;        // if NTP is disabled, then return
-  if (!settings.ntp.bSendtime) return;      // if NTP send time is disabled, then return
-  if (NtpStatus != TIME_SYNC) return;   // only send time command when time is synced
-  if (!state.pic.bAvailable) return;           // only send when pic is available
-  if (OTGWSerial.firmwareType() != FIRMWARE_OTGW) return; //only send timecommand when in gateway firmware, not in diagnostic or interface mode
-
-  //send time command to OTGW
-  //send time / weekday
-  time_t now = time(nullptr);
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
-  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
-  //DebugTf(PSTR("%02d:%02d:%02d %02d-%02d-%04d\r\n"), myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
-
-  char msg[15]={0};
-  //Send msg id xx: hour:minute/day of week
-  int day_of_week = (myTime.dayOfWeek()+6)%7+1;
-  snprintf_P(msg, sizeof(msg), PSTR("SC=%d:%02d/%d"), myTime.hour(), myTime.minute(), day_of_week);
-  addOTWGcmdtoqueue(msg, strlen(msg), false, 0);
-
-  if (dayChanged()){
-    //Send msg id 21: month, day
-    snprintf_P(msg, sizeof(msg), PSTR("SR=21:%d,%d"), myTime.month(), myTime.day());
-    addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
-  }
-
-  if (yearChanged()){
-    //Send msg id 22: HB of Year, LB of Year
-    snprintf_P(msg, sizeof(msg), PSTR("SR=22:%d,%d"), (myTime.year() >> 8) & 0xFF, myTime.year() & 0xFF);
-    addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
-  }
-}
-
 //=====[ Helpers ]=============================================================
 
 const char* getMacAddress()
 {
   static char baseMacChr[13] = {0};
   uint8_t baseMac[6];
-  platformGetMacAddress(baseMac);
+#if defined(ESP8266)
+  WiFi.macAddress(baseMac);
   snprintf_P(baseMacChr, sizeof(baseMacChr), PSTR("%02X%02X%02X%02X%02X%02X"),
              baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
+#elif defined(ESP32)
+  esp_read_mac(baseMac, ESP_MAC_WIFI_STA);
+  snprintf_P(baseMacChr, sizeof(baseMacChr), PSTR("%02X%02X%02X%02X%02X%02X"),
+             baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
+#else
+  snprintf_P(baseMacChr, sizeof(baseMacChr), PSTR("%02X%02X%02X%02X%02X%02X"),
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+#endif
   return baseMacChr;
 }
 

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.4.0-beta
+**  Version  : v1.3.5-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -164,7 +164,6 @@ static void handleFilesystem(const char words[][API_WORD_LEN], uint8_t wc, HTTPM
 static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
-static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 
 void sendOTGWvalue(int msgid);
 void sendOTGWlabel(const char *msglabel);
@@ -468,107 +467,6 @@ static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMeth
   }
 }
 
-// Extract value from POST body: accepts raw "21.5" or JSON {"value":"21.5"}
-// Returns pointer into buf (null-terminated), or nullptr if no value found.
-static const char* satExtractPostValue(const char* body, char* buf, size_t bufSize)
-{
-  if (!body || !*body) return nullptr;
-  // Try to find "value" key in JSON: crude but avoids pulling in a JSON library
-  const char* vp = strstr_P(body, PSTR("\"value\""));
-  if (vp) {
-    // Skip past "value" and any : and whitespace/quotes
-    vp += 7; // strlen("\"value\"")
-    while (*vp == ':' || *vp == ' ' || *vp == '"') vp++;
-    // Copy until quote, comma, brace, or end
-    size_t i = 0;
-    while (vp[i] && vp[i] != '"' && vp[i] != ',' && vp[i] != '}' && i < bufSize - 1) {
-      buf[i] = vp[i];
-      i++;
-    }
-    buf[i] = '\0';
-    return buf;
-  }
-  // No JSON structure found — treat body as raw value
-  strlcpy(buf, body, bufSize);
-  return buf;
-}
-
-//=== SAT API handler ===
-// GET /api/v2/sat/status — returns full SAT runtime state
-// POST /api/v2/sat/target — set target temperature (body: "21.0" or {"value":"21.0"})
-// POST /api/v2/sat/externaltemp — push indoor temp
-// POST /api/v2/sat/externaloutdoor — push outdoor temp
-static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)
-{
-  if (!checkHttpAuth()) return;
-
-  if (wc <= 4) {
-    // GET /api/v2/sat — default to status
-    if (method == HTTP_GET) {
-      httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
-      satSendStatusJSON();
-    } else {
-      sendApiMethodNotAllowed(F("GET"));
-    }
-    return;
-  }
-
-  const char* sub = words[4];
-  if (strcasecmp_P(sub, PSTR("status")) == 0) {
-    if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
-    httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
-    satSendStatusJSON();
-  }
-  else if (strcasecmp_P(sub, PSTR("target")) == 0) {
-    if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
-    char valBuf[16];
-    const char* val = nullptr;
-    if (httpServer.hasArg(F("plain"))) {
-      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
-    } else if (wc > 5) {
-      val = words[5];
-    }
-    if (!val || !satHandleTargetTemp(val)) {
-      sendApiError(400, F("Invalid or missing value (5.0-30.0)"));
-      return;
-    }
-    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
-  }
-  else if (strcasecmp_P(sub, PSTR("externaltemp")) == 0) {
-    if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
-    char valBuf[16];
-    const char* val = nullptr;
-    if (httpServer.hasArg(F("plain"))) {
-      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
-    } else if (wc > 5) {
-      val = words[5];
-    }
-    if (!val || !satHandleExternalTemp(val)) {
-      sendApiError(400, F("Invalid or missing numeric value"));
-      return;
-    }
-    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
-  }
-  else if (strcasecmp_P(sub, PSTR("externaloutdoor")) == 0) {
-    if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
-    char valBuf[16];
-    const char* val = nullptr;
-    if (httpServer.hasArg(F("plain"))) {
-      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
-    } else if (wc > 5) {
-      val = words[5];
-    }
-    if (!val || !satHandleExternalOutdoor(val)) {
-      sendApiError(400, F("Invalid or missing numeric value"));
-      return;
-    }
-    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
-  }
-  else {
-    sendApiNotFound(originalURI);
-  }
-}
-
 //=== Route dispatch table (ADR-050) ===
 // Adding a new v2 resource: (1) write handler function above, (2) add entry below.
 typedef void (*ApiResourceHandler)(const char[][API_WORD_LEN], uint8_t, HTTPMethod, const char*);
@@ -589,7 +487,6 @@ static const char kRouteFilesystem[] PROGMEM = "filesystem";
 static const char kRouteSimulate[]   PROGMEM = "simulate";
 static const char kRouteOtgw[]       PROGMEM = "otgw";
 static const char kRouteWebhook[]    PROGMEM = "webhook";
-static const char kRouteSat[]        PROGMEM = "sat";
 
 static const ApiRoute kV2Routes[] = {
   { kRouteHealth,     handleHealth },
@@ -603,7 +500,6 @@ static const ApiRoute kV2Routes[] = {
   { kRouteSimulate,   handleSimulate },
   { kRouteOtgw,       handleOtgw },
   { kRouteWebhook,    handleWebhook },
-  { kRouteSat,        handleSAT },
   { nullptr,          nullptr }  // sentinel
 };
 
@@ -889,9 +785,13 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("maxfreeblock"), platformMaxFreeBlock());
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%06X"), (unsigned int)platformChipId());
   sendJsonMapEntry(F("chipid"), cMsg);
-  sendJsonMapEntry(F("coreversion"), platformCoreVersion());
-  sendJsonMapEntry(F("sdkversion"),  platformSdkVersion());
-  sendJsonMapEntry(F("cpufreq"), platformCpuFreqMHz());
+#if defined(ESP8266)
+  sendJsonMapEntry(F("coreversion"), CSTR(ESP.getCoreVersion()) );
+#elif defined(ESP32)
+  sendJsonMapEntry(F("coreversion"), ESP.getSdkVersion());
+#endif
+  sendJsonMapEntry(F("sdkversion"),  ESP.getSdkVersion());
+  sendJsonMapEntry(F("cpufreq"), ESP.getCpuFreqMHz());
   sendJsonMapEntry(F("sketchsize"), platformSketchSize() );
   sendJsonMapEntry(F("freesketchspace"),  platformFreeSketchSpace() );
 
@@ -900,8 +800,12 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("flashchipsize"), (platformFlashChipSize() / 1024.0f / 1024.0f));
   sendJsonMapEntry(F("flashchiprealsize"), (platformFlashChipRealSize() / 1024.0f / 1024.0f));
 
-  platformFSInfo(LittleFSinfo);
+#if defined(ESP8266)
+  LittleFS.info(LittleFSinfo);
   sendJsonMapEntry(F("LittleFSsize"), floorf((LittleFSinfo.totalBytes / (1024.0f * 1024.0f))));
+#elif defined(ESP32)
+  sendJsonMapEntry(F("LittleFSsize"), floorf((LittleFS.totalBytes() / (1024.0f * 1024.0f))));
+#endif
 
   sendJsonMapEntry(F("flashchipspeed"), floorf((platformFlashChipSpeed() / 1000.0f / 1000.0f)));
 
@@ -1154,30 +1058,6 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("webhooktriggerbit"), settings.webhook.iTriggerBit, "i", 0, 15);
   sendJsonSettingObj(F("webhookpayload"), CSTR(settings.webhook.sPayload), "s", 200);
   sendJsonSettingObj(F("webhookcontenttype"), CSTR(settings.webhook.sContentType), "s", 31);
-  // --- SAT settings ---
-  sendJsonSettingObj(F("satenabled"), settings.sat.bEnabled, "b");
-  sendJsonSettingObj(F("satsystem"), settings.sat.iHeatingSystem, "i", 0, 1);
-  {
-    char tmpBuf[8];
-    dtostrf(settings.sat.fTargetTemp, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("sattargettemp"), tmpBuf, "f", 5, 30);
-    dtostrf(settings.sat.fHeatingCurveCoeff, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("satcoefficient"), tmpBuf, "f", 0, 5);
-    dtostrf(settings.sat.fDeadband, 1, 2, tmpBuf);
-    sendJsonSettingObj(F("satdeadband"), tmpBuf, "f", 0, 2);
-  }
-  sendJsonSettingObj(F("satinterval"), settings.sat.iControlInterval, "i", 10, 300);
-  sendJsonSettingObj(F("satexternaltemp"), settings.sat.bUseExternalTemp, "b");
-  {
-    char tmpBuf[8];
-    dtostrf(settings.sat.fPresetComfort, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("satpresetcomfort"), tmpBuf, "f", 15, 28);
-    dtostrf(settings.sat.fPresetEco, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("satpreseteco"), tmpBuf, "f", 10, 22);
-    dtostrf(settings.sat.fPresetAway, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("satpresetaway"), tmpBuf, "f", 5, 18);
-  }
-  sendJsonSettingObj(F("satpwmautoswitch"), settings.sat.bPwmAutoSwitch, "b");
   char httpPasswordPlaceholder[sizeof("password=40")];
   snprintf_P(httpPasswordPlaceholder,
              sizeof(httpPasswordPlaceholder),
@@ -1202,9 +1082,6 @@ static const char* const PROGMEM knownSettings[] = {
   "ntpenable", "ntphostname", "ntpsendtime", "ntptimezone",
   "otgwcommandenable", "otgwcommands",
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
-  "satcoefficient", "satdeadband", "satenabled", "satexternaltemp",
-  "satinterval", "satpresetaway", "satpresetcomfort", "satpreseteco",
-  "satpwmautoswitch", "satsystem", "sattargettemp",
   "ui_autodownloadlog", "ui_autoexport", "ui_autoscreenshot", "ui_autoscroll",
   "ui_capture", "ui_graphtimewindow", "ui_timestamps",
   "webhookcontenttype", "webhookenable", "webhookenabled",
