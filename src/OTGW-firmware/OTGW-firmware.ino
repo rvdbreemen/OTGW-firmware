@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v1.4.0-beta
+**  Version  : v1.3.5-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -56,11 +56,11 @@ uint32_t wifiPortalResetWindowDeadline = 0;
 bool wifiPortalResetWindowOpen = false;
 
 bool readWifiPortalResetState(WifiPortalResetState &portalState) {
-  return ESP.rtcUserMemoryRead(WIFI_PORTAL_RESET_RTC_SLOT, reinterpret_cast<uint32_t*>(&portalState), sizeof(portalState));
+  return platformRtcRead(WIFI_PORTAL_RESET_RTC_SLOT, reinterpret_cast<uint32_t*>(&portalState), sizeof(portalState));
 }
 
 bool writeWifiPortalResetState(const WifiPortalResetState &portalState) {
-  return ESP.rtcUserMemoryWrite(WIFI_PORTAL_RESET_RTC_SLOT, const_cast<uint32_t*>(reinterpret_cast<const uint32_t*>(&portalState)), sizeof(portalState));
+  return platformRtcWrite(WIFI_PORTAL_RESET_RTC_SLOT, reinterpret_cast<const uint32_t*>(&portalState), sizeof(portalState));
 }
 
 void clearWifiPortalResetState() {
@@ -69,8 +69,7 @@ void clearWifiPortalResetState() {
 }
 
 bool isExternalSystemReset() {
-  rst_info *resetInfo = ESP.getResetInfoPtr();
-  return (resetInfo != nullptr) && (resetInfo->reason == REASON_EXT_SYS_RST);
+  return platformIsExternalReset();
 }
 
 bool shouldForceWifiConfigPortal() {
@@ -131,7 +130,7 @@ void setup() {
   detectPIC();
 
   //setup randomseed the right way
-  randomSeed(RANDOM_REG32); //This is 8266 HWRNG used to seed the Random PRNG: Read more: https://config9.com/arduino/getting-a-truly-random-number-in-arduino/
+  randomSeed(platformHardwareRandom()); // Hardware RNG to seed the Random PRNG
  
   //setup the status LED
   setLed(LED1, ON);
@@ -168,7 +167,7 @@ void setup() {
   startMQTT();               // start the MQTT after webserver, always.
  
   { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason)); }  // setup the WatchDog
-  strlcpy(lastReset, ESP.getResetReason().c_str(), sizeof(lastReset));
+  platformResetReason(lastReset, sizeof(lastReset));
   SetupDebugf(PSTR("Last reset reason: [%s]\r\n"), CSTR(lastReset));
   state.uptime.iRebootCount = updateRebootCount();
   updateRebootLog(lastReset);
@@ -194,7 +193,6 @@ void setup() {
   if (!LittleFSmounted) sendMQTTData(F("otgw-firmware/error"), "LittleFS mount failed - running on defaults", false);
   initS0Count();        // init S0 counter
   initSensors();        // init DS18B20 (after MQ is up!)
-  initSAT();            // init SAT thermostat controller
   // Clear the triple-reset portal counter: a successful setup() proves the device is healthy.
   // This prevents USB flash resets or stale RTC data from triggering the portal on next boot.
   clearWifiPortalResetState();
@@ -203,6 +201,161 @@ void setup() {
 }
 //=====================================================================
 
+
+//====[ Non-blocking WiFi Reconnect State Machine (ADR-047) ]===
+// Replaces blocking restartWifi() — no delay() in reconnect path.
+// Called every loop iteration from doBackgroundTasks().
+
+enum WifiState_t {
+  WIFI_IDLE,         // connected, monitoring
+  WIFI_DISCONNECTED, // just dropped — start reconnect
+  WIFI_CONNECTING,   // waiting non-blocking for connection
+  WIFI_RECONNECTED,  // just came back — restart services
+  WIFI_FAILED        // too many retries — trigger reboot
+};
+static WifiState_t wifiState = WIFI_IDLE;
+static int wifiRetryCount = 0;
+
+void loopWifi() {
+  DECLARE_TIMER_SEC(timerWifiRetry, 5, CATCH_UP_MISSED_TICKS);
+
+  switch (wifiState) {
+    case WIFI_IDLE:
+      if (WiFi.status() != WL_CONNECTED) {
+        DebugTln(F("WiFi: connection lost, starting non-blocking reconnect"));
+        wifiRetryCount = 0;
+        wifiState = WIFI_DISCONNECTED;
+      }
+      break;
+
+    case WIFI_DISCONNECTED:
+      DebugTf(PSTR("WiFi: reconnect attempt %d starting for hostname [%s]\r\n"),
+              wifiRetryCount + 1,
+              CSTR(settings.sHostname));
+      WiFi.hostname(CSTR(settings.sHostname));
+      WiFi.begin();  // uses stored credentials
+      RESTART_TIMER(timerWifiRetry);
+      wifiState = WIFI_CONNECTING;
+      break;
+
+    case WIFI_CONNECTING:
+      if (WiFi.status() == WL_CONNECTED) {
+        wifiState = WIFI_RECONNECTED;
+        wifiRetryCount = 0;
+      } else if (DUE(timerWifiRetry)) {
+        wifiRetryCount++;
+        DebugTf(PSTR("WiFi: connect attempt %d failed\r\n"), wifiRetryCount);
+        if (wifiRetryCount >= 15) {
+          wifiState = WIFI_FAILED;
+        } else {
+          wifiState = WIFI_DISCONNECTED;  // retry
+        }
+      }
+      break;
+
+    case WIFI_RECONNECTED:
+      // Match the startup path: re-apply the configured hostname and force a
+      // DHCP re-announce so the renewed lease uses the expected name.
+      WiFi.hostname(CSTR(settings.sHostname));
+      DebugTf(PSTR("WiFi: reconnected, re-announcing DHCP lease for hostname [%s]\r\n"),
+              CSTR(settings.sHostname));
+      platformRestartDHCP();
+      startTelnet();
+      startOTGWstream();
+      startMQTT();
+      startWebSocket();
+      wifiState = WIFI_IDLE;
+      DebugTf(PSTR("WiFi: reconnected, services restarted; IP=%s\r\n"),
+              WiFi.localIP().toString().c_str());
+      break;
+
+    case WIFI_FAILED:
+      doRestart("WiFi: too many reconnect failures");
+      break;
+  }
+}
+
+void sendMQTTuptime(){
+  DebugTf(PSTR("Uptime seconds: %lu\r\n"), (unsigned long)state.uptime.iSeconds);
+  char uptimeBuf[11] = {0};
+  snprintf_P(uptimeBuf, sizeof(uptimeBuf), PSTR("%lu"), (unsigned long)state.uptime.iSeconds);
+  sendMQTTData(F("otgw-firmware/uptime"), uptimeBuf, false);
+}
+
+void sendtimecommand(){
+  if (state.otgw.bPSmode) return;                  // when in Print Summary mode (PS=1), no timesync commands (improving legacy/Domoticz compatibility)
+  if (!settings.ntp.bEnable) return;        // if NTP is disabled, then return
+  if (!settings.ntp.bSendtime) return;      // if NTP send time is disabled, then return
+  if (NtpStatus != TIME_SYNC) return;   // only send time command when time is synced
+  if (!state.pic.bAvailable) return;           // only send when pic is available
+  if (OTGWSerial.firmwareType() != FIRMWARE_OTGW) return; //only send timecommand when in gateway firmware, not in diagnostic or interface mode
+
+  //send time command to OTGW
+  //send time / weekday
+  time_t now = time(nullptr);
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
+  //DebugTf(PSTR("%02d:%02d:%02d %02d-%02d-%04d\r\n"), myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
+
+  char msg[15]={0};
+  //Send msg id xx: hour:minute/day of week
+  int day_of_week = (myTime.dayOfWeek()+6)%7+1;
+  snprintf_P(msg, sizeof(msg), PSTR("SC=%d:%02d/%d"), myTime.hour(), myTime.minute(), day_of_week);
+  addOTWGcmdtoqueue(msg, strlen(msg), false, 0);
+
+  if (dayChanged()){
+    //Send msg id 21: month, day
+    snprintf_P(msg, sizeof(msg), PSTR("SR=21:%d,%d"), myTime.month(), myTime.day());
+    addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
+  }
+
+  if (yearChanged()){
+    //Send msg id 22: HB of Year, LB of Year
+    snprintf_P(msg, sizeof(msg), PSTR("SR=22:%d,%d"), (myTime.year() >> 8) & 0xFF, myTime.year() & 0xFF);
+    addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
+  }
+}
+
+//===[ blink status led ]===
+void setLed(uint8_t led, uint8_t status){
+  pinMode(led, OUTPUT);
+  digitalWrite(led, status); 
+}
+
+void blinkLEDms(uint32_t delay){
+  //blink the statusled, when time passed
+  DECLARE_TIMER_MS(timerBlink, delay);
+  if (DUE(timerBlink)) {
+    blinkLEDnow();
+  }
+}
+
+void blinkLED(uint8_t led, int nr, uint32_t waittime_ms){
+    for (int i = nr; i>0; i--){
+      blinkLEDnow(led);
+      delayms(waittime_ms);
+      blinkLEDnow(led);
+      delayms(waittime_ms);
+    }
+}
+
+void blinkLEDnow(uint8_t led = LED1){
+  pinMode(led, OUTPUT);
+  if (settings.bLEDblink) {
+    digitalWrite(led, !digitalRead(led));
+  } else setLed(led, OFF);
+
+}
+
+//===[ no-blocking delay with running background tasks in ms ]===
+void delayms(unsigned long delay_ms)
+{
+  DECLARE_TIMER_MS(timerDelayms, delay_ms);
+  while (DUE(timerDelayms))
+    doBackgroundTasks();
+}
+
+//=====================================================================
 
 //===[ Do task every 1s ]===
 void doTaskEvery1s(){
@@ -279,7 +432,20 @@ static void handleEspFlashBackgroundTasks()
 {
   handleDebug();              // Keep telnet debug active for monitoring
   httpServer.handleClient();  // MUST continue - processes upload chunks
-  MDNS.update();              // Keep MDNS active for network discovery
+#if MDNS_NEEDS_UPDATE
+  MDNS.update();
+#endif              // Keep MDNS active for network discovery
+  handleWebSocket();          // Keep WebSocket service responsive during flash
+}
+
+static void handlePicFlashBackgroundTasks()
+{
+  handleDebug();              // Keep telnet debug active for monitoring
+  httpServer.handleClient();  // Keep HTTP active
+#if MDNS_NEEDS_UPDATE
+  MDNS.update();
+#endif              // Keep MDNS active for network discovery
+  handleOTGW();               // REQUIRED for PIC flash - processes serial communication
   handleWebSocket();          // Keep WebSocket service responsive during flash
 }
 
@@ -319,7 +485,9 @@ void doBackgroundTasks()
       handleOTGW();                 // OTGW handling
       handleWebSocket();            // WebSocket handling for OT log streaming
       httpServer.handleClient();
-      MDNS.update();
+    #if MDNS_NEEDS_UPDATE
+  MDNS.update();
+#endif
       loopNTP();
     }
   } //otherwise, just wait until reconnected gracefully
@@ -346,7 +514,6 @@ void loop()
       if (minuteChanged())              doTaskMinuteChanged(); //exactly on the minute
       evalOutputs();                    // when the bits change, the output gpio bit will follow
       evalWebhook();                    // when the trigger bit changes, fire the webhook
-      satControlLoop();                 // SAT thermostat control loop (timer-guarded internally)
       handlePendingUpgrade();           // Check if we need to start an upgrade
     } 
 
