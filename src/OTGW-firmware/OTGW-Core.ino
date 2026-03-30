@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.4.0-beta
+**  Version  : v1.3.3-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3707,9 +3707,6 @@ void processOT(const char *buf, int len){
       //when parity error in OTGW then skip data to MQTT nor store it local in data object
       OTdata.skipthis |= (OTdata.rsptype == OTGW_PARITY_ERROR);
 
-      //keep track of last update time of each message id
-      setMsgLastUpdated(OTdata.id, currentTrackedSeconds());
-      
       //Read information from this OT message ready for use...
       if (OTdata.id <= OT_MSGID_MAX) {
         PROGMEM_readAnything (&OTmap[OTdata.id], OTlookupitem);
@@ -3721,6 +3718,11 @@ void processOT(const char *buf, int len){
         OTlookupitem.label = "Unknown";
         OTlookupitem.friendlyname = "Unknown";
         OTlookupitem.unit = "";
+      }
+
+      //keep track of last update time — only for valid responses
+      if (is_value_valid(OTdata, OTlookupitem)) {
+        setMsgLastUpdated(OTdata.id, currentTrackedSeconds());
       }
 
       // check wheter MQTT topic needs to be configuered
