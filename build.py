@@ -9,12 +9,14 @@ Requirements:
 - arduino-cli (installed automatically if not found)
 
 Usage:
-    python build.py              # Full build (firmware + filesystem)
-    python build.py --firmware   # Build firmware only
-    python build.py --filesystem # Build filesystem only
-    python build.py --clean      # Clean build artifacts
-    python build.py --distclean  # Clean build + cached dependencies
-    python build.py --help       # Show help
+    python build.py                      # Full build for ESP8266 + ESP32 (default)
+    python build.py --target esp8266     # Build for ESP8266 only
+    python build.py --target esp32       # Build for ESP32 only
+    python build.py --firmware           # Build firmware only
+    python build.py --filesystem         # Build filesystem only
+    python build.py --clean              # Clean build artifacts
+    python build.py --distclean          # Clean build + cached dependencies
+    python build.py --help               # Show help
 """
 
 import argparse
@@ -43,6 +45,47 @@ import urllib.request
 import zipfile
 from pathlib import Path
 import config
+
+# =============================================================================
+# Target definitions — one entry per supported chip family
+# =============================================================================
+TARGETS = {
+    "esp8266": {
+        "name": "ESP8266",
+        "core": "esp8266:esp8266",
+        "board_manager_url": "https://github.com/esp8266/Arduino/releases/download/3.1.2/package_esp8266com_index.json",
+        "fqbn": "esp8266:esp8266:d1_mini:eesz=4M2M,xtal=160",
+        "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_NODOSHOP_ESP8266",
+        "chip": "esp8266",
+        "flash_mode": "dio",
+        "flash_freq": "40m",
+        "flash_size": "4MB",
+        "firmware_offset": "0x0",
+        "fs_offset": "0x200000",
+        "fs_tool_path": "esp8266/tools/mklittlefs",
+        "fs_block": 8192,
+        "fs_page": 256,
+        "fs_size": 2072576,    # FS_PHYS_SIZE from eagle.flash.4m2m.ld (0x1FA000)
+    },
+    "esp32": {
+        "name": "ESP32",
+        "core": "esp32:esp32",
+        "board_manager_url": "https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json",
+        "fqbn": "esp32:esp32:esp32:PartitionScheme=huge_app",
+        "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_NODOSHOP_ESP32",
+        "chip": "esp32",
+        "flash_mode": "dio",
+        "flash_freq": "40m",
+        "flash_size": "4MB",
+        "firmware_offset": "0x10000",
+        "fs_offset": "0x310000",
+        "fs_tool_path": "esp32/tools/mklittlefs",
+        "fs_block": 4096,
+        "fs_page": 256,
+        "fs_size": 917504,       # 0xE0000 — huge_app partition (896KB LittleFS)
+        "bootloader_offset": "0x1000",
+    },
+}
 
 class Colors:
     """ANSI color codes for terminal output"""
@@ -162,54 +205,66 @@ def check_python_version():
     print_success(f"Python {version.major}.{version.minor}.{version.micro}")
 
 
-def setup_arduino_config(project_dir):
+def setup_arduino_config(project_dir, target_names):
     """Setup arduino-cli configuration"""
     print_step("Configuring arduino-cli")
-    
+
     arduino_dir = project_dir / "arduino"
     arduino_dir.mkdir(exist_ok=True)
-    
+
     config_file = arduino_dir / "arduino-cli.yaml"
-    
+
     # Initialize config
     run_command(["arduino-cli", "config", "init", "--dest-file", str(config_file), "--overwrite"])
-    
+
+    # Collect unique board manager URLs for the requested targets
+    urls = list(dict.fromkeys(
+        TARGETS[t]["board_manager_url"] for t in target_names
+    ))
+
     # Set config values
     configs = [
         ["directories.data", str(arduino_dir)],
-        ["board_manager.additional_urls", "https://github.com/esp8266/Arduino/releases/download/3.1.2/package_esp8266com_index.json"],
+        ["board_manager.additional_urls"] + urls,
         ["directories.downloads", str(project_dir / "staging")],
         ["directories.user", str(project_dir)],
         ["sketch.always_export_binaries", "true"],
         ["library.enable_unsafe_install", "true"]
     ]
-    
-    for key, value in configs:
-        run_command(["arduino-cli", "config", "set", key, value, "--config-file", str(config_file)])
-        
+
+    for entry in configs:
+        key = entry[0]
+        values = entry[1:]
+        run_command(["arduino-cli", "config", "set", key] + values + ["--config-file", str(config_file)])
+
     return config_file
 
 
-def install_dependencies(project_dir, config_file):
-    """Install core and libraries"""
+def install_dependencies(project_dir, config_file, target_names):
+    """Install cores and libraries for the requested targets"""
     print_step("Installing dependencies")
-    
+
     cmd_base = ["arduino-cli", "--config-file", str(config_file)]
-    
+
     # Update index
     print_info("Updating core index...")
     run_command(cmd_base + ["core", "update-index"])
-    
-    # Install core
-    print_info("Installing ESP8266 core...")
-    run_command(cmd_base + ["core", "install", "esp8266:esp8266"])
-    
+
+    # Install cores for each requested target
+    installed_cores = set()
+    for t in target_names:
+        core = TARGETS[t]["core"]
+        if core not in installed_cores:
+            print_info(f"Installing {TARGETS[t]['name']} core ({core})...")
+            run_command(cmd_base + ["core", "install", core])
+            installed_cores.add(core)
+
     # Update lib index
     print_info("Updating library index...")
     run_command(cmd_base + ["lib", "update-index"])
-    
-    # Install libraries
-    # Note: TelnetStream and ESP Telnet are no longer downloaded here.
+
+    # Install libraries (shared across all targets)
+    # Note: TelnetStream and ESPTelnet are no longer downloaded here.
     # They are replaced by SimpleTelnet (src/libraries/SimpleTelnet/),
     # which is picked up via the --libraries src/libraries flag in compile().
     libraries = [
@@ -222,7 +277,7 @@ def install_dependencies(project_dir, config_file):
         "DallasTemperature@4.0.6",
         "WebSockets@2.7.2"
     ]
-    
+
     for lib in libraries:
         print_info(f"Installing {lib}...")
         run_command(cmd_base + ["lib", "install", lib])
@@ -426,191 +481,167 @@ def create_build_directory(project_dir):
     return build_dir
 
 
-def build_firmware(project_dir, config_file):
-    """Build firmware using arduino-cli"""
-    print_step("Building firmware")
-    
-    fqbn = "esp8266:esp8266:d1_mini:eesz=4M2M,xtal=160"
-    cflags = "-DNO_GLOBAL_HTTPUPDATE"
-    
-    # Use temporary directory for build artifacts
-    temp_build_dir = config.TEMP_DIR / "build"
+def build_firmware(project_dir, config_file, target):
+    """Build firmware using arduino-cli for the given target"""
+    tcfg = TARGETS[target]
+    print_step(f"Building firmware [{tcfg['name']}]")
+
+    # Use target-specific temporary directory for build artifacts
+    temp_build_dir = config.TEMP_DIR / f"build-{target}"
     temp_build_dir.mkdir(parents=True, exist_ok=True)
-    
+
     cmd = [
         "arduino-cli",
         "compile",
-        "--fqbn", fqbn,
+        "--fqbn", tcfg["fqbn"],
         "--warnings", "default",
         "--verbose",
         "--libraries", str(project_dir / "src" / "libraries"),
-        "--build-property", f"compiler.cpp.extra_flags=\"{cflags}\"",
+        "--build-property", f"compiler.cpp.extra_flags=\"{tcfg['build_flags']}\"",
         "--build-path", str(temp_build_dir),
         "--config-file", str(config_file),
         str(config.FIRMWARE_ROOT)
     ]
-    
+
     run_command(cmd, cwd=project_dir, show_output=True)
-    print_success("Firmware build complete")
+    print_success(f"Firmware build complete [{tcfg['name']}]")
 
 
-def build_filesystem(project_dir, config_file):
-    """Build filesystem using mklittlefs"""
-    print_step("Building filesystem")
-    
-    # Find mklittlefs
-    # It should be in arduino/packages/esp8266/tools/mklittlefs/*/mklittlefs(.exe)
-    tools_dir = project_dir / "arduino" / "packages" / "esp8266" / "tools" / "mklittlefs"
-    
+def build_filesystem(project_dir, config_file, target):
+    """Build filesystem using mklittlefs for the given target"""
+    tcfg = TARGETS[target]
+    print_step(f"Building filesystem [{tcfg['name']}]")
+
+    # Find mklittlefs under the target's tool path
+    # e.g. arduino/packages/esp8266/tools/mklittlefs/*/mklittlefs(.exe)
+    tools_dir = project_dir / "arduino" / "packages" / tcfg["fs_tool_path"]
+
     mklittlefs_path = None
     if tools_dir.exists():
         for path in tools_dir.glob("**/mklittlefs*"):
-            if path.is_file() and (path.name == "mklittlefs" or path.name == "mklittlefs.exe"):
+            if path.is_file() and path.name in ("mklittlefs", "mklittlefs.exe"):
                 mklittlefs_path = path
                 break
-    
+
     if not mklittlefs_path:
-        print_error("mklittlefs not found. Make sure the ESP8266 core is installed.")
+        print_error(f"mklittlefs not found for {tcfg['name']}. Make sure the {tcfg['core']} core is installed.")
         sys.exit(1)
-        
+
     print_info(f"Using mklittlefs: {mklittlefs_path}")
-    
+
     fs_dir = config.DATA_DIR
-    output_file = config.BUILD_DIR / f"{config.PROJECT_NAME}.littlefs.bin"
-    
+    output_file = config.BUILD_DIR / f"{config.PROJECT_NAME}-{target}.littlefs.bin"
+
     # Ensure build dir exists
     output_file.parent.mkdir(exist_ok=True)
-    
-    # Filesystem size must match FS_PHYS_SIZE from the linker script for the chosen
-    # partition variant.  For eesz=4M2M (eagle.flash.4m2m.ld):
-    #   _FS_start = 0x40400000, _FS_end = 0x405FA000
-    #   FS_PHYS_SIZE = 0x1FA000 = 2,072,576 bytes
-    # Using a smaller value (e.g. 1,024,000) causes LittleFS to store a mismatched
-    # block_count in the superblock; core 3.x rejects this with a mount failure.
+
     cmd = [
         str(mklittlefs_path),
-        "-p", "256",
-        "-b", "8192",
-        "-s", "2072576",
+        "-p", str(tcfg["fs_page"]),
+        "-b", str(tcfg["fs_block"]),
+        "-s", str(tcfg["fs_size"]),
         "-c", str(fs_dir),
         str(output_file)
     ]
-    
+
     run_command(cmd, cwd=project_dir, show_output=True)
-    print_success("Filesystem build complete")
+    print_success(f"Filesystem build complete [{tcfg['name']}]")
 
 
-def consolidate_build_artifacts(project_dir):
-    """Move all build artifacts from temporary directory to build root and clean up"""
-    print_step("Consolidating build artifacts")
-    
+def consolidate_build_artifacts(project_dir, target):
+    """Move build artifacts from the target's temporary directory to build root"""
+    tcfg = TARGETS[target]
+    print_step(f"Consolidating build artifacts [{tcfg['name']}]")
+
     build_dir = config.BUILD_DIR
-    # Ensure build dir exists
     build_dir.mkdir(exist_ok=True)
-    
-    # Temporary build directory (where arduino-cli outputs)
-    temp_build_dir = config.TEMP_DIR / "build"
-    
+
+    # Target-specific temporary build directory
+    temp_build_dir = config.TEMP_DIR / f"build-{target}"
+
     moved = []
-    
-    # Helper to move artifact
-    def process_artifact(source_path, dest_dir):
+
+    def process_artifact(source_path, dest_dir, rename_to=None):
         if not source_path.exists():
             return False
-            
-        dest_path = dest_dir / source_path.name
-        
-        # Handle name conflicts
+        dest_name = rename_to or source_path.name
+        dest_path = dest_dir / dest_name
         if dest_path.exists() and dest_path != source_path:
-            # Check if it is the same file
             try:
                 if source_path.resolve() == dest_path.resolve():
                     return False
             except OSError:
                 pass
-            print_warning(f"File {dest_path.name} already exists, overwriting")
+            print_warning(f"File {dest_name} already exists, overwriting")
             dest_path.unlink()
-        
         if source_path != dest_path:
             shutil.move(str(source_path), str(dest_path))
-            print_info(f"Moved: {source_path.name}")
+            print_info(f"Moved: {source_path.name} -> {dest_name}")
             moved.append(dest_path)
             return True
         return False
 
-    # Move artifacts from temporary build directory
+    # Move firmware .bin from temp build dir, renaming to include target
     if temp_build_dir.exists():
-        patterns = ["**/*.ino.bin"]
-        for pattern in patterns:
-            for file_path in temp_build_dir.glob(pattern):
-                process_artifact(file_path, build_dir)
+        for file_path in temp_build_dir.glob("**/*.ino.bin"):
+            # Rename: OTGW-firmware.ino.bin -> OTGW-firmware-esp8266.ino.bin
+            new_name = file_path.name.replace(".ino.bin", f"-{target}.ino.bin")
+            process_artifact(file_path, build_dir, rename_to=new_name)
 
-    # Move artifacts from subdirectories in build/ (if any)
-    patterns = ["**/*.ino.bin", "**/*.littlefs.bin"]
-    for pattern in patterns:
+    # Move any remaining artifacts from subdirectories in build/
+    for pattern in ["**/*.ino.bin", "**/*.littlefs.bin"]:
         for file_path in build_dir.glob(pattern):
-            # Skip files already in build root
             if file_path.parent == build_dir:
                 continue
-            
             process_artifact(file_path, build_dir)
-            
+
     if moved:
         print_success(f"Consolidated {len(moved)} artifact(s) to build root")
-    
-    # Remove empty subdirectories and any remaining files in build/
+
+    # Remove empty subdirectories in build/
     for item in build_dir.iterdir():
         if item.is_dir():
             try:
-                # Remove the entire subdirectory tree
                 shutil.rmtree(item)
                 print_info(f"Removed directory: {item.name}")
             except Exception as e:
                 print_warning(f"Could not remove {item.name}: {e}")
 
-    print_success("Build directory cleaned")
+    print_success(f"Build directory cleaned [{tcfg['name']}]")
 
 
-def rename_build_artifacts(project_dir, semver):
-    """Rename build artifacts with version number"""
-    print_step("Renaming build artifacts")
-    
+def rename_build_artifacts(project_dir, semver, target):
+    """Rename build artifacts with version number for the given target"""
+    tcfg = TARGETS[target]
+    print_step(f"Renaming build artifacts [{tcfg['name']}]")
+
     build_dir = config.BUILD_DIR
     if not build_dir.exists():
         print_warning("Build directory not found, skipping rename")
         return
-    
+
     renamed = []
-    
-    # Find and rename .bin files (only in build root)
-    for pattern in ["*.ino.bin"]:
-        for file_path in build_dir.glob(pattern):
-            # Create new name with version
-            if file_path.suffix == ".bin":
-                new_name = file_path.stem.replace(".ino", "") + f"-{semver}.ino.bin"
-            
-            new_path = file_path.parent / new_name
-            file_path.rename(new_path)
-            renamed.append(new_path)
-            print_info(f"Renamed: {file_path.name} -> {new_name}")
-    
-    # Rename filesystem
-    for file_path in build_dir.glob("*.littlefs.bin"):
-        # Handle both *.ino.littlefs.bin and *.littlefs.bin patterns
-        if ".ino.littlefs" in file_path.name:
-            new_name = file_path.stem.replace(".ino.littlefs", "") + f".{semver}.littlefs.bin"
-        else:
-            # Remove .littlefs from stem to avoid double extension
-            base_name = file_path.stem.replace(".littlefs", "")
-            new_name = base_name + f".{semver}.littlefs.bin"
+
+    # Rename firmware binaries that belong to this target
+    for file_path in build_dir.glob(f"*-{target}.ino.bin"):
+        new_name = file_path.stem.replace(".ino", "") + f"-{semver}.ino.bin"
         new_path = file_path.parent / new_name
         file_path.rename(new_path)
         renamed.append(new_path)
         print_info(f"Renamed: {file_path.name} -> {new_name}")
-    
+
+    # Rename filesystem binaries that belong to this target
+    for file_path in build_dir.glob(f"*-{target}.littlefs.bin"):
+        base_name = file_path.stem.replace(".littlefs", "")
+        new_name = base_name + f"-{semver}.littlefs.bin"
+        new_path = file_path.parent / new_name
+        file_path.rename(new_path)
+        renamed.append(new_path)
+        print_info(f"Renamed: {file_path.name} -> {new_name}")
+
     if renamed:
         print_success(f"Renamed {len(renamed)} artifact(s)")
-    
+
     return renamed
 
 
@@ -637,115 +668,147 @@ def list_build_artifacts(project_dir):
     print()
 
 
-def create_merged_binary(project_dir, semver, compress=False):
+def create_merged_binary(project_dir, semver, target, compress=False):
     """Create a merged binary containing both firmware and filesystem using esptool merge_bin.
-    
+
     Args:
         project_dir: Project directory path
         semver: Semantic version string
+        target: Target key ("esp8266" or "esp32")
         compress: If True, also create a gzip-compressed version
-    
+
     Returns:
         Path to the merged binary (or compressed version if compress=True)
     """
-    print_step("Creating merged binary")
-    
+    tcfg = TARGETS[target]
+    print_step(f"Creating merged binary [{tcfg['name']}]")
+
     build_dir = project_dir / "build"
     if not build_dir.exists():
         print_error("Build directory not found")
         return None
-    
-    # Find firmware and filesystem files
+
+    # Find firmware and filesystem files for this target
     firmware_file = None
     filesystem_file = None
-    
-    # Look for firmware (try versioned first, then unversioned)
-    for pattern in [f"*{semver}*.ino.bin", "*.ino.bin", "OTGW-firmware*.bin"]:
+
+    for pattern in [f"*-{target}-{semver}*.ino.bin", f"*-{target}*.ino.bin"]:
         matches = list(build_dir.glob(pattern))
-        # Filter out littlefs and merged files
         matches = [m for m in matches if "littlefs" not in m.name.lower() and "merged" not in m.name.lower()]
         if matches:
-            firmware_file = sorted(matches)[0]  # Take the first match
+            firmware_file = sorted(matches)[0]
             break
-    
-    # Look for filesystem (try versioned first, then unversioned)
-    for pattern in [f"*{semver}*.littlefs.bin", "*.littlefs.bin"]:
+
+    for pattern in [f"*-{target}-{semver}*.littlefs.bin", f"*-{target}*.littlefs.bin"]:
         matches = list(build_dir.glob(pattern))
         if matches:
             filesystem_file = sorted(matches)[0]
             break
-    
+
     if not firmware_file:
-        print_error("Firmware binary not found in build directory")
+        print_error(f"Firmware binary not found for {tcfg['name']}")
         return None
-    
+
     if not filesystem_file:
         print_warning("Filesystem binary not found - creating firmware-only merged binary")
-    
+
     print_info(f"Firmware: {firmware_file.name}")
     if filesystem_file:
         print_info(f"Filesystem: {filesystem_file.name}")
-    
+
     # Create output filename
     if semver and semver != "unknown":
-        merged_name = f"OTGW-firmware-{semver}-merged.bin"
+        merged_name = f"OTGW-firmware-{target}-{semver}-merged.bin"
     else:
-        merged_name = "OTGW-firmware-merged.bin"
-    
+        merged_name = f"OTGW-firmware-{target}-merged.bin"
+
     merged_file = build_dir / merged_name
-    
+
     # Build esptool merge_bin command
-    # ESP8266 flash layout: firmware at 0x0, filesystem at 0x200000
-    # Flash size: 4MB (0x400000)
     cmd = [
         sys.executable, "-m", "esptool",
-        "--chip", "esp8266",
+        "--chip", tcfg["chip"],
         "merge_bin",
         "-o", str(merged_file),
-        "--flash_mode", "dio",
-        "--flash_freq", "40m",
-        "--flash_size", "4MB",
-        "0x0", str(firmware_file)
+        "--flash_mode", tcfg["flash_mode"],
+        "--flash_freq", tcfg["flash_freq"],
+        "--flash_size", tcfg["flash_size"],
     ]
-    
-    # Add filesystem if available
+
+    # ESP32 needs bootloader + partition table in the merged image
+    if "bootloader_offset" in tcfg:
+        temp_build_dir = config.TEMP_DIR / f"build-{target}"
+        # Find bootloader
+        bootloader = None
+        for bl in temp_build_dir.glob("**/bootloader.bin"):
+            bootloader = bl
+            break
+        if bootloader:
+            cmd.extend([tcfg["bootloader_offset"], str(bootloader)])
+            print_info(f"Bootloader: {bootloader.name}")
+        else:
+            print_warning("Bootloader not found in build output — merged image may not be bootable")
+
+        # Find partition table
+        partitions = None
+        for pt in temp_build_dir.glob("**/partitions.bin"):
+            partitions = pt
+            break
+        if not partitions:
+            for pt in temp_build_dir.glob("**/*.partitions.bin"):
+                partitions = pt
+                break
+        if partitions:
+            cmd.extend(["0x8000", str(partitions)])
+            print_info(f"Partitions: {partitions.name}")
+
+        # Find boot_app0.bin
+        boot_app = None
+        for ba in (project_dir / "arduino" / "packages" / "esp32").glob("**/boot_app0.bin"):
+            boot_app = ba
+            break
+        if boot_app:
+            cmd.extend(["0xe000", str(boot_app)])
+
+    # Firmware
+    cmd.extend([tcfg["firmware_offset"], str(firmware_file)])
+
+    # Filesystem
     if filesystem_file:
-        cmd.extend(["0x200000", str(filesystem_file)])
-    
-    print_info(f"Running: esptool merge_bin...")
-    
+        cmd.extend([tcfg["fs_offset"], str(filesystem_file)])
+
+    print_info("Running: esptool merge_bin...")
+
     try:
-        result = run_command(cmd, cwd=project_dir, capture_output=True, show_output=False)
-        
+        run_command(cmd, cwd=project_dir, capture_output=True, show_output=False)
+
         if merged_file.exists():
             size_mb = merged_file.stat().st_size / (1024 * 1024)
             print_success(f"Created merged binary: {merged_name} ({size_mb:.2f} MB)")
-            
-            # Optionally compress the merged binary
+
             if compress:
                 print_info("Compressing merged binary with gzip...")
                 compressed_file = build_dir / f"{merged_name}.gz"
-                
+
                 try:
                     with open(merged_file, 'rb') as f_in:
                         with gzip.open(compressed_file, 'wb', compresslevel=9) as f_out:
                             shutil.copyfileobj(f_in, f_out)
-                    
+
                     compressed_size_mb = compressed_file.stat().st_size / (1024 * 1024)
                     compression_ratio = (1 - compressed_file.stat().st_size / merged_file.stat().st_size) * 100
                     print_success(f"Created compressed binary: {compressed_file.name} ({compressed_size_mb:.2f} MB, {compression_ratio:.1f}% reduction)")
-                    
                     return compressed_file
-                    
+
                 except Exception as e:
                     print_warning(f"Compression failed: {e}")
                     return merged_file
-            
+
             return merged_file
         else:
             print_error("Merged binary was not created")
             return None
-            
+
     except Exception as e:
         print_error(f"Failed to create merged binary: {e}")
         print_info("Make sure esptool is installed: pip install esptool")
@@ -839,13 +902,15 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python build.py                  # Full build (firmware + filesystem)
-  python build.py --firmware       # Build firmware only
-  python build.py --filesystem     # Build filesystem only
-  python build.py --merged         # Build and create merged binary (single flashable file)
-  python build.py --merged --compress  # Build and create compressed merged binary
-  python build.py --clean          # Clean build artifacts
-  python build.py --distclean      # Also remove cores/libraries cache
+  python build.py                          # Full build for ESP8266 + ESP32 (default)
+  python build.py --target esp8266         # Build for ESP8266 only
+  python build.py --target esp32           # Build for ESP32 only
+  python build.py --firmware               # Build firmware only
+  python build.py --filesystem             # Build filesystem only
+  python build.py --merged                 # Build and create merged binary
+  python build.py --merged --compress      # Build and create compressed merged binary
+  python build.py --clean                  # Clean build artifacts
+  python build.py --distclean              # Also remove cores/libraries cache
         """
     )
     
@@ -878,6 +943,12 @@ Examples:
         "--compress",
         action="store_true",
         help="Compress the merged binary with gzip (requires --merged)"
+    )
+    parser.add_argument(
+        "--target",
+        choices=["esp8266", "esp32", "all"],
+        default="all",
+        help="Target platform: esp8266, esp32, or all (default)"
     )
     parser.add_argument(
         "--no-install-cli",
@@ -927,6 +998,14 @@ Examples:
         clean_build(project_dir)
         return
     
+    # Resolve target list
+    if args.target == "all":
+        target_names = list(TARGETS.keys())
+    else:
+        target_names = [args.target]
+
+    print_info(f"Target(s): {', '.join(TARGETS[t]['name'] for t in target_names)}")
+
     # Install arduino-cli if needed and add to PATH
     if not args.no_install_cli:
         cli_install_dir = install_arduino_cli(system)
@@ -935,59 +1014,61 @@ Examples:
             current_path = os.environ.get("PATH", "")
             os.environ["PATH"] = f"{cli_install_dir}{os.pathsep}{current_path}"
             print_info(f"Added {cli_install_dir} to PATH for this build session")
-            
-    # Setup arduino-cli config
-    config_file = setup_arduino_config(project_dir)
-    
-    # Install dependencies
-    install_dependencies(project_dir, config_file)
-    
+
+    # Setup arduino-cli config (with board manager URLs for all requested targets)
+    config_file = setup_arduino_config(project_dir, target_names)
+
+    # Install dependencies (cores for all requested targets + shared libraries)
+    install_dependencies(project_dir, config_file, target_names)
+
     # Update version
     update_version(project_dir)
-    
+
     # Get semantic version
     semver = get_semver(project_dir)
     print_info(f"Building version: {semver}")
-    
+
     # Create build directory
     create_build_directory(project_dir)
-    
-    # Build based on arguments
-    if args.firmware and not args.filesystem:
-        # Firmware only
-        build_firmware(project_dir, config_file)
-    elif args.filesystem and not args.firmware:
-        # Filesystem only
-        build_filesystem(project_dir, config_file)
-    else:
-        # Full build (default)
-        build_firmware(project_dir, config_file)
-        build_filesystem(project_dir, config_file)
-    
-    # Consolidate build artifacts from subdirectories
-    consolidate_build_artifacts(project_dir)
-    
-    # Rename artifacts with version
-    rename_build_artifacts(project_dir, semver)
-    
-    # Create merged binary if requested
-    if args.merged:
-        # Check/install esptool first
-        if not check_esptool():
-            print_error("esptool is required for creating merged binaries")
-            sys.exit(1)
-        
-        merged_file = create_merged_binary(project_dir, semver, compress=args.compress)
-        if not merged_file:
-            print_error("Failed to create merged binary")
-            sys.exit(1)
-        
-        print_info(f"Merged binary ready for flashing: {merged_file.name}")
-        print_info("Flash command: esptool.py --port <PORT> -b 460800 write_flash 0x0 " + str(merged_file))
-    
+
+    # Build each target
+    for target in target_names:
+        tcfg = TARGETS[target]
+        print(f"\n{Colors.HEADER}{Colors.BOLD}--- Building for {tcfg['name']} ---{Colors.ENDC}\n")
+
+        # Build based on arguments
+        if args.firmware and not args.filesystem:
+            build_firmware(project_dir, config_file, target)
+        elif args.filesystem and not args.firmware:
+            build_filesystem(project_dir, config_file, target)
+        else:
+            build_firmware(project_dir, config_file, target)
+            build_filesystem(project_dir, config_file, target)
+
+        # Consolidate build artifacts from subdirectories
+        consolidate_build_artifacts(project_dir, target)
+
+        # Rename artifacts with version
+        rename_build_artifacts(project_dir, semver, target)
+
+        # Create merged binary if requested
+        if args.merged:
+            if not check_esptool():
+                print_error("esptool is required for creating merged binaries")
+                sys.exit(1)
+
+            merged_file = create_merged_binary(project_dir, semver, target, compress=args.compress)
+            if not merged_file:
+                print_error(f"Failed to create merged binary for {tcfg['name']}")
+                sys.exit(1)
+
+            print_info(f"Merged binary ready for flashing: {merged_file.name}")
+            flash_offset = "0x0" if target == "esp8266" else tcfg.get("bootloader_offset", "0x0")
+            print_info(f"Flash command: esptool.py --chip {tcfg['chip']} --port <PORT> -b 460800 write_flash {flash_offset} {merged_file}")
+
     # List build artifacts
     list_build_artifacts(project_dir)
-    
+
     # Clean up temporary directory
     cleanup_temp_directory(project_dir)
     

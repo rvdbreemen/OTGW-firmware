@@ -4056,6 +4056,7 @@ void handleOTGW()
 
   //Handle incoming data from OTGW through serial port (READ BUFFER)
   if (!state.debug.bOTGWSimulation) {
+#if defined(ESP8266)
     if (OTGWSerial.hasOverrun()) {
       DebugT(F("Serial Overrun\r\n"));
       reportOTGWEvent_P(PSTR("Serial Overrun"), '!', true);
@@ -4064,6 +4065,7 @@ void handleOTGW()
       DebugT(F("Serial Rx Error\r\n"));
       reportOTGWEvent_P(PSTR("Serial Rx Error"), '!', true);
     }
+#endif
     
     while (OTGWSerial.available()) {
       outByte = OTGWSerial.read();
