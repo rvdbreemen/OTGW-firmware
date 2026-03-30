@@ -22,19 +22,20 @@
 #include <TelnetStream.h>       // https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
 #include "Wire.h"
 #include "safeTimers.h"
+#include "boards.h"             // Board-specific pin maps (PIN_LED1, PIN_PIC_RST, etc.)
 #include <OTGWSerial.h>         // Bron Schelte's Serial class - it upgrades and more
-#include "OTGW-Core.h"          // Core code for this firmware 
+#include "OTGW-Core.h"          // Core code for this firmware
 #include <OneWire.h>            // required for Dallas sensor library
 #include <DallasTemperature.h>  // Miles Burton's - Arduino Dallas library
 
-//OTGW Nodoshop hardware definitions
-#define I2CSCL D1
-#define I2CSDA D2
-#define BUTTON D3
-#define PICRST D5
-
-#define LED1 D4
-#define LED2 D0
+// Legacy pin aliases — map old names to boards.h constants so existing code
+// (and any user forks) keeps compiling without search-and-replace churn.
+#define I2CSCL  PIN_I2C_SCL
+#define I2CSDA  PIN_I2C_SDA
+#define BUTTON  PIN_BUTTON
+#define PICRST  PIN_PIC_RST
+#define LED1    PIN_LED1
+#define LED2    PIN_LED2
 
 #define PICFIRMWARE "/gateway.hex"
 

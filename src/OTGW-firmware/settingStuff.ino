@@ -424,7 +424,7 @@ void updateSetting(const char *field, const char *newValue)
   if (strcasecmp_P(field, PSTR("hostname"))==0) 
   { //make sure we have a valid hostname here...
     strlcpy(settings.sHostname, newValue, sizeof(settings.sHostname));
-    if (strlen(settings.sHostname)==0) snprintf_P(settings.sHostname, sizeof(settings.sHostname), PSTR("OTGW-%06x"), (unsigned int)ESP.getChipId());
+    if (strlen(settings.sHostname)==0) snprintf_P(settings.sHostname, sizeof(settings.sHostname), PSTR("OTGW-%06x"), (unsigned int)platformChipId());
     
     //strip away anything beyond the dot
     char *dot = strchr(settings.sHostname, '.');
