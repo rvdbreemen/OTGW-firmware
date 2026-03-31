@@ -29,8 +29,70 @@
 
 // ---- Common includes (identical API on both platforms) --------------------
 #include <WiFiUdp.h>
-#include <LittleFS.h>
 #include <WiFiClient.h>
+
+// ---- Unified directory iteration -----------------------------------------
+// Wraps ESP8266 Dir and ESP32 File-based directory APIs into one interface.
+class PlatformDir {
+public:
+  explicit PlatformDir(const char* path)
+#if defined(ESP8266)
+    : _dir(LittleFS.openDir(path)) {}
+#elif defined(ESP32)
+  {
+    _dirFile = LittleFS.open(path);
+  }
+#endif
+
+  bool valid() {
+#if defined(ESP8266)
+    return true;  // ESP8266 Dir is always valid; empty dir has no entries
+#elif defined(ESP32)
+    return (_dirFile && _dirFile.isDirectory());
+#endif
+  }
+
+  bool next() {
+#if defined(ESP8266)
+    return _dir.next();
+#elif defined(ESP32)
+    _entry = _dirFile.openNextFile();
+    return (bool)_entry;
+#endif
+  }
+
+  String fileName() {
+#if defined(ESP8266)
+    return _dir.fileName();
+#elif defined(ESP32)
+    return String(_entry.name());
+#endif
+  }
+
+  size_t fileSize() {
+#if defined(ESP8266)
+    return _dir.fileSize();
+#elif defined(ESP32)
+    return _entry.size();
+#endif
+  }
+
+  bool isDirectory() {
+#if defined(ESP8266)
+    return _dir.isDirectory();
+#elif defined(ESP32)
+    return _entry.isDirectory();
+#endif
+  }
+
+private:
+#if defined(ESP8266)
+  Dir _dir;
+#elif defined(ESP32)
+  File _dirFile;
+  File _entry;
+#endif
+};
 
 /***************************************************************************
 *
