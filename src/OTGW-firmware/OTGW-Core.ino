@@ -240,6 +240,26 @@ static bool mqttForceNextSlaveStatusPublish  = true;
 static bool mqttForceNextMasterStatusVHPublish = true;
 static bool mqttForceNextSlaveStatusVHPublish  = true;
 
+// Pending MQTT throttle slot update — applied only after successful publish.
+// Prevents the throttle from "burning" a slot when sendMQTTData fails silently.
+struct MQTTPendingSlotUpdate {
+  uint8_t  idx;         // tracked slot index
+  uint16_t rawValue;    // value to record
+  uint16_t trackedTime; // timestamp to record
+  bool     pending;     // true = waiting for confirmation
+  bool     isTimeOnly;  // true = PS=1 mode (update time only, preserve value bits)
+};
+static MQTTPendingSlotUpdate mqttPendingSlot = {0, 0, 0, false, false};
+
+struct MQTTPendingTrackedUpdate {
+  uint16_t *trackedSlots; // pointer to the tracked array
+  uint8_t   slot;         // slot index
+  uint16_t  trackedTime;  // timestamp to record
+  bool      pending;
+};
+static MQTTPendingTrackedUpdate mqttPendingBitSlot  = {nullptr, 0, 0, false};
+static MQTTPendingTrackedUpdate mqttPendingByteSlot = {nullptr, 0, 0, false};
+
 // TRACKED_TIME_UNSEEN must be a sentinel that currentTrackedSeconds() can never produce.
 // currentTrackedSeconds() returns values in [0, TRACKED_TIME_MODULUS-1] = [0, 65534].
 // 0xFFFF (65535) is therefore never produced, making it a safe "not yet seen" marker.
@@ -1267,6 +1287,36 @@ static void setPackedSlot(uint8_t idx, uint16_t rawValue, uint16_t trackedNow)
   mqttlastsent[idx] = (static_cast<uint32_t>(rawValue) << 16) | trackedNow;
 }
 
+// Confirm pending throttle slot updates after successful MQTT publish.
+// Called from sendMQTTData() on success so the slot is only marked
+// "published" when the data actually reached the broker.
+void confirmMQTTPublishSlot()
+{
+  if (!mqttPendingSlot.pending) return;
+  if (mqttPendingSlot.isTimeOnly) {
+    mqttlastsent[mqttPendingSlot.idx] =
+      (mqttlastsent[mqttPendingSlot.idx] & 0xFFFF0000UL) |
+      static_cast<uint32_t>(mqttPendingSlot.trackedTime);
+  } else {
+    setPackedSlot(mqttPendingSlot.idx, mqttPendingSlot.rawValue, mqttPendingSlot.trackedTime);
+  }
+  mqttPendingSlot.pending = false;
+}
+
+void confirmMQTTPublishBitSlot()
+{
+  if (!mqttPendingBitSlot.pending || !mqttPendingBitSlot.trackedSlots) return;
+  mqttPendingBitSlot.trackedSlots[mqttPendingBitSlot.slot] = mqttPendingBitSlot.trackedTime;
+  mqttPendingBitSlot.pending = false;
+}
+
+void confirmMQTTPublishByteSlot()
+{
+  if (!mqttPendingByteSlot.pending || !mqttPendingByteSlot.trackedSlots) return;
+  mqttPendingByteSlot.trackedSlots[mqttPendingByteSlot.slot] = mqttPendingByteSlot.trackedTime;
+  mqttPendingByteSlot.pending = false;
+}
+
 void requestMQTTRepublishAll()
 {
   resetMqttTrackedState();
@@ -1321,7 +1371,10 @@ bool shouldPublishMQTTForID(byte id, byte masterslave, uint16_t rawValue) {
   logMQTTValueGateDecision(id, masterslave, idx, lastVal, rawValue, firstSeen, valueChanged, intervalElapsed, lastTime, now, allowPublish,
                            allowPublish ? F("tracked update") : F("suppressed by interval"));
   if (allowPublish) {
-    setPackedSlot(idx, rawValue, now);
+    // Defer slot update until sendMQTTData confirms successful publish.
+    // If publish fails, the slot retains its previous state so the value
+    // will be retried on the next observation.
+    mqttPendingSlot = {idx, rawValue, now, true, false};
     return true;
   }
   return false;
@@ -1361,8 +1414,7 @@ bool shouldPublishMQTTForPSField(byte id) {
                   now,
                   allowPublish ? "publish" : "skip");
   if (allowPublish) {
-    // Preserve the last-value bits; update only the time field
-    mqttlastsent[idx] = (mqttlastsent[idx] & 0xFFFF0000UL) | static_cast<uint32_t>(now);
+    mqttPendingSlot = {idx, 0, now, true, true}; // isTimeOnly for PS=1
     return true;
   }
   return false;
@@ -1370,18 +1422,19 @@ bool shouldPublishMQTTForPSField(byte id) {
 
 // shouldPublishStatusBit - per-bit publish decision for OT_Statusflags
 static bool shouldPublishTrackedStatusBit(uint16_t *trackedSlots, uint8_t bitSlot, bool newVal, bool prevVal, bool forcePublish) {
+  mqttPendingBitSlot.pending = false; // discard unconfirmed pending from prior call
   const uint16_t lastTime = trackedSlots[bitSlot];
   const bool firstSeen = !hasTrackedTime(lastTime);
   const uint16_t now = currentTrackedSeconds();
   if (forcePublish) {
-    trackedSlots[bitSlot] = now;
+    mqttPendingBitSlot = {trackedSlots, bitSlot, now, true};
     return true;
   }
   if (settings.mqtt.iInterval == 0) return true;   // legacy: always publish
   bool valueChanged    = (newVal != prevVal);
   bool intervalElapsed = !firstSeen && (elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval);
   if (firstSeen || valueChanged || intervalElapsed) {
-    trackedSlots[bitSlot] = now;
+    mqttPendingBitSlot = {trackedSlots, bitSlot, now, true};
     return true;
   }
   return false;
@@ -1398,18 +1451,19 @@ static bool shouldPublishStatusVHBit(uint8_t bitSlot, bool newVal, bool prevVal,
 
 static bool shouldPublishTrackedStatusByte(uint16_t *trackedSlots, uint8_t byteSlot, uint8_t newVal, uint8_t prevVal, bool forcePublish)
 {
+  mqttPendingByteSlot.pending = false; // discard unconfirmed pending from prior call
   const uint16_t lastTime = trackedSlots[byteSlot];
   const bool firstSeen = !hasTrackedTime(lastTime);
   const uint16_t now = currentTrackedSeconds();
   if (forcePublish) {
-    trackedSlots[byteSlot] = now;
+    mqttPendingByteSlot = {trackedSlots, byteSlot, now, true};
     return true;
   }
   if (settings.mqtt.iInterval == 0) return true;
   const bool valueChanged = (newVal != prevVal);
   const bool intervalElapsed = !firstSeen && (elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval);
   if (firstSeen || valueChanged || intervalElapsed) {
-    trackedSlots[byteSlot] = now;
+    mqttPendingByteSlot = {trackedSlots, byteSlot, now, true};
     return true;
   }
   return false;

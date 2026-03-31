@@ -955,7 +955,11 @@ void sendMQTTData(const char* topic, const char *json, const bool retain)
     MQTTclient.endPublish();
     return;
   }
-  if (!MQTTclient.endPublish()) PrintMQTTError();
+  if (!MQTTclient.endPublish()) { PrintMQTTError(); return; }
+  // Publish succeeded — confirm any pending throttle slot updates
+  confirmMQTTPublishSlot();
+  confirmMQTTPublishBitSlot();
+  confirmMQTTPublishByteSlot();
   feedWatchDog();//feed the dog
 } // sendMQTTData()
 
@@ -996,11 +1000,14 @@ void sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
     MQTTclient.endPublish();
     return;
   }
-  if (!MQTTclient.endPublish()) PrintMQTTError();
+  if (!MQTTclient.endPublish()) { PrintMQTTError(); return; }
+  confirmMQTTPublishSlot();
+  confirmMQTTPublishBitSlot();
+  confirmMQTTPublishByteSlot();
   feedWatchDog();
 }
 
-/* 
+/*
 * topic:  <string> , topic will be used as is (no prefixing), retained = true
 * json:   <string> , payload to send
 */
