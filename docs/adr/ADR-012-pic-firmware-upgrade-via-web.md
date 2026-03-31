@@ -252,6 +252,7 @@ ws.onmessage = function(event) {
 ## Related Decisions
 - ADR-005: WebSocket for Real-Time Streaming (progress updates)
 - ADR-004: Static Buffer Allocation Strategy (binary data safety)
+- ADR-060: PIC Availability Guard Pattern (upgrade paths guarded by `isPICEnabled()`)
 
 ## References
 - Implementation: `src/libraries/OTGWSerial/OTGWSerial.cpp` (hex file parsing)
