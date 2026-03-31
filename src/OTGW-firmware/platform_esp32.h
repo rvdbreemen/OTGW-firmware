@@ -37,8 +37,7 @@
 using OTGWWebServer = WebServer;
 
 // ---- FSInfo compatibility ------------------------------------------------
-// ESP8266 uses FSInfo struct with LittleFS.info(). ESP32 LittleFS has
-// totalBytes() and usedBytes() methods instead. Provide a shim.
+// ESP8266 uses FSInfo struct natively. Define it here for ESP32.
 struct FSInfo {
   size_t totalBytes;
   size_t usedBytes;
@@ -48,24 +47,37 @@ struct FSInfo {
   size_t maxPathLength;
 };
 
-namespace platform_esp32_internal {
-  inline bool getLittleFSInfo(FSInfo &info) {
-    info.totalBytes   = LittleFS.totalBytes();
-    info.usedBytes    = LittleFS.usedBytes();
-    info.blockSize    = 0;   // not directly exposed on ESP32
-    info.pageSize     = 0;
-    info.maxOpenFiles = 10;
-    info.maxPathLength = 255;
-    return true;
-  }
+// ---- Platform functions --------------------------------------------------
+
+// WiFi hostname
+inline void platformSetHostname(const char *hostname) {
+  WiFi.setHostname(hostname);
 }
 
-// Macro to make LittleFS.info(fsInfo) work on ESP32
-// ESP8266: LittleFS.info(fsInfo) is a member function returning bool
-// ESP32:   We provide this as a free function via macro
-#define LittleFS_info(info) platform_esp32_internal::getLittleFSInfo(info)
+inline const char* platformGetHostname() {
+  return WiFi.getHostname();
+}
 
-// ---- Platform shim functions ---------------------------------------------
+// LittleFS info (ESP32: construct from totalBytes/usedBytes)
+inline bool platformFSInfo(FSInfo &info) {
+  info.totalBytes    = LittleFS.totalBytes();
+  info.usedBytes     = LittleFS.usedBytes();
+  info.blockSize     = 0;
+  info.pageSize      = 0;
+  info.maxOpenFiles  = 10;
+  info.maxPathLength = 255;
+  return (info.totalBytes > 0);
+}
+
+// Core/SDK version
+inline const char* platformCoreVersion() {
+  return ESP.getSdkVersion();
+}
+
+// MAC address
+inline void platformGetMacAddress(uint8_t *mac) {
+  esp_efuse_mac_get_default(mac);
+}
 
 // Chip identity (derive a 32-bit ID from the 48-bit MAC)
 inline uint32_t platformChipId() {
@@ -169,6 +181,20 @@ inline bool platformRtcWrite(uint32_t slot, const uint32_t *data, size_t len) {
 // Reset info
 inline bool platformIsExternalReset() {
   return (esp_reset_reason() == ESP_RST_EXT);
+}
+
+inline uint32_t platformResetCode() {
+  return (uint32_t)esp_reset_reason();
+}
+
+// Register dump — not available on ESP32 via esp_reset_reason() API
+inline void platformResetRegisterDump(char *buf, size_t bufLen) {
+  buf[0] = '\0';
+}
+
+// Exception cause — not available on ESP32 via esp_reset_reason() API
+inline void platformResetExceptionInfo(char *buf, size_t bufLen) {
+  buf[0] = '\0';
 }
 
 // DHCP restart — ESP32 doesn't expose low-level DHCP controls the same way;

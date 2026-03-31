@@ -304,23 +304,15 @@ void apifirmwarefilelist() {
   DebugTln(F("--- Firmware File List (streamed) ---"));
   DebugTln(F("["));
 
-#if defined(ESP8266)
-  Dir dir = LittleFS.openDir(dirpath);
-  while (dir.next()) {
-    String entryName = dir.fileName();
-    size_t entrySize = dir.fileSize();
-#elif defined(ESP32)
-  File dirFile = LittleFS.open(dirpath);
-  if (!dirFile || !dirFile.isDirectory()) {
+  PlatformDir dir(dirpath.c_str());
+  if (!dir.valid()) {
     httpServer.sendContent(F("]\r\n"));
     httpServer.sendContent(F(""));
     return;
   }
-  File entry = dirFile.openNextFile();
-  while (entry) {
-    String entryName = String(entry.name());
-    size_t entrySize = entry.size();
-#endif
+  while (dir.next()) {
+    String entryName = dir.fileName();
+    size_t entrySize = dir.fileSize();
     DebugTf(PSTR("entry=%s\r\n"), entryName.c_str());
     if (entryName.endsWith(".hex")) {
       version="";
@@ -369,9 +361,6 @@ void apifirmwarefilelist() {
 
       feedWatchDog(); // Feed watchdog during potentially long operation
     }
-#if defined(ESP32)
-    entry = dirFile.openNextFile();
-#endif
   }
   
   // Close JSON array
@@ -441,31 +430,19 @@ void apilistfiles()
   int fileCount = 0;
   bool truncated = false;
 
-#if defined(ESP8266)
-  Dir dir = LittleFS.openDir(path);
-  while (dir.next()) {
-    String fname = dir.fileName();
-    long   fsize = (long)dir.fileSize();
-    bool   isDir = dir.isDirectory();
-#elif defined(ESP32)
-  File dirFile = LittleFS.open(path);
-  if (!dirFile || !dirFile.isDirectory()) {
+  PlatformDir dir(path.c_str());
+  if (!dir.valid()) {
     httpServer.sendContent(F("]\r\n"));
     httpServer.sendContent(F(""));
     return;
   }
-  File entry = dirFile.openNextFile();
-  while (entry) {
-    String fname = String(entry.name());
-    long   fsize = (long)entry.size();
-    bool   isDir = entry.isDirectory();
-#endif
+  while (dir.next()) {
+    String fname = dir.fileName();
+    long   fsize = (long)dir.fileSize();
+    bool   isDir = dir.isDirectory();
     feedWatchDog();
     // Skip hidden files/directories (names starting with '.')
     if (fname.charAt(0) == '.') {
-#if defined(ESP32)
-      entry = dirFile.openNextFile();
-#endif
       continue;
     }
     if (fileCount >= MAX_FILES_IN_LIST) { truncated = true; break; }
@@ -478,22 +455,13 @@ void apilistfiles()
       isDir ? "dir" : "file");
     httpServer.sendContent(buf);
     fileCount++;
-#if defined(ESP32)
-    entry = dirFile.openNextFile();
-#endif
   }
 
   // Storage info as last entry (raw bytes — frontend formats for display)
-  unsigned long totalBytes, usedBytesRaw;
-#if defined(ESP8266)
   FSInfo fsInfo;
-  LittleFS.info(fsInfo);
-  totalBytes = fsInfo.totalBytes;
-  usedBytesRaw = fsInfo.usedBytes;
-#elif defined(ESP32)
-  totalBytes = LittleFS.totalBytes();
-  usedBytesRaw = LittleFS.usedBytes();
-#endif
+  platformFSInfo(fsInfo);
+  unsigned long totalBytes = fsInfo.totalBytes;
+  unsigned long usedBytesRaw = fsInfo.usedBytes;
   if (!first) httpServer.sendContent(F(","));
   unsigned long usedBytes = (unsigned long)(usedBytesRaw * 1.05);
   unsigned long freeBytes = totalBytes - usedBytes;
@@ -614,16 +582,10 @@ const String &contentType(String& filename)
 //=====================================================================================
 bool freeSpace(uint16_t const& printsize)
 {
-  unsigned long totalB, usedB;
-#if defined(ESP8266)
-  FSInfo LittleFSinfo;
-  LittleFS.info(LittleFSinfo);
-  totalB = LittleFSinfo.totalBytes;
-  usedB  = LittleFSinfo.usedBytes;
-#elif defined(ESP32)
-  totalB = LittleFS.totalBytes();
-  usedB  = LittleFS.usedBytes();
-#endif
+  FSInfo fsInfo;
+  platformFSInfo(fsInfo);
+  unsigned long totalB = fsInfo.totalBytes;
+  unsigned long usedB  = fsInfo.usedBytes;
   Debugln(formatBytes(totalB - (unsigned long)(usedB * 1.05)) + " im LittleFS frei");
   return (totalB - (unsigned long)(usedB * 1.05) > printsize);
 
