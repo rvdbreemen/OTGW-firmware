@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v1.3.3
+**  Version  : v1.3.4-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -4100,6 +4100,10 @@ function refreshDeviceInfo() {
           var fldDiv = document.createElement("div");
           fldDiv.setAttribute("class", "devinfocolumn1");
           fldDiv.textContent = displayLabel;
+          var tooltipText = translateTooltip(key);
+          if (tooltipText) {
+            fldDiv.setAttribute("title", tooltipText);
+          }
           rowDiv.appendChild(fldDiv);
           //--- value on screen ---
           var valDiv = document.createElement("div");
@@ -4860,7 +4864,7 @@ var translateFields = [
   , ["thermostatconnected", "Thermostat Connected"]
   , ["boilerconnected", "Boiler Connected"]
   , ["otgwmode", "Gateway Mode"]
-  , ["otgwconnected", "OTGW Connected"]
+  , ["otgwconnected", "OpenTherm Active"]
   , ["gpiooutputsenabled", "GPIO Output Trigger Enabled"]
   , ["gpiooutputspin", "GPIO Output Pin"]
   , ["gpiooutputstriggerbit", "GPIO Trigger Bit (0-15)"]
@@ -4913,7 +4917,7 @@ var translateTooltips = [
   , ["thermostatconnected", "Read-only status showing whether the thermostat side is currently detected."]
   , ["boilerconnected", "Read-only status showing whether the boiler side is currently detected."]
   , ["otgwmode", "Current gateway operating mode reported by the firmware."]
-  , ["otgwconnected", "Shows whether the OTGW is online (thermostat and/or boiler communication detected)."]
+  , ["otgwconnected", "Shows whether OpenTherm communication is active (thermostat and/or boiler detected on the bus)."]
   , ["gpiooutputsenabled", "Enable the GPIO output trigger feature."]
   , ["gpiooutputspin", "GPIO pin that will be switched when the selected status bit changes."]
   , ["gpiooutputstriggerbit", "Status bit number to follow. Use values 0 through 15."]
