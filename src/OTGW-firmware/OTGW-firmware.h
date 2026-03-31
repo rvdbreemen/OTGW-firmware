@@ -143,7 +143,7 @@ struct PICSection {            // state.pic — PIC microcontroller identity/sta
 };
 
 struct OTGWProtocol {          // state.otgw — OpenTherm protocol & bus state
-  bool bOnline           = true;   // was bOTGWonline — serial link alive
+  bool bOnline           = false;  // was bOTGWonline — serial link alive
   bool bPSmode           = false;  // was bPSmode — Print Summary mode (PS=1)
   bool bGatewayMode      = false;  // was bOTGWgatewaystate — true=gateway, false=monitor
   bool bGatewayModeKnown = false;  // was bOTGWgatewaystateKnown
@@ -224,6 +224,7 @@ OTGWState state;
 // Set at boot by detectPIC() and can flip true at runtime if a PIC banner is received.
 // All PIC-related operations (commands, queries, upgrades) check this before proceeding.
 inline bool isPICEnabled() { return state.pic.bAvailable; }
+inline bool isGatewayFirmware() { return strcmp_P(state.pic.sType, PSTR("gateway")) == 0; }
 
 //===================[ Persistent Settings — serialized to LittleFS (ADR-051) ]===================
 // Sub-section structs for OTGWSettings — groups configuration by feature area.
