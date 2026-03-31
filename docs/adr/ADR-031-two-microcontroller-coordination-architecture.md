@@ -408,6 +408,7 @@ ESP8266: Re-query version
 - **ADR-012:** PIC Firmware Upgrade via Web UI (documents upgrade process)
 - **ADR-016:** OpenTherm Command Queue (prevents serial overruns)
 - **ADR-011:** External Hardware Watchdog (ESP8266 recovery mechanism)
+- **ADR-060:** PIC Availability Guard Pattern (extends this ADR to handle the "no PIC" case)
 
 ## References
 
