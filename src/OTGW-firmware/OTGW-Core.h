@@ -190,15 +190,15 @@ enum OTValueType {
 
 enum OpenThermMessageType {
 	/*  Master to Slave */
-	OT_READ_DATA       = B000,
-	OT_WRITE_DATA      = B001,
-	OT_INVALID_DATA    = B010,
-	OT_RESERVED        = B011,
+	OT_READ_DATA       = 0b000,
+	OT_WRITE_DATA      = 0b001,
+	OT_INVALID_DATA    = 0b010,
+	OT_RESERVED        = 0b011,
 	/* Slave to Master */
-	OT_READ_ACK        = B100,
-	OT_WRITE_ACK       = B101,
-	OT_DATA_INVALID    = B110,
-	OT_UNKNOWN_DATA_ID = B111
+	OT_READ_ACK        = 0b100,
+	OT_WRITE_ACK       = 0b101,
+	OT_DATA_INVALID    = 0b110,
+	OT_UNKNOWN_DATA_ID = 0b111
 };
 
 enum OpenThermMessageID {
