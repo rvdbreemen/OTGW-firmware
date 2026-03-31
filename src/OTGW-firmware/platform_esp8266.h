@@ -25,6 +25,7 @@
 
 extern "C" {
   #include "user_interface.h"   // wifi_station_dhcpc_stop/start, system_get_rst_info
+  int clock_gettime(clockid_t unused, struct timespec *tp);
 }
 
 // ---- Platform name -------------------------------------------------------
@@ -178,6 +179,15 @@ inline void platformResetExceptionInfo(char *buf, size_t bufLen) {
 inline void platformRestartDHCP() {
   wifi_station_dhcpc_stop();
   wifi_station_dhcpc_start();
+}
+
+// Serial error checks (ESP8266 HardwareSerial has these; ESP32 does not)
+inline bool platformSerialHasOverrun(HardwareSerial &serial) {
+  return serial.hasOverrun();
+}
+
+inline bool platformSerialHasRxError(HardwareSerial &serial) {
+  return serial.hasRxError();
 }
 
 /***************************************************************************

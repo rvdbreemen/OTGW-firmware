@@ -53,10 +53,6 @@
  * - Do NOT expose the OTGW HTTP/WebSocket ports directly to the internet.
  */
 
-#if defined(ESP8266)
-extern "C" int clock_gettime(clockid_t unused, struct timespec *tp);
-#endif
-
 //=====[ Types ]===============================================================
 
 enum NtpStatus_t {
