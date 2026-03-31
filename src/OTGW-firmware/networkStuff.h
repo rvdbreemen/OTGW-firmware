@@ -72,9 +72,7 @@ extern NtpStatus_t       NtpStatus;
 extern time_t            NtpLastSync;
 extern OTGWWebServer     httpServer;
 extern OTGWUpdateServer  httpUpdater;
-#if defined(ESP8266)
 extern FSInfo            LittleFSinfo;
-#endif
 extern bool              LittleFSmounted;
 #define WM_DEBUG_PORT debugTelnet
 

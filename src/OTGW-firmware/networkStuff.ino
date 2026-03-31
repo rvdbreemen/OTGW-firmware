@@ -27,9 +27,7 @@ SimpleTelnet<1> debugTelnet(23);
 OTGWWebServer           httpServer(80);
 OTGWUpdateServer        httpUpdater(true);
 
-#if defined(ESP8266)
 FSInfo LittleFSinfo;
-#endif
 bool   LittleFSmounted = false;
 
 //=====[ WiFi ]================================================================
@@ -98,11 +96,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     // server sees the desired hostname. Avoid forcing a reconnect here so we
     // don't accidentally drop a working connection and fall back into the
     // WiFiManager config portal on transient failures.
-    #if defined(ESP8266)
-      String currentHostname = WiFi.hostname();
-    #elif defined(ESP32)
-      String currentHostname = String(WiFi.getHostname());
-    #endif
+    String currentHostname = platformGetHostname();
     if (currentHostname == hostname)
     {
       DebugTln(F("Wifi already connected with correct hostname, skipping hostname update."));
@@ -113,11 +107,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
               currentHostname.c_str(), hostname);
       // Update the hostname for future DHCP negotiations; the current lease
       // will typically keep using the old hostname until the next reconnect.
-      #if defined(ESP8266)
-        WiFi.hostname(hostname);
-      #elif defined(ESP32)
-        WiFi.setHostname(hostname);
-      #endif
+      platformSetHostname(hostname);
       DebugTln(F("Hostname updated; keeping existing WiFi connection active."));
     }
   }
@@ -127,11 +117,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     int directConnectTimeout = timeOut / 2;
     if (directConnectTimeout < 5) directConnectTimeout = 5;
     DebugTf(PSTR("Direct connect timeout: %d sec\r\n"), directConnectTimeout);
-    #if defined(ESP8266)
-      WiFi.hostname(hostname);  // set before begin() so DHCP sends the correct hostname
-    #elif defined(ESP32)
-      WiFi.setHostname(hostname);
-    #endif
+    platformSetHostname(hostname);  // set before begin() so DHCP sends the correct hostname
     WiFi.begin(); // use stored credentials
     DECLARE_TIMER_SEC(timeoutWifiConnectInitial, directConnectTimeout, CATCH_UP_MISSED_TICKS);
     while (WiFi.status() != WL_CONNECTED)
@@ -187,13 +173,8 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 
   // Catch-all: if the hostname still doesn't match after all connection paths,
   // force a DHCP re-announce. Mark it done so startNTP() doesn't do it again.
-  #if defined(ESP8266)
-    WiFi.hostname(hostname);
-    const char *_hn = WiFi.hostname().c_str();
-  #elif defined(ESP32)
-    WiFi.setHostname(hostname);
-    const char *_hn = WiFi.getHostname();
-  #endif
+  platformSetHostname(hostname);
+  const char *_hn = platformGetHostname();
   if (!sDhcpHostnameFixed && strcmp(_hn, hostname) != 0) {
     DebugTf(PSTR("Catch-all: hostname mismatch after connect ('%s' vs '%s'), forcing DHCP re-announce.\r\n"),
             _hn, hostname);
@@ -374,22 +355,13 @@ void startNTP()
 
   // Set hostname before configTime() — configTime() is known to reset the
   // station hostname to "ESP-XXXXXX" on some ESP8266 SDK versions.
-  #if defined(ESP8266)
-    WiFi.hostname(CSTR(settings.sHostname));
-  #elif defined(ESP32)
-    WiFi.setHostname(CSTR(settings.sHostname));
-  #endif
+  platformSetHostname(CSTR(settings.sHostname));
   configTime(0, 0, settings.ntp.sHostname, nullptr, nullptr);
   // Capture hostname immediately after configTime() to detect if the SDK
   // reset it, *before* we restore it. This drives the DHCP re-announce
   // decision below.
-  #if defined(ESP8266)
-    bool hostnameWasReset = (strcmp(WiFi.hostname().c_str(), CSTR(settings.sHostname)) != 0);
-    WiFi.hostname(CSTR(settings.sHostname));
-  #elif defined(ESP32)
-    bool hostnameWasReset = (strcmp(WiFi.getHostname(), CSTR(settings.sHostname)) != 0);
-    WiFi.setHostname(CSTR(settings.sHostname));
-  #endif
+  bool hostnameWasReset = (strcmp(platformGetHostname(), CSTR(settings.sHostname)) != 0);
+  platformSetHostname(CSTR(settings.sHostname));
 
   // If configTime() did reset the hostname, the DHCP lease may have been
   // re-announced with the wrong name.  Force a DHCP re-announce once so the
@@ -491,18 +463,9 @@ const char* getMacAddress()
 {
   static char baseMacChr[13] = {0};
   uint8_t baseMac[6];
-#if defined(ESP8266)
-  WiFi.macAddress(baseMac);
+  platformGetMacAddress(baseMac);
   snprintf_P(baseMacChr, sizeof(baseMacChr), PSTR("%02X%02X%02X%02X%02X%02X"),
              baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
-#elif defined(ESP32)
-  esp_efuse_mac_get_default(baseMac);
-  snprintf_P(baseMacChr, sizeof(baseMacChr), PSTR("%02X%02X%02X%02X%02X%02X"),
-             baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
-#else
-  snprintf_P(baseMacChr, sizeof(baseMacChr), PSTR("%02X%02X%02X%02X%02X%02X"),
-             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-#endif
   return baseMacChr;
 }
 
