@@ -370,6 +370,9 @@ function parseGatewayModeValue(modeValue) {
   if (normalized === 'detecting') {
     return 'detecting';
   }
+  if (normalized === 'n/a') {
+    return 'unavailable';
+  }
   return null;
 }
 
@@ -378,6 +381,7 @@ function formatGatewayModeDisplayValue(modeValue) {
   if (parsedMode === 'gateway') return 'Gateway';
   if (parsedMode === 'monitor') return 'Monitor';
   if (parsedMode === 'detecting') return 'Detecting...';
+  if (parsedMode === 'unavailable') return 'N/A';
   return modeValue;
 }
 
