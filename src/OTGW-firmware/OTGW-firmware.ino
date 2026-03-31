@@ -392,7 +392,8 @@ void doTaskEvery60s(){
 
   // Query gateway mode from PIC — non-blocking, queues PR=M.
   // State update + MQTT publish handled by handlePRresponse() when response arrives.
-  if (state.pic.bAvailable && state.otgw.bOnline) {
+  // Only gateway firmware supports PR=M; no dependency on OT bus traffic.
+  if (isPICEnabled() && isGatewayFirmware()) {
     queryOTGWgatewaymode();
   }
 
