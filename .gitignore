@@ -45,3 +45,4 @@ other-projects/*
 other-projects/.gitignore
 discord_backlog_last_checkted.txt
 .claude/discord_backlog_last_checked.txt
+other-projects/*
