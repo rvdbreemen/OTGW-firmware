@@ -410,19 +410,13 @@ enum OTSpecCompatMode : uint8_t {
 
 // Default behavior:
 // - AUTO keeps pre-v4.2 compatibility until a 4.x OpenTherm version is detected,
-//   then applies v4.x reserved-ID rules (IDs 50-55 and 58-69).
-// Note: IDs 56 (TdhwSet) and 57 (MaxTSet) are valid in OpenTherm v4.2 and are NOT
-// reserved; only IDs 50-55 and 58-69 are reserved/legacy in v4.x mode.
+//   then applies v4.x reserved-ID rules (notably IDs 50-63).
 static OTSpecCompatMode gOTSpecCompatMode = OT_SPEC_COMPAT_AUTO;
 
 //===================[ OT Spec Profile Helpers ]====================
-// Returns true for IDs that were pre-v4.2 parameter IDs but are reserved/redefined
-// in OpenTherm v4.x. Per OpenTherm v4.2 spec, the reserved ranges are 50-55 and
-// 58-69. IDs 56 (TdhwSet) and 57 (MaxTSet) remain valid in v4.2 and must NOT be
-// included here.
 static bool isLegacyPreV42CompatibilityId(uint8_t msgid)
 {
-  return (msgid >= 50U && msgid <= 55U) || (msgid >= 58U && msgid <= 69U);
+  return (msgid >= 50U && msgid <= 63U);
 }
 
 static bool useV4xReservedIdRules()
@@ -1173,13 +1167,8 @@ const char *byte_to_binary(int x)
   Rules are:
   - if the message is overriden (R and A messages override B and T messages), then the value is not valid for use.
   - if the OT message is a READ message, and the received OT msg is being read and acknowledged, then the value is valid.
-  - if the OT message is a WRITE message, and the received OT msg is being written (OT_WRITE_DATA) or
-    write-acknowledged by the slave (OT_WRITE_ACK), then the value is valid. The slave's WRITE-ACK may contain a
-    different (e.g., clamped) value than the master's WRITE-DATA request, so both are captured.
-    This also enables source-separated MQTT topics: WRITE-DATA publishes to the thermostat source,
-    WRITE-ACK publishes to the boiler source.
-  - if the OT message is a READ/WRITE message, and receive OT msg is being read and acknowledged, written, or
-    write-acknowledged by the slave (OT_WRITE_ACK), then the value is valid.
+  - if the OT message is a WRITE message, and the received OT msg is being written (OT_WRITE_DATA), then the value is valid.
+  - if the OT message is a READ/WRITE message, and receive OT msg is being read and ackownledge, or, is being written, then the value is valid.
   - if the OT message is a status message (from Heating, HAVC or Solar), then the message is always valid.
 */
 bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
@@ -1187,8 +1176,8 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   if (isMsgIdReservedInActiveProfile(OT.id)) return false;
   bool _valid = false;
   _valid = _valid || (OTlookup.msgcmd==OT_READ && OT.type==OT_READ_ACK);
-  _valid = _valid || (OTlookup.msgcmd==OT_WRITE && (OT.type==OT_WRITE_DATA || OT.type==OT_WRITE_ACK));
-  _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OT.type==OT_WRITE_DATA || OT.type==OT_WRITE_ACK));
+  _valid = _valid || (OTlookup.msgcmd==OT_WRITE && OT.type==OT_WRITE_DATA);
+  _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OT.type==OT_WRITE_DATA));
   _valid = _valid || (OT.id==OT_Statusflags) || (OT.id==OT_StatusVH) || (OT.id==OT_SolarStorageMaster);;
   return _valid;
 }

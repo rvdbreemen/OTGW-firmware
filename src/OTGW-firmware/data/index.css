@@ -581,23 +581,6 @@
 
   .input-changed { background: lightgray; }
   .input-normal { background: white; }
-  .input-readonly { background: #f0f0f0; color: #666; }
-
-  .btn-wifi-reset {
-    margin-left: 8px;
-    padding: 4px 10px;
-    background: #e57373;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-    transition: background 0.2s;
-  }
-
-  .btn-wifi-reset:hover {
-    background: #c62828;
-  }
 
   /*
   ***************************************************************************

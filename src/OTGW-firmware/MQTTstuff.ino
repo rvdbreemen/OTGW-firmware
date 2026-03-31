@@ -932,11 +932,11 @@ void PrintMQTTError(){
   json:   <string> , payload to send
   retain: <bool> , retain mqtt message  
 */
-void sendMQTTData(const char* topic, const char *json, const bool retain)
+void sendMQTTData(const char* topic, const char *json, const bool retain) 
 {
   if (!settings.mqtt.bEnable) return;
   if (!mqttPublishAllowed) return;
-  if (!MQTTclient.connected()) { return; }  // handleMQTT() logs disconnect and manages reconnect
+  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
   if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
   
   // Check heap health before publishing
@@ -975,7 +975,7 @@ void sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
 {
   if (!settings.mqtt.bEnable) return;
   if (!mqttPublishAllowed) return;
-  if (!MQTTclient.connected()) { return; }  // handleMQTT() logs disconnect and manages reconnect
+  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;}
   if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;}
   if (!canPublishMQTT()) return;
 
@@ -1058,10 +1058,10 @@ void sendMQTT(const char* topic, const char *json) {
   sendMQTTStreaming(topic, json, strlen(json));
 }
 
-void sendMQTTStreaming(const char* topic, const char *json, const size_t len)
+void sendMQTTStreaming(const char* topic, const char *json, const size_t len) 
 {
   if (!settings.mqtt.bEnable) return;
-  if (!MQTTclient.connected()) { return; }  // handleMQTT() logs disconnect and manages reconnect
+  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
   if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
   
   // Check heap health before publishing
@@ -1157,8 +1157,8 @@ static bool resolveSourceIndex(byte rsptype, uint8_t &sourceIndex) {
   switch (rsptype) {
     case OTGW_THERMOSTAT:        sourceIndex = 0; return true;
     case OTGW_BOILER:            sourceIndex = 1; return true;
-    case OTGW_ANSWER_THERMOSTAT: sourceIndex = 1; return true;  // OTGW answers as boiler — value is boiler-side
-    case OTGW_REQUEST_BOILER:    sourceIndex = 2; return true;  // OTGW requests for itself — gateway source
+    case OTGW_REQUEST_BOILER:
+    case OTGW_ANSWER_THERMOSTAT: sourceIndex = 2; return true;
     default: return false;
   }
 }

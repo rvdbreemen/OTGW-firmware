@@ -18,6 +18,7 @@
 
 NtpStatus_t NtpStatus  = TIME_NOTSET;
 time_t      NtpLastSync = 0;
+static bool sDhcpHostnameFixed = false;  // set once after any DHCP restart to prevent double-announce
 
 // Debug telnet instance (port 23). SimpleTelnet replaces ESPTelnet for debug output.
 // Port is fixed in the constructor; begin() needs no port argument.
@@ -239,13 +240,6 @@ void loopWifi() {
               wifiRetryCount + 1,
               CSTR(settings.sHostname));
       WiFi.hostname(CSTR(settings.sHostname));
-      // Explicitly (re-)enable DHCP before reconnecting.  WiFi.begin() with no
-      // arguments only calls wifi_station_connect() — it does NOT call
-      // wifi_station_dhcpc_start().  This call ensures a fresh DHCP DISCOVER
-      // is sent on every reconnection, which is required after a router reboot
-      // so the device does not try to renew a stale lease that the router no
-      // longer has.  See issue #525 and ADR-047.
-      wifi_station_dhcpc_start();
       WiFi.begin();  // uses stored credentials
       RESTART_TIMER(timerWifiRetry);
       wifiState = WIFI_CONNECTING;
@@ -267,16 +261,13 @@ void loopWifi() {
       break;
 
     case WIFI_RECONNECTED:
-      // The hostname was already set in WIFI_DISCONNECTED before WiFi.begin(),
-      // and wifi_station_dhcpc_start() was called there too — so the DHCP
-      // negotiation already used the correct hostname.
-      // Do NOT call wifi_station_dhcpc_stop/start here: the SDK requires
-      // dhcpc_start only when the station is NOT connected, and calling it
-      // while connected temporarily resets the IP to 0.0.0.0.  That causes
-      // WIFI_IDLE to mistake the in-progress DHCP renewal for a disconnect,
-      // which triggers a new WiFi.begin() cycle that never re-enables DHCP,
-      // leaving the device associated at the WiFi layer but with no IP address.
+      // Match the startup path: re-apply the configured hostname and force a
+      // DHCP re-announce so the renewed lease uses the expected name.
       WiFi.hostname(CSTR(settings.sHostname));
+      DebugTf(PSTR("WiFi: reconnected, re-announcing DHCP lease for hostname [%s]\r\n"),
+              CSTR(settings.sHostname));
+      wifi_station_dhcpc_stop();
+      wifi_station_dhcpc_start();
       startTelnet();
       startOTGWstream();
       startMQTT();
@@ -420,22 +411,14 @@ void loopNTP()
   switch (NtpStatus) {
     case TIME_NOTSET:
     case TIME_NEEDSYNC:
-      // Guard: only store a valid timestamp as the sync baseline. If time() still
-      // returns the SDK bogus initial value (0xFFFFFFFF = year 2106) or a small
-      // pre-epoch value, use 0 instead. This prevents NtpLastSync from being
-      // poisoned to 4294967295, which would make the TIME_WAITFORSYNC check
-      //   (now >= NtpLastSync)  always fail once real NTP time arrives.
-      NtpLastSync = ((now > EPOCH_2000_01_01) && (now < EPOCH_2038_01_19)) ? now : 0;
+      NtpLastSync = now;
       DebugTln(F("Start time syncing"));
       startNTP();
       DebugTf(PSTR("Starting timezone lookup for [%s]\r\n"), CSTR(settings.ntp.sTimezone));
       NtpStatus = TIME_WAITFORSYNC;
       break;
     case TIME_WAITFORSYNC:
-      // Guard: ESP8266 SDK initialises time() to 0xFFFFFFFF (year 2106) before
-      // SNTP sync. That value passes the lower-bound check alone, so we also
-      // require an upper bound to reject the bogus SDK initial value.
-      if ((now > EPOCH_2000_01_01) && (now < EPOCH_2038_01_19) && (now >= NtpLastSync)) {
+      if ((now > EPOCH_2000_01_01) && (now >= NtpLastSync)) {
         NtpLastSync = now;
         TimeZone myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
         if (myTz.isError()) {
