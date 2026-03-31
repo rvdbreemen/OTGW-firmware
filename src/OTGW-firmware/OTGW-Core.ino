@@ -587,7 +587,7 @@ void triggerPICsettingsReadout() {
   Skips all queries when PIC is unavailable, offline, or flashing is in progress.
 */
 void queryNextPICsetting() {
-  if (!state.pic.bAvailable || !state.otgw.bOnline) return;
+  if (!isPICEnabled() || !isGatewayFirmware()) return;
   if (state.flash.bESPactive || state.flash.bPICactive) return;
 
   const uint8_t idx = picSettingsQueryIdx;

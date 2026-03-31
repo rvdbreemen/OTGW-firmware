@@ -743,7 +743,7 @@ void sendDeviceInfoV2()
   if (isPICEnabled()) {
     sendJsonMapEntry(F("thermostatconnected"), state.otgw.bThermostatState);
     sendJsonMapEntry(F("boilerconnected"), state.otgw.bBoilerState);
-    sendJsonMapEntry(F("otgwmode"), state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
+    sendJsonMapEntry(F("otgwmode"), !isGatewayFirmware() ? "N/A" : state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
     sendJsonMapEntry(F("otgwconnected"), state.otgw.bOnline);
   }
   sendJsonMapEntry(F("otgwsimulation"), state.debug.bOTGWSimulation);
