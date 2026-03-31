@@ -487,6 +487,9 @@ extern bool     mqttPublishAllowed;        // MQTT interval gate — managed via
 uint16_t getMsgLastUpdated(uint8_t msgId); // rolling seconds-since-boot for REST last-updated fields (0 when unseen)
 void requestMQTTRepublishAll();            // reset MQTT publish eligibility so next observed values publish as first-seen again
 void requestMQTTStatusRepublish();         // force the next observed master/slave status frames to republish
+void confirmMQTTPublishSlot();             // confirm pending throttle slot update after successful MQTT publish
+void confirmMQTTPublishBitSlot();          // confirm pending status-bit slot update after successful MQTT publish
+void confirmMQTTPublishByteSlot();         // confirm pending status-byte slot update after successful MQTT publish
 
 // RAII guard for the MQTT publish gate. Saves/restores mqttPublishAllowed on scope exit
 // so nested or interrupted gate operations can never leave the gate stuck false.
