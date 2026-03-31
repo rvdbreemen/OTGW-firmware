@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.3.3
+**  Version  : v1.3.4-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3593,10 +3593,8 @@ static void decodeAndPublishOTValue()
 void processOT(const char *buf, int len){
   static time_t epochBoilerlastseen = 0;
   static time_t epochThermostatlastseen = 0;
-  static time_t epochGatewaylastseen = 0;
   static bool bOTGWboilerpreviousstate = false;
   static bool bOTGWthermostatpreviousstate = false;
-  static bool bOTGWgatewaypreviousstate = false;
   static bool bOTGWpreviousstate = false;
   time_t now = time(nullptr);
 
@@ -3624,10 +3622,8 @@ void processOT(const char *buf, int len){
       epochThermostatlastseen = now;
       OTdata.rsptype = OTGW_THERMOSTAT;
     } else if (buf[0]=='R')    {
-      epochGatewaylastseen = now;
       OTdata.rsptype = OTGW_REQUEST_BOILER;
     } else if (buf[0]=='A')    {
-      epochGatewaylastseen = now;
       OTdata.rsptype = OTGW_ANSWER_THERMOSTAT;
     } else if (buf[0]=='E')    {
       OTdata.rsptype = OTGW_PARITY_ERROR;
@@ -3647,13 +3643,8 @@ void processOT(const char *buf, int len){
       bOTGWthermostatpreviousstate = state.otgw.bThermostatState;
     }
     
-    // Gateway mode is now detected via PR=M command in doTaskEvery30s()
-    // We still track gateway message activity (R/A messages) for online status detection
-    // but don't use it to determine gateway mode anymore
-    bool bOTGWgatewayactive = (now < (epochGatewaylastseen+30));
-
-    //If both (Boiler and Thermostat and Gateway) are offline, then the OTGW is considered offline as a whole.
-    state.otgw.bOnline = (state.otgw.bBoilerState && state.otgw.bThermostatState) || (state.otgw.bBoilerState && bOTGWgatewayactive);
+    //OpenTherm is active when at least one side (boiler or thermostat) is communicating on the bus.
+    state.otgw.bOnline = state.otgw.bBoilerState || state.otgw.bThermostatState;
     if ((state.otgw.bOnline != bOTGWpreviousstate) || (cntOTmessagesprocessed==1)){
       if (isPICEnabled()) {
         sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otgw.bOnline));
