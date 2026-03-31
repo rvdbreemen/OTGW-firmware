@@ -204,6 +204,17 @@ inline void platformRestartDHCP() {
   WiFi.reconnect();
 }
 
+// Serial error checks (ESP32 HardwareSerial does not expose overrun/rx error)
+inline bool platformSerialHasOverrun(HardwareSerial &serial) {
+  (void)serial;
+  return false;
+}
+
+inline bool platformSerialHasRxError(HardwareSerial &serial) {
+  (void)serial;
+  return false;
+}
+
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a
