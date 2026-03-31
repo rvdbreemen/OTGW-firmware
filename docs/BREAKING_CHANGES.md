@@ -4,6 +4,12 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ---
 
+## 🛑 v1.3.3
+
+There are **no breaking changes** in `v1.3.3`. This release adds PIC-less OTGW support and fixes dashboard display of unsupported OT values. All MQTT topics, REST API endpoints, settings format, and ser2net behavior remain identical to `v1.3.2`.
+
+---
+
 ## 🛑 v1.3.2
 
 There are **no breaking changes** in `v1.3.2`. This is a bugfix release for the file explorer. All MQTT topics, REST API endpoints, settings format, and ser2net behavior remain identical to `v1.3.1`.
