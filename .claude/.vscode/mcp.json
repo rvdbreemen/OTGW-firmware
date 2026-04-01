@@ -1,4 +1,12 @@
 {
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "discord-token",
+      "description": "Discord Bot Token",
+      "password": true
+    }
+  ],
   "servers": {
     "backlog": {
       "type": "stdio",
@@ -6,6 +14,14 @@
       "args": ["mcp", "start"],
       "env": {
         "BACKLOG_CWD": "${workspaceFolder}"
+      }
+    },
+    "discord": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["mcp-discord"],
+      "env": {
+        "DISCORD_TOKEN": "${input:discord-token}"
       }
     }
   }
