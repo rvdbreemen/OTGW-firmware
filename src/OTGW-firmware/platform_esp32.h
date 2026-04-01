@@ -25,6 +25,7 @@
 #include <LittleFS.h>
 #include <esp_system.h>
 #include <esp_mac.h>
+#include <esp_netif.h>
 
 // ---- Platform name -------------------------------------------------------
 #define PLATFORM_NAME "ESP32"
@@ -72,6 +73,16 @@ inline bool platformFSInfo(FSInfo &info) {
 // Core/SDK version
 inline const char* platformCoreVersion() {
   return ESP.getSdkVersion();
+}
+
+// SDK version
+inline const char* platformSdkVersion() {
+  return ESP.getSdkVersion();
+}
+
+// CPU frequency
+inline uint32_t platformCpuFreqMHz() {
+  return ESP.getCpuFreqMHz();
 }
 
 // MAC address
@@ -197,11 +208,14 @@ inline void platformResetExceptionInfo(char *buf, size_t bufLen) {
   buf[0] = '\0';
 }
 
-// DHCP restart — ESP32 doesn't expose low-level DHCP controls the same way;
-// disconnect + reconnect achieves the same re-announce effect.
+// DHCP restart — use esp_netif API to restart only the DHCP client without
+// dropping the WiFi association (mirrors ESP8266's wifi_station_dhcpc_stop/start).
 inline void platformRestartDHCP() {
-  WiFi.disconnect(false);  // keep credentials
-  WiFi.reconnect();
+  esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+  if (netif) {
+    esp_netif_dhcpc_stop(netif);
+    esp_netif_dhcpc_start(netif);
+  }
 }
 
 // Serial error checks (ESP32 HardwareSerial does not expose overrun/rx error)
