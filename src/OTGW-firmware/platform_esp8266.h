@@ -68,6 +68,16 @@ inline void platformGetMacAddress(uint8_t *mac) {
   WiFi.macAddress(mac);
 }
 
+// SDK version
+inline const char* platformSdkVersion() {
+  return ESP.getSdkVersion();
+}
+
+// CPU frequency
+inline uint32_t platformCpuFreqMHz() {
+  return ESP.getCpuFreqMHz();
+}
+
 // Chip identity
 inline uint32_t platformChipId() {
   return ESP.getChipId();

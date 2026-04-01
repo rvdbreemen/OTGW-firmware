@@ -44,6 +44,13 @@ public:
   }
 #endif
 
+#if defined(ESP32)
+  ~PlatformDir() {
+    if (_entry) _entry.close();
+    if (_dirFile) _dirFile.close();
+  }
+#endif
+
   bool valid() {
 #if defined(ESP8266)
     return true;  // ESP8266 Dir is always valid; empty dir has no entries
@@ -56,6 +63,7 @@ public:
 #if defined(ESP8266)
     return _dir.next();
 #elif defined(ESP32)
+    if (_entry) _entry.close();  // close previous entry before opening next
     _entry = _dirFile.openNextFile();
     return (bool)_entry;
 #endif
@@ -65,7 +73,10 @@ public:
 #if defined(ESP8266)
     return _dir.fileName();
 #elif defined(ESP32)
-    return String(_entry.name());
+    // ESP32 File::name() returns full path; strip to basename for consistency
+    const char* name = _entry.name();
+    const char* slash = strrchr(name, '/');
+    return String(slash ? slash + 1 : name);
 #endif
   }
 
