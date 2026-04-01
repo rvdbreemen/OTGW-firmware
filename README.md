@@ -4,16 +4,21 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 “devkit” that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-## 🚀 What's New in v1.3.3
+## 🚀 What's New in v1.3.4
 
-Version 1.3.3 adds PIC-less OTGW support and fixes the dashboard showing empty values for unsupported OpenTherm message IDs. Full release notes: [RELEASE_NOTES_1.3.3.md](RELEASE_NOTES_1.3.3.md)
+Version 1.3.4 fixes MQTT throttle slot suppression, adds Debug Info tooltips, renames "OTGW Connected" to "OpenTherm Active", and adds thermostat-only MQTT support. Full release notes: [RELEASE_NOTES_1.3.4.md](RELEASE_NOTES_1.3.4.md)
 
 ### Highlights
 
-- **PIC-less OTGW support:** All PIC functions automatically disabled when no PIC is detected at boot. Auto-recovery via banner detection. REST API returns 503, UI hides PIC elements.
-- **Dashboard shows only active OT values:** Unsupported or never-queried message IDs no longer appear with empty or zero values.
-- **Gateway mode and label fixes:** Non-gateway firmware shows "N/A"; misleading "Home Assistant Integration" label corrected to "OTGW Connected".
-- **No breaking changes** vs v1.3.2.
+- **MQTT throttle slot fix:** Stable values like Room Temperature could become permanently suppressed after a transient publish failure. Now only updated after successful publish.
+- **Debug Information page tooltips:** Tooltips now visible on hover for device info labels.
+- **Renamed "OTGW Connected" to "OpenTherm Active":** Clearer label with updated tooltip.
+- **Thermostat-only MQTT support:** OTGW stays online via MQTT when only a thermostat is connected (boiler not required).
+- **No breaking changes** vs v1.3.3.
+
+## What was new in v1.3.3
+
+Version 1.3.3 adds PIC-less OTGW support and fixes the dashboard showing empty values for unsupported OpenTherm message IDs. Full release notes: [RELEASE_NOTES_1.3.3.md](RELEASE_NOTES_1.3.3.md)
 
 ## What was new in v1.3.2
 
