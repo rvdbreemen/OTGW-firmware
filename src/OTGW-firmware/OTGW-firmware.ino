@@ -144,7 +144,7 @@ void setup() {
   // Set hostname ASAP after loading settings.  WiFi.persistent(true) from a
   // previous boot lets the SDK auto-connect before startWiFi() is reached;
   // without this early call the DHCP request carries the default "ESP-XXXXXX".
-  WiFi.hostname(CSTR(settings.sHostname));
+  platformSetHostname(CSTR(settings.sHostname));
 
   // Connect to and initialise WiFi network
   setLed(LED1, ON);
@@ -232,7 +232,7 @@ void loopWifi() {
       DebugTf(PSTR("WiFi: reconnect attempt %d starting for hostname [%s]\r\n"),
               wifiRetryCount + 1,
               CSTR(settings.sHostname));
-      WiFi.hostname(CSTR(settings.sHostname));
+      platformSetHostname(CSTR(settings.sHostname));
       WiFi.begin();  // uses stored credentials
       RESTART_TIMER(timerWifiRetry);
       wifiState = WIFI_CONNECTING;
@@ -256,7 +256,7 @@ void loopWifi() {
     case WIFI_RECONNECTED:
       // Match the startup path: re-apply the configured hostname and force a
       // DHCP re-announce so the renewed lease uses the expected name.
-      WiFi.hostname(CSTR(settings.sHostname));
+      platformSetHostname(CSTR(settings.sHostname));
       DebugTf(PSTR("WiFi: reconnected, re-announcing DHCP lease for hostname [%s]\r\n"),
               CSTR(settings.sHostname));
       platformRestartDHCP();

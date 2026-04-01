@@ -715,8 +715,8 @@ void sendDeviceInfoV2()
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%06X"), (unsigned int)platformChipId());
   sendJsonMapEntry(F("chipid"), cMsg);
   sendJsonMapEntry(F("coreversion"), platformCoreVersion());
-  sendJsonMapEntry(F("sdkversion"),  ESP.getSdkVersion());
-  sendJsonMapEntry(F("cpufreq"), ESP.getCpuFreqMHz());
+  sendJsonMapEntry(F("sdkversion"),  platformSdkVersion());
+  sendJsonMapEntry(F("cpufreq"), platformCpuFreqMHz());
   sendJsonMapEntry(F("sketchsize"), platformSketchSize() );
   sendJsonMapEntry(F("freesketchspace"),  platformFreeSketchSpace() );
 

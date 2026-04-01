@@ -168,7 +168,7 @@ private:
       }
     } else {
       _uploadTarget = "firmware";
-      uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+      uint32_t maxSketchSpace = (platformFreeSketchSpace() - 0x1000) & 0xFFFFF000;
       if (_serial_output) {
         DebugTf(PSTR("[OTA] Target: firmware (%u bytes)\r\n"), static_cast<unsigned>(maxSketchSpace));
       }
