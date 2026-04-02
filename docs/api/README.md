@@ -242,7 +242,23 @@ Update a single device setting.
 - `401` - Authentication required
 - `403` - CSRF protection: invalid origin
 
-**Known setting names**: `hostname`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `ledblink`, `darktheme`, `ui_autoscroll`, `ui_timestamps`, `ui_capture`, `ui_autoscreenshot`, `ui_autodownloadlog`, `ui_autoexport`, `ui_graphtimewindow`, `gpiosensorsenabled`, `gpiosensorslegacyformat`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterdebouncetime`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `httppasswd`
+**Known setting names**: `hostname`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `ledblink`, `darktheme`, `ui_autoscroll`, `ui_timestamps`, `ui_capture`, `ui_autoscreenshot`, `ui_autodownloadlog`, `ui_autoexport`, `ui_graphtimewindow`, `gpiosensorsenabled`, `gpiosensorslegacyformat`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterdebouncetime`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `httppasswd`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satdeadband`, `satinterval`, `satexternaltemp`, `satpresetcomfort`, `satpreseteco`, `satpresetaway`, `satpwmautoswitch`
+
+**SAT setting details**:
+
+| Setting | Type | Range | Default | Description |
+|---------|------|-------|---------|-------------|
+| `satenabled` | bool | - | `false` | Enable/disable SAT controller |
+| `satsystem` | int | 0-1 | `0` | Heating system (0=radiator, 1=underfloor) |
+| `sattargettemp` | float | 5-30 | `20.0` | Target room temperature (°C) |
+| `satcoefficient` | float | 0-5 | `1.5` | Heating curve coefficient |
+| `satdeadband` | float | 0-2 | `0.25` | PID deadband (°C) |
+| `satinterval` | int | 10-300 | `30` | Control loop interval (seconds) |
+| `satexternaltemp` | bool | - | `false` | Prefer external indoor sensor over OT bus |
+| `satpresetcomfort` | float | 15-28 | `21.0` | Comfort preset temperature (°C) |
+| `satpreseteco` | float | 10-22 | `18.0` | Eco preset temperature (°C) |
+| `satpresetaway` | float | 5-18 | `15.0` | Away preset temperature (°C) |
+| `satpwmautoswitch` | bool | - | `true` | Auto-switch between PWM/continuous mode |
 
 ---
 
@@ -634,6 +650,146 @@ Triggers a test webhook call to verify the configured webhook URL is reachable.
 
 ---
 
+### SAT (Smart Autotune Thermostat)
+
+The SAT endpoints provide access to the embedded smart heating controller. SAT runs entirely on the ESP — these endpoints are for monitoring state and pushing external inputs.
+
+#### `GET /api/v2/sat/status`
+
+Returns the full SAT runtime state including temperatures, PID terms, cycle data, and safety status.
+
+**Authentication**: Required (when password is configured)
+
+**Response** `200 OK`:
+```json
+{
+  "enabled": true,
+  "active": true,
+  "control_mode": 1,
+  "boiler_status": 3,
+  "target_temp": 21.0,
+  "room_temp": 20.5,
+  "outside_temp": 8.0,
+  "heating_curve": 42.3,
+  "pid_output": 43.1,
+  "final_setpoint": 43.1,
+  "error": 0.50,
+  "pid_p": 0.82,
+  "pid_i": 0.03,
+  "pid_d": -0.04,
+  "kp": 1.6350,
+  "ki": 0.000195,
+  "kd": 960.60,
+  "coefficient": 1.5,
+  "deadband": 0.25,
+  "cycle_count": 12,
+  "last_cycle_class": 1,
+  "cycle_max_flow": 45.2,
+  "cycle_overshoot_sec": 0,
+  "pwm_duty": 0.00,
+  "pwm_flame_req": false,
+  "heating_system": 0,
+  "external_temp_valid": false,
+  "external_outdoor_valid": false,
+  "safety_tripped": false
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `enabled` | boolean | Whether SAT is enabled in settings |
+| `active` | boolean | Whether SAT is actively controlling |
+| `control_mode` | integer | 0=Off, 1=Continuous, 2=PWM |
+| `boiler_status` | integer | Boiler status enum (0-14, see below) |
+| `target_temp` | float | Desired room temperature (°C) |
+| `room_temp` | float | Current room temperature (°C, from OT bus or external sensor) |
+| `outside_temp` | float | Current outside temperature (°C, from OT bus or external sensor) |
+| `heating_curve` | float | Calculated heating curve setpoint (°C) |
+| `pid_output` | float | PID output = curve + P + I + D (°C) |
+| `final_setpoint` | float | Setpoint sent to boiler after mode/clamp (°C) |
+| `error` | float | PID error = target - room temp (°C) |
+| `pid_p` | float | Proportional term |
+| `pid_i` | float | Integral term |
+| `pid_d` | float | Derivative term |
+| `kp` | float | Current Kp gain |
+| `ki` | float | Current Ki gain |
+| `kd` | float | Current Kd gain |
+| `coefficient` | float | Heating curve coefficient setting |
+| `deadband` | float | PID deadband setting (°C) |
+| `cycle_count` | integer | Total completed flame cycles |
+| `last_cycle_class` | integer | 0=None, 1=Good, 2=Overshoot, 3=Underheat, 4=Short, 5=Uncertain |
+| `cycle_max_flow` | float | Maximum flow temp in last cycle (°C) |
+| `cycle_overshoot_sec` | float | Seconds flow temp exceeded setpoint+margin in last cycle |
+| `pwm_duty` | float | PWM duty cycle (0.0–1.0) |
+| `pwm_flame_req` | boolean | Whether PWM is requesting flame |
+| `heating_system` | integer | 0=Radiator, 1=Underfloor |
+| `external_temp_valid` | boolean | Whether an external indoor sensor is active |
+| `external_outdoor_valid` | boolean | Whether an external outdoor sensor is active |
+| `safety_tripped` | boolean | Whether safety shutdown is active |
+
+**Boiler status values**: 0=Off, 1=Idle, 2=Preheating, 3=At Setpoint, 4=Modulating Up, 5=Modulating Down, 6=Ignition Surge, 7=Stalled Ignition, 8=Anti-Cycling, 9=Pump Starting, 10=Waiting Flame, 11=Overshoot Cooling, 12=Post-Cycle, 13=Heating, 14=Cooling
+
+#### `POST /api/v2/sat/target`
+
+Set the SAT target room temperature. Persists to flash via deferred settings write.
+
+**Authentication**: Required (when password is configured)
+
+**Request body**: Raw value or JSON:
+```
+21.5
+```
+or:
+```json
+{"value": "21.5"}
+```
+
+**Valid range**: 5.0–30.0 °C
+
+**Response** `200 OK`:
+```json
+{"status": "ok"}
+```
+
+#### `POST /api/v2/sat/externaltemp`
+
+Push an external indoor temperature reading (e.g., from a more accurate room sensor). The reading expires after 5 minutes if not refreshed, falling back to the OT bus room temperature.
+
+**Authentication**: Required (when password is configured)
+
+**Request body**: Raw value or JSON:
+```
+20.8
+```
+or:
+```json
+{"value": "20.8"}
+```
+
+**Valid range**: -50.0–100.0 °C
+
+**Response** `200 OK`:
+```json
+{"status": "ok"}
+```
+
+#### `POST /api/v2/sat/externaloutdoor`
+
+Push an external outdoor temperature reading. Expires after 10 minutes if not refreshed, falling back to the OT bus outdoor temperature.
+
+**Authentication**: Required (when password is configured)
+
+**Request body**: Same format as `externaltemp`.
+
+**Valid range**: -50.0–100.0 °C
+
+**Response** `200 OK`:
+```json
+{"status": "ok"}
+```
+
+---
+
 ### Non-API Routes
 
 These routes are served directly by the web server (not under `/api`):
@@ -851,6 +1007,34 @@ curl -X POST http://otgw.local/api/v2/simulate/start
 
 ```bash
 curl -X POST "http://otgw.local/api/v2/webhook/test?state=on"
+```
+
+### Get SAT Status
+
+```bash
+curl http://otgw.local/api/v2/sat/status
+```
+
+### Set SAT Target Temperature
+
+```bash
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"value":"21.5"}' \
+  http://otgw.local/api/v2/sat/target
+```
+
+### Push External Room Temperature to SAT
+
+```bash
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"value":"20.8"}' \
+  http://otgw.local/api/v2/sat/externaltemp
+```
+
+### Push External Outdoor Temperature to SAT
+
+```bash
+curl -X POST -d "8.5" http://otgw.local/api/v2/sat/externaloutdoor
 ```
 
 ## Integration Examples

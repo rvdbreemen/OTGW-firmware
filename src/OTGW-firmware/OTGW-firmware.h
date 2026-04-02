@@ -150,6 +150,21 @@ void evalWebhook();
 bool checkHttpAuth();  // HTTP Basic Auth guard (ADR-054; defined in restAPI.ino)
 extern bool picSettingsCycleActive;  // PIC settings readout cycle flag (OTGW-Core.ino)
 
+// SAT (Smart Autotune Thermostat) forward declarations — defined in SATcontrol.ino, SATpid.ino, SATcycles.ino
+void initSAT();
+void satControlLoop();
+void satPublishMQTT();
+bool satHandleExternalTemp(const char* value);
+bool satHandleExternalOutdoor(const char* value);
+bool satHandleTargetTemp(const char* value);
+void satHandleEnabled(const char* value);
+void satDisable();
+void satHandleControlMode(const char* value);
+void satCycleOnFlameChange(bool flameOn);
+void satSendStatusJSON();
+uint32_t satCycleGetFlameOnStartMs();
+uint32_t satCycleGetFlameOffStartMs();
+
 //===================[ Runtime State — transient, never persisted (ADR-051) ]===================
 // Sub-section structs for OTGWState — groups runtime state by system component.
 // Hungarian prefixes: b=bool, s=string/char[], i=int/uint, f=float
@@ -226,6 +241,55 @@ struct PicSettingsSection {    // state.picSettings — settings polled from PIC
   char sVoltageRef[4]         = "";  // PR=V: voltage reference setting (numeric)
 };
 
+//--- SAT runtime enums and state ---
+enum SATControlMode : uint8_t { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS, SAT_MODE_PWM };
+enum SATCycleClass  : uint8_t {
+  SAT_CYCLE_NONE = 0, SAT_CYCLE_GOOD, SAT_CYCLE_OVERSHOOT,
+  SAT_CYCLE_UNDERHEAT, SAT_CYCLE_SHORT, SAT_CYCLE_UNCERTAIN
+};
+enum SATBoilerStatus : uint8_t {
+  SAT_BS_OFF = 0, SAT_BS_IDLE, SAT_BS_PREHEATING, SAT_BS_AT_SETPOINT,
+  SAT_BS_MODULATING_UP, SAT_BS_MODULATING_DOWN, SAT_BS_IGNITION_SURGE,
+  SAT_BS_STALLED_IGNITION, SAT_BS_ANTI_CYCLING, SAT_BS_PUMP_STARTING,
+  SAT_BS_WAITING_FLAME, SAT_BS_OVERSHOOT_COOLING, SAT_BS_POST_CYCLE,
+  SAT_BS_HEATING, SAT_BS_COOLING
+};
+
+struct SATRuntimeSection {         // state.sat — SAT thermostat controller state
+  bool            bActive        = false;
+  SATControlMode  eControlMode   = SAT_MODE_OFF;
+  SATBoilerStatus eBoilerStatus  = SAT_BS_OFF;
+  // Heating curve + PID
+  float fHeatingCurveValue       = 0.0f;
+  float fPidOutput               = 0.0f;  // = curve + P + I + D
+  float fPidP                    = 0.0f;
+  float fPidI                    = 0.0f;
+  float fPidD                    = 0.0f;
+  float fFinalSetpoint           = 0.0f;
+  float fError                   = 0.0f;  // target - room temp
+  float fKp                      = 0.0f;
+  float fKi                      = 0.0f;
+  float fKd                      = 0.0f;
+  // Cycle tracking
+  SATCycleClass eLastCycleClass  = SAT_CYCLE_NONE;
+  uint32_t iCycleCount           = 0;
+  float    fCycleMaxFlow         = 0.0f;
+  float    fCycleOvershootSec    = 0.0f;
+  // PWM state
+  float fPwmDutyCycle            = 0.0f;
+  bool  bPwmFlameRequested       = false;
+  // External inputs (MQTT/REST overrides)
+  float fExternalTemp            = 0.0f;
+  float fExternalOutdoor         = 0.0f;
+  bool  bExternalTempValid       = false;
+  bool  bExternalOutdoorValid    = false;
+  uint32_t iLastControlMs        = 0;
+  // Safety / fallback
+  uint32_t iExternalTempLastMs   = 0;   // millis() when external indoor temp was last received
+  uint32_t iExternalOutdoorLastMs = 0;  // millis() when external outdoor temp was last received
+  bool     bSafetyTripped        = false; // true if safety forced satDisable()
+};
+
 struct OTGWState {
   PICSection         pic;         // state.pic.bAvailable, state.pic.sFwversion
   OTGWProtocol       otgw;        // state.otgw.bOnline, state.otgw.bBoilerState
@@ -234,6 +298,7 @@ struct OTGWState {
   DebugSection       debug;       // state.debug.bOTmsg, state.debug.bMQTT
   UptimeSection      uptime;      // state.uptime.iSeconds, state.uptime.iRebootCount
   PicSettingsSection picSettings; // state.picSettings — PR=-polled settings from PIC
+  SATRuntimeSection  sat;         // state.sat — SAT thermostat controller
   StatusMessage      statusMessage = StatusMessage::None;
   bool               bSetupComplete = false;
 };
@@ -318,6 +383,23 @@ struct OTGWBootSection {            // PIC boot-time command injection
   char sCommands[129] = "";
 };
 
+//--- SAT (Smart Autotune Thermostat) settings ---
+// Ported from SAT releases/thermo-nova (https://github.com/Alexwijn/SAT)
+// with permission from the SAT authors.
+struct SATSection {
+  bool     bEnabled           = false;
+  uint8_t  iHeatingSystem     = 0;      // 0=radiator, 1=underfloor
+  float    fTargetTemp        = 20.0f;  // Default room target °C
+  float    fHeatingCurveCoeff = 1.5f;   // Heating curve coefficient
+  float    fDeadband          = 0.25f;  // PID deadband °C
+  uint16_t iControlInterval   = 30;     // Control loop interval (seconds)
+  bool     bUseExternalTemp   = false;  // Prefer MQTT-pushed indoor temp over OT msg 24
+  float    fPresetComfort     = 21.0f;  // Preset: Comfort
+  float    fPresetEco         = 18.0f;  // Preset: Eco
+  float    fPresetAway        = 15.0f;  // Preset: Away
+  bool     bPwmAutoSwitch     = true;   // Auto-switch between PWM and continuous mode
+};
+
 struct OTGWSettings {
   // Device-level fields (universal device identity)
   char sHostname[41] = _HOSTNAME;
@@ -335,6 +417,7 @@ struct OTGWSettings {
   WebhookSection      webhook;
   UISection           ui;
   OTGWBootSection     otgw;
+  SATSection          sat;
 };
 
 OTGWSettings settings;
