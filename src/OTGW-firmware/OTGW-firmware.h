@@ -136,9 +136,9 @@ extern bool picSettingsCycleActive;  // PIC settings readout cycle flag (OTGW-Co
 void initSAT();
 void satControlLoop();
 void satPublishMQTT();
-void satHandleExternalTemp(const char* value);
-void satHandleExternalOutdoor(const char* value);
-void satHandleTargetTemp(const char* value);
+bool satHandleExternalTemp(const char* value);
+bool satHandleExternalOutdoor(const char* value);
+bool satHandleTargetTemp(const char* value);
 void satHandleEnabled(const char* value);
 void satDisable();
 void satHandleControlMode(const char* value);

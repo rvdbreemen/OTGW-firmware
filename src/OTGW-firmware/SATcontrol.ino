@@ -47,7 +47,7 @@ static uint32_t _bs_stateEntryMs    = 0;
 // --- Previous flame state for edge detection ---
 static bool     _sat_prevFlameState = false;
 
-// --- Timer for control loop ---
+// --- Timer for control loop (initial value, updated from settings in initSAT) ---
 DECLARE_TIMER_SEC(timerSATControl, 30, CATCH_UP_MISSED_TICKS);
 
 //=====================================================================
@@ -244,53 +244,65 @@ static float satGetOutsideTemp()
 //=====================================================================
 //=== External Input Handlers (called from MQTT/REST) ===
 //=====================================================================
-void satHandleExternalTemp(const char* value)
+bool satHandleExternalTemp(const char* value)
 {
-  if (!value || !*value) return;
-  float temp = atof(value);
+  if (!value || !*value) return false;
+  char* endp = nullptr;
+  float temp = strtof(value, &endp);
+  if (endp == value || *endp != '\0') return false;  // non-numeric input
   if (temp > -50.0f && temp < 100.0f) {
     state.sat.fExternalTemp = temp;
     state.sat.bExternalTempValid = true;
     state.sat.iExternalTempLastMs = millis();
     DebugTf(PSTR("SAT: external indoor temp set to %.1f°C\r\n"), temp);
+    return true;
   }
+  return false;
 }
 
-void satHandleExternalOutdoor(const char* value)
+bool satHandleExternalOutdoor(const char* value)
 {
-  if (!value || !*value) return;
-  float temp = atof(value);
+  if (!value || !*value) return false;
+  char* endp = nullptr;
+  float temp = strtof(value, &endp);
+  if (endp == value || *endp != '\0') return false;  // non-numeric input
   if (temp > -50.0f && temp < 100.0f) {
     state.sat.fExternalOutdoor = temp;
     state.sat.bExternalOutdoorValid = true;
     state.sat.iExternalOutdoorLastMs = millis();
     DebugTf(PSTR("SAT: external outdoor temp set to %.1f°C\r\n"), temp);
+    return true;
   }
+  return false;
 }
 
-void satHandleTargetTemp(const char* value)
+// Returns true if the value was valid and applied
+bool satHandleTargetTemp(const char* value)
 {
-  if (!value || !*value) return;
-  float temp = atof(value);
+  if (!value || !*value) return false;
+  char* endp = nullptr;
+  float temp = strtof(value, &endp);
+  if (endp == value || *endp != '\0') return false;  // non-numeric input
   if (temp >= 5.0f && temp <= 30.0f) {
     // Go through updateSetting() to persist via deferred flush
     updateSetting("SATtargettemp", value);
     DebugTf(PSTR("SAT: target temp set to %.1f°C\r\n"), temp);
+    return true;
   }
+  return false;
 }
 
 void satHandleEnabled(const char* value)
 {
   if (!value || !*value) return;
   bool enabled = EVALBOOLEAN(value);
-  settings.sat.bEnabled = enabled;
+  // Route through updateSetting() so the change persists to flash
+  updateSetting("SATenabled", enabled ? "1" : "0");
   if (enabled) {
     // Clear safety trip so SAT can resume
     state.sat.bSafetyTripped = false;
     _sat_consecutiveSkips = 0;
     _sat_picFailCount = 0;
-  } else {
-    satDisable();
   }
   DebugTf(PSTR("SAT: %s\r\n"), enabled ? "enabled" : "disabled");
 }
@@ -443,6 +455,9 @@ void initSAT()
   }
   // If PIC not ready yet, _sat_bootCS0sent stays false and the control loop
   // will send CS=0 on its first call when PIC becomes available.
+
+  // Sync timer to configured interval
+  CHANGE_INTERVAL_SEC(timerSATControl, settings.sat.iControlInterval);
 
   if (settings.sat.bEnabled) {
     state.sat.eControlMode = SAT_MODE_CONTINUOUS;

@@ -462,7 +462,10 @@ void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, 
     } else if (wc > 5) {
       val = words[5];
     }
-    if (val) satHandleTargetTemp(val);
+    if (!val || !satHandleTargetTemp(val)) {
+      sendApiError(400, F("Invalid or missing value (5.0-30.0)"));
+      return;
+    }
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   else if (strcasecmp_P(sub, PSTR("externaltemp")) == 0) {
@@ -474,7 +477,10 @@ void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, 
     } else if (wc > 5) {
       val = words[5];
     }
-    if (val) satHandleExternalTemp(val);
+    if (!val || !satHandleExternalTemp(val)) {
+      sendApiError(400, F("Invalid or missing numeric value"));
+      return;
+    }
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   else if (strcasecmp_P(sub, PSTR("externaloutdoor")) == 0) {
@@ -486,7 +492,10 @@ void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, 
     } else if (wc > 5) {
       val = words[5];
     }
-    if (val) satHandleExternalOutdoor(val);
+    if (!val || !satHandleExternalOutdoor(val)) {
+      sendApiError(400, F("Invalid or missing numeric value"));
+      return;
+    }
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   else {

@@ -65,8 +65,10 @@ All safety mechanisms are RAM-only — no flash writes required:
 
 ### API surface
 
-- **REST**: `GET/POST /api/v2/sat/status`, `POST /api/v2/sat/target_temp`, `POST /api/v2/sat/external_temp`, `POST /api/v2/sat/external_outdoor`, `POST /api/v2/sat/enabled`, `POST /api/v2/sat/control_mode`
-- **MQTT**: Subscribe `OTGW/sat/{target_temp,external_temp,external_outdoor,enabled,control_mode}`, Publish 13 status topics under `OTGW/sat/`
+- **REST**: `GET /api/v2/sat/status`, `POST /api/v2/sat/target`, `POST /api/v2/sat/externaltemp`, `POST /api/v2/sat/externaloutdoor`
+- **MQTT**:
+  - Subscribe: `<mqtt-prefix>/set/<node-id>/sat/{target,indoor_temp,outdoor_temp,enabled,control_mode}`
+  - Publish: `<mqtt-prefix>/value/<node-id>/sat/{mode,setpoint,heating_curve,pid_output,target,error,pid_p,pid_i,pid_d,boiler_status,cycle_class,pwm_duty,safety_tripped}`
 - **HA auto-discovery**: Climate entity + 7 sensor entities via `mqttha.cfg`
 - **Web UI**: Dedicated SAT dashboard tab (`sat.js`) — visualization only, polls status every 5s
 

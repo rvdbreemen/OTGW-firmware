@@ -60,7 +60,12 @@ var SAT = (function() {
   // --- Fetch SAT status from REST API ---
   function fetchStatus() {
     fetch(APIGW + 'v2/sat/status')
-      .then(function(r) { return r.ok ? r.json() : Promise.reject(r.statusText); })
+      .then(function(r) {
+        if (!r.ok) return Promise.reject(r.statusText);
+        var ct = r.headers.get('content-type') || '';
+        if (ct.indexOf('application/json') === -1) return Promise.reject('Not JSON');
+        return r.json();
+      })
       .then(function(d) { updateDashboard(d); })
       .catch(function(err) {
         console.warn('SAT fetch error:', err);

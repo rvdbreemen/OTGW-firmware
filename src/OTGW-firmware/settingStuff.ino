@@ -657,14 +657,21 @@ void updateSetting(const char *field, const char *newValue)
       strcasecmp_P(field, PSTR("webhookcontenttype")) == 0) strlcpy(settings.webhook.sContentType, newValue, sizeof(settings.webhook.sContentType));
   // --- SAT settings ---
   else if (strcasecmp_P(field, PSTR("SATenabled")) == 0) {
+    bool wasEnabled = settings.sat.bEnabled;
     settings.sat.bEnabled = EVALBOOLEAN(newValue);
-    if (!settings.sat.bEnabled) satDisable();
+    // Only disable on actual enabled→disabled transition, and not during boot
+    if (wasEnabled && !settings.sat.bEnabled && state.bSetupComplete) {
+      satDisable();
+    }
   }
   else if (strcasecmp_P(field, PSTR("SATsystem")) == 0)          settings.sat.iHeatingSystem = constrain(atoi(newValue), 0, 1);
   else if (strcasecmp_P(field, PSTR("SATtargettemp")) == 0)      settings.sat.fTargetTemp = constrain(atof(newValue), 5.0f, 30.0f);
   else if (strcasecmp_P(field, PSTR("SATcoefficient")) == 0)     settings.sat.fHeatingCurveCoeff = constrain(atof(newValue), 0.1f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATdeadband")) == 0)        settings.sat.fDeadband = constrain(atof(newValue), 0.05f, 2.0f);
-  else if (strcasecmp_P(field, PSTR("SATinterval")) == 0)        settings.sat.iControlInterval = constrain(atoi(newValue), 10, 300);
+  else if (strcasecmp_P(field, PSTR("SATinterval")) == 0) {
+    settings.sat.iControlInterval = constrain(atoi(newValue), 10, 300);
+    CHANGE_INTERVAL_SEC(timerSATControl, settings.sat.iControlInterval);
+  }
   else if (strcasecmp_P(field, PSTR("SATexternaltemp")) == 0)    settings.sat.bUseExternalTemp = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATpresetcomfort")) == 0)   settings.sat.fPresetComfort = constrain(atof(newValue), 15.0f, 28.0f);
   else if (strcasecmp_P(field, PSTR("SATpreseteco")) == 0)       settings.sat.fPresetEco = constrain(atof(newValue), 10.0f, 22.0f);
