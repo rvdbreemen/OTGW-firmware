@@ -634,6 +634,12 @@ Full help available: `backlog --help`
 
 ESP8266 firmware for the NodoShop OpenTherm Gateway. Provides Web UI, MQTT, REST API, and TCP serial socket with Home Assistant integration focus.
 
+## Design Principles
+
+- **KISS (Keep It Simple, Stupid)**: Always choose the simplest solution that works. Avoid over-engineering, unnecessary abstractions, and speculative complexity. When in doubt, pick the straightforward approach. Share your design choices so the user can decide if more complexity is needed.
+- **YAGNI (You Aren't Gonna Need It)**: Don't build features or abstractions for hypothetical future requirements. Solve the problem at hand.
+- **Minimal change surface**: Prefer small, focused changes over sweeping refactors. Each change should be justified by a concrete need.
+
 - **Platform**: ESP8266 (NodeMCU / Wemos D1 mini), ~40KB usable RAM
 - **Language**: Arduino C/C++ (.ino files), single translation unit
 - **Serial**: Reserved exclusively for PIC communication — never write to Serial after init
