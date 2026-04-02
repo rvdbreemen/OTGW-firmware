@@ -26,6 +26,18 @@ static const float SAT_MAX_SETPOINT_DEFAULT  = 75.0f;   // Default max boiler se
 static const float SAT_FLOW_OFFSET_CONTINUOUS = 5.0f;   // Flow temp offset for continuous mode smoothing
 static const float SAT_PWM_MIN_ON_SEC        = 30.0f;   // Minimum flame-on time in PWM mode
 
+// --- Safety Constants ---
+static const float    SAT_HARD_MAX_FLOOR     = 50.0f;   // Absolute ceiling for underfloor heating
+static const float    SAT_HARD_MAX_RAD       = 80.0f;   // Absolute ceiling for radiator heating
+static const uint32_t SAT_STALE_TEMP_MS      = 300000UL; // 5 min: external indoor temp considered stale
+static const uint32_t SAT_STALE_OUTDOOR_MS   = 600000UL; // 10 min: external outdoor temp considered stale
+static const uint8_t  SAT_MAX_SKIP_COUNT     = 10;       // Consecutive invalid-input skips before disable
+static const uint8_t  SAT_MAX_PIC_FAILS      = 5;        // Consecutive PIC comm failures before disable
+
+static uint8_t _sat_consecutiveSkips  = 0;
+static uint8_t _sat_picFailCount      = 0;
+static bool    _sat_bootCS0sent       = false;  // One-shot: ensure CS=0 is sent once PIC is available
+
 // --- Boiler Status Tracking ---
 static bool     _bs_prevFlame       = false;
 static float    _bs_prevModulation  = 0.0f;
@@ -205,7 +217,13 @@ static float satApplyContinuous(float pidOutput)
 static float satGetRoomTemp()
 {
   if (settings.sat.bUseExternalTemp && state.sat.bExternalTempValid) {
-    return state.sat.fExternalTemp;
+    // Check staleness — if no update for 5 min, fall back to OT bus
+    if ((millis() - state.sat.iExternalTempLastMs) > SAT_STALE_TEMP_MS) {
+      state.sat.bExternalTempValid = false;
+      DebugTln(F("SAT: external indoor temp stale, falling back to OT bus"));
+    } else {
+      return state.sat.fExternalTemp;
+    }
   }
   return OTcurrentSystemState.Tr;  // OT message ID 24
 }
@@ -214,7 +232,13 @@ static float satGetRoomTemp()
 static float satGetOutsideTemp()
 {
   if (state.sat.bExternalOutdoorValid) {
-    return state.sat.fExternalOutdoor;
+    // Check staleness — if no update for 10 min, fall back to OT bus
+    if ((millis() - state.sat.iExternalOutdoorLastMs) > SAT_STALE_OUTDOOR_MS) {
+      state.sat.bExternalOutdoorValid = false;
+      DebugTln(F("SAT: external outdoor temp stale, falling back to OT bus"));
+    } else {
+      return state.sat.fExternalOutdoor;
+    }
   }
   return OTcurrentSystemState.Toutside;  // OT message ID 27
 }
@@ -229,6 +253,7 @@ void satHandleExternalTemp(const char* value)
   if (temp > -50.0f && temp < 100.0f) {
     state.sat.fExternalTemp = temp;
     state.sat.bExternalTempValid = true;
+    state.sat.iExternalTempLastMs = millis();
     DebugTf(PSTR("SAT: external indoor temp set to %.1f°C\r\n"), temp);
   }
 }
@@ -240,6 +265,7 @@ void satHandleExternalOutdoor(const char* value)
   if (temp > -50.0f && temp < 100.0f) {
     state.sat.fExternalOutdoor = temp;
     state.sat.bExternalOutdoorValid = true;
+    state.sat.iExternalOutdoorLastMs = millis();
     DebugTf(PSTR("SAT: external outdoor temp set to %.1f°C\r\n"), temp);
   }
 }
@@ -259,7 +285,12 @@ void satHandleEnabled(const char* value)
   if (!value || !*value) return;
   bool enabled = EVALBOOLEAN(value);
   settings.sat.bEnabled = enabled;
-  if (!enabled) {
+  if (enabled) {
+    // Clear safety trip so SAT can resume
+    state.sat.bSafetyTripped = false;
+    _sat_consecutiveSkips = 0;
+    _sat_picFailCount = 0;
+  } else {
     satDisable();
   }
   DebugTf(PSTR("SAT: %s\r\n"), enabled ? "enabled" : "disabled");
@@ -307,7 +338,7 @@ void satSendStatusJSON(Print& client)
     "\"cycle_max_flow\":%.1f,\"cycle_overshoot_sec\":%.0f,"
     "\"pwm_duty\":%.2f,\"pwm_flame_req\":%s,"
     "\"heating_system\":%d,\"external_temp_valid\":%s,"
-    "\"external_outdoor_valid\":%s}";
+    "\"external_outdoor_valid\":%s,\"safety_tripped\":%s}";
 
   char buf[512];
   snprintf_P(buf, sizeof(buf), fmt,
@@ -325,7 +356,8 @@ void satSendStatusJSON(Print& client)
     state.sat.fPwmDutyCycle, CBOOLEAN(state.sat.bPwmFlameRequested),
     (int)settings.sat.iHeatingSystem,
     CBOOLEAN(state.sat.bExternalTempValid),
-    CBOOLEAN(state.sat.bExternalOutdoorValid));
+    CBOOLEAN(state.sat.bExternalOutdoorValid),
+    CBOOLEAN(state.sat.bSafetyTripped));
 
   client.print(buf);
 }
@@ -381,6 +413,9 @@ void satPublishMQTT()
   // PWM duty
   dtostrf(state.sat.fPwmDutyCycle, 1, 2, valBuf);
   sendMQTTData(F("sat/pwm_duty"), valBuf, false);
+
+  // Safety
+  sendMQTTData(F("sat/safety_tripped"), state.sat.bSafetyTripped ? "true" : "false", false);
 }
 
 //=====================================================================
@@ -392,6 +427,22 @@ void initSAT()
   satCycleInit();
   state.sat.bActive = false;
   state.sat.eControlMode = SAT_MODE_OFF;
+  state.sat.bSafetyTripped = false;
+  _sat_consecutiveSkips = 0;
+  _sat_picFailCount = 0;
+  _sat_bootCS0sent = false;
+
+  // BOOT SAFETY: Release any stale PIC control setpoint override.
+  // After a crash/reboot, the PIC may still hold the last CS= value.
+  // Send CS=0 so the thermostat controls the boiler until SAT's first
+  // control loop iteration computes a proper setpoint (~30s).
+  if (isPICEnabled()) {
+    addOTWGcmdtoqueue("CS=0", 4, false, 0);
+    _sat_bootCS0sent = true;
+    DebugTln(F("SAT: boot safety — sent CS=0 to release stale PIC override"));
+  }
+  // If PIC not ready yet, _sat_bootCS0sent stays false and the control loop
+  // will send CS=0 on its first call when PIC becomes available.
 
   if (settings.sat.bEnabled) {
     state.sat.eControlMode = SAT_MODE_CONTINUOUS;
@@ -413,6 +464,17 @@ void satControlLoop()
     return;
   }
 
+  // If safety tripped, stay disabled until explicitly re-enabled
+  if (state.sat.bSafetyTripped) return;
+
+  // Boot safety deferred: if CS=0 wasn't sent during initSAT() (PIC not ready),
+  // send it now on the first call where PIC is available.
+  if (!_sat_bootCS0sent && isPICEnabled()) {
+    addOTWGcmdtoqueue("CS=0", 4, false, 0);
+    _sat_bootCS0sent = true;
+    DebugTln(F("SAT: deferred boot safety — sent CS=0"));
+  }
+
   // Flame edge detection — always process, independent of timer
   bool currentFlame = (OTcurrentSystemState.Statusflags & 0x08) != 0;
   if (currentFlame != _sat_prevFlameState) {
@@ -431,16 +493,25 @@ void satControlLoop()
     state.sat.eControlMode = SAT_MODE_CONTINUOUS;
   }
 
-  // --- Read inputs ---
+  // --- Read inputs (staleness is checked inside these functions) ---
   float roomTemp = satGetRoomTemp();
   float outsideTemp = satGetOutsideTemp();
   float targetTemp = settings.sat.fTargetTemp;
 
-  // Validate inputs
-  if (roomTemp < -10.0f || roomTemp > 50.0f) return;  // Invalid room temp
+  // Validate room temp — count consecutive failures
+  if (roomTemp < -10.0f || roomTemp > 50.0f) {
+    _sat_consecutiveSkips++;
+    if (_sat_consecutiveSkips >= SAT_MAX_SKIP_COUNT) {
+      DebugTln(F("SAT SAFETY: too many invalid room temp readings, disabling"));
+      state.sat.bSafetyTripped = true;
+      satDisable();
+    }
+    return;
+  }
+  _sat_consecutiveSkips = 0;  // Valid reading — reset counter
+
   if (outsideTemp < -40.0f || outsideTemp > 50.0f) {
-    // Outside temp might not be available; use a safe default
-    outsideTemp = 10.0f;
+    outsideTemp = 10.0f;  // Safe fallback
   }
 
   // --- Update boiler status ---
@@ -455,6 +526,11 @@ void satControlLoop()
   // --- Clamp to valid range ---
   float maxSetpoint = OTcurrentSystemState.MaxTSet;
   if (maxSetpoint < 30.0f) maxSetpoint = SAT_MAX_SETPOINT_DEFAULT;
+
+  // Hard safety ceiling based on heating system type — never exceeded
+  float hardMax = (settings.sat.iHeatingSystem == 1) ? SAT_HARD_MAX_FLOOR : SAT_HARD_MAX_RAD;
+  if (maxSetpoint > hardMax) maxSetpoint = hardMax;
+
   if (pidOutput < SAT_MIN_SETPOINT) pidOutput = SAT_MIN_SETPOINT;
   if (pidOutput > maxSetpoint) pidOutput = maxSetpoint;
 
@@ -466,7 +542,7 @@ void satControlLoop()
     finalSetpoint = satApplyContinuous(pidOutput);
   }
 
-  // Final clamp
+  // Final clamp (including hard ceiling)
   if (finalSetpoint < SAT_MIN_SETPOINT) finalSetpoint = SAT_MIN_SETPOINT;
   if (finalSetpoint > maxSetpoint) finalSetpoint = maxSetpoint;
   state.sat.fFinalSetpoint = finalSetpoint;
@@ -474,10 +550,21 @@ void satControlLoop()
   // --- Check auto-switch ---
   satCycleCheckAutoSwitch();
 
-  // --- Send CS= command to boiler ---
-  char cmdBuf[16];
-  snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("CS=%.1f"), finalSetpoint);
-  addOTWGcmdtoqueue(cmdBuf, strlen(cmdBuf), false, 0);
+  // --- Send CS= command to boiler (with PIC comm check) ---
+  if (isPICEnabled()) {
+    char cmdBuf[16];
+    snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("CS=%.1f"), finalSetpoint);
+    addOTWGcmdtoqueue(cmdBuf, strlen(cmdBuf), false, 0);
+    _sat_picFailCount = 0;
+  } else {
+    _sat_picFailCount++;
+    if (_sat_picFailCount >= SAT_MAX_PIC_FAILS) {
+      DebugTln(F("SAT SAFETY: PIC unavailable for too long, disabling"));
+      state.sat.bSafetyTripped = true;
+      satDisable();
+      return;
+    }
+  }
 
   state.sat.iLastControlMs = millis();
 

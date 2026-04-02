@@ -110,6 +110,11 @@ static void _pidUpdateIntegral(float error, float curveValue, bool force)
   if (_pid_integral > curveValue)  _pid_integral = curveValue;
   if (_pid_integral < -curveValue) _pid_integral = -curveValue;
 
+  // Hard absolute cap — defense against runaway regardless of curve value
+  static const float SAT_PID_INTEGRAL_ABS_MAX = 20.0f;
+  if (_pid_integral > SAT_PID_INTEGRAL_ABS_MAX)  _pid_integral = SAT_PID_INTEGRAL_ABS_MAX;
+  if (_pid_integral < -SAT_PID_INTEGRAL_ABS_MAX) _pid_integral = -SAT_PID_INTEGRAL_ABS_MAX;
+
   _pid_lastIntegralMs = millis();
 }
 

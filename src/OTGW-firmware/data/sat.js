@@ -77,6 +77,9 @@ var SAT = (function() {
       if (!d.enabled) {
         badge.textContent = 'Disabled';
         badge.className = 'sat-badge sat-badge-disabled';
+      } else if (d.safety_tripped) {
+        badge.textContent = 'Safety Tripped';
+        badge.className = 'sat-badge sat-badge-error';
       } else if (d.active) {
         badge.textContent = MODE_LABELS[d.control_mode] || 'Active';
         badge.className = 'sat-badge sat-badge-active';

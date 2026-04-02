@@ -263,6 +263,10 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   bool  bExternalTempValid       = false;
   bool  bExternalOutdoorValid    = false;
   uint32_t iLastControlMs        = 0;
+  // Safety / fallback
+  uint32_t iExternalTempLastMs   = 0;   // millis() when external indoor temp was last received
+  uint32_t iExternalOutdoorLastMs = 0;  // millis() when external outdoor temp was last received
+  bool     bSafetyTripped        = false; // true if safety forced satDisable()
 };
 
 struct OTGWState {
