@@ -71,7 +71,7 @@ TARGETS = {
         "name": "ESP32",
         "core": "esp32:esp32",
         "board_manager_url": "https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json",
-        "fqbn": "esp32:esp32:esp32:PartitionScheme=huge_app",
+        "fqbn": "esp32:esp32:esp32:PartitionScheme=custom",
         "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_NODOSHOP_ESP32",
         "chip": "esp32",
         "flash_mode": "dio",
@@ -82,7 +82,7 @@ TARGETS = {
         "fs_tool_path": "esp32/tools/mklittlefs",
         "fs_block": 4096,
         "fs_page": 256,
-        "fs_size": 917504,       # 0xE0000 — huge_app partition (896KB LittleFS)
+        "fs_size": 786432,       # 0xC0000 — custom OTA partition (768KB LittleFS)
         "bootloader_offset": "0x1000",
     },
 }

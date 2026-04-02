@@ -168,7 +168,12 @@ inline uint32_t platformHardwareRandom() {
   return esp_random();
 }
 
-// RTC user memory — emulated via NVS Preferences on ESP32
+// RTC user memory — emulated via NVS Preferences on ESP32.
+// WARNING: Unlike ESP8266 RTC memory (battery-backed SRAM, unlimited writes),
+// NVS on ESP32 is flash-backed with finite erase/write cycles (10K-100K per
+// sector). Only call platformRtcWrite() infrequently (boot, reset, deep sleep).
+// Never use in a loop or on a timer. For high-frequency volatile storage on
+// ESP32, consider RTC_DATA_ATTR variables instead.
 inline bool platformRtcRead(uint32_t slot, uint32_t *data, size_t len) {
   Preferences prefs;
   if (!prefs.begin("otgw_rtc", true)) return false;  // read-only
