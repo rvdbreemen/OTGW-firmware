@@ -246,6 +246,30 @@ The exact set of published topics depends on which OpenTherm message IDs the the
 | `solar_storage_mode_status` | `"0"` | Solar mode status |
 | `solar_storage_slave_status` | `"0"` | Solar slave status |
 
+### SAT (Smart Autotune Thermostat)
+
+Published every control loop interval (default 30s) when SAT is enabled. Topics are under the standard publish namespace.
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/mode` | `"off"` / `"continuous"` / `"pwm"` | yes | Current control mode |
+| `sat/setpoint` | `"43.1"` | yes | Final flow temperature setpoint sent to boiler (°C) |
+| `sat/heating_curve` | `"42.3"` | yes | Heating curve calculated value (°C) |
+| `sat/pid_output` | `"43.1"` | yes | PID output = curve + P + I + D (°C) |
+| `sat/target` | `"21.0"` | yes | Target room temperature (°C) |
+| `sat/error` | `"0.50"` | no | PID error = target - room temp (°C) |
+| `sat/pid_p` | `"0.82"` | no | Proportional term |
+| `sat/pid_i` | `"0.03"` | no | Integral term |
+| `sat/pid_d` | `"-0.04"` | no | Derivative term |
+| `sat/boiler_status` | `"3"` | no | Boiler status code (0-14) |
+| `sat/cycle_class` | `"1"` | no | Last cycle classification (0-5) |
+| `sat/pwm_duty` | `"0.65"` | no | PWM duty cycle (0.00-1.00) |
+| `sat/safety_tripped` | `"false"` | no | Safety shutdown active |
+
+**Boiler status codes**: 0=Off, 1=Idle, 2=Preheating, 3=At Setpoint, 4=Modulating Up, 5=Modulating Down, 6=Ignition Surge, 7=Stalled Ignition, 8=Anti-Cycling, 9=Pump Starting, 10=Waiting Flame, 11=Overshoot Cooling, 12=Post-Cycle, 13=Heating, 14=Cooling
+
+**Cycle class codes**: 0=None, 1=Good, 2=Overshoot, 3=Underheat, 4=Short, 5=Uncertain
+
 ### Raw OpenTherm Message (Optional)
 
 When `settings.mqtt.bOTmessage` is enabled:
@@ -350,6 +374,33 @@ The firmware subscribes to `{TopTopic}/set/{UniqueId}/#` and processes commands 
 | `voltageref` | `"3.3"` | `VR=3.3` | Set voltage reference |
 | `debugptr` | `"0"` | `DP=0` | Debug pointer |
 
+#### SAT Commands
+
+SAT-specific commands are nested under the `sat/` sub-topic:
+
+| Topic Suffix | Payload | Description |
+| ------------ | ------- | ----------- |
+| `sat/target` | `"21.5"` | Set SAT target room temperature (5-30 °C, persisted to flash) |
+| `sat/indoor_temp` | `"20.8"` | Push external indoor temperature (expires after 5 min) |
+| `sat/outdoor_temp` | `"8.0"` | Push external outdoor temperature (expires after 10 min) |
+| `sat/enabled` | `"true"` / `"false"` | Enable or disable SAT controller |
+| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` | Set control mode (or `"0"`, `"1"`, `"2"`) |
+
+**Example** — Set SAT target to 21.5°C:
+```bash
+mosquitto_pub -h mqtt-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/target" -m "21.5"
+```
+
+**Example** — Push room temperature from external sensor:
+```bash
+mosquitto_pub -h mqtt-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/indoor_temp" -m "20.8"
+```
+
+**Example** — Disable SAT:
+```bash
+mosquitto_pub -h mqtt-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/enabled" -m "false"
+```
+
 #### Alternative Topic Names
 
 Commands can also be sent using the two-letter OTGW command codes directly as topic suffixes. For example, `TT`, `TC`, `OT`, etc.
@@ -396,6 +447,23 @@ When `settings.mqtt.bSeparateSources` is enabled, discovery entries with source-
 - `{entity}_thermostat` - values from thermostat requests
 - `{entity}_boiler` - values from boiler responses
 - `{entity}_gateway` - values injected/modified by the gateway
+
+### SAT Discovery Entities
+
+When SAT is enabled, the following HA entities are auto-discovered:
+
+| Entity Type | Entity ID | Description |
+|-------------|-----------|-------------|
+| `climate` | `sat_climate` | Climate entity with target temp control and mode display |
+| `sensor` | `sat_setpoint` | Flow temperature setpoint (°C) |
+| `sensor` | `sat_heating_curve` | Heating curve value (°C) |
+| `sensor` | `sat_pid_output` | PID output (°C) |
+| `sensor` | `sat_error` | PID error (°C) |
+| `sensor` | `sat_mode` | Control mode (off/continuous/pwm) |
+| `sensor` | `sat_boiler_status` | Boiler status code |
+| `sensor` | `sat_pwm_duty` | PWM duty cycle (%) |
+
+The climate entity publishes its target temperature to `sat/target` and reads current temperature from the room temp on the OT bus.
 
 ### Discovery Lifecycle
 
