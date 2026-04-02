@@ -48,7 +48,7 @@ static uint32_t _bs_stateEntryMs    = 0;
 static bool     _sat_prevFlameState = false;
 
 // --- Timer for control loop (initial value, updated from settings in initSAT) ---
-DECLARE_TIMER_SEC(timerSATControl, 30, CATCH_UP_MISSED_TICKS);
+DECLARE_TIMER_SEC(timerSATControl, settings.sat.iControlInterval, CATCH_UP_MISSED_TICKS);
 
 //=====================================================================
 //=== Heating Curve Calculation ===
