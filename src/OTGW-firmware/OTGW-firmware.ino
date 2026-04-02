@@ -193,6 +193,7 @@ void setup() {
   if (!LittleFSmounted) sendMQTTData(F("otgw-firmware/error"), "LittleFS mount failed - running on defaults", false);
   initS0Count();        // init S0 counter
   initSensors();        // init DS18B20 (after MQ is up!)
+  initSAT();            // init SAT thermostat controller
   // Clear the triple-reset portal counter: a successful setup() proves the device is healthy.
   // This prevents USB flash resets or stale RTC data from triggering the portal on next boot.
   clearWifiPortalResetState();
@@ -518,6 +519,7 @@ void loop()
       if (minuteChanged())              doTaskMinuteChanged(); //exactly on the minute
       evalOutputs();                    // when the bits change, the output gpio bit will follow
       evalWebhook();                    // when the trigger bit changes, fire the webhook
+      satControlLoop();                 // SAT thermostat control loop (timer-guarded internally)
       handlePendingUpgrade();           // Check if we need to start an upgrade
     } 
 
