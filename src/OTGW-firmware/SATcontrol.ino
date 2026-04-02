@@ -334,43 +334,55 @@ void satHandleControlMode(const char* value)
 //=====================================================================
 //=== Send SAT Status as JSON (for REST API) ===
 //=====================================================================
-void satSendStatusJSON(Print& client)
+// Precision-aware float entry — SAT fields need varying decimal places
+// (sendJsonMapEntry(float) defaults to %.3f which doesn't suit all fields)
+static void satSendJsonFloat(const __FlashStringHelper* cName, float fValue, uint8_t decimals)
 {
-  static const char fmt[] PROGMEM =
-    "{\"enabled\":%s,\"active\":%s,\"control_mode\":%d,"
-    "\"boiler_status\":%d,\"target_temp\":%.1f,"
-    "\"room_temp\":%.1f,\"outside_temp\":%.1f,"
-    "\"heating_curve\":%.1f,\"pid_output\":%.1f,"
-    "\"final_setpoint\":%.1f,\"error\":%.2f,"
-    "\"pid_p\":%.2f,\"pid_i\":%.2f,\"pid_d\":%.2f,"
-    "\"kp\":%.4f,\"ki\":%.6f,\"kd\":%.2f,"
-    "\"coefficient\":%.1f,\"deadband\":%.2f,"
-    "\"cycle_count\":%lu,\"last_cycle_class\":%d,"
-    "\"cycle_max_flow\":%.1f,\"cycle_overshoot_sec\":%.0f,"
-    "\"pwm_duty\":%.2f,\"pwm_flame_req\":%s,"
-    "\"heating_system\":%d,\"external_temp_valid\":%s,"
-    "\"external_outdoor_valid\":%s,\"safety_tripped\":%s}";
+  char nameBuf[25];
+  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf) - 1] = 0;
+  char numBuf[16];
+  dtostrf(fValue, 1, decimals, numBuf);
+  char jsonBuff[60];
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": %s"), nameBuf, numBuf);
+  sendBeforenext();
+  sendIdent();
+  httpServer.sendContent(jsonBuff);
+}
 
-  char buf[600];
-  snprintf_P(buf, sizeof(buf), fmt,
-    CBOOLEAN(settings.sat.bEnabled), CBOOLEAN(state.sat.bActive),
-    (int)state.sat.eControlMode, (int)state.sat.eBoilerStatus,
-    settings.sat.fTargetTemp,
-    satGetRoomTemp(), satGetOutsideTemp(),
-    state.sat.fHeatingCurveValue, state.sat.fPidOutput,
-    state.sat.fFinalSetpoint, state.sat.fError,
-    state.sat.fPidP, state.sat.fPidI, state.sat.fPidD,
-    state.sat.fKp, state.sat.fKi, state.sat.fKd,
-    settings.sat.fHeatingCurveCoeff, settings.sat.fDeadband,
-    (unsigned long)state.sat.iCycleCount, (int)state.sat.eLastCycleClass,
-    state.sat.fCycleMaxFlow, state.sat.fCycleOvershootSec,
-    state.sat.fPwmDutyCycle, CBOOLEAN(state.sat.bPwmFlameRequested),
-    (int)settings.sat.iHeatingSystem,
-    CBOOLEAN(state.sat.bExternalTempValid),
-    CBOOLEAN(state.sat.bExternalOutdoorValid),
-    CBOOLEAN(state.sat.bSafetyTripped));
-
-  client.print(buf);
+void satSendStatusJSON()
+{
+  sendStartJsonMap("");
+  sendJsonMapEntry(F("enabled"),              settings.sat.bEnabled);
+  sendJsonMapEntry(F("active"),               state.sat.bActive);
+  sendJsonMapEntry(F("control_mode"),         (int32_t)state.sat.eControlMode);
+  sendJsonMapEntry(F("boiler_status"),        (int32_t)state.sat.eBoilerStatus);
+  satSendJsonFloat(F("target_temp"),          settings.sat.fTargetTemp, 1);
+  satSendJsonFloat(F("room_temp"),            satGetRoomTemp(), 1);
+  satSendJsonFloat(F("outside_temp"),         satGetOutsideTemp(), 1);
+  satSendJsonFloat(F("heating_curve"),        state.sat.fHeatingCurveValue, 1);
+  satSendJsonFloat(F("pid_output"),           state.sat.fPidOutput, 1);
+  satSendJsonFloat(F("final_setpoint"),       state.sat.fFinalSetpoint, 1);
+  satSendJsonFloat(F("error"),                state.sat.fError, 2);
+  satSendJsonFloat(F("pid_p"),                state.sat.fPidP, 2);
+  satSendJsonFloat(F("pid_i"),                state.sat.fPidI, 2);
+  satSendJsonFloat(F("pid_d"),                state.sat.fPidD, 2);
+  satSendJsonFloat(F("kp"),                   state.sat.fKp, 4);
+  satSendJsonFloat(F("ki"),                   state.sat.fKi, 6);
+  satSendJsonFloat(F("kd"),                   state.sat.fKd, 2);
+  satSendJsonFloat(F("coefficient"),          settings.sat.fHeatingCurveCoeff, 1);
+  satSendJsonFloat(F("deadband"),             settings.sat.fDeadband, 2);
+  sendJsonMapEntry(F("cycle_count"),          state.sat.iCycleCount);
+  sendJsonMapEntry(F("last_cycle_class"),     (int32_t)state.sat.eLastCycleClass);
+  satSendJsonFloat(F("cycle_max_flow"),       state.sat.fCycleMaxFlow, 1);
+  satSendJsonFloat(F("cycle_overshoot_sec"),  state.sat.fCycleOvershootSec, 0);
+  satSendJsonFloat(F("pwm_duty"),             state.sat.fPwmDutyCycle, 2);
+  sendJsonMapEntry(F("pwm_flame_req"),        state.sat.bPwmFlameRequested);
+  sendJsonMapEntry(F("heating_system"),       (int32_t)settings.sat.iHeatingSystem);
+  sendJsonMapEntry(F("external_temp_valid"),  state.sat.bExternalTempValid);
+  sendJsonMapEntry(F("external_outdoor_valid"), state.sat.bExternalOutdoorValid);
+  sendJsonMapEntry(F("safety_tripped"),       state.sat.bSafetyTripped);
+  sendEndJsonMap("");
 }
 
 //=====================================================================

@@ -434,10 +434,7 @@ void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, 
     // GET /api/v2/sat — default to status
     if (method == HTTP_GET) {
       httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
-      httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-      httpServer.send(200, F("application/json"), "");
-      satSendStatusJSON(httpServer);
-      httpServer.sendContent("");
+      satSendStatusJSON();
     } else {
       sendApiMethodNotAllowed(F("GET"));
     }
@@ -448,10 +445,7 @@ void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, 
   if (strcasecmp_P(sub, PSTR("status")) == 0) {
     if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
     httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
-    httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-    httpServer.send(200, F("application/json"), "");
-    satSendStatusJSON(httpServer);
-    httpServer.sendContent("");
+    satSendStatusJSON();
   }
   else if (strcasecmp_P(sub, PSTR("target")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }

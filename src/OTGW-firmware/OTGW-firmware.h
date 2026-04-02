@@ -143,7 +143,7 @@ void satHandleEnabled(const char* value);
 void satDisable();
 void satHandleControlMode(const char* value);
 void satCycleOnFlameChange(bool flameOn);
-void satSendStatusJSON(Print& client);
+void satSendStatusJSON();
 uint32_t satCycleGetFlameOnStartMs();
 uint32_t satCycleGetFlameOffStartMs();
 
