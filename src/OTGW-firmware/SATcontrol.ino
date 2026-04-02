@@ -260,11 +260,21 @@ void satHandleEnabled(const char* value)
   bool enabled = EVALBOOLEAN(value);
   settings.sat.bEnabled = enabled;
   if (!enabled) {
-    state.sat.eControlMode = SAT_MODE_OFF;
-    state.sat.bActive = false;
-    satPidReset();
+    satDisable();
   }
   DebugTf(PSTR("SAT: %s\r\n"), enabled ? "enabled" : "disabled");
+}
+
+//=== Cleanly disable SAT and release boiler control ===
+void satDisable()
+{
+  state.sat.eControlMode = SAT_MODE_OFF;
+  state.sat.bActive = false;
+  state.sat.fFinalSetpoint = 0.0f;
+  satPidReset();
+  // Send CS=0 to release control setpoint override — thermostat regains control
+  addOTWGcmdtoqueue("CS=0", 4, false, 0);
+  DebugTln(F("SAT: disabled, sent CS=0 to release boiler control"));
 }
 
 void satHandleControlMode(const char* value)
@@ -398,8 +408,7 @@ void satControlLoop()
 {
   if (!settings.sat.bEnabled || isFlashing()) {
     if (state.sat.bActive) {
-      state.sat.bActive = false;
-      state.sat.eControlMode = SAT_MODE_OFF;
+      satDisable();
     }
     return;
   }

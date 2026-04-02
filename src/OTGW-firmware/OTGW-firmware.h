@@ -140,6 +140,7 @@ void satHandleExternalTemp(const char* value);
 void satHandleExternalOutdoor(const char* value);
 void satHandleTargetTemp(const char* value);
 void satHandleEnabled(const char* value);
+void satDisable();
 void satHandleControlMode(const char* value);
 void satCycleOnFlameChange(bool flameOn);
 void satSendStatusJSON(Print& client);

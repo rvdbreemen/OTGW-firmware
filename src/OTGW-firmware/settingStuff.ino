@@ -656,7 +656,10 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("WebhookContentType")) == 0 ||
       strcasecmp_P(field, PSTR("webhookcontenttype")) == 0) strlcpy(settings.webhook.sContentType, newValue, sizeof(settings.webhook.sContentType));
   // --- SAT settings ---
-  else if (strcasecmp_P(field, PSTR("SATenabled")) == 0)         settings.sat.bEnabled = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATenabled")) == 0) {
+    settings.sat.bEnabled = EVALBOOLEAN(newValue);
+    if (!settings.sat.bEnabled) satDisable();
+  }
   else if (strcasecmp_P(field, PSTR("SATsystem")) == 0)          settings.sat.iHeatingSystem = constrain(atoi(newValue), 0, 1);
   else if (strcasecmp_P(field, PSTR("SATtargettemp")) == 0)      settings.sat.fTargetTemp = constrain(atof(newValue), 5.0f, 30.0f);
   else if (strcasecmp_P(field, PSTR("SATcoefficient")) == 0)     settings.sat.fHeatingCurveCoeff = constrain(atof(newValue), 0.1f, 5.0f);
