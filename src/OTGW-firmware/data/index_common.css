@@ -149,3 +149,113 @@
     margin-right: 4px;
   }
 }
+
+/* ==================== SAT Dashboard Layout ==================== */
+.sat-dashboard {
+  padding: 10px 15px;
+  max-width: 960px;
+}
+
+.sat-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sat-header h2 {
+  margin: 0;
+  font-size: 1.3em;
+}
+
+.sat-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 600;
+}
+
+.sat-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sat-card {
+  flex: 1 1 140px;
+  min-width: 120px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.sat-card-label {
+  font-size: 0.8em;
+  margin-bottom: 4px;
+}
+
+.sat-card-value {
+  font-size: 1.6em;
+  font-weight: 700;
+}
+
+.sat-section {
+  margin-bottom: 16px;
+}
+
+.sat-section h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.05em;
+}
+
+.sat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 4px 16px;
+}
+
+.sat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+}
+
+.sat-label {
+  font-size: 0.9em;
+}
+
+.sat-value {
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.sat-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 5px;
+}
+
+.sat-indicator-on {
+  background: #4caf50;
+}
+
+.sat-indicator-off {
+  background: #999;
+}
+
+@media (max-width: 768px) {
+  .sat-cards {
+    flex-direction: column;
+  }
+  .sat-grid {
+    grid-template-columns: 1fr;
+  }
+  .sat-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

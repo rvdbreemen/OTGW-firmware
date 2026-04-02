@@ -203,6 +203,16 @@ static void writeJsonIntKV(File& file, const __FlashStringHelper* key, int value
                 withComma ? "," : "");
 }
 
+static void writeJsonFloatKV(File& file, const __FlashStringHelper* key, float value, bool withComma)
+{
+  char valBuf[16];
+  dtostrf(value, 1, 2, valBuf);
+  file.printf_P(PSTR("  \"%S\": %s%s\n"),
+                reinterpret_cast<PGM_P>(key),
+                valBuf,
+                withComma ? "," : "");
+}
+
 //=======================================================================
 void writeSettings(bool show)
 {
@@ -264,7 +274,19 @@ void writeSettings(bool show)
   writeJsonStringKV(file, F("WebhookURLoff"), settings.webhook.sURLoff, true);
   writeJsonIntKV(file, F("WebhookTriggerBit"), settings.webhook.iTriggerBit, true);
   writeJsonStringKV(file, F("WebhookPayload"), settings.webhook.sPayload, true);
-  writeJsonStringKV(file, F("WebhookContentType"), settings.webhook.sContentType, false);
+  writeJsonStringKV(file, F("WebhookContentType"), settings.webhook.sContentType, true);
+  // --- SAT settings ---
+  writeJsonBoolKV(file, F("SATenabled"), settings.sat.bEnabled, true);
+  writeJsonIntKV(file, F("SATsystem"), settings.sat.iHeatingSystem, true);
+  writeJsonFloatKV(file, F("SATtargettemp"), settings.sat.fTargetTemp, true);
+  writeJsonFloatKV(file, F("SATcoefficient"), settings.sat.fHeatingCurveCoeff, true);
+  writeJsonFloatKV(file, F("SATdeadband"), settings.sat.fDeadband, true);
+  writeJsonIntKV(file, F("SATinterval"), settings.sat.iControlInterval, true);
+  writeJsonBoolKV(file, F("SATexternaltemp"), settings.sat.bUseExternalTemp, true);
+  writeJsonFloatKV(file, F("SATpresetcomfort"), settings.sat.fPresetComfort, true);
+  writeJsonFloatKV(file, F("SATpreseteco"), settings.sat.fPresetEco, true);
+  writeJsonFloatKV(file, F("SATpresetaway"), settings.sat.fPresetAway, true);
+  writeJsonBoolKV(file, F("SATpwmautoswitch"), settings.sat.bPwmAutoSwitch, false);
   file.print(F("}\n"));
   Debugln(F("\r\n[Settings] State: File write complete, closing file"));
   file.close();  // Close write handle before any subsequent read
@@ -633,6 +655,18 @@ void updateSetting(const char *field, const char *newValue)
       strcasecmp_P(field, PSTR("webhookpayload")) == 0)    strlcpy(settings.webhook.sPayload, newValue, sizeof(settings.webhook.sPayload));
   else if (strcasecmp_P(field, PSTR("WebhookContentType")) == 0 ||
       strcasecmp_P(field, PSTR("webhookcontenttype")) == 0) strlcpy(settings.webhook.sContentType, newValue, sizeof(settings.webhook.sContentType));
+  // --- SAT settings ---
+  else if (strcasecmp_P(field, PSTR("SATenabled")) == 0)         settings.sat.bEnabled = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATsystem")) == 0)          settings.sat.iHeatingSystem = constrain(atoi(newValue), 0, 1);
+  else if (strcasecmp_P(field, PSTR("SATtargettemp")) == 0)      settings.sat.fTargetTemp = constrain(atof(newValue), 5.0f, 30.0f);
+  else if (strcasecmp_P(field, PSTR("SATcoefficient")) == 0)     settings.sat.fHeatingCurveCoeff = constrain(atof(newValue), 0.1f, 5.0f);
+  else if (strcasecmp_P(field, PSTR("SATdeadband")) == 0)        settings.sat.fDeadband = constrain(atof(newValue), 0.05f, 2.0f);
+  else if (strcasecmp_P(field, PSTR("SATinterval")) == 0)        settings.sat.iControlInterval = constrain(atoi(newValue), 10, 300);
+  else if (strcasecmp_P(field, PSTR("SATexternaltemp")) == 0)    settings.sat.bUseExternalTemp = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATpresetcomfort")) == 0)   settings.sat.fPresetComfort = constrain(atof(newValue), 15.0f, 28.0f);
+  else if (strcasecmp_P(field, PSTR("SATpreseteco")) == 0)       settings.sat.fPresetEco = constrain(atof(newValue), 10.0f, 22.0f);
+  else if (strcasecmp_P(field, PSTR("SATpresetaway")) == 0)      settings.sat.fPresetAway = constrain(atof(newValue), 5.0f, 18.0f);
+  else if (strcasecmp_P(field, PSTR("SATpwmautoswitch")) == 0)   settings.sat.bPwmAutoSwitch = EVALBOOLEAN(newValue);
 
   // Side-effect checks — independent if's, multiple can fire
   if (strstr_P(field, PSTR("mqtt")) != NULL)        pendingSideEffects |= SIDE_EFFECT_MQTT; // defer MQTT restart to flushSettings()
