@@ -144,6 +144,8 @@ void satDisable();
 void satHandleControlMode(const char* value);
 void satCycleOnFlameChange(bool flameOn);
 void satSendStatusJSON(Print& client);
+uint32_t satCycleGetFlameOnStartMs();
+uint32_t satCycleGetFlameOffStartMs();
 
 //===================[ Runtime State — transient, never persisted (ADR-051) ]===================
 // Sub-section structs for OTGWState — groups runtime state by system component.

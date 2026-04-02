@@ -86,7 +86,6 @@ static void satUpdateBoilerStatus()
 
   if (!flame && !_bs_prevFlame) {
     // No flame, was already off
-    float offDur = (float)(now - _bs_stateEntryMs) / 1000.0f;
     if (boilerTemp > setpoint + 2.0f) {
       newStatus = SAT_BS_OVERSHOOT_COOLING;
     } else if (prev == SAT_BS_HEATING || prev == SAT_BS_AT_SETPOINT) {
@@ -105,7 +104,6 @@ static void satUpdateBoilerStatus()
   }
   else if (flame) {
     // Flame is on
-    float tempDelta = boilerTemp - _bs_prevBoilerTemp;
     if (fabsf(boilerTemp - setpoint) < 3.0f) {
       newStatus = SAT_BS_AT_SETPOINT;
     } else if (boilerTemp < setpoint) {
@@ -160,7 +158,7 @@ static float satApplyPWM(float pidOutput)
   // Simple time-proportional: within each control interval, flame on for duty% of time
   uint32_t intervalMs = (uint32_t)settings.sat.iControlInterval * 1000UL;
   uint32_t onTimeMs = (uint32_t)(duty * (float)intervalMs);
-  uint32_t sinceFlameStart = millis() - _cycle_flameOnStartMs;
+  uint32_t sinceFlameStart = millis() - satCycleGetFlameOnStartMs();
 
   if (duty >= 0.95f) {
     // Nearly 100% — just use full setpoint
@@ -183,7 +181,7 @@ static float satApplyPWM(float pidOutput)
   }
   else {
     // Flame OFF phase — check if we should turn on again
-    uint32_t sinceFlameOff = millis() - _cycle_flameOffStartMs;
+    uint32_t sinceFlameOff = millis() - satCycleGetFlameOffStartMs();
     uint32_t offTimeMs = intervalMs - onTimeMs;
     if (sinceFlameOff >= offTimeMs) {
       state.sat.bPwmFlameRequested = true;
@@ -275,7 +273,8 @@ void satHandleTargetTemp(const char* value)
   if (!value || !*value) return;
   float temp = atof(value);
   if (temp >= 5.0f && temp <= 30.0f) {
-    settings.sat.fTargetTemp = temp;
+    // Go through updateSetting() to persist via deferred flush
+    updateSetting("SATtargettemp", value);
     DebugTf(PSTR("SAT: target temp set to %.1f°C\r\n"), temp);
   }
 }
@@ -340,7 +339,7 @@ void satSendStatusJSON(Print& client)
     "\"heating_system\":%d,\"external_temp_valid\":%s,"
     "\"external_outdoor_valid\":%s,\"safety_tripped\":%s}";
 
-  char buf[512];
+  char buf[600];
   snprintf_P(buf, sizeof(buf), fmt,
     CBOOLEAN(settings.sat.bEnabled), CBOOLEAN(state.sat.bActive),
     (int)state.sat.eControlMode, (int)state.sat.eBoilerStatus,
@@ -374,7 +373,8 @@ void satPublishMQTT()
 
   // Control mode: off/continuous/pwm
   static const char* modeNames[] = { "off", "continuous", "pwm" };
-  sendMQTTData(F("sat/mode"), modeNames[state.sat.eControlMode], true);
+  uint8_t modeIdx = (uint8_t)state.sat.eControlMode;
+  sendMQTTData(F("sat/mode"), modeNames[modeIdx < 3 ? modeIdx : 0], true);
 
   // Key temperatures
   dtostrf(state.sat.fFinalSetpoint, 1, 1, valBuf);

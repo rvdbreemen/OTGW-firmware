@@ -396,11 +396,36 @@ static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMeth
   }
 }
 
+// Extract value from POST body: accepts raw "21.5" or JSON {"value":"21.5"}
+// Returns pointer into buf (null-terminated), or nullptr if no value found.
+static const char* satExtractPostValue(const char* body, char* buf, size_t bufSize)
+{
+  if (!body || !*body) return nullptr;
+  // Try to find "value" key in JSON: crude but avoids pulling in a JSON library
+  const char* vp = strstr_P(body, PSTR("\"value\""));
+  if (vp) {
+    // Skip past "value" and any : and whitespace/quotes
+    vp += 7; // strlen("\"value\"")
+    while (*vp == ':' || *vp == ' ' || *vp == '"') vp++;
+    // Copy until quote, comma, brace, or end
+    size_t i = 0;
+    while (vp[i] && vp[i] != '"' && vp[i] != ',' && vp[i] != '}' && i < bufSize - 1) {
+      buf[i] = vp[i];
+      i++;
+    }
+    buf[i] = '\0';
+    return buf;
+  }
+  // No JSON structure found — treat body as raw value
+  strlcpy(buf, body, bufSize);
+  return buf;
+}
+
 //=== SAT API handler ===
 // GET /api/v2/sat/status — returns full SAT runtime state
-// POST /api/v2/sat/target — set target temperature (body: {"value":"21.0"})
-// POST /api/v2/sat/externaltemp — push indoor temp (body: {"value":"20.5"})
-// POST /api/v2/sat/externaloutdoor — push outdoor temp (body: {"value":"5.0"})
+// POST /api/v2/sat/target — set target temperature (body: "21.0" or {"value":"21.0"})
+// POST /api/v2/sat/externaltemp — push indoor temp
+// POST /api/v2/sat/externaloutdoor — push outdoor temp
 void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)
 {
   if (!checkHttpAuth()) return;
@@ -430,29 +455,38 @@ void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, 
   }
   else if (strcasecmp_P(sub, PSTR("target")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    char valBuf[16];
+    const char* val = nullptr;
     if (httpServer.hasArg(F("plain"))) {
-      satHandleTargetTemp(httpServer.arg(F("plain")).c_str());
+      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
     } else if (wc > 5) {
-      satHandleTargetTemp(words[5]);
+      val = words[5];
     }
+    if (val) satHandleTargetTemp(val);
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   else if (strcasecmp_P(sub, PSTR("externaltemp")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    char valBuf[16];
+    const char* val = nullptr;
     if (httpServer.hasArg(F("plain"))) {
-      satHandleExternalTemp(httpServer.arg(F("plain")).c_str());
+      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
     } else if (wc > 5) {
-      satHandleExternalTemp(words[5]);
+      val = words[5];
     }
+    if (val) satHandleExternalTemp(val);
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   else if (strcasecmp_P(sub, PSTR("externaloutdoor")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    char valBuf[16];
+    const char* val = nullptr;
     if (httpServer.hasArg(F("plain"))) {
-      satHandleExternalOutdoor(httpServer.arg(F("plain")).c_str());
+      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
     } else if (wc > 5) {
-      satHandleExternalOutdoor(words[5]);
+      val = words[5];
     }
+    if (val) satHandleExternalOutdoor(val);
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   else {

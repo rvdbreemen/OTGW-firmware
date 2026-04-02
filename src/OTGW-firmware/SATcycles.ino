@@ -229,3 +229,7 @@ uint8_t satCycleCountClass(SATCycleClass cls)
   }
   return count;
 }
+
+//=== Accessors for cycle timing (used by SATcontrol.ino PWM mode) ===
+uint32_t satCycleGetFlameOnStartMs()  { return _cycle_flameOnStartMs; }
+uint32_t satCycleGetFlameOffStartMs() { return _cycle_flameOffStartMs; }
