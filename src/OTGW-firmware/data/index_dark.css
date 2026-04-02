@@ -58,7 +58,7 @@
      font-size: 12pt;
   }
   
-  #displayMainPage, #displayPICflash, #displayDeviceInfo, #displaySettingsPage {
+  #displayMainPage, #displayPICflash, #displayDeviceInfo, #displaySettingsPage, #displaySATPage {
     max-width: 100%;
   }
 
@@ -1157,4 +1157,48 @@ body.disable-interaction {
 .pic-settings-refresh button {
   margin-right: 8px;
   cursor: pointer;
+}
+
+/* ==================== SAT Theme (Dark) ==================== */
+#displaySATPage {
+  max-width: 100%;
+}
+.sat-card {
+  background: #1e3a3a;
+  border: 1px solid #2e5050;
+}
+.sat-card-label {
+  color: #aaa;
+}
+.sat-card-value {
+  color: #80cbc4;
+}
+.sat-section {
+  border-bottom: 1px solid #444;
+  padding-bottom: 12px;
+}
+.sat-section h3 {
+  color: #80cbc4;
+}
+.sat-label {
+  color: #bbb;
+}
+.sat-value {
+  color: #eee;
+}
+.sat-badge-active {
+  background: #1b5e20;
+  color: #a5d6a7;
+}
+.sat-badge-idle {
+  background: #4a3c00;
+  color: #fff176;
+}
+.sat-badge-disabled {
+  background: #424242;
+  color: #999;
+}
+.sat-badge-error {
+  background: #4a1010;
+  color: #ef9a9a;
 }

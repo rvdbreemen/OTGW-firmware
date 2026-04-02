@@ -689,6 +689,29 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
       }
       MQTTDebugf(PSTR("%s"), topicToken);
       if (topicToken[0] != '\0') {
+        // --- SAT MQTT commands: set/<nodeId>/sat/<sub-command> ---
+        if (strcasecmp_P(topicToken, PSTR("sat")) == 0) {
+          char satSubCmd[20];
+          if (readMQTTTopicToken(topicCursor, satSubCmd, sizeof(satSubCmd))) {
+            MQTTDebugf(PSTR("/%s [%s]\r\n"), satSubCmd, msgPayload);
+            if (strcasecmp_P(satSubCmd, PSTR("target")) == 0) {
+              satHandleTargetTemp(msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("indoor_temp")) == 0) {
+              satHandleExternalTemp(msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("outdoor_temp")) == 0) {
+              satHandleExternalOutdoor(msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("enabled")) == 0) {
+              satHandleEnabled(msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("control_mode")) == 0) {
+              satHandleControlMode(msgPayload);
+            } else {
+              MQTTDebugTf(PSTR("SAT: unknown sub-command [%s]\r\n"), satSubCmd);
+            }
+          } else {
+            MQTTDebugln(F(" SAT: missing sub-command"));
+          }
+          return;
+        }
         if (!isPICEnabled()) {
           MQTTDebugln(F(" MQTT command ignored: no PIC detected"));
           return;

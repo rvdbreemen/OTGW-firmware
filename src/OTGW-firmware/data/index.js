@@ -291,7 +291,7 @@ function stopTimeUpdates() {
 }
 
 function setActivePageSection(activeId) {
-  ['displayMainPage', 'displaySettingsPage', 'displayDeviceInfo', 'displayPICflash', 'displayWebhookPage'].forEach(function(id) {
+  ['displayMainPage', 'displaySettingsPage', 'displayDeviceInfo', 'displayPICflash', 'displayWebhookPage', 'displaySATPage'].forEach(function(id) {
     var section = document.getElementById(id);
     if (!section) return;
     if (id === activeId) section.classList.add('active');
@@ -300,6 +300,9 @@ function setActivePageSection(activeId) {
 
   if (activeId !== 'displayPICflash') {
     stopPICsettingsRefreshTimer();
+  }
+  if (activeId !== 'displaySATPage' && typeof SAT !== 'undefined') {
+    SAT.stop();
   }
 }
 
@@ -2808,6 +2811,9 @@ function initMainPage() {
     if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.setTheme === 'function') {
       OTGraph.setTheme(isDark ? 'dark' : 'light');
     }
+    if (typeof SAT !== 'undefined' && SAT && typeof SAT.setTheme === 'function') {
+      SAT.setTheme(isDark ? 'dark' : 'light');
+    }
     var cb = document.getElementById('darktheme');
     if (cb) cb.checked = isDark;
     fetch(APIGW + 'v2/settings', {
@@ -2871,6 +2877,15 @@ function initMainPage() {
     function (el, idx, arr) {
       el.addEventListener('click', function () {
         webhookPage();
+        toggleHidden('adv_dropdown', true);
+        toggleHidden('btnSaveSettings', true);
+      });
+    }
+  );
+  Array.from(document.getElementsByClassName('tabSAT')).forEach(
+    function (el, idx, arr) {
+      el.addEventListener('click', function () {
+        satPage();
         toggleHidden('adv_dropdown', true);
         toggleHidden('btnSaveSettings', true);
       });
@@ -2996,6 +3011,7 @@ function checkFSMismatch() {
 function showMainPage() {
   console.log("showMainPage()");
   stopOTmonitorPolling();
+  if (typeof SAT !== 'undefined') SAT.stop();
   
   // Exit flash mode if it was active
   if (flashModeActive) {
@@ -3057,6 +3073,16 @@ function webhookPage() {
   document.getElementById("displayWebhookPage").classList.add('active');
 
 } // webhookPage()
+
+function satPage() {
+  disconnectOTLogWebSocket();
+  stopOTmonitorPolling();
+  refreshDevTime();
+  setActivePageSection('displaySATPage');
+  if (typeof SAT !== 'undefined') {
+    SAT.start();
+  }
+} // satPage()
 
 function toggleHidden(className, hideOnly) {
   Array.from(document.getElementsByClassName(className)).forEach(
@@ -4874,7 +4900,18 @@ var translateFields = [
   , ["webhooktriggerbit", "Webhook Trigger Bit (0-15)"]
   , ["webhookpayload", "Webhook Payload Template"]
   , ["webhookcontenttype", "Webhook Content-Type (POST)"]
-  
+  , ["SATenabled", "SAT Enabled"]
+  , ["SATsystem", "SAT Heating System (0=Radiator, 1=Underfloor)"]
+  , ["SATtargettemp", "SAT Target Temperature"]
+  , ["SATcoefficient", "SAT Heating Curve Coefficient"]
+  , ["SATdeadband", "SAT PID Deadband"]
+  , ["SATinterval", "SAT Control Interval (sec)"]
+  , ["SATexternaltemp", "SAT Use External Temperature"]
+  , ["SATpresetcomfort", "SAT Preset: Comfort"]
+  , ["SATpreseteco", "SAT Preset: Eco"]
+  , ["SATpresetaway", "SAT Preset: Away"]
+  , ["SATpwmautoswitch", "SAT PWM Auto-Switch"]
+
 ];
 
 var translateTooltips = [
@@ -4927,6 +4964,17 @@ var translateTooltips = [
   , ["webhooktriggerbit", "Status bit number that triggers the webhook. Use values 0 through 15."]
   , ["webhookpayload", "Optional POST body. Leave empty when the receiving service does not need a payload."]
   , ["webhookcontenttype", "HTTP Content-Type header sent with POST requests, for example application/json."]
+  , ["SATenabled", "Enable the SAT (Smart Autotune Thermostat) smart heating controller."]
+  , ["SATsystem", "0 = Radiator (base offset 27.2), 1 = Underfloor (base offset 20.0)."]
+  , ["SATtargettemp", "Desired room temperature in degrees Celsius (5-30)."]
+  , ["SATcoefficient", "Heating curve steepness. Higher = hotter boiler water for same demand."]
+  , ["SATdeadband", "PID deadband in degrees. Within this band only the I-term integrates."]
+  , ["SATinterval", "Seconds between SAT control loop updates (10-300)."]
+  , ["SATexternaltemp", "Use external temperature sensor via MQTT/REST instead of OT bus room temp."]
+  , ["SATpresetcomfort", "Comfort preset target temperature."]
+  , ["SATpreseteco", "Eco preset target temperature."]
+  , ["SATpresetaway", "Away preset target temperature."]
+  , ["SATpwmautoswitch", "Automatically switch between PWM and continuous mode based on cycle analysis."]
 
 ];
 
