@@ -737,12 +737,18 @@ def create_merged_binary(project_dir, semver, target, compress=False):
 
     # ESP32 needs bootloader + partition table in the merged image
     if "bootloader_offset" in tcfg:
+        # Search paths: arduino-cli temp dir AND build/ (PlatformIO artifacts)
         temp_build_dir = config.TEMP_DIR / f"build-{target}"
+        search_dirs = [d for d in [temp_build_dir, build_dir] if d.exists()]
+
         # Find bootloader
         bootloader = None
-        for bl in temp_build_dir.glob("**/bootloader.bin"):
-            bootloader = bl
-            break
+        for sd in search_dirs:
+            for bl in sd.glob("**/bootloader.bin"):
+                bootloader = bl
+                break
+            if bootloader:
+                break
         if bootloader:
             cmd.extend([tcfg["bootloader_offset"], str(bootloader)])
             print_info(f"Bootloader: {bootloader.name}")
@@ -751,22 +757,33 @@ def create_merged_binary(project_dir, semver, target, compress=False):
 
         # Find partition table
         partitions = None
-        for pt in temp_build_dir.glob("**/partitions.bin"):
-            partitions = pt
-            break
-        if not partitions:
-            for pt in temp_build_dir.glob("**/*.partitions.bin"):
+        for sd in search_dirs:
+            for pt in sd.glob("**/partitions.bin"):
                 partitions = pt
                 break
+            if partitions:
+                break
+        if not partitions:
+            for sd in search_dirs:
+                for pt in sd.glob("**/*.partitions.bin"):
+                    partitions = pt
+                    break
+                if partitions:
+                    break
         if partitions:
             cmd.extend(["0x8000", str(partitions)])
             print_info(f"Partitions: {partitions.name}")
 
-        # Find boot_app0.bin
+        # Find boot_app0.bin (arduino-cli packages or PlatformIO packages)
         boot_app = None
-        for ba in (project_dir / "arduino" / "packages" / "esp32").glob("**/boot_app0.bin"):
-            boot_app = ba
-            break
+        for packages_dir in [project_dir / "arduino" / "packages" / "esp32",
+                             project_dir / ".platformio" / "packages"]:
+            if packages_dir.exists():
+                for ba in packages_dir.glob("**/boot_app0.bin"):
+                    boot_app = ba
+                    break
+            if boot_app:
+                break
         if boot_app:
             cmd.extend(["0xe000", str(boot_app)])
 
