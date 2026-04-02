@@ -41,10 +41,15 @@ extern void blinkLEDnow(uint8_t);
 
 class OTGWUpdateServer {
 public:
+  enum class UploadTarget : uint8_t { None, Firmware, Filesystem };
+
   OTGWUpdateServer(bool serial_debug = false)
     : _serial_output(serial_debug), _server(nullptr), _authenticated(false),
       _serverIndex(nullptr), _serverSuccess(nullptr),
-      _uploadExpectedBytes(0), _uploadWrittenBytes(0), _uploadBlockIndex(0) {}
+      _uploadTarget(UploadTarget::None),
+      _uploadExpectedBytes(0), _uploadWrittenBytes(0), _uploadBlockIndex(0) {
+    _updaterError[0] = '\0';
+  }
 
   void setup(WebServer *server) {
     setup(server, emptyString, emptyString);
@@ -76,12 +81,14 @@ public:
     _server->on(path.c_str(), HTTP_POST, [&]() {
       if (!_authenticated)
         return _server->requestAuthentication();
-      if (Update.hasError() || _updaterError.length()) {
+      if (Update.hasError() || _updaterError[0] != '\0') {
         ::state.flash.bESPactive = false;
-        if (!LittleFSmounted && _uploadTarget == "filesystem") {
+        if (!LittleFSmounted && _uploadTarget == UploadTarget::Filesystem) {
           LittleFSmounted = LittleFS.begin();
         }
-        _server->send(200, F("text/html"), String(F("Flash error: ")) + _updaterError);
+        char errMsg[192];
+        snprintf_P(errMsg, sizeof(errMsg), PSTR("Flash error: %s"), _updaterError);
+        _server->send(200, F("text/html"), errMsg);
       } else {
         _server->client().setNoDelay(true);
         _server->send_P(200, PSTR("text/html"), _serverSuccess);
@@ -97,9 +104,9 @@ public:
       HTTPUpload& upload = _server->upload();
       if (upload.status == UPLOAD_FILE_START) {
         _handleUploadStart(upload);
-      } else if (_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()) {
+      } else if (_authenticated && upload.status == UPLOAD_FILE_WRITE && _updaterError[0] == '\0') {
         _handleUploadWrite(upload);
-      } else if (_authenticated && upload.status == UPLOAD_FILE_END && !_updaterError.length()) {
+      } else if (_authenticated && upload.status == UPLOAD_FILE_END && _updaterError[0] == '\0') {
         _handleUploadEnd(upload);
       } else if (_authenticated && upload.status == UPLOAD_FILE_ABORTED) {
         _handleUploadAbort(upload);
@@ -118,7 +125,7 @@ public:
 
 private:
   void _resetUploadTracking() {
-    _uploadTarget = emptyString;
+    _uploadTarget = UploadTarget::None;
     _uploadExpectedBytes = 0;
     _uploadWrittenBytes = 0;
     _uploadBlockIndex = 0;
@@ -135,7 +142,7 @@ private:
   }
 
   void _handleUploadStart(HTTPUpload& upload) {
-    _updaterError.clear();
+    _updaterError[0] = '\0';
     _resetUploadTracking();
     _authenticated = (_username.length() == 0 || _password.length() == 0 ||
                       _server->authenticate(_username.c_str(), _password.c_str()));
@@ -155,25 +162,25 @@ private:
     _uploadExpectedBytes = uploadTotal;
 
     if (upload.name == F("filesystem")) {
-      _uploadTarget = "filesystem";
+      _uploadTarget = UploadTarget::Filesystem;
       size_t fsSize = LittleFS.totalBytes();
       if (_serial_output) {
         DebugTf(PSTR("[OTA] Target: filesystem (%u bytes)\r\n"), static_cast<unsigned>(fsSize));
       }
       LittleFS.end();
       if (uploadTotal > 0 && uploadTotal > fsSize) {
-        _updaterError = F("filesystem image too large");
+        strlcpy(_updaterError, "filesystem image too large", sizeof(_updaterError));
       } else if (!Update.begin(fsSize, U_SPIFFS)) {  // U_SPIFFS covers LittleFS on ESP32
         _setUpdaterError();
       }
     } else {
-      _uploadTarget = "firmware";
+      _uploadTarget = UploadTarget::Firmware;
       uint32_t maxSketchSpace = (platformFreeSketchSpace() - 0x1000) & 0xFFFFF000;
       if (_serial_output) {
         DebugTf(PSTR("[OTA] Target: firmware (%u bytes)\r\n"), static_cast<unsigned>(maxSketchSpace));
       }
       if (uploadTotal > 0 && uploadTotal > maxSketchSpace) {
-        _updaterError = F("firmware image too large");
+        strlcpy(_updaterError, "firmware image too large", sizeof(_updaterError));
       } else if (!Update.begin(uploadTotal > 0 ? uploadTotal : maxSketchSpace, U_FLASH)) {
         _setUpdaterError();
       }
@@ -200,7 +207,7 @@ private:
       unsigned long pct = static_cast<unsigned long>((_uploadWrittenBytes * 100UL) / _uploadExpectedBytes);
       if (pct > 100UL) pct = 100UL;
       DebugTf(PSTR("[OTA] progress: %s block=%lu %u/%u (%lu%%)\r\n"),
-              _uploadTarget.c_str(),
+              _uploadTargetStr(),
               static_cast<unsigned long>(_uploadBlockIndex),
               static_cast<unsigned>(_uploadWrittenBytes),
               static_cast<unsigned>(_uploadExpectedBytes), pct);
@@ -213,7 +220,7 @@ private:
     bool updateOk = Update.end(true);
     if (updateOk) {
       if (_serial_output) DebugTf(PSTR("[OTA] End: success (%u bytes)\r\n"), upload.totalSize);
-      if (_uploadTarget == "filesystem") {
+      if (_uploadTarget == UploadTarget::Filesystem) {
         LittleFSmounted = LittleFS.begin();
         if (LittleFSmounted) {
           updateLittleFSStatus(F("/.ota_post"));
@@ -243,7 +250,7 @@ private:
       DebugTf(PSTR("[OTA] Abort: after %u bytes\r\n"), static_cast<unsigned>(_uploadWrittenBytes));
     }
     // Remount LittleFS if a filesystem upload was aborted mid-flight
-    if (_uploadTarget == "filesystem" && !LittleFSmounted) {
+    if (_uploadTarget == UploadTarget::Filesystem && !LittleFSmounted) {
       LittleFSmounted = LittleFS.begin();
       if (_serial_output) {
         DebugTf(PSTR("[OTA] Abort: LittleFS remount %s\r\n"), LittleFSmounted ? "OK" : "FAILED");
@@ -254,10 +261,18 @@ private:
     _resetUploadTracking();
   }
 
+  const char* _uploadTargetStr() const {
+    switch (_uploadTarget) {
+      case UploadTarget::Firmware:   return "firmware";
+      case UploadTarget::Filesystem: return "filesystem";
+      default:                       return "none";
+    }
+  }
+
   void _setUpdaterError() {
     StreamString str;
     Update.printError(str);
-    _updaterError = str.c_str();
+    strlcpy(_updaterError, str.c_str(), sizeof(_updaterError));
   }
 
   bool _serial_output;
@@ -265,8 +280,8 @@ private:
   String _username;
   String _password;
   bool _authenticated;
-  String _updaterError;
-  String _uploadTarget;
+  char _updaterError[128];
+  UploadTarget _uploadTarget;
   size_t _uploadExpectedBytes;
   size_t _uploadWrittenBytes;
   uint32_t _uploadBlockIndex;
