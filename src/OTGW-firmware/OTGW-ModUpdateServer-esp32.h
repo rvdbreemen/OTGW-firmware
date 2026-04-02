@@ -233,6 +233,7 @@ private:
       _setUpdaterError();
     }
     ::state.flash.bESPactive = false;
+    _authenticated = false;  // force re-authentication on next upload
     _resetUploadTracking();
   }
 
@@ -241,7 +242,15 @@ private:
     if (_serial_output) {
       DebugTf(PSTR("[OTA] Abort: after %u bytes\r\n"), static_cast<unsigned>(_uploadWrittenBytes));
     }
+    // Remount LittleFS if a filesystem upload was aborted mid-flight
+    if (_uploadTarget == "filesystem" && !LittleFSmounted) {
+      LittleFSmounted = LittleFS.begin();
+      if (_serial_output) {
+        DebugTf(PSTR("[OTA] Abort: LittleFS remount %s\r\n"), LittleFSmounted ? "OK" : "FAILED");
+      }
+    }
     ::state.flash.bESPactive = false;
+    _authenticated = false;  // force re-authentication on next upload
     _resetUploadTracking();
   }
 
