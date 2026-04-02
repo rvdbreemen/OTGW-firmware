@@ -147,7 +147,7 @@ inline uint32_t platformFlashChipId() {
 }
 
 inline uint8_t platformFlashChipMode() {
-  return 0;  // Not directly available on ESP32 in the same enum
+  return 4;  // Not available on ESP32; return index for "Unknown" in flashMode[]
 }
 
 inline uint32_t platformSketchSize() {
