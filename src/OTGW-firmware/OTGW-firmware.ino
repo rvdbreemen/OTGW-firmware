@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v1.3.5-beta
+**  Version  : v1.4.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -56,11 +56,11 @@ uint32_t wifiPortalResetWindowDeadline = 0;
 bool wifiPortalResetWindowOpen = false;
 
 bool readWifiPortalResetState(WifiPortalResetState &portalState) {
-  return ESP.rtcUserMemoryRead(WIFI_PORTAL_RESET_RTC_SLOT, reinterpret_cast<uint32_t*>(&portalState), sizeof(portalState));
+  return platformRtcRead(WIFI_PORTAL_RESET_RTC_SLOT, reinterpret_cast<uint32_t*>(&portalState), sizeof(portalState));
 }
 
 bool writeWifiPortalResetState(const WifiPortalResetState &portalState) {
-  return ESP.rtcUserMemoryWrite(WIFI_PORTAL_RESET_RTC_SLOT, const_cast<uint32_t*>(reinterpret_cast<const uint32_t*>(&portalState)), sizeof(portalState));
+  return platformRtcWrite(WIFI_PORTAL_RESET_RTC_SLOT, reinterpret_cast<const uint32_t*>(&portalState), sizeof(portalState));
 }
 
 void clearWifiPortalResetState() {
@@ -69,8 +69,7 @@ void clearWifiPortalResetState() {
 }
 
 bool isExternalSystemReset() {
-  rst_info *resetInfo = ESP.getResetInfoPtr();
-  return (resetInfo != nullptr) && (resetInfo->reason == REASON_EXT_SYS_RST);
+  return platformIsExternalReset();
 }
 
 bool shouldForceWifiConfigPortal() {
@@ -131,7 +130,7 @@ void setup() {
   detectPIC();
 
   //setup randomseed the right way
-  randomSeed(RANDOM_REG32); //This is 8266 HWRNG used to seed the Random PRNG: Read more: https://config9.com/arduino/getting-a-truly-random-number-in-arduino/
+  randomSeed(platformHardwareRandom()); // Hardware RNG to seed the Random PRNG
  
   //setup the status LED
   setLed(LED1, ON);
@@ -145,7 +144,7 @@ void setup() {
   // Set hostname ASAP after loading settings.  WiFi.persistent(true) from a
   // previous boot lets the SDK auto-connect before startWiFi() is reached;
   // without this early call the DHCP request carries the default "ESP-XXXXXX".
-  WiFi.hostname(CSTR(settings.sHostname));
+  platformSetHostname(CSTR(settings.sHostname));
 
   // Connect to and initialise WiFi network
   setLed(LED1, ON);
@@ -168,7 +167,7 @@ void setup() {
   startMQTT();               // start the MQTT after webserver, always.
  
   { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason)); }  // setup the WatchDog
-  strlcpy(lastReset, ESP.getResetReason().c_str(), sizeof(lastReset));
+  platformResetReason(lastReset, sizeof(lastReset));
   SetupDebugf(PSTR("Last reset reason: [%s]\r\n"), CSTR(lastReset));
   state.uptime.iRebootCount = updateRebootCount();
   updateRebootLog(lastReset);
@@ -233,7 +232,7 @@ void loopWifi() {
       DebugTf(PSTR("WiFi: reconnect attempt %d starting for hostname [%s]\r\n"),
               wifiRetryCount + 1,
               CSTR(settings.sHostname));
-      WiFi.hostname(CSTR(settings.sHostname));
+      platformSetHostname(CSTR(settings.sHostname));
       WiFi.begin();  // uses stored credentials
       RESTART_TIMER(timerWifiRetry);
       wifiState = WIFI_CONNECTING;
@@ -257,11 +256,10 @@ void loopWifi() {
     case WIFI_RECONNECTED:
       // Match the startup path: re-apply the configured hostname and force a
       // DHCP re-announce so the renewed lease uses the expected name.
-      WiFi.hostname(CSTR(settings.sHostname));
+      platformSetHostname(CSTR(settings.sHostname));
       DebugTf(PSTR("WiFi: reconnected, re-announcing DHCP lease for hostname [%s]\r\n"),
               CSTR(settings.sHostname));
-      wifi_station_dhcpc_stop();
-      wifi_station_dhcpc_start();
+      platformRestartDHCP();
       startTelnet();
       startOTGWstream();
       startMQTT();
@@ -434,7 +432,9 @@ static void handleEspFlashBackgroundTasks()
 {
   handleDebug();              // Keep telnet debug active for monitoring
   httpServer.handleClient();  // MUST continue - processes upload chunks
-  MDNS.update();              // Keep MDNS active for network discovery
+#if MDNS_NEEDS_UPDATE
+  MDNS.update();
+#endif              // Keep MDNS active for network discovery
   handleWebSocket();          // Keep WebSocket service responsive during flash
 }
 
@@ -442,7 +442,9 @@ static void handlePicFlashBackgroundTasks()
 {
   handleDebug();              // Keep telnet debug active for monitoring
   httpServer.handleClient();  // Keep HTTP active
-  MDNS.update();              // Keep MDNS active for network discovery
+#if MDNS_NEEDS_UPDATE
+  MDNS.update();
+#endif              // Keep MDNS active for network discovery
   handleOTGW();               // REQUIRED for PIC flash - processes serial communication
   handleWebSocket();          // Keep WebSocket service responsive during flash
 }
@@ -483,7 +485,9 @@ void doBackgroundTasks()
       handleOTGW();                 // OTGW handling
       handleWebSocket();            // WebSocket handling for OT log streaming
       httpServer.handleClient();
-      MDNS.update();
+    #if MDNS_NEEDS_UPDATE
+  MDNS.update();
+#endif
       loopNTP();
     }
   } //otherwise, just wait until reconnected gracefully

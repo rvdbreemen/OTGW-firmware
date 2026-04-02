@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.3.5-beta
+**  Version  : v1.4.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -49,16 +49,15 @@
 #define OTGWDebug(...)    ({ if (state.debug.bOTmsg) Debug(__VA_ARGS__);    })
 #define OTGWDebugFlush()  ({ if (state.debug.bOTmsg) DebugFlush();    })
 
-//define Nodoshop OTGW hardware
-#define OTGW_BUTTON 0   //D3
-#define OTGW_RESET  14  //D5
-#define OTGW_LED1   2   //D4
-#define OTGW_LED2   16  //D0
+// Pin aliases — sourced from boards.h (included via OTGW-firmware.h)
+#define OTGW_BUTTON PIN_BUTTON
+#define OTGW_RESET  PIN_PIC_RST
+#define OTGW_LED1   PIN_LED1
+#define OTGW_LED2   PIN_LED2
 
-//external watchdog 
+//external watchdog
 #define EXT_WD_I2C_ADDRESS 0x26
-#define PIN_I2C_SDA 4   //D2
-#define PIN_I2C_SCL 5   //D1
+// I2C pins sourced from boards.h (PIN_I2C_SDA, PIN_I2C_SCL)
 
 //used by update firmware functions
 const char *hexheaders[] = {
@@ -4022,11 +4021,11 @@ void handleOTGW()
 
   //Handle incoming data from OTGW through serial port (READ BUFFER)
   if (!state.debug.bOTGWSimulation) {
-    if (OTGWSerial.hasOverrun()) {
+    if (platformSerialHasOverrun(OTGWSerial)) {
       DebugT(F("Serial Overrun\r\n"));
       reportOTGWEvent_P(PSTR("Serial Overrun"), '!', true);
     }
-    if (OTGWSerial.hasRxError()){
+    if (platformSerialHasRxError(OTGWSerial)) {
       DebugT(F("Serial Rx Error\r\n"));
       reportOTGWEvent_P(PSTR("Serial Rx Error"), '!', true);
     }
@@ -4610,7 +4609,7 @@ void handlePendingUpgrade() {
     DebugTln(F("=== Starting Deferred PIC Upgrade ==="));
     DebugTf(PSTR("Hex file path: %s\r\n"), pendingUpgradePath.c_str());
     DebugTf(PSTR("Flash state: state.flash.bESPactive=%d, state.flash.bPICactive=%d\r\n"), state.flash.bESPactive, state.flash.bPICactive);
-    DebugTf(PSTR("Free heap: %d bytes\r\n"), ESP.getFreeHeap());
+    DebugTf(PSTR("Free heap: %d bytes\r\n"), platformFreeHeap());
     upgradepicnow(pendingUpgradePath.c_str());
     pendingUpgradePath = "";
     DebugTln(F("Deferred upgrade initiated, upgrade now runs in background"));

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program : networkStuff.h
-**  Version  : v1.3.5-beta
+**  Version  : v1.4.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -28,18 +28,7 @@
 #ifndef NETWORKSTUFF_H
 #define NETWORKSTUFF_H
 
-#include <ESP8266WiFi.h>        // ESP8266 Core WiFi Library
-#include <ESP8266WebServer.h>   // Version 1.0.0 - part of ESP8266 Core
-#include <ESP8266mDNS.h>        // part of ESP8266 Core
-#include <ESP8266HTTPClient.h>
-#include <ESP8266LLMNR.h>
-
-extern "C" {
-  #include "user_interface.h"   // wifi_station_dhcpc_stop/start
-}
-
-#include <WiFiUdp.h>            // part of ESP8266 Core
-#include <LittleFS.h>
+#include "platform.h"           // Unified ESP8266/ESP32 abstraction layer
 #include "OTGW-ModUpdateServer.h"   // <<special version for Nodoshop Watchdog needed>>
 #include "updateServerHtml.h"
 #include <WiFiManager.h>        // version 2.0.4-beta
@@ -64,8 +53,6 @@ extern "C" {
  * - Do NOT expose the OTGW HTTP/WebSocket ports directly to the internet.
  */
 
-extern "C" int clock_gettime(clockid_t unused, struct timespec *tp);
-
 //=====[ Types ]===============================================================
 
 enum NtpStatus_t {
@@ -84,8 +71,8 @@ static const time_t EPOCH_2000_01_01 = 946684800;
 
 extern NtpStatus_t       NtpStatus;
 extern time_t            NtpLastSync;
-extern ESP8266WebServer  httpServer;
-extern ESP8266HTTPUpdateServer httpUpdater;
+extern OTGWWebServer     httpServer;
+extern OTGWUpdateServer  httpUpdater;
 extern FSInfo            LittleFSinfo;
 extern bool              LittleFSmounted;
 #define WM_DEBUG_PORT TelnetStream

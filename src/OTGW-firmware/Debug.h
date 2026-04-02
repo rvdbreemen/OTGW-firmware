@@ -13,6 +13,8 @@
  #ifndef DEBUG_H
  #define DEBUG_H
 
+ #include "platform.h"
+
 /*---- start macro's ------------------------------------------------------------------*/
 
 
@@ -93,7 +95,7 @@ void _debugBOL(const char *fn, int line)
    int written = snprintf(_bol, sizeof(_bol), 
                  "%02d:%02d:%02d.%06d (%7u|%6u) %-12.12s(%4d): ", 
                  myTime.hour(), myTime.minute(), myTime.second(), (int)now.tv_usec, 
-                 ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(),
+                 platformFreeHeap(), platformMaxFreeBlock(),
                  fn, line);
    
    // Ensure null termination even if truncated

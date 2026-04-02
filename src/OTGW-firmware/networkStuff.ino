@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v1.3.5-beta
+**  Version  : v1.4.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -20,8 +20,8 @@ NtpStatus_t NtpStatus  = TIME_NOTSET;
 time_t      NtpLastSync = 0;
 static bool sDhcpHostnameFixed = false;  // set once after any DHCP restart to prevent double-announce
 
-ESP8266WebServer        httpServer(80);
-ESP8266HTTPUpdateServer httpUpdater(true);
+OTGWWebServer           httpServer(80);
+OTGWUpdateServer        httpUpdater(true);
 
 FSInfo LittleFSinfo;
 bool   LittleFSmounted = false;
@@ -92,7 +92,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     // server sees the desired hostname. Avoid forcing a reconnect here so we
     // don't accidentally drop a working connection and fall back into the
     // WiFiManager config portal on transient failures.
-    String currentHostname = WiFi.hostname();
+    String currentHostname = platformGetHostname();
     if (currentHostname == hostname)
     {
       DebugTln(F("Wifi already connected with correct hostname, skipping hostname update."));
@@ -103,7 +103,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
               currentHostname.c_str(), hostname);
       // Update the hostname for future DHCP negotiations; the current lease
       // will typically keep using the old hostname until the next reconnect.
-      WiFi.hostname(hostname);
+      platformSetHostname(hostname);
       DebugTln(F("Hostname updated; keeping existing WiFi connection active."));
     }
   }
@@ -113,7 +113,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     int directConnectTimeout = timeOut / 2;
     if (directConnectTimeout < 5) directConnectTimeout = 5;
     DebugTf(PSTR("Direct connect timeout: %d sec\r\n"), directConnectTimeout);
-    WiFi.hostname(hostname);  // set before begin() so DHCP sends the correct hostname
+    platformSetHostname(hostname);  // set before begin() so DHCP sends the correct hostname
     WiFi.begin(); // use stored credentials
     DECLARE_TIMER_SEC(timeoutWifiConnectInitial, directConnectTimeout, CATCH_UP_MISSED_TICKS);
     while (WiFi.status() != WL_CONNECTED)
@@ -137,7 +137,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     {
       DebugTln(F("failed to connect and hit timeout"));
       delay(2000);  // Enough time for messages to be sent.
-      ESP.restart();
+      platformRestart();
       delay(5000);  // Enough time to ensure we don't return.
     }
   }
@@ -166,12 +166,12 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 
   // Catch-all: if the hostname still doesn't match after all connection paths,
   // force a DHCP re-announce. Mark it done so startNTP() doesn't do it again.
-  WiFi.hostname(hostname);
-  if (!sDhcpHostnameFixed && strcmp(WiFi.hostname().c_str(), hostname) != 0) {
+  platformSetHostname(hostname);
+  const char *_hn = platformGetHostname();
+  if (!sDhcpHostnameFixed && strcmp(_hn, hostname) != 0) {
     DebugTf(PSTR("Catch-all: hostname mismatch after connect ('%s' vs '%s'), forcing DHCP re-announce.\r\n"),
-            WiFi.hostname().c_str(), hostname);
-    wifi_station_dhcpc_stop();
-    wifi_station_dhcpc_start();
+            _hn, hostname);
+    platformRestartDHCP();
     sDhcpHostnameFixed = true;
   }
 
@@ -214,6 +214,7 @@ void startMDNS(const char *hostname)
 
 void startLLMNR(const char *hostname)
 {
+#if HAS_LLMNR
   DebugTf(PSTR("LLMNR setup as [%s]\r\n"), hostname);
   if (LLMNR.begin(hostname))               // Start the LLMNR responder for hostname
   {
@@ -223,6 +224,9 @@ void startLLMNR(const char *hostname)
   {
     DebugTln(F("Error setting up LLMNR responder!\r\n"));
   }
+#else
+  (void)hostname;  // LLMNR not available on this platform
+#endif
 } // startLLMNR()
 
 //=====[ NTP ]=================================================================
@@ -235,13 +239,13 @@ void startNTP()
 
   // Set hostname before configTime() — configTime() is known to reset the
   // station hostname to "ESP-XXXXXX" on some ESP8266 SDK versions.
-  WiFi.hostname(CSTR(settings.sHostname));
+  platformSetHostname(CSTR(settings.sHostname));
   configTime(0, 0, settings.ntp.sHostname, nullptr, nullptr);
   // Capture hostname immediately after configTime() to detect if the SDK
   // reset it, *before* we restore it. This drives the DHCP re-announce
   // decision below.
-  bool hostnameWasReset = (strcmp(WiFi.hostname().c_str(), CSTR(settings.sHostname)) != 0);
-  WiFi.hostname(CSTR(settings.sHostname));
+  bool hostnameWasReset = (strcmp(platformGetHostname(), CSTR(settings.sHostname)) != 0);
+  platformSetHostname(CSTR(settings.sHostname));
 
   // If configTime() did reset the hostname, the DHCP lease may have been
   // re-announced with the wrong name.  Force a DHCP re-announce once so the
@@ -249,8 +253,7 @@ void startNTP()
   // the STA lease on every 30-min NTP resync (which would break MQTT/Telnet/
   // WebSocket connections).
   if (!sDhcpHostnameFixed && hostnameWasReset && WiFi.isConnected()) {
-    wifi_station_dhcpc_stop();
-    wifi_station_dhcpc_start();
+    platformRestartDHCP();
     sDhcpHostnameFixed = true;
   }
   NtpStatus = TIME_WAITFORSYNC;
@@ -310,18 +313,9 @@ const char* getMacAddress()
 {
   static char baseMacChr[13] = {0};
   uint8_t baseMac[6];
-#if defined(ESP8266)
-  WiFi.macAddress(baseMac);
+  platformGetMacAddress(baseMac);
   snprintf_P(baseMacChr, sizeof(baseMacChr), PSTR("%02X%02X%02X%02X%02X%02X"),
              baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
-#elif defined(ESP32)
-  esp_read_mac(baseMac, ESP_MAC_WIFI_STA);
-  snprintf_P(baseMacChr, sizeof(baseMacChr), PSTR("%02X%02X%02X%02X%02X%02X"),
-             baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
-#else
-  snprintf_P(baseMacChr, sizeof(baseMacChr), PSTR("%02X%02X%02X%02X%02X%02X"),
-             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-#endif
   return baseMacChr;
 }
 
