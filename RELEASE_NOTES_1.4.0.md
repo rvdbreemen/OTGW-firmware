@@ -1,11 +1,12 @@
 # OTGW-firmware v1.4.0 Release Notes
+
 **Release date:** 2026-04-02
 **Branch:** main (from dev)
 **Compare:** [v1.3.4...v1.4.0](https://github.com/rvdbreemen/OTGW-firmware/compare/v1.3.4...v1.4.0)
 
 ## Overview
 
-v1.4.0 is a major feature release. It adds an embedded smart thermostat (SAT) that turns the OTGW into a standalone heating controller, and introduces ESP32 support alongside the existing ESP8266 target through a unified platform abstraction layer.
+v1.4.0 is a major feature release. It adds an embedded smart thermostat (SAT) that turns the OTGW into a standalone heating controller, introduces ESP32 support alongside the existing ESP8266 target through a unified platform abstraction layer, and improves WiFi resilience and MQTT observability.
 
 ## New features
 
@@ -18,6 +19,8 @@ v1.4.0 is a major feature release. It adds an embedded smart thermostat (SAT) th
 
 ## Improvements
 
+- **Non-blocking WiFi reconnect:** The blocking 30-second reconnect loop is replaced with a cooperative state machine (`loopWifi()`), preventing main-loop freezes on a heating system controller. Timeout tuned to avoid premature reboots on slow networks.
+- **MQTT uptime and firmware version publishing:** Uptime (seconds) and firmware version string are now published to `otgw-firmware/uptime` and `otgw-firmware/version` MQTT topics, improving device observability.
 - **OpenTherm binary literal modernization:** `OpenThermMessageType` enum values changed from `B000`..`B111` to standard `0b000`..`0b111` (C++14), improving compiler compatibility.
 - **Serial error detection abstraction:** New `platformSerialHasOverrun()` and `platformSerialHasRxError()` functions. Available on ESP8266; returns `false` on ESP32 (hardware limitation).
 - **Unified filesystem handling:** `LittleFS` is used on both platforms with abstracted `FSInfo` retrieval.
