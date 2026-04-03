@@ -118,16 +118,32 @@ bool wifiPortalResetWindowExpired() {
 //=====================================================================
 void setup() {
 
- 
-  // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
-  // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
-  // while (!Serial) {} //Wait for OK
+
+  // Serial is initialized by OTGWSerial (PIC boards) or manually (OTGW32).
   WatchDogEnabled(0); // turn off watchdog
-  
+
   SetupDebugln(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   SetupDebugf(PSTR("Booting....[%s]\r\n\r\n"), _VERSION);
-  
-  detectPIC();
+
+  detectPIC();  // no-op on OTGW32
+#if HAS_DIRECT_OT
+  initOTDirect();
+#endif
+
+  // Runtime peripheral detection (OTGW32: OLED, Ethernet)
+#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+  Wire.beginTransmission(0x3C);  // Common SSD1306 OLED address
+  state.hw.bOLEDPresent = (Wire.endTransmission() == 0);
+  SetupDebugTf(PSTR("OLED probe at 0x3C: %s\r\n"), state.hw.bOLEDPresent ? "found" : "not found");
+#endif
+
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  // TODO: SPI probe for W5500 Ethernet — requires SPI pin definitions
+  // state.hw.bEthernetPresent = probeW5500();
+  state.hw.bEthernetPresent = false;
+  SetupDebugTln(F("Ethernet probe: not yet implemented"));
+#endif
 
   //setup randomseed the right way
   randomSeed(platformHardwareRandom()); // Hardware RNG to seed the Random PRNG
@@ -284,12 +300,14 @@ void sendMQTTuptime(){
 }
 
 void sendtimecommand(){
+  if (!isPICEnabled()) return;              // only send when pic is available
   if (state.otgw.bPSmode) return;                  // when in Print Summary mode (PS=1), no timesync commands (improving legacy/Domoticz compatibility)
   if (!settings.ntp.bEnable) return;        // if NTP is disabled, then return
   if (!settings.ntp.bSendtime) return;      // if NTP send time is disabled, then return
   if (NtpStatus != TIME_SYNC) return;   // only send time command when time is synced
-  if (!state.pic.bAvailable) return;           // only send when pic is available
+#if HAS_PIC
   if (OTGWSerial.firmwareType() != FIRMWARE_OTGW) return; //only send timecommand when in gateway firmware, not in diagnostic or interface mode
+#endif
 
   //send time command to OTGW
   //send time / weekday
@@ -375,8 +393,10 @@ void doTaskEvery1s(){
 //===[ Do task every 3s ]===
 void doTaskEvery3s(){
   //== do tasks ==
+#if HAS_PIC
   if (!picSettingsCycleActive) return;
   queryNextPICsetting();
+#endif
 }
 
 
@@ -396,6 +416,7 @@ void doTaskEvery60s(){
     queryOTGWgatewaymode();
   }
 
+#if HAS_PIC
   // Probe PIC firmware version if still unknown.
   // Runs regardless of isPICEnabled() so a transient boot-probe miss can recover:
   // detectPIC() relies on a single ETX check; if that fails, this 60s retry is the
@@ -409,6 +430,7 @@ void doTaskEvery60s(){
     OTGWSerial.write("PR=A\r\n");
     OTGWSerial.flush();
   }
+#endif
   
   // Log heap statistics every minute for monitoring
   logHeapStats();
@@ -439,6 +461,7 @@ static void handleEspFlashBackgroundTasks()
   handleWebSocket();          // Keep WebSocket service responsive during flash
 }
 
+#if HAS_PIC
 static void handlePicFlashBackgroundTasks()
 {
   handleDebug();              // Keep telnet debug active for monitoring
@@ -449,6 +472,7 @@ static void handlePicFlashBackgroundTasks()
   handleOTGW();               // REQUIRED for PIC flash - processes serial communication
   handleWebSocket();          // Keep WebSocket service responsive during flash
 }
+#endif
 
 //===[ Do the background tasks ]===
 void doBackgroundTasks()
@@ -477,13 +501,18 @@ void doBackgroundTasks()
   if (WiFi.status() == WL_CONNECTED) {
     if (state.flash.bESPactive) {
       handleEspFlashBackgroundTasks();
+#if HAS_PIC
     } else if (state.flash.bPICactive) {
       handlePicFlashBackgroundTasks();
+#endif
     } else {
       //while connected handle everything that uses network stuff
       handleDebug();
       handleMQTT();                 // MQTT transmissions
-      handleOTGW();                 // OTGW handling
+      handleOTGW();                 // OTGW serial handling (PIC boards)
+#if HAS_DIRECT_OT
+      if (isOTDirectEnabled()) loopOTDirect();  // OT-direct handling (OTGW32)
+#endif
       handleWebSocket();            // WebSocket handling for OT log streaming
       httpServer.handleClient();
     #if MDNS_NEEDS_UPDATE
@@ -516,7 +545,9 @@ void loop()
       evalOutputs();                    // when the bits change, the output gpio bit will follow
       evalWebhook();                    // when the trigger bit changes, fire the webhook
       satControlLoop();                 // SAT thermostat control loop (timer-guarded internally)
-      handlePendingUpgrade();           // Check if we need to start an upgrade
+#if HAS_PIC
+      handlePendingUpgrade();           // Check if we need to start a PIC upgrade
+#endif
     } 
 
   doBackgroundTasks();              // run background tasks

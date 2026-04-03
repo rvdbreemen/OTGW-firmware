@@ -22,8 +22,10 @@
 #include <TelnetStream.h>       // https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
 #include "Wire.h"
 #include "safeTimers.h"
-#include "boards.h"             // Board-specific pin maps (PIN_LED1, PIN_PIC_RST, etc.)
+#include "boards.h"             // Board-specific pin maps and feature flags (HAS_PIC, HAS_DIRECT_OT)
+#if HAS_PIC
 #include <OTGWSerial.h>         // Bron Schelte's Serial class - it upgrades and more
+#endif
 #include "OTGW-Core.h"          // Core code for this firmware
 #include <OneWire.h>            // required for Dallas sensor library
 #include <DallasTemperature.h>  // Miles Burton's - Arduino Dallas library
@@ -33,15 +35,22 @@
 #define I2CSCL  PIN_I2C_SCL
 #define I2CSDA  PIN_I2C_SDA
 #define BUTTON  PIN_BUTTON
-#define PICRST  PIN_PIC_RST
 #define LED1    PIN_LED1
 #define LED2    PIN_LED2
 
+#if HAS_PIC
+#define PICRST  PIN_PIC_RST
 #define PICFIRMWARE "/gateway.hex"
-
 OTGWSerial OTGWSerial(PICRST, LED2);
 void fwupgradestart(const char *hexfile);
 void handlePendingUpgrade();
+#endif
+
+#if HAS_DIRECT_OT
+// OT-direct forward declarations (defined in OTDirect.ino)
+void initOTDirect();
+void loopOTDirect();
+#endif
 
 void blinkLEDnow();
 void blinkLEDnow(uint8_t);
@@ -146,6 +155,20 @@ void satCycleOnFlameChange(bool flameOn);
 void satSendStatusJSON();
 uint32_t satCycleGetFlameOnStartMs();
 uint32_t satCycleGetFlameOffStartMs();
+
+//===================[ Hardware Mode — detected at boot ]===================
+enum OTGWHardwareMode : uint8_t {
+  HW_MODE_UNKNOWN   = 0,   // Not yet detected
+  HW_MODE_PIC       = 1,   // PIC16F co-processor on UART (traditional OTGW)
+  HW_MODE_OT_DIRECT = 2,   // Direct GPIO OpenTherm via opentherm_library (OTGW32)
+  HW_MODE_DEGRADED  = 3,   // Hardware detected but non-functional (OT bus dead, PIC missing)
+};
+
+struct HardwareSection {       // state.hw — detected hardware capabilities
+  OTGWHardwareMode eMode       = HW_MODE_UNKNOWN;
+  bool bOLEDPresent            = false;
+  bool bEthernetPresent        = false;
+};
 
 //===================[ Runtime State — transient, never persisted (ADR-051) ]===================
 // Sub-section structs for OTGWState — groups runtime state by system component.
@@ -272,6 +295,7 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
 };
 
 struct OTGWState {
+  HardwareSection    hw;          // state.hw.eMode, state.hw.bOLEDPresent
   PICSection         pic;         // state.pic.bAvailable, state.pic.sFwversion
   OTGWProtocol       otgw;        // state.otgw.bOnline, state.otgw.bBoilerState
   MQTTRuntimeSection mqtt;        // state.mqtt.bConnected
@@ -289,8 +313,28 @@ OTGWState state;
 // Central PIC availability guard — returns true when a PIC is available.
 // Set at boot by detectPIC() and can flip true at runtime if a PIC banner is received.
 // All PIC-related operations (commands, queries, upgrades) check this before proceeding.
-inline bool isPICEnabled() { return state.pic.bAvailable; }
+inline bool isPICEnabled() {
+#if HAS_PIC
+  return state.pic.bAvailable;
+#else
+  return false;  // compiled out on OTGW32
+#endif
+}
+
+// Returns true when OT-direct hardware is active (OTGW32 with working OT bus).
+inline bool isOTDirectEnabled() {
+#if HAS_DIRECT_OT
+  return state.hw.eMode == HW_MODE_OT_DIRECT;
+#else
+  return false;  // compiled out on PIC boards
+#endif
+}
+
+#if HAS_PIC
 inline bool isGatewayFirmware() { return strcmp_P(state.pic.sType, PSTR("gateway")) == 0; }
+#else
+inline bool isGatewayFirmware() { return false; }
+#endif
 
 //===================[ Persistent Settings — serialized to LittleFS (ADR-051) ]===================
 // Sub-section structs for OTGWSettings — groups configuration by feature area.
