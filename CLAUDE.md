@@ -656,6 +656,15 @@ Do NOT create ADRs for: pure refactors, bug fixes, minor features within existin
 
 To change a decision: create a NEW ADR with the next available number that supersedes the old one, then mark the old ADR's status as "Superseded by ADR-XXX". Only **Proposed** ADRs may be freely edited.
 
+### ADR creation workflow (human checkpoints required)
+
+1. **Create** the ADR file with `Status: Proposed`. Include Context, Decision, Consequences, and Related sections.
+2. **Stop and ask the user to review.** Do not proceed until the user explicitly approves or requests changes. Present the key trade-offs and ask for confirmation.
+3. **Iterate** on feedback — edit the Proposed ADR as needed.
+4. **Only set `Status: Accepted` after the user explicitly approves.** Never self-approve an ADR. The user must say the ADR is accepted before you change the status.
+
+This applies equally to new ADRs and to ADRs that supersede existing ones.
+
 ### ADR format
 ```
 # ADR-NNN-Short-Title
