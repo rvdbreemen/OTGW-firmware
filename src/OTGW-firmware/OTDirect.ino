@@ -118,8 +118,8 @@ static unsigned long buildStatusRequest() {
   // Build a complete READ_DATA request so message type, data-id and parity are correct.
   // MsgID 0: Master status flags in data-value HB (bits 15-8), LB = 0 (slave fills it)
   return OpenTherm::buildRequest(
-    OpenThermLibMessageType::READ_DATA,
-    OpenThermLibMessageID::Status,
+    OpenThermMessageType::READ_DATA,
+    OpenThermMessageID::Status,
     ((unsigned int)otMasterStatusFlags << 8)
   );
 }
@@ -205,7 +205,7 @@ static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin 
   if (!otMaster.isReady()) return false;  // bus busy — try again later
   otLastSentRequest = request;
   otLastRequestOrigin = origin;
-  otMasterRequestActive = otMaster.sendRequestAync(request);
+  otMasterRequestActive = otMaster.sendRequestAsync(request);
   if (otMasterRequestActive) {
     bridgeFrameToParser((origin == OT_DIRECT_ORIGIN_THERMOSTAT) ? 'T' : 'R', request);
   }
@@ -268,8 +268,8 @@ static void scheduleMasterRequest() {
         request = buildStatusRequest();
       } else {
         request = OpenTherm::buildRequest(
-          OpenThermLibMessageType::READ_DATA,
-          static_cast<OpenThermLibMessageID>(entry.msgId),
+          OpenThermMessageType::READ_DATA,
+          static_cast<OpenThermMessageID>(entry.msgId),
           0
         );
       }
@@ -298,8 +298,9 @@ void loopOTDirect() {
 
   // Forward pending thermostat frame when master bus is idle.
   // Keep frame pending until send succeeds (retry on next loop).
+  // Note: sendMasterRequestAsync bridges the frame to processOT() on success,
+  // so we don't bridge here to avoid duplicate parsing on retries.
   if (!otMasterRequestActive && otSlaveFramePending) {
-    bridgeFrameToParser('T', otSlaveFrame);
     if (sendMasterRequestAsync(otSlaveFrame, OT_DIRECT_ORIGIN_THERMOSTAT)) {
       otSlaveFramePending = false;
     }
@@ -333,8 +334,8 @@ void handleOTDirectCommand(const char* buf, int len) {
     float setpoint = atof(value);
     uint16_t f88 = (uint16_t)((int16_t)(setpoint * 256.0f));
     otCmdFrame = OpenTherm::buildRequest(
-      OpenThermLibMessageType::WRITE_DATA,
-      OpenThermLibMessageID::TrSet,
+      OpenThermMessageType::WRITE_DATA,
+      OpenThermMessageID::TrSet,
       f88
     );
     otCmdPending = true;
@@ -345,8 +346,8 @@ void handleOTDirectCommand(const char* buf, int len) {
     float setpoint = atof(value);
     uint16_t f88 = (uint16_t)((int16_t)(setpoint * 256.0f));
     otCmdFrame = OpenTherm::buildRequest(
-      OpenThermLibMessageType::WRITE_DATA,
-      OpenThermLibMessageID::TSet,
+      OpenThermMessageType::WRITE_DATA,
+      OpenThermMessageID::TSet,
       f88
     );
     otCmdPending = true;
@@ -357,8 +358,8 @@ void handleOTDirectCommand(const char* buf, int len) {
     float setpoint = atof(value);
     uint16_t f88 = (uint16_t)((int16_t)(setpoint * 256.0f));
     otCmdFrame = OpenTherm::buildRequest(
-      OpenThermLibMessageType::WRITE_DATA,
-      OpenThermLibMessageID::TsetCH2,
+      OpenThermMessageType::WRITE_DATA,
+      OpenThermMessageID::TsetCH2,
       f88
     );
     otCmdPending = true;
@@ -399,8 +400,8 @@ void handleOTDirectCommand(const char* buf, int len) {
     float setpoint = atof(value);
     uint16_t f88 = (uint16_t)((int16_t)(setpoint * 256.0f));
     otCmdFrame = OpenTherm::buildRequest(
-      OpenThermLibMessageType::WRITE_DATA,
-      OpenThermLibMessageID::TdhwSet,
+      OpenThermMessageType::WRITE_DATA,
+      OpenThermMessageID::TdhwSet,
       f88
     );
     otCmdPending = true;
@@ -411,8 +412,8 @@ void handleOTDirectCommand(const char* buf, int len) {
     float setpoint = atof(value);
     uint16_t f88 = (uint16_t)((int16_t)(setpoint * 256.0f));
     otCmdFrame = OpenTherm::buildRequest(
-      OpenThermLibMessageType::WRITE_DATA,
-      OpenThermLibMessageID::MaxTSet,
+      OpenThermMessageType::WRITE_DATA,
+      OpenThermMessageID::MaxTSet,
       f88
     );
     otCmdPending = true;
@@ -423,8 +424,8 @@ void handleOTDirectCommand(const char* buf, int len) {
     float level = atof(value);
     uint16_t f88 = (uint16_t)((int16_t)(level * 256.0f));
     otCmdFrame = OpenTherm::buildRequest(
-      OpenThermLibMessageType::WRITE_DATA,
-      OpenThermLibMessageID::MaxRelModLevelSetting,
+      OpenThermMessageType::WRITE_DATA,
+      OpenThermMessageID::MaxRelModLevelSetting,
       f88
     );
     otCmdPending = true;
@@ -435,8 +436,8 @@ void handleOTDirectCommand(const char* buf, int len) {
     float temp = atof(value);
     uint16_t f88 = (uint16_t)((int16_t)(temp * 256.0f));
     otCmdFrame = OpenTherm::buildRequest(
-      OpenThermLibMessageType::WRITE_DATA,
-      OpenThermLibMessageID::Toutside,
+      OpenThermMessageType::WRITE_DATA,
+      OpenThermMessageID::Toutside,
       f88
     );
     otCmdPending = true;
@@ -447,8 +448,8 @@ void handleOTDirectCommand(const char* buf, int len) {
     float setpoint = atof(value);
     uint16_t f88 = (uint16_t)((int16_t)(setpoint * 256.0f));
     otCmdFrame = OpenTherm::buildRequest(
-      OpenThermLibMessageType::WRITE_DATA,
-      OpenThermLibMessageID::TSet,
+      OpenThermMessageType::WRITE_DATA,
+      OpenThermMessageID::TSet,
       f88
     );
     otCmdPending = true;
@@ -459,8 +460,8 @@ void handleOTDirectCommand(const char* buf, int len) {
     int level = atoi(value);
     uint16_t data = ((uint16_t)(level & 0xFF)) << 8;  // value in HB
     otCmdFrame = OpenTherm::buildRequest(
-      OpenThermLibMessageType::WRITE_DATA,
-      static_cast<OpenThermLibMessageID>(71),
+      OpenThermMessageType::WRITE_DATA,
+      static_cast<OpenThermMessageID>(71),
       data
     );
     otCmdPending = true;
