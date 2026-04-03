@@ -497,6 +497,12 @@ void doBackgroundTasks()
     emergencyHeapRecovery();
   }
 
+  // OT-direct must run regardless of WiFi state — OTGW32 has no PIC co-processor
+  // to keep thermostat↔boiler traffic alive during WiFi outages.
+#if HAS_DIRECT_OT
+  if (isOTDirectEnabled()) loopOTDirect();
+#endif
+
   if (WiFi.status() == WL_CONNECTED) {
     if (state.flash.bESPactive) {
       handleEspFlashBackgroundTasks();
@@ -509,9 +515,6 @@ void doBackgroundTasks()
       handleDebug();
       handleMQTT();                 // MQTT transmissions
       handleOTGW();                 // OTGW serial handling (PIC boards)
-#if HAS_DIRECT_OT
-      if (isOTDirectEnabled()) loopOTDirect();  // OT-direct handling (OTGW32)
-#endif
       handleWebSocket();            // WebSocket handling for OT log streaming
       httpServer.handleClient();
     #if MDNS_NEEDS_UPDATE
