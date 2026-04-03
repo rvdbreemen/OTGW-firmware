@@ -118,7 +118,7 @@ Refactored in P9 of the C++ refactoring plan (OTGW-firmware.ino):
 - `loopWifi()` added to `doBackgroundTasks()` as first call
 - States: `WIFI_IDLE`, `WIFI_DISCONNECTED`, `WIFI_CONNECTING`, `WIFI_RECONNECTED`, `WIFI_FAILED`
 - 30-second connection timeout, 10 retry attempts before rebooting
-- `WiFi.setAutoReconnect(false)` — SDK auto-reconnect disabled to prevent interference with the state machine
+- `WiFi.setAutoReconnect(true)` kept enabled — SDK handles brief glitches transparently; `loopWifi()` is the fallback for longer outages
 
 ## Related Decisions
 - ADR-007: Timer-Based Task Scheduling (cooperative scheduling model)
