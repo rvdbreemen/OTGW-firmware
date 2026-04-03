@@ -4,15 +4,18 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 “devkit” that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-## 🚀 What's New in v1.3.5
+## What's New in v1.4.0
 
-Version 1.3.5 fixes the WiFi reconnection regression reported since v1.3.0 and adds MQTT uptime/version publishing. Full release notes: [RELEASE_NOTES_1.3.5.md](RELEASE_NOTES_1.3.5.md)
+Version 1.4.0 is a major feature release. It adds SAT (Smart Autotune Thermostat), an embedded heating controller that turns the OTGW into a standalone smart thermostat. It also introduces ESP32 support through a unified platform abstraction layer. Full release notes: [RELEASE_NOTES_1.4.0.md](RELEASE_NOTES_1.4.0.md)
 
 ### Highlights
 
-- **WiFi reconnection fix (#530):** The WiFi state machine timeout (5s) was too short for ESP8266, causing devices to go offline periodically. Timeout increased to 30s, matching v1.2.0 behavior.
-- **MQTT uptime and version publishing:** Firmware now publishes uptime and version info to MQTT on connect for better device visibility.
-- **No breaking changes** vs v1.3.4.
+- **SAT (Smart Autotune Thermostat):** Embedded heating controller running entirely on the ESP. Weather-compensated heating curve + PID v3 controller with automatic gain tuning. Supports continuous modulation and PWM flame cycling, radiator and underfloor heating. Six independent safety layers. Web UI dashboard, REST API, MQTT, and Home Assistant auto-discovery. No HA or external controller required.
+- **ESP32 support (experimental):** The firmware now compiles for both ESP8266 and ESP32 from one source tree. 30+ platform shim functions abstract away SDK differences at compile time.
+- **PlatformIO build system:** New `platformio.ini` with `esp8266` and `esp32` environments. Build with `pio run -e esp8266` or `pio run -e esp32`.
+- **Board-level GPIO definitions:** Auto-detected pin mappings per platform via `boards.h`.
+- **OpenTherm enum modernization:** Binary literals updated to C++14 standard format for better compiler compatibility.
+- **No breaking changes** vs v1.3.4. The ESP8266 build is functionally identical.
 
 ## What was new in v1.3.4
 
