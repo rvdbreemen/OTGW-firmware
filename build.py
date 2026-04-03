@@ -277,9 +277,9 @@ def install_dependencies(project_dir, config_file, target_names):
         "WebSockets@2.3.6"
     ]
 
-    # OTGW32 target needs OpenTherm library for direct GPIO OT
+    # OTGW32 target needs OpenTherm library for direct GPIO OT (Phunkafizer fork)
     if "otgw32" in target_names:
-        libraries.append("OpenTherm Library@1.1.5")
+        libraries.append("https://github.com/Phunkafizer/opentherm_library.git")
 
     for lib in libraries:
         print_info(f"Installing {lib}...")
