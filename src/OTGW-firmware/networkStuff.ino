@@ -143,6 +143,9 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   }
   DebugTf(PSTR("Wifi status: %s\r\n"), WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
   DebugTf(PSTR("Connected to: %s\r\n"), WiFi.localIP().toString().c_str());
+  // SDK auto-reconnect handles brief WiFi glitches (channel hops, momentary
+  // interference) transparently at the radio level, often in <1 second.
+  // loopWifi() (ADR-047) is the fallback for longer outages.
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
 
