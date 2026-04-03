@@ -54,6 +54,7 @@ void handleDebug(){
                 detectPIC();
                 break;
             case 'a':
+#if HAS_PIC
                 DebugTln(F("Send PR=A command, to ID the chip"));
                 getpicfwversion();
                 DebugTln(F("Debug --> PR=A report firmware version, type"));
@@ -63,6 +64,9 @@ void handleDebug(){
                 OTGWDebugTf(PSTR("Current device id: %s\r\n"), state.pic.sDeviceid);
                 strlcpy(state.pic.sType, OTGWSerial.firmwareToString().c_str(), sizeof(state.pic.sType));
                 OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
+#else
+                DebugTln(F("PIC not available on this hardware"));
+#endif
                 break;
             case 'q':
                 DebugTln(F("Read settings"));

@@ -50,6 +50,7 @@ void handlePendingUpgrade();
 // OT-direct forward declarations (defined in OTDirect.ino)
 void initOTDirect();
 void loopOTDirect();
+void handleOTDirectCommand(const char* buf, int len);
 #endif
 
 void blinkLEDnow();

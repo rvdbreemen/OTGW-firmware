@@ -130,21 +130,6 @@ void setup() {
   initOTDirect();
 #endif
 
-  // Runtime peripheral detection (OTGW32: OLED, Ethernet)
-#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
-  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
-  Wire.beginTransmission(0x3C);  // Common SSD1306 OLED address
-  state.hw.bOLEDPresent = (Wire.endTransmission() == 0);
-  SetupDebugTf(PSTR("OLED probe at 0x3C: %s\r\n"), state.hw.bOLEDPresent ? "found" : "not found");
-#endif
-
-#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-  // TODO: SPI probe for W5500 Ethernet — requires SPI pin definitions
-  // state.hw.bEthernetPresent = probeW5500();
-  state.hw.bEthernetPresent = false;
-  SetupDebugTln(F("Ethernet probe: not yet implemented"));
-#endif
-
   //setup randomseed the right way
   randomSeed(platformHardwareRandom()); // Hardware RNG to seed the Random PRNG
  
@@ -183,6 +168,20 @@ void setup() {
   startMQTT();               // start the MQTT after webserver, always.
  
   { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason)); }  // setup the WatchDog
+
+  // Runtime peripheral detection (OTGW32: OLED, Ethernet)
+  // Wire.begin() was called by initWatchDog() so I2C bus is ready
+#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
+  Wire.beginTransmission(0x3C);  // Common SSD1306 OLED address
+  state.hw.bOLEDPresent = (Wire.endTransmission() == 0);
+  SetupDebugTf(PSTR("OLED probe at 0x3C: %s\r\n"), state.hw.bOLEDPresent ? "found" : "not found");
+#endif
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  // TODO: SPI probe for W5500 Ethernet — requires SPI pin definitions
+  state.hw.bEthernetPresent = false;
+  SetupDebugTln(F("Ethernet probe: not yet implemented"));
+#endif
+
   platformResetReason(lastReset, sizeof(lastReset));
   SetupDebugf(PSTR("Last reset reason: [%s]\r\n"), CSTR(lastReset));
   state.uptime.iRebootCount = updateRebootCount();

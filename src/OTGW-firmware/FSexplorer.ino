@@ -209,8 +209,10 @@ void startWebserver(){
     httpServer.streamFile(f, F("application/javascript"));
     f.close();
   });
+#if HAS_PIC
   //otgw pic functions
   httpServer.on("/pic", upgradepic);
+#endif
   // all other api calls are catched in FSexplorer onNotFounD!
   httpServer.on("/api", HTTP_ANY, processAPI);  //was only HTTP_GET (20210110)
 

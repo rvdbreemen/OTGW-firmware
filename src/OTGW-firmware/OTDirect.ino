@@ -67,6 +67,11 @@ static uint8_t otScheduleIdx = 0;
 static bool     otCmdPending = false;
 static uint32_t otCmdFrame   = 0;
 
+// Async state tracking for non-blocking OT requests
+static bool     otMasterRequestActive = false;   // true while waiting for boiler response
+static unsigned long otLastSentRequest = 0;      // frame we sent (for bridge logging)
+static bool     otSlaveForwarding     = false;   // true when forwarding thermostat frame
+
 // ---------------------------------------------------------------------------
 // bridgeFrameToParser — format a 32-bit OT frame and feed to processOT()
 // ---------------------------------------------------------------------------
@@ -80,11 +85,9 @@ static void bridgeFrameToParser(char prefix, unsigned long frame) {
 // buildStatusRequest — construct MsgID 0 master request with current flags
 // ---------------------------------------------------------------------------
 static unsigned long buildStatusRequest() {
-  // MsgID 0: Master status (HB) = flags, slave status (LB) = 0 (will be filled by boiler)
-  return ((unsigned long)0 << 28)    // msg-type: READ_DATA = 0
-       | ((unsigned long)0 << 16)    // reserved
-       | ((unsigned long)0 << 8)     // data-id = 0
-       | ((unsigned long)otMasterStatusFlags);  // master status flags in LB of request
+  // MsgID 0: Master status flags in data-value HB (bits 15-8), LB = 0 (slave fills it)
+  // OT frame: [msg-type:4][spare:4][reserved:8][data-id:8][data-value:16]
+  return ((unsigned long)otMasterStatusFlags << 8);  // HB = master status, all other fields = 0
 }
 
 // ---------------------------------------------------------------------------
@@ -136,17 +139,23 @@ void initOTDirect() {
   otSlave.begin(slaveISR);
   DebugTln(F("OT-direct: Slave interface started"));
 
-  // 5. Set hardware mode
-  state.hw.eMode = HW_MODE_OT_DIRECT;
-  DebugTln(F("OT-direct: Hardware mode set to OT_DIRECT"));
+  // 5. Set hardware mode based on bus probe result
+  if (busPresent) {
+    state.hw.eMode = HW_MODE_OT_DIRECT;
+    DebugTln(F("OT-direct: Hardware mode set to OT_DIRECT"));
+  } else {
+    state.hw.eMode = HW_MODE_DEGRADED;
+    DebugTln(F("OT-direct: Hardware mode set to DEGRADED (bus not detected)"));
+  }
 
   // 6. Send initial status request to boiler to check connectivity
+  // Blocking call is acceptable during setup() — not yet in cooperative loop
   unsigned long request = buildStatusRequest();
   unsigned long response = otMaster.sendRequest(request);
   if (otMaster.isValidResponse(response)) {
     state.otgw.bOnline = true;
+    state.hw.eMode = HW_MODE_OT_DIRECT;  // upgrade from DEGRADED if boiler responds
     DebugTln(F("OT-direct: Boiler responded — OT bus online"));
-    // Bridge both request and response
     bridgeFrameToParser('T', request);
     bridgeFrameToParser('B', response);
   } else {
@@ -156,22 +165,59 @@ void initOTDirect() {
 }
 
 // ---------------------------------------------------------------------------
-// scheduleMasterRequest — pick next scheduled message and send to boiler
+// sendMasterRequestAsync — initiate an async OT request (non-blocking)
 // ---------------------------------------------------------------------------
-static void scheduleMasterRequest() {
-  uint32_t now = millis();
+static bool sendMasterRequestAsync(unsigned long request) {
+  if (!otMaster.isReady()) return false;  // bus busy — try again later
+  otLastSentRequest = request;
+  otMasterRequestActive = otMaster.sendRequestAsync(request);
+  if (otMasterRequestActive) {
+    bridgeFrameToParser('T', request);
+  }
+  return otMasterRequestActive;
+}
 
-  // If there's a pending command from the queue, send it first
-  if (otCmdPending) {
-    otCmdPending = false;
-    unsigned long response = otMaster.sendRequest(otCmdFrame);
-    bridgeFrameToParser('T', otCmdFrame);
-    if (otMaster.isValidResponse(response)) {
-      bridgeFrameToParser('B', response);
-      state.otgw.bOnline = true;
-    } else {
+// ---------------------------------------------------------------------------
+// handleMasterResponse — process a completed async master request
+// ---------------------------------------------------------------------------
+static void handleMasterResponse() {
+  unsigned long response = otMaster.getLastResponse();
+  OpenThermResponseStatus status = otMaster.getLastResponseStatus();
+
+  if (status == OpenThermResponseStatus::SUCCESS) {
+    bridgeFrameToParser('B', response);
+    state.otgw.bOnline = true;
+
+    // If this was a forwarded thermostat frame, send response back
+    if (otSlaveForwarding) {
+      otSlave.sendResponse(response);
+    }
+  } else {
+    // Only mark offline on status request (MsgID 0) failures
+    uint8_t msgId = (otLastSentRequest >> 8) & 0xFF;
+    if (msgId == 0) {
       state.otgw.bOnline = false;
     }
+  }
+
+  otMasterRequestActive = false;
+  otSlaveForwarding = false;
+}
+
+// ---------------------------------------------------------------------------
+// scheduleMasterRequest — pick next scheduled message and send async
+// ---------------------------------------------------------------------------
+static void scheduleMasterRequest() {
+  // Don't schedule if master is already busy (collision avoidance)
+  if (otMasterRequestActive) return;
+
+  uint32_t now = millis();
+
+  // Pending command from the queue takes priority
+  if (otCmdPending) {
+    otCmdPending = false;
+    otSlaveForwarding = false;
+    sendMasterRequestAsync(otCmdFrame);
     return;
   }
 
@@ -188,23 +234,15 @@ static void scheduleMasterRequest() {
       if (entry.msgId == 0) {
         request = buildStatusRequest();
       } else {
-        // READ_DATA request for the message ID
-        request = ((unsigned long)0 << 28)    // READ_DATA
-                | ((unsigned long)entry.msgId << 8);
+        request = OpenTherm::buildRequest(
+          OpenThermMessageType::READ_DATA,
+          static_cast<OpenThermMessageID>(entry.msgId),
+          0
+        );
       }
 
-      unsigned long response = otMaster.sendRequest(request);
-      bridgeFrameToParser('T', request);
-      if (otMaster.isValidResponse(response)) {
-        bridgeFrameToParser('B', response);
-        state.otgw.bOnline = true;
-      } else {
-        // Don't immediately mark offline for a single failed request
-        // Only MsgID 0 failures indicate true offline state
-        if (entry.msgId == 0) {
-          state.otgw.bOnline = false;
-        }
-      }
+      otSlaveForwarding = false;
+      sendMasterRequestAsync(request);
       return;  // One request per call
     }
   } while (otScheduleIdx != startIdx);
@@ -212,27 +250,30 @@ static void scheduleMasterRequest() {
 
 // ---------------------------------------------------------------------------
 // loopOTDirect — called from doBackgroundTasks() on OTGW32 builds
+// Non-blocking: uses async requests, never blocks for OT response.
 // ---------------------------------------------------------------------------
 void loopOTDirect() {
-  // Process OpenTherm library state machines
+  // Process OpenTherm library state machines (drives ISR-based TX/RX)
   otMaster.process();
   otSlave.process();
 
+  // Check if an async master request has completed
+  if (otMasterRequestActive && otMaster.isReady()) {
+    handleMasterResponse();
+  }
+
   // Handle incoming thermostat frames (slave mode)
-  if (otSlave.hasMessage()) {
+  // Only forward if master bus is idle (collision avoidance)
+  if (!otMasterRequestActive && otSlave.hasMessage()) {
     unsigned long thermostatFrame = otSlave.getMessage();
     bridgeFrameToParser('T', thermostatFrame);
 
-    // In repeater mode: forward thermostat request to boiler
-    unsigned long boilerResponse = otMaster.sendRequest(thermostatFrame);
-    if (otMaster.isValidResponse(boilerResponse)) {
-      bridgeFrameToParser('B', boilerResponse);
-      otSlave.sendResponse(boilerResponse);
-      state.otgw.bOnline = true;
-    }
+    // Forward thermostat request to boiler asynchronously
+    otSlaveForwarding = true;
+    sendMasterRequestAsync(thermostatFrame);
   }
 
-  // Schedule periodic master requests (status, temps, etc.)
+  // Schedule periodic master requests (non-blocking, skips if bus busy)
   DECLARE_TIMER_MS(timerOTSchedule, 100, SKIP_MISSED_TICKS);
   if (DUE(timerOTSchedule)) {
     scheduleMasterRequest();
@@ -259,14 +300,9 @@ void handleOTDirectCommand(const char* buf, int len) {
   if (cmd0 == 'T' && cmd1 == 'T') {
     float setpoint = atof(value);
     int16_t fixed = (int16_t)(setpoint * 256.0f);
-    unsigned long frame = ((unsigned long)1 << 28)   // WRITE_DATA
-                        | ((unsigned long)1 << 8)    // MsgID 1 = TSet
-                        | ((unsigned long)((fixed >> 8) & 0xFF) << 8)
-                        | ((unsigned long)(fixed & 0xFF));
-    // Correct: pack data value in low 16 bits
-    frame = ((unsigned long)1 << 28)  // WRITE_DATA
-          | ((unsigned long)1 << 8)   // MsgID 1
-          | (((uint16_t)fixed) & 0xFFFF);
+    unsigned long frame = ((unsigned long)1 << 28)  // WRITE_DATA
+                        | ((unsigned long)1 << 8)   // MsgID 1 = TSet
+                        | (((uint16_t)fixed) & 0xFFFF);
     otCmdFrame = frame;
     otCmdPending = true;
     OTGWDebugTf(PSTR("OT-direct: TT=%.1f -> frame 0x%08lX\r\n"), setpoint, frame);

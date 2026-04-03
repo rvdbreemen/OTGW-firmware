@@ -39,9 +39,9 @@ extern void settingsMarkClean();      // Clear dirty flag without writing or res
 
 #ifndef Debug
   //#warning Debug() was not defined!
-	#define Debug(...)		({ OTGWSerial.print(__VA_ARGS__); })  
-	#define Debugln(...)	({ OTGWSerial.println(__VA_ARGS__); })  
-  #define Debugf(...)		({ OTGWSerial.printf_P(__VA_ARGS__); })  
+	#define Debug(...)		({ Serial.print(__VA_ARGS__); })
+	#define Debugln(...)	({ Serial.println(__VA_ARGS__); })
+  #define Debugf(...)		({ Serial.printf_P(__VA_ARGS__); })
 //#else
 //  #warning Seems Debug() is already defined!
 #endif
@@ -161,7 +161,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_beginFilesystemUpload(HTTPUpl
   if (uploadTotal > 0 && uploadTotal > fsSize) {
     _updaterError = F("filesystem image too large");
   } else if (!Update.begin(fsSize, U_FS)) { // always use full partition size to erase stale upper-block data
-    if (_serial_output) Update.printError(OTGWSerial);
+    if (_serial_output) Update.printError(Serial);
     _setUpdaterError();
   }
 }
@@ -340,7 +340,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setSuccessPage(const char *suc
 template <typename ServerType>
 void ESP8266HTTPUpdateServerTemplate<ServerType>::_setUpdaterError()
 {
-  if (_serial_output) Update.printError(OTGWSerial);
+  if (_serial_output) Update.printError(Serial);
   StreamString str;
   Update.printError(str);
   _updaterError = str.c_str();
