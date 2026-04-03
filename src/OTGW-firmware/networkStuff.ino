@@ -190,6 +190,77 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 } // startWiFi()
 
 //===========================================================================================
+enum WifiState_t {
+  WIFI_IDLE,         // connected, monitoring
+  WIFI_DISCONNECTED, // just dropped — start reconnect
+  WIFI_CONNECTING,   // waiting non-blocking for connection
+  WIFI_RECONNECTED,  // just came back — restart services
+  WIFI_FAILED        // too many retries — trigger reboot
+};
+static WifiState_t wifiState = WIFI_IDLE;
+static int wifiRetryCount = 0;
+
+void loopWifi() {
+  DECLARE_TIMER_SEC(timerWifiRetry, 30, CATCH_UP_MISSED_TICKS);
+
+  switch (wifiState) {
+    case WIFI_IDLE:
+      if (WiFi.status() != WL_CONNECTED) {
+        DebugTln(F("WiFi: connection lost, starting non-blocking reconnect"));
+        wifiRetryCount = 0;
+        wifiState = WIFI_DISCONNECTED;
+      }
+      break;
+
+    case WIFI_DISCONNECTED:
+      DebugTf(PSTR("WiFi: reconnect attempt %d starting for hostname [%s]\r\n"),
+              wifiRetryCount + 1,
+              CSTR(settings.sHostname));
+      WiFi.hostname(CSTR(settings.sHostname));
+      WiFi.begin();  // uses stored credentials
+      RESTART_TIMER(timerWifiRetry);
+      wifiState = WIFI_CONNECTING;
+      break;
+
+    case WIFI_CONNECTING:
+      if (WiFi.status() == WL_CONNECTED) {
+        wifiState = WIFI_RECONNECTED;
+        wifiRetryCount = 0;
+      } else if (DUE(timerWifiRetry)) {
+        wifiRetryCount++;
+        DebugTf(PSTR("WiFi: connect attempt %d failed\r\n"), wifiRetryCount);
+        if (wifiRetryCount >= 10) {
+          wifiState = WIFI_FAILED;
+        } else {
+          wifiState = WIFI_DISCONNECTED;  // retry
+        }
+      }
+      break;
+
+    case WIFI_RECONNECTED:
+      // Match the startup path: re-apply the configured hostname and force a
+      // DHCP re-announce so the renewed lease uses the expected name.
+      WiFi.hostname(CSTR(settings.sHostname));
+      DebugTf(PSTR("WiFi: reconnected, re-announcing DHCP lease for hostname [%s]\r\n"),
+              CSTR(settings.sHostname));
+      wifi_station_dhcpc_stop();
+      wifi_station_dhcpc_start();
+      startTelnet();
+      startOTGWstream();
+      startMQTT();
+      startWebSocket();
+      wifiState = WIFI_IDLE;
+      DebugTf(PSTR("WiFi: reconnected, services restarted; IP=%s\r\n"),
+              WiFi.localIP().toString().c_str());
+      break;
+
+    case WIFI_FAILED:
+      doRestart("WiFi: too many reconnect failures");
+      break;
+  }
+}
+
+//===========================================================================================
 void startTelnet()
 {
   DebugT(F("\r\nUse  'telnet "));
@@ -305,6 +376,40 @@ void loopNTP()
 bool isNTPtimeSet()
 {
   return NtpStatus == TIME_SYNC;
+}
+
+void sendtimecommand(){
+  if (state.otgw.bPSmode) return;                  // when in Print Summary mode (PS=1), no timesync commands (improving legacy/Domoticz compatibility)
+  if (!settings.ntp.bEnable) return;        // if NTP is disabled, then return
+  if (!settings.ntp.bSendtime) return;      // if NTP send time is disabled, then return
+  if (NtpStatus != TIME_SYNC) return;   // only send time command when time is synced
+  if (!state.pic.bAvailable) return;           // only send when pic is available
+  if (OTGWSerial.firmwareType() != FIRMWARE_OTGW) return; //only send timecommand when in gateway firmware, not in diagnostic or interface mode
+
+  //send time command to OTGW
+  //send time / weekday
+  time_t now = time(nullptr);
+  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
+  //DebugTf(PSTR("%02d:%02d:%02d %02d-%02d-%04d\r\n"), myTime.hour(), myTime.minute(), myTime.second(), myTime.day(), myTime.month(), myTime.year());
+
+  char msg[15]={0};
+  //Send msg id xx: hour:minute/day of week
+  int day_of_week = (myTime.dayOfWeek()+6)%7+1;
+  snprintf_P(msg, sizeof(msg), PSTR("SC=%d:%02d/%d"), myTime.hour(), myTime.minute(), day_of_week);
+  addOTWGcmdtoqueue(msg, strlen(msg), false, 0);
+
+  if (dayChanged()){
+    //Send msg id 21: month, day
+    snprintf_P(msg, sizeof(msg), PSTR("SR=21:%d,%d"), myTime.month(), myTime.day());
+    addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
+  }
+
+  if (yearChanged()){
+    //Send msg id 22: HB of Year, LB of Year
+    snprintf_P(msg, sizeof(msg), PSTR("SR=22:%d,%d"), (myTime.year() >> 8) & 0xFF, myTime.year() & 0xFF);
+    addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
+  }
 }
 
 //=====[ Helpers ]=============================================================

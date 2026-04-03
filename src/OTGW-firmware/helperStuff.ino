@@ -849,6 +849,45 @@ void emergencyHeapRecovery() {
           heapAfter, (long)recovered);
 }
 
+//===[ blink status led ]===
+void setLed(uint8_t led, uint8_t status){
+  pinMode(led, OUTPUT);
+  digitalWrite(led, status);
+}
+
+void blinkLEDms(uint32_t delay){
+  //blink the statusled, when time passed
+  DECLARE_TIMER_MS(timerBlink, delay);
+  if (DUE(timerBlink)) {
+    blinkLEDnow();
+  }
+}
+
+void blinkLED(uint8_t led, int nr, uint32_t waittime_ms){
+    for (int i = nr; i>0; i--){
+      blinkLEDnow(led);
+      delayms(waittime_ms);
+      blinkLEDnow(led);
+      delayms(waittime_ms);
+    }
+}
+
+void blinkLEDnow(uint8_t led = LED1){
+  pinMode(led, OUTPUT);
+  if (settings.bLEDblink) {
+    digitalWrite(led, !digitalRead(led));
+  } else setLed(led, OFF);
+
+}
+
+//===[ no-blocking delay with running background tasks in ms ]===
+void delayms(unsigned long delay_ms)
+{
+  DECLARE_TIMER_MS(timerDelayms, delay_ms);
+  while (DUE(timerDelayms))
+    doBackgroundTasks();
+}
+
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a
