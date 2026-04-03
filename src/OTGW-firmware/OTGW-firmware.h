@@ -49,6 +49,13 @@ void handlePendingUpgrade();
 String checkforupdatepic(String filename);
 
 #if HAS_DIRECT_OT
+enum class OpenThermResponseStatus : byte;
+
+enum OTDirectRequestOrigin : uint8_t {
+  OT_DIRECT_ORIGIN_GATEWAY = 0,
+  OT_DIRECT_ORIGIN_THERMOSTAT
+};
+
 // OT-direct forward declarations (defined in OTDirect.ino)
 void initOTDirect();
 void loopOTDirect();

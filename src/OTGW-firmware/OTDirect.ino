@@ -70,11 +70,6 @@ static uint32_t otCmdFrame   = 0;
 static bool     otSlaveFramePending = false;
 static unsigned long otSlaveFrame = 0;
 
-enum OTDirectRequestOrigin : uint8_t {
-  OT_DIRECT_ORIGIN_GATEWAY = 0,
-  OT_DIRECT_ORIGIN_THERMOSTAT
-};
-
 // Async state tracking for non-blocking OT requests
 static bool     otMasterRequestActive = false;   // true while waiting for boiler response
 static unsigned long otLastSentRequest = 0;      // frame we sent (for bridge logging)
