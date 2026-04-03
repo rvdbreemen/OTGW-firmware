@@ -1,8 +1,8 @@
-# OTGW-firmware for NodoShop OpenTherm Gateway
+# OTGW-firmware (ESP8266) for NodoShop OpenTherm Gateway
 
 [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
 
-This repository contains the firmware for the **NodoShop OpenTherm Gateway (OTGW)**. It supports the ESP8266 “devkit” that is part of the NodoShop OTGW and (experimentally) ESP32. It turns the gateway into a standalone network device.
+This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 “devkit” that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
 ## What's New in v1.4.0
 
@@ -14,8 +14,6 @@ Version 1.4.0 is a major feature release. It adds SAT (Smart Autotune Thermostat
 - **ESP32 support (experimental):** The firmware now compiles for both ESP8266 and ESP32 from one source tree. 30+ platform shim functions abstract away SDK differences at compile time.
 - **PlatformIO build system:** New `platformio.ini` with `esp8266` and `esp32` environments. Build with `pio run -e esp8266` or `pio run -e esp32`.
 - **Board-level GPIO definitions:** Auto-detected pin mappings per platform via `boards.h`.
-- **Non-blocking WiFi reconnect:** The blocking 30-second reconnect loop is replaced with a state machine, preventing main-loop freezes. Timeout tuned for stability.
-- **MQTT uptime and version publishing:** Firmware version and uptime are now published to MQTT topics for better observability.
 - **OpenTherm enum modernization:** Binary literals updated to C++14 standard format for better compiler compatibility.
 - **No breaking changes** vs v1.3.4. The ESP8266 build is functionally identical.
 

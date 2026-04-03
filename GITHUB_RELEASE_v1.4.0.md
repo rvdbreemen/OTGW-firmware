@@ -1,6 +1,6 @@
-## v1.4.0 -- SAT Embedded Thermostat, ESP32 Support, WiFi Resilience
+## v1.4.0 — SAT Embedded Thermostat and ESP32 Platform Support
 
-A major feature release. SAT (Smart Autotune Thermostat) turns the OTGW into a standalone smart heating controller. ESP32 support lands alongside the existing ESP8266 target through a unified platform abstraction layer. WiFi reconnect is now non-blocking and MQTT publishes uptime and firmware version. **No breaking changes** for existing ESP8266 users.
+A major feature release. SAT (Smart Autotune Thermostat) turns the OTGW into a standalone smart heating controller. ESP32 support lands alongside the existing ESP8266 target through a unified platform abstraction layer. **No breaking changes** for existing ESP8266 users.
 
 ### SAT (Smart Autotune Thermostat)
 
@@ -15,12 +15,6 @@ An embedded heating controller that runs entirely on the ESP, independent of Hom
 - **External sensors optional**: works with OT bus data alone; MQTT/REST indoor and outdoor temperature inputs enhance accuracy when available
 
 Documentation: [Feature guide](docs/features/smart-autotune-thermostat.md) | [ADR-062](docs/adr/ADR-062-sat-smart-autotune-thermostat-integration.md)
-
-### WiFi and MQTT improvements
-
-- **Non-blocking WiFi reconnect:** The blocking 30-second reconnect loop is replaced with a cooperative state machine (`loopWifi()`), preventing main-loop freezes on a heating system controller. Timeout tuned to avoid premature reboots on slow networks.
-- **MQTT uptime publishing:** Uptime (seconds) is published to `otgw-firmware/uptime`, improving device observability and enabling uptime-based automations.
-- **MQTT firmware version publishing:** Firmware version string is published to `otgw-firmware/version` after connect, making it easy to track which firmware is running across multiple devices.
 
 ### ESP32 and platform improvements
 
