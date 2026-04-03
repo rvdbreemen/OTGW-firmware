@@ -470,11 +470,11 @@ static void appendProgmemSuffix(char *dst, size_t dstSize, PGM_P suffix)
 
 static void handlePicFlashBackgroundTasks()
 {
-  debugTelnet.loop();         // Keep debug telnet connections alive
-  OTGWstream.loop();          // Keep OTGWstream clients alive during PIC flash
   handleDebug();              // Keep telnet debug active for monitoring
   httpServer.handleClient();  // Keep HTTP active
+#if MDNS_NEEDS_UPDATE
   MDNS.update();              // Keep MDNS active for network discovery
+#endif
   handleOTGW();               // REQUIRED for PIC flash - processes serial communication
   handleWebSocket();          // Keep WebSocket service responsive during flash
 }
