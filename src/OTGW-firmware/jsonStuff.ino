@@ -484,6 +484,19 @@ void sendJsonSettingObj(const char *cName, const char *cValue, const char *sType
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\", \"type\": \"%s\", \"maxlen\": %d}"), sType, maxLen);
   httpServer.sendContent(jsonBuff);
 
+} // sendJsonSettingObj(*char, *char, *char, int)
+
+//=======================================================================
+// Float setting: value is a pre-formatted string emitted as a JSON number (no quotes)
+void sendJsonSettingObj(const char *cName, const char *cValue, const char *sType, int minValue, int maxValue)
+{
+  char jsonBuff[200] = "";
+
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %s, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
+                                      , cName, cValue, sType, minValue, maxValue);
+
+  sendBeforenext();
+  httpServer.sendContent(jsonBuff);
 } // sendJsonSettingObj(*char, *char, *char, int, int)
 
 //=======================================================================
@@ -583,6 +596,14 @@ void sendJsonSettingObj(const __FlashStringHelper* cName, int iValue, const char
   strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
   nameBuf[sizeof(nameBuf)-1] = 0;
   sendJsonSettingObj(nameBuf, iValue, iType, minValue, maxValue);
+}
+
+// For: void sendJsonSettingObj(const char *cName, const char *cValue, const char *sType, int minValue, int maxValue)
+void sendJsonSettingObj(const __FlashStringHelper* cName, const char *cValue, const char *sType, int minValue, int maxValue) {
+  char nameBuf[35];
+  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
+  nameBuf[sizeof(nameBuf)-1] = 0;
+  sendJsonSettingObj(nameBuf, cValue, sType, minValue, maxValue);
 }
 
 // For: void sendJsonSettingObj(const char *cName, const char *cValue, const char *sType, int maxLen)

@@ -164,6 +164,7 @@ static void handleFilesystem(const char words[][API_WORD_LEN], uint8_t wc, HTTPM
 static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 
 void sendOTGWvalue(int msgid);
 void sendOTGWlabel(const char *msglabel);
@@ -497,7 +498,7 @@ static const char* satExtractPostValue(const char* body, char* buf, size_t bufSi
 // POST /api/v2/sat/target — set target temperature (body: "21.0" or {"value":"21.0"})
 // POST /api/v2/sat/externaltemp — push indoor temp
 // POST /api/v2/sat/externaloutdoor — push outdoor temp
-void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)
+static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)
 {
   if (!checkHttpAuth()) return;
 
