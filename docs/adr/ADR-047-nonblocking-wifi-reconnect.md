@@ -57,14 +57,14 @@ The function was called from `doTaskMinuteChanged()` (a timer callback), making 
 **States:**
 - `WIFI_IDLE` — WiFi connected, monitoring for disconnection
 - `WIFI_DISCONNECTED` — Connection lost, preparing to reconnect
-- `WIFI_CONNECTING` — `WiFi.begin()` called, waiting for association (30s timeout)
+- `WIFI_CONNECTING` — `WiFi.begin()` called, waiting for association (5s timeout)
 - `WIFI_RECONNECTED` — Successfully reconnected, log and return to IDLE
 - `WIFI_FAILED` — Attempt failed, increment retry counter, try again or give up
 
 **Key properties:**
 - Zero blocking: each call to `loopWifi()` returns immediately
 - Uses `DECLARE_TIMER_SEC` from safeTimers.h for timeout tracking
-- Up to 10 reconnection attempts before giving up and triggering a device reboot (prevents infinite retry storm)
+- Up to 15 reconnection attempts before giving up and triggering a device reboot (prevents infinite retry storm)
 - Called from `doBackgroundTasks()` before the WiFi-dependent service checks
 - `yield()` and `feedWatchDog()` called at appropriate points
 
@@ -107,7 +107,7 @@ Use a `Ticker` or safeTimer to schedule reconnection attempts.
 
 ### Negative
 - **Reconnection takes longer:** Non-blocking approach spreads the reconnection over multiple loop iterations instead of a single blocking call
-  - Accepted: The delay is barely noticeable (30s timeout × 10 retries = 300s max) and all services remain responsive during the process
+  - Accepted: The delay is barely noticeable (5s timeout × 15 retries = 75s max) and all services remain responsive during the process
 - **More code:** State machine is more verbose than a simple while loop
   - Accepted: The clarity and safety benefits outweigh the verbosity
 
@@ -117,8 +117,7 @@ Refactored in P9 of the C++ refactoring plan (OTGW-firmware.ino):
 - `restartWifi()` removed from `doTaskMinuteChanged()`
 - `loopWifi()` added to `doBackgroundTasks()` as first call
 - States: `WIFI_IDLE`, `WIFI_DISCONNECTED`, `WIFI_CONNECTING`, `WIFI_RECONNECTED`, `WIFI_FAILED`
-- 30-second connection timeout, 10 retry attempts before rebooting
-- `WiFi.setAutoReconnect(true)` kept enabled — SDK handles brief glitches transparently; `loopWifi()` is the fallback for longer outages
+- 5-second connection timeout, 15 retry attempts before rebooting
 
 ## Related Decisions
 - ADR-007: Timer-Based Task Scheduling (cooperative scheduling model)
