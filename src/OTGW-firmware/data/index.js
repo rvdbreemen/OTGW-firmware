@@ -143,6 +143,7 @@ let mainPageCompatWarningShown = false;
 let otLogCompatWarningShown = false;
 let picSettingsRefreshTimer = null;
 let picAvailable = false;  // Unknown until /api/v2/device/info confirms PIC is present
+let otCommandInterfaceAvailable = false;
 
 const PIC_SETTINGS_REFRESH_INTERVAL_MS = 3000;
 const PIC_SETTINGS_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -1721,13 +1722,18 @@ function parseSimulationValue(rawValue) {
   return null;
 }
 
-// Hide or show all PIC-related UI elements based on PIC availability.
+// Hide or show PIC-only and OT-command-capable UI elements based on hardware.
 // Called once after the first /api/v2/device/info response.
-function applyPICAvailability(available) {
+function applyPICAvailability(available, otCommandAvailable) {
   picAvailable = !!available;
+  otCommandInterfaceAvailable = !!otCommandAvailable;
   // Static HTML elements marked with class "pic-only"
   Array.from(document.getElementsByClassName('pic-only')).forEach(function(el) {
     if (picAvailable) el.classList.remove('hidden');
+    else el.classList.add('hidden');
+  });
+  Array.from(document.getElementsByClassName('ot-command-capable')).forEach(function(el) {
+    if (otCommandInterfaceAvailable) el.classList.remove('hidden');
     else el.classList.add('hidden');
   });
   // Dynamic settings rows (created by refreshSettings)
@@ -1735,7 +1741,7 @@ function applyPICAvailability(available) {
   picSettingKeys.forEach(function(key) {
     var row = document.getElementById('D_' + key);
     if (row) {
-      if (picAvailable) row.classList.remove('hidden');
+      if (otCommandInterfaceAvailable) row.classList.remove('hidden');
       else row.classList.add('hidden');
     }
   });
@@ -2943,7 +2949,7 @@ function initMainPage() {
         .then(function(r) { return r.ok ? r.json() : Promise.reject(r.statusText); })
         .then(function(json) {
           var d = json.device || {};
-          applyPICAvailability(d.picavailable);
+          applyPICAvailability(d.picavailable, d.otcommandinterface);
           if (picAvailable) {
             firmwarePage();
           } else {
@@ -3868,7 +3874,7 @@ function refreshDevInfo() {
 
       applyParsedGatewayMode(parseGatewayModeValue(device.otgwmode));
       applyOTGWSimulationState(device.otgwsimulation);
-      applyPICAvailability(device.picavailable);
+      applyPICAvailability(device.picavailable, device.otcommandinterface);
 
       const versionEl = document.getElementById('devVersion');
       if (versionEl) versionEl.textContent = version;
@@ -4111,7 +4117,7 @@ function refreshDeviceInfo() {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
       const device = json.device || {};
       applyOTGWSimulationState(device.otgwsimulation);
-      applyPICAvailability(device.picavailable);
+      applyPICAvailability(device.picavailable, device.otcommandinterface);
       for (let key in device) {
         if (key === 'otgwsimulation') continue;
         console.log("[" + key + "]=>[" + device[key] + "]");
@@ -4420,7 +4426,7 @@ function refreshSettings() {
       }
       //console.log("-->done..");
       // Hide PIC-related settings rows when no PIC is detected
-      applyPICAvailability(picAvailable);
+      applyPICAvailability(picAvailable, otCommandInterfaceAvailable);
     })
     .catch(function (error) {
       var msgEl = document.getElementById("settingMessage");

@@ -460,13 +460,13 @@ void initSAT()
   // After a crash/reboot, the PIC may still hold the last CS= value.
   // Send CS=0 so the thermostat controls the boiler until SAT's first
   // control loop iteration computes a proper setpoint (~30s).
-  if (isPICEnabled()) {
+  if (hasOTCommandInterface()) {
     addOTWGcmdtoqueue("CS=0", 4, false, 0);
     _sat_bootCS0sent = true;
-    DebugTln(F("SAT: boot safety — sent CS=0 to release stale PIC override"));
+    DebugTln(F("SAT: boot safety - sent CS=0 to release stale control override"));
   }
-  // If PIC not ready yet, _sat_bootCS0sent stays false and the control loop
-  // will send CS=0 on its first call when PIC becomes available.
+  // If no OT command interface is ready yet, _sat_bootCS0sent stays false and
+  // the control loop will send CS=0 on its first call when one becomes available.
 
   // Sync timer to configured interval
   CHANGE_INTERVAL_SEC(timerSATControl, settings.sat.iControlInterval);
@@ -494,9 +494,9 @@ void satControlLoop()
   // If safety tripped, stay disabled until explicitly re-enabled
   if (state.sat.bSafetyTripped) return;
 
-  // Boot safety deferred: if CS=0 wasn't sent during initSAT() (PIC not ready),
-  // send it now on the first call where PIC is available.
-  if (!_sat_bootCS0sent && isPICEnabled()) {
+  // Boot safety deferred: if CS=0 wasn't sent during initSAT(), send it on the
+  // first call where an OT command interface is available.
+  if (!_sat_bootCS0sent && hasOTCommandInterface()) {
     addOTWGcmdtoqueue("CS=0", 4, false, 0);
     _sat_bootCS0sent = true;
     DebugTln(F("SAT: deferred boot safety — sent CS=0"));
@@ -577,8 +577,8 @@ void satControlLoop()
   // --- Check auto-switch ---
   satCycleCheckAutoSwitch();
 
-  // --- Send CS= command to boiler (with PIC comm check) ---
-  if (isPICEnabled()) {
+  // --- Send CS= command to boiler when an OT command interface is available ---
+  if (hasOTCommandInterface()) {
     char cmdBuf[16];
     snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("CS=%.1f"), finalSetpoint);
     addOTWGcmdtoqueue(cmdBuf, strlen(cmdBuf), false, 0);

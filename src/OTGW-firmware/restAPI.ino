@@ -163,8 +163,8 @@ static void sendApiOptions() {
 
 // Helper to queue a command from URL segment or request body, with validation
 static void handleCommandSubmit(const char* cmdStr) {
-  if (!isPICEnabled()) {
-    sendApiError(503, F("No PIC detected - commands disabled"));
+  if (!hasOTCommandInterface()) {
+    sendApiError(503, F("No OT command interface detected - commands disabled"));
     return;
   }
   if (!cmdStr || cmdStr[0] == '\0') {
@@ -846,11 +846,14 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("lastreset"), lastReset);
   sendJsonMapEntry(F("bootcount"), state.uptime.iRebootCount);
   sendJsonMapEntry(F("mqttconnected"), state.mqtt.bConnected);
-  if (isPICEnabled()) {
+  sendJsonMapEntry(F("otcommandinterface"), hasOTCommandInterface());
+  if (hasOTCommandInterface()) {
     sendJsonMapEntry(F("thermostatconnected"), state.otgw.bThermostatState);
     sendJsonMapEntry(F("boilerconnected"), state.otgw.bBoilerState);
-    sendJsonMapEntry(F("otgwmode"), !isGatewayFirmware() ? "N/A" : state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
     sendJsonMapEntry(F("otgwconnected"), state.otgw.bOnline);
+  }
+  if (isPICEnabled()) {
+    sendJsonMapEntry(F("otgwmode"), !isGatewayFirmware() ? "N/A" : state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
   }
   sendJsonMapEntry(F("otgwsimulation"), state.debug.bOTGWSimulation);
   

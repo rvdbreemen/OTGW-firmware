@@ -712,8 +712,8 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
           }
           return;
         }
-        if (!isPICEnabled()) {
-          MQTTDebugln(F(" MQTT command ignored: no PIC detected"));
+        if (!hasOTCommandInterface()) {
+          MQTTDebugln(F(" MQTT command ignored: no OT command interface detected"));
           return;
         }
         const int cmdIndex = findMQTTSetCommandIndex(topicToken);

@@ -477,18 +477,41 @@ void sendMQTTversioninfo(){
   sendMQTTData("otgw-pic/picavailable", CCONOFF(state.pic.bAvailable));
 }
 
+static void publishBoilerConnectedState()
+{
+  sendMQTTData(F("boiler_connected"), CCONOFF(state.otgw.bBoilerState));
+  if (isPICEnabled()) {
+    sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
+  }
+}
+
+static void publishThermostatConnectedState()
+{
+  sendMQTTData(F("thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
+  if (isPICEnabled()) {
+    sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
+  }
+}
+
+static void publishOTGWConnectedState()
+{
+  sendMQTTData(F("otgw_connected"), CCONOFF(state.otgw.bOnline));
+  if (isPICEnabled()) {
+    sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otgw.bOnline));
+  }
+  sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
+}
+
 /*
 Publish state information of PIC firmware version information to MQTT broker.
 */
 void sendMQTTstateinformation(){
-  if (!isPICEnabled()) return;
-  sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
-  sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
+  publishBoilerConnectedState();
+  publishThermostatConnectedState();
   if (state.otgw.bGatewayModeKnown) {
     sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(state.otgw.bGatewayMode));
   }
-  sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otgw.bOnline));
-  sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
+  publishOTGWConnectedState();
 }
 
 //===================[ Reset OTGW ]===============================
@@ -1010,7 +1033,12 @@ void initWatchDog(char* reasonBuf, size_t reasonSize) {
   if (reasonSize > 0) reasonBuf[0] = '\0';
   OTGWDebugTln(F("Setup ESP32 Task Watchdog"));
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);  // I2C bus for OLED/sensors
-  esp_task_wdt_init(30, true);   // 30s timeout, panic on timeout
+  const esp_task_wdt_config_t twdtConfig = {
+    .timeout_ms = 30000,
+    .idle_core_mask = 0,
+    .trigger_panic = true,
+  };
+  esp_task_wdt_init(&twdtConfig);
   esp_task_wdt_add(NULL);        // watch current (loop) task
 }
 
@@ -1067,7 +1095,7 @@ void OpenthermData_t::s16(int16_t value) {
 }
 
 //parsing helpers
-const char *messageTypeToString(OpenThermMessageType message_type)
+const char *messageTypeToString(OTLibMessageType message_type)
 {
 	switch (message_type) {
 		case OT_READ_DATA:        return "Read-Data";
@@ -1082,21 +1110,21 @@ const char *messageTypeToString(OpenThermMessageType message_type)
 	}
 }
 
-const char *messageIDToString(OpenThermMessageID message_id){
+const char *messageIDToString(OTLibMessageID message_id){
   if (message_id <= OT_MSGID_MAX) {
     PROGMEM_readAnything (&OTmap[message_id], OTlookupitem);
     return OTlookupitem.label;
   } else return "Undefined";}
 
-OpenThermMessageType getMessageType(unsigned long message)
+OTLibMessageType getMessageType(unsigned long message)
 {
-    OpenThermMessageType msg_type = static_cast<OpenThermMessageType>((message >> 28) & 7);
+    OTLibMessageType msg_type = static_cast<OTLibMessageType>((message >> 28) & 7);
     return msg_type;
 }
 
-OpenThermMessageID getDataID(unsigned long frame)
+OTLibMessageID getDataID(unsigned long frame)
 {
-    return (OpenThermMessageID)((frame >> 16) & 0xFF);
+    return (OTLibMessageID)((frame >> 16) & 0xFF);
 }
 
 //===================[ Status Bit Query Helpers ]========================
@@ -1781,7 +1809,7 @@ void print_f88(float& value)
 
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
-    const char* topic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
+    const char* topic = messageIDToString(static_cast<OTLibMessageID>(OTdata.id));
     sendMQTTData(topic, _msg);
     publishToSourceTopic(topic, _msg, OTdata.rsptype);
     value = _value;
@@ -1800,7 +1828,7 @@ void print_s16(int16_t& value)
 
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
-    const char* topic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
+    const char* topic = messageIDToString(static_cast<OTLibMessageID>(OTdata.id));
     sendMQTTData(topic, _msg);
     publishToSourceTopic(topic, _msg, OTdata.rsptype);
     value = _value;
@@ -1815,7 +1843,7 @@ void print_s8s8(uint16_t& value)
   char _msg[15] {0};
   otTopic[0] = '\0';
   itoa((int8_t)OTdata.valueHB, _msg, 10);
-  strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+  strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
   strlcat(otTopic, "_value_hb", sizeof(otTopic));
   //AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
   const bool _valid = is_value_valid(OTdata, OTlookupitem);
@@ -1825,7 +1853,7 @@ void print_s8s8(uint16_t& value)
   }
   //Build string for MQTT
   itoa((int8_t)OTdata.valueLB, _msg, 10);
-  strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+  strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
   strlcat(otTopic, "_value_lb", sizeof(otTopic));
   //AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
   if (_valid){
@@ -1846,7 +1874,7 @@ void print_u16(uint16_t& value)
   
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
-    const char* topic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
+    const char* topic = messageIDToString(static_cast<OTLibMessageID>(OTdata.id));
     sendMQTTData(topic, _msg);
     publishToSourceTopic(topic, _msg, OTdata.rsptype);
     value = _value;
@@ -2176,7 +2204,7 @@ void print_remoteoverridefunction(uint16_t& value)
     //Build string for MQTT
     otTopic[0] = '\0';
     //flag8 value
-    strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_flag8", sizeof(otTopic));
     sendMQTTData(otTopic, byte_to_binary(OTdata.valueLB));
     //report remote override flags to MQTT
@@ -2194,13 +2222,13 @@ void print_flag8u8(uint16_t& value)
     //Build string for MQTT
     otTopic[0] = '\0';
     //flag8 value
-    strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_flag8", sizeof(otTopic));
     sendMQTTData(otTopic, byte_to_binary(OTdata.valueHB));
     //u8 value
     char _msg[15] {0};
     utoa(OTdata.valueLB, _msg, 10);
-    strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_code", sizeof(otTopic));
     sendMQTTData(otTopic, _msg);
     value = OTdata.u16(); 
@@ -2216,7 +2244,7 @@ void print_flag8(uint16_t& value)
     //Build string for MQTT
     otTopic[0] = '\0';
     //flag8 value
-    strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_flag8", sizeof(otTopic));
     sendMQTTData(otTopic, byte_to_binary(OTdata.valueLB));
     value = OTdata.u16();
@@ -2233,14 +2261,14 @@ void print_flag8flag8(uint16_t& value)
   AddLogf("%s = HB flag8[%s] -[%3d] ", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueHB);
 
   if (is_value_valid(OTdata, OTlookupitem)){
-    strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_hb_flag8", sizeof(otTopic));
     sendMQTTData(otTopic, byte_to_binary(OTdata.valueHB));
   }
   //flag8 valueLB
   AddLogf("%s = LB flag8[%s] - [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
   if (is_value_valid(OTdata, OTlookupitem)){
-    strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_lb_flag8", sizeof(otTopic));
     sendMQTTData(otTopic, byte_to_binary(OTdata.valueLB));
     value = OTdata.u16();
@@ -2255,7 +2283,7 @@ void print_vh_remoteparametersetting(uint16_t& value)
   
   AddLogf("%s = HB flag8[%s] -[%3d] ", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueHB);
   if (is_value_valid(OTdata, OTlookupitem)){
-    strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_hb_flag8", sizeof(otTopic));
     sendMQTTData(otTopic, byte_to_binary(OTdata.valueHB));
     sendMQTTData(F("vh_transfer_enable_nominal_ventilation_value"),    (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
@@ -2263,7 +2291,7 @@ void print_vh_remoteparametersetting(uint16_t& value)
   //flag8 valueLB
   AddLogf("%s = LB flag8[%s] - [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
   if (is_value_valid(OTdata, OTlookupitem)){
-    strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_lb_flag8", sizeof(otTopic));
     sendMQTTData(otTopic, byte_to_binary(OTdata.valueLB));
     sendMQTTData(F("vh_rw_nominal_ventilation_value"),    (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));
@@ -2286,10 +2314,10 @@ void print_command(uint16_t& value)
     //flag8 valueHB
     utoa((OTdata.valueHB), _msg, 10);
     //AddLogf("%s = HB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueHB);
-    strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_hb_u8", sizeof(otTopic));
     sendMQTTData(otTopic, _msg);
-    strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_remote_command", sizeof(otTopic));
     switch (OTdata.valueHB) {
       case 1: sendMQTTData(otTopic, "Remote Request Boiler Lockout-reset");  AddLogf("\r\n%s = remote command [%s]", OTlookupitem.label, "Remote Request Boiler Lockout-reset"); break;
@@ -2301,7 +2329,7 @@ void print_command(uint16_t& value)
     //flag8 valueLB
     utoa((OTdata.valueLB), _msg, 10);
     //AddLogf("%s = LB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueLB);
-    strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_lb_u8", sizeof(otTopic));
     sendMQTTData(otTopic, _msg);
     value = OTdata.u16();
@@ -2320,13 +2348,13 @@ void print_u8u8(uint16_t& value)
     //flag8 valueHB
     utoa((OTdata.valueHB), _msg, 10);
     //AddLogf("%s = HB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueHB);
-    strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_hb_u8", sizeof(otTopic));
     sendMQTTData(otTopic, _msg);
     //flag8 valueLB
     utoa((OTdata.valueLB), _msg, 10);
     //AddLogf("%s = LB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueLB);
-    strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_lb_u8", sizeof(otTopic));
     sendMQTTData(otTopic, _msg);
     value = OTdata.u16();
@@ -2369,7 +2397,7 @@ static void print_u8_single(uint16_t& value, bool useHB)
 
   if (is_value_valid(OTdata, OTlookupitem)){
     char _msg[10] {0};
-    const char* baseTopic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
+    const char* baseTopic = messageIDToString(static_cast<OTLibMessageID>(OTdata.id));
     utoa(activeByte, _msg, 10);
     sendMQTTData(baseTopic, _msg);
     publishToSourceTopic(baseTopic, _msg, OTdata.rsptype);
@@ -2460,7 +2488,7 @@ static PGM_P onOffToString_P(bool isOn)
 
 static void publish_current_message_u8_alias_topics()
 {
-  publish_u8_alias_topics(messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
+  publish_u8_alias_topics(messageIDToString(static_cast<OTLibMessageID>(OTdata.id)));
 }
 
 static void publish_mqtt_u8_value_topic(const __FlashStringHelper *topic, uint8_t value)
@@ -2581,13 +2609,13 @@ void print_date(uint16_t& value)
     //flag8 valueHB
     utoa((OTdata.valueHB), _msg, 10);
     //AddLogf("%s = HB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueHB);
-    strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_month", sizeof(otTopic));
     sendMQTTData(otTopic, _msg);
     //flag8 valueLB
     utoa((OTdata.valueLB), _msg, 10);
     //AddLogf("%s = LB u8[%s] [%3d]", OTlookupitem.label, _msg, OTdata.valueLB);
-    strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_day_of_month", sizeof(otTopic));
     sendMQTTData(otTopic, _msg);
     value = OTdata.u16();
@@ -2616,15 +2644,15 @@ void print_daytime(uint16_t& value)
     otTopic[0] = '\0';
     char _msg[10] {0};
     //dayofweek
-    strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_dayofweek", sizeof(otTopic));
     sendMQTTData(otTopic, dayName); 
     //hour
-    strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_hour", sizeof(otTopic));
     sendMQTTData(otTopic, itoa((OTdata.valueHB & 0x1F), _msg, 10)); 
     //min
-    strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
+    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_minutes", sizeof(otTopic));
     sendMQTTData(otTopic, itoa((OTdata.valueLB), _msg, 10)); 
     value = OTdata.u16();
@@ -3005,10 +3033,12 @@ static bool handleOTGWSimulation(File& otgwSimulationFile,
     state.debug.iOTGWSimulationNextDueMs = 0;
   }
 
+  #if HAS_PIC
   while (OTGWSerial.available()) {
     OTGWSerial.read();
     feedWatchDog();
   }
+  #endif
 
   if (!LittleFSmounted) {
     DebugTln(F("OTGW simulation disabled: LittleFS not mounted"));
@@ -3499,7 +3529,7 @@ bool isvalidotmsg(const char *buf, int len){
   return _ret;
 }
 
-static bool decodeAndPublishStatusAndConfigValue(OpenThermMessageID msgId)
+static bool decodeAndPublishStatusAndConfigValue(OTLibMessageID msgId)
 {
   switch (msgId) {
     case OT_Statusflags:                            print_status(OTcurrentSystemState.Statusflags); return true;
@@ -3537,7 +3567,7 @@ static bool decodeAndPublishStatusAndConfigValue(OpenThermMessageID msgId)
   }
 }
 
-static bool decodeAndPublishTemperatureAndSensorValue(OpenThermMessageID msgId)
+static bool decodeAndPublishTemperatureAndSensorValue(OTLibMessageID msgId)
 {
   switch (msgId) {
     case OT_TSet:                                   print_f88(OTcurrentSystemState.TSet); return true;
@@ -3595,7 +3625,7 @@ static bool decodeAndPublishTemperatureAndSensorValue(OpenThermMessageID msgId)
   }
 }
 
-static bool decodeAndPublishVentilationValue(OpenThermMessageID msgId)
+static bool decodeAndPublishVentilationValue(OTLibMessageID msgId)
 {
   switch (msgId) {
     case OT_StatusVH:                               print_statusVH(OTcurrentSystemState.StatusVH); return true;
@@ -3625,7 +3655,7 @@ static bool decodeAndPublishVentilationValue(OpenThermMessageID msgId)
   }
 }
 
-static bool decodeAndPublishSpecialValue(OpenThermMessageID msgId)
+static bool decodeAndPublishSpecialValue(OTLibMessageID msgId)
 {
   switch (msgId) {
     case OT_DayTime:                                print_daytime(OTcurrentSystemState.DayTime); return true;
@@ -3636,7 +3666,7 @@ static bool decodeAndPublishSpecialValue(OpenThermMessageID msgId)
   }
 }
 
-static bool decodeAndPublishSolarStorageValue(OpenThermMessageID msgId)
+static bool decodeAndPublishSolarStorageValue(OTLibMessageID msgId)
 {
   switch (msgId) {
     case OT_SolarStorageMaster:                     print_solar_storage_status(OTcurrentSystemState.SolarStorageStatus ); return true;
@@ -3652,7 +3682,7 @@ static bool decodeAndPublishSolarStorageValue(OpenThermMessageID msgId)
   }
 }
 
-static bool decodeAndPublishVendorValue(OpenThermMessageID msgId)
+static bool decodeAndPublishVendorValue(OTLibMessageID msgId)
 {
   switch (msgId) {
     case OT_RemehadFdUcodes:                        print_u8u8(OTcurrentSystemState.RemehadFdUcodes); return true;
@@ -3673,7 +3703,7 @@ static void decodeAndPublishOTValue()
     return;
   }
 
-  const OpenThermMessageID msgId = static_cast<OpenThermMessageID>(OTdata.id);
+  const OTLibMessageID msgId = static_cast<OTLibMessageID>(OTdata.id);
 
   if (decodeAndPublishStatusAndConfigValue(msgId)) return;
   if (decodeAndPublishTemperatureAndSensorValue(msgId)) return;
@@ -3739,24 +3769,21 @@ void processOT(const char *buf, int len){
     //If the Boiler messages have not been seen for 30 seconds, then set the state to false. 
     state.otgw.bBoilerState = (now < (epochBoilerlastseen+30));
     if ((state.otgw.bBoilerState != bOTGWboilerpreviousstate) || (cntOTmessagesprocessed==1)) {
-      if (isPICEnabled()) sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
+      publishBoilerConnectedState();
       bOTGWboilerpreviousstate = state.otgw.bBoilerState;
     }
 
     //If the Thermostat messages have not been seen for 30 seconds, then set the state to false.
     state.otgw.bThermostatState = (now < (epochThermostatlastseen+30));
     if ((state.otgw.bThermostatState != bOTGWthermostatpreviousstate) || (cntOTmessagesprocessed==1)){
-      if (isPICEnabled()) sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
+      publishThermostatConnectedState();
       bOTGWthermostatpreviousstate = state.otgw.bThermostatState;
     }
     
     //OpenTherm is active when at least one side (boiler or thermostat) is communicating on the bus.
     state.otgw.bOnline = state.otgw.bBoilerState || state.otgw.bThermostatState;
     if ((state.otgw.bOnline != bOTGWpreviousstate) || (cntOTmessagesprocessed==1)){
-      if (isPICEnabled()) {
-        sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otgw.bOnline));
-        sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
-      }
+      publishOTGWConnectedState();
       // nodeMCU online/offline zelf naar 'otgw-firmware/' pushen
       bOTGWpreviousstate = state.otgw.bOnline; //remember state, so we can detect statechanges
     }
@@ -3827,7 +3854,7 @@ void processOT(const char *buf, int len){
       if (is_value_valid(OTdata, OTlookupitem) && settings.mqtt.bEnable ) {
         if(getMQTTConfigDone(OTdata.id)==false) {
           MQTTDebugTf(PSTR("Need to set MQTT config for message %s (%d)\r\n"), OTlookupitem.label, OTdata.id);
-          bool success = doAutoConfigureMsgid(OTdata.id, NodeId, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
+          bool success = doAutoConfigureMsgid(OTdata.id, NodeId, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)));
           if(success) {
             MQTTDebugTf(PSTR("Successfully sent MQTT config for message %s (%d)\r\n"), OTlookupitem.label, OTdata.id);
             setMQTTConfigDone(OTdata.id);
@@ -3864,8 +3891,8 @@ void processOT(const char *buf, int len){
 
       //print message Type and ID
       AddLogf(" %s %3d", OTdata.buf, OTdata.id);
-      AddLogf(" %-16s", messageTypeToString(static_cast<OpenThermMessageType>(OTdata.type)));
-      //OTGWDebugf("[%-30s]", messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
+      AddLogf(" %-16s", messageTypeToString(static_cast<OTLibMessageType>(OTdata.type)));
+      //OTGWDebugf("[%-30s]", messageIDToString(static_cast<OTLibMessageID>(OTdata.id)));
       //OTGWDebugf("[M=%d]",OTdata.master);
 
       //Add indicators for parity error, skip message or valid value
@@ -4202,7 +4229,7 @@ const char* getOTGWValue(int msgid)
 {
   static char buffer[32];
   
-  switch (static_cast<OpenThermMessageID>(msgid)) { 
+  switch (static_cast<OTLibMessageID>(msgid)) { 
     case OT_TSet:                              dtostrf(OTcurrentSystemState.TSet, 0, 2, buffer); return buffer;
     case OT_CoolingControl:                    dtostrf(OTcurrentSystemState.CoolingControl, 0, 2, buffer); return buffer;
     case OT_TsetCH2:                           dtostrf(OTcurrentSystemState.TsetCH2, 0, 2, buffer); return buffer;

@@ -67,11 +67,25 @@ static uint8_t otScheduleIdx = 0;
 // Pending command from addOTWGcmdtoqueue() routed here via sendOTGW()
 static bool     otCmdPending = false;
 static uint32_t otCmdFrame   = 0;
+static bool     otSlaveFramePending = false;
+static unsigned long otSlaveFrame = 0;
+
+enum OTDirectRequestOrigin : uint8_t {
+  OT_DIRECT_ORIGIN_GATEWAY = 0,
+  OT_DIRECT_ORIGIN_THERMOSTAT
+};
 
 // Async state tracking for non-blocking OT requests
 static bool     otMasterRequestActive = false;   // true while waiting for boiler response
 static unsigned long otLastSentRequest = 0;      // frame we sent (for bridge logging)
-static bool     otSlaveForwarding     = false;   // true when forwarding thermostat frame
+static OTDirectRequestOrigin otLastRequestOrigin = OT_DIRECT_ORIGIN_GATEWAY;
+
+static void handleSlaveRequest(unsigned long request, OpenThermResponseStatus status) {
+  if (status == OpenThermResponseStatus::SUCCESS) {
+    otSlaveFrame = request;
+    otSlaveFramePending = true;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // bridgeFrameToParser — format a 32-bit OT frame and feed to processOT()
@@ -89,8 +103,8 @@ static unsigned long buildStatusRequest() {
   // Build a complete READ_DATA request so message type, data-id and parity are correct.
   // MsgID 0: Master status flags in data-value HB (bits 15-8), LB = 0 (slave fills it)
   return OpenTherm::buildRequest(
-    OpenThermMessageType::READ_DATA,
-    static_cast<OpenThermMessageID>(0),
+    OpenThermLibMessageType::READ_DATA,
+    OpenThermLibMessageID::Status,
     ((unsigned int)otMasterStatusFlags << 8)
   );
 }
@@ -141,7 +155,7 @@ void initOTDirect() {
   DebugTln(F("OT-direct: Master interface started"));
 
   // 4. Start OpenTherm slave (listens to thermostat)
-  otSlave.begin(slaveISR);
+  otSlave.begin(slaveISR, handleSlaveRequest);
   DebugTln(F("OT-direct: Slave interface started"));
 
   // 5. Always set OT_DIRECT mode — this is OTGW32 hardware.
@@ -161,7 +175,7 @@ void initOTDirect() {
   if (otMaster.isValidResponse(response)) {
     state.otgw.bOnline = true;
     DebugTln(F("OT-direct: Boiler responded — OT bus online"));
-    bridgeFrameToParser('T', request);
+    bridgeFrameToParser('R', request);
     bridgeFrameToParser('B', response);
   } else {
     state.otgw.bOnline = false;
@@ -172,12 +186,13 @@ void initOTDirect() {
 // ---------------------------------------------------------------------------
 // sendMasterRequestAsync — initiate an async OT request (non-blocking)
 // ---------------------------------------------------------------------------
-static bool sendMasterRequestAsync(unsigned long request) {
+static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin origin) {
   if (!otMaster.isReady()) return false;  // bus busy — try again later
   otLastSentRequest = request;
-  otMasterRequestActive = otMaster.sendRequestAsync(request);
+  otLastRequestOrigin = origin;
+  otMasterRequestActive = otMaster.sendRequestAync(request);
   if (otMasterRequestActive) {
-    bridgeFrameToParser('T', request);
+    bridgeFrameToParser((origin == OT_DIRECT_ORIGIN_THERMOSTAT) ? 'T' : 'R', request);
   }
   return otMasterRequestActive;
 }
@@ -194,7 +209,7 @@ static void handleMasterResponse() {
     state.otgw.bOnline = true;
 
     // If this was a forwarded thermostat frame, send response back
-    if (otSlaveForwarding) {
+    if (otLastRequestOrigin == OT_DIRECT_ORIGIN_THERMOSTAT) {
       otSlave.sendResponse(response);
     }
   } else {
@@ -206,7 +221,7 @@ static void handleMasterResponse() {
   }
 
   otMasterRequestActive = false;
-  otSlaveForwarding = false;
+  otLastRequestOrigin = OT_DIRECT_ORIGIN_GATEWAY;
 }
 
 // ---------------------------------------------------------------------------
@@ -220,9 +235,8 @@ static void scheduleMasterRequest() {
 
   // Pending command from the queue takes priority
   if (otCmdPending) {
-    if (sendMasterRequestAsync(otCmdFrame)) {
+    if (sendMasterRequestAsync(otCmdFrame, OT_DIRECT_ORIGIN_GATEWAY)) {
       otCmdPending = false;
-      otSlaveForwarding = false;
     }
     return;
   }
@@ -239,14 +253,13 @@ static void scheduleMasterRequest() {
         request = buildStatusRequest();
       } else {
         request = OpenTherm::buildRequest(
-          OpenThermMessageType::READ_DATA,
-          static_cast<OpenThermMessageID>(entry.msgId),
+          OpenThermLibMessageType::READ_DATA,
+          static_cast<OpenThermLibMessageID>(entry.msgId),
           0
         );
       }
 
-      otSlaveForwarding = false;
-      if (sendMasterRequestAsync(request)) {
+      if (sendMasterRequestAsync(request, OT_DIRECT_ORIGIN_GATEWAY)) {
         entry.lastSentMs = now;  // Only advance timer on successful send
       }
       return;  // One request per call
@@ -270,13 +283,13 @@ void loopOTDirect() {
 
   // Handle incoming thermostat frames (slave mode)
   // Only forward if master bus is idle (collision avoidance)
-  if (!otMasterRequestActive && otSlave.hasMessage()) {
-    unsigned long thermostatFrame = otSlave.getMessage();
+  if (!otMasterRequestActive && otSlaveFramePending) {
+    unsigned long thermostatFrame = otSlaveFrame;
+    otSlaveFramePending = false;
     bridgeFrameToParser('T', thermostatFrame);
 
     // Forward thermostat request to boiler asynchronously
-    otSlaveForwarding = true;
-    sendMasterRequestAsync(thermostatFrame);
+    sendMasterRequestAsync(thermostatFrame, OT_DIRECT_ORIGIN_THERMOSTAT);
   }
 
   // Schedule periodic master requests (non-blocking, skips if bus busy)
@@ -302,67 +315,79 @@ void handleOTDirectCommand(const char* buf, int len) {
 
   const char* value = buf + 3;
 
-  // TT=xx.x — Control setpoint (MsgID 1)
+  // TT=xx.x — Room setpoint / thermostat override (MsgID 16 = TrSet)
   if (cmd0 == 'T' && cmd1 == 'T') {
     float setpoint = atof(value);
     uint16_t f88 = (uint16_t)((int16_t)(setpoint * 256.0f));
     otCmdFrame = OpenTherm::buildRequest(
-      OpenThermMessageType::WRITE_DATA,
-      static_cast<OpenThermMessageID>(1),  // MsgID 1 = TSet
+      OpenThermLibMessageType::WRITE_DATA,
+      OpenThermLibMessageID::TrSet,
       f88
     );
     otCmdPending = true;
-    OTGWDebugTf(PSTR("OT-direct: TT=%.1f -> frame 0x%08lX\r\n"), setpoint, otCmdFrame);
+    if (state.debug.bOTmsg) DebugTf(PSTR("OT-direct: TT=%.1f -> frame 0x%08lX\r\n"), setpoint, otCmdFrame);
   }
-  // CS=xx.x — Control setpoint CH2 (MsgID 8)
+  // CS=xx.x — Control setpoint (MsgID 1 = TSet)
   else if (cmd0 == 'C' && cmd1 == 'S') {
     float setpoint = atof(value);
     uint16_t f88 = (uint16_t)((int16_t)(setpoint * 256.0f));
     otCmdFrame = OpenTherm::buildRequest(
-      OpenThermMessageType::WRITE_DATA,
-      static_cast<OpenThermMessageID>(8),  // MsgID 8 = TSet CH2
+      OpenThermLibMessageType::WRITE_DATA,
+      OpenThermLibMessageID::TSet,
       f88
     );
     otCmdPending = true;
-    OTGWDebugTf(PSTR("OT-direct: CS=%.1f -> frame 0x%08lX\r\n"), setpoint, otCmdFrame);
+    if (state.debug.bOTmsg) DebugTf(PSTR("OT-direct: CS=%.1f -> frame 0x%08lX\r\n"), setpoint, otCmdFrame);
+  }
+  // C2=xx.x — Control setpoint CH2 (MsgID 8 = TsetCH2)
+  else if (cmd0 == 'C' && cmd1 == '2') {
+    float setpoint = atof(value);
+    uint16_t f88 = (uint16_t)((int16_t)(setpoint * 256.0f));
+    otCmdFrame = OpenTherm::buildRequest(
+      OpenThermLibMessageType::WRITE_DATA,
+      OpenThermLibMessageID::TsetCH2,
+      f88
+    );
+    otCmdPending = true;
+    if (state.debug.bOTmsg) DebugTf(PSTR("OT-direct: C2=%.1f -> frame 0x%08lX\r\n"), setpoint, otCmdFrame);
   }
   // HW=0/1/A — DHW enable (modifies status flags for MsgID 0)
   else if (cmd0 == 'H' && cmd1 == 'W') {
     if (value[0] == '1' || value[0] == 'A') {
       otMasterStatusFlags |= 0x02;   // bit1 = DHW enable
-      OTGWDebugTln(F("OT-direct: DHW enabled"));
+      if (state.debug.bOTmsg) DebugTln(F("OT-direct: DHW enabled"));
     } else {
       otMasterStatusFlags &= ~0x02;
-      OTGWDebugTln(F("OT-direct: DHW disabled"));
+      if (state.debug.bOTmsg) DebugTln(F("OT-direct: DHW disabled"));
     }
   }
   // CH=0/1 — CH enable (modifies status flags for MsgID 0)
   else if (cmd0 == 'C' && cmd1 == 'H') {
     if (value[0] == '1') {
       otMasterStatusFlags |= 0x01;   // bit0 = CH enable
-      OTGWDebugTln(F("OT-direct: CH enabled"));
+      if (state.debug.bOTmsg) DebugTln(F("OT-direct: CH enabled"));
     } else {
       otMasterStatusFlags &= ~0x01;
-      OTGWDebugTln(F("OT-direct: CH disabled"));
+      if (state.debug.bOTmsg) DebugTln(F("OT-direct: CH disabled"));
     }
   }
   // PS=1/PS=0 — Print Summary mode toggle (no OT frame, handled by processOT)
   else if (cmd0 == 'P' && cmd1 == 'S') {
     // No-op for OT-direct; PS mode is a PIC firmware feature
-    OTGWDebugTf(PSTR("OT-direct: PS command ignored (PIC-only feature)\r\n"));
+    if (state.debug.bOTmsg) DebugTf(PSTR("OT-direct: PS command ignored (PIC-only feature)\r\n"));
   }
   // GW=R — Reset (restart OT interfaces)
   else if (cmd0 == 'G' && cmd1 == 'W' && value[0] == 'R') {
-    OTGWDebugTln(F("OT-direct: Resetting OT interfaces"));
+    if (state.debug.bOTmsg) DebugTln(F("OT-direct: Resetting OT interfaces"));
     otMaster.end();
     otSlave.end();
     delay(100);
     otMaster.begin(masterISR);
-    otSlave.begin(slaveISR);
-    OTGWDebugTln(F("OT-direct: OT interfaces restarted"));
+    otSlave.begin(slaveISR, handleSlaveRequest);
+    if (state.debug.bOTmsg) DebugTln(F("OT-direct: OT interfaces restarted"));
   }
   else {
-    OTGWDebugTf(PSTR("OT-direct: Unknown command [%c%c=%s] ignored\r\n"), cmd0, cmd1, value);
+    if (state.debug.bOTmsg) DebugTf(PSTR("OT-direct: Unknown command [%c%c=%s] ignored\r\n"), cmd0, cmd1, value);
   }
 }
 

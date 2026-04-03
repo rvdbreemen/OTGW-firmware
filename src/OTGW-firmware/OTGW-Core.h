@@ -188,7 +188,7 @@ enum OTValueType {
 	OT_VALTYPE_SPECIAL   // special formatting
 };
 
-enum OpenThermMessageType {
+enum OTLibMessageType {
 	/*  Master to Slave */
 	OT_READ_DATA       = 0b000,
 	OT_WRITE_DATA      = 0b001,
@@ -201,7 +201,7 @@ enum OpenThermMessageType {
 	OT_UNKNOWN_DATA_ID = 0b111
 };
 
-enum OpenThermMessageID {
+enum OTLibMessageID {
 	OT_Statusflags, // flag8 / flag8  Master and Slave Status flags. 
 	OT_TSet, // f8.8  Control setpoint  ie CH  water temperature setpoint (°C)
 	OT_MasterConfigMemberIDcode, // flag8 / u8  Master Configuration Flags /  Master MemberID Code 

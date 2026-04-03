@@ -46,6 +46,8 @@ void fwupgradestart(const char *hexfile);
 void handlePendingUpgrade();
 #endif
 
+String checkforupdatepic(String filename);
+
 #if HAS_DIRECT_OT
 // OT-direct forward declarations (defined in OTDirect.ino)
 void initOTDirect();
@@ -329,6 +331,10 @@ inline bool isOTDirectEnabled() {
 #else
   return false;  // compiled out on PIC boards
 #endif
+}
+
+inline bool hasOTCommandInterface() {
+  return isPICEnabled() || isOTDirectEnabled();
 }
 
 #if HAS_PIC
