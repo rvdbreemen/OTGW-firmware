@@ -9,9 +9,9 @@ Requirements:
 - arduino-cli (installed automatically if not found)
 
 Usage:
-    python build.py                      # Full build for ESP8266 + ESP32 (default)
+    python build.py                      # Full build for ESP8266 + OTGW32 (default)
     python build.py --target esp8266     # Build for ESP8266 only
-    python build.py --target esp32       # Build for ESP32 only
+    python build.py --target otgw32      # Build for OTGW32 (ESP32-S3) only
     python build.py --firmware           # Build firmware only
     python build.py --filesystem         # Build filesystem only
     python build.py --clean              # Clean build artifacts
@@ -67,13 +67,13 @@ TARGETS = {
         "fs_page": 256,
         "fs_size": 1024000,
     },
-    "esp32": {
-        "name": "ESP32",
+    "otgw32": {
+        "name": "OTGW32 (ESP32-S3)",
         "core": "esp32:esp32",
         "board_manager_url": "https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json",
-        "fqbn": "esp32:esp32:esp32:PartitionScheme=custom",
-        "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_NODOSHOP_ESP32",
-        "chip": "esp32",
+        "fqbn": "esp32:esp32:esp32s3:PartitionScheme=custom",
+        "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_NODOSHOP_OTGW32",
+        "chip": "esp32s3",
         "flash_mode": "dio",
         "flash_freq": "40m",
         "flash_size": "4MB",
@@ -83,7 +83,7 @@ TARGETS = {
         "fs_block": 4096,
         "fs_page": 256,
         "fs_size": 786432,       # 0xC0000 — custom OTA partition (768KB LittleFS)
-        "bootloader_offset": "0x1000",
+        "bootloader_offset": "0x0",  # ESP32-S3 bootloader at 0x0
     },
 }
 
@@ -673,7 +673,7 @@ def create_merged_binary(project_dir, semver, target, compress=False):
     Args:
         project_dir: Project directory path
         semver: Semantic version string
-        target: Target key ("esp8266" or "esp32")
+        target: Target key ("esp8266" or "otgw32")
         compress: If True, also create a gzip-compressed version
 
     Returns:
@@ -898,7 +898,7 @@ def cleanup_temp_directory(project_dir):
 # Map target names to PlatformIO environment names
 PIO_ENV_MAP = {
     "esp8266": "esp8266",
-    "esp32": "esp32",
+    "otgw32": "otgw32",
 }
 
 
@@ -968,7 +968,7 @@ def collect_pio_artifacts(project_dir, target):
         collected.append(fs_dest)
 
     # ESP32 extras needed for merged binary
-    if target == "esp32":
+    if target == "otgw32":
         for extra in ["bootloader.bin", "partitions.bin"]:
             src = pio_build_dir / extra
             if src.exists():
@@ -1013,7 +1013,8 @@ def main():
         epilog="""
 Examples:
   python build.py                              # Full build (arduino-cli, default)
-  python build.py --target esp8266             # ESP8266 only
+  python build.py --target esp8266             # ESP8266 (PIC) only
+  python build.py --target otgw32             # OTGW32 (ESP32-S3) only
   python build.py --pio --target esp8266       # ESP8266 with PlatformIO backend
   python build.py --firmware                   # Build firmware only
   python build.py --filesystem                 # Build filesystem only
@@ -1079,9 +1080,9 @@ Examples:
     )
     parser.add_argument(
         "--target",
-        choices=["esp8266", "esp32", "all"],
+        choices=["esp8266", "otgw32", "all"],
         default="all",
-        help="Target platform: esp8266, esp32, or all (default)"
+        help="Target platform: esp8266, otgw32, or all (default)"
     )
     parser.add_argument(
         "--no-install-cli",
