@@ -648,9 +648,13 @@ Create one when a change affects: architecture, NFRs (security/performance/avail
 
 Do NOT create ADRs for: pure refactors, bug fixes, minor features within existing patterns.
 
-### ADR lifecycle (IMMUTABLE once Accepted)
+### ADR lifecycle
+
 - **Proposed** → Draft; **Accepted** → Stands; **Deprecated** → No longer recommended; **Superseded** → Replaced
-- To reverse a decision: create a NEW ADR that supersedes the old one; mark old as "Superseded by ADR-XXX"
+
+**CRITICAL: NEVER edit an Accepted or Deprecated ADR.** The content of these ADRs is immutable — do not change their text, parameters, numbers, or any other content. The ONLY permitted change to an Accepted/Deprecated ADR is updating its Status field to "Superseded by ADR-XXX".
+
+To change a decision: create a NEW ADR with the next available number that supersedes the old one, then mark the old ADR's status as "Superseded by ADR-XXX". Only **Proposed** ADRs may be freely edited.
 
 ### ADR format
 ```
