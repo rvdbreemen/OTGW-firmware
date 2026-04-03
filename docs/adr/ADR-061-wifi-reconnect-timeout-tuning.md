@@ -1,6 +1,6 @@
 # ADR-061: WiFi Reconnect Timeout Tuning
 
-**Status:** Accepted
+**Status:** Proposed
 **Date:** 2026-04-03
 **Supersedes:** ADR-047 (timeout and retry parameters only; state machine design unchanged)
 
