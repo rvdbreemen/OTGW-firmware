@@ -51,13 +51,15 @@
 
 // Pin aliases — sourced from boards.h (included via OTGW-firmware.h)
 #define OTGW_BUTTON PIN_BUTTON
-#define OTGW_RESET  PIN_PIC_RST
 #define OTGW_LED1   PIN_LED1
 #define OTGW_LED2   PIN_LED2
+#if HAS_PIC
+#define OTGW_RESET  PIN_PIC_RST
+#endif
 
-//external watchdog
+#if HAS_PIC
+//external watchdog (PIC board I2C watchdog at 0x26)
 #define EXT_WD_I2C_ADDRESS 0x26
-// I2C pins sourced from boards.h (PIN_I2C_SDA, PIN_I2C_SCL)
 
 //used by update firmware functions
 const char *hexheaders[] = {
@@ -67,6 +69,7 @@ const char *hexheaders[] = {
 
 //Macro to Feed the Watchdog
 #define FEEDWATCHDOGNOW   Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   Wire.write(0xA5);   Wire.endTransmission();
+#endif
 
 /* --- PRINTF_BYTE_TO_BINARY macro's --- */
 #define PRINTF_BINARY_PATTERN_INT8 "%c%c%c%c%c%c%c%c"
@@ -489,6 +492,7 @@ void sendMQTTstateinformation(){
 }
 
 //===================[ Reset OTGW ]===============================
+#if HAS_PIC
 void resetOTGW() {
   if (!isPICEnabled()) return;
   scheduleOTGWStartupQuietPeriod();
@@ -505,12 +509,18 @@ void detectPIC(){
   OTGWSerial.resetPic(); // make sure it the firmware is detected
   state.pic.bAvailable = OTGWSerial.find(ETX);
   if (state.pic.bAvailable) {
+      state.hw.eMode = HW_MODE_PIC;
       DebugTln(F("ETX found after reset: Pic detected!"));
   } else {
+      state.hw.eMode = HW_MODE_DEGRADED;
       DebugTln(F("No ETX found after reset: no Pic detected!"));
       DebugTln(F("All PIC-related functions are disabled (no PIC-based OTGW detected)"));
   }
 }
+#else
+void resetOTGW() {}   // no-op on OTGW32
+void detectPIC() {}   // no-op on OTGW32
+#endif
 
 //===================[ getpicfwversion ]===========================
 /*
@@ -820,6 +830,7 @@ void sendOTGWbootcmd(){
 }
 
 //===================[ OTGW Command & Response ]===================
+#if HAS_PIC
 void executeCommand(const char* sCmd, char* outBuf, size_t outSize, bool mirrorToWebSocket){
   //send command to OTGW — uses char[] buffers per ADR-004 (no heap allocation)
   if (outSize > 0) outBuf[0] = '\0';
@@ -919,7 +930,15 @@ void executeCommand(const char* sCmd, char* outBuf, size_t outSize, bool mirrorT
   }
   OTGWDebugTf(PSTR("Command send [%s]-[%s] - Response line: [%s] - Returned value: [%s]\r\n"), sCmd, cmdPrefix, line, outBuf);
 }
+#else  // !HAS_PIC
+void executeCommand(const char* sCmd, char* outBuf, size_t outSize, bool mirrorToWebSocket){
+  if (outSize > 0) outBuf[0] = '\0';
+  strlcpy(outBuf, "NG - No PIC on this hardware.", outSize);
+}
+#endif // HAS_PIC
 //===================[ Watchdog OTGW ]===============================
+#if HAS_PIC
+// External I2C watchdog at 0x26 — PIC-based Nodoshop boards only
 void initWatchDog(char* reasonBuf, size_t reasonSize) {
   // Hardware WatchDog is based on:
   // https://github.com/rvdbreemen/ESPEasySlaves/tree/master/TinyI2CWatchdog
@@ -981,8 +1000,36 @@ void feedWatchDog() {
   {
     blinkLEDnow(LED1);
   }
-  //yield(); 
+  //yield();
 }
+
+#else  // !HAS_PIC — OTGW32: use ESP32 Task Watchdog Timer
+#include <esp_task_wdt.h>
+
+void initWatchDog(char* reasonBuf, size_t reasonSize) {
+  if (reasonSize > 0) reasonBuf[0] = '\0';
+  OTGWDebugTln(F("Setup ESP32 Task Watchdog"));
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);  // I2C bus for OLED/sensors
+  esp_task_wdt_init(30, true);   // 30s timeout, panic on timeout
+  esp_task_wdt_add(NULL);        // watch current (loop) task
+}
+
+void WatchDogEnabled(byte stateWatchdog) {
+  // ESP32 TWDT is always running; enable/disable is a no-op
+  (void)stateWatchdog;
+}
+
+void feedWatchDog() {
+  DECLARE_TIMER_MS(timerWD, 100, SKIP_MISSED_TICKS);
+  if DUE(timerWD) {
+    esp_task_wdt_reset();
+  }
+  DECLARE_TIMER_MS(timerWDBlink, 1000, SKIP_MISSED_TICKS);
+  if DUE(timerWDBlink) {
+    blinkLEDnow(LED1);
+  }
+}
+#endif // HAS_PIC
 
 //===================[ END Watchdog OTGW ]===============================
 
@@ -2797,37 +2844,36 @@ void checkOTGWcmdqueue(const char *buf, unsigned int len){
 
 
 //===================[ Send buffer to OTGW ]=============================
-/* 
+/*
   sendOTGW(const char* buf, int len) sends a string to the serial OTGW device.
   The buffer is send out to OTGW on the serial device instantly, as long as there is space in the buffer.
 */
 void sendOTGW(const char* buf, int len)
 {
   if (!isPICEnabled()) {
+#if HAS_DIRECT_OT
+    // On OTGW32, route commands through OT-direct command handler
+    handleOTDirectCommand(buf, len);
+#else
     OTGWDebugTln(F("sendOTGW: No PIC detected - command ignored"));
+#endif
     return;
   }
+#if HAS_PIC
   if (state.debug.bOTGWSimulation) {
     OTGWDebugTln(F("OTGW simulation active - serial send blocked"));
     sendEventToWebSocket_P('!', PSTR("OTGW simulation blocked serial send"));
     return;
   }
 
-  // while (OTGWSerial.availableForWrite() < (len+2)) {
-  //   //cannot write, buffer full, wait for some space in serial out buffer
-  // feedWatchDog();     //this yields for other processes
-  // }
-
   //Send the buffer to OTGW when the Serial interface is available
   if (OTGWSerial.availableForWrite()>=len+2) {
-    //check the write buffer
-    //OTGWDebugf("Serial Write Buffer space = [%d] - needed [%d]\r\n",OTGWSerial.availableForWrite(), (len+2));
     OTGWDebugT(F("Sending to Serial ["));
     for (int i = 0; i < len; i++) {
       OTGWDebug((char)buf[i]);
     }
     OTGWDebug(F("] (")); OTGWDebug(len); OTGWDebug(F(")")); OTGWDebugln();
-        
+
     //write buffer to serial
     OTGWSerial.write(buf, len);
     OTGWSerial.write('\r');
@@ -2835,6 +2881,7 @@ void sendOTGW(const char* buf, int len)
     OTGWSerial.flush();
     sendEventToWebSocket('>', buf, len);
   } else OTGWDebugln(F("Error: Write buffer not big enough!"));
+#endif
 }
 
 static void dispatchOTGWInputLine(const char* buf, size_t len)
@@ -3922,11 +3969,13 @@ void processOT(const char *buf, int len){
     sendMQTTData(F("Error 04"), errorBuf);
     snprintf_P(cMsg, sizeof(cMsg), PSTR("Error 04 [%u]"), OTcurrentSystemState.error04);
     sendEventToWebSocket('!', cMsg);
+#if HAS_PIC
   } else if (strstr(buf, OTGW_BANNER)!=NULL){
     //found a banner, so get the version of PIC
     // Re-enable PIC functions if boot-time detection missed it (transient startup failure).
     if (!state.pic.bAvailable) {
       state.pic.bAvailable = true;
+      state.hw.eMode = HW_MODE_PIC;
       DebugTln(F("PIC detected via banner — PIC functions re-enabled"));
     }
     strlcpy(state.pic.sFwversion, OTGWSerial.firmwareVersion(), sizeof(state.pic.sFwversion));
@@ -3945,6 +3994,7 @@ void processOT(const char *buf, int len){
       }
     }
     { char evtBuf[60]; snprintf_P(evtBuf, sizeof(evtBuf), PSTR("OTGW PIC restarted [%s]"), state.pic.sFwversion); reportOTGWEvent(evtBuf, '*', true); }
+#endif
   } else if (strchr(buf, ',') != nullptr) {
     // Comma-separated line: handle PS=1 summary (25 or 34 comma-separated fields).
     // processPSSummary() validates the field count and returns silently if not a PS=1 line.
@@ -3995,6 +4045,9 @@ void processOT(const char *buf, int len){
 */
 void handleOTGW()
 {
+#if !HAS_PIC
+  return;  // No PIC serial on OTGW32 — OT-direct uses loopOTDirect() instead
+#else
   //handle serial communication and line processing
   #define MAX_BUFFER_READ 512       //PS=1 summary lines can exceed 256 bytes
   #define MAX_BUFFER_WRITE 128
@@ -4134,6 +4187,7 @@ void handleOTGW()
         sWrite[bytes_write++] = outByte;
     }
   }
+#endif // HAS_PIC
 }// END of handleOTGW
 
 //====================[ functions for REST API ]====================
@@ -4316,6 +4370,7 @@ static void jsonEscape(const char *in, char *out, size_t outSize) {
   out[j] = '\0';
 }
 
+#if HAS_PIC
 void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   DebugTln(F(""));
   DebugTln(F("=== PIC Upgrade Complete ==="));
@@ -4673,6 +4728,7 @@ void upgradepic() {
   httpServer.sendHeader(F("Location"), F("index.html#tabPICflash"), true);
   httpServer.send_P(303, PSTR("text/html; charset=UTF-8"), PSTR("<a href='index.html#tabPICflash'>Return</a>"));
 }
+#endif // HAS_PIC — end of PIC firmware upgrade functions
 
 /***************************************************************************
 *
