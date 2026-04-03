@@ -50,7 +50,9 @@ struct OTScheduleEntry {
 };
 
 static OTScheduleEntry otSchedule[] = {
+  // Fast poll — essential for control loop and dashboard
   {  0, OT_STATUS_INTERVAL_MS,  0 },  // Status (mandatory, ≤1s)
+  // Temperature & modulation — 10s interval
   { 25, OT_TEMP_INTERVAL_MS,    0 },  // Boiler flow temp (Tboiler)
   { 28, OT_TEMP_INTERVAL_MS,    0 },  // Return water temp (Tret)
   { 26, OT_TEMP_INTERVAL_MS,    0 },  // DHW temp (Tdhw)
@@ -58,8 +60,26 @@ static OTScheduleEntry otSchedule[] = {
   { 17, OT_TEMP_INTERVAL_MS,    0 },  // Relative modulation level
   { 18, OT_TEMP_INTERVAL_MS,    0 },  // CH water pressure
   {  1, OT_TEMP_INTERVAL_MS,    0 },  // Control setpoint (TSet)
+  { 16, OT_TEMP_INTERVAL_MS,    0 },  // Room setpoint (TrSet)
+  { 24, OT_TEMP_INTERVAL_MS,    0 },  // Room temperature (Tr)
+  { 56, OT_TEMP_INTERVAL_MS,    0 },  // DHW setpoint (TdhwSet)
+  { 57, OT_TEMP_INTERVAL_MS,    0 },  // Max CH water setpoint (MaxTSet)
+  { 19, OT_TEMP_INTERVAL_MS,    0 },  // Boiler capacity & min modulation
+  // Slow poll — config/diagnostics, 60s interval
   {  3, OT_SLOW_INTERVAL_MS,    0 },  // Slave configuration
+  {  5, OT_SLOW_INTERVAL_MS,    0 },  // ASF flags / fault code
   {115, OT_SLOW_INTERVAL_MS,    0 },  // OEM fault code
+  { 14, OT_SLOW_INTERVAL_MS,    0 },  // Max relative modulation setting
+  { 33, OT_SLOW_INTERVAL_MS,    0 },  // Exhaust temperature
+  { 34, OT_SLOW_INTERVAL_MS,    0 },  // Boiler heat exchanger temp
+  {116, OT_SLOW_INTERVAL_MS,    0 },  // Burner starts
+  {117, OT_SLOW_INTERVAL_MS,    0 },  // CH pump starts
+  {118, OT_SLOW_INTERVAL_MS,    0 },  // DHW pump starts
+  {119, OT_SLOW_INTERVAL_MS,    0 },  // DHW burner starts
+  {120, OT_SLOW_INTERVAL_MS,    0 },  // Burner operation hours
+  {121, OT_SLOW_INTERVAL_MS,    0 },  // CH pump operation hours
+  {122, OT_SLOW_INTERVAL_MS,    0 },  // DHW pump operation hours
+  {123, OT_SLOW_INTERVAL_MS,    0 },  // DHW burner operation hours
 };
 static constexpr uint8_t OT_SCHEDULE_SIZE = sizeof(otSchedule) / sizeof(otSchedule[0]);
 static uint8_t otScheduleIdx = 0;
@@ -281,15 +301,13 @@ void loopOTDirect() {
     handleMasterResponse();
   }
 
-  // Handle incoming thermostat frames (slave mode)
-  // Only forward if master bus is idle (collision avoidance)
+  // Forward pending thermostat frame when master bus is idle.
+  // Keep frame pending until send succeeds (retry on next loop).
   if (!otMasterRequestActive && otSlaveFramePending) {
-    unsigned long thermostatFrame = otSlaveFrame;
-    otSlaveFramePending = false;
-    bridgeFrameToParser('T', thermostatFrame);
-
-    // Forward thermostat request to boiler asynchronously
-    sendMasterRequestAsync(thermostatFrame, OT_DIRECT_ORIGIN_THERMOSTAT);
+    bridgeFrameToParser('T', otSlaveFrame);
+    if (sendMasterRequestAsync(otSlaveFrame, OT_DIRECT_ORIGIN_THERMOSTAT)) {
+      otSlaveFramePending = false;
+    }
   }
 
   // Schedule periodic master requests (non-blocking, skips if bus busy)
@@ -371,9 +389,90 @@ void handleOTDirectCommand(const char* buf, int len) {
       if (state.debug.bOTmsg) DebugTln(F("OT-direct: CH disabled"));
     }
   }
-  // PS=1/PS=0 — Print Summary mode toggle (no OT frame, handled by processOT)
+  // H2=0/1 — CH2 enable (modifies status flags for MsgID 0)
+  else if (cmd0 == 'H' && cmd1 == '2') {
+    if (value[0] == '1') {
+      otMasterStatusFlags |= 0x10;   // bit4 = CH2 enable
+      if (state.debug.bOTmsg) DebugTln(F("OT-direct: CH2 enabled"));
+    } else {
+      otMasterStatusFlags &= ~0x10;
+      if (state.debug.bOTmsg) DebugTln(F("OT-direct: CH2 disabled"));
+    }
+  }
+  // SW=xx.x — Max DHW setpoint (MsgID 56 = TdhwSet)
+  else if (cmd0 == 'S' && cmd1 == 'W') {
+    float setpoint = atof(value);
+    uint16_t f88 = (uint16_t)((int16_t)(setpoint * 256.0f));
+    otCmdFrame = OpenTherm::buildRequest(
+      OpenThermLibMessageType::WRITE_DATA,
+      OpenThermLibMessageID::TdhwSet,
+      f88
+    );
+    otCmdPending = true;
+    if (state.debug.bOTmsg) DebugTf(PSTR("OT-direct: SW=%.1f -> MsgID 56 frame 0x%08lX\r\n"), setpoint, otCmdFrame);
+  }
+  // SH=xx.x — Max CH setpoint (MsgID 57 = MaxTSet)
+  else if (cmd0 == 'S' && cmd1 == 'H') {
+    float setpoint = atof(value);
+    uint16_t f88 = (uint16_t)((int16_t)(setpoint * 256.0f));
+    otCmdFrame = OpenTherm::buildRequest(
+      OpenThermLibMessageType::WRITE_DATA,
+      OpenThermLibMessageID::MaxTSet,
+      f88
+    );
+    otCmdPending = true;
+    if (state.debug.bOTmsg) DebugTf(PSTR("OT-direct: SH=%.1f -> MsgID 57 frame 0x%08lX\r\n"), setpoint, otCmdFrame);
+  }
+  // MM=xx — Max relative modulation level (MsgID 14)
+  else if (cmd0 == 'M' && cmd1 == 'M') {
+    float level = atof(value);
+    uint16_t f88 = (uint16_t)((int16_t)(level * 256.0f));
+    otCmdFrame = OpenTherm::buildRequest(
+      OpenThermLibMessageType::WRITE_DATA,
+      OpenThermLibMessageID::MaxRelModLevelSetting,
+      f88
+    );
+    otCmdPending = true;
+    if (state.debug.bOTmsg) DebugTf(PSTR("OT-direct: MM=%.0f -> MsgID 14 frame 0x%08lX\r\n"), level, otCmdFrame);
+  }
+  // OT=xx.x — Outside temperature (MsgID 27 = Toutside)
+  else if (cmd0 == 'O' && cmd1 == 'T') {
+    float temp = atof(value);
+    uint16_t f88 = (uint16_t)((int16_t)(temp * 256.0f));
+    otCmdFrame = OpenTherm::buildRequest(
+      OpenThermLibMessageType::WRITE_DATA,
+      OpenThermLibMessageID::Toutside,
+      f88
+    );
+    otCmdPending = true;
+    if (state.debug.bOTmsg) DebugTf(PSTR("OT-direct: OT=%.1f -> MsgID 27 frame 0x%08lX\r\n"), temp, otCmdFrame);
+  }
+  // TC=xx.x — Constant temperature override (same as CS= for OT-direct)
+  else if (cmd0 == 'T' && cmd1 == 'C') {
+    float setpoint = atof(value);
+    uint16_t f88 = (uint16_t)((int16_t)(setpoint * 256.0f));
+    otCmdFrame = OpenTherm::buildRequest(
+      OpenThermLibMessageType::WRITE_DATA,
+      OpenThermLibMessageID::TSet,
+      f88
+    );
+    otCmdPending = true;
+    if (state.debug.bOTmsg) DebugTf(PSTR("OT-direct: TC=%.1f -> MsgID 1 frame 0x%08lX\r\n"), setpoint, otCmdFrame);
+  }
+  // VS=xx — Ventilation setpoint (MsgID 71)
+  else if (cmd0 == 'V' && cmd1 == 'S') {
+    int level = atoi(value);
+    uint16_t data = ((uint16_t)(level & 0xFF)) << 8;  // value in HB
+    otCmdFrame = OpenTherm::buildRequest(
+      OpenThermLibMessageType::WRITE_DATA,
+      static_cast<OpenThermLibMessageID>(71),
+      data
+    );
+    otCmdPending = true;
+    if (state.debug.bOTmsg) DebugTf(PSTR("OT-direct: VS=%d -> MsgID 71 frame 0x%08lX\r\n"), level, otCmdFrame);
+  }
+  // PS=1/PS=0 — Print Summary mode toggle (PIC-only feature)
   else if (cmd0 == 'P' && cmd1 == 'S') {
-    // No-op for OT-direct; PS mode is a PIC firmware feature
     if (state.debug.bOTmsg) DebugTf(PSTR("OT-direct: PS command ignored (PIC-only feature)\r\n"));
   }
   // GW=R — Reset (restart OT interfaces)
@@ -385,6 +484,16 @@ void handleOTDirectCommand(const char* buf, int len) {
     otMaster.begin(masterISR);
     otSlave.begin(slaveISR, handleSlaveRequest);
     if (state.debug.bOTmsg) DebugTln(F("OT-direct: OT interfaces restarted"));
+  }
+  // PIC-only commands — explicitly reject with message
+  else if ((cmd0 == 'S' && cmd1 == 'B') || (cmd0 == 'A' && cmd1 == 'A') ||
+           (cmd0 == 'D' && cmd1 == 'A') || (cmd0 == 'U' && cmd1 == 'I') ||
+           (cmd0 == 'K' && cmd1 == 'I') || (cmd0 == 'P' && cmd1 == 'M') ||
+           (cmd0 == 'S' && cmd1 == 'R') || (cmd0 == 'C' && cmd1 == 'R') ||
+           (cmd0 == 'R' && cmd1 == 'S') || (cmd0 == 'I' && cmd1 == 'T') ||
+           (cmd0 == 'O' && cmd1 == 'H') || (cmd0 == 'F' && cmd1 == 'T') ||
+           (cmd0 == 'V' && cmd1 == 'R') || (cmd0 == 'D' && cmd1 == 'P')) {
+    if (state.debug.bOTmsg) DebugTf(PSTR("OT-direct: %c%c command not supported (PIC-only)\r\n"), cmd0, cmd1);
   }
   else {
     if (state.debug.bOTmsg) DebugTf(PSTR("OT-direct: Unknown command [%c%c=%s] ignored\r\n"), cmd0, cmd1, value);
