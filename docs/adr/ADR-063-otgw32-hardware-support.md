@@ -20,7 +20,7 @@ The firmware should support both hardware variants from a single codebase to avo
 - **The PIC serial link must not be disturbed** — Never write to Serial after OTGW initialization on PIC boards.
 - **OT-Thing (OTGW32/OT-Thing project) already validates the approach** — Its TCP server on port 25238 outputs PIC-compatible text lines (`T`, `B`, `R`, `A` prefix + hex frame), confirming the frame bridge pattern works.
 
-### Alternatives considered:
+## Alternatives Considered
 
 1. **Separate firmware fork for OTGW32** — Rejected: duplicates MQTT, REST, WebSocket, settings, and UI code. Maintenance burden grows linearly with features.
 2. **Single ESP32 binary supporting both PIC and OT-direct** — Rejected: GPIO pin conflicts between board variants make this physically impossible. Would require runtime pin remapping that conflicts with hardware electrical design.
@@ -112,10 +112,13 @@ New board section in `boards.h` with ESP32-S3 pin map from OT-Thing NODO variant
 - Step-up converter enable sequence timing may need tuning for actual hardware
 - OT slave interface (thermostat emulation) is more complex than master-only mode — may be phased
 
-## Related
+## Related Decisions
 
 - **ADR-061**: Unified ESP8266/ESP32 platform abstraction layer — provides the `platform.h` shim layer this builds on
 - **ADR-060**: PIC availability guard pattern — `isPICEnabled()` pattern extended here
+
+## References
+
 - **OT-Thing project**: https://github.com/OTGW32/OT-Thing — reference implementation for direct GPIO OpenTherm on ESP32
-- **opentherm_library**: https://github.com/Phunkafizer/OpenTherm — Phunkafizer fork with ESP32 hardware timer support
+- **OpenTherm Library**: ihormelnyk/OpenTherm (stock library pinned in platformio.ini); Phunkafizer fork adds HW timer support
 - **Plan document**: `docs/plan/OTGW32_INTEGRATION_PLAN.md`

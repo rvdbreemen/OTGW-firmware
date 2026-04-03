@@ -2664,7 +2664,14 @@ static void removeFromCmdQueue(int index) {
 //void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue = false, const int16_t delay = OTGW_DELAY_SEND_MS);
 void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, const int16_t delay){
   if (!isPICEnabled()) {
-    OTGWDebugTln(F("CmdQueue: No PIC detected - command ignored"));
+#if HAS_DIRECT_OT
+    // On OTGW32, route commands directly to OT-direct handler
+    if (isOTDirectEnabled()) {
+      handleOTDirectCommand(buf, len);
+      return;
+    }
+#endif
+    OTGWDebugTln(F("CmdQueue: No PIC or OT-direct detected - command ignored"));
     return;
   }
 
@@ -4325,7 +4332,7 @@ void startOTGWstream()
 }
 
 //---------[ Upgrade PIC stuff taken from Schelte Bron's NodeMCU Firmware ]---------
-
+#if HAS_PIC
 void upgradepicnow(const char *filename) {
   if (!isPICEnabled()) {
     DebugTln(F("PIC upgrade rejected: no PIC detected"));
@@ -4348,6 +4355,7 @@ void upgradepicnow(const char *filename) {
   DebugTln(F(">>> Background upgrade active <<<"));
   DebugTln(F(""));
 }
+#endif // HAS_PIC — upgradepicnow
 
 // Helper function to escape JSON strings for WebSocket messages
 // Escapes quotes, backslashes, and control characters

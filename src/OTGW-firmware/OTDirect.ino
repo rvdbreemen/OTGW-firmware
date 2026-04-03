@@ -6,8 +6,9 @@
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
 **  Direct GPIO OpenTherm driver for OTGW32 (ESP32-S3, no PIC).
-**  Uses the opentherm_library (Phunkafizer fork) to drive the OT bus
-**  via GPIO interrupts + hardware timer for Manchester encoding.
+**  Uses the project-pinned OpenTherm.h library to drive the OT bus via
+**  GPIO interrupts and hardware-timer Manchester encoding. This module
+**  requires support for async/non-blocking requests and slave mode.
 **
 **  Frame bridge pattern: 32-bit OT frames are formatted as 9-char text
 **  strings (e.g. "B%08lX") and fed into processOT(), reusing the entire
@@ -85,9 +86,13 @@ static void bridgeFrameToParser(char prefix, unsigned long frame) {
 // buildStatusRequest — construct MsgID 0 master request with current flags
 // ---------------------------------------------------------------------------
 static unsigned long buildStatusRequest() {
+  // Build a complete READ_DATA request so message type, data-id and parity are correct.
   // MsgID 0: Master status flags in data-value HB (bits 15-8), LB = 0 (slave fills it)
-  // OT frame: [msg-type:4][spare:4][reserved:8][data-id:8][data-value:16]
-  return ((unsigned long)otMasterStatusFlags << 8);  // HB = master status, all other fields = 0
+  return OpenTherm::buildRequest(
+    OpenThermMessageType::READ_DATA,
+    static_cast<OpenThermMessageID>(0),
+    ((unsigned int)otMasterStatusFlags << 8)
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -139,13 +144,14 @@ void initOTDirect() {
   otSlave.begin(slaveISR);
   DebugTln(F("OT-direct: Slave interface started"));
 
-  // 5. Set hardware mode based on bus probe result
-  if (busPresent) {
-    state.hw.eMode = HW_MODE_OT_DIRECT;
-    DebugTln(F("OT-direct: Hardware mode set to OT_DIRECT"));
-  } else {
-    state.hw.eMode = HW_MODE_DEGRADED;
-    DebugTln(F("OT-direct: Hardware mode set to DEGRADED (bus not detected)"));
+  // 5. Always set OT_DIRECT mode — this is OTGW32 hardware.
+  //    Bus liveness is tracked via state.otgw.bOnline, not eMode.
+  //    The OT-direct loop must keep running so it can retry/recover.
+  state.hw.eMode = HW_MODE_OT_DIRECT;
+  DebugTln(F("OT-direct: Hardware mode set to OT_DIRECT"));
+
+  if (!busPresent) {
+    DebugTln(F("OT-direct: WARNING — OT bus not idle, boiler may be disconnected"));
   }
 
   // 6. Send initial status request to boiler to check connectivity
@@ -154,13 +160,12 @@ void initOTDirect() {
   unsigned long response = otMaster.sendRequest(request);
   if (otMaster.isValidResponse(response)) {
     state.otgw.bOnline = true;
-    state.hw.eMode = HW_MODE_OT_DIRECT;  // upgrade from DEGRADED if boiler responds
     DebugTln(F("OT-direct: Boiler responded — OT bus online"));
     bridgeFrameToParser('T', request);
     bridgeFrameToParser('B', response);
   } else {
     state.otgw.bOnline = false;
-    DebugTln(F("OT-direct: No valid boiler response — OT bus offline"));
+    DebugTln(F("OT-direct: No valid boiler response — OT bus offline (will retry in loop)"));
   }
 }
 
@@ -194,7 +199,7 @@ static void handleMasterResponse() {
     }
   } else {
     // Only mark offline on status request (MsgID 0) failures
-    uint8_t msgId = (otLastSentRequest >> 8) & 0xFF;
+    uint8_t msgId = (otLastSentRequest >> 16) & 0xFF;
     if (msgId == 0) {
       state.otgw.bOnline = false;
     }
@@ -215,9 +220,10 @@ static void scheduleMasterRequest() {
 
   // Pending command from the queue takes priority
   if (otCmdPending) {
-    otCmdPending = false;
-    otSlaveForwarding = false;
-    sendMasterRequestAsync(otCmdFrame);
+    if (sendMasterRequestAsync(otCmdFrame)) {
+      otCmdPending = false;
+      otSlaveForwarding = false;
+    }
     return;
   }
 
@@ -228,8 +234,6 @@ static void scheduleMasterRequest() {
     otScheduleIdx = (otScheduleIdx + 1) % OT_SCHEDULE_SIZE;
 
     if ((now - entry.lastSentMs) >= entry.intervalMs) {
-      entry.lastSentMs = now;
-
       unsigned long request;
       if (entry.msgId == 0) {
         request = buildStatusRequest();
@@ -242,7 +246,9 @@ static void scheduleMasterRequest() {
       }
 
       otSlaveForwarding = false;
-      sendMasterRequestAsync(request);
+      if (sendMasterRequestAsync(request)) {
+        entry.lastSentMs = now;  // Only advance timer on successful send
+      }
       return;  // One request per call
     }
   } while (otScheduleIdx != startIdx);
@@ -299,24 +305,26 @@ void handleOTDirectCommand(const char* buf, int len) {
   // TT=xx.x — Control setpoint (MsgID 1)
   if (cmd0 == 'T' && cmd1 == 'T') {
     float setpoint = atof(value);
-    int16_t fixed = (int16_t)(setpoint * 256.0f);
-    unsigned long frame = ((unsigned long)1 << 28)  // WRITE_DATA
-                        | ((unsigned long)1 << 8)   // MsgID 1 = TSet
-                        | (((uint16_t)fixed) & 0xFFFF);
-    otCmdFrame = frame;
+    uint16_t f88 = (uint16_t)((int16_t)(setpoint * 256.0f));
+    otCmdFrame = OpenTherm::buildRequest(
+      OpenThermMessageType::WRITE_DATA,
+      static_cast<OpenThermMessageID>(1),  // MsgID 1 = TSet
+      f88
+    );
     otCmdPending = true;
-    OTGWDebugTf(PSTR("OT-direct: TT=%.1f -> frame 0x%08lX\r\n"), setpoint, frame);
+    OTGWDebugTf(PSTR("OT-direct: TT=%.1f -> frame 0x%08lX\r\n"), setpoint, otCmdFrame);
   }
   // CS=xx.x — Control setpoint CH2 (MsgID 8)
   else if (cmd0 == 'C' && cmd1 == 'S') {
     float setpoint = atof(value);
-    int16_t fixed = (int16_t)(setpoint * 256.0f);
-    unsigned long frame = ((unsigned long)1 << 28)  // WRITE_DATA
-                        | ((unsigned long)8 << 8)   // MsgID 8
-                        | (((uint16_t)fixed) & 0xFFFF);
-    otCmdFrame = frame;
+    uint16_t f88 = (uint16_t)((int16_t)(setpoint * 256.0f));
+    otCmdFrame = OpenTherm::buildRequest(
+      OpenThermMessageType::WRITE_DATA,
+      static_cast<OpenThermMessageID>(8),  // MsgID 8 = TSet CH2
+      f88
+    );
     otCmdPending = true;
-    OTGWDebugTf(PSTR("OT-direct: CS=%.1f -> frame 0x%08lX\r\n"), setpoint, frame);
+    OTGWDebugTf(PSTR("OT-direct: CS=%.1f -> frame 0x%08lX\r\n"), setpoint, otCmdFrame);
   }
   // HW=0/1/A — DHW enable (modifies status flags for MsgID 0)
   else if (cmd0 == 'H' && cmd1 == 'W') {

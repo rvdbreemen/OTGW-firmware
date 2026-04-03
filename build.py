@@ -277,6 +277,10 @@ def install_dependencies(project_dir, config_file, target_names):
         "WebSockets@2.3.6"
     ]
 
+    # OTGW32 target needs OpenTherm library for direct GPIO OT
+    if "otgw32" in target_names:
+        libraries.append("OpenTherm Library@1.1.5")
+
     for lib in libraries:
         print_info(f"Installing {lib}...")
         run_command(cmd_base + ["lib", "install", lib])
