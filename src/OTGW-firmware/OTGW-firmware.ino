@@ -218,7 +218,7 @@ static WifiState_t wifiState = WIFI_IDLE;
 static int wifiRetryCount = 0;
 
 void loopWifi() {
-  DECLARE_TIMER_SEC(timerWifiRetry, 5, CATCH_UP_MISSED_TICKS);
+  DECLARE_TIMER_SEC(timerWifiRetry, 30, CATCH_UP_MISSED_TICKS);
 
   switch (wifiState) {
     case WIFI_IDLE:
@@ -246,7 +246,7 @@ void loopWifi() {
       } else if (DUE(timerWifiRetry)) {
         wifiRetryCount++;
         DebugTf(PSTR("WiFi: connect attempt %d failed\r\n"), wifiRetryCount);
-        if (wifiRetryCount >= 15) {
+        if (wifiRetryCount >= 10) {
           wifiState = WIFI_FAILED;
         } else {
           wifiState = WIFI_DISCONNECTED;  // retry

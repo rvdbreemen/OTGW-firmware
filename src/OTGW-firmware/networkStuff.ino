@@ -143,7 +143,10 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   }
   DebugTf(PSTR("Wifi status: %s\r\n"), WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
   DebugTf(PSTR("Connected to: %s\r\n"), WiFi.localIP().toString().c_str());
-  WiFi.setAutoReconnect(true);
+  // ADR-047: loopWifi() handles all reconnection explicitly.
+  // Disable SDK auto-reconnect to prevent interference with the state machine
+  // (e.g. WiFi.begin() in loopWifi() cancelling an in-progress SDK reconnect).
+  WiFi.setAutoReconnect(false);
   WiFi.persistent(true);
 
   DebugTf(PSTR("Wifi status: %s\r\n"), WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
