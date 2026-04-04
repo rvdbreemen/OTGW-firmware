@@ -312,6 +312,7 @@ document.addEventListener('visibilitychange', function () {
     // When tab is hidden, stop UI updates to save resources but KEEP WebSocket connected
     stopTimeUpdates();
     stopOTmonitorPolling();
+    stopOTDStatusPolling();
     stopPICsettingsRefreshTimer();
     // WebSocket stays connected to continue gathering data in background
     // The watchdog timer will keep it alive and reconnect if needed
@@ -325,6 +326,7 @@ document.addEventListener('visibilitychange', function () {
     // Ensure WebSocket is connected (will reconnect if needed)
     initOTLogWebSocket();
     startOTmonitorPolling();
+    if (isMainPageActive()) startOTDStatusPolling();
     startPICsettingsRefreshTimer();
   }
 });
@@ -1797,6 +1799,140 @@ function applyOTDirectAvailability(available) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// OT-Direct status widget — polls /api/v2/otdirect/status every 5 seconds
+// ---------------------------------------------------------------------------
+var _otdStatusTimer = null;
+
+function startOTDStatusPolling() {
+  if (_otdStatusTimer || !otDirectAvailable) return;
+  refreshOTDStatus();
+  _otdStatusTimer = setInterval(refreshOTDStatus, 5000);
+}
+
+function stopOTDStatusPolling() {
+  if (_otdStatusTimer) { clearInterval(_otdStatusTimer); _otdStatusTimer = null; }
+}
+
+function refreshOTDStatus() {
+  if (!otDirectAvailable) return;
+  fetch(APIGW + 'v2/otdirect/status')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(json) {
+      if (!json || !json.otdirect_status) return;
+      var s = json.otdirect_status;
+      var el;
+      el = document.getElementById('otd-st-mode');
+      if (el) { el.textContent = (s.mode || '--').toUpperCase(); }
+      el = document.getElementById('otd-st-online');
+      if (el) { el.textContent = s.ot_online ? 'Online' : 'Offline'; el.className = 'otd-value ' + (s.ot_online ? 'otd-val-ok' : 'otd-val-err'); }
+      el = document.getElementById('otd-st-therm');
+      if (el) { el.textContent = s.thermostat_connected ? 'Connected' : 'None'; el.className = 'otd-value ' + (s.thermostat_connected ? 'otd-val-ok' : 'otd-val-warn'); }
+      el = document.getElementById('otd-st-boiler');
+      if (el) { el.textContent = s.boiler ? 'Active' : 'Idle'; el.className = 'otd-value ' + (s.boiler ? 'otd-val-ok' : 'otd-val-warn'); }
+      el = document.getElementById('otd-st-setback');
+      if (el) { el.textContent = s.setback_active ? 'ACTIVE' : 'Off'; el.className = 'otd-value ' + (s.setback_active ? 'otd-val-warn' : 'otd-val-ok'); }
+      el = document.getElementById('otd-st-sched');
+      if (el) { el.textContent = (s.schedule_active || 0) + '/' + (s.schedule_total || 0); }
+      el = document.getElementById('otd-st-ovr');
+      if (el) { el.textContent = String(s.overrides_active || 0); }
+      el = document.getElementById('otd-st-stepup');
+      if (el) { el.textContent = s.stepup ? 'On' : 'Off'; }
+    })
+    .catch(function() {});
+}
+
+// ---------------------------------------------------------------------------
+// OT-Direct override management
+// ---------------------------------------------------------------------------
+function toggleOTDOverrides() {
+  var sec = document.getElementById('otd-ovr-section');
+  var arrow = document.getElementById('otd-ovr-arrow');
+  if (!sec) return;
+  var visible = sec.style.display !== 'none';
+  sec.style.display = visible ? 'none' : 'block';
+  if (arrow) arrow.innerHTML = visible ? '&#9660;' : '&#9650;';
+  if (!visible) refreshOTDOverrides();
+}
+
+function refreshOTDOverrides() {
+  fetch(APIGW + 'v2/otdirect/overrides')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(json) {
+      if (!json || !json.overrides) return;
+      renderOTDOverrides(json.overrides);
+    })
+    .catch(function() {});
+}
+
+function renderOTDOverrides(ov) {
+  var list = document.getElementById('otd-ovr-list');
+  if (!list) return;
+  var html = '';
+  var hasAny = false;
+
+  if (ov.write && ov.write.length) {
+    ov.write.forEach(function(e) {
+      hasAny = true;
+      html += '<div class="otd-ovr-row"><span>Write</span><span>MsgID ' + e.msgid + '</span><span>0x' + ('0000' + e.value.toString(16)).slice(-4).toUpperCase() + '</span></div>';
+    });
+  }
+  if (ov.response && ov.response.length) {
+    ov.response.forEach(function(e) {
+      hasAny = true;
+      html += '<div class="otd-ovr-row"><span>SR</span><span>MsgID ' + e.msgid + '</span><span>0x' + ('0000' + e.value.toString(16)).slice(-4).toUpperCase() + '</span>';
+      html += '<button onclick="clearOTDOverride(\'cr\',' + e.msgid + ')">Clear</button></div>';
+    });
+  }
+  if (ov.modify && ov.modify.length) {
+    ov.modify.forEach(function(e) {
+      hasAny = true;
+      html += '<div class="otd-ovr-row"><span>RM</span><span>MsgID ' + e.msgid + '</span><span>0x' + ('0000' + e.value.toString(16)).slice(-4).toUpperCase() + '</span>';
+      html += '<button onclick="clearOTDOverride(\'cm\',' + e.msgid + ')">Clear</button></div>';
+    });
+  }
+  if (ov.unknown && ov.unknown.length) {
+    ov.unknown.forEach(function(id) {
+      hasAny = true;
+      html += '<div class="otd-ovr-row"><span>UI</span><span>MsgID ' + id + '</span><span>(Unknown ID)</span>';
+      html += '<button onclick="clearOTDOverride(\'ki\',' + id + ')">Clear</button></div>';
+    });
+  }
+
+  list.innerHTML = hasAny ? html : '<div class="otd-ovr-empty">No active overrides</div>';
+}
+
+function sendOTDOverride() {
+  var action = document.getElementById('otd-ovr-action');
+  var msgid = document.getElementById('otd-ovr-msgid');
+  var value = document.getElementById('otd-ovr-value');
+  if (!action || !msgid) return;
+  var a = action.value;
+  var m = msgid.value;
+  if (m === '') return;
+  var url = APIGW + 'v2/otdirect/overrides?action=' + a + '&msgid=' + m;
+  if ((a === 'sr' || a === 'rm') && value && value.value !== '') {
+    url += '&value=' + value.value;
+  }
+  fetch(url, { method: 'POST', mode: 'cors' })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(json) {
+      if (json && json.overrides) renderOTDOverrides(json.overrides);
+      if (msgid) msgid.value = '';
+      if (value) value.value = '';
+    })
+    .catch(function(err) { console.log('OTD override error: ' + err.message); });
+}
+
+function clearOTDOverride(action, msgid) {
+  fetch(APIGW + 'v2/otdirect/overrides?action=' + action + '&msgid=' + msgid, { method: 'POST', mode: 'cors' })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(json) {
+      if (json && json.overrides) renderOTDOverrides(json.overrides);
+    })
+    .catch(function() {});
+}
+
 function applyOTGWSimulationState(rawValue) {
   const parsedValue = parseSimulationValue(rawValue);
   if (parsedValue === null) return;
@@ -3059,6 +3195,7 @@ function checkFSMismatch() {
 function showMainPage() {
   console.log("showMainPage()");
   stopOTmonitorPolling();
+  stopOTDStatusPolling();
   if (typeof SAT !== 'undefined') SAT.stop();
   
   // Exit flash mode if it was active
@@ -3075,12 +3212,14 @@ function showMainPage() {
   
   if (!flashModeActive) {
     startOTmonitorPolling();
+    startOTDStatusPolling();
     // Initialize WebSocket for OT log streaming
     initOTLogWebSocket();
   }
 }
 
 function firmwarePage() {
+  stopOTDStatusPolling();
   initOTLogWebSocket();
   stopOTmonitorPolling();
   refreshDevTime();
@@ -3091,6 +3230,7 @@ function firmwarePage() {
 function deviceinfoPage() {
   disconnectOTLogWebSocket();
   stopOTmonitorPolling();
+  stopOTDStatusPolling();
   refreshDevTime();
   refreshDeviceInfo();
   refreshCrashLogInfo();
@@ -3101,6 +3241,7 @@ function deviceinfoPage() {
 function settingsPage() {
   disconnectOTLogWebSocket();
   stopOTmonitorPolling();
+  stopOTDStatusPolling();
   refreshDevTime();
   setActivePageSection('displaySettingsPage');
   var msgEl = document.getElementById("settingMessage");
@@ -3111,6 +3252,7 @@ function settingsPage() {
 
 function webhookPage() {
   disconnectOTLogWebSocket();
+  stopOTDStatusPolling();
   clearInterval(tid);
   refreshDevTime();
   document.getElementById("displayMainPage").classList.remove('active');
@@ -3125,6 +3267,7 @@ function webhookPage() {
 function satPage() {
   disconnectOTLogWebSocket();
   stopOTmonitorPolling();
+  stopOTDStatusPolling();
   refreshDevTime();
   setActivePageSection('displaySATPage');
   if (typeof SAT !== 'undefined') {

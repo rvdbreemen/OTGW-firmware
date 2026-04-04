@@ -274,3 +274,41 @@
     align-items: flex-start;
   }
 }
+
+/* OT-Direct status & override panel */
+#otd-panel { margin: 0.5rem 0.75rem; }
+.otd-status-card, .otd-override-card {
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 0.5rem;
+}
+.otd-status-card h3, .otd-override-card h3 { margin: 0 0 0.4rem; font-size: 1rem; }
+.otd-status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.3rem 0.8rem;
+}
+.otd-stat { display: flex; flex-direction: column; align-items: center; }
+.otd-label { font-size: 0.75rem; opacity: 0.65; }
+.otd-value { font-size: 0.95rem; font-weight: 600; }
+.otd-val-ok { color: #2a7; }
+.otd-val-warn { color: #c80; }
+.otd-val-err { color: #c33; }
+.otd-ovr-toggle { cursor: pointer; user-select: none; }
+.otd-ovr-toggle:hover { opacity: 0.8; }
+#otd-ovr-list { margin-bottom: 0.4rem; }
+.otd-ovr-row {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.15rem 0; font-size: 0.85rem; font-family: monospace;
+}
+.otd-ovr-row button { font-size: 0.75rem; padding: 0.1rem 0.3rem; cursor: pointer; }
+.otd-ovr-form {
+  display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap;
+  padding-top: 0.3rem; border-top: 1px solid #ddd;
+}
+.otd-ovr-form select, .otd-ovr-form input, .otd-ovr-form button { font-size: 0.8rem; }
+.otd-ovr-empty { font-size: 0.85rem; opacity: 0.6; font-style: italic; }
+@media (max-width: 768px) {
+  .otd-status-grid { grid-template-columns: repeat(2, 1fr); }
+}

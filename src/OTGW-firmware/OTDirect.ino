@@ -572,6 +572,52 @@ void updateOTDirectStatus() {
 }
 
 // ---------------------------------------------------------------------------
+// getOTDirectOverridesJSON — serialize all active overrides into a JSON string.
+// Called from restAPI.ino. Buffer must be at least 512 bytes.
+// Returns actual length written.
+// ---------------------------------------------------------------------------
+int getOTDirectOverridesJSON(char* buf, size_t bufSize) {
+  int pos = 0;
+  pos += snprintf_P(buf + pos, bufSize - pos, PSTR("{\"overrides\":{\"write\":["));
+
+  bool first = true;
+  for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
+    if (!otOverrides[i].active) continue;
+    pos += snprintf_P(buf + pos, bufSize - pos, PSTR("%s{\"msgid\":%u,\"value\":%u}"),
+                       first ? "" : ",", otOverrides[i].msgId, otOverrides[i].overrideValue);
+    first = false;
+  }
+
+  pos += snprintf_P(buf + pos, bufSize - pos, PSTR("],\"response\":["));
+  first = true;
+  for (uint8_t i = 0; i < OT_RESPONSE_OVERRIDE_MAX; i++) {
+    if (!otResponseOverrides[i].active) continue;
+    pos += snprintf_P(buf + pos, bufSize - pos, PSTR("%s{\"msgid\":%u,\"value\":%u}"),
+                       first ? "" : ",", otResponseOverrides[i].msgId, otResponseOverrides[i].value);
+    first = false;
+  }
+
+  pos += snprintf_P(buf + pos, bufSize - pos, PSTR("],\"modify\":["));
+  first = true;
+  for (uint8_t i = 0; i < OT_RESPONSE_MODIFY_MAX; i++) {
+    if (!otResponseModifiers[i].active) continue;
+    pos += snprintf_P(buf + pos, bufSize - pos, PSTR("%s{\"msgid\":%u,\"value\":%u}"),
+                       first ? "" : ",", otResponseModifiers[i].msgId, otResponseModifiers[i].value);
+    first = false;
+  }
+
+  pos += snprintf_P(buf + pos, bufSize - pos, PSTR("],\"unknown\":["));
+  first = true;
+  for (uint8_t i = 0; i < otUnknownIdCount; i++) {
+    pos += snprintf_P(buf + pos, bufSize - pos, PSTR("%s%u"), first ? "" : ",", otUnknownIds[i]);
+    first = false;
+  }
+
+  pos += snprintf_P(buf + pos, bufSize - pos, PSTR("]}}"));
+  return pos;
+}
+
+// ---------------------------------------------------------------------------
 // Loopback test mode — simulated boiler data table
 // Provides realistic OT values so the full stack (parser, MQTT, WebSocket,
 // REST, HA discovery) can be exercised without any boiler hardware.

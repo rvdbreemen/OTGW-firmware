@@ -320,6 +320,52 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
       sendApiMethodNotAllowed(F("GET, POST"));
     }
   }
+  // GET /api/v2/otdirect/overrides — list all active overrides
+  // POST /api/v2/otdirect/overrides?action=sr&msgid=X&value=HHHH — set stored response
+  // POST /api/v2/otdirect/overrides?action=cr&msgid=X — clear stored response
+  // POST /api/v2/otdirect/overrides?action=rm&msgid=X&value=HHHH — set response modifier
+  // POST /api/v2/otdirect/overrides?action=cm&msgid=X — clear response modifier
+  // POST /api/v2/otdirect/overrides?action=ui&msgid=X — mark unknown ID
+  // POST /api/v2/otdirect/overrides?action=ki&msgid=X — mark known ID
+  else if (wc > 4 && strcmp_P(words[4], PSTR("overrides")) == 0) {
+    if (method == HTTP_GET) {
+      char ovrBuf[1536];
+      getOTDirectOverridesJSON(ovrBuf, sizeof(ovrBuf));
+      sendCorsOriginHeader();
+      httpServer.send(200, F("application/json"), ovrBuf);
+    } else if (method == HTTP_POST || method == HTTP_PUT) {
+      if (!httpServer.hasArg("action") || !httpServer.hasArg("msgid")) {
+        sendApiError(400, F("Missing 'action' and/or 'msgid' parameter")); return;
+      }
+      String action = httpServer.arg("action");
+      String msgidStr = httpServer.arg("msgid");
+      // Build command string and queue it (reuses existing handlers)
+      char cmdBuf[16];
+      if (action == F("sr") || action == F("rm")) {
+        if (!httpServer.hasArg("value")) { sendApiError(400, F("Missing 'value' parameter")); return; }
+        String valStr = httpServer.arg("value");
+        const char* prefix = (action == F("sr")) ? "SR=" : "RM=";
+        snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("%s%s:%s"), prefix, msgidStr.c_str(), valStr.c_str());
+      } else if (action == F("cr") || action == F("cm") || action == F("ui") || action == F("ki")) {
+        const char* prefix;
+        if (action == F("cr")) prefix = "CR=";
+        else if (action == F("cm")) prefix = "CM=";
+        else if (action == F("ui")) prefix = "UI=";
+        else prefix = "KI=";
+        snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("%s%s"), prefix, msgidStr.c_str());
+      } else {
+        sendApiError(400, F("Invalid action. Use: sr, cr, rm, cm, ui, ki")); return;
+      }
+      addOTWGcmdtoqueue(cmdBuf, strlen(cmdBuf), true);
+      // Return updated override list
+      char ovrBuf[1536];
+      getOTDirectOverridesJSON(ovrBuf, sizeof(ovrBuf));
+      sendCorsOriginHeader();
+      httpServer.send(200, F("application/json"), ovrBuf);
+    } else {
+      sendApiMethodNotAllowed(F("GET, POST"));
+    }
+  }
   else {
     sendApiNotFound(originalURI);
   }

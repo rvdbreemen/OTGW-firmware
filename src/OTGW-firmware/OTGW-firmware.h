@@ -60,6 +60,7 @@ enum OTDirectRequestOrigin : uint8_t {
 void initOTDirect();
 void loopOTDirect();
 void handleOTDirectCommand(const char* buf, int len);
+int getOTDirectOverridesJSON(char* buf, size_t bufSize);
 #endif
 
 void blinkLEDnow();

@@ -70,6 +70,42 @@
         <div id="waiting">Wait for it...</div>
       </div>
       
+      <!-- OT-Direct Status & Override Panel (OTGW32 only) -->
+      <div id="otd-panel" class="otdirect-only hidden">
+        <div class="otd-status-card">
+          <h3>OT-Direct Status</h3>
+          <div class="otd-status-grid">
+            <div class="otd-stat"><span class="otd-label">Mode</span><span id="otd-st-mode" class="otd-value">--</span></div>
+            <div class="otd-stat"><span class="otd-label">OT Bus</span><span id="otd-st-online" class="otd-value">--</span></div>
+            <div class="otd-stat"><span class="otd-label">Thermostat</span><span id="otd-st-therm" class="otd-value">--</span></div>
+            <div class="otd-stat"><span class="otd-label">Boiler</span><span id="otd-st-boiler" class="otd-value">--</span></div>
+            <div class="otd-stat"><span class="otd-label">Setback</span><span id="otd-st-setback" class="otd-value">--</span></div>
+            <div class="otd-stat"><span class="otd-label">Schedule</span><span id="otd-st-sched" class="otd-value">--</span></div>
+            <div class="otd-stat"><span class="otd-label">Overrides</span><span id="otd-st-ovr" class="otd-value">--</span></div>
+            <div class="otd-stat"><span class="otd-label">Step-Up</span><span id="otd-st-stepup" class="otd-value">--</span></div>
+          </div>
+        </div>
+        <div class="otd-override-card">
+          <h3 class="otd-ovr-toggle" onclick="toggleOTDOverrides()">Active Overrides <span id="otd-ovr-arrow">&#9660;</span></h3>
+          <div id="otd-ovr-section" style="display:none;">
+            <div id="otd-ovr-list"></div>
+            <div class="otd-ovr-form">
+              <select id="otd-ovr-action">
+                <option value="sr">SR (Stored Response)</option>
+                <option value="cr">CR (Clear Response)</option>
+                <option value="rm">RM (Response Modify)</option>
+                <option value="cm">CM (Clear Modify)</option>
+                <option value="ui">UI (Mark Unknown ID)</option>
+                <option value="ki">KI (Mark Known ID)</option>
+              </select>
+              <input type="number" id="otd-ovr-msgid" min="0" max="127" placeholder="MsgID" style="width:70px;" />
+              <input type="text" id="otd-ovr-value" placeholder="Hex value" style="width:80px;" />
+              <button type="button" onclick="sendOTDOverride()">Apply</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- OpenTherm Log Viewer Section -->
       <div id="otLogSection" class="ot-log-section">
         <div class="ot-log-header">
