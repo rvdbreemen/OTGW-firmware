@@ -300,13 +300,11 @@ def install_dependencies(project_dir, config_file, target_names):
     # SSD1306Ascii: text-only, no 1KB framebuffer — saves RAM on ESP8266
     libraries.append("SSD1306Ascii@1.3.5")
 
-    # ESP32-S3 targets need OpenTherm library for direct GPIO OT (Phunkafizer fork)
+    # ESP32-S3: OpenTherm library is bundled in src/libraries/OpenTherm (Phunkafizer fork)
+    # Only OTGW32 Nodo has W5500 SPI Ethernet
     esp32_targets = {"otgw32", "otthing"}
-    if esp32_targets & set(target_names):
-        libraries.append("https://github.com/Phunkafizer/opentherm_library.git")
-        # Only OTGW32 Nodo has W5500 SPI Ethernet
-        if "otgw32" in target_names:
-            libraries.append("EthernetESP32")
+    if "otgw32" in set(target_names):
+        libraries.append("EthernetESP32")
 
     for lib in libraries:
         print_info(f"Installing {lib}...")

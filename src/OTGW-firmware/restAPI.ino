@@ -130,8 +130,8 @@ static bool parseMsgId(const char *token, uint8_t &msgId) {
 // requires: (1) add handler function, (2) add one entry to kV2Routes[].
 //=======================================================================
 
-constexpr uint8_t API_MAX_WORDS = 8;
-constexpr size_t  API_WORD_LEN  = 32;
+#define API_MAX_WORDS  8
+#define API_WORD_LEN   32
 
 static void handleHealth(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleSettings(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);

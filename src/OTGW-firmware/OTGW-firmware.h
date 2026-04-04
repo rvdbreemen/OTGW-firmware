@@ -425,6 +425,12 @@ inline bool isNetworkUp() {
   return (WiFi.status() == WL_CONNECTED);
 }
 
+// Forward declarations for Ethernet.ino helpers (defined after this header)
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+String getEthernetIPString();
+String getEthernetMACString();
+#endif
+
 inline String getActiveIP() {
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   if (state.net.eMode == NET_ETHERNET) return getEthernetIPString();
