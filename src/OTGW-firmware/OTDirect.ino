@@ -68,7 +68,10 @@ static OTScheduleEntry otSchedule[] = {
   R_ENTRY( 0, OT_STATUS_INTERVAL_MS),   // Status (mandatory, ≤1s)
 
   // === Periodic writes — keep boiler setpoints alive (15s refresh) ===
-  W_ENTRY( 1, OT_WRITE_INTERVAL_MS),    // Control setpoint (TSet) — CS=
+  // Write entries are inactive until a value is set by a command.
+  W_ENTRY( 1, OT_WRITE_INTERVAL_MS),    // Control setpoint (TSet) — CS=/TC=
+  W_ENTRY( 7, OT_WRITE_INTERVAL_MS),    // Cooling control signal — CC=
+  W_ENTRY( 8, OT_WRITE_INTERVAL_MS),    // Control setpoint CH2 (TsetCH2) — C2=
   W_ENTRY(14, OT_WRITE_INTERVAL_MS),    // Max relative modulation — MM=
   W_ENTRY(16, OT_WRITE_INTERVAL_MS),    // Room setpoint (TrSet) — TT=
   W_ENTRY(24, OT_WRITE_INTERVAL_MS),    // Room temperature (Tr)
@@ -82,52 +85,103 @@ static OTScheduleEntry otSchedule[] = {
   R_ENTRY(26, OT_TEMP_INTERVAL_MS),     // DHW temp (Tdhw)
   R_ENTRY(17, OT_TEMP_INTERVAL_MS),     // Relative modulation level
   R_ENTRY(18, OT_TEMP_INTERVAL_MS),     // CH water pressure
-  R_ENTRY(19, OT_TEMP_INTERVAL_MS),     // Boiler capacity & min modulation
-  R_ENTRY( 8, OT_TEMP_INTERVAL_MS),     // Control setpoint CH2 (TsetCH2)
+  R_ENTRY(19, OT_TEMP_INTERVAL_MS),     // DHW flow rate
   R_ENTRY(29, OT_TEMP_INTERVAL_MS),     // Solar storage temperature
-  R_ENTRY(30, OT_TEMP_INTERVAL_MS),     // Solar collector temperature
+  R_ENTRY(30, OT_TEMP_INTERVAL_MS),     // Solar collector temperature (s16)
   R_ENTRY(31, OT_TEMP_INTERVAL_MS),     // Flow temp CH2
   R_ENTRY(32, OT_TEMP_INTERVAL_MS),     // DHW2 temperature
-  R_ENTRY(35, OT_TEMP_INTERVAL_MS),     // Fan speed (boiler)
-  R_ENTRY(36, OT_TEMP_INTERVAL_MS),     // Electrical current / flame current
+  R_ENTRY(35, OT_TEMP_INTERVAL_MS),     // Fan speed setpoint/actual
+  R_ENTRY(36, OT_TEMP_INTERVAL_MS),     // Flame current (µA)
+  R_ENTRY(38, OT_TEMP_INTERVAL_MS),     // Relative humidity
 
   // === Slow poll — config/diagnostics, 60s interval ===
+  // All entries auto-disable if boiler responds UNKNOWN_DATA_ID.
   R_ENTRY( 3, OT_SLOW_INTERVAL_MS),     // Slave configuration / member ID
   R_ENTRY( 5, OT_SLOW_INTERVAL_MS),     // ASF flags / OEM fault code
   R_ENTRY( 6, OT_SLOW_INTERVAL_MS),     // Remote boiler parameter flags
   R_ENTRY( 9, OT_SLOW_INTERVAL_MS),     // Remote override room setpoint
   R_ENTRY(15, OT_SLOW_INTERVAL_MS),     // Max boiler capacity & min modulation
-  R_ENTRY(33, OT_SLOW_INTERVAL_MS),     // Exhaust temperature
+  R_ENTRY(33, OT_SLOW_INTERVAL_MS),     // Exhaust temperature (s16)
   R_ENTRY(34, OT_SLOW_INTERVAL_MS),     // Boiler heat exchanger temp
+  R_ENTRY(37, OT_SLOW_INTERVAL_MS),     // Room temperature CH2
+  R_ENTRY(39, OT_SLOW_INTERVAL_MS),     // Remote override room setpoint 2
+  // Bounds (s8+s8)
   R_ENTRY(48, OT_SLOW_INTERVAL_MS),     // TdhwSet upper/lower bounds
   R_ENTRY(49, OT_SLOW_INTERVAL_MS),     // MaxTSet upper/lower bounds
-  R_ENTRY(23, OT_SLOW_INTERVAL_MS),     // Room setpoint CH2
-  R_ENTRY(37, OT_SLOW_INTERVAL_MS),     // Room temperature CH2
-  R_ENTRY(100, OT_SLOW_INTERVAL_MS),    // Remote override function
-  R_ENTRY(115, OT_SLOW_INTERVAL_MS),    // OEM diagnostic code
-  R_ENTRY(116, OT_SLOW_INTERVAL_MS),    // Burner starts
-  R_ENTRY(117, OT_SLOW_INTERVAL_MS),    // CH pump starts
-  R_ENTRY(118, OT_SLOW_INTERVAL_MS),    // DHW pump starts
-  R_ENTRY(119, OT_SLOW_INTERVAL_MS),    // DHW burner starts
-  R_ENTRY(120, OT_SLOW_INTERVAL_MS),    // Burner operation hours
-  R_ENTRY(121, OT_SLOW_INTERVAL_MS),    // CH pump operation hours
-  R_ENTRY(122, OT_SLOW_INTERVAL_MS),    // DHW pump operation hours
-  R_ENTRY(123, OT_SLOW_INTERVAL_MS),    // DHW burner operation hours
-  R_ENTRY(113, OT_SLOW_INTERVAL_MS),    // Bad starts burner
-  R_ENTRY(114, OT_SLOW_INTERVAL_MS),    // Low signal flame
-  // OT version & product info
-  R_ENTRY(124, OT_SLOW_INTERVAL_MS),    // OpenTherm version master
-  R_ENTRY(125, OT_SLOW_INTERVAL_MS),    // OpenTherm version slave
-  R_ENTRY(126, OT_SLOW_INTERVAL_MS),    // Master product type/version
-  R_ENTRY(127, OT_SLOW_INTERVAL_MS),    // Slave product type/version
-  // Ventilation / heat-recovery (will auto-disable if not supported)
-  R_ENTRY(70, OT_SLOW_INTERVAL_MS),     // V/H status
+  R_ENTRY(50, OT_SLOW_INTERVAL_MS),     // OTC heat curve ratio bounds
+  R_ENTRY(51, OT_SLOW_INTERVAL_MS),     // Remote param 4 bounds
+  R_ENTRY(52, OT_SLOW_INTERVAL_MS),     // Remote param 5 bounds
+  R_ENTRY(53, OT_SLOW_INTERVAL_MS),     // Remote param 6 bounds
+  R_ENTRY(54, OT_SLOW_INTERVAL_MS),     // Remote param 7 bounds
+  R_ENTRY(55, OT_SLOW_INTERVAL_MS),     // Remote param 8 bounds
+  // Remote parameters (f8.8, R/W)
+  R_ENTRY(58, OT_SLOW_INTERVAL_MS),     // OTC heat curve ratio (Hcratio)
+  R_ENTRY(59, OT_SLOW_INTERVAL_MS),     // Remote parameter 4
+  R_ENTRY(60, OT_SLOW_INTERVAL_MS),     // Remote parameter 5
+  R_ENTRY(61, OT_SLOW_INTERVAL_MS),     // Remote parameter 6
+  R_ENTRY(62, OT_SLOW_INTERVAL_MS),     // Remote parameter 7
+  R_ENTRY(63, OT_SLOW_INTERVAL_MS),     // Remote parameter 8
+  // Ventilation / heat-recovery
+  R_ENTRY(70, OT_SLOW_INTERVAL_MS),     // V/H status (flag8+flag8)
   R_ENTRY(71, OT_SLOW_INTERVAL_MS),     // V/H control setpoint
-  R_ENTRY(77, OT_SLOW_INTERVAL_MS),     // Relative ventilation
+  R_ENTRY(72, OT_SLOW_INTERVAL_MS),     // V/H ASF flags / fault code
+  R_ENTRY(73, OT_SLOW_INTERVAL_MS),     // V/H OEM diagnostic code
+  R_ENTRY(74, OT_SLOW_INTERVAL_MS),     // V/H config / member ID
+  R_ENTRY(75, OT_SLOW_INTERVAL_MS),     // V/H OpenTherm version
+  R_ENTRY(76, OT_SLOW_INTERVAL_MS),     // V/H product version
+  R_ENTRY(77, OT_SLOW_INTERVAL_MS),     // Relative ventilation level
+  R_ENTRY(78, OT_SLOW_INTERVAL_MS),     // Relative humidity exhaust air
+  R_ENTRY(79, OT_SLOW_INTERVAL_MS),     // CO2 level exhaust air (ppm)
   R_ENTRY(80, OT_SLOW_INTERVAL_MS),     // Supply inlet temperature
   R_ENTRY(81, OT_SLOW_INTERVAL_MS),     // Supply outlet temperature
   R_ENTRY(82, OT_SLOW_INTERVAL_MS),     // Exhaust inlet temperature
   R_ENTRY(83, OT_SLOW_INTERVAL_MS),     // Exhaust outlet temperature
+  R_ENTRY(84, OT_SLOW_INTERVAL_MS),     // Exhaust fan speed (rpm)
+  R_ENTRY(85, OT_SLOW_INTERVAL_MS),     // Supply fan speed (rpm)
+  R_ENTRY(86, OT_SLOW_INTERVAL_MS),     // V/H remote parameter flags
+  R_ENTRY(87, OT_SLOW_INTERVAL_MS),     // Nominal ventilation value
+  R_ENTRY(88, OT_SLOW_INTERVAL_MS),     // V/H TSP count
+  R_ENTRY(89, OT_SLOW_INTERVAL_MS),     // V/H TSP entry
+  R_ENTRY(90, OT_SLOW_INTERVAL_MS),     // V/H fault buffer size
+  R_ENTRY(91, OT_SLOW_INTERVAL_MS),     // V/H fault buffer entry
+  // Brand info (u8+u8, index-based — will get index 0 only)
+  R_ENTRY(93, OT_SLOW_INTERVAL_MS),     // Brand name (index 0)
+  R_ENTRY(94, OT_SLOW_INTERVAL_MS),     // Brand version (index 0)
+  R_ENTRY(95, OT_SLOW_INTERVAL_MS),     // Brand serial number (index 0)
+  // Counters and special
+  R_ENTRY(96, OT_SLOW_INTERVAL_MS),     // Cooling operation hours
+  R_ENTRY(97, OT_SLOW_INTERVAL_MS),     // Power cycles
+  R_ENTRY(100, OT_SLOW_INTERVAL_MS),    // Remote override function
+  // Solar storage
+  R_ENTRY(101, OT_SLOW_INTERVAL_MS),    // Solar storage status
+  R_ENTRY(102, OT_SLOW_INTERVAL_MS),    // Solar storage ASF flags
+  R_ENTRY(103, OT_SLOW_INTERVAL_MS),    // Solar storage config / member ID
+  R_ENTRY(104, OT_SLOW_INTERVAL_MS),    // Solar storage product version
+  R_ENTRY(105, OT_SLOW_INTERVAL_MS),    // Solar storage TSP count
+  R_ENTRY(106, OT_SLOW_INTERVAL_MS),    // Solar storage TSP entry
+  R_ENTRY(107, OT_SLOW_INTERVAL_MS),    // Solar storage fault buffer size
+  R_ENTRY(108, OT_SLOW_INTERVAL_MS),    // Solar storage fault buffer entry
+  // Electricity producer
+  R_ENTRY(109, OT_SLOW_INTERVAL_MS),    // Electricity producer starts
+  R_ENTRY(110, OT_SLOW_INTERVAL_MS),    // Electricity producer hours
+  R_ENTRY(111, OT_SLOW_INTERVAL_MS),    // Electricity production (W)
+  R_ENTRY(112, OT_SLOW_INTERVAL_MS),    // Cumulative electricity production (kWh)
+  // Burner diagnostics
+  R_ENTRY(113, OT_SLOW_INTERVAL_MS),    // Unsuccessful burner starts
+  R_ENTRY(114, OT_SLOW_INTERVAL_MS),    // Flame signal too low count
+  R_ENTRY(115, OT_SLOW_INTERVAL_MS),    // OEM diagnostic code
+  // Starts & operation hours counters
+  R_ENTRY(116, OT_SLOW_INTERVAL_MS),    // Burner starts
+  R_ENTRY(117, OT_SLOW_INTERVAL_MS),    // CH pump starts
+  R_ENTRY(118, OT_SLOW_INTERVAL_MS),    // DHW pump/valve starts
+  R_ENTRY(119, OT_SLOW_INTERVAL_MS),    // DHW burner starts
+  R_ENTRY(120, OT_SLOW_INTERVAL_MS),    // Burner operation hours
+  R_ENTRY(121, OT_SLOW_INTERVAL_MS),    // CH pump operation hours
+  R_ENTRY(122, OT_SLOW_INTERVAL_MS),    // DHW pump/valve operation hours
+  R_ENTRY(123, OT_SLOW_INTERVAL_MS),    // DHW burner operation hours
+  // OT version & product info
+  R_ENTRY(125, OT_SLOW_INTERVAL_MS),    // OpenTherm version slave
+  R_ENTRY(127, OT_SLOW_INTERVAL_MS),    // Slave product type/version
 };
 
 #undef R_ENTRY
@@ -174,7 +228,8 @@ struct OTFrameOverride {
 };
 
 static OTFrameOverride otOverrides[] = {
-  {  1, false, 0 },   // TSet — CS= override
+  {  1, false, 0 },   // TSet — CS=/TC= override
+  {  7, false, 0 },   // CoolingControl — CC= override
   {  8, false, 0 },   // TsetCH2 — C2= override
   { 14, false, 0 },   // MaxRelModLevelSetting — MM= override
   { 16, false, 0 },   // TrSet — TT= override
@@ -337,7 +392,7 @@ void initOTDirect() {
   }
 
   // 7. Send initial status request to boiler to check connectivity
-  // Blocking call is acceptable during setup() — not yet in cooperative loop
+  // Blocking calls are acceptable during setup() — not yet in cooperative loop
   unsigned long request = buildStatusRequest();
   unsigned long response = otMaster.sendRequest(request);
   if (otMaster.isValidResponse(response)) {
@@ -348,6 +403,66 @@ void initOTDirect() {
   } else {
     state.otgw.bOnline = false;
     DebugTln(F("OT-direct: No valid boiler response — OT bus offline (will retry in loop)"));
+  }
+
+  // 8. OT protocol handshake — identify ourselves to the boiler.
+  //    MsgID 2: Master config flags (HB) + MemberID (LB). We set Smart Power bit if available.
+  //    MsgID 124: OpenTherm version we speak (f8.8, 2.2 = 0x0233).
+  //    MsgID 126: Master product type (HB) + version (LB).
+  //    These are one-time WRITE_DATA, not polled.
+  if (state.otgw.bOnline) {
+    unsigned long handshake;
+
+    // MsgID 2: Master config (HB=flags bit0=SmartPower, LB=MemberID 0)
+    handshake = OpenTherm::buildRequest(
+      OpenThermMessageType::WRITE_DATA,
+      OpenThermMessageID::MConfigMMemberIDcode,
+      0x0100  // HB=0x01 (Smart Power supported), LB=0x00 (MemberID)
+    );
+    response = otMaster.sendRequest(handshake);
+    bridgeFrameToParser('R', handshake);
+    if (otMaster.isValidResponse(response)) bridgeFrameToParser('B', response);
+
+    // MsgID 3: Read slave config to learn what the boiler supports
+    handshake = OpenTherm::buildRequest(
+      OpenThermMessageType::READ_DATA,
+      OpenThermMessageID::SConfigSMemberIDcode,
+      0
+    );
+    response = otMaster.sendRequest(handshake);
+    bridgeFrameToParser('R', handshake);
+    if (otMaster.isValidResponse(response)) {
+      bridgeFrameToParser('B', response);
+      uint8_t slaveConfig = (response >> 8) & 0xFF;
+      DebugTf(PSTR("OT-direct: Slave config=0x%02X (DHW=%d ModCtrl=%d Cool=%d CH2=%d)\r\n"),
+        slaveConfig,
+        (slaveConfig & 0x01) ? 1 : 0,  // DHW present
+        (slaveConfig & 0x02) ? 0 : 1,  // 0=modulating, 1=on-off
+        (slaveConfig & 0x04) ? 1 : 0,  // Cooling supported
+        (slaveConfig & 0x10) ? 1 : 0); // CH2 present
+    }
+
+    // MsgID 124: OT protocol version (f8.8: 2.2 = 0x0233 ≈ 2.20)
+    handshake = OpenTherm::buildRequest(
+      OpenThermMessageType::WRITE_DATA,
+      OpenThermMessageID::OpenThermVersionMaster,
+      0x0233  // 2.2 in f8.8 (2 + 51/256 ≈ 2.20)
+    );
+    response = otMaster.sendRequest(handshake);
+    bridgeFrameToParser('R', handshake);
+    if (otMaster.isValidResponse(response)) bridgeFrameToParser('B', response);
+
+    // MsgID 126: Master product type=0 (gateway), version=1
+    handshake = OpenTherm::buildRequest(
+      OpenThermMessageType::WRITE_DATA,
+      OpenThermMessageID::MasterVersion,
+      0x0001  // HB=type 0, LB=version 1
+    );
+    response = otMaster.sendRequest(handshake);
+    bridgeFrameToParser('R', handshake);
+    if (otMaster.isValidResponse(response)) bridgeFrameToParser('B', response);
+
+    DebugTln(F("OT-direct: Protocol handshake complete"));
   }
 }
 
@@ -574,6 +689,11 @@ void handleOTDirectCommand(const char* buf, int len) {
   else if (cmd0 == 'C' && cmd1 == '2') {
     uint16_t f88 = (uint16_t)((int16_t)(atof(value) * 256.0f));
     enqueueWriteCommand(8, f88, "C2");
+  }
+  // CC=xx.x — Cooling control signal (MsgID 7, 0-100%)
+  else if (cmd0 == 'C' && cmd1 == 'C') {
+    uint16_t f88 = (uint16_t)((int16_t)(atof(value) * 256.0f));
+    enqueueWriteCommand(7, f88, "CC");
   }
   // SW=xx.x — DHW setpoint (MsgID 56 = TdhwSet)
   else if (cmd0 == 'S' && cmd1 == 'W') {
