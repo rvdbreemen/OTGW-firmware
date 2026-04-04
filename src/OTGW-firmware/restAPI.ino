@@ -281,6 +281,16 @@ static void handlePic(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
   }
 }
 
+static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+  if (!isOTDirectEnabled()) { sendApiError(503, F("No OT-direct hardware - OTGW32 functions disabled")); return; }
+  if (wc > 4 && strcmp_P(words[4], PSTR("status")) == 0) {
+    sendOTDirectStatus();
+  } else {
+    sendApiNotFound(originalURI);
+  }
+}
+
 static void handleFirmware(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
   if (wc > 4 && strcmp_P(words[4], PSTR("files")) == 0) {
@@ -518,6 +528,7 @@ static const char kRouteFilesystem[] PROGMEM = "filesystem";
 static const char kRouteSimulate[]   PROGMEM = "simulate";
 static const char kRouteOtgw[]       PROGMEM = "otgw";
 static const char kRouteWebhook[]    PROGMEM = "webhook";
+static const char kRouteOtdirect[]   PROGMEM = "otdirect";
 static const char kRouteSat[]        PROGMEM = "sat";
 
 static const ApiRoute kV2Routes[] = {
@@ -527,6 +538,7 @@ static const ApiRoute kV2Routes[] = {
   { kRouteDevice,     handleDevice },
   { kRouteFlash,      handleFlash },
   { kRoutePic,        handlePic },
+  { kRouteOtdirect,   handleOTDirect },
   { kRouteFirmware,   handleFirmware },
   { kRouteFilesystem, handleFilesystem },
   { kRouteSimulate,   handleSimulate },
@@ -808,6 +820,15 @@ void sendDeviceInfoV2()
     sendJsonMapEntry(F("picdeviceid"), state.pic.sDeviceid);
     sendJsonMapEntry(F("picfwtype"), state.pic.sType);
   }
+  sendJsonMapEntry(F("otdirectavailable"), isOTDirectEnabled());
+  if (isOTDirectEnabled()) {
+    sendJsonMapEntry(F("otdbypass"), state.otd.bBypassActive);
+    sendJsonMapEntry(F("otdstepup"), state.otd.bStepUpEnabled);
+    sendJsonMapEntry(F("otdschedtotal"), state.otd.iScheduleTotal);
+    sendJsonMapEntry(F("otdschedactive"), state.otd.iScheduleActive);
+    sendJsonMapEntry(F("otdscheddisabled"), state.otd.iScheduleDisabled);
+    sendJsonMapEntry(F("otdoverrides"), state.otd.iOverrideCount);
+  }
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
   sendJsonMapEntry(F("compiled"), cMsg);
   sendJsonMapEntry(F("hostname"), CSTR(settings.sHostname));
@@ -949,6 +970,29 @@ void sendPICsettings()
   sendJsonMapEntry(F("voltage_ref"),         state.picSettings.sVoltageRef);
   sendEndJsonMap(F("pic_settings"));
 } // sendPICsettings()
+
+//=======================================================================
+// Sends OT-direct (OTGW32) runtime status as JSON map.
+// Parallel to sendPICsettings() — exposes OTGW32-specific diagnostics.
+// Returns: {"otdirect_status":{"bypass":false,"stepup":true,...}}
+void sendOTDirectStatus()
+{
+  sendStartJsonMap(F("otdirect_status"));
+  // Hardware state
+  sendJsonMapEntry(F("bypass"),           state.otd.bBypassActive);
+  sendJsonMapEntry(F("stepup"),           state.otd.bStepUpEnabled);
+  // Schedule statistics
+  sendJsonMapEntry(F("schedule_total"),   state.otd.iScheduleTotal);
+  sendJsonMapEntry(F("schedule_active"),  state.otd.iScheduleActive);
+  sendJsonMapEntry(F("schedule_disabled"), state.otd.iScheduleDisabled);
+  // Override status
+  sendJsonMapEntry(F("overrides_active"), state.otd.iOverrideCount);
+  // OT bus state
+  sendJsonMapEntry(F("ot_online"),        state.otgw.bOnline);
+  sendJsonMapEntry(F("thermostat"),       state.otgw.bThermostatState);
+  sendJsonMapEntry(F("boiler"),           state.otgw.bBoilerState);
+  sendEndJsonMap(F("otdirect_status"));
+} // sendOTDirectStatus()
 
 //=======================================================================
 void sendPICFlashStatus()

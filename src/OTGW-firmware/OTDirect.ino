@@ -467,6 +467,28 @@ void initOTDirect() {
 }
 
 // ---------------------------------------------------------------------------
+// updateOTDirectStatus — refresh state.otd with current schedule/override stats.
+// Called from loopOTDirect() once per second so REST/MQTT always have fresh data.
+// ---------------------------------------------------------------------------
+void updateOTDirectStatus() {
+  uint8_t total = OT_SCHEDULE_SIZE;
+  uint8_t disabled = 0;
+  for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
+    if (otSchedule[i].disabled) disabled++;
+  }
+  uint8_t overrides = 0;
+  for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
+    if (otOverrides[i].active) overrides++;
+  }
+  state.otd.iScheduleTotal    = total;
+  state.otd.iScheduleActive   = total - disabled;
+  state.otd.iScheduleDisabled = disabled;
+  state.otd.iOverrideCount    = overrides;
+  state.otd.bBypassActive     = otBypassActive;
+  state.otd.bStepUpEnabled    = (digitalRead(PIN_STEPUP_ENABLE) == HIGH);
+}
+
+// ---------------------------------------------------------------------------
 // sendMasterRequestAsync — initiate an async OT request (non-blocking)
 // ---------------------------------------------------------------------------
 static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin origin) {
@@ -615,6 +637,12 @@ void loopOTDirect() {
   DECLARE_TIMER_MS(timerOTSchedule, 100, SKIP_MISSED_TICKS);
   if (DUE(timerOTSchedule)) {
     scheduleMasterRequest();
+  }
+
+  // Refresh state.otd stats once per second for REST/MQTT
+  DECLARE_TIMER_SEC(timerOTDStatus, 1, SKIP_MISSED_TICKS);
+  if (DUE(timerOTDStatus)) {
+    updateOTDirectStatus();
   }
 }
 

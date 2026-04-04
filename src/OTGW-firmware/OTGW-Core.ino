@@ -476,6 +476,20 @@ void sendMQTTversioninfo(){
   }
   sendMQTTData("otgw-pic/picavailable", CCONOFF(state.pic.bAvailable));
 
+  // OT-direct (OTGW32) status — parallel to otgw-pic/ topics
+  sendMQTTData(F("otgw-otdirect/available"), CCONOFF(isOTDirectEnabled()));
+  if (isOTDirectEnabled()) {
+    sendMQTTData(F("otgw-otdirect/bypass"), CCONOFF(state.otd.bBypassActive));
+    sendMQTTData(F("otgw-otdirect/stepup"), CCONOFF(state.otd.bStepUpEnabled));
+    char buf[8];
+    snprintf_P(buf, sizeof(buf), PSTR("%u"), state.otd.iScheduleActive);
+    sendMQTTData(F("otgw-otdirect/schedule_active"), buf);
+    snprintf_P(buf, sizeof(buf), PSTR("%u"), state.otd.iScheduleDisabled);
+    sendMQTTData(F("otgw-otdirect/schedule_disabled"), buf);
+    snprintf_P(buf, sizeof(buf), PSTR("%u"), state.otd.iOverrideCount);
+    sendMQTTData(F("otgw-otdirect/overrides_active"), buf);
+  }
+
   // Hardware platform info
   sendMQTTData(F("otgw-firmware/board"), boardName());
   sendMQTTData(F("otgw-firmware/hardware_mode"), hardwareModeName());
@@ -488,6 +502,9 @@ static void publishBoilerConnectedState()
   if (isPICEnabled()) {
     sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
   }
+  if (isOTDirectEnabled()) {
+    sendMQTTData(F("otgw-otdirect/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
+  }
 }
 
 static void publishThermostatConnectedState()
@@ -496,6 +513,9 @@ static void publishThermostatConnectedState()
   if (isPICEnabled()) {
     sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
   }
+  if (isOTDirectEnabled()) {
+    sendMQTTData(F("otgw-otdirect/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
+  }
 }
 
 static void publishOTGWConnectedState()
@@ -503,6 +523,9 @@ static void publishOTGWConnectedState()
   sendMQTTData(F("otgw_connected"), CCONOFF(state.otgw.bOnline));
   if (isPICEnabled()) {
     sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otgw.bOnline));
+  }
+  if (isOTDirectEnabled()) {
+    sendMQTTData(F("otgw-otdirect/ot_online"), CCONOFF(state.otgw.bOnline));
   }
   sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
 }

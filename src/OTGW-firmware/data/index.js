@@ -1776,6 +1776,27 @@ function applyPICAvailability(available, otCommandAvailable) {
   });
 }
 
+// Hide or show OT-direct-only UI elements based on hardware.
+// Parallel to applyPICAvailability() for OTGW32 builds.
+var otDirectAvailable = false;
+
+function applyOTDirectAvailability(available) {
+  otDirectAvailable = !!available;
+  Array.from(document.getElementsByClassName('otdirect-only')).forEach(function(el) {
+    if (otDirectAvailable) el.classList.remove('hidden');
+    else el.classList.add('hidden');
+  });
+  // Dynamic device info rows
+  var otdDevInfoKeys = ['otdirectavailable', 'otdbypass', 'otdstepup', 'otdschedtotal', 'otdschedactive', 'otdscheddisabled', 'otdoverrides'];
+  otdDevInfoKeys.forEach(function(key) {
+    var row = document.getElementById('devinfo_' + key);
+    if (row) {
+      if (otDirectAvailable) row.classList.remove('hidden');
+      else row.classList.add('hidden');
+    }
+  });
+}
+
 function applyOTGWSimulationState(rawValue) {
   const parsedValue = parseSimulationValue(rawValue);
   if (parsedValue === null) return;
@@ -2970,6 +2991,7 @@ function initMainPage() {
         .then(function(json) {
           var d = json.device || {};
           applyPICAvailability(d.picavailable, d.otcommandinterface);
+          applyOTDirectAvailability(d.otdirectavailable);
           if (picAvailable) {
             firmwarePage();
           } else {
@@ -3896,6 +3918,7 @@ function refreshDevInfo() {
       applyParsedGatewayMode(parseGatewayModeValue(device.otgwmode));
       applyOTGWSimulationState(device.otgwsimulation);
       applyPICAvailability(device.picavailable, device.otcommandinterface);
+      applyOTDirectAvailability(device.otdirectavailable);
       updateNetworkIndicator(device.networkmode);
 
       const versionEl = document.getElementById('devVersion');
@@ -4140,6 +4163,7 @@ function refreshDeviceInfo() {
       const device = json.device || {};
       applyOTGWSimulationState(device.otgwsimulation);
       applyPICAvailability(device.picavailable, device.otcommandinterface);
+      applyOTDirectAvailability(device.otdirectavailable);
       for (let key in device) {
         if (key === 'otgwsimulation') continue;
         console.log("[" + key + "]=>[" + device[key] + "]");
@@ -4449,6 +4473,7 @@ function refreshSettings() {
       //console.log("-->done..");
       // Hide PIC-related settings rows when no PIC is detected
       applyPICAvailability(picAvailable, otCommandInterfaceAvailable);
+      applyOTDirectAvailability(otDirectAvailable);
     })
     .catch(function (error) {
       var msgEl = document.getElementById("settingMessage");
@@ -4880,6 +4905,13 @@ var translateFields = [
   , ["flashchipspeed", "Flash Chip Speed (MHz)"]
   , ["flashchipmode", "Flash Mode"]
   , ["boardtype", "Board Type"]
+  , ["otdirectavailable", "OT-Direct Active"]
+  , ["otdbypass", "Bypass Relay"]
+  , ["otdstepup", "24V Step-Up"]
+  , ["otdschedtotal", "Poll Schedule Total"]
+  , ["otdschedactive", "Poll Schedule Active"]
+  , ["otdscheddisabled", "Poll Schedule Disabled"]
+  , ["otdoverrides", "Active Overrides"]
   , ["board", "Board"]
   , ["hardwaremode", "Hardware Mode"]
   , ["networkmode", "Network Transport"]

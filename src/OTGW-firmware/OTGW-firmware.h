@@ -202,6 +202,15 @@ struct PICSection {            // state.pic — PIC microcontroller identity/sta
   char sType[32]      = "no pic found";  // was sPICtype
 };
 
+struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime status
+  uint8_t  iScheduleTotal    = 0;   // total schedule entries
+  uint8_t  iScheduleActive   = 0;   // entries not disabled by boiler
+  uint8_t  iScheduleDisabled = 0;   // entries disabled (UNKNOWN_DATA_ID)
+  uint8_t  iOverrideCount    = 0;   // number of active write overrides
+  bool     bBypassActive     = false; // true = thermostat direct to boiler (relay)
+  bool     bStepUpEnabled    = false; // 24V step-up converter on
+};
+
 struct OTGWProtocol {          // state.otgw — OpenTherm protocol & bus state
   bool bOnline           = false;  // was bOTGWonline — serial link alive
   bool bPSmode           = false;  // was bPSmode — Print Summary mode (PS=1)
@@ -319,6 +328,7 @@ struct OTGWState {
   HardwareSection    hw;          // state.hw.eMode, state.hw.bOLEDPresent
   NetworkSection     net;         // state.net.eMode, state.net.bEthernetLink
   PICSection         pic;         // state.pic.bAvailable, state.pic.sFwversion
+  OTDirectSection    otd;         // state.otd — OT-direct schedule/override stats (OTGW32)
   OTGWProtocol       otgw;        // state.otgw.bOnline, state.otgw.bBoilerState
   MQTTRuntimeSection mqtt;        // state.mqtt.bConnected
   FlashSection       flash;       // state.flash.bESPactive, state.flash.iPICprogress

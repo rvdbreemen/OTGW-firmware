@@ -1318,6 +1318,8 @@ void doAutoConfigure(){
       // Skip PIC-specific discovery entries when no PIC is detected.
       // Relies on the "otgw-pic/" topic prefix convention — update if topics are renamed.
       if (!isPICEnabled() && strstr_P(sLine, PSTR("otgw-pic/"))) continue;
+      // Skip OT-direct discovery entries when OT-direct is not active (ESP8266/PIC builds).
+      if (!isOTDirectEnabled() && strstr_P(sLine, PSTR("otgw-otdirect/"))) continue;
 
       {
 
