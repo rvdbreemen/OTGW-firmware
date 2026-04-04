@@ -690,6 +690,12 @@ For string comparisons: use `strcmp_P()`, `strcasecmp_P()` with `PSTR()`.
 
 **Post-mortem rule**: If a bug involves `_P` helpers, `PGM_P`, or `__FlashStringHelper`, assume a storage-domain mismatch until proven otherwise. The RAM/flash domain must match the helper — never pass a PROGMEM pointer where RAM is expected or vice versa.
 
+### No ArduinoJson library — NEVER
+- Do **not** use the ArduinoJson library anywhere in this project
+- JSON is built manually with `snprintf_P` / `sendJsonMapEntry` / chunked `httpServer.sendContent()`
+- JSON is parsed with the project's own lightweight `parseJsonKVLine()` helper
+- ArduinoJson pulls in too much flash/RAM and is unnecessary for our simple JSON needs
+
 ### No String class in hot paths (ADR-004)
 - Use `char[]` buffers with `strlcpy`, `strncat`, `snprintf_P`
 - `String` is only acceptable in setup/init code or truly one-off contexts
