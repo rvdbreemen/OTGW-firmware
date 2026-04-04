@@ -14,7 +14,11 @@ void handleDebug(){
                 Debugln(F("--- Status ---"));
                 Debugf(PSTR("Network: %s (%s) | MQTT: %s | OTGW: %s\r\n"),
                     isNetworkUp() ? "Connected" : "Disconnected",
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
                     (state.net.eMode == NET_ETHERNET) ? "Ethernet" : "WiFi",
+#else
+                    "WiFi",
+#endif
                     CBOOLEAN(state.mqtt.bConnected),
                     CBOOLEAN(state.otgw.bOnline));
                 Debugf(PSTR("Thermostat: %s | Boiler: %s | Gateway Mode: %s\r\n"),

@@ -286,7 +286,15 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATpresetcomfort"), settings.sat.fPresetComfort, true);
   writeJsonFloatKV(file, F("SATpreseteco"), settings.sat.fPresetEco, true);
   writeJsonFloatKV(file, F("SATpresetaway"), settings.sat.fPresetAway, true);
-  writeJsonBoolKV(file, F("SATpwmautoswitch"), settings.sat.bPwmAutoSwitch, false);
+  writeJsonBoolKV(file, F("SATpwmautoswitch"), settings.sat.bPwmAutoSwitch, true);
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  // Ethernet static IP (OTGW32 only)
+  writeJsonBoolKV(file, F("ETHstaticip"), settings.eth.bStaticIP, true);
+  writeJsonStringKV(file, F("ETHipaddress"), settings.eth.sIPaddress, true);
+  writeJsonStringKV(file, F("ETHgateway"), settings.eth.sGateway, true);
+  writeJsonStringKV(file, F("ETHsubnet"), settings.eth.sSubnet, true);
+  writeJsonStringKV(file, F("ETHdns"), settings.eth.sDNS, false);
+#endif
   file.print(F("}\n"));
   Debugln(F("\r\n[Settings] State: File write complete, closing file"));
   file.close();  // Close write handle before any subsequent read
@@ -677,6 +685,14 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATpreseteco")) == 0)       settings.sat.fPresetEco = constrain(atof(newValue), 10.0f, 22.0f);
   else if (strcasecmp_P(field, PSTR("SATpresetaway")) == 0)      settings.sat.fPresetAway = constrain(atof(newValue), 5.0f, 18.0f);
   else if (strcasecmp_P(field, PSTR("SATpwmautoswitch")) == 0)   settings.sat.bPwmAutoSwitch = EVALBOOLEAN(newValue);
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  // Ethernet static IP (OTGW32 only)
+  else if (strcasecmp_P(field, PSTR("ETHstaticip")) == 0)       settings.eth.bStaticIP = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("ETHipaddress")) == 0)      strlcpy(settings.eth.sIPaddress, newValue, sizeof(settings.eth.sIPaddress));
+  else if (strcasecmp_P(field, PSTR("ETHgateway")) == 0)        strlcpy(settings.eth.sGateway, newValue, sizeof(settings.eth.sGateway));
+  else if (strcasecmp_P(field, PSTR("ETHsubnet")) == 0)         strlcpy(settings.eth.sSubnet, newValue, sizeof(settings.eth.sSubnet));
+  else if (strcasecmp_P(field, PSTR("ETHdns")) == 0)            strlcpy(settings.eth.sDNS, newValue, sizeof(settings.eth.sDNS));
+#endif
 
   // Side-effect checks — independent if's, multiple can fire
   if (strstr_P(field, PSTR("mqtt")) != NULL)        pendingSideEffects |= SIDE_EFFECT_MQTT; // defer MQTT restart to flushSettings()

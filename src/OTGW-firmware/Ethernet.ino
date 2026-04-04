@@ -88,10 +88,26 @@ static bool startEthernet(uint16_t dhcpTimeoutMs) {
   w5500Driver.setPhyAddress(0);
   Ethernet.init(w5500Driver);
 
-  if (!Ethernet.begin(ethMac, dhcpTimeoutMs)) {
-    DebugTln(F("Ethernet DHCP failed"));
-    return false;
+  if (settings.eth.bStaticIP) {
+    // Static IP configuration
+    IPAddress ip, gw, sn, dns;
+    ip.fromString(settings.eth.sIPaddress);
+    gw.fromString(settings.eth.sGateway);
+    sn.fromString(settings.eth.sSubnet);
+    dns.fromString(settings.eth.sDNS);
+    // If DNS is 0.0.0.0, use gateway as DNS
+    if (dns == IPAddress(0, 0, 0, 0)) dns = gw;
+    Ethernet.begin(ethMac, ip, dns, gw, sn);
+    DebugTf(PSTR("Ethernet: static IP=%s, GW=%s\r\n"),
+            ip.toString().c_str(), gw.toString().c_str());
+  } else {
+    // DHCP
+    if (!Ethernet.begin(ethMac, dhcpTimeoutMs)) {
+      DebugTln(F("Ethernet DHCP failed"));
+      return false;
+    }
   }
+
   if (Ethernet.linkStatus() != LinkON) {
     DebugTln(F("Ethernet: no link"));
     return false;

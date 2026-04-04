@@ -233,8 +233,10 @@ void loopWifi() {
 
   switch (wifiState) {
     case WIFI_IDLE:
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
       // When on Ethernet, WiFi is intentionally disconnected — don't reconnect
       if (state.net.eMode == NET_ETHERNET) break;
+#endif
       if (WiFi.status() != WL_CONNECTED) {
         DebugTln(F("WiFi: connection lost, starting non-blocking reconnect"));
         wifiRetryCount = 0;

@@ -281,6 +281,7 @@ static void handlePic(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
   }
 }
 
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
 static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
   if (!isOTDirectEnabled()) { sendApiError(503, F("No OT-direct hardware - OTGW32 functions disabled")); return; }
@@ -290,6 +291,7 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
     sendApiNotFound(originalURI);
   }
 }
+#endif
 
 static void handleFirmware(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
@@ -528,7 +530,9 @@ static const char kRouteFilesystem[] PROGMEM = "filesystem";
 static const char kRouteSimulate[]   PROGMEM = "simulate";
 static const char kRouteOtgw[]       PROGMEM = "otgw";
 static const char kRouteWebhook[]    PROGMEM = "webhook";
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
 static const char kRouteOtdirect[]   PROGMEM = "otdirect";
+#endif
 static const char kRouteSat[]        PROGMEM = "sat";
 
 static const ApiRoute kV2Routes[] = {
@@ -538,7 +542,9 @@ static const ApiRoute kV2Routes[] = {
   { kRouteDevice,     handleDevice },
   { kRouteFlash,      handleFlash },
   { kRoutePic,        handlePic },
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   { kRouteOtdirect,   handleOTDirect },
+#endif
   { kRouteFirmware,   handleFirmware },
   { kRouteFilesystem, handleFilesystem },
   { kRouteSimulate,   handleSimulate },
@@ -821,6 +827,7 @@ void sendDeviceInfoV2()
     sendJsonMapEntry(F("picfwtype"), state.pic.sType);
   }
   sendJsonMapEntry(F("otdirectavailable"), isOTDirectEnabled());
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   if (isOTDirectEnabled()) {
     sendJsonMapEntry(F("otdbypass"), state.otd.bBypassActive);
     sendJsonMapEntry(F("otdstepup"), state.otd.bStepUpEnabled);
@@ -829,6 +836,7 @@ void sendDeviceInfoV2()
     sendJsonMapEntry(F("otdscheddisabled"), state.otd.iScheduleDisabled);
     sendJsonMapEntry(F("otdoverrides"), state.otd.iOverrideCount);
   }
+#endif
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
   sendJsonMapEntry(F("compiled"), cMsg);
   sendJsonMapEntry(F("hostname"), CSTR(settings.sHostname));
@@ -857,12 +865,15 @@ void sendDeviceInfoV2()
 
   uint8_t ideMode = platformFlashChipMode();
   sendJsonMapEntry(F("flashchipmode"), flashMode[ideMode < 4 ? ideMode : 4]);
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   if (state.net.eMode == NET_ETHERNET) {
     sendJsonMapEntry(F("ssid"), F("Wired"));
     sendJsonMapEntry(F("wifirssi"), 0);
     sendJsonMapEntry(F("wifiquality"), 100);
     sendJsonMapEntry(F("wifiquality_text"), F("Wired"));
-  } else {
+  } else
+#endif
+  {
     sendJsonMapEntry(F("ssid"), CSTR(WiFi.SSID()));
     sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());
     sendJsonMapEntry(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
@@ -913,7 +924,11 @@ void sendHealth()
   sendJsonMapEntry(F("uptime"), upTime());
   sendJsonMapEntry(F("heap"), platformFreeHeap());
   sendJsonMapEntry(F("networkmode"), networkModeName());
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   sendJsonMapEntry(F("wifirssi"), (state.net.eMode == NET_ETHERNET) ? 0 : WiFi.RSSI());
+#else
+  sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());
+#endif
   sendJsonMapEntry(F("mqttconnected"), CBOOLEAN(state.mqtt.bConnected));
   sendJsonMapEntry(F("otgwconnected"), CBOOLEAN(state.otgw.bOnline));
   sendJsonMapEntry(F("picavailable"), CBOOLEAN(state.pic.bAvailable));
@@ -971,6 +986,7 @@ void sendPICsettings()
   sendEndJsonMap(F("pic_settings"));
 } // sendPICsettings()
 
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
 //=======================================================================
 // Sends OT-direct (OTGW32) runtime status as JSON map.
 // Parallel to sendPICsettings() — exposes OTGW32-specific diagnostics.
@@ -993,6 +1009,7 @@ void sendOTDirectStatus()
   sendJsonMapEntry(F("boiler"),           state.otgw.bBoilerState);
   sendEndJsonMap(F("otdirect_status"));
 } // sendOTDirectStatus()
+#endif
 
 //=======================================================================
 void sendPICFlashStatus()
@@ -1176,6 +1193,14 @@ void sendDeviceSettings()
     sendJsonSettingObj(F("satpresetaway"), tmpBuf, "f", 5, 18);
   }
   sendJsonSettingObj(F("satpwmautoswitch"), settings.sat.bPwmAutoSwitch, "b");
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  // --- Ethernet settings (OTGW32 only) ---
+  sendJsonSettingObj(F("ethstaticip"), settings.eth.bStaticIP, "b");
+  sendJsonSettingObj(F("ethipaddress"), CSTR(settings.eth.sIPaddress), "s", 15);
+  sendJsonSettingObj(F("ethgateway"), CSTR(settings.eth.sGateway), "s", 15);
+  sendJsonSettingObj(F("ethsubnet"), CSTR(settings.eth.sSubnet), "s", 15);
+  sendJsonSettingObj(F("ethdns"), CSTR(settings.eth.sDNS), "s", 15);
+#endif
   char httpPasswordPlaceholder[sizeof("password=40")];
   snprintf_P(httpPasswordPlaceholder,
              sizeof(httpPasswordPlaceholder),
@@ -1191,7 +1216,11 @@ void sendDeviceSettings()
 // PROGMEM whitelist of recognised setting field names (canonical lower-case).
 // Keep sorted alphabetically for readability; lookup is linear (small list).
 static const char* const PROGMEM knownSettings[] = {
-  "darktheme", "gpiooutputsenabled", "gpiooutputspin", "gpiooutputstriggerbit",
+  "darktheme",
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  "ethdns", "ethgateway", "ethipaddress", "ethstaticip", "ethsubnet",
+#endif
+  "gpiooutputsenabled", "gpiooutputspin", "gpiooutputstriggerbit",
   "gpiosensorsenabled", "gpiosensorsinterval", "gpiosensorslegacyformat", "gpiosensorspin",
   "hostname", "httppasswd", "ledblink",
   "mqttbroker", "mqttbrokerport", "mqttenable", "mqtthaprefix", "mqttharebootdetection",

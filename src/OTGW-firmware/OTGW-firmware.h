@@ -182,14 +182,20 @@ enum OTGWNetworkMode : uint8_t {
 
 struct HardwareSection {       // state.hw — detected hardware capabilities
   OTGWHardwareMode eMode       = HW_MODE_UNKNOWN;
+#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
   bool bOLEDPresent            = false;
+#endif
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   bool bEthernetPresent        = false;
+#endif
 };
 
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
 struct NetworkSection {        // state.net — active network transport state
   OTGWNetworkMode eMode        = NET_WIFI;
   bool bEthernetLink           = false;   // physical link up on W5500
 };
+#endif
 
 //===================[ Runtime State — transient, never persisted (ADR-051) ]===================
 // Sub-section structs for OTGWState — groups runtime state by system component.
@@ -202,6 +208,7 @@ struct PICSection {            // state.pic — PIC microcontroller identity/sta
   char sType[32]      = "no pic found";  // was sPICtype
 };
 
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
 struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime status
   uint8_t  iScheduleTotal    = 0;   // total schedule entries
   uint8_t  iScheduleActive   = 0;   // entries not disabled by boiler
@@ -210,6 +217,7 @@ struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime statu
   bool     bBypassActive     = false; // true = thermostat direct to boiler (relay)
   bool     bStepUpEnabled    = false; // 24V step-up converter on
 };
+#endif
 
 struct OTGWProtocol {          // state.otgw — OpenTherm protocol & bus state
   bool bOnline           = false;  // was bOTGWonline — serial link alive
@@ -326,9 +334,13 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
 
 struct OTGWState {
   HardwareSection    hw;          // state.hw.eMode, state.hw.bOLEDPresent
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   NetworkSection     net;         // state.net.eMode, state.net.bEthernetLink
+#endif
   PICSection         pic;         // state.pic.bAvailable, state.pic.sFwversion
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   OTDirectSection    otd;         // state.otd — OT-direct schedule/override stats (OTGW32)
+#endif
   OTGWProtocol       otgw;        // state.otgw.bOnline, state.otgw.bBoilerState
   MQTTRuntimeSection mqtt;        // state.mqtt.bConnected
   FlashSection       flash;       // state.flash.bESPactive, state.flash.iPICprogress
@@ -378,7 +390,11 @@ inline const __FlashStringHelper* hardwareModeName() {
 
 // Returns a PROGMEM string describing the active network transport.
 inline const __FlashStringHelper* networkModeName() {
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   return (state.net.eMode == NET_ETHERNET) ? F("Ethernet") : F("WiFi");
+#else
+  return F("WiFi");
+#endif
 }
 
 //===================[ Unified network helpers ]===================
@@ -387,7 +403,9 @@ inline const __FlashStringHelper* networkModeName() {
 // On ESP8266 the Ethernet branches compile away entirely (HAS_ETH_CAPABLE=0).
 
 inline bool isNetworkUp() {
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   if (state.net.eMode == NET_ETHERNET) return true;  // Ethernet: link was verified by loopEthernet()
+#endif
   return (WiFi.status() == WL_CONNECTED);
 }
 
@@ -511,6 +529,16 @@ struct SATSection {
   bool     bPwmAutoSwitch     = true;   // Auto-switch between PWM and continuous mode
 };
 
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+struct EthernetSection {
+  bool bStaticIP       = false;             // false=DHCP (default), true=use static IP
+  char sIPaddress[16]  = "0.0.0.0";        // Static IP address
+  char sGateway[16]    = "0.0.0.0";        // Gateway
+  char sSubnet[16]     = "255.255.255.0";  // Subnet mask
+  char sDNS[16]        = "0.0.0.0";        // DNS server (0.0.0.0 = use gateway)
+};
+#endif
+
 struct OTGWSettings {
   // Device-level fields (universal device identity)
   char sHostname[41] = _HOSTNAME;
@@ -529,6 +557,9 @@ struct OTGWSettings {
   UISection           ui;
   OTGWBootSection     otgw;
   SATSection          sat;
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  EthernetSection     eth;
+#endif
 };
 
 OTGWSettings settings;

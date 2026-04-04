@@ -4977,6 +4977,11 @@ var translateFields = [
   , ["SATpreseteco", "SAT Preset: Eco"]
   , ["SATpresetaway", "SAT Preset: Away"]
   , ["SATpwmautoswitch", "SAT PWM Auto-Switch"]
+  , ["ethstaticip", "Ethernet Static IP"]
+  , ["ethipaddress", "Ethernet IP Address"]
+  , ["ethgateway", "Ethernet Gateway"]
+  , ["ethsubnet", "Ethernet Subnet Mask"]
+  , ["ethdns", "Ethernet DNS Server"]
 
 ];
 
@@ -5041,6 +5046,11 @@ var translateTooltips = [
   , ["SATpreseteco", "Eco preset target temperature."]
   , ["SATpresetaway", "Away preset target temperature."]
   , ["SATpwmautoswitch", "Automatically switch between PWM and continuous mode based on cycle analysis."]
+  , ["ethstaticip", "Use a static IP address for Ethernet instead of DHCP."]
+  , ["ethipaddress", "Static IP address for the Ethernet interface (e.g. 192.168.1.100)."]
+  , ["ethgateway", "Default gateway for the Ethernet interface."]
+  , ["ethsubnet", "Subnet mask for the Ethernet interface (e.g. 255.255.255.0)."]
+  , ["ethdns", "DNS server for the Ethernet interface. Leave 0.0.0.0 to use the gateway."]
 
 ];
 

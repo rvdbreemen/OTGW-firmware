@@ -476,6 +476,7 @@ void sendMQTTversioninfo(){
   }
   sendMQTTData("otgw-pic/picavailable", CCONOFF(state.pic.bAvailable));
 
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // OT-direct (OTGW32) status — parallel to otgw-pic/ topics
   sendMQTTData(F("otgw-otdirect/available"), CCONOFF(isOTDirectEnabled()));
   if (isOTDirectEnabled()) {
@@ -489,6 +490,7 @@ void sendMQTTversioninfo(){
     snprintf_P(buf, sizeof(buf), PSTR("%u"), state.otd.iOverrideCount);
     sendMQTTData(F("otgw-otdirect/overrides_active"), buf);
   }
+#endif
 
   // Hardware platform info
   sendMQTTData(F("otgw-firmware/board"), boardName());
@@ -502,9 +504,11 @@ static void publishBoilerConnectedState()
   if (isPICEnabled()) {
     sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
   }
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   if (isOTDirectEnabled()) {
     sendMQTTData(F("otgw-otdirect/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
   }
+#endif
 }
 
 static void publishThermostatConnectedState()
@@ -513,9 +517,11 @@ static void publishThermostatConnectedState()
   if (isPICEnabled()) {
     sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
   }
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   if (isOTDirectEnabled()) {
     sendMQTTData(F("otgw-otdirect/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
   }
+#endif
 }
 
 static void publishOTGWConnectedState()
@@ -524,9 +530,11 @@ static void publishOTGWConnectedState()
   if (isPICEnabled()) {
     sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otgw.bOnline));
   }
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   if (isOTDirectEnabled()) {
     sendMQTTData(F("otgw-otdirect/ot_online"), CCONOFF(state.otgw.bOnline));
   }
+#endif
   sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
 }
 
