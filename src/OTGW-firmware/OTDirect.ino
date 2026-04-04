@@ -891,17 +891,25 @@ static void handleMasterResponse() {
 
     // DHW push state machine — monitor MsgID 0 boiler responses
     if (respMsgId == 0 && otDHWPushState != PUSH_IDLE) {
-      uint8_t slaveByte4 = response & 0xFF;
-      if (otDHWPushState == PUSH_PENDING) {
-        if ((slaveByte4 & 0x08) && (slaveByte4 & 0x04)) {  // flame on + DHW mode
-          otDHWPushState = PUSH_STARTED;
-        }
-      } else if (otDHWPushState == PUSH_STARTED) {
-        if (!(slaveByte4 & 0x04)) {  // DHW mode off — push complete
-          otDHWPushState = PUSH_IDLE;
-          otMasterStatusFlags &= ~0x02;  // clear DHW enable
-          otDHWOverride = 0xFF;          // back to auto
-          DebugTln(F("OT-direct: DHW push complete"));
+      // Timeout check (~30s, matching PIC firmware)
+      if ((millis() - otDHWPushStartMs) >= OT_DHW_PUSH_TIMEOUT_MS) {
+        otDHWPushState = PUSH_IDLE;
+        otMasterStatusFlags &= ~0x02;
+        otDHWOverride = 0xFF;
+        DebugTln(F("OT-direct: DHW push timed out"));
+      } else {
+        uint8_t slaveByte4 = response & 0xFF;
+        if (otDHWPushState == PUSH_PENDING) {
+          if ((slaveByte4 & 0x08) && (slaveByte4 & 0x04)) {  // flame on + DHW mode
+            otDHWPushState = PUSH_STARTED;
+          }
+        } else if (otDHWPushState == PUSH_STARTED) {
+          if (!(slaveByte4 & 0x04)) {  // DHW mode off — push complete
+            otDHWPushState = PUSH_IDLE;
+            otMasterStatusFlags &= ~0x02;  // clear DHW enable
+            otDHWOverride = 0xFF;          // back to auto
+            DebugTln(F("OT-direct: DHW push complete"));
+          }
         }
       }
     }
@@ -949,6 +957,7 @@ static void scheduleMasterRequest() {
     uint32_t cmdFrame = otCmdQueue[otCmdTail];
     if (sendMasterRequestAsync(cmdFrame, OT_DIRECT_ORIGIN_GATEWAY)) {
       otCmdTail = (otCmdTail + 1) % OT_CMD_QUEUE_SIZE;  // consume on success
+      otLastAnySendMs = now;   // MI= inter-message gap tracking
     }
     return;
   }
@@ -1238,6 +1247,11 @@ static void synthesizeResponse(const char* cmd, const char* value) {
   synthesizeResponse(cmd[0], cmd[1], value);
 }
 
+// checkBoolean — PIC-compatible strict 0/1 validation. Returns true if valid.
+static inline bool checkBoolean(const char* value) {
+  return (value[0] == '0' || value[0] == '1') && value[1] == '\0';
+}
+
 // PIC-emulated local state — stored in RAM, not persisted.
 // These hold values set by PIC configuration commands that have no direct
 // hardware equivalent on OTGW32 but need valid PR= query responses.
@@ -1298,6 +1312,8 @@ static void clearUnknownCount(uint8_t msgId) {
 // Phase 9: DHW push state machine
 enum DHWPushState : uint8_t { PUSH_IDLE = 0, PUSH_PENDING, PUSH_STARTED };
 static DHWPushState otDHWPushState = PUSH_IDLE;
+static uint32_t otDHWPushStartMs = 0;
+static constexpr uint32_t OT_DHW_PUSH_TIMEOUT_MS = 30000;  // 30s, matches PIC
 
 // Phase 10: PS= summary mode
 static bool otSummaryMode     = false;      // PS=1 active
@@ -1343,9 +1359,61 @@ static void clearWriteOverride(uint8_t msgId) {
 }
 
 // ---------------------------------------------------------------------------
+// resetTransientState — clear all transient state (called on GW=R and mode change)
+// Mirrors PIC hardware reset clearing all RAM, except persisted settings.
+// ---------------------------------------------------------------------------
+static void resetTransientState() {
+  // Operating mode overrides
+  otOperModeDHW = 0;
+  otOperModeCH1 = 0;
+  otOperModeCH2 = 0;
+  // DHW push state machine
+  otDHWPushState = PUSH_IDLE;
+  otDHWPushStartMs = 0;
+  // PS=1 summary mode
+  otSummaryMode = false;
+  otHideReports = false;
+  otSummaryPending = false;
+  // Status bit overrides (non-persisted)
+  otDHWBlocking = false;
+  otCoolingEnable = false;
+  otMasterStatusFlags &= ~(0x44);  // clear bit2 (cooling) and bit6 (DHW block)
+  // DHW override
+  otDHWOverride = 0xFF;  // auto
+  // 3-strike unknown counters
+  memset(otUnknownCounters, 0, sizeof(otUnknownCounters));
+  // Clear all schedule disable flags (re-enable all MsgIDs)
+  for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
+    otSchedule[i].disabled = false;
+  }
+  // Clear unknown ID list
+  otUnknownIdCount = 0;
+  // Clear response overrides
+  for (uint8_t i = 0; i < OT_RESPONSE_OVERRIDE_MAX; i++) {
+    otResponseOverrides[i].active = false;
+  }
+  // Clear write caches (stop periodic writes)
+  for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
+    otSchedule[i].valueSet = false;
+  }
+  // Clear repeater overrides
+  for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
+    otOverrides[i].active = false;
+  }
+  // Clear response modifiers
+  clearAllResponseModifiers();
+  // Clear setback state
+  if (otSetbackEngaged) {
+    otSetbackEngaged = false;
+    state.otd.bSetbackActive = false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // setOTDirectMode — switch operating mode with hardware reconfiguration
 // ---------------------------------------------------------------------------
 static void setOTDirectMode(OTDirectMode newMode) {
+  resetTransientState();  // Clear all transient state on mode change
   otCurrentMode  = newMode;
 
   switch (newMode) {
@@ -1378,12 +1446,6 @@ static void setOTDirectMode(OTDirectMode newMode) {
 #if HAS_BYPASS_RELAY
       digitalWrite(PIN_BYPASS_RELAY, LOW);
 #endif
-      // In master mode, clear any thermostat-related overrides/setback
-      if (otSetbackEngaged) {
-        otSetbackEngaged = false;
-        state.otd.bSetbackActive = false;
-        clearOverride(1);
-      }
       // Start or stop slave interface based on bEnableSlave setting
       if (settings.otd.bEnableSlave) {
         otSlave.begin(slaveISR, handleSlaveRequest);
@@ -1535,6 +1597,9 @@ static void clearResponseModifier(uint8_t msgId) {
       return;
     }
   }
+}
+static void clearAllResponseModifiers() {
+  for (uint8_t i = 0; i < OT_RESPONSE_MODIFY_MAX; i++) otResponseModifiers[i].active = false;
 }
 
 // Apply response-path modifications to a boiler response frame before
@@ -1710,6 +1775,7 @@ void handleOTDirectCommand(const char* buf, int len) {
       otDHWOverride = 1;
       if (otDHWPushState == PUSH_IDLE) {
         otDHWPushState = PUSH_PENDING;
+        otDHWPushStartMs = millis();
         // Send MsgID 99 with DHW push bit (bit4 of byte3)
         uint16_t data99 = ((uint16_t)(otOperModeDHW | 0x10)) |
                           ((uint16_t)(otOperModeCH1 | (otOperModeCH2 << 4)) << 8);
@@ -1740,6 +1806,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   }
   // CH=0/1 — CH enable (bit0 of master status)
   else if (cmd0 == 'C' && cmd1 == 'H') {
+    if (!checkBoolean(value)) { processOT("BV", 2); return; }
     if (value[0] == '1') {
       otMasterStatusFlags |= 0x01;
     } else {
@@ -1750,6 +1817,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   }
   // H2=0/1 — CH2 enable (bit4 of master status)
   else if (cmd0 == 'H' && cmd1 == '2') {
+    if (!checkBoolean(value)) { processOT("BV", 2); return; }
     if (value[0] == '1') {
       otMasterStatusFlags |= 0x10;
     } else {
@@ -1760,6 +1828,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   }
   // SM=0/1 — Summer mode (bit5 of master status)
   else if (cmd0 == 'S' && cmd1 == 'M') {
+    if (!checkBoolean(value)) { processOT("BV", 2); return; }
     if (value[0] == '1') {
       otMasterStatusFlags |= 0x20;
       otSummerMode = true;
@@ -1773,6 +1842,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   }
   // BW=0/1 — DHW blocking (bit6 of master status, not persisted)
   else if (cmd0 == 'B' && cmd1 == 'W') {
+    if (!checkBoolean(value)) { processOT("BV", 2); return; }
     if (value[0] == '1') {
       otMasterStatusFlags |= 0x40;
       otDHWBlocking = true;
@@ -1785,6 +1855,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   }
   // CE=0/1 — Cooling enable (bit2 of master status, not persisted)
   else if (cmd0 == 'C' && cmd1 == 'E') {
+    if (!checkBoolean(value)) { processOT("BV", 2); return; }
     if (value[0] == '1') {
       otMasterStatusFlags |= 0x04;
       otCoolingEnable = true;
@@ -1891,7 +1962,10 @@ void handleOTDirectCommand(const char* buf, int len) {
       // GW=L — Loopback test mode: simulated boiler, no hardware needed
       setOTDirectMode(OTD_MODE_LOOPBACK);
     } else if (value[0] == 'R') {
-      DebugTln(F("OT-direct: Resetting OT interfaces"));
+      // Full reset: clear all transient state (mirrors PIC hardware reset)
+      DebugTln(F("OT-direct: Full gateway reset"));
+      resetTransientState();
+      // Restart OT interfaces
       otMaster.end();
       otSlave.end();
       delay(100);
@@ -1912,9 +1986,8 @@ void handleOTDirectCommand(const char* buf, int len) {
     char prBuf[48];
     switch (reg) {
       case 'A':
-        // Banner — inject directly (not "PR: A=..." format)
-        // Don't use synthesizeResponse here — banner is handled specially
-        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: A=OTGW32-Direct 1.0"));
+        // Banner — tools pattern-match on "OpenTherm Gateway" to detect device
+        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: A=OpenTherm Gateway OTGW32"));
         processOT(prBuf, strlen(prBuf));
         break;
       case 'M':
@@ -1996,12 +2069,28 @@ void handleOTDirectCommand(const char* buf, int len) {
         snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: C=240"));  // ESP32-S3 @ 240MHz
         processOT(prBuf, strlen(prBuf));
         break;
-      case 'Q':
-        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: Q=P"));  // power-on
+      case 'Q': {
+        // Map ESP32 reset reason to PIC-compatible codes:
+        // P=power-on, C=cold(SW reset), W=watchdog, B=brownout, E=external
+        char rc = 'P';
+#if defined(ESP32)
+        switch (esp_reset_reason()) {
+          case ESP_RST_SW:      rc = 'C'; break;  // Software reset → Cold start
+          case ESP_RST_INT_WDT:
+          case ESP_RST_TASK_WDT:
+          case ESP_RST_WDT:     rc = 'W'; break;  // Watchdog
+          case ESP_RST_BROWNOUT: rc = 'B'; break;
+          case ESP_RST_EXT:     rc = 'E'; break;  // External reset
+          default:              rc = 'P'; break;  // Power-on or unknown
+        }
+#endif
+        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: Q=%c"), rc);
         processOT(prBuf, strlen(prBuf));
         break;
+      }
       case 'N':
-        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: N=%c"), IS_MASTER_MODE() ? '1' : '0');
+        // Message interval in centiseconds (10ms units), matching PIC PR=N format
+        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: N=%u"), (unsigned)(otMinIntervalMs / 10));
         processOT(prBuf, strlen(prBuf));
         break;
       case 'V':
@@ -2052,6 +2141,7 @@ void handleOTDirectCommand(const char* buf, int len) {
       }
     }
     if (!found) { processOT("NF", 2); return; }
+    clearUnknownCount(msgId);  // Reset 3-strike counter so it doesn't re-disable immediately
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), msgId);
     synthesizeResponse(buf, rspBuf);
   }
@@ -2208,12 +2298,14 @@ void handleOTDirectCommand(const char* buf, int len) {
   }
   // IT=0/1 — Ignore transitions
   else if (cmd0 == 'I' && cmd1 == 'T') {
+    if (!checkBoolean(value)) { processOT("BV", 2); return; }
     otIgnoreTransitions = (value[0] == '1') ? 1 : 0;
     rspBuf[0] = '0' + otIgnoreTransitions; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
   }
   // OH=0/1 — Override high byte
   else if (cmd0 == 'O' && cmd1 == 'H') {
+    if (!checkBoolean(value)) { processOT("BV", 2); return; }
     otOverrideHB = (value[0] == '1') ? 1 : 0;
     rspBuf[0] = '0' + otOverrideHB; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
@@ -2247,11 +2339,13 @@ void handleOTDirectCommand(const char* buf, int len) {
     if (val < 100 || val > 2550) { processOT("OR", 2); return; }
     otMinIntervalMs = val;
     settings.otd.iMsgInterval = val;
-    snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%u"), val);
+    // PIC responds in centiseconds (10ms units): 100ms → "10", 2550ms → "255"
+    snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%u"), val / 10);
     synthesizeResponse(buf, rspBuf);
   }
   // FS=0/1 — Fail safety (controls setback on thermostat disconnect)
   else if (cmd0 == 'F' && cmd1 == 'S') {
+    if (!checkBoolean(value)) { processOT("BV", 2); return; }
     otFailSafeEnabled = (value[0] == '1');
     settings.otd.bFailSafe = otFailSafeEnabled;
     rspBuf[0] = value[0]; rspBuf[1] = '\0';
@@ -2272,11 +2366,14 @@ void handleOTDirectCommand(const char* buf, int len) {
       isWrite = true;
       tpValue = atoi(eqPos + 1);
     }
-    // Validate MsgID: 11 (TSP entry) or 13 (FHB entry)
-    if (tpMsgId != 11 && tpMsgId != 13) { processOT("BV", 2); return; }
+    // Validate MsgID: 11/13 (main HC), 89/91 (DHW), 106/108 (solar)
+    // Odd = TSP r/w, Even+2 = FHB read-only
+    if (tpMsgId != 11 && tpMsgId != 13 &&
+        tpMsgId != 89 && tpMsgId != 91 &&
+        tpMsgId != 106 && tpMsgId != 108) { processOT("BV", 2); return; }
     if (tpIndex > 255 || tpValue > 255) { processOT("OR", 2); return; }
-    // FHB is read-only
-    if (isWrite && tpMsgId == 13) { processOT("SE", 2); return; }
+    // FHB entries (13, 91, 108) are read-only
+    if (isWrite && (tpMsgId == 13 || tpMsgId == 91 || tpMsgId == 108)) { processOT("SE", 2); return; }
     // Build and queue the frame
     uint16_t tpData = ((uint16_t)tpIndex << 8) | (isWrite ? (uint16_t)tpValue : 0);
     OpenThermMessageType tpType = isWrite ?
