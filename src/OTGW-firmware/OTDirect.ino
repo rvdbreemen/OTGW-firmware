@@ -1162,12 +1162,12 @@ static void setOTDirectMode(OTDirectMode newMode) {
       break;
   }
 
-  // Persist mode to settings so it survives reboot
-  settings.otd.iMode = (uint8_t)newMode;
-  // Defer write to flash (uses the existing debounce timer)
-  extern bool settingsDirty;
-  settingsDirty = true;
-  RESTART_TIMER(timerFlushSettings);
+  // Persist mode to settings via the public updateSetting() API.
+  // This keeps all settings mutation through a single path and gets
+  // side-effect handling (dirty flag, debounce timer) for free.
+  char modeBuf[4];
+  snprintf_P(modeBuf, sizeof(modeBuf), PSTR("%d"), (int)newMode);
+  updateSetting("OTDmode", modeBuf);
 }
 
 // ---------------------------------------------------------------------------

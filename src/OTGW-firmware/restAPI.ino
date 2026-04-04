@@ -328,40 +328,54 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
   // POST /api/v2/otdirect/overrides?action=ui&msgid=X — mark unknown ID
   // POST /api/v2/otdirect/overrides?action=ki&msgid=X — mark known ID
   else if (wc > 4 && strcmp_P(words[4], PSTR("overrides")) == 0) {
+    // Reuse global sLine[] buffer (1200 bytes) — sufficient for override JSON (~1050 max).
+    // REST handlers don't run concurrently with MQTT autoconfig that also uses sLine.
     if (method == HTTP_GET) {
-      char ovrBuf[1536];
-      getOTDirectOverridesJSON(ovrBuf, sizeof(ovrBuf));
+      getOTDirectOverridesJSON(sLine, sizeof(sLine));
       sendCorsOriginHeader();
-      httpServer.send(200, F("application/json"), ovrBuf);
+      httpServer.send(200, F("application/json"), sLine);
     } else if (method == HTTP_POST || method == HTTP_PUT) {
       if (!httpServer.hasArg("action") || !httpServer.hasArg("msgid")) {
         sendApiError(400, F("Missing 'action' and/or 'msgid' parameter")); return;
       }
-      String action = httpServer.arg("action");
-      String msgidStr = httpServer.arg("msgid");
-      // Build command string and queue it (reuses existing handlers)
+      // Validate msgid is numeric 0-127
+      const char* msgidRaw = httpServer.arg("msgid").c_str();
+      long msgidVal = strtol(msgidRaw, nullptr, 10);
+      if (msgidVal < 0 || msgidVal > 127) {
+        sendApiError(400, F("Invalid msgid (0-127)")); return;
+      }
+      char msgidBuf[4];
+      strlcpy(msgidBuf, msgidRaw, sizeof(msgidBuf));
+
+      const char* actionRaw = httpServer.arg("action").c_str();
       char cmdBuf[16];
-      if (action == F("sr") || action == F("rm")) {
+      if (strcmp_P(actionRaw, PSTR("sr")) == 0 || strcmp_P(actionRaw, PSTR("rm")) == 0) {
         if (!httpServer.hasArg("value")) { sendApiError(400, F("Missing 'value' parameter")); return; }
-        String valStr = httpServer.arg("value");
-        const char* prefix = (action == F("sr")) ? "SR=" : "RM=";
-        snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("%s%s:%s"), prefix, msgidStr.c_str(), valStr.c_str());
-      } else if (action == F("cr") || action == F("cm") || action == F("ui") || action == F("ki")) {
+        const char* valRaw = httpServer.arg("value").c_str();
+        // Validate value is hex, max 4 chars
+        size_t vLen = strlen(valRaw);
+        if (vLen == 0 || vLen > 4) { sendApiError(400, F("Invalid value (hex, 1-4 chars)")); return; }
+        for (size_t i = 0; i < vLen; i++) {
+          if (!isxdigit((unsigned char)valRaw[i])) { sendApiError(400, F("Invalid value (hex chars only)")); return; }
+        }
+        const char* prefix = (strcmp_P(actionRaw, PSTR("sr")) == 0) ? "SR=" : "RM=";
+        snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("%s%s:%s"), prefix, msgidBuf, valRaw);
+      } else if (strcmp_P(actionRaw, PSTR("cr")) == 0 || strcmp_P(actionRaw, PSTR("cm")) == 0 ||
+                 strcmp_P(actionRaw, PSTR("ui")) == 0 || strcmp_P(actionRaw, PSTR("ki")) == 0) {
         const char* prefix;
-        if (action == F("cr")) prefix = "CR=";
-        else if (action == F("cm")) prefix = "CM=";
-        else if (action == F("ui")) prefix = "UI=";
-        else prefix = "KI=";
-        snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("%s%s"), prefix, msgidStr.c_str());
+        if (strcmp_P(actionRaw, PSTR("cr")) == 0)      prefix = "CR=";
+        else if (strcmp_P(actionRaw, PSTR("cm")) == 0)  prefix = "CM=";
+        else if (strcmp_P(actionRaw, PSTR("ui")) == 0)  prefix = "UI=";
+        else                                            prefix = "KI=";
+        snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("%s%s"), prefix, msgidBuf);
       } else {
         sendApiError(400, F("Invalid action. Use: sr, cr, rm, cm, ui, ki")); return;
       }
       addOTWGcmdtoqueue(cmdBuf, strlen(cmdBuf), true);
       // Return updated override list
-      char ovrBuf[1536];
-      getOTDirectOverridesJSON(ovrBuf, sizeof(ovrBuf));
+      getOTDirectOverridesJSON(sLine, sizeof(sLine));
       sendCorsOriginHeader();
-      httpServer.send(200, F("application/json"), ovrBuf);
+      httpServer.send(200, F("application/json"), sLine);
     } else {
       sendApiMethodNotAllowed(F("GET, POST"));
     }

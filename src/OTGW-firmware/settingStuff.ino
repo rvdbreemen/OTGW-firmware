@@ -345,9 +345,9 @@ void readSettings(bool show)
   // Own line buffer — prevents cMsg clobber if readSettings() is called from an
   // HTTP handler where file.readBytesUntil() calls yield() internally, which
   // could allow writeSettings() → writeJsonStringKV() to overwrite cMsg mid-parse.
-  char lineBuf[256];
-  char keyBuf[64];
-  char valueBuf[201]; // must fit the largest setting value (WebhookPayload: 201 bytes)
+  static char lineBuf[256];
+  static char keyBuf[64];
+  static char valueBuf[201]; // must fit the largest setting value (WebhookPayload: 201 bytes)
 
   while (file.available()) {
     size_t len = file.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
@@ -712,10 +712,10 @@ void updateSetting(const char *field, const char *newValue)
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // Ethernet static IP (OTGW32 only)
   else if (strcasecmp_P(field, PSTR("ETHstaticip")) == 0)       settings.eth.bStaticIP = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("ETHipaddress")) == 0)      strlcpy(settings.eth.sIPaddress, newValue, sizeof(settings.eth.sIPaddress));
-  else if (strcasecmp_P(field, PSTR("ETHgateway")) == 0)        strlcpy(settings.eth.sGateway, newValue, sizeof(settings.eth.sGateway));
-  else if (strcasecmp_P(field, PSTR("ETHsubnet")) == 0)         strlcpy(settings.eth.sSubnet, newValue, sizeof(settings.eth.sSubnet));
-  else if (strcasecmp_P(field, PSTR("ETHdns")) == 0)            strlcpy(settings.eth.sDNS, newValue, sizeof(settings.eth.sDNS));
+  else if (strcasecmp_P(field, PSTR("ETHipaddress")) == 0)    { IPAddress t; if (t.fromString(newValue)) strlcpy(settings.eth.sIPaddress, newValue, sizeof(settings.eth.sIPaddress)); else DebugTf(PSTR("Invalid IP '%s', ignored\r\n"), newValue); }
+  else if (strcasecmp_P(field, PSTR("ETHgateway")) == 0)      { IPAddress t; if (t.fromString(newValue)) strlcpy(settings.eth.sGateway, newValue, sizeof(settings.eth.sGateway)); else DebugTf(PSTR("Invalid IP '%s', ignored\r\n"), newValue); }
+  else if (strcasecmp_P(field, PSTR("ETHsubnet")) == 0)       { IPAddress t; if (t.fromString(newValue)) strlcpy(settings.eth.sSubnet, newValue, sizeof(settings.eth.sSubnet)); else DebugTf(PSTR("Invalid IP '%s', ignored\r\n"), newValue); }
+  else if (strcasecmp_P(field, PSTR("ETHdns")) == 0)          { IPAddress t; if (t.fromString(newValue)) strlcpy(settings.eth.sDNS, newValue, sizeof(settings.eth.sDNS)); else DebugTf(PSTR("Invalid IP '%s', ignored\r\n"), newValue); }
 #endif
 
   // Side-effect checks — independent if's, multiple can fire

@@ -602,3 +602,4 @@ void satControlLoop()
   // --- Publish to MQTT ---
   satPublishMQTT();
 }
+

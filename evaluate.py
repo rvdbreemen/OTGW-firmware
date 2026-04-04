@@ -235,39 +235,225 @@ class WorkspaceEvaluator:
                 "; ".join([f"{f}: {s}B" for f, s in large_buffers[:5]])
             ))
 
+    # ===== PROGMEM COMPLIANCE CHECKS =====
+
+    def check_progmem_compliance(self):
+        """Check that string literals use PROGMEM wrappers (F(), PSTR(), _P suffixes)"""
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== PROGMEM Compliance ==={Colors.ENDC}")
+
+        violations: List[str] = []
+        src_dir = config.FIRMWARE_ROOT
+        code_files = (list(src_dir.glob("*.ino")) +
+                      list(src_dir.glob("*.cpp")) +
+                      list(src_dir.glob("*.h")))
+
+        patterns = [
+            (re.compile(r'DebugTln\(\s*"'), 'DebugTln without F() wrapper'),
+            (re.compile(r'DebugTf\(\s*"'), 'DebugTf without PSTR() wrapper'),
+            (re.compile(r'\bsnprintf\s*\('), 'snprintf without _P suffix'),
+            (re.compile(r'\bstrcmp\s*\([^)]*"'), 'strcmp with string literal (use strcmp_P + PSTR)'),
+            (re.compile(r'\bstrcasecmp\s*\([^)]*"'), 'strcasecmp with string literal (use strcasecmp_P + PSTR)'),
+        ]
+        # Negative lookahead pattern to exclude snprintf_P from snprintf hits
+        snprintf_p_re = re.compile(r'\bsnprintf_P\s*\(')
+
+        for file in code_files:
+            with open(file, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.read().split('\n')
+
+            for i, line in enumerate(lines, 1):
+                stripped = line.lstrip()
+                # Skip comment lines and #define macros
+                if stripped.startswith('//') or stripped.startswith('/*') or stripped.startswith('#define'):
+                    continue
+
+                for pat, desc in patterns:
+                    if pat.search(line):
+                        # For snprintf, skip if it is actually snprintf_P
+                        if 'snprintf' in desc and snprintf_p_re.search(line):
+                            continue
+                        violations.append(f"{file.name}:{i}: {desc}")
+
+        if violations:
+            self.add_result(EvaluationResult(
+                "PROGMEM", "Flash string compliance", "FAIL",
+                f"Found {len(violations)} PROGMEM violations (wastes RAM)",
+                "; ".join(violations[:10])
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "PROGMEM", "Flash string compliance", "PASS",
+                "All string literals use proper PROGMEM wrappers"
+            ))
+
+    # ===== ARDUINOJSON BAN CHECK =====
+
+    def check_no_arduinojson(self):
+        """Ensure ArduinoJson library is never used (hard project rule)"""
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ArduinoJson Ban ==={Colors.ENDC}")
+
+        violations: List[str] = []
+        src_dir = config.FIRMWARE_ROOT
+        code_files = (list(src_dir.glob("*.ino")) +
+                      list(src_dir.glob("*.cpp")) +
+                      list(src_dir.glob("*.h")))
+
+        include_re = re.compile(r'#include\s*[<"]ArduinoJson')
+        types_re = re.compile(
+            r'StaticJsonDocument|DynamicJsonDocument|JsonDocument|deserializeJson|serializeJson'
+        )
+
+        for file in code_files:
+            with open(file, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.read().split('\n')
+
+            for i, line in enumerate(lines, 1):
+                if include_re.search(line):
+                    violations.append(f"{file.name}:{i}: #include ArduinoJson")
+                if types_re.search(line):
+                    violations.append(f"{file.name}:{i}: ArduinoJson type usage")
+
+        if violations:
+            self.add_result(EvaluationResult(
+                "ArduinoJson", "Library ban", "FAIL",
+                f"Found {len(violations)} ArduinoJson usages (banned by project rules)",
+                "; ".join(violations[:10])
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "ArduinoJson", "Library ban", "PASS",
+                "No ArduinoJson usage found"
+            ))
+
+    # ===== STACK SAFETY CHECK =====
+
+    def check_stack_safety(self):
+        """Find non-static local char arrays > 256 bytes that risk stack overflow"""
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Stack Safety ==={Colors.ENDC}")
+
+        warnings: List[str] = []
+        src_dir = config.FIRMWARE_ROOT
+        code_files = (list(src_dir.glob("*.ino")) +
+                      list(src_dir.glob("*.cpp")) +
+                      list(src_dir.glob("*.h")))
+
+        # Match lines starting with whitespace, containing char name[SIZE], not static
+        buf_re = re.compile(r'char\s+(\w+)\[(\d+)\]')
+
+        for file in code_files:
+            with open(file, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.read().split('\n')
+
+            for i, line in enumerate(lines, 1):
+                stripped = line.lstrip()
+                # Only look at indented lines (local variables), skip globals and statics
+                if not line or line[0] not in (' ', '\t'):
+                    continue
+                if 'static' in line:
+                    continue
+                m = buf_re.search(line)
+                if m:
+                    name = m.group(1)
+                    size = int(m.group(2))
+                    if size > 256:
+                        warnings.append(f"{file.name}:{i}: {name}[{size}]")
+
+        if warnings:
+            self.add_result(EvaluationResult(
+                "Stack", "Large local buffers", "WARN",
+                f"Found {len(warnings)} non-static local char buffers > 256 bytes (ESP8266 has 4KB stack)",
+                "; ".join(warnings[:10])
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "Stack", "Large local buffers", "PASS",
+                "No oversized local char buffers found"
+            ))
+
     # ===== BUILD SYSTEM CHECKS =====
-    
+
     def check_build_system(self):
         """Validate build system configuration"""
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Build System ==={Colors.ENDC}")
-        
-        # Check Makefile
+
+        # Check platformio.ini (primary build system)
+        pio_ini = self.project_dir / "platformio.ini"
+        if pio_ini.exists():
+            self.add_result(EvaluationResult(
+                "Build", "platformio.ini", "PASS",
+                "Found PlatformIO configuration (primary build system)"
+            ))
+
+            with open(pio_ini, 'r', encoding='utf-8', errors='ignore') as f:
+                pio_content = f.read()
+
+            # Parse [env:*] sections
+            env_sections = re.findall(r'\[env:(\w+)\]', pio_content)
+            if env_sections:
+                self.add_result(EvaluationResult(
+                    "Build", "PlatformIO environments", "INFO",
+                    f"Found {len(env_sections)} build environments",
+                    ", ".join(env_sections)
+                ))
+
+            # Check lib_deps version pinning
+            lib_deps = re.findall(r'^\s+(\S.*\S)\s*$', pio_content, re.MULTILINE)
+            # Filter to lines that look like library dependencies (after a lib_deps = line)
+            in_lib_deps = False
+            all_libs: List[str] = []
+            unpinned: List[str] = []
+            for line in pio_content.split('\n'):
+                stripped = line.strip()
+                if stripped.startswith('lib_deps'):
+                    in_lib_deps = True
+                    continue
+                if in_lib_deps:
+                    if stripped == '' or (not stripped.startswith(';') and '=' in stripped and not stripped.startswith('$')):
+                        in_lib_deps = False
+                        continue
+                    if stripped.startswith(';') or stripped.startswith('$') or stripped == '':
+                        continue
+                    # This is a library line
+                    lib_line = stripped.rstrip(';').strip()
+                    if not lib_line or lib_line.startswith('$'):
+                        continue
+                    # Remove inline comments
+                    if ';' in lib_line:
+                        lib_line = lib_line[:lib_line.index(';')].strip()
+                    all_libs.append(lib_line)
+                    # Check if version-pinned (contains @ or is a URL)
+                    if '@' not in lib_line and '://' not in lib_line:
+                        unpinned.append(lib_line)
+
+            if all_libs:
+                if unpinned:
+                    self.add_result(EvaluationResult(
+                        "Build", "lib_deps version pinning", "WARN",
+                        f"{len(unpinned)}/{len(all_libs)} libraries not version-pinned",
+                        "; ".join(unpinned[:5])
+                    ))
+                else:
+                    self.add_result(EvaluationResult(
+                        "Build", "lib_deps version pinning", "PASS",
+                        f"All {len(all_libs)} libraries are version-pinned or URL-based"
+                    ))
+        else:
+            self.add_result(EvaluationResult(
+                "Build", "platformio.ini", "FAIL",
+                "platformio.ini not found (primary build system missing)"
+            ))
+
+        # Check Makefile (legacy)
         makefile = self.project_dir / "Makefile"
         if makefile.exists():
             self.add_result(EvaluationResult(
-                "Build", "Makefile", "PASS",
-                "Found Makefile"
+                "Build", "Makefile (legacy)", "INFO",
+                "Found legacy Makefile"
             ))
-            
-            with open(makefile, 'r') as f:
-                content = f.read()
-                # Check for essential targets
-                targets = ['binaries', 'clean', 'upload', 'filesystem']
-                for target in targets:
-                    if f"{target}:" in content:
-                        self.add_result(EvaluationResult(
-                            "Build", f"Make target: {target}", "PASS",
-                            "Target defined"
-                        ))
-                    else:
-                        self.add_result(EvaluationResult(
-                            "Build", f"Make target: {target}", "WARN",
-                            "Target not found"
-                        ))
         else:
             self.add_result(EvaluationResult(
-                "Build", "Makefile", "FAIL",
-                "Makefile not found"
+                "Build", "Makefile (legacy)", "INFO",
+                "No legacy Makefile (expected for PlatformIO-based builds)"
             ))
 
         # Check build.py
@@ -398,7 +584,8 @@ class WorkspaceEvaluator:
         security_issues: Dict[str, List[str]] = {
             'hardcoded_creds': [],
             'unsafe_string_ops': [],
-            'buffer_overflow_risk': []
+            'buffer_overflow_risk': [],
+            'unsafe_sprintf': []
         }
         
         src_dir = config.FIRMWARE_ROOT
@@ -417,8 +604,12 @@ class WorkspaceEvaluator:
                         security_issues['hardcoded_creds'].append(f"{file.name}:{i}")
                     
                     # Check for unsafe string operations
-                    if re.search(r'\b(strcpy|strcat|sprintf|gets)\s*\(', line):
+                    if re.search(r'\b(strcpy|strcat|gets)\s*\(', line):
                         security_issues['unsafe_string_ops'].append(f"{file.name}:{i}")
+
+                    # Check for bare sprintf (should use snprintf_P with size limit)
+                    if re.search(r'\bsprintf\s*\(', line) and not re.search(r'\bsnprintf', line):
+                        security_issues['unsafe_sprintf'].append(f"{file.name}:{i}")
 
         if security_issues['hardcoded_creds']:
             self.add_result(EvaluationResult(
@@ -442,6 +633,18 @@ class WorkspaceEvaluator:
             self.add_result(EvaluationResult(
                 "Security", "Unsafe String Ops", "PASS",
                 "No unsafe string operations found"
+            ))
+
+        if security_issues['unsafe_sprintf']:
+            self.add_result(EvaluationResult(
+                "Security", "Unsafe sprintf", "WARN",
+                f"Found {len(security_issues['unsafe_sprintf'])} bare sprintf() calls (use snprintf_P with size limit)",
+                "; ".join(security_issues['unsafe_sprintf'][:5])
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "Security", "Unsafe sprintf", "PASS",
+                "No bare sprintf() calls found"
             ))
 
     # ===== GIT REPOSITORY CHECKS =====
@@ -578,7 +781,9 @@ class WorkspaceEvaluator:
         self.check_code_structure()
         self.check_build_system()
         self.check_version_info()
-        
+        self.check_progmem_compliance()
+        self.check_no_arduinojson()
+
         if not quick:
             # Detailed checks
             self.check_coding_standards()
@@ -588,6 +793,7 @@ class WorkspaceEvaluator:
             self.check_security()
             self.check_git_repository()
             self.check_filesystem_data()
+            self.check_stack_safety()
 
     def print_summary(self):
         """Print evaluation summary"""

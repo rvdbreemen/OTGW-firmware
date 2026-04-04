@@ -297,8 +297,8 @@ def install_dependencies(project_dir, config_file, target_names):
     ]
 
     # OLED display support (both ESP8266 and OTGW32 — runtime I2C probe)
-    libraries.append("Adafruit SSD1306@2.5.13")
-    libraries.append("Adafruit GFX Library@1.11.11")
+    # SSD1306Ascii: text-only, no 1KB framebuffer — saves RAM on ESP8266
+    libraries.append("SSD1306Ascii@1.3.5")
 
     # ESP32-S3 targets need OpenTherm library for direct GPIO OT (Phunkafizer fork)
     esp32_targets = {"otgw32", "otthing"}
