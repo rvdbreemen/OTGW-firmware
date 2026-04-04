@@ -46,11 +46,21 @@ static uint8_t otMasterStatusFlags = 0x01;  // bit0=CH enable (default on)
 // Current operating mode (gateway/monitor/bypass/master)
 static OTDirectMode otCurrentMode = OTD_MODE_GATEWAY;
 
-// Legacy convenience flags — derived from otCurrentMode for readability
-static bool otBypassActive  = false;
-static bool otMonitorMode   = false;
-static bool otMasterMode    = false;  // sole OT master, no thermostat expected
-static bool otLoopbackMode  = false;  // internal test with simulated boiler
+// Inline mode checks — single source of truth is otCurrentMode
+#define IS_BYPASS_MODE()   (otCurrentMode == OTD_MODE_BYPASS)
+#define IS_MONITOR_MODE()  (otCurrentMode == OTD_MODE_MONITOR)
+#define IS_MASTER_MODE()   (otCurrentMode == OTD_MODE_MASTER)
+#define IS_LOOPBACK_MODE() (otCurrentMode == OTD_MODE_LOOPBACK)
+
+// ---------------------------------------------------------------------------
+// Parity helper — sets bit 31 to make total number of 1-bits even
+// ---------------------------------------------------------------------------
+static inline void setOTParityBit(unsigned long &frame) {
+  frame &= 0x7FFFFFFFUL;
+  uint32_t p = frame;
+  p ^= (p >> 16); p ^= (p >> 8); p ^= (p >> 4); p ^= (p >> 2); p ^= (p >> 1);
+  if (p & 1) frame |= 0x80000000UL;
+}
 
 // Thermostat connectivity tracking — detect disconnect and apply setback
 static bool     otThermostatSeen    = false;   // at least one frame received since boot
@@ -280,11 +290,7 @@ static unsigned long applyOverrides(unsigned long frame, bool &modified) {
     if (otOverrides[i].active && otOverrides[i].msgId == msgId) {
       // Replace data value (lower 16 bits) while keeping msg type + data-id
       frame = (frame & 0xFFFF0000UL) | otOverrides[i].overrideValue;
-      // Recalculate parity (bit 31)
-      frame &= 0x7FFFFFFFUL;  // clear parity
-      uint32_t p = frame;
-      p ^= (p >> 16); p ^= (p >> 8); p ^= (p >> 4); p ^= (p >> 2); p ^= (p >> 1);
-      if (p & 1) frame |= 0x80000000UL;
+      setOTParityBit(frame);
       modified = true;
       break;
     }
@@ -379,17 +385,12 @@ void initOTDirect() {
   // Boards without relay can't do bypass mode — force gateway if saved as bypass
   if (otCurrentMode == OTD_MODE_BYPASS) otCurrentMode = OTD_MODE_GATEWAY;
 #endif
-  otBypassActive = (otCurrentMode == OTD_MODE_BYPASS);
-  otMonitorMode  = (otCurrentMode == OTD_MODE_MONITOR);
-  otMasterMode   = (otCurrentMode == OTD_MODE_MASTER);
-  otLoopbackMode = (otCurrentMode == OTD_MODE_LOOPBACK);
-
   // Initialize bypass relay hardware
 #if HAS_BYPASS_RELAY
   pinMode(PIN_BYPASS_RELAY, OUTPUT);
-  digitalWrite(PIN_BYPASS_RELAY, otBypassActive ? HIGH : LOW);
+  digitalWrite(PIN_BYPASS_RELAY, IS_BYPASS_MODE() ? HIGH : LOW);
   DebugTf(PSTR("OT-direct: Bypass relay initialized (%s)\r\n"),
-          otBypassActive ? "BYPASS mode" : "off");
+          IS_BYPASS_MODE() ? "BYPASS mode" : "off");
 #else
   DebugTln(F("OT-direct: No bypass relay on this board"));
 #endif
@@ -422,7 +423,7 @@ void initOTDirect() {
   // 5. Start OpenTherm slave (listens to thermostat)
   //    In master mode with slave disabled, skip starting the slave interface.
   bool startSlave = true;
-  if (otMasterMode && !settings.otd.bEnableSlave) {
+  if (IS_MASTER_MODE() && !settings.otd.bEnableSlave) {
     startSlave = false;
     DebugTln(F("OT-direct: Slave interface DISABLED (master mode, bEnableSlave=false)"));
   }
@@ -563,10 +564,10 @@ void updateOTDirectStatus() {
   state.otd.iScheduleActive   = total - disabled;
   state.otd.iScheduleDisabled = disabled;
   state.otd.iOverrideCount    = overrides;
-  state.otd.bBypassActive     = otBypassActive;
+  state.otd.bBypassActive     = IS_BYPASS_MODE();
   state.otd.bStepUpEnabled    = (digitalRead(PIN_STEPUP_ENABLE) == HIGH);
-  state.otd.bMonitorMode      = otMonitorMode;
-  state.otd.bMasterMode       = otMasterMode;
+  state.otd.bMonitorMode      = IS_MONITOR_MODE();
+  state.otd.bMasterMode       = IS_MASTER_MODE();
   state.otd.eMode             = otCurrentMode;
   state.otd.iLastThermostatMs = otLastThermostatMs;
 }
@@ -770,7 +771,7 @@ static unsigned long simulateLoopbackResponse(unsigned long request) {
 // ---------------------------------------------------------------------------
 static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin origin) {
   // Loopback mode: simulate response immediately, no bus activity
-  if (otLoopbackMode) {
+  if (IS_LOOPBACK_MODE()) {
     bridgeFrameToParser((origin == OT_DIRECT_ORIGIN_THERMOSTAT) ? 'T' : 'R', request);
     unsigned long response = simulateLoopbackResponse(request);
     bridgeFrameToParser('B', response);
@@ -935,7 +936,7 @@ void loopOTDirect() {
   // Monitor mode: forward all frames unmodified — skip UI/SR/override tables.
   // Gateway mode: check UI (unknown-ID) and SR (response override) tables first,
   // then apply repeater-mode value overrides before forwarding to boiler.
-  if (otSlaveFramePending && otMasterMode) {
+  if (otSlaveFramePending && IS_MASTER_MODE()) {
     // Master mode: we are the sole OT master — respond to thermostat ourselves.
     // If a thermostat reconnects while in master mode, we serve it cached data.
     handleMasterModeSlaveFrame(otSlaveFrame);
@@ -945,7 +946,7 @@ void loopOTDirect() {
   }
   else if (!otMasterRequestActive && otSlaveFramePending) {
 
-    if (otMonitorMode) {
+    if (IS_MONITOR_MODE()) {
       // Monitor mode: transparent pass-through — no overrides, no interception
       if (sendMasterRequestAsync(otSlaveFrame, OT_DIRECT_ORIGIN_THERMOSTAT)) {
         otSlaveFramePending = false;
@@ -958,10 +959,7 @@ void loopOTDirect() {
       // UI table: respond UNKNOWN_DATAID directly, don't forward to boiler
       if (isUnknownId(slaveMsgId)) {
         unsigned long unknownResp = (otSlaveFrame & 0x00FF0000UL) | (7UL << 28);  // type=UNKNOWN_DATAID
-        // Recalculate parity
-        unknownResp &= 0x7FFFFFFFUL;
-        uint32_t p = unknownResp; p ^= (p >> 16); p ^= (p >> 8); p ^= (p >> 4); p ^= (p >> 2); p ^= (p >> 1);
-        if (p & 1) unknownResp |= 0x80000000UL;
+        setOTParityBit(unknownResp);
         bridgeFrameToParser('T', otSlaveFrame);
         bridgeFrameToParser('A', unknownResp);
         otSlave.sendResponse(unknownResp);
@@ -974,9 +972,7 @@ void loopOTDirect() {
           if (otResponseOverrides[i].active && otResponseOverrides[i].msgId == slaveMsgId) {
             // Build READ_ACK with the stored data value
             unsigned long srResp = (4UL << 28) | ((unsigned long)slaveMsgId << 16) | otResponseOverrides[i].value;
-            srResp &= 0x7FFFFFFFUL;
-            uint32_t p = srResp; p ^= (p >> 16); p ^= (p >> 8); p ^= (p >> 4); p ^= (p >> 2); p ^= (p >> 1);
-            if (p & 1) srResp |= 0x80000000UL;
+            setOTParityBit(srResp);
             bridgeFrameToParser('T', otSlaveFrame);
             bridgeFrameToParser('A', srResp);
             otSlave.sendResponse(srResp);
@@ -1111,10 +1107,6 @@ static void clearWriteOverride(uint8_t msgId) {
 // ---------------------------------------------------------------------------
 static void setOTDirectMode(OTDirectMode newMode) {
   otCurrentMode  = newMode;
-  otBypassActive = (newMode == OTD_MODE_BYPASS);
-  otMonitorMode  = (newMode == OTD_MODE_MONITOR);
-  otMasterMode   = (newMode == OTD_MODE_MASTER);
-  otLoopbackMode = (newMode == OTD_MODE_LOOPBACK);
 
   switch (newMode) {
     case OTD_MODE_BYPASS:
@@ -1227,9 +1219,7 @@ static void checkThermostatTimeout() {
 // type: 4=READ_ACK, 5=WRITE_ACK, 7=UNKNOWN_DATAID
 static unsigned long buildOTResponse(uint8_t type, uint8_t msgId, uint16_t data) {
   unsigned long resp = ((unsigned long)type << 28) | ((unsigned long)msgId << 16) | data;
-  resp &= 0x7FFFFFFFUL;  // clear parity
-  uint32_t p = resp; p ^= (p >> 16); p ^= (p >> 8); p ^= (p >> 4); p ^= (p >> 2); p ^= (p >> 1);
-  if (p & 1) resp |= 0x80000000UL;
+  setOTParityBit(resp);
   return resp;
 }
 
@@ -1324,11 +1314,7 @@ static unsigned long applyResponseModifiers(unsigned long response) {
   for (uint8_t i = 0; i < OT_RESPONSE_MODIFY_MAX; i++) {
     if (otResponseModifiers[i].active && otResponseModifiers[i].msgId == msgId) {
       response = (response & 0xFFFF0000UL) | otResponseModifiers[i].value;
-      // Recalculate parity (bit 31)
-      response &= 0x7FFFFFFFUL;
-      uint32_t p = response;
-      p ^= (p >> 16); p ^= (p >> 8); p ^= (p >> 4); p ^= (p >> 2); p ^= (p >> 1);
-      if (p & 1) response |= 0x80000000UL;
+      setOTParityBit(response);
       break;
     }
   }
@@ -1582,10 +1568,10 @@ void handleOTDirectCommand(const char* buf, int len) {
         // Gateway mode: G=gateway, M=monitor, P=passthru (bypass), S=standalone, L=loopback
         {
           char modeChar = 'G';
-          if (otBypassActive) modeChar = 'P';
-          else if (otMonitorMode) modeChar = 'M';
-          else if (otMasterMode) modeChar = 'S';
-          else if (otLoopbackMode) modeChar = 'L';
+          if (IS_BYPASS_MODE()) modeChar = 'P';
+          else if (IS_MONITOR_MODE()) modeChar = 'M';
+          else if (IS_MASTER_MODE()) modeChar = 'S';
+          else if (IS_LOOPBACK_MODE()) modeChar = 'L';
           snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: M=%c"), modeChar);
           processOT(prBuf, strlen(prBuf));
         }
@@ -1662,7 +1648,7 @@ void handleOTDirectCommand(const char* buf, int len) {
         processOT(prBuf, strlen(prBuf));
         break;
       case 'N':
-        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: N=%c"), otMasterMode ? '1' : '0');
+        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: N=%c"), IS_MASTER_MODE() ? '1' : '0');
         processOT(prBuf, strlen(prBuf));
         break;
       case 'V':
