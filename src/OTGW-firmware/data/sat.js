@@ -18,8 +18,18 @@ var SAT = (function() {
   var POLL_INTERVAL_MS = 5000;
   var _pollTimer = null;
   var _chartInstance = null;
+  var _curveChartInstance = null;
+  var _curveVisible = true;
+  var _lastCurveCoeff = -1;
+  var _lastCurveSystem = -1;
+  var _lastCurveTarget = -1;
   var _chartData = { time: [], setpoint: [], flow: [], room: [], outside: [], pid: [] };
   var _maxChartPoints = 720; // 1 hour at 5s intervals
+
+  // --- Heating curve constants (must match SATcontrol.ino) ---
+  var HC_BASE_OFFSET_FLOOR = 20.0;
+  var HC_BASE_OFFSET_RAD   = 27.2;
+  var HC_REF_TEMP          = 20.0;
 
   // --- Mode / Status label maps ---
   var MODE_LABELS  = ['Off', 'Continuous', 'PWM'];
@@ -140,8 +150,9 @@ var SAT = (function() {
       extOutEl.title = d.external_outdoor_valid ? 'External outdoor sensor active' : 'Using OT bus outdoor temp';
     }
 
-    // Update chart
+    // Update charts
     updateChart(d);
+    updateCurveChart(d);
   }
 
   // --- Chart ---
@@ -197,13 +208,194 @@ var SAT = (function() {
     });
   }
 
+  // --- Heating Curve (Stooklijn) ---
+  // JS port of satCalcHeatingCurve() from SATcontrol.ino
+  function calcHeatingCurve(outsideTemp, targetTemp, coefficient, heatingSystem) {
+    var baseOffset = (heatingSystem === 1) ? HC_BASE_OFFSET_FLOOR : HC_BASE_OFFSET_RAD;
+    var diff = outsideTemp - HC_REF_TEMP;
+    var curveValue = 4.0 * (targetTemp - HC_REF_TEMP)
+                   + 0.03 * diff * diff
+                   - 0.4 * diff;
+    return baseOffset + (coefficient / 4.0) * curveValue;
+  }
+
+  function buildCurveOption(coeff, system, target, outsideTemp, currentSetpoint, theme) {
+    // X axis: outside temperatures from -15 to 25
+    var xData = [];
+    for (var t = -15; t <= 25; t++) xData.push(t);
+
+    var series = [];
+    // Reference curves: coefficient 0.5 to 5.0, step 0.5
+    var refCoeffs = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0];
+    var isLight = (theme !== 'dark');
+    for (var ci = 0; ci < refCoeffs.length; ci++) {
+      var c = refCoeffs[ci];
+      var isActive = (Math.abs(c - coeff) < 0.05);
+      var data = [];
+      for (var xi = 0; xi < xData.length; xi++) {
+        data.push(Math.round(calcHeatingCurve(xData[xi], target, c, system) * 10) / 10);
+      }
+      series.push({
+        name: 'c=' + c.toFixed(1),
+        type: 'line',
+        smooth: true,
+        data: data,
+        symbol: 'none',
+        lineStyle: {
+          width: isActive ? 3 : 1,
+          color: isActive ? '#ff6600' : (isLight ? '#bbb' : '#555')
+        },
+        emphasis: { disabled: true },
+        silent: true,
+        z: isActive ? 5 : 1
+      });
+    }
+
+    // If coefficient doesn't match any reference, draw it explicitly
+    var matchesRef = false;
+    for (var ri = 0; ri < refCoeffs.length; ri++) {
+      if (Math.abs(refCoeffs[ri] - coeff) < 0.05) { matchesRef = true; break; }
+    }
+    if (!matchesRef && coeff > 0) {
+      var activeData = [];
+      for (var ai = 0; ai < xData.length; ai++) {
+        activeData.push(Math.round(calcHeatingCurve(xData[ai], target, coeff, system) * 10) / 10);
+      }
+      series.push({
+        name: 'c=' + coeff.toFixed(1),
+        type: 'line',
+        smooth: true,
+        data: activeData,
+        symbol: 'none',
+        lineStyle: { width: 3, color: '#ff6600' },
+        emphasis: { disabled: true },
+        silent: true,
+        z: 5
+      });
+    }
+
+    // Current operating point
+    if (outsideTemp !== null && outsideTemp !== undefined &&
+        currentSetpoint !== null && currentSetpoint !== undefined) {
+      series.push({
+        name: 'Current',
+        type: 'scatter',
+        data: [[outsideTemp, Math.round(currentSetpoint * 10) / 10]],
+        symbolSize: 14,
+        itemStyle: { color: '#ff3300', borderColor: '#fff', borderWidth: 2 },
+        z: 10
+      });
+    }
+
+    return {
+      tooltip: {
+        trigger: 'axis',
+        formatter: function(params) {
+          if (!params || !params.length) return '';
+          var tip = 'Outside: ' + params[0].axisValue + '\u00B0C<br/>';
+          for (var pi = 0; pi < params.length; pi++) {
+            if (params[pi].seriesType === 'scatter') continue;
+            var val = params[pi].data;
+            if (val !== null && val !== undefined) {
+              tip += '<span style="color:' + params[pi].color + '">\u25CF</span> '
+                   + params[pi].seriesName + ': ' + val + '\u00B0C<br/>';
+            }
+          }
+          return tip;
+        }
+      },
+      grid: { left: 55, right: 25, top: 30, bottom: 40 },
+      xAxis: {
+        type: 'value',
+        name: 'Outside \u00B0C',
+        nameLocation: 'center',
+        nameGap: 25,
+        min: -15,
+        max: 25,
+        interval: 5,
+        axisLabel: { formatter: '{value}\u00B0' }
+      },
+      yAxis: {
+        type: 'value',
+        name: 'Flow \u00B0C',
+        min: 10,
+        max: 80,
+        axisLabel: { formatter: '{value}\u00B0' }
+      },
+      series: series
+    };
+  }
+
+  function initCurveChart() {
+    var container = el('sat-curve-chart');
+    if (!container || typeof echarts === 'undefined') return;
+    _curveChartInstance = echarts.init(container);
+    // Initial empty state — filled on first data fetch
+    _curveChartInstance.setOption(buildCurveOption(1.5, 0, 20.0, null, null, 'light'));
+  }
+
+  function updateCurveChart(d) {
+    if (!_curveChartInstance) return;
+    var coeff = d.coefficient;
+    var system = d.heating_system;
+    var target = d.target_temp;
+    var outside = d.outside_temp;
+    var setpoint = d.heating_curve;
+
+    // Only rebuild full curve family when parameters change
+    var needsRebuild = (coeff !== _lastCurveCoeff ||
+                        system !== _lastCurveSystem ||
+                        Math.abs(target - _lastCurveTarget) > 0.05);
+
+    if (needsRebuild) {
+      _lastCurveCoeff = coeff;
+      _lastCurveSystem = system;
+      _lastCurveTarget = target;
+      var theme = document.body.classList.contains('dark') ? 'dark' : 'light';
+      _curveChartInstance.setOption(buildCurveOption(coeff, system, target, outside, setpoint, theme), true);
+    } else {
+      // Just update operating point (last series)
+      var seriesCount = _curveChartInstance.getOption().series.length;
+      var lastSeries = _curveChartInstance.getOption().series[seriesCount - 1];
+      if (lastSeries && lastSeries.type === 'scatter') {
+        var update = [];
+        for (var si = 0; si < seriesCount - 1; si++) update.push({});
+        update.push({
+          data: (outside !== null && outside !== undefined && setpoint !== null && setpoint !== undefined)
+            ? [[outside, Math.round(setpoint * 10) / 10]]
+            : []
+        });
+        _curveChartInstance.setOption({ series: update });
+      }
+    }
+
+    // Update info label
+    var label = el('sat-curve-label');
+    if (label) {
+      label.textContent = (system === 1 ? 'Underfloor' : 'Radiator')
+                        + ' | Coefficient: ' + (coeff !== undefined ? coeff.toFixed(1) : '--')
+                        + ' | Target: ' + (target !== undefined ? target.toFixed(1) + '\u00B0C' : '--');
+    }
+  }
+
+  function toggleCurve() {
+    _curveVisible = !_curveVisible;
+    var section = el('sat-curve-section');
+    var arrow = el('sat-curve-arrow');
+    if (section) section.style.display = _curveVisible ? '' : 'none';
+    if (arrow) arrow.innerHTML = _curveVisible ? '&#9660;' : '&#9654;';
+    if (_curveVisible && _curveChartInstance) _curveChartInstance.resize();
+  }
+
   function resizeChart() {
     if (_chartInstance) _chartInstance.resize();
+    if (_curveChartInstance) _curveChartInstance.resize();
   }
 
   // --- Public API ---
   function start() {
     initChart();
+    initCurveChart();
     fetchStatus(); // immediate first fetch
     _pollTimer = setInterval(fetchStatus, POLL_INTERVAL_MS);
     window.addEventListener('resize', resizeChart);
@@ -215,10 +407,11 @@ var SAT = (function() {
   }
 
   function setTheme(theme) {
+    var themeArg = (theme === 'dark') ? 'dark' : null;
     if (_chartInstance) {
       var container = el('sat-chart');
       _chartInstance.dispose();
-      _chartInstance = echarts.init(container, theme === 'dark' ? 'dark' : null);
+      _chartInstance = echarts.init(container, themeArg);
       // Re-apply chart data
       var option = {
         tooltip: { trigger: 'axis' },
@@ -236,11 +429,19 @@ var SAT = (function() {
       };
       _chartInstance.setOption(option);
     }
+    if (_curveChartInstance) {
+      var curveContainer = el('sat-curve-chart');
+      _curveChartInstance.dispose();
+      _curveChartInstance = echarts.init(curveContainer, themeArg);
+      // Force rebuild on next data update
+      _lastCurveCoeff = -1;
+    }
   }
 
   return {
     start: start,
     stop: stop,
-    setTheme: setTheme
+    setTheme: setTheme,
+    toggleCurve: toggleCurve
   };
 })();

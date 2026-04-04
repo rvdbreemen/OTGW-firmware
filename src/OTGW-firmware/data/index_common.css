@@ -247,6 +247,21 @@
   background: #999;
 }
 
+/* Heating Curve (Stooklijn) section */
+.sat-curve-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+.sat-curve-toggle:hover {
+  opacity: 0.8;
+}
+.sat-curve-info {
+  text-align: center;
+  padding: 0.3rem 0 0;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
 @media (max-width: 768px) {
   .sat-cards {
     flex-direction: column;
