@@ -283,11 +283,42 @@ static void handlePic(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
 static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
-  if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
   if (!isOTDirectEnabled()) { sendApiError(503, F("No OT-direct hardware - OTGW32 functions disabled")); return; }
+
   if (wc > 4 && strcmp_P(words[4], PSTR("status")) == 0) {
+    if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
     sendOTDirectStatus();
-  } else {
+  }
+  // POST /api/v2/otdirect/mode?mode=gateway|monitor|bypass
+  else if (wc > 4 && strcmp_P(words[4], PSTR("mode")) == 0) {
+    if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST")); return; }
+    if (!httpServer.hasArg("mode")) { sendApiError(400, F("Missing 'mode' parameter")); return; }
+    String modeStr = httpServer.arg("mode");
+    if (modeStr == F("gateway"))       addOTWGcmdtoqueue("GW=1", 4, true);
+    else if (modeStr == F("monitor"))  addOTWGcmdtoqueue("GW=M", 4, true);
+    else if (modeStr == F("bypass"))   addOTWGcmdtoqueue("GW=0", 4, true);
+    else { sendApiError(400, F("Invalid mode. Use: gateway, monitor, bypass")); return; }
+    // Return current status (mode will be updated by the time response renders)
+    sendOTDirectStatus();
+  }
+  // GET /api/v2/otdirect/settings — read OTD settings
+  // POST /api/v2/otdirect/settings?setbacktemp=xx&setbacktimeout=yy — update
+  else if (wc > 4 && strcmp_P(words[4], PSTR("settings")) == 0) {
+    if (method == HTTP_GET) {
+      sendStartJsonMap(F("otdirect_settings"));
+      sendJsonMapEntry(F("mode"), (int)settings.otd.iMode);
+      sendJsonMapEntry(F("setback_temp"), settings.otd.fSetbackTemp);
+      sendJsonMapEntry(F("setback_timeout"), (int)settings.otd.iSetbackTimeout);
+      sendEndJsonMap(F("otdirect_settings"));
+    } else if (method == HTTP_POST || method == HTTP_PUT) {
+      if (httpServer.hasArg("setbacktemp"))    updateSetting("OTDsetbacktemp", httpServer.arg("setbacktemp").c_str());
+      if (httpServer.hasArg("setbacktimeout")) updateSetting("OTDsetbacktimeout", httpServer.arg("setbacktimeout").c_str());
+      sendOTDirectStatus();
+    } else {
+      sendApiMethodNotAllowed(F("GET, POST"));
+    }
+  }
+  else {
     sendApiNotFound(originalURI);
   }
 }
@@ -829,9 +860,17 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("otdirectavailable"), isOTDirectEnabled());
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   if (isOTDirectEnabled()) {
+    {
+      const char* modeStr = "gateway";
+      if (state.otd.eMode == OTD_MODE_MONITOR) modeStr = "monitor";
+      else if (state.otd.eMode == OTD_MODE_BYPASS) modeStr = "bypass";
+      sendJsonMapEntry(F("otdmode"), modeStr);
+    }
     sendJsonMapEntry(F("otdbypass"), state.otd.bBypassActive);
     sendJsonMapEntry(F("otdmonitor"), state.otd.bMonitorMode);
     sendJsonMapEntry(F("otdstepup"), state.otd.bStepUpEnabled);
+    sendJsonMapEntry(F("otdthermostat"), state.otd.bThermostatConnected);
+    sendJsonMapEntry(F("otdsetback"), state.otd.bSetbackActive);
     sendJsonMapEntry(F("otdschedtotal"), state.otd.iScheduleTotal);
     sendJsonMapEntry(F("otdschedactive"), state.otd.iScheduleActive);
     sendJsonMapEntry(F("otdscheddisabled"), state.otd.iScheduleDisabled);
@@ -995,10 +1034,20 @@ void sendPICsettings()
 void sendOTDirectStatus()
 {
   sendStartJsonMap(F("otdirect_status"));
+  // Operating mode
+  {
+    const char* modeStr = "gateway";
+    if (state.otd.eMode == OTD_MODE_MONITOR) modeStr = "monitor";
+    else if (state.otd.eMode == OTD_MODE_BYPASS) modeStr = "bypass";
+    sendJsonMapEntry(F("mode"),             modeStr);
+  }
   // Hardware state
   sendJsonMapEntry(F("bypass"),           state.otd.bBypassActive);
   sendJsonMapEntry(F("stepup"),           state.otd.bStepUpEnabled);
   sendJsonMapEntry(F("monitor_mode"),     state.otd.bMonitorMode);
+  // Thermostat connectivity
+  sendJsonMapEntry(F("thermostat_connected"), state.otd.bThermostatConnected);
+  sendJsonMapEntry(F("setback_active"),   state.otd.bSetbackActive);
   // Schedule statistics
   sendJsonMapEntry(F("schedule_total"),   state.otd.iScheduleTotal);
   sendJsonMapEntry(F("schedule_active"),  state.otd.iScheduleActive);

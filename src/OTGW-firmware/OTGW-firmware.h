@@ -209,6 +209,13 @@ struct PICSection {            // state.pic — PIC microcontroller identity/sta
 };
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+// OT-direct operating modes (gateway perspective)
+enum OTDirectMode : uint8_t {
+  OTD_MODE_GATEWAY  = 1,   // Full gateway: scheduler + thermostat forwarding + overrides (default)
+  OTD_MODE_MONITOR  = 2,   // Transparent: forward all frames unmodified, log everything
+  OTD_MODE_BYPASS   = 0,   // Thermostat direct to boiler via relay, OT-direct inactive
+};
+
 struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime status
   uint8_t  iScheduleTotal    = 0;   // total schedule entries
   uint8_t  iScheduleActive   = 0;   // entries not disabled by boiler
@@ -217,6 +224,10 @@ struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime statu
   bool     bBypassActive     = false; // true = thermostat direct to boiler (relay)
   bool     bStepUpEnabled    = false; // 24V step-up converter on
   bool     bMonitorMode      = false; // true = transparent pass-through, no overrides applied
+  OTDirectMode eMode         = OTD_MODE_GATEWAY; // current operating mode
+  bool     bThermostatConnected = false; // thermostat recently seen (within timeout)
+  bool     bSetbackActive    = false;    // thermostat disconnected → setback override engaged
+  uint32_t iLastThermostatMs = 0;        // millis() of last thermostat frame received
 };
 #endif
 
@@ -532,6 +543,14 @@ struct SATSection {
   bool     bPwmAutoSwitch     = true;   // Auto-switch between PWM and continuous mode
 };
 
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+struct OTDirectSettingsSection {
+  uint8_t iMode              = 1;     // OTD_MODE_GATEWAY default, persisted across reboot
+  float   fSetbackTemp       = 16.0f; // Setback temp on thermostat disconnect (°C)
+  uint8_t iSetbackTimeout    = 30;    // Seconds before thermostat considered disconnected
+};
+#endif
+
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
 struct EthernetSection {
   bool bStaticIP       = false;             // false=DHCP (default), true=use static IP
@@ -560,6 +579,9 @@ struct OTGWSettings {
   UISection           ui;
   OTGWBootSection     otgw;
   SATSection          sat;
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+  OTDirectSettingsSection otd;
+#endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   EthernetSection     eth;
 #endif

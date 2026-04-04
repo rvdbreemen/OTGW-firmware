@@ -480,9 +480,18 @@ void sendMQTTversioninfo(){
   // OT-direct (OTGW32) status — parallel to otgw-pic/ topics
   sendMQTTData(F("otgw-otdirect/available"), CCONOFF(isOTDirectEnabled()));
   if (isOTDirectEnabled()) {
+    // Operating mode (text string for HA)
+    {
+      const char* modeStr = "gateway";
+      if (state.otd.eMode == OTD_MODE_MONITOR) modeStr = "monitor";
+      else if (state.otd.eMode == OTD_MODE_BYPASS) modeStr = "bypass";
+      sendMQTTData(F("otgw-otdirect/mode"), modeStr);
+    }
     sendMQTTData(F("otgw-otdirect/bypass"), CCONOFF(state.otd.bBypassActive));
     sendMQTTData(F("otgw-otdirect/monitor_mode"), CCONOFF(state.otd.bMonitorMode));
     sendMQTTData(F("otgw-otdirect/stepup"), CCONOFF(state.otd.bStepUpEnabled));
+    sendMQTTData(F("otgw-otdirect/thermostat_connected"), CCONOFF(state.otd.bThermostatConnected));
+    sendMQTTData(F("otgw-otdirect/setback_active"), CCONOFF(state.otd.bSetbackActive));
     char buf[8];
     snprintf_P(buf, sizeof(buf), PSTR("%u"), state.otd.iScheduleActive);
     sendMQTTData(F("otgw-otdirect/schedule_active"), buf);

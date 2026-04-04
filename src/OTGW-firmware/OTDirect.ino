@@ -43,14 +43,17 @@ static constexpr uint32_t OT_WRITE_INTERVAL_MS    = 15000;  // Periodic writes e
 // Status flags to send in MsgID 0 (master status byte)
 static uint8_t otMasterStatusFlags = 0x01;  // bit0=CH enable (default on)
 
-// Bypass relay state (GW=0 bypass on, GW=1 gateway mode)
-// Only functional on boards with HAS_BYPASS_RELAY=1 (e.g. Seegel OT-Thing)
-static bool otBypassActive = false;
+// Current operating mode (gateway/monitor/bypass)
+static OTDirectMode otCurrentMode = OTD_MODE_GATEWAY;
 
-// Monitor mode flag — transparent pass-through, no overrides applied
-// All thermostat frames forwarded unmodified, all boiler responses returned as-is.
-// Logging/MQTT/WebSocket still active for read-only observation.
+// Legacy convenience flags — derived from otCurrentMode for readability
+static bool otBypassActive = false;
 static bool otMonitorMode = false;
+
+// Thermostat connectivity tracking — detect disconnect and apply setback
+static bool     otThermostatSeen    = false;   // at least one frame received since boot
+static uint32_t otLastThermostatMs  = 0;       // millis() of last thermostat frame
+static bool     otSetbackEngaged    = false;    // setback override currently active
 
 // Schedule table: supports both reads and periodic writes.
 // Write entries periodically re-send a cached value to keep the boiler in sync.
@@ -362,16 +365,31 @@ static bool probeOTBus() {
 void initOTDirect() {
   DebugTln(F("OT-direct: Initializing direct GPIO OpenTherm..."));
 
-  // 1. Initialize bypass relay (off = gateway mode) — only on boards with relay hardware
+  // 1. Restore operating mode from persistent settings
+  otCurrentMode = static_cast<OTDirectMode>(settings.otd.iMode);
+#if !HAS_BYPASS_RELAY
+  // Boards without relay can't do bypass mode — force gateway if saved as bypass
+  if (otCurrentMode == OTD_MODE_BYPASS) otCurrentMode = OTD_MODE_GATEWAY;
+#endif
+  otBypassActive = (otCurrentMode == OTD_MODE_BYPASS);
+  otMonitorMode  = (otCurrentMode == OTD_MODE_MONITOR);
+
+  // Initialize bypass relay hardware
 #if HAS_BYPASS_RELAY
   pinMode(PIN_BYPASS_RELAY, OUTPUT);
-  digitalWrite(PIN_BYPASS_RELAY, LOW);
-  otBypassActive = false;
-  DebugTln(F("OT-direct: Bypass relay initialized (gateway mode)"));
+  digitalWrite(PIN_BYPASS_RELAY, otBypassActive ? HIGH : LOW);
+  DebugTf(PSTR("OT-direct: Bypass relay initialized (%s)\r\n"),
+          otBypassActive ? "BYPASS mode" : "off");
 #else
-  otBypassActive = false;
   DebugTln(F("OT-direct: No bypass relay on this board"));
 #endif
+
+  // Restore setback temp from settings to local variable
+  otSetbackTemp = settings.otd.fSetbackTemp;
+
+  DebugTf(PSTR("OT-direct: Mode=%d (%s)\r\n"), (int)otCurrentMode,
+          otCurrentMode == OTD_MODE_GATEWAY ? "gateway" :
+          otCurrentMode == OTD_MODE_MONITOR ? "monitor" : "bypass");
 
   // 2. Enable step-up converter
   enableStepUp();
@@ -498,6 +516,8 @@ void updateOTDirectStatus() {
   state.otd.bBypassActive     = otBypassActive;
   state.otd.bStepUpEnabled    = (digitalRead(PIN_STEPUP_ENABLE) == HIGH);
   state.otd.bMonitorMode      = otMonitorMode;
+  state.otd.eMode             = otCurrentMode;
+  state.otd.iLastThermostatMs = otLastThermostatMs;
 }
 
 // ---------------------------------------------------------------------------
@@ -544,6 +564,10 @@ static void handleMasterResponse() {
 
     // If this was a forwarded thermostat frame, send response back
     if (otLastRequestOrigin == OT_DIRECT_ORIGIN_THERMOSTAT) {
+      // In gateway mode, apply response-path modifications before forwarding
+      if (otCurrentMode == OTD_MODE_GATEWAY) {
+        response = applyResponseModifiers(response);
+      }
       otSlave.sendResponse(response);
     }
   } else {
@@ -629,6 +653,12 @@ void loopOTDirect() {
     handleMasterResponse();
   }
 
+  // Track thermostat connectivity — any pending frame means thermostat is alive
+  if (otSlaveFramePending) {
+    otLastThermostatMs = millis();
+    otThermostatSeen = true;
+  }
+
   // Forward pending thermostat frame when master bus is idle.
   // Monitor mode: forward all frames unmodified — skip UI/SR/override tables.
   // Gateway mode: check UI (unknown-ID) and SR (response override) tables first,
@@ -701,6 +731,7 @@ void loopOTDirect() {
   DECLARE_TIMER_SEC(timerOTDStatus, 1, SKIP_MISSED_TICKS);
   if (DUE(timerOTDStatus)) {
     updateOTDirectStatus();
+    checkThermostatTimeout();
   }
 }
 
@@ -793,6 +824,143 @@ static void clearWriteOverride(uint8_t msgId) {
       break;
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// setOTDirectMode — switch operating mode with hardware reconfiguration
+// ---------------------------------------------------------------------------
+static void setOTDirectMode(OTDirectMode newMode) {
+  otCurrentMode = newMode;
+  otBypassActive = (newMode == OTD_MODE_BYPASS);
+  otMonitorMode  = (newMode == OTD_MODE_MONITOR);
+
+  switch (newMode) {
+    case OTD_MODE_BYPASS:
+#if HAS_BYPASS_RELAY
+      digitalWrite(PIN_BYPASS_RELAY, HIGH);
+      DebugTln(F("OT-direct: Bypass mode ON (thermostat direct to boiler)"));
+#endif
+      break;
+
+    case OTD_MODE_GATEWAY:
+#if HAS_BYPASS_RELAY
+      digitalWrite(PIN_BYPASS_RELAY, LOW);
+#endif
+      DebugTln(F("OT-direct: Gateway mode ON (OT-direct active, overrides enabled)"));
+      break;
+
+    case OTD_MODE_MONITOR:
+#if HAS_BYPASS_RELAY
+      digitalWrite(PIN_BYPASS_RELAY, LOW);
+#endif
+      DebugTln(F("OT-direct: Monitor mode ON (transparent pass-through, no overrides)"));
+      break;
+  }
+
+  // Persist mode to settings so it survives reboot
+  settings.otd.iMode = (uint8_t)newMode;
+  // Defer write to flash (uses the existing debounce timer)
+  extern bool settingsDirty;
+  settingsDirty = true;
+  RESTART_TIMER(timerFlushSettings);
+}
+
+// ---------------------------------------------------------------------------
+// checkThermostatTimeout — detect thermostat disconnect and apply setback
+// Called once per second from loopOTDirect().
+// ---------------------------------------------------------------------------
+static void checkThermostatTimeout() {
+  if (!otThermostatSeen) return;  // no frame ever received — nothing to time out
+
+  uint32_t elapsed = millis() - otLastThermostatMs;
+  uint32_t timeoutMs = (uint32_t)settings.otd.iSetbackTimeout * 1000UL;
+
+  if (elapsed > timeoutMs) {
+    // Thermostat disconnected
+    if (state.otd.bThermostatConnected) {
+      state.otd.bThermostatConnected = false;
+      DebugTf(PSTR("OT-direct: Thermostat disconnected (no frame for %lus)\r\n"),
+              elapsed / 1000UL);
+    }
+    // Engage setback if in gateway mode and not already active
+    if (otCurrentMode == OTD_MODE_GATEWAY && !otSetbackEngaged) {
+      otSetbackEngaged = true;
+      state.otd.bSetbackActive = true;
+      uint16_t f88 = (uint16_t)((int16_t)(settings.otd.fSetbackTemp * 256.0f));
+      setOverride(1, f88);        // Override TSet (MsgID 1) to setback temp
+      updateWriteCache(1, f88);   // Keep writing it to boiler
+      char tb[8]; dtostrf(settings.otd.fSetbackTemp, 1, 1, tb);
+      DebugTf(PSTR("OT-direct: Setback engaged — TSet overridden to %s°C\r\n"), tb);
+    }
+  } else {
+    state.otd.bThermostatConnected = true;
+    // Release setback when thermostat reconnects
+    if (otSetbackEngaged) {
+      otSetbackEngaged = false;
+      state.otd.bSetbackActive = false;
+      clearOverride(1);           // Release TSet override
+      DebugTln(F("OT-direct: Thermostat reconnected, setback released"));
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Response-path override table — modify boiler responses before forwarding
+// to thermostat. Separate from SR (which intercepts entirely) — these modify
+// the real boiler response data for specific MsgIDs.
+// ---------------------------------------------------------------------------
+struct OTResponseModify {
+  uint8_t  msgId;
+  bool     active;
+  uint16_t value;   // replacement data value (HB:LB)
+};
+static constexpr uint8_t OT_RESPONSE_MODIFY_MAX = 8;
+static OTResponseModify otResponseModifiers[OT_RESPONSE_MODIFY_MAX];
+
+static void setResponseModifier(uint8_t msgId, uint16_t value) {
+  // Find existing or free slot
+  int8_t slot = -1;
+  for (uint8_t i = 0; i < OT_RESPONSE_MODIFY_MAX; i++) {
+    if (otResponseModifiers[i].active && otResponseModifiers[i].msgId == msgId) {
+      slot = i; break;
+    }
+  }
+  if (slot < 0) {
+    for (uint8_t i = 0; i < OT_RESPONSE_MODIFY_MAX; i++) {
+      if (!otResponseModifiers[i].active) { slot = i; break; }
+    }
+  }
+  if (slot < 0) return;  // table full
+  otResponseModifiers[slot].msgId = msgId;
+  otResponseModifiers[slot].value = value;
+  otResponseModifiers[slot].active = true;
+}
+
+static void clearResponseModifier(uint8_t msgId) {
+  for (uint8_t i = 0; i < OT_RESPONSE_MODIFY_MAX; i++) {
+    if (otResponseModifiers[i].active && otResponseModifiers[i].msgId == msgId) {
+      otResponseModifiers[i].active = false;
+      return;
+    }
+  }
+}
+
+// Apply response-path modifications to a boiler response frame before
+// forwarding to thermostat. Returns the (potentially modified) frame.
+static unsigned long applyResponseModifiers(unsigned long response) {
+  uint8_t msgId = (response >> 16) & 0xFF;
+  for (uint8_t i = 0; i < OT_RESPONSE_MODIFY_MAX; i++) {
+    if (otResponseModifiers[i].active && otResponseModifiers[i].msgId == msgId) {
+      response = (response & 0xFFFF0000UL) | otResponseModifiers[i].value;
+      // Recalculate parity (bit 31)
+      response &= 0x7FFFFFFFUL;
+      uint32_t p = response;
+      p ^= (p >> 16); p ^= (p >> 8); p ^= (p >> 4); p ^= (p >> 2); p ^= (p >> 1);
+      if (p & 1) response |= 0x80000000UL;
+      break;
+    }
+  }
+  return response;
 }
 
 // ---------------------------------------------------------------------------
@@ -992,10 +1160,7 @@ void handleOTDirectCommand(const char* buf, int len) {
     if (value[0] == '0') {
       // GW=0 — Bypass mode: thermostat direct to boiler via relay
 #if HAS_BYPASS_RELAY
-      digitalWrite(PIN_BYPASS_RELAY, HIGH);
-      otBypassActive = true;
-      otMonitorMode = false;
-      DebugTln(F("OT-direct: Bypass mode ON (thermostat direct to boiler)"));
+      setOTDirectMode(OTD_MODE_BYPASS);
 #else
       // No bypass relay on this board — reject command
       DebugTln(F("OT-direct: GW=0 not supported (no bypass relay on this board)"));
@@ -1004,20 +1169,10 @@ void handleOTDirectCommand(const char* buf, int len) {
 #endif
     } else if (value[0] == '1') {
       // GW=1 — Gateway mode: full override processing
-#if HAS_BYPASS_RELAY
-      digitalWrite(PIN_BYPASS_RELAY, LOW);
-#endif
-      otBypassActive = false;
-      otMonitorMode = false;
-      DebugTln(F("OT-direct: Gateway mode ON (OT-direct active)"));
+      setOTDirectMode(OTD_MODE_GATEWAY);
     } else if (value[0] == 'M') {
       // GW=M — Monitor mode: transparent pass-through, all frames unmodified
-#if HAS_BYPASS_RELAY
-      digitalWrite(PIN_BYPASS_RELAY, LOW);
-#endif
-      otBypassActive = false;
-      otMonitorMode = true;
-      DebugTln(F("OT-direct: Monitor mode ON (transparent pass-through, no overrides)"));
+      setOTDirectMode(OTD_MODE_MONITOR);
     } else if (value[0] == 'R') {
       DebugTln(F("OT-direct: Resetting OT interfaces"));
       otMaster.end();
@@ -1294,9 +1449,29 @@ void handleOTDirectCommand(const char* buf, int len) {
   // Local storage commands (SB, IT, OH, RS)
   // =====================================================================
 
+  // RM=MsgID:HHHH — Set response modifier (modify boiler→thermostat response data)
+  else if (cmd0 == 'R' && cmd1 == 'M') {
+    unsigned int msgId = 0;
+    unsigned int dataVal = 0;
+    if (sscanf(value, "%u:%x", &msgId, &dataVal) != 2 || msgId > 127) {
+      processOT("BV", 2); return;
+    }
+    setResponseModifier((uint8_t)msgId, (uint16_t)dataVal);
+    synthesizeResponse(buf, value);
+  }
+  // CM=MsgID — Clear response modifier
+  else if (cmd0 == 'C' && cmd1 == 'M') {
+    uint8_t msgId = atoi(value);
+    if (msgId > 127) { processOT("BV", 2); return; }
+    clearResponseModifier(msgId);
+    snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), msgId);
+    synthesizeResponse(buf, rspBuf);
+  }
+
   // SB=xx.x — Setback temperature (used when thermostat disconnects)
   else if (cmd0 == 'S' && cmd1 == 'B') {
     otSetbackTemp = constrain(atof(value), 1.0f, 30.0f);
+    settings.otd.fSetbackTemp = otSetbackTemp;  // persist to settings
     dtostrf(otSetbackTemp, 1, 2, rspBuf);
     synthesizeResponse(buf, rspBuf);
   }

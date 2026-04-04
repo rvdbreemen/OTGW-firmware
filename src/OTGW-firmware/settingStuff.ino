@@ -287,6 +287,12 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATpreseteco"), settings.sat.fPresetEco, true);
   writeJsonFloatKV(file, F("SATpresetaway"), settings.sat.fPresetAway, true);
   writeJsonBoolKV(file, F("SATpwmautoswitch"), settings.sat.bPwmAutoSwitch, true);
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+  // --- OT-direct settings (OTGW32/OT-Thing only) ---
+  writeJsonIntKV(file, F("OTDmode"), settings.otd.iMode, true);
+  writeJsonFloatKV(file, F("OTDsetbacktemp"), settings.otd.fSetbackTemp, true);
+  writeJsonIntKV(file, F("OTDsetbacktimeout"), settings.otd.iSetbackTimeout, true);
+#endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // Ethernet static IP (OTGW32 only)
   writeJsonBoolKV(file, F("ETHstaticip"), settings.eth.bStaticIP, true);
@@ -433,6 +439,12 @@ void readSettings(bool show)
     Debugf(PSTR("Webhook Trigger Bit   : %d\r\n"), settings.webhook.iTriggerBit);
     Debugf(PSTR("Webhook Payload       : %s\r\n"), CSTR(settings.webhook.sPayload));
     Debugf(PSTR("Webhook ContentType   : %s\r\n"), CSTR(settings.webhook.sContentType));
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+    Debugf(PSTR("OTD Mode              : %d\r\n"), settings.otd.iMode);
+    Debugf(PSTR("OTD Setback temp      : "));
+    { char tb[8]; dtostrf(settings.otd.fSetbackTemp, 1, 1, tb); Debugf(PSTR("%s\r\n"), tb); }
+    Debugf(PSTR("OTD Setback timeout   : %d\r\n"), settings.otd.iSetbackTimeout);
+#endif
   }
 
   Debugln(F("-\r\n"));
@@ -685,6 +697,12 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATpreseteco")) == 0)       settings.sat.fPresetEco = constrain(atof(newValue), 10.0f, 22.0f);
   else if (strcasecmp_P(field, PSTR("SATpresetaway")) == 0)      settings.sat.fPresetAway = constrain(atof(newValue), 5.0f, 18.0f);
   else if (strcasecmp_P(field, PSTR("SATpwmautoswitch")) == 0)   settings.sat.bPwmAutoSwitch = EVALBOOLEAN(newValue);
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+  // --- OT-direct settings ---
+  else if (strcasecmp_P(field, PSTR("OTDmode")) == 0)           settings.otd.iMode = constrain(atoi(newValue), 0, 2);
+  else if (strcasecmp_P(field, PSTR("OTDsetbacktemp")) == 0)    settings.otd.fSetbackTemp = constrain(atof(newValue), 1.0f, 30.0f);
+  else if (strcasecmp_P(field, PSTR("OTDsetbacktimeout")) == 0) settings.otd.iSetbackTimeout = constrain(atoi(newValue), 5, 255);
+#endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // Ethernet static IP (OTGW32 only)
   else if (strcasecmp_P(field, PSTR("ETHstaticip")) == 0)       settings.eth.bStaticIP = EVALBOOLEAN(newValue);
