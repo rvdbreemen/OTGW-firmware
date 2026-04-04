@@ -31,3 +31,13 @@ tmpclaude-*
 nul
 plan.md
 .pio
+OT-Thing-master.zip
+OT-Thing-OTGW32.zip
+otgw-6.6.tgz
+OT-Thing-OTGW32/*
+otgw-6.6/*
+OT-Thing-Pkunfazir/*
+OT-Thing-Pkunfazir/.gitignore
+OT-Thing-Pkunfazir/Firmware/.gitignore
+OT-Thing-Pkunfazir/PCB/.gitignore
+OT-Thing-Pkunfazir/Tester PCB/.gitignore
