@@ -552,6 +552,7 @@ struct OTDirectSettingsSection {
   bool    bAutoDetect        = true;  // Auto-detect thermostat presence at boot
   float   fSetbackTemp       = 16.0f; // Setback temp on thermostat disconnect (°C)
   uint8_t iSetbackTimeout    = 30;    // Seconds before thermostat considered disconnected
+  bool    bEnableSlave       = true;  // Enable slave interface in master mode
 };
 #endif
 

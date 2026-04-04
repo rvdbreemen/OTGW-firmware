@@ -293,6 +293,7 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("OTDautodetect"), settings.otd.bAutoDetect, true);
   writeJsonFloatKV(file, F("OTDsetbacktemp"), settings.otd.fSetbackTemp, true);
   writeJsonIntKV(file, F("OTDsetbacktimeout"), settings.otd.iSetbackTimeout, true);
+  writeJsonBoolKV(file, F("OTDenableslave"), settings.otd.bEnableSlave, true);
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // Ethernet static IP (OTGW32 only)
@@ -446,6 +447,7 @@ void readSettings(bool show)
     Debugf(PSTR("OTD Setback temp      : "));
     { char tb[8]; dtostrf(settings.otd.fSetbackTemp, 1, 1, tb); Debugf(PSTR("%s\r\n"), tb); }
     Debugf(PSTR("OTD Setback timeout   : %d\r\n"), settings.otd.iSetbackTimeout);
+    Debugf(PSTR("OTD Enable slave      : %s\r\n"), CBOOLEAN(settings.otd.bEnableSlave));
 #endif
   }
 
@@ -705,6 +707,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("OTDautodetect")) == 0)    settings.otd.bAutoDetect = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDsetbacktemp")) == 0)    settings.otd.fSetbackTemp = constrain(atof(newValue), 1.0f, 30.0f);
   else if (strcasecmp_P(field, PSTR("OTDsetbacktimeout")) == 0) settings.otd.iSetbackTimeout = constrain(atoi(newValue), 5, 255);
+  else if (strcasecmp_P(field, PSTR("OTDenableslave")) == 0)   settings.otd.bEnableSlave = EVALBOOLEAN(newValue);
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // Ethernet static IP (OTGW32 only)

@@ -420,8 +420,16 @@ void initOTDirect() {
   DebugTln(F("OT-direct: Master interface started"));
 
   // 5. Start OpenTherm slave (listens to thermostat)
-  otSlave.begin(slaveISR, handleSlaveRequest);
-  DebugTln(F("OT-direct: Slave interface started"));
+  //    In master mode with slave disabled, skip starting the slave interface.
+  bool startSlave = true;
+  if (otMasterMode && !settings.otd.bEnableSlave) {
+    startSlave = false;
+    DebugTln(F("OT-direct: Slave interface DISABLED (master mode, bEnableSlave=false)"));
+  }
+  if (startSlave) {
+    otSlave.begin(slaveISR, handleSlaveRequest);
+    DebugTln(F("OT-direct: Slave interface started"));
+  }
 
   // 6. Always set OT_DIRECT mode — this is OTGW32 hardware.
   //    Bus liveness is tracked via state.otgw.bOnline, not eMode.
@@ -1074,6 +1082,8 @@ static void setOTDirectMode(OTDirectMode newMode) {
 #if HAS_BYPASS_RELAY
       digitalWrite(PIN_BYPASS_RELAY, LOW);
 #endif
+      // Ensure slave interface is running (may have been stopped in master mode)
+      otSlave.begin(slaveISR, handleSlaveRequest);
       DebugTln(F("OT-direct: Gateway mode ON (OT-direct active, overrides enabled)"));
       break;
 
@@ -1081,6 +1091,8 @@ static void setOTDirectMode(OTDirectMode newMode) {
 #if HAS_BYPASS_RELAY
       digitalWrite(PIN_BYPASS_RELAY, LOW);
 #endif
+      // Ensure slave interface is running (may have been stopped in master mode)
+      otSlave.begin(slaveISR, handleSlaveRequest);
       DebugTln(F("OT-direct: Monitor mode ON (transparent pass-through, no overrides)"));
       break;
 
@@ -1094,7 +1106,14 @@ static void setOTDirectMode(OTDirectMode newMode) {
         state.otd.bSetbackActive = false;
         clearOverride(1);
       }
-      DebugTln(F("OT-direct: Master mode ON (standalone, no thermostat)"));
+      // Start or stop slave interface based on bEnableSlave setting
+      if (settings.otd.bEnableSlave) {
+        otSlave.begin(slaveISR, handleSlaveRequest);
+        DebugTln(F("OT-direct: Master mode ON (slave interface enabled for thermostat)"));
+      } else {
+        otSlave.end();
+        DebugTln(F("OT-direct: Master mode ON (slave interface disabled, pure standalone)"));
+      }
       break;
 
     case OTD_MODE_LOOPBACK:
