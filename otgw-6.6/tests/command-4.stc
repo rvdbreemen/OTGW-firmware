@@ -1,0 +1,11 @@
+test "incomplete command"
+
+load boiler.stc
+load thermostat.stc
+
+go 4000000
+
+Serial.tx = "CS=\r"
+go 5000000
+check {CS: [0-9.]*} {}
+check {(?n)^SE[^\r]*} {SE}

@@ -1,0 +1,10 @@
+test "sensor not connected"
+
+load boiler.stc
+load thermostat.stc
+
+go 3000000
+
+Serial.tx = "GB=7\r"
+go 8000000
+check A601B0000

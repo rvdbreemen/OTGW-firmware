@@ -1,0 +1,127 @@
+# Hide prompts
+sim.verbosity = 0
+
+# Load the OTGW firmware
+load s gateway.cod
+
+Vdd = 3.3
+
+p16f1847.xpos = 72
+p16f1847.ypos = 204
+
+module library libgpsim_modules
+module library libgpsim_otgw
+
+# Set up the serial interface at 9600 baud
+module load usart Serial
+Serial.txbaud = 9600
+Serial.rxbaud = 9600
+Serial.xpos = 84
+Serial.ypos = 384
+Serial.console = true
+
+node SERIAL_rx
+node SERIAL_tx
+attach SERIAL_rx portb5 Serial.RXPIN
+attach SERIAL_tx portb2 Serial.TXPIN
+
+# Connect a simulated boiler
+module load slave Boiler
+Boiler.xpos = 84
+Boiler.ypos = 132
+node SLAVE_tx
+attach SLAVE_tx porta1 Boiler.out
+node SLAVE_rx
+attach SLAVE_rx porta3 Boiler.in
+
+# Connect a simulated thermostat
+module load master Thermostat
+Thermostat.xpos = 84
+Thermostat.ypos = 72
+node MASTER_tx
+attach MASTER_tx porta0 Thermostat.out
+node MASTER_rx
+attach MASTER_rx porta4 Thermostat.in
+
+# Connect the reset pin to RB1
+module load switch RST
+module load pulldown GND
+module load pullup VCC
+module load pullup ResetPullUp
+
+VCC.voltage = Vdd
+ResetPullUp.voltage = Vdd
+
+# Setting the resistance to 0 results in -nanV
+GND.resistance = 0.01
+VCC.resistance = 0.01
+node reset
+node ground
+node supply
+attach reset p16f1847.portb1 p16f1847.MCLR RST.A ResetPullUp.pin
+attach ground GND.pin RST.B
+attach supply VCC.pin
+
+# Define the LEDs
+module load led LA
+module load not InverterA
+module load probe LedA
+module load led LB
+module load not InverterB
+module load probe LedB
+module load led LC
+module load not InverterC
+module load probe LedC
+module load led LD
+module load not InverterD
+module load probe LedD
+node LEDA LEDB LEDC LEDD
+node INVA INVB INVC INVD
+attach LEDA portb3 LA.in InverterA.in0
+attach INVA InverterA.out LedA.in
+attach LEDB portb4 LB.in InverterB.in0
+attach INVB InverterB.out LedB.in
+attach LEDC portb6 LC.in InverterC.in0
+attach INVC InverterC.out LedC.in
+attach LEDD portb7 LD.in InverterB.in0
+attach INVD InverterD.out LedD.in
+
+# Quirk of gpsim: A node must be attached to RA2 for the voltage reference
+# output to appear on the non-inverting inputs of the comparators
+node voltref
+attach voltref porta2
+
+### Helper macros for tcltest
+
+# Add a test description (handled by tcltest)
+test macro description
+endm
+
+# Add a check (handled by tcltest)
+check macro pattern
+endm
+
+# Set a mark as a starting point for future checks
+mark macro
+echo
+echo ### mark
+endm
+
+# Run to a specified cycle
+go macro cycle
+break c cycle
+run
+endm
+
+# Dump the eeprom memory
+eeprom macro check
+echo =============================  EEPROM  DUMP  =============================
+dump e
+echo ==========================================================================
+endm
+
+# Dump the thermostat and boiler reports
+analyze macro
+Thermostat.report
+Boiler.report
+endm

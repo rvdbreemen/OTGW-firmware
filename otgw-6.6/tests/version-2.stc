@@ -1,0 +1,10 @@
+test "pass version from boiler"
+
+load boiler.stc
+load thermostat.stc
+Thermostat.tx = 0x007D0000
+Boiler.response = 0x407D031A
+
+go 5000000
+check B407D031A
+check A.07D.... {}

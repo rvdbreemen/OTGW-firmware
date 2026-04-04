@@ -1,0 +1,17 @@
+test "change reference voltage"
+constraint p16f1847
+
+load boiler.stc
+load thermostat.stc
+
+go 2000000
+
+Serial.tx = "VR=3\r"
+go 3000000
+check {VR: \d+}
+
+Serial.tx = "PR=V\r"
+go 3100000
+check {PR: V=.}
+
+eeprom 0 0x73

@@ -1,0 +1,50 @@
+test "print summary"
+
+load boiler.stc
+Thermostat.tx = 0x80000200
+Thermostat.tx = 0x10010A00
+Thermostat.tx = 0x00060000
+Thermostat.tx = 0x10070F00
+Thermostat.tx = 0x10080500
+Thermostat.tx = 0x900E6400
+Thermostat.tx = 0x000F0000
+Thermostat.tx = 0x90101480
+Thermostat.tx = 0x00110000
+Thermostat.tx = 0x00120000
+Thermostat.tx = 0x80130000
+Thermostat.tx = 0x90171080
+Thermostat.tx = 0x9018146C
+Thermostat.tx = 0x80190000
+Thermostat.tx = 0x801A0000
+Thermostat.tx = 0x101BFCB3
+Thermostat.tx = 0x801C0000
+Thermostat.tx = 0x801F0000
+Thermostat.tx = 0x00210000
+Thermostat.tx = 0x00300000
+Thermostat.tx = 0x80310000
+Thermostat.tx = 0x80380000
+Thermostat.tx = 0x00390000
+Thermostat.tx = 0x80460000
+Thermostat.tx = 0x10470019
+Thermostat.tx = 0x004D0000
+Thermostat.tx = 0x00740000
+Thermostat.tx = 0x80750000
+Thermostat.tx = 0x80760000
+Thermostat.tx = 0x00770000
+Thermostat.tx = 0x00780000
+Thermostat.tx = 0x80790000
+Thermostat.tx = 0x807A0000
+Thermostat.tx = 0x007B0000
+
+go 20000000
+
+# Verify the summary report contains the expected values
+Serial.tx = "PS=1\r"
+go 20500000
+check {PS: 1}
+check {\S+} "00000010/00001100\x2c10.00\x2c00000011/00000011\x2c15.00\x2c5.00\x2c100.00\x2c33/17\x2c20.50\x2c3.50\x2c2.10\x2c2.36\x2c16.50\x2c20.42\x2c43.50\x2c40.20\x2c-3.30\x2c39.50\x2c24.19\x2c-28\x2c60/40\x2c75/20\x2c60.00\x2c50.00\x2c00000011/01000110\x2c25\x2c13\x2c52072\x2c54920\x2c51856\x2c5480\x2c3688\x2c5624\x2c58496\x2c136"
+
+# Messages should be reported again after a PS=0 command
+Serial.tx = "PS=0\r"
+go 25000000
+check {(?w)^B[0-9A-F]{8}$}

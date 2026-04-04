@@ -1,0 +1,15 @@
+test "Write FHB"
+constraint p16f1847
+
+load boiler.stc
+Boiler.TSP = "12: 42, 88, 17"
+load thermostat.stc
+
+go 1500000
+clearalttable
+
+go 3000000
+
+Serial.tx = "TP=13:1=39\r"
+go 40000000
+check "TP: \\S*" "TP: SE"

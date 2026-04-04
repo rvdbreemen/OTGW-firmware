@@ -1,0 +1,19 @@
+test "Query main FHBs"
+
+load boiler.stc
+Boiler.TSP = "12: 42, 88, 17"
+load thermostat.stc
+
+go 1500000
+clearalttable
+
+go 3000000
+
+Serial.tx = "PM=12\r"
+go 30000000
+
+check R.00C.... R000C0000
+check R.00D.... R800D0000
+check R.00D.... R000D0100
+check R.00D.... R000D0200
+check R.00D.... {}

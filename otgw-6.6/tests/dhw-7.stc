@@ -1,0 +1,29 @@
+test "DHW enable override off"
+
+load boiler.stc
+load thermostat.stc
+Thermostat.tx = 0x80380000
+
+go 2000000
+Serial.tx = "UI=27\r"
+# Serial.tx = "UI=28\r"
+
+go 6000000
+Serial.tx = "SW=55.7\r"
+
+go 8000000
+check R.038.... R903837B4
+check A.038.... AC03837B4
+
+# Push the reset button
+RST.state = closed
+go 8100000
+RST.state = open
+
+go 10000000
+
+reg(dhwsetpoint1)
+check {dhwsetpoint1\[0x[[:xdigit:]]+\] = (0x\S+)} 0x37
+reg(dhwsetpoint2)
+check {dhwsetpoint2\[0x[[:xdigit:]]+\] = (0x\S+)} 0xb4
+

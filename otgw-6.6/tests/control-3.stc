@@ -1,0 +1,21 @@
+test "Control setpoint expiry"
+
+load boiler.stc
+load thermostat.stc
+
+go 2000000
+
+Serial.tx = "CS=54.3\r"
+
+go 32000000
+check R.001.... R1001364D
+
+Serial.tx = "SC=21:50/3\r"
+
+go 65000000
+mark
+
+go 74000000
+check T.001.... T10010A00
+check R.001.... {}
+check B.001....

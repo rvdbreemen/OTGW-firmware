@@ -1,0 +1,25 @@
+test "DHW enable override on"
+
+load boiler.stc
+Thermostat.tx = 0x00000000
+Boiler.response = 0xC0000000
+Thermostat.tx = 0x10010A00
+Thermostat.tx = 0x100E0000
+Thermostat.tx = 0x00120000
+Thermostat.tx = 0x80190000
+Thermostat.tx = 0x001B0000
+Thermostat.tx = 0x801C0000
+
+
+go 4000000
+
+Serial.tx = "HW=1\r"
+go 8000000
+check R.000.... R80000200
+
+Serial.tx = "HW=0\r"
+go 10000000
+
+mark
+go 15000000
+check R.000.... {}

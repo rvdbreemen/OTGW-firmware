@@ -1,0 +1,26 @@
+test "outside and return water temperature"
+
+module library libgpsim_extras
+module load DS18B20 sensor
+module load pu pullup
+node GPIOB
+attach GPIOB porta7 pullup.pin sensor.pin 
+pullup.resistance = 4700
+sensor.temperature = 28.2
+
+load boiler.stc
+load thermostat.stc
+
+go 3000000
+
+Serial.tx = "UI=28\r"
+Serial.tx = "TS=R\r"
+Serial.tx = "GB=7\r"
+Serial.tx = "OT=7.6\r"
+go 8000000
+check A401B079A
+check AC01C1C30
+reg(valuestorage+30)
+check {REG[[:xdigit:]]+\[0x[[:xdigit:]]+\] = (0x\S+)} {0x7}
+reg(valuestorage+31)
+check {REG[[:xdigit:]]+\[0x[[:xdigit:]]+\] = (0x\S+)} {0x9a}

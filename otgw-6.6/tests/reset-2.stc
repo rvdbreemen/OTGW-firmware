@@ -1,0 +1,15 @@
+test "Reset by serial command"
+
+load boiler.stc
+load thermostat.stc
+
+go 3000000
+
+Serial.tx = "GW=R\r"
+go 4500000
+go 5000000
+
+Serial.tx = "PR=Q\r"
+go 5100000
+
+check {PR: Q=.} {PR: Q=C}

@@ -1,0 +1,20 @@
+test "BREAK on the serial line"
+
+load boiler.stc
+load thermostat.stc
+
+module load switch BRK
+attach SERIAL_tx BRK.A
+attach ground BRK.B
+
+go 3000000
+BRK.state = closed
+go 3010000
+BRK.state = open
+
+go 5000000
+Serial.tx = "PR=Q\r"
+
+go 5100000
+
+check {PR: Q=.} {PR: Q=S}

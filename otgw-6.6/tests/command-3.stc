@@ -1,0 +1,14 @@
+test "bad commands"
+
+load boiler.stc
+load thermostat.stc
+
+go 4000000
+
+Serial.tx = "CH=2\r"
+go 8000000
+check {CH: \S*} {CH: BV}
+
+Serial.tx = "ZZ=15.3\r"
+go 9000000
+check {ZZ: \S*} {ZZ: NG}

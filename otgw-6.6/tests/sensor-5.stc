@@ -1,0 +1,12 @@
+test "no sensor for return water temperature"
+
+load boiler.stc
+load thermostat.stc
+
+go 3000000
+
+Serial.tx = "UI=28\r"
+Serial.tx = "TS=R\r"
+Serial.tx = "GB=7\r"
+go 8000000
+check AE01C0000

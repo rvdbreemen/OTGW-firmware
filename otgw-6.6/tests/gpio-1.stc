@@ -1,0 +1,32 @@
+test "gpio ports used as digital inputs"
+
+module load probe GA
+module load pullup PullUpA
+module load switch SwitchA
+module load probe GB
+module load pullup PullUpB
+module load switch SwitchB
+node GPIOA GPIOB
+attach ground SwitchA.A SwitchB.A
+attach GPIOA PullUpA.pin SwitchA.B GA.in porta6
+attach GPIOB PullUpB.pin SwitchB.B GB.in porta7
+
+load boiler.stc
+load thermostat.stc
+
+go 2000000
+
+Serial.tx = "PR=I\r"
+go 2100000
+check {PR: I=..} "PR: I=11"
+
+SwitchA.state = closed
+Serial.tx = "PR=I\r"
+go 2200000
+check {PR: I=..} "PR: I=01"
+
+SwitchA.state = open
+SwitchB.state = closed
+Serial.tx = "PR=I\r"
+go 2300000
+check {PR: I=..} "PR: I=10"

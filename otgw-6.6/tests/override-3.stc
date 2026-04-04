@@ -1,0 +1,19 @@
+test "temperature override release"
+
+load boiler.stc
+load override.stc
+
+go 4000000
+check AC0090000 
+
+Serial.tx = "TT=16.1\r"
+go 20000000
+check {TT: 16.10}
+
+Thermostat.setpoint = 20
+go 30000000
+check AC009101A
+check A40640303
+check AC0090000
+LedC.state
+check {LedC = [01]} "LedC = 0"

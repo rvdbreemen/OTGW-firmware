@@ -1,0 +1,14 @@
+test "circuit2 command"
+
+load boiler.stc
+load thermostat.stc
+
+go 4000000
+
+Serial.tx = "C2=45.6\r"
+go 8000000
+check {C2: [0-9.]*} {C2: 45.60}
+
+Serial.tx = "H2=0\r"
+go 9000000
+check {H2: .} {H2: 0}

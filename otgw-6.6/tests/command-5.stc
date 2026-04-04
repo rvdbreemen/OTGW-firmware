@@ -1,0 +1,11 @@
+test "not a valid command"
+
+load boiler.stc
+load thermostat.stc
+
+go 4000000
+
+Serial.tx = "FOO=42\r"
+go 5000000
+check {FOO: [0-9.]*} {}
+check {(?n)^SE[^\r]*} {SE}

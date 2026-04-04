@@ -1,0 +1,30 @@
+test "gpio ports set to ground and vcc"
+
+module load probe GA
+module load probe GB
+node GPIOA GPIOB
+attach GPIOA GA.in porta6
+attach GPIOB GB.in porta7
+
+load boiler.stc
+load thermostat.stc
+
+go 2000000
+
+Serial.tx = "GA=1\r"
+go 2100000
+Serial.tx = "GB=2\r"
+go 2200000
+GA.state
+GB.state
+check {GA = [01]} "GA = 0"
+check {GB = [01]} "GB = 1"
+
+Serial.tx = "GA=2\r"
+go 2300000
+Serial.tx = "GB=1\r"
+go 2400000
+GA.state
+GB.state
+check {GA = [01]} "GA = 1"
+check {GB = [01]} "GB = 0"

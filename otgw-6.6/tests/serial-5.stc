@@ -1,0 +1,20 @@
+test "Summer mode"
+constraint p16f1847
+
+load boiler.stc
+load thermostat.stc
+
+go 2000000
+
+Serial.tx = "SM=1\r"
+go 4000000
+check "SM: 1"
+check R.000.... R00002200
+
+eeprom 14 0x08
+
+Serial.tx = "SM=0\r"
+go 6000000
+
+check "SM: 0"
+check R.000.... {}

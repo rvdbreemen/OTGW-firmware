@@ -1,0 +1,17 @@
+test "DHW enable override off"
+
+load boiler.stc
+load thermostat.stc
+
+go 4000000
+
+Serial.tx = "HW=0\r"
+go 8000000
+check R.000.... R00000000
+
+Serial.tx = "HW=1\r"
+go 10000000
+
+mark
+go 15000000
+check R.000.... {}

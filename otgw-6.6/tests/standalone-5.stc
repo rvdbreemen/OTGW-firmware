@@ -1,0 +1,15 @@
+test "Unknown init commands"
+
+load boiler.stc
+
+# Disconnect the thermostat
+Thermostat.mode = off
+
+go 3000000
+Serial.tx = "UI=48\r"
+
+go 30000000
+check R00060000
+# MessageID 48 should not be sent
+check R00300000 {}
+check R80310000

@@ -1,0 +1,8 @@
+test "basic operation with a thermostat"
+
+load boiler.stc
+load thermostat.stc
+
+go 10000000
+
+analyze

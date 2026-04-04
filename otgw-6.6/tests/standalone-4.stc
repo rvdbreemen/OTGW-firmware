@@ -1,0 +1,13 @@
+test "Unsupported CHsetpoint update"
+
+load boiler.stc
+# Boiler does not support max CHsetpoint update
+Boiler.response = 0xC0060301
+
+# Disconnect the thermostat
+Thermostat.mode = off
+
+go 30000000
+check R00060000
+check R00300000
+check R80310000

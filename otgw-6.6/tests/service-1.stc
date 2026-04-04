@@ -1,0 +1,13 @@
+test "boiler service status indication"
+
+load boiler.stc
+load override.stc
+
+# Boiler indicates fault condition
+Boiler.response = 0x4000020D
+Boiler.response = 0xC005082A
+go 20000000
+
+check B.005.... BC005082A
+LedD.state
+check {LedD = [01]} "LedD = 1"

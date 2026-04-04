@@ -1,0 +1,17 @@
+test "Write TSP"
+constraint p16f1847
+
+load boiler.stc
+Boiler.TSP = "10: 42, 88, 17"
+load thermostat.stc
+
+go 1500000
+clearalttable
+
+go 3000000
+
+Serial.tx = "TP=11:1=39\r"
+go 30000000
+
+check R.00B.... R900B0127
+check R.00B.... {}

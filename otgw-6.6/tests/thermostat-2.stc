@@ -1,0 +1,22 @@
+test "time and date request"
+
+load boiler.stc
+load clock.stc
+
+go 2000000
+
+Serial.tx = "SC=21:50/3\r"
+Serial.tx = "SR=21:1,13\r"
+Serial.tx = "SR=22:7,229\r"
+go 66100000
+check A.014.... A50147532
+check A.014.... AC0147532
+check A.015.... A4015010D
+check A.016.... A401607E5
+
+mark
+go 74000000
+check A.014.... A5014892A
+check A.014.... A60140000
+check A.015.... A4015010D
+check A.016.... A401607E5

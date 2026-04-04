@@ -1,0 +1,12 @@
+test "Power on reset"
+
+load boiler.stc
+load thermostat.stc
+
+go 3000000
+
+Serial.tx = "PR=Q\r"
+
+go 3100000
+
+check {PR: Q=.} {PR: Q=P}

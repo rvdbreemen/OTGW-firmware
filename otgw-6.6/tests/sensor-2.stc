@@ -1,0 +1,29 @@
+test "read DS18B20 temperature sensor"
+
+module library libgpsim_extras
+module load DS18B20 sensor
+module load pu pullup
+node GPIOB
+attach GPIOB porta7 pullup.pin sensor.pin 
+pullup.resistance = 4700
+sensor.temperature = 4.3
+
+load boiler.stc
+load thermostat.stc
+
+go 3000000
+
+Serial.tx = "PR=G\r"
+Serial.tx = "GB=7\r"
+go 8000000
+check A401B0450
+
+sensor.temperature = 5.2
+go 16000000
+check AC01B0530
+
+go 17000000
+reg(valuestorage+30)
+check {REG[[:xdigit:]]+\[0x[[:xdigit:]]+\] = (0x\S+)} {0x5}
+reg(valuestorage+31)
+check {REG[[:xdigit:]]+\[0x[[:xdigit:]]+\] = (0x\S+)} {0x30}

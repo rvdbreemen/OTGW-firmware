@@ -1,0 +1,26 @@
+test "monitor mode with smart power"
+
+load boiler.stc
+load smartpower.stc
+
+go 1200000
+
+Serial.tx = "GW=0\r"
+go 2600000
+Thermostat.power = high
+go 2800000
+check "High power"
+
+Thermostat.power = low
+go 4100000
+check "Low power"
+
+Thermostat.power = medium
+go 4700000
+check "Medium power"
+
+Thermostat.power = low
+go 4900000
+check "Low power"
+
+analyze

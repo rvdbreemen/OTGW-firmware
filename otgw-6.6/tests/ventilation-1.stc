@@ -1,0 +1,19 @@
+test "ventilation control commands"
+
+load boiler.stc
+load thermostat.stc
+# The thermostat requests 20% relative ventilation
+Thermostat.tx = 0x90470014
+
+go 5000000
+check B.047.... B50470014
+
+Serial.tx = "VS=15\r"
+go 10000000
+check "VS: \\S*" "VS: 15"
+check R.047.... R9047000F
+
+Serial.tx = "VS=XX\r"
+go 15000000
+check "VS: \\S*" "VS: -"
+check R.074.... {}

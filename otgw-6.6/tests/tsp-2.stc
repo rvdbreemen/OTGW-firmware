@@ -1,0 +1,19 @@
+test "Query TSPs for ventilation/heat-recovery"
+
+load boiler.stc
+Boiler.TSP = "88: 42, 88, 17"
+load thermostat.stc
+
+go 1500000
+clearalttable
+
+go 3000000
+
+Serial.tx = "PM=88\r"
+go 30000000
+
+check R.058.... R80580000
+check R.059.... R00590000
+check R.059.... R80590100
+check R.059.... R80590200
+check R.059.... {}

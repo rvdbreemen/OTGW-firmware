@@ -1,0 +1,11 @@
+test "basic operation without a thermostat"
+
+load boiler.stc
+
+# Disconnect the thermostat
+Thermostat.mode = off
+
+# Run for 7.5 seconds
+go 7500000
+check {Thermostat disconnected}
+check R00060000

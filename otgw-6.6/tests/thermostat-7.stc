@@ -1,0 +1,9 @@
+test "Convert unknown dataid to ack for MsgID 16"
+
+load boiler.stc
+load thermostat.stc
+Thermostat.tx = 0x10100000
+
+go 10000000
+
+check A.010.... A50101480

@@ -1,0 +1,120 @@
+// File: 16f1847.lkr
+// Modified linker script for the PIC16F1847 processor
+
+LIBPATH .
+
+CODEPAGE   NAME=page0      START=0x0               END=0x7FF                    
+CODEPAGE   NAME=page1      START=0x800             END=0xFFF                    
+CODEPAGE   NAME=page2      START=0x1000            END=0x17FF                   
+CODEPAGE   NAME=page3      START=0x1800            END=0x1FFF                   
+CODEPAGE   NAME=.idlocs    START=0x8000            END=0x8003         PROTECTED 
+CODEPAGE   NAME=.devid     START=0x8006            END=0x8006         PROTECTED 
+CODEPAGE   NAME=.config    START=0x8007            END=0x8008         PROTECTED 
+CODEPAGE   NAME=eedata     START=0xF000            END=0xF0FF         PROTECTED
+
+LINEARMEM  NAME=linear0    START=0x2000            END=0x23EF         PROTECTED
+
+DATABANK   NAME=sfr0       START=0x0               END=0x1F           PROTECTED
+DATABANK   NAME=sfr1       START=0x80              END=0x9F           PROTECTED
+DATABANK   NAME=sfr2       START=0x100             END=0x11F          PROTECTED
+DATABANK   NAME=sfr3       START=0x180             END=0x19F          PROTECTED
+DATABANK   NAME=sfr4       START=0x200             END=0x21F          PROTECTED
+DATABANK   NAME=sfr5       START=0x280             END=0x29F          PROTECTED
+DATABANK   NAME=sfr6       START=0x300             END=0x31F          PROTECTED
+DATABANK   NAME=sfr7       START=0x380             END=0x39F          PROTECTED
+DATABANK   NAME=sfr8       START=0x400             END=0x41F          PROTECTED
+DATABANK   NAME=sfr9       START=0x480             END=0x49F          PROTECTED
+DATABANK   NAME=sfr10      START=0x500             END=0x51F          PROTECTED
+DATABANK   NAME=sfr11      START=0x580             END=0x59F          PROTECTED
+DATABANK   NAME=sfr12      START=0x600             END=0x61F          PROTECTED
+DATABANK   NAME=sfr13      START=0x680             END=0x69F          PROTECTED
+DATABANK   NAME=sfr14      START=0x700             END=0x71F          PROTECTED
+DATABANK   NAME=sfr15      START=0x780             END=0x79F          PROTECTED
+DATABANK   NAME=sfr16      START=0x800             END=0x81F          PROTECTED
+DATABANK   NAME=sfr17      START=0x880             END=0x89F          PROTECTED
+DATABANK   NAME=sfr18      START=0x900             END=0x91F          PROTECTED
+DATABANK   NAME=sfr19      START=0x980             END=0x99F          PROTECTED
+DATABANK   NAME=sfr20      START=0xA00             END=0xA1F          PROTECTED
+DATABANK   NAME=sfr21      START=0xA80             END=0xA9F          PROTECTED
+DATABANK   NAME=sfr22      START=0xB00             END=0xB1F          PROTECTED
+DATABANK   NAME=sfr23      START=0xB80             END=0xB9F          PROTECTED
+DATABANK   NAME=sfr24      START=0xC00             END=0xC1F          PROTECTED
+DATABANK   NAME=sfr25      START=0xC80             END=0xC9F          PROTECTED
+DATABANK   NAME=sfr26      START=0xD00             END=0xD1F          PROTECTED
+DATABANK   NAME=sfr27      START=0xD80             END=0xD9F          PROTECTED
+DATABANK   NAME=sfr28      START=0xE00             END=0xE1F          PROTECTED
+DATABANK   NAME=sfr29      START=0xE80             END=0xE9F          PROTECTED
+DATABANK   NAME=sfr30      START=0xF00             END=0xF1F          PROTECTED
+DATABANK   NAME=sfr31      START=0xF80             END=0xFEF          PROTECTED
+
+DATABANK   NAME=gpr0       START=0x20              END=0x6F           SHADOW=linear0:0x2000
+DATABANK   NAME=gpr1       START=0xA0              END=0xEF           SHADOW=linear0:0x2050
+DATABANK   NAME=gpr2       START=0x120             END=0x16F          SHADOW=linear0:0x20A0
+DATABANK   NAME=gpr3       START=0x1A0             END=0x1EF          SHADOW=linear0:0x20F0
+DATABANK   NAME=gpr4       START=0x220             END=0x26F          SHADOW=linear0:0x2140
+DATABANK   NAME=gpr5       START=0x2A0             END=0x2EF          SHADOW=linear0:0x2190
+DATABANK   NAME=gpr6       START=0x320             END=0x36F          SHADOW=linear0:0x21E0
+DATABANK   NAME=gpr7       START=0x3A0             END=0x3EF          SHADOW=linear0:0x2230
+DATABANK   NAME=gpr8       START=0x420             END=0x46F          SHADOW=linear0:0x2280
+DATABANK   NAME=gpr9       START=0x4A0             END=0x4EF          SHADOW=linear0:0x22D0
+DATABANK   NAME=gpr10      START=0x520             END=0x56F          SHADOW=linear0:0x2320
+DATABANK   NAME=gpr11      START=0x5A0             END=0x5EF          SHADOW=linear0:0x2370
+DATABANK   NAME=gpr12      START=0x620             END=0x64F          SHADOW=linear0:0x23C0
+
+SHAREBANK  NAME=gprnobank  START=0x70            END=0x7F           
+SHAREBANK  NAME=gprnobank  START=0xF0            END=0xFF           PROTECTED
+SHAREBANK  NAME=gprnobank  START=0x170           END=0x17F          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0x1F0           END=0x1FF          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0x270           END=0x27F          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0x2F0           END=0x2FF          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0x370           END=0x37F          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0x3F0           END=0x3FF          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0x470           END=0x47F          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0x4F0           END=0x4FF          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0x570           END=0x57F          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0x5F0           END=0x5FF          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0x670           END=0x67F          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0x6F0           END=0x6FF          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0x770           END=0x77F          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0x7F0           END=0x7FF          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0x870           END=0x87F          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0x8F0           END=0x8FF          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0x970           END=0x97F          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0x9F0           END=0x9FF          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0xA70           END=0xA7F          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0xAF0           END=0xAFF          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0xB70           END=0xB7F          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0xBF0           END=0xBFF          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0xC70           END=0xC7F          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0xCF0           END=0xCFF          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0xD70           END=0xD7F          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0xDF0           END=0xDFF          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0xE70           END=0xE7F          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0xEF0           END=0xEFF          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0xF70           END=0xF7F          PROTECTED
+SHAREBANK  NAME=gprnobank  START=0xFF0           END=0xFFF          PROTECTED
+
+SECTION    NAME=PROG0      ROM=page0           // ROM code space - page0
+SECTION    NAME=PROG1      ROM=page1           // ROM code space - page1
+SECTION    NAME=PROG2      ROM=page2           // ROM code space - page2
+SECTION    NAME=PROG3      ROM=page3           // ROM code space - page3
+SECTION    NAME=IDLOCS     ROM=.idlocs         // ID locations
+SECTION    NAME=DEEPROM    ROM=eedata          // Data EEPROM
+SECTION    NAME=LINEAR0    RAM=linear0         // Linear Memory
+
+// Assign the variables to the appropriate data banks
+SECTION    NAME=Bank0data  RAM=gpr0
+SECTION    NAME=Bank1data  RAM=gpr1
+SECTION    NAME=Bank2data  RAM=gpr2
+SECTION    NAME=Bank3data  RAM=gpr3
+SECTION    NAME=Bank4data  RAM=gpr4
+SECTION    NAME=Bank5data  RAM=gpr5
+SECTION    NAME=Bank6data  RAM=gpr6
+SECTION    NAME=Bank7data  RAM=gpr7
+SECTION    NAME=Bank8data  RAM=gpr8
+SECTION    NAME=Bank9data  RAM=gpr9
+SECTION    NAME=Bank10data RAM=gpr10
+SECTION    NAME=Bank11data RAM=gpr11
+SECTION    NAME=Bank12data RAM=gpr12
+// Make sure that the overlay section ends up in bank 0
+SECTION    NAME=testdata   RAM=gpr0

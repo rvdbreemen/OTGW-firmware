@@ -1,0 +1,31 @@
+test "gpio port B with away function"
+
+module load switch Away
+module load pullup GA
+module load pulldown GB
+node GPIOA GPIOB
+attach supply Away.A
+attach GPIOA GA.pin porta6
+attach GPIOB GB.pin porta7 Away.B
+
+load boiler.stc
+load override.stc
+
+go 2000000
+
+Serial.tx = "GB=6\r"
+Serial.tx = "SB=18.23\r"
+go 10000000
+check {A.009....} AC0090000
+
+mark
+Serial.tx = "PR=S\r"
+Away.state = closed
+go 18000000
+check "PR: S=18.23"
+check {A.009....} A4009123B
+
+mark
+Away.state = open
+go 26000000
+check {A.009....} AC0090000

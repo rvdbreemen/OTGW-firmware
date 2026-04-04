@@ -1,0 +1,11 @@
+test "monitor mode"
+
+load boiler.stc
+load smartpower.stc
+
+go 1200000
+
+Serial.tx = "GW=0\r"
+go 30200000
+
+analyze

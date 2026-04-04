@@ -1,0 +1,36 @@
+test "gpio ports as led E and F"
+
+module load led LE
+module load not InverterE
+module load probe LedE
+module load led LF
+module load not InverterF
+module load probe LedF
+node LEDE INVE LEDF INVF
+attach LEDF porta6 LF.in InverterF.in0
+attach INVF InverterF.out LedF.in
+attach LEDE porta7 LE.in InverterE.in0
+attach INVE InverterE.out LedE.in
+
+load boiler.stc
+load thermostat.stc
+Boiler.response = 0xC000020D
+
+go 2000000
+
+Serial.tx = "GA=4\r"
+Serial.tx = "GB=3\r"
+Serial.tx = "PR=I\r"
+go 2500000
+check {PR: I=[01][01]} "PR: I=01"
+LedE.state
+check {LedE = [01]} "LedE = 0"
+LedF.state
+check {LedF = [01]} "LedF = 1"
+
+Serial.tx = "LE=M\r"
+go 2800000
+LedE.state
+check {LedE = [01]} "LedE = 1"
+LedF.state
+check {LedF = [01]} "LedF = 1"

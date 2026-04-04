@@ -1,0 +1,22 @@
+test "room setpoint override"
+
+constraint p16f1847
+
+load boiler.stc
+load thermostat.stc
+Thermostat.tx = 0x10100000
+Boiler.response = 0xD0100000
+Thermostat.setpoint = 18.5
+
+go 4000000
+check B50101280
+
+Serial.tx = "BS=24.6\r"
+go 10000000
+check {BS: 24.60}
+check R.010.... R1010189A
+
+Serial.tx = "BS=0\r"
+go 14000000
+check {BS: 0.00}
+check R.010.... {}

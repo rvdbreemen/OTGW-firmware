@@ -1,0 +1,20 @@
+test "Query TSPs with thermostat interfering"
+
+load boiler.stc
+Boiler.TSP = "10: 42, 88, 17"
+load thermostat.stc
+Thermostat.tx = 0x000B0200
+
+go 1500000
+clearalttable
+
+go 3000000
+
+Serial.tx = "PM=10\r"
+go 40000000
+
+check R.00A.... R000A0000
+check R.00B.... R800B0000
+check R.00B.... R000B0100
+check R.00B.... R000B0200
+check R.00B.... {}

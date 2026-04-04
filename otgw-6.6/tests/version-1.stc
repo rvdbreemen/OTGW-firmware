@@ -1,0 +1,9 @@
+test "version upgrade"
+
+load boiler.stc
+load thermostat.stc
+Thermostat.tx = 0x007D0000
+Boiler.response = 0xC07D0234
+
+go 5000000
+check AC07D0300

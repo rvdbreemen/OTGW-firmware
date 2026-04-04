@@ -1,0 +1,19 @@
+test "No expiry for control setpoint below 8 degrees"
+
+load boiler.stc
+load thermostat.stc
+
+go 2000000
+
+Serial.tx = "CS=5\r"
+
+go 32000000
+check R.001.... R10010500
+
+go 65000000
+mark
+
+go 74000000
+check T.001.... T10010A00
+check R.001.... R10010500
+check B.001....

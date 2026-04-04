@@ -1,0 +1,24 @@
+test "CS command without a thermostat"
+
+load boiler.stc
+
+# Disconnect the thermostat
+Thermostat.mode = off
+
+go 6000000
+check {Thermostat disconnected}
+# check R.006.... R00060000
+check R.000.... R00000000
+check R.001.... R10010000
+
+Serial.tx = "CS=42.88\r"
+go 15000000
+check "CS: \\S*" "CS: 42.88"
+check R.000.... R80000100
+check R.001.... R90012AE2
+
+Serial.tx = "CS=0\r"
+go 24000000
+check "CS: \\S*" "CS: 0.00"
+check R.000.... R00000000
+check R.001.... R10010000

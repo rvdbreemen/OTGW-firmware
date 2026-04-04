@@ -1,0 +1,20 @@
+test "Operating mode HC1"
+constraint p16f1847
+
+load boiler.stc
+load thermostat.stc
+Thermostat.tx = 0x00630000
+
+go 5000000
+Serial.tx = "MH=2\r"
+
+go 12000000
+check "MH: 2"
+check A.063.... A40630002
+check A.063.... A40630002
+Thermostat.tx = 0x90630000
+
+go 16000000
+check {A[5D]063....} A50630000
+check {A[4C]063....} AC0630000
+

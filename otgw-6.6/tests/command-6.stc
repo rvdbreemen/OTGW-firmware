@@ -1,0 +1,18 @@
+test "floating point parsing"
+
+load boiler.stc
+load thermostat.stc
+
+go 4000000
+
+Serial.tx = "OT=9.999\r"
+go 5000000
+check {OT: \S*} {OT: 10.00}
+
+Serial.tx = "OT=-9.999\r"
+go 6000000
+check {OT: \S*} {OT: -10.00}
+
+Serial.tx = "OT=-0.004\r"
+go 7000000
+check {OT: \S*} {OT: 0.00}

@@ -1,0 +1,14 @@
+test "regular command"
+
+load boiler.stc
+load thermostat.stc
+
+go 4000000
+
+Serial.tx = "GW=1\r"
+go 8000000
+check {GW: .} {GW: 1}
+
+Serial.tx = "PR=M\r"
+go 9000000
+check {PR: M=.} {PR: M=G}

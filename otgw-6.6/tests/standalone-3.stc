@@ -1,0 +1,14 @@
+test "Unsupported init commands"
+
+load boiler.stc
+# Boiler does not support Remote-parameter flags
+Boiler.response = 0xF0060000
+
+# Disconnect the thermostat
+Thermostat.mode = off
+
+go 20000000
+check R00060000
+# MessageIDs 48 and 49 should still be requested
+check R00300000
+check R80310000

@@ -1,0 +1,28 @@
+test "gpio port A with home function"
+
+module load switch Home
+module load pullup GA
+module load pulldown GB
+node GPIOA GPIOB
+attach ground Home.A
+attach GPIOA GA.pin porta6 Home.B
+attach GPIOB GB.pin porta7
+
+load boiler.stc
+load override.stc
+
+go 2000000
+
+Serial.tx = "GA=5\r"
+go 10000000
+check {A.009....} AC0090000
+
+mark
+Home.state = closed
+go 18000000
+check {A.009....} A40091000
+
+mark
+Home.state = open
+go 26000000
+check {A.009....} AC0090000

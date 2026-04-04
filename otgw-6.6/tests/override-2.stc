@@ -1,0 +1,16 @@
+test "temperature override failure"
+
+load boiler.stc
+load override.stc
+
+go 4000000
+check AC0090000 
+
+Serial.tx = "TC=16.2\r"
+go 20000000
+check {TC: 16.20}
+check AC0091034
+check A40640101
+check AC0090000
+LedC.state
+check {LedC = [01]} "LedC = 0"

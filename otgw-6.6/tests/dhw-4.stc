@@ -1,0 +1,33 @@
+test "Manual DHW push"
+constraint p16f1847
+
+load boiler.stc
+load thermostat.stc
+Boiler.response = 0xC0000000
+
+go 1200000
+
+Serial.tx = "UI=27\r"
+Serial.tx = "UI=28\r"
+Serial.tx = "HW=0\r"
+
+go 5000000
+check R.000.... R00000000
+
+Serial.tx = "HW=P\r"
+go 7000000
+check "HW: P"
+check R.063.... R10631000
+check R.000.... {}
+mark
+
+Boiler.response = 0xC0000204
+go 10000000
+
+Boiler.response = 0x4000020C
+go 14000000
+
+Boiler.response = 0x40000200
+go 20000000
+
+check R.000.... R00000000

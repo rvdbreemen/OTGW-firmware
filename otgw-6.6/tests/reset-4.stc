@@ -1,0 +1,13 @@
+test "Stuck in a loop"
+
+load boiler.stc
+Thermostat.tx = 0x00000000
+Thermostat.interval = 1
+
+go 72000000
+
+Serial.tx = "PR=Q\r"
+
+go 72500000
+
+check {PR: Q=.} {PR: Q=L}

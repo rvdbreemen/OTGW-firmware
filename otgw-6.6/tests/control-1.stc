@@ -1,0 +1,17 @@
+test "control setpoint override"
+
+load boiler.stc
+load thermostat.stc
+
+go 4000000
+
+Serial.tx = "CS=49.72\r"
+go 14000000
+check {CS: 49.72}
+check R100131B9
+check R00000300
+
+Serial.tx = "CH=0\r"
+go 24000000
+check {CH: 0}
+check R00000300 ""

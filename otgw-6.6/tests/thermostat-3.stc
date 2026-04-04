@@ -1,0 +1,27 @@
+test "thermostat that uses smart power"
+
+load boiler.stc
+load smartpower.stc
+Thermostat.interval = 1.0
+
+go 2500000
+check AD002010B
+
+Thermostat.power = high
+go 3500000
+check {High power}
+check B4000020C
+
+Thermostat.power = low
+go 9500000
+check {Low power}
+
+Thermostat.power = medium
+go 12500000
+check {Medium power}
+check BC0303C28
+
+Thermostat.power = low
+go 13500000
+check {Low power}
+check B40393200

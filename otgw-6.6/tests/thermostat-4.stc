@@ -1,0 +1,21 @@
+test "on/off thermostat"
+
+load boiler.stc
+
+Thermostat.mode = off
+go 16000000
+check R.000.... R00000000
+check R.001.... R10010000
+
+mark
+Thermostat.mode = on
+go 32000000
+check R.000.... R80000100
+check R.001.... R10014B00
+check R.00E.... R900E6400
+
+mark
+Thermostat.mode = off
+go 48000000
+check R.000.... R00000000
+check R.001.... R10010000

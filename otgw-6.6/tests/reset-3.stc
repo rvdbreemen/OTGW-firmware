@@ -1,0 +1,18 @@
+test "External reset"
+
+load boiler.stc
+load thermostat.stc
+
+go 3000000
+
+# Push the reset button
+RST.state = closed
+go 3100000
+RST.state = open
+
+go 5000000
+
+Serial.tx = "PR=Q\r"
+go 5100000
+
+check {PR: Q=.} {PR: Q=E}

@@ -1,0 +1,34 @@
+test "gpio port for DHW blocking"
+constraint p16f1847
+
+module load probe GA
+module load pullup PullUpA
+module load switch SwitchA
+module load probe GB
+module load pullup PullUpB
+module load switch SwitchB
+node GPIOA GPIOB
+attach ground SwitchA.A SwitchB.A
+attach GPIOA PullUpA.pin SwitchA.B GA.in porta6
+attach GPIOB PullUpB.pin SwitchB.B GB.in porta7
+
+load boiler.stc
+load thermostat.stc
+
+go 2000000
+
+Serial.tx = "GA=8\r"
+go 5000000
+check "GA: 8"
+check R.000.... ""
+
+go 8000000
+mark
+SwitchA.state = closed
+
+go 10000000
+check R.000.... "R00004200"
+SwitchA.state = open
+
+go 12000000
+check R.000.... ""

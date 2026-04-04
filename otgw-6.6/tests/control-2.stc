@@ -1,0 +1,10 @@
+test "Stored max ch update"
+
+load boiler.stc
+load thermostat.stc
+# Load 55.7 into EEPROM MaxCHSetting
+loadee control-2.hex
+
+go 20000000
+
+check R.039.... R103937B4

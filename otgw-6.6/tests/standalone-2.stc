@@ -1,0 +1,25 @@
+test "disconnect and connect a thermostat"
+
+load boiler.stc
+load thermostat.stc
+
+# Run for 5 seconds
+go 5000000
+check {T[19]001....}
+
+# Disconnect the thermostat
+Thermostat.mode = off
+
+# Run for 5 seconds
+go 10000000
+check {Thermostat disconnected}
+check R00060000
+
+# Connect the thermostat
+Thermostat.mode = ot
+load thermostat.stc
+
+# Run for 5 seconds
+go 15000000
+check {Thermostat connected}
+check {T[19]001....}

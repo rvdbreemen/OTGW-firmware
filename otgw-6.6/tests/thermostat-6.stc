@@ -1,0 +1,23 @@
+test "Thermostat detection"
+
+load boiler.stc
+load smartpower.stc
+
+go 2000000
+
+Serial.tx = "PR=R\r"
+go 2200000
+check "PR: R=." "PR: R=I"
+
+Serial.tx = "FT=S\r"
+go 8000000
+check "FT: ." "FT: S"
+check T1002010B
+
+# The manual setting must not be changed when MsgID 2 is received
+Serial.tx = "PR=R\r"
+go 8200000
+check "PR: R=." "PR: R=S"
+
+# Check the setting is stored in EEPROM
+eeprom 0x0d 0x10

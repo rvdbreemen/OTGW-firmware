@@ -1,0 +1,20 @@
+test "pass received override"
+
+load boiler.stc
+load override.stc
+Boiler.response = 0xC0091380
+
+go 10000000
+check BC0091380
+check AC0090000 {}
+
+mark
+Serial.tx = "TT=16.1\r"
+go 20000000
+check AC009101A
+
+mark
+Serial.tx = "TC=0\r"
+go 30000000
+check AC0090000
+check AC0090000 {}

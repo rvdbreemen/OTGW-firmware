@@ -1,0 +1,16 @@
+test "DHW enable override auto"
+
+load boiler.stc
+load thermostat.stc
+Thermostat.tx = 0x00000000
+
+go 2000000
+
+Serial.tx = "HW=0\r"
+go 5000000
+check R.000.... R00000000
+
+Serial.tx = "HW=A\r"
+go 10000000
+check "HW: A"
+check R.000.... {}

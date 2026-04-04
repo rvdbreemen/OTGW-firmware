@@ -1,0 +1,18 @@
+test "DHW blocking"
+constraint p16f1847
+
+load boiler.stc
+load thermostat.stc
+
+go 2000000
+
+Serial.tx = "BW=1\r"
+go 4000000
+check "BW: 1"
+check R.000.... R00004200
+
+Serial.tx = "BW=0\r"
+go 6000000
+
+check "BW: 0"
+check R.000.... {}

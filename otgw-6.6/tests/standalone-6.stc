@@ -1,0 +1,25 @@
+test "standalone with empty alternative list"
+
+load boiler.stc
+
+# Disconnect the thermostat
+Thermostat.mode = off
+
+go 1200000
+clearalttable
+
+go 3000000
+Serial.tx = "HW=1\r"
+
+go 45000000
+check "HW: 1"
+
+# MessageID 0 should always have the DHW enable bit set
+check R.000.... R80000200
+check R.000.... R80000200
+check R.000.... R80000200
+check R.000.... R80000200
+check R.000.... R80000200
+check R.000.... R80000200
+check R.000.... R80000200
+check R.000.... R80000200
