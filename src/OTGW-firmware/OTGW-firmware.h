@@ -344,6 +344,27 @@ inline bool hasOTCommandInterface() {
   return isPICEnabled() || isOTDirectEnabled();
 }
 
+// Returns a PROGMEM string describing the hardware mode for display/MQTT/REST.
+inline const __FlashStringHelper* hardwareModeName() {
+  switch (state.hw.eMode) {
+    case HW_MODE_PIC:        return F("PIC");
+    case HW_MODE_OT_DIRECT:  return F("OT-Direct");
+    case HW_MODE_DEGRADED:   return F("Degraded");
+    default:                 return F("Unknown");
+  }
+}
+
+// Returns a PROGMEM string describing the board variant.
+inline const __FlashStringHelper* boardName() {
+#if defined(BOARD_NODOSHOP_ESP8266)
+  return F("Nodoshop OTGW (ESP8266)");
+#elif defined(BOARD_NODOSHOP_OTGW32)
+  return F("Nodoshop OTGW32 (ESP32-S3)");
+#else
+  return F("Unknown board");
+#endif
+}
+
 #if HAS_PIC
 inline bool isGatewayFirmware() { return strcmp_P(state.pic.sType, PSTR("gateway")) == 0; }
 #else

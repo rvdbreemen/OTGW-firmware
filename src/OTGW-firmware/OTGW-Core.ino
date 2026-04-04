@@ -475,6 +475,10 @@ void sendMQTTversioninfo(){
     sendMQTTData("otgw-pic/firmwaretype", state.pic.sType);
   }
   sendMQTTData("otgw-pic/picavailable", CCONOFF(state.pic.bAvailable));
+
+  // Hardware platform info
+  sendMQTTData(F("otgw-firmware/board"), boardName());
+  sendMQTTData(F("otgw-firmware/hardware_mode"), hardwareModeName());
 }
 
 static void publishBoilerConnectedState()

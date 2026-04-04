@@ -50,6 +50,7 @@
 
 #define HAS_PIC           1
 #define HAS_DIRECT_OT     0
+#define HAS_OLED_CAPABLE  1    // probed at runtime via I2C scan
 
 #define PIN_I2C_SCL       5    // D1
 #define PIN_I2C_SDA       4    // D2

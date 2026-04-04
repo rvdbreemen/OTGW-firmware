@@ -856,7 +856,17 @@ void sendDeviceInfoV2()
     sendJsonMapEntry(F("otgwmode"), !isGatewayFirmware() ? "N/A" : state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
   }
   sendJsonMapEntry(F("otgwsimulation"), state.debug.bOTGWSimulation);
-  
+
+  // Hardware platform details
+  sendJsonMapEntry(F("board"), boardName());
+  sendJsonMapEntry(F("hardwaremode"), hardwareModeName());
+#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
+  sendJsonMapEntry(F("oledpresent"), state.hw.bOLEDPresent);
+#endif
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  sendJsonMapEntry(F("ethernetpresent"), state.hw.bEthernetPresent);
+#endif
+
   sendEndJsonMap(F("device"));
 
 } // sendDeviceInfoV2()

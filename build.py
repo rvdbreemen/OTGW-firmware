@@ -277,6 +277,10 @@ def install_dependencies(project_dir, config_file, target_names):
         "WebSockets@2.3.6"
     ]
 
+    # OLED display support (both ESP8266 and OTGW32 — runtime I2C probe)
+    libraries.append("Adafruit SSD1306@2.5.13")
+    libraries.append("Adafruit GFX Library@1.11.11")
+
     # OTGW32 target needs OpenTherm library for direct GPIO OT (Phunkafizer fork)
     if "otgw32" in target_names:
         libraries.append("https://github.com/Phunkafizer/opentherm_library.git")

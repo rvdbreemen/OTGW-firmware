@@ -172,9 +172,7 @@ void setup() {
   // Runtime peripheral detection (OTGW32: OLED, Ethernet)
   // Wire.begin() was called by initWatchDog() so I2C bus is ready
 #if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
-  Wire.beginTransmission(0x3C);  // Common SSD1306 OLED address
-  state.hw.bOLEDPresent = (Wire.endTransmission() == 0);
-  SetupDebugTf(PSTR("OLED probe at 0x3C: %s\r\n"), state.hw.bOLEDPresent ? "found" : "not found");
+  initOLED();  // Probes I2C 0x3C, initializes display if present, attaches button ISR
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // TODO: SPI probe for W5500 Ethernet — requires SPI pin definitions
@@ -501,6 +499,10 @@ void doBackgroundTasks()
   // to keep thermostat↔boiler traffic alive during WiFi outages.
 #if HAS_DIRECT_OT
   if (isOTDirectEnabled()) loopOTDirect();
+#endif
+
+#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
+  loopOLED();  // Non-blocking OLED refresh (self-guarded if no display)
 #endif
 
   if (WiFi.status() == WL_CONNECTED) {
