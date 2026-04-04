@@ -4553,6 +4553,7 @@ function refreshSettings() {
               if (String(opts[oi][0]) === String(s.value)) opt.selected = true;
               sInput.appendChild(opt);
             }
+            sInput.setAttribute("data-prev-value", String(s.value));
           } else {
             sInput = document.createElement("input");
             sInput.setAttribute("id", key);
@@ -4594,6 +4595,20 @@ function refreshSettings() {
           }
           sInput.addEventListener('change',
             function () {
+              if (fieldName === "otdmode") {
+                var modeWarnings = {
+                  "0": "Bypass mode routes the thermostat directly to the boiler via relay. OT processing, overrides, and logging will stop. Continue?",
+                  "2": "Monitor mode disables all overrides and modifications. Frames pass through unmodified. Continue?",
+                  "3": "Master/Standalone mode assumes no thermostat is connected. The OTGW32 becomes the sole OT master. Continue?",
+                  "4": "Loopback test mode uses simulated boiler data. No real boiler communication will occur. Continue?"
+                };
+                var warning = modeWarnings[this.value];
+                if (warning && !confirm(warning)) {
+                  this.value = this.getAttribute("data-prev-value");
+                  return;
+                }
+                this.setAttribute("data-prev-value", this.value);
+              }
               var inputEl = document.getElementById(fieldName);
               if (inputEl) {
                 inputEl.className = "input-changed";
@@ -4635,6 +4650,9 @@ function refreshSettings() {
             else if (isPasswordPlaceholderField(key) && isHttpPasswordPlaceholder(s.value))
               inputEl.value = getHttpPasswordPlaceholderLength(s.value) > 0 ? s.value : "";
             else inputEl.value = s.value;
+            if (inputEl.hasAttribute("data-prev-value")) {
+              inputEl.setAttribute("data-prev-value", String(s.value));
+            }
           }
         }
       }
