@@ -811,8 +811,16 @@ void sendDeviceInfoV2()
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
   sendJsonMapEntry(F("compiled"), cMsg);
   sendJsonMapEntry(F("hostname"), CSTR(settings.sHostname));
-  sendJsonMapEntry(F("ipaddress"), CSTR(WiFi.localIP().toString()));
-  sendJsonMapEntry(F("macaddress"), CSTR(WiFi.macAddress()));
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  if (state.net.eMode == NET_ETHERNET) {
+    sendJsonMapEntry(F("ipaddress"), CSTR(getEthernetIPString()));
+    sendJsonMapEntry(F("macaddress"), CSTR(getEthernetMACString()));
+  } else
+#endif
+  {
+    sendJsonMapEntry(F("ipaddress"), CSTR(WiFi.localIP().toString()));
+    sendJsonMapEntry(F("macaddress"), CSTR(WiFi.macAddress()));
+  }
   sendJsonMapEntry(F("platform"), F(PLATFORM_NAME));
   sendJsonMapEntry(F("freeheap"), platformFreeHeap());
   sendJsonMapEntry(F("maxfreeblock"), platformMaxFreeBlock());
@@ -836,10 +844,20 @@ void sendDeviceInfoV2()
 
   uint8_t ideMode = platformFlashChipMode();
   sendJsonMapEntry(F("flashchipmode"), flashMode[ideMode < 4 ? ideMode : 4]);
-  sendJsonMapEntry(F("ssid"), CSTR(WiFi.SSID()));
-  sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());
-  sendJsonMapEntry(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
-  sendJsonMapEntry(F("wifiquality_text"), dBmtoQuality(WiFi.RSSI()));
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  if (state.net.eMode == NET_ETHERNET) {
+    sendJsonMapEntry(F("ssid"), F("Wired"));
+    sendJsonMapEntry(F("wifirssi"), 0);
+    sendJsonMapEntry(F("wifiquality"), 100);
+    sendJsonMapEntry(F("wifiquality_text"), F("Wired"));
+  } else
+#endif
+  {
+    sendJsonMapEntry(F("ssid"), CSTR(WiFi.SSID()));
+    sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());
+    sendJsonMapEntry(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
+    sendJsonMapEntry(F("wifiquality_text"), dBmtoQuality(WiFi.RSSI()));
+  }
   sendJsonMapEntry(F("ntpenable"), settings.ntp.bEnable);
   sendJsonMapEntry(F("ntptimezone"), CSTR(settings.ntp.sTimezone));
   sendJsonMapEntry(F("uptime"), upTime());
@@ -860,11 +878,13 @@ void sendDeviceInfoV2()
   // Hardware platform details
   sendJsonMapEntry(F("board"), boardName());
   sendJsonMapEntry(F("hardwaremode"), hardwareModeName());
+  sendJsonMapEntry(F("networkmode"), networkModeName());
 #if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
   sendJsonMapEntry(F("oledpresent"), state.hw.bOLEDPresent);
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   sendJsonMapEntry(F("ethernetpresent"), state.hw.bEthernetPresent);
+  sendJsonMapEntry(F("ethernetlink"), state.net.bEthernetLink);
 #endif
 
   sendEndJsonMap(F("device"));
@@ -1029,6 +1049,7 @@ void sendDeviceTimeV2()
   sendJsonMapEntry(F("otgwsimulation"), state.debug.bOTGWSimulation);
   sendJsonMapEntry(F("freeheap"), platformFreeHeap());
   sendJsonMapEntry(F("maxfreeblock"), platformMaxFreeBlock());
+  sendJsonMapEntry(F("networkmode"), networkModeName());
 
   sendEndJsonMap(F("devtime"));
 

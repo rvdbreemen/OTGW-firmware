@@ -282,8 +282,10 @@ def install_dependencies(project_dir, config_file, target_names):
     libraries.append("Adafruit GFX Library@1.11.11")
 
     # OTGW32 target needs OpenTherm library for direct GPIO OT (Phunkafizer fork)
+    # and EthernetESP32 for W5500 SPI Ethernet support
     if "otgw32" in target_names:
         libraries.append("https://github.com/Phunkafizer/opentherm_library.git")
+        libraries.append("EthernetESP32")
 
     for lib in libraries:
         print_info(f"Installing {lib}...")

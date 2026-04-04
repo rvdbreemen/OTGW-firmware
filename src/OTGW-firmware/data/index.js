@@ -360,6 +360,26 @@ function updateGatewayModeIndicator(value) {
   }
 }
 
+// Network mode indicator (WiFi / Ethernet icon in header)
+var currentNetworkMode = 'WiFi';
+
+function updateNetworkIndicator(mode) {
+  if (!mode) return;
+  currentNetworkMode = mode;
+  var container = document.getElementById('netStatus');
+  var wifiIcon = document.getElementById('netIconWifi');
+  var ethIcon = document.getElementById('netIconEth');
+  var textEl = document.getElementById('netStatusText');
+  if (!container || !wifiIcon || !ethIcon) return;
+
+  var isEth = (mode === 'Ethernet');
+  container.className = 'headercolumn net-status ' + (isEth ? 'net-ethernet' : 'net-wifi');
+  container.title = 'Network: ' + mode;
+  wifiIcon.classList.toggle('hidden', isEth);
+  ethIcon.classList.toggle('hidden', !isEth);
+  if (textEl) textEl.textContent = mode;
+}
+
 function parseGatewayModeValue(modeValue) {
   if (typeof modeValue === 'boolean') return modeValue ? 'gateway' : 'monitor';
   if (typeof modeValue !== 'string') return null;
@@ -3175,6 +3195,7 @@ function refreshDevTime() {
       if (devtime.freeheap !== undefined)    currentFreeHeap = devtime.freeheap;
       if (devtime.maxfreeblock !== undefined) currentMaxFreeBlock = devtime.maxfreeblock;
       updateHeapDisplay();
+      if (devtime.networkmode) updateNetworkIndicator(devtime.networkmode);
 
       if (hasPsmode) {
         if (newPSmode !== isPSmode) {
@@ -3875,6 +3896,7 @@ function refreshDevInfo() {
       applyParsedGatewayMode(parseGatewayModeValue(device.otgwmode));
       applyOTGWSimulationState(device.otgwsimulation);
       applyPICAvailability(device.picavailable, device.otcommandinterface);
+      updateNetworkIndicator(device.networkmode);
 
       const versionEl = document.getElementById('devVersion');
       if (versionEl) versionEl.textContent = version;
@@ -4858,6 +4880,12 @@ var translateFields = [
   , ["flashchipspeed", "Flash Chip Speed (MHz)"]
   , ["flashchipmode", "Flash Mode"]
   , ["boardtype", "Board Type"]
+  , ["board", "Board"]
+  , ["hardwaremode", "Hardware Mode"]
+  , ["networkmode", "Network Transport"]
+  , ["oledpresent", "OLED Display"]
+  , ["ethernetpresent", "Ethernet Hardware"]
+  , ["ethernetlink", "Ethernet Link"]
   , ["ssid", "Wi-Fi Network (SSID)"]
   , ["wifirssi", "Wi-Fi Signal Strength (dBm)"]
   , ["wifiquality", "Wi-Fi Quality (%)"]

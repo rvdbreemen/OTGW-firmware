@@ -330,7 +330,33 @@
     display: table;
     clear: both;
   }
-  
+
+  /* Network status icon in header */
+  .net-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: default;
+  }
+
+  .net-icon {
+    vertical-align: middle;
+    opacity: 0.85;
+    transition: opacity 0.3s ease;
+  }
+
+  .net-icon.hidden {
+    display: none;
+  }
+
+  .net-status-text {
+    font-size: 11px;
+    opacity: 0.7;
+  }
+
+  .net-status.net-wifi .net-icon { color: #4caf50; }
+  .net-status.net-ethernet .net-icon { color: #2196f3; }
+
   /* PIC firmware page */
 .pictable {
   display: table;

@@ -479,6 +479,7 @@ void sendMQTTversioninfo(){
   // Hardware platform info
   sendMQTTData(F("otgw-firmware/board"), boardName());
   sendMQTTData(F("otgw-firmware/hardware_mode"), hardwareModeName());
+  sendMQTTData(F("otgw-firmware/network_mode"), networkModeName());
 }
 
 static void publishBoilerConnectedState()

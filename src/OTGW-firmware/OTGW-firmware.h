@@ -174,10 +174,21 @@ enum OTGWHardwareMode : uint8_t {
   HW_MODE_DEGRADED  = 3,   // Hardware detected but non-functional (OT bus dead, PIC missing)
 };
 
+//===================[ Network Transport — WiFi vs Ethernet ]===================
+enum OTGWNetworkMode : uint8_t {
+  NET_WIFI     = 0,   // Using WiFi (default)
+  NET_ETHERNET = 1,   // Using wired Ethernet (W5500)
+};
+
 struct HardwareSection {       // state.hw — detected hardware capabilities
   OTGWHardwareMode eMode       = HW_MODE_UNKNOWN;
   bool bOLEDPresent            = false;
   bool bEthernetPresent        = false;
+};
+
+struct NetworkSection {        // state.net — active network transport state
+  OTGWNetworkMode eMode        = NET_WIFI;
+  bool bEthernetLink           = false;   // physical link up on W5500
 };
 
 //===================[ Runtime State — transient, never persisted (ADR-051) ]===================
@@ -306,6 +317,7 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
 
 struct OTGWState {
   HardwareSection    hw;          // state.hw.eMode, state.hw.bOLEDPresent
+  NetworkSection     net;         // state.net.eMode, state.net.bEthernetLink
   PICSection         pic;         // state.pic.bAvailable, state.pic.sFwversion
   OTGWProtocol       otgw;        // state.otgw.bOnline, state.otgw.bBoilerState
   MQTTRuntimeSection mqtt;        // state.mqtt.bConnected
@@ -352,6 +364,11 @@ inline const __FlashStringHelper* hardwareModeName() {
     case HW_MODE_DEGRADED:   return F("Degraded");
     default:                 return F("Unknown");
   }
+}
+
+// Returns a PROGMEM string describing the active network transport.
+inline const __FlashStringHelper* networkModeName() {
+  return (state.net.eMode == NET_ETHERNET) ? F("Ethernet") : F("WiFi");
 }
 
 // Returns a PROGMEM string describing the board variant.

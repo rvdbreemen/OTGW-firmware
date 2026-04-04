@@ -91,6 +91,14 @@
 #define PIN_BUTTON        9
 #define PIN_1WIRE         4
 
+// SPI (W5500 Ethernet)
+#define PIN_SPI_CS        14
+#define PIN_SPI_MISO      13
+#define PIN_SPI_MOSI      11
+#define PIN_SPI_SCK       12
+#define PIN_SPI_INT       15   // W5500 interrupt
+#define PIN_SPI_RST       16   // W5500 hardware reset
+
 // Map generic LED names used by existing code
 #define PIN_LED1          PIN_STATUS_LED
 #define PIN_LED2          PIN_OT_RED_LED

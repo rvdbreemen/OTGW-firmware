@@ -175,9 +175,7 @@ void setup() {
   initOLED();  // Probes I2C 0x3C, initializes display if present, attaches button ISR
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-  // TODO: SPI probe for W5500 Ethernet — requires SPI pin definitions
-  state.hw.bEthernetPresent = false;
-  SetupDebugTln(F("Ethernet probe: not yet implemented"));
+  initEthernet();  // Probes W5500 via SPI VERSION register, attempts DHCP if cable present
 #endif
 
   platformResetReason(lastReset, sizeof(lastReset));
@@ -235,6 +233,8 @@ void loopWifi() {
 
   switch (wifiState) {
     case WIFI_IDLE:
+      // When on Ethernet, WiFi is intentionally disconnected — don't reconnect
+      if (state.net.eMode == NET_ETHERNET) break;
       if (WiFi.status() != WL_CONNECTED) {
         DebugTln(F("WiFi: connection lost, starting non-blocking reconnect"));
         wifiRetryCount = 0;
@@ -480,6 +480,12 @@ void doBackgroundTasks()
   // blinkLED/delayms in setup() would otherwise invoke handleMQTT() before
   // startMQTT() sets the 1350-byte buffer, and handleOTGW() before resetOTGW().
   if (!state.bSetupComplete) return;
+  // Ethernet link monitoring + automatic WiFi↔Ethernet failover (OTGW32 only).
+  // Runs before loopWifi() so a transport switch is visible to the WiFi state machine.
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  if (!isFlashing()) loopEthernet();
+#endif
+
   // ADR-047: Non-blocking WiFi reconnect state machine.
   // Guard: skip during any flash operation (ESP or PIC).
   // During Update.write() the ESP8266 suspends flash reads, starving the WiFi
@@ -505,7 +511,10 @@ void doBackgroundTasks()
   loopOLED();  // Non-blocking OLED refresh (self-guarded if no display)
 #endif
 
-  if (WiFi.status() == WL_CONNECTED) {
+  // Network is "up" when WiFi is connected OR when we're on Ethernet
+  bool networkUp = (WiFi.status() == WL_CONNECTED) || (state.net.eMode == NET_ETHERNET);
+
+  if (networkUp) {
     if (state.flash.bESPactive) {
       handleEspFlashBackgroundTasks();
 #if HAS_PIC
