@@ -371,6 +371,30 @@ inline const __FlashStringHelper* networkModeName() {
   return (state.net.eMode == NET_ETHERNET) ? F("Ethernet") : F("WiFi");
 }
 
+//===================[ Unified network helpers ]===================
+// Single API for checking connectivity and retrieving IP/MAC regardless
+// of whether WiFi or Ethernet is the active transport.
+// On ESP8266 the Ethernet branches compile away entirely (HAS_ETH_CAPABLE=0).
+
+inline bool isNetworkUp() {
+  if (state.net.eMode == NET_ETHERNET) return true;  // Ethernet: link was verified by loopEthernet()
+  return (WiFi.status() == WL_CONNECTED);
+}
+
+inline String getActiveIP() {
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  if (state.net.eMode == NET_ETHERNET) return getEthernetIPString();
+#endif
+  return WiFi.localIP().toString();
+}
+
+inline String getActiveMAC() {
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  if (state.net.eMode == NET_ETHERNET) return getEthernetMACString();
+#endif
+  return WiFi.macAddress();
+}
+
 // Returns a PROGMEM string describing the board variant.
 inline const __FlashStringHelper* boardName() {
 #if defined(BOARD_NODOSHOP_ESP8266)

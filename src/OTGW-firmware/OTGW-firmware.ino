@@ -512,9 +512,7 @@ void doBackgroundTasks()
 #endif
 
   // Network is "up" when WiFi is connected OR when we're on Ethernet
-  bool networkUp = (WiFi.status() == WL_CONNECTED) || (state.net.eMode == NET_ETHERNET);
-
-  if (networkUp) {
+  if (isNetworkUp()) {
     if (state.flash.bESPactive) {
       handleEspFlashBackgroundTasks();
 #if HAS_PIC

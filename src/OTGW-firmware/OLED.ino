@@ -189,19 +189,23 @@ static void drawPageHC2() {
 static void drawPageSystem() {
   drawHeader("System Status");
 
-  // WiFi
+  // Network
   oledDisplay.setCursor(0, 14);
-  if (WiFi.status() == WL_CONNECTED) {
-    oledDisplay.print(F("WiFi: "));
-    // Truncate SSID to fit screen
-    String ssid = WiFi.SSID();
-    if (ssid.length() > 14) ssid = ssid.substring(0, 14);
-    oledDisplay.print(ssid);
+  if (isNetworkUp()) {
+    oledDisplay.print(networkModeName());
+    oledDisplay.print(F(": "));
+    if (state.net.eMode == NET_ETHERNET) {
+      oledDisplay.print(F("Wired"));
+    } else {
+      String ssid = WiFi.SSID();
+      if (ssid.length() > 14) ssid = ssid.substring(0, 14);
+      oledDisplay.print(ssid);
+    }
     oledDisplay.setCursor(0, 24);
     oledDisplay.print(F("IP: "));
-    oledDisplay.print(WiFi.localIP().toString());
+    oledDisplay.print(getActiveIP());
   } else {
-    oledDisplay.print(F("WiFi: not connected"));
+    oledDisplay.print(F("Network: offline"));
   }
 
   // MQTT

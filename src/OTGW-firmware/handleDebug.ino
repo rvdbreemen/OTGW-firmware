@@ -12,8 +12,9 @@ void handleDebug(){
                 Debugf(PSTR("PIC: %s | Type: %s | Version: %s\r\n"), state.pic.sDeviceid, state.pic.sType, state.pic.sFwversion);
                 Debugln();
                 Debugln(F("--- Status ---"));
-                Debugf(PSTR("WiFi: %s | MQTT: %s | OTGW: %s\r\n"), 
-                    (WiFi.status() == WL_CONNECTED) ? "Connected" : "Disconnected",
+                Debugf(PSTR("Network: %s (%s) | MQTT: %s | OTGW: %s\r\n"),
+                    isNetworkUp() ? "Connected" : "Disconnected",
+                    (state.net.eMode == NET_ETHERNET) ? "Ethernet" : "WiFi",
                     CBOOLEAN(state.mqtt.bConnected),
                     CBOOLEAN(state.otgw.bOnline));
                 Debugf(PSTR("Thermostat: %s | Boiler: %s | Gateway Mode: %s\r\n"),

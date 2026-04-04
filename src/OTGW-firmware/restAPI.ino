@@ -811,16 +811,8 @@ void sendDeviceInfoV2()
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
   sendJsonMapEntry(F("compiled"), cMsg);
   sendJsonMapEntry(F("hostname"), CSTR(settings.sHostname));
-#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-  if (state.net.eMode == NET_ETHERNET) {
-    sendJsonMapEntry(F("ipaddress"), CSTR(getEthernetIPString()));
-    sendJsonMapEntry(F("macaddress"), CSTR(getEthernetMACString()));
-  } else
-#endif
-  {
-    sendJsonMapEntry(F("ipaddress"), CSTR(WiFi.localIP().toString()));
-    sendJsonMapEntry(F("macaddress"), CSTR(WiFi.macAddress()));
-  }
+  sendJsonMapEntry(F("ipaddress"), CSTR(getActiveIP()));
+  sendJsonMapEntry(F("macaddress"), CSTR(getActiveMAC()));
   sendJsonMapEntry(F("platform"), F(PLATFORM_NAME));
   sendJsonMapEntry(F("freeheap"), platformFreeHeap());
   sendJsonMapEntry(F("maxfreeblock"), platformMaxFreeBlock());
@@ -844,15 +836,12 @@ void sendDeviceInfoV2()
 
   uint8_t ideMode = platformFlashChipMode();
   sendJsonMapEntry(F("flashchipmode"), flashMode[ideMode < 4 ? ideMode : 4]);
-#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   if (state.net.eMode == NET_ETHERNET) {
     sendJsonMapEntry(F("ssid"), F("Wired"));
     sendJsonMapEntry(F("wifirssi"), 0);
     sendJsonMapEntry(F("wifiquality"), 100);
     sendJsonMapEntry(F("wifiquality_text"), F("Wired"));
-  } else
-#endif
-  {
+  } else {
     sendJsonMapEntry(F("ssid"), CSTR(WiFi.SSID()));
     sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());
     sendJsonMapEntry(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
@@ -902,7 +891,8 @@ void sendHealth()
   sendJsonMapEntry(F("status"), LittleFSmounted ? F("UP") : F("DEGRADED"));
   sendJsonMapEntry(F("uptime"), upTime());
   sendJsonMapEntry(F("heap"), platformFreeHeap());
-  sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());
+  sendJsonMapEntry(F("networkmode"), networkModeName());
+  sendJsonMapEntry(F("wifirssi"), (state.net.eMode == NET_ETHERNET) ? 0 : WiFi.RSSI());
   sendJsonMapEntry(F("mqttconnected"), CBOOLEAN(state.mqtt.bConnected));
   sendJsonMapEntry(F("otgwconnected"), CBOOLEAN(state.otgw.bOnline));
   sendJsonMapEntry(F("picavailable"), CBOOLEAN(state.pic.bAvailable));
