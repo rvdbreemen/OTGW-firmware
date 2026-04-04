@@ -280,6 +280,50 @@ static void clearOverride(uint8_t msgId) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// PIC-compat state variables — declared early because ESP32's Arduino core
+// processes auto-prototypes before variable definitions, unlike ESP8266.
+// ---------------------------------------------------------------------------
+static float   otSetbackTemp     = 16.0f;   // SB= setback temperature
+static uint8_t otIgnoreTransitions = 1;      // IT= (1=ignore, PIC default)
+static uint8_t otOverrideHB      = 0;        // OH= override high byte flag
+static char    otGpioFunctions[3] = "00";    // GA=/GB= function codes
+static char    otLedFunctions[7]  = "XXXXXX";// LA=-LF= config chars
+static uint8_t otVoltageRef      = 5;        // VR= voltage reference digit
+static char    otTempSensor      = 'O';      // TS= temp sensor function
+static char    otForceThermostat = 'A';      // FT= thermostat detection
+static uint8_t otDHWOverride     = 0xFF;     // HW state: 0='0', 1='1', 0xFF='A' (auto)
+
+// SR/CR response override table
+static constexpr uint8_t OT_RESPONSE_OVERRIDE_MAX = 16;
+struct OTResponseOverride {
+  uint8_t  msgId;
+  bool     active;
+  uint16_t value;
+};
+static OTResponseOverride otResponseOverrides[OT_RESPONSE_OVERRIDE_MAX];
+
+// UI/KI unknown-ID table
+static constexpr uint8_t OT_UNKNOWN_ID_MAX = 16;
+static uint8_t otUnknownIds[OT_UNKNOWN_ID_MAX];
+static uint8_t otUnknownIdCount = 0;
+
+static bool isUnknownId(uint8_t msgId) {
+  for (uint8_t i = 0; i < otUnknownIdCount; i++) {
+    if (otUnknownIds[i] == msgId) return true;
+  }
+  return false;
+}
+
+// RM/CM response-path modifier table
+struct OTResponseModify {
+  uint8_t  msgId;
+  bool     active;
+  uint16_t value;
+};
+static constexpr uint8_t OT_RESPONSE_MODIFY_MAX = 8;
+static OTResponseModify otResponseModifiers[OT_RESPONSE_MODIFY_MAX];
+
 // Apply overrides to a thermostat frame before forwarding to boiler.
 // Returns the (potentially modified) frame. If modified, also bridges the
 // original thermostat frame as 'T' and the modified frame as 'R'.
@@ -1050,45 +1094,6 @@ static void synthesizeResponse(const char* cmd, const char* value) {
 }
 
 // ---------------------------------------------------------------------------
-// PIC-emulated local state — stored in RAM, not persisted.
-// These hold values set by PIC configuration commands that have no direct
-// hardware equivalent on OTGW32 but need valid PR= query responses.
-// ---------------------------------------------------------------------------
-static float   otSetbackTemp     = 16.0f;   // SB= setback temperature
-static uint8_t otIgnoreTransitions = 1;      // IT= (1=ignore, PIC default)
-static uint8_t otOverrideHB      = 0;        // OH= override high byte flag
-static char    otGpioFunctions[3] = "00";    // GA=/GB= function codes
-static char    otLedFunctions[7]  = "XXXXXX";// LA=-LF= config chars
-static uint8_t otVoltageRef      = 5;        // VR= voltage reference digit
-static char    otTempSensor      = 'O';      // TS= temp sensor function
-static char    otForceThermostat = 'A';      // FT= thermostat detection
-static uint8_t otDHWOverride     = 0xFF;     // HW state: 0='0', 1='1', 0xFF='A' (auto)
-
-// SR/CR response override table — gateway answers thermostat directly.
-// Separate from the repeater overrides (which modify thermostat→boiler frames).
-// These intercept thermostat READ_DATA and respond without asking the boiler.
-static constexpr uint8_t OT_RESPONSE_OVERRIDE_MAX = 16;
-struct OTResponseOverride {
-  uint8_t  msgId;
-  bool     active;
-  uint16_t value;  // HB:LB response data
-};
-static OTResponseOverride otResponseOverrides[OT_RESPONSE_OVERRIDE_MAX];
-
-// UI/KI unknown-ID table — marks MsgIDs as "unknown" (gateway responds
-// UNKNOWN_DATAID to thermostat instead of forwarding to boiler)
-static constexpr uint8_t OT_UNKNOWN_ID_MAX = 16;
-static uint8_t otUnknownIds[OT_UNKNOWN_ID_MAX];
-static uint8_t otUnknownIdCount = 0;
-
-static bool isUnknownId(uint8_t msgId) {
-  for (uint8_t i = 0; i < otUnknownIdCount; i++) {
-    if (otUnknownIds[i] == msgId) return true;
-  }
-  return false;
-}
-
-// ---------------------------------------------------------------------------
 // clearWriteOverride — helper to clear both write cache and repeater override
 // for a MsgID (used by TT=0, CS=0, etc.)
 // ---------------------------------------------------------------------------
@@ -1267,18 +1272,8 @@ static void handleMasterModeSlaveFrame(unsigned long frame) {
 }
 
 // ---------------------------------------------------------------------------
-// Response-path override table — modify boiler responses before forwarding
-// to thermostat. Separate from SR (which intercepts entirely) — these modify
-// the real boiler response data for specific MsgIDs.
+// Response-path modifier functions (struct/array declared at top of file)
 // ---------------------------------------------------------------------------
-struct OTResponseModify {
-  uint8_t  msgId;
-  bool     active;
-  uint16_t value;   // replacement data value (HB:LB)
-};
-static constexpr uint8_t OT_RESPONSE_MODIFY_MAX = 8;
-static OTResponseModify otResponseModifiers[OT_RESPONSE_MODIFY_MAX];
-
 static void setResponseModifier(uint8_t msgId, uint16_t value) {
   // Find existing or free slot
   int8_t slot = -1;
