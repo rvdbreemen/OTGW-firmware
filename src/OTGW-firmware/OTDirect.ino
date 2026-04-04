@@ -43,12 +43,13 @@ static constexpr uint32_t OT_WRITE_INTERVAL_MS    = 15000;  // Periodic writes e
 // Status flags to send in MsgID 0 (master status byte)
 static uint8_t otMasterStatusFlags = 0x01;  // bit0=CH enable (default on)
 
-// Current operating mode (gateway/monitor/bypass)
+// Current operating mode (gateway/monitor/bypass/master)
 static OTDirectMode otCurrentMode = OTD_MODE_GATEWAY;
 
 // Legacy convenience flags — derived from otCurrentMode for readability
 static bool otBypassActive = false;
 static bool otMonitorMode = false;
+static bool otMasterMode  = false;  // sole OT master, no thermostat expected
 
 // Thermostat connectivity tracking — detect disconnect and apply setback
 static bool     otThermostatSeen    = false;   // at least one frame received since boot
@@ -301,6 +302,12 @@ static void updateWriteCache(uint8_t msgId, uint16_t value) {
   }
 }
 
+// Raw boiler response cache — indexed by MsgID (0-127).
+// Updated on every successful boiler response, used by master mode to
+// respond to thermostat READ_DATA with real boiler values.
+static uint16_t otBoilerCache[128] = { 0 };
+static bool     otBoilerCacheValid[128] = { false };
+
 // Async state tracking for non-blocking OT requests
 static bool     otMasterRequestActive = false;   // true while waiting for boiler response
 static unsigned long otLastSentRequest = 0;      // frame we sent (for bridge logging)
@@ -373,6 +380,7 @@ void initOTDirect() {
 #endif
   otBypassActive = (otCurrentMode == OTD_MODE_BYPASS);
   otMonitorMode  = (otCurrentMode == OTD_MODE_MONITOR);
+  otMasterMode   = (otCurrentMode == OTD_MODE_MASTER);
 
   // Initialize bypass relay hardware
 #if HAS_BYPASS_RELAY
@@ -387,9 +395,12 @@ void initOTDirect() {
   // Restore setback temp from settings to local variable
   otSetbackTemp = settings.otd.fSetbackTemp;
 
-  DebugTf(PSTR("OT-direct: Mode=%d (%s)\r\n"), (int)otCurrentMode,
-          otCurrentMode == OTD_MODE_GATEWAY ? "gateway" :
-          otCurrentMode == OTD_MODE_MONITOR ? "monitor" : "bypass");
+  {
+    const char* modeNames[] = { "bypass", "gateway", "monitor", "master" };
+    uint8_t modeIdx = (uint8_t)otCurrentMode;
+    DebugTf(PSTR("OT-direct: Mode=%d (%s)\r\n"), modeIdx,
+            modeIdx <= 3 ? modeNames[modeIdx] : "unknown");
+  }
 
   // 2. Enable step-up converter
   enableStepUp();
@@ -493,6 +504,35 @@ void initOTDirect() {
 
     DebugTln(F("OT-direct: Protocol handshake complete"));
   }
+
+  // 9. Auto-detect thermostat presence (if enabled and mode is gateway)
+  //    Wait a few seconds to see if any thermostat frames arrive on the slave bus.
+  //    OpenTherm thermostats send MsgID 0 every ~1 second, so 5 seconds gives
+  //    high confidence. If none seen, switch to master (standalone) mode.
+  if (settings.otd.bAutoDetect && otCurrentMode == OTD_MODE_GATEWAY) {
+    DebugTln(F("OT-direct: Auto-detecting thermostat (5 second window)..."));
+    uint32_t detectStart = millis();
+    bool thermostatFound = false;
+    while ((millis() - detectStart) < 5000UL) {
+      otSlave.process();
+      if (otSlaveFramePending) {
+        thermostatFound = true;
+        DebugTln(F("OT-direct: Thermostat detected!"));
+        otLastThermostatMs = millis();
+        otThermostatSeen = true;
+        state.otd.bThermostatConnected = true;
+        break;
+      }
+      feedWatchDog();
+      delay(50);
+    }
+    if (!thermostatFound) {
+      DebugTln(F("OT-direct: No thermostat detected — switching to master (standalone) mode"));
+      setOTDirectMode(OTD_MODE_MASTER);
+    } else {
+      DebugTln(F("OT-direct: Thermostat present — staying in gateway mode"));
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -516,6 +556,7 @@ void updateOTDirectStatus() {
   state.otd.bBypassActive     = otBypassActive;
   state.otd.bStepUpEnabled    = (digitalRead(PIN_STEPUP_ENABLE) == HIGH);
   state.otd.bMonitorMode      = otMonitorMode;
+  state.otd.bMasterMode       = otMasterMode;
   state.otd.eMode             = otCurrentMode;
   state.otd.iLastThermostatMs = otLastThermostatMs;
 }
@@ -544,6 +585,13 @@ static void handleMasterResponse() {
   if (status == OpenThermResponseStatus::SUCCESS) {
     bridgeFrameToParser('B', response);
     state.otgw.bOnline = true;
+
+    // Cache boiler response data for master mode slave responses
+    {
+      uint8_t cacheId = (response >> 16) & 0x7F;
+      otBoilerCache[cacheId] = response & 0xFFFF;
+      otBoilerCacheValid[cacheId] = true;
+    }
 
     // Self-disabling poll: if boiler responds with UNKNOWN_DATA_ID,
     // disable that MsgID from future scheduled polling (OT-Thing pattern).
@@ -660,10 +708,19 @@ void loopOTDirect() {
   }
 
   // Forward pending thermostat frame when master bus is idle.
+  // Master mode: respond directly with cached boiler values (we ARE the boiler).
   // Monitor mode: forward all frames unmodified — skip UI/SR/override tables.
   // Gateway mode: check UI (unknown-ID) and SR (response override) tables first,
   // then apply repeater-mode value overrides before forwarding to boiler.
-  if (!otMasterRequestActive && otSlaveFramePending) {
+  if (otSlaveFramePending && otMasterMode) {
+    // Master mode: we are the sole OT master — respond to thermostat ourselves.
+    // If a thermostat reconnects while in master mode, we serve it cached data.
+    handleMasterModeSlaveFrame(otSlaveFrame);
+    otSlaveFramePending = false;
+    // If auto-detect is enabled and thermostat appears, notify but stay in master mode.
+    // User can manually switch to gateway mode via GW=1 if they reconnect a thermostat.
+  }
+  else if (!otMasterRequestActive && otSlaveFramePending) {
 
     if (otMonitorMode) {
       // Monitor mode: transparent pass-through — no overrides, no interception
@@ -833,6 +890,7 @@ static void setOTDirectMode(OTDirectMode newMode) {
   otCurrentMode = newMode;
   otBypassActive = (newMode == OTD_MODE_BYPASS);
   otMonitorMode  = (newMode == OTD_MODE_MONITOR);
+  otMasterMode   = (newMode == OTD_MODE_MASTER);
 
   switch (newMode) {
     case OTD_MODE_BYPASS:
@@ -854,6 +912,19 @@ static void setOTDirectMode(OTDirectMode newMode) {
       digitalWrite(PIN_BYPASS_RELAY, LOW);
 #endif
       DebugTln(F("OT-direct: Monitor mode ON (transparent pass-through, no overrides)"));
+      break;
+
+    case OTD_MODE_MASTER:
+#if HAS_BYPASS_RELAY
+      digitalWrite(PIN_BYPASS_RELAY, LOW);
+#endif
+      // In master mode, clear any thermostat-related overrides/setback
+      if (otSetbackEngaged) {
+        otSetbackEngaged = false;
+        state.otd.bSetbackActive = false;
+        clearOverride(1);
+      }
+      DebugTln(F("OT-direct: Master mode ON (standalone, no thermostat)"));
       break;
   }
 
@@ -902,6 +973,65 @@ static void checkThermostatTimeout() {
       DebugTln(F("OT-direct: Thermostat reconnected, setback released"));
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// handleMasterModeSlaveFrame — respond to thermostat as if we ARE the boiler.
+// In master mode (standalone), the gateway is the sole OT master. If a
+// thermostat is connected anyway (or reconnects), we respond with cached
+// boiler values from OTcurrentSystemState so the thermostat sees valid data.
+// ---------------------------------------------------------------------------
+// Helper: build an OT response frame with parity (no library buildResponse needed)
+// type: 4=READ_ACK, 5=WRITE_ACK, 7=UNKNOWN_DATAID
+static unsigned long buildOTResponse(uint8_t type, uint8_t msgId, uint16_t data) {
+  unsigned long resp = ((unsigned long)type << 28) | ((unsigned long)msgId << 16) | data;
+  resp &= 0x7FFFFFFFUL;  // clear parity
+  uint32_t p = resp; p ^= (p >> 16); p ^= (p >> 8); p ^= (p >> 4); p ^= (p >> 2); p ^= (p >> 1);
+  if (p & 1) resp |= 0x80000000UL;
+  return resp;
+}
+
+static void handleMasterModeSlaveFrame(unsigned long frame) {
+  uint8_t msgId = (frame >> 16) & 0xFF;
+  uint8_t msgType = (frame >> 28) & 0x07;
+
+  unsigned long response;
+
+  if (msgType == 0) {
+    // READ_DATA — respond with cached boiler value
+    if (otBoilerCacheValid[msgId & 0x7F]) {
+      response = buildOTResponse(4, msgId, otBoilerCache[msgId & 0x7F]);  // 4 = READ_ACK
+    } else {
+      response = buildOTResponse(7, msgId, 0);  // 7 = UNKNOWN_DATAID (no cached data yet)
+    }
+  }
+  else if (msgType == 1) {
+    // WRITE_DATA — accept and echo back as WRITE_ACK
+    uint16_t dataVal = frame & 0xFFFF;
+    response = buildOTResponse(5, msgId, dataVal);  // 5 = WRITE_ACK
+    // Apply thermostat's TSet as our write cache so scheduler sends it to boiler
+    if (msgId == 1 && dataVal != 0) {
+      setOverride(1, dataVal);
+      updateWriteCache(1, dataVal);
+    }
+    // Apply thermostat's room setpoint
+    if (msgId == 16) {
+      updateWriteCache(16, dataVal);
+    }
+    // Apply thermostat's room temperature
+    if (msgId == 24) {
+      updateWriteCache(24, dataVal);
+    }
+  }
+  else {
+    // Anything else — respond UNKNOWN_DATAID
+    response = buildOTResponse(7, msgId, 0);  // 7 = UNKNOWN_DATAID
+  }
+
+  // Bridge the thermostat frame + our response for logging
+  bridgeFrameToParser('T', frame);
+  bridgeFrameToParser('A', response);
+  otSlave.sendResponse(response);
 }
 
 // ---------------------------------------------------------------------------
@@ -1170,6 +1300,9 @@ void handleOTDirectCommand(const char* buf, int len) {
     } else if (value[0] == '1') {
       // GW=1 — Gateway mode: full override processing
       setOTDirectMode(OTD_MODE_GATEWAY);
+    } else if (value[0] == '2' || value[0] == 'S') {
+      // GW=2 or GW=S — Master/Standalone mode: sole OT master, no thermostat
+      setOTDirectMode(OTD_MODE_MASTER);
     } else if (value[0] == 'M') {
       // GW=M — Monitor mode: transparent pass-through, all frames unmodified
       setOTDirectMode(OTD_MODE_MONITOR);
@@ -1201,11 +1334,12 @@ void handleOTDirectCommand(const char* buf, int len) {
         processOT(prBuf, strlen(prBuf));
         break;
       case 'M':
-        // Gateway mode: G=gateway, M=monitor (transparent), P=passthru (bypass relay)
+        // Gateway mode: G=gateway, M=monitor (transparent), P=passthru (bypass), S=standalone (master)
         {
           char modeChar = 'G';
           if (otBypassActive) modeChar = 'P';
           else if (otMonitorMode) modeChar = 'M';
+          else if (otMasterMode) modeChar = 'S';
           snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: M=%c"), modeChar);
           processOT(prBuf, strlen(prBuf));
         }
@@ -1282,7 +1416,7 @@ void handleOTDirectCommand(const char* buf, int len) {
         processOT(prBuf, strlen(prBuf));
         break;
       case 'N':
-        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: N=0"));   // no standalone mode
+        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: N=%c"), otMasterMode ? '1' : '0');
         processOT(prBuf, strlen(prBuf));
         break;
       case 'V':

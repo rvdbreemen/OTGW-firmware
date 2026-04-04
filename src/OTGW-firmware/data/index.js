@@ -1787,7 +1787,7 @@ function applyOTDirectAvailability(available) {
     else el.classList.add('hidden');
   });
   // Dynamic device info rows
-  var otdDevInfoKeys = ['otdirectavailable', 'otdmode', 'otdbypass', 'otdmonitor', 'otdstepup', 'otdthermostat', 'otdsetback', 'otdschedtotal', 'otdschedactive', 'otdscheddisabled', 'otdoverrides'];
+  var otdDevInfoKeys = ['otdirectavailable', 'otdmode', 'otdbypass', 'otdmonitor', 'otdmaster', 'otdstepup', 'otdthermostat', 'otdsetback', 'otdschedtotal', 'otdschedactive', 'otdscheddisabled', 'otdoverrides'];
   otdDevInfoKeys.forEach(function(key) {
     var row = document.getElementById('devinfo_' + key);
     if (row) {
@@ -4909,6 +4909,7 @@ var translateFields = [
   , ["otdmode", "OT-Direct Mode"]
   , ["otdbypass", "Bypass Relay"]
   , ["otdmonitor", "Monitor Mode"]
+  , ["otdmaster", "Master/Standalone Mode"]
   , ["otdstepup", "24V Step-Up"]
   , ["otdthermostat", "Thermostat Connected"]
   , ["otdsetback", "Setback Active"]

@@ -297,7 +297,8 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
     if (modeStr == F("gateway"))       addOTWGcmdtoqueue("GW=1", 4, true);
     else if (modeStr == F("monitor"))  addOTWGcmdtoqueue("GW=M", 4, true);
     else if (modeStr == F("bypass"))   addOTWGcmdtoqueue("GW=0", 4, true);
-    else { sendApiError(400, F("Invalid mode. Use: gateway, monitor, bypass")); return; }
+    else if (modeStr == F("master"))   addOTWGcmdtoqueue("GW=S", 4, true);
+    else { sendApiError(400, F("Invalid mode. Use: gateway, monitor, bypass, master")); return; }
     // Return current status (mode will be updated by the time response renders)
     sendOTDirectStatus();
   }
@@ -864,10 +865,12 @@ void sendDeviceInfoV2()
       const char* modeStr = "gateway";
       if (state.otd.eMode == OTD_MODE_MONITOR) modeStr = "monitor";
       else if (state.otd.eMode == OTD_MODE_BYPASS) modeStr = "bypass";
+      else if (state.otd.eMode == OTD_MODE_MASTER) modeStr = "master";
       sendJsonMapEntry(F("otdmode"), modeStr);
     }
     sendJsonMapEntry(F("otdbypass"), state.otd.bBypassActive);
     sendJsonMapEntry(F("otdmonitor"), state.otd.bMonitorMode);
+    sendJsonMapEntry(F("otdmaster"), state.otd.bMasterMode);
     sendJsonMapEntry(F("otdstepup"), state.otd.bStepUpEnabled);
     sendJsonMapEntry(F("otdthermostat"), state.otd.bThermostatConnected);
     sendJsonMapEntry(F("otdsetback"), state.otd.bSetbackActive);
@@ -1039,12 +1042,14 @@ void sendOTDirectStatus()
     const char* modeStr = "gateway";
     if (state.otd.eMode == OTD_MODE_MONITOR) modeStr = "monitor";
     else if (state.otd.eMode == OTD_MODE_BYPASS) modeStr = "bypass";
+    else if (state.otd.eMode == OTD_MODE_MASTER) modeStr = "master";
     sendJsonMapEntry(F("mode"),             modeStr);
   }
   // Hardware state
   sendJsonMapEntry(F("bypass"),           state.otd.bBypassActive);
   sendJsonMapEntry(F("stepup"),           state.otd.bStepUpEnabled);
   sendJsonMapEntry(F("monitor_mode"),     state.otd.bMonitorMode);
+  sendJsonMapEntry(F("master_mode"),      state.otd.bMasterMode);
   // Thermostat connectivity
   sendJsonMapEntry(F("thermostat_connected"), state.otd.bThermostatConnected);
   sendJsonMapEntry(F("setback_active"),   state.otd.bSetbackActive);

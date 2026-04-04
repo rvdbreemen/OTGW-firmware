@@ -290,6 +290,7 @@ void writeSettings(bool show)
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings (OTGW32/OT-Thing only) ---
   writeJsonIntKV(file, F("OTDmode"), settings.otd.iMode, true);
+  writeJsonBoolKV(file, F("OTDautodetect"), settings.otd.bAutoDetect, true);
   writeJsonFloatKV(file, F("OTDsetbacktemp"), settings.otd.fSetbackTemp, true);
   writeJsonIntKV(file, F("OTDsetbacktimeout"), settings.otd.iSetbackTimeout, true);
 #endif
@@ -441,6 +442,7 @@ void readSettings(bool show)
     Debugf(PSTR("Webhook ContentType   : %s\r\n"), CSTR(settings.webhook.sContentType));
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
     Debugf(PSTR("OTD Mode              : %d\r\n"), settings.otd.iMode);
+    Debugf(PSTR("OTD Auto-detect       : %s\r\n"), CBOOLEAN(settings.otd.bAutoDetect));
     Debugf(PSTR("OTD Setback temp      : "));
     { char tb[8]; dtostrf(settings.otd.fSetbackTemp, 1, 1, tb); Debugf(PSTR("%s\r\n"), tb); }
     Debugf(PSTR("OTD Setback timeout   : %d\r\n"), settings.otd.iSetbackTimeout);
@@ -699,7 +701,8 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATpwmautoswitch")) == 0)   settings.sat.bPwmAutoSwitch = EVALBOOLEAN(newValue);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings ---
-  else if (strcasecmp_P(field, PSTR("OTDmode")) == 0)           settings.otd.iMode = constrain(atoi(newValue), 0, 2);
+  else if (strcasecmp_P(field, PSTR("OTDmode")) == 0)           settings.otd.iMode = constrain(atoi(newValue), 0, 3);
+  else if (strcasecmp_P(field, PSTR("OTDautodetect")) == 0)    settings.otd.bAutoDetect = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDsetbacktemp")) == 0)    settings.otd.fSetbackTemp = constrain(atof(newValue), 1.0f, 30.0f);
   else if (strcasecmp_P(field, PSTR("OTDsetbacktimeout")) == 0) settings.otd.iSetbackTimeout = constrain(atoi(newValue), 5, 255);
 #endif

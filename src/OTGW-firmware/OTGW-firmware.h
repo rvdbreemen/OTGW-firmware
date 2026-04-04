@@ -214,6 +214,7 @@ enum OTDirectMode : uint8_t {
   OTD_MODE_GATEWAY  = 1,   // Full gateway: scheduler + thermostat forwarding + overrides (default)
   OTD_MODE_MONITOR  = 2,   // Transparent: forward all frames unmodified, log everything
   OTD_MODE_BYPASS   = 0,   // Thermostat direct to boiler via relay, OT-direct inactive
+  OTD_MODE_MASTER   = 3,   // Sole OT master: scheduler only, no thermostat expected
 };
 
 struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime status
@@ -225,6 +226,7 @@ struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime statu
   bool     bStepUpEnabled    = false; // 24V step-up converter on
   bool     bMonitorMode      = false; // true = transparent pass-through, no overrides applied
   OTDirectMode eMode         = OTD_MODE_GATEWAY; // current operating mode
+  bool     bMasterMode       = false;    // true = standalone master, no thermostat
   bool     bThermostatConnected = false; // thermostat recently seen (within timeout)
   bool     bSetbackActive    = false;    // thermostat disconnected → setback override engaged
   uint32_t iLastThermostatMs = 0;        // millis() of last thermostat frame received
@@ -546,6 +548,7 @@ struct SATSection {
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
 struct OTDirectSettingsSection {
   uint8_t iMode              = 1;     // OTD_MODE_GATEWAY default, persisted across reboot
+  bool    bAutoDetect        = true;  // Auto-detect thermostat presence at boot
   float   fSetbackTemp       = 16.0f; // Setback temp on thermostat disconnect (°C)
   uint8_t iSetbackTimeout    = 30;    // Seconds before thermostat considered disconnected
 };

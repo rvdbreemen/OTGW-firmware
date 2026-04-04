@@ -485,10 +485,12 @@ void sendMQTTversioninfo(){
       const char* modeStr = "gateway";
       if (state.otd.eMode == OTD_MODE_MONITOR) modeStr = "monitor";
       else if (state.otd.eMode == OTD_MODE_BYPASS) modeStr = "bypass";
+      else if (state.otd.eMode == OTD_MODE_MASTER) modeStr = "master";
       sendMQTTData(F("otgw-otdirect/mode"), modeStr);
     }
     sendMQTTData(F("otgw-otdirect/bypass"), CCONOFF(state.otd.bBypassActive));
     sendMQTTData(F("otgw-otdirect/monitor_mode"), CCONOFF(state.otd.bMonitorMode));
+    sendMQTTData(F("otgw-otdirect/master_mode"), CCONOFF(state.otd.bMasterMode));
     sendMQTTData(F("otgw-otdirect/stepup"), CCONOFF(state.otd.bStepUpEnabled));
     sendMQTTData(F("otgw-otdirect/thermostat_connected"), CCONOFF(state.otd.bThermostatConnected));
     sendMQTTData(F("otgw-otdirect/setback_active"), CCONOFF(state.otd.bSetbackActive));
