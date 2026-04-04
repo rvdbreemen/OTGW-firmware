@@ -216,6 +216,7 @@ struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime statu
   uint8_t  iOverrideCount    = 0;   // number of active write overrides
   bool     bBypassActive     = false; // true = thermostat direct to boiler (relay)
   bool     bStepUpEnabled    = false; // 24V step-up converter on
+  bool     bMonitorMode      = false; // true = transparent pass-through, no overrides applied
 };
 #endif
 
@@ -429,6 +430,8 @@ inline const __FlashStringHelper* boardName() {
   return F("Nodoshop OTGW (ESP8266)");
 #elif defined(BOARD_NODOSHOP_OTGW32)
   return F("Nodoshop OTGW32 (ESP32-S3)");
+#elif defined(BOARD_SEEGEL_OTTHING)
+  return F("OT-Thing Seegel (ESP32-S3)");
 #else
   return F("Unknown board");
 #endif

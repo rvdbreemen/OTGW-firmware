@@ -481,6 +481,7 @@ void sendMQTTversioninfo(){
   sendMQTTData(F("otgw-otdirect/available"), CCONOFF(isOTDirectEnabled()));
   if (isOTDirectEnabled()) {
     sendMQTTData(F("otgw-otdirect/bypass"), CCONOFF(state.otd.bBypassActive));
+    sendMQTTData(F("otgw-otdirect/monitor_mode"), CCONOFF(state.otd.bMonitorMode));
     sendMQTTData(F("otgw-otdirect/stepup"), CCONOFF(state.otd.bStepUpEnabled));
     char buf[8];
     snprintf_P(buf, sizeof(buf), PSTR("%u"), state.otd.iScheduleActive);

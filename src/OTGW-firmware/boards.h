@@ -20,10 +20,11 @@
 // Build flags should define exactly one BOARD_* macro, e.g.:
 //   -DBOARD_NODOSHOP_ESP8266   (current Nodoshop OTGW with D1 mini + PIC)
 //   -DBOARD_NODOSHOP_OTGW32    (Nodoshop OTGW32 with ESP32-S3, direct GPIO OT)
+//   -DBOARD_SEEGEL_OTTHING     (Seegel OT-Thing with ESP32-S3, direct GPIO OT)
 //
 // When no board is explicitly selected, auto-detect from the platform.
 
-#if !defined(BOARD_NODOSHOP_ESP8266) && !defined(BOARD_NODOSHOP_OTGW32)
+#if !defined(BOARD_NODOSHOP_ESP8266) && !defined(BOARD_NODOSHOP_OTGW32) && !defined(BOARD_SEEGEL_OTTHING)
   #if defined(ESP8266)
     #define BOARD_NODOSHOP_ESP8266
   #elif defined(ESP32)
@@ -33,8 +34,9 @@
 
 // ---- Feature flags --------------------------------------------------------
 // Each board sets these to indicate hardware capabilities.
-// HAS_PIC       — PIC16F co-processor present (UART-based OT gateway)
-// HAS_DIRECT_OT — Direct GPIO OpenTherm via opentherm_library (no PIC)
+// HAS_PIC            — PIC16F co-processor present (UART-based OT gateway)
+// HAS_DIRECT_OT      — Direct GPIO OpenTherm via opentherm_library (no PIC)
+// HAS_BYPASS_RELAY    — Hardware bypass relay present (thermostat direct to boiler)
 
 // ---------------------------------------------------------------------------
 #if defined(BOARD_NODOSHOP_ESP8266)
@@ -69,6 +71,7 @@
 
 #define HAS_PIC           0
 #define HAS_DIRECT_OT     1
+#define HAS_BYPASS_RELAY  0    // GPIO 47 not connected to relay on Nodo OTGW32
 #define HAS_OLED_CAPABLE  1    // probed at runtime via I2C scan
 #define HAS_ETH_CAPABLE   1    // probed at runtime via SPI (W5500)
 
@@ -78,7 +81,6 @@
 #define PIN_OT_SLAVE_IN   6    // OT slave receive (from thermostat)
 #define PIN_OT_SLAVE_OUT  7    // OT slave transmit (to thermostat)
 #define PIN_STEPUP_ENABLE 10   // 24V step-up converter enable
-#define PIN_BYPASS_RELAY  47   // Bypass relay (thermostat direct to boiler)
 
 // I2C (OLED, sensors)
 #define PIN_I2C_SCL       17
@@ -104,8 +106,42 @@
 #define PIN_LED2          PIN_OT_RED_LED
 
 // ---------------------------------------------------------------------------
+#elif defined(BOARD_SEEGEL_OTTHING)
+// ---------------------------------------------------------------------------
+// Seegel OT-Thing — ESP32-S3, direct GPIO OpenTherm (no PIC)
+//
+// Original OT-Thing hardware (non-Nodo variant) by Seegel Systeme.
+// Has a functional bypass relay, no OLED, no W5500 Ethernet.
+// Pin assignments from OT-Thing default (non-NODO) hwdef.h.
+
+#define HAS_PIC           0
+#define HAS_DIRECT_OT     1
+#define HAS_BYPASS_RELAY  1    // Functional bypass relay on GPIO 20
+#define HAS_OLED_CAPABLE  0    // No I2C display on this board
+#define HAS_ETH_CAPABLE   0    // No SPI Ethernet on this board
+
+// OpenTherm GPIO pins
+#define PIN_OT_MASTER_IN  3    // OT master receive (from boiler)
+#define PIN_OT_MASTER_OUT 1    // OT master transmit (to boiler)
+#define PIN_OT_SLAVE_IN   6    // OT slave receive (from thermostat)
+#define PIN_OT_SLAVE_OUT  7    // OT slave transmit (to thermostat)
+#define PIN_STEPUP_ENABLE 10   // 24V step-up converter enable
+#define PIN_BYPASS_RELAY  20   // Bypass relay (thermostat direct to boiler)
+
+// LEDs, button, 1-wire
+#define PIN_STATUS_LED    8
+#define PIN_OT_RED_LED    2
+#define PIN_OT_GREEN_LED  21
+#define PIN_BUTTON        0    // Config button (same as boot button)
+#define PIN_1WIRE         4
+
+// Map generic LED names used by existing code
+#define PIN_LED1          PIN_STATUS_LED
+#define PIN_LED2          PIN_OT_RED_LED
+
+// ---------------------------------------------------------------------------
 #else
-  #error "No board defined. Set BOARD_NODOSHOP_ESP8266 or BOARD_NODOSHOP_OTGW32."
+  #error "No board defined. Set BOARD_NODOSHOP_ESP8266, BOARD_NODOSHOP_OTGW32, or BOARD_SEEGEL_OTTHING."
 #endif
 
 /***************************************************************************

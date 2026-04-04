@@ -830,6 +830,7 @@ void sendDeviceInfoV2()
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   if (isOTDirectEnabled()) {
     sendJsonMapEntry(F("otdbypass"), state.otd.bBypassActive);
+    sendJsonMapEntry(F("otdmonitor"), state.otd.bMonitorMode);
     sendJsonMapEntry(F("otdstepup"), state.otd.bStepUpEnabled);
     sendJsonMapEntry(F("otdschedtotal"), state.otd.iScheduleTotal);
     sendJsonMapEntry(F("otdschedactive"), state.otd.iScheduleActive);
@@ -997,6 +998,7 @@ void sendOTDirectStatus()
   // Hardware state
   sendJsonMapEntry(F("bypass"),           state.otd.bBypassActive);
   sendJsonMapEntry(F("stepup"),           state.otd.bStepUpEnabled);
+  sendJsonMapEntry(F("monitor_mode"),     state.otd.bMonitorMode);
   // Schedule statistics
   sendJsonMapEntry(F("schedule_total"),   state.otd.iScheduleTotal);
   sendJsonMapEntry(F("schedule_active"),  state.otd.iScheduleActive);

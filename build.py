@@ -9,9 +9,10 @@ Requirements:
 - arduino-cli (installed automatically if not found)
 
 Usage:
-    python build.py                      # Full build for ESP8266 + OTGW32 (default)
+    python build.py                      # Full build for all 3 targets (default)
     python build.py --target esp8266     # Build for ESP8266 only
-    python build.py --target otgw32      # Build for OTGW32 (ESP32-S3) only
+    python build.py --target otgw32      # Build for OTGW32 Nodo (ESP32-S3) only
+    python build.py --target otthing     # Build for OT-Thing Seegel (ESP32-S3) only
     python build.py --firmware           # Build firmware only
     python build.py --filesystem         # Build filesystem only
     python build.py --clean              # Clean build artifacts
@@ -68,11 +69,29 @@ TARGETS = {
         "fs_size": 1024000,
     },
     "otgw32": {
-        "name": "OTGW32 (ESP32-S3)",
+        "name": "OTGW32 Nodo (ESP32-S3)",
         "core": "esp32:esp32",
         "board_manager_url": "https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json",
         "fqbn": "esp32:esp32:esp32s3:PartitionScheme=custom",
         "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_NODOSHOP_OTGW32",
+        "chip": "esp32s3",
+        "flash_mode": "dio",
+        "flash_freq": "40m",
+        "flash_size": "4MB",
+        "firmware_offset": "0x10000",
+        "fs_offset": "0x310000",
+        "fs_tool_path": "esp32/tools/mklittlefs",
+        "fs_block": 4096,
+        "fs_page": 256,
+        "fs_size": 786432,       # 0xC0000 — custom OTA partition (768KB LittleFS)
+        "bootloader_offset": "0x0",  # ESP32-S3 bootloader at 0x0
+    },
+    "otthing": {
+        "name": "OT-Thing Seegel (ESP32-S3)",
+        "core": "esp32:esp32",
+        "board_manager_url": "https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json",
+        "fqbn": "esp32:esp32:esp32s3:PartitionScheme=custom",
+        "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_SEEGEL_OTTHING",
         "chip": "esp32s3",
         "flash_mode": "dio",
         "flash_freq": "40m",
@@ -281,11 +300,13 @@ def install_dependencies(project_dir, config_file, target_names):
     libraries.append("Adafruit SSD1306@2.5.13")
     libraries.append("Adafruit GFX Library@1.11.11")
 
-    # OTGW32 target needs OpenTherm library for direct GPIO OT (Phunkafizer fork)
-    # and EthernetESP32 for W5500 SPI Ethernet support
-    if "otgw32" in target_names:
+    # ESP32-S3 targets need OpenTherm library for direct GPIO OT (Phunkafizer fork)
+    esp32_targets = {"otgw32", "otthing"}
+    if esp32_targets & set(target_names):
         libraries.append("https://github.com/Phunkafizer/opentherm_library.git")
-        libraries.append("EthernetESP32")
+        # Only OTGW32 Nodo has W5500 SPI Ethernet
+        if "otgw32" in target_names:
+            libraries.append("EthernetESP32")
 
     for lib in libraries:
         print_info(f"Installing {lib}...")
@@ -909,6 +930,7 @@ def cleanup_temp_directory(project_dir):
 PIO_ENV_MAP = {
     "esp8266": "esp8266",
     "otgw32": "otgw32",
+    "otthing": "otthing",
 }
 
 
@@ -978,7 +1000,7 @@ def collect_pio_artifacts(project_dir, target):
         collected.append(fs_dest)
 
     # ESP32 extras needed for merged binary
-    if target == "otgw32":
+    if target in ("otgw32", "otthing"):
         for extra in ["bootloader.bin", "partitions.bin"]:
             src = pio_build_dir / extra
             if src.exists():
@@ -1022,9 +1044,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python build.py                              # Full build (arduino-cli, default)
+  python build.py                              # Full build, all 3 targets (default)
   python build.py --target esp8266             # ESP8266 (PIC) only
-  python build.py --target otgw32             # OTGW32 (ESP32-S3) only
+  python build.py --target otgw32             # OTGW32 Nodo (ESP32-S3) only
+  python build.py --target otthing            # OT-Thing Seegel (ESP32-S3) only
   python build.py --pio --target esp8266       # ESP8266 with PlatformIO backend
   python build.py --firmware                   # Build firmware only
   python build.py --filesystem                 # Build filesystem only
@@ -1090,9 +1113,9 @@ Examples:
     )
     parser.add_argument(
         "--target",
-        choices=["esp8266", "otgw32", "all"],
+        choices=["esp8266", "otgw32", "otthing", "all"],
         default="all",
-        help="Target platform: esp8266, otgw32, or all (default)"
+        help="Target platform: esp8266, otgw32, otthing, or all (default)"
     )
     parser.add_argument(
         "--no-install-cli",

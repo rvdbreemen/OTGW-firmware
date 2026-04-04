@@ -1787,7 +1787,7 @@ function applyOTDirectAvailability(available) {
     else el.classList.add('hidden');
   });
   // Dynamic device info rows
-  var otdDevInfoKeys = ['otdirectavailable', 'otdbypass', 'otdstepup', 'otdschedtotal', 'otdschedactive', 'otdscheddisabled', 'otdoverrides'];
+  var otdDevInfoKeys = ['otdirectavailable', 'otdbypass', 'otdmonitor', 'otdstepup', 'otdschedtotal', 'otdschedactive', 'otdscheddisabled', 'otdoverrides'];
   otdDevInfoKeys.forEach(function(key) {
     var row = document.getElementById('devinfo_' + key);
     if (row) {
@@ -4907,6 +4907,7 @@ var translateFields = [
   , ["boardtype", "Board Type"]
   , ["otdirectavailable", "OT-Direct Active"]
   , ["otdbypass", "Bypass Relay"]
+  , ["otdmonitor", "Monitor Mode"]
   , ["otdstepup", "24V Step-Up"]
   , ["otdschedtotal", "Poll Schedule Total"]
   , ["otdschedactive", "Poll Schedule Active"]

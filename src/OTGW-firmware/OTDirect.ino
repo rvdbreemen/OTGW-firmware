@@ -44,7 +44,13 @@ static constexpr uint32_t OT_WRITE_INTERVAL_MS    = 15000;  // Periodic writes e
 static uint8_t otMasterStatusFlags = 0x01;  // bit0=CH enable (default on)
 
 // Bypass relay state (GW=0 bypass on, GW=1 gateway mode)
+// Only functional on boards with HAS_BYPASS_RELAY=1 (e.g. Seegel OT-Thing)
 static bool otBypassActive = false;
+
+// Monitor mode flag — transparent pass-through, no overrides applied
+// All thermostat frames forwarded unmodified, all boiler responses returned as-is.
+// Logging/MQTT/WebSocket still active for read-only observation.
+static bool otMonitorMode = false;
 
 // Schedule table: supports both reads and periodic writes.
 // Write entries periodically re-send a cached value to keep the boiler in sync.
@@ -356,11 +362,16 @@ static bool probeOTBus() {
 void initOTDirect() {
   DebugTln(F("OT-direct: Initializing direct GPIO OpenTherm..."));
 
-  // 1. Initialize bypass relay (off = gateway mode)
+  // 1. Initialize bypass relay (off = gateway mode) — only on boards with relay hardware
+#if HAS_BYPASS_RELAY
   pinMode(PIN_BYPASS_RELAY, OUTPUT);
   digitalWrite(PIN_BYPASS_RELAY, LOW);
   otBypassActive = false;
   DebugTln(F("OT-direct: Bypass relay initialized (gateway mode)"));
+#else
+  otBypassActive = false;
+  DebugTln(F("OT-direct: No bypass relay on this board"));
+#endif
 
   // 2. Enable step-up converter
   enableStepUp();
@@ -486,6 +497,7 @@ void updateOTDirectStatus() {
   state.otd.iOverrideCount    = overrides;
   state.otd.bBypassActive     = otBypassActive;
   state.otd.bStepUpEnabled    = (digitalRead(PIN_STEPUP_ENABLE) == HIGH);
+  state.otd.bMonitorMode      = otMonitorMode;
 }
 
 // ---------------------------------------------------------------------------
@@ -618,51 +630,62 @@ void loopOTDirect() {
   }
 
   // Forward pending thermostat frame when master bus is idle.
-  // Check UI (unknown-ID) and SR (response override) tables first.
-  // Apply repeater-mode value overrides before forwarding to boiler.
+  // Monitor mode: forward all frames unmodified — skip UI/SR/override tables.
+  // Gateway mode: check UI (unknown-ID) and SR (response override) tables first,
+  // then apply repeater-mode value overrides before forwarding to boiler.
   if (!otMasterRequestActive && otSlaveFramePending) {
-    uint8_t slaveMsgId = (otSlaveFrame >> 16) & 0xFF;
 
-    // UI table: respond UNKNOWN_DATAID directly, don't forward to boiler
-    if (isUnknownId(slaveMsgId)) {
-      unsigned long unknownResp = (otSlaveFrame & 0x00FF0000UL) | (7UL << 28);  // type=UNKNOWN_DATAID
-      // Recalculate parity
-      unknownResp &= 0x7FFFFFFFUL;
-      uint32_t p = unknownResp; p ^= (p >> 16); p ^= (p >> 8); p ^= (p >> 4); p ^= (p >> 2); p ^= (p >> 1);
-      if (p & 1) unknownResp |= 0x80000000UL;
-      bridgeFrameToParser('T', otSlaveFrame);
-      bridgeFrameToParser('A', unknownResp);
-      otSlave.sendResponse(unknownResp);
-      otSlaveFramePending = false;
-    }
-    // SR table: respond with stored value directly, don't forward to boiler
-    else {
-      bool srHandled = false;
-      for (uint8_t i = 0; i < OT_RESPONSE_OVERRIDE_MAX; i++) {
-        if (otResponseOverrides[i].active && otResponseOverrides[i].msgId == slaveMsgId) {
-          // Build READ_ACK with the stored data value
-          unsigned long srResp = (4UL << 28) | ((unsigned long)slaveMsgId << 16) | otResponseOverrides[i].value;
-          srResp &= 0x7FFFFFFFUL;
-          uint32_t p = srResp; p ^= (p >> 16); p ^= (p >> 8); p ^= (p >> 4); p ^= (p >> 2); p ^= (p >> 1);
-          if (p & 1) srResp |= 0x80000000UL;
-          bridgeFrameToParser('T', otSlaveFrame);
-          bridgeFrameToParser('A', srResp);
-          otSlave.sendResponse(srResp);
-          otSlaveFramePending = false;
-          srHandled = true;
-          break;
-        }
+    if (otMonitorMode) {
+      // Monitor mode: transparent pass-through — no overrides, no interception
+      if (sendMasterRequestAsync(otSlaveFrame, OT_DIRECT_ORIGIN_THERMOSTAT)) {
+        otSlaveFramePending = false;
       }
-      // Normal path: apply value overrides and forward to boiler
-      if (!srHandled) {
-        bool modified = false;
-        unsigned long frameToSend = applyOverrides(otSlaveFrame, modified);
-        if (modified) {
-          bridgeFrameToParser('T', otSlaveFrame);
+    }
+    else {
+      // Gateway mode: full override processing
+      uint8_t slaveMsgId = (otSlaveFrame >> 16) & 0xFF;
+
+      // UI table: respond UNKNOWN_DATAID directly, don't forward to boiler
+      if (isUnknownId(slaveMsgId)) {
+        unsigned long unknownResp = (otSlaveFrame & 0x00FF0000UL) | (7UL << 28);  // type=UNKNOWN_DATAID
+        // Recalculate parity
+        unknownResp &= 0x7FFFFFFFUL;
+        uint32_t p = unknownResp; p ^= (p >> 16); p ^= (p >> 8); p ^= (p >> 4); p ^= (p >> 2); p ^= (p >> 1);
+        if (p & 1) unknownResp |= 0x80000000UL;
+        bridgeFrameToParser('T', otSlaveFrame);
+        bridgeFrameToParser('A', unknownResp);
+        otSlave.sendResponse(unknownResp);
+        otSlaveFramePending = false;
+      }
+      // SR table: respond with stored value directly, don't forward to boiler
+      else {
+        bool srHandled = false;
+        for (uint8_t i = 0; i < OT_RESPONSE_OVERRIDE_MAX; i++) {
+          if (otResponseOverrides[i].active && otResponseOverrides[i].msgId == slaveMsgId) {
+            // Build READ_ACK with the stored data value
+            unsigned long srResp = (4UL << 28) | ((unsigned long)slaveMsgId << 16) | otResponseOverrides[i].value;
+            srResp &= 0x7FFFFFFFUL;
+            uint32_t p = srResp; p ^= (p >> 16); p ^= (p >> 8); p ^= (p >> 4); p ^= (p >> 2); p ^= (p >> 1);
+            if (p & 1) srResp |= 0x80000000UL;
+            bridgeFrameToParser('T', otSlaveFrame);
+            bridgeFrameToParser('A', srResp);
+            otSlave.sendResponse(srResp);
+            otSlaveFramePending = false;
+            srHandled = true;
+            break;
+          }
         }
-        if (sendMasterRequestAsync(frameToSend,
-              modified ? OT_DIRECT_ORIGIN_GATEWAY : OT_DIRECT_ORIGIN_THERMOSTAT)) {
-          otSlaveFramePending = false;
+        // Normal path: apply value overrides and forward to boiler
+        if (!srHandled) {
+          bool modified = false;
+          unsigned long frameToSend = applyOverrides(otSlaveFrame, modified);
+          if (modified) {
+            bridgeFrameToParser('T', otSlaveFrame);
+          }
+          if (sendMasterRequestAsync(frameToSend,
+                modified ? OT_DIRECT_ORIGIN_GATEWAY : OT_DIRECT_ORIGIN_THERMOSTAT)) {
+            otSlaveFramePending = false;
+          }
         }
       }
     }
@@ -967,13 +990,34 @@ void handleOTDirectCommand(const char* buf, int len) {
 
   else if (cmd0 == 'G' && cmd1 == 'W') {
     if (value[0] == '0') {
+      // GW=0 — Bypass mode: thermostat direct to boiler via relay
+#if HAS_BYPASS_RELAY
       digitalWrite(PIN_BYPASS_RELAY, HIGH);
       otBypassActive = true;
+      otMonitorMode = false;
       DebugTln(F("OT-direct: Bypass mode ON (thermostat direct to boiler)"));
+#else
+      // No bypass relay on this board — reject command
+      DebugTln(F("OT-direct: GW=0 not supported (no bypass relay on this board)"));
+      processOT("NG", 2);
+      return;
+#endif
     } else if (value[0] == '1') {
+      // GW=1 — Gateway mode: full override processing
+#if HAS_BYPASS_RELAY
       digitalWrite(PIN_BYPASS_RELAY, LOW);
+#endif
       otBypassActive = false;
+      otMonitorMode = false;
       DebugTln(F("OT-direct: Gateway mode ON (OT-direct active)"));
+    } else if (value[0] == 'M') {
+      // GW=M — Monitor mode: transparent pass-through, all frames unmodified
+#if HAS_BYPASS_RELAY
+      digitalWrite(PIN_BYPASS_RELAY, LOW);
+#endif
+      otBypassActive = false;
+      otMonitorMode = true;
+      DebugTln(F("OT-direct: Monitor mode ON (transparent pass-through, no overrides)"));
     } else if (value[0] == 'R') {
       DebugTln(F("OT-direct: Resetting OT interfaces"));
       otMaster.end();
@@ -1002,9 +1046,14 @@ void handleOTDirectCommand(const char* buf, int len) {
         processOT(prBuf, strlen(prBuf));
         break;
       case 'M':
-        // Gateway mode: G=gateway, M=monitor (bypass)
-        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: M=%c"), otBypassActive ? 'M' : 'G');
-        processOT(prBuf, strlen(prBuf));
+        // Gateway mode: G=gateway, M=monitor (transparent), P=passthru (bypass relay)
+        {
+          char modeChar = 'G';
+          if (otBypassActive) modeChar = 'P';
+          else if (otMonitorMode) modeChar = 'M';
+          snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: M=%c"), modeChar);
+          processOT(prBuf, strlen(prBuf));
+        }
         break;
       case 'O': {
         // Setpoint override: check CS (constant) and TT (temporary)
