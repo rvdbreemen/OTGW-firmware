@@ -375,6 +375,7 @@ static void handleSlaveRequest(unsigned long request, OpenThermResponseStatus st
 // bridgeFrameToParser — format a 32-bit OT frame and feed to processOT()
 // ---------------------------------------------------------------------------
 static void bridgeFrameToParser(char prefix, unsigned long frame) {
+  if (otHideReports) return;  // PS=1 mode: suppress individual frame output
   char buf[10];
   snprintf_P(buf, sizeof(buf), PSTR("%c%08lX"), prefix, frame);
   processOT(buf, 9);
@@ -439,8 +440,12 @@ void initOTDirect() {
   DebugTln(F("OT-direct: No bypass relay on this board"));
 #endif
 
-  // Restore setback temp from settings to local variable
-  otSetbackTemp = settings.otd.fSetbackTemp;
+  // Restore persisted settings to local variables
+  otSetbackTemp     = settings.otd.fSetbackTemp;
+  otSummerMode      = settings.otd.bSummerMode;
+  otFailSafeEnabled = settings.otd.bFailSafe;
+  otMinIntervalMs   = settings.otd.iMsgInterval;
+  if (otSummerMode) otMasterStatusFlags |= 0x20;
 
   {
     const char* modeNames[] = { "bypass", "gateway", "monitor", "master" };
@@ -861,21 +866,49 @@ static void handleMasterResponse() {
       otBoilerCacheValid[cacheId] = true;
     }
 
-    // Self-disabling poll: if boiler responds with UNKNOWN_DATA_ID,
-    // disable that MsgID from future scheduled polling (OT-Thing pattern).
+    // 3-strike auto-blacklist: if boiler responds with UNKNOWN_DATA_ID,
+    // increment 2-bit counter. Disable schedule entry after 3 consecutive unknowns.
     // MsgID 0 (status) is never disabled — it's mandatory.
     OpenThermMessageType respType = OpenTherm::getMessageType(response);
+    uint8_t respMsgId = (response >> 16) & 0xFF;
     if (respType == OpenThermMessageType::UNKNOWN_DATA_ID) {
-      uint8_t msgId = (response >> 16) & 0xFF;
-      if (msgId != 0) {
-        for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
-          if (otSchedule[i].msgId == msgId && !otSchedule[i].disabled) {
-            otSchedule[i].disabled = true;
-            DebugTf(PSTR("OT-direct: MsgID %u disabled (UNKNOWN_DATA_ID)\r\n"), msgId);
-            break;
+      if (respMsgId != 0) {
+        incUnknownCount(respMsgId);
+        if (getUnknownCount(respMsgId) >= 3) {
+          for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
+            if (otSchedule[i].msgId == respMsgId && !otSchedule[i].disabled) {
+              otSchedule[i].disabled = true;
+              DebugTf(PSTR("OT-direct: MsgID %u disabled (3× UNKNOWN_DATA_ID)\r\n"), respMsgId);
+              break;
+            }
           }
         }
       }
+    } else if (respMsgId != 0) {
+      // Successful response — reset unknown counter for this MsgID
+      clearUnknownCount(respMsgId);
+    }
+
+    // DHW push state machine — monitor MsgID 0 boiler responses
+    if (respMsgId == 0 && otDHWPushState != PUSH_IDLE) {
+      uint8_t slaveByte4 = response & 0xFF;
+      if (otDHWPushState == PUSH_PENDING) {
+        if ((slaveByte4 & 0x08) && (slaveByte4 & 0x04)) {  // flame on + DHW mode
+          otDHWPushState = PUSH_STARTED;
+        }
+      } else if (otDHWPushState == PUSH_STARTED) {
+        if (!(slaveByte4 & 0x04)) {  // DHW mode off — push complete
+          otDHWPushState = PUSH_IDLE;
+          otMasterStatusFlags &= ~0x02;  // clear DHW enable
+          otDHWOverride = 0xFF;          // back to auto
+          DebugTln(F("OT-direct: DHW push complete"));
+        }
+      }
+    }
+
+    // PS=1 summary: trigger pending summary after MsgID 0 response
+    if (respMsgId == 0 && otSummaryMode) {
+      otSummaryPending = true;
     }
 
     // If this was a forwarded thermostat frame, send response back
@@ -906,6 +939,9 @@ static void scheduleMasterRequest() {
   if (otMasterRequestActive) return;
 
   uint32_t now = millis();
+
+  // MI= global minimum inter-message gap
+  if ((now - otLastAnySendMs) < otMinIntervalMs) return;
 
   // Pending commands from the ring buffer take priority.
   // Peek first — only dequeue after successful async send (Codex P1 fix).
@@ -949,10 +985,113 @@ static void scheduleMasterRequest() {
 
       if (sendMasterRequestAsync(request, OT_DIRECT_ORIGIN_GATEWAY)) {
         entry.lastSentMs = now;  // Only advance timer on successful send
+        otLastAnySendMs = now;   // MI= inter-message gap tracking
       }
       return;  // One request per call
     }
   } while (otScheduleIdx != startIdx);
+}
+
+// ---------------------------------------------------------------------------
+// emitSummaryLine — PS=1 summary: 34 comma-separated values matching PIC format
+// MsgIDs: 0,1,6,7,8,14,15,16,17,18,19,23,24,25,26,27,28,31,33,48,49,56,57,70,71,77,116-123
+// ---------------------------------------------------------------------------
+static void emitSummaryLine() {
+  // Build summary into a buffer. Max ~34 fields × ~12 chars = ~408 bytes.
+  static char line[420];
+  int pos = 0;
+  OTdataStruct &s = OTcurrentSystemState;
+
+  // Helper: append binary status (BBBBBBBB/BBBBBBBB)
+  auto appendStatus = [&](uint16_t val) {
+    for (int b = 7; b >= 0; b--) pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%c"), (val >> (8 + b)) & 1 ? '1' : '0');
+    line[pos++] = '/';
+    for (int b = 7; b >= 0; b--) pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%c"), (val >> b) & 1 ? '1' : '0');
+  };
+  // Helper: append float (f8.8)
+  auto appendFloat = [&](float val) {
+    char tmp[12]; dtostrf(val, 1, 2, tmp);
+    pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%s"), tmp);
+  };
+  // Helper: append signed float
+  auto appendSigned = [&](float val) {
+    char tmp[12]; dtostrf(val, 1, 2, tmp);
+    if (val >= 0) { line[pos++] = '+'; }
+    pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%s"), tmp);
+  };
+
+  #define COMMA() do { line[pos++] = ','; } while(0)
+
+  // MsgID 0: Status (binary HB/LB)
+  appendStatus(s.Statusflags); COMMA();
+  // MsgID 1: TSet (f8.8)
+  appendFloat(s.TSet); COMMA();
+  // MsgID 6: RBPflags (status)
+  appendStatus(s.RBPflags); COMMA();
+  // MsgID 7: CoolingControl (f8.8)
+  appendFloat(s.CoolingControl); COMMA();
+  // MsgID 8: TsetCH2 (f8.8)
+  appendFloat(s.TsetCH2); COMMA();
+  // MsgID 14: MaxRelModLevelSetting (f8.8)
+  appendFloat(s.MaxRelModLevelSetting); COMMA();
+  // MsgID 15: MaxCapacityMinModLevel (bytes HB,LB)
+  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u,%u"),
+    (s.MaxCapacityMinModLevel >> 8) & 0xFF, s.MaxCapacityMinModLevel & 0xFF); COMMA();
+  // MsgID 16: TrSet (f8.8)
+  appendFloat(s.TrSet); COMMA();
+  // MsgID 17: RelModLevel (f8.8)
+  appendFloat(s.RelModLevel); COMMA();
+  // MsgID 18: CHPressure (f8.8)
+  appendFloat(s.CHPressure); COMMA();
+  // MsgID 19: DHWFlowRate (f8.8)
+  appendFloat(s.DHWFlowRate); COMMA();
+  // MsgID 23: TrSetCH2 (f8.8)
+  appendFloat(s.TrSetCH2); COMMA();
+  // MsgID 24: Tr (f8.8)
+  appendFloat(s.Tr); COMMA();
+  // MsgID 25: Tboiler (f8.8)
+  appendFloat(s.Tboiler); COMMA();
+  // MsgID 26: Tdhw (f8.8)
+  appendFloat(s.Tdhw); COMMA();
+  // MsgID 27: Toutside (signed f8.8)
+  appendSigned(s.Toutside); COMMA();
+  // MsgID 28: Tret (f8.8)
+  appendFloat(s.Tret); COMMA();
+  // MsgID 31: TflowCH2 (f8.8)
+  appendFloat(s.TflowCH2); COMMA();
+  // MsgID 33: Texhaust (signed short)
+  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%d"), s.Texhaust); COMMA();
+  // MsgID 48: TdhwSetUBTdhwSetLB (bytes)
+  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u,%u"),
+    (s.TdhwSetUBTdhwSetLB >> 8) & 0xFF, s.TdhwSetUBTdhwSetLB & 0xFF); COMMA();
+  // MsgID 49: MaxTSetUBMaxTSetLB (bytes)
+  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u,%u"),
+    (s.MaxTSetUBMaxTSetLB >> 8) & 0xFF, s.MaxTSetUBMaxTSetLB & 0xFF); COMMA();
+  // MsgID 56: TdhwSet (f8.8)
+  appendFloat(s.TdhwSet); COMMA();
+  // MsgID 57: MaxTSet (f8.8)
+  appendFloat(s.MaxTSet); COMMA();
+  // MsgID 70: StatusVH (status)
+  appendStatus(s.StatusVH); COMMA();
+  // MsgID 71: RelativeVentilation (low byte)
+  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.RelativeVentilation & 0xFF); COMMA();
+  // MsgID 77: OEMDiagnosticCode → use FanSpeed as proxy for ID77 (exhaust fan speed)
+  // PIC stores raw ID77 value; we use the closest available field
+  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.FanSpeed & 0xFF); COMMA();
+  // MsgID 116-123: counters (unsigned 16-bit)
+  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.BurnerStarts); COMMA();
+  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.CHPumpStarts); COMMA();
+  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.DHWPumpValveStarts); COMMA();
+  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.DHWBurnerStarts); COMMA();
+  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.BurnerOperationHours); COMMA();
+  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.CHPumpOperationHours); COMMA();
+  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.DHWPumpValveOperationHours); COMMA();
+  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.DHWBurnerOperationHours);
+
+  #undef COMMA
+
+  line[pos] = '\0';
+  processOT(line, pos);
 }
 
 // ---------------------------------------------------------------------------
@@ -1047,6 +1186,12 @@ void loopOTDirect() {
     scheduleMasterRequest();
   }
 
+  // PS=1 summary emission
+  if (otSummaryPending) {
+    otSummaryPending = false;
+    emitSummaryLine();
+  }
+
   // Refresh state.otd stats once per second for REST/MQTT
   DECLARE_TIMER_SEC(timerOTDStatus, 1, SKIP_MISSED_TICKS);
   if (DUE(timerOTDStatus)) {
@@ -1091,6 +1236,96 @@ static void synthesizeResponse(char c0, char c1, const char* value) {
 // Convenience: synthesize from the original command buffer (first 2 chars)
 static void synthesizeResponse(const char* cmd, const char* value) {
   synthesizeResponse(cmd[0], cmd[1], value);
+}
+
+// PIC-emulated local state — stored in RAM, not persisted.
+// These hold values set by PIC configuration commands that have no direct
+// hardware equivalent on OTGW32 but need valid PR= query responses.
+// ---------------------------------------------------------------------------
+static float   otSetbackTemp     = 16.0f;   // SB= setback temperature
+static uint8_t otIgnoreTransitions = 1;      // IT= (1=ignore, PIC default)
+static uint8_t otOverrideHB      = 0;        // OH= override high byte flag
+static char    otGpioFunctions[3] = "00";    // GA=/GB= function codes
+static char    otLedFunctions[7]  = "XXXXXX";// LA=-LF= config chars
+static uint8_t otVoltageRef      = 5;        // VR= voltage reference digit
+static char    otTempSensor      = 'O';      // TS= temp sensor function
+static char    otForceThermostat = 'A';      // FT= thermostat detection
+static uint8_t otDHWOverride     = 0xFF;     // HW state: 0='0', 1='1', 0xFF='A' (auto)
+
+// Phase 1: Additional master status flags
+static bool otSummerMode       = false;     // SM= summer mode (bit5 of MsgID 0 master status)
+static bool otDHWBlocking      = false;     // BW= DHW blocking (bit6, not persisted)
+static bool otCoolingEnable    = false;     // CE= cooling enable (bit2, not persisted)
+
+// Phase 2: Operating mode — MsgID 99 (Remote Override Operating Mode)
+static uint8_t otOperModeDHW   = 0;         // MW= lower nibble of byte3
+static uint8_t otOperModeCH1   = 0;         // MH= lower nibble of byte4
+static uint8_t otOperModeCH2   = 0;         // M2= upper nibble of byte4
+
+// Phase 3: Remote request — RR= sends MsgID 4
+// (no state needed, one-shot command)
+
+// Phase 4: Message interval — MI= global minimum inter-message gap
+static uint32_t otMinIntervalMs  = 100;     // default 100ms
+static uint32_t otLastAnySendMs  = 0;       // timestamp of last frame sent
+
+// Phase 5: Fail safety — FS= controls setback on thermostat disconnect
+static bool otFailSafeEnabled    = true;    // default: enabled
+
+// Phase 8: Unknown ID 3-strike auto-blacklist counters (2 bits per MsgID)
+static uint8_t otUnknownCounters[32] = {0}; // 128 MsgIDs × 2 bits = 32 bytes
+
+static uint8_t getUnknownCount(uint8_t msgId) {
+  uint8_t byteIdx = msgId >> 2;
+  uint8_t bitShift = (msgId & 0x03) * 2;
+  return (otUnknownCounters[byteIdx] >> bitShift) & 0x03;
+}
+static void incUnknownCount(uint8_t msgId) {
+  uint8_t byteIdx = msgId >> 2;
+  uint8_t bitShift = (msgId & 0x03) * 2;
+  uint8_t count = (otUnknownCounters[byteIdx] >> bitShift) & 0x03;
+  if (count < 3) {
+    otUnknownCounters[byteIdx] &= ~(0x03 << bitShift);
+    otUnknownCounters[byteIdx] |= ((count + 1) << bitShift);
+  }
+}
+static void clearUnknownCount(uint8_t msgId) {
+  uint8_t byteIdx = msgId >> 2;
+  uint8_t bitShift = (msgId & 0x03) * 2;
+  otUnknownCounters[byteIdx] &= ~(0x03 << bitShift);
+}
+
+// Phase 9: DHW push state machine
+enum DHWPushState : uint8_t { PUSH_IDLE = 0, PUSH_PENDING, PUSH_STARTED };
+static DHWPushState otDHWPushState = PUSH_IDLE;
+
+// Phase 10: PS= summary mode
+static bool otSummaryMode     = false;      // PS=1 active
+static bool otHideReports     = false;      // suppress T/B/R/A frame output
+static bool otSummaryPending  = false;      // summary line ready to emit
+
+// SR/CR response override table — gateway answers thermostat directly.
+// Separate from the repeater overrides (which modify thermostat→boiler frames).
+// These intercept thermostat READ_DATA and respond without asking the boiler.
+static constexpr uint8_t OT_RESPONSE_OVERRIDE_MAX = 16;
+struct OTResponseOverride {
+  uint8_t  msgId;
+  bool     active;
+  uint16_t value;  // HB:LB response data
+};
+static OTResponseOverride otResponseOverrides[OT_RESPONSE_OVERRIDE_MAX];
+
+// UI/KI unknown-ID table — marks MsgIDs as "unknown" (gateway responds
+// UNKNOWN_DATAID to thermostat instead of forwarding to boiler)
+static constexpr uint8_t OT_UNKNOWN_ID_MAX = 16;
+static uint8_t otUnknownIds[OT_UNKNOWN_ID_MAX];
+static uint8_t otUnknownIdCount = 0;
+
+static bool isUnknownId(uint8_t msgId) {
+  for (uint8_t i = 0; i < otUnknownIdCount; i++) {
+    if (otUnknownIds[i] == msgId) return true;
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -1192,8 +1427,8 @@ static void checkThermostatTimeout() {
       DebugTf(PSTR("OT-direct: Thermostat disconnected (no frame for %lus)\r\n"),
               elapsed / 1000UL);
     }
-    // Engage setback if in gateway mode and not already active
-    if (otCurrentMode == OTD_MODE_GATEWAY && !otSetbackEngaged) {
+    // Engage setback if fail-safe enabled and in gateway mode
+    if (otFailSafeEnabled && otCurrentMode == OTD_MODE_GATEWAY && !otSetbackEngaged) {
       otSetbackEngaged = true;
       state.otd.bSetbackActive = true;
       uint16_t f88 = (uint16_t)((int16_t)(settings.otd.fSetbackTemp * 256.0f));
@@ -1466,15 +1701,34 @@ void handleOTDirectCommand(const char* buf, int len) {
   // Status flag commands (immediate effect on MsgID 0 status byte)
   // =====================================================================
 
-  // HW=0/1/A/P — DHW enable (bit1 of master status)
+  // HW=0/1/A/P — DHW enable (bit1 of master status) + DHW push state machine
   else if (cmd0 == 'H' && cmd1 == 'W') {
     char v = value[0];
-    if (v == '1' || v == 'P') {
+    if (v == 'P') {
+      // DHW push: enable DHW + start push state machine
+      otMasterStatusFlags |= 0x02;
+      otDHWOverride = 1;
+      if (otDHWPushState == PUSH_IDLE) {
+        otDHWPushState = PUSH_PENDING;
+        // Send MsgID 99 with DHW push bit (bit4 of byte3)
+        uint16_t data99 = ((uint16_t)(otOperModeDHW | 0x10)) |
+                          ((uint16_t)(otOperModeCH1 | (otOperModeCH2 << 4)) << 8);
+        unsigned long frame99 = OpenTherm::buildRequest(
+          OpenThermMessageType::WRITE_DATA,
+          static_cast<OpenThermMessageID>(99), data99);
+        otCmdEnqueue(frame99);
+      }
+    } else if (v == '1') {
       otMasterStatusFlags |= 0x02;
       otDHWOverride = 1;
     } else if (v == '0') {
       otMasterStatusFlags &= ~0x02;
       otDHWOverride = 0;
+      // Abort DHW push if in progress
+      if (otDHWPushState != PUSH_IDLE) {
+        otDHWPushState = PUSH_IDLE;
+        DebugTln(F("OT-direct: DHW push aborted"));
+      }
     } else {
       // Any other char = auto (thermostat controls DHW)
       otMasterStatusFlags |= 0x02;  // default on for auto
@@ -1502,6 +1756,110 @@ void handleOTDirectCommand(const char* buf, int len) {
       otMasterStatusFlags &= ~0x10;
     }
     rspBuf[0] = value[0]; rspBuf[1] = '\0';
+    synthesizeResponse(buf, rspBuf);
+  }
+  // SM=0/1 — Summer mode (bit5 of master status)
+  else if (cmd0 == 'S' && cmd1 == 'M') {
+    if (value[0] == '1') {
+      otMasterStatusFlags |= 0x20;
+      otSummerMode = true;
+    } else {
+      otMasterStatusFlags &= ~0x20;
+      otSummerMode = false;
+    }
+    settings.otd.bSummerMode = otSummerMode;
+    rspBuf[0] = value[0]; rspBuf[1] = '\0';
+    synthesizeResponse(buf, rspBuf);
+  }
+  // BW=0/1 — DHW blocking (bit6 of master status, not persisted)
+  else if (cmd0 == 'B' && cmd1 == 'W') {
+    if (value[0] == '1') {
+      otMasterStatusFlags |= 0x40;
+      otDHWBlocking = true;
+    } else {
+      otMasterStatusFlags &= ~0x40;
+      otDHWBlocking = false;
+    }
+    rspBuf[0] = value[0]; rspBuf[1] = '\0';
+    synthesizeResponse(buf, rspBuf);
+  }
+  // CE=0/1 — Cooling enable (bit2 of master status, not persisted)
+  else if (cmd0 == 'C' && cmd1 == 'E') {
+    if (value[0] == '1') {
+      otMasterStatusFlags |= 0x04;
+      otCoolingEnable = true;
+    } else {
+      otMasterStatusFlags &= ~0x04;
+      otCoolingEnable = false;
+    }
+    rspBuf[0] = value[0]; rspBuf[1] = '\0';
+    synthesizeResponse(buf, rspBuf);
+  }
+  // CL=xx.x — Cooling level (PIC-compatible alias for CC=, MsgID 7)
+  else if (cmd0 == 'C' && cmd1 == 'L') {
+    float cl = atof(value);
+    if (cl == 0.0f) {
+      clearWriteOverride(7);
+    } else {
+      uint16_t f88 = (uint16_t)((int16_t)(cl * 256.0f));
+      enqueueWriteCommand(7, f88, "CL");
+    }
+    dtostrf(cl, 1, 2, rspBuf);
+    synthesizeResponse(buf, rspBuf);
+  }
+
+  // =====================================================================
+  // Operating mode commands (MH, MW, M2) — MsgID 99
+  // =====================================================================
+
+  // MH=x — Remote override operating mode CH1 (lower nibble of byte4)
+  else if (cmd0 == 'M' && cmd1 == 'H') {
+    uint8_t val = atoi(value);
+    if (val > 15) { processOT("BV", 2); return; }
+    otOperModeCH1 = val;
+    // Send MsgID 99 WRITE_DATA
+    uint16_t data99 = ((uint16_t)otOperModeDHW) | ((uint16_t)(otOperModeCH1 | (otOperModeCH2 << 4)) << 8);
+    unsigned long frame99 = OpenTherm::buildRequest(
+      OpenThermMessageType::WRITE_DATA,
+      static_cast<OpenThermMessageID>(99), data99);
+    otCmdEnqueue(frame99);
+    snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
+    synthesizeResponse(buf, rspBuf);
+  }
+  // MW=x — Remote override operating mode DHW (lower nibble of byte3)
+  else if (cmd0 == 'M' && cmd1 == 'W') {
+    uint8_t val = atoi(value);
+    if (val > 15) { processOT("BV", 2); return; }
+    otOperModeDHW = val;
+    uint16_t data99 = ((uint16_t)otOperModeDHW) | ((uint16_t)(otOperModeCH1 | (otOperModeCH2 << 4)) << 8);
+    unsigned long frame99 = OpenTherm::buildRequest(
+      OpenThermMessageType::WRITE_DATA,
+      static_cast<OpenThermMessageID>(99), data99);
+    otCmdEnqueue(frame99);
+    snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
+    synthesizeResponse(buf, rspBuf);
+  }
+  // M2=x — Remote override operating mode CH2 (upper nibble of byte4)
+  else if (cmd0 == 'M' && cmd1 == '2') {
+    uint8_t val = atoi(value);
+    if (val > 15) { processOT("BV", 2); return; }
+    otOperModeCH2 = val;
+    uint16_t data99 = ((uint16_t)otOperModeDHW) | ((uint16_t)(otOperModeCH1 | (otOperModeCH2 << 4)) << 8);
+    unsigned long frame99 = OpenTherm::buildRequest(
+      OpenThermMessageType::WRITE_DATA,
+      static_cast<OpenThermMessageID>(99), data99);
+    otCmdEnqueue(frame99);
+    snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
+    synthesizeResponse(buf, rspBuf);
+  }
+  // RR=x — Remote request (MsgID 4, one-shot WRITE_DATA)
+  else if (cmd0 == 'R' && cmd1 == 'R') {
+    uint8_t code = atoi(value);
+    unsigned long frame4 = OpenTherm::buildRequest(
+      OpenThermMessageType::WRITE_DATA,
+      static_cast<OpenThermMessageID>(4), (uint16_t)code << 8);
+    otCmdEnqueue(frame4);
+    snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), code);
     synthesizeResponse(buf, rspBuf);
   }
 
@@ -1657,10 +2015,21 @@ void handleOTDirectCommand(const char* buf, int len) {
   }
 
   // =====================================================================
-  // PS=0/1 — Print Summary mode (no-op on OT-direct, acknowledge)
+  // PS=0/1 — Print Summary mode
+  // PS=1: suppress T/B/R/A frames, emit comma-separated summary per cycle
+  // PS=0: resume normal frame output
   // =====================================================================
 
   else if (cmd0 == 'P' && cmd1 == 'S') {
+    if (value[0] == '1') {
+      otSummaryMode = true;
+      otHideReports = true;
+      otSummaryPending = true;  // trigger immediate first summary
+    } else {
+      otSummaryMode = false;
+      otHideReports = false;
+      otSummaryPending = false;
+    }
     rspBuf[0] = value[0]; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
   }
@@ -1798,6 +2167,7 @@ void handleOTDirectCommand(const char* buf, int len) {
         break;
       }
     }
+    clearUnknownCount(msgId);  // Reset 3-strike counter
     // Re-enable in schedule
     for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
       if (otSchedule[i].msgId == msgId) { otSchedule[i].disabled = false; break; }
@@ -1848,12 +2218,78 @@ void handleOTDirectCommand(const char* buf, int len) {
     rspBuf[0] = '0' + otOverrideHB; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
   }
-  // RS=counter — Reset counter: re-enable all disabled schedule entries
+  // RS=HBS/HBH/HPS/HPH/WBS/WBH/WPS/WPH — Reset boiler counter via WRITE_DATA
   else if (cmd0 == 'R' && cmd1 == 'S') {
-    for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
-      otSchedule[i].disabled = false;
+    // Map 3-char counter code to MsgID
+    uint8_t targetMsgId = 0;
+    if (strlen(value) >= 3) {
+      char c0 = value[0], c1 = value[1], c2 = value[2];
+      if (c0 == 'H' && c1 == 'B' && c2 == 'S') targetMsgId = 116;
+      else if (c0 == 'H' && c1 == 'P' && c2 == 'S') targetMsgId = 117;
+      else if (c0 == 'W' && c1 == 'P' && c2 == 'S') targetMsgId = 118;
+      else if (c0 == 'W' && c1 == 'B' && c2 == 'S') targetMsgId = 119;
+      else if (c0 == 'H' && c1 == 'B' && c2 == 'H') targetMsgId = 120;
+      else if (c0 == 'H' && c1 == 'P' && c2 == 'H') targetMsgId = 121;
+      else if (c0 == 'W' && c1 == 'P' && c2 == 'H') targetMsgId = 122;
+      else if (c0 == 'W' && c1 == 'B' && c2 == 'H') targetMsgId = 123;
     }
+    if (targetMsgId == 0) { processOT("BV", 2); return; }
+    // Send WRITE_DATA with value 0 to reset the counter
+    unsigned long frame = OpenTherm::buildRequest(
+      OpenThermMessageType::WRITE_DATA,
+      static_cast<OpenThermMessageID>(targetMsgId), 0);
+    otCmdEnqueue(frame);
     synthesizeResponse(buf, value);
+  }
+  // MI=nnn — Message interval (minimum gap between OT messages, 100-2550ms)
+  else if (cmd0 == 'M' && cmd1 == 'I') {
+    uint16_t val = atoi(value);
+    if (val < 100 || val > 2550) { processOT("OR", 2); return; }
+    otMinIntervalMs = val;
+    settings.otd.iMsgInterval = val;
+    snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%u"), val);
+    synthesizeResponse(buf, rspBuf);
+  }
+  // FS=0/1 — Fail safety (controls setback on thermostat disconnect)
+  else if (cmd0 == 'F' && cmd1 == 'S') {
+    otFailSafeEnabled = (value[0] == '1');
+    settings.otd.bFailSafe = otFailSafeEnabled;
+    rspBuf[0] = value[0]; rspBuf[1] = '\0';
+    synthesizeResponse(buf, rspBuf);
+  }
+  // TP=MsgID:Index[=Value] — Thermostat slave parameters (TSP/FHB)
+  else if (cmd0 == 'T' && cmd1 == 'P') {
+    unsigned int tpMsgId = 0, tpIndex = 0, tpValue = 0;
+    bool isWrite = false;
+    // Parse "MsgID:Index" or "MsgID:Index=Value"
+    char* colonPos = strchr(value, ':');
+    if (!colonPos) { processOT("SE", 2); return; }
+    tpMsgId = atoi(value);
+    char* afterColon = colonPos + 1;
+    tpIndex = atoi(afterColon);
+    char* eqPos = strchr(afterColon, '=');
+    if (eqPos) {
+      isWrite = true;
+      tpValue = atoi(eqPos + 1);
+    }
+    // Validate MsgID: 11 (TSP entry) or 13 (FHB entry)
+    if (tpMsgId != 11 && tpMsgId != 13) { processOT("BV", 2); return; }
+    if (tpIndex > 255 || tpValue > 255) { processOT("OR", 2); return; }
+    // FHB is read-only
+    if (isWrite && tpMsgId == 13) { processOT("SE", 2); return; }
+    // Build and queue the frame
+    uint16_t tpData = ((uint16_t)tpIndex << 8) | (isWrite ? (uint16_t)tpValue : 0);
+    OpenThermMessageType tpType = isWrite ?
+      OpenThermMessageType::WRITE_DATA : OpenThermMessageType::READ_DATA;
+    unsigned long tpFrame = OpenTherm::buildRequest(
+      tpType, static_cast<OpenThermMessageID>(tpMsgId), tpData);
+    otCmdEnqueue(tpFrame);
+    if (isWrite) {
+      snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%u:%u=%u"), tpMsgId, tpIndex, tpValue);
+    } else {
+      snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%u:%u"), tpMsgId, tpIndex);
+    }
+    synthesizeResponse(buf, rspBuf);
   }
 
   // =====================================================================

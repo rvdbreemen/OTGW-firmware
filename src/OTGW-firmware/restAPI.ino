@@ -1323,6 +1323,9 @@ void sendDeviceSettings()
   }
   sendJsonSettingObj(F("otdsetbacktimeout"), settings.otd.iSetbackTimeout, "i", 5, 255);
   sendJsonSettingObj(F("otdenableslave"), settings.otd.bEnableSlave, "b");
+  sendJsonSettingObj(F("otdsummermode"), settings.otd.bSummerMode, "b");
+  sendJsonSettingObj(F("otdfailsafe"), settings.otd.bFailSafe, "b");
+  sendJsonSettingObj(F("otdmsginterval"), settings.otd.iMsgInterval, "i", 100, 2550);
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // --- Ethernet settings (OTGW32 only) ---
@@ -1358,7 +1361,8 @@ static const char* const PROGMEM knownSettings[] = {
   "mqttinterval", "mqttotmessage", "mqttpasswd", "mqttseparatesources",
   "mqtttoptopic", "mqttuniqueid", "mqttuser",
   "ntpenable", "ntphostname", "ntpsendtime", "ntptimezone",
-  "otdautodetect", "otdenableslave", "otdmode", "otdsetbacktemp", "otdsetbacktimeout",
+  "otdautodetect", "otdenableslave", "otdfailsafe", "otdmode", "otdmsginterval",
+  "otdsetbacktemp", "otdsetbacktimeout", "otdsummermode",
   "otgwcommandenable", "otgwcommands",
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
   "satcoefficient", "satdeadband", "satenabled", "satexternaltemp",

@@ -294,6 +294,9 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("OTDsetbacktemp"), settings.otd.fSetbackTemp, true);
   writeJsonIntKV(file, F("OTDsetbacktimeout"), settings.otd.iSetbackTimeout, true);
   writeJsonBoolKV(file, F("OTDenableslave"), settings.otd.bEnableSlave, true);
+  writeJsonBoolKV(file, F("OTDsummermode"), settings.otd.bSummerMode, true);
+  writeJsonBoolKV(file, F("OTDfailsafe"), settings.otd.bFailSafe, true);
+  writeJsonIntKV(file, F("OTDmsginterval"), settings.otd.iMsgInterval, true);
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // Ethernet static IP (OTGW32 only)
@@ -708,6 +711,9 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("OTDsetbacktemp")) == 0)    settings.otd.fSetbackTemp = constrain(atof(newValue), 1.0f, 30.0f);
   else if (strcasecmp_P(field, PSTR("OTDsetbacktimeout")) == 0) settings.otd.iSetbackTimeout = constrain(atoi(newValue), 5, 255);
   else if (strcasecmp_P(field, PSTR("OTDenableslave")) == 0)   settings.otd.bEnableSlave = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("OTDsummermode")) == 0)    settings.otd.bSummerMode = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("OTDfailsafe")) == 0)      settings.otd.bFailSafe = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("OTDmsginterval")) == 0)   settings.otd.iMsgInterval = constrain(atoi(newValue), 100, 2550);
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // Ethernet static IP (OTGW32 only)

@@ -555,11 +555,14 @@ struct SATSection {
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
 struct OTDirectSettingsSection {
-  uint8_t iMode              = 1;     // OTD_MODE_GATEWAY default, persisted across reboot
-  bool    bAutoDetect        = true;  // Auto-detect thermostat presence at boot
-  float   fSetbackTemp       = 16.0f; // Setback temp on thermostat disconnect (°C)
-  uint8_t iSetbackTimeout    = 30;    // Seconds before thermostat considered disconnected
-  bool    bEnableSlave       = true;  // Enable slave interface in master mode
+  uint8_t  iMode              = 1;     // OTD_MODE_GATEWAY default, persisted across reboot
+  bool     bAutoDetect        = true;  // Auto-detect thermostat presence at boot
+  float    fSetbackTemp       = 16.0f; // Setback temp on thermostat disconnect (°C)
+  uint8_t  iSetbackTimeout    = 30;    // Seconds before thermostat considered disconnected
+  bool     bEnableSlave       = true;  // Enable slave interface in master mode
+  bool     bSummerMode        = false; // SM= summer mode (bit5 of master status)
+  bool     bFailSafe          = true;  // FS= fail-safe setback on thermostat disconnect
+  uint16_t iMsgInterval       = 100;   // MI= minimum inter-message gap (ms, 100-2550)
 };
 #endif
 
