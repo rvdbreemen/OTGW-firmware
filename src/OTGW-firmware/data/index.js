@@ -4390,7 +4390,8 @@ function refreshSettings() {
               [0, "Bypass (thermostat direct to boiler)"],
               [1, "Gateway (full override processing)"],
               [2, "Monitor (transparent pass-through)"],
-              [3, "Master / Standalone (no thermostat)"]
+              [3, "Master / Standalone (no thermostat)"],
+              [4, "Loopback Test (simulated boiler)"]
             ]
           };
 

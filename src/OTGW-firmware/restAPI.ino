@@ -298,7 +298,8 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
     else if (modeStr == F("monitor"))  addOTWGcmdtoqueue("GW=M", 4, true);
     else if (modeStr == F("bypass"))   addOTWGcmdtoqueue("GW=0", 4, true);
     else if (modeStr == F("master"))   addOTWGcmdtoqueue("GW=S", 4, true);
-    else { sendApiError(400, F("Invalid mode. Use: gateway, monitor, bypass, master")); return; }
+    else if (modeStr == F("loopback")) addOTWGcmdtoqueue("GW=L", 4, true);
+    else { sendApiError(400, F("Invalid mode. Use: gateway, monitor, bypass, master, loopback")); return; }
     // Return current status (mode will be updated by the time response renders)
     sendOTDirectStatus();
   }
@@ -866,6 +867,7 @@ void sendDeviceInfoV2()
       if (state.otd.eMode == OTD_MODE_MONITOR) modeStr = "monitor";
       else if (state.otd.eMode == OTD_MODE_BYPASS) modeStr = "bypass";
       else if (state.otd.eMode == OTD_MODE_MASTER) modeStr = "master";
+      else if (state.otd.eMode == OTD_MODE_LOOPBACK) modeStr = "loopback";
       sendJsonMapEntry(F("otdmode"), modeStr);
     }
     sendJsonMapEntry(F("otdbypass"), state.otd.bBypassActive);
@@ -1043,6 +1045,7 @@ void sendOTDirectStatus()
     if (state.otd.eMode == OTD_MODE_MONITOR) modeStr = "monitor";
     else if (state.otd.eMode == OTD_MODE_BYPASS) modeStr = "bypass";
     else if (state.otd.eMode == OTD_MODE_MASTER) modeStr = "master";
+    else if (state.otd.eMode == OTD_MODE_LOOPBACK) modeStr = "loopback";
     sendJsonMapEntry(F("mode"),             modeStr);
   }
   // Hardware state
@@ -1251,7 +1254,7 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("satpwmautoswitch"), settings.sat.bPwmAutoSwitch, "b");
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-Direct settings (OTGW32 only) ---
-  sendJsonSettingObj(F("otdmode"), settings.otd.iMode, "i", 0, 3);
+  sendJsonSettingObj(F("otdmode"), settings.otd.iMode, "i", 0, 4);
   sendJsonSettingObj(F("otdautodetect"), settings.otd.bAutoDetect, "b");
   {
     char tmpBuf[8];

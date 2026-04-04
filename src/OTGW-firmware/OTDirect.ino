@@ -47,9 +47,10 @@ static uint8_t otMasterStatusFlags = 0x01;  // bit0=CH enable (default on)
 static OTDirectMode otCurrentMode = OTD_MODE_GATEWAY;
 
 // Legacy convenience flags — derived from otCurrentMode for readability
-static bool otBypassActive = false;
-static bool otMonitorMode = false;
-static bool otMasterMode  = false;  // sole OT master, no thermostat expected
+static bool otBypassActive  = false;
+static bool otMonitorMode   = false;
+static bool otMasterMode    = false;  // sole OT master, no thermostat expected
+static bool otLoopbackMode  = false;  // internal test with simulated boiler
 
 // Thermostat connectivity tracking — detect disconnect and apply setback
 static bool     otThermostatSeen    = false;   // at least one frame received since boot
@@ -381,6 +382,7 @@ void initOTDirect() {
   otBypassActive = (otCurrentMode == OTD_MODE_BYPASS);
   otMonitorMode  = (otCurrentMode == OTD_MODE_MONITOR);
   otMasterMode   = (otCurrentMode == OTD_MODE_MASTER);
+  otLoopbackMode = (otCurrentMode == OTD_MODE_LOOPBACK);
 
   // Initialize bypass relay hardware
 #if HAS_BYPASS_RELAY
@@ -562,9 +564,176 @@ void updateOTDirectStatus() {
 }
 
 // ---------------------------------------------------------------------------
+// Loopback test mode — simulated boiler data table
+// Provides realistic OT values so the full stack (parser, MQTT, WebSocket,
+// REST, HA discovery) can be exercised without any boiler hardware.
+// Table indexed by MsgID; 0xFFFF = not supported (reply UNKNOWN_DATA_ID).
+// Values are f8.8 or raw uint16 depending on the MsgID data type.
+// ---------------------------------------------------------------------------
+static const uint16_t PROGMEM otLoopbackData[128] = {
+  // MsgID  0: Status — slave flags: flame=1, CH=1, DHW=0 → 0x0A (bits: flame+CH mode)
+  0x000A,
+  // MsgID  1: TSet (control setpoint) — 45.0°C → 0x2D00
+  0x2D00,
+  // MsgID  2: Master config / member ID
+  0x0000,
+  // MsgID  3: Slave config / member ID — DHW present, modulating
+  0x000B,
+  // MsgID  4: Remote command — not supported
+  0xFFFF,
+  // MsgID  5: Application-specific flags
+  0x0000,
+  // MsgID  6: Remote param flags
+  0x0000,
+  // MsgID  7: Cooling control signal — not supported
+  0xFFFF,
+  // MsgID  8: TsetCH2 — not supported
+  0xFFFF,
+  // MsgID  9: Remote override room setpoint — 0
+  0x0000,
+  // MsgID 10: TSP count
+  0x0000,
+  // MsgID 11: TSP entry — not supported
+  0xFFFF,
+  // MsgID 12: FHB size — 0
+  0x0000,
+  // MsgID 13: FHB entry — not supported
+  0xFFFF,
+  // MsgID 14: Max relative modulation — 80%
+  0x5000,
+  // MsgID 15: Max boiler capacity / min modulation
+  0x1E14,   // 30kW / 20%
+  // MsgID 16: TrSet (room setpoint) — 20.5°C
+  0x1480,
+  // MsgID 17: Relative modulation level — 55.0%
+  0x3700,
+  // MsgID 18: CH water pressure — 1.5 bar
+  0x0180,
+  // MsgID 19: DHW flow rate — 0.0 (no DHW active)
+  0x0000,
+  // MsgID 20: Day of week / time
+  0x0000,
+  // MsgID 21: Date
+  0x0000,
+  // MsgID 22: Year
+  0x07E8,   // 2024
+  // MsgID 23: Second setpoint room — not supported
+  0xFFFF,
+  // MsgID 24: Room temperature — 20.2°C → 0x1433
+  0x1433,
+  // MsgID 25: Boiler flow temperature — 42.5°C
+  0x2A80,
+  // MsgID 26: DHW temperature — 48.0°C
+  0x3000,
+  // MsgID 27: Outside temperature — 8.5°C
+  0x0880,
+  // MsgID 28: Return water temperature — 35.0°C
+  0x2300,
+  // MsgID 29: Solar storage temperature — not supported
+  0xFFFF,
+  // MsgID 30: Solar collector temperature — not supported
+  0xFFFF,
+  // MsgID 31: Flow temperature CH2 — not supported
+  0xFFFF,
+  // MsgID 32: DHW2 temperature — not supported
+  0xFFFF,
+  // MsgID 33: Exhaust temperature (s16) — 120°C → 0x0078
+  0x0078,
+  // MsgID 34-47: reserved / not supported
+  0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,
+  0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,
+  // MsgID 48: DHW setpoint upper/lower bounds
+  0x3C1E,   // 60°C / 30°C
+  // MsgID 49: Max CH water setpoint upper/lower bounds
+  0x5A14,   // 90°C / 20°C
+  // MsgID 50-55: not supported
+  0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,
+  // MsgID 56: DHW setpoint — 50.0°C
+  0x3200,
+  // MsgID 57: Max CH water setpoint — 65.0°C
+  0x4100,
+  // MsgID 58-115: not supported
+  0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,  // 58-65
+  0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,  // 66-73
+  0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,  // 74-81
+  0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,  // 82-89
+  0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,  // 90-97
+  0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,  // 98-105
+  0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,  // 106-113
+  0xFFFF, 0xFFFF,                                                    // 114-115
+  // MsgID 116: Burner starts — 1234
+  0x04D2,
+  // MsgID 117: CH pump starts — 567
+  0x0237,
+  // MsgID 118: DHW pump/valve starts — 89
+  0x0059,
+  // MsgID 119: DHW burner starts — 45
+  0x002D,
+  // MsgID 120: Burner hours — 5678
+  0x162E,
+  // MsgID 121: CH pump hours — 4321
+  0x10E1,
+  // MsgID 122: DHW pump/valve hours — 876
+  0x036C,
+  // MsgID 123: DHW burner hours — 234
+  0x00EA,
+  // MsgID 124: OT version master — 2.2
+  0x0202,
+  // MsgID 125: OT version slave — 2.2
+  0x0202,
+  // MsgID 126: Master product — type 1, version 1
+  0x0101,
+  // MsgID 127: Slave product — type 4, version 5
+  0x0405,
+};
+
+// ---------------------------------------------------------------------------
+// simulateLoopbackResponse — generate a fake boiler response for a request.
+// Looks up the MsgID in otLoopbackData[]; 0xFFFF → UNKNOWN_DATA_ID.
+// WRITE_DATA requests are accepted (WRITE_ACK) and update the table cache.
+// ---------------------------------------------------------------------------
+static unsigned long simulateLoopbackResponse(unsigned long request) {
+  uint8_t msgId = (request >> 16) & 0xFF;
+  uint8_t reqType = (request >> 28) & 0x07;
+
+  uint16_t data = pgm_read_word(&otLoopbackData[msgId]);
+
+  // WRITE_DATA (type 1) — accept the write, echo data back as WRITE_ACK
+  if (reqType == 1) {
+    uint16_t writeData = request & 0xFFFF;
+    return buildOTResponse(5, msgId, writeData);  // type 5 = WRITE_ACK
+  }
+
+  // READ_DATA (type 0) — look up simulated value
+  if (data == 0xFFFF) {
+    return buildOTResponse(7, msgId, 0);  // type 7 = UNKNOWN_DATA_ID
+  }
+  return buildOTResponse(4, msgId, data);   // type 4 = READ_ACK
+}
+
+// ---------------------------------------------------------------------------
 // sendMasterRequestAsync — initiate an async OT request (non-blocking)
 // ---------------------------------------------------------------------------
 static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin origin) {
+  // Loopback mode: simulate response immediately, no bus activity
+  if (otLoopbackMode) {
+    bridgeFrameToParser((origin == OT_DIRECT_ORIGIN_THERMOSTAT) ? 'T' : 'R', request);
+    unsigned long response = simulateLoopbackResponse(request);
+    bridgeFrameToParser('B', response);
+    state.otgw.bOnline = true;
+
+    // Cache response for master mode slave handler (reuses same cache)
+    uint8_t cacheId = (response >> 16) & 0x7F;
+    otBoilerCache[cacheId] = response & 0xFFFF;
+    otBoilerCacheValid[cacheId] = true;
+
+    // If forwarded thermostat frame, send simulated response back
+    if (origin == OT_DIRECT_ORIGIN_THERMOSTAT) {
+      otSlave.sendResponse(response);
+    }
+    return true;  // "completed" instantly
+  }
+
   if (!otMaster.isReady()) return false;  // bus busy — try again later
   otLastSentRequest = request;
   otLastRequestOrigin = origin;
@@ -887,10 +1056,11 @@ static void clearWriteOverride(uint8_t msgId) {
 // setOTDirectMode — switch operating mode with hardware reconfiguration
 // ---------------------------------------------------------------------------
 static void setOTDirectMode(OTDirectMode newMode) {
-  otCurrentMode = newMode;
+  otCurrentMode  = newMode;
   otBypassActive = (newMode == OTD_MODE_BYPASS);
   otMonitorMode  = (newMode == OTD_MODE_MONITOR);
   otMasterMode   = (newMode == OTD_MODE_MASTER);
+  otLoopbackMode = (newMode == OTD_MODE_LOOPBACK);
 
   switch (newMode) {
     case OTD_MODE_BYPASS:
@@ -925,6 +1095,13 @@ static void setOTDirectMode(OTDirectMode newMode) {
         clearOverride(1);
       }
       DebugTln(F("OT-direct: Master mode ON (standalone, no thermostat)"));
+      break;
+
+    case OTD_MODE_LOOPBACK:
+#if HAS_BYPASS_RELAY
+      digitalWrite(PIN_BYPASS_RELAY, LOW);
+#endif
+      DebugTln(F("OT-direct: Loopback test mode ON (simulated boiler responses)"));
       break;
   }
 
@@ -1306,6 +1483,9 @@ void handleOTDirectCommand(const char* buf, int len) {
     } else if (value[0] == 'M') {
       // GW=M — Monitor mode: transparent pass-through, all frames unmodified
       setOTDirectMode(OTD_MODE_MONITOR);
+    } else if (value[0] == 'L') {
+      // GW=L — Loopback test mode: simulated boiler, no hardware needed
+      setOTDirectMode(OTD_MODE_LOOPBACK);
     } else if (value[0] == 'R') {
       DebugTln(F("OT-direct: Resetting OT interfaces"));
       otMaster.end();
@@ -1334,12 +1514,13 @@ void handleOTDirectCommand(const char* buf, int len) {
         processOT(prBuf, strlen(prBuf));
         break;
       case 'M':
-        // Gateway mode: G=gateway, M=monitor (transparent), P=passthru (bypass), S=standalone (master)
+        // Gateway mode: G=gateway, M=monitor, P=passthru (bypass), S=standalone, L=loopback
         {
           char modeChar = 'G';
           if (otBypassActive) modeChar = 'P';
           else if (otMonitorMode) modeChar = 'M';
           else if (otMasterMode) modeChar = 'S';
+          else if (otLoopbackMode) modeChar = 'L';
           snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: M=%c"), modeChar);
           processOT(prBuf, strlen(prBuf));
         }

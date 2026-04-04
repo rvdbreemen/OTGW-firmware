@@ -486,6 +486,7 @@ void sendMQTTversioninfo(){
       if (state.otd.eMode == OTD_MODE_MONITOR) modeStr = "monitor";
       else if (state.otd.eMode == OTD_MODE_BYPASS) modeStr = "bypass";
       else if (state.otd.eMode == OTD_MODE_MASTER) modeStr = "master";
+      else if (state.otd.eMode == OTD_MODE_LOOPBACK) modeStr = "loopback";
       sendMQTTData(F("otgw-otdirect/mode"), modeStr);
     }
     sendMQTTData(F("otgw-otdirect/bypass"), CCONOFF(state.otd.bBypassActive));

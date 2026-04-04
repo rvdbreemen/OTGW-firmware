@@ -215,6 +215,7 @@ enum OTDirectMode : uint8_t {
   OTD_MODE_MONITOR  = 2,   // Transparent: forward all frames unmodified, log everything
   OTD_MODE_BYPASS   = 0,   // Thermostat direct to boiler via relay, OT-direct inactive
   OTD_MODE_MASTER   = 3,   // Sole OT master: scheduler only, no thermostat expected
+  OTD_MODE_LOOPBACK = 4,   // Internal test: simulated boiler responses, no hardware needed
 };
 
 struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime status

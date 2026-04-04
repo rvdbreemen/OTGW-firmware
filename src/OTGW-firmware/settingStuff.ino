@@ -701,7 +701,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATpwmautoswitch")) == 0)   settings.sat.bPwmAutoSwitch = EVALBOOLEAN(newValue);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings ---
-  else if (strcasecmp_P(field, PSTR("OTDmode")) == 0)           settings.otd.iMode = constrain(atoi(newValue), 0, 3);
+  else if (strcasecmp_P(field, PSTR("OTDmode")) == 0)           settings.otd.iMode = constrain(atoi(newValue), 0, 4);
   else if (strcasecmp_P(field, PSTR("OTDautodetect")) == 0)    settings.otd.bAutoDetect = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDsetbacktemp")) == 0)    settings.otd.fSetbackTemp = constrain(atof(newValue), 1.0f, 30.0f);
   else if (strcasecmp_P(field, PSTR("OTDsetbacktimeout")) == 0) settings.otd.iSetbackTimeout = constrain(atoi(newValue), 5, 255);
