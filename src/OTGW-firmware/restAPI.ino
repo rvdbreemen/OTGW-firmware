@@ -1249,6 +1249,17 @@ void sendDeviceSettings()
     sendJsonSettingObj(F("satpresetaway"), tmpBuf, "f", 5, 18);
   }
   sendJsonSettingObj(F("satpwmautoswitch"), settings.sat.bPwmAutoSwitch, "b");
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+  // --- OT-Direct settings (OTGW32 only) ---
+  sendJsonSettingObj(F("otdmode"), settings.otd.iMode, "i", 0, 3);
+  sendJsonSettingObj(F("otdautodetect"), settings.otd.bAutoDetect, "b");
+  {
+    char tmpBuf[8];
+    dtostrf(settings.otd.fSetbackTemp, 1, 1, tmpBuf);
+    sendJsonSettingObj(F("otdsetbacktemp"), tmpBuf, "f", 1, 30);
+  }
+  sendJsonSettingObj(F("otdsetbacktimeout"), settings.otd.iSetbackTimeout, "i", 5, 255);
+#endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // --- Ethernet settings (OTGW32 only) ---
   sendJsonSettingObj(F("ethstaticip"), settings.eth.bStaticIP, "b");
@@ -1283,6 +1294,7 @@ static const char* const PROGMEM knownSettings[] = {
   "mqttinterval", "mqttotmessage", "mqttpasswd", "mqttseparatesources",
   "mqtttoptopic", "mqttuniqueid", "mqttuser",
   "ntpenable", "ntphostname", "ntpsendtime", "ntptimezone",
+  "otdautodetect", "otdmode", "otdsetbacktemp", "otdsetbacktimeout",
   "otgwcommandenable", "otgwcommands",
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
   "satcoefficient", "satdeadband", "satenabled", "satexternaltemp",

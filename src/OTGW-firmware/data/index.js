@@ -4384,48 +4384,72 @@ function refreshSettings() {
           var inputDiv = document.createElement("div");
           inputDiv.className = 'settings-input-container';
 
-          var sInput = document.createElement("input");
-          //----sInput.setAttribute("id", "setFld_"+key);
-          sInput.setAttribute("id", key);
-          if (s.type == "b") {
-            sInput.setAttribute("type", "checkbox");
-            sInput.checked = strToBool(s.value);
-          }
-          else if (s.type == "s") {
-            sInput.setAttribute("type", "text");
-            sInput.setAttribute("maxlength", s.maxlen);
-            sInput.setAttribute("size", (s.maxlen > 20 ? 20 : s.maxlen));
-          }
-          else if (s.type == "p") {
-            sInput.setAttribute("type", "password");
-            sInput.setAttribute("maxlength", s.maxlen);
-            sInput.setAttribute("size", (s.maxlen > 20 ? 20 : s.maxlen));
-          }
-          else if (s.type == "f") {
-            sInput.setAttribute("type", "number");
-            sInput.max = s.max;
-            sInput.min = s.min;
-            sInput.step = (s.min + s.max) / 1000;
-          }
-          else if (s.type == "i") {
-            sInput.setAttribute("type", "number");
-            sInput.setAttribute("size", 10);
-            sInput.max = s.max;
-            sInput.min = s.min;
-            //sInput.step = (s.min + s.max) / 1000;
-            sInput.step = 1;
-          }
-          if (isPasswordPlaceholderField(key) && isHttpPasswordPlaceholder(s.value)) {
-            sInput.setAttribute("value", getHttpPasswordPlaceholderLength(s.value) > 0 ? s.value : "");
+          // Dropdown options for select-type fields
+          var selectOptions = {
+            "otdmode": [
+              [0, "Bypass (thermostat direct to boiler)"],
+              [1, "Gateway (full override processing)"],
+              [2, "Monitor (transparent pass-through)"],
+              [3, "Master / Standalone (no thermostat)"]
+            ]
+          };
+
+          var sInput;
+          const fieldName = key;
+
+          if (selectOptions[key]) {
+            // Render as <select> dropdown
+            sInput = document.createElement("select");
+            sInput.setAttribute("id", key);
+            var opts = selectOptions[key];
+            for (var oi = 0; oi < opts.length; oi++) {
+              var opt = document.createElement("option");
+              opt.value = opts[oi][0];
+              opt.textContent = opts[oi][1];
+              if (String(opts[oi][0]) === String(s.value)) opt.selected = true;
+              sInput.appendChild(opt);
+            }
           } else {
-            sInput.setAttribute("value", s.value);
+            sInput = document.createElement("input");
+            sInput.setAttribute("id", key);
+            if (s.type == "b") {
+              sInput.setAttribute("type", "checkbox");
+              sInput.checked = strToBool(s.value);
+            }
+            else if (s.type == "s") {
+              sInput.setAttribute("type", "text");
+              sInput.setAttribute("maxlength", s.maxlen);
+              sInput.setAttribute("size", (s.maxlen > 20 ? 20 : s.maxlen));
+            }
+            else if (s.type == "p") {
+              sInput.setAttribute("type", "password");
+              sInput.setAttribute("maxlength", s.maxlen);
+              sInput.setAttribute("size", (s.maxlen > 20 ? 20 : s.maxlen));
+            }
+            else if (s.type == "f") {
+              sInput.setAttribute("type", "number");
+              sInput.max = s.max;
+              sInput.min = s.min;
+              sInput.step = (s.min + s.max) / 1000;
+            }
+            else if (s.type == "i") {
+              sInput.setAttribute("type", "number");
+              sInput.setAttribute("size", 10);
+              sInput.max = s.max;
+              sInput.min = s.min;
+              sInput.step = 1;
+            }
+            if (isPasswordPlaceholderField(key) && isHttpPasswordPlaceholder(s.value)) {
+              sInput.setAttribute("value", getHttpPasswordPlaceholderLength(s.value) > 0 ? s.value : "");
+            } else {
+              sInput.setAttribute("value", s.value);
+            }
           }
           if (tooltipText) {
             sInput.setAttribute("title", tooltipText);
           }
-          const fieldName = key;
           sInput.addEventListener('change',
-            function () { 
+            function () {
               var inputEl = document.getElementById(fieldName);
               if (inputEl) {
                 inputEl.className = "input-changed";
@@ -4440,7 +4464,7 @@ function refreshSettings() {
             false
           );
           sInput.addEventListener('keydown',
-            function () { 
+            function () {
               var inputEl = document.getElementById(fieldName);
               if (inputEl) {
                 inputEl.className = "input-changed";
@@ -4651,20 +4675,20 @@ function saveWebhookSettings() {
 //============================================================================  
 function saveSettings() {
   console.log("saveSettings() ...");
-  let changes = false;
 
   //--- has anything changed?
   var page = document.getElementById("settingsPage");
+  // Collect both <input> and <select> elements
   var inputs = page.getElementsByTagName("input");
-  //var mRow = document.getElementById("mainPage").getElementsByTagName('div');
-  for (var i = 0; i < inputs.length; i++) {
-    //do something to each div like
-    var field = inputs[i].getAttribute("id");
+  var selects = page.getElementsByTagName("select");
+  var allFields = Array.prototype.slice.call(inputs).concat(Array.prototype.slice.call(selects));
+  for (var i = 0; i < allFields.length; i++) {
+    var field = allFields[i].getAttribute("id");
     console.log("InputNr[" + i + "], InputId[" + field + "]");
     const fieldEl = document.getElementById(field);
     if (!fieldEl) continue;
     var value;
-    if (inputs[i].type == "checkbox") {
+    if (allFields[i].type == "checkbox") {
       value = fieldEl.checked;
     } else {
       value = fieldEl.value;
@@ -4678,7 +4702,7 @@ function saveSettings() {
       //then it was changes, and needs to be saved
       fieldEl.className = "input-normal";
       console.log("Changes where made in [" + field + "][" + value + "]");
-      
+
       // Update theme immediately if darktheme setting changed
       if (field === "darktheme") {
         let isDark = fieldEl.checked;
@@ -4687,7 +4711,6 @@ function saveSettings() {
         updateThemeToggle();
       }
 
-      //processWithTimeout([(data.length -1), 0], 2, data, sendPostReading);
       const msgEl = document.getElementById("settingMessage");
       if (msgEl) msgEl.textContent = "Saving changes...";
       sendPostSetting(field, value);
@@ -4982,6 +5005,10 @@ var translateFields = [
   , ["SATpreseteco", "SAT Preset: Eco"]
   , ["SATpresetaway", "SAT Preset: Away"]
   , ["SATpwmautoswitch", "SAT PWM Auto-Switch"]
+  , ["otdmode", "OT-Direct Operating Mode"]
+  , ["otdautodetect", "OT-Direct Auto-Detect Mode"]
+  , ["otdsetbacktemp", "OT-Direct Setback Temperature (\u00B0C)"]
+  , ["otdsetbacktimeout", "OT-Direct Setback Timeout (seconds)"]
   , ["ethstaticip", "Ethernet Static IP"]
   , ["ethipaddress", "Ethernet IP Address"]
   , ["ethgateway", "Ethernet Gateway"]
@@ -5051,6 +5078,10 @@ var translateTooltips = [
   , ["SATpreseteco", "Eco preset target temperature."]
   , ["SATpresetaway", "Away preset target temperature."]
   , ["SATpwmautoswitch", "Automatically switch between PWM and continuous mode based on cycle analysis."]
+  , ["otdmode", "Gateway: full control with overrides. Monitor: transparent pass-through, observe only. Bypass: thermostat talks directly to boiler via relay. Master: standalone, no thermostat needed."]
+  , ["otdautodetect", "At boot, wait 5 seconds for thermostat on the bus. If none found, automatically switch to Master mode."]
+  , ["otdsetbacktemp", "When the thermostat disconnects, override the boiler setpoint to this safe temperature (1-30\u00B0C)."]
+  , ["otdsetbacktimeout", "Seconds without thermostat communication before engaging setback protection (5-255s)."]
   , ["ethstaticip", "Use a static IP address for Ethernet instead of DHCP."]
   , ["ethipaddress", "Static IP address for the Ethernet interface (e.g. 192.168.1.100)."]
   , ["ethgateway", "Default gateway for the Ethernet interface."]
