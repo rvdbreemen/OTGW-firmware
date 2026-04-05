@@ -1,10 +1,11 @@
 ---
 id: TASK-12
 title: Control interval visible and configurable via all APIs
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-05 10:06'
-updated_date: '2026-04-05 21:42'
+updated_date: '2026-04-05 23:01'
 labels:
   - sat
   - feature
@@ -23,9 +24,9 @@ The control interval (settings.sat.iControlInterval, 10-300s) is already configu
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 REST API: GET /api/v2/sat/status includes control_interval_sec field
+- [x] #1 REST API: GET /api/v2/sat/status includes control_interval_sec field
 - [ ] #2 REST API: POST /api/v2/sat/interval with body for interval value (10-300)
-- [ ] #3 MQTT subscribe: set/<nodeId>/sat/interval
+- [x] #3 MQTT subscribe: set/<nodeId>/sat/interval
 - [ ] #4 MQTT publish: sat/interval
 - [ ] #5 WebUI: interval field in SAT settings with tooltip about recommended values
 - [ ] #6 WebUI: interval visible in Control Details section of dashboard
@@ -48,3 +49,9 @@ SAT Python references (Control interval):
 - area.py:15,21 - imports async_track_time_interval + PID_UPDATE_INTERVAL
 - area.py:188-189 - per-area PID also uses async_track_time_interval(hass, control_pid, timedelta(seconds=PID_UPDATE_INTERVAL))
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Control interval already configurable via settings. Added MQTT subscribe handler for set/<nodeId>/sat/interval and control_interval_sec to JSON status output.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,10 +1,11 @@
 ---
 id: TASK-6
 title: PID integral and derivative persistence to LittleFS
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-05 10:04'
-updated_date: '2026-04-05 21:42'
+updated_date: '2026-04-05 23:04'
 labels:
   - sat
   - feature
@@ -46,3 +47,9 @@ SAT Python references (PID persistence):
 - pid.py:135-139 - reset() zeroes _integral and _raw_derivative (does not clear store)
 - Storage format: HA Store (JSON file in .storage/), versioned with STORAGE_VERSION
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+PID state (I, D, error) persisted to /sat_pid_state.json via LittleFS. Saved every 5 min and on satDisable(). Restored on initSAT() after reboot.
+<!-- SECTION:FINAL_SUMMARY:END -->

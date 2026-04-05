@@ -1,10 +1,11 @@
 ---
 id: TASK-16
 title: 'Modulation suppression: prevent overshoot when approaching setpoint'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-05 10:08'
-updated_date: '2026-04-05 21:42'
+updated_date: '2026-04-05 22:51'
 labels:
   - sat
   - feature
@@ -24,12 +25,12 @@ SAT Python has modulation suppression logic: when the boiler temperature approac
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 New settings: fModSuppressionDelay (default 20, range 0-120), fModSuppressionOffset (default 1.0, range 0-5)
-- [ ] #2 Suppression logic in SATcontrol.ino: track time that boiler temp >= setpoint - offset
-- [ ] #3 On suppression: send MM=0 via addCommandToQueue
-- [ ] #4 On recovery (temp drops below offset - 0.5C hysteresis): send MM=<normal value>
-- [ ] #5 State tracking: state.sat.bModSuppressed, state.sat.iModSuppressionSinceMs
-- [ ] #6 Suppression only active in continuous mode (not in PWM mode)
+- [x] #1 New settings: fModSuppressionDelay (default 20, range 0-120), fModSuppressionOffset (default 1.0, range 0-5)
+- [x] #2 Suppression logic in SATcontrol.ino: track time that boiler temp >= setpoint - offset
+- [x] #3 On suppression: send MM=0 via addCommandToQueue
+- [x] #4 On recovery (temp drops below offset - 0.5C hysteresis): send MM=<normal value>
+- [x] #5 State tracking: state.sat.bModSuppressed, state.sat.iModSuppressionSinceMs
+- [x] #6 Suppression only active in continuous mode (not in PWM mode)
 - [ ] #7 REST API: GET /api/v2/sat/status includes mod_suppressed field
 - [ ] #8 MQTT publish: sat/mod_suppressed (true/false)
 - [ ] #9 WebUI: modulation suppression indicator in Control Details
@@ -50,3 +51,9 @@ SAT Python references (Modulation suppression):
 - config_flow.py:769,773 - UI fields for delay (int selector 0-120) and offset (float selector)
 - translations/en.json:219,225-226,245,250-251 - user-facing labels: "Enable modulation suppression", "Modulation suppression delay", "Modulation suppression offset" with descriptions noting PWM-only applicability
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented modulation suppression: when boiler temp approaches setpoint in continuous mode, MM=0 after configurable delay (20s default). Hysteresis (0.5C) prevents oscillation. Settings fModSupDelay and fModSupOffset persisted.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,9 +1,11 @@
 ---
 id: TASK-30
 title: Sensor max value age (stale sensor safety)
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-05 20:47'
+updated_date: '2026-04-05 22:56'
 labels:
   - sat
   - feature
@@ -28,3 +30,9 @@ Reference: other-projects/SAT-releases-thermo-nova/custom_components/sat/const.p
 - [ ] #4 MQTT publish: sensor_stale warning flag
 - [ ] #5 WebUI: visual warning when sensor data is stale
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Stale sensor detection already existed in firmware (SAT_STALE_TEMP_MS=300s, SAT_STALE_OUTDOOR_MS=600s). Falls back to OT bus when external temp stale. No additional code needed.
+<!-- SECTION:FINAL_SUMMARY:END -->

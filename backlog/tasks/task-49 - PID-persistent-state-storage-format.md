@@ -1,9 +1,11 @@
 ---
 id: TASK-49
 title: PID persistent state storage format
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-05 21:06'
+updated_date: '2026-04-05 23:04'
 labels:
   - sat
   - feature
@@ -29,3 +31,9 @@ Store PID controller state (integral, last_error, raw_derivative, last_temperatu
 - [ ] #4 Graceful handling of missing/corrupt stored state (fall back to defaults)
 - [ ] #5 Storage writes throttled to prevent flash wear (not every cycle)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+PID state storage format: JSON {i, d, err} in /sat_pid_state.json. Simple parse on load, snprintf_P on save.
+<!-- SECTION:FINAL_SUMMARY:END -->

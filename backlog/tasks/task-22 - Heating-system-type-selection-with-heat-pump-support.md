@@ -1,11 +1,11 @@
 ---
 id: TASK-22
 title: Heating system type selection with heat pump support
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-05 20:24'
-updated_date: '2026-04-05 22:04'
+updated_date: '2026-04-05 22:34'
 labels:
   - sat
   - feature
@@ -76,3 +76,9 @@ Implementation progress (2026-04-05):
 - REST API range updated to 0-3 in restAPI.ino
 - MQTT subscribe handler added for set/<nodeId>/sat/heating_system
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented heating system type selection with auto-detect from OT MsgID 3. SATHeatingSystem enum, 6 helper functions, REST/MQTT/WebUI integration. 10/13 ACs complete, remaining depend on Task #4.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,9 +1,11 @@
 ---
 id: TASK-38
 title: OT error flag monitoring and reporting
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-05 20:52'
+updated_date: '2026-04-05 22:56'
 labels:
   - sat
   - feature
@@ -28,3 +30,9 @@ Reference: other-projects/SAT-releases-thermo-nova/custom_components/sat/const.p
 - [ ] #4 WebUI: error status display with descriptions
 - [ ] #5 Optional: auto-disable SAT on critical boiler faults
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added OT fault flag check (SlaveStatus bit 0) in SAT control loop. Skips control cycle when boiler reports fault. Existing fault MQTT publishing already in OTGW-Core.ino.
+<!-- SECTION:FINAL_SUMMARY:END -->

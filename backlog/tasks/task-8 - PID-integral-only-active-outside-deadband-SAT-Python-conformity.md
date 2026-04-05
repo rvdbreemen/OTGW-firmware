@@ -1,11 +1,11 @@
 ---
 id: TASK-8
 title: 'PID integral: only active outside deadband (SAT Python conformity)'
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-05 10:05'
-updated_date: '2026-04-05 20:08'
+updated_date: '2026-04-05 23:12'
 labels:
   - sat
   - bugfix
@@ -22,12 +22,12 @@ SAT custom PID design: integral is ONLY active INSIDE the deadband as a smooth c
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Integral clamp range changed to [0, curveValue] (was: [-curveValue, +curveValue])
-- [ ] #2 Hard cap remains at 20.0 (not -20.0 to +20.0, only 0 to 20.0)
-- [ ] #3 Integral time limit removed or adjusted (SAT Python has no 300s delay)
-- [ ] #4 Integral active when |error| <= deadband (compensator for external heat sources)
-- [ ] #5 Integral reset to 0.0 when |error| > deadband (heating curve takes over)
-- [ ] #6 Test scenario: error inside deadband -> integral accumulates smoothly; error outside deadband -> integral = 0
+- [x] #1 Integral clamp range changed to [0, curveValue] (was: [-curveValue, +curveValue])
+- [x] #2 Hard cap remains at 20.0 (not -20.0 to +20.0, only 0 to 20.0)
+- [x] #3 Integral time limit removed or adjusted (SAT Python has no 300s delay)
+- [x] #4 Integral active when |error| <= deadband (compensator for external heat sources)
+- [x] #5 Integral reset to 0.0 when |error| > deadband (heating curve takes over)
+- [x] #6 Test scenario: error inside deadband -> integral accumulates smoothly; error outside deadband -> integral = 0
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -53,16 +53,5 @@ sergeantd feedback (2026-04-05): Task needs REVERSAL. Integral should be active 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Fixed critical PID integral logic inversion per SAT Python (pid.py).
-
-Changes:
-- Integral now accumulates when |error| > deadband (was incorrectly active inside deadband)
-- Integral resets to 0 when |error| <= deadband (was incorrectly resetting outside)
-- Clamp range changed from [-curveValue, +curveValue] to [0, curveValue] (positive only)
-- Hard cap changed from [-20, +20] to [0, 20]
-- Removed 300s integral time limit (SAT Python has none)
-- Uses fixed 60s interval (SAT_PID_UPDATE_INTERVAL) instead of elapsed time tracking
-- Removed unused _pid_lastIntegralMs variable and SAT_PID_INTEGRAL_TIME_LIMIT constant
-
-Files modified: SATpid.ino
+Fixed critical PID integral deadband logic per sergeantd's SAT design feedback.\n\nThe integral now activates INSIDE the deadband (as compensator for external heat sources like sun/cooking) and resets to 0 OUTSIDE the deadband (where the heating curve takes over). This was previously inverted.\n\nSAT PID zones:\n- Outside deadband: P + HeatingCurve + active Derivative (integral = 0)\n- Inside deadband: P + HeatingCurve + frozen Derivative + active Integral\n\nClamp: [0, curveValue], hard cap 20.0. No time limit (SAT Python has none).\n\nFiles modified: SATpid.ino
 <!-- SECTION:FINAL_SUMMARY:END -->

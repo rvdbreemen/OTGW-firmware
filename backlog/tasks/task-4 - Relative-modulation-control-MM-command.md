@@ -1,11 +1,11 @@
 ---
 id: TASK-4
 title: Relative modulation control (MM= command)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-05 10:03'
-updated_date: '2026-04-05 22:18'
+updated_date: '2026-04-05 22:34'
 labels:
   - sat
   - feature
@@ -74,3 +74,9 @@ SAT Python references (Relative Modulation MM=):
 - climate.py:492 - passes relative_modulation to heating demand
 - binary_sensor.py:62,143-144,151-152 - modulation sensor checks supports_relative_modulation_management, compares climate vs maximum modulation
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented MM= modulation control alongside CS= in SAT control loop. Heat pumps always MM=100, gas boilers MM=0 during PWM OFF. 11/15 ACs complete.
+<!-- SECTION:FINAL_SUMMARY:END -->

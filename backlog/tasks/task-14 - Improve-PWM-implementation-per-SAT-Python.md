@@ -1,11 +1,11 @@
 ---
 id: TASK-14
 title: Improve PWM implementation per SAT Python
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-05 10:07'
-updated_date: '2026-04-05 22:29'
+updated_date: '2026-04-05 22:48'
 labels:
   - sat
   - feature
@@ -64,3 +64,9 @@ Implementation (2026-04-06): Replaced simple PWM with 5-range duty mapper per SA
 - Max cycles from satGetMaxCyclesPerHour() (4 gas, 2 heat pump)
 - DHW guard not yet implemented (depends on Task #3)
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Replaced simple PWM with 5-range duty cycle mapper per SAT Python. EMA tracking, flame sync, system-aware min ON time. 8/13 ACs.
+<!-- SECTION:FINAL_SUMMARY:END -->

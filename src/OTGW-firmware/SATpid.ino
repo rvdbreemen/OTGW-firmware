@@ -77,19 +77,21 @@ static void _pidCalculateGains(float curveValue)
 }
 
 //=== Integral Update ===
-// Per SAT Python (pid.py): integral is only active when |error| > deadband
-// (correcting steady-state offset). Inside deadband, target is reached and
-// integral resets to 0. Clamp to [0, curveValue] — positive only.
+// Per sergeantd / SAT Python (pid.py): integral is ONLY active INSIDE the
+// deadband as a smooth compensator for external heat sources (sun, cooking,
+// activity). Outside the deadband, the heating curve replaces the integral
+// role. Clamp to [0, curveValue] — positive only.
 static void _pidUpdateIntegral(float error, float curveValue, bool force)
 {
   float deadband = settings.sat.fDeadband;
 
-  // Inside deadband: target reached, reset integral
-  if (fabsf(error) <= deadband) {
+  // Outside deadband: heating curve takes over, reset integral
+  if (fabsf(error) > deadband) {
     _pid_integral = 0.0f;
     return;
   }
 
+  // Inside deadband: integral acts as compensator
   if (state.sat.fKi < 1e-9f) return;
 
   // Accumulate: Ki * error * PID_UPDATE_INTERVAL (fixed 60s per SAT Python)
@@ -105,16 +107,18 @@ static void _pidUpdateIntegral(float error, float curveValue, bool force)
 }
 
 //=== Derivative Update ===
-// Per SAT Python (pid.py): temperature-based derivative with negative sign
-// (rising temp = negative derivative = damping). Uses adaptive alpha for
-// low-pass filter that scales with sample rate. Only active outside deadband.
+// Per sergeantd / SAT Python (pid.py): temperature-based derivative with
+// negative sign (rising temp = negative derivative = damping). Uses adaptive
+// alpha for low-pass filter that scales with sample rate.
+// Inside deadband: derivative FREEZES at last calculated value (persists as
+// heating curve offset). Outside deadband: derivative actively updates.
 static void _pidUpdateDerivative(float roomTemp)
 {
   float deadband = settings.sat.fDeadband;
 
-  // Inside deadband: reset derivative to 0, update timestamp only
+  // Inside deadband: FREEZE derivative (keep last value), update timestamp only
   if (fabsf(_pid_lastError) <= deadband) {
-    _pid_rawDerivative = 0.0f;
+    // _pid_rawDerivative keeps its last value — intentional freeze
     _pid_lastDerivativeMs = millis();
     return;
   }

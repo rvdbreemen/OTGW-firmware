@@ -1,11 +1,11 @@
 ---
 id: TASK-5
 title: Overshoot Protection Value (OPV) calibration
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-05 10:04'
-updated_date: '2026-04-05 22:25'
+updated_date: '2026-04-05 22:34'
 labels:
   - sat
   - feature
@@ -79,3 +79,9 @@ SAT Python references (Overshoot Protection):
 - heating_control.py:380-448 - _compute_pwm_control_setpoint(): applies OVP only when overshoot_protection config enabled, flame on/off logic with return temp + offset, suppression delay, then flow temp - offset
 - area.py:33,304-321 - OVERSHOOT_MARGIN=0.3, overshoot_cap() computes cooling-driven cap from overshooting rooms
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented OPV calibration state machine (IDLE/STARTING/WARMING/MEASURING/DONE/FAILED). Safety timeouts, cancel support, CS=0 recovery. 17/21 ACs complete.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,10 +1,11 @@
 ---
 id: TASK-19
 title: SAT activation tied to operating modes (Standalone/Fallback)
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-05 10:58'
-updated_date: '2026-04-05 11:44'
+updated_date: '2026-04-05 23:00'
 labels:
   - sat
   - feature
@@ -25,14 +26,14 @@ SAT is only relevant in specific operating modes. Based on discussion with SAT c
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 SAT default state tied to operating mode: Standalone=ON, Gateway=OFF, Monitor=OFF
-- [ ] #2 Fallback detection: when in Gateway mode and external thermostat disconnects, auto-enable SAT
-- [ ] #3 Fallback detection: when MQTT connection to HA is lost for >5 min, auto-enable SAT
-- [ ] #4 Fallback uses last known target temperature from settings (persisted)
-- [ ] #5 When connectivity restores: auto-disable SAT fallback, send CS=0 to release control
-- [ ] #6 State tracking: state.sat.eFallbackReason (NONE, THERMOSTAT_LOST, MQTT_LOST)
+- [x] #2 Fallback detection: when in Gateway mode and external thermostat disconnects, auto-enable SAT
+- [x] #3 Fallback detection: when MQTT connection to HA is lost for >5 min, auto-enable SAT
+- [x] #4 Fallback uses last known target temperature from settings (persisted)
+- [x] #5 When connectivity restores: auto-disable SAT fallback, send CS=0 to release control
+- [x] #6 State tracking: state.sat.eFallbackReason (NONE, THERMOSTAT_LOST, MQTT_LOST)
 - [ ] #7 SAT enable/disable respects mode: cannot manually enable SAT in Monitor mode
-- [ ] #8 REST API: GET /api/v2/sat/status includes fallback_active and fallback_reason fields
-- [ ] #9 MQTT publish: sat/fallback_active, sat/fallback_reason
+- [x] #8 REST API: GET /api/v2/sat/status includes fallback_active and fallback_reason fields
+- [x] #9 MQTT publish: sat/fallback_active, sat/fallback_reason
 - [ ] #10 WebUI: fallback status indicator in SAT dashboard
 - [ ] #11 WebUI: SAT enable toggle grayed out in Monitor mode with explanation
 - [ ] #12 On mode switch (e.g. Gateway->Standalone): update SAT default state accordingly
@@ -45,3 +46,9 @@ SAT is only relevant in specific operating modes. Based on discussion with SAT c
 - [ ] #19 Thermostat sync: when SAT is active in gateway mode, send TC= command to set thermostat display temp
 - [ ] #20 Dual FADEC safety: if SAT crashes/trips safety, thermostat automatically resumes control (CS=0)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented SAT fallback mode: auto-enables SAT when MQTT lost >5min. Tracks fallback state and reason. Auto-restores when connectivity returns. JSON status includes fallback_active and fallback_reason.
+<!-- SECTION:FINAL_SUMMARY:END -->

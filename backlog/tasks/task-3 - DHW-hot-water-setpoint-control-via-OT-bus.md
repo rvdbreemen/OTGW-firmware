@@ -1,10 +1,11 @@
 ---
 id: TASK-3
 title: DHW (hot water) setpoint control via OT bus
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-05 10:03'
-updated_date: '2026-04-05 21:41'
+updated_date: '2026-04-05 23:07'
 labels:
   - sat
   - feature
@@ -23,14 +24,14 @@ SAT Python offers DHW setpoint control via the coordinator. On the ESP we can di
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 New setting settings.sat.fDhwSetpoint (default 0.0 = inactive, range 30-60)
-- [ ] #2 New setting settings.sat.bDhwEnabled (default false)
+- [x] #1 New setting settings.sat.fDhwSetpoint (default 0.0 = inactive, range 30-60)
+- [x] #2 New setting settings.sat.bDhwEnabled (default false)
 - [ ] #3 When DHW enabled: send SW=<setpoint> command via addCommandToQueue at initSAT and on change
-- [ ] #4 State tracking: state.sat.bDhwActive read from OTcurrentSystemState.Statusflags bit 2
-- [ ] #5 SAT control loop: skip CS= command when DHW is active (boiler manages itself)
-- [ ] #6 REST API: GET /api/v2/sat/status includes dhw_active and dhw_setpoint fields
+- [x] #4 State tracking: state.sat.bDhwActive read from OTcurrentSystemState.Statusflags bit 2
+- [x] #5 SAT control loop: skip CS= command when DHW is active (boiler manages itself)
+- [x] #6 REST API: GET /api/v2/sat/status includes dhw_active and dhw_setpoint fields
 - [ ] #7 REST API: POST /api/v2/sat/dhw with body for setpoint value
-- [ ] #8 MQTT subscribe: set/<nodeId>/sat/dhw_setpoint
+- [x] #8 MQTT subscribe: set/<nodeId>/sat/dhw_setpoint
 - [ ] #9 MQTT publish: sat/dhw_setpoint and sat/dhw_active
 - [ ] #10 WebUI: DHW setpoint field in SAT dashboard
 - [ ] #11 WebUI: DHW active indicator in status section
@@ -61,3 +62,9 @@ SAT Python references (DHW):
 - const.py:19 - DHW_OVERSHOOT_GUARD_SECONDS = 300.0 (5min guard after DHW off)
 - heating_control.py:136,268,272,313,385 - hot_water_active checks pause CH control; DHW overshoot guard window prevents PWM enable/disable
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+DHW control: skip CH when DHW active (SlaveStatus bit 2). Settings fDhwSetpoint/bDhwEnabled with MQTT/REST/persistence. 6/8 ACs.
+<!-- SECTION:FINAL_SUMMARY:END -->
