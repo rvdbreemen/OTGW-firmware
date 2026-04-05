@@ -838,9 +838,14 @@ void satPublishMQTT()
   { char bsName[20]; satGetBoilerStatusName(bsName, sizeof(bsName));
     sendMQTTData(F("sat/boiler_status"), bsName, false); }
 
-  // Cycle info
-  snprintf_P(valBuf, sizeof(valBuf), PSTR("%d"), (int)state.sat.eLastCycleClass);
-  sendMQTTData(F("sat/cycle_class"), valBuf, false);
+  // Cycle class (string label)
+  { static const char* const ccNames[] PROGMEM = {
+      "none", "good", "overshoot", "underheat", "short", "uncertain"
+    };
+    int ccIdx = (int)state.sat.eLastCycleClass;
+    if (ccIdx < 0 || ccIdx > 5) ccIdx = 0;
+    sendMQTTData(F("sat/cycle_class"), ccNames[ccIdx], false);
+  }
 
   // PWM duty
   dtostrf(state.sat.fPwmDutyCycle, 1, 2, valBuf);
@@ -849,6 +854,26 @@ void satPublishMQTT()
   // Overshoot margin
   dtostrf(settings.sat.fOvershootMargin, 1, 1, valBuf);
   sendMQTTData(F("sat/overshoot_margin"), valBuf, true);
+
+  // Active state
+  sendMQTTData(F("sat/active"), state.sat.bActive ? "true" : "false", true);
+
+  // Room and outside temps
+  dtostrf(satGetRoomTemp(), 1, 1, valBuf);
+  sendMQTTData(F("sat/room_temp"), valBuf, false);
+
+  dtostrf(satGetOutsideTemp(), 1, 1, valBuf);
+  sendMQTTData(F("sat/outside_temp"), valBuf, false);
+
+  // PID gains
+  dtostrf(state.sat.fKp, 1, 4, valBuf);
+  sendMQTTData(F("sat/kp"), valBuf, false);
+
+  dtostrf(state.sat.fKi, 1, 6, valBuf);
+  sendMQTTData(F("sat/ki"), valBuf, false);
+
+  dtostrf(state.sat.fKd, 1, 2, valBuf);
+  sendMQTTData(F("sat/kd"), valBuf, false);
 
   // Safety
   sendMQTTData(F("sat/safety_tripped"), state.sat.bSafetyTripped ? "true" : "false", false);
