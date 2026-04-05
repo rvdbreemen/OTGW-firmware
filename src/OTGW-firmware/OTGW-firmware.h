@@ -244,8 +244,9 @@ struct OTBusState {          // state.otgw — OpenTherm protocol & bus state
   bool bThermostatState  = false;  // was bOTGWthermostatstate
 };
 
-struct MQTTRuntimeSection {    // state.mqtt — MQTT broker connection state
+struct MQTTRuntimeSection {    // state.mqtt -- MQTT broker connection state
   bool bConnected        = false;  // was statusMQTTconnection
+  uint32_t iLastConnectedMs = 0;   // millis() when MQTT was last connected (for fallback detection)
 };
 
 struct FlashSection {          // state.flash — Firmware upgrade operations
@@ -315,6 +316,9 @@ enum SATPreset : uint8_t {
   SAT_PRESET_NONE = 0, SAT_PRESET_AWAY, SAT_PRESET_ECO,
   SAT_PRESET_COMFORT, SAT_PRESET_SLEEP, SAT_PRESET_ACTIVITY
 };
+enum SATFallbackReason : uint8_t {
+  SAT_FB_NONE = 0, SAT_FB_THERMOSTAT_LOST, SAT_FB_MQTT_LOST
+};
 enum SATCycleClass  : uint8_t {
   SAT_CYCLE_NONE = 0, SAT_CYCLE_GOOD, SAT_CYCLE_OVERSHOOT,
   SAT_CYCLE_UNDERHEAT, SAT_CYCLE_SHORT, SAT_CYCLE_UNCERTAIN
@@ -374,6 +378,9 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint32_t iExternalTempLastMs   = 0;   // millis() when external indoor temp was last received
   uint32_t iExternalOutdoorLastMs = 0;  // millis() when external outdoor temp was last received
   bool     bSafetyTripped        = false; // true if safety forced satDisable()
+  // Fallback mode
+  bool     bFallbackActive       = false;
+  SATFallbackReason eFallbackReason = SAT_FB_NONE;
   // Heating system detection
   uint8_t  iDetectedHeatingSystem = SAT_HSYS_RADIATORS; // auto-detected from OT MsgID 3
 };

@@ -628,6 +628,8 @@ void satSendStatusJSON()
   sendJsonMapEntry(F("pwm_flame_req"),        state.sat.bPwmFlameRequested);
   sendJsonMapEntry(F("active_preset"),         (int32_t)state.sat.eActivePreset);
   sendJsonMapEntry(F("mod_suppressed"),        state.sat.bModSuppressed);
+  sendJsonMapEntry(F("fallback_active"),       state.sat.bFallbackActive);
+  sendJsonMapEntry(F("fallback_reason"),       (int32_t)state.sat.eFallbackReason);
   sendJsonMapEntry(F("max_rel_modulation"),   (int32_t)settings.sat.iMaxRelModulation);
   sendJsonMapEntry(F("current_modulation"),   (int32_t)state.sat.iCurrentModulation);
   satSendJsonFloat(F("ovp_value"),            settings.sat.fOvpValue, 1);
@@ -750,6 +752,28 @@ void initSAT()
 //=====================================================================
 void satControlLoop()
 {
+  // --- Fallback detection (Task #19): auto-enable SAT when external control lost ---
+  if (!settings.sat.bEnabled && !state.sat.bFallbackActive) {
+    // Check if we should auto-enable as fallback
+    bool mqttLost = !state.mqtt.bConnected &&
+                    (millis() - state.mqtt.iLastConnectedMs > 300000UL); // 5 min MQTT loss
+    if (mqttLost) {
+      state.sat.bFallbackActive = true;
+      state.sat.eFallbackReason = SAT_FB_MQTT_LOST;
+      settings.sat.bEnabled = true; // Temporarily enable SAT
+      DebugTln(F("SAT FALLBACK: MQTT lost >5min, auto-enabling SAT"));
+    }
+  }
+  // Check if fallback should be lifted
+  if (state.sat.bFallbackActive && state.mqtt.bConnected) {
+    state.sat.bFallbackActive = false;
+    state.sat.eFallbackReason = SAT_FB_NONE;
+    settings.sat.bEnabled = false; // Restore disabled state
+    DebugTln(F("SAT FALLBACK: connectivity restored, disabling fallback"));
+    satDisable();
+    return;
+  }
+
   if (!settings.sat.bEnabled || isFlashing()) {
     if (state.sat.bActive) {
       satDisable();

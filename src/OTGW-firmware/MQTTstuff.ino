@@ -946,6 +946,7 @@ void handleMQTT()
     break;
   }
   state.mqtt.bConnected = MQTTclient.connected();
+  if (state.mqtt.bConnected) state.mqtt.iLastConnectedMs = millis();
 } // handleMQTT()
 
 void PrintMQTTError(){
