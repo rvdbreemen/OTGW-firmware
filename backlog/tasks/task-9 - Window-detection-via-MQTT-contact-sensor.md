@@ -4,7 +4,7 @@ title: Window detection via MQTT contact sensor
 status: To Do
 assignee: []
 created_date: '2026-04-05 10:05'
-updated_date: '2026-04-05 10:21'
+updated_date: '2026-04-05 21:42'
 labels:
   - sat
   - feature
@@ -38,3 +38,19 @@ SAT Python detects open windows via contact sensors and switches to Activity pre
 - [ ] #12 WebUI: window status indicator in SAT dashboard
 - [ ] #13 WebUI: window detection settings (enable, min open time) in settings page
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+SAT Python references (Window detection):
+- const.py:59 - CONF_WINDOW_SENSORS = "window_sensors"
+- const.py:61 - CONF_WINDOW_MINIMUM_OPEN_TIME = "window_minimum_open_time"
+- const.py:130 - default: CONF_WINDOW_SENSORS: []
+- const.py:172 - default: CONF_WINDOW_MINIMUM_OPEN_TIME: "00:00:15" (15 seconds)
+- climate.py:94 - _window_sensor_handle: Optional[asyncio.Task] for delayed window-open detection
+- climate.py:157-159 - cleanup cancels _window_sensor_handle on removal
+- climate.py:746 - async_track_state_change_event subscribes to window_sensors list, callback=_async_window_sensor_changed
+- climate.py:800-828 - _async_window_sensor_changed(): on window open, starts asyncio.sleep(window_minimum_open_time_seconds) delay then pauses heating; on window close, cancels pending handle and resumes heating
+- binary_sensor.py:56 - creates SatWindowSensor entity if window_sensors configured
+- binary_sensor.py:450-471 - SatWindowSensor class extends BinarySensorGroup: mode=any (any window triggers), device_class=WINDOW, uses config.window_sensors as entity_ids
+<!-- SECTION:NOTES:END -->

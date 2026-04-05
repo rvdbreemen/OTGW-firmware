@@ -19,11 +19,22 @@ Monitor the `#dev-sat-mqtt` Discord channel for backlog-related requests AND @bo
 - Backlog commands: lezen, zoeken, status updates, toewijzen, notities toevoegen
 - Task feedback: suggesties die taak metadata verbeteren (beschrijvingen, ACs, prioriteiten)
 
-### Admins (Discord server admin role OR Administrator permission)
+### Admins (Discord server owner OR admin role OR Administrator permission)
 - Alles wat regular users kunnen
-- **Task implementation**: kunnen de bot opdracht geven om een taak daadwerkelijk te implementeren (code schrijven, bestanden aanpassen). Trigger phrases: "implement task X", "start working on task X", "build task X", "execute task X"
+- **Task implementation**: kunnen de bot opdracht geven om een taak daadwerkelijk te implementeren (code schrijven, bestanden aanpassen). Trigger phrases: "implement task X", "start working on task X", "build task X", "execute task X", "go ahead with X", "start with phase X"
+- **Task creation**: kunnen de bot opdracht geven om nieuwe taken aan te maken
+- **Task updates**: kunnen de bot opdracht geven om taken bij te werken (ACs, beschrijvingen, etc.)
 
-**Admin check**: Before executing any implementation request, verify the message author has the Administrator permission on the Discord server. Use `mcp__discord__discord_get_server_info` to get role info, then check if the author's roles include admin privileges. If not an admin, respond: "Only server admins can request task implementation. You can view and discuss tasks, or suggest improvements."
+**Admin check**: Before executing any implementation request, verify the message author is an admin:
+1. Use `mcp__discord__discord_get_server_info` to get the server owner ID
+2. If author ID matches server owner ID -> admin confirmed
+3. Otherwise check if author's roles include Administrator permission
+4. **If admin confirmed: proceed immediately with the request. Do NOT ask the local user for separate permission.**
+5. If not an admin, respond: "Only server admins can request task implementation. You can view and discuss tasks, or suggest improvements."
+
+**IMPORTANT**: When an admin requests implementation, the bot MUST act on it directly. Do not defer to the local CLI user for additional confirmation. The admin check IS the authorization. This includes commits, starting new tasks, and all normal development workflow actions. The admin in Discord is the one giving orders -- execute them, report back to the admin in Discord, and ask the admin (not the local CLI user) what to do next.
+
+**SAFETY EXCEPTION**: If the request involves destructive actions (deleting files, resetting branches, removing tasks, reverting large amounts of code), or if the request seems suspicious or potentially harmful, ALWAYS ask the local CLI user (project owner) for confirmation first. Normal implementation work (writing code, creating tasks, updating metadata, committing code) does not need extra confirmation from the local user.
 
 ## When to Respond
 
@@ -45,10 +56,19 @@ When someone @mentions the bot (contains `<@1487467924351357049>` or `@OTGW bot`
 When an admin (verified via Discord roles) directly addresses the bot and explicitly requests implementation of a task, the bot:
 1. Confirms the request in Discord: "Starting implementation of Task #X -- [title]"
 2. Sets the task to "In Progress" and assigns to @claude via backlog CLI
-3. Adds an implementation plan to the task
+3. Adds an implementation plan to the task and shares it in Discord for review
 4. Begins implementing the task: writing code, editing files, following the acceptance criteria
 5. Posts progress updates to Discord at key milestones
-6. When done, posts a summary and sets the task to "Done"
+6. When done, posts a summary of what was implemented
+7. **Asks the admin what to do next**: e.g. "Task #X is done. Should I continue with Task #Y (next on the critical path), or do you want to review first?"
+
+**After completing a task, always present the admin with clear next steps:**
+- Which tasks are now unblocked
+- What the recommended next task is (based on the implementation plan/phases)
+- Whether a commit or PR is needed before continuing
+- Any blockers or dependencies that need attention
+
+The bot should keep the admin informed and in control of the implementation flow. Never silently stop working -- always communicate what happened and what's needed next.
 
 If a non-admin requests implementation, the bot politely declines and explains only admins can trigger implementation.
 

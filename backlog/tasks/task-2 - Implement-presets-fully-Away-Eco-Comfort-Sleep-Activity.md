@@ -4,7 +4,7 @@ title: Implement presets fully (Away/Eco/Comfort/Sleep/Activity)
 status: To Do
 assignee: []
 created_date: '2026-04-05 10:02'
-updated_date: '2026-04-05 10:18'
+updated_date: '2026-04-05 21:41'
 labels:
   - sat
   - feature
@@ -37,3 +37,15 @@ SAT Python has 5 presets: Away, Sleep, Home (=Eco), Comfort, Activity. The curre
 - [ ] #12 Settings persistence: all 5 preset temperatures saved and loaded
 - [ ] #13 HA auto-discovery: climate entity preset_modes updated in mqttha.cfg
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+SAT Python references (Presets):
+- climate.py:17-18,23 - imports PRESET_HOME, PRESET_NONE, PRESET_AWAY, PRESET_SLEEP, PRESET_COMFORT, PRESET_ACTIVITY
+- climate.py:99,101 - default preset_mode=PRESET_NONE, builds preset_modes list
+- climate.py:567,613-633 - async_set_preset_mode() logic: PRESET_NONE resets, others store previous target temp and apply preset temp; PRESET_HOME special-cased
+- climate.py:868-871 - _build_presets() maps preset names to config temperature keys
+- const.py:104-108 - CONF_AWAY_TEMPERATURE, CONF_HOME_TEMPERATURE, CONF_SLEEP_TEMPERATURE, CONF_COMFORT_TEMPERATURE, CONF_ACTIVITY_TEMPERATURE
+- const.py:175-179 - defaults: activity=10, away=10, home=18, sleep=15, comfort=20
+<!-- SECTION:NOTES:END -->

@@ -4,7 +4,7 @@ title: Overshoot Protection Value (OPV) calibration
 status: To Do
 assignee: []
 created_date: '2026-04-05 10:04'
-updated_date: '2026-04-05 10:19'
+updated_date: '2026-04-05 21:42'
 labels:
   - sat
   - feature
@@ -47,3 +47,18 @@ OPV is SAT's killer feature. It automatically detects a boiler's minimum output 
 - [ ] #20 HA auto-discovery: sensor entity for OPV value, binary_sensor for calibration active
 - [ ] #21 Safety: calibration cancellable, timeout protection, CS=0 on failure
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+SAT Python references (Overshoot Protection):
+- const.py:77 - CONF_OVERSHOOT_PROTECTION = "overshoot_protection"
+- const.py:122 - default: CONF_OVERSHOOT_PROTECTION: False
+- const.py:188 - OVERSHOOT_PROTECTION_REQUIRED_DATASET = 40 (min samples needed)
+- const.py:196 - STORAGE_OVERSHOOT_PROTECTION_VALUE for persisted OPV
+- const.py:201-202 - SERVICE_SET_OVERSHOOT_PROTECTION_VALUE, SERVICE_START_OVERSHOOT_PROTECTION_CALCULATION
+- const.py:21 - OVERSHOOT_SUSTAIN_SECONDS = 60.0 (sustained overshoot detection)
+- heating_control.py:262-305 - _maybe_enable_pwm_on_sustained_overshoot(): enables PWM when flow temp exceeds requested_setpoint + OVERSHOOT_MARGIN_CELSIUS for OVERSHOOT_SUSTAIN_SECONDS; guards against hot_water_active and DHW guard window
+- heating_control.py:380-448 - _compute_pwm_control_setpoint(): applies OVP only when overshoot_protection config enabled, flame on/off logic with return temp + offset, suppression delay, then flow temp - offset
+- area.py:33,304-321 - OVERSHOOT_MARGIN=0.3, overshoot_cap() computes cooling-driven cap from overshooting rooms
+<!-- SECTION:NOTES:END -->

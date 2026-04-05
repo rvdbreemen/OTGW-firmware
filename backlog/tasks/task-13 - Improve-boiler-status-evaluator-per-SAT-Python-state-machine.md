@@ -4,7 +4,7 @@ title: Improve boiler status evaluator per SAT Python state machine
 status: To Do
 assignee: []
 created_date: '2026-04-05 10:07'
-updated_date: '2026-04-05 10:22'
+updated_date: '2026-04-05 21:07'
 labels:
   - sat
   - feature
@@ -36,3 +36,22 @@ SAT Python has a more advanced boiler status evaluator with extra states and bet
 - [ ] #11 WebUI: boiler status with descriptive text instead of number
 - [ ] #12 HA auto-discovery: sensor entity with string values for boiler status
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+SAT thermo-nova boiler status evaluator reference (device/status.py:32-116):
+14-state machine with states:
+- PREHEATING: delta between setpoint and flow > 6C
+- AT_SETPOINT_BAND: flow within +-1.5C of setpoint
+- IGNITION_SURGE: flow rising > 0.5C/s (rapid temp spike on ignition)
+- PUMP_STARTING: initial pump spin-up detection
+- POST_CYCLE_SETTLING: 60s cooldown after flame off
+- OVERSHOOT_COOLING: flow > setpoint + 3C (boiler thermal mass overshoot)
+- ANTI_CYCLING: 180s minimum off time between cycles
+- STALLED_IGNITION: heater off > 600s without expected ignition
+- MODULATING_UP: modulation increasing
+- MODULATING_DOWN: modulation decreasing
+- Plus additional transitional states
+- Hysteresis: 0.7C for state transitions to prevent chattering
+<!-- SECTION:NOTES:END -->

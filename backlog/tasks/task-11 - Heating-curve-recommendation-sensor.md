@@ -4,7 +4,7 @@ title: Heating curve recommendation sensor
 status: To Do
 assignee: []
 created_date: '2026-04-05 10:06'
-updated_date: '2026-04-05 10:22'
+updated_date: '2026-04-05 21:07'
 labels:
   - sat
   - feature
@@ -33,3 +33,14 @@ SAT Python calculates a recommendation for the heating curve coefficient based o
 - [ ] #8 WebUI: recommendation visible in Heating Curve section with color code
 - [ ] #9 HA auto-discovery: sensor entity for curve_recommendation in mqttha.cfg
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+SAT thermo-nova algorithmic reference (heating_curve.py:10-40):
+- Quadratic formula: curve_value = 4*(T_target - 20) + 0.03*(T_outside - 20)^2 - 0.4*(T_outside - 20)
+- Final setpoint = base_offset + (coefficient / 4) * curve_value
+- base_offset and coefficient are user-configurable parameters
+- The quadratic term (0.03) compensates for increased heat loss at very low outdoor temps
+- The linear term (-0.4) provides baseline correction
+<!-- SECTION:NOTES:END -->

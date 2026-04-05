@@ -4,7 +4,7 @@ title: Improve PWM implementation per SAT Python
 status: To Do
 assignee: []
 created_date: '2026-04-05 10:07'
-updated_date: '2026-04-05 10:23'
+updated_date: '2026-04-05 21:07'
 labels:
   - sat
   - feature
@@ -38,3 +38,19 @@ SAT Python has a much more advanced PWM implementation than the current port. Di
 - [ ] #12 WebUI: PWM details section expanded with on/off times, effective temp
 - [ ] #13 Settings persistence: cycles_per_hour in settingStuff.ino
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+SAT thermo-nova PWM duty mapper reference (pwm.py:117-301):
+5-range duty cycle mapper:
+1. Low-duty: on=180s, off=max-180s (minimum flame time for reliable ignition)
+2. Low-range: linear scaling from low-duty baseline
+3. Mid-range: proportional on/off ratio
+4. High-range: scaled on-time, minimal off-time
+5. Max: on=max, off=0 (continuous operation)
+
+Flame ignition window: 180s minimum on-time to ensure stable combustion
+EMA smoothing alpha=0.3 on duty cycle to prevent rapid switching
+Total cycle period is configurable (default varies by range)
+<!-- SECTION:NOTES:END -->

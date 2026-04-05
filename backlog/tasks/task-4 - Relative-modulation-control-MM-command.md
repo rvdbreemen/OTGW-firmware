@@ -4,7 +4,7 @@ title: Relative modulation control (MM= command)
 status: To Do
 assignee: []
 created_date: '2026-04-05 10:03'
-updated_date: '2026-04-05 10:18'
+updated_date: '2026-04-05 21:41'
 labels:
   - sat
   - feature
@@ -40,3 +40,19 @@ SAT Python sends MM= (max relative modulation) command to the boiler to limit mo
 - [ ] #14 Settings persistence via settingStuff.ino
 - [ ] #15 HA auto-discovery: number entity for max modulation in mqttha.cfg
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+SAT Python references (Relative Modulation MM=):
+- heating_control.py:510-524 - _compute_relative_modulation_value(): if coordinator does not support rel mod management, sets None and skips; OFF state sets MINIMUM_RELATIVE_MODULATION, else uses config.pwm.maximum_relative_modulation; Geminox special case floors at 10
+- heating_control.py:237 - async_control() calls coordinator.async_set_control_max_relative_modulation(value)
+- coordinator/__init__.py:372 - base async_set_control_max_relative_modulation() abstract method
+- coordinator/mqtt/opentherm.py:216-222 - OpenTherm MQTT impl publishes max_relative_modulation via MQTT
+- coordinator/esphome/__init__.py:278-283 - ESPHome impl sends number command for max relative modulation
+- coordinator/serial/__init__.py:216-220 - Serial impl sends CS= command with max relative modulation
+- climate.py:50 - ATTR_RELATIVE_MODULATION_VALUE exposed as extra state attribute
+- climate.py:257-258 - exposes relative_modulation_value and relative_modulation_state in state attrs
+- climate.py:492 - passes relative_modulation to heating demand
+- binary_sensor.py:62,143-144,151-152 - modulation sensor checks supports_relative_modulation_management, compares climate vs maximum modulation
+<!-- SECTION:NOTES:END -->

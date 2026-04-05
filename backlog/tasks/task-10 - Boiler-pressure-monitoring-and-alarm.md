@@ -4,7 +4,7 @@ title: Boiler pressure monitoring and alarm
 status: To Do
 assignee: []
 created_date: '2026-04-05 10:06'
-updated_date: '2026-04-05 10:21'
+updated_date: '2026-04-05 21:07'
 labels:
   - sat
   - feature
@@ -35,3 +35,9 @@ SAT Python monitors boiler water pressure (CHPressure from OT MsgID 18) and dete
 - [ ] #9 HA auto-discovery: binary_sensor for pressure_alarm, sensor for pressure in mqttha.cfg
 - [ ] #10 Settings persistence via settingStuff.ino
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Advanced pressure analytics (EMA smoothing, linear regression drop-rate, settle delay, confirmation window) have been split into a separate dedicated task: TASK-39 "Pressure health: advanced EMA + regression analytics". This task (TASK-10) covers the basic pressure monitoring threshold. See TASK-39 for the advanced implementation.
+<!-- SECTION:NOTES:END -->

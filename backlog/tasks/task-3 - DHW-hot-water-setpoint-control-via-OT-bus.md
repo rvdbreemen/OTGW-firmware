@@ -4,7 +4,7 @@ title: DHW (hot water) setpoint control via OT bus
 status: To Do
 assignee: []
 created_date: '2026-04-05 10:03'
-updated_date: '2026-04-05 10:58'
+updated_date: '2026-04-05 21:41'
 labels:
   - sat
   - feature
@@ -42,3 +42,22 @@ SAT Python offers DHW setpoint control via the coordinator. On the ESP we can di
 - [ ] #17 WebUI: DHW slider range dynamically set from boundary values
 - [ ] #18 SAT DHW control only active in Standalone mode or fallback mode (not Monitor/Gateway)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+SAT Python references (DHW):
+- coordinator/__init__.py:135 - hot_water_active included in DeviceState
+- coordinator/__init__.py:174 - hot_water_active property
+- coordinator/__init__.py:179 - hot_water_setpoint property
+- coordinator/__init__.py:199,204 - minimum/maximum_hot_water_setpoint properties
+- coordinator/__init__.py:295 - supports_hot_water_setpoint_management property
+- coordinator/__init__.py:362-364 - async_set_control_hot_water_setpoint() checks supports_hot_water_setpoint_management
+- coordinator/esphome/__init__.py:132 - supports_hot_water_setpoint_management override
+- coordinator/esphome/__init__.py:152,160,164-169 - hot_water_active, hot_water_setpoint, min/max setpoint from OT keys t_dhw_set_lb/ub
+- coordinator/esphome/__init__.py:264-269 - async_set_control_hot_water_setpoint() sends number command
+- coordinator/mqtt/ems.py:43,63,71,115 - EMS coordinator DHW support, active state, setpoint, set command
+- coordinator/mqtt/opentherm.py - inherits base DHW handling
+- const.py:19 - DHW_OVERSHOOT_GUARD_SECONDS = 300.0 (5min guard after DHW off)
+- heating_control.py:136,268,272,313,385 - hot_water_active checks pause CH control; DHW overshoot guard window prevents PWM enable/disable
+<!-- SECTION:NOTES:END -->

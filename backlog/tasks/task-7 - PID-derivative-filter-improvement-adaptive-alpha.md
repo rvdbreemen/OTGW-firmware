@@ -1,11 +1,11 @@
 ---
 id: TASK-7
 title: 'PID derivative filter improvement: adaptive alpha'
-status: Done
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-04-05 10:04'
-updated_date: '2026-04-05 11:33'
+updated_date: '2026-04-05 20:08'
 labels:
   - sat
   - bugfix
@@ -24,11 +24,11 @@ SAT Python uses an adaptive alpha for the derivative low-pass filter: alpha = de
 <!-- AC:BEGIN -->
 - [x] #1 Derivative alpha calculation changed to adaptive: alpha = dt / (PID_UPDATE_INTERVAL + dt)
 - [x] #2 Derivative calculation validates correct negative sign convention
-- [x] #3 Derivative reset to 0 when error falls within deadband (per SAT Python)
-- [x] #4 Derivative skip when delta_time < PID_UPDATE_INTERVAL (prevents noise at fast sampling)
-- [x] #5 REST API: GET /api/v2/sat/status includes raw_derivative field
-- [x] #6 MQTT publish: sat/raw_derivative
-- [x] #7 WebUI: raw derivative value visible in PID Details section
+- [x] #3 Derivative skip when delta_time < PID_UPDATE_INTERVAL (prevents noise at fast sampling)
+- [x] #4 REST API: GET /api/v2/sat/status includes raw_derivative field
+- [x] #5 MQTT publish: sat/raw_derivative
+- [x] #6 WebUI: raw derivative value visible in PID Details section
+- [ ] #7 Derivative FREEZES at last calculated value when error falls within deadband (not reset to 0)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -43,6 +43,12 @@ SAT Python uses an adaptive alpha for the derivative low-pass filter: alpha = de
 7. Add MQTT publish sat/raw_derivative
 8. Add WebUI display in PID Details section
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+sergeantd feedback (2026-04-05): Derivative should FREEZE (not reset to 0) inside deadband. Last derivative value persists as heating curve offset. SAT design: outside deadband = P + Heating Curve + active Derivative; inside deadband = P + Heating Curve + frozen Derivative + active Integral.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 

@@ -4,7 +4,7 @@ title: 'Modulation suppression: prevent overshoot when approaching setpoint'
 status: To Do
 assignee: []
 created_date: '2026-04-05 10:08'
-updated_date: '2026-04-05 10:24'
+updated_date: '2026-04-05 21:42'
 labels:
   - sat
   - feature
@@ -35,3 +35,18 @@ SAT Python has modulation suppression logic: when the boiler temperature approac
 - [ ] #9 WebUI: modulation suppression indicator in Control Details
 - [ ] #10 Settings persistence via settingStuff.ino
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+SAT Python references (Modulation suppression):
+- const.py:86-87 - CONF_MODULATION_SUPPRESSION_DELAY_SECONDS, CONF_MODULATION_SUPPRESSION_OFFSET_CELSIUS
+- const.py:152-153 - defaults: delay=20s, offset=1.0C
+- entry_data.py:178-183 - config properties: modulation_suppression_delay_seconds, modulation_suppression_offset_celsius
+- heating_control.py:410-448 - full suppression logic in _compute_pwm_control_setpoint():
+  - :414-415 - reads suppression_delay from config
+  - :417-433 - if elapsed_since_flame_on < suppression_delay: holds flame-off setpoint or waits
+  - :435-448 - after delay: reads flow_temperature, subtracts modulation_suppression_offset_celsius to get suppressed_setpoint; clears flame_off_hold
+- config_flow.py:769,773 - UI fields for delay (int selector 0-120) and offset (float selector)
+- translations/en.json:219,225-226,245,250-251 - user-facing labels: "Enable modulation suppression", "Modulation suppression delay", "Modulation suppression offset" with descriptions noting PWM-only applicability
+<!-- SECTION:NOTES:END -->
