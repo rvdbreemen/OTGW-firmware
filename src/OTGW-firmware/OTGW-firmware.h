@@ -300,6 +300,12 @@ struct PicSettingsSection {    // state.picSettings — settings polled from PIC
 };
 
 //--- SAT runtime enums and state ---
+enum SATHeatingSystem : uint8_t {
+  SAT_HSYS_AUTO       = 0,  // Auto-detect from OT MsgID 3 system_type bit
+  SAT_HSYS_RADIATORS  = 1,  // Gas boiler + radiators (default if auto-detect fails)
+  SAT_HSYS_HEAT_PUMP  = 2,  // Heat pump (hybrid or standalone)
+  SAT_HSYS_UNDERFLOOR = 3   // Underfloor heating
+};
 enum SATControlMode : uint8_t { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS, SAT_MODE_PWM };
 enum SATCycleClass  : uint8_t {
   SAT_CYCLE_NONE = 0, SAT_CYCLE_GOOD, SAT_CYCLE_OVERSHOOT,
@@ -347,6 +353,8 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint32_t iExternalTempLastMs   = 0;   // millis() when external indoor temp was last received
   uint32_t iExternalOutdoorLastMs = 0;  // millis() when external outdoor temp was last received
   bool     bSafetyTripped        = false; // true if safety forced satDisable()
+  // Heating system detection
+  uint8_t  iDetectedHeatingSystem = SAT_HSYS_RADIATORS; // auto-detected from OT MsgID 3
 };
 
 struct OTGWState {
@@ -542,7 +550,7 @@ struct PICBootSection {            // PIC boot-time command injection
 // with permission from the SAT authors.
 struct SATSection {
   bool     bEnabled           = false;
-  uint8_t  iHeatingSystem     = 0;      // 0=radiator, 1=underfloor
+  uint8_t  iHeatingSystem     = SAT_HSYS_AUTO; // SATHeatingSystem enum: auto/radiators/heat_pump/underfloor
   float    fTargetTemp        = 20.0f;  // Default room target °C
   float    fHeatingCurveCoeff = 1.5f;   // Heating curve coefficient
   float    fDeadband          = 0.25f;  // PID deadband °C

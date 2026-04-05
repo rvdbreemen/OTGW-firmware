@@ -34,6 +34,76 @@ static const uint32_t SAT_STALE_OUTDOOR_MS   = 600000UL; // 10 min: external out
 static const uint8_t  SAT_MAX_SKIP_COUNT     = 10;       // Consecutive invalid-input skips before disable
 static const uint8_t  SAT_MAX_PIC_FAILS      = 5;        // Consecutive PIC comm failures before disable
 
+// --- Heating System Helper Functions ---
+// Returns the effective heating system (resolves AUTO to detected or fallback)
+static uint8_t satGetEffectiveHeatingSystem()
+{
+  if (settings.sat.iHeatingSystem == SAT_HSYS_AUTO)
+    return state.sat.iDetectedHeatingSystem;
+  return settings.sat.iHeatingSystem;
+}
+
+// Returns max boiler setpoint for the current heating system
+static float satGetMaxSetpoint()
+{
+  switch (satGetEffectiveHeatingSystem()) {
+    case SAT_HSYS_HEAT_PUMP:  return 40.0f;
+    case SAT_HSYS_UNDERFLOOR: return 45.0f;
+    case SAT_HSYS_RADIATORS:
+    default:                  return 62.0f;
+  }
+}
+
+// Returns heating curve base offset for the current heating system
+static float satGetBaseOffset()
+{
+  switch (satGetEffectiveHeatingSystem()) {
+    case SAT_HSYS_UNDERFLOOR: return SAT_HC_BASE_OFFSET_FLOOR;  // 20.0
+    case SAT_HSYS_HEAT_PUMP:
+    case SAT_HSYS_RADIATORS:
+    default:                  return SAT_HC_BASE_OFFSET_RAD;    // 27.2
+  }
+}
+
+// Returns max PWM cycles per hour for the current heating system
+static uint8_t satGetMaxCyclesPerHour()
+{
+  switch (satGetEffectiveHeatingSystem()) {
+    case SAT_HSYS_HEAT_PUMP:  return 2;   // Heat pumps: max 2 cycles/hr
+    case SAT_HSYS_UNDERFLOOR: return 3;
+    case SAT_HSYS_RADIATORS:
+    default:                  return 4;
+  }
+}
+
+// Returns minimum ON time in seconds for the current heating system
+static uint32_t satGetMinOnTimeSec()
+{
+  switch (satGetEffectiveHeatingSystem()) {
+    case SAT_HSYS_HEAT_PUMP:  return 1800; // 30 minutes for heat pumps
+    case SAT_HSYS_UNDERFLOOR:
+    case SAT_HSYS_RADIATORS:
+    default:                  return 180;  // 3 minutes for gas boilers
+  }
+}
+
+// Returns whether MM=100 should always be used (heat pumps)
+static bool satAlwaysMaxModulation()
+{
+  return (satGetEffectiveHeatingSystem() == SAT_HSYS_HEAT_PUMP);
+}
+
+// Returns the name string for the current heating system
+static const char* satGetHeatingSystemName()
+{
+  switch (satGetEffectiveHeatingSystem()) {
+    case SAT_HSYS_HEAT_PUMP:  return "heat_pump";
+    case SAT_HSYS_UNDERFLOOR: return "underfloor";
+    case SAT_HSYS_RADIATORS:  return "radiators";
+    default:                  return "auto";
+  }
+}
+
 static uint8_t _sat_consecutiveSkips  = 0;
 static uint8_t _sat_picFailCount      = 0;
 static bool    _sat_bootCS0sent       = false;  // One-shot: ensure CS=0 is sent once PIC is available
@@ -55,7 +125,7 @@ DECLARE_TIMER_SEC(timerSATControl, settings.sat.iControlInterval, CATCH_UP_MISSE
 //=====================================================================
 static float satCalcHeatingCurve(float targetTemp, float outsideTemp)
 {
-  float baseOffset = (settings.sat.iHeatingSystem == 1) ? SAT_HC_BASE_OFFSET_FLOOR : SAT_HC_BASE_OFFSET_RAD;
+  float baseOffset = satGetBaseOffset();
   float coeff = settings.sat.fHeatingCurveCoeff;
   float diff = outsideTemp - SAT_HC_REF_TEMP;
 
@@ -144,7 +214,7 @@ static float satApplyPWM(float pidOutput)
   float maxSetpoint = OTcurrentSystemState.MaxTSet;
   if (maxSetpoint < 30.0f) maxSetpoint = SAT_MAX_SETPOINT_DEFAULT;
 
-  float baseOffset = (settings.sat.iHeatingSystem == 1) ? SAT_HC_BASE_OFFSET_FLOOR : SAT_HC_BASE_OFFSET_RAD;
+  float baseOffset = satGetBaseOffset();
   float range = maxSetpoint - baseOffset;
   if (range < 10.0f) range = 10.0f;
 
@@ -381,6 +451,8 @@ void satSendStatusJSON()
   satSendJsonFloat(F("pwm_duty"),             state.sat.fPwmDutyCycle, 2);
   sendJsonMapEntry(F("pwm_flame_req"),        state.sat.bPwmFlameRequested);
   sendJsonMapEntry(F("heating_system"),       (int32_t)settings.sat.iHeatingSystem);
+  sendJsonMapEntry(F("heating_system_detected"), (int32_t)state.sat.iDetectedHeatingSystem);
+  satSendJsonFloat(F("max_setpoint_system"), satGetMaxSetpoint(), 1);
   sendJsonMapEntry(F("external_temp_valid"),  state.sat.bExternalTempValid);
   sendJsonMapEntry(F("external_outdoor_valid"), state.sat.bExternalOutdoorValid);
   sendJsonMapEntry(F("safety_tripped"),       state.sat.bSafetyTripped);
@@ -563,8 +635,10 @@ void satControlLoop()
   float maxSetpoint = OTcurrentSystemState.MaxTSet;
   if (maxSetpoint < 30.0f) maxSetpoint = SAT_MAX_SETPOINT_DEFAULT;
 
-  // Hard safety ceiling based on heating system type — never exceeded
-  float hardMax = (settings.sat.iHeatingSystem == 1) ? SAT_HARD_MAX_FLOOR : SAT_HARD_MAX_RAD;
+  // Hard safety ceiling based on heating system type -- never exceeded
+  float sysMax = satGetMaxSetpoint();
+  float hardMax = (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? SAT_HARD_MAX_FLOOR : SAT_HARD_MAX_RAD;
+  if (maxSetpoint > sysMax) maxSetpoint = sysMax;
   if (maxSetpoint > hardMax) maxSetpoint = hardMax;
 
   if (pidOutput < SAT_MIN_SETPOINT) pidOutput = SAT_MIN_SETPOINT;

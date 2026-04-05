@@ -1290,7 +1290,7 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("webhookcontenttype"), CSTR(settings.webhook.sContentType), "s", 31);
   // --- SAT settings ---
   sendJsonSettingObj(F("satenabled"), settings.sat.bEnabled, "b");
-  sendJsonSettingObj(F("satsystem"), settings.sat.iHeatingSystem, "i", 0, 1);
+  sendJsonSettingObj(F("satsystem"), settings.sat.iHeatingSystem, "i", 0, 3);  // 0=auto,1=radiators,2=heat_pump,3=underfloor
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fTargetTemp, 1, 1, tmpBuf);
@@ -1313,6 +1313,7 @@ void sendDeviceSettings()
   }
   sendJsonSettingObj(F("satpwmautoswitch"), settings.sat.bPwmAutoSwitch, "b");
   {
+    char tmpBuf[8];
     dtostrf(settings.sat.fOvershootMargin, 1, 1, tmpBuf);
     sendJsonSettingObj(F("satovershootmargin"), tmpBuf, "f", 0, 5);
   }

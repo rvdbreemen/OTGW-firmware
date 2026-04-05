@@ -2202,9 +2202,11 @@ void print_vh_configmemberid(uint16_t& value)
     //Build string for MQTT
     char _msg[15] {0};
     sendMQTTData(F("vh_configuration"), byte_to_binary(OTdata.valueHB)); 
-    sendMQTTData(F("vh_configuration_system_type"),    (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
-    sendMQTTData(F("vh_configuration_bypass"),         (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  
-    sendMQTTData(F("vh_configuration_speed_control"),  (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  
+    sendMQTTData(F("vh_configuration_system_type"),    (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
+    sendMQTTData(F("vh_configuration_bypass"),         (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));
+    sendMQTTData(F("vh_configuration_speed_control"),  (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));
+    // SAT auto-detect: bit 0 of HB = system type (0=boiler, 1=heat pump)
+    state.sat.iDetectedHeatingSystem = ((OTdata.valueHB) & 0x01) ? SAT_HSYS_HEAT_PUMP : SAT_HSYS_RADIATORS;  
     
     utoa(OTdata.valueLB, _msg, 10);
     sendMQTTData(F("vh_memberid_code"), _msg);
