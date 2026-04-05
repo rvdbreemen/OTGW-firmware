@@ -24,7 +24,6 @@ evaluation-report.json
 .claude/settings.local.json
 .claude/.vscode/mcp.json
 .mcp.json
-
 /src/OTGW-firmware/build
 *.ino.map
 tmpclaude-*
@@ -36,5 +35,5 @@ OT-Thing-OTGW32.zip
 otgw-6.6.tgz
 OT-Thing-OTGW32/*
 OT-Thing-Pkunfazir/*
-
+other-projects/*
 

@@ -328,6 +328,7 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float fKp                      = 0.0f;
   float fKi                      = 0.0f;
   float fKd                      = 0.0f;
+  float fRawDerivative           = 0.0f;  // filtered derivative (for diagnostics)
   // Cycle tracking
   SATCycleClass eLastCycleClass  = SAT_CYCLE_NONE;
   uint32_t iCycleCount           = 0;
@@ -551,6 +552,7 @@ struct SATSection {
   float    fPresetEco         = 18.0f;  // Preset: Eco
   float    fPresetAway        = 15.0f;  // Preset: Away
   bool     bPwmAutoSwitch     = true;   // Auto-switch between PWM and continuous mode
+  float    fOvershootMargin   = 2.0f;   // Overshoot margin °C (cycle classification + auto-switch)
 };
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT

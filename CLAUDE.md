@@ -634,6 +634,19 @@ Full help available: `backlog --help`
 
 ESP8266 firmware for the NodoShop OpenTherm Gateway. Provides Web UI, MQTT, REST API, and TCP serial socket with Home Assistant integration focus.
 
+## Task Management (MANDATORY)
+
+All implementation work MUST use the Backlog.md system. Before starting any task:
+1. Check if a backlog task exists for the work (`backlog task <id> --plain`)
+2. If no task exists, create one before starting implementation
+3. Set the task to "In Progress" and assign to yourself when starting
+4. Check off acceptance criteria as you complete them
+5. Add implementation notes as you work
+6. Write a final summary when done
+7. Never start coding without an approved plan in the task
+
+**Note:** `backlog task list` has a known bug and returns empty results. Use `backlog task <id> --plain` to view individual tasks, or read files directly from `backlog/tasks/`.
+
 ## Design Principles
 
 - **KISS (Keep It Simple, Stupid)**: Always choose the simplest solution that works. Avoid over-engineering, unnecessary abstractions, and speculative complexity. When in doubt, pick the straightforward approach. Share your design choices so the user can decide if more complexity is needed.

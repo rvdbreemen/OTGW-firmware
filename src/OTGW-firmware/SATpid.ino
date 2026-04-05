@@ -18,9 +18,8 @@
 // --- PID Constants ---
 static const float SAT_PID_DEADBAND_DEFAULT     = 0.25f;
 static const float SAT_PID_SAMPLE_TIME_LIMIT    = 10.0f;   // seconds
-static const float SAT_PID_INTEGRAL_TIME_LIMIT  = 300.0f;  // seconds
 static const float SAT_PID_UPDATE_INTERVAL      = 60.0f;   // seconds
-static const float SAT_PID_DERIVATIVE_ALPHA     = 0.8f;    // EMA filter alpha
+// Derivative alpha is now adaptive: alpha = dt / (PID_UPDATE_INTERVAL + dt)
 static const float SAT_PID_DERIVATIVE_CAP       = 5.0f;    // Max raw derivative magnitude
 static const float SAT_PID_AGGRESSION_V3        = 8400.0f;
 
@@ -37,7 +36,6 @@ static float  _pid_lastRoomTemp       = 0.0f;
 static float  _pid_lastCurveValue     = 0.0f;
 static uint32_t _pid_lastUpdateMs     = 0;
 static uint32_t _pid_lastDerivativeMs = 0;
-static uint32_t _pid_lastIntegralMs   = 0;
 static bool   _pid_initialized        = false;
 
 //=== PID Reset ===
@@ -51,7 +49,6 @@ void satPidReset()
   _pid_lastCurveValue     = 0.0f;
   _pid_lastUpdateMs       = millis();
   _pid_lastDerivativeMs   = millis();
-  _pid_lastIntegralMs     = millis();
   _pid_initialized        = false;
 
   state.sat.fPidP = 0.0f;
@@ -61,6 +58,7 @@ void satPidReset()
   state.sat.fKp = 0.0f;
   state.sat.fKi = 0.0f;
   state.sat.fKd = 0.0f;
+  state.sat.fRawDerivative = 0.0f;
 }
 
 //=== Auto-Gain Calculation (Version 3) ===
@@ -79,65 +77,80 @@ static void _pidCalculateGains(float curveValue)
 }
 
 //=== Integral Update ===
-// Only active when |error| <= deadband (fine-tuning near setpoint)
+// Per SAT Python (pid.py): integral is only active when |error| > deadband
+// (correcting steady-state offset). Inside deadband, target is reached and
+// integral resets to 0. Clamp to [0, curveValue] — positive only.
 static void _pidUpdateIntegral(float error, float curveValue, bool force)
 {
   float deadband = settings.sat.fDeadband;
 
-  // When error transitions from outside to inside deadband, reset integral timer
-  if (fabsf(_pid_lastError) > deadband && fabsf(error) <= deadband) {
-    _pid_lastIntegralMs = millis();
-  }
-
-  bool integralEnabled = (fabsf(error) <= deadband);
-  if (!integralEnabled) {
+  // Inside deadband: target reached, reset integral
+  if (fabsf(error) <= deadband) {
     _pid_integral = 0.0f;
-    return;
-  }
-
-  // Respect integral time limit unless forced
-  float secsSinceIntegral = (float)(millis() - _pid_lastIntegralMs) / 1000.0f;
-  if (!force && secsSinceIntegral < SAT_PID_INTEGRAL_TIME_LIMIT) {
     return;
   }
 
   if (state.sat.fKi < 1e-9f) return;
 
-  float deltaTime = secsSinceIntegral;
-  _pid_integral += state.sat.fKi * error * deltaTime;
+  // Accumulate: Ki * error * PID_UPDATE_INTERVAL (fixed 60s per SAT Python)
+  _pid_integral += state.sat.fKi * error * SAT_PID_UPDATE_INTERVAL;
 
-  // Clamp integral to prevent windup: [-curveValue, +curveValue]
-  if (_pid_integral > curveValue)  _pid_integral = curveValue;
-  if (_pid_integral < -curveValue) _pid_integral = -curveValue;
+  // Clamp integral to [0, curveValue] — positive only (SAT Python convention)
+  if (_pid_integral < 0.0f)      _pid_integral = 0.0f;
+  if (_pid_integral > curveValue) _pid_integral = curveValue;
 
-  // Hard absolute cap — defense against runaway regardless of curve value
+  // Hard absolute cap — defense against runaway
   static const float SAT_PID_INTEGRAL_ABS_MAX = 20.0f;
-  if (_pid_integral > SAT_PID_INTEGRAL_ABS_MAX)  _pid_integral = SAT_PID_INTEGRAL_ABS_MAX;
-  if (_pid_integral < -SAT_PID_INTEGRAL_ABS_MAX) _pid_integral = -SAT_PID_INTEGRAL_ABS_MAX;
-
-  _pid_lastIntegralMs = millis();
+  if (_pid_integral > SAT_PID_INTEGRAL_ABS_MAX) _pid_integral = SAT_PID_INTEGRAL_ABS_MAX;
 }
 
 //=== Derivative Update ===
-// Temperature-based (thermo-nova): tracks actual room temp change rate
-// Only active when |error| > deadband (dampens rapid approach)
+// Per SAT Python (pid.py): temperature-based derivative with negative sign
+// (rising temp = negative derivative = damping). Uses adaptive alpha for
+// low-pass filter that scales with sample rate. Only active outside deadband.
 static void _pidUpdateDerivative(float roomTemp)
 {
   float deadband = settings.sat.fDeadband;
-  bool derivativeEnabled = (fabsf(_pid_lastError) > deadband);
-  if (!derivativeEnabled) return;
+
+  // Inside deadband: reset derivative to 0, update timestamp only
+  if (fabsf(_pid_lastError) <= deadband) {
+    _pid_rawDerivative = 0.0f;
+    _pid_lastDerivativeMs = millis();
+    return;
+  }
 
   uint32_t now = millis();
-  float timeDiff = (float)(now - _pid_lastDerivativeMs) / 1000.0f;
-  if (timeDiff <= 0.0f) return;
+  float deltaTime = (float)(now - _pid_lastDerivativeMs) / 1000.0f;
 
-  // Temperature-based derivative (negative slope = heating up = good)
-  float rawDeriv = (roomTemp - _pid_lastRoomTemp) / timeDiff;
+  // Skip if insufficient time elapsed (prevents noise at fast sampling)
+  if (deltaTime <= SAT_PID_UPDATE_INTERVAL) return;
 
-  // Single low-pass filter with magnitude cap
-  float filtered = SAT_PID_DERIVATIVE_ALPHA * rawDeriv + (1.0f - SAT_PID_DERIVATIVE_ALPHA) * _pid_rawDerivative;
+  // No temperature change: just update timestamp
+  float tempDelta = roomTemp - _pid_lastRoomTemp;
+  if (fabsf(tempDelta) < 0.001f) {
+    _pid_lastDerivativeMs = now;
+    return;
+  }
 
-  // Cap magnitude
+  // Temperature-based derivative with NEGATIVE sign (SAT Python convention):
+  // rising temp -> negative derivative -> reduces PID output (damping)
+  float rawDeriv = -tempDelta / deltaTime;
+
+  // Hard cap first (SAT Python applies cap before filter on extreme values)
+  if (fabsf(rawDeriv) >= SAT_PID_DERIVATIVE_CAP) {
+    if (rawDeriv > SAT_PID_DERIVATIVE_CAP)  rawDeriv = SAT_PID_DERIVATIVE_CAP;
+    if (rawDeriv < -SAT_PID_DERIVATIVE_CAP) rawDeriv = -SAT_PID_DERIVATIVE_CAP;
+    _pid_rawDerivative = rawDeriv;
+    _pid_lastDerivativeMs = now;
+    return;
+  }
+
+  // Adaptive alpha low-pass filter (SAT Python: alpha = dt / (interval + dt))
+  // Longer dt -> alpha closer to 1.0 (trusts new reading more)
+  float alpha = deltaTime / (SAT_PID_UPDATE_INTERVAL + deltaTime);
+  float filtered = alpha * rawDeriv + (1.0f - alpha) * _pid_rawDerivative;
+
+  // Final cap
   if (filtered > SAT_PID_DERIVATIVE_CAP) filtered = SAT_PID_DERIVATIVE_CAP;
   if (filtered < -SAT_PID_DERIVATIVE_CAP) filtered = -SAT_PID_DERIVATIVE_CAP;
 
@@ -160,7 +173,6 @@ float satPidUpdate(float roomTemp, float targetTemp, float heatingCurveValue, fl
     _pid_lastCurveValue   = heatingCurveValue;
     _pid_lastUpdateMs     = now;
     _pid_lastDerivativeMs = now;
-    _pid_lastIntegralMs   = now;
     _pid_initialized      = true;
   }
 
@@ -195,6 +207,7 @@ float satPidUpdate(float roomTemp, float targetTemp, float heatingCurveValue, fl
   state.sat.fPidI = I;
   state.sat.fPidD = D;
   state.sat.fError = error;
+  state.sat.fRawDerivative = _pid_rawDerivative;
 
   // PID output = heatingCurveValue + P + I + D (thermo-nova style)
   float output = heatingCurveValue + P + I + D;

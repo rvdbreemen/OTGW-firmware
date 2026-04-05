@@ -704,6 +704,8 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
               satHandleEnabled(msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("control_mode")) == 0) {
               satHandleControlMode(msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("overshoot_margin")) == 0) {
+              updateSetting("SATovershootmargin", msgPayload);
             } else {
               MQTTDebugTf(PSTR("SAT: unknown sub-command [%s]\r\n"), satSubCmd);
             }

@@ -17,7 +17,7 @@
 // --- Cycle Constants ---
 static const uint8_t  SAT_CYCLE_HISTORY_SIZE       = 8;
 static const float    SAT_CYCLE_SHORT_DURATION_SEC  = 60.0f;   // Cycles shorter than this = SHORT_CYCLING
-static const float    SAT_OVERSHOOT_MARGIN_C        = 3.0f;    // Flow temp margin above setpoint for overshoot
+// Overshoot margin now read from settings.sat.fOvershootMargin (default 2.0C)
 static const float    SAT_OVERSHOOT_SUSTAIN_SEC     = 60.0f;   // Sustained overshoot before PWM switch
 static const float    SAT_UNDERSHOOT_MARGIN_C       = 2.0f;    // Below setpoint margin for underheat
 static const float    SAT_UNDERHEAT_SUSTAIN_SEC     = 180.0f;  // Sustained underheat before continuous switch
@@ -94,7 +94,7 @@ static SATCycleClass _cycleClassify(float durationSec, float maxFlowTemp, float 
   }
 
   // Significant overshoot detected
-  if (maxFlowTemp > setpoint + SAT_OVERSHOOT_MARGIN_C && overshootSec > 10.0f) {
+  if (maxFlowTemp > setpoint + settings.sat.fOvershootMargin && overshootSec > 10.0f) {
     return SAT_CYCLE_OVERSHOOT;
   }
 
@@ -155,7 +155,7 @@ void satCycleSample()
 
   // Track overshoot seconds: time flow temp is above setpoint + margin
   float elapsed = (float)(now - _cycle_lastSampleMs) / 1000.0f;
-  if (flowTemp > _cycle_setpointAtStart + SAT_OVERSHOOT_MARGIN_C) {
+  if (flowTemp > _cycle_setpointAtStart + settings.sat.fOvershootMargin) {
     _cycle_overshootSec += elapsed;
   }
 
@@ -178,7 +178,7 @@ bool satCycleCheckAutoSwitch()
 
   // --- Overshoot detection (continuous → PWM) ---
   if (state.sat.eControlMode == SAT_MODE_CONTINUOUS) {
-    if (flowTemp > setpoint + SAT_OVERSHOOT_MARGIN_C) {
+    if (flowTemp > setpoint + settings.sat.fOvershootMargin) {
       _sustain_overshootSec += dt;
     } else {
       _sustain_overshootSec = 0.0f;

@@ -86,7 +86,7 @@ static void satUpdateBoilerStatus()
 
   if (!flame && !_bs_prevFlame) {
     // No flame, was already off
-    if (boilerTemp > setpoint + 2.0f) {
+    if (boilerTemp > setpoint + settings.sat.fOvershootMargin) {
       newStatus = SAT_BS_OVERSHOOT_COOLING;
     } else if (prev == SAT_BS_HEATING || prev == SAT_BS_AT_SETPOINT) {
       newStatus = SAT_BS_POST_CYCLE;
@@ -370,8 +370,10 @@ void satSendStatusJSON()
   satSendJsonFloat(F("kp"),                   state.sat.fKp, 4);
   satSendJsonFloat(F("ki"),                   state.sat.fKi, 6);
   satSendJsonFloat(F("kd"),                   state.sat.fKd, 2);
+  satSendJsonFloat(F("raw_derivative"),        state.sat.fRawDerivative, 4);
   satSendJsonFloat(F("coefficient"),          settings.sat.fHeatingCurveCoeff, 1);
   satSendJsonFloat(F("deadband"),             settings.sat.fDeadband, 2);
+  satSendJsonFloat(F("overshoot_margin"),     settings.sat.fOvershootMargin, 1);
   sendJsonMapEntry(F("cycle_count"),          state.sat.iCycleCount);
   sendJsonMapEntry(F("last_cycle_class"),     (int32_t)state.sat.eLastCycleClass);
   satSendJsonFloat(F("cycle_max_flow"),       state.sat.fCycleMaxFlow, 1);
@@ -426,6 +428,9 @@ void satPublishMQTT()
   dtostrf(state.sat.fPidD, 1, 2, valBuf);
   sendMQTTData(F("sat/pid_d"), valBuf, false);
 
+  dtostrf(state.sat.fRawDerivative, 1, 4, valBuf);
+  sendMQTTData(F("sat/raw_derivative"), valBuf, false);
+
   // Boiler status
   snprintf_P(valBuf, sizeof(valBuf), PSTR("%d"), (int)state.sat.eBoilerStatus);
   sendMQTTData(F("sat/boiler_status"), valBuf, false);
@@ -437,6 +442,10 @@ void satPublishMQTT()
   // PWM duty
   dtostrf(state.sat.fPwmDutyCycle, 1, 2, valBuf);
   sendMQTTData(F("sat/pwm_duty"), valBuf, false);
+
+  // Overshoot margin
+  dtostrf(settings.sat.fOvershootMargin, 1, 1, valBuf);
+  sendMQTTData(F("sat/overshoot_margin"), valBuf, true);
 
   // Safety
   sendMQTTData(F("sat/safety_tripped"), state.sat.bSafetyTripped ? "true" : "false", false);

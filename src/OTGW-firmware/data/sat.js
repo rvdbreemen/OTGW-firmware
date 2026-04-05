@@ -118,6 +118,7 @@ var SAT = (function() {
     setText('sat-boiler-status', BOILER_LABELS[d.boiler_status] || '--');
     setText('sat-coefficient', d.coefficient !== undefined ? d.coefficient.toFixed(1) : '--');
     setText('sat-deadband', d.deadband !== undefined ? d.deadband.toFixed(2) + '\u00B0C' : '--');
+    setText('sat-overshoot-margin', d.overshoot_margin !== undefined ? d.overshoot_margin.toFixed(1) + '\u00B0C' : '--');
     setText('sat-heating-system', d.heating_system === 1 ? 'Underfloor' : 'Radiator');
 
     // PID details
@@ -127,6 +128,7 @@ var SAT = (function() {
     setText('sat-kp', d.kp !== undefined ? d.kp.toFixed(4) : '--');
     setText('sat-ki', d.ki !== undefined ? d.ki.toFixed(6) : '--');
     setText('sat-kd', d.kd !== undefined ? d.kd.toFixed(2) : '--');
+    setText('sat-raw-derivative', d.raw_derivative !== undefined ? d.raw_derivative.toFixed(4) : '--');
 
     // PWM info
     setText('sat-pwm-duty', d.pwm_duty !== undefined ? (d.pwm_duty * 100).toFixed(0) + '%' : '--');

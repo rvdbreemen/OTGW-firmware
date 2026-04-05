@@ -1312,6 +1312,10 @@ void sendDeviceSettings()
     sendJsonSettingObj(F("satpresetaway"), tmpBuf, "f", 5, 18);
   }
   sendJsonSettingObj(F("satpwmautoswitch"), settings.sat.bPwmAutoSwitch, "b");
+  {
+    dtostrf(settings.sat.fOvershootMargin, 1, 1, tmpBuf);
+    sendJsonSettingObj(F("satovershootmargin"), tmpBuf, "f", 0, 5);
+  }
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-Direct settings (OTGW32 only) ---
   sendJsonSettingObj(F("otdmode"), settings.otd.iMode, "i", 0, 4);
@@ -1366,7 +1370,7 @@ static const char* const PROGMEM knownSettings[] = {
   "otgwcommandenable", "otgwcommands",
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
   "satcoefficient", "satdeadband", "satenabled", "satexternaltemp",
-  "satinterval", "satpresetaway", "satpresetcomfort", "satpreseteco",
+  "satinterval", "satovershootmargin", "satpresetaway", "satpresetcomfort", "satpreseteco",
   "satpwmautoswitch", "satsystem", "sattargettemp",
   "ui_autodownloadlog", "ui_autoexport", "ui_autoscreenshot", "ui_autoscroll",
   "ui_capture", "ui_graphtimewindow", "ui_timestamps",
