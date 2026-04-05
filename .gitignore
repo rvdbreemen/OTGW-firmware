@@ -41,3 +41,7 @@ OT-Thing-Pkunfazir/.gitignore
 OT-Thing-Pkunfazir/Firmware/.gitignore
 OT-Thing-Pkunfazir/PCB/.gitignore
 OT-Thing-Pkunfazir/Tester PCB/.gitignore
+other-projects/*
+other-projects/.gitignore
+discord_backlog_last_checkted.txt
+.claude/discord_backlog_last_checked.txt
