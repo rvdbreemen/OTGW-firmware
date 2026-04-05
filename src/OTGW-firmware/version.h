@@ -4,10 +4,10 @@
 
 #define _VERSION_MAJOR 1
 #define _VERSION_MINOR 3
-#define _VERSION_PATCH 5
+#define _VERSION_PATCH 6
 #define _VERSION_BUILD 2935
 #define _VERSION_GITHASH "e134814"
-//#define _VERSION_PRERELEASE beta
+#define _VERSION_PRERELEASE beta
 #define _VERSION_DATE "05-04-2026"
 #define _VERSION_TIME "23:51:54"
 #define _SEMVER_CORE "1.3.5"
