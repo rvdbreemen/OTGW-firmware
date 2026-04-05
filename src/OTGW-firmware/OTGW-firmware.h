@@ -355,6 +355,9 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   SATPreset eActivePreset        = SAT_PRESET_NONE;
   // Modulation control
   uint8_t iCurrentModulation     = 100;   // Last MM= value sent to boiler (0-100)
+  // Modulation suppression
+  bool     bModSuppressed           = false;
+  uint32_t iModSuppressionSinceMs   = 0;
   // OPV calibration state
   SATCalibPhase eCalibPhase      = SAT_CALIB_IDLE;
   float    fCalibMaxTemp         = 0.0f;  // Maximum boiler temp observed during calibration
@@ -584,6 +587,8 @@ struct SATSection {
   float    fOvpValue          = 0.0f;   // Overshoot Protection Value (0=not calibrated)
   bool     bOvpEnabled        = false;  // Use OPV for auto PWM switching
   float    fOvershootMargin   = 2.0f;   // Overshoot margin °C (cycle classification + auto-switch)
+  float    fModSupDelay       = 20.0f;  // Modulation suppression delay (seconds)
+  float    fModSupOffset      = 1.0f;   // Modulation suppression offset (°C below setpoint)
 };
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT

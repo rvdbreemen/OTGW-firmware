@@ -627,6 +627,7 @@ void satSendStatusJSON()
   satSendJsonFloat(F("pwm_duty"),             state.sat.fPwmDutyCycle, 2);
   sendJsonMapEntry(F("pwm_flame_req"),        state.sat.bPwmFlameRequested);
   sendJsonMapEntry(F("active_preset"),         (int32_t)state.sat.eActivePreset);
+  sendJsonMapEntry(F("mod_suppressed"),        state.sat.bModSuppressed);
   sendJsonMapEntry(F("max_rel_modulation"),   (int32_t)settings.sat.iMaxRelModulation);
   sendJsonMapEntry(F("current_modulation"),   (int32_t)state.sat.iCurrentModulation);
   satSendJsonFloat(F("ovp_value"),            settings.sat.fOvpValue, 1);
@@ -841,20 +842,81 @@ void satControlLoop()
   if (finalSetpoint > maxSetpoint) finalSetpoint = maxSetpoint;
   state.sat.fFinalSetpoint = finalSetpoint;
 
-  // --- Check auto-switch ---
-  satCycleCheckAutoSwitch();
+  // --- Auto-switch between continuous and PWM modes (Tasks #42/#43) ---
+  if (settings.sat.bPwmAutoSwitch && !satAlwaysMaxModulation()) {
+    float boilerTemp = OTcurrentSystemState.Tboiler;
+    static uint32_t _autoSwOvershootSince = 0;
+    static uint32_t _autoSwUnderheatSince = 0;
 
-  // --- Compute modulation value based on mode and heating system ---
+    if (state.sat.eControlMode == SAT_MODE_CONTINUOUS) {
+      // Task #42: Auto-enable PWM on sustained overshoot
+      if (boilerTemp >= finalSetpoint + 0.5f) {
+        if (_autoSwOvershootSince == 0) _autoSwOvershootSince = millis();
+        if ((millis() - _autoSwOvershootSince) >= 300000UL) { // 300s sustained
+          state.sat.eControlMode = SAT_MODE_PWM;
+          _autoSwOvershootSince = 0;
+          DebugTln(F("SAT: auto-switch continuous->PWM (sustained overshoot 5min)"));
+        }
+      } else {
+        _autoSwOvershootSince = 0;
+      }
+    } else if (state.sat.eControlMode == SAT_MODE_PWM) {
+      // Task #43: Auto-disable PWM on sustained underheat
+      if (boilerTemp <= finalSetpoint - 0.3f) {
+        if (_autoSwUnderheatSince == 0) _autoSwUnderheatSince = millis();
+        if ((millis() - _autoSwUnderheatSince) >= 180000UL) { // 180s sustained
+          state.sat.eControlMode = SAT_MODE_CONTINUOUS;
+          _autoSwUnderheatSince = 0;
+          DebugTln(F("SAT: auto-switch PWM->continuous (sustained underheat 3min)"));
+        }
+      } else {
+        _autoSwUnderheatSince = 0;
+      }
+    }
+  }
+
+  // --- Modulation suppression: prevent overshoot in continuous mode ---
+  if (state.sat.eControlMode == SAT_MODE_CONTINUOUS && !satAlwaysMaxModulation()) {
+    float boilerTemp = OTcurrentSystemState.Tboiler;
+    float suppressThreshold = finalSetpoint - settings.sat.fModSupOffset;
+    float recoveryThreshold = suppressThreshold - 0.5f; // 0.5C hysteresis
+
+    if (!state.sat.bModSuppressed) {
+      // Check if we should start suppressing
+      if (boilerTemp >= suppressThreshold) {
+        if (state.sat.iModSuppressionSinceMs == 0)
+          state.sat.iModSuppressionSinceMs = millis();
+        if ((millis() - state.sat.iModSuppressionSinceMs) >= (uint32_t)(settings.sat.fModSupDelay * 1000.0f)) {
+          state.sat.bModSuppressed = true;
+          DebugTf(PSTR("SAT: modulation suppressed (boiler=%.1f >= threshold=%.1f)\r\n"), boilerTemp, suppressThreshold);
+        }
+      } else {
+        state.sat.iModSuppressionSinceMs = 0; // Reset timer
+      }
+    } else {
+      // Check if we should recover
+      if (boilerTemp < recoveryThreshold) {
+        state.sat.bModSuppressed = false;
+        state.sat.iModSuppressionSinceMs = 0;
+        DebugTf(PSTR("SAT: modulation suppression lifted (boiler=%.1f < recovery=%.1f)\r\n"), boilerTemp, recoveryThreshold);
+      }
+    }
+  } else {
+    state.sat.bModSuppressed = false;
+    state.sat.iModSuppressionSinceMs = 0;
+  }
+
+  // --- Compute modulation value based on mode, heating system, and suppression ---
   {
     uint8_t mmValue;
     if (satAlwaysMaxModulation()) {
-      // Heat pumps: always MM=100, let heat pump manage internal modulation
       mmValue = 100;
+    } else if (state.sat.bModSuppressed) {
+      // Modulation suppression active: send MM=0
+      mmValue = 0;
     } else if (state.sat.eControlMode == SAT_MODE_PWM && !state.sat.bPwmFlameRequested) {
-      // PWM OFF phase (gas boilers): suppress modulation
       mmValue = 0;
     } else {
-      // PWM ON or Continuous mode: use configured max
       mmValue = settings.sat.iMaxRelModulation;
     }
     state.sat.iCurrentModulation = mmValue;
