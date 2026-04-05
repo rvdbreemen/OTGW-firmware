@@ -121,7 +121,7 @@ void sendMQTTData(const char*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const bool = false);
 void publishToSourceTopic(const char*, const char*, byte);
-void addOTWGcmdtoqueue(const char* ,  int , const bool = false, const int16_t = 1000);
+void addCommandToQueue(const char* ,  int , const bool = false, const int16_t = 1000);
 void sendLogToWebSocket(const char* logMessage);
 
 // Forward declarations for functions defined in later .ino files
@@ -235,7 +235,7 @@ struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime statu
 };
 #endif
 
-struct OTGWProtocol {          // state.otgw — OpenTherm protocol & bus state
+struct OTBusState {          // state.otgw — OpenTherm protocol & bus state
   bool bOnline           = false;  // was bOTGWonline — serial link alive
   bool bPSmode           = false;  // was bPSmode — Print Summary mode (PS=1)
   bool bGatewayMode      = false;  // was bOTGWgatewaystate — true=gateway, false=monitor
@@ -357,7 +357,7 @@ struct OTGWState {
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   OTDirectSection    otd;         // state.otd — OT-direct schedule/override stats (OTGW32)
 #endif
-  OTGWProtocol       otgw;        // state.otgw.bOnline, state.otgw.bBoilerState
+  OTBusState       otBus;       // state.otBus.bOnline, state.otBus.bBoilerState
   MQTTRuntimeSection mqtt;        // state.mqtt.bConnected
   FlashSection       flash;       // state.flash.bESPactive, state.flash.iPICprogress
   DebugSection       debug;       // state.debug.bOTmsg, state.debug.bMQTT
@@ -531,7 +531,7 @@ struct UISection {
   int  iGraphTimeWindow = 60;      // Default to 1 Hour (60 minutes)
 };
 
-struct OTGWBootSection {            // PIC boot-time command injection
+struct PICBootSection {            // PIC boot-time command injection
   bool bEnable        = false;
   char sCommands[129] = "";
 };
@@ -592,7 +592,7 @@ struct OTGWSettings {
   OutputsSection      outputs;
   WebhookSection      webhook;
   UISection           ui;
-  OTGWBootSection     otgw;
+  PICBootSection     picBoot;
   SATSection          sat;
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   OTDirectSettingsSection otd;

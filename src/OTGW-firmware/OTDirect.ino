@@ -482,7 +482,7 @@ void initOTDirect() {
   }
 
   // 6. Always set OT_DIRECT mode — this is OTGW32 hardware.
-  //    Bus liveness is tracked via state.otgw.bOnline, not eMode.
+  //    Bus liveness is tracked via state.otBus.bOnline, not eMode.
   //    The OT-direct loop must keep running so it can retry/recover.
   state.hw.eMode = HW_MODE_OT_DIRECT;
   DebugTln(F("OT-direct: Hardware mode set to OT_DIRECT"));
@@ -496,12 +496,12 @@ void initOTDirect() {
   unsigned long request = buildStatusRequest();
   unsigned long response = otMaster.sendRequest(request);
   if (otMaster.isValidResponse(response)) {
-    state.otgw.bOnline = true;
+    state.otBus.bOnline = true;
     DebugTln(F("OT-direct: Boiler responded — OT bus online"));
     bridgeFrameToParser('R', request);
     bridgeFrameToParser('B', response);
   } else {
-    state.otgw.bOnline = false;
+    state.otBus.bOnline = false;
     DebugTln(F("OT-direct: No valid boiler response — OT bus offline (will retry in loop)"));
   }
 
@@ -510,7 +510,7 @@ void initOTDirect() {
   //    MsgID 124: OpenTherm version we speak (f8.8, 2.2 = 0x0233).
   //    MsgID 126: Master product type (HB) + version (LB).
   //    These are one-time WRITE_DATA, not polled.
-  if (state.otgw.bOnline) {
+  if (state.otBus.bOnline) {
     unsigned long handshake;
 
     // MsgID 2: Master config (HB=flags bit0=SmartPower, LB=MemberID 0)
@@ -824,7 +824,7 @@ static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin 
     bridgeFrameToParser((origin == OT_DIRECT_ORIGIN_THERMOSTAT) ? 'T' : 'R', request);
     unsigned long response = simulateLoopbackResponse(request);
     bridgeFrameToParser('B', response);
-    state.otgw.bOnline = true;
+    state.otBus.bOnline = true;
 
     // Cache response for master mode slave handler (reuses same cache)
     uint8_t cacheId = (response >> 16) & 0x7F;
@@ -857,7 +857,7 @@ static void handleMasterResponse() {
 
   if (status == OpenThermResponseStatus::SUCCESS) {
     bridgeFrameToParser('B', response);
-    state.otgw.bOnline = true;
+    state.otBus.bOnline = true;
 
     // Cache boiler response data for master mode slave responses
     {
@@ -931,7 +931,7 @@ static void handleMasterResponse() {
     // Only mark offline on status request (MsgID 0) failures
     uint8_t msgId = (otLastSentRequest >> 16) & 0xFF;
     if (msgId == 0) {
-      state.otgw.bOnline = false;
+      state.otBus.bOnline = false;
     }
   }
 
@@ -1618,7 +1618,7 @@ static unsigned long applyResponseModifiers(unsigned long response) {
 
 // ---------------------------------------------------------------------------
 // handleOTDirectCommand — translate PIC-style commands to OT frames
-// Called from sendOTGW() when HAS_DIRECT_OT is enabled.
+// Called from sendPICSerial() when HAS_DIRECT_OT is enabled.
 //
 // Full PIC command emulation: all commands that the PIC firmware supports
 // are handled here — either translated to OpenTherm frames, applied to

@@ -146,8 +146,8 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
 static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 
-void sendOTGWvalue(int msgid);
-void sendOTGWlabel(const char *msglabel);
+void sendOTValue(int msgid);
+void sendOTLabel(const char *msglabel);
 void sendOTmonitorV2();
 void sendFilesystemHashCheck();
 void sendApiNotFound(const char *URI);
@@ -185,12 +185,12 @@ static void handleCommandSubmit(const char* cmdStr) {
     sendApiError(413, F("Command too long"));
     return;
   }
-  addOTWGcmdtoqueue(cmdStr, static_cast<int>(cmdLen));
+  addCommandToQueue(cmdStr, static_cast<int>(cmdLen));
   sendCorsOriginHeader();
   httpServer.send(202, F("application/json"), F("{\"status\":\"queued\"}"));
 }
 
-static void sendOTGWSimulationStatus() {
+static void sendSimulationStatus() {
   static const char kOTGWSimulationFile[] PROGMEM = "/otgw_simulation.log";
   char jsonBuf[160];
   snprintf_P(jsonBuf, sizeof(jsonBuf),
@@ -294,11 +294,11 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST")); return; }
     if (!httpServer.hasArg("mode")) { sendApiError(400, F("Missing 'mode' parameter")); return; }
     String modeStr = httpServer.arg("mode");
-    if (modeStr == F("gateway"))       addOTWGcmdtoqueue("GW=1", 4, true);
-    else if (modeStr == F("monitor"))  addOTWGcmdtoqueue("GW=M", 4, true);
-    else if (modeStr == F("bypass"))   addOTWGcmdtoqueue("GW=0", 4, true);
-    else if (modeStr == F("master"))   addOTWGcmdtoqueue("GW=S", 4, true);
-    else if (modeStr == F("loopback")) addOTWGcmdtoqueue("GW=L", 4, true);
+    if (modeStr == F("gateway"))       addCommandToQueue("GW=1", 4, true);
+    else if (modeStr == F("monitor"))  addCommandToQueue("GW=M", 4, true);
+    else if (modeStr == F("bypass"))   addCommandToQueue("GW=0", 4, true);
+    else if (modeStr == F("master"))   addCommandToQueue("GW=S", 4, true);
+    else if (modeStr == F("loopback")) addCommandToQueue("GW=L", 4, true);
     else { sendApiError(400, F("Invalid mode. Use: gateway, monitor, bypass, master, loopback")); return; }
     // Return current status (mode will be updated by the time response renders)
     sendOTDirectStatus();
@@ -371,7 +371,7 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
       } else {
         sendApiError(400, F("Invalid action. Use: sr, cr, rm, cm, ui, ki")); return;
       }
-      addOTWGcmdtoqueue(cmdBuf, strlen(cmdBuf), true);
+      addCommandToQueue(cmdBuf, strlen(cmdBuf), true);
       // Return updated override list
       getOTDirectOverridesJSON(sLine, sizeof(sLine));
       sendCorsOriginHeader();
@@ -412,21 +412,21 @@ static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
 
   if (wc == 4) {
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
-    sendOTGWSimulationStatus();
+    sendSimulationStatus();
     return;
   }
 
   if (wc > 4 && strcmp_P(words[4], PSTR("start")) == 0) {
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
     setOTGWSimulationEnabled(true);
-    sendOTGWSimulationStatus();
+    sendSimulationStatus();
     return;
   }
 
   if (wc > 4 && strcmp_P(words[4], PSTR("stop")) == 0) {
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
     setOTGWSimulationEnabled(false);
-    sendOTGWSimulationStatus();
+    sendSimulationStatus();
     return;
   }
 
@@ -447,7 +447,7 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
     uint8_t msgId = 0;
     if (wc > 5 && parseMsgId(words[5], msgId)) {
-      sendOTGWvalue(msgId);
+      sendOTValue(msgId);
     } else {
       sendApiError(400, F("Invalid or missing message ID"));
     }
@@ -474,7 +474,7 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
   } else if (strcmp_P(words[4], PSTR("label")) == 0) {
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
     if (wc <= 5 || words[5][0] == '\0') { sendApiError(400, F("Missing label")); return; }
-    sendOTGWlabel(words[5]);
+    sendOTLabel(words[5]);
   } else {
     sendApiNotFound(originalURI);
   }
@@ -725,7 +725,7 @@ void processAPI()
 
 
 //====[ implementing REST API ]====
-void sendOTGWvalue(int msgid){
+void sendOTValue(int msgid){
   if (msgid < 0 || msgid > OT_MSGID_MAX) {
     sendStartJsonMap("");
     sendJsonMapEntry(F("error"), F("message id: out of range"));
@@ -751,7 +751,7 @@ void sendOTGWvalue(int msgid){
   sendEndJsonMap("");
 }
 
-void sendOTGWlabel(const char *msglabel){
+void sendOTLabel(const char *msglabel){
   uint_fast8_t msgid;
   for (msgid = 0; msgid <= OT_MSGID_MAX; msgid++){
     PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
@@ -992,12 +992,12 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("mqttconnected"), state.mqtt.bConnected);
   sendJsonMapEntry(F("otcommandinterface"), hasOTCommandInterface());
   if (hasOTCommandInterface()) {
-    sendJsonMapEntry(F("thermostatconnected"), state.otgw.bThermostatState);
-    sendJsonMapEntry(F("boilerconnected"), state.otgw.bBoilerState);
-    sendJsonMapEntry(F("otgwconnected"), state.otgw.bOnline);
+    sendJsonMapEntry(F("thermostatconnected"), state.otBus.bThermostatState);
+    sendJsonMapEntry(F("boilerconnected"), state.otBus.bBoilerState);
+    sendJsonMapEntry(F("otgwconnected"), state.otBus.bOnline);
   }
   if (isPICEnabled()) {
-    sendJsonMapEntry(F("otgwmode"), !isGatewayFirmware() ? "N/A" : state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
+    sendJsonMapEntry(F("otgwmode"), !isGatewayFirmware() ? "N/A" : state.otBus.bGatewayModeKnown ? CCONOFF(state.otBus.bGatewayMode) : "detecting");
   }
   sendJsonMapEntry(F("otgwsimulation"), state.debug.bOTGWSimulation);
 
@@ -1035,7 +1035,7 @@ void sendHealth()
   sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());
 #endif
   sendJsonMapEntry(F("mqttconnected"), CBOOLEAN(state.mqtt.bConnected));
-  sendJsonMapEntry(F("otgwconnected"), CBOOLEAN(state.otgw.bOnline));
+  sendJsonMapEntry(F("otgwconnected"), CBOOLEAN(state.otBus.bOnline));
   sendJsonMapEntry(F("picavailable"), CBOOLEAN(state.pic.bAvailable));
   sendJsonMapEntry(F("littlefsMounted"), CBOOLEAN(LittleFSmounted));
   
@@ -1123,9 +1123,9 @@ void sendOTDirectStatus()
   // Override status
   sendJsonMapEntry(F("overrides_active"), state.otd.iOverrideCount);
   // OT bus state
-  sendJsonMapEntry(F("ot_online"),        state.otgw.bOnline);
-  sendJsonMapEntry(F("thermostat"),       state.otgw.bThermostatState);
-  sendJsonMapEntry(F("boiler"),           state.otgw.bBoilerState);
+  sendJsonMapEntry(F("ot_online"),        state.otBus.bOnline);
+  sendJsonMapEntry(F("thermostat"),       state.otBus.bThermostatState);
+  sendJsonMapEntry(F("boiler"),           state.otBus.bBoilerState);
   sendEndJsonMap(F("otdirect_status"));
 } // sendOTDirectStatus()
 #endif
@@ -1215,7 +1215,7 @@ void sendDeviceTimeV2()
   sendJsonMapEntry(F("dateTime"), buf); 
   sendJsonMapEntry(F("epoch"), (int)now);
   sendJsonMapEntry(F("message"), getStatusMessageText());
-  sendJsonMapEntry(F("psmode"), state.otgw.bPSmode);
+  sendJsonMapEntry(F("psmode"), state.otBus.bPSmode);
   sendJsonMapEntry(F("otgwsimulation"), state.debug.bOTGWSimulation);
   sendJsonMapEntry(F("freeheap"), platformFreeHeap());
   sendJsonMapEntry(F("maxfreeblock"), platformMaxFreeBlock());
@@ -1280,8 +1280,8 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("gpiooutputsenabled"), settings.outputs.bEnabled, "b");
   sendJsonSettingObj(F("gpiooutputspin"), settings.outputs.iPin, "i", 0, 16);
   sendJsonSettingObj(F("gpiooutputstriggerbit"), settings.outputs.iTriggerBit, "i", 0, 16);
-  sendJsonSettingObj(F("otgwcommandenable"), settings.otgw.bEnable, "b");
-  sendJsonSettingObj(F("otgwcommands"), CSTR(settings.otgw.sCommands), "s", 128);
+  sendJsonSettingObj(F("otgwcommandenable"), settings.picBoot.bEnable, "b");
+  sendJsonSettingObj(F("otgwcommands"), CSTR(settings.picBoot.sCommands), "s", 128);
   sendJsonSettingObj(F("webhookenable"), settings.webhook.bEnabled, "b");
   sendJsonSettingObj(F("webhookurlon"), CSTR(settings.webhook.sURLon), "s", 100);
   sendJsonSettingObj(F("webhookurloff"), CSTR(settings.webhook.sURLoff), "s", 100);

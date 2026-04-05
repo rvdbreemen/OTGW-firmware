@@ -725,7 +725,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
             //raw command
             snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s"), msgPayload);
             MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
-            addOTWGcmdtoqueue(otgwcmd, strlen(otgwcmd), true);
+            addCommandToQueue(otgwcmd, strlen(otgwcmd), true);
           } else {
             //all other commands are <otgwcmd>=<payload message>
             // Copy command string from Flash to temp buffer for snprintf
@@ -735,7 +735,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 
             snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s=%s"), cmdBuf, msgPayload);
             MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
-            addOTWGcmdtoqueue(otgwcmd, strlen(otgwcmd), true);
+            addCommandToQueue(otgwcmd, strlen(otgwcmd), true);
           }
         } else {
           //no match found

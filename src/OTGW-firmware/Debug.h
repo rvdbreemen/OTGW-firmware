@@ -45,7 +45,7 @@
 //   #define XxxDebugTf(...)  ({ if (state.debug.bXxx) DebugTf(__VA_ARGS__);  })
 //   ... (Tln, ln, Tf, f, T, plain)
 //
-// Modules: OTGWDebug* (bOTmsg), MQTTDebug* (bMQTT), RESTDebug* (bRestAPI),
+// Modules: OTDebug* (bOTmsg), MQTTDebug* (bMQTT), RESTDebug* (bRestAPI),
 //          SensorDebug* (bSensors) — see each .ino file header.
 
 // needs #include <TelnetStream.h>       // Version 0.0.1 - https://github.com/jandrassy/TelnetStream

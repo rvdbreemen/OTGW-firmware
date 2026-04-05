@@ -233,7 +233,7 @@ static void drawPageSystem() {
   oledDisplay.setRow(6);
   oledDisplay.setCol(0);
   oledDisplay.print(F("OT bus: "));
-  oledDisplay.print(state.otgw.bOnline ? F("online") : F("offline"));
+  oledDisplay.print(state.otBus.bOnline ? F("online") : F("offline"));
 
   // Firmware version
   oledDisplay.setRow(7);

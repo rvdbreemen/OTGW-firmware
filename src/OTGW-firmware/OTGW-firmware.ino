@@ -193,12 +193,12 @@ void setup() {
   // and switch to telnet port 23 for debug purposed. 
   // Setup the OTGW PIC
   resetOTGW();          // reset the OTGW pic
-  startOTGWstream();    // start port 25238 
+  startPICStream();    // start port 25238 
  // initSensors();        // init DS18B20 (after MQ is up! )
   initOutputs();
   
   WatchDogEnabled(1);   // turn on watchdog
-  sendOTGWbootcmd();   
+  sendPICBootCommands();   
   //Blink LED2 to signal setup done
   setLed(LED1, OFF);
   blinkLED(LED2, 3, 100);
@@ -277,7 +277,7 @@ void loopWifi() {
               CSTR(settings.sHostname));
       platformRestartDHCP();
       startTelnet();
-      startOTGWstream();
+      startPICStream();
       startMQTT();
       startWebSocket();
       wifiState = WIFI_IDLE;
@@ -300,7 +300,7 @@ void sendMQTTuptime(){
 
 void sendtimecommand(){
   if (!isPICEnabled()) return;              // only send when pic is available
-  if (state.otgw.bPSmode) return;                  // when in Print Summary mode (PS=1), no timesync commands (improving legacy/Domoticz compatibility)
+  if (state.otBus.bPSmode) return;                  // when in Print Summary mode (PS=1), no timesync commands (improving legacy/Domoticz compatibility)
   if (!settings.ntp.bEnable) return;        // if NTP is disabled, then return
   if (!settings.ntp.bSendtime) return;      // if NTP send time is disabled, then return
   if (NtpStatus != TIME_SYNC) return;   // only send time command when time is synced
@@ -319,18 +319,18 @@ void sendtimecommand(){
   //Send msg id xx: hour:minute/day of week
   int day_of_week = (myTime.dayOfWeek()+6)%7+1;
   snprintf_P(msg, sizeof(msg), PSTR("SC=%d:%02d/%d"), myTime.hour(), myTime.minute(), day_of_week);
-  addOTWGcmdtoqueue(msg, strlen(msg), false, 0);
+  addCommandToQueue(msg, strlen(msg), false, 0);
 
   if (dayChanged()){
     //Send msg id 21: month, day
     snprintf_P(msg, sizeof(msg), PSTR("SR=21:%d,%d"), myTime.month(), myTime.day());
-    addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
+    addCommandToQueue(msg, strlen(msg), true, 0);
   }
 
   if (yearChanged()){
     //Send msg id 22: HB of Year, LB of Year
     snprintf_P(msg, sizeof(msg), PSTR("SR=22:%d,%d"), (myTime.year() >> 8) & 0xFF, myTime.year() & 0xFF);
-    addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
+    addCommandToQueue(msg, strlen(msg), true, 0);
   }
 }
 
@@ -378,7 +378,7 @@ void delayms(unsigned long delay_ms)
 //===[ Do task every 1s ]===
 void doTaskEvery1s(){
   //== do tasks ==
-  handleOTGWqueue(); //just check if there are commands to retry
+  handleCommandQueue(); //just check if there are commands to retry
   state.uptime.iSeconds++;
 
   if (wifiPortalResetWindowExpired()) {
@@ -468,7 +468,7 @@ static void handlePicFlashBackgroundTasks()
 #if MDNS_NEEDS_UPDATE
   MDNS.update();
 #endif              // Keep MDNS active for network discovery
-  handleOTGW();               // REQUIRED for PIC flash - processes serial communication
+  handlePICSerial();               // REQUIRED for PIC flash - processes serial communication
   handleWebSocket();          // Keep WebSocket service responsive during flash
 }
 #endif
@@ -480,7 +480,7 @@ void doBackgroundTasks()
 
   // ADR-036: block service handlers until setup() completes.
   // blinkLED/delayms in setup() would otherwise invoke handleMQTT() before
-  // startMQTT() sets the 1350-byte buffer, and handleOTGW() before resetOTGW().
+  // startMQTT() sets the 1350-byte buffer, and handlePICSerial() before resetOTGW().
   if (!state.bSetupComplete) return;
   // ADR-047: Non-blocking WiFi reconnect state machine.
   // Guard: skip during any flash operation (ESP or PIC).
@@ -514,7 +514,7 @@ void doBackgroundTasks()
       //while connected handle everything that uses network stuff
       handleDebug();
       handleMQTT();                 // MQTT transmissions
-      handleOTGW();                 // OTGW serial handling (PIC boards)
+      handlePICSerial();                 // OTGW serial handling (PIC boards)
       handleWebSocket();            // WebSocket handling for OT log streaming
       httpServer.handleClient();
     #if MDNS_NEEDS_UPDATE

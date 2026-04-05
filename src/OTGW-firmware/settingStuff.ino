@@ -264,8 +264,8 @@ void writeSettings(bool show)
   writeJsonIntKV(file, F("S0COUNTERdebouncetime"), settings.s0.iDebounceTime, true);
   writeJsonIntKV(file, F("S0COUNTERpulsekw"), settings.s0.iPulsekw, true);
   writeJsonIntKV(file, F("S0COUNTERinterval"), settings.s0.iInterval, true);
-  writeJsonBoolKV(file, F("OTGWcommandenable"), settings.otgw.bEnable, true);
-  writeJsonStringKV(file, F("OTGWcommands"), settings.otgw.sCommands, true);
+  writeJsonBoolKV(file, F("OTGWcommandenable"), settings.picBoot.bEnable, true);
+  writeJsonStringKV(file, F("OTGWcommands"), settings.picBoot.sCommands, true);
   writeJsonBoolKV(file, F("GPIOOUTPUTSenabled"), settings.outputs.bEnabled, true);
   writeJsonIntKV(file, F("GPIOOUTPUTSpin"), settings.outputs.iPin, true);
   writeJsonIntKV(file, F("GPIOOUTPUTStriggerBit"), settings.outputs.iTriggerBit, true);
@@ -397,7 +397,7 @@ void readSettings(bool show)
     strlcpy(settings.ntp.sTimezone, "Europe/Amsterdam", sizeof(settings.ntp.sTimezone));
   if (strlen(settings.ntp.sHostname) == 0 || strcmp_P(settings.ntp.sHostname, PSTR("null")) == 0)
     strlcpy(settings.ntp.sHostname, NTP_HOST_DEFAULT, sizeof(settings.ntp.sHostname));
-  if (strcmp_P(settings.otgw.sCommands, PSTR("null")) == 0) settings.otgw.sCommands[0] = 0;
+  if (strcmp_P(settings.picBoot.sCommands, PSTR("null")) == 0) settings.picBoot.sCommands[0] = 0;
 
   CHANGE_INTERVAL_SEC(timerpollsensor, settings.sensors.iInterval, CATCH_UP_MISSED_TICKS);
   CHANGE_INTERVAL_SEC(timers0counter, settings.s0.iInterval, CATCH_UP_MISSED_TICKS);
@@ -433,8 +433,8 @@ void readSettings(bool show)
     Debugf(PSTR("S0 Counter Debouncetime:%d\r\n"), settings.s0.iDebounceTime);
     Debugf(PSTR("S0 Counter Pulses/kw  : %d\r\n"), settings.s0.iPulsekw);
     Debugf(PSTR("S0 Counter Interval   : %d\r\n"), settings.s0.iInterval);
-    Debugf(PSTR("OTGW boot cmd enabled : %s\r\n"), CBOOLEAN(settings.otgw.bEnable));
-    Debugf(PSTR("OTGW boot cmd         : %s\r\n"), CSTR(settings.otgw.sCommands));
+    Debugf(PSTR("OTGW boot cmd enabled : %s\r\n"), CBOOLEAN(settings.picBoot.bEnable));
+    Debugf(PSTR("OTGW boot cmd         : %s\r\n"), CSTR(settings.picBoot.sCommands));
     Debugf(PSTR("GPIO Outputs          : %s\r\n"), CBOOLEAN(settings.outputs.bEnabled));
     Debugf(PSTR("GPIO Out. Pin         : %d\r\n"), settings.outputs.iPin);
     Debugf(PSTR("GPIO Out. Trg. Bit    : %d\r\n"), settings.outputs.iTriggerBit);
@@ -630,8 +630,8 @@ void updateSetting(const char *field, const char *newValue)
     settings.s0.iInterval = constrain(val, 1, 3600);
     CHANGE_INTERVAL_SEC(timers0counter, settings.s0.iInterval, CATCH_UP_MISSED_TICKS);
   }
-  else if (strcasecmp_P(field, PSTR("OTGWcommandenable"))==0)    settings.otgw.bEnable = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("OTGWcommands"))==0)         strlcpy(settings.otgw.sCommands, newValue, sizeof(settings.otgw.sCommands));
+  else if (strcasecmp_P(field, PSTR("OTGWcommandenable"))==0)    settings.picBoot.bEnable = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("OTGWcommands"))==0)         strlcpy(settings.picBoot.sCommands, newValue, sizeof(settings.picBoot.sCommands));
   else if (strcasecmp_P(field, PSTR("GPIOOUTPUTSenabled")) == 0)
   {
     settings.outputs.bEnabled = EVALBOOLEAN(newValue);

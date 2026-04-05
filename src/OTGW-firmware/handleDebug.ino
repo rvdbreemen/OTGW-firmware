@@ -20,11 +20,11 @@ void handleDebug(){
                     "WiFi",
 #endif
                     CBOOLEAN(state.mqtt.bConnected),
-                    CBOOLEAN(state.otgw.bOnline));
+                    CBOOLEAN(state.otBus.bOnline));
                 Debugf(PSTR("Thermostat: %s | Boiler: %s | Gateway Mode: %s\r\n"),
-                    CCONOFF(state.otgw.bThermostatState),
-                    CCONOFF(state.otgw.bBoilerState),
-                    state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
+                    CCONOFF(state.otBus.bThermostatState),
+                    CCONOFF(state.otBus.bBoilerState),
+                    state.otBus.bGatewayModeKnown ? CCONOFF(state.otBus.bGatewayMode) : "detecting");
                 Debugf(PSTR("OTGW Simulation: %s\r\n"), CBOOLEAN(state.debug.bOTGWSimulation));
                 Debugf(PSTR("CH Temp: %.1f°C | Room Temp: %.1f°C | Setpoint: %.1f°C\r\n"),
                     OTcurrentSystemState.Tboiler,
@@ -64,11 +64,11 @@ void handleDebug(){
                 getpicfwversion();
                 DebugTln(F("Debug --> PR=A report firmware version, type"));
                 strlcpy(state.pic.sFwversion, OTGWSerial.firmwareVersion(), sizeof(state.pic.sFwversion));
-                OTGWDebugTf(PSTR("Current firmware version: %s\r\n"), state.pic.sFwversion);
+                OTDebugTf(PSTR("Current firmware version: %s\r\n"), state.pic.sFwversion);
                 strlcpy(state.pic.sDeviceid, OTGWSerial.processorToString().c_str(), sizeof(state.pic.sDeviceid));
-                OTGWDebugTf(PSTR("Current device id: %s\r\n"), state.pic.sDeviceid);
+                OTDebugTf(PSTR("Current device id: %s\r\n"), state.pic.sDeviceid);
                 strlcpy(state.pic.sType, OTGWSerial.firmwareToString().c_str(), sizeof(state.pic.sType));
-                OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
+                OTDebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
 #else
                 DebugTln(F("PIC not available on this hardware"));
 #endif
@@ -89,7 +89,7 @@ void handleDebug(){
                     startWiFi(CSTR(settings.sHostname), 240);
                     //check OTGW and telnet
                     startTelnet();
-                    startOTGWstream(); 
+                    startPICStream(); 
                 } else DebugTln(F("Wifi is connected"));
                     
                 if (!state.mqtt.bConnected) {

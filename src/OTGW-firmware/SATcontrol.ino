@@ -315,7 +315,7 @@ void satDisable()
   state.sat.fFinalSetpoint = 0.0f;
   satPidReset();
   // Send CS=0 to release control setpoint override — thermostat regains control
-  addOTWGcmdtoqueue("CS=0", 4, false, 0);
+  addCommandToQueue("CS=0", 4, false, 0);
   DebugTln(F("SAT: disabled, sent CS=0 to release boiler control"));
 }
 
@@ -461,7 +461,7 @@ void initSAT()
   // Send CS=0 so the thermostat controls the boiler until SAT's first
   // control loop iteration computes a proper setpoint (~30s).
   if (hasOTCommandInterface()) {
-    addOTWGcmdtoqueue("CS=0", 4, false, 0);
+    addCommandToQueue("CS=0", 4, false, 0);
     _sat_bootCS0sent = true;
     DebugTln(F("SAT: boot safety - sent CS=0 to release stale control override"));
   }
@@ -497,7 +497,7 @@ void satControlLoop()
   // Boot safety deferred: if CS=0 wasn't sent during initSAT(), send it on the
   // first call where an OT command interface is available.
   if (!_sat_bootCS0sent && hasOTCommandInterface()) {
-    addOTWGcmdtoqueue("CS=0", 4, false, 0);
+    addCommandToQueue("CS=0", 4, false, 0);
     _sat_bootCS0sent = true;
     DebugTln(F("SAT: deferred boot safety — sent CS=0"));
   }
@@ -581,7 +581,7 @@ void satControlLoop()
   if (hasOTCommandInterface()) {
     char cmdBuf[16];
     snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("CS=%.1f"), finalSetpoint);
-    addOTWGcmdtoqueue(cmdBuf, strlen(cmdBuf), false, 0);
+    addCommandToQueue(cmdBuf, strlen(cmdBuf), false, 0);
     _sat_picFailCount = 0;
   } else {
     _sat_picFailCount++;
