@@ -401,9 +401,10 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // Modulation reliability
   bool     bModulationReliable    = true;
   uint8_t  iModChangeCount        = 0;   // changes observed in window
-  // Heating curve recommendation
+  // Heating curve recommendation + error statistics
   SATCurveRecommendation eCurveRecommendation = SAT_CR_INSUFFICIENT;
   float    fMeanError             = 0.0f;
+  float    fErrorStdDev           = 0.0f;
   // OT setpoint sync
   bool     bSetpointMismatch      = false;
   uint32_t iMismatchSinceMs       = 0;
@@ -628,6 +629,7 @@ struct SATSection {
   uint16_t iWindowMinOpenSec  = 60;     // Minimum seconds window must stay open before action
   bool     bForcePWM          = false;  // Force PWM mode regardless of boiler modulation
   float    fFlowOffset        = 2.0f;   // Continuous mode: max setpoint drop from boiler temp
+  float    fTargetTempStep    = 0.5f;   // Target temperature UI step size (0.1-1.0)
   float    fMinPressure       = 0.8f;   // Pressure alarm: minimum bar
   float    fMaxPressure       = 2.5f;   // Pressure alarm: maximum bar
   float    fMaxPressureDrop   = 0.3f;   // Pressure alarm: max bar/hour drop rate

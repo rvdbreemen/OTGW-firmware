@@ -850,6 +850,8 @@ void satSendStatusJSON()
     if (crIdx < 0 || crIdx > 3) crIdx = 0;
     sendJsonMapEntry(F("curve_recommendation"), crNames[crIdx]); }
   satSendJsonFloat(F("mean_error"),            state.sat.fMeanError, 2);
+  satSendJsonFloat(F("error_stddev"),          state.sat.fErrorStdDev, 3);
+  satSendJsonFloat(F("target_temp_step"),      settings.sat.fTargetTempStep, 1);
   sendEndJsonMap("");
 }
 
@@ -963,6 +965,14 @@ void satPublishMQTT()
     if (crIdx < 0 || crIdx > 3) crIdx = 0;
     sendMQTTData(F("sat/curve_recommendation"), crNames[crIdx], false);
   }
+
+  // Error statistics
+  { char sBuf[12];
+    dtostrf(state.sat.fMeanError, 1, 2, sBuf);
+    sendMQTTData(F("sat/error_mean"), sBuf, false);
+    dtostrf(state.sat.fErrorStdDev, 1, 3, sBuf);
+    sendMQTTData(F("sat/error_stddev"), sBuf, false);
+  }
 }
 
 //=====================================================================
@@ -1060,6 +1070,14 @@ static void satUpdateCurveRecommendation()
   }
   float mean = sum / (float)_cr_bufferCount;
   state.sat.fMeanError = mean;
+
+  // Standard deviation
+  float sumSq = 0.0f;
+  for (uint8_t i = 0; i < _cr_bufferCount; i++) {
+    float d = _cr_errorBuffer[i] - mean;
+    sumSq += d * d;
+  }
+  state.sat.fErrorStdDev = sqrtf(sumSq / (float)_cr_bufferCount);
 
   // Compare with 2*deadband threshold
   float threshold = settings.sat.fDeadband * 2.0f;

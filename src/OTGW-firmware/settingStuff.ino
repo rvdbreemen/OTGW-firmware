@@ -301,6 +301,7 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATflameoffset"), settings.sat.fFlameOffOffset, true);
   writeJsonBoolKV(file, F("SATwindowdetect"), settings.sat.bWindowDetection, true);
   writeJsonIntKV(file, F("SATwindowminsec"), settings.sat.iWindowMinOpenSec, true);
+  writeJsonFloatKV(file, F("SATtempstep"), settings.sat.fTargetTempStep, true);
   writeJsonBoolKV(file, F("SATforcepwm"), settings.sat.bForcePWM, true);
   writeJsonFloatKV(file, F("SATflowoffset"), settings.sat.fFlowOffset, true);
   writeJsonFloatKV(file, F("SATminpressure"), settings.sat.fMinPressure, true);
@@ -737,6 +738,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATflameoffset")) == 0)    settings.sat.fFlameOffOffset = constrain(atof(newValue), 0.0f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATwindowdetect")) == 0)  settings.sat.bWindowDetection = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATwindowminsec")) == 0)  settings.sat.iWindowMinOpenSec = constrain(atoi(newValue), 10, 600);
+  else if (strcasecmp_P(field, PSTR("SATtempstep")) == 0)     settings.sat.fTargetTempStep = constrain(atof(newValue), 0.1f, 1.0f);
   else if (strcasecmp_P(field, PSTR("SATforcepwm")) == 0)     settings.sat.bForcePWM = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATflowoffset")) == 0)   settings.sat.fFlowOffset = constrain(atof(newValue), 0.5f, 10.0f);
   else if (strcasecmp_P(field, PSTR("SATminpressure")) == 0)  settings.sat.fMinPressure = constrain(atof(newValue), 0.0f, 3.0f);
