@@ -801,7 +801,13 @@ void satControlLoop()
     }
     return;
   }
-  _sat_consecutiveSkips = 0;  // Valid reading — reset counter
+  _sat_consecutiveSkips = 0;  // Valid reading -- reset counter
+
+  // Task #38: OT error flag monitoring -- check for critical boiler faults
+  if (OTcurrentSystemState.SlaveStatus & 0x01) { // Bit 0 = fault indication
+    DebugTln(F("SAT: boiler fault flag detected, skipping control cycle"));
+    return; // Skip this control cycle, let boiler handle the fault
+  }
 
   if (outsideTemp < -40.0f || outsideTemp > 50.0f) {
     outsideTemp = 10.0f;  // Safe fallback
