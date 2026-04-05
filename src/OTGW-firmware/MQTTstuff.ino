@@ -733,11 +733,14 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
             } else if (strcasecmp_P(satSubCmd, PSTR("reset_integral")) == 0) {
               satResetIntegral();
             } else if (strcasecmp_P(satSubCmd, PSTR("window")) == 0) {
-              // Window open/closed detection via MQTT
               bool isOpen = (strcasecmp_P(msgPayload, PSTR("open")) == 0 ||
                             strcasecmp_P(msgPayload, PSTR("1")) == 0 ||
                             strcasecmp_P(msgPayload, PSTR("ON")) == 0);
               satHandleWindow(isOpen);
+            } else if (strcasecmp_P(satSubCmd, PSTR("force_pwm")) == 0) {
+              updateSetting("SATforcepwm", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("flow_offset")) == 0) {
+              updateSetting("SATflowoffset", msgPayload);
             } else {
               MQTTDebugTf(PSTR("SAT: unknown sub-command [%s]\r\n"), satSubCmd);
             }

@@ -390,6 +390,11 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint32_t iWindowOpenSinceMs     = 0;
   float    fPreWindowTarget       = 0.0f;
   uint8_t  iPreWindowPreset       = 0;   // SATPreset before window opened
+  // Pressure monitoring
+  float    fSmoothedPressure      = 0.0f;
+  float    fPressureDropRate      = 0.0f; // bar/hour
+  bool     bPressureAlarm         = false;
+  uint32_t iPressureAlarmSinceMs  = 0;
 };
 
 struct OTGWState {
@@ -609,6 +614,11 @@ struct SATSection {
   float    fFlameOffOffset    = 0.0f;   // Setpoint offset when flame off (anti-cycling hysteresis)
   bool     bWindowDetection   = false;  // Enable window open detection via MQTT
   uint16_t iWindowMinOpenSec  = 60;     // Minimum seconds window must stay open before action
+  bool     bForcePWM          = false;  // Force PWM mode regardless of boiler modulation
+  float    fFlowOffset        = 2.0f;   // Continuous mode: max setpoint drop from boiler temp
+  float    fMinPressure       = 0.8f;   // Pressure alarm: minimum bar
+  float    fMaxPressure       = 2.5f;   // Pressure alarm: maximum bar
+  float    fMaxPressureDrop   = 0.3f;   // Pressure alarm: max bar/hour drop rate
 };
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT

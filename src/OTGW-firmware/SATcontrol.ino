@@ -591,13 +591,14 @@ static void _satCheckWindowTimer()
 //=====================================================================
 static float satApplyContinuous(float pidOutput)
 {
-  // Flow-temperature-aware clamping:
-  // Don't drop setpoint abruptly when boiler is hot — smooth ramp down
+  // Asymmetric setpoint clamping (Task #44, SAT Python heating_control.py):
+  // minimum_allowed = boiler_temp - flow_offset (configurable, default 2.0C)
+  // Prevents setpoint spikes on overheat and ensures smooth ramp-down
   float boilerTemp = OTcurrentSystemState.Tboiler;
-  float minAllowed = boilerTemp - SAT_FLOW_OFFSET_CONTINUOUS;
+  float flowOffset = settings.sat.fFlowOffset;
+  float minAllowed = boilerTemp - flowOffset;
 
-  if (pidOutput < minAllowed && boilerTemp > pidOutput + SAT_FLOW_OFFSET_CONTINUOUS) {
-    // Boiler is much hotter than target — ramp down gradually
+  if (pidOutput < minAllowed && boilerTemp > pidOutput + flowOffset) {
     return minAllowed;
   }
 
@@ -837,6 +838,11 @@ void satSendStatusJSON()
   sendJsonMapEntry(F("window_detection"),      settings.sat.bWindowDetection);
   sendJsonMapEntry(F("push_setpoint"),         settings.sat.bPushSetpoint);
   satSendJsonFloat(F("flame_off_offset"),      settings.sat.fFlameOffOffset, 1);
+  sendJsonMapEntry(F("force_pwm"),             settings.sat.bForcePWM);
+  satSendJsonFloat(F("flow_offset"),           settings.sat.fFlowOffset, 1);
+  satSendJsonFloat(F("pressure"),              state.sat.fSmoothedPressure, 2);
+  satSendJsonFloat(F("pressure_drop_rate"),    state.sat.fPressureDropRate, 3);
+  sendJsonMapEntry(F("pressure_alarm"),        state.sat.bPressureAlarm);
   sendEndJsonMap("");
 }
 
@@ -930,6 +936,70 @@ void satPublishMQTT()
 
   // Window detection
   sendMQTTData(F("sat/window_open"), state.sat.bWindowOpen ? "true" : "false", false);
+
+  // Pressure monitoring
+  { char pBuf[12];
+    dtostrf(state.sat.fSmoothedPressure, 1, 2, pBuf);
+    sendMQTTData(F("sat/pressure"), pBuf, false);
+    dtostrf(state.sat.fPressureDropRate, 1, 3, pBuf);
+    sendMQTTData(F("sat/pressure_drop_rate"), pBuf, false);
+    sendMQTTData(F("sat/pressure_alarm"), state.sat.bPressureAlarm ? "true" : "false", false);
+  }
+}
+
+//=====================================================================
+//=== Pressure Monitoring (Task #10) ===
+//=====================================================================
+static float _press_prevSmoothed = 0.0f;
+static uint32_t _press_prevMs    = 0;
+
+static void satUpdatePressure()
+{
+  float raw = OTcurrentSystemState.CHPressure;
+  if (raw < 0.01f) return;  // No pressure reading available
+
+  uint32_t now = millis();
+
+  // EMA smoothing (alpha=0.05 per SAT Python)
+  if (state.sat.fSmoothedPressure < 0.01f) {
+    state.sat.fSmoothedPressure = raw;  // Initialize
+    _press_prevSmoothed = raw;
+    _press_prevMs = now;
+    return;
+  }
+
+  state.sat.fSmoothedPressure = 0.05f * raw + 0.95f * state.sat.fSmoothedPressure;
+
+  // Calculate drop rate (bar/hour) from smoothed readings
+  float dt = (float)(now - _press_prevMs) / 1000.0f;
+  if (dt > 30.0f) {  // Update drop rate every 30s minimum
+    float delta = _press_prevSmoothed - state.sat.fSmoothedPressure;
+    state.sat.fPressureDropRate = (delta / dt) * 3600.0f;  // Convert to bar/hour
+    _press_prevSmoothed = state.sat.fSmoothedPressure;
+    _press_prevMs = now;
+  }
+
+  // Check alarm conditions
+  bool alarmCond = (state.sat.fSmoothedPressure < settings.sat.fMinPressure ||
+                    state.sat.fSmoothedPressure > settings.sat.fMaxPressure ||
+                    state.sat.fPressureDropRate > settings.sat.fMaxPressureDrop);
+
+  if (alarmCond) {
+    if (state.sat.iPressureAlarmSinceMs == 0) {
+      state.sat.iPressureAlarmSinceMs = now;
+    }
+    // Confirm after 120s persistent
+    if ((now - state.sat.iPressureAlarmSinceMs) >= 120000UL) {
+      if (!state.sat.bPressureAlarm) {
+        state.sat.bPressureAlarm = true;
+        DebugTf(PSTR("SAT: PRESSURE ALARM (smoothed=%.2f drop=%.3f bar/hr)\r\n"),
+                state.sat.fSmoothedPressure, state.sat.fPressureDropRate);
+      }
+    }
+  } else {
+    state.sat.iPressureAlarmSinceMs = 0;
+    state.sat.bPressureAlarm = false;
+  }
 }
 
 //=====================================================================
@@ -1070,6 +1140,9 @@ void satControlLoop()
   // --- Window detection timer check ---
   _satCheckWindowTimer();
 
+  // --- Pressure monitoring ---
+  satUpdatePressure();
+
   // --- Update boiler status ---
   satUpdateBoilerStatus();
 
@@ -1091,6 +1164,11 @@ void satControlLoop()
 
   if (pidOutput < SAT_MIN_SETPOINT) pidOutput = SAT_MIN_SETPOINT;
   if (pidOutput > maxSetpoint) pidOutput = maxSetpoint;
+
+  // --- Force PWM if configured (Task #41) ---
+  if (settings.sat.bForcePWM && state.sat.eControlMode != SAT_MODE_PWM) {
+    state.sat.eControlMode = SAT_MODE_PWM;
+  }
 
   // --- Apply control mode ---
   float finalSetpoint;
