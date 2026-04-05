@@ -34,11 +34,15 @@ var SAT = (function() {
   // --- Mode / Status label maps ---
   var MODE_LABELS  = ['Off', 'Continuous', 'PWM'];
   var CYCLE_LABELS = ['None', 'Good', 'Overshoot', 'Underheat', 'Short', 'Uncertain'];
-  var BOILER_LABELS = [
-    'Off', 'Idle', 'Preheating', 'At Setpoint', 'Modulating Up', 'Modulating Down',
-    'Ignition Surge', 'Stalled Ignition', 'Anti-Cycling', 'Pump Starting',
-    'Waiting Flame', 'Overshoot Cooling', 'Post-Cycle', 'Heating', 'Cooling'
-  ];
+  var BOILER_LABELS = {
+    'off': 'Off', 'idle': 'Idle', 'preheating': 'Preheating',
+    'at_setpoint': 'At Setpoint', 'modulating_up': 'Modulating Up',
+    'modulating_down': 'Modulating Down', 'ignition_surge': 'Ignition Surge',
+    'stalled_ignition': 'Stalled Ignition', 'anti_cycling': 'Anti-Cycling',
+    'pump_starting': 'Pump Starting', 'waiting_flame': 'Waiting Flame',
+    'overshoot_cooling': 'Overshoot Cooling', 'post_cycle': 'Post-Cycle',
+    'heating': 'Heating', 'cooling': 'Cooling'
+  };
 
   // --- DOM helpers ---
   function el(id) { return document.getElementById(id); }

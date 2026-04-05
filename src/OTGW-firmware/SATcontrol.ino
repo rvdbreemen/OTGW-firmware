@@ -208,10 +208,13 @@ static void satOvpStopCalibration()
 }
 
 // --- Boiler Status Tracking ---
-static bool     _bs_prevFlame       = false;
-static float    _bs_prevModulation  = 0.0f;
-static float    _bs_prevBoilerTemp  = 0.0f;
-static uint32_t _bs_stateEntryMs    = 0;
+static bool     _bs_prevFlame          = false;
+static float    _bs_prevModulation     = 0.0f;
+static float    _bs_prevBoilerTemp     = 0.0f;
+static uint32_t _bs_stateEntryMs       = 0;
+static uint32_t _bs_flameOnMs          = 0;
+static uint32_t _bs_flameOffMs         = 0;
+static uint32_t _bs_lastCycleDurationMs = 0;
 
 // --- Previous flame state for edge detection ---
 static bool     _sat_prevFlameState = false;
@@ -242,46 +245,115 @@ static float satCalcHeatingCurve(float targetTemp, float outsideTemp)
 //=====================================================================
 //=== Boiler Status Evaluator ===
 //=====================================================================
+// SAT Python status.py timing constants
+static const uint32_t BS_ANTI_CYCLE_MIN_OFF_MS   = 180000UL;  // 180s min OFF between cycles
+static const uint32_t BS_STALLED_IGNITION_MIN_MS  = 600000UL;  // 600s default stalled threshold
+static const uint32_t BS_POST_CYCLE_SETTLE_MS     = 60000UL;   // 60s post-cycle settling
+static const uint32_t BS_IGNITION_SURGE_WINDOW_MS = 30000UL;   // 30s window for ignition surge
+static const float    BS_DEMAND_HYSTERESIS        = 0.7f;      // demand = setpoint > flow + 0.7C
+static const float    BS_AT_SETPOINT_BAND         = 1.5f;      // +/- 1.5C at setpoint
+static const float    BS_PUMP_START_DELTA         = 6.0f;      // pump starting: temp drop > 6C
+static const float    BS_IGNITION_SURGE_RATE      = 0.5f;      // 0.5C/s temp rise rate
+
 static void satUpdateBoilerStatus()
 {
-  bool flame = (OTcurrentSystemState.Statusflags & 0x08) != 0;  // Bit 3 of slave status = flame
+  bool flame = (OTcurrentSystemState.Statusflags & 0x08) != 0;
   float mod = OTcurrentSystemState.RelModLevel;
   float boilerTemp = OTcurrentSystemState.Tboiler;
   float setpoint = state.sat.fFinalSetpoint;
   uint32_t now = millis();
   SATBoilerStatus prev = state.sat.eBoilerStatus;
 
+  // Track flame transitions for timing
+  if (flame && !_bs_prevFlame) {
+    _bs_flameOnMs = now;
+  }
+  if (!flame && _bs_prevFlame) {
+    if (_bs_flameOnMs > 0) {
+      _bs_lastCycleDurationMs = now - _bs_flameOnMs;
+    }
+    _bs_flameOffMs = now;
+  }
+
+  // Demand detection with hysteresis (SAT Python)
+  bool hasDemand = (setpoint > boilerTemp + BS_DEMAND_HYSTERESIS);
+
+  // Temperature rate of change (degrees per second)
+  float tempRate = 0.0f;
+  if (_bs_prevBoilerTemp > 0.001f) {
+    // Approximate: we're called each control cycle
+    float dt = (float)(now - _bs_stateEntryMs) / 1000.0f;
+    if (dt > 0.5f) {
+      tempRate = (boilerTemp - _bs_prevBoilerTemp);  // per call, not per second
+    }
+  }
+
   SATBoilerStatus newStatus = SAT_BS_OFF;
 
   if (!flame && !_bs_prevFlame) {
-    // No flame, was already off
+    // --- No flame, was already off ---
+    uint32_t offDuration = (now - _bs_flameOffMs);
+
     if (boilerTemp > setpoint + settings.sat.fOvershootMargin) {
       newStatus = SAT_BS_OVERSHOOT_COOLING;
-    } else if (prev == SAT_BS_HEATING || prev == SAT_BS_AT_SETPOINT) {
+    }
+    else if (_bs_flameOffMs > 0 && offDuration < BS_POST_CYCLE_SETTLE_MS &&
+             (prev == SAT_BS_HEATING || prev == SAT_BS_AT_SETPOINT ||
+              prev == SAT_BS_COOLING || prev == SAT_BS_POST_CYCLE)) {
       newStatus = SAT_BS_POST_CYCLE;
-    } else {
+    }
+    else if (hasDemand && _bs_flameOffMs > 0 && offDuration < BS_ANTI_CYCLE_MIN_OFF_MS) {
+      newStatus = SAT_BS_ANTI_CYCLING;
+    }
+    else if (hasDemand && _bs_flameOffMs > 0) {
+      uint32_t stalledThreshold = BS_STALLED_IGNITION_MIN_MS;
+      if (_bs_lastCycleDurationMs > 0 && _bs_lastCycleDurationMs * 3 > stalledThreshold) {
+        stalledThreshold = _bs_lastCycleDurationMs * 3;
+      }
+      if (offDuration > stalledThreshold) {
+        newStatus = SAT_BS_STALLED_IGNITION;
+      } else {
+        newStatus = SAT_BS_WAITING_FLAME;
+      }
+    }
+    else {
       newStatus = SAT_BS_IDLE;
     }
   }
   else if (flame && !_bs_prevFlame) {
-    // Flame just ignited
-    if (boilerTemp < setpoint - 10.0f) {
-      newStatus = SAT_BS_PREHEATING;
+    // --- Flame just ignited ---
+    if (boilerTemp < setpoint - BS_PUMP_START_DELTA) {
+      newStatus = SAT_BS_PUMP_STARTING;
     } else {
       newStatus = SAT_BS_IGNITION_SURGE;
     }
   }
   else if (flame) {
-    // Flame is on
-    if (fabsf(boilerTemp - setpoint) < 3.0f) {
+    // --- Flame is on ---
+    uint32_t flameDuration = (now - _bs_flameOnMs);
+
+    // Check for ignition surge (within 30s, rapid temp rise)
+    if (flameDuration < BS_IGNITION_SURGE_WINDOW_MS && tempRate >= BS_IGNITION_SURGE_RATE) {
+      newStatus = SAT_BS_IGNITION_SURGE;
+    }
+    // Pump starting: early flame, temp dropping, large delta
+    else if (flameDuration < BS_IGNITION_SURGE_WINDOW_MS &&
+             tempRate < 0.0f && (setpoint - boilerTemp) > BS_PUMP_START_DELTA) {
+      newStatus = SAT_BS_PUMP_STARTING;
+    }
+    // At setpoint band (1.5C)
+    else if (fabsf(boilerTemp - setpoint) <= BS_AT_SETPOINT_BAND) {
       newStatus = SAT_BS_AT_SETPOINT;
-    } else if (boilerTemp < setpoint) {
+    }
+    else if (boilerTemp < setpoint) {
       if (mod > _bs_prevModulation + 1.0f) {
         newStatus = SAT_BS_MODULATING_UP;
       } else {
-        newStatus = SAT_BS_HEATING;
+        newStatus = SAT_BS_PREHEATING;
       }
-    } else {
+    }
+    else {
+      // boilerTemp > setpoint + band
       if (mod < _bs_prevModulation - 1.0f) {
         newStatus = SAT_BS_MODULATING_DOWN;
       } else {
@@ -290,7 +362,7 @@ static void satUpdateBoilerStatus()
     }
   }
   else {
-    // Flame just turned off
+    // --- Flame just turned off ---
     newStatus = SAT_BS_COOLING;
   }
 
@@ -302,6 +374,37 @@ static void satUpdateBoilerStatus()
   _bs_prevFlame = flame;
   _bs_prevModulation = mod;
   _bs_prevBoilerTemp = boilerTemp;
+}
+
+// String labels for boiler status (PROGMEM)
+static const char _bsOff[]        PROGMEM = "off";
+static const char _bsIdle[]       PROGMEM = "idle";
+static const char _bsPreheat[]    PROGMEM = "preheating";
+static const char _bsAtSetpoint[] PROGMEM = "at_setpoint";
+static const char _bsModUp[]      PROGMEM = "modulating_up";
+static const char _bsModDown[]    PROGMEM = "modulating_down";
+static const char _bsSurge[]      PROGMEM = "ignition_surge";
+static const char _bsStalled[]    PROGMEM = "stalled_ignition";
+static const char _bsAntiCycle[]  PROGMEM = "anti_cycling";
+static const char _bsPumpStart[]  PROGMEM = "pump_starting";
+static const char _bsWaiting[]    PROGMEM = "waiting_flame";
+static const char _bsOvershoot[]  PROGMEM = "overshoot_cooling";
+static const char _bsPostCycle[]  PROGMEM = "post_cycle";
+static const char _bsHeating[]    PROGMEM = "heating";
+static const char _bsCooling[]    PROGMEM = "cooling";
+
+static PGM_P const _bsNames[] PROGMEM = {
+  _bsOff, _bsIdle, _bsPreheat, _bsAtSetpoint,
+  _bsModUp, _bsModDown, _bsSurge, _bsStalled,
+  _bsAntiCycle, _bsPumpStart, _bsWaiting, _bsOvershoot,
+  _bsPostCycle, _bsHeating, _bsCooling
+};
+
+void satGetBoilerStatusName(char* buf, size_t bufLen)
+{
+  int idx = (int)state.sat.eBoilerStatus;
+  if (idx < 0 || idx > (int)SAT_BS_COOLING) idx = 0;
+  strlcpy_P(buf, (PGM_P)pgm_read_ptr(&_bsNames[idx]), bufLen);
 }
 
 //=====================================================================
@@ -639,7 +742,8 @@ void satSendStatusJSON()
   sendJsonMapEntry(F("enabled"),              settings.sat.bEnabled);
   sendJsonMapEntry(F("active"),               state.sat.bActive);
   sendJsonMapEntry(F("control_mode"),         (int32_t)state.sat.eControlMode);
-  sendJsonMapEntry(F("boiler_status"),        (int32_t)state.sat.eBoilerStatus);
+  { char bsName[20]; satGetBoilerStatusName(bsName, sizeof(bsName));
+    sendJsonMapEntry(F("boiler_status"),        bsName); }
   satSendJsonFloat(F("target_temp"),          settings.sat.fTargetTemp, 1);
   satSendJsonFloat(F("room_temp"),            satGetRoomTemp(), 1);
   satSendJsonFloat(F("outside_temp"),         satGetOutsideTemp(), 1);
@@ -730,9 +834,9 @@ void satPublishMQTT()
   dtostrf(state.sat.fRawDerivative, 1, 4, valBuf);
   sendMQTTData(F("sat/raw_derivative"), valBuf, false);
 
-  // Boiler status
-  snprintf_P(valBuf, sizeof(valBuf), PSTR("%d"), (int)state.sat.eBoilerStatus);
-  sendMQTTData(F("sat/boiler_status"), valBuf, false);
+  // Boiler status (string label)
+  { char bsName[20]; satGetBoilerStatusName(bsName, sizeof(bsName));
+    sendMQTTData(F("sat/boiler_status"), bsName, false); }
 
   // Cycle info
   snprintf_P(valBuf, sizeof(valBuf), PSTR("%d"), (int)state.sat.eLastCycleClass);
