@@ -355,6 +355,9 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint32_t iCycleCount           = 0;
   float    fCycleMaxFlow         = 0.0f;
   float    fCycleOvershootSec    = 0.0f;
+  float    fDutyRatio            = 0.0f;   // EMA flame-on fraction
+  float    fOvershootFraction    = 0.0f;   // EMA overshoot cycle fraction
+  float    fUnderheatFraction    = 0.0f;   // EMA underheat cycle fraction
   // PWM state
   float fPwmDutyCycle            = 0.0f;
   bool  bPwmFlameRequested       = false;

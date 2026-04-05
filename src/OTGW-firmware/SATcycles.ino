@@ -14,8 +14,13 @@
 ***************************************************************************
 */
 
+// --- Cycle Kind ---
+enum SATCycleKind : uint8_t {
+  SAT_CK_UNKNOWN = 0, SAT_CK_CH, SAT_CK_DHW, SAT_CK_MIXED
+};
+
 // --- Cycle Constants ---
-static const uint8_t  SAT_CYCLE_HISTORY_SIZE       = 8;
+static const uint8_t  SAT_CYCLE_HISTORY_SIZE       = 16;
 static const float    SAT_CYCLE_SHORT_DURATION_SEC  = 60.0f;   // Cycles shorter than this = SHORT_CYCLING
 // Overshoot margin now read from settings.sat.fOvershootMargin (default 2.0C)
 static const float    SAT_OVERSHOOT_SUSTAIN_SEC     = 60.0f;   // Sustained overshoot before PWM switch
@@ -32,6 +37,8 @@ static float    _cycle_minFlowTemp      = 999.0f;
 static float    _cycle_setpointAtStart  = 0.0f;
 static float    _cycle_overshootSec     = 0.0f;
 static uint32_t _cycle_lastSampleMs     = 0;
+static uint16_t _cycle_dhwSamples       = 0;   // samples where DHW was active
+static uint16_t _cycle_totalSamples     = 0;   // total samples this cycle
 
 // --- Sustained State Detection ---
 static float    _sustain_overshootSec   = 0.0f;
@@ -39,12 +46,21 @@ static float    _sustain_underheatSec   = 0.0f;
 static float    _sustain_saturationSec  = 0.0f;
 static uint32_t _sustain_lastCheckMs    = 0;
 
+// --- EMA Fractions (lightweight sliding window) ---
+static float _ema_dutyRatio       = 0.0f;  // fraction of time flame is on
+static float _ema_overshootFrac   = 0.0f;  // fraction of cycles with overshoot
+static float _ema_underheatFrac   = 0.0f;  // fraction of cycles with underheat
+static float _ema_longCycleFrac   = 0.0f;  // fraction of cycles > 600s
+static const float EMA_ALPHA      = 0.15f; // decay factor per cycle
+
 // --- Cycle History ---
 struct SATCycleRecord {
   SATCycleClass eClass;
+  SATCycleKind  eKind;
   float         fDurationSec;
   float         fMaxFlowTemp;
   float         fOvershootSec;
+  float         fFlowSetpointError;  // max(flow - setpoint) during cycle
 };
 
 static SATCycleRecord _cycleHistory[SAT_CYCLE_HISTORY_SIZE];
@@ -69,13 +85,28 @@ void satCycleInit()
   memset(_cycleHistory, 0, sizeof(_cycleHistory));
 }
 
+//=== Determine cycle kind from DHW sample fraction ===
+static SATCycleKind _cycleDetectKind()
+{
+  if (_cycle_totalSamples < 3) return SAT_CK_UNKNOWN;
+  float dhwFrac = (float)_cycle_dhwSamples / (float)_cycle_totalSamples;
+  if (dhwFrac > 0.8f) return SAT_CK_DHW;
+  if (dhwFrac < 0.2f) return SAT_CK_CH;
+  return SAT_CK_MIXED;
+}
+
 //=== Record a completed cycle into history ===
 static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, float overshootSec)
 {
+  SATCycleKind kind = _cycleDetectKind();
+  float flowError = maxFlow - _cycle_setpointAtStart;
+
   _cycleHistory[_cycleHistoryIdx].eClass = cls;
+  _cycleHistory[_cycleHistoryIdx].eKind = kind;
   _cycleHistory[_cycleHistoryIdx].fDurationSec = durationSec;
   _cycleHistory[_cycleHistoryIdx].fMaxFlowTemp = maxFlow;
   _cycleHistory[_cycleHistoryIdx].fOvershootSec = overshootSec;
+  _cycleHistory[_cycleHistoryIdx].fFlowSetpointError = flowError;
   _cycleHistoryIdx = (_cycleHistoryIdx + 1) % SAT_CYCLE_HISTORY_SIZE;
   if (_cycleHistoryCount < SAT_CYCLE_HISTORY_SIZE) _cycleHistoryCount++;
 
@@ -83,6 +114,28 @@ static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, fl
   state.sat.eLastCycleClass = cls;
   state.sat.fCycleMaxFlow = maxFlow;
   state.sat.fCycleOvershootSec = overshootSec;
+
+  // Update EMA fractions
+  _ema_overshootFrac = EMA_ALPHA * (cls == SAT_CYCLE_OVERSHOOT ? 1.0f : 0.0f)
+                     + (1.0f - EMA_ALPHA) * _ema_overshootFrac;
+  _ema_underheatFrac = EMA_ALPHA * (cls == SAT_CYCLE_UNDERHEAT ? 1.0f : 0.0f)
+                     + (1.0f - EMA_ALPHA) * _ema_underheatFrac;
+  _ema_longCycleFrac = EMA_ALPHA * (durationSec > 600.0f ? 1.0f : 0.0f)
+                     + (1.0f - EMA_ALPHA) * _ema_longCycleFrac;
+
+  // Duty ratio: flame-on time / total time since last cycle
+  float totalTime = durationSec;
+  if (_cycle_flameOffStartMs > 0 && _cycle_flameOnStartMs > _cycle_flameOffStartMs) {
+    totalTime = (float)(millis() - _cycle_flameOffStartMs) / 1000.0f;
+  }
+  float dutyThis = (totalTime > 0.0f) ? (durationSec / totalTime) : 0.0f;
+  if (dutyThis > 1.0f) dutyThis = 1.0f;
+  _ema_dutyRatio = EMA_ALPHA * dutyThis + (1.0f - EMA_ALPHA) * _ema_dutyRatio;
+
+  // Expose to state
+  state.sat.fDutyRatio = _ema_dutyRatio;
+  state.sat.fOvershootFraction = _ema_overshootFrac;
+  state.sat.fUnderheatFraction = _ema_underheatFrac;
 }
 
 //=== Classify a completed cycle ===
@@ -125,6 +178,8 @@ void satCycleOnFlameChange(bool flameOn)
     _cycle_setpointAtStart = state.sat.fFinalSetpoint;
     _cycle_overshootSec = 0.0f;
     _cycle_lastSampleMs = now;
+    _cycle_dhwSamples = 0;
+    _cycle_totalSamples = 0;
   }
   else if (!flameOn && _cycle_flameOn) {
     // Flame just turned OFF — complete the cycle
@@ -157,6 +212,12 @@ void satCycleSample()
   float elapsed = (float)(now - _cycle_lastSampleMs) / 1000.0f;
   if (flowTemp > _cycle_setpointAtStart + settings.sat.fOvershootMargin) {
     _cycle_overshootSec += elapsed;
+  }
+
+  // Track DHW vs CH samples for cycle kind detection
+  _cycle_totalSamples++;
+  if ((OTcurrentSystemState.Statusflags & 0x04) != 0) {  // Bit 2 = DHW active
+    _cycle_dhwSamples++;
   }
 
   _cycle_lastSampleMs = now;
