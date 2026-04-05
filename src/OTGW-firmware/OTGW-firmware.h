@@ -359,6 +359,8 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   SATPreset eActivePreset        = SAT_PRESET_NONE;
   // Modulation control
   uint8_t iCurrentModulation     = 100;   // Last MM= value sent to boiler (0-100)
+  // DHW state
+  bool     bDhwActive               = false;  // DHW currently active (from OT status)
   // Modulation suppression
   bool     bModSuppressed           = false;
   uint32_t iModSuppressionSinceMs   = 0;
@@ -596,6 +598,8 @@ struct SATSection {
   float    fOvershootMargin   = 2.0f;   // Overshoot margin °C (cycle classification + auto-switch)
   float    fModSupDelay       = 20.0f;  // Modulation suppression delay (seconds)
   float    fModSupOffset      = 1.0f;   // Modulation suppression offset (°C below setpoint)
+  float    fDhwSetpoint       = 0.0f;   // DHW setpoint (0=inactive, 30-60°C)
+  bool     bDhwEnabled        = false;  // Enable DHW control in standalone/fallback mode
 };
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT

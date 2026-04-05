@@ -295,6 +295,8 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATovershootmargin"), settings.sat.fOvershootMargin, true);
   writeJsonFloatKV(file, F("SATmodsupdelay"), settings.sat.fModSupDelay, true);
   writeJsonFloatKV(file, F("SATmodsupoffset"), settings.sat.fModSupOffset, true);
+  writeJsonFloatKV(file, F("SATdhwsetpoint"), settings.sat.fDhwSetpoint, true);
+  writeJsonBoolKV(file, F("SATdhwenabled"), settings.sat.bDhwEnabled, true);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings (OTGW32/OT-Thing only) ---
   writeJsonIntKV(file, F("OTDmode"), settings.otd.iMode, true);
@@ -720,6 +722,8 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATovershootmargin")) == 0) settings.sat.fOvershootMargin = constrain(atof(newValue), 0.5f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATmodsupdelay")) == 0)    settings.sat.fModSupDelay = constrain(atof(newValue), 0.0f, 120.0f);
   else if (strcasecmp_P(field, PSTR("SATmodsupoffset")) == 0)   settings.sat.fModSupOffset = constrain(atof(newValue), 0.0f, 5.0f);
+  else if (strcasecmp_P(field, PSTR("SATdhwsetpoint")) == 0)    settings.sat.fDhwSetpoint = constrain(atof(newValue), 0.0f, 60.0f);
+  else if (strcasecmp_P(field, PSTR("SATdhwenabled")) == 0)     settings.sat.bDhwEnabled = EVALBOOLEAN(newValue);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings ---
   else if (strcasecmp_P(field, PSTR("OTDmode")) == 0)           settings.otd.iMode = constrain(atoi(newValue), 0, 4);

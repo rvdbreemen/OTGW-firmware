@@ -665,6 +665,8 @@ void satSendStatusJSON()
   sendJsonMapEntry(F("pwm_flame_req"),        state.sat.bPwmFlameRequested);
   sendJsonMapEntry(F("active_preset"),         (int32_t)state.sat.eActivePreset);
   sendJsonMapEntry(F("mod_suppressed"),        state.sat.bModSuppressed);
+  sendJsonMapEntry(F("dhw_active"),             state.sat.bDhwActive);
+  satSendJsonFloat(F("dhw_setpoint"),          settings.sat.fDhwSetpoint, 1);
   sendJsonMapEntry(F("control_interval_sec"),  (int32_t)settings.sat.iControlInterval);
   sendJsonMapEntry(F("fallback_active"),       state.sat.bFallbackActive);
   sendJsonMapEntry(F("fallback_reason"),       (int32_t)state.sat.eFallbackReason);
@@ -847,6 +849,13 @@ void satControlLoop()
   state.sat.bActive = true;
   if (state.sat.eControlMode == SAT_MODE_OFF) {
     state.sat.eControlMode = SAT_MODE_CONTINUOUS;
+  }
+
+  // --- DHW detection (Task #3): skip CH control when DHW is active ---
+  state.sat.bDhwActive = (OTcurrentSystemState.SlaveStatus & 0x04) != 0; // Bit 2 = DHW active
+  if (state.sat.bDhwActive) {
+    // DHW has priority - don't adjust CH setpoint, boiler manages itself
+    return;
   }
 
   // --- Read inputs (staleness is checked inside these functions) ---
