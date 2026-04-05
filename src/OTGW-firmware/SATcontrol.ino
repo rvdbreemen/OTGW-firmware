@@ -401,6 +401,43 @@ static float satApplyPWM(float pidOutput)
 }
 
 //=====================================================================
+//=== Preset Handling ===
+//=====================================================================
+static const char* satGetPresetName(SATPreset p)
+{
+  switch (p) {
+    case SAT_PRESET_AWAY:     return "away";
+    case SAT_PRESET_ECO:      return "eco";
+    case SAT_PRESET_COMFORT:  return "comfort";
+    case SAT_PRESET_SLEEP:    return "sleep";
+    case SAT_PRESET_ACTIVITY: return "activity";
+    default:                  return "none";
+  }
+}
+
+void satHandlePreset(const char* value)
+{
+  SATPreset newPreset = SAT_PRESET_NONE;
+  float newTarget = settings.sat.fTargetTemp;
+
+  if (strcasecmp_P(value, PSTR("away")) == 0)          { newPreset = SAT_PRESET_AWAY;     newTarget = settings.sat.fPresetAway; }
+  else if (strcasecmp_P(value, PSTR("eco")) == 0)      { newPreset = SAT_PRESET_ECO;      newTarget = settings.sat.fPresetEco; }
+  else if (strcasecmp_P(value, PSTR("comfort")) == 0)  { newPreset = SAT_PRESET_COMFORT;  newTarget = settings.sat.fPresetComfort; }
+  else if (strcasecmp_P(value, PSTR("sleep")) == 0)    { newPreset = SAT_PRESET_SLEEP;    newTarget = settings.sat.fPresetSleep; }
+  else if (strcasecmp_P(value, PSTR("activity")) == 0) { newPreset = SAT_PRESET_ACTIVITY;  newTarget = settings.sat.fPresetActivity; }
+  else if (strcasecmp_P(value, PSTR("none")) == 0)     { newPreset = SAT_PRESET_NONE; }
+  else return; // Unknown preset
+
+  state.sat.eActivePreset = newPreset;
+  if (newPreset != SAT_PRESET_NONE) {
+    settings.sat.fTargetTemp = newTarget;
+    // Reset PID integral to prevent overshoot on large temp jumps
+    state.sat.fPidI = 0.0f;
+    DebugTf(PSTR("SAT: preset '%s' -> target %.1f, integral reset\r\n"), satGetPresetName(newPreset), newTarget);
+  }
+}
+
+//=====================================================================
 //=== Continuous Control Mode ===
 //=====================================================================
 static float satApplyContinuous(float pidOutput)
@@ -589,6 +626,7 @@ void satSendStatusJSON()
   satSendJsonFloat(F("cycle_overshoot_sec"),  state.sat.fCycleOvershootSec, 0);
   satSendJsonFloat(F("pwm_duty"),             state.sat.fPwmDutyCycle, 2);
   sendJsonMapEntry(F("pwm_flame_req"),        state.sat.bPwmFlameRequested);
+  sendJsonMapEntry(F("active_preset"),         (int32_t)state.sat.eActivePreset);
   sendJsonMapEntry(F("max_rel_modulation"),   (int32_t)settings.sat.iMaxRelModulation);
   sendJsonMapEntry(F("current_modulation"),   (int32_t)state.sat.iCurrentModulation);
   satSendJsonFloat(F("ovp_value"),            settings.sat.fOvpValue, 1);

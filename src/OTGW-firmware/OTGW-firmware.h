@@ -311,6 +311,10 @@ enum SATCalibPhase  : uint8_t {
   SAT_CALIB_IDLE = 0, SAT_CALIB_STARTING, SAT_CALIB_WARMING,
   SAT_CALIB_MEASURING, SAT_CALIB_COOLDOWN, SAT_CALIB_DONE, SAT_CALIB_FAILED
 };
+enum SATPreset : uint8_t {
+  SAT_PRESET_NONE = 0, SAT_PRESET_AWAY, SAT_PRESET_ECO,
+  SAT_PRESET_COMFORT, SAT_PRESET_SLEEP, SAT_PRESET_ACTIVITY
+};
 enum SATCycleClass  : uint8_t {
   SAT_CYCLE_NONE = 0, SAT_CYCLE_GOOD, SAT_CYCLE_OVERSHOOT,
   SAT_CYCLE_UNDERHEAT, SAT_CYCLE_SHORT, SAT_CYCLE_UNCERTAIN
@@ -347,6 +351,8 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // PWM state
   float fPwmDutyCycle            = 0.0f;
   bool  bPwmFlameRequested       = false;
+  // Preset
+  SATPreset eActivePreset        = SAT_PRESET_NONE;
   // Modulation control
   uint8_t iCurrentModulation     = 100;   // Last MM= value sent to boiler (0-100)
   // OPV calibration state
@@ -571,6 +577,8 @@ struct SATSection {
   float    fPresetComfort     = 21.0f;  // Preset: Comfort
   float    fPresetEco         = 18.0f;  // Preset: Eco
   float    fPresetAway        = 15.0f;  // Preset: Away
+  float    fPresetSleep       = 16.0f;  // Preset: Sleep
+  float    fPresetActivity    = 10.0f;  // Preset: Activity (used by window detection)
   bool     bPwmAutoSwitch     = true;   // Auto-switch between PWM and continuous mode
   uint8_t  iMaxRelModulation  = 100;    // Max relative modulation 0-100% (MM= command)
   float    fOvpValue          = 0.0f;   // Overshoot Protection Value (0=not calibrated)

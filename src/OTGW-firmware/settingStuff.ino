@@ -286,6 +286,8 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATpresetcomfort"), settings.sat.fPresetComfort, true);
   writeJsonFloatKV(file, F("SATpreseteco"), settings.sat.fPresetEco, true);
   writeJsonFloatKV(file, F("SATpresetaway"), settings.sat.fPresetAway, true);
+  writeJsonFloatKV(file, F("SATpresetsleep"), settings.sat.fPresetSleep, true);
+  writeJsonFloatKV(file, F("SATpresetactivity"), settings.sat.fPresetActivity, true);
   writeJsonBoolKV(file, F("SATpwmautoswitch"), settings.sat.bPwmAutoSwitch, true);
   writeJsonIntKV(file, F("SATmaxmodulation"), settings.sat.iMaxRelModulation, true);
   writeJsonFloatKV(file, F("SATovpvalue"), settings.sat.fOvpValue, true);
@@ -707,6 +709,8 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATpresetcomfort")) == 0)   settings.sat.fPresetComfort = constrain(atof(newValue), 15.0f, 28.0f);
   else if (strcasecmp_P(field, PSTR("SATpreseteco")) == 0)       settings.sat.fPresetEco = constrain(atof(newValue), 10.0f, 22.0f);
   else if (strcasecmp_P(field, PSTR("SATpresetaway")) == 0)      settings.sat.fPresetAway = constrain(atof(newValue), 5.0f, 18.0f);
+  else if (strcasecmp_P(field, PSTR("SATpresetsleep")) == 0)     settings.sat.fPresetSleep = constrain(atof(newValue), 5.0f, 25.0f);
+  else if (strcasecmp_P(field, PSTR("SATpresetactivity")) == 0)  settings.sat.fPresetActivity = constrain(atof(newValue), 5.0f, 20.0f);
   else if (strcasecmp_P(field, PSTR("SATpwmautoswitch")) == 0)   settings.sat.bPwmAutoSwitch = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATmaxmodulation")) == 0)   settings.sat.iMaxRelModulation = constrain(atoi(newValue), 0, 100);
   else if (strcasecmp_P(field, PSTR("SATovpvalue")) == 0)        settings.sat.fOvpValue = constrain(atof(newValue), 0.0f, 90.0f);

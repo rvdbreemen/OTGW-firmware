@@ -1312,6 +1312,13 @@ void sendDeviceSettings()
     sendJsonSettingObj(F("satpresetaway"), tmpBuf, "f", 5, 18);
   }
   sendJsonSettingObj(F("satpwmautoswitch"), settings.sat.bPwmAutoSwitch, "b");
+  {
+    char tmpBuf[8];
+    dtostrf(settings.sat.fPresetSleep, 1, 1, tmpBuf);
+    sendJsonSettingObj(F("satpresetsleep"), tmpBuf, "f", 5, 25);
+    dtostrf(settings.sat.fPresetActivity, 1, 1, tmpBuf);
+    sendJsonSettingObj(F("satpresetactivity"), tmpBuf, "f", 5, 20);
+  }
   sendJsonSettingObj(F("satmaxmodulation"), settings.sat.iMaxRelModulation, "i", 0, 100);
   {
     char tmpBuf[8];

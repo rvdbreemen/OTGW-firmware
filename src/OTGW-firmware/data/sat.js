@@ -119,6 +119,10 @@ var SAT = (function() {
     setText('sat-coefficient', d.coefficient !== undefined ? d.coefficient.toFixed(1) : '--');
     setText('sat-deadband', d.deadband !== undefined ? d.deadband.toFixed(2) + '\u00B0C' : '--');
     setText('sat-overshoot-margin', d.overshoot_margin !== undefined ? d.overshoot_margin.toFixed(1) + '\u00B0C' : '--');
+    // Preset
+    var presetNames = ['None', 'Away', 'Eco', 'Comfort', 'Sleep', 'Activity'];
+    setText('sat-preset', d.active_preset !== undefined ? (presetNames[d.active_preset] || '--') : '--');
+
     var hsNames = ['Auto', 'Radiators', 'Heat Pump', 'Underfloor'];
     var hsIdx = d.heating_system !== undefined ? d.heating_system : 0;
     var hsDetected = d.heating_system_detected !== undefined ? d.heating_system_detected : 1;
