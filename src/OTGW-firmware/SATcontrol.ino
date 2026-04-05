@@ -307,53 +307,93 @@ static void satUpdateBoilerStatus()
 //=====================================================================
 //=== PWM Control Mode ===
 //=====================================================================
+// PWM state tracking for effective temperature and flame timing
+static float    _pwm_effectiveBoilerTemp = 0.0f;
+static uint32_t _pwm_flameOnMs          = 0;
+static uint32_t _pwm_lastSampleMs       = 0;
+static bool     _pwm_waitingForFlame    = false;
+
 static float satApplyPWM(float pidOutput)
 {
-  // PWM duty cycle: ratio of needed output to max capacity
-  float maxSetpoint = OTcurrentSystemState.MaxTSet;
-  if (maxSetpoint < 30.0f) maxSetpoint = SAT_MAX_SETPOINT_DEFAULT;
-
+  // --- Duty cycle calculation per SAT Python: (setpoint - base) / (effective_temp - base) ---
   float baseOffset = satGetBaseOffset();
-  float range = maxSetpoint - baseOffset;
-  if (range < 10.0f) range = 10.0f;
+  float effectiveTemp = _pwm_effectiveBoilerTemp;
+  if (effectiveTemp < baseOffset + 5.0f) effectiveTemp = baseOffset + 20.0f; // Fallback
 
-  float duty = (pidOutput - baseOffset) / range;
+  float duty = (pidOutput - baseOffset) / (effectiveTemp - baseOffset);
   if (duty < 0.0f) duty = 0.0f;
   if (duty > 1.0f) duty = 1.0f;
-
   state.sat.fPwmDutyCycle = duty;
 
-  // Determine if flame should be on based on duty cycle
-  // Simple time-proportional: within each control interval, flame on for duty% of time
-  uint32_t intervalMs = (uint32_t)settings.sat.iControlInterval * 1000UL;
-  uint32_t onTimeMs = (uint32_t)(duty * (float)intervalMs);
-  uint32_t sinceFlameStart = millis() - satCycleGetFlameOnStartMs();
+  // --- Time thresholds from heating system ---
+  uint32_t minOnMs   = satGetMinOnTimeSec() * 1000UL;  // 180s gas, 1800s heat pump
+  uint8_t  cyclesHr  = satGetMaxCyclesPerHour();
+  uint32_t upperMs   = (3600000UL / cyclesHr);          // e.g. 900s at 4 cycles/hr
+  uint32_t maxMs     = upperMs * 2;                      // Max cycle time
+
+  // --- Effective temperature tracking (EMA during first 30s of flame-on) ---
+  bool flame = (OTcurrentSystemState.MasterStatus & 0x08) != 0;
+  float boilerTemp = OTcurrentSystemState.Tboiler;
+  if (flame && !_pwm_waitingForFlame) {
+    uint32_t sinceFlamOn = millis() - _pwm_flameOnMs;
+    if (sinceFlamOn < 30000UL) {
+      // EMA smoothing during first 30s (alpha=0.3)
+      _pwm_effectiveBoilerTemp = 0.3f * boilerTemp + 0.7f * _pwm_effectiveBoilerTemp;
+    }
+  }
+
+  // --- Flame sync: track flame-on moment ---
+  if (flame && _pwm_waitingForFlame) {
+    _pwm_flameOnMs = millis();
+    _pwm_waitingForFlame = false;
+  }
+  if (!flame && !_pwm_waitingForFlame && state.sat.bPwmFlameRequested) {
+    _pwm_waitingForFlame = true;
+  }
+
+  // --- 5-range duty cycle mapper ---
+  uint32_t onTimeMs, offTimeMs;
 
   if (duty >= 0.95f) {
-    // Nearly 100% — just use full setpoint
+    // Range 5: Over-max - continuous ON
     state.sat.bPwmFlameRequested = true;
     return pidOutput;
   } else if (duty <= 0.05f) {
-    // Nearly 0% — minimum setpoint to suppress flame
-    state.sat.bPwmFlameRequested = false;
-    return SAT_MIN_SETPOINT;
+    // Range 1: Ultra-low - minimum on, long off
+    onTimeMs  = minOnMs;
+    offTimeMs = maxMs - minOnMs;
+  } else if (duty < 0.3f) {
+    // Range 2: Low - on=min, off scaled
+    onTimeMs  = minOnMs;
+    offTimeMs = (uint32_t)((float)minOnMs * (1.0f - duty) / duty);
+    if (offTimeMs > maxMs - minOnMs) offTimeMs = maxMs - minOnMs;
+  } else if (duty < 0.7f) {
+    // Range 3: Mid - proportional
+    onTimeMs  = (uint32_t)(duty * (float)upperMs);
+    offTimeMs = upperMs - onTimeMs;
+    if (onTimeMs < minOnMs) onTimeMs = minOnMs;
+  } else {
+    // Range 4: High - long on, short off
+    offTimeMs = (uint32_t)((1.0f - duty) * (float)upperMs);
+    onTimeMs  = upperMs - offTimeMs;
+    if (onTimeMs < minOnMs) onTimeMs = minOnMs;
   }
 
-  // Flame ON phase: send the full setpoint
+  // --- PWM state machine ---
+  uint32_t sinceFlameStart = millis() - satCycleGetFlameOnStartMs();
   if (state.sat.bPwmFlameRequested) {
-    if (sinceFlameStart < onTimeMs || sinceFlameStart < (uint32_t)(SAT_PWM_MIN_ON_SEC * 1000.0f)) {
+    // ON phase: keep flame on for calculated duration (minimum: minOnMs)
+    if (sinceFlameStart < onTimeMs || sinceFlameStart < minOnMs) {
       return pidOutput;
     }
-    // Switch to OFF phase
     state.sat.bPwmFlameRequested = false;
     return SAT_MIN_SETPOINT;
-  }
-  else {
-    // Flame OFF phase — check if we should turn on again
+  } else {
+    // OFF phase: wait for off duration then restart
     uint32_t sinceFlameOff = millis() - satCycleGetFlameOffStartMs();
-    uint32_t offTimeMs = intervalMs - onTimeMs;
     if (sinceFlameOff >= offTimeMs) {
       state.sat.bPwmFlameRequested = true;
+      _pwm_waitingForFlame = true;
       return pidOutput;
     }
     return SAT_MIN_SETPOINT;

@@ -1,0 +1,156 @@
+ATAG Wize|48|3842
+AgpoTherm Plus Artikelnummer: 1201045|0|257
+Atag BrainZ RSC V3.0|48|280
+Atlantic Navilink 105|0|
+Atlantic Navilink 105||
+Atlantic Navilink H55||
+Baxi 7104336|27|
+Baxi 710433601|56|
+Baxi Nuvola 3 integrated||
+Baxi luna 3 Confort HT|4|2097
+Baxi uSense|11|
+BeSmart Opentherm||
+Bosch Easycontrol CT200 + Nefit Easy Connect adapter||513
+Bosch OR80||
+Bosch TF30||
+Bosch/Junkers TF25||
+CENVAX VAG 5000 floor||
+CM937||
+DIYLess Wifi Opentherm Thermostat||
+Daikin D(R)OTROOMTHEAA||
+De Dietrich AD 303|11|
+De Dietrich AD 304|11|
+De Dietrich AD289 iSense|11|
+De Dietrich AD341|11|
+Drayton Wiser Hub 1||
+EMOS P5616OT||1283
+Elco Remocon Smart|48|
+Elektrobock BPT57|4|
+Elektrobock BT52|4|
+Elektrobock BT52|4|257
+Elektrobock PT52|4|257
+Elektrobock PT52|4|
+Elektrobock PT52 Wifi|6|
+Elektrobock PT52 Wifi|4|
+Elektrobock PT59 (2012)|4|257
+Emos P5606OT||1283
+Ferroli Romeo clock thermostat|13|3842
+Google Nest V3 Opentherm||
+Honeywell Basicstat Modulation||
+Honeywell CR11011|13|3842
+Honeywell Chronotherm Modulation CMT8851A1006||
+Honeywell Chronotherm Modulation CMT8851M1000||
+Honeywell Chronotherm Modulation CMT937|2|257
+Honeywell Chronotherm Modulation CMT937|13|3350
+Honeywell Chronotherm Modulation CMT937||
+Honeywell Chronotherm Touch||
+Honeywell Chronotherm Touch Modulation||
+Honeywell Chronotherm Touch Modulation|2|257
+Honeywell Chronotherm Touch Modulation + Techneco EVA||
+Honeywell Chronotherm Vision Modulation|2|257
+Honeywell Chronotherm Vision Modulation||
+Honeywell Chronotherm Wireless Modulation||
+Honeywell DT4M||
+Honeywell EvoHome with R8810 OT Gateway||
+Honeywell EvoHome with R8810 OT Gateway|13|267
+Honeywell Evohome WIFI||
+Honeywell Evohome WIFI|13|267
+Honeywell Lyric T6||
+Honeywell Lyric T6|0|
+Honeywell Lyric T6|1|
+Honeywell Lyric T6|0|0
+Honeywell Lyric T6|1|0
+Honeywell Lyric T6R||
+Honeywell Lyric T6R|0|
+Honeywell Round Modulation||
+Honeywell Round Modulation|13|3350
+Honeywell Round Modulation|13|
+Honeywell Round Modulation|48|
+Honeywell Round Modulation T87M1003||
+Honeywell Round Modulation T87M1003|48|
+Honeywell Round Modulation T87M1003|13|3350
+Honeywell Round Modulation T87M1003|13|3349
+Honeywell Round Modulation T87M2018|13|13830
+Honeywell Round Modulation T87M2018|13|
+Honeywell Round Modulation T87M2018|173|769
+Honeywell Round Wireless RF (Y87RF1004)||
+Honeywell Round Wireless RF (Y87RF2008) new model!||
+Honeywell T40 (modulerende)|13|
+Honeywell T40 (modulerende)||
+Honeywell T4M||
+Honeywell T6H700RW|1|
+Honeywell T87M Round Modulation|13|
+Hoval TopTronic-T/RS-OT|22|280
+ICY Smart Thermostat||
+Ideal 221527||
+Ideal Halo Lite 221358 220360 S/W 1.09 F/W 1.05||
+Ideal Halo Lite 221358 220360 S/W 1.09 F/W 1.05|0|
+Intergas Comfort Touch|173|266
+Intergas Comfort Touch|173|271
+Intergas Comfort Touch|173|
+Intergas Gateway + Honeywell Round Modulation T87M2018|173|769
+Inventum EVA thermostaat|178|
+Itho Daalderop Spider|154|
+Itho Daalderop Spider|154|290
+Itho Daalderop Spider|154|308
+Itho Daalderop Spider|154|311
+Itho daalderop Autotemp MFT|5|
+MHF IC3 mit Raumgerät THETA RSC-OT|22|280
+Mini ECO Round & CM737 2021-05.pdf||
+Nefit Easy||513
+Nefit Easy + Easy Connect adapter (OT)||264
+Nefit Moduline 1010||
+Netatmo Modulating Thermostat||
+Neva Lux 8224 (OEM Nordgas EASYREMOTE)|41|
+Perfinox BVI R 4100||
+Plugwise Anna|140|36609
+Quatt CIC|18|
+Quby (Toon)|70|
+Radiant EASY REMOTE 40 00017|41|
+Remeha Celcia 20|11|5123
+Remeha Celcia 20||1
+Remeha Celcia 20||
+Remeha Qsense|11|8972
+Remeha Qsense|11|
+Remeha c-Mix Regelmodule + 2x Remeha iSense|11|2827
+Remeha eTwist /w Remeha GTW16||
+Remeha iSense|11|8215
+Remeha iSense|11|7699
+Remeha iSense|11|
+Remeha iSense||
+Remeha iSense RF|11|8458
+Remeha iSense RF|11|
+Remeha iSense RF|11|8459
+Remeha iSense V30|11|
+Remeha iSense V30||
+Remeha iSense v19|11|
+Remeha iSense v19|11|7699
+Remeha iSense v27|11|8219
+Remeha iSense v27|11|
+Remeha iSense v28|11|
+Remeha iSense v28||
+Salus RT520 |0|1024
+Salus RT520RF||
+Salus RT520RF SW V1.9||
+Salus RT520RF SW V2.2|0|1024
+Schneider Electric - Wiser - passerelle Wifi / actionneur de chaudière 1 canal - CCTFR6311||
+Siemens QAA73|4|316
+Siemens QAA73|4|257
+Siemens QAA73|4|256
+Siemens QAA73|4|292
+Siemens QAA73|4|305
+Siemens QAA73.210|4|2049
+Siemens QAA73.210|4|257
+Tado||
+Tasmota OT adapter||
+Termet CR 11011 (WKZ0 624000000)|13|3842
+Thermosmart|138|
+Thermosmart|4|
+Thermosmart (stand-alone version)|138|
+Toon v1|70|
+Toon v2|70|
+Viessmann Vitovent 300 controller|18|4610
+Viessmann supplied thermostat (unknown model)||
+WOLF CWL Fernbedienung|18|4610
+Windhager REG 021A, Theben RAM 786||
+atlantic UA55||

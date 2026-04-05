@@ -1,0 +1,1415 @@
+{
+  "meta": {
+    "source": "https://www.opentherm.eu/",
+    "crawler": "OpenThermPublicCrawler/1.0",
+    "public_only": true,
+    "notes": [
+      "Gebruik member/manufacturer ID als primaire merkidentificatie.",
+      "Data-ID/MsgID correlaties uit publieke pagina's zijn heuristisch, tenzij expliciet anders gedocumenteerd.",
+      "Private/members-only content is niet benaderd."
+    ],
+    "stats": {
+      "pages_seen": 107,
+      "members_found": 98,
+      "documents_found": 0,
+      "data_id_hints_found": 0,
+      "product_pages_found": 0,
+      "errors": 14
+    }
+  },
+  "official_member_id_documents": [],
+  "members": [
+    {
+      "company_name": "AET80 (former Nordgas Srl)",
+      "url": "https://www.opentherm.eu/member/nordgas-srl/",
+      "country": "Italy",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Airfit (Shanghai) Heating Equipment Co. Ltd.",
+      "url": "https://www.opentherm.eu/member/airfit-shanghai-heating-equipment-co-ltd/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Airios",
+      "url": "https://www.opentherm.eu/member/airios/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "ATAG Verwarming Nederland BV",
+      "url": "https://www.opentherm.eu/member/atag-verwarming-nederland-b-v/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Avidsen",
+      "url": "https://www.opentherm.eu/member/avidsen/",
+      "country": "France",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Axenco",
+      "url": "https://www.opentherm.eu/member/imhotep-creation/",
+      "country": "France",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "BDR Thermea Group",
+      "url": "https://www.opentherm.eu/member/bdr-thermea/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Bertelli & Partners S.r.l.",
+      "url": "https://www.opentherm.eu/member/bertelli-partners-s-r-l/",
+      "country": "Italy",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Bosch Termotecnologia S.A.",
+      "url": "https://www.opentherm.eu/member/bosch-termotecnologia-s-a/",
+      "country": "Portugal",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Bosch Thermotechniek BV",
+      "url": "https://www.opentherm.eu/member/bosch-thermotechniek-b-v/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "BRAHMA S.p.A.",
+      "url": "https://www.opentherm.eu/member/brahma-s-p-a/",
+      "country": "Italy",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Caleffi SpA",
+      "url": "https://www.opentherm.eu/member/caleffi-spa/",
+      "country": "Italy",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Centrica Hive Ltd.",
+      "url": "https://www.opentherm.eu/member/centrica-hive-ltd/",
+      "country": "United Kingdom",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "CercaTrova",
+      "url": "https://www.opentherm.eu/member/cercatrova/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Chunhui Controls",
+      "url": "https://www.opentherm.eu/member/chunhui-controls/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Cooll Sustainable Energy Solutions",
+      "url": "https://www.opentherm.eu/member/cooll-sustainable-energy-solutions/",
+      "country": null,
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Corporación empresarial Altra S.L.",
+      "url": "https://www.opentherm.eu/member/corporacion-empresarial-altra-s-l/",
+      "country": "Spain",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Danfoss Ltd.",
+      "url": "https://www.opentherm.eu/member/danfoss-limited/",
+      "country": "United Kingdom",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "DELTA DORE",
+      "url": "https://www.opentherm.eu/member/delta-dore/",
+      "country": "France",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "ebm-papst Landshut GmbH",
+      "url": "https://www.opentherm.eu/member/ebm-papst-landshut-gmbh/",
+      "country": "Germany",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "EbV Elektronikbau- und Vertriebs-GmbH",
+      "url": "https://www.opentherm.eu/member/ebv-elektronikbau-und-vertriebs-gmbh/",
+      "country": "Germany",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Enel X",
+      "url": "https://www.opentherm.eu/member/enel-x/",
+      "country": "Italy",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "EOGB Energy Products Ltd",
+      "url": "https://www.opentherm.eu/member/eogb-energy-products-ltd/",
+      "country": "United Kingdom",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "EPH Controls Ltd",
+      "url": "https://www.opentherm.eu/member/eph-controls-ltd/",
+      "country": "Ireland",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Esi Controls Ltd",
+      "url": "https://www.opentherm.eu/member/esi-controls-ltd/",
+      "country": "United Kingdom",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Fantini Cosmi SpA",
+      "url": "https://www.opentherm.eu/member/fantini-cosmi-spa/",
+      "country": "Italy",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Ferroli Nederland",
+      "url": "https://www.opentherm.eu/member/ferroli-nederland/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Flamco IMZ BV",
+      "url": "https://www.opentherm.eu/member/flamco-imz-bv/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Fortes Energy Systems",
+      "url": "https://www.opentherm.eu/member/fortes-energy-systems/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "General Life / Isipark",
+      "url": "https://www.opentherm.eu/member/general-life-isipark/",
+      "country": null,
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Giordano Controls SpA",
+      "url": "https://www.opentherm.eu/member/giordano-controls/",
+      "country": "Italy",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Groupe Atlantic (Ideal Boilers)",
+      "url": "https://www.opentherm.eu/member/ideal-boilers/",
+      "country": "United Kingdom",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Guangdong Baiwei Electronic Co. Ltd.",
+      "url": "https://www.opentherm.eu/member/guangdong-baiwei-electronic-co-ltd/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Guangdong HMJD Electrical Appliance Co. Ltd",
+      "url": "https://www.opentherm.eu/member/guangdong-hmjd-electrical-appliance-co-ltd/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "GuangDong JUSCE Electronics Co., Ltd",
+      "url": "https://www.opentherm.eu/member/guangdong-jusce-electronics-co-ltd/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Guangdong Mezic Tech. Co. Ltd.",
+      "url": "https://www.opentherm.eu/member/guangdong-mezic-tech-co-ltd/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Guangdong Zhida Hangyi Electrical Limited Company",
+      "url": "https://www.opentherm.eu/member/guangdong-zhida-hangyi-electrical-limited-company/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Hangzhou Ezviz Network Co., Ltd.",
+      "url": "https://www.opentherm.eu/member/hangzhou-ezviz-network-co-ltd/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Heatmiser UK Ltd",
+      "url": "https://www.opentherm.eu/member/heatmiser-uk-ltd/",
+      "country": "United Kingdom",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "HeatronX B.V.",
+      "url": "https://www.opentherm.eu/member/ti-green-b-v/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Honeywell BV",
+      "url": "https://www.opentherm.eu/member/honeywell-b-v/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Hubei Telin Energy-saving Equipment Co. Ltd.",
+      "url": "https://www.opentherm.eu/member/hubei-telin-energy-saving-equipment-co-ltd/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "HZC Electric",
+      "url": "https://www.opentherm.eu/member/hzc-electric/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "ICY B.V.",
+      "url": "https://www.opentherm.eu/member/icy-bv/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "IMIT Control System",
+      "url": "https://www.opentherm.eu/member/imit-control-system/",
+      "country": "Italy",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Inspire Home Automation Limited",
+      "url": "https://www.opentherm.eu/member/inspire-home-automation-limited/",
+      "country": "United Kingdom",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Intergas Verwarming BV",
+      "url": "https://www.opentherm.eu/member/intergas-verwarming-b-v/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Inventum Technologies BV",
+      "url": "https://www.opentherm.eu/member/inventum-technologies-b-v/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "IRSAP SpA",
+      "url": "https://www.opentherm.eu/member/irsap-spa/",
+      "country": "Italy",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Itho Daalderop Operations BV",
+      "url": "https://www.opentherm.eu/member/itho-daalderop-operations-b-v/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Joule Technologies B.V.",
+      "url": "https://www.opentherm.eu/member/joule-technologies-b-v/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "K.Z. Meet- en Regelapparatuur",
+      "url": "https://www.opentherm.eu/member/k-z-meet-en-regelapparatuur/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "KBlue Srl.",
+      "url": "https://www.opentherm.eu/member/kblue-srl/",
+      "country": "Italy",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "KD Navien Co. Ltd.",
+      "url": "https://www.opentherm.eu/member/kd-navien-co-ltd/",
+      "country": "South Korea",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "KOBER Ltd Vaduri Branch",
+      "url": "https://www.opentherm.eu/member/kober-ltd-vaduri-branch/",
+      "country": null,
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Midea Europe GmbH",
+      "url": "https://www.opentherm.eu/member/midea-german-research-center/",
+      "country": "Germany",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "OpenTherm Association",
+      "url": "https://www.opentherm.eu/member/opentherm/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Pactrol Controls Ltd",
+      "url": "https://www.opentherm.eu/member/pactrol-controls-ltd/",
+      "country": "United Kingdom",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Plugwise B.V.",
+      "url": "https://www.opentherm.eu/member/anna-technology-b-v-plugwise/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Plum Sp. z.o.o.",
+      "url": "https://www.opentherm.eu/member/plum/",
+      "country": "Poland",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "PSV Project Service and Value srl",
+      "url": "https://www.opentherm.eu/member/psv-project-service-and-value-srl/",
+      "country": "Italy",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Qingdao economic and technological development zone haier water heater Co. Ltd.",
+      "url": "https://www.opentherm.eu/member/qingdao-economic-and-technological-development-zone-haier-water-heater-co-ltd/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "RES Enerji Sistemleri A.Ş.",
+      "url": "https://www.opentherm.eu/member/res-enerji-sistemleri-a-s/",
+      "country": "Turkey",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Resideo",
+      "url": "https://www.opentherm.eu/member/resideo/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Resideo UK / Honeywell Control Systems Ltd",
+      "url": "https://www.opentherm.eu/member/honeywell-control-systems-ltd/",
+      "country": "United Kingdom",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Rinnai Corporation",
+      "url": "https://www.opentherm.eu/member/rinnai-corporation/",
+      "country": null,
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "SALUS Controls plc",
+      "url": "https://www.opentherm.eu/member/salus-controls-plc/",
+      "country": "United Kingdom",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Schneider Electric Controls UK Ltd",
+      "url": "https://www.opentherm.eu/member/invensys-controls-uk-ltd/",
+      "country": "United Kingdom",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Secretariat OpenTherm",
+      "url": "https://www.opentherm.eu/author/secopentherm/",
+      "country": null,
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Secure Meters",
+      "url": "https://www.opentherm.eu/member/secure-meters/",
+      "country": "United Kingdom",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "SEEKCO Environmental Technology Co. Ltd.",
+      "url": "https://www.opentherm.eu/member/seekco-environmental-technology-co-ltd/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Shenzhen Myuet Energy Saving Equipment Co., Ltd",
+      "url": "https://www.opentherm.eu/member/shenzhen-myuet-energy-saving-equipment-co-ltd/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Shenzhen Rti-Tek Co., Ltd.",
+      "url": "https://www.opentherm.eu/member/shenzhen-rti-tek-co-ltd/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "ShenZhen Saswell Technology Inc.",
+      "url": "https://www.opentherm.eu/member/shenzhen-saswell-technology-inc/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Shenzhen Topband Co. Ltd.",
+      "url": "https://www.opentherm.eu/member/shenzhen-allied-control-system-co-ltd/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "SHENZHEN TOUPWELL TECHNOLOGY CO.,LTD",
+      "url": "https://www.opentherm.eu/member/shenzhen-toupwell-technology-co-ltd/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Siemens AG",
+      "url": "https://www.opentherm.eu/member/siemens-ag/",
+      "country": "Germany",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Siterwell",
+      "url": "https://www.opentherm.eu/member/siterwell/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Switchee Ltd",
+      "url": "https://www.opentherm.eu/member/switchee-ltd/",
+      "country": "United Kingdom",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Tado GmbH",
+      "url": "https://www.opentherm.eu/member/tado-gmbh/",
+      "country": "Germany",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "TECH STEROWNIKI",
+      "url": "https://www.opentherm.eu/member/tech-sp-j/",
+      "country": "Poland",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "TEM A.G.",
+      "url": "https://www.opentherm.eu/member/tem-a-g/",
+      "country": "Switzerland",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Theben AG",
+      "url": "https://www.opentherm.eu/member/theben-ag/",
+      "country": "Germany",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Thercon NV",
+      "url": "https://www.opentherm.eu/member/thercon-b-v/",
+      "country": "Belgium",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Tiemme Raccorderie SpA",
+      "url": "https://www.opentherm.eu/member/tiemme-raccorderie-spa/",
+      "country": "Italy",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Triple Solar",
+      "url": "https://www.opentherm.eu/member/triple-solar/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Unical AG S.p.a.",
+      "url": "https://www.opentherm.eu/member/unical-ag-s-p-a/",
+      "country": "Italy",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Universal Electronics Inc.",
+      "url": "https://www.opentherm.eu/member/universal-electronics-inc/",
+      "country": null,
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Vaillant Group Netherlands BV",
+      "url": "https://www.opentherm.eu/member/vaillant-group-netherlands-b-v/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Viessmann Elektronik GmbH",
+      "url": "https://www.opentherm.eu/member/viessmann-elektronik-gmbh/",
+      "country": "Germany",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Watts EMEA",
+      "url": "https://www.opentherm.eu/member/watts-emea/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "WeHeat",
+      "url": "https://www.opentherm.eu/member/weheat/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Wolf GmbH",
+      "url": "https://www.opentherm.eu/member/wolf-gmbh/",
+      "country": "Germany",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Wunda Group PLC",
+      "url": "https://www.opentherm.eu/member/wunda-group-plc/",
+      "country": "United Kingdom",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Xiamen Davell Auto Control Equipment Co., Ltd.",
+      "url": "https://www.opentherm.eu/member/xiamen-davell-auto-control-equipment-co-ltd/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Xiamen Hysen Control Technology",
+      "url": "https://www.opentherm.eu/member/xiamen-hysen-control-technology/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "Xiamen Ronglin Electronics Technology & Development Co. Ltd.",
+      "url": "https://www.opentherm.eu/member/xiamen-ronglin-electronics-technology-development-co-ltd/",
+      "country": "China",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    },
+    {
+      "company_name": "YOBIIQ INTELLIGENCE B.V.",
+      "url": "https://www.opentherm.eu/member/yobiiq-intelligence-b-v/",
+      "country": "Netherlands",
+      "confidence": "public-site-direct",
+      "source_url": "https://www.opentherm.eu/members/"
+    }
+  ],
+  "documents": [],
+  "data_id_brand_hints": [],
+  "data_id_brand_hints_index": {},
+  "product_pages": {},
+  "pages": [
+    {
+      "url": "https://www.opentherm.eu/",
+      "title": "Home - Opentherm Association",
+      "category": "page",
+      "discovered_from": null
+    },
+    {
+      "url": "https://www.opentherm.eu/members-only/general-members-area/",
+      "title": "No access - Opentherm Association",
+      "category": "page",
+      "discovered_from": "https://www.opentherm.eu/"
+    },
+    {
+      "url": "https://www.opentherm.eu/opentherm-protocol/what-is-opentherm/",
+      "title": "What is OpenTherm - Opentherm Association",
+      "category": "page",
+      "discovered_from": "https://www.opentherm.eu/"
+    },
+    {
+      "url": "https://www.opentherm.eu/opentherm-protocol/why-a-communication-protocol/",
+      "title": "Why a communication protocol - Opentherm Association",
+      "category": "page",
+      "discovered_from": "https://www.opentherm.eu/"
+    },
+    {
+      "url": "https://www.opentherm.eu/opentherm-protocol/benefits/",
+      "title": "OpenTherm benefits - Opentherm Association",
+      "category": "page",
+      "discovered_from": "https://www.opentherm.eu/"
+    },
+    {
+      "url": "https://www.opentherm.eu/opentherm-protocol/how-to-use-the-protocol/",
+      "title": "How to use the Protocol - Opentherm Association",
+      "category": "page",
+      "discovered_from": "https://www.opentherm.eu/"
+    },
+    {
+      "url": "https://www.opentherm.eu/opentherm-protocol/how-to-test-and-certify/",
+      "title": "How to test and certify - Opentherm Association",
+      "category": "page",
+      "discovered_from": "https://www.opentherm.eu/"
+    },
+    {
+      "url": "https://www.opentherm.eu/members/",
+      "title": "Members - Opentherm Association",
+      "category": "members_index",
+      "discovered_from": "https://www.opentherm.eu/"
+    },
+    {
+      "url": "https://www.opentherm.eu/products/",
+      "title": "Products - Opentherm Association",
+      "category": "page",
+      "discovered_from": "https://www.opentherm.eu/"
+    },
+    {
+      "url": "https://www.opentherm.eu/members/membership/membership-application/",
+      "title": "Membership application - Opentherm Association",
+      "category": "page",
+      "discovered_from": "https://www.opentherm.eu/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/nordgas-srl/",
+      "title": "AET80 (former Nordgas Srl) - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/airfit-shanghai-heating-equipment-co-ltd/",
+      "title": "Airfit (Shanghai) Heating Equipment Co. Ltd. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/airios/",
+      "title": "Airios - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/atag-verwarming-nederland-b-v/",
+      "title": "ATAG Verwarming Nederland BV - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/avidsen/",
+      "title": "Avidsen - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/imhotep-creation/",
+      "title": "Axenco - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/bdr-thermea/",
+      "title": "BDR Thermea Group - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/bertelli-partners-s-r-l/",
+      "title": "Bertelli & Partners S.r.l. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/bosch-termotecnologia-s-a/",
+      "title": "Bosch Termotecnologia S.A. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/bosch-thermotechniek-b-v/",
+      "title": "Bosch Thermotechniek BV - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/brahma-s-p-a/",
+      "title": "BRAHMA S.p.A. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/caleffi-spa/",
+      "title": "Caleffi SpA - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/centrica-hive-ltd/",
+      "title": "Centrica Hive Ltd. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/cercatrova/",
+      "title": "CercaTrova - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/chunhui-controls/",
+      "title": "Chunhui Controls - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/cooll-sustainable-energy-solutions/",
+      "title": "Cooll Sustainable Energy Solutions - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/corporacion-empresarial-altra-s-l/",
+      "title": "Corporación empresarial Altra S.L. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/danfoss-limited/",
+      "title": "Danfoss Ltd. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/delta-dore/",
+      "title": "DELTA DORE - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/ebm-papst-landshut-gmbh/",
+      "title": "ebm-papst Landshut GmbH - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/ebv-elektronikbau-und-vertriebs-gmbh/",
+      "title": "EbV Elektronikbau- und Vertriebs-GmbH - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/enel-x/",
+      "title": "Enel X - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/eogb-energy-products-ltd/",
+      "title": "EOGB Energy Products Ltd - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/eph-controls-ltd/",
+      "title": "EPH Controls Ltd - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/esi-controls-ltd/",
+      "title": "Esi Controls Ltd - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/fantini-cosmi-spa/",
+      "title": "Fantini Cosmi SpA - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/ferroli-nederland/",
+      "title": "Ferroli Nederland - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/flamco-imz-bv/",
+      "title": "Flamco IMZ BV - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/fortes-energy-systems/",
+      "title": "Fortes Energy Systems - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/general-life-isipark/",
+      "title": "General Life / Isipark - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/giordano-controls/",
+      "title": "Giordano Controls SpA - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/ideal-boilers/",
+      "title": "Groupe Atlantic (Ideal Boilers) - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/guangdong-baiwei-electronic-co-ltd/",
+      "title": "Guangdong Baiwei Electronic Co. Ltd. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/guangdong-hmjd-electrical-appliance-co-ltd/",
+      "title": "Guangdong HMJD Electrical Appliance Co. Ltd - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/guangdong-jusce-electronics-co-ltd/",
+      "title": "GuangDong JUSCE Electronics Co., Ltd - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/guangdong-mezic-tech-co-ltd/",
+      "title": "Guangdong Mezic Tech. Co. Ltd. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/guangdong-zhida-hangyi-electrical-limited-company/",
+      "title": "Guangdong Zhida Hangyi Electrical Limited Company - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/hangzhou-ezviz-network-co-ltd/",
+      "title": "Hangzhou Ezviz Network Co., Ltd. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/heatmiser-uk-ltd/",
+      "title": "Heatmiser UK Ltd - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/ti-green-b-v/",
+      "title": "HeatronX B.V. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/honeywell-b-v/",
+      "title": "Honeywell BV - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/hubei-telin-energy-saving-equipment-co-ltd/",
+      "title": "Hubei Telin Energy-saving Equipment Co. Ltd. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/hzc-electric/",
+      "title": "HZC Electric - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/icy-bv/",
+      "title": "ICY B.V. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/imit-control-system/",
+      "title": "IMIT Control System - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/inspire-home-automation-limited/",
+      "title": "Inspire Home Automation Limited - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/intergas-verwarming-b-v/",
+      "title": "Intergas Verwarming BV - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/inventum-technologies-b-v/",
+      "title": "Inventum Technologies BV - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/irsap-spa/",
+      "title": "IRSAP SpA - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/itho-daalderop-operations-b-v/",
+      "title": "Itho Daalderop Operations BV - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/joule-technologies-b-v/",
+      "title": "Joule Technologies B.V. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/k-z-meet-en-regelapparatuur/",
+      "title": "K.Z. Meet- en Regelapparatuur - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/kblue-srl/",
+      "title": "KBlue Srl. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/kd-navien-co-ltd/",
+      "title": "KD Navien Co. Ltd. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/kober-ltd-vaduri-branch/",
+      "title": "KOBER Ltd Vaduri Branch - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/midea-german-research-center/",
+      "title": "Midea Europe GmbH - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/opentherm/",
+      "title": "OpenTherm Association - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/pactrol-controls-ltd/",
+      "title": "Pactrol Controls Ltd - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/anna-technology-b-v-plugwise/",
+      "title": "Plugwise B.V. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/plum/",
+      "title": "Plum Sp. z.o.o. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/psv-project-service-and-value-srl/",
+      "title": "PSV Project Service and Value srl - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/qingdao-economic-and-technological-development-zone-haier-water-heater-co-ltd/",
+      "title": "Qingdao economic and technological development zone haier water heater Co. Ltd. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/res-enerji-sistemleri-a-s/",
+      "title": "RES Enerji Sistemleri A.Ş. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/resideo/",
+      "title": "Resideo - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/honeywell-control-systems-ltd/",
+      "title": "Resideo UK / Honeywell Control Systems Ltd - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/rinnai-corporation/",
+      "title": "Rinnai Corporation - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/salus-controls-plc/",
+      "title": "SALUS Controls plc - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/invensys-controls-uk-ltd/",
+      "title": "Schneider Electric Controls UK Ltd - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/secure-meters/",
+      "title": "Secure Meters - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/seekco-environmental-technology-co-ltd/",
+      "title": "SEEKCO Environmental Technology Co. Ltd. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/shenzhen-myuet-energy-saving-equipment-co-ltd/",
+      "title": "Shenzhen Myuet Energy Saving Equipment Co., Ltd - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/shenzhen-rti-tek-co-ltd/",
+      "title": "Shenzhen Rti-Tek Co., Ltd. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/shenzhen-saswell-technology-inc/",
+      "title": "ShenZhen Saswell Technology Inc. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/shenzhen-allied-control-system-co-ltd/",
+      "title": "Shenzhen Topband Co. Ltd. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/shenzhen-toupwell-technology-co-ltd/",
+      "title": "SHENZHEN TOUPWELL TECHNOLOGY CO.,LTD - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/siemens-ag/",
+      "title": "Siemens AG - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/siterwell/",
+      "title": "Siterwell - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/switchee-ltd/",
+      "title": "Switchee Ltd - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/tado-gmbh/",
+      "title": "Tado GmbH - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/tech-sp-j/",
+      "title": "TECH STEROWNIKI - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/tem-a-g/",
+      "title": "TEM A.G. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/theben-ag/",
+      "title": "Theben AG - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/thercon-b-v/",
+      "title": "Thercon NV - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/tiemme-raccorderie-spa/",
+      "title": "Tiemme Raccorderie SpA - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/triple-solar/",
+      "title": "Triple Solar - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/unical-ag-s-p-a/",
+      "title": "Unical AG S.p.a. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/universal-electronics-inc/",
+      "title": "Universal Electronics Inc. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/vaillant-group-netherlands-b-v/",
+      "title": "Vaillant Group Netherlands BV - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/viessmann-elektronik-gmbh/",
+      "title": "Viessmann Elektronik GmbH - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/watts-emea/",
+      "title": "Watts EMEA - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/weheat/",
+      "title": "WeHeat - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/wolf-gmbh/",
+      "title": "Wolf GmbH - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/wunda-group-plc/",
+      "title": "Wunda Group PLC - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/xiamen-davell-auto-control-equipment-co-ltd/",
+      "title": "Xiamen Davell Auto Control Equipment Co., Ltd. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/xiamen-hysen-control-technology/",
+      "title": "Xiamen Hysen Control Technology - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/xiamen-ronglin-electronics-technology-development-co-ltd/",
+      "title": "Xiamen Ronglin Electronics Technology & Development Co. Ltd. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/yobiiq-intelligence-b-v/",
+      "title": "YOBIIQ INTELLIGENCE B.V. - Opentherm Association",
+      "category": "member_detail",
+      "discovered_from": "https://www.opentherm.eu/members/"
+    }
+  ],
+  "errors": [
+    {
+      "url": "https://www.opentherm.eu/member/airfit-shanghai-heating-equipment-co-ltd/airfit.cn",
+      "error": "HTTP 404"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/centrica-hive-ltd/www.hivehome.com",
+      "error": "HTTP 404"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/ebv-elektronikbau-und-vertriebs-gmbh/www.ebv-gmbh.eu",
+      "error": "HTTP 404"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/fantini-cosmi-spa/www.fantinicosmi.it",
+      "error": "HTTP 404"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/general-life-isipark/www.generallife.com.tr",
+      "error": "HTTP 404"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/guangdong-mezic-tech-co-ltd/www.mezic.cn",
+      "error": "HTTP 404"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/hubei-telin-energy-saving-equipment-co-ltd/www.sztelin.com",
+      "error": "HTTP 404"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/hzc-electric/www.hzc-electric.com",
+      "error": "HTTP 404"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/joule-technologies-b-v/www.joule-technologies.com",
+      "error": "HTTP 404"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/plum/www.plum.pl",
+      "error": "HTTP 404"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/seekco-environmental-technology-co-ltd/www.seekco.com",
+      "error": "HTTP 404"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/shenzhen-saswell-technology-inc/www.saswell.com",
+      "error": "HTTP 404"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/tiemme-raccorderie-spa/www.tiemme.com",
+      "error": "HTTP 404"
+    },
+    {
+      "url": "https://www.opentherm.eu/member/xiamen-hysen-control-technology/www.hysencontrol.com",
+      "error": "HTTP 404"
+    }
+  ]
+}

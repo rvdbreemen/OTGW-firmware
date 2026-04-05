@@ -1,0 +1,708 @@
+{
+  "_metadata": {
+    "description": "OpenTherm Member ID (MID) codes per fabrikant/merk - Master (thermostaat) en Slave (ketel/warmtepomp)",
+    "protocol_reference": "OpenTherm Protocol Specification v2.2 / v4.2",
+    "data_id": "ID3 LB (Slave MemberID Code) en ID2 LB (Master MemberID Code)",
+    "range": "0-255 (u8), 0 = niet-specifiek/generiek apparaat",
+    "assigned_by": "OpenTherm Association (opentherm.eu)",
+    "sources": [
+      {
+        "name": "OpenTherm Association - Official Member ID Codes",
+        "url": "https://www.opentherm.eu/document/opentherm-members-id-codes/",
+        "authority": "PRIMAIR - Officieel (toegang vereist lidmaatschap)",
+        "notes": "Pagina bestaat maar inhoud is niet publiek toegankelijk"
+      },
+      {
+        "name": "OTGW Equipment Matrix (otgw.tclcode.com)",
+        "url": "https://otgw.tclcode.com/matrix.cgi",
+        "authority": "HOOG - Community-gedreven, gebaseerd op echte communicatielogs"
+      },
+      {
+        "name": "Schelte Bron's OTGW Thermostat & Boiler Database",
+        "url": "https://otgw.tclcode.com/matrix.cgi",
+        "authority": "HOOG - Direct van de OTGW-auteur, gebaseerd op ingezonden logs van gebruikers",
+        "notes": "Ontvangen als thermo.txt en boilers.txt via Schelte Bron. Bevat msgid 2 LB/126 (master) en msgid 3 LB/127 (slave) data."
+      },
+      {
+        "name": "SAT Boiler Compatibility Discussion (GitHub)",
+        "url": "https://github.com/Alexwijn/SAT/discussions/21",
+        "authority": "GEMIDDELD - Community, gebaseerd op gebruikerservaringen"
+      },      {
+        "name": "OTGateway Compatibility Wiki (GitHub)",
+        "url": "https://github.com/Laxilef/OTGateway/wiki/Compatibility",
+        "authority": "GEMIDDELD - Community firmware project"
+      },
+      {
+        "name": "OTGW-firmware Issue #10 (rvdbreemen)",
+        "url": "https://github.com/rvdbreemen/OTGW-firmware/issues/10",
+        "authority": "GEMIDDELD - Relevant voor OTGW-firmware project"
+      },
+      {
+        "name": "OpenTherm Protocol Specification v2.2",
+        "url": "https://ihormelnyk.com/Content/Pages/opentherm_library/Opentherm%20Protocol%20v2-2.pdf",
+        "authority": "PRIMAIR - Officieel OT-protocol (2003)"
+      }
+    ],
+    "last_updated": "2026-04-01",
+    "notes": [
+      "MemberID 0 betekent 'niet-specifiek' apparaat (geen lid of generiek)",
+      "IDs 128-255 zijn gereserveerd voor fabrikant-specifieke Test & Diagnostics data",
+      "MemberIDs worden toegewezen en beheerd door de OpenTherm Association",
+      "Meerdere merken kunnen hetzelfde MemberID delen (bijv. groepen/dochtermerken)",
+      "De officiële volledige lijst is alleen beschikbaar voor leden van de OT Association",
+      "OTGW PR=T commando retourneert de Slave MemberID rechtstreeks van het apparaat",
+      "opentherm_public.json bevat 98 officieel gecrawlde leden van opentherm.eu (publieke ledenlijst, zonder numerieke IDs)",
+      "Sommige apparaten rapporteren ID 0 of 255 terwijl ze wel een eigen ID zouden moeten hebben - dit duidt op firmware-bugs of niet-geconfigureerde OT-implementaties",
+      "Slave MemberID = ketel/warmtepomp (msgid 3 LB), Master MemberID = thermostaat/regelaar (msgid 2 LB)"
+    ],
+    "additional_sources": [
+      {        "name": "opentherm_public.json - Crawler output opentherm.eu",
+        "description": "Bevat 98 officieel gecrawlde leden direct van opentherm.eu/members/. Geen numerieke MemberIDs, wel de kanonieke lijst van bedrijven met een OT-lidmaatschap.",
+        "authority": "HOOG - Direct van opentherm.eu publieke pagina",
+        "stats": {"members_found": 98, "pages_seen": 107}
+      },
+      {
+        "name": "LwjciPcE.txt - OTGW live diagnostiek-log (via Schelte Bron)",
+        "description": "Echte OpenTherm communicatielog van OTGW. Bevat PR=T=11 (Slave MemberID = Remeha). Afkomstig van Schelte Bron, de maker van de originele OTGW firmware (otgw.tclcode.com).",
+        "authority": "PRIMAIR - Rechtstreekse meting op een echte installatie, via gezaghebbende OTGW-auteur",
+        "key_findings": {
+          "PR_T": "11 (Slave MemberID = Remeha)",
+          "PR_L": "FXOMPC (Slave configuratie flags)",
+          "PR_V": "4 (Slave versie-indicator)",
+          "PR_B": "17:51 12-03-2023 (PIC firmware build datum)",
+          "PR_C": "4 MHz (PIC klokfrequentie)",
+          "PR_P": "Low power (PIC vermogensprofiel)"
+        }
+      }
+    ]
+  },
+  "slave_member_ids": [
+    {
+      "id": 0,
+      "manufacturers": ["Generiek / niet-specifiek"],
+      "notes": "MemberID 0 = klant-niet-specifiek apparaat (protocol definitie). Veel apparaten rapporteren 0 door firmware-bugs of niet-geconfigureerde OT-stack.",
+      "confidence": "HOOG",
+      "source": "OpenTherm Protocol Specification v2.2 §5.3.2 Note 1",
+      "models_reporting_zero": [
+        "AGPO Econpact 127C", "Agpo Ferroli Econpact 225c (sommige FW)", "Atlantic LORIA DUO 6000",
+        "Atlantic Naia 2 Micro", "Baxi Eco Nova 24f (sommige FW)", "Brink Allure B25 HR (sommige FW)",        "Daalderop Combifort", "Daalderop Comfort Classic 130", "Dakon KZ24",
+        "Domusa Evolution Solar FD30", "Heishamon OT Alfa", "Intergas Kombi Kompakt HR (oudere FW)",
+        "Intergas Kombi Kompakt HReco (sommige FW)", "Intergas Prestige CW6",
+        "Inventum Ecolution Modul-Air All-E (sommige FW)", "Keston C36 Combi",
+        "Remeha Techneco Toros Vision", "Remeha Tzerra (sommige FW)",
+        "Termet Crystal II/EcoCondens/Ecocondens 30", "Thermona EL14",
+        "WOLF CWL 400", "Windhager BWE 100"
+      ]
+    },
+    {
+      "id": 2,
+      "manufacturers": ["Vaillant (legacy)", "Remeha (legacy)", "AWB", "Bulex", "Brink"],
+      "models": [
+        "AWB ThermoMaster 2HR",
+        "Remeha Quinta 28c",
+        "Remeha Quinta 35c",
+        "Vaillant VHR NL 24-28C (sommige FW)",
+        "Bulex FAS (sommige FW)",
+        "Brink Allure B25 HR (sommige FW)"
+      ],
+      "notes": "Legacy ID - oudere Vaillant/Remeha/AWB ketels. Nieuwere modellen gebruiken ID 24 (Vaillant) of 11 (Remeha). AWB is historisch Vaillant-merk.",
+      "confidence": "GEMIDDELD",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 4,
+      "manufacturers": ["ATAG", "Baxi", "Brötje", "Elco", "Geminox", "Atlantic"],
+      "models": [
+        "ATAG E325EC", "ATAG A244EC", "ATAG i-Serie",
+        "Atlantic (generiek)",        "Baxi Slim",
+        "Brötje WGB 2", "Brötje WHBS 22 D",
+        "Elco Euron 24 HG", "Elco Thision 9/25", "Elco Thision XL",
+        "Geminox THRi 5-25 DC", "Geminox THRi 2-17 DC", "Geminox ZEM 2-17C"
+      ],
+      "notes": "Breed gebruikt door BDR Thermea-merken (ATAG, Brötje, De Dietrich legacy) en Elco/Geminox. ATAG E325EC was eerder foutief als ID 48 geregistreerd - gecorrigeerd op basis van Schelte's data. Baxi AMPERA (eerder vermeld) niet in Schelte's data, mogelijk ander PCB.",
+      "confidence": "HOOG",
+      "source": "Schelte Bron OTGW Database; OTGateway Wiki; SAT Compatibility"
+    },
+    {
+      "id": 5,
+      "manufacturers": ["Itho Daalderop"],
+      "models": [
+        "Itho Daalderop WPU4",
+        "Itho Daalderop WPU5G"
+      ],
+      "notes": "Itho Daalderop warmtepompen. Verschilt van ID 29 (Base Cube) - WPU-lijn heeft eigen ID.",
+      "confidence": "GEMIDDELD",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 6,
+      "manufacturers": ["Ideal", "Daikin"],
+      "models": [
+        "Ideal Combi Logic 24", "Ideal Logic Combi ESP1 35",
+        "Ideal Vogue C32", "Ideal Vogue Max C40",
+        "Daikin D2CND024A1A"
+      ],
+      "notes": "Ideal (Groupe Atlantic) en Daikin delen slave ID 6.",
+      "confidence": "HOOG",      "source": "Schelte Bron OTGW Database; SAT Compatibility Discussion #21"
+    },
+    {
+      "id": 8,
+      "manufacturers": ["Bosch", "Buderus", "Biasi", "Hoval"],
+      "models": [
+        "Bosch GAZ6000",
+        "Buderus Logamax U072 K 24KW",
+        "Biasi Inovia Cond 35SV",
+        "Hoval TopGas Comfort 16KW"
+      ],
+      "notes": "Bosch Thermotechniek basis-ID. Verschilt van ID 18 (Bosch HRC/Junkers) en ID 131 (Nefit). Buderus rapporteerde eerder 'default' - nu bevestigd als ID 8.",
+      "confidence": "GEMIDDELD",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 9,
+      "manufacturers": ["Ferroli"],
+      "models": [
+        "Ferroli BlueHelix Pro",
+        "Ferroli BlueSense 5",
+        "Agpo Ferroli Econpact 225c (sommige FW)"
+      ],
+      "notes": "Ferroli hoofdlijn. DOMIcompact C24 met MF08FA-board gebruikt afwijkend ID 211.",
+      "confidence": "HOOG",
+      "source": "Schelte Bron OTGW Database; SAT Compatibility Discussion #21"
+    },
+    {
+      "id": 11,
+      "manufacturers": ["Remeha", "De Dietrich", "Baxi (nieuwer)", "BDR Thermea Group"],      "models": [
+        "Remeha Avanta (incl. ACE)", "Remeha Calenta (incl. Ace)",
+        "Remeha Elga Ace (warmtepomp)", "Remeha Eria Tower WPR-2E",
+        "Remeha Quinta Pro", "Remeha Tzerra (incl. Ace/M/Plus)",
+        "De Dietrich MCR 24", "De Dietrich NANEO EMC-S 24/28 MI",
+        "De Dietrich TWINEO EGC 25",
+        "BAXI Prime 1.24", "Baxi 800 Combi 2"
+      ],
+      "notes": "Primair BDR Thermea Group ID. Remeha, De Dietrich en nieuwere Baxi-modellen delen dit ID. Remeha-specifieke extensie: ID131 (dF/dU-codes), ID132 (servicemeldingen), ID133 (SCU-detectie).",
+      "confidence": "HOOG",
+      "source": "Schelte Bron OTGW Database; OTGW-firmware Issue #10; SAT Compatibility"
+    },
+    {
+      "id": 13,
+      "manufacturers": ["Cetetherm"],
+      "models": ["Cetetherm Mini ECO (stadsverwarming)"],
+      "notes": "Stadsverwarming-interface. Opvallend: ID 13 wordt ook breed gebruikt als Master ID door Honeywell-thermostaten.",
+      "confidence": "LAAG",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 16,
+      "manufacturers": ["Unical"],
+      "models": ["Unical KONm"],
+      "notes": "Eén bevestiging. Unical is Italiaanse fabrikant, lid van OT Association.",
+      "confidence": "LAAG",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 18,      "manufacturers": ["Bosch", "Junkers"],
+      "models": [
+        "Bosch HRC 30", "Bosch HRC35/2",
+        "Bosch/Junkers Cerapur ZWB"
+      ],
+      "notes": "Bosch premium-lijn en Junkers. Verschilt van ID 8 (Bosch GAZ/Buderus) en ID 131 (Nefit). Sommige Bosch HRC 30 rapporteren ook ID 131 - mogelijk firmware-afhankelijk.",
+      "confidence": "GEMIDDELD",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 24,
+      "manufacturers": ["Vaillant", "Saunier Duval", "Bulex"],
+      "models": [
+        "Vaillant EcoTEC CW5+", "Vaillant Ecotec PLUS 30-34 CW5",
+        "Vaillant ecoTEC Plus VHR 25/32CS", "Vaillant ecoTEC exclusive 843",
+        "Vaillant hrSolide VHR NL 24-28C/3 C",
+        "Saunier Duval Thelia Condens 25",
+        "Bulex FAS"
+      ],
+      "notes": "Vaillant Group hoofdlijn. Saunier Duval en Bulex zijn Vaillant-dochtermerken. Oudere Vaillant-modellen rapporteren soms ID 2.",
+      "confidence": "HOOG",
+      "source": "Schelte Bron OTGW Database; SAT Compatibility Discussion #21; OTGW matrix"
+    },
+    {
+      "id": 27,
+      "manufacturers": ["Immergas", "Baxi (sommige)"],
+      "models": [
+        "Immergas Victrix Superior 26",
+        "Baxi Nuvola DuoTec HT 24"
+      ],      "notes": "Immergas en sommige Baxi-modellen. Sime (eerder vermeld) niet in Schelte's data bevestigd.",
+      "confidence": "GEMIDDELD",
+      "source": "Schelte Bron OTGW Database; SAT Compatibility Discussion #21"
+    },
+    {
+      "id": 29,
+      "manufacturers": ["Itho Daalderop", "Daalderop"],
+      "models": [
+        "Itho Daalderop Base Cube",
+        "Daalderop Comfort Classic 24/50+"
+      ],
+      "notes": "Daalderop CV-ketels. WPU-warmtepompen gebruiken ID 5.",
+      "confidence": "GEMIDDELD",
+      "source": "Schelte Bron OTGW Database; SAT Compatibility Discussion #21"
+    },
+    {
+      "id": 31,
+      "manufacturers": ["Vokera"],
+      "models": ["Vokera Linea one"],
+      "notes": "Vokera is een Riello Group-merk (Italië/UK).",
+      "confidence": "LAAG",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 33,
+      "manufacturers": ["Viessmann"],
+      "models": [
+        "Viessmann Vitodens 050-W",
+        "Viessmann Vitodens 100-W (incl. B1HC)",
+        "Viessmann Vitodens 111-W"      ],
+      "notes": "Viessmann hoofdlijn. Nu ook Vitodens 050-W en 111-W bevestigd naast 100-W.",
+      "confidence": "HOOG",
+      "source": "Schelte Bron OTGW Database; SAT Compatibility Discussion #21; OTGW matrix"
+    },
+    {
+      "id": 41,
+      "manufacturers": ["Radiant", "ENBRA"],
+      "models": [
+        "Radiant R1K28/B",
+        "ENBRA CD 24"
+      ],
+      "notes": "ENBRA (Tsjechisch merk) nu ook bevestigd naast Radiant.",
+      "confidence": "GEMIDDELD",
+      "source": "Schelte Bron OTGW Database; SAT Compatibility Discussion #21"
+    },
+    {
+      "id": 56,
+      "manufacturers": ["Baxi", "De Dietrich"],
+      "models": [
+        "Baxi Luna Duo-Tec 1.28+ ERP",
+        "De Dietrich MPX"
+      ],
+      "notes": "BDR Thermea sub-ID, apart van ID 4 (ATAG/Elco) en ID 11 (Remeha/De Dietrich nieuwer). Mogelijk voor specifieke productlijn/PCB.",
+      "confidence": "GEMIDDELD",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 131,
+      "manufacturers": ["Nefit"],      "models": [
+        "Nefit Proline HRC 24/CW4 + EMS-OT",
+        "Nefit Proline NXT HRC 24/CW3",
+        "Nefit Proline NXT HRC 24/CW4",
+        "Nefit Proline NXT HRC 30/CW5",
+        "Nefit TopLine Compact HRC25 + EMS-OT",
+        "Nefit Trendline HRC30/CW5 + EMS-OT"
+      ],
+      "notes": "Nefit (Bosch-merk) met EMS-OT bridge. Valt in T&D-bereik (128-255). Sommige Bosch HRC 30 en ATAG i-Serie rapporteren ook ID 131 - mogelijk firmware-crossover. Let op: ID 131 is ook Remeha-specifiek Data-ID (dF/dU-codes) bij MemberID=11, geen conflict want dat betreft een ander OT Data-ID.",
+      "confidence": "HOOG",
+      "source": "Schelte Bron OTGW Database; SAT Compatibility Discussion #21"
+    },
+    {
+      "id": 153,
+      "manufacturers": ["AWB"],
+      "models": ["AWB ThermoMaster 3HR"],
+      "notes": "Valt in T&D-bereik (128-255). Verschilt van ID 2 (AWB ThermoMaster 2HR) - ander PCB/generatie.",
+      "confidence": "LAAG",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 161,
+      "manufacturers": ["Novaya"],
+      "models": ["Novaya Thermastage Compact Duo"],
+      "notes": "Valt in T&D-bereik (128-255). Novaya is een minder bekend merk.",
+      "confidence": "LAAG",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 162,      "manufacturers": ["Inventum"],
+      "models": ["Inventum Ecolution Modul-Air All-E"],
+      "notes": "Valt in T&D-bereik (128-255). Sommige Inventum Modul-Air rapporteren ID 0 - firmware-afhankelijk.",
+      "confidence": "LAAG",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 170,
+      "manufacturers": ["BaltGaz"],
+      "models": ["BaltGaz Neva Lux 8224 (OEM Enpi Electronik)"],
+      "notes": "Valt in T&D-bereik (128-255). OEM boiler control board van Enpi Electronik.",
+      "confidence": "LAAG",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 173,
+      "manufacturers": ["Intergas", "MHG"],
+      "models": [
+        "Intergas ECO RF", "Intergas HRE 24/18A", "Intergas HRE 28/24 A",
+        "Intergas Kombi Kompakt HR (36/30) (nieuwere FW)",
+        "Intergas Kombi Kompakt HRE A 28/24",
+        "Intergas Kombi Kompakt HReco",
+        "Intergas XTend", "Intergas Xclusive 30",
+        "Intergas Xtreme 30", "Intergas Xtreme 36",
+        "MHG Meisterlinie ecoGAS 24"
+      ],
+      "notes": "Intergas hoofdlijn. Oudere Kombi Kompakt-modellen rapporteren soms ID 0 of 255 (firmware-issue). MHG Meisterlinie deelt dit ID - mogelijk OEM-relatie. Valt in T&D-bereik (128-255).",
+      "confidence": "HOOG",
+      "source": "Schelte Bron OTGW Database; SAT Compatibility; OTGateway Wiki; OTGW matrix"
+    },    {
+      "id": 211,
+      "manufacturers": ["Ferroli", "Thermona"],
+      "models": [
+        "Ferroli DOMIcompact C 24 (Board: MF08FA)",
+        "Thermona Therm 23 CLN.A"
+      ],
+      "notes": "Thermona nu ook bevestigd naast Ferroli DOMIcompact. Valt in T&D-bereik.",
+      "confidence": "LAAG",
+      "source": "Schelte Bron OTGW Database; OTGateway Wiki"
+    }
+  ],
+  "master_member_ids": [
+    {
+      "id": 0,
+      "manufacturers": ["Generiek / niet-specifiek"],
+      "notes": "Veel thermostaten rapporteren Master MemberID 0, waaronder sommige Honeywell Lyric T6 en Salus-modellen.",
+      "confidence": "HOOG",
+      "source": "OpenTherm Protocol Specification v2.2; Schelte Bron OTGW Database"
+    },
+    {
+      "id": 1,
+      "manufacturers": ["Honeywell"],
+      "models": ["Honeywell Lyric T6", "Honeywell T6H700RW"],
+      "notes": "Sommige Lyric T6 rapporteren ID 0 of 1 afhankelijk van firmware/variant.",
+      "confidence": "GEMIDDELD",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 2,      "manufacturers": ["Honeywell"],
+      "models": [
+        "Honeywell Chronotherm Modulation CMT937",
+        "Honeywell Chronotherm Vision Modulation",
+        "Honeywell Chronotherm Touch Modulation"
+      ],
+      "notes": "Honeywell Chronotherm-lijn. Sommige CMT937 rapporteren ook ID 13 - mogelijk hardware-revisie.",
+      "confidence": "GEMIDDELD",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 4,
+      "manufacturers": ["Siemens", "Elektrobock", "Baxi", "Thermosmart"],
+      "models": [
+        "Siemens QAA73", "Siemens QAA73.210",
+        "Elektrobock BPT57", "Elektrobock BT52", "Elektrobock PT52", "Elektrobock PT59",
+        "Baxi luna 3 Confort HT",
+        "Thermosmart"
+      ],
+      "notes": "Breed gebruikt door OEM-thermostaten. Thermosmart rapporteert soms ook ID 138 (stand-alone versie).",
+      "confidence": "HOOG",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 5,
+      "manufacturers": ["Itho Daalderop"],
+      "models": ["Itho Daalderop Autotemp MFT"],
+      "notes": "Itho Daalderop thermostaat/regelaar.",
+      "confidence": "LAAG",
+      "source": "Schelte Bron OTGW Database"    },
+    {
+      "id": 6,
+      "manufacturers": ["Elektrobock"],
+      "models": ["Elektrobock PT52 Wifi"],
+      "notes": "Wifi-variant van PT52 rapporteert ID 6 i.p.v. ID 4 (niet-wifi versie).",
+      "confidence": "LAAG",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 11,
+      "manufacturers": ["Remeha", "De Dietrich", "Baxi"],
+      "models": [
+        "Remeha Celcia 20", "Remeha Qsense", "Remeha iSense (alle versies)", "Remeha iSense RF",
+        "Remeha c-Mix Regelmodule",
+        "De Dietrich AD 303", "De Dietrich AD 304", "De Dietrich AD289 iSense", "De Dietrich AD341",
+        "Baxi uSense"
+      ],
+      "notes": "BDR Thermea thermostaten. Remeha iSense is de meest voorkomende.",
+      "confidence": "HOOG",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 13,
+      "manufacturers": ["Honeywell", "Ferroli", "Termet"],
+      "models": [
+        "Honeywell CR11011", "Honeywell Round Modulation T87M (alle versies)",
+        "Honeywell T40 (modulerende)", "Honeywell T87M Round Modulation",
+        "Ferroli Romeo clock thermostat",
+        "Termet CR 11011"      ],
+      "notes": "Breed gebruikt Honeywell-thermostaat-ID. Ferroli Romeo en Termet CR delen dit ID (mogelijk Honeywell OEM-module). Sommige Honeywell Round Modulation rapporteren ook ID 48.",
+      "confidence": "HOOG",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 18,
+      "manufacturers": ["Quatt", "Viessmann", "WOLF"],
+      "models": [
+        "Quatt CIC",
+        "Viessmann Vitovent 300 controller",
+        "WOLF CWL Fernbedienung"
+      ],
+      "notes": "Diverse regelaars/ventilatie-controllers. WOLF CWL is een ventilatie-systeem, geen CV.",
+      "confidence": "GEMIDDELD",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 22,
+      "manufacturers": ["Hoval", "MHF"],
+      "models": [
+        "Hoval TopTronic-T/RS-OT",
+        "MHF IC3 mit Raumgerät THETA RSC-OT"
+      ],
+      "notes": "Hoval en MHF regelaars.",
+      "confidence": "LAAG",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 41,      "manufacturers": ["Radiant", "Neva Lux"],
+      "models": [
+        "Radiant EASY REMOTE 40",
+        "Neva Lux 8224 (OEM Nordgas EASYREMOTE)"
+      ],
+      "notes": "Radiant/Nordgas EASYREMOTE thermostaten.",
+      "confidence": "LAAG",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 48,
+      "manufacturers": ["ATAG", "Elco", "Honeywell (sommige)"],
+      "models": [
+        "ATAG Wize", "ATAG BrainZ RSC V3.0",
+        "Elco Remocon Smart",
+        "Honeywell Round Modulation (sommige)", "Honeywell Round Modulation T87M1003 (sommige)"
+      ],
+      "notes": "ATAG thermostaten en Elco Remocon. Let op: ID 48 was eerder foutief als Slave ID voor ATAG E325EC geregistreerd. ATAG-ketels gebruiken Slave ID 4. Sommige Honeywell Round Modulation varianten rapporteren ook dit ID.",
+      "confidence": "HOOG",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 56,
+      "manufacturers": ["Baxi"],
+      "models": ["Baxi 710433601"],
+      "notes": "Specifiek Baxi-thermostaat model.",
+      "confidence": "LAAG",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {      "id": 70,
+      "manufacturers": ["Quby"],
+      "models": ["Quby Toon v1", "Quby Toon v2"],
+      "notes": "Eneco Toon slimme thermostaat (Quby). Breed gebruikt in Nederland.",
+      "confidence": "GEMIDDELD",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 138,
+      "manufacturers": ["Thermosmart"],
+      "models": ["Thermosmart (stand-alone version)"],
+      "notes": "Stand-alone versie van Thermosmart. Gateway-versie rapporteert ID 4. Valt in T&D-bereik (128-255).",
+      "confidence": "GEMIDDELD",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 140,
+      "manufacturers": ["Plugwise"],
+      "models": ["Plugwise Anna"],
+      "notes": "Plugwise Anna slimme thermostaat. Valt in T&D-bereik (128-255). Plugwise is Nederlands OT Association-lid.",
+      "confidence": "GEMIDDELD",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 154,
+      "manufacturers": ["Itho Daalderop"],
+      "models": ["Itho Daalderop Spider"],
+      "notes": "Itho Daalderop Spider thermostaat. Valt in T&D-bereik (128-255).",
+      "confidence": "HOOG",
+      "source": "Schelte Bron OTGW Database"    },
+    {
+      "id": 173,
+      "manufacturers": ["Intergas"],
+      "models": ["Intergas Comfort Touch"],
+      "notes": "Intergas eigen thermostaat. Zelfde ID als Intergas-ketels (slave).",
+      "confidence": "GEMIDDELD",
+      "source": "Schelte Bron OTGW Database"
+    },
+    {
+      "id": 178,
+      "manufacturers": ["Inventum"],
+      "models": ["Inventum EVA thermostaat"],
+      "notes": "Inventum EVA. Valt in T&D-bereik (128-255).",
+      "confidence": "LAAG",
+      "source": "Schelte Bron OTGW Database"
+    }
+  ],
+  "manufacturers_without_confirmed_id": [
+    {
+      "manufacturer": "Saunier Duval (sommige modellen)",
+      "notes": "ThemaFast Condens 25: geen apart MemberID gerapporteerd. Sommige Saunier Duval modellen gebruiken Vaillant ID 24.",
+      "related_brands": ["Vaillant Groep"]
+    },
+    {
+      "manufacturer": "Daikin (sommige modellen)",
+      "notes": "D2CND024A1A bevestigd als ID 6. Andere Daikin-modellen geen data.",
+      "related_brands": []
+    },
+    {      "manufacturer": "Brötje (sommige modellen)",
+      "notes": "BLW Eco en WHBS 22 C: geen MemberID. WGB 2 en WHBS 22 D bevestigd als ID 4.",
+      "related_brands": ["BDR Thermea"]
+    },
+    {
+      "manufacturer": "Hajdu",
+      "notes": "HGK-28: rapporteert ID 255 of geen ID. Waarschijnlijk niet-geconfigureerd.",
+      "related_brands": []
+    },
+    {
+      "manufacturer": "Defro",
+      "notes": "Geen MemberID data beschikbaar.",
+      "related_brands": []
+    },
+    {
+      "manufacturer": "Hitachi",
+      "notes": "RWM-2.0FSN3E: geen MemberID data beschikbaar.",
+      "related_brands": []
+    }
+  ],
+  "official_members_opentherm_eu": {
+    "_note": "Volledige lijst van 98 officiële OT-Association leden, direct gecrawld van opentherm.eu/members/ (publiek toegankelijk). Numerieke MemberID codes zijn NIET publiek - die staan op opentherm.eu/document/opentherm-members-id-codes/ (leden-only). Bron: opentherm_public.json.",
+    "_source": "OpenThermPublicCrawler/1.0 - opentherm.eu - 2026-03-29",
+    "members": [
+      {"name": "AET80 (former Nordgas Srl)", "country": "Italy"},
+      {"name": "Airfit (Shanghai) Heating Equipment Co. Ltd.", "country": "China"},
+      {"name": "Airios", "country": "Netherlands"},
+      {"name": "ATAG Verwarming Nederland BV", "country": "Netherlands"},
+      {"name": "Avidsen", "country": "France"},
+      {"name": "Axenco", "country": "France"},      {"name": "BDR Thermea Group", "country": "Netherlands", "note": "Omvat: Remeha, De Dietrich, Baxi, Brötje, Saunier Duval"},
+      {"name": "Bertelli & Partners S.r.l.", "country": "Italy"},
+      {"name": "Bosch Termotecnologia S.A.", "country": "Portugal"},
+      {"name": "Bosch Thermotechniek BV", "country": "Netherlands", "note": "Omvat: Nefit, Buderus, Worcester Bosch, Junkers"},
+      {"name": "BRAHMA S.p.A.", "country": "Italy"},
+      {"name": "Caleffi SpA", "country": "Italy"},
+      {"name": "Centrica Hive Ltd.", "country": "United Kingdom"},
+      {"name": "CercaTrova", "country": "Netherlands"},
+      {"name": "Chunhui Controls", "country": "China"},
+      {"name": "Cooll Sustainable Energy Solutions", "country": null},
+      {"name": "Corporación empresarial Altra S.L.", "country": "Spain"},
+      {"name": "Danfoss Ltd.", "country": "United Kingdom"},
+      {"name": "DELTA DORE", "country": "France"},
+      {"name": "ebm-papst Landshut GmbH", "country": "Germany"},
+      {"name": "EbV Elektronikbau- und Vertriebs-GmbH", "country": "Germany"},
+      {"name": "Enel X", "country": "Italy"},
+      {"name": "EOGB Energy Products Ltd", "country": "United Kingdom"},
+      {"name": "EPH Controls Ltd", "country": "Ireland"},
+      {"name": "Esi Controls Ltd", "country": "United Kingdom"},
+      {"name": "Fantini Cosmi SpA", "country": "Italy"},
+      {"name": "Ferroli Nederland", "country": "Netherlands"},
+      {"name": "Flamco IMZ BV", "country": "Netherlands"},
+      {"name": "Fortes Energy Systems", "country": "Netherlands"},
+      {"name": "General Life / Isipark", "country": null},
+      {"name": "Giordano Controls SpA", "country": "Italy"},
+      {"name": "Groupe Atlantic (Ideal Boilers)", "country": "United Kingdom"},
+      {"name": "Guangdong Baiwei Electronic Co. Ltd.", "country": "China"},
+      {"name": "Guangdong HMJD Electrical Appliance Co. Ltd", "country": "China"},
+      {"name": "GuangDong JUSCE Electronics Co., Ltd", "country": "China"},
+      {"name": "Guangdong Mezic Tech. Co. Ltd.", "country": "China"},      {"name": "Guangdong Zhida Hangyi Electrical Limited Company", "country": "China"},
+      {"name": "Hangzhou Ezviz Network Co., Ltd.", "country": "China"},
+      {"name": "Heatmiser UK Ltd", "country": "United Kingdom"},
+      {"name": "HeatronX B.V.", "country": "Netherlands"},
+      {"name": "Honeywell BV", "country": "Netherlands"},
+      {"name": "Hubei Telin Energy-saving Equipment Co. Ltd.", "country": "China"},
+      {"name": "HZC Electric", "country": "China"},
+      {"name": "ICY B.V.", "country": "Netherlands"},
+      {"name": "IMIT Control System", "country": "Italy"},
+      {"name": "Inspire Home Automation Limited", "country": "United Kingdom"},
+      {"name": "Intergas Verwarming BV", "country": "Netherlands"},
+      {"name": "Inventum Technologies BV", "country": "Netherlands"},
+      {"name": "IRSAP SpA", "country": "Italy"},
+      {"name": "Itho Daalderop Operations BV", "country": "Netherlands"},
+      {"name": "Joule Technologies B.V.", "country": "Netherlands"},
+      {"name": "K.Z. Meet- en Regelapparatuur", "country": "Netherlands"},
+      {"name": "KBlue Srl.", "country": "Italy"},
+      {"name": "KD Navien Co. Ltd.", "country": "South Korea"},
+      {"name": "KOBER Ltd Vaduri Branch", "country": null},
+      {"name": "Midea Europe GmbH", "country": "Germany"},
+      {"name": "OpenTherm Association", "country": "Netherlands"},
+      {"name": "Pactrol Controls Ltd", "country": "United Kingdom"},
+      {"name": "Plugwise B.V.", "country": "Netherlands"},
+      {"name": "Plum Sp. z.o.o.", "country": "Poland"},
+      {"name": "PSV Project Service and Value srl", "country": "Italy"},
+      {"name": "Qingdao economic and technological development zone haier water heater Co. Ltd.", "country": "China"},
+      {"name": "RES Enerji Sistemleri A.Ş.", "country": "Turkey"},
+      {"name": "Resideo", "country": "Netherlands"},
+      {"name": "Resideo UK / Honeywell Control Systems Ltd", "country": "United Kingdom"},
+      {"name": "Rinnai Corporation", "country": null},      {"name": "SALUS Controls plc", "country": "United Kingdom"},
+      {"name": "Schneider Electric Controls UK Ltd", "country": "United Kingdom"},
+      {"name": "Secure Meters", "country": "United Kingdom"},
+      {"name": "SEEKCO Environmental Technology Co. Ltd.", "country": "China"},
+      {"name": "Shenzhen Myuet Energy Saving Equipment Co., Ltd", "country": "China"},
+      {"name": "Shenzhen Rti-Tek Co., Ltd.", "country": "China"},
+      {"name": "ShenZhen Saswell Technology Inc.", "country": "China"},
+      {"name": "Shenzhen Topband Co. Ltd.", "country": "China"},
+      {"name": "SHENZHEN TOUPWELL TECHNOLOGY CO.,LTD", "country": "China"},
+      {"name": "Siemens AG", "country": "Germany"},
+      {"name": "Siterwell", "country": "China"},
+      {"name": "Switchee Ltd", "country": "United Kingdom"},
+      {"name": "Tado GmbH", "country": "Germany"},
+      {"name": "TECH STEROWNIKI", "country": "Poland"},
+      {"name": "TEM A.G.", "country": "Switzerland"},
+      {"name": "Theben AG", "country": "Germany"},
+      {"name": "Thercon NV", "country": "Belgium"},
+      {"name": "Tiemme Raccorderie SpA", "country": "Italy"},
+      {"name": "Triple Solar", "country": "Netherlands"},
+      {"name": "Unical AG S.p.a.", "country": "Italy"},
+      {"name": "Universal Electronics Inc.", "country": null},
+      {"name": "Vaillant Group Netherlands BV", "country": "Netherlands"},
+      {"name": "Viessmann Elektronik GmbH", "country": "Germany"},
+      {"name": "Watts EMEA", "country": "Netherlands"},
+      {"name": "WeHeat", "country": "Netherlands"},
+      {"name": "Wolf GmbH", "country": "Germany"},
+      {"name": "Wunda Group PLC", "country": "United Kingdom"},
+      {"name": "Xiamen Davell Auto Control Equipment Co., Ltd.", "country": "China"},
+      {"name": "Xiamen Hysen Control Technology", "country": "China"},
+      {"name": "Xiamen Ronglin Electronics Technology & Development Co. Ltd.", "country": "China"},      {"name": "YOBIIQ INTELLIGENCE B.V.", "country": "Netherlands"}
+    ]
+  },
+  "protocol_context": {
+    "data_id_2": {
+      "name": "M-Config / M-MemberIDcode",
+      "type": "flag8 / u8",
+      "direction": "Master -> Slave (Write)",
+      "description": "Master Configuration Flags (HB) + Master MemberID Code (LB)"
+    },
+    "data_id_3": {
+      "name": "S-Config / S-MemberIDcode",
+      "type": "flag8 / u8",
+      "direction": "Slave -> Master (Read)",
+      "description": "Slave Configuration Flags (HB) + Slave MemberID Code (LB)"
+    },
+    "data_id_126": {
+      "name": "Master product version / type",
+      "type": "u8 / u8",
+      "direction": "Master -> Slave (Write)",
+      "description": "Master product-version number (HB) + Master product-type (LB)"
+    },
+    "data_id_127": {
+      "name": "Slave product version / type",
+      "type": "u8 / u8",
+      "direction": "Slave -> Master (Read)",
+      "description": "Slave product-version number (HB) + Slave product-type (LB)"
+    },
+    "test_diagnostics_range": {
+      "range": "128-255",      "description": "Data-IDs voor fabrikant-specifieke Test & Diagnostics. Alleen bruikbaar na handshake via MemberID."
+    },
+    "remeha_specific_ids": {
+      "description": "Actief alleen wanneer Slave MemberID = 11",
+      "ids": {
+        "131": "dF- / dU-codes",
+        "132": "Servicemeldingen",
+        "133": "Connected SCU detectie"
+      }
+    }
+  }
+}

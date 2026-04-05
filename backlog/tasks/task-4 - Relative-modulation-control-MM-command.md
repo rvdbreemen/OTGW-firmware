@@ -1,10 +1,11 @@
 ---
 id: TASK-4
 title: Relative modulation control (MM= command)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-05 10:03'
-updated_date: '2026-04-05 21:41'
+updated_date: '2026-04-05 22:18'
 labels:
   - sat
   - feature
@@ -24,22 +25,39 @@ SAT Python sends MM= (max relative modulation) command to the boiler to limit mo
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 New setting settings.sat.iMaxRelModulation (default 100, range 0-100)
-- [ ] #2 SAT control loop: send MM=<value> command alongside CS= command
-- [ ] #3 PWM OFF phase: send MM=0 to suppress modulation
-- [ ] #4 PWM ON phase: send MM=<configured max>
-- [ ] #5 Continuous mode: send MM=<configured max>
+- [x] #1 New setting settings.sat.iMaxRelModulation (default 100, range 0-100)
+- [x] #2 SAT control loop: send MM=<value> command alongside CS= command
+- [x] #3 PWM OFF phase: send MM=0 to suppress modulation
+- [x] #4 PWM ON phase: send MM=<configured max>
+- [x] #5 Continuous mode: send MM=<configured max>
 - [ ] #6 Modulation suppression: when boiler temp within 1.0C of setpoint, send MM=0 after 20s delay
-- [ ] #7 State tracking: state.sat.iCurrentModulation (current sent MM value)
+- [x] #7 State tracking: state.sat.iCurrentModulation (current sent MM value)
 - [ ] #8 REST API: GET /api/v2/sat/status includes max_rel_modulation and current_modulation fields
 - [ ] #9 REST API: POST /api/v2/sat/modulation with body for max modulation value
-- [ ] #10 MQTT subscribe: set/<nodeId>/sat/max_modulation
-- [ ] #11 MQTT publish: sat/max_modulation and sat/current_modulation
-- [ ] #12 WebUI: max modulation slider/field in SAT dashboard
-- [ ] #13 WebUI: current modulation value visible in Control Details
-- [ ] #14 Settings persistence via settingStuff.ino
+- [x] #10 MQTT subscribe: set/<nodeId>/sat/max_modulation
+- [x] #11 MQTT publish: sat/max_modulation and sat/current_modulation
+- [x] #12 WebUI: max modulation slider/field in SAT dashboard
+- [x] #13 WebUI: current modulation value visible in Control Details
+- [x] #14 Settings persistence via settingStuff.ino
 - [ ] #15 HA auto-discovery: number entity for max modulation in mqttha.cfg
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add settings.sat.iMaxRelModulation (uint8_t, default 100, range 0-100) to OTGW-firmware.h
+2. Add state.sat.iCurrentModulation to SATRuntimeSection
+3. In SATcontrol.ino: add satSendModulationCommand() that sends MM=<value> via addOTWGcmdtoqueue
+4. Integrate with control loop: send MM alongside CS in satControlLoop
+5. PWM mode: MM=0 on OFF phase (unless heat pump: MM=100 always via satAlwaysMaxModulation)
+6. Continuous mode: MM=configured max
+7. Add settings persistence in settingStuff.ino
+8. Add REST API endpoint in restAPI.ino
+9. Add MQTT subscribe handler for max_modulation
+10. Add MQTT publish in SAT status
+11. Update WebUI sat.js display
+12. Heat pump integration: use satAlwaysMaxModulation() from Task #22
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 

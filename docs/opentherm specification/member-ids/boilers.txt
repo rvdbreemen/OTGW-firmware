@@ -1,0 +1,243 @@
+AGPO Econpact 127C|0|0
+ATAG E325EC|4|43521
+AWB ThermoMaster 2HR|2|0
+AWB ThermoMaster 2HR|24|400
+AWB ThermoMaster 3HR|153|5120
+Agpo Ferroli Econpact 225c|0|0
+Agpo Ferroli Econpact 225c|0|
+Agpo Ferroli Econpact 225c|9|0
+Atag A244EC|4|43521
+Atag i-Serie|4|43521
+Atag i-Serie||
+Atag i-Serie|255|0
+Atag i-Serie|131|1477
+Atlantic|4|
+Atlantic LORIA DUO 6000|0|0
+Atlantic Naia 2 Micro|0|0
+BAXI Prime 1.24|11|4866
+BaltGaz Neva Lux 8224 (OEM of the boiler control board - Enpi Electronik)|170|0
+Baxi 800 Combi 2|11|6146
+Baxi Eco Nova 24f|0|16
+Baxi Eco Nova 24f||
+Baxi Eco Nova 24f|0|
+Baxi Luna Duo-Tec 1.28+ ERP|56|0
+Baxi Main Four 240 F||
+Baxi Nuvola 3 Comfort||
+Baxi Nuvola DuoTec HT 24|27|
+Baxi Nuvola DuoTec HT 24|56|0
+Baxi Slim|4|13057
+Baxi luna 3 Confort HT||43522
+Baxi luna 3 Confort HT||
+Biasi Inovia Cond 35SV|8|25856
+Bosch GAZ6000|8|
+Bosch HRC 30|18|
+Bosch HRC 30|131|1477
+Bosch HRC 30|18|0
+Bosch HRC35/2|18|0
+Bosch/Junkers Cerapur ZWB|18|0
+Brink Allure B25 HR|2|0
+Brink Allure B25 HR|0|0
+Brötje BLW Eco||
+Brötje WGB 2|4|25601
+Brötje WHBS 22 C||
+Brötje WHBS 22 D|4|43522
+Buderus  Logamax U072 K 24KW|8|41728
+Bulex FAS|24|0
+Bulex FAS|2|0
+Bulex Thermomaster 25/30 -A||
+Cetetherm Mini ECO  district heating central|13|8966
+Daalderop Combifort|0|0
+Daalderop Comfort Classic 130|0|
+Daalderop Comfort Classic 130|0|0
+Daalderop Comfort Classic 24/50+||
+Daalderop Comfort Classic 24/50+|29|0
+Daalderop Comfort Classic 24/50+|0|0
+Daikin D2CND024A1A|6|53762
+Dakon KZ24|0|0
+De Dietrich MCR 24|11|1817
+De Dietrich MCR 24|11|1814
+De Dietrich MCR 24|11|5889
+De Dietrich MCR 24|11|3345
+De Dietrich MPX|56|0
+De Dietrich NANEO EMC-S 24/28 MI|11|5889
+De Dietrich TWINEO EGC 25 V100SL|11|
+Defro||
+Domusa Evolution Solar FD30|0|0
+ENBRA CD 24|41|0
+Elco Euron 24 HG|4|25601
+Elco Thision 25|4|25601
+Elco Thision 9|4|25601
+Elco Thision XL|4|
+Ferroli BlueHelix Pro||
+Ferroli BlueHelix Pro|9|
+Ferroli BlueHelix Pro|9|0
+Ferroli BlueHelix Tech RRT 28C||
+Ferroli BlueHelix Tech RRT 28C|9|0
+Ferroli BlueSense 5|9|0
+Ferroli BlueSense 5|9|
+Ferroli Divatop HF 24||
+Ferroli Megadens||
+Geminox  THRi 5-25 DC|4|25601
+Geminox THRi 2-17 DC|4|25601
+Geminox ZEM 2-17C|4|43521
+Hajdu HGK-28||
+Hajdu HGK-28|255|
+Heishamon_3.0_OT_Alfa|0|0
+Heishamon_3.2.3|0|0
+Hitachi RWM-2.0FSN3E||
+Hoval TopGas Comfort 16KW|8|
+Ideal Combi Logic 24||
+Ideal Combi Logic 24|6|513
+Ideal Combi Logic 24|6|33285
+Ideal Logic Combi ESP1 35|6|33286
+Ideal Vogue C32|6|2049
+Ideal Vogue Max C40|6|33795
+Immergas Victrix Superior 26|27|0
+Immergas Victrix Tera 28||
+Intergas ECO RF|173|0
+Intergas HRE 24/18A + Xtend 5kW|173|0
+Intergas HRE 28/24 A|173|0
+Intergas Kombi Kompakt HR|0|0
+Intergas Kombi Kompakt HR|0|
+Intergas Kombi Kompakt HR||
+Intergas Kombi Kompakt HR (36/30)||
+Intergas Kombi Kompakt HR (36/30)|0|0
+Intergas Kombi Kompakt HR (36/30)|173|0
+Intergas Kombi Kompakt HR (36/30)|255|0
+Intergas Kombi Kompakt HRE A 28/24|0|0
+Intergas Kombi Kompakt HRE A 28/24||
+Intergas Kombi Kompakt HRE A 28/24|173|0
+Intergas Kombi Kompakt HRE A 28/24|255|0
+Intergas Kombi Kompakt HRE A 28/24|173|
+Intergas Kombi Kompakt HReco|0|0
+Intergas Kombi Kompakt HReco|173|0
+Intergas Kompakt Solo HRE|0|0
+Intergas Prestige CW6|0|0
+Intergas XClusive 30||
+Intergas XTend|173|769
+Intergas Xclusive 30|173|257
+Intergas Xtreme 30|173|257
+Intergas Xtreme 36|173|0
+Intergas Xtreme 36|173|257
+Inventum Ecolution Modul-AIR SOLO||
+Inventum Ecolution Modul-Air All-E|0|0
+Inventum Ecolution Modul-Air All-E|162|514
+Itho Daalderop Base Cube|29|
+Itho Daalderop Base Cube|29|0
+Itho Daalderop WPU4|5|
+Itho Daalderop WPU5G|5|3397
+Itho Daalderop WPU5G|5|3400
+Itho Kli-Max 2 CW6|0|0
+Keston C36 Combi|0|0
+MHG Meisterlinie ecoGAS 24|173|0
+Nefit Proline HRC 24/CW4 + EMS-OT||
+Nefit Proline HRC 24/CW4 + EMS-OT|131|1093
+Nefit Proline HRC 24/CW4 + EMS-OT|131|1475
+Nefit Proline HRC 24/CW4 + EMS-OT|18|1093
+Nefit Proline NXT HRC 24/CW4||
+Nefit Proline NXT HRC 24/CW4|131|294
+Nefit Proline NXT HRC 24/CW4|131|542
+Nefit Proline NXT HRC 24/CW4|131|550
+Nefit Proline NXT HRC 24/CW4|131|286
+Nefit Proline NXT HRC 24/CW4|131|551
+Nefit Proline NXT HRC 30/CW5|131|806
+Nefit Proline NXT HRC 30/CW5|131|798
+Nefit Proline NXT HRC 30/CW5|131|800
+Nefit Smartline (HR) + EMS-OT||
+Nefit TopLine Aquapower + EMS-OT||
+Nefit TopLine Compact HRC25 + EMS-OT|131|1053
+Nefit TopLine Compact HRC25 + EMS-OT||
+Nefit TopLine Compact HRC25 + EMS-OT|131|1475
+Nefit Trendline HRC30/CW5 + EMS-OT|131|1477
+Novaya Thermastage Compact Duo|161|28
+Radiant R1K28/B|41|0
+Remeha|11|
+Remeha|11|4355
+Remeha Avanta|11|1301
+Remeha Avanta|11|
+Remeha Avanta|11|1297
+Remeha Avanta|11|1304
+Remeha Avanta|11|1300
+Remeha Avanta|11|1302
+Remeha Avanta|11|1295
+Remeha Avanta ACE|11|6146
+Remeha Avanta ACE|11|5121
+Remeha Calenta|11|2574
+Remeha Calenta|11|2579
+Remeha Calenta||
+Remeha Calenta|11|2578
+Remeha Calenta|11|5121
+Remeha Calenta|11|2580
+Remeha Calenta|11|2828
+Remeha Calenta|11|2575
+Remeha Calenta|11|2577
+Remeha Calenta|11|1304
+Remeha Calenta Ace|11|5121
+Remeha Calenta Ace||
+Remeha Elga Ace (Heat Pump)|11|
+Remeha Elga Ace (Heat Pump)|11|4353
+Remeha Elga Ace (Heat Pump)||
+Remeha Eria Tower WPR-2E V200 11-16|11|4354
+Remeha Quinta 28c|2|
+Remeha Quinta 28c||
+Remeha Quinta 28c|2|292
+Remeha Quinta 35c|2|292
+Remeha Quinta 35c||
+Remeha Quinta 45||
+Remeha Quinta Pro|11|3085
+Remeha Techneco Toros Vision|0|0
+Remeha Tzerra|11|3340
+Remeha Tzerra||
+Remeha Tzerra|0|0
+Remeha Tzerra|11|3344
+Remeha Tzerra|11|
+Remeha Tzerra|11|5889
+Remeha Tzerra|11|3342
+Remeha Tzerra|11|3341
+Remeha Tzerra Ace|11|5889
+Remeha Tzerra Ace|11|4865
+Remeha Tzerra Ace||
+Remeha Tzerra Ace|11|3345
+Remeha Tzerra Ace|11|4353
+Remeha Tzerra M|11|3344
+Remeha Tzerra Plus|11|3344
+Remeha Tzerra Plus|11|3342
+Remeha W28 Eco||
+Saunier Duval Thelia Condens 25|24|0
+Techneco Elga (+ Remeha Calenta)||
+Termet Crystal II EcoCondens 25|0|0
+Termet EcoCondens 20|0|0
+Termet Ecocondens 30 1F (WKJ1301000000)|0|0
+Thermona EL14 (2012)|0|0
+Thermona Therm 23 CLN.A,|211|
+Unical KONm|16|
+Vaillant EcoTEC CW5+||
+Vaillant EcoTEC CW5+|24|
+Vaillant EcoTEC CW5+|24|0
+Vaillant Ecotec PLUS 30-34 CW5|24|0
+Vaillant VHR NL 24-28C||
+Vaillant VHR NL 24-28C|24|0
+Vaillant VHR NL 24-28C|2|0
+Vaillant ecoTEC Plus VHR 25/32CS/1-5 CW4|24|0
+Vaillant ecoTEC exclusive 843|24|0
+Vaillant ecoTEC plus VUW OE 296/3-5 R3 + VR33||
+Vaillant hrSolide C||
+Vaillant hrSolide VHR NL 24-28C/3 C|24|
+Vaillant hrSolide VHR NL 24-28C/3 C||
+Vaillant hrSolide VHR NL 24-28C/3 C|24|0
+Viessmann Vitodens 050-W|33|2086
+Viessmann Vitodens 050-W|33|9584
+Viessmann Vitodens 100-W||
+Viessmann Vitodens 100-W|33|
+Viessmann Vitodens 100-W|33|2394
+Viessmann Vitodens 100-W|33|25630
+Viessmann Vitodens 100-W|33|9573
+Viessmann Vitodens 100-W B1HC|33|2394
+Viessmann Vitodens 100-W B1HC||
+Viessmann Vitodens 111-W|33|9573
+Viessmann Vitovent 300||0
+Vokera Linea one |31|8981
+WOLF CWL 400 + BYPASS|0|0
+Windhager BWE 100 Exklusiv Bj2006|0|
+Windhager JetWin Exclusive 165||
+efit ProlLne NxT HRC 24/CW3 (Bosch)|131|288

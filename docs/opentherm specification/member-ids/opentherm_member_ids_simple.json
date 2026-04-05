@@ -1,0 +1,171 @@
+{
+  "slave_member_ids": {
+    "0": [
+      "Generiek / niet-specifiek"
+    ],
+    "2": [
+      "Vaillant (legacy)",
+      "Remeha (legacy)",
+      "AWB",
+      "Bulex",
+      "Brink"
+    ],
+    "4": [
+      "ATAG",
+      "Baxi",
+      "Brötje",
+      "Elco",
+      "Geminox",
+      "Atlantic"
+    ],
+    "5": [
+      "Itho Daalderop"
+    ],
+    "6": [
+      "Ideal",
+      "Daikin"
+    ],
+    "8": [
+      "Bosch",
+      "Buderus",      "Biasi",
+      "Hoval"
+    ],
+    "9": [
+      "Ferroli"
+    ],
+    "11": [
+      "Remeha",
+      "De Dietrich",
+      "Baxi (nieuwer)",
+      "BDR Thermea Group"
+    ],
+    "13": [
+      "Cetetherm"
+    ],
+    "16": [
+      "Unical"
+    ],
+    "18": [
+      "Bosch",
+      "Junkers"
+    ],
+    "24": [
+      "Vaillant",
+      "Saunier Duval",
+      "Bulex"
+    ],
+    "27": [
+      "Immergas",
+      "Baxi (sommige)"    ],
+    "29": [
+      "Itho Daalderop",
+      "Daalderop"
+    ],
+    "31": [
+      "Vokera"
+    ],
+    "33": [
+      "Viessmann"
+    ],
+    "41": [
+      "Radiant",
+      "ENBRA"
+    ],
+    "56": [
+      "Baxi",
+      "De Dietrich"
+    ],
+    "131": [
+      "Nefit"
+    ],
+    "153": [
+      "AWB"
+    ],
+    "161": [
+      "Novaya"
+    ],
+    "162": [
+      "Inventum"    ],
+    "170": [
+      "BaltGaz"
+    ],
+    "173": [
+      "Intergas",
+      "MHG"
+    ],
+    "211": [
+      "Ferroli",
+      "Thermona"
+    ]
+  },
+  "master_member_ids": {
+    "0": [
+      "Generiek / niet-specifiek"
+    ],
+    "1": [
+      "Honeywell"
+    ],
+    "2": [
+      "Honeywell"
+    ],
+    "4": [
+      "Siemens",
+      "Elektrobock",
+      "Baxi",
+      "Thermosmart"
+    ],
+    "5": [      "Itho Daalderop"
+    ],
+    "6": [
+      "Elektrobock"
+    ],
+    "11": [
+      "Remeha",
+      "De Dietrich",
+      "Baxi"
+    ],
+    "13": [
+      "Honeywell",
+      "Ferroli",
+      "Termet"
+    ],
+    "18": [
+      "Quatt",
+      "Viessmann",
+      "WOLF"
+    ],
+    "22": [
+      "Hoval",
+      "MHF"
+    ],
+    "41": [
+      "Radiant",
+      "Neva Lux"
+    ],
+    "48": [
+      "ATAG",      "Elco",
+      "Honeywell (sommige)"
+    ],
+    "56": [
+      "Baxi"
+    ],
+    "70": [
+      "Quby"
+    ],
+    "138": [
+      "Thermosmart"
+    ],
+    "140": [
+      "Plugwise"
+    ],
+    "154": [
+      "Itho Daalderop"
+    ],
+    "173": [
+      "Intergas"
+    ],
+    "178": [
+      "Inventum"
+    ]
+  }
+}

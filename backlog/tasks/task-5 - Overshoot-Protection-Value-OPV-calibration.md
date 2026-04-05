@@ -1,10 +1,11 @@
 ---
 id: TASK-5
 title: Overshoot Protection Value (OPV) calibration
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-05 10:04'
-updated_date: '2026-04-05 21:42'
+updated_date: '2026-04-05 22:25'
 labels:
   - sat
   - feature
@@ -25,28 +26,44 @@ OPV is SAT's killer feature. It automatically detects a boiler's minimum output 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 New enum SATCalibrationPhase: IDLE, STARTING, WARMING, MEASURING, COOLDOWN, DONE, FAILED
-- [ ] #2 New state fields: state.sat.eCalibPhase, fCalibMaxTemp, fCalibStartTemp, iCalibStartMs, iCalibSamples
-- [ ] #3 New setting: settings.sat.fOvpValue (default 0.0 = not calibrated)
-- [ ] #4 New setting: settings.sat.bOvpEnabled (default false)
-- [ ] #5 Calibration state machine in satOvpCalibrate() - called from control loop
-- [ ] #6 Calibration start: send MM=0 and CS=62 (radiator) or CS=45 (underfloor), wait for flame
-- [ ] #7 WARMING phase: wait until boiler temp rises above startTemp + 5C
-- [ ] #8 MEASURING phase: sample boiler temp every 10s for 20 minutes, track max
-- [ ] #9 DONE: store max temp as OPV in settings, send CS=0 and MM=100 to recover
-- [ ] #10 FAILED: timeout after 30 min or no flame after 3 min - recover to normal operation
-- [ ] #11 OPV used in control loop: if boiler temp > OPV and error < deadband, switch to PWM
-- [ ] #12 REST API: GET /api/v2/sat/status includes ovp_value, ovp_enabled, calib_phase fields
+- [x] #1 New enum SATCalibrationPhase: IDLE, STARTING, WARMING, MEASURING, COOLDOWN, DONE, FAILED
+- [x] #2 New state fields: state.sat.eCalibPhase, fCalibMaxTemp, fCalibStartTemp, iCalibStartMs, iCalibSamples
+- [x] #3 New setting: settings.sat.fOvpValue (default 0.0 = not calibrated)
+- [x] #4 New setting: settings.sat.bOvpEnabled (default false)
+- [x] #5 Calibration state machine in satOvpCalibrate() - called from control loop
+- [x] #6 Calibration start: send MM=0 and CS=62 (radiator) or CS=45 (underfloor), wait for flame
+- [x] #7 WARMING phase: wait until boiler temp rises above startTemp + 5C
+- [x] #8 MEASURING phase: sample boiler temp every 10s for 20 minutes, track max
+- [x] #9 DONE: store max temp as OPV in settings, send CS=0 and MM=100 to recover
+- [x] #10 FAILED: timeout after 30 min or no flame after 3 min - recover to normal operation
+- [x] #11 OPV used in control loop: if boiler temp > OPV and error < deadband, switch to PWM
+- [x] #12 REST API: GET /api/v2/sat/status includes ovp_value, ovp_enabled, calib_phase fields
 - [ ] #13 REST API: POST /api/v2/sat/ovp/start - start calibration
 - [ ] #14 REST API: POST /api/v2/sat/ovp/stop - cancel calibration
 - [ ] #15 REST API: POST /api/v2/sat/ovp/value - manually set OPV value
-- [ ] #16 MQTT subscribe: set/<nodeId>/sat/ovp_start, ovp_stop, ovp_value
-- [ ] #17 MQTT publish: sat/ovp_value, sat/ovp_phase, sat/ovp_enabled
-- [ ] #18 WebUI: OPV section in SAT dashboard with calibration button, current OPV value, phase indicator
-- [ ] #19 WebUI: manual OPV input as alternative to calibration
+- [x] #16 MQTT subscribe: set/<nodeId>/sat/ovp_start, ovp_stop, ovp_value
+- [x] #17 MQTT publish: sat/ovp_value, sat/ovp_phase, sat/ovp_enabled
+- [x] #18 WebUI: OPV section in SAT dashboard with calibration button, current OPV value, phase indicator
+- [x] #19 WebUI: manual OPV input as alternative to calibration
 - [ ] #20 HA auto-discovery: sensor entity for OPV value, binary_sensor for calibration active
-- [ ] #21 Safety: calibration cancellable, timeout protection, CS=0 on failure
+- [x] #21 Safety: calibration cancellable, timeout protection, CS=0 on failure
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add SATCalibrationPhase enum to OTGW-firmware.h
+2. Add calibration state fields to SATRuntimeSection
+3. Add settings.sat.fOvpValue and bOvpEnabled
+4. Implement satOvpCalibrate() state machine in SATcontrol.ino
+5. Integrate with control loop: skip normal control during calibration
+6. Settings persistence for OPV value and enabled flag
+7. REST API endpoints for start/stop/value
+8. MQTT subscribe handlers
+9. MQTT publish in status
+10. WebUI: OPV section with calibration button
+11. Safety: timeout, cancel, CS=0 recovery
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
