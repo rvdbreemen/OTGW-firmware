@@ -815,6 +815,8 @@ void satSendStatusJSON()
   satSendJsonFloat(F("duty_ratio"),           state.sat.fDutyRatio, 3);
   satSendJsonFloat(F("overshoot_fraction"),   state.sat.fOvershootFraction, 3);
   satSendJsonFloat(F("underheat_fraction"),   state.sat.fUnderheatFraction, 3);
+  sendJsonMapEntry(F("cycle_phase"),          satCycleGetPhaseName());
+  sendJsonMapEntry(F("phase_duration_sec"),   (int32_t)satCycleGetPhaseDurationSec());
   satSendJsonFloat(F("pwm_duty"),             state.sat.fPwmDutyCycle, 2);
   sendJsonMapEntry(F("pwm_flame_req"),        state.sat.bPwmFlameRequested);
   sendJsonMapEntry(F("active_preset"),         (int32_t)state.sat.eActivePreset);
@@ -925,6 +927,9 @@ void satPublishMQTT()
 
   dtostrf(state.sat.fOvershootFraction, 1, 3, valBuf);
   sendMQTTData(F("sat/overshoot_fraction"), valBuf, false);
+
+  // Cycle phase
+  sendMQTTData(F("sat/cycle_phase"), satCycleGetPhaseName(), false);
 
   // Overshoot margin
   dtostrf(settings.sat.fOvershootMargin, 1, 1, valBuf);

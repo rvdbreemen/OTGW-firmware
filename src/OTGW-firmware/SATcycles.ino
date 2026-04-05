@@ -19,6 +19,11 @@ enum SATCycleKind : uint8_t {
   SAT_CK_UNKNOWN = 0, SAT_CK_CH, SAT_CK_DHW, SAT_CK_MIXED
 };
 
+// --- Cycle Phase (Task #35) ---
+enum SATCyclePhase : uint8_t {
+  SAT_CP_IDLE = 0, SAT_CP_STARTUP, SAT_CP_STEADY, SAT_CP_COOLDOWN
+};
+
 // --- Cycle Constants ---
 static const uint8_t  SAT_CYCLE_HISTORY_SIZE       = 16;
 static const float    SAT_CYCLE_SHORT_DURATION_SEC  = 60.0f;   // Cycles shorter than this = SHORT_CYCLING
@@ -39,6 +44,8 @@ static float    _cycle_overshootSec     = 0.0f;
 static uint32_t _cycle_lastSampleMs     = 0;
 static uint16_t _cycle_dhwSamples       = 0;   // samples where DHW was active
 static uint16_t _cycle_totalSamples     = 0;   // total samples this cycle
+static SATCyclePhase _cycle_phase       = SAT_CP_IDLE;
+static uint32_t _cycle_phaseStartMs     = 0;
 
 // --- Sustained State Detection ---
 static float    _sustain_overshootSec   = 0.0f;
@@ -185,6 +192,8 @@ void satCycleOnFlameChange(bool flameOn)
     // Flame just turned OFF — complete the cycle
     _cycle_flameOn = false;
     _cycle_flameOffStartMs = now;
+    _cycle_phase = SAT_CP_COOLDOWN;
+    _cycle_phaseStartMs = now;
 
     float durationSec = (float)(now - _cycle_flameOnStartMs) / 1000.0f;
     SATCycleClass cls = _cycleClassify(durationSec, _cycle_maxFlowTemp,
@@ -218,6 +227,23 @@ void satCycleSample()
   _cycle_totalSamples++;
   if ((OTcurrentSystemState.Statusflags & 0x04) != 0) {  // Bit 2 = DHW active
     _cycle_dhwSamples++;
+  }
+
+  // Phase detection (Task #35)
+  SATCyclePhase newPhase = _cycle_phase;
+  float setpoint = _cycle_setpointAtStart;
+  float band = 1.5f;  // at-setpoint band
+
+  if (flowTemp < setpoint - band) {
+    newPhase = SAT_CP_STARTUP;
+  } else if (fabsf(flowTemp - setpoint) <= band) {
+    newPhase = SAT_CP_STEADY;
+  }
+  // Cooldown is set on flame-off in satCycleOnFlameChange
+
+  if (newPhase != _cycle_phase) {
+    _cycle_phase = newPhase;
+    _cycle_phaseStartMs = now;
   }
 
   _cycle_lastSampleMs = now;
@@ -294,4 +320,21 @@ uint8_t satCycleCountClass(SATCycleClass cls)
 //=== Accessors for cycle timing (used by SATcontrol.ino PWM mode) ===
 uint32_t satCycleGetFlameOnStartMs()  { return _cycle_flameOnStartMs; }
 uint32_t satCycleGetFlameOffStartMs() { return _cycle_flameOffStartMs; }
+
+//=== Cycle phase name (Task #35) ===
+const char* satCycleGetPhaseName()
+{
+  switch (_cycle_phase) {
+    case SAT_CP_STARTUP:  return "startup";
+    case SAT_CP_STEADY:   return "steady";
+    case SAT_CP_COOLDOWN: return "cooldown";
+    default:              return "idle";
+  }
+}
+
+uint32_t satCycleGetPhaseDurationSec()
+{
+  if (_cycle_phaseStartMs == 0) return 0;
+  return (millis() - _cycle_phaseStartMs) / 1000;
+}
 
