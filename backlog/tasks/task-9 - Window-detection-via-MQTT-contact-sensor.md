@@ -1,10 +1,11 @@
 ---
 id: TASK-9
 title: Window detection via MQTT contact sensor
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-05 10:05'
-updated_date: '2026-04-05 21:42'
+updated_date: '2026-04-05 23:21'
 labels:
   - sat
   - feature
@@ -24,17 +25,17 @@ SAT Python detects open windows via contact sensors and switches to Activity pre
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 New setting settings.sat.bWindowDetection (default false)
-- [ ] #2 New setting settings.sat.iWindowMinOpenSec (default 60, range 10-600)
-- [ ] #3 New state fields: state.sat.bWindowOpen, state.sat.iWindowOpenSinceMs
-- [ ] #4 State tracking: state.sat.fPreWindowTarget (target temp before window open event)
-- [ ] #5 State tracking: state.sat.iPreWindowPreset (preset before window open event)
-- [ ] #6 MQTT subscribe: set/<nodeId>/sat/window (payload: open/closed or 1/0 or ON/OFF)
-- [ ] #7 On window open + timer expired: switch to Activity preset, save previous target/preset
-- [ ] #8 On window closed: restore saved target temp and preset
-- [ ] #9 REST API: GET /api/v2/sat/status includes window_open and window_detection fields
-- [ ] #10 REST API: POST /api/v2/sat/window (manually set open/closed for testing)
-- [ ] #11 MQTT publish: sat/window_open (true/false)
+- [x] #1 New setting settings.sat.bWindowDetection (default false)
+- [x] #2 New setting settings.sat.iWindowMinOpenSec (default 60, range 10-600)
+- [x] #3 New state fields: state.sat.bWindowOpen, state.sat.iWindowOpenSinceMs
+- [x] #4 State tracking: state.sat.fPreWindowTarget (target temp before window open event)
+- [x] #5 State tracking: state.sat.iPreWindowPreset (preset before window open event)
+- [x] #6 MQTT subscribe: set/<nodeId>/sat/window (payload: open/closed or 1/0 or ON/OFF)
+- [x] #7 On window open + timer expired: switch to Activity preset, save previous target/preset
+- [x] #8 On window closed: restore saved target temp and preset
+- [x] #9 REST API: GET /api/v2/sat/status includes window_open and window_detection fields
+- [x] #10 REST API: POST /api/v2/sat/window (manually set open/closed for testing)
+- [x] #11 MQTT publish: sat/window_open (true/false)
 - [ ] #12 WebUI: window status indicator in SAT dashboard
 - [ ] #13 WebUI: window detection settings (enable, min open time) in settings page
 <!-- AC:END -->
@@ -54,3 +55,9 @@ SAT Python references (Window detection):
 - binary_sensor.py:56 - creates SatWindowSensor entity if window_sensors configured
 - binary_sensor.py:450-471 - SatWindowSensor class extends BinarySensorGroup: mode=any (any window triggers), device_class=WINDOW, uses config.window_sensors as entity_ids
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Window detection via MQTT contact sensor.\n\nChanges:\n- New settings: bWindowDetection (default off), iWindowMinOpenSec (default 60)\n- State fields: bWindowOpen, iWindowOpenSinceMs, fPreWindowTarget, iPreWindowPreset\n- MQTT subscribe: set/<nodeId>/sat/window (open/closed/1/0/ON/OFF)\n- Timer-based: window must stay open for iWindowMinOpenSec before switching\n- On timer expiry: saves current target/preset, switches to Activity preset\n- On close: restores saved target and preset, resets PID integral\n- REST API: GET status includes window_open, window_detection; POST /sat/window\n- MQTT publish: sat/window_open (true/false)\n- AC#12/#13 (WebUI display/settings) left for WebUI polish phase\n\nFiles: OTGW-firmware.h, SATcontrol.ino, settingStuff.ino, MQTTstuff.ino, restAPI.ino
+<!-- SECTION:FINAL_SUMMARY:END -->

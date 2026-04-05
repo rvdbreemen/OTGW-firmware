@@ -726,6 +726,18 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
               updateSetting("SATovpvalue", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("ovp_enabled")) == 0) {
               updateSetting("SATovpenabled", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("push_setpoint")) == 0) {
+              updateSetting("SATpushsetpoint", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("flame_off_offset")) == 0) {
+              updateSetting("SATflameoffset", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("reset_integral")) == 0) {
+              satResetIntegral();
+            } else if (strcasecmp_P(satSubCmd, PSTR("window")) == 0) {
+              // Window open/closed detection via MQTT
+              bool isOpen = (strcasecmp_P(msgPayload, PSTR("open")) == 0 ||
+                            strcasecmp_P(msgPayload, PSTR("1")) == 0 ||
+                            strcasecmp_P(msgPayload, PSTR("ON")) == 0);
+              satHandleWindow(isOpen);
             } else {
               MQTTDebugTf(PSTR("SAT: unknown sub-command [%s]\r\n"), satSubCmd);
             }

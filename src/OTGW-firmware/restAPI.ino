@@ -598,6 +598,30 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     }
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
+  else if (strcasecmp_P(sub, PSTR("reset_integral")) == 0) {
+    if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
+    satResetIntegral();
+    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\",\"integral\":0}"));
+  }
+  else if (strcasecmp_P(sub, PSTR("window")) == 0) {
+    if (method == HTTP_POST || method == HTTP_PUT) {
+      char valBuf[16];
+      const char* val = nullptr;
+      if (httpServer.hasArg(F("plain"))) {
+        val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+      } else if (wc > 5) {
+        val = words[5];
+      }
+      if (!val) { sendApiError(400, F("Missing value (open/closed)")); return; }
+      bool isOpen = (strcasecmp_P(val, PSTR("open")) == 0 ||
+                    strcasecmp_P(val, PSTR("1")) == 0 ||
+                    strcasecmp_P(val, PSTR("ON")) == 0);
+      satHandleWindow(isOpen);
+      httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    } else {
+      sendApiMethodNotAllowed(F("POST, PUT"));
+    }
+  }
   else {
     sendApiNotFound(originalURI);
   }

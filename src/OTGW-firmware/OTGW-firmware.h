@@ -385,6 +385,11 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   SATFallbackReason eFallbackReason = SAT_FB_NONE;
   // Heating system detection
   uint8_t  iDetectedHeatingSystem = SAT_HSYS_RADIATORS; // auto-detected from OT MsgID 3
+  // Window detection
+  bool     bWindowOpen            = false;
+  uint32_t iWindowOpenSinceMs     = 0;
+  float    fPreWindowTarget       = 0.0f;
+  uint8_t  iPreWindowPreset       = 0;   // SATPreset before window opened
 };
 
 struct OTGWState {
@@ -600,6 +605,10 @@ struct SATSection {
   float    fModSupOffset      = 1.0f;   // Modulation suppression offset (°C below setpoint)
   float    fDhwSetpoint       = 0.0f;   // DHW setpoint (0=inactive, 30-60°C)
   bool     bDhwEnabled        = false;  // Enable DHW control in standalone/fallback mode
+  bool     bPushSetpoint      = false;  // Push SAT target to thermostat display (TC= command)
+  float    fFlameOffOffset    = 0.0f;   // Setpoint offset when flame off (anti-cycling hysteresis)
+  bool     bWindowDetection   = false;  // Enable window open detection via MQTT
+  uint16_t iWindowMinOpenSec  = 60;     // Minimum seconds window must stay open before action
 };
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT

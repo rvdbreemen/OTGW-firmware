@@ -297,6 +297,10 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATmodsupoffset"), settings.sat.fModSupOffset, true);
   writeJsonFloatKV(file, F("SATdhwsetpoint"), settings.sat.fDhwSetpoint, true);
   writeJsonBoolKV(file, F("SATdhwenabled"), settings.sat.bDhwEnabled, true);
+  writeJsonBoolKV(file, F("SATpushsetpoint"), settings.sat.bPushSetpoint, true);
+  writeJsonFloatKV(file, F("SATflameoffset"), settings.sat.fFlameOffOffset, true);
+  writeJsonBoolKV(file, F("SATwindowdetect"), settings.sat.bWindowDetection, true);
+  writeJsonIntKV(file, F("SATwindowminsec"), settings.sat.iWindowMinOpenSec, true);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings (OTGW32/OT-Thing only) ---
   writeJsonIntKV(file, F("OTDmode"), settings.otd.iMode, true);
@@ -724,6 +728,10 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATmodsupoffset")) == 0)   settings.sat.fModSupOffset = constrain(atof(newValue), 0.0f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATdhwsetpoint")) == 0)    settings.sat.fDhwSetpoint = constrain(atof(newValue), 0.0f, 60.0f);
   else if (strcasecmp_P(field, PSTR("SATdhwenabled")) == 0)     settings.sat.bDhwEnabled = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATpushsetpoint")) == 0)   settings.sat.bPushSetpoint = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATflameoffset")) == 0)    settings.sat.fFlameOffOffset = constrain(atof(newValue), 0.0f, 5.0f);
+  else if (strcasecmp_P(field, PSTR("SATwindowdetect")) == 0)  settings.sat.bWindowDetection = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATwindowminsec")) == 0)  settings.sat.iWindowMinOpenSec = constrain(atoi(newValue), 10, 600);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings ---
   else if (strcasecmp_P(field, PSTR("OTDmode")) == 0)           settings.otd.iMode = constrain(atoi(newValue), 0, 4);

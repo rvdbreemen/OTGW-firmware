@@ -541,6 +541,52 @@ void satHandlePreset(const char* value)
 }
 
 //=====================================================================
+//=== Window Detection Handler ===
+//=====================================================================
+void satHandleWindow(bool isOpen)
+{
+  if (!settings.sat.bWindowDetection) return;
+
+  if (isOpen && !state.sat.bWindowOpen) {
+    // Window just opened - start timer
+    state.sat.bWindowOpen = true;
+    state.sat.iWindowOpenSinceMs = millis();
+    DebugTln(F("SAT: window opened, starting timer"));
+  }
+  else if (!isOpen && state.sat.bWindowOpen) {
+    // Window closed - restore previous state
+    state.sat.bWindowOpen = false;
+    state.sat.iWindowOpenSinceMs = 0;
+    if (state.sat.fPreWindowTarget > 0.0f) {
+      settings.sat.fTargetTemp = state.sat.fPreWindowTarget;
+      state.sat.eActivePreset = (SATPreset)state.sat.iPreWindowPreset;
+      state.sat.fPreWindowTarget = 0.0f;
+      satResetIntegral();
+      DebugTf(PSTR("SAT: window closed, restored target %.1f\r\n"), settings.sat.fTargetTemp);
+    }
+  }
+}
+
+// Called from satControlLoop to apply window detection action after timer expires
+static void _satCheckWindowTimer()
+{
+  if (!state.sat.bWindowOpen || state.sat.fPreWindowTarget > 0.0f) return;  // not open or already switched
+  if (state.sat.iWindowOpenSinceMs == 0) return;
+
+  uint32_t openDuration = (millis() - state.sat.iWindowOpenSinceMs) / 1000;
+  if (openDuration >= settings.sat.iWindowMinOpenSec) {
+    // Timer expired - switch to Activity preset
+    state.sat.fPreWindowTarget = settings.sat.fTargetTemp;
+    state.sat.iPreWindowPreset = (uint8_t)state.sat.eActivePreset;
+    state.sat.eActivePreset = SAT_PRESET_ACTIVITY;
+    settings.sat.fTargetTemp = settings.sat.fPresetActivity;
+    satResetIntegral();
+    DebugTf(PSTR("SAT: window open > %us, switched to Activity (%.1f)\r\n"),
+            settings.sat.iWindowMinOpenSec, settings.sat.fPresetActivity);
+  }
+}
+
+//=====================================================================
 //=== Continuous Control Mode ===
 //=====================================================================
 static float satApplyContinuous(float pidOutput)
@@ -787,6 +833,10 @@ void satSendStatusJSON()
   sendJsonMapEntry(F("external_temp_valid"),  state.sat.bExternalTempValid);
   sendJsonMapEntry(F("external_outdoor_valid"), state.sat.bExternalOutdoorValid);
   sendJsonMapEntry(F("safety_tripped"),       state.sat.bSafetyTripped);
+  sendJsonMapEntry(F("window_open"),           state.sat.bWindowOpen);
+  sendJsonMapEntry(F("window_detection"),      settings.sat.bWindowDetection);
+  sendJsonMapEntry(F("push_setpoint"),         settings.sat.bPushSetpoint);
+  satSendJsonFloat(F("flame_off_offset"),      settings.sat.fFlameOffOffset, 1);
   sendEndJsonMap("");
 }
 
@@ -877,6 +927,9 @@ void satPublishMQTT()
 
   // Safety
   sendMQTTData(F("sat/safety_tripped"), state.sat.bSafetyTripped ? "true" : "false", false);
+
+  // Window detection
+  sendMQTTData(F("sat/window_open"), state.sat.bWindowOpen ? "true" : "false", false);
 }
 
 //=====================================================================
@@ -1014,6 +1067,9 @@ void satControlLoop()
     outsideTemp = 10.0f;  // Safe fallback
   }
 
+  // --- Window detection timer check ---
+  _satCheckWindowTimer();
+
   // --- Update boiler status ---
   satUpdateBoilerStatus();
 
@@ -1129,6 +1185,16 @@ void satControlLoop()
     state.sat.iCurrentModulation = mmValue;
   }
 
+  // --- Flame-off setpoint offset (anti-cycling hysteresis, Task #32) ---
+  if (settings.sat.fFlameOffOffset > 0.001f) {
+    bool flame = (OTcurrentSystemState.Statusflags & 0x08) != 0;
+    if (!flame) {
+      finalSetpoint += settings.sat.fFlameOffOffset;
+      if (finalSetpoint > maxSetpoint) finalSetpoint = maxSetpoint;
+      state.sat.fFinalSetpoint = finalSetpoint;
+    }
+  }
+
   // --- Send CS= and MM= commands to boiler when an OT command interface is available ---
   if (hasOTCommandInterface()) {
     char cmdBuf[16];
@@ -1137,6 +1203,11 @@ void satControlLoop()
     // Send MM= (max relative modulation) alongside CS=
     snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("MM=%u"), state.sat.iCurrentModulation);
     addCommandToQueue(cmdBuf, strlen(cmdBuf), false, 0);
+    // Push SAT target to thermostat display via TC= command (Task #31)
+    if (settings.sat.bPushSetpoint) {
+      snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("TC=%.1f"), settings.sat.fTargetTemp);
+      addCommandToQueue(cmdBuf, strlen(cmdBuf), false, 0);
+    }
     _sat_picFailCount = 0;
   } else {
     _sat_picFailCount++;

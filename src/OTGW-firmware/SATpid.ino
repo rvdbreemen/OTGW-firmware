@@ -38,6 +38,14 @@ static uint32_t _pid_lastUpdateMs     = 0;
 static uint32_t _pid_lastDerivativeMs = 0;
 static bool   _pid_initialized        = false;
 
+//=== Integral-only Reset (debug tool) ===
+void satResetIntegral()
+{
+  _pid_integral = 0.0f;
+  state.sat.fPidI = 0.0f;
+  DebugTln(F("SAT: PID integral reset"));
+}
+
 //=== PID Reset ===
 void satPidReset()
 {
