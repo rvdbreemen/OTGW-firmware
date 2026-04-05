@@ -710,6 +710,8 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
               updateSetting("SATsystem", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("max_modulation")) == 0) {
               updateSetting("SATmaxmodulation", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("interval")) == 0) {
+              updateSetting("SATinterval", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("preset")) == 0) {
               satHandlePreset(msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("ovp_start")) == 0) {

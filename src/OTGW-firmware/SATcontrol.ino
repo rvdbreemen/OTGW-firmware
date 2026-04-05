@@ -553,14 +553,51 @@ void satHandleEnabled(const char* value)
   DebugTf(PSTR("SAT: %s\r\n"), enabled ? "enabled" : "disabled");
 }
 
+//=== PID State Persistence (Tasks #6, #49) ===
+static const char* SAT_PID_STATE_FILE PROGMEM = "/sat_pid_state.json";
+static uint32_t _pidLastSaveMs = 0;
+
+void satSavePidState()
+{
+  File f = LittleFS.open(FPSTR(SAT_PID_STATE_FILE), "w");
+  if (!f) return;
+  char buf[128];
+  snprintf_P(buf, sizeof(buf), PSTR("{\"i\":%.4f,\"d\":%.4f,\"err\":%.2f}"),
+             state.sat.fPidI, state.sat.fPidD, state.sat.fError);
+  f.print(buf);
+  f.close();
+  _pidLastSaveMs = millis();
+}
+
+void satLoadPidState()
+{
+  File f = LittleFS.open(FPSTR(SAT_PID_STATE_FILE), "r");
+  if (!f) return;
+  char buf[128];
+  size_t len = f.readBytes(buf, sizeof(buf) - 1);
+  buf[len] = 0;
+  f.close();
+  // Simple parse: extract values from {"i":X,"d":Y,"err":Z}
+  float i = 0, d = 0, err = 0;
+  char* p;
+  if ((p = strstr(buf, "\"i\":")) != nullptr) i = atof(p + 4);
+  if ((p = strstr(buf, "\"d\":")) != nullptr) d = atof(p + 4);
+  if ((p = strstr(buf, "\"err\":")) != nullptr) err = atof(p + 6);
+  state.sat.fPidI = i;
+  state.sat.fPidD = d;
+  state.sat.fError = err;
+  DebugTf(PSTR("SAT: PID state restored (I=%.4f D=%.4f err=%.2f)\r\n"), i, d, err);
+}
+
 //=== Cleanly disable SAT and release boiler control ===
 void satDisable()
 {
   state.sat.eControlMode = SAT_MODE_OFF;
   state.sat.bActive = false;
   state.sat.fFinalSetpoint = 0.0f;
+  satSavePidState(); // Persist PID state before reset
   satPidReset();
-  // Send CS=0 to release control setpoint override — thermostat regains control
+  // Send CS=0 to release control setpoint override -- thermostat regains control
   addCommandToQueue("CS=0", 4, false, 0);
   DebugTln(F("SAT: disabled, sent CS=0 to release boiler control"));
 }
@@ -628,6 +665,7 @@ void satSendStatusJSON()
   sendJsonMapEntry(F("pwm_flame_req"),        state.sat.bPwmFlameRequested);
   sendJsonMapEntry(F("active_preset"),         (int32_t)state.sat.eActivePreset);
   sendJsonMapEntry(F("mod_suppressed"),        state.sat.bModSuppressed);
+  sendJsonMapEntry(F("control_interval_sec"),  (int32_t)settings.sat.iControlInterval);
   sendJsonMapEntry(F("fallback_active"),       state.sat.bFallbackActive);
   sendJsonMapEntry(F("fallback_reason"),       (int32_t)state.sat.eFallbackReason);
   sendJsonMapEntry(F("max_rel_modulation"),   (int32_t)settings.sat.iMaxRelModulation);
@@ -716,6 +754,7 @@ void satPublishMQTT()
 void initSAT()
 {
   satPidReset();
+  satLoadPidState(); // Restore PID state from LittleFS after reset
   satCycleInit();
   state.sat.bActive = false;
   state.sat.eControlMode = SAT_MODE_OFF;
@@ -972,6 +1011,11 @@ void satControlLoop()
   }
 
   state.sat.iLastControlMs = millis();
+
+  // Periodically save PID state to LittleFS (every 5 min)
+  if ((millis() - _pidLastSaveMs) >= 300000UL) {
+    satSavePidState();
+  }
 
   DebugTf(PSTR("SAT: room=%.1f target=%.1f outside=%.1f curve=%.1f pid=%.1f final=%.1f mode=%d\r\n"),
           roomTemp, targetTemp, outsideTemp, curveValue, pidOutput, finalSetpoint,
