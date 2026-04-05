@@ -1,9 +1,11 @@
 ---
 id: TASK-33
 title: Modulation reliability tracker
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-05 20:51'
+updated_date: '2026-04-05 23:25'
 labels:
   - sat
   - feature
@@ -21,8 +23,14 @@ Reference: other-projects/SAT-releases-thermo-nova/custom_components/sat/device/
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Track modulation value changes over time
-- [ ] #2 Detect stuck or unreliable modulation reporting
-- [ ] #3 Flag unreliable modulation state for control loop
-- [ ] #4 MQTT publish: modulation_reliable boolean
+- [x] #1 Track modulation value changes over time
+- [x] #2 Detect stuck or unreliable modulation reporting
+- [x] #3 Flag unreliable modulation state for control loop
+- [x] #4 MQTT publish: modulation_reliable boolean
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Modulation reliability tracker.\n\nChanges:\n- 10-minute observation window counting modulation value changes\n- Needs >= 3 changes per window to be "reliable"\n- Flags unreliable modulation for control loop decisions\n- MQTT: sat/modulation_reliable, REST: modulation_reliable\n\nFiles: OTGW-firmware.h, SATcontrol.ino
+<!-- SECTION:FINAL_SUMMARY:END -->

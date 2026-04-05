@@ -395,6 +395,12 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float    fPressureDropRate      = 0.0f; // bar/hour
   bool     bPressureAlarm         = false;
   uint32_t iPressureAlarmSinceMs  = 0;
+  // Modulation reliability
+  bool     bModulationReliable    = true;
+  uint8_t  iModChangeCount        = 0;   // changes observed in window
+  // OT setpoint sync
+  bool     bSetpointMismatch      = false;
+  uint32_t iMismatchSinceMs       = 0;
 };
 
 struct OTGWState {

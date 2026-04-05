@@ -843,6 +843,8 @@ void satSendStatusJSON()
   satSendJsonFloat(F("pressure"),              state.sat.fSmoothedPressure, 2);
   satSendJsonFloat(F("pressure_drop_rate"),    state.sat.fPressureDropRate, 3);
   sendJsonMapEntry(F("pressure_alarm"),        state.sat.bPressureAlarm);
+  sendJsonMapEntry(F("modulation_reliable"),   state.sat.bModulationReliable);
+  sendJsonMapEntry(F("setpoint_mismatch"),     state.sat.bSetpointMismatch);
   sendEndJsonMap("");
 }
 
@@ -945,6 +947,10 @@ void satPublishMQTT()
     sendMQTTData(F("sat/pressure_drop_rate"), pBuf, false);
     sendMQTTData(F("sat/pressure_alarm"), state.sat.bPressureAlarm ? "true" : "false", false);
   }
+
+  // Modulation reliability + setpoint sync
+  sendMQTTData(F("sat/modulation_reliable"), state.sat.bModulationReliable ? "true" : "false", false);
+  sendMQTTData(F("sat/setpoint_mismatch"), state.sat.bSetpointMismatch ? "true" : "false", false);
 }
 
 //=====================================================================
@@ -999,6 +1005,68 @@ static void satUpdatePressure()
   } else {
     state.sat.iPressureAlarmSinceMs = 0;
     state.sat.bPressureAlarm = false;
+  }
+}
+
+//=====================================================================
+//=== Modulation Reliability Tracker (Task #33) ===
+//=====================================================================
+static float    _mod_prevValue     = -1.0f;
+static uint32_t _mod_windowStartMs = 0;
+static const uint32_t MOD_WINDOW_MS = 600000UL;  // 10 min observation window
+static const uint8_t  MOD_MIN_CHANGES = 3;        // need at least 3 changes to be "reliable"
+
+static void satUpdateModulationReliability()
+{
+  float mod = OTcurrentSystemState.RelModLevel;
+  uint32_t now = millis();
+
+  if (_mod_windowStartMs == 0) {
+    _mod_windowStartMs = now;
+    _mod_prevValue = mod;
+    return;
+  }
+
+  // Count value changes (more than 1% difference)
+  if (fabsf(mod - _mod_prevValue) > 1.0f) {
+    if (state.sat.iModChangeCount < 255) state.sat.iModChangeCount++;
+    _mod_prevValue = mod;
+  }
+
+  // Check at end of window
+  if ((now - _mod_windowStartMs) >= MOD_WINDOW_MS) {
+    state.sat.bModulationReliable = (state.sat.iModChangeCount >= MOD_MIN_CHANGES);
+    state.sat.iModChangeCount = 0;
+    _mod_windowStartMs = now;
+  }
+}
+
+//=====================================================================
+//=== OT Setpoint Sync Sensor (Task #40) ===
+//=====================================================================
+static void satCheckSetpointSync()
+{
+  // Compare what we sent (fFinalSetpoint) vs what boiler reports (Tset)
+  float sent = state.sat.fFinalSetpoint;
+  float reported = OTcurrentSystemState.TSet;
+  uint32_t now = millis();
+
+  if (sent < 1.0f) return;  // Not controlling
+
+  // Mismatch if difference > 1.0C (allow rounding)
+  bool mismatch = (fabsf(sent - reported) > 1.0f);
+
+  if (mismatch) {
+    if (state.sat.iMismatchSinceMs == 0) {
+      state.sat.iMismatchSinceMs = now;
+    }
+    // Confirm after 60s delay
+    if ((now - state.sat.iMismatchSinceMs) >= 60000UL) {
+      state.sat.bSetpointMismatch = true;
+    }
+  } else {
+    state.sat.iMismatchSinceMs = 0;
+    state.sat.bSetpointMismatch = false;
   }
 }
 
@@ -1142,6 +1210,12 @@ void satControlLoop()
 
   // --- Pressure monitoring ---
   satUpdatePressure();
+
+  // --- Modulation reliability ---
+  satUpdateModulationReliability();
+
+  // --- OT setpoint sync ---
+  satCheckSetpointSync();
 
   // --- Update boiler status ---
   satUpdateBoilerStatus();
