@@ -708,6 +708,8 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
               updateSetting("SATovershootmargin", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("heating_system")) == 0) {
               updateSetting("SATsystem", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("max_modulation")) == 0) {
+              updateSetting("SATmaxmodulation", msgPayload);
             } else {
               MQTTDebugTf(PSTR("SAT: unknown sub-command [%s]\r\n"), satSubCmd);
             }

@@ -343,6 +343,8 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // PWM state
   float fPwmDutyCycle            = 0.0f;
   bool  bPwmFlameRequested       = false;
+  // Modulation control
+  uint8_t iCurrentModulation     = 100;   // Last MM= value sent to boiler (0-100)
   // External inputs (MQTT/REST overrides)
   float fExternalTemp            = 0.0f;
   float fExternalOutdoor         = 0.0f;
@@ -560,6 +562,7 @@ struct SATSection {
   float    fPresetEco         = 18.0f;  // Preset: Eco
   float    fPresetAway        = 15.0f;  // Preset: Away
   bool     bPwmAutoSwitch     = true;   // Auto-switch between PWM and continuous mode
+  uint8_t  iMaxRelModulation  = 100;    // Max relative modulation 0-100% (MM= command)
   float    fOvershootMargin   = 2.0f;   // Overshoot margin °C (cycle classification + auto-switch)
 };
 

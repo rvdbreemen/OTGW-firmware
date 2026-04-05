@@ -1312,6 +1312,7 @@ void sendDeviceSettings()
     sendJsonSettingObj(F("satpresetaway"), tmpBuf, "f", 5, 18);
   }
   sendJsonSettingObj(F("satpwmautoswitch"), settings.sat.bPwmAutoSwitch, "b");
+  sendJsonSettingObj(F("satmaxmodulation"), settings.sat.iMaxRelModulation, "i", 0, 100);
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fOvershootMargin, 1, 1, tmpBuf);

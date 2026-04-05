@@ -139,6 +139,10 @@ var SAT = (function() {
     setText('sat-pwm-duty', d.pwm_duty !== undefined ? (d.pwm_duty * 100).toFixed(0) + '%' : '--');
     setText('sat-pwm-flame', d.pwm_flame_req ? 'Requesting' : 'Off');
 
+    // Modulation
+    setText('sat-modulation', d.current_modulation !== undefined ? d.current_modulation + '%' : '--');
+    setText('sat-max-modulation', d.max_rel_modulation !== undefined ? d.max_rel_modulation + '%' : '--');
+
     // Cycle info
     setText('sat-cycle-count', d.cycle_count !== undefined ? d.cycle_count : '--');
     setText('sat-last-cycle', CYCLE_LABELS[d.last_cycle_class] || '--');

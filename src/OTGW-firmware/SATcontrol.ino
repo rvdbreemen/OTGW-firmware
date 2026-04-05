@@ -450,6 +450,8 @@ void satSendStatusJSON()
   satSendJsonFloat(F("cycle_overshoot_sec"),  state.sat.fCycleOvershootSec, 0);
   satSendJsonFloat(F("pwm_duty"),             state.sat.fPwmDutyCycle, 2);
   sendJsonMapEntry(F("pwm_flame_req"),        state.sat.bPwmFlameRequested);
+  sendJsonMapEntry(F("max_rel_modulation"),   (int32_t)settings.sat.iMaxRelModulation);
+  sendJsonMapEntry(F("current_modulation"),   (int32_t)state.sat.iCurrentModulation);
   sendJsonMapEntry(F("heating_system"),       (int32_t)settings.sat.iHeatingSystem);
   sendJsonMapEntry(F("heating_system_detected"), (int32_t)state.sat.iDetectedHeatingSystem);
   satSendJsonFloat(F("max_setpoint_system"), satGetMaxSetpoint(), 1);
@@ -660,10 +662,29 @@ void satControlLoop()
   // --- Check auto-switch ---
   satCycleCheckAutoSwitch();
 
-  // --- Send CS= command to boiler when an OT command interface is available ---
+  // --- Compute modulation value based on mode and heating system ---
+  {
+    uint8_t mmValue;
+    if (satAlwaysMaxModulation()) {
+      // Heat pumps: always MM=100, let heat pump manage internal modulation
+      mmValue = 100;
+    } else if (state.sat.eControlMode == SAT_MODE_PWM && !state.sat.bPwmFlameRequested) {
+      // PWM OFF phase (gas boilers): suppress modulation
+      mmValue = 0;
+    } else {
+      // PWM ON or Continuous mode: use configured max
+      mmValue = settings.sat.iMaxRelModulation;
+    }
+    state.sat.iCurrentModulation = mmValue;
+  }
+
+  // --- Send CS= and MM= commands to boiler when an OT command interface is available ---
   if (hasOTCommandInterface()) {
     char cmdBuf[16];
     snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("CS=%.1f"), finalSetpoint);
+    addCommandToQueue(cmdBuf, strlen(cmdBuf), false, 0);
+    // Send MM= (max relative modulation) alongside CS=
+    snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("MM=%u"), state.sat.iCurrentModulation);
     addCommandToQueue(cmdBuf, strlen(cmdBuf), false, 0);
     _sat_picFailCount = 0;
   } else {
