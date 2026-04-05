@@ -4,17 +4,19 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 “devkit” that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-## 🚀 What's New in v1.3.4
+## 🚀 What's New in v1.3.5
 
-Version 1.3.4 fixes MQTT throttle slot suppression, adds Debug Info tooltips, renames "OTGW Connected" to "OpenTherm Active", and adds thermostat-only MQTT support. Full release notes: [RELEASE_NOTES_1.3.4.md](RELEASE_NOTES_1.3.4.md)
+Version 1.3.5 fixes the WiFi reconnection regression reported since v1.3.0 and adds MQTT uptime/version publishing. Full release notes: [RELEASE_NOTES_1.3.5.md](RELEASE_NOTES_1.3.5.md)
 
 ### Highlights
 
-- **MQTT throttle slot fix:** Stable values like Room Temperature could become permanently suppressed after a transient publish failure. Now only updated after successful publish.
-- **Debug Information page tooltips:** Tooltips now visible on hover for device info labels.
-- **Renamed "OTGW Connected" to "OpenTherm Active":** Clearer label with updated tooltip.
-- **Thermostat-only MQTT support:** OTGW stays online via MQTT when only a thermostat is connected (boiler not required).
-- **No breaking changes** vs v1.3.3.
+- **WiFi reconnection fix (#530):** The WiFi state machine timeout (5s) was too short for ESP8266, causing devices to go offline periodically. Timeout increased to 30s, matching v1.2.0 behavior.
+- **MQTT uptime and version publishing:** Firmware now publishes uptime and version info to MQTT on connect for better device visibility.
+- **No breaking changes** vs v1.3.4.
+
+## What was new in v1.3.4
+
+Version 1.3.4 fixes MQTT throttle slot suppression, adds Debug Info tooltips, renames "OTGW Connected" to "OpenTherm Active", and adds thermostat-only MQTT support. Full release notes: [RELEASE_NOTES_1.3.4.md](RELEASE_NOTES_1.3.4.md)
 
 ## What was new in v1.3.3
 
