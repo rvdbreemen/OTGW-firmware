@@ -307,6 +307,10 @@ enum SATHeatingSystem : uint8_t {
   SAT_HSYS_UNDERFLOOR = 3   // Underfloor heating
 };
 enum SATControlMode : uint8_t { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS, SAT_MODE_PWM };
+enum SATCalibPhase  : uint8_t {
+  SAT_CALIB_IDLE = 0, SAT_CALIB_STARTING, SAT_CALIB_WARMING,
+  SAT_CALIB_MEASURING, SAT_CALIB_COOLDOWN, SAT_CALIB_DONE, SAT_CALIB_FAILED
+};
 enum SATCycleClass  : uint8_t {
   SAT_CYCLE_NONE = 0, SAT_CYCLE_GOOD, SAT_CYCLE_OVERSHOOT,
   SAT_CYCLE_UNDERHEAT, SAT_CYCLE_SHORT, SAT_CYCLE_UNCERTAIN
@@ -345,6 +349,12 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   bool  bPwmFlameRequested       = false;
   // Modulation control
   uint8_t iCurrentModulation     = 100;   // Last MM= value sent to boiler (0-100)
+  // OPV calibration state
+  SATCalibPhase eCalibPhase      = SAT_CALIB_IDLE;
+  float    fCalibMaxTemp         = 0.0f;  // Maximum boiler temp observed during calibration
+  float    fCalibStartTemp       = 0.0f;  // Boiler temp at calibration start
+  uint32_t iCalibStartMs         = 0;     // millis() when calibration started
+  uint16_t iCalibSamples         = 0;     // Number of temperature samples taken
   // External inputs (MQTT/REST overrides)
   float fExternalTemp            = 0.0f;
   float fExternalOutdoor         = 0.0f;
@@ -563,6 +573,8 @@ struct SATSection {
   float    fPresetAway        = 15.0f;  // Preset: Away
   bool     bPwmAutoSwitch     = true;   // Auto-switch between PWM and continuous mode
   uint8_t  iMaxRelModulation  = 100;    // Max relative modulation 0-100% (MM= command)
+  float    fOvpValue          = 0.0f;   // Overshoot Protection Value (0=not calibrated)
+  bool     bOvpEnabled        = false;  // Use OPV for auto PWM switching
   float    fOvershootMargin   = 2.0f;   // Overshoot margin °C (cycle classification + auto-switch)
 };
 

@@ -710,6 +710,14 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
               updateSetting("SATsystem", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("max_modulation")) == 0) {
               updateSetting("SATmaxmodulation", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("ovp_start")) == 0) {
+              satOvpStartCalibration();
+            } else if (strcasecmp_P(satSubCmd, PSTR("ovp_stop")) == 0) {
+              satOvpStopCalibration();
+            } else if (strcasecmp_P(satSubCmd, PSTR("ovp_value")) == 0) {
+              updateSetting("SATovpvalue", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("ovp_enabled")) == 0) {
+              updateSetting("SATovpenabled", msgPayload);
             } else {
               MQTTDebugTf(PSTR("SAT: unknown sub-command [%s]\r\n"), satSubCmd);
             }

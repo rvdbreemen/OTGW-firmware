@@ -108,6 +108,105 @@ static uint8_t _sat_consecutiveSkips  = 0;
 static uint8_t _sat_picFailCount      = 0;
 static bool    _sat_bootCS0sent       = false;  // One-shot: ensure CS=0 is sent once PIC is available
 
+// --- OPV Calibration Constants ---
+static const uint32_t SAT_CALIB_TIMEOUT_MS    = 1800000UL; // 30 min total timeout
+static const uint32_t SAT_CALIB_FLAME_WAIT_MS = 180000UL;  // 3 min wait for flame
+static const uint32_t SAT_CALIB_MEASURE_MS    = 1200000UL; // 20 min measuring phase
+static const uint32_t SAT_CALIB_SAMPLE_MS     = 10000UL;   // Sample every 10s
+static const float    SAT_CALIB_WARM_DELTA    = 5.0f;      // Temp must rise 5C above start
+
+// OPV calibration state machine - called from control loop when calibration is active
+static void satOvpCalibrate()
+{
+  float boilerTemp = OTcurrentSystemState.Tboiler;
+  bool  flameOn    = (OTcurrentSystemState.MasterStatus & 0x08) != 0;
+  uint32_t elapsed = millis() - state.sat.iCalibStartMs;
+
+  switch (state.sat.eCalibPhase) {
+    case SAT_CALIB_STARTING: {
+      // Send high setpoint + MM=0 to find minimum boiler output
+      float calibSetpoint = satGetMaxSetpoint();
+      char cmdBuf[16];
+      snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("CS=%.1f"), calibSetpoint);
+      addCommandToQueue(cmdBuf, strlen(cmdBuf), false, 0);
+      addCommandToQueue("MM=0", 4, false, 0);
+      state.sat.fCalibStartTemp = boilerTemp;
+      state.sat.fCalibMaxTemp   = boilerTemp;
+      state.sat.iCalibSamples   = 0;
+      DebugTf(PSTR("OPV: calibration started, CS=%.1f MM=0, boiler=%.1f\r\n"), calibSetpoint, boilerTemp);
+      state.sat.eCalibPhase = SAT_CALIB_WARMING;
+      break;
+    }
+    case SAT_CALIB_WARMING: {
+      // Wait for flame and temp to rise
+      if (!flameOn && elapsed > SAT_CALIB_FLAME_WAIT_MS) {
+        DebugTln(F("OPV: FAILED - no flame after 3 min"));
+        state.sat.eCalibPhase = SAT_CALIB_FAILED;
+        break;
+      }
+      if (boilerTemp > state.sat.fCalibStartTemp + SAT_CALIB_WARM_DELTA) {
+        DebugTf(PSTR("OPV: warming done, boiler=%.1f, starting measurement\r\n"), boilerTemp);
+        state.sat.fCalibMaxTemp = boilerTemp;
+        state.sat.iCalibStartMs = millis(); // Reset timer for measuring phase
+        state.sat.eCalibPhase = SAT_CALIB_MEASURING;
+      }
+      if (elapsed > SAT_CALIB_TIMEOUT_MS) {
+        DebugTln(F("OPV: FAILED - timeout during warming"));
+        state.sat.eCalibPhase = SAT_CALIB_FAILED;
+      }
+      break;
+    }
+    case SAT_CALIB_MEASURING: {
+      // Sample boiler temp, track maximum
+      state.sat.iCalibSamples++;
+      if (boilerTemp > state.sat.fCalibMaxTemp) {
+        state.sat.fCalibMaxTemp = boilerTemp;
+      }
+      // Keep sending MM=0 to maintain minimum modulation
+      addCommandToQueue("MM=0", 4, false, 0);
+      elapsed = millis() - state.sat.iCalibStartMs;
+      if (elapsed >= SAT_CALIB_MEASURE_MS) {
+        // Measurement complete
+        settings.sat.fOvpValue = state.sat.fCalibMaxTemp;
+        settings.sat.bOvpEnabled = true;
+        DebugTf(PSTR("OPV: calibration DONE! OPV=%.1f from %u samples\r\n"),
+                state.sat.fCalibMaxTemp, state.sat.iCalibSamples);
+        state.sat.eCalibPhase = SAT_CALIB_DONE;
+      }
+      break;
+    }
+    case SAT_CALIB_DONE:
+    case SAT_CALIB_FAILED: {
+      // Recovery: send CS=0 and MM=100 to return to normal
+      addCommandToQueue("CS=0", 4, false, 0);
+      char cmdBuf[8];
+      snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("MM=%u"), settings.sat.iMaxRelModulation);
+      addCommandToQueue(cmdBuf, strlen(cmdBuf), false, 0);
+      state.sat.eCalibPhase = SAT_CALIB_IDLE;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+// Start OPV calibration
+static void satOvpStartCalibration()
+{
+  if (state.sat.eCalibPhase != SAT_CALIB_IDLE) return; // Already running
+  state.sat.eCalibPhase  = SAT_CALIB_STARTING;
+  state.sat.iCalibStartMs = millis();
+  DebugTln(F("OPV: calibration requested"));
+}
+
+// Cancel OPV calibration
+static void satOvpStopCalibration()
+{
+  if (state.sat.eCalibPhase == SAT_CALIB_IDLE) return;
+  DebugTln(F("OPV: calibration cancelled"));
+  state.sat.eCalibPhase = SAT_CALIB_FAILED; // Will trigger recovery on next call
+}
+
 // --- Boiler Status Tracking ---
 static bool     _bs_prevFlame       = false;
 static float    _bs_prevModulation  = 0.0f;
@@ -452,6 +551,11 @@ void satSendStatusJSON()
   sendJsonMapEntry(F("pwm_flame_req"),        state.sat.bPwmFlameRequested);
   sendJsonMapEntry(F("max_rel_modulation"),   (int32_t)settings.sat.iMaxRelModulation);
   sendJsonMapEntry(F("current_modulation"),   (int32_t)state.sat.iCurrentModulation);
+  satSendJsonFloat(F("ovp_value"),            settings.sat.fOvpValue, 1);
+  sendJsonMapEntry(F("ovp_enabled"),          settings.sat.bOvpEnabled);
+  sendJsonMapEntry(F("ovp_calib_phase"),      (int32_t)state.sat.eCalibPhase);
+  satSendJsonFloat(F("ovp_calib_max_temp"),   state.sat.fCalibMaxTemp, 1);
+  sendJsonMapEntry(F("ovp_calib_samples"),    (int32_t)state.sat.iCalibSamples);
   sendJsonMapEntry(F("heating_system"),       (int32_t)settings.sat.iHeatingSystem);
   sendJsonMapEntry(F("heating_system_detected"), (int32_t)state.sat.iDetectedHeatingSystem);
   satSendJsonFloat(F("max_setpoint_system"), satGetMaxSetpoint(), 1);

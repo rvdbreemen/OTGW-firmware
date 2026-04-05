@@ -143,6 +143,12 @@ var SAT = (function() {
     setText('sat-modulation', d.current_modulation !== undefined ? d.current_modulation + '%' : '--');
     setText('sat-max-modulation', d.max_rel_modulation !== undefined ? d.max_rel_modulation + '%' : '--');
 
+    // OPV
+    var ovpVal = d.ovp_value !== undefined && d.ovp_value > 0 ? d.ovp_value.toFixed(1) + '\u00B0C' : 'Not calibrated';
+    setText('sat-ovp-value', ovpVal);
+    var calibPhases = ['Idle', 'Starting', 'Warming', 'Measuring', 'Cooldown', 'Done', 'Failed'];
+    setText('sat-ovp-phase', d.ovp_calib_phase !== undefined ? (calibPhases[d.ovp_calib_phase] || '--') : '--');
+
     // Cycle info
     setText('sat-cycle-count', d.cycle_count !== undefined ? d.cycle_count : '--');
     setText('sat-last-cycle', CYCLE_LABELS[d.last_cycle_class] || '--');

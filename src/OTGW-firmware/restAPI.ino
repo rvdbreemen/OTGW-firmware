@@ -1315,6 +1315,12 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("satmaxmodulation"), settings.sat.iMaxRelModulation, "i", 0, 100);
   {
     char tmpBuf[8];
+    dtostrf(settings.sat.fOvpValue, 1, 1, tmpBuf);
+    sendJsonSettingObj(F("satovpvalue"), tmpBuf, "f", 0, 90);
+  }
+  sendJsonSettingObj(F("satovpenabled"), settings.sat.bOvpEnabled, "b");
+  {
+    char tmpBuf[8];
     dtostrf(settings.sat.fOvershootMargin, 1, 1, tmpBuf);
     sendJsonSettingObj(F("satovershootmargin"), tmpBuf, "f", 0, 5);
   }
