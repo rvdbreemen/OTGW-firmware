@@ -845,6 +845,11 @@ void satSendStatusJSON()
   sendJsonMapEntry(F("pressure_alarm"),        state.sat.bPressureAlarm);
   sendJsonMapEntry(F("modulation_reliable"),   state.sat.bModulationReliable);
   sendJsonMapEntry(F("setpoint_mismatch"),     state.sat.bSetpointMismatch);
+  { static const char* const crNames[] = { "insufficient", "increase", "decrease", "hold" };
+    int crIdx = (int)state.sat.eCurveRecommendation;
+    if (crIdx < 0 || crIdx > 3) crIdx = 0;
+    sendJsonMapEntry(F("curve_recommendation"), crNames[crIdx]); }
+  satSendJsonFloat(F("mean_error"),            state.sat.fMeanError, 2);
   sendEndJsonMap("");
 }
 
@@ -951,6 +956,13 @@ void satPublishMQTT()
   // Modulation reliability + setpoint sync
   sendMQTTData(F("sat/modulation_reliable"), state.sat.bModulationReliable ? "true" : "false", false);
   sendMQTTData(F("sat/setpoint_mismatch"), state.sat.bSetpointMismatch ? "true" : "false", false);
+
+  // Heating curve recommendation
+  { static const char* const crNames[] = { "insufficient", "increase", "decrease", "hold" };
+    int crIdx = (int)state.sat.eCurveRecommendation;
+    if (crIdx < 0 || crIdx > 3) crIdx = 0;
+    sendMQTTData(F("sat/curve_recommendation"), crNames[crIdx], false);
+  }
 }
 
 //=====================================================================
@@ -1005,6 +1017,58 @@ static void satUpdatePressure()
   } else {
     state.sat.iPressureAlarmSinceMs = 0;
     state.sat.bPressureAlarm = false;
+  }
+}
+
+//=====================================================================
+//=== Heating Curve Recommendation (Task #11) ===
+//=====================================================================
+static const uint8_t  CR_BUFFER_SIZE = 24;
+static float    _cr_errorBuffer[CR_BUFFER_SIZE];
+static uint8_t  _cr_bufferCount  = 0;
+static uint8_t  _cr_bufferIdx    = 0;
+static uint32_t _cr_lastSampleMs = 0;
+static const uint32_t CR_SAMPLE_INTERVAL_MS = 3600000UL;  // 1 sample per hour
+
+static void satUpdateCurveRecommendation()
+{
+  uint32_t now = millis();
+
+  // Sample every hour
+  if (_cr_lastSampleMs != 0 && (now - _cr_lastSampleMs) < CR_SAMPLE_INTERVAL_MS) return;
+  _cr_lastSampleMs = now;
+
+  // Only sample when actively controlling
+  if (!state.sat.bActive) return;
+
+  // Store error sample in ring buffer
+  _cr_errorBuffer[_cr_bufferIdx] = state.sat.fError;
+  _cr_bufferIdx = (_cr_bufferIdx + 1) % CR_BUFFER_SIZE;
+  if (_cr_bufferCount < CR_BUFFER_SIZE) _cr_bufferCount++;
+
+  // Need at least 6 samples
+  if (_cr_bufferCount < 6) {
+    state.sat.eCurveRecommendation = SAT_CR_INSUFFICIENT;
+    state.sat.fMeanError = 0.0f;
+    return;
+  }
+
+  // Calculate mean error
+  float sum = 0.0f;
+  for (uint8_t i = 0; i < _cr_bufferCount; i++) {
+    sum += _cr_errorBuffer[i];
+  }
+  float mean = sum / (float)_cr_bufferCount;
+  state.sat.fMeanError = mean;
+
+  // Compare with 2*deadband threshold
+  float threshold = settings.sat.fDeadband * 2.0f;
+  if (mean > threshold) {
+    state.sat.eCurveRecommendation = SAT_CR_INCREASE;  // Room too cold
+  } else if (mean < -threshold) {
+    state.sat.eCurveRecommendation = SAT_CR_DECREASE;  // Room too warm
+  } else {
+    state.sat.eCurveRecommendation = SAT_CR_HOLD;
   }
 }
 
@@ -1210,6 +1274,9 @@ void satControlLoop()
 
   // --- Pressure monitoring ---
   satUpdatePressure();
+
+  // --- Heating curve recommendation ---
+  satUpdateCurveRecommendation();
 
   // --- Modulation reliability ---
   satUpdateModulationReliability();

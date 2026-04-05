@@ -323,6 +323,9 @@ enum SATCycleClass  : uint8_t {
   SAT_CYCLE_NONE = 0, SAT_CYCLE_GOOD, SAT_CYCLE_OVERSHOOT,
   SAT_CYCLE_UNDERHEAT, SAT_CYCLE_SHORT, SAT_CYCLE_UNCERTAIN
 };
+enum SATCurveRecommendation : uint8_t {
+  SAT_CR_INSUFFICIENT = 0, SAT_CR_INCREASE, SAT_CR_DECREASE, SAT_CR_HOLD
+};
 enum SATBoilerStatus : uint8_t {
   SAT_BS_OFF = 0, SAT_BS_IDLE, SAT_BS_PREHEATING, SAT_BS_AT_SETPOINT,
   SAT_BS_MODULATING_UP, SAT_BS_MODULATING_DOWN, SAT_BS_IGNITION_SURGE,
@@ -398,6 +401,9 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // Modulation reliability
   bool     bModulationReliable    = true;
   uint8_t  iModChangeCount        = 0;   // changes observed in window
+  // Heating curve recommendation
+  SATCurveRecommendation eCurveRecommendation = SAT_CR_INSUFFICIENT;
+  float    fMeanError             = 0.0f;
   // OT setpoint sync
   bool     bSetpointMismatch      = false;
   uint32_t iMismatchSinceMs       = 0;
