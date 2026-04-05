@@ -1,7 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "mcp__discord__*",
       "Bash(*)"
     ]
   }
