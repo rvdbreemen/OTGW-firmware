@@ -308,6 +308,10 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATmaxpressure"), settings.sat.fMaxPressure, true);
   writeJsonFloatKV(file, F("SATmaxpressdrop"), settings.sat.fMaxPressureDrop, true);
   writeJsonIntKV(file, F("SATmanufacturer"), settings.sat.iManufacturer, true);
+  writeJsonBoolKV(file, F("SATweatherenable"), settings.sat.bWeatherEnable, true);
+  writeJsonFloatKV(file, F("SATweatherlat"), settings.sat.fWeatherLat, true);
+  writeJsonFloatKV(file, F("SATweatherlon"), settings.sat.fWeatherLon, true);
+  writeJsonIntKV(file, F("SATweatherinterval"), settings.sat.iWeatherInterval, true);
   writeJsonBoolKV(file, F("SATsimulation"), settings.sat.bSimulation, true);
   writeJsonFloatKV(file, F("SATsimheatrate"), settings.sat.fSimHeatRate, true);
   writeJsonFloatKV(file, F("SATsimcoolrate"), settings.sat.fSimCoolRate, true);
@@ -749,6 +753,13 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATmaxpressure")) == 0)  settings.sat.fMaxPressure = constrain(atof(newValue), 1.0f, 4.0f);
   else if (strcasecmp_P(field, PSTR("SATmaxpressdrop")) == 0) settings.sat.fMaxPressureDrop = constrain(atof(newValue), 0.05f, 2.0f);
   else if (strcasecmp_P(field, PSTR("SATmanufacturer")) == 0) settings.sat.iManufacturer = constrain(atoi(newValue), 0, SAT_MFR_COUNT - 1);
+  else if (strcasecmp_P(field, PSTR("SATweatherenable")) == 0) settings.sat.bWeatherEnable = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATweatherlat")) == 0)    settings.sat.fWeatherLat = constrain(atof(newValue), -90.0f, 90.0f);
+  else if (strcasecmp_P(field, PSTR("SATweatherlon")) == 0)    settings.sat.fWeatherLon = constrain(atof(newValue), -180.0f, 180.0f);
+  else if (strcasecmp_P(field, PSTR("SATweatherinterval")) == 0) {
+    settings.sat.iWeatherInterval = constrain(atoi(newValue), 300, 3600);
+    CHANGE_INTERVAL_SEC(timerWeatherPoll, settings.sat.iWeatherInterval);
+  }
   else if (strcasecmp_P(field, PSTR("SATsimulation")) == 0) {
     settings.sat.bSimulation = EVALBOOLEAN(newValue);
     if (settings.sat.bSimulation) {

@@ -362,6 +362,22 @@
           <div class="sat-feedback" id="sat-feedback"></div>
         </div>
 
+        <!-- Weather -->
+        <div class="sat-section" id="sat-weather-section" style="display:none">
+          <h3>Weather (Open-Meteo)</h3>
+          <div class="sat-grid">
+            <div class="sat-row"><span class="sat-label">Outdoor Temp</span><span class="sat-value" id="sat-weather-temp">--</span></div>
+            <div class="sat-row"><span class="sat-label">Humidity</span><span class="sat-value" id="sat-weather-humidity">--</span></div>
+            <div class="sat-row"><span class="sat-label">Wind Speed</span><span class="sat-value" id="sat-weather-wind">--</span></div>
+            <div class="sat-row"><span class="sat-label">Last Update</span><span class="sat-value" id="sat-weather-updated">--</span></div>
+            <div class="sat-row"><span class="sat-label">Fetch Errors</span><span class="sat-value" id="sat-weather-errors">0</span></div>
+          </div>
+          <div class="sat-controls-row" style="margin-top:8px">
+            <button class="sat-btn" id="sat-btn-detect-location" onclick="SAT.detectLocation()">Detect Location</button>
+            <span id="sat-weather-coords" style="font-size:0.85em;color:#888"></span>
+          </div>
+        </div>
+
         <!-- Chart -->
         <div class="sat-section">
           <h3>Temperature History</h3>

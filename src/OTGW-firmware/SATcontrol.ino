@@ -739,6 +739,10 @@ static float satGetOutsideTemp()
       return state.sat.fExternalOutdoor;
     }
   }
+  // Weather API fallback: use fetched outdoor temp when OT bus has no sensor
+  if (state.sat.weather.bValid && OTcurrentSystemState.Toutside == 0.0f) {
+    return state.sat.weather.fTemperature;
+  }
   return OTcurrentSystemState.Toutside;  // OT message ID 27
 }
 
@@ -1113,6 +1117,9 @@ void satPublishMQTT()
 
   // Simulation (Task #37)
   sendMQTTData(F("sat/simulation"), settings.sat.bSimulation ? "ON" : "OFF", true);
+
+  // Weather data (Task #50)
+  weatherPublishMQTT();
 }
 
 //=====================================================================

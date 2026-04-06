@@ -661,6 +661,11 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     satHandleControlMode(val);
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
+  else if (strcasecmp_P(sub, PSTR("weather")) == 0) {
+    if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+    httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+    weatherSendStatusJSON();
+  }
   else {
     sendApiNotFound(originalURI);
   }
@@ -1395,6 +1400,16 @@ void sendDeviceSettings()
     dtostrf(settings.sat.fOvershootMargin, 1, 1, tmpBuf);
     sendJsonSettingObj(F("satovershootmargin"), tmpBuf, "f", 0, 5);
   }
+  // --- SAT Weather settings (Task #50) ---
+  sendJsonSettingObj(F("satweatherenable"), settings.sat.bWeatherEnable, "b");
+  {
+    char tmpBuf[12];
+    dtostrf(settings.sat.fWeatherLat, 1, 4, tmpBuf);
+    sendJsonSettingObj(F("satweatherlat"), tmpBuf, "f", -90, 90);
+    dtostrf(settings.sat.fWeatherLon, 1, 4, tmpBuf);
+    sendJsonSettingObj(F("satweatherlon"), tmpBuf, "f", -180, 180);
+  }
+  sendJsonSettingObj(F("satweatherinterval"), settings.sat.iWeatherInterval, "i", 300, 3600);
   // --- SAT Simulation settings (Task #37) ---
   sendJsonSettingObj(F("satsimulation"), settings.sat.bSimulation, "b");
   {
@@ -1460,6 +1475,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satcoefficient", "satdeadband", "satenabled", "satexternaltemp",
   "satinterval", "satmanufacturer", "satovershootmargin", "satpresetaway", "satpresetcomfort", "satpreseteco",
   "satpwmautoswitch", "satsimcoolrate", "satsimheatrate", "satsimulation", "satsystem", "sattargettemp",
+  "satweatherenable", "satweatherinterval", "satweatherlat", "satweatherlon",
   "ui_autodownloadlog", "ui_autoexport", "ui_autoscreenshot", "ui_autoscroll",
   "ui_capture", "ui_graphtimewindow", "ui_timestamps",
   "webhookcontenttype", "webhookenable", "webhookenabled",

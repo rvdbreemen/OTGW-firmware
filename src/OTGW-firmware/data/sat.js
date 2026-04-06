@@ -17,6 +17,7 @@ var SAT = (function() {
 
   var POLL_INTERVAL_MS = 5000;
   var _pollTimer = null;
+  var _weatherTimer = null;
   var _chartInstance = null;
   var _curveChartInstance = null;
   var _curveVisible = true;
@@ -471,12 +472,15 @@ var SAT = (function() {
     initChart();
     initCurveChart();
     fetchStatus(); // immediate first fetch
+    fetchWeather(); // immediate weather fetch
     _pollTimer = setInterval(fetchStatus, POLL_INTERVAL_MS);
+    _weatherTimer = setInterval(fetchWeather, 30000); // weather every 30s
     window.addEventListener('resize', resizeChart);
   }
 
   function stop() {
     if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+    if (_weatherTimer) { clearInterval(_weatherTimer); _weatherTimer = null; }
     window.removeEventListener('resize', resizeChart);
   }
 
@@ -577,6 +581,92 @@ var SAT = (function() {
     });
   }
 
+  // --- Weather data ---
+  function fetchWeather() {
+    fetch(APIGW + 'v2/sat/weather')
+      .then(function(r) {
+        if (!r.ok) return Promise.reject(r.statusText);
+        var ct = r.headers.get('content-type') || '';
+        if (ct.indexOf('application/json') === -1) return Promise.reject('Not JSON');
+        return r.json();
+      })
+      .then(function(w) { updateWeather(w); })
+      .catch(function(err) {
+        console.warn('Weather fetch error:', err);
+      });
+  }
+
+  function updateWeather(w) {
+    var section = el('sat-weather-section');
+    if (!section) return;
+
+    if (w.enabled) {
+      section.style.display = '';
+      setText('sat-weather-temp', w.valid ? parseFloat(w.temperature).toFixed(1) + '\u00B0C' : '--');
+      setText('sat-weather-humidity', w.valid ? parseInt(w.humidity) + '%' : '--');
+      setText('sat-weather-wind', w.valid ? parseFloat(w.wind_speed).toFixed(1) + ' km/h' : '--');
+      setText('sat-weather-errors', String(w.fetch_errors || 0));
+
+      if (w.valid && w.age_seconds >= 0) {
+        var mins = Math.floor(w.age_seconds / 60);
+        setText('sat-weather-updated', mins < 1 ? 'Just now' : mins + ' min ago');
+      } else {
+        setText('sat-weather-updated', 'Never');
+      }
+
+      // Show coordinates
+      var coordEl = el('sat-weather-coords');
+      if (coordEl) {
+        var lat = parseFloat(w.latitude);
+        var lon = parseFloat(w.longitude);
+        if (lat !== 0 || lon !== 0) {
+          coordEl.textContent = lat.toFixed(4) + ', ' + lon.toFixed(4);
+        } else {
+          coordEl.textContent = 'No location set';
+        }
+      }
+    } else {
+      section.style.display = 'none';
+    }
+  }
+
+  function detectLocation() {
+    if (!navigator.geolocation) {
+      showFeedback('Geolocation not supported by browser', true);
+      return;
+    }
+    showFeedback('Detecting location...', false);
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      var lat = pos.coords.latitude.toFixed(4);
+      var lon = pos.coords.longitude.toFixed(4);
+      // Send coordinates and enable weather
+      var settings = [
+        { name: 'SATweatherlat', value: lat },
+        { name: 'SATweatherlon', value: lon },
+        { name: 'SATweatherenable', value: '1' }
+      ];
+      var promises = [];
+      for (var i = 0; i < settings.length; i++) {
+        promises.push(
+          fetch(APIGW + 'v1/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{"name":"' + settings[i].name + '","value":"' + settings[i].value + '"}'
+          })
+        );
+      }
+      Promise.all(promises).then(function() {
+        showFeedback('Location set: ' + lat + ', ' + lon, false);
+        // Refresh weather data after a short delay
+        setTimeout(fetchWeather, 2000);
+      }).catch(function(e) {
+        showFeedback('Error saving location: ' + e.message, true);
+      });
+    }, function(err) {
+      showFeedback('Location error: ' + err.message, true);
+    }, { timeout: 10000 });
+  }
+
   return {
     start: start,
     stop: stop,
@@ -586,6 +676,7 @@ var SAT = (function() {
     setPreset: setPreset,
     setMode: setMode,
     toggleEnable: toggleEnable,
-    toggleSimulation: toggleSimulation
+    toggleSimulation: toggleSimulation,
+    detectLocation: detectLocation
   };
 })();

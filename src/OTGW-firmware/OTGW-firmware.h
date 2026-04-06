@@ -152,6 +152,12 @@ void evalWebhook();
 bool checkHttpAuth();  // HTTP Basic Auth guard (ADR-054; defined in restAPI.ino)
 extern bool picSettingsCycleActive;  // PIC settings readout cycle flag (OTGW-Core.ino)
 
+// SAT Weather forward declarations — defined in SATweather.ino
+void weatherLoop();
+void weatherFetch();
+void weatherSendStatusJSON();
+void weatherPublishMQTT();
+
 // SAT (Smart Autotune Thermostat) forward declarations — defined in SATcontrol.ino, SATpid.ino, SATcycles.ino
 void initSAT();
 void satControlLoop();
@@ -432,6 +438,15 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // OT setpoint sync
   bool     bSetpointMismatch      = false;
   uint32_t iMismatchSinceMs       = 0;
+  // Weather data (Open-Meteo API)
+  struct {
+    float    fTemperature    = 0.0f;   // Current outdoor temperature (C)
+    float    fHumidity       = 0.0f;   // Current relative humidity (%)
+    float    fWindSpeed      = 0.0f;   // Current wind speed (km/h)
+    bool     bValid          = false;  // true after first successful fetch
+    uint32_t iLastUpdateMs   = 0;      // millis() of last successful fetch
+    uint16_t iFetchErrors    = 0;      // consecutive or total fetch error count
+  } weather;
   // Simulation (Task #37)
   float    fSimRoomTemp           = 20.0f;
   float    fSimFlowTemp           = 20.0f;
@@ -664,6 +679,11 @@ struct SATSection {
   float    fMaxPressure       = 2.5f;   // Pressure alarm: maximum bar
   float    fMaxPressureDrop   = 0.3f;   // Pressure alarm: max bar/hour drop rate
   uint8_t  iManufacturer      = SAT_MFR_AUTO; // User-confirmed manufacturer (0=auto-detect)
+  // Weather data (Open-Meteo API, Task #50)
+  bool     bWeatherEnable     = false;  // Enable weather data fetching
+  float    fWeatherLat        = 0.0f;   // Latitude (from browser geolocation or manual)
+  float    fWeatherLon        = 0.0f;   // Longitude
+  uint16_t iWeatherInterval   = 900;    // Poll interval in seconds (default 15 min, min 5 min)
   // Simulation mode (Task #37) — test SAT without a real boiler
   bool     bSimulation        = false;  // Enable simulation mode
   float    fSimHeatRate       = 0.5f;   // Room heating rate C/min
