@@ -1410,6 +1410,12 @@ void sendDeviceSettings()
     sendJsonSettingObj(F("satweatherlon"), tmpBuf, "f", -180, 180);
   }
   sendJsonSettingObj(F("satweatherinterval"), settings.sat.iWeatherInterval, "i", 300, 3600);
+  // --- SAT Power/Energy settings (Task #45) ---
+  {
+    char tmpBuf[8];
+    dtostrf(settings.sat.fBoilerCapacity, 1, 1, tmpBuf);
+    sendJsonSettingObj(F("satboilercapacity"), tmpBuf, "f", 1, 100);
+  }
   // --- SAT Simulation settings (Task #37) ---
   sendJsonSettingObj(F("satsimulation"), settings.sat.bSimulation, "b");
   {
@@ -1472,7 +1478,7 @@ static const char* const PROGMEM knownSettings[] = {
   "otdsetbacktemp", "otdsetbacktimeout", "otdsummermode",
   "otgwcommandenable", "otgwcommands",
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
-  "satcoefficient", "satdeadband", "satenabled", "satexternaltemp",
+  "satboilercapacity", "satcoefficient", "satdeadband", "satenabled", "satexternaltemp",
   "satinterval", "satmanufacturer", "satovershootmargin", "satpresetaway", "satpresetcomfort", "satpreseteco",
   "satpwmautoswitch", "satsimcoolrate", "satsimheatrate", "satsimulation", "satsystem", "sattargettemp",
   "satweatherenable", "satweatherinterval", "satweatherlat", "satweatherlon",

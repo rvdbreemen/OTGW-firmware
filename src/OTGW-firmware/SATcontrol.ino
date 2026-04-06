@@ -971,6 +971,9 @@ void satSendStatusJSON()
   satSendJsonFloat(F("mean_error"),            state.sat.fMeanError, 2);
   satSendJsonFloat(F("error_stddev"),          state.sat.fErrorStdDev, 3);
   satSendJsonFloat(F("target_temp_step"),      settings.sat.fTargetTempStep, 1);
+  satSendJsonFloat(F("power_kw"),              state.sat.fCurrentPower, 2);
+  satSendJsonFloat(F("energy_kwh"),            state.sat.fEnergyTotal, 3);
+  satSendJsonFloat(F("boiler_capacity"),       settings.sat.fBoilerCapacity, 1);
   // Simulation (Task #37)
   sendJsonMapEntry(F("simulation"),            settings.sat.bSimulation);
   if (settings.sat.bSimulation) {
@@ -1111,6 +1114,12 @@ void satPublishMQTT()
     sendMQTTData(F("sat/error_stddev"), sBuf, false);
   }
 
+  // Power and energy (Task #45)
+  dtostrf(state.sat.fCurrentPower, 1, 2, valBuf);
+  sendMQTTData(F("sat/power"), valBuf, false);
+  dtostrf(state.sat.fEnergyTotal, 1, 3, valBuf);
+  sendMQTTData(F("sat/energy_total"), valBuf, true);  // retained for HA energy dashboard
+
   // Manufacturer
   { char mfrName[12]; satGetManufacturerName(mfrName, sizeof(mfrName));
     sendMQTTData(F("sat/manufacturer"), mfrName, true); }
@@ -1120,6 +1129,37 @@ void satPublishMQTT()
 
   // Weather data (Task #50)
   weatherPublishMQTT();
+}
+
+//=====================================================================
+//=== Power & Energy Tracking (Task #45) ===
+//=====================================================================
+static void satUpdatePowerEnergy()
+{
+  float modulation = OTcurrentSystemState.RelModLevel;
+  bool flame = (OTcurrentSystemState.Statusflags & 0x08) != 0;
+
+  // Power = modulation% * capacity (only when flame is on)
+  if (flame && modulation > 0.0f) {
+    state.sat.fCurrentPower = (modulation / 100.0f) * settings.sat.fBoilerCapacity;
+  } else {
+    state.sat.fCurrentPower = 0.0f;
+  }
+
+  // Clamp to reasonable bounds
+  if (state.sat.fCurrentPower < 0.0f) state.sat.fCurrentPower = 0.0f;
+  if (state.sat.fCurrentPower > settings.sat.fBoilerCapacity * 1.1f)
+    state.sat.fCurrentPower = settings.sat.fBoilerCapacity;
+
+  // Integrate energy (kWh = kW * hours)
+  uint32_t now = millis();
+  if (state.sat.iEnergyLastMs > 0) {
+    float dtHours = (float)(now - state.sat.iEnergyLastMs) / 3600000.0f;
+    if (dtHours > 0.0f && dtHours < 1.0f) { // Sanity: max 1 hour gap
+      state.sat.fEnergyTotal += state.sat.fCurrentPower * dtHours;
+    }
+  }
+  state.sat.iEnergyLastMs = now;
 }
 
 //=====================================================================
@@ -1581,6 +1621,9 @@ void satControlLoop()
 
   // --- Pressure monitoring ---
   satUpdatePressure();
+
+  // --- Power & energy tracking (Task #45) ---
+  satUpdatePowerEnergy();
 
   // --- Heating curve recommendation ---
   satUpdateCurveRecommendation();

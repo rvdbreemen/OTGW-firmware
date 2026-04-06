@@ -447,6 +447,10 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
     uint32_t iLastUpdateMs   = 0;      // millis() of last successful fetch
     uint16_t iFetchErrors    = 0;      // consecutive or total fetch error count
   } weather;
+  // Power and energy (Task #45)
+  float    fCurrentPower          = 0.0f;   // Current power in kW (modulation * capacity)
+  float    fEnergyTotal           = 0.0f;   // Cumulative energy in kWh
+  uint32_t iEnergyLastMs          = 0;      // Last energy integration timestamp
   // Simulation (Task #37)
   float    fSimRoomTemp           = 20.0f;
   float    fSimFlowTemp           = 20.0f;
@@ -684,6 +688,8 @@ struct SATSection {
   float    fWeatherLat        = 0.0f;   // Latitude (from browser geolocation or manual)
   float    fWeatherLon        = 0.0f;   // Longitude
   uint16_t iWeatherInterval   = 900;    // Poll interval in seconds (default 15 min, min 5 min)
+  // Power/energy (Task #45)
+  float    fBoilerCapacity    = 24.0f;  // Boiler capacity in kW (for power calculation)
   // Simulation mode (Task #37) — test SAT without a real boiler
   bool     bSimulation        = false;  // Enable simulation mode
   float    fSimHeatRate       = 0.5f;   // Room heating rate C/min
