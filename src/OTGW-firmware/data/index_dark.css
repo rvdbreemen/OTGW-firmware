@@ -1255,6 +1255,17 @@ body.disable-interaction {
 .sat-view-simple .sat-card-value { font-size: 2rem; }
 .sat-view-simple .sat-cards { justify-content: center; }
 
+/* SAT Simple Status Summary */
+.sat-simple-status {
+  text-align: center;
+  font-size: 1.3rem;
+  padding: 12px;
+  color: #aaa;
+  font-weight: 500;
+}
+.sat-view-simple .sat-simple-status.heating { color: #e67e22; }
+.sat-view-simple .sat-simple-status.error { color: #ef5350; }
+
 /* SAT Interactive Controls (Dark) */
 .sat-btn { background: #3a3a3c; color: #e0e0e0; border-color: #555; }
 .sat-btn:hover { background: #4a4a4c; }

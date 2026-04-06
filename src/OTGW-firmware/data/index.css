@@ -1249,3 +1249,14 @@ body.disable-interaction {
 /* SAT Simple View Enhancements */
 .sat-view-simple .sat-card-value { font-size: 2rem; }
 .sat-view-simple .sat-cards { justify-content: center; }
+
+/* SAT Simple Status Summary */
+.sat-simple-status {
+  text-align: center;
+  font-size: 1.3rem;
+  padding: 12px;
+  color: #666;
+  font-weight: 500;
+}
+.sat-view-simple .sat-simple-status.heating { color: #e67e22; }
+.sat-view-simple .sat-simple-status.error { color: #e74c3c; }

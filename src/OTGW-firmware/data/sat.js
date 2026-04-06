@@ -229,6 +229,58 @@ var SAT = (function() {
       extOutEl.title = d.external_outdoor_valid ? 'External outdoor sensor active' : 'Using OT bus outdoor temp';
     }
 
+    // Simple view status summary
+    var simpleStatus = el('sat-simple-status');
+    if (simpleStatus) {
+      var statusText = 'Idle';
+      var statusClass = 'sat-simple-status';
+      if (!d.enabled) {
+        statusText = 'Disabled';
+      } else if (d.safety_tripped) {
+        statusText = 'Safety tripped!';
+        statusClass += ' error';
+      } else if (d.window_open) {
+        statusText = 'Window open';
+      } else if (d.summer_active) {
+        statusText = 'Summer mode';
+      } else if (d.active) {
+        statusText = 'Heating to ' + (d.target_temp !== undefined ? d.target_temp.toFixed(1) : '--') + '\u00B0C';
+        statusClass += ' heating';
+      }
+      simpleStatus.textContent = statusText;
+      simpleStatus.className = statusClass;
+    }
+
+    // Smart Features (expert/diag)
+    setText('sat-solar-gain', d.solar_gain_active ? 'Active' : 'Inactive');
+
+    if (d.summer_active) {
+      var summerHrs = d.summer_hours_above !== undefined ? d.summer_hours_above.toFixed(0) + 'h above' : '';
+      setText('sat-summer-mode', 'Active' + (summerHrs ? ' (' + summerHrs + ')' : ''));
+    } else {
+      setText('sat-summer-mode', 'Inactive');
+    }
+
+    if (d.thermal_coefficient !== undefined && d.thermal_coefficient > 0) {
+      setText('sat-thermal-learning', d.thermal_coefficient.toFixed(3));
+    } else {
+      setText('sat-thermal-learning', 'Learning...');
+    }
+
+    if (d.comfort_offset !== undefined && d.comfort_offset !== 0) {
+      setText('sat-comfort-status', d.comfort_offset.toFixed(2) + '\u00B0C');
+    } else {
+      setText('sat-comfort-status', 'Disabled');
+    }
+
+    setText('sat-simmer-index', d.simmer_index !== undefined ? d.simmer_index.toFixed(1) : '--');
+
+    if (d.autotune_score !== undefined && d.autotune_score > 0) {
+      setText('sat-autotune-status', d.autotune_score.toFixed(2));
+    } else {
+      setText('sat-autotune-status', 'Disabled');
+    }
+
     // Update charts
     updateChart(d);
     updateCurveChart(d);
