@@ -777,6 +777,11 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
               updateSetting("SATautotunerate", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("multi_area_count")) == 0) {
               updateSetting("SATmultiareacount", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("valves_open")) == 0) {
+              state.sat.bValvesOpen = (strcasecmp_P(msgPayload, PSTR("true")) == 0 ||
+                                      strcmp_P(msgPayload, PSTR("1")) == 0 ||
+                                      strcasecmp_P(msgPayload, PSTR("open")) == 0);
+              DebugTf(PSTR("SAT: valves_open = %s\r\n"), state.sat.bValvesOpen ? "true" : "false");
             } else if (strcasecmp_P(satSubCmd, PSTR("area")) == 0) {
               // sat/area/<index> — push area temperature
               char areaIdx[4];
