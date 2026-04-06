@@ -4,17 +4,22 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 “devkit” that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-## 🚀 What's New in v1.3.4
+## What's New in v1.4.0
 
-Version 1.3.4 fixes MQTT throttle slot suppression, adds Debug Info tooltips, renames "OTGW Connected" to "OpenTherm Active", and adds thermostat-only MQTT support. Full release notes: [RELEASE_NOTES_1.3.4.md](RELEASE_NOTES_1.3.4.md)
+Version 1.4.0 is a major feature release. It adds SAT (Smart Autotune Thermostat), an embedded heating controller that turns the OTGW into a standalone smart thermostat. It also introduces ESP32 support through a unified platform abstraction layer. Full release notes: [RELEASE_NOTES_1.4.0.md](RELEASE_NOTES_1.4.0.md)
 
 ### Highlights
 
-- **MQTT throttle slot fix:** Stable values like Room Temperature could become permanently suppressed after a transient publish failure. Now only updated after successful publish.
-- **Debug Information page tooltips:** Tooltips now visible on hover for device info labels.
-- **Renamed "OTGW Connected" to "OpenTherm Active":** Clearer label with updated tooltip.
-- **Thermostat-only MQTT support:** OTGW stays online via MQTT when only a thermostat is connected (boiler not required).
-- **No breaking changes** vs v1.3.3.
+- **SAT (Smart Autotune Thermostat):** Embedded heating controller running entirely on the ESP. Weather-compensated heating curve + PID v3 controller with automatic gain tuning. Supports continuous modulation and PWM flame cycling, radiator and underfloor heating. Six independent safety layers. Web UI dashboard, REST API, MQTT, and Home Assistant auto-discovery. No HA or external controller required.
+- **ESP32 support (experimental):** The firmware now compiles for both ESP8266 and ESP32 from one source tree. 30+ platform shim functions abstract away SDK differences at compile time.
+- **PlatformIO build system:** New `platformio.ini` with `esp8266` and `esp32` environments. Build with `pio run -e esp8266` or `pio run -e esp32`.
+- **Board-level GPIO definitions:** Auto-detected pin mappings per platform via `boards.h`.
+- **OpenTherm enum modernization:** Binary literals updated to C++14 standard format for better compiler compatibility.
+- **No breaking changes** vs v1.3.4. The ESP8266 build is functionally identical.
+
+## What was new in v1.3.4
+
+Version 1.3.4 fixes MQTT throttle slot suppression, adds Debug Info tooltips, renames "OTGW Connected" to "OpenTherm Active", and adds thermostat-only MQTT support. Full release notes: [RELEASE_NOTES_1.3.4.md](RELEASE_NOTES_1.3.4.md)
 
 ## What was new in v1.3.3
 

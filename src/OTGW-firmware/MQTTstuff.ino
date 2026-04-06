@@ -1070,6 +1070,46 @@ void sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
   feedWatchDog();
 }
 
+//===================[ Send useful information to MQTT ]======================
+
+void sendMQTTuptime(){
+  DebugTf(PSTR("Uptime seconds: %lu\r\n"), (unsigned long)state.uptime.iSeconds);
+  char uptimeBuf[11] = {0};
+  snprintf_P(uptimeBuf, sizeof(uptimeBuf), PSTR("%lu"), (unsigned long)state.uptime.iSeconds);
+  sendMQTTData(F("otgw-firmware/uptime"), uptimeBuf, false);
+}
+
+/*
+Publish usefull firmware version information to MQTT broker.
+*/
+void sendMQTTversioninfo(){
+  char rebootCountBuf[12];
+  snprintf_P(rebootCountBuf, sizeof(rebootCountBuf), PSTR("%lu"), static_cast<unsigned long>(state.uptime.iRebootCount));
+  sendMQTTData("otgw-firmware/version", _SEMVER_FULL);
+  sendMQTTData("otgw-firmware/reboot_count", rebootCountBuf);
+  sendMQTTData("otgw-firmware/reboot_reason", lastReset);
+  if (isPICEnabled()) {
+    sendMQTTData("otgw-pic/version", state.pic.sFwversion);
+    sendMQTTData("otgw-pic/deviceid", state.pic.sDeviceid);
+    sendMQTTData("otgw-pic/firmwaretype", state.pic.sType);
+  }
+  sendMQTTData("otgw-pic/picavailable", CCONOFF(state.pic.bAvailable));
+}
+
+/*
+Publish state information of PIC firmware version information to MQTT broker.
+*/
+void sendMQTTstateinformation(){
+  if (!isPICEnabled()) return;
+  sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
+  sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
+  if (state.otgw.bGatewayModeKnown) {
+    sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(state.otgw.bGatewayMode));
+  }
+  sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otgw.bOnline));
+  sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
+}
+
 /*
 * topic:  <string> , topic will be used as is (no prefixing), retained = true
 * json:   <string> , payload to send

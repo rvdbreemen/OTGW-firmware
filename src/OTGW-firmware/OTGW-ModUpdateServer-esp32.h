@@ -34,9 +34,9 @@ extern void settingsMarkClean();
 extern void blinkLEDnow(uint8_t);
 
 #ifndef Debug
-  #define Debug(...)      ({ Serial.print(__VA_ARGS__); })
-  #define Debugln(...)    ({ Serial.println(__VA_ARGS__); })
-  #define Debugf(...)     ({ Serial.printf(__VA_ARGS__); })
+  #define Debug(...)      ({ OTGWSerial.print(__VA_ARGS__); })
+  #define Debugln(...)    ({ OTGWSerial.println(__VA_ARGS__); })
+  #define Debugf(...)     ({ OTGWSerial.printf_P(__VA_ARGS__); })
 #endif
 
 class OTGWUpdateServer {

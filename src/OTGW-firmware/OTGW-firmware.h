@@ -198,6 +198,7 @@ struct NetworkSection {        // state.net — active network transport state
 };
 #endif
 
+
 //===================[ Runtime State — transient, never persisted (ADR-051) ]===================
 // Sub-section structs for OTGWState — groups runtime state by system component.
 // Hungarian prefixes: b=bool, s=string/char[], i=int/uint, f=float
@@ -680,6 +681,7 @@ struct EthernetSection {
   char sDNS[16]        = "0.0.0.0";        // DNS server (0.0.0.0 = use gateway)
 };
 #endif
+
 
 struct OTGWSettings {
   // Device-level fields (universal device identity)

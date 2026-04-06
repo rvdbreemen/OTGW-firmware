@@ -1,6 +1,6 @@
 # ADR-047: Non-Blocking WiFi Reconnect State Machine
 
-**Status:** Accepted
+**Status:** Superseded by ADR-061 (timeout and retry parameters only; state machine design unchanged)
 **Date:** 2026-03-01
 **Relates to:** ADR-007 (Timer-Based Task Scheduling), ADR-001 (ESP8266 Platform)
 

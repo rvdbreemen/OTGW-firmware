@@ -24,6 +24,7 @@ evaluation-report.json
 .claude/settings.local.json
 .claude/.vscode/mcp.json
 .mcp.json
+
 /src/OTGW-firmware/build
 *.ino.map
 tmpclaude-*
@@ -34,6 +35,14 @@ OT-Thing-master.zip
 OT-Thing-OTGW32.zip
 otgw-6.6.tgz
 OT-Thing-OTGW32/*
+otgw-6.6/*
 OT-Thing-Pkunfazir/*
+OT-Thing-Pkunfazir/.gitignore
+OT-Thing-Pkunfazir/Firmware/.gitignore
+OT-Thing-Pkunfazir/PCB/.gitignore
+OT-Thing-Pkunfazir/Tester PCB/.gitignore
 other-projects/*
-
+other-projects/.gitignore
+discord_backlog_last_checkted.txt
+.claude/discord_backlog_last_checked.txt
+other-projects/*

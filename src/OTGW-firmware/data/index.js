@@ -3197,16 +3197,16 @@ function showMainPage() {
   stopOTmonitorPolling();
   stopOTDStatusPolling();
   if (typeof SAT !== 'undefined') SAT.stop();
-  
+
   // Exit flash mode if it was active
   if (flashModeActive) {
     exitFlashMode();
   }
-  
+
   refreshDevTime();
-  
+
   setActivePageSection('displayMainPage');
-  
+
   refreshDevInfo();
   refreshOTmonitor();
   

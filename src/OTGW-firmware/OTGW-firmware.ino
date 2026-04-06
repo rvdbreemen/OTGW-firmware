@@ -56,11 +56,11 @@ uint32_t wifiPortalResetWindowDeadline = 0;
 bool wifiPortalResetWindowOpen = false;
 
 bool readWifiPortalResetState(WifiPortalResetState &portalState) {
-  return ESP.rtcUserMemoryRead(WIFI_PORTAL_RESET_RTC_SLOT, reinterpret_cast<uint32_t*>(&portalState), sizeof(portalState));
+  return platformRtcRead(WIFI_PORTAL_RESET_RTC_SLOT, reinterpret_cast<uint32_t*>(&portalState), sizeof(portalState));
 }
 
 bool writeWifiPortalResetState(const WifiPortalResetState &portalState) {
-  return ESP.rtcUserMemoryWrite(WIFI_PORTAL_RESET_RTC_SLOT, const_cast<uint32_t*>(reinterpret_cast<const uint32_t*>(&portalState)), sizeof(portalState));
+  return platformRtcWrite(WIFI_PORTAL_RESET_RTC_SLOT, reinterpret_cast<const uint32_t*>(&portalState), sizeof(portalState));
 }
 
 void clearWifiPortalResetState() {
@@ -69,8 +69,7 @@ void clearWifiPortalResetState() {
 }
 
 bool isExternalSystemReset() {
-  rst_info *resetInfo = ESP.getResetInfoPtr();
-  return (resetInfo != nullptr) && (resetInfo->reason == REASON_EXT_SYS_RST);
+  return platformIsExternalReset();
 }
 
 bool shouldForceWifiConfigPortal() {
@@ -131,7 +130,7 @@ void setup() {
   detectPIC();
 
   //setup randomseed the right way
-  randomSeed(RANDOM_REG32); //This is 8266 HWRNG used to seed the Random PRNG: Read more: https://config9.com/arduino/getting-a-truly-random-number-in-arduino/
+  randomSeed(platformHardwareRandom()); // Hardware RNG to seed the Random PRNG
  
   //setup the status LED
   setLed(LED1, ON);
@@ -145,7 +144,7 @@ void setup() {
   // Set hostname ASAP after loading settings.  WiFi.persistent(true) from a
   // previous boot lets the SDK auto-connect before startWiFi() is reached;
   // without this early call the DHCP request carries the default "ESP-XXXXXX".
-  WiFi.hostname(CSTR(settings.sHostname));
+  platformSetHostname(CSTR(settings.sHostname));
 
   // Connect to and initialise WiFi network
   setLed(LED1, ON);
@@ -168,7 +167,7 @@ void setup() {
   startMQTT();               // start the MQTT after webserver, always.
  
   { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason)); }  // setup the WatchDog
-  strlcpy(lastReset, ESP.getResetReason().c_str(), sizeof(lastReset));
+  platformResetReason(lastReset, sizeof(lastReset));
   SetupDebugf(PSTR("Last reset reason: [%s]\r\n"), CSTR(lastReset));
   state.uptime.iRebootCount = updateRebootCount();
   updateRebootLog(lastReset);
@@ -194,6 +193,7 @@ void setup() {
   if (!LittleFSmounted) sendMQTTData(F("otgw-firmware/error"), "LittleFS mount failed - running on defaults", false);
   initS0Count();        // init S0 counter
   initSensors();        // init DS18B20 (after MQ is up!)
+  initSAT();            // init SAT thermostat controller
   // Clear the triple-reset portal counter: a successful setup() proves the device is healthy.
   // This prevents USB flash resets or stale RTC data from triggering the portal on next boot.
   clearWifiPortalResetState();
@@ -202,6 +202,46 @@ void setup() {
 }
 //=====================================================================
 
+//===[ blink status led ]===
+void setLed(uint8_t led, uint8_t status){
+  pinMode(led, OUTPUT);
+  digitalWrite(led, status);
+}
+
+void blinkLEDms(uint32_t delay){
+  //blink the statusled, when time passed
+  DECLARE_TIMER_MS(timerBlink, delay);
+  if (DUE(timerBlink)) {
+    blinkLEDnow();
+  }
+}
+
+void blinkLED(uint8_t led, int nr, uint32_t waittime_ms){
+    for (int i = nr; i>0; i--){
+      blinkLEDnow(led);
+      delayms(waittime_ms);
+      blinkLEDnow(led);
+      delayms(waittime_ms);
+    }
+}
+
+void blinkLEDnow(uint8_t led = LED1){
+  pinMode(led, OUTPUT);
+  if (settings.bLEDblink) {
+    digitalWrite(led, !digitalRead(led));
+  } else setLed(led, OFF);
+
+}
+
+//===[ no-blocking delay with running background tasks in ms ]===
+void delayms(unsigned long delay_ms)
+{
+  DECLARE_TIMER_MS(timerDelayms, delay_ms);
+  while (DUE(timerDelayms))
+    doBackgroundTasks();
+}
+
+//=====================================================================
 
 //===[ Do task every 1s ]===
 void doTaskEvery1s(){
@@ -278,9 +318,23 @@ static void handleEspFlashBackgroundTasks()
 {
   handleDebug();              // Keep telnet debug active for monitoring
   httpServer.handleClient();  // MUST continue - processes upload chunks
-  MDNS.update();              // Keep MDNS active for network discovery
+#if MDNS_NEEDS_UPDATE
+  MDNS.update();
+#endif              // Keep MDNS active for network discovery
   handleWebSocket();          // Keep WebSocket service responsive during flash
 }
+
+static void handlePicFlashBackgroundTasks()
+{
+  handleDebug();              // Keep telnet debug active for monitoring
+  httpServer.handleClient();  // Keep HTTP active
+#if MDNS_NEEDS_UPDATE
+  MDNS.update();
+#endif              // Keep MDNS active for network discovery
+  handleOTGW();               // REQUIRED for PIC flash - processes serial communication
+  handleWebSocket();          // Keep WebSocket service responsive during flash
+}
+
 
 //===[ Do the background tasks ]===
 void doBackgroundTasks()
@@ -318,7 +372,9 @@ void doBackgroundTasks()
       handleOTGW();                 // OTGW handling
       handleWebSocket();            // WebSocket handling for OT log streaming
       httpServer.handleClient();
-      MDNS.update();
+    #if MDNS_NEEDS_UPDATE
+  MDNS.update();
+#endif
       loopNTP();
     }
   } //otherwise, just wait until reconnected gracefully
@@ -345,6 +401,7 @@ void loop()
       if (minuteChanged())              doTaskMinuteChanged(); //exactly on the minute
       evalOutputs();                    // when the bits change, the output gpio bit will follow
       evalWebhook();                    // when the trigger bit changes, fire the webhook
+      satControlLoop();                 // SAT thermostat control loop (timer-guarded internally)
       handlePendingUpgrade();           // Check if we need to start an upgrade
     } 
 
