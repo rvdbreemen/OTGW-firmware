@@ -476,6 +476,39 @@
             <div class="sat-row"><span class="sat-label">Outdoor sensor</span><span id="sat-ext-outdoor-indicator" class="sat-indicator sat-indicator-off" title="Using OT bus"></span></div>
           </div>
         </div>
+
+        <!-- Diagnostics: Health Indicators -->
+        <div class="sat-section" data-view="diag">
+          <h3>Health Indicators</h3>
+          <div class="sat-health-grid">
+            <div class="sat-health-item"><span class="sat-health-dot" id="sat-health-device"></span><span>Device</span></div>
+            <div class="sat-health-item"><span class="sat-health-dot" id="sat-health-cycle"></span><span>Cycle</span></div>
+            <div class="sat-health-item"><span class="sat-health-dot" id="sat-health-flame"></span><span>Flame</span></div>
+            <div class="sat-health-item"><span class="sat-health-dot" id="sat-health-pressure"></span><span>Pressure</span></div>
+            <div class="sat-health-item"><span class="sat-health-dot" id="sat-health-setpoint"></span><span>Setpoint Sync</span></div>
+            <div class="sat-health-item"><span class="sat-health-dot" id="sat-health-modulation"></span><span>Mod Sync</span></div>
+          </div>
+        </div>
+
+        <!-- Diagnostics: Simulation Controls -->
+        <div class="sat-section" data-view="diag">
+          <h3>Simulation & Diagnostics</h3>
+          <div class="sat-grid">
+            <div class="sat-row"><span class="sat-label">Simulation Mode</span><span class="sat-value" id="sat-diag-simulation">--</span></div>
+            <div class="sat-row"><span class="sat-label">Sim Room Temp</span><span class="sat-value" id="sat-diag-sim-room">--</span></div>
+            <div class="sat-row"><span class="sat-label">Sim Flow Temp</span><span class="sat-value" id="sat-diag-sim-flow">--</span></div>
+            <div class="sat-row"><span class="sat-label">OPV Phase</span><span class="sat-value" id="sat-diag-ovp-phase">--</span></div>
+            <div class="sat-row"><span class="sat-label">OPV Value</span><span class="sat-value" id="sat-diag-ovp-value">--</span></div>
+            <div class="sat-row"><span class="sat-label">Fallback Active</span><span class="sat-value" id="sat-diag-fallback">--</span></div>
+            <div class="sat-row"><span class="sat-label">Fallback Reason</span><span class="sat-value" id="sat-diag-fallback-reason">--</span></div>
+          </div>
+        </div>
+
+        <!-- Diagnostics: Raw JSON Data -->
+        <div class="sat-section" data-view="diag">
+          <h3 class="sat-collapsible" onclick="SAT.toggleRawData()">Raw Data <span id="sat-raw-arrow">&#9654;</span></h3>
+          <pre id="sat-raw-json" class="sat-raw-data" style="display:none"></pre>
+        </div>
       </div>
     </div>
     <div class="footer">

@@ -281,6 +281,31 @@ var SAT = (function() {
       setText('sat-autotune-status', 'Disabled');
     }
 
+    // Health indicators (green=ok, red=problem)
+    function setHealth(id, ok) {
+      var dot = el(id);
+      if (dot) dot.className = 'sat-health-dot ' + (ok ? 'sat-health-ok' : 'sat-health-problem');
+    }
+    setHealth('sat-health-device', d.boiler_status !== 'off');
+    setHealth('sat-health-cycle', !(['overshoot','underheat','short'].includes(d.last_cycle_class)));
+    setHealth('sat-health-flame', !d.safety_tripped);
+    setHealth('sat-health-pressure', !d.pressure_alarm);
+    setHealth('sat-health-setpoint', !d.setpoint_mismatch);
+    setHealth('sat-health-modulation', d.modulation_reliable);
+
+    // Diagnostics fields
+    setText('sat-diag-simulation', d.simulation ? 'ACTIVE' : 'Off');
+    setText('sat-diag-sim-room', d.simulation ? fmtTemp(d.sim_room_temp) : '--');
+    setText('sat-diag-sim-flow', d.simulation ? fmtTemp(d.sim_flow_temp) : '--');
+    setText('sat-diag-ovp-phase', d.ovp_calib_phase || '0');
+    setText('sat-diag-ovp-value', d.ovp_value ? d.ovp_value.toFixed(1) + ' C' : '0.0 C');
+    setText('sat-diag-fallback', d.fallback_active ? 'Yes' : 'No');
+    setText('sat-diag-fallback-reason', d.fallback_reason || '0');
+
+    // Raw JSON
+    var rawEl = el('sat-raw-json');
+    if (rawEl) rawEl.textContent = JSON.stringify(d, null, 2);
+
     // Update charts
     updateChart(d);
     updateCurveChart(d);
@@ -746,12 +771,20 @@ var SAT = (function() {
     }, { timeout: 10000 });
   }
 
+  function toggleRawData() {
+    var raw = el('sat-raw-json');
+    var arrow = el('sat-raw-arrow');
+    if (raw) { raw.style.display = raw.style.display === 'none' ? 'block' : 'none'; }
+    if (arrow) { arrow.innerHTML = raw.style.display === 'none' ? '&#9654;' : '&#9660;'; }
+  }
+
   return {
     start: start,
     stop: stop,
     setTheme: setTheme,
     switchView: switchView,
     toggleCurve: toggleCurve,
+    toggleRawData: toggleRawData,
     adjustTarget: adjustTarget,
     setPreset: setPreset,
     setMode: setMode,

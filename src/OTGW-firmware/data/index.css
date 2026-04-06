@@ -1260,3 +1260,13 @@ body.disable-interaction {
 }
 .sat-view-simple .sat-simple-status.heating { color: #e67e22; }
 .sat-view-simple .sat-simple-status.error { color: #e74c3c; }
+
+/* SAT Diagnostics */
+.sat-health-grid { display: flex; flex-wrap: wrap; gap: 12px; padding: 8px 0; }
+.sat-health-item { display: flex; align-items: center; gap: 6px; font-size: 0.9em; }
+.sat-health-dot { width: 16px; height: 16px; border-radius: 50%; display: inline-block; background: #999; }
+.sat-health-ok { background: #27ae60; }
+.sat-health-problem { background: #e74c3c; }
+.sat-raw-data { background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 0.8em; max-height: 400px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+.sat-collapsible { cursor: pointer; }
+.sat-collapsible:hover { opacity: 0.8; }
