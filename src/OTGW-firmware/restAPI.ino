@@ -1428,6 +1428,12 @@ void sendDeviceSettings()
     dtostrf(settings.sat.fSimCoolRate, 1, 2, tmpBuf);
     sendJsonSettingObj(F("satsimcoolrate"), tmpBuf, "f", 0, 5);
   }
+  // --- SAT Thermal Drop Learning (Task #21) ---
+  {
+    char tmpBuf[8];
+    dtostrf(settings.sat.fThermalCoeff, 1, 4, tmpBuf);
+    sendJsonSettingObj(F("satthermalcoeff"), tmpBuf, "f", 0, 1);
+  }
   // --- SAT Solar Gain settings (Task #23) ---
   sendJsonSettingObj(F("satsolargain"), settings.sat.bSolarGainEnable, "b");
   {
@@ -1504,7 +1510,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satpwmautoswitch", "satsimcoolrate", "satsimheatrate", "satsimulation",
   "satsolargain", "satsolarminrise", "satsolaroffset",
   "satsummerminhours", "satsummersimmer", "satsummerthreshold",
-  "satsystem", "sattargettemp",
+  "satsystem", "sattargettemp", "satthermalcoeff",
   "satweatherenable", "satweatherinterval", "satweatherlat", "satweatherlon",
   "ui_autodownloadlog", "ui_autoexport", "ui_autoscreenshot", "ui_autoscroll",
   "ui_capture", "ui_graphtimewindow", "ui_timestamps",

@@ -34,6 +34,20 @@ static const uint32_t SAT_STALE_OUTDOOR_MS   = 600000UL; // 10 min: external out
 static const uint8_t  SAT_MAX_SKIP_COUNT     = 10;       // Consecutive invalid-input skips before disable
 static const uint8_t  SAT_MAX_PIC_FAILS      = 5;        // Consecutive PIC comm failures before disable
 
+// --- Thermal Drop Learning Constants (Task #21) ---
+static const uint32_t SAT_THERMAL_SAMPLE_MS   = 300000UL; // 5 min between learning samples
+static const uint32_t SAT_THERMAL_SAVE_MS     = 3600000UL; // 1 hour between settings saves
+static const uint32_t SAT_THERMAL_VALID_MS    = 86400000UL; // 24h of data for model validity
+static const float    SAT_THERMAL_MIN_DELTA   = 2.0f;    // Min indoor-outdoor delta for learning
+static const float    SAT_THERMAL_MIN_DROP    = 0.05f;   // Min room temp drop per sample (C)
+static const float    SAT_THERMAL_EMA_ALPHA   = 0.1f;    // EMA smoothing for coefficient
+static const float    SAT_THERMAL_COEFF_MIN   = 0.005f;  // Minimum plausible coefficient
+static const float    SAT_THERMAL_COEFF_MAX   = 0.3f;    // Maximum plausible coefficient
+static const float    SAT_THERMAL_EST_MIN     = 5.0f;    // Minimum estimated room temp
+static const float    SAT_THERMAL_EST_MAX     = 35.0f;   // Maximum estimated room temp
+static const float    SAT_THERMAL_SAFE_FLOW   = 45.0f;   // Fixed safe setpoint after 2h estimation
+static const uint32_t SAT_THERMAL_MAX_EST_MS  = 7200000UL; // 2h: max estimation before safe setpoint
+
 // --- Simulation Constants (Task #37) ---
 static const float    SAT_SIM_FLOW_HEAT_RATE = 2.0f;    // Flow temp rise rate C/s when heating
 static const float    SAT_SIM_FLOW_COOL_RATE = 1.0f;    // Flow temp fall rate C/s when off
@@ -190,6 +204,15 @@ static const char* satGetHeatingSystemName()
 static uint8_t _sat_consecutiveSkips  = 0;
 static uint8_t _sat_picFailCount      = 0;
 static bool    _sat_bootCS0sent       = false;  // One-shot: ensure CS=0 is sent once PIC is available
+
+// --- Thermal Drop Learning State (Task #21) ---
+static float    _thermal_prevRoom     = 0.0f;
+static uint32_t _thermal_prevMs       = 0;
+static bool     _thermal_learning     = false;  // true when flame is off and measuring decay
+static float    _thermal_coeffEma     = 0.05f;  // Running EMA of thermal coefficient
+static uint32_t _thermal_lastSaveMs   = 0;
+static uint32_t _thermal_learningStartMs = 0;   // When learning first started (for 24h validity)
+static uint32_t _thermal_totalLearnMs = 0;       // Accumulated learning time
 
 // --- OPV Calibration Constants ---
 static const uint32_t SAT_CALIB_TIMEOUT_MS    = 1800000UL; // 30 min total timeout
@@ -729,7 +752,15 @@ static float satGetRoomTemp()
       return state.sat.fExternalTemp;
     }
   }
-  return OTcurrentSystemState.Tr;  // OT message ID 24
+  float otRoom = OTcurrentSystemState.Tr;  // OT message ID 24
+  // Task #21: If in fallback mode and OT room temp is invalid, use thermal estimation
+  if (state.sat.bFallbackActive && (otRoom < -10.0f || otRoom > 50.0f)) {
+    if (state.sat.iLastKnownRoomMs > 0) {
+      float outside = satGetOutsideTemp();
+      return satEstimateRoomTemp(outside);
+    }
+  }
+  return otRoom;
 }
 
 //=== Get Outside Temperature (OT bus or external) ===
@@ -985,6 +1016,12 @@ void satSendStatusJSON()
   satSendJsonFloat(F("boiler_capacity"),       settings.sat.fBoilerCapacity, 1);
   // Preset sync (Task #46)
   sendJsonMapEntry(F("preset_sync"),           settings.sat.bPresetSync);
+  // Thermal drop learning (Task #21)
+  satSendJsonFloat(F("thermal_coeff"),         settings.sat.fThermalCoeff, 4);
+  satSendJsonFloat(F("thermal_drop_rate"),     state.sat.fThermalDropRate, 4);
+  sendJsonMapEntry(F("thermal_model_valid"),   state.sat.bThermalModelValid);
+  satSendJsonFloat(F("estimated_room"),        state.sat.fEstimatedRoom, 1);
+  satSendJsonFloat(F("last_known_room"),       state.sat.fLastKnownRoom, 1);
   // Solar gain (Task #23)
   sendJsonMapEntry(F("solar_gain_active"),     state.sat.bSolarGainActive);
   satSendJsonFloat(F("indoor_rise_rate"),      state.sat.fIndoorRiseRate, 2);
@@ -1143,6 +1180,18 @@ void satPublishMQTT()
   // Manufacturer
   { char mfrName[12]; satGetManufacturerName(mfrName, sizeof(mfrName));
     sendMQTTData(F("sat/manufacturer"), mfrName, true); }
+
+  // Thermal drop learning (Task #21)
+  // AC#10: MQTT publish thermal_drop_rate
+  { char thBuf[12];
+    dtostrf(settings.sat.fThermalCoeff, 1, 4, thBuf);
+    sendMQTTData(F("sat/thermal_coeff"), thBuf, true);
+    dtostrf(state.sat.fThermalDropRate, 1, 4, thBuf);
+    sendMQTTData(F("sat/thermal_drop_rate"), thBuf, false);
+    sendMQTTData(F("sat/thermal_model_valid"), state.sat.bThermalModelValid ? "true" : "false", true);
+    dtostrf(state.sat.fEstimatedRoom, 1, 1, thBuf);
+    sendMQTTData(F("sat/estimated_room"), thBuf, false);
+  }
 
   // Solar gain (Task #23)
   sendMQTTData(F("sat/solar_gain"), state.sat.bSolarGainActive ? "true" : "false", false);
@@ -1552,6 +1601,116 @@ static void satUpdateSimulation()
 }
 
 //=====================================================================
+//=== Thermal Drop Learning (Task #21) ===
+//=====================================================================
+static void satUpdateThermalLearning()
+{
+  if (!settings.sat.bEnabled && !state.sat.bFallbackActive) return;
+
+  uint32_t now = millis();
+  bool flame = (OTcurrentSystemState.Statusflags & 0x08) != 0;
+  float roomTemp = satGetRoomTemp();
+  float outsideTemp = satGetOutsideTemp();
+  bool roomValid = (roomTemp > -10.0f && roomTemp < 50.0f);
+  bool outdoorValid = (outsideTemp > -40.0f && outsideTemp < 50.0f);
+
+  // Always track last known good room temp for fallback estimation
+  if (roomValid) {
+    state.sat.fLastKnownRoom = roomTemp;
+    state.sat.iLastKnownRoomMs = now;
+  }
+
+  // Initialize EMA from persisted coefficient on first call
+  static bool _thermal_initialized = false;
+  if (!_thermal_initialized) {
+    _thermal_coeffEma = settings.sat.fThermalCoeff;
+    _thermal_initialized = true;
+  }
+
+  // Learning: only when flame is OFF, room temp valid, outdoor temp valid
+  // AC#6: Learning only runs when SAT has valid room temp AND outside temp simultaneously
+  if (!flame && roomValid && outdoorValid) {
+    float delta = roomTemp - outsideTemp;
+    if (delta < SAT_THERMAL_MIN_DELTA) {
+      // Indoor-outdoor delta too small for meaningful measurement
+      _thermal_learning = false;
+      return;
+    }
+
+    if (!_thermal_learning) {
+      // Flame just turned off (or first valid reading) -- start learning period
+      _thermal_learning = true;
+      _thermal_prevRoom = roomTemp;
+      _thermal_prevMs = now;
+      return;
+    }
+
+    // AC#1: Track temperature drop rate during heating-off periods
+    uint32_t elapsed = now - _thermal_prevMs;
+    if (elapsed >= SAT_THERMAL_SAMPLE_MS) {
+      float dtHours = (float)elapsed / 3600000.0f;
+      float roomDrop = _thermal_prevRoom - roomTemp;
+
+      // Only learn from actual temperature drops (building cooling down)
+      if (roomDrop >= SAT_THERMAL_MIN_DROP) {
+        float dropPerHour = roomDrop / dtHours;
+        float sample = dropPerHour / delta;
+
+        // Sanity check the sample
+        if (sample >= SAT_THERMAL_COEFF_MIN && sample <= SAT_THERMAL_COEFF_MAX) {
+          // AC#2: EMA update of thermal coefficient
+          _thermal_coeffEma = SAT_THERMAL_EMA_ALPHA * sample + (1.0f - SAT_THERMAL_EMA_ALPHA) * _thermal_coeffEma;
+          state.sat.fThermalDropRate = sample;
+
+          // Track learning duration for validity (AC#7)
+          _thermal_totalLearnMs += elapsed;
+          if (_thermal_totalLearnMs >= SAT_THERMAL_VALID_MS) {
+            state.sat.bThermalModelValid = true;
+          }
+
+          // AC#11: Save to settings periodically (every hour)
+          if ((now - _thermal_lastSaveMs) >= SAT_THERMAL_SAVE_MS) {
+            settings.sat.fThermalCoeff = _thermal_coeffEma;
+            char coeffBuf[12];
+            dtostrf(_thermal_coeffEma, 1, 4, coeffBuf);
+            updateSetting("SATthermalcoeff", coeffBuf);
+            _thermal_lastSaveMs = now;
+            DebugTf(PSTR("SAT thermal: coeff updated %.4f\r\n"), _thermal_coeffEma);
+          }
+        }
+      }
+
+      _thermal_prevRoom = roomTemp;
+      _thermal_prevMs = now;
+    }
+  } else {
+    // Flame on or invalid readings -- stop learning
+    _thermal_learning = false;
+  }
+}
+
+// AC#3: Estimate room temperature during fallback when no valid sensor data
+static float satEstimateRoomTemp(float outsideTemp)
+{
+  uint32_t now = millis();
+  if (state.sat.iLastKnownRoomMs == 0) return 0.0f;  // No data at all
+
+  float hoursElapsed = (float)(now - state.sat.iLastKnownRoomMs) / 3600000.0f;
+  float lastRoom = state.sat.fLastKnownRoom;
+  float coeff = _thermal_coeffEma;
+
+  // estimated = lastKnown - coeff * (lastKnown - outdoor) * hoursElapsed
+  float estimated = lastRoom - coeff * (lastRoom - outsideTemp) * hoursElapsed;
+
+  // Clamp to reasonable range
+  if (estimated < SAT_THERMAL_EST_MIN) estimated = SAT_THERMAL_EST_MIN;
+  if (estimated > SAT_THERMAL_EST_MAX) estimated = SAT_THERMAL_EST_MAX;
+
+  state.sat.fEstimatedRoom = estimated;
+  return estimated;
+}
+
+//=====================================================================
 //=== Solar Gain Compensation (Task #23) ===
 //=====================================================================
 static float    _solar_prevRoomTemp   = 0.0f;
@@ -1687,6 +1846,8 @@ void satControlLoop()
 {
   // --- Simulation update (Task #37): model thermal behavior before PID ---
   satUpdateSimulation();
+  // --- Thermal drop learning (Task #21): learn building thermal decay rate ---
+  satUpdateThermalLearning();
   // --- Fallback detection (Task #19): auto-enable SAT when external control lost ---
   if (!settings.sat.bEnabled && !state.sat.bFallbackActive) {
     // Check if we should auto-enable as fallback
@@ -1779,6 +1940,32 @@ void satControlLoop()
     outsideTemp = 10.0f;  // Safe fallback
   }
 
+  // --- Task #21: Thermal estimation fallback ---
+  // AC#5: After 2+ hours of estimation without real data, switch to fixed safe setpoint
+  float savedDeadband = settings.sat.fDeadband;
+  bool thermalDeadbandWidened = false;
+  if (state.sat.bFallbackActive && state.sat.iLastKnownRoomMs > 0) {
+    uint32_t estElapsed = millis() - state.sat.iLastKnownRoomMs;
+    if (estElapsed >= SAT_THERMAL_MAX_EST_MS) {
+      // Too long without real data -- use fixed safe flow setpoint
+      state.sat.fFinalSetpoint = SAT_THERMAL_SAFE_FLOW;
+      float sysMax = satGetMaxSetpoint();
+      if (state.sat.fFinalSetpoint > sysMax) state.sat.fFinalSetpoint = sysMax;
+      if (hasOTCommandInterface()) {
+        char cmd[12];
+        snprintf_P(cmd, sizeof(cmd), PSTR("CS=%d"), (int)state.sat.fFinalSetpoint);
+        addCommandToQueue(cmd, strlen(cmd), false, 0);
+      }
+      satPublishMQTT();
+      return;
+    }
+    // AC#4: Widen deadband proportionally to estimation time (uncertainty grows)
+    // Add 0.5C per hour of estimation on top of normal deadband
+    float estHours = (float)estElapsed / 3600000.0f;
+    settings.sat.fDeadband += 0.5f * estHours;
+    thermalDeadbandWidened = true;
+  }
+
   // --- Window detection timer check ---
   _satCheckWindowTimer();
 
@@ -1821,6 +2008,11 @@ void satControlLoop()
 
   // --- Calculate PID output (includes heating curve value) ---
   float pidOutput = satPidUpdate(roomTemp, targetTemp, curveValue, OTcurrentSystemState.Tboiler);
+
+  // Task #21: Restore original deadband after PID used the widened value
+  if (thermalDeadbandWidened) {
+    settings.sat.fDeadband = savedDeadband;
+  }
 
   // --- Clamp to valid range ---
   float maxSetpoint = OTcurrentSystemState.MaxTSet;

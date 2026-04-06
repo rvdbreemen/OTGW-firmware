@@ -457,6 +457,12 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float    fSimOutdoorTemp        = 5.0f;
   uint32_t iSimLastUpdateMs       = 0;
   bool     bSimWarmupDone         = false;
+  // Thermal drop learning (Task #21)
+  float    fEstimatedRoom         = 0.0f;   // Estimated room temp during fallback
+  float    fLastKnownRoom         = 0.0f;   // Last valid room temp before fallback
+  uint32_t iLastKnownRoomMs       = 0;      // When last valid room temp was recorded
+  bool     bThermalModelValid     = false;   // True after sufficient learning data
+  float    fThermalDropRate       = 0.0f;    // Current drop rate sample (C/hr per C delta)
   // Solar gain (Task #23)
   bool     bSolarGainActive       = false;
   float    fIndoorRiseRate        = 0.0f;  // Current indoor temp rise rate (C/hr)
@@ -703,6 +709,8 @@ struct SATSection {
   bool     bSimulation        = false;  // Enable simulation mode
   float    fSimHeatRate       = 0.5f;   // Room heating rate C/min
   float    fSimCoolRate       = 0.1f;   // Room cooling rate C/min
+  // Thermal drop learning (Task #21) — learned building thermal decay coefficient
+  float    fThermalCoeff      = 0.05f;  // Learned thermal drop coefficient (C/hr per C delta)
   // Solar gain compensation (Task #23)
   bool     bSolarGainEnable   = false;  // Enable solar gain compensation
   float    fSolarMinRiseRate  = 0.5f;   // Minimum indoor rise rate (C/hr) to trigger

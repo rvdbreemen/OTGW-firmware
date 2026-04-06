@@ -1,9 +1,11 @@
 ---
 id: TASK-21
 title: Thermal drop learning for SAT fallback mode
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-05 11:45'
+updated_date: '2026-04-06 12:33'
 labels:
   - sat
   - feature
@@ -34,3 +36,18 @@ When SAT operates in fallback mode (external control lost), it should make intel
 - [ ] #10 MQTT publish: sat/thermal_drop_rate
 - [ ] #11 Settings persistence: learned coefficient saved to LittleFS
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add fThermalCoeff to SATSection (settings) and thermal state fields to SATRuntimeSection
+2. Add thermal learning constants and static tracking variables to SATcontrol.ino
+3. Implement satUpdateThermalLearning() - learns drop rate during flame-off periods using EMA
+4. Implement satEstimateRoomTemp() - estimates room temp using learned coefficient during fallback
+5. Modify satGetRoomTemp() to use thermal estimation when in fallback with invalid room temp
+6. Add deadband widening (AC#4) and safe setpoint fallback after 2h (AC#5) in satControlLoop
+7. Add thermal fields to satSendStatusJSON() and satPublishMQTT()
+8. Add persistence in settingStuff.ino (write + update handler)
+9. Add to restAPI.ino sendDeviceSettings + knownSettings
+10. Add translateSettings + tooltip in index.js
+<!-- SECTION:PLAN:END -->

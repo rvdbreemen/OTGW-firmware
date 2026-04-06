@@ -318,6 +318,7 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("SATsimulation"), settings.sat.bSimulation, true);
   writeJsonFloatKV(file, F("SATsimheatrate"), settings.sat.fSimHeatRate, true);
   writeJsonFloatKV(file, F("SATsimcoolrate"), settings.sat.fSimCoolRate, true);
+  writeJsonFloatKV(file, F("SATthermalcoeff"), settings.sat.fThermalCoeff, true);
   writeJsonBoolKV(file, F("SATsolargain"), settings.sat.bSolarGainEnable, true);
   writeJsonFloatKV(file, F("SATsolarminrise"), settings.sat.fSolarMinRiseRate, true);
   writeJsonFloatKV(file, F("SATsolaroffset"), settings.sat.fSolarSetpointOffset, true);
@@ -781,6 +782,7 @@ void updateSetting(const char *field, const char *newValue)
   }
   else if (strcasecmp_P(field, PSTR("SATsimheatrate")) == 0) settings.sat.fSimHeatRate = constrain(atof(newValue), 0.01f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATsimcoolrate")) == 0) settings.sat.fSimCoolRate = constrain(atof(newValue), 0.01f, 5.0f);
+  else if (strcasecmp_P(field, PSTR("SATthermalcoeff")) == 0) settings.sat.fThermalCoeff = constrain(atof(newValue), 0.005f, 0.3f);
   else if (strcasecmp_P(field, PSTR("SATsolargain")) == 0) settings.sat.bSolarGainEnable = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATsolarminrise")) == 0) settings.sat.fSolarMinRiseRate = constrain(atof(newValue), 0.1f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATsolaroffset")) == 0) settings.sat.fSolarSetpointOffset = constrain(atof(newValue), 0.5f, 10.0f);
