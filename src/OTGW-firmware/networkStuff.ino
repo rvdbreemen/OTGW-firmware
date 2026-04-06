@@ -245,7 +245,7 @@ void loopWifi() {
               CSTR(settings.sHostname));
       platformRestartDHCP();
       startTelnet();
-      startOTGWstream();
+      // OTGWstream is auto-started by handleOTGW() in the main loop
       startMQTT();
       startWebSocket();
       wifiState = WIFI_IDLE;
@@ -381,7 +381,7 @@ bool isNTPtimeSet()
 }
 
 void sendtimecommand(){
-  if (state.otgw.bPSmode) return;                  // when in Print Summary mode (PS=1), no timesync commands (improving legacy/Domoticz compatibility)
+  if (state.otBus.bPSmode) return;                  // when in Print Summary mode (PS=1), no timesync commands (improving legacy/Domoticz compatibility)
   if (!settings.ntp.bEnable) return;        // if NTP is disabled, then return
   if (!settings.ntp.bSendtime) return;      // if NTP send time is disabled, then return
   if (NtpStatus != TIME_SYNC) return;   // only send time command when time is synced
@@ -399,18 +399,18 @@ void sendtimecommand(){
   //Send msg id xx: hour:minute/day of week
   int day_of_week = (myTime.dayOfWeek()+6)%7+1;
   snprintf_P(msg, sizeof(msg), PSTR("SC=%d:%02d/%d"), myTime.hour(), myTime.minute(), day_of_week);
-  addOTWGcmdtoqueue(msg, strlen(msg), false, 0);
+  addCommandToQueue(msg, strlen(msg), false, 0);
 
   if (dayChanged()){
     //Send msg id 21: month, day
     snprintf_P(msg, sizeof(msg), PSTR("SR=21:%d,%d"), myTime.month(), myTime.day());
-    addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
+    addCommandToQueue(msg, strlen(msg), true, 0);
   }
 
   if (yearChanged()){
     //Send msg id 22: HB of Year, LB of Year
     snprintf_P(msg, sizeof(msg), PSTR("SR=22:%d,%d"), (myTime.year() >> 8) & 0xFF, myTime.year() & 0xFF);
-    addOTWGcmdtoqueue(msg, strlen(msg), true, 0);
+    addCommandToQueue(msg, strlen(msg), true, 0);
   }
 }
 
