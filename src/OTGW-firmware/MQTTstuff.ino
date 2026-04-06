@@ -765,6 +765,10 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
               updateSetting("SATpresetsynctopic", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("multi_area")) == 0) {
               updateSetting("SATmultiarea", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("auto_tune")) == 0) {
+              updateSetting("SATautotune", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("auto_tune_rate")) == 0) {
+              updateSetting("SATautotunerate", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("multi_area_count")) == 0) {
               updateSetting("SATmultiareacount", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("area")) == 0) {

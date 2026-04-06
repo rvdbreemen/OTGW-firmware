@@ -1114,6 +1114,12 @@ void satSendStatusJSON()
     satSendJsonFloat(F("sim_flow_temp"),        state.sat.fSimFlowTemp, 1);
     satSendJsonFloat(F("sim_outdoor_temp"),     state.sat.fSimOutdoorTemp, 1);
   }
+  // PID auto-tuning (Task #27)
+  sendJsonMapEntry(F("auto_tune"),             settings.sat.bAutoTune);
+  sendJsonMapEntry(F("auto_tune_active"),      state.sat.bAutoTuneActive);
+  sendJsonMapEntry(F("auto_tune_cycles"),      (int32_t)state.sat.iAutoTuneCycles);
+  satSendJsonFloat(F("auto_tune_score"),       state.sat.fAutoTuneScore, 2);
+  satSendJsonFloat(F("auto_tune_rate"),        settings.sat.fAutoTuneRate, 3);
   // Multi-area (Task #25)
   sendJsonMapEntry(F("multi_area"),            settings.sat.bMultiArea);
   sendJsonMapEntry(F("multi_area_count"),      (int32_t)settings.sat.iMultiAreaCount);
@@ -1319,6 +1325,17 @@ void satPublishMQTT()
 
   // Simulation (Task #37)
   sendMQTTData(F("sat/simulation"), settings.sat.bSimulation ? "ON" : "OFF", true);
+
+  // PID auto-tuning (Task #27)
+  sendMQTTData(F("sat/auto_tune"), settings.sat.bAutoTune ? "ON" : "OFF", true);
+  if (settings.sat.bAutoTune) {
+    char atBuf[12];
+    dtostrf(state.sat.fAutoTuneScore, 1, 2, atBuf);
+    sendMQTTData(F("sat/auto_tune_score"), atBuf, false);
+    dtostrf(settings.sat.fAutoTuneRate, 1, 3, atBuf);
+    sendMQTTData(F("sat/auto_tune_rate"), atBuf, false);
+    sendMQTTData(F("sat/auto_tune_active"), state.sat.bAutoTuneActive ? "true" : "false", false);
+  }
 
   // Multi-area (Task #25)
   if (settings.sat.bMultiArea && settings.sat.iMultiAreaCount > 0) {
@@ -1992,6 +2009,143 @@ static void satUpdateSummerSimmer()
 }
 
 //=====================================================================
+//=== PID Auto-Tuning (Task #27) ===
+//=====================================================================
+// Performance-based PID gain self-tuning. Monitors overshoot/undershoot/
+// oscillation over time and applies small conservative adjustments once
+// per hour (with at least 6 heating cycles of data).
+
+// Gain clamp ranges
+static const float AT_KP_MIN = 0.5f;
+static const float AT_KP_MAX = 50.0f;
+static const float AT_KI_MIN = 0.0001f;
+static const float AT_KI_MAX = 0.01f;
+static const float AT_KD_MIN = 0.0f;
+static const float AT_KD_MAX = 500.0f;
+
+// Tracking state (static, never persisted)
+static uint16_t _at_overshootCount    = 0;
+static uint16_t _at_undershootCount   = 0;
+static uint16_t _at_oscillationCount  = 0;
+static float    _at_convergenceSum    = 0.0f;  // sum of convergence times (minutes)
+static uint16_t _at_convergenceN      = 0;     // number of convergence samples
+static uint32_t _at_lastTuneMs        = 0;
+static uint32_t _at_cyclesSinceTune   = 0;
+static bool     _at_prevOvershoot     = false;  // for oscillation detection
+static const uint32_t AT_TUNE_INTERVAL_MS = 3600000UL; // 1 hour
+static const uint8_t  AT_MIN_CYCLES       = 6;
+
+static void satAutoTuneUpdate()
+{
+  if (!settings.sat.bAutoTune || !state.sat.bActive) {
+    state.sat.bAutoTuneActive = false;
+    return;
+  }
+  state.sat.bAutoTuneActive = true;
+
+  // --- Accumulate per-cycle metrics from cycle tracker ---
+  // Check if a new cycle just completed (cycle count changed)
+  static uint32_t _at_lastCycleCount = 0;
+  if (state.sat.iCycleCount > _at_lastCycleCount) {
+    _at_lastCycleCount = state.sat.iCycleCount;
+    _at_cyclesSinceTune++;
+
+    // Classify the completed cycle
+    bool isOvershoot = (state.sat.eLastCycleClass == SAT_CYCLE_OVERSHOOT);
+    bool isUnderheat = (state.sat.eLastCycleClass == SAT_CYCLE_UNDERHEAT);
+
+    if (isOvershoot) _at_overshootCount++;
+    if (isUnderheat) _at_undershootCount++;
+
+    // Oscillation: alternating overshoot/undershoot
+    if (isOvershoot && !_at_prevOvershoot && _at_undershootCount > 0) _at_oscillationCount++;
+    if (isUnderheat && _at_prevOvershoot && _at_overshootCount > 0) _at_oscillationCount++;
+    _at_prevOvershoot = isOvershoot;
+
+    // Track convergence time from cycle overshoot seconds (proxy for settling)
+    if (state.sat.fCycleOvershootSec > 0.0f) {
+      _at_convergenceSum += state.sat.fCycleOvershootSec / 60.0f;
+      _at_convergenceN++;
+    }
+  }
+
+  state.sat.iAutoTuneCycles = _at_cyclesSinceTune;
+
+  // --- Check if it is time to tune ---
+  uint32_t now = millis();
+  if (_at_lastTuneMs == 0) _at_lastTuneMs = now;
+
+  if ((now - _at_lastTuneMs) < AT_TUNE_INTERVAL_MS) return;
+  if (_at_cyclesSinceTune < AT_MIN_CYCLES) return;
+
+  // --- Analyze and adjust ---
+  float rate = settings.sat.fAutoTuneRate;
+  uint16_t totalCycles = _at_overshootCount + _at_undershootCount;
+  if (totalCycles == 0) totalCycles = 1;  // avoid divide-by-zero
+
+  // Score: positive = overshoot dominant, negative = undershoot dominant
+  float score = (float)((int16_t)_at_overshootCount - (int16_t)_at_undershootCount) / (float)totalCycles;
+  state.sat.fAutoTuneScore = score;
+
+  float avgConvergence = (_at_convergenceN > 0) ? (_at_convergenceSum / (float)_at_convergenceN) : 0.0f;
+
+  // Read current gains from PID auto-gain calculation (state.sat.fKp/fKi/fKd)
+  // We adjust the heating curve coefficient which drives gain calculation
+  float coeff = settings.sat.fHeatingCurveCoeff;
+  bool adjusted = false;
+
+  // Oscillation dominates: strong damping needed
+  if (_at_oscillationCount > _at_cyclesSinceTune / 3) {
+    coeff *= (1.0f - rate * 2.0f);
+    adjusted = true;
+    DebugTf(PSTR("SAT AutoTune: oscillation detected (%u/%lu), reducing coeff\r\n"),
+            _at_oscillationCount, (unsigned long)_at_cyclesSinceTune);
+  }
+  // Overshoot dominant: reduce aggression
+  else if (score > 0.3f) {
+    coeff *= (1.0f - rate);
+    adjusted = true;
+    DebugTf(PSTR("SAT AutoTune: overshoot dominant (score=%.2f), reducing coeff\r\n"), score);
+  }
+  // Undershoot dominant: increase aggression
+  else if (score < -0.3f) {
+    coeff *= (1.0f + rate);
+    adjusted = true;
+    DebugTf(PSTR("SAT AutoTune: undershoot dominant (score=%.2f), increasing coeff\r\n"), score);
+  }
+
+  // Slow convergence: slightly increase coefficient (faster response)
+  if (avgConvergence > 30.0f && !adjusted) {
+    coeff *= (1.0f + rate * 0.5f);
+    adjusted = true;
+    DebugTf(PSTR("SAT AutoTune: slow convergence (%.1f min), increasing coeff\r\n"), avgConvergence);
+  }
+
+  // Clamp coefficient to reasonable range
+  if (coeff < 0.3f) coeff = 0.3f;
+  if (coeff > 5.0f) coeff = 5.0f;
+
+  if (adjusted) {
+    settings.sat.fHeatingCurveCoeff = coeff;
+    DebugTf(PSTR("SAT AutoTune: new coefficient=%.2f (cycles=%lu, os=%u, us=%u, osc=%u)\r\n"),
+            coeff, (unsigned long)_at_cyclesSinceTune,
+            _at_overshootCount, _at_undershootCount, _at_oscillationCount);
+
+    // Persist updated coefficient
+    writeSettings(false);
+  }
+
+  // Reset counters for next tuning window
+  _at_overshootCount   = 0;
+  _at_undershootCount  = 0;
+  _at_oscillationCount = 0;
+  _at_convergenceSum   = 0.0f;
+  _at_convergenceN     = 0;
+  _at_cyclesSinceTune  = 0;
+  _at_lastTuneMs       = now;
+}
+
+//=====================================================================
 //=== Main Control Loop (called from doBackgroundTasks) ===
 //=====================================================================
 void satControlLoop()
@@ -2139,6 +2293,9 @@ void satControlLoop()
 
   // --- Power & energy tracking (Task #45) ---
   satUpdatePowerEnergy();
+
+  // --- PID auto-tuning (Task #27) ---
+  satAutoTuneUpdate();
 
   // --- Heating curve recommendation ---
   satUpdateCurveRecommendation();

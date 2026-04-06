@@ -1510,6 +1510,13 @@ void sendDeviceSettings()
     dtostrf(settings.sat.fAreaWeight[3], 1, 2, tmpBuf);
     sendJsonSettingObj(F("satareaweight3"), tmpBuf, "f", 0, 10);
   }
+  // --- SAT PID Auto-Tuning settings (Task #27) ---
+  sendJsonSettingObj(F("satautotune"), settings.sat.bAutoTune, "b");
+  {
+    char tmpBuf[8];
+    dtostrf(settings.sat.fAutoTuneRate, 1, 3, tmpBuf);
+    sendJsonSettingObj(F("satautotunerate"), tmpBuf, "f", 0, 1);
+  }
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-Direct settings (OTGW32 only) ---
   sendJsonSettingObj(F("otdmode"), settings.otd.iMode, "i", 0, 4);
@@ -1564,6 +1571,7 @@ static const char* const PROGMEM knownSettings[] = {
   "otgwcommandenable", "otgwcommands",
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
   "satareaweight0", "satareaweight1", "satareaweight2", "satareaweight3",
+  "satautotune", "satautotunerate",
   "satboilercapacity", "satcoefficient", "satcomfortadjust", "satcomforthumidity", "satcomfortmaxoffset",
   "satdeadband", "satenabled", "satexternaltemp",
   "satinterval", "satmanufacturer", "satmultiarea", "satmultiareacount",

@@ -334,6 +334,8 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATareaweight1"), settings.sat.fAreaWeight[1], true);
   writeJsonFloatKV(file, F("SATareaweight2"), settings.sat.fAreaWeight[2], true);
   writeJsonFloatKV(file, F("SATareaweight3"), settings.sat.fAreaWeight[3], true);
+  writeJsonBoolKV(file, F("SATautotune"), settings.sat.bAutoTune, true);
+  writeJsonFloatKV(file, F("SATautotunerate"), settings.sat.fAutoTuneRate, true);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings (OTGW32/OT-Thing only) ---
   writeJsonIntKV(file, F("OTDmode"), settings.otd.iMode, true);
@@ -807,6 +809,8 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATareaweight1")) == 0) settings.sat.fAreaWeight[1] = constrain(atof(newValue), 0.0f, 10.0f);
   else if (strcasecmp_P(field, PSTR("SATareaweight2")) == 0) settings.sat.fAreaWeight[2] = constrain(atof(newValue), 0.0f, 10.0f);
   else if (strcasecmp_P(field, PSTR("SATareaweight3")) == 0) settings.sat.fAreaWeight[3] = constrain(atof(newValue), 0.0f, 10.0f);
+  else if (strcasecmp_P(field, PSTR("SATautotune")) == 0) settings.sat.bAutoTune = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATautotunerate")) == 0) settings.sat.fAutoTuneRate = constrain(atof(newValue), 0.005f, 0.1f);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings ---
   else if (strcasecmp_P(field, PSTR("OTDmode")) == 0)           settings.otd.iMode = constrain(atoi(newValue), 0, 4);

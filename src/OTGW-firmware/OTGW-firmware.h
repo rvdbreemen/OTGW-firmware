@@ -478,6 +478,10 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float    fAreaTemp[4]           = {0};    // Temperature per area
   bool     bAreaValid[4]          = {false};// Area has valid reading
   uint32_t iAreaLastMs[4]         = {0};    // Last update per area
+  // PID auto-tuning (Task #27)
+  bool     bAutoTuneActive        = false;  // Currently running auto-tune analysis
+  uint16_t iAutoTuneCycles        = 0;      // Cycles analyzed since last adjustment
+  float    fAutoTuneScore         = 0.0f;   // Current performance score (-1 to +1)
 };
 
 struct OTGWState {
@@ -736,6 +740,9 @@ struct SATSection {
   bool     bMultiArea         = false;  // Enable multi-area weighted temperature
   uint8_t  iMultiAreaCount    = 0;      // Number of configured areas (0-4)
   float    fAreaWeight[4]     = {1.0f, 1.0f, 1.0f, 1.0f};  // Weight per area
+  // PID auto-tuning (Task #27)
+  bool     bAutoTune          = false;  // Enable automatic PID gains tuning
+  float    fAutoTuneRate      = 0.02f;  // Adjustment rate per tuning cycle (2%)
 };
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT

@@ -5296,6 +5296,8 @@ var translateTooltips = [
   , ["SATareaweight1", "Weight for area 1 in the weighted average calculation. Default 1.0, range 0-10."]
   , ["SATareaweight2", "Weight for area 2 in the weighted average calculation. Default 1.0, range 0-10."]
   , ["SATareaweight3", "Weight for area 3 in the weighted average calculation. Default 1.0, range 0-10."]
+  , ["SATautotune", "Enable automatic PID gains self-tuning. Monitors heating cycle performance (overshoot, undershoot, oscillation) and gradually adjusts the heating curve coefficient. Tuning runs once per hour after at least 6 heating cycles."]
+  , ["SATautotunerate", "Adjustment rate per tuning cycle (0.5%-10%). Default 2%. Lower values make smaller, more conservative adjustments. Higher values converge faster but risk instability."]
   , ["SATthermalcoeff", "Learned thermal drop coefficient (degrees C per hour per degree indoor-outdoor delta). Automatically updated by observing how fast the building cools when the boiler is off. Used during fallback mode to estimate room temperature. Default 0.05, typical range 0.02-0.1 for well-insulated buildings."]
   , ["SATweatherenable", "Enable weather data fetching from Open-Meteo API (free, no key needed). Provides outdoor temperature fallback when no OT outdoor sensor is available."]
   , ["SATweatherlat", "Latitude for weather data. Use the Detect Location button on the SAT dashboard, or enter manually (-90 to 90)."]
