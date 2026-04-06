@@ -102,6 +102,9 @@ static void _pidUpdateIntegral(float error, float curveValue, bool force)
   // Inside deadband: integral acts as compensator
   if (state.sat.fKi < 1e-9f) return;
 
+  // Solar gain freeze: skip integral accumulation to prevent windup (Task #23)
+  if (state.sat.bSolarGainActive) return;
+
   // Accumulate: Ki * error * PID_UPDATE_INTERVAL (fixed 60s per SAT Python)
   _pid_integral += state.sat.fKi * error * SAT_PID_UPDATE_INTERVAL;
 

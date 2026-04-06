@@ -457,6 +457,9 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float    fSimOutdoorTemp        = 5.0f;
   uint32_t iSimLastUpdateMs       = 0;
   bool     bSimWarmupDone         = false;
+  // Solar gain (Task #23)
+  bool     bSolarGainActive       = false;
+  float    fIndoorRiseRate        = 0.0f;  // Current indoor temp rise rate (C/hr)
 };
 
 struct OTGWState {
@@ -697,6 +700,10 @@ struct SATSection {
   bool     bSimulation        = false;  // Enable simulation mode
   float    fSimHeatRate       = 0.5f;   // Room heating rate C/min
   float    fSimCoolRate       = 0.1f;   // Room cooling rate C/min
+  // Solar gain compensation (Task #23)
+  bool     bSolarGainEnable   = false;  // Enable solar gain compensation
+  float    fSolarMinRiseRate  = 0.5f;   // Minimum indoor rise rate (C/hr) to trigger
+  float    fSolarSetpointOffset = 2.0f; // Setpoint reduction during solar gain (C)
 };
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT

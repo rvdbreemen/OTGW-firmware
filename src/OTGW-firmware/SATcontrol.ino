@@ -985,6 +985,9 @@ void satSendStatusJSON()
   satSendJsonFloat(F("boiler_capacity"),       settings.sat.fBoilerCapacity, 1);
   // Preset sync (Task #46)
   sendJsonMapEntry(F("preset_sync"),           settings.sat.bPresetSync);
+  // Solar gain (Task #23)
+  sendJsonMapEntry(F("solar_gain_active"),     state.sat.bSolarGainActive);
+  satSendJsonFloat(F("indoor_rise_rate"),      state.sat.fIndoorRiseRate, 2);
   // Simulation (Task #37)
   sendJsonMapEntry(F("simulation"),            settings.sat.bSimulation);
   if (settings.sat.bSimulation) {
@@ -1134,6 +1137,13 @@ void satPublishMQTT()
   // Manufacturer
   { char mfrName[12]; satGetManufacturerName(mfrName, sizeof(mfrName));
     sendMQTTData(F("sat/manufacturer"), mfrName, true); }
+
+  // Solar gain (Task #23)
+  sendMQTTData(F("sat/solar_gain"), state.sat.bSolarGainActive ? "true" : "false", false);
+  { char sgBuf[12];
+    dtostrf(state.sat.fIndoorRiseRate, 1, 2, sgBuf);
+    sendMQTTData(F("sat/indoor_rise_rate"), sgBuf, false);
+  }
 
   // Simulation (Task #37)
   sendMQTTData(F("sat/simulation"), settings.sat.bSimulation ? "ON" : "OFF", true);
@@ -1529,6 +1539,76 @@ static void satUpdateSimulation()
 }
 
 //=====================================================================
+//=== Solar Gain Compensation (Task #23) ===
+//=====================================================================
+static float    _solar_prevRoomTemp   = 0.0f;
+static uint32_t _solar_prevMs         = 0;
+static float    _solar_riseRateEma    = 0.0f;
+static uint32_t _solar_conditionMs    = 0;  // How long condition has persisted
+static bool     _solar_wasActive      = false; // Track previous state for hysteresis
+
+static void satUpdateSolarGain()
+{
+  if (!settings.sat.bSolarGainEnable) {
+    state.sat.bSolarGainActive = false;
+    state.sat.fIndoorRiseRate = 0.0f;
+    _solar_conditionMs = 0;
+    _solar_wasActive = false;
+    return;
+  }
+
+  float roomTemp = satGetRoomTemp();
+  uint32_t now = millis();
+
+  // Calculate rise rate (EMA smoothed), minimum 30s between samples
+  if (_solar_prevMs > 0 && (now - _solar_prevMs) > 30000UL) {
+    float dtHours = (float)(now - _solar_prevMs) / 3600000.0f;
+    float rawRate = (roomTemp - _solar_prevRoomTemp) / dtHours;
+    _solar_riseRateEma = 0.3f * rawRate + 0.7f * _solar_riseRateEma;
+    _solar_prevRoomTemp = roomTemp;
+    _solar_prevMs = now;
+  } else if (_solar_prevMs == 0) {
+    _solar_prevRoomTemp = roomTemp;
+    _solar_prevMs = now;
+  }
+
+  state.sat.fIndoorRiseRate = _solar_riseRateEma;
+
+  // Detect solar gain condition: rising fast + low boiler modulation
+  float modulation = OTcurrentSystemState.RelModLevel;
+  bool risingFast = (_solar_riseRateEma > settings.sat.fSolarMinRiseRate);
+  bool lowModulation = (modulation < 30.0f);
+
+  if (!_solar_wasActive) {
+    // Not yet active: require sustained rising + low modulation for 10 min
+    if (risingFast && lowModulation) {
+      if (_solar_conditionMs == 0) _solar_conditionMs = now;
+      if ((now - _solar_conditionMs) > 600000UL) { // 10 min sustained
+        state.sat.bSolarGainActive = true;
+        _solar_wasActive = true;
+        _solar_conditionMs = 0;
+        DebugTln(F("SAT: solar gain detected"));
+      }
+    } else {
+      _solar_conditionMs = 0;
+    }
+  } else {
+    // Currently active: require rise rate below threshold for 10 min to clear
+    if (!risingFast) {
+      if (_solar_conditionMs == 0) _solar_conditionMs = now;
+      if ((now - _solar_conditionMs) > 600000UL) { // 10 min below threshold
+        state.sat.bSolarGainActive = false;
+        _solar_wasActive = false;
+        _solar_conditionMs = 0;
+        DebugTln(F("SAT: solar gain cleared"));
+      }
+    } else {
+      _solar_conditionMs = 0; // Still rising, stay active
+    }
+  }
+}
+
+//=====================================================================
 //=== Main Control Loop (called from doBackgroundTasks) ===
 //=====================================================================
 void satControlLoop()
@@ -1633,6 +1713,9 @@ void satControlLoop()
   // --- Pressure monitoring ---
   satUpdatePressure();
 
+  // --- Solar gain compensation (Task #23) ---
+  satUpdateSolarGain();
+
   // --- Power & energy tracking (Task #45) ---
   satUpdatePowerEnergy();
 
@@ -1686,6 +1769,12 @@ void satControlLoop()
   // Final clamp (including hard ceiling)
   if (finalSetpoint < SAT_MIN_SETPOINT) finalSetpoint = SAT_MIN_SETPOINT;
   if (finalSetpoint > maxSetpoint) finalSetpoint = maxSetpoint;
+
+  // --- Solar gain compensation: reduce setpoint (Task #23) ---
+  if (state.sat.bSolarGainActive && settings.sat.bSolarGainEnable) {
+    finalSetpoint -= settings.sat.fSolarSetpointOffset;
+    if (finalSetpoint < SAT_MIN_SETPOINT) finalSetpoint = SAT_MIN_SETPOINT;
+  }
   state.sat.fFinalSetpoint = finalSetpoint;
 
   // --- Auto-switch between continuous and PWM modes (Tasks #42/#43) ---
