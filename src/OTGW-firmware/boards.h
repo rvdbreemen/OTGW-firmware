@@ -77,6 +77,18 @@
 #define PIN_PIC_RX        16   // UART1 RX — connects to PIC TX
 #define PIN_PIC_TX        17   // UART1 TX — connects to PIC RX
 
+// OT-Direct master pins (ESP32 direct OpenTherm without PIC)
+#define PIN_OT_MASTER_IN  32   // OpenTherm master input
+#define PIN_OT_MASTER_OUT 33   // OpenTherm master output
+
+// SPI pins for W5500 Ethernet module
+#define PIN_SPI_CS        5    // W5500 chip select
+#define PIN_SPI_INT       34   // W5500 interrupt (input only on ESP32)
+#define PIN_SPI_RST       15   // W5500 reset
+#define PIN_SPI_SCK       18   // SPI clock
+#define PIN_SPI_MISO      19   // SPI MISO
+#define PIN_SPI_MOSI      23   // SPI MOSI
+
 // Feature flags for ESP32 Nodoshop OTGW32
 #define HAS_PIC           1    // Has PIC microcontroller for OpenTherm gateway
 #define HAS_DIRECT_OT     1    // Can also do direct OT master (without PIC)
