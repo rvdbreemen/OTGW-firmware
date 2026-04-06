@@ -1231,6 +1231,14 @@ void satPublishMQTT()
   dtostrf(state.sat.fPidD, 1, 2, valBuf);
   sendMQTTData(F("sat/pid_d"), valBuf, false);
 
+  // PID JSON attributes for HA (json_attributes_topic) — Task #55
+  {
+    char jsonBuf[128];
+    snprintf_P(jsonBuf, sizeof(jsonBuf), PSTR("{\"error\":%.2f,\"proportional\":%.2f,\"integral\":%.2f,\"derivative\":%.2f}"),
+      state.sat.fError, state.sat.fPidP, state.sat.fPidI, state.sat.fPidD);
+    sendMQTTData(F("sat/pid_attributes"), jsonBuf, false);
+  }
+
   dtostrf(state.sat.fRawDerivative, 1, 4, valBuf);
   sendMQTTData(F("sat/raw_derivative"), valBuf, false);
 
@@ -1435,6 +1443,40 @@ void satPublishMQTT()
       pwmState = state.sat.bPwmFlameRequested ? "ON" : "OFF";
     }
     sendMQTTData(F("sat/pwm_state"), pwmState, false);
+  }
+
+  // DHW setpoint (Task #62: HA number entity)
+  dtostrf(settings.sat.fDhwSetpoint, 1, 1, valBuf);
+  sendMQTTData(F("sat/dhw_setpoint"), valBuf, true);
+
+  // Max setpoint for heating system (Task #63: HA number entity)
+  dtostrf(satGetMaxSetpoint(), 1, 1, valBuf);
+  sendMQTTData(F("sat/max_setpoint"), valBuf, true);
+
+  // Requested setpoint: PID output clamped to [min, max] before PWM (Task #51)
+  {
+    float reqSp = state.sat.fPidOutput;
+    float sysMax = satGetMaxSetpoint();
+    if (reqSp < SAT_MIN_SETPOINT) reqSp = SAT_MIN_SETPOINT;
+    if (reqSp > sysMax)           reqSp = sysMax;
+    dtostrf(reqSp, 1, 1, valBuf);
+    sendMQTTData(F("sat/requested_setpoint"), valBuf, false);
+  }
+
+  // Gas consumption m3/h (Task #52) — only when min+max consumption configured
+  {
+    float minCons = 0.0f;  // TODO: from settings when available
+    float maxCons = 0.0f;  // TODO: from settings when available
+    if (minCons > 0 && maxCons > 0) {
+      float consumption = 0.0f;
+      bool flame = (OTcurrentSystemState.Statusflags & 0x08) != 0;
+      if (state.sat.bActive && flame) {
+        float modFrac = OTcurrentSystemState.RelModLevel / 100.0f;
+        consumption = minCons + (modFrac * (maxCons - minCons));
+      }
+      snprintf_P(valBuf, sizeof(valBuf), PSTR("%.3f"), consumption);
+      sendMQTTData(F("sat/consumption"), valBuf, false);
+    }
   }
 
   // Weather data (Task #50)
