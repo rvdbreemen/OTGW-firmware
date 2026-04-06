@@ -469,6 +469,11 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // Summer simmer (Task #24)
   bool     bSummerActive          = false;  // Summer mode currently suppressing heating
   float    fSummerHoursAbove      = 0.0f;   // Hours outdoor temp has been above threshold
+  // Humidity and comfort (Task #28/#47)
+  float    fHumidity              = 0.0f;   // Current indoor humidity %
+  bool     bHumidityValid         = false;  // Humidity reading available
+  uint32_t iHumidityLastMs        = 0;      // Last humidity update timestamp
+  float    fComfortOffset         = 0.0f;   // Current comfort adjustment (C)
 };
 
 struct OTGWState {
@@ -719,6 +724,10 @@ struct SATSection {
   bool     bSummerSimmer      = false;  // Enable summer simmer auto-disable
   float    fSummerThreshold   = 18.0f;  // Outdoor temp threshold for summer mode (C)
   uint8_t  iSummerMinHours    = 6;      // Consecutive hours above threshold to trigger
+  // Thermal comfort adjustment (Task #28/#47) — humidity-based setpoint correction
+  bool     bComfortAdjust     = false;  // Enable thermal comfort (humidity) adjustment
+  float    fComfortHumidity   = 50.0f;  // Reference humidity % (no adjustment at this level)
+  float    fComfortMaxOffset  = 1.0f;   // Max target temp adjustment from humidity (C)
 };
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT

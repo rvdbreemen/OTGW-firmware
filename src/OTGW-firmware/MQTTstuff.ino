@@ -749,6 +749,14 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
               updateSetting("SATsummerthreshold", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("summer_min_hours")) == 0) {
               updateSetting("SATsummerminhours", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("humidity")) == 0) {
+              satHandleHumidity(msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("comfort_adjust")) == 0) {
+              updateSetting("SATcomfortadjust", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("comfort_humidity")) == 0) {
+              updateSetting("SATcomforthumidity", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("comfort_max_offset")) == 0) {
+              updateSetting("SATcomfortmaxoffset", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("simulation")) == 0) {
               updateSetting("SATsimulation", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("preset_sync")) == 0) {

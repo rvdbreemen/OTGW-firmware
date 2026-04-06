@@ -532,6 +532,7 @@ static const char* satExtractPostValue(const char* body, char* buf, size_t bufSi
 // POST /api/v2/sat/target — set target temperature (body: "21.0" or {"value":"21.0"})
 // POST /api/v2/sat/externaltemp — push indoor temp
 // POST /api/v2/sat/externaloutdoor — push outdoor temp
+// POST /api/v2/sat/humidity — push indoor humidity (0-100%)
 static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)
 {
   if (!checkHttpAuth()) return;
@@ -659,6 +660,21 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     }
     if (!val) { sendApiError(400, F("Missing mode (continuous/pwm)")); return; }
     satHandleControlMode(val);
+    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+  }
+  else if (strcasecmp_P(sub, PSTR("humidity")) == 0) {
+    if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    char valBuf[16];
+    const char* val = nullptr;
+    if (httpServer.hasArg(F("plain"))) {
+      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+    } else if (wc > 5) {
+      val = words[5];
+    }
+    if (!val || !satHandleHumidity(val)) {
+      sendApiError(400, F("Invalid or missing value (0-100)"));
+      return;
+    }
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   else if (strcasecmp_P(sub, PSTR("weather")) == 0) {
@@ -1451,6 +1467,15 @@ void sendDeviceSettings()
     sendJsonSettingObj(F("satsummerthreshold"), tmpBuf, "f", 5, 35);
   }
   sendJsonSettingObj(F("satsummerminhours"), settings.sat.iSummerMinHours, "i", 1, 48);
+  // --- SAT Thermal Comfort settings (Task #28/#47) ---
+  sendJsonSettingObj(F("satcomfortadjust"), settings.sat.bComfortAdjust, "b");
+  {
+    char tmpBuf[8];
+    dtostrf(settings.sat.fComfortHumidity, 1, 0, tmpBuf);
+    sendJsonSettingObj(F("satcomforthumidity"), tmpBuf, "f", 10, 90);
+    dtostrf(settings.sat.fComfortMaxOffset, 1, 1, tmpBuf);
+    sendJsonSettingObj(F("satcomfortmaxoffset"), tmpBuf, "f", 0, 3);
+  }
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-Direct settings (OTGW32 only) ---
   sendJsonSettingObj(F("otdmode"), settings.otd.iMode, "i", 0, 4);
@@ -1504,7 +1529,8 @@ static const char* const PROGMEM knownSettings[] = {
   "otdsetbacktemp", "otdsetbacktimeout", "otdsummermode",
   "otgwcommandenable", "otgwcommands",
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
-  "satboilercapacity", "satcoefficient", "satdeadband", "satenabled", "satexternaltemp",
+  "satboilercapacity", "satcoefficient", "satcomfortadjust", "satcomforthumidity", "satcomfortmaxoffset",
+  "satdeadband", "satenabled", "satexternaltemp",
   "satinterval", "satmanufacturer", "satovershootmargin", "satpresetaway", "satpresetcomfort", "satpreseteco",
   "satpresetsync", "satpresetsynctopic",
   "satpwmautoswitch", "satsimcoolrate", "satsimheatrate", "satsimulation",

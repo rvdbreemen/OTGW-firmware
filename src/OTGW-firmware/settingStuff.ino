@@ -325,6 +325,9 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("SATsummersimmer"), settings.sat.bSummerSimmer, true);
   writeJsonFloatKV(file, F("SATsummerthreshold"), settings.sat.fSummerThreshold, true);
   writeJsonIntKV(file, F("SATsummerminhours"), settings.sat.iSummerMinHours, true);
+  writeJsonBoolKV(file, F("SATcomfortadjust"), settings.sat.bComfortAdjust, true);
+  writeJsonFloatKV(file, F("SATcomforthumidity"), settings.sat.fComfortHumidity, true);
+  writeJsonFloatKV(file, F("SATcomfortmaxoffset"), settings.sat.fComfortMaxOffset, true);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings (OTGW32/OT-Thing only) ---
   writeJsonIntKV(file, F("OTDmode"), settings.otd.iMode, true);
@@ -789,6 +792,9 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATsummersimmer")) == 0) settings.sat.bSummerSimmer = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATsummerthreshold")) == 0) settings.sat.fSummerThreshold = constrain(atof(newValue), 5.0f, 35.0f);
   else if (strcasecmp_P(field, PSTR("SATsummerminhours")) == 0) settings.sat.iSummerMinHours = constrain(atoi(newValue), 1, 48);
+  else if (strcasecmp_P(field, PSTR("SATcomfortadjust")) == 0) settings.sat.bComfortAdjust = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATcomforthumidity")) == 0) settings.sat.fComfortHumidity = constrain(atof(newValue), 10.0f, 90.0f);
+  else if (strcasecmp_P(field, PSTR("SATcomfortmaxoffset")) == 0) settings.sat.fComfortMaxOffset = constrain(atof(newValue), 0.0f, 3.0f);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings ---
   else if (strcasecmp_P(field, PSTR("OTDmode")) == 0)           settings.otd.iMode = constrain(atoi(newValue), 0, 4);

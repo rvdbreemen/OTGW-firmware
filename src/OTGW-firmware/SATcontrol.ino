@@ -822,6 +822,20 @@ bool satHandleExternalOutdoor(const char* value)
 }
 
 // Returns true if the value was valid and applied
+bool satHandleHumidity(const char* value)
+{
+  if (!value || !*value) return false;
+  char* endp = nullptr;
+  float h = strtof(value, &endp);
+  if (endp == value || *endp != '\0') return false;
+  if (h < 0.0f || h > 100.0f) return false;
+  state.sat.fHumidity = h;
+  state.sat.bHumidityValid = true;
+  state.sat.iHumidityLastMs = millis();
+  DebugTf(PSTR("SAT: humidity set to %.0f%%\r\n"), h);
+  return true;
+}
+
 bool satHandleTargetTemp(const char* value)
 {
   if (!value || !*value) return false;
@@ -1031,6 +1045,13 @@ void satSendStatusJSON()
   satSendJsonFloat(F("summer_hours_above"),    state.sat.fSummerHoursAbove, 1);
   satSendJsonFloat(F("summer_threshold"),      settings.sat.fSummerThreshold, 1);
   sendJsonMapEntry(F("summer_min_hours"),      (int32_t)settings.sat.iSummerMinHours);
+  // Thermal comfort (Task #28/#47)
+  sendJsonMapEntry(F("comfort_adjust"),        settings.sat.bComfortAdjust);
+  satSendJsonFloat(F("humidity"),              state.sat.fHumidity, 0);
+  sendJsonMapEntry(F("humidity_valid"),         state.sat.bHumidityValid);
+  satSendJsonFloat(F("comfort_offset"),        state.sat.fComfortOffset, 2);
+  satSendJsonFloat(F("comfort_ref_humidity"),  settings.sat.fComfortHumidity, 0);
+  satSendJsonFloat(F("comfort_max_offset"),    settings.sat.fComfortMaxOffset, 1);
   // Simulation (Task #37)
   sendJsonMapEntry(F("simulation"),            settings.sat.bSimulation);
   if (settings.sat.bSimulation) {
@@ -1207,11 +1228,49 @@ void satPublishMQTT()
     sendMQTTData(F("sat/summer_hours_above"), suBuf, false);
   }
 
+  // Thermal comfort (Task #28/#47)
+  { char cBuf[12];
+    dtostrf(state.sat.fHumidity, 1, 0, cBuf);
+    sendMQTTData(F("sat/humidity"), cBuf, false);
+    sendMQTTData(F("sat/humidity_valid"), state.sat.bHumidityValid ? "true" : "false", false);
+    dtostrf(state.sat.fComfortOffset, 1, 2, cBuf);
+    sendMQTTData(F("sat/comfort_offset"), cBuf, false);
+  }
+
   // Simulation (Task #37)
   sendMQTTData(F("sat/simulation"), settings.sat.bSimulation ? "ON" : "OFF", true);
 
   // Weather data (Task #50)
   weatherPublishMQTT();
+}
+
+//=====================================================================
+//=== Thermal Comfort Adjustment (Task #28/#47) ===
+//=====================================================================
+static void satUpdateComfort()
+{
+  if (!settings.sat.bComfortAdjust || !state.sat.bHumidityValid) {
+    state.sat.fComfortOffset = 0.0f;
+    return;
+  }
+  // Stale check: humidity older than 30 min is invalid
+  if (millis() - state.sat.iHumidityLastMs > 1800000UL) {
+    state.sat.bHumidityValid = false;
+    state.sat.fComfortOffset = 0.0f;
+    return;
+  }
+  // Use weather API humidity as fallback if direct humidity is stale
+  // (already validated above, so this only applies when bHumidityValid was
+  //  set from weather data in satControlLoop)
+
+  // Comfort model: humidity above reference makes it feel warmer (reduce setpoint)
+  // humidity below reference makes it feel cooler (increase setpoint)
+  float delta = (state.sat.fHumidity - settings.sat.fComfortHumidity) / 100.0f;
+  float offset = -delta * settings.sat.fComfortMaxOffset * 2.0f;
+  // Clamp to max offset
+  if (offset > settings.sat.fComfortMaxOffset) offset = settings.sat.fComfortMaxOffset;
+  if (offset < -settings.sat.fComfortMaxOffset) offset = -settings.sat.fComfortMaxOffset;
+  state.sat.fComfortOffset = offset;
 }
 
 //=====================================================================
@@ -2003,11 +2062,21 @@ void satControlLoop()
   // --- Update boiler status ---
   satUpdateBoilerStatus();
 
+  // --- Thermal comfort adjustment (Task #28/#47) ---
+  // Weather humidity fallback: if no direct humidity input, use weather API
+  if (!state.sat.bHumidityValid && state.sat.weather.bValid) {
+    state.sat.fHumidity = state.sat.weather.fHumidity;
+    state.sat.bHumidityValid = true;
+    state.sat.iHumidityLastMs = state.sat.weather.iLastUpdateMs;
+  }
+  satUpdateComfort();
+  float effectiveTarget = targetTemp + state.sat.fComfortOffset;
+
   // --- Calculate heating curve ---
-  float curveValue = satCalcHeatingCurve(targetTemp, outsideTemp);
+  float curveValue = satCalcHeatingCurve(effectiveTarget, outsideTemp);
 
   // --- Calculate PID output (includes heating curve value) ---
-  float pidOutput = satPidUpdate(roomTemp, targetTemp, curveValue, OTcurrentSystemState.Tboiler);
+  float pidOutput = satPidUpdate(roomTemp, effectiveTarget, curveValue, OTcurrentSystemState.Tboiler);
 
   // Task #21: Restore original deadband after PID used the widened value
   if (thermalDeadbandWidened) {
