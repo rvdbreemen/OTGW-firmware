@@ -3,8 +3,9 @@
 **  Module   : SATpid.ino
 **  Description: PID controller for the SAT (Smart Autotune Thermostat)
 **
-**  Ported from SAT releases/thermo-nova pid.py
-**  (https://github.com/Alexwijn/SAT) with permission from the authors.
+**  Ported from SAT Python custom component (releases/thermo-nova) pid.py
+**  Original SAT component by Alexwijn (https://github.com/Alexwijn/SAT)
+**  SAT concept and algorithm design by George Dellas
 **
 **  PID version 3 with automatic gain calculation, temperature-based
 **  derivative (not error-based), deadband mode switching, and single

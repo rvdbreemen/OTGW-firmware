@@ -3,8 +3,9 @@
 **  Module   : SATcycles.ino
 **  Description: Cycle tracker and classifier for SAT
 **
-**  Ported from SAT releases/thermo-nova cycles/ package
-**  (https://github.com/Alexwijn/SAT) with permission from the authors.
+**  Ported from SAT Python custom component (releases/thermo-nova) cycles/
+**  Original SAT component by Alexwijn (https://github.com/Alexwijn/SAT)
+**  SAT concept and algorithm design by George Dellas
 **
 **  Monitors flame ON/OFF transitions, builds per-cycle metrics,
 **  and classifies each completed cycle to drive PWM auto-switching.

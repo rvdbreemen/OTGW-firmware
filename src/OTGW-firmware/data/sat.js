@@ -3,6 +3,10 @@
 **  Module   : sat.js
 **  Description: SAT (Smart Autotune Thermostat) Web UI dashboard
 **
+**  Part of SAT (Smart Autotune Thermostat) firmware port.
+**  Original SAT component by Alexwijn (https://github.com/Alexwijn/SAT)
+**  SAT concept and algorithm design by George Dellas
+**
 **  Visualization-only dashboard. All control logic runs on the ESP.
 **  This page fetches state via REST API and displays it.
 **  Settings changes go through the standard settings API.

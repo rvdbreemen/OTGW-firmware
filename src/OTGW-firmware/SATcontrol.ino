@@ -3,8 +3,9 @@
 **  Module   : SATcontrol.ino
 **  Description: SAT (Smart Autotune Thermostat) control loop
 **
-**  Ported from SAT releases/thermo-nova
-**  (https://github.com/Alexwijn/SAT) with permission from the authors.
+**  Ported from SAT Python custom component (releases/thermo-nova)
+**  Original SAT component by Alexwijn (https://github.com/Alexwijn/SAT)
+**  SAT concept and algorithm design by George Dellas
 **
 **  Standalone smart heating controller embedded in OTGW firmware.
 **  Uses OpenTherm data directly from OTcurrentSystemState.

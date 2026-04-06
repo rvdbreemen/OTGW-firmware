@@ -1,15 +1,18 @@
 /*
 ***************************************************************************
-**  Program  : SATweather.ino
-**  Version  : v1.4.0-beta
+**  Module   : SATweather.ino
+**  Description: Weather data integration for SAT
 **
-**  Copyright (c) 2021-2026 Robert van den Breemen
+**  Part of SAT (Smart Autotune Thermostat) firmware port.
+**  Original SAT component by Alexwijn (https://github.com/Alexwijn/SAT)
+**  SAT concept and algorithm design by George Dellas
 **
 **  Weather data integration via Open-Meteo API.
 **  Fetches outdoor temperature, humidity, wind speed, and 24-hour
 **  hourly temperature forecast.  Free API, no key required.
 **
-**  TERMS OF USE: MIT License. See bottom of file.
+**  Copyright (c) 2021-2026 Robert van den Breemen
+**  TERMS OF USE: MIT License. See bottom of OTGW-firmware.h
 ***************************************************************************
 */
 
