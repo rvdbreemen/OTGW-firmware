@@ -747,6 +747,19 @@ static float satGetRoomTemp()
   if (settings.sat.bSimulation) {
     return state.sat.fSimRoomTemp;
   }
+#if defined(ESP32)
+  // BLE sensor has highest priority when available (Task #20)
+  // Temperature source priority: BLE > MQTT external > OT bus MsgID 24
+  if (settings.sat.bBleEnable && state.sat.bBleTempValid) {
+    // Check staleness: if no update for 5 min, fall back to next source
+    if ((millis() - state.sat.iBleTempLastMs) > SAT_STALE_TEMP_MS) {
+      state.sat.bBleTempValid = false;
+      DebugTln(F("SAT: BLE temp stale, falling back to next source"));
+    } else {
+      return state.sat.fBleTemp;  // BLE has 0.01C precision
+    }
+  }
+#endif
   // Multi-area weighted average (Task #25) — takes priority when enabled and valid
   if (settings.sat.bMultiArea && settings.sat.iMultiAreaCount > 0) {
     float weighted = satGetWeightedRoomTemp();
@@ -1145,6 +1158,10 @@ void satSendStatusJSON()
       sendBeforenext(); sendIdent(); httpServer.sendContent(jsonBuff);
     }
   }
+#if defined(ESP32)
+  // BLE sensor status (Task #20)
+  satBLESendStatusJSON();
+#endif
   sendEndJsonMap("");
 }
 
@@ -1352,6 +1369,11 @@ void satPublishMQTT()
 
   // Weather data (Task #50)
   weatherPublishMQTT();
+
+#if defined(ESP32)
+  // BLE sensor data (Task #20)
+  satBLEPublishMQTT();
+#endif
 }
 
 //=====================================================================
@@ -1666,6 +1688,11 @@ void initSAT()
   }
   // If no OT command interface is ready yet, _sat_bootCS0sent stays false and
   // the control loop will send CS=0 on its first call when one becomes available.
+
+#if defined(ESP32)
+  // Initialize BLE sensor scanning (Task #20)
+  satBLEInit();
+#endif
 
   // Sync timer to configured interval
   CHANGE_INTERVAL_SEC(timerSATControl, settings.sat.iControlInterval);

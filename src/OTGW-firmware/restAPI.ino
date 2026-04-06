@@ -1517,6 +1517,12 @@ void sendDeviceSettings()
     dtostrf(settings.sat.fAutoTuneRate, 1, 3, tmpBuf);
     sendJsonSettingObj(F("satautotunerate"), tmpBuf, "f", 0, 1);
   }
+#if defined(ESP32)
+  // --- SAT BLE Sensor settings (Task #20, ESP32 only) ---
+  sendJsonSettingObj(F("satbleenable"), settings.sat.bBleEnable, "b");
+  sendJsonSettingObj(F("satblemac"), CSTR(settings.sat.sBleMAC), "s", 17);
+  sendJsonSettingObj(F("satbleinterval"), settings.sat.iBleInterval, "i", 10, 300);
+#endif
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-Direct settings (OTGW32 only) ---
   sendJsonSettingObj(F("otdmode"), settings.otd.iMode, "i", 0, 4);
@@ -1572,6 +1578,7 @@ static const char* const PROGMEM knownSettings[] = {
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
   "satareaweight0", "satareaweight1", "satareaweight2", "satareaweight3",
   "satautotune", "satautotunerate",
+  "satbleenable", "satbleinterval", "satblemac",
   "satboilercapacity", "satcoefficient", "satcomfortadjust", "satcomforthumidity", "satcomfortmaxoffset",
   "satdeadband", "satenabled", "satexternaltemp",
   "satinterval", "satmanufacturer", "satmultiarea", "satmultiareacount",

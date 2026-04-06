@@ -759,6 +759,12 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
               updateSetting("SATcomfortmaxoffset", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("simulation")) == 0) {
               updateSetting("SATsimulation", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("ble_enable")) == 0) {
+              updateSetting("SATbleenable", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("ble_mac")) == 0) {
+              updateSetting("SATblemac", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("ble_interval")) == 0) {
+              updateSetting("SATbleinterval", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("preset_sync")) == 0) {
               updateSetting("SATpresetsync", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("preset_sync_topic")) == 0) {

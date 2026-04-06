@@ -336,6 +336,12 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATareaweight3"), settings.sat.fAreaWeight[3], true);
   writeJsonBoolKV(file, F("SATautotune"), settings.sat.bAutoTune, true);
   writeJsonFloatKV(file, F("SATautotunerate"), settings.sat.fAutoTuneRate, true);
+#if defined(ESP32)
+  // BLE temperature sensor (Task #20, ESP32 only)
+  writeJsonBoolKV(file, F("SATbleenable"), settings.sat.bBleEnable, true);
+  writeJsonStringKV(file, F("SATblemac"), settings.sat.sBleMAC, true);
+  writeJsonIntKV(file, F("SATbleinterval"), settings.sat.iBleInterval, true);
+#endif
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings (OTGW32/OT-Thing only) ---
   writeJsonIntKV(file, F("OTDmode"), settings.otd.iMode, true);
@@ -811,6 +817,12 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATareaweight3")) == 0) settings.sat.fAreaWeight[3] = constrain(atof(newValue), 0.0f, 10.0f);
   else if (strcasecmp_P(field, PSTR("SATautotune")) == 0) settings.sat.bAutoTune = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATautotunerate")) == 0) settings.sat.fAutoTuneRate = constrain(atof(newValue), 0.005f, 0.1f);
+#if defined(ESP32)
+  // --- BLE temperature sensor settings (Task #20) ---
+  else if (strcasecmp_P(field, PSTR("SATbleenable")) == 0)  settings.sat.bBleEnable = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATblemac")) == 0)      strlcpy(settings.sat.sBleMAC, newValue, sizeof(settings.sat.sBleMAC));
+  else if (strcasecmp_P(field, PSTR("SATbleinterval")) == 0) settings.sat.iBleInterval = constrain(atoi(newValue), 10, 300);
+#endif
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings ---
   else if (strcasecmp_P(field, PSTR("OTDmode")) == 0)           settings.otd.iMode = constrain(atoi(newValue), 0, 4);

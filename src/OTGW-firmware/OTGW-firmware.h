@@ -158,6 +158,17 @@ void weatherFetch();
 void weatherSendStatusJSON();
 void weatherPublishMQTT();
 
+// SAT BLE forward declarations — defined in SATble.ino (ESP32 only)
+#if defined(ESP32)
+void satBLEInit();
+void satBLELoop();
+void satBLEUpdateState();
+float satBLEGetTemperature();
+float satBLEGetHumidity();
+void satBLEPublishMQTT();
+void satBLESendStatusJSON();
+#endif
+
 // SAT (Smart Autotune Thermostat) forward declarations — defined in SATcontrol.ino, SATpid.ino, SATcycles.ino
 void initSAT();
 void satControlLoop();
@@ -482,6 +493,16 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   bool     bAutoTuneActive        = false;  // Currently running auto-tune analysis
   uint16_t iAutoTuneCycles        = 0;      // Cycles analyzed since last adjustment
   float    fAutoTuneScore         = 0.0f;   // Current performance score (-1 to +1)
+#if defined(ESP32)
+  // BLE temperature sensor (Task #20, ESP32 only)
+  float    fBleTemp               = 0.0f;   // BLE sensor temperature (0.01C precision)
+  float    fBleHumidity           = 0.0f;   // BLE sensor humidity %
+  bool     bBleTempValid          = false;  // BLE reading available and non-stale
+  uint32_t iBleTempLastMs         = 0;      // Last BLE temperature update timestamp
+  uint8_t  iBleSensorCount        = 0;      // Number of active BLE sensors seen
+  uint8_t  iBleBattery            = 0;      // Battery level of primary BLE sensor
+  int8_t   iBleRssi               = 0;      // RSSI of primary BLE sensor
+#endif
 };
 
 struct OTGWState {
@@ -743,6 +764,12 @@ struct SATSection {
   // PID auto-tuning (Task #27)
   bool     bAutoTune          = false;  // Enable automatic PID gains tuning
   float    fAutoTuneRate      = 0.02f;  // Adjustment rate per tuning cycle (2%)
+#if defined(ESP32)
+  // BLE temperature sensor (Task #20, ESP32 only)
+  bool     bBleEnable         = false;         // Enable BLE temperature sensor scanning
+  char     sBleMAC[18]        = "";            // Bind to specific sensor MAC (empty = accept all)
+  uint16_t iBleInterval       = 30;            // Scan interval in seconds (10-300)
+#endif
 };
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT

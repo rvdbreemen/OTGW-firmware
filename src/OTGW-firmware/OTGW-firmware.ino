@@ -402,6 +402,9 @@ void loop()
       evalOutputs();                    // when the bits change, the output gpio bit will follow
       evalWebhook();                    // when the trigger bit changes, fire the webhook
       satControlLoop();                 // SAT thermostat control loop (timer-guarded internally)
+#if defined(ESP32)
+      satBLELoop();                     // BLE temperature sensor scan (timer-guarded, Task #20)
+#endif
       weatherLoop();                    // Weather data fetch (timer-guarded, Task #50)
       handlePendingUpgrade();           // Check if we need to start an upgrade
     } 
