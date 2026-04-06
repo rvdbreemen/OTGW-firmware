@@ -81,6 +81,13 @@
 #define PIN_OT_MASTER_IN  32   // OpenTherm master input
 #define PIN_OT_MASTER_OUT 33   // OpenTherm master output
 
+// OT-Direct slave pins (gateway mode: listen to thermostat)
+#define PIN_OT_SLAVE_IN   25   // OpenTherm slave input (thermostat signal)
+#define PIN_OT_SLAVE_OUT  26   // OpenTherm slave output (response to thermostat)
+
+// Step-up converter enable (18V OT bus power)
+#define PIN_STEPUP_ENABLE 27   // HIGH = enable 18V step-up for OT bus
+
 // SPI pins for W5500 Ethernet module
 #define PIN_SPI_CS        5    // W5500 chip select
 #define PIN_SPI_INT       34   // W5500 interrupt (input only on ESP32)

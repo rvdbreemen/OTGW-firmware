@@ -57,16 +57,25 @@ When an admin (verified via Discord roles) directly addresses the bot and explic
 1. Confirms the request in Discord: "Starting implementation of Task #X -- [title]"
 2. Sets the task to "In Progress" and assigns to @claude via backlog CLI
 3. Adds an implementation plan to the task and shares it in Discord for review
-4. Begins implementing the task: writing code, editing files, following the acceptance criteria
-5. Posts progress updates to Discord at key milestones
-6. When done, posts a summary of what was implemented
-7. **Asks the admin what to do next**: e.g. "Task #X is done. Should I continue with Task #Y (next on the critical path), or do you want to review first?"
+4. **Launches implementation agent in BACKGROUND** (`run_in_background: true`) so the main conversation stays responsive for Discord monitoring and user input
+5. While the agent works: continues monitoring Discord, responds to messages, processes other requests
+6. When agent completes: commits, pushes, runs incremental build in background (`python build.py --firmware`), posts completion summary to Discord
+7. Continues with next task or asks admin for direction
+
+**Async implementation is MANDATORY.** Never block the main conversation waiting for an implementation agent. The Discord cron loop and user interaction must always remain responsive.
 
 **After completing a task, always present the admin with clear next steps:**
 - Which tasks are now unblocked
 - What the recommended next task is (based on the implementation plan/phases)
 - Whether a commit or PR is needed before continuing
 - Any blockers or dependencies that need attention
+
+**Post-commit workflow:**
+1. `git commit` with descriptive title (not task ID)
+2. `git push` to remote
+3. Run `python build.py --firmware` in background (incremental, no --clean)
+4. Post completion to Discord
+5. Start next task immediately (don't wait for build)
 
 The bot should keep the admin informed and in control of the implementation flow. Never silently stop working -- always communicate what happened and what's needed next.
 
@@ -219,3 +228,8 @@ Just share your thoughts on tasks in the channel. If your feedback is actionable
 - **Be concise** -- Discord is chat, keep responses short and scannable.
 - **Respect the backlog CLI** -- always use CLI commands, never edit task files directly.
 - **Post friendly errors** -- e.g. "Task 99 not found. Try `list tasks` to see what's available."
+- **Always announce task start AND finish on Discord** -- two posts per task: one at start, one at completion.
+- **ALWAYS run implementation agents in background** (`run_in_background: true`) -- never block the main conversation. This keeps Discord monitoring and user interaction responsive while code is being written.
+- **ALWAYS run builds in background** -- after committing, run `python build.py --firmware` (incremental, no --clean) with `run_in_background: true`. Don't wait for build results before starting next task.
+- **Commit with descriptive titles** -- use feature descriptions, not task IDs. Task IDs are forgotten, descriptions persist in git history.
+- **Push after every commit** -- always `git push` to remote immediately after committing.

@@ -1,11 +1,11 @@
 ---
 id: TASK-21
 title: Thermal drop learning for SAT fallback mode
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-05 11:45'
-updated_date: '2026-04-06 12:33'
+updated_date: '2026-04-06 12:34'
 labels:
   - sat
   - feature
@@ -24,17 +24,17 @@ When SAT operates in fallback mode (external control lost), it should make intel
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Track temperature drop rate during heating-off periods: delta_indoor / delta_time at known delta_outdoor
-- [ ] #2 Store learned thermal coefficient in settings (degrees/hour per degree indoor-outdoor delta)
-- [ ] #3 During fallback without room temp: estimate current room temp using last known temp + learned drop rate + elapsed time + outside temp
-- [ ] #4 Estimated temp has increasing uncertainty over time - widen deadband proportionally
-- [ ] #5 After 2+ hours of estimation without real data, switch to fixed safe setpoint (e.g. 45C flow) instead of PID
-- [ ] #6 Learning only runs when SAT has valid room temp AND outside temp simultaneously
-- [ ] #7 Minimum 24h of data before thermal model is considered valid
-- [ ] #8 State tracking: state.sat.fThermalDropRate, state.sat.bThermalModelValid
-- [ ] #9 REST API: GET /api/v2/sat/status includes thermal_drop_rate and thermal_model_valid
-- [ ] #10 MQTT publish: sat/thermal_drop_rate
-- [ ] #11 Settings persistence: learned coefficient saved to LittleFS
+- [x] #1 Track temperature drop rate during heating-off periods: delta_indoor / delta_time at known delta_outdoor
+- [x] #2 Store learned thermal coefficient in settings (degrees/hour per degree indoor-outdoor delta)
+- [x] #3 During fallback without room temp: estimate current room temp using last known temp + learned drop rate + elapsed time + outside temp
+- [x] #4 Estimated temp has increasing uncertainty over time - widen deadband proportionally
+- [x] #5 After 2+ hours of estimation without real data, switch to fixed safe setpoint (e.g. 45C flow) instead of PID
+- [x] #6 Learning only runs when SAT has valid room temp AND outside temp simultaneously
+- [x] #7 Minimum 24h of data before thermal model is considered valid
+- [x] #8 State tracking: state.sat.fThermalDropRate, state.sat.bThermalModelValid
+- [x] #9 REST API: GET /api/v2/sat/status includes thermal_drop_rate and thermal_model_valid
+- [x] #10 MQTT publish: sat/thermal_drop_rate
+- [x] #11 Settings persistence: learned coefficient saved to LittleFS
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -51,3 +51,18 @@ When SAT operates in fallback mode (external control lost), it should make intel
 9. Add to restAPI.ino sendDeviceSettings + knownSettings
 10. Add translateSettings + tooltip in index.js
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Thermal drop learning for SAT fallback mode.
+
+Changes:
+- Learns building thermal decay rate during flame-off periods (EMA, alpha=0.1)
+- Estimates room temp in fallback: lastKnown - coeff * deltaT * hours
+- 24h minimum learning before model is valid
+- Widens deadband during estimation (0.5C/hr safety)
+- Falls back to fixed 45C safe setpoint after 2h without real data
+- Coefficient saved hourly, constrained 0.005-0.3
+- MQTT: sat/thermal_coeff, sat/estimated_room
+<!-- SECTION:FINAL_SUMMARY:END -->

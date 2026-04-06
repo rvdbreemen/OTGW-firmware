@@ -1,10 +1,10 @@
 ---
 id: TASK-26
 title: Manufacturer detection from OT MemberID
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-05 20:46'
-updated_date: '2026-04-05 20:55'
+updated_date: '2026-04-06 19:35'
 labels:
   - sat
   - feature
@@ -23,16 +23,16 @@ Known quirk: Geminox needs min MM=10 (heating_control.py:522)
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Read OT MemberID from MsgID 3 slave response
-- [ ] #2 Map MemberID to known manufacturer names (best-effort)
-- [ ] #3 Apply brand-specific quirks where needed (e.g. Geminox min MM=10)
-- [ ] #4 MQTT publish: detected manufacturer name
-- [ ] #5 WebUI: show detected manufacturer in device info
-- [ ] #6 Geminox quirk: enforce minimum modulation of 10% (never send MM=0)
-- [ ] #7 Immergas quirk: send TP=11:12=<value> alongside MM=, cap at 80%
-- [ ] #8 Ideal/Intergas/Geminox/Nefit: supports_relative_modulation=False, skip modulation-based decisions (coordinator/__init__.py:310)
-- [ ] #9 Ideal/Intergas/Nefit: send MI=500 on boot for faster OT polling (opentherm.py:171)
-- [ ] #10 All manufacturers: boot sequence sends PM=3, PM=15, PM=48 priority messages (opentherm.py:167-169)
+- [x] #1 Read OT MemberID from MsgID 3 slave response
+- [x] #2 Map MemberID to known manufacturer names (best-effort)
+- [x] #3 Apply brand-specific quirks where needed (e.g. Geminox min MM=10)
+- [x] #4 MQTT publish: detected manufacturer name
+- [x] #5 WebUI: show detected manufacturer in device info
+- [x] #6 Geminox quirk: enforce minimum modulation of 10% (never send MM=0)
+- [x] #7 Immergas quirk: send TP=11:12=<value> alongside MM=, cap at 80%
+- [x] #8 Ideal/Intergas/Geminox/Nefit: supports_relative_modulation=False, skip modulation-based decisions (coordinator/__init__.py:310)
+- [x] #9 Ideal/Intergas/Nefit: send MI=500 on boot for faster OT polling (opentherm.py:171)
+- [x] #10 All manufacturers: boot sequence sends PM=3, PM=15, PM=48 priority messages (opentherm.py:167-169)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -55,3 +55,15 @@ File references in other-projects/SAT-releases-thermo-nova:
 - No modulation support: custom_components/sat/coordinator/__init__.py:310
 - MI=500 boot: custom_components/sat/coordinator/mqtt/opentherm.py:171
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Manufacturer detection already implemented in previous session. All 18 manufacturers mapped from OT MemberID 3, with brand-specific quirks:
+- Geminox: min modulation 10%, no relative modulation support
+- Immergas: TP=11:12 command, cap at 80%
+- Ideal/Intergas/Nefit: no modulation reading support
+- MQTT: sat/manufacturer published with detected name
+- WebUI: manufacturer shown in control status grid
+- PROGMEM table with member IDs, quirk flags, and names
+<!-- SECTION:FINAL_SUMMARY:END -->
