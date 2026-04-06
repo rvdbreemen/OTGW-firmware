@@ -114,6 +114,17 @@ static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, fl
   state.sat.eLastCycleClass = cls;
   state.sat.fCycleMaxFlow = maxFlow;
   state.sat.fCycleOvershootSec = overshootSec;
+  state.sat.fLastCycleDuration = durationSec;
+  state.sat.eLastCycleKind = kind;
+  // Compute CH/DHW fractions from sample counts
+  if (_cycle_totalSamples > 0) {
+    float dhwFrac = (float)_cycle_dhwSamples / (float)_cycle_totalSamples;
+    state.sat.fLastCycleFractionDHW = dhwFrac;
+    state.sat.fLastCycleFractionCH  = 1.0f - dhwFrac;
+  } else {
+    state.sat.fLastCycleFractionDHW = 0.0f;
+    state.sat.fLastCycleFractionCH  = 0.0f;
+  }
 
   // Update EMA fractions
   _ema_overshootFrac = EMA_ALPHA * (cls == SAT_CYCLE_OVERSHOOT ? 1.0f : 0.0f)

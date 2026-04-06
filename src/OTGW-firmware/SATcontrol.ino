@@ -1078,6 +1078,7 @@ void satSendStatusJSON()
   sendJsonMapEntry(F("external_temp_valid"),  state.sat.bExternalTempValid);
   sendJsonMapEntry(F("external_outdoor_valid"), state.sat.bExternalOutdoorValid);
   sendJsonMapEntry(F("safety_tripped"),       state.sat.bSafetyTripped);
+  sendJsonMapEntry(F("valves_open"),            state.sat.bValvesOpen);
   sendJsonMapEntry(F("window_open"),           state.sat.bWindowOpen);
   sendJsonMapEntry(F("window_detection"),      settings.sat.bWindowDetection);
   sendJsonMapEntry(F("push_setpoint"),         settings.sat.bPushSetpoint);
@@ -1335,6 +1336,9 @@ void satPublishMQTT()
       sendMQTTData(F("sat/flame_health"), problem ? "ON" : "OFF", true);
     }
   }
+
+  // TRV valve detection (Task #29)
+  sendMQTTData(F("sat/valves_open"), state.sat.bValvesOpen ? "true" : "false", false);
 
   // Window detection
   sendMQTTData(F("sat/window_open"), state.sat.bWindowOpen ? "true" : "false", false);
@@ -2595,6 +2599,17 @@ void satControlLoop()
       addCommandToQueue("CS=0", 4, false, 0);
     }
     return; // Skip rest of control loop
+  }
+
+  // --- TRV valve detection (Task #29): skip heating when all valves closed ---
+  if (!state.sat.bValvesOpen) {
+    state.sat.fFinalSetpoint = SAT_MIN_SETPOINT;
+    if (hasOTCommandInterface()) {
+      addCommandToQueue("CS=0", 4, false, 0);
+    }
+    // Don't update PID integral or record error statistics
+    satPublishMQTT();
+    return;
   }
 
   // --- Power & energy tracking (Task #45) ---

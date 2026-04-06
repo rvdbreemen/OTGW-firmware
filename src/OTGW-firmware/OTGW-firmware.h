@@ -332,7 +332,8 @@ enum SATCalibPhase  : uint8_t {
 };
 enum SATPreset : uint8_t {
   SAT_PRESET_NONE = 0, SAT_PRESET_AWAY, SAT_PRESET_ECO,
-  SAT_PRESET_COMFORT, SAT_PRESET_SLEEP, SAT_PRESET_ACTIVITY
+  SAT_PRESET_COMFORT, SAT_PRESET_SLEEP, SAT_PRESET_ACTIVITY,
+  SAT_PRESET_HOME
 };
 enum SATFallbackReason : uint8_t {
   SAT_FB_NONE = 0, SAT_FB_THERMOSTAT_LOST, SAT_FB_MQTT_LOST
@@ -366,6 +367,10 @@ enum SATManufacturer : uint8_t {
 #define SAT_QUIRK_IMMERGAS_TP    0x02  // Immergas: extra TP=11:12 command, cap 80%
 #define SAT_QUIRK_NO_REL_MOD     0x04  // Ideal/Intergas/Geminox/Nefit: no relative modulation support
 #define SAT_QUIRK_MI_500_BOOT    0x08  // Ideal/Intergas/Nefit: send MI=500 on boot
+enum SATFlameStatus : uint8_t {
+  SAT_FS_INSUFFICIENT_DATA = 0, SAT_FS_HEALTHY, SAT_FS_IDLE_OK,
+  SAT_FS_STUCK_ON, SAT_FS_STUCK_OFF, SAT_FS_PWM_SHORT, SAT_FS_SHORT_CYCLING
+};
 enum SATBoilerStatus : uint8_t {
   SAT_BS_OFF = 0, SAT_BS_IDLE, SAT_BS_PREHEATING, SAT_BS_AT_SETPOINT,
   SAT_BS_MODULATING_UP, SAT_BS_MODULATING_DOWN, SAT_BS_IGNITION_SURGE,
@@ -395,6 +400,10 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint32_t iCycleCount           = 0;
   float    fCycleMaxFlow         = 0.0f;
   float    fCycleOvershootSec    = 0.0f;
+  float    fLastCycleDuration     = 0.0f;   // Duration of last completed cycle (sec)
+  SATCycleKind eLastCycleKind    = SAT_CK_UNKNOWN; // Kind of last completed cycle
+  float    fLastCycleFractionCH  = 0.0f;   // Fraction of last cycle that was CH (0-1)
+  float    fLastCycleFractionDHW = 0.0f;   // Fraction of last cycle that was DHW (0-1)
   float    fDutyRatio            = 0.0f;   // EMA flame-on fraction
   float    fOvershootFraction    = 0.0f;   // EMA overshoot cycle fraction
   float    fUnderheatFraction    = 0.0f;   // EMA underheat cycle fraction
@@ -434,6 +443,8 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // Manufacturer detection
   uint8_t  iDetectedManufacturer  = SAT_MFR_OTHER;      // auto-detected from OT MsgID 3 valueLB
   uint8_t  iSlaveMemberID        = 0;                   // raw slave MemberID code from MsgID 3
+  // TRV valve detection (Task #29)
+  bool     bValvesOpen            = true;   // default true: assume heat demand when no TRV data
   // Window detection
   bool     bWindowOpen            = false;
   uint32_t iWindowOpenSinceMs     = 0;
@@ -452,6 +463,9 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   SATCurveRecommendation eCurveRecommendation = SAT_CR_INSUFFICIENT;
   float    fMeanError             = 0.0f;
   float    fErrorStdDev           = 0.0f;
+  uint8_t  iErrorSampleCount      = 0;     // Number of samples in error ring buffer
+  // Flame health (Task #70/#71)
+  SATFlameStatus eFlameStatus     = SAT_FS_INSUFFICIENT_DATA;
   // OT setpoint sync
   bool     bSetpointMismatch      = false;
   uint32_t iMismatchSinceMs       = 0;
@@ -715,6 +729,7 @@ struct SATSection {
   float    fPresetAway        = 15.0f;  // Preset: Away
   float    fPresetSleep       = 16.0f;  // Preset: Sleep
   float    fPresetActivity    = 10.0f;  // Preset: Activity (used by window detection)
+  float    fPresetHome        = 18.0f;  // Preset: Home (standard at-home temperature)
   bool     bPwmAutoSwitch     = true;   // Auto-switch between PWM and continuous mode
   uint8_t  iMaxRelModulation  = 100;    // Max relative modulation 0-100% (MM= command)
   float    fOvpValue          = 0.0f;   // Overshoot Protection Value (0=not calibrated)
