@@ -4,7 +4,7 @@
 **  Description: PID controller for the SAT (Smart Autotune Thermostat)
 **
 **  Ported from SAT Python custom component (releases/thermo-nova) pid.py
-**  Original SAT component by Alexwijn (https://github.com/Alexwijn/SAT)
+**  Original SAT component by Alex Wijnholds (https://github.com/Alexwijn/SAT)
 **  SAT concept and algorithm design by George Dellas
 **
 **  PID version 3 with automatic gain calculation, temperature-based

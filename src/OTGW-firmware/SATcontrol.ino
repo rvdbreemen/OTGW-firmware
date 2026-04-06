@@ -4,7 +4,7 @@
 **  Description: SAT (Smart Autotune Thermostat) control loop
 **
 **  Ported from SAT Python custom component (releases/thermo-nova)
-**  Original SAT component by Alexwijn (https://github.com/Alexwijn/SAT)
+**  Original SAT component by Alex Wijnholds (https://github.com/Alexwijn/SAT)
 **  SAT concept and algorithm design by George Dellas
 **
 **  Standalone smart heating controller embedded in OTGW firmware.

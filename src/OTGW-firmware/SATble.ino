@@ -4,7 +4,7 @@
 **  Description: BLE temperature sensor support for SAT (ESP32 only)
 **
 **  Part of SAT (Smart Autotune Thermostat) firmware port.
-**  Original SAT component by Alexwijn (https://github.com/Alexwijn/SAT)
+**  Original SAT component by Alex Wijnholds (https://github.com/Alexwijn/SAT)
 **  SAT concept and algorithm design by George Dellas
 **
 **  Scans for BLE advertisements from common temperature/humidity sensors
