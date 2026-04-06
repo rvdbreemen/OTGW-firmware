@@ -171,7 +171,7 @@ def parse_enum_map(header_text: str) -> Dict[str, Dict[str, Any]]:
     current_value = -1
 
     for lineno, line in enumerate(header_text.splitlines(), start=1):
-        if "enum OpenThermMessageID" in line:
+        if "enum OpenThermMessageID" in line or "enum OTLibMessageID" in line:
             inside_enum = True
             continue
         if inside_enum and "};" in line:
