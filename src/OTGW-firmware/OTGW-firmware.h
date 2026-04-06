@@ -418,9 +418,10 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint8_t  iPreWindowPreset       = 0;   // SATPreset before window opened
   // Pressure monitoring
   float    fSmoothedPressure      = 0.0f;
-  float    fPressureDropRate      = 0.0f; // bar/hour
+  float    fPressureDropRate      = 0.0f; // bar/hour (linear regression)
   bool     bPressureAlarm         = false;
   uint32_t iPressureAlarmSinceMs  = 0;
+  bool     bPressureHealthy       = true;  // binary sensor: true=healthy
   // Modulation reliability
   bool     bModulationReliable    = true;
   uint8_t  iModChangeCount        = 0;   // changes observed in window

@@ -1065,6 +1065,7 @@ void satPublishMQTT()
     dtostrf(state.sat.fPressureDropRate, 1, 3, pBuf);
     sendMQTTData(F("sat/pressure_drop_rate"), pBuf, false);
     sendMQTTData(F("sat/pressure_alarm"), state.sat.bPressureAlarm ? "true" : "false", false);
+    sendMQTTData(F("sat/pressure_health"), state.sat.bPressureHealthy ? "ON" : "OFF", true);
   }
 
   // Modulation reliability + setpoint sync
@@ -1092,10 +1093,16 @@ void satPublishMQTT()
 }
 
 //=====================================================================
-//=== Pressure Monitoring (Task #10) ===
+//=== Pressure Monitoring (Task #10, enhanced Task #39) ===
 //=====================================================================
-static float _press_prevSmoothed = 0.0f;
-static uint32_t _press_prevMs    = 0;
+
+// --- Linear regression ring buffer for drop rate ---
+static const uint8_t  PRESS_RING_SIZE = 12;           // ~6 min window at 30s intervals
+static float    _press_ringVal[PRESS_RING_SIZE];       // smoothed pressure samples
+static uint32_t _press_ringMs[PRESS_RING_SIZE];        // timestamps (millis)
+static uint8_t  _press_ringCount = 0;
+static uint8_t  _press_ringIdx   = 0;
+static uint32_t _press_lastSampleMs = 0;
 
 static void satUpdatePressure()
 {
@@ -1104,26 +1111,64 @@ static void satUpdatePressure()
 
   uint32_t now = millis();
 
-  // EMA smoothing (alpha=0.05 per SAT Python)
+  // --- EMA smoothing (alpha=0.05) ---
   if (state.sat.fSmoothedPressure < 0.01f) {
     state.sat.fSmoothedPressure = raw;  // Initialize
-    _press_prevSmoothed = raw;
-    _press_prevMs = now;
+    return;
+  }
+  state.sat.fSmoothedPressure = 0.05f * raw + 0.95f * state.sat.fSmoothedPressure;
+
+  // --- 600s settle delay after flame-on ---
+  // Pressure fluctuates during boiler startup; skip analysis until settled
+  uint32_t flameOnMs = satCycleGetFlameOnStartMs();
+  if (flameOnMs > 0 && (now - flameOnMs) < 600000UL) {
+    // During settle: reset ring buffer so stale data doesn't pollute regression
+    _press_ringCount = 0;
+    _press_ringIdx   = 0;
+    _press_lastSampleMs = 0;
     return;
   }
 
-  state.sat.fSmoothedPressure = 0.05f * raw + 0.95f * state.sat.fSmoothedPressure;
+  // --- Sample into ring buffer every ~30s ---
+  if (_press_lastSampleMs != 0 && (now - _press_lastSampleMs) < 30000UL) return;
+  _press_lastSampleMs = now;
 
-  // Calculate drop rate (bar/hour) from smoothed readings
-  float dt = (float)(now - _press_prevMs) / 1000.0f;
-  if (dt > 30.0f) {  // Update drop rate every 30s minimum
-    float delta = _press_prevSmoothed - state.sat.fSmoothedPressure;
-    state.sat.fPressureDropRate = (delta / dt) * 3600.0f;  // Convert to bar/hour
-    _press_prevSmoothed = state.sat.fSmoothedPressure;
-    _press_prevMs = now;
+  _press_ringVal[_press_ringIdx] = state.sat.fSmoothedPressure;
+  _press_ringMs[_press_ringIdx]  = now;
+  _press_ringIdx = (_press_ringIdx + 1) % PRESS_RING_SIZE;
+  if (_press_ringCount < PRESS_RING_SIZE) _press_ringCount++;
+
+  // --- Linear regression for drop rate (need >= 4 samples) ---
+  if (_press_ringCount >= 4) {
+    // x = time in seconds (relative to first sample), y = pressure
+    // slope = (n*sum_xy - sum_x*sum_y) / (n*sum_xx - sum_x*sum_x)
+    float sum_x = 0.0f, sum_y = 0.0f, sum_xy = 0.0f, sum_xx = 0.0f;
+    uint8_t oldest = (_press_ringCount < PRESS_RING_SIZE)
+                     ? 0
+                     : _press_ringIdx;  // oldest entry in full ring
+    uint32_t t0 = _press_ringMs[oldest];
+    uint8_t n = _press_ringCount;
+
+    for (uint8_t i = 0; i < n; i++) {
+      uint8_t idx = (_press_ringCount < PRESS_RING_SIZE)
+                    ? i
+                    : (oldest + i) % PRESS_RING_SIZE;
+      float x = (float)(_press_ringMs[idx] - t0) / 1000.0f;  // seconds
+      float y = _press_ringVal[idx];
+      sum_x  += x;
+      sum_y  += y;
+      sum_xy += x * y;
+      sum_xx += x * x;
+    }
+
+    float denom = (float)n * sum_xx - sum_x * sum_x;
+    if (denom > 0.001f || denom < -0.001f) {
+      float slope = ((float)n * sum_xy - sum_x * sum_y) / denom;  // bar/sec
+      state.sat.fPressureDropRate = -slope * 3600.0f;  // bar/hour, positive = dropping
+    }
   }
 
-  // Check alarm conditions
+  // --- Alarm conditions ---
   bool alarmCond = (state.sat.fSmoothedPressure < settings.sat.fMinPressure ||
                     state.sat.fSmoothedPressure > settings.sat.fMaxPressure ||
                     state.sat.fPressureDropRate > settings.sat.fMaxPressureDrop);
@@ -1132,17 +1177,22 @@ static void satUpdatePressure()
     if (state.sat.iPressureAlarmSinceMs == 0) {
       state.sat.iPressureAlarmSinceMs = now;
     }
-    // Confirm after 120s persistent
+    // 120s confirmation window before declaring problem
     if ((now - state.sat.iPressureAlarmSinceMs) >= 120000UL) {
       if (!state.sat.bPressureAlarm) {
         state.sat.bPressureAlarm = true;
+        state.sat.bPressureHealthy = false;
         DebugTf(PSTR("SAT: PRESSURE ALARM (smoothed=%.2f drop=%.3f bar/hr)\r\n"),
                 state.sat.fSmoothedPressure, state.sat.fPressureDropRate);
       }
     }
   } else {
     state.sat.iPressureAlarmSinceMs = 0;
-    state.sat.bPressureAlarm = false;
+    if (state.sat.bPressureAlarm) {
+      state.sat.bPressureAlarm = false;
+      state.sat.bPressureHealthy = true;
+      DebugTln(F("SAT: Pressure alarm cleared"));
+    }
   }
 }
 
