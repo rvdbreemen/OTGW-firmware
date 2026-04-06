@@ -639,6 +639,7 @@ static const char* satGetPresetName(SATPreset p)
     case SAT_PRESET_COMFORT:  return "comfort";
     case SAT_PRESET_SLEEP:    return "sleep";
     case SAT_PRESET_ACTIVITY: return "activity";
+    case SAT_PRESET_HOME:     return "home";
     default:                  return "none";
   }
 }
@@ -653,6 +654,7 @@ void satHandlePreset(const char* value)
   else if (strcasecmp_P(value, PSTR("comfort")) == 0)  { newPreset = SAT_PRESET_COMFORT;  newTarget = settings.sat.fPresetComfort; }
   else if (strcasecmp_P(value, PSTR("sleep")) == 0)    { newPreset = SAT_PRESET_SLEEP;    newTarget = settings.sat.fPresetSleep; }
   else if (strcasecmp_P(value, PSTR("activity")) == 0) { newPreset = SAT_PRESET_ACTIVITY;  newTarget = settings.sat.fPresetActivity; }
+  else if (strcasecmp_P(value, PSTR("home")) == 0)     { newPreset = SAT_PRESET_HOME;     newTarget = settings.sat.fPresetHome; }
   else if (strcasecmp_P(value, PSTR("none")) == 0)     { newPreset = SAT_PRESET_NONE; }
   else return; // Unknown preset
 
@@ -1255,6 +1257,24 @@ void satPublishMQTT()
     sendMQTTData(F("sat/cycle_class"), ccNames[ccIdx], false);
   }
 
+  // Cycle Status JSON attributes (Task #53)
+  { static const char* const ckNames[] PROGMEM = {
+      "UNKNOWN", "CENTRAL_HEATING", "DOMESTIC_HOT_WATER", "MIXED"
+    };
+    int ckIdx = (int)state.sat.eLastCycleKind;
+    if (ckIdx < 0 || ckIdx > 3) ckIdx = 0;
+    char jBuf[200];
+    snprintf_P(jBuf, sizeof(jBuf),
+      PSTR("{\"kind\":\"%s\",\"sample_count\":%u,\"duration_seconds\":%.1f,\"max_flow_temperature\":%.1f,\"fraction_space_heating\":%.2f,\"fraction_domestic_hot_water\":%.2f}"),
+      ckNames[ckIdx],
+      (unsigned)state.sat.iCycleCount,
+      state.sat.fLastCycleDuration,
+      state.sat.fCycleMaxFlow,
+      state.sat.fLastCycleFractionCH,
+      state.sat.fLastCycleFractionDHW);
+    sendMQTTData(F("sat/cycle_attributes"), jBuf, false);
+  }
+
   // PWM duty
   dtostrf(state.sat.fPwmDutyCycle, 1, 2, valBuf);
   sendMQTTData(F("sat/pwm_duty"), valBuf, false);
@@ -1296,6 +1316,26 @@ void satPublishMQTT()
   // Safety
   sendMQTTData(F("sat/safety_tripped"), state.sat.bSafetyTripped ? "true" : "false", false);
 
+  // Flame Status (Task #70)
+  { static const char* const fsNames[] PROGMEM = {
+      "INSUFFICIENT_DATA", "HEALTHY", "IDLE_OK", "STUCK_ON",
+      "STUCK_OFF", "PWM_SHORT", "SHORT_CYCLING"
+    };
+    int fsIdx = (int)state.sat.eFlameStatus;
+    if (fsIdx < 0 || fsIdx > 6) fsIdx = 0;
+    sendMQTTData(F("sat/flame_status"), fsNames[fsIdx], false);
+  }
+
+  // Flame Health binary sensor (Task #71)
+  { SATFlameStatus fs = state.sat.eFlameStatus;
+    // Problem if stuck or short cycling; unavailable (don't publish) if insufficient data
+    if (fs != SAT_FS_INSUFFICIENT_DATA) {
+      bool problem = (fs == SAT_FS_STUCK_ON || fs == SAT_FS_STUCK_OFF ||
+                      fs == SAT_FS_PWM_SHORT || fs == SAT_FS_SHORT_CYCLING);
+      sendMQTTData(F("sat/flame_health"), problem ? "ON" : "OFF", true);
+    }
+  }
+
   // Window detection
   sendMQTTData(F("sat/window_open"), state.sat.bWindowOpen ? "true" : "false", false);
 
@@ -1318,6 +1358,17 @@ void satPublishMQTT()
     int crIdx = (int)state.sat.eCurveRecommendation;
     if (crIdx < 0 || crIdx > 3) crIdx = 0;
     sendMQTTData(F("sat/curve_recommendation"), crNames[crIdx], false);
+  }
+
+  // Curve Recommendation JSON attributes (Task #54)
+  { char jBuf[180];
+    snprintf_P(jBuf, sizeof(jBuf),
+      PSTR("{\"error_threshold\":%.2f,\"daily_mean_error\":%.2f,\"daily_sample_count\":%u,\"recent_mean_error\":%.2f}"),
+      settings.sat.fDeadband * 2.0f,
+      state.sat.fMeanError,
+      (unsigned)state.sat.iErrorSampleCount,
+      state.sat.fError);
+    sendMQTTData(F("sat/curve_recommendation_attributes"), jBuf, false);
   }
 
   // Error statistics
@@ -1476,6 +1527,58 @@ void satPublishMQTT()
       }
       snprintf_P(valBuf, sizeof(valBuf), PSTR("%.3f"), consumption);
       sendMQTTData(F("sat/consumption"), valBuf, false);
+    }
+  }
+
+  // Synchronization binary sensors (Tasks #56, #57, #58)
+  // Each uses a 60-second delay to avoid false positives during normal transitions.
+  {
+    // Task #56: Control Setpoint Synchronization
+    static unsigned long syncSetpointMismatchSince = 0;
+    {
+      float satSetpoint = state.sat.fFinalSetpoint;
+      float boilerSetpoint = OTcurrentSystemState.TSet;
+      bool mismatch = (fabsf(satSetpoint - boilerSetpoint) > 0.5f) && state.sat.bActive;
+
+      if (!mismatch) {
+        syncSetpointMismatchSince = 0;
+      } else if (syncSetpointMismatchSince == 0) {
+        syncSetpointMismatchSince = millis();
+      }
+
+      bool problem = mismatch && syncSetpointMismatchSince > 0 &&
+                     (millis() - syncSetpointMismatchSince >= 60000UL);
+      sendMQTTData(F("sat/setpoint_sync"), problem ? "ON" : "OFF", true);
+    }
+
+    // Task #57: Relative Modulation Synchronization
+    static unsigned long syncModulationMismatchSince = 0;
+    {
+      int satMod = (int)settings.sat.iMaxRelModulation;
+      int boilerMod = (int)OTcurrentSystemState.MaxRelModLevelSetting;
+      bool mismatch = (satMod != boilerMod) && state.sat.bActive;
+
+      if (!mismatch) syncModulationMismatchSince = 0;
+      else if (syncModulationMismatchSince == 0) syncModulationMismatchSince = millis();
+
+      bool problem = mismatch && syncModulationMismatchSince > 0 &&
+                     (millis() - syncModulationMismatchSince >= 60000UL);
+      sendMQTTData(F("sat/modulation_sync"), problem ? "ON" : "OFF", true);
+    }
+
+    // Task #58: Central Heating Synchronization
+    static unsigned long syncCHMismatchSince = 0;
+    {
+      bool boilerActive = (OTcurrentSystemState.SlaveStatus & 0x02) != 0;  // Bit 1 = CH active
+      bool satHeating = state.sat.bActive;
+      bool mismatch = (satHeating != boilerActive);
+
+      if (!mismatch) syncCHMismatchSince = 0;
+      else if (syncCHMismatchSince == 0) syncCHMismatchSince = millis();
+
+      bool problem = mismatch && syncCHMismatchSince > 0 &&
+                     (millis() - syncCHMismatchSince >= 60000UL);
+      sendMQTTData(F("sat/ch_sync"), problem ? "ON" : "OFF", true);
     }
   }
 
@@ -1678,6 +1781,8 @@ static void satUpdateCurveRecommendation()
   _cr_bufferIdx = (_cr_bufferIdx + 1) % CR_BUFFER_SIZE;
   if (_cr_bufferCount < CR_BUFFER_SIZE) _cr_bufferCount++;
 
+  state.sat.iErrorSampleCount = _cr_bufferCount;
+
   // Need at least 6 samples
   if (_cr_bufferCount < 6) {
     state.sat.eCurveRecommendation = SAT_CR_INSUFFICIENT;
@@ -1772,6 +1877,68 @@ static void satCheckSetpointSync()
     state.sat.iMismatchSinceMs = 0;
     state.sat.bSetpointMismatch = false;
   }
+}
+
+//=====================================================================
+//=== Flame Status Tracker (Task #70) ===
+//=====================================================================
+static uint32_t _flame_lastUpdateMs  = 0;
+static uint16_t _flame_sampleCount   = 0;
+
+static void satUpdateFlameStatus()
+{
+  uint32_t now = millis();
+  // Update every 10 seconds
+  if (_flame_lastUpdateMs != 0 && (now - _flame_lastUpdateMs) < 10000UL) return;
+  _flame_lastUpdateMs = now;
+
+  if (_flame_sampleCount < 6) {
+    _flame_sampleCount++;
+    state.sat.eFlameStatus = SAT_FS_INSUFFICIENT_DATA;
+    return;
+  }
+
+  bool flame = (OTcurrentSystemState.Statusflags & 0x08) != 0;  // Bit 3 = flame
+
+  if (!state.sat.bActive) {
+    state.sat.eFlameStatus = SAT_FS_IDLE_OK;
+    return;
+  }
+
+  // Safety tripped = flame not responding to commands
+  if (state.sat.bSafetyTripped) {
+    state.sat.eFlameStatus = SAT_FS_STUCK_OFF;
+    return;
+  }
+
+  // Short cycling detection from last completed cycle
+  if (state.sat.eLastCycleClass == SAT_CYCLE_SHORT) {
+    state.sat.eFlameStatus = SAT_FS_SHORT_CYCLING;
+    return;
+  }
+
+  // Stuck ON: flame on when setpoint is very low (below 5C means we want off)
+  if (flame && state.sat.fFinalSetpoint < 5.0f) {
+    state.sat.eFlameStatus = SAT_FS_STUCK_ON;
+    return;
+  }
+
+  // Stuck OFF: requesting heat (setpoint > 30C) but no flame for extended time
+  if (!flame && state.sat.fFinalSetpoint > 30.0f) {
+    uint32_t flameOffMs = satCycleGetFlameOffStartMs();
+    if (flameOffMs > 0 && (now - flameOffMs) > 300000UL) {  // 5 min no flame
+      state.sat.eFlameStatus = SAT_FS_STUCK_OFF;
+      return;
+    }
+  }
+
+  // PWM short: in PWM mode with very short flame-on bursts
+  if (state.sat.eControlMode == SAT_MODE_PWM && state.sat.fPwmDutyCycle < 0.05f && flame) {
+    state.sat.eFlameStatus = SAT_FS_PWM_SHORT;
+    return;
+  }
+
+  state.sat.eFlameStatus = SAT_FS_HEALTHY;
 }
 
 //=====================================================================
@@ -2447,6 +2614,9 @@ void satControlLoop()
 
   // --- OT setpoint sync ---
   satCheckSetpointSync();
+
+  // --- Flame status (Task #70) ---
+  satUpdateFlameStatus();
 
   // --- Update boiler status ---
   satUpdateBoilerStatus();
