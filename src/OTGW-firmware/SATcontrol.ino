@@ -1167,6 +1167,30 @@ void satSendStatusJSON()
 }
 
 //=====================================================================
+//=== Summer Simmer Index (Task #64) ===
+//=====================================================================
+// Matches SAT Python summer_simmer.py formula exactly
+static float satCalcSimmerIndex(float tempC, float humidity) {
+  if (humidity < 0 || humidity > 100) return tempC;
+  float F = tempC * 9.0f / 5.0f + 32.0f;
+  if (F < 58.0f) return tempC;  // below threshold, return raw temp
+  float idx = 1.98f * (F - (0.55f - 0.0055f * humidity) * (F - 58.0f)) - 56.83f;
+  return (idx - 32.0f) * 5.0f / 9.0f;  // convert back to Celsius
+}
+
+static const char* satSimmerPerception(float indexC) {
+  if (indexC < 21.1f) return "Cool";
+  if (indexC < 25.0f) return "Slightly Cool";
+  if (indexC < 28.3f) return "Comfortable";
+  if (indexC < 32.8f) return "Slightly Warm";
+  if (indexC < 37.8f) return "Increasing Discomfort";
+  if (indexC < 44.4f) return "Extremely Warm";
+  if (indexC < 51.7f) return "Danger Of Heatstroke";
+  if (indexC < 65.6f) return "Extreme Danger Of Heatstroke";
+  return "Circulatory Collapse Imminent";
+}
+
+//=====================================================================
 //=== MQTT Publishing ===
 //=====================================================================
 void satPublishMQTT()
@@ -1366,6 +1390,51 @@ void satPublishMQTT()
       dtostrf(state.sat.fAreaTemp[i], 1, 1, vBuf);
       sendMQTTData(topicBuf, vBuf, false);
     }
+  }
+
+  // Device Health binary sensor (Task #60): ON = problem (boiler off / no data)
+  sendMQTTData(F("sat/device_health"), (state.sat.eBoilerStatus == SAT_BS_OFF) ? "ON" : "OFF", true);
+
+  // Cycle Health binary sensor (Task #61): ON = problem (overshoot, underheat, or short)
+  {
+    bool cycleProb = (state.sat.eLastCycleClass == SAT_CYCLE_OVERSHOOT ||
+                      state.sat.eLastCycleClass == SAT_CYCLE_UNDERHEAT ||
+                      state.sat.eLastCycleClass == SAT_CYCLE_SHORT);
+    sendMQTTData(F("sat/cycle_health"), cycleProb ? "ON" : "OFF", true);
+  }
+
+  // Summer Simmer Index (Task #64): requires valid humidity
+  if (state.sat.bHumidityValid && state.sat.fHumidity > 0) {
+    float simmerIdx = satCalcSimmerIndex(satGetRoomTemp(), state.sat.fHumidity);
+    snprintf_P(valBuf, sizeof(valBuf), PSTR("%.1f"), simmerIdx);
+    sendMQTTData(F("sat/summer_simmer_index"), valBuf, false);
+    sendMQTTData(F("sat/summer_simmer_perception"), satSimmerPerception(simmerIdx), false);
+  }
+
+  // Relative Modulation State (Task #65)
+  {
+    const char* modState = "OFF";
+    if (state.sat.bActive) {
+      if (state.sat.bDhwActive) {
+        modState = "HOT_WATER";
+      } else if (state.sat.eControlMode == SAT_MODE_PWM && !state.sat.bPwmFlameRequested) {
+        modState = "PWM_OFF";
+      } else if (OTcurrentSystemState.Tboiler < 22.0f) {
+        modState = "COLD";
+      } else {
+        modState = "ACTIVE";
+      }
+    }
+    sendMQTTData(F("sat/modulation_state"), modState, false);
+  }
+
+  // PWM Status (Task #66): ON/OFF/IDLE
+  {
+    const char* pwmState = "IDLE";
+    if (state.sat.eControlMode == SAT_MODE_PWM) {
+      pwmState = state.sat.bPwmFlameRequested ? "ON" : "OFF";
+    }
+    sendMQTTData(F("sat/pwm_state"), pwmState, false);
   }
 
   // Weather data (Task #50)
