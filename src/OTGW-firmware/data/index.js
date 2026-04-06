@@ -5283,7 +5283,7 @@ var translateTooltips = [
   , ["SATovershootmargin", "Flow temperature margin above setpoint to classify as overshoot (0.5-5.0). Default 2.0."]
   , ["SATboilercapacity", "Boiler power capacity in kW (1-100). Used to calculate current power from modulation percentage. Typical values: 24 kW for combi boilers, 15-40 kW range."]
   , ["SATpresetsync", "When enabled, publish the active preset name to the configured MQTT topic on every preset change. Secondary climate entities or Home Assistant automations can subscribe to follow the same preset."]
-  , ["SATpresetsynctopic", "MQTT topic to publish preset changes to (e.g. homeassistant/climate/zone2/preset). The preset name (away, eco, comfort, sleep, activity, none) is published as a retained message."]
+  , ["SATpresetsynctopic", "MQTT topic to publish preset changes to (e.g. homeassistant/climate/zone2/preset). The preset name (activity, away, eco, home, comfort, sleep, none) is published as a retained message."]
   , ["SATsolargain", "Detect solar heating (sunlight through windows) and reduce setpoint to prevent overheating. Triggers when indoor temp rises while boiler modulation is low."]
   , ["SATsolarminrise", "Minimum indoor temperature rise rate in degrees per hour to detect solar gain. Default 0.5. Lower values are more sensitive."]
   , ["SATsolaroffset", "Setpoint reduction in degrees Celsius during solar gain event. Default 2.0. Higher values reduce heating more aggressively."]

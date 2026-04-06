@@ -1,9 +1,11 @@
 ---
 id: TASK-76
 title: 'WebUI: SAT Expert view (heating control specialist)'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-06 19:15'
+updated_date: '2026-04-06 20:15'
 labels:
   - webui
   - sat-dashboard
@@ -45,14 +47,20 @@ Design guidelines:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All Thermostat view elements visible plus control details
-- [ ] #2 Heating curve chart with coefficient and system type display
-- [ ] #3 Control Status grid: mode, boiler status, manufacturer, coefficient, deadband, overshoot, modulation
-- [ ] #4 PID Controller grid: P/I/D terms, Kp/Ki/Kd, error, raw derivative
-- [ ] #5 PWM and Cycles grid: duty, flame, count, last class, max flow, overshoot fraction
-- [ ] #6 Full temperature history chart with multiple series
-- [ ] #7 Weather section visible when enabled
-- [ ] #8 Smart features status row: solar gain, summer simmer, thermal coeff, comfort offset
-- [ ] #9 Curve recommendation displayed (increase/decrease/hold)
-- [ ] #10 Collapsible sections for PID and PWM details
+- [x] #1 All Thermostat view elements visible plus control details
+- [x] #2 Heating curve chart with coefficient and system type display
+- [x] #3 Control Status grid: mode, boiler status, manufacturer, coefficient, deadband, overshoot, modulation
+- [x] #4 PID Controller grid: P/I/D terms, Kp/Ki/Kd, error, raw derivative
+- [x] #5 PWM and Cycles grid: duty, flame, count, last class, max flow, overshoot fraction
+- [x] #6 Full temperature history chart with multiple series
+- [x] #7 Weather section visible when enabled
+- [x] #8 Smart features status row: solar gain, summer simmer, thermal coeff, comfort offset
+- [x] #9 Curve recommendation displayed (increase/decrease/hold)
+- [x] #10 Collapsible sections for PID and PWM details
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Expert view enhanced (5bda0675). Smart Features section: solar gain, summer mode, thermal learning, comfort offset, simmer index, auto-tune.
+<!-- SECTION:FINAL_SUMMARY:END -->

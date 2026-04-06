@@ -1,9 +1,11 @@
 ---
 id: TASK-78
 title: 'REST API: Extended SAT status endpoint for diagnostics data'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-06 19:16'
+updated_date: '2026-04-06 20:22'
 labels:
   - webui
   - rest-api

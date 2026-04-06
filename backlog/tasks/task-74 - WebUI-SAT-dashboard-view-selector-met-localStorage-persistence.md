@@ -1,9 +1,11 @@
 ---
 id: TASK-74
 title: 'WebUI: SAT dashboard view selector met localStorage persistence'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-06 19:15'
+updated_date: '2026-04-06 20:10'
 labels:
   - webui
   - sat-dashboard
@@ -33,11 +35,17 @@ Implementation approach:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Dropdown select element in sat-header, right-aligned after badges
-- [ ] #2 Three options: Thermostat (default), Expert, Diagnostics
-- [ ] #3 Selection persisted in localStorage('sat-dashboard-view')
-- [ ] #4 View switch is instant (CSS show/hide), no page reload
-- [ ] #5 Default view is 'Thermostat' when no localStorage value exists
-- [ ] #6 Each sat-section tagged with data-view attribute for visibility control
-- [ ] #7 Dropdown styled to match existing UI theme (light + dark)
+- [x] #1 Dropdown select element in sat-header, right-aligned after badges
+- [x] #2 Three options: Thermostat (default), Expert, Diagnostics
+- [x] #3 Selection persisted in localStorage('sat-dashboard-view')
+- [x] #4 View switch is instant (CSS show/hide), no page reload
+- [x] #5 Default view is 'Thermostat' when no localStorage value exists
+- [x] #6 Each sat-section tagged with data-view attribute for visibility control
+- [x] #7 Dropdown styled to match existing UI theme (light + dark)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+View selector dropdown added to SAT header (46d0fab8). Three options: Thermostat/Expert/Diagnostics. Persisted in localStorage. CSS class switching for instant view changes.
+<!-- SECTION:FINAL_SUMMARY:END -->

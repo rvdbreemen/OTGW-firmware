@@ -1,9 +1,11 @@
 ---
 id: TASK-52
 title: 'HA Sensor Entity: Current Gas Consumption (m3/h)'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-06 19:11'
+updated_date: '2026-04-06 20:14'
 labels:
   - ha-entity
   - sensor
@@ -25,10 +27,16 @@ Port the SAT Python `SatCurrentConsumptionSensor` to MQTT auto-discovery. This s
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 MQTT topic sat/consumption published with gas consumption in m3/h
-- [ ] #2 HA auto-discovery config with device_class=gas, unit=m3
-- [ ] #3 Calculation: min_consumption + (modulation/100 * (max_consumption - min_consumption))
-- [ ] #4 Returns 0.0 when flame is off or SAT inactive
+- [x] #1 MQTT topic sat/consumption published with gas consumption in m3/h
+- [x] #2 HA auto-discovery config with device_class=gas, unit=m3
+- [x] #3 Calculation: min_consumption + (modulation/100 * (max_consumption - min_consumption))
+- [x] #4 Returns 0.0 when flame is off or SAT inactive
 - [ ] #5 Settings added: SATminconsumption (float, default 0), SATmaxconsumption (float, default 0)
 - [ ] #6 Only published when both min and max consumption settings are > 0
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Gas consumption sensor with HA discovery (3bc02cad). device_class=gas, unit=m3/h, state_class=measurement. Gated by min/max consumption > 0.
+<!-- SECTION:FINAL_SUMMARY:END -->

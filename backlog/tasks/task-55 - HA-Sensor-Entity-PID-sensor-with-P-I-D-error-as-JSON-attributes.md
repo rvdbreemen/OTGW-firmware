@@ -1,9 +1,11 @@
 ---
 id: TASK-55
 title: 'HA Sensor Entity: PID sensor with P/I/D/error as JSON attributes'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-06 19:11'
+updated_date: '2026-04-06 20:14'
 labels:
   - ha-entity
   - sensor
@@ -25,9 +27,15 @@ Restructure PID data publishing to match SAT Python's `SatPidSensor` pattern. In
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 HA auto-discovery config for PID sensor with device_class=temperature, unit=C
-- [ ] #2 Main state topic: sat/pid_output (already exists)
-- [ ] #3 JSON attributes topic: sat/pid_attributes with {error, proportional, integral, derivative}
-- [ ] #4 Existing separate topics (sat/pid_p, sat/pid_i, sat/pid_d, sat/error) remain for backwards compatibility
+- [x] #1 HA auto-discovery config for PID sensor with device_class=temperature, unit=C
+- [x] #2 Main state topic: sat/pid_output (already exists)
+- [x] #3 JSON attributes topic: sat/pid_attributes with {error, proportional, integral, derivative}
+- [x] #4 Existing separate topics (sat/pid_p, sat/pid_i, sat/pid_d, sat/error) remain for backwards compatibility
 - [ ] #5 Per-area PID sensors when multi-area is enabled (sat/area/N/pid_output + attributes)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+PID JSON attributes topic added to HA discovery (3bc02cad). json_attr_t on sat_pid_output sensor entry.
+<!-- SECTION:FINAL_SUMMARY:END -->

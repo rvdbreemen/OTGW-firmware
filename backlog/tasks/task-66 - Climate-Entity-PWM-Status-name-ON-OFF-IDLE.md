@@ -1,9 +1,11 @@
 ---
 id: TASK-66
 title: 'Climate Entity: PWM Status name (ON/OFF/IDLE)'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-06 19:13'
+updated_date: '2026-04-06 20:10'
 labels:
   - ha-entity
   - climate
@@ -28,8 +30,20 @@ Port the SAT Python PWM status reporting to match the exact attribute pattern. S
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 MQTT topic sat/pwm_state published with PWM status string
-- [ ] #2 States: ON (flame-on phase), OFF (flame-off phase), IDLE (PWM not active)
-- [ ] #3 Matches SAT Python PWMStatus enum exactly
-- [ ] #4 Published alongside existing sat/pwm_duty topic
+- [x] #1 MQTT topic sat/pwm_state published with PWM status string
+- [x] #2 States: ON (flame-on phase), OFF (flame-off phase), IDLE (PWM not active)
+- [x] #3 Matches SAT Python PWMStatus enum exactly
+- [x] #4 Published alongside existing sat/pwm_duty topic
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Published sat/pwm_state as ON/OFF/IDLE. Placed right after modulation_state and near existing sat/pwm_duty.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+PWM Status name published as sat/pwm_state ON/OFF/IDLE (1b472b60)
+<!-- SECTION:FINAL_SUMMARY:END -->

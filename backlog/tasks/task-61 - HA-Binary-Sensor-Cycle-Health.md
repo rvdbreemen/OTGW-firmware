@@ -1,9 +1,11 @@
 ---
 id: TASK-61
 title: 'HA Binary Sensor: Cycle Health'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-06 19:12'
+updated_date: '2026-04-06 20:10'
 labels:
   - ha-entity
   - binary-sensor
@@ -25,9 +27,21 @@ Port the SAT Python `SatCycleHealthSensor` to MQTT auto-discovery. This binary s
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 MQTT topic sat/cycle_health published as binary ON/OFF
-- [ ] #2 HA auto-discovery config with device_class=problem
-- [ ] #3 ON when last_cycle classification is OVERSHOOT, UNDERHEAT, or SHORT_CYCLING
-- [ ] #4 OFF when GOOD, UNCERTAIN, or INSUFFICIENT_DATA
-- [ ] #5 Updated at end of each heating cycle
+- [x] #1 MQTT topic sat/cycle_health published as binary ON/OFF
+- [x] #2 HA auto-discovery config with device_class=problem
+- [x] #3 ON when last_cycle classification is OVERSHOOT, UNDERHEAT, or SHORT_CYCLING
+- [x] #4 OFF when GOOD, UNCERTAIN, or INSUFFICIENT_DATA
+- [x] #5 Updated at end of each heating cycle
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Published sat/cycle_health as ON for OVERSHOOT/UNDERHEAT/SHORT, OFF otherwise. Evaluated every satPublishMQTT call.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Cycle Health binary sensor publishes sat/cycle_health ON/OFF (1b472b60)
+<!-- SECTION:FINAL_SUMMARY:END -->

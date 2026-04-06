@@ -1,9 +1,11 @@
 ---
 id: TASK-53
 title: 'HA Sensor Entity: Cycle Status with detailed attributes'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-06 19:11'
+updated_date: '2026-04-06 20:46'
 labels:
   - ha-entity
   - sensor
@@ -28,13 +30,25 @@ Port the SAT Python `SatCycleSensor` to MQTT auto-discovery with full cycle anal
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 HA auto-discovery config for cycle_status sensor
-- [ ] #2 Main state: CycleClassification enum name string
-- [ ] #3 Attribute: kind (CENTRAL_HEATING/DOMESTIC_HOT_WATER/MIXED/UNKNOWN)
-- [ ] #4 Attribute: sample_count (int)
-- [ ] #5 Attribute: duration_seconds (float, rounded to 1 decimal)
-- [ ] #6 Attribute: max_flow_temperature (float)
-- [ ] #7 Attribute: fraction_space_heating (float 0-1)
-- [ ] #8 Attribute: fraction_domestic_hot_water (float 0-1)
-- [ ] #9 JSON attributes topic published alongside main state for HA to parse
+- [x] #1 HA auto-discovery config for cycle_status sensor
+- [x] #2 Main state: CycleClassification enum name string
+- [x] #3 Attribute: kind (CENTRAL_HEATING/DOMESTIC_HOT_WATER/MIXED/UNKNOWN)
+- [x] #4 Attribute: sample_count (int)
+- [x] #5 Attribute: duration_seconds (float, rounded to 1 decimal)
+- [x] #6 Attribute: max_flow_temperature (float)
+- [x] #7 Attribute: fraction_space_heating (float 0-1)
+- [x] #8 Attribute: fraction_domestic_hot_water (float 0-1)
+- [x] #9 JSON attributes topic published alongside main state for HA to parse
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Added SATCycleKind names, fLastCycleDuration, eLastCycleKind, fLastCycleFractionCH/DHW state fields. Published sat/cycle_attributes JSON. Added json_attr_t to cycle_class HA discovery.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Cycle status with JSON attributes: kind, samples, duration, max flow, CH/DHW fractions.
+<!-- SECTION:FINAL_SUMMARY:END -->

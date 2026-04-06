@@ -1,9 +1,11 @@
 ---
 id: TASK-57
 title: 'HA Binary Sensor: Relative Modulation Synchronization'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-06 19:11'
+updated_date: '2026-04-06 20:29'
 labels:
   - ha-entity
   - binary-sensor
@@ -25,9 +27,15 @@ Port the SAT Python `SatRelativeModulationSyncSensor` to MQTT auto-discovery. Th
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 MQTT topic sat/modulation_sync published as binary ON/OFF
-- [ ] #2 HA auto-discovery config with device_class=problem
-- [ ] #3 Compares SAT's requested max modulation vs boiler's reported max modulation (as int)
-- [ ] #4 60-second delay before reporting mismatch
-- [ ] #5 Only available when relative modulation is supported
+- [x] #1 MQTT topic sat/modulation_sync published as binary ON/OFF
+- [x] #2 HA auto-discovery config with device_class=problem
+- [x] #3 Compares SAT's requested max modulation vs boiler's reported max modulation (as int)
+- [x] #4 60-second delay before reporting mismatch
+- [x] #5 Only available when relative modulation is supported
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Modulation sync binary sensor with 60s delay. Compares SAT max modulation vs OT MaxRelModLevelSetting.
+<!-- SECTION:FINAL_SUMMARY:END -->

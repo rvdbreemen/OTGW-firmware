@@ -1,9 +1,11 @@
 ---
 id: TASK-75
 title: 'WebUI: SAT Thermostat view (simple, family-friendly)'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-06 19:15'
+updated_date: '2026-04-06 20:15'
 labels:
   - webui
   - sat-dashboard
@@ -44,12 +46,18 @@ Design guidelines:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Room temperature displayed prominently (large font, min 2rem)
-- [ ] #2 Target temperature with +/- buttons (0.5C steps, touch-friendly 44px+)
-- [ ] #3 Preset buttons: Away/Eco/Home/Comfort/Sleep with active state highlighting
-- [ ] #4 Single status line summarizing current state in plain language
-- [ ] #5 Simple temperature graph (room vs target, last 4 hours)
-- [ ] #6 All technical sections hidden (PID, cycles, modulation, OPV, etc.)
-- [ ] #7 Responsive layout works on mobile (320px minimum width)
-- [ ] #8 Enable/Disable SAT toggle available but subtle (not prominent)
+- [x] #1 Room temperature displayed prominently (large font, min 2rem)
+- [x] #2 Target temperature with +/- buttons (0.5C steps, touch-friendly 44px+)
+- [x] #3 Preset buttons: Away/Eco/Home/Comfort/Sleep with active state highlighting
+- [x] #4 Single status line summarizing current state in plain language
+- [x] #5 Simple temperature graph (room vs target, last 4 hours)
+- [x] #6 All technical sections hidden (PID, cycles, modulation, OPV, etc.)
+- [x] #7 Responsive layout works on mobile (320px minimum width)
+- [x] #8 Enable/Disable SAT toggle available but subtle (not prominent)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Thermostat view enhanced (5bda0675). Status summary line: Heating/Idle/Summer/Window/Safety/Disabled. Color coded. Large temps.
+<!-- SECTION:FINAL_SUMMARY:END -->

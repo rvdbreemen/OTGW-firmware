@@ -1,9 +1,11 @@
 ---
 id: TASK-80
 title: 'HA Auto-Discovery: bulk sensor entities for all published MQTT topics'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-06 19:22'
+updated_date: '2026-04-06 20:08'
 labels:
   - ha-entity
   - auto-discovery
@@ -41,11 +43,21 @@ Total: ~38 new HA discovery entries needed in mqttha.cfg. Use proper device_clas
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All 78 published MQTT topics have corresponding HA auto-discovery entries in mqttha.cfg
-- [ ] #2 Each sensor has correct device_class (temperature, pressure, power, energy, humidity, etc.)
-- [ ] #3 Each sensor has correct unit_of_measurement
-- [ ] #4 Energy sensor (sat/energy_total) has state_class=total_increasing for HA energy dashboard
-- [ ] #5 Binary topics use binary_sensor discovery (not sensor)
-- [ ] #6 All entities grouped under the SAT device in HA
-- [ ] #7 Existing 12 discovery entries preserved and unchanged
+- [x] #1 All 78 published MQTT topics have corresponding HA auto-discovery entries in mqttha.cfg
+- [x] #2 Each sensor has correct device_class (temperature, pressure, power, energy, humidity, etc.)
+- [x] #3 Each sensor has correct unit_of_measurement
+- [x] #4 Energy sensor (sat/energy_total) has state_class=total_increasing for HA energy dashboard
+- [x] #5 Binary topics use binary_sensor discovery (not sensor)
+- [x] #6 All entities grouped under the SAT device in HA
+- [x] #7 Existing 12 discovery entries preserved and unchanged
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added 40 new HA auto-discovery entries to mqttha.cfg (bee74b7c).
+
+Groups: 5 temperature, 7 modulation/boiler, 7 PID, 8 thermal/analytics, 2 summer/auto-tune, 11 binary sensors.
+Energy sensor has state_class=total_increasing for HA energy dashboard.
+All entries use consistent naming, device grouping, and availability topics.
+<!-- SECTION:FINAL_SUMMARY:END -->

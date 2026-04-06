@@ -1,9 +1,11 @@
 ---
 id: TASK-71
 title: 'HA Binary Sensor: Flame Health (problem detection)'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-06 19:14'
+updated_date: '2026-04-06 20:46'
 labels:
   - ha-entity
   - binary-sensor
@@ -26,10 +28,22 @@ Port the SAT Python Flame Health binary sensor. This is a device_class=PROBLEM b
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 MQTT topic sat/flame_health published as binary ON/OFF
-- [ ] #2 HA auto-discovery config with device_class=problem
-- [ ] #3 ON when flame_status is STUCK_ON, STUCK_OFF, PWM_SHORT, or SHORT_CYCLING
-- [ ] #4 OFF when flame_status is HEALTHY or IDLE_OK
-- [ ] #5 Unavailable when INSUFFICIENT_DATA
-- [ ] #6 Depends on task #70 (Flame Status sensor) for state data
+- [x] #1 MQTT topic sat/flame_health published as binary ON/OFF
+- [x] #2 HA auto-discovery config with device_class=problem
+- [x] #3 ON when flame_status is STUCK_ON, STUCK_OFF, PWM_SHORT, or SHORT_CYCLING
+- [x] #4 OFF when flame_status is HEALTHY or IDLE_OK
+- [x] #5 Unavailable when INSUFFICIENT_DATA
+- [x] #6 Depends on task #70 (Flame Status sensor) for state data
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Published sat/flame_health binary sensor ON/OFF. ON when flame status is STUCK_ON/STUCK_OFF/PWM_SHORT/SHORT_CYCLING. OFF when HEALTHY/IDLE_OK. Not published when INSUFFICIENT_DATA. HA binary_sensor discovery with device_class=problem.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Flame health binary sensor. ON for problematic states, OFF for healthy, unavailable when insufficient data.
+<!-- SECTION:FINAL_SUMMARY:END -->

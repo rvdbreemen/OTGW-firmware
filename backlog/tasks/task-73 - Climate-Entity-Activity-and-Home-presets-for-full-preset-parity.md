@@ -1,9 +1,11 @@
 ---
 id: TASK-73
 title: 'Climate Entity: Activity and Home presets for full preset parity'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-06 19:14'
+updated_date: '2026-04-06 20:25'
 labels:
   - ha-entity
   - climate

@@ -1,9 +1,11 @@
 ---
 id: TASK-60
 title: 'HA Binary Sensor: Device Health'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-06 19:12'
+updated_date: '2026-04-06 20:10'
 labels:
   - ha-entity
   - binary-sensor
@@ -25,8 +27,20 @@ Port the SAT Python `SatDeviceHealthSensor` to MQTT auto-discovery. This binary 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 MQTT topic sat/device_health published as binary ON/OFF
-- [ ] #2 HA auto-discovery config with device_class=problem
-- [ ] #3 ON when boiler_status == INSUFFICIENT_DATA
-- [ ] #4 OFF when any other valid boiler status is reported
+- [x] #1 MQTT topic sat/device_health published as binary ON/OFF
+- [x] #2 HA auto-discovery config with device_class=problem
+- [x] #3 ON when boiler_status == INSUFFICIENT_DATA
+- [x] #4 OFF when any other valid boiler status is reported
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Published sat/device_health as ON when eBoilerStatus==SAT_BS_OFF, OFF otherwise. SAT_BS_OFF maps to Python's INSUFFICIENT_DATA.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Device Health binary sensor publishes sat/device_health ON/OFF (1b472b60)
+<!-- SECTION:FINAL_SUMMARY:END -->

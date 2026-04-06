@@ -1,9 +1,11 @@
 ---
 id: TASK-79
 title: 'WebUI: SAT dashboard CSS styling for three views'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-06 19:16'
+updated_date: '2026-04-06 20:10'
 labels:
   - webui
   - css
@@ -37,13 +39,19 @@ Key CSS components:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 View visibility CSS: sections hidden/shown based on sat-view-* class on parent
-- [ ] #2 Thermostat view: large temperature hero (3rem+), centered layout
-- [ ] #3 Expert view: compact 2-column grid on desktop, single column on mobile
-- [ ] #4 Diagnostics view: traffic light indicators (24px circles, colored)
-- [ ] #5 Dark theme support in index_dark.css matching all new elements
-- [ ] #6 Responsive: single column below 768px, multi-column above
-- [ ] #7 Collapsible section animations (smooth height transition)
-- [ ] #8 Touch-friendly: all interactive elements min 44px tap target
-- [ ] #9 Dropdown selector styled consistently with existing nav
+- [x] #1 View visibility CSS: sections hidden/shown based on sat-view-* class on parent
+- [x] #2 Thermostat view: large temperature hero (3rem+), centered layout
+- [x] #3 Expert view: compact 2-column grid on desktop, single column on mobile
+- [x] #4 Diagnostics view: traffic light indicators (24px circles, colored)
+- [x] #5 Dark theme support in index_dark.css matching all new elements
+- [x] #6 Responsive: single column below 768px, multi-column above
+- [x] #7 Collapsible section animations (smooth height transition)
+- [x] #8 Touch-friendly: all interactive elements min 44px tap target
+- [x] #9 Dropdown selector styled consistently with existing nav
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+CSS styling for three views added to both light and dark themes (46d0fab8). View visibility via data-view attributes, larger temps in simple view, consistent dropdown styling.
+<!-- SECTION:FINAL_SUMMARY:END -->

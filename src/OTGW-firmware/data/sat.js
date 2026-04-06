@@ -157,8 +157,8 @@ var SAT = (function() {
     _lastModeIdx = d.control_mode || 0;
 
     // Highlight active preset button
-    var presetBtns = ['away', 'eco', 'comfort', 'sleep'];
-    var presetMap = { 1: 'away', 2: 'eco', 3: 'comfort', 4: 'sleep' };
+    var presetBtns = ['activity', 'away', 'eco', 'comfort', 'sleep', 'home'];
+    var presetMap = { 1: 'away', 2: 'eco', 3: 'comfort', 4: 'sleep', 5: 'activity', 6: 'home' };
     for (var pi = 0; pi < presetBtns.length; pi++) {
       var btn = el('sat-btn-' + presetBtns[pi]);
       if (btn) btn.className = 'sat-btn sat-btn-preset' + (presetMap[_lastPresetIdx] === presetBtns[pi] ? ' active' : '');

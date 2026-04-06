@@ -1,9 +1,11 @@
 ---
 id: TASK-51
 title: 'HA Sensor Entity: Requested Setpoint'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-06 19:11'
+updated_date: '2026-04-06 20:13'
 labels:
   - ha-entity
   - sensor
@@ -28,7 +30,13 @@ Port the SAT Python `SatRequestedSetpoint` sensor entity to MQTT auto-discovery.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 MQTT topic sat/requested_setpoint published with the pre-adjustment setpoint value
-- [ ] #2 HA auto-discovery config added in mqttha.cfg for sensor with device_class=temperature, unit=C
-- [ ] #3 Value matches SAT Python's requested_setpoint property (heating_curve + PID output, clamped)
+- [x] #1 MQTT topic sat/requested_setpoint published with the pre-adjustment setpoint value
+- [x] #2 HA auto-discovery config added in mqttha.cfg for sensor with device_class=temperature, unit=C
+- [x] #3 Value matches SAT Python's requested_setpoint property (heating_curve + PID output, clamped)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Requested setpoint sensor publishes sat/requested_setpoint (PID output clamped to min/max). HA discovery with device_class=temperature, state_class=measurement.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -527,8 +527,40 @@ static const char* satExtractPostValue(const char* body, char* buf, size_t bufSi
   return buf;
 }
 
+//=== SAT extended health summary (detail=full) ===
+// Sends a compact JSON with derived health booleans for the diagnostics view.
+// Called instead of satSendStatusJSON() when ?detail=full is present.
+static void satSendHealthJSON()
+{
+  // Derive health booleans from existing state
+  bool syncSetpoint    = state.sat.bSetpointMismatch;
+  bool syncModulation  = !state.sat.bModulationReliable;
+  bool flameHealth     = !state.sat.bSafetyTripped;
+  bool deviceHealth    = (state.sat.eBoilerStatus != SAT_BS_OFF)
+                      && (state.sat.eBoilerStatus != SAT_BS_STALLED_IGNITION);
+  bool cycleHealth     = (state.sat.eLastCycleClass != SAT_CYCLE_OVERSHOOT)
+                      && (state.sat.eLastCycleClass != SAT_CYCLE_UNDERHEAT)
+                      && (state.sat.eLastCycleClass != SAT_CYCLE_SHORT);
+
+  sendStartJsonMap("");
+  sendJsonMapEntry(F("sync_setpoint"),    syncSetpoint);
+  sendJsonMapEntry(F("sync_modulation"),  syncModulation);
+  sendJsonMapEntry(F("flame_health"),     flameHealth);
+  sendJsonMapEntry(F("device_health"),    deviceHealth);
+  sendJsonMapEntry(F("cycle_health"),     cycleHealth);
+  sendEndJsonMap("");
+}
+
+// Check whether the current request carries ?detail=full
+static bool satRequestHasDetailFull()
+{
+  return httpServer.hasArg(F("detail"))
+      && httpServer.arg(F("detail")) == F("full");
+}
+
 //=== SAT API handler ===
 // GET /api/v2/sat/status — returns full SAT runtime state
+// GET /api/v2/sat/status?detail=full — returns extended health diagnostics
 // POST /api/v2/sat/target — set target temperature (body: "21.0" or {"value":"21.0"})
 // POST /api/v2/sat/externaltemp — push indoor temp
 // POST /api/v2/sat/externaloutdoor — push outdoor temp
@@ -542,7 +574,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     // GET /api/v2/sat — default to status
     if (method == HTTP_GET) {
       httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
-      satSendStatusJSON();
+      if (satRequestHasDetailFull()) { satSendHealthJSON(); }
+      else                           { satSendStatusJSON(); }
     } else {
       sendApiMethodNotAllowed(F("GET"));
     }
@@ -553,7 +586,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
   if (strcasecmp_P(sub, PSTR("status")) == 0) {
     if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
     httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
-    satSendStatusJSON();
+    if (satRequestHasDetailFull()) { satSendHealthJSON(); }
+    else                           { satSendStatusJSON(); }
   }
   else if (strcasecmp_P(sub, PSTR("target")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
@@ -633,7 +667,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     } else if (wc > 5) {
       val = words[5];
     }
-    if (!val) { sendApiError(400, F("Missing preset name (away/eco/comfort/sleep/activity)")); return; }
+    if (!val) { sendApiError(400, F("Missing preset name (away/eco/comfort/sleep/activity/home)")); return; }
     satHandlePreset(val);
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
@@ -1423,6 +1457,8 @@ void sendDeviceSettings()
     sendJsonSettingObj(F("satpresetsleep"), tmpBuf, "f", 5, 25);
     dtostrf(settings.sat.fPresetActivity, 1, 1, tmpBuf);
     sendJsonSettingObj(F("satpresetactivity"), tmpBuf, "f", 5, 20);
+    dtostrf(settings.sat.fPresetHome, 1, 1, tmpBuf);
+    sendJsonSettingObj(F("satpresethome"), tmpBuf, "f", 10, 25);
   }
   sendJsonSettingObj(F("satmaxmodulation"), settings.sat.iMaxRelModulation, "i", 0, 100);
   {

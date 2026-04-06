@@ -1,9 +1,11 @@
 ---
 id: TASK-58
 title: 'HA Binary Sensor: Central Heating Synchronization'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-06 19:12'
+updated_date: '2026-04-06 20:29'
 labels:
   - ha-entity
   - binary-sensor
@@ -25,9 +27,15 @@ Port the SAT Python `SatCentralHeatingSyncSensor` to MQTT auto-discovery. This b
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 MQTT topic sat/ch_sync published as binary ON/OFF
-- [ ] #2 HA auto-discovery config with device_class=problem
-- [ ] #3 Validates: OFF+inactive=ok, IDLE+inactive=ok, HEATING+active=ok, anything else=mismatch
-- [ ] #4 60-second delay before reporting mismatch
-- [ ] #5 Turns OFF immediately when state matches expectations
+- [x] #1 MQTT topic sat/ch_sync published as binary ON/OFF
+- [x] #2 HA auto-discovery config with device_class=problem
+- [x] #3 Validates: OFF+inactive=ok, IDLE+inactive=ok, HEATING+active=ok, anything else=mismatch
+- [x] #4 60-second delay before reporting mismatch
+- [x] #5 Turns OFF immediately when state matches expectations
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+CH sync binary sensor with 60s delay. Compares SAT active vs OT SlaveStatus CH active bit.
+<!-- SECTION:FINAL_SUMMARY:END -->
