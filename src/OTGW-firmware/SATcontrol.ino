@@ -635,6 +635,15 @@ void satHandlePreset(const char* value)
     state.sat.fPidI = 0.0f;
     DebugTf(PSTR("SAT: preset '%s' -> target %.1f, integral reset\r\n"), satGetPresetName(newPreset), newTarget);
   }
+
+  // Sync preset to secondary entities (Task #46)
+  if (settings.sat.bPresetSync && settings.sat.sPresetSyncTopic[0] != '\0') {
+    const char* presetName = satGetPresetName(newPreset);
+    if (presetName && state.mqtt.bConnected) {
+      sendMQTTData(settings.sat.sPresetSyncTopic, presetName, true);
+      DebugTf(PSTR("SAT: Preset synced to %s: %s\r\n"), settings.sat.sPresetSyncTopic, presetName);
+    }
+  }
 }
 
 //=====================================================================
@@ -974,6 +983,8 @@ void satSendStatusJSON()
   satSendJsonFloat(F("power_kw"),              state.sat.fCurrentPower, 2);
   satSendJsonFloat(F("energy_kwh"),            state.sat.fEnergyTotal, 3);
   satSendJsonFloat(F("boiler_capacity"),       settings.sat.fBoilerCapacity, 1);
+  // Preset sync (Task #46)
+  sendJsonMapEntry(F("preset_sync"),           settings.sat.bPresetSync);
   // Simulation (Task #37)
   sendJsonMapEntry(F("simulation"),            settings.sat.bSimulation);
   if (settings.sat.bSimulation) {

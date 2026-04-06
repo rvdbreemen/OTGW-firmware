@@ -690,6 +690,9 @@ struct SATSection {
   uint16_t iWeatherInterval   = 900;    // Poll interval in seconds (default 15 min, min 5 min)
   // Power/energy (Task #45)
   float    fBoilerCapacity    = 24.0f;  // Boiler capacity in kW (for power calculation)
+  // Preset sync (Task #46) — broadcast preset changes to secondary entities
+  bool     bPresetSync        = false;         // Sync preset to secondary entities via MQTT
+  char     sPresetSyncTopic[65] = "";          // MQTT topic for preset sync
   // Simulation mode (Task #37) — test SAT without a real boiler
   bool     bSimulation        = false;  // Enable simulation mode
   float    fSimHeatRate       = 0.5f;   // Room heating rate C/min

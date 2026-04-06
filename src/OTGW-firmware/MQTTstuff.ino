@@ -745,6 +745,10 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
               updateSetting("SATflowoffset", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("simulation")) == 0) {
               updateSetting("SATsimulation", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("preset_sync")) == 0) {
+              updateSetting("SATpresetsync", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("preset_sync_topic")) == 0) {
+              updateSetting("SATpresetsynctopic", msgPayload);
             } else {
               MQTTDebugTf(PSTR("SAT: unknown sub-command [%s]\r\n"), satSubCmd);
             }
