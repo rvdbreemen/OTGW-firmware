@@ -178,12 +178,12 @@ void setup() {
   // and switch to telnet port 23 for debug purposed. 
   // Setup the OTGW PIC
   resetOTGW();          // reset the OTGW pic
-  startOTGWstream();    // start port 25238 
+  startPICStream();    // start port 25238 
  // initSensors();        // init DS18B20 (after MQ is up! )
   initOutputs();
   
   WatchDogEnabled(1);   // turn on watchdog
-  sendOTGWbootcmd();   
+  sendPICBootCommands();   
   //Blink LED2 to signal setup done
   setLed(LED1, OFF);
   blinkLED(LED2, 3, 100);
@@ -246,7 +246,7 @@ void delayms(unsigned long delay_ms)
 //===[ Do task every 1s ]===
 void doTaskEvery1s(){
   //== do tasks ==
-  handleOTGWqueue(); //just check if there are commands to retry
+  handleCommandQueue(); //just check if there are commands to retry
   state.uptime.iSeconds++;
 
   if (wifiPortalResetWindowExpired()) {
@@ -331,7 +331,7 @@ static void handlePicFlashBackgroundTasks()
 #if MDNS_NEEDS_UPDATE
   MDNS.update();
 #endif              // Keep MDNS active for network discovery
-  handleOTGW();               // REQUIRED for PIC flash - processes serial communication
+  handlePICSerial();               // REQUIRED for PIC flash - processes serial communication
   handleWebSocket();          // Keep WebSocket service responsive during flash
 }
 
@@ -343,7 +343,7 @@ void doBackgroundTasks()
 
   // ADR-036: block service handlers until setup() completes.
   // blinkLED/delayms in setup() would otherwise invoke handleMQTT() before
-  // startMQTT() sets the 1350-byte buffer, and handleOTGW() before resetOTGW().
+  // startMQTT() sets the 1350-byte buffer, and handlePICSerial() before resetOTGW().
   if (!state.bSetupComplete) return;
   // ADR-047: Non-blocking WiFi reconnect state machine.
   // Guard: skip during any flash operation (ESP or PIC).
@@ -369,7 +369,7 @@ void doBackgroundTasks()
       //while connected handle everything that uses network stuff
       handleDebug();
       handleMQTT();                 // MQTT transmissions
-      handleOTGW();                 // OTGW handling
+      handlePICSerial();                 // OTGW handling
       handleWebSocket();            // WebSocket handling for OT log streaming
       httpServer.handleClient();
     #if MDNS_NEEDS_UPDATE
