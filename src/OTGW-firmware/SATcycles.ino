@@ -14,15 +14,7 @@
 ***************************************************************************
 */
 
-// --- Cycle Kind ---
-enum SATCycleKind : uint8_t {
-  SAT_CK_UNKNOWN = 0, SAT_CK_CH, SAT_CK_DHW, SAT_CK_MIXED
-};
-
-// --- Cycle Phase (Task #35) ---
-enum SATCyclePhase : uint8_t {
-  SAT_CP_IDLE = 0, SAT_CP_STARTUP, SAT_CP_STEADY, SAT_CP_COOLDOWN
-};
+// --- Cycle Kind & Phase enums are in OTGW-firmware.h ---
 
 // --- Cycle Constants ---
 static const uint8_t  SAT_CYCLE_HISTORY_SIZE       = 16;

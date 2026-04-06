@@ -1139,20 +1139,92 @@ void sendMQTTversioninfo(){
     sendMQTTData("otgw-pic/firmwaretype", state.pic.sType);
   }
   sendMQTTData("otgw-pic/picavailable", CCONOFF(state.pic.bAvailable));
+
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+  // OT-direct (OTGW32) status — parallel to otgw-pic/ topics
+  sendMQTTData(F("otgw-otdirect/available"), CCONOFF(isOTDirectEnabled()));
+  if (isOTDirectEnabled()) {
+    // Operating mode (text string for HA)
+    {
+      const char* modeStr = "gateway";
+      if (state.otd.eMode == OTD_MODE_MONITOR) modeStr = "monitor";
+      else if (state.otd.eMode == OTD_MODE_BYPASS) modeStr = "bypass";
+      else if (state.otd.eMode == OTD_MODE_MASTER) modeStr = "master";
+      else if (state.otd.eMode == OTD_MODE_LOOPBACK) modeStr = "loopback";
+      sendMQTTData(F("otgw-otdirect/mode"), modeStr);
+    }
+    sendMQTTData(F("otgw-otdirect/bypass"), CCONOFF(state.otd.bBypassActive));
+    sendMQTTData(F("otgw-otdirect/monitor_mode"), CCONOFF(state.otd.bMonitorMode));
+    sendMQTTData(F("otgw-otdirect/master_mode"), CCONOFF(state.otd.bMasterMode));
+    sendMQTTData(F("otgw-otdirect/stepup"), CCONOFF(state.otd.bStepUpEnabled));
+    sendMQTTData(F("otgw-otdirect/thermostat_connected"), CCONOFF(state.otd.bThermostatConnected));
+    sendMQTTData(F("otgw-otdirect/setback_active"), CCONOFF(state.otd.bSetbackActive));
+    char buf[8];
+    snprintf_P(buf, sizeof(buf), PSTR("%u"), state.otd.iScheduleActive);
+    sendMQTTData(F("otgw-otdirect/schedule_active"), buf);
+    snprintf_P(buf, sizeof(buf), PSTR("%u"), state.otd.iScheduleDisabled);
+    sendMQTTData(F("otgw-otdirect/schedule_disabled"), buf);
+    snprintf_P(buf, sizeof(buf), PSTR("%u"), state.otd.iOverrideCount);
+    sendMQTTData(F("otgw-otdirect/overrides_active"), buf);
+  }
+#endif
+
+  // Hardware platform info
+  sendMQTTData(F("otgw-firmware/board"), boardName());
+  sendMQTTData(F("otgw-firmware/hardware_mode"), hardwareModeName());
+  sendMQTTData(F("otgw-firmware/network_mode"), networkModeName());
+}
+
+static void publishBoilerConnectedState()
+{
+  sendMQTTData(F("boiler_connected"), CCONOFF(state.otBus.bBoilerState));
+  if (isPICEnabled()) {
+    sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otBus.bBoilerState));
+  }
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+  if (isOTDirectEnabled()) {
+    sendMQTTData(F("otgw-otdirect/boiler_connected"), CCONOFF(state.otBus.bBoilerState));
+  }
+#endif
+}
+
+static void publishThermostatConnectedState()
+{
+  sendMQTTData(F("thermostat_connected"), CCONOFF(state.otBus.bThermostatState));
+  if (isPICEnabled()) {
+    sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otBus.bThermostatState));
+  }
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+  if (isOTDirectEnabled()) {
+    sendMQTTData(F("otgw-otdirect/thermostat_connected"), CCONOFF(state.otBus.bThermostatState));
+  }
+#endif
+}
+
+static void publishOTGWConnectedState()
+{
+  sendMQTTData(F("otgw_connected"), CCONOFF(state.otBus.bOnline));
+  if (isPICEnabled()) {
+    sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otBus.bOnline));
+  }
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+  if (isOTDirectEnabled()) {
+    sendMQTTData(F("otgw-otdirect/ot_online"), CCONOFF(state.otBus.bOnline));
+  }
+#endif
+  sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otBus.bOnline));
 }
 
 /*
 Publish state information of PIC firmware version information to MQTT broker.
 */
 void sendMQTTstateinformation(){
-  if (!isPICEnabled()) return;
-  sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
-  sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
-  if (state.otgw.bGatewayModeKnown) {
-    sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(state.otgw.bGatewayMode));
+  publishBoilerConnectedState();
+  publishThermostatConnectedState();
+  if (state.otBus.bGatewayModeKnown) {
+    sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(state.otBus.bGatewayMode));
   }
-  sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otgw.bOnline));
-  sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
+  publishOTGWConnectedState();
 }
 
 /*
