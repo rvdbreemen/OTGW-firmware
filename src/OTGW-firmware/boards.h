@@ -50,6 +50,11 @@
 #define PIN_LED1          2    // D4
 #define PIN_LED2          16   // D0
 
+// Feature flags for ESP8266 Nodoshop OTGW
+#define HAS_PIC           1    // Has PIC microcontroller for OpenTherm gateway
+#define HAS_DIRECT_OT     0    // No direct OT master (uses PIC)
+#define HAS_ETH_CAPABLE   0    // No Ethernet support
+
 // ---------------------------------------------------------------------------
 #elif defined(BOARD_NODOSHOP_ESP32)
 // ---------------------------------------------------------------------------
@@ -71,6 +76,11 @@
 // ESP32 needs explicit Serial1 RX/TX pins for PIC communication
 #define PIN_PIC_RX        16   // UART1 RX — connects to PIC TX
 #define PIN_PIC_TX        17   // UART1 TX — connects to PIC RX
+
+// Feature flags for ESP32 Nodoshop OTGW32
+#define HAS_PIC           1    // Has PIC microcontroller for OpenTherm gateway
+#define HAS_DIRECT_OT     1    // Can also do direct OT master (without PIC)
+#define HAS_ETH_CAPABLE   1    // Has Ethernet support (W5500 or similar)
 
 // ---------------------------------------------------------------------------
 #else
