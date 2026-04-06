@@ -134,6 +134,10 @@ var SAT = (function() {
     if (hsIdx === 0) hsLabel = 'Auto (' + (hsNames[hsDetected] || 'Radiators') + ')';
     setText('sat-heating-system', hsLabel);
 
+    // Manufacturer
+    var mfrName = d.manufacturer || '--';
+    setText('sat-manufacturer', mfrName);
+
     // PID details
     setText('sat-pid-p', d.pid_p !== undefined ? d.pid_p.toFixed(2) : '--');
     setText('sat-pid-i', d.pid_i !== undefined ? d.pid_i.toFixed(2) : '--');

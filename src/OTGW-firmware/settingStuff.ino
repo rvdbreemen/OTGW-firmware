@@ -307,6 +307,7 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATminpressure"), settings.sat.fMinPressure, true);
   writeJsonFloatKV(file, F("SATmaxpressure"), settings.sat.fMaxPressure, true);
   writeJsonFloatKV(file, F("SATmaxpressdrop"), settings.sat.fMaxPressureDrop, true);
+  writeJsonIntKV(file, F("SATmanufacturer"), settings.sat.iManufacturer, true);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings (OTGW32/OT-Thing only) ---
   writeJsonIntKV(file, F("OTDmode"), settings.otd.iMode, true);
@@ -744,6 +745,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATminpressure")) == 0)  settings.sat.fMinPressure = constrain(atof(newValue), 0.0f, 3.0f);
   else if (strcasecmp_P(field, PSTR("SATmaxpressure")) == 0)  settings.sat.fMaxPressure = constrain(atof(newValue), 1.0f, 4.0f);
   else if (strcasecmp_P(field, PSTR("SATmaxpressdrop")) == 0) settings.sat.fMaxPressureDrop = constrain(atof(newValue), 0.05f, 2.0f);
+  else if (strcasecmp_P(field, PSTR("SATmanufacturer")) == 0) settings.sat.iManufacturer = constrain(atoi(newValue), 0, SAT_MFR_COUNT - 1);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings ---
   else if (strcasecmp_P(field, PSTR("OTDmode")) == 0)           settings.otd.iMode = constrain(atoi(newValue), 0, 4);

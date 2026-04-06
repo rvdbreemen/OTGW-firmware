@@ -1315,6 +1315,7 @@ void sendDeviceSettings()
   // --- SAT settings ---
   sendJsonSettingObj(F("satenabled"), settings.sat.bEnabled, "b");
   sendJsonSettingObj(F("satsystem"), settings.sat.iHeatingSystem, "i", 0, 3);  // 0=auto,1=radiators,2=heat_pump,3=underfloor
+  sendJsonSettingObj(F("satmanufacturer"), settings.sat.iManufacturer, "i", 0, SAT_MFR_COUNT - 1);
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fTargetTemp, 1, 1, tmpBuf);
@@ -1409,7 +1410,7 @@ static const char* const PROGMEM knownSettings[] = {
   "otgwcommandenable", "otgwcommands",
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
   "satcoefficient", "satdeadband", "satenabled", "satexternaltemp",
-  "satinterval", "satovershootmargin", "satpresetaway", "satpresetcomfort", "satpreseteco",
+  "satinterval", "satmanufacturer", "satovershootmargin", "satpresetaway", "satpresetcomfort", "satpreseteco",
   "satpwmautoswitch", "satsystem", "sattargettemp",
   "ui_autodownloadlog", "ui_autoexport", "ui_autoscreenshot", "ui_autoscroll",
   "ui_capture", "ui_graphtimewindow", "ui_timestamps",

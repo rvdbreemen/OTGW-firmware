@@ -34,6 +34,84 @@ static const uint32_t SAT_STALE_OUTDOOR_MS   = 600000UL; // 10 min: external out
 static const uint8_t  SAT_MAX_SKIP_COUNT     = 10;       // Consecutive invalid-input skips before disable
 static const uint8_t  SAT_MAX_PIC_FAILS      = 5;        // Consecutive PIC comm failures before disable
 
+// --- Manufacturer Table (PROGMEM) ---
+struct SATMfrEntry {
+  uint8_t  memberID;   // OT MemberID code (MsgID 3 valueLB)
+  uint8_t  quirks;     // Bitmask of SAT_QUIRK_* flags
+  char     name[12];   // Short display name
+};
+static const SATMfrEntry satManufacturerTable[] PROGMEM = {
+  // Index must match SATManufacturer enum (skip AUTO=0)
+  /*  1 ATAG       */ {   4, 0,                                              "Atag"       },
+  /*  2 BAXI       */ {   4, 0,                                              "Baxi"       },
+  /*  3 BROTGE     */ {   4, 0,                                              "Brotge"     },
+  /*  4 DEDIETRICH */ {   4, 0,                                              "DeDietrich" },
+  /*  5 FERROLI    */ {   9, 0,                                              "Ferroli"    },
+  /*  6 GEMINOX    */ {   4, SAT_QUIRK_MIN_MOD_10 | SAT_QUIRK_NO_REL_MOD,   "Geminox"    },
+  /*  7 IDEAL      */ {   6, SAT_QUIRK_NO_REL_MOD | SAT_QUIRK_MI_500_BOOT,  "Ideal"      },
+  /*  8 IMMERGAS   */ {  27, SAT_QUIRK_IMMERGAS_TP,                          "Immergas"   },
+  /*  9 INTERGAS   */ { 173, SAT_QUIRK_NO_REL_MOD | SAT_QUIRK_MI_500_BOOT,  "Intergas"   },
+  /* 10 ITHO       */ {  29, 0,                                              "Itho"       },
+  /* 11 NEFIT      */ { 131, SAT_QUIRK_NO_REL_MOD | SAT_QUIRK_MI_500_BOOT,  "Nefit"      },
+  /* 12 RADIANT    */ {  41, 0,                                              "Radiant"    },
+  /* 13 REMEHA     */ {  11, 0,                                              "Remeha"     },
+  /* 14 SIME       */ {  27, 0,                                              "Sime"       },
+  /* 15 VAILLANT   */ {  24, 0,                                              "Vaillant"   },
+  /* 16 VIESSMANN  */ {  33, 0,                                              "Viessmann"  },
+  /* 17 WORCESTER  */ {  95, 0,                                              "Worcester"  },
+  /* 18 OTHER      */ {   0, 0,                                              "Other"      },
+};
+static const uint8_t SAT_MFR_TABLE_SIZE = sizeof(satManufacturerTable) / sizeof(satManufacturerTable[0]);
+
+// Returns the effective manufacturer (resolves AUTO to detected)
+static uint8_t satGetEffectiveManufacturer()
+{
+  if (settings.sat.iManufacturer == SAT_MFR_AUTO)
+    return state.sat.iDetectedManufacturer;
+  return settings.sat.iManufacturer;
+}
+
+// Returns the manufacturer name from PROGMEM table
+static void satGetManufacturerName(char* buf, size_t bufLen)
+{
+  uint8_t mfr = satGetEffectiveManufacturer();
+  if (mfr >= SAT_MFR_ATAG && mfr <= SAT_MFR_OTHER) {
+    strncpy_P(buf, satManufacturerTable[mfr - 1].name, bufLen - 1);
+    buf[bufLen - 1] = '\0';
+  } else {
+    strlcpy(buf, "Unknown", bufLen);
+  }
+}
+
+// Returns the quirk flags for the effective manufacturer
+static uint8_t satGetManufacturerQuirks()
+{
+  uint8_t mfr = satGetEffectiveManufacturer();
+  if (mfr >= SAT_MFR_ATAG && mfr <= SAT_MFR_OTHER)
+    return pgm_read_byte(&satManufacturerTable[mfr - 1].quirks);
+  return 0;
+}
+
+// Auto-detect manufacturer from OT MsgID 3 slave MemberID
+// Note: some MemberIDs are shared (e.g. 4 = Atag/Baxi/Brotge/DeDietrich/Geminox)
+// Returns first match; user should confirm via dropdown for ambiguous IDs
+void satDetectManufacturer(uint8_t slaveMemberID)
+{
+  state.sat.iSlaveMemberID = slaveMemberID;
+  for (uint8_t i = 0; i < SAT_MFR_TABLE_SIZE; i++) {
+    if (pgm_read_byte(&satManufacturerTable[i].memberID) == slaveMemberID) {
+      state.sat.iDetectedManufacturer = i + 1; // +1 because enum starts at ATAG=1
+      char name[12];
+      strncpy_P(name, satManufacturerTable[i].name, sizeof(name) - 1);
+      name[sizeof(name) - 1] = '\0';
+      DebugTf(PSTR("SAT: Detected manufacturer: %s (MemberID %d)\r\n"), name, slaveMemberID);
+      return;
+    }
+  }
+  state.sat.iDetectedManufacturer = SAT_MFR_OTHER;
+  DebugTf(PSTR("SAT: Unknown manufacturer (MemberID %d)\r\n"), slaveMemberID);
+}
+
 // --- Heating System Helper Functions ---
 // Returns the effective heating system (resolves AUTO to detected or fallback)
 static uint8_t satGetEffectiveHeatingSystem()
@@ -404,7 +482,8 @@ void satGetBoilerStatusName(char* buf, size_t bufLen)
 {
   int idx = (int)state.sat.eBoilerStatus;
   if (idx < 0 || idx > (int)SAT_BS_COOLING) idx = 0;
-  strlcpy_P(buf, (PGM_P)pgm_read_ptr(&_bsNames[idx]), bufLen);
+  strncpy_P(buf, (PGM_P)pgm_read_ptr(&_bsNames[idx]), bufLen - 1);
+  buf[bufLen - 1] = '\0';
 }
 
 //=====================================================================
@@ -454,31 +533,44 @@ static float satApplyPWM(float pidOutput)
     _pwm_waitingForFlame = true;
   }
 
-  // --- 5-range duty cycle mapper ---
+  // --- Duty cycle thresholds derived from cycles_per_hour (per SAT Python pwm.py) ---
+  float dutyLower = (float)minOnMs / (float)upperMs;   // e.g. 180/900 = 0.20 at 4cph
+  float dutyUpper = 1.0f - dutyLower;                  // e.g. 0.80
+  float dutyMin   = dutyLower / 2.0f;                  // e.g. 0.10
+  float dutyMax   = 1.0f - dutyMin;                    // e.g. 0.90
+
+  // --- 5-range duty cycle mapper (SAT Python parity) ---
   uint32_t onTimeMs, offTimeMs;
 
-  if (duty >= 0.95f) {
+  if (duty >= dutyMax) {
     // Range 5: Over-max - continuous ON
     state.sat.bPwmFlameRequested = true;
     return pidOutput;
-  } else if (duty <= 0.05f) {
-    // Range 1: Ultra-low - minimum on, long off
-    onTimeMs  = minOnMs;
-    offTimeMs = maxMs - minOnMs;
-  } else if (duty < 0.3f) {
-    // Range 2: Low - on=min, off scaled
+  } else if (duty < dutyMin) {
+    // Range 1: Ultra-low - keep off or let existing flame finish min-on
+    if (flame && !state.sat.bDhwActive) {
+      // Flame already on: run minimum on-time, then long off
+      onTimeMs  = minOnMs;
+      offTimeMs = maxMs - minOnMs;
+    } else {
+      // No flame: stay off entirely
+      onTimeMs  = 0;
+      offTimeMs = maxMs;
+    }
+  } else if (duty <= dutyLower) {
+    // Range 2: Low - on=min, off scaled by duty
     onTimeMs  = minOnMs;
     offTimeMs = (uint32_t)((float)minOnMs * (1.0f - duty) / duty);
     if (offTimeMs > maxMs - minOnMs) offTimeMs = maxMs - minOnMs;
-  } else if (duty < 0.7f) {
-    // Range 3: Mid - proportional
+  } else if (duty <= dutyUpper) {
+    // Range 3: Mid - proportional split
     onTimeMs  = (uint32_t)(duty * (float)upperMs);
     offTimeMs = upperMs - onTimeMs;
     if (onTimeMs < minOnMs) onTimeMs = minOnMs;
   } else {
-    // Range 4: High - long on, short off
-    offTimeMs = (uint32_t)((1.0f - duty) * (float)upperMs);
-    onTimeMs  = upperMs - offTimeMs;
+    // Range 4: High - on=min/(1-d)-min, off=min (SAT Python formula)
+    onTimeMs  = (uint32_t)((float)minOnMs / (1.0f - duty)) - minOnMs;
+    offTimeMs = minOnMs;
     if (onTimeMs < minOnMs) onTimeMs = minOnMs;
   }
 
@@ -835,6 +927,11 @@ void satSendStatusJSON()
   sendJsonMapEntry(F("ovp_calib_samples"),    (int32_t)state.sat.iCalibSamples);
   sendJsonMapEntry(F("heating_system"),       (int32_t)settings.sat.iHeatingSystem);
   sendJsonMapEntry(F("heating_system_detected"), (int32_t)state.sat.iDetectedHeatingSystem);
+  { char mfrName[12]; satGetManufacturerName(mfrName, sizeof(mfrName));
+    sendJsonMapEntry(F("manufacturer"), mfrName); }
+  sendJsonMapEntry(F("manufacturer_setting"), (int32_t)settings.sat.iManufacturer);
+  sendJsonMapEntry(F("manufacturer_detected"), (int32_t)state.sat.iDetectedManufacturer);
+  sendJsonMapEntry(F("slave_memberid"),        (int32_t)state.sat.iSlaveMemberID);
   satSendJsonFloat(F("max_setpoint_system"), satGetMaxSetpoint(), 1);
   sendJsonMapEntry(F("external_temp_valid"),  state.sat.bExternalTempValid);
   sendJsonMapEntry(F("external_outdoor_valid"), state.sat.bExternalOutdoorValid);
@@ -988,6 +1085,10 @@ void satPublishMQTT()
     dtostrf(state.sat.fErrorStdDev, 1, 3, sBuf);
     sendMQTTData(F("sat/error_stddev"), sBuf, false);
   }
+
+  // Manufacturer
+  { char mfrName[12]; satGetManufacturerName(mfrName, sizeof(mfrName));
+    sendMQTTData(F("sat/manufacturer"), mfrName, true); }
 }
 
 //=====================================================================
@@ -1200,6 +1301,17 @@ void initSAT()
   if (settings.sat.bEnabled) {
     state.sat.eControlMode = SAT_MODE_CONTINUOUS;
     DebugTln(F("SAT: initialized and enabled (continuous mode)"));
+    // Boot sequence: send priority messages PM=3,15,48 per SAT Python
+    if (hasOTCommandInterface()) {
+      addCommandToQueue("PM=3", 4, false, 0);
+      addCommandToQueue("PM=15", 5, false, 0);
+      addCommandToQueue("PM=48", 5, false, 0);
+      // Manufacturer boot quirk: MI=500 for faster OT polling
+      if (satGetManufacturerQuirks() & SAT_QUIRK_MI_500_BOOT) {
+        addCommandToQueue("MI=500", 6, false, 0);
+        DebugTln(F("SAT: MI=500 sent (manufacturer boot quirk)"));
+      }
+    }
   } else {
     DebugTln(F("SAT: initialized but disabled"));
   }
@@ -1311,8 +1423,11 @@ void satControlLoop()
   // --- Heating curve recommendation ---
   satUpdateCurveRecommendation();
 
-  // --- Modulation reliability ---
-  satUpdateModulationReliability();
+  // --- Modulation reliability (skip if manufacturer doesn't support relative modulation) ---
+  if (!(satGetManufacturerQuirks() & SAT_QUIRK_NO_REL_MOD))
+    satUpdateModulationReliability();
+  else
+    state.sat.bModulationReliable = false; // Mark as unreliable so it's not used for decisions
 
   // --- OT setpoint sync ---
   satCheckSetpointSync();
@@ -1421,18 +1536,26 @@ void satControlLoop()
     state.sat.iModSuppressionSinceMs = 0;
   }
 
-  // --- Compute modulation value based on mode, heating system, and suppression ---
+  // --- Compute modulation value based on mode, heating system, suppression, and quirks ---
   {
     uint8_t mmValue;
+    uint8_t quirks = satGetManufacturerQuirks();
     if (satAlwaysMaxModulation()) {
       mmValue = 100;
     } else if (state.sat.bModSuppressed) {
-      // Modulation suppression active: send MM=0
       mmValue = 0;
     } else if (state.sat.eControlMode == SAT_MODE_PWM && !state.sat.bPwmFlameRequested) {
       mmValue = 0;
     } else {
       mmValue = settings.sat.iMaxRelModulation;
+    }
+    // Geminox quirk: minimum modulation 10% (never send MM=0 when flame requested)
+    if ((quirks & SAT_QUIRK_MIN_MOD_10) && mmValue > 0 && mmValue < 10) {
+      mmValue = 10;
+    }
+    // Immergas quirk: cap modulation at 80%
+    if ((quirks & SAT_QUIRK_IMMERGAS_TP) && mmValue > 80) {
+      mmValue = 80;
     }
     state.sat.iCurrentModulation = mmValue;
   }
@@ -1455,6 +1578,11 @@ void satControlLoop()
     // Send MM= (max relative modulation) alongside CS=
     snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("MM=%u"), state.sat.iCurrentModulation);
     addCommandToQueue(cmdBuf, strlen(cmdBuf), false, 0);
+    // Immergas quirk: send TP=11:12=<setpoint> alongside MM=
+    if (satGetManufacturerQuirks() & SAT_QUIRK_IMMERGAS_TP) {
+      snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("TP=11:12=%.0f"), finalSetpoint);
+      addCommandToQueue(cmdBuf, strlen(cmdBuf), false, 0);
+    }
     // Push SAT target to thermostat display via TC= command (Task #31)
     if (settings.sat.bPushSetpoint) {
       snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("TC=%.1f"), settings.sat.fTargetTemp);

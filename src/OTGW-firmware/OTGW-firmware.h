@@ -326,6 +326,22 @@ enum SATCycleClass  : uint8_t {
 enum SATCurveRecommendation : uint8_t {
   SAT_CR_INSUFFICIENT = 0, SAT_CR_INCREASE, SAT_CR_DECREASE, SAT_CR_HOLD
 };
+// Manufacturer enum — indices must match satManufacturerTable[] in SATcontrol.ino
+enum SATManufacturer : uint8_t {
+  SAT_MFR_AUTO = 0,   // Auto-detect from OT MemberID (may be ambiguous)
+  SAT_MFR_ATAG,       SAT_MFR_BAXI,      SAT_MFR_BROTGE,
+  SAT_MFR_DEDIETRICH, SAT_MFR_FERROLI,   SAT_MFR_GEMINOX,
+  SAT_MFR_IDEAL,      SAT_MFR_IMMERGAS,  SAT_MFR_INTERGAS,
+  SAT_MFR_ITHO,       SAT_MFR_NEFIT,     SAT_MFR_RADIANT,
+  SAT_MFR_REMEHA,     SAT_MFR_SIME,      SAT_MFR_VAILLANT,
+  SAT_MFR_VIESSMANN,  SAT_MFR_WORCESTER, SAT_MFR_OTHER,
+  SAT_MFR_COUNT
+};
+// Manufacturer quirk flags
+#define SAT_QUIRK_MIN_MOD_10     0x01  // Geminox: minimum modulation 10%
+#define SAT_QUIRK_IMMERGAS_TP    0x02  // Immergas: extra TP=11:12 command, cap 80%
+#define SAT_QUIRK_NO_REL_MOD     0x04  // Ideal/Intergas/Geminox/Nefit: no relative modulation support
+#define SAT_QUIRK_MI_500_BOOT    0x08  // Ideal/Intergas/Nefit: send MI=500 on boot
 enum SATBoilerStatus : uint8_t {
   SAT_BS_OFF = 0, SAT_BS_IDLE, SAT_BS_PREHEATING, SAT_BS_AT_SETPOINT,
   SAT_BS_MODULATING_UP, SAT_BS_MODULATING_DOWN, SAT_BS_IGNITION_SURGE,
@@ -390,7 +406,10 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   bool     bFallbackActive       = false;
   SATFallbackReason eFallbackReason = SAT_FB_NONE;
   // Heating system detection
-  uint8_t  iDetectedHeatingSystem = SAT_HSYS_RADIATORS; // auto-detected from OT MsgID 3
+  uint8_t  iDetectedHeatingSystem = SAT_HSYS_RADIATORS; // auto-detected from OT MsgID 74
+  // Manufacturer detection
+  uint8_t  iDetectedManufacturer  = SAT_MFR_OTHER;      // auto-detected from OT MsgID 3 valueLB
+  uint8_t  iSlaveMemberID        = 0;                   // raw slave MemberID code from MsgID 3
   // Window detection
   bool     bWindowOpen            = false;
   uint32_t iWindowOpenSinceMs     = 0;
@@ -636,6 +655,7 @@ struct SATSection {
   float    fMinPressure       = 0.8f;   // Pressure alarm: minimum bar
   float    fMaxPressure       = 2.5f;   // Pressure alarm: maximum bar
   float    fMaxPressureDrop   = 0.3f;   // Pressure alarm: max bar/hour drop rate
+  uint8_t  iManufacturer      = SAT_MFR_AUTO; // User-confirmed manufacturer (0=auto-detect)
 };
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
