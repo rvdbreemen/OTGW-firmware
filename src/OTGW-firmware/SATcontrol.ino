@@ -34,6 +34,11 @@ static const uint32_t SAT_STALE_OUTDOOR_MS   = 600000UL; // 10 min: external out
 static const uint8_t  SAT_MAX_SKIP_COUNT     = 10;       // Consecutive invalid-input skips before disable
 static const uint8_t  SAT_MAX_PIC_FAILS      = 5;        // Consecutive PIC comm failures before disable
 
+// --- Simulation Constants (Task #37) ---
+static const float    SAT_SIM_FLOW_HEAT_RATE = 2.0f;    // Flow temp rise rate C/s when heating
+static const float    SAT_SIM_FLOW_COOL_RATE = 1.0f;    // Flow temp fall rate C/s when off
+static const uint32_t SAT_SIM_WARMUP_MS      = 300000UL; // 5 min warmup period
+
 // --- Manufacturer Table (PROGMEM) ---
 struct SATMfrEntry {
   uint8_t  memberID;   // OT MemberID code (MsgID 3 valueLB)
@@ -702,6 +707,10 @@ static float satApplyContinuous(float pidOutput)
 //=====================================================================
 static float satGetRoomTemp()
 {
+  // Simulation mode overrides all other sources
+  if (settings.sat.bSimulation) {
+    return state.sat.fSimRoomTemp;
+  }
   if (settings.sat.bUseExternalTemp && state.sat.bExternalTempValid) {
     // Check staleness — if no update for 5 min, fall back to OT bus
     if ((millis() - state.sat.iExternalTempLastMs) > SAT_STALE_TEMP_MS) {
@@ -717,6 +726,10 @@ static float satGetRoomTemp()
 //=== Get Outside Temperature (OT bus or external) ===
 static float satGetOutsideTemp()
 {
+  // Simulation mode overrides all other sources
+  if (settings.sat.bSimulation) {
+    return state.sat.fSimOutdoorTemp;
+  }
   if (state.sat.bExternalOutdoorValid) {
     // Check staleness — if no update for 10 min, fall back to OT bus
     if ((millis() - state.sat.iExternalOutdoorLastMs) > SAT_STALE_OUTDOOR_MS) {
@@ -954,6 +967,13 @@ void satSendStatusJSON()
   satSendJsonFloat(F("mean_error"),            state.sat.fMeanError, 2);
   satSendJsonFloat(F("error_stddev"),          state.sat.fErrorStdDev, 3);
   satSendJsonFloat(F("target_temp_step"),      settings.sat.fTargetTempStep, 1);
+  // Simulation (Task #37)
+  sendJsonMapEntry(F("simulation"),            settings.sat.bSimulation);
+  if (settings.sat.bSimulation) {
+    satSendJsonFloat(F("sim_room_temp"),        state.sat.fSimRoomTemp, 1);
+    satSendJsonFloat(F("sim_flow_temp"),        state.sat.fSimFlowTemp, 1);
+    satSendJsonFloat(F("sim_outdoor_temp"),     state.sat.fSimOutdoorTemp, 1);
+  }
   sendEndJsonMap("");
 }
 
@@ -1090,6 +1110,9 @@ void satPublishMQTT()
   // Manufacturer
   { char mfrName[12]; satGetManufacturerName(mfrName, sizeof(mfrName));
     sendMQTTData(F("sat/manufacturer"), mfrName, true); }
+
+  // Simulation (Task #37)
+  sendMQTTData(F("sat/simulation"), settings.sat.bSimulation ? "ON" : "OFF", true);
 }
 
 //=====================================================================
@@ -1368,10 +1391,92 @@ void initSAT()
 }
 
 //=====================================================================
+//=== Simulation Mode (Task #37) ===
+//=====================================================================
+static void satUpdateSimulation()
+{
+  if (!settings.sat.bSimulation) return;
+
+  uint32_t now = millis();
+  if (state.sat.iSimLastUpdateMs == 0) {
+    // First call — initialize timestamp, skip delta calculation
+    state.sat.iSimLastUpdateMs = now;
+    state.sat.bSimWarmupDone = false;
+    DebugTln(F("SAT SIM: simulation started"));
+    return;
+  }
+
+  float dtSec = (float)(now - state.sat.iSimLastUpdateMs) / 1000.0f;
+  if (dtSec <= 0.0f || dtSec > 60.0f) dtSec = 1.0f; // clamp sanity
+  state.sat.iSimLastUpdateMs = now;
+
+  float targetSetpoint = state.sat.fFinalSetpoint;
+  bool  heating = (targetSetpoint > SAT_MIN_SETPOINT + 1.0f) && state.sat.bActive;
+
+  // --- Flow temperature model ---
+  if (heating) {
+    // Warmup: first 5 minutes, flow ramps from current toward setpoint at reduced rate
+    if (!state.sat.bSimWarmupDone) {
+      uint32_t elapsed = now - (state.sat.iSimLastUpdateMs - (uint32_t)(dtSec * 1000.0f));
+      // Check if we've been running for SAT_SIM_WARMUP_MS
+      if (state.sat.fSimFlowTemp >= (targetSetpoint - 1.0f)) {
+        state.sat.bSimWarmupDone = true;
+      } else {
+        // Ramp at half the normal rate during warmup
+        float rampRate = SAT_SIM_FLOW_HEAT_RATE * 0.5f;
+        state.sat.fSimFlowTemp += rampRate * dtSec;
+        if (state.sat.fSimFlowTemp > targetSetpoint)
+          state.sat.fSimFlowTemp = targetSetpoint;
+      }
+    } else {
+      // Normal operation: flow tracks toward setpoint
+      if (state.sat.fSimFlowTemp < targetSetpoint) {
+        state.sat.fSimFlowTemp += SAT_SIM_FLOW_HEAT_RATE * dtSec;
+        if (state.sat.fSimFlowTemp > targetSetpoint)
+          state.sat.fSimFlowTemp = targetSetpoint;
+      } else if (state.sat.fSimFlowTemp > targetSetpoint) {
+        state.sat.fSimFlowTemp -= SAT_SIM_FLOW_COOL_RATE * dtSec;
+        if (state.sat.fSimFlowTemp < targetSetpoint)
+          state.sat.fSimFlowTemp = targetSetpoint;
+      }
+    }
+  } else {
+    // Not heating: flow cools toward room temp
+    if (state.sat.fSimFlowTemp > state.sat.fSimRoomTemp) {
+      state.sat.fSimFlowTemp -= SAT_SIM_FLOW_COOL_RATE * dtSec;
+      if (state.sat.fSimFlowTemp < state.sat.fSimRoomTemp)
+        state.sat.fSimFlowTemp = state.sat.fSimRoomTemp;
+    }
+    state.sat.bSimWarmupDone = false; // reset for next heating cycle
+  }
+
+  // --- Room temperature model ---
+  float dtMin = dtSec / 60.0f;
+  if (heating) {
+    // Room rises toward target at configured rate
+    float target = settings.sat.fTargetTemp;
+    if (state.sat.fSimRoomTemp < target) {
+      state.sat.fSimRoomTemp += settings.sat.fSimHeatRate * dtMin;
+      if (state.sat.fSimRoomTemp > target)
+        state.sat.fSimRoomTemp = target;
+    }
+  } else {
+    // Room decays toward outdoor temp
+    if (state.sat.fSimRoomTemp > state.sat.fSimOutdoorTemp) {
+      state.sat.fSimRoomTemp -= settings.sat.fSimCoolRate * dtMin;
+      if (state.sat.fSimRoomTemp < state.sat.fSimOutdoorTemp)
+        state.sat.fSimRoomTemp = state.sat.fSimOutdoorTemp;
+    }
+  }
+}
+
+//=====================================================================
 //=== Main Control Loop (called from doBackgroundTasks) ===
 //=====================================================================
 void satControlLoop()
 {
+  // --- Simulation update (Task #37): model thermal behavior before PID ---
+  satUpdateSimulation();
   // --- Fallback detection (Task #19): auto-enable SAT when external control lost ---
   if (!settings.sat.bEnabled && !state.sat.bFallbackActive) {
     // Check if we should auto-enable as fallback

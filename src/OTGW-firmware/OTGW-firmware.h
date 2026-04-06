@@ -432,6 +432,12 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // OT setpoint sync
   bool     bSetpointMismatch      = false;
   uint32_t iMismatchSinceMs       = 0;
+  // Simulation (Task #37)
+  float    fSimRoomTemp           = 20.0f;
+  float    fSimFlowTemp           = 20.0f;
+  float    fSimOutdoorTemp        = 5.0f;
+  uint32_t iSimLastUpdateMs       = 0;
+  bool     bSimWarmupDone         = false;
 };
 
 struct OTGWState {
@@ -658,6 +664,10 @@ struct SATSection {
   float    fMaxPressure       = 2.5f;   // Pressure alarm: maximum bar
   float    fMaxPressureDrop   = 0.3f;   // Pressure alarm: max bar/hour drop rate
   uint8_t  iManufacturer      = SAT_MFR_AUTO; // User-confirmed manufacturer (0=auto-detect)
+  // Simulation mode (Task #37) — test SAT without a real boiler
+  bool     bSimulation        = false;  // Enable simulation mode
+  float    fSimHeatRate       = 0.5f;   // Room heating rate C/min
+  float    fSimCoolRate       = 0.1f;   // Room cooling rate C/min
 };
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT

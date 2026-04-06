@@ -1395,6 +1395,15 @@ void sendDeviceSettings()
     dtostrf(settings.sat.fOvershootMargin, 1, 1, tmpBuf);
     sendJsonSettingObj(F("satovershootmargin"), tmpBuf, "f", 0, 5);
   }
+  // --- SAT Simulation settings (Task #37) ---
+  sendJsonSettingObj(F("satsimulation"), settings.sat.bSimulation, "b");
+  {
+    char tmpBuf[8];
+    dtostrf(settings.sat.fSimHeatRate, 1, 2, tmpBuf);
+    sendJsonSettingObj(F("satsimheatrate"), tmpBuf, "f", 0, 5);
+    dtostrf(settings.sat.fSimCoolRate, 1, 2, tmpBuf);
+    sendJsonSettingObj(F("satsimcoolrate"), tmpBuf, "f", 0, 5);
+  }
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-Direct settings (OTGW32 only) ---
   sendJsonSettingObj(F("otdmode"), settings.otd.iMode, "i", 0, 4);
@@ -1450,7 +1459,7 @@ static const char* const PROGMEM knownSettings[] = {
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
   "satcoefficient", "satdeadband", "satenabled", "satexternaltemp",
   "satinterval", "satmanufacturer", "satovershootmargin", "satpresetaway", "satpresetcomfort", "satpreseteco",
-  "satpwmautoswitch", "satsystem", "sattargettemp",
+  "satpwmautoswitch", "satsimcoolrate", "satsimheatrate", "satsimulation", "satsystem", "sattargettemp",
   "ui_autodownloadlog", "ui_autoexport", "ui_autoscreenshot", "ui_autoscroll",
   "ui_capture", "ui_graphtimewindow", "ui_timestamps",
   "webhookcontenttype", "webhookenable", "webhookenabled",

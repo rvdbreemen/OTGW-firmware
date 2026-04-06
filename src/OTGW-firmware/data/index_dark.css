@@ -1228,6 +1228,10 @@ body.disable-interaction {
   background: #4a1010;
   color: #ef9a9a;
 }
+.sat-badge-sim {
+  background: #4a148c;
+  color: #ce93d8;
+}
 /* SAT Interactive Controls (Dark) */
 .sat-btn { background: #3a3a3c; color: #e0e0e0; border-color: #555; }
 .sat-btn:hover { background: #4a4a4c; }

@@ -743,6 +743,8 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
               updateSetting("SATforcepwm", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("flow_offset")) == 0) {
               updateSetting("SATflowoffset", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("simulation")) == 0) {
+              updateSetting("SATsimulation", msgPayload);
             } else {
               MQTTDebugTf(PSTR("SAT: unknown sub-command [%s]\r\n"), satSubCmd);
             }

@@ -108,6 +108,25 @@ var SAT = (function() {
       }
     }
 
+    // Simulation badge
+    var simBadge = el('sat-sim-badge');
+    if (simBadge) {
+      if (d.simulation) {
+        simBadge.textContent = 'SIMULATION';
+        simBadge.className = 'sat-badge sat-badge-sim';
+        simBadge.style.display = '';
+      } else {
+        simBadge.style.display = 'none';
+      }
+    }
+    // Simulation toggle button
+    var simBtn = el('sat-btn-simulation');
+    if (simBtn) {
+      _lastSimEnabled = !!d.simulation;
+      simBtn.textContent = _lastSimEnabled ? 'Stop Sim' : 'Start Sim';
+      simBtn.className = 'sat-btn sat-btn-toggle' + (_lastSimEnabled ? ' active' : '');
+    }
+
     // Temperature cards
     setText('sat-room-temp', fmtTemp(d.room_temp));
     setText('sat-target-temp', fmtTemp(d.target_temp));
@@ -495,6 +514,7 @@ var SAT = (function() {
 
   // --- Interactive Controls ---
   var _lastSATEnabled = false;
+  var _lastSimEnabled = false;
   var _lastPresetIdx = 0;
   var _lastModeIdx = 0;
 
@@ -543,6 +563,20 @@ var SAT = (function() {
     satPost('enable', _lastSATEnabled ? '0' : '1');
   }
 
+  function toggleSimulation() {
+    var newVal = _lastSimEnabled ? '0' : '1';
+    fetch(APIGW + 'v1/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"name":"satsimulation","value":"' + newVal + '"}'
+    }).then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      showFeedback('Simulation ' + (newVal === '1' ? 'enabled' : 'disabled'), false);
+    }).catch(function(e) {
+      showFeedback('Error: ' + e.message, true);
+    });
+  }
+
   return {
     start: start,
     stop: stop,
@@ -551,6 +585,7 @@ var SAT = (function() {
     adjustTarget: adjustTarget,
     setPreset: setPreset,
     setMode: setMode,
-    toggleEnable: toggleEnable
+    toggleEnable: toggleEnable,
+    toggleSimulation: toggleSimulation
   };
 })();

@@ -317,6 +317,7 @@
         <div class="sat-header">
           <h2>SAT - Smart Autotune Thermostat</h2>
           <span id="sat-status-badge" class="sat-badge sat-badge-disabled">Disabled</span>
+          <span id="sat-sim-badge" class="sat-badge sat-badge-sim" style="display:none">SIMULATION</span>
         </div>
 
         <!-- Temperature cards -->
@@ -356,6 +357,7 @@
             <button class="sat-btn sat-btn-mode" id="sat-btn-continuous" onclick="SAT.setMode('continuous')">Continuous</button>
             <button class="sat-btn sat-btn-mode" id="sat-btn-pwm" onclick="SAT.setMode('pwm')">PWM</button>
             <button class="sat-btn sat-btn-toggle" id="sat-btn-enable" onclick="SAT.toggleEnable()">Enable SAT</button>
+            <button class="sat-btn sat-btn-toggle" id="sat-btn-simulation" onclick="SAT.toggleSimulation()">Start Sim</button>
           </div>
           <div class="sat-feedback" id="sat-feedback"></div>
         </div>

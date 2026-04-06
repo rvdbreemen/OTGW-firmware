@@ -308,6 +308,9 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATmaxpressure"), settings.sat.fMaxPressure, true);
   writeJsonFloatKV(file, F("SATmaxpressdrop"), settings.sat.fMaxPressureDrop, true);
   writeJsonIntKV(file, F("SATmanufacturer"), settings.sat.iManufacturer, true);
+  writeJsonBoolKV(file, F("SATsimulation"), settings.sat.bSimulation, true);
+  writeJsonFloatKV(file, F("SATsimheatrate"), settings.sat.fSimHeatRate, true);
+  writeJsonFloatKV(file, F("SATsimcoolrate"), settings.sat.fSimCoolRate, true);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings (OTGW32/OT-Thing only) ---
   writeJsonIntKV(file, F("OTDmode"), settings.otd.iMode, true);
@@ -746,6 +749,15 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATmaxpressure")) == 0)  settings.sat.fMaxPressure = constrain(atof(newValue), 1.0f, 4.0f);
   else if (strcasecmp_P(field, PSTR("SATmaxpressdrop")) == 0) settings.sat.fMaxPressureDrop = constrain(atof(newValue), 0.05f, 2.0f);
   else if (strcasecmp_P(field, PSTR("SATmanufacturer")) == 0) settings.sat.iManufacturer = constrain(atoi(newValue), 0, SAT_MFR_COUNT - 1);
+  else if (strcasecmp_P(field, PSTR("SATsimulation")) == 0) {
+    settings.sat.bSimulation = EVALBOOLEAN(newValue);
+    if (settings.sat.bSimulation) {
+      state.sat.iSimLastUpdateMs = 0;  // reset on enable
+      state.sat.bSimWarmupDone = false;
+    }
+  }
+  else if (strcasecmp_P(field, PSTR("SATsimheatrate")) == 0) settings.sat.fSimHeatRate = constrain(atof(newValue), 0.01f, 5.0f);
+  else if (strcasecmp_P(field, PSTR("SATsimcoolrate")) == 0) settings.sat.fSimCoolRate = constrain(atof(newValue), 0.01f, 5.0f);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings ---
   else if (strcasecmp_P(field, PSTR("OTDmode")) == 0)           settings.otd.iMode = constrain(atoi(newValue), 0, 4);
