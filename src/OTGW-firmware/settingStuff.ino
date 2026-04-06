@@ -321,6 +321,9 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("SATsolargain"), settings.sat.bSolarGainEnable, true);
   writeJsonFloatKV(file, F("SATsolarminrise"), settings.sat.fSolarMinRiseRate, true);
   writeJsonFloatKV(file, F("SATsolaroffset"), settings.sat.fSolarSetpointOffset, true);
+  writeJsonBoolKV(file, F("SATsummersimmer"), settings.sat.bSummerSimmer, true);
+  writeJsonFloatKV(file, F("SATsummerthreshold"), settings.sat.fSummerThreshold, true);
+  writeJsonIntKV(file, F("SATsummerminhours"), settings.sat.iSummerMinHours, true);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings (OTGW32/OT-Thing only) ---
   writeJsonIntKV(file, F("OTDmode"), settings.otd.iMode, true);
@@ -781,6 +784,9 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATsolargain")) == 0) settings.sat.bSolarGainEnable = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATsolarminrise")) == 0) settings.sat.fSolarMinRiseRate = constrain(atof(newValue), 0.1f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATsolaroffset")) == 0) settings.sat.fSolarSetpointOffset = constrain(atof(newValue), 0.5f, 10.0f);
+  else if (strcasecmp_P(field, PSTR("SATsummersimmer")) == 0) settings.sat.bSummerSimmer = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATsummerthreshold")) == 0) settings.sat.fSummerThreshold = constrain(atof(newValue), 5.0f, 35.0f);
+  else if (strcasecmp_P(field, PSTR("SATsummerminhours")) == 0) settings.sat.iSummerMinHours = constrain(atoi(newValue), 1, 48);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings ---
   else if (strcasecmp_P(field, PSTR("OTDmode")) == 0)           settings.otd.iMode = constrain(atoi(newValue), 0, 4);

@@ -743,6 +743,12 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
               updateSetting("SATforcepwm", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("flow_offset")) == 0) {
               updateSetting("SATflowoffset", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("summer_simmer")) == 0) {
+              updateSetting("SATsummersimmer", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("summer_threshold")) == 0) {
+              updateSetting("SATsummerthreshold", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("summer_min_hours")) == 0) {
+              updateSetting("SATsummerminhours", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("simulation")) == 0) {
               updateSetting("SATsimulation", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("preset_sync")) == 0) {

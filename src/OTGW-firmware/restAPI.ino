@@ -1437,6 +1437,14 @@ void sendDeviceSettings()
     dtostrf(settings.sat.fSolarSetpointOffset, 1, 1, tmpBuf);
     sendJsonSettingObj(F("satsolaroffset"), tmpBuf, "f", 0, 10);
   }
+  // --- SAT Summer Simmer settings (Task #24) ---
+  sendJsonSettingObj(F("satsummersimmer"), settings.sat.bSummerSimmer, "b");
+  {
+    char tmpBuf[8];
+    dtostrf(settings.sat.fSummerThreshold, 1, 1, tmpBuf);
+    sendJsonSettingObj(F("satsummerthreshold"), tmpBuf, "f", 5, 35);
+  }
+  sendJsonSettingObj(F("satsummerminhours"), settings.sat.iSummerMinHours, "i", 1, 48);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-Direct settings (OTGW32 only) ---
   sendJsonSettingObj(F("otdmode"), settings.otd.iMode, "i", 0, 4);
@@ -1495,6 +1503,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satpresetsync", "satpresetsynctopic",
   "satpwmautoswitch", "satsimcoolrate", "satsimheatrate", "satsimulation",
   "satsolargain", "satsolarminrise", "satsolaroffset",
+  "satsummerminhours", "satsummersimmer", "satsummerthreshold",
   "satsystem", "sattargettemp",
   "satweatherenable", "satweatherinterval", "satweatherlat", "satweatherlon",
   "ui_autodownloadlog", "ui_autoexport", "ui_autoscreenshot", "ui_autoscroll",

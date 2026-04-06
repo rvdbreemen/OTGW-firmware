@@ -460,6 +460,9 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // Solar gain (Task #23)
   bool     bSolarGainActive       = false;
   float    fIndoorRiseRate        = 0.0f;  // Current indoor temp rise rate (C/hr)
+  // Summer simmer (Task #24)
+  bool     bSummerActive          = false;  // Summer mode currently suppressing heating
+  float    fSummerHoursAbove      = 0.0f;   // Hours outdoor temp has been above threshold
 };
 
 struct OTGWState {
@@ -704,6 +707,10 @@ struct SATSection {
   bool     bSolarGainEnable   = false;  // Enable solar gain compensation
   float    fSolarMinRiseRate  = 0.5f;   // Minimum indoor rise rate (C/hr) to trigger
   float    fSolarSetpointOffset = 2.0f; // Setpoint reduction during solar gain (C)
+  // Summer simmer (Task #24) — auto-disable heating when outdoor temp stays warm
+  bool     bSummerSimmer      = false;  // Enable summer simmer auto-disable
+  float    fSummerThreshold   = 18.0f;  // Outdoor temp threshold for summer mode (C)
+  uint8_t  iSummerMinHours    = 6;      // Consecutive hours above threshold to trigger
 };
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT

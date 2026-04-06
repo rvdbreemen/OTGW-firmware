@@ -988,6 +988,12 @@ void satSendStatusJSON()
   // Solar gain (Task #23)
   sendJsonMapEntry(F("solar_gain_active"),     state.sat.bSolarGainActive);
   satSendJsonFloat(F("indoor_rise_rate"),      state.sat.fIndoorRiseRate, 2);
+  // Summer simmer (Task #24)
+  sendJsonMapEntry(F("summer_simmer"),         settings.sat.bSummerSimmer);
+  sendJsonMapEntry(F("summer_active"),         state.sat.bSummerActive);
+  satSendJsonFloat(F("summer_hours_above"),    state.sat.fSummerHoursAbove, 1);
+  satSendJsonFloat(F("summer_threshold"),      settings.sat.fSummerThreshold, 1);
+  sendJsonMapEntry(F("summer_min_hours"),      (int32_t)settings.sat.iSummerMinHours);
   // Simulation (Task #37)
   sendJsonMapEntry(F("simulation"),            settings.sat.bSimulation);
   if (settings.sat.bSimulation) {
@@ -1143,6 +1149,13 @@ void satPublishMQTT()
   { char sgBuf[12];
     dtostrf(state.sat.fIndoorRiseRate, 1, 2, sgBuf);
     sendMQTTData(F("sat/indoor_rise_rate"), sgBuf, false);
+  }
+
+  // Summer simmer (Task #24)
+  sendMQTTData(F("sat/summer_active"), state.sat.bSummerActive ? "true" : "false", false);
+  { char suBuf[12];
+    dtostrf(state.sat.fSummerHoursAbove, 1, 1, suBuf);
+    sendMQTTData(F("sat/summer_hours_above"), suBuf, false);
   }
 
   // Simulation (Task #37)
@@ -1609,6 +1622,65 @@ static void satUpdateSolarGain()
 }
 
 //=====================================================================
+//=== Summer Simmer (Task #24) ===
+//=====================================================================
+static uint32_t _summer_lastCheckMs = 0;
+static const uint32_t SUMMER_CHECK_INTERVAL_MS = 300000UL; // Check every 5 min
+
+static void satUpdateSummerSimmer()
+{
+  if (!settings.sat.bSummerSimmer) {
+    state.sat.bSummerActive = false;
+    state.sat.fSummerHoursAbove = 0.0f;
+    _summer_lastCheckMs = 0;
+    return;
+  }
+
+  uint32_t now = millis();
+  if (_summer_lastCheckMs == 0) {
+    _summer_lastCheckMs = now;
+    return;
+  }
+  if ((now - _summer_lastCheckMs) < SUMMER_CHECK_INTERVAL_MS) return;
+
+  float dtHours = (float)(now - _summer_lastCheckMs) / 3600000.0f;
+  _summer_lastCheckMs = now;
+
+  float outsideTemp = satGetOutsideTemp();
+  float hysteresis = 2.0f; // Re-enable threshold is threshold - 2C
+
+  if (!state.sat.bSummerActive) {
+    // Not yet in summer mode: accumulate time above threshold
+    if (outsideTemp >= settings.sat.fSummerThreshold) {
+      state.sat.fSummerHoursAbove += dtHours;
+      if (state.sat.fSummerHoursAbove >= (float)settings.sat.iSummerMinHours) {
+        state.sat.bSummerActive = true;
+        DebugTf(PSTR("SAT: summer simmer activated (outdoor=%.1f >= %.1f for %.1fh)\r\n"),
+                outsideTemp, settings.sat.fSummerThreshold, state.sat.fSummerHoursAbove);
+      }
+    } else {
+      // Below threshold: reset accumulator
+      state.sat.fSummerHoursAbove = 0.0f;
+    }
+  } else {
+    // Currently in summer mode: decay when temp drops below threshold - hysteresis
+    if (outsideTemp < (settings.sat.fSummerThreshold - hysteresis)) {
+      state.sat.fSummerHoursAbove -= dtHours;
+      if (state.sat.fSummerHoursAbove <= 0.0f) {
+        state.sat.fSummerHoursAbove = 0.0f;
+        state.sat.bSummerActive = false;
+        DebugTf(PSTR("SAT: summer simmer deactivated (outdoor=%.1f < %.1f)\r\n"),
+                outsideTemp, settings.sat.fSummerThreshold - hysteresis);
+      }
+    } else {
+      // Still warm enough: keep hours at max so deactivation requires sustained cold
+      if (state.sat.fSummerHoursAbove < (float)settings.sat.iSummerMinHours)
+        state.sat.fSummerHoursAbove = (float)settings.sat.iSummerMinHours;
+    }
+  }
+}
+
+//=====================================================================
 //=== Main Control Loop (called from doBackgroundTasks) ===
 //=====================================================================
 void satControlLoop()
@@ -1715,6 +1787,16 @@ void satControlLoop()
 
   // --- Solar gain compensation (Task #23) ---
   satUpdateSolarGain();
+
+  // --- Summer simmer (Task #24): skip heating if summer mode active ---
+  satUpdateSummerSimmer();
+  if (state.sat.bSummerActive && settings.sat.bSummerSimmer) {
+    state.sat.fFinalSetpoint = SAT_MIN_SETPOINT;
+    if (hasOTCommandInterface()) {
+      addCommandToQueue("CS=0", 4, false, 0);
+    }
+    return; // Skip rest of control loop
+  }
 
   // --- Power & energy tracking (Task #45) ---
   satUpdatePowerEnergy();
