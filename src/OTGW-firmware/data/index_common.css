@@ -247,6 +247,19 @@
   background: #999;
 }
 
+/* SAT Interactive Controls */
+.sat-card-interactive .sat-card-controls { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.sat-btn { padding: 8px 16px; border: 1px solid #ccc; border-radius: 6px; background: #f5f5f5; cursor: pointer; font-size: 14px; min-width: 44px; min-height: 44px; transition: background 0.2s; }
+.sat-btn:hover { background: #e0e0e0; }
+.sat-btn:active { background: #d0d0d0; }
+.sat-btn.active { background: #4CAF50; color: white; border-color: #388E3C; }
+.sat-btn-temp { font-size: 20px; font-weight: bold; width: 48px; height: 48px; border-radius: 50%; }
+.sat-btn-toggle.active { background: #f44336; border-color: #d32f2f; }
+.sat-controls-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 8px 0; }
+.sat-feedback { text-align: center; min-height: 20px; font-size: 13px; margin-top: 4px; }
+.sat-feedback-ok { color: #4CAF50; }
+.sat-feedback-error { color: #f44336; }
+
 @media (max-width: 768px) {
   .sat-cards {
     flex-direction: column;

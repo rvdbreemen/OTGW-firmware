@@ -127,6 +127,32 @@ var SAT = (function() {
     var presetNames = ['None', 'Away', 'Eco', 'Comfort', 'Sleep', 'Activity'];
     setText('sat-preset', d.active_preset !== undefined ? (presetNames[d.active_preset] || '--') : '--');
 
+    // Update control button states
+    _lastSATEnabled = !!d.enabled;
+    _lastPresetIdx = d.active_preset || 0;
+    _lastModeIdx = d.control_mode || 0;
+
+    // Highlight active preset button
+    var presetBtns = ['away', 'eco', 'comfort', 'sleep'];
+    var presetMap = { 1: 'away', 2: 'eco', 3: 'comfort', 4: 'sleep' };
+    for (var pi = 0; pi < presetBtns.length; pi++) {
+      var btn = el('sat-btn-' + presetBtns[pi]);
+      if (btn) btn.className = 'sat-btn sat-btn-preset' + (presetMap[_lastPresetIdx] === presetBtns[pi] ? ' active' : '');
+    }
+
+    // Highlight active mode button
+    var contBtn = el('sat-btn-continuous');
+    var pwmBtn = el('sat-btn-pwm');
+    if (contBtn) contBtn.className = 'sat-btn sat-btn-mode' + (_lastModeIdx === 1 ? ' active' : '');
+    if (pwmBtn) pwmBtn.className = 'sat-btn sat-btn-mode' + (_lastModeIdx === 2 ? ' active' : '');
+
+    // Enable/disable toggle button state
+    var enBtn = el('sat-btn-enable');
+    if (enBtn) {
+      enBtn.textContent = _lastSATEnabled ? 'Disable SAT' : 'Enable SAT';
+      enBtn.className = 'sat-btn sat-btn-toggle' + (_lastSATEnabled ? ' active' : '');
+    }
+
     var hsNames = ['Auto', 'Radiators', 'Heat Pump', 'Underfloor'];
     var hsIdx = d.heating_system !== undefined ? d.heating_system : 0;
     var hsDetected = d.heating_system_detected !== undefined ? d.heating_system_detected : 1;
@@ -467,10 +493,64 @@ var SAT = (function() {
     }
   }
 
+  // --- Interactive Controls ---
+  var _lastSATEnabled = false;
+  var _lastPresetIdx = 0;
+  var _lastModeIdx = 0;
+
+  function satPost(endpoint, value) {
+    return fetch('/api/v2/sat/' + endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: String(value)
+    }).then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      showFeedback('OK', false);
+      return r;
+    }).catch(function(e) {
+      showFeedback('Error: ' + e.message, true);
+    });
+  }
+
+  function showFeedback(msg, isError) {
+    var fb = el('sat-feedback');
+    if (!fb) return;
+    fb.textContent = msg;
+    fb.className = 'sat-feedback ' + (isError ? 'sat-feedback-error' : 'sat-feedback-ok');
+    setTimeout(function() { fb.textContent = ''; fb.className = 'sat-feedback'; }, 3000);
+  }
+
+  function adjustTarget(delta) {
+    var curEl = el('sat-target-temp');
+    if (!curEl) return;
+    var cur = parseFloat(curEl.textContent);
+    if (isNaN(cur)) return;
+    var next = Math.round((cur + delta) * 10) / 10;
+    if (next < 5 || next > 30) return;
+    curEl.textContent = next.toFixed(1) + '\u00B0C';
+    satPost('target', next.toFixed(1));
+  }
+
+  function setPreset(name) {
+    satPost('preset', name);
+  }
+
+  function setMode(mode) {
+    satPost('mode', mode);
+  }
+
+  function toggleEnable() {
+    satPost('enable', _lastSATEnabled ? '0' : '1');
+  }
+
   return {
     start: start,
     stop: stop,
     setTheme: setTheme,
-    toggleCurve: toggleCurve
+    toggleCurve: toggleCurve,
+    adjustTarget: adjustTarget,
+    setPreset: setPreset,
+    setMode: setMode,
+    toggleEnable: toggleEnable
   };
 })();

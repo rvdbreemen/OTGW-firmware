@@ -622,6 +622,45 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       sendApiMethodNotAllowed(F("POST, PUT"));
     }
   }
+  else if (strcasecmp_P(sub, PSTR("preset")) == 0) {
+    if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    char valBuf[16];
+    const char* val = nullptr;
+    if (httpServer.hasArg(F("plain"))) {
+      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+    } else if (wc > 5) {
+      val = words[5];
+    }
+    if (!val) { sendApiError(400, F("Missing preset name (away/eco/comfort/sleep/activity)")); return; }
+    satHandlePreset(val);
+    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+  }
+  else if (strcasecmp_P(sub, PSTR("enable")) == 0) {
+    if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    char valBuf[16];
+    const char* val = nullptr;
+    if (httpServer.hasArg(F("plain"))) {
+      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+    } else if (wc > 5) {
+      val = words[5];
+    }
+    if (!val) { sendApiError(400, F("Missing value (0/1)")); return; }
+    satHandleEnabled(val);
+    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+  }
+  else if (strcasecmp_P(sub, PSTR("mode")) == 0) {
+    if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    char valBuf[16];
+    const char* val = nullptr;
+    if (httpServer.hasArg(F("plain"))) {
+      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+    } else if (wc > 5) {
+      val = words[5];
+    }
+    if (!val) { sendApiError(400, F("Missing mode (continuous/pwm)")); return; }
+    satHandleControlMode(val);
+    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+  }
   else {
     sendApiNotFound(originalURI);
   }

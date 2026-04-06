@@ -1228,3 +1228,11 @@ body.disable-interaction {
   background: #4a1010;
   color: #ef9a9a;
 }
+/* SAT Interactive Controls (Dark) */
+.sat-btn { background: #3a3a3c; color: #e0e0e0; border-color: #555; }
+.sat-btn:hover { background: #4a4a4c; }
+.sat-btn:active { background: #555; }
+.sat-btn.active { background: #2e7d32; color: #fff; border-color: #388E3C; }
+.sat-btn-toggle.active { background: #c62828; border-color: #b71c1c; }
+.sat-feedback-ok { color: #66bb6a; }
+.sat-feedback-error { color: #ef5350; }

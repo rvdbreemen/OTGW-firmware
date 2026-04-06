@@ -325,9 +325,13 @@
             <div class="sat-card-label">Room Temperature</div>
             <div class="sat-card-value" id="sat-room-temp">--</div>
           </div>
-          <div class="sat-card">
+          <div class="sat-card sat-card-interactive">
             <div class="sat-card-label">Target Temperature</div>
-            <div class="sat-card-value" id="sat-target-temp">--</div>
+            <div class="sat-card-controls">
+              <button class="sat-btn sat-btn-temp" onclick="SAT.adjustTarget(-0.5)">-</button>
+              <div class="sat-card-value" id="sat-target-temp">--</div>
+              <button class="sat-btn sat-btn-temp" onclick="SAT.adjustTarget(0.5)">+</button>
+            </div>
           </div>
           <div class="sat-card">
             <div class="sat-card-label">Outside Temperature</div>
@@ -337,6 +341,23 @@
             <div class="sat-card-label">Boiler Setpoint</div>
             <div class="sat-card-value" id="sat-flow-temp">--</div>
           </div>
+        </div>
+
+        <!-- SAT Controls -->
+        <div class="sat-section">
+          <h3>Controls</h3>
+          <div class="sat-controls-row">
+            <button class="sat-btn sat-btn-preset" id="sat-btn-away" onclick="SAT.setPreset('away')">Away</button>
+            <button class="sat-btn sat-btn-preset" id="sat-btn-eco" onclick="SAT.setPreset('eco')">Eco</button>
+            <button class="sat-btn sat-btn-preset" id="sat-btn-comfort" onclick="SAT.setPreset('comfort')">Comfort</button>
+            <button class="sat-btn sat-btn-preset" id="sat-btn-sleep" onclick="SAT.setPreset('sleep')">Sleep</button>
+          </div>
+          <div class="sat-controls-row">
+            <button class="sat-btn sat-btn-mode" id="sat-btn-continuous" onclick="SAT.setMode('continuous')">Continuous</button>
+            <button class="sat-btn sat-btn-mode" id="sat-btn-pwm" onclick="SAT.setMode('pwm')">PWM</button>
+            <button class="sat-btn sat-btn-toggle" id="sat-btn-enable" onclick="SAT.toggleEnable()">Enable SAT</button>
+          </div>
+          <div class="sat-feedback" id="sat-feedback"></div>
         </div>
 
         <!-- Chart -->
