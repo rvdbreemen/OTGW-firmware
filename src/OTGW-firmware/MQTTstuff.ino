@@ -763,6 +763,21 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
               updateSetting("SATpresetsync", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("preset_sync_topic")) == 0) {
               updateSetting("SATpresetsynctopic", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("multi_area")) == 0) {
+              updateSetting("SATmultiarea", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("multi_area_count")) == 0) {
+              updateSetting("SATmultiareacount", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("area")) == 0) {
+              // sat/area/<index> — push area temperature
+              char areaIdx[4];
+              if (readMQTTTopicToken(topicCursor, areaIdx, sizeof(areaIdx))) {
+                int idx = atoi(areaIdx);
+                if (idx >= 0 && idx < 4) {
+                  satHandleAreaTemp((uint8_t)idx, msgPayload);
+                } else {
+                  MQTTDebugTf(PSTR("SAT: area index out of range [%s]\r\n"), areaIdx);
+                }
+              }
             } else {
               MQTTDebugTf(PSTR("SAT: unknown sub-command [%s]\r\n"), satSubCmd);
             }

@@ -48,6 +48,10 @@ static const float    SAT_THERMAL_EST_MAX     = 35.0f;   // Maximum estimated ro
 static const float    SAT_THERMAL_SAFE_FLOW   = 45.0f;   // Fixed safe setpoint after 2h estimation
 static const uint32_t SAT_THERMAL_MAX_EST_MS  = 7200000UL; // 2h: max estimation before safe setpoint
 
+// --- Multi-area Constants (Task #25) ---
+static const uint8_t  SAT_MAX_AREAS           = 4;         // Maximum number of temperature areas
+static const uint32_t SAT_AREA_STALE_MS       = 300000UL;  // 5 min: area temp considered stale
+
 // --- Simulation Constants (Task #37) ---
 static const float    SAT_SIM_FLOW_HEAT_RATE = 2.0f;    // Flow temp rise rate C/s when heating
 static const float    SAT_SIM_FLOW_COOL_RATE = 1.0f;    // Flow temp fall rate C/s when off
@@ -743,6 +747,12 @@ static float satGetRoomTemp()
   if (settings.sat.bSimulation) {
     return state.sat.fSimRoomTemp;
   }
+  // Multi-area weighted average (Task #25) — takes priority when enabled and valid
+  if (settings.sat.bMultiArea && settings.sat.iMultiAreaCount > 0) {
+    float weighted = satGetWeightedRoomTemp();
+    if (!isnan(weighted)) return weighted;
+    // No valid areas: fall through to single-sensor logic
+  }
   if (settings.sat.bUseExternalTemp && state.sat.bExternalTempValid) {
     // Check staleness — if no update for 5 min, fall back to OT bus
     if ((millis() - state.sat.iExternalTempLastMs) > SAT_STALE_TEMP_MS) {
@@ -834,6 +844,51 @@ bool satHandleHumidity(const char* value)
   state.sat.iHumidityLastMs = millis();
   DebugTf(PSTR("SAT: humidity set to %.0f%%\r\n"), h);
   return true;
+}
+
+// --- Multi-area room temperature handler (Task #25) ---
+bool satHandleAreaTemp(uint8_t area, const char* value)
+{
+  if (area >= SAT_MAX_AREAS) return false;
+  if (!value || !*value) return false;
+  char* endp = nullptr;
+  float temp = strtof(value, &endp);
+  if (endp == value || *endp != '\0') return false;  // non-numeric input
+  if (temp > -50.0f && temp < 100.0f) {
+    state.sat.fAreaTemp[area] = temp;
+    state.sat.bAreaValid[area] = true;
+    state.sat.iAreaLastMs[area] = millis();
+    DebugTf(PSTR("SAT: area %u temp set to %.1f\r\n"), area, temp);
+    return true;
+  }
+  return false;
+}
+
+// Returns weighted average of valid, non-stale area temperatures.
+// Returns NAN if no valid areas are available.
+static float satGetWeightedRoomTemp()
+{
+  float sumWeightedTemp = 0.0f;
+  float sumWeight = 0.0f;
+  uint32_t now = millis();
+  uint8_t count = settings.sat.iMultiAreaCount;
+  if (count > SAT_MAX_AREAS) count = SAT_MAX_AREAS;
+
+  for (uint8_t i = 0; i < count; i++) {
+    if (!state.sat.bAreaValid[i]) continue;
+    // Stale check: mark invalid if no update for 5 min
+    if ((now - state.sat.iAreaLastMs[i]) > SAT_AREA_STALE_MS) {
+      state.sat.bAreaValid[i] = false;
+      DebugTf(PSTR("SAT: area %u temp stale\r\n"), i);
+      continue;
+    }
+    float w = settings.sat.fAreaWeight[i];
+    if (w <= 0.0f) continue;
+    sumWeightedTemp += state.sat.fAreaTemp[i] * w;
+    sumWeight += w;
+  }
+  if (sumWeight <= 0.0f) return NAN;
+  return sumWeightedTemp / sumWeight;
 }
 
 bool satHandleTargetTemp(const char* value)
@@ -1059,6 +1114,31 @@ void satSendStatusJSON()
     satSendJsonFloat(F("sim_flow_temp"),        state.sat.fSimFlowTemp, 1);
     satSendJsonFloat(F("sim_outdoor_temp"),     state.sat.fSimOutdoorTemp, 1);
   }
+  // Multi-area (Task #25)
+  sendJsonMapEntry(F("multi_area"),            settings.sat.bMultiArea);
+  sendJsonMapEntry(F("multi_area_count"),      (int32_t)settings.sat.iMultiAreaCount);
+  if (settings.sat.bMultiArea && settings.sat.iMultiAreaCount > 0) {
+    uint8_t cnt = settings.sat.iMultiAreaCount;
+    if (cnt > SAT_MAX_AREAS) cnt = SAT_MAX_AREAS;
+    for (uint8_t i = 0; i < cnt; i++) {
+      char nameBuf[20];
+      char numBuf[12];
+      char jsonBuff[60];
+      // area_N_temp
+      snprintf_P(nameBuf, sizeof(nameBuf), PSTR("area_%u_temp"), i);
+      dtostrf(state.sat.fAreaTemp[i], 1, 1, numBuf);
+      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": %s"), nameBuf, numBuf);
+      sendBeforenext(); sendIdent(); httpServer.sendContent(jsonBuff);
+      // area_N_valid
+      snprintf_P(nameBuf, sizeof(nameBuf), PSTR("area_%u_valid"), i);
+      sendJsonMapEntry(nameBuf, state.sat.bAreaValid[i]);
+      // area_N_weight
+      snprintf_P(nameBuf, sizeof(nameBuf), PSTR("area_%u_weight"), i);
+      dtostrf(settings.sat.fAreaWeight[i], 1, 2, numBuf);
+      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": %s"), nameBuf, numBuf);
+      sendBeforenext(); sendIdent(); httpServer.sendContent(jsonBuff);
+    }
+  }
   sendEndJsonMap("");
 }
 
@@ -1239,6 +1319,19 @@ void satPublishMQTT()
 
   // Simulation (Task #37)
   sendMQTTData(F("sat/simulation"), settings.sat.bSimulation ? "ON" : "OFF", true);
+
+  // Multi-area (Task #25)
+  if (settings.sat.bMultiArea && settings.sat.iMultiAreaCount > 0) {
+    uint8_t cnt = settings.sat.iMultiAreaCount;
+    if (cnt > SAT_MAX_AREAS) cnt = SAT_MAX_AREAS;
+    char topicBuf[24];
+    char vBuf[12];
+    for (uint8_t i = 0; i < cnt; i++) {
+      snprintf_P(topicBuf, sizeof(topicBuf), PSTR("sat/area/%u"), i);
+      dtostrf(state.sat.fAreaTemp[i], 1, 1, vBuf);
+      sendMQTTData(topicBuf, vBuf, false);
+    }
+  }
 
   // Weather data (Task #50)
   weatherPublishMQTT();

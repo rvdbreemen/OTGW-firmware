@@ -474,6 +474,10 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   bool     bHumidityValid         = false;  // Humidity reading available
   uint32_t iHumidityLastMs        = 0;      // Last humidity update timestamp
   float    fComfortOffset         = 0.0f;   // Current comfort adjustment (C)
+  // Multi-area room temperature (Task #25)
+  float    fAreaTemp[4]           = {0};    // Temperature per area
+  bool     bAreaValid[4]          = {false};// Area has valid reading
+  uint32_t iAreaLastMs[4]         = {0};    // Last update per area
 };
 
 struct OTGWState {
@@ -728,6 +732,10 @@ struct SATSection {
   bool     bComfortAdjust     = false;  // Enable thermal comfort (humidity) adjustment
   float    fComfortHumidity   = 50.0f;  // Reference humidity % (no adjustment at this level)
   float    fComfortMaxOffset  = 1.0f;   // Max target temp adjustment from humidity (C)
+  // Multi-area room temperature (Task #25)
+  bool     bMultiArea         = false;  // Enable multi-area weighted temperature
+  uint8_t  iMultiAreaCount    = 0;      // Number of configured areas (0-4)
+  float    fAreaWeight[4]     = {1.0f, 1.0f, 1.0f, 1.0f};  // Weight per area
 };
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT

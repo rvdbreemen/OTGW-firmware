@@ -328,6 +328,12 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("SATcomfortadjust"), settings.sat.bComfortAdjust, true);
   writeJsonFloatKV(file, F("SATcomforthumidity"), settings.sat.fComfortHumidity, true);
   writeJsonFloatKV(file, F("SATcomfortmaxoffset"), settings.sat.fComfortMaxOffset, true);
+  writeJsonBoolKV(file, F("SATmultiarea"), settings.sat.bMultiArea, true);
+  writeJsonIntKV(file, F("SATmultiareacount"), settings.sat.iMultiAreaCount, true);
+  writeJsonFloatKV(file, F("SATareaweight0"), settings.sat.fAreaWeight[0], true);
+  writeJsonFloatKV(file, F("SATareaweight1"), settings.sat.fAreaWeight[1], true);
+  writeJsonFloatKV(file, F("SATareaweight2"), settings.sat.fAreaWeight[2], true);
+  writeJsonFloatKV(file, F("SATareaweight3"), settings.sat.fAreaWeight[3], true);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings (OTGW32/OT-Thing only) ---
   writeJsonIntKV(file, F("OTDmode"), settings.otd.iMode, true);
@@ -795,6 +801,12 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATcomfortadjust")) == 0) settings.sat.bComfortAdjust = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATcomforthumidity")) == 0) settings.sat.fComfortHumidity = constrain(atof(newValue), 10.0f, 90.0f);
   else if (strcasecmp_P(field, PSTR("SATcomfortmaxoffset")) == 0) settings.sat.fComfortMaxOffset = constrain(atof(newValue), 0.0f, 3.0f);
+  else if (strcasecmp_P(field, PSTR("SATmultiarea")) == 0) settings.sat.bMultiArea = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATmultiareacount")) == 0) settings.sat.iMultiAreaCount = constrain(atoi(newValue), 0, 4);
+  else if (strcasecmp_P(field, PSTR("SATareaweight0")) == 0) settings.sat.fAreaWeight[0] = constrain(atof(newValue), 0.0f, 10.0f);
+  else if (strcasecmp_P(field, PSTR("SATareaweight1")) == 0) settings.sat.fAreaWeight[1] = constrain(atof(newValue), 0.0f, 10.0f);
+  else if (strcasecmp_P(field, PSTR("SATareaweight2")) == 0) settings.sat.fAreaWeight[2] = constrain(atof(newValue), 0.0f, 10.0f);
+  else if (strcasecmp_P(field, PSTR("SATareaweight3")) == 0) settings.sat.fAreaWeight[3] = constrain(atof(newValue), 0.0f, 10.0f);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings ---
   else if (strcasecmp_P(field, PSTR("OTDmode")) == 0)           settings.otd.iMode = constrain(atoi(newValue), 0, 4);

@@ -533,6 +533,7 @@ static const char* satExtractPostValue(const char* body, char* buf, size_t bufSi
 // POST /api/v2/sat/externaltemp — push indoor temp
 // POST /api/v2/sat/externaloutdoor — push outdoor temp
 // POST /api/v2/sat/humidity — push indoor humidity (0-100%)
+// POST /api/v2/sat/area/<0-3> — push area temperature (multi-area)
 static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)
 {
   if (!checkHttpAuth()) return;
@@ -681,6 +682,25 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
     httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
     weatherSendStatusJSON();
+  }
+  else if (strcasecmp_P(sub, PSTR("area")) == 0) {
+    // POST /api/v2/sat/area/<0-3> — push area temperature
+    if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    if (wc <= 5) { sendApiError(400, F("Missing area index (0-3)")); return; }
+    int area = atoi(words[5]);
+    if (area < 0 || area >= 4) { sendApiError(400, F("Area index must be 0-3")); return; }
+    char valBuf[16];
+    const char* val = nullptr;
+    if (httpServer.hasArg(F("plain"))) {
+      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+    } else if (wc > 6) {
+      val = words[6];
+    }
+    if (!val || !satHandleAreaTemp((uint8_t)area, val)) {
+      sendApiError(400, F("Invalid or missing numeric value"));
+      return;
+    }
+    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   else {
     sendApiNotFound(originalURI);
@@ -1476,6 +1496,20 @@ void sendDeviceSettings()
     dtostrf(settings.sat.fComfortMaxOffset, 1, 1, tmpBuf);
     sendJsonSettingObj(F("satcomfortmaxoffset"), tmpBuf, "f", 0, 3);
   }
+  // --- SAT Multi-area settings (Task #25) ---
+  sendJsonSettingObj(F("satmultiarea"), settings.sat.bMultiArea, "b");
+  sendJsonSettingObj(F("satmultiareacount"), settings.sat.iMultiAreaCount, "i", 0, 4);
+  {
+    char tmpBuf[8];
+    dtostrf(settings.sat.fAreaWeight[0], 1, 2, tmpBuf);
+    sendJsonSettingObj(F("satareaweight0"), tmpBuf, "f", 0, 10);
+    dtostrf(settings.sat.fAreaWeight[1], 1, 2, tmpBuf);
+    sendJsonSettingObj(F("satareaweight1"), tmpBuf, "f", 0, 10);
+    dtostrf(settings.sat.fAreaWeight[2], 1, 2, tmpBuf);
+    sendJsonSettingObj(F("satareaweight2"), tmpBuf, "f", 0, 10);
+    dtostrf(settings.sat.fAreaWeight[3], 1, 2, tmpBuf);
+    sendJsonSettingObj(F("satareaweight3"), tmpBuf, "f", 0, 10);
+  }
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-Direct settings (OTGW32 only) ---
   sendJsonSettingObj(F("otdmode"), settings.otd.iMode, "i", 0, 4);
@@ -1529,9 +1563,11 @@ static const char* const PROGMEM knownSettings[] = {
   "otdsetbacktemp", "otdsetbacktimeout", "otdsummermode",
   "otgwcommandenable", "otgwcommands",
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
+  "satareaweight0", "satareaweight1", "satareaweight2", "satareaweight3",
   "satboilercapacity", "satcoefficient", "satcomfortadjust", "satcomforthumidity", "satcomfortmaxoffset",
   "satdeadband", "satenabled", "satexternaltemp",
-  "satinterval", "satmanufacturer", "satovershootmargin", "satpresetaway", "satpresetcomfort", "satpreseteco",
+  "satinterval", "satmanufacturer", "satmultiarea", "satmultiareacount",
+  "satovershootmargin", "satpresetaway", "satpresetcomfort", "satpreseteco",
   "satpresetsync", "satpresetsynctopic",
   "satpwmautoswitch", "satsimcoolrate", "satsimheatrate", "satsimulation",
   "satsolargain", "satsolarminrise", "satsolaroffset",
