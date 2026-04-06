@@ -67,6 +67,27 @@ static bool     otThermostatSeen    = false;   // at least one frame received si
 static uint32_t otLastThermostatMs  = 0;       // millis() of last thermostat frame
 static bool     otSetbackEngaged    = false;    // setback override currently active
 
+// Phase 1: Additional master status flags (moved here: used before original definition)
+static bool otSummerMode       = false;     // SM= summer mode (bit5 of MsgID 0 master status)
+
+// Phase 4: Message interval — MI= global minimum inter-message gap
+static uint32_t otMinIntervalMs  = 100;     // default 100ms
+static uint32_t otLastAnySendMs  = 0;       // timestamp of last frame sent
+
+// Phase 5: Fail safety — FS= controls setback on thermostat disconnect
+static bool otFailSafeEnabled    = true;    // default: enabled
+
+// Phase 9: DHW push state machine (moved here: used before original definition)
+enum DHWPushState : uint8_t { PUSH_IDLE = 0, PUSH_PENDING, PUSH_STARTED };
+static DHWPushState otDHWPushState = PUSH_IDLE;
+static uint32_t otDHWPushStartMs = 0;
+static constexpr uint32_t OT_DHW_PUSH_TIMEOUT_MS = 30000;  // 30s, matches PIC
+
+// Phase 10: PS= summary mode (moved here: used before original definition)
+static bool otSummaryMode     = false;      // PS=1 active
+static bool otHideReports     = false;      // suppress T/B/R/A frame output
+static bool otSummaryPending  = false;      // summary line ready to emit
+
 // Schedule table: supports both reads and periodic writes.
 // Write entries periodically re-send a cached value to keep the boiler in sync.
 // Entries with `disabled = true` are skipped (auto-set on UNKNOWN_DATA_ID response).
@@ -323,6 +344,29 @@ struct OTResponseModify {
 };
 static constexpr uint8_t OT_RESPONSE_MODIFY_MAX = 8;
 static OTResponseModify otResponseModifiers[OT_RESPONSE_MODIFY_MAX];
+
+// Phase 8: Unknown ID 3-strike auto-blacklist counters (2 bits per MsgID)
+static uint8_t otUnknownCounters[32] = {0}; // 128 MsgIDs × 2 bits = 32 bytes
+
+static uint8_t getUnknownCount(uint8_t msgId) {
+  uint8_t byteIdx = msgId >> 2;
+  uint8_t bitShift = (msgId & 0x03) * 2;
+  return (otUnknownCounters[byteIdx] >> bitShift) & 0x03;
+}
+static void incUnknownCount(uint8_t msgId) {
+  uint8_t byteIdx = msgId >> 2;
+  uint8_t bitShift = (msgId & 0x03) * 2;
+  uint8_t count = (otUnknownCounters[byteIdx] >> bitShift) & 0x03;
+  if (count < 3) {
+    otUnknownCounters[byteIdx] &= ~(0x03 << bitShift);
+    otUnknownCounters[byteIdx] |= ((count + 1) << bitShift);
+  }
+}
+static void clearUnknownCount(uint8_t msgId) {
+  uint8_t byteIdx = msgId >> 2;
+  uint8_t bitShift = (msgId & 0x03) * 2;
+  otUnknownCounters[byteIdx] &= ~(0x03 << bitShift);
+}
 
 // Apply overrides to a thermostat frame before forwarding to boiler.
 // Returns the (potentially modified) frame. If modified, also bridges the
@@ -1252,97 +1296,13 @@ static inline bool checkBoolean(const char* value) {
   return (value[0] == '0' || value[0] == '1') && value[1] == '\0';
 }
 
-// PIC-emulated local state — stored in RAM, not persisted.
-// These hold values set by PIC configuration commands that have no direct
-// hardware equivalent on OTGW32 but need valid PR= query responses.
-// ---------------------------------------------------------------------------
-static float   otSetbackTemp     = 16.0f;   // SB= setback temperature
-static uint8_t otIgnoreTransitions = 1;      // IT= (1=ignore, PIC default)
-static uint8_t otOverrideHB      = 0;        // OH= override high byte flag
-static char    otGpioFunctions[3] = "00";    // GA=/GB= function codes
-static char    otLedFunctions[7]  = "XXXXXX";// LA=-LF= config chars
-static uint8_t otVoltageRef      = 5;        // VR= voltage reference digit
-static char    otTempSensor      = 'O';      // TS= temp sensor function
-static char    otForceThermostat = 'A';      // FT= thermostat detection
-static uint8_t otDHWOverride     = 0xFF;     // HW state: 0='0', 1='1', 0xFF='A' (auto)
-
-// Phase 1: Additional master status flags
-static bool otSummerMode       = false;     // SM= summer mode (bit5 of MsgID 0 master status)
+// PIC-compat + Phase 1-10 state variables and tables: moved to top of file.
+// Remaining state variables that are only used after this point:
 static bool otDHWBlocking      = false;     // BW= DHW blocking (bit6, not persisted)
 static bool otCoolingEnable    = false;     // CE= cooling enable (bit2, not persisted)
-
-// Phase 2: Operating mode — MsgID 99 (Remote Override Operating Mode)
 static uint8_t otOperModeDHW   = 0;         // MW= lower nibble of byte3
 static uint8_t otOperModeCH1   = 0;         // MH= lower nibble of byte4
 static uint8_t otOperModeCH2   = 0;         // M2= upper nibble of byte4
-
-// Phase 3: Remote request — RR= sends MsgID 4
-// (no state needed, one-shot command)
-
-// Phase 4: Message interval — MI= global minimum inter-message gap
-static uint32_t otMinIntervalMs  = 100;     // default 100ms
-static uint32_t otLastAnySendMs  = 0;       // timestamp of last frame sent
-
-// Phase 5: Fail safety — FS= controls setback on thermostat disconnect
-static bool otFailSafeEnabled    = true;    // default: enabled
-
-// Phase 8: Unknown ID 3-strike auto-blacklist counters (2 bits per MsgID)
-static uint8_t otUnknownCounters[32] = {0}; // 128 MsgIDs × 2 bits = 32 bytes
-
-static uint8_t getUnknownCount(uint8_t msgId) {
-  uint8_t byteIdx = msgId >> 2;
-  uint8_t bitShift = (msgId & 0x03) * 2;
-  return (otUnknownCounters[byteIdx] >> bitShift) & 0x03;
-}
-static void incUnknownCount(uint8_t msgId) {
-  uint8_t byteIdx = msgId >> 2;
-  uint8_t bitShift = (msgId & 0x03) * 2;
-  uint8_t count = (otUnknownCounters[byteIdx] >> bitShift) & 0x03;
-  if (count < 3) {
-    otUnknownCounters[byteIdx] &= ~(0x03 << bitShift);
-    otUnknownCounters[byteIdx] |= ((count + 1) << bitShift);
-  }
-}
-static void clearUnknownCount(uint8_t msgId) {
-  uint8_t byteIdx = msgId >> 2;
-  uint8_t bitShift = (msgId & 0x03) * 2;
-  otUnknownCounters[byteIdx] &= ~(0x03 << bitShift);
-}
-
-// Phase 9: DHW push state machine
-enum DHWPushState : uint8_t { PUSH_IDLE = 0, PUSH_PENDING, PUSH_STARTED };
-static DHWPushState otDHWPushState = PUSH_IDLE;
-static uint32_t otDHWPushStartMs = 0;
-static constexpr uint32_t OT_DHW_PUSH_TIMEOUT_MS = 30000;  // 30s, matches PIC
-
-// Phase 10: PS= summary mode
-static bool otSummaryMode     = false;      // PS=1 active
-static bool otHideReports     = false;      // suppress T/B/R/A frame output
-static bool otSummaryPending  = false;      // summary line ready to emit
-
-// SR/CR response override table — gateway answers thermostat directly.
-// Separate from the repeater overrides (which modify thermostat→boiler frames).
-// These intercept thermostat READ_DATA and respond without asking the boiler.
-static constexpr uint8_t OT_RESPONSE_OVERRIDE_MAX = 16;
-struct OTResponseOverride {
-  uint8_t  msgId;
-  bool     active;
-  uint16_t value;  // HB:LB response data
-};
-static OTResponseOverride otResponseOverrides[OT_RESPONSE_OVERRIDE_MAX];
-
-// UI/KI unknown-ID table — marks MsgIDs as "unknown" (gateway responds
-// UNKNOWN_DATAID to thermostat instead of forwarding to boiler)
-static constexpr uint8_t OT_UNKNOWN_ID_MAX = 16;
-static uint8_t otUnknownIds[OT_UNKNOWN_ID_MAX];
-static uint8_t otUnknownIdCount = 0;
-
-static bool isUnknownId(uint8_t msgId) {
-  for (uint8_t i = 0; i < otUnknownIdCount; i++) {
-    if (otUnknownIds[i] == msgId) return true;
-  }
-  return false;
-}
 
 // ---------------------------------------------------------------------------
 // clearWriteOverride — helper to clear both write cache and repeater override

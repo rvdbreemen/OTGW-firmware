@@ -179,7 +179,8 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
     // Try ATC/pvvx format: service data UUID 0x181A
     if (advertisedDevice.haveServiceData()) {
       BLEUUID svcUUID = advertisedDevice.getServiceDataUUID();
-      std::string svcData = advertisedDevice.getServiceData();
+      String svcDataStr = advertisedDevice.getServiceData();
+      std::string svcData(svcDataStr.c_str(), svcDataStr.length());
       uint16_t uuid16 = 0;
 
       // Extract 16-bit UUID
@@ -188,7 +189,8 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
       } else {
         // Some BLE stacks return the full 128-bit form for 16-bit UUIDs
         // Try matching by string
-        std::string uuidStr = svcUUID.toString();
+        String uuidArdu = svcUUID.toString();
+        std::string uuidStr(uuidArdu.c_str());
         if (uuidStr.find("181a") != std::string::npos || uuidStr.find("181A") != std::string::npos) {
           uuid16 = ATC_SERVICE_UUID_16;
         } else if (uuidStr.find("fcd2") != std::string::npos || uuidStr.find("FCD2") != std::string::npos) {
@@ -206,7 +208,8 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
     if (!parsed) return;
 
     // Get MAC address string
-    std::string macStr = advertisedDevice.getAddress().toString();
+    String macArdu = advertisedDevice.getAddress().toString();
+    std::string macStr(macArdu.c_str());
     // Convert to uppercase AA:BB:CC:DD:EE:FF format
     char macBuf[18];
     strlcpy(macBuf, macStr.c_str(), sizeof(macBuf));
