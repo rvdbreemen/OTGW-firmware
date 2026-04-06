@@ -1232,6 +1232,29 @@ body.disable-interaction {
   background: #4a148c;
   color: #ce93d8;
 }
+/* SAT View Selector (Dark) */
+#sat-view-selector {
+  margin-left: auto;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #555;
+  background: #2c2c2e;
+  font-size: 0.9em;
+  color: #e0e0e0;
+}
+
+/* SAT View Visibility */
+.sat-dashboard.sat-view-simple .sat-section[data-view]:not([data-view*="simple"]),
+.sat-dashboard.sat-view-simple .sat-cards[data-view]:not([data-view*="simple"]) { display: none; }
+.sat-dashboard.sat-view-expert .sat-section[data-view]:not([data-view*="expert"]),
+.sat-dashboard.sat-view-expert .sat-cards[data-view]:not([data-view*="expert"]) { display: none; }
+.sat-dashboard.sat-view-diag .sat-section[data-view]:not([data-view*="diag"]),
+.sat-dashboard.sat-view-diag .sat-cards[data-view]:not([data-view*="diag"]) { display: none; }
+
+/* SAT Simple View Enhancements */
+.sat-view-simple .sat-card-value { font-size: 2rem; }
+.sat-view-simple .sat-cards { justify-content: center; }
+
 /* SAT Interactive Controls (Dark) */
 .sat-btn { background: #3a3a3c; color: #e0e0e0; border-color: #555; }
 .sat-btn:hover { background: #4a4a4c; }

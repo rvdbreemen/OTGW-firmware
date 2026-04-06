@@ -318,10 +318,15 @@
           <h2>SAT - Smart Autotune Thermostat</h2>
           <span id="sat-status-badge" class="sat-badge sat-badge-disabled">Disabled</span>
           <span id="sat-sim-badge" class="sat-badge sat-badge-sim" style="display:none">SIMULATION</span>
+          <select id="sat-view-selector" onchange="SAT.switchView(this.value)">
+            <option value="simple">Thermostat</option>
+            <option value="expert">Expert</option>
+            <option value="diag">Diagnostics</option>
+          </select>
         </div>
 
         <!-- Temperature cards -->
-        <div class="sat-cards">
+        <div class="sat-cards" data-view="simple expert diag">
           <div class="sat-card">
             <div class="sat-card-label">Room Temperature</div>
             <div class="sat-card-value" id="sat-room-temp">--</div>
@@ -345,7 +350,7 @@
         </div>
 
         <!-- SAT Controls -->
-        <div class="sat-section">
+        <div class="sat-section" data-view="simple expert diag">
           <h3>Controls</h3>
           <div class="sat-controls-row">
             <button class="sat-btn sat-btn-preset" id="sat-btn-away" onclick="SAT.setPreset('away')">Away</button>
@@ -363,7 +368,7 @@
         </div>
 
         <!-- Weather -->
-        <div class="sat-section" id="sat-weather-section" style="display:none">
+        <div class="sat-section" id="sat-weather-section" data-view="expert diag" style="display:none">
           <h3>Weather (Open-Meteo)</h3>
           <div class="sat-grid">
             <div class="sat-row"><span class="sat-label">Outdoor Temp</span><span class="sat-value" id="sat-weather-temp">--</span></div>
@@ -379,13 +384,13 @@
         </div>
 
         <!-- Chart -->
-        <div class="sat-section">
+        <div class="sat-section" data-view="simple expert diag">
           <h3>Temperature History</h3>
           <div id="sat-chart" style="width:100%;height:300px;"></div>
         </div>
 
         <!-- Heating Curve (Stooklijn) -->
-        <div class="sat-section">
+        <div class="sat-section" data-view="expert diag">
           <h3 class="sat-curve-toggle" onclick="SAT.toggleCurve()">Heating Curve (Stooklijn) <span id="sat-curve-arrow">&#9660;</span></h3>
           <div id="sat-curve-section">
             <div id="sat-curve-chart" style="width:100%;height:320px;"></div>
@@ -397,7 +402,7 @@
 
 
         <!-- Control Info -->
-        <div class="sat-section">
+        <div class="sat-section" data-view="expert diag">
           <h3>Control Status</h3>
           <div class="sat-grid">
             <div class="sat-row"><span class="sat-label">Control Mode</span><span class="sat-value" id="sat-control-mode">--</span></div>
@@ -419,7 +424,7 @@
         </div>
 
         <!-- PID Details -->
-        <div class="sat-section">
+        <div class="sat-section" data-view="expert diag">
           <h3>PID Controller</h3>
           <div class="sat-grid">
             <div class="sat-row"><span class="sat-label">P term</span><span class="sat-value" id="sat-pid-p">--</span></div>
@@ -433,7 +438,7 @@
         </div>
 
         <!-- PWM & Cycles -->
-        <div class="sat-section">
+        <div class="sat-section" data-view="expert diag">
           <h3>PWM & Cycle Tracking</h3>
           <div class="sat-grid">
             <div class="sat-row"><span class="sat-label">PWM Duty Cycle</span><span class="sat-value" id="sat-pwm-duty">--</span></div>
@@ -446,7 +451,7 @@
         </div>
 
         <!-- External Sensors -->
-        <div class="sat-section">
+        <div class="sat-section" data-view="expert diag">
           <h3>External Sensors</h3>
           <div class="sat-grid">
             <div class="sat-row"><span class="sat-label">Indoor sensor</span><span id="sat-ext-temp-indicator" class="sat-indicator sat-indicator-off" title="Using OT bus"></span></div>

@@ -471,8 +471,31 @@ var SAT = (function() {
     if (_curveChartInstance) _curveChartInstance.resize();
   }
 
+  // --- View Selector ---
+  function switchView(view) {
+    var valid = ['simple', 'expert', 'diag'];
+    if (valid.indexOf(view) === -1) view = 'simple';
+    try { localStorage.setItem('sat-dashboard-view', view); } catch (e) {}
+    var dash = document.querySelector('.sat-dashboard');
+    if (dash) {
+      dash.classList.remove('sat-view-simple', 'sat-view-expert', 'sat-view-diag');
+      dash.classList.add('sat-view-' + view);
+    }
+    var sel = el('sat-view-selector');
+    if (sel) sel.value = view;
+    // Resize charts since visibility may have changed
+    setTimeout(resizeChart, 50);
+  }
+
+  function initView() {
+    var view = 'simple';
+    try { view = localStorage.getItem('sat-dashboard-view') || 'simple'; } catch (e) {}
+    switchView(view);
+  }
+
   // --- Public API ---
   function start() {
+    initView();
     initChart();
     initCurveChart();
     fetchStatus(); // immediate first fetch
@@ -675,6 +698,7 @@ var SAT = (function() {
     start: start,
     stop: stop,
     setTheme: setTheme,
+    switchView: switchView,
     toggleCurve: toggleCurve,
     adjustTarget: adjustTarget,
     setPreset: setPreset,
