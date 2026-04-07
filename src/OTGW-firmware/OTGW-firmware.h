@@ -788,6 +788,14 @@ struct SATSection {
   // PID auto-tuning (Task #27)
   bool     bAutoTune          = false;  // Enable automatic PID gains tuning
   float    fAutoTuneRate      = 0.02f;  // Adjustment rate per tuning cycle (2%)
+  // SAT Python parity settings (Task #82)
+  uint32_t iSensorMaxAgeS     = 21600; // Max age of sensor reading before considered stale (seconds, 6h default)
+  bool     bErrorMonitoring   = false; // Enable detailed error stats tracking
+  float    fAutoGainsValue    = 2.0f;  // Multiplier for auto-tune PID gain calculation
+  uint8_t  iHeatingMode       = 0;     // 0=COMFORT, 1=ECO
+  uint8_t  iCyclesPerHour     = 3;     // Target cycles per hour (2-6)
+  float    fValveOffset       = 0.0f;  // Offset for TRV valve position detection (-1 to 1)
+  bool     bSolarFreezeIntegral = true; // Freeze PID integral during solar gain compensation
 #if defined(ESP32)
   // BLE temperature sensor (Task #20, ESP32 only)
   bool     bBleEnable         = false;         // Enable BLE temperature sensor scanning

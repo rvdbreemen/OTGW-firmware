@@ -814,6 +814,28 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
               updateSetting("SATwindowdetect", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("pwm_auto_switch")) == 0) {
               updateSetting("SATpwmautoswitch", msgPayload);
+            // --- Task #82: SAT Python parity setting commands ---
+            } else if (strcasecmp_P(satSubCmd, PSTR("sensor_max_age")) == 0) {
+              updateSetting("SATsensormaxage", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("error_monitoring")) == 0) {
+              updateSetting("SATerrormon", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("auto_gains_value")) == 0) {
+              updateSetting("SATautogains", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("heating_mode")) == 0) {
+              // Accept "comfort"/"eco" strings or 0/1
+              if (strcasecmp_P(msgPayload, PSTR("eco")) == 0) {
+                updateSetting("SATheatingmode", "1");
+              } else if (strcasecmp_P(msgPayload, PSTR("comfort")) == 0) {
+                updateSetting("SATheatingmode", "0");
+              } else {
+                updateSetting("SATheatingmode", msgPayload);
+              }
+            } else if (strcasecmp_P(satSubCmd, PSTR("cycles_per_hour")) == 0) {
+              updateSetting("SATcyclesperhour", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("valve_offset")) == 0) {
+              updateSetting("SATvalveoffset", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("solar_freeze_integral")) == 0) {
+              updateSetting("SATsolarfreezeint", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("valves_open")) == 0) {
               state.sat.bValvesOpen = (strcasecmp_P(msgPayload, PSTR("true")) == 0 ||
                                       strcmp_P(msgPayload, PSTR("1")) == 0 ||

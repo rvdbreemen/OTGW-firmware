@@ -337,6 +337,14 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATareaweight3"), settings.sat.fAreaWeight[3], true);
   writeJsonBoolKV(file, F("SATautotune"), settings.sat.bAutoTune, true);
   writeJsonFloatKV(file, F("SATautotunerate"), settings.sat.fAutoTuneRate, true);
+  // SAT Python parity settings (Task #82)
+  writeJsonIntKV(file, F("SATsensormaxage"), settings.sat.iSensorMaxAgeS, true);
+  writeJsonBoolKV(file, F("SATerrormon"), settings.sat.bErrorMonitoring, true);
+  writeJsonFloatKV(file, F("SATautogains"), settings.sat.fAutoGainsValue, true);
+  writeJsonIntKV(file, F("SATheatingmode"), settings.sat.iHeatingMode, true);
+  writeJsonIntKV(file, F("SATcyclesperhour"), settings.sat.iCyclesPerHour, true);
+  writeJsonFloatKV(file, F("SATvalveoffset"), settings.sat.fValveOffset, true);
+  writeJsonBoolKV(file, F("SATsolarfreezeint"), settings.sat.bSolarFreezeIntegral, false);
 #if defined(ESP32)
   // BLE temperature sensor (Task #20, ESP32 only)
   writeJsonBoolKV(file, F("SATbleenable"), settings.sat.bBleEnable, true);
@@ -819,6 +827,14 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATareaweight3")) == 0) settings.sat.fAreaWeight[3] = constrain(atof(newValue), 0.0f, 10.0f);
   else if (strcasecmp_P(field, PSTR("SATautotune")) == 0) settings.sat.bAutoTune = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATautotunerate")) == 0) settings.sat.fAutoTuneRate = constrain(atof(newValue), 0.005f, 0.1f);
+  // SAT Python parity settings (Task #82)
+  else if (strcasecmp_P(field, PSTR("SATsensormaxage")) == 0)  settings.sat.iSensorMaxAgeS = constrain((uint32_t)atol(newValue), 60UL, 86400UL);
+  else if (strcasecmp_P(field, PSTR("SATerrormon")) == 0)      settings.sat.bErrorMonitoring = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATautogains")) == 0)     settings.sat.fAutoGainsValue = constrain(atof(newValue), 0.1f, 10.0f);
+  else if (strcasecmp_P(field, PSTR("SATheatingmode")) == 0)   settings.sat.iHeatingMode = constrain(atoi(newValue), 0, 1);
+  else if (strcasecmp_P(field, PSTR("SATcyclesperhour")) == 0) settings.sat.iCyclesPerHour = constrain(atoi(newValue), 2, 6);
+  else if (strcasecmp_P(field, PSTR("SATvalveoffset")) == 0)   settings.sat.fValveOffset = constrain(atof(newValue), -1.0f, 1.0f);
+  else if (strcasecmp_P(field, PSTR("SATsolarfreezeint")) == 0) settings.sat.bSolarFreezeIntegral = EVALBOOLEAN(newValue);
 #if defined(ESP32)
   // --- BLE temperature sensor settings (Task #20) ---
   else if (strcasecmp_P(field, PSTR("SATbleenable")) == 0)  settings.sat.bBleEnable = EVALBOOLEAN(newValue);

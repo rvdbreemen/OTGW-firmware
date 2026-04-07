@@ -170,6 +170,10 @@ static float satGetBaseOffset()
 // Returns max PWM cycles per hour for the current heating system
 static uint8_t satGetMaxCyclesPerHour()
 {
+  // Use user-configured value if set (Task #82); otherwise fall back to system defaults
+  if (settings.sat.iCyclesPerHour >= 2 && settings.sat.iCyclesPerHour <= 6) {
+    return settings.sat.iCyclesPerHour;
+  }
   switch (satGetEffectiveHeatingSystem()) {
     case SAT_HSYS_HEAT_PUMP:  return 2;   // Heat pumps: max 2 cycles/hr
     case SAT_HSYS_UNDERFLOOR: return 3;
@@ -1163,6 +1167,14 @@ void satSendStatusJSON()
   sendJsonMapEntry(F("auto_tune_cycles"),      (int32_t)state.sat.iAutoTuneCycles);
   satSendJsonFloat(F("auto_tune_score"),       state.sat.fAutoTuneScore, 2);
   satSendJsonFloat(F("auto_tune_rate"),        settings.sat.fAutoTuneRate, 3);
+  // SAT Python parity settings (Task #82)
+  sendJsonMapEntry(F("sensor_max_age"),        (int32_t)settings.sat.iSensorMaxAgeS);
+  sendJsonMapEntry(F("error_monitoring"),      settings.sat.bErrorMonitoring);
+  satSendJsonFloat(F("auto_gains_value"),      settings.sat.fAutoGainsValue, 2);
+  sendJsonMapEntry(F("heating_mode"),          settings.sat.iHeatingMode == 1 ? "eco" : "comfort");
+  sendJsonMapEntry(F("cycles_per_hour"),       (int32_t)settings.sat.iCyclesPerHour);
+  satSendJsonFloat(F("valve_offset"),          settings.sat.fValveOffset, 2);
+  sendJsonMapEntry(F("solar_freeze_integral"), settings.sat.bSolarFreezeIntegral);
   // Multi-area (Task #25)
   sendJsonMapEntry(F("multi_area"),            settings.sat.bMultiArea);
   sendJsonMapEntry(F("multi_area_count"),      (int32_t)settings.sat.iMultiAreaCount);
@@ -1487,6 +1499,22 @@ void satPublishMQTT()
     dtostrf(settings.sat.fAutoTuneRate, 1, 3, atBuf);
     sendMQTTData(F("sat/auto_tune_rate"), atBuf, false);
     sendMQTTData(F("sat/auto_tune_active"), state.sat.bAutoTuneActive ? "true" : "false", false);
+  }
+
+  // SAT Python parity settings (Task #82)
+  {
+    char agBuf[12];
+    snprintf_P(valBuf, sizeof(valBuf), PSTR("%lu"), (unsigned long)settings.sat.iSensorMaxAgeS);
+    sendMQTTData(F("sat/sensor_max_age"), valBuf, true);
+    sendMQTTData(F("sat/error_monitoring"), settings.sat.bErrorMonitoring ? "true" : "false", true);
+    dtostrf(settings.sat.fAutoGainsValue, 1, 2, agBuf);
+    sendMQTTData(F("sat/auto_gains_value"), agBuf, true);
+    sendMQTTData(F("sat/heating_mode"), settings.sat.iHeatingMode == 1 ? "eco" : "comfort", true);
+    snprintf_P(valBuf, sizeof(valBuf), PSTR("%u"), (unsigned)settings.sat.iCyclesPerHour);
+    sendMQTTData(F("sat/cycles_per_hour"), valBuf, true);
+    dtostrf(settings.sat.fValveOffset, 1, 2, agBuf);
+    sendMQTTData(F("sat/valve_offset"), agBuf, true);
+    sendMQTTData(F("sat/solar_freeze_integral"), settings.sat.bSolarFreezeIntegral ? "true" : "false", true);
   }
 
   // Multi-area (Task #25)

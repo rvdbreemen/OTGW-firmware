@@ -1601,6 +1601,22 @@ void sendDeviceSettings()
     dtostrf(settings.sat.fAutoTuneRate, 1, 3, tmpBuf);
     sendJsonSettingObj(F("satautotunerate"), tmpBuf, "f", 0, 1);
   }
+  // --- SAT Python parity settings (Task #82) ---
+  sendJsonSettingObj(F("satsensormaxage"), (int32_t)settings.sat.iSensorMaxAgeS, "i", 60, 86400);
+  sendJsonSettingObj(F("saterrormon"), settings.sat.bErrorMonitoring, "b");
+  {
+    char tmpBuf[8];
+    dtostrf(settings.sat.fAutoGainsValue, 1, 2, tmpBuf);
+    sendJsonSettingObj(F("satautogains"), tmpBuf, "f", 0, 10);
+  }
+  sendJsonSettingObj(F("satheatingmode"), settings.sat.iHeatingMode, "i", 0, 1);
+  sendJsonSettingObj(F("satcyclesperhour"), settings.sat.iCyclesPerHour, "i", 2, 6);
+  {
+    char tmpBuf[8];
+    dtostrf(settings.sat.fValveOffset, 1, 2, tmpBuf);
+    sendJsonSettingObj(F("satvalveoffset"), tmpBuf, "f", -1, 1);
+  }
+  sendJsonSettingObj(F("satsolarfreezeint"), settings.sat.bSolarFreezeIntegral, "b");
 #if defined(ESP32)
   // --- SAT BLE Sensor settings (Task #20, ESP32 only) ---
   sendJsonSettingObj(F("satbleenable"), settings.sat.bBleEnable, "b");
