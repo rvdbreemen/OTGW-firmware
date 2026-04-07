@@ -690,10 +690,17 @@ void satHandlePreset(const char* value)
 
   state.sat.eActivePreset = newPreset;
   if (newPreset != SAT_PRESET_NONE) {
+    // Save pre-custom temperature before changing target (Task #67)
+    if (state.sat.fPreCustomTemp == 0.0f) {
+      state.sat.fPreCustomTemp = settings.sat.fTargetTemp;
+    }
     settings.sat.fTargetTemp = newTarget;
     // Reset PID integral to prevent overshoot on large temp jumps
     state.sat.fPidI = 0.0f;
     DebugTf(PSTR("SAT: preset '%s' -> target %.1f, integral reset\r\n"), satGetPresetName(newPreset), newTarget);
+  } else {
+    // Preset cleared: reset pre-custom temperature (Task #67)
+    state.sat.fPreCustomTemp = 0.0f;
   }
 
   // Sync preset to secondary entities (Task #46)
@@ -727,6 +734,7 @@ void satHandleWindow(bool isOpen)
       settings.sat.fTargetTemp = state.sat.fPreWindowTarget;
       state.sat.eActivePreset = (SATPreset)state.sat.iPreWindowPreset;
       state.sat.fPreWindowTarget = 0.0f;
+      state.sat.fPreActivityTemp = 0.0f;  // Task #67: clear MQTT-visible pre-activity temp
       satResetIntegral();
       DebugTf(PSTR("SAT: window closed, restored target %.1f\r\n"), settings.sat.fTargetTemp);
     }
@@ -743,6 +751,7 @@ static void _satCheckWindowTimer()
   if (openDuration >= settings.sat.iWindowMinOpenSec) {
     // Timer expired - switch to Activity preset
     state.sat.fPreWindowTarget = settings.sat.fTargetTemp;
+    state.sat.fPreActivityTemp = settings.sat.fTargetTemp;  // Task #67: mirror for MQTT visibility
     state.sat.iPreWindowPreset = (uint8_t)state.sat.eActivePreset;
     state.sat.eActivePreset = SAT_PRESET_ACTIVITY;
     settings.sat.fTargetTemp = settings.sat.fPresetActivity;
@@ -889,6 +898,21 @@ bool satHandleHumidity(const char* value)
   state.sat.bHumidityValid = true;
   state.sat.iHumidityLastMs = millis();
   DebugTf(PSTR("SAT: humidity set to %.0f%%\r\n"), h);
+  return true;
+}
+
+// --- Sun elevation handler (Task #68) ---
+bool satHandleSunElevation(const char* value)
+{
+  if (!value || !*value) return false;
+  char* endp = nullptr;
+  float elev = strtof(value, &endp);
+  if (endp == value || *endp != '\0') return false;
+  if (elev < -90.0f || elev > 90.0f) return false;
+  state.sat.fSunElevation = elev;
+  state.sat.bSunElevationValid = true;
+  state.sat.iSunElevLastMs = millis();
+  DebugTf(PSTR("SAT: sun elevation set to %.1f deg\r\n"), elev);
   return true;
 }
 
@@ -1378,6 +1402,18 @@ void satPublishMQTT()
   // TRV valve detection (Task #29)
   sendMQTTData(F("sat/valves_open"), state.sat.bValvesOpen ? "true" : "false", false);
 
+  // Pre-temperature tracking (Task #67)
+  { char valBuf[12];
+    if (state.sat.fPreCustomTemp > 0.0f) {
+      dtostrf(state.sat.fPreCustomTemp, 1, 1, valBuf);
+      sendMQTTData(F("sat/pre_custom_temperature"), valBuf, false);
+    }
+    if (state.sat.fPreActivityTemp > 0.0f) {
+      dtostrf(state.sat.fPreActivityTemp, 1, 1, valBuf);
+      sendMQTTData(F("sat/pre_activity_temperature"), valBuf, false);
+    }
+  }
+
   // Window detection
   sendMQTTData(F("sat/window_open"), state.sat.bWindowOpen ? "true" : "false", false);
 
@@ -1469,6 +1505,11 @@ void satPublishMQTT()
   { char sgBuf[12];
     dtostrf(state.sat.fIndoorRiseRate, 1, 2, sgBuf);
     sendMQTTData(F("sat/indoor_rise_rate"), sgBuf, false);
+    // Sun elevation (Task #68)
+    if (state.sat.bSunElevationValid) {
+      dtostrf(state.sat.fSunElevation, 1, 1, sgBuf);
+      sendMQTTData(F("sat/solar_gain_sun_elevation"), sgBuf, false);
+    }
   }
 
   // Summer simmer (Task #24)
@@ -2457,6 +2498,22 @@ static void satUpdateSolarGain()
   }
 
   state.sat.fIndoorRiseRate = _solar_riseRateEma;
+
+  // Sun elevation gating (Task #68): if we have valid sun elevation, gate on minimum elevation
+  if (state.sat.bSunElevationValid) {
+    // Stale check: sun elevation older than 1 hour is invalid
+    if ((now - state.sat.iSunElevLastMs) > 3600000UL) {
+      state.sat.bSunElevationValid = false;
+      DebugTln(F("SAT: sun elevation data stale, falling back to rise rate"));
+    } else if (state.sat.fSunElevation < settings.sat.fSolarMinElevation) {
+      // Sun too low, no solar gain regardless of rise rate
+      state.sat.bSolarGainActive = false;
+      _solar_wasActive = false;
+      _solar_conditionMs = 0;
+      return;
+    }
+  }
+  // else: no sun elevation data, rely on rise rate alone (AC#6)
 
   // Detect solar gain condition: rising fast + low boiler modulation
   float modulation = OTcurrentSystemState.RelModLevel;

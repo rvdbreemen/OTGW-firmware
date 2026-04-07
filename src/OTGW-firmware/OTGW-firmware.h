@@ -450,6 +450,9 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint32_t iWindowOpenSinceMs     = 0;
   float    fPreWindowTarget       = 0.0f;
   uint8_t  iPreWindowPreset       = 0;   // SATPreset before window opened
+  // Pre-temperature tracking (Task #67)
+  float    fPreCustomTemp         = 0.0f;  // target temp before last preset change (0 = not set)
+  float    fPreActivityTemp       = 0.0f;  // target temp before last window-open event (0 = not set, mirrors fPreWindowTarget)
   // Pressure monitoring
   float    fSmoothedPressure      = 0.0f;
   float    fPressureDropRate      = 0.0f; // bar/hour (linear regression), negative when suspended
@@ -500,6 +503,10 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // Solar gain (Task #23)
   bool     bSolarGainActive       = false;
   float    fIndoorRiseRate        = 0.0f;  // Current indoor temp rise rate (C/hr)
+  // Sun elevation (Task #68)
+  float    fSunElevation          = 0.0f;  // Current sun elevation from HA (degrees)
+  bool     bSunElevationValid     = false; // Whether we have valid sun elevation data
+  uint32_t iSunElevLastMs         = 0;     // Timestamp of last sun elevation update
   // Summer simmer (Task #24)
   bool     bSummerActive          = false;  // Summer mode currently suppressing heating
   float    fSummerHoursAbove      = 0.0f;   // Hours outdoor temp has been above threshold
@@ -773,6 +780,7 @@ struct SATSection {
   bool     bSolarGainEnable   = false;  // Enable solar gain compensation
   float    fSolarMinRiseRate  = 0.5f;   // Minimum indoor rise rate (C/hr) to trigger
   float    fSolarSetpointOffset = 2.0f; // Setpoint reduction during solar gain (C)
+  float    fSolarMinElevation = 12.0f;  // Minimum sun elevation for solar gain activation (degrees, Task #68)
   // Summer simmer (Task #24) — auto-disable heating when outdoor temp stays warm
   bool     bSummerSimmer      = false;  // Enable summer simmer auto-disable
   float    fSummerThreshold   = 18.0f;  // Outdoor temp threshold for summer mode (C)
