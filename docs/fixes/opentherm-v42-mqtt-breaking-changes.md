@@ -6,7 +6,8 @@ An OpenTherm v4.2 audit found multiple MQTT output and Home Assistant discovery 
 
 - Some message IDs were decoded with the wrong data type or wrong active byte (`u8/u8` used where v4.2 defines `f8.8`, `special`, or single-byte fields).
 - `mqttha.cfg` contained discovery template errors (wrong message ID trigger and wrong state topic).
-- Legacy pre-v4.2 IDs `50-63` were treated as normal IDs even on v4.x systems, although OpenTherm v4.2 reserves them.
+- Legacy pre-v4.2 IDs `50-55` and `58-63` were treated as normal IDs even on v4.x systems, although OpenTherm v4.2 reserves them.
+  Note: IDs `56` (TdhwSet) and `57` (MaxTSet) are **not** reserved in v4.2 and must remain accessible.
 
 This caused incorrect values, broken HA entities, and non-compliant behavior on v4.x systems.
 
@@ -20,10 +21,11 @@ This caused incorrect values, broken HA entities, and non-compliant behavior on 
 
 ### Firmware (OpenTherm decoding and MQTT publishing)
 
-- Added a compatibility profile for IDs `50-63`:
-  - `AUTO` (default): suppresses IDs `50-63` only after detecting OpenTherm v4.x (`OpenThermVersionMaster` or `OpenThermVersionSlave` >= `4.0`)
+- Added a compatibility profile for IDs `50-55` and `58-63` (reserved in OpenTherm v4.2):
+  - `AUTO` (default): suppresses IDs `50-55` and `58-63` only after detecting OpenTherm v4.x (`OpenThermVersionMaster` or `OpenThermVersionSlave` >= `4.0`)
   - `V4X_STRICT`: always suppress
   - `PRE_V42_LEGACY`: always allow legacy decoding
+  - IDs `56` (TdhwSet) and `57` (MaxTSet) are **not** suppressed — they are valid in v4.2.
 - Corrected v4.2 decoding for:
   - ID `38` (`RelativeHumidity`) -> `f8.8`
   - IDs `71`, `77`, `78`, `87` -> single-byte handling with correct HB/LB selection
@@ -50,9 +52,10 @@ This caused incorrect values, broken HA entities, and non-compliant behavior on 
    - Old behavior: split byte topics (`RelativeHumidity_hb_u8`, `RelativeHumidity_lb_u8`) due to incorrect `u8/u8` decoding.
    - New behavior: canonical `RelativeHumidity` topic publishes v4.2 `f8.8` value.
 
-2. Legacy IDs `50-63` on v4.x systems
+2. Legacy IDs `50-55` and `58-63` on v4.x systems
    - Old behavior: always decoded/published.
    - New behavior: suppressed in default `AUTO` mode after v4.x is detected (reserved in v4.2+).
+   - IDs `56` (TdhwSet) and `57` (MaxTSet) are **not** suppressed; they remain valid in v4.2.
 
 3. Typo-topic fixes (already breaking if manually subscribed)
    - `eletric_production` -> `electric_production`
@@ -78,7 +81,7 @@ This caused incorrect values, broken HA entities, and non-compliant behavior on 
 
 - IDs `71`, `77`, `78`, `87`: legacy split alias topics are still published.
 - IDs `98`, `99`: raw byte aliases are still published, plus new semantic decoded topics.
-- Legacy IDs `50-63` remain supported for actual pre-v4.2 devices via `AUTO` (before v4.x is detected) and `PRE_V42_LEGACY`.
+- Legacy IDs `50-55` and `58-63` remain supported for actual pre-v4.2 devices via `AUTO` (before v4.x is detected) and `PRE_V42_LEGACY`. IDs `56` (TdhwSet) and `57` (MaxTSet) are valid in v4.2 and always accessible.
 - Typo-fix topic renames above do not publish legacy aliases; update manual subscriptions and allow HA to rediscover replacement entities.
 
 Current limitation:
@@ -96,9 +99,10 @@ Current limitation:
    - `solar_storage_slave_fault_incidator` -> `solar_storage_slave_fault_indicator`
    - `CumulativElectricityProduction` -> `CumulativeElectricityProduction`
    - `vh_*_ventlation_*` / `vh_*ventliation*` variants -> corrected `vh_*_ventilation_*` topics
-5. If you rely on IDs `50-63`, verify your device protocol generation:
+5. If you rely on IDs `50-55` or `58-63`, verify your device protocol generation:
    - pre-v4.2: legacy topics remain available
    - v4.x: reserved IDs are suppressed by default
+   Note: IDs `56` (TdhwSet) and `57` (MaxTSet) are valid in v4.2 and are not affected.
 
 ## Testing
 
@@ -121,7 +125,7 @@ Not yet performed:
 
 - Improves OpenTherm v4.2 compliance and HA discovery correctness.
 - Preserves backward compatibility for legacy pre-v4.2 systems through profile-based handling and MQTT alias topics.
-- Introduces documented breaking changes for some MQTT/HA consumers (mainly `RelativeHumidity`, `FanSpeed`, and legacy IDs `50-63` on v4.x systems).
+- Introduces documented breaking changes for some MQTT/HA consumers (mainly `RelativeHumidity`, `FanSpeed`, and legacy IDs `50-55`/`58-63` on v4.x systems). IDs `56` (TdhwSet) and `57` (MaxTSet) are unaffected — they remain valid in v4.2.
 
 ## Related Files
 
