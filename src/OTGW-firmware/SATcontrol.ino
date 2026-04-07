@@ -2596,7 +2596,7 @@ void satControlLoop()
   if (state.sat.bSummerActive && settings.sat.bSummerSimmer) {
     state.sat.fFinalSetpoint = SAT_MIN_SETPOINT;
     if (hasOTCommandInterface()) {
-      addCommandToQueue("CS=0", 4, false, 0);
+      addCommandToQueue("CS=10", 5, false, 0);
     }
     return; // Skip rest of control loop
   }
@@ -2605,7 +2605,7 @@ void satControlLoop()
   if (!state.sat.bValvesOpen) {
     state.sat.fFinalSetpoint = SAT_MIN_SETPOINT;
     if (hasOTCommandInterface()) {
-      addCommandToQueue("CS=0", 4, false, 0);
+      addCommandToQueue("CS=10", 5, false, 0);
     }
     // Don't update PID integral or record error statistics
     satPublishMQTT();
