@@ -398,19 +398,19 @@ enum OTSpecCompatMode : uint8_t {
 
 // Default behavior:
 // - AUTO keeps pre-v4.2 compatibility until a 4.x OpenTherm version is detected,
-//   then applies v4.x reserved-ID rules (IDs 50-55 and 58-63).
+//   then applies v4.x reserved-ID rules (IDs 50-55 and 58-69).
 // Note: IDs 56 (TdhwSet) and 57 (MaxTSet) are valid in OpenTherm v4.2 and are NOT
-// reserved; only IDs 50-55 and 58-63 are reserved/legacy in v4.x mode.
+// reserved; only IDs 50-55 and 58-69 are reserved/legacy in v4.x mode.
 static OTSpecCompatMode gOTSpecCompatMode = OT_SPEC_COMPAT_AUTO;
 
 //===================[ OT Spec Profile Helpers ]====================
 // Returns true for IDs that were pre-v4.2 parameter IDs but are reserved/redefined
 // in OpenTherm v4.x. Per OpenTherm v4.2 spec, the reserved ranges are 50-55 and
-// 58-63. IDs 56 (TdhwSet) and 57 (MaxTSet) remain valid in v4.2 and must NOT be
+// 58-69. IDs 56 (TdhwSet) and 57 (MaxTSet) remain valid in v4.2 and must NOT be
 // included here.
 static bool isLegacyPreV42CompatibilityId(uint8_t msgid)
 {
-  return (msgid >= 50U && msgid <= 55U) || (msgid >= 58U && msgid <= 63U);
+  return (msgid >= 50U && msgid <= 55U) || (msgid >= 58U && msgid <= 69U);
 }
 
 static bool useV4xReservedIdRules()
