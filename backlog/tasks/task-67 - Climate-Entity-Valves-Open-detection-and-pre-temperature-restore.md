@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-06 19:13'
-updated_date: '2026-04-07 16:33'
+updated_date: '2026-04-07 16:34'
 labels:
   - ha-entity
   - climate
@@ -44,19 +44,5 @@ Port two SAT Python climate entity features: (1) valves_open detection - checks 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Added valves_open MQTT publish and pre-temperature tracking for climate entity parity (Task #67).
-
-Changes:
-- OTGW-firmware.h: Added fPreCustomTemp and fPreActivityTemp fields to SATState struct for tracking pre-change temperatures.
-- SATcontrol.ino satHandlePreset(): Save current target to fPreCustomTemp before first preset activation; clear on preset reset to NONE.
-- SATcontrol.ino _satCheckWindowTimer(): Set fPreActivityTemp alongside existing fPreWindowTarget when window timer expires and Activity preset fires.
-- SATcontrol.ino satHandleWindow(): Clear fPreActivityTemp when window closes and temperature is restored.
-- SATcontrol.ino satPublishMQTT(): Added publish of sat/pre_custom_temperature and sat/pre_activity_temperature (only when non-zero).
-
-ACs already satisfied before this commit:
-- sat/valves_open already published (line 1388).
-- MQTT subscribe for valves_open already handled in MQTTstuff.ino.
-- Early return before PID update when !bValvesOpen already in place (satControlLoop line 2845).
-
-Temperature restore on window close (AC #6) uses existing fPreWindowTarget logic; fPreActivityTemp mirrors it for HA display.
+ACs 1-3 were already implemented from Task #29. This task added pre-temperature tracking:\n\n- OTGW-firmware.h: added fPreCustomTemp and fPreActivityTemp state fields\n- satHandlePreset(): saves fPreCustomTemp before first preset activation, clears on reset to NONE\n- _satCheckWindowTimer(): sets fPreActivityTemp when window timer fires\n- satHandleWindow(): clears fPreActivityTemp on window close\n- satPublishMQTT(): publishes sat/pre_custom_temperature and sat/pre_activity_temperature when non-zero\n\nCommit: 9099b5de"
 <!-- SECTION:FINAL_SUMMARY:END -->

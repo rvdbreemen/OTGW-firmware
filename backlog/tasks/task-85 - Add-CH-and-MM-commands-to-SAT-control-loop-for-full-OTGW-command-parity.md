@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-07 05:59'
-updated_date: '2026-04-07 16:27'
+updated_date: '2026-04-07 16:28'
 labels:
   - sat-control
   - critical
@@ -54,17 +54,5 @@ All 8 changes implemented in SATcontrol.ino:
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Added CH/MM commands and PWM CS startup sequence to SAT control loop for full OTGW command parity with SAT Python.
-
-Changes:
-- satApplyPWM(): Added _pwm_flameOffHoldSetpoint static var; implemented 4-step PWM ON CS sequence: (1) waiting for flame: CS=Tret+offset to avoid ignition overshoot, (2) flame on within fModSupDelay: hold the low ignition setpoint, (3) flame stable: CS=Tboiler-fModSupOffset for steady-state, (4) OFF phase: CS=SAT_MIN_SETPOINT
-- Auto-switch continuous->PWM threshold reduced from 300s (5min) to 180s (3min) for faster response
-- Removed continuous mode modulation suppression block; modulation suppression now handled via CS sequence in satApplyPWM() only
-- MM=0 now applies to all PWM mode (not just when flame not requested), matching SAT Python behavior where MM controls duty cycle indirectly
-- CH=1/CH=0 added to main send block every cycle based on whether finalSetpoint > SAT_MIN_SETPOINT
-- All early exits (summer simmer, valves closed, thermal fallback) now send MM=max + CH=0 (idle paths) or CH=1 (thermal fallback)
-- satUpdateComfort(): comfort humidity offset now gated behind settings.sat.bSummerSimmer enable flag
-
-All PROGMEM constraints satisfied (PSTR/F() used); no new violations vs baseline.
-All 8 acceptance criteria verified.
+Added full 3-command pattern (CS + MM + CH) to SAT control loop, matching SAT Python heating_control.py behavior.\n\nChanges in SATcontrol.ino:\n- satApplyPWM(): 4-step PWM ON CS sequence: (1) idle=CS=10, (2) waiting for flame: CS=Tret+fFlameOffOffset saved as hold, (3) within fModSupDelay: CS=hold, (4) after delay: CS=Tboiler-fModSupOffset\n- Auto-switch continuous->PWM: 300s -> 180s (3 minutes)\n- Removed continuous mode modulation suppression block; bModSuppressed reset only, suppression now lives in PWM CS sequence\n- MM=0 for entire PWM mode (not just OFF phase)\n- CH=1/CH=0 sent every cycle based on finalSetpoint > SAT_MIN_SETPOINT\n- Early exits (summer, valves, thermal fallback): now send MM=max + CH=0 alongside CS=10\n- satUpdateComfort(): humidity offset gated behind bSummerSimmer\n\nCommit: 7a2f8699"
 <!-- SECTION:FINAL_SUMMARY:END -->

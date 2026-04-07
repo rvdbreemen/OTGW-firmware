@@ -1,9 +1,11 @@
 ---
 id: TASK-84
 title: 'WebUI: Settings page for all SAT configuration parameters'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-06 19:23'
+updated_date: '2026-04-07 16:36'
 labels:
   - webui
   - settings
