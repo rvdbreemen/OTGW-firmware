@@ -217,6 +217,13 @@ void loopWifi() {
               wifiRetryCount + 1,
               CSTR(settings.sHostname));
       WiFi.hostname(CSTR(settings.sHostname));
+      // Explicitly (re-)enable DHCP before reconnecting.  WiFi.begin() with no
+      // arguments only calls wifi_station_connect() — it does NOT call
+      // wifi_station_dhcpc_start().  If DHCP was disabled by a previous
+      // wifi_station_dhcpc_stop() call (e.g. in startNTP()), the station would
+      // re-associate at the WiFi layer but skip DHCP entirely, leaving the
+      // device with no IP address and unreachable.
+      wifi_station_dhcpc_start();
       WiFi.begin();  // uses stored credentials
       RESTART_TIMER(timerWifiRetry);
       wifiState = WIFI_CONNECTING;
@@ -238,13 +245,16 @@ void loopWifi() {
       break;
 
     case WIFI_RECONNECTED:
-      // Match the startup path: re-apply the configured hostname and force a
-      // DHCP re-announce so the renewed lease uses the expected name.
+      // The hostname was already set in WIFI_DISCONNECTED before WiFi.begin(),
+      // and wifi_station_dhcpc_start() was called there too — so the DHCP
+      // negotiation already used the correct hostname.
+      // Do NOT call wifi_station_dhcpc_stop/start here: the SDK requires
+      // dhcpc_start only when the station is NOT connected, and calling it
+      // while connected temporarily resets the IP to 0.0.0.0.  That causes
+      // WIFI_IDLE to mistake the in-progress DHCP renewal for a disconnect,
+      // which triggers a new WiFi.begin() cycle that never re-enables DHCP,
+      // leaving the device associated at the WiFi layer but with no IP address.
       WiFi.hostname(CSTR(settings.sHostname));
-      DebugTf(PSTR("WiFi: reconnected, re-announcing DHCP lease for hostname [%s]\r\n"),
-              CSTR(settings.sHostname));
-      wifi_station_dhcpc_stop();
-      wifi_station_dhcpc_start();
       startTelnet();
       startOTGWstream();
       startMQTT();
