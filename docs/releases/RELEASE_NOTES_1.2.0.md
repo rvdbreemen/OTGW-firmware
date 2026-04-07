@@ -115,10 +115,11 @@ Version `1.2.0` builds on the stable `v1.0.0` baseline with two major release in
   - `FanSpeed` (ID `35`) handled as `u8/u8` and `Hz`
   - `RelativeHumidity` (ID `38`) handled as `f8.8`
   - `DHWFlowRate` unit updated to `l/min`
-- Added compatibility profile for legacy pre-v4.2 IDs `50-63`:
-  - `AUTO` (default runtime behavior in code): keep legacy decoding until OT v4.x is detected, then suppress reserved IDs `50-63`
+- Added compatibility profile for legacy pre-v4.2 IDs `50-55` and `58-63`:
+  - `AUTO` (default runtime behavior in code): keep legacy decoding until OT v4.x is detected, then suppress reserved IDs `50-55` and `58-63`
   - `V4X_STRICT`: always suppress
   - `PRE_V42_LEGACY`: always decode/publish
+  - IDs `56` (TdhwSet) and `57` (MaxTSet) are valid in OpenTherm v4.2 and are not suppressed in any mode.
 - Added missing `getOTGWValue()` mappings for IDs `113` and `114`.
 
 ### Runtime safety and correctness hardening
@@ -313,7 +314,7 @@ Manual MQTT consumers and older HA entities may need updates:
 - `vh_rw_nominal_ventlation_value` -> `vh_rw_nominal_ventilation_value`
 - `RelativeHumidity_hb_u8` / `RelativeHumidity_lb_u8` (legacy split-byte decoding) -> `RelativeHumidity` canonical `f8.8` payload
 - HA discovery `FanSpeed` (`rpm`) -> `FanSpeed_setpoint_hz` + `FanSpeed_actual_hz` (`Hz`)
-- Legacy IDs `50-63` now suppressed on v4.x systems in default `AUTO` compatibility mode
+- Legacy IDs `50-55` and `58-63` now suppressed on v4.x systems in default `AUTO` compatibility mode (IDs `56`/`57` are valid in v4.2 and remain accessible)
 - Source-specific MQTT and HA discovery paths now use nested `<metric>/<source>` segments instead of `<metric>_<source>`
 
 Example source-path migrations (when `mqttseparatesources=true`):
@@ -348,7 +349,7 @@ If you parse device info JSON directly (instead of the Web UI), update these key
 3. Trigger MQTT auto-discovery again (especially if using HA entities for `FanSpeed`, source-separated entities, or v4.2-affected IDs).
 4. Remove stale HA entities linked to typo topics, old `FanSpeed` discovery, or old source-specific discovery paths.
 5. Update manual MQTT automations/sensors to new topic names and payload formats (including typo-fix renames like `CumulativeElectricityProduction`, `vh_*_ventilation_*`, and nested source paths such as `TSet/thermostat`).
-6. If you rely on legacy IDs `50-63`, confirm the system is truly pre-v4.2.
+6. If you rely on legacy IDs `50-55` or `58-63`, confirm the system is truly pre-v4.2. IDs `56` (TdhwSet) and `57` (MaxTSet) are valid in v4.2 and always accessible.
 7. If custom tooling reads `/api/.../device/info`, update field names to `otgwmode` and `wifiquality_text`.
 
 Detailed OpenTherm MQTT/HA migration guidance: `docs/fixes/opentherm-v42-mqtt-breaking-changes.md`

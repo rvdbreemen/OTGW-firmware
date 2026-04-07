@@ -7,7 +7,7 @@ This directory contains detailed documentation for bug fixes in the OTGW-firmwar
 ### [OpenTherm v4.2 MQTT / HA Breaking Changes (v1.2.0-beta)](opentherm-v42-mqtt-breaking-changes.md)
 - **Issue**: MQTT payload/topic mismatches and HA discovery template errors relative to OpenTherm v4.2 semantics
 - **Root Cause**: Legacy decoding assumptions (`u8/u8`) and stale/copy-paste errors in `mqttha.cfg`
-- **Fix**: v4.2-compliant decoding for affected IDs, compatibility handling for pre-v4.2 IDs `50-63`, and corrected HA discovery topics/templates
+- **Fix**: v4.2-compliant decoding for affected IDs, compatibility handling for pre-v4.2 IDs `50-55` and `58-63` (IDs `56`/`57` remain valid in v4.2), and corrected HA discovery topics/templates
 - **Date**: 2026-02-22
 - **Commit**: Unreleased working tree (post-audit changes)
 
