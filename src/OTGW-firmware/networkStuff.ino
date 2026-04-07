@@ -18,7 +18,6 @@
 
 NtpStatus_t NtpStatus  = TIME_NOTSET;
 time_t      NtpLastSync = 0;
-static bool sDhcpHostnameFixed = false;  // set once after any DHCP restart to prevent double-announce
 
 ESP8266WebServer        httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater(true);
@@ -167,16 +166,10 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   DebugT(F("IP gateway: " ));  Debugln(WiFi.gatewayIP());
   Debugln();
 
-  // Catch-all: if the hostname still doesn't match after all connection paths,
-  // force a DHCP re-announce. Mark it done so startNTP() doesn't do it again.
+  // Ensure the hostname is set for the next DHCP exchange (renewal or reconnect).
+  // loopWifi() WIFI_DISCONNECTED calls wifi_station_dhcpc_start() before WiFi.begin()
+  // in the correct (not-connected) state, so no SDK DHCP call is needed here.
   WiFi.hostname(hostname);
-  if (!sDhcpHostnameFixed && strcmp(WiFi.hostname().c_str(), hostname) != 0) {
-    DebugTf(PSTR("Catch-all: hostname mismatch after connect ('%s' vs '%s'), forcing DHCP re-announce.\r\n"),
-            WiFi.hostname().c_str(), hostname);
-    wifi_station_dhcpc_stop();
-    wifi_station_dhcpc_start();
-    sDhcpHostnameFixed = true;
-  }
 
   httpUpdater.setup(&httpServer);
   httpUpdater.setIndexPage(UpdateServerIndex);
@@ -219,10 +212,10 @@ void loopWifi() {
       WiFi.hostname(CSTR(settings.sHostname));
       // Explicitly (re-)enable DHCP before reconnecting.  WiFi.begin() with no
       // arguments only calls wifi_station_connect() — it does NOT call
-      // wifi_station_dhcpc_start().  If DHCP was disabled by a previous
-      // wifi_station_dhcpc_stop() call (e.g. in startNTP()), the station would
-      // re-associate at the WiFi layer but skip DHCP entirely, leaving the
-      // device with no IP address and unreachable.
+      // wifi_station_dhcpc_start().  This call ensures a fresh DHCP DISCOVER
+      // is sent on every reconnection, which is required after a router reboot
+      // so the device does not try to renew a stale lease that the router no
+      // longer has.  See issue #525 and ADR-047.
       wifi_station_dhcpc_start();
       WiFi.begin();  // uses stored credentials
       RESTART_TIMER(timerWifiRetry);
@@ -321,22 +314,12 @@ void startNTP()
   // station hostname to "ESP-XXXXXX" on some ESP8266 SDK versions.
   WiFi.hostname(CSTR(settings.sHostname));
   configTime(0, 0, settings.ntp.sHostname, nullptr, nullptr);
-  // Capture hostname immediately after configTime() to detect if the SDK
-  // reset it, *before* we restore it. This drives the DHCP re-announce
-  // decision below.
-  bool hostnameWasReset = (strcmp(WiFi.hostname().c_str(), CSTR(settings.sHostname)) != 0);
+  // Restore hostname in case configTime() reset it.  The correct hostname will
+  // be sent to the router on the next DHCP exchange (renewal or reconnect).
+  // Do NOT call wifi_station_dhcpc_stop/start here: calling dhcpc_start() while
+  // connected resets the IP to 0.0.0.0 — see issue #525 and analysis report in
+  // docs/reviews/2026-04-07_issue-525-sdk-dhcp-analysis/ANALYSIS_REPORT.md
   WiFi.hostname(CSTR(settings.sHostname));
-
-  // If configTime() did reset the hostname, the DHCP lease may have been
-  // re-announced with the wrong name.  Force a DHCP re-announce once so the
-  // router sees the correct hostname.  Only do this once to avoid dropping
-  // the STA lease on every 30-min NTP resync (which would break MQTT/Telnet/
-  // WebSocket connections).
-  if (!sDhcpHostnameFixed && hostnameWasReset && WiFi.isConnected()) {
-    wifi_station_dhcpc_stop();
-    wifi_station_dhcpc_start();
-    sDhcpHostnameFixed = true;
-  }
   NtpStatus = TIME_WAITFORSYNC;
 }
 
