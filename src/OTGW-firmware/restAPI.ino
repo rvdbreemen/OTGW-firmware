@@ -607,13 +607,14 @@ static bool satRequestHasDetailFull()
 }
 
 //=== SAT API handler ===
-// GET /api/v2/sat/status — returns full SAT runtime state
-// GET /api/v2/sat/status?detail=full — returns extended health diagnostics
-// POST /api/v2/sat/target — set target temperature (body: "21.0" or {"value":"21.0"})
-// POST /api/v2/sat/externaltemp — push indoor temp
-// POST /api/v2/sat/externaloutdoor — push outdoor temp
-// POST /api/v2/sat/humidity — push indoor humidity (0-100%)
-// POST /api/v2/sat/area/<0-3> — push area temperature (multi-area)
+// GET  /api/v2/sat/status               — returns full SAT runtime state
+// GET  /api/v2/sat/status?detail=full   — returns extended health diagnostics
+// POST /api/v2/sat/target               — set target temperature (body: "21.0" or {"value":"21.0"})
+// POST /api/v2/sat/externaltemp         — push indoor temp
+// POST /api/v2/sat/externaloutdoor      — push outdoor temp
+// POST /api/v2/sat/humidity             — push indoor humidity (0-100%)
+// POST /api/v2/sat/area/<0-3>           — push area temperature (multi-area)
+// POST /api/v2/sat/settings/<name>      — update any SAT setting (mirrors all MQTT sat/* commands)
 static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)
 {
   if (!checkHttpAuth()) return;
@@ -783,6 +784,169 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       return;
     }
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+  }
+  else if (strcasecmp_P(sub, PSTR("settings")) == 0) {
+    // POST/PUT /api/v2/sat/settings/<setting-name> — mirrors all MQTT sat/<sub-command> handlers
+    if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    if (wc <= 5) { sendApiError(400, F("Missing setting name")); return; }
+    const char* settingName = words[5];
+    char valBuf[64];
+    const char* val = nullptr;
+    if (httpServer.hasArg(F("plain"))) {
+      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+    } else if (wc > 6) {
+      val = words[6];
+    }
+    bool handled = false;
+    bool needsVal = true;
+    // No-value commands
+    if (strcasecmp_P(settingName, PSTR("reset_integral")) == 0) {
+      satResetIntegral();
+      handled = true; needsVal = false;
+    } else if (strcasecmp_P(settingName, PSTR("ovp_start")) == 0) {
+      satOvpStartCalibration();
+      handled = true; needsVal = false;
+    } else if (strcasecmp_P(settingName, PSTR("ovp_stop")) == 0) {
+      satOvpStopCalibration();
+      handled = true; needsVal = false;
+    }
+    if (handled && !needsVal) {
+      httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+      return;
+    }
+    // All remaining commands require a value
+    if (!val) { sendApiError(400, F("Missing value")); return; }
+    // Special handlers
+    if (strcasecmp_P(settingName, PSTR("control_mode")) == 0) {
+      satHandleControlMode(val);
+      handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("preset")) == 0) {
+      satHandlePreset(val);
+      handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("heating_mode")) == 0) {
+      if (strcasecmp_P(val, PSTR("eco")) == 0) {
+        updateSetting("SATheatingmode", "1");
+      } else if (strcasecmp_P(val, PSTR("comfort")) == 0) {
+        updateSetting("SATheatingmode", "0");
+      } else {
+        updateSetting("SATheatingmode", val);
+      }
+      handled = true;
+    // Direct updateSetting() calls
+    } else if (strcasecmp_P(settingName, PSTR("overshoot_margin")) == 0) {
+      updateSetting("SATovershootmargin", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("heating_system")) == 0) {
+      updateSetting("SATsystem", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("manufacturer")) == 0) {
+      updateSetting("SATmanufacturer", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("max_modulation")) == 0) {
+      updateSetting("SATmaxmodulation", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("dhw_setpoint")) == 0) {
+      updateSetting("SATdhwsetpoint", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("dhw_enabled")) == 0) {
+      updateSetting("SATdhwenabled", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("interval")) == 0) {
+      updateSetting("SATinterval", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("ovp_value")) == 0) {
+      updateSetting("SATovpvalue", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("ovp_enabled")) == 0) {
+      updateSetting("SATovpenabled", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("push_setpoint")) == 0) {
+      updateSetting("SATpushsetpoint", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("flame_off_offset")) == 0) {
+      updateSetting("SATflameoffset", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("force_pwm")) == 0) {
+      updateSetting("SATforcepwm", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("flow_offset")) == 0) {
+      updateSetting("SATflowoffset", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("summer_simmer")) == 0) {
+      updateSetting("SATsummersimmer", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("summer_threshold")) == 0) {
+      updateSetting("SATsummerthreshold", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("summer_min_hours")) == 0) {
+      updateSetting("SATsummerminhours", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("comfort_adjust")) == 0) {
+      updateSetting("SATcomfortadjust", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("comfort_humidity")) == 0) {
+      updateSetting("SATcomforthumidity", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("comfort_max_offset")) == 0) {
+      updateSetting("SATcomfortmaxoffset", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("simulation")) == 0) {
+      updateSetting("SATsimulation", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("ble_enable")) == 0) {
+      updateSetting("SATbleenable", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("ble_mac")) == 0) {
+      updateSetting("SATblemac", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("ble_interval")) == 0) {
+      updateSetting("SATbleinterval", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("preset_sync")) == 0) {
+      updateSetting("SATpresetsync", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("preset_sync_topic")) == 0) {
+      updateSetting("SATpresetsynctopic", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("multi_area")) == 0) {
+      updateSetting("SATmultiarea", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("auto_tune")) == 0) {
+      updateSetting("SATautotune", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("auto_tune_rate")) == 0) {
+      updateSetting("SATautotunerate", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("multi_area_count")) == 0) {
+      updateSetting("SATmultiareacount", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("heating_curve")) == 0) {
+      updateSetting("SATcoefficient", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("deadband")) == 0) {
+      updateSetting("SATdeadband", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("mod_sup_delay")) == 0) {
+      updateSetting("SATmodsupdelay", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("mod_sup_offset")) == 0) {
+      updateSetting("SATmodsupoffset", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("boiler_capacity")) == 0) {
+      updateSetting("SATboilercapacity", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("target_temp_step")) == 0) {
+      updateSetting("SATtempstep", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("min_pressure")) == 0) {
+      updateSetting("SATminpressure", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("max_pressure")) == 0) {
+      updateSetting("SATmaxpressure", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("max_pressure_drop")) == 0) {
+      updateSetting("SATmaxpressdrop", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("preset_comfort")) == 0) {
+      updateSetting("SATpresetcomfort", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("preset_eco")) == 0) {
+      updateSetting("SATpreseteco", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("preset_away")) == 0) {
+      updateSetting("SATpresetaway", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("preset_sleep")) == 0) {
+      updateSetting("SATpresetsleep", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("preset_activity")) == 0) {
+      updateSetting("SATpresetactivity", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("preset_home")) == 0) {
+      updateSetting("SATpresethome", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("solar_gain")) == 0) {
+      updateSetting("SATsolargain", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("window_detection")) == 0) {
+      updateSetting("SATwindowdetect", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("pwm_auto_switch")) == 0) {
+      updateSetting("SATpwmautoswitch", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("sensor_max_age")) == 0) {
+      updateSetting("SATsensormaxage", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("error_monitoring")) == 0) {
+      updateSetting("SATerrormon", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("auto_gains_value")) == 0) {
+      updateSetting("SATautogains", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("cycles_per_hour")) == 0) {
+      updateSetting("SATcyclesperhour", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("valve_offset")) == 0) {
+      updateSetting("SATvalveoffset", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("solar_freeze_integral")) == 0) {
+      updateSetting("SATsolarfreezeint", val); handled = true;
+    }
+    if (!handled) {
+      sendApiError(404, F("Unknown setting name"));
+      return;
+    }
+    char respBuf[96];
+    snprintf_P(respBuf, sizeof(respBuf), PSTR("{\"status\":\"ok\",\"setting\":\"%s\",\"value\":\"%s\"}"), settingName, val);
+    httpServer.send(200, F("application/json"), respBuf);
   }
   else {
     sendApiNotFound(originalURI);

@@ -323,6 +323,7 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("SATsolargain"), settings.sat.bSolarGainEnable, true);
   writeJsonFloatKV(file, F("SATsolarminrise"), settings.sat.fSolarMinRiseRate, true);
   writeJsonFloatKV(file, F("SATsolaroffset"), settings.sat.fSolarSetpointOffset, true);
+  writeJsonFloatKV(file, F("SATsolarminelev"), settings.sat.fSolarMinElevation, true);
   writeJsonBoolKV(file, F("SATsummersimmer"), settings.sat.bSummerSimmer, true);
   writeJsonFloatKV(file, F("SATsummerthreshold"), settings.sat.fSummerThreshold, true);
   writeJsonIntKV(file, F("SATsummerminhours"), settings.sat.iSummerMinHours, true);
@@ -813,6 +814,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATsolargain")) == 0) settings.sat.bSolarGainEnable = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATsolarminrise")) == 0) settings.sat.fSolarMinRiseRate = constrain(atof(newValue), 0.1f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATsolaroffset")) == 0) settings.sat.fSolarSetpointOffset = constrain(atof(newValue), 0.5f, 10.0f);
+  else if (strcasecmp_P(field, PSTR("SATsolarminelev")) == 0) settings.sat.fSolarMinElevation = constrain(atof(newValue), -10.0f, 45.0f);
   else if (strcasecmp_P(field, PSTR("SATsummersimmer")) == 0) settings.sat.bSummerSimmer = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATsummerthreshold")) == 0) settings.sat.fSummerThreshold = constrain(atof(newValue), 5.0f, 35.0f);
   else if (strcasecmp_P(field, PSTR("SATsummerminhours")) == 0) settings.sat.iSummerMinHours = constrain(atoi(newValue), 1, 48);

@@ -852,6 +852,12 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
                   MQTTDebugTf(PSTR("SAT: area index out of range [%s]\r\n"), areaIdx);
                 }
               }
+            } else if (strcasecmp_P(satSubCmd, PSTR("sun_elevation")) == 0) {
+              // sat/sun_elevation — receive sun elevation from HA (Task #68)
+              satHandleSunElevation(msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("solar_min_elevation")) == 0) {
+              // sat/solar_min_elevation — set minimum sun elevation threshold (Task #68)
+              updateSetting("SATsolarminelev", msgPayload);
             } else {
               MQTTDebugTf(PSTR("SAT: unknown sub-command [%s]\r\n"), satSubCmd);
             }
