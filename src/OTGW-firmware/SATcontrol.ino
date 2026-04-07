@@ -1351,6 +1351,27 @@ void satPublishMQTT()
     sendMQTTData(F("sat/pressure_drop_rate"), pBuf, false);
     sendMQTTData(F("sat/pressure_alarm"), state.sat.bPressureAlarm ? "true" : "false", false);
     sendMQTTData(F("sat/pressure_health"), state.sat.bPressureHealthy ? "ON" : "OFF", true);
+    // JSON attributes for pressure_health binary sensor (Task #59)
+    static char pressAttrBuf[200];
+    char sBuf[12];
+    int pos = 0;
+    pos += snprintf_P(pressAttrBuf + pos, sizeof(pressAttrBuf) - pos,
+                      PSTR("{\"pressure\":"));
+    dtostrf(OTcurrentSystemState.CHPressure, 1, 2, sBuf);
+    pos += snprintf_P(pressAttrBuf + pos, sizeof(pressAttrBuf) - pos,
+                      PSTR("%s,\"smoothed_pressure\":"), sBuf);
+    dtostrf(state.sat.fSmoothedPressure, 1, 2, sBuf);
+    pos += snprintf_P(pressAttrBuf + pos, sizeof(pressAttrBuf) - pos,
+                      PSTR("%s,\"pressure_drop_rate_bar_per_hour\":"), sBuf);
+    dtostrf(state.sat.fPressureDropRate, 1, 3, sBuf);
+    pos += snprintf_P(pressAttrBuf + pos, sizeof(pressAttrBuf) - pos,
+                      PSTR("%s,\"last_pressure\":"), sBuf);
+    dtostrf(state.sat.fLastPressure, 1, 2, sBuf);
+    pos += snprintf_P(pressAttrBuf + pos, sizeof(pressAttrBuf) - pos,
+                      PSTR("%s,\"last_pressure_timestamp\":%lu,\"last_seen_pressure_timestamp\":%lu}"),
+                      sBuf, state.sat.iLastPressureMs / 1000UL,
+                      state.sat.iLastSeenPressureMs / 1000UL);
+    sendMQTTData(F("sat/pressure_health_attr"), pressAttrBuf, false);
   }
 
   // Modulation reliability + setpoint sync
@@ -1586,6 +1607,104 @@ void satPublishMQTT()
     }
   }
 
+  // --- Task #81: Publish all SAT settings as individual MQTT topics for HA entities ---
+  {
+    // Number settings (float)
+    dtostrf(settings.sat.fHeatingCurveCoeff, 1, 1, valBuf);
+    sendMQTTData(F("sat/heating_curve_coeff"), valBuf, true);
+
+    dtostrf(settings.sat.fDeadband, 1, 2, valBuf);
+    sendMQTTData(F("sat/deadband"), valBuf, true);
+
+    snprintf_P(valBuf, sizeof(valBuf), PSTR("%u"), settings.sat.iControlInterval);
+    sendMQTTData(F("sat/control_interval"), valBuf, true);
+
+    snprintf_P(valBuf, sizeof(valBuf), PSTR("%u"), settings.sat.iMaxRelModulation);
+    sendMQTTData(F("sat/max_modulation"), valBuf, true);
+
+    dtostrf(settings.sat.fFlameOffOffset, 1, 1, valBuf);
+    sendMQTTData(F("sat/flame_off_offset"), valBuf, true);
+
+    dtostrf(settings.sat.fFlowOffset, 1, 1, valBuf);
+    sendMQTTData(F("sat/flow_offset"), valBuf, true);
+
+    dtostrf(settings.sat.fModSupDelay, 1, 1, valBuf);
+    sendMQTTData(F("sat/mod_sup_delay"), valBuf, true);
+
+    dtostrf(settings.sat.fModSupOffset, 1, 1, valBuf);
+    sendMQTTData(F("sat/mod_sup_offset"), valBuf, true);
+
+    dtostrf(settings.sat.fBoilerCapacity, 1, 1, valBuf);
+    sendMQTTData(F("sat/boiler_capacity"), valBuf, true);
+
+    dtostrf(settings.sat.fComfortHumidity, 1, 0, valBuf);
+    sendMQTTData(F("sat/comfort_humidity"), valBuf, true);
+
+    dtostrf(settings.sat.fComfortMaxOffset, 1, 1, valBuf);
+    sendMQTTData(F("sat/comfort_max_offset"), valBuf, true);
+
+    dtostrf(settings.sat.fSummerThreshold, 1, 1, valBuf);
+    sendMQTTData(F("sat/summer_threshold"), valBuf, true);
+
+    dtostrf(settings.sat.fTargetTempStep, 1, 1, valBuf);
+    sendMQTTData(F("sat/target_temp_step"), valBuf, true);
+
+    dtostrf(settings.sat.fMinPressure, 1, 1, valBuf);
+    sendMQTTData(F("sat/min_pressure"), valBuf, true);
+
+    dtostrf(settings.sat.fMaxPressure, 1, 1, valBuf);
+    sendMQTTData(F("sat/max_pressure"), valBuf, true);
+
+    dtostrf(settings.sat.fMaxPressureDrop, 1, 2, valBuf);
+    sendMQTTData(F("sat/max_pressure_drop"), valBuf, true);
+
+    // Preset temperatures
+    dtostrf(settings.sat.fPresetComfort, 1, 1, valBuf);
+    sendMQTTData(F("sat/preset_comfort"), valBuf, true);
+
+    dtostrf(settings.sat.fPresetEco, 1, 1, valBuf);
+    sendMQTTData(F("sat/preset_eco"), valBuf, true);
+
+    dtostrf(settings.sat.fPresetAway, 1, 1, valBuf);
+    sendMQTTData(F("sat/preset_away"), valBuf, true);
+
+    dtostrf(settings.sat.fPresetSleep, 1, 1, valBuf);
+    sendMQTTData(F("sat/preset_sleep"), valBuf, true);
+
+    dtostrf(settings.sat.fPresetActivity, 1, 1, valBuf);
+    sendMQTTData(F("sat/preset_activity"), valBuf, true);
+
+    dtostrf(settings.sat.fPresetHome, 1, 1, valBuf);
+    sendMQTTData(F("sat/preset_home"), valBuf, true);
+
+    // OVP value (already has cmd topic, add state for completeness)
+    dtostrf(settings.sat.fOvpValue, 1, 1, valBuf);
+    sendMQTTData(F("sat/ovp_value"), valBuf, true);
+
+    // Heating system type (integer)
+    snprintf_P(valBuf, sizeof(valBuf), PSTR("%u"), settings.sat.iHeatingSystem);
+    sendMQTTData(F("sat/heating_system"), valBuf, true);
+
+    // Manufacturer (integer)
+    snprintf_P(valBuf, sizeof(valBuf), PSTR("%u"), settings.sat.iManufacturer);
+    sendMQTTData(F("sat/manufacturer_id"), valBuf, true);
+
+    // Switch (boolean) settings
+    sendMQTTData(F("sat/solar_gain_enable"), settings.sat.bSolarGainEnable ? "true" : "false", true);
+    sendMQTTData(F("sat/summer_simmer_enable"), settings.sat.bSummerSimmer ? "true" : "false", true);
+    sendMQTTData(F("sat/comfort_adjust_enable"), settings.sat.bComfortAdjust ? "true" : "false", true);
+    sendMQTTData(F("sat/multi_area_enable"), settings.sat.bMultiArea ? "true" : "false", true);
+    sendMQTTData(F("sat/auto_tune_enable"), settings.sat.bAutoTune ? "true" : "false", true);
+    sendMQTTData(F("sat/simulation_enable"), settings.sat.bSimulation ? "true" : "false", true);
+    sendMQTTData(F("sat/window_detection_enable"), settings.sat.bWindowDetection ? "true" : "false", true);
+    sendMQTTData(F("sat/force_pwm_enable"), settings.sat.bForcePWM ? "true" : "false", true);
+    sendMQTTData(F("sat/push_setpoint_enable"), settings.sat.bPushSetpoint ? "true" : "false", true);
+    sendMQTTData(F("sat/ovp_enabled"), settings.sat.bOvpEnabled ? "true" : "false", true);
+    sendMQTTData(F("sat/preset_sync_enable"), settings.sat.bPresetSync ? "true" : "false", true);
+    sendMQTTData(F("sat/dhw_enabled"), settings.sat.bDhwEnabled ? "true" : "false", true);
+    sendMQTTData(F("sat/pwm_auto_switch_enable"), settings.sat.bPwmAutoSwitch ? "true" : "false", true);
+  }
+
   // Weather data (Task #50)
   weatherPublishMQTT();
 
@@ -1656,85 +1775,145 @@ static void satUpdatePowerEnergy()
 }
 
 //=====================================================================
-//=== Pressure Monitoring (Task #10, enhanced Task #39) ===
+//=== Pressure Monitoring (Task #10, enhanced Task #39, Task #59) ===
 //=====================================================================
 
-// --- Linear regression ring buffer for drop rate ---
-static const uint8_t  PRESS_RING_SIZE = 12;           // ~6 min window at 30s intervals
-static float    _press_ringVal[PRESS_RING_SIZE];       // smoothed pressure samples
-static uint32_t _press_ringMs[PRESS_RING_SIZE];        // timestamps (millis)
+// --- Pressure sample ring buffer for linear regression drop rate ---
+static const uint8_t  PRESS_RING_SIZE = 20;          // max samples in history
+struct PressSample { uint32_t ms; float val; };
+static PressSample _press_ring[PRESS_RING_SIZE];
 static uint8_t  _press_ringCount = 0;
-static uint8_t  _press_ringIdx   = 0;
+static uint8_t  _press_ringHead  = 0;                // next write position
 static uint32_t _press_lastSampleMs = 0;
+
+// --- CH active state tracking for 600s suspension ---
+static bool     _press_lastActive     = false;
+static bool     _press_lastActiveInit = false;
+static uint32_t _press_suspendUntilMs = 0;
 
 static void satUpdatePressure()
 {
   float raw = OTcurrentSystemState.CHPressure;
-  if (raw < 0.01f) return;  // No pressure reading available
-
   uint32_t now = millis();
+
+  // --- Track CH active state transitions (600s drop rate suspension) ---
+  bool active = state.sat.bActive;
+  if (!_press_lastActiveInit) {
+    _press_lastActive = active;
+    _press_lastActiveInit = true;
+  } else if (_press_lastActive != active) {
+    _press_suspendUntilMs = now + 600000UL;
+    // Clear sample history on state transition
+    _press_ringCount = 0;
+    _press_ringHead  = 0;
+    _press_lastSampleMs = 0;
+  }
+  _press_lastActive = active;
+
+  // No pressure reading available
+  if (raw < 0.01f) return;
+
+  state.sat.iLastSeenPressureMs = now;
 
   // --- EMA smoothing (alpha=0.05) ---
   if (state.sat.fSmoothedPressure < 0.01f) {
     state.sat.fSmoothedPressure = raw;  // Initialize
-    return;
+  } else {
+    state.sat.fSmoothedPressure = 0.05f * raw + 0.95f * state.sat.fSmoothedPressure;
   }
-  state.sat.fSmoothedPressure = 0.05f * raw + 0.95f * state.sat.fSmoothedPressure;
+  float smoothed = state.sat.fSmoothedPressure;
 
-  // --- 600s settle delay after flame-on ---
-  // Pressure fluctuates during boiler startup; skip analysis until settled
-  uint32_t flameOnMs = satCycleGetFlameOnStartMs();
-  if (flameOnMs > 0 && (now - flameOnMs) < 600000UL) {
-    // During settle: reset ring buffer so stale data doesn't pollute regression
-    _press_ringCount = 0;
-    _press_ringIdx   = 0;
-    _press_lastSampleMs = 0;
-    return;
-  }
+  // --- Record raw pressure sample every ~30s ---
+  if (_press_lastSampleMs == 0 || (now - _press_lastSampleMs) >= 30000UL) {
+    _press_lastSampleMs = now;
+    _press_ring[_press_ringHead].ms  = now;
+    _press_ring[_press_ringHead].val = raw;
+    _press_ringHead = (_press_ringHead + 1) % PRESS_RING_SIZE;
+    if (_press_ringCount < PRESS_RING_SIZE) _press_ringCount++;
 
-  // --- Sample into ring buffer every ~30s ---
-  if (_press_lastSampleMs != 0 && (now - _press_lastSampleMs) < 30000UL) return;
-  _press_lastSampleMs = now;
-
-  _press_ringVal[_press_ringIdx] = state.sat.fSmoothedPressure;
-  _press_ringMs[_press_ringIdx]  = now;
-  _press_ringIdx = (_press_ringIdx + 1) % PRESS_RING_SIZE;
-  if (_press_ringCount < PRESS_RING_SIZE) _press_ringCount++;
-
-  // --- Linear regression for drop rate (need >= 4 samples) ---
-  if (_press_ringCount >= 4) {
-    // x = time in seconds (relative to first sample), y = pressure
-    // slope = (n*sum_xy - sum_x*sum_y) / (n*sum_xx - sum_x*sum_x)
-    float sum_x = 0.0f, sum_y = 0.0f, sum_xy = 0.0f, sum_xx = 0.0f;
-    uint8_t oldest = (_press_ringCount < PRESS_RING_SIZE)
-                     ? 0
-                     : _press_ringIdx;  // oldest entry in full ring
-    uint32_t t0 = _press_ringMs[oldest];
-    uint8_t n = _press_ringCount;
-
-    for (uint8_t i = 0; i < n; i++) {
-      uint8_t idx = (_press_ringCount < PRESS_RING_SIZE)
-                    ? i
-                    : (oldest + i) % PRESS_RING_SIZE;
-      float x = (float)(_press_ringMs[idx] - t0) / 1000.0f;  // seconds
-      float y = _press_ringVal[idx];
-      sum_x  += x;
-      sum_y  += y;
-      sum_xy += x * y;
-      sum_xx += x * x;
-    }
-
-    float denom = (float)n * sum_xx - sum_x * sum_x;
-    if (denom > 0.001f || denom < -0.001f) {
-      float slope = ((float)n * sum_xy - sum_x * sum_y) / denom;  // bar/sec
-      state.sat.fPressureDropRate = -slope * 3600.0f;  // bar/hour, positive = dropping
+    // Evict samples older than 3600s (matches SAT Python drop_window_seconds)
+    while (_press_ringCount > 0) {
+      uint8_t oldest = (_press_ringCount < PRESS_RING_SIZE)
+                       ? 0
+                       : _press_ringHead;  // in a full ring, head IS oldest
+      if ((now - _press_ring[oldest].ms) > 3600000UL) {
+        if (_press_ringCount < PRESS_RING_SIZE) {
+          // Partial ring: shift array left
+          for (uint8_t i = 0; i < _press_ringCount - 1; i++) {
+            _press_ring[i] = _press_ring[i + 1];
+          }
+          if (_press_ringHead > 0) _press_ringHead--;
+        } else {
+          // Full ring: advance head past oldest
+          _press_ringHead = (_press_ringHead + 1) % PRESS_RING_SIZE;
+        }
+        _press_ringCount--;
+      } else {
+        break;
+      }
     }
   }
 
-  // --- Alarm conditions ---
-  bool alarmCond = (state.sat.fSmoothedPressure < settings.sat.fMinPressure ||
-                    state.sat.fSmoothedPressure > settings.sat.fMaxPressure ||
-                    state.sat.fPressureDropRate > settings.sat.fMaxPressureDrop);
+  // --- Linear regression for drop rate (min 3 samples, 300s window) ---
+  bool dropRateSuspended = (_press_suspendUntilMs != 0 && now < _press_suspendUntilMs);
+  float dropRate = -1.0f;  // sentinel: not calculated
+
+  if (!dropRateSuspended && _press_ringCount >= 3) {
+    uint8_t oldestIdx = (_press_ringCount < PRESS_RING_SIZE) ? 0 : _press_ringHead;
+    uint8_t newestIdx = (_press_ringHead == 0)
+                        ? (PRESS_RING_SIZE - 1) : (_press_ringHead - 1);
+    if (_press_ringCount < PRESS_RING_SIZE) {
+      newestIdx = _press_ringCount - 1;
+    }
+    uint32_t elapsed = _press_ring[newestIdx].ms - _press_ring[oldestIdx].ms;
+
+    if (elapsed >= 300000UL) {  // 300s minimum window
+      float sum_t = 0.0f, sum_p = 0.0f, sum_tp = 0.0f, sum_t2 = 0.0f;
+      uint8_t n = _press_ringCount;
+      uint32_t t0 = _press_ring[oldestIdx].ms;
+
+      for (uint8_t i = 0; i < n; i++) {
+        uint8_t idx = (_press_ringCount < PRESS_RING_SIZE)
+                      ? i
+                      : (oldestIdx + i) % PRESS_RING_SIZE;
+        float t = (float)(_press_ring[idx].ms - t0) / 1000.0f;
+        float p = _press_ring[idx].val;
+        sum_t  += t;
+        sum_p  += p;
+        sum_tp += t * p;
+        sum_t2 += t * t;
+      }
+
+      float denom = (float)n * sum_t2 - sum_t * sum_t;
+      if (denom > 0.001f || denom < -0.001f) {
+        float slope = ((float)n * sum_tp - sum_t * sum_p) / denom;
+        dropRate = -slope * 3600.0f;  // bar/hour, positive = dropping
+      }
+    }
+  }
+
+  // Update state drop rate
+  if (dropRateSuspended) {
+    state.sat.fPressureDropRate = 0.0f;
+  } else if (dropRate >= 0.0f) {
+    state.sat.fPressureDropRate = dropRate;
+  }
+
+  // Clear suspension once expired
+  if (_press_suspendUntilMs != 0 && now >= _press_suspendUntilMs) {
+    _press_suspendUntilMs = 0;
+  }
+
+  // --- Update last pressure tracking ---
+  state.sat.fLastPressure    = raw;
+  state.sat.iLastPressureMs  = now;
+
+  // --- Alarm conditions with 120s confirmation ---
+  bool dropRateHigh = (!dropRateSuspended && dropRate >= 0.0f &&
+                       dropRate > settings.sat.fMaxPressureDrop);
+  bool alarmCond = (smoothed < settings.sat.fMinPressure ||
+                    smoothed > settings.sat.fMaxPressure ||
+                    dropRateHigh);
 
   if (alarmCond) {
     if (state.sat.iPressureAlarmSinceMs == 0) {
@@ -1746,7 +1925,7 @@ static void satUpdatePressure()
         state.sat.bPressureAlarm = true;
         state.sat.bPressureHealthy = false;
         DebugTf(PSTR("SAT: PRESSURE ALARM (smoothed=%.2f drop=%.3f bar/hr)\r\n"),
-                state.sat.fSmoothedPressure, state.sat.fPressureDropRate);
+                smoothed, state.sat.fPressureDropRate);
       }
     }
   } else {

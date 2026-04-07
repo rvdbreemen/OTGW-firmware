@@ -777,6 +777,43 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
               updateSetting("SATautotunerate", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("multi_area_count")) == 0) {
               updateSetting("SATmultiareacount", msgPayload);
+            // --- Task #81: additional SAT setting commands ---
+            } else if (strcasecmp_P(satSubCmd, PSTR("heating_curve")) == 0) {
+              updateSetting("SATcoefficient", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("deadband")) == 0) {
+              updateSetting("SATdeadband", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("mod_sup_delay")) == 0) {
+              updateSetting("SATmodsupdelay", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("mod_sup_offset")) == 0) {
+              updateSetting("SATmodsupoffset", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("boiler_capacity")) == 0) {
+              updateSetting("SATboilercapacity", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("target_temp_step")) == 0) {
+              updateSetting("SATtempstep", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("min_pressure")) == 0) {
+              updateSetting("SATminpressure", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("max_pressure")) == 0) {
+              updateSetting("SATmaxpressure", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("max_pressure_drop")) == 0) {
+              updateSetting("SATmaxpressdrop", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("preset_comfort")) == 0) {
+              updateSetting("SATpresetcomfort", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("preset_eco")) == 0) {
+              updateSetting("SATpreseteco", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("preset_away")) == 0) {
+              updateSetting("SATpresetaway", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("preset_sleep")) == 0) {
+              updateSetting("SATpresetsleep", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("preset_activity")) == 0) {
+              updateSetting("SATpresetactivity", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("preset_home")) == 0) {
+              updateSetting("SATpresethome", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("solar_gain")) == 0) {
+              updateSetting("SATsolargain", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("window_detection")) == 0) {
+              updateSetting("SATwindowdetect", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("pwm_auto_switch")) == 0) {
+              updateSetting("SATpwmautoswitch", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("valves_open")) == 0) {
               state.sat.bValvesOpen = (strcasecmp_P(msgPayload, PSTR("true")) == 0 ||
                                       strcmp_P(msgPayload, PSTR("1")) == 0 ||
