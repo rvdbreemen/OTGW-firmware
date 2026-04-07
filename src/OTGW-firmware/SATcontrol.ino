@@ -523,10 +523,11 @@ void satGetBoilerStatusName(char* buf, size_t bufLen)
 //=== PWM Control Mode ===
 //=====================================================================
 // PWM state tracking for effective temperature and flame timing
-static float    _pwm_effectiveBoilerTemp = 0.0f;
-static uint32_t _pwm_flameOnMs          = 0;
-static uint32_t _pwm_lastSampleMs       = 0;
-static bool     _pwm_waitingForFlame    = false;
+static float    _pwm_effectiveBoilerTemp    = 0.0f;
+static uint32_t _pwm_flameOnMs             = 0;
+static uint32_t _pwm_lastSampleMs          = 0;
+static bool     _pwm_waitingForFlame       = false;
+static float    _pwm_flameOffHoldSetpoint  = 0.0f;
 
 static float satApplyPWM(float pidOutput)
 {
@@ -575,8 +576,10 @@ static float satApplyPWM(float pidOutput)
   // --- 5-range duty cycle mapper (SAT Python parity) ---
   uint32_t onTimeMs, offTimeMs;
 
+  float maxSetpoint = satGetMaxSetpoint();
+
   if (duty >= dutyMax) {
-    // Range 5: Over-max - continuous ON
+    // Range 5: Over-max - continuous ON (no CS startup sequence needed)
     state.sat.bPwmFlameRequested = true;
     return pidOutput;
   } else if (duty < dutyMin) {
@@ -607,17 +610,40 @@ static float satApplyPWM(float pidOutput)
     if (onTimeMs < minOnMs) onTimeMs = minOnMs;
   }
 
-  // --- PWM state machine ---
+  // --- PWM state machine with 4-step CS startup sequence ---
   uint32_t sinceFlameStart = millis() - satCycleGetFlameOnStartMs();
   if (state.sat.bPwmFlameRequested) {
-    // ON phase: keep flame on for calculated duration (minimum: minOnMs)
-    if (sinceFlameStart < onTimeMs || sinceFlameStart < minOnMs) {
-      return pidOutput;
+    // ON phase: 4-step CS sequence (SAT Python _compute_pwm_control_setpoint)
+    if (sinceFlameStart >= onTimeMs && sinceFlameStart >= minOnMs) {
+      // ON time expired: switch to OFF
+      state.sat.bPwmFlameRequested = false;
+      _pwm_flameOffHoldSetpoint = 0.0f;
+      return SAT_MIN_SETPOINT;
     }
-    state.sat.bPwmFlameRequested = false;
-    return SAT_MIN_SETPOINT;
+    // Step 2: waiting for flame - send low CS to avoid overshoot on ignition
+    if (_pwm_waitingForFlame) {
+      float cs = OTcurrentSystemState.Tret + settings.sat.fFlameOffOffset;
+      if (cs < SAT_MIN_SETPOINT) cs = SAT_MIN_SETPOINT;
+      if (cs > maxSetpoint) cs = maxSetpoint;
+      _pwm_flameOffHoldSetpoint = cs;
+      return cs;
+    }
+    // Step 3: flame just lit, within fModSupDelay - hold the ignition setpoint
+    uint32_t sinceFlameOn = millis() - _pwm_flameOnMs;
+    if (sinceFlameOn < (uint32_t)(settings.sat.fModSupDelay * 1000.0f)) {
+      return _pwm_flameOffHoldSetpoint;
+    }
+    // Step 4: flame stable, after fModSupDelay - apply modulation suppression setpoint
+    {
+      float cs = OTcurrentSystemState.Tboiler - settings.sat.fModSupOffset;
+      if (cs < SAT_MIN_SETPOINT) cs = SAT_MIN_SETPOINT;
+      if (cs > maxSetpoint) cs = maxSetpoint;
+      _pwm_flameOffHoldSetpoint = 0.0f;
+      return cs;
+    }
   } else {
-    // OFF phase: wait for off duration then restart
+    // OFF phase: clear hold setpoint, wait for off duration then restart
+    _pwm_flameOffHoldSetpoint = 0.0f;
     uint32_t sinceFlameOff = millis() - satCycleGetFlameOffStartMs();
     if (sinceFlameOff >= offTimeMs) {
       state.sat.bPwmFlameRequested = true;
@@ -1719,7 +1745,7 @@ void satPublishMQTT()
 //=====================================================================
 static void satUpdateComfort()
 {
-  if (!settings.sat.bComfortAdjust || !state.sat.bHumidityValid) {
+  if (!settings.sat.bComfortAdjust || !state.sat.bHumidityValid || !settings.sat.bSummerSimmer) {
     state.sat.fComfortOffset = 0.0f;
     return;
   }
@@ -2747,9 +2773,12 @@ void satControlLoop()
       float sysMax = satGetMaxSetpoint();
       if (state.sat.fFinalSetpoint > sysMax) state.sat.fFinalSetpoint = sysMax;
       if (hasOTCommandInterface()) {
-        char cmd[12];
+        char cmd[16];
         snprintf_P(cmd, sizeof(cmd), PSTR("CS=%d"), (int)state.sat.fFinalSetpoint);
         addCommandToQueue(cmd, strlen(cmd), false, 0);
+        snprintf_P(cmd, sizeof(cmd), PSTR("MM=%u"), settings.sat.iMaxRelModulation);
+        addCommandToQueue(cmd, strlen(cmd), false, 0);
+        addCommandToQueue("CH=1", 4, false, 0);
       }
       satPublishMQTT();
       return;
@@ -2776,6 +2805,10 @@ void satControlLoop()
     state.sat.fFinalSetpoint = SAT_MIN_SETPOINT;
     if (hasOTCommandInterface()) {
       addCommandToQueue("CS=10", 5, false, 0);
+      char mmBuf[8];
+      snprintf_P(mmBuf, sizeof(mmBuf), PSTR("MM=%u"), settings.sat.iMaxRelModulation);
+      addCommandToQueue(mmBuf, strlen(mmBuf), false, 0);
+      addCommandToQueue("CH=0", 4, false, 0);
     }
     return; // Skip rest of control loop
   }
@@ -2785,6 +2818,10 @@ void satControlLoop()
     state.sat.fFinalSetpoint = SAT_MIN_SETPOINT;
     if (hasOTCommandInterface()) {
       addCommandToQueue("CS=10", 5, false, 0);
+      char mmBuf[8];
+      snprintf_P(mmBuf, sizeof(mmBuf), PSTR("MM=%u"), settings.sat.iMaxRelModulation);
+      addCommandToQueue(mmBuf, strlen(mmBuf), false, 0);
+      addCommandToQueue("CH=0", 4, false, 0);
     }
     // Don't update PID integral or record error statistics
     satPublishMQTT();
@@ -2883,10 +2920,10 @@ void satControlLoop()
       // Task #42: Auto-enable PWM on sustained overshoot
       if (boilerTemp >= finalSetpoint + 0.5f) {
         if (_autoSwOvershootSince == 0) _autoSwOvershootSince = millis();
-        if ((millis() - _autoSwOvershootSince) >= 300000UL) { // 300s sustained
+        if ((millis() - _autoSwOvershootSince) >= 180000UL) { // 180s sustained (3 minutes)
           state.sat.eControlMode = SAT_MODE_PWM;
           _autoSwOvershootSince = 0;
-          DebugTln(F("SAT: auto-switch continuous->PWM (sustained overshoot 5min)"));
+          DebugTln(F("SAT: auto-switch continuous->PWM (sustained overshoot 3min)"));
         }
       } else {
         _autoSwOvershootSince = 0;
@@ -2906,36 +2943,9 @@ void satControlLoop()
     }
   }
 
-  // --- Modulation suppression: prevent overshoot in continuous mode ---
-  if (state.sat.eControlMode == SAT_MODE_CONTINUOUS && !satAlwaysMaxModulation()) {
-    float boilerTemp = OTcurrentSystemState.Tboiler;
-    float suppressThreshold = finalSetpoint - settings.sat.fModSupOffset;
-    float recoveryThreshold = suppressThreshold - 0.5f; // 0.5C hysteresis
-
-    if (!state.sat.bModSuppressed) {
-      // Check if we should start suppressing
-      if (boilerTemp >= suppressThreshold) {
-        if (state.sat.iModSuppressionSinceMs == 0)
-          state.sat.iModSuppressionSinceMs = millis();
-        if ((millis() - state.sat.iModSuppressionSinceMs) >= (uint32_t)(settings.sat.fModSupDelay * 1000.0f)) {
-          state.sat.bModSuppressed = true;
-          DebugTf(PSTR("SAT: modulation suppressed (boiler=%.1f >= threshold=%.1f)\r\n"), boilerTemp, suppressThreshold);
-        }
-      } else {
-        state.sat.iModSuppressionSinceMs = 0; // Reset timer
-      }
-    } else {
-      // Check if we should recover
-      if (boilerTemp < recoveryThreshold) {
-        state.sat.bModSuppressed = false;
-        state.sat.iModSuppressionSinceMs = 0;
-        DebugTf(PSTR("SAT: modulation suppression lifted (boiler=%.1f < recovery=%.1f)\r\n"), boilerTemp, recoveryThreshold);
-      }
-    }
-  } else {
-    state.sat.bModSuppressed = false;
-    state.sat.iModSuppressionSinceMs = 0;
-  }
+  // Modulation suppression is handled via CS sequence in satApplyPWM() (PWM ON only)
+  state.sat.bModSuppressed = false;
+  state.sat.iModSuppressionSinceMs = 0;
 
   // --- Compute modulation value based on mode, heating system, suppression, and quirks ---
   {
@@ -2945,7 +2955,7 @@ void satControlLoop()
       mmValue = 100;
     } else if (state.sat.bModSuppressed) {
       mmValue = 0;
-    } else if (state.sat.eControlMode == SAT_MODE_PWM && !state.sat.bPwmFlameRequested) {
+    } else if (state.sat.eControlMode == SAT_MODE_PWM) {
       mmValue = 0;
     } else {
       mmValue = settings.sat.iMaxRelModulation;
@@ -2979,6 +2989,9 @@ void satControlLoop()
     // Send MM= (max relative modulation) alongside CS=
     snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("MM=%u"), state.sat.iCurrentModulation);
     addCommandToQueue(cmdBuf, strlen(cmdBuf), false, 0);
+    // Send CH= (central heating enable/disable) every cycle
+    bool wantHeating = (finalSetpoint > SAT_MIN_SETPOINT);
+    addCommandToQueue(wantHeating ? "CH=1" : "CH=0", 4, false, 0);
     // Immergas quirk: send TP=11:12=<setpoint> alongside MM=
     if (satGetManufacturerQuirks() & SAT_QUIRK_IMMERGAS_TP) {
       snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("TP=11:12=%.0f"), finalSetpoint);
