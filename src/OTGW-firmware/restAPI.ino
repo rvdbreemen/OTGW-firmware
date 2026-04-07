@@ -528,13 +528,18 @@ static const char* satExtractPostValue(const char* body, char* buf, size_t bufSi
 }
 
 //=== SAT extended health summary (detail=full) ===
-// Sends a compact JSON with derived health booleans for the diagnostics view.
+// Sends a comprehensive JSON with health booleans, pressure, cycle, error,
+// and auto-tune diagnostics.  Uses chunked transfer via sendStartJsonMap /
+// sendJsonMapEntry / satSendJsonFloat (defined in SATcontrol.ino).
 // Called instead of satSendStatusJSON() when ?detail=full is present.
 static void satSendHealthJSON()
 {
-  // Derive health booleans from existing state
+  // --- Derive health booleans ---
   bool syncSetpoint    = state.sat.bSetpointMismatch;
   bool syncModulation  = !state.sat.bModulationReliable;
+  // CH sync: computed the same way as the MQTT publisher (SATcontrol.ino)
+  bool boilerCHActive  = (OTcurrentSystemState.SlaveStatus & 0x02) != 0;
+  bool syncCH          = (state.sat.bActive != boilerCHActive);
   bool flameHealth     = !state.sat.bSafetyTripped;
   bool deviceHealth    = (state.sat.eBoilerStatus != SAT_BS_OFF)
                       && (state.sat.eBoilerStatus != SAT_BS_STALLED_IGNITION);
@@ -542,12 +547,55 @@ static void satSendHealthJSON()
                       && (state.sat.eLastCycleClass != SAT_CYCLE_UNDERHEAT)
                       && (state.sat.eLastCycleClass != SAT_CYCLE_SHORT);
 
+  // --- Cycle class / kind names (kept in PROGMEM via static const) ---
+  static const char* const ccNames[] = {
+    "none", "good", "overshoot", "underheat", "short", "uncertain"
+  };
+  int ccIdx = (int)state.sat.eLastCycleClass;
+  if (ccIdx < 0 || ccIdx > 5) ccIdx = 0;
+
+  static const char* const ckNames[] = {
+    "unknown", "ch", "dhw", "mixed"
+  };
+  int ckIdx = (int)state.sat.eLastCycleKind;
+  if (ckIdx < 0 || ckIdx > 3) ckIdx = 0;
+
+  // --- Build chunked JSON response ---
   sendStartJsonMap("");
-  sendJsonMapEntry(F("sync_setpoint"),    syncSetpoint);
-  sendJsonMapEntry(F("sync_modulation"),  syncModulation);
-  sendJsonMapEntry(F("flame_health"),     flameHealth);
-  sendJsonMapEntry(F("device_health"),    deviceHealth);
-  sendJsonMapEntry(F("cycle_health"),     cycleHealth);
+
+  // Synchronization problem indicators (AC#3)
+  sendJsonMapEntry(F("sync_setpoint"),       syncSetpoint);
+  sendJsonMapEntry(F("sync_modulation"),     syncModulation);
+  sendJsonMapEntry(F("sync_ch"),             syncCH);
+
+  // Pressure diagnostics (AC#4)
+  satSendJsonFloat(F("pressure_smoothed"),   state.sat.fSmoothedPressure, 2);
+  satSendJsonFloat(F("pressure_drop_rate"),  state.sat.fPressureDropRate, 3);
+  sendJsonMapEntry(F("pressure_alarm"),      state.sat.bPressureAlarm);
+
+  // Cycle diagnostics (AC#5)
+  sendJsonMapEntry(F("cycle_kind"),          ckNames[ckIdx]);
+  satSendJsonFloat(F("cycle_duration"),      state.sat.fLastCycleDuration, 0);
+  sendJsonMapEntry(F("cycle_count"),         state.sat.iCycleCount);
+  satSendJsonFloat(F("cycle_fraction_ch"),   state.sat.fLastCycleFractionCH, 3);
+  satSendJsonFloat(F("cycle_fraction_dhw"),  state.sat.fLastCycleFractionDHW, 3);
+
+  // Error / curve statistics (AC#6)
+  satSendJsonFloat(F("error_mean"),          state.sat.fMeanError, 2);
+  satSendJsonFloat(F("error_stddev"),        state.sat.fErrorStdDev, 3);
+  sendJsonMapEntry(F("error_samples"),       (int32_t)state.sat.iErrorSampleCount);
+
+  // Health booleans (AC#7)
+  sendJsonMapEntry(F("flame_health"),        flameHealth);
+  sendJsonMapEntry(F("device_health"),       deviceHealth);
+  sendJsonMapEntry(F("cycle_health"),        cycleHealth);
+  sendJsonMapEntry(F("cycle_class"),         ccNames[ccIdx]);
+
+  // Auto-tune and OVP calibration (AC#8)
+  satSendJsonFloat(F("auto_tune_score"),     state.sat.fAutoTuneScore, 2);
+  sendJsonMapEntry(F("auto_tune_cycles"),    (int32_t)state.sat.iAutoTuneCycles);
+  sendJsonMapEntry(F("ovp_phase"),           (int32_t)state.sat.eCalibPhase);
+
   sendEndJsonMap("");
 }
 
