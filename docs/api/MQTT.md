@@ -344,9 +344,9 @@ The firmware subscribes to `{TopTopic}/set/{UniqueId}/#` and processes commands 
 | `constant` | `"20.5"` | `TC=20.5` | Constant temperature setpoint |
 | `outside` | `"12.0"` | `OT=12.0` | Outside temperature |
 | `hotwater` | `"1"` | `HW=1` | Hot water on/off/push (`0`, `1`, `P`, other=auto) |
-| `gatewaymode` | `"1"` | `GW=1` | Gateway mode (1=gateway, 0=monitor) |
+| `gatewaymode` | `"1"` / `"0"` / `"2"` / `"S"` / `"M"` / `"L"` / `"R"` | `GW=…` | Operating mode (see table below) |
 | `setback` | `"15.0"` | `SB=15.0` | Setback temperature |
-| `maxchsetpt` | `"80"` | `SH=80` | Max CH water setpoint |
+| `maxchsetpt` | `"80"` | `SH=80` | Max CH water setpoint (°C) |
 | `maxdhwsetpt` | `"60"` | `SW=60` | Max DHW setpoint |
 | `maxmodulation` | `"100"` | `MM=100` | Max modulation level |
 | `ctrlsetpt` | `"55"` | `CS=55` | Control setpoint |
@@ -354,25 +354,108 @@ The firmware subscribes to `{TopTopic}/set/{UniqueId}/#` and processes commands 
 | `chenable` | `"1"` | `CH=1` | Central heating enable |
 | `chenable2` | `"0"` | `H2=0` | Central heating 2 enable |
 | `ventsetpt` | `"50"` | `VS=50` | Ventilation setpoint |
+| `coolingenable` | `"0"` / `"1"` | `CE=0` / `CE=1` | Cooling enable (bit2 of OT master status). Not persisted. |
+| `summermode` | `"0"` / `"1"` | `SM=0` / `SM=1` | Summer mode (bit5 of OT master status). Persisted to flash. |
+| `dhwblocking` | `"0"` / `"1"` | `BW=0` / `BW=1` | DHW blocking (bit6 of OT master status). Not persisted. |
+| `coolinglevel` | `"50.0"` | `CC=50.0` | Cooling control signal (MsgID 7, 0-100%). Alias: `coolingcontrol`. |
+| `coolingcontrol` | `"50.0"` | `CC=50.0` | Cooling control signal (MsgID 7, 0-100%). Alias for `coolinglevel`. |
+| `ch1opermode` | `"0"`–`"15"` | `MH=x` | CH1 operating mode (lower nibble of MsgID 99 byte 4). Values 0-15 per OT spec. |
+| `dhwopermode` | `"0"`–`"15"` | `MW=x` | DHW operating mode (lower nibble of MsgID 99 byte 3). Values 0-15 per OT spec. |
+| `ch2opermode` | `"0"`–`"15"` | `M2=x` | CH2 operating mode (upper nibble of MsgID 99 byte 4). Values 0-15 per OT spec. |
+| `remoterequest` | `"0"` | `RR=x` | Remote request (MsgID 4, one-shot WRITE_DATA). Value is the request code byte. |
+| `timesync` | `"HH:MM/DOW"` | `SC=HH:MM/DOW` | Time/day sync (MsgID 20). DOW is day-of-week 1-7. No response synthesized. |
+| `printsummary` | `"0"` / `"1"` | `PS=0` / `PS=1` | Print summary mode. 1=suppress frame-by-frame output; emit periodic CSV summary. 0=resume normal output. |
+| `msginterval` | `"500"` | `MI=500` | Minimum OT message interval in ms (100-2550). OTGW32 only; persisted. Acknowledge value is in centiseconds (divide by 10). |
+| `failsafe` | `"0"` / `"1"` | `FS=0` / `FS=1` | Fail-safety on thermostat disconnect. 1=activate setback when thermostat is silent; 0=disable. Persisted. |
+| `gpioa` | `"0"`-`"9"` | `GA=x` | GPIO-A function code. On OTGW32: stored locally and returned by PR=G query, but has no hardware effect. |
+| `gpiob` | `"0"`-`"9"` | `GB=x` | GPIO-B function code. On OTGW32: stored locally and returned by PR=G query, but has no hardware effect. |
+
+**Gateway mode values (`gatewaymode` topic)**
+
+| Payload | OT Command | Mode | Description |
+|---------|-----------|------|-------------|
+| `"1"` | `GW=1` | Gateway | Full gateway: scheduler + thermostat forwarding + overrides (default) |
+| `"0"` | `GW=0` | Bypass | Thermostat direct to boiler via relay; OT-direct inactive. Requires bypass relay hardware. On boards without relay: no-op (`NG` response). |
+| `"2"` or `"S"` | `GW=2` / `GW=S` | Master/Standalone | OTGW32 is the sole OT master; scheduler only, no thermostat expected. OTGW32 extension. |
+| `"M"` | `GW=M` | Monitor | Transparent pass-through; all frames forwarded unmodified. OTGW32 extension. |
+| `"L"` | `GW=L` | Loopback | Internal loopback test mode with simulated boiler responses; no hardware needed. OTGW32 extension. |
+| `"R"` | `GW=R` | Reset | Full gateway reset: clears all transient state and restarts OT interfaces. OTGW32 extension. |
+
+On standard PIC firmware, only `0` (monitor) and `1` (gateway) are recognized.
 
 #### Advanced Commands
 
 | Topic Suffix | Payload | OT Command | Description |
 | ------------ | ------- | ---------- | ----------- |
-| `temperaturesensor` | `"O=21.5"` | `TS=O=21.5` | Temperature sensor function |
-| `addalternative` | `"12"` | `AA=12` | Add alternative message ID |
-| `delalternative` | `"12"` | `DA=12` | Delete alternative message ID |
-| `unknownid` | `"12"` | `UI=12` | Add to unknown ID list |
-| `knownid` | `"12"` | `KI=12` | Add to known ID list |
-| `priomsg` | `"12"` | `PM=12` | Set priority message |
-| `setresponse` | `"12,0000"` | `SR=12,0000` | Set response for message ID |
-| `clearrespons` | `"12"` | `CR=12` | Clear response for message ID |
-| `resetcounter` | `"0"` | `RS=0` | Reset counter |
-| `ignoretransitations` | `"0"` | `IT=0` | Ignore transitions |
-| `overridehb` | `"0"` | `OH=0` | Override high byte |
-| `forcethermostat` | `"0"` | `FT=0` | Force thermostat detection |
-| `voltageref` | `"3.3"` | `VR=3.3` | Set voltage reference |
-| `debugptr` | `"0"` | `DP=0` | Debug pointer |
+| `temperaturesensor` | `"O=21.5"` | `TS=O=21.5` | Temperature sensor function (`O`=outside, `R`=return) |
+| `addalternative` | `"12"` | `AA=12` | Re-enable a previously disabled schedule entry (MsgID 1-127) |
+| `delalternative` | `"12"` | `DA=12` | Disable a schedule entry (MsgID 1-127) |
+| `unknownid` | `"12"` | `UI=12` | Mark MsgID as unknown: gateway responds UNKNOWN_DATAID to thermostat |
+| `knownid` | `"12"` | `KI=12` | Mark MsgID as known again; restore normal forwarding |
+| `priomsg` | `"12"` | `PM=12` | Send MsgID on next cycle with priority (force immediate poll) |
+| `setresponse` | `"12:0000"` | `SR=12:0000` | Set stored response override: gateway answers thermostat for MsgID with given 4-hex-digit data word |
+| `clearrespons` | `"12"` | `CR=12` | Clear stored response override for MsgID |
+| `setresponsemod` | `"12:0000"` | `RM=12:0000` | Set response modifier: modify boiler→thermostat response data for MsgID (4-hex-digit mask applied) |
+| `clearresponsemod` | `"12"` | `CM=12` | Clear response modifier for MsgID |
+| `resetcounter` | `"HBS"` | `RS=HBS` | Reset a boiler energy/runtime counter (see table below) |
+| `ignoretransitations` | `"0"` / `"1"` | `IT=0` / `IT=1` | Ignore transitions in OT signal (0=off, 1=on) |
+| `overridehb` | `"0"` / `"1"` | `OH=0` / `OH=1` | Override high byte of OT frames (0=off, 1=on) |
+| `forcethermostat` | `"I"` | `FT=I` | Force thermostat detection mode (mirrors PIC FT= command) |
+| `voltageref` | `"3"` | `VR=3` | Voltage reference setting (stored locally, returned by PR=V) |
+| `debugptr` | `"0"` | `DP=0` | Debug pointer (no-op; acknowledged but has no effect on OTGW32) |
+| `thermostatslaveparam` | `"11:0"` | `TP=11:0` | Read TSP/FHB thermostat slave parameter. Format: `MsgID:Index` (read) or `MsgID:Index=Value` (write). Valid MsgIDs: 11/13 (HC), 89/91 (DHW), 106/108 (solar). FHB entries (13, 91, 108) are read-only. |
+
+**Reset counter codes (`resetcounter` topic / `RS=` command)**
+
+OTGW32 maps counter names to OT MsgIDs via WRITE_DATA with value 0:
+
+| Payload | OT MsgID | Counter |
+|---------|----------|---------|
+| `HBS` | 116 | Heat burner starts |
+| `HPS` | 117 | Heat pump starts |
+| `WPS` | 118 | Warm water pump starts |
+| `WBS` | 119 | Warm water burner starts |
+| `HBH` | 120 | Heat burner operating hours |
+| `HPH` | 121 | Heat pump operating hours |
+| `WPH` | 122 | Warm water pump operating hours |
+| `WBH` | 123 | Warm water boiler operating hours |
+
+**PR= query commands**
+
+Sending `PR=X` returns the current value of register `X`. On OTGW32 these are synthesized from internal state; the responses are compatible with the PIC firmware format.
+
+| Topic suffix | Payload | Returns | Description |
+|--------------|---------|---------|-------------|
+| `command` | `"PR=A"` | `PR: A=OpenTherm Gateway OTGW32` | Device banner (tools pattern-match on this) |
+| `command` | `"PR=M"` | `PR: M=G` / `M=M` / `M=P` / `M=S` / `M=L` | Current gateway mode: G=gateway, M=monitor, P=passthru (bypass), S=standalone, L=loopback |
+| `command` | `"PR=O"` | `PR: O=T20.50` / `O=C20.50` / `O=N` | Setpoint override: T=temporary (TT=), C=constant (TC=), N=none |
+| `command` | `"PR=S"` | `PR: S=15.00` | Setback temperature (SB= value) |
+| `command` | `"PR=W"` | `PR: W=0` / `W=1` / `W=A` | DHW override: 0=off, 1=on, A=auto |
+| `command` | `"PR=G"` | `PR: G=00` | GPIO A+B function codes (stored locally, no hardware effect on OTGW32) |
+| `command` | `"PR=I"` | `PR: I=00` | GPIO A+B input states (always `00` on OTGW32, no GPIO inputs) |
+| `command` | `"PR=L"` | `PR: L=RFFTTT` | LED A–F function chars (stored locally, no hardware effect on OTGW32) |
+| `command` | `"PR=T"` | `PR: T=0/0` | Tweaks: ignore_transitions/override_high_byte |
+| `command` | `"PR=D"` | `PR: D=O` | Temp sensor function (O=outside, R=return) |
+| `command` | `"PR=P"` | `PR: P=M` | Smart power mode (always M=medium on OTGW32) |
+| `command` | `"PR=R"` | `PR: R=I` | Thermostat detection mode (always I=internal on OTGW32) |
+| `command` | `"PR=B"` | `PR: B=Apr  8 2026` | Firmware build date |
+| `command` | `"PR=C"` | `PR: C=240` | CPU clock in MHz (ESP32-S3 at 240 MHz) |
+| `command` | `"PR=Q"` | `PR: Q=P` / `Q=C` / `Q=W` / `Q=B` / `Q=E` | Reset cause: P=power-on, C=software(cold), W=watchdog, B=brownout, E=external |
+| `command` | `"PR=N"` | `PR: N=10` | Message interval in centiseconds (100ms → N=10) |
+| `command` | `"PR=V"` | `PR: V=3` | Voltage reference value |
+
+**LED function codes (`LA=` through `LF=` commands)**
+
+| Topic suffix | Payload | OT Command | Description |
+|--------------|---------|------------|-------------|
+| `command` | `"LA=F"` | `LA=F` | LED A function. On OTGW32: stored locally; returned by `PR=L`; no hardware LED effect. |
+| `command` | `"LB=X"` | `LB=X` | LED B function. Same no-op note as LA=. |
+| `command` | `"LC=O"` | `LC=O` | LED C function. Same no-op note as LA=. |
+| `command` | `"LD=M"` | `LD=M` | LED D function. Same no-op note as LA=. |
+| `command` | `"LE=P"` | `LE=P` | LED E function. Same no-op note as LA=. |
+| `command` | `"LF=C"` | `LF=C` | LED F function. Same no-op note as LA=. |
+
+All `LA=` through `LF=` commands are accepted and echoed back as a valid response on both PIC and OTGW32 builds. On OTGW32 they only update the internal state reported by `PR=L`; there is no physical LED hardware driven by these codes.
 
 #### SAT Commands
 

@@ -156,10 +156,24 @@ Returns comprehensive device information as a flat JSON map. Boolean values are 
     "boilerconnected": true,
     "otgwmode": "on",
     "otgwconnected": true,
-    "otgwsimulation": false
+    "otgwsimulation": false,
+    "otdirectavailable": true,
+    "otdmode": "gateway",
+    "otdbypass": false,
+    "otdmonitor": false,
+    "otdmaster": false,
+    "otdstepup": true,
+    "otdthermostat": true,
+    "otdsetback": false,
+    "otdschedtotal": 12,
+    "otdschedactive": 11,
+    "otdscheddisabled": 1,
+    "otdoverrides": 0
   }
 }
 ```
+
+The `otd*` fields are only present when `otdirectavailable` is `true` (OTGW32 builds). On standard ESP8266+PIC builds, only `otdirectavailable: false` is included.
 
 #### `GET /api/v2/device/time`
 
@@ -787,6 +801,163 @@ Push an external outdoor temperature reading. Expires after 10 minutes if not re
 ```json
 {"status": "ok"}
 ```
+
+---
+
+### OT Direct — OTGW32 Only
+
+The `/api/v2/otdirect/*` endpoints are only present in OTGW32 builds (`HAS_DIRECT_OT=1`).
+On standard ESP8266+PIC hardware all these endpoints return `503 Service Unavailable`.
+
+#### `GET /api/v2/otdirect/status`
+
+Returns the full OTGW32 OT-direct runtime state.
+
+**Authentication**: Not required
+
+**Response** `200 OK`:
+```json
+{
+  "otdirect_status": {
+    "mode": "gateway",
+    "bypass": false,
+    "stepup": true,
+    "monitor_mode": false,
+    "master_mode": false,
+    "thermostat_connected": true,
+    "setback_active": false,
+    "schedule_total": 12,
+    "schedule_active": 11,
+    "schedule_disabled": 1,
+    "overrides_active": 2,
+    "ot_online": true,
+    "thermostat": true,
+    "boiler": true
+  }
+}
+```
+
+All fields are **read-only** runtime state. See the field reference table below.
+
+#### `POST /api/v2/otdirect/mode`
+
+Switch the OT-direct engine to the requested operating mode. Send `mode` as a form or JSON parameter.
+
+**Authentication**: Not required
+
+**Valid mode values**:
+
+| Value | Equivalent command | Description |
+|-------|--------------------|-------------|
+| `gateway` | `GW=1` | Full gateway with scheduler, thermostat forwarding, and overrides (default) |
+| `monitor` | `GW=M` | Transparent pass-through; all frames forwarded unmodified |
+| `bypass` | `GW=0` | Thermostat direct to boiler via hardware relay (requires bypass relay) |
+| `master` | `GW=2` | OTGW32 is the sole OT master; scheduler only, no thermostat expected |
+| `loopback` | `GW=L` | Internal loopback test with simulated boiler; no hardware needed |
+
+**Response** `200 OK`: Full `otdirect_status` object reflecting the mode after the switch command has been queued.
+
+**Error responses**:
+- `400` — Missing or invalid `mode` parameter
+- `503` — OT Direct hardware not available
+
+#### `GET /api/v2/otdirect/settings`
+
+Returns the persisted OT-direct configuration settings.
+
+**Authentication**: Not required
+
+**Response** `200 OK`:
+```json
+{
+  "otdirect_settings": {
+    "mode": 1,
+    "setback_temp": 15.0,
+    "setback_timeout": 300
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mode` | integer | Persisted mode index: 0=bypass, 1=gateway, 2=monitor, 3=master, 4=loopback |
+| `setback_temp` | float | Setback temperature applied when thermostat disconnects (°C, range 1-30) |
+| `setback_timeout` | integer | Seconds without a thermostat frame before setback activates |
+
+#### `POST /api/v2/otdirect/settings`
+
+Update OT-direct settings. Only provided parameters are updated.
+
+**Authentication**: Not required
+
+**Form parameters**: `setbacktemp` (float, 1.0-30.0), `setbacktimeout` (integer, seconds)
+
+**Response** `200 OK`: Full `otdirect_status` object.
+
+#### `GET /api/v2/otdirect/overrides`
+
+Returns all active write overrides and response overrides in the OT-direct engine.
+
+**Authentication**: Not required
+
+**Response** `200 OK`: JSON object with override lists (structure defined by `getOTDirectOverridesJSON()`).
+
+#### `POST /api/v2/otdirect/overrides`
+
+Add, clear, or manage override entries. All actions require `action` and `msgid`. Actions `sr` and `rm` additionally require `value`.
+
+**Form parameters**:
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `action` | Yes | One of: `sr`, `cr`, `rm`, `cm`, `ui`, `ki` |
+| `msgid` | Yes | OpenTherm Message ID (0-127) |
+| `value` | For `sr`/`rm` | 4-hex-digit data word (e.g., `3C00`) |
+
+| Action | OT command | Description |
+|--------|------------|-------------|
+| `sr` | `SR=MsgID:HHHH` | Set stored response (gateway answers thermostat with fixed data for this MsgID) |
+| `cr` | `CR=MsgID` | Clear stored response |
+| `rm` | `RM=MsgID:HHHH` | Set response modifier (modify boiler response data sent to thermostat) |
+| `cm` | `CM=MsgID` | Clear response modifier |
+| `ui` | `UI=MsgID` | Mark MsgID as unknown (gateway replies UNKNOWN_DATAID) |
+| `ki` | `KI=MsgID` | Mark MsgID as known again (restore normal forwarding) |
+
+**Response** `200 OK`: Updated override list.
+
+**Error responses**:
+- `400` — Invalid or missing parameters
+- `503` — OT Direct hardware not available
+
+---
+
+#### OT Direct State Field Reference
+
+The `state.otd.*` struct fields are exposed via two REST endpoints:
+1. `/api/v2/otdirect/status` — as an `otdirect_status` object with unprefixed field names
+2. `/api/v2/device/info` — as flattened fields with `otd` prefix (only when `otdirectavailable` is `true`)
+
+All fields are **read-only** runtime state except where noted.
+
+| `otdirect_status` field | `device/info` field | Struct field | Type | Access | Description |
+|-------------------------|---------------------|--------------|------|--------|-------------|
+| `mode` | `otdmode` | `eMode` | string enum | read-only | Current operating mode: `gateway`, `monitor`, `bypass`, `master`, or `loopback` |
+| `bypass` | `otdbypass` | `bBypassActive` | boolean | read-only | True when thermostat is routed directly to boiler via bypass relay |
+| `monitor_mode` | `otdmonitor` | `bMonitorMode` | boolean | read-only | True when engine is in transparent pass-through mode |
+| `master_mode` | `otdmaster` | `bMasterMode` | boolean | read-only | True when OTGW32 is acting as sole OT master with no thermostat |
+| `stepup` | `otdstepup` | `bStepUpEnabled` | boolean | read-only | True when the 24V step-up converter is active |
+| `thermostat_connected` | `otdthermostat` | `bThermostatConnected` | boolean | read-only | True when a thermostat frame has been received within the setback timeout |
+| `setback_active` | `otdsetback` | `bSetbackActive` | boolean | read-only | True when thermostat is disconnected and setback override is engaged |
+| `schedule_total` | `otdschedtotal` | `iScheduleTotal` | integer | read-only | Total number of OT message IDs in the polling schedule |
+| `schedule_active` | `otdschedactive` | `iScheduleActive` | integer | read-only | Number of schedule entries currently active (not disabled by boiler) |
+| `schedule_disabled` | `otdscheddisabled` | `iScheduleDisabled` | integer | read-only | Number of entries disabled (boiler returned UNKNOWN_DATA_ID three times) |
+| `overrides_active` | `otdoverrides` | `iOverrideCount` | integer | read-only | Number of active write-override slots (CS=, TT=, SH=, SW= etc.) |
+| `ot_online` | _(not in device/info)_ | _(otBus.bOnline)_ | boolean | read-only | True when the OT bus is alive (frames recently received) |
+| `thermostat` | _(not in device/info)_ | _(otBus.bThermostatState)_ | boolean | read-only | True when the thermostat OT bus side is active |
+| `boiler` | _(not in device/info)_ | _(otBus.bBoilerState)_ | boolean | read-only | True when the boiler OT bus side is active |
+| _(not exposed)_ | _(not in device/info)_ | `iLastThermostatMs` | uint32 | internal | `millis()` timestamp of last thermostat frame received; used internally for setback timeout, not exposed via REST |
+
+The `otdirectavailable` field in `/api/v2/device/info` is always present (boolean). When `false`, all other `otd*` fields are absent from the response.
 
 ---
 

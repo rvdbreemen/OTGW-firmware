@@ -64,6 +64,11 @@ tags:
     description: OTGW simulation mode control
   - name: Webhook
     description: Webhook testing
+  - name: OT Direct (OTGW32)
+    description: |
+      OT Direct endpoints are only available on OTGW32 hardware (`HAS_DIRECT_OT=1`).
+      On standard ESP8266+PIC hardware all `/v2/otdirect/*` endpoints return
+      `503 Service Unavailable` with `{"error":{"status":503,"message":"No OT-direct hardware - OTGW32 functions disabled"}}`.
 
 paths:
   /v2/health:
@@ -359,6 +364,44 @@ paths:
                         type: boolean
                       otgwsimulation:
                         type: boolean
+                      # OT Direct fields — only present when otdirectavailable=true (OTGW32 builds)
+                      otdirectavailable:
+                        type: boolean
+                        description: True when OTGW32 OT-direct hardware is present and enabled
+                      otdmode:
+                        type: string
+                        enum: [gateway, monitor, bypass, master, loopback]
+                        description: Current OT-direct operating mode (OTGW32 only)
+                      otdbypass:
+                        type: boolean
+                        description: True when thermostat is routed directly to boiler via bypass relay
+                      otdmonitor:
+                        type: boolean
+                        description: True when engine is in transparent monitor/pass-through mode
+                      otdmaster:
+                        type: boolean
+                        description: True when OTGW32 is acting as sole OT master (no thermostat)
+                      otdstepup:
+                        type: boolean
+                        description: True when the 24V step-up converter is active
+                      otdthermostat:
+                        type: boolean
+                        description: True when a thermostat frame has been received within the setback timeout
+                      otdsetback:
+                        type: boolean
+                        description: True when thermostat is disconnected and setback override is active
+                      otdschedtotal:
+                        type: integer
+                        description: Total number of OT message IDs in the polling schedule
+                      otdschedactive:
+                        type: integer
+                        description: Number of schedule entries currently enabled (not disabled by boiler)
+                      otdscheddisabled:
+                        type: integer
+                        description: Number of schedule entries disabled because boiler returned UNKNOWN_DATA_ID
+                      otdoverrides:
+                        type: integer
+                        description: Number of active write-override slots
               examples:
                 example:
                   value:
@@ -1060,6 +1103,383 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
+  # --- OT Direct endpoints (OTGW32 only) ---
+
+  /v2/otdirect/status:
+    get:
+      tags:
+        - OT Direct (OTGW32)
+      summary: Get OT Direct runtime status
+      description: |
+        Returns the full OTGW32 OT-direct runtime status. All fields reflect the
+        current in-memory state of the OT-direct engine.
+
+        **OTGW32 only** — returns 503 on standard ESP8266+PIC hardware.
+      operationId: getOTDirectStatus
+      responses:
+        '200':
+          description: OT Direct status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OTDirectStatus'
+              example:
+                otdirect_status:
+                  mode: "gateway"
+                  bypass: false
+                  stepup: true
+                  monitor_mode: false
+                  master_mode: false
+                  thermostat_connected: true
+                  setback_active: false
+                  schedule_total: 12
+                  schedule_active: 11
+                  schedule_disabled: 1
+                  overrides_active: 2
+                  ot_online: true
+                  thermostat: true
+                  boiler: true
+        '503':
+          description: OT Direct hardware not available (standard PIC build)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/otdirect/mode:
+    post:
+      tags:
+        - OT Direct (OTGW32)
+      summary: Set OT Direct operating mode
+      description: |
+        Switch the OTGW32 OT-direct engine to the requested operating mode.
+        The command is translated to the equivalent `GW=` command internally.
+
+        Supported modes:
+
+        | Mode | Equivalent | Description |
+        |------|------------|-------------|
+        | `gateway` | `GW=1` | Full gateway: scheduler + thermostat forwarding + overrides (default) |
+        | `monitor` | `GW=M` | Transparent pass-through, all frames forwarded unmodified |
+        | `bypass` | `GW=0` | Thermostat direct to boiler via relay; OT-direct inactive (requires bypass relay) |
+        | `master` | `GW=2` | Sole OT master: scheduler only, no thermostat expected |
+        | `loopback` | `GW=L` | Internal loopback test: simulated boiler responses, no hardware needed |
+
+        The response echoes the current status *after* the mode switch command has
+        been queued; the `mode` field in the response reflects the new mode.
+
+        **OTGW32 only** — returns 503 on standard ESP8266+PIC hardware.
+      operationId: setOTDirectMode
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - mode
+              properties:
+                mode:
+                  type: string
+                  enum: [gateway, monitor, bypass, master, loopback]
+                  description: Operating mode to activate
+          application/json:
+            schema:
+              type: object
+              required:
+                - mode
+              properties:
+                mode:
+                  type: string
+                  enum: [gateway, monitor, bypass, master, loopback]
+      responses:
+        '200':
+          description: Mode switch queued; response contains current status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OTDirectStatus'
+        '400':
+          description: |
+            Invalid mode string, or `mode` parameter missing.
+            `bypass` mode also returns 400 when sent via REST (use `GW=0` MQTT/serial
+            command on boards with a bypass relay).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          examples:
+            invalidMode:
+              value:
+                error:
+                  status: 400
+                  message: "Invalid mode. Use: gateway, monitor, bypass, master, loopback"
+            missingParam:
+              value:
+                error:
+                  status: 400
+                  message: "Missing 'mode' parameter"
+        '404':
+          description: Bypass mode requested but no bypass relay present on this board
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: OT Direct hardware not available (standard PIC build)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    put:
+      tags:
+        - OT Direct (OTGW32)
+      summary: Set OT Direct operating mode (PUT alias)
+      operationId: setOTDirectModePut
+      requestBody:
+        $ref: '#/paths/~1v2~1otdirect~1mode/post/requestBody'
+      responses:
+        '200':
+          description: Mode switch queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OTDirectStatus'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '503':
+          description: OT Direct hardware not available
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/otdirect/settings:
+    get:
+      tags:
+        - OT Direct (OTGW32)
+      summary: Get OT Direct settings
+      description: |
+        Returns the persisted OT-direct configuration settings.
+
+        **OTGW32 only** — returns 503 on standard ESP8266+PIC hardware.
+      operationId: getOTDirectSettings
+      responses:
+        '200':
+          description: OT Direct settings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  otdirect_settings:
+                    type: object
+                    properties:
+                      mode:
+                        type: integer
+                        description: Persisted mode index (0=bypass, 1=gateway, 2=monitor, 3=master, 4=loopback)
+                      setback_temp:
+                        type: number
+                        format: float
+                        description: Setback temperature applied when thermostat disconnects (°C, range 1-30)
+                        example: 15.0
+                      setback_timeout:
+                        type: integer
+                        description: Seconds without a thermostat frame before setback activates
+                        example: 300
+              example:
+                otdirect_settings:
+                  mode: 1
+                  setback_temp: 15.0
+                  setback_timeout: 300
+        '503':
+          description: OT Direct hardware not available (standard PIC build)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    post:
+      tags:
+        - OT Direct (OTGW32)
+      summary: Update OT Direct settings
+      description: |
+        Update one or both OT-direct settings. Only provided parameters are updated.
+        Returns the current full OT-direct status after the update.
+
+        **OTGW32 only** — returns 503 on standard ESP8266+PIC hardware.
+      operationId: updateOTDirectSettings
+      requestBody:
+        required: false
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                setbacktemp:
+                  type: string
+                  description: Setback temperature in °C (range 1.0-30.0)
+                  example: "15.0"
+                setbacktimeout:
+                  type: string
+                  description: Setback timeout in seconds
+                  example: "300"
+      responses:
+        '200':
+          description: Settings updated; response contains current full OT-direct status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OTDirectStatus'
+        '503':
+          description: OT Direct hardware not available (standard PIC build)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    put:
+      tags:
+        - OT Direct (OTGW32)
+      summary: Update OT Direct settings (PUT alias)
+      operationId: updateOTDirectSettingsPut
+      requestBody:
+        $ref: '#/paths/~1v2~1otdirect~1settings/post/requestBody'
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OTDirectStatus'
+        '503':
+          description: OT Direct hardware not available
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/otdirect/overrides:
+    get:
+      tags:
+        - OT Direct (OTGW32)
+      summary: Get active OT Direct overrides
+      description: |
+        Returns all currently active write overrides and response overrides in the
+        OT-direct engine as a JSON object.
+
+        **OTGW32 only** — returns 503 on standard ESP8266+PIC hardware.
+      operationId: getOTDirectOverrides
+      responses:
+        '200':
+          description: Override list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                description: |
+                  JSON object containing override lists. Structure defined by
+                  `getOTDirectOverridesJSON()` in `OTDirect.ino`.
+        '503':
+          description: OT Direct hardware not available (standard PIC build)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    post:
+      tags:
+        - OT Direct (OTGW32)
+      summary: Manage OT Direct overrides
+      description: |
+        Add, clear, or manage override entries in the OT-direct engine.
+        All actions require `msgid` (0-127). Actions `sr` and `rm` additionally
+        require `value` (4-hex-digit data word).
+
+        | Action | OT command | Description |
+        |--------|------------|-------------|
+        | `sr` | `SR=MsgID:HHHH` | Set stored response — gateway answers thermostat with fixed data for this MsgID |
+        | `cr` | `CR=MsgID` | Clear stored response |
+        | `rm` | `RM=MsgID:HHHH` | Set response modifier — modify boiler→thermostat response data for this MsgID |
+        | `cm` | `CM=MsgID` | Clear response modifier |
+        | `ui` | `UI=MsgID` | Mark MsgID as unknown — gateway responds UNKNOWN_DATAID to thermostat |
+        | `ki` | `KI=MsgID` | Mark MsgID as known again — restore normal forwarding |
+
+        Returns the updated override list after the command is queued.
+
+        **OTGW32 only** — returns 503 on standard ESP8266+PIC hardware.
+      operationId: manageOTDirectOverrides
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - action
+                - msgid
+              properties:
+                action:
+                  type: string
+                  enum: [sr, cr, rm, cm, ui, ki]
+                  description: Override action to perform
+                msgid:
+                  type: integer
+                  minimum: 0
+                  maximum: 127
+                  description: OpenTherm Message ID (0-127)
+                value:
+                  type: string
+                  pattern: '^[0-9A-Fa-f]{4}$'
+                  description: 4-hex-digit data word (required for `sr` and `rm` actions)
+                  example: "3C00"
+      responses:
+        '200':
+          description: Override command queued; response contains updated override list
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Updated override list
+        '400':
+          description: |
+            Invalid or missing parameters. Possible causes:
+            - `action` parameter missing or not one of the valid values
+            - `msgid` missing or out of range (0-127)
+            - `value` missing for `sr` or `rm` actions
+            - `value` format invalid (must be exactly 4 hex digits)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: OT Direct hardware not available (standard PIC build)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    put:
+      tags:
+        - OT Direct (OTGW32)
+      summary: Manage OT Direct overrides (PUT alias)
+      operationId: manageOTDirectOverridesPut
+      requestBody:
+        $ref: '#/paths/~1v2~1otdirect~1overrides/post/requestBody'
+      responses:
+        '200':
+          description: Override command queued
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '503':
+          description: OT Direct hardware not available
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
   # --- backward-compatibility aliases (prefer primary endpoints above) ---
 
   /v2/otgw/id/{msgid}:
@@ -1241,6 +1661,66 @@ components:
         error:
           status: 400
           message: "Invalid message ID"
+
+    OTDirectStatus:
+      type: object
+      description: |
+        OTGW32 OT-direct runtime status object. Returned by `/v2/otdirect/status`,
+        `/v2/otdirect/mode` (POST), and `/v2/otdirect/settings` (POST/PUT).
+        All fields are read-only runtime state.
+      properties:
+        otdirect_status:
+          type: object
+          properties:
+            mode:
+              type: string
+              enum: [gateway, monitor, bypass, master, loopback]
+              description: |
+                Current operating mode of the OT-direct engine.
+                - `gateway` (default) — full gateway with scheduler, thermostat forwarding, and overrides
+                - `monitor` — transparent pass-through; all frames forwarded unmodified
+                - `bypass` — thermostat direct to boiler via hardware relay; OT-direct inactive (requires bypass relay)
+                - `master` — OTGW32 is the sole OT master; scheduler only, no thermostat expected
+                - `loopback` — internal test mode with simulated boiler responses; no hardware required
+            bypass:
+              type: boolean
+              description: True when the bypass relay is active (thermostat direct to boiler)
+            stepup:
+              type: boolean
+              description: True when the 24V step-up converter is on
+            monitor_mode:
+              type: boolean
+              description: True when the engine is in transparent pass-through mode (equivalent to `mode == "monitor"`)
+            master_mode:
+              type: boolean
+              description: True when OTGW32 is the sole OT master (equivalent to `mode == "master"`)
+            thermostat_connected:
+              type: boolean
+              description: True when a thermostat frame has been received within the configured setback timeout
+            setback_active:
+              type: boolean
+              description: True when thermostat is considered disconnected and the setback temperature override is engaged
+            schedule_total:
+              type: integer
+              description: Total number of OpenTherm Message IDs in the polling schedule
+            schedule_active:
+              type: integer
+              description: Number of schedule entries currently active (not disabled by the boiler)
+            schedule_disabled:
+              type: integer
+              description: Number of schedule entries disabled because the boiler returned UNKNOWN_DATA_ID three times
+            overrides_active:
+              type: integer
+              description: Number of active write-override slots (CS=/TT=/SH=/SW= etc.)
+            ot_online:
+              type: boolean
+              description: True when the OT serial bus is alive (frames recently received)
+            thermostat:
+              type: boolean
+              description: True when the thermostat OT bus side is active (from `state.otBus.bThermostatState`)
+            boiler:
+              type: boolean
+              description: True when the boiler OT bus side is active (from `state.otBus.bBoilerState`)
 
     SimulationStatus:
       type: object
