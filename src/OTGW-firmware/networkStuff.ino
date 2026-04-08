@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v1.3.6-beta
+**  Version  : v1.3.7-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -338,7 +338,10 @@ void loopNTP()
       NtpStatus = TIME_WAITFORSYNC;
       break;
     case TIME_WAITFORSYNC:
-      if ((now > EPOCH_2000_01_01) && (now >= NtpLastSync)) {
+      // Guard: ESP8266 SDK initialises time() to 0xFFFFFFFF (year 2106) before
+      // SNTP sync. That value passes the lower-bound check alone, so we also
+      // require an upper bound to reject the bogus SDK initial value.
+      if ((now > EPOCH_2000_01_01) && (now < EPOCH_2038_01_19) && (now >= NtpLastSync)) {
         NtpLastSync = now;
         TimeZone myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
         if (myTz.isError()) {
