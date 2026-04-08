@@ -4,6 +4,7 @@ title: 'Fix: Max CH setpoint shows 0°C in HA Boiler entity'
 status: To Do
 assignee: []
 created_date: '2026-04-08 20:51'
+updated_date: '2026-04-08 21:03'
 labels:
   - bug
   - needs-info
@@ -36,3 +37,9 @@ Suspected cause: OT message ID mapping issue — value reaches firmware correctl
 - [ ] #2 HA Thermostat entity still shows correct value after fix
 - [ ] #3 Telnet logs confirm correct MQTT publish path
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-04-08: andrebrait shared HA integration debug logs (via attachment in Discord #beta-testing). However, maintainer clarified that firmware-side telnet logs are needed (not HA logs) — see wiki link sent by number3nl. Task remains needs-info until telnet logs arrive.
+<!-- SECTION:NOTES:END -->
