@@ -40,16 +40,19 @@ Follow these phases strictly and in order.
 ### Phase 1c: Fetch Tweakers forum posts
 
 1. **Read the last-checked Tweakers timestamp** from `.claude/tweakers_last_checked.txt`. If the file does not exist, default to posts from the last 7 days.
-2. **Fetch the Tweakers forum page** using WebFetch:
-   - URL: `https://gathering.tweakers.net/forum/list_messages/1653967/last`
-   - This shows the last page of the OTGW firmware thread on Tweakers.net (Dutch tech forum).
-3. **Parse the page** to extract individual posts with:
-   - Post author (username)
-   - Post timestamp (date/time)
-   - Post content (message body)
-   - Direct link to the post (anchor `#<post-id>` appended to the thread URL)
-4. **Filter** to only posts newer than the last-checked Tweakers timestamp.
-5. **Exclude** posts by the maintainer (Tweakers username `rvdbreemen`) or purely social/off-topic messages.
+2. **Fetch the Tweakers RSS feed** using curl (WebFetch is blocked by Tweakers; the RSS feed works fine):
+
+   ```bash
+   curl -s --max-time 10 -A "Mozilla/5.0" "https://gathering.tweakers.net/rss/list_messages/1653967"
+   ```
+
+3. **Parse the RSS XML** to extract individual `<item>` elements with:
+   - `<dc:creator>` — post author (username)
+   - `<pubDate>` — post timestamp (RFC 822 format)
+   - `<description>` or `<content:encoded>` — post content
+   - `<link>` — direct permalink to the post
+4. **Filter** to only posts with `<pubDate>` newer than the last-checked Tweakers timestamp.
+5. **Exclude** posts by the maintainer (Tweakers username `number3` or `rvdbreemen`) or purely social/off-topic messages.
 6. **Save the current timestamp** to `.claude/tweakers_last_checked.txt` for next run.
 7. **Note**: Tweakers is a Dutch forum — posts will be in Dutch. Summarize them in English for the triage list.
 
