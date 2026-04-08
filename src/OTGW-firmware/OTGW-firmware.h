@@ -61,6 +61,14 @@ void initOTDirect();
 void loopOTDirect();
 void handleOTDirectCommand(const char* buf, int len);
 int getOTDirectOverridesJSON(char* buf, size_t bufSize);
+// TASK-183: PI room compensation
+float getFlowTemp();
+// TASK-184: flame ratio metrics
+uint8_t getFlameRatioDuty();
+float   getFlameRatioFreq();
+// TASK-185: MQTT-sourced room temp/setpoint routing
+void otdMqttSetRoomTemp(float tempC);
+void otdMqttSetRoomSetpoint(float tempC);
 #endif
 
 void blinkLEDnow();
@@ -823,6 +831,18 @@ struct OTDirectSettingsSection {
   bool     bFailSafe          = true;  // FS= fail-safe setback on thermostat disconnect
   uint16_t iMsgInterval       = 100;   // MI= minimum inter-message gap (ms, 100-1275)
   bool     bHasBypassRelay    = false; // Runtime: bypass relay present on this board
+  // --- TASK-183: PI room compensation + weather-compensated heating curve ---
+  uint8_t  iCHMode            = 1;     // 0=off, 1=fixed flow, 2=heating curve (AUTO)
+  float    fFlowTemp          = 45.0f; // Fixed flow temp for CH mode=fixed (°C)
+  float    fFlowMax           = 75.0f; // Maximum flow temperature (°C)
+  float    fRoomSetpoint      = 20.0f; // Default room setpoint for heating curve (°C)
+  float    fGradient          = 1.5f;  // Heating curve gradient
+  float    fExponent          = 1.0f;  // Heating curve exponent (1.0 = linear)
+  float    fOffset            = 0.0f;  // Heating curve offset (°C)
+  bool     bRoomCompEnabled   = false; // PI room compensation enabled
+  float    fKp                = 5.0f;  // Proportional gain (K/K)
+  float    fKi                = 0.5f;  // Integral gain (1/h)
+  float    fKboost            = 2.0f;  // Boost gain (K/K), applied when error > 1°C
 };
 #endif
 

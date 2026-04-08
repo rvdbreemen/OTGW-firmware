@@ -496,6 +496,9 @@ void initOTDirect() {
   DebugTln(F("OT-direct: No bypass relay on this board"));
 #endif
 
+  // TASK-184: initialize flame ratio ring buffers
+  initFlameRatio();
+
   // Restore persisted settings to local variables
   otSetbackTemp     = settings.otd.fSetbackTemp;
   otSummerMode      = settings.otd.bSummerMode;
@@ -923,6 +926,16 @@ static void handleMasterResponse() {
       otBoilerCacheValid[cacheId] = true;
     }
 
+    // TASK-184: update flame ratio state from MsgID 0 slave status byte
+    // Flame bit = bit 3 of slave status LB (bit 3 of response byte 0)
+    {
+      uint8_t cacheId0 = (response >> 16) & 0x7F;
+      if (cacheId0 == 0) {
+        bool flameOn = (otBoilerCache[0] & 0x08) != 0;  // bit 3 of LB = flame active
+        flameRatioSet(flameOn);
+      }
+    }
+
     // 3-strike auto-blacklist: if boiler responds with UNKNOWN_DATA_ID,
     // increment 2-bit counter. Disable schedule entry after 3 consecutive unknowns.
     // MsgID 0 (status) is never disabled — it's mandatory.
@@ -1158,6 +1171,270 @@ static void emitSummaryLine() {
   processOT(line, pos);
 }
 
+// ===========================================================================
+// TASK-183: PI room compensation + weather-compensated heating curve
+// ===========================================================================
+
+// PI controller state (static locals — one heating circuit)
+static float  otPiIntegState   = 0.0f;   // integrator state (K)
+static float  otPiRoomFilt     = 0.0f;   // low-pass filtered room temp
+static float  otPiRspPrev      = 0.0f;   // previous room setpoint
+static bool   otPiInit         = false;  // first-run flag
+static float  otPiDeltaT       = 0.0f;  // current PI correction (K)
+static uint32_t otNextPiCtrl   = 0;      // next PI update (millis)
+
+static constexpr uint32_t OT_PI_INTERVAL_MS = 60000UL;  // 60s PI period (matches OT-Thing)
+
+// getFlowTemp — compute target flow temperature from settings + PI correction.
+// Returns 0 if CH is off; clipped to [0, fFlowMax].
+float getFlowTemp() {
+  float flow = settings.otd.fFlowTemp;  // fixed-flow default
+
+  if (settings.otd.iCHMode == 0) {
+    return 0.0f;  // off
+  }
+
+  if (settings.otd.iCHMode == 2) {
+    // AUTO mode: weather-compensated heating curve
+    // Need outside temperature from OT cache (MsgID 27 = Toutside, f8.8)
+    if (otBoilerCacheValid[27]) {
+      int16_t rawOT = (int16_t)otBoilerCache[27];
+      float outTmp = rawOT / 256.0f;
+
+      float rsp = settings.otd.fRoomSetpoint;
+      float flowMax = settings.otd.fFlowMax;
+      float gradient = settings.otd.fGradient;
+      float exponent = settings.otd.fExponent;
+      float offset = settings.otd.fOffset;
+
+      // Formula from OT-Thing getFlow() (CTRLMODE_AUTO):
+      // minOutside = rsp - (flowMax - rsp) / gradient
+      // c1 = (flowMax - rsp) / pow(rsp - minOutside, 1/exponent)
+      // flow = rsp + c1 * pow(rsp - outTmp, 1/exponent) + offset
+      float minOutside = rsp - (flowMax - rsp) / gradient;
+      float span = rsp - minOutside;
+      if (span > 0.0f) {
+        float c1 = (flowMax - rsp) / powf(span, 1.0f / exponent);
+        float diff = rsp - outTmp;
+        if (diff > 0.0f) {
+          flow = rsp + c1 * powf(diff, 1.0f / exponent) + offset;
+        } else {
+          flow = rsp + offset;  // outside >= room setpoint: minimal flow
+        }
+      }
+    }
+    // else: outside temp unknown, fall back to fixed flow
+  }
+
+  // Apply PI room compensation correction
+  if (settings.otd.bRoomCompEnabled) {
+    flow += otPiDeltaT;
+  }
+
+  // Clip to [0, flowMax]
+  if (flow < 0.0f) flow = 0.0f;
+  if (flow > settings.otd.fFlowMax) flow = settings.otd.fFlowMax;
+
+  return flow;
+}
+
+// loopPiCtrl — run PI room temperature compensation (called every 60s).
+// Reads room temperature from MsgID 24 cache and room setpoint from MsgID 16 cache.
+static void loopPiCtrl() {
+  // Force the boiler write for MsgID 1 on next scheduler cycle
+  for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
+    if (otSchedule[i].msgId == 1 && otSchedule[i].isWrite) {
+      otSchedule[i].lastSentMs = 0;  // force immediate send
+      break;
+    }
+  }
+
+  if (!settings.otd.bRoomCompEnabled) {
+    otPiDeltaT = 0.0f;
+    return;
+  }
+
+  // Need room temp (MsgID 24 = Tr) and room setpoint (MsgID 16 = TrSet)
+  if (!otBoilerCacheValid[24] || !otBoilerCacheValid[16]) {
+    // Not enough data — decay integrator gently
+    otPiIntegState *= 0.95f;
+    otPiDeltaT = 0.0f;
+    return;
+  }
+
+  float rt  = (int16_t)otBoilerCache[24] / 256.0f;  // room temp (f8.8)
+  float rsp = (int16_t)otBoilerCache[16] / 256.0f;  // room setpoint (f8.8)
+
+  if (!otPiInit) {
+    otPiRoomFilt = rt;
+    otPiRspPrev  = rsp;
+    otPiInit     = true;
+  } else {
+    otPiRoomFilt = 0.1f * rt + 0.9f * otPiRoomFilt;
+  }
+
+  float e = rsp - rt;       // error
+  if (e > -0.2f && e < 0.2f) e = 0.0f;  // 0.2°C deadband
+
+  // Proportional part
+  float p = settings.otd.fKp * e;
+
+  // Integral part — track setpoint changes
+  otPiIntegState += rsp - otPiRspPrev;
+  otPiRspPrev = rsp;
+
+  // Integrate only when CH is active (infer from flame on, bit 3 of MsgID 0 slave byte)
+  bool chActive = false;
+  if (otBoilerCacheValid[0]) {
+    chActive = (otBoilerCache[0] & 0x02) != 0;  // bit 1 of slave status LB = CH active
+  }
+  if (chActive) {
+    if (e > 0.0f)
+      otPiIntegState += settings.otd.fKi * e * (OT_PI_INTERVAL_MS / 1000.0f) / 3600.0f;
+    else
+      otPiIntegState += settings.otd.fKi * e * 0.3f * (OT_PI_INTERVAL_MS / 1000.0f) / 3600.0f;
+  } else {
+    otPiIntegState *= 0.95f;  // decay when not heating
+  }
+
+  // Anti-windup: clip integral to [-5, +5] K
+  if (otPiIntegState < -5.0f) otPiIntegState = -5.0f;
+  if (otPiIntegState >  5.0f) otPiIntegState =  5.0f;
+
+  // Boost term: extra push when significantly cold
+  float boost = 0.0f;
+  if (e > 1.0f) boost = e * settings.otd.fKboost;
+
+  otPiDeltaT = p + otPiIntegState + boost;
+
+  // Clip total correction to [-5, +12] K
+  if (otPiDeltaT < -5.0f)  otPiDeltaT = -5.0f;
+  if (otPiDeltaT > 12.0f)  otPiDeltaT = 12.0f;
+
+  if (state.debug.bOTmsg) {
+    DebugTf(PSTR("OTD PI: rt=%.1f rsp=%.1f e=%.2f p=%.2f I=%.2f boost=%.2f dT=%.2f\r\n"),
+            rt, rsp, e, p, otPiIntegState, boost, otPiDeltaT);
+  }
+}
+
+// ===========================================================================
+// TASK-184: Flame ratio tracking
+// ===========================================================================
+
+// Ring buffer: 180 slots x 1 slot/minute = 180 minutes (3h rolling window)
+static constexpr uint8_t FLAME_BUF_SIZE = 180;
+
+struct FlameRatioBuf {
+  uint8_t buf[FLAME_BUF_SIZE];
+  uint32_t sum;
+  uint8_t  current;   // accumulator for current minute
+};
+
+static struct {
+  FlameRatioBuf on;      // seconds of flame-on per minute
+  FlameRatioBuf cycles;  // flame-on transitions per minute
+  uint8_t  idx;          // current ring buffer index
+  bool     currentFlame; // last observed flame state
+  bool     init;         // true once first minute completes
+  uint32_t lastEdge;     // millis() of last flame transition
+  uint32_t lastInc;      // millis() of last 1-minute increment
+} otFlame;
+
+// Call once from init — zero the buffers
+static void initFlameRatio() {
+  memset(&otFlame, 0, sizeof(otFlame));
+}
+
+// flameRatioAccum — add elapsed on-time since lastEdge to current accumulator.
+// Called on flame transitions and at the end of each minute slot.
+static void flameRatioAccum() {
+  if (otFlame.currentFlame) {
+    uint32_t diff = (millis() - otFlame.lastEdge) / 1000;
+    if (diff > 60) diff = 60;  // clamp to one minute slot
+    otFlame.on.current += (uint8_t)diff;
+  }
+  otFlame.lastEdge = millis();
+}
+
+// Commit current minute into ring buffer, advance index
+static void flameRatioBufCommit(FlameRatioBuf &b) {
+  b.sum -= b.buf[otFlame.idx];
+  b.buf[otFlame.idx] = b.current;
+  b.sum += b.current;
+  b.current = 0;
+}
+
+// Called when flame state changes (from MsgID 0 response)
+static void flameRatioSet(bool flame) {
+  if (otFlame.currentFlame != flame) {
+    if (!otFlame.init) {
+      // First transition: pre-fill on-time buffer with 60 so duty starts sensibly
+      // (matches OT-Thing behaviour for the first incomplete minute)
+      memset(otFlame.on.buf, 60, sizeof(otFlame.on.buf));
+      otFlame.on.sum = (uint32_t)FLAME_BUF_SIZE * 60UL;
+      otFlame.init = true;
+    }
+    if (flame) otFlame.cycles.current++;  // rising edge = one cycle
+    flameRatioAccum();                    // account for time in previous state
+    otFlame.currentFlame = flame;
+  }
+}
+
+// Return flame duty cycle 0-100%
+uint8_t getFlameRatioDuty() {
+  if (!otFlame.init) return 0;
+  return (uint8_t)(100UL * otFlame.on.sum / FLAME_BUF_SIZE / 60);
+}
+
+// Return flame cycle frequency (cycles/h, one decimal)
+float getFlameRatioFreq() {
+  if (!otFlame.init) return 0.0f;
+  // sum of cycles over FLAME_BUF_SIZE minutes = FLAME_BUF_SIZE/60 hours
+  return otFlame.cycles.sum / (FLAME_BUF_SIZE / 60.0f);
+}
+
+// Called every second — advance ring buffer every 60s, publish MQTT
+static void loopFlameRatio() {
+  if ((millis() - otFlame.lastInc) >= 60000UL) {
+    flameRatioAccum();  // finalize on-time for this minute slot
+    flameRatioBufCommit(otFlame.on);
+    flameRatioBufCommit(otFlame.cycles);
+    otFlame.idx = (otFlame.idx + 1) % FLAME_BUF_SIZE;
+    otFlame.lastInc = millis();
+    otFlame.init = true;
+
+    // Publish to MQTT using sendMQTTData (prepends MQTTPubNamespace/)
+    if (state.mqtt.bConnected) {
+      char val[12];
+      snprintf_P(val, sizeof(val), PSTR("%u"), getFlameRatioDuty());
+      sendMQTTData(F("otgw32/flame_duty_pct"), val);
+      dtostrf(getFlameRatioFreq(), 1, 1, val);
+      sendMQTTData(F("otgw32/flame_cycles_per_hour"), val);
+    }
+  }
+}
+
+// ===========================================================================
+// TASK-185: MQTT-sourced room temp/setpoint routing to OT bus
+// Public API callable from MQTTstuff.ino
+// ===========================================================================
+
+// Route room temperature from MQTT into MsgID 24 write cache
+void otdMqttSetRoomTemp(float tempC) {
+  if (!isOTDirectEnabled()) return;
+  if (tempC < -40.0f || tempC > 127.0f) return;  // sanity range
+  uint16_t f88 = (uint16_t)((int16_t)(tempC * 256.0f));
+  enqueueWriteCommand(24, f88, "MQTT-room_temp");
+}
+
+// Route room setpoint from MQTT into MsgID 16 write cache
+void otdMqttSetRoomSetpoint(float tempC) {
+  if (!isOTDirectEnabled()) return;
+  if (tempC < -40.0f || tempC > 127.0f) return;  // sanity range
+  uint16_t f88 = (uint16_t)((int16_t)(tempC * 256.0f));
+  enqueueWriteCommand(16, f88, "MQTT-room_setpoint");
+}
+
 // ---------------------------------------------------------------------------
 // loopOTDirect — called from doBackgroundTasks() on OTGW32 builds
 // Non-blocking: uses async requests, never blocks for OT response.
@@ -1262,6 +1539,22 @@ void loopOTDirect() {
   if (DUE(timerOTDStatus)) {
     updateOTDirectStatus();
     checkThermostatTimeout();
+    // TASK-184: flame ratio — update every second, publish every 60s
+    loopFlameRatio();
+  }
+
+  // TASK-183: PI room compensation — run every 60s
+  if ((millis() - otNextPiCtrl) >= OT_PI_INTERVAL_MS || otNextPiCtrl == 0) {
+    loopPiCtrl();
+    // Apply heating curve flow in master mode when CH mode is not fixed
+    if (IS_MASTER_MODE() && settings.otd.iCHMode != 0) {
+      float flow = getFlowTemp();
+      if (flow > 0.0f) {
+        uint16_t f88 = (uint16_t)((int16_t)(flow * 256.0f));
+        enqueueWriteCommand(1, f88, "heating-curve");
+      }
+    }
+    otNextPiCtrl = millis();
   }
 }
 
@@ -1387,6 +1680,13 @@ static void resetTransientState() {
     otSetbackEngaged = false;
     state.otd.bSetbackActive = false;
   }
+  // TASK-183: reset PI controller state
+  otPiIntegState = 0.0f;
+  otPiRoomFilt   = 0.0f;
+  otPiRspPrev    = 0.0f;
+  otPiInit       = false;
+  otPiDeltaT     = 0.0f;
+  otNextPiCtrl   = 0;
 }
 
 // ---------------------------------------------------------------------------

@@ -866,6 +866,28 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
           }
           return;
         }
+        // --- TASK-185: OTGW32 OT-direct MQTT commands: set/<nodeId>/otgw32/<sub-command> ---
+        if (strcasecmp_P(topicToken, PSTR("otgw32")) == 0) {
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+          char otgw32Cmd[20];
+          if (readMQTTTopicToken(topicCursor, otgw32Cmd, sizeof(otgw32Cmd))) {
+            MQTTDebugf(PSTR("/%s [%s]\r\n"), otgw32Cmd, msgPayload);
+            float val = atof(msgPayload);
+            if (strcasecmp_P(otgw32Cmd, PSTR("room_temp")) == 0) {
+              otdMqttSetRoomTemp(val);
+            } else if (strcasecmp_P(otgw32Cmd, PSTR("room_setpoint")) == 0) {
+              otdMqttSetRoomSetpoint(val);
+            } else {
+              MQTTDebugTf(PSTR("OTGW32: unknown sub-command [%s]\r\n"), otgw32Cmd);
+            }
+          } else {
+            MQTTDebugln(F(" OTGW32: missing sub-command"));
+          }
+#else
+          MQTTDebugln(F(" OTGW32: OT-direct not available on this build"));
+#endif
+          return;
+        }
         if (!hasOTCommandInterface()) {
           MQTTDebugln(F(" MQTT command ignored: no OT command interface detected"));
           return;

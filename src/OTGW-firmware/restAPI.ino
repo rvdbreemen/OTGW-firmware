@@ -304,17 +304,41 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
     sendOTDirectStatus();
   }
   // GET /api/v2/otdirect/settings — read OTD settings
-  // POST /api/v2/otdirect/settings?setbacktemp=xx&setbacktimeout=yy — update
+  // POST /api/v2/otdirect/settings?... — update
   else if (wc > 4 && strcmp_P(words[4], PSTR("settings")) == 0) {
     if (method == HTTP_GET) {
       sendStartJsonMap(F("otdirect_settings"));
-      sendJsonMapEntry(F("mode"), (int)settings.otd.iMode);
-      sendJsonMapEntry(F("setback_temp"), settings.otd.fSetbackTemp);
+      sendJsonMapEntry(F("mode"),            (int)settings.otd.iMode);
+      sendJsonMapEntry(F("setback_temp"),    settings.otd.fSetbackTemp);
       sendJsonMapEntry(F("setback_timeout"), (int)settings.otd.iSetbackTimeout);
+      // TASK-183: PI room compensation + heating curve
+      sendJsonMapEntry(F("ch_mode"),         (int)settings.otd.iCHMode);
+      sendJsonMapEntry(F("flow_temp"),       settings.otd.fFlowTemp);
+      sendJsonMapEntry(F("flow_max"),        settings.otd.fFlowMax);
+      sendJsonMapEntry(F("room_setpoint"),   settings.otd.fRoomSetpoint);
+      sendJsonMapEntry(F("gradient"),        settings.otd.fGradient);
+      sendJsonMapEntry(F("exponent"),        settings.otd.fExponent);
+      sendJsonMapEntry(F("offset"),          settings.otd.fOffset);
+      sendJsonMapEntry(F("room_comp"),       settings.otd.bRoomCompEnabled);
+      sendJsonMapEntry(F("kp"),              settings.otd.fKp);
+      sendJsonMapEntry(F("ki"),              settings.otd.fKi);
+      sendJsonMapEntry(F("kboost"),          settings.otd.fKboost);
       sendEndJsonMap(F("otdirect_settings"));
     } else if (method == HTTP_POST || method == HTTP_PUT) {
       if (httpServer.hasArg("setbacktemp"))    updateSetting("OTDsetbacktemp", httpServer.arg("setbacktemp").c_str());
       if (httpServer.hasArg("setbacktimeout")) updateSetting("OTDsetbacktimeout", httpServer.arg("setbacktimeout").c_str());
+      // TASK-183: PI room compensation + heating curve settings
+      if (httpServer.hasArg("chmode"))       updateSetting("OTDchmode", httpServer.arg("chmode").c_str());
+      if (httpServer.hasArg("flowtemp"))     updateSetting("OTDflowtemp", httpServer.arg("flowtemp").c_str());
+      if (httpServer.hasArg("flowmax"))      updateSetting("OTDflowmax", httpServer.arg("flowmax").c_str());
+      if (httpServer.hasArg("roomsetpoint")) updateSetting("OTDroomsetpoint", httpServer.arg("roomsetpoint").c_str());
+      if (httpServer.hasArg("gradient"))     updateSetting("OTDgradient", httpServer.arg("gradient").c_str());
+      if (httpServer.hasArg("exponent"))     updateSetting("OTDexponent", httpServer.arg("exponent").c_str());
+      if (httpServer.hasArg("offset"))       updateSetting("OTDoffset", httpServer.arg("offset").c_str());
+      if (httpServer.hasArg("roomcomp"))     updateSetting("OTDroomcomp", httpServer.arg("roomcomp").c_str());
+      if (httpServer.hasArg("kp"))           updateSetting("OTDkp", httpServer.arg("kp").c_str());
+      if (httpServer.hasArg("ki"))           updateSetting("OTDki", httpServer.arg("ki").c_str());
+      if (httpServer.hasArg("kboost"))       updateSetting("OTDkboost", httpServer.arg("kboost").c_str());
       sendOTDirectStatus();
     } else {
       sendApiMethodNotAllowed(F("GET, POST"));
@@ -1476,6 +1500,13 @@ void sendOTDirectStatus()
   sendJsonMapEntry(F("ot_online"),        state.otBus.bOnline);
   sendJsonMapEntry(F("thermostat"),       state.otBus.bThermostatState);
   sendJsonMapEntry(F("boiler"),           state.otBus.bBoilerState);
+  // TASK-184: flame ratio metrics
+  sendJsonMapEntry(F("flame_duty_pct"),         (int)getFlameRatioDuty());
+  {
+    char freqBuf[8];
+    dtostrf(getFlameRatioFreq(), 1, 1, freqBuf);
+    sendJsonMapEntry(F("flame_cycles_per_hour"), freqBuf);
+  }
   sendEndJsonMap(F("otdirect_status"));
 } // sendOTDirectStatus()
 #endif

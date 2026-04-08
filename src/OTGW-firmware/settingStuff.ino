@@ -362,6 +362,18 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("OTDsummermode"), settings.otd.bSummerMode, true);
   writeJsonBoolKV(file, F("OTDfailsafe"), settings.otd.bFailSafe, true);
   writeJsonIntKV(file, F("OTDmsginterval"), settings.otd.iMsgInterval, true);
+  // --- TASK-183: PI room compensation + heating curve ---
+  writeJsonIntKV(file, F("OTDchmode"), settings.otd.iCHMode, true);
+  writeJsonFloatKV(file, F("OTDflowtemp"), settings.otd.fFlowTemp, true);
+  writeJsonFloatKV(file, F("OTDflowmax"), settings.otd.fFlowMax, true);
+  writeJsonFloatKV(file, F("OTDroomsetpoint"), settings.otd.fRoomSetpoint, true);
+  writeJsonFloatKV(file, F("OTDgradient"), settings.otd.fGradient, true);
+  writeJsonFloatKV(file, F("OTDexponent"), settings.otd.fExponent, true);
+  writeJsonFloatKV(file, F("OTDoffset"), settings.otd.fOffset, true);
+  writeJsonBoolKV(file, F("OTDroomcomp"), settings.otd.bRoomCompEnabled, true);
+  writeJsonFloatKV(file, F("OTDkp"), settings.otd.fKp, true);
+  writeJsonFloatKV(file, F("OTDki"), settings.otd.fKi, true);
+  writeJsonFloatKV(file, F("OTDkboost"), settings.otd.fKboost, true);
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // Ethernet static IP (OTGW32 only)
@@ -854,6 +866,18 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("OTDfailsafe")) == 0)      settings.otd.bFailSafe = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDmsginterval")) == 0)   settings.otd.iMsgInterval = constrain(atoi(newValue), 100, 1275);
   else if (strcasecmp_P(field, PSTR("OTDhasbypassrelay")) == 0) settings.otd.bHasBypassRelay = EVALBOOLEAN(newValue);
+  // --- TASK-183: PI room compensation + heating curve ---
+  else if (strcasecmp_P(field, PSTR("OTDchmode")) == 0)         settings.otd.iCHMode = constrain(atoi(newValue), 0, 2);
+  else if (strcasecmp_P(field, PSTR("OTDflowtemp")) == 0)       settings.otd.fFlowTemp = constrain(atof(newValue), 5.0f, 90.0f);
+  else if (strcasecmp_P(field, PSTR("OTDflowmax")) == 0)        settings.otd.fFlowMax = constrain(atof(newValue), 20.0f, 90.0f);
+  else if (strcasecmp_P(field, PSTR("OTDroomsetpoint")) == 0)   settings.otd.fRoomSetpoint = constrain(atof(newValue), 5.0f, 30.0f);
+  else if (strcasecmp_P(field, PSTR("OTDgradient")) == 0)       settings.otd.fGradient = constrain(atof(newValue), 0.1f, 5.0f);
+  else if (strcasecmp_P(field, PSTR("OTDexponent")) == 0)       settings.otd.fExponent = constrain(atof(newValue), 0.5f, 2.0f);
+  else if (strcasecmp_P(field, PSTR("OTDoffset")) == 0)         settings.otd.fOffset = constrain(atof(newValue), -10.0f, 10.0f);
+  else if (strcasecmp_P(field, PSTR("OTDroomcomp")) == 0)       settings.otd.bRoomCompEnabled = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("OTDkp")) == 0)             settings.otd.fKp = constrain(atof(newValue), 0.0f, 20.0f);
+  else if (strcasecmp_P(field, PSTR("OTDki")) == 0)             settings.otd.fKi = constrain(atof(newValue), 0.0f, 5.0f);
+  else if (strcasecmp_P(field, PSTR("OTDkboost")) == 0)         settings.otd.fKboost = constrain(atof(newValue), 0.0f, 10.0f);
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // Ethernet static IP (OTGW32 only)
