@@ -1800,6 +1800,87 @@ void satPublishMQTT()
     sendMQTTData(F("sat/pwm_auto_switch_enable"), settings.sat.bPwmAutoSwitch ? "true" : "false", true);
   }
 
+  // Climate entity extra_state_attributes JSON blob (Task #72)
+  // Publishes sat/climate_attributes for HA json_attributes_topic
+  {
+    static char climAttrBuf[512];
+    char fBuf[16];
+    int pos = 0;
+
+    // optimal_coefficient — heating curve coefficient (maps to SAT Python optimal_coefficient)
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR("{"));
+    dtostrf(settings.sat.fHeatingCurveCoeff, 1, 2, fBuf);
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
+                      PSTR("\"optimal_coefficient\":%s"), fBuf);
+
+    // coefficient_derivative — not tracked in firmware; publish 0.0
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
+                      PSTR(",\"coefficient_derivative\":0.0"));
+
+    // minimum_setpoint — static minimum boiler setpoint (SAT_MIN_SETPOINT = 10.0)
+    dtostrf(SAT_MIN_SETPOINT, 1, 1, fBuf);
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
+                      PSTR(",\"minimum_setpoint\":%s"), fBuf);
+
+    // boiler_flame_timing — duration of last completed flame cycle in seconds
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
+                      PSTR(",\"boiler_flame_timing\":%.1f"), state.sat.fLastCycleDuration);
+
+    // boiler_temperature_cold — boiler temp when flame is off (Tboiler when not heating)
+    dtostrf(OTcurrentSystemState.Tboiler, 1, 1, fBuf);
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
+                      PSTR(",\"boiler_temperature_cold\":%s"), fBuf);
+
+    // boiler_temperature_tracking — no EMA tracking state in firmware; publish false
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
+                      PSTR(",\"boiler_temperature_tracking\":false"));
+
+    // boiler_temperature_derivative — not tracked; publish 0.0
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
+                      PSTR(",\"boiler_temperature_derivative\":0.0"));
+
+    // error_source — single zone; always "main"
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
+                      PSTR(",\"error_source\":\"main\""));
+
+    // error_pid — current PID error (target - room)
+    dtostrf(state.sat.fError, 1, 2, fBuf);
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
+                      PSTR(",\"error_pid\":%s"), fBuf);
+
+    // integral_enabled — integral is always active when SAT is running
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
+                      PSTR(",\"integral_enabled\":true"));
+
+    // derivative_enabled — derivative is always active when SAT is running
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
+                      PSTR(",\"derivative_enabled\":true"));
+
+    // derivative_raw — raw (filtered) derivative before PID scaling
+    dtostrf(state.sat.fRawDerivative, 1, 4, fBuf);
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
+                      PSTR(",\"derivative_raw\":%s"), fBuf);
+
+    // current_kp, current_ki, current_kd — current PID gains
+    dtostrf(state.sat.fKp, 1, 4, fBuf);
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
+                      PSTR(",\"current_kp\":%s"), fBuf);
+    dtostrf(state.sat.fKi, 1, 6, fBuf);
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
+                      PSTR(",\"current_ki\":%s"), fBuf);
+    dtostrf(state.sat.fKd, 1, 2, fBuf);
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
+                      PSTR(",\"current_kd\":%s"), fBuf);
+
+    // relative_modulation_enabled — true unless manufacturer quirk disables it
+    bool relModEnabled = !(satGetManufacturerQuirks() & SAT_QUIRK_NO_REL_MOD);
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
+                      PSTR(",\"relative_modulation_enabled\":%s}"),
+                      relModEnabled ? "true" : "false");
+
+    sendMQTTData(F("sat/climate_attributes"), climAttrBuf, false);
+  }
+
   // Weather data (Task #50)
   weatherPublishMQTT();
 
