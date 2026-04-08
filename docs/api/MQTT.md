@@ -365,7 +365,7 @@ The firmware subscribes to `{TopTopic}/set/{UniqueId}/#` and processes commands 
 | `remoterequest` | `"0"` | `RR=x` | Remote request (MsgID 4, one-shot WRITE_DATA). Value is the request code byte. |
 | `timesync` | `"HH:MM/DOW"` | `SC=HH:MM/DOW` | Time/day sync (MsgID 20). DOW is day-of-week 1-7. No response synthesized. |
 | `printsummary` | `"0"` / `"1"` | `PS=0` / `PS=1` | Print summary mode. 1=suppress frame-by-frame output; emit periodic CSV summary. 0=resume normal output. |
-| `msginterval` | `"500"` | `MI=500` | Minimum OT message interval in ms (100-2550). OTGW32 only; persisted. Acknowledge value is in centiseconds (divide by 10). |
+| `msginterval` | `"500"` | `MI=500` | Minimum OT message interval in ms (100-1275). OTGW32 only; persisted. Acknowledge value is in centiseconds (divide by 10). |
 | `failsafe` | `"0"` / `"1"` | `FS=0` / `FS=1` | Fail-safety on thermostat disconnect. 1=activate setback when thermostat is silent; 0=disable. Persisted. |
 | `gpioa` | `"0"`-`"9"` | `GA=x` | GPIO-A function code. On OTGW32: stored locally and returned by PR=G query, but has no hardware effect. |
 | `gpiob` | `"0"`-`"9"` | `GB=x` | GPIO-B function code. On OTGW32: stored locally and returned by PR=G query, but has no hardware effect. |
