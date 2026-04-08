@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program : networkStuff.h
-**  Version  : v1.3.6-beta
+**  Version  : v1.3.7-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -78,6 +78,11 @@ enum NtpStatus_t {
 //=====[ Constants ]===========================================================
 
 static const time_t EPOCH_2000_01_01 = 946684800;
+// Upper sanity bound: ESP8266 SDK initialises time() to 0xFFFFFFFF before
+// SNTP sync. That value (year 2106) is > EPOCH_2000_01_01, so the old check
+// incorrectly treated it as a valid synced time. INT32_MAX (2038-01-19) is
+// safely below 0xFFFFFFFF and above any realistic current date.
+static const time_t EPOCH_2038_01_19 = 2147483647UL;
 
 //=====[ Extern variable declarations ]========================================
 // Defined in networkStuff.ino
