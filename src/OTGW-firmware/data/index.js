@@ -292,7 +292,7 @@ function stopTimeUpdates() {
 }
 
 function setActivePageSection(activeId) {
-  ['displayMainPage', 'displaySettingsPage', 'displayDeviceInfo', 'displayPICflash', 'displayWebhookPage', 'displaySATPage'].forEach(function(id) {
+  ['displayMainPage', 'displaySettingsPage', 'displayDeviceInfo', 'displayPICflash', 'displayWebhookPage', 'displaySATPage', 'displaySATSettingsPage'].forEach(function(id) {
     var section = document.getElementById(id);
     if (!section) return;
     if (id === activeId) section.classList.add('active');
@@ -3274,6 +3274,380 @@ function satPage() {
     SAT.start();
   }
 } // satPage()
+
+function satSettingsPage() {
+  disconnectOTLogWebSocket();
+  stopOTmonitorPolling();
+  stopOTDStatusPolling();
+  refreshDevTime();
+  setActivePageSection('displaySATSettingsPage');
+  refreshSATSettings();
+} // satSettingsPage()
+
+// ============================================================================
+// SAT Settings Page — load, render, save
+// ============================================================================
+
+// Definition of all SAT settings grouped in 12 categories.
+// Fields: key (API setting name), label, type ('b'|'f'|'i'|'s'|'select'),
+//         unit (optional string), min, max, step (for numbers),
+//         options (for select: [[value, label], ...])
+// Keys use the lowercase form returned by GET /api/v2/settings.
+// updateSetting() on the firmware accepts case-insensitive names so saving back works fine.
+var SAT_SETTINGS_GROUPS = [
+  {
+    id: 'sat-grp-core',
+    title: 'Core Control',
+    fields: [
+      { key: 'satenabled',     label: 'SAT Enabled',           type: 'b' },
+      { key: 'satsystem',      label: 'Heating System',        type: 'select',
+        options: [[0,'Gas / Radiators'],[1,'Heat Pump'],[2,'Hybrid'],[3,'Underfloor']] },
+      { key: 'satmanufacturer',label: 'Manufacturer',          type: 'select',
+        options: [[0,'Generic'],[1,'Intergas'],[2,'Remeha'],[3,'Nefit'],[4,'Vaillant'],[5,'Bosch'],[6,'Worcester'],[7,'Baxi'],[8,'Ideal'],[9,'Atag']] },
+      { key: 'satcoefficient', label: 'Heating Curve',         type: 'f', min: 0.1, max: 5.0, step: 0.1 },
+      { key: 'satdeadband',    label: 'Deadband',              type: 'f', unit: '\u00B0C', min: 0.05, max: 2.0, step: 0.05 },
+      { key: 'satinterval',    label: 'Control Interval',      type: 'i', unit: 's', min: 30, max: 600, step: 10 },
+      { key: 'satheatingmode', label: 'Heating Mode',          type: 'select',
+        options: [[0,'Comfort'],[1,'Eco']] }
+    ]
+  },
+  {
+    id: 'sat-grp-pid',
+    title: 'PID Tuning',
+    fields: [
+      { key: 'satpwmautoswitch',  label: 'Auto Gains',         type: 'b' },
+      { key: 'satautogains',      label: 'Auto Gains Value',   type: 'f', min: 0.1, max: 10.0, step: 0.1 },
+      { key: 'satovershootmargin',label: 'Overshoot Margin',   type: 'f', unit: '\u00B0C', min: 0.5, max: 5.0, step: 0.1 }
+    ]
+  },
+  {
+    id: 'sat-grp-pwm',
+    title: 'PWM',
+    fields: [
+      { key: 'satforcepwm',       label: 'Force PWM',          type: 'b' },
+      { key: 'satcyclesperhour',  label: 'Cycles per Hour',    type: 'i', min: 2, max: 6, step: 1 },
+      { key: 'satmaxmodulation',  label: 'Max Rel. Modulation',type: 'i', unit: '%', min: 0, max: 100, step: 1 }
+    ]
+  },
+  {
+    id: 'sat-grp-tempsrc',
+    title: 'Temperature Sources',
+    fields: [
+      { key: 'satexternaltemp',   label: 'Use External Temp',  type: 'b' },
+      { key: 'satsensormaxage',   label: 'Sensor Max Age',     type: 'i', unit: 's', min: 60, max: 86400, step: 60 },
+      { key: 'satbleenable',      label: 'BLE Enable',         type: 'b' },
+      { key: 'satblemac',         label: 'BLE MAC Address',    type: 's', maxlen: 18, size: 20 },
+      { key: 'satbleinterval',    label: 'BLE Interval',       type: 'i', unit: 's', min: 10, max: 300, step: 5 }
+    ]
+  },
+  {
+    id: 'sat-grp-presets',
+    title: 'Presets',
+    fields: [
+      { key: 'satpresetcomfort',  label: 'Comfort',            type: 'f', unit: '\u00B0C', min: 15.0, max: 28.0, step: 0.5 },
+      { key: 'satpreseteco',      label: 'Eco',                type: 'f', unit: '\u00B0C', min: 10.0, max: 22.0, step: 0.5 },
+      { key: 'satpresetaway',     label: 'Away',               type: 'f', unit: '\u00B0C', min: 5.0,  max: 18.0, step: 0.5 },
+      { key: 'satpresetsleep',    label: 'Sleep',              type: 'f', unit: '\u00B0C', min: 5.0,  max: 25.0, step: 0.5 },
+      { key: 'satpresetactivity', label: 'Activity',           type: 'f', unit: '\u00B0C', min: 5.0,  max: 20.0, step: 0.5 },
+      { key: 'satpresethome',     label: 'Home',               type: 'f', unit: '\u00B0C', min: 10.0, max: 25.0, step: 0.5 }
+    ]
+  },
+  {
+    id: 'sat-grp-dhw',
+    title: 'DHW (Domestic Hot Water)',
+    fields: [
+      { key: 'satdhwenabled',     label: 'DHW Enabled',        type: 'b' },
+      { key: 'satdhwsetpoint',    label: 'DHW Setpoint',       type: 'f', unit: '\u00B0C', min: 0.0, max: 60.0, step: 0.5 }
+    ]
+  },
+  {
+    id: 'sat-grp-pressure',
+    title: 'Pressure',
+    fields: [
+      { key: 'satminpressure',    label: 'Min Pressure',       type: 'f', unit: 'bar', min: 0.0, max: 3.0, step: 0.1 },
+      { key: 'satmaxpressure',    label: 'Max Pressure',       type: 'f', unit: 'bar', min: 1.0, max: 4.0, step: 0.1 },
+      { key: 'satmaxpressdrop',   label: 'Max Pressure Drop',  type: 'f', unit: 'bar', min: 0.05, max: 2.0, step: 0.05 }
+    ]
+  },
+  {
+    id: 'sat-grp-smart',
+    title: 'Smart Features',
+    fields: [
+      { key: 'satsolargain',       label: 'Solar Gain Enable',      type: 'b' },
+      { key: 'satsolarminrise',    label: 'Solar Min Rise Rate',    type: 'f', unit: '\u00B0C/hr', min: 0.1, max: 5.0, step: 0.1 },
+      { key: 'satsolaroffset',     label: 'Solar Setpoint Offset',  type: 'f', unit: '\u00B0C', min: 0.5, max: 10.0, step: 0.5 },
+      { key: 'satsolarminelev',    label: 'Solar Min Elevation',    type: 'f', unit: '\u00B0', min: -10.0, max: 45.0, step: 1.0 },
+      { key: 'satsolarfreezeint',  label: 'Solar Freeze Integral',  type: 'b' },
+      { key: 'satsummersimmer',    label: 'Summer Simmer Enable',   type: 'b' },
+      { key: 'satsummerthreshold', label: 'Summer Threshold',       type: 'f', unit: '\u00B0C', min: 5.0, max: 35.0, step: 0.5 },
+      { key: 'satsummerminhours',  label: 'Summer Min Hours',       type: 'i', unit: 'h', min: 1, max: 48, step: 1 },
+      { key: 'satcomfortadjust',   label: 'Thermal Comfort Enable', type: 'b' },
+      { key: 'satcomforthumidity', label: 'Comfort Humidity',       type: 'f', unit: '%', min: 10.0, max: 90.0, step: 1.0 },
+      { key: 'satcomfortmaxoffset',label: 'Comfort Max Offset',     type: 'f', unit: '\u00B0C', min: 0.0, max: 3.0, step: 0.1 },
+      { key: 'satmultiarea',       label: 'Multi-Area Enable',      type: 'b' },
+      { key: 'satmultiareacount',  label: 'Multi-Area Count',       type: 'i', min: 0, max: 4, step: 1 }
+    ]
+  },
+  {
+    id: 'sat-grp-safety',
+    title: 'Safety',
+    fields: [
+      { key: 'satwindowdetect',  label: 'Window Detection',       type: 'b' },
+      { key: 'satwindowminsec',  label: 'Window Min Open Time',   type: 'i', unit: 's', min: 10, max: 600, step: 10 },
+      { key: 'satpushsetpoint',  label: 'Push Setpoint',          type: 'b' },
+      { key: 'satovpenabled',    label: 'OVP Enabled',            type: 'b' },
+      { key: 'satovpvalue',      label: 'OVP Value',              type: 'f', unit: '\u00B0C', min: 0.0, max: 90.0, step: 0.5 }
+    ]
+  },
+  {
+    id: 'sat-grp-energy',
+    title: 'Energy',
+    fields: [
+      { key: 'satboilercapacity', label: 'Boiler Capacity', type: 'f', unit: 'kW', min: 1.0, max: 100.0, step: 0.5 }
+    ]
+  },
+  {
+    id: 'sat-grp-sync',
+    title: 'Sync',
+    fields: [
+      { key: 'satpresetsync',       label: 'Preset Sync Enable', type: 'b' },
+      { key: 'satpresetsynctopic',  label: 'Preset Sync Topic',  type: 's', maxlen: 64, size: 40 }
+    ]
+  },
+  {
+    id: 'sat-grp-advanced',
+    title: 'Advanced',
+    fields: [
+      { key: 'satsimulation',    label: 'Simulation Mode',       type: 'b' },
+      { key: 'satautotune',      label: 'Auto-Tune',             type: 'b' },
+      { key: 'satautotunerate',  label: 'Auto-Tune Rate',        type: 'f', min: 0.005, max: 0.1, step: 0.005 },
+      { key: 'saterrormon',      label: 'Error Monitoring',      type: 'b' },
+      { key: 'satflameoffset',   label: 'Flame Off Offset',      type: 'f', unit: '\u00B0C', min: 0.0, max: 5.0, step: 0.1 },
+      { key: 'satflowoffset',    label: 'Flow Offset',           type: 'f', unit: '\u00B0C', min: 0.5, max: 10.0, step: 0.1 },
+      { key: 'satmodsupoffset',  label: 'Mod Suppression Offset',type: 'f', unit: '%', min: 0.0, max: 5.0, step: 0.1 },
+      { key: 'satmodsupdelay',   label: 'Mod Suppression Delay', type: 'f', unit: 's', min: 0.0, max: 120.0, step: 1.0 },
+      { key: 'satvalveoffset',   label: 'Valve Offset',          type: 'f', min: -1.0, max: 1.0, step: 0.1 }
+    ]
+  }
+];
+
+function toggleSATSettingsGroup(headerId) {
+  var header = document.getElementById(headerId);
+  if (!header) return;
+  var body = header.nextElementSibling;
+  if (!body) return;
+  var collapsed = body.style.display === 'none';
+  body.style.display = collapsed ? '' : 'none';
+  var arrow = header.querySelector('.sat-settings-arrow');
+  if (arrow) arrow.innerHTML = collapsed ? '&#9660;' : '&#9654;';
+}
+
+function refreshSATSettings() {
+  var page = document.getElementById('satSettingsContent');
+  var msgEl = document.getElementById('satSettingsMessage');
+  if (!page) return;
+  if (msgEl) { msgEl.textContent = 'Loading\u2026'; msgEl.className = 'loading'; }
+
+  fetch(APIGW + 'v2/settings')
+    .then(function(response) {
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      return response.json();
+    })
+    .then(function(json) {
+      var data = json.settings || {};
+      if (msgEl) { msgEl.textContent = ''; msgEl.className = ''; }
+
+      // Build the groups if not yet rendered
+      if (!page.hasChildNodes()) {
+        buildSATSettingsGroups(page, data);
+      } else {
+        // Just update values
+        populateSATSettingsValues(data);
+      }
+    })
+    .catch(function(error) {
+      if (msgEl) { msgEl.textContent = 'Error loading settings: ' + error.message; msgEl.className = 'error'; }
+    });
+}
+
+function buildSATSettingsGroups(page, data) {
+  SAT_SETTINGS_GROUPS.forEach(function(group) {
+    // Group container
+    var grpDiv = document.createElement('div');
+    grpDiv.className = 'sat-settings-group';
+
+    // Collapsible header
+    var header = document.createElement('div');
+    header.className = 'sat-settings-group-header';
+    header.id = group.id + '-header';
+    var arrow = document.createElement('span');
+    arrow.className = 'sat-settings-arrow';
+    arrow.innerHTML = '&#9660;';
+    header.appendChild(arrow);
+    header.appendChild(document.createTextNode(' ' + group.title));
+    (function(hid) {
+      header.addEventListener('click', function() { toggleSATSettingsGroup(hid); }, false);
+    })(group.id + '-header');
+
+    // Save group button
+    var saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'sat-settings-save-btn';
+    saveBtn.textContent = 'Save';
+    (function(gid) {
+      saveBtn.addEventListener('click', function() { saveSATSettingsGroup(gid); }, false);
+    })(group.id);
+    header.appendChild(saveBtn);
+
+    grpDiv.appendChild(header);
+
+    // Body
+    var body = document.createElement('div');
+    body.className = 'sat-settings-group-body';
+    body.id = group.id + '-body';
+
+    group.fields.forEach(function(field) {
+      var val = data[field.key] ? data[field.key].value : '';
+      var rowDiv = document.createElement('div');
+      rowDiv.className = 'settingDiv';
+      rowDiv.id = 'SATD_' + field.key;
+
+      var labelEl = document.createElement('label');
+      labelEl.className = 'settings-field-container';
+      labelEl.setAttribute('for', 'SAT_' + field.key);
+      labelEl.textContent = field.label;
+      rowDiv.appendChild(labelEl);
+
+      var inputDiv = document.createElement('div');
+      inputDiv.className = 'settings-input-container';
+
+      var input;
+      if (field.type === 'select') {
+        input = document.createElement('select');
+        input.id = 'SAT_' + field.key;
+        field.options.forEach(function(opt) {
+          var o = document.createElement('option');
+          o.value = opt[0];
+          o.textContent = opt[1];
+          if (String(opt[0]) === String(val)) o.selected = true;
+          input.appendChild(o);
+        });
+      } else if (field.type === 'b') {
+        input = document.createElement('input');
+        input.type = 'checkbox';
+        input.id = 'SAT_' + field.key;
+        input.checked = (val === true || val === 'true' || val === '1' || val === 'on');
+      } else if (field.type === 's') {
+        input = document.createElement('input');
+        input.type = 'text';
+        input.id = 'SAT_' + field.key;
+        if (field.maxlen) input.maxLength = field.maxlen;
+        if (field.size) input.size = field.size;
+        input.value = val;
+      } else {
+        // 'f' or 'i'
+        input = document.createElement('input');
+        input.type = 'number';
+        input.id = 'SAT_' + field.key;
+        if (field.min !== undefined) input.min = field.min;
+        if (field.max !== undefined) input.max = field.max;
+        if (field.step !== undefined) input.step = field.step;
+        input.value = val;
+      }
+      input.className = 'sat-setting-input';
+      (function(inputEl) {
+        function markDirty() { inputEl.className = 'sat-setting-input sat-setting-changed'; }
+        inputEl.addEventListener('change', markDirty, false);
+        inputEl.addEventListener('keydown', markDirty, false);
+      })(input);
+      inputDiv.appendChild(input);
+
+      // Unit label
+      if (field.unit) {
+        var unitSpan = document.createElement('span');
+        unitSpan.className = 'sat-setting-unit';
+        unitSpan.textContent = ' ' + field.unit;
+        inputDiv.appendChild(unitSpan);
+      }
+
+      rowDiv.appendChild(inputDiv);
+      body.appendChild(rowDiv);
+    });
+
+    grpDiv.appendChild(body);
+    page.appendChild(grpDiv);
+  });
+}
+
+function populateSATSettingsValues(data) {
+  SAT_SETTINGS_GROUPS.forEach(function(group) {
+    group.fields.forEach(function(field) {
+      var el = document.getElementById('SAT_' + field.key);
+      if (!el) return;
+      var val = data[field.key] ? data[field.key].value : '';
+      if (field.type === 'b') {
+        el.checked = strToBool(val);
+      } else if (field.type === 'select') {
+        el.value = String(val);
+      } else {
+        el.value = val;
+      }
+      el.className = 'sat-setting-input';
+    });
+  });
+}
+
+function saveSATSettingsGroup(groupId) {
+  var group = null;
+  for (var i = 0; i < SAT_SETTINGS_GROUPS.length; i++) {
+    if (SAT_SETTINGS_GROUPS[i].id === groupId) { group = SAT_SETTINGS_GROUPS[i]; break; }
+  }
+  if (!group) return;
+
+  var msgEl = document.getElementById('satSettingsMessage');
+  var changed = [];
+  group.fields.forEach(function(field) {
+    var el = document.getElementById('SAT_' + field.key);
+    if (!el) return;
+    if (el.className.indexOf('sat-setting-changed') === -1) return;
+    var value;
+    if (field.type === 'b') {
+      value = el.checked ? 'true' : 'false';
+    } else {
+      value = el.value;
+    }
+    changed.push({ key: field.key, value: value });
+  });
+
+  if (changed.length === 0) {
+    if (msgEl) { msgEl.textContent = 'No changes to save.'; setTimeout(function() { if (msgEl) msgEl.textContent = ''; }, 2000); }
+    return;
+  }
+
+  if (msgEl) msgEl.textContent = 'Saving\u2026';
+
+  var promises = changed.map(function(item) {
+    return fetch(APIGW + 'v2/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+      body: JSON.stringify({ name: item.key, value: item.value }),
+      mode: 'cors'
+    }).then(function(resp) {
+      if (!resp.ok) throw new Error(item.key + ': HTTP ' + resp.status);
+      var el = document.getElementById('SAT_' + item.key);
+      if (el) el.className = 'sat-setting-input';
+      return resp;
+    });
+  });
+
+  Promise.all(promises)
+    .then(function() {
+      if (msgEl) { msgEl.textContent = 'Saved successfully.'; setTimeout(function() { if (msgEl) msgEl.textContent = ''; }, 2500); }
+    })
+    .catch(function(err) {
+      if (msgEl) { msgEl.textContent = 'Save error: ' + err.message; }
+    });
+}
 
 function toggleHidden(className, hideOnly) {
   Array.from(document.getElementsByClassName(className)).forEach(

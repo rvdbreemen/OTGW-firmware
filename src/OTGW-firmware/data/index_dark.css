@@ -1284,3 +1284,18 @@ body.disable-interaction {
 .sat-btn-toggle.active { background: #c62828; border-color: #b71c1c; }
 .sat-feedback-ok { color: #66bb6a; }
 .sat-feedback-error { color: #ef5350; }
+
+/* SAT Settings Groups (dark theme) */
+.sat-settings-group-header {
+  background: #1e3a3a;
+  color: #80cbc4;
+  border-bottom: 1px solid #2e4a4a;
+}
+.sat-settings-group-header:hover {
+  background: #2a4a4a;
+}
+.sat-settings-group-body {
+  background: #1a1a2e;
+  border: 1px solid #2e4a4a;
+  border-top: none;
+}

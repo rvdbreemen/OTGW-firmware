@@ -1270,3 +1270,19 @@ body.disable-interaction {
 .sat-raw-data { background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 0.8em; max-height: 400px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
 .sat-collapsible { cursor: pointer; }
 .sat-collapsible:hover { opacity: 0.8; }
+
+
+/* SAT Settings Groups (light theme) */
+.sat-settings-group-header {
+  background: #e0f2f1;
+  color: #004d40;
+  border-bottom: 1px solid #b2dfdb;
+}
+.sat-settings-group-header:hover {
+  background: #b2dfdb;
+}
+.sat-settings-group-body {
+  background: #fafafa;
+  border: 1px solid #b2dfdb;
+  border-top: none;
+}

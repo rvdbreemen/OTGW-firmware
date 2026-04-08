@@ -1,11 +1,11 @@
 ---
 id: TASK-84
 title: 'WebUI: Settings page for all SAT configuration parameters'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-06 19:23'
-updated_date: '2026-04-07 16:36'
+updated_date: '2026-04-08 21:45'
 labels:
   - webui
   - settings
@@ -44,13 +44,32 @@ Each group should be collapsible. Input types: toggle switches for bools, number
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All 52+ SAT settings accessible from dedicated SAT settings section
-- [ ] #2 Settings grouped in 12 logical categories with collapsible headers
-- [ ] #3 Bool settings use toggle switches
-- [ ] #4 Float/int settings use number inputs with proper min/max/step/unit labels
-- [ ] #5 Enum settings use dropdown selects (heating system, manufacturer, heating mode)
-- [ ] #6 Changes saved via REST API with success/error feedback
-- [ ] #7 Settings page accessible from SAT dashboard (all three views)
-- [ ] #8 Responsive layout matching existing settings page style
-- [ ] #9 Dark theme support
+- [x] #1 All 52+ SAT settings accessible from dedicated SAT settings section
+- [x] #2 Settings grouped in 12 logical categories with collapsible headers
+- [x] #3 Bool settings use toggle switches
+- [x] #4 Float/int settings use number inputs with proper min/max/step/unit labels
+- [x] #5 Enum settings use dropdown selects (heating system, manufacturer, heating mode)
+- [x] #6 Changes saved via REST API with success/error feedback
+- [x] #7 Settings page accessible from SAT dashboard (all three views)
+- [x] #8 Responsive layout matching existing settings page style
+- [x] #9 Dark theme support
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added dedicated SAT settings page accessible from the SAT dashboard via a new Settings button.
+
+Changes:
+- index.html: added Settings button to SAT dashboard header; added displaySATSettingsPage section with full nav bar containing home, SAT Dashboard, Settings, and Advanced buttons
+- index.js: extended setActivePageSection() to include displaySATSettingsPage; added satSettingsPage() navigation function; added SAT_SETTINGS_GROUPS definition (12 collapsible categories with 50+ settings); added buildSATSettingsGroups(), populateSATSettingsValues(), refreshSATSettings(), saveSATSettingsGroup(), and toggleSATSettingsGroup() functions
+- index_common.css: added shared layout rules for sat-settings-group, sat-settings-group-header, sat-settings-group-body, sat-settings-arrow, sat-settings-save-btn, sat-setting-unit, sat-setting-changed, satSettingsMessage
+- index.css / index_dark.css: added theme-specific colors for SAT settings group headers and bodies
+
+Design:
+- Settings loaded from GET /api/v2/settings (SAT* keys returned as lowercase); saved via POST /api/v2/settings with the same lowercase key (firmware updateSetting() is case-insensitive)
+- Booleans: checkbox inputs; floats/ints: number inputs with min/max/step; enums: select dropdowns
+- Changed fields get orange outline; Save button per group saves only changed fields
+- Dark theme support via index_dark.css additions
+- Responsive layout reuses existing settingDiv/settings-field-container patterns
+<!-- SECTION:FINAL_SUMMARY:END -->

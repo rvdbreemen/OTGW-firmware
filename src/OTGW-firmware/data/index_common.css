@@ -272,3 +272,72 @@
     align-items: flex-start;
   }
 }
+
+/* ==================== SAT Settings Groups ==================== */
+.sat-settings-group {
+  margin-bottom: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.sat-settings-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1.0em;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sat-settings-arrow {
+  font-size: 0.85em;
+  min-width: 12px;
+  flex-shrink: 0;
+}
+
+.sat-settings-save-btn {
+  margin-left: auto;
+  padding: 4px 12px;
+  font-size: 0.85em;
+  min-height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.sat-settings-group-body {
+  padding: 8px 12px 4px 12px;
+}
+
+.sat-setting-unit {
+  font-size: 0.85em;
+  margin-left: 4px;
+  opacity: 0.8;
+}
+
+.sat-setting-input.sat-setting-changed {
+  outline: 2px solid #f0a000;
+}
+
+.sat-settings-nav-btn {
+  font-size: 0.85em;
+  padding: 5px 12px;
+  min-height: 32px;
+}
+
+#satSettingsMessage {
+  padding: 6px 12px;
+  min-height: 24px;
+  font-size: 0.9em;
+}
+
+#satSettingsMessage.loading {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+#satSettingsMessage.error {
+  color: #e53935;
+}

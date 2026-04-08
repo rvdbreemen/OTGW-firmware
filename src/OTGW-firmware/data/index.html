@@ -323,6 +323,7 @@
             <option value="expert">Expert</option>
             <option value="diag">Diagnostics</option>
           </select>
+          <button type="button" class="sat-btn sat-settings-nav-btn" onclick="satSettingsPage()" title="SAT Settings">Settings</button>
         </div>
 
         <!-- Temperature cards -->
@@ -511,6 +512,31 @@
           <h3 class="sat-collapsible" onclick="SAT.toggleRawData()">Raw Data <span id="sat-raw-arrow">&#9654;</span></h3>
           <pre id="sat-raw-json" class="sat-raw-data" style="display:none"></pre>
         </div>
+      </div>
+    </div>
+    <div id="displaySATSettingsPage" class="page-section">
+      <div class="nav-container">
+        <div class='nav-left'>
+          <button type="button" class='home nav-item tabButton'>Home</button>
+          <button type="button" class='tabSAT nav-item tabButton'>SAT Dashboard</button>
+        </div>
+        <div class='nav-right'>
+          <button type="button" class='basicSettings nav-item tabButton'>Settings</button>
+          <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
+          <div class="adv_dropdown hidden">
+            <span class="list_item tabPICflash pic-only">PIC firmware</span>
+            <span class="list_item tabWebhook">Webhook</span>
+            <span class="list_item tabDeviceInfo">Debug Information</span>
+            <span class="list_item FSexplorer">File system contents</span>
+          </div>
+        </div>
+      </div>
+      <div class="sat-dashboard">
+        <div class="sat-header">
+          <h2>SAT Settings</h2>
+        </div>
+        <div id="satSettingsMessage"></div>
+        <div id="satSettingsContent"></div>
       </div>
     </div>
     <div class="footer">
