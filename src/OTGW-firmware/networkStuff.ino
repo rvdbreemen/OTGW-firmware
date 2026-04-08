@@ -18,7 +18,6 @@
 
 NtpStatus_t NtpStatus  = TIME_NOTSET;
 time_t      NtpLastSync = 0;
-static bool sDhcpHostnameFixed = false;  // set once after any DHCP restart to prevent double-announce
 
 OTGWWebServer           httpServer(80);
 OTGWUpdateServer        httpUpdater(true);
@@ -347,7 +346,10 @@ void loopNTP()
       NtpStatus = TIME_WAITFORSYNC;
       break;
     case TIME_WAITFORSYNC:
-      if ((now > EPOCH_2000_01_01) && (now >= NtpLastSync)) {
+      // Guard: ESP8266 SDK initialises time() to 0xFFFFFFFF (year 2106) before
+      // SNTP sync. That value passes the lower-bound check alone, so we also
+      // require an upper bound to reject the bogus SDK initial value.
+      if ((now > EPOCH_2000_01_01) && (now < EPOCH_2038_01_19) && (now >= NtpLastSync)) {
         NtpLastSync = now;
         TimeZone myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
         if (myTz.isError()) {
