@@ -1800,7 +1800,8 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("otdenableslave"), settings.otd.bEnableSlave, "b");
   sendJsonSettingObj(F("otdsummermode"), settings.otd.bSummerMode, "b");
   sendJsonSettingObj(F("otdfailsafe"), settings.otd.bFailSafe, "b");
-  sendJsonSettingObj(F("otdmsginterval"), settings.otd.iMsgInterval, "i", 100, 2550);
+  sendJsonSettingObj(F("otdmsginterval"), settings.otd.iMsgInterval, "i", 100, 1275);
+  sendJsonSettingObj(F("otdhasbypassrelay"), settings.otd.bHasBypassRelay, "b");
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // --- Ethernet settings (OTGW32 only) ---

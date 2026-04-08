@@ -821,7 +821,8 @@ struct OTDirectSettingsSection {
   bool     bEnableSlave       = true;  // Enable slave interface in master mode
   bool     bSummerMode        = false; // SM= summer mode (bit5 of master status)
   bool     bFailSafe          = true;  // FS= fail-safe setback on thermostat disconnect
-  uint16_t iMsgInterval       = 100;   // MI= minimum inter-message gap (ms, 100-2550)
+  uint16_t iMsgInterval       = 100;   // MI= minimum inter-message gap (ms, 100-1275)
+  bool     bHasBypassRelay    = false; // Runtime: bypass relay present on this board
 };
 #endif
 

@@ -143,6 +143,10 @@ static OTScheduleEntry otSchedule[] = {
   R_ENTRY( 6, OT_SLOW_INTERVAL_MS),     // Remote boiler parameter flags
   R_ENTRY( 9, OT_SLOW_INTERVAL_MS),     // Remote override room setpoint
   R_ENTRY(15, OT_SLOW_INTERVAL_MS),     // Max boiler capacity & min modulation
+  // Date/time (read from boiler, slow poll)
+  R_ENTRY(20, OT_SLOW_INTERVAL_MS),     // Day of week / time of day
+  R_ENTRY(21, OT_SLOW_INTERVAL_MS),     // Date (month + day)
+  R_ENTRY(22, OT_SLOW_INTERVAL_MS),     // Year
   R_ENTRY(33, OT_SLOW_INTERVAL_MS),     // Exhaust temperature (s16)
   R_ENTRY(34, OT_SLOW_INTERVAL_MS),     // Boiler heat exchanger temp
   R_ENTRY(37, OT_SLOW_INTERVAL_MS),     // Room temperature CH2
@@ -193,6 +197,8 @@ static OTScheduleEntry otSchedule[] = {
   // Counters and special
   R_ENTRY(96, OT_SLOW_INTERVAL_MS),     // Cooling operation hours
   R_ENTRY(97, OT_SLOW_INTERVAL_MS),     // Power cycles
+  R_ENTRY(98, OT_SLOW_INTERVAL_MS),     // Remote parameter 4 bounds (s8+s8)
+  R_ENTRY(99, OT_SLOW_INTERVAL_MS),     // Remote parameter 5 bounds (s8+s8)
   R_ENTRY(100, OT_SLOW_INTERVAL_MS),    // Remote override function
   // Solar storage
   R_ENTRY(101, OT_SLOW_INTERVAL_MS),    // Solar storage status
@@ -233,7 +239,7 @@ static constexpr uint8_t OT_SCHEDULE_SIZE = sizeof(otSchedule) / sizeof(otSchedu
 static uint8_t otScheduleIdx = 0;
 
 // Command ring buffer — queues frames from handleOTDirectCommand()
-static constexpr uint8_t OT_CMD_QUEUE_SIZE = 8;
+static constexpr uint8_t OT_CMD_QUEUE_SIZE = 12;
 static uint32_t otCmdQueue[OT_CMD_QUEUE_SIZE];
 static uint8_t  otCmdHead = 0;   // next write position
 static uint8_t  otCmdTail = 0;   // next read position
@@ -473,6 +479,12 @@ void initOTDirect() {
 #if !HAS_BYPASS_RELAY
   // Boards without relay can't do bypass mode — force gateway if saved as bypass
   if (otCurrentMode == OTD_MODE_BYPASS) otCurrentMode = OTD_MODE_GATEWAY;
+#else
+  // Runtime check: even if board has relay, it must be enabled in settings
+  if (otCurrentMode == OTD_MODE_BYPASS && !settings.otd.bHasBypassRelay) {
+    DebugTln(F("OT-direct: Bypass relay not enabled in settings — forcing gateway mode"));
+    otCurrentMode = OTD_MODE_GATEWAY;
+  }
 #endif
   // Initialize bypass relay hardware
 #if HAS_BYPASS_RELAY
@@ -888,6 +900,7 @@ static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin 
   otMasterRequestActive = otMaster.sendRequestAsync(request);
   if (otMasterRequestActive) {
     bridgeFrameToParser((origin == OT_DIRECT_ORIGIN_THERMOSTAT) ? 'T' : 'R', request);
+    otLastAnySendMs = millis();  // MI= gap tracking: covers thermostat-forward and gateway paths
   }
   return otMasterRequestActive;
 }
@@ -1001,7 +1014,6 @@ static void scheduleMasterRequest() {
     uint32_t cmdFrame = otCmdQueue[otCmdTail];
     if (sendMasterRequestAsync(cmdFrame, OT_DIRECT_ORIGIN_GATEWAY)) {
       otCmdTail = (otCmdTail + 1) % OT_CMD_QUEUE_SIZE;  // consume on success
-      otLastAnySendMs = now;   // MI= inter-message gap tracking
     }
     return;
   }
@@ -1038,7 +1050,6 @@ static void scheduleMasterRequest() {
 
       if (sendMasterRequestAsync(request, OT_DIRECT_ORIGIN_GATEWAY)) {
         entry.lastSentMs = now;  // Only advance timer on successful send
-        otLastAnySendMs = now;   // MI= inter-message gap tracking
       }
       return;  // One request per call
     }
@@ -1234,8 +1245,9 @@ void loopOTDirect() {
   }
 
   // Schedule periodic master requests (non-blocking, skips if bus busy)
+  // In monitor mode the gateway must not inject its own frames — transparent pass-through only.
   DECLARE_TIMER_MS(timerOTSchedule, 100, SKIP_MISSED_TICKS);
-  if (DUE(timerOTSchedule)) {
+  if (DUE(timerOTSchedule) && !IS_MONITOR_MODE()) {
     scheduleMasterRequest();
   }
 
@@ -1334,10 +1346,18 @@ static void resetTransientState() {
   otSummaryMode = false;
   otHideReports = false;
   otSummaryPending = false;
-  // Status bit overrides (non-persisted)
+  // Thermostat connectivity tracking — reset to boot state
+  otThermostatSeen = false;
+  otLastThermostatMs = 0;
+  // Force all schedule entries to poll immediately on next cycle
+  for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
+    otSchedule[i].lastSentMs = 0;
+  }
+  // Status bit overrides (non-persisted) — reset to CH enable only (boot default)
   otDHWBlocking = false;
   otCoolingEnable = false;
-  otMasterStatusFlags &= ~(0x44);  // clear bit2 (cooling) and bit6 (DHW block)
+  otMasterStatusFlags = 0x01;  // CH enable only; summer mode re-applied below if persisted
+  if (settings.otd.bSummerMode) otMasterStatusFlags |= 0x20;
   // DHW override
   otDHWOverride = 0xFF;  // auto
   // 3-strike unknown counters
@@ -1742,7 +1762,7 @@ void handleOTDirectCommand(const char* buf, int len) {
         unsigned long frame99 = OpenTherm::buildRequest(
           OpenThermMessageType::WRITE_DATA,
           static_cast<OpenThermMessageID>(99), data99);
-        otCmdEnqueue(frame99);
+        if (!otCmdEnqueue(frame99)) { DebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
       }
     } else if (v == '1') {
       otMasterStatusFlags |= 0x02;
@@ -1853,7 +1873,7 @@ void handleOTDirectCommand(const char* buf, int len) {
     unsigned long frame99 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(99), data99);
-    otCmdEnqueue(frame99);
+    if (!otCmdEnqueue(frame99)) { DebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
     synthesizeResponse(buf, rspBuf);
   }
@@ -1866,7 +1886,7 @@ void handleOTDirectCommand(const char* buf, int len) {
     unsigned long frame99 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(99), data99);
-    otCmdEnqueue(frame99);
+    if (!otCmdEnqueue(frame99)) { DebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
     synthesizeResponse(buf, rspBuf);
   }
@@ -1879,7 +1899,7 @@ void handleOTDirectCommand(const char* buf, int len) {
     unsigned long frame99 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(99), data99);
-    otCmdEnqueue(frame99);
+    if (!otCmdEnqueue(frame99)) { DebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
     synthesizeResponse(buf, rspBuf);
   }
@@ -1889,7 +1909,7 @@ void handleOTDirectCommand(const char* buf, int len) {
     unsigned long frame4 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(4), (uint16_t)code << 8);
-    otCmdEnqueue(frame4);
+    if (!otCmdEnqueue(frame4)) { DebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame4); }
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), code);
     synthesizeResponse(buf, rspBuf);
   }
@@ -1902,6 +1922,12 @@ void handleOTDirectCommand(const char* buf, int len) {
     if (value[0] == '0') {
       // GW=0 — Bypass mode: thermostat direct to boiler via relay
 #if HAS_BYPASS_RELAY
+      // Runtime check: relay must also be enabled in settings for this board
+      if (!settings.otd.bHasBypassRelay) {
+        DebugTln(F("OT-direct: GW=0 rejected (bypass relay not enabled in settings)"));
+        processOT("NG", 2);
+        return;
+      }
       setOTDirectMode(OTD_MODE_BYPASS);
 #else
       // No bypass relay on this board — reject command
@@ -2141,7 +2167,7 @@ void handleOTDirectCommand(const char* buf, int len) {
       unsigned long frame = OpenTherm::buildRequest(
         OpenThermMessageType::READ_DATA,
         static_cast<OpenThermMessageID>(msgId), 0);
-      otCmdEnqueue(frame);
+      if (!otCmdEnqueue(frame)) { DebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame); }
     }
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), msgId);
     synthesizeResponse(buf, rspBuf);
@@ -2290,16 +2316,16 @@ void handleOTDirectCommand(const char* buf, int len) {
     unsigned long frame = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(targetMsgId), 0);
-    otCmdEnqueue(frame);
+    if (!otCmdEnqueue(frame)) { DebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame); }
     synthesizeResponse(buf, value);
   }
-  // MI=nnn — Message interval (minimum gap between OT messages, 100-2550ms)
+  // MI=nnn — Message interval (minimum gap between OT messages, 100-1275ms)
   else if (cmd0 == 'M' && cmd1 == 'I') {
     uint16_t val = atoi(value);
-    if (val < 100 || val > 2550) { processOT("OR", 2); return; }
+    if (val < 100 || val > 1275) { processOT("OR", 2); return; }
     otMinIntervalMs = val;
     settings.otd.iMsgInterval = val;
-    // PIC responds in centiseconds (10ms units): 100ms → "10", 2550ms → "255"
+    // PIC responds in centiseconds (10ms units): 100ms → "10", 1275ms → "127"
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%u"), val / 10);
     synthesizeResponse(buf, rspBuf);
   }
@@ -2340,7 +2366,7 @@ void handleOTDirectCommand(const char* buf, int len) {
       OpenThermMessageType::WRITE_DATA : OpenThermMessageType::READ_DATA;
     unsigned long tpFrame = OpenTherm::buildRequest(
       tpType, static_cast<OpenThermMessageID>(tpMsgId), tpData);
-    otCmdEnqueue(tpFrame);
+    if (!otCmdEnqueue(tpFrame)) { DebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), tpFrame); }
     if (isWrite) {
       snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%u:%u=%u"), tpMsgId, tpIndex, tpValue);
     } else {
