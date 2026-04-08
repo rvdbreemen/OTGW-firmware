@@ -67,6 +67,54 @@ Combine Discord messages, GitHub issues, and Tweakers forum posts into a single 
    - **Excerpt**: relevant message or issue body snippet, plus any key replies/comments
 5. **Cross-reference**: if the same issue appears in multiple sources, merge them into one entry and note all sources.
 
+### Phase 2b: Backlog triage for every identified issue
+
+For **every** bug report or actionable issue found in Phase 2 — regardless of whether the developer selects it for immediate work — do the following:
+
+1. **Check the backlog** for an existing task covering this issue:
+
+   ```bash
+   backlog search "<short issue description>" --plain
+   ```
+
+2. **If no task exists**, create one immediately:
+
+   ```bash
+   backlog task create "Fix: <short description>" \
+     -d "<what the issue is, who reported it, where>" \
+     --ac "<testable acceptance criterion>" \
+     -l "bug,needs-info" --priority medium
+   ```
+
+   Add a reference to the source (GitHub issue URL, Discord channel + username):
+
+   ```bash
+   backlog task edit <id> --ref "https://github.com/rvdbreemen/OTGW-firmware/issues/NNN"
+   backlog task edit <id> --ref "Discord #channel, user <username>, <date>"
+   ```
+
+3. **Assess information readiness.** A task is ready to pick up only when ALL of the following are available:
+   - A reproducible description of the problem
+   - Enough context to identify the likely code area (logs, MQTT traces, or telnet output)
+   - At least one reporter who can validate a fix
+
+4. **If information is insufficient**, keep the task in `To Do` with label `needs-info` and add a note:
+
+   ```bash
+   backlog task edit <id> --append-notes "Waiting for: <what is missing, e.g. telnet logs from reporter>"
+   ```
+
+   **Do NOT move such a task to In Progress.** It stays `To Do / needs-info` until the missing information arrives.
+
+5. **If information is sufficient**, remove the `needs-info` label and present the task to the developer as a candidate for work.
+
+6. **When checking issues in future runs**, always cross-reference new messages against open `needs-info` tasks in the backlog. If new information has arrived (e.g., logs shared on Discord), update the task notes and re-assess readiness:
+
+   ```bash
+   backlog task edit <id> --append-notes "<date>: Reporter shared telnet logs. Ready to investigate."
+   backlog task edit <id> -l "bug"   # remove needs-info once sufficient
+   ```
+
 **CHECKPOINT: Ask the developer which issue(s) to work on. Do not proceed until they select one.**
 
 ### Phase 3: Analyze the selected issue
