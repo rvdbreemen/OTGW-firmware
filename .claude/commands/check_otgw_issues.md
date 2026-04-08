@@ -1,6 +1,6 @@
-# /check_discord_issues — Monitor Discord for user-reported issues
+# /check_otgw_issues — Monitor Discord, GitHub and Tweakers for user-reported issues
 
-Scan the OTGW-firmware Discord server for new issues reported by users since the last check, analyze them, propose a fix, and implement it on a dedicated branch after developer approval.
+Scan the OTGW-firmware Discord server **and** GitHub issue tracker for new issues reported by users since the last check, analyze them, propose a fix, and implement it on a dedicated branch after developer approval.
 
 ## Workflow
 
@@ -19,16 +19,53 @@ Follow these phases strictly and in order.
 5. **Exclude** messages from the maintainer (user ID `384411356616720384`, username `number3nl`) and bot accounts.
 6. **Save the current timestamp** to `.claude/discord_last_checked.txt` for next run.
 
+### Phase 1b: Fetch GitHub issues
+
+1. **Read the last-checked GitHub timestamp** from `.claude/github_last_checked.txt`. If the file does not exist, default to the last 7 days.
+2. **List new open GitHub issues** created or updated since the last check:
+
+   ```bash
+   gh issue list --repo rvdbreemen/OTGW-firmware --state open --limit 50 --json number,title,body,createdAt,updatedAt,labels,author,url
+   ```
+
+3. **Filter** to issues created or updated after the last-checked GitHub timestamp.
+4. **Exclude** issues authored by the maintainer (`rvdbreemen`) or bot accounts (login contains `[bot]`).
+5. **For each new issue**, fetch its comments for full context:
+
+   ```bash
+   gh issue view <number> --repo rvdbreemen/OTGW-firmware --json number,title,body,comments,labels,author,url
+   ```
+6. **Save the current timestamp** to `.claude/github_last_checked.txt` for next run.
+
+### Phase 1c: Fetch Tweakers forum posts
+
+1. **Read the last-checked Tweakers timestamp** from `.claude/tweakers_last_checked.txt`. If the file does not exist, default to posts from the last 7 days.
+2. **Fetch the Tweakers forum page** using WebFetch:
+   - URL: `https://gathering.tweakers.net/forum/list_messages/1653967/last`
+   - This shows the last page of the OTGW firmware thread on Tweakers.net (Dutch tech forum).
+3. **Parse the page** to extract individual posts with:
+   - Post author (username)
+   - Post timestamp (date/time)
+   - Post content (message body)
+   - Direct link to the post (anchor `#<post-id>` appended to the thread URL)
+4. **Filter** to only posts newer than the last-checked Tweakers timestamp.
+5. **Exclude** posts by the maintainer (Tweakers username `rvdbreemen`) or purely social/off-topic messages.
+6. **Save the current timestamp** to `.claude/tweakers_last_checked.txt` for next run.
+7. **Note**: Tweakers is a Dutch forum — posts will be in Dutch. Summarize them in English for the triage list.
+
 ### Phase 2: Identify and triage issues
 
-1. **Classify each message** as one of: bug report, feature request, question, general discussion, or not relevant.
+Combine Discord messages, GitHub issues, and Tweakers forum posts into a single triage list.
+
+1. **Classify each item** as one of: bug report, feature request, question, general discussion, or not relevant.
 2. **Focus only on bug reports and actionable issues.** Skip feature requests, questions, and general chat.
-3. If **no new issues** are found, report "No new issues since last check" and stop.
-4. **Present a numbered list** of identified issues to the developer with:
-   - Channel where it was reported
-   - Reporter username (strip trailing 4-digit suffixes for display, e.g. `fuzzyduck3793` -> `fuzzyduck`)
-   - Short summary of the issue
-   - Relevant message excerpts or context from replies
+3. If **no new issues** are found from any source, report "No new issues since last check" and stop.
+4. **Present a numbered list** of identified issues to the developer. For each item include:
+   - **Source**: Discord (channel name), GitHub (issue number + link, e.g. `GitHub #542`), or Tweakers (post link)
+   - **Reporter**: Discord username (strip trailing 4-digit suffixes), GitHub username, or Tweakers username
+   - **Summary**: short description of the issue (in English, even if the original post was in Dutch)
+   - **Excerpt**: relevant message or issue body snippet, plus any key replies/comments
+5. **Cross-reference**: if the same issue appears in multiple sources, merge them into one entry and note all sources.
 
 **CHECKPOINT: Ask the developer which issue(s) to work on. Do not proceed until they select one.**
 
@@ -99,9 +136,12 @@ Follow these phases strictly and in order.
 
 ### Phase 6: Report results
 
-1. **Commit all changes** with a descriptive message referencing the Discord issue.
+1. **Commit all changes** with a descriptive message referencing the source issue:
+   - If the issue originated from GitHub, include `Fixes #<number>` (or `Refs #<number>` if not fully resolved) in the commit message body so GitHub auto-closes or links the issue.
+   - If the issue originated from Discord only, describe it in plain text.
+   - Example: `fix: resolve MQTT reconnect crash after router reboot\n\nFixes #542`
 2. **Present a summary** to the developer:
-   - What was the issue (from Discord)
+   - What was the issue (source: Discord channel or GitHub #NNN + link)
    - What was changed (files modified, approach taken)
    - Build status (pass/fail)
    - Evaluation status (pass/fail)
@@ -117,3 +157,6 @@ Follow these phases strictly and in order.
 - **All code changes must follow OTGW-firmware coding rules** (PROGMEM, no String, etc.)
 - **All release-related text must be in English** (international audience)
 - **Strip Discord username suffixes** for display (4-digit trailing numbers)
+- **GitHub issue numbers** must be referenced in commit messages when fixing a GitHub-tracked issue (`Fixes #NNN`)
+- **Tweakers posts are in Dutch** — always summarize them in English for the triage list and any developer-facing output
+- **Tweakers maintainer username** is `rvdbreemen` — exclude posts by this account from new issue detection
