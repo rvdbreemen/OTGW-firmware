@@ -78,7 +78,7 @@ Create or update the following files on `main`.
 
 ### 1. Full release notes — `RELEASE_NOTES_<version>.md`
 
-Create in the repository root. Structure:
+Create in the repository root. The current release notes file always lives at the root; previous release notes are archived in `docs/releases/` (see Phase 7 step 9). Structure:
 
 ```
 # OTGW-firmware v<version> Release Notes
@@ -102,7 +102,7 @@ Categorize changes into:
 
 ### 2. GitHub release message — `RELEASE_GITHUB_<version>.md`
 
-Create in the repository root. This is the concise version pasted into the GitHub Release UI.
+Create in the repository root. This is the concise version pasted into the GitHub Release UI. Previous versions are archived in `docs/releases/` alongside the full release notes (see Phase 7 step 9).
 
 - One-line summary at the top
 - Links to full release notes, README, and API docs
@@ -172,10 +172,10 @@ If there ARE breaking changes, list them with migration instructions. This file 
 
 Update the top of the file:
 
-1. **Demote** the current "What's New in v<prev>" to "What was new in v<prev>"
-2. **Add** a new "What's New in v<version>" section with highlights from the release notes
-3. **Link** to the full `RELEASE_NOTES_<version>.md`
-4. Verify all version references are correct (no `-beta`, no stale version numbers)
+1. **Update** the "Current version" line to show the new version and link to the new `RELEASE_NOTES_<version>.md` in the root.
+2. **Verify** the "Previous releases" link points to `docs/releases/`.
+3. **Update** the version history table in the collapsible section at the bottom if needed (add a new row or update the current minor series row with a link to the new release notes).
+4. Verify all version references are correct (no `-beta`, no stale version numbers).
 
 ### 5. ADR updates (if applicable)
 
@@ -200,13 +200,14 @@ Run through every item below before creating the GitHub release.
 
 ### Documentation completeness
 
-- [ ] `RELEASE_NOTES_<version>.md` exists, is final, contains no "beta" / "rc" / "this branch" language
-- [ ] `RELEASE_GITHUB_<version>.md` exists and is ready to paste
+- [ ] `RELEASE_NOTES_<version>.md` exists **in root**, is final, contains no "beta" / "rc" / "this branch" language
+- [ ] `RELEASE_GITHUB_<version>.md` exists **in root** and is ready to paste
+- [ ] Previous release notes have been moved to `docs/releases/` (only the current version remains in root)
 - [ ] `docs/BREAKING_CHANGES.md` has a section for this version
-- [ ] `README.md` "What's New" heading matches the release version
-- [ ] Previous release section in `README.md` is demoted to "What was new"
+- [ ] `README.md` "Current version" line is updated with the new version and links to the root release notes
+- [ ] `README.md` version history table includes the new version with correct link
 
-> **Check:** `grep -n "beta\|Development Release\|new in this branch" README.md RELEASE_NOTES_*.md`
+> **Check:** `grep -rn "beta\|Development Release\|new in this branch" README.md RELEASE_NOTES_*.md docs/releases/`
 
 ### No debug / placeholder artifacts
 
@@ -235,13 +236,22 @@ Once the checklist is complete:
 
 1. **Commit all outstanding changes on `main`** and push to remote.
 
-2. **Remove pre-release from `version.h`** — Comment out `_VERSION_PRERELEASE` (or remove the `beta`/`rc` suffix) so the firmware version string is a clean `v<version>` without any pre-release tag. Verify: `grep -n "PRERELEASE" src/OTGW-firmware/version.h`
+2. **Archive previous release notes**: Move the previous version's release files from root to `docs/releases/`:
 
-3. **Run `python build.py`** — This runs `autoinc-semver.py` internally (increments build number, updates version strings across all files) and builds firmware + filesystem. Verify the build succeeds.
+   ```bash
+   git mv RELEASE_NOTES_<prev>.md docs/releases/
+   git mv RELEASE_GITHUB_<prev>.md docs/releases/
+   ```
 
-4. **Commit the release build** on `main` and push to remote.
+   Update links in `README.md` version history table to point to `docs/releases/` for the archived files. Commit with message: `docs: archive v<prev> release notes to docs/releases/`.
 
-5. **Create draft GitHub release (creates the tag):**
+3. **Remove pre-release from `version.h`** — Comment out `_VERSION_PRERELEASE` (or remove the `beta`/`rc` suffix) so the firmware version string is a clean `v<version>` without any pre-release tag. Verify: `grep -n "PRERELEASE" src/OTGW-firmware/version.h`
+
+4. **Run `python build.py`** — This runs `autoinc-semver.py` internally (increments build number, updates version strings across all files) and builds firmware + filesystem. Verify the build succeeds.
+
+5. **Commit the release build** on `main` and push to remote.
+
+6. **Create draft GitHub release (creates the tag):**
 
    Derive a short title (3-6 words) that summarizes the release theme. Format: `v<version> — <Short Title>`.
 
@@ -253,13 +263,13 @@ Once the checklist is complete:
 
    This creates the `v<version>` tag on the latest `main` commit and a draft release. The release is not yet visible to the public.
 
-6. **Upload build artifacts to the draft release:**
+7. **Upload build artifacts to the draft release:**
 
    ```bash
    gh release upload v<version> build/*.ino.bin build/*.littlefs.bin --clobber
    ```
 
-7. **Verify artifacts are attached:**
+8. **Verify artifacts are attached:**
 
    ```bash
    gh release view v<version> --json assets --jq '.assets[].name'
@@ -267,7 +277,7 @@ Once the checklist is complete:
 
    Confirm that `.ino.bin` and `.littlefs.bin` are listed.
 
-8. **Publish the release (only after artifacts are confirmed):**
+9. **Publish the release (only after artifacts are confirmed):**
 
    ```bash
    gh release edit v<version> --draft=false --latest
@@ -365,8 +375,9 @@ Version strings are generated by `scripts/autoinc-semver.py` (called by `build.p
 |------|---------|
 | `src/OTGW-firmware/version.h` | Authoritative version — edit manually for major/minor/patch and pre-release |
 | `scripts/autoinc-semver.py` | Auto-increments build, updates timestamps, propagates to file headers |
-| `RELEASE_NOTES_<version>.md` | Full detailed release notes (root, linked from README) |
-| `RELEASE_GITHUB_<version>.md` | Concise release body for GitHub release UI (root) |
+| `RELEASE_NOTES_<version>.md` | Full detailed release notes for the **current** release (root, linked from README) |
+| `RELEASE_GITHUB_<version>.md` | Concise release body for GitHub release UI (root, **current** release only) |
+| `docs/releases/` | Archive of all previous release notes and GitHub release files |
 | `docs/BREAKING_CHANGES.md` | Cumulative breaking changes log across all versions |
-| `README.md` | Project readme — "What's New" section, links to release notes |
+| `README.md` | Project readme — feature highlights, MQTT/HA setup, links to release notes |
 | `docs/adr/` | Architecture Decision Records — check for new/updated ADRs per release |

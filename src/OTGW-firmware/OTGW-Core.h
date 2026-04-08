@@ -373,7 +373,7 @@ enum OTLibMessageID {
 		{  35, OT_READ  , ot_u8u8,	 	 	"FanSpeed", "Boiler fan speed and setpoint", "Hz" },
 		{  36, OT_READ  , ot_f88, 			"ElectricalCurrentBurnerFlame", "Electrical current through burner flame", "µA" },
 		{  37, OT_WRITE , ot_f88, 			"TRoomCH2", "Room temperature for 2nd CH circuit", "°C" },
-		{  38, OT_RW    , ot_f88, 			"RelativeHumidity", "Relative Humidity", "%" }, // OTv4.2 spec: u8/u8 (HB=humidity%, LB=reserved); retained as f8.8 for backward compatibility
+		{  38, OT_RW    , ot_f88, 			"RelativeHumidity", "Relative Humidity", "%" }, // OTv4.2 spec §5.3: f8.8 combined (−128.00–+127.996 %); some early Remeha docs described this as u8/u8 but the authoritative v4.2 spec uses f8.8
 		{  39, OT_READ  , ot_f88, 			"TrOverride2", "Remote override room setpoint 2", "°C" },
 		{  40, OT_UNDEF , ot_undef, 		"", "", "" },
 		{  41, OT_UNDEF , ot_undef, 		"", "", "" },

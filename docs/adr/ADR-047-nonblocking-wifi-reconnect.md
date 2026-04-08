@@ -119,6 +119,26 @@ Refactored in P9 of the C++ refactoring plan (OTGW-firmware.ino):
 - States: `WIFI_IDLE`, `WIFI_DISCONNECTED`, `WIFI_CONNECTING`, `WIFI_RECONNECTED`, `WIFI_FAILED`
 - 5-second connection timeout, 15 retry attempts before rebooting
 
+## DHCP management rule (confirmed by issue #525)
+
+**`wifi_station_dhcpc_start()` must only be called when the STA is NOT connected.**
+
+Calling it while the station is associated resets the IP address to 0.0.0.0 immediately.
+Once the DHCP client has been manually started, the SDK's `setAutoReconnect` path
+(`wifi_station_connect()`) no longer calls `dhcpc_start()` on reconnection — DHCP is
+considered "user-managed". After a router reboot, the device re-associates at L2 but the
+DHCP client only tries to RENEW the old lease rather than sending a fresh DISCOVER; if the
+router does not honour the renewal, the device remains unreachable indefinitely.
+
+**Rules derived from issue #525 root-cause analysis:**
+1. Call `wifi_station_dhcpc_start()` **only** in `WIFI_DISCONNECTED`, before `WiFi.begin()`.
+2. **Never** call `dhcpc_stop/start` while the station is connected (not in `startNTP()`,
+   not in `startWiFi()`, not in `WIFI_RECONNECTED`).
+3. `WiFi.hostname()` can safely be called at any time — it only sets the in-memory hostname
+   used for the *next* DHCP exchange; it does not disrupt the current connection.
+
+Detailed analysis: `docs/reviews/2026-04-07_issue-525-sdk-dhcp-analysis/ANALYSIS_REPORT.md`
+
 ## Related Decisions
 - ADR-007: Timer-Based Task Scheduling (cooperative scheduling model)
 - ADR-011: External Hardware Watchdog (must not block >3s)

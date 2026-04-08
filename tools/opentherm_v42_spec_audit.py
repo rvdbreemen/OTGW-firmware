@@ -357,8 +357,9 @@ def build_audit(
             row_copy["expected_decode_fn"] = EXPECTED_DECODE_BY_ID[msg_id]
             findings["decode_mismatches"].append(row_copy)
 
-    # Legacy IDs present for compatibility (informational, unless guard missing)
-    for legacy_id in range(50, 64):
+    # Legacy IDs present for compatibility (informational, unless guard missing).
+    # Per v4.2 spec the reserved legacy ranges are 50-55 and 58-69 (56-57 are valid).
+    for legacy_id in list(range(50, 56)) + list(range(58, 70)):
         if legacy_id in otmap and legacy_id not in spec_ids:
             findings["reserved_legacy_ids_present"].append(
                 {
