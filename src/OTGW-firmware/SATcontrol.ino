@@ -213,6 +213,7 @@ static const char* satGetHeatingSystemName()
 static uint8_t _sat_consecutiveSkips  = 0;
 static uint8_t _sat_picFailCount      = 0;
 static bool    _sat_bootCS0sent       = false;  // One-shot: ensure CS=0 is sent once PIC is available
+static bool    _sat_prevDhwActive     = false;  // Track DHW transition to send TW= on entry
 
 // --- Thermal Drop Learning State (Task #21) ---
 static float    _thermal_prevRoom     = 0.0f;
@@ -2664,7 +2665,7 @@ static void satUpdateSolarGain()
   // Detect solar gain condition: rising fast + low boiler modulation
   float modulation = OTcurrentSystemState.RelModLevel;
   bool risingFast = (_solar_riseRateEma > settings.sat.fSolarMinRiseRate);
-  bool lowModulation = (modulation < 30.0f);
+  bool lowModulation = (modulation < 20.0f);  // 20% threshold matches Python SAT reference
 
   if (!_solar_wasActive) {
     // Not yet active: require sustained rising + low modulation for 10 min
@@ -2896,6 +2897,15 @@ static void satAutoTuneUpdate()
 //=====================================================================
 void satControlLoop()
 {
+  // Deferred PID state restore (Task #222): satLoadPidState() is called at initSAT()
+  // but NTP may not yet be synced at that point, so the restore is skipped there.
+  // Retry here once after NTP becomes available so freshness can be verified.
+  static bool _pidStateRestoreAttempted = false;
+  if (!_pidStateRestoreAttempted && isNTPtimeSet()) {
+    _pidStateRestoreAttempted = true;
+    satLoadPidState();
+  }
+
   // --- Simulation update (Task #37): model thermal behavior before PID ---
   satUpdateSimulation();
   // --- Thermal drop learning (Task #21): learn building thermal decay rate ---
@@ -2961,9 +2971,20 @@ void satControlLoop()
   // --- DHW detection (Task #3): skip CH control when DHW is active ---
   state.sat.bDhwActive = (OTcurrentSystemState.SlaveStatus & 0x04) != 0; // Bit 2 = DHW active
   if (state.sat.bDhwActive) {
-    // DHW has priority - don't adjust CH setpoint, boiler manages itself
+    // DHW has priority - don't adjust CH setpoint, boiler manages itself.
+    // On transition into DHW mode, send TW= to set the DHW setpoint (matches Python SAT behaviour).
+    if (!_sat_prevDhwActive && settings.sat.bDhwEnabled &&
+        settings.sat.fDhwSetpoint >= 30.0f && settings.sat.fDhwSetpoint <= 70.0f &&
+        hasOTCommandInterface()) {
+      char twCmd[16];
+      snprintf_P(twCmd, sizeof(twCmd), PSTR("TW=%d"), (int)settings.sat.fDhwSetpoint);
+      addCommandToQueue(twCmd, strlen(twCmd), false, 0);
+      DebugTf(PSTR("SAT: DHW active, sent %s\r\n"), twCmd);
+    }
+    _sat_prevDhwActive = true;
     return;
   }
+  _sat_prevDhwActive = false;
 
   // --- Read inputs (staleness is checked inside these functions) ---
   float roomTemp = satGetRoomTemp();

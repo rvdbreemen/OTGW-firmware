@@ -1,4 +1,4 @@
-# ADR-061: WiFi Reconnect Timeout Tuning
+# ADR-075: WiFi Reconnect Timeout Tuning
 
 **Status:** Accepted
 **Date:** 2026-04-03

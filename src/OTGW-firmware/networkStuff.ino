@@ -18,6 +18,7 @@
 
 NtpStatus_t NtpStatus  = TIME_NOTSET;
 time_t      NtpLastSync = 0;
+static bool sDhcpHostnameFixed = false;  // tracks whether DHCP re-announce has been done
 
 OTGWWebServer           httpServer(80);
 OTGWUpdateServer        httpUpdater(true);
@@ -309,10 +310,14 @@ void startNTP()
   if (strlen(settings.ntp.sTimezone) == 0) strlcpy(settings.ntp.sTimezone, NTP_DEFAULT_TIMEZONE, sizeof(settings.ntp.sTimezone));
   if (strlen(settings.ntp.sHostname) == 0) strlcpy(settings.ntp.sHostname, NTP_HOST_DEFAULT, sizeof(settings.ntp.sHostname));
 
-  // Set hostname before configTime() — configTime() is known to reset the
-  // station hostname to "ESP-XXXXXX" on some ESP8266 SDK versions.
+#if defined(ESP8266)
+  // ESP8266 SDK bug: configTime() resets the WiFi station hostname to "ESP-XXXXXX"
+  // on some SDK versions. Save hostname before and restore after. Not needed on ESP32
+  // (configTime() does not touch the hostname there).
   platformSetHostname(CSTR(settings.sHostname));
+#endif
   configTime(0, 0, settings.ntp.sHostname, nullptr, nullptr);
+#if defined(ESP8266)
   // Capture hostname immediately after configTime() to detect if the SDK
   // reset it, *before* we restore it. This drives the DHCP re-announce
   // decision below.
@@ -328,6 +333,7 @@ void startNTP()
     platformRestartDHCP();
     sDhcpHostnameFixed = true;
   }
+#endif
   NtpStatus = TIME_WAITFORSYNC;
 }
 
